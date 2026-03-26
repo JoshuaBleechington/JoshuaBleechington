@@ -3,19 +3,22 @@
 🔒
 I enjoy cybersecurity and love tackling complex challenges through hands-on projects. From vulnerability management to threat detection, these projects have helped me thoroughly understand the importance of maintaining a secure infrastructure at all times. Feel free to review the past projects I've done, and have an awesome day!
 
-⚠️ Vulnerability Management Projects
+### ⚠️ Vulnerability Management Projects
 
-Vulnerability Management Program Implementation
+- [Vulnerability Management Program Implementation](https://github.com/JoshuaBleechington/Vulnerability-management-program)
 
+---
 
-🛡️ Identity & Access Monitoring
+### 🛡️ Identity & Access Monitoring
 
-Entra ID Login Monitoring & Global Attack Visualization
+- [Entra ID Login Monitoring & Global Attack Visualization](https://github.com/JoshuaBleechington/Entra-ID-LOGIN-Monitoring)
 
+---
 
-🎯 Threat Hunting and Security Operations
+### 🎯 Threat Hunting and Security Operations
 
-Threat Hunting Scenario (Tor Browser Usage)
+- [Threat Hunting Scenario (Tor Browser Usage)](https://github.com/JoshuaBleechington/Threat-hunting-scenario-Tor-Darkweb)
+
 
 ## 🤳 Connect With Me
 

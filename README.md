@@ -1,17 +1,21 @@
 # <a href="https://www.linkedin.com/in/Joshua Bleechington/">Joshua Bleechington</a>'s IT and Cybersecurity Project Portfolio 🔐
 
+Joshua Bleechington's IT and Cybersecurity Project Portfolio 🔒
 I enjoy cybersecurity and love tackling complex challenges through hands-on projects. From vulnerability management to threat detection, these projects have helped me thoroughly understand the importance of maintaining a secure infrastructure at all times. Feel free to review the past projects I've done, and have an awesome day!
 
+⚠️ Vulnerability Management Projects
 
-## ⚠️ Vulnerability Management Projects
+Vulnerability Management Program Implementation
 
-- **[Vulnerability Management Program Implementation](https://github.com/JoshuaBleechington/Vulnerability-management-program)**
 
-## 🚨 Threat Hunting and Security Operations
+🛡️ Identity & Access Monitoring
 
-- **[Threat Hunting Scenario (Tor Browser Usage)](https://github.com/JoshuaBleechington/Threat-hunting-scenario-Tor-Darkweb)**
+Entra ID Login Monitoring & Global Attack Visualization
 
-<hr/>
+
+🎯 Threat Hunting and Security Operations
+
+Threat Hunting Scenario (Tor Browser Usage)
 
 ## 🤳 Connect With Me
 

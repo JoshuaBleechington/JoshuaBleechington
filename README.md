@@ -1,6 +1,6 @@
-# <a href="https://www.linkedin.com/in/Joshua Bleechington/">Joshua Bleechington</a>'s IT and Cybersecurity Project Portfolio 🔐
+# <a href="https://www.linkedin.com/in/Joshua Bleechington/">Joshua Bleechington</a> Cybersecurity Project Portfolio 🔐
 
-Joshua Bleechington's IT and Cybersecurity Project Portfolio 🔒
+🔒
 I enjoy cybersecurity and love tackling complex challenges through hands-on projects. From vulnerability management to threat detection, these projects have helped me thoroughly understand the importance of maintaining a secure infrastructure at all times. Feel free to review the past projects I've done, and have an awesome day!
 
 ⚠️ Vulnerability Management Projects

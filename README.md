@@ -12,6 +12,11 @@ I enjoy cybersecurity and love tackling complex challenges through hands-on proj
 ### 🛡️ Identity & Access Monitoring
 
 - [Entra ID Login Monitoring & Global Attack Visualization](https://github.com/JoshuaBleechington/Entra-ID-LOGIN-Monitoring)
+  
+
+### 🤖 AI Governance & Compliance
+
+- [AI Governance Framework — NIST AI RMF / EU AI Act / ISO 42001](https://github.com/JoshuaBleechington/AI-Governance-Framework)
 
 ---
 

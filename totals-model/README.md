@@ -12,6 +12,11 @@ python3 -m totals mlb  examples/mlb_slate.json
 python3 -m totals wnba examples/wnba_slate.json
 ```
 
+**Prefer to point and click?** Open `web/index.html` in any browser. It's the
+same model ported to JavaScript — a form for the inputs, results that update as
+you type, and a chart of the outcome distribution. One file, no server, works
+offline. Numbers were checked against the Python to six decimal places.
+
 ```
 WNBA totals -- 3 game(s), model weight 0.5
 
@@ -204,6 +209,23 @@ TOTAL_SD      = 11.5          # spread of a final total around projection
 
 The weather coefficients in `mlb.py` (4% per 10°F, 0.8% per mph of wind) are
 deliberately small and clamped to ±10%. Treat them as a nudge, not a signal.
+
+## Why a projection above the line can still say UNDER
+
+This trips everyone up once. Run scoring is right-skewed: blowouts drag the
+*average* up without moving the *typical* game. A projection of 8.91 runs has a
+median of 8, so `P(over 8.5)` is 48.8% even though the mean sits above the line.
+
+```
+projected 8.91 runs
+line  8.5   P(over) = 0.4880   P(under) = 0.5120
+line  9.5   P(over) = 0.3982   P(under) = 0.6018
+```
+
+Trust the win probability, not the gap between the projection and the line. This
+is the whole reason the model convolves distributions instead of comparing two
+numbers — a mean-only model would confidently pick the wrong side of the median.
+The web page calls this out automatically whenever it happens.
 
 ## Honest limitations
 

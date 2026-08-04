@@ -1,0 +1,1237 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Totals Model — MLB &amp; WNBA</title>
+<style>*{margin:0;padding:0}</style>
+</head>
+<body>
+
+<style>
+  /* ---------------------------------------------------------------
+     Tokens. Scoreboard amber on cool slate; every component is styled
+     through these roles so the two themes swap in one place.
+     Chart pair validated for CVD in both modes:
+       light  #2F6FB5 / #C77A08 on #FFFFFF
+       dark   #4D8CD4 / #C58414 on #171A22
+  ----------------------------------------------------------------*/
+  :root {
+    color-scheme: light;
+    --plane: #f4f6f8;
+    --surface: #ffffff;
+    --surface-2: #fafbfc;
+    --ink: #12151c;
+    --ink-2: #5a6172;
+    --muted: #868d9c;
+    --rule: #e3e7ed;
+    --rule-strong: #cfd5df;
+    --accent: #c77a08;
+    --accent-ink: #9a5d05;
+    --accent-wash: rgba(199, 122, 8, 0.09);
+    --under: #2f6fb5;
+    --over: #c77a08;
+    --push: #9aa1af;
+    --good: #0a7d0a;
+    --bad: #b53434;
+    --good-wash: rgba(10, 125, 10, 0.1);
+    --bad-wash: rgba(181, 52, 52, 0.09);
+    --shadow: 0 1px 2px rgba(18, 21, 28, 0.05), 0 8px 24px -12px rgba(18, 21, 28, 0.18);
+    --ui: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", sans-serif;
+    --mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, "Liberation Mono", monospace;
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      color-scheme: dark;
+      --plane: #0e1015;
+      --surface: #171a22;
+      --surface-2: #1c2029;
+      --ink: #e9ecf2;
+      --ink-2: #98a0b0;
+      --muted: #79808f;
+      --rule: #262b36;
+      --rule-strong: #333947;
+      --accent: #e3a445;
+      --accent-ink: #e3a445;
+      --accent-wash: rgba(227, 164, 69, 0.12);
+      --under: #4d8cd4;
+      --over: #c58414;
+      --push: #6b7280;
+      --good: #35b135;
+      --bad: #e06a6a;
+      --good-wash: rgba(53, 177, 53, 0.13);
+      --bad-wash: rgba(224, 106, 106, 0.12);
+      --shadow: 0 1px 2px rgba(0, 0, 0, 0.4), 0 8px 24px -12px rgba(0, 0, 0, 0.6);
+    }
+  }
+
+  :root[data-theme="dark"] {
+    color-scheme: dark;
+    --plane: #0e1015;
+    --surface: #171a22;
+    --surface-2: #1c2029;
+    --ink: #e9ecf2;
+    --ink-2: #98a0b0;
+    --muted: #79808f;
+    --rule: #262b36;
+    --rule-strong: #333947;
+    --accent: #e3a445;
+    --accent-ink: #e3a445;
+    --accent-wash: rgba(227, 164, 69, 0.12);
+    --under: #4d8cd4;
+    --over: #c58414;
+    --push: #6b7280;
+    --good: #35b135;
+    --bad: #e06a6a;
+    --good-wash: rgba(53, 177, 53, 0.13);
+    --bad-wash: rgba(224, 106, 106, 0.12);
+    --shadow: 0 1px 2px rgba(0, 0, 0, 0.4), 0 8px 24px -12px rgba(0, 0, 0, 0.6);
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    background: var(--plane);
+    color: var(--ink);
+    font-family: var(--ui);
+    font-size: 15px;
+    line-height: 1.5;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  .wrap { max-width: 1240px; margin: 0 auto; padding: 28px 20px 96px; }
+
+  /* --- header --- */
+  .masthead {
+    display: flex; flex-wrap: wrap; align-items: flex-end;
+    justify-content: space-between; gap: 16px;
+    padding-bottom: 18px; margin-bottom: 24px;
+    border-bottom: 1px solid var(--rule);
+  }
+  .masthead h1 {
+    margin: 0; font-size: 27px; font-weight: 800;
+    letter-spacing: -0.025em; text-wrap: balance;
+  }
+  .masthead p { margin: 5px 0 0; color: var(--ink-2); font-size: 14px; max-width: 62ch; }
+
+  .eyebrow {
+    font-size: 11px; font-weight: 700; text-transform: uppercase;
+    letter-spacing: 0.11em; color: var(--muted);
+  }
+
+  /* --- sport toggle --- */
+  .sports { display: flex; gap: 3px; padding: 3px; background: var(--surface-2);
+            border: 1px solid var(--rule); border-radius: 9px; }
+  .sports button {
+    appearance: none; border: 0; cursor: pointer;
+    background: transparent; color: var(--ink-2);
+    font-family: var(--ui); font-size: 13px; font-weight: 650;
+    letter-spacing: 0.03em; padding: 8px 20px; border-radius: 6px;
+    transition: background 0.14s, color 0.14s;
+  }
+  .sports button:hover { color: var(--ink); }
+  .sports button[aria-pressed="true"] {
+    background: var(--surface); color: var(--ink); box-shadow: var(--shadow);
+  }
+
+  /* --- layout --- */
+  .cols { display: grid; grid-template-columns: minmax(0, 460px) minmax(0, 1fr); gap: 22px; align-items: start; }
+  @media (max-width: 940px) { .cols { grid-template-columns: minmax(0, 1fr); } }
+
+  .stack { display: flex; flex-direction: column; gap: 16px; }
+  .rail-right { position: sticky; top: 20px; }
+  @media (max-width: 940px) { .rail-right { position: static; } }
+
+  /* --- cards --- */
+  .card {
+    background: var(--surface); border: 1px solid var(--rule);
+    border-radius: 12px; box-shadow: var(--shadow); overflow: hidden;
+  }
+  .card > header {
+    display: flex; align-items: center; justify-content: space-between; gap: 10px;
+    padding: 13px 16px; border-bottom: 1px solid var(--rule); background: var(--surface-2);
+  }
+  .card > header h2 { margin: 0; font-size: 12px; font-weight: 700;
+                      text-transform: uppercase; letter-spacing: 0.09em; color: var(--ink-2); }
+  .card-body { padding: 16px; }
+
+  /* --- form --- */
+  .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  .grid3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
+  @media (max-width: 520px) { .grid3 { grid-template-columns: 1fr 1fr; } }
+
+  .field { display: flex; flex-direction: column; gap: 5px; min-width: 0; }
+  .field label {
+    font-size: 10.5px; font-weight: 700; text-transform: uppercase;
+    letter-spacing: 0.075em; color: var(--muted); white-space: nowrap;
+    overflow: hidden; text-overflow: ellipsis;
+  }
+  .field input[type="text"], .field input[type="number"] {
+    width: 100%; padding: 8px 10px;
+    background: var(--surface); color: var(--ink);
+    border: 1px solid var(--rule-strong); border-radius: 7px;
+    font-family: var(--mono); font-size: 14px; font-variant-numeric: tabular-nums;
+    transition: border-color 0.14s, box-shadow 0.14s;
+  }
+  .field input[type="text"] { font-family: var(--ui); }
+  .field input:hover { border-color: var(--muted); }
+  .field input:focus-visible {
+    outline: none; border-color: var(--accent);
+    box-shadow: 0 0 0 3px var(--accent-wash);
+  }
+  input[type="number"] { -moz-appearance: textfield; }
+  input[type="number"]::-webkit-outer-spin-button,
+  input[type="number"]::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+
+  .team-block + .team-block { margin-top: 18px; padding-top: 18px; border-top: 1px dashed var(--rule); }
+
+  .check { display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--ink-2); }
+  .check input { accent-color: var(--accent); width: 16px; height: 16px; }
+
+  details.settings > summary {
+    cursor: pointer; padding: 13px 16px; font-size: 12px; font-weight: 700;
+    text-transform: uppercase; letter-spacing: 0.09em; color: var(--ink-2);
+    background: var(--surface-2); list-style: none;
+    display: flex; align-items: center; justify-content: space-between;
+  }
+  details.settings > summary::-webkit-details-marker { display: none; }
+  details.settings > summary::after { content: "+"; font-family: var(--mono); font-size: 15px; }
+  details.settings[open] > summary::after { content: "\2212"; }
+  details.settings[open] > summary { border-bottom: 1px solid var(--rule); }
+  details.settings > summary:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+
+  input[type="range"] { width: 100%; accent-color: var(--accent); }
+
+  .hint { font-size: 12.5px; color: var(--muted); line-height: 1.5; margin: 0; }
+
+  /* --- hero readout --- */
+  .readout { padding: 20px 18px 18px; text-align: center; }
+  .readout .big {
+    font-family: var(--mono); font-size: 58px; font-weight: 600;
+    letter-spacing: -0.03em; line-height: 1; font-variant-numeric: tabular-nums;
+    color: var(--ink);
+  }
+  .readout .sub { margin-top: 9px; font-size: 13px; color: var(--ink-2); }
+  .readout .sub b { font-family: var(--mono); color: var(--ink); font-weight: 600; }
+
+  .scoreline {
+    display: flex; align-items: stretch; justify-content: center;
+    gap: 0; margin-top: 16px; border-top: 1px solid var(--rule);
+  }
+  .scoreline div { flex: 1; padding: 11px 8px 3px; }
+  .scoreline div + div { border-left: 1px solid var(--rule); }
+  .scoreline .n {
+    font-family: var(--mono); font-size: 21px; font-weight: 600;
+    font-variant-numeric: tabular-nums; letter-spacing: -0.01em;
+  }
+  .scoreline .t {
+    font-size: 10.5px; text-transform: uppercase; letter-spacing: 0.08em;
+    color: var(--muted); font-weight: 700; margin-top: 2px;
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  }
+
+  /* --- verdict --- */
+  .verdict { display: flex; align-items: center; gap: 13px; padding: 15px 16px; }
+  /* Standalone — the pill is used in the verdict row and the mobile bar alike,
+     so its base styles must not be scoped to either container. */
+  .pill {
+    display: inline-flex; align-items: center; gap: 7px; flex: none;
+    padding: 7px 13px; border-radius: 999px;
+    font-size: 13px; font-weight: 750; letter-spacing: 0.02em;
+    border: 1px solid transparent; white-space: nowrap;
+  }
+  .pill.bet { background: var(--good-wash); color: var(--good); border-color: var(--good); }
+  .pill.pass { background: var(--bad-wash); color: var(--bad); border-color: var(--bad); }
+  .pill .glyph { font-family: var(--mono); font-size: 14px; font-weight: 700; }
+  .verdict .detail { font-size: 13px; color: var(--ink-2); line-height: 1.45; }
+  .verdict .detail b { color: var(--ink); font-family: var(--mono); font-weight: 600; }
+
+  /* --- metric strip --- */
+  .metrics { display: grid; grid-template-columns: repeat(4, 1fr); border-top: 1px solid var(--rule); }
+  @media (max-width: 620px) { .metrics { grid-template-columns: 1fr 1fr; } }
+  .metrics div { padding: 12px 14px; }
+  .metrics div + div { border-left: 1px solid var(--rule); }
+  @media (max-width: 620px) {
+    .metrics div:nth-child(3) { border-left: 0; }
+    .metrics div:nth-child(n + 3) { border-top: 1px solid var(--rule); }
+  }
+  .metrics .k {
+    font-size: 10px; font-weight: 700; text-transform: uppercase;
+    letter-spacing: 0.08em; color: var(--muted);
+  }
+  .metrics .v {
+    font-family: var(--mono); font-size: 18px; font-weight: 600;
+    font-variant-numeric: tabular-nums; margin-top: 3px;
+  }
+
+  /* --- probability split bar --- */
+  .split { padding: 16px; }
+  .split-track {
+    display: flex; height: 34px; border-radius: 7px; overflow: hidden;
+    background: var(--rule); gap: 2px;
+  }
+  .split-track span {
+    display: flex; align-items: center; justify-content: center;
+    font-family: var(--mono); font-size: 12.5px; font-weight: 650;
+    color: #fff; min-width: 0; overflow: hidden; white-space: nowrap;
+    transition: flex-basis 0.25s ease;
+  }
+  .split-under { background: var(--under); }
+  .split-over { background: var(--over); }
+  .split-push { background: var(--push); }
+  .split-legend {
+    display: flex; flex-wrap: wrap; gap: 14px; margin-top: 11px;
+    font-size: 12px; color: var(--ink-2);
+  }
+  .split-legend span { display: inline-flex; align-items: center; gap: 6px; }
+  .swatch { width: 10px; height: 10px; border-radius: 2px; flex: none; }
+
+  /* --- chart --- */
+  .chart-wrap { padding: 8px 10px 14px; position: relative; }
+  .chart-wrap svg { display: block; width: 100%; height: auto; overflow: visible; }
+  .bar { transition: opacity 0.12s; }
+  .bar:hover { opacity: 0.72; }
+  .axis-label { font-family: var(--mono); font-size: 10px; fill: var(--muted); }
+  .region-label {
+    font-family: var(--ui); font-size: 11px; font-weight: 750;
+    letter-spacing: 0.05em; text-transform: uppercase;
+  }
+  .tip {
+    position: absolute; pointer-events: none; opacity: 0;
+    transform: translate(-50%, -100%);
+    background: var(--ink); color: var(--surface);
+    padding: 6px 9px; border-radius: 6px; font-size: 12px;
+    font-family: var(--mono); white-space: nowrap; z-index: 5;
+    transition: opacity 0.1s;
+  }
+
+  .note {
+    margin: 0; padding: 12px 16px; border-top: 1px solid var(--rule);
+    background: var(--accent-wash); font-size: 13px; line-height: 1.5; color: var(--ink);
+  }
+  .note b { font-weight: 700; }
+
+  table.dist { width: 100%; border-collapse: collapse; font-size: 13px; }
+  table.dist th, table.dist td {
+    text-align: right; padding: 5px 9px; border-bottom: 1px solid var(--rule);
+    font-family: var(--mono); font-variant-numeric: tabular-nums;
+  }
+  table.dist th { color: var(--muted); font-size: 10px; text-transform: uppercase;
+                  letter-spacing: 0.07em; font-family: var(--ui); font-weight: 700; }
+  table.dist td:first-child, table.dist th:first-child { text-align: left; }
+  .table-scroll { max-height: 260px; overflow: auto; }
+
+  /* --- buttons --- */
+  .btn {
+    appearance: none; cursor: pointer; font-family: var(--ui);
+    font-size: 12.5px; font-weight: 650; padding: 7px 13px; border-radius: 7px;
+    background: var(--surface); color: var(--ink-2);
+    border: 1px solid var(--rule-strong);
+    transition: color 0.14s, border-color 0.14s, background 0.14s;
+  }
+  .btn:hover { color: var(--ink); border-color: var(--muted); }
+  .btn:focus-visible { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-wash); }
+  .btn-row { display: flex; flex-wrap: wrap; gap: 8px; }
+
+  footer.legal {
+    margin-top: 30px; padding-top: 18px; border-top: 1px solid var(--rule);
+    font-size: 12.5px; color: var(--muted); line-height: 1.6; max-width: 78ch;
+  }
+
+  .sr-only {
+    position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px;
+    overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0;
+  }
+
+  /* Live summary while you type — only where the results panel is off-screen. */
+  .mobile-bar { display: none; }
+  @media (max-width: 940px) {
+    .mobile-bar {
+      display: flex; align-items: center; justify-content: space-between; gap: 12px;
+      position: fixed; left: 0; right: 0; bottom: 0; z-index: 20;
+      padding: 10px 16px calc(10px + env(safe-area-inset-bottom, 0px));
+      background: var(--surface); border-top: 1px solid var(--rule-strong);
+      box-shadow: 0 -6px 20px -12px rgba(0, 0, 0, 0.4);
+    }
+    .mobile-bar .mb-total {
+      font-family: var(--mono); font-size: 22px; font-weight: 600;
+      font-variant-numeric: tabular-nums; line-height: 1.1;
+    }
+    .mobile-bar .mb-k {
+      font-size: 9.5px; font-weight: 700; text-transform: uppercase;
+      letter-spacing: 0.09em; color: var(--muted);
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    * { transition: none !important; animation: none !important; }
+  }
+</style>
+
+<div class="wrap">
+  <header class="masthead">
+    <div>
+      <div class="eyebrow">Game totals</div>
+      <h1>Runs &amp; Points Projector</h1>
+      <p>Enter a handful of team numbers and tonight's line. Everything recalculates as you type.</p>
+    </div>
+    <div class="sports" role="group" aria-label="Choose sport">
+      <button type="button" id="tab-mlb" aria-pressed="true">MLB</button>
+      <button type="button" id="tab-wnba" aria-pressed="false">WNBA</button>
+    </div>
+  </header>
+
+  <div class="cols">
+    <!-- ============ INPUTS ============ -->
+    <div class="stack">
+      <section class="card">
+        <header>
+          <h2 id="teams-heading">Teams</h2>
+          <div class="btn-row">
+            <button type="button" class="btn" id="load-example">Load example</button>
+          </div>
+        </header>
+        <div class="card-body" id="teams-body"></div>
+      </section>
+
+      <section class="card" id="game-card">
+        <header><h2>Venue &amp; conditions</h2></header>
+        <div class="card-body" id="game-body"></div>
+      </section>
+
+      <section class="card">
+        <header><h2>The line</h2></header>
+        <div class="card-body">
+          <div class="grid3">
+            <div class="field">
+              <label for="line">Total</label>
+              <input type="number" id="line" step="0.5" value="8.5" />
+            </div>
+            <div class="field">
+              <label for="over-odds">Over price</label>
+              <input type="number" id="over-odds" step="5" value="-110" />
+            </div>
+            <div class="field">
+              <label for="under-odds">Under price</label>
+              <input type="number" id="under-odds" step="5" value="-110" />
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <details class="card settings">
+        <summary>Staking &amp; trust</summary>
+        <div class="card-body stack">
+          <div class="field">
+            <label for="weight">Model weight — <span id="weight-val">0.50</span></label>
+            <input type="range" id="weight" min="0" max="1" step="0.05" value="0.5" />
+            <p class="hint">
+              How far to trust your numbers over the posted line. At 0.50 the projection meets the
+              market halfway. Push toward 1.00 only after you've checked your inputs against closing
+              lines; at 0.00 the model always agrees with the market and never bets.
+            </p>
+          </div>
+          <div class="grid2">
+            <div class="field">
+              <label for="kelly">Kelly fraction</label>
+              <input type="number" id="kelly" step="0.05" min="0" max="1" value="0.25" />
+            </div>
+            <div class="field">
+              <label for="maxstake">Max stake %</label>
+              <input type="number" id="maxstake" step="0.5" min="0" value="2" />
+            </div>
+          </div>
+          <p class="hint">
+            Bets are sized with fractional Kelly and then hard-capped. The cap is what stops an
+            overconfident projection from recommending a fifth of your bankroll.
+          </p>
+        </div>
+      </details>
+    </div>
+
+    <!-- ============ RESULTS ============ -->
+    <div class="stack rail-right">
+      <section class="card">
+        <div class="readout">
+          <div class="eyebrow" id="readout-label">Projected total</div>
+          <div class="big" id="proj-total">—</div>
+          <div class="sub" id="proj-sub"></div>
+          <div class="scoreline">
+            <div><div class="n" id="away-score">—</div><div class="t" id="away-label">Away</div></div>
+            <div><div class="n" id="home-score">—</div><div class="t" id="home-label">Home</div></div>
+            <div><div class="n" id="model-raw">—</div><div class="t">Before blend</div></div>
+          </div>
+        </div>
+
+        <div class="verdict" id="verdict"></div>
+
+        <div class="metrics">
+          <div><div class="k">Win prob</div><div class="v" id="m-prob">—</div></div>
+          <div><div class="k">Fair price</div><div class="v" id="m-fair">—</div></div>
+          <div><div class="k">Edge vs mkt</div><div class="v" id="m-edge">—</div></div>
+          <div><div class="k">Stake</div><div class="v" id="m-stake">—</div></div>
+        </div>
+
+        <p class="note" id="skew-note" hidden></p>
+      </section>
+
+      <section class="card">
+        <header><h2>Over / under split</h2></header>
+        <div class="split">
+          <div class="split-track" id="split" role="img" aria-labelledby="split-desc"></div>
+          <p class="sr-only" id="split-desc"></p>
+          <div class="split-legend" id="split-legend"></div>
+        </div>
+      </section>
+
+      <section class="card">
+        <header>
+          <h2 id="chart-title">Distribution of outcomes</h2>
+          <span class="eyebrow" id="chart-unit"></span>
+        </header>
+        <div class="chart-wrap">
+          <div class="tip" id="tip"></div>
+          <svg id="chart" viewBox="0 0 640 250" role="img" aria-labelledby="chart-desc"></svg>
+          <p class="sr-only" id="chart-desc"></p>
+          <div class="split-legend" id="chart-legend" style="padding:2px 6px 0"></div>
+        </div>
+        <details>
+          <summary style="cursor:pointer;padding:10px 16px;font-size:12.5px;color:var(--ink-2);border-top:1px solid var(--rule)">
+            View as table
+          </summary>
+          <div class="table-scroll"><table class="dist" id="dist-table"></table></div>
+        </details>
+      </section>
+
+      <section class="card">
+        <header><h2>Export</h2></header>
+        <div class="card-body">
+          <div class="btn-row">
+            <button type="button" class="btn" id="copy-json">Copy as JSON</button>
+            <button type="button" class="btn" id="copy-summary">Copy summary</button>
+          </div>
+          <p class="hint" style="margin-top:10px">
+            The JSON matches the input format of the Python CLI, so anything you build here can be
+            dropped straight into a slate file.
+          </p>
+        </div>
+      </section>
+    </div>
+  </div>
+
+  <div class="mobile-bar" id="mbar">
+    <div>
+      <div class="mb-k">Projected total</div>
+      <div class="mb-total" id="mb-total">—</div>
+    </div>
+    <div id="mb-verdict"></div>
+  </div>
+
+  <footer class="legal">
+    <b>Read this before you act on a number.</b> The model knows season-long rates and the line you
+    typed — not bullpen usage over the last three days, a scratched starter, or a rest day for a
+    star. It has not been backtested against closing lines. Real edges in liquid markets run 1–3%;
+    if you see 30%, an input is wrong, not the market. Sports betting involves risk, and no model
+    guarantees a profit.
+  </footer>
+</div>
+
+<script>
+(function () {
+  "use strict";
+
+  /* =====================================================================
+     MODEL — ported from the Python package, verified to match it.
+  ===================================================================== */
+
+  var LANCZOS = [0.99999999999980993, 676.5203681218851, -1259.1392167224028,
+    771.32342877765313, -176.61502916214059, 12.507343278686905,
+    -0.13857109526572012, 9.9843695780195716e-6, 1.5056327351493116e-7];
+
+  function lgamma(z) {
+    if (z < 0.5) return Math.log(Math.PI / Math.sin(Math.PI * z)) - lgamma(1 - z);
+    z -= 1;
+    var x = LANCZOS[0];
+    for (var i = 1; i < 9; i++) x += LANCZOS[i] / (z + i);
+    var t = z + 7.5;
+    return 0.5 * Math.log(2 * Math.PI) + (z + 0.5) * Math.log(t) - t + Math.log(x);
+  }
+
+  function erf(x) {
+    var sign = x < 0 ? -1 : 1;
+    x = Math.abs(x);
+    var t = 1 / (1 + 0.3275911 * x);
+    var y = 1 - ((((1.061405429 * t - 1.453152027) * t + 1.421413741) * t - 0.284496736) * t
+      + 0.254829592) * t * Math.exp(-x * x);
+    return sign * y;
+  }
+
+  function normalCdf(x, mu, sigma) { return 0.5 * (1 + erf((x - mu) / (sigma * Math.SQRT2))); }
+  function normalPdf(x, mu, sigma) {
+    var z = (x - mu) / sigma;
+    return Math.exp(-0.5 * z * z) / (sigma * Math.sqrt(2 * Math.PI));
+  }
+
+  function nbPmf(mean, r, kmax) {
+    kmax = kmax || 30;
+    var p = r / (r + mean), logP = Math.log(p), logQ = Math.log1p(-p), pmf = [], sum = 0;
+    for (var k = 0; k <= kmax; k++) {
+      var v = Math.exp(lgamma(k + r) - lgamma(r) - lgamma(k + 1) + r * logP + k * logQ);
+      pmf.push(v); sum += v;
+    }
+    pmf[pmf.length - 1] += Math.max(1 - sum, 0);
+    return pmf;
+  }
+
+  function convolve(a, b) {
+    var out = new Array(a.length + b.length - 1).fill(0);
+    for (var i = 0; i < a.length; i++) {
+      if (!a[i]) continue;
+      for (var j = 0; j < b.length; j++) out[i + j] += a[i] * b[j];
+    }
+    return out;
+  }
+
+  function discreteProbs(pmf, line) {
+    var over = 0, under = 0, push = 0;
+    for (var k = 0; k < pmf.length; k++) {
+      if (k > line) over += pmf[k]; else if (k < line) under += pmf[k]; else push += pmf[k];
+    }
+    return { pOver: over, pUnder: under, pPush: push };
+  }
+
+  function normalProbs(mu, sd, line) {
+    var whole = Math.abs(line - Math.round(line)) < 1e-9;
+    if (whole) {
+      var pPush = normalCdf(line + 0.5, mu, sd) - normalCdf(line - 0.5, mu, sd);
+      var pUnder = normalCdf(line - 0.5, mu, sd);
+      return { pOver: 1 - pUnder - pPush, pUnder: pUnder, pPush: pPush };
+    }
+    var u = normalCdf(line, mu, sd);
+    return { pOver: 1 - u, pUnder: u, pPush: 0 };
+  }
+
+  function amToDec(o) { return o > 0 ? 1 + o / 100 : 1 + 100 / Math.abs(o); }
+  function amToProb(o) { return 1 / amToDec(o); }
+  function probToAm(p) {
+    var d = 1 / p;
+    return d >= 2 ? Math.round((d - 1) * 100) : Math.round(-100 / (d - 1));
+  }
+  function devig(over, under) {
+    var a = amToProb(over), b = amToProb(under), s = a + b;
+    return { pOver: a / s, pUnder: b / s, hold: s - 1 };
+  }
+  function ev(prob, odds, push) {
+    return prob * (amToDec(odds) - 1) - Math.max(1 - prob - (push || 0), 0);
+  }
+  function kelly(prob, odds, push, mult) {
+    var decided = 1 - (push || 0);
+    if (decided <= 0) return 0;
+    var p = prob / decided, b = amToDec(odds) - 1;
+    var edge = p * b - (1 - p);
+    if (edge <= 0 || b <= 0) return 0;
+    return (edge / b) * mult * decided;
+  }
+
+  var MLB = { LG_RPG: 4.4, ERA_TO_RA9: 1.075, DISPERSION: 4.0 };
+  var WNBA = { LG_PACE: 80, LG_RATING: 101, TOTAL_SD: 11.5, MARGIN_SD: 11,
+               HCA: 2.5, B2B: 2, OT_POINTS: 19, OT_CAL: 1.5 };
+
+  function weatherFactor(w) {
+    if (!w || w.dome) return 1;
+    var f = 1;
+    if (isNum(w.tempF)) f *= 1 + 0.004 * (w.tempF - 70);
+    if (isNum(w.windMphOut)) f *= 1 + 0.008 * w.windMphOut;
+    return Math.max(0.9, Math.min(1.1, f));
+  }
+  function parkNeutral(rate, pf) { return pf === 1 ? rate : rate / ((1 + pf) / 2); }
+  function isNum(v) { return typeof v === "number" && isFinite(v); }
+
+  function projectMlb(g) {
+    var lg = MLB.LG_RPG;
+    function side(t) {
+      return {
+        name: t.name || "?",
+        rpg: isNum(t.runsPerGame) ? t.runsPerGame : lg,
+        spRa9: isNum(t.starterEra) ? t.starterEra * MLB.ERA_TO_RA9 : lg,
+        spIp: isNum(t.starterIp) ? t.starterIp : 5.2,
+        bpRa9: isNum(t.bullpenEra) ? t.bullpenEra * MLB.ERA_TO_RA9 : lg,
+        ownPf: isNum(t.ownParkFactor) ? t.ownParkFactor : 1
+      };
+    }
+    var a = side(g.away), h = side(g.home);
+    function off(t) { return parkNeutral(t.rpg, t.ownPf) / lg; }
+    function def(t) {
+      var share = Math.max(0, Math.min(1, t.spIp / 9));
+      return parkNeutral(share * t.spRa9 + (1 - share) * t.bpRa9, t.ownPf) / lg;
+    }
+    var park = isNum(g.parkFactor) ? g.parkFactor : 1;
+    var wx = weatherFactor(g.weather);
+    return {
+      sport: "MLB", away: a.name, home: h.name,
+      awayScore: lg * off(a) * def(h) * park * wx,
+      homeScore: lg * off(h) * def(a) * park * wx,
+      build: function (x, y) {
+        var pmf = convolve(nbPmf(x, MLB.DISPERSION), nbPmf(y, MLB.DISPERSION));
+        return { kind: "discrete", pmf: pmf, probs: function (l) { return discreteProbs(pmf, l); } };
+      }
+    };
+  }
+
+  function otPoints(margin) {
+    return Math.min(0.15, WNBA.OT_CAL * normalPdf(0, margin, WNBA.MARGIN_SD)) * WNBA.OT_POINTS;
+  }
+
+  function projectWnba(g) {
+    function side(t) {
+      return {
+        name: t.name || "?",
+        pace: isNum(t.pace) ? t.pace : WNBA.LG_PACE,
+        off: isNum(t.offRating) ? t.offRating : WNBA.LG_RATING,
+        def: isNum(t.defRating) ? t.defRating : WNBA.LG_RATING,
+        rest: isNum(t.restDays) ? t.restDays : 2
+      };
+    }
+    var a = side(g.away), h = side(g.home);
+    var adjOff = function (t) { return t.rest <= 0 ? t.off - WNBA.B2B : t.off; };
+    var poss = (a.pace * h.pace) / WNBA.LG_PACE;
+    var ap = (poss * ((adjOff(a) * h.def) / WNBA.LG_RATING)) / 100;
+    var hp = (poss * ((adjOff(h) * a.def) / WNBA.LG_RATING)) / 100;
+    hp += WNBA.HCA / 2; ap -= WNBA.HCA / 2;
+    var ot = otPoints(hp - ap);
+    ap += ot / 2; hp += ot / 2;
+    return {
+      sport: "WNBA", away: a.name, home: h.name, awayScore: ap, homeScore: hp,
+      possessions: poss,
+      build: function (x, y) {
+        var mu = x + y, sd = WNBA.TOTAL_SD;
+        return { kind: "normal", mu: mu, sd: sd,
+                 probs: function (l) { return normalProbs(mu, sd, l); } };
+      }
+    };
+  }
+
+  function evaluate(proj, market, opts) {
+    var modelTotal = proj.awayScore + proj.homeScore;
+    var w = opts.modelWeight;
+    var scale = (w >= 1 || modelTotal <= 0) ? 1
+      : (w * modelTotal + (1 - w) * market.line) / modelTotal;
+    var a = proj.awayScore * scale, h = proj.homeScore * scale;
+    var built = proj.build(a, h);
+    var pr = built.probs(market.line);
+    var fair = devig(market.overOdds, market.underOdds);
+    var overEv = ev(pr.pOver, market.overOdds, pr.pPush);
+    var underEv = ev(pr.pUnder, market.underOdds, pr.pPush);
+    var side = overEv >= underEv ? "OVER" : "UNDER";
+    var sideProb = side === "OVER" ? pr.pOver : pr.pUnder;
+    var sideOdds = side === "OVER" ? market.overOdds : market.underOdds;
+    var mktProb = side === "OVER" ? fair.pOver : fair.pUnder;
+    var stake = 100 * kelly(sideProb, sideOdds, pr.pPush, opts.kellyMultiplier);
+    return {
+      sport: proj.sport, away: proj.away, home: proj.home,
+      modelAway: proj.awayScore, modelHome: proj.homeScore, modelTotal: modelTotal,
+      projectedTotal: a + h, awayScore: a, homeScore: h,
+      built: built, line: market.line,
+      pOver: pr.pOver, pUnder: pr.pUnder, pPush: pr.pPush,
+      bestSide: side, bestSideProb: sideProb, bestSideOdds: sideOdds,
+      fairOdds: sideProb > 0 && sideProb < 1 ? probToAm(sideProb) : null,
+      probEdge: sideProb - mktProb,
+      evPerUnit: Math.max(overEv, underEv),
+      stakePct: Math.min(stake, opts.maxStakePct),
+      uncappedPct: stake,
+      hold: fair.hold
+    };
+  }
+
+  /* =====================================================================
+     FORM DEFINITIONS
+  ===================================================================== */
+
+  var MLB_TEAM_FIELDS = [
+    { key: "runsPerGame", label: "Runs / game", step: 0.05 },
+    { key: "starterEra", label: "Starter ERA", step: 0.05 },
+    { key: "starterIp", label: "Starter IP", step: 0.1 },
+    { key: "bullpenEra", label: "Bullpen ERA", step: 0.05 },
+    { key: "ownParkFactor", label: "Home park factor", step: 0.01 }
+  ];
+  var WNBA_TEAM_FIELDS = [
+    { key: "pace", label: "Pace (per 40)", step: 0.5 },
+    { key: "offRating", label: "Off rating", step: 0.5 },
+    { key: "defRating", label: "Def rating", step: 0.5 },
+    { key: "restDays", label: "Days rest", step: 1 }
+  ];
+
+  var EXAMPLES = {
+    mlb: {
+      away: { name: "Dodgers", runsPerGame: 5.05, starterEra: 3.05, starterIp: 6.0,
+              bullpenEra: 3.6, ownParkFactor: 1.0 },
+      home: { name: "Rockies", runsPerGame: 4.95, starterEra: 5.4, starterIp: 5.0,
+              bullpenEra: 5.1, ownParkFactor: 1.28 },
+      parkFactor: 1.28, tempF: 84, windMphOut: 5, dome: false,
+      line: 11.5, overOdds: -105, underOdds: -115
+    },
+    wnba: {
+      away: { name: "Aces", pace: 81.5, offRating: 108.0, defRating: 99.5, restDays: 2 },
+      home: { name: "Liberty", pace: 79.0, offRating: 109.5, defRating: 96.0, restDays: 3 },
+      line: 167.5, overOdds: -110, underOdds: -110
+    }
+  };
+
+  var state = { sport: "mlb" };
+  var $ = function (id) { return document.getElementById(id); };
+
+  function field(id, label, value, step, type) {
+    return '<div class="field">' +
+      '<label for="' + id + '">' + label + '</label>' +
+      '<input type="' + (type || "number") + '" id="' + id + '" ' +
+      (type === "text" ? "" : 'step="' + step + '" inputmode="decimal" ') +
+      'value="' + value + '" />' +
+      '</div>';
+  }
+
+  function renderForm() {
+    var fields = state.sport === "mlb" ? MLB_TEAM_FIELDS : WNBA_TEAM_FIELDS;
+    var ex = EXAMPLES[state.sport];
+    var html = "";
+    ["away", "home"].forEach(function (side) {
+      html += '<div class="team-block">' +
+        '<div class="stack" style="gap:12px">' +
+        field(side + "-name", (side === "away" ? "Away" : "Home") + " team",
+              ex[side].name, null, "text") +
+        '<div class="grid2">';
+      fields.forEach(function (f) {
+        html += field(side + "-" + f.key, f.label, ex[side][f.key], f.step);
+      });
+      html += "</div></div></div>";
+    });
+    $("teams-body").innerHTML = html;
+
+    if (state.sport === "mlb") {
+      $("game-card").hidden = false;
+      $("game-body").innerHTML =
+        '<div class="grid3">' +
+        field("parkFactor", "Park factor", ex.parkFactor, 0.01) +
+        field("tempF", "Temp °F", ex.tempF, 1) +
+        field("windMphOut", "Wind out mph", ex.windMphOut, 1) +
+        '</div>' +
+        '<label class="check" style="margin-top:12px">' +
+        '<input type="checkbox" id="dome" /> Dome or closed roof (ignore weather)</label>' +
+        '<p class="hint" style="margin-top:10px">Park factor 1.00 is neutral. Negative wind means ' +
+        'blowing in. Weather is capped at ±10% either way.</p>';
+    } else {
+      $("game-card").hidden = true;
+      $("game-body").innerHTML = "";
+    }
+
+    $("line").value = ex.line;
+    $("over-odds").value = ex.overOdds;
+    $("under-odds").value = ex.underOdds;
+    bindInputs();
+    compute();
+  }
+
+  function bindInputs() {
+    document.querySelectorAll("input").forEach(function (el) {
+      el.removeEventListener("input", compute);
+      el.addEventListener("input", compute);
+    });
+  }
+
+  function num(id) {
+    var el = $(id);
+    if (!el) return NaN;
+    var v = parseFloat(el.value);
+    return isFinite(v) ? v : NaN;
+  }
+  function str(id) { var el = $(id); return el ? el.value : ""; }
+
+  function readGame() {
+    var fields = state.sport === "mlb" ? MLB_TEAM_FIELDS : WNBA_TEAM_FIELDS;
+    var g = { away: {}, home: {} };
+    ["away", "home"].forEach(function (side) {
+      g[side].name = str(side + "-name") || (side === "away" ? "Away" : "Home");
+      fields.forEach(function (f) {
+        var v = num(side + "-" + f.key);
+        if (isFinite(v)) g[side][f.key] = v;
+      });
+    });
+    if (state.sport === "mlb") {
+      var pf = num("parkFactor");
+      if (isFinite(pf)) g.parkFactor = pf;
+      g.weather = { dome: $("dome") && $("dome").checked };
+      if (!g.weather.dome) {
+        var t = num("tempF"), w = num("windMphOut");
+        if (isFinite(t)) g.weather.tempF = t;
+        if (isFinite(w)) g.weather.windMphOut = w;
+      }
+    }
+    return g;
+  }
+
+  /* =====================================================================
+     RENDER
+  ===================================================================== */
+
+  var fmt1 = function (n) { return n.toFixed(1); };
+  var fmt2 = function (n) { return n.toFixed(2); };
+  var pct = function (n) { return (100 * n).toFixed(1) + "%"; };
+  var signed = function (n, d) { return (n >= 0 ? "+" : "") + n.toFixed(d); };
+  var priceStr = function (n) { return (n > 0 ? "+" : "") + n; };
+
+  var last = null;
+
+  function compute() {
+    var g = readGame();
+    var line = num("line");
+    var overOdds = num("over-odds");
+    var underOdds = num("under-odds");
+    var weight = num("weight");
+    $("weight-val").textContent = fmt2(weight);
+
+    var proj = state.sport === "mlb" ? projectMlb(g) : projectWnba(g);
+
+    if (!isFinite(line) || !isFinite(overOdds) || !isFinite(underOdds)
+        || overOdds === 0 || underOdds === 0) {
+      renderNoMarket(proj);
+      return;
+    }
+
+    var r = evaluate(proj, { line: line, overOdds: overOdds, underOdds: underOdds }, {
+      modelWeight: weight,
+      kellyMultiplier: isFinite(num("kelly")) ? num("kelly") : 0.25,
+      maxStakePct: isFinite(num("maxstake")) ? num("maxstake") : 2
+    });
+    last = { result: r, game: g };
+    render(r);
+  }
+
+  function renderNoMarket(proj) {
+    var total = proj.awayScore + proj.homeScore;
+    $("readout-label").textContent = "Model total";
+    $("proj-total").textContent = fmt1(total);
+    $("proj-sub").textContent = "Enter a line and two prices to grade it.";
+    $("away-score").textContent = fmt1(proj.awayScore);
+    $("home-score").textContent = fmt1(proj.homeScore);
+    $("model-raw").textContent = "—";
+    $("away-label").textContent = proj.away;
+    $("home-label").textContent = proj.home;
+    $("verdict").innerHTML = '<span class="pill pass"><span class="glyph">—</span>No line</span>' +
+      '<span class="detail">A projection on its own is not a bet.</span>';
+    ["m-prob", "m-fair", "m-edge", "m-stake"].forEach(function (id) {
+      $(id).textContent = "—";
+    });
+    $("split").innerHTML = "";
+    $("split-legend").innerHTML = "";
+    $("chart").innerHTML = "";
+    $("dist-table").innerHTML = "";
+    $("skew-note").hidden = true;
+    $("mb-total").textContent = fmt1(total);
+    $("mb-verdict").innerHTML = '<span class="pill pass"><span class="glyph">&#9675;</span>No line</span>';
+  }
+
+  function render(r) {
+    var unit = r.sport === "MLB" ? "runs" : "points";
+
+    $("readout-label").textContent = "Projected total";
+    $("proj-total").textContent = fmt1(r.projectedTotal);
+    $("proj-sub").innerHTML = "vs a posted line of <b>" + r.line + "</b> &middot; " +
+      signed(r.projectedTotal - r.line, 2) + " " + unit;
+    $("away-score").textContent = fmt1(r.awayScore);
+    $("home-score").textContent = fmt1(r.homeScore);
+    $("model-raw").textContent = fmt1(r.modelTotal);
+    $("away-label").textContent = r.away;
+    $("home-label").textContent = r.home;
+
+    var bet = r.evPerUnit > 0 && r.stakePct > 0;
+    $("verdict").innerHTML = bet
+      ? '<span class="pill bet"><span class="glyph">&#9679;</span>Bet ' + r.bestSide +
+        " " + priceStr(r.bestSideOdds) + "</span>" +
+        '<span class="detail">Expected return <b>' + signed(100 * r.evPerUnit, 2) +
+        "%</b> per unit risked.</span>"
+      : '<span class="pill pass"><span class="glyph">&#9675;</span>No bet</span>' +
+        '<span class="detail">Best available side is ' + r.bestSide + " at <b>" +
+        signed(100 * r.evPerUnit, 2) + "%</b> — not worth the juice.</span>";
+
+    $("m-prob").textContent = pct(r.bestSideProb);
+    $("m-fair").textContent = r.fairOdds === null ? "—" : priceStr(r.fairOdds);
+    $("m-edge").textContent = signed(100 * r.probEdge, 1) + "pt";
+    // Only a bet-worthy edge gets the good colour — a positive probability edge
+    // that the juice eats is not good news, and shouldn't look like it.
+    $("m-edge").style.color = bet ? "var(--good)" : "var(--ink)";
+    $("m-stake").textContent = fmt2(r.stakePct) + "%";
+    $("m-stake").style.color = r.stakePct > 0 ? "var(--accent-ink)" : "var(--muted)";
+
+    $("mb-total").textContent = fmt1(r.projectedTotal);
+    $("mb-verdict").innerHTML = bet
+      ? '<span class="pill bet"><span class="glyph">&#9679;</span>' + r.bestSide +
+        " " + priceStr(r.bestSideOdds) + "</span>"
+      : '<span class="pill pass"><span class="glyph">&#9675;</span>No bet</span>';
+
+    renderSplit(r);
+    renderChart(r, unit);
+    renderSkewNote(r, unit);
+  }
+
+  function renderSplit(r) {
+    var parts = [
+      { cls: "split-under", p: r.pUnder, label: "Under " + pct(r.pUnder), name: "Under", color: "var(--under)" },
+      { cls: "split-push", p: r.pPush, label: r.pPush > 0.04 ? "Push " + pct(r.pPush) : "", name: "Push", color: "var(--push)" },
+      { cls: "split-over", p: r.pOver, label: "Over " + pct(r.pOver), name: "Over", color: "var(--over)" }
+    ].filter(function (x) { return x.p > 0.0005; });
+
+    $("split").innerHTML = parts.map(function (x) {
+      return '<span class="' + x.cls + '" style="flex:' + x.p.toFixed(4) +
+        " 1 " + (100 * x.p).toFixed(2) + '%">' + x.label + "</span>";
+    }).join("");
+
+    $("split-legend").innerHTML = parts.map(function (x) {
+      return '<span><i class="swatch" style="background:' + x.color + '"></i>' +
+        x.name + " " + pct(x.p) + "</span>";
+    }).join("");
+
+    $("split-desc").textContent = "Under " + pct(r.pUnder) + ", over " + pct(r.pOver) +
+      (r.pPush > 0.0005 ? ", push " + pct(r.pPush) : "") + ".";
+  }
+
+  /* Buckets: one per integer for baseball, 2-point bins for basketball. */
+  function buckets(r) {
+    var b = r.built, out = [];
+    if (b.kind === "discrete") {
+      var pmf = b.pmf;
+      var lo = 0, hi = pmf.length - 1, acc = 0;
+      for (var i = 0; i < pmf.length; i++) { acc += pmf[i]; if (acc > 0.004) { lo = i; break; } }
+      acc = 0;
+      for (var j = pmf.length - 1; j >= 0; j--) { acc += pmf[j]; if (acc > 0.004) { hi = j; break; } }
+      for (var k = lo; k <= hi; k++) {
+        out.push({ mid: k, label: String(k), p: pmf[k],
+                   side: k > r.line ? "over" : (k < r.line ? "under" : "push") });
+      }
+    } else {
+      var w = 2, lo2 = Math.round((b.mu - 3.4 * b.sd) / w) * w, hi2 = lo2 + Math.ceil(6.8 * b.sd / w) * w;
+      for (var x = lo2; x <= hi2; x += w) {
+        var p = normalCdf(x + w / 2, b.mu, b.sd) - normalCdf(x - w / 2, b.mu, b.sd);
+        out.push({ mid: x, label: String(x), p: p,
+                   side: x > r.line ? "over" : "under" });
+      }
+    }
+    return out;
+  }
+
+  function renderChart(r, unit) {
+    var data = buckets(r);
+    // Draw at the container's real pixel width so one SVG unit is one CSS pixel
+    // and label text renders at its true size on a phone as well as a desktop.
+    var W = Math.max(300, Math.round($("chart").getBoundingClientRect().width) || 640);
+    var H = W < 460 ? 210 : 250;
+    var padL = 8, padR = 8, padT = 30, padB = 30;
+    var iw = W - padL - padR, ih = H - padT - padB;
+    var maxP = Math.max.apply(null, data.map(function (d) { return d.p; }));
+    var n = data.length;
+    var slot = iw / n;
+    var gap = Math.min(2, slot * 0.18);
+    var bw = Math.max(1, slot - gap);
+    var color = { over: "var(--over)", under: "var(--under)", push: "var(--push)" };
+
+    var svg = "";
+
+    // baseline
+    svg += '<line x1="' + padL + '" y1="' + (padT + ih) + '" x2="' + (W - padR) +
+      '" y2="' + (padT + ih) + '" stroke="var(--rule-strong)" stroke-width="1" />';
+
+    // bars, 4px rounded tops anchored to the baseline
+    data.forEach(function (d, i) {
+      var h = Math.max(d.p / maxP * ih, d.p > 0 ? 1.5 : 0);
+      var x = padL + i * slot + gap / 2;
+      var y = padT + ih - h;
+      var rad = Math.min(4, bw / 2, h);
+      svg += '<path class="bar" data-i="' + i + '" fill="' + color[d.side] + '" d="' +
+        "M" + x.toFixed(2) + "," + (padT + ih) +
+        " L" + x.toFixed(2) + "," + (y + rad).toFixed(2) +
+        " Q" + x.toFixed(2) + "," + y.toFixed(2) + " " + (x + rad).toFixed(2) + "," + y.toFixed(2) +
+        " L" + (x + bw - rad).toFixed(2) + "," + y.toFixed(2) +
+        " Q" + (x + bw).toFixed(2) + "," + y.toFixed(2) + " " + (x + bw).toFixed(2) + "," + (y + rad).toFixed(2) +
+        " L" + (x + bw).toFixed(2) + "," + (padT + ih) + " Z" + '" />';
+    });
+
+    // the line marker sits between the last under bucket and the first over bucket
+    var idx = 0;
+    for (var i = 0; i < data.length; i++) { if (data[i].mid > r.line) { idx = i; break; } idx = i + 1; }
+    var lx = padL + idx * slot - gap / 2;
+    lx = Math.max(padL, Math.min(W - padR, lx));
+    svg += '<line x1="' + lx.toFixed(1) + '" y1="' + (padT - 14) + '" x2="' + lx.toFixed(1) +
+      '" y2="' + (padT + ih) + '" stroke="var(--ink)" stroke-width="2" stroke-dasharray="4 3" />';
+    svg += '<text id="lbl-line" x="' + lx.toFixed(1) + '" y="' + (padT - 19) +
+      '" text-anchor="middle" class="region-label" fill="var(--ink)">LINE ' + r.line + "</text>";
+
+    // Direct region labels. Emitted unconditionally, then pruned below against
+    // the measured position of the line label — guessing at text width by
+    // character count is off by just enough to collide.
+    svg += '<text id="lbl-under" x="' + (padL + 4) + '" y="' + (padT - 19) +
+      '" class="region-label" fill="var(--under)">UNDER ' + pct(r.pUnder) + "</text>";
+    svg += '<text id="lbl-over" x="' + (W - padR - 4) + '" y="' + (padT - 19) +
+      '" text-anchor="end" class="region-label" fill="var(--over)">OVER ' + pct(r.pOver) + "</text>";
+
+    // x ticks, thinned so labels never collide
+    var every = Math.max(1, Math.ceil(n / Math.max(4, Math.floor(W / 46))));
+    data.forEach(function (d, i) {
+      if (i % every) return;
+      svg += '<text x="' + (padL + i * slot + slot / 2).toFixed(1) + '" y="' + (padT + ih + 15) +
+        '" text-anchor="middle" class="axis-label">' + d.label + "</text>";
+    });
+    svg += '<text x="' + (W / 2) + '" y="' + (H - 2) +
+      '" text-anchor="middle" class="axis-label">total ' + unit + "</text>";
+
+    $("chart").setAttribute("viewBox", "0 0 " + W + " " + H);
+    $("chart").innerHTML = svg;
+
+    // Drop any region label that would run into the line marker's label.
+    var lineLbl = $("chart").querySelector("#lbl-line");
+    if (lineLbl) {
+      var lb = lineLbl.getBoundingClientRect();
+      ["#lbl-under", "#lbl-over"].forEach(function (sel) {
+        var el = $("chart").querySelector(sel);
+        if (!el) return;
+        var b = el.getBoundingClientRect();
+        if (b.right > lb.left - 8 && b.left < lb.right + 8) el.remove();
+      });
+    }
+
+    // A legend is always present, so identity never rests on colour alone even
+    // when the plot is too narrow for the in-chart region labels.
+    $("chart-legend").innerHTML =
+      '<span><i class="swatch" style="background:var(--under)"></i>Under ' + pct(r.pUnder) +
+      '</span><span><i class="swatch" style="background:var(--over)"></i>Over ' + pct(r.pOver) +
+      "</span>" +
+      (r.pPush > 0.0005
+        ? '<span><i class="swatch" style="background:var(--push)"></i>Push ' + pct(r.pPush) + "</span>"
+        : "");
+    $("chart-unit").textContent = r.sport === "MLB" ? "per game" : "2-point bins";
+    $("chart-desc").textContent = "Probability of each final total. " +
+      pct(r.pUnder) + " under " + r.line + ", " + pct(r.pOver) + " over.";
+
+    // hover
+    var tip = $("tip"), wrap = $("chart").parentNode;
+    $("chart").querySelectorAll(".bar").forEach(function (bar) {
+      bar.addEventListener("mouseenter", function (e) {
+        var d = data[+bar.dataset.i];
+        tip.textContent = d.label + " " + unit + " · " + (100 * d.p).toFixed(1) + "%";
+        var br = wrap.getBoundingClientRect(), rr = bar.getBoundingClientRect();
+        tip.style.left = (rr.left - br.left + rr.width / 2) + "px";
+        tip.style.top = (rr.top - br.top - 6) + "px";
+        tip.style.opacity = "1";
+      });
+      bar.addEventListener("mouseleave", function () { tip.style.opacity = "0"; });
+    });
+
+    // table view
+    var rows = '<thead><tr><th>Total</th><th>Chance</th><th>Side</th></tr></thead><tbody>';
+    data.forEach(function (d) {
+      rows += "<tr><td>" + d.label + "</td><td>" + (100 * d.p).toFixed(1) + "%</td><td>" +
+        d.side + "</td></tr>";
+    });
+    $("dist-table").innerHTML = rows + "</tbody>";
+  }
+
+  /* The one result that reliably confuses people: a projection above the line
+     that still points at the under, because run scoring is right-skewed. */
+  function renderSkewNote(r, unit) {
+    var el = $("skew-note");
+    var leansOver = r.projectedTotal > r.line;
+    var picksOver = r.bestSide === "OVER";
+    if (leansOver === picksOver) { el.hidden = true; return; }
+    el.hidden = false;
+    el.innerHTML = "<b>Worth a look:</b> the projection sits " +
+      signed(r.projectedTotal - r.line, 2) + " " + unit + " " +
+      (leansOver ? "above" : "below") + " the line, but the model still likes the " +
+      r.bestSide + ". Scoring is right-skewed — blowouts pull the average up without moving " +
+      "the typical game — so the mean can sit on one side of the line while most outcomes " +
+      "land on the other. Trust the win probability, not the gap.";
+  }
+
+  /* =====================================================================
+     WIRING
+  ===================================================================== */
+
+  function setSport(s) {
+    state.sport = s;
+    $("tab-mlb").setAttribute("aria-pressed", String(s === "mlb"));
+    $("tab-wnba").setAttribute("aria-pressed", String(s === "wnba"));
+    $("chart-title").textContent = s === "mlb" ? "Distribution of total runs"
+                                               : "Distribution of total points";
+    renderForm();
+  }
+
+  $("tab-mlb").addEventListener("click", function () { setSport("mlb"); });
+  $("tab-wnba").addEventListener("click", function () { setSport("wnba"); });
+  $("load-example").addEventListener("click", function () { renderForm(); });
+
+  function snakeGame() {
+    var g = last ? last.game : readGame();
+    var out = { away: {}, home: {} };
+    var map = {
+      runsPerGame: "runs_per_game", starterEra: "starter_era", starterIp: "starter_ip",
+      bullpenEra: "bullpen_era", ownParkFactor: "own_park_factor",
+      pace: "pace", offRating: "off_rating", defRating: "def_rating", restDays: "rest_days",
+      name: "name"
+    };
+    ["away", "home"].forEach(function (side) {
+      Object.keys(g[side]).forEach(function (k) { out[side][map[k] || k] = g[side][k]; });
+    });
+    if (g.parkFactor !== undefined) out.park_factor = g.parkFactor;
+    if (g.weather) {
+      var w = {};
+      if (g.weather.dome) w.dome = true;
+      if (g.weather.tempF !== undefined) w.temp_f = g.weather.tempF;
+      if (g.weather.windMphOut !== undefined) w.wind_mph_out = g.weather.windMphOut;
+      out.weather = w;
+    }
+    out.market = { line: num("line"), over_odds: num("over-odds"), under_odds: num("under-odds") };
+    return out;
+  }
+
+  function copy(text, btn) {
+    var done = function () {
+      var old = btn.textContent;
+      btn.textContent = "Copied";
+      setTimeout(function () { btn.textContent = old; }, 1400);
+    };
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(text).then(done, function () { fallback(text); done(); });
+    } else { fallback(text); done(); }
+  }
+  function fallback(text) {
+    var ta = document.createElement("textarea");
+    ta.value = text; ta.style.position = "fixed"; ta.style.opacity = "0";
+    document.body.appendChild(ta); ta.select();
+    try { document.execCommand("copy"); } catch (e) { /* clipboard unavailable */ }
+    document.body.removeChild(ta);
+  }
+
+  $("copy-json").addEventListener("click", function () {
+    copy(JSON.stringify(snakeGame(), null, 2), this);
+  });
+  $("copy-summary").addEventListener("click", function () {
+    if (!last) return;
+    var r = last.result;
+    copy([
+      r.away + " @ " + r.home + "  (" + r.sport + ")",
+      "model " + fmt2(r.modelTotal) + "  line " + r.line + "  projected " + fmt2(r.projectedTotal),
+      r.bestSide + " " + priceStr(r.bestSideOdds) + "  win " + pct(r.bestSideProb) +
+        "  EV " + signed(100 * r.evPerUnit, 2) + "%  stake " + fmt2(r.stakePct) + "%"
+    ].join("\n"), this);
+  });
+
+  var resizeTimer;
+  window.addEventListener("resize", function () {
+    clearTimeout(resizeTimer);
+    resizeTimer = setTimeout(compute, 120);
+  });
+
+  setSport("mlb");
+})();
+</script>
+
+</body>
+</html>

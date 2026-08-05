@@ -635,7 +635,10 @@
     return (edge / b) * mult * decided;
   }
 
-  var MLB = { LG_RPG: 4.4, ERA_TO_RA9: 1.075, DISPERSION: 4.0 };
+  // LG_RPG is net in the denominator of the odds ratio, so a stale value biases
+  // every projection the same way -- too low inflates totals toward the over.
+  // 2026 runs ~9.04 combined, i.e. 4.52 per team. Re-check each season.
+  var MLB = { LG_RPG: 4.52, ERA_TO_RA9: 1.075, DISPERSION: 4.0 };
   var WNBA = { LG_PACE: 80, LG_RATING: 101, TOTAL_SD: 11.5, MARGIN_SD: 11,
                HCA: 2.5, B2B: 2, OT_POINTS: 19, OT_CAL: 1.5 };
 

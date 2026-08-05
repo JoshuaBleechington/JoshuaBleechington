@@ -24,8 +24,16 @@ from typing import Any
 from .core import Projection
 from .distributions import convolve, discrete_total_probs, negative_binomial_pmf
 
-# League baselines -- update once a season. 2024-25 MLB sits right around here.
-LEAGUE_RUNS_PER_GAME = 4.40
+# League baselines -- CHECK THIS EVERY SEASON. 2026 is running ~9.04 combined
+# runs per game, so 4.52 per team.
+#
+# This constant is not cosmetic. Expanding the odds-ratio leaves it net in the
+# denominator (runs = offence * opposing_run_prevention / lg_rpg), so a stale
+# value biases every single projection in the same direction. Setting it low
+# inflates totals and tilts the model toward the over; setting it high does the
+# reverse. At 4.40 against a true 4.52 environment, every game projected 2.7%
+# high -- about a quarter of a run, enough to flip marginal games to the over.
+LEAGUE_RUNS_PER_GAME = 4.52
 
 # Earned runs are ~93% of all runs, so RA/9 runs a touch above ERA.
 ERA_TO_RA9 = 1.075

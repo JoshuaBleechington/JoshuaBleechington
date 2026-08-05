@@ -203,6 +203,30 @@
   .log-actions { display: flex; flex-wrap: wrap; gap: 8px; align-items: center;
                  padding: 14px 16px; border-top: 1px solid var(--rule); }
 
+  /* --- data source links --- */
+  .sources {
+    display: flex; flex-wrap: wrap; align-items: center; gap: 8px;
+    margin: -6px 0 22px;
+  }
+  .sources .lbl {
+    font-size: 10px; font-weight: 700; text-transform: uppercase;
+    letter-spacing: 0.09em; color: var(--muted); margin-right: 2px;
+  }
+  .sources a {
+    display: inline-flex; align-items: center; gap: 6px;
+    padding: 6px 11px; border-radius: 999px;
+    background: var(--surface); border: 1px solid var(--rule);
+    color: var(--ink-2); text-decoration: none;
+    font-size: 12.5px; font-weight: 600;
+    transition: color 0.14s, border-color 0.14s, background 0.14s;
+  }
+  .sources a:hover { color: var(--accent-ink); border-color: var(--accent); background: var(--accent-wash); }
+  .sources a:focus-visible { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-wash); }
+  .sources a::after { content: "↗"; font-size: 10px; opacity: 0.6; }
+  .sources a .what {
+    font-weight: 400; color: var(--muted); font-size: 11.5px;
+  }
+
   /* --- layout --- */
   .cols { display: grid; grid-template-columns: minmax(0, 460px) minmax(0, 1fr); gap: 22px; align-items: start; }
   @media (max-width: 940px) { .cols { grid-template-columns: minmax(0, 1fr); } }
@@ -456,6 +480,8 @@
     </div>
   </header>
 
+  <nav class="sources" id="sources" aria-label="Where to get the numbers"></nav>
+
   <div class="cols" id="calc-view">
     <!-- ============ INPUTS ============ -->
     <div class="stack">
@@ -463,7 +489,8 @@
         <header>
           <h2 id="teams-heading">Teams</h2>
           <div class="btn-row">
-            <button type="button" class="btn" id="load-example">Load example</button>
+            <button type="button" class="btn" id="clear-fields">Clear</button>
+            <button type="button" class="btn" id="load-example">Example</button>
           </div>
         </header>
         <div class="card-body" id="teams-body"></div>
@@ -640,11 +667,17 @@
       </div>
       <div class="log-scroll"><table class="logtable" id="log-table"></table></div>
       <div class="log-actions">
-        <button type="button" class="btn" id="export-csv">Export CSV</button>
-        <button type="button" class="btn" id="export-log-json">Export JSON</button>
+        <button type="button" class="btn primary" id="copy-report">Copy full report</button>
+        <button type="button" class="btn" id="export-report">Download report</button>
+        <button type="button" class="btn" id="export-csv">CSV</button>
+        <button type="button" class="btn" id="export-log-json">JSON</button>
         <button type="button" class="btn danger" id="clear-log">Clear log</button>
-        <span class="hint" style="margin-left:auto">Saved in this browser only.</span>
       </div>
+      <p class="hint" style="padding:0 16px 14px">
+        The report carries every input behind every pick, so it can be reviewed without
+        screenshots. Copy it and paste it straight into a message. Saved in this browser only —
+        download it now and then so a cleared cache can't take it.
+      </p>
     </section>
   </div>
 
@@ -926,6 +959,32 @@
       line: 167.5, overOdds: -110, underOdds: -110
     }
   };
+
+  /* Where each field comes from. Ordered to match the form top to bottom. */
+  var SOURCES = {
+    mlb: [
+      ["Baseball Reference", "R/G", "https://www.baseball-reference.com/leagues/majors/2026.shtml"],
+      ["FanGraphs", "ERA · FIP · IP",
+       "https://www.fangraphs.com/leaders/major-league?month=0&pos=all&stats=sta&type=8"],
+      ["Baseball Savant", "park factors",
+       "https://baseballsavant.mlb.com/leaderboard/statcast-park-factors"],
+      ["RotoWire", "weather", "https://www.rotowire.com/baseball/weather.php"],
+      ["Covers", "lines", "https://www.covers.com/sports/mlb/matchups"]
+    ],
+    wnba: [
+      ["WNBA Stats", "pace · ratings", "https://stats.wnba.com/teams/advanced/?sort=W&dir=-1"],
+      ["Covers", "lines", "https://www.covers.com/sports/wnba/matchups"]
+    ]
+  };
+
+  function renderSources() {
+    var list = SOURCES[state.sport] || [];
+    $("sources").innerHTML = '<span class="lbl">Get the numbers</span>' +
+      list.map(function (s) {
+        return '<a href="' + s[2] + '" target="_blank" rel="noopener noreferrer">' +
+          s[0] + ' <span class="what">' + s[1] + "</span></a>";
+      }).join("");
+  }
 
   var state = { sport: "mlb" };
   var $ = function (id) { return document.getElementById(id); };
@@ -1316,12 +1375,28 @@
     $("tab-wnba").setAttribute("aria-pressed", String(s === "wnba"));
     $("chart-title").textContent = s === "mlb" ? "Distribution of total runs"
                                                : "Distribution of total points";
+    renderSources();
     renderForm();
   }
 
   $("tab-mlb").addEventListener("click", function () { setSport("mlb"); });
   $("tab-wnba").addEventListener("click", function () { setSport("wnba"); });
   $("load-example").addEventListener("click", function () { renderForm(false); });
+
+  /* Clear every field. Blank inputs fall back to league average, so the panel
+     shows a neutral game rather than breaking. */
+  $("clear-fields").addEventListener("click", function () {
+    document.querySelectorAll("#calc-view input").forEach(function (el) {
+      if (el.type === "checkbox") el.checked = false;
+      else if (el.type === "range") return;          // leave the trust slider alone
+      else if (el.id === "kelly" || el.id === "maxstake") return;  // and the staking rules
+      else el.value = "";
+    });
+    compute();
+    var btn = $("clear-fields");
+    btn.textContent = "Cleared";
+    setTimeout(function () { btn.textContent = "Clear"; }, 1200);
+  });
 
   function snakeGame() {
     var g = last ? last.game : readGame();
@@ -1448,11 +1523,39 @@
   var profitOf = function (e) { return profitSide(e, actualSide(e)); };
   var modelSide = function (e) { return e.side; };
 
+  /* A readable snapshot of every field, stored with the entry so a logged game
+     can be reviewed (or reproduced) later without a screenshot. */
+  function inputSnapshot() {
+    var fields = state.sport === "mlb" ? MLB_TEAM_FIELDS : WNBA_TEAM_FIELDS;
+    var snap = { sport: state.sport, away: {}, home: {}, venue: {}, market: {}, settings: {} };
+    ["away", "home"].forEach(function (side) {
+      snap[side].name = str(side + "-name");
+      fields.forEach(function (f) {
+        var v = num(side + "-" + f.key);
+        snap[side][f.label] = isFinite(v) ? v : null;
+      });
+    });
+    if (state.sport === "mlb") {
+      snap.venue["Park factor"] = isFinite(num("parkFactor")) ? num("parkFactor") : null;
+      snap.venue["Dome"] = $("dome") ? $("dome").checked : false;
+      snap.venue["Temp °F"] = isFinite(num("tempF")) ? num("tempF") : null;
+      snap.venue["Wind out mph"] = isFinite(num("windMphOut")) ? num("windMphOut") : null;
+    }
+    snap.market["Line"] = num("line");
+    snap.market["Over"] = num("over-odds");
+    snap.market["Under"] = num("under-odds");
+    snap.settings["Model weight"] = num("weight");
+    snap.settings["Kelly"] = num("kelly");
+    snap.settings["Max stake %"] = num("maxstake");
+    return snap;
+  }
+
   function logCurrent(status) {
     if (!last) return;
     var r = last.result;
     if (r.line === undefined) return;
     store.log.unshift({
+      inputs: inputSnapshot(),
       id: String(Date.now()) + Math.random().toString(36).slice(2, 7),
       ts: new Date().toISOString(),
       sport: r.sport, away: r.away, home: r.home,
@@ -1607,6 +1710,96 @@
     });
   }
 
+  /* A plain-text report of everything: inputs, recommendation, settlement.
+     This is what replaces pasting screenshots into a document -- it carries the
+     numbers that produced each pick, which a screenshot only shows and a bare
+     CSV of results leaves out entirely. */
+  function plural(n, word) { return n + " " + word + (n === 1 ? "" : "s"); }
+
+  function pairs(obj) {
+    return Object.keys(obj)
+      .filter(function (k) {
+        var v = obj[k];
+        if (v === null || v === "" || v === undefined) return false;
+        if (k === "name") return false;
+        if (v === false) return false;            // an unticked box is not worth a column
+        return true;
+      })
+      .map(function (k) { return obj[k] === true ? k : k + " " + obj[k]; })
+      .join(" · ");
+  }
+
+  function reportFor(e, index) {
+    var lines = [];
+    var when = new Date(e.ts).toLocaleString(undefined,
+      { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" });
+    var statusWord = e.status === "bet" ? "BET" : e.status === "faded" ? "FADED" : "PASSED";
+    lines.push((index + 1) + ". " + e.away + " @ " + e.home +
+               "  (" + e.sport + " · " + when + " · " + statusWord + ")");
+    lines.push("   Pick        " + actualSide(e) + " " + priceStr(
+      actualSide(e) === "OVER" ? e.overOdds : e.underOdds) +
+      "  ·  win " + pct(e.bestSideProb !== undefined ? e.bestSideProb : e.prob) +
+      "  ·  EV " + signed(100 * e.ev, 2) + "%  ·  stake " + fmt2(e.stakePct) + "%" +
+      (e.recommended ? "" : "   [model saw no edge]"));
+    lines.push("   Model       " + fmt2(e.modelTotal) + " raw → " + fmt2(e.projectedTotal) +
+      " blended   vs line " + e.line + "   (" + signed(e.projectedTotal - e.line, 2) + ")");
+
+    var c = clvOf(e), g = gradeOf(e);
+    if (e.closeLine !== null && e.closeLine !== undefined || e.finalTotal !== null && e.finalTotal !== undefined) {
+      lines.push("   Settled     close " +
+        (e.closeLine === null || e.closeLine === undefined ? "—" : e.closeLine) +
+        "  ·  final " + (e.finalTotal === null || e.finalTotal === undefined ? "—" : e.finalTotal) +
+        "  ·  CLV " + (c === null ? "—" : signed(c, 1)) +
+        "  ·  " + (g === null ? "open" : g));
+    } else {
+      lines.push("   Settled     not yet");
+    }
+
+    var s = e.inputs;
+    if (s) {
+      lines.push("   Inputs");
+      lines.push("     Away " + (s.away.name || "?") + "   " + pairs(s.away));
+      lines.push("     Home " + (s.home.name || "?") + "   " + pairs(s.home));
+      if (s.venue && Object.keys(s.venue).length) lines.push("     Venue      " + pairs(s.venue));
+      lines.push("     Market     " + pairs(s.market));
+      lines.push("     Settings   " + pairs(s.settings));
+    } else {
+      lines.push("   Inputs      (not captured — logged before input snapshots were added)");
+    }
+    return lines.join("\n");
+  }
+
+  function fullReport() {
+    var all = store.log;
+    var bets = all.filter(function (e) { return e.status === "bet" || e.status === "faded"; });
+    var clv = clvSummary(bets);
+    var mine = summarise(bets, actualSide);
+    var model = summarise(all.filter(function (e) { return e.recommended; }), modelSide);
+
+    var head = [
+      "TOTALS MODEL — TRACK RECORD",
+      "Exported " + new Date().toLocaleString(),
+      "",
+      "SUMMARY",
+      "  Logged            " + plural(all.length, "game") + " (" + bets.length + " backed, " +
+        all.filter(function (e) { return e.status === "skipped"; }).length + " passed)",
+      "  Settled           " + mine.settled,
+      "  Your record       " + (mine.settled ? mine.w + "-" + mine.l + (mine.p ? "-" + mine.p : "") +
+        "   ROI " + signed(100 * mine.roi, 1) + "%   " + signed(mine.units, 2) + " units" : "—"),
+      "  Model blind       " + (model.settled ? model.w + "-" + model.l + (model.p ? "-" + model.p : "") +
+        "   ROI " + signed(100 * model.roi, 1) + "%" : "—"),
+      "  Average CLV       " + (clv.avg === null ? "— (no closing lines entered)" :
+        signed(clv.avg, 2) + " over " + plural(clv.n, "graded bet") + ", beat the close " +
+        (100 * clv.beat).toFixed(0) + "%" +
+        (clv.n < 20 ? "   [too few to read — needs 50-100]" : "")),
+      "",
+      "GAMES",
+      ""
+    ].join("\n");
+
+    return head + all.map(reportFor).join("\n\n") + "\n";
+  }
+
   function toCsv() {
     var head = ["date", "sport", "away", "home", "pick", "recommended", "status", "line",
                 "model_total", "projected_total", "win_prob", "ev", "stake_pct",
@@ -1639,6 +1832,13 @@
   $("log-bet").addEventListener("click", function () { logCurrent("bet"); });
   $("log-skip").addEventListener("click", function () { logCurrent("skipped"); });
   $("log-fade").addEventListener("click", function () { logCurrent("faded"); });
+  $("copy-report").addEventListener("click", function () {
+    if (!store.log.length) return;
+    copy(fullReport(), this);
+  });
+  $("export-report").addEventListener("click", function () {
+    download("totals-report.txt", fullReport(), "text/plain");
+  });
   $("export-csv").addEventListener("click", function () {
     download("totals-log.csv", toCsv(), "text/csv");
   });
@@ -1661,6 +1861,7 @@
     $("view-log").setAttribute("aria-pressed", String(isLog));
     $("calc-view").hidden = isLog;
     $("log-view").hidden = !isLog;
+    $("sources").hidden = isLog;
     document.querySelector(".sports").style.visibility = isLog ? "hidden" : "";
     $("mbar").style.display = isLog ? "none" : "";
     if (isLog) renderLog();

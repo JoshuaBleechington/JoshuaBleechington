@@ -17,6 +17,47 @@ same model ported to JavaScript — a form for the inputs, results that update a
 you type, and a chart of the outcome distribution. One file, no server, works
 offline. Numbers were checked against the Python to six decimal places.
 
+It also keeps a **track record**, which is the part that matters if you ever
+want to know whether any of this works. See below.
+
+## Closing line value, and why the record isn't the point
+
+A win/loss record is a terrible way to evaluate a model, because the sample
+sizes are brutal:
+
+| If you are truly a… | Bets needed to prove it (95%, one-sided) |
+|---|---|
+| 54% winner | ~2,581 |
+| 55% winner | ~986 |
+| 56% winner | ~517 |
+| 58% winner | ~214 |
+
+Breakeven at -110 is 52.38%. A genuinely excellent 55% bettor needs about a
+thousand bets before the record itself is convincing. A 3-0 start happens 12.5%
+of the time by coin flip.
+
+**Closing line value is the shortcut.** Record the line when you bet and the
+line at game time. If you bet OVER 8.5 and it closes at 9, you got a better
+number than the market's final answer — that is +1.0 of CLV, whether the bet
+wins or loses. Because CLV measures a continuous quantity against a sharp
+benchmark instead of a coin flip, it reads in dozens of bets rather than
+thousands.
+
+The web page tracks it automatically. Run a game, hit **Bet it**, **Passed**, or
+**Bet the other side**, and later fill in the closing line and final score. It
+keeps three separate records:
+
+- **Yours** — what you actually bet
+- **The model's** — every green recommendation, bet blindly
+- **The gap between them** — whether your overrides help or hurt
+
+Those diverge whenever you fade the model, which is exactly when the comparison
+is worth having. Everything is stored in your browser, exportable to CSV, and
+never leaves your machine.
+
+**Log the games you pass on too.** A record of only the games you liked cannot
+tell you whether the model works — the ones you skipped are half the evidence.
+
 ```
 WNBA totals -- 3 game(s), model weight 0.5
 

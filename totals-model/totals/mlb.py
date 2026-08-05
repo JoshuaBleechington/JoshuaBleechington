@@ -38,6 +38,27 @@ LEAGUE_RUNS_PER_GAME = 4.52
 # Earned runs are ~93% of all runs, so RA/9 runs a touch above ERA.
 ERA_TO_RA9 = 1.075
 
+# A starter's raw ERA is a terrible estimate of how he will pitch tonight. It is
+# noisy at any realistic sample size, and the extremes are almost entirely luck:
+# nobody's true talent is a 1.50 ERA or a 7.80 one. Betting markets price the
+# talent, so a model fed raw ERA will disagree with the market by multiple runs
+# and mistake that disagreement for edge.
+#
+# The fix is to regress toward league average, weighted by how many innings the
+# ERA is actually built on:
+#
+#     regressed = (season_ip * era + PRIOR_IP * lg_era) / (season_ip + PRIOR_IP)
+#
+# PRIOR_IP is how many innings of league-average pitching to blend in. 100 is in
+# line with what projection systems use for pitcher ERA. Feeding FIP or xERA
+# instead of ERA is better still -- both are far more predictive, and FanGraphs
+# lists them next to ERA on the same page.
+STARTER_ERA_PRIOR_IP = 100.0
+
+# Assumed season innings when the caller doesn't say. A rotation regular is
+# around here by midsummer; supply the real number for anyone else.
+DEFAULT_STARTER_SEASON_IP = 130.0
+
 # Negative binomial r. variance = mean + mean^2 / r; r = 4.0 gives sd ~3.0 at a
 # 4.4 run mean, which matches the real distribution of team runs per game.
 RUN_DISPERSION = 4.0
@@ -55,6 +76,18 @@ def _ra9(team: dict[str, Any], prefix: str, default: float) -> float:
     if f"{prefix}_era" in team:
         return float(team[f"{prefix}_era"]) * ERA_TO_RA9
     return default
+
+
+def regress_era(era: float, season_ip: float | None, lg_era: float,
+                prior_ip: float = STARTER_ERA_PRIOR_IP) -> float:
+    """Shrink a starter's ERA toward league average by how much it is worth.
+
+    A 7.84 ERA over 40 innings says far less than a 3.10 over 160. Without this,
+    one small-sample starter swings a projected total by two or three runs.
+    """
+    if season_ip is None or season_ip <= 0:
+        season_ip = DEFAULT_STARTER_SEASON_IP
+    return (season_ip * era + prior_ip * lg_era) / (season_ip + prior_ip)
 
 
 def _park_neutral(rate: float, own_park_factor: float) -> float:
@@ -89,11 +122,20 @@ class MlbTeam:
     own_park_factor: float = 1.0
 
     @classmethod
-    def from_dict(cls, d: dict[str, Any], lg_rpg: float) -> "MlbTeam":
+    def from_dict(cls, d: dict[str, Any], lg_rpg: float, regress: bool = True) -> "MlbTeam":
+        starter = _ra9(d, "starter", lg_rpg)
+        if regress:
+            # Regress in ERA space, where the prior is expressed, then convert back.
+            lg_era = lg_rpg / ERA_TO_RA9
+            starter = regress_era(
+                starter / ERA_TO_RA9,
+                d.get("starter_season_ip"),
+                lg_era,
+            ) * ERA_TO_RA9
         return cls(
             name=d.get("name", "?"),
             runs_per_game=float(d.get("runs_per_game", lg_rpg)),
-            starter_ra9=_ra9(d, "starter", lg_rpg),
+            starter_ra9=starter,
             starter_ip=float(d.get("starter_ip", 5.2)),
             bullpen_ra9=_ra9(d, "bullpen", lg_rpg),
             own_park_factor=float(d.get("own_park_factor", 1.0)),
@@ -113,8 +155,9 @@ def project(game: dict[str, Any]) -> Projection:
     league = game.get("league", {})
     lg_rpg = float(league.get("runs_per_game", LEAGUE_RUNS_PER_GAME))
 
-    away = MlbTeam.from_dict(game["away"], lg_rpg)
-    home = MlbTeam.from_dict(game["home"], lg_rpg)
+    regress = bool(game.get("regress_starters", True))
+    away = MlbTeam.from_dict(game["away"], lg_rpg, regress)
+    home = MlbTeam.from_dict(game["home"], lg_rpg, regress)
 
     park = float(game.get("park_factor", 1.0))
     wx = weather_factor(game.get("weather"))

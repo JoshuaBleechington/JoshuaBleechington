@@ -170,6 +170,60 @@ class TestMlb(unittest.TestCase):
         self.assertLessEqual(mlb.weather_factor({"temp_f": 120, "wind_mph_out": 40}), 1.10)
         self.assertGreaterEqual(mlb.weather_factor({"temp_f": 20, "wind_mph_out": -40}), 0.90)
 
+    def test_regression_leaves_a_league_average_starter_alone(self):
+        lg_era = mlb.LEAGUE_RUNS_PER_GAME / mlb.ERA_TO_RA9
+        self.assertAlmostEqual(mlb.regress_era(lg_era, 130, lg_era), lg_era, places=9)
+        self.assertAlmostEqual(mlb.regress_era(lg_era, 10, lg_era), lg_era, places=9)
+
+    def test_regression_pulls_extremes_toward_league(self):
+        lg_era = mlb.LEAGUE_RUNS_PER_GAME / mlb.ERA_TO_RA9
+        hot = mlb.regress_era(1.53, 40, lg_era)
+        cold = mlb.regress_era(7.84, 45, lg_era)
+        self.assertTrue(1.53 < hot < lg_era, hot)
+        self.assertTrue(lg_era < cold < 7.84, cold)
+
+    def test_more_innings_means_less_regression(self):
+        lg_era = mlb.LEAGUE_RUNS_PER_GAME / mlb.ERA_TO_RA9
+        small = mlb.regress_era(2.50, 30, lg_era)
+        large = mlb.regress_era(2.50, 200, lg_era)
+        self.assertLess(large, small)  # the bigger sample keeps more of its own ERA
+        self.assertLess(2.50, large)
+
+    def test_missing_season_ip_still_regresses(self):
+        lg_era = mlb.LEAGUE_RUNS_PER_GAME / mlb.ERA_TO_RA9
+        assumed = mlb.regress_era(2.00, None, lg_era)
+        explicit = mlb.regress_era(2.00, mlb.DEFAULT_STARTER_SEASON_IP, lg_era)
+        self.assertAlmostEqual(assumed, explicit, places=9)
+        self.assertGreater(assumed, 2.00)
+
+    def test_regression_shrinks_disagreement_with_the_market(self):
+        """A small-sample blowup starter should not move the total three runs."""
+        game = self.neutral_game()
+        game["away"].pop("starter_ra9")
+        game["away"]["starter_era"] = 7.84
+        game["away"]["starter_season_ip"] = 45
+        raw = mlb.project(dict(game, regress_starters=False)).total
+        reg = mlb.project(game).total
+        neutral = 2 * mlb.LEAGUE_RUNS_PER_GAME
+        self.assertGreater(raw, reg)
+        self.assertLess(abs(reg - neutral), abs(raw - neutral))
+
+    def test_regression_can_be_switched_off(self):
+        """The away starter is the one getting hit, so the home team scores."""
+        game = self.neutral_game()
+        game["away"].pop("starter_ra9")
+        game["away"]["starter_era"] = 7.84
+        game["away"]["starter_season_ip"] = 45
+        off = mlb.project(dict(game, regress_starters=False))
+        on = mlb.project(game)
+        # Away offence faces an untouched league-average home staff either way.
+        self.assertAlmostEqual(off.away_score, mlb.LEAGUE_RUNS_PER_GAME, places=6)
+        self.assertAlmostEqual(on.away_score, mlb.LEAGUE_RUNS_PER_GAME, places=6)
+        # The home side is where the bad starter shows up, and regression tames it.
+        self.assertGreater(off.home_score, mlb.LEAGUE_RUNS_PER_GAME)
+        self.assertGreater(off.home_score, on.home_score)
+        self.assertGreater(on.home_score, mlb.LEAGUE_RUNS_PER_GAME)
+
     def test_projected_totals_land_in_a_believable_range(self):
         p = mlb.project(self.neutral_game(park_factor=1.0))
         probs = p.total_probs(8.5)

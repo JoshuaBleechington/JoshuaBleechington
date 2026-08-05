@@ -765,7 +765,21 @@
   // LG_RPG is net in the denominator of the odds ratio, so a stale value biases
   // every projection the same way -- too low inflates totals toward the over.
   // 2026 runs ~9.04 combined, i.e. 4.52 per team. Re-check each season.
-  var MLB = { LG_RPG: 4.52, ERA_TO_RA9: 1.075, DISPERSION: 4.0 };
+  var MLB = {
+    LG_RPG: 4.52, ERA_TO_RA9: 1.075, DISPERSION: 4.0,
+    // A starter's raw ERA is a poor estimate of tonight: it is noisy at any
+    // realistic sample, and the extremes are mostly luck. Nobody's true talent
+    // is a 1.50 ERA or a 7.80 one. Markets price the talent, so raw ERA makes
+    // the model disagree by multiple runs and call it edge. Regress toward
+    // league, weighted by the innings the ERA is built on.
+    ERA_PRIOR_IP: 100,
+    DEFAULT_SEASON_IP: 130
+  };
+
+  function regressEra(era, seasonIp, lgEra) {
+    if (!isNum(seasonIp) || seasonIp <= 0) seasonIp = MLB.DEFAULT_SEASON_IP;
+    return (seasonIp * era + MLB.ERA_PRIOR_IP * lgEra) / (seasonIp + MLB.ERA_PRIOR_IP);
+  }
   var WNBA = { LG_PACE: 80, LG_RATING: 101, TOTAL_SD: 11.5, MARGIN_SD: 11,
                HCA: 2.5, B2B: 2, OT_POINTS: 19, OT_CAL: 1.5 };
 
@@ -781,11 +795,14 @@
 
   function projectMlb(g) {
     var lg = MLB.LG_RPG;
+    var lgEra = lg / MLB.ERA_TO_RA9;
     function side(t) {
+      var era = isNum(t.starterEra) ? t.starterEra : lgEra;
+      if (g.regressStarters !== false) era = regressEra(era, t.starterSeasonIp, lgEra);
       return {
         name: t.name || "?",
         rpg: isNum(t.runsPerGame) ? t.runsPerGame : lg,
-        spRa9: isNum(t.starterEra) ? t.starterEra * MLB.ERA_TO_RA9 : lg,
+        spRa9: era * MLB.ERA_TO_RA9,
         spIp: isNum(t.starterIp) ? t.starterIp : 5.2,
         bpRa9: isNum(t.bullpenEra) ? t.bullpenEra * MLB.ERA_TO_RA9 : lg,
         ownPf: isNum(t.ownParkFactor) ? t.ownParkFactor : 1
@@ -881,8 +898,9 @@
 
   var MLB_TEAM_FIELDS = [
     { key: "runsPerGame", label: "Runs / game", step: 0.05 },
-    { key: "starterEra", label: "Starter ERA", step: 0.05 },
-    { key: "starterIp", label: "Starter IP", step: 0.1 },
+    { key: "starterEra", label: "Starter ERA (or FIP)", step: 0.05 },
+    { key: "starterSeasonIp", label: "Starter season IP", step: 1 },
+    { key: "starterIp", label: "IP this start", step: 0.1 },
     { key: "bullpenEra", label: "Bullpen ERA", step: 0.05 },
     { key: "ownParkFactor", label: "Home park factor", step: 0.01 }
   ];
@@ -895,10 +913,10 @@
 
   var EXAMPLES = {
     mlb: {
-      away: { name: "Dodgers", runsPerGame: 5.05, starterEra: 3.05, starterIp: 6.0,
-              bullpenEra: 3.6, ownParkFactor: 1.0 },
-      home: { name: "Rockies", runsPerGame: 4.95, starterEra: 5.4, starterIp: 5.0,
-              bullpenEra: 5.1, ownParkFactor: 1.28 },
+      away: { name: "Dodgers", runsPerGame: 5.05, starterEra: 3.05, starterSeasonIp: 140,
+              starterIp: 6.0, bullpenEra: 3.6, ownParkFactor: 1.0 },
+      home: { name: "Rockies", runsPerGame: 4.95, starterEra: 5.4, starterSeasonIp: 110,
+              starterIp: 5.0, bullpenEra: 5.1, ownParkFactor: 1.28 },
       parkFactor: 1.28, tempF: 84, windMphOut: 5, dome: false,
       line: 11.5, overOdds: -105, underOdds: -115
     },
@@ -936,6 +954,12 @@
       });
       html += "</div></div></div>";
     });
+    if (state.sport === "mlb") {
+      html += '<p class="hint" style="margin-top:16px;padding-top:14px;border-top:1px solid var(--rule)">' +
+        "Starter ERA is regressed toward league average based on the season innings behind it — " +
+        "a 7.80 ERA over 40 innings is mostly noise, and the market knows it. " +
+        "<b>FIP or xERA works better than ERA here</b>; FanGraphs lists both in the same table.</p>";
+    }
     $("teams-body").innerHTML = html;
 
     if (state.sport === "mlb") {

@@ -939,7 +939,7 @@
     { key: "runsPerGame", label: "Runs / game", step: 0.05 },
     { key: "starterEra", label: "Starter ERA (or FIP)", step: 0.05 },
     { key: "starterSeasonIp", label: "Starter season IP", step: 1 },
-    { key: "starterIp", label: "IP this start", step: 0.1 },
+    { key: "starterIp", label: "Avg IP", step: 0.1 },
     { key: "bullpenEra", label: "Bullpen ERA", step: 0.05 },
     { key: "ownParkFactor", label: "Home park factor", step: 0.01 }
   ];
@@ -1023,7 +1023,10 @@
       html += '<p class="hint" style="margin-top:16px;padding-top:14px;border-top:1px solid var(--rule)">' +
         "Starter ERA is regressed toward league average based on the season innings behind it — " +
         "a 7.80 ERA over 40 innings is mostly noise, and the market knows it. " +
-        "<b>FIP or xERA works better than ERA here</b>; FanGraphs lists both in the same table.</p>";
+        "<b>FIP or xERA works better than ERA here</b>; FanGraphs lists both in the same table. " +
+        "<b>Avg IP</b> is season IP ÷ games started — it splits the game between the starter and " +
+        "the bullpen. Leave it blank for the 5.2 league average; it only moves the total much when " +
+        "the starter and the pen are far apart.</p>";
     }
     $("teams-body").innerHTML = html;
 

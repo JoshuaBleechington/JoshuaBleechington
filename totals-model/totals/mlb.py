@@ -8,11 +8,11 @@ opposing run prevention is.
            * park * weather
 
 Run prevention is a blend of the announced starter and the bullpen, weighted by
-how deep the starter is expected to go. That single input does most of the work
+how deep the starter typically goes (season IP / GS). That single input does most of the work
 in baseball totals, which is why it is worth entering by hand.
 
 Only five numbers per team are required:
-  runs_per_game, starter ERA (or RA/9), starter innings, bullpen ERA (or RA/9),
+  runs_per_game, starter ERA (or RA/9), average innings per start, bullpen ERA,
   plus the park factor for the venue.
 """
 

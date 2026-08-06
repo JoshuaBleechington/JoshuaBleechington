@@ -78,7 +78,7 @@ WNBA totals -- 3 game(s), model weight 0.5
 |---|---|---|
 | `runs_per_game` | Team runs scored per game | FanGraphs team batting, or Baseball Reference |
 | `starter_era` *or* `starter_ra9` | Tonight's announced starter | FanGraphs pitcher page (`RA9` if you have it, ERA is fine) |
-| `starter_ip` | Innings you expect that starter to go | Their IP/GS this season; 5.0–6.0 covers most |
+| `starter_ip` | Average innings per start (IP ÷ GS) | FanGraphs, same row as ERA; 5.0–6.0 covers most |
 | `bullpen_era` *or* `bullpen_ra9` | Team bullpen ERA | FanGraphs team relief pitching |
 | `own_park_factor` | Park factor of the team's *home* stadium | Baseball Savant park factors (100 → 1.00) |
 | `park_factor` | Park factor of tonight's venue (game-level) | Same source |

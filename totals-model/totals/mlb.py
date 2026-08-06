@@ -90,6 +90,20 @@ def regress_era(era: float, season_ip: float | None, lg_era: float,
     return (season_ip * era + prior_ip * lg_era) / (season_ip + prior_ip)
 
 
+def normalize_park_factor(pf: float) -> float:
+    """Accept a park factor on either scale.
+
+    Baseball Savant prints 102; the model wants 1.02. The two scales cannot
+    overlap -- no ballpark is 5x run-neutral, and none is 5% of it -- so a value
+    above 5 is unambiguously the 100 scale and can be converted rather than
+    rejected. Entered on the wrong scale, a park factor is off by 100x and
+    silently drives every projection to nonsense.
+    """
+    if pf > 5.0:
+        return pf / 100.0
+    return pf
+
+
 def _park_neutral(rate: float, own_park_factor: float) -> float:
     """Season rates are half home, half road, so a team's own park inflates them.
 
@@ -138,7 +152,7 @@ class MlbTeam:
             starter_ra9=starter,
             starter_ip=float(d.get("starter_ip", 5.2)),
             bullpen_ra9=_ra9(d, "bullpen", lg_rpg),
-            own_park_factor=float(d.get("own_park_factor", 1.0)),
+            own_park_factor=normalize_park_factor(float(d.get("own_park_factor", 1.0))),
         )
 
     def offence_index(self, lg_rpg: float) -> float:
@@ -159,7 +173,7 @@ def project(game: dict[str, Any]) -> Projection:
     away = MlbTeam.from_dict(game["away"], lg_rpg, regress)
     home = MlbTeam.from_dict(game["home"], lg_rpg, regress)
 
-    park = float(game.get("park_factor", 1.0))
+    park = normalize_park_factor(float(game.get("park_factor", 1.0)))
     wx = weather_factor(game.get("weather"))
     # Home teams skip the bottom of the 9th when they lead, which cancels out
     # against hitting last. Left at 1.0; move it if your own numbers say so.

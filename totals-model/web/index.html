@@ -823,6 +823,12 @@
     if (isNum(w.windMphOut)) f *= 1 + 0.008 * w.windMphOut;
     return Math.max(0.9, Math.min(1.1, f));
   }
+  /* Savant prints 102; the model wants 1.02. The scales cannot overlap -- no
+     park is 5x neutral and none is 5% of it -- so anything above 5 is
+     unambiguously the 100 scale. Entered on the wrong one it is off by 100x and
+     quietly drives every projection to nonsense. */
+  function normalizeParkFactor(pf) { return pf > 5 ? pf / 100 : pf; }
+
   function parkNeutral(rate, pf) { return pf === 1 ? rate : rate / ((1 + pf) / 2); }
   function isNum(v) { return typeof v === "number" && isFinite(v); }
 
@@ -838,7 +844,7 @@
         spRa9: era * MLB.ERA_TO_RA9,
         spIp: isNum(t.starterIp) ? t.starterIp : 5.2,
         bpRa9: isNum(t.bullpenEra) ? t.bullpenEra * MLB.ERA_TO_RA9 : lg,
-        ownPf: isNum(t.ownParkFactor) ? t.ownParkFactor : 1
+        ownPf: isNum(t.ownParkFactor) ? normalizeParkFactor(t.ownParkFactor) : 1
       };
     }
     var a = side(g.away), h = side(g.home);
@@ -847,7 +853,7 @@
       var share = Math.max(0, Math.min(1, t.spIp / 9));
       return parkNeutral(share * t.spRa9 + (1 - share) * t.bpRa9, t.ownPf) / lg;
     }
-    var park = isNum(g.parkFactor) ? g.parkFactor : 1;
+    var park = isNum(g.parkFactor) ? normalizeParkFactor(g.parkFactor) : 1;
     var wx = weatherFactor(g.weather);
     return {
       sport: "MLB", away: a.name, home: h.name,

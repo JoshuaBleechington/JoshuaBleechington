@@ -224,6 +224,32 @@ class TestMlb(unittest.TestCase):
         self.assertGreater(off.home_score, on.home_score)
         self.assertGreater(on.home_score, mlb.LEAGUE_RUNS_PER_GAME)
 
+    def test_park_factor_accepts_either_scale(self):
+        self.assertAlmostEqual(mlb.normalize_park_factor(102), 1.02, places=9)
+        self.assertAlmostEqual(mlb.normalize_park_factor(1.02), 1.02, places=9)
+        self.assertAlmostEqual(mlb.normalize_park_factor(100), 1.00, places=9)
+        self.assertAlmostEqual(mlb.normalize_park_factor(0.92), 0.92, places=9)
+
+    def test_savant_scale_gives_the_same_projection_as_decimals(self):
+        """102 and 1.02 must mean the same thing, everywhere they appear."""
+        decimal = self.neutral_game(park_factor=1.02)
+        decimal["away"]["own_park_factor"] = 0.98
+        decimal["home"]["own_park_factor"] = 1.02
+        hundred = self.neutral_game(park_factor=102)
+        hundred["away"]["own_park_factor"] = 98
+        hundred["home"]["own_park_factor"] = 102
+        self.assertAlmostEqual(mlb.project(decimal).total, mlb.project(hundred).total, places=9)
+
+    def test_hundred_scale_no_longer_collapses_the_projection(self):
+        """The bug this guards: 100-scale factors drove every total to ~0.3 runs
+        and made the model shout UNDER on games it had never really seen."""
+        g = self.neutral_game(park_factor=102)
+        g["away"]["own_park_factor"] = 98
+        g["home"]["own_park_factor"] = 102
+        total = mlb.project(g).total
+        self.assertGreater(total, 7.0)
+        self.assertLess(total, 12.0)
+
     def test_projected_totals_land_in_a_believable_range(self):
         p = mlb.project(self.neutral_game(park_factor=1.0))
         probs = p.total_probs(8.5)

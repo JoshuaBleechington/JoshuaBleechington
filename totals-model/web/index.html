@@ -200,6 +200,8 @@
   }
   .warn .glyph { font-size: 15px; line-height: 1.3; color: var(--bad); flex: none; }
   .warn b { color: var(--bad); }
+  .warn.caution { border-color: var(--accent); background: var(--accent-wash); }
+  .warn.caution .glyph, .warn.caution b { color: var(--accent-ink); }
   .warn p { margin: 0; }
   .warn p + p { margin-top: 6px; }
 
@@ -1547,8 +1549,14 @@
      either way, so the app looks healthy right up until a reload empties it.
      That has to be surfaced, not swallowed -- a logger that quietly forgets is
      worse than no logger, because you stop keeping records elsewhere. */
-  var storageOk = false;
+  var storageOk = false;      // writes don't throw
+  var storageProven = false;  // ...and something actually survived a page load
+  var MARK_KEY = STORE_KEY + ":mark";
 
+  /* A write/read/delete round trip inside one tick proves almost nothing: a
+     sandboxed frame can hand back a perfectly functional localStorage that is
+     discarded when the frame goes away. The only test that means anything is
+     whether a value written on a previous load is still here on this one. */
   function checkStorage() {
     try {
       var probe = STORE_KEY + ":probe";
@@ -1565,6 +1573,9 @@
     storageOk = checkStorage();
     if (!storageOk) return;
     try {
+      // A mark left by an earlier load is proof that storage survives one.
+      storageProven = !!window.localStorage.getItem(MARK_KEY);
+      window.localStorage.setItem(MARK_KEY, new Date().toISOString());
       var raw = window.localStorage.getItem(STORE_KEY);
       if (raw) {
         var parsed = JSON.parse(raw);
@@ -1591,7 +1602,34 @@
   function renderStorageWarning() {
     var el = $("storage-warning");
     if (!el) return;
-    el.hidden = storageOk;
+    // Three states, not two. "Blocked" is certain. "Unverified" means writes
+    // work but nothing has yet been shown to survive a load -- true on a
+    // genuine first visit, and permanently true if storage is being wiped.
+    // Saying so lets the page diagnose itself: see it once, fine; see it every
+    // time, storage is not keeping anything.
+    if (!storageOk) {
+      el.className = "warn";
+      el.innerHTML = '<span class="glyph" aria-hidden="true">■</span><div>' +
+        "<p><b>This page can't save your log.</b> The browser is blocking storage here, so " +
+        "anything you record will be gone when you reload.</p>" +
+        "<p>Export the <b>JSON</b> before you close the tab and use <b>Import</b> to bring it " +
+        "back, or run the downloaded <code>index.html</code> from your own machine, where " +
+        "saving works normally.</p></div>";
+      el.hidden = false;
+      return;
+    }
+    if (!storageProven) {
+      el.className = "warn caution";
+      el.innerHTML = '<span class="glyph" aria-hidden="true">▲</span><div>' +
+        "<p><b>Saving hasn't been confirmed yet.</b> This page has no record of a previous " +
+        "visit. That's normal the first time.</p>" +
+        "<p><b>If you're seeing this every time you open the page, your log is not being " +
+        "kept</b> — export the JSON before closing, or run the downloaded " +
+        "<code>index.html</code> locally, where saving works.</p></div>";
+      el.hidden = false;
+      return;
+    }
+    el.hidden = true;
   }
 
   /* Bring a previously exported log back in. Without this, any loss is final:

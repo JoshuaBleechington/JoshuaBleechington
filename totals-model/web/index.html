@@ -202,6 +202,21 @@
   .warn b { color: var(--bad); }
   .warn.caution { border-color: var(--accent); background: var(--accent-wash); }
   .warn.caution .glyph, .warn.caution b { color: var(--accent-ink); }
+  .warn.recall-note { align-items: center; }
+  .warn.recall-note .btn { flex: none; margin-left: auto; }
+
+  /* The game name in the log doubles as the way back into the projector. */
+  .logtable .recall {
+    appearance: none; background: none; border: 0; padding: 0;
+    font: inherit; color: var(--accent-ink); cursor: pointer;
+    text-align: left; text-decoration: underline;
+    text-decoration-color: color-mix(in srgb, var(--accent) 40%, transparent);
+    text-underline-offset: 3px;
+  }
+  .logtable .recall:hover { text-decoration-color: var(--accent); }
+  .logtable .recall:focus-visible {
+    outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 3px;
+  }
   .warn p { margin: 0; }
   .warn p + p { margin-top: 6px; }
 
@@ -504,6 +519,8 @@
       from your own machine, where saving works normally.</p>
     </div>
   </div>
+
+  <div class="warn caution recall-note" id="recall-banner" role="status" hidden></div>
 
   <nav class="sources" id="sources" aria-label="Where to get the numbers"></nav>
 
@@ -1045,6 +1062,11 @@
       '</div>';
   }
 
+  /* Set just before a re-render to load a logged game instead of the last
+     session's inputs. Consumed once, then cleared. */
+  var pendingRestore = null;
+  var viewingId = null;
+
   function renderForm(useSaved) {
     var fields = state.sport === "mlb" ? MLB_TEAM_FIELDS : WNBA_TEAM_FIELDS;
     var ex = EXAMPLES[state.sport];
@@ -1110,15 +1132,70 @@
     $("line").value = ex.line;
     $("over-odds").value = ex.overOdds;
     $("under-odds").value = ex.underOdds;
-    if (useSaved !== false) restoreInputs();
+    if (pendingRestore) {
+      applyValues(pendingRestore);
+      pendingRestore = null;
+    } else if (useSaved !== false) {
+      restoreInputs();
+    }
     bindInputs();
+    compute();
+    renderRecallBanner();
+  }
+
+  function renderRecallBanner() {
+    var el = $("recall-banner");
+    if (!el) return;
+    if (!viewingId) { el.hidden = true; return; }
+    var e = store.log.filter(function (x) { return x.id === viewingId; })[0];
+    if (!e) { viewingId = null; el.hidden = true; return; }
+    el.hidden = false;
+    el.innerHTML = '<span class="glyph" aria-hidden="true">↻</span><div><p>' +
+      "Showing <b>" + e.away + " @ " + e.home + "</b> as it was logged on " +
+      new Date(e.ts).toLocaleString(undefined,
+        { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" }) +
+      ". Editing any field turns this back into a normal projection — logging it " +
+      "again would add a second entry.</p></div>" +
+      '<button type="button" class="btn" id="recall-clear">Done</button>';
+    $("recall-clear").addEventListener("click", function () {
+      viewingId = null;
+      renderForm(true);
+    });
+  }
+
+  /* Reopen a logged game in the projector, so the probabilities, the split bar
+     and the distribution chart can all be looked at again. */
+  function restoreGame(id) {
+    var e = store.log.filter(function (x) { return x.id === id; })[0];
+    if (!e || !e.form) return;
+    viewingId = id;
+    pendingRestore = e.form;
+    var sport = (e.sport || "MLB").toLowerCase();
+    setView("calc");
+    if (state.sport !== sport) {
+      setSport(sport);          // re-renders, and consumes pendingRestore
+    } else {
+      renderForm();
+    }
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  }
+
+  /* Editing anything while a logged game is on screen means you're building a
+     new projection, not looking at the old one -- so drop the recall state. */
+  function onCalcInput() {
+    if (viewingId) {
+      viewingId = null;
+      renderRecallBanner();
+    }
     compute();
   }
 
   function bindInputs() {
-    document.querySelectorAll("input").forEach(function (el) {
-      el.removeEventListener("input", compute);
-      el.addEventListener("input", compute);
+    // Scoped to the calculator: the log table's own inputs settle games and
+    // must not trigger a re-projection.
+    document.querySelectorAll("#calc-view input").forEach(function (el) {
+      el.removeEventListener("input", onCalcInput);
+      el.addEventListener("input", onCalcInput);
     });
   }
 
@@ -1744,6 +1821,10 @@
     if (r.line === undefined) return;
     store.log.unshift({
       inputs: inputSnapshot(),
+      // Raw field values, so the game can be reopened in the projector exactly
+      // as it was run -- including the league baselines, which would otherwise
+      // recompute against whatever they've since been changed to.
+      form: formValues(),
       id: String(Date.now()) + Math.random().toString(36).slice(2, 7),
       ts: new Date().toISOString(),
       sport: r.sport, away: r.away, home: r.home,
@@ -1869,7 +1950,10 @@
       var c = clvOf(e), g = gradeOf(e);
       rows += "<tr>" +
         "<td>" + new Date(e.ts).toLocaleDateString(undefined, { month: "short", day: "numeric" }) + "</td>" +
-        "<td>" + e.away + " @ " + e.home + "</td>" +
+        "<td>" + (e.form
+          ? '<button type="button" class="recall" data-recall="' + e.id + '">' +
+            e.away + " @ " + e.home + "</button>"
+          : e.away + " @ " + e.home) + "</td>" +
         "<td>" + actualSide(e) + (e.recommended ? "" : " <span class='chip skipped'>no edge</span>") + "</td>" +
         "<td class='num'>" + e.line + "</td>" +
         "<td class='num'>" + e.projectedTotal.toFixed(1) + "</td>" +
@@ -1885,6 +1969,10 @@
         "</tr>";
     });
     $("log-table").innerHTML = rows + "</tbody>";
+
+    $("log-table").querySelectorAll("[data-recall]").forEach(function (btn) {
+      btn.addEventListener("click", function () { restoreGame(btn.dataset.recall); });
+    });
 
     $("log-table").querySelectorAll("input").forEach(function (inp) {
       inp.addEventListener("change", function () {
@@ -2061,6 +2149,7 @@
     $("calc-view").hidden = isLog;
     $("log-view").hidden = !isLog;
     $("sources").hidden = isLog;
+    $("recall-banner").hidden = isLog || !viewingId;
     document.querySelector(".sports").style.visibility = isLog ? "hidden" : "";
     $("mbar").style.display = isLog ? "none" : "";
     if (isLog) renderLog();
@@ -2068,14 +2157,29 @@
   $("view-calc").addEventListener("click", function () { setView("calc"); });
   $("view-log").addEventListener("click", function () { setView("log"); });
 
-  /* Remember the last inputs per sport so a refresh doesn't cost you a retype. */
-  function rememberInputs() {
+  /* Every field on the calculator, keyed by input id. Used both to remember the
+     last session and to snapshot a logged game so it can be reopened later. */
+  function formValues() {
     var vals = {};
     document.querySelectorAll("#calc-view input").forEach(function (el) {
       if (el.id) vals[el.id] = el.type === "checkbox" ? el.checked : el.value;
     });
-    store.inputs[state.sport] = vals;
+    return vals;
+  }
+
+  /* Remember the last inputs per sport so a refresh doesn't cost you a retype. */
+  function rememberInputs() {
+    store.inputs[state.sport] = formValues();
     saveStore();
+  }
+
+  function applyValues(vals) {
+    Object.keys(vals).forEach(function (id) {
+      var el = $(id);
+      if (!el) return;
+      if (el.type === "checkbox") el.checked = vals[id];
+      else el.value = vals[id];
+    });
   }
 
   function restoreInputs() {

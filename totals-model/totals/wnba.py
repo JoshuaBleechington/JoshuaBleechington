@@ -22,10 +22,20 @@ from typing import Any
 from .core import Projection
 from .distributions import normal_pdf, normal_total_probs
 
-# League baselines -- update once a season. WNBA plays 40-minute games, so pace
-# is possessions per 40, not per 48. These are 2024-25 ballpark figures.
+# League baselines -- CHECK THESE EVERY SEASON. WNBA plays 40-minute games, so
+# pace is possessions per 40, not per 48.
+#
+# Both constants sit in denominators (possessions divide by lg_pace, efficiency
+# divides by lg_rating), so a stale value biases every projection the same way
+# rather than washing out. Too low inflates totals and makes the model call the
+# over on everything, which is a stuck clock, not an edge.
+#
+# To re-derive the rating without a league-average source: every point scored is
+# a point allowed, so the mean offensive rating and mean defensive rating across
+# the league must be the same number, and that number is this constant. Average
+# the two across whatever teams you have and you will be close.
 LEAGUE_PACE = 80.0
-LEAGUE_RATING = 101.0
+LEAGUE_RATING = 105.8
 
 # Empirical spread of a WNBA final total around its projection.
 TOTAL_SD = 11.5

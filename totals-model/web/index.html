@@ -566,6 +566,8 @@
               <input type="number" id="maxstake" step="0.5" min="0" value="2" />
             </div>
           </div>
+
+          <div id="league-body"></div>
           <p class="hint">
             Bets are sized with fractional Kelly and then hard-capped. The cap is what stops an
             overconfident projection from recommending a fifth of your bankroll.
@@ -839,7 +841,11 @@
     if (!isNum(seasonIp) || seasonIp <= 0) seasonIp = MLB.DEFAULT_SEASON_IP;
     return (seasonIp * era + MLB.ERA_PRIOR_IP * lgEra) / (seasonIp + MLB.ERA_PRIOR_IP);
   }
-  var WNBA = { LG_PACE: 80, LG_RATING: 101, TOTAL_SD: 11.5, MARGIN_SD: 11,
+  // Both league constants sit in denominators, so a stale value biases every
+  // projection the same way rather than washing out. To re-derive the rating:
+  // every point scored is a point allowed, so the league's mean offensive
+  // rating equals its mean defensive rating, and that is this number.
+  var WNBA = { LG_PACE: 80, LG_RATING: 105.8, TOTAL_SD: 11.5, MARGIN_SD: 11,
                HCA: 2.5, B2B: 2, OT_POINTS: 19, OT_CAL: 1.5 };
 
   function weatherFactor(w) {
@@ -859,7 +865,7 @@
   function isNum(v) { return typeof v === "number" && isFinite(v); }
 
   function projectMlb(g) {
-    var lg = MLB.LG_RPG;
+    var lg = (g.league && isNum(g.league.runsPerGame)) ? g.league.runsPerGame : MLB.LG_RPG;
     var lgEra = lg / MLB.ERA_TO_RA9;
     function side(t) {
       var era = isNum(t.starterEra) ? t.starterEra : lgEra;
@@ -897,20 +903,22 @@
   }
 
   function projectWnba(g) {
+    var lgPace = (g.league && isNum(g.league.pace)) ? g.league.pace : WNBA.LG_PACE;
+    var lgRating = (g.league && isNum(g.league.rating)) ? g.league.rating : WNBA.LG_RATING;
     function side(t) {
       return {
         name: t.name || "?",
-        pace: isNum(t.pace) ? t.pace : WNBA.LG_PACE,
-        off: isNum(t.offRating) ? t.offRating : WNBA.LG_RATING,
-        def: isNum(t.defRating) ? t.defRating : WNBA.LG_RATING,
+        pace: isNum(t.pace) ? t.pace : lgPace,
+        off: isNum(t.offRating) ? t.offRating : lgRating,
+        def: isNum(t.defRating) ? t.defRating : lgRating,
         rest: isNum(t.restDays) ? t.restDays : 2
       };
     }
     var a = side(g.away), h = side(g.home);
     var adjOff = function (t) { return t.rest <= 0 ? t.off - WNBA.B2B : t.off; };
-    var poss = (a.pace * h.pace) / WNBA.LG_PACE;
-    var ap = (poss * ((adjOff(a) * h.def) / WNBA.LG_RATING)) / 100;
-    var hp = (poss * ((adjOff(h) * a.def) / WNBA.LG_RATING)) / 100;
+    var poss = (a.pace * h.pace) / lgPace;
+    var ap = (poss * ((adjOff(a) * h.def) / lgRating)) / 100;
+    var hp = (poss * ((adjOff(h) * a.def) / lgRating)) / 100;
     hp += WNBA.HCA / 2; ap -= WNBA.HCA / 2;
     var ot = otPoints(hp - ap);
     ap += ot / 2; hp += ot / 2;
@@ -1078,6 +1086,25 @@
       $("game-body").innerHTML = "";
     }
 
+    // League baselines live with the settings, not the game, because they are
+    // the same for every game and go stale silently. Both sit in denominators,
+    // so a wrong one tilts every projection the same way.
+    $("league-body").innerHTML =
+      '<div style="margin-top:16px;padding-top:14px;border-top:1px solid var(--rule)">' +
+      (state.sport === "mlb"
+        ? '<div class="grid2">' + field("lgRuns", "League R / game", MLB.LG_RPG, 0.01) + "</div>"
+        : '<div class="grid2">' + field("lgPace", "League pace", WNBA.LG_PACE, 0.1) +
+          field("lgRating", "League rating", WNBA.LG_RATING, 0.1) + "</div>") +
+      '<p class="hint" style="margin-top:10px">' +
+      (state.sport === "mlb"
+        ? "Runs per team per game across the league. Set it too low and every total " +
+          "comes out high, tilting the model toward overs."
+        : "League pace and points per 100 possessions. Set them too low and every total " +
+          "comes out high, tilting the model toward overs. To check the rating: league " +
+          "mean offensive rating equals league mean defensive rating, so average the two " +
+          "across the teams you have.") +
+      "</p></div>";
+
     $("line").value = ex.line;
     $("over-odds").value = ex.overOdds;
     $("under-odds").value = ex.underOdds;
@@ -1112,6 +1139,7 @@
       });
     });
     if (state.sport === "mlb") {
+      if (isFinite(num("lgRuns"))) g.league = { runsPerGame: num("lgRuns") };
       var pf = num("parkFactor");
       if (isFinite(pf)) g.parkFactor = pf;
       g.weather = { dome: $("dome") && $("dome").checked };
@@ -1119,6 +1147,13 @@
         var t = num("tempF"), w = num("windMphOut");
         if (isFinite(t)) g.weather.tempF = t;
         if (isFinite(w)) g.weather.windMphOut = w;
+      }
+    } else {
+      var lp = num("lgPace"), lr = num("lgRating");
+      if (isFinite(lp) || isFinite(lr)) {
+        g.league = {};
+        if (isFinite(lp)) g.league.pace = lp;
+        if (isFinite(lr)) g.league.rating = lr;
       }
     }
     return g;

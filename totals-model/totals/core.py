@@ -127,6 +127,15 @@ def evaluate(
 
     stake = 100.0 * kelly_fraction(side_prob, side_odds, probs.p_push, kelly_multiplier)
 
+    # Compare like with like. The model's probability is a share of *all*
+    # outcomes, pushes included; the de-vigged market price is a share of
+    # *decided* ones, since a push returns the stake and the book prices the
+    # two sides against each other. On a whole-number line that gap is the
+    # push probability -- large enough to print a negative edge next to a
+    # positive EV, which reads like the model contradicting itself.
+    decided = 1.0 - probs.p_push
+    side_prob_decided = side_prob / decided if decided > 0 else side_prob
+
     result.update(
         {
             "line": market.line,
@@ -143,7 +152,8 @@ def evaluate(
             "best_side_prob": round(side_prob, 4),
             "best_side_odds": side_odds,
             "fair_odds": prob_to_american(side_prob) if 0 < side_prob < 1 else None,
-            "prob_edge_vs_market": round(side_prob - market_prob, 4),
+            "prob_edge_vs_market": round(side_prob_decided - market_prob, 4),
+            "best_side_prob_decided": round(side_prob_decided, 4),
             "ev_per_unit": round(side_ev, 4),
             "kelly_stake_pct": round(min(stake, max_stake_pct), 2),
             "kelly_uncapped_pct": round(stake, 2),

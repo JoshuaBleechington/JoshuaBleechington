@@ -941,6 +941,12 @@
     var sideOdds = side === "OVER" ? market.overOdds : market.underOdds;
     var mktProb = side === "OVER" ? fair.pOver : fair.pUnder;
     var stake = 100 * kelly(sideProb, sideOdds, pr.pPush, opts.kellyMultiplier);
+    // The model's probability counts pushes; the de-vigged market price does
+    // not, since a push returns the stake. Put both on decided outcomes
+    // before subtracting, or a whole-number line prints a negative edge
+    // beside a positive EV.
+    var decided = 1 - pr.pPush;
+    var sideProbDecided = decided > 0 ? sideProb / decided : sideProb;
     return {
       sport: proj.sport, away: proj.away, home: proj.home,
       modelAway: proj.awayScore, modelHome: proj.homeScore, modelTotal: modelTotal,
@@ -949,7 +955,7 @@
       pOver: pr.pOver, pUnder: pr.pUnder, pPush: pr.pPush,
       bestSide: side, bestSideProb: sideProb, bestSideOdds: sideOdds,
       fairOdds: sideProb > 0 && sideProb < 1 ? probToAm(sideProb) : null,
-      probEdge: sideProb - mktProb,
+      probEdge: sideProbDecided - mktProb,
       evPerUnit: Math.max(overEv, underEv),
       stakePct: Math.min(stake, opts.maxStakePct),
       uncappedPct: stake,

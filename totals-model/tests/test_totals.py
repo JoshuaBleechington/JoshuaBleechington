@@ -353,6 +353,42 @@ class TestEndToEnd(unittest.TestCase):
         self.assertEqual(r["best_side"], "OVER")
         self.assertGreater(r["ev_per_unit"], 0)
 
+    def test_edge_vs_market_agrees_with_ev_on_a_push_line(self):
+        """A whole-number line used to print a negative edge beside a positive
+        EV, because the model's probability counted pushes and the de-vigged
+        market price did not."""
+        game = {
+            "away": {"name": "A", "runs_per_game": 4.37, "starter_era": 7.25,
+                     "starter_season_ip": 104, "starter_ip": 4.1, "bullpen_era": 3.45,
+                     "own_park_factor": 97},
+            "home": {"name": "H", "runs_per_game": 4.52, "starter_era": 4.80,
+                     "starter_season_ip": 13, "starter_ip": 4.1, "bullpen_era": 4.17,
+                     "own_park_factor": 104},
+            "park_factor": 104, "weather": {"dome": True},
+            "market": {"line": 9.0, "over_odds": -110, "under_odds": -110},
+        }
+        r = run_game("mlb", game)
+        self.assertGreater(r["p_push"], 0.05)          # a real push chunk
+        self.assertGreater(r["ev_per_unit"], 0)        # and a positive EV
+        # The two must not disagree in sign.
+        self.assertGreater(r["prob_edge_vs_market"], 0)
+        # The decided-outcome probability is what clears breakeven at -110.
+        self.assertGreater(r["best_side_prob_decided"], 110 / 210)
+        self.assertGreater(r["best_side_prob_decided"], r["best_side_prob"])
+
+    def test_half_line_edge_is_unaffected(self):
+        """With no push, decided-outcome and raw probabilities are the same."""
+        game = {
+            "away": {"name": "A", "runs_per_game": 4.8, "starter_era": 3.2,
+                     "starter_ip": 6.0, "bullpen_era": 3.6},
+            "home": {"name": "H", "runs_per_game": 4.2, "starter_era": 4.5,
+                     "starter_ip": 5.0, "bullpen_era": 4.4},
+            "market": {"line": 8.5, "over_odds": -110, "under_odds": -110},
+        }
+        r = run_game("mlb", game)
+        self.assertEqual(r["p_push"], 0.0)
+        self.assertAlmostEqual(r["best_side_prob_decided"], r["best_side_prob"], places=4)
+
     def test_no_market_still_projects(self):
         game = {
             "away": {"name": "A", "pace": 80, "off_rating": 101, "def_rating": 101},

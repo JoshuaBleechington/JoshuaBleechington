@@ -1812,6 +1812,15 @@
     snap.settings["Model weight"] = num("weight");
     snap.settings["Kelly"] = num("kelly");
     snap.settings["Max stake %"] = num("maxstake");
+    // The league baselines belong in the record too. They sit in the
+    // denominator of every projection, so without them a logged number can't
+    // be checked later -- you can't tell a model change from a stale constant.
+    if (state.sport === "mlb") {
+      snap.settings["League R/G"] = isFinite(num("lgRuns")) ? num("lgRuns") : MLB.LG_RPG;
+    } else {
+      snap.settings["League pace"] = isFinite(num("lgPace")) ? num("lgPace") : WNBA.LG_PACE;
+      snap.settings["League rating"] = isFinite(num("lgRating")) ? num("lgRating") : WNBA.LG_RATING;
+    }
     return snap;
   }
 

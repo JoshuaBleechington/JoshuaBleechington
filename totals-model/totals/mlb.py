@@ -63,10 +63,23 @@ DEFAULT_STARTER_SEASON_IP = 130.0
 # 4.4 run mean, which matches the real distribution of team runs per game.
 RUN_DISPERSION = 4.0
 
-# Weather nudges, per unit, applied to the game total. Deliberately small.
-TEMP_COEF_PER_DEGREE = 0.004  # ~4% swing per 10F away from 70F
-WIND_COEF_PER_MPH = 0.008  # positive = blowing out, negative = blowing in
-WEATHER_CLAMP = 0.10  # never let weather move the total more than 10%
+# Weather nudges. These were originally 4% per 10F and 8% per 10mph against a
+# 70F reference, clamped at 10%. Across a real August slate that clamp fired on
+# six of seven outdoor games, so the guardrail became the adjustment: a flat
+# +10% on everything, worth about +0.9 runs. It pushed the model's average
+# disagreement with the market from +0.18 runs to +0.95, all of it toward the
+# over.
+#
+# Two things were wrong. The coefficients were several times too large for the
+# real effect, and the 70F reference makes the temperature term a one-way
+# ratchet in summer -- every game is above it -- while the league runs-per-game
+# constant is already averaged over a season that includes those hot games. The
+# reference now sits near a typical game temperature, so the term is symmetric
+# across the calendar: negative in April, positive in July.
+TEMP_REFERENCE_F = 74.0
+TEMP_COEF_PER_DEGREE = 0.0015  # ~1.5% per 10F from the seasonal norm
+WIND_COEF_PER_MPH = 0.002  # positive = blowing out, negative = blowing in
+WEATHER_CLAMP = 0.05  # a guardrail for genuine extremes, not a normal outcome
 
 
 def _ra9(team: dict[str, Any], prefix: str, default: float) -> float:
@@ -120,7 +133,7 @@ def weather_factor(weather: dict[str, Any] | None) -> float:
         return 1.0
     factor = 1.0
     if "temp_f" in weather:
-        factor *= 1.0 + TEMP_COEF_PER_DEGREE * (float(weather["temp_f"]) - 70.0)
+        factor *= 1.0 + TEMP_COEF_PER_DEGREE * (float(weather["temp_f"]) - TEMP_REFERENCE_F)
     if "wind_mph_out" in weather:
         factor *= 1.0 + WIND_COEF_PER_MPH * float(weather["wind_mph_out"])
     return max(1.0 - WEATHER_CLAMP, min(1.0 + WEATHER_CLAMP, factor))

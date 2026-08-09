@@ -867,12 +867,20 @@
   var WNBA = { LG_PACE: 80, LG_RATING: 105.8, TOTAL_SD: 11.5, MARGIN_SD: 11,
                HCA: 2.5, B2B: 2, OT_POINTS: 19, OT_CAL: 1.5 };
 
+  /* Originally 4% per 10F and 8% per 10mph against a 70F reference, clamped at
+     10%. On a real August slate that clamp fired on six of seven outdoor games,
+     so the guardrail became the adjustment -- a flat +10%, worth about +0.9
+     runs, all of it toward the over. The coefficients were several times too
+     large, and a 70F reference is a one-way ratchet in summer when the league
+     runs-per-game constant already averages over those same hot games. */
+  var WEATHER = { REF_F: 74, TEMP: 0.0015, WIND: 0.002, CLAMP: 0.05 };
+
   function weatherFactor(w) {
     if (!w || w.dome) return 1;
     var f = 1;
-    if (isNum(w.tempF)) f *= 1 + 0.004 * (w.tempF - 70);
-    if (isNum(w.windMphOut)) f *= 1 + 0.008 * w.windMphOut;
-    return Math.max(0.9, Math.min(1.1, f));
+    if (isNum(w.tempF)) f *= 1 + WEATHER.TEMP * (w.tempF - WEATHER.REF_F);
+    if (isNum(w.windMphOut)) f *= 1 + WEATHER.WIND * w.windMphOut;
+    return Math.max(1 - WEATHER.CLAMP, Math.min(1 + WEATHER.CLAMP, f));
   }
   /* Savant prints 102; the model wants 1.02. The scales cannot overlap -- no
      park is 5x neutral and none is 5% of it -- so anything above 5 is

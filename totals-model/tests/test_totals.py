@@ -167,8 +167,31 @@ class TestMlb(unittest.TestCase):
         self.assertLess(mlb.weather_factor({"wind_mph_out": -12}), 1.0)
 
     def test_weather_is_clamped(self):
-        self.assertLessEqual(mlb.weather_factor({"temp_f": 120, "wind_mph_out": 40}), 1.10)
-        self.assertGreaterEqual(mlb.weather_factor({"temp_f": 20, "wind_mph_out": -40}), 0.90)
+        cap = 1.0 + mlb.WEATHER_CLAMP
+        self.assertLessEqual(mlb.weather_factor({"temp_f": 120, "wind_mph_out": 40}), cap)
+        self.assertGreaterEqual(mlb.weather_factor({"temp_f": 20, "wind_mph_out": -40}),
+                                1.0 - mlb.WEATHER_CLAMP)
+
+    def test_ordinary_summer_weather_does_not_hit_the_clamp(self):
+        """The clamp is a guardrail for extremes. When it fires on a routine
+        August game it stops being an adjustment and becomes a constant, which
+        is how a +10% cap turned into a flat +0.9 runs on every outdoor game."""
+        cap = 1.0 + mlb.WEATHER_CLAMP
+        for temp, wind in ((88, 8), (89, 8), (83, 11), (90, 10), (88, 11), (91, 11)):
+            f = mlb.weather_factor({"temp_f": temp, "wind_mph_out": wind})
+            self.assertLess(f, cap - 1e-9,
+                            "%dF / %dmph wind should not cap out" % (temp, wind))
+
+    def test_temperature_is_symmetric_across_the_calendar(self):
+        """Anchored to a seasonal norm, not 70F: cold games suppress, hot games
+        inflate. Against a 70F reference nearly every game in summer is a
+        one-way boost, on top of a league constant that already averages over
+        those same hot games."""
+        april = mlb.weather_factor({"temp_f": 55})
+        september = mlb.weather_factor({"temp_f": 93})
+        self.assertLess(april, 1.0)
+        self.assertGreater(september, 1.0)
+        self.assertAlmostEqual(mlb.weather_factor({"temp_f": mlb.TEMP_REFERENCE_F}), 1.0, places=9)
 
     def test_regression_leaves_a_league_average_starter_alone(self):
         lg_era = mlb.LEAGUE_RUNS_PER_GAME / mlb.ERA_TO_RA9

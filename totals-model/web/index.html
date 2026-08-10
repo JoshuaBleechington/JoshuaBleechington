@@ -405,6 +405,36 @@
     font-variant-numeric: tabular-nums; margin-top: 3px;
   }
 
+  /* --- why this number: a running build-up from a league-average game --- */
+  .why { padding: 6px 16px 14px; }
+  .why-row {
+    display: grid; grid-template-columns: 1fr 88px 62px;
+    align-items: center; gap: 10px; padding: 7px 0;
+    border-bottom: 1px solid var(--rule);
+  }
+  .why-row:last-child { border-bottom: 0; }
+  .why-row .lbl { font-size: 13px; color: var(--ink-2); }
+  .why-row.base .lbl, .why-row.total .lbl { color: var(--ink); font-weight: 650; }
+  .why-row.total { border-top: 1px solid var(--rule-strong); margin-top: 2px; padding-top: 10px; }
+  .why-row .amt {
+    font-family: var(--mono); font-size: 13.5px; font-variant-numeric: tabular-nums;
+    text-align: right;
+  }
+  .why-row.total .amt { font-weight: 650; font-size: 15px; }
+  /* A bar drawn from the centre: right for more scoring, left for less. */
+  .why-bar { position: relative; height: 8px; background: var(--rule); border-radius: 4px; }
+  .why-bar i {
+    position: absolute; top: 0; height: 8px; border-radius: 4px; display: block;
+  }
+  .why-bar .up { background: var(--over); left: 50%; }
+  .why-bar .down { background: var(--under); right: 50%; }
+  .why-bar::after {
+    content: ""; position: absolute; left: 50%; top: -2px; width: 1px; height: 12px;
+    background: var(--rule-strong);
+  }
+  .why-row.base .why-bar, .why-row.total .why-bar { visibility: hidden; }
+  .why-none { padding: 4px 0 6px; font-size: 12.5px; color: var(--muted); }
+
   /* --- probability split bar --- */
   .split { padding: 16px; }
   .split-track {
@@ -639,6 +669,15 @@
         </div>
 
         <p class="note" id="skew-note" hidden></p>
+      </section>
+
+      <section class="card">
+        <header>
+          <h2>Why this number</h2>
+          <span class="eyebrow" id="why-unit"></span>
+        </header>
+        <div class="why" id="why"></div>
+        <p class="note" id="why-verdict"></p>
       </section>
 
       <section class="card">
@@ -1337,6 +1376,9 @@
     ["m-prob", "m-fair", "m-edge", "m-stake"].forEach(function (id) {
       $(id).textContent = "—";
     });
+    $("why").innerHTML = "";
+    $("why-verdict").innerHTML = "";
+    $("why-unit").textContent = "";
     $("split").innerHTML = "";
     $("split-legend").innerHTML = "";
     $("chart").innerHTML = "";
@@ -1384,9 +1426,157 @@
         " " + priceStr(r.bestSideOdds) + "</span>"
       : '<span class="pill pass"><span class="glyph">&#9675;</span>No bet</span>';
 
+    renderWhy(r, last.game, unit);
     renderSplit(r);
     renderChart(r, unit);
     renderSkewNote(r, unit);
+  }
+
+  /* =====================================================================
+     WHY THIS NUMBER
+
+     Start from a league-average game and switch one group of inputs on at a
+     time, recording what each step moves the total. Because the steps are
+     applied in sequence rather than in isolation, the parts add up exactly to
+     the projection -- no residual to explain away. The order is fixed and
+     stated, since with a multiplicative model a different order shifts credit
+     slightly between factors.
+
+     This is also the fastest way to see a broken constant: a factor that
+     contributes the same large amount on every game is a bug, not a read.
+  ===================================================================== */
+
+  function explainMlb(g) {
+    var league = g.league;
+    function total(mod) {
+      var p = projectMlb(mod);
+      return p.awayScore + p.homeScore;
+    }
+    var pick = function (t, keys) {
+      var out = { name: t.name };
+      keys.forEach(function (k) { if (isNum(t[k])) out[k] = t[k]; });
+      return out;
+    };
+    var OFF = ["runsPerGame", "ownParkFactor"];
+    var PITCH = ["starterEra", "starterSeasonIp", "starterIp", "bullpenEra", "ownParkFactor"];
+
+    var steps = [];
+    var base = total({ away: {}, home: {}, league: league });
+    var cur = base;
+
+    var afterOff = total({ away: pick(g.away, OFF), home: pick(g.home, OFF), league: league });
+    steps.push(["Offences", afterOff - cur]); cur = afterOff;
+
+    var both = function (t) { return pick(t, OFF.concat(PITCH)); };
+    var afterPitch = total({ away: both(g.away), home: both(g.home), league: league });
+    steps.push(["Starters &amp; bullpens", afterPitch - cur]); cur = afterPitch;
+
+    var afterPark = total({ away: both(g.away), home: both(g.home), league: league,
+                            parkFactor: g.parkFactor });
+    steps.push(["Ballpark", afterPark - cur]); cur = afterPark;
+
+    var afterWx = total({ away: both(g.away), home: both(g.home), league: league,
+                          parkFactor: g.parkFactor, weather: g.weather });
+    steps.push(["Weather", afterWx - cur]); cur = afterWx;
+
+    return { base: base, baseLabel: "League-average game", steps: steps, total: cur };
+  }
+
+  function explainWnba(g) {
+    var league = g.league;
+    function total(mod) {
+      var p = projectWnba(mod);
+      return p.awayScore + p.homeScore;
+    }
+    var pick = function (t, keys) {
+      var out = { name: t.name };
+      keys.forEach(function (k) { if (isNum(t[k])) out[k] = t[k]; });
+      return out;
+    };
+    var steps = [];
+    var base = total({ away: {}, home: {}, league: league });
+    var cur = base;
+
+    var afterPace = total({ away: pick(g.away, ["pace"]), home: pick(g.home, ["pace"]),
+                            league: league });
+    steps.push(["Pace", afterPace - cur]); cur = afterPace;
+
+    var eff = ["pace", "offRating", "defRating"];
+    var afterEff = total({ away: pick(g.away, eff), home: pick(g.home, eff), league: league });
+    steps.push(["Offence &amp; defence", afterEff - cur]); cur = afterEff;
+
+    var all = eff.concat(["restDays"]);
+    var afterRest = total({ away: pick(g.away, all), home: pick(g.home, all), league: league });
+    steps.push(["Rest", afterRest - cur]); cur = afterRest;
+
+    return { base: base, baseLabel: "League-average game", steps: steps, total: cur };
+  }
+
+  function renderWhy(r, game, unit) {
+    var ex = r.sport === "MLB" ? explainMlb(game) : explainWnba(game);
+    var biggest = Math.max.apply(null, ex.steps.map(function (s) { return Math.abs(s[1]); }).concat([0.01]));
+
+    function bar(delta) {
+      var pctw = Math.min(50, (Math.abs(delta) / biggest) * 48);
+      if (Math.abs(delta) < 0.005) return '<div class="why-bar"></div>';
+      return '<div class="why-bar"><i class="' + (delta > 0 ? "up" : "down") +
+        '" style="width:' + pctw.toFixed(1) + '%"></i></div>';
+    }
+
+    var html = '<div class="why-row base"><span class="lbl">' + ex.baseLabel +
+      '</span><div class="why-bar"></div><span class="amt">' + ex.base.toFixed(1) + "</span></div>";
+
+    var shown = 0;
+    ex.steps.forEach(function (s) {
+      if (Math.abs(s[1]) < 0.005) return;
+      shown++;
+      html += '<div class="why-row"><span class="lbl">' + s[0] + "</span>" + bar(s[1]) +
+        '<span class="amt" style="color:' + (s[1] > 0 ? "var(--over)" : "var(--under)") + '">' +
+        signed(s[1], 2) + "</span></div>";
+    });
+    if (!shown) {
+      html += '<div class="why-none">Everything is at league average, so nothing moves the total.</div>';
+    }
+    html += '<div class="why-row total"><span class="lbl">Model total</span><div class="why-bar"></div>' +
+      '<span class="amt">' + ex.total.toFixed(2) + "</span></div>";
+
+    $("why").innerHTML = html;
+    $("why-unit").textContent = unit;
+    renderWhyVerdict(r, unit);
+  }
+
+  /* Plain-language version of the bet, including where the edge comes from --
+     which on a whole-number line is often the push rather than a disagreement
+     with the market. */
+  function renderWhyVerdict(r, unit) {
+    var el = $("why-verdict");
+    var bet = r.evPerUnit > 0 && r.stakePct > 0;
+    var side = r.bestSide;
+    var gap = r.projectedTotal - r.line;
+    var breakeven = 100 / (amToDec(r.bestSideOdds) * 100) * 100;
+    var need = 1 / amToDec(r.bestSideOdds);
+
+    var parts = [];
+    parts.push("<b>" + (bet ? "Why it's a bet:" : "Why it's a pass:") + "</b> after meeting the " +
+      "market halfway the projection sits <b>" + signed(gap, 2) + " " + unit + "</b> " +
+      (Math.abs(gap) < 0.005 ? "on" : (gap > 0 ? "above" : "below")) + " the line of " + r.line + ".");
+
+    parts.push("That makes <b>" + side + "</b> a <b>" + pct(r.bestSideProb) + "</b> shot; at " +
+      priceStr(r.bestSideOdds) + " you need <b>" + pct(need) + "</b> to break even.");
+
+    if (r.pPush > 0.04) {
+      parts.push("The line is a whole number, so <b>" + pct(r.pPush) + "</b> of the time it lands " +
+        "exactly there and your stake comes back — that push is doing part of the work here.");
+    }
+    if (Math.abs(r.modelTotal - r.projectedTotal) > 0.005) {
+      parts.push("Raw model was " + r.modelTotal.toFixed(2) + "; the blend pulled it to " +
+        r.projectedTotal.toFixed(2) + ".");
+    }
+    parts.push(bet
+      ? "Quarter-Kelly on that edge is <b>" + fmt2(r.stakePct) + "%</b> of bankroll."
+      : "Not enough to clear the juice, so no stake.");
+
+    el.innerHTML = parts.join(" ");
   }
 
   function renderSplit(r) {

@@ -350,8 +350,13 @@ class TestEndToEnd(unittest.TestCase):
         self.assertIn(r["best_side"], ("OVER", "UNDER"))
         self.assertAlmostEqual(r["p_over"] + r["p_under"] + r["p_push"], 1.0, places=3)
         self.assertGreaterEqual(r["kelly_stake_pct"], 0.0)
-        self.assertAlmostEqual(r["raw_edge"], round(r["model_total"] - 8.5, 2), places=2)
-        self.assertAlmostEqual(r["blended_edge"], round(r["projected_total"] - 8.5, 2), places=2)
+        # Edges are measured against the market's implied MEAN, not the posted
+        # line, so that both sides of the comparison are the same quantity.
+        self.assertAlmostEqual(
+            r["raw_edge"], round(r["model_total"] - r["market_implied_total"], 2), places=2)
+        self.assertAlmostEqual(
+            r["blended_edge"], round(r["projected_total"] - r["market_implied_total"], 2), places=2)
+        self.assertGreater(r["market_implied_total"], 8.5)  # median < mean, right-skewed
 
     def test_wnba_game_report(self):
         game = {
@@ -391,13 +396,74 @@ class TestEndToEnd(unittest.TestCase):
             "market": {"line": 9.0, "over_odds": -110, "under_odds": -110},
         }
         r = run_game("mlb", game)
-        self.assertGreater(r["p_push"], 0.05)          # a real push chunk
-        self.assertGreater(r["ev_per_unit"], 0)        # and a positive EV
-        # The two must not disagree in sign.
-        self.assertGreater(r["prob_edge_vs_market"], 0)
-        # The decided-outcome probability is what clears breakeven at -110.
-        self.assertGreater(r["best_side_prob_decided"], 110 / 210)
+        self.assertGreater(r["p_push"], 0.05)  # a real push chunk
+        # A positive EV must imply a positive edge: you cannot beat the price
+        # while agreeing with the market. The converse is fine -- a small
+        # disagreement that fails to cover the hold is +edge and -EV.
+        if r["ev_per_unit"] > 0:
+            self.assertGreater(r["prob_edge_vs_market"], 0)
         self.assertGreater(r["best_side_prob_decided"], r["best_side_prob"])
+
+    def test_push_line_edge_is_positive_when_the_model_really_disagrees(self):
+        """The same invariant on a game where the model has a genuine read,
+        rather than the skew artefact that used to manufacture one."""
+        game = {
+            "away": {"name": "A", "runs_per_game": 5.9, "starter_era": 5.9,
+                     "starter_season_ip": 150, "starter_ip": 4.0, "bullpen_era": 5.9},
+            "home": {"name": "H", "runs_per_game": 5.9, "starter_era": 5.9,
+                     "starter_season_ip": 150, "starter_ip": 4.0, "bullpen_era": 5.9},
+            "market": {"line": 9.0, "over_odds": -110, "under_odds": -110},
+        }
+        r = run_game("mlb", game, model_weight=1.0)
+        self.assertGreater(r["p_push"], 0.04)
+        self.assertEqual(r["best_side"], "OVER")
+        self.assertGreater(r["ev_per_unit"], 0)
+        self.assertGreater(r["prob_edge_vs_market"], 0)
+        self.assertGreater(r["best_side_prob_decided"], 110 / 210)
+
+    def test_deferring_to_the_market_means_no_bet(self):
+        """At weight 0 the model adopts the market's own probabilities, so EV is
+        exactly minus the hold and nothing is worth backing.
+
+        Previously it still claimed roughly +5% on the under of every game: the
+        posted line was treated as a mean when it is a median, and centring a
+        right-skewed distribution on it left over half the mass underneath."""
+        base = {
+            "away": {"name": "A", "runs_per_game": 4.49, "starter_era": 4.18,
+                     "starter_season_ip": 130, "starter_ip": 5.2, "bullpen_era": 4.18},
+            "home": {"name": "H", "runs_per_game": 4.49, "starter_era": 4.18,
+                     "starter_season_ip": 130, "starter_ip": 5.2, "bullpen_era": 4.18},
+        }
+        for line in (7.5, 8.0, 8.5, 9.0, 9.5, 10.0, 11.5):
+            game = dict(base, market={"line": line, "over_odds": -110, "under_odds": -110})
+            r = run_game("mlb", game, model_weight=0.0)
+            self.assertEqual(r["kelly_stake_pct"], 0.0, "line %s should pass" % line)
+            self.assertLess(r["ev_per_unit"], 0, "line %s should be -EV" % line)
+            self.assertAlmostEqual(r["prob_edge_vs_market"], 0.0, places=3)
+
+    def test_market_implied_total_sits_above_a_baseball_line(self):
+        """Right-skewed scoring: the line is the median, the mean is higher."""
+        game = {
+            "away": {"name": "A", "runs_per_game": 4.49, "starter_era": 4.18,
+                     "starter_season_ip": 130, "starter_ip": 5.2, "bullpen_era": 4.18},
+            "home": {"name": "H", "runs_per_game": 4.49, "starter_era": 4.18,
+                     "starter_season_ip": 130, "starter_ip": 5.2, "bullpen_era": 4.18},
+            "market": {"line": 9.0, "over_odds": -110, "under_odds": -110},
+        }
+        r = run_game("mlb", game)
+        self.assertGreater(r["market_implied_total"], 9.0)
+        self.assertLess(r["market_implied_total"], 10.5)
+
+    def test_wnba_line_is_its_own_implied_mean(self):
+        """Basketball totals are modelled as symmetric, so median == mean and
+        the correction is a no-op there."""
+        game = {
+            "away": {"name": "A", "pace": 80, "off_rating": 105.8, "def_rating": 105.8},
+            "home": {"name": "H", "pace": 80, "off_rating": 105.8, "def_rating": 105.8},
+            "market": {"line": 168.5, "over_odds": -110, "under_odds": -110},
+        }
+        r = run_game("wnba", game)
+        self.assertAlmostEqual(r["market_implied_total"], 168.5, places=1)
 
     def test_half_line_edge_is_unaffected(self):
         """With no push, decided-outcome and raw probabilities are the same."""

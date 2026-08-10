@@ -49,26 +49,52 @@ class Projection:
     def total_probs(self, line: float) -> TotalProbs:
         return self.build_probs(self.away_score, self.home_score)(line)
 
-    def blended(self, line: float, model_weight: float) -> "Projection":
-        """Shrink the projection toward the posted line, keeping the margin.
-
-        Both scores are scaled by the same ratio, so a 10-run projection blended
-        against a 9-run line becomes 9.5 with the lean between the two teams
-        intact.
-        """
-        if model_weight >= 1.0 or self.total <= 0:
+    def scaled(self, target_total: float) -> "Projection":
+        """The same matchup rescaled to a different total, margin lean intact."""
+        if self.total <= 0:
             return self
-        target = model_weight * self.total + (1.0 - model_weight) * line
-        scale = target / self.total
+        k = target_total / self.total
         return Projection(
             sport=self.sport,
             away=self.away,
             home=self.home,
-            away_score=self.away_score * scale,
-            home_score=self.home_score * scale,
+            away_score=self.away_score * k,
+            home_score=self.home_score * k,
             build_probs=self.build_probs,
             notes=self.notes,
         )
+
+
+def market_implied_total(projection: Projection, line: float, p_over_decided: float) -> float:
+    """The mean that would make this model reproduce the market's own odds.
+
+    A betting line is not a forecast of the mean. At -110 both ways the book is
+    saying over and under are equally likely, which puts the line at the MEDIAN.
+    Scoring distributions are right-skewed, so the median sits below the mean --
+    by half a run to a full run in baseball.
+
+    Blending a model's mean toward the line therefore compares two different
+    quantities, and centring a right-skewed distribution on the line leaves more
+    than half its mass underneath. The model then reports the under as favoured
+    on every game, from the shape of the distribution alone, knowing nothing
+    about the teams.
+
+    Solving for the mean that reproduces the market's de-vigged probability
+    converts the line into the same units as the projection, so the two can
+    actually be averaged -- and deferring completely to the market now means
+    agreeing with it, which is the only sensible reading of zero confidence.
+    """
+    lo, hi = max(0.25, line * 0.25), max(line * 2.5, line + 10.0)
+    for _ in range(80):
+        mid = (lo + hi) / 2.0
+        probs = projection.scaled(mid).total_probs(line)
+        decided = 1.0 - probs.p_push
+        over = probs.p_over / decided if decided > 0 else probs.p_over
+        if over < p_over_decided:
+            lo = mid
+        else:
+            hi = mid
+    return (lo + hi) / 2.0
 
 
 @dataclass
@@ -112,9 +138,12 @@ def evaluate(
         result["projected_total"] = result["model_total"]
         return result
 
-    blended = projection.blended(market.line, model_weight)
-    probs = blended.total_probs(market.line)
     fair = devig(market.over_odds, market.under_odds, devig_method)
+    # Put the line into the same units as the projection before averaging them.
+    implied = market_implied_total(projection, market.line, fair.p_over)
+    used_total = model_weight * projection.total + (1.0 - model_weight) * implied
+    blended = projection.scaled(used_total)
+    probs = blended.total_probs(market.line)
 
     over_ev = ev_per_unit(probs.p_over, market.over_odds, probs.p_push)
     under_ev = ev_per_unit(probs.p_under, market.under_odds, probs.p_push)
@@ -141,8 +170,12 @@ def evaluate(
             "line": market.line,
             "model_weight": model_weight,
             "projected_total": round(blended.total, 2),
-            "raw_edge": round(projection.total - market.line, 2),
-            "blended_edge": round(blended.total - market.line, 2),
+            # The market's line expressed as a mean, so it can be compared with
+            # the model's mean directly. This is the honest benchmark; the line
+            # itself is a median and sits lower.
+            "market_implied_total": round(implied, 2),
+            "raw_edge": round(projection.total - implied, 2),
+            "blended_edge": round(blended.total - implied, 2),
             "p_over": round(probs.p_over, 4),
             "p_under": round(probs.p_under, 4),
             "p_push": round(probs.p_push, 4),

@@ -1037,15 +1037,41 @@
     };
   }
 
+  /* The mean at which this model would reproduce the market's own odds.
+
+     A line is not a forecast of the mean. At -110 both ways the book is saying
+     over and under are equally likely, which puts the line at the MEDIAN, and
+     scoring is right-skewed so the median sits below the mean -- by half a run
+     to a full run in baseball. Averaging a model mean against a line compares
+     two different quantities, and centring a right-skewed distribution on the
+     line leaves more than half its mass underneath, so the under looks
+     favoured on every game from the distribution's shape alone. Restating the
+     line as a mean makes the two comparable, and deferring completely to the
+     market then means agreeing with it. */
+  function marketImpliedTotal(proj, line, pOverDecided) {
+    var total = proj.awayScore + proj.homeScore;
+    if (total <= 0) return line;
+    var lo = Math.max(0.25, line * 0.25), hi = Math.max(line * 2.5, line + 10);
+    for (var i = 0; i < 80; i++) {
+      var mid = (lo + hi) / 2, k = mid / total;
+      var pr = proj.build(proj.awayScore * k, proj.homeScore * k).probs(line);
+      var decided = 1 - pr.pPush;
+      var over = decided > 0 ? pr.pOver / decided : pr.pOver;
+      if (over < pOverDecided) lo = mid; else hi = mid;
+    }
+    return (lo + hi) / 2;
+  }
+
   function evaluate(proj, market, opts) {
     var modelTotal = proj.awayScore + proj.homeScore;
     var w = opts.modelWeight;
-    var scale = (w >= 1 || modelTotal <= 0) ? 1
-      : (w * modelTotal + (1 - w) * market.line) / modelTotal;
+    var fair = devig(market.overOdds, market.underOdds);
+    var implied = marketImpliedTotal(proj, market.line, fair.pOver);
+    var used = w * modelTotal + (1 - w) * implied;
+    var scale = modelTotal > 0 ? used / modelTotal : 1;
     var a = proj.awayScore * scale, h = proj.homeScore * scale;
     var built = proj.build(a, h);
     var pr = built.probs(market.line);
-    var fair = devig(market.overOdds, market.underOdds);
     var overEv = ev(pr.pOver, market.overOdds, pr.pPush);
     var underEv = ev(pr.pUnder, market.underOdds, pr.pPush);
     var side = overEv >= underEv ? "OVER" : "UNDER";
@@ -1063,6 +1089,8 @@
       sport: proj.sport, away: proj.away, home: proj.home,
       modelAway: proj.awayScore, modelHome: proj.homeScore, modelTotal: modelTotal,
       projectedTotal: a + h, awayScore: a, homeScore: h,
+      // The line restated as a mean, so it is comparable with the projection.
+      marketImpliedTotal: implied,
       built: built, line: market.line,
       pOver: pr.pOver, pUnder: pr.pUnder, pPush: pr.pPush,
       bestSide: side, bestSideProb: sideProb, bestSideOdds: sideOdds,
@@ -1556,10 +1584,16 @@
     var breakeven = 100 / (amToDec(r.bestSideOdds) * 100) * 100;
     var need = 1 / amToDec(r.bestSideOdds);
 
+    var impliedGap = r.modelTotal - r.marketImpliedTotal;
     var parts = [];
-    parts.push("<b>" + (bet ? "Why it's a bet:" : "Why it's a pass:") + "</b> after meeting the " +
-      "market halfway the projection sits <b>" + signed(gap, 2) + " " + unit + "</b> " +
-      (Math.abs(gap) < 0.005 ? "on" : (gap > 0 ? "above" : "below")) + " the line of " + r.line + ".");
+    // Compare mean with mean. The posted line is a median -- the point where the
+    // book has over and under equally likely -- and scoring is right-skewed, so
+    // the mean the market is implying sits above the number on the board.
+    parts.push("<b>" + (bet ? "Why it's a bet:" : "Why it's a pass:") + "</b> a line of " +
+      r.line + " implies a mean of about <b>" + r.marketImpliedTotal.toFixed(2) + " " + unit +
+      "</b>; your model says <b>" + r.modelTotal.toFixed(2) + "</b>, a gap of <b>" +
+      signed(impliedGap, 2) + "</b>. After meeting the market halfway the projection is " +
+      r.projectedTotal.toFixed(2) + ".");
 
     parts.push("That makes <b>" + side + "</b> a <b>" + pct(r.bestSideProb) + "</b> shot; at " +
       priceStr(r.bestSideOdds) + " you need <b>" + pct(need) + "</b> to break even.");
@@ -1567,10 +1601,6 @@
     if (r.pPush > 0.04) {
       parts.push("The line is a whole number, so <b>" + pct(r.pPush) + "</b> of the time it lands " +
         "exactly there and your stake comes back — that push is doing part of the work here.");
-    }
-    if (Math.abs(r.modelTotal - r.projectedTotal) > 0.005) {
-      parts.push("Raw model was " + r.modelTotal.toFixed(2) + "; the blend pulled it to " +
-        r.projectedTotal.toFixed(2) + ".");
     }
     parts.push(bet
       ? "Quarter-Kelly on that edge is <b>" + fmt2(r.stakePct) + "%</b> of bankroll."

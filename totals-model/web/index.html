@@ -220,6 +220,26 @@
   .warn p { margin: 0; }
   .warn p + p { margin-top: 6px; }
 
+  details.sync { border-top: 1px solid var(--rule); }
+  details.sync > summary {
+    cursor: pointer; padding: 12px 16px; font-size: 12.5px; font-weight: 650;
+    color: var(--ink-2); list-style: none;
+    display: flex; align-items: center; justify-content: space-between;
+  }
+  details.sync > summary::-webkit-details-marker { display: none; }
+  details.sync > summary::after { content: "+"; font-family: var(--mono); font-size: 15px; }
+  details.sync[open] > summary::after { content: "\2212"; }
+  details.sync > summary:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+  #paste-box {
+    width: 100%; padding: 9px 11px; border-radius: 8px;
+    background: var(--surface-2); color: var(--ink);
+    border: 1px solid var(--rule-strong);
+    font-family: var(--mono); font-size: 12px; line-height: 1.45; resize: vertical;
+  }
+  #paste-box:focus-visible {
+    outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-wash);
+  }
+
   .empty { padding: 40px 24px; text-align: center; color: var(--ink-2); }
   .empty h3 { margin: 0 0 8px; font-size: 16px; font-weight: 700; color: var(--ink); }
   .empty p { margin: 0 auto; max-width: 52ch; font-size: 13.5px; line-height: 1.55; }
@@ -715,10 +735,28 @@
         <button type="button" class="btn" id="export-report">Download report</button>
         <button type="button" class="btn" id="export-csv">CSV</button>
         <button type="button" class="btn" id="export-log-json">JSON</button>
-        <button type="button" class="btn" id="import-log">Import</button>
+        <button type="button" class="btn" id="import-log">Import file</button>
         <input type="file" id="import-file" accept=".json,application/json" hidden />
         <button type="button" class="btn danger" id="clear-log">Clear log</button>
       </div>
+
+      <details class="sync">
+        <summary>Move this log to another device</summary>
+        <div class="card-body">
+          <p class="hint" style="margin-bottom:12px">
+            There's no server behind this page, so each browser keeps its own log — your phone
+            and your PC can't see each other's. To combine them, copy the log out of one and
+            paste it into the other. Importing <b>merges</b>: games already present are left
+            alone, so it's safe to do in either direction, as often as you like.
+          </p>
+          <div class="btn-row" style="margin-bottom:10px">
+            <button type="button" class="btn primary" id="copy-log">Copy log</button>
+            <button type="button" class="btn" id="paste-import">Import pasted text</button>
+          </div>
+          <textarea id="paste-box" rows="4" spellcheck="false"
+            placeholder="Paste a copied log here, then press Import pasted text"></textarea>
+        </div>
+      </details>
       <p class="hint" style="padding:0 16px 14px">
         The report carries every input behind every pick, so it can be reviewed without
         screenshots — copy it and paste it straight into a message. <b>Export the JSON at the end
@@ -1730,17 +1768,18 @@
     setTimeout(function () { btn.textContent = btn.dataset.label; }, ms || 2200);
   }
 
-  function importLog(text) {
+  function importLog(text, btnId) {
+    btnId = btnId || "import-log";
     var incoming;
     try {
       incoming = JSON.parse(text);
     } catch (e) {
-      flashButton("import-log", "Not valid JSON");
+      flashButton(btnId, "Not valid JSON");
       return;
     }
     if (!Array.isArray(incoming)) incoming = incoming && incoming.log;
     if (!Array.isArray(incoming)) {
-      flashButton("import-log", "No log in that file");
+      flashButton(btnId, "No log in that file");
       return;
     }
     var seen = {};
@@ -1755,8 +1794,8 @@
     store.log.sort(function (a, b) { return String(b.ts).localeCompare(String(a.ts)); });
     saveStore();
     renderLog();
-    flashButton("import-log", added
-      ? "Restored " + added
+    flashButton(btnId, added
+      ? "Added " + added
       : "Already had those");
   }
 
@@ -2138,6 +2177,20 @@
   $("export-log-json").addEventListener("click", function () {
     download("totals-log.json", JSON.stringify(store.log, null, 2), "application/json");
   });
+  /* Clipboard rather than files, because moving a file between a phone and a
+     desktop is far more work than pasting text into a synced note. */
+  $("copy-log").addEventListener("click", function () {
+    if (!store.log.length) { flashButton("copy-log", "Nothing to copy"); return; }
+    copy(JSON.stringify(store.log), this);
+  });
+
+  $("paste-import").addEventListener("click", function () {
+    var text = $("paste-box").value.trim();
+    if (!text) { flashButton("paste-import", "Paste something first"); return; }
+    importLog(text, "paste-import");
+    $("paste-box").value = "";
+  });
+
   $("import-log").addEventListener("click", function () { $("import-file").click(); });
   $("import-file").addEventListener("change", function () {
     var file = this.files && this.files[0];

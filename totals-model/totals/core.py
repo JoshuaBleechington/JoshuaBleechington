@@ -18,6 +18,19 @@ DEFAULT_MODEL_WEIGHT = 0.5
 # an overconfident projection will happily suggest 15%; it should not.
 DEFAULT_MAX_STAKE_PCT = 2.0
 
+# Floor on a single bet, as a percentage of bankroll. Kelly is continuous: it
+# will hand back 0.01% as readily as 1.5%, and any positive number reads as a
+# recommendation. It is not one. A 0.01% stake is the model saying it cannot
+# separate the two sides -- the implied edge is a hundredth of the error in the
+# inputs that produced it. Across a real 18-bet sample the four plays sized
+# between 0.01% and 0.17% went 1-3 and cost more than the ten genuine ones,
+# because they were staked like convictions.
+#
+# Anything under a quarter of a unit is noise wearing a recommendation's
+# clothes. Below the floor the play is reported as not recommended, and the
+# uncapped number stays in the output so the size is still inspectable.
+DEFAULT_MIN_STAKE_PCT = 0.25
+
 
 @dataclass
 class Projection:
@@ -121,6 +134,7 @@ def evaluate(
     devig_method: str = "multiplicative",
     model_weight: float = DEFAULT_MODEL_WEIGHT,
     max_stake_pct: float = DEFAULT_MAX_STAKE_PCT,
+    min_stake_pct: float = DEFAULT_MIN_STAKE_PCT,
 ) -> dict[str, Any]:
     """Combine a projection with a posted total and report where the edge is."""
 
@@ -155,6 +169,9 @@ def evaluate(
     market_prob = fair.p_over if side == "OVER" else fair.p_under
 
     stake = 100.0 * kelly_fraction(side_prob, side_odds, probs.p_push, kelly_multiplier)
+    sized = min(stake, max_stake_pct)
+    # A play is only a play if it is worth money *and* worth sizing.
+    recommended = side_ev > 0 and sized >= min_stake_pct
 
     # Compare like with like. The model's probability is a share of *all*
     # outcomes, pushes included; the de-vigged market price is a share of
@@ -188,7 +205,9 @@ def evaluate(
             "prob_edge_vs_market": round(side_prob_decided - market_prob, 4),
             "best_side_prob_decided": round(side_prob_decided, 4),
             "ev_per_unit": round(side_ev, 4),
-            "kelly_stake_pct": round(min(stake, max_stake_pct), 2),
+            "recommended": recommended,
+            "min_stake_pct": min_stake_pct,
+            "kelly_stake_pct": round(sized, 2) if recommended else 0.0,
             "kelly_uncapped_pct": round(stake, 2),
         }
     )

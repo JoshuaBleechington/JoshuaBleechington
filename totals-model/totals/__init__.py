@@ -2,6 +2,7 @@
 
 from .core import (
     DEFAULT_MAX_STAKE_PCT,
+    DEFAULT_MIN_STAKE_PCT,
     DEFAULT_MODEL_WEIGHT,
     Market,
     Projection,
@@ -19,6 +20,7 @@ __all__ = [
     "run_slate",
     "DEFAULT_MODEL_WEIGHT",
     "DEFAULT_MAX_STAKE_PCT",
+    "DEFAULT_MIN_STAKE_PCT",
 ]
 
 __version__ = "1.0.0"
@@ -32,6 +34,7 @@ def run_game(
     kelly_multiplier: float = 0.25,
     model_weight: float = DEFAULT_MODEL_WEIGHT,
     max_stake_pct: float = DEFAULT_MAX_STAKE_PCT,
+    min_stake_pct: float = DEFAULT_MIN_STAKE_PCT,
 ) -> dict:
     """Project one game and, if a market is attached, grade it."""
     key = sport.lower()
@@ -44,6 +47,7 @@ def run_game(
         kelly_multiplier=kelly_multiplier,
         model_weight=model_weight,
         max_stake_pct=max_stake_pct,
+        min_stake_pct=min_stake_pct,
     )
 
 
@@ -53,10 +57,12 @@ def run_slate(
     kelly_multiplier: float = 0.25,
     model_weight: float = DEFAULT_MODEL_WEIGHT,
     max_stake_pct: float = DEFAULT_MAX_STAKE_PCT,
+    min_stake_pct: float = DEFAULT_MIN_STAKE_PCT,
 ) -> list[dict]:
     """Project a list of games, best edge first."""
     results = [
-        run_game(sport, g, kelly_multiplier, model_weight, max_stake_pct) for g in games
+        run_game(sport, g, kelly_multiplier, model_weight, max_stake_pct, min_stake_pct)
+        for g in games
     ]
     results.sort(key=lambda r: r.get("ev_per_unit", float("-inf")), reverse=True)
     return results

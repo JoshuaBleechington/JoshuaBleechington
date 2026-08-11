@@ -12,7 +12,12 @@ import json
 import sys
 from typing import Any
 
-from . import DEFAULT_MAX_STAKE_PCT, DEFAULT_MODEL_WEIGHT, run_slate
+from . import (
+    DEFAULT_MAX_STAKE_PCT,
+    DEFAULT_MIN_STAKE_PCT,
+    DEFAULT_MODEL_WEIGHT,
+    run_slate,
+)
 
 
 def _load(path: str) -> list[dict[str, Any]]:
@@ -30,7 +35,7 @@ def _format_row(r: dict[str, Any]) -> str:
     head = f"{r['matchup']:<28} model {r['model_total']:>6.2f}"
     if "line" not in r:
         return head + "   (no market posted)"
-    tag = "  *" if r["ev_per_unit"] > 0 else "   "
+    tag = "  *" if r["recommended"] else "   "
     return (
         f"{head}  line {r['line']:>6}  proj {r['projected_total']:>6.2f}  "
         f"{r['best_side']:<5} {r['best_side_odds']:>6}  "
@@ -67,11 +72,20 @@ def main(argv: list[str] | None = None) -> int:
         default=DEFAULT_MAX_STAKE_PCT,
         help="cap on a single stake, %% of bankroll (default %(default)s)",
     )
+    parser.add_argument(
+        "--min-stake",
+        type=float,
+        default=DEFAULT_MIN_STAKE_PCT,
+        help="floor on a single stake, %% of bankroll; below it the play is not "
+             "recommended (default %(default)s)",
+    )
     parser.add_argument("--format", choices=["table", "json"], default="table")
     args = parser.parse_args(argv)
 
     games = _load(args.file)
-    results = run_slate(args.sport, games, args.kelly, args.model_weight, args.max_stake)
+    results = run_slate(
+        args.sport, games, args.kelly, args.model_weight, args.max_stake, args.min_stake
+    )
 
     if args.min_ev is not None:
         results = [r for r in results if r.get("ev_per_unit", -1) >= args.min_ev]
@@ -87,7 +101,10 @@ def main(argv: list[str] | None = None) -> int:
     print(f"\n{args.sport.upper()} totals -- {len(results)} game(s), model weight {args.model_weight}\n")
     for r in results:
         print("  " + _format_row(r))
-    print("\n  * = positive expected value at the posted price\n")
+    print(
+        f"\n  * = positive expected value and worth at least "
+        f"{args.min_stake}% of bankroll\n"
+    )
     return 0
 
 

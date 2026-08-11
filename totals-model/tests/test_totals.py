@@ -567,6 +567,37 @@ class TestShrinkageAndStaking(unittest.TestCase):
     def test_no_stake_without_edge(self):
         r = run_game("wnba", self.wnba_game(150.5), model_weight=0.0)
         self.assertEqual(r["kelly_stake_pct"], 0.0)
+        self.assertFalse(r["recommended"])
+
+    def test_a_sliver_of_an_edge_is_not_a_recommendation(self):
+        """Kelly is continuous; a recommendation should not be.
+
+        Find the line where the model is barely on the right side of the juice,
+        then confirm it reports positive EV and still refuses to call it a play.
+        """
+        for line in [x / 100.0 for x in range(19000, 22000)]:
+            r = run_game("wnba", self.wnba_game(line))
+            if 0 < r["kelly_uncapped_pct"] < r["min_stake_pct"]:
+                break
+        else:  # pragma: no cover
+            self.fail("no line produced a sub-floor stake")
+        self.assertGreater(r["ev_per_unit"], 0.0)
+        self.assertFalse(r["recommended"])
+        self.assertEqual(r["kelly_stake_pct"], 0.0)
+        # The real size stays visible even when it is not being advised.
+        self.assertGreater(r["kelly_uncapped_pct"], 0.0)
+
+    def test_a_real_edge_still_clears_the_floor(self):
+        r = run_game("wnba", self.wnba_game(140.5))
+        self.assertTrue(r["recommended"])
+        self.assertGreaterEqual(r["kelly_stake_pct"], r["min_stake_pct"])
+
+    def test_the_floor_can_be_lowered(self):
+        game = self.wnba_game(150.5)
+        loose = run_game("wnba", game, min_stake_pct=0.0)
+        strict = run_game("wnba", game, min_stake_pct=5.0)
+        self.assertGreaterEqual(loose["kelly_stake_pct"], strict["kelly_stake_pct"])
+        self.assertFalse(strict["recommended"])
 
     def test_mlb_blend_rebuilds_the_run_distribution(self):
         game = {

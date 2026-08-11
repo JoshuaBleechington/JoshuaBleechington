@@ -755,6 +755,16 @@
       <div class="tiles" id="result-tiles"></div>
     </section>
 
+    <section class="card" style="margin-bottom:16px">
+      <header>
+        <h2>Calibration</h2>
+        <span class="eyebrow">is the model's confidence honest?</span>
+      </header>
+      <div class="tiles" id="calib-tiles"></div>
+      <div class="log-scroll"><table class="logtable" id="calib-table"></table></div>
+      <p class="note" id="calib-note"></p>
+    </section>
+
     <section class="card">
       <header>
         <h2>Logged games</h2>
@@ -2108,6 +2118,9 @@
       underOdds: r.bestSide === "UNDER" ? r.bestSideOdds : num("under-odds"),
       modelTotal: r.modelTotal, projectedTotal: r.projectedTotal,
       side: r.bestSide, prob: r.bestSideProb, ev: r.evPerUnit, stakePct: r.stakePct,
+      // Kept for calibration: a win/loss is a decided outcome, so the honest
+      // comparison is against the probability that excludes pushes.
+      probDecided: r.bestSideProb / (1 - r.pPush || 1), pPush: r.pPush,
       recommended: r.evPerUnit > 0 && r.stakePct > 0,
       status: status, closeLine: null, finalTotal: null
     });
@@ -2154,6 +2167,108 @@
     var sum = 0, beat = 0;
     vals.forEach(function (v) { sum += v; if (v > 0) beat++; });
     return { n: vals.length, avg: sum / vals.length, beat: beat / vals.length };
+  }
+
+  /* =====================================================================
+     CALIBRATION
+
+     A win/loss record asks "am I profitable", which needs many hundreds of
+     bets. Calibration asks the cheaper question: when the model says 57%, does
+     it win 57%? Every settled bet contributes regardless of its probability,
+     so it reads at 50-100 games rather than 500.
+
+     It also catches a failure a projection check cannot. The model can centre
+     the total perfectly and still be wrong about the SPREAD of outcomes -- and
+     the spread is what sets the win probability, and therefore every stake. Too
+     narrow a distribution means overconfidence: real edges reported as large
+     ones, and bets sized accordingly.
+
+     Pushes are excluded: a win rate is a share of decided outcomes.
+  ===================================================================== */
+
+  function calibrationRows() {
+    var out = [];
+    store.log.forEach(function (e) {
+      if (e.status !== "bet" && e.status !== "faded") return;
+      var g = gradeOf(e);
+      if (g !== "W" && g !== "L") return;          // unsettled or push
+      // Older entries predate probDecided; their prob understates slightly.
+      var p = isNum(e.probDecided) ? e.probDecided : e.prob;
+      if (!isNum(p) || p <= 0 || p >= 1) return;
+      out.push({ p: p, won: g === "W", entry: e });
+    });
+    return out;
+  }
+
+  function renderCalibration() {
+    var rows = calibrationRows();
+    var expected = rows.reduce(function (a, r) { return a + r.p; }, 0);
+    var actual = rows.filter(function (r) { return r.won; }).length;
+    var n = rows.length;
+
+    $("calib-tiles").innerHTML =
+      tile("Model expected", n ? expected.toFixed(1) + " wins" : "—",
+           n ? "from " + plural(n, "decided bet") : "nothing settled yet", true) +
+      tile("You actually got", n ? actual + " wins" : "—",
+           n ? (100 * actual / n).toFixed(0) + "% of them" : "") +
+      tile("Gap", n ? signed(actual - expected, 1) : "—",
+           n ? (actual >= expected ? "running ahead of the model" : "running behind the model") : "");
+
+    // Buckets, coarse enough to hold something at realistic sample sizes.
+    var buckets = [[0, 0.50, "under 50%"], [0.50, 0.55, "50–55%"],
+                   [0.55, 0.60, "55–60%"], [0.60, 1.01, "60%+"]];
+    var body = "<thead><tr><th>Model said</th><th class='num'>Bets</th>" +
+      "<th class='num'>Predicted</th><th class='num'>Actual</th><th class='num'>Gap</th></tr></thead><tbody>";
+    var any = false;
+    buckets.forEach(function (b) {
+      var inb = rows.filter(function (r) { return r.p >= b[0] && r.p < b[1]; });
+      if (!inb.length) return;
+      any = true;
+      var pred = inb.reduce(function (a, r) { return a + r.p; }, 0) / inb.length;
+      var act = inb.filter(function (r) { return r.won; }).length / inb.length;
+      var gap = act - pred;
+      body += "<tr><td>" + b[2] + "</td><td class='num'>" + inb.length + "</td>" +
+        "<td class='num'>" + pct(pred) + "</td><td class='num'>" + pct(act) + "</td>" +
+        "<td class='num' style='color:" + (Math.abs(gap) < 0.05 ? "var(--ink)" :
+          gap > 0 ? "var(--good)" : "var(--bad)") + "'>" + signed(100 * gap, 1) + "pt</td></tr>";
+    });
+    $("calib-table").innerHTML = any ? body + "</tbody>" : "";
+
+    // How far off is the count, in its own standard deviations? Each bet is an
+    // independent coin at its own probability, so the spread of the win count
+    // under the model is sqrt(sum of p(1-p)). Judging the gap against a fixed
+    // fraction of n instead would call a genuine 2-sigma miss "reasonable" on a
+    // large sample and cry wolf on a small one.
+    var variance = rows.reduce(function (a, r) { return a + r.p * (1 - r.p); }, 0);
+    var sd = Math.sqrt(variance);
+    var z = sd > 0 ? (actual - expected) / sd : 0;
+
+    var note = $("calib-note");
+    if (!n) {
+      note.innerHTML = "<b>Nothing settled yet.</b> Log some bets and fill in the final " +
+        "scores; this fills itself in.";
+    } else if (Math.abs(z) < 2.0) {
+      // Two sigma is the usual bar. Below it, say which way it leans without
+      // calling it a finding -- a model is not broken because it is 1.4 sigma off.
+      note.innerHTML = "<b>No strong evidence either way.</b> The model expected " +
+        expected.toFixed(1) + " wins and got " + actual + " across " + plural(n, "decided bet") +
+        " — " + Math.abs(z).toFixed(1) + " standard deviations, inside ordinary luck" +
+        (Math.abs(z) > 1 ? ", though it is leaning " + (z < 0 ? "overconfident" : "underconfident") +
+          " and worth another look as the sample grows" : "") + ". " +
+        (n < 50 ? "Still thin: at this many bets only a large bias would show at all."
+                : "That is a real result, not just a small sample.");
+    } else if (z < 0) {
+      note.innerHTML = "<b>Running overconfident (" + Math.abs(z).toFixed(1) + " sigma).</b> " +
+        "The model expected " + expected.toFixed(1) + " wins and delivered " + actual +
+        " across " + plural(n, "decided bet") + ". Its distributions are too narrow: real edges " +
+        "are being reported as bigger ones, and every stake has been too large. The fix is a " +
+        "wider spread — dispersion for MLB, total SD for WNBA — not a different projection.";
+    } else {
+      note.innerHTML = "<b>Running underconfident (" + z.toFixed(1) + " sigma).</b> " +
+        "The model expected " + expected.toFixed(1) + " wins and delivered " + actual +
+        " across " + plural(n, "decided bet") + ". Its distributions are too wide, so it has " +
+        "been passing on bets that were worth taking.";
+    }
   }
 
   function tile(k, v, s, hero) {
@@ -2211,6 +2326,8 @@
       tile("Model, bet blindly",
            model.settled ? model.w + "-" + model.l + (model.p ? "-" + model.p : "") : "—",
            model.roi === null ? "every green recommendation" : signed(100 * model.roi, 1) + "% ROI on every green pick");
+
+    renderCalibration();
 
     // ---- table ----
     $("log-empty").hidden = all.length > 0;

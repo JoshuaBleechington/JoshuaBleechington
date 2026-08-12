@@ -30,12 +30,31 @@ from .distributions import normal_pdf, normal_total_probs
 # rather than washing out. Too low inflates totals and makes the model call the
 # over on everything, which is a stuck clock, not an edge.
 #
-# To re-derive the rating without a league-average source: every point scored is
-# a point allowed, so the mean offensive rating and mean defensive rating across
-# the league must be the same number, and that number is this constant. Average
-# the two across whatever teams you have and you will be close.
+# Calibrate these against the MARKET, not against results. The model's average
+# projection should sit on the market's average implied mean; whatever edge a
+# four-input model has is in the game-to-game variation, not in knowing the
+# league's overall scoring level better than the books do.
+#
+# That test is also enormously cheaper. Over eight logged games the gap between
+# the model's mean and the market's mean had a standard error of 0.8 points; the
+# gap between the model's mean and the actual finals had a standard error of
+# 3.5. The market is a stable reference with no game randomness in it, so eight
+# games calibrate the level. Hundreds would be needed to do it off results.
+#
+# Measured that way at 105.8 the model sat +2.04 points above the market on
+# every game (se 0.80). 107.0 zeroes it.
+#
+# A tempting alternative derivation is the identity that every point scored is a
+# point allowed, so the league's mean offensive and defensive ratings must be
+# equal, and equal to this constant. Averaging twelve of the thirteen teams
+# gives 108.1 -- and using it makes the model WORSE, pushing it 1.8 points below
+# the market. The identity is sound; the inputs violate its premise, because the
+# pace figures and the ratings come off different possession estimates. Two
+# numbers from different sources cannot be combined by an identity that assumes
+# they share a denominator. The market comparison needs no such assumption,
+# which is why it is the one to trust.
 LEAGUE_PACE = 80.0
-LEAGUE_RATING = 105.8
+LEAGUE_RATING = 107.0
 
 # Empirical spread of a WNBA final total around its projection.
 TOTAL_SD = 11.5

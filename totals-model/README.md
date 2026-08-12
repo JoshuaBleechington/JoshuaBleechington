@@ -238,7 +238,7 @@ Output keys: `model_total` (raw model), `projected_total` (after shrinkage),
 python3 -m unittest discover -s tests -v
 ```
 
-46 tests, covering the odds math, the distributions, both sport models, the
+66 tests, covering the odds math, the distributions, both sport models, the
 shrinkage behaviour and the staking rails.
 
 ---
@@ -250,17 +250,33 @@ should be refreshed once a season:
 
 ```python
 # mlb.py
-LEAGUE_RUNS_PER_GAME = 4.40
+LEAGUE_RUNS_PER_GAME = 4.52
 RUN_DISPERSION       = 4.0    # variance = mean + mean²/r
 
 # wnba.py
 LEAGUE_PACE   = 80.0          # possessions per 40 min
-LEAGUE_RATING = 101.0
+LEAGUE_RATING = 107.0
 TOTAL_SD      = 11.5          # spread of a final total around projection
 ```
 
-The weather coefficients in `mlb.py` (4% per 10°F, 0.8% per mph of wind) are
-deliberately small and clamped to ±10%. Treat them as a nudge, not a signal.
+The weather coefficients in `mlb.py` (0.15% per °F from a 74°F reference, 0.2%
+per mph of wind) are deliberately small and clamped to ±5%. Treat them as a
+nudge, not a signal.
+
+**Calibrate the baselines against the market, not against results.** Every one
+of these constants sits in a denominator, so a stale value biases every game the
+same direction rather than washing out — which is exactly what makes it hard to
+notice and easy to mistake for edge. The test is to average the model's raw
+projection and the market's implied mean over your logged games; the gap should
+be near zero. That comparison has no game randomness in it, so a dozen games
+settle it. Grading against actual finals needs hundreds.
+
+Beware of deriving a baseline from an identity instead. The league's mean
+offensive and defensive ratings must be equal, and equal to `LEAGUE_RATING` —
+true, but only if the pace and rating figures you enter share a possession
+estimate. When they came off different sources, that derivation put the WNBA
+constant at 108.1 and made the model 1.8 points *worse* against the market than
+107.0 did.
 
 ## Why a projection above the line can still say UNDER
 

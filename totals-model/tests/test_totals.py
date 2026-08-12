@@ -458,8 +458,10 @@ class TestEndToEnd(unittest.TestCase):
         """Basketball totals are modelled as symmetric, so median == mean and
         the correction is a no-op there."""
         game = {
-            "away": {"name": "A", "pace": 80, "off_rating": 105.8, "def_rating": 105.8},
-            "home": {"name": "H", "pace": 80, "off_rating": 105.8, "def_rating": 105.8},
+            "away": {"name": "A", "pace": wnba.LEAGUE_PACE,
+                     "off_rating": wnba.LEAGUE_RATING, "def_rating": wnba.LEAGUE_RATING},
+            "home": {"name": "H", "pace": wnba.LEAGUE_PACE,
+                     "off_rating": wnba.LEAGUE_RATING, "def_rating": wnba.LEAGUE_RATING},
             "market": {"line": 168.5, "over_odds": -110, "under_odds": -110},
         }
         r = run_game("wnba", game)

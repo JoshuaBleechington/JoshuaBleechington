@@ -398,6 +398,10 @@
     font-size: 10px; font-weight: 700; text-transform: uppercase;
     letter-spacing: 0.08em; color: var(--muted);
   }
+  .metrics .sub {
+    font-size: 10.5px; color: var(--muted); margin-top: 4px;
+    font-family: var(--mono); line-height: 1.3; white-space: nowrap;
+  }
   .metrics .v {
     font-family: var(--mono); font-size: 18px; font-weight: 600;
     font-variant-numeric: tabular-nums; margin-top: 3px;
@@ -666,7 +670,8 @@
           <div><div class="k">Win prob</div><div class="v" id="m-prob">—</div></div>
           <div><div class="k">Fair price</div><div class="v" id="m-fair">—</div></div>
           <div><div class="k">Edge vs mkt</div><div class="v" id="m-edge">—</div></div>
-          <div><div class="k">Stake</div><div class="v" id="m-stake">—</div></div>
+          <div><div class="k">Stake</div><div class="v" id="m-stake">—</div>
+            <div class="sub" id="m-stake-sub" hidden></div></div>
         </div>
 
         <p class="note" id="skew-note" hidden></p>
@@ -952,7 +957,7 @@
   // projection the same way rather than washing out. To re-derive the rating:
   // every point scored is a point allowed, so the league's mean offensive
   // rating equals its mean defensive rating, and that is this number.
-  var WNBA = { LG_PACE: 80, LG_RATING: 105.8, TOTAL_SD: 11.5, MARGIN_SD: 11,
+  var WNBA = { LG_PACE: 80, LG_RATING: 107, TOTAL_SD: 11.5, MARGIN_SD: 11,
                HCA: 2.5, B2B: 2, OT_POINTS: 19, OT_CAL: 1.5 };
 
   /* Originally 4% per 10F and 8% per 10mph against a 70F reference, clamped at
@@ -1122,6 +1127,7 @@
       built: built, line: market.line,
       pOver: pr.pOver, pUnder: pr.pUnder, pPush: pr.pPush,
       bestSide: side, bestSideProb: sideProb, bestSideOdds: sideOdds,
+      modelWeight: opts.modelWeight,
       fairOdds: sideProb > 0 && sideProb < 1 ? probToAm(sideProb) : null,
       probEdge: sideProbDecided - mktProb,
       evPerUnit: Math.max(overEv, underEv),
@@ -1482,6 +1488,12 @@
     $("m-edge").style.color = bet ? "var(--good)" : "var(--ink)";
     $("m-stake").textContent = fmt2(bet ? r.stakePct : 0) + "%";
     $("m-stake").style.color = bet ? "var(--accent-ink)" : "var(--muted)";
+    // When the cap is doing the sizing, say so. A 2.00% that was truncated from
+    // 8% is not a confident bet -- it is the model out past what four inputs
+    // per team can support, and the flat number hides that completely.
+    var capped = bet && r.uncappedPct > r.stakePct + 0.005;
+    $("m-stake-sub").hidden = !capped;
+    if (capped) $("m-stake-sub").textContent = "cut from " + fmt2(r.uncappedPct) + "%";
 
     $("mb-total").textContent = fmt1(r.projectedTotal);
     $("mb-verdict").innerHTML = bet
@@ -1611,6 +1623,22 @@
   /* Plain-language version of the bet, including where the edge comes from --
      which on a whole-number line is often the push rather than a disagreement
      with the market. */
+  /* The blend sentence has to describe the weight actually in use. It used to
+     say "meeting the market halfway" unconditionally, which was a plain lie at
+     any setting other than 0.50 -- and 1.00, where the model is not deferring to
+     the market at all, is exactly where a reader most needs to be told. */
+  function blendPhrase(r) {
+    if (r.modelWeight >= 0.995)
+      return "Model weight is <b>1.00</b>, so nothing is shrunk toward the market and the " +
+             "projection stays at " + r.projectedTotal.toFixed(2);
+    if (r.modelWeight <= 0.005)
+      return "Model weight is <b>0.00</b>, so the projection is simply the market's own number, " +
+             r.projectedTotal.toFixed(2);
+    var pctModel = Math.round(100 * r.modelWeight);
+    return "Weighting your model <b>" + pctModel + "%</b> against the market's " +
+           (100 - pctModel) + "% puts the projection at " + r.projectedTotal.toFixed(2);
+  }
+
   function renderWhyVerdict(r, unit) {
     var el = $("why-verdict");
     var bet = r.recommended;
@@ -1627,8 +1655,7 @@
     parts.push("<b>" + (bet ? "Why it's a bet:" : "Why it's a pass:") + "</b> a line of " +
       r.line + " implies a mean of about <b>" + r.marketImpliedTotal.toFixed(2) + " " + unit +
       "</b>; your model says <b>" + r.modelTotal.toFixed(2) + "</b>, a gap of <b>" +
-      signed(impliedGap, 2) + "</b>. After meeting the market halfway the projection is " +
-      r.projectedTotal.toFixed(2) + ".");
+      signed(impliedGap, 2) + "</b>. " + blendPhrase(r) + ".");
 
     parts.push("That makes <b>" + side + "</b> a <b>" + pct(r.bestSideProb) + "</b> shot; at " +
       priceStr(r.bestSideOdds) + " you need <b>" + pct(need) + "</b> to break even.");
@@ -1638,7 +1665,11 @@
         "exactly there and your stake comes back — that push is doing part of the work here.");
     }
     parts.push(bet
-      ? "Quarter-Kelly on that edge is <b>" + fmt2(r.stakePct) + "%</b> of bankroll."
+      ? "Quarter-Kelly on that edge is <b>" + fmt2(r.stakePct) + "%</b> of bankroll." +
+        (r.uncappedPct > r.stakePct + 0.005
+          ? " It wanted <b>" + fmt2(r.uncappedPct) + "%</b> and hit the cap — a projection that " +
+            "far from the market is usually an input worth re-checking, not an edge worth pressing."
+          : "")
       : r.evPerUnit > 0
         ? "Kelly sizes that at <b>" + fmt2(r.stakePct) + "%</b> of bankroll. A stake that " +
           "small is the model saying it cannot tell the two sides apart, so it is not a play."

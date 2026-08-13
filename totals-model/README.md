@@ -247,8 +247,55 @@ Output keys: `model_total` (raw model), `projected_total` (after shrinkage),
 python3 -m unittest discover -s tests -v
 ```
 
-72 tests, covering the odds math, the distributions, both sport models, the
+88 tests, covering the odds math, the distributions, both sport models, the
 shrinkage behaviour and the staking rails.
+
+---
+
+## The verdict model
+
+A second, separate read on the same games, in `totals/confidence.py` and
+`web/verdict.html`. It answers a different question — *which side, and how
+sure* — and shares none of the pricing machinery.
+
+```python
+from totals import run_verdict
+
+r = run_verdict("mlb", {
+    "away": {"name": "Cubs", "runs_per_game": 5.16, "starter_era": 4.38,
+             "starter_season_ip": 132, "starter_ip": 5.7, "bullpen_era": 3.87},
+    "home": {"name": "Nationals", "runs_per_game": 5.36, "starter_era": 4.74,
+             "starter_season_ip": 62, "starter_ip": 5.0, "bullpen_era": 5.07},
+    "park_factor": 1.02, "weather": {"temp_f": 86},
+    "line": 9.0,
+    "h2h":  {"avg_total": 10.5, "games": 4},
+    "form": {"away_avg_total": 9.8, "home_avg_total": 10.1, "games": 5},
+})
+r["band"], r["side"], r["win_pct"]   # ('MEDIUM', 'OVER', 0.5715)
+```
+
+**No odds.** The only market input is the posted total. At even money the line
+is the point where the book has over and under equally likely, so solving for
+the mean at which the model reproduces it converts the line into the
+projection's own units — enough to compare against, with no price involved.
+
+**Three signals, not one.** The matchup model, the head-to-head history and each
+side's recent form each vote, weighted by the evidence behind them. Head-to-head
+and recent form may take at most a quarter of the trust budget each, and only at
+a full sample; the matchup model always keeps at least half. A projection is one
+opinion, three that agree are a trend.
+
+**Confidence only ever falls.** The win probability sets the ceiling — HIGH at
+58%, MEDIUM at 54.5%, LOW at 52% — and each doubt knocks it down a step:
+signals pointing different ways, thin inputs, a projection implausibly far from
+the market. Nothing knocks it up. That asymmetry is deliberate. Four separate
+faults in this model's history all presented as unusually high confidence, so an
+exceptional number is a reason to check the inputs before it is a reason to bet.
+
+**Park factors apply only to the park being played in.** A team's own home park
+does not adjust its season rates here. That costs some accuracy for road teams
+from extreme parks, and removes a per-team input that is easy to enter on the
+wrong scale and silently ruinous when it is.
 
 ---
 

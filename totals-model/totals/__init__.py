@@ -9,14 +9,17 @@ from .core import (
     Projection,
     evaluate,
 )
-from . import mlb, wnba
+from . import confidence, mlb, wnba
 
 __all__ = [
     "Market",
     "Projection",
     "evaluate",
+    "confidence",
     "mlb",
     "wnba",
+    "run_verdict",
+    "run_verdict_slate",
     "run_game",
     "run_slate",
     "DEFAULT_MODEL_WEIGHT",
@@ -71,4 +74,38 @@ def run_slate(
         for g in games
     ]
     results.sort(key=lambda r: r.get("ev_per_unit", float("-inf")), reverse=True)
+    return results
+
+
+def run_verdict(sport: str, game: dict) -> dict:
+    """The confidence read: which side, and how sure, with no price involved.
+
+    A separate question from ``run_game`` -- not a replacement. This one wants
+    only a posted total, and answers on a High / Medium / Low scale.
+
+    A team's own park factor is ignored here by design; only the venue being
+    played in adjusts the total.
+    """
+    key = sport.lower()
+    if key not in _MODELS:
+        raise ValueError(f"Unknown sport {sport!r}; expected one of {sorted(_MODELS)}")
+    if "line" not in game:
+        raise ValueError("A posted total is required: set 'line'.")
+
+    payload = dict(game)
+    if key == "mlb":
+        for side in ("away", "home"):
+            team = dict(payload.get(side) or {})
+            team.pop("own_park_factor", None)
+            payload[side] = team
+
+    projection = _MODELS[key].project(payload)
+    return confidence.decide(key.upper(), projection, payload).to_dict()
+
+
+def run_verdict_slate(sport: str, games: list[dict]) -> list[dict]:
+    """Grade a slate, strongest read first."""
+    order = {"HIGH": 3, "MEDIUM": 2, "LOW": 1, "NO PLAY": 0}
+    results = [run_verdict(sport, g) for g in games]
+    results.sort(key=lambda r: (order[r["band"]], r["win_pct"]), reverse=True)
     return results

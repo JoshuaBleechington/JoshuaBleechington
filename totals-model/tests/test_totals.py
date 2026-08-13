@@ -5,13 +5,23 @@ import unittest
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from totals import market, mlb, run_game, wnba  # noqa: E402
+from totals import (  # noqa: E402
+    market,
+    mlb,
+    run_game,
+    run_verdict,
+    run_verdict_slate,
+    wnba,
+)
+from totals.confidence import BANDS  # noqa: E402
 from totals.distributions import (  # noqa: E402
     convolve,
     discrete_total_probs,
     negative_binomial_pmf,
     normal_total_probs,
 )
+
+BANDS_ORDER = {b: i for i, b in enumerate(BANDS)}
 
 
 class TestMarket(unittest.TestCase):
@@ -689,3 +699,136 @@ class TestShrinkageAndStaking(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)
+
+
+class TestConfidenceModel(unittest.TestCase):
+    """The verdict model: a side and a band, no price anywhere."""
+
+    def mlb_game(self, **over):
+        g = {
+            "away": {"name": "A", "runs_per_game": 4.52, "starter_era": 4.20,
+                     "starter_season_ip": 140, "starter_ip": 5.5, "bullpen_era": 4.20},
+            "home": {"name": "H", "runs_per_game": 4.52, "starter_era": 4.20,
+                     "starter_season_ip": 140, "starter_ip": 5.5, "bullpen_era": 4.20},
+            "line": 9.0,
+            "h2h": {"avg_total": 9.0, "games": 8},
+            "form": {"away_avg_total": 9.0, "home_avg_total": 9.0, "games": 10},
+        }
+        g.update(over)
+        return g
+
+    def wnba_game(self, **over):
+        g = {
+            "away": {"name": "A", "pace": 80, "off_rating": 107, "def_rating": 107},
+            "home": {"name": "H", "pace": 80, "off_rating": 107, "def_rating": 107},
+            "line": 171.0,
+            "h2h": {"avg_total": 171.0, "games": 4},
+            "form": {"away_avg_total": 171.0, "home_avg_total": 171.0, "games": 8},
+        }
+        g.update(over)
+        return g
+
+    def test_it_reports_no_price_anywhere(self):
+        r = run_verdict("mlb", self.mlb_game())
+        for banned in ("ev_per_unit", "kelly_stake_pct", "best_side_odds", "fair_odds",
+                       "book_hold", "market_p_over_novig", "recommended"):
+            self.assertNotIn(banned, r)
+        self.assertIn("band", r)
+        self.assertIn("win_pct", r)
+
+    def test_a_line_needs_no_odds_to_become_a_mean(self):
+        """The market mean sits above a baseball line, because runs are skewed."""
+        r = run_verdict("mlb", self.mlb_game(line=9.0))
+        self.assertGreater(r["market_mean"], 9.0)
+        self.assertLess(r["market_mean"], 10.5)
+
+    def test_symmetric_scoring_puts_the_mean_on_the_line(self):
+        r = run_verdict("wnba", self.wnba_game(line=171.0))
+        self.assertAlmostEqual(r["market_mean"], 171.0, places=1)
+
+    def test_bands_only_ever_step_down(self):
+        """Every fault in this project's history arrived dressed as confidence."""
+        from totals.confidence import BANDS, band_for, _step_down
+        for b in BANDS:
+            self.assertEqual(BANDS.index(_step_down(b)), max(0, BANDS.index(b) - 1))
+        self.assertEqual(_step_down("HIGH", 5), "NO PLAY")
+        self.assertEqual(band_for(0.99), "HIGH")
+        self.assertEqual(band_for(0.50), "NO PLAY")
+
+    def test_a_trend_pointing_the_other_way_costs_a_band(self):
+        strong = {"h2h": {"avg_total": 20.0, "games": 8}}   # screams over
+        agree = run_verdict("mlb", self.mlb_game(line=6.5, **strong))
+        dissent = run_verdict("mlb", self.mlb_game(
+            line=6.5, h2h={"avg_total": 3.0, "games": 8}))
+        self.assertEqual(agree["side"], "OVER")
+        self.assertIn("head to head points the other way (under)",
+                      " ".join(dissent["downgrades"]))
+        self.assertLess(BANDS_ORDER[dissent["band"]], BANDS_ORDER[agree["band"]])
+
+    def test_no_trend_data_at_all_is_itself_a_downgrade(self):
+        bare = run_verdict("mlb", self.mlb_game(line=6.5, h2h=None, form=None))
+        self.assertIn("no head-to-head or recent form", " ".join(bare["downgrades"]))
+
+    def test_a_blank_starter_costs_confidence_rather_than_earning_it(self):
+        g = self.mlb_game(line=6.5)
+        g["home"]["starter_era"] = 0.0
+        g["home"]["starter_season_ip"] = 0.0
+        r = run_verdict("mlb", g)
+        self.assertTrue(any("league average arm" in f for f in r["flags"]))
+        self.assertIn("inputs behind it are thin", " ".join(r["downgrades"]))
+
+    def test_an_absurd_disagreement_is_a_symptom_not_an_edge(self):
+        r = run_verdict("mlb", self.mlb_game(line=3.5))
+        self.assertTrue(any("from the market" in f for f in r["flags"]))
+        self.assertIn("inputs behind it are thin", " ".join(r["downgrades"]))
+
+    def test_the_teams_own_park_is_ignored(self):
+        plain = run_verdict("mlb", self.mlb_game())
+        g = self.mlb_game()
+        g["away"]["own_park_factor"] = 130
+        g["home"]["own_park_factor"] = 70
+        self.assertAlmostEqual(run_verdict("mlb", g)["projected_total"],
+                               plain["projected_total"], places=6)
+
+    def test_the_venue_park_still_moves_the_total(self):
+        base = run_verdict("mlb", self.mlb_game())["model_total"]
+        hot = run_verdict("mlb", self.mlb_game(park_factor=1.20))["model_total"]
+        # Both sides are reported rounded to cents, so compare within that.
+        self.assertAlmostEqual(hot, base * 1.20, delta=0.02)
+
+    def test_trend_weights_never_outrun_the_model(self):
+        r = run_verdict("mlb", self.mlb_game(trust=1.0))
+        by = {s["name"]: s for s in r["signals"]}
+        self.assertGreaterEqual(by["Matchup model"]["weight"], 0.5)
+        self.assertAlmostEqual(sum(s["weight"] for s in r["signals"]), 1.0, places=6)
+
+    def test_a_thin_head_to_head_earns_less_than_a_full_one(self):
+        one = run_verdict("mlb", self.mlb_game(h2h={"avg_total": 11.0, "games": 1}))
+        many = run_verdict("mlb", self.mlb_game(h2h={"avg_total": 11.0, "games": 8}))
+        w = lambda r: [s for s in r["signals"] if s["name"] == "Head to head"][0]["weight"]
+        self.assertLess(w(one), w(many))
+        self.assertGreater(w(one), 0.0)
+
+    def test_trust_zero_leaves_the_projection_on_the_market(self):
+        r = run_verdict("mlb", self.mlb_game(line=6.5, trust=0.0))
+        self.assertAlmostEqual(r["projected_total"], r["market_mean"], places=6)
+        self.assertEqual(r["band"], "NO PLAY")
+
+    def test_a_slate_sorts_strongest_first(self):
+        games = [self.mlb_game(line=9.0), self.mlb_game(line=6.5),
+                 self.mlb_game(line=13.5)]
+        out = run_verdict_slate("mlb", games)
+        ranks = [BANDS_ORDER[r["band"]] for r in out]
+        self.assertEqual(ranks, sorted(ranks, reverse=True))
+
+    def test_a_missing_line_is_an_error_not_a_guess(self):
+        g = self.mlb_game()
+        del g["line"]
+        with self.assertRaises(ValueError):
+            run_verdict("mlb", g)
+
+    def test_wnba_works_the_same_way(self):
+        r = run_verdict("wnba", self.wnba_game(line=160.0))
+        self.assertEqual(r["side"], "OVER")
+        self.assertIn(r["band"], BANDS)
+        self.assertEqual(len(r["signals"]), 3)

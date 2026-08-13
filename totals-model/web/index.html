@@ -398,6 +398,23 @@
     font-size: 10px; font-weight: 700; text-transform: uppercase;
     letter-spacing: 0.08em; color: var(--muted);
   }
+  .field select {
+    width: 100%; padding: 8px 30px 8px 10px;
+    background: var(--surface); color: var(--ink);
+    border: 1px solid var(--rule-strong); border-radius: 7px;
+    font-family: var(--ui); font-size: 14px;
+    -webkit-appearance: none; appearance: none;
+    background-image: linear-gradient(45deg, transparent 50%, var(--ink-2) 50%),
+                      linear-gradient(135deg, var(--ink-2) 50%, transparent 50%);
+    background-position: calc(100% - 16px) calc(50% + 1px), calc(100% - 11px) calc(50% + 1px);
+    background-size: 5px 5px, 5px 5px; background-repeat: no-repeat;
+    transition: border-color 0.14s, box-shadow 0.14s;
+  }
+  .field select:hover { border-color: var(--muted); }
+  .field select:focus-visible {
+    outline: none; border-color: var(--accent);
+    box-shadow: 0 0 0 3px var(--accent-wash);
+  }
   .metrics .sub {
     font-size: 10.5px; color: var(--muted); margin-top: 4px;
     font-family: var(--mono); line-height: 1.3; white-space: nowrap;
@@ -636,6 +653,21 @@
               <label for="maxstake">Max stake %</label>
               <input type="number" id="maxstake" step="0.5" min="0" value="2" />
             </div>
+          </div>
+
+          <div class="field" style="margin-top:14px">
+            <label for="sides">Sides to bet</label>
+            <select id="sides">
+              <option value="over" selected>Overs only</option>
+              <option value="both">Both sides</option>
+              <option value="under">Unders only</option>
+            </select>
+            <p class="hint">
+              Filters the <em>recommendation</em> only — the projection, the win probability and
+              the graph always show what the model actually thinks, including on the side you
+              aren't taking. Suppressing a side would corrupt the other one, since they are the
+              same number seen from opposite ends.
+            </p>
           </div>
 
           <div id="league-body"></div>
@@ -949,10 +981,22 @@
     DEFAULT_SEASON_IP: 130
   };
 
+  /* Missing innings and zero innings are different claims, and collapsing them
+     cost a real bet. Missing means "here is an ERA, I didn't say how many
+     innings are behind it" -- assume a rotation regular. An explicit zero means
+     there are no innings, so there is no evidence and the answer is the league
+     average with nothing mixed in.
+     A starter entered as 0.00 ERA over 0.0 IP was read as a 0.00 ERA over 130
+     innings, regressed to 1.83, and produced the largest UNDER stake in the
+     log. The game went 14 runs. Handled properly it is not a bet at all. */
   function regressEra(era, seasonIp, lgEra) {
-    if (!isNum(seasonIp) || seasonIp <= 0) seasonIp = MLB.DEFAULT_SEASON_IP;
+    if (isNum(seasonIp) && seasonIp <= 0) return lgEra;
+    if (!isNum(seasonIp)) seasonIp = MLB.DEFAULT_SEASON_IP;
     return (seasonIp * era + MLB.ERA_PRIOR_IP * lgEra) / (seasonIp + MLB.ERA_PRIOR_IP);
   }
+  /* A zero or negative rate is not a pitcher, it is an empty box. Nobody has a
+     0.00 season ERA, and a number input hands back 0 readily. */
+  function rateOr(v, fallback) { return isNum(v) && v > 0 ? v : fallback; }
   // Both league constants sit in denominators, so a stale value biases every
   // projection the same way rather than washing out. To re-derive the rating:
   // every point scored is a point allowed, so the league's mean offensive
@@ -977,6 +1021,15 @@
      honestly resolve. */
   var MIN_STAKE_PCT = 0.25;
 
+  /* Which sides may be recommended. This filters the RECOMMENDATION, never the
+     projection: a bettor who only wants overs still needs an honest probability
+     for the under, because it is the same number seen from the other side.
+     Suppressing one would corrupt the other. So a filtered game shows the
+     model's real read and simply declines to bet it. */
+  function sideAllowed(side, sides) {
+    return sides === "both" || side.toLowerCase() === sides;
+  }
+
   function weatherFactor(w) {
     if (!w || w.dome) return 1;
     var f = 1;
@@ -997,14 +1050,14 @@
     var lg = (g.league && isNum(g.league.runsPerGame)) ? g.league.runsPerGame : MLB.LG_RPG;
     var lgEra = lg / MLB.ERA_TO_RA9;
     function side(t) {
-      var era = isNum(t.starterEra) ? t.starterEra : lgEra;
+      var era = rateOr(t.starterEra, lgEra);
       if (g.regressStarters !== false) era = regressEra(era, t.starterSeasonIp, lgEra);
       return {
         name: t.name || "?",
         rpg: isNum(t.runsPerGame) ? t.runsPerGame : lg,
         spRa9: era * MLB.ERA_TO_RA9,
         spIp: isNum(t.starterIp) ? t.starterIp : 5.2,
-        bpRa9: isNum(t.bullpenEra) ? t.bullpenEra * MLB.ERA_TO_RA9 : lg,
+        bpRa9: rateOr(t.bullpenEra, lgEra) * MLB.ERA_TO_RA9,
         ownPf: isNum(t.ownParkFactor) ? normalizeParkFactor(t.ownParkFactor) : 1
       };
     }
@@ -1111,7 +1164,14 @@
     // because the implied edge is a fraction of the error in the inputs behind
     // it. Below the floor the play is reported as not recommended, and the real
     // size stays on the page so nothing is hidden.
-    var recommended = Math.max(overEv, underEv) > 0 && sized >= opts.minStakePct;
+    var whyNot = null;
+    if (!sideAllowed(side, opts.sides))
+      whyNot = "you have it set to " + opts.sides + "s only";
+    else if (Math.max(overEv, underEv) <= 0) whyNot = "the juice eats the edge";
+    else if (sized < opts.minStakePct)
+      whyNot = "it sizes to " + sized.toFixed(2) + "% of bankroll, under the " +
+               opts.minStakePct.toFixed(2) + "% floor";
+    var recommended = whyNot === null;
     // The model's probability counts pushes; the de-vigged market price does
     // not, since a push returns the stake. Put both on decided outcomes
     // before subtracting, or a whole-number line prints a negative edge
@@ -1132,6 +1192,8 @@
       probEdge: sideProbDecided - mktProb,
       evPerUnit: Math.max(overEv, underEv),
       recommended: recommended,
+      whyNot: whyNot,
+      sides: opts.sides,
       minStakePct: opts.minStakePct,
       stakePct: sized,
       uncappedPct: stake,
@@ -1342,9 +1404,13 @@
   function bindInputs() {
     // Scoped to the calculator: the log table's own inputs settle games and
     // must not trigger a re-projection.
-    document.querySelectorAll("#calc-view input").forEach(function (el) {
+    // A <select> fires "change", not "input", so binding only "input" would
+    // leave the control looking live while changing nothing.
+    document.querySelectorAll("#calc-view input, #calc-view select").forEach(function (el) {
       el.removeEventListener("input", onCalcInput);
       el.addEventListener("input", onCalcInput);
+      el.removeEventListener("change", onCalcInput);
+      el.addEventListener("change", onCalcInput);
     });
   }
 
@@ -1419,7 +1485,8 @@
       modelWeight: weight,
       kellyMultiplier: isFinite(num("kelly")) ? num("kelly") : 0.25,
       maxStakePct: isFinite(num("maxstake")) ? num("maxstake") : 2,
-      minStakePct: MIN_STAKE_PCT
+      minStakePct: MIN_STAKE_PCT,
+      sides: $("sides") ? $("sides").value : "over"
     });
     last = { result: r, game: g };
     render(r);
@@ -1473,12 +1540,8 @@
         '<span class="detail">Expected return <b>' + signed(100 * r.evPerUnit, 2) +
         "%</b> per unit risked.</span>"
       : '<span class="pill pass"><span class="glyph">&#9675;</span>No bet</span>' +
-        '<span class="detail">' + (r.evPerUnit > 0
-          ? "Best side is " + r.bestSide + " at <b>" + signed(100 * r.evPerUnit, 2) +
-            "%</b>, which sizes to <b>" + fmt2(r.stakePct) + "%</b> of bankroll — under the " +
-            fmt2(MIN_STAKE_PCT) + "% floor, so it is inside the model's own margin of error."
-          : "Best available side is " + r.bestSide + " at <b>" +
-            signed(100 * r.evPerUnit, 2) + "%</b> — not worth the juice.") + "</span>";
+        '<span class="detail">Model reads ' + r.bestSide + " at <b>" +
+        signed(100 * r.evPerUnit, 2) + "%</b> — no play, because " + r.whyNot + ".</span>";
 
     $("m-prob").textContent = pct(r.bestSideProb);
     $("m-fair").textContent = r.fairOdds === null ? "—" : priceStr(r.fairOdds);
@@ -1670,10 +1733,7 @@
           ? " It wanted <b>" + fmt2(r.uncappedPct) + "%</b> and hit the cap — a projection that " +
             "far from the market is usually an input worth re-checking, not an edge worth pressing."
           : "")
-      : r.evPerUnit > 0
-        ? "Kelly sizes that at <b>" + fmt2(r.stakePct) + "%</b> of bankroll. A stake that " +
-          "small is the model saying it cannot tell the two sides apart, so it is not a play."
-        : "Not enough to clear the juice, so no stake.");
+      : "No stake — " + r.whyNot + ".");
 
     el.innerHTML = parts.join(" ");
   }
@@ -2148,6 +2208,7 @@
     snap.settings["Model weight"] = num("weight");
     snap.settings["Kelly"] = num("kelly");
     snap.settings["Max stake %"] = num("maxstake");
+    snap.settings["Sides"] = $("sides").value;
     // The league baselines belong in the record too. They sit in the
     // denominator of every projection, so without them a logged number can't
     // be checked later -- you can't tell a model change from a stale constant.

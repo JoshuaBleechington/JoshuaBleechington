@@ -31,6 +31,22 @@ DEFAULT_MAX_STAKE_PCT = 2.0
 # uncapped number stays in the output so the size is still inspectable.
 DEFAULT_MIN_STAKE_PCT = 0.25
 
+# Which sides may be recommended: "both", "over" or "under".
+#
+# This filters the recommendation, never the projection. A bettor who only wants
+# overs still needs an honest probability for the under -- suppressing one side
+# of a distribution would corrupt the number that the other side is derived
+# from, and the win probability on the page would stop meaning anything.
+#
+# So a filtered game reports the model's real read and its real probability, and
+# simply declines to bet. The output says which side the model liked and that
+# the filter is why there is no play, rather than quietly showing the other side.
+DEFAULT_SIDES = "both"
+
+
+def _allowed(side: str, sides: str) -> bool:
+    return sides == "both" or side.lower() == sides.lower()
+
 
 @dataclass
 class Projection:
@@ -135,6 +151,7 @@ def evaluate(
     model_weight: float = DEFAULT_MODEL_WEIGHT,
     max_stake_pct: float = DEFAULT_MAX_STAKE_PCT,
     min_stake_pct: float = DEFAULT_MIN_STAKE_PCT,
+    sides: str = DEFAULT_SIDES,
 ) -> dict[str, Any]:
     """Combine a projection with a posted total and report where the edge is."""
 
@@ -170,8 +187,19 @@ def evaluate(
 
     stake = 100.0 * kelly_fraction(side_prob, side_odds, probs.p_push, kelly_multiplier)
     sized = min(stake, max_stake_pct)
-    # A play is only a play if it is worth money *and* worth sizing.
-    recommended = side_ev > 0 and sized >= min_stake_pct
+    # A play is only a play if it is worth money, worth sizing, and on a side
+    # you are willing to take. Report which of the three failed -- "no bet" with
+    # no reason is the kind of output that gets overridden.
+    side_ok = _allowed(side, sides)
+    if not side_ok:
+        why_not = f"model likes the {side.lower()}, and you are betting {sides}s only"
+    elif side_ev <= 0:
+        why_not = "the juice eats the edge"
+    elif sized < min_stake_pct:
+        why_not = f"sizes to {sized:.2f}%, under the {min_stake_pct:.2f}% floor"
+    else:
+        why_not = None
+    recommended = why_not is None
 
     # Compare like with like. The model's probability is a share of *all*
     # outcomes, pushes included; the de-vigged market price is a share of
@@ -206,6 +234,8 @@ def evaluate(
             "best_side_prob_decided": round(side_prob_decided, 4),
             "ev_per_unit": round(side_ev, 4),
             "recommended": recommended,
+            "not_recommended_because": why_not,
+            "sides": sides,
             "min_stake_pct": min_stake_pct,
             "kelly_stake_pct": round(sized, 2) if recommended else 0.0,
             "kelly_uncapped_pct": round(stake, 2),

@@ -196,6 +196,14 @@ and lost more than the ten genuine ones combined. Below the floor, `recommended`
 is `False` and `kelly_stake_pct` is 0; `kelly_uncapped_pct` still shows the real
 size, so nothing is hidden.
 
+**Side filter (`--sides`, default `both`).** Restricts which sides may be
+recommended. It filters the *recommendation*, never the projection: a bettor
+taking overs only still needs an honest probability for the under, because it is
+the same number seen from the other end, and suppressing one would corrupt the
+other. A filtered game reports the model's real read, its real probability and
+its real EV, and declines to bet — `not_recommended_because` says which of the
+three rails stopped it (side filter, juice, or stake floor).
+
 ---
 
 ## Command line
@@ -208,6 +216,7 @@ python3 -m totals {mlb|wnba} FILE [options]
   --model-weight 0.5   how far to trust the model over the line (0–1)
   --max-stake 2.0      cap on a single stake, % of bankroll
   --min-stake 0.25     floor on a single stake; below it, not a recommendation
+  --sides over         restrict recommendations to one side (both|over|under)
   --format json        machine-readable output
 ```
 
@@ -229,8 +238,8 @@ for r in run_slate("wnba", games, model_weight=0.6):
 Output keys: `model_total` (raw model), `projected_total` (after shrinkage),
 `raw_edge` / `blended_edge`, `p_over` / `p_under` / `p_push`,
 `market_p_over_novig`, `book_hold`, `best_side`, `fair_odds`,
-`prob_edge_vs_market`, `ev_per_unit`, `recommended`, `kelly_stake_pct`,
-`kelly_uncapped_pct`.
+`prob_edge_vs_market`, `ev_per_unit`, `recommended`,
+`not_recommended_because`, `kelly_stake_pct`, `kelly_uncapped_pct`.
 
 ## Tests
 
@@ -238,7 +247,7 @@ Output keys: `model_total` (raw model), `projected_total` (after shrinkage),
 python3 -m unittest discover -s tests -v
 ```
 
-66 tests, covering the odds math, the distributions, both sport models, the
+72 tests, covering the odds math, the distributions, both sport models, the
 shrinkage behaviour and the staking rails.
 
 ---

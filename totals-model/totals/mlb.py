@@ -83,11 +83,19 @@ WEATHER_CLAMP = 0.05  # a guardrail for genuine extremes, not a normal outcome
 
 
 def _ra9(team: dict[str, Any], prefix: str, default: float) -> float:
-    """Accept either an RA/9 or an ERA for starter/bullpen."""
-    if f"{prefix}_ra9" in team:
-        return float(team[f"{prefix}_ra9"])
-    if f"{prefix}_era" in team:
-        return float(team[f"{prefix}_era"]) * ERA_TO_RA9
+    """Accept either an RA/9 or an ERA for starter/bullpen.
+
+    A zero or negative rate is not a pitcher, it is a blank field. Nobody has a
+    0.00 ERA over a season, and a form that offers a number box will happily
+    hand back 0 when the user did not have the figure. Taking that literally is
+    how an unknown starter becomes the best pitcher alive, so it falls back to
+    the league default instead.
+    """
+    for key, scale in ((f"{prefix}_ra9", 1.0), (f"{prefix}_era", ERA_TO_RA9)):
+        if key in team:
+            value = float(team[key])
+            if value > 0:
+                return value * scale
     return default
 
 
@@ -97,9 +105,22 @@ def regress_era(era: float, season_ip: float | None, lg_era: float,
 
     A 7.84 ERA over 40 innings says far less than a 3.10 over 160. Without this,
     one small-sample starter swings a projected total by two or three runs.
+
+    Missing and zero mean different things and must not share a branch. A
+    missing innings figure means "here is an ERA, I didn't say how many innings
+    are behind it" -- assume a rotation regular. An explicit *zero* means there
+    are no innings at all, so there is no evidence, and the answer is the league
+    average with nothing mixed in.
+
+    Collapsing the two cost a real bet. A starter entered as 0.00 ERA over 0.0
+    IP was read as a 0.00 ERA over 130 innings, regressed to 1.83, and produced
+    the largest UNDER stake in the log. The game went 14 runs. Handled properly
+    the same game is not a bet at all.
     """
-    if season_ip is None or season_ip <= 0:
+    if season_ip is None:
         season_ip = DEFAULT_STARTER_SEASON_IP
+    elif season_ip <= 0:
+        return lg_era
     return (season_ip * era + prior_ip * lg_era) / (season_ip + prior_ip)
 
 

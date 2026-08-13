@@ -16,6 +16,7 @@ from . import (
     DEFAULT_MAX_STAKE_PCT,
     DEFAULT_MIN_STAKE_PCT,
     DEFAULT_MODEL_WEIGHT,
+    DEFAULT_SIDES,
     run_slate,
 )
 
@@ -79,12 +80,20 @@ def main(argv: list[str] | None = None) -> int:
         help="floor on a single stake, %% of bankroll; below it the play is not "
              "recommended (default %(default)s)",
     )
+    parser.add_argument(
+        "--sides",
+        choices=["both", "over", "under"],
+        default=DEFAULT_SIDES,
+        help="which sides may be recommended (default %(default)s). Filters the "
+             "recommendation only; the projection and probabilities are unchanged.",
+    )
     parser.add_argument("--format", choices=["table", "json"], default="table")
     args = parser.parse_args(argv)
 
     games = _load(args.file)
     results = run_slate(
-        args.sport, games, args.kelly, args.model_weight, args.max_stake, args.min_stake
+        args.sport, games, args.kelly, args.model_weight, args.max_stake, args.min_stake,
+        args.sides
     )
 
     if args.min_ev is not None:

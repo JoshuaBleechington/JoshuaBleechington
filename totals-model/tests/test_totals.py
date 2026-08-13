@@ -219,6 +219,33 @@ class TestMlb(unittest.TestCase):
         self.assertAlmostEqual(assumed, explicit, places=9)
         self.assertGreater(assumed, 2.00)
 
+    def test_zero_innings_is_no_evidence_at_all(self):
+        """Missing innings and zero innings are different claims.
+
+        Missing means "an ERA, without saying how many innings back it"; zero
+        means there is nothing behind it, so the answer is the league average.
+        """
+        lg_era = mlb.LEAGUE_RUNS_PER_GAME / mlb.ERA_TO_RA9
+        self.assertAlmostEqual(mlb.regress_era(0.00, 0, lg_era), lg_era, places=9)
+        self.assertAlmostEqual(mlb.regress_era(1.20, 0, lg_era), lg_era, places=9)
+        # ...and it must not quietly reuse the rotation-regular default.
+        self.assertNotAlmostEqual(mlb.regress_era(0.00, 0, lg_era),
+                                  mlb.regress_era(0.00, None, lg_era), places=3)
+
+    def test_a_blank_starter_does_not_become_the_best_pitcher_alive(self):
+        """A form hands back 0 when the user hasn't got the number.
+
+        Read literally, 0.00 ERA over 0.0 IP once regressed to 1.83 and produced
+        the largest UNDER stake in the log; the game went 14 runs.
+        """
+        game = self.neutral_game()
+        game["home"].pop("starter_ra9")
+        game["home"]["starter_era"] = 0.0
+        game["home"]["starter_season_ip"] = 0.0
+        blank = mlb.project(game)
+        neutral = mlb.project(self.neutral_game())
+        self.assertAlmostEqual(blank.total, neutral.total, places=6)
+
     def test_regression_shrinks_disagreement_with_the_market(self):
         """A small-sample blowup starter should not move the total three runs."""
         game = self.neutral_game()
@@ -593,6 +620,48 @@ class TestShrinkageAndStaking(unittest.TestCase):
         r = run_game("wnba", self.wnba_game(140.5))
         self.assertTrue(r["recommended"])
         self.assertGreaterEqual(r["kelly_stake_pct"], r["min_stake_pct"])
+
+    def test_betting_overs_only_declines_an_under(self):
+        game = self.wnba_game(300.5)  # way above any projection -> model likes UNDER
+        both = run_game("wnba", game)
+        self.assertEqual(both["best_side"], "UNDER")
+        self.assertTrue(both["recommended"])
+
+        over_only = run_game("wnba", game, sides="over")
+        self.assertFalse(over_only["recommended"])
+        self.assertEqual(over_only["kelly_stake_pct"], 0.0)
+        self.assertIn("under", over_only["not_recommended_because"])
+
+    def test_the_filter_never_touches_the_projection_or_the_odds(self):
+        """Filtering is a betting rule, not a modelling one.
+
+        Suppressing a side would corrupt the number the other side is derived
+        from, so everything the model actually believes must come through
+        unchanged -- only the recommendation is withheld.
+        """
+        game = self.wnba_game(300.5)
+        both = run_game("wnba", game)
+        over_only = run_game("wnba", game, sides="over")
+        for key in ("model_total", "projected_total", "p_over", "p_under", "p_push",
+                    "best_side", "best_side_prob", "ev_per_unit", "fair_odds",
+                    "market_implied_total", "kelly_uncapped_pct"):
+            self.assertEqual(both[key], over_only[key], key)
+
+    def test_betting_overs_only_still_takes_an_over(self):
+        game = self.wnba_game(140.5)  # far below any projection -> model likes OVER
+        r = run_game("wnba", game, sides="over")
+        self.assertEqual(r["best_side"], "OVER")
+        self.assertTrue(r["recommended"])
+        self.assertIsNone(r["not_recommended_because"])
+
+    def test_every_refusal_says_which_rail_stopped_it(self):
+        reasons = {
+            run_game("wnba", self.wnba_game(300.5), sides="over")["not_recommended_because"],
+            run_game("wnba", self.wnba_game(150.5), model_weight=0.0)["not_recommended_because"],
+            run_game("wnba", self.wnba_game(150.5), min_stake_pct=5.0)["not_recommended_because"],
+        }
+        self.assertEqual(len(reasons), 3)
+        self.assertTrue(all(r for r in reasons))
 
     def test_the_floor_can_be_lowered(self):
         game = self.wnba_game(150.5)

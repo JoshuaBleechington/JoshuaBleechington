@@ -835,16 +835,19 @@
       <div id="log-table"></div>
       <div class="log-actions">
         <button type="button" class="btn primary" id="copy-report">Copy report</button>
-        <button type="button" class="btn" id="export-csv">CSV</button>
+        <button type="button" class="btn" id="export-csv">CSV (spreadsheet)</button>
         <button type="button" class="btn" id="copy-log">Save log</button>
         <button type="button" class="btn" id="paste-import">Load log</button>
         <button type="button" class="btn danger" id="clear-log">Erase</button>
       </div>
       <div class="card-body">
+        <p class="hint" id="io-status"></p>
         <p class="hint">
           The log lives in this browser's storage only. <b>Save log</b> copies it as text you can
-          paste anywhere — into a note, an email to yourself, or this page on another device via
-          <b>Load log</b>.
+          paste anywhere — a note, an email to yourself, or this page on another device.
+          <b>Load log</b> takes any of the three: the saved log, a copied report, or the CSV.
+          Only the first two carry the inputs, so only those let you reopen a game in the
+          projector.
         </p>
       </div>
     </section>
@@ -2497,23 +2500,239 @@
     }
   }
 
-  function importLog(text, btnId) {
-    var parsed;
-    try { parsed = JSON.parse(text); }
-    catch (e) { flashButton(btnId, "Not valid JSON", 2600); return; }
-    if (!parsed || !Array.isArray(parsed.entries)) {
-      flashButton(btnId, "No log in there", 2600); return;
+  /* ---------------------------------------------------------------------
+     LOADING A LOG BACK IN
+
+     Three things leave this page as text, and only one of them used to come
+     back. "Load log" parsed JSON and nothing else, so pasting the CSV -- which
+     sits on the button right next to it -- failed with a two-second flash on a
+     button you were no longer looking at.
+
+     All three are accepted now, because the honest reason to have three
+     formats is that different ones survive different journeys:
+
+       · the JSON  — everything, including the inputs, so a game can be
+                     reopened in the projector
+       · the report — also everything, and it is the format that gets pasted
+                     into notes and messages, so it is the one you actually
+                     still have three days later
+       · the CSV   — results only. Enough to rebuild the record and the band
+                     table, not enough to reopen a game. It says so.
+  --------------------------------------------------------------------- */
+
+  function ioStatus(msg, bad) {
+    var el = $("io-status");
+    el.innerHTML = msg || "";
+    el.style.color = bad ? "var(--bad)" : "var(--ink-2)";
+  }
+
+  // RFC-4180-ish: quoted fields, doubled quotes inside them, commas and
+  // newlines allowed within quotes.
+  function parseCsv(text) {
+    var rows = [], row = [], cell = "", inQ = false, i = 0;
+    text = text.replace(/\r\n?/g, "\n");
+    while (i < text.length) {
+      var c = text[i];
+      if (inQ) {
+        if (c === '"' && text[i + 1] === '"') { cell += '"'; i += 2; continue; }
+        if (c === '"') { inQ = false; i++; continue; }
+        cell += c; i++;
+      } else if (c === '"') { inQ = true; i++; }
+      else if (c === ",") { row.push(cell); cell = ""; i++; }
+      else if (c === "\n") { row.push(cell); rows.push(row); row = []; cell = ""; i++; }
+      else { cell += c; i++; }
     }
+    if (cell !== "" || row.length) { row.push(cell); rows.push(row); }
+    return rows.filter(function (r) { return r.some(function (v) { return v !== ""; }); });
+  }
+
+  function entriesFromCsv(text) {
+    var rows = parseCsv(text);
+    if (!rows.length) return { entries: [], partial: true, reason: "that CSV has no rows" };
+    var head = rows[0].map(function (h) { return h.trim(); });
+    if (head.indexOf("band") < 0 || head.indexOf("line") < 0)
+      return null;
+    if (rows.length < 2)
+      return { entries: [], partial: true,
+               reason: "that is the CSV header row on its own — no games in it" };
+    var idx = {};
+    head.forEach(function (h, i) { idx[h] = i; });
+    var out = rows.slice(1).map(function (r, n) {
+      var get = function (k) { return idx[k] === undefined ? "" : (r[idx[k]] || "").trim(); };
+      var fin = get("final");
+      return {
+        id: "csv" + (Date.parse(get("date")) || Date.now()) + "-" + n,
+        date: get("date"), ts: Date.parse(get("date")) || Date.now() - n,
+        sport: get("sport"), away: get("away"), home: get("home"),
+        line: parseFloat(get("line")), side: get("side"),
+        band: get("band"), earnedBand: get("earned_band") || get("band"),
+        winPct: parseFloat(get("win_pct")), pPush: 0,
+        modelTotal: parseFloat(get("model_total")),
+        marketMean: parseFloat(get("market_mean")),
+        projectedTotal: parseFloat(get("projected_total")),
+        signals: [], downgrades: get("downgrades") ? get("downgrades").split("; ") : [],
+        status: get("status") || "backed", note: get("note"),
+        inputs: null, values: null,
+        final: fin === "" ? null : parseFloat(fin)
+      };
+    }).filter(function (e) { return e.away && isFinite(e.line) && e.band; });
+    return { entries: out, partial: true,
+             reason: "the CSV keeps results but not the inputs, so those games can be "
+                   + "counted but not reopened in the projector" };
+  }
+
+  var REPORT_TEAM = /^\s*(Away|Home)\s+(.*?)\s{2,}(Runs \/ game|Pace \(per 40\))\s(.*)$/;
+
+  function kvPairs(s) {
+    var out = {};
+    (s || "").split("·").forEach(function (part) {
+      var m = part.trim().match(/^(.*?)\s+([-\d.]+)$/);
+      if (m) out[m[1].trim()] = parseFloat(m[2]);
+      else if (part.trim()) out[part.trim()] = true;
+    });
+    return out;
+  }
+
+  function entriesFromReport(text) {
+    var i = text.indexOf("GAMES");
+    if (i < 0) return null;
+    var blocks = text.slice(i).split(/\n(?=\d+\.\s)/).slice(1);
+    if (!blocks.length) return null;
+
+    var out = [];
+    blocks.forEach(function (b, n) {
+      var head = b.match(/^(\d+)\.\s+(.*?)\s+@\s+(.*?)\s+\((MLB|WNBA)\s+·\s+(.*?)\s+·\s+(BACKED|PASSED)\)/);
+      var vd = b.match(/Verdict\s+(HIGH|MEDIUM|LOW|NO PLAY)\s+(OVER|UNDER)\s+·\s+win\s+([\d.]+)%\s+·\s+line\s+([\d.]+)(\s+\[earned (HIGH|MEDIUM|LOW|NO PLAY)\])?/);
+      var md = b.match(/Model\s+([\d.]+) raw → ([\d.]+) projected\s+vs a line reading ([\d.]+)/);
+      if (!head || !vd || !md) return;
+
+      var sport = head[4];
+      var settled = b.match(/Settled\s+final\s+([\d.]+)/);
+      var marked = b.match(/Marked down (.+)/);
+
+      var vals = {};
+      vals.__sport = sport.toLowerCase();
+      var teamLines = b.split("\n").filter(function (l) { return REPORT_TEAM.test(l); });
+      teamLines.forEach(function (line) {
+        var m = line.match(REPORT_TEAM);
+        var side = m[1].toLowerCase();
+        vals[side + "-name"] = m[2].trim();
+        var kv = kvPairs(m[3] + " " + m[4]);
+        if (sport === "MLB") {
+          vals[side + "-runsPerGame"] = kv["Runs / game"];
+          vals[side + "-starterEra"] = kv["Starter ERA (or FIP)"];
+          vals[side + "-starterSeasonIp"] = kv["Starter season IP"];
+          vals[side + "-starterIp"] = kv["Avg IP"];
+          vals[side + "-bullpenEra"] = kv["Bullpen ERA"];
+        } else {
+          vals[side + "-pace"] = kv["Pace (per 40)"];
+          vals[side + "-offRating"] = kv["Off rating"];
+          vals[side + "-defRating"] = kv["Def rating"];
+          vals[side + "-restDays"] = kv["Days rest"];
+        }
+      });
+
+      var venue = b.match(/Venue\s+(.*)/);
+      if (venue) {
+        var vk = kvPairs(venue[1]);
+        vals.parkFactor = vk["Park factor"];
+        vals.tempF = vk["Temp °F"];
+        vals.windMphOut = vk["Wind out mph"];
+        vals.dome = vk.Dome === true;
+      }
+      var trends = b.match(/Trends\s+(.*)/);
+      if (trends && !/none entered/.test(trends[1])) {
+        var tk = kvPairs(trends[1]);
+        vals.h2hAvg = tk["H2H avg total"];
+        vals.h2hGames = tk["H2H meetings"];
+        vals.formAway = tk["Away form avg"];
+        vals.formHome = tk["Home form avg"];
+        vals.formGames = tk["Form games"];
+      }
+      var settings = b.match(/Settings\s+(.*)/);
+      var sk = settings ? kvPairs(settings[1]) : {};
+      vals.lgRpg = sk["League R/G"];
+      vals.lgPace = sk["League pace"];
+      vals.lgRating = sk["League rating"];
+      vals.line = sk.Line !== undefined ? sk.Line : parseFloat(vd[4]);
+      vals.trust = sk.Trust !== undefined ? sk.Trust : 0.5;
+
+      Object.keys(vals).forEach(function (k) {
+        if (vals[k] === undefined || (typeof vals[k] === "number" && !isFinite(vals[k])))
+          delete vals[k];
+      });
+
+      var when = head[5];
+      out.push({
+        id: "rep" + (Date.parse(when) || Date.now()) + "-" + n,
+        date: when, ts: Date.parse(when) || Date.now() - n,
+        sport: sport, away: head[2].trim(), home: head[3].trim(),
+        line: parseFloat(vd[4]), side: vd[2], band: vd[1],
+        earnedBand: vd[6] || vd[1], winPct: parseFloat(vd[3]) / 100, pPush: 0,
+        modelTotal: parseFloat(md[1]), projectedTotal: parseFloat(md[2]),
+        marketMean: parseFloat(md[3]),
+        signals: [], downgrades: marked ? marked[1].trim().split("; ") : [],
+        status: head[6].toLowerCase(), note: "",
+        inputs: null, values: vals,
+        final: settled ? parseFloat(settled[1]) : null
+      });
+    });
+    return out.length ? { entries: out, partial: false } : null;
+  }
+
+  function importLog(text, btnId) {
+    text = (text || "").trim();
+    if (!text) { ioStatus("Nothing pasted.", true); return; }
+
+    var got = null, kind = "";
+    if (text.charAt(0) === "{") {
+      try {
+        var parsed = JSON.parse(text);
+        if (parsed && Array.isArray(parsed.entries)) {
+          got = { entries: parsed.entries, partial: false };
+          kind = "saved log";
+        }
+      } catch (e) {
+        ioStatus("That starts like the saved log but isn't valid JSON — it may have been "
+               + "cut off when it was copied.", true);
+        return;
+      }
+    }
+    if (!got) { got = entriesFromReport(text); if (got) kind = "report"; }
+    if (!got) { got = entriesFromCsv(text); if (got) kind = "CSV"; }
+
+    if (!got) {
+      ioStatus("That doesn't look like any of the three. <b>Load log</b> takes the JSON from "
+             + "<b>Save log</b>, the text from <b>Copy report</b>, or the <b>CSV</b>.", true);
+      return;
+    }
+    if (!got.entries.length) {
+      ioStatus(got.reason || "No games found in that.", true);
+      return;
+    }
+
     var have = {};
-    store.entries.forEach(function (e) { have[e.id] = true; });
-    var added = 0;
-    parsed.entries.forEach(function (e) {
-      if (e && e.id && !have[e.id]) { store.entries.push(e); added++; }
+    store.entries.forEach(function (e) {
+      have[e.id] = true;
+      have[[e.sport, e.away, e.home, e.line, e.date].join("|")] = true;
+    });
+    var added = 0, skipped = 0;
+    got.entries.forEach(function (e) {
+      if (!e || !e.away) return;
+      var key = [e.sport, e.away, e.home, e.line, e.date].join("|");
+      if (have[e.id] || have[key]) { skipped++; return; }
+      have[e.id] = true; have[key] = true;
+      store.entries.push(e);
+      added++;
     });
     store.entries.sort(function (a, b) { return (b.ts || 0) - (a.ts || 0); });
     saveStore();
     renderLog();
-    flashButton(btnId, added ? "Added " + added : "Nothing new", 2200);
+
+    var msg = "Loaded <b>" + added + "</b> " + (added === 1 ? "game" : "games") +
+              " from the " + kind + (skipped ? ", skipped " + skipped + " already here" : "") + ".";
+    if (got.partial) msg += " " + got.reason.charAt(0).toUpperCase() + got.reason.slice(1) + ".";
+    ioStatus(msg, false);
   }
 
   /* =====================================================================
@@ -2600,8 +2819,10 @@
     copyText(JSON.stringify(store), "copy-log", "Copied — paste to save");
   });
   $("paste-import").addEventListener("click", function () {
-    var text = window.prompt("Paste a saved log (the JSON from Save log):");
-    if (text) importLog(text, "paste-import");
+    ioStatus("");
+    var text = window.prompt(
+      "Paste any of the three: the saved log (JSON), a copied report, or the CSV.");
+    if (text !== null) importLog(text, "paste-import");
   });
   $("clear-log").addEventListener("click", function () {
     if (!window.confirm("Erase every logged game? This cannot be undone.")) return;

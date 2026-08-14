@@ -247,7 +247,7 @@ Output keys: `model_total` (raw model), `projected_total` (after shrinkage),
 python3 -m unittest discover -s tests -v
 ```
 
-88 tests, covering the odds math, the distributions, both sport models, the
+92 tests, covering the odds math, the distributions, both sport models, the
 shrinkage behaviour and the staking rails.
 
 ---
@@ -291,6 +291,13 @@ signals pointing different ways, thin inputs, a projection implausibly far from
 the market. Nothing knocks it up. That asymmetry is deliberate. Four separate
 faults in this model's history all presented as unusually high confidence, so an
 exceptional number is a reason to check the inputs before it is a reason to bet.
+
+**Impossible numbers name themselves.** Every field has a physical range —
+not "unlikely", *impossible* — and anything outside it is flagged by name, marks
+the offending box on the form, and costs a confidence band. A typo does not
+announce itself; it gets absorbed. An average of 401 innings per start was read
+as "this starter goes all nine", which took the bullpen out of the calculation
+and moved the projection half a run, because 401 clamps quietly to 9.
 
 **Park factors apply only to the park being played in.** A team's own home park
 does not adjust its season rates here. That costs some accuracy for road teams

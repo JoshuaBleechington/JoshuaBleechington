@@ -559,6 +559,12 @@
 
   .lede { margin: 7px 0 0; font-size: 14px; color: var(--ink-2); line-height: 1.55; max-width: 46ch; }
 
+  /* A field the model judged impossible. The verdict panel explains the
+     downgrade; this points at the number that needs fixing. */
+  .field.bad input { border-color: var(--bad); background: var(--bad-wash); }
+  .field.bad label { color: var(--bad); }
+  .field.bad label::after { content: " ⚠"; }
+
   /* --- verdict bands: the whole output of this model --- */
   .band-wrap { padding: 18px 16px; display: flex; align-items: center; gap: 16px; flex-wrap: wrap; }
   .band {
@@ -1146,6 +1152,30 @@
   // How far a signal must lean before it counts as dissenting rather than quiet.
   var DISSENT = { MLB: 0.35, WNBA: 2.5 };
 
+  /* What each field can physically be. A number outside its range is a typo,
+     and typos do not announce themselves -- they get absorbed. An average of
+     401 innings per start was read as "this starter goes all nine", which took
+     the bullpen out of the calculation and moved the projection half a run,
+     with nothing on the page to say so, because 401 clamps quietly to 9.
+     These bounds are not "unlikely", they are "impossible". */
+  var FIELD_RANGES = {
+    MLB: {
+      runsPerGame:     [2, 8,   "runs per game"],
+      starterEra:      [0.5, 15, "starter ERA"],
+      starterSeasonIp: [0, 300, "starter season IP"],
+      starterIp:       [1, 9,   "average IP per start"],
+      bullpenEra:      [1, 9,   "bullpen ERA"]
+    },
+    WNBA: {
+      pace:      [60, 110, "pace"],
+      offRating: [80, 130, "offensive rating"],
+      defRating: [80, 130, "defensive rating"],
+      restDays:  [0, 14,   "days rest"]
+    }
+  };
+  var TOTAL_RANGE = { MLB: [0, 30], WNBA: [100, 280] };
+  function fmtNum(v) { return String(Math.round(v * 100) / 100); }
+
   function ramp(games, full) { return games <= 0 ? 0 : Math.min(1, games / full); }
   function bandFor(p) {
     return p >= BAND_HIGH ? "HIGH" : p >= BAND_MEDIUM ? "MEDIUM"
@@ -1195,6 +1225,7 @@
       out.push("the model is " + gap.toFixed(1) + " " + (sport === "MLB" ? "runs" : "points") +
                " from the market, which is usually a bad input rather than an edge");
 
+    badFields = [];
     ["away", "home"].forEach(function (k) {
       var t = g[k] || {}, nm = t.name || k;
       if (sport === "MLB") {
@@ -1203,16 +1234,49 @@
         else if (t.starterSeasonIp < 40)
           out.push("only " + Math.round(t.starterSeasonIp) + " innings behind the " + nm +
                    " starter's ERA");
-        if (!isNum(t.runsPerGame) || t.runsPerGame <= 0) out.push(nm + " runs per game is blank");
-        if (!isNum(t.bullpenEra) || t.bullpenEra <= 0) out.push(nm + " bullpen ERA is blank");
-      } else {
-        if (!isNum(t.pace) || t.pace <= 0) out.push(nm + " pace is blank");
-        if (!isNum(t.offRating) || t.offRating <= 0) out.push(nm + " offensive rating is blank");
-        if (!isNum(t.defRating) || t.defRating <= 0) out.push(nm + " defensive rating is blank");
+      }
+      var ranges = FIELD_RANGES[sport];
+      Object.keys(ranges).forEach(function (key) {
+        var lo = ranges[key][0], hi = ranges[key][1], label = ranges[key][2];
+        var v = t[key];
+        if (!isNum(v)) {
+          // Season IP is the one field where blank is a real answer, and it is
+          // already reported above.
+          if (key !== "starterSeasonIp") {
+            out.push(nm + " " + label + " is blank");
+            badFields.push(k + "-" + key);
+          }
+          return;
+        }
+        if (key === "starterSeasonIp" && v <= 0) return;
+        if (v <= 0) {
+          out.push(nm + " " + label + " is blank");
+          badFields.push(k + "-" + key);
+        } else if (v < lo || v > hi) {
+          out.push(nm + " " + label + " is " + fmtNum(v) + ", outside the possible range " +
+                   fmtNum(lo) + "–" + fmtNum(hi) + " — check that entry");
+          badFields.push(k + "-" + key);
+        }
+      });
+    });
+
+    var tlo = TOTAL_RANGE[sport][0], thi = TOTAL_RANGE[sport][1];
+    [["h2hAvg", "head-to-head average total"],
+     ["formAway", "away recent-form average"],
+     ["formHome", "home recent-form average"]].forEach(function (pair) {
+      var v = g[pair[0]];
+      if (!isNum(v)) return;
+      if (v < tlo || v > thi) {
+        out.push("the " + pair[1] + " is " + fmtNum(v) + ", outside the possible range " +
+                 fmtNum(tlo) + "–" + fmtNum(thi) + " — check that entry");
+        badFields.push(pair[0]);
       }
     });
     return out;
   }
+
+  // Field ids the last run judged impossible, so the form can mark them.
+  var badFields = [];
 
   function decide(proj, g) {
     var sport = proj.sport;
@@ -1261,7 +1325,8 @@
       built: built, pOver: pr.pOver, pUnder: pr.pUnder, pPush: pr.pPush,
       side: side, winPct: winPct,
       earnedBand: earned, band: band,
-      signals: signals, downgrades: downgrades, flags: flags
+      signals: signals, downgrades: downgrades, flags: flags,
+      badFields: badFields.slice()
     };
   }
 
@@ -1578,6 +1643,7 @@
       "nothing to compare the projection to.</span>";
     ["downgrades", "signals", "why", "split", "split-legend", "chart", "dist-table"]
       .forEach(function (id) { $(id).innerHTML = ""; });
+    markBadFields([]);
     ["m-prob", "m-mean", "m-agree", "m-push"].forEach(function (id) {
       $(id).textContent = "—";
       $(id).style.color = "";
@@ -1635,6 +1701,7 @@
       ? "var(--good)" : voting.length ? "var(--ink)" : "var(--muted)";
     $("m-push").textContent = r.pPush > 0.005 ? pct(r.pPush) : "—";
 
+    markBadFields(r.badFields);
     renderSignals(r, unit);
     renderWhy(r, last.game, unit);
     renderWhyVerdict(r, unit);
@@ -1645,6 +1712,19 @@
     $("mb-total").textContent = fmt1(r.projectedTotal);
     $("mb-verdict").innerHTML = '<span class="band band-' + cls + '">' + r.band +
       (play ? '<span class="pick">' + r.side + "</span>" : "") + "</span>";
+  }
+
+  /* Say it where the mistake is. A flag in the verdict panel explains the
+     downgrade, but the number that needs fixing is up in the form, and on a
+     phone that is a screen away. */
+  function markBadFields(ids) {
+    document.querySelectorAll("#calc-view .field.bad").forEach(function (el) {
+      el.classList.remove("bad");
+    });
+    (ids || []).forEach(function (id) {
+      var el = $(id);
+      if (el && el.parentElement) el.parentElement.classList.add("bad");
+    });
   }
 
   function renderSignals(r, unit) {
@@ -2079,9 +2159,23 @@
     return snap;
   }
 
+  /* The same game logged twice quietly doubles its weight in the band table,
+     and the band table is the only thing this page is trying to measure. */
+  function duplicateOf(r) {
+    return store.entries.filter(function (e) {
+      return e.sport === r.sport && e.away === r.away && e.home === r.home &&
+             e.line === r.line;
+    })[0] || null;
+  }
+
   function logCurrent(status) {
     if (!last) { flash("Enter a line first."); return; }
     var r = last.result;
+    var dupe = duplicateOf(r);
+    if (dupe && !window.confirm(
+        r.away + " @ " + r.home + " at " + r.line + " is already in the log, saved " +
+        dupe.date + " as " + dupe.status + ".\n\nLogging it again counts it twice in the " +
+        "band table. Add it anyway?")) return;
     store.entries.unshift({
       id: "g" + Date.now() + Math.random().toString(36).slice(2, 6),
       date: new Date().toLocaleString(),

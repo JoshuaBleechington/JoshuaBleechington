@@ -77,6 +77,38 @@ IMPLAUSIBLE_GAP = {"MLB": 2.0, "WNBA": 12.0}
 # rather than merely being quiet.
 DISSENT_THRESHOLD = {"MLB": 0.35, "WNBA": 2.5}
 
+# What each field can physically be. A number outside its range is a typo, and
+# typos do not announce themselves -- they get absorbed. An average of 401
+# innings per start was silently read as "this starter pitches all nine", which
+# removed the bullpen from the calculation entirely and moved the projection
+# half a run. The model had no way to say so, because 401 clamps quietly to 9.
+#
+# These bounds are deliberately generous: they are not "unlikely", they are
+# "impossible". Nobody's bullpen has a 0.4 ERA and nobody starts 40 innings.
+# Anything outside them names itself in the flags and costs a confidence band.
+FIELD_RANGES: dict[str, dict[str, tuple[float, float, str]]] = {
+    "MLB": {
+        "runs_per_game": (2.0, 8.0, "runs per game"),
+        "starter_era": (0.5, 15.0, "starter ERA"),
+        "starter_season_ip": (0.0, 300.0, "starter season IP"),
+        "starter_ip": (1.0, 9.0, "average IP per start"),
+        "bullpen_era": (1.0, 9.0, "bullpen ERA"),
+    },
+    "WNBA": {
+        "pace": (60.0, 110.0, "pace"),
+        "off_rating": (80.0, 130.0, "offensive rating"),
+        "def_rating": (80.0, 130.0, "defensive rating"),
+        "rest_days": (0.0, 14.0, "days rest"),
+    },
+}
+
+# Plausible range for a game total, used to sanity-check the trend inputs.
+TOTAL_RANGE = {"MLB": (0.0, 30.0), "WNBA": (100.0, 280.0)}
+
+
+def _fmt(v: float) -> str:
+    return f"{v:g}"
+
 DEFAULT_TRUST = 0.5
 
 
@@ -199,28 +231,52 @@ def quality_flags(sport: str, game: dict[str, Any], model_total: float,
             "usually a bad input rather than an edge"
         )
 
-    if sport == "MLB":
-        for side in ("away", "home"):
-            t = game.get(side) or {}
-            name = t.get("name") or side
+    for side in ("away", "home"):
+        t = game.get(side) or {}
+        name = t.get("name") or side
+
+        if sport == "MLB":
             ip = t.get("starter_season_ip")
-            if ip in (None, "", 0) or float(ip or 0) <= 0:
-                flags.append(f"no season innings for the {name} starter, so he is a league average arm")
+            if ip in (None, "") or float(ip or 0) <= 0:
+                flags.append(
+                    f"no season innings for the {name} starter, so he is a league average arm"
+                )
             elif float(ip) < 40:
                 flags.append(f"only {float(ip):.0f} innings behind the {name} starter's ERA")
-            for key, label in (("runs_per_game", "runs per game"), ("bullpen_era", "bullpen ERA")):
-                v = t.get(key)
-                if v in (None, "") or float(v or 0) <= 0:
+
+        for key, (lo, hi, label) in FIELD_RANGES[sport].items():
+            v = t.get(key)
+            if v in (None, ""):
+                # Season IP is the one field where blank is a real answer, and it
+                # is already reported above.
+                if key != "starter_season_ip":
                     flags.append(f"{name} {label} is blank")
-    else:
-        for side in ("away", "home"):
-            t = game.get(side) or {}
-            name = t.get("name") or side
-            for key, label in (("pace", "pace"), ("off_rating", "offensive rating"),
-                               ("def_rating", "defensive rating")):
-                v = t.get(key)
-                if v in (None, "") or float(v or 0) <= 0:
-                    flags.append(f"{name} {label} is blank")
+                continue
+            v = float(v)
+            if key == "starter_season_ip" and v <= 0:
+                continue  # already reported
+            if v <= 0:
+                flags.append(f"{name} {label} is blank")
+            elif not lo <= v <= hi:
+                flags.append(
+                    f"{name} {label} is {_fmt(v)}, outside the possible range "
+                    f"{_fmt(lo)}–{_fmt(hi)} — check that entry"
+                )
+
+    lo, hi = TOTAL_RANGE[sport]
+    for block, key, label in (("h2h", "avg_total", "head-to-head average total"),
+                              ("form", "away_avg_total", "away recent-form average"),
+                              ("form", "home_avg_total", "home recent-form average")):
+        src = game.get(block) or {}
+        v = src.get(key)
+        if v in (None, ""):
+            continue
+        v = float(v)
+        if not lo <= v <= hi:
+            flags.append(
+                f"the {label} is {_fmt(v)}, outside the possible range "
+                f"{_fmt(lo)}–{_fmt(hi)} — check that entry"
+            )
     return flags
 
 

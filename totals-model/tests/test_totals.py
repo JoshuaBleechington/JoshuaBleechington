@@ -777,6 +777,42 @@ class TestConfidenceModel(unittest.TestCase):
         self.assertTrue(any("league average arm" in f for f in r["flags"]))
         self.assertIn("inputs behind it are thin", " ".join(r["downgrades"]))
 
+    def test_an_impossible_number_names_itself(self):
+        """A typo does not announce itself -- it gets absorbed.
+
+        401 average innings per start was silently read as "goes all nine",
+        which removed the bullpen from the calculation and moved the projection
+        half a run, with nothing on the page to say so.
+        """
+        g = self.mlb_game()
+        g["away"]["starter_ip"] = 401
+        r = run_verdict("mlb", g)
+        self.assertTrue(any("average IP per start is 401" in f for f in r["flags"]), r["flags"])
+        self.assertIn("inputs behind it are thin", " ".join(r["downgrades"]))
+
+    def test_every_ranged_field_is_actually_checked(self):
+        from totals.confidence import FIELD_RANGES
+        for sport, ranges in FIELD_RANGES.items():
+            build = self.mlb_game if sport == "MLB" else self.wnba_game
+            for key, (lo, hi, label) in ranges.items():
+                g = build()
+                g["away"][key] = hi * 10 + 1
+                flags = run_verdict(sport.lower(), g)["flags"]
+                self.assertTrue(any(label in f and "outside the possible range" in f
+                                    for f in flags),
+                                f"{sport}.{key} above range went unflagged: {flags}")
+
+    def test_a_plausible_number_is_left_alone(self):
+        for sport in ("mlb", "wnba"):
+            g = self.mlb_game() if sport == "mlb" else self.wnba_game()
+            self.assertEqual(
+                [f for f in run_verdict(sport, g)["flags"] if "outside the possible" in f], [])
+
+    def test_a_nonsense_trend_is_flagged_too(self):
+        r = run_verdict("mlb", self.mlb_game(h2h={"avg_total": 900, "games": 4}))
+        self.assertTrue(any("head-to-head average total is 900" in f for f in r["flags"]),
+                        r["flags"])
+
     def test_an_absurd_disagreement_is_a_symptom_not_an_edge(self):
         r = run_verdict("mlb", self.mlb_game(line=3.5))
         self.assertTrue(any("from the market" in f for f in r["flags"]))

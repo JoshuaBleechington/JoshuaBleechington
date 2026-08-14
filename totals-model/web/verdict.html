@@ -840,6 +840,18 @@
         <button type="button" class="btn" id="paste-import">Load log</button>
         <button type="button" class="btn danger" id="clear-log">Erase</button>
       </div>
+      <div class="card-body stack" id="paste-panel" hidden>
+        <label class="hint" for="paste-box">
+          Paste a saved log, a copied report, or the CSV:
+        </label>
+        <textarea id="paste-box" rows="6" spellcheck="false"
+          placeholder="Paste here, then press Load"></textarea>
+        <div class="btn-row">
+          <button type="button" class="btn primary" id="paste-go">Load</button>
+          <button type="button" class="btn" id="paste-cancel">Cancel</button>
+        </div>
+      </div>
+
       <div class="card-body">
         <p class="hint" id="io-status"></p>
         <p class="hint">
@@ -2171,14 +2183,21 @@
     })[0] || null;
   }
 
+  var pendingDuplicate = null;
+
   function logCurrent(status) {
     if (!last) { flash("Enter a line first."); return; }
     var r = last.result;
+    // Same reason as everything else here: confirm() is ignored in this
+    // sandbox, so a duplicate asks for a second press instead of a dialog.
     var dupe = duplicateOf(r);
-    if (dupe && !window.confirm(
-        r.away + " @ " + r.home + " at " + r.line + " is already in the log, saved " +
-        dupe.date + " as " + dupe.status + ".\n\nLogging it again counts it twice in the " +
-        "band table. Add it anyway?")) return;
+    if (dupe && pendingDuplicate !== r.away + r.home + r.line) {
+      pendingDuplicate = r.away + r.home + r.line;
+      setTimeout(function () { pendingDuplicate = null; }, 5000);
+      flash("Already logged — press again");
+      return;
+    }
+    pendingDuplicate = null;
     store.entries.unshift({
       id: "g" + Date.now() + Math.random().toString(36).slice(2, 6),
       date: new Date().toLocaleString(),
@@ -2818,19 +2837,62 @@
   $("copy-log").addEventListener("click", function () {
     copyText(JSON.stringify(store), "copy-log", "Copied — paste to save");
   });
+  /* No window.prompt or window.confirm anywhere below this line.
+     The page runs inside a sandboxed iframe without allow-modals, where both
+     are ignored outright -- the call returns null, no dialog appears, and
+     nothing at all happens. "Load log" did nothing for exactly this reason,
+     and it looked like a dead button because that is what it was. Local
+     testing missed it because a plain file:// page has no such sandbox, so
+     the harness now runs the page inside one. */
+
   $("paste-import").addEventListener("click", function () {
-    ioStatus("");
-    var text = window.prompt(
-      "Paste any of the three: the saved log (JSON), a copied report, or the CSV.");
-    if (text !== null) importLog(text, "paste-import");
+    var panel = $("paste-panel");
+    var showing = !panel.hidden;
+    panel.hidden = showing;
+    if (!showing) {
+      ioStatus("");
+      $("paste-box").focus();
+    }
   });
-  $("clear-log").addEventListener("click", function () {
-    if (!window.confirm("Erase every logged game? This cannot be undone.")) return;
+  $("paste-cancel").addEventListener("click", function () {
+    $("paste-panel").hidden = true;
+    $("paste-box").value = "";
+    ioStatus("");
+  });
+  $("paste-go").addEventListener("click", function () {
+    var before = store.entries.length;
+    importLog($("paste-box").value, "paste-import");
+    if (store.entries.length > before) {
+      $("paste-box").value = "";
+      $("paste-panel").hidden = true;
+    }
+  });
+
+  /* Two clicks instead of a confirm dialog. The button says what the second
+     click will do, and forgets after a few seconds. */
+  function armTwice(id, armedLabel, action) {
+    var btn = $(id), original = btn.textContent, armed = false, timer = null;
+    function disarm() {
+      armed = false;
+      btn.textContent = original;
+      btn.classList.remove("primary");
+      clearTimeout(timer);
+    }
+    btn.addEventListener("click", function () {
+      if (armed) { disarm(); action(); return; }
+      armed = true;
+      btn.textContent = armedLabel;
+      btn.classList.add("primary");
+      timer = setTimeout(disarm, 4000);
+    });
+  }
+
+  armTwice("clear-log", "Click again to erase", function () {
     store = { entries: [] };
     saveStore();
     renderLog();
+    ioStatus("Log erased.");
   });
-
   checkStorage();
   loadStore();
   renderStorageWarning();

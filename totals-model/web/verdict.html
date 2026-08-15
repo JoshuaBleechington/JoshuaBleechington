@@ -565,6 +565,24 @@
   .field.bad label { color: var(--bad); }
   .field.bad label::after { content: " ⚠"; }
 
+  /* The plain-language read sits above the breakdown, because it is the part
+     that answers "so is this an over or an under" without needing the rest. */
+  .note.plain {
+    border-top: 0; border-bottom: 1px solid var(--rule);
+    background: var(--surface-2); color: var(--ink); font-size: 13.5px; line-height: 1.6;
+  }
+  .note.plain b { color: var(--ink); }
+  details.detail-why > summary {
+    cursor: pointer; padding: 10px 16px; font-size: 12.5px; color: var(--ink-2);
+    border-top: 1px solid var(--rule); list-style: none;
+    display: flex; align-items: center; justify-content: space-between;
+  }
+  details.detail-why > summary::-webkit-details-marker { display: none; }
+  details.detail-why > summary::after { content: "+"; font-family: var(--mono); font-size: 15px; }
+  details.detail-why[open] > summary::after { content: "\2212"; }
+  details.detail-why > summary:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+  details.detail-why .note { border-top: 0; }
+
   /* --- verdict bands: the whole output of this model --- */
   .band-wrap { padding: 18px 16px; display: flex; align-items: center; gap: 16px; flex-wrap: wrap; }
   .band {
@@ -772,8 +790,12 @@
 
       <section class="card">
         <header><h2>Why this number</h2><span class="eyebrow" id="why-unit">runs</span></header>
+        <p class="note plain" id="plain-read"></p>
         <div class="why" id="why"></div>
-        <p class="note" id="why-verdict"></p>
+        <details class="detail-why">
+          <summary>The same thing in the model's own terms</summary>
+          <p class="note" id="why-verdict"></p>
+        </details>
       </section>
 
       <section class="card">
@@ -1691,6 +1713,7 @@
       $(id).style.color = "";
     });
     $("why-verdict").innerHTML = "";
+    $("plain-read").innerHTML = "";
     $("skew-note").hidden = true;
     $("mb-total").textContent = fmt1(total);
     $("mb-verdict").innerHTML = '<span class="band band-none">No line</span>';
@@ -1747,8 +1770,7 @@
 
     markBadFields(r.badFields);
     renderSignals(r, unit);
-    renderWhy(r, last.game, unit);
-    renderWhyVerdict(r, unit);
+    renderWhyVerdict(r, unit, renderWhy(r, last.game, unit));
     renderSplit(r);
     renderChart(r, unit);
     renderSkewNote(r, unit);
@@ -1899,11 +1921,124 @@
 
     $("why").innerHTML = html;
     $("why-unit").textContent = unit;
+    return ex;
   }
 
-  /* Plain-language version of the verdict: where the number came from, what it
-     had to clear, and what took it down a peg. */
-  function renderWhyVerdict(r, unit) {
+  /* The single most likely final total. For runs that is the top of the
+     distribution; for points the distribution is symmetric, so it is the
+     projection itself. A concrete number to picture is worth more to a decision
+     than another percentage. */
+  function likeliestTotal(r) {
+    if (r.built.kind === "discrete") {
+      var pmf = r.built.pmf, best = 0, at = 0;
+      for (var i = 0; i < pmf.length; i++) if (pmf[i] > best) { best = pmf[i]; at = i; }
+      return at;
+    }
+    return Math.round(r.projectedTotal);
+  }
+
+  /* What the game has to produce for the pick to land. Over 8.5 needs 9; over 8
+     needs 9 too, because 8 is a push. */
+  function needsToLand(r) {
+    var l = r.line;
+    if (r.side === "OVER") return Math.floor(l) + 1;
+    return Number.isInteger(l) ? l - 1 : Math.floor(l);
+  }
+
+  /* The whole readout in ordinary words: what is driving it, what has to happen,
+     and what is arguing against. Everything here is already computed elsewhere;
+     this only says it without the vocabulary. */
+  function plainRead(r, ex, unit) {
+    var out = [];
+    var need = needsToLand(r);
+    var mode = likeliestTotal(r);
+    var over = r.side === "OVER";
+
+    out.push("<b>In plain terms:</b> the single most likely result is <b>" + mode + " " +
+      unit + "</b>. For the " + r.side.toLowerCase() + " you need <b>" +
+      (over ? need + " or more" : need + " or fewer") + "</b>, and the model makes that a <b>" +
+      pct(r.winPct) + "</b> shot.");
+
+    /* Lead with the comparison that actually decides over or under: your
+       numbers against the line. The breakdown underneath is measured against a
+       league-average game, which is a different baseline -- a game can sit well
+       above average and still be an under, because the line is higher still.
+       Saying "nothing pushes it down" there was measuring the wrong thing and
+       reading like a contradiction. */
+    var PLAIN = [[/Offence.*defence/i, "the shooting"],
+                 [/Offence/i, "the bats"],
+                 [/Starter|bullpen/i, "the pitching"],
+                 [/Ballpark/i, "the ballpark"],
+                 [/Weather/i, "the weather"],
+                 [/Pace/i, "how fast both teams play"],
+                 [/Rest/i, "rest"]];
+    var name = function (lbl) {
+      for (var i = 0; i < PLAIN.length; i++) if (PLAIN[i][0].test(lbl)) return PLAIN[i][1];
+      return lbl.replace(/&amp;/g, "and").toLowerCase();
+    };
+
+    var gap = r.modelTotal - r.marketMean;
+    out.push("Your numbers put this game at <b>" + fmt1(r.modelTotal) + "</b>, " +
+      (Math.abs(gap) < 0.05 ? "right on"
+        : "<b>" + Math.abs(gap).toFixed(1) + " " + unit + "</b> " +
+          (gap > 0 ? "above" : "below")) +
+      " what the line is asking for — that is the case for the " + r.side.toLowerCase() + ".");
+
+    var biggest = null;
+    ex.steps.forEach(function (st) {
+      if (!biggest || Math.abs(st[1]) > Math.abs(biggest[1])) biggest = st;
+    });
+    if (biggest && Math.abs(biggest[1]) >= 0.15) {
+      out.push("The biggest single piece is <b>" + name(biggest[0]) + "</b>, worth " +
+        Math.abs(biggest[1]).toFixed(1) + " " + unit + " " +
+        (biggest[1] > 0 ? "more" : "less") + " than an average game.");
+    } else {
+      out.push("Both sides are close to league average, so most of this comes from " +
+        "where the line is set rather than from the teams.");
+    }
+
+    // What the corroborating evidence says, in a sentence.
+    var voting = r.signals.filter(function (s) { return s.present && s.weight > 0; });
+    var trends = voting.filter(function (s) { return s.name !== "Matchup model"; });
+    if (!trends.length) {
+      out.push("There are no trends entered, so this is the team numbers on their own.");
+    } else {
+      var agree = trends.filter(function (s) { return s.side === r.side; });
+      if (agree.length === trends.length) {
+        out.push("The trends back it up: " + trends.map(function (s) {
+          return s.name.toLowerCase() + " reads " + fmt1(s.value);
+        }).join(" and ") + ".");
+      } else if (!agree.length) {
+        out.push("The trends push back — " + trends.map(function (s) {
+          return s.name.toLowerCase() + " reads " + fmt1(s.value);
+        }).join(" and ") + ", which is the other side of this line.");
+      } else {
+        var against = trends.filter(function (s) { return s.side !== r.side; });
+        out.push("The trends are split: " + agree[0].name.toLowerCase() + " agrees, but " +
+          against[0].name.toLowerCase() + " reads " + fmt1(against[0].value) +
+          " and wants the other side.");
+      }
+    }
+
+    if (r.pPush > 0.06) {
+      out.push("The line is a whole number, so about <b>" + pct(r.pPush) +
+        "</b> of the time it lands exactly on it and the bet is void.");
+    }
+
+    out.push(r.band === "NO PLAY"
+      ? "<b>Not enough to act on.</b> " + (r.downgrades.length
+          ? "The warnings above are why."
+          : "It is close to a coin flip.")
+      : r.downgrades.length
+        ? "<b>Treat it as a lean, not a conviction</b> — see the warnings above."
+        : "<b>Nothing is arguing against it.</b>");
+    return out.join(" ");
+  }
+
+  /* The same thing again in the model's own terms, for when the plain version
+     raises a question. */
+  function renderWhyVerdict(r, unit, ex) {
+    $("plain-read").innerHTML = plainRead(r, ex, unit);
     var parts = [];
     var gap = r.modelTotal - r.marketMean;
 

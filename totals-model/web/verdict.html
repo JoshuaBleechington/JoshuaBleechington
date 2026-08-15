@@ -596,9 +596,18 @@
   }
   .sig-bar i { position: absolute; top: 0; bottom: 0; display: block; }
 
-  .downgrades { margin: 0; padding: 0 16px 15px 34px; }
-  .downgrades li { font-size: 13px; color: var(--ink-2); line-height: 1.55; margin-top: 5px; }
-  .downgrades li::marker { color: var(--under); }
+  /* These are the model's misgivings, so they read as warnings rather than as
+     more body text. Red marker, red headline, the explanation underneath in
+     the quieter colour so the eye lands on the concern first. */
+  .downgrades { margin: 0; padding: 2px 16px 15px 32px; }
+  .downgrades li { line-height: 1.5; margin-top: 9px; }
+  .downgrades li::marker { color: var(--bad); content: "▲  "; font-size: 11px; }
+  .downgrades .what {
+    display: block; font-size: 13px; font-weight: 700; color: var(--bad);
+  }
+  .downgrades .why {
+    display: block; font-size: 12.5px; color: var(--ink-2); margin-top: 2px;
+  }
 
   .band-chip {
     display: inline-block; padding: 2px 9px; border-radius: 999px;
@@ -1315,19 +1324,37 @@
     var side = pOver >= 0.5 ? "OVER" : "UNDER";
     var winPct = side === "OVER" ? pOver : 1 - pOver;
 
-    var downgrades = [];
+    /* Each downgrade carries a note saying what to actually look at. The
+       headline names a category -- "the inputs behind it are thin" -- and the
+       note names the number, which is the part you can do something about.
+       Two parallel arrays rather than one array of pairs, so a log saved
+       before the notes existed still loads. */
+    var downgrades = [], dnotes = [];
+    var unit = sport === "MLB" ? "runs" : "points";
+
     signals.forEach(function (s) {
       if (!s.present || s.weight <= 0 || !s.side) return;
-      if (s.side !== side && Math.abs(s.lean) >= DISSENT[sport])
+      if (s.side !== side && Math.abs(s.lean) >= DISSENT[sport]) {
         downgrades.push(s.name.toLowerCase() + " points the other way (" + s.side.toLowerCase() + ")");
+        dnotes.push("It reads " + s.value.toFixed(1) + ", a gap of " +
+          Math.abs(s.lean).toFixed(1) + " " + unit + " the other way. The projection is an " +
+          "average of signals that disagree, which is a weaker thing than three that line up.");
+      }
     });
 
     var flags = qualityFlags(sport, g, modelTotal, marketMean);
-    if (flags.length) downgrades.push("the inputs behind it are thin");
+    if (flags.length) {
+      downgrades.push("the inputs behind it are thin");
+      var joined = flags.join("; ");
+      dnotes.push(joined.charAt(0).toUpperCase() + joined.slice(1) + ".");
+    }
 
     var corroborated = signals.slice(1).some(function (s) { return s.present && s.weight > 0; });
-    if (!corroborated)
+    if (!corroborated) {
       downgrades.push("no head-to-head or recent form to corroborate it");
+      dnotes.push("Only the matchup model voted. Filling in either trend would confirm the " +
+        "read or catch a bad input, and could put the band back up.");
+    }
 
     var earned = bandFor(winPct);
     var band = stepDown(earned, downgrades.length);
@@ -1340,7 +1367,7 @@
       built: built, pOver: pr.pOver, pUnder: pr.pUnder, pPush: pr.pPush,
       side: side, winPct: winPct,
       earnedBand: earned, band: band,
-      signals: signals, downgrades: downgrades, flags: flags,
+      signals: signals, downgrades: downgrades, downgradeNotes: dnotes, flags: flags,
       badFields: badFields.slice()
     };
   }
@@ -1702,8 +1729,10 @@
         : "") +
       "</span>";
 
-    $("downgrades").innerHTML = r.downgrades.map(function (d) {
-      return "<li>" + esc(d) + "</li>";
+    $("downgrades").innerHTML = r.downgrades.map(function (d, i) {
+      var note = (r.downgradeNotes || [])[i];
+      return "<li><span class='what'>" + esc(d) + "</span>" +
+        (note ? "<span class='why'>" + esc(note) + "</span>" : "") + "</li>";
     }).join("");
 
     $("m-prob").textContent = pct(r.winPct);
@@ -2211,6 +2240,7 @@
                  weight: s.weight, lean: s.present ? s.lean : null, side: s.side };
       }),
       downgrades: r.downgrades.slice(),
+      downgradeNotes: (r.downgradeNotes || []).slice(),
       status: status,
       note: str("log-note"),
       inputs: inputSnapshot(),
@@ -2430,7 +2460,10 @@
       return s.name + " " + (s.value === null ? "—" : s.value.toFixed(1) +
         " (" + signed(s.lean, 1) + ", " + Math.round(100 * s.weight) + "%)");
     }).join("  ·  "));
-    if (e.downgrades.length) L.push("   Marked down " + e.downgrades.join("; "));
+    if (e.downgrades.length) {
+      L.push("   Marked down " + e.downgrades.join("; "));
+      (e.downgradeNotes || []).forEach(function (n) { L.push("     ↳ " + n); });
+    }
     L.push("   Settled     " + (g ? "final " + e.final + "  ·  " + g : "not yet"));
     if (e.note) L.push("   Note        " + e.note);
     L.push("   Inputs");
@@ -2691,6 +2724,9 @@
         modelTotal: parseFloat(md[1]), projectedTotal: parseFloat(md[2]),
         marketMean: parseFloat(md[3]),
         signals: [], downgrades: marked ? marked[1].trim().split("; ") : [],
+        downgradeNotes: (b.match(/^\s*↳ (.+)$/gm) || []).map(function (l) {
+          return l.replace(/^\s*↳ /, "").trim();
+        }),
         status: head[6].toLowerCase(), note: "",
         inputs: null, values: vals,
         final: settled ? parseFloat(settled[1]) : null

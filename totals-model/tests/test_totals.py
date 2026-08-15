@@ -813,6 +813,32 @@ class TestConfidenceModel(unittest.TestCase):
         self.assertTrue(any("head-to-head average total is 900" in f for f in r["flags"]),
                         r["flags"])
 
+    def test_every_downgrade_carries_a_note_saying_what_to_look_at(self):
+        """The headline names a category; the note has to name the number."""
+        g = self.mlb_game(line=6.5, h2h={"avg_total": 3.0, "games": 8})
+        g["home"]["starter_season_ip"] = 8
+        r = run_verdict("mlb", g)
+        self.assertTrue(r["downgrades"])
+        self.assertEqual(len(r["downgrades"]), len(r["downgrade_notes"]))
+        for note in r["downgrade_notes"]:
+            self.assertTrue(note.strip(), "a downgrade came through with an empty note")
+            self.assertTrue(note[0].isupper(), note)
+            self.assertTrue(note.rstrip().endswith("."), note)
+        joined = " ".join(r["downgrade_notes"])
+        self.assertIn("3.0", joined)   # the dissenting head-to-head value
+        self.assertIn("8 innings", joined)   # the thin-sample flag, verbatim
+
+    def test_a_clean_verdict_has_no_notes(self):
+        r = run_verdict("mlb", self.mlb_game())
+        self.assertEqual(r["downgrades"], [])
+        self.assertEqual(r["downgrade_notes"], [])
+
+    def test_the_no_corroboration_note_says_what_to_add(self):
+        r = run_verdict("mlb", self.mlb_game(line=6.5, h2h=None, form=None))
+        note = " ".join(r["downgrade_notes"])
+        self.assertIn("matchup model", note)
+        self.assertIn("trend", note)
+
     def test_an_absurd_disagreement_is_a_symptom_not_an_edge(self):
         r = run_verdict("mlb", self.mlb_game(line=3.5))
         self.assertTrue(any("from the market" in f for f in r["flags"]))

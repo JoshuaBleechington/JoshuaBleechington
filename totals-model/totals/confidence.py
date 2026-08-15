@@ -109,6 +109,11 @@ TOTAL_RANGE = {"MLB": (0.0, 30.0), "WNBA": (100.0, 280.0)}
 def _fmt(v: float) -> str:
     return f"{v:g}"
 
+
+def _sentence_case(text: str) -> str:
+    return text[:1].upper() + text[1:] if text else text
+
+
 DEFAULT_TRUST = 0.5
 
 
@@ -145,6 +150,7 @@ class Verdict:
     band: str
     signals: list[Signal]
     downgrades: list[str] = field(default_factory=list)
+    downgrade_notes: list[str] = field(default_factory=list)
     flags: list[str] = field(default_factory=list)
     notes: dict[str, Any] = field(default_factory=dict)
 
@@ -171,6 +177,7 @@ class Verdict:
                 for s in self.signals
             ],
             "downgrades": self.downgrades,
+            "downgrade_notes": self.downgrade_notes,
             "flags": self.flags,
             "notes": self.notes,
         }
@@ -316,7 +323,13 @@ def decide(sport: str, projection: Projection, game: dict[str, Any]) -> Verdict:
     win_pct = p_over if side == "OVER" else 1.0 - p_over
 
     band = band_for(win_pct)
+    # Each downgrade carries a note saying what to actually look at. The headline
+    # alone ("the inputs behind it are thin") names a category; the note names
+    # the number. Kept as two parallel lists rather than one list of pairs so a
+    # log saved before the notes existed still loads.
     downgrades: list[str] = []
+    notes: list[str] = []
+    unit = "runs" if sport == "MLB" else "points"
 
     # Dissent: a present signal pointing the other way, hard enough to mean it.
     for s in signals:
@@ -324,14 +337,24 @@ def decide(sport: str, projection: Projection, game: dict[str, Any]) -> Verdict:
             continue
         if s.side() and s.side() != side and abs(s.lean) >= DISSENT_THRESHOLD[sport]:
             downgrades.append(f"{s.name.lower()} points the other way ({s.side().lower()})")
+            notes.append(
+                f"It reads {s.value:.1f}, a gap of {abs(s.lean):.1f} {unit} the other way. "
+                f"The projection is an average of signals that disagree, which is a weaker "
+                f"thing than three that line up."
+            )
 
     flags = quality_flags(sport, game, model_total, market_mean)
     if flags:
         downgrades.append("the inputs behind it are thin")
+        notes.append(_sentence_case("; ".join(flags)) + ".")
 
     # No trend evidence at all means the matchup model is talking to itself.
     if not any(s.present and s.weight > 0 for s in signals[1:]):
         downgrades.append("no head-to-head or recent form to corroborate it")
+        notes.append(
+            "Only the matchup model voted. Filling in either trend would confirm the read "
+            "or catch a bad input, and could put the band back up."
+        )
 
     band = _step_down(band, len(downgrades))
 
@@ -347,6 +370,7 @@ def decide(sport: str, projection: Projection, game: dict[str, Any]) -> Verdict:
         band=band,
         signals=signals,
         downgrades=downgrades,
+        downgrade_notes=notes,
         flags=flags,
         notes=dict(projection.notes, p_push=round(probs.p_push, 4), trust=trust),
     )

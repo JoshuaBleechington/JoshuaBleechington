@@ -247,7 +247,7 @@ Output keys: `model_total` (raw model), `projected_total` (after shrinkage),
 python3 -m unittest discover -s tests -v
 ```
 
-92 tests, covering the odds math, the distributions, both sport models, the
+95 tests, covering the odds math, the distributions, both sport models, the
 shrinkage behaviour and the staking rails.
 
 ---

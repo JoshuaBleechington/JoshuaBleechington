@@ -106,7 +106,7 @@ default, so you can start with three inputs and add the rest as you go.
 | `pace` | Possessions per 40 minutes | Her Hoop Stats, Basketball Reference team stats |
 | `off_rating` | Points scored per 100 possessions | Same |
 | `def_rating` | Points allowed per 100 possessions | Same |
-| `rest_days` | Days since last game; `0` = back-to-back | The schedule |
+| `rest_days` | Days since last game; `0` = back-to-back, `1` = short rest | The schedule |
 
 ```json
 {
@@ -153,7 +153,10 @@ points_A    = possessions × (off_rating_A × def_rating_B / lg_rating) / 100
 
 Home court is applied to the **margin only**, not the total — home teams win by
 more, they do not play systematically higher-scoring games. A back-to-back costs
-that team 2.0 points per 100 possessions. Overtime is added as an expected value
+that team 2.0 points per 100 possessions, and one day of rest costs 1.0 — the
+penalty used to gate on zero days, which never once fired on a real slate,
+because the schedule almost never produces a true zero-day turnaround and
+`rest_days` already treats two days as the normal baseline. Overtime is added as an expected value
 weighted by how close the game projects (a pick-'em adds about a point; a
 20-point mismatch adds almost nothing). The final total is treated as normal
 with sd 11.5.
@@ -290,6 +293,13 @@ two: over the games logged so far its own estimate of the total misses the final
 by 6.4 against recent form's 5.0. The matchup model is the most accurate of the
 three at 4.6 and the only one that knows who is pitching, which is why raising
 form's share comes out of head-to-head and never out of it.
+
+**Basketball votes with two.** WNBA teams meet one to three times a season, so
+head-to-head there is not a sample — it is a single lopsided game wearing a
+trend's clothes, and across the logged games it read between 5.5 and 27 points
+off the market. So the WNBA drops the signal outright rather than ramping it ever
+smaller: it never enters the signal list, its input is hidden, its range is not
+checked, and the matchup model keeps the share it would have taken.
 
 **Confidence only ever falls.** The win probability sets the ceiling — HIGH at
 58%, MEDIUM at 54.5%, LOW at 52% — and each doubt knocks it down a step:

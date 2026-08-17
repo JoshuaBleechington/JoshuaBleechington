@@ -687,12 +687,8 @@
       <section class="card">
         <header><h2>Trends</h2></header>
         <div class="card-body stack">
-          <p class="hint">
-            Two independent reads on the same game. Leave either blank and it simply doesn't vote
-            — but a verdict with nothing to corroborate it loses a confidence band, because then
-            it is only the matchup model talking to itself.
-          </p>
-          <div class="grid2">
+          <p class="hint" id="trends-lede"></p>
+          <div class="grid2" id="h2h-fields">
             <div class="field">
               <label for="h2hAvg">Head to head — avg total</label>
               <input type="number" id="h2hAvg" step="0.1" min="0" />
@@ -744,13 +740,7 @@
           <div class="field">
             <label for="trust">Trust in your numbers — <span id="trust-val">0.50</span></label>
             <input type="range" id="trust" min="0" max="1" step="0.05" value="0.5" />
-            <p class="hint">
-              How far the three signals may pull the projection away from the posted total. At
-              0.50 they get half the distance. At 0.00 the projection is simply the line and
-              nothing is ever a play. The matchup model always keeps at least half of whatever
-              you allow. The other half goes to the trends, split three to two in recent form's
-              favour, and each only earns its full share with a full sample behind it.
-            </p>
+            <p class="hint" id="trust-hint"></p>
           </div>
           <div id="league-body"></div>
         </div>
@@ -784,7 +774,7 @@
       </section>
 
       <section class="card">
-        <header><h2>The three signals</h2><span class="eyebrow" id="sig-unit">runs</span></header>
+        <header><h2 id="sig-count-label">The three signals</h2><span class="eyebrow" id="sig-unit">runs</span></header>
         <div id="signals"></div>
       </section>
 
@@ -1020,8 +1010,15 @@
   // projection the same way rather than washing out. To re-derive the rating:
   // every point scored is a point allowed, so the league's mean offensive
   // rating equals its mean defensive rating, and that is this number.
+  // B2B was gated at rest <= 0, a true zero-day turnaround, and nothing in the
+  // logged games ever hit it -- the lowest rest entered was 1 -- so the penalty
+  // never fired at all, including on two games where both sides were on one day
+  // and the total missed by 12 to 20 points. side() already defaults to 2 days
+  // as the normal baseline, so one day was being read as fully rested when the
+  // model's own assumption says it is already short. SHORT_REST covers that at
+  // half the full B2B penalty; revisit the split once more games are logged.
   var WNBA = { LG_PACE: 80, LG_RATING: 107, TOTAL_SD: 11.5, MARGIN_SD: 11,
-               HCA: 2.5, B2B: 2, OT_POINTS: 19, OT_CAL: 1.5 };
+               HCA: 2.5, B2B: 2, SHORT_REST: 1, OT_POINTS: 19, OT_CAL: 1.5 };
 
   /* Originally 4% per 10F and 8% per 10mph against a 70F reference, clamped at
      10%. On a real August slate that clamp fired on six of seven outdoor games,
@@ -1121,7 +1118,11 @@
       };
     }
     var a = side(g.away), h = side(g.home);
-    var adjOff = function (t) { return t.rest <= 0 ? t.off - WNBA.B2B : t.off; };
+    var adjOff = function (t) {
+      if (t.rest <= 0) return t.off - WNBA.B2B;
+      if (t.rest === 1) return t.off - WNBA.SHORT_REST;
+      return t.off;
+    };
     var poss = (a.pace * h.pace) / lgPace;
     var ap = (poss * ((adjOff(a) * h.def) / lgRating)) / 100;
     var hp = (poss * ((adjOff(h) * a.def) / lgRating)) / 100;
@@ -1167,10 +1168,11 @@
   /* =====================================================================
      THE VERDICT
 
-     Three signals vote on the total: the matchup model, the head-to-head
+     Up to three signals vote on the total: the matchup model, the head-to-head
      history, and each side's recent form. Each is weighted by how much
-     evidence sits behind it, and all three are measured against the same
-     reference — the mean the posted line implies.
+     evidence sits behind it, and all of them are measured against the same
+     reference — the mean the posted line implies. Basketball votes with two,
+     because head-to-head there is a single game pretending to be a sample.
 
      The band that comes out can only ever be lowered. Whatever the win
      probability earns is the ceiling; every doubt knocks it down a step and
@@ -1240,9 +1242,18 @@
     return BANDS[Math.max(0, BANDS.indexOf(band) - n)];
   }
 
+  // WNBA teams meet one to three times a season, so "head to head" there is
+  // almost never a sample -- it is a single lopsided game wearing a trend's
+  // clothes. Across the logged WNBA games its reads ran from +5.5 to +27 off one
+  // to three meetings, which ramping alone did not discount nearly enough.
+  // Rather than trust an ever-smaller ramp to contain it, basketball drops the
+  // signal outright: it never enters the sig array, so it cannot vote, cannot
+  // corroborate, and the matchup model keeps the share it would have taken
+  // (sig[0].weight below is already "trust minus whatever the others used").
   function buildSignals(sport, g, marketMean, modelTotal, trust) {
-    var h2hGames = isNum(g.h2hGames) ? g.h2hGames : 0;
-    var h2hValue = isNum(g.h2hAvg) && h2hGames > 0 ? g.h2hAvg : null;
+    var includeH2h = sport !== "WNBA";
+    var h2hGames = includeH2h && isNum(g.h2hGames) ? g.h2hGames : 0;
+    var h2hValue = includeH2h && isNum(g.h2hAvg) && h2hGames > 0 ? g.h2hAvg : null;
 
     var formGames = isNum(g.formGames) ? g.formGames : 0;
     var haveForm = formGames > 0 && isNum(g.formAway) && isNum(g.formHome);
@@ -1250,17 +1261,19 @@
     // averaging the two is the neutral estimate for a game between them.
     var formValue = haveForm ? (g.formAway + g.formHome) / 2 : null;
 
-    var sig = [
-      { name: "Matchup model", value: modelTotal, games: 1, weight: 0, lean: 0 },
-      { name: "Head to head", value: h2hValue, games: h2hGames, weight: 0, lean: 0 },
-      { name: "Recent form", value: formValue, games: formGames, weight: 0, lean: 0 }
-    ];
+    var sig = [{ name: "Matchup model", value: modelTotal, games: 1, weight: 0, lean: 0 }];
+    if (includeH2h) {
+      sig.push({ name: "Head to head", value: h2hValue, games: h2hGames, weight: 0, lean: 0 });
+    }
+    sig.push({ name: "Recent form", value: formValue, games: formGames, weight: 0, lean: 0 });
     sig.forEach(function (s) { s.present = s.value !== null && s.games > 0; });
 
-    var wH = sig[1].present ? trust * H2H_SHARE * ramp(h2hGames, H2H_FULL[sport]) : 0;
-    var wF = sig[2].present ? trust * FORM_SHARE * ramp(formGames, FORM_FULL[sport]) : 0;
-    sig[1].weight = wH;
-    sig[2].weight = wF;
+    var h2h = includeH2h ? sig[1] : null;
+    var form = sig[sig.length - 1];
+    var wH = h2h && h2h.present ? trust * H2H_SHARE * ramp(h2hGames, H2H_FULL[sport]) : 0;
+    var wF = form.present ? trust * FORM_SHARE * ramp(formGames, FORM_FULL[sport]) : 0;
+    if (h2h) h2h.weight = wH;
+    form.weight = wF;
     sig[0].weight = trust - wH - wF;
 
     sig.forEach(function (s) {
@@ -1313,9 +1326,16 @@
     });
 
     var tlo = TOTAL_RANGE[sport][0], thi = TOTAL_RANGE[sport][1];
-    [["h2hAvg", "head-to-head average total"],
-     ["formAway", "away recent-form average"],
-     ["formHome", "home recent-form average"]].forEach(function (pair) {
+    // Head to head is excluded from WNBA entirely (see buildSignals), so checking
+    // its range here would flag a field that can no longer reach the projection,
+    // off whatever value happens to be sitting in the hidden input.
+    var checks = sport === "WNBA"
+      ? [["formAway", "away recent-form average"],
+         ["formHome", "home recent-form average"]]
+      : [["h2hAvg", "head-to-head average total"],
+         ["formAway", "away recent-form average"],
+         ["formHome", "home recent-form average"]];
+    checks.forEach(function (pair) {
       var v = g[pair[0]];
       if (!isNum(v)) return;
       if (v < tlo || v > thi) {
@@ -1431,7 +1451,7 @@
     wnba: {
       away: { name: "Liberty", pace: 80.4, offRating: 112.1, defRating: 107.4, restDays: 1 },
       home: { name: "Fever", pace: 82.8, offRating: 114.6, defRating: 107.9, restDays: 2 },
-      line: 191.5, h2hAvg: 189, h2hGames: 3, formAway: 186, formHome: 194, formGames: 5
+      line: 191.5, formAway: 186, formHome: 194, formGames: 5
     }
   };
 
@@ -1507,6 +1527,11 @@
         "is season IP ÷ games started; it splits the game between the starter and the pen. " +
         "Leave a box blank rather than typing 0 — a zero is read as unknown, and says so in the " +
         "verdict.";
+      $("h2h-fields").hidden = false;
+      $("trends-lede").textContent =
+        "Two independent reads on the same game. Leave either blank and it simply doesn't vote " +
+        "— but a verdict with nothing to corroborate it loses a confidence band, because then " +
+        "it is only the matchup model talking to itself.";
       $("trends-hint").textContent =
         "Head to head is weak in baseball — tonight's starters mostly weren't involved last " +
         "time — so it needs 8 meetings to reach full weight. Recent form is the average total " +
@@ -1517,16 +1542,38 @@
     } else {
       $("game-card").hidden = true;
       $("game-body").innerHTML = "";
-      $("teams-hint").textContent =
+      $("teams-hint").innerHTML =
         "Pace is possessions per 40 minutes, not per 48. Ratings are points per 100 possessions. " +
-        "Days rest of 0 means a back-to-back and trims the offence.";
+        "<b>Days rest</b> of 0 is a back-to-back and trims the offence by " + WNBA.B2B +
+        "; 1 day is still short and trims it by " + WNBA.SHORT_REST + ". Home court is already " +
+        "worth " + WNBA.HCA + " combined points in every projection — there's no separate field " +
+        "for it because it isn't a per-team number, it applies to whichever side is listed as Home.";
+      $("h2h-fields").hidden = true;
+      $("trends-lede").textContent =
+        "Head to head is left out for WNBA: two teams usually meet only 1-3 times a season, so " +
+        "there's rarely a real sample behind it, and a single lopsided game can swing the average " +
+        "by double digits. Recent form is the one trend that votes here.";
       $("trends-hint").textContent =
-        "Head to head carries more here than in baseball — the same rosters meet again in the " +
-        "same season — so 4 meetings reach full weight. Recent form is the average total in " +
-        "each team's own last N games, and it still carries the heavier of the two trend weights.";
+        "Recent form is the average total in each team's own last N games, and here it is the " +
+        "only trend with a vote. Leave it blank and the matchup model — which already prices in " +
+        "pace, ratings, rest, and home court — carries the whole projection on its own.";
       $("formAwayLabel").textContent = "Away — avg total, last N";
       $("formHomeLabel").textContent = "Home — avg total, last N";
     }
+
+    $("sig-count-label").textContent =
+      state.sport === "mlb" ? "The three signals" : "The two signals";
+    $("trust-hint").textContent = state.sport === "mlb"
+      ? "How far the three signals may pull the projection away from the posted total. At 0.50 " +
+        "they get half the distance. At 0.00 the projection is simply the line and nothing is " +
+        "ever a play. The matchup model always keeps at least half of whatever you allow. The " +
+        "other half goes to the trends, split three to two in recent form's favour, and each " +
+        "only earns its full share with a full sample behind it."
+      : "How far the signals may pull the projection away from the posted total. At 0.50 they " +
+        "get half the distance. At 0.00 the projection is simply the line and nothing is ever a " +
+        "play. The matchup model always keeps at least half of whatever you allow; recent form " +
+        "gets the rest, and only earns its full share with a full sample behind it. Head to " +
+        "head is excluded for WNBA (see Trends).";
 
     // League baselines live with the settings, not the game: they describe the
     // season, and every one of them sits in a denominator where a stale value
@@ -1568,7 +1615,7 @@
       $("dome").checked = !!ex.dome;
     }
     ["line", "h2hAvg", "h2hGames", "formAway", "formHome", "formGames"].forEach(function (k) {
-      if (ex[k] !== undefined) $(k).value = ex[k];
+      $(k).value = ex[k] !== undefined ? ex[k] : "";
     });
     viewingId = null;
     renderRecallBanner();
@@ -1662,7 +1709,14 @@
       if (isFinite(num("lgPace"))) g.league.pace = num("lgPace");
       if (isFinite(num("lgRating"))) g.league.rating = num("lgRating");
     }
-    ["h2hAvg", "h2hGames", "formAway", "formHome", "formGames"].forEach(function (k) {
+    // h2hAvg/h2hGames are excluded here for WNBA rather than merely left
+    // unweighted: the field is hidden but stays in the DOM, and a value left over
+    // from an earlier MLB session would otherwise ride along into g and be judged
+    // by qualityFlags against a range it was never entered for.
+    var trendKeys = state.sport === "wnba"
+      ? ["formAway", "formHome", "formGames"]
+      : ["h2hAvg", "h2hGames", "formAway", "formHome", "formGames"];
+    trendKeys.forEach(function (k) {
       var v = num(k);
       if (isFinite(v)) g[k] = v;
     });

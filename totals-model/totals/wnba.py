@@ -65,6 +65,15 @@ HOME_COURT_POINTS = 2.5  # applied to margin, total-neutral
 B2B_RATING_PENALTY = 2.0  # points per 100 possessions off a team's offence
 B2B_PACE_BUMP = 0.0  # tired legs play a touch slower; left off by default
 
+# One day of rest is not a back-to-back, but it is not rest either. The B2B
+# penalty was gated at zero days, and across the first WNBA games logged nothing
+# ever hit zero -- the lowest rest entered was 1 -- so the adjustment never fired
+# at all, including on two games where both sides were on one day and the total
+# missed by 12 to 20 points. WnbaTeam defaults rest_days to 2, which says plainly
+# that two days is the normal baseline; one day therefore has to cost something.
+# Half the full penalty, to be revisited once more games are logged.
+SHORT_REST_RATING_PENALTY = 1.0
+
 OT_POINTS = 19.0  # typical combined scoring in a 5-minute overtime
 OT_CALIBRATION = 1.5  # real tie rates run above the normal approximation
 
@@ -91,9 +100,15 @@ class WnbaTeam:
     def on_back_to_back(self) -> bool:
         return self.rest_days <= 0
 
+    @property
+    def on_short_rest(self) -> bool:
+        return self.rest_days == 1
+
     def adjusted_off_rating(self) -> float:
         if self.on_back_to_back:
             return self.off_rating - B2B_RATING_PENALTY
+        if self.on_short_rest:
+            return self.off_rating - SHORT_REST_RATING_PENALTY
         return self.off_rating
 
     def adjusted_pace(self) -> float:
@@ -154,5 +169,7 @@ def project(game: dict[str, Any]) -> Projection:
             "expected_ot_points": round(ot, 2),
             "away_b2b": away.on_back_to_back,
             "home_b2b": home.on_back_to_back,
+            "away_short_rest": away.on_short_rest,
+            "home_short_rest": home.on_short_rest,
         },
     )

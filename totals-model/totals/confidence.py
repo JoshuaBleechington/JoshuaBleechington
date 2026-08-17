@@ -74,6 +74,15 @@ FORM_SHARE = 0.30
 H2H_FULL_GAMES = {"MLB": 8.0, "WNBA": 4.0}
 FORM_FULL_GAMES = {"MLB": 10.0, "WNBA": 8.0}
 
+# Sports where head-to-head votes at all. WNBA teams meet one to three times a
+# season, so "head to head" there is not a sample -- it is a single lopsided game
+# wearing a trend's clothes. Across the logged WNBA games its reads ran from 5.5
+# to 27 points off one to three meetings, which ramping alone did not discount
+# nearly enough. So basketball drops the signal outright rather than trusting an
+# ever-smaller ramp to contain it: it never enters the signal list, cannot vote,
+# cannot corroborate, and the matchup model keeps the share it would have taken.
+H2H_SPORTS = frozenset({"MLB"})
+
 # A projection this far from the market is treated as a symptom, not a signal.
 # Every large disagreement this model has produced in practice traced back to an
 # input -- a park factor on the wrong scale, a blank ERA read as 0.00, a stale
@@ -199,8 +208,14 @@ def _ramp(games: float, full: float) -> float:
 
 def build_signals(sport: str, game: dict[str, Any], market_mean: float,
                   model_total: float, trust: float) -> list[Signal]:
-    """The matchup model, head-to-head, and recent form -- each with its share."""
-    h2h = game.get("h2h") or {}
+    """The matchup model, head-to-head, and recent form -- each with its share.
+
+    Head-to-head is absent entirely in sports outside ``H2H_SPORTS``, rather than
+    present at zero weight: a signal that cannot move the projection should not be
+    on the page claiming to be one of the votes.
+    """
+    include_h2h = sport in H2H_SPORTS
+    h2h = (game.get("h2h") or {}) if include_h2h else {}
     form = game.get("form") or {}
 
     h2h_games = float(h2h.get("games", 0) or 0)
@@ -215,16 +230,20 @@ def build_signals(sport: str, game: dict[str, Any], market_mean: float,
     # Averaging the two is the neutral estimate for a game between them.
     form_value = (float(away_form) + float(home_form)) / 2.0 if have_form else None
 
-    signals = [
-        Signal("Matchup model", model_total, games=1.0),
-        Signal("Head to head", h2h_value, games=h2h_games),
-        Signal("Recent form", form_value, games=form_games),
-    ]
+    signals = [Signal("Matchup model", model_total, games=1.0)]
+    h2h_signal = Signal("Head to head", h2h_value, games=h2h_games) if include_h2h else None
+    if h2h_signal is not None:
+        signals.append(h2h_signal)
+    form_signal = Signal("Recent form", form_value, games=form_games)
+    signals.append(form_signal)
 
-    h2h_w = trust * H2H_SHARE * _ramp(h2h_games, H2H_FULL_GAMES[sport]) if signals[1].present else 0.0
-    form_w = trust * FORM_SHARE * _ramp(form_games, FORM_FULL_GAMES[sport]) if signals[2].present else 0.0
-    signals[1].weight = h2h_w
-    signals[2].weight = form_w
+    h2h_w = (trust * H2H_SHARE * _ramp(h2h_games, H2H_FULL_GAMES[sport])
+             if h2h_signal is not None and h2h_signal.present else 0.0)
+    form_w = (trust * FORM_SHARE * _ramp(form_games, FORM_FULL_GAMES[sport])
+              if form_signal.present else 0.0)
+    if h2h_signal is not None:
+        h2h_signal.weight = h2h_w
+    form_signal.weight = form_w
     signals[0].weight = trust - h2h_w - form_w
 
     for s in signals:
@@ -278,9 +297,14 @@ def quality_flags(sport: str, game: dict[str, Any], model_total: float,
                 )
 
     lo, hi = TOTAL_RANGE[sport]
-    for block, key, label in (("h2h", "avg_total", "head-to-head average total"),
-                              ("form", "away_avg_total", "away recent-form average"),
-                              ("form", "home_avg_total", "home recent-form average")):
+    checks = [("form", "away_avg_total", "away recent-form average"),
+              ("form", "home_avg_total", "home recent-form average")]
+    # Only range-check head-to-head where head-to-head votes. Flagging a number
+    # that cannot reach the projection would cost a confidence band over a field
+    # the model has already decided to ignore.
+    if sport in H2H_SPORTS:
+        checks.insert(0, ("h2h", "avg_total", "head-to-head average total"))
+    for block, key, label in checks:
         src = game.get(block) or {}
         v = src.get(key)
         if v in (None, ""):

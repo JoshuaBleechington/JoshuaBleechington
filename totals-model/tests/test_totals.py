@@ -911,4 +911,42 @@ class TestConfidenceModel(unittest.TestCase):
         r = run_verdict("wnba", self.wnba_game(line=160.0))
         self.assertEqual(r["side"], "OVER")
         self.assertIn(r["band"], BANDS)
-        self.assertEqual(len(r["signals"]), 3)
+        # Two signals, not three: basketball has no head-to-head vote.
+        self.assertEqual([s["name"] for s in r["signals"]],
+                         ["Matchup model", "Recent form"])
+
+    def test_basketball_head_to_head_does_not_vote_at_all(self):
+        """Absent, not merely weightless.
+
+        One to three meetings a season is not a sample, and the logged games had
+        it reading up to 27 points off the market. A signal that cannot move the
+        projection should not be listed as one of the votes either.
+        """
+        quiet = run_verdict("wnba", self.wnba_game(line=170.0))
+        loud = run_verdict("wnba", self.wnba_game(line=170.0,
+                                                 h2h={"avg_total": 240.0, "games": 3}))
+        self.assertEqual(loud["projected_total"], quiet["projected_total"])
+        self.assertNotIn("Head to head", [s["name"] for s in loud["signals"]])
+
+    def test_an_ignored_head_to_head_number_is_not_held_against_the_game(self):
+        """It cannot reach the projection, so it must not cost a band either."""
+        r = run_verdict("wnba", self.wnba_game(line=170.0,
+                                               h2h={"avg_total": 12.0, "games": 2}))
+        self.assertEqual(r["flags"], run_verdict("wnba", self.wnba_game(line=170.0))["flags"])
+
+    def test_one_day_of_rest_is_not_rest(self):
+        """The B2B penalty gated at zero days and so never fired in practice.
+
+        Nothing in the logged games ever came in at zero days rest; one day was
+        the floor, and it was being read as fully rested even though the model's
+        own default baseline is two.
+        """
+        def at(rest_days):
+            g = self.wnba_game(line=170.0)
+            for side in ("away", "home"):
+                g[side]["rest_days"] = rest_days
+            return run_verdict("wnba", g)["model_total"]
+
+        self.assertLess(at(1), at(2))
+        self.assertLess(at(0), at(1))
+        self.assertEqual(at(3), at(2))

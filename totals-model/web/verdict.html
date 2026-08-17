@@ -2514,12 +2514,19 @@
      one win as often as it said it would? A two-sigma band on the expected
      count is the honest test -- a raw hit rate on eight games says nothing, and
      reading one as if it did is how people talk themselves into a broken
-     model. */
+     model.
+
+     Every logged game counts here, backed or passed. This table grades the
+     MODEL, not the bankroll -- "Your record" above is the bankroll. Filtering
+     to backed games made the NO PLAY row unanswerable by construction: a
+     NO PLAY you skipped is exactly the evidence that says whether NO PLAY is
+     really a coin flip, and skipping it is the normal thing to do, so the row
+     could only ever contain the handful of times the advice was overridden. */
   function renderBandCheck() {
-    var backed = store.entries.filter(function (e) { return e.status === "backed"; });
     var rows = BAND_ORDER.map(function (b) {
-      var sub = backed.filter(function (e) { return e.band === b; });
-      return { band: b, n: sub.length, s: summarise(sub) };
+      var sub = store.entries.filter(function (e) { return e.band === b; });
+      var took = sub.filter(function (e) { return e.status === "backed"; }).length;
+      return { band: b, n: sub.length, took: took, s: summarise(sub) };
     }).filter(function (r) { return r.n > 0; });
 
     if (!rows.length) {
@@ -2530,7 +2537,7 @@
     }
 
     var html = '<div class="log-scroll"><table class="logtable"><thead><tr>' +
-      "<th>Band</th><th>Games</th><th>W-L-P</th><th>Hit rate</th>" +
+      "<th>Band</th><th>Games</th><th>You backed</th><th>W-L-P</th><th>Hit rate</th>" +
       "<th>Model said</th><th>Read</th></tr></thead><tbody>";
     rows.forEach(function (r) {
       var s = r.s;
@@ -2545,7 +2552,7 @@
             (sigma > 0 ? "beating" : "missing") + " it (" + signed(sigma, 1) + "&sigma;)</b>";
       }
       html += "<tr><td><span class='band-chip chip-" + BAND_CLASS[r.band] + "'>" + r.band +
-        "</span></td><td>" + r.n + "</td><td>" +
+        "</span></td><td>" + r.n + "</td><td>" + r.took + "</td><td>" +
         s.w + "-" + s.l + (s.p ? "-" + s.p : "") + "</td><td>" +
         (s.hitRate === null ? "—" : pct(s.hitRate)) + "</td><td>" +
         (s.decided ? pct(s.expected / s.decided) : "—") + "</td><td>" + read + "</td></tr>";
@@ -2563,6 +2570,10 @@
         + "With this few games that is close to a coin flip either way; it starts to mean " +
         "something around 50 games per band.</p>";
     }
+    html += '<p class="note" style="background:var(--surface-2);color:var(--ink-2)">' +
+      "Every logged game counts here once you enter a final, whether you backed it or passed. " +
+      "This table grades the <b>model</b>; <b>Your record</b> above grades your bets. A NO PLAY " +
+      "you skipped is still the evidence that says whether NO PLAY is really a coin flip.</p>";
     $("bandcheck").innerHTML = html;
   }
 
@@ -2692,12 +2703,14 @@
                s.w + (s.sd > 0 ? "   (" + signed((s.w - s.expected) / s.sd, 1) + " sigma)" : "")
                : "—") +
                (s.decided && s.decided < 30 ? "   [too few to read — needs 50-100]" : ""),
-             "", "BY BAND"];
+             "", "BY BAND  (every logged game, backed or passed — this grades the model)"];
     BAND_ORDER.forEach(function (b) {
-      var sub = backed.filter(function (e) { return e.band === b; });
+      var sub = store.entries.filter(function (e) { return e.band === b; });
       if (!sub.length) return;
       var bs = summarise(sub);
+      var took = sub.filter(function (e) { return e.status === "backed"; }).length;
       L.push("  " + (b + "        ").slice(0, 8) + " " + sub.length + " games   " +
+             "you backed " + took + "   " +
              bs.w + "-" + bs.l + (bs.p ? "-" + bs.p : "") +
              (bs.hitRate === null ? "" : "   " + pct(bs.hitRate) + " hit") +
              (bs.decided ? "   model said " + pct(bs.expected / bs.decided) : ""));

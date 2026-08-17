@@ -748,8 +748,8 @@
               How far the three signals may pull the projection away from the posted total. At
               0.50 they get half the distance. At 0.00 the projection is simply the line and
               nothing is ever a play. The matchup model always keeps at least half of whatever
-              you allow; head-to-head and recent form split the rest, and only earn their full
-              share with a full sample behind them.
+              you allow. The other half goes to the trends, split three to two in recent form's
+              favour, and each only earns its full share with a full sample behind it.
             </p>
           </div>
           <div id="league-body"></div>
@@ -1164,7 +1164,6 @@
     return (lo + hi) / 2;
   }
 
-
   /* =====================================================================
      THE VERDICT
 
@@ -1187,9 +1186,16 @@
 
   // Head-to-head and recent form are real information and weak information:
   // small samples of games played by different pitchers and sometimes different
-  // rosters. Each may take at most a quarter of the trust budget, and only at a
-  // full sample. The matchup model always keeps at least half.
-  var H2H_SHARE = 0.25, FORM_SHARE = 0.25;
+  // rosters. Together they take at most half the trust budget, and each only at
+  // a full sample. The matchup model always keeps the other half, so these two
+  // must always add up to 0.50.
+  //
+  // Recent form gets the larger share. Both are weak, but head-to-head is the
+  // weaker: on the games logged so far it misses the final total by 6.4 on
+  // average against recent form's 5.0. The extra weight comes out of
+  // head-to-head rather than out of the matchup model, which is the most
+  // accurate of the three (4.6) and the only one that knows who is pitching.
+  var H2H_SHARE = 0.20, FORM_SHARE = 0.30;
   var H2H_FULL = { MLB: 8, WNBA: 4 };
   var FORM_FULL = { MLB: 10, WNBA: 8 };
 
@@ -1504,7 +1510,8 @@
       $("trends-hint").textContent =
         "Head to head is weak in baseball — tonight's starters mostly weren't involved last " +
         "time — so it needs 8 meetings to reach full weight. Recent form is the average total " +
-        "in each team's own last N games, runs scored plus allowed.";
+        "in each team's own last N games, runs scored plus allowed, and it carries the heavier " +
+        "of the two trend weights.";
       $("formAwayLabel").textContent = "Away — avg total, last N";
       $("formHomeLabel").textContent = "Home — avg total, last N";
     } else {
@@ -1516,7 +1523,7 @@
       $("trends-hint").textContent =
         "Head to head carries more here than in baseball — the same rosters meet again in the " +
         "same season — so 4 meetings reach full weight. Recent form is the average total in " +
-        "each team's own last N games.";
+        "each team's own last N games, and it still carries the heavier of the two trend weights.";
       $("formAwayLabel").textContent = "Away — avg total, last N";
       $("formHomeLabel").textContent = "Home — avg total, last N";
     }
@@ -3073,6 +3080,5 @@
   setView("calc");
 })();
 </script>
-
 </body>
 </html>

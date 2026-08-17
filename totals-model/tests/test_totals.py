@@ -864,6 +864,24 @@ class TestConfidenceModel(unittest.TestCase):
         self.assertGreaterEqual(by["Matchup model"]["weight"], 0.5)
         self.assertAlmostEqual(sum(s["weight"] for s in r["signals"]), 1.0, places=6)
 
+    def test_the_two_trends_never_take_more_than_the_model(self):
+        """The shares are tuned by hand, so the invariant is asserted, not assumed.
+
+        Raising recent form's share has to come out of head-to-head. If it comes
+        out of the matchup model instead, the signal that actually knows who is
+        pitching stops being the majority of the projection.
+        """
+        from totals import confidence
+
+        self.assertAlmostEqual(confidence.H2H_SHARE + confidence.FORM_SHARE, 0.5, places=9)
+
+    def test_recent_form_outweighs_head_to_head_at_a_full_sample(self):
+        g = self.mlb_game(trust=1.0, h2h={"avg_total": 9.0, "games": 20},
+                          form={"away_avg_total": 9.0, "home_avg_total": 9.0, "games": 20})
+        by = {s["name"]: s["weight"] for s in run_verdict("mlb", g)["signals"]}
+        self.assertGreater(by["Recent form"], by["Head to head"])
+        self.assertGreaterEqual(by["Matchup model"], 0.5)
+
     def test_a_thin_head_to_head_earns_less_than_a_full_one(self):
         one = run_verdict("mlb", self.mlb_game(h2h={"avg_total": 11.0, "games": 1}))
         many = run_verdict("mlb", self.mlb_game(h2h={"avg_total": 11.0, "games": 8}))

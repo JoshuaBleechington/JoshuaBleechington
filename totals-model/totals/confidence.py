@@ -55,11 +55,18 @@ BANDS = ("NO PLAY", "LOW", "MEDIUM", "HIGH")
 #
 # Head-to-head and recent form are real information and weak information. They
 # are small samples of games played by different pitchers, different rotations
-# and sometimes different rosters. Each may take at most a quarter of whatever
-# trust is not being left with the market, and only reaches that share with a
-# full sample behind it. The matchup model always keeps at least half.
-H2H_SHARE = 0.25
-FORM_SHARE = 0.25
+# and sometimes different rosters. Together they may take at most half of
+# whatever trust is not being left with the market, and each only reaches its
+# share with a full sample behind it. The matchup model always keeps the other
+# half -- that invariant is what the two numbers below must always add up to.
+#
+# Recent form gets the larger share of the two. Both are weak, but head-to-head
+# is the weaker: on the games logged so far its own estimate of the total misses
+# by 6.4 on average against recent form's 5.0. So the split is uneven rather
+# than the extra weight coming out of the matchup model, which is the most
+# accurate of the three (4.6) and the one signal that knows who is pitching.
+H2H_SHARE = 0.20
+FORM_SHARE = 0.30
 
 # Games needed before a trend signal is at full strength. Head-to-head counts
 # for more in basketball, where the same rosters meet again in the same season;

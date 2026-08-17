@@ -271,7 +271,7 @@ r = run_verdict("mlb", {
     "h2h":  {"avg_total": 10.5, "games": 4},
     "form": {"away_avg_total": 9.8, "home_avg_total": 10.1, "games": 5},
 })
-r["band"], r["side"], r["win_pct"]   # ('MEDIUM', 'OVER', 0.5715)
+r["band"], r["side"], r["win_pct"]   # ('MEDIUM', 'OVER', 0.571)
 ```
 
 **No odds.** The only market input is the posted total. At even money the line
@@ -280,10 +280,16 @@ the mean at which the model reproduces it converts the line into the
 projection's own units — enough to compare against, with no price involved.
 
 **Three signals, not one.** The matchup model, the head-to-head history and each
-side's recent form each vote, weighted by the evidence behind them. Head-to-head
-and recent form may take at most a quarter of the trust budget each, and only at
-a full sample; the matchup model always keeps at least half. A projection is one
-opinion, three that agree are a trend.
+side's recent form each vote, weighted by the evidence behind them. The two
+trends take at most half the trust budget between them — 30% recent form, 20%
+head-to-head, and each only at a full sample; the matchup model always keeps the
+other half. A projection is one opinion, three that agree are a trend.
+
+Recent form outweighs head-to-head because head-to-head is the weaker of the
+two: over the games logged so far its own estimate of the total misses the final
+by 6.4 against recent form's 5.0. The matchup model is the most accurate of the
+three at 4.6 and the only one that knows who is pitching, which is why raising
+form's share comes out of head-to-head and never out of it.
 
 **Confidence only ever falls.** The win probability sets the ceiling — HIGH at
 58%, MEDIUM at 54.5%, LOW at 52% — and each doubt knocks it down a step:

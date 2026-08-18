@@ -13,10 +13,11 @@ Three consequences follow from that, and they are the whole design:
   this model would agree converts the line into the same units as a projection.
   Everything downstream is a probability, never a price.
 
-* **Three independent signals, not one.** The matchup model, the head-to-head
-  history and each side's recent form all get a vote, weighted by how much
-  evidence is behind them. A projection is one opinion; three opinions that
-  agree are a trend.
+* **Up to four independent signals, not one.** The matchup model, the
+  head-to-head history, each side's recent form, and -- for WNBA -- each
+  side's record against the total all get a vote, weighted by how much
+  evidence is behind them. A projection is one opinion; several that agree
+  are a trend.
 
 * **Confidence can only be lost, never gained.** The band starts at whatever the
   win probability earns, and every doubt -- signals pointing different ways, a
@@ -68,11 +69,31 @@ BANDS = ("NO PLAY", "LOW", "MEDIUM", "HIGH")
 H2H_SHARE = 0.20
 FORM_SHARE = 0.30
 
+# WNBA's second trend slot. Head-to-head does not vote there (see H2H_SPORTS
+# below), which leaves 0.20 of the 0.50 trend ceiling unclaimed in that sport --
+# exactly the room this signal fills, so the matchup model keeps at least half
+# in both sports on the same schedule.
+#
+# UNVALIDATED, unlike the other three shares. Those numbers came from mean
+# error on logged games; this one is a placeholder because there is no logged
+# history with this signal in it yet. Revisit it -- the ramp, the share, and
+# the conversion in ou_signal() below -- once enough WNBA games have been
+# logged with an over/under record entered to backtest it the way FORM_SHARE
+# was backtested against H2H_SHARE.
+OU_SHARE = 0.20
+
 # Games needed before a trend signal is at full strength. Head-to-head counts
 # for more in basketball, where the same rosters meet again in the same season;
-# in baseball tonight's starters were mostly not involved last time.
+# in baseball tonight's starters were mostly not involved last time. The
+# over/under record accumulates over a whole season, so it clears a given game
+# count faster than head-to-head ever does -- but each of those games is
+# against a different opponent under different conditions, diluted the way a
+# single-season batting average is diluted next to a matchup stat. 12 is a
+# guess at "enough games that a lopsided record probably isn't just four early
+# blowouts," not a fitted number.
 H2H_FULL_GAMES = {"MLB": 8.0, "WNBA": 4.0}
 FORM_FULL_GAMES = {"MLB": 10.0, "WNBA": 8.0}
+OU_FULL_GAMES = {"WNBA": 12.0}
 
 # Sports where head-to-head votes at all. WNBA teams meet one to three times a
 # season, so "head to head" there is not a sample -- it is a single lopsided game
@@ -82,6 +103,17 @@ FORM_FULL_GAMES = {"MLB": 10.0, "WNBA": 8.0}
 # ever-smaller ramp to contain it: it never enters the signal list, cannot vote,
 # cannot corroborate, and the matchup model keeps the share it would have taken.
 H2H_SPORTS = frozenset({"MLB"})
+
+# Sports where a team's record against the total votes. MLB starting pitchers
+# change the number too much game to game for a season-long team record to mean
+# much; WNBA rotations are steadier, so the record says more about the team.
+OU_SPORTS = frozenset({"WNBA"})
+
+# A record this lopsided is more likely a typo -- wins and losses swapped, or a
+# stray digit -- than a real edge the market has missed all season. Clamped the
+# same width both ways: used to flag an extreme raw record, and to keep a small
+# sample from swinging the implied value to an unstable extreme.
+OU_PCT_CLAMP = (0.15, 0.85)
 
 # A projection this far from the market is treated as a symptom, not a signal.
 # Every large disagreement this model has produced in practice traced back to an
@@ -206,17 +238,72 @@ def _ramp(games: float, full: float) -> float:
     return min(1.0, games / full)
 
 
-def build_signals(sport: str, game: dict[str, Any], market_mean: float,
-                  model_total: float, trust: float) -> list[Signal]:
-    """The matchup model, head-to-head, and recent form -- each with its share.
+def _team_ou_pct(record: dict[str, Any] | None) -> tuple[float | None, float]:
+    """A team's own over rate and game count from a wins/losses record.
 
-    Head-to-head is absent entirely in sports outside ``H2H_SPORTS``, rather than
-    present at zero weight: a signal that cannot move the projection should not be
-    on the page claiming to be one of the votes.
+    Both fields have to be explicitly present. Defaulting a missing one to
+    zero -- "wins: 20" with no losses key read as 20-0 -- is exactly how a
+    blank ERA got read as 0.00 and produced this model's largest false-
+    confidence bet: a half-filled field silently becoming an extreme, and
+    therefore very convincing-looking, number.
+    """
+    r = record or {}
+    wins, losses = r.get("wins"), r.get("losses")
+    if wins in (None, "") or losses in (None, ""):
+        return None, 0.0
+    wins, losses = float(wins), float(losses)
+    games = wins + losses
+    if games <= 0:
+        return None, 0.0
+    return wins / games, games
+
+
+def ou_signal(sport: str, game: dict[str, Any], projection: Projection,
+              line: float) -> tuple[float | None, float]:
+    """The value implied by both teams' record against the total, and its games.
+
+    Each team's own over rate is a probability, not a points total, so it
+    cannot be averaged into a value the way two recent-form totals can. It is
+    converted into one instead by reusing the exact machinery ``market_mean``
+    itself is built from: solve for the mean at which this game's own
+    distribution would produce that probability of going over. That keeps the
+    conversion dimensionally honest -- a given percentage swings the value more
+    in a high-variance MLB game than a tight WNBA one -- without inventing a
+    flat points-per-percent constant this project has no basis for.
+
+    The two teams' rates are averaged before the inversion, the same way two
+    recent-form totals are averaged: the neutral read on a game between them.
+    ``games`` is the SMALLER of the two team counts, not the larger, so a
+    thin record on one side still limits how much the pair can vote --
+    the general rule in this model that a weak leg limits the whole signal.
+    """
+    if sport not in OU_SPORTS:
+        return None, 0.0
+    record = game.get("over_under_record") or {}
+    away_pct, away_games = _team_ou_pct(record.get("away"))
+    home_pct, home_games = _team_ou_pct(record.get("home"))
+    if away_pct is None or home_pct is None:
+        return None, 0.0
+    lo, hi = OU_PCT_CLAMP
+    combined = min(hi, max(lo, (away_pct + home_pct) / 2.0))
+    value = market_implied_total(projection, line, combined)
+    return value, min(away_games, home_games)
+
+
+def build_signals(sport: str, game: dict[str, Any], market_mean: float,
+                  model_total: float, trust: float,
+                  ou: tuple[float | None, float] = (None, 0.0)) -> list[Signal]:
+    """The matchup model plus whichever trend signals apply to this sport.
+
+    Head-to-head is absent entirely in sports outside ``H2H_SPORTS``, and the
+    over/under record is absent outside ``OU_SPORTS``, rather than either being
+    present at zero weight: a signal that cannot move the projection should not
+    be on the page claiming to be one of the votes.
     """
     include_h2h = sport in H2H_SPORTS
     h2h = (game.get("h2h") or {}) if include_h2h else {}
     form = game.get("form") or {}
+    ou_value, ou_games = ou
 
     h2h_games = float(h2h.get("games", 0) or 0)
     h2h_value = h2h.get("avg_total")
@@ -236,15 +323,22 @@ def build_signals(sport: str, game: dict[str, Any], market_mean: float,
         signals.append(h2h_signal)
     form_signal = Signal("Recent form", form_value, games=form_games)
     signals.append(form_signal)
+    ou_signal_obj = Signal("O/U record", ou_value, games=ou_games) if sport in OU_SPORTS else None
+    if ou_signal_obj is not None:
+        signals.append(ou_signal_obj)
 
     h2h_w = (trust * H2H_SHARE * _ramp(h2h_games, H2H_FULL_GAMES[sport])
              if h2h_signal is not None and h2h_signal.present else 0.0)
     form_w = (trust * FORM_SHARE * _ramp(form_games, FORM_FULL_GAMES[sport])
               if form_signal.present else 0.0)
+    ou_w = (trust * OU_SHARE * _ramp(ou_games, OU_FULL_GAMES.get(sport, 1.0))
+            if ou_signal_obj is not None and ou_signal_obj.present else 0.0)
     if h2h_signal is not None:
         h2h_signal.weight = h2h_w
     form_signal.weight = form_w
-    signals[0].weight = trust - h2h_w - form_w
+    if ou_signal_obj is not None:
+        ou_signal_obj.weight = ou_w
+    signals[0].weight = trust - h2h_w - form_w - ou_w
 
     for s in signals:
         if s.present:
@@ -315,6 +409,23 @@ def quality_flags(sport: str, game: dict[str, Any], model_total: float,
                 f"the {label} is {_fmt(v)}, outside the possible range "
                 f"{_fmt(lo)}–{_fmt(hi)} — check that entry"
             )
+
+    # A record this lopsided is more likely wins and losses swapped than a real
+    # season-long market miss.
+    if sport in OU_SPORTS:
+        record = game.get("over_under_record") or {}
+        ou_lo, ou_hi = OU_PCT_CLAMP
+        for side in ("away", "home"):
+            t = game.get(side) or {}
+            name = t.get("name") or side
+            pct, games = _team_ou_pct(record.get(side))
+            if pct is not None and games >= 8 and not ou_lo <= pct <= ou_hi:
+                w = record.get(side, {}).get("wins")
+                l = record.get(side, {}).get("losses")
+                flags.append(
+                    f"the {name} over/under record ({w:g}-{l:g}) reads {100 * pct:.0f}% "
+                    "over, unusually lopsided for a season — check that entry"
+                )
     return flags
 
 
@@ -344,7 +455,8 @@ def decide(sport: str, projection: Projection, game: dict[str, Any]) -> Verdict:
     market_mean = market_implied_total(projection, line, 0.5)
     model_total = projection.total
 
-    signals = build_signals(sport, game, market_mean, model_total, trust)
+    ou = ou_signal(sport, game, projection, line)
+    signals = build_signals(sport, game, market_mean, model_total, trust, ou)
     projected = market_mean + sum(s.weight * s.lean for s in signals if s.present)
 
     probs = projection.scaled(projected).total_probs(line)
@@ -380,10 +492,14 @@ def decide(sport: str, projection: Projection, game: dict[str, Any]) -> Verdict:
         notes.append(_sentence_case("; ".join(flags)) + ".")
 
     # No trend evidence at all means the matchup model is talking to itself.
+    # Named dynamically rather than a fixed phrase, because which trends even
+    # apply differs by sport (WNBA has no head-to-head; only WNBA has an
+    # over/under record).
     if not any(s.present and s.weight > 0 for s in signals[1:]):
-        downgrades.append("no head-to-head or recent form to corroborate it")
+        trend_names = " or ".join(s.name.lower() for s in signals[1:])
+        downgrades.append(f"no {trend_names} to corroborate it")
         notes.append(
-            "Only the matchup model voted. Filling in either trend would confirm the read "
+            "Only the matchup model voted. Filling in a trend would confirm the read "
             "or catch a bad input, and could put the band back up."
         )
 

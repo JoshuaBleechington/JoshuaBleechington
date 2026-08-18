@@ -282,11 +282,11 @@ is the point where the book has over and under equally likely, so solving for
 the mean at which the model reproduces it converts the line into the
 projection's own units — enough to compare against, with no price involved.
 
-**Three signals, not one.** The matchup model, the head-to-head history and each
-side's recent form each vote, weighted by the evidence behind them. The two
+**Several signals, not one.** The matchup model, the head-to-head history and
+each side's recent form each vote, weighted by the evidence behind them. The
 trends take at most half the trust budget between them — 30% recent form, 20%
 head-to-head, and each only at a full sample; the matchup model always keeps the
-other half. A projection is one opinion, three that agree are a trend.
+other half. A projection is one opinion, several that agree are a trend.
 
 Recent form outweighs head-to-head because head-to-head is the weaker of the
 two: over the games logged so far its own estimate of the total misses the final
@@ -294,12 +294,26 @@ by 6.4 against recent form's 5.0. The matchup model is the most accurate of the
 three at 4.6 and the only one that knows who is pitching, which is why raising
 form's share comes out of head-to-head and never out of it.
 
-**Basketball votes with two.** WNBA teams meet one to three times a season, so
-head-to-head there is not a sample — it is a single lopsided game wearing a
-trend's clothes, and across the logged games it read between 5.5 and 27 points
-off the market. So the WNBA drops the signal outright rather than ramping it ever
-smaller: it never enters the signal list, its input is hidden, its range is not
-checked, and the matchup model keeps the share it would have taken.
+**Basketball trades head-to-head for a team's own over/under record.** WNBA
+teams meet one to three times a season, so head-to-head there is not a sample —
+it is a single lopsided game wearing a trend's clothes, and across the logged
+games it read between 5.5 and 27 points off the market. So the WNBA drops the
+signal outright rather than ramping it ever smaller: it never enters the signal
+list, its input is hidden, its range is not checked, and the matchup model keeps
+the share it would have taken.
+
+In its place, WNBA games can vote a team's own win-loss record against the
+total — `over_under_record`, wins and losses for each side. That number is a
+*rate* ("the market's line has been right about this team X% of the time"),
+not a *value* like the other three, so it cannot be averaged into a total the
+way two scoring rates can. It is converted instead by reusing the exact
+machinery `market_mean` itself is built from: solve for the mean at which this
+game's own distribution would produce that probability of going over. **This
+share (20%) is unvalidated**, unlike the other three, which came from mean
+error on logged games — there is no history with this signal in it yet.
+Revisit the share, the ramp, and the conversion once WNBA games have been
+logged with a record entered, the same way `FORM_SHARE` was checked against
+`H2H_SHARE`.
 
 **Confidence only ever falls.** The win probability sets the ceiling — HIGH at
 58%, MEDIUM at 54.5%, LOW at 52% — and each doubt knocks it down a step:

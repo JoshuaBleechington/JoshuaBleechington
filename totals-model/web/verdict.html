@@ -717,6 +717,28 @@
               <input type="number" id="formGames" step="1" min="0" max="30" />
             </div>
           </div>
+          <div class="stack" id="ou-fields" hidden>
+            <div class="grid2">
+              <div class="field">
+                <label for="ouAwayWins">Away — O/U wins</label>
+                <input type="number" id="ouAwayWins" step="1" min="0" />
+              </div>
+              <div class="field">
+                <label for="ouAwayLosses">Away — O/U losses</label>
+                <input type="number" id="ouAwayLosses" step="1" min="0" />
+              </div>
+            </div>
+            <div class="grid2">
+              <div class="field">
+                <label for="ouHomeWins">Home — O/U wins</label>
+                <input type="number" id="ouHomeWins" step="1" min="0" />
+              </div>
+              <div class="field">
+                <label for="ouHomeLosses">Home — O/U losses</label>
+                <input type="number" id="ouHomeLosses" step="1" min="0" />
+              </div>
+            </div>
+          </div>
           <p class="hint" id="trends-hint"></p>
         </div>
       </section>
@@ -1215,6 +1237,18 @@
   var H2H_FULL = { MLB: 8, WNBA: 4 };
   var FORM_FULL = { MLB: 10, WNBA: 8 };
 
+  // WNBA's second trend slot. Head-to-head does not vote there, which leaves
+  // 0.20 of the 0.50 trend ceiling unclaimed -- exactly the room this fills,
+  // so the matchup model keeps at least half in both sports on the same
+  // schedule. UNVALIDATED unlike the other shares: there is no logged history
+  // with this signal in it yet to check it against. Revisit once there is.
+  var OU_SHARE = 0.20;
+  var OU_FULL = { WNBA: 12 };
+  // A record this lopsided is more likely wins and losses swapped than a real
+  // season-long market miss. Used both to flag an extreme raw record and to
+  // keep a thin sample from swinging the implied value to an unstable extreme.
+  var OU_CLAMP = [0.15, 0.85];
+
   // A projection this far from the market is treated as a symptom, not an edge.
   var IMPLAUSIBLE = { MLB: 2.0, WNBA: 12.0 };
   // How far a signal must lean before it counts as dissenting rather than quiet.
@@ -1264,8 +1298,44 @@
   // signal outright: it never enters the sig array, so it cannot vote, cannot
   // corroborate, and the matchup model keeps the share it would have taken
   // (sig[0].weight below is already "trust minus whatever the others used").
-  function buildSignals(sport, g, marketMean, modelTotal, trust) {
+  // A team's own wins/losses against the total -> its own over rate and game
+  // count. Both fields have to be explicitly present: defaulting a missing one
+  // to zero -- "20 wins" with losses left blank read as 20-0 -- is exactly how
+  // a blank ERA got read as 0.00 and produced this model's largest false-
+  // confidence bet. A half-filled field must not silently become an extreme,
+  // convincing-looking number.
+  function teamOuPct(wins, losses) {
+    if (!isNum(wins) || !isNum(losses)) return [null, 0];
+    var games = wins + losses;
+    if (games <= 0) return [null, 0];
+    return [wins / games, games];
+  }
+
+  // The over/under record is a RATE ("the market has been right about this
+  // team X% of the time"), not a points value like the other signals, so it
+  // cannot be averaged into a total the way two scoring rates can. Converted
+  // instead by reusing the exact machinery marketMean itself is built from:
+  // solve for the mean at which this game's own distribution would produce
+  // that probability of going over. That keeps the conversion dimensionally
+  // honest -- a given percentage swings the value more in a high-variance MLB
+  // game than a tight WNBA one -- without inventing a flat points-per-percent
+  // constant this project has no basis for.
+  function ouSignalValue(sport, g, proj, line) {
+    if (sport !== "WNBA") return [null, 0];
+    var away = teamOuPct(g.ouAwayWins, g.ouAwayLosses);
+    var home = teamOuPct(g.ouHomeWins, g.ouHomeLosses);
+    if (away[0] === null || home[0] === null) return [null, 0];
+    var combined = Math.min(OU_CLAMP[1], Math.max(OU_CLAMP[0], (away[0] + home[0]) / 2));
+    var value = marketImpliedTotal(proj, line, combined);
+    // The smaller of the two counts, not the larger: a thin record on one side
+    // still limits how much the pair can vote -- the general rule in this
+    // model that a weak leg limits the whole signal.
+    return [value, Math.min(away[1], home[1])];
+  }
+
+  function buildSignals(sport, g, marketMean, modelTotal, trust, ou) {
     var includeH2h = sport !== "WNBA";
+    var includeOu = sport === "WNBA";
     var h2hGames = includeH2h && isNum(g.h2hGames) ? g.h2hGames : 0;
     var h2hValue = includeH2h && isNum(g.h2hAvg) && h2hGames > 0 ? g.h2hAvg : null;
 
@@ -1275,20 +1345,28 @@
     // averaging the two is the neutral estimate for a game between them.
     var formValue = haveForm ? (g.formAway + g.formHome) / 2 : null;
 
+    var ouValue = ou[0], ouGames = ou[1];
+
     var sig = [{ name: "Matchup model", value: modelTotal, games: 1, weight: 0, lean: 0 }];
     if (includeH2h) {
       sig.push({ name: "Head to head", value: h2hValue, games: h2hGames, weight: 0, lean: 0 });
     }
     sig.push({ name: "Recent form", value: formValue, games: formGames, weight: 0, lean: 0 });
+    if (includeOu) {
+      sig.push({ name: "O/U record", value: ouValue, games: ouGames, weight: 0, lean: 0 });
+    }
     sig.forEach(function (s) { s.present = s.value !== null && s.games > 0; });
 
     var h2h = includeH2h ? sig[1] : null;
-    var form = sig[sig.length - 1];
+    var form = sig.filter(function (s) { return s.name === "Recent form"; })[0];
+    var ouSig = includeOu ? sig[sig.length - 1] : null;
     var wH = h2h && h2h.present ? trust * H2H_SHARE * ramp(h2hGames, H2H_FULL[sport]) : 0;
     var wF = form.present ? trust * FORM_SHARE * ramp(formGames, FORM_FULL[sport]) : 0;
+    var wO = ouSig && ouSig.present ? trust * OU_SHARE * ramp(ouGames, OU_FULL[sport] || 1) : 0;
     if (h2h) h2h.weight = wH;
     form.weight = wF;
-    sig[0].weight = trust - wH - wF;
+    if (ouSig) ouSig.weight = wO;
+    sig[0].weight = trust - wH - wF - wO;
 
     sig.forEach(function (s) {
       if (s.present) s.lean = s.value - marketMean;
@@ -1358,6 +1436,24 @@
         badFields.push(pair[0]);
       }
     });
+
+    // A record this lopsided is more likely wins and losses swapped than a
+    // real season-long market miss.
+    if (sport === "WNBA") {
+      [["away", g.ouAwayWins, g.ouAwayLosses, "ouAwayWins", "ouAwayLosses"],
+       ["home", g.ouHomeWins, g.ouHomeLosses, "ouHomeWins", "ouHomeLosses"]]
+        .forEach(function (row) {
+          var side = row[0], w = row[1], l = row[2];
+          var pg = teamOuPct(w, l);
+          if (pg[0] !== null && pg[1] >= 8 && (pg[0] < OU_CLAMP[0] || pg[0] > OU_CLAMP[1])) {
+            var t = g[side] || {}, nm = t.name || side;
+            out.push("the " + nm + " over/under record (" + w + "-" + l + ") reads " +
+                     Math.round(100 * pg[0]) + "% over, unusually lopsided for a season — " +
+                     "check that entry");
+            badFields.push(row[3], row[4]);
+          }
+        });
+    }
     return out;
   }
 
@@ -1374,7 +1470,8 @@
     // this model reproduces it puts the line into the projection's own units.
     var marketMean = marketImpliedTotal(proj, line, 0.5);
 
-    var signals = buildSignals(sport, g, marketMean, modelTotal, trust);
+    var ou = ouSignalValue(sport, g, proj, line);
+    var signals = buildSignals(sport, g, marketMean, modelTotal, trust, ou);
     var projected = marketMean;
     signals.forEach(function (s) { if (s.present) projected += s.weight * s.lean; });
 
@@ -1413,8 +1510,13 @@
 
     var corroborated = signals.slice(1).some(function (s) { return s.present && s.weight > 0; });
     if (!corroborated) {
-      downgrades.push("no head-to-head or recent form to corroborate it");
-      dnotes.push("Only the matchup model voted. Filling in either trend would confirm the " +
+      // Named dynamically, same as the dissent message above: which trends
+      // even apply differs by sport (WNBA has no head-to-head; only WNBA has
+      // an over/under record).
+      var trendNames = signals.slice(1).map(function (s) { return s.name.toLowerCase(); })
+        .join(" or ");
+      downgrades.push("no " + trendNames + " to corroborate it");
+      dnotes.push("Only the matchup model voted. Filling in a trend would confirm the " +
         "read or catch a bad input, and could put the band back up.");
     }
 
@@ -1465,7 +1567,8 @@
     wnba: {
       away: { name: "Liberty", pace: 80.4, offRating: 112.1, defRating: 107.4, restDays: 1 },
       home: { name: "Fever", pace: 82.8, offRating: 114.6, defRating: 107.9, restDays: 2 },
-      line: 191.5, formAway: 186, formHome: 194, formGames: 5
+      line: 191.5, formAway: 186, formHome: 194, formGames: 5,
+      ouAwayWins: 20, ouAwayLosses: 14, ouHomeWins: 20, ouHomeLosses: 11
     }
   };
 
@@ -1551,6 +1654,7 @@
         "Leave a box blank rather than typing 0 — a zero is read as unknown, and says so in the " +
         "verdict.";
       $("h2h-fields").hidden = false;
+      $("ou-fields").hidden = true;
       $("trends-lede").textContent =
         "Two independent reads on the same game. Leave either blank and it simply doesn't vote " +
         "— but a verdict with nothing to corroborate it loses a confidence band, because then " +
@@ -1572,20 +1676,24 @@
         "worth " + WNBA.HCA + " combined points in every projection — there's no separate field " +
         "for it because it isn't a per-team number, it applies to whichever side is listed as Home.";
       $("h2h-fields").hidden = true;
+      $("ou-fields").hidden = false;
       $("trends-lede").textContent =
         "Head to head is left out for WNBA: two teams usually meet only 1-3 times a season, so " +
         "there's rarely a real sample behind it, and a single lopsided game can swing the average " +
-        "by double digits. Recent form is the one trend that votes here.";
-      $("trends-hint").textContent =
-        "Recent form is the average total in each team's own last N games, and here it is the " +
-        "only trend with a vote. Leave it blank and the matchup model — which already prices in " +
-        "pace, ratings, rest, and home court — carries the whole projection on its own.";
+        "by double digits. Recent form and each team's own record against the total vote instead.";
+      $("trends-hint").innerHTML =
+        "Recent form is the average total in each team's own last N games. " +
+        "<b>O/U record</b> is that team's own season-long wins and losses against whatever total " +
+        "was posted for its games — e.g. Covers' team pages. It votes as a probability, not a " +
+        "score, and the share it earns is a guess, not something backtested yet like the other " +
+        "three — flag it as a rough one until more games are logged with it. Leave either trend " +
+        "blank and the matchup model — which already prices in pace, ratings, rest, and home " +
+        "court — carries more of the projection on its own.";
       $("formAwayLabel").textContent = "Away — avg total, last N";
       $("formHomeLabel").textContent = "Home — avg total, last N";
     }
 
-    $("sig-count-label").textContent =
-      state.sport === "mlb" ? "The three signals" : "The two signals";
+    $("sig-count-label").textContent = "The three signals";
     $("trust-hint").textContent = state.sport === "mlb"
       ? "How far the three signals may pull the projection away from the posted total. At 0.50 " +
         "they get half the distance. At 0.00 the projection is simply the line and nothing is " +
@@ -1594,9 +1702,10 @@
         "only earns its full share with a full sample behind it."
       : "How far the signals may pull the projection away from the posted total. At 0.50 they " +
         "get half the distance. At 0.00 the projection is simply the line and nothing is ever a " +
-        "play. The matchup model always keeps at least half of whatever you allow; recent form " +
-        "gets the rest, and only earns its full share with a full sample behind it. Head to " +
-        "head is excluded for WNBA (see Trends).";
+        "play. The matchup model always keeps at least half of whatever you allow. The other " +
+        "half goes to the trends, split three to two in recent form's favour over the O/U " +
+        "record, and each only earns its full share with a full sample behind it. Head to head " +
+        "is excluded for WNBA (see Trends).";
 
     // League baselines live with the settings, not the game: they describe the
     // season, and every one of them sits in a denominator where a stale value
@@ -1614,7 +1723,8 @@
         "randomness in it, so a dozen games settle it.</p>";
 
     if (!$("line").value) $("line").value = ex.line;
-    ["h2hAvg", "h2hGames", "formAway", "formHome", "formGames"].forEach(function (k) {
+    ["h2hAvg", "h2hGames", "formAway", "formHome", "formGames",
+     "ouAwayWins", "ouAwayLosses", "ouHomeWins", "ouHomeLosses"].forEach(function (k) {
       if (!$(k).value && ex[k] !== undefined) $(k).value = ex[k];
     });
 
@@ -1637,7 +1747,8 @@
       $("windMphOut").value = ex.windMphOut;
       $("dome").checked = !!ex.dome;
     }
-    ["line", "h2hAvg", "h2hGames", "formAway", "formHome", "formGames"].forEach(function (k) {
+    ["line", "h2hAvg", "h2hGames", "formAway", "formHome", "formGames",
+     "ouAwayWins", "ouAwayLosses", "ouHomeWins", "ouHomeLosses"].forEach(function (k) {
       $(k).value = ex[k] !== undefined ? ex[k] : "";
     });
     viewingId = null;
@@ -1737,7 +1848,8 @@
     // from an earlier MLB session would otherwise ride along into g and be judged
     // by qualityFlags against a range it was never entered for.
     var trendKeys = state.sport === "wnba"
-      ? ["formAway", "formHome", "formGames"]
+      ? ["formAway", "formHome", "formGames", "ouAwayWins", "ouAwayLosses",
+         "ouHomeWins", "ouHomeLosses"]
       : ["h2hAvg", "h2hGames", "formAway", "formHome", "formGames"];
     trendKeys.forEach(function (k) {
       var v = num(k);
@@ -2417,6 +2529,10 @@
     snap.trends["Away form avg"] = num("formAway");
     snap.trends["Home form avg"] = num("formHome");
     snap.trends["Form games"] = num("formGames");
+    snap.trends["Away O/U wins"] = num("ouAwayWins");
+    snap.trends["Away O/U losses"] = num("ouAwayLosses");
+    snap.trends["Home O/U wins"] = num("ouHomeWins");
+    snap.trends["Home O/U losses"] = num("ouHomeLosses");
     snap.settings.Line = num("line");
     snap.settings.Trust = num("trust");
     return snap;

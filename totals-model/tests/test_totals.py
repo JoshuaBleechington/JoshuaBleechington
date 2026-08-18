@@ -767,7 +767,9 @@ class TestConfidenceModel(unittest.TestCase):
 
     def test_no_trend_data_at_all_is_itself_a_downgrade(self):
         bare = run_verdict("mlb", self.mlb_game(line=6.5, h2h=None, form=None))
-        self.assertIn("no head-to-head or recent form", " ".join(bare["downgrades"]))
+        # Named after the signals themselves, same as the dissent message below,
+        # so no hyphen: this is generated, not hand-written prose.
+        self.assertIn("no head to head or recent form", " ".join(bare["downgrades"]))
 
     def test_a_blank_starter_costs_confidence_rather_than_earning_it(self):
         g = self.mlb_game(line=6.5)
@@ -911,9 +913,79 @@ class TestConfidenceModel(unittest.TestCase):
         r = run_verdict("wnba", self.wnba_game(line=160.0))
         self.assertEqual(r["side"], "OVER")
         self.assertIn(r["band"], BANDS)
-        # Two signals, not three: basketball has no head-to-head vote.
+        # Three signals, not the MLB three: no head-to-head, but an O/U record
+        # slot exists even when nothing was entered for it (present at weight 0,
+        # not absent -- unlike head-to-head, which never appears for WNBA at all).
         self.assertEqual([s["name"] for s in r["signals"]],
-                         ["Matchup model", "Recent form"])
+                         ["Matchup model", "Recent form", "O/U record"])
+        ou = [s for s in r["signals"] if s["name"] == "O/U record"][0]
+        self.assertIsNone(ou["value"])
+        self.assertEqual(ou["weight"], 0.0)
+
+    def test_an_over_under_record_votes_for_wnba(self):
+        g = self.wnba_game(line=160.0, trust=1.0,
+                           over_under_record={"away": {"wins": 22, "losses": 8},
+                                              "home": {"wins": 20, "losses": 10}})
+        r = run_verdict("wnba", g)
+        ou = [s for s in r["signals"] if s["name"] == "O/U record"][0]
+        self.assertIsNotNone(ou["value"])
+        self.assertGreater(ou["weight"], 0.0)
+        self.assertEqual(ou["side"], "OVER")   # both teams run hot on overs
+        # The matchup model still keeps at least half of trust, same invariant
+        # as MLB's head-to-head + recent form.
+        matchup = [s for s in r["signals"] if s["name"] == "Matchup model"][0]
+        self.assertGreaterEqual(matchup["weight"], 0.5)
+
+    def test_the_over_under_record_does_not_vote_for_mlb(self):
+        g = self.mlb_game(over_under_record={"away": {"wins": 22, "losses": 8},
+                                             "home": {"wins": 20, "losses": 10}})
+        r = run_verdict("mlb", g)
+        self.assertNotIn("O/U record", [s["name"] for s in r["signals"]])
+
+    def test_a_thinner_over_under_record_earns_less_weight(self):
+        thin = self.wnba_game(line=160.0, trust=1.0,
+                              over_under_record={"away": {"wins": 3, "losses": 1},
+                                                 "home": {"wins": 20, "losses": 10}})
+        full = self.wnba_game(line=160.0, trust=1.0,
+                              over_under_record={"away": {"wins": 24, "losses": 8},
+                                                 "home": {"wins": 20, "losses": 10}})
+        w = lambda r: [s for s in r["signals"] if s["name"] == "O/U record"][0]["weight"]
+        self.assertLess(w(run_verdict("wnba", thin)), w(run_verdict("wnba", full)))
+
+    def test_a_swapped_over_under_record_flags_itself(self):
+        """22-8 read as 8-22 is the same typo shape as the 401-innings bug --
+
+        a plausible-looking number that is actually backwards. A record this
+        lopsided this deep into a season is far likelier to be a data-entry
+        slip than a real season-long market miss.
+        """
+        g = self.wnba_game(line=160.0,
+                           over_under_record={"away": {"wins": 2, "losses": 22},
+                                              "home": {"wins": 20, "losses": 10}})
+        r = run_verdict("wnba", g)
+        self.assertTrue(any("unusually lopsided" in f for f in r["flags"]), r["flags"])
+
+    def test_a_half_entered_over_under_record_is_not_a_perfect_one(self):
+        """wins with no losses key must not read as 100% -- the same shape of
+
+        bug as the blank ERA read as 0.00: a half-filled field silently
+        becoming an extreme, convincing-looking number.
+        """
+        g = self.wnba_game(line=160.0,
+                           over_under_record={"away": {"wins": 20},
+                                              "home": {"wins": 20, "losses": 10}})
+        r = run_verdict("wnba", g)
+        ou = [s for s in r["signals"] if s["name"] == "O/U record"][0]
+        self.assertIsNone(ou["value"])
+        self.assertEqual(ou["weight"], 0.0)
+
+    def test_a_thin_over_under_record_is_not_flagged(self):
+        """Early season, 3-1 is just a small sample, not a typo."""
+        g = self.wnba_game(line=160.0,
+                           over_under_record={"away": {"wins": 3, "losses": 1},
+                                              "home": {"wins": 20, "losses": 10}})
+        r = run_verdict("wnba", g)
+        self.assertEqual([f for f in r["flags"] if "unusually lopsided" in f], [])
 
     def test_basketball_head_to_head_does_not_vote_at_all(self):
         """Absent, not merely weightless.

@@ -635,6 +635,11 @@
   .chip-medium { background: var(--accent-wash); color: var(--accent-ink); }
   .chip-low    { background: var(--surface-2);   color: var(--ink-2); }
   .chip-none   { background: transparent; color: var(--muted); border: 1px dashed var(--rule-strong); }
+
+  /* Sport filter on the track record. It narrows what is shown, never what is
+     stored — the export buttons always act on the whole log. */
+  .log-filter { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 14px; margin: 0 0 16px; }
+  .log-filter .hint { flex: 1 1 260px; }
 </style>
 
 <div class="wrap">
@@ -838,6 +843,15 @@
 
   <!-- ================= TRACK RECORD ================= -->
   <div id="log-view" hidden>
+    <div class="log-filter">
+      <div class="sports" role="tablist" aria-label="Which sport's record">
+        <button type="button" id="filter-all" aria-pressed="true">Both</button>
+        <button type="button" id="filter-mlb" aria-pressed="false">MLB</button>
+        <button type="button" id="filter-wnba" aria-pressed="false">WNBA</button>
+      </div>
+      <p class="hint">Filters everything below — summary, bands, games. Copy report, CSV,
+        Save log and Erase always cover the whole log, both sports.</p>
+    </div>
     <section class="card">
       <header><h2>Summary</h2></header>
       <div class="tiles" id="summary"></div>
@@ -1469,7 +1483,16 @@
     ]
   };
 
-  var state = { sport: "mlb" };
+  var state = { sport: "mlb", logFilter: "all" };
+
+  // What the track record reads. The filter narrows the view, never the store:
+  // exports and Erase act on store.entries directly, so nothing shown here can
+  // make a backup or a wipe quietly cover half the log.
+  function logEntries() {
+    if (state.logFilter === "all") return store.entries;
+    var want = state.logFilter.toUpperCase();
+    return store.entries.filter(function (e) { return e.sport === want; });
+  }
   var $ = function (id) { return document.getElementById(id); };
 
   function renderSources() {
@@ -2490,12 +2513,13 @@
   }
 
   function renderSummary() {
-    var backed = store.entries.filter(function (e) { return e.status === "backed"; });
+    var entries = logEntries();
+    var backed = entries.filter(function (e) { return e.status === "backed"; });
     var s = summarise(backed);
-    var settled = store.entries.filter(function (e) { return gradeOf(e) !== null; });
+    var settled = entries.filter(function (e) { return gradeOf(e) !== null; });
     var html =
-      tile("Logged", store.entries.length,
-           backed.length + " backed, " + (store.entries.length - backed.length) + " passed") +
+      tile("Logged", entries.length,
+           backed.length + " backed, " + (entries.length - backed.length) + " passed") +
       tile("Settled", settled.length, "") +
       tile("Your record", s.w + "-" + s.l + (s.p ? "-" + s.p : ""),
            s.hitRate === null ? "no decided games yet" : pct(s.hitRate) + " hit rate", true) +
@@ -2523,8 +2547,9 @@
      really a coin flip, and skipping it is the normal thing to do, so the row
      could only ever contain the handful of times the advice was overridden. */
   function renderBandCheck() {
+    var entries = logEntries();
     var rows = BAND_ORDER.map(function (b) {
-      var sub = store.entries.filter(function (e) { return e.band === b; });
+      var sub = entries.filter(function (e) { return e.band === b; });
       var took = sub.filter(function (e) { return e.status === "backed"; }).length;
       return { band: b, n: sub.length, took: took, s: summarise(sub) };
     }).filter(function (r) { return r.n > 0; });
@@ -2581,8 +2606,16 @@
     renderSummary();
     renderBandCheck();
 
-    $("log-empty").hidden = store.entries.length > 0;
-    if (!store.entries.length) {
+    var entries = logEntries();
+    var emptyMsg = !store.entries.length
+      ? "No games yet. Work one out on the Verdict tab and log it."
+      : !entries.length
+        ? "Nothing logged for " + state.logFilter.toUpperCase() +
+          " yet. The filter above is showing one sport only."
+        : "";
+    $("log-empty").hidden = !emptyMsg;
+    if (emptyMsg) $("log-empty").innerHTML = "<p>" + emptyMsg + "</p>";
+    if (!entries.length) {
       $("log-table").innerHTML = "";
       renderStorageWarning();
       return;
@@ -2592,7 +2625,7 @@
       "<th>Game</th><th>Band</th><th>Pick</th><th>Line</th><th>Win%</th>" +
       "<th>Final</th><th>Result</th><th></th></tr></thead><tbody>";
 
-    store.entries.forEach(function (e) {
+    entries.forEach(function (e) {
       var g = gradeOf(e);
       var resCell = g === "W" ? "<b style='color:var(--good)'>W</b>"
         : g === "L" ? "<b style='color:var(--under)'>L</b>"
@@ -3055,7 +3088,18 @@
     $("line").value = "";
   }
 
+  function setLogFilter(which) {
+    state.logFilter = which;
+    ["all", "mlb", "wnba"].forEach(function (k) {
+      $("filter-" + k).setAttribute("aria-pressed", String(which === k));
+    });
+    renderLog();
+  }
+
   function setSport(sport) {
+    // In the track record the sport tabs double as the filter: picking MLB
+    // there means "show me the MLB record". Both lives in the filter row.
+    if (!$("log-view").hidden) setLogFilter(sport);
     if (state.sport === sport) return;
     state.sport = sport;
     viewingId = null;
@@ -3069,6 +3113,9 @@
   $("view-log").addEventListener("click", function () { setView("log"); });
   $("tab-mlb").addEventListener("click", function () { setSport("mlb"); });
   $("tab-wnba").addEventListener("click", function () { setSport("wnba"); });
+  $("filter-all").addEventListener("click", function () { setLogFilter("all"); });
+  $("filter-mlb").addEventListener("click", function () { setLogFilter("mlb"); });
+  $("filter-wnba").addEventListener("click", function () { setLogFilter("wnba"); });
   $("load-example").addEventListener("click", loadExample);
   $("clear-fields").addEventListener("click", clearForm);
   $("log-bet").addEventListener("click", function () { logCurrent("backed"); });

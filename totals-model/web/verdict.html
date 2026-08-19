@@ -645,6 +645,15 @@
      stored — the export buttons always act on the whole log. */
   .log-filter { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 14px; margin: 0 0 16px; }
   .log-filter .hint { flex: 1 1 260px; }
+
+  /* The only feedback a log action gets used to live solely in the mobile
+     bar, which is display:none above 940px -- so on desktop, clicking Log as
+     backed/passed, hitting the duplicate guard, or forgetting a line all
+     looked identical: nothing visibly happened. This is that feedback, where
+     a desktop user can actually see it. */
+  #log-status:empty { display: none; }
+  #log-status.ok   { color: var(--good); font-weight: 650; }
+  #log-status.warn { color: var(--bad); font-weight: 650; }
 </style>
 
 <div class="wrap">
@@ -858,6 +867,7 @@
             <button type="button" class="btn primary" id="log-bet">Log as backed</button>
             <button type="button" class="btn" id="log-skip">Log as passed</button>
           </div>
+          <p class="hint" id="log-status" aria-live="polite"></p>
           <p class="hint">
             Backed means you took the side. Passed means you recorded it and didn't. Both grade
             once you enter the final score, so the track record can tell you whether the bands
@@ -2558,17 +2568,28 @@
 
   /* The same game logged twice quietly doubles its weight in the band table,
      and the band table is the only thing this page is trying to measure. */
+  // Same team, same line, but a DIFFERENT day is not a duplicate -- division
+  // rivals meet a dozen-plus times a season and commonly land on the same
+  // posted total more than once. Without the day check, a genuine rematch
+  // silently ate the log attempt: the duplicate guard fired, nothing saved,
+  // and (until the fix below) there was no visible sign anything had
+  // happened at all.
+  function loggedDay(dateStr) {
+    return String(dateStr).split(",")[0];
+  }
+
   function duplicateOf(r) {
+    var today = loggedDay(new Date().toLocaleString());
     return store.entries.filter(function (e) {
       return e.sport === r.sport && e.away === r.away && e.home === r.home &&
-             e.line === r.line;
+             e.line === r.line && loggedDay(e.date) === today;
     })[0] || null;
   }
 
   var pendingDuplicate = null;
 
   function logCurrent(status) {
-    if (!last) { flash("Enter a line first."); return; }
+    if (!last) { flash("Enter a line first.", "warn"); return; }
     var r = last.result;
     // Same reason as everything else here: confirm() is ignored in this
     // sandbox, so a duplicate asks for a second press instead of a dialog.
@@ -2576,7 +2597,7 @@
     if (dupe && pendingDuplicate !== r.away + r.home + r.line) {
       pendingDuplicate = r.away + r.home + r.line;
       setTimeout(function () { pendingDuplicate = null; }, 5000);
-      flash("Already logged — press again");
+      flash("Already logged today — press again to log it anyway", "warn", 5000);
       return;
     }
     pendingDuplicate = null;
@@ -2603,14 +2624,20 @@
     saveStore();
     renderLog();
     $("log-note").value = "";
-    flash(status === "backed" ? "Logged as backed." : "Logged as passed.");
+    flash(status === "backed" ? "Logged as backed." : "Logged as passed.", "ok");
   }
 
-  function flash(msg) {
+  function flash(msg, kind, ms) {
+    var dur = ms || 1400;
     var el = $("mb-verdict");
     var prev = el.innerHTML;
     el.innerHTML = '<span class="band band-low">' + esc(msg) + "</span>";
-    setTimeout(function () { if (last) render(last.result); else el.innerHTML = prev; }, 1400);
+    setTimeout(function () { if (last) render(last.result); else el.innerHTML = prev; }, dur);
+
+    var status = $("log-status");
+    status.textContent = msg;
+    status.className = "hint " + (kind === "warn" ? "warn" : "ok");
+    setTimeout(function () { status.textContent = ""; status.className = "hint"; }, dur);
   }
 
   function gradeOf(e) {

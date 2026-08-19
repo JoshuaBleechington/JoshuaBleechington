@@ -1660,11 +1660,14 @@
         "adjusts its own season numbers here. Negative wind means blowing in; weather is capped " +
         "at ±5% either way.</p>";
       $("teams-hint").innerHTML =
-        "Starter ERA is regressed toward league average by the season innings behind it — a 7.80 " +
+        "Starter ERA is regressed toward league average by the innings behind it — a 7.80 " +
         "over 40 innings is mostly noise. <b>FIP or xERA works better than ERA</b>. <b>Avg IP</b> " +
-        "is season IP ÷ games started; it splits the game between the starter and the pen. " +
+        "is that innings total ÷ games started; it splits the game between the starter and the pen. " +
         "Leave a box blank rather than typing 0 — a zero is read as unknown, and says so in the " +
-        "verdict.";
+        "verdict. Season isn't the only option: swap in a starter's last 5 (or any) starts by " +
+        "entering that stretch's ERA, its total innings, and its average IP per start together — " +
+        "just the three as a set. A short stretch regresses harder toward average, as it should, " +
+        "and reads as a thin-sample flag below 40 innings.";
       $("h2h-fields").hidden = false;
       $("ou-fields").hidden = true;
       $("trends-lede").textContent =

@@ -765,6 +765,40 @@ class TestConfidenceModel(unittest.TestCase):
                       " ".join(dissent["downgrades"]))
         self.assertLess(BANDS_ORDER[dissent["band"]], BANDS_ORDER[agree["band"]])
 
+    def test_one_doubt_on_an_earned_low_lands_on_lean_not_no_play(self):
+        """LEAN exists so a real read with one doubt still names a side.
+
+        On the logged games, NO PLAY hit 58.8% whether a game landed there by
+        earning it outright or by being knocked all the way down -- evidence
+        that blanket silence past LOW was hiding real reads, not protecting
+        against bad ones. This is the model choosing not to be silent there.
+        """
+        g = self.mlb_game(line=8.0)
+        g["away"]["starter_season_ip"] = 30  # one thin-input flag, nothing else
+        r = run_verdict("mlb", g)
+        self.assertEqual(len(r["downgrades"]), 1)
+        self.assertEqual(r["band"], "LEAN")
+        self.assertIn(r["side"], ("OVER", "UNDER"))
+        self.assertGreater(r["win_pct"], 0.5)
+
+    def test_two_doubts_on_an_earned_low_still_reach_no_play(self):
+        """LEAN absorbs exactly one doubt. A second still empties it out."""
+        g2 = self.mlb_game(line=8.0, h2h={"avg_total": 3.0, "games": 8})
+        g2["away"]["starter_season_ip"] = 30
+        r2 = run_verdict("mlb", g2)
+        self.assertGreaterEqual(len(r2["downgrades"]), 2)
+        self.assertEqual(r2["band"], "NO PLAY")
+
+    def test_lean_is_never_earned_directly(self):
+        """A game can only arrive at LEAN by losing a step from LOW+; a raw
+
+        win probability never lands there on its own, so a clean read with no
+        doubts is always exactly NO PLAY or LOW, never LEAN.
+        """
+        from totals.confidence import band_for
+        for wp in (0.505, 0.515, 0.519, 0.520, 0.530, 0.544):
+            self.assertIn(band_for(wp), ("NO PLAY", "LOW"))
+
     def test_no_trend_data_at_all_is_itself_a_downgrade(self):
         bare = run_verdict("mlb", self.mlb_game(line=6.5, h2h=None, form=None))
         # Named after the signals themselves, same as the dissent message below,

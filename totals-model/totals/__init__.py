@@ -105,7 +105,9 @@ def run_verdict(sport: str, game: dict) -> dict:
 
 def run_verdict_slate(sport: str, games: list[dict]) -> list[dict]:
     """Grade a slate, strongest read first."""
-    order = {"HIGH": 3, "MEDIUM": 2, "LOW": 1, "NO PLAY": 0}
+    # Derived from confidence.BANDS rather than hand-listed, so adding a band
+    # there (LEAN was) can't silently leave this ranking one step behind.
+    order = {b: i for i, b in enumerate(confidence.BANDS)}
     results = [run_verdict(sport, g) for g in games]
     results.sort(key=lambda r: (order[r["band"]], r["win_pct"]), reverse=True)
     return results

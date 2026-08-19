@@ -322,6 +322,16 @@ the market. Nothing knocks it up. That asymmetry is deliberate. Four separate
 faults in this model's history all presented as unusually high confidence, so an
 exceptional number is a reason to check the inputs before it is a reason to bet.
 
+**LEAN sits one step below LOW.** A game that earned LOW or better but took
+exactly one doubt still names a side — a weaker version of a real read, not
+nothing. Two doubts still empty it all the way to NO PLAY. LEAN is never earned
+directly from a win probability; a game only lands there by losing a step, which
+keeps its meaning fixed. It exists because NO PLAY, on the logged games, hit
+58.8% (n=34) whether a game landed there by earning it outright or by being
+knocked down to it — the *reason* said less than the raw number did, which was
+the case for not treating every downgrade past LOW as silence. n=34 is thin;
+revisit past the ~50 games per band the track record page already asks for.
+
 **Impossible numbers name themselves.** Every field has a physical range —
 not "unlikely", *impossible* — and anything outside it is flagged by name, marks
 the offending box on the form, and costs a confidence band. A typo does not

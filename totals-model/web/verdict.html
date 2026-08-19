@@ -594,6 +594,10 @@
   .band-high   { background: var(--good-wash);   color: var(--good);   border: 1.5px solid var(--good); }
   .band-medium { background: var(--accent-wash); color: var(--accent-ink); border: 1.5px solid var(--accent); }
   .band-low    { background: var(--surface-2);   color: var(--ink-2);  border: 1.5px solid var(--rule-strong); }
+  /* Solid border, same language as LOW: a real pick, not the dashed "not a
+     pick" language NO PLAY uses. Muted colour marks it the weakest of the
+     three that still print a side. */
+  .band-lean   { background: transparent;        color: var(--muted);  border: 1.5px solid var(--rule-strong); }
   .band-none   { background: transparent;        color: var(--muted);  border: 1.5px dashed var(--rule-strong); }
   .band-line { font-size: 13.5px; color: var(--ink-2); line-height: 1.5; flex: 1 1 220px; min-width: 0; }
   .band-line b { color: var(--ink); font-family: var(--mono); font-weight: 700; }
@@ -634,6 +638,7 @@
   .chip-high   { background: var(--good-wash);   color: var(--good); }
   .chip-medium { background: var(--accent-wash); color: var(--accent-ink); }
   .chip-low    { background: var(--surface-2);   color: var(--ink-2); }
+  .chip-lean   { background: transparent; color: var(--muted); border: 1px solid var(--rule-strong); }
   .chip-none   { background: transparent; color: var(--muted); border: 1px dashed var(--rule-strong); }
 
   /* Sport filter on the track record. It narrows what is shown, never what is
@@ -1220,7 +1225,14 @@
   ===================================================================== */
 
   var BAND_HIGH = 0.580, BAND_MEDIUM = 0.545, BAND_LOW = 0.520;
-  var BANDS = ["NO PLAY", "LOW", "MEDIUM", "HIGH"];
+  // LEAN is landing-only: bandFor() never returns it directly. A game only
+  // arrives here by earning LOW or better and losing exactly one step to a
+  // downgrade -- a real read with one doubt attached, still worth a side,
+  // not the silence NO PLAY is for. On the logged games NO PLAY hit 58.8%
+  // (n=34) whether a game earned it outright or was knocked all the way down
+  // to it -- evidence the *reason* a game lands there said less than the raw
+  // win probability did. Revisit past ~50 games per band; n=34 isn't that.
+  var BANDS = ["NO PLAY", "LEAN", "LOW", "MEDIUM", "HIGH"];
 
   // Head-to-head and recent form are real information and weak information:
   // small samples of games played by different pitchers and sometimes different
@@ -1916,7 +1928,7 @@
     last = null;
   }
 
-  var BAND_CLASS = { HIGH: "high", MEDIUM: "medium", LOW: "low", "NO PLAY": "none" };
+  var BAND_CLASS = { HIGH: "high", MEDIUM: "medium", LOW: "low", LEAN: "lean", "NO PLAY": "none" };
 
   function render(r) {
     var unit = r.sport === "MLB" ? "runs" : "points";
@@ -2603,7 +2615,7 @@
     return (f > e.line) === (e.side === "OVER") ? "W" : "L";
   }
 
-  var BAND_ORDER = ["HIGH", "MEDIUM", "LOW", "NO PLAY"];
+  var BAND_ORDER = ["HIGH", "MEDIUM", "LOW", "LEAN", "NO PLAY"];
 
   function summarise(entries) {
     var w = 0, l = 0, p = 0, expected = 0, variance = 0;
@@ -3012,7 +3024,7 @@
     var out = [];
     blocks.forEach(function (b, n) {
       var head = b.match(/^(\d+)\.\s+(.*?)\s+@\s+(.*?)\s+\((MLB|WNBA)\s+·\s+(.*?)\s+·\s+(BACKED|PASSED)\)/);
-      var vd = b.match(/Verdict\s+(HIGH|MEDIUM|LOW|NO PLAY)\s+(OVER|UNDER)\s+·\s+win\s+([\d.]+)%\s+·\s+line\s+([\d.]+)(\s+\[earned (HIGH|MEDIUM|LOW|NO PLAY)\])?/);
+      var vd = b.match(/Verdict\s+(HIGH|MEDIUM|LOW|LEAN|NO PLAY)\s+(OVER|UNDER)\s+·\s+win\s+([\d.]+)%\s+·\s+line\s+([\d.]+)(\s+\[earned (HIGH|MEDIUM|LOW|LEAN|NO PLAY)\])?/);
       var md = b.match(/Model\s+([\d.]+) raw → ([\d.]+) projected\s+vs a line reading ([\d.]+)/);
       if (!head || !vd || !md) return;
 

@@ -27,6 +27,18 @@ Three consequences follow from that, and they are the whole design:
   deliberate: an unusually strong number is a reason for suspicion before it is
   a reason for conviction.
 
+  LEAN sits one step below LOW for exactly this reason. A game whose numbers
+  earned LOW or better, but that took a single doubt, still deserves a side --
+  it is a weaker version of a real read, not nothing. NO PLAY is reserved for
+  the games that never earned a read in the first place (win probability under
+  52% on the raw numbers) or that took enough doubts to fall all the way
+  through. On the logged games so far, NO PLAY as a whole hit 58.8% (n=34) --
+  identical whether a game got there by earning it outright or by being
+  knocked down -- which is itself evidence the *reason* a game lands there
+  says less than the raw win probability does. Revisit this band once each
+  tier has the ~50 games the track record page says it needs to mean anything;
+  n=34 is not that.
+
 Park factors apply only to the park being played in. A team's own park does not
 adjust its season rates here. That is a deliberate simplification: it costs a
 little accuracy for road teams from extreme parks, and it removes a per-team
@@ -50,7 +62,12 @@ BAND_HIGH = 0.580
 BAND_MEDIUM = 0.545
 BAND_LOW = 0.520
 
-BANDS = ("NO PLAY", "LOW", "MEDIUM", "HIGH")
+# LEAN is landing-only: nothing is ever assessed as LEAN directly from win
+# probability (see band_for) -- a game only arrives here by earning LOW or
+# better and then losing exactly one step to a downgrade. That keeps the
+# meaning fixed: LEAN always means "a real read, but with one doubt attached,"
+# never "a slightly-below-coin-flip number that got rounded up."
+BANDS = ("NO PLAY", "LEAN", "LOW", "MEDIUM", "HIGH")
 
 # --- how much of the trust budget the trend signals may claim ----------------
 #

@@ -315,6 +315,20 @@ Revisit the share, the ramp, and the conversion once WNBA games have been
 logged with a record entered, the same way `FORM_SHARE` was checked against
 `H2H_SHARE`.
 
+**`starter_season_ip` isn't tied to a season.** It means "innings behind this
+ERA," full stop — regress_era() shrinks toward league average by whatever
+number goes there, whether that is a full season or a starter's last 5 starts.
+Swap in a shorter window by moving the ERA, this field, and `starter_ip`
+(average IP per start) together as a set; a short window regresses harder
+toward average on its own, which is the correction. There used to be a
+confidence downgrade for anything under 40 innings, calibrated for a season-
+long sample. It was removed by request to run this field as a last-5 window,
+since a real value there is always under 40 by design and the flag would have
+fired on every single game and said nothing. Leaving the field blank or at
+zero still costs a downgrade — an ERA with no innings behind it at all is a
+different, worse problem than a real short one, and is what turned a 0.00 ERA
+into this model's largest false-confidence bet before that check existed.
+
 **Confidence only ever falls.** The win probability sets the ceiling — HIGH at
 58%, MEDIUM at 54.5%, LOW at 52% — and each doubt knocks it down a step:
 signals pointing different ways, thin inputs, a projection implausibly far from

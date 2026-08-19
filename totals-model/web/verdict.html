@@ -1400,9 +1400,12 @@
       if (sport === "MLB") {
         if (!isNum(t.starterSeasonIp) || t.starterSeasonIp <= 0)
           out.push("no season innings for the " + nm + " starter, so he is a league average arm");
-        else if (t.starterSeasonIp < 40)
-          out.push("only " + Math.round(t.starterSeasonIp) + " innings behind the " + nm +
-                   " starter's ERA");
+        // No "only N innings" flag past this by request, to run this field as
+        // a last-5-starts window instead of a season. A real value there is
+        // always under 40 by design, so the old flag would fire on every
+        // single game and say nothing. The blank/zero check above still
+        // stands -- an ERA with genuinely no innings behind it at all is a
+        // different, worse problem than a real short window.
       }
       var ranges = FIELD_RANGES[sport];
       Object.keys(ranges).forEach(function (key) {
@@ -1666,8 +1669,8 @@
         "Leave a box blank rather than typing 0 — a zero is read as unknown, and says so in the " +
         "verdict. Season isn't the only option: swap in a starter's last 5 (or any) starts by " +
         "entering that stretch's ERA, its total innings, and its average IP per start together — " +
-        "just the three as a set. A short stretch regresses harder toward average, as it should, " +
-        "and reads as a thin-sample flag below 40 innings.";
+        "just the three as a set. A short stretch regresses harder toward average on its own, " +
+        "which is the correction; there's no separate thin-sample warning on top of it.";
       $("h2h-fields").hidden = false;
       $("ou-fields").hidden = true;
       $("trends-lede").textContent =

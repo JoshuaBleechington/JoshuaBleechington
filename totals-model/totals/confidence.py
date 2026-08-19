@@ -21,8 +21,8 @@ Three consequences follow from that, and they are the whole design:
 
 * **Confidence can only be lost, never gained.** The band starts at whatever the
   win probability earns, and every doubt -- signals pointing different ways, a
-  starter with nine innings behind him, a projection miles from the market --
-  knocks it down a step. Nothing knocks it up. Four separate faults in this
+  starter with no innings behind him at all, a projection miles from the market
+  -- knocks it down a step. Nothing knocks it up. Four separate faults in this
   project's history all presented as *high* confidence, so the asymmetry is
   deliberate: an unusually strong number is a reason for suspicion before it is
   a reason for conviction.
@@ -385,8 +385,15 @@ def quality_flags(sport: str, game: dict[str, Any], model_total: float,
                 flags.append(
                     f"no season innings for the {name} starter, so he is a league average arm"
                 )
-            elif float(ip) < 40:
-                flags.append(f"only {float(ip):.0f} innings behind the {name} starter's ERA")
+            # No "only N innings" flag past this. There used to be one below 40,
+            # calibrated for a season-long sample. Removed by request to run
+            # this field as a last-5-starts window instead -- a real value
+            # there is always going to be under 40 by design, so the flag would
+            # fire on every single game and say nothing. The blank/zero check
+            # above still stands: an ERA with genuinely no innings behind it at
+            # all is a different, worse problem than a real short window, and
+            # is exactly what turned a 0.00 ERA into this model's largest
+            # false-confidence bet before that check existed.
 
         for key, (lo, hi, label) in FIELD_RANGES[sport].items():
             v = t.get(key)

@@ -774,7 +774,7 @@ class TestConfidenceModel(unittest.TestCase):
         against bad ones. This is the model choosing not to be silent there.
         """
         g = self.mlb_game(line=8.0)
-        g["away"]["starter_season_ip"] = 30  # one thin-input flag, nothing else
+        g["away"]["starter_season_ip"] = 0  # one thin-input flag, nothing else
         r = run_verdict("mlb", g)
         self.assertEqual(len(r["downgrades"]), 1)
         self.assertEqual(r["band"], "LEAN")
@@ -784,7 +784,7 @@ class TestConfidenceModel(unittest.TestCase):
     def test_two_doubts_on_an_earned_low_still_reach_no_play(self):
         """LEAN absorbs exactly one doubt. A second still empties it out."""
         g2 = self.mlb_game(line=8.0, h2h={"avg_total": 3.0, "games": 8})
-        g2["away"]["starter_season_ip"] = 30
+        g2["away"]["starter_season_ip"] = 0
         r2 = run_verdict("mlb", g2)
         self.assertGreaterEqual(len(r2["downgrades"]), 2)
         self.assertEqual(r2["band"], "NO PLAY")
@@ -812,6 +812,21 @@ class TestConfidenceModel(unittest.TestCase):
         r = run_verdict("mlb", g)
         self.assertTrue(any("league average arm" in f for f in r["flags"]))
         self.assertIn("inputs behind it are thin", " ".join(r["downgrades"]))
+
+    def test_a_short_starter_sample_is_not_flagged_on_its_own(self):
+        """The thin-sample flag below 40 innings was removed by request, to run
+
+        this field as a last-5-starts window rather than a season -- a real
+        value there is always under 40 by design, so the old flag would have
+        fired on every game and said nothing. A real, nonzero number, however
+        small, is not itself a reason for a downgrade any more; only a
+        genuinely blank or zero one still is (see the test above).
+        """
+        g = self.mlb_game()
+        g["home"]["starter_season_ip"] = 6  # one start's worth, still a real number
+        r = run_verdict("mlb", g)
+        self.assertEqual(r["flags"], [])
+        self.assertEqual(r["downgrades"], [])
 
     def test_an_impossible_number_names_itself(self):
         """A typo does not announce itself -- it gets absorbed.
@@ -852,7 +867,7 @@ class TestConfidenceModel(unittest.TestCase):
     def test_every_downgrade_carries_a_note_saying_what_to_look_at(self):
         """The headline names a category; the note has to name the number."""
         g = self.mlb_game(line=6.5, h2h={"avg_total": 3.0, "games": 8})
-        g["home"]["starter_season_ip"] = 8
+        g["home"]["starter_season_ip"] = 350  # outside the possible range
         r = run_verdict("mlb", g)
         self.assertTrue(r["downgrades"])
         self.assertEqual(len(r["downgrades"]), len(r["downgrade_notes"]))
@@ -862,7 +877,7 @@ class TestConfidenceModel(unittest.TestCase):
             self.assertTrue(note.rstrip().endswith("."), note)
         joined = " ".join(r["downgrade_notes"])
         self.assertIn("3.0", joined)   # the dissenting head-to-head value
-        self.assertIn("8 innings", joined)   # the thin-sample flag, verbatim
+        self.assertIn("350", joined)   # the out-of-range flag, verbatim
 
     def test_a_clean_verdict_has_no_notes(self):
         r = run_verdict("mlb", self.mlb_game())

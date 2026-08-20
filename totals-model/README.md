@@ -4,6 +4,9 @@ A small, dependency-free model for game totals. You supply a handful of numbers
 per team, it returns a projected total, over/under probabilities, the fair
 price, expected value against the posted odds, and a suggested stake.
 
+WNBA also has a **spread** read — which side covers, and how sure — built on
+the same team inputs. See [The spread verdict](#the-spread-verdict--wnba).
+
 No libraries to install, no API keys, no data pipeline. Python 3.9+ and the
 standard library.
 
@@ -250,8 +253,8 @@ Output keys: `model_total` (raw model), `projected_total` (after shrinkage),
 python3 -m unittest discover -s tests -v
 ```
 
-95 tests, covering the odds math, the distributions, both sport models, the
-shrinkage behaviour and the staking rails.
+129 tests, covering the odds math, the distributions, both sport models, the
+verdict and spread verdicts, the shrinkage behaviour and the staking rails.
 
 ---
 
@@ -302,7 +305,7 @@ signal outright rather than ramping it ever smaller: it never enters the signal
 list, its input is hidden, its range is not checked, and the matchup model keeps
 the share it would have taken.
 
-In its place, WNBA games can vote a team's own win-loss record against the
+In its place, WNBA totals can vote a team's own win-loss record against the
 total — `over_under_record`, wins and losses for each side. That number is a
 *rate* ("the market's line has been right about this team X% of the time"),
 not a *value* like the other three, so it cannot be averaged into a total the
@@ -314,6 +317,11 @@ error on logged games — there is no history with this signal in it yet.
 Revisit the share, the ramp, and the conversion once WNBA games have been
 logged with a record entered, the same way `FORM_SHARE` was checked against
 `H2H_SHARE`.
+
+> **The page no longer runs WNBA on totals** — it runs the spread verdict
+> below. `run_verdict("wnba", …)` still works, and the over/under record
+> signal with it; the library kept the capability, the page changed which
+> question it asks. See **The spread verdict** below for why.
 
 **`starter_season_ip` isn't tied to a season.** It means "innings behind this
 ERA," full stop — regress_era() shrinks toward league average by whatever
@@ -357,6 +365,82 @@ and moved the projection half a run, because 401 clamps quietly to 9.
 does not adjust its season rates here. That costs some accuracy for road teams
 from extreme parks, and removes a per-team input that is easy to enter on the
 wrong scale and silently ruinous when it is.
+
+---
+
+## The spread verdict — WNBA
+
+`totals/spread.py`. Same question as the verdict model, asked about the margin
+instead of the total: **which side covers, and how sure.** MLB stays on totals;
+this is WNBA only.
+
+```python
+from totals import run_spread_verdict
+
+r = run_spread_verdict("wnba", {
+    "away": {"name": "Wings", "pace": 79.8, "off_rating": 104.9,
+             "def_rating": 112.1, "rest_days": 2},
+    "home": {"name": "Lynx", "pace": 79.5, "off_rating": 114.0,
+             "def_rating": 104.0, "rest_days": 2},
+    "league": {"pace": 79.3, "rating": 109.4},
+    "spread": -9.5,                       # the HOME line, as the book prints it
+    "form": {"away_avg_margin": -5.5, "home_avg_margin": 7.0, "games": 5},
+    "ats_record": {"away": {"wins": 13, "losses": 19},
+                   "home": {"wins": 18, "losses": 14}},
+})
+r["band"], r["side"], r["win_pct"]   # ('HIGH', 'HOME', 0.5996)
+```
+
+**Why the margin and not the total.** The WNBA totals verdicts swung hard game
+to game while the same model's *margin* internals sat unused: `project()` has
+always returned separate away and home scores, home court has always been
+applied to the margin only (it moves who wins, not how much scoring there is),
+and `MARGIN_SD = 11.0` had been sitting in `wnba.py` doing nothing but feeding
+the overtime estimate. The margin is the half of that projection the model is
+better built to defend.
+
+**Sign conventions, fixed once and used everywhere.** `spread` is the home
+line as posted: `-6.5` means the home side is favoured by 6.5, `+4.5` means it
+is a 4.5-point underdog. Margins are home minus away, so positive means the
+home team wins. A signal's lean is its margin minus the market's — positive
+leans `HOME`, negative leans `AWAY`.
+
+**One thing gets simpler.** A totals line is a *median* on a right-skewed
+distribution and has to be solved into a mean before anything can be compared
+against it. A margin distribution is symmetric, so the spread already *is* the
+expected margin: `market_margin = -spread`, no bisection anywhere.
+
+**Recent form is a margin, and home court goes back on.** `away_avg_margin`
+and `home_avg_margin` are each team's average margin over its own last N games
+— points scored minus points allowed, so a team losing by 4 a night is `-4`.
+That average is roughly venue-neutral (about half those games were at home), so
+the neutral read on tonight is the difference of the two, plus home court.
+Without that add-back, form would dissent toward the away side by a flat 2.5
+points on *every* game — a systematic argument against the model and the market
+at once.
+
+**`ats_record` replaces the over/under record.** Wins and losses against the
+spread for each side. Like the over/under record it is a *rate*, not a value,
+so it is converted by inverting the same distribution the verdict is scored on:
+`market_margin + z(p) × margin_sd`. The two records point in opposite
+directions by construction — the home team covering *its* games says the market
+underrates it, the away team *failing* its games says the market overrates it,
+and both of those lean home tonight — so the combined figure averages the home
+cover rate with the complement of the away one. **The 20% share is unvalidated**,
+exactly as the over/under record's was: there is no logged spread history to
+check it against yet.
+
+Everything structural is inherited rather than reinvented: the same band ladder
+with the same thresholds, the same landing-only LEAN, the same trust budget
+where the matchup model keeps at least half, the same confidence-only-goes-down
+rule, and the same refusal to read a half-filled wins/losses box as a number.
+
+In the track record a spread pick is graded from **both scores, away first** —
+`74-88` is a 14-point home win, which covers `-9.5`. Entries carry a `bet_type`
+so a mixed log grades each row by its own rules; WNBA games logged before the
+pivot are still counted and still graded as the totals bets they were, but the
+projector will not reopen one, because reading a 163.5 total as a spread would
+produce confident nonsense.
 
 ---
 

@@ -1,11 +1,4 @@
-<!doctype html>
-<html lang="en">
-<head>
-<meta charset="utf-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1" />
 <title>Over/Under Verdict</title>
-</head>
-<body>
 <style>
   /* ---------------------------------------------------------------
      Tokens. Scoreboard amber on cool slate; every component is styled
@@ -660,8 +653,8 @@
 
   <header class="masthead">
     <div>
-      <div class="eyebrow">Game totals</div>
-      <h1>Over/Under Verdict</h1>
+      <div class="eyebrow" id="eyebrow">Game totals</div>
+      <h1 id="page-title">Over/Under Verdict</h1>
       <p class="lede">Enter the numbers and the trends. You get a side and a confidence band —
         no prices, no stake sizing.</p>
     </div>
@@ -731,25 +724,25 @@
               <input type="number" id="formGames" step="1" min="0" max="30" />
             </div>
           </div>
-          <div class="stack" id="ou-fields" hidden>
+          <div class="stack" id="ats-fields" hidden>
             <div class="grid2">
               <div class="field">
-                <label for="ouAwayWins">Away — O/U wins</label>
-                <input type="number" id="ouAwayWins" step="1" min="0" />
+                <label for="atsAwayWins">Away — ATS wins</label>
+                <input type="number" id="atsAwayWins" step="1" min="0" />
               </div>
               <div class="field">
-                <label for="ouAwayLosses">Away — O/U losses</label>
-                <input type="number" id="ouAwayLosses" step="1" min="0" />
+                <label for="atsAwayLosses">Away — ATS losses</label>
+                <input type="number" id="atsAwayLosses" step="1" min="0" />
               </div>
             </div>
             <div class="grid2">
               <div class="field">
-                <label for="ouHomeWins">Home — O/U wins</label>
-                <input type="number" id="ouHomeWins" step="1" min="0" />
+                <label for="atsHomeWins">Home — ATS wins</label>
+                <input type="number" id="atsHomeWins" step="1" min="0" />
               </div>
               <div class="field">
-                <label for="ouHomeLosses">Home — O/U losses</label>
-                <input type="number" id="ouHomeLosses" step="1" min="0" />
+                <label for="atsHomeLosses">Home — ATS losses</label>
+                <input type="number" id="atsHomeLosses" step="1" min="0" />
               </div>
             </div>
           </div>
@@ -762,11 +755,11 @@
         <div class="card-body stack">
           <div class="grid3">
             <div class="field">
-              <label for="line">Posted total</label>
+              <label for="line" id="line-label">Posted total</label>
               <input type="number" id="line" step="0.5" value="8.5" />
             </div>
           </div>
-          <p class="hint">
+          <p class="hint" id="line-hint">
             The total is all this model wants from the market. At even money a line is the point
             where the book has over and under equally likely, which is enough to read it as a
             forecast. Prices would only tell you what a bet <em>pays</em>, and this model isn't
@@ -797,7 +790,7 @@
           <div class="scoreline">
             <div><div class="n" id="away-score">—</div><div class="t" id="away-label">Away</div></div>
             <div><div class="n" id="home-score">—</div><div class="t" id="home-label">Home</div></div>
-            <div><div class="n" id="model-raw">—</div><div class="t">Model alone</div></div>
+            <div><div class="n" id="model-raw">—</div><div class="t" id="model-raw-label">Model alone</div></div>
           </div>
         </div>
 
@@ -805,8 +798,8 @@
         <ul class="downgrades" id="downgrades"></ul>
 
         <div class="metrics">
-          <div><div class="k">Win prob</div><div class="v" id="m-prob">—</div></div>
-          <div><div class="k">Line reads as</div><div class="v" id="m-mean">—</div></div>
+          <div><div class="k" id="m-prob-label">Win prob</div><div class="v" id="m-prob">—</div></div>
+          <div><div class="k" id="m-mean-label">Line reads as</div><div class="v" id="m-mean">—</div></div>
           <div><div class="k">Signals agree</div><div class="v" id="m-agree">—</div></div>
           <div><div class="k">Push chance</div><div class="v" id="m-push">—</div></div>
         </div>
@@ -830,7 +823,7 @@
       </section>
 
       <section class="card">
-        <header><h2>Over / under split</h2></header>
+        <header><h2 id="split-title">Over / under split</h2></header>
         <div class="split">
           <div class="split-track" id="split"></div>
           <div class="split-legend" id="split-legend"></div>
@@ -945,7 +938,7 @@
 
 <div class="mobile-bar" id="mbar">
   <div>
-    <div class="mb-k">Projected total</div>
+    <div class="mb-k" id="mb-label">Projected total</div>
     <div class="mb-total" id="mb-total">—</div>
   </div>
   <div id="mb-verdict"></div>
@@ -1562,6 +1555,263 @@
   }
 
   /* =====================================================================
+     THE SPREAD VERDICT — ported from totals/spread.py, verified to match.
+
+     WNBA runs on this instead of totals. The pivot came from the log, not
+     from theory: the WNBA totals verdicts ran hot and cold while the same
+     model's margin internals — separate away/home scores, home court applied
+     to the margin only, an empirical margin SD — sat unused. So basketball
+     now gets asked the question this model is better built to answer: not
+     "how many points tonight" but "who wins, and by how much".
+
+     Sign conventions, fixed once and used everywhere:
+       · the spread is the HOME line as the book prints it: -6.5 means the
+         home side is favoured by 6.5
+       · margins are home minus away; positive means the home team wins
+       · a signal's lean is its margin minus the market's; positive leans
+         HOME, negative leans AWAY
+
+     One thing gets SIMPLER here. A totals line is a median on a right-skewed
+     distribution and has to be bisected into a mean before anything can vote
+     against it. A margin distribution is symmetric, so the spread already IS
+     the mean: marketMargin = -spread, no inversion anywhere.
+  ===================================================================== */
+
+  var SPREAD = {
+    // The ATS record's share of the trust budget — the same 0.20 slot the
+    // O/U record filled on the totals side, so the matchup model keeps at
+    // least half of the trust on the same schedule as everywhere else.
+    // UNVALIDATED, same as that one was: no logged spread history yet.
+    ATS_SHARE: 0.20, ATS_FULL: 12,
+    // A model margin this far from the spread is a symptom, not an edge.
+    // Smaller than the 12-point totals threshold because margins are smaller
+    // numbers: with inputs inside their physical ranges even an extreme
+    // mismatch only moves the model a handful of points off the market.
+    IMPLAUSIBLE: 9.0,
+    // Same value as the WNBA totals dissent threshold — margin SD (11) and
+    // total SD (11.5) are close enough that 2.5 points means the same thing.
+    DISSENT: 2.5,
+    // The widest WNBA closing spreads on record sit under 20 points; no team
+    // averages a 40-point margin over any stretch. Outside these is a typo —
+    // and a totals number entered by habit lands far outside, which matters
+    // during exactly this transition.
+    RANGE: [-35, 35], FORM_RANGE: [-40, 40]
+  };
+
+  // The z at which the standard normal CDF equals p. Bisection against the
+  // CDF, the same solve-by-bisection style marketImpliedTotal uses.
+  function invNorm(p) {
+    var lo = -8, hi = 8;
+    for (var i = 0; i < 80; i++) {
+      var mid = (lo + hi) / 2;
+      if (normalCdf(mid, 0, 1) < p) lo = mid; else hi = mid;
+    }
+    return (lo + hi) / 2;
+  }
+
+  /* The margin implied by both teams' record against the spread. A cover
+     rate is a probability, not a points value, so — exactly like the O/U
+     record was on the totals side — it is converted by inverting the same
+     distribution the verdict is scored on. The two records point in opposite
+     directions by construction: the home team covering ITS games says the
+     market underrates it, the away team FAILING its games says the market
+     overrates it — both lean home tonight. Games is the SMALLER of the two
+     counts: a weak leg limits the whole signal. */
+  function atsSignalValue(g, marketMargin, sd) {
+    var away = teamOuPct(g.atsAwayWins, g.atsAwayLosses);
+    var home = teamOuPct(g.atsHomeWins, g.atsHomeLosses);
+    if (away[0] === null || home[0] === null) return [null, 0];
+    var combined = Math.min(OU_CLAMP[1],
+      Math.max(OU_CLAMP[0], (home[0] + (1 - away[0])) / 2));
+    return [marketMargin + invNorm(combined) * sd, Math.min(away[1], home[1])];
+  }
+
+  /* Recent form here is each team's average MARGIN over its last N games.
+     A team's overall average margin is close to venue-neutral (about half
+     those games were at home), so the neutral estimate for tonight is the
+     difference of the two — and then home court goes back on, because
+     tonight is not neutral. Without that, form would dissent away by a flat
+     2.5 points on every single game. Head-to-head stays out for the same
+     reason it is out of the WNBA totals verdict: a margin off one to three
+     meetings is even noisier than a total. */
+  function buildSpreadSignals(g, marketMargin, modelMargin, trust, hca, ats) {
+    var formGames = isNum(g.formGames) ? g.formGames : 0;
+    var haveForm = formGames > 0 && isNum(g.formAway) && isNum(g.formHome);
+    var formValue = haveForm ? g.formHome - g.formAway + hca : null;
+
+    var sig = [
+      { name: "Matchup model", value: modelMargin, games: 1, weight: 0, lean: 0 },
+      { name: "Recent form", value: formValue, games: formGames, weight: 0, lean: 0 },
+      { name: "ATS record", value: ats[0], games: ats[1], weight: 0, lean: 0 }
+    ];
+    sig.forEach(function (s) { s.present = s.value !== null && s.games > 0; });
+
+    var wF = sig[1].present ? trust * FORM_SHARE * ramp(formGames, FORM_FULL.WNBA) : 0;
+    var wA = sig[2].present ? trust * SPREAD.ATS_SHARE * ramp(ats[1], SPREAD.ATS_FULL) : 0;
+    sig[1].weight = wF;
+    sig[2].weight = wA;
+    sig[0].weight = trust - wF - wA;
+
+    sig.forEach(function (s) {
+      if (s.present) s.lean = s.value - marketMargin;
+      s.side = !s.present || s.lean === 0 ? null : (s.lean > 0 ? "HOME" : "AWAY");
+    });
+    return sig;
+  }
+
+  function spreadQualityFlags(g, modelMargin, marketMargin) {
+    var out = [];
+    var gap = Math.abs(modelMargin - marketMargin);
+    if (gap > SPREAD.IMPLAUSIBLE)
+      out.push("the model's margin is " + gap.toFixed(1) + " points from the spread, " +
+               "which is usually a bad input rather than an edge");
+
+    badFields = [];
+    ["away", "home"].forEach(function (k) {
+      var t = g[k] || {}, nm = t.name || k;
+      var ranges = FIELD_RANGES.WNBA;
+      Object.keys(ranges).forEach(function (key) {
+        var lo = ranges[key][0], hi = ranges[key][1], label = ranges[key][2];
+        var v = t[key];
+        if (!isNum(v)) {
+          out.push(nm + " " + label + " is blank");
+          badFields.push(k + "-" + key);
+          return;
+        }
+        if (v <= 0) {
+          out.push(nm + " " + label + " is blank");
+          badFields.push(k + "-" + key);
+        } else if (v < lo || v > hi) {
+          out.push(nm + " " + label + " is " + fmtNum(v) + ", outside the possible range " +
+                   fmtNum(lo) + "–" + fmtNum(hi) + " — check that entry");
+          badFields.push(k + "-" + key);
+        }
+      });
+    });
+
+    // A spread outside anything the league has ever posted is a typo — and a
+    // totals number entered here by habit is the likeliest one during the
+    // switch from totals, so it gets named as exactly that.
+    if (isNum(g.spread) && (g.spread < SPREAD.RANGE[0] || g.spread > SPREAD.RANGE[1])) {
+      out.push("the posted spread is " + fmtNum(g.spread) + ", outside the possible range " +
+               fmtNum(SPREAD.RANGE[0]) + "–" + fmtNum(SPREAD.RANGE[1]) +
+               " — a totals number entered by habit looks exactly like this");
+      badFields.push("line");
+    }
+
+    [["formAway", "away recent-form margin"],
+     ["formHome", "home recent-form margin"]].forEach(function (pair) {
+      var v = g[pair[0]];
+      if (!isNum(v)) return;
+      if (v < SPREAD.FORM_RANGE[0] || v > SPREAD.FORM_RANGE[1]) {
+        out.push("the " + pair[1] + " is " + fmtNum(v) + ", outside the possible range " +
+                 fmtNum(SPREAD.FORM_RANGE[0]) + "–" + fmtNum(SPREAD.FORM_RANGE[1]) +
+                 " — check that entry");
+        badFields.push(pair[0]);
+      }
+    });
+
+    // A season-long record more lopsided than the clamp is more likely wins
+    // and losses swapped than a market that has been wrong about one team
+    // 85% of the time.
+    [["away", g.atsAwayWins, g.atsAwayLosses, "atsAwayWins", "atsAwayLosses"],
+     ["home", g.atsHomeWins, g.atsHomeLosses, "atsHomeWins", "atsHomeLosses"]]
+      .forEach(function (row) {
+        var side = row[0], w = row[1], l = row[2];
+        var pg = teamOuPct(w, l);
+        if (pg[0] !== null && pg[1] >= 8 && (pg[0] < OU_CLAMP[0] || pg[0] > OU_CLAMP[1])) {
+          var t = g[side] || {}, nm = t.name || side;
+          out.push("the " + nm + " against-the-spread record (" + w + "-" + l + ") reads " +
+                   Math.round(100 * pg[0]) + "% covers, unusually lopsided for a season — " +
+                   "check that entry");
+          badFields.push(row[3], row[4]);
+        }
+      });
+    return out;
+  }
+
+  /* P(home covers) / P(away covers) / P(push). Final margins are integers,
+     so a whole-number spread can push and gets the same half-point
+     continuity correction the totals side uses. */
+  function marginProbs(mu, marketMargin, sd) {
+    var whole = Math.abs(marketMargin - Math.round(marketMargin)) < 1e-9;
+    if (whole) {
+      var pPush = normalCdf(marketMargin + 0.5, mu, sd) - normalCdf(marketMargin - 0.5, mu, sd);
+      var pAway = normalCdf(marketMargin - 0.5, mu, sd);
+      return { pHome: 1 - pAway - pPush, pAway: pAway, pPush: pPush };
+    }
+    var a = normalCdf(marketMargin, mu, sd);
+    return { pHome: 1 - a, pAway: a, pPush: 0 };
+  }
+
+  function decideSpread(proj, g) {
+    var spread = g.spread;
+    var trust = Math.max(0, Math.min(1, isNum(g.trust) ? g.trust : 0.5));
+    var hca = WNBA.HCA;
+    var sd = WNBA.MARGIN_SD;
+    var modelMargin = proj.homeScore - proj.awayScore;
+
+    // The spread already is the market's margin, sign flipped: home -6.5
+    // means the market expects home minus away to land on +6.5.
+    var marketMargin = -spread;
+
+    var ats = atsSignalValue(g, marketMargin, sd);
+    var signals = buildSpreadSignals(g, marketMargin, modelMargin, trust, hca, ats);
+    var projected = marketMargin;
+    signals.forEach(function (s) { if (s.present) projected += s.weight * s.lean; });
+
+    var pr = marginProbs(projected, marketMargin, sd);
+    var decided = 1 - pr.pPush;
+    var pHome = decided > 0 ? pr.pHome / decided : pr.pHome;
+    var side = pHome >= 0.5 ? "HOME" : "AWAY";
+    var winPct = side === "HOME" ? pHome : 1 - pHome;
+
+    var downgrades = [], dnotes = [];
+
+    signals.forEach(function (s) {
+      if (!s.present || s.weight <= 0 || !s.side) return;
+      if (s.side !== side && Math.abs(s.lean) >= SPREAD.DISSENT) {
+        downgrades.push(s.name.toLowerCase() + " points the other way (" + s.side.toLowerCase() + ")");
+        dnotes.push("It reads " + signed(s.value, 1) + ", a gap of " +
+          Math.abs(s.lean).toFixed(1) + " points the other way. The projection is an " +
+          "average of signals that disagree, which is a weaker thing than three that line up.");
+      }
+    });
+
+    var flags = spreadQualityFlags(g, modelMargin, marketMargin);
+    if (flags.length) {
+      downgrades.push("the inputs behind it are thin");
+      var joined = flags.join("; ");
+      dnotes.push(joined.charAt(0).toUpperCase() + joined.slice(1) + ".");
+    }
+
+    var corroborated = signals.slice(1).some(function (s) { return s.present && s.weight > 0; });
+    if (!corroborated) {
+      var trendNames = signals.slice(1).map(function (s) { return s.name.toLowerCase(); })
+        .join(" or ");
+      downgrades.push("no " + trendNames + " to corroborate it");
+      dnotes.push("Only the matchup model voted. Filling in a trend would confirm the " +
+        "read or catch a bad input, and could put the band back up.");
+    }
+
+    var earned = bandFor(winPct);
+    var band = stepDown(earned, downgrades.length);
+
+    return {
+      sport: "WNBA", betType: "spread", away: proj.away, home: proj.home,
+      awayScore: proj.awayScore, homeScore: proj.homeScore,
+      modelMargin: modelMargin, marketMargin: marketMargin, projectedMargin: projected,
+      spread: spread, line: spread, trust: trust,
+      built: { kind: "margin", mu: projected, sd: sd },
+      pHome: pr.pHome, pAway: pr.pAway, pPush: pr.pPush,
+      side: side, winPct: winPct,
+      earnedBand: earned, band: band,
+      signals: signals, downgrades: downgrades, downgradeNotes: dnotes, flags: flags,
+      badFields: badFields.slice()
+    };
+  }
+
+  /* =====================================================================
      FORM
   ===================================================================== */
 
@@ -1589,11 +1839,14 @@
       parkFactor: 102, tempF: 86, windMphOut: 0, dome: false,
       line: 9, h2hAvg: 10.5, h2hGames: 4, formAway: 9.8, formHome: 10.1, formGames: 5
     },
+    // WNBA is spreads now, not totals: the line is the HOME side's number as
+    // the book prints it (-3.5 = home favoured by 3.5), form is each team's
+    // average margin over its last N, and the record is against the spread.
     wnba: {
       away: { name: "Liberty", pace: 80.4, offRating: 112.1, defRating: 107.4, restDays: 1 },
       home: { name: "Fever", pace: 82.8, offRating: 114.6, defRating: 107.9, restDays: 2 },
-      line: 191.5, formAway: 186, formHome: 194, formGames: 5,
-      ouAwayWins: 20, ouAwayLosses: 14, ouHomeWins: 20, ouHomeLosses: 11
+      line: -3.5, formAway: 2.0, formHome: 4.5, formGames: 5,
+      atsAwayWins: 17, atsAwayLosses: 16, atsHomeWins: 19, atsHomeLosses: 14
     }
   };
 
@@ -1607,7 +1860,8 @@
     ],
     wnba: [
       { name: "WNBA Stats", what: "pace · ratings", url: "https://stats.wnba.com/teams/advanced/" },
-      { name: "Covers", what: "lines · H2H", url: "https://www.covers.com/sport/basketball/wnba/odds" }
+      { name: "Covers", what: "spreads · ATS records", url: "https://www.covers.com/sport/basketball/wnba/odds" },
+      { name: "Basketball Reference", what: "game logs · margins", url: "https://www.basketball-reference.com/wnba/" }
     ]
   };
 
@@ -1658,6 +1912,11 @@
     });
     $("teams-body").innerHTML = html;
 
+    // The masthead, the line card and the form-margin bounds all follow the
+    // sport: MLB is a totals model, WNBA is a spread model.
+    $("eyebrow").textContent = state.sport === "mlb" ? "Game totals" : "Point spreads";
+    $("page-title").textContent = state.sport === "mlb" ? "Over/Under Verdict" : "Spread Verdict";
+
     if (state.sport === "mlb") {
       $("game-card").hidden = false;
       $("game-body").innerHTML =
@@ -1682,7 +1941,7 @@
         "just the three as a set. A short stretch regresses harder toward average on its own, " +
         "which is the correction; there's no separate thin-sample warning on top of it.";
       $("h2h-fields").hidden = false;
-      $("ou-fields").hidden = true;
+      $("ats-fields").hidden = true;
       $("trends-lede").textContent =
         "Two independent reads on the same game. Leave either blank and it simply doesn't vote " +
         "— but a verdict with nothing to corroborate it loses a confidence band, because then " +
@@ -1692,33 +1951,56 @@
         "time — so it needs 8 meetings to reach full weight. Recent form is the average total " +
         "in each team's own last N games, runs scored plus allowed, and it carries the heavier " +
         "of the two trend weights.";
-      $("formAwayLabel").textContent = "Away — avg total, last N";
-      $("formHomeLabel").textContent = "Home — avg total, last N";
+      // Short enough not to ellipsis in a 134px column. The ", last N" these
+      // used to carry is already sitting in the "games each" field beside them.
+      $("formAwayLabel").textContent = "Away — avg total";
+      $("formHomeLabel").textContent = "Home — avg total";
+      // Totals can't be negative; margins can. Restore the floor MLB relies on.
+      $("formAway").setAttribute("min", "0");
+      $("formHome").setAttribute("min", "0");
+      $("line-label").textContent = "Posted total";
+      $("line-hint").innerHTML =
+        "The total is all this model wants from the market. At even money a line is the point " +
+        "where the book has over and under equally likely, which is enough to read it as a " +
+        "forecast. Prices would only tell you what a bet <em>pays</em>, and this model isn't " +
+        "sizing bets.";
     } else {
       $("game-card").hidden = true;
       $("game-body").innerHTML = "";
       $("teams-hint").innerHTML =
         "Pace is possessions per 40 minutes, not per 48. Ratings are points per 100 possessions. " +
         "<b>Days rest</b> of 0 is a back-to-back and trims the offence by " + WNBA.B2B +
-        "; 1 day is still short and trims it by " + WNBA.SHORT_REST + ". Home court is already " +
-        "worth " + WNBA.HCA + " combined points in every projection — there's no separate field " +
-        "for it because it isn't a per-team number, it applies to whichever side is listed as Home.";
+        "; 1 day is still short and trims it by " + WNBA.SHORT_REST + ". Home court is worth " +
+        WNBA.HCA + " points of margin in every projection — there's no separate field for it, " +
+        "it applies to whichever side is listed as Home.";
       $("h2h-fields").hidden = true;
-      $("ou-fields").hidden = false;
+      $("ats-fields").hidden = false;
       $("trends-lede").textContent =
         "Head to head is left out for WNBA: two teams usually meet only 1-3 times a season, so " +
-        "there's rarely a real sample behind it, and a single lopsided game can swing the average " +
-        "by double digits. Recent form and each team's own record against the total vote instead.";
+        "there's rarely a real sample behind it, and a margin off a single lopsided game is even " +
+        "noisier than a total. Recent form and each team's record against the spread vote instead.";
       $("trends-hint").innerHTML =
-        "Recent form is the average total in each team's own last N games. " +
-        "<b>O/U record</b> is that team's own season-long wins and losses against whatever total " +
-        "was posted for its games — e.g. Covers' team pages. It votes as a probability, not a " +
-        "score, and the share it earns is a guess, not something backtested yet like the other " +
-        "three — flag it as a rough one until more games are logged with it. Leave either trend " +
-        "blank and the matchup model — which already prices in pace, ratings, rest, and home " +
-        "court — carries more of the projection on its own.";
-      $("formAwayLabel").textContent = "Away — avg total, last N";
-      $("formHomeLabel").textContent = "Home — avg total, last N";
+        "Recent form is each team's <b>average margin</b> over its own last N games — points " +
+        "scored minus points allowed, so a team losing by 4 a night is −4. Baseball-Reference " +
+        "game logs give it quickest. <b>ATS record</b> is that team's season-long wins and " +
+        "losses against the spread — Covers' team pages print it. It votes as a probability, " +
+        "not a score, and the share it earns is a guess until enough spread games are logged " +
+        "to backtest it. Leave either trend blank and the matchup model — which already prices " +
+        "in pace, ratings, rest, and home court — carries more of the projection on its own.";
+      // "avg margin" overflows the column by a few pixels and ellipsises; the
+      // trends hint below spells out that it is an average over the last N.
+      $("formAwayLabel").textContent = "Away — margin";
+      $("formHomeLabel").textContent = "Home — margin";
+      // Margins go negative for a team on a losing stretch; a min of 0 would
+      // silently refuse exactly the entries that matter most.
+      $("formAway").removeAttribute("min");
+      $("formHome").removeAttribute("min");
+      $("line-label").textContent = "Home spread";
+      $("line-hint").innerHTML =
+        "The home side's line exactly as the book prints it: <b>−6.5</b> means the home team " +
+        "is favoured by 6.5, <b>+4.5</b> means it's a 4.5-point underdog. That one number is " +
+        "the market's whole forecast of the margin, and it's all this model wants — no prices, " +
+        "because this model isn't sizing bets.";
     }
 
     $("sig-count-label").textContent = "The three signals";
@@ -1728,12 +2010,12 @@
         "ever a play. The matchup model always keeps at least half of whatever you allow. The " +
         "other half goes to the trends, split three to two in recent form's favour, and each " +
         "only earns its full share with a full sample behind it."
-      : "How far the signals may pull the projection away from the posted total. At 0.50 they " +
-        "get half the distance. At 0.00 the projection is simply the line and nothing is ever a " +
-        "play. The matchup model always keeps at least half of whatever you allow. The other " +
-        "half goes to the trends, split three to two in recent form's favour over the O/U " +
-        "record, and each only earns its full share with a full sample behind it. Head to head " +
-        "is excluded for WNBA (see Trends).";
+      : "How far the signals may pull the projected margin away from the posted spread. At " +
+        "0.50 they get half the distance. At 0.00 the projection is simply the spread and " +
+        "nothing is ever a play. The matchup model always keeps at least half of whatever you " +
+        "allow. The other half goes to the trends, split three to two in recent form's favour " +
+        "over the ATS record, and each only earns its full share with a full sample behind it. " +
+        "Head to head is excluded for WNBA (see Trends).";
 
     // League baselines live with the settings, not the game: they describe the
     // season, and every one of them sits in a denominator where a stale value
@@ -1752,7 +2034,7 @@
 
     if (!$("line").value) $("line").value = ex.line;
     ["h2hAvg", "h2hGames", "formAway", "formHome", "formGames",
-     "ouAwayWins", "ouAwayLosses", "ouHomeWins", "ouHomeLosses"].forEach(function (k) {
+     "atsAwayWins", "atsAwayLosses", "atsHomeWins", "atsHomeLosses"].forEach(function (k) {
       if (!$(k).value && ex[k] !== undefined) $(k).value = ex[k];
     });
 
@@ -1776,7 +2058,7 @@
       $("dome").checked = !!ex.dome;
     }
     ["line", "h2hAvg", "h2hGames", "formAway", "formHome", "formGames",
-     "ouAwayWins", "ouAwayLosses", "ouHomeWins", "ouHomeLosses"].forEach(function (k) {
+     "atsAwayWins", "atsAwayLosses", "atsHomeWins", "atsHomeLosses"].forEach(function (k) {
       $(k).value = ex[k] !== undefined ? ex[k] : "";
     });
     viewingId = null;
@@ -1811,6 +2093,15 @@
   function restoreGame(id) {
     var e = store.entries.filter(function (x) { return x.id === id; })[0];
     if (!e || !e.values) return;
+    // WNBA games logged before the spread pivot were totals bets. They still
+    // count in the record and still grade, but the WNBA projector is a spread
+    // model now — reopening one would read its 160-something total as a
+    // spread and produce confident nonsense.
+    if (e.sport === "WNBA" && e.betType !== "spread") {
+      ioStatus("That WNBA game predates the switch to spreads — it was a totals bet. " +
+        "It still counts in the record, but the projector can't reopen it.", true);
+      return;
+    }
     viewingId = id;
     if (e.sport.toLowerCase() !== state.sport) {
       state.sport = e.sport.toLowerCase();
@@ -1876,14 +2167,16 @@
     // from an earlier MLB session would otherwise ride along into g and be judged
     // by qualityFlags against a range it was never entered for.
     var trendKeys = state.sport === "wnba"
-      ? ["formAway", "formHome", "formGames", "ouAwayWins", "ouAwayLosses",
-         "ouHomeWins", "ouHomeLosses"]
+      ? ["formAway", "formHome", "formGames", "atsAwayWins", "atsAwayLosses",
+         "atsHomeWins", "atsHomeLosses"]
       : ["h2hAvg", "h2hGames", "formAway", "formHome", "formGames"];
     trendKeys.forEach(function (k) {
       var v = num(k);
       if (isFinite(v)) g[k] = v;
     });
     g.line = num("line");
+    // For WNBA the line box holds the home spread; same box, different animal.
+    if (state.sport === "wnba") g.spread = g.line;
     g.trust = isFinite(num("trust")) ? num("trust") : 0.5;
     return g;
   }
@@ -1904,31 +2197,54 @@
     });
   }
 
+  function fmtSigned(v) { return (v >= 0 ? "+" : "") + fmtNum(v); }
+
+  // The picked side named the way it would be said out loud: the team and its
+  // number. HOME keeps the spread as posted; AWAY takes the other side of it.
+  // Works on a live result (which carries .spread) and on a log entry (which
+  // stores the spread in .line).
+  function pickLabel(r) {
+    if (r.betType !== "spread") return r.side;
+    var sp = r.spread !== undefined ? r.spread : r.line;
+    return (r.side === "HOME" ? r.home : r.away) + " " +
+           fmtSigned(r.side === "HOME" ? sp : -sp);
+  }
+
   function compute() {
     var g = readGame();
     var proj = state.sport === "mlb" ? projectMlb(g) : projectWnba(g);
 
-    if (!isFinite(g.line) || g.line <= 0) { renderNoLine(proj); return; }
+    // A totals line has to be a positive number; a spread just has to be a
+    // number — zero (pick'em) and negatives are ordinary spreads.
+    var noLine = state.sport === "wnba"
+      ? !isFinite(g.spread)
+      : (!isFinite(g.line) || g.line <= 0);
+    if (noLine) { renderNoLine(proj); return; }
 
-    var r = decide(proj, g);
+    var r = state.sport === "wnba" ? decideSpread(proj, g) : decide(proj, g);
     last = { result: r, game: g };
     render(r);
   }
 
   function renderNoLine(proj) {
+    var spreadMode = state.sport === "wnba";
     var total = proj.awayScore + proj.homeScore;
-    $("readout-label").textContent = "Model total";
-    $("proj-total").textContent = fmt1(total);
-    $("proj-sub").textContent = "Enter tonight's posted total to get a verdict.";
+    var margin = proj.homeScore - proj.awayScore;
+    $("readout-label").textContent = spreadMode ? "Model margin (home − away)" : "Model total";
+    $("proj-total").textContent = spreadMode ? fmtSigned(Math.round(margin * 10) / 10) : fmt1(total);
+    $("proj-sub").textContent = spreadMode
+      ? "Enter tonight's home spread to get a verdict."
+      : "Enter tonight's posted total to get a verdict.";
     $("away-score").textContent = fmt1(proj.awayScore);
     $("home-score").textContent = fmt1(proj.homeScore);
-    $("model-raw").textContent = fmt1(total);
+    $("model-raw").textContent = spreadMode ? fmtSigned(Math.round(margin * 10) / 10) : fmt1(total);
+    $("model-raw-label").textContent = spreadMode ? "Model margin" : "Model alone";
     $("away-label").textContent = proj.away;
     $("home-label").textContent = proj.home;
     $("band-wrap").innerHTML =
-      '<span class="band band-none">No line</span>' +
-      '<span class="band-line">A verdict is a comparison. Without a posted total there is ' +
-      "nothing to compare the projection to.</span>";
+      '<span class="band band-none">' + (spreadMode ? "No spread" : "No line") + "</span>" +
+      '<span class="band-line">A verdict is a comparison. Without a posted ' +
+      (spreadMode ? "spread" : "total") + " there is nothing to compare the projection to.</span>";
     ["downgrades", "signals", "why", "split", "split-legend", "chart", "dist-table"]
       .forEach(function (id) { $(id).innerHTML = ""; });
     markBadFields([]);
@@ -1939,37 +2255,58 @@
     $("why-verdict").innerHTML = "";
     $("plain-read").innerHTML = "";
     $("skew-note").hidden = true;
-    $("mb-total").textContent = fmt1(total);
-    $("mb-verdict").innerHTML = '<span class="band band-none">No line</span>';
+    $("mb-label").textContent = spreadMode ? "Model margin" : "Projected total";
+    $("mb-total").textContent = spreadMode
+      ? fmtSigned(Math.round(margin * 10) / 10) : fmt1(total);
+    $("mb-verdict").innerHTML = '<span class="band band-none">' +
+      (spreadMode ? "No spread" : "No line") + "</span>";
     last = null;
   }
 
   var BAND_CLASS = { HIGH: "high", MEDIUM: "medium", LOW: "low", LEAN: "lean", "NO PLAY": "none" };
 
   function render(r) {
+    var isSpread = r.betType === "spread";
     var unit = r.sport === "MLB" ? "runs" : "points";
     $("sig-unit").textContent = unit;
     $("why-unit").textContent = unit;
 
-    $("readout-label").textContent = "Projected total";
-    $("proj-total").textContent = fmt1(r.projectedTotal);
-    $("proj-sub").innerHTML = "vs a posted line of <b>" + r.line + "</b> &middot; " +
-      signed(r.projectedTotal - r.line, 2) + " " + unit;
+    if (isSpread) {
+      $("readout-label").textContent = "Projected margin (home − away)";
+      $("proj-total").textContent = fmtSigned(Math.round(r.projectedMargin * 10) / 10);
+      $("proj-sub").innerHTML = "vs a home spread of <b>" + fmtSigned(r.spread) +
+        "</b> &middot; " + signed(r.projectedMargin - r.marketMargin, 2) + " " + unit +
+        " off the market";
+      $("model-raw").textContent = fmtSigned(Math.round(r.modelMargin * 10) / 10);
+      $("model-raw-label").textContent = "Model margin";
+    } else {
+      $("readout-label").textContent = "Projected total";
+      $("proj-total").textContent = fmt1(r.projectedTotal);
+      $("proj-sub").innerHTML = "vs a posted line of <b>" + r.line + "</b> &middot; " +
+        signed(r.projectedTotal - r.line, 2) + " " + unit;
+      $("model-raw").textContent = fmt1(r.modelTotal);
+      $("model-raw-label").textContent = "Model alone";
+    }
     $("away-score").textContent = fmt1(r.awayScore);
     $("home-score").textContent = fmt1(r.homeScore);
-    $("model-raw").textContent = fmt1(r.modelTotal);
     $("away-label").textContent = r.away;
     $("home-label").textContent = r.home;
 
     var cls = BAND_CLASS[r.band];
     var play = r.band !== "NO PLAY";
+    var pick = pickLabel(r);
     $("band-wrap").innerHTML =
       '<span class="band band-' + cls + '">' + r.band +
-      (play ? '<span class="pick">' + r.side + "</span>" : "") + "</span>" +
+      (play ? '<span class="pick">' + esc(pick) + "</span>" : "") + "</span>" +
       '<span class="band-line">' +
-      (play
-        ? "The " + r.side.toLowerCase() + " is a <b>" + pct(r.winPct) + "</b> shot."
-        : "Model reads " + r.side + " at <b>" + pct(r.winPct) + "</b> — not enough to act on.") +
+      (isSpread
+        ? (play
+          ? "<b>" + esc(pick) + "</b> covers at <b>" + pct(r.winPct) + "</b>."
+          : "Model reads " + esc(pick) + " at <b>" + pct(r.winPct) +
+            "</b> — not enough to act on.")
+        : (play
+          ? "The " + r.side.toLowerCase() + " is a <b>" + pct(r.winPct) + "</b> shot."
+          : "Model reads " + r.side + " at <b>" + pct(r.winPct) + "</b> — not enough to act on.")) +
       (r.downgrades.length
         ? " Earned <b>" + r.earnedBand + "</b>, marked down " +
           (r.downgrades.length === 1 ? "a band" : r.downgrades.length + " bands") + ":"
@@ -1982,9 +2319,12 @@
         (note ? "<span class='why'>" + esc(note) + "</span>" : "") + "</li>";
     }).join("");
 
+    $("m-prob-label").textContent = isSpread ? "Cover prob" : "Win prob";
     $("m-prob").textContent = pct(r.winPct);
     $("m-prob").style.color = play ? "var(--good)" : "var(--ink)";
-    $("m-mean").textContent = fmt2(r.marketMean);
+    $("m-mean-label").textContent = isSpread ? "Spread says margin" : "Line reads as";
+    $("m-mean").textContent = isSpread ? fmtSigned(Math.round(r.marketMargin * 100) / 100)
+                                       : fmt2(r.marketMean);
     var voting = r.signals.filter(function (s) { return s.present && s.weight > 0; });
     var agreeing = voting.filter(function (s) { return s.side === r.side; }).length;
     $("m-agree").textContent = agreeing + " of " + voting.length;
@@ -1999,9 +2339,11 @@
     renderChart(r, unit);
     renderSkewNote(r, unit);
 
-    $("mb-total").textContent = fmt1(r.projectedTotal);
+    $("mb-label").textContent = isSpread ? "Projected margin" : "Projected total";
+    $("mb-total").textContent = isSpread
+      ? fmtSigned(Math.round(r.projectedMargin * 10) / 10) : fmt1(r.projectedTotal);
     $("mb-verdict").innerHTML = '<span class="band band-' + cls + '">' + r.band +
-      (play ? '<span class="pick">' + r.side + "</span>" : "") + "</span>";
+      (play ? '<span class="pick">' + esc(pick) + "</span>" : "") + "</span>";
   }
 
   /* Say it where the mistake is. A flag in the verdict panel explains the
@@ -2018,6 +2360,7 @@
   }
 
   function renderSignals(r, unit) {
+    var isSpread = r.betType === "spread";
     var maxLean = Math.max.apply(null, r.signals.map(function (s) {
       return s.present ? Math.abs(s.lean) : 0;
     }).concat([r.sport === "MLB" ? 1 : 6]));
@@ -2028,7 +2371,10 @@
           '<span class="val lean-none">not entered</span>' +
           '<span class="sub">Doesn\'t vote. A verdict with nothing to corroborate it loses a band.</span></div>';
       }
-      var leanCls = s.side === "OVER" ? "lean-over" : s.side === "UNDER" ? "lean-under" : "lean-none";
+      // HOME borrows the over colour and AWAY the under colour: same "which
+      // way does it lean" reading, different pair of directions.
+      var leanCls = s.side === "OVER" || s.side === "HOME" ? "lean-over"
+                  : s.side === "UNDER" || s.side === "AWAY" ? "lean-under" : "lean-none";
       var frac = Math.min(1, Math.abs(s.lean) / maxLean);
       var half = 50 * frac;
       var bar = s.weight > 0
@@ -2042,7 +2388,8 @@
         : s.games + (s.games === 1 ? " game" : " games") + " of evidence";
       return '<div class="sig' + (s.weight > 0 ? "" : " quiet") + '">' +
         '<span class="nm">' + s.name + "</span>" +
-        '<span class="val ' + leanCls + '">' + fmt1(s.value) + " &middot; " +
+        '<span class="val ' + leanCls + '">' +
+        (isSpread ? fmtSigned(Math.round(s.value * 10) / 10) : fmt1(s.value)) + " &middot; " +
         signed(s.lean, 1) + "</span>" + bar +
         '<span class="sub">' + evidence + " &rarr; <b>" + Math.round(100 * s.weight) +
         "%</b> of the projection" +
@@ -2115,8 +2462,41 @@
     return { base: base, baseLabel: "League-average game", steps: steps, total: cur };
   }
 
+  /* The margin version of the breakdown. The base is not a league-average
+     total but a game between identical teams, which home court alone decides:
+     +2.5. Pace is folded into the offence/defence step because pace on its
+     own cannot move a margin — it multiplies a rating difference that is zero
+     until the ratings go in. */
+  function explainWnbaMargin(g) {
+    var league = g.league;
+    function margin(mod) {
+      var p = projectWnba(mod);
+      return p.homeScore - p.awayScore;
+    }
+    var pick = function (t, keys) {
+      var out = { name: t.name };
+      keys.forEach(function (k) { if (isNum(t[k])) out[k] = t[k]; });
+      return out;
+    };
+    var steps = [];
+    var base = margin({ away: {}, home: {}, league: league });
+    var cur = base;
+
+    var eff = ["pace", "offRating", "defRating"];
+    var afterEff = margin({ away: pick(g.away, eff), home: pick(g.home, eff), league: league });
+    steps.push(["Offence &amp; defence", afterEff - cur]); cur = afterEff;
+
+    var all = eff.concat(["restDays"]);
+    var afterRest = margin({ away: pick(g.away, all), home: pick(g.home, all), league: league });
+    steps.push(["Rest", afterRest - cur]); cur = afterRest;
+
+    return { base: base, baseLabel: "Home court, teams equal", steps: steps, total: cur,
+             totalLabel: "Model margin", signed: true };
+  }
+
   function renderWhy(r, game, unit) {
-    var ex = r.sport === "MLB" ? explainMlb(game) : explainWnba(game);
+    var ex = r.sport === "MLB" ? explainMlb(game)
+           : r.betType === "spread" ? explainWnbaMargin(game) : explainWnba(game);
     var biggest = Math.max.apply(null, ex.steps.map(function (s) { return Math.abs(s[1]); }).concat([0.01]));
 
     function bar(delta) {
@@ -2126,8 +2506,9 @@
         '" style="width:' + pctw.toFixed(1) + '%"></i></div>';
     }
 
+    var fmtAmt = function (v, d) { return ex.signed ? signed(v, d) : v.toFixed(d); };
     var html = '<div class="why-row base"><span class="lbl">' + ex.baseLabel +
-      '</span><div class="why-bar"></div><span class="amt">' + ex.base.toFixed(1) + "</span></div>";
+      '</span><div class="why-bar"></div><span class="amt">' + fmtAmt(ex.base, 1) + "</span></div>";
 
     var shown = 0;
     ex.steps.forEach(function (s) {
@@ -2138,10 +2519,12 @@
         signed(s[1], 2) + "</span></div>";
     });
     if (!shown) {
-      html += '<div class="why-none">Everything is at league average, so nothing moves the total.</div>';
+      html += '<div class="why-none">Everything is at league average, so nothing moves the ' +
+        (ex.signed ? "margin past home court" : "total") + ".</div>";
     }
-    html += '<div class="why-row total"><span class="lbl">Model total</span><div class="why-bar"></div>' +
-      '<span class="amt">' + ex.total.toFixed(2) + "</span></div>";
+    html += '<div class="why-row total"><span class="lbl">' + (ex.totalLabel || "Model total") +
+      '</span><div class="why-bar"></div>' +
+      '<span class="amt">' + fmtAmt(ex.total, 2) + "</span></div>";
 
     $("why").innerHTML = html;
     $("why-unit").textContent = unit;
@@ -2259,9 +2642,142 @@
     return out.join(" ");
   }
 
+  /* What the picked side needs the final margin to be, in words a scoreboard
+     can answer. Margins are home minus away throughout. */
+  function coverPhrase(r) {
+    var M = r.marketMargin;                       // what the spread expects
+    var whole = Math.abs(M - Math.round(M)) < 1e-9;
+    if (r.side === "HOME") {
+      var needH = whole ? M + 1 : Math.floor(M) + 1;
+      if (needH > 0) return "<b>" + esc(r.home) + " to win by " + needH + " or more</b>";
+      if (needH === 0) return "<b>" + esc(r.home) + " to win or draw the margin even</b>";
+      return "<b>" + esc(r.home) + " to win, or lose by " + (-needH) + " or fewer</b>";
+    }
+    var needA = whole ? M - 1 : Math.ceil(M) - 1; // margin must be <= needA
+    if (needA < 0) return "<b>" + esc(r.away) + " to win by " + (-needA) + " or more</b>";
+    if (needA === 0) return "<b>" + esc(r.away) + " to win or draw the margin even</b>";
+    return "<b>" + esc(r.away) + " to win, or lose by " + needA + " or fewer</b>";
+  }
+
+  function plainReadSpread(r, ex) {
+    var out = [];
+    var mode = Math.round(r.projectedMargin);
+    var modeTxt = mode > 0 ? esc(r.home) + " by " + mode
+                : mode < 0 ? esc(r.away) + " by " + (-mode)
+                : "a game decided by a point either way";
+    out.push("<b>In plain terms:</b> the single most likely result is <b>" + modeTxt +
+      "</b>. For " + esc(pickLabel(r)) + " you need " + coverPhrase(r) +
+      ", and the model makes that a <b>" + pct(r.winPct) + "</b> shot.");
+
+    var gap = r.modelMargin - r.marketMargin;
+    var marginTxt = function (m) {
+      return m > 0 ? esc(r.home) + " by " + Math.abs(m).toFixed(1)
+           : m < 0 ? esc(r.away) + " by " + Math.abs(m).toFixed(1)
+           : "a dead heat";
+    };
+    out.push("Your numbers make it <b>" + marginTxt(r.modelMargin) + "</b>, " +
+      (Math.abs(gap) < 0.05 ? "right on"
+        : "<b>" + Math.abs(gap).toFixed(1) + " points</b> " +
+          (gap > 0 ? "more home-friendly than" : "more away-friendly than")) +
+      " the spread — that is the case for " + esc(pickLabel(r)) + ".");
+
+    var biggest = null;
+    ex.steps.forEach(function (st) {
+      if (!biggest || Math.abs(st[1]) > Math.abs(biggest[1])) biggest = st;
+    });
+    if (biggest && Math.abs(biggest[1]) >= 0.15) {
+      out.push("The biggest single piece is <b>" +
+        (/Offence/i.test(biggest[0]) ? "the gap in the teams' ratings" : "rest") +
+        "</b>, worth " + Math.abs(biggest[1]).toFixed(1) + " points of margin toward the " +
+        (biggest[1] > 0 ? "home" : "away") + " side on top of home court's " +
+        ex.base.toFixed(1) + ".");
+    } else {
+      out.push("The teams' numbers are close to even, so most of this is home court " +
+        "against where the spread is set.");
+    }
+
+    var trends = r.signals.filter(function (s) {
+      return s.present && s.weight > 0 && s.name !== "Matchup model";
+    });
+    if (!trends.length) {
+      out.push("There are no trends entered, so this is the team numbers on their own.");
+    } else {
+      var sayTrend = function (s) { return s.name.toLowerCase() + " reads " + marginTxt(s.value); };
+      var agree = trends.filter(function (s) { return s.side === r.side; });
+      if (agree.length === trends.length) {
+        out.push("The trends back it up: " + trends.map(sayTrend).join(" and ") + ".");
+      } else if (!agree.length) {
+        out.push("The trends push back — " + trends.map(sayTrend).join(" and ") +
+          ", which is the other side of this spread.");
+      } else {
+        var against = trends.filter(function (s) { return s.side !== r.side; });
+        out.push("The trends are split: " + agree[0].name.toLowerCase() + " agrees, but " +
+          sayTrend(against[0]) + " and wants the other side.");
+      }
+    }
+
+    if (r.pPush > 0.03) {
+      out.push("The spread is a whole number, so about <b>" + pct(r.pPush) +
+        "</b> of the time the margin lands exactly on it and the bet is void.");
+    }
+
+    out.push(r.band === "NO PLAY"
+      ? "<b>Not enough to act on.</b> " + (r.downgrades.length
+          ? "The warnings above are why."
+          : "It is close to a coin flip.")
+      : r.downgrades.length
+        ? "<b>Treat it as a lean, not a conviction</b> — see the warnings above."
+        : "<b>Nothing is arguing against it.</b>");
+    return out.join(" ");
+  }
+
+  function whyVerdictSpread(r) {
+    var parts = [];
+    var gap = r.modelMargin - r.marketMargin;
+
+    parts.push("<b>" + (r.band === "NO PLAY" ? "Why it's a pass:" : "Why it's a " +
+      r.band.toLowerCase() + ":") + "</b> a home spread of " + fmtSigned(r.spread) +
+      " says the market expects a margin of <b>" + fmtSigned(Math.round(r.marketMargin * 100) / 100) +
+      "</b>; your team numbers alone say <b>" + fmtSigned(Math.round(r.modelMargin * 100) / 100) +
+      "</b>, a gap of <b>" + signed(gap, 2) + "</b>. No median-to-mean conversion here, " +
+      "unlike a total: margins are symmetric, so the spread already is the expected margin.");
+
+    var voting = r.signals.filter(function (s) { return s.present && s.weight > 0; });
+    if (voting.length > 1) {
+      var agree = voting.filter(function (s) { return s.side === r.side; });
+      parts.push(agree.length === voting.length
+        ? "All " + voting.length + " signals lean the same way."
+        : agree.length + " of " + voting.length + " signals lean " + r.side.toLowerCase() + ".");
+    }
+
+    parts.push("Pulling the spread " + Math.round(100 * r.trust) + "% of the way toward them " +
+      "puts the projected margin at <b>" + fmtSigned(Math.round(r.projectedMargin * 100) / 100) +
+      "</b>, which makes <b>" + esc(pickLabel(r)) + "</b> a <b>" + pct(r.winPct) +
+      "</b> shot to cover.");
+
+    if (r.pPush > 0.02) {
+      parts.push("The spread is a whole number, so <b>" + pct(r.pPush) + "</b> of the time " +
+        "the margin lands exactly there and the bet is void — that is excluded from the " +
+        "cover probability.");
+    }
+
+    parts.push(r.downgrades.length
+      ? "That earns <b>" + r.earnedBand + "</b> on its own, but confidence only ever comes down: " +
+        r.downgrades.length + (r.downgrades.length === 1 ? " doubt takes" : " doubts take") +
+        " it to <b>" + r.band + "</b>."
+      : "Nothing argues against it, so the band stands at <b>" + r.band + "</b>.");
+
+    return parts.join(" ");
+  }
+
   /* The same thing again in the model's own terms, for when the plain version
      raises a question. */
   function renderWhyVerdict(r, unit, ex) {
+    if (r.betType === "spread") {
+      $("plain-read").innerHTML = plainReadSpread(r, ex);
+      $("why-verdict").innerHTML = whyVerdictSpread(r);
+      return;
+    }
     $("plain-read").innerHTML = plainRead(r, ex, unit);
     var parts = [];
     var gap = r.modelTotal - r.marketMean;
@@ -2298,7 +2814,17 @@
   }
 
   function renderSplit(r) {
-    var parts = [
+    $("split-title").textContent = r.betType === "spread" ? "Who covers" : "Over / under split";
+    var parts = r.betType === "spread"
+      ? [
+        { cls: "split-under", p: r.pAway, label: esc(r.away) + " " + pct(r.pAway),
+          name: esc(r.away) + " covers", color: "var(--under)" },
+        { cls: "split-push", p: r.pPush, label: r.pPush > 0.10 ? "Push " + pct(r.pPush) : "",
+          name: "Push", color: "var(--push)" },
+        { cls: "split-over", p: r.pHome, label: esc(r.home) + " " + pct(r.pHome),
+          name: esc(r.home) + " covers", color: "var(--over)" }
+      ].filter(function (x) { return x.p > 0.0005; })
+      : [
       { cls: "split-under", p: r.pUnder, label: "Under " + pct(r.pUnder), name: "Under", color: "var(--under)" },
       // The push slice is narrow by nature; its label clips below about a tenth
       // of the bar, and the legend underneath carries it anyway.
@@ -2318,6 +2844,17 @@
 
   function buckets(r) {
     var b = r.built, out = [];
+    if (b.kind === "margin") {
+      // Final margins, home minus away, against the spread's expected margin.
+      var mw = 2, mlo = Math.round((b.mu - 3.4 * b.sd) / mw) * mw;
+      var mhi = mlo + Math.ceil(6.8 * b.sd / mw) * mw;
+      for (var m = mlo; m <= mhi; m += mw) {
+        var mp = normalCdf(m + mw / 2, b.mu, b.sd) - normalCdf(m - mw / 2, b.mu, b.sd);
+        out.push({ mid: m, label: (m > 0 ? "+" : "") + m, p: mp,
+                   side: m > r.marketMargin ? "home" : (m < r.marketMargin ? "away" : "push") });
+      }
+      return out;
+    }
     if (b.kind === "discrete") {
       var pmf = b.pmf;
       var lo = 0, hi = pmf.length - 1, acc = 0;
@@ -2340,6 +2877,17 @@
   }
 
   function renderChart(r, unit) {
+    var isSpread = r.betType === "spread";
+    // Everything below draws "a distribution split by a marker". Only the
+    // names change in spread mode: the marker is the spread's expected margin,
+    // the two regions are who covers, and the colours are borrowed — home
+    // wears over's, away wears under's.
+    var mark = isSpread ? r.marketMargin : r.line;
+    var markName = isSpread ? "SPREAD " + fmtSigned(r.spread) : "LINE " + r.line;
+    var loName = isSpread ? esc(r.away).toUpperCase() : "UNDER";
+    var hiName = isSpread ? esc(r.home).toUpperCase() : "OVER";
+    var loP = isSpread ? r.pAway : r.pUnder;
+    var hiP = isSpread ? r.pHome : r.pOver;
     var data = buckets(r);
     // Draw at the container's real pixel width so one SVG unit is one CSS pixel
     // and label text renders at its true size on a phone as well as a desktop.
@@ -2352,7 +2900,8 @@
     var slot = iw / n;
     var gap = Math.min(2, slot * 0.18);
     var bw = Math.max(1, slot - gap);
-    var color = { over: "var(--over)", under: "var(--under)", push: "var(--push)" };
+    var color = { over: "var(--over)", under: "var(--under)", push: "var(--push)",
+                  home: "var(--over)", away: "var(--under)" };
 
     var svg = "";
 
@@ -2375,23 +2924,23 @@
         " L" + (x + bw).toFixed(2) + "," + (padT + ih) + " Z" + '" />';
     });
 
-    // the line marker sits between the last under bucket and the first over bucket
+    // the marker sits between the last low-side bucket and the first high-side bucket
     var idx = 0;
-    for (var i = 0; i < data.length; i++) { if (data[i].mid > r.line) { idx = i; break; } idx = i + 1; }
+    for (var i = 0; i < data.length; i++) { if (data[i].mid > mark) { idx = i; break; } idx = i + 1; }
     var lx = padL + idx * slot - gap / 2;
     lx = Math.max(padL, Math.min(W - padR, lx));
     svg += '<line x1="' + lx.toFixed(1) + '" y1="' + (padT - 14) + '" x2="' + lx.toFixed(1) +
       '" y2="' + (padT + ih) + '" stroke="var(--ink)" stroke-width="2" stroke-dasharray="4 3" />';
     svg += '<text id="lbl-line" x="' + lx.toFixed(1) + '" y="' + (padT - 19) +
-      '" text-anchor="middle" class="region-label" fill="var(--ink)">LINE ' + r.line + "</text>";
+      '" text-anchor="middle" class="region-label" fill="var(--ink)">' + markName + "</text>";
 
     // Direct region labels. Emitted unconditionally, then pruned below against
     // the measured position of the line label — guessing at text width by
     // character count is off by just enough to collide.
     svg += '<text id="lbl-under" x="' + (padL + 4) + '" y="' + (padT - 19) +
-      '" class="region-label" fill="var(--under)">UNDER ' + pct(r.pUnder) + "</text>";
+      '" class="region-label" fill="var(--under)">' + loName + " " + pct(loP) + "</text>";
     svg += '<text id="lbl-over" x="' + (W - padR - 4) + '" y="' + (padT - 19) +
-      '" text-anchor="end" class="region-label" fill="var(--over)">OVER ' + pct(r.pOver) + "</text>";
+      '" text-anchor="end" class="region-label" fill="var(--over)">' + hiName + " " + pct(hiP) + "</text>";
 
     // x ticks, thinned so labels never collide
     var every = Math.max(1, Math.ceil(n / Math.max(4, Math.floor(W / 46))));
@@ -2401,7 +2950,8 @@
         '" text-anchor="middle" class="axis-label">' + d.label + "</text>";
     });
     svg += '<text x="' + (W / 2) + '" y="' + (H - 2) +
-      '" text-anchor="middle" class="axis-label">total ' + unit + "</text>";
+      '" text-anchor="middle" class="axis-label">' +
+      (isSpread ? "final margin, home &#8722; away" : "total " + unit) + "</text>";
 
     $("chart").setAttribute("viewBox", "0 0 " + W + " " + H);
     $("chart").innerHTML = svg;
@@ -2420,15 +2970,26 @@
 
     // A legend is always present, so identity never rests on colour alone even
     // when the plot is too narrow for the in-chart region labels.
-    $("chart-legend").innerHTML =
-      '<span><i class="swatch" style="background:var(--under)"></i>Under ' + pct(r.pUnder) +
+    $("chart-legend").innerHTML = isSpread
+      ? '<span><i class="swatch" style="background:var(--under)"></i>' + esc(r.away) +
+        " covers " + pct(loP) +
+        '</span><span><i class="swatch" style="background:var(--over)"></i>' + esc(r.home) +
+        " covers " + pct(hiP) + "</span>" +
+        (r.pPush > 0.0005
+          ? '<span><i class="swatch" style="background:var(--push)"></i>Push ' + pct(r.pPush) + "</span>"
+          : "")
+      : '<span><i class="swatch" style="background:var(--under)"></i>Under ' + pct(r.pUnder) +
       '</span><span><i class="swatch" style="background:var(--over)"></i>Over ' + pct(r.pOver) +
       "</span>" +
       (r.pPush > 0.0005
         ? '<span><i class="swatch" style="background:var(--push)"></i>Push ' + pct(r.pPush) + "</span>"
         : "");
+    $("chart-title").textContent = isSpread ? "Distribution of margins" : "Distribution of totals";
     $("chart-unit").textContent = r.sport === "MLB" ? "per game" : "2-point bins";
-    $("chart-desc").textContent = "Probability of each final total. " +
+    $("chart-desc").textContent = isSpread
+      ? "Probability of each final margin, home minus away. " + pct(loP) + " " + r.away +
+        " covers, " + pct(hiP) + " " + r.home + " covers against a spread of " + fmtSigned(r.spread) + "."
+      : "Probability of each final total. " +
       pct(r.pUnder) + " under " + r.line + ", " + pct(r.pOver) + " over.";
 
     // hover
@@ -2446,10 +3007,12 @@
     });
 
     // table view
-    var rows = '<thead><tr><th>Total</th><th>Chance</th><th>Side</th></tr></thead><tbody>';
+    var rows = '<thead><tr><th>' + (isSpread ? "Margin" : "Total") +
+      "</th><th>Chance</th><th>" + (isSpread ? "Covers" : "Side") + "</th></tr></thead><tbody>";
     data.forEach(function (d) {
       rows += "<tr><td>" + d.label + "</td><td>" + (100 * d.p).toFixed(1) + "%</td><td>" +
-        d.side + "</td></tr>";
+        (isSpread ? (d.side === "home" ? esc(r.home) : d.side === "away" ? esc(r.away) : "push")
+                  : d.side) + "</td></tr>";
     });
     $("dist-table").innerHTML = rows + "</tbody>";
   }
@@ -2459,6 +3022,9 @@
 
   function renderSkewNote(r, unit) {
     var el = $("skew-note");
+    // Margins are symmetric: the projected margin and the cover side can never
+    // disagree, so there is nothing to explain in spread mode.
+    if (r.betType === "spread") { el.hidden = true; return; }
     var above = r.projectedTotal > r.line;
     var contrary = (above && r.side === "UNDER") || (!above && r.side === "OVER");
     if (!contrary || Math.abs(r.projectedTotal - r.line) < 0.05) { el.hidden = true; return; }
@@ -2552,16 +3118,26 @@
       snap.settings["League pace"] = isFinite(num("lgPace")) ? num("lgPace") : WNBA.LG_PACE;
       snap.settings["League rating"] = isFinite(num("lgRating")) ? num("lgRating") : WNBA.LG_RATING;
     }
-    snap.trends["H2H avg total"] = num("h2hAvg");
-    snap.trends["H2H meetings"] = num("h2hGames");
-    snap.trends["Away form avg"] = num("formAway");
-    snap.trends["Home form avg"] = num("formHome");
-    snap.trends["Form games"] = num("formGames");
-    snap.trends["Away O/U wins"] = num("ouAwayWins");
-    snap.trends["Away O/U losses"] = num("ouAwayLosses");
-    snap.trends["Home O/U wins"] = num("ouHomeWins");
-    snap.trends["Home O/U losses"] = num("ouHomeLosses");
-    snap.settings.Line = num("line");
+    // The keys here are what the report prints and what the report parser
+    // reads back, so they say what the number IS in each sport: totals trends
+    // for MLB, margin trends and a spread for WNBA.
+    if (state.sport === "mlb") {
+      snap.trends["H2H avg total"] = num("h2hAvg");
+      snap.trends["H2H meetings"] = num("h2hGames");
+      snap.trends["Away form avg"] = num("formAway");
+      snap.trends["Home form avg"] = num("formHome");
+      snap.trends["Form games"] = num("formGames");
+      snap.settings.Line = num("line");
+    } else {
+      snap.trends["Away form margin"] = num("formAway");
+      snap.trends["Home form margin"] = num("formHome");
+      snap.trends["Form games"] = num("formGames");
+      snap.trends["Away ATS wins"] = num("atsAwayWins");
+      snap.trends["Away ATS losses"] = num("atsAwayLosses");
+      snap.trends["Home ATS wins"] = num("atsHomeWins");
+      snap.trends["Home ATS losses"] = num("atsHomeLosses");
+      snap.settings["Home spread"] = num("line");
+    }
     snap.settings.Trust = num("trust");
     return snap;
   }
@@ -2601,14 +3177,21 @@
       return;
     }
     pendingDuplicate = null;
+    var isSpread = r.betType === "spread";
     store.entries.unshift({
       id: "g" + Date.now() + Math.random().toString(36).slice(2, 6),
       date: new Date().toLocaleString(),
       ts: Date.now(),
       sport: r.sport, away: r.away, home: r.home,
+      // A spread entry keeps the same storage keys as a totals one — line is
+      // the home spread, and the three model numbers are margins. betType is
+      // what says which reading applies, everywhere downstream.
+      betType: isSpread ? "spread" : "total",
       line: r.line, side: r.side, band: r.band, earnedBand: r.earnedBand,
       winPct: r.winPct, pPush: r.pPush,
-      modelTotal: r.modelTotal, marketMean: r.marketMean, projectedTotal: r.projectedTotal,
+      modelTotal: isSpread ? r.modelMargin : r.modelTotal,
+      marketMean: isSpread ? r.marketMargin : r.marketMean,
+      projectedTotal: isSpread ? r.projectedMargin : r.projectedTotal,
       signals: r.signals.map(function (s) {
         return { name: s.name, value: s.present ? s.value : null, games: s.games,
                  weight: s.weight, lean: s.present ? s.lean : null, side: s.side };
@@ -2640,8 +3223,23 @@
     setTimeout(function () { status.textContent = ""; status.className = "hint"; }, dur);
   }
 
+  // A spread final is both scores, away first, the way a box score reads:
+  // "78-85". Any of - : , or a space works between them.
+  function parseFinalScores(v) {
+    var m = String(v).trim().match(/^(\d+)\s*[-–:,\s]\s*(\d+)$/);
+    return m ? [parseFloat(m[1]), parseFloat(m[2])] : null;
+  }
+
   function gradeOf(e) {
     if (e.final === null || e.final === undefined || e.final === "") return null;
+    if (e.betType === "spread") {
+      var sc = parseFinalScores(e.final);
+      if (!sc) return null;
+      var margin = sc[1] - sc[0];          // home minus away, like everywhere
+      var expected = -e.line;              // the margin the spread predicts
+      if (margin === expected) return "P";
+      return (margin > expected) === (e.side === "HOME") ? "W" : "L";
+    }
     var f = parseFloat(e.final);
     if (!isFinite(f)) return null;
     if (f === e.line) return "P";
@@ -2788,9 +3386,18 @@
 
     entries.forEach(function (e) {
       var g = gradeOf(e);
+      var isSpread = e.betType === "spread";
       var resCell = g === "W" ? "<b style='color:var(--good)'>W</b>"
         : g === "L" ? "<b style='color:var(--under)'>L</b>"
         : g === "P" ? "<span class='muted'>push</span>" : "<span class='muted'>—</span>";
+      // A spread final is both scores ("78-85", away first), so the input is
+      // text; a totals final stays a single number.
+      var finalCell = isSpread
+        ? "<input type='text' inputmode='numeric' placeholder='78-85' class='cell' " +
+          "data-final='" + e.id + "' value='" +
+          esc(e.final === null || e.final === undefined ? "" : e.final) + "' />"
+        : "<input type='number' step='0.5' class='cell' data-final='" + e.id + "' value='" +
+          (e.final === null || e.final === undefined ? "" : e.final) + "' />";
       html += "<tr>" +
         "<td><a href='#' class='recall' data-recall='" + e.id + "'>" +
         esc(e.away) + " @ " + esc(e.home) + "</a>" +
@@ -2798,11 +3405,10 @@
         esc(e.date) + (e.status === "backed" ? "" : " &middot; passed") +
         (e.note ? " &middot; " + esc(e.note) : "") + "</div></td>" +
         "<td><span class='band-chip chip-" + BAND_CLASS[e.band] + "'>" + e.band + "</span></td>" +
-        "<td>" + e.side + "</td>" +
+        "<td>" + esc(pickLabel(e)) + "</td>" +
         "<td>" + e.line + "</td>" +
         "<td>" + pct(e.winPct) + "</td>" +
-        "<td><input type='number' step='0.5' class='cell' data-final='" + e.id + "' value='" +
-        (e.final === null || e.final === undefined ? "" : e.final) + "' /></td>" +
+        "<td>" + finalCell + "</td>" +
         "<td>" + resCell + "</td>" +
         "<td><button type='button' class='btn danger' data-del='" + e.id + "'>×</button></td>" +
         "</tr>";
@@ -2814,7 +3420,11 @@
       inp.addEventListener("change", function () {
         var e = store.entries.filter(function (x) { return x.id === inp.dataset.final; })[0];
         if (!e) return;
-        e.final = inp.value === "" ? null : parseFloat(inp.value);
+        // Spread finals stay as the "away-home" text they were typed as;
+        // gradeOf parses them on every read, so a half-typed score simply
+        // stays ungraded instead of becoming a number it never was.
+        e.final = inp.value === "" ? null
+          : e.betType === "spread" ? inp.value.trim() : parseFloat(inp.value);
         saveStore();
         renderLog();
       });
@@ -2848,15 +3458,19 @@
 
   function reportFor(e, i) {
     var g = gradeOf(e);
+    var isSpread = e.betType === "spread";
     var L = [];
     L.push(i + ". " + e.away + " @ " + e.home + "  (" + e.sport + " · " + e.date + " · " +
            e.status.toUpperCase() + ")");
-    L.push("   Verdict     " + e.band + " " + e.side + "  ·  win " + pct(e.winPct) +
-           "  ·  line " + e.line +
+    // The spread verdict line names the pick out loud ("HOME (Fever -3.5)")
+    // and calls the number a spread; the parser accepts both dialects.
+    L.push("   Verdict     " + e.band + " " + e.side +
+           (isSpread ? " (" + pickLabel(e) + ")" : "") + "  ·  win " + pct(e.winPct) +
+           "  ·  " + (isSpread ? "spread" : "line") + " " + e.line +
            (e.earnedBand !== e.band ? "   [earned " + e.earnedBand + "]" : ""));
     L.push("   Model       " + e.modelTotal.toFixed(2) + " raw → " +
-           e.projectedTotal.toFixed(2) + " projected   vs a line reading " +
-           e.marketMean.toFixed(2));
+           e.projectedTotal.toFixed(2) + " projected   vs a " +
+           (isSpread ? "spread" : "line") + " reading " + e.marketMean.toFixed(2));
     L.push("   Signals     " + e.signals.map(function (s) {
       return s.name + " " + (s.value === null ? "—" : s.value.toFixed(1) +
         " (" + signed(s.lean, 1) + ", " + Math.round(100 * s.weight) + "%)");
@@ -2886,7 +3500,7 @@
     var backed = store.entries.filter(function (e) { return e.status === "backed"; });
     var s = summarise(backed);
     var settled = store.entries.filter(function (e) { return gradeOf(e) !== null; });
-    var L = ["OVER/UNDER VERDICT — TRACK RECORD",
+    var L = ["VERDICT MODEL — TRACK RECORD  (MLB totals · WNBA spreads)",
              "Exported " + new Date().toLocaleString(), "", "SUMMARY",
              "  Logged            " + store.entries.length + " games (" + backed.length +
                " backed, " + (store.entries.length - backed.length) + " passed)",
@@ -2915,16 +3529,20 @@
   }
 
   function toCsv() {
+    // bet_type rides at the end so a spreadsheet built on the old columns
+    // still lines up. For a spread row, line is the home spread, the model
+    // columns are margins, and final is both scores ("78-85", away first).
     var head = ["date", "sport", "away", "home", "line", "side", "band", "earned_band",
                 "win_pct", "status", "final", "result", "model_total", "market_mean",
-                "projected_total", "downgrades", "note"];
+                "projected_total", "downgrades", "note", "bet_type"];
     var rows = [head.join(",")];
     store.entries.forEach(function (e) {
       rows.push([e.date, e.sport, e.away, e.home, e.line, e.side, e.band, e.earnedBand,
                  e.winPct.toFixed(4), e.status,
                  e.final === null || e.final === undefined ? "" : e.final,
                  gradeOf(e) || "", e.modelTotal.toFixed(2), e.marketMean.toFixed(2),
-                 e.projectedTotal.toFixed(2), e.downgrades.join("; "), e.note || ""]
+                 e.projectedTotal.toFixed(2), e.downgrades.join("; "), e.note || "",
+                 e.betType || "total"]
         .map(function (v) { return '"' + String(v).replace(/"/g, '""') + '"'; }).join(","));
     });
     return rows.join("\n");
@@ -3015,10 +3633,14 @@
     var out = rows.slice(1).map(function (r, n) {
       var get = function (k) { return idx[k] === undefined ? "" : (r[idx[k]] || "").trim(); };
       var fin = get("final");
+      // Older CSVs have no bet_type column; everything in them was a total.
+      var betType = get("bet_type") ||
+        (get("side") === "HOME" || get("side") === "AWAY" ? "spread" : "total");
       return {
         id: "csv" + (Date.parse(get("date")) || Date.now()) + "-" + n,
         date: get("date"), ts: Date.parse(get("date")) || Date.now() - n,
         sport: get("sport"), away: get("away"), home: get("home"),
+        betType: betType,
         line: parseFloat(get("line")), side: get("side"),
         band: get("band"), earnedBand: get("earned_band") || get("band"),
         winPct: parseFloat(get("win_pct")), pPush: 0,
@@ -3028,7 +3650,8 @@
         signals: [], downgrades: get("downgrades") ? get("downgrades").split("; ") : [],
         status: get("status") || "backed", note: get("note"),
         inputs: null, values: null,
-        final: fin === "" ? null : parseFloat(fin)
+        // A spread final is the "78-85" score pair and stays text.
+        final: fin === "" ? null : (betType === "spread" ? fin : parseFloat(fin))
       };
     }).filter(function (e) { return e.away && isFinite(e.line) && e.band; });
     return { entries: out, partial: true,
@@ -3057,12 +3680,18 @@
     var out = [];
     blocks.forEach(function (b, n) {
       var head = b.match(/^(\d+)\.\s+(.*?)\s+@\s+(.*?)\s+\((MLB|WNBA)\s+·\s+(.*?)\s+·\s+(BACKED|PASSED)\)/);
-      var vd = b.match(/Verdict\s+(HIGH|MEDIUM|LOW|LEAN|NO PLAY)\s+(OVER|UNDER)\s+·\s+win\s+([\d.]+)%\s+·\s+line\s+([\d.]+)(\s+\[earned (HIGH|MEDIUM|LOW|LEAN|NO PLAY)\])?/);
-      var md = b.match(/Model\s+([\d.]+) raw → ([\d.]+) projected\s+vs a line reading ([\d.]+)/);
+      // Two dialects of the same line: totals say "OVER · win 54% · line 8.5",
+      // spreads say "HOME (Fever -3.5) · win 54% · spread -3.5". Numbers can
+      // be negative in the spread dialect, nowhere else.
+      var vd = b.match(/Verdict\s+(HIGH|MEDIUM|LOW|LEAN|NO PLAY)\s+(OVER|UNDER|HOME|AWAY)(?:\s+\([^)]*\))?\s+·\s+win\s+([\d.]+)%\s+·\s+(?:line|spread)\s+(-?[\d.]+)(\s+\[earned (HIGH|MEDIUM|LOW|LEAN|NO PLAY)\])?/);
+      var md = b.match(/Model\s+(-?[\d.]+) raw → (-?[\d.]+) projected\s+vs a (?:line|spread) reading (-?[\d.]+)/);
       if (!head || !vd || !md) return;
 
       var sport = head[4];
-      var settled = b.match(/Settled\s+final\s+([\d.]+)/);
+      var isSpread = vd[2] === "HOME" || vd[2] === "AWAY";
+      // A totals final is one number; a spread final is the score pair.
+      var settled = isSpread ? b.match(/Settled\s+final\s+(\d+\s*[-–:,]\s*\d+)/)
+                             : b.match(/Settled\s+final\s+([\d.]+)/);
       var marked = b.match(/Marked down (.+)/);
 
       var vals = {};
@@ -3098,18 +3727,29 @@
       var trends = b.match(/Trends\s+(.*)/);
       if (trends && !/none entered/.test(trends[1])) {
         var tk = kvPairs(trends[1]);
-        vals.h2hAvg = tk["H2H avg total"];
-        vals.h2hGames = tk["H2H meetings"];
-        vals.formAway = tk["Away form avg"];
-        vals.formHome = tk["Home form avg"];
-        vals.formGames = tk["Form games"];
+        if (isSpread) {
+          vals.formAway = tk["Away form margin"];
+          vals.formHome = tk["Home form margin"];
+          vals.formGames = tk["Form games"];
+          vals.atsAwayWins = tk["Away ATS wins"];
+          vals.atsAwayLosses = tk["Away ATS losses"];
+          vals.atsHomeWins = tk["Home ATS wins"];
+          vals.atsHomeLosses = tk["Home ATS losses"];
+        } else {
+          vals.h2hAvg = tk["H2H avg total"];
+          vals.h2hGames = tk["H2H meetings"];
+          vals.formAway = tk["Away form avg"];
+          vals.formHome = tk["Home form avg"];
+          vals.formGames = tk["Form games"];
+        }
       }
       var settings = b.match(/Settings\s+(.*)/);
       var sk = settings ? kvPairs(settings[1]) : {};
       vals.lgRpg = sk["League R/G"];
       vals.lgPace = sk["League pace"];
       vals.lgRating = sk["League rating"];
-      vals.line = sk.Line !== undefined ? sk.Line : parseFloat(vd[4]);
+      vals.line = sk["Home spread"] !== undefined ? sk["Home spread"]
+                : sk.Line !== undefined ? sk.Line : parseFloat(vd[4]);
       vals.trust = sk.Trust !== undefined ? sk.Trust : 0.5;
 
       Object.keys(vals).forEach(function (k) {
@@ -3122,6 +3762,7 @@
         id: "rep" + (Date.parse(when) || Date.now()) + "-" + n,
         date: when, ts: Date.parse(when) || Date.now() - n,
         sport: sport, away: head[2].trim(), home: head[3].trim(),
+        betType: isSpread ? "spread" : "total",
         line: parseFloat(vd[4]), side: vd[2], band: vd[1],
         earnedBand: vd[6] || vd[1], winPct: parseFloat(vd[3]) / 100, pPush: 0,
         modelTotal: parseFloat(md[1]), projectedTotal: parseFloat(md[2]),
@@ -3132,7 +3773,7 @@
         }),
         status: head[6].toLowerCase(), note: "",
         inputs: null, values: vals,
-        final: settled ? parseFloat(settled[1]) : null
+        final: settled ? (isSpread ? settled[1].trim() : parseFloat(settled[1])) : null
       });
     });
     return out.length ? { entries: out, partial: false } : null;
@@ -3229,7 +3870,12 @@
       var raw = window.localStorage.getItem(VALUE_IDS_KEY);
       if (!raw) return;
       var vals = JSON.parse(raw);
-      if (vals && vals.__sport === state.sport) applyValues(vals);
+      if (!vals || vals.__sport !== state.sport) return;
+      // WNBA inputs remembered from before the spread pivot have no ATS
+      // fields and a 160-something total where the spread now goes. Dropping
+      // them beats restoring a game the projector would misread.
+      if (state.sport === "wnba" && vals.atsAwayWins === undefined) return;
+      applyValues(vals);
     } catch (e) { /* ignore */ }
   }
 
@@ -3355,5 +4001,3 @@
   setView("calc");
 })();
 </script>
-</body>
-</html>

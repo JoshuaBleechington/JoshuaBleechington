@@ -9,7 +9,7 @@ from .core import (
     Projection,
     evaluate,
 )
-from . import confidence, mlb, wnba
+from . import confidence, mlb, spread, wnba
 
 __all__ = [
     "Market",
@@ -17,9 +17,12 @@ __all__ = [
     "evaluate",
     "confidence",
     "mlb",
+    "spread",
     "wnba",
     "run_verdict",
     "run_verdict_slate",
+    "run_spread_verdict",
+    "run_spread_slate",
     "run_game",
     "run_slate",
     "DEFAULT_MODEL_WEIGHT",
@@ -109,5 +112,30 @@ def run_verdict_slate(sport: str, games: list[dict]) -> list[dict]:
     # there (LEAN was) can't silently leave this ranking one step behind.
     order = {b: i for i, b in enumerate(confidence.BANDS)}
     results = [run_verdict(sport, g) for g in games]
+    results.sort(key=lambda r: (order[r["band"]], r["win_pct"]), reverse=True)
+    return results
+
+
+def run_spread_verdict(sport: str, game: dict) -> dict:
+    """The spread read: which side covers the posted line, and how sure.
+
+    WNBA only. The totals verdict never answered well there -- the model's own
+    margin internals were always the sounder half of its projection -- so
+    basketball gets asked the margin question instead. MLB keeps the totals
+    verdict; run lines are a different animal and nothing here models them.
+    """
+    if sport.lower() != "wnba":
+        raise ValueError("The spread verdict is WNBA only; MLB stays on totals.")
+    if "spread" not in game:
+        raise ValueError("A posted home spread is required: set 'spread' "
+                         "(negative when the home side is favoured).")
+    projection = wnba.project(game)
+    return spread.decide_spread(projection, game).to_dict()
+
+
+def run_spread_slate(sport: str, games: list[dict]) -> list[dict]:
+    """Grade a spread slate, strongest read first."""
+    order = {b: i for i, b in enumerate(confidence.BANDS)}
+    results = [run_spread_verdict(sport, g) for g in games]
     results.sort(key=lambda r: (order[r["band"]], r["win_pct"]), reverse=True)
     return results

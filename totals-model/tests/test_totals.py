@@ -9,6 +9,7 @@ from totals import (  # noqa: E402
     market,
     mlb,
     run_game,
+    run_spread_verdict,
     run_verdict,
     run_verdict_slate,
     wnba,
@@ -1071,3 +1072,165 @@ class TestConfidenceModel(unittest.TestCase):
         self.assertLess(at(1), at(2))
         self.assertLess(at(0), at(1))
         self.assertEqual(at(3), at(2))
+
+
+class TestSpreadVerdict(unittest.TestCase):
+    """The WNBA spread verdict: which side covers, graded on the same ladder.
+
+    The pivot away from WNBA totals came from the log, not from theory: the
+    totals verdicts there ran hot and cold while the same model's margin
+    internals (separate scores, margin-only home court, an empirical margin
+    SD) sat unused. These tests pin the sign conventions, the trust budget,
+    and the record-to-margin conversion so the spread side can't drift.
+    """
+
+    def spread_game(self, **over):
+        g = {
+            "away": {"name": "A", "pace": 80, "off_rating": 107, "def_rating": 107,
+                     "rest_days": 2},
+            "home": {"name": "H", "pace": 80, "off_rating": 107, "def_rating": 107,
+                     "rest_days": 2},
+            "spread": -2.5,
+            "form": {"away_avg_margin": 0.0, "home_avg_margin": 0.0, "games": 8},
+            "ats_record": {"away": {"wins": 16, "losses": 16},
+                           "home": {"wins": 16, "losses": 16}},
+        }
+        g.update(over)
+        return g
+
+    def test_the_spread_is_already_the_market_margin(self):
+        """No bisection: a symmetric distribution's median is its mean."""
+        r = run_spread_verdict("wnba", self.spread_game(spread=-6.5))
+        self.assertEqual(r["market_margin"], 6.5)
+        r = run_spread_verdict("wnba", self.spread_game(spread=4.0))
+        self.assertEqual(r["market_margin"], -4.0)
+
+    def test_equal_teams_at_home_carry_the_home_court_margin(self):
+        r = run_spread_verdict("wnba", self.spread_game())
+        self.assertAlmostEqual(r["model_margin"], wnba.HOME_COURT_POINTS, places=2)
+
+    def test_a_spread_fatter_than_the_model_backs_the_dog(self):
+        """Equal teams are worth home court and no more; laying 6.5 is too many."""
+        r = run_spread_verdict("wnba", self.spread_game(spread=-6.5))
+        self.assertEqual(r["side"], "AWAY")
+        thin = run_spread_verdict("wnba", self.spread_game(spread=-0.5))
+        self.assertEqual(thin["side"], "HOME")
+
+    def test_mlb_is_refused(self):
+        with self.assertRaises(ValueError):
+            run_spread_verdict("mlb", self.spread_game())
+
+    def test_a_spread_is_required(self):
+        g = self.spread_game()
+        del g["spread"]
+        with self.assertRaises(ValueError):
+            run_spread_verdict("wnba", g)
+
+    def test_no_price_anywhere(self):
+        r = run_spread_verdict("wnba", self.spread_game())
+        for banned in ("ev_per_unit", "kelly_stake_pct", "fair_odds", "recommended"):
+            self.assertNotIn(banned, r)
+        self.assertIn("band", r)
+        self.assertIn("win_pct", r)
+
+    def test_form_is_a_difference_of_margins_plus_home_court(self):
+        """Each team's average margin is venue-neutral; tonight is not."""
+        r = run_spread_verdict("wnba", self.spread_game(
+            form={"away_avg_margin": -3.0, "home_avg_margin": 4.0, "games": 8}))
+        form = [s for s in r["signals"] if s["name"] == "Recent form"][0]
+        self.assertAlmostEqual(form["value"],
+                               4.0 - (-3.0) + wnba.HOME_COURT_POINTS, places=2)
+
+    def test_flat_form_margins_still_lean_home_by_home_court(self):
+        """Without the add-back, form would dissent away on every single game."""
+        r = run_spread_verdict("wnba", self.spread_game(spread=0.0))
+        form = [s for s in r["signals"] if s["name"] == "Recent form"][0]
+        self.assertEqual(form["side"], "HOME")
+        self.assertAlmostEqual(form["lean"], wnba.HOME_COURT_POINTS, places=2)
+
+    def test_the_matchup_model_keeps_at_least_half_the_trust(self):
+        r = run_spread_verdict("wnba", self.spread_game(trust=1.0))
+        weights = {s["name"]: s["weight"] for s in r["signals"]}
+        self.assertGreaterEqual(weights["Matchup model"], 0.5 - 1e-9)
+        self.assertAlmostEqual(sum(weights.values()), 1.0, places=6)
+
+    def test_ats_records_point_in_opposite_directions(self):
+        """Home covering its games and away failing its games both lean home."""
+        home_hot = run_spread_verdict("wnba", self.spread_game(
+            ats_record={"away": {"wins": 16, "losses": 16},
+                        "home": {"wins": 22, "losses": 10}}))
+        away_cold = run_spread_verdict("wnba", self.spread_game(
+            ats_record={"away": {"wins": 10, "losses": 22},
+                        "home": {"wins": 16, "losses": 16}}))
+        for r in (home_hot, away_cold):
+            ats = [s for s in r["signals"] if s["name"] == "ATS record"][0]
+            self.assertEqual(ats["side"], "HOME")
+            self.assertGreater(ats["lean"], 0)
+
+    def test_a_half_entered_ats_record_does_not_vote(self):
+        """Same rule as everywhere: a missing field must not become a number."""
+        r = run_spread_verdict("wnba", self.spread_game(
+            ats_record={"away": {"wins": 20},
+                        "home": {"wins": 16, "losses": 16}}))
+        ats = [s for s in r["signals"] if s["name"] == "ATS record"][0]
+        self.assertIsNone(ats["value"])
+        self.assertEqual(ats["weight"], 0.0)
+
+    def test_a_thin_ats_record_earns_less_weight(self):
+        fat = run_spread_verdict("wnba", self.spread_game())
+        thin = run_spread_verdict("wnba", self.spread_game(
+            ats_record={"away": {"wins": 2, "losses": 2},
+                        "home": {"wins": 2, "losses": 2}}))
+        w = lambda r: [s for s in r["signals"]
+                       if s["name"] == "ATS record"][0]["weight"]
+        self.assertLess(w(thin), w(fat))
+
+    def test_a_lopsided_ats_record_is_flagged_as_a_probable_typo(self):
+        r = run_spread_verdict("wnba", self.spread_game(
+            ats_record={"away": {"wins": 30, "losses": 2},
+                        "home": {"wins": 16, "losses": 16}}))
+        self.assertTrue(any("against-the-spread record" in f for f in r["flags"]))
+
+    def test_a_model_miles_from_the_spread_is_a_symptom(self):
+        r = run_spread_verdict("wnba", self.spread_game(spread=-14.5))
+        self.assertTrue(any("usually a bad input" in f for f in r["flags"]))
+
+    def test_no_trends_costs_a_band_and_names_them(self):
+        g = self.spread_game()
+        del g["form"], g["ats_record"]
+        r = run_spread_verdict("wnba", g)
+        self.assertIn("no recent form or ats record to corroborate it",
+                      r["downgrades"])
+
+    def test_a_whole_number_spread_can_push(self):
+        whole = run_spread_verdict("wnba", self.spread_game(spread=-3.0))
+        half = run_spread_verdict("wnba", self.spread_game(spread=-3.5))
+        self.assertGreater(whole["notes"]["p_push"], 0)
+        self.assertEqual(half["notes"]["p_push"], 0)
+
+    def test_head_to_head_never_votes_on_a_spread(self):
+        r = run_spread_verdict("wnba", self.spread_game(
+            h2h={"avg_margin": 25.0, "games": 3}))
+        self.assertEqual([s["name"] for s in r["signals"]],
+                         ["Matchup model", "Recent form", "ATS record"])
+
+    def test_the_ladder_is_the_same_ladder(self):
+        """A dissenting trend steps the spread band down exactly one rung."""
+        agree = run_spread_verdict("wnba", self.spread_game(
+            spread=-8.5,
+            form={"away_avg_margin": 4.0, "home_avg_margin": -4.0, "games": 8}))
+        dissent = run_spread_verdict("wnba", self.spread_game(
+            spread=-8.5,
+            form={"away_avg_margin": -6.0, "home_avg_margin": 6.0, "games": 8}))
+        self.assertEqual(agree["side"], "AWAY")
+        self.assertIn("recent form points the other way (home)",
+                      dissent["downgrades"])
+        self.assertLess(BANDS_ORDER[dissent["band"]], BANDS_ORDER[agree["band"]])
+
+    def test_rest_moves_the_margin(self):
+        """A tired home side is worth less against the same spread."""
+        rested = run_spread_verdict("wnba", self.spread_game())
+        g = self.spread_game()
+        g["home"]["rest_days"] = 0
+        tired = run_spread_verdict("wnba", g)
+        self.assertLess(tired["model_margin"], rested["model_margin"])

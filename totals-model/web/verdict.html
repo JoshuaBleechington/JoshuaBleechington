@@ -1264,6 +1264,10 @@
   // keep a thin sample from swinging the implied value to an unstable extreme.
   var OU_CLAMP = [0.15, 0.85];
 
+  // Innings behind a starter's ERA below which the number is mostly noise.
+  // Calibrated for a SEASON sample, which is what this field is for again.
+  var THIN_STARTER_IP = 40;
+
   // A projection this far from the market is treated as a symptom, not an edge.
   var IMPLAUSIBLE = { MLB: 2.0, WNBA: 12.0 };
   // How far a signal must lean before it counts as dissenting rather than quiet.
@@ -1403,12 +1407,14 @@
       if (sport === "MLB") {
         if (!isNum(t.starterSeasonIp) || t.starterSeasonIp <= 0)
           out.push("no season innings for the " + nm + " starter, so he is a league average arm");
-        // No "only N innings" flag past this by request, to run this field as
-        // a last-5-starts window instead of a season. A real value there is
-        // always under 40 by design, so the old flag would fire on every
-        // single game and say nothing. The blank/zero check above still
-        // stands -- an ERA with genuinely no innings behind it at all is a
-        // different, worse problem than a real short window.
+        // Back to a season sample, so the thin-sample flag comes back with it:
+        // under 40 innings an ERA is mostly noise, and the verdict says so and
+        // costs a band. (It was off for one day while this field was being run
+        // as a last-5 window, where a real value is always under 40 by design
+        // and the flag therefore fired on every game and said nothing.)
+        else if (t.starterSeasonIp < THIN_STARTER_IP)
+          out.push("only " + Math.round(t.starterSeasonIp) + " innings behind the " + nm +
+                   " starter's ERA");
       }
       var ranges = FIELD_RANGES[sport];
       Object.keys(ranges).forEach(function (key) {
@@ -1936,10 +1942,11 @@
         "over 40 innings is mostly noise. <b>FIP or xERA works better than ERA</b>. <b>Avg IP</b> " +
         "is that innings total ÷ games started; it splits the game between the starter and the pen. " +
         "Leave a box blank rather than typing 0 — a zero is read as unknown, and says so in the " +
-        "verdict. Season isn't the only option: swap in a starter's last 5 (or any) starts by " +
-        "entering that stretch's ERA, its total innings, and its average IP per start together — " +
-        "just the three as a set. A short stretch regresses harder toward average on its own, " +
-        "which is the correction; there's no separate thin-sample warning on top of it.";
+        "verdict. <b>Use season numbers</b> — the ERA, the season innings behind it, and the " +
+        "average IP per start, as a set. Under 40 innings the ERA is mostly noise, and the " +
+        "verdict flags it and drops a band. A shorter window still works arithmetically " +
+        "(regress_era shrinks by whatever innings you give it), but the flag is calibrated " +
+        "for a season, so it would fire every game and tell you nothing.";
       $("h2h-fields").hidden = false;
       $("ats-fields").hidden = true;
       $("trends-lede").textContent =

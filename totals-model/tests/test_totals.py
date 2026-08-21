@@ -814,20 +814,26 @@ class TestConfidenceModel(unittest.TestCase):
         self.assertTrue(any("league average arm" in f for f in r["flags"]))
         self.assertIn("inputs behind it are thin", " ".join(r["downgrades"]))
 
-    def test_a_short_starter_sample_is_not_flagged_on_its_own(self):
-        """The thin-sample flag below 40 innings was removed by request, to run
+    def test_a_thin_starter_sample_is_flagged_and_costs_a_band(self):
+        """Under 40 innings, an ERA is mostly noise, and the verdict says so.
 
-        this field as a last-5-starts window rather than a season -- a real
-        value there is always under 40 by design, so the old flag would have
-        fired on every game and said nothing. A real, nonzero number, however
-        small, is not itself a reason for a downgrade any more; only a
-        genuinely blank or zero one still is (see the test above).
+        This flag was off for one day, while this field was being run as a
+        last-5-starts window -- a real value there is always under 40 by
+        design, so it fired on every game and said nothing. Back on a season
+        sample the threshold means something again, so the flag is back with
+        it. The two belong together: the number and the warning about the
+        number are calibrated for the same window.
         """
         g = self.mlb_game()
-        g["home"]["starter_season_ip"] = 6  # one start's worth, still a real number
+        g["home"]["starter_season_ip"] = 6  # one start's worth, on a season field
         r = run_verdict("mlb", g)
-        self.assertEqual(r["flags"], [])
-        self.assertEqual(r["downgrades"], [])
+        self.assertTrue(any("only 6 innings behind" in f for f in r["flags"]), r["flags"])
+        self.assertIn("inputs behind it are thin", " ".join(r["downgrades"]))
+
+        # A full season's worth is not flagged, so the warning still separates
+        # the thin from the ordinary rather than firing on everything.
+        g["home"]["starter_season_ip"] = 140
+        self.assertEqual(run_verdict("mlb", g)["flags"], [])
 
     def test_an_impossible_number_names_itself(self):
         """A typo does not announce itself -- it gets absorbed.

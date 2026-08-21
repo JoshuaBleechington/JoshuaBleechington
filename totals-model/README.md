@@ -323,8 +323,9 @@ logged with a record entered, the same way `FORM_SHARE` was checked against
 > signal with it; the library kept the capability, the page changed which
 > question it asks. See **The spread verdict** below for why.
 
-**`starter_season_ip` isn't tied to a season.** It means "innings behind this
-ERA," full stop — regress_era() shrinks toward league average by whatever
+**`starter_season_ip` is a season figure again.** Under 40 innings it is
+flagged and costs a band. The field still works arithmetically for any window
+-- it means "innings behind this ERA," full stop — regress_era() shrinks toward league average by whatever
 number goes there, whether that is a full season or a starter's last 5 starts.
 Swap in a shorter window by moving the ERA, this field, and `starter_ip`
 (average IP per start) together as a set; a short window regresses harder

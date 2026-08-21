@@ -21,7 +21,7 @@ Three consequences follow from that, and they are the whole design:
 
 * **Confidence can only be lost, never gained.** The band starts at whatever the
   win probability earns, and every doubt -- signals pointing different ways, a
-  starter with no innings behind him at all, a projection miles from the market
+  starter with nine innings behind him, a projection miles from the market
   -- knocks it down a step. Nothing knocks it up. Four separate faults in this
   project's history all presented as *high* confidence, so the asymmetry is
   deliberate: an unusually strong number is a reason for suspicion before it is
@@ -131,6 +131,18 @@ OU_SPORTS = frozenset({"WNBA"})
 # same width both ways: used to flag an extreme raw record, and to keep a small
 # sample from swinging the implied value to an unstable extreme.
 OU_PCT_CLAMP = (0.15, 0.85)
+
+# Innings behind a starter's ERA below which the number is mostly noise, and
+# the verdict says so and costs a band.
+#
+# This is calibrated for a SEASON-long sample, which is what this field is for.
+# It was removed for a day to run the field as a last-5-starts window instead;
+# a real last-5 value is always under 40 by design, so the flag fired on every
+# game and said nothing, and a warning that always fires is not a warning.
+# Going back to season numbers puts the flag back with it -- the two belong
+# together, and the one day of last-5 verdicts sits in the log under different
+# rules from everything before and after it.
+THIN_STARTER_IP = 40.0
 
 # A projection this far from the market is treated as a symptom, not a signal.
 # Every large disagreement this model has produced in practice traced back to an
@@ -385,15 +397,8 @@ def quality_flags(sport: str, game: dict[str, Any], model_total: float,
                 flags.append(
                     f"no season innings for the {name} starter, so he is a league average arm"
                 )
-            # No "only N innings" flag past this. There used to be one below 40,
-            # calibrated for a season-long sample. Removed by request to run
-            # this field as a last-5-starts window instead -- a real value
-            # there is always going to be under 40 by design, so the flag would
-            # fire on every single game and say nothing. The blank/zero check
-            # above still stands: an ERA with genuinely no innings behind it at
-            # all is a different, worse problem than a real short window, and
-            # is exactly what turned a 0.00 ERA into this model's largest
-            # false-confidence bet before that check existed.
+            elif float(ip) < THIN_STARTER_IP:
+                flags.append(f"only {float(ip):.0f} innings behind the {name} starter's ERA")
 
         for key, (lo, hi, label) in FIELD_RANGES[sport].items():
             v = t.get(key)

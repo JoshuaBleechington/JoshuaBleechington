@@ -644,6 +644,13 @@
      backed/passed, hitting the duplicate guard, or forgetting a line all
      looked identical: nothing visibly happened. This is that feedback, where
      a desktop user can actually see it. */
+  /* What this band has actually done, in this log, next to what it claims.
+     The band is a prediction; this is the scoreboard for that prediction. */
+  .band-evidence { font-size: 12.5px; line-height: 1.55; }
+  .band-evidence b { font-family: var(--mono); }
+  .band-evidence.under { background: var(--bad-wash); color: var(--ink); }
+  .band-evidence.under b { color: var(--bad); }
+
   #log-status:empty { display: none; }
   #log-status.ok   { color: var(--good); font-weight: 650; }
   #log-status.warn { color: var(--bad); font-weight: 650; }
@@ -795,6 +802,7 @@
         </div>
 
         <div class="band-wrap" id="band-wrap"></div>
+        <p class="note band-evidence" id="band-evidence" hidden></p>
         <ul class="downgrades" id="downgrades"></ul>
 
         <div class="metrics">
@@ -1226,6 +1234,19 @@
      0.00 — all presented as unusually high confidence. An exceptional number
      is a reason to check the inputs before it is a reason to bet.
   ===================================================================== */
+
+  /* Which configuration produced a verdict. Stamped onto every logged game.
+     Eight days of logs turned out to hold at least four different models --
+     the form share moved, the trust slider spent a day at 1.00, the pitching
+     window went to last-5 and back, LEAN appeared partway through -- and
+     nothing in the log said which games came from which. So the band table
+     could not answer "does MEDIUM work", only "did MEDIUM work across four
+     models averaged together", which is not a question worth asking.
+
+     Bump this whenever a constant that moves a verdict changes. Leave it
+     alone for display-only changes: a stamp that changes when nothing changed
+     splits the evidence for no reason. */
+  var MODEL_VERSION = "2026-08-21";
 
   var BAND_HIGH = 0.580, BAND_MEDIUM = 0.545, BAND_LOW = 0.520;
   // LEAN is landing-only: bandFor() never returns it directly. A game only
@@ -2255,6 +2276,7 @@
     ["downgrades", "signals", "why", "split", "split-legend", "chart", "dist-table"]
       .forEach(function (id) { $(id).innerHTML = ""; });
     markBadFields([]);
+    if ($("band-evidence")) $("band-evidence").hidden = true;
     ["m-prob", "m-mean", "m-agree", "m-push"].forEach(function (id) {
       $(id).textContent = "—";
       $(id).style.color = "";
@@ -2319,6 +2341,8 @@
           (r.downgrades.length === 1 ? "a band" : r.downgrades.length + " bands") + ":"
         : "") +
       "</span>";
+
+    bandEvidence(r);
 
     $("downgrades").innerHTML = r.downgrades.map(function (d, i) {
       var note = (r.downgradeNotes || [])[i];
@@ -3194,6 +3218,7 @@
       // the home spread, and the three model numbers are margins. betType is
       // what says which reading applies, everywhere downstream.
       betType: isSpread ? "spread" : "total",
+      modelVersion: MODEL_VERSION,
       line: r.line, side: r.side, band: r.band, earnedBand: r.earnedBand,
       winPct: r.winPct, pPush: r.pPush,
       modelTotal: isSpread ? r.modelMargin : r.modelTotal,
@@ -3235,6 +3260,61 @@
   function parseFinalScores(v) {
     var m = String(v).trim().match(/^(\d+)\s*[-–:,\s]\s*(\d+)$/);
     return m ? [parseFloat(m[1]), parseFloat(m[2])] : null;
+  }
+
+  /* How this exact band has actually performed, in this log, on this kind of
+     bet. Shown directly under the verdict, because a band is a claim about a
+     hit rate and the log is the only thing that can check it.
+
+     Scoped to the same sport AND the same bet type on purpose. An MLB totals
+     LOW and a WNBA spread LOW are different claims that happen to share a
+     name; pooling them would produce a number that describes neither. Scoped
+     to the same model version too -- a band's record under a configuration
+     that no longer exists is not evidence about the one running now.
+  */
+  function bandEvidence(r) {
+    var el = $("band-evidence");
+    if (!el) return;
+    var betType = r.betType || "total";
+    var same = store.entries.filter(function (e) {
+      return e.band === r.band && e.sport === r.sport &&
+             (e.betType || "total") === betType &&
+             (e.modelVersion || "") === MODEL_VERSION &&
+             gradeOf(e) !== null;
+    });
+    var w = 0, l = 0, expected = 0;
+    same.forEach(function (e) {
+      var g = gradeOf(e);
+      if (g === "W") w++; else if (g === "L") l++;
+      if (g === "W" || g === "L") expected += e.winPct;
+    });
+    var n = w + l;
+    var label = r.band + " " + r.sport + " " + (betType === "spread" ? "spread" : "totals");
+
+    if (!n) {
+      el.hidden = false;
+      el.className = "note band-evidence";
+      el.innerHTML = "No settled <b>" + esc(label) + "</b> games logged under the current " +
+        "model yet. Log this one either way — a band with nothing behind it is a claim, " +
+        "not a record.";
+      return;
+    }
+    var hit = w / n, claimed = expected / n;
+    /* "Behind its claim" needs a real gap AND enough games to mean it. The
+       floor is the same 20 the sentence below uses to stop disclaiming --
+       otherwise the panel turns red while its own text says the number is
+       too thin to read, which is the page arguing with itself. */
+    var behind = n >= 20 && hit < claimed - 0.05;
+    el.hidden = false;
+    el.className = "note band-evidence" + (behind ? " under" : "");
+    el.innerHTML = "In your log, <b>" + esc(label) + "</b> is <b>" + w + "-" + l +
+      "</b> (" + pct(hit) + ") across " + n + " settled " + (n === 1 ? "game" : "games") +
+      ", against the <b>" + pct(claimed) + "</b> it claimed. " +
+      (n < 20
+        ? "Far too few to read — this needs about 50."
+        : behind
+          ? "This band is currently not doing what it says."
+          : "Holding up so far.");
   }
 
   function gradeOf(e) {
@@ -3283,21 +3363,37 @@
     var backed = entries.filter(function (e) { return e.status === "backed"; });
     var s = summarise(backed);
     var settled = entries.filter(function (e) { return gradeOf(e) !== null; });
+    /* The passed games are shown next to the backed ones deliberately. They
+       are the control group: the model's advice, unbet. If the games you
+       skipped are beating the games you took, that is the single most useful
+       fact this page can tell you, and it was previously buried in the
+       exported report where nobody looks. */
+    var passed = entries.filter(function (e) { return e.status !== "backed"; });
+    var ps = summarise(passed);
     var html =
       tile("Logged", entries.length,
            backed.length + " backed, " + (entries.length - backed.length) + " passed") +
-      tile("Settled", settled.length, "") +
       tile("Your record", s.w + "-" + s.l + (s.p ? "-" + s.p : ""),
            s.hitRate === null ? "no decided games yet" : pct(s.hitRate) + " hit rate", true) +
+      tile("Games you passed", ps.w + "-" + ps.l + (ps.p ? "-" + ps.p : ""),
+           ps.hitRate === null ? "none settled" : pct(ps.hitRate) + " hit rate") +
       tile("Model expected", s.decided ? s.expected.toFixed(1) + " wins" : "—",
            s.decided ? "you got " + s.w : "") +
       "";
     $("summary").innerHTML = html;
-    $("summary-note").innerHTML = s.decided && s.decided < 30
+    var thin = s.decided && s.decided < 30
       ? s.decided + " decided " + (s.decided === 1 ? "game" : "games") + " is far too few to " +
         "read. A hit rate needs 50 to 100 before it means anything, and the band table below " +
         "needs that many <em>per band</em>."
       : "";
+    // Only worth saying once both sides have enough games to be worth comparing.
+    var fade = (s.decided >= 15 && ps.decided >= 15 && ps.hitRate > s.hitRate)
+      ? "<b>The games you passed are out-hitting the games you backed</b> (" +
+        pct(ps.hitRate) + " vs " + pct(s.hitRate) + "). That is the comparison worth " +
+        "watching: it says the picks you acted on were not the better half of the model's " +
+        "output."
+      : "";
+    $("summary-note").innerHTML = [fade, thin].filter(Boolean).join(" ");
   }
 
   /* The only question that matters: do the bands rank correctly, and does each

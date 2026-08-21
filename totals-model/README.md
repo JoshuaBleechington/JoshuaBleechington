@@ -445,6 +445,34 @@ produce confident nonsense.
 
 ---
 
+## Reading the recommendation
+
+Three things on the page exist to stop a band being read as more than it is.
+
+**The band's own record, under the band.** A band is a claim about a hit rate.
+Directly beneath it the page prints what that band has actually done in your
+log — scoped to the same sport, the same bet type, and the same model version,
+because an MLB totals LOW and a WNBA spread LOW are different claims that
+happen to share a name. Below 20 settled games it says so and stays quiet;
+past that, if the band is more than 5 points under what it claimed, it says
+that instead.
+
+**Backed against passed.** The summary shows the games you took and the games
+you skipped side by side. The skipped games are the control group: the model's
+advice, unbet. If they are out-hitting the games you backed, the page says so
+outright — that is the single most useful fact a track record can produce, and
+it used to be buried in the exported report.
+
+**A model version stamp.** Every logged game records which configuration
+produced it (`MODEL_VERSION`). Eight days of early logs turned out to contain
+at least four different models — the form share moved, the trust slider spent a
+day at 1.00, the pitching window went to last-5 and back, LEAN appeared partway
+through — and nothing recorded which games came from which, so the band table
+could only report on four models averaged together. Bump the stamp when a
+constant that moves a verdict changes; leave it alone for display-only changes.
+
+---
+
 ## Tuning it
 
 League baselines live at the top of `totals/mlb.py` and `totals/wnba.py` and

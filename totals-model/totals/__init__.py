@@ -9,13 +9,14 @@ from .core import (
     Projection,
     evaluate,
 )
-from . import confidence, mlb, spread, wnba
+from . import confidence, late, mlb, spread, wnba
 
 __all__ = [
     "Market",
     "Projection",
     "evaluate",
     "confidence",
+    "late",
     "mlb",
     "spread",
     "wnba",
@@ -23,6 +24,7 @@ __all__ = [
     "run_verdict_slate",
     "run_spread_verdict",
     "run_spread_slate",
+    "run_late_verdict",
     "run_game",
     "run_slate",
     "DEFAULT_MODEL_WEIGHT",
@@ -139,3 +141,13 @@ def run_spread_slate(sport: str, games: list[dict]) -> list[dict]:
     results = [run_spread_verdict(sport, g) for g in games]
     results.sort(key=lambda r: (order[r["band"]], r["win_pct"]), reverse=True)
     return results
+
+
+def run_late_verdict(game: dict) -> dict:
+    """The late-factor read: adjust the posted total, never replace it.
+
+    MLB only. This is the model that replaced the season-statistics verdict
+    for totals -- see ``totals/late.py`` for the measurements that retired it.
+    ``run_verdict`` is still here and still runs, but it is not the one to bet.
+    """
+    return late.decide_late(game).to_dict()

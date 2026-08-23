@@ -23,6 +23,85 @@ offline. Numbers were checked against the Python to six decimal places.
 It also keeps a **track record**, which is the part that matters if you ever
 want to know whether any of this works. See below.
 
+## Read this first: the MLB totals verdict was retired
+
+The season-statistics verdict for MLB totals does not work, and it is not a
+tuning problem. Measured over 116 settled games in the track record:
+
+| | |
+|---|---|
+| Mean absolute error, model's projected total | **3.61 runs** |
+| Mean absolute error, *just using the posted line* | **3.58 runs** |
+
+The projection was a slightly noisier copy of the number it was betting
+against. Two further checks agree:
+
+* **Nothing predicts the residual.** Correlating each collected input against
+  (final total − posted line), the largest was temperature at t = −1.60.
+  Combined runs/game reached t = +0.60, combined starter ERA t = +0.87, park
+  factor t = −0.57, recent form t = −0.07. Nothing cleared |t| = 2.
+* **No combination of them does either.** Ridge regression on all fourteen
+  inputs, leave-one-out cross-validated, gave a *negative* out-of-sample
+  R² at every regularisation strength (best −0.055), improving monotonically
+  as the fit was forced toward using none of them. Betting that fit's own
+  out-of-sample side went **44-69 (38.9%)**.
+* **And the weights never mattered.** Sweeping `FORM_SHARE` from 0.30 to 0 and
+  `H2H_SHARE` from 0.35 to 0, every combination landed between 48.7% and 53.1%
+  overall and 48.0%–50.0% on the actionable picks.
+
+Every input that model uses is published, public, and inside the posted number
+before you see it. There is no gap to find, so no arrangement of them finds
+one. `run_verdict` still exists and still runs — the code is unchanged and the
+tests still pass — but it is not the one to bet.
+
+## The late-factor model — `totals/late.py`
+
+The replacement starts from the opposite premise: **the posted total is the
+best forecast available, and this model does not compete with it.** It adjusts
+the line, and only for things that (a) have a documented effect on run scoring
+and (b) are not reliably in the number when you see it.
+
+```python
+from totals import run_late_verdict
+
+r = run_late_verdict({
+    "away": {"name": "Toronto", "relievers_unavailable": 2},
+    "home": {"name": "Yankees"},
+    "weather": {"temp_f": 74, "wind_mph": 14, "wind_direction": "out"},
+    "umpire": {"name": "Ed Hickox", "runs_per_game": 9.3, "games": 210},
+    "line": 8.5,
+})
+r["side"], r["win_pct"], r["band"]   # ('OVER', 0.6233, 'STRONG')
+```
+
+| Adjustment | Basis | What it needs |
+|---|---|---|
+| **Umpire** | documented | His own runs/game and games worked, regressed toward league by `n/(n+120)` — published daily by RotoWire, OddsShark, RefMetrics, and posted the morning of the game |
+| **Wind** | documented | Speed **and direction** (`out`/`in`/`cross`). Dead below 8 mph, then 0.10 runs/mph, capped at 1.5. A cross wind is explicitly zero |
+| **Temperature** | documented | Degrees from a 70°F baseline at 0.008 runs each, capped at 0.35 — deliberately modest, since it is the weather term the market prices best |
+| **Bullpen availability** | *provisional* | High-leverage arms unavailable per side. The best claim to being unpriced: it breaks after lines open and season bullpen ERA cannot see it |
+| **Lineup** | *provisional* | Regulars out per side |
+
+Three things are different in kind from the old model:
+
+**It refuses to invent an edge.** With no late factor supplied it returns
+`NO EDGE` and says why — not a 51% lean squeezed out of season stats. Feeding
+it the old model's entire feature set changes nothing; those fields are not
+read at all.
+
+**The numbers are small, because the measurement says they should be.**
+`RESIDUAL_SD = 4.39` is the observed standard deviation of (final − line) over
+those 116 games. A *full run* of adjustment is a quarter of one standard
+deviation. That is why an honest edge here reads 53%, not 62%, and why the
+first band that names a bet (`SLIM`) starts at 52.38% — the actual −110
+breakeven — rather than at it.
+
+**Placeholder coefficients announce themselves.** Every adjustment carries a
+`basis` of `documented` or `provisional`, the verdict reports the two subtotals
+separately, and if most of an edge rests on placeholders it says so in the
+notes. Nothing here was tuned on the 116 games — those games contain none of
+these inputs, which is the entire point.
+
 ## Closing line value, and why the record isn't the point
 
 A win/loss record is a terrible way to evaluate a model, because the sample

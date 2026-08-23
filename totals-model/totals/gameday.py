@@ -41,12 +41,14 @@ A recommendation has to survive all four:
   With no validated weights there is no honest way to net two real signals that
   disagree, so the honest answer is to stand down.
 
-Magnitudes are in runs, and positive always means toward the OVER.
+Magnitudes are in runs (MLB) or points (WNBA), and positive always means
+toward the OVER.
 
 Scope
 -----
-MLB totals. The WNBA spread model that used to live alongside this went 4-5
-and was retired; basketball is not covered here at all.
+Totals, both sports. The WNBA *spread* model went 4-5 and is retired -- what is
+here is the over/under, which is what the WNBA side of this project was before
+the spread pivot. Nothing here prices a side or a spread in either sport.
 """
 
 from __future__ import annotations
@@ -55,20 +57,24 @@ from dataclasses import dataclass, field
 from datetime import date
 from typing import Any, Iterable
 
-# MLB totals only. The WNBA spread model went 4-5 and was retired at the
-# owner's call; nothing here covers basketball and adding a sport back means
-# adding its dispersion, its thresholds and its own checklist deliberately.
+# Totals only, both sports. The WNBA *spread* model went 4-5 and is retired;
+# what came back is the over/under, which is what the WNBA half of this project
+# was before the spread pivot.
 #
-# How big the residual, unpriced edge has to be before it is worth acting on.
-# MLB totals scatter with a standard deviation of 4.39 runs around the line, so
-# these are roughly a tenth and a fifth of a standard deviation. Below that the
-# edge is smaller than the vig and the honest answer is no.
-MIN_EDGE = {"MLB": 0.45}
-STRONG_EDGE = {"MLB": 0.90}
-
 # Measured, not chosen: the observed standard deviation of (final total minus
-# posted line) over the 116 settled MLB games in the track record.
-DISPERSION = {"MLB": 4.39}
+# posted line). MLB is 4.39 over 116 settled games. WNBA is 11.51 over 13, which
+# is far too few to trust as a point estimate -- it is used because it is the
+# only measurement available and because it agrees with the 11.0 the spread
+# model used for margins, not because 13 games settle anything.
+DISPERSION = {"MLB": 4.39, "WNBA": 11.51}
+
+# How big the residual, unpriced edge has to be before it is worth acting on.
+# Both are the same fractions of their own dispersion -- about a tenth for a
+# LEAN and a fifth for a BET -- so the two sports demand the same evidence in
+# the units each is actually measured in. Below that the edge is smaller than
+# the vig and the honest answer is no.
+MIN_EDGE = {"MLB": 0.45, "WNBA": 1.20}
+STRONG_EDGE = {"MLB": 0.90, "WNBA": 2.40}
 
 BASES = ("documented", "provisional")
 VERDICTS = ("PASS", "LEAN", "BET")
@@ -366,3 +372,52 @@ def temperature(temp_f: float, source: str, as_of=None) -> "Evidence":
     runs = max(-0.35, min(0.35, (temp_f - 70.0) * 0.008))
     return Evidence("Temperature", runs, "documented",
                     f"{source}: {temp_f:.0f}F against a 70F baseline.", as_of)
+
+
+# A missing rotation player costs a WNBA team more than in any other league:
+# twelve-deep rosters, starters at 32+ minutes, and no bench to absorb it. The
+# direction is documented -- absent offensive players pull totals down, absent
+# defensive ones push them up -- but the size per player is not, so these are
+# capped hard and deliberately conservative. Two points for a starter, three
+# and a half for a team's leading scorer, and a ceiling per team however long
+# the injury list runs, because the fourth man out is being replaced by someone
+# who would not otherwise take the floor and the returns stop compounding well
+# before that.
+#
+# The ceiling is 8.0 rather than the 6.0 first written here. At 6.0 it bound at
+# three absences, so three, five and nine all scored identically and the model
+# could not tell a thin night from a gutted one. It binds at four now, which
+# keeps the granularity that matters and still refuses to let a long list read
+# as a huge edge.
+POINTS_PER_STARTER_OUT = 2.0
+POINTS_LEADING_SCORER_OUT = 3.5
+MAX_POINTS_PER_TEAM_OUT = 8.0
+
+
+def players_out(team: str, starters_out: int, source: str,
+                leading_scorer_out: bool = False, as_of=None) -> "Evidence | None":
+    """Absent rotation players, as points off the total.
+
+    ``starters_out`` counts rotation regulars, including the leading scorer if
+    ``leading_scorer_out``. Returns None at zero rather than an Evidence worth
+    nothing -- a team with nobody out is not a reading about tonight.
+    """
+    if starters_out <= 0:
+        return None
+    base = (starters_out - 1) * POINTS_PER_STARTER_OUT if leading_scorer_out \
+        else starters_out * POINTS_PER_STARTER_OUT
+    if leading_scorer_out:
+        base += POINTS_LEADING_SCORER_OUT
+    points = -min(MAX_POINTS_PER_TEAM_OUT, base)
+    who = f"{starters_out} rotation regular{'s' if starters_out != 1 else ''}"
+    if leading_scorer_out:
+        who += ", including their leading scorer"
+    return Evidence(
+        f"{team} absences",
+        points,
+        "documented",
+        f"{source}: {who} out. Worth {points:+.1f} on a capped coefficient — "
+        "the direction is documented, the size is not, and the cap is what "
+        "stops a five-deep injury list reading as a fifteen-point edge.",
+        as_of,
+    )

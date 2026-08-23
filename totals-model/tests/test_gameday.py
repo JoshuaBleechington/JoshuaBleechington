@@ -9,6 +9,8 @@ import unittest
 from datetime import date
 
 from totals.gameday import (
+    DISPERSION,
+    players_out,
     public_split,
     temperature,
     umpire,
@@ -189,15 +191,14 @@ class TestEvidenceHygiene(unittest.TestCase):
                    [ev("Umpire", 1.0, source="RotoWire assignments")], DAY)
         self.assertIn("RotoWire assignments", c.brief())
 
-    def test_only_mlb_is_supported(self):
-        """WNBA was retired at the owner's call; nothing here covers it.
-
-        Adding a sport back means adding its dispersion, its thresholds and its
-        own checklist on purpose, not by a string slipping through.
-        """
-        for sport in ("WNBA", "NFL", "NBA"):
+    def test_only_the_two_totals_markets_are_supported(self):
+        """Adding a sport means adding its dispersion and thresholds on purpose,
+        not by a string slipping through."""
+        for sport in ("NFL", "NBA", "NHL"):
             with self.assertRaises(ValueError):
                 decide(sport, "A @ B", "total 44", "OVER", "UNDER", [], DAY)
+        for sport in ("MLB", "WNBA"):
+            decide(sport, "A @ B", "total 180", "OVER", "UNDER", [], DAY)
 
 
 if __name__ == "__main__":
@@ -263,3 +264,66 @@ class TestEvidenceBuilders(unittest.TestCase):
         self.assertEqual(c.verdict, "BET")
         self.assertLess(c.net, -0.9)
         self.assertTrue(all(c.gates.values()))
+
+
+class TestWnbaAbsences(unittest.TestCase):
+    """The WNBA is back as a totals market only -- the spread model went 4-5."""
+
+    def test_a_thin_bench_is_worth_more_than_in_any_other_league(self):
+        e = players_out("Toronto", 3, "beat writer", leading_scorer_out=True,
+                        as_of=DAY)
+        self.assertLess(e.worth, 0)
+        self.assertAlmostEqual(e.worth, -(3.5 + 2 * 2.0))
+
+    def test_the_leading_scorer_counts_once_not_twice(self):
+        """He is one of the starters_out, not an extra body on top of them."""
+        with_star = players_out("T", 1, "src", leading_scorer_out=True, as_of=DAY)
+        without = players_out("T", 1, "src", as_of=DAY)
+        self.assertAlmostEqual(with_star.worth, -3.5)
+        self.assertAlmostEqual(without.worth, -2.0)
+
+    def test_a_long_injury_list_is_capped(self):
+        """A five-deep list must not read as a fifteen-point edge.
+
+        The fifth player out is replaced by someone who would not otherwise
+        take the floor, and the returns stop compounding well before that.
+        """
+        e = players_out("Toronto", 5, "src", leading_scorer_out=True, as_of=DAY)
+        self.assertAlmostEqual(e.worth, -8.0)
+        deeper = players_out("Toronto", 9, "src", leading_scorer_out=True, as_of=DAY)
+        self.assertAlmostEqual(deeper.worth, -8.0)
+
+    def test_the_cap_still_leaves_room_to_tell_thin_from_gutted(self):
+        """The first cap was 6.0 and bound at three absences, which made three,
+        five and nine score the same. Granularity below the cap is the point."""
+        worths = [players_out("T", n, "src", leading_scorer_out=True, as_of=DAY).worth
+                  for n in (1, 2, 3, 4, 5)]
+        self.assertEqual(len(set(worths[:4])), 4)
+        self.assertAlmostEqual(worths[3], worths[4])
+
+    def test_nobody_out_is_no_reading_rather_than_a_zero(self):
+        self.assertIsNone(players_out("Toronto", 0, "src", as_of=DAY))
+
+    def test_wnba_thresholds_demand_the_same_evidence_in_its_own_units(self):
+        """Same fraction of dispersion as MLB, so neither sport is the soft one."""
+        self.assertAlmostEqual(MIN_EDGE["WNBA"] / DISPERSION["WNBA"],
+                               MIN_EDGE["MLB"] / DISPERSION["MLB"], places=2)
+        self.assertAlmostEqual(STRONG_EDGE["WNBA"] / DISPERSION["WNBA"],
+                               STRONG_EDGE["MLB"] / DISPERSION["MLB"], places=2)
+
+    def test_absences_alone_can_carry_a_wnba_under(self):
+        c = decide("WNBA", "Aces @ Tempo", "total 180", "OVER", "UNDER",
+                   [players_out("Toronto", 5, "beat writer",
+                                leading_scorer_out=True, as_of=DAY)], DAY)
+        self.assertEqual(c.side, "UNDER")
+        self.assertEqual(c.verdict, "BET")
+
+    def test_but_not_once_the_line_has_already_moved_on_them(self):
+        """The whole point. Five out is real; five out that the number already
+        knows about is not a bet."""
+        e = players_out("Toronto", 5, "beat writer", leading_scorer_out=True,
+                        as_of=DAY)
+        e.already_moved = -7.5
+        c = decide("WNBA", "Aces @ Tempo", "total 180", "OVER", "UNDER", [e], DAY)
+        self.assertEqual(c.verdict, "PASS")
+        self.assertIn("already moved", " ".join(c.reasons))

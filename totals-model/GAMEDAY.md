@@ -1,11 +1,12 @@
-# Game-day playbook — MLB totals
+# Game-day playbook — totals
 
 What I do when a slate arrives. Written down so it is the same every night and
 so the numbers below are auditable rather than invented on the spot.
 
-**Scope: MLB totals, under-weighted.** The WNBA spread model went 4-5 and was
-retired. Nothing here covers basketball, and the code raises rather than
-guessing if a basketball game is passed to it.
+**Scope: totals, both sports, under-weighted.** The WNBA *spread* model went
+4-5 and is retired; what is here is the over/under, which is what the WNBA side
+of this project was before the spread pivot. Nothing here prices a side or a
+spread in either sport.
 
 ## The one rule
 
@@ -47,7 +48,7 @@ Per game: **teams, the posted total, and roughly when it was posted.** If you
 have the opening number as well as the current one, send both — the movement is
 half the model. Start times help.
 
-## The checklist
+## The checklist — MLB
 
 Run top to bottom. Most games produce nothing; that is the expected result.
 
@@ -71,6 +72,28 @@ same as an 80-point one, because the direction is documented and the magnitude
 is not, and inventing a curve there would be exactly the false precision that
 sank the previous two models.
 
+## The checklist — WNBA
+
+| # | Check | Where | Worth | Basis |
+|---|---|---|---|---|
+| 1 | **Rotation players out** | team injury report, beat writers | 2.0 pts per starter, 3.5 if their leading scorer, ceiling 8.0 per team | documented direction, capped size |
+| 2 | **Line movement since open** | you | Subtract from 1 | — |
+
+This is the one place where a single item can carry a bet. A twelve-deep roster
+with starters at 32+ minutes has no bench to absorb an absence, so it costs a
+WNBA team more than the same news costs any other league's team.
+
+The ceiling is 8.0 and binds at four absences. It was 6.0 first, which bound at
+three and made three, five and nine score identically — the model could not
+tell a thin night from a gutted one. Below the ceiling the ladder runs 3.5,
+5.5, 7.5, 8.0.
+
+**Thresholds are the same fraction of dispersion as MLB** — a tenth for a LEAN,
+a fifth for a BET — so neither sport is the soft one. WNBA dispersion is 11.51
+points, measured over only 13 logged totals, which is far too few to trust as a
+point estimate; it is used because it is the only measurement available and
+because it agrees with the 11.0 the spread model used for margins.
+
 ## The gates
 
 Every candidate has to survive all four (`totals/gameday.py`):
@@ -78,8 +101,8 @@ Every candidate has to survive all four (`totals/gameday.py`):
 1. **Fresh** — evidence dated to game day. Yesterday's note is a guess.
 2. **Grounded** — at least one `documented` item. Provisional coefficients
    alone get logged as a hypothesis, never backed.
-3. **Unpriced** — net edge after line movement must clear **0.45 runs**.
-   A `BET` needs **0.90**.
+3. **Unpriced** — net edge after line movement must clear **0.45 runs** (MLB)
+   or **1.20 points** (WNBA). A `BET` needs **0.90** / **2.40**.
 4. **Uncontradicted** — no documented item pointing the other way. With no
    validated weights there is no honest way to net two real signals that
    disagree, so the answer is stand down.

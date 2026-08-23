@@ -9,6 +9,10 @@ import unittest
 from datetime import date
 
 from totals.gameday import (
+    public_split,
+    temperature,
+    umpire,
+    wind,
     MIN_EDGE,
     STRONG_EDGE,
     Call,
@@ -34,17 +38,17 @@ class TestPricedInIsNotAnEdge(unittest.TestCase):
     """
 
     def test_news_the_line_has_fully_absorbed_is_worth_nothing(self):
-        c = decide("WNBA", "Fever @ Sky", "home +6", "HOME", "AWAY",
-                   [ev("Clark out", -4.8, already_moved=-5.0)], DAY)
+        c = decide("MLB", "Cubs @ Reds", "total 9", "OVER", "UNDER",
+                   [ev("Ace scratched", -1.2, already_moved=-1.3)], DAY)
         self.assertEqual(c.verdict, "PASS")
         self.assertAlmostEqual(c.net, 0.0)
         self.assertIn("already moved", " ".join(c.reasons))
 
     def test_only_the_unabsorbed_half_counts(self):
-        c = decide("WNBA", "Lynx @ Storm", "home +3.5", "HOME", "AWAY",
-                   [ev("Collier out", -3.4, already_moved=-1.0)], DAY)
-        self.assertAlmostEqual(c.net, -2.4)
-        self.assertEqual(c.side, "AWAY")
+        c = decide("MLB", "Cubs @ Reds", "total 9", "OVER", "UNDER",
+                   [ev("Wind in 18", -1.0, already_moved=-0.5)], DAY)
+        self.assertAlmostEqual(c.net, -0.5)
+        self.assertEqual(c.side, "UNDER")
         self.assertEqual(c.verdict, "LEAN")
 
     def test_a_line_that_moved_further_than_the_factor_is_not_a_fade(self):
@@ -185,10 +189,77 @@ class TestEvidenceHygiene(unittest.TestCase):
                    [ev("Umpire", 1.0, source="RotoWire assignments")], DAY)
         self.assertIn("RotoWire assignments", c.brief())
 
-    def test_an_unknown_sport_is_an_error_not_a_default(self):
-        with self.assertRaises(ValueError):
-            decide("NFL", "A @ B", "total 44", "OVER", "UNDER", [], DAY)
+    def test_only_mlb_is_supported(self):
+        """WNBA was retired at the owner's call; nothing here covers it.
+
+        Adding a sport back means adding its dispersion, its thresholds and its
+        own checklist on purpose, not by a string slipping through.
+        """
+        for sport in ("WNBA", "NFL", "NBA"):
+            with self.assertRaises(ValueError):
+                decide(sport, "A @ B", "total 44", "OVER", "UNDER", [], DAY)
 
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class TestEvidenceBuilders(unittest.TestCase):
+    """The under-hunting inputs. Mostly checking they refuse to read what they
+    cannot see, since a builder that returns zero when it means "unchecked" is
+    how a blank form starts producing verdicts."""
+
+    def test_a_lopsided_ticket_money_split_leans_under(self):
+        e = public_split(78, 44, "Action Network", DAY)
+        self.assertLess(e.worth, 0)
+        self.assertEqual(e.basis, "documented")
+        self.assertIn("34-point gap", e.source)
+
+    def test_the_reverse_split_leans_over(self):
+        e = public_split(40, 72, "Action Network", DAY)
+        self.assertGreater(e.worth, 0)
+
+    def test_a_narrow_split_is_not_a_signal_at_all(self):
+        self.assertIsNone(public_split(55, 51, "Action Network", DAY))
+
+    def test_the_split_is_capped_because_the_size_is_not_documented(self):
+        small = public_split(75, 45, "src", DAY)
+        huge = public_split(95, 15, "src", DAY)
+        self.assertAlmostEqual(small.worth, huge.worth)
+        self.assertIn("size is not", small.source)
+
+    def test_wind_in_is_the_biggest_single_under_driver(self):
+        self.assertAlmostEqual(wind(23, "in", "RotoWire", DAY).worth, -1.5)
+        self.assertAlmostEqual(wind(6, "in", "RotoWire", DAY).worth, 0.0)
+
+    def test_a_cross_wind_reads_zero_rather_than_nothing(self):
+        """Zero means checked; None means unchecked, and the gates tell them apart."""
+        e = wind(25, "cross", "RotoWire", DAY)
+        self.assertIsNotNone(e)
+        self.assertAlmostEqual(e.worth, 0.0)
+        self.assertIsNone(wind(25, "", "RotoWire", DAY))
+
+    def test_a_pitcher_friendly_umpire_leans_under(self):
+        e = umpire(7.9, 260, "RotoWire", as_of=DAY)
+        self.assertLess(e.worth, 0)
+        self.assertGreater(e.worth, -1.0)
+
+    def test_an_impossible_umpire_figure_is_ignored(self):
+        self.assertIsNone(umpire(40.0, 200, "RotoWire", as_of=DAY))
+
+    def test_a_cold_night_leans_under_but_barely(self):
+        e = temperature(48, "RotoWire", DAY)
+        self.assertLess(e.worth, 0)
+        self.assertGreater(e.worth, -0.35)
+
+    def test_a_real_under_card_stacks_up(self):
+        c = decide("MLB", "Mariners @ Guardians", "total 7.5", "OVER", "UNDER", [
+            wind(18, "in", "RotoWire", DAY),
+            umpire(8.0, 300, "RotoWire", as_of=DAY),
+            public_split(76, 46, "Action Network", DAY),
+            temperature(55, "RotoWire", DAY),
+        ], DAY)
+        self.assertEqual(c.side, "UNDER")
+        self.assertEqual(c.verdict, "BET")
+        self.assertLess(c.net, -0.9)
+        self.assertTrue(all(c.gates.values()))

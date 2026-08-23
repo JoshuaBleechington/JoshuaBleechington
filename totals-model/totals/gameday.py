@@ -41,8 +41,12 @@ A recommendation has to survive all four:
   With no validated weights there is no honest way to net two real signals that
   disagree, so the honest answer is to stand down.
 
-Magnitudes are signed in the sport's own unit -- runs for a total, points of
-margin for a spread -- and positive always means "toward the side named".
+Magnitudes are in runs, and positive always means toward the OVER.
+
+Scope
+-----
+MLB totals. The WNBA spread model that used to live alongside this went 4-5
+and was retired; basketball is not covered here at all.
 """
 
 from __future__ import annotations
@@ -51,18 +55,20 @@ from dataclasses import dataclass, field
 from datetime import date
 from typing import Any, Iterable
 
+# MLB totals only. The WNBA spread model went 4-5 and was retired at the
+# owner's call; nothing here covers basketball and adding a sport back means
+# adding its dispersion, its thresholds and its own checklist deliberately.
+#
 # How big the residual, unpriced edge has to be before it is worth acting on.
-# Sized off the observed spread of outcomes: MLB totals scatter with a standard
-# deviation of 4.39 runs around the line, WNBA margins about 11 points, so
-# these are each roughly a tenth of a standard deviation. Below that the edge
-# is smaller than the vig and the honest answer is no.
-MIN_EDGE = {"MLB": 0.45, "WNBA": 1.20}
-STRONG_EDGE = {"MLB": 0.90, "WNBA": 2.60}
+# MLB totals scatter with a standard deviation of 4.39 runs around the line, so
+# these are roughly a tenth and a fifth of a standard deviation. Below that the
+# edge is smaller than the vig and the honest answer is no.
+MIN_EDGE = {"MLB": 0.45}
+STRONG_EDGE = {"MLB": 0.90}
 
-# Converting a magnitude into a win probability needs a dispersion. These are
-# measured, not chosen: 4.39 from the 116 settled MLB games in the track record,
-# 11.0 for WNBA margins from the spread model.
-DISPERSION = {"MLB": 4.39, "WNBA": 11.0}
+# Measured, not chosen: the observed standard deviation of (final total minus
+# posted line) over the 116 settled MLB games in the track record.
+DISPERSION = {"MLB": 4.39}
 
 BASES = ("documented", "provisional")
 VERDICTS = ("PASS", "LEAN", "BET")
@@ -269,3 +275,94 @@ def slate(calls: Iterable[Call]) -> str:
         out.append("Nothing on this board clears the gates. That is the read, "
                    "not a missing one.")
     return "\n".join(out)
+
+
+# --------------------------------------------------------------------------
+# Evidence builders
+#
+# Everything that can put a game on the under, plus the two that can push it
+# the other way. Each returns an Evidence or None -- None means "no reading",
+# which is different from "a reading of zero" and is why the gates can tell
+# the difference between a quiet game and an unchecked one.
+# --------------------------------------------------------------------------
+
+# The market shades totals upward because recreational money bets overs -- the
+# public wants runs. That is a documented structural feature rather than a
+# forecast, and the usable signal is the gap between the share of *tickets* and
+# the share of *money* on a side: many small bets on the over against fewer,
+# larger bets on the under is the standard sharp-money tell.
+#
+# The direction is well established; the size per game is not, so the term is
+# capped hard. A 40-point divergence is worth the same 0.30 runs as an 80-point
+# one, because anything more precise would be invented.
+PUBLIC_SPLIT_MIN_GAP = 20.0
+PUBLIC_SPLIT_RUNS = 0.30
+
+
+def public_split(ticket_pct_over: float, money_pct_over: float,
+                 source: str, as_of=None) -> "Evidence | None":
+    """Sharp money against the public, read off the ticket/money divergence.
+
+    Both arguments are the OVER's share, 0-100. Tickets well above money means
+    a lot of small over bets and a little large under money, which leans under.
+    """
+    gap = ticket_pct_over - money_pct_over
+    if abs(gap) < PUBLIC_SPLIT_MIN_GAP:
+        return None
+    runs = -PUBLIC_SPLIT_RUNS if gap > 0 else PUBLIC_SPLIT_RUNS
+    lean = "under" if gap > 0 else "over"
+    return Evidence(
+        "Sharp/public split",
+        runs,
+        "documented",
+        f"{source}: over has {ticket_pct_over:.0f}% of tickets but "
+        f"{money_pct_over:.0f}% of money, a {abs(gap):.0f}-point gap. Small bets on "
+        f"the over, big money on the {lean}. Capped at {PUBLIC_SPLIT_RUNS} runs "
+        "because the direction is documented and the size is not.",
+        as_of,
+    )
+
+
+def wind(mph: float, direction: str, source: str, as_of=None) -> "Evidence | None":
+    """Wind, the largest weather term and the main physical under-driver.
+
+    Nothing below 8 mph, then 0.10 runs per mph, capped at 1.5. A cross wind is
+    explicitly nothing rather than absent -- it is a reading, and it says the
+    weather was checked.
+    """
+    d = (direction or "").strip().lower()
+    if d not in ("out", "in", "cross"):
+        return None
+    if d == "cross":
+        return Evidence("Wind", 0.0, "documented",
+                        f"{source}: {mph:.0f} mph across the field, which carries "
+                        "a fly ball neither way.", as_of)
+    effective = max(0.0, mph - 8.0)
+    mag = min(1.5, effective * 0.10)
+    runs = mag if d == "out" else -mag
+    return Evidence("Wind", runs, "documented",
+                    f"{source}: {mph:.0f} mph blowing {d}.", as_of)
+
+
+def umpire(runs_per_game: float, games: float, source: str,
+           league: float = 8.6, as_of=None) -> "Evidence | None":
+    """The plate umpire's own run environment, regressed for sample size.
+
+    Capped at a run either way. An umpire entered at an impossible figure is
+    read as a typo and ignored -- impossible inputs produced the worst calls
+    this project ever made.
+    """
+    if not (6.0 <= runs_per_game <= 12.0):
+        return None
+    shrink = games / (games + 120.0) if games > 0 else 0.0
+    runs = max(-1.0, min(1.0, (runs_per_game - league) * shrink))
+    return Evidence("Umpire", runs, "documented",
+                    f"{source}: {runs_per_game:.2f} runs a game against {league:.2f} "
+                    f"league, on {games:.0f} games — regressed to {runs:+.2f}.", as_of)
+
+
+def temperature(temp_f: float, source: str, as_of=None) -> "Evidence":
+    """Air density. Small, real, and the weather term the market prices best."""
+    runs = max(-0.35, min(0.35, (temp_f - 70.0) * 0.008))
+    return Evidence("Temperature", runs, "documented",
+                    f"{source}: {temp_f:.0f}F against a 70F baseline.", as_of)

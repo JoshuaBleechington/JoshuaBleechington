@@ -80,6 +80,22 @@ class TestUmpire(unittest.TestCase):
     def test_absent_umpire_produces_nothing_rather_than_zero(self):
         self.assertIsNone(umpire_adjustment({}))
 
+    def test_an_impossible_figure_is_read_as_a_typo_and_ignored(self):
+        """The failure mode this project keeps rediscovering.
+
+        A blank ERA read as 0.00 and an average of 401 innings per start both
+        arrived dressed as unusually high confidence. Every other term here is
+        bounded; this one is too now.
+        """
+        a = umpire_adjustment({"umpire": {"runs_per_game": 40.0, "games": 200}})
+        self.assertAlmostEqual(a.runs, 0.0)
+        self.assertIn("typo", a.detail)
+
+    def test_the_umpire_term_is_capped_even_inside_the_plausible_range(self):
+        a = umpire_adjustment({"umpire": {"runs_per_game": 11.9, "games": 100000,
+                                          "league_runs_per_game": 8.6}})
+        self.assertAlmostEqual(a.runs, 1.0)
+
 
 class TestWind(unittest.TestCase):
     def test_a_light_wind_does_nothing(self):

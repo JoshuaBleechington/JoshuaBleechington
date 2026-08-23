@@ -102,6 +102,38 @@ separately, and if most of an edge rests on placeholders it says so in the
 notes. Nothing here was tuned on the 116 games — those games contain none of
 these inputs, which is the entire point.
 
+## The page
+
+`web/verdict.html` runs the late-factor model for MLB and the spread model for
+WNBA, both ported from the package and checked against it case by case
+(`test-late.js`, `test-spread.js` — fixtures regenerated from Python, never
+hand-edited).
+
+Three things about the MLB form are deliberate:
+
+**It ships blank.** No default umpire, no default wind, no default line. This
+one was a real bug for a while: the form shipped pre-filled with the example
+umpire and wind, so every game a user opened inherited a fabricated edge before
+they typed anything — the precise failure the model exists to end. The Example
+button still loads a worked game; nothing else fills a box. `test-blank.js`
+runs in a clean browser context to check it, because the page remembers what
+you last typed and testing defaults after any other suite would be testing
+`localStorage`.
+
+**There are no trend inputs at all.** Head-to-head and recent form were two of
+the fourteen features that cross-validated to nothing. The card is gone rather
+than hidden, and `test-late.js` checks that values left in the DOM from a WNBA
+session cannot reach the verdict.
+
+**Reopening an older logged game says so.** MLB games logged under the
+season-statistics verdict cannot be re-run — their inputs have no box on this
+form — so the recall banner says that outright instead of showing `NO EDGE`
+over an empty form as though the model changed its mind.
+
+The track record now has a **Close** column and a **CLV** column beside the
+final, and a "Beat the close" tile in the summary. That is the metric this
+model would rather be judged on; see below.
+
 ## Closing line value, and why the record isn't the point
 
 A win/loss record is a terrible way to evaluate a model, because the sample

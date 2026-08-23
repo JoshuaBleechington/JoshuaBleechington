@@ -676,7 +676,7 @@
     <div>
       <div class="eyebrow" id="eyebrow">Game totals</div>
       <h1 id="page-title">Over/Under Verdict</h1>
-      <p class="lede">Enter the numbers and the trends. You get a side and a confidence band —
+      <p class="lede" id="lede">Enter the numbers and the trends. You get a side and a confidence band —
         no prices, no stake sizing.</p>
     </div>
     <div class="switchers">
@@ -717,7 +717,7 @@
         <div class="card-body" id="game-body"></div>
       </section>
 
-      <section class="card">
+      <section class="card" id="trends-card">
         <header><h2>Trends</h2></header>
         <div class="card-body stack">
           <p class="hint" id="trends-lede"></p>
@@ -822,7 +822,7 @@
         <div class="metrics">
           <div><div class="k" id="m-prob-label">Win prob</div><div class="v" id="m-prob">—</div></div>
           <div><div class="k" id="m-mean-label">Line reads as</div><div class="v" id="m-mean">—</div></div>
-          <div><div class="k">Signals agree</div><div class="v" id="m-agree">—</div></div>
+          <div><div class="k" id="m-agree-label">Signals agree</div><div class="v" id="m-agree">—</div></div>
           <div><div class="k">Push chance</div><div class="v" id="m-push">—</div></div>
         </div>
 
@@ -1231,6 +1231,218 @@
     return (lo + hi) / 2;
   }
 
+
+  /* =====================================================================
+     THE LATE-FACTOR MODEL — MLB totals. Ported from totals/late.py.
+
+     The season-statistics verdict below still runs, and its tests still pass,
+     but it is no longer the one to bet. Over 116 settled games its projection
+     had a mean absolute error of 3.61 runs against the final; just using the
+     posted line had 3.58. Ridge on all fourteen collected inputs, leave-one-out
+     cross-validated, gave a negative out-of-sample R^2 at every regularisation
+     strength, improving as the fit was pushed toward using none of them.
+
+     So this one does not compete with the line. It starts from the posted
+     number and adjusts only for factors that are documented to move run
+     scoring AND are not reliably priced when you see the number. With none of
+     them supplied it returns NO EDGE and says so, rather than manufacturing a
+     lean out of season stats.
+  ===================================================================== */
+
+  // Observed standard deviation of (final total - posted line) over the 116
+  // settled MLB games in the track record. Measured, not chosen. It is why a
+  // full run of adjustment is only a quarter of a standard deviation, and why
+  // an honest edge here reads 53% rather than 62%.
+  var RESIDUAL_SD = 4.39;
+  var LEAGUE_RPG_UMP = 8.6;
+  // Every other term here is bounded and this one was not: an umpire typed in
+  // at 40 runs a game on 200 games produced a +23 run adjustment and a 100%
+  // verdict. Impossible inputs were the source of the worst calls this project
+  // ever made, so the term is capped and the raw figure range-checked too.
+  var UMPIRE_SHRINK_GAMES = 120;
+  var UMPIRE_CAP_RUNS = 1.0, UMPIRE_RPG_LO = 6.0, UMPIRE_RPG_HI = 12.0;
+  var WIND_DEAD_ZONE_MPH = 8, WIND_RUNS_PER_MPH = 0.10, WIND_CAP_RUNS = 1.5;
+  var TEMP_BASELINE_F = 70, TEMP_RUNS_PER_DEGREE = 0.008, TEMP_CAP_RUNS = 0.35;
+  var RUNS_PER_UNAVAILABLE_RELIEVER = 0.15, MAX_RELIEVERS_COUNTED = 3;
+  var RUNS_PER_MISSING_REGULAR = 0.12, MAX_REGULARS_COUNTED = 3;
+
+  // -110 needs 52.38% to break even, so the first band that names a bet starts
+  // above it rather than at it.
+  var BREAKEVEN_110 = 0.5238;
+  var BAND_STRONG = 0.560, BAND_PLAYABLE = 0.535;
+  var LATE_BANDS = ["NO EDGE", "SLIM", "PLAYABLE", "STRONG"];
+
+  function lateBandFor(p) {
+    return p >= BAND_STRONG ? "STRONG"
+         : p >= BAND_PLAYABLE ? "PLAYABLE"
+         : p >= BREAKEVEN_110 ? "SLIM" : "NO EDGE";
+  }
+
+  function adj(name, runs, basis, detail) {
+    return { name: name, runs: runs, basis: basis, detail: detail };
+  }
+
+  function umpireAdjustment(g) {
+    var u = g.umpire || {};
+    if (!isFinite(u.runsPerGame)) return null;
+    var games = isFinite(u.games) ? u.games : 0;
+    var league = isFinite(u.leagueRunsPerGame) ? u.leagueRunsPerGame : LEAGUE_RPG_UMP;
+    var name = u.name || "the plate umpire";
+    if (u.runsPerGame < UMPIRE_RPG_LO || u.runsPerGame > UMPIRE_RPG_HI) {
+      return adj("Umpire", 0, "documented",
+        u.runsPerGame.toFixed(2) + " runs a game is outside the " + UMPIRE_RPG_LO.toFixed(0) +
+        "-" + UMPIRE_RPG_HI.toFixed(0) + " range any umpire lives in, so it is being read " +
+        "as a typo and ignored rather than trusted.");
+    }
+    var raw = u.runsPerGame - league;
+    var shrink = games > 0 ? games / (games + UMPIRE_SHRINK_GAMES) : 0;
+    var runs = Math.max(-UMPIRE_CAP_RUNS, Math.min(UMPIRE_CAP_RUNS, raw * shrink));
+    return adj("Umpire", runs, "documented",
+      name + " runs " + u.runsPerGame.toFixed(2) + " a game against a " +
+      league.toFixed(2) + " league average, on " + games.toFixed(0) + " games. " +
+      "Regressed for that sample it is worth " + signedFixed(runs, 2) +
+      " runs, not the " + signedFixed(raw, 2) + " the raw split shows.");
+  }
+
+  function windAdjustment(g) {
+    var w = g.weather || {};
+    if (w.dome) return adj("Wind", 0, "documented", "Roof is closed; wind is not a factor.");
+    var dir = (w.windDirection || "").toLowerCase();
+    if (!isFinite(w.windMph) || ["out", "in", "cross"].indexOf(dir) < 0) return null;
+    if (dir === "cross") {
+      return adj("Wind", 0, "documented", w.windMph.toFixed(0) +
+        " mph across the field, which does not carry a fly ball either way.");
+    }
+    var effective = Math.max(0, w.windMph - WIND_DEAD_ZONE_MPH);
+    var magnitude = Math.min(WIND_CAP_RUNS, effective * WIND_RUNS_PER_MPH);
+    var runs = dir === "out" ? magnitude : -magnitude;
+    var detail = effective <= 0
+      ? w.windMph.toFixed(0) + " mph is below the " + WIND_DEAD_ZONE_MPH +
+        " mph where wind starts to carry, so no adjustment."
+      : w.windMph.toFixed(0) + " mph blowing " + dir + ", which is " +
+        effective.toFixed(0) + " mph past the dead zone and worth " +
+        signedFixed(runs, 2) + " runs.";
+    return adj("Wind", runs, "documented", detail);
+  }
+
+  function temperatureAdjustment(g) {
+    var w = g.weather || {};
+    if (w.dome || !isFinite(w.tempF)) return null;
+    var raw = (w.tempF - TEMP_BASELINE_F) * TEMP_RUNS_PER_DEGREE;
+    var runs = Math.max(-TEMP_CAP_RUNS, Math.min(TEMP_CAP_RUNS, raw));
+    return adj("Temperature", runs, "documented",
+      w.tempF.toFixed(0) + "F against a " + TEMP_BASELINE_F +
+      "F baseline, worth " + signedFixed(runs, 2) + " runs.");
+  }
+
+  function bullpenAdjustment(g) {
+    var total = 0, parts = [];
+    ["away", "home"].forEach(function (side) {
+      var t = g[side] || {};
+      if (!isFinite(t.relieversUnavailable) || t.relieversUnavailable <= 0) return;
+      var counted = Math.min(t.relieversUnavailable, MAX_RELIEVERS_COUNTED);
+      total += counted * RUNS_PER_UNAVAILABLE_RELIEVER;
+      parts.push((t.name || side) + " are down " + counted.toFixed(0) +
+        " high-leverage arm" + (counted !== 1 ? "s" : ""));
+    });
+    if (!parts.length) return null;
+    return adj("Bullpen availability", total, "provisional",
+      parts.join("; ") + ". Worth " + signedFixed(total, 2) +
+      " runs on a placeholder coefficient that has not been backtested yet.");
+  }
+
+  function lineupAdjustment(g) {
+    var total = 0, parts = [];
+    ["away", "home"].forEach(function (side) {
+      var t = g[side] || {};
+      if (!isFinite(t.regularsOut) || t.regularsOut <= 0) return;
+      var counted = Math.min(t.regularsOut, MAX_REGULARS_COUNTED);
+      total -= counted * RUNS_PER_MISSING_REGULAR;
+      parts.push((t.name || side) + " are without " + counted.toFixed(0) +
+        " regular" + (counted !== 1 ? "s" : ""));
+    });
+    if (!parts.length) return null;
+    return adj("Lineup", total, "provisional",
+      parts.join("; ") + ". Worth " + signedFixed(total, 2) +
+      " runs on a placeholder coefficient that has not been backtested yet.");
+  }
+
+  var LATE_BUILDERS = [umpireAdjustment, windAdjustment, temperatureAdjustment,
+                       bullpenAdjustment, lineupAdjustment];
+
+  function signedFixed(x, d) { return (x >= 0 ? "+" : "") + x.toFixed(d); }
+
+  function decideLate(g) {
+    var line = g.line;
+    var adjustments = [];
+    LATE_BUILDERS.forEach(function (b) {
+      var a = b(g);
+      if (a) adjustments.push(a);
+    });
+    var totalRuns = 0, documented = 0, provisional = 0;
+    adjustments.forEach(function (a) {
+      totalRuns += a.runs;
+      if (a.basis === "documented") documented += a.runs; else provisional += a.runs;
+    });
+
+    var projected = line + totalRuns;
+    // Mirrors distributions.normal_total_probs: a whole-number line gets a
+    // continuity correction so the push is the mass in [line-0.5, line+0.5].
+    var whole = Math.abs(line - Math.round(line)) < 1e-9;
+    var pPush, pUnderRaw, pOverRaw;
+    if (whole) {
+      pPush = normalCdf(line + 0.5, projected, RESIDUAL_SD) -
+              normalCdf(line - 0.5, projected, RESIDUAL_SD);
+      pUnderRaw = normalCdf(line - 0.5, projected, RESIDUAL_SD);
+      pOverRaw = 1 - pUnderRaw - pPush;
+    } else {
+      pPush = 0;
+      pUnderRaw = normalCdf(line, projected, RESIDUAL_SD);
+      pOverRaw = 1 - pUnderRaw;
+    }
+    var decided = 1 - pPush;
+    var pOver = decided > 0 ? pOverRaw / decided : pOverRaw;
+    // Matches late.decide_late: a dead heat is OVER by convention. The two
+    // erf implementations disagree in the last bit, and without this they name
+    // different sides for a game with no adjustment at all.
+    var side = pOver >= 0.5 - 1e-9 ? "OVER" : "UNDER";
+    var winPct = side === "OVER" ? pOver : 1 - pOver;
+
+    var notes = [];
+    if (!adjustments.length) {
+      notes.push("No late factor was supplied, so there is nothing here the posted " +
+        "number does not already know. That is a genuine no-bet, not a weak read: " +
+        "this model has no opinion without an umpire, a wind, or an availability note.");
+    }
+    if (provisional && Math.abs(provisional) > Math.abs(documented)) {
+      notes.push("Most of this edge (" + signedFixed(provisional, 2) + " of " +
+        signedFixed(totalRuns, 2) + " runs) rests on coefficients that have not been " +
+        "backtested. Treat it as a hypothesis being logged, not a priced bet.");
+    }
+    if (Math.abs(totalRuns) >= 1.0) {
+      notes.push("A " + Math.abs(totalRuns).toFixed(2) + " run adjustment is large for " +
+        "this model. Check the inputs before the number.");
+    }
+
+    return {
+      sport: "MLB", betType: "total", model: "late",
+      away: (g.away || {}).name || "Away", home: (g.home || {}).name || "Home",
+      line: line, adjustments: adjustments,
+      totalRuns: totalRuns, projectedTotal: projected, marketMean: line,
+      modelTotal: projected,
+      documentedRuns: documented, provisionalRuns: provisional,
+      side: side, winPct: winPct, pOver: pOver, pUnder: 1 - pOver, pPush: pPush,
+      band: adjustments.length ? lateBandFor(winPct) : "NO EDGE",
+      notes: notes,
+      built: { kind: "normal", mu: projected, sd: RESIDUAL_SD },
+      // The old shape, kept empty so the log, the chart and the CSV keep
+      // working unchanged across both models.
+      signals: [], downgrades: [], downgradeNotes: [], flags: [],
+      inputGrade: "clean", earnedBand: adjustments.length ? lateBandFor(winPct) : "NO EDGE",
+      badFields: []
+    };
+  }
+
   /* =====================================================================
      THE VERDICT
 
@@ -1260,7 +1472,7 @@
      Bump this whenever a constant that moves a verdict changes. Leave it
      alone for display-only changes: a stamp that changes when nothing changed
      splits the evidence for no reason. */
-  var MODEL_VERSION = "2026-08-23";
+  var MODEL_VERSION = "2026-08-24-late";
 
   var BAND_HIGH = 0.580, BAND_MEDIUM = 0.545, BAND_LOW = 0.520;
   // LEAN is landing-only: bandFor() never returns it directly. A game only
@@ -1859,13 +2071,14 @@
      FORM
   ===================================================================== */
 
-  // No own-park field: park factors apply only to the park being played in.
+  /* MLB asks for availability, not season statistics. Every stat the old form
+     collected -- runs per game, starter ERA, season innings, average IP,
+     bullpen ERA -- is published and already inside the posted total, which is
+     why fourteen of them together produced a negative cross-validated R^2
+     against the line. These two are late-breaking and are not. */
   var MLB_TEAM_FIELDS = [
-    { key: "runsPerGame", label: "Runs / game", step: 0.05 },
-    { key: "starterEra", label: "Starter ERA (or FIP)", step: 0.05 },
-    { key: "starterSeasonIp", label: "Starter season IP", step: 1 },
-    { key: "starterIp", label: "Avg IP", step: 0.1 },
-    { key: "bullpenEra", label: "Bullpen ERA", step: 0.05 }
+    { key: "relieversUnavailable", label: "Relievers unavailable", step: 1 },
+    { key: "regularsOut", label: "Regulars out", step: 1 }
   ];
   var WNBA_TEAM_FIELDS = [
     { key: "pace", label: "Pace (per 40)", step: 0.1 },
@@ -1876,12 +2089,11 @@
 
   var EXAMPLES = {
     mlb: {
-      away: { name: "Cubs", runsPerGame: 5.16, starterEra: 4.38, starterSeasonIp: 132,
-              starterIp: 5.7, bullpenEra: 3.87 },
-      home: { name: "Nationals", runsPerGame: 5.36, starterEra: 4.74, starterSeasonIp: 62,
-              starterIp: 5.0, bullpenEra: 5.07 },
-      parkFactor: 102, tempF: 86, windMphOut: 0, dome: false,
-      line: 9, h2hAvg: 10.5, h2hGames: 4, formAway: 9.8, formHome: 10.1, formGames: 5
+      away: { name: "Cubs", relieversUnavailable: 2, regularsOut: 0 },
+      home: { name: "Nationals", relieversUnavailable: 0, regularsOut: 1 },
+      umpName: "Ed Hickox", umpRunsPerGame: 9.3, umpGames: 210, lgRpgUmp: 8.6,
+      tempF: 86, windMph: 14, windDirection: "out", dome: false,
+      line: 9
     },
     // WNBA is spreads now, not totals: the line is the HOME side's number as
     // the book prints it (-3.5 = home favoured by 3.5), form is each team's
@@ -1895,12 +2107,15 @@
   };
 
   var SOURCES = {
+    /* Only the late-factor inputs. The season-statistic sources that used to
+       sit here -- R/G, bullpen ERA, park factors -- were pointing at numbers
+       the market has already priced, which is what the rewrite established. */
     mlb: [
-      { name: "Baseball Reference", what: "R/G", url: "https://www.baseball-reference.com/leagues/majors/2026.shtml" },
-      { name: "Inside The Pen", what: "bullpen ERA", url: "https://www.insidethepen.com/bullpen-stats" },
-      { name: "Baseball Savant", what: "park factors", url: "https://baseballsavant.mlb.com/leaderboard/statcast-park-factors" },
-      { name: "RotoWire", what: "weather", url: "https://www.rotowire.com/baseball/weather.php" },
-      { name: "Covers", what: "lines · H2H", url: "https://www.covers.com/sport/baseball/mlb/odds" }
+      { name: "RotoWire", what: "umpire assignments", url: "https://www.rotowire.com/baseball/umpire-stats-daily.php" },
+      { name: "OddsShark", what: "umpire O/U records", url: "https://www.oddsshark.com/mlb/umpire-handicapping-statistics" },
+      { name: "RotoWire", what: "wind · weather", url: "https://www.rotowire.com/baseball/weather.php" },
+      { name: "MLB.com", what: "bullpen usage · lineups", url: "https://www.mlb.com/scores" },
+      { name: "Covers", what: "lines · closing", url: "https://www.covers.com/sport/baseball/mlb/odds" }
     ],
     wnba: [
       { name: "WNBA Stats", what: "pace · ratings", url: "https://stats.wnba.com/teams/advanced/" },
@@ -1945,13 +2160,21 @@
     var ex = EXAMPLES[state.sport];
     var fields = state.sport === "mlb" ? MLB_TEAM_FIELDS : WNBA_TEAM_FIELDS;
     var html = "";
+    /* MLB ships blank. Every late factor is an assertion that something is
+       true about tonight -- an umpire's run environment, a wind, an arm that
+       cannot go -- and a default value asserts it for a game nobody looked at.
+       Pre-filling those is how a model with no information starts reporting
+       edges, which is the exact failure this model was written to end. The
+       Example button still fills them; nothing else does. */
+    var prefill = state.sport !== "mlb";
     ["away", "home"].forEach(function (sideKey) {
       var label = sideKey === "away" ? "Away team" : "Home team";
       html += '<div class="team-block"><p class="k">' + label + "</p>" +
-        field(sideKey + "-name", label, ex[sideKey].name, "", "text") +
+        field(sideKey + "-name", label, prefill ? ex[sideKey].name : "", "", "text") +
         '<div class="grid2">' +
         fields.map(function (f) {
-          return field(sideKey + "-" + f.key, f.label, ex[sideKey][f.key], f.step);
+          return field(sideKey + "-" + f.key, f.label,
+                       prefill ? ex[sideKey][f.key] : "", f.step);
         }).join("") + "</div></div>";
     });
     $("teams-body").innerHTML = html;
@@ -1960,33 +2183,56 @@
     // sport: MLB is a totals model, WNBA is a spread model.
     $("eyebrow").textContent = state.sport === "mlb" ? "Game totals" : "Point spreads";
     $("page-title").textContent = state.sport === "mlb" ? "Over/Under Verdict" : "Spread Verdict";
+    if ($("lede")) {
+      $("lede").textContent = state.sport === "mlb"
+        ? "Starts from the posted total and moves it only for what the number does not "
+          + "already know. With nothing to move it, it says so."
+        : "Enter the numbers and the trends. You get a side and a confidence band — "
+          + "no prices, no stake sizing.";
+    }
 
     if (state.sport === "mlb") {
       $("game-card").hidden = false;
       $("game-body").innerHTML =
+        '<p class="k">Home plate umpire</p>' +
+        '<div class="grid2">' +
+        field("umpName", "Umpire", "", "", "text") +
+        field("umpRunsPerGame", "His runs / game", "", 0.01) +
+        "</div>" +
+        '<div class="grid2" style="margin-top:10px">' +
+        field("umpGames", "Games worked", "", 1) +
+        field("lgRpgUmp", "League runs / game", "", 0.01) +
+        "</div>" +
+        '<p class="k" style="margin-top:16px">Weather</p>' +
         '<div class="grid3">' +
-        field("parkFactor", "Park factor", ex.parkFactor, 0.01) +
-        field("tempF", "Temp °F", ex.tempF, 1) +
-        field("windMphOut", "Wind out mph", ex.windMphOut, 1) +
+        field("windMph", "Wind mph", "", 1) +
+        '<div class="field"><label for="windDirection">Wind direction</label>' +
+        '<select id="windDirection">' +
+        '<option value="">—</option>' +
+        '<option value="out">Out</option>' +
+        '<option value="in">In</option>' +
+        '<option value="cross">Cross</option>' +
+        "</select></div>" +
+        field("tempF", "Temp °F", "", 1) +
         "</div>" +
         '<label class="check" style="margin-top:12px">' +
-        '<input type="checkbox" id="dome" /> Dome or closed roof (ignore weather)</label>' +
-        '<p class="hint" style="margin-top:10px">Park factor 1.00 is neutral. This is the park ' +
-        "tonight's game is in, and it is the only park that matters — neither team's home park " +
-        "adjusts its own season numbers here. Negative wind means blowing in; weather is capped " +
-        "at ±5% either way.</p>";
+        '<input type="checkbox" id="dome" /> Dome or closed roof</label>' +
+        '<p class="hint" style="margin-top:10px">The umpire is the largest of these and the ' +
+        "one most likely to be missing from an opening number — assignments post the morning " +
+        "of the game. His runs per game is regressed toward league by the games behind it, so " +
+        "a big split on 30 games barely moves the total. <b>Wind direction is required</b>: a " +
+        "speed alone is not usable, and a cross wind is explicitly worth nothing.</p>";
       $("teams-hint").innerHTML =
-        "Starter ERA is regressed toward league average by the innings behind it — a 7.80 " +
-        "over 40 innings is mostly noise. <b>FIP or xERA works better than ERA</b>. <b>Avg IP</b> " +
-        "is that innings total ÷ games started; it splits the game between the starter and the pen. " +
-        "Leave a box blank rather than typing 0 — a zero is read as unknown, and says so in the " +
-        "verdict. <b>Use season numbers</b> — the ERA, the season innings behind it, and the " +
-        "average IP per start, as a set. Under 40 innings the ERA is mostly noise, and the " +
-        "verdict flags it and drops a band. A shorter window still works arithmetically " +
-        "(regress_era shrinks by whatever innings you give it), but the flag is calibrated " +
-        "for a season, so it would fire every game and tell you nothing.";
-      $("h2h-fields").hidden = false;
+        "<b>Relievers unavailable</b> is how many high-leverage arms threw enough last night " +
+        "to be down tonight — beat writers' morning notes, not a stat line. It is the input " +
+        "with the best claim to being unpriced, because it breaks after the number is posted " +
+        "and season bullpen ERA cannot see it. <b>Regulars out</b> is the same idea for the " +
+        "lineup. Both coefficients are <b>provisional</b> — placeholders sized by reasoning, " +
+        "waiting on logged games — and the verdict says so when an edge leans on them. " +
+        "Leave a box blank rather than typing 0.";
+      $("h2h-fields").hidden = true;
       $("ats-fields").hidden = true;
+      $("trends-card").hidden = true;
       $("trends-lede").textContent =
         "Two independent reads on the same game. Leave either blank and it simply doesn't vote " +
         "— but a verdict with nothing to corroborate it loses a confidence band, because then " +
@@ -2012,6 +2258,7 @@
     } else {
       $("game-card").hidden = true;
       $("game-body").innerHTML = "";
+      $("trends-card").hidden = false;
       $("teams-hint").innerHTML =
         "Pace is possessions per 40 minutes, not per 48. Ratings are points per 100 possessions. " +
         "<b>Days rest</b> of 0 is a back-to-back and trims the offence by " + WNBA.B2B +
@@ -2077,10 +2324,10 @@
         "average projection should sit on the average line. That comparison has no game " +
         "randomness in it, so a dozen games settle it.</p>";
 
-    if (!$("line").value) $("line").value = ex.line;
+    if (state.sport !== "mlb" && !$("line").value) $("line").value = ex.line;
     ["h2hAvg", "h2hGames", "formAway", "formHome", "formGames",
      "atsAwayWins", "atsAwayLosses", "atsHomeWins", "atsHomeLosses"].forEach(function (k) {
-      if (!$(k).value && ex[k] !== undefined) $(k).value = ex[k];
+      if ($(k) && !$(k).value && ex[k] !== undefined) $(k).value = ex[k];
     });
 
     bindInputs();
@@ -2097,14 +2344,15 @@
       fields.forEach(function (f) { $(k + "-" + f.key).value = ex[k][f.key]; });
     });
     if (state.sport === "mlb") {
-      $("parkFactor").value = ex.parkFactor;
-      $("tempF").value = ex.tempF;
-      $("windMphOut").value = ex.windMphOut;
+      ["umpName", "umpRunsPerGame", "umpGames", "lgRpgUmp",
+       "tempF", "windMph", "windDirection"].forEach(function (k) {
+        if ($(k)) $(k).value = ex[k] !== undefined ? ex[k] : "";
+      });
       $("dome").checked = !!ex.dome;
     }
     ["line", "h2hAvg", "h2hGames", "formAway", "formHome", "formGames",
      "atsAwayWins", "atsAwayLosses", "atsHomeWins", "atsHomeLosses"].forEach(function (k) {
-      $(k).value = ex[k] !== undefined ? ex[k] : "";
+      if ($(k)) $(k).value = ex[k] !== undefined ? ex[k] : "";
     });
     viewingId = null;
     renderRecallBanner();
@@ -2127,8 +2375,17 @@
     if (!viewingId) { el.innerHTML = ""; return; }
     var e = store.entries.filter(function (x) { return x.id === viewingId; })[0];
     if (!e) { el.innerHTML = ""; return; }
+    /* An MLB game logged before the late-factor model cannot be reloaded into
+       this form -- the boxes it was entered in do not exist any more. Saying so
+       is the honest option; silently showing NO EDGE over an empty form looks
+       like the model changed its mind about a game it never saw. */
+    var stale = e.sport === "MLB" && (e.modelVersion || "") !== MODEL_VERSION;
     el.innerHTML = '<div class="recall"><span>Showing a logged game — <b>' +
       esc(e.away + " @ " + e.home) + "</b>, " + esc(e.date) +
+      (stale ? '<br><span class="muted">Logged under the season-statistics verdict, which ' +
+               "was retired. Its inputs have no box on this form, so the panel below is the " +
+               "late-factor model reading a blank slate, not a re-run of that game.</span>"
+             : "") +
       '</span><button type="button" class="ghost" id="btn-unrecall">Back to a fresh game</button></div>';
     $("btn-unrecall").addEventListener("click", function () {
       viewingId = null; renderRecallBanner();
@@ -2197,11 +2454,17 @@
       });
     });
     if (state.sport === "mlb") {
-      if (isFinite(num("parkFactor"))) g.parkFactor = num("parkFactor");
       g.weather = { dome: $("dome") && $("dome").checked };
       if (isFinite(num("tempF"))) g.weather.tempF = num("tempF");
-      if (isFinite(num("windMphOut"))) g.weather.windMphOut = num("windMphOut");
-      if (isFinite(num("lgRpg"))) g.league = { runsPerGame: num("lgRpg") };
+      if (isFinite(num("windMph"))) g.weather.windMph = num("windMph");
+      var wd = $("windDirection") ? $("windDirection").value : "";
+      if (wd) g.weather.windDirection = wd;
+      g.umpire = {};
+      var un = str("umpName");
+      if (un) g.umpire.name = un;
+      if (isFinite(num("umpRunsPerGame"))) g.umpire.runsPerGame = num("umpRunsPerGame");
+      if (isFinite(num("umpGames"))) g.umpire.games = num("umpGames");
+      if (isFinite(num("lgRpgUmp"))) g.umpire.leagueRunsPerGame = num("lgRpgUmp");
     } else {
       g.league = {};
       if (isFinite(num("lgPace"))) g.league.pace = num("lgPace");
@@ -2211,10 +2474,13 @@
     // unweighted: the field is hidden but stays in the DOM, and a value left over
     // from an earlier MLB session would otherwise ride along into g and be judged
     // by qualityFlags against a range it was never entered for.
+    // MLB has no trend inputs at all now. Head to head and recent form were
+    // two of the fourteen features that cross-validated to nothing; leaving the
+    // boxes on the form would invite them back in through the side door.
     var trendKeys = state.sport === "wnba"
       ? ["formAway", "formHome", "formGames", "atsAwayWins", "atsAwayLosses",
          "atsHomeWins", "atsHomeLosses"]
-      : ["h2hAvg", "h2hGames", "formAway", "formHome", "formGames"];
+      : [];
     trendKeys.forEach(function (k) {
       var v = num(k);
       if (isFinite(v)) g[k] = v;
@@ -2257,16 +2523,20 @@
 
   function compute() {
     var g = readGame();
-    var proj = state.sport === "mlb" ? projectMlb(g) : projectWnba(g);
+    if (state.sport === "mlb") {
+      if (!isFinite(g.line) || g.line <= 0) { renderNoLineLate(); return; }
+      var lr = decideLate(g);
+      last = { result: lr, game: g };
+      render(lr);
+      return;
+    }
+    var proj = projectWnba(g);
 
     // A totals line has to be a positive number; a spread just has to be a
     // number — zero (pick'em) and negatives are ordinary spreads.
-    var noLine = state.sport === "wnba"
-      ? !isFinite(g.spread)
-      : (!isFinite(g.line) || g.line <= 0);
-    if (noLine) { renderNoLine(proj); return; }
+    if (!isFinite(g.spread)) { renderNoLine(proj); return; }
 
-    var r = state.sport === "wnba" ? decideSpread(proj, g) : decide(proj, g);
+    var r = decideSpread(proj, g);
     last = { result: r, game: g };
     render(r);
   }
@@ -2309,9 +2579,179 @@
     last = null;
   }
 
-  var BAND_CLASS = { HIGH: "high", MEDIUM: "medium", LOW: "low", LEAN: "lean", "NO PLAY": "none" };
+  var BAND_CLASS = {
+    HIGH: "high", MEDIUM: "medium", LOW: "low", LEAN: "lean", "NO PLAY": "none",
+    // The late-factor ladder. Deliberately fewer rungs and a higher floor:
+    // SLIM starts at the real -110 breakeven rather than below it.
+    STRONG: "high", PLAYABLE: "medium", SLIM: "low", "NO EDGE": "none"
+  };
+
+
+  /* =====================================================================
+     THE LATE-FACTOR READOUT
+
+     A different model needs a different panel. There is no projected score
+     line here and no signal vote, because there is no matchup projection --
+     only the posted number and a list of reasons to move it.
+  ===================================================================== */
+
+  function renderNoLineLate() {
+    $("readout-label").textContent = "Adjusted total";
+    $("proj-total").textContent = "—";
+    $("proj-sub").textContent = "Enter tonight's posted total to get a verdict.";
+    ["away-score", "home-score", "model-raw"].forEach(function (id) {
+      $(id).textContent = "—";
+    });
+    $("away-label").textContent = "Documented";
+    $("home-label").textContent = "Provisional";
+    $("model-raw-label").textContent = "Net";
+    $("band-wrap").innerHTML =
+      '<span class="band band-none">No line</span>' +
+      '<span class="band-line">This model adjusts a posted total. Without one there is ' +
+      "nothing to adjust.</span>";
+    ["downgrades", "signals", "why", "split", "split-legend", "chart", "dist-table"]
+      .forEach(function (id) { $(id).innerHTML = ""; });
+    markBadFields([]);
+    if ($("band-evidence")) $("band-evidence").hidden = true;
+    ["m-prob", "m-mean", "m-agree", "m-push"].forEach(function (id) {
+      $(id).textContent = "—";
+      $(id).style.color = "";
+    });
+    $("why-verdict").innerHTML = "";
+    $("plain-read").innerHTML = "";
+    $("skew-note").hidden = true;
+    $("mb-label").textContent = "Adjusted total";
+    $("mb-total").textContent = "—";
+    $("mb-verdict").innerHTML = '<span class="band band-none">No line</span>';
+    last = null;
+  }
+
+  function renderLate(r) {
+    var cls = BAND_CLASS[r.band];
+    var play = r.band !== "NO EDGE";
+    var moved = Math.round(r.totalRuns * 100) / 100;
+
+    $("sig-unit").textContent = "runs";
+    $("why-unit").textContent = "runs";
+    $("readout-label").textContent = "Adjusted total";
+    $("proj-total").textContent = fmt1(r.projectedTotal);
+    $("proj-sub").innerHTML = r.adjustments.length
+      ? "posted at <b>" + r.line + "</b>, moved " + signed(moved, 2) + " runs"
+      : "posted at <b>" + r.line + "</b>, unmoved";
+    $("away-score").textContent = signed(Math.round(r.documentedRuns * 100) / 100, 2);
+    $("home-score").textContent = signed(Math.round(r.provisionalRuns * 100) / 100, 2);
+    $("model-raw").textContent = signed(moved, 2);
+    $("away-label").textContent = "Documented";
+    $("home-label").textContent = "Provisional";
+    $("model-raw-label").textContent = "Net";
+
+    $("band-wrap").innerHTML =
+      '<span class="band band-' + cls + '">' + r.band +
+      '<span class="pick">' + esc(r.side) + "</span></span>" +
+      '<span class="band-line">' +
+      "The " + r.side.toLowerCase() + " is a <b>" + pct(r.winPct) + "</b> shot." +
+      (play ? "" : r.adjustments.length
+        ? " Under the " + pct(BREAKEVEN_110) + " a bet at -110 has to clear."
+        : " Nothing here the posted number does not already know.") +
+      "</span>";
+    if ($("band-evidence")) bandEvidence(r);
+
+    $("downgrades").innerHTML = r.notes.map(function (n) {
+      return "<li><span class='what'>" + esc(n) + "</span></li>";
+    }).join("");
+
+    $("m-prob-label").textContent = "Win prob";
+    $("m-prob").textContent = pct(r.winPct);
+    $("m-prob").style.color = play ? "var(--good)" : "var(--ink)";
+    $("m-mean-label").textContent = "Posted total";
+    $("m-mean").textContent = fmt2(r.line);
+    $("m-agree-label").textContent = "Late factors";
+    $("m-agree").textContent = r.adjustments.length
+      ? r.adjustments.length + (r.adjustments.length === 1 ? " factor" : " factors") : "none";
+    $("m-agree").style.color = r.adjustments.length ? "var(--ink)" : "var(--muted)";
+    $("m-push").textContent = r.pPush > 0.005 ? pct(r.pPush) : "—";
+
+    markBadFields([]);
+    renderAdjustments(r);
+    renderLateWhy(r);
+    renderSplit(r);
+    renderChart(r, "runs");
+    $("skew-note").hidden = true;
+
+    $("mb-label").textContent = "Adjusted total";
+    $("mb-total").textContent = fmt1(r.projectedTotal);
+    $("mb-verdict").innerHTML = '<span class="band band-' + cls + '">' + r.band +
+      '<span class="pick">' + esc(r.side) + "</span></span>";
+  }
+
+  function renderAdjustments(r) {
+    $("sig-count-label").textContent = r.adjustments.length
+      ? "What moved the number" : "Nothing moved the number";
+    if (!r.adjustments.length) {
+      $("signals").innerHTML =
+        '<p class="note" style="margin:14px 16px">No umpire, no wind direction and no ' +
+        "availability note, so this model has no opinion. It will not invent one out of " +
+        "season statistics — fourteen of those, cross-validated, predicted the line worse " +
+        "than guessing.</p>";
+      return;
+    }
+    var max = Math.max.apply(null, r.adjustments.map(function (a) {
+      return Math.abs(a.runs);
+    }).concat([0.25]));
+    $("signals").innerHTML = r.adjustments.map(function (a) {
+      var w = Math.min(100, Math.abs(a.runs) / max * 100);
+      var dir = a.runs > 0 ? "over" : a.runs < 0 ? "under" : "push";
+      return '<div class="signal">' +
+        '<div class="signal-head">' +
+        '<span class="signal-name">' + esc(a.name) +
+        '<span class="grade grade-' + (a.basis === "documented" ? "clean" : "flagged") +
+        '" style="margin-left:8px">' + a.basis + "</span></span>" +
+        '<span class="signal-val ' + dir + '">' + signed(Math.round(a.runs * 100) / 100, 2) +
+        "</span></div>" +
+        '<div class="signal-bar"><span class="' + dir + '" style="width:' + w.toFixed(1) +
+        '%"></span></div>' +
+        '<p class="signal-why">' + esc(a.detail) + "</p></div>";
+    }).join("");
+  }
+
+  function renderLateWhy(r) {
+    if (!r.adjustments.length) {
+      $("plain-read").innerHTML =
+        "<b>In plain terms:</b> no bet. The posted total already knows everything on this " +
+        "form, so there is no reason to take a side. That is the answer, not a missing one.";
+      $("why").innerHTML = "";
+      $("why-verdict").innerHTML =
+        "This model starts from the posted number and moves it only for factors that are " +
+        "documented to change run scoring and are not reliably in the price yet. With none " +
+        "supplied the adjustment is zero and the win probability is exactly a coin flip.";
+      return;
+    }
+    var need = r.side === "OVER"
+      ? Math.floor(r.line) + 1
+      : (Math.abs(r.line - Math.round(r.line)) < 1e-9 ? r.line - 1 : Math.floor(r.line));
+    // Same house phrasing the totals and spread reads use, so the paragraph
+    // reads the same whichever model produced it.
+    $("plain-read").innerHTML =
+      "<b>In plain terms:</b> the book says " + r.line + ", tonight's conditions are worth " +
+      signed(Math.round(r.totalRuns * 100) / 100, 2) + " runs against that, and the most " +
+      "likely result is " + Math.round(r.projectedTotal) + " runs. Taking the <b>" +
+      r.side.toLowerCase() + "</b>, you need " + need + " or " +
+      (r.side === "OVER" ? "more" : "fewer") + " to land it.";
+    $("why").innerHTML = r.adjustments.map(function (a) {
+      return '<div class="why-row"><span class="why-label">' + esc(a.name) + "</span>" +
+        '<span class="why-val">' + signed(Math.round(a.runs * 100) / 100, 2) + "</span></div>";
+    }).join("") +
+      '<div class="why-row total"><span class="why-label">Net adjustment</span>' +
+      '<span class="why-val">' + signed(Math.round(r.totalRuns * 100) / 100, 2) + "</span></div>";
+    $("why-verdict").innerHTML =
+      "A run of adjustment is only " + (1 / RESIDUAL_SD).toFixed(2) + " standard deviations " +
+      "against a residual spread of " + RESIDUAL_SD + " runs, measured over the 116 settled " +
+      "games in the track record. That is why " + signed(Math.round(r.totalRuns * 100) / 100, 2) +
+      " runs comes out at " + pct(r.winPct) + " and not something flattering.";
+  }
 
   function render(r) {
+    if (r.model === "late") { renderLate(r); return; }
     var isSpread = r.betType === "spread";
     var unit = r.sport === "MLB" ? "runs" : "points";
     $("sig-unit").textContent = unit;
@@ -2382,6 +2822,7 @@
     $("m-mean-label").textContent = isSpread ? "Spread says margin" : "Line reads as";
     $("m-mean").textContent = isSpread ? fmtSigned(Math.round(r.marketMargin * 100) / 100)
                                        : fmt2(r.marketMean);
+    $("m-agree-label").textContent = "Signals agree";
     var voting = r.signals.filter(function (s) { return s.present && s.weight > 0; });
     var agreeing = voting.filter(function (s) { return s.side === r.side; }).length;
     $("m-agree").textContent = agreeing + " of " + voting.length;
@@ -3360,7 +3801,12 @@
     return (f > e.line) === (e.side === "OVER") ? "W" : "L";
   }
 
-  var BAND_ORDER = ["HIGH", "MEDIUM", "LOW", "LEAN", "NO PLAY"];
+  /* Both ladders, strongest first. The late-factor model replaced the totals
+     verdict's five rungs with four, and the log holds games from both -- so the
+     table lists whichever bands actually appear rather than assuming one set.
+     A row with no games in it is dropped anyway. */
+  var BAND_ORDER = ["STRONG", "PLAYABLE", "SLIM", "NO EDGE",
+                    "HIGH", "MEDIUM", "LOW", "LEAN", "NO PLAY"];
 
   function summarise(entries) {
     var w = 0, l = 0, p = 0, expected = 0, variance = 0;
@@ -3385,6 +3831,29 @@
       '</p><p class="v">' + v + "</p>" + (s ? '<p class="s">' + s + "</p>" : "") + "</div>";
   }
 
+  /* Closing line value, which is the metric this page would rather be judged
+     on. A win-loss record cannot settle whether a model works at these sample
+     sizes -- one sigma on 116 games is roughly nine percentage points, so a
+     true 55% and a true 50% look identical for months. Whether the number moved
+     toward your side is a much lower-variance question, and it converges in
+     tens of bets rather than hundreds. Beating the close on better than about
+     55% is the real signal. */
+  function clvTile(entries) {
+    var withClose = entries.map(clvOf).filter(function (c) { return c !== null; });
+    var moved = withClose.filter(function (c) { return !c.noMove; });
+    if (!moved.length) {
+      return tile("Beat the close", "—",
+                  withClose.length ? withClose.length + " logged, none moved"
+                                   : "enter closing lines to track this");
+    }
+    var beat = moved.filter(function (c) { return c.beat; }).length;
+    var rate = beat / moved.length;
+    var sub = beat + " of " + moved.length +
+      (moved.length < 25 ? " — needs ~25 to read" : rate >= 0.55 ? " — a real signal"
+                                                                : " — below the 55% mark");
+    return tile("Beat the close", pct(rate), sub);
+  }
+
   function renderSummary() {
     var entries = logEntries();
     var backed = entries.filter(function (e) { return e.status === "backed"; });
@@ -3406,6 +3875,7 @@
            ps.hitRate === null ? "none settled" : pct(ps.hitRate) + " hit rate") +
       tile("Model expected", s.decided ? s.expected.toFixed(1) + " wins" : "—",
            s.decided ? "you got " + s.w : "") +
+      clvTile(entries) +
       "";
     $("summary").innerHTML = html;
     var thin = s.decided && s.decided < 30
@@ -3491,6 +3961,29 @@
     $("bandcheck").innerHTML = html;
   }
 
+  /* Did the number move toward the side we took?
+
+     Ported from late.closing_line_value. A totals pick wants the number to
+     move up if we took the over and down if we took the under; a spread pick
+     wants the home line to move toward the side we backed. Beating the close
+     on better than about 55% of bets is the signal that something real is
+     underneath, whatever the win-loss column says that month. */
+  function clvOf(e) {
+    if (e.closingLine === null || e.closingLine === undefined) return null;
+    var open = parseFloat(e.line), close = parseFloat(e.closingLine);
+    if (!isFinite(open) || !isFinite(close)) return null;
+    var move = close - open;
+    var beat;
+    if (e.betType === "spread") {
+      // line is the HOME number. It going down (more negative) means the
+      // market moved toward the home side.
+      beat = e.side === "HOME" ? move < 0 : move > 0;
+    } else {
+      beat = e.side === "OVER" ? move > 0 : move < 0;
+    }
+    return { move: move, beat: move !== 0 && beat, noMove: move === 0 };
+  }
+
   function renderLog() {
     renderSummary();
     renderBandCheck();
@@ -3511,8 +4004,8 @@
     }
 
     var html = '<div class="log-scroll"><table class="logtable"><thead><tr>' +
-      "<th>Game</th><th>Band</th><th>Pick</th><th>Line</th><th>Win%</th>" +
-      "<th>Final</th><th>Result</th><th></th></tr></thead><tbody>";
+      "<th>Game</th><th>Band</th><th>Pick</th><th>Line</th><th>Close</th><th>Win%</th>" +
+      "<th>Final</th><th>Result</th><th>CLV</th><th></th></tr></thead><tbody>";
 
     entries.forEach(function (e) {
       var g = gradeOf(e);
@@ -3528,6 +4021,17 @@
           esc(e.final === null || e.final === undefined ? "" : e.final) + "' />"
         : "<input type='number' step='0.5' class='cell' data-final='" + e.id + "' value='" +
           (e.final === null || e.final === undefined ? "" : e.final) + "' />";
+      // Closing line value. Win-loss cannot settle whether a model works at
+      // these sample sizes -- one sigma on 116 games is about nine points --
+      // but whether the number moved toward your side converges far faster.
+      var closeCell = "<input type='number' step='0.5' class='cell' data-close='" + e.id +
+        "' placeholder='" + e.line + "' value='" +
+        (e.closingLine === null || e.closingLine === undefined ? "" : e.closingLine) + "' />";
+      var clv = clvOf(e);
+      var clvCell = clv === null ? "<span class='muted'>—</span>"
+        : clv.noMove ? "<span class='muted'>flat</span>"
+        : clv.beat ? "<b style='color:var(--good)'>" + signed(clv.move, 1) + "</b>"
+        : "<b style='color:var(--under)'>" + signed(clv.move, 1) + "</b>";
       html += "<tr>" +
         "<td><a href='#' class='recall' data-recall='" + e.id + "'>" +
         esc(e.away) + " @ " + esc(e.home) + "</a>" +
@@ -3537,9 +4041,11 @@
         "<td><span class='band-chip chip-" + BAND_CLASS[e.band] + "'>" + e.band + "</span></td>" +
         "<td>" + esc(pickLabel(e)) + "</td>" +
         "<td>" + e.line + "</td>" +
+        "<td>" + closeCell + "</td>" +
         "<td>" + pct(e.winPct) + "</td>" +
         "<td>" + finalCell + "</td>" +
         "<td>" + resCell + "</td>" +
+        "<td>" + clvCell + "</td>" +
         "<td><button type='button' class='btn danger' data-del='" + e.id + "'>×</button></td>" +
         "</tr>";
     });
@@ -3555,6 +4061,15 @@
         // stays ungraded instead of becoming a number it never was.
         e.final = inp.value === "" ? null
           : e.betType === "spread" ? inp.value.trim() : parseFloat(inp.value);
+        saveStore();
+        renderLog();
+      });
+    });
+    $("log-table").querySelectorAll("[data-close]").forEach(function (inp) {
+      inp.addEventListener("change", function () {
+        var e = store.entries.filter(function (x) { return x.id === inp.dataset.close; })[0];
+        if (!e) return;
+        e.closingLine = inp.value === "" ? null : parseFloat(inp.value);
         saveStore();
         renderLog();
       });
@@ -3610,6 +4125,12 @@
       (e.downgradeNotes || []).forEach(function (n) { L.push("     ↳ " + n); });
     }
     L.push("   Settled     " + (g ? "final " + e.final + "  ·  " + g : "not yet"));
+    var c = clvOf(e);
+    if (c) {
+      L.push("   Close       " + e.closingLine + "  ·  " +
+             (c.noMove ? "no move" : signed(c.move, 1) + "  ·  " +
+              (c.beat ? "beat the close" : "lost the close")));
+    }
     if (e.note) L.push("   Note        " + e.note);
     L.push("   Inputs");
     ["away", "home"].forEach(function (k) {
@@ -3663,14 +4184,16 @@
     // still lines up. For a spread row, line is the home spread, the model
     // columns are margins, and final is both scores ("78-85", away first).
     var head = ["date", "sport", "away", "home", "line", "side", "band", "earned_band",
-                "win_pct", "status", "final", "result", "model_total", "market_mean",
+                "win_pct", "status", "final", "result", "closing_line", "model_total", "market_mean",
                 "projected_total", "downgrades", "note", "bet_type"];
     var rows = [head.join(",")];
     store.entries.forEach(function (e) {
       rows.push([e.date, e.sport, e.away, e.home, e.line, e.side, e.band, e.earnedBand,
                  e.winPct.toFixed(4), e.status,
                  e.final === null || e.final === undefined ? "" : e.final,
-                 gradeOf(e) || "", e.modelTotal.toFixed(2), e.marketMean.toFixed(2),
+                 gradeOf(e) || "",
+                 e.closingLine === null || e.closingLine === undefined ? "" : e.closingLine,
+                 e.modelTotal.toFixed(2), e.marketMean.toFixed(2),
                  e.projectedTotal.toFixed(2), e.downgrades.join("; "), e.note || "",
                  e.betType || "total"]
         .map(function (v) { return '"' + String(v).replace(/"/g, '""') + '"'; }).join(","));
@@ -3763,6 +4286,7 @@
     var out = rows.slice(1).map(function (r, n) {
       var get = function (k) { return idx[k] === undefined ? "" : (r[idx[k]] || "").trim(); };
       var fin = get("final");
+      var close = get("closing_line");
       // Older CSVs have no bet_type column; everything in them was a total.
       var betType = get("bet_type") ||
         (get("side") === "HOME" || get("side") === "AWAY" ? "spread" : "total");
@@ -3781,7 +4305,8 @@
         status: get("status") || "backed", note: get("note"),
         inputs: null, values: null,
         // A spread final is the "78-85" score pair and stays text.
-        final: fin === "" ? null : (betType === "spread" ? fin : parseFloat(fin))
+        final: fin === "" ? null : (betType === "spread" ? fin : parseFloat(fin)),
+        closingLine: close === "" || close === undefined ? null : parseFloat(close)
       };
     }).filter(function (e) { return e.away && isFinite(e.line) && e.band; });
     return { entries: out, partial: true,

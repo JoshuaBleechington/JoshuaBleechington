@@ -68,6 +68,12 @@ LEAGUE_RUNS_PER_GAME = 8.6
 # gets his difference from league shrunk hard; one with 400 keeps most of it.
 # Shrinkage is n / (n + UMPIRE_SHRINK_GAMES).
 UMPIRE_SHRINK_GAMES = 120.0
+# Every other term here is bounded and this one was not: an umpire typed in at
+# 40 runs a game on 200 games produced a +23 run adjustment and a 100% verdict.
+# Impossible inputs were the source of the worst calls this project ever made,
+# so the term is capped and the raw figure is range-checked as well.
+UMPIRE_CAP_RUNS = 1.0
+UMPIRE_PLAUSIBLE_RPG = (6.0, 12.0)
 
 # Wind does nothing below this, then scales roughly linearly. Sized so that a
 # 15 mph wind straight out moves the total about 0.7 runs and 20 mph about
@@ -149,10 +155,17 @@ def umpire_adjustment(game: dict[str, Any]) -> Adjustment | None:
         return None
     games = _f(ump.get("games")) or 0.0
     league = _f(ump.get("league_runs_per_game")) or LEAGUE_RUNS_PER_GAME
+    name = ump.get("name") or "the plate umpire"
+    lo, hi = UMPIRE_PLAUSIBLE_RPG
+    if not (lo <= rpg <= hi):
+        return Adjustment(
+            "Umpire", 0.0, "documented",
+            f"{rpg:.2f} runs a game is outside the {lo:.0f}-{hi:.0f} range any umpire "
+            "lives in, so it is being read as a typo and ignored rather than trusted.",
+        )
     raw = rpg - league
     shrink = games / (games + UMPIRE_SHRINK_GAMES) if games > 0 else 0.0
-    runs = raw * shrink
-    name = ump.get("name") or "the plate umpire"
+    runs = max(-UMPIRE_CAP_RUNS, min(UMPIRE_CAP_RUNS, raw * shrink))
     return Adjustment(
         "Umpire",
         runs,
@@ -337,7 +350,12 @@ def decide_late(game: dict[str, Any]) -> LateVerdict:
     probs: TotalProbs = normal_total_probs(projected, RESIDUAL_SD, line)
     decided = 1.0 - probs.p_push
     p_over = probs.p_over / decided if decided > 0 else probs.p_over
-    side = "OVER" if p_over >= 0.5 else "UNDER"
+    # With no adjustment the two sides are exactly even, and which one gets
+    # named is a coin flip that floating point should not be deciding -- the
+    # page's erf and this one disagree in the last bit and picked different
+    # sides for the same game. A dead heat is OVER by convention, and the band
+    # is NO EDGE either way, so the label is all that is at stake.
+    side = "OVER" if p_over >= 0.5 - 1e-9 else "UNDER"
     win_pct = p_over if side == "OVER" else 1.0 - p_over
 
     notes: list[str] = []

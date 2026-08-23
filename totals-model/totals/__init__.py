@@ -9,13 +9,14 @@ from .core import (
     Projection,
     evaluate,
 )
-from . import confidence, late, mlb, spread, wnba
+from . import confidence, gameday, late, mlb, spread, wnba
 
 __all__ = [
     "Market",
     "Projection",
     "evaluate",
     "confidence",
+    "gameday",
     "late",
     "mlb",
     "spread",

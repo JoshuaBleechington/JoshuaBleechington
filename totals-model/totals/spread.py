@@ -51,9 +51,9 @@ from .confidence import (
     _fmt,
     _ramp,
     _sentence_case,
-    _step_down,
     _team_ou_pct,
     band_for,
+    input_grade_for,
 )
 from .core import Projection
 from .distributions import normal_cdf
@@ -153,6 +153,7 @@ class SpreadVerdict:
     win_pct: float               # probability the picked side covers
     band: str
     signals: list[SpreadSignal]
+    input_grade: str = "clean"
     downgrades: list[str] = field(default_factory=list)
     downgrade_notes: list[str] = field(default_factory=list)
     flags: list[str] = field(default_factory=list)
@@ -172,6 +173,7 @@ class SpreadVerdict:
             "side": self.side,
             "win_pct": round(self.win_pct, 4),
             "band": self.band,
+            "input_grade": self.input_grade,
             "signals": [
                 {
                     "name": s.name,
@@ -394,10 +396,8 @@ def decide_spread(projection: Projection, game: dict[str, Any]) -> SpreadVerdict
         downgrades.append(f"no {trend_names} to corroborate it")
         notes.append(
             "Only the matchup model voted. Filling in a trend would confirm the read "
-            "or catch a bad input, and could put the band back up."
+            "or catch a bad input."
         )
-
-    band = _step_down(band, len(downgrades))
 
     return SpreadVerdict(
         sport="WNBA",
@@ -412,6 +412,7 @@ def decide_spread(projection: Projection, game: dict[str, Any]) -> SpreadVerdict
         win_pct=win_pct,
         band=band,
         signals=signals,
+        input_grade=input_grade_for(len(downgrades)),
         downgrades=downgrades,
         downgrade_notes=notes,
         flags=flags,

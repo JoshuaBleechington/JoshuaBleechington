@@ -338,26 +338,37 @@ zero still costs a downgrade — an ERA with no innings behind it at all is a
 different, worse problem than a real short one, and is what turned a 0.00 ERA
 into this model's largest false-confidence bet before that check existed.
 
-**Confidence only ever falls.** The win probability sets the ceiling — HIGH at
-58%, MEDIUM at 54.5%, LOW at 52% — and each doubt knocks it down a step:
-signals pointing different ways, thin inputs, a projection implausibly far from
-the market. Nothing knocks it up. That asymmetry is deliberate. Four separate
-faults in this model's history all presented as unusually high confidence, so an
-exceptional number is a reason to check the inputs before it is a reason to bet.
+**The band is the edge, and only the edge.** The win probability sets it —
+HIGH at 58%, MEDIUM at 54.5%, LOW at 52%, NO PLAY below that — and nothing else
+moves it. A doubt does not cost a rung.
 
-**LEAN sits one step below LOW.** A game that earned LOW or better but took
-exactly one doubt still names a side — a weaker version of a real read, not
-nothing. Two doubts still empty it all the way to NO PLAY. LEAN is never earned
-directly from a win probability; a game only lands there by losing a step, which
-keeps its meaning fixed. It exists because NO PLAY, on the logged games, hit
-58.8% (n=34) whether a game landed there by earning it outright or by being
-knocked down to it — the *reason* said less than the raw number did, which was
-the case for not treating every downgrade past LOW as silence. n=34 is thin;
-revisit past the ~50 games per band the track record page already asks for.
+It used to. Every complaint — signals pointing different ways, thin inputs, a
+projection implausibly far from the market — knocked the band down one step. The
+track record is what retired that rule. NO PLAY ended up holding two completely
+different kinds of game under one label: the ones that earned it, with no edge
+to speak of, and the ones that earned LOW or better and got marked down. On 147
+logged games those two went **7-8** and **10-5**. Nothing in the log could tell
+them apart, because the band was answering two questions with one word.
+
+**Input quality is its own answer.** `input_grade` is `clean`, `flagged` (one
+doubt) or `shaky` (two or more), reported next to the band rather than
+subtracted from it. Same evidence, same complaints, same notes — they just no
+longer masquerade as a smaller edge. This is a reporting change, not a claim
+about which way the doubts point: separating the two axes is what makes that
+question answerable from the next hundred games instead of unanswerable forever.
+
+**A read is never an abstention.** Every verdict names a side and a number,
+including NO PLAY, and the page now shows the pick at every band. It used to
+hide it below LOW, which read as the model declining to answer. It never was:
+one of two things happens tonight, and the model always had an opinion. NO PLAY
+means *thin edge* — below the 52.4% a -110 bet has to clear — not *no pick*.
+
+`LEAN` remains in `BANDS` so logs written under the old rule still render, but
+nothing produces it any more; it was only ever reachable by stepping down.
 
 **Impossible numbers name themselves.** Every field has a physical range —
 not "unlikely", *impossible* — and anything outside it is flagged by name, marks
-the offending box on the form, and costs a confidence band. A typo does not
+the offending box on the form, and grades the inputs shaky. A typo does not
 announce itself; it gets absorbed. An average of 401 innings per start was read
 as "this starter goes all nine", which took the bullpen out of the calculation
 and moved the projection half a run, because 401 clamps quietly to 9.
@@ -432,9 +443,9 @@ exactly as the over/under record's was: there is no logged spread history to
 check it against yet.
 
 Everything structural is inherited rather than reinvented: the same band ladder
-with the same thresholds, the same landing-only LEAN, the same trust budget
-where the matchup model keeps at least half, the same confidence-only-goes-down
-rule, and the same refusal to read a half-filled wins/losses box as a number.
+with the same thresholds, the same trust budget where the matchup model keeps
+at least half, the same separation of the edge band from the input grade, and
+the same refusal to read a half-filled wins/losses box as a number.
 
 In the track record a spread pick is graded from **both scores, away first** —
 `74-88` is a 14-point home win, which covers `-9.5`. Entries carry a `bet_type`

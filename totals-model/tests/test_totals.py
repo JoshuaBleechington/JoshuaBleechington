@@ -747,14 +747,30 @@ class TestConfidenceModel(unittest.TestCase):
         r = run_verdict("wnba", self.wnba_game(line=171.0))
         self.assertAlmostEqual(r["market_mean"], 171.0, places=1)
 
-    def test_bands_only_ever_step_down(self):
-        """Every fault in this project's history arrived dressed as confidence."""
-        from totals.confidence import BANDS, band_for, _step_down
-        for b in BANDS:
-            self.assertEqual(BANDS.index(_step_down(b)), max(0, BANDS.index(b) - 1))
-        self.assertEqual(_step_down("HIGH", 5), "NO PLAY")
+    def test_the_band_is_the_edge_and_nothing_else(self):
+        """A doubt no longer eats the band; it is reported on its own axis.
+
+        The old rule stepped the band down once per complaint, which put two
+        different games under one label: the ones with no edge, and the ones
+        with a real edge and a shaky input. On the logged games those two
+        went 7-8 and 10-5, and no reading of the record could separate them
+        while the band was answering both questions at once.
+        """
+        from totals.confidence import band_for, input_grade_for
         self.assertEqual(band_for(0.99), "HIGH")
         self.assertEqual(band_for(0.50), "NO PLAY")
+        self.assertEqual(input_grade_for(0), "clean")
+        self.assertEqual(input_grade_for(1), "flagged")
+        self.assertEqual(input_grade_for(4), "shaky")
+
+        # Same game, one thin input added: the edge read is untouched.
+        g = self.mlb_game(line=8.0)
+        clean = run_verdict("mlb", g)
+        g["away"]["starter_season_ip"] = 0
+        doubted = run_verdict("mlb", g)
+        self.assertEqual(clean["band"], doubted["band"])
+        self.assertEqual(clean["input_grade"], "clean")
+        self.assertEqual(doubted["input_grade"], "flagged")
 
     def test_a_trend_pointing_the_other_way_costs_a_band(self):
         strong = {"h2h": {"avg_total": 20.0, "games": 8}}   # screams over
@@ -778,17 +794,24 @@ class TestConfidenceModel(unittest.TestCase):
         g["away"]["starter_season_ip"] = 0  # one thin-input flag, nothing else
         r = run_verdict("mlb", g)
         self.assertEqual(len(r["downgrades"]), 1)
-        self.assertEqual(r["band"], "LEAN")
+        self.assertEqual(r["input_grade"], "flagged")
         self.assertIn(r["side"], ("OVER", "UNDER"))
         self.assertGreater(r["win_pct"], 0.5)
 
-    def test_two_doubts_on_an_earned_low_still_reach_no_play(self):
-        """LEAN absorbs exactly one doubt. A second still empties it out."""
+    def test_two_doubts_grade_the_inputs_shaky_and_still_name_a_side(self):
+        """Doubt is never an abstention. Every read names a side and a number.
+
+        Two complaints used to knock any read down to NO PLAY, which read on
+        the page as "no pick". The pick was always there; the label was hiding
+        it. Now the doubts grade the inputs and the edge stands on its own.
+        """
         g2 = self.mlb_game(line=8.0, h2h={"avg_total": 3.0, "games": 8})
         g2["away"]["starter_season_ip"] = 0
         r2 = run_verdict("mlb", g2)
         self.assertGreaterEqual(len(r2["downgrades"]), 2)
-        self.assertEqual(r2["band"], "NO PLAY")
+        self.assertEqual(r2["input_grade"], "shaky")
+        self.assertIn(r2["side"], ("OVER", "UNDER"))
+        self.assertEqual(r2["band"], __import__("totals").confidence.band_for(r2["win_pct"]))
 
     def test_lean_is_never_earned_directly(self):
         """A game can only arrive at LEAN by losing a step from LOW+; a raw

@@ -226,6 +226,7 @@ class Verdict:
     win_pct: float
     band: str
     signals: list[Signal]
+    input_grade: str = "clean"
     downgrades: list[str] = field(default_factory=list)
     downgrade_notes: list[str] = field(default_factory=list)
     flags: list[str] = field(default_factory=list)
@@ -242,6 +243,7 @@ class Verdict:
             "side": self.side,
             "win_pct": round(self.win_pct, 4),
             "band": self.band,
+            "input_grade": self.input_grade,
             "signals": [
                 {
                     "name": s.name,
@@ -468,9 +470,23 @@ def band_for(win_pct: float) -> str:
     return "NO PLAY"
 
 
-def _step_down(band: str, steps: int = 1) -> str:
-    i = BANDS.index(band)
-    return BANDS[max(0, i - steps)]
+INPUT_GRADES = ("clean", "flagged", "shaky")
+
+
+def input_grade_for(downgrades: int) -> str:
+    """How much the inputs behind a read wobbled, as its own answer.
+
+    This used to be spent demoting the band -- one step down per complaint.
+    That collapsed two different questions into one number, and the track
+    record showed what it cost: NO PLAY ended up holding both the games with
+    no edge (7-8) and the games with a big edge and a shaky input (10-5),
+    under one label, as if they were the same bet. They are not, and no
+    reading of the log could tell them apart while the band was doing both
+    jobs. Edge and input quality are reported separately now.
+    """
+    if downgrades <= 0:
+        return INPUT_GRADES[0]
+    return INPUT_GRADES[1] if downgrades == 1 else INPUT_GRADES[2]
 
 
 def decide(sport: str, projection: Projection, game: dict[str, Any]) -> Verdict:
@@ -532,8 +548,6 @@ def decide(sport: str, projection: Projection, game: dict[str, Any]) -> Verdict:
             "or catch a bad input, and could put the band back up."
         )
 
-    band = _step_down(band, len(downgrades))
-
     return Verdict(
         sport=sport,
         matchup=f"{projection.away} @ {projection.home}",
@@ -545,6 +559,7 @@ def decide(sport: str, projection: Projection, game: dict[str, Any]) -> Verdict:
         win_pct=win_pct,
         band=band,
         signals=signals,
+        input_grade=input_grade_for(len(downgrades)),
         downgrades=downgrades,
         downgrade_notes=notes,
         flags=flags,

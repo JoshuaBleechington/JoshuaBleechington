@@ -25,8 +25,10 @@
     --push: #9aa1af;
     --good: #0a7d0a;
     --bad: #b53434;
+    --warn: #8a6100;
     --good-wash: rgba(10, 125, 10, 0.1);
     --bad-wash: rgba(181, 52, 52, 0.09);
+    --warn-wash: rgba(138, 97, 0, 0.11);
     --shadow: 0 1px 2px rgba(18, 21, 28, 0.05), 0 8px 24px -12px rgba(18, 21, 28, 0.18);
     --ui: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", sans-serif;
     --mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, "Liberation Mono", monospace;
@@ -51,8 +53,10 @@
       --push: #6b7280;
       --good: #35b135;
       --bad: #e06a6a;
+      --warn: #d6a640;
       --good-wash: rgba(53, 177, 53, 0.13);
       --bad-wash: rgba(224, 106, 106, 0.12);
+      --warn-wash: rgba(214, 166, 64, 0.14);
       --shadow: 0 1px 2px rgba(0, 0, 0, 0.4), 0 8px 24px -12px rgba(0, 0, 0, 0.6);
     }
   }
@@ -75,8 +79,10 @@
     --push: #6b7280;
     --good: #35b135;
     --bad: #e06a6a;
+    --warn: #d6a640;
     --good-wash: rgba(53, 177, 53, 0.13);
     --bad-wash: rgba(224, 106, 106, 0.12);
+    --warn-wash: rgba(214, 166, 64, 0.14);
     --shadow: 0 1px 2px rgba(0, 0, 0, 0.4), 0 8px 24px -12px rgba(0, 0, 0, 0.6);
   }
 
@@ -592,6 +598,14 @@
      three that still print a side. */
   .band-lean   { background: transparent;        color: var(--muted);  border: 1.5px solid var(--rule-strong); }
   .band-none   { background: transparent;        color: var(--muted);  border: 1.5px dashed var(--rule-strong); }
+  /* Input quality, reported beside the band rather than subtracted from it.
+     Deliberately quieter than the band chip: it qualifies the read, it is not
+     the read. */
+  .grade { font-size: 11px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase;
+           padding: 3px 8px; border-radius: 999px; white-space: nowrap; align-self: center; }
+  .grade-clean   { background: var(--good-wash); color: var(--good); }
+  .grade-flagged { background: var(--warn-wash); color: var(--warn); }
+  .grade-shaky   { background: var(--bad-wash);  color: var(--bad); }
   .band-line { font-size: 13.5px; color: var(--ink-2); line-height: 1.5; flex: 1 1 220px; min-width: 0; }
   .band-line b { color: var(--ink); font-family: var(--mono); font-weight: 700; }
 
@@ -1246,7 +1260,7 @@
      Bump this whenever a constant that moves a verdict changes. Leave it
      alone for display-only changes: a stamp that changes when nothing changed
      splits the evidence for no reason. */
-  var MODEL_VERSION = "2026-08-21";
+  var MODEL_VERSION = "2026-08-23";
 
   var BAND_HIGH = 0.580, BAND_MEDIUM = 0.545, BAND_LOW = 0.520;
   // LEAN is landing-only: bandFor() never returns it directly. A game only
@@ -1323,11 +1337,14 @@
     return p >= BAND_HIGH ? "HIGH" : p >= BAND_MEDIUM ? "MEDIUM"
          : p >= BAND_LOW ? "LOW" : "NO PLAY";
   }
-  function stepDown(band, steps) {
-    // Not `steps || 1`: zero downgrades is the common case and is not a missing
-    // argument. That coercion marked every clean verdict down a band.
-    var n = steps === undefined ? 1 : steps;
-    return BANDS[Math.max(0, BANDS.indexOf(band) - n)];
+  /* How much the inputs behind a read wobbled -- its own answer, not a tax on
+     the band. Doubts used to step the band down once each, which filed two
+     different games under one label: the ones with no edge, and the ones with
+     a real edge and a shaky input. On the logged games those went 7-8 and
+     10-5. Ported from confidence.input_grade_for. */
+  var INPUT_GRADES = ["clean", "flagged", "shaky"];
+  function inputGradeFor(n) {
+    return n <= 0 ? "clean" : n === 1 ? "flagged" : "shaky";
   }
 
   // WNBA teams meet one to three times a season, so "head to head" there is
@@ -1562,11 +1579,11 @@
         .join(" or ");
       downgrades.push("no " + trendNames + " to corroborate it");
       dnotes.push("Only the matchup model voted. Filling in a trend would confirm the " +
-        "read or catch a bad input, and could put the band back up.");
+        "read or catch a bad input.");
     }
 
-    var earned = bandFor(winPct);
-    var band = stepDown(earned, downgrades.length);
+    var band = bandFor(winPct);
+    var inputGrade = inputGradeFor(downgrades.length);
 
     return {
       sport: sport, away: proj.away, home: proj.home,
@@ -1575,7 +1592,7 @@
       line: line, trust: trust,
       built: built, pOver: pr.pOver, pUnder: pr.pUnder, pPush: pr.pPush,
       side: side, winPct: winPct,
-      earnedBand: earned, band: band,
+      earnedBand: band, band: band, inputGrade: inputGrade,
       signals: signals, downgrades: downgrades, downgradeNotes: dnotes, flags: flags,
       badFields: badFields.slice()
     };
@@ -1818,11 +1835,11 @@
         .join(" or ");
       downgrades.push("no " + trendNames + " to corroborate it");
       dnotes.push("Only the matchup model voted. Filling in a trend would confirm the " +
-        "read or catch a bad input, and could put the band back up.");
+        "read or catch a bad input.");
     }
 
-    var earned = bandFor(winPct);
-    var band = stepDown(earned, downgrades.length);
+    var band = bandFor(winPct);
+    var inputGrade = inputGradeFor(downgrades.length);
 
     return {
       sport: "WNBA", betType: "spread", away: proj.away, home: proj.home,
@@ -1832,7 +1849,7 @@
       built: { kind: "margin", mu: projected, sd: sd },
       pHome: pr.pHome, pAway: pr.pAway, pPush: pr.pPush,
       side: side, winPct: winPct,
-      earnedBand: earned, band: band,
+      earnedBand: band, band: band, inputGrade: inputGrade,
       signals: signals, downgrades: downgrades, downgradeNotes: dnotes, flags: flags,
       badFields: badFields.slice()
     };
@@ -2322,23 +2339,32 @@
     $("home-label").textContent = r.home;
 
     var cls = BAND_CLASS[r.band];
+    /* The pick is always shown. It was hidden below LOW, which read on the page
+       as the model declining to answer -- but a side and a number were always
+       there, and one of two things is going to happen tonight either way. The
+       band says how big the edge is; it is not permission to look. */
     var play = r.band !== "NO PLAY";
     var pick = pickLabel(r);
+    var GRADE_TEXT = {
+      clean: "inputs clean",
+      flagged: "one input flagged",
+      shaky: "inputs shaky"
+    };
+    var grade = r.inputGrade || "clean";
     $("band-wrap").innerHTML =
       '<span class="band band-' + cls + '">' + r.band +
-      (play ? '<span class="pick">' + esc(pick) + "</span>" : "") + "</span>" +
+      '<span class="pick">' + esc(pick) + "</span></span>" +
+      '<span class="grade grade-' + grade + '">' + GRADE_TEXT[grade] + "</span>" +
       '<span class="band-line">' +
       (isSpread
-        ? (play
-          ? "<b>" + esc(pick) + "</b> covers at <b>" + pct(r.winPct) + "</b>."
-          : "Model reads " + esc(pick) + " at <b>" + pct(r.winPct) +
-            "</b> — not enough to act on.")
-        : (play
-          ? "The " + r.side.toLowerCase() + " is a <b>" + pct(r.winPct) + "</b> shot."
-          : "Model reads " + r.side + " at <b>" + pct(r.winPct) + "</b> — not enough to act on.")) +
+        ? "<b>" + esc(pick) + "</b> covers at <b>" + pct(r.winPct) + "</b>."
+        : "The " + r.side.toLowerCase() + " is a <b>" + pct(r.winPct) + "</b> shot.") +
+      (play ? "" : " That is a thin edge — under the " + pct(0.524) +
+        " a bet at -110 has to clear.") +
       (r.downgrades.length
-        ? " Earned <b>" + r.earnedBand + "</b>, marked down " +
-          (r.downgrades.length === 1 ? "a band" : r.downgrades.length + " bands") + ":"
+        ? " The edge read is unchanged by it, but " +
+          (r.downgrades.length === 1 ? "one thing is" : r.downgrades.length + " things are") +
+          " worth a look:"
         : "") +
       "</span>";
 
@@ -3220,6 +3246,7 @@
       betType: isSpread ? "spread" : "total",
       modelVersion: MODEL_VERSION,
       line: r.line, side: r.side, band: r.band, earnedBand: r.earnedBand,
+      inputGrade: r.inputGrade,
       winPct: r.winPct, pPush: r.pPush,
       modelTotal: isSpread ? r.modelMargin : r.modelTotal,
       marketMean: isSpread ? r.marketMargin : r.marketMean,

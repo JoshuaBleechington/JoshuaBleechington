@@ -115,23 +115,38 @@ first time these inputs were in a model.
 
 ### What the page carries
 
-`web/gameday.html` deliberately holds a **subset** of the package: the wind, the
-umpire's over/under record, and the ticket-vs-money split behind an optional
-disclosure. Seven controls, two lookups.
+`web/gameday.html` now carries every builder in the package: the line and its
+movement, weather (wind and temperature), park factor, the plate umpire, both
+starters' last five, both bullpens, team form, head to head, and the
+ticket-vs-money split behind an optional disclosure. The Strict/Trial toggle is
+what keeps the provisional half honest.
 
-The trial tier is not on it. Asked for on 2026-08-24 and taken back off on the
-same day for being too much typing, which is a fair verdict: form and
-head-to-head measured null, the four fields per arm were the bulk of the work,
-and none of them could carry a call on its own in strict mode anyway. They stay
-in `totals/gameday.py` and can still be logged from there.
+It was cut to three inputs on 2026-08-24 for being too much typing and put back
+the same day on request. Both calls are defensible and the record of the swap
+matters more than which one is current: the trial tier is a hypothesis under
+test, and the page logs it separately so the question can actually be settled.
 
-Temperature came off for a different reason. Its cap is 0.35, which sits *under*
-the 0.45 lean bar, so it can never carry anything by itself — its only real
-effect was tripping the contradiction gate on games a documented signal was
-carrying. That is the exact failure this playbook already records twice.
+### The park
 
-`tools_check_gameday_page.js` replays `web/gameday-cases.json` — twelve games
-generated from the package — through the page in a browser and asserts the
+Park factor is an input, but it does **not** get a term of its own. It is
+published, season-long and identical every night, so the posted total already
+holds it — adding it again is the double count that put the fourteen-input model
+behind the naked line.
+
+What it legitimately changes is what *tonight's* wind is worth. Fifteen out
+where balls carry is not the same event as fifteen out where they die on the
+track, and the line prices the park's average conditions rather than this
+evening's. So it multiplies the wind and nothing else, held inside ±20%: a 113
+park lifts a 1.00-run wind to 1.13. With no wind reading it does nothing at all,
+and anything outside 70–130 is read as a typo and ignored — the same guard the
+umpire's 40 R/Gm needed.
+
+The size is reasoning, not measurement. It is bounded so it can never invent a
+signal where the wind was not already saying something, and it can never flip a
+sign.
+
+`tools_check_gameday_page.js` replays `web/gameday-cases.json` — eighteen games,
+each run strict and trial — through the page in a browser and asserts the
 verdict, net, side and bar count match. Run it after touching either side.
 
 **Read the hourly row and the prose, never the headline.** The weather cards

@@ -427,12 +427,53 @@ def public_split(ticket_pct_over: float, money_pct_over: float,
     )
 
 
-def wind(mph: float, direction: str, source: str, as_of=None) -> "Evidence | None":
+# --- the park -------------------------------------------------------------
+#
+# A park factor does NOT get a term of its own here, and that is deliberate.
+# It is published, season-long and identical every night, so it is inside the
+# posted total before anyone looks it up. Adding it as an adjustment is the
+# same double count that put the fourteen-input model behind the naked line.
+#
+# What it legitimately does is change how much TONIGHT's wind is worth. Fifteen
+# miles an hour blowing out at a park where balls already carry is not the same
+# event as fifteen out where they die on the track, and the line prices the
+# park's average conditions rather than this evening's. So the park enters as a
+# multiplier on the wind and nowhere else.
+#
+# The size is reasoning, not measurement: a factor is scaled to pf/100 and held
+# inside +/-20%, so a 113 park lifts a 1.00-run wind to 1.13 and a 90 park cuts
+# it to 0.90. Big enough to matter on a stacked card, too small to invent a
+# signal where the wind was not already saying something.
+PARK_NEUTRAL = 100.0
+PARK_PLAUSIBLE = (70.0, 130.0)
+PARK_WIND_SCALE_CAP = 0.20
+
+
+def park_wind_scale(park_factor: float | None) -> float:
+    """How far tonight's wind is amplified or damped by the park.
+
+    Returns 1.0 for a missing, neutral or implausible figure -- a typo must
+    leave the wind alone rather than double it.
+    """
+    if park_factor is None:
+        return 1.0
+    lo, hi = PARK_PLAUSIBLE
+    if not (lo <= park_factor <= hi):
+        return 1.0
+    scale = park_factor / PARK_NEUTRAL
+    return max(1.0 - PARK_WIND_SCALE_CAP, min(1.0 + PARK_WIND_SCALE_CAP, scale))
+
+
+def wind(mph: float, direction: str, source: str, as_of=None,
+         park_factor: float | None = None) -> "Evidence | None":
     """Wind, the largest weather term and the main physical under-driver.
 
     Nothing below 8 mph, then 0.10 runs per mph, capped at 1.5. A cross wind is
     explicitly nothing rather than absent -- it is a reading, and it says the
     weather was checked.
+
+    ``park_factor`` scales the result and nothing else; see the note above for
+    why the park is not allowed a term of its own.
     """
     d = (direction or "").strip().lower()
     if d not in ("out", "in", "cross"):
@@ -443,9 +484,16 @@ def wind(mph: float, direction: str, source: str, as_of=None) -> "Evidence | Non
                         "a fly ball neither way.", as_of)
     effective = max(0.0, mph - 8.0)
     mag = min(1.5, effective * 0.10)
+    scale = park_wind_scale(park_factor)
+    tail = ""
+    if scale != 1.0:
+        tail = (f" Scaled by {scale:.2f} for a park factor of {park_factor:.0f} "
+                "-- the park is not a term of its own, it only changes what "
+                "tonight's wind is worth.")
+        mag = min(1.5, mag * scale)
     runs = mag if d == "out" else -mag
     return Evidence("Wind", runs, "documented",
-                    f"{source}: {mph:.0f} mph blowing {d}.", as_of)
+                    f"{source}: {mph:.0f} mph blowing {d}.{tail}", as_of)
 
 
 # --- the umpire, done properly -------------------------------------------

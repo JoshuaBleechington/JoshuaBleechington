@@ -41,45 +41,50 @@ const CASES = JSON.parse(fs.readFileSync(path.join(__dirname, 'web/gameday-cases
   };
 
   for (const c of CASES) {
-    const got = await pg.evaluate(async (inputs) => {
-      const ids = ["away", "home", "open", "line", "mph", "dir", "uo", "uu", "tick", "cash"];
-      ids.forEach(id => { document.getElementById(id).value = ''; });
-      document.getElementById('dome').checked = false;
-      for (const [k, v] of Object.entries(inputs)) {
-        if (v === null || v === undefined) continue;
-        if (k === 'dome') { document.getElementById('dome').checked = !!v; continue; }
-        const e = document.getElementById(k);
-        if (e) e.value = String(v);
-      }
-      ids.forEach(id => document.getElementById(id)
-        .dispatchEvent(new Event('input', { bubbles: true })));
-      document.getElementById('dome').dispatchEvent(new Event('change', { bubbles: true }));
-      await new Promise(r => setTimeout(r, 80));
+    for (const mode of ['strict', 'trial']) {
+      const got = await pg.evaluate(async ([inputs, mode]) => {
+        const ids = ["away", "home", "open", "line", "mph", "dir", "temp", "pf", "uo", "uu",
+                     "spa", "spai", "sph", "sphi", "bpa", "bpai", "bph", "bphi",
+                     "fa", "fh", "fg", "h2h", "h2hn", "tick", "cash"];
+        ids.forEach(id => { document.getElementById(id).value = ''; });
+        document.getElementById('dome').checked = false;
+        document.getElementById(mode === 'trial' ? 'm-trial' : 'm-strict').click();
+        for (const [k, v] of Object.entries(inputs)) {
+          if (v === null || v === undefined) continue;
+          if (k === 'dome') { document.getElementById('dome').checked = !!v; continue; }
+          const e = document.getElementById(k);
+          if (e) e.value = String(v);
+        }
+        ids.forEach(id => document.getElementById(id)
+          .dispatchEvent(new Event('input', { bubbles: true })));
+        document.getElementById('dome').dispatchEvent(new Event('change', { bubbles: true }));
+        await new Promise(r => setTimeout(r, 60));
 
-      const pick = document.querySelector('#verdict .pick');
-      return {
-        band: document.querySelector('#verdict .band').textContent.trim(),
-        side: pick ? pick.textContent.trim().split(' ')[0] : null,
-        net: parseFloat(document.querySelectorAll('#verdict .nums .v')[0].textContent.trim()),
-        bars: document.querySelectorAll('#chart .bar').length,
-        go: document.getElementById('verdict').classList.contains('go'),
-        greenBand: document.querySelector('#verdict .band').classList.contains('go'),
-      };
-    }, c.inputs);
+        const pick = document.querySelector('#verdict .pick');
+        return {
+          band: document.querySelector('#verdict .band').textContent.trim(),
+          side: pick ? pick.textContent.trim().split(' ')[0] : null,
+          net: parseFloat(document.querySelectorAll('#verdict .nums .v')[0].textContent.trim()),
+          bars: document.querySelectorAll('#chart .bar').length,
+          go: document.getElementById('verdict').classList.contains('go'),
+          greenBand: document.querySelector('#verdict .band').classList.contains('go'),
+        };
+      }, [c.inputs, mode]);
 
-    const w = c.expect, tag = c.name;
-    chk(got.band === w.verdict, `${tag}: ${w.verdict}`, `page said ${got.band}`);
-    chk(Math.abs(got.net - w.net) < 0.011, `${tag}: net ${w.net.toFixed(2)}`, `page said ${got.net}`);
-    chk(got.bars === w.items, `${tag}: ${w.items} bars`, `page drew ${got.bars}`);
-    if (w.go) chk(got.side === w.side, `${tag}: side ${w.side}`, `page said ${got.side}`);
-    // The user's one explicit rule for the graph: green means medium or high.
-    chk(got.go === w.go && got.greenBand === w.go,
-        `${tag}: green only when it is a call`,
-        `go=${got.go} band=${got.greenBand} verdict=${w.verdict}`);
+      const w = c.expect[mode], tag = `${c.name} [${mode}]`;
+      chk(got.band === w.verdict, `${tag}: ${w.verdict}`, `page said ${got.band}`);
+      chk(Math.abs(got.net - w.net) < 0.011, `${tag}: net ${w.net.toFixed(2)}`, `page said ${got.net}`);
+      chk(got.bars === w.items, `${tag}: ${w.items} bars`, `page drew ${got.bars}`);
+      if (w.go) chk(got.side === w.side, `${tag}: side ${w.side}`, `page said ${got.side}`);
+      // The user's one explicit rule for the graph: green means medium or high.
+      chk(got.go === w.go && got.greenBand === w.go,
+          `${tag}: green only when it is a call`,
+          `go=${got.go} band=${got.greenBand} verdict=${w.verdict}`);
+    }
   }
 
   if (errs.length) { console.log('PAGE ERRORS:\n' + errs.join('\n')); fails++; }
-  console.log(fails ? `\n${fails} FAILED` : `\nall checks passed (${CASES.length} cases)`);
+  console.log(fails ? `\n${fails} FAILED` : `\nall checks passed (${CASES.length} cases x 2 modes)`);
   await b.close();
   process.exit(fails ? 1 : 0);
 })();

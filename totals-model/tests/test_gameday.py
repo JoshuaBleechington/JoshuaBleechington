@@ -15,6 +15,7 @@ from totals.gameday import (
     temperature,
     bullpens_recent,
     head_to_head,
+    park_wind_scale,
     pitchers_last5,
     team_form,
     umpire_ou,
@@ -296,6 +297,55 @@ class TestEvidenceBuilders(unittest.TestCase):
         self.assertEqual(c.verdict, "BET")
         self.assertLess(c.net, -0.9)
         self.assertTrue(all(c.gates.values()))
+
+
+class TestParkFactor(unittest.TestCase):
+    """The park scales the wind and is never a term of its own.
+
+    Its own effect is published, season-long and identical every night, so it
+    is inside the posted total already. Giving it an adjustment is the double
+    count that put the fourteen-input model behind the naked line.
+    """
+
+    def test_a_missing_park_leaves_the_wind_exactly_as_it_was(self):
+        plain = wind(18, "out", "fixture")
+        parked = wind(18, "out", "fixture", park_factor=None)
+        self.assertAlmostEqual(plain.worth, parked.worth)
+        self.assertAlmostEqual(plain.worth, 1.0, places=6)
+
+    def test_a_hitters_park_lifts_the_wind_and_a_pitchers_park_cuts_it(self):
+        hot = wind(18, "out", "fixture", park_factor=113)
+        cold = wind(18, "out", "fixture", park_factor=90)
+        self.assertAlmostEqual(hot.worth, 1.13, places=6)
+        self.assertAlmostEqual(cold.worth, 0.90, places=6)
+
+    def test_the_park_cannot_flip_the_sign_of_a_wind_blowing_in(self):
+        into = wind(18, "in", "fixture", park_factor=120)
+        self.assertLess(into.worth, 0)
+        self.assertAlmostEqual(into.worth, -1.2, places=6)
+
+    def test_the_scaling_is_held_inside_twenty_percent(self):
+        self.assertAlmostEqual(park_wind_scale(129), 1.20)
+        self.assertAlmostEqual(park_wind_scale(71), 0.80)
+
+    def test_an_implausible_figure_is_read_as_a_typo_and_ignored(self):
+        """Same guard as the umpire's 40 R/Gm.
+
+        A park factor entered as 1.13 instead of 113, or as 1130, must leave
+        the wind alone rather than erase it or double it.
+        """
+        self.assertAlmostEqual(park_wind_scale(1.13), 1.0)
+        self.assertAlmostEqual(park_wind_scale(1130), 1.0)
+
+    def test_a_park_cannot_push_the_wind_past_its_own_cap(self):
+        gale = wind(40, "out", "fixture", park_factor=120)
+        self.assertAlmostEqual(gale.worth, 1.5, places=6)
+
+    def test_no_wind_reading_means_the_park_does_nothing_at_all(self):
+        """There is no path by which a park factor alone produces evidence."""
+        self.assertIsNone(wind(18, "", "fixture", park_factor=120))
+        cross = wind(25, "cross", "fixture", park_factor=120)
+        self.assertAlmostEqual(cross.worth, 0.0)
 
 
 class TestWnbaAbsences(unittest.TestCase):

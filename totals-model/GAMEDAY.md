@@ -44,9 +44,29 @@ anyone is flaking.
 
 ## What I need from you
 
-Per game: **teams, the posted total, and roughly when it was posted.** If you
-have the opening number as well as the current one, send both — the movement is
-half the model. Start times help.
+**I am behind an egress proxy that blocks every data site on this list.**
+Verified on 2026-08-24: rotowire.com, covers.com, refmetrics.com,
+sportsbettingdime.com, mlb.com, actionnetwork.com, baseballsavant.mlb.com and
+api.weather.gov all refuse the connection. Web *search* works and returns
+headlines; it does not return the tables. So I can reason, but on most nights I
+cannot fetch the two documented inputs myself.
+
+That inverts what is worth screenshotting. The Covers **Stats** tab — records,
+ATS, O/U splits, last-10, head-to-head, season pitcher lines — is the priced
+category and I do not need any of it. What I cannot get and cannot substitute:
+
+1. **The odds board with the Open column**, which is the single most valuable
+   screenshot. Movement from the open is half the model, and it is the only way
+   to tell an unpriced edge from one the market already bought.
+2. **The weather page** — wind speed *and direction* per park, temperature,
+   roof open or closed. Direction is what matters; speed alone is unusable.
+3. **The umpire assignments** — tonight's plate umpire and his runs/game.
+4. **Prices on both sides** (o7.5 −118 / u7.5 −102). The vig asymmetry says
+   where the money is.
+
+Without 2 and 3 there is usually no documented item, and the grounded gate
+fails, and the honest answer for the whole board is PASS. That is not the model
+being coy — it is the model refusing to bet on nothing.
 
 ## The checklist — MLB
 

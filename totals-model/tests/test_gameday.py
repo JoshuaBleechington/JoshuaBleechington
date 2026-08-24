@@ -93,6 +93,33 @@ class TestGates(unittest.TestCase):
         self.assertFalse(c.gates["grounded"])
         self.assertIn("hypothesis", " ".join(c.reasons))
 
+    def test_a_reading_worth_nothing_cannot_ground_a_call(self):
+        """A closed roof is a documented reading worth exactly zero.
+
+        It says the weather was checked and is not a factor, which is worth
+        recording and is not evidence of an edge. Found when a shut roof
+        grounded a BET resting entirely on unmeasured coefficients — the gate
+        satisfied by an item that contributed nothing to the number it was
+        grounding. Same shape for a cross wind.
+        """
+        c = decide("MLB", "Astros @ Rangers", "total 8.5", "OVER", "UNDER",
+                   [ev("Roof shut", 0.0),
+                    ev("Starters, last 5", 1.1, basis="provisional")], DAY)
+        self.assertFalse(c.gates["grounded"])
+        self.assertEqual(c.verdict, "PASS")
+
+    def test_a_real_reading_the_market_bought_still_grounds(self):
+        """`worth`, not `unpriced`. Priced is not the same as absent.
+
+        A wind reading the line has fully absorbed still found something real;
+        it just is not an edge any more. It may still ground another item that
+        the market has not bought.
+        """
+        c = decide("MLB", "Cubs @ Reds", "total 9", "OVER", "UNDER",
+                   [ev("Wind out", 1.0, already_moved=1.0),
+                    ev("Temperature", 0.30)], DAY)
+        self.assertTrue(c.gates["grounded"])
+
     def test_a_documented_contradiction_stands_the_bet_down(self):
         c = decide("MLB", "Cubs @ Reds", "total 9", "OVER", "UNDER",
                    [ev("Umpire", 0.42), ev("Wind in", -1.40)], DAY)

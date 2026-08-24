@@ -282,6 +282,16 @@ def decide(sport: str, matchup: str, market: str, positive_side: str,
     side = positive_side if net >= 0 else negative_side
 
     documented = [e for e in fresh if e.basis == "documented"]
+    # ...but only one that FOUND something can ground a call. A closed roof and
+    # a cross wind are both documented readings worth exactly zero: they say the
+    # weather was checked and is not a factor, which is useful to record and is
+    # not evidence of an edge. Without this a shut roof grounded a BET resting
+    # entirely on unmeasured coefficients -- the grounded gate satisfied by an
+    # item that contributed nothing to the number it was grounding.
+    #
+    # Note this tests `worth`, not `unpriced`. A real reading the market has
+    # already bought still found something; it is priced, not absent.
+    grounding = [e for e in documented if e.worth != 0.0]
     # A documented item counts as contradicting only if it is itself still
     # unpriced and points the other way. An item the market has fully absorbed
     # is not an argument about tonight; it is history.
@@ -295,7 +305,7 @@ def decide(sport: str, matchup: str, market: str, positive_side: str,
     # false confidence this whole model exists to refuse.
     gates = {
         "fresh": bool(fresh),
-        "grounded": bool(documented) or (trial and bool(fresh)),
+        "grounded": bool(grounding) or (trial and bool(fresh)),
         "unpriced": abs(net) >= MIN_EDGE[sport],
         "uncontradicted": not contradicting,
     }
@@ -308,9 +318,9 @@ def decide(sport: str, matchup: str, market: str, positive_side: str,
         )
     if not fresh:
         reasons.append("Nothing found today. The posted number is the best estimate here.")
-    elif not documented:
+    elif not grounding:
         reasons.append(
-            "Everything found rests on provisional coefficients."
+            "Nothing found tonight is both documented and worth anything."
             + (" Trial mode: logged as a hypothesis under test. Record it next to "
                "the strict read and compare after thirty or forty games — that "
                "comparison is the only thing that can settle whether these help."
@@ -333,7 +343,7 @@ def decide(sport: str, matchup: str, market: str, positive_side: str,
 
     if all(gates.values()):
         verdict = "BET" if abs(net) >= STRONG_EDGE[sport] else "LEAN"
-        if trial and not documented:
+        if trial and not grounding:
             verdict = "LEAN"      # provisional evidence never reaches the top band
             capped = True
         else:

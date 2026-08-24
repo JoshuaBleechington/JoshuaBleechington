@@ -280,7 +280,8 @@
       <div class="eyebrow">MLB totals · game day</div>
       <h1>Run Ledger</h1>
       <p>Starts from the posted total and moves it only for what the number does not
-         already know. Green means it is worth a ticket.</p>
+         already know. The weather is the one input carrying real weight. Green means it is
+         worth a ticket.</p>
     </div>
     <div class="modes" role="group" aria-label="Evidence mode">
       <button type="button" id="m-strict" aria-pressed="true">Strict</button>
@@ -312,6 +313,23 @@
             bought it before you did. Leave <b>Opened at</b> blank and the page assumes it never
             moved, which will flatter every read.</p>
         </div>
+
+        <details class="opt">
+          <summary>Optional · money split</summary>
+          <div class="body" style="padding-top:2px">
+            <div class="grid2">
+              <div class="f"><label for="tick">Over % of tickets</label><input id="tick" type="number" step="1" min="0" max="100" inputmode="numeric" placeholder="76"></div>
+              <div class="f"><label for="cash">Over % of money</label><input id="cash" type="number" step="1" min="0" max="100" inputmode="numeric" placeholder="46"></div>
+            </div>
+            <div class="links">
+              <a href="https://www.actionnetwork.com/mlb/public-betting" target="_blank" rel="noopener">Action Network</a>
+              <a href="https://contests.covers.com/consensus/topconsensus/mlb/overall" target="_blank" rel="noopener">Covers consensus</a>
+            </div>
+            <p class="note">Skip this on a normal night. Lots of small bets on the over against a
+              few large ones is the sharp tell; it needs a 20-point gap to register and is worth a
+              flat 0.30 either way.</p>
+          </div>
+        </details>
       </section>
 
       <section class="card">
@@ -339,47 +357,6 @@
             <b>out</b> — that “in” is the preposition, and reading it wrong flips the biggest
             number on this page. Under 8 mph counts for nothing. Across counts for nothing.</p>
         </div>
-      </section>
-
-      <section class="card">
-        <h2>Plate umpire <span class="tag">worth up to 1.0 runs</span></h2>
-        <div class="body">
-          <div class="grid2">
-            <div class="f"><label for="uo">Games gone over</label><input id="uo" type="number" step="1" min="0" inputmode="numeric" placeholder="185"></div>
-            <div class="f"><label for="uu">Games gone under</label><input id="uu" type="number" step="1" min="0" inputmode="numeric" placeholder="115"></div>
-          </div>
-          <div class="links">
-            <a href="https://www.rotowire.com/daily/mlb/umpire_stats.php" target="_blank" rel="noopener">RotoWire · career totals</a>
-            <a href="https://www.covers.com/sport/baseball/mlb/statistics/umpires/overunder/2026" target="_blank" rel="noopener">Covers · O/U leaderboard</a>
-            <a href="https://www.covers.com/sport/baseball/mlb/umpires" target="_blank" rel="noopener">Covers · tonight’s assignments</a>
-            <a href="https://www.oddsshark.com/mlb/umpire-handicapping-statistics" target="_blank" rel="noopener">OddsShark</a>
-          </div>
-          <p class="note">His <b>over/under record</b> — not his runs per game, which mostly tells
-            you which parks he drew. Career if you can get it: one season is about 30 plate games
-            against a 335-game prior, so a 3-0 umpire at the top of a leaderboard is worth about
-            <b>+0.05</b> runs while a dull-looking 185-115 is worth <b>+0.61</b>.</p>
-          <p class="note"><b>If this season is all you can find, enter it anyway.</b> It will read
-            close to zero, and that is the right answer rather than a broken one — 7-8 over 15
-            games is what a coin does. Leave both boxes empty and the umpire drops out entirely,
-            which just means the game is decided by the wind. That is usually the honest result.</p>
-        </div>
-
-        <details class="opt">
-          <summary>Optional · money split</summary>
-          <div class="body" style="padding-top:2px">
-            <div class="grid2">
-              <div class="f"><label for="tick">Over % of tickets</label><input id="tick" type="number" step="1" min="0" max="100" inputmode="numeric" placeholder="76"></div>
-              <div class="f"><label for="cash">Over % of money</label><input id="cash" type="number" step="1" min="0" max="100" inputmode="numeric" placeholder="46"></div>
-            </div>
-            <div class="links">
-              <a href="https://www.actionnetwork.com/mlb/public-betting" target="_blank" rel="noopener">Action Network</a>
-              <a href="https://contests.covers.com/consensus/topconsensus/mlb/overall" target="_blank" rel="noopener">Covers consensus</a>
-            </div>
-            <p class="note">Skip this on a normal night. Lots of small bets on the over against a
-              few large ones is the sharp tell; it needs a 20-point gap to register and is worth a
-              flat 0.30 either way.</p>
-          </div>
-        </details>
       </section>
 
       <section class="card">
@@ -489,6 +466,12 @@
         <button type="button" class="btn" id="example">Example</button>
       </div>
 
+      <p class="note"><b>What counts as documented now.</b> With the umpire off the page, the
+        only items that can satisfy the grounded gate are the <b>wind</b>, the <b>temperature</b>
+        and the <b>money split</b>. On a still night with the roof open and no split entered,
+        Strict has nothing to stand on and every game reads PASS — that is the gate working, not
+        the page failing. The wind is doing most of the work here; it is also the easiest thing on
+        the list to look up.</p>
       <p class="note"><b>Strict vs Trial.</b> The four cards marked <i>trial</i> rest on
         coefficients nobody has validated, so in Strict they cannot satisfy the grounded gate and a
         game carried only by them reads PASS. Trial lets them carry a <b>LEAN</b> — never a BET,
@@ -547,7 +530,6 @@
   var DISPERSION = 4.39;         // sd of (final - line), 116 logged games
   var MIN_EDGE = 0.45, STRONG_EDGE = 0.90;
   var CONTRADICTION_FLOOR = MIN_EDGE / 2;
-  var UMPIRE_PRIOR_GAMES = 335, UMPIRE_CAP_RUNS = 1.0;
   var PUBLIC_SPLIT_MIN_GAP = 20, PUBLIC_SPLIT_RUNS = 0.30;
   var WIND_DEAD = 8, WIND_PER_MPH = 0.10, WIND_CAP = 1.5;
   var TEMP_BASE = 70, TEMP_PER_DEG = 0.008, TEMP_CAP = 0.35;
@@ -609,16 +591,6 @@
       t.toFixed(0) + "°F against a " + TEMP_BASE + "° baseline. Capped at " +
       TEMP_CAP.toFixed(2) + ", which is under the lean bar — it can add to a stack, never carry one.");
   }
-  function bUmp(o, u) {
-    if (o === null || u === null) return null;
-    var n = o + u; if (n <= 0) return null;
-    var a = UMPIRE_PRIOR_GAMES / 2;
-    var p = (o + a) / (n + 2 * a);
-    return ev("Umpire", clamp(invNorm(p) * DISPERSION, UMPIRE_CAP_RUNS), "documented",
-      o + "-" + u + " to the over (" + (o / n * 100).toFixed(0) + "%) on " + n +
-      " plate games. Shrunk against a " + UMPIRE_PRIOR_GAMES + "-game prior it reads " +
-      (p * 100).toFixed(2) + "%.");
-  }
   function bSplit(tick, cash) {
     if (tick === null || cash === null) return null;
     var gap = tick - cash;
@@ -665,29 +637,6 @@
       parts.join("; ") + " against a " + LEAGUE_ERA.toFixed(2) + " league ERA. " + tail);
   }
 
-  /* Inverse normal CDF, Acklam's rational approximation. Only used to turn
-     an umpire's shrunk over-rate back into runs. */
-  function invNorm(p) {
-    if (p <= 0) return -Infinity; if (p >= 1) return Infinity;
-    var a = [-3.969683028665376e+01, 2.209460984245205e+02, -2.759285104469687e+02,
-             1.383577518672690e+02, -3.066479806614716e+01, 2.506628277459239e+00];
-    var b = [-5.447609879822406e+01, 1.615858368580409e+02, -1.556989798598866e+02,
-             6.680131188771972e+01, -1.328068155288572e+01];
-    var c = [-7.784894002430293e-03, -3.223964580411365e-01, -2.400758277161838e+00,
-             -2.549732539343734e+00, 4.374664141464968e+00, 2.938163982698783e+00];
-    var d = [7.784695709041462e-03, 3.224671290700398e-01, 2.445134137142996e+00,
-             3.754408661907416e+00];
-    var pl = 0.02425, q, r;
-    if (p < pl) { q = Math.sqrt(-2 * Math.log(p));
-      return (((((c[0]*q+c[1])*q+c[2])*q+c[3])*q+c[4])*q+c[5]) /
-             ((((d[0]*q+d[1])*q+d[2])*q+d[3])*q+1); }
-    if (p > 1 - pl) { q = Math.sqrt(-2 * Math.log(1 - p));
-      return -(((((c[0]*q+c[1])*q+c[2])*q+c[3])*q+c[4])*q+c[5]) /
-              ((((d[0]*q+d[1])*q+d[2])*q+d[3])*q+1); }
-    q = p - 0.5; r = q * q;
-    return (((((a[0]*r+a[1])*r+a[2])*r+a[3])*r+a[4])*r+a[5])*q /
-           (((((b[0]*r+b[1])*r+b[2])*r+b[3])*r+b[4])*r+1);
-  }
   function normCdf(x) { return 0.5 * (1 + erf(x / Math.SQRT2)); }
   function erf(x) {
     var s = x < 0 ? -1 : 1; x = Math.abs(x);
@@ -706,7 +655,6 @@
     var items = [];
     [bWind(num("mph"), $("dir").value, dome, num("pf")),
      bTemp(num("temp"), dome),
-     bUmp(num("uo"), num("uu")),
      bSplit(num("tick"), num("cash")),
      armPair(num("spa"), num("spai"), num("sph"), num("sphi"), ERA_STAB, STARTER_SHARE,
              PITCHER_CAP, "Starters, last 5",
@@ -737,6 +685,14 @@
     var items = g.items;
     var net = 0; items.forEach(function (e) { net += e.unpriced(); });
     var documented = items.filter(function (e) { return e.basis === "documented"; });
+    /* Only a documented item that FOUND something can ground a call. A shut
+       roof and a cross wind are documented readings worth exactly zero: they
+       say the weather was checked and is not a factor, which is worth recording
+       and is not evidence of an edge. Without this a closed roof grounded a BET
+       resting entirely on unmeasured coefficients. Tests `worth`, not
+       `unpriced` — a real reading the market already bought still found
+       something. */
+    var grounding = documented.filter(function (e) { return e.worth !== 0; });
     /* Only a DOCUMENTED item can veto. An unvalidated coefficient is not
        entitled to stand down a call it could not have made itself. */
     var contradicting = documented.filter(function (e) {
@@ -745,7 +701,7 @@
     });
     var gates = {
       fresh: items.length > 0,
-      grounded: documented.length > 0 || (trial && items.length > 0),
+      grounded: grounding.length > 0 || (trial && items.length > 0),
       unpriced: Math.abs(net) >= MIN_EDGE,
       uncontradicted: contradicting.length === 0
     };
@@ -755,7 +711,7 @@
       verdict = Math.abs(net) >= STRONG_EDGE ? "BET" : "LEAN";
       /* Trial never reaches the top band. A BET on coefficients nobody has
          measured is the false confidence this model exists to refuse. */
-      if (!documented.length) { verdict = "LEAN"; capped = true; }
+      if (!grounding.length) { verdict = "LEAN"; capped = true; }
     }
     var side = net >= 0 ? "OVER" : "UNDER";
 
@@ -770,7 +726,7 @@
     if (!items.length) reasons.push(
       "<b>Nothing entered yet.</b> With no late factor the posted number is the best estimate " +
       "there is — that is the finding this whole page is built on, not a placeholder.");
-    else if (!documented.length) reasons.push(trial
+    else if (!grounding.length) reasons.push(trial
       ? "<b>Nothing documented here.</b> Everything rests on provisional coefficients, so Trial " +
         "logs this as a hypothesis under test. Record it beside the strict read and compare " +
         "after thirty or forty games."
@@ -888,7 +844,7 @@
   }
 
   // ---- wiring -------------------------------------------------------
-  var IDS = ["away","home","open","line","mph","dir","temp","dome","pf","uo","uu",
+  var IDS = ["away","home","open","line","mph","dir","temp","dome","pf",
              "spa","spai","sph","sphi","bpa","bph",
              "fa","fh","fg","h2h","h2hn","tick","cash"];
   IDS.forEach(function (id) {
@@ -918,7 +874,7 @@
      and the wind, so every fresh game silently inherited a fabricated edge. */
   $("example").addEventListener("click", function () {
     var V = { away: "Rays", home: "Tigers", open: 7.5, line: 7.5,
-              mph: 11, dir: "out", temp: 78, pf: 101, uo: 185, uu: 115,
+              mph: 11, dir: "out", temp: 78, pf: 101,
               spa: 5.90, spai: 26, sph: 3.10, sphi: 29,
               bpa: 4.60, bph: 3.40,
               fa: 9.4, fh: 8.2, fg: 5, h2h: 9.1, h2hn: 6, tick: 76, cash: 46 };

@@ -49,7 +49,7 @@ Verified on 2026-08-24: rotowire.com, covers.com, refmetrics.com,
 sportsbettingdime.com, mlb.com, actionnetwork.com, baseballsavant.mlb.com and
 api.weather.gov all refuse the connection. Web *search* works and returns
 headlines; it does not return the tables. So I can reason, but on most nights I
-cannot fetch the two documented inputs myself.
+cannot fetch the documented inputs myself.
 
 That inverts what is worth screenshotting. The Covers **Stats** tab — records,
 ATS, O/U splits, last-10, head-to-head, season pitcher lines — is the priced
@@ -60,12 +60,11 @@ category and I do not need any of it. What I cannot get and cannot substitute:
    to tell an unpriced edge from one the market already bought.
 2. **The weather page** — wind speed *and direction* per park, temperature,
    roof open or closed. Direction is what matters; speed alone is unusable.
-3. **The umpire assignments** — tonight's plate umpire and his runs/game.
-4. **Prices on both sides** (o7.5 −118 / u7.5 −102). The vig asymmetry says
+3. **Prices on both sides** (o7.5 −118 / u7.5 −102). The vig asymmetry says
    where the money is.
 
-Without 2 and 3 there is usually no documented item, and the grounded gate
-fails, and the honest answer for the whole board is PASS. That is not the model
+Without 2 there is usually no documented item, and the grounded gate fails, and
+the honest answer for the whole board is PASS. That is not the model
 being coy — it is the model refusing to bet on nothing.
 
 ## The checklist — MLB
@@ -75,11 +74,10 @@ Run top to bottom. Most games produce nothing; that is the expected result.
 | # | Check | Where | Worth | Basis |
 |---|---|---|---|---|
 | 1 | **Wind speed + direction** | [RotoWire weather](https://www.rotowire.com/baseball/weather.php) | Nothing under 8 mph; then 0.10 runs/mph, capped 1.5. Cross wind = 0 | documented |
-| 2 | **Home plate umpire** | [RotoWire daily](https://www.rotowire.com/baseball/umpire-stats-daily.php), [OddsShark O/U records](https://www.oddsshark.com/mlb/umpire-handicapping-statistics) | His **over/under record**, Beta-shrunk against a 335-game prior, capped ±1.0. R/Gm only as a fallback | documented |
-| 3 | **Ticket vs money split** | [Action Network](https://www.actionnetwork.com/mlb/public-betting), [Covers consensus](https://contests.covers.com/consensus/topconsensus/mlb/overall) | ±0.30 runs when the gap is 20+ points. Capped flat — direction documented, size not | documented |
-| 4 | **Temperature** | RotoWire | 0.008 runs/°F from 70°, capped 0.35 | documented |
-| 5 | **Lineup scratches** | beat writers, [MLB.com](https://www.mlb.com/scores) | 0.12 runs per missing regular, max 3/side | *provisional* |
-| 6 | **Line movement since open** | you, or Covers | Subtract from 1–5 | — |
+| 2 | **Ticket vs money split** | [Action Network](https://www.actionnetwork.com/mlb/public-betting), [Covers consensus](https://contests.covers.com/consensus/topconsensus/mlb/overall) | ±0.30 runs when the gap is 20+ points. Capped flat — direction documented, size not | documented |
+| 3 | **Temperature** | RotoWire | 0.008 runs/°F from 70°, capped 0.35 | documented |
+| 4 | **Lineup scratches** | beat writers, [MLB.com](https://www.mlb.com/scores) | 0.12 runs per missing regular, max 3/side | *provisional* |
+| 5 | **Line movement since open** | you, or Covers | Subtract from 1–4 | — |
 
 ### The trial tier
 
@@ -127,16 +125,21 @@ first time these inputs were in a model.
 
 ### What the page carries
 
-`web/gameday.html` now carries every builder in the package: the line and its
-movement, weather (wind and temperature), park factor, the plate umpire, both
-starters' last five, both bullpens, team form, head to head, and the
-ticket-vs-money split behind an optional disclosure. The Strict/Trial toggle is
-what keeps the provisional half honest.
+`web/gameday.html` carries the line and its movement, weather (wind and
+temperature), park factor, both starters' last five, both bullpens, team form,
+head to head, and the ticket-vs-money split behind an optional disclosure. The
+Strict/Trial toggle is what keeps the provisional half honest.
 
-It was cut to three inputs on 2026-08-24 for being too much typing and put back
-the same day on request. Both calls are defensible and the record of the swap
-matters more than which one is current: the trial tier is a hypothesis under
-test, and the page logs it separately so the question can actually be settled.
+**The umpire came off on 2026-08-24** — too much work to dig his stats out every
+night, and the season records that are easy to find are worth roughly nothing
+(7-8 over fifteen games shrinks to −0.02). `umpire_ou()` and `umpire_rpg()` stay
+in the package, tested, for the night someone wants them back.
+
+That leaves **three documented items**: the wind, the temperature and the money
+split. On a still night with the roof open and no split entered, strict mode has
+nothing to stand on and the whole board reads PASS. That is the gate working.
+The wind is now carrying the model almost single-handed, which is at least the
+easiest of the three to look up.
 
 ### The park
 

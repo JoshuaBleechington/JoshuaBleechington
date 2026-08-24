@@ -76,6 +76,14 @@ DISPERSION = {"MLB": 4.39, "WNBA": 11.51}
 MIN_EDGE = {"MLB": 0.45, "WNBA": 1.20}
 STRONG_EDGE = {"MLB": 0.90, "WNBA": 2.40}
 
+# A dissenting item only vetoes the bet if it is itself worth something. Half
+# the lean bar is the line. Without this, a 0.15-run temperature term stands
+# down a game carried by a half-run umpire -- which is precisely the fault that
+# killed the old confidence model: a head-to-head signal holding 1.25% of the
+# weight could still cost a full band, and four picks were downgraded that way.
+# Rediscovered here by watching a warm night in Anaheim veto a real read.
+CONTRADICTION_FLOOR = {k: v / 2.0 for k, v in MIN_EDGE.items()}
+
 BASES = ("documented", "provisional")
 VERDICTS = ("PASS", "LEAN", "BET")
 
@@ -139,6 +147,9 @@ class Call:
     evidence: list[Evidence]
     gates: dict[str, bool]
     reasons: list[str] = field(default_factory=list)
+    opened: float | None = None      # the line when it was first posted
+    posted: float | None = None      # the line now
+    missing: list[str] = field(default_factory=list)
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -155,19 +166,80 @@ class Call:
         }
 
     def brief(self) -> str:
-        """One screen, for reading a slate."""
-        lines = [f"{self.matchup}  ({self.market})",
-                 f"  {self.verdict}"
-                 + (f"  {self.side}  net {self.net:+.2f}  {self.win_pct * 100:.1f}%"
-                    if self.verdict != "PASS" else "")]
-        for e in self.evidence:
-            lines.append(f"    {e.unpriced:+.2f}  {e.name}  [{e.basis}]"
-                         + (f"  (worth {e.worth:+.2f}, line already moved {e.already_moved:+.2f})"
-                            if e.already_moved else ""))
-            lines.append(f"           {e.source}")
+        """Everything needed to make the call, including what would change it.
+
+        A verdict on its own is not a decision aid -- "PASS" tells you nothing
+        about whether the game was close or dead, and the difference matters
+        when a missing input is still to come. So this prints the arithmetic,
+        which gate failed, and exactly how much more evidence would flip it.
+        """
+        unit = "runs" if self.sport == "MLB" else "pts"
+        bar, strong = MIN_EDGE[self.sport], STRONG_EDGE[self.sport]
+        L = []
+
+        head = f"{self.matchup}   {self.market}"
+        if self.opened is not None:
+            mv = self.posted - self.opened if self.posted is not None else None
+            if mv:
+                who = "under money" if mv < 0 else "over money"
+                head += f"   (opened {self.opened:g}, moved {mv:+g} — {who} already in)"
+            else:
+                head += f"   (opened {self.opened:g}, unmoved)"
+        L.append(head)
+        L.append(f"  {self.verdict}" + (f"   {self.side}   {self.win_pct * 100:.1f}%"
+                                        if self.verdict != "PASS" else ""))
+        L.append("")
+
+        if self.evidence:
+            L.append("  what I found")
+            for e in self.evidence:
+                tag = "" if e.basis == "documented" else "  [PROVISIONAL]"
+                line = f"    {e.unpriced:+6.2f}  {e.name}{tag}"
+                if e.already_moved:
+                    line += (f"   (worth {e.worth:+.2f}, line already took "
+                             f"{e.already_moved:+.2f})")
+                L.append(line)
+                L.append(f"            {e.source}")
+            L.append(f"    {'-' * 6}")
+            L.append(f"    {self.net:+6.2f}  net unpriced {unit}"
+                     f"      bar {bar:g} to lean, {strong:g} to bet")
+        else:
+            L.append("  what I found")
+            L.append("    nothing. No late factor was supplied or found.")
+        L.append("")
+
+        L.append("  gates")
+        for k in ("fresh", "grounded", "unpriced", "uncontradicted"):
+            mark = "pass" if self.gates[k] else "FAIL"
+            extra = ""
+            if k == "unpriced" and not self.gates[k]:
+                extra = f"   short by {bar - abs(self.net):.2f} {unit}"
+            L.append(f"    {k:<15s} {mark}{extra}")
+        L.append("")
+
+        L.append("  what would change it")
+        gap_lean = bar - abs(self.net)
+        gap_bet = strong - abs(self.net)
+        if self.verdict == "PASS" and self.gates["grounded"] and self.gates["uncontradicted"]:
+            side = self.side if self.side != "—" else ("OVER" if self.net >= 0 else "UNDER")
+            L.append(f"    {gap_lean:+.2f} {unit} more -> LEAN {side}")
+            L.append(f"    {gap_bet:+.2f} {unit} more -> BET {side}")
+        elif not self.gates["grounded"]:
+            L.append("    one documented item. Provisional coefficients cannot carry a bet")
+            L.append("    on their own, however large they look.")
+        elif not self.gates["uncontradicted"]:
+            L.append("    nothing. Two documented items disagree and there is no validated")
+            L.append("    way to net them, so this stays a stand-down whatever else turns up.")
+        elif self.verdict == "LEAN":
+            L.append(f"    {gap_bet:+.2f} {unit} more -> BET {self.side}")
+        else:
+            L.append("    already at the top band.")
+        if self.missing:
+            L.append(f"    still unchecked: {', '.join(self.missing)}")
+
         for r in self.reasons:
-            lines.append(f"    - {r}")
-        return "\n".join(lines)
+            L.append(f"    note: {r}")
+        return "\n".join(L)
 
 
 def _win_pct(net: float, sport: str) -> float:
@@ -185,7 +257,9 @@ def _win_pct(net: float, sport: str) -> float:
 
 def decide(sport: str, matchup: str, market: str, positive_side: str,
            negative_side: str, evidence: Iterable[Evidence],
-           game_day: date | None = None) -> Call:
+           game_day: date | None = None, opened: float | None = None,
+           posted: float | None = None,
+           missing: Iterable[str] | None = None) -> Call:
     """Run the gates over one game's evidence.
 
     ``positive_side`` is the side a positive magnitude favours -- OVER for a
@@ -206,8 +280,9 @@ def decide(sport: str, matchup: str, market: str, positive_side: str,
     # A documented item counts as contradicting only if it is itself still
     # unpriced and points the other way. An item the market has fully absorbed
     # is not an argument about tonight; it is history.
+    floor = CONTRADICTION_FLOOR[sport]
     contradicting = [e for e in documented
-                     if e.unpriced != 0 and (e.unpriced > 0) != (net > 0)]
+                     if abs(e.unpriced) >= floor and (e.unpriced > 0) != (net > 0)]
 
     gates = {
         "fresh": bool(fresh),
@@ -239,8 +314,9 @@ def decide(sport: str, matchup: str, market: str, positive_side: str,
         )
     for e in contradicting:
         reasons.append(
-            f"{e.name} points the other way and is documented, so there is no "
-            "honest way to net it out. Standing down."
+            f"{e.name} points the other way at {abs(e.unpriced):.2f}, over the "
+            f"{floor:.2f} that counts as a real dissent, and is documented. There is "
+            "no validated way to net two real signals that disagree. Standing down."
         )
 
     if all(gates.values()):
@@ -259,6 +335,9 @@ def decide(sport: str, matchup: str, market: str, positive_side: str,
         evidence=fresh,
         gates=gates,
         reasons=reasons,
+        opened=opened,
+        posted=posted,
+        missing=list(missing or []),
     )
 
 
@@ -350,21 +429,93 @@ def wind(mph: float, direction: str, source: str, as_of=None) -> "Evidence | Non
                     f"{source}: {mph:.0f} mph blowing {d}.", as_of)
 
 
-def umpire(runs_per_game: float, games: float, source: str,
-           league: float = 8.6, as_of=None) -> "Evidence | None":
-    """The plate umpire's own run environment, regressed for sample size.
+# --- the umpire, done properly -------------------------------------------
+#
+# The plate umpire owns the strike zone and the strike zone is the game's
+# thermostat: a wide zone means more called strikes, more strikeouts, shorter
+# counts and fewer walks, so fewer runs; a tight zone forces pitchers over the
+# heart of the plate or into walks, so more. Published work puts the spread
+# between the most pitcher-friendly and most hitter-friendly umpire at about
+# 1.5 runs a game. It is also the one input that arrives AFTER the opening
+# number -- assignments post the morning of the game -- which is what makes it
+# worth having at all.
+#
+# Two things this gets right that the naive version did not.
+#
+# 1. USE THE OVER/UNDER RECORD, NOT RUNS PER GAME. An umpire's R/Gm is
+#    confounded by which parks he drew: a man who happened to work Coors and
+#    Cincinnati reads hot for reasons that have nothing to do with his zone.
+#    His over/under record is park-adjusted by construction, because the line
+#    he was measured against already accounts for the park and the teams. R/Gm
+#    survives below only as a fallback, and says it is the weaker input.
+#
+# 2. DERIVE THE SHRINKAGE, DO NOT PICK IT. The first version used n/(n+120),
+#    which implies a true between-umpire spread of 0.40 runs. The 1.5-run
+#    figure is the RAW observed spread across ~90 umpires and so contains
+#    sampling noise; the true spread is smaller. Treating 1.5 as roughly five
+#    standard deviations gives tau ~= 0.30 runs, and k = sd^2/tau^2 = 214.
+#
+# For the over/under form the same logic becomes a Beta prior: an umpire's true
+# over-rate has sd tau/sd_total * phi(0) = 0.027, and the Beta(a,a) with that
+# spread has a = 168, i.e. a prior worth 335 games. Umpires work the plate
+# about every fourth game, so a season is ~30 -- barely a tenth of the prior.
+# That is the honest reason a spectacular-looking single-season line is worth
+# almost nothing.
+UMPIRE_TAU_RUNS = 0.30
+UMPIRE_PRIOR_GAMES = 335.0
+UMPIRE_SHRINK_GAMES = 214.0        # for the R/Gm fallback
+UMPIRE_CAP_RUNS = 1.0
+UMPIRE_PLAUSIBLE_RPG = (6.0, 12.0)
 
-    Capped at a run either way. An umpire entered at an impossible figure is
-    read as a typo and ignored -- impossible inputs produced the worst calls
-    this project ever made.
+
+def umpire_ou(over: int, under: int, source: str, as_of=None,
+              name: str = "the plate umpire") -> "Evidence | None":
+    """From the umpire's over/under record — the park-adjusted input.
+
+    Beta-shrunk toward even, then converted to runs through the observed
+    dispersion. A 3-0 umpire at the top of a leaderboard sorted by over-rate
+    comes out worth about +0.05 runs, which is the point.
     """
-    if not (6.0 <= runs_per_game <= 12.0):
+    from statistics import NormalDist
+    n = over + under
+    if n <= 0:
         return None
-    shrink = games / (games + 120.0) if games > 0 else 0.0
-    runs = max(-1.0, min(1.0, (runs_per_game - league) * shrink))
-    return Evidence("Umpire", runs, "documented",
-                    f"{source}: {runs_per_game:.2f} runs a game against {league:.2f} "
-                    f"league, on {games:.0f} games — regressed to {runs:+.2f}.", as_of)
+    a = UMPIRE_PRIOR_GAMES / 2.0
+    p = (over + a) / (n + 2 * a)
+    runs = NormalDist().inv_cdf(p) * DISPERSION["MLB"]
+    runs = max(-UMPIRE_CAP_RUNS, min(UMPIRE_CAP_RUNS, runs))
+    return Evidence(
+        "Umpire", runs, "documented",
+        f"{source}: {name} is {over}-{under} to the over ({over / n * 100:.0f}%) "
+        f"on {n} plate games. Shrunk against a {UMPIRE_PRIOR_GAMES:.0f}-game prior "
+        f"that reads {p * 100:.2f}%, worth {runs:+.2f} runs. Umpires work the plate "
+        "about every fourth game, so one season is ~30 — a tenth of the prior, "
+        "which is why a big single-season split moves almost nothing.",
+        as_of,
+    )
+
+
+def umpire_rpg(runs_per_game: float, games: float, source: str,
+               league: float = 8.6, as_of=None) -> "Evidence | None":
+    """Fallback: the umpire's runs per game, when no over/under record is to hand.
+
+    Weaker than ``umpire_ou`` and labelled as such, because R/Gm is confounded
+    by which parks the man drew. Capped at a run either way, and an impossible
+    figure is read as a typo and ignored rather than trusted — impossible
+    inputs produced the worst calls this project ever made.
+    """
+    if not (UMPIRE_PLAUSIBLE_RPG[0] <= runs_per_game <= UMPIRE_PLAUSIBLE_RPG[1]):
+        return None
+    shrink = games / (games + UMPIRE_SHRINK_GAMES) if games > 0 else 0.0
+    runs = max(-UMPIRE_CAP_RUNS, min(UMPIRE_CAP_RUNS, (runs_per_game - league) * shrink))
+    return Evidence(
+        "Umpire (R/Gm fallback)", runs, "documented",
+        f"{source}: {runs_per_game:.2f} runs a game against {league:.2f} league, on "
+        f"{games:.0f} games — regressed to {runs:+.2f}. This is the weaker of the two "
+        "umpire inputs: R/Gm is confounded by which parks he happened to draw, where "
+        "his over/under record is park-adjusted by the lines he was measured against.",
+        as_of,
+    )
 
 
 def temperature(temp_f: float, source: str, as_of=None) -> "Evidence":

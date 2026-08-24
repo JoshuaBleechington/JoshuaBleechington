@@ -75,7 +75,7 @@ Run top to bottom. Most games produce nothing; that is the expected result.
 | # | Check | Where | Worth | Basis |
 |---|---|---|---|---|
 | 1 | **Wind speed + direction** | [RotoWire weather](https://www.rotowire.com/baseball/weather.php) | Nothing under 8 mph; then 0.10 runs/mph, capped 1.5. Cross wind = 0 | documented |
-| 2 | **Home plate umpire** | [RotoWire daily](https://www.rotowire.com/baseball/umpire-stats-daily.php), [OddsShark O/U records](https://www.oddsshark.com/mlb/umpire-handicapping-statistics) | His runs/game minus league, shrunk `n/(n+120)`, capped ±1.0 | documented |
+| 2 | **Home plate umpire** | [RotoWire daily](https://www.rotowire.com/baseball/umpire-stats-daily.php), [OddsShark O/U records](https://www.oddsshark.com/mlb/umpire-handicapping-statistics) | His **over/under record**, Beta-shrunk against a 335-game prior, capped ±1.0. R/Gm only as a fallback | documented |
 | 3 | **Ticket vs money split** | [Action Network](https://www.actionnetwork.com/mlb/public-betting), [Covers consensus](https://contests.covers.com/consensus/topconsensus/mlb/overall) | ±0.30 runs when the gap is 20+ points. Capped flat — direction documented, size not | documented |
 | 4 | **Temperature** | RotoWire | 0.008 runs/°F from 70°, capped 0.35 | documented |
 | 5 | **Bullpen availability** | beat writers, [MLB.com](https://www.mlb.com/scores) | 0.15 runs per unavailable high-leverage arm, max 3/side | *provisional* |
@@ -94,6 +94,27 @@ Wind blowing in is the single largest under-driver available — 20 mph in is
 worth more than a full run, which is over twice anything else on this list.
 Umpire assignments post the morning of the game and are the item most likely to
 be missing from an opening number.
+
+**Ask for the over/under record, not runs per game.** R/Gm is confounded by
+which parks the man happened to draw — work a month of Coors and Cincinnati and
+you read hot for reasons that have nothing to do with your zone. His O/U record
+is park-adjusted by construction, because every line he was measured against
+already accounted for the park and the teams. `umpire_rpg()` survives as a
+fallback and labels itself the weaker input.
+
+**And read the game count before the percentage.** Umpires work the plate about
+every fourth game, so one season is ~30 — against a prior worth 335. A
+leaderboard sorted by over-rate therefore puts the *smallest* samples on top:
+the 3-0, 100% umpire heading such a list is worth **+0.05 runs** after
+shrinking, while a 185-115 career line that looks unremarkable is worth
+**+0.61**. Twelve times as much, from a number that reads worse.
+
+The shrinkage is derived, not chosen. `k = sd² / τ²`, where sd is the observed
+4.39 and τ is the true between-umpire spread. The 1.5-run figure quoted for the
+gap between extremes is the *raw* spread across ~90 umpires and so contains
+sampling noise; treating it as roughly five standard deviations gives τ ≈ 0.30
+and k ≈ 214. The first version used 120, which quietly assumed τ = 0.40 — the
+optimistic end, and it made every umpire look twice as important as he is.
 
 The split at #3 is deliberately capped flat: a 40-point divergence scores the
 same as an 80-point one, because the direction is documented and the magnitude
@@ -131,9 +152,16 @@ Every candidate has to survive all four (`totals/gameday.py`):
    alone get logged as a hypothesis, never backed.
 3. **Unpriced** — net edge after line movement must clear **0.45 runs** (MLB)
    or **1.20 points** (WNBA). A `BET` needs **0.90** / **2.40**.
-4. **Uncontradicted** — no documented item pointing the other way. With no
-   validated weights there is no honest way to net two real signals that
-   disagree, so the answer is stand down.
+4. **Uncontradicted** — no documented item pointing the other way *by at least
+   half the lean bar*. With no validated weights there is no honest way to net
+   two real signals that disagree, so the answer is stand down.
+
+   The floor matters. Without it a 0.15-run temperature term stood down a game
+   carried by a half-run umpire — which is exactly the fault that killed the
+   old confidence model, where a head-to-head signal holding 1.25% of the
+   weight could still cost a full band and did so on four logged picks. Same
+   bug, different model, found again by watching a warm night in Anaheim veto
+   a real read.
 
 A stacked under — wind in, pitcher's umpire, sharp money under, cold — clears
 0.90 comfortably and is the shape worth waiting for. One of those alone

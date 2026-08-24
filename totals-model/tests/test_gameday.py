@@ -13,7 +13,8 @@ from totals.gameday import (
     players_out,
     public_split,
     temperature,
-    umpire,
+    umpire_ou,
+    umpire_rpg,
     wind,
     MIN_EDGE,
     STRONG_EDGE,
@@ -92,7 +93,34 @@ class TestGates(unittest.TestCase):
                    [ev("Umpire", 0.42), ev("Wind in", -1.40)], DAY)
         self.assertEqual(c.verdict, "PASS")
         self.assertFalse(c.gates["uncontradicted"])
-        self.assertIn("no honest way to net it out", " ".join(c.reasons))
+        self.assertIn("no validated way to net", " ".join(c.reasons))
+
+    def test_a_trivial_dissent_does_not_veto_a_real_read(self):
+        """The fault that killed the old confidence model, rediscovered here.
+
+        There, a head-to-head signal holding 1.25% of the weight could still
+        cost a full band, and four logged picks were downgraded that way. Here
+        a 0.15-run temperature term was standing down a game carried by a
+        half-run umpire. A dissent has to be worth something to count.
+        """
+        c = decide("MLB", "A @ B", "total 8", "OVER", "UNDER",
+                   [ev("Umpire", -0.70), ev("Temperature", 0.15)], DAY)
+        self.assertTrue(c.gates["uncontradicted"])
+        self.assertEqual(c.side, "UNDER")
+        self.assertEqual(c.verdict, "LEAN")
+
+    def test_the_dissent_floor_is_half_the_lean_bar(self):
+        from totals.gameday import CONTRADICTION_FLOOR
+        for sport in ("MLB", "WNBA"):
+            self.assertAlmostEqual(CONTRADICTION_FLOOR[sport], MIN_EDGE[sport] / 2)
+        # just under the floor: ignored. just over: vetoes.
+        floor = CONTRADICTION_FLOOR["MLB"]
+        quiet = decide("MLB", "A @ B", "total 8", "OVER", "UNDER",
+                       [ev("Umpire", -0.80), ev("Temp", floor - 0.01)], DAY)
+        loud = decide("MLB", "A @ B", "total 8", "OVER", "UNDER",
+                      [ev("Umpire", -0.80), ev("Temp", floor + 0.01)], DAY)
+        self.assertTrue(quiet.gates["uncontradicted"])
+        self.assertFalse(loud.gates["uncontradicted"])
 
     def test_a_contradiction_the_market_already_ate_does_not_block(self):
         """An item the line has absorbed is history, not an argument about tonight."""
@@ -241,12 +269,12 @@ class TestEvidenceBuilders(unittest.TestCase):
         self.assertIsNone(wind(25, "", "RotoWire", DAY))
 
     def test_a_pitcher_friendly_umpire_leans_under(self):
-        e = umpire(7.9, 260, "RotoWire", as_of=DAY)
+        e = umpire_ou(115, 185, "OddsShark", DAY)
         self.assertLess(e.worth, 0)
         self.assertGreater(e.worth, -1.0)
 
     def test_an_impossible_umpire_figure_is_ignored(self):
-        self.assertIsNone(umpire(40.0, 200, "RotoWire", as_of=DAY))
+        self.assertIsNone(umpire_rpg(40.0, 200, "RotoWire", as_of=DAY))
 
     def test_a_cold_night_leans_under_but_barely(self):
         e = temperature(48, "RotoWire", DAY)
@@ -256,7 +284,7 @@ class TestEvidenceBuilders(unittest.TestCase):
     def test_a_real_under_card_stacks_up(self):
         c = decide("MLB", "Mariners @ Guardians", "total 7.5", "OVER", "UNDER", [
             wind(18, "in", "RotoWire", DAY),
-            umpire(8.0, 300, "RotoWire", as_of=DAY),
+            umpire_ou(120, 180, "OddsShark", DAY),
             public_split(76, 46, "Action Network", DAY),
             temperature(55, "RotoWire", DAY),
         ], DAY)
@@ -327,3 +355,58 @@ class TestWnbaAbsences(unittest.TestCase):
         c = decide("WNBA", "Aces @ Tempo", "total 180", "OVER", "UNDER", [e], DAY)
         self.assertEqual(c.verdict, "PASS")
         self.assertIn("already moved", " ".join(c.reasons))
+
+
+class TestUmpire(unittest.TestCase):
+    """The biggest single term available, and the easiest to overrate.
+
+    An umpire's raw over/under split is mostly sampling noise: they work the
+    plate about every fourth game, so a season is ~30 games against a prior
+    worth 335. The job of these tests is to keep that honest.
+    """
+
+    def test_the_top_of_a_leaderboard_is_worth_almost_nothing(self):
+        """Sorting umpires by over-rate puts the smallest samples on top.
+
+        CB Bucknor at 3-0 and 100% led the table the owner sent. After
+        shrinking he is worth five hundredths of a run.
+        """
+        e = umpire_ou(3, 0, "leaderboard", DAY, "CB Bucknor")
+        self.assertLess(abs(e.worth), 0.10)
+        self.assertIn("100%", e.source)
+
+    def test_a_smaller_split_on_a_career_beats_a_huge_one_on_a_season(self):
+        season = umpire_ou(9, 1, "leaderboard", DAY)      # 90% over, 10 games
+        career = umpire_ou(185, 115, "career", DAY)       # 62% over, 300 games
+        self.assertGreater(career.worth, season.worth * 3)
+
+    def test_it_is_symmetric(self):
+        over = umpire_ou(185, 115, "career", DAY)
+        under = umpire_ou(115, 185, "career", DAY)
+        self.assertAlmostEqual(over.worth, -under.worth, places=6)
+
+    def test_an_even_record_is_worth_nothing(self):
+        self.assertAlmostEqual(umpire_ou(150, 150, "career", DAY).worth, 0.0, places=6)
+
+    def test_no_games_is_no_reading(self):
+        self.assertIsNone(umpire_ou(0, 0, "career", DAY))
+
+    def test_the_term_is_capped(self):
+        self.assertLessEqual(abs(umpire_ou(3000, 0, "absurd", DAY).worth), 1.0)
+
+    def test_the_rgm_fallback_says_it_is_the_weaker_input(self):
+        """R/Gm is confounded by which parks he drew; the over/under record is
+        park-adjusted by the lines it was measured against."""
+        e = umpire_rpg(9.2, 250, "RotoWire", as_of=DAY)
+        self.assertIn("weaker", e.source)
+        self.assertIn("confounded", e.source)
+        self.assertEqual(e.name, "Umpire (R/Gm fallback)")
+
+    def test_the_shrinkage_is_derived_not_picked(self):
+        """k = sd^2 / tau^2. The first version used 120, which quietly assumed a
+        true between-umpire spread of 0.40 runs -- the optimistic end."""
+        from totals.gameday import (DISPERSION, UMPIRE_SHRINK_GAMES,
+                                    UMPIRE_TAU_RUNS)
+        self.assertAlmostEqual(UMPIRE_SHRINK_GAMES,
+                               DISPERSION["MLB"] ** 2 / UMPIRE_TAU_RUNS ** 2,
+                               delta=1.0)

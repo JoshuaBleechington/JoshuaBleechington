@@ -113,6 +113,27 @@ ways, strict and trial, against the same line. After thirty or forty games the
 comparison answers the question, which is the thing that was never done the
 first time these inputs were in a model.
 
+### What the page carries
+
+`web/gameday.html` deliberately holds a **subset** of the package: the wind, the
+umpire's over/under record, and the ticket-vs-money split behind an optional
+disclosure. Seven controls, two lookups.
+
+The trial tier is not on it. Asked for on 2026-08-24 and taken back off on the
+same day for being too much typing, which is a fair verdict: form and
+head-to-head measured null, the four fields per arm were the bulk of the work,
+and none of them could carry a call on its own in strict mode anyway. They stay
+in `totals/gameday.py` and can still be logged from there.
+
+Temperature came off for a different reason. Its cap is 0.35, which sits *under*
+the 0.45 lean bar, so it can never carry anything by itself — its only real
+effect was tripping the contradiction gate on games a documented signal was
+carrying. That is the exact failure this playbook already records twice.
+
+`tools_check_gameday_page.js` replays `web/gameday-cases.json` — twelve games
+generated from the package — through the page in a browser and asserts the
+verdict, net, side and bar count match. Run it after touching either side.
+
 **Read the hourly row and the prose, never the headline.** The weather cards
 head each game with "N MPH wind blowing X in CITY", and when no direction is
 given that "in" is the preposition, not the direction — "8 MPH wind blowing in

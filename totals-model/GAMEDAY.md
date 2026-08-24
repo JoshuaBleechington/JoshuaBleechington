@@ -82,6 +82,14 @@ Run top to bottom. Most games produce nothing; that is the expected result.
 | 6 | **Lineup scratches** | same | 0.12 runs per missing regular, max 3/side | *provisional* |
 | 7 | **Line movement since open** | you, or Covers | Subtract from 1–6 | — |
 
+**Read the hourly row and the prose, never the headline.** The weather cards
+head each game with "N MPH wind blowing X in CITY", and when no direction is
+given that "in" is the preposition, not the direction — "8 MPH wind blowing in
+West Sacramento" is a card whose own hourly row and prose both say the wind is
+blowing **out**. Reading the headline literally flips the sign on the largest
+term in the model. Same trap on "blowing in Washington, D.C.", where the prose
+says the breeze crosses the diamond left to right.
+
 Wind blowing in is the single largest under-driver available — 20 mph in is
 worth more than a full run, which is over twice anything else on this list.
 Umpire assignments post the morning of the game and are the item most likely to

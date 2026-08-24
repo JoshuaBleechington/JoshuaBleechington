@@ -13,6 +13,10 @@ from totals.gameday import (
     players_out,
     public_split,
     temperature,
+    bullpens_recent,
+    head_to_head,
+    pitchers_last5,
+    team_form,
     umpire_ou,
     umpire_rpg,
     wind,
@@ -410,3 +414,82 @@ class TestUmpire(unittest.TestCase):
         self.assertAlmostEqual(UMPIRE_SHRINK_GAMES,
                                DISPERSION["MLB"] ** 2 / UMPIRE_TAU_RUNS ** 2,
                                delta=1.0)
+
+
+class TestTrialTier(unittest.TestCase):
+    """Three inputs the owner asked to try, two of which measured null.
+
+    Head-to-head came back t = -0.40 and team form t = -0.07 against the
+    residual on 116 logged games. They are built because they were asked for,
+    sized small because a large guess is how the first two models died, and
+    labelled every time they appear. Pitcher last-five is the exception: the
+    log only ever held season ERA, so that window is genuinely untested.
+    """
+
+    def test_all_three_are_provisional_and_say_why(self):
+        for e in (team_form(9.4, 8.2, 5, 8.0, "Covers", DAY),
+                  head_to_head(10.2, 6, 8.0, "Covers", DAY),
+                  pitchers_last5(5.8, 27, 3.1, 29, "Covers", as_of=DAY),
+                  bullpens_recent(5.1, 60, 3.4, 55, "Covers", as_of=DAY)):
+            self.assertEqual(e.basis, "provisional")
+        self.assertIn("t = -0.07", team_form(9.4, 8.2, 5, 8.0, "Covers", DAY).source)
+        self.assertIn("t = -0.40", head_to_head(10.2, 6, 8.0, "Covers", DAY).source)
+        self.assertIn("Untested here",
+                      pitchers_last5(5.8, 27, 3.1, 29, "Covers", as_of=DAY).source)
+
+    def test_two_meetings_is_not_a_head_to_head(self):
+        """Letting a two-game h2h vote is the exact fault that cost four picks a
+        band in the old model."""
+        self.assertIsNone(head_to_head(12.0, 2, 8.0, "Covers", DAY))
+        self.assertIsNotNone(head_to_head(12.0, 3, 8.0, "Covers", DAY))
+
+    def test_five_starts_keeps_under_a_fifth_of_its_gap(self):
+        """27 innings against a 120-inning half-weight point."""
+        e = pitchers_last5(8.30, 27, 4.30, 27, "Covers", as_of=DAY)
+        raw = (8.30 - 4.30) * (5 / 9)          # what it would be unregressed
+        self.assertLess(abs(e.worth), raw * 0.25)
+
+    def test_the_trend_terms_are_capped(self):
+        wild = team_form(20.0, 20.0, 5, 6.0, "Covers", DAY)
+        self.assertAlmostEqual(wild.worth, 0.60)
+        wild_h2h = head_to_head(30.0, 10, 6.0, "Covers", DAY)
+        self.assertAlmostEqual(wild_h2h.worth, 0.40)
+
+    def test_strict_mode_will_not_bet_on_provisional_evidence_alone(self):
+        ev = [team_form(9.4, 9.8, 5, 8.0, "Covers", DAY),
+              head_to_head(10.4, 6, 8.0, "Covers", DAY),
+              pitchers_last5(5.9, 26, 5.4, 28, "Covers", as_of=DAY)]
+        c = decide("MLB", "A @ B", "total 8", "OVER", "UNDER", ev, DAY)
+        self.assertEqual(c.verdict, "PASS")
+        self.assertFalse(c.gates["grounded"])
+
+    def test_trial_mode_lets_it_lean_but_never_bet(self):
+        """A top-band call on coefficients nobody has measured is the false
+        confidence this whole model exists to refuse."""
+        ev = [team_form(14.0, 14.0, 5, 8.0, "Covers", DAY),
+              head_to_head(16.0, 8, 8.0, "Covers", DAY),
+              pitchers_last5(9.0, 30, 9.0, 30, "Covers", as_of=DAY)]
+        c = decide("MLB", "A @ B", "total 8", "OVER", "UNDER", ev, DAY, trial=True)
+        self.assertGreater(abs(c.net), STRONG_EDGE["MLB"])   # would be a BET
+        self.assertEqual(c.verdict, "LEAN")                  # but is not
+        self.assertTrue(c.capped_at_lean)
+        self.assertIn("tops out at LEAN", c.brief())
+
+    def test_trial_mode_says_to_log_both_reads(self):
+        c = decide("MLB", "A @ B", "total 8", "OVER", "UNDER",
+                   [team_form(11.0, 11.0, 5, 8.0, "Covers", DAY)], DAY, trial=True)
+        self.assertIn("compare after", " ".join(c.reasons))
+
+    def test_a_documented_item_still_outranks_the_trial_tier(self):
+        """With real evidence present the call is grounded normally and can bet."""
+        ev = [ev_wind := wind(20, "out", "RotoWire", DAY),
+              team_form(9.0, 9.0, 5, 8.0, "Covers", DAY)]
+        c = decide("MLB", "A @ B", "total 8", "OVER", "UNDER", ev, DAY)
+        self.assertTrue(c.gates["grounded"])
+        self.assertEqual(c.verdict, "BET")
+        self.assertFalse(c.capped_at_lean)
+
+    def test_the_bullpen_is_form_not_availability_and_says_so(self):
+        e = bullpens_recent(5.60, 70, 3.20, 65, "Covers", as_of=DAY)
+        self.assertIn("not availability", e.source)
+        self.assertLess(e.worth, BULLPEN_CAP_CHECK := 0.60)

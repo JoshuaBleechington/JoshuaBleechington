@@ -150,6 +150,7 @@ class Call:
     opened: float | None = None      # the line when it was first posted
     posted: float | None = None      # the line now
     missing: list[str] = field(default_factory=list)
+    capped_at_lean: bool = False     # trial mode: provisional cannot reach BET
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -230,6 +231,9 @@ class Call:
         elif not self.gates["uncontradicted"]:
             L.append("    nothing. Two documented items disagree and there is no validated")
             L.append("    way to net them, so this stays a stand-down whatever else turns up.")
+        elif self.verdict == "LEAN" and self.capped_at_lean:
+            L.append("    nothing — trial mode tops out at LEAN. Provisional")
+            L.append("    coefficients do not get to name a top-band bet.")
         elif self.verdict == "LEAN":
             L.append(f"    {gap_bet:+.2f} {unit} more -> BET {self.side}")
         else:
@@ -259,7 +263,8 @@ def decide(sport: str, matchup: str, market: str, positive_side: str,
            negative_side: str, evidence: Iterable[Evidence],
            game_day: date | None = None, opened: float | None = None,
            posted: float | None = None,
-           missing: Iterable[str] | None = None) -> Call:
+           missing: Iterable[str] | None = None,
+           trial: bool = False) -> Call:
     """Run the gates over one game's evidence.
 
     ``positive_side`` is the side a positive magnitude favours -- OVER for a
@@ -284,9 +289,13 @@ def decide(sport: str, matchup: str, market: str, positive_side: str,
     contradicting = [e for e in documented
                      if abs(e.unpriced) >= floor and (e.unpriced > 0) != (net > 0)]
 
+    # In trial mode provisional items satisfy the grounded gate, so an idea
+    # can be run and logged rather than argued about. It still cannot reach
+    # BET: a top-band call on coefficients nobody has measured would be the
+    # false confidence this whole model exists to refuse.
     gates = {
         "fresh": bool(fresh),
-        "grounded": bool(documented),
+        "grounded": bool(documented) or (trial and bool(fresh)),
         "unpriced": abs(net) >= MIN_EDGE[sport],
         "uncontradicted": not contradicting,
     }
@@ -301,8 +310,11 @@ def decide(sport: str, matchup: str, market: str, positive_side: str,
         reasons.append("Nothing found today. The posted number is the best estimate here.")
     elif not documented:
         reasons.append(
-            "Everything found rests on provisional coefficients. Logged as a "
-            "hypothesis, not backed."
+            "Everything found rests on provisional coefficients."
+            + (" Trial mode: logged as a hypothesis under test. Record it next to "
+               "the strict read and compare after thirty or forty games — that "
+               "comparison is the only thing that can settle whether these help."
+               if trial else " Logged as a hypothesis, not backed.")
         )
     if fresh and not gates["unpriced"]:
         spent = sum(abs(e.already_moved) for e in fresh)
@@ -321,8 +333,14 @@ def decide(sport: str, matchup: str, market: str, positive_side: str,
 
     if all(gates.values()):
         verdict = "BET" if abs(net) >= STRONG_EDGE[sport] else "LEAN"
+        if trial and not documented:
+            verdict = "LEAN"      # provisional evidence never reaches the top band
+            capped = True
+        else:
+            capped = False
     else:
         verdict = "PASS"
+        capped = False
 
     return Call(
         sport=sport,
@@ -338,6 +356,7 @@ def decide(sport: str, matchup: str, market: str, positive_side: str,
         opened=opened,
         posted=posted,
         missing=list(missing or []),
+        capped_at_lean=capped,
     )
 
 
@@ -570,5 +589,155 @@ def players_out(team: str, starters_out: int, source: str,
         f"{source}: {who} out. Worth {points:+.1f} on a capped coefficient — "
         "the direction is documented, the size is not, and the cap is what "
         "stops a five-deep injury list reading as a fifteen-point edge.",
+        as_of,
+    )
+
+
+# --- the trial tier -------------------------------------------------------
+#
+# Three inputs the owner asked to try. They are marked provisional, and not as
+# a hedge: two of them have been measured on the 116-game log and came back
+# null. Correlations against (final - line) were head-to-head t = -0.40 and
+# team form t = -0.07, and neither survived a cross-validated fit. So they
+# carry small coefficients, they are labelled every time they appear, and by
+# default they cannot satisfy the grounded gate on their own.
+#
+# Pitcher last-five is the exception worth taking seriously. The log only ever
+# held *season* starter ERA; a last-five window has never been tested here, so
+# it is genuinely a new input rather than a re-run of a failed one.
+#
+# ``decide(trial=True)`` lets these carry a LEAN so the idea can actually be
+# run and logged. Every call should be recorded both ways -- strict and trial
+# -- because the only way to find out whether these help is to measure them
+# against the same games, which is exactly what was never done the first time.
+
+# Fractions of the gap between what the trend says and what the line says.
+# Deliberately small: with a measured effect indistinguishable from zero, any
+# coefficient is a guess, and a large guess is how the first two models died.
+FORM_FRACTION = 0.15
+FORM_CAP = 0.60
+H2H_FRACTION = 0.10
+H2H_CAP = 0.40
+H2H_MIN_MEETINGS = 3
+
+# ERA stabilises slowly. Five starts is roughly 27 innings against a ~120
+# innings half-weight point, so a last-five line keeps under a fifth of its
+# apparent gap. The starters cover about five of the nine innings each.
+ERA_STABILISE_IP = 120.0
+STARTER_INNINGS_SHARE = 5.0 / 9.0
+PITCHER_CAP = 0.70
+LEAGUE_ERA = 4.30
+
+
+def team_form(away_avg_total: float, home_avg_total: float, games: int,
+              line: float, source: str, as_of=None) -> "Evidence | None":
+    """Each side's average total over its last N games, against tonight's line.
+
+    Measured null on the logged games (t = -0.07). Kept small and provisional.
+    """
+    if games <= 0:
+        return None
+    avg = (away_avg_total + home_avg_total) / 2.0
+    gap = avg - line
+    runs = max(-FORM_CAP, min(FORM_CAP, gap * FORM_FRACTION))
+    return Evidence(
+        f"Team form (last {games})", runs, "provisional",
+        f"{source}: last-{games} totals average {avg:.1f} against a line of {line:g}, "
+        f"a gap of {gap:+.1f} runs. Taken at {FORM_FRACTION:.0%} and capped — this "
+        f"input measured t = -0.07 against the residual on 116 logged games.",
+        as_of,
+    )
+
+
+def head_to_head(avg_total: float, meetings: int, line: float, source: str,
+                 as_of=None) -> "Evidence | None":
+    """These two clubs' average total when they have met, against tonight's line.
+
+    Returns nothing under three meetings. One or two games is not a trend, and
+    letting a two-game h2h vote is the specific fault that cost four picks a
+    confidence band in the old model.
+    """
+    if meetings < H2H_MIN_MEETINGS:
+        return None
+    gap = avg_total - line
+    runs = max(-H2H_CAP, min(H2H_CAP, gap * H2H_FRACTION))
+    return Evidence(
+        f"Head to head ({meetings})", runs, "provisional",
+        f"{source}: {meetings} meetings averaging {avg_total:.1f} against a line of "
+        f"{line:g}, a gap of {gap:+.1f} runs. Taken at {H2H_FRACTION:.0%} and capped — "
+        "this input measured t = -0.40 against the residual on 116 logged games.",
+        as_of,
+    )
+
+
+def pitchers_last5(away_era: float, away_ip: float, home_era: float,
+                   home_ip: float, source: str, league_era: float = LEAGUE_ERA,
+                   as_of=None) -> "Evidence | None":
+    """Both starters' ERA over their last five starts, regressed for innings.
+
+    The one genuinely untested input of the three: the track record only ever
+    held season ERA, so this window has never been measured here. Still
+    provisional until it has been.
+
+    Each starter's gap from league is shrunk by ip/(ip + 120) -- five starts is
+    about 27 innings, so roughly a fifth of the gap survives -- and then scaled
+    by the share of the game a starter actually pitches.
+    """
+    parts, total = [], 0.0
+    for era, ip, who in ((away_era, away_ip, "away"), (home_era, home_ip, "home")):
+        if era is None or ip is None or ip <= 0:
+            continue
+        shrink = ip / (ip + ERA_STABILISE_IP)
+        runs = (era - league_era) * shrink * STARTER_INNINGS_SHARE
+        total += runs
+        parts.append(f"{who} {era:.2f} over {ip:.0f} IP -> {runs:+.2f}")
+    if not parts:
+        return None
+    total = max(-PITCHER_CAP, min(PITCHER_CAP, total))
+    return Evidence(
+        "Starters, last 5", total, "provisional",
+        f"{source}: {'; '.join(parts)} against a {league_era:.2f} league ERA. "
+        f"Net {total:+.2f} runs. Five starts is ~27 innings against a 120-inning "
+        "half-weight point, so under a fifth of each gap survives regression. "
+        "Untested here — the log only ever held season ERA.",
+        as_of,
+    )
+
+
+# The bullpen covers roughly four of the nine innings -- more than most people
+# credit it with, and the half of the game the starter inputs say nothing
+# about. Same regression treatment as the starters, scaled by that share.
+#
+# Note this is bullpen *form*, not bullpen *availability*. Availability -- who
+# threw last night and cannot go -- is the better idea and the one with a real
+# claim to being unpriced, but it needs beat-writer notes that are hard to get
+# consistently and impossible to check afterwards. Form is what a screenshot
+# can actually deliver, so it is what this measures.
+BULLPEN_INNINGS_SHARE = 4.0 / 9.0
+BULLPEN_STABILISE_IP = 90.0
+BULLPEN_CAP = 0.60
+
+
+def bullpens_recent(away_era: float, away_ip: float, home_era: float,
+                    home_ip: float, source: str, league_era: float = LEAGUE_ERA,
+                    as_of=None) -> "Evidence | None":
+    """Both bullpens' recent ERA, regressed for innings and scaled by their share."""
+    parts, total = [], 0.0
+    for era, ip, who in ((away_era, away_ip, "away"), (home_era, home_ip, "home")):
+        if era is None or ip is None or ip <= 0:
+            continue
+        shrink = ip / (ip + BULLPEN_STABILISE_IP)
+        runs = (era - league_era) * shrink * BULLPEN_INNINGS_SHARE
+        total += runs
+        parts.append(f"{who} {era:.2f} over {ip:.0f} IP -> {runs:+.2f}")
+    if not parts:
+        return None
+    total = max(-BULLPEN_CAP, min(BULLPEN_CAP, total))
+    return Evidence(
+        "Bullpens, recent", total, "provisional",
+        f"{source}: {'; '.join(parts)} against a {league_era:.2f} league ERA. "
+        f"Net {total:+.2f} runs, scaled by the ~4 of 9 innings a pen covers. This "
+        "is bullpen form, not availability — availability is the better idea but "
+        "needs beat notes a screenshot cannot carry.",
         as_of,
     )

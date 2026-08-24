@@ -78,9 +78,40 @@ Run top to bottom. Most games produce nothing; that is the expected result.
 | 2 | **Home plate umpire** | [RotoWire daily](https://www.rotowire.com/baseball/umpire-stats-daily.php), [OddsShark O/U records](https://www.oddsshark.com/mlb/umpire-handicapping-statistics) | His **over/under record**, Beta-shrunk against a 335-game prior, capped ±1.0. R/Gm only as a fallback | documented |
 | 3 | **Ticket vs money split** | [Action Network](https://www.actionnetwork.com/mlb/public-betting), [Covers consensus](https://contests.covers.com/consensus/topconsensus/mlb/overall) | ±0.30 runs when the gap is 20+ points. Capped flat — direction documented, size not | documented |
 | 4 | **Temperature** | RotoWire | 0.008 runs/°F from 70°, capped 0.35 | documented |
-| 5 | **Bullpen availability** | beat writers, [MLB.com](https://www.mlb.com/scores) | 0.15 runs per unavailable high-leverage arm, max 3/side | *provisional* |
-| 6 | **Lineup scratches** | same | 0.12 runs per missing regular, max 3/side | *provisional* |
-| 7 | **Line movement since open** | you, or Covers | Subtract from 1–6 | — |
+| 5 | **Lineup scratches** | beat writers, [MLB.com](https://www.mlb.com/scores) | 0.12 runs per missing regular, max 3/side | *provisional* |
+| 6 | **Line movement since open** | you, or Covers | Subtract from 1–5 | — |
+
+### The trial tier
+
+Asked for on 2026-08-24. Two of these have been measured on the 116-game log
+and came back null — head-to-head **t = −0.40**, team form **t = −0.07** — so
+they carry deliberately small coefficients and say so every time they print.
+Pitcher last-five is the exception worth taking seriously: the log only ever
+held *season* starter ERA, so that window has genuinely never been tested here.
+
+| Check | From your screenshot | Worth |
+|---|---|---|
+| **Team form, last 5** | each side's last-5 average total | 15% of the gap to the line, cap 0.60 |
+| **Head to head** | average total in the meetings | 10% of the gap, cap 0.40, **needs 3+ meetings** |
+| **Starters, last 5** | each starter's last-5 ERA and IP | gap from league, shrunk `ip/(ip+120)`, × 5/9 innings, cap 0.70 |
+| **Bullpens, recent** | each pen's recent ERA and IP | gap from league, shrunk `ip/(ip+90)`, × 4/9 innings, cap 0.60 |
+
+The h2h floor at three meetings is not arbitrary: letting a two-game
+head-to-head vote is the specific fault that cost four picks a confidence band
+in the old model.
+
+Bullpen here is **form, not availability**. Availability — who threw last night
+and cannot go — is the better idea and the one with a real claim to being
+unpriced, but it needs beat notes that are hard to get consistently and
+impossible to verify afterwards. Form is what a screenshot can carry.
+
+**How the trial runs.** In strict mode these cannot satisfy the grounded gate,
+so a card carried only by them reads PASS. `decide(trial=True)` lets them carry
+a **LEAN** — never a BET, because a top-band call on unmeasured coefficients is
+the false confidence this model exists to refuse. Every game gets logged both
+ways, strict and trial, against the same line. After thirty or forty games the
+comparison answers the question, which is the thing that was never done the
+first time these inputs were in a model.
 
 **Read the hourly row and the prose, never the headline.** The weather cards
 head each game with "N MPH wind blowing X in CITY", and when no direction is

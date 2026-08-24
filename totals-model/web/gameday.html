@@ -151,6 +151,20 @@
   details.opt[open] > summary::before { content: "\2212"; }
   details.opt > summary:focus-visible { outline: 2px solid var(--ink); outline-offset: -2px; }
 
+  /* Where to look each thing up. Kept as chips rather than inline links so the
+     lookup is findable without reading the note it would otherwise sit inside. */
+  .links { display: flex; flex-wrap: wrap; gap: 6px; }
+  .links a {
+    font: 600 11px/1 var(--sans); letter-spacing: .03em; text-decoration: none;
+    color: var(--ink-2); background: var(--surface-2);
+    border: 1px solid var(--rule); border-radius: 999px; padding: 7px 11px;
+    white-space: nowrap;
+  }
+  .links a:hover { border-color: var(--muted); color: var(--ink); }
+  .links a:focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; }
+  .links a::after { content: " \2197"; color: var(--muted); }
+  .links a:hover::after { color: var(--ink); }
+
   .btn {
     font: 600 13px/1 var(--sans); padding: 10px 14px; cursor: pointer;
     border: 1px solid var(--rule-firm); border-radius: 7px;
@@ -265,6 +279,10 @@
             <div class="f"><label for="open">Opened at</label><input id="open" type="number" step="0.5" inputmode="decimal" placeholder="7.5"></div>
             <div class="f"><label for="line">Total now</label><input id="line" type="number" step="0.5" inputmode="decimal" placeholder="7.5"></div>
           </div>
+          <div class="links">
+            <a href="https://www.covers.com/sport/baseball/mlb/odds" target="_blank" rel="noopener">Covers odds · Open column</a>
+            <a href="https://www.vegasinsider.com/mlb/odds/las-vegas/" target="_blank" rel="noopener">Vegas Insider</a>
+          </div>
           <p class="note">If the number already moved your way, that part is spent — the market
             bought it before you did. Leave <b>Opened at</b> blank and the page assumes it never
             moved, which will flatter every read.</p>
@@ -287,6 +305,11 @@
               <label class="check" style="padding-bottom:11px"><input type="checkbox" id="dome"> Roof shut</label>
             </div>
           </div>
+          <div class="links">
+            <a href="https://www.rotowire.com/baseball/weather.php" target="_blank" rel="noopener">RotoWire · park weather</a>
+            <a href="https://swishanalytics.com/mlb/mlb-weather-report" target="_blank" rel="noopener">Swish · weather report</a>
+            <a href="https://www.ballparkpal.com/Weather.php" target="_blank" rel="noopener">Ballpark Pal</a>
+          </div>
           <p class="note">Read the <b>hourly row nearest first pitch</b>, never the card headline.
             “8 mph wind blowing in West Sacramento” is a card whose own hourly row says
             <b>out</b> — that “in” is the preposition, and reading it wrong flips the biggest
@@ -301,6 +324,11 @@
             <div class="f"><label for="uo">Games gone over</label><input id="uo" type="number" step="1" min="0" inputmode="numeric" placeholder="185"></div>
             <div class="f"><label for="uu">Games gone under</label><input id="uu" type="number" step="1" min="0" inputmode="numeric" placeholder="115"></div>
           </div>
+          <div class="links">
+            <a href="https://www.covers.com/sport/baseball/mlb/umpires" target="_blank" rel="noopener">Covers · tonight’s assignments</a>
+            <a href="https://www.oddsshark.com/mlb/umpire-handicapping-statistics" target="_blank" rel="noopener">OddsShark · O/U records</a>
+            <a href="https://www.rotowire.com/baseball/umpire-stats-daily.php" target="_blank" rel="noopener">RotoWire · daily</a>
+          </div>
           <p class="note">His <b>over/under record</b> — not his runs per game, which mostly tells
             you which parks he drew. Career if you can get it: one season is about 30 plate games
             against a 335-game prior, so a 3-0 umpire at the top of a leaderboard is worth about
@@ -314,11 +342,31 @@
               <div class="f"><label for="tick">Over % of tickets</label><input id="tick" type="number" step="1" min="0" max="100" inputmode="numeric" placeholder="76"></div>
               <div class="f"><label for="cash">Over % of money</label><input id="cash" type="number" step="1" min="0" max="100" inputmode="numeric" placeholder="46"></div>
             </div>
+            <div class="links">
+              <a href="https://www.actionnetwork.com/mlb/public-betting" target="_blank" rel="noopener">Action Network</a>
+              <a href="https://contests.covers.com/consensus/topconsensus/mlb/overall" target="_blank" rel="noopener">Covers consensus</a>
+            </div>
             <p class="note">Skip this on a normal night. Lots of small bets on the over against a
               few large ones is the sharp tell; it needs a 20-point gap to register and is worth a
               flat 0.30 either way.</p>
           </div>
         </details>
+      </section>
+
+      <section class="card">
+        <h2>Ballpark <span class="tag">reference · not an input</span></h2>
+        <div class="body">
+          <div class="links">
+            <a href="https://baseballsavant.mlb.com/leaderboard/statcast-park-factors" target="_blank" rel="noopener">Statcast park factors</a>
+            <a href="https://www.espn.com/mlb/stats/parkfactor" target="_blank" rel="noopener">ESPN park factors</a>
+          </div>
+          <p class="note">There is no box for the park on purpose. Park factor is published,
+            season-long and the same every night — the number that went up already has Coors in it
+            and already has Petco in it. Typing it in would move the total for something the
+            market priced weeks ago, which is the mistake the old model made fourteen times over.
+            <b>Use these to sanity-check a total, never to adjust one.</b> What the park does
+            change is how much the wind matters, and the wind is a box.</p>
+        </div>
       </section>
 
       <div class="row">

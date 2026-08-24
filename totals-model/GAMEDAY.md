@@ -94,11 +94,23 @@ held *season* starter ERA, so that window has genuinely never been tested here.
 | **Team form, last 5** | each side's last-5 average total | 15% of the gap to the line, cap 0.60 |
 | **Head to head** | average total in the meetings | 10% of the gap, cap 0.40, **needs 3+ meetings** |
 | **Starters, last 5** | each starter's last-5 ERA and IP | gap from league, shrunk `ip/(ip+120)`, × 5/9 innings, cap 0.70 |
-| **Bullpens, recent** | each pen's recent ERA and IP | gap from league, shrunk `ip/(ip+90)`, × 4/9 innings, cap 0.60 |
+| **Bullpens** | each pen's ERA, no innings | gap from league, shrunk on an assumed 110 IP, × 4/9 innings, cap 0.60 |
 
 The h2h floor at three meetings is not arbitrary: letting a two-game
 head-to-head vote is the specific fault that cost four picks a confidence band
 in the old model.
+
+**Bullpen innings came off the form** on 2026-08-24 — two ERAs is the whole job
+and chasing the innings behind them was not worth the typing. The regression
+cannot come off with them, because an unshrunk ERA gap is exactly the false
+precision this model exists to refuse, so a missing figure falls back to 110
+innings, roughly a month of bullpen work, and 55% of the gap survives.
+
+The direction of that assumption is the point. A team's *season* bullpen ERA
+rests on ~450 innings and would earn 84%, so a season figure entered here is
+under-counted rather than over-counted. A guess that errs toward not betting is
+the right way for a guess to be wrong. The detail line prints "IP assumed" so
+the number is never reported as though it had been typed in.
 
 Bullpen here is **form, not availability**. Availability — who threw last night
 and cannot go — is the better idea and the one with a real claim to being

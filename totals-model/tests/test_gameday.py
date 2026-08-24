@@ -487,6 +487,40 @@ class TestTrialTier(unittest.TestCase):
         self.assertIn("Untested here",
                       pitchers_last5(5.8, 27, 3.1, 29, "Covers", as_of=DAY).source)
 
+    def test_bullpen_innings_are_optional_and_the_stand_in_says_so(self):
+        """Innings came off the form on request; the regression cannot come off.
+
+        An unshrunk ERA gap is the false precision this model exists to refuse,
+        so a missing figure falls back to about a month of bullpen work. What
+        matters is that the number is never reported as though it were entered.
+        """
+        from totals.gameday import BULLPEN_ASSUMED_IP
+        e = bullpens_recent(6.20, None, 3.10, None, "Covers", as_of=DAY)
+        self.assertIn("assumed", e.source)
+        self.assertIn(f"{BULLPEN_ASSUMED_IP:.0f} IP", e.source)
+        stated = bullpens_recent(6.20, BULLPEN_ASSUMED_IP, 3.10, BULLPEN_ASSUMED_IP,
+                                 "Covers", as_of=DAY)
+        self.assertAlmostEqual(e.worth, stated.worth)
+        self.assertNotIn("assumed", stated.source)
+
+    def test_the_assumed_innings_under_weight_a_season_figure(self):
+        """The direction the guess is allowed to be wrong in.
+
+        A season bullpen ERA rests on ~450 innings and would earn 0.84 of its
+        gap. Assuming a month earns 0.55, so a season figure entered here is
+        under-counted rather than over-counted -- it errs toward not betting.
+        """
+        assumed = bullpens_recent(6.20, None, 4.30, None, "Covers", as_of=DAY)
+        season = bullpens_recent(6.20, 450, 4.30, 450, "Covers", as_of=DAY)
+        self.assertLess(assumed.worth, season.worth)
+        self.assertGreater(assumed.worth, 0)
+
+    def test_a_bullpen_with_no_era_at_all_still_contributes_nothing(self):
+        self.assertIsNone(bullpens_recent(None, None, None, None, "Covers", as_of=DAY))
+        one = bullpens_recent(6.20, None, None, None, "Covers", as_of=DAY)
+        self.assertIn("away", one.source)
+        self.assertNotIn("home", one.source)
+
     def test_two_meetings_is_not_a_head_to_head(self):
         """Letting a two-game h2h vote is the exact fault that cost four picks a
         band in the old model."""

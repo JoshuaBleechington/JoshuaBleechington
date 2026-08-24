@@ -44,7 +44,7 @@ const CASES = JSON.parse(fs.readFileSync(path.join(__dirname, 'web/gameday-cases
     for (const mode of ['strict', 'trial']) {
       const got = await pg.evaluate(async ([inputs, mode]) => {
         const ids = ["away", "home", "open", "line", "mph", "dir", "temp", "pf", "uo", "uu",
-                     "spa", "spai", "sph", "sphi", "bpa", "bpai", "bph", "bphi",
+                     "spa", "spai", "sph", "sphi", "bpa", "bph",
                      "fa", "fh", "fg", "h2h", "h2hn", "tick", "cash"];
         ids.forEach(id => { document.getElementById(id).value = ''; });
         document.getElementById('dome').checked = false;

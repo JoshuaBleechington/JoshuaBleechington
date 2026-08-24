@@ -430,23 +430,25 @@
       </section>
 
       <section class="card">
-        <h2>Bullpens <span class="tag prov">recent · trial</span></h2>
+        <h2>Bullpens <span class="tag prov">era only · trial</span></h2>
         <div class="body">
           <div class="grid2">
             <div class="f"><label for="bpa">Away bullpen ERA</label><input id="bpa" type="number" step="0.01" inputmode="decimal" placeholder="4.60"></div>
-            <div class="f"><label for="bpai">…innings</label><input id="bpai" type="number" step="0.1" inputmode="decimal" placeholder="60"></div>
-          </div>
-          <div class="grid2">
             <div class="f"><label for="bph">Home bullpen ERA</label><input id="bph" type="number" step="0.01" inputmode="decimal" placeholder="3.40"></div>
-            <div class="f"><label for="bphi">…innings</label><input id="bphi" type="number" step="0.1" inputmode="decimal" placeholder="55"></div>
           </div>
           <div class="links">
             <a href="https://www.fangraphs.com/leaders/major-league?pos=all&amp;stats=rel&amp;lg=all&amp;type=0" target="_blank" rel="noopener">FanGraphs · reliever leaders</a>
             <a href="https://www.baseball-reference.com/leagues/majors/2026-standard-pitching.shtml" target="_blank" rel="noopener">B-Ref · team pitching</a>
           </div>
-          <p class="note">Same regression as the starters, shrunk on a 90-inning point and scaled
-            by the roughly four of nine innings a pen covers — more than most people credit it
-            with, and the half of the game the starter fields say nothing about. Capped at 0.60.</p>
+          <p class="note">Two numbers, no innings. The regression still happens — an unshrunk ERA
+            gap is exactly the false precision this model exists to refuse — so a <b>110-inning</b>
+            workload is assumed, about a month of bullpen work, and 55% of the gap from a 4.30
+            league ERA survives. Then it is scaled by the roughly four of nine innings a pen
+            covers, which is more than most people credit it with and is the half of the game the
+            starter fields say nothing about. Capped at 0.60.</p>
+          <p class="note">Enter a <b>season</b> bullpen ERA and it will be under-weighted rather
+            than over-weighted: ~450 innings would earn 84% of the gap where this assumes 55%. A
+            guess that errs toward not betting is the right way for a guess to be wrong.</p>
           <p class="note">This is bullpen <b>form</b>, not availability. Who threw last night and
             cannot go is the better idea and the one with a real claim to being unpriced, but it
             needs beat notes that are hard to get and impossible to check afterwards. Form is what
@@ -554,6 +556,7 @@
   var H2H_FRACTION = 0.10, H2H_CAP = 0.40, H2H_MIN = 3;
   var ERA_STAB = 120, STARTER_SHARE = 5 / 9, PITCHER_CAP = 0.70;
   var BULLPEN_STAB = 90, BULLPEN_SHARE = 4 / 9, BULLPEN_CAP = 0.60;
+  var BULLPEN_ASSUMED_IP = 110;   // innings came off the form; the regression did not
   var LEAGUE_ERA = 4.30;
 
   function clamp(v, c) { return Math.max(-c, Math.min(c, v)); }
@@ -640,13 +643,22 @@
       n + " meetings averaging " + avg.toFixed(1) + " against a line of " + line +
       ", a gap of " + sgn(gap, 1) + ". Taken at 10% — measured t = −0.40 on 116 games.");
   }
-  function armPair(ae, ai, he, hi, stab, share, cap, label, tail) {
+  /* `assumedIp` is null for the starters, where the innings are entered, and a
+     stand-in for the pens, where they are not. An assumed figure must never be
+     printed as though it had been typed in. */
+  function armPair(ae, ai, he, hi, stab, share, cap, label, tail, assumedIp) {
     var parts = [], total = 0;
     [[ae, ai, "away"], [he, hi, "home"]].forEach(function (r) {
-      if (r[0] === null || r[1] === null || r[1] <= 0) return;
-      var runs = (r[0] - LEAGUE_ERA) * (r[1] / (r[1] + stab)) * share;
+      if (r[0] === null) return;
+      var ip = r[1], assumed = false;
+      if (ip === null || ip <= 0) {
+        if (assumedIp === null || assumedIp === undefined) return;
+        ip = assumedIp; assumed = true;
+      }
+      var runs = (r[0] - LEAGUE_ERA) * (ip / (ip + stab)) * share;
       total += runs;
-      parts.push(r[2] + " " + r[0].toFixed(2) + " over " + r[1].toFixed(0) + " IP → " + sgn(runs));
+      parts.push(r[2] + " " + r[0].toFixed(2) + " over " + ip.toFixed(0) +
+                 (assumed ? " IP assumed" : " IP") + " → " + sgn(runs));
     });
     if (!parts.length) return null;
     return ev(label, clamp(total, cap), "provisional",
@@ -698,10 +710,13 @@
      bSplit(num("tick"), num("cash")),
      armPair(num("spa"), num("spai"), num("sph"), num("sphi"), ERA_STAB, STARTER_SHARE,
              PITCHER_CAP, "Starters, last 5",
-             "Five starts is ~27 innings against a 120-inning half-weight point, so under a fifth survives."),
-     armPair(num("bpa"), num("bpai"), num("bph"), num("bphi"), BULLPEN_STAB, BULLPEN_SHARE,
-             BULLPEN_CAP, "Bullpens, recent",
-             "Scaled by the ~4 of 9 innings a pen covers. This is form, not availability."),
+             "Five starts is ~27 innings against a 120-inning half-weight point, so under a fifth survives.",
+             null),
+     armPair(num("bpa"), null, num("bph"), null, BULLPEN_STAB, BULLPEN_SHARE,
+             BULLPEN_CAP, "Bullpens",
+             "Innings assumed at " + BULLPEN_ASSUMED_IP + ", about a month of work, so 55% of each " +
+             "gap survives. Scaled by the ~4 of 9 innings a pen covers. This is form, not availability.",
+             BULLPEN_ASSUMED_IP),
      bForm(num("fa"), num("fh"), num("fg"), line),
      bH2h(num("h2h"), num("h2hn"), line)
     ].forEach(function (e) { if (e) items.push(e); });
@@ -874,7 +889,7 @@
 
   // ---- wiring -------------------------------------------------------
   var IDS = ["away","home","open","line","mph","dir","temp","dome","pf","uo","uu",
-             "spa","spai","sph","sphi","bpa","bpai","bph","bphi",
+             "spa","spai","sph","sphi","bpa","bph",
              "fa","fh","fg","h2h","h2hn","tick","cash"];
   IDS.forEach(function (id) {
     var el = $(id);
@@ -905,7 +920,7 @@
     var V = { away: "Rays", home: "Tigers", open: 7.5, line: 7.5,
               mph: 11, dir: "out", temp: 78, pf: 101, uo: 185, uu: 115,
               spa: 5.90, spai: 26, sph: 3.10, sphi: 29,
-              bpa: 4.60, bpai: 60, bph: 3.40, bphi: 55,
+              bpa: 4.60, bph: 3.40,
               fa: 9.4, fh: 8.2, fg: 5, h2h: 9.1, h2hn: 6, tick: 76, cash: 46 };
     Object.keys(V).forEach(function (k) { $(k).value = V[k]; });
     $("dome").checked = false;

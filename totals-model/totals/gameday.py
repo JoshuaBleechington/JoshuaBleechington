@@ -765,19 +765,40 @@ BULLPEN_INNINGS_SHARE = 4.0 / 9.0
 BULLPEN_STABILISE_IP = 90.0
 BULLPEN_CAP = 0.60
 
+# Innings became optional on request: entering two ERAs is the whole job and
+# hunting down the innings behind them was not worth the typing. Regression
+# still has to happen -- an unshrunk ERA gap is the false precision this model
+# exists to refuse -- so a missing figure falls back to roughly a month of
+# bullpen work, which shrinks to 110/(110+90) = 0.55 of the gap.
+#
+# The direction of the assumption matters. A team's SEASON bullpen ERA rests on
+# ~450 innings and would earn ~0.84, so assuming a month under-weights a season
+# figure rather than over-weighting a recent one. That errs toward not betting,
+# which is the right way for a guess to be wrong.
+BULLPEN_ASSUMED_IP = 110.0
 
-def bullpens_recent(away_era: float, away_ip: float, home_era: float,
-                    home_ip: float, source: str, league_era: float = LEAGUE_ERA,
+
+def bullpens_recent(away_era: float, away_ip: float | None, home_era: float,
+                    home_ip: float | None, source: str,
+                    league_era: float = LEAGUE_ERA,
                     as_of=None) -> "Evidence | None":
-    """Both bullpens' recent ERA, regressed for innings and scaled by their share."""
+    """Both bullpens' recent ERA, regressed for innings and scaled by their share.
+
+    ``away_ip`` and ``home_ip`` may be None, in which case BULLPEN_ASSUMED_IP
+    stands in and the detail string says so -- an assumed number must never be
+    reported as though it were entered.
+    """
     parts, total = [], 0.0
     for era, ip, who in ((away_era, away_ip, "away"), (home_era, home_ip, "home")):
-        if era is None or ip is None or ip <= 0:
+        if era is None:
             continue
+        assumed = ip is None or ip <= 0
+        ip = BULLPEN_ASSUMED_IP if assumed else ip
         shrink = ip / (ip + BULLPEN_STABILISE_IP)
         runs = (era - league_era) * shrink * BULLPEN_INNINGS_SHARE
         total += runs
-        parts.append(f"{who} {era:.2f} over {ip:.0f} IP -> {runs:+.2f}")
+        over = f"{ip:.0f} IP assumed" if assumed else f"{ip:.0f} IP"
+        parts.append(f"{who} {era:.2f} over {over} -> {runs:+.2f}")
     if not parts:
         return None
     total = max(-BULLPEN_CAP, min(BULLPEN_CAP, total))

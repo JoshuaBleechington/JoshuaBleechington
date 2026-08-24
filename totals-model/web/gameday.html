@@ -1,0 +1,796 @@
+<title>Run Ledger</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600;700;800&family=IBM+Plex+Mono:wght@400;500;600&display=swap">
+
+<style>
+  /* ------------------------------------------------------------------
+     Tokens. Light is the bare :root so the un-stamped "system" state
+     resolves; dark is redefined twice, once behind prefers-color-scheme
+     (guarded against an explicit light choice) and once behind the
+     explicit dark stamp, so the toggle wins in both directions.
+
+     Over and under are directional and deliberately NOT the go colour:
+     a big under lean must never read as "bet this" on its own.
+  ------------------------------------------------------------------ */
+  :root {
+    color-scheme: light;
+    --paper:      #f4f5f7;
+    --surface:    #ffffff;
+    --surface-2:  #eef0f3;
+    --ink:        #16181d;
+    --ink-2:      #4a515e;
+    --muted:      #7b8291;
+    --rule:       #dfe3e9;
+    --rule-firm:  #c3cad4;
+    --over:       #b8541f;
+    --under:      #2b6a8f;
+    --go:         #1d7a4c;
+    --go-wash:    rgba(29, 122, 76, 0.10);
+    --warn:       #8a6a12;
+    --over-wash:  rgba(184, 84, 31, 0.12);
+    --under-wash: rgba(43, 106, 143, 0.12);
+    --shadow:     0 1px 2px rgba(22,24,29,.05), 0 10px 30px -18px rgba(22,24,29,.35);
+    --sans: "Archivo", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+    --mono: "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      color-scheme: dark;
+      --paper:      #101318;
+      --surface:    #181c23;
+      --surface-2:  #1f242c;
+      --ink:        #e8eaef;
+      --ink-2:      #a8b0be;
+      --muted:      #79818f;
+      --rule:       #272d37;
+      --rule-firm:  #3a4250;
+      --over:       #e08a4e;
+      --under:      #5fa3cc;
+      --go:         #3fb377;
+      --go-wash:    rgba(63, 179, 119, 0.14);
+      --warn:       #d3ab4a;
+      --over-wash:  rgba(224, 138, 78, 0.14);
+      --under-wash: rgba(95, 163, 204, 0.14);
+      --shadow:     0 1px 2px rgba(0,0,0,.5), 0 10px 30px -18px rgba(0,0,0,.8);
+    }
+  }
+  :root[data-theme="dark"] {
+    color-scheme: dark;
+    --paper:      #101318;
+    --surface:    #181c23;
+    --surface-2:  #1f242c;
+    --ink:        #e8eaef;
+    --ink-2:      #a8b0be;
+    --muted:      #79818f;
+    --rule:       #272d37;
+    --rule-firm:  #3a4250;
+    --over:       #e08a4e;
+    --under:      #5fa3cc;
+    --go:         #3fb377;
+    --go-wash:    rgba(63, 179, 119, 0.14);
+    --warn:       #d3ab4a;
+    --over-wash:  rgba(224, 138, 78, 0.14);
+    --under-wash: rgba(95, 163, 204, 0.14);
+    --shadow:     0 1px 2px rgba(0,0,0,.5), 0 10px 30px -18px rgba(0,0,0,.8);
+  }
+
+  * { box-sizing: border-box; }
+  [hidden] { display: none !important; }
+
+  body {
+    margin: 0;
+    background: var(--paper);
+    color: var(--ink);
+    font-family: var(--sans);
+    font-size: 15px;
+    line-height: 1.5;
+    -webkit-font-smoothing: antialiased;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .wrap { max-width: 1220px; margin: 0 auto; padding: 26px 20px 90px; }
+
+  /* --- masthead --- */
+  header.top {
+    display: flex; flex-wrap: wrap; gap: 16px;
+    align-items: flex-end; justify-content: space-between;
+    padding-bottom: 16px; margin-bottom: 22px;
+    border-bottom: 2px solid var(--ink);
+  }
+  header.top h1 {
+    margin: 0; font-size: 30px; font-weight: 800;
+    letter-spacing: -.03em; text-wrap: balance;
+  }
+  header.top p { margin: 6px 0 0; color: var(--ink-2); font-size: 13.5px; max-width: 60ch; }
+  .eyebrow {
+    font-size: 10.5px; font-weight: 700; text-transform: uppercase;
+    letter-spacing: .14em; color: var(--muted);
+  }
+
+  .modes { display: flex; gap: 2px; padding: 3px; background: var(--surface-2);
+           border: 1px solid var(--rule); border-radius: 8px; }
+  .modes button {
+    font: 600 12.5px/1 var(--sans); letter-spacing: .01em;
+    padding: 9px 14px; border: 0; border-radius: 6px;
+    background: transparent; color: var(--ink-2); cursor: pointer;
+  }
+  .modes button[aria-pressed="true"] { background: var(--surface); color: var(--ink); box-shadow: var(--shadow); }
+  .modes button:focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; }
+
+  /* --- columns --- */
+  .cols { display: grid; grid-template-columns: minmax(0,1fr) minmax(0,1fr); gap: 22px; align-items: start; }
+  @media (max-width: 940px) { .cols { grid-template-columns: 1fr; } }
+  .rail { position: sticky; top: 18px; display: flex; flex-direction: column; gap: 16px; }
+  @media (max-width: 940px) { .rail { position: static; } }
+  .stack { display: flex; flex-direction: column; gap: 16px; }
+
+  /* --- cards --- */
+  .card { background: var(--surface); border: 1px solid var(--rule); border-radius: 10px; box-shadow: var(--shadow); }
+  .card > h2 {
+    margin: 0; padding: 13px 16px; font-size: 12px; font-weight: 700;
+    text-transform: uppercase; letter-spacing: .12em; color: var(--ink-2);
+    border-bottom: 1px solid var(--rule);
+    display: flex; align-items: baseline; justify-content: space-between; gap: 10px;
+  }
+  .card > h2 .tag { font-size: 10px; letter-spacing: .1em; color: var(--muted); }
+  .card > h2 .tag.prov { color: var(--warn); }
+  .body { padding: 15px 16px; display: flex; flex-direction: column; gap: 13px; }
+  .note { margin: 0; font-size: 12.5px; line-height: 1.55; color: var(--ink-2); }
+  .note b { color: var(--ink); }
+
+  /* --- fields --- */
+  .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .grid3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; }
+  @media (max-width: 480px) { .grid3 { grid-template-columns: 1fr 1fr; } }
+  .f { display: flex; flex-direction: column; gap: 5px; min-width: 0; }
+  .f label {
+    font-size: 10.5px; font-weight: 700; text-transform: uppercase;
+    letter-spacing: .08em; color: var(--muted);
+  }
+  .f input, .f select {
+    font: 500 14.5px/1.2 var(--mono);
+    color: var(--ink); background: var(--surface);
+    border: 1px solid var(--rule-firm); border-radius: 6px;
+    padding: 9px 10px; width: 100%; min-width: 0;
+  }
+  .f select { font-family: var(--sans); font-size: 13.5px; }
+  .f input:focus-visible, .f select:focus-visible { outline: 2px solid var(--ink); outline-offset: 1px; border-color: var(--ink); }
+  .check { display: flex; align-items: center; gap: 8px; font-size: 13.5px; color: var(--ink-2); cursor: pointer; }
+  .check input { width: 16px; height: 16px; accent-color: var(--ink); }
+
+  .btn {
+    font: 600 13px/1 var(--sans); padding: 10px 14px; cursor: pointer;
+    border: 1px solid var(--rule-firm); border-radius: 7px;
+    background: var(--surface); color: var(--ink);
+  }
+  .btn:hover { border-color: var(--muted); }
+  .btn:focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; }
+  .btn.solid { background: var(--ink); color: var(--paper); border-color: var(--ink); }
+  .row { display: flex; gap: 8px; flex-wrap: wrap; }
+
+  /* --- the verdict --- */
+  .verdict { padding: 18px 16px 16px; border-radius: 10px; border: 1px solid var(--rule);
+             background: var(--surface); box-shadow: var(--shadow); }
+  .verdict.go { border-color: var(--go); background: var(--go-wash); }
+  .vtop { display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap; }
+  .band {
+    font: 800 13px/1 var(--sans); letter-spacing: .1em; text-transform: uppercase;
+    padding: 8px 12px; border-radius: 6px;
+    background: var(--surface-2); color: var(--ink-2); border: 1px solid var(--rule-firm);
+  }
+  .band.go { background: var(--go); color: #fff; border-color: var(--go); }
+  .pick { font: 700 26px/1 var(--sans); letter-spacing: -.02em; }
+  .pick.over { color: var(--over); } .pick.under { color: var(--under); }
+  .prob { font: 500 15px/1 var(--mono); color: var(--ink-2); }
+  .vline { margin: 12px 0 0; font-size: 13px; color: var(--ink-2); line-height: 1.55; }
+
+  .nums { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1px;
+          background: var(--rule); border: 1px solid var(--rule);
+          border-radius: 8px; overflow: hidden; margin-top: 14px; }
+  .nums div { background: var(--surface); padding: 10px 12px; }
+  .nums .k { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .09em; color: var(--muted); }
+  .nums .v { font: 600 18px/1.2 var(--mono); margin-top: 3px; }
+
+  /* --- contribution chart --- */
+  .chart { display: flex; flex-direction: column; gap: 9px; }
+  .bar { display: grid; grid-template-columns: 118px 1fr 58px; gap: 10px; align-items: center; }
+  .bar .nm { font-size: 11.5px; color: var(--ink-2); line-height: 1.25; }
+  .bar .nm i { font-style: normal; display: block; font-size: 9.5px; letter-spacing: .07em;
+               text-transform: uppercase; color: var(--warn); font-weight: 700; }
+  .track { position: relative; height: 22px; background: var(--surface-2);
+           border-radius: 4px; overflow: hidden; }
+  .track .mid { position: absolute; left: 50%; top: 0; bottom: 0; width: 1px; background: var(--rule-firm); }
+  .track span { position: absolute; top: 3px; bottom: 3px; border-radius: 3px; }
+  .track span.over  { background: var(--over); }
+  .track span.under { background: var(--under); }
+  .track span.prov  { opacity: .55; }
+  .bar .amt { font: 600 13px/1 var(--mono); text-align: right; }
+  .amt.over { color: var(--over); } .amt.under { color: var(--under); }
+
+  /* --- threshold ruler --- */
+  .ruler { margin-top: 4px; }
+  .rtrack { position: relative; height: 34px; background: var(--surface-2);
+            border: 1px solid var(--rule); border-radius: 6px; overflow: hidden; }
+  .rfill { position: absolute; left: 0; top: 0; bottom: 0; background: var(--rule-firm); }
+  .rfill.go { background: var(--go); }
+  .rtick { position: absolute; top: 0; bottom: 0; width: 2px; background: var(--ink); opacity: .55; }
+  /* Labels are positioned to sit under their own ticks. space-between put
+     them at 0/50/100% while the ticks land at 37% and 74%, which is a chart
+     that quietly lies about where the thresholds are. */
+  .rlab { position: relative; height: 14px; margin-top: 5px;
+          font: 500 10.5px/1 var(--mono); color: var(--muted); }
+  .rlab span { position: absolute; top: 0; white-space: nowrap; }
+  .rlab span.mark { transform: translateX(-50%); }
+  .rlab span.mark::before { content: ""; }
+
+  /* --- gates --- */
+  .gates { display: flex; flex-direction: column; gap: 0; }
+  .gate { display: flex; align-items: center; gap: 10px; padding: 8px 0;
+          border-bottom: 1px solid var(--rule); font-size: 13px; }
+  .gate:last-child { border-bottom: 0; }
+  .gate .dot { width: 8px; height: 8px; border-radius: 50%; flex: none; background: var(--go); }
+  .gate.bad .dot { background: var(--over); }
+  .gate .g { flex: 1; }
+  .gate .why { font-size: 11.5px; color: var(--muted); }
+  .gate.bad .why { color: var(--over); }
+
+  ul.reasons { margin: 0; padding-left: 18px; display: flex; flex-direction: column; gap: 7px; }
+  ul.reasons li { font-size: 12.5px; color: var(--ink-2); line-height: 1.5; }
+
+  /* --- slate table --- */
+  .scroll { overflow-x: auto; }
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  th { text-align: left; font-size: 10px; font-weight: 700; text-transform: uppercase;
+       letter-spacing: .09em; color: var(--muted); padding: 9px 10px;
+       border-bottom: 1px solid var(--rule-firm); white-space: nowrap; }
+  td { padding: 9px 10px; border-bottom: 1px solid var(--rule); vertical-align: middle; }
+  td.n { font-family: var(--mono); font-weight: 500; white-space: nowrap; }
+  tr:last-child td { border-bottom: 0; }
+  .chip { display: inline-block; font: 700 10px/1 var(--sans); letter-spacing: .08em;
+          text-transform: uppercase; padding: 5px 8px; border-radius: 4px;
+          background: var(--surface-2); color: var(--ink-2); }
+  .chip.go { background: var(--go); color: #fff; }
+  .empty { padding: 22px 16px; color: var(--muted); font-size: 13px; }
+  .x { border: 0; background: transparent; color: var(--muted); cursor: pointer;
+       font-size: 17px; line-height: 1; padding: 2px 6px; border-radius: 4px; }
+  .x:hover { color: var(--over); background: var(--over-wash); }
+
+  @media (prefers-reduced-motion: reduce) { * { transition: none !important; animation: none !important; } }
+</style>
+
+<div class="wrap">
+
+  <header class="top">
+    <div>
+      <div class="eyebrow">MLB totals · game day</div>
+      <h1>Run Ledger</h1>
+      <p>Starts from the posted total and moves it only for what the number does not already
+         know. Anything the line has bought is subtracted before it counts.</p>
+    </div>
+    <div class="modes" role="group" aria-label="Evidence mode">
+      <button type="button" id="m-strict" aria-pressed="true">Strict</button>
+      <button type="button" id="m-trial" aria-pressed="false">Trial</button>
+    </div>
+  </header>
+
+  <div class="cols">
+
+    <!-- ============ INPUTS ============ -->
+    <div class="stack">
+
+      <section class="card">
+        <h2>The game <span class="tag">from the odds board</span></h2>
+        <div class="body">
+          <div class="grid2">
+            <div class="f"><label for="away">Away</label><input id="away" type="text" placeholder="Rays"></div>
+            <div class="f"><label for="home">Home</label><input id="home" type="text" placeholder="Tigers"></div>
+          </div>
+          <div class="grid2">
+            <div class="f"><label for="open">Opening total</label><input id="open" type="number" step="0.5" placeholder="7.5"></div>
+            <div class="f"><label for="line">Total now</label><input id="line" type="number" step="0.5" placeholder="7.5"></div>
+          </div>
+          <p class="note">The movement between these two is half the model. A number that has
+            already come down has bought its own under — that part is spent.</p>
+        </div>
+      </section>
+
+      <section class="card">
+        <h2>Weather <span class="tag">documented</span></h2>
+        <div class="body">
+          <div class="grid3">
+            <div class="f"><label for="mph">Wind mph</label><input id="mph" type="number" step="1" placeholder="11"></div>
+            <div class="f"><label for="dir">Direction</label>
+              <select id="dir">
+                <option value="">—</option>
+                <option value="out">Out</option>
+                <option value="in">In</option>
+                <option value="cross">Cross</option>
+              </select></div>
+            <div class="f"><label for="temp">Temp °F</label><input id="temp" type="number" step="1" placeholder="78"></div>
+          </div>
+          <label class="check"><input type="checkbox" id="dome"> Dome or closed roof</label>
+          <p class="note">Read the <b>hourly row nearest first pitch</b>, never the card headline.
+            “8 mph wind blowing in West Sacramento” is a card whose own hourly row says
+            <b>out</b> — that “in” is the preposition. Nothing under 8 mph counts; a cross
+            wind is explicitly zero.</p>
+        </div>
+      </section>
+
+      <section class="card">
+        <h2>Plate umpire <span class="tag">documented</span></h2>
+        <div class="body">
+          <div class="grid2">
+            <div class="f"><label for="uo">Overs</label><input id="uo" type="number" step="1" min="0" placeholder="185"></div>
+            <div class="f"><label for="uu">Unders</label><input id="uu" type="number" step="1" min="0" placeholder="115"></div>
+          </div>
+          <p class="note">His <b>over/under record</b>, not his runs per game — R/Gm is confounded
+            by which parks he drew. <b>Career numbers if you can get them.</b> One season is
+            about 30 plate games against a 335-game prior, so a 3-0 umpire topping a
+            leaderboard is worth roughly +0.05 runs.</p>
+        </div>
+      </section>
+
+      <section class="card">
+        <h2>Money <span class="tag">documented</span></h2>
+        <div class="body">
+          <div class="grid2">
+            <div class="f"><label for="tick">Over % of tickets</label><input id="tick" type="number" step="1" min="0" max="100" placeholder="76"></div>
+            <div class="f"><label for="cash">Over % of money</label><input id="cash" type="number" step="1" min="0" max="100" placeholder="46"></div>
+          </div>
+          <p class="note">Many small bets on the over against fewer large ones is the standard
+            sharp tell. Needs a 20-point gap to register, and is capped flat — the direction
+            is documented, the size is not.</p>
+        </div>
+      </section>
+
+      <section class="card">
+        <h2>Form <span class="tag prov">provisional · trial</span></h2>
+        <div class="body">
+          <div class="grid3">
+            <div class="f"><label for="fa">Away last-5 avg</label><input id="fa" type="number" step="0.1" placeholder="9.4"></div>
+            <div class="f"><label for="fh">Home last-5 avg</label><input id="fh" type="number" step="0.1" placeholder="8.2"></div>
+            <div class="f"><label for="fg">Games</label><input id="fg" type="number" step="1" placeholder="5"></div>
+          </div>
+          <div class="grid2">
+            <div class="f"><label for="h2h">H2H avg total</label><input id="h2h" type="number" step="0.1" placeholder="9.1"></div>
+            <div class="f"><label for="h2hn">Meetings</label><input id="h2hn" type="number" step="1" placeholder="6"></div>
+          </div>
+          <p class="note">Both measured null on the 116-game log — head to head <b>t = −0.40</b>,
+            team form <b>t = −0.07</b>. Built because they were asked for, sized small, and they
+            cannot carry a call in Strict. Head to head refuses to read under three meetings.</p>
+        </div>
+      </section>
+
+      <section class="card">
+        <h2>Arms, recent <span class="tag prov">provisional · trial</span></h2>
+        <div class="body">
+          <div class="grid2">
+            <div class="f"><label for="spa">Away starter, last-5 ERA</label><input id="spa" type="number" step="0.01" placeholder="5.90"></div>
+            <div class="f"><label for="spai">…innings</label><input id="spai" type="number" step="0.1" placeholder="26"></div>
+          </div>
+          <div class="grid2">
+            <div class="f"><label for="sph">Home starter, last-5 ERA</label><input id="sph" type="number" step="0.01" placeholder="3.10"></div>
+            <div class="f"><label for="sphi">…innings</label><input id="sphi" type="number" step="0.1" placeholder="29"></div>
+          </div>
+          <div class="grid2">
+            <div class="f"><label for="bpa">Away bullpen ERA</label><input id="bpa" type="number" step="0.01" placeholder="4.60"></div>
+            <div class="f"><label for="bpai">…innings</label><input id="bpai" type="number" step="0.1" placeholder="60"></div>
+          </div>
+          <div class="grid2">
+            <div class="f"><label for="bph">Home bullpen ERA</label><input id="bph" type="number" step="0.01" placeholder="3.40"></div>
+            <div class="f"><label for="bphi">…innings</label><input id="bphi" type="number" step="0.1" placeholder="55"></div>
+          </div>
+          <p class="note">Five starts is about 27 innings against a 120-inning half-weight point,
+            so under a fifth of the gap survives. A starter at 8.30 over his last five moves the
+            total about a third of a run, not four.</p>
+        </div>
+      </section>
+
+      <div class="row">
+        <button type="button" class="btn solid" id="add">Add to slate</button>
+        <button type="button" class="btn" id="clear">Clear</button>
+        <button type="button" class="btn" id="example">Example</button>
+      </div>
+    </div>
+
+    <!-- ============ VERDICT ============ -->
+    <div class="rail">
+
+      <div class="verdict" id="verdict"></div>
+
+      <section class="card">
+        <h2>What moved the number <span class="tag" id="unit">runs</span></h2>
+        <div class="body">
+          <div class="chart" id="chart"></div>
+          <div class="ruler">
+            <div class="rtrack" id="rtrack"><div class="rfill" id="rfill"></div></div>
+            <div class="rlab"><span style="left:0">0</span><span class="mark" id="rl-lean">lean 0.45</span><span class="mark" id="rl-bet">bet 0.90</span></div>
+          </div>
+        </div>
+      </section>
+
+      <section class="card">
+        <h2>Gates</h2>
+        <div class="body">
+          <div class="gates" id="gates"></div>
+          <ul class="reasons" id="reasons"></ul>
+        </div>
+      </section>
+    </div>
+  </div>
+
+  <section class="card" style="margin-top:22px">
+    <h2>Tonight’s slate <span class="tag" id="slate-count"></span></h2>
+    <div id="slate"></div>
+  </section>
+</div>
+
+<script>
+(function () {
+  "use strict";
+  var $ = function (id) { return document.getElementById(id); };
+
+  /* ====================================================================
+     Ported from totals/gameday.py. Every constant below is the same value
+     the package uses; changing one here without changing it there makes
+     the page and the model disagree, which is the bug this project has
+     shipped most often.
+  ==================================================================== */
+  var SPORT = "MLB";
+  var DISPERSION = 4.39;         // sd of (final - line), 116 logged games
+  var MIN_EDGE = 0.45, STRONG_EDGE = 0.90;
+  var CONTRADICTION_FLOOR = MIN_EDGE / 2;
+  var UMPIRE_PRIOR_GAMES = 335, UMPIRE_CAP_RUNS = 1.0;
+  var PUBLIC_SPLIT_MIN_GAP = 20, PUBLIC_SPLIT_RUNS = 0.30;
+  var WIND_DEAD = 8, WIND_PER_MPH = 0.10, WIND_CAP = 1.5;
+  var TEMP_BASE = 70, TEMP_PER_DEG = 0.008, TEMP_CAP = 0.35;
+  var FORM_FRACTION = 0.15, FORM_CAP = 0.60;
+  var H2H_FRACTION = 0.10, H2H_CAP = 0.40, H2H_MIN = 3;
+  var ERA_STAB = 120, STARTER_SHARE = 5 / 9, PITCHER_CAP = 0.70;
+  var BULLPEN_STAB = 90, BULLPEN_SHARE = 4 / 9, BULLPEN_CAP = 0.60;
+  var LEAGUE_ERA = 4.30;
+
+  function clamp(v, c) { return Math.max(-c, Math.min(c, v)); }
+  function num(id) { var v = parseFloat($(id).value); return isFinite(v) ? v : null; }
+  function txt(id) { return ($(id).value || "").trim(); }
+  function sgn(v, d) { return (v >= 0 ? "+" : "") + v.toFixed(d === undefined ? 2 : d); }
+
+  function ev(name, worth, basis, source) {
+    return { name: name, worth: worth, basis: basis, source: source, moved: 0,
+      unpriced: function () {
+        /* Clamped at zero rather than allowed to flip sign. A line that moved
+           further than the factor is worth is the market disagreeing with this
+           estimate, not an invitation to fade it. */
+        if (this.worth >= 0) return Math.max(0, this.worth - Math.max(0, this.moved));
+        return Math.min(0, this.worth - Math.min(0, this.moved));
+      } };
+  }
+
+  // ---- builders -----------------------------------------------------
+  function bWind(mph, dir, dome) {
+    if (dome) return ev("Roof closed", 0, "documented", "Weather is not a factor.");
+    if (mph === null || !dir) return null;
+    if (dir === "cross") return ev("Wind", 0, "documented",
+      mph.toFixed(0) + " mph across the field — carries a fly ball neither way.");
+    var eff = Math.max(0, mph - WIND_DEAD);
+    var mag = Math.min(WIND_CAP, eff * WIND_PER_MPH);
+    return ev("Wind", dir === "out" ? mag : -mag, "documented",
+      mph.toFixed(0) + " mph blowing " + dir +
+      (eff <= 0 ? " — under the " + WIND_DEAD + " mph where wind starts to carry." : "."));
+  }
+  function bTemp(t, dome) {
+    if (dome || t === null) return null;
+    return ev("Temperature", clamp((t - TEMP_BASE) * TEMP_PER_DEG, TEMP_CAP),
+      "documented", t.toFixed(0) + "°F against a " + TEMP_BASE + "° baseline.");
+  }
+  function bUmp(o, u) {
+    if (o === null || u === null) return null;
+    var n = o + u; if (n <= 0) return null;
+    var a = UMPIRE_PRIOR_GAMES / 2;
+    var p = (o + a) / (n + 2 * a);
+    return ev("Umpire", clamp(invNorm(p) * DISPERSION, UMPIRE_CAP_RUNS), "documented",
+      o + "-" + u + " to the over (" + (o / n * 100).toFixed(0) + "%) on " + n +
+      " plate games. Shrunk against a " + UMPIRE_PRIOR_GAMES + "-game prior it reads " +
+      (p * 100).toFixed(2) + "%.");
+  }
+  function bSplit(tick, cash) {
+    if (tick === null || cash === null) return null;
+    var gap = tick - cash;
+    if (Math.abs(gap) < PUBLIC_SPLIT_MIN_GAP) return null;
+    return ev("Sharp/public split", gap > 0 ? -PUBLIC_SPLIT_RUNS : PUBLIC_SPLIT_RUNS,
+      "documented", "Over has " + tick.toFixed(0) + "% of tickets but " + cash.toFixed(0) +
+      "% of money — a " + Math.abs(gap).toFixed(0) + "-point gap. Big money on the " +
+      (gap > 0 ? "under" : "over") + ". Capped flat: the direction is documented, the size is not.");
+  }
+  function bForm(a, h, g, line) {
+    if (a === null || h === null || !g || g <= 0 || line === null) return null;
+    var avg = (a + h) / 2, gap = avg - line;
+    return ev("Team form (last " + g + ")", clamp(gap * FORM_FRACTION, FORM_CAP),
+      "provisional", "Last-" + g + " totals average " + avg.toFixed(1) + " against a line of " +
+      line + ", a gap of " + sgn(gap, 1) + ". Taken at 15% — measured t = −0.07 on 116 games.");
+  }
+  function bH2h(avg, n, line) {
+    if (avg === null || n === null || line === null) return null;
+    if (n < H2H_MIN) return null;
+    var gap = avg - line;
+    return ev("Head to head (" + n + ")", clamp(gap * H2H_FRACTION, H2H_CAP),
+      "provisional", n + " meetings averaging " + avg.toFixed(1) + " against a line of " +
+      line + ", a gap of " + sgn(gap, 1) + ". Taken at 10% — measured t = −0.40 on 116 games.");
+  }
+  function armPair(ae, ai, he, hi, stab, share, cap, label, tail) {
+    var parts = [], total = 0;
+    [[ae, ai, "away"], [he, hi, "home"]].forEach(function (r) {
+      if (r[0] === null || r[1] === null || r[1] <= 0) return;
+      var runs = (r[0] - LEAGUE_ERA) * (r[1] / (r[1] + stab)) * share;
+      total += runs;
+      parts.push(r[2] + " " + r[0].toFixed(2) + " over " + r[1].toFixed(0) + " IP → " + sgn(runs));
+    });
+    if (!parts.length) return null;
+    return ev(label, clamp(total, cap), "provisional",
+      parts.join("; ") + " against a " + LEAGUE_ERA.toFixed(2) + " league ERA. " + tail);
+  }
+
+  /* Inverse normal CDF, Acklam's rational approximation. Only used to turn
+     an umpire's shrunk over-rate back into runs. */
+  function invNorm(p) {
+    if (p <= 0) return -Infinity; if (p >= 1) return Infinity;
+    var a = [-3.969683028665376e+01, 2.209460984245205e+02, -2.759285104469687e+02,
+             1.383577518672690e+02, -3.066479806614716e+01, 2.506628277459239e+00];
+    var b = [-5.447609879822406e+01, 1.615858368580409e+02, -1.556989798598866e+02,
+             6.680131188771972e+01, -1.328068155288572e+01];
+    var c = [-7.784894002430293e-03, -3.223964580411365e-01, -2.400758277161838e+00,
+             -2.549732539343734e+00, 4.374664141464968e+00, 2.938163982698783e+00];
+    var d = [7.784695709041462e-03, 3.224671290700398e-01, 2.445134137142996e+00,
+             3.754408661907416e+00];
+    var pl = 0.02425, q, r;
+    if (p < pl) { q = Math.sqrt(-2 * Math.log(p));
+      return (((((c[0]*q+c[1])*q+c[2])*q+c[3])*q+c[4])*q+c[5]) /
+             ((((d[0]*q+d[1])*q+d[2])*q+d[3])*q+1); }
+    if (p > 1 - pl) { q = Math.sqrt(-2 * Math.log(1 - p));
+      return -(((((c[0]*q+c[1])*q+c[2])*q+c[3])*q+c[4])*q+c[5]) /
+              ((((d[0]*q+d[1])*q+d[2])*q+d[3])*q+1); }
+    q = p - 0.5; r = q * q;
+    return (((((a[0]*r+a[1])*r+a[2])*r+a[3])*r+a[4])*r+a[5])*q /
+           (((((b[0]*r+b[1])*r+b[2])*r+b[3])*r+b[4])*r+1);
+  }
+  function normCdf(x) { return 0.5 * (1 + erf(x / Math.SQRT2)); }
+  function erf(x) {
+    var s = x < 0 ? -1 : 1; x = Math.abs(x);
+    var t = 1 / (1 + 0.3275911 * x);
+    var y = 1 - ((((1.061405429*t - 1.453152027)*t + 1.421413741)*t - 0.284496736)*t
+              + 0.254829592) * t * Math.exp(-x * x);
+    return s * y;
+  }
+
+  // ---- the decision -------------------------------------------------
+  var trial = false;
+
+  function readGame() {
+    var line = num("line"), open = num("open");
+    var dome = $("dome").checked;
+    var items = [];
+    [bWind(num("mph"), $("dir").value, dome),
+     bUmp(num("uo"), num("uu")),
+     bSplit(num("tick"), num("cash")),
+     bTemp(num("temp"), dome),
+     bForm(num("fa"), num("fh"), num("fg"), line),
+     bH2h(num("h2h"), num("h2hn"), line),
+     armPair(num("spa"), num("spai"), num("sph"), num("sphi"), ERA_STAB, STARTER_SHARE,
+             PITCHER_CAP, "Starters, last 5",
+             "Five starts is ~27 innings against a 120-inning half-weight point, so under a fifth survives."),
+     armPair(num("bpa"), num("bpai"), num("bph"), num("bphi"), BULLPEN_STAB, BULLPEN_SHARE,
+             BULLPEN_CAP, "Bullpens, recent",
+             "Scaled by the ~4 of 9 innings a pen covers. This is form, not availability.")
+    ].forEach(function (e) { if (e) items.push(e); });
+
+    /* Movement from the open is charged against the first item that leans the
+       same way — the market bought that news, not some other one. */
+    var move = (line !== null && open !== null) ? line - open : 0;
+    if (move) {
+      for (var i = 0; i < items.length; i++) {
+        if (items[i].worth !== 0 && (items[i].worth > 0) === (move > 0)) { items[i].moved = move; break; }
+      }
+    }
+    return { line: line, open: open, move: move, items: items,
+             away: txt("away") || "Away", home: txt("home") || "Home" };
+  }
+
+  function decide(g) {
+    var items = g.items;
+    var net = 0; items.forEach(function (e) { net += e.unpriced(); });
+    var documented = items.filter(function (e) { return e.basis === "documented"; });
+    var contradicting = documented.filter(function (e) {
+      var u = e.unpriced();
+      return Math.abs(u) >= CONTRADICTION_FLOOR && (u > 0) !== (net > 0);
+    });
+    var gates = {
+      fresh: items.length > 0,
+      grounded: documented.length > 0 || (trial && items.length > 0),
+      unpriced: Math.abs(net) >= MIN_EDGE,
+      uncontradicted: contradicting.length === 0
+    };
+    var ok = gates.fresh && gates.grounded && gates.unpriced && gates.uncontradicted;
+    var verdict = "PASS", capped = false;
+    if (ok) {
+      verdict = Math.abs(net) >= STRONG_EDGE ? "BET" : "LEAN";
+      if (trial && !documented.length) { verdict = "LEAN"; capped = true; }
+    }
+    var side = net >= 0 ? "OVER" : "UNDER";
+    var reasons = [];
+    if (!items.length) reasons.push("Nothing entered yet. With no late factor the posted number is the best estimate there is.");
+    else if (!documented.length) reasons.push(trial
+      ? "Everything here rests on provisional coefficients. Trial mode logs it as a hypothesis under test — record it beside the strict read and compare after thirty or forty games."
+      : "Everything here rests on provisional coefficients, which cannot carry a call on their own. Switch to Trial to run it as a hypothesis.");
+    if (items.length && !gates.unpriced) reasons.push("Net unpriced edge is " +
+      Math.abs(net).toFixed(2) + ", under the " + MIN_EDGE.toFixed(2) + " runs this model needs" +
+      (g.move ? " — the line has already moved " + Math.abs(g.move).toFixed(1) + " on this news." : "."));
+    contradicting.forEach(function (e) { reasons.push(e.name + " points the other way at " +
+      Math.abs(e.unpriced()).toFixed(2) + ", over the " + CONTRADICTION_FLOOR.toFixed(2) +
+      " that counts as a real dissent. There is no validated way to net two real signals that disagree."); });
+    return { net: net, side: side, verdict: verdict, gates: gates, capped: capped,
+             reasons: reasons, items: items, go: verdict !== "PASS",
+             winPct: normCdf(Math.abs(net) / DISPERSION) };
+  }
+
+  // ---- rendering ----------------------------------------------------
+  function render() {
+    var g = readGame(), r = decide(g);
+    var v = $("verdict");
+    v.className = "verdict" + (r.go ? " go" : "");
+
+    var head = '<div class="vtop"><span class="band' + (r.go ? " go" : "") + '">' +
+      r.verdict + "</span>";
+    if (r.go) head += '<span class="pick ' + r.side.toLowerCase() + '">' + r.side +
+      (g.line !== null ? " " + g.line : "") + '</span><span class="prob">' +
+      (r.winPct * 100).toFixed(1) + "%</span>";
+    head += "</div>";
+
+    var line = g.line === null
+      ? "Enter tonight’s posted total to get a verdict."
+      : "<b>" + g.away + " @ " + g.home + "</b> · posted " + g.line +
+        (g.open !== null && g.move
+          ? ", opened " + g.open + " (" + sgn(g.move, 1) + " — " +
+            (g.move < 0 ? "under" : "over") + " money already in)"
+          : g.open !== null ? ", unmoved from the open" : "");
+    head += '<p class="vline">' + line + "</p>";
+
+    head += '<div class="nums">' +
+      '<div><p class="k">Net</p><p class="v" style="color:' +
+        (r.net === 0 ? "var(--ink)" : r.net > 0 ? "var(--over)" : "var(--under)") + '">' +
+        sgn(r.net) + "</p></div>" +
+      '<div><p class="k">Adjusted total</p><p class="v">' +
+        (g.line === null ? "—" : (g.line + r.net).toFixed(2)) + "</p></div>" +
+      '<div><p class="k">Inputs</p><p class="v">' + r.items.length + "</p></div></div>";
+    v.innerHTML = head;
+
+    // contribution chart
+    var max = 0;
+    r.items.forEach(function (e) { max = Math.max(max, Math.abs(e.unpriced()), Math.abs(e.worth)); });
+    max = Math.max(max, 0.5);
+    $("chart").innerHTML = r.items.length ? r.items.map(function (e) {
+      var u = e.unpriced(), w = Math.abs(u) / max * 50;
+      var cls = u > 0 ? "over" : u < 0 ? "under" : "";
+      var style = u >= 0 ? "left:50%;width:" + w + "%" : "right:50%;width:" + w + "%";
+      return '<div class="bar"><div class="nm">' + e.name +
+        (e.basis === "provisional" ? "<i>provisional</i>" : "") + "</div>" +
+        '<div class="track"><div class="mid"></div>' +
+        (u === 0 ? "" : '<span class="' + cls + (e.basis === "provisional" ? " prov" : "") +
+          '" style="' + style + '"></span>') + "</div>" +
+        '<div class="amt ' + cls + '">' + sgn(u) + "</div></div>";
+    }).join("") : '<p class="note">Nothing entered yet.</p>';
+
+    // threshold ruler
+    var span = STRONG_EDGE * 1.35;
+    var pct = Math.min(100, Math.abs(r.net) / span * 100);
+    var fill = $("rfill");
+    fill.style.width = pct + "%";
+    fill.className = "rfill" + (r.go ? " go" : "");
+    var tr = $("rtrack");
+    tr.querySelectorAll(".rtick").forEach(function (n) { n.remove(); });
+    [[MIN_EDGE, "rl-lean"], [STRONG_EDGE, "rl-bet"]].forEach(function (row) {
+      var at = row[0] / span * 100;
+      var d = document.createElement("div");
+      d.className = "rtick"; d.style.left = at + "%";
+      tr.appendChild(d);
+      $(row[1]).style.left = at + "%";           // label sits under its own tick
+    });
+
+    // gates
+    var G = [["fresh", "Something was found today"],
+             ["grounded", "At least one documented item"],
+             ["unpriced", "Clears " + MIN_EDGE.toFixed(2) + " after line movement"],
+             ["uncontradicted", "No real signal pointing the other way"]];
+    $("gates").innerHTML = G.map(function (row) {
+      var good = r.gates[row[0]];
+      var why = "";
+      if (row[0] === "unpriced" && !good && r.items.length)
+        why = "short by " + (MIN_EDGE - Math.abs(r.net)).toFixed(2);
+      return '<div class="gate' + (good ? "" : " bad") + '"><span class="dot"></span>' +
+        '<span class="g">' + row[1] + "</span>" +
+        '<span class="why">' + (why || (good ? "pass" : "fail")) + "</span></div>";
+    }).join("");
+
+    var rs = r.reasons.slice();
+    if (r.capped) rs.push("Trial mode tops out at LEAN. Provisional coefficients do not get to name a top-band bet.");
+    $("reasons").innerHTML = rs.map(function (x) { return "<li>" + x + "</li>"; }).join("");
+    last = { g: g, r: r };
+  }
+
+  // ---- slate --------------------------------------------------------
+  var last = null, slate = [];
+  function renderSlate() {
+    $("slate-count").textContent = slate.length ? slate.length + " games" : "";
+    if (!slate.length) {
+      $("slate").innerHTML = '<p class="empty">Nothing added yet. Work a game out above and press ' +
+        "“Add to slate”. Passes are kept too — a night of passes is the record, not a gap in it.</p>";
+      return;
+    }
+    $("slate").innerHTML = '<div class="scroll"><table><thead><tr>' +
+      "<th>Game</th><th>Total</th><th>Move</th><th>Net</th><th>Call</th><th>Mode</th><th></th>" +
+      "</tr></thead><tbody>" + slate.map(function (s, i) {
+        return "<tr><td>" + s.name + '</td><td class="n">' + s.line +
+          '</td><td class="n">' + (s.move ? sgn(s.move, 1) : "—") +
+          '</td><td class="n" style="color:' + (s.net > 0 ? "var(--over)" : s.net < 0 ? "var(--under)" : "var(--muted)") +
+          '">' + sgn(s.net) + "</td><td>" +
+          '<span class="chip' + (s.go ? " go" : "") + '">' + s.verdict +
+          (s.go ? " " + s.side : "") + "</span></td>" +
+          '<td class="n">' + s.mode + "</td>" +
+          '<td style="text-align:right"><button class="x" data-i="' + i + '" aria-label="Remove">×</button></td></tr>';
+      }).join("") + "</tbody></table></div>";
+    $("slate").querySelectorAll("[data-i]").forEach(function (b) {
+      b.addEventListener("click", function () {
+        slate.splice(+b.dataset.i, 1); renderSlate();
+      });
+    });
+  }
+
+  // ---- wiring -------------------------------------------------------
+  var IDS = ["away","home","open","line","mph","dir","temp","dome","uo","uu","tick","cash",
+             "fa","fh","fg","h2h","h2hn","spa","spai","sph","sphi","bpa","bpai","bph","bphi"];
+  IDS.forEach(function (id) {
+    var el = $(id);
+    el.addEventListener("input", render);
+    el.addEventListener("change", render);
+  });
+
+  function setMode(t) {
+    trial = t;
+    $("m-strict").setAttribute("aria-pressed", String(!t));
+    $("m-trial").setAttribute("aria-pressed", String(t));
+    render();
+  }
+  $("m-strict").addEventListener("click", function () { setMode(false); });
+  $("m-trial").addEventListener("click", function () { setMode(true); });
+
+  $("clear").addEventListener("click", function () {
+    IDS.forEach(function (id) {
+      var el = $(id);
+      if (el.type === "checkbox") el.checked = false; else el.value = "";
+    });
+    render();
+  });
+
+  $("example").addEventListener("click", function () {
+    var V = { away: "Rays", home: "Tigers", open: 7.5, line: 7.5, mph: 11, dir: "out",
+              temp: 78, uo: 185, uu: 115, tick: 76, cash: 46,
+              fa: 9.4, fh: 8.2, fg: 5, h2h: 9.1, h2hn: 6,
+              spa: 5.90, spai: 26, sph: 3.10, sphi: 29,
+              bpa: 4.60, bpai: 60, bph: 3.40, bphi: 55 };
+    Object.keys(V).forEach(function (k) { $(k).value = V[k]; });
+    $("dome").checked = false;
+    render();
+  });
+
+  $("add").addEventListener("click", function () {
+    if (!last || last.g.line === null) return;
+    slate.push({ name: last.g.away + " @ " + last.g.home, line: last.g.line,
+                 move: last.g.move, net: last.r.net, verdict: last.r.verdict,
+                 side: last.r.side, go: last.r.go, mode: trial ? "trial" : "strict" });
+    renderSlate();
+  });
+
+  render();
+  renderSlate();
+})();
+</script>

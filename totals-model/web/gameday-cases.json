@@ -1,0 +1,280 @@
+{
+ "cases": {
+  "example": {
+   "open": 7.5,
+   "line": 7.5,
+   "mph": 11,
+   "dir": "out",
+   "temp": 78,
+   "dome": false,
+   "uo": 185,
+   "uu": 115,
+   "tick": 76,
+   "cash": 46,
+   "fa": 9.4,
+   "fh": 8.2,
+   "fg": 5,
+   "h2h": 9.1,
+   "h2hn": 6,
+   "spa": 5.9,
+   "spai": 26,
+   "sph": 3.1,
+   "sphi": 29,
+   "bpa": 4.6,
+   "bpai": 60,
+   "bph": 3.4,
+   "bphi": 55
+  },
+  "wind only, under bar": {
+   "open": 7.5,
+   "line": 7.5,
+   "mph": 11,
+   "dir": "out",
+   "temp": 78,
+   "dome": false
+  },
+  "wind in, big": {
+   "open": 8.5,
+   "line": 8.5,
+   "mph": 22,
+   "dir": "in",
+   "temp": 58,
+   "dome": false
+  },
+  "priced in": {
+   "open": 8.5,
+   "line": 7.5,
+   "mph": 22,
+   "dir": "in",
+   "temp": 70,
+   "dome": false
+  },
+  "dome": {
+   "open": 8.0,
+   "line": 8.0,
+   "mph": 30,
+   "dir": "out",
+   "temp": 95,
+   "dome": true
+  },
+  "trial only": {
+   "open": 8.0,
+   "line": 8.0,
+   "fa": 11.0,
+   "fh": 11.0,
+   "fg": 5,
+   "h2h": 12.0,
+   "h2hn": 6,
+   "spa": 6.5,
+   "spai": 28,
+   "sph": 6.2,
+   "sphi": 27
+  },
+  "ump carries it": {
+   "open": 8.0,
+   "line": 8.0,
+   "uo": 210,
+   "uu": 90
+  },
+  "split only": {
+   "open": 8.0,
+   "line": 8.0,
+   "tick": 80,
+   "cash": 40
+  }
+ },
+ "expect": {
+  "example|strict": {
+   "net": 0.9576,
+   "verdict": "PASS",
+   "side": null,
+   "n": 8,
+   "gates": {
+    "fresh": true,
+    "grounded": true,
+    "unpriced": true,
+    "uncontradicted": false
+   }
+  },
+  "example|trial": {
+   "net": 0.9576,
+   "verdict": "PASS",
+   "side": null,
+   "n": 8,
+   "gates": {
+    "fresh": true,
+    "grounded": true,
+    "unpriced": true,
+    "uncontradicted": false
+   }
+  },
+  "wind only, under bar|strict": {
+   "net": 0.364,
+   "verdict": "PASS",
+   "side": null,
+   "n": 2,
+   "gates": {
+    "fresh": true,
+    "grounded": true,
+    "unpriced": false,
+    "uncontradicted": true
+   }
+  },
+  "wind only, under bar|trial": {
+   "net": 0.364,
+   "verdict": "PASS",
+   "side": null,
+   "n": 2,
+   "gates": {
+    "fresh": true,
+    "grounded": true,
+    "unpriced": false,
+    "uncontradicted": true
+   }
+  },
+  "wind in, big|strict": {
+   "net": -1.496,
+   "verdict": "BET",
+   "side": "UNDER",
+   "n": 2,
+   "gates": {
+    "fresh": true,
+    "grounded": true,
+    "unpriced": true,
+    "uncontradicted": true
+   }
+  },
+  "wind in, big|trial": {
+   "net": -1.496,
+   "verdict": "BET",
+   "side": "UNDER",
+   "n": 2,
+   "gates": {
+    "fresh": true,
+    "grounded": true,
+    "unpriced": true,
+    "uncontradicted": true
+   }
+  },
+  "priced in|strict": {
+   "net": -0.4,
+   "verdict": "PASS",
+   "side": null,
+   "n": 2,
+   "gates": {
+    "fresh": true,
+    "grounded": true,
+    "unpriced": false,
+    "uncontradicted": true
+   }
+  },
+  "priced in|trial": {
+   "net": -0.4,
+   "verdict": "PASS",
+   "side": null,
+   "n": 2,
+   "gates": {
+    "fresh": true,
+    "grounded": true,
+    "unpriced": false,
+    "uncontradicted": true
+   }
+  },
+  "dome|strict": {
+   "net": 0.0,
+   "verdict": "PASS",
+   "side": null,
+   "n": 1,
+   "gates": {
+    "fresh": true,
+    "grounded": true,
+    "unpriced": false,
+    "uncontradicted": true
+   }
+  },
+  "dome|trial": {
+   "net": 0.0,
+   "verdict": "PASS",
+   "side": null,
+   "n": 1,
+   "gates": {
+    "fresh": true,
+    "grounded": true,
+    "unpriced": false,
+    "uncontradicted": true
+   }
+  },
+  "trial only|strict": {
+   "net": 1.2751,
+   "verdict": "PASS",
+   "side": null,
+   "n": 3,
+   "gates": {
+    "fresh": true,
+    "grounded": false,
+    "unpriced": true,
+    "uncontradicted": true
+   }
+  },
+  "trial only|trial": {
+   "net": 1.2751,
+   "verdict": "LEAN",
+   "side": "OVER",
+   "n": 3,
+   "gates": {
+    "fresh": true,
+    "grounded": true,
+    "unpriced": true,
+    "uncontradicted": true
+   }
+  },
+  "ump carries it|strict": {
+   "net": 1.0,
+   "verdict": "BET",
+   "side": "OVER",
+   "n": 1,
+   "gates": {
+    "fresh": true,
+    "grounded": true,
+    "unpriced": true,
+    "uncontradicted": true
+   }
+  },
+  "ump carries it|trial": {
+   "net": 1.0,
+   "verdict": "BET",
+   "side": "OVER",
+   "n": 1,
+   "gates": {
+    "fresh": true,
+    "grounded": true,
+    "unpriced": true,
+    "uncontradicted": true
+   }
+  },
+  "split only|strict": {
+   "net": -0.3,
+   "verdict": "PASS",
+   "side": null,
+   "n": 1,
+   "gates": {
+    "fresh": true,
+    "grounded": true,
+    "unpriced": false,
+    "uncontradicted": true
+   }
+  },
+  "split only|trial": {
+   "net": -0.3,
+   "verdict": "PASS",
+   "side": null,
+   "n": 1,
+   "gates": {
+    "fresh": true,
+    "grounded": true,
+    "unpriced": false,
+    "uncontradicted": true
+   }
+  }
+ }
+}

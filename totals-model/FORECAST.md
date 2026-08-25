@@ -155,10 +155,11 @@ what makes that read possible later, which is why the page keeps one.
 
 ## Verification
 
-- `tests/test_forecast.py` — 38 tests. Always answers, re-weighting,
-  market anchoring, the bounded blend, the calibration, and the probabilities.
-- `web/forecast-cases.json` — 27 games generated from the package.
-- `tools_check_forecast_page.js` — replays all 27 through the page in a real
+- `tests/test_forecast.py` — 45 tests. Always answers, re-weighting, the
+  head-to-head discount, market anchoring, the bounded blend, the calibration,
+  and the probabilities.
+- `web/forecast-cases.json` — 30 games generated from the package.
+- `tools_check_forecast_page.js` — replays all 30 through the page in a real
   browser and checks side, band, probability to 1e-4, projection to 1e-6,
   estimate and delta counts, and that green appears only when confident. It
   also round-trips the card: store a game, clear the form, click the row, and

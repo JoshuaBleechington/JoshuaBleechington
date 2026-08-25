@@ -58,6 +58,24 @@ Form and head-to-head both measured null against the residual on the 116-game
 log — **t = −0.07** and **t = −0.40**. They are weighted to move a close card,
 not to overturn the market and the starters together.
 
+### Head to head is discounted for sample size
+
+An average of one meeting is not the same evidence as an average of eight, and
+taking both at full weight is how a single result ends up holding 9% of a
+forecast. The h2h weight scales by `meetings / 4`:
+
+| meetings | share of its weight |
+|---|---|
+| 1 | 25% |
+| 2 | 50% |
+| 3 | 75% |
+| 4+ | 100% |
+
+The old gate model *refused* to read a head-to-head under three meetings.
+Refusing is the wrong instinct for something that has to answer every card —
+one meeting **is** information, just a quarter as much of it. So enter it and
+let the model discount it; judging the sample size is the model's job.
+
 The WNBA weights are reasoned, not fitted. There are 13 logged WNBA totals,
 which is not enough to have tuned anything. They are written down so they can be
 argued with.

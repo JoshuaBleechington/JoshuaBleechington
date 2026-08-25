@@ -132,6 +132,23 @@ WEIGHTS = {
     "WNBA": {"market": 3.0, "form": 1.6, "h2h": 1.0},
 }
 
+# A head-to-head average of one game is not the same evidence as an average of
+# eight, and taking both at full weight is how a single result ends up holding
+# 9% of a forecast. The h2h weight is scaled by meetings/4, so one meeting counts
+# a quarter, two count half, three count three-quarters, and four or more count
+# in full.
+#
+# The old gate model refused to read h2h under three meetings at all. Refusing
+# is the wrong instinct here — one meeting IS information, just a quarter as
+# much of it — and this forecaster is built to degrade rather than stall.
+H2H_FULL_WEIGHT_AT = 4.0
+
+
+def h2h_weight(base: float, meetings: int) -> float:
+    """The h2h weight, discounted for how few games it rests on."""
+    return base * min(1.0, max(0.0, meetings) / H2H_FULL_WEIGHT_AT)
+
+
 # --- bands -----------------------------------------------------------------
 #
 # Every card gets a side. The band describes how far from a coin flip it is,
@@ -375,15 +392,19 @@ def forecast_mlb_f5(
     # --- head to head ------------------------------------------------------
     if h2h_total is not None and h2h_meetings:
         total = h2h_total * F5_SHARE * park
+        weight = h2h_weight(w["h2h"], h2h_meetings)
+        thin = ""
+        if h2h_meetings < H2H_FULL_WEIGHT_AT:
+            thin = (f" Discounted to {h2h_meetings:.0f}/{H2H_FULL_WEIGHT_AT:.0f} of its "
+                    f"weight because it rests on {h2h_meetings} meeting(s) — worth "
+                    "entering, not worth trusting like a season.")
         estimates.append(Estimate(
-            f"Head to head ({h2h_meetings})", total, w["h2h"],
+            f"Head to head ({h2h_meetings})", total, weight,
             f"{h2h_meetings} meetings averaging {h2h_total:.1f} full-game, "
             f"{total:.2f} across five innings. Measured t = −0.40, the weakest "
             "thing in the blend, and it holds the smallest weight because of it."
+            + thin
         ))
-        if h2h_meetings < 3:
-            notes.append(f"Only {h2h_meetings} head-to-head meeting(s). Two games is "
-                         "not a trend — treat that estimate as barely information.")
     elif h2h_total is None:
         notes.append("No head-to-head. Its weight has been redistributed across the "
                      "estimates that are present, so the forecast is a blend of "
@@ -455,14 +476,17 @@ def forecast_wnba(
         ))
 
     if h2h_total is not None and h2h_meetings:
+        weight = h2h_weight(w["h2h"], h2h_meetings)
+        thin = ""
+        if h2h_meetings < H2H_FULL_WEIGHT_AT:
+            thin = (f" Discounted to {h2h_meetings:.0f}/{H2H_FULL_WEIGHT_AT:.0f} of its "
+                    f"weight because it rests on {h2h_meetings} meeting(s).")
         estimates.append(Estimate(
-            f"Head to head ({h2h_meetings})", h2h_total, w["h2h"],
+            f"Head to head ({h2h_meetings})", h2h_total, weight,
             f"{h2h_meetings} meetings averaging {h2h_total:.1f}. Same clubs, same "
             "matchup problems, and in a twelve-team league they meet often enough "
-            "for it to mean something."
+            "for it to mean something." + thin
         ))
-        if h2h_meetings < 3:
-            notes.append(f"Only {h2h_meetings} head-to-head meeting(s) — thin.")
     else:
         notes.append("No head-to-head on file. Its weight has gone to the market and "
                      "the last-ten form, which now carry the whole blend between "

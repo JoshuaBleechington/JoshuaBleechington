@@ -371,6 +371,9 @@
               <b>t = −0.07</b> and head to head at <b>t = −0.40</b>. They are weighted to move a close
               card, not to overturn the market and the starters together. Leave them blank and their
               weight redistributes automatically.</p>
+            <p class="note"><b>One meeting still counts — enter it.</b> Head to head scales by
+              meetings ÷ 4, so a single game holds a quarter of its weight and four or more hold all
+              of it. Judging the sample size is the model’s job, not yours.</p>
           </div>
         </section>
 
@@ -435,10 +438,14 @@
               <div class="f"><label for="wh2h">H2H avg total</label><input id="wh2h" type="number" step="0.1" inputmode="decimal" placeholder="174.0"></div>
               <div class="f"><label for="wh2hn">Meetings</label><input id="wh2hn" type="number" step="1" inputmode="numeric" placeholder="3"></div>
             </div>
-            <p class="note"><b>Leave it blank if they have not met.</b> The model does not stall and does
-              not guess — the head-to-head weight is simply redistributed across the market and the
-              last ten, which then carry the whole blend between them. You still get a side and a
-              percentage; it is just built from fewer things.</p>
+            <p class="note"><b>Put it in even if they have only met once.</b> One meeting is real
+              information, just a quarter as much of it — the weight scales by meetings ÷ 4, so one
+              counts a quarter, two count half, four or more count in full. You do not have to judge
+              whether the sample is big enough; the model discounts it for you and shows the share
+              it ended up with.</p>
+            <p class="note"><b>Leave it blank only if they genuinely have not met.</b> Then the
+              head-to-head weight is redistributed across the market and the last ten, which carry
+              the whole blend between them. You still get a side and a percentage.</p>
           </div>
         </section>
 
@@ -525,6 +532,12 @@
     MLB_F5: { market: 3.0, starters: 2.0, form: 1.0, h2h: 0.6 },
     WNBA:   { market: 3.0, form: 1.6, h2h: 1.0 }
   };
+  /* One meeting is not the same evidence as eight, so the h2h weight scales
+     by meetings/4. The old gate model refused to read h2h under three meetings;
+     refusing is the wrong instinct here — one meeting IS information, just a
+     quarter as much of it. */
+  var H2H_FULL_WEIGHT_AT = 4;
+  function h2hWeight(base, n) { return base * Math.min(1, Math.max(0, n) / H2H_FULL_WEIGHT_AT); }
   var BANDS = [[0.62, "MAX"], [0.57, "STRONG"], [0.53, "LEAN"], [0.00, "COIN FLIP"]];
   var PLAUSIBLE = { era: [0, 15], park: [70, 130], mlb_total: [2, 20], wnba_total: [110, 230] };
   var WIND_DEAD = 8.0, WIND_PER_MPH = 0.10 * F5_SHARE;
@@ -594,12 +607,13 @@
 
     var hv = num("h2h"), hn = num("h2hn");
     if (hv !== null && hn) {
-      estimates.push(est("Head to head (" + hn + ")", hv * F5_SHARE * park, w.h2h,
+      estimates.push(est("Head to head (" + hn + ")", hv * F5_SHARE * park, h2hWeight(w.h2h, hn),
         hn + " meetings averaging " + hv.toFixed(1) + " full-game, " +
         (hv * F5_SHARE).toFixed(2) + " across five. Measured t = −0.40, the weakest thing in the " +
-        "blend, and it holds the smallest weight because of it."));
-      if (hn < 3) notes.push("Only " + hn + " head-to-head meeting(s). Two games is not a trend — " +
-                             "treat that estimate as barely information.");
+        "blend, and it holds the smallest weight because of it." +
+        (hn < H2H_FULL_WEIGHT_AT ? " Discounted to " + hn + "/" + H2H_FULL_WEIGHT_AT +
+          " of its weight because it rests on " + hn + " meeting(s) — worth entering, not worth " +
+          "trusting like a season." : "")));
     } else if (hv === null) {
       notes.push("No head-to-head. Its weight has been redistributed across the estimates that are " +
                  "present, so this is a blend of those rather than a partial answer.");
@@ -649,10 +663,11 @@
 
     var hv = num("wh2h"), hn = num("wh2hn");
     if (hv !== null && hn) {
-      estimates.push(est("Head to head (" + hn + ")", hv, w.h2h,
+      estimates.push(est("Head to head (" + hn + ")", hv, h2hWeight(w.h2h, hn),
         hn + " meetings averaging " + hv.toFixed(1) + ". Same clubs, same matchup problems, and " +
-        "in a twelve-team league they meet often enough for it to mean something."));
-      if (hn < 3) notes.push("Only " + hn + " head-to-head meeting(s) — thin.");
+        "in a twelve-team league they meet often enough for it to mean something." +
+        (hn < H2H_FULL_WEIGHT_AT ? " Discounted to " + hn + "/" + H2H_FULL_WEIGHT_AT +
+          " of its weight because it rests on " + hn + " meeting(s)." : "")));
     } else {
       notes.push("No head-to-head on file. Its weight has gone to the market and the last-ten form, " +
                  "which now carry the whole blend between them. The forecast is not weaker for the " +

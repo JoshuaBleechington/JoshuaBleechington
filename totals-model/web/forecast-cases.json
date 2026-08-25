@@ -181,7 +181,37 @@
   },
   {
     "sport": "MLB_F5",
-    "name": "thin h2h flagged",
+    "name": "h2h from one meeting, quarter weight",
+    "inputs": {
+      "away": "A",
+      "home": "B",
+      "line": 4.5,
+      "aera": null,
+      "hera": null,
+      "arpg": null,
+      "hrpg": null,
+      "al5": 9.0,
+      "hl5": 9.0,
+      "h2h": 14.0,
+      "h2hn": 1,
+      "pf": null,
+      "mph": null,
+      "dir": null,
+      "temp": null,
+      "dome": null
+    },
+    "expect": {
+      "side": "OVER",
+      "band": "COIN FLIP",
+      "p_side": 0.52304119,
+      "projected": 4.68566681,
+      "estimates": 3,
+      "deltas": 0
+    }
+  },
+  {
+    "sport": "MLB_F5",
+    "name": "h2h from two meetings, half weight",
     "inputs": {
       "away": "A",
       "home": "B",
@@ -194,6 +224,36 @@
       "hl5": 9.0,
       "h2h": 14.0,
       "h2hn": 2,
+      "pf": null,
+      "mph": null,
+      "dir": null,
+      "temp": null,
+      "dome": null
+    },
+    "expect": {
+      "side": "OVER",
+      "band": "LEAN",
+      "p_side": 0.53519345,
+      "projected": 4.78380112,
+      "estimates": 3,
+      "deltas": 0
+    }
+  },
+  {
+    "sport": "MLB_F5",
+    "name": "h2h from six meetings, full weight",
+    "inputs": {
+      "away": "A",
+      "home": "B",
+      "line": 4.5,
+      "aera": null,
+      "hera": null,
+      "arpg": null,
+      "hrpg": null,
+      "al5": 9.0,
+      "hl5": 9.0,
+      "h2h": 14.0,
+      "h2hn": 6,
       "pf": null,
       "mph": null,
       "dir": null,
@@ -638,15 +698,15 @@
     "expect": {
       "side": "OVER",
       "band": "MAX",
-      "p_side": 0.67014021,
-      "projected": 165.56785714,
+      "p_side": 0.65765333,
+      "projected": 165.17383178,
       "estimates": 3,
       "deltas": 0
     }
   },
   {
     "sport": "WNBA",
-    "name": "thin h2h flagged",
+    "name": "one meeting, quarter weight",
     "inputs": {
       "away": "A",
       "home": "B",
@@ -654,7 +714,32 @@
       "al10": 165.0,
       "hl10": 165.0,
       "wh2h": 180.0,
-      "wh2hn": 2,
+      "wh2hn": 1,
+      "aout": null,
+      "hout": null,
+      "alead": null,
+      "hlead": null
+    },
+    "expect": {
+      "side": "OVER",
+      "band": "STRONG",
+      "p_side": 0.59207148,
+      "projected": 162.68041237,
+      "estimates": 3,
+      "deltas": 0
+    }
+  },
+  {
+    "sport": "WNBA",
+    "name": "four meetings, full weight",
+    "inputs": {
+      "away": "A",
+      "home": "B",
+      "line": 160.0,
+      "al10": 165.0,
+      "hl10": 165.0,
+      "wh2h": 180.0,
+      "wh2hn": 4,
       "aout": null,
       "hout": null,
       "alead": null,
@@ -688,8 +773,8 @@
     "expect": {
       "side": "OVER",
       "band": "LEAN",
-      "p_side": 0.55417511,
-      "projected": 162.06785714,
+      "p_side": 0.54061517,
+      "projected": 161.67383178,
       "estimates": 3,
       "deltas": 1
     }

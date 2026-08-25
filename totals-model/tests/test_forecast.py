@@ -12,6 +12,8 @@ import unittest
 
 from totals.forecast import (
     BANDS,
+    H2H_FULL_WEIGHT_AT,
+    h2h_weight,
     DISPERSION,
     F5_SHARE,
     F5_TOTAL,
@@ -107,6 +109,60 @@ class TestMissingInputsReweight(unittest.TestCase):
         f = forecast_mlb_f5("A @ B", 4.5, away_starter_era=7.90)
         self.assertEqual([e.name for e in f.estimates], ["Market"])
         self.assertIn("Only one starter", " ".join(f.notes))
+
+
+class TestHeadToHeadSampleSize(unittest.TestCase):
+    """One meeting is information. It is not four meetings' worth of it.
+
+    The old gate model refused to read a head-to-head under three meetings.
+    Refusing is the wrong instinct for a forecaster that has to answer every
+    card — the right move is to take the number and discount it.
+    """
+
+    def test_the_weight_scales_with_meetings_up_to_four(self):
+        self.assertAlmostEqual(h2h_weight(1.0, 1), 0.25)
+        self.assertAlmostEqual(h2h_weight(1.0, 2), 0.50)
+        self.assertAlmostEqual(h2h_weight(1.0, 3), 0.75)
+        self.assertAlmostEqual(h2h_weight(1.0, 4), 1.00)
+        self.assertAlmostEqual(h2h_weight(1.0, 40), 1.00)
+        self.assertAlmostEqual(h2h_weight(1.0, 0), 0.00)
+
+    def test_one_meeting_moves_the_forecast_less_than_four_do(self):
+        def p(n):
+            return forecast_wnba("A @ B", 160.0, away_last10_total=165.0,
+                                 home_last10_total=165.0, h2h_total=185.0,
+                                 h2h_meetings=n).projected
+        self.assertLess(p(1), p(2))
+        self.assertLess(p(2), p(4))
+        self.assertAlmostEqual(p(4), p(9))     # full weight, and no more
+
+    def test_a_single_meeting_still_counts_for_something(self):
+        """Entering it must beat leaving it out, or the advice is wrong."""
+        without = forecast_wnba("A @ B", 160.0, away_last10_total=165.0,
+                                home_last10_total=165.0)
+        with_one = forecast_wnba("A @ B", 160.0, away_last10_total=165.0,
+                                 home_last10_total=165.0, h2h_total=185.0,
+                                 h2h_meetings=1)
+        self.assertGreater(with_one.projected, without.projected)
+
+    def test_a_thin_head_to_head_says_it_was_discounted(self):
+        f = forecast_mlb_f5("A @ B", 4.5, h2h_total=13.0, h2h_meetings=1)
+        h = next(e for e in f.estimates if e.name.startswith("Head"))
+        self.assertIn("Discounted", h.detail)
+        self.assertAlmostEqual(h.weight, WEIGHTS["MLB_F5"]["h2h"] / H2H_FULL_WEIGHT_AT)
+
+    def test_a_full_head_to_head_does_not_claim_a_discount(self):
+        f = forecast_mlb_f5("A @ B", 4.5, h2h_total=13.0, h2h_meetings=6)
+        h = next(e for e in f.estimates if e.name.startswith("Head"))
+        self.assertNotIn("Discounted", h.detail)
+        self.assertAlmostEqual(h.weight, WEIGHTS["MLB_F5"]["h2h"])
+
+    def test_one_meeting_cannot_outweigh_the_last_ten(self):
+        f = forecast_wnba("A @ B", 160.0, away_last10_total=165.0,
+                          home_last10_total=165.0, h2h_total=200.0, h2h_meetings=1)
+        h = next(e for e in f.estimates if e.name.startswith("Head"))
+        form = next(e for e in f.estimates if e.name == "Last 10")
+        self.assertLess(h.weight, form.weight / 4)
 
 
 class TestAnchoredToTheMarket(unittest.TestCase):

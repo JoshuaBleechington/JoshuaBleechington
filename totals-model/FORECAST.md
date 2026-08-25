@@ -153,6 +153,32 @@ that at 50 games a true 55% and a true 50% are still hard to tell apart, so the
 first real read on whether this works will take a while. Logging the card is
 what makes that read possible later, which is why the page keeps one.
 
+## Saving
+
+Two separate things are kept, and neither needs a button pressed:
+
+- **The card** — the record of calls made.
+- **The draft** — whatever is half-typed into the form right now, written on
+  every keystroke and restored on open.
+
+Only the card was stored at first. That meant closing the tab mid-entry lost
+everything typed, which is the failure a user is most likely to hit and least
+likely to forgive.
+
+Every storage read and write is wrapped, because `localStorage` throws rather
+than returning empty in a private window and during thumbnail capture.
+
+**Browser storage is per-browser and is not a vault.** It does not follow the
+user to another device and it goes away with cleared site data. So the page also
+offers a **backup file** through the `downloads` capability — JSON rather than
+CSV because JSON is in the guaranteed extension set and reads back in without
+losing the inputs behind each call. Loading a backup **merges**: restoring onto a
+machine that already has a night on it must not silently delete that night.
+
+The backup button stays hidden until `claude.use("downloads")` resolves to
+something real, so it is never offered and then found not to work. When it is
+unavailable, **Copy card as text** is the fallback and the page says so.
+
 ## Verification
 
 - `tests/test_forecast.py` — 45 tests. Always answers, re-weighting, the
@@ -163,7 +189,10 @@ what makes that read possible later, which is why the page keeps one.
   browser and checks side, band, probability to 1e-4, projection to 1e-6,
   estimate and delta counts, and that green appears only when confident. It
   also round-trips the card: store a game, clear the form, click the row, and
-  assert the inputs and the sport come back.
+  assert the inputs and the sport come back. Then it types a half-finished game,
+  reloads the browser, and asserts the draft, the sport and the card all come
+  back — plus that loading a backup merges rather than replaces, and that a junk
+  file changes nothing.
 
 The page exposes full-precision values in `data-p-over` and `data-projected`
 because the panel rounds to a tenth of a percent, and a verifier comparing a

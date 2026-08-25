@@ -477,6 +477,26 @@
         <button type="button" class="btn" id="clear">Clear</button>
         <button type="button" class="btn" id="example">Example</button>
       </div>
+
+      <section class="card">
+        <h2>Saving <span class="tag" id="saveState">draft saved</span></h2>
+        <div class="body">
+          <p class="note"><b>Nothing is lost when you close the tab.</b> What you are typing is
+            written to this browser after every keystroke and comes back when you reopen the page,
+            and the card below is stored the same way. You do not have to press anything.</p>
+          <div class="row">
+            <button type="button" class="btn solid" id="backup">Save a backup file</button>
+            <button type="button" class="btn" id="restore">Load a backup</button>
+            <button type="button" class="btn" id="copy">Copy card as text</button>
+          </div>
+          <input type="file" id="restoreFile" accept="application/json,.json" hidden>
+          <p class="note" id="saveMsg" hidden></p>
+          <p class="note"><b>Browser storage is per-browser, and it is not a vault.</b> It does not
+            follow you to your phone, and it goes away if you clear site data or open the page in a
+            private window. Take a backup file at the end of a night you care about — that is the
+            copy that survives a new laptop.</p>
+        </div>
+      </section>
     </div>
 
     <!-- ================= THE CALL ================= -->
@@ -835,12 +855,25 @@
     $("why").innerHTML = items.join("");
   }
 
-  // ---- the card (tracking) --------------------------------------------
+  // ---- persistence -----------------------------------------------------
+  //
+  // Two separate things get kept. The CARD is the record of calls made; the
+  // DRAFT is whatever is half-typed into the form right now. Only the card was
+  // stored at first, which meant closing the tab mid-entry lost everything
+  // typed — the failure a user is most likely to hit and least likely to
+  // forgive. Both are written on every change; neither needs a button.
+  //
+  // Every read and write is wrapped, because storage throws rather than
+  // returning empty in a private window and in thumbnail capture.
   var KEY = "callsheet.card.v1";
+  var DRAFT_KEY = "callsheet.draft.v1";
   var card = [];
   try { card = JSON.parse(localStorage.getItem(KEY) || "[]"); } catch (e) { card = []; }
 
-  function save() { try { localStorage.setItem(KEY, JSON.stringify(card)); } catch (e) {} }
+  function save() {
+    try { localStorage.setItem(KEY, JSON.stringify(card)); }
+    catch (e) { $("saveState").textContent = "this browser is not storing anything"; }
+  }
 
   function renderCard() {
     $("cardCount").textContent = card.length ? card.length + " games" : "";
@@ -894,6 +927,31 @@
     CHECKS.forEach(function (id) { v[id] = $(id).checked; });
     return v;
   }
+
+  function saveDraft() {
+    try {
+      localStorage.setItem(DRAFT_KEY, JSON.stringify({ sport: sport, inputs: snapshot() }));
+      $("saveState").textContent = "draft saved";
+    } catch (e) {
+      $("saveState").textContent = "this browser is not storing anything";
+    }
+  }
+
+  function loadDraft() {
+    var d = null;
+    try { d = JSON.parse(localStorage.getItem(DRAFT_KEY) || "null"); } catch (e) { return false; }
+    if (!d || !d.inputs) return false;
+    setSport(d.sport, true);
+    ALL.forEach(function (id) { $(id).value = d.inputs[id] || ""; });
+    CHECKS.forEach(function (id) { $(id).checked = !!d.inputs[id]; });
+    return true;
+  }
+
+  function say(msg) {
+    var el = $("saveMsg");
+    el.hidden = false;
+    el.innerHTML = msg;
+  }
   function restore(row) {
     if (!row) return;
     setSport(row.sport, true);
@@ -925,19 +983,20 @@
         "is read as a typo and refused rather than forecast.";
     if (!quiet) render();
   }
-  $("m-mlb").addEventListener("click", function () { setSport("MLB_F5"); });
-  $("m-wnba").addEventListener("click", function () { setSport("WNBA"); });
+  $("m-mlb").addEventListener("click", function () { setSport("MLB_F5"); saveDraft(); });
+  $("m-wnba").addEventListener("click", function () { setSport("WNBA"); saveDraft(); });
 
+  function onEdit() { render(); saveDraft(); }
   ALL.concat(CHECKS).forEach(function (id) {
     var el = $(id);
-    el.addEventListener("input", render);
-    el.addEventListener("change", render);
+    el.addEventListener("input", onEdit);
+    el.addEventListener("change", onEdit);
   });
 
   $("clear").addEventListener("click", function () {
     ALL.forEach(function (id) { $(id).value = ""; });
     CHECKS.forEach(function (id) { $(id).checked = false; });
-    render();
+    render(); saveDraft();
   });
 
   /* The form ships blank on purpose. An earlier build pre-filled the weather
@@ -955,7 +1014,7 @@
     ALL.forEach(function (id) { $(id).value = ""; });
     CHECKS.forEach(function (id) { $(id).checked = false; });
     Object.keys(V).forEach(function (k) { $(k).value = V[k]; });
-    render();
+    render(); saveDraft();
   });
 
   $("add").addEventListener("click", function () {
@@ -969,7 +1028,110 @@
     save(); renderCard();
   });
 
+  // ---- backup, restore, copy -------------------------------------------
+  //
+  // Browser storage is per-browser and evaporates with cleared site data, so
+  // the file is the copy that survives a new laptop. JSON rather than CSV on
+  // purpose: it is in the guaranteed extension set, and it reads back in
+  // without losing the inputs behind each call.
+  function backupBlob() {
+    return JSON.stringify({
+      format: "callsheet.backup", version: 1,
+      savedAt: new Date().toISOString(),
+      card: card, draft: { sport: sport, inputs: snapshot() }
+    }, null, 2);
+  }
+
+  function cardAsText() {
+    if (!card.length) return "Nothing on the card.";
+    return ["GAME\tSPORT\tLINE\tPROJ\tCALL\tPROB\tBAND"].concat(
+      card.map(function (s) {
+        return [s.matchup, s.sport === "WNBA" ? "WNBA" : "MLB F5", s.line,
+                s.projected, s.side, s.prob + "%", s.band].join("\t");
+      })).join("\n");
+  }
+
+  var downloads = null;
+  if (window.claude && typeof window.claude.use === "function") {
+    /* Resolves later than this script, and null when the view cannot run it —
+       so the button is hidden until it is known to work rather than offered
+       and then failing. */
+    window.claude.use("downloads").then(function (d) {
+      downloads = d;
+      $("backup").hidden = !d;
+      if (!d) say("This view cannot save files, so the backup button is hidden. " +
+                  "<b>Copy card as text</b> still works — paste it somewhere safe.");
+    }).catch(function () { $("backup").hidden = true; });
+  } else {
+    $("backup").hidden = true;
+  }
+
+  $("backup").addEventListener("click", function () {
+    if (!downloads) return;
+    var stamp = new Date().toISOString().slice(0, 10);
+    downloads.save({ filename: "call-sheet-" + stamp + ".json", data: backupBlob() })
+      .then(function () { say("Backup saved. Load it with <b>Load a backup</b> on any device."); })
+      .catch(function (err) {
+        var code = (err && err.code) || "unavailable";
+        say(code === "declined"
+          ? "Save cancelled — nothing was written. Your card is still here."
+          : "Could not save the file (<code>" + code + "</code>). Use <b>Copy card as text</b> " +
+            "and paste it somewhere safe instead.");
+      });
+  });
+
+  $("restore").addEventListener("click", function () { $("restoreFile").click(); });
+  $("restoreFile").addEventListener("change", function () {
+    var file = this.files && this.files[0];
+    if (!file) return;
+    var reader = new FileReader();
+    reader.onload = function () {
+      var data;
+      try { data = JSON.parse(String(reader.result)); }
+      catch (e) { return say("That file is not a Call Sheet backup — it is not readable JSON."); }
+      if (!data || data.format !== "callsheet.backup" || !Array.isArray(data.card)) {
+        return say("That file is not a Call Sheet backup. Nothing was changed.");
+      }
+      /* Merge rather than replace. Restoring onto a machine that already has a
+         night on it must not silently delete that night. */
+      var seen = {};
+      card.forEach(function (r) { seen[r.matchup + "|" + r.line + "|" + r.prob] = true; });
+      var added = 0;
+      data.card.forEach(function (r) {
+        var k = r.matchup + "|" + r.line + "|" + r.prob;
+        if (!seen[k]) { card.push(r); seen[k] = true; added++; }
+      });
+      save(); renderCard();
+      if (data.draft && data.draft.inputs) {
+        restore({ sport: data.draft.sport, inputs: data.draft.inputs });
+        saveDraft();
+      }
+      say("Loaded. <b>" + added + "</b> game(s) added to the card" +
+          (added < data.card.length
+            ? ", " + (data.card.length - added) + " already there and left alone." : "."));
+    };
+    reader.readAsText(file);
+    this.value = "";
+  });
+
+  $("copy").addEventListener("click", function () {
+    var text = cardAsText();
+    var done = function () { say("Card copied. Paste it into a note or a spreadsheet."); };
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(text).then(done).catch(function () {
+        say("Could not reach the clipboard. Here it is to copy by hand:<br>" +
+            "<textarea readonly rows=\"6\" style=\"width:100%;font:500 12px/1.5 var(--mono)\">" +
+            text.replace(/</g, "&lt;") + "</textarea>");
+      });
+    } else {
+      say("Clipboard unavailable. Here it is to copy by hand:<br>" +
+          "<textarea readonly rows=\"6\" style=\"width:100%;font:500 12px/1.5 var(--mono)\">" +
+          text.replace(/</g, "&lt;") + "</textarea>");
+    }
+  });
+
   setSport("MLB_F5", true);
+  loadDraft();
   render();
   renderCard();
 })();

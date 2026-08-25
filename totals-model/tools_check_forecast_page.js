@@ -156,6 +156,89 @@ const CHECKS = ["dome", "alead", "hlead"];
   chk(round.sportRestored === 'true', 'card: the row restores its own sport',
       round.sportRestored);
 
+  // The draft has to survive a reload. This is the failure a user is most
+  // likely to hit — close the tab half way through entering a game — and the
+  // reason the form is written to storage on every keystroke.
+  const draft = await pg.evaluate(async () => {
+    document.getElementById('m-mlb').click();
+    const set = (id, v) => {
+      const el = document.getElementById(id);
+      el.value = String(v);
+      el.dispatchEvent(new Event('input', { bubbles: true }));
+    };
+    set('away', 'Cubs'); set('home', 'Reds'); set('line', 4.5); set('aera', 3.33);
+    await new Promise(r => setTimeout(r, 60));
+    return JSON.parse(localStorage.getItem('callsheet.draft.v1') || 'null');
+  });
+  chk(draft && draft.inputs && draft.inputs.away === 'Cubs' && draft.inputs.aera === '3.33',
+      'draft: half-typed inputs are written to storage', JSON.stringify(draft));
+  chk(draft && draft.sport === 'MLB_F5', 'draft: the sport is stored with it',
+      draft && draft.sport);
+
+  await pg.reload();
+  await pg.waitForTimeout(400);
+  const afterReload = await pg.evaluate(() => ({
+    away: document.getElementById('away').value,
+    aera: document.getElementById('aera').value,
+    line: document.getElementById('line').value,
+    mlb: document.getElementById('m-mlb').getAttribute('aria-pressed'),
+    band: document.querySelector('#call .band').textContent.trim(),
+    cardRows: document.querySelectorAll('#cardTable tbody tr').length,
+  }));
+  chk(afterReload.away === 'Cubs' && afterReload.aera === '3.33' && afterReload.line === '4.5',
+      'draft: it all comes back after a reload', JSON.stringify(afterReload));
+  chk(afterReload.mlb === 'true', 'draft: the sport comes back too', afterReload.mlb);
+  chk(afterReload.cardRows === 1, 'card: it survived the reload as well',
+      String(afterReload.cardRows));
+
+  // A backup has to round-trip, and loading one must not wipe what is already
+  // on the machine.
+  const backup = await pg.evaluate(async () => {
+    const before = JSON.parse(localStorage.getItem('callsheet.card.v1') || '[]');
+    // build a backup by hand in the same shape the page writes
+    const blob = JSON.stringify({
+      format: 'callsheet.backup', version: 1, savedAt: new Date().toISOString(),
+      card: [{ matchup: 'Aces @ Liberty', sport: 'WNBA', line: 164.5, projected: '167.0',
+               side: 'OVER', prob: '58.0', band: 'STRONG', inputs: {} }],
+      draft: { sport: 'WNBA', inputs: {} },
+    });
+    const file = new File([blob], 'backup.json', { type: 'application/json' });
+    const dt = new DataTransfer();
+    dt.items.add(file);
+    const input = document.getElementById('restoreFile');
+    input.files = dt.files;
+    input.dispatchEvent(new Event('change', { bubbles: true }));
+    await new Promise(r => setTimeout(r, 250));
+    return {
+      before: before.length,
+      after: JSON.parse(localStorage.getItem('callsheet.card.v1') || '[]').length,
+      msg: document.getElementById('saveMsg').textContent,
+    };
+  });
+  chk(backup.after === backup.before + 1,
+      'backup: loading one merges rather than replaces',
+      `${backup.before} -> ${backup.after}`);
+  chk(/added to the card/.test(backup.msg), 'backup: it says what it did', backup.msg);
+
+  const junk = await pg.evaluate(async () => {
+    const before = JSON.parse(localStorage.getItem('callsheet.card.v1') || '[]').length;
+    const file = new File(['not json at all'], 'x.json', { type: 'application/json' });
+    const dt = new DataTransfer();
+    dt.items.add(file);
+    const input = document.getElementById('restoreFile');
+    input.files = dt.files;
+    input.dispatchEvent(new Event('change', { bubbles: true }));
+    await new Promise(r => setTimeout(r, 250));
+    return {
+      before,
+      after: JSON.parse(localStorage.getItem('callsheet.card.v1') || '[]').length,
+      msg: document.getElementById('saveMsg').textContent,
+    };
+  });
+  chk(junk.after === junk.before, 'backup: a junk file changes nothing',
+      `${junk.before} -> ${junk.after}`);
+  chk(/not a Call Sheet backup/.test(junk.msg), 'backup: it says the file was wrong', junk.msg);
+
   if (errs.length) { console.log('PAGE ERRORS:\n' + errs.join('\n')); fails++; }
   console.log(fails ? `\n${fails} FAILED` : `\nall checks passed (${CASES.length} cases)`);
   await b.close();

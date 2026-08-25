@@ -1,0 +1,961 @@
+<title>Call Sheet</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600;700;800;900&family=IBM+Plex+Mono:wght@400;500;600&display=swap">
+
+<style>
+  /* ------------------------------------------------------------------
+     Light is the bare :root so the un-stamped "system" state resolves.
+     Dark is redefined twice — once behind prefers-color-scheme, guarded
+     against an explicit light choice, and once behind the explicit dark
+     stamp — so a toggle wins in both directions.
+
+     Green means confident, and only that. Over and under keep their own
+     directional colours so a large under never reads as a green light.
+  ------------------------------------------------------------------ */
+  :root {
+    color-scheme: light;
+    --paper:      #f4f5f7;
+    --surface:    #ffffff;
+    --surface-2:  #eef0f3;
+    --ink:        #16181d;
+    --ink-2:      #4a515e;
+    --muted:      #7b8291;
+    --rule:       #dfe3e9;
+    --rule-firm:  #c3cad4;
+    --over:       #b8541f;
+    --under:      #2b6a8f;
+    --go:         #1d7a4c;
+    --go-deep:    #145c39;
+    --go-wash:    rgba(29, 122, 76, 0.10);
+    --over-wash:  rgba(184, 84, 31, 0.12);
+    --under-wash: rgba(43, 106, 143, 0.12);
+    --warn:       #8a6a12;
+    --shadow:     0 1px 2px rgba(22,24,29,.05), 0 10px 30px -18px rgba(22,24,29,.35);
+    --sans: "Archivo", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+    --mono: "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      color-scheme: dark;
+      --paper:      #101318;
+      --surface:    #181c23;
+      --surface-2:  #1f242c;
+      --ink:        #e8eaef;
+      --ink-2:      #a8b0be;
+      --muted:      #79818f;
+      --rule:       #272d37;
+      --rule-firm:  #3a4250;
+      --over:       #e08a4e;
+      --under:      #5fa3cc;
+      --go:         #3fb377;
+      --go-deep:    #59c98d;
+      --go-wash:    rgba(63, 179, 119, 0.14);
+      --over-wash:  rgba(224, 138, 78, 0.14);
+      --under-wash: rgba(95, 163, 204, 0.14);
+      --warn:       #d3ab4a;
+      --shadow:     0 1px 2px rgba(0,0,0,.5), 0 10px 30px -18px rgba(0,0,0,.8);
+    }
+  }
+  :root[data-theme="dark"] {
+    color-scheme: dark;
+    --paper:      #101318;
+    --surface:    #181c23;
+    --surface-2:  #1f242c;
+    --ink:        #e8eaef;
+    --ink-2:      #a8b0be;
+    --muted:      #79818f;
+    --rule:       #272d37;
+    --rule-firm:  #3a4250;
+    --over:       #e08a4e;
+    --under:      #5fa3cc;
+    --go:         #3fb377;
+    --go-deep:    #59c98d;
+    --go-wash:    rgba(63, 179, 119, 0.14);
+    --over-wash:  rgba(224, 138, 78, 0.14);
+    --under-wash: rgba(95, 163, 204, 0.14);
+    --warn:       #d3ab4a;
+    --shadow:     0 1px 2px rgba(0,0,0,.5), 0 10px 30px -18px rgba(0,0,0,.8);
+  }
+
+  * { box-sizing: border-box; }
+  [hidden] { display: none !important; }
+
+  body {
+    margin: 0; background: var(--paper); color: var(--ink);
+    font-family: var(--sans); font-size: 15px; line-height: 1.5;
+    -webkit-font-smoothing: antialiased; font-variant-numeric: tabular-nums;
+  }
+  .wrap { max-width: 1180px; margin: 0 auto; padding: 24px 18px 90px; }
+
+  /* --- masthead --- */
+  header.top {
+    display: flex; flex-wrap: wrap; gap: 14px; align-items: flex-end;
+    justify-content: space-between; padding-bottom: 14px; margin-bottom: 20px;
+    border-bottom: 2px solid var(--ink);
+  }
+  header.top h1 { margin: 0; font-size: 31px; font-weight: 900; letter-spacing: -.035em; }
+  header.top p { margin: 6px 0 0; color: var(--ink-2); font-size: 13.5px; max-width: 62ch; }
+  .eyebrow { font-size: 10.5px; font-weight: 700; text-transform: uppercase;
+             letter-spacing: .14em; color: var(--muted); }
+
+  .modes { display: flex; gap: 2px; padding: 3px; background: var(--surface-2);
+           border: 1px solid var(--rule); border-radius: 9px; }
+  .modes button {
+    font: 700 12.5px/1 var(--sans); letter-spacing: .02em; padding: 10px 15px;
+    border: 0; border-radius: 6px; background: transparent; color: var(--ink-2); cursor: pointer;
+  }
+  .modes button[aria-pressed="true"] { background: var(--surface); color: var(--ink); box-shadow: var(--shadow); }
+  .modes button:focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; }
+
+  /* --- layout --- */
+  .cols { display: grid; grid-template-columns: minmax(0,.92fr) minmax(0,1.08fr);
+          gap: 20px; align-items: start; }
+  @media (max-width: 920px) { .cols { grid-template-columns: 1fr; } }
+  .rail { position: sticky; top: 16px; display: flex; flex-direction: column; gap: 15px; }
+  @media (max-width: 920px) { .rail { position: static; } }
+  .stack { display: flex; flex-direction: column; gap: 15px; }
+
+  /* --- cards --- */
+  .card { background: var(--surface); border: 1px solid var(--rule);
+          border-radius: 11px; box-shadow: var(--shadow); }
+  .card > h2 {
+    margin: 0; padding: 12px 15px; font-size: 11.5px; font-weight: 700;
+    text-transform: uppercase; letter-spacing: .12em; color: var(--ink-2);
+    border-bottom: 1px solid var(--rule);
+    display: flex; align-items: baseline; justify-content: space-between; gap: 10px;
+  }
+  .card > h2 .tag { font-size: 10px; letter-spacing: .09em; color: var(--muted); font-weight: 600; }
+  .body { padding: 14px 15px; display: flex; flex-direction: column; gap: 12px; }
+  .note { margin: 0; font-size: 12.5px; line-height: 1.55; color: var(--ink-2); }
+  .note b { color: var(--ink); }
+
+  /* --- fields --- */
+  .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 9px; }
+  .grid3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 9px; }
+  @media (max-width: 430px) { .grid3 { grid-template-columns: 1fr 1fr; } }
+  .f { display: flex; flex-direction: column; gap: 5px; min-width: 0; }
+  .f label { font-size: 10px; font-weight: 700; text-transform: uppercase;
+             letter-spacing: .07em; color: var(--muted); }
+  .f input, .f select {
+    font: 500 15px/1.2 var(--mono); color: var(--ink); background: var(--surface);
+    border: 1px solid var(--rule-firm); border-radius: 6px; padding: 10px; width: 100%; min-width: 0;
+  }
+  .f select { font-family: var(--sans); font-size: 14px; }
+  .f input:focus-visible, .f select:focus-visible {
+    outline: 2px solid var(--ink); outline-offset: 1px; border-color: var(--ink); }
+  .check { display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--ink-2); cursor: pointer; }
+  .check input { width: 16px; height: 16px; accent-color: var(--ink); }
+
+  .links { display: flex; flex-wrap: wrap; gap: 6px; }
+  .links a {
+    font: 600 11px/1 var(--sans); letter-spacing: .03em; text-decoration: none;
+    color: var(--ink-2); background: var(--surface-2); border: 1px solid var(--rule);
+    border-radius: 999px; padding: 7px 11px; white-space: nowrap;
+  }
+  .links a:hover { border-color: var(--muted); color: var(--ink); }
+  .links a:focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; }
+  .links a::after { content: " \2197"; color: var(--muted); }
+
+  .btn { font: 600 13px/1 var(--sans); padding: 10px 14px; cursor: pointer;
+         border: 1px solid var(--rule-firm); border-radius: 7px;
+         background: var(--surface); color: var(--ink); }
+  .btn:hover { border-color: var(--muted); }
+  .btn:focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; }
+  .btn.solid { background: var(--ink); color: var(--paper); border-color: var(--ink); }
+  .row { display: flex; gap: 8px; flex-wrap: wrap; }
+
+  /* --- the call --- */
+  .call { padding: 18px 16px 16px; border-radius: 11px; border: 1px solid var(--rule);
+          background: var(--surface); box-shadow: var(--shadow); }
+  .call.hot { border-color: var(--go); background: var(--go-wash); }
+  .ctop { display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap; }
+  .band { font: 800 12px/1 var(--sans); letter-spacing: .11em; text-transform: uppercase;
+          padding: 8px 11px; border-radius: 6px; background: var(--surface-2);
+          color: var(--ink-2); border: 1px solid var(--rule-firm); }
+  .band.hot  { background: var(--go); color: #fff; border-color: var(--go); }
+  .band.max  { background: var(--go-deep); color: #fff; border-color: var(--go-deep); }
+  .pick { font: 900 30px/1 var(--sans); letter-spacing: -.03em; }
+  .pick.over { color: var(--over); } .pick.under { color: var(--under); }
+  .pct { font: 700 30px/1 var(--mono); margin-left: auto; }
+  .pct.over { color: var(--over); } .pct.under { color: var(--under); }
+  .cline { margin: 12px 0 0; font-size: 13px; color: var(--ink-2); line-height: 1.5; }
+  .cline b { color: var(--ink); }
+
+  /* probability split */
+  .split { display: flex; height: 30px; border-radius: 7px; overflow: hidden;
+           margin-top: 13px; border: 1px solid var(--rule); }
+  .split i { font-style: normal; display: flex; align-items: center;
+             font: 700 11.5px/1 var(--sans); letter-spacing: .06em; color: #fff;
+             white-space: nowrap; overflow: hidden; }
+  .split .o { background: var(--over); justify-content: flex-start; padding-left: 9px; }
+  .split .u { background: var(--under); justify-content: flex-end; padding-right: 9px; }
+
+  .nums { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1px;
+          background: var(--rule); border: 1px solid var(--rule);
+          border-radius: 8px; overflow: hidden; margin-top: 13px; }
+  .nums div { background: var(--surface); padding: 9px 11px; }
+  .nums .k { font-size: 9.5px; font-weight: 700; text-transform: uppercase;
+             letter-spacing: .09em; color: var(--muted); margin: 0; }
+  .nums .v { font: 600 17px/1.2 var(--mono); margin: 3px 0 0; }
+
+  /* --- where each source lands --- */
+  .scale { position: relative; height: 46px; margin: 2px 0 4px;
+           background: var(--surface-2); border: 1px solid var(--rule); border-radius: 7px; }
+  .scale .zone { position: absolute; top: 0; bottom: 0; }
+  .scale .zone.o { background: var(--over-wash); }
+  .scale .zone.u { background: var(--under-wash); }
+  .scale .lineMark { position: absolute; top: -3px; bottom: -3px; width: 2px;
+                     background: var(--ink); }
+  .scale .proj { position: absolute; top: 50%; width: 15px; height: 15px;
+                 margin: -7.5px 0 0 -7.5px; border-radius: 50%;
+                 border: 3px solid var(--surface); box-shadow: 0 0 0 1px currentColor; }
+  .scale .dot { position: absolute; top: 50%; width: 10px; height: 10px;
+                margin: -5px 0 0 -5px; border-radius: 50%; opacity: .85; }
+  /* Two rows tall so the projection label can drop below the line label when
+     they land on top of each other, which they do whenever the forecast sits
+     close to the number — the most common case, and the one where reading the
+     chart matters most. */
+  .scaleLab { position: relative; height: 26px; margin-bottom: 8px;
+              font: 500 10px/1 var(--mono); color: var(--muted); }
+  .scaleLab span { position: absolute; top: 0; white-space: nowrap; transform: translateX(-50%); }
+
+  /* --- estimate rows --- */
+  .est { display: flex; flex-direction: column; gap: 9px; }
+  .erow { display: grid; grid-template-columns: 1fr 62px; gap: 10px; align-items: center; }
+  .ehead { display: flex; align-items: baseline; gap: 7px; }
+  .ename { font-size: 12.5px; color: var(--ink); font-weight: 600; }
+  .eshare { font: 500 10px/1 var(--mono); color: var(--muted); }
+  .wbar { height: 7px; border-radius: 4px; background: var(--surface-2); margin-top: 5px; overflow: hidden; }
+  .wbar i { display: block; height: 100%; border-radius: 4px; background: var(--rule-firm); }
+  .wbar i.o { background: var(--over); } .wbar i.u { background: var(--under); }
+  .wbar i.m { background: var(--ink-2); }
+  .etot { font: 600 14px/1 var(--mono); text-align: right; }
+  .etot.o { color: var(--over); } .etot.u { color: var(--under); }
+
+  /* --- deltas --- */
+  .drow { display: grid; grid-template-columns: 104px 1fr 56px; gap: 9px; align-items: center; }
+  .dtrack { position: relative; height: 20px; background: var(--surface-2); border-radius: 4px; overflow: hidden; }
+  .dtrack .mid { position: absolute; left: 50%; top: 0; bottom: 0; width: 1px; background: var(--rule-firm); }
+  .dtrack span { position: absolute; top: 3px; bottom: 3px; border-radius: 3px; }
+  .dtrack span.o { background: var(--over); } .dtrack span.u { background: var(--under); }
+  .dname { font-size: 11.5px; color: var(--ink-2); }
+  .damt { font: 600 12px/1 var(--mono); text-align: right; }
+  .damt.o { color: var(--over); } .damt.u { color: var(--under); }
+
+  ul.why { margin: 0; padding-left: 17px; display: flex; flex-direction: column; gap: 8px; }
+  ul.why li { font-size: 12.5px; color: var(--ink-2); line-height: 1.55; }
+  ul.why li b { color: var(--ink); }
+  .flag { border-left: 3px solid var(--warn); padding-left: 10px; font-size: 12.5px;
+          color: var(--ink-2); line-height: 1.55; }
+
+  /* --- the card / tracking --- */
+  .scroll { overflow-x: auto; }
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  th { text-align: left; font-size: 9.5px; font-weight: 700; text-transform: uppercase;
+       letter-spacing: .09em; color: var(--muted); padding: 9px 10px;
+       border-bottom: 1px solid var(--rule-firm); white-space: nowrap; }
+  td { padding: 0; border-bottom: 1px solid var(--rule); }
+  tr:last-child td { border-bottom: 0; }
+  td .cell { padding: 10px; }
+  td.n .cell { font-family: var(--mono); font-weight: 500; white-space: nowrap; }
+  tr.pick-row:hover td { background: var(--surface-2); }
+  .openbtn { display: block; width: 100%; text-align: left; border: 0; background: transparent;
+             padding: 10px; font: inherit; color: inherit; cursor: pointer; }
+  .openbtn:focus-visible { outline: 2px solid var(--ink); outline-offset: -2px; }
+  .chip { display: inline-block; font: 700 10px/1 var(--sans); letter-spacing: .07em;
+          text-transform: uppercase; padding: 5px 8px; border-radius: 4px;
+          background: var(--surface-2); color: var(--ink-2); }
+  .chip.hot { background: var(--go); color: #fff; }
+  .chip.max { background: var(--go-deep); color: #fff; }
+  .chip.o { background: var(--over); color: #fff; }
+  .chip.u { background: var(--under); color: #fff; }
+  .empty { padding: 20px 15px; color: var(--muted); font-size: 13px; }
+  .x { border: 0; background: transparent; color: var(--muted); cursor: pointer;
+       font-size: 17px; line-height: 1; padding: 3px 7px; border-radius: 4px; }
+  .x:hover { color: var(--over); background: var(--over-wash); }
+
+  @media (prefers-reduced-motion: reduce) { * { transition: none !important; animation: none !important; } }
+</style>
+
+<div class="wrap">
+
+  <header class="top">
+    <div>
+      <div class="eyebrow" id="eyebrow">MLB · first five innings</div>
+      <h1>Call Sheet</h1>
+      <p>Blends the posted number with everything else you can find, then names a side
+         and says how sure it is. Every card gets an answer.</p>
+    </div>
+    <div class="modes" role="group" aria-label="Sport">
+      <button type="button" id="m-mlb" aria-pressed="true">MLB · First 5</button>
+      <button type="button" id="m-wnba" aria-pressed="false">WNBA</button>
+    </div>
+  </header>
+
+  <div class="cols">
+
+    <!-- ================= INPUTS ================= -->
+    <div class="stack">
+
+      <section class="card">
+        <h2>The game <span class="tag" id="lineTag">posted F5 total</span></h2>
+        <div class="body">
+          <div class="grid2">
+            <div class="f"><label for="away">Away</label><input id="away" type="text" placeholder="Phillies"></div>
+            <div class="f"><label for="home">Home</label><input id="home" type="text" placeholder="Mariners"></div>
+          </div>
+          <div class="grid2">
+            <div class="f"><label for="line" id="lineLabel">F5 total</label><input id="line" type="number" step="0.5" inputmode="decimal" placeholder="4.5"></div>
+            <div class="f"><label for="gdate">Date</label><input id="gdate" type="date"></div>
+          </div>
+          <div class="links">
+            <a href="https://app.outlier.bet/MLB/games" target="_blank" rel="noopener">Outlier · games</a>
+            <a href="https://www.covers.com/sport/baseball/mlb/odds" target="_blank" rel="noopener">Covers odds</a>
+            <a href="https://www.vegasinsider.com/mlb/odds/las-vegas/" target="_blank" rel="noopener">Vegas Insider</a>
+          </div>
+          <p class="note" id="lineNote"><b>The first-five number, not the full game.</b> Books post
+            it separately and it usually sits near 4.5. If you only have the full-game total,
+            multiply by <b>0.54</b> — F5 carries about 54% of a game’s runs.</p>
+        </div>
+      </section>
+
+      <!-- ---------- MLB ---------- -->
+      <div id="mlbFields" class="stack">
+        <section class="card">
+          <h2>Starting pitchers <span class="tag">the biggest input</span></h2>
+          <div class="body">
+            <div class="grid2">
+              <div class="f"><label for="aera">Away starter ERA</label><input id="aera" type="number" step="0.01" inputmode="decimal" placeholder="5.12"></div>
+              <div class="f"><label for="hera">Home starter ERA</label><input id="hera" type="number" step="0.01" inputmode="decimal" placeholder="4.18"></div>
+            </div>
+            <div class="grid2">
+              <div class="f"><label for="arpg">Away runs/game</label><input id="arpg" type="number" step="0.01" inputmode="decimal" placeholder="4.60"></div>
+              <div class="f"><label for="hrpg">Home runs/game</label><input id="hrpg" type="number" step="0.01" inputmode="decimal" placeholder="4.10"></div>
+            </div>
+            <div class="links">
+              <a href="https://app.outlier.bet/MLB/games" target="_blank" rel="noopener">Outlier · matchup panel</a>
+              <a href="https://www.rotowire.com/baseball/daily-lineups.php" target="_blank" rel="noopener">RotoWire · lineups</a>
+              <a href="https://www.teamrankings.com/mlb/stat/runs-per-game" target="_blank" rel="noopener">TeamRankings · runs/game</a>
+            </div>
+            <p class="note"><b>This is what first-five is for.</b> Take the bullpen out of a total and
+              the two starters are most of what is left — and they are the most predictable thing in
+              the sport, known hours ahead. Season ERA is fine here; the model converts it to runs
+              over five innings and calibrates so two league-average arms project the league-average
+              F5 total.</p>
+            <p class="note">Runs/game is optional but worth the ten seconds. ERA alone cannot tell a
+              5.10 offence from a 3.60 one, and each starter is scored against the lineup he actually
+              faces.</p>
+          </div>
+        </section>
+
+        <section class="card">
+          <h2>Form &amp; head to head <span class="tag">enter full-game</span></h2>
+          <div class="body">
+            <div class="grid2">
+              <div class="f"><label for="al5">Away last-5 avg total</label><input id="al5" type="number" step="0.1" inputmode="decimal" placeholder="10.8"></div>
+              <div class="f"><label for="hl5">Home last-5 avg total</label><input id="hl5" type="number" step="0.1" inputmode="decimal" placeholder="12.6"></div>
+            </div>
+            <div class="grid2">
+              <div class="f"><label for="h2h">H2H avg total</label><input id="h2h" type="number" step="0.1" inputmode="decimal" placeholder="13.2"></div>
+              <div class="f"><label for="h2hn">Meetings</label><input id="h2hn" type="number" step="1" inputmode="numeric" placeholder="4"></div>
+            </div>
+            <div class="links">
+              <a href="https://app.outlier.bet/MLB/games" target="_blank" rel="noopener">Outlier · L5 / H2H tabs</a>
+              <a href="https://www.covers.com/sport/baseball/mlb/matchups" target="_blank" rel="noopener">Covers · matchups</a>
+            </div>
+            <p class="note">Enter these as <b>full-game</b> combined totals — that is what every site
+              publishes — and the model converts them to five innings. Asking you for a number nobody
+              prints is how inputs end up guessed at.</p>
+            <p class="note">Both measured null against the residual on 116 logged games, form at
+              <b>t = −0.07</b> and head to head at <b>t = −0.40</b>. They are weighted to move a close
+              card, not to overturn the market and the starters together. Leave them blank and their
+              weight redistributes automatically.</p>
+          </div>
+        </section>
+
+        <section class="card">
+          <h2>Park &amp; weather <span class="tag">tonight only</span></h2>
+          <div class="body">
+            <div class="grid3">
+              <div class="f"><label for="pf">Park factor</label><input id="pf" type="number" step="1" inputmode="numeric" placeholder="100"></div>
+              <div class="f"><label for="mph">Wind mph</label><input id="mph" type="number" step="1" inputmode="numeric" placeholder="10"></div>
+              <div class="f"><label for="dir">Blowing</label>
+                <select id="dir">
+                  <option value="">—</option>
+                  <option value="out">Out</option>
+                  <option value="in">In</option>
+                  <option value="cross">Across</option>
+                </select></div>
+            </div>
+            <div class="grid3">
+              <div class="f"><label for="temp">Temp °F</label><input id="temp" type="number" step="1" inputmode="numeric" placeholder="78"></div>
+            </div>
+            <label class="check"><input type="checkbox" id="dome"> Roof shut — wind and temp both drop out</label>
+            <div class="links">
+              <a href="https://www.rotowire.com/baseball/weather.php" target="_blank" rel="noopener">RotoWire · weather</a>
+              <a href="https://baseballsavant.mlb.com/leaderboard/statcast-park-factors" target="_blank" rel="noopener">Statcast · park factors</a>
+              <a href="https://www.ballparkpal.com/Weather.php" target="_blank" rel="noopener">Ballpark Pal</a>
+            </div>
+            <p class="note"><b>Read the hourly row, never the card headline.</b> “8 mph wind blowing in
+              West Sacramento” is a card whose own hourly row says <b>out</b> — that “in” is the
+              preposition. Nothing counts under 8 mph; across counts as zero.</p>
+            <p class="note">Park factor scales the <b>statistical</b> estimates and the wind, and never
+              the posted line — the line already holds the park, and counting it twice is the exact
+              double count that put the old fourteen-input model behind the naked number.</p>
+          </div>
+        </section>
+      </div>
+
+      <!-- ---------- WNBA ---------- -->
+      <div id="wnbaFields" class="stack" hidden>
+        <section class="card">
+          <h2>Last 10 <span class="tag">the load-bearing input</span></h2>
+          <div class="body">
+            <div class="grid2">
+              <div class="f"><label for="al10">Away last-10 avg total</label><input id="al10" type="number" step="0.1" inputmode="decimal" placeholder="168.2"></div>
+              <div class="f"><label for="hl10">Home last-10 avg total</label><input id="hl10" type="number" step="0.1" inputmode="decimal" placeholder="171.4"></div>
+            </div>
+            <div class="links">
+              <a href="https://www.covers.com/sport/basketball/wnba/matchups" target="_blank" rel="noopener">Covers · WNBA matchups</a>
+              <a href="https://www.teamrankings.com/wnba/stat/points-per-game" target="_blank" rel="noopener">TeamRankings · points/game</a>
+              <a href="https://www.basketball-reference.com/wnba/" target="_blank" rel="noopener">Basketball Reference</a>
+            </div>
+            <p class="note">Each side’s <b>combined game total</b> over its last ten — both teams’
+              points added, not just theirs. Ten games is a third of a WNBA season, which is why this
+              carries the largest non-market weight here: there is no starting-pitcher equivalent to
+              lean on.</p>
+          </div>
+        </section>
+
+        <section class="card">
+          <h2>Head to head <span class="tag">optional</span></h2>
+          <div class="body">
+            <div class="grid2">
+              <div class="f"><label for="wh2h">H2H avg total</label><input id="wh2h" type="number" step="0.1" inputmode="decimal" placeholder="174.0"></div>
+              <div class="f"><label for="wh2hn">Meetings</label><input id="wh2hn" type="number" step="1" inputmode="numeric" placeholder="3"></div>
+            </div>
+            <p class="note"><b>Leave it blank if they have not met.</b> The model does not stall and does
+              not guess — the head-to-head weight is simply redistributed across the market and the
+              last ten, which then carry the whole blend between them. You still get a side and a
+              percentage; it is just built from fewer things.</p>
+          </div>
+        </section>
+
+        <section class="card">
+          <h2>Absences <span class="tag">worth more here than anywhere</span></h2>
+          <div class="body">
+            <div class="grid2">
+              <div class="f"><label for="aout">Away starters out</label><input id="aout" type="number" step="1" min="0" inputmode="numeric" placeholder="0"></div>
+              <div class="f"><label for="hout">Home starters out</label><input id="hout" type="number" step="1" min="0" inputmode="numeric" placeholder="0"></div>
+            </div>
+            <label class="check"><input type="checkbox" id="alead"> Away’s leading scorer is out</label>
+            <label class="check"><input type="checkbox" id="hlead"> Home’s leading scorer is out</label>
+            <div class="links">
+              <a href="https://www.espn.com/wnba/injuries" target="_blank" rel="noopener">ESPN · WNBA injuries</a>
+              <a href="https://www.rotowire.com/basketball/injury-report.php?league=WNBA" target="_blank" rel="noopener">RotoWire · injury report</a>
+            </div>
+            <p class="note">2.0 points off the total per rotation player, 3.5 if it is their leading
+              scorer. A twelve-deep roster with starters at 32+ minutes has no bench to absorb a loss,
+              so the same news costs a WNBA team more than it costs any other league’s team.</p>
+            <p class="note"><b>Check whether the line already moved on it.</b> When Caitlin Clark was
+              ruled out the Fever line went −11 to −6 on the announcement. If the number you typed in
+              was posted after the news, it is already in there.</p>
+          </div>
+        </section>
+      </div>
+
+      <div class="row">
+        <button type="button" class="btn solid" id="add">Add to card</button>
+        <button type="button" class="btn" id="clear">Clear</button>
+        <button type="button" class="btn" id="example">Example</button>
+      </div>
+    </div>
+
+    <!-- ================= THE CALL ================= -->
+    <div class="rail">
+      <div class="call" id="call"></div>
+
+      <section class="card">
+        <h2>Where each source lands <span class="tag" id="unitTag">runs</span></h2>
+        <div class="body">
+          <div class="scale" id="scale"></div>
+          <div class="scaleLab" id="scaleLab"></div>
+          <div class="est" id="est"></div>
+        </div>
+      </section>
+
+      <section class="card" id="deltaCard">
+        <h2>Tonight-only adjustments</h2>
+        <div class="body"><div class="est" id="deltas"></div></div>
+      </section>
+
+      <section class="card">
+        <h2>Why</h2>
+        <div class="body"><ul class="why" id="why"></ul></div>
+      </section>
+    </div>
+  </div>
+
+  <section class="card" style="margin-top:20px">
+    <h2>Tonight’s card <span class="tag" id="cardCount"></span></h2>
+    <div id="cardTable"></div>
+  </section>
+</div>
+
+<script>
+(function () {
+  "use strict";
+  var $ = function (id) { return document.getElementById(id); };
+
+  /* ====================================================================
+     Ported from totals/forecast.py. Every constant is the same value the
+     package uses; a drift between the two is the bug this project has
+     shipped more often than any other, so the fixtures in
+     web/forecast-cases.json are replayed through this page in a browser
+     and checked against the package on every change.
+  ==================================================================== */
+  var LEAGUE_ERA = 4.30, LEAGUE_RPG = 4.35;
+  var FULL_GAME_TOTAL = 8.70, F5_TOTAL = 4.66;
+  var F5_SHARE = F5_TOTAL / FULL_GAME_TOTAL;
+  var F5_INNINGS = 5.0, UNEARNED = 1.08;
+  var PITCHER_CALIBRATION = F5_TOTAL / (2 * (LEAGUE_ERA / 9) * F5_INNINGS * UNEARNED);
+  var DISPERSION = { MLB_F5: 4.39 * Math.sqrt(F5_SHARE), WNBA: 11.51 };
+  var WEIGHTS = {
+    MLB_F5: { market: 3.0, starters: 2.0, form: 1.0, h2h: 0.6 },
+    WNBA:   { market: 3.0, form: 1.6, h2h: 1.0 }
+  };
+  var BANDS = [[0.62, "MAX"], [0.57, "STRONG"], [0.53, "LEAN"], [0.00, "COIN FLIP"]];
+  var PLAUSIBLE = { era: [0, 15], park: [70, 130], mlb_total: [2, 20], wnba_total: [110, 230] };
+  var WIND_DEAD = 8.0, WIND_PER_MPH = 0.10 * F5_SHARE;
+  var TEMP_BASE = 70.0, TEMP_PER_DEG = 0.008 * F5_SHARE;
+  var PTS_PER_STARTER = 2.0, PTS_LEADING = 3.5;
+
+  function ok(v, w) { return v !== null && v >= PLAUSIBLE[w][0] && v <= PLAUSIBLE[w][1]; }
+  function num(id) { var v = parseFloat($(id).value); return isFinite(v) ? v : null; }
+  function txt(id) { return ($(id).value || "").trim(); }
+  function sgn(v, d) { return (v >= 0 ? "+" : "") + v.toFixed(d === undefined ? 2 : d); }
+
+  function normCdf(x) { return 0.5 * (1 + erf(x / Math.SQRT2)); }
+  function erf(x) {
+    var s = x < 0 ? -1 : 1; x = Math.abs(x);
+    var t = 1 / (1 + 0.3275911 * x);
+    var y = 1 - ((((1.061405429 * t - 1.453152027) * t + 1.421413741) * t - 0.284496736) * t
+              + 0.254829592) * t * Math.exp(-x * x);
+    return s * y;
+  }
+
+  function est(name, total, weight, detail) {
+    return { name: name, total: total, weight: weight, detail: detail };
+  }
+  function delta(name, runs, detail) { return { name: name, runs: runs, detail: detail }; }
+
+  function parkScale(pf) { return ok(pf, "park") ? pf / 100 : 1; }
+
+  function starterF5(era, oppRpg) {
+    var r = era / 9 * F5_INNINGS * UNEARNED * PITCHER_CALIBRATION;
+    if (oppRpg !== null && oppRpg > 0) r *= oppRpg / LEAGUE_RPG;
+    return r;
+  }
+
+  // ---- MLB, first five ----------------------------------------------
+  function readMlb() {
+    var line = num("line");
+    if (!ok(line, "mlb_total")) return null;
+    var w = WEIGHTS.MLB_F5, park = parkScale(num("pf"));
+    var estimates = [est("Market", line, w.market,
+      "The posted F5 number, " + line + ". Largest single weight because it is the only " +
+      "estimate here with a measured record — over 116 logged games the line beat a " +
+      "fourteen-input model on mean error, 3.58 to 3.61.")];
+    var notes = [];
+
+    var ae = num("aera"), he = num("hera"), arpg = num("arpg"), hrpg = num("hrpg");
+    if (ok(ae, "era") && ok(he, "era")) {
+      var ar = starterF5(ae, hrpg), hr = starterF5(he, arpg);
+      var t = (ar + hr) * park;
+      estimates.push(est("Starters", t, w.starters,
+        "Away " + ae.toFixed(2) + " ERA projects " + ar.toFixed(2) + " runs over five, home " +
+        he.toFixed(2) + " projects " + hr.toFixed(2) + "." +
+        (park !== 1 ? " Park scales it to " + t.toFixed(2) + "." : "") +
+        " No bullpen, no blowout effects, no extra innings — this is what F5 exists to isolate."));
+    } else if (ok(ae, "era") || ok(he, "era")) {
+      notes.push("Only one starter's ERA is in. The pair is scored together or not at all, so the " +
+                 "starters are out of the blend and their weight has gone to what is left.");
+    }
+
+    var a5 = num("al5"), h5 = num("hl5");
+    if (a5 !== null && h5 !== null) {
+      var full = (a5 + h5) / 2;
+      estimates.push(est("Recent form", full * F5_SHARE * park, w.form,
+        "Last-five full-game totals average " + full.toFixed(1) + ", which is " +
+        (full * F5_SHARE).toFixed(2) + " across five innings. Measured t = −0.07 on 116 games, " +
+        "so it is weighted to move a close card and not to overturn one."));
+    }
+
+    var hv = num("h2h"), hn = num("h2hn");
+    if (hv !== null && hn) {
+      estimates.push(est("Head to head (" + hn + ")", hv * F5_SHARE * park, w.h2h,
+        hn + " meetings averaging " + hv.toFixed(1) + " full-game, " +
+        (hv * F5_SHARE).toFixed(2) + " across five. Measured t = −0.40, the weakest thing in the " +
+        "blend, and it holds the smallest weight because of it."));
+      if (hn < 3) notes.push("Only " + hn + " head-to-head meeting(s). Two games is not a trend — " +
+                             "treat that estimate as barely information.");
+    } else if (hv === null) {
+      notes.push("No head-to-head. Its weight has been redistributed across the estimates that are " +
+                 "present, so this is a blend of those rather than a partial answer.");
+    }
+
+    var deltas = [];
+    if ($("dome").checked) {
+      deltas.push(delta("Roof shut", 0, "Closed roof — wind and temperature are both out."));
+    } else {
+      var mph = num("mph"), dir = $("dir").value;
+      if (mph !== null && dir) {
+        if (dir === "cross") {
+          deltas.push(delta("Wind", 0, mph.toFixed(0) +
+            " mph across the field, which carries a fly ball neither way."));
+        } else {
+          var eff = Math.max(0, mph - WIND_DEAD), r = eff * WIND_PER_MPH * park;
+          deltas.push(delta("Wind", dir === "out" ? r : -r, mph.toFixed(0) + " mph blowing " + dir +
+            ". Nothing counts under " + WIND_DEAD + " mph, then " + WIND_PER_MPH.toFixed(3) +
+            " runs per mph over it — the full-game coefficient cut to five innings."));
+        }
+      }
+      var tp = num("temp");
+      if (tp !== null) deltas.push(delta("Temperature", (tp - TEMP_BASE) * TEMP_PER_DEG,
+        tp.toFixed(0) + "°F against a " + TEMP_BASE + "° baseline."));
+    }
+    return assemble("MLB_F5", txt("away") || "Away", txt("home") || "Home",
+                    line, estimates, deltas, notes);
+  }
+
+  // ---- WNBA ----------------------------------------------------------
+  function readWnba() {
+    var line = num("line");
+    if (!ok(line, "wnba_total")) return null;
+    var w = WEIGHTS.WNBA;
+    var estimates = [est("Market", line, w.market,
+      "The posted total, " + line + ". Largest single weight for the same reason as always: " +
+      "it is the estimate with a measured record.")];
+    var notes = [];
+
+    var a = num("al10"), h = num("hl10");
+    if (a !== null && h !== null) {
+      estimates.push(est("Last 10", (a + h) / 2, w.form,
+        "Combined totals over the last ten average " + a.toFixed(1) + " away and " + h.toFixed(1) +
+        " home, blending to " + ((a + h) / 2).toFixed(1) + ". Ten games is a third of a WNBA " +
+        "season, and there is no starting-pitcher equivalent here to lean on."));
+    }
+
+    var hv = num("wh2h"), hn = num("wh2hn");
+    if (hv !== null && hn) {
+      estimates.push(est("Head to head (" + hn + ")", hv, w.h2h,
+        hn + " meetings averaging " + hv.toFixed(1) + ". Same clubs, same matchup problems, and " +
+        "in a twelve-team league they meet often enough for it to mean something."));
+      if (hn < 3) notes.push("Only " + hn + " head-to-head meeting(s) — thin.");
+    } else {
+      notes.push("No head-to-head on file. Its weight has gone to the market and the last-ten form, " +
+                 "which now carry the whole blend between them. The forecast is not weaker for the " +
+                 "absence, it is just built from fewer things.");
+    }
+
+    var deltas = [];
+    [["Away", num("aout"), $("alead").checked], ["Home", num("hout"), $("hlead").checked]]
+      .forEach(function (r) {
+        var out = r[1] || 0;
+        if (out <= 0 && !r[2]) return;
+        var pts = out * PTS_PER_STARTER + (r[2] ? PTS_LEADING - PTS_PER_STARTER : 0);
+        deltas.push(delta(r[0] + " absences", -pts, out + " rotation player(s) out" +
+          (r[2] ? ", including their leading scorer" : "") + ". A twelve-deep roster with starters " +
+          "at 32+ minutes has no bench to absorb it: " + pts.toFixed(1) + " points off the total."));
+      });
+
+    return assemble("WNBA", txt("away") || "Away", txt("home") || "Home",
+                    line, estimates, deltas, notes);
+  }
+
+  // ---- the blend ------------------------------------------------------
+  function assemble(sport, away, home, line, estimates, deltas, notes) {
+    var tw = 0, sum = 0;
+    estimates.forEach(function (e) { tw += e.weight; sum += e.total * e.weight; });
+    var blended = sum / tw;
+    var dsum = 0; deltas.forEach(function (d) { dsum += d.runs; });
+    var projected = blended + dsum;
+    var sd = DISPERSION[sport];
+    var pOver = normCdf((projected - line) / sd);
+    /* Tie goes to the over by rule, in both implementations. A half-point
+       disagreement between the Python and the browser flipped a card once. */
+    var side = pOver >= 0.5 - 1e-9 ? "OVER" : "UNDER";
+    var pSide = side === "OVER" ? pOver : 1 - pOver;
+    var band = "COIN FLIP";
+    for (var i = 0; i < BANDS.length; i++) { if (pSide >= BANDS[i][0]) { band = BANDS[i][1]; break; } }
+
+    if (estimates.length === 1) notes.push("Nothing entered but the line, so the forecast IS the " +
+      "line and the answer is a coin flip. That is not the model being coy — with no information " +
+      "the posted number is the best estimate there is.");
+    if (band === "MAX") notes.push("Top band. Worth re-reading the inputs before acting — in this " +
+      "project a spectacular number has more often been a mistyped one than a real edge.");
+
+    return { sport: sport, away: away, home: home, matchup: away + " @ " + home, line: line,
+             projected: projected, pOver: pOver, pSide: pSide, side: side, band: band,
+             estimates: estimates, deltas: deltas, notes: notes, totalWeight: tw,
+             hot: band !== "COIN FLIP" };
+  }
+
+  // ---- rendering -------------------------------------------------------
+  var sport = "MLB_F5", last = null;
+
+  function fmt(v) { return sport === "WNBA" ? v.toFixed(1) : v.toFixed(2); }
+
+  function render() {
+    var f = sport === "MLB_F5" ? readMlb() : readWnba();
+    last = f;
+    var c = $("call");
+
+    if (!f) {
+      c.className = "call";
+      delete c.dataset.pOver; delete c.dataset.projected;
+      c.innerHTML = '<div class="ctop"><span class="band">AWAITING A LINE</span></div>' +
+        '<p class="cline">Enter tonight\u2019s posted ' +
+        (sport === "WNBA" ? "total" : "first-five total") +
+        ' to get a call. Everything else is optional — the model works with whatever it has ' +
+        'and re-weights around the gaps.</p>';
+      $("scale").innerHTML = ""; $("scaleLab").innerHTML = "";
+      $("est").innerHTML = '<p class="note">Nothing to blend yet.</p>';
+      $("deltaCard").hidden = true;
+      $("why").innerHTML = "";
+      return;
+    }
+
+    var lo = f.side.toLowerCase();
+    c.className = "call" + (f.hot ? " hot" : "");
+    /* Full precision for the cross-check. The panel rounds to a tenth of a
+       percent because that is all anyone can act on, but a verifier comparing
+       a rounded display against the package would be testing the formatter
+       rather than the model. */
+    c.dataset.pOver = f.pOver.toFixed(10);
+    c.dataset.projected = f.projected.toFixed(10);
+    var bandCls = f.band === "MAX" ? " max" : (f.hot ? " hot" : "");
+    c.innerHTML =
+      '<div class="ctop"><span class="band' + bandCls + '">' + f.band + "</span>" +
+      '<span class="pick ' + lo + '">' + f.side + " " + f.line + "</span>" +
+      '<span class="pct ' + lo + '">' + (f.pSide * 100).toFixed(1) + "%</span></div>" +
+      '<p class="cline"><b>' + f.matchup + "</b> · projected <b>" + fmt(f.projected) +
+        "</b> against a line of " + f.line + " (" + sgn(f.projected - f.line, 2) + ")</p>" +
+      '<div class="split">' +
+        '<i class="o" style="width:' + (f.pOver * 100) + '%">OVER ' + (f.pOver * 100).toFixed(1) + "%</i>" +
+        '<i class="u" style="width:' + ((1 - f.pOver) * 100) + '%">' + ((1 - f.pOver) * 100).toFixed(1) + "% UNDER</i>" +
+      "</div>" +
+      '<div class="nums">' +
+        '<div><p class="k">Projected</p><p class="v">' + fmt(f.projected) + "</p></div>" +
+        '<div><p class="k">Line</p><p class="v">' + f.line + "</p></div>" +
+        '<div><p class="k">Sources</p><p class="v">' + f.estimates.length + "</p></div></div>";
+
+    // --- where each source lands ---
+    var vals = f.estimates.map(function (e) { return e.total; }).concat([f.line, f.projected]);
+    var min = Math.min.apply(null, vals), max = Math.max.apply(null, vals);
+    var pad = Math.max((max - min) * 0.25, sport === "WNBA" ? 4 : 0.4);
+    min -= pad; max += pad;
+    var at = function (v) { return (v - min) / (max - min) * 100; };
+    var linePct = at(f.line);
+
+    $("scale").innerHTML =
+      '<div class="zone u" style="left:0;width:' + linePct + '%"></div>' +
+      '<div class="zone o" style="left:' + linePct + '%;right:0"></div>' +
+      f.estimates.map(function (e) {
+        var cls = e.total >= f.line ? "over" : "under";
+        return '<div class="dot" title="' + e.name + '" style="left:' + at(e.total) +
+          '%;background:var(--' + cls + ')"></div>';
+      }).join("") +
+      '<div class="lineMark" style="left:' + linePct + '%"></div>' +
+      '<div class="proj" style="left:' + at(f.projected) + '%;color:var(--' + lo +
+        ');background:var(--' + lo + ')"></div>';
+
+    var projPct = at(f.projected);
+    var stacked = Math.abs(projPct - linePct) < 11;
+    $("scaleLab").innerHTML =
+      '<span style="left:' + linePct + '%">line ' + f.line + "</span>" +
+      '<span style="left:' + projPct + '%;color:var(--' + lo + ');font-weight:600' +
+        (stacked ? ";top:13px" : "") + '">' + fmt(f.projected) + "</span>";
+
+    // --- estimate rows, sized by share of weight ---
+    $("est").innerHTML = f.estimates.map(function (e) {
+      var share = e.weight / f.totalWeight * 100;
+      var cls = e.name === "Market" ? "m" : (e.total >= f.line ? "o" : "u");
+      var tcls = e.name === "Market" ? "" : (e.total >= f.line ? "o" : "u");
+      return '<div class="erow"><div>' +
+        '<div class="ehead"><span class="ename">' + e.name + "</span>" +
+        '<span class="eshare">' + share.toFixed(0) + "% of weight</span></div>" +
+        '<div class="wbar"><i class="' + cls + '" style="width:' + share + '%"></i></div>' +
+        "</div>" +
+        '<div class="etot ' + tcls + '">' + fmt(e.total) + "</div></div>";
+    }).join("");
+
+    // --- deltas ---
+    $("deltaCard").hidden = f.deltas.length === 0;
+    if (f.deltas.length) {
+      var dmax = 0;
+      f.deltas.forEach(function (d) { dmax = Math.max(dmax, Math.abs(d.runs)); });
+      dmax = Math.max(dmax, sport === "WNBA" ? 2 : 0.2);
+      $("deltas").innerHTML = f.deltas.map(function (d) {
+        var w = Math.abs(d.runs) / dmax * 50;
+        var cls = d.runs > 0 ? "o" : d.runs < 0 ? "u" : "";
+        var style = d.runs >= 0 ? "left:50%;width:" + w + "%" : "right:50%;width:" + w + "%";
+        return '<div class="drow"><div class="dname">' + d.name + "</div>" +
+          '<div class="dtrack"><div class="mid"></div>' +
+          (d.runs === 0 ? "" : '<span class="' + cls + '" style="' + style + '"></span>') +
+          "</div>" + '<div class="damt ' + cls + '">' + sgn(d.runs, 2) + "</div></div>";
+      }).join("");
+    }
+
+    // --- why ---
+    var items = f.estimates.map(function (e) {
+      return "<li><b>" + e.name + " · " + fmt(e.total) + ", " +
+        (e.weight / f.totalWeight * 100).toFixed(0) + "% of the weight.</b> " + e.detail + "</li>";
+    }).concat(f.deltas.map(function (d) {
+      return "<li><b>" + d.name + " " + sgn(d.runs, 2) + ".</b> " + d.detail + "</li>";
+    })).concat(f.notes.map(function (n) {
+      return '<li><span class="flag">' + n + "</span></li>";
+    }));
+    $("why").innerHTML = items.join("");
+  }
+
+  // ---- the card (tracking) --------------------------------------------
+  var KEY = "callsheet.card.v1";
+  var card = [];
+  try { card = JSON.parse(localStorage.getItem(KEY) || "[]"); } catch (e) { card = []; }
+
+  function save() { try { localStorage.setItem(KEY, JSON.stringify(card)); } catch (e) {} }
+
+  function renderCard() {
+    $("cardCount").textContent = card.length ? card.length + " games" : "";
+    if (!card.length) {
+      $("cardTable").innerHTML = '<p class="empty">Nothing on the card yet. Work a game out above and ' +
+        "press “Add to card”. Click any row later to load it straight back into the form.</p>";
+      return;
+    }
+    $("cardTable").innerHTML = '<div class="scroll"><table><thead><tr>' +
+      "<th>Game</th><th>Sport</th><th>Line</th><th>Proj</th><th>Call</th><th>Prob</th><th>Band</th><th></th>" +
+      "</tr></thead><tbody>" + card.map(function (s, i) {
+        var bc = s.band === "MAX" ? " max" : (s.band !== "COIN FLIP" ? " hot" : "");
+        return '<tr class="pick-row">' +
+          '<td><button class="openbtn" data-open="' + i + '" title="Load this game back into the form">' +
+            s.matchup + "</button></td>" +
+          '<td class="n"><span class="cell">' + (s.sport === "WNBA" ? "WNBA" : "MLB F5") + "</span></td>" +
+          '<td class="n"><span class="cell">' + s.line + "</span></td>" +
+          '<td class="n"><span class="cell">' + s.projected + "</span></td>" +
+          '<td><span class="cell"><span class="chip ' + (s.side === "OVER" ? "o" : "u") + '">' +
+            s.side + "</span></span></td>" +
+          '<td class="n"><span class="cell">' + s.prob + "%</span></td>" +
+          '<td><span class="cell"><span class="chip' + bc + '">' + s.band + "</span></span></td>" +
+          '<td style="text-align:right"><span class="cell"><button class="x" data-del="' + i +
+            '" aria-label="Remove">×</button></span></td></tr>';
+      }).join("") + "</tbody></table></div>";
+
+    $("cardTable").querySelectorAll("[data-del]").forEach(function (b) {
+      b.addEventListener("click", function () {
+        card.splice(+b.dataset.del, 1); save(); renderCard();
+      });
+    });
+    /* Clicking a row puts the game back in the form. Without this the card is
+       a dead log — you can see a call but not revisit how it was reached, and
+       revisiting it is the whole reason for keeping one. */
+    $("cardTable").querySelectorAll("[data-open]").forEach(function (b) {
+      b.addEventListener("click", function () {
+        restore(card[+b.dataset.open]);
+      });
+    });
+  }
+
+  var MLB_IDS = ["away","home","line","gdate","aera","hera","arpg","hrpg","al5","hl5",
+                 "h2h","h2hn","pf","mph","dir","temp"];
+  var WNBA_IDS = ["away","home","line","gdate","al10","hl10","wh2h","wh2hn","aout","hout"];
+  var CHECKS = ["dome","alead","hlead"];
+  var ALL = MLB_IDS.concat(WNBA_IDS).filter(function (v, i, a) { return a.indexOf(v) === i; });
+
+  function snapshot() {
+    var v = {};
+    ALL.forEach(function (id) { v[id] = $(id).value; });
+    CHECKS.forEach(function (id) { v[id] = $(id).checked; });
+    return v;
+  }
+  function restore(row) {
+    if (!row) return;
+    setSport(row.sport, true);
+    ALL.forEach(function (id) { $(id).value = (row.inputs && row.inputs[id]) || ""; });
+    CHECKS.forEach(function (id) { $(id).checked = !!(row.inputs && row.inputs[id]); });
+    render();
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  }
+
+  // ---- wiring ----------------------------------------------------------
+  function setSport(s, quiet) {
+    sport = s === "WNBA" ? "WNBA" : "MLB_F5";
+    var mlb = sport === "MLB_F5";
+    $("m-mlb").setAttribute("aria-pressed", String(mlb));
+    $("m-wnba").setAttribute("aria-pressed", String(!mlb));
+    $("mlbFields").hidden = !mlb;
+    $("wnbaFields").hidden = mlb;
+    $("eyebrow").textContent = mlb ? "MLB · first five innings" : "WNBA · full game";
+    $("lineLabel").textContent = mlb ? "F5 total" : "Game total";
+    $("lineTag").textContent = mlb ? "posted F5 total" : "posted total";
+    $("unitTag").textContent = mlb ? "runs" : "points";
+    $("line").step = mlb ? "0.5" : "0.5";
+    $("line").placeholder = mlb ? "4.5" : "162.5";
+    $("lineNote").innerHTML = mlb
+      ? "<b>The first-five number, not the full game.</b> Books post it separately and it usually " +
+        "sits near 4.5. If you only have the full-game total, multiply by <b>0.54</b> — F5 carries " +
+        "about 54% of a game’s runs."
+      : "<b>The full-game total.</b> WNBA lines run in the 150s to 170s; anything outside 110–230 " +
+        "is read as a typo and refused rather than forecast.";
+    if (!quiet) render();
+  }
+  $("m-mlb").addEventListener("click", function () { setSport("MLB_F5"); });
+  $("m-wnba").addEventListener("click", function () { setSport("WNBA"); });
+
+  ALL.concat(CHECKS).forEach(function (id) {
+    var el = $(id);
+    el.addEventListener("input", render);
+    el.addEventListener("change", render);
+  });
+
+  $("clear").addEventListener("click", function () {
+    ALL.forEach(function (id) { $(id).value = ""; });
+    CHECKS.forEach(function (id) { $(id).checked = false; });
+    render();
+  });
+
+  /* The form ships blank on purpose. An earlier build pre-filled the weather
+     and the umpire, so every fresh game silently inherited a fabricated edge. */
+  $("example").addEventListener("click", function () {
+    var V;
+    if (sport === "MLB_F5") {
+      V = { away: "Phillies", home: "Mariners", line: 4.5, aera: 5.12, hera: 4.18,
+                arpg: 4.62, hrpg: 4.28, al5: 10.8, hl5: 12.6, h2h: 13.25, h2hn: 4,
+                pf: 93, mph: 10, dir: "out", temp: 84 };
+    } else {
+      V = { away: "Fever", home: "Wings", line: 162.5, al10: 168.2, hl10: 171.4,
+                wh2h: 174.0, wh2hn: 3, aout: 1, hout: 0 };
+    }
+    ALL.forEach(function (id) { $(id).value = ""; });
+    CHECKS.forEach(function (id) { $(id).checked = false; });
+    Object.keys(V).forEach(function (k) { $(k).value = V[k]; });
+    render();
+  });
+
+  $("add").addEventListener("click", function () {
+    if (!last) return;
+    card.unshift({
+      matchup: last.matchup, sport: last.sport, line: last.line,
+      projected: fmt(last.projected), side: last.side,
+      prob: (last.pSide * 100).toFixed(1), band: last.band,
+      inputs: snapshot()
+    });
+    save(); renderCard();
+  });
+
+  setSport("MLB_F5", true);
+  render();
+  renderCard();
+})();
+</script>

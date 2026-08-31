@@ -14,9 +14,10 @@ from __future__ import annotations
 
 import re
 from dataclasses import dataclass, field
-from typing import List, Optional
+from typing import List, Optional, Sequence
 
 from .extract import Document
+from .text import is_letter_spaced
 from .resume import Resume, EMAIL_RE, PHONE_RE
 
 SEVERITY_ORDER = {"blocker": 0, "major": 1, "minor": 2}
@@ -60,11 +61,27 @@ class ParseAudit:
         return sum(1 for f in self.findings if f.severity == severity)
 
 
-def audit(doc: Document, resume: Resume) -> ParseAudit:
+COVER_LETTER_MARKERS = (
+    "dear hiring manager", "dear sir or madam", "to whom it may concern",
+    "i am writing to express", "i am writing to apply", "cover letter",
+    "thank you for considering my application",
+)
+
+
+def audit(doc: Document, resume: Resume, repairs: Sequence[str] = ()) -> ParseAudit:
     result = ParseAudit()
     text = doc.text or ""
     words = doc.word_count
 
+    for note in repairs:
+        result.add(
+            "blocker", "encoding.symbolbullets",
+            note[0].upper() + note[1:] + ".",
+            "Replace them with your word processor's standard bullet list. "
+            "The scores below assume the repair; without it, every "
+            "accomplishment reads to a parser as unstructured prose.",
+        )
+    _check_cover_letter(result, text)
     _check_extraction(result, doc, words)
     _check_layout(result, doc)
     _check_contact(result, doc, resume)
@@ -266,17 +283,20 @@ def _check_encoding(result: ParseAudit, text: str) -> None:
             "Use your word processor's standard bullet list. Decorative glyphs "
             "sometimes take the rest of the line with them.",
         )
-    # Letter-spaced headings ("E X P E R I E N C E") tokenise into nonsense.
-    for line in text.splitlines():
-        stripped = line.strip()
-        if len(stripped) > 8 and re.fullmatch(r"(?:[A-Za-z]\s){4,}[A-Za-z]", stripped):
-            result.add(
-                "major", "encoding.spaced",
-                f"Letter-spaced text found: '{stripped[:40]}'.",
-                "Use font letter-spacing instead of typing spaces between "
-                "letters -- as typed, these words are unreadable to a parser.",
-            )
-            break
+    # Letter-spaced text ("E D U C A T I O N") tokenises into nonsense.
+    spaced = [ln.strip() for ln in text.splitlines() if is_letter_spaced(ln)]
+    if spaced:
+        sample = "; ".join(s[:32] for s in spaced[:3])
+        # A handful is a styled heading; a page full of it means the section
+        # headings and skills list are gone entirely.
+        severity = "blocker" if len(spaced) >= 4 else "major"
+        result.add(
+            severity, "encoding.spaced",
+            f"{len(spaced)} line(s) are letter-spaced and unreadable to a parser: {sample}.",
+            "Set letter-spacing in the font instead of typing spaces between "
+            "letters. As typed, these words -- often the section headings and "
+            "the whole skills list -- do not exist as far as an ATS is concerned.",
+        )
     tabs = sum(1 for ln in text.splitlines() if ln.count("\t") >= 2)
     if tabs > 6:
         result.add(
@@ -284,6 +304,19 @@ def _check_encoding(result: ParseAudit, text: str) -> None:
             f"{tabs} lines use multiple tab stops to simulate columns.",
             "Tab-aligned pseudo-columns can be read as one run-on line. Prefer "
             "separate lines.",
+        )
+
+
+def _check_cover_letter(result: ParseAudit, text: str) -> None:
+    """A cover letter bound into the resume file displaces the resume itself."""
+    head = " ".join(text.split())[:2500].lower()
+    if any(marker in head for marker in COVER_LETTER_MARKERS):
+        result.add(
+            "major", "content.coverletter",
+            "The file appears to open with a cover letter.",
+            "Upload the cover letter as a separate document. Bound in here it "
+            "becomes page one of the resume, pushing the work history down and "
+            "diluting the keyword index with letter prose.",
         )
 
 

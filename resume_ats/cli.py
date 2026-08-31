@@ -97,9 +97,12 @@ def cmd_audit(args: argparse.Namespace) -> int:
     from .parseability import audit as run_audit
     from .resume import parse as parse_resume
 
+    from .text import repair_layout
+
     document = _load_resume(args.resume, None)
-    resume = parse_resume(document.text)
-    result = run_audit(document, resume)
+    repaired, repairs = repair_layout(document.text)
+    resume = parse_resume(repaired)
+    result = run_audit(document, resume, repairs)
 
     if args.format == "json":
         payload = {

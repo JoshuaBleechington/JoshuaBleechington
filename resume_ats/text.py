@@ -177,3 +177,56 @@ def dedupe(items: Iterable[str]) -> List[str]:
             seen.add(key)
             out.append(it)
     return out
+
+# Glyphs that a symbol font (Wingdings, Symbol) leaves behind when a decorative
+# bullet is exported to PDF or plain text.  A Wingdings checkmark becomes a
+# literal "u" with an umlaut, so a whole resume of bullets arrives as prose and
+# no parser sees a single bullet point.  These characters essentially never
+# start a real English line, which is what makes the repair safe.
+BROKEN_BULLETS = "\u00fc\u00a7\u00d8\u00fe\u00a4\u00a8"
+_BROKEN_BULLET_RE = re.compile(r"^([ \t]*)[%s]([ \t]+|(?=[A-Z]))" % re.escape(BROKEN_BULLETS))
+_LONE_BROKEN_RE = re.compile(r"^[ \t]*[%s][ \t]*$" % re.escape(BROKEN_BULLETS))
+
+
+def is_letter_spaced(line: str) -> bool:
+    """True for text typed with spaces between letters ("E X P E R I E N C E").
+
+    Two shapes occur in practice: fully spaced headings, and the ragged
+    fragments a design tool produces when it tracks out a word
+    ("Tra ns fo rmati o na l").  Both are unreadable to a parser, so both count.
+    """
+    stripped = line.strip()
+    if len(stripped) < 7:
+        return False
+    if re.fullmatch(r"(?:[A-Za-z]\s){3,}[A-Za-z]", stripped):
+        return True
+    parts = stripped.split()
+    if len(parts) < 5:
+        return False
+    short = sum(1 for p in parts if len(p) <= 2 and p.isalpha())
+    return short / len(parts) >= 0.6
+
+
+def repair_layout(text: str) -> Tuple[str, List[str]]:
+    """Undo the damage that stops a parser reading a visually fine resume.
+
+    Returns the repaired text and a list of human-readable notes describing
+    what was repaired, so the audit can report the underlying problem rather
+    than silently papering over it.
+    """
+    notes: List[str] = []
+    out: List[str] = []
+    broken = 0
+    for raw in text.splitlines():
+        if _LONE_BROKEN_RE.match(raw):
+            broken += 1
+            continue  # an orphaned bullet glyph with no text of its own
+        repaired, n = _BROKEN_BULLET_RE.subn(r"\1- ", raw)
+        broken += n
+        out.append(repaired)
+    if broken:
+        notes.append(
+            f"{broken} bullet(s) used a symbol font that exports as a stray "
+            "letter, so no parser would have recognised them as bullets"
+        )
+    return "\n".join(out), notes

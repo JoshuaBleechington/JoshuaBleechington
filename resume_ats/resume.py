@@ -12,7 +12,7 @@ from __future__ import annotations
 import re
 from dataclasses import dataclass, field
 from datetime import date
-from typing import Dict, List, Optional, Tuple
+from typing import Dict, List, Optional, Set, Tuple
 
 from .text import is_bullet, lines, normalize, strip_bullet
 
@@ -294,9 +294,12 @@ def parse_contact(text: str, header_hint: str = "") -> Contact:
     contact.github = m.group(0) if m else None
     contact.urls = URL_RE.findall(head)
 
+    banners = repeated_lines(text)
     for raw in text.splitlines()[:6]:
         line = raw.strip()
         if not line or EMAIL_RE.search(line) or URL_RE.search(line):
+            continue
+        if line in banners:
             continue
         words = line.replace(",", " ").split()
         if 1 < len(words) <= 4 and all(w[0].isupper() for w in words if w[:1].isalpha()):
@@ -312,8 +315,9 @@ def parse_contact(text: str, header_hint: str = "") -> Contact:
     return contact
 
 
-def parse_roles(experience_text: str) -> List[Role]:
+def parse_roles(experience_text: str, banners: Optional[Set[str]] = None) -> List[Role]:
     """Reconstruct positions from the experience block."""
+    banners = banners or set()
     roles: List[Role] = []
     current: Optional[Role] = None
     buffer: List[str] = []
@@ -336,6 +340,8 @@ def parse_roles(experience_text: str) -> List[Role]:
             start, end, is_current = parse_dates(line)
             current = Role(heading=line, start=start, end=end, is_current=is_current)
             title, org = _split_title_org(line)
+            if title in banners:
+                title = ""
             current.title, current.organization = title, org
             continue
         if current is None:
@@ -382,6 +388,21 @@ def collect_bullets(text: str) -> List[str]:
     return [b for b in out if len(b) > 15]
 
 
+def repeated_lines(text: str, min_repeats: int = 3) -> Set[str]:
+    """Lines that recur across the document -- page banners, headers, footers.
+
+    A designed resume often repeats a name/title banner on every page.  Left in,
+    it is mistaken for a job title on every role, so a candidate whose history
+    tops out at Senior Director reads as "Vice President" throughout.
+    """
+    counts: Dict[str, int] = {}
+    for raw in text.splitlines():
+        line = raw.strip()
+        if 3 < len(line) < 70:
+            counts[line] = counts.get(line, 0) + 1
+    return {line for line, n in counts.items() if n >= min_repeats}
+
+
 def parse(text: str) -> Resume:
     sections, order, unrecognized = split_sections(text)
     resume = Resume(
@@ -391,7 +412,8 @@ def parse(text: str) -> Resume:
         unrecognized_headings=unrecognized,
     )
     resume.contact = parse_contact(text, sections.get("_header", ""))
+    banners = repeated_lines(text)
     exp = sections.get("experience", "")
-    resume.roles = parse_roles(exp) if exp else parse_roles(text)
+    resume.roles = parse_roles(exp, banners) if exp else parse_roles(text, banners)
     resume.bullets = collect_bullets(text)
     return resume

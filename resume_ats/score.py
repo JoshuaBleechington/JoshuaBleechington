@@ -26,7 +26,7 @@ from .match import (
 )
 from .parseability import ParseAudit, audit as parse_audit
 from .resume import METRIC_RE, Resume, STRONG_VERBS, WEAK_OPENERS
-from .text import stems, tokenize
+from .text import repair_layout, stems, tokenize
 
 # Component weights, summing to 100.
 WEIGHTS: Dict[str, float] = {
@@ -171,11 +171,22 @@ def _experience_score(jd: JobDescription, resume: Resume) -> Tuple[float, str]:
     return score, f"posting asks {need:.0f}+ years; resume evidences about {have} years"
 
 
+def degree_evidence(resume: Resume) -> int:
+    """Highest degree evidenced anywhere in the resume.
+
+    Deliberately not limited to the education section.  A design-led layout can
+    place the "Education" heading *after* the degrees it labels, or lose it to a
+    text box, leaving a section that parses to something like "Page 2 of 2".
+    Trusting that section alone reported a real candidate's MBA and BS as "no
+    degree detected" and failed a degree gate that he actually meets -- a false
+    knockout is far worse than crediting a degree mentioned elsewhere.
+    """
+    sectioned = degree_rank(resume.section("education") + "\n" + resume.section("certifications"))
+    return max(sectioned, degree_rank(resume.text))
+
+
 def _education_score(jd: JobDescription, resume: Resume) -> Tuple[float, str]:
-    edu_text = resume.section("education") + "\n" + resume.section("certifications")
-    if not edu_text.strip():
-        edu_text = resume.text
-    have = degree_rank(edu_text)
+    have = degree_evidence(resume)
     if jd.min_degree is None:
         return (85.0, "no degree requirement stated") if have else (70.0, "no degree requirement stated; none detected")
     need = degree_rank(jd.min_degree)
@@ -263,7 +274,7 @@ def _evaluate_gates(jd: JobDescription, resume: Resume, index: ResumeIndex) -> L
             ))
         elif hard.kind == "degree":
             need = int(hard.value or 0)
-            have = degree_rank(resume.section("education") or resume.text)
+            have = degree_evidence(resume)
             gates.append(Gate(
                 "degree", hard.detail,
                 satisfied=have >= need,
@@ -295,11 +306,15 @@ def score(
     from .resume import parse as parse_resume
 
     lexicon = lexicon or default_lexicon()
-    resume = parse_resume(document.text)
+    # Repair mechanical damage first, then measure. Scoring the broken text
+    # would report a content problem ("no bullet points") for what is really a
+    # font problem, and send the candidate off to rewrite prose that is fine.
+    repaired_text, repairs = repair_layout(document.text)
+    resume = parse_resume(repaired_text)
 
     recent_text = resume.roles[0].text if resume.roles else ""
     index = ResumeIndex(
-        document.text,
+        repaired_text,
         skills_text=resume.section("skills"),
         recent_text=recent_text,
     )
@@ -314,12 +329,12 @@ def score(
     # counted twice.
     resume_lines = list(resume.bullets)
     resume_lines += [
-        ln.strip() for ln in document.text.splitlines()
+        ln.strip() for ln in repaired_text.splitlines()
         if len(ln.split()) > 4 and ln.strip() not in resume_lines
     ]
     pairs = contextual_coverage(jd_lines, resume_lines)
 
-    audit_result = parse_audit(document, resume)
+    audit_result = parse_audit(document, resume, repairs)
 
     coverage = mres.coverage
     kw_score = min(100.0, coverage * 118.0)  # full marks short of literal 100% coverage

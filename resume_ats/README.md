@@ -86,10 +86,54 @@ Shows the mined terms with their weights and whether they came from a required
 or preferred block. Useful for sanity-checking the tool's reading of a posting
 before you trust its gaps.
 
+### `tailor` — rebuild the resume as an ATS-aligned Word document
+
+```bash
+resume-ats tailor resume.docx job.txt -o tailored.docx
+resume-ats tailor resume.docx job.txt -o tailored.txt        # plain text instead
+resume-ats tailor resume.docx job.txt --headline "VP, Solutions" -o out.docx
+```
+
+Applies the findings from `score` that can be applied mechanically, and writes
+a `.docx` with no third-party dependency.
+
+**What it changes.** It repairs layout damage (symbol-font bullets, tab
+pseudo-columns, repeated page banners, a cover letter bound into the file),
+rebuilds the document single-column with standard headings, native Word bullets
+and dates on the title line, sets a headline to the posting's title, and adds
+the posting's wording for a skill your resume already evidences under a
+different name — "solution consulting" where your resume says "presales".
+
+**What it will not change.** It never writes an achievement, number, employer,
+credential or skill you did not write yourself. A tool that invents "increased
+revenue 40%" because a posting asked for revenue growth produces a document you
+have to defend in an interview. Terms the posting wants and your resume shows
+no evidence of are reported to *you*, separately, and never appear in the file.
+
+**When it refuses.** Tailoring can only rearrange what came out of the file. If
+the source is a graphic-led layout whose dates and headings never became text,
+the rebuild would be faithful to a parse that already lost most of the resume,
+so the command stops and asks for a readable source instead of confidently
+producing something worse. `--force` overrides this.
+
+```
+Score against this posting: 77.2 -> 90.7
+
+CHANGES APPLIED
+  [layout] 54 bullet(s) used a symbol font that exports as a stray letter...
+  [terminology] Added the posting's wording for skills the resume already
+      evidences under another name: Solution Consulting, Deal Shaping, CXO, OEM.
+
+ONLY YOU CAN DO THESE (deliberately not written into the file)
+  - The posting asks for these and the resume shows no evidence of them...
+  - Your current role has no numbers in any of its 7 bullets...
+```
+
 ### `compare` — rank your drafts
 
 ```bash
 resume-ats compare v1.docx v2.docx v3.docx --jd job.txt
+resume-ats tailor resume.docx job.txt -o tailored.docx
 ```
 
 This is the intended workflow: change one thing, re-score, keep what helped.
@@ -174,8 +218,11 @@ you actually did in the words the posting uses.
 python -m pytest tests -q
 ```
 
-55 tests cover extraction, section parsing, requirement mining, matching
-precision, the parsing audit, scoring behaviour and the CLI.
+107 tests cover extraction, section parsing, requirement mining, matching
+precision, the parsing audit, scoring behaviour, document generation and the
+CLI. The tailoring tests pin the integrity guarantees hardest: no invented
+numbers, no unevidenced skills in the file, and advice to the candidate never
+leaking into the document sent to an employer.
 
 Module map:
 
@@ -189,6 +236,8 @@ Module map:
 | `match.py` | Exact/alias/fuzzy matching, BM25, TF-IDF cosine |
 | `parseability.py` | The ATS-readability audit |
 | `score.py` | Component weights, gates, suggestions |
+| `tailor.py` | Rebuilds a resume as an ATS-aligned document |
+| `docx_writer.py` | Minimal stdlib OOXML writer (no dependencies) |
 | `report.py` | Terminal, Markdown, JSON, HTML renderers |
 | `cli.py` | Argument parsing and subcommands |
 

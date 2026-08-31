@@ -346,3 +346,25 @@ def test_native_word_bullets_are_detected(tmp_path):
     doc = extract(str(path))
     assert "- Increased signings" in doc.text
     assert "- Director |" not in doc.text, "a normal paragraph must not become a bullet"
+
+
+def test_short_but_well_structured_resume_is_not_a_parse_blocker(tmp_path):
+    """"Nothing extracted" and "the resume is brief" are different findings."""
+    from resume_ats.docx_writer import Block, Run, write_docx
+    from resume_ats.extract import extract
+
+    path = str(tmp_path / "short.docx")
+    write_docx(path, [
+        Block([Run("Jane Doe", bold=True)]),
+        Block([Run("jane@example.com | (555) 010-2233")]),
+        Block([Run("EXPERIENCE", bold=True)], kind="heading"),
+        Block([Run("Director | Acme | Jan 2015 - Present", bold=True)]),
+        Block([Run("Increased signings 40% year over year.")], kind="bullet"),
+        Block([Run("EDUCATION", bold=True)], kind="heading"),
+        Block([Run("BS Engineering")]),
+    ])
+    doc = extract(path)
+    result = audit(doc, parse_resume(doc.text))
+    codes = {f.code for f in result.findings}
+    assert "extract.empty" not in codes, "a short but well-parsed resume is not unreadable"
+    assert "length.short" in codes, "brevity is still reported, as a lesser finding"

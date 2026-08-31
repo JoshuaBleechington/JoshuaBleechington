@@ -12,7 +12,7 @@ from __future__ import annotations
 import re
 from dataclasses import dataclass, field
 from datetime import date
-from typing import Dict, List, Optional, Set, Tuple
+from typing import Dict, List, Optional, Sequence, Set, Tuple
 
 from .text import is_bullet, lines, normalize, stem, strip_bullet, tokenize
 
@@ -355,17 +355,67 @@ def parse_contact(text: str, header_hint: str = "") -> Contact:
     return contact
 
 
+_ORG_LINE_RE = re.compile(r"^[A-Z0-9][A-Z0-9 &.,'()/\-\u2013\u2014]{3,}$")
+
+
+def _looks_like_org(line: str) -> bool:
+    """An employer line is typically set in caps, often with a location."""
+    return bool(_ORG_LINE_RE.match(line.strip()))
+
+
+def _borrow_heading(recent: Sequence[str]) -> Tuple[str, str, List[str]]:
+    """Recover a title and employer from the lines above a bare date line.
+
+    Many resumes stack the block as employer / title / dates on three lines, so
+    the dated line carries no name at all.  Reading only that line loses every
+    job title and employer, and leaves the employer text stuck on the end of the
+    previous role's last bullet.
+    """
+    title, org, used = "", "", []
+    for line in reversed(list(recent)):
+        # Collapse tabs first: a resume that tab-aligns its heading would
+        # otherwise fail the employer test and land as the job title.
+        candidate = " ".join(line.split())
+        if not candidate or len(candidate) > 120 or is_bullet(candidate):
+            continue
+        if _looks_like_org(candidate):
+            if not org:
+                org, _ = _split_title_org(candidate)
+                org = org or candidate
+                used.append(line)
+        elif not title:
+            title = candidate
+            used.append(line)
+        if title and org:
+            break
+    return title, org, used
+
+
 def parse_roles(experience_text: str, banners: Optional[Set[str]] = None) -> List[Role]:
     """Reconstruct positions from the experience block."""
     banners = banners or set()
     roles: List[Role] = []
     current: Optional[Role] = None
     buffer: List[str] = []
+    recent: List[str] = []
 
     def flush() -> None:
         if current is not None:
             current.text = "\n".join(buffer).strip()
             roles.append(current)
+
+    def disown(lines: Sequence[str]) -> None:
+        """Take borrowed heading lines back off the previous role."""
+        for line in lines:
+            stripped = line.strip()
+            if stripped in buffer:
+                buffer.remove(stripped)
+            if current is not None and current.bullets:
+                last = current.bullets[-1]
+                if last.endswith(stripped) and last != stripped:
+                    current.bullets[-1] = last[: -len(stripped)].strip()
+                elif last == stripped:
+                    current.bullets.pop()
 
     for raw in experience_text.splitlines():
         line = raw.strip()
@@ -375,18 +425,34 @@ def parse_roles(experience_text: str, banners: Optional[Set[str]] = None) -> Lis
             re.search(r"(19|20)\d{2}\s*(?:-|–|—|to)\s*(?:present|current|(19|20)\d{2})", line, re.I)
         )
         if has_dates and not is_bullet(raw):
+            title, org = _split_title_org(line)
+            if title in banners:
+                title = ""
+            if not title or not org:
+                borrowed_title, borrowed_org, used = _borrow_heading(recent)
+                if not title and borrowed_title and borrowed_title not in banners:
+                    title = borrowed_title
+                if not org and borrowed_org:
+                    org = borrowed_org
+                disown(used)
             flush()
             buffer = [line]
             start, end, is_current = parse_dates(line)
             current = Role(heading=line, start=start, end=end, is_current=is_current)
-            title, org = _split_title_org(line)
-            if title in banners:
-                title = ""
             current.title, current.organization = title, org
+            recent = []
             continue
         if current is None:
+            if not is_bullet(raw):
+                recent.append(line)
+                if len(recent) > 3:
+                    recent.pop(0)
             continue
         buffer.append(line)
+        if not is_bullet(raw):
+            recent.append(line)
+            if len(recent) > 3:
+                recent.pop(0)
         if is_bullet(raw):
             current.bullets.append(strip_bullet(raw))
         elif current.bullets:
@@ -452,6 +518,15 @@ def parse(text: str) -> Resume:
         unrecognized_headings=unrecognized,
     )
     resume.contact = parse_contact(text, sections.get("_header", ""))
+    # The candidate's own name is short and often capitalised, which makes it
+    # look exactly like a section heading. Flagging it as a "non-standard
+    # heading" is noise, not a finding.
+    if resume.contact.name_guess:
+        name = resume.contact.name_guess.strip()
+        resume.unrecognized_headings = [
+            h for h in resume.unrecognized_headings
+            if " ".join(h.split()).lower() != " ".join(name.split()).lower()
+        ]
     banners = repeated_lines(text)
     exp = sections.get("experience", "")
     resume.roles = parse_roles(exp, banners) if exp else parse_roles(text, banners)

@@ -82,7 +82,7 @@ def audit(doc: Document, resume: Resume, repairs: Sequence[str] = ()) -> ParseAu
             "accomplishment reads to a parser as unstructured prose.",
         )
     _check_cover_letter(result, text)
-    _check_extraction(result, doc, words)
+    _check_extraction(result, doc, resume, words)
     _check_layout(result, doc)
     _check_contact(result, doc, resume)
     _check_sections(result, resume)
@@ -95,17 +95,23 @@ def audit(doc: Document, resume: Resume, repairs: Sequence[str] = ()) -> ParseAu
     return result
 
 
-def _check_extraction(result: ParseAudit, doc: Document, words: int) -> None:
+def _check_extraction(result: ParseAudit, doc: Document, resume: Resume, words: int) -> None:
     for warning in doc.warnings:
         result.add(
             "blocker", "extract.warning", warning,
             "Export a text-based PDF directly from Word or Google Docs "
             "(File > Save as PDF), never a scan, photo or 'print to image'.",
         )
-    if words < 120 and doc.kind != "txt":
+    # This finding means "the content did not survive extraction", not "the
+    # resume is short" -- length.short already covers that. Requiring the loss
+    # of structure as well stops it firing on a genuinely brief resume that
+    # parsed perfectly, where it was a false blocker that swamped the score.
+    structure_lost = not resume.section_order or not resume.roles
+    if words < 120 and doc.kind != "txt" and structure_lost:
         result.add(
             "blocker", "extract.empty",
-            f"Only {words} words of text could be recovered from this file.",
+            f"Only {words} words of text could be recovered from this file, "
+            "and no usable structure came with them.",
             "If the resume looks full when you open it, the content is locked "
             "inside images or shapes. Rebuild it as ordinary body text.",
         )

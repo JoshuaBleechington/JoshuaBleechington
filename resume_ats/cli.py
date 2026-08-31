@@ -22,6 +22,7 @@ examples:
   resume-ats score resume.docx job.txt --format html -o report.html
   resume-ats audit resume.docx
   resume-ats compare v1.docx v2.docx v3.docx --jd job.txt
+  resume-ats tailor resume.docx job.txt -o tailored.docx
   resume-ats keywords job.txt --top 40
 """
 
@@ -196,6 +197,93 @@ def cmd_keywords(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_tailor(args: argparse.Namespace) -> int:
+    """Rebuild a resume as an ATS-aligned .docx aimed at one posting."""
+    from . import tailor as tailor_mod
+    from .score import score as run_score
+
+    lexicon = default_lexicon()
+    if args.aliases:
+        lexicon.load_extra(args.aliases)
+
+    document = _load_resume(args.resume, args.resume_text)
+    jd_text = _read_source(args.jd, args.jd_text, "jd")
+    jd = parse_jd(jd_text, lexicon)
+
+    result = tailor_mod.build(document, jd, lexicon, headline=args.headline)
+
+    if result.source_warnings and not args.force:
+        print("Cannot rebuild faithfully from this file.\n", file=sys.stderr)
+        for warning in result.source_warnings:
+            print(f"  - {_wrap_cli(warning, 74)}", file=sys.stderr)
+        print(
+            "\nTailoring can only rearrange what came out of the file, and too much\n"
+            "of this one never reached the parser. Export the resume as .docx (or\n"
+            "save a text-based PDF) and run this again on that. Use --force to\n"
+            "write the file anyway, knowing it will be missing content.",
+            file=sys.stderr)
+        return 2
+
+    out_path = args.output or "tailored-resume.docx"
+    tailor_mod.save(result, out_path)
+
+    before = run_score(document, jd, lexicon)
+    after = run_score(extract(out_path) if not out_path.lower().endswith((".txt", ".md"))
+                      else from_string(result.text, out_path), jd, lexicon)
+
+    if args.format == "json":
+        payload = {
+            "output": out_path,
+            "headline": result.headline,
+            "source_warnings": result.source_warnings,
+            "score_before": before.total,
+            "score_after": after.total,
+            "changes": [{"category": c.category, "detail": c.detail} for c in result.changes],
+            "manual": [{"kind": m.kind, "detail": m.detail} for m in result.manual],
+        }
+        print(json.dumps(payload, indent=2))
+        return 0
+
+    width = 78
+    out = []
+    if result.source_warnings:
+        out.append("WARNING: the source file was damaged; content is missing from the rebuild.")
+        for warning in result.source_warnings:
+            out.append(f"  - {_wrap_cli(warning, width - 4)}")
+        out.append("")
+    out += [f"TAILORED RESUME WRITTEN -> {out_path}", "-" * width,
+           f"Target: {jd.title or '(title not detected)'}",
+           f"Score against this posting: {before.total:.1f} -> {after.total:.1f}", ""]
+
+    out.append("CHANGES APPLIED")
+    for change in result.changes:
+        out.append(f"  [{change.category}] {_wrap_cli(change.detail, width - 4)}")
+
+    if result.manual:
+        out += ["", "ONLY YOU CAN DO THESE (deliberately not written into the file)"]
+        for item in result.manual:
+            out.append(f"  - {_wrap_cli(item.detail, width - 4)}")
+
+    out += ["", "This rebuilds and re-words what your resume already says. It never adds",
+            "an achievement, number, employer or skill you did not write yourself.",
+            "Read the result before you send it."]
+    _emit("\n".join(out), None)
+    return 0
+
+
+def _wrap_cli(text: str, width: int, indent: str = "      ") -> str:
+    words, lines, current = text.split(), [], ""
+    for word in words:
+        if len(current) + len(word) + 1 > width:
+            lines.append(current)
+            current = word
+        else:
+            current = f"{current} {word}".strip()
+    if current:
+        lines.append(current)
+    return ("\n" + indent).join(lines)
+
+
 def cmd_compare(args: argparse.Namespace) -> int:
     """Score several resume versions against one posting, best first."""
     lexicon = default_lexicon()
@@ -284,6 +372,21 @@ def build_parser() -> argparse.ArgumentParser:
     p_kw.add_argument("-f", "--format", default="text", choices=["text", "json"])
     add_common(p_kw)
     p_kw.set_defaults(func=cmd_keywords)
+
+    p_tailor = sub.add_parser(
+        "tailor",
+        help="rebuild a resume as an ATS-aligned .docx aimed at one posting")
+    p_tailor.add_argument("resume", nargs="?", help="resume file or - for stdin")
+    p_tailor.add_argument("jd", nargs="?", help="job description file, or - for stdin")
+    p_tailor.add_argument("--resume-text", help="pass resume text directly")
+    p_tailor.add_argument("--jd-text", help="pass job description text directly")
+    p_tailor.add_argument("--headline",
+                          help="headline to put under the name (defaults to the posting's title)")
+    p_tailor.add_argument("-f", "--format", default="text", choices=["text", "json"])
+    p_tailor.add_argument("--force", action="store_true",
+                          help="write the file even when the source is too damaged to rebuild faithfully")
+    add_common(p_tailor)
+    p_tailor.set_defaults(func=cmd_tailor)
 
     p_cmp = sub.add_parser("compare", help="rank several resume versions against one posting")
     p_cmp.add_argument("resumes", nargs="+", help="resume files to compare")

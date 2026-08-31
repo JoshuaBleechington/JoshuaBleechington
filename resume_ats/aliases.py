@@ -74,6 +74,10 @@ class SkillLexicon:
     def category(self, term: str) -> str:
         return self._category.get(term, "custom")
 
+    def all_terms(self) -> List[str]:
+        """Every canonical term, in insertion order."""
+        return list(self._surfaces)
+
     def keys(self) -> Set[str]:
         """Every canonical key (stemmed) known to the lexicon."""
         return set(self._canon_by_key)

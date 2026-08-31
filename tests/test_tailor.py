@@ -419,3 +419,88 @@ def test_batch_output_never_contains_invented_numbers(tmp_path):
     nums = lambda t: set(re.findall(r"\$?\d[\d,.]*%?", t))
     produced = extract(str(outdir / "alpha.docx")).text
     assert not (nums(produced) - nums(STACKED_RESUME))
+
+
+# -- OOXML validity ----------------------------------------------------------
+
+def test_paragraph_properties_are_emitted_in_schema_order(tmp_path):
+    """CT_PPr is a sequence: numPr, pBdr, spacing, ind, outlineLvl.
+
+    Word tolerates a wrong order, so this only shows up under a schema check --
+    which is exactly why it needs a test.
+    """
+    import re as _re
+    import zipfile
+    from resume_ats.docx_writer import Block, Run, write_docx
+
+    path = str(tmp_path / "order.docx")
+    write_docx(path, [
+        Block([Run("Heading")], kind="heading", rule_below=True, space_before=200),
+        Block([Run("A bullet")], kind="bullet"),
+    ])
+    with zipfile.ZipFile(path) as zf:
+        xml = zf.read("word/document.xml").decode("utf-8")
+
+    order = ["numPr", "pBdr", "spacing", "ind", "outlineLvl"]
+    for para in _re.findall(r"<w:pPr>.*?</w:pPr>", xml):
+        seen = [name for name in order if f"<w:{name}" in para]
+        positions = [para.index(f"<w:{name}") for name in seen]
+        assert positions == sorted(positions), f"pPr children out of schema order: {seen}"
+
+
+def test_bullet_paragraphs_carry_numbering_and_indent(tmp_path):
+    import zipfile
+    from resume_ats.docx_writer import Block, Run, write_docx
+
+    path = str(tmp_path / "b.docx")
+    write_docx(path, [Block([Run("Did the thing")], kind="bullet")])
+    with zipfile.ZipFile(path) as zf:
+        xml = zf.read("word/document.xml").decode("utf-8")
+        assert "numbering.xml" in zf.read("word/_rels/document.xml.rels").decode("utf-8")
+    assert "<w:numPr>" in xml and 'w:numId w:val="1"' in xml
+
+
+# -- wrapped competency lines ------------------------------------------------
+
+def test_a_competency_wrapped_across_lines_is_not_cut_in_half():
+    resume = """Moe Y
+moe@example.com | (555) 010-2233
+
+CORE COMPETENCIES
+Presales Engagement | Deal Shaping and
+Pursuit Management | Managed Services
+
+PROFESSIONAL EXPERIENCE
+Director | Acme | Jan 2015 - Present
+- Led presales pursuits.
+
+EDUCATION
+BS Engineering
+"""
+    out = tailor.build(from_string(resume), parse_jd(JD), default_lexicon())
+    assert "Deal Shaping and Pursuit Management" in out.text
+    assert "Deal Shaping and |" not in out.text
+
+
+def test_a_wrapped_summary_becomes_one_paragraph():
+    """Source line breaks must not freeze into ragged fragments in Word."""
+    resume = """Moe Y
+moe@example.com | (555) 010-2233
+
+SUMMARY
+Presales leader with 28 years in IT services, managed services
+and IT outsourcing. Builds teams that shape and close complex
+multi-tower deals.
+
+PROFESSIONAL EXPERIENCE
+Director | Acme | Jan 2015 - Present
+- Led presales pursuits.
+
+EDUCATION
+BS Engineering
+"""
+    out = tailor.build(from_string(resume), parse_jd(JD), default_lexicon())
+    summary_blocks = [b for b in out.blocks
+                      if b.kind == "body" and "Presales leader" in "".join(r.text for r in b.runs)]
+    assert len(summary_blocks) == 1
+    assert "managed services and IT outsourcing" in "".join(r.text for r in summary_blocks[0].runs)

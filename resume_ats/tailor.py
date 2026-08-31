@@ -120,19 +120,42 @@ def _contact_line(resume: Resume) -> str:
     return " | ".join(b for b in bits if b)
 
 
+def _join_wrapped(text: str) -> List[str]:
+    """Rejoin lines that are continuations of the one above.
+
+    A line is a continuation when the previous line did not end at a separator
+    and this one does not start a new list item.
+    """
+    out: List[str] = []
+    for raw in text.splitlines():
+        line = raw.rstrip()
+        if not line.strip():
+            continue
+        stripped = line.strip()
+        starts_item = stripped.startswith(("-", "\u2022", "*"))
+        if out and not starts_item and not out[-1].rstrip().endswith((",", "|", ":", ";")):
+            out[-1] = out[-1].rstrip() + " " + stripped
+        else:
+            out.append(stripped)
+    return out
+
+
 def _competency_terms(resume: Resume) -> List[str]:
     """Existing competencies, split out of whatever separator the resume used."""
     raw = resume.section("skills")
     terms: List[str] = []
-    for line in raw.splitlines():
-        line = line.strip().lstrip("-•*").strip()
-        if not line:
+    # Join wrapped lines first. A competency that ran over the line break was
+    # otherwise cut in half, turning "Deal Shaping and Pursuit Management" into
+    # "Deal Shaping and" plus "Pursuit Management".
+    for chunk in _join_wrapped(raw):
+        chunk = chunk.strip().lstrip("-•*").strip()
+        if not chunk:
             continue
         # A "Category: a, b, c" line contributes its items, not its label.
-        if ":" in line and len(line.split(":")[0].split()) <= 4:
-            line = line.split(":", 1)[1]
-        for part in line.replace("|", ",").split(","):
-            part = part.strip()
+        if ":" in chunk and len(chunk.split(":")[0].split()) <= 4:
+            chunk = chunk.split(":", 1)[1]
+        for part in chunk.replace("|", ",").split(","):
+            part = " ".join(part.split())
             if 1 < len(part) <= 60:
                 terms.append(part)
     seen, out = set(), []
@@ -383,11 +406,14 @@ def build(
         if not body.strip():
             continue
         heading(label)
-        for line in body.splitlines():
+        # Rejoin wrapped lines so a summary reads as one flowing paragraph
+        # rather than seven ragged fragments, which is how the source file's
+        # line breaks would otherwise render in Word.
+        for line in _join_wrapped(body):
             line = line.strip()
             if not line:
                 continue
-            if line.lstrip().startswith("-"):
+            if line.startswith("-"):
                 result.blocks.append(Block([Run(_clean(line.lstrip("-")), size=20)], kind="bullet"))
             else:
                 result.blocks.append(Block([Run(_clean(line), size=20)], space_after=40))

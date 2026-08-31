@@ -80,12 +80,20 @@ def _run_xml(run: Run) -> str:
 
 
 def _block_xml(block: Block) -> str:
-    props = [f'<w:spacing w:before="{block.space_before}" w:after="{block.space_after}"/>']
+    """Build the paragraph, emitting pPr children in schema order.
+
+    CT_PPr is a sequence, not a choice: numPr, then pBdr, then spacing, then
+    ind, then outlineLvl.  Word tolerates a wrong order, but the OOXML schema
+    does not, and some parsers follow the schema.
+    """
+    props: List[str] = []
     if block.kind == "bullet":
-        props.insert(0, f'<w:numPr><w:ilvl w:val="0"/><w:numId w:val="{BULLET_NUM_ID}"/></w:numPr>')
-        props.append('<w:ind w:left="360" w:hanging="220"/>')
+        props.append(f'<w:numPr><w:ilvl w:val="0"/><w:numId w:val="{BULLET_NUM_ID}"/></w:numPr>')
     if block.rule_below:
         props.append('<w:pBdr><w:bottom w:val="single" w:sz="6" w:space="2" w:color="444444"/></w:pBdr>')
+    props.append(f'<w:spacing w:before="{block.space_before}" w:after="{block.space_after}"/>')
+    if block.kind == "bullet":
+        props.append('<w:ind w:left="360" w:hanging="220"/>')
     if block.kind == "heading":
         props.append('<w:outlineLvl w:val="0"/>')
     ppr = f"<w:pPr>{''.join(props)}</w:pPr>"

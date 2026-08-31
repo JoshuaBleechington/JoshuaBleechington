@@ -240,13 +240,23 @@ being asked whether the experience is real. Claiming skills you do not have
 fails at the interview at best, so the tool is built to help you surface work
 you actually did in the words the posting uses.
 
+## Output formats
+
+`tailor` writes `.docx` (or `.txt`/`.md` by extension). For a posting that wants
+a PDF, export from Word after opening the `.docx` — with one thing to check:
+**the bullets must survive as text.** A PDF whose bullets are drawn by the
+layout engine rather than written as characters extracts as unstructured prose,
+and every quantified achievement stops reading as an accomplishment. Run
+`resume-ats audit resume.pdf` on the exported file; if the writing score
+collapses and the audit reports no bullet points, the export dropped them.
+
 ## Development
 
 ```bash
 python -m pytest tests -q
 ```
 
-117 tests cover extraction, section parsing, requirement mining, matching
+121 tests cover extraction, section parsing, requirement mining, matching
 precision, the parsing audit, scoring behaviour, document generation and the
 CLI. The tailoring tests pin the integrity guarantees hardest: no invented
 numbers, no unevidenced skills in the file, and advice to the candidate never

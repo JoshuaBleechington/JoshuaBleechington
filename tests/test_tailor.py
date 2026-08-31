@@ -306,3 +306,12 @@ UT Austin - MBA
     out = tailor.build(from_string(resume), parse_jd(JD), default_lexicon())
     for employer in ("Milestone Technologies Inc.", "Pivot Technology Solutions"):
         assert employer in out.text, f"{employer} was lost in the rebuild"
+
+
+def test_plural_acronyms_are_capitalised():
+    """A posting's "OEMs" must not be rendered "Oems"."""
+    from resume_ats.tailor import _acronyms, _title_case_term
+    acr = _acronyms(default_lexicon())
+    assert _title_case_term("oems", acr) == "OEMs"
+    assert _title_case_term("oem", acr) == "OEM"
+    assert _title_case_term("solution consulting", acr) == "Solution Consulting"

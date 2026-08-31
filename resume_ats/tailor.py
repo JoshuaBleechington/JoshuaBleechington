@@ -214,8 +214,12 @@ def _title_case_term(term: str, acronyms: Optional[set] = None) -> str:
     words = term.split()
     out = []
     for i, w in enumerate(words):
-        if w.isupper() or w.lower() in acronyms:
+        low = w.lower()
+        # Check the singular too, so a posting's "OEMs" is not rendered "Oems".
+        if w.isupper() or low in acronyms:
             out.append(w.upper())
+        elif low.endswith("s") and low[:-1] in acronyms:
+            out.append(low[:-1].upper() + "s")
         elif i and w.lower() in _SMALL_WORDS:
             out.append(w.lower())
         else:

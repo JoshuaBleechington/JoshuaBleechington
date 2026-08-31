@@ -69,6 +69,18 @@ def _para_text(node: ET.Element) -> str:
     return "".join(out)
 
 
+def _is_list_paragraph(para: ET.Element) -> bool:
+    """True if Word marks this paragraph as a numbered or bulleted list item.
+
+    A correctly built Word bullet stores the glyph as a numbering property, not
+    as text, so nothing in the run content looks like a bullet.  Real parsers
+    read the numbering; so must we, or the properly formatted resume we tell
+    people to write scores as having no bullet points at all.
+    """
+    props = para.find(W + "pPr")
+    return props is not None and props.find(W + "numPr") is not None
+
+
 def _iter_block_text(root: ET.Element) -> List[str]:
     """Walk body-level blocks in document order, flattening tables to rows."""
     blocks: List[str] = []
@@ -76,7 +88,12 @@ def _iter_block_text(root: ET.Element) -> List[str]:
     def walk(node: ET.Element) -> None:
         for child in node:
             if child.tag == W + "p":
-                blocks.append(_para_text(child))
+                text = _para_text(child)
+                if text.strip() and _is_list_paragraph(child):
+                    # Normalise to a literal marker so the rest of the pipeline
+                    # sees a bullet regardless of how it was authored.
+                    text = "- " + text.lstrip()
+                blocks.append(text)
             elif child.tag == W + "tbl":
                 for row in child.findall(W + "tr"):
                     cells = []

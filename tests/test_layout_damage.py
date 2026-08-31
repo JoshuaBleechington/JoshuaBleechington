@@ -327,3 +327,22 @@ Manager | Acme | Jan 2015 - Present
 """
     # No headline present, so the title score must not be inflated by contact text.
     assert score_text(resume, jd).component("title").score < 60
+
+
+def test_native_word_bullets_are_detected(tmp_path):
+    """A correctly authored Word list stores the bullet as numbering, not text."""
+    import zipfile
+    from resume_ats.extract import extract
+
+    W = 'xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"'
+    listed = ('<w:p><w:pPr><w:numPr><w:ilvl w:val="0"/><w:numId w:val="1"/></w:numPr></w:pPr>'
+              '<w:r><w:t>Increased signings 40% year over year</w:t></w:r></w:p>')
+    plain = '<w:p><w:r><w:t>Director | Acme | Jan 2015 - Present</w:t></w:r></w:p>'
+    path = tmp_path / "native.docx"
+    with zipfile.ZipFile(path, "w") as zf:
+        zf.writestr("word/document.xml",
+                    f'<?xml version="1.0"?><w:document {W}><w:body>{plain}{listed}</w:body></w:document>')
+
+    doc = extract(str(path))
+    assert "- Increased signings" in doc.text
+    assert "- Director |" not in doc.text, "a normal paragraph must not become a bullet"

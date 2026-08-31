@@ -467,7 +467,15 @@ def _split_title_org(line: str) -> Tuple[str, str]:
     """Best-effort split of a 'Title | Company | Dates' style heading."""
     cleaned = DATE_RANGE_RE.sub("", line)
     cleaned = re.sub(r"(19|20)\d{2}\s*(?:-|–|—|to)\s*(?:present|current)", "", cleaned, flags=re.I)
-    parts = [p.strip(" ,|·—–-\t") for p in re.split(r"\s*[|•·]\s*|\s{2,}|\s+[-–—]\s+|,\s+", cleaned)]
+    # When the author used an explicit delimiter, honour only that one. Also
+    # splitting on commas turned "Senior Director, Sales and Solution Support |
+    # Pivot Technology Solutions" into a title of "Senior Director" and an
+    # employer of "Sales and Solution Support", losing the real employer.
+    if re.search(r"[|•·]", cleaned):
+        pieces = re.split(r"\s*[|•·]\s*", cleaned)
+    else:
+        pieces = re.split(r"\s{2,}|\s+[-–—]\s+|,\s+", cleaned)
+    parts = [p.strip(" ,|·—–-\t") for p in pieces]
     parts = [p for p in parts if p and not re.fullmatch(r"[\d\s./-]*", p)]
     if not parts:
         return "", ""

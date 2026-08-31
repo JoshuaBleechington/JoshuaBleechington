@@ -276,3 +276,33 @@ def test_cli_force_overrides_the_refusal(tmp_path):
     out = tmp_path / "out.docx"
     assert main(["tailor", str(resume), str(jd), "-o", str(out), "--force"]) == 0
     assert out.exists()
+
+
+def test_an_explicit_delimiter_wins_over_a_comma():
+    """A comma inside a job title must not be mistaken for the employer break."""
+    from resume_ats.resume import _split_title_org
+    title, org = _split_title_org(
+        "Senior Director, Sales and Solution Support | Pivot Technology Solutions | "
+        "Plano, TX | July 2018 - April 2020")
+    assert title == "Senior Director, Sales and Solution Support"
+    assert org == "Pivot Technology Solutions"
+
+
+def test_every_employer_survives_tailoring():
+    resume = """Moe Y
+moe@example.com | (555) 010-2233
+
+PROFESSIONAL EXPERIENCE
+
+Senior Solutions Director | Milestone Technologies Inc. | Fremont, CA | April 2020 - Present
+- Lead enterprise transformation initiatives.
+
+Senior Director, Sales and Solution Support | Pivot Technology Solutions | Plano, TX | July 2018 - April 2020
+- Signed deals in excess of $21M in annual contract value.
+
+EDUCATION
+UT Austin - MBA
+"""
+    out = tailor.build(from_string(resume), parse_jd(JD), default_lexicon())
+    for employer in ("Milestone Technologies Inc.", "Pivot Technology Solutions"):
+        assert employer in out.text, f"{employer} was lost in the rebuild"

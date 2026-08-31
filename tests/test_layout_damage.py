@@ -218,3 +218,112 @@ EDUCATION
 Culinary diploma
 """
     assert score(from_string(presales), jd).total > score(from_string(other), jd).total + 20
+
+
+# -- accomplishment scoring --------------------------------------------------
+
+def test_present_tense_verbs_count_as_strong_openers():
+    """A current role is correctly written in present tense."""
+    from resume_ats.resume import opener_strength
+    for bullet in ("Lead enterprise transformation initiatives.",
+                   "Design and implement transformation strategies.",
+                   "Drive process improvement across the business.",
+                   "Establish performance metrics and KPIs."):
+        assert opener_strength(bullet) == "strong", bullet
+
+
+def test_past_and_present_forms_score_alike():
+    from resume_ats.resume import opener_strength
+    for present, past in [("Lead the team.", "Led the team."),
+                          ("Design the solution.", "Designed the solution."),
+                          ("Deliver the program.", "Delivered the program.")]:
+        assert opener_strength(present) == opener_strength(past) == "strong"
+
+
+def test_common_deal_verbs_are_recognised():
+    from resume_ats.resume import opener_strength
+    for bullet in ("Signed deals exceeding $21M in annual contract value.",
+                   "Closed complex multi-year engagements.",
+                   "Retained multi-million-dollar accounts.",
+                   "Positioned ITSM processes through consultative selling."):
+        assert opener_strength(bullet) == "strong", bullet
+
+
+def test_weak_openers_still_flagged():
+    from resume_ats.resume import opener_strength
+    assert opener_strength("Responsible for weekly reporting.") == "weak"
+    assert opener_strength("Assisted with endpoint patching.") == "weak"
+    assert opener_strength("Helped sign two deals.") == "weak"
+
+
+def test_education_lines_do_not_count_as_accomplishment_bullets():
+    """Having a degree must not read as an unquantified, weak-opener bullet."""
+    resume = parse_resume("""Jane Doe
+jane@example.com | (555) 010-2233
+
+EXPERIENCE
+Director | Acme | Jan 2015 - Present
+- Increased signings 40% year over year.
+
+EDUCATION
+- Master of Business Administration, University of Texas at Austin
+- Bachelor of Science, Industrial Engineering
+""")
+    assert len(resume.bullets) == 3
+    assert resume.experience_bullets == ["Increased signings 40% year over year."]
+
+
+def test_degree_lines_do_not_depress_the_writing_score():
+    base = """Jane Doe
+jane@example.com | (555) 010-2233
+
+EXPERIENCE
+Director | Acme | Jan 2015 - Present
+- Increased signings 40% year over year.
+- Closed deals worth $21M in annual contract value.
+"""
+    with_degrees = base + """
+EDUCATION
+- Master of Business Administration, University of Texas at Austin
+- Bachelor of Science, Industrial Engineering, University of Texas at Arlington
+"""
+    jd = "Director\n\nRequirements\n- 5 years of experience.\n"
+    assert (score_text(with_degrees, jd).component("writing").score
+            == score_text(base, jd).component("writing").score)
+
+
+def test_headline_under_the_name_counts_toward_title_match():
+    """A target-title headline is standard practice and must be seen."""
+    jd = "Senior Director, Solution Consulting\n\nRequirements\n- 5 years of experience.\n"
+    without = """Mohammed Y
+m@example.com | (555) 010-2233
+
+SUMMARY
+Experienced services leader.
+
+EXPERIENCE
+Business Delivery Manager | Acme | Jan 2015 - Present
+- Delivered programs worth $10M.
+"""
+    with_headline = without.replace(
+        "m@example.com | (555) 010-2233\n",
+        "m@example.com | (555) 010-2233\n\nSenior Director, Solution Consulting\n")
+    assert (score_text(with_headline, jd).component("title").score
+            > score_text(without, jd).component("title").score)
+
+
+def test_contact_lines_are_not_treated_as_a_headline():
+    jd = "Senior Director, Solution Consulting\n\nRequirements\n- 5 years of experience.\n"
+    resume = """Mohammed Y
+m@example.com | (555) 010-2233
+linkedin.com/in/example
+
+SUMMARY
+Services leader.
+
+EXPERIENCE
+Manager | Acme | Jan 2015 - Present
+- Delivered programs.
+"""
+    # No headline present, so the title score must not be inflated by contact text.
+    assert score_text(resume, jd).component("title").score < 60

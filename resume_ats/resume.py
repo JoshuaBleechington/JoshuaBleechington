@@ -14,7 +14,7 @@ from dataclasses import dataclass, field
 from datetime import date
 from typing import Dict, List, Optional, Set, Tuple
 
-from .text import is_bullet, lines, normalize, strip_bullet
+from .text import is_bullet, lines, normalize, stem, strip_bullet, tokenize
 
 # Section headings an ATS looks for, mapped to the canonical bucket.  The
 # aliases matter: "Professional Experience" is recognised, "What I've Been Up
@@ -82,6 +82,11 @@ WEAK_OPENERS = frozenset({
     "participated", "involved", "familiar", "exposure", "handled", "various",
 })
 
+# Matched by stem, so "design"/"designed"/"designing" all count.  Irregular
+# verbs need both forms listed, since no stemmer relates "lead" to "led".
+# Present tense matters: a current role is correctly written in it, and an
+# earlier version of this list credited only past tense, quietly penalising
+# every bullet in the job the candidate holds right now.
 STRONG_VERBS = frozenset("""
 achieved administered analyzed architected audited automated built centralized
 championed conducted configured consolidated coordinated created cut decreased
@@ -96,7 +101,29 @@ reorganized reported researched resolved restructured revamped saved scaled
 secured shipped simplified spearheaded standardized streamlined strengthened
 supervised supported tested tracked trained transformed triaged tuned
 uncovered unified upgraded validated
+lead drive build run win grow oversee hold keep rebuild undertake set shape
+close sign retain position engage present negotiate expand advise partner
+signed closed retained positioned engaged consulted presented negotiated won
+grew expanded advised chaired forecast governed guided influenced instrumented
+justified landed originated qualified quantified rescued restored safeguarded
+sold sourced sponsored steered structured surfaced turned unblocked
 """.split())
+
+STRONG_VERB_STEMS = frozenset(stem(v) for v in STRONG_VERBS)
+WEAK_OPENER_STEMS = frozenset(stem(v) for v in WEAK_OPENERS)
+
+
+def opener_strength(bullet: str) -> str:
+    """Classify a bullet's first word as 'strong', 'weak' or 'neutral'."""
+    first = (tokenize(bullet) or [""])[0]
+    if not first:
+        return "neutral"
+    root = stem(first)
+    if root in WEAK_OPENER_STEMS:
+        return "weak"
+    if root in STRONG_VERB_STEMS:
+        return "strong"
+    return "neutral"
 
 METRIC_RE = re.compile(
     r"(?:\$\s?\d|\d+\s?(?:%|percent)|\b\d{1,3}(?:,\d{3})+\b|\b\d+\s?(?:x|hours?|hrs?|"
@@ -156,6 +183,19 @@ class Resume:
     contact: Contact = field(default_factory=Contact)
     roles: List[Role] = field(default_factory=list)
     bullets: List[str] = field(default_factory=list)
+
+    @property
+    def experience_bullets(self) -> List[str]:
+        """Bullets attached to a dated position.
+
+        Education and certification lines are list items, not accomplishments;
+        counting "Master of Business Administration" as an unquantified bullet
+        with a weak opener penalised the candidate for having a degree.
+        """
+        out: List[str] = []
+        for role in self.roles:
+            out.extend(role.bullets)
+        return out or self.bullets
 
     @property
     def total_experience_months(self) -> int:

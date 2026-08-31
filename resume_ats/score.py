@@ -25,7 +25,7 @@ from .match import (
     MatchResult, ResumeIndex, TermMatch, bm25, contextual_coverage, match_requirements,
 )
 from .parseability import ParseAudit, audit as parse_audit
-from .resume import METRIC_RE, Resume, STRONG_VERBS, WEAK_OPENERS
+from .resume import EMAIL_RE, METRIC_RE, PHONE_RE, URL_RE, Resume, opener_strength
 from .text import repair_layout, stems, tokenize
 
 # Component weights, summing to 100.
@@ -141,6 +141,22 @@ def _title_score(jd: JobDescription, resume: Resume) -> Tuple[float, str]:
         overlap = len(target & got) / len(target)
         recency_bonus = 1.0 if role is resume.roles[0] else 0.85
         candidates.append((overlap * recency_bonus, role.title))
+    # A headline under the name ("Senior Director, Solution Consulting") is
+    # standard practice and is precisely what a title match should see, but it
+    # sits above the first section heading, so scanning only roles and the
+    # summary missed it entirely.
+    for raw in resume.section("_header").splitlines():
+        line = raw.strip()
+        if not line or len(line.split()) > 12:
+            continue
+        if EMAIL_RE.search(line) or PHONE_RE.search(line) or URL_RE.search(line):
+            continue
+        got = set(stems(line))
+        if not got:
+            continue
+        # Just under a held title: a stated target is a claim, not a record.
+        candidates.append((len(target & got) / len(target) * 0.95, f"headline {line!r}"))
+
     summary = resume.section("summary")
     if summary:
         got = set(stems(summary))
@@ -199,7 +215,7 @@ def _education_score(jd: JobDescription, resume: Resume) -> Tuple[float, str]:
 
 def _writing_score(resume: Resume) -> Tuple[float, str]:
     """Accomplishment quality: quantification, strong openers, bullet length."""
-    bullets = resume.bullets
+    bullets = resume.experience_bullets
     if not bullets:
         return 35.0, "no bullet points detected"
 
@@ -207,10 +223,10 @@ def _writing_score(resume: Resume) -> Tuple[float, str]:
     strong = 0
     weak = 0
     for b in bullets:
-        first = (tokenize(b) or [""])[0]
-        if first in STRONG_VERBS:
+        strength = opener_strength(b)
+        if strength == "strong":
             strong += 1
-        elif first in WEAK_OPENERS:
+        elif strength == "weak":
             weak += 1
     long_bullets = sum(1 for b in bullets if len(b.split()) > 45)
 

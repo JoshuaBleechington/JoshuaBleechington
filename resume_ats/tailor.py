@@ -143,6 +143,40 @@ def _competency_terms(resume: Resume) -> List[str]:
     return out
 
 
+# Glue words an initialism usually skips: SIEM is Security Information and
+# Event Management, not S-I-A-E-M.
+_ACRONYM_SKIP = frozenset({"and", "or", "of", "the", "for", "to", "in", "on", "a", "an"})
+
+
+def _is_acronym_of(short: str, long_form: str) -> bool:
+    """True when ``short`` is the initialism of ``long_form``.
+
+    Tested both with and without the glue words, since real acronyms are
+    inconsistent about them -- SIEM drops the "and", while R&D keeps it.
+    """
+    probe = short.replace(".", "").replace("-", "").replace("&", "").lower()
+    if len(probe) < 2 or " " in short.strip():
+        return False
+    words = [w for w in long_form.split() if w and w[0].isalnum()]
+    with_glue = "".join(w[0] for w in words).lower()
+    without_glue = "".join(w[0] for w in words if w.lower() not in _ACRONYM_SKIP).lower()
+    return probe in (with_glue, without_glue)
+
+
+def pair_forms(a: str, b: str) -> str:
+    """Render two names for one skill so a literal index finds both.
+
+    Spelling out an acronym on first use -- "SIEM (Security Information and
+    Event Management)" -- is ordinary resume practice, and it is the single
+    cheapest way to satisfy two postings that search for opposite halves of the
+    same pair.
+    """
+    short, long_form = (a, b) if len(a) <= len(b) else (b, a)
+    if _is_acronym_of(short, long_form):
+        return f"{short.upper()} ({long_form})"
+    return f"{a} ({b})"
+
+
 def _evidenced_gap_terms(
     jd: JobDescription, resume: Resume, index: ResumeIndex, lexicon: SkillLexicon
 ) -> Tuple[List[str], List[str]]:
@@ -167,16 +201,16 @@ def _evidenced_gap_terms(
             continue  # already worded exactly as the posting words it
 
         canonical_term = lexicon.resolve(term)
-        evidenced = False
+        resume_form = ""
         if canonical_term:
             for surface in lexicon.surfaces(canonical_term):
                 found, _ = index.contains(surface)
                 if found:
-                    evidenced = True
+                    resume_form = surface
                     break
-        if evidenced:
+        if resume_form:
             if len(addable) < MAX_ADDED_TERMS:
-                addable.append(term)
+                addable.append((term, resume_form))
         elif match.required or match.known_skill:
             absent.append(term)
     return addable, absent
@@ -283,13 +317,38 @@ def build(
     addable, absent = _evidenced_gap_terms(jd, resume, index, lexicon)
     acronyms = _acronyms(lexicon)
     competencies = _competency_terms(resume)
-    added_display = [_title_case_term(t, acronyms) for t in addable]
+
+    added_display: List[str] = []
+    paired = 0
+    for posting_form, resume_form in addable:
+        posting_display = _title_case_term(posting_form, acronyms)
+        resume_display = _title_case_term(resume_form, acronyms)
+        differs = posting_display.lower() != resume_display.lower()
+        is_pair = (_is_acronym_of(resume_form, posting_form)
+                   or _is_acronym_of(posting_form, resume_form))
+        if differs and is_pair:
+            added_display.append(pair_forms(posting_display, resume_display))
+            paired += 1
+        else:
+            added_display.append(posting_display)
     competencies.extend(added_display)
+
     if added_display:
         result.changes.append(Change(
             "terminology",
             "Added the posting's wording for skills the resume already "
             f"evidences under another name: {', '.join(added_display)}."))
+    if paired:
+        result.changes.append(Change(
+            "terminology",
+            f"Paired {paired} acronym(s) with their spelled-out form, so a "
+            "posting searching for either half finds it."))
+
+    # Lead with what this posting weights most heavily; a truncated read of a
+    # long competencies line then still covers the important terms.
+    weights = {r.term.lower(): r.weight for r in jd.requirements}
+    competencies.sort(key=lambda t: -max(
+        [weights.get(w, 0.0) for w in (t.lower(), t.lower().split(" (")[0])] or [0.0]))
 
     # ---- body ----------------------------------------------------------
     def heading(text: str) -> None:
@@ -403,6 +462,109 @@ def _source_warnings(text: str, resume: Resume) -> List[str]:
     if not resume.contact.email:
         warnings.append("No email address could be read from the original.")
     return warnings
+
+
+def _is_whole_requirement(line: str) -> bool:
+    """Filter out the second half of a wrapped posting line.
+
+    A requirement split across two lines yields fragments like "or related
+    field; equivalent experience will be considered." Handing that back as a
+    writing prompt is noise, so only lines that read as a complete statement
+    are used.
+    """
+    text = line.strip()
+    if len(text) < 35 or len(text) > 200:
+        return False
+    if not text[:1].isupper():
+        return False
+    first = text.split()[0].lower().rstrip(",")
+    if first in {"and", "or", "but", "with", "including", "that", "which", "to",
+                 "for", "as", "the", "a", "an", "in", "on", "of", "plus"}:
+        return False
+    return True
+
+
+def notes_markdown(result: TailorResult, jd: JobDescription, report=None) -> str:
+    """A working list for the candidate: what to write, and where.
+
+    Kept strictly separate from the resume.  Everything here is a prompt for
+    the person to answer from their own history -- the tool can say which
+    requirement has no counterpart in the resume, but only they know whether
+    they have done the work and what the number was.
+    """
+    name = result.resume.contact.name_guess if result.resume else ""
+    lines: List[str] = []
+    lines.append(f"# Tailoring notes — {jd.title or 'this posting'}")
+    lines.append("")
+    if name:
+        lines.append(f"For: {name}")
+    if report is not None:
+        lines.append(f"Current score against this posting: **{report.total:.1f}/100** ({report.band})")
+    lines.append("")
+    lines.append("> These are prompts, not content. Answer them from work you actually did, "
+                 "then paste the result into the resume. Nothing here has been written into "
+                 "the document.")
+    lines.append("")
+
+    if report is not None and report.failed_gates:
+        lines.append("## Blocking: unmet hard requirements")
+        lines.append("")
+        lines.append("A stated minimum behaves as a knockout, not a scoring factor. "
+                     "If you do meet these, say so explicitly and early.")
+        lines.append("")
+        for gate in report.failed_gates:
+            lines.append(f"- **{gate.detail}** — {gate.evidence}")
+        lines.append("")
+
+    if result.manual:
+        lines.append("## What the posting wants that your resume does not show")
+        lines.append("")
+        for item in result.manual:
+            lines.append(f"- {item.detail}")
+        lines.append("")
+
+    # Requirement lines with no counterpart: the clearest writing prompts there are.
+    if report is not None and report.context_pairs:
+        unmatched = [(line, sc) for line, sc, _ in report.context_pairs
+                     if sc < 0.10 and _is_whole_requirement(line)]
+        if unmatched:
+            lines.append("## Requirements with no matching line in your resume")
+            lines.append("")
+            lines.append("For each, ask: *have I done this?* If yes, write one bullet — "
+                         "**action verb + what you did + the scale + the result**. If no, skip it; "
+                         "do not write it.")
+            lines.append("")
+            for line, _ in unmatched[:12]:
+                lines.append(f"- [ ] {line}")
+                lines.append("      - Your bullet: ")
+            lines.append("")
+
+    if report is not None:
+        missing = report.missing(20)
+        if missing:
+            lines.append("## Missing keywords, ranked by how hard the posting leans on them")
+            lines.append("")
+            lines.append("| Term | Required | Where the posting says it |")
+            lines.append("|---|---|---|")
+            for match in missing:
+                req = match.requirement
+                context = (req.contexts[0] if req.contexts else "").replace("|", "/")[:90]
+                lines.append(f"| `{req.term}` | {'yes' if req.required else '—'} | {context} |")
+            lines.append("")
+
+    lines.append("## The two changes worth most, on any posting")
+    lines.append("")
+    lines.append("1. **Put numbers in your current role.** It is the first thing a recruiter "
+                 "reads and the last thing most resumes quantify. Scope, savings, percentage, "
+                 "headcount, contract value — two or three is enough.")
+    lines.append("2. **Match the posting's exact title** in the headline under your name. "
+                 "`tailor` does this automatically; check it reads naturally before sending.")
+    lines.append("")
+    lines.append("---")
+    lines.append("")
+    lines.append("_Generated alongside the tailored resume. This file is for you — do not "
+                 "send it with an application._")
+    return "\n".join(lines) + "\n"
 
 
 def to_text(result: TailorResult) -> str:

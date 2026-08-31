@@ -22,7 +22,8 @@ examples:
   resume-ats score resume.docx job.txt --format html -o report.html
   resume-ats audit resume.docx
   resume-ats compare v1.docx v2.docx v3.docx --jd job.txt
-  resume-ats tailor resume.docx job.txt -o tailored.docx
+  resume-ats tailor resume.docx job.txt -o tailored.docx --notes notes.md
+  resume-ats tailor resume.docx --jobs postings/ --outdir applications/
   resume-ats keywords job.txt --top 40
 """
 
@@ -197,10 +198,88 @@ def cmd_keywords(args: argparse.Namespace) -> int:
     return 0
 
 
+def _collect_jd_paths(entries: Sequence[str]) -> List[str]:
+    """Expand files and directories into a sorted list of job-description files."""
+    paths: List[str] = []
+    for entry in entries:
+        if os.path.isdir(entry):
+            for name in sorted(os.listdir(entry)):
+                if name.lower().endswith((".txt", ".md", ".markdown")):
+                    paths.append(os.path.join(entry, name))
+        else:
+            paths.append(entry)
+    return paths
+
+
+def cmd_tailor_batch(args: argparse.Namespace) -> int:
+    """Tailor one resume against many postings, one document each."""
+    from . import tailor as tailor_mod
+    from .score import score as run_score
+
+    lexicon = default_lexicon()
+    if args.aliases:
+        lexicon.load_extra(args.aliases)
+
+    document = _load_resume(args.resume, args.resume_text)
+    jd_paths = _collect_jd_paths(args.jobs)
+    if not jd_paths:
+        print("error: no job descriptions found", file=sys.stderr)
+        return 1
+
+    outdir = args.outdir or "applications"
+    os.makedirs(outdir, exist_ok=True)
+
+    rows = []
+    for jd_path in jd_paths:
+        stem = os.path.splitext(os.path.basename(jd_path))[0]
+        try:
+            jd_text = extract(jd_path).text
+        except ExtractionError as exc:
+            print(f"skipping {jd_path}: {exc}", file=sys.stderr)
+            continue
+        jd = parse_jd(jd_text, lexicon)
+        result = tailor_mod.build(document, jd, lexicon, headline=args.headline)
+        if result.source_warnings and not args.force:
+            print("error: the resume could not be rebuilt faithfully; "
+                  "run `tailor` on a single posting to see why", file=sys.stderr)
+            return 2
+
+        doc_path = os.path.join(outdir, f"{stem}.docx")
+        tailor_mod.save(result, doc_path)
+        before = run_score(document, jd, lexicon)
+        after = run_score(extract(doc_path), jd, lexicon)
+        notes_path = os.path.join(outdir, f"{stem}-notes.md")
+        with open(notes_path, "w", encoding="utf-8") as fh:
+            fh.write(tailor_mod.notes_markdown(result, jd, after))
+        rows.append((stem, jd.title, before.total, after.total, after.band,
+                     len(after.failed_gates)))
+
+    rows.sort(key=lambda r: -r[3])
+    if args.format == "json":
+        print(json.dumps([
+            {"posting": r[0], "title": r[1], "before": r[2], "after": r[3],
+             "band": r[4], "unmet_gates": r[5]} for r in rows], indent=2))
+        return 0
+
+    pad = max((len(r[0]) for r in rows), default=10)
+    out = [f"{len(rows)} tailored resume(s) written to {outdir}/", "-" * (pad + 40),
+           f"{'posting'.ljust(pad)}  before  after  band"]
+    for stem, _, before, after, band, gates in rows:
+        flag = f"  ({gates} unmet requirement{'s' if gates != 1 else ''})" if gates else ""
+        out.append(f"{stem.ljust(pad)}  {before:6.1f} {after:6.1f}  {band}{flag}")
+    out += ["", "Each posting also has a -notes.md working list of what only you can add.",
+            "Apply to the strongest matches first."]
+    _emit("\n".join(out), None)
+    return 0
+
+
 def cmd_tailor(args: argparse.Namespace) -> int:
     """Rebuild a resume as an ATS-aligned .docx aimed at one posting."""
     from . import tailor as tailor_mod
     from .score import score as run_score
+
+    if getattr(args, "jobs", None):
+        return cmd_tailor_batch(args)
 
     lexicon = default_lexicon()
     if args.aliases:
@@ -231,6 +310,11 @@ def cmd_tailor(args: argparse.Namespace) -> int:
     after = run_score(extract(out_path) if not out_path.lower().endswith((".txt", ".md"))
                       else from_string(result.text, out_path), jd, lexicon)
 
+    notes_path = args.notes
+    if notes_path:
+        with open(notes_path, "w", encoding="utf-8") as fh:
+            fh.write(tailor_mod.notes_markdown(result, jd, after))
+
     if args.format == "json":
         payload = {
             "output": out_path,
@@ -240,6 +324,7 @@ def cmd_tailor(args: argparse.Namespace) -> int:
             "score_after": after.total,
             "changes": [{"category": c.category, "detail": c.detail} for c in result.changes],
             "manual": [{"kind": m.kind, "detail": m.detail} for m in result.manual],
+            "notes": notes_path,
         }
         print(json.dumps(payload, indent=2))
         return 0
@@ -263,6 +348,9 @@ def cmd_tailor(args: argparse.Namespace) -> int:
         out += ["", "ONLY YOU CAN DO THESE (deliberately not written into the file)"]
         for item in result.manual:
             out.append(f"  - {_wrap_cli(item.detail, width - 4)}")
+
+    if notes_path:
+        out += ["", f"Working list written -> {notes_path}"]
 
     out += ["", "This rebuilds and re-words what your resume already says. It never adds",
             "an achievement, number, employer or skill you did not write yourself.",
@@ -383,6 +471,11 @@ def build_parser() -> argparse.ArgumentParser:
     p_tailor.add_argument("--headline",
                           help="headline to put under the name (defaults to the posting's title)")
     p_tailor.add_argument("-f", "--format", default="text", choices=["text", "json"])
+    p_tailor.add_argument("--jobs", nargs="+", metavar="PATH",
+                          help="tailor against several postings at once (files or a directory)")
+    p_tailor.add_argument("--outdir", help="where batch output goes (default: applications/)")
+    p_tailor.add_argument("--notes", metavar="PATH",
+                          help="also write a markdown working list of what only you can add")
     p_tailor.add_argument("--force", action="store_true",
                           help="write the file even when the source is too damaged to rebuild faithfully")
     add_common(p_tailor)

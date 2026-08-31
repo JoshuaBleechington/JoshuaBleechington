@@ -274,7 +274,11 @@ def _mine_terms(
                 line_weight *= 0.45
 
             seen_in_line = set()
-            for phrase in phrase_ngrams(line, 1, 4):
+            # Up to five raw tokens: a four-word skill containing a glue word
+            # ("security information and event management") needs five, and the
+            # candidate filter below rejects any long phrase the lexicon does
+            # not vouch for, so the extra length costs no precision.
+            for phrase in phrase_ngrams(line, 1, 5):
                 key = canonical(phrase)
                 if not key or key in seen_in_line:
                     continue

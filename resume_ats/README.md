@@ -103,12 +103,40 @@ rebuilds the document single-column with standard headings, native Word bullets
 and dates on the title line, sets a headline to the posting's title, and adds
 the posting's wording for a skill your resume already evidences under a
 different name — "solution consulting" where your resume says "presales".
+Where the two names are an acronym and its expansion, it writes both —
+`SIEM (Security Information and Event Management)` — because two postings
+routinely search for opposite halves of the same pair. Competencies are ordered
+so the terms this posting weights most heavily come first.
 
 **What it will not change.** It never writes an achievement, number, employer,
 credential or skill you did not write yourself. A tool that invents "increased
 revenue 40%" because a posting asked for revenue growth produces a document you
 have to defend in an interview. Terms the posting wants and your resume shows
 no evidence of are reported to *you*, separately, and never appear in the file.
+
+**Working across many postings.**
+
+```bash
+resume-ats tailor resume.docx --jobs postings/ --outdir applications/
+```
+
+Writes one tailored `.docx` per posting plus a `-notes.md` working list for
+each, and ranks them so you know which to apply to first:
+
+```
+posting                       before  after  band
+wns_vp_procurement              78.2   88.4  Strong
+zones_practice_director         77.6   84.9  Good
+accenture_strategy_principal    70.7   78.4  Good
+```
+
+**The working list (`--notes`).** The one thing the tool cannot do is write
+your accomplishments. What it can do is tell you exactly where the holes are:
+which stated requirements have no counterpart anywhere in your resume, which
+keywords the posting leans on hardest and the sentence each appears in, and
+which of your bullets carry no numbers. Every entry is a prompt to answer from
+your own history. The file is for you and is never part of the document you
+send.
 
 **When it refuses.** Tailoring can only rearrange what came out of the file. If
 the source is a graphic-led layout whose dates and headings never became text,
@@ -218,7 +246,7 @@ you actually did in the words the posting uses.
 python -m pytest tests -q
 ```
 
-107 tests cover extraction, section parsing, requirement mining, matching
+117 tests cover extraction, section parsing, requirement mining, matching
 precision, the parsing audit, scoring behaviour, document generation and the
 CLI. The tailoring tests pin the integrity guarantees hardest: no invented
 numbers, no unevidenced skills in the file, and advice to the candidate never

@@ -315,3 +315,107 @@ def test_plural_acronyms_are_capitalised():
     assert _title_case_term("oems", acr) == "OEMs"
     assert _title_case_term("oem", acr) == "OEM"
     assert _title_case_term("solution consulting", acr) == "Solution Consulting"
+
+
+# -- acronym pairing ---------------------------------------------------------
+
+def test_acronym_and_expansion_are_paired():
+    from resume_ats.tailor import pair_forms, _is_acronym_of
+    assert _is_acronym_of("tcv", "total contract value")
+    assert not _is_acronym_of("presales", "solution consulting")
+    assert pair_forms("TCV", "Total Contract Value") == "TCV (Total Contract Value)"
+    assert pair_forms("Total Contract Value", "TCV") == "TCV (Total Contract Value)"
+
+
+def test_pairing_puts_both_forms_where_an_index_finds_them():
+    resume = """Moe Y
+moe@example.com | (555) 010-2233
+
+AREAS OF EXPERTISE
+SIEM, incident response
+
+PROFESSIONAL EXPERIENCE
+Director | Acme | Jan 2015 - Present
+- Ran the SIEM platform for the estate.
+
+EDUCATION
+BS Engineering
+"""
+    jd = parse_jd("Director\n\nRequirements\n"
+                  "- Must have security information and event management experience.\n")
+    out = tailor.build(from_string(resume), jd, default_lexicon())
+    body = out.text.lower()
+    assert "siem" in body and "security information and event management" in body
+
+
+# -- the working list --------------------------------------------------------
+
+def test_notes_are_generated_and_never_enter_the_resume(result):
+    from resume_ats.score import score
+    notes = tailor.notes_markdown(result, parse_jd(JD), score(from_string(STACKED_RESUME), parse_jd(JD)))
+    assert "# Tailoring notes" in notes
+    assert "do not send it with an application" in notes
+    for phrase in ("Tailoring notes", "Your bullet", "prompts, not content"):
+        assert phrase not in result.text
+
+
+def test_notes_filter_out_wrapped_line_fragments():
+    from resume_ats.tailor import _is_whole_requirement
+    assert _is_whole_requirement("Lead complex global procurement transformation programs.")
+    assert not _is_whole_requirement("or related field; equivalent experience considered.")
+    assert not _is_whole_requirement("and operational objectives that support growth.")
+    assert not _is_whole_requirement("Short.")
+
+
+def test_competencies_lead_with_the_postings_heaviest_terms():
+    resume = """Moe Y
+moe@example.com | (555) 010-2233
+
+AREAS OF EXPERTISE
+Volunteering, Presales Engagement, Gardening
+
+PROFESSIONAL EXPERIENCE
+Director | Acme | Jan 2015 - Present
+- Led presales engagement for managed services pursuits.
+
+EDUCATION
+BS Engineering
+"""
+    jd = parse_jd("Director, Presales\n\nRequirements\n"
+                  "- Must have presales experience. Presales leadership is required.\n")
+    out = tailor.build(from_string(resume), jd, default_lexicon())
+    line = next(l for l in out.text.splitlines() if "Presales Engagement" in l)
+    assert line.index("Presales Engagement") < line.index("Gardening")
+
+
+# -- batch -------------------------------------------------------------------
+
+def test_batch_writes_a_document_and_notes_per_posting(tmp_path):
+    from resume_ats.cli import main
+    resume = tmp_path / "r.txt"
+    resume.write_text(STACKED_RESUME, encoding="utf-8")
+    jobs = tmp_path / "jobs"
+    jobs.mkdir()
+    (jobs / "alpha.txt").write_text(JD, encoding="utf-8")
+    (jobs / "beta.txt").write_text(UNGATED_JD, encoding="utf-8")
+    outdir = tmp_path / "apps"
+
+    assert main(["tailor", str(resume), "--jobs", str(jobs), "--outdir", str(outdir)]) == 0
+    for stem in ("alpha", "beta"):
+        assert (outdir / f"{stem}.docx").exists()
+        assert (outdir / f"{stem}-notes.md").exists()
+
+
+def test_batch_output_never_contains_invented_numbers(tmp_path):
+    from resume_ats.cli import main
+    resume = tmp_path / "r.txt"
+    resume.write_text(STACKED_RESUME, encoding="utf-8")
+    jobs = tmp_path / "jobs"
+    jobs.mkdir()
+    (jobs / "alpha.txt").write_text(JD, encoding="utf-8")
+    outdir = tmp_path / "apps"
+    main(["tailor", str(resume), "--jobs", str(jobs), "--outdir", str(outdir)])
+
+    nums = lambda t: set(re.findall(r"\$?\d[\d,.]*%?", t))
+    produced = extract(str(outdir / "alpha.docx")).text
+    assert not (nums(produced) - nums(STACKED_RESUME))

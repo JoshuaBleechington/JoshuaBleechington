@@ -219,6 +219,11 @@ def match_requirements(
             present, count = index.contains(form)
             if present:
                 status = "exact" if i == 0 else "alias"
+                # The skills-list penalty is for a capability you listed but
+                # never showed doing. Showing it under a different name is
+                # still showing it, so check every equivalent surface form
+                # before docking the match.
+                demonstrated = any(_outside_skills(index, f) for f in forms)
                 best = TermMatch(
                     requirement=req,
                     status=status,
@@ -226,7 +231,7 @@ def match_requirements(
                     evidence=index.find_line(form),
                     occurrences=count,
                     in_recent_role=index.in_recent(form),
-                    in_skills_only=index.in_skills(form) and not _outside_skills(index, form),
+                    in_skills_only=index.in_skills(form) and not demonstrated,
                 )
                 break
         if best is None:

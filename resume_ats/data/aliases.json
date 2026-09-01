@@ -705,6 +705,108 @@
       "return on investment",
       "tco",
       "total cost of ownership"
+    ],
+    "sales enablement": [
+      "enablement",
+      "sales training",
+      "sales coaching",
+      "field enablement",
+      "seller enablement",
+      "sales readiness"
+    ],
+    "cross functional leadership": [
+      "cross-functional leadership",
+      "cross functional teams",
+      "cross-functional teams",
+      "matrix leadership",
+      "cross functional collaboration"
+    ],
+    "business planning": [
+      "account planning",
+      "strategic business plans",
+      "business plans",
+      "strategic planning",
+      "growth planning"
+    ],
+    "strategic partners": [
+      "partner relationships",
+      "partner ecosystem",
+      "alliance partners",
+      "technology partners",
+      "joint go to market",
+      "partner strategy"
+    ],
+    "practice leadership": [
+      "practice",
+      "practice management",
+      "capability leadership",
+      "service line leadership",
+      "practice director"
+    ],
+    "executive leadership": [
+      "executive stakeholders",
+      "executive presence",
+      "executive communication",
+      "c-suite engagement"
+    ],
+    "operating model": [
+      "target operating model",
+      "tom",
+      "tom design",
+      "operating model design",
+      "org design"
+    ],
+    "commercial acumen": [
+      "commercial constructs",
+      "commercial management",
+      "pricing strategy",
+      "deal economics",
+      "commercial strategy"
+    ],
+    "business development": [
+      "new logo acquisition",
+      "new logo",
+      "revenue growth",
+      "bookings growth",
+      "signings growth",
+      "pipeline development"
+    ],
+    "technology consulting": [
+      "it consulting",
+      "technology advisory",
+      "advisory services",
+      "management consulting"
+    ],
+    "thought leadership": [
+      "industry forums",
+      "conference speaking",
+      "white papers",
+      "published articles"
+    ],
+    "solution reviews": [
+      "solution review",
+      "deal reviews",
+      "design reviews",
+      "architecture reviews",
+      "bid reviews"
+    ],
+    "technical resources": [
+      "solution architects",
+      "technical teams",
+      "technical staff",
+      "architects",
+      "engineering teams"
+    ],
+    "customer workshops": [
+      "client workshops",
+      "discovery workshops",
+      "design workshops"
+    ],
+    "mentoring": [
+      "coaching",
+      "mentorship",
+      "talent development",
+      "people development"
     ]
   },
   "business_certs": {

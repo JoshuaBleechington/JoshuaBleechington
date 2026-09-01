@@ -337,6 +337,48 @@ def _mine_terms(
     return found
 
 
+# Verb forms that begin or end a mid-sentence fragment. A phrase hinged on one
+# of these ("leading global procurement", "success building") is a slice of a
+# sentence, not a skill. Nouns that merely end in -ing -- engineering,
+# consulting, marketing, planning, training -- are deliberately absent.
+GERUND_HINGES = frozenset("""
+leading building driving managing developing creating ensuring supporting
+delivering providing working using including scaling commercializing defining
+establishing identifying partnering collaborating monitoring representing
+fostering sponsoring guiding advising enabling executing owning translating
+maintaining leveraging aligning shaping growing serving
+""".split())
+
+# Modifier suffixes. "AI-enabled", "market-leading" and "executive-level"
+# qualify a skill; alone they are adjectives, and reporting one as a missing
+# keyword tells a candidate to add a word rather than a capability.
+MODIFIER_SUFFIXES = ("-enabled", "-led", "-driven", "-based", "-level", "-leading",
+                     "-focused", "-oriented", "-facing", "-ready", "-centric",
+                     "-native", "-first", "-wide", "-critical", "-grade")
+
+# Generic business nouns a posting uses to frame a requirement rather than to
+# name one. Every one of these was reported as a missing keyword against a real
+# posting, where "add the word firm to your resume" is worse than useless: it
+# pads the denominator and understates how well the resume actually covers the
+# job.
+VAGUE_SINGLES = frozenset("""
+experience knowledge understanding ability skills strong excellent years work
+working team environment including related field level support using use new
+well etc firm practice industry industries provider providers network networks
+communication communications define scaling global market markets business
+organization organizations company companies client clients customer customers
+stakeholder stakeholders leader leaders analyst analysts executive executives
+professional professionals priorities priority objectives outcomes initiatives
+reviews review resources growth success excellence innovation insights trends
+vision culture impact opportunities opportunity engagements solutions offerings
+methodologies frameworks practices approaches capabilities
+serves serve define defines drive drives lead leads own owns build builds
+deliver delivers ensure ensures supports manage manages develop develops
+create creates execute executes execution monitor monitors represent
+represents identify identifies collaborate partner partners translate foster
+sponsor guide advise enable maintain leverage align shape grow pipeline
+""".split())
+
 # Generic container nouns.  A phrase ending in one is a wrapper around the real
 # skill ("SIEM platforms" -> "SIEM"), and reporting both as separate gaps is
 # noise, so phrases are trimmed to the skill itself.
@@ -417,13 +459,24 @@ def _is_candidate(phrase: str, key: str, lexicon: Optional[SkillLexicon] = None)
             return False
         # Bare verbs and vague nouns add noise as single tokens; they still
         # count inside longer phrases.
-        if w in {"experience", "knowledge", "understanding", "ability", "skills",
-                 "strong", "excellent", "years", "work", "working", "team",
-                 "environment", "including", "related", "field", "level",
-                 "support", "using", "use", "new", "well", "etc"}:
+        if w in VAGUE_SINGLES:
+            return False
+        if w.endswith(MODIFIER_SUFFIXES):
             return False
     if all(w.isdigit() or len(w) <= 2 for w in words):
         return False
+    # "15+" is a quantity, not a keyword.
+    if words and all(w.rstrip("+-").isdigit() for w in words):
+        return False
+    # A phrase hinged on a bare verb form is a slice of a sentence.
+    if len(words) > 1 and (words[0] in GERUND_HINGES or words[-1] in GERUND_HINGES):
+        if lexicon is None or lexicon.resolve(phrase) is None:
+            return False
+    # A phrase made entirely of generic words names nothing: "business growth"
+    # and "practice priorities" are framing, not capabilities.
+    if len(words) > 1 and all(w in VAGUE_SINGLES for w in words):
+        if lexicon is None or lexicon.resolve(phrase) is None:
+            return False
     # Stray single letters come from possessives ("bachelor's" -> "bachelor s").
     if any(len(w) == 1 and not w.isdigit() for w in words):
         return False

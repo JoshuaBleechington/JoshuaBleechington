@@ -368,3 +368,60 @@ def test_short_but_well_structured_resume_is_not_a_parse_blocker(tmp_path):
     codes = {f.code for f in result.findings}
     assert "extract.empty" not in codes, "a short but well-parsed resume is not unreadable"
     assert "length.short" in codes, "brevity is still reported, as a lesser finding"
+
+
+def test_a_skill_demonstrated_under_another_name_is_not_docked_as_list_only():
+    """The penalty is for listing a skill you never showed doing."""
+    from resume_ats.aliases import default_lexicon
+    from resume_ats.jd import parse as parse_jd
+    from resume_ats.match import ResumeIndex, match_requirements
+    from resume_ats.resume import parse as rp
+
+    resume = """Moe Y
+moe@example.com | (555) 010-2233
+
+CORE COMPETENCIES
+Solution Consulting, Managed Services
+
+PROFESSIONAL EXPERIENCE
+Director | Acme | Jan 2015 - Present
+- Led presales engagement across managed services pursuits.
+
+EDUCATION
+BS Engineering
+"""
+    jd = parse_jd("Director\n\nRequirements\n- Must have solution consulting experience.\n")
+    parsed = rp(resume)
+    index = ResumeIndex(resume, skills_text=parsed.section("skills"))
+    matches = match_requirements(jd.requirements, index, default_lexicon())
+    hit = next((m for m in matches if m.requirement.term == "solution consulting"), None)
+    assert hit is not None and hit.status != "missing"
+    # "presales" in a bullet demonstrates the same capability.
+    assert not hit.in_skills_only
+
+
+def test_a_skill_listed_and_never_shown_is_still_docked():
+    from resume_ats.aliases import default_lexicon
+    from resume_ats.jd import parse as parse_jd
+    from resume_ats.match import ResumeIndex, match_requirements
+    from resume_ats.resume import parse as rp
+
+    resume = """Moe Y
+moe@example.com | (555) 010-2233
+
+CORE COMPETENCIES
+Kubernetes, Managed Services
+
+PROFESSIONAL EXPERIENCE
+Director | Acme | Jan 2015 - Present
+- Ran the account governance process.
+
+EDUCATION
+BS Engineering
+"""
+    jd = parse_jd("Director\n\nRequirements\n- Must have Kubernetes experience.\n")
+    parsed = rp(resume)
+    index = ResumeIndex(resume, skills_text=parsed.section("skills"))
+    matches = match_requirements(jd.requirements, index, default_lexicon())
+    hit = next((m for m in matches if "kubernetes" in m.requirement.term), None)
+    assert hit is not None and hit.in_skills_only

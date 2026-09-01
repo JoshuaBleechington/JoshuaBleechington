@@ -125,10 +125,28 @@ def opener_strength(bullet: str) -> str:
         return "strong"
     return "neutral"
 
+# Units seen in real accomplishment bullets. The list was short enough to miss
+# genuine quantification -- "raising customer satisfaction 10 points" read as
+# unquantified -- which understates a resume's writing quality and sends the
+# candidate off to add numbers that are already there.
+_METRIC_UNITS = (
+    r"x|hours?|hrs?|days?|weeks?|months?|years?|users?|endpoints?|servers?|"
+    r"alerts?|incidents?|systems?|accounts?|devices?|tickets?|points?|pts?|"
+    r"bps|fte|headcount|clients?|customers?|projects?|programs?|programmes?|"
+    r"sites?|countries|regions?|teams?|engineers?|staff|seats?|licen[cs]es?|"
+    r"releases?|deals?|logos?|vendors?|partners?|suppliers?|contracts?|"
+    r"k\b|m\b|mm\b|bn\b"
+)
+_SPELLED = r"one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve"
+
+# Built by concatenation: the pattern contains a literal "%" for percentages,
+# which %-formatting would try to interpret.
 METRIC_RE = re.compile(
-    r"(?:\$\s?\d|\d+\s?(?:%|percent)|\b\d{1,3}(?:,\d{3})+\b|\b\d+\s?(?:x|hours?|hrs?|"
-    r"days?|weeks?|months?|users?|endpoints?|servers?|alerts?|incidents?|systems?|"
-    r"accounts?|devices?|tickets?|k\b|m\b|mm\b|bn\b))",
+    r"(?:\$\s?\d"                        # a dollar amount
+    r"|\d+(?:\.\d+)?\s?(?:%|percent)"    # a percentage
+    r"|\b\d{1,3}(?:,\d{3})+\b"           # a grouped number
+    r"|\b\d+(?:\.\d+)?\s?(?:" + _METRIC_UNITS + r")"      # a number with a unit
+    r"|\b(?:" + _SPELLED + r")\s+(?:" + _METRIC_UNITS + r"))",  # spelled-out plus unit
     re.I,
 )
 

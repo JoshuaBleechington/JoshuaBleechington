@@ -204,7 +204,12 @@ def degree_evidence(resume: Resume) -> int:
 def _education_score(jd: JobDescription, resume: Resume) -> Tuple[float, str]:
     have = degree_evidence(resume)
     if jd.min_degree is None:
-        return (85.0, "no degree requirement stated") if have else (70.0, "no degree requirement stated; none detected")
+        # A posting that states no requirement cannot be under-met. Holding a
+        # degree anyway is full marks; the old 85 ceiling docked a candidate
+        # for a gap that did not exist and could not be closed.
+        if have:
+            return 100.0, "no degree requirement stated; resume shows a degree"
+        return 70.0, "no degree requirement stated; none detected"
     need = degree_rank(jd.min_degree)
     if have >= need:
         return 100.0, f"posting asks for a {jd.min_degree} degree; resume shows an equal or higher degree"

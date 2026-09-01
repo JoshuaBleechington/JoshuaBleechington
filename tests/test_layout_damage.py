@@ -425,3 +425,25 @@ BS Engineering
     matches = match_requirements(jd.requirements, index, default_lexicon())
     hit = next((m for m in matches if "kubernetes" in m.requirement.term), None)
     assert hit is not None and hit.in_skills_only
+
+
+def test_exceeding_a_stated_minimum_is_a_full_pass():
+    """An ATS years filter asks years >= minimum; exceeding it is not a demerit."""
+    from resume_ats.jd import parse as parse_jd
+    from resume_ats.score import _experience_score, score
+
+    class _R:
+        years_experience = 28.0
+    jd = parse_jd("Director\n\nRequirements\n- Minimum of 5 years of experience.\n")
+    assert jd.min_years == 5.0
+    assert _experience_score(jd, _R())[0] == 100.0
+
+
+def test_falling_short_of_a_minimum_still_costs():
+    from resume_ats.jd import parse as parse_jd
+    from resume_ats.score import _experience_score
+
+    class _R:
+        years_experience = 2.0
+    jd = parse_jd("Director\n\nRequirements\n- Minimum of 10 years of experience.\n")
+    assert _experience_score(jd, _R())[0] < 40.0

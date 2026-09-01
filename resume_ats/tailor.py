@@ -443,6 +443,14 @@ def build(
                 "first. Add scope, savings, percentages or headcount to two or "
                 "three of them."))
 
+    if jd.min_years and resume.years_experience >= jd.min_years * 2.5:
+        result.manual.append(ManualItem(
+            "verify",
+            f"You evidence about {resume.years_experience:.0f} years against a "
+            f"{jd.min_years:.0f}-year minimum. No keyword filter penalises that, but a "
+            "human reader may read it as overqualified. If the level is right for you, "
+            "say why you want this scope in the cover note."))
+
     skills_only = [m.requirement.term for m in match_requirements(jd.requirements, index, lexicon)
                    if m.status != "missing" and m.in_skills_only][:8]
     if skills_only:

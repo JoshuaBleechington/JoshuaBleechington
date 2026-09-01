@@ -180,8 +180,13 @@ def _experience_score(jd: JobDescription, resume: Resume) -> Tuple[float, str]:
         return 15.0, f"posting asks for {need:.0f}+ years; none could be parsed from dates"
     ratio = have / need
     if ratio >= 1.0:
-        # Being wildly over the requirement is a mild negative in practice.
-        score = 100.0 if ratio <= 2.5 else 88.0
+        # A stated minimum is a threshold: an applicant tracking system asks
+        # whether years >= minimum, and exceeding it is a full pass. Docking
+        # someone for being well over the bar encoded a human screening
+        # dynamic ("overqualified") that this component does not model and
+        # that no keyword filter applies. It belongs in the working list, not
+        # in a score about clearing the filter.
+        score = 100.0
     else:
         score = max(10.0, 100.0 * (ratio ** 1.5))
     return score, f"posting asks {need:.0f}+ years; resume evidences about {have} years"

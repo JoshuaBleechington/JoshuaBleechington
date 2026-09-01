@@ -22,7 +22,7 @@ $ resume-ats score resume.docx job-posting.txt
 | `keywords` | 30 | Weighted coverage of terms mined from the posting, with alias and acronym resolution |
 | `context` | 14 | Whether requirements are evidenced in real bullets, not just listed |
 | `title` | 10 | Overlap between your job titles and the requisition title |
-| `experience` | 10 | Years evidenced by your date ranges vs. years asked for |
+| `experience` | 10 | Years evidenced by your date ranges against the stated minimum (a threshold, so exceeding it is a full pass) |
 | `education` | 6 | Degree level and certifications against stated minimums |
 | `writing` | 8 | Quantified results, strong action verbs, bullet hygiene |
 
@@ -256,7 +256,7 @@ collapses and the audit reports no bullet points, the export dropped them.
 python -m pytest tests -q
 ```
 
-123 tests cover extraction, section parsing, requirement mining, matching
+125 tests cover extraction, section parsing, requirement mining, matching
 precision, the parsing audit, scoring behaviour, document generation and the
 CLI. The tailoring tests pin the integrity guarantees hardest: no invented
 numbers, no unevidenced skills in the file, and advice to the candidate never

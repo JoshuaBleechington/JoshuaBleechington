@@ -133,11 +133,42 @@ def _join_wrapped(text: str) -> List[str]:
             continue
         stripped = line.strip()
         starts_item = stripped.startswith(("-", "\u2022", "*"))
-        if out and not starts_item and not out[-1].rstrip().endswith((",", "|", ":", ";")):
+        # A line opening its own "Category: ..." block is not a continuation,
+        # or three skill categories merge into one run-on line.
+        colon = stripped.find(":")
+        starts_category = 0 < colon <= 70 and len(stripped[:colon].split()) <= 8
+        if (out and not starts_item and not starts_category
+                and not out[-1].rstrip().endswith((",", "|", ":", ";"))):
             out[-1] = out[-1].rstrip() + " " + stripped
         else:
             out.append(stripped)
     return out
+
+
+def _competency_lines(resume: Resume) -> List[Tuple[str, List[str]]]:
+    """The skills section as (label, items) groups, preserving the author's own.
+
+    A senior resume can carry a hundred competencies under half a dozen
+    headings. Flattening those into one pipe-delimited paragraph is technically
+    parseable and miserable to read, so the groups are kept.
+    """
+    groups: List[Tuple[str, List[str]]] = []
+    for chunk in _join_wrapped(resume.section("skills")):
+        chunk = chunk.strip().lstrip("-\u2022*").strip()
+        if not chunk:
+            continue
+        label = ""
+        colon = chunk.find(":")
+        if 0 < colon <= 70 and len(chunk[:colon].split()) <= 8:
+            label, chunk = chunk[:colon].strip(), chunk[colon + 1:]
+        items: List[str] = []
+        for part in chunk.replace("|", ",").split(","):
+            part = " ".join(part.split())
+            if 1 < len(part) <= 60:
+                items.append(part)
+        if items:
+            groups.append((label, items))
+    return groups
 
 
 def _competency_terms(resume: Resume) -> List[str]:
@@ -152,8 +183,12 @@ def _competency_terms(resume: Resume) -> List[str]:
         if not chunk:
             continue
         # A "Category: a, b, c" line contributes its items, not its label.
-        if ":" in chunk and len(chunk.split(":")[0].split()) <= 4:
-            chunk = chunk.split(":", 1)[1]
+        # The label can itself contain commas -- "Governance, Risk, and
+        # Compliance (GRC):" -- and a four-word limit split that into three
+        # bogus skills plus a run-on. Judge by where the colon sits instead.
+        colon = chunk.find(":")
+        if 0 < colon <= 70 and len(chunk[:colon].split()) <= 8:
+            chunk = chunk[colon + 1:]
         for part in chunk.replace("|", ",").split(","):
             part = " ".join(part.split())
             if 1 < len(part) <= 60:
@@ -383,8 +418,23 @@ def build(
         if key == "skills":
             if competencies:
                 heading(label)
-                result.blocks.append(Block([Run(_clean(" | ".join(competencies)), size=20)],
-                                           space_after=40))
+                groups = _competency_lines(resume)
+                labelled = [g for g in groups if g[0]]
+                if len(labelled) >= 2:
+                    # Keep the author's own grouping, and put the terms this
+                    # posting adds on their own final line.
+                    for group_label, items in groups:
+                        text = " | ".join(items)
+                        prefix = f"{group_label}: " if group_label else ""
+                        result.blocks.append(
+                            Block([Run(_clean(prefix + text), size=20)], space_after=30))
+                    if added_display:
+                        result.blocks.append(Block(
+                            [Run(_clean("Additional: " + " | ".join(added_display)), size=20)],
+                            space_after=40))
+                else:
+                    result.blocks.append(
+                        Block([Run(_clean(" | ".join(competencies)), size=20)], space_after=40))
             continue
 
         if key == "experience":

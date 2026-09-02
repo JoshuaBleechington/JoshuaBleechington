@@ -584,3 +584,109 @@ def test_the_cover_letter_is_still_dropped_not_rescued():
     out = tailor.build(from_string(source), parse_jd(JD), default_lexicon())
     assert "passion for excellence" not in out.text
     assert "9,123,456" in out.text
+
+
+# -- the "Position" bug: a date line above the job title ---------------------
+
+DATES_ABOVE = """Joshua B
+Phoenix, AZ | 602-555-0100 | jb@example.com
+
+SUMMARY
+CISSP certified cloud security analyst.
+
+CORE COMPETENCIES
+Governance, Risk, and Compliance (GRC): NIST 800-53, HIPAA, Risk Register
+Vulnerability Management: Tenable.io, Nessus, CVE Triage
+
+PROFESSIONAL EXPERIENCE
+February 2020 - Present
+Cloud Security Analyst, Acme Corp
+- Built KQL detections in Microsoft Sentinel, cutting alert fatigue 40%.
+
+June 2017 - January 2020
+Security Analyst, Betaco
+- Ran authenticated vulnerability scans across 900 endpoints.
+
+EDUCATION
+BS Information Technology
+"""
+
+
+def test_a_date_line_above_the_title_still_names_the_role():
+    """A right-aligned date often extracts onto the line above the title."""
+    resume = parse_resume(DATES_ABOVE)
+    assert len(resume.roles) == 2
+    assert resume.roles[0].title == "Cloud Security Analyst"
+    assert resume.roles[0].organization == "Acme Corp"
+    assert resume.roles[1].title == "Security Analyst"
+    assert resume.roles[1].organization == "Betaco"
+
+
+def test_no_role_is_ever_rendered_as_the_word_position():
+    out = tailor.build(from_string(DATES_ABOVE), parse_jd(JD), default_lexicon())
+    assert "\nPosition\n" not in out.text
+    assert "Cloud Security Analyst" in out.text
+    assert "Security Analyst | Betaco" in out.text
+
+
+def test_a_later_role_does_not_steal_the_previous_titles():
+    """With dates above the name, role two was taking role one's title."""
+    resume = parse_resume(DATES_ABOVE)
+    assert resume.roles[0].title != resume.roles[1].title
+    assert resume.roles[0].organization != resume.roles[1].organization
+
+
+DATES_BELOW = DATES_ABOVE.replace(
+    "February 2020 - Present\nCloud Security Analyst, Acme Corp",
+    "Cloud Security Analyst, Acme Corp\nFebruary 2020 - Present",
+).replace(
+    "June 2017 - January 2020\nSecurity Analyst, Betaco",
+    "Security Analyst, Betaco\nJune 2017 - January 2020",
+)
+
+
+def test_a_borrowed_heading_is_not_also_kept_as_the_previous_roles_content():
+    """The line naming role two was surviving as a stray line under role one."""
+    out = tailor.build(from_string(DATES_BELOW), parse_jd(JD), default_lexicon())
+    headings = [line for line in out.text.splitlines() if "Betaco" in line]
+    assert headings == ["Security Analyst | Betaco"]
+
+
+def test_both_date_layouts_rebuild_to_the_same_headings():
+    above = tailor.build(from_string(DATES_ABOVE), parse_jd(JD), default_lexicon())
+    below = tailor.build(from_string(DATES_BELOW), parse_jd(JD), default_lexicon())
+    pick = lambda t: [l for l in t.splitlines() if "|" in l and ("Acme" in l or "Betaco" in l)]
+    assert pick(above.text) == pick(below.text)
+
+
+def test_the_employer_keeps_its_name_without_the_location():
+    resume = parse_resume("""J B
+jb@example.com | (555) 010-2233
+
+PROFESSIONAL EXPERIENCE
+Acme Corp - Phoenix, AZ
+Cloud Security Analyst
+February 2020 - Present
+- Built detections.
+
+EDUCATION
+BS IT
+""")
+    assert resume.roles[0].organization == "Acme Corp"
+    assert resume.roles[0].title == "Cloud Security Analyst"
+
+
+# -- competency categories ---------------------------------------------------
+
+def test_a_multi_word_category_label_is_not_split_into_skills():
+    """"Governance, Risk, and Compliance (GRC):" is a label, not three skills."""
+    out = tailor.build(from_string(DATES_ABOVE), parse_jd(JD), default_lexicon())
+    assert "Governance, Risk, and Compliance (GRC): NIST 800-53" in out.text
+    assert "| Governance |" not in out.text
+
+
+def test_skill_categories_stay_on_their_own_lines():
+    out = tailor.build(from_string(DATES_ABOVE), parse_jd(JD), default_lexicon())
+    lines = [l for l in out.text.splitlines() if ":" in l and "|" in l]
+    assert any(l.startswith("Vulnerability Management:") for l in lines)
+    assert not any("Risk Register Vulnerability Management" in l for l in out.text.splitlines())

@@ -410,9 +410,7 @@
   },
   "general": {
     "stakeholder management": [
-      "stakeholder engagement",
-      "cross functional collaboration",
-      "cross-functional"
+      "stakeholder engagement"
     ],
     "risk assessment": [
       "risk analysis",
@@ -629,9 +627,7 @@
       "ciso"
     ],
     "stakeholder management": [
-      "stakeholder engagement",
-      "executive communication",
-      "executive presence"
+      "stakeholder engagement"
     ],
     "net promoter score": [
       "nps",
@@ -718,8 +714,9 @@
       "cross-functional leadership",
       "cross functional teams",
       "cross-functional teams",
-      "matrix leadership",
-      "cross functional collaboration"
+      "cross functional collaboration",
+      "cross-functional",
+      "matrix leadership"
     ],
     "business planning": [
       "account planning",
@@ -744,10 +741,10 @@
       "practice director"
     ],
     "executive leadership": [
-      "executive stakeholders",
       "executive presence",
       "executive communication",
-      "c-suite engagement"
+      "c-suite engagement",
+      "executive stakeholder management"
     ],
     "operating model": [
       "target operating model",

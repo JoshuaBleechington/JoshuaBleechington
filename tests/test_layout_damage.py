@@ -447,3 +447,51 @@ def test_falling_short_of_a_minimum_still_costs():
         years_experience = 2.0
     jd = parse_jd("Director\n\nRequirements\n- Minimum of 10 years of experience.\n")
     assert _experience_score(jd, _R())[0] < 40.0
+
+
+def test_the_hiring_companys_name_is_not_a_required_keyword():
+    """Nobody can put the employer's own name on their resume."""
+    from resume_ats.jd import parse as parse_jd
+    jd = parse_jd("""Senior Director, Solution Consulting
+Acmetech - Remote
+
+About Acmetech
+Acmetech is a leading provider of managed services.
+
+Requirements
+- Must have presales experience.
+- Strong ITIL knowledge required.
+""")
+    terms = {r.term for r in jd.requirements}
+    assert "acmetech" not in terms
+    assert "presales" in terms or "itil" in terms
+
+
+def test_a_common_noun_in_the_company_name_is_kept_when_it_recurs():
+    """"WNS Global Services" must not cost the keyword "services"."""
+    from resume_ats.jd import parse as parse_jd
+    jd = parse_jd("""Director, Delivery
+Northwind Global Services - Remote
+
+Responsibilities
+- Own managed services delivery for enterprise accounts.
+- Grow professional services revenue across the portfolio.
+- Lead services transformation for strategic clients.
+
+Requirements
+- Experience running services engagements.
+""")
+    assert "northwind" in jd.company_tokens
+    assert "services" not in jd.company_tokens
+
+
+def test_a_product_sharing_the_employers_name_is_still_mined():
+    """An employer called Splunk must not blind the miner to Splunk."""
+    from resume_ats.jd import parse as parse_jd
+    jd = parse_jd("""Security Engineer
+Splunk - Remote
+
+Requirements
+- Must have Splunk administration experience.
+""")
+    assert "splunk" not in jd.company_tokens

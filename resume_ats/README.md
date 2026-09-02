@@ -205,7 +205,7 @@ forms onto canonical terms. Add your own field's vocabulary there, or pass
 
 **Noise filtering.** Terms are mined only from responsibility and requirement
 blocks. Benefits, EEO statements and company blurbs are excluded, so the tool
-never tells you to add `401k` or `equal opportunity employer` to your resume.
+never tells you to add `401k` or `equal opportunity employer` to your resume. The hiring company's own name is excluded too, unless it is also a product you could genuinely have used.
 Requirement language (`must have`, `minimum`, `expertise in`) is stripped from
 phrases, and fragments that only ever appear inside a stronger term are
 suppressed, so `security operations center` is reported once rather than as
@@ -256,7 +256,7 @@ collapses and the audit reports no bullet points, the export dropped them.
 python -m pytest tests -q
 ```
 
-125 tests cover extraction, section parsing, requirement mining, matching
+128 tests cover extraction, section parsing, requirement mining, matching
 precision, the parsing audit, scoring behaviour, document generation and the
 CLI. The tailoring tests pin the integrity guarantees hardest: no invented
 numbers, no unevidenced skills in the file, and advice to the candidate never

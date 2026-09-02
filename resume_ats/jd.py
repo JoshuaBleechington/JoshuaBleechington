@@ -13,7 +13,7 @@ import math
 import re
 from collections import Counter, defaultdict
 from dataclasses import dataclass, field
-from typing import Dict, List, Optional, Sequence, Tuple
+from typing import Dict, List, Optional, Sequence, Set, Tuple
 
 from .aliases import SkillLexicon, default_lexicon
 from .text import STOPWORDS, canonical, is_bullet, normalize, phrase_ngrams, strip_bullet
@@ -125,6 +125,7 @@ class JobDescription:
     min_degree: Optional[str] = None
     clearance: Optional[str] = None
     blocks: List[Tuple[str, str, str]] = field(default_factory=list)  # (heading, kind, text)
+    company_tokens: Set[str] = field(default_factory=set)
 
     def top(self, n: int = 30) -> List[Requirement]:
         return sorted(self.requirements, key=lambda r: -r.weight)[:n]
@@ -150,6 +151,53 @@ def degree_rank(text: str) -> int:
         if re.search(r"\b" + re.escape(name) + r"\b", t):
             best = max(best, rank)
     return best
+
+
+# Words that appear in section headings, never in an employer's name.
+_SECTION_VOCAB = frozenset(
+    w for name in (NOISE_SECTIONS + REQUIRED_SECTIONS + PREFERRED_SECTIONS
+                   + RESPONSIBILITY_SECTIONS)
+    for w in name.split()
+) | {"overview", "summary", "description", "position", "job", "posting"}
+
+_COMPANY_PATTERNS = (
+    re.compile(r"^\s*([A-Z][\w&.\-]*(?:\s+[A-Z][\w&.\-]*){0,3})\s*[-\u2013\u2014|]\s*\S", re.M),
+    re.compile(r"\b(?:About|Join|At)\s+([A-Z][\w&.\-]*(?:\s+[A-Z][\w&.\-]*){0,2})\b"),
+    re.compile(r"\b([A-Z][\w&.\-]*(?:\s+[A-Z][\w&.\-]*){0,2})\s+is\s+(?:a|an|the|part of)\b"),
+)
+
+
+def company_tokens(text: str, lexicon: Optional[SkillLexicon] = None) -> Set[str]:
+    """Words that name the hiring employer rather than a requirement.
+
+    A posting repeats its own company name, and the miner was counting it as a
+    required keyword -- "accenture" and "five9" were among the heaviest missing
+    terms against those postings. Nobody can put the hiring company's name on
+    their resume, so every occurrence padded the denominator and understated
+    coverage on exactly the postings that scored worst.
+
+    A token is never excluded if the lexicon knows it as a skill, so an
+    employer called Oracle or Splunk does not blind the miner to the product.
+    """
+    # The employer is named at the very top; scanning further down starts
+    # catching section headings ("Key Responsibilities") instead.
+    head = "\n".join(text.splitlines()[:3])
+    found: Set[str] = set()
+    for i, pattern in enumerate(_COMPANY_PATTERNS):
+        scope = head if i == 0 else "\n".join(text.splitlines()[:12])
+        for match in pattern.finditer(scope):
+            for word in match.group(1).split():
+                token = normalize(word).strip(".,&-")
+                if len(token) < 3 or token in STOPWORDS or token in VAGUE_SINGLES:
+                    continue
+                if token in _SECTION_VOCAB:
+                    continue
+                # Never blind the miner to a product because the employer
+                # shares its name.
+                if lexicon is not None and lexicon.resolve(token):
+                    continue
+                found.add(token)
+    return found
 
 
 def _classify_heading(line: str) -> Optional[str]:
@@ -253,7 +301,9 @@ def _find_hard_requirements(text: str, blocks: Sequence[Tuple[str, str, str]]) -
 
 
 def _mine_terms(
-    blocks: Sequence[Tuple[str, str, str]], lexicon: SkillLexicon
+    blocks: Sequence[Tuple[str, str, str]],
+    lexicon: SkillLexicon,
+    exclude: Optional[Set[str]] = None,
 ) -> Dict[str, Requirement]:
     """Score candidate phrases by where and how they appear in the posting."""
     found: Dict[str, Requirement] = {}
@@ -283,6 +333,8 @@ def _mine_terms(
                 if not key or key in seen_in_line:
                     continue
                 if not _is_candidate(phrase, key, lexicon):
+                    continue
+                if exclude and any(w in exclude for w in phrase.split()):
                     continue
                 seen_in_line.add(key)
                 doc_freq[key] += 1
@@ -377,6 +429,8 @@ deliver delivers ensure ensures supports manage manages develop develops
 create creates execute executes execution monitor monitors represent
 represents identify identifies collaborate partner partners translate foster
 sponsor guide advise enable maintain leverage align shape grow pipeline
+important defining generation operating thought asset assets spanning adoption
+questions roadmaps launches workflow launch coverage areas area role roles
 """.split())
 
 # Generic container nouns.  A phrase ending in one is a wrapper around the real
@@ -496,7 +550,16 @@ def parse(text: str, lexicon: Optional[SkillLexicon] = None) -> JobDescription:
     blocks = split_blocks(text)
     jd = JobDescription(text=text, blocks=blocks, title=extract_title(text))
 
-    jd.requirements = list(_mine_terms(blocks, lexicon).values())
+    # A company name can contain a common noun ("WNS Global Services"). If the
+    # word also recurs through the requirements it is doing double duty as a
+    # real term, and excluding it would lose a genuine keyword.
+    candidates = company_tokens(text, lexicon)
+    body = normalize("\n".join(t for _, kind, t in blocks if kind in ("required", "responsibility")))
+    jd.company_tokens = {
+        token for token in candidates
+        if len(re.findall(r"\b" + re.escape(token) + r"\b", body)) < 3
+    }
+    jd.requirements = list(_mine_terms(blocks, lexicon, jd.company_tokens).values())
     jd.hard_requirements = _find_hard_requirements(text, blocks)
 
     years = [h.value for h in jd.hard_requirements if h.kind == "years" and h.value]

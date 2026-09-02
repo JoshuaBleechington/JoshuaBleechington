@@ -80,6 +80,11 @@ def stem(token: str) -> str:
     """
     if len(token) <= 4 or not token.isalpha():
         return token
+    # A word ending in -ss keeps it. Stripping the final s gave "proces" for
+    # "process" while "processes" reduced to "process", so a singular and its
+    # own plural stopped matching -- as did "business" and "businesses".
+    if token.endswith("ss"):
+        return token
     for suffix, repl in _SUFFIXES:
         if token.endswith(suffix) and len(token) - len(suffix) + len(repl) >= 3:
             return token[: -len(suffix)] + repl

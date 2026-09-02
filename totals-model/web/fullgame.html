@@ -1,0 +1,1408 @@
+<title>Call Sheet</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600;700;800;900&family=IBM+Plex+Mono:wght@400;500;600&display=swap">
+
+<style>
+  /* ------------------------------------------------------------------
+     Light is the bare :root so the un-stamped "system" state resolves.
+     Dark is redefined twice — once behind prefers-color-scheme, guarded
+     against an explicit light choice, and once behind the explicit dark
+     stamp — so a toggle wins in both directions.
+
+     Green means confident, and only that. Over and under keep their own
+     directional colours so a large under never reads as a green light.
+  ------------------------------------------------------------------ */
+  :root {
+    color-scheme: light;
+    --paper:      #f4f5f7;
+    --surface:    #ffffff;
+    --surface-2:  #eef0f3;
+    --ink:        #16181d;
+    --ink-2:      #4a515e;
+    --muted:      #7b8291;
+    --rule:       #dfe3e9;
+    --rule-firm:  #c3cad4;
+    --over:       #b8541f;
+    --under:      #2b6a8f;
+    --go:         #1d7a4c;
+    --go-deep:    #145c39;
+    --go-wash:    rgba(29, 122, 76, 0.10);
+    --over-wash:  rgba(184, 84, 31, 0.12);
+    --under-wash: rgba(43, 106, 143, 0.12);
+    --warn:       #8a6a12;
+    --shadow:     0 1px 2px rgba(22,24,29,.05), 0 10px 30px -18px rgba(22,24,29,.35);
+    --sans: "Archivo", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+    --mono: "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      color-scheme: dark;
+      --paper:      #101318;
+      --surface:    #181c23;
+      --surface-2:  #1f242c;
+      --ink:        #e8eaef;
+      --ink-2:      #a8b0be;
+      --muted:      #79818f;
+      --rule:       #272d37;
+      --rule-firm:  #3a4250;
+      --over:       #e08a4e;
+      --under:      #5fa3cc;
+      --go:         #3fb377;
+      --go-deep:    #59c98d;
+      --go-wash:    rgba(63, 179, 119, 0.14);
+      --over-wash:  rgba(224, 138, 78, 0.14);
+      --under-wash: rgba(95, 163, 204, 0.14);
+      --warn:       #d3ab4a;
+      --shadow:     0 1px 2px rgba(0,0,0,.5), 0 10px 30px -18px rgba(0,0,0,.8);
+    }
+  }
+  :root[data-theme="dark"] {
+    color-scheme: dark;
+    --paper:      #101318;
+    --surface:    #181c23;
+    --surface-2:  #1f242c;
+    --ink:        #e8eaef;
+    --ink-2:      #a8b0be;
+    --muted:      #79818f;
+    --rule:       #272d37;
+    --rule-firm:  #3a4250;
+    --over:       #e08a4e;
+    --under:      #5fa3cc;
+    --go:         #3fb377;
+    --go-deep:    #59c98d;
+    --go-wash:    rgba(63, 179, 119, 0.14);
+    --over-wash:  rgba(224, 138, 78, 0.14);
+    --under-wash: rgba(95, 163, 204, 0.14);
+    --warn:       #d3ab4a;
+    --shadow:     0 1px 2px rgba(0,0,0,.5), 0 10px 30px -18px rgba(0,0,0,.8);
+  }
+
+  * { box-sizing: border-box; }
+  [hidden] { display: none !important; }
+
+  body {
+    margin: 0; background: var(--paper); color: var(--ink);
+    font-family: var(--sans); font-size: 15px; line-height: 1.5;
+    -webkit-font-smoothing: antialiased; font-variant-numeric: tabular-nums;
+  }
+  .wrap { max-width: 1180px; margin: 0 auto; padding: 24px 18px 90px; }
+
+  /* --- masthead --- */
+  header.top {
+    display: flex; flex-wrap: wrap; gap: 14px; align-items: flex-end;
+    justify-content: space-between; padding-bottom: 14px; margin-bottom: 20px;
+    border-bottom: 2px solid var(--ink);
+  }
+  header.top h1 { margin: 0; font-size: 31px; font-weight: 900; letter-spacing: -.035em; }
+  header.top p { margin: 6px 0 0; color: var(--ink-2); font-size: 13.5px; max-width: 62ch; }
+  .eyebrow { font-size: 10.5px; font-weight: 700; text-transform: uppercase;
+             letter-spacing: .14em; color: var(--muted); }
+
+  .modes { display: flex; gap: 2px; padding: 3px; background: var(--surface-2);
+           border: 1px solid var(--rule); border-radius: 9px; }
+  .modes button {
+    font: 700 12.5px/1 var(--sans); letter-spacing: .02em; padding: 10px 15px;
+    border: 0; border-radius: 6px; background: transparent; color: var(--ink-2); cursor: pointer;
+  }
+  .modes button[aria-pressed="true"] { background: var(--surface); color: var(--ink); box-shadow: var(--shadow); }
+  .modes button:focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; }
+
+  /* --- layout --- */
+  .cols { display: grid; grid-template-columns: minmax(0,.92fr) minmax(0,1.08fr);
+          gap: 20px; align-items: start; }
+  @media (max-width: 920px) { .cols { grid-template-columns: 1fr; } }
+  .rail { position: sticky; top: 16px; display: flex; flex-direction: column; gap: 15px; }
+  @media (max-width: 920px) { .rail { position: static; } }
+  .stack { display: flex; flex-direction: column; gap: 15px; }
+
+  /* --- cards --- */
+  .card { background: var(--surface); border: 1px solid var(--rule);
+          border-radius: 11px; box-shadow: var(--shadow); }
+  .card > h2 {
+    margin: 0; padding: 12px 15px; font-size: 11.5px; font-weight: 700;
+    text-transform: uppercase; letter-spacing: .12em; color: var(--ink-2);
+    border-bottom: 1px solid var(--rule);
+    display: flex; align-items: baseline; justify-content: space-between; gap: 10px;
+  }
+  .card > h2 .tag { font-size: 10px; letter-spacing: .09em; color: var(--muted); font-weight: 600; }
+  .body { padding: 14px 15px; display: flex; flex-direction: column; gap: 12px; }
+  .note { margin: 0; font-size: 12.5px; line-height: 1.55; color: var(--ink-2); }
+  .note b { color: var(--ink); }
+
+  /* --- fields --- */
+  .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 9px; }
+  .grid3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 9px; }
+  @media (max-width: 430px) { .grid3 { grid-template-columns: 1fr 1fr; } }
+  .f { display: flex; flex-direction: column; gap: 5px; min-width: 0; }
+  .f label { font-size: 10px; font-weight: 700; text-transform: uppercase;
+             letter-spacing: .07em; color: var(--muted); }
+  .f input, .f select {
+    font: 500 15px/1.2 var(--mono); color: var(--ink); background: var(--surface);
+    border: 1px solid var(--rule-firm); border-radius: 6px; padding: 10px; width: 100%; min-width: 0;
+  }
+  .f select { font-family: var(--sans); font-size: 14px; }
+  .f input:focus-visible, .f select:focus-visible {
+    outline: 2px solid var(--ink); outline-offset: 1px; border-color: var(--ink); }
+  .check { display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--ink-2); cursor: pointer; }
+  .check input { width: 16px; height: 16px; accent-color: var(--ink); }
+
+  .links { display: flex; flex-wrap: wrap; gap: 6px; }
+  .links a {
+    font: 600 11px/1 var(--sans); letter-spacing: .03em; text-decoration: none;
+    color: var(--ink-2); background: var(--surface-2); border: 1px solid var(--rule);
+    border-radius: 999px; padding: 7px 11px; white-space: nowrap;
+  }
+  .links a:hover { border-color: var(--muted); color: var(--ink); }
+  .links a:focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; }
+  .links a::after { content: " \2197"; color: var(--muted); }
+
+  .btn { font: 600 13px/1 var(--sans); padding: 10px 14px; cursor: pointer;
+         border: 1px solid var(--rule-firm); border-radius: 7px;
+         background: var(--surface); color: var(--ink); }
+  .btn:hover { border-color: var(--muted); }
+  .btn:focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; }
+  .btn.solid { background: var(--ink); color: var(--paper); border-color: var(--ink); }
+  .row { display: flex; gap: 8px; flex-wrap: wrap; }
+
+  /* --- the call --- */
+  .call { padding: 18px 16px 16px; border-radius: 11px; border: 1px solid var(--rule);
+          background: var(--surface); box-shadow: var(--shadow); }
+  .call.hot { border-color: var(--go); background: var(--go-wash); }
+  .ctop { display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap; }
+  .band { font: 800 12px/1 var(--sans); letter-spacing: .11em; text-transform: uppercase;
+          padding: 8px 11px; border-radius: 6px; background: var(--surface-2);
+          color: var(--ink-2); border: 1px solid var(--rule-firm); }
+  .band.hot  { background: var(--go); color: #fff; border-color: var(--go); }
+  .band.max  { background: var(--go-deep); color: #fff; border-color: var(--go-deep); }
+  .pick { font: 900 30px/1 var(--sans); letter-spacing: -.03em; }
+  .pick.over { color: var(--over); } .pick.under { color: var(--under); }
+  .pct { font: 700 30px/1 var(--mono); margin-left: auto; }
+  .pct.over { color: var(--over); } .pct.under { color: var(--under); }
+  .cline { margin: 12px 0 0; font-size: 13px; color: var(--ink-2); line-height: 1.5; }
+  .cline b { color: var(--ink); }
+
+  /* probability split */
+  .split { display: flex; height: 30px; border-radius: 7px; overflow: hidden;
+           margin-top: 13px; border: 1px solid var(--rule); }
+  .split i { font-style: normal; display: flex; align-items: center;
+             font: 700 11.5px/1 var(--sans); letter-spacing: .06em; color: #fff;
+             white-space: nowrap; overflow: hidden; }
+  .split .o { background: var(--over); justify-content: flex-start; padding-left: 9px; }
+  .split .u { background: var(--under); justify-content: flex-end; padding-right: 9px; }
+
+  .nums { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1px;
+          background: var(--rule); border: 1px solid var(--rule);
+          border-radius: 8px; overflow: hidden; margin-top: 13px; }
+  .nums div { background: var(--surface); padding: 9px 11px; }
+  .nums .k { font-size: 9.5px; font-weight: 700; text-transform: uppercase;
+             letter-spacing: .09em; color: var(--muted); margin: 0; }
+  .nums .v { font: 600 17px/1.2 var(--mono); margin: 3px 0 0; }
+
+  /* --- where each source lands --- */
+  .scale { position: relative; height: 46px; margin: 2px 0 4px;
+           background: var(--surface-2); border: 1px solid var(--rule); border-radius: 7px; }
+  .scale .zone { position: absolute; top: 0; bottom: 0; }
+  .scale .zone.o { background: var(--over-wash); }
+  .scale .zone.u { background: var(--under-wash); }
+  .scale .lineMark { position: absolute; top: -3px; bottom: -3px; width: 2px;
+                     background: var(--ink); }
+  .scale .proj { position: absolute; top: 50%; width: 15px; height: 15px;
+                 margin: -7.5px 0 0 -7.5px; border-radius: 50%;
+                 border: 3px solid var(--surface); box-shadow: 0 0 0 1px currentColor; }
+  .scale .dot { position: absolute; top: 50%; width: 10px; height: 10px;
+                margin: -5px 0 0 -5px; border-radius: 50%; opacity: .85; }
+  /* Two rows tall so the projection label can drop below the line label when
+     they land on top of each other, which they do whenever the forecast sits
+     close to the number — the most common case, and the one where reading the
+     chart matters most. */
+  .scaleLab { position: relative; height: 26px; margin-bottom: 8px;
+              font: 500 10px/1 var(--mono); color: var(--muted); }
+  .scaleLab span { position: absolute; top: 0; white-space: nowrap; transform: translateX(-50%); }
+
+  /* --- estimate rows --- */
+  .est { display: flex; flex-direction: column; gap: 9px; }
+  .erow { display: grid; grid-template-columns: 1fr 62px; gap: 10px; align-items: center; }
+  .ehead { display: flex; align-items: baseline; gap: 7px; }
+  .ename { font-size: 12.5px; color: var(--ink); font-weight: 600; }
+  .eshare { font: 500 10px/1 var(--mono); color: var(--muted); }
+  .wbar { height: 7px; border-radius: 4px; background: var(--surface-2); margin-top: 5px; overflow: hidden; }
+  .wbar i { display: block; height: 100%; border-radius: 4px; background: var(--rule-firm); }
+  .wbar i.o { background: var(--over); } .wbar i.u { background: var(--under); }
+  .wbar i.m { background: var(--ink-2); }
+  .etot { font: 600 14px/1 var(--mono); text-align: right; }
+  .etot.o { color: var(--over); } .etot.u { color: var(--under); }
+
+  /* --- deltas --- */
+  .drow { display: grid; grid-template-columns: 104px 1fr 56px; gap: 9px; align-items: center; }
+  .dtrack { position: relative; height: 20px; background: var(--surface-2); border-radius: 4px; overflow: hidden; }
+  .dtrack .mid { position: absolute; left: 50%; top: 0; bottom: 0; width: 1px; background: var(--rule-firm); }
+  .dtrack span { position: absolute; top: 3px; bottom: 3px; border-radius: 3px; }
+  .dtrack span.o { background: var(--over); } .dtrack span.u { background: var(--under); }
+  .dname { font-size: 11.5px; color: var(--ink-2); }
+  .damt { font: 600 12px/1 var(--mono); text-align: right; }
+  .damt.o { color: var(--over); } .damt.u { color: var(--under); }
+
+  ul.why { margin: 0; padding-left: 17px; display: flex; flex-direction: column; gap: 8px; }
+  ul.why li { font-size: 12.5px; color: var(--ink-2); line-height: 1.55; }
+  ul.why li b { color: var(--ink); }
+  .flag { border-left: 3px solid var(--warn); padding-left: 10px; font-size: 12.5px;
+          color: var(--ink-2); line-height: 1.55; }
+
+  /* --- the card / tracking --- */
+  .scroll { overflow-x: auto; }
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  th { text-align: left; font-size: 9.5px; font-weight: 700; text-transform: uppercase;
+       letter-spacing: .09em; color: var(--muted); padding: 9px 10px;
+       border-bottom: 1px solid var(--rule-firm); white-space: nowrap; }
+  td { padding: 0; border-bottom: 1px solid var(--rule); }
+  tr:last-child td { border-bottom: 0; }
+  td .cell { padding: 10px; }
+  td.n .cell { font-family: var(--mono); font-weight: 500; white-space: nowrap; }
+  tr.pick-row:hover td { background: var(--surface-2); }
+  .openbtn { display: block; width: 100%; text-align: left; border: 0; background: transparent;
+             padding: 10px; font: inherit; color: inherit; cursor: pointer; }
+  .openbtn:focus-visible { outline: 2px solid var(--ink); outline-offset: -2px; }
+  .chip { display: inline-block; font: 700 10px/1 var(--sans); letter-spacing: .07em;
+          text-transform: uppercase; padding: 5px 8px; border-radius: 4px;
+          background: var(--surface-2); color: var(--ink-2); }
+  .chip.hot { background: var(--go); color: #fff; }
+  .chip.max { background: var(--go-deep); color: #fff; }
+  .chip.o { background: var(--over); color: #fff; }
+  .chip.u { background: var(--under); color: #fff; }
+  .empty { padding: 20px 15px; color: var(--muted); font-size: 13px; }
+  .x { border: 0; background: transparent; color: var(--muted); cursor: pointer;
+       font-size: 17px; line-height: 1; padding: 3px 7px; border-radius: 4px; }
+  .x:hover { color: var(--over); background: var(--over-wash); }
+
+  @media (prefers-reduced-motion: reduce) { * { transition: none !important; animation: none !important; } }
+
+  /* --- three-way split: over / push / under --- */
+  .split3 { display: flex; height: 32px; border-radius: 7px; overflow: hidden;
+            margin-top: 13px; border: 1px solid var(--rule); }
+  .split3 i { font-style: normal; display: flex; align-items: center; justify-content: center;
+              font: 700 11px/1 var(--sans); letter-spacing: .05em; color: #fff;
+              white-space: nowrap; overflow: hidden; min-width: 0; }
+  .split3 .o { background: var(--over); }
+  .split3 .p { background: var(--muted); }
+  .split3 .u { background: var(--under); }
+
+  /* --- price / edge --- */
+  .price { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1px;
+           background: var(--rule); border: 1px solid var(--rule);
+           border-radius: 8px; overflow: hidden; margin-top: 12px; }
+  .price div { background: var(--surface); padding: 9px 11px; }
+  .price .k { font-size: 9.5px; font-weight: 700; text-transform: uppercase;
+              letter-spacing: .09em; color: var(--muted); margin: 0; }
+  .price .v { font: 600 17px/1.2 var(--mono); margin: 3px 0 0; }
+  .price .v.good { color: var(--go); }
+  .price .v.bad  { color: var(--over); }
+
+  /* --- grading + calibration --- */
+  .grade { width: 74px; font: 500 13px/1.2 var(--mono); padding: 6px 7px;
+           border: 1px solid var(--rule-firm); border-radius: 5px;
+           background: var(--surface); color: var(--ink); }
+  .grade:focus-visible { outline: 2px solid var(--ink); outline-offset: 1px; }
+  .res { display: inline-block; font: 700 10px/1 var(--sans); letter-spacing: .07em;
+         text-transform: uppercase; padding: 5px 8px; border-radius: 4px; }
+  .res.win  { background: var(--go); color: #fff; }
+  .res.loss { background: var(--over); color: #fff; }
+  .res.push { background: var(--surface-2); color: var(--ink-2); }
+  .calib { display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+           gap: 1px; background: var(--rule); border: 1px solid var(--rule);
+           border-radius: 8px; overflow: hidden; }
+  .calib div { background: var(--surface); padding: 10px 12px; }
+  .calib .k { font-size: 9.5px; font-weight: 700; text-transform: uppercase;
+              letter-spacing: .09em; color: var(--muted); margin: 0; }
+  .calib .v { font: 600 17px/1.2 var(--mono); margin: 3px 0 0; }
+  .verdict { border-left: 3px solid var(--rule-firm); padding-left: 11px;
+             font-size: 12.5px; line-height: 1.55; color: var(--ink-2); }
+  .verdict.bad { border-left-color: var(--over); }
+  .verdict.good { border-left-color: var(--go); }
+</style>
+
+<div class="wrap">
+
+  <header class="top">
+    <div>
+      <div class="eyebrow" id="eyebrow">MLB · full game</div>
+      <h1>Call Sheet</h1>
+      <p>Anchors on what the market is really on — the prices, not the rounded number —
+         then adjusts for what tonight changes. Names a side on every card, and grades
+         itself once the games land.</p>
+    </div>
+    <div class="modes" role="group" aria-label="Sport">
+      <button type="button" id="m-mlb" aria-pressed="true">MLB</button>
+      <button type="button" id="m-wnba" aria-pressed="false">WNBA</button>
+    </div>
+  </header>
+
+  <div class="cols">
+    <div class="stack">
+
+      <section class="card">
+        <h2>The number <span class="tag">prices matter more than the line</span></h2>
+        <div class="body">
+          <div class="grid2">
+            <div class="f"><label for="away">Away</label><input id="away" type="text" placeholder="Orioles"></div>
+            <div class="f"><label for="home">Home</label><input id="home" type="text" placeholder="Rockies"></div>
+          </div>
+          <div class="grid3">
+            <div class="f"><label for="line" id="lineLabel">Total</label><input id="line" type="number" step="0.5" inputmode="decimal" placeholder="8.5"></div>
+            <div class="f"><label for="op">Over price</label><input id="op" type="number" step="5" inputmode="numeric" placeholder="-110"></div>
+            <div class="f"><label for="up">Under price</label><input id="up" type="number" step="5" inputmode="numeric" placeholder="-110"></div>
+          </div>
+          <div class="grid2">
+            <div class="f"><label for="opened">Opened at (optional)</label><input id="opened" type="number" step="0.5" inputmode="decimal" placeholder="8.5"></div>
+            <div class="f"><label for="gdate">Date</label><input id="gdate" type="date"></div>
+          </div>
+          <div class="links">
+            <a href="https://app.outlier.bet/MLB/games" target="_blank" rel="noopener">Outlier · games</a>
+            <a href="https://www.covers.com/sport/baseball/mlb/odds" target="_blank" rel="noopener">Covers odds</a>
+            <a href="https://www.vegasinsider.com/mlb/odds/las-vegas/" target="_blank" rel="noopener">Vegas Insider</a>
+          </div>
+          <p class="note"><b>Enter both prices. They are the most valuable thing on the board
+            and the old model threw them away.</b> A posted total is rounded to the half run;
+            the prices are not. Over −120 with the under at +100 says fair sits well above the
+            number that got posted, and the model solves for exactly how far.</p>
+          <p class="note"><b>Opened at is shown, never scored.</b> The current line is the anchor,
+            so a move is already inside it — subtracting it again would double-count. It is here
+            because a big move against your side is worth seeing before you bet.</p>
+        </div>
+      </section>
+
+      <div id="mlbFields" class="stack">
+        <section class="card">
+          <h2>Starting pitchers <span class="tag">scored as a differential</span></h2>
+          <div class="body">
+            <div class="grid2">
+              <div class="f"><label for="aera">Away starter ERA</label><input id="aera" type="number" step="0.01" inputmode="decimal" placeholder="4.16"></div>
+              <div class="f"><label for="hera">Home starter ERA</label><input id="hera" type="number" step="0.01" inputmode="decimal" placeholder="4.16"></div>
+            </div>
+            <div class="grid2">
+              <div class="f"><label for="arpg">Away runs/game</label><input id="arpg" type="number" step="0.01" inputmode="decimal" placeholder="4.52"></div>
+              <div class="f"><label for="hrpg">Home runs/game</label><input id="hrpg" type="number" step="0.01" inputmode="decimal" placeholder="4.52"></div>
+            </div>
+            <div class="links">
+              <a href="https://app.outlier.bet/MLB/games" target="_blank" rel="noopener">Outlier · matchup panel</a>
+              <a href="https://www.rotowire.com/baseball/daily-lineups.php" target="_blank" rel="noopener">RotoWire · lineups</a>
+              <a href="https://www.teamrankings.com/mlb/stat/runs-per-game" target="_blank" rel="noopener">TeamRankings · runs/game</a>
+            </div>
+            <p class="note"><b>Both arms or neither.</b> These are scored as a gap from a league-average
+              starter, not as a projection of runs. Two average starters move the line by <b>exactly
+              zero</b> — that is arithmetic, not a calibration that came out right, and it is the fix
+              for the permanent over-lean the previous model carried.</p>
+            <p class="note">Runs/game is optional and worth the ten seconds: ERA alone cannot tell a
+              5.10 offence from a 3.60 one, and each arm is scored against the lineup it faces.</p>
+          </div>
+        </section>
+
+        <section class="card">
+          <h2>Bullpens <span class="tag">back, because this is nine innings</span></h2>
+          <div class="body">
+            <div class="grid2">
+              <div class="f"><label for="abp">Away bullpen ERA</label><input id="abp" type="number" step="0.01" inputmode="decimal" placeholder="4.05"></div>
+              <div class="f"><label for="hbp">Home bullpen ERA</label><input id="hbp" type="number" step="0.01" inputmode="decimal" placeholder="4.05"></div>
+            </div>
+            <div class="links">
+              <a href="https://www.fangraphs.com/leaders/major-league?pos=all&amp;stats=rel&amp;lg=all&amp;type=0" target="_blank" rel="noopener">FanGraphs · relievers</a>
+              <a href="https://www.covers.com/sport/baseball/mlb/statistics/team-pitching/2026" target="_blank" rel="noopener">Covers · team pitching</a>
+            </div>
+            <p class="note">Same differential treatment, over the roughly <b>3.6 innings</b> a pen covers.
+              First-five existed partly to delete this half of the game; a full-game market cannot,
+              and the bullpen is where a lot of nine-inning totals are actually decided.</p>
+          </div>
+        </section>
+
+        <section class="card">
+          <h2>Form &amp; head to head <span class="tag">measured null · small</span></h2>
+          <div class="body">
+            <div class="grid2">
+              <div class="f"><label for="al10">Away last-10 avg total</label><input id="al10" type="number" step="0.1" inputmode="decimal" placeholder="9.4"></div>
+              <div class="f"><label for="hl10">Home last-10 avg total</label><input id="hl10" type="number" step="0.1" inputmode="decimal" placeholder="8.8"></div>
+            </div>
+            <div class="grid2">
+              <div class="f"><label for="h2h">H2H avg total</label><input id="h2h" type="number" step="0.1" inputmode="decimal" placeholder="9.1"></div>
+              <div class="f"><label for="h2hn">Meetings</label><input id="h2hn" type="number" step="1" inputmode="numeric" placeholder="4"></div>
+            </div>
+            <div class="links">
+              <a href="https://app.outlier.bet/MLB/games" target="_blank" rel="noopener">Outlier · L10 / H2H</a>
+              <a href="https://www.covers.com/sport/baseball/mlb/matchups" target="_blank" rel="noopener">Covers · matchups</a>
+            </div>
+            <p class="note">Combined game totals — both teams' runs added. Both measured null against
+              the residual on 116 logged games, form at <b>t = −0.07</b> and head to head at
+              <b>t = −0.40</b>, so they are small and say so. <b>One meeting still counts</b>: h2h
+              weight scales by meetings ÷ 4, so enter it and let the model discount it.</p>
+          </div>
+        </section>
+
+        <section class="card">
+          <h2>Park &amp; weather <span class="tag">the one unpriced input</span></h2>
+          <div class="body">
+            <div class="grid3">
+              <div class="f"><label for="pf">Park factor</label><input id="pf" type="number" step="1" inputmode="numeric" placeholder="100"></div>
+              <div class="f"><label for="mph">Wind mph</label><input id="mph" type="number" step="1" inputmode="numeric" placeholder="10"></div>
+              <div class="f"><label for="dir">Blowing</label>
+                <select id="dir"><option value="">—</option><option value="out">Out</option><option value="in">In</option><option value="cross">Across</option></select></div>
+            </div>
+            <div class="grid3">
+              <div class="f"><label for="temp">Temp °F</label><input id="temp" type="number" step="1" inputmode="numeric" placeholder="72"></div>
+              <div class="f"><label for="tick">Over % tickets</label><input id="tick" type="number" step="1" min="0" max="100" inputmode="numeric" placeholder="72"></div>
+              <div class="f"><label for="cash">Over % money</label><input id="cash" type="number" step="1" min="0" max="100" inputmode="numeric" placeholder="59"></div>
+            </div>
+            <label class="check"><input type="checkbox" id="dome"> Roof shut — wind and temp both drop out</label>
+            <div class="links">
+              <a href="https://www.rotowire.com/baseball/weather.php" target="_blank" rel="noopener">RotoWire · weather</a>
+              <a href="https://baseballsavant.mlb.com/leaderboard/statcast-park-factors" target="_blank" rel="noopener">Statcast · park factors</a>
+              <a href="https://www.actionnetwork.com/mlb/public-betting" target="_blank" rel="noopener">Action · public betting</a>
+            </div>
+            <p class="note"><b>Wind is the only thing on this page the market prices imperfectly</b>,
+              because it changes after the number posts. Everything else here is published and already
+              inside the line. Read the <b>hourly row, never the card headline</b> — “8 mph wind blowing
+              in West Sacramento” is a card whose own hourly row says <b>out</b>.</p>
+            <p class="note">Park factor scales the differentials and the wind, <b>never the market
+              anchor</b>. The posted number already holds the park; counting it twice is the double
+              count that put the old fourteen-input model behind the naked line.</p>
+          </div>
+        </section>
+      </div>
+
+      <div id="wnbaFields" class="stack" hidden>
+        <section class="card">
+          <h2>Last 10 <span class="tag">the load-bearing input</span></h2>
+          <div class="body">
+            <div class="grid2">
+              <div class="f"><label for="wal10">Away last-10 avg total</label><input id="wal10" type="number" step="0.1" inputmode="decimal" placeholder="168.2"></div>
+              <div class="f"><label for="whl10">Home last-10 avg total</label><input id="whl10" type="number" step="0.1" inputmode="decimal" placeholder="171.4"></div>
+            </div>
+            <div class="links">
+              <a href="https://www.covers.com/sport/basketball/wnba/matchups" target="_blank" rel="noopener">Covers · WNBA</a>
+              <a href="https://www.teamrankings.com/wnba/stat/points-per-game" target="_blank" rel="noopener">TeamRankings</a>
+            </div>
+            <p class="note">Each side's <b>combined game total</b> over its last ten — both teams' points
+              added. Ten games is a third of a WNBA season, and there is no starting-pitcher equivalent
+              here to lean on.</p>
+          </div>
+        </section>
+        <section class="card">
+          <h2>Head to head <span class="tag">optional</span></h2>
+          <div class="body">
+            <div class="grid2">
+              <div class="f"><label for="wh2h">H2H avg total</label><input id="wh2h" type="number" step="0.1" inputmode="decimal" placeholder="174.0"></div>
+              <div class="f"><label for="wh2hn">Meetings</label><input id="wh2hn" type="number" step="1" inputmode="numeric" placeholder="3"></div>
+            </div>
+            <p class="note"><b>Put it in even if they have met once.</b> The weight scales by meetings ÷ 4,
+              so one counts a quarter and four or more count in full. Judging the sample is the model's
+              job. Leave it blank only if they genuinely have not met — the weight then redistributes.</p>
+          </div>
+        </section>
+        <section class="card">
+          <h2>Absences <span class="tag">worth more here than anywhere</span></h2>
+          <div class="body">
+            <div class="grid2">
+              <div class="f"><label for="aout">Away starters out</label><input id="aout" type="number" step="1" min="0" inputmode="numeric" placeholder="0"></div>
+              <div class="f"><label for="hout">Home starters out</label><input id="hout" type="number" step="1" min="0" inputmode="numeric" placeholder="0"></div>
+            </div>
+            <label class="check"><input type="checkbox" id="alead"> Away's leading scorer is out</label>
+            <label class="check"><input type="checkbox" id="hlead"> Home's leading scorer is out</label>
+            <div class="links">
+              <a href="https://www.espn.com/wnba/injuries" target="_blank" rel="noopener">ESPN · injuries</a>
+              <a href="https://www.rotowire.com/basketball/injury-report.php?league=WNBA" target="_blank" rel="noopener">RotoWire · injuries</a>
+            </div>
+            <p class="note">2.0 points per rotation player, 3.5 if it is their leading scorer. A
+              twelve-deep roster with starters at 32+ minutes has no bench to absorb a loss.
+              <b>Check whether the line already moved on it</b> — when Caitlin Clark was ruled out the
+              Fever line went −11 to −6 on the announcement.</p>
+          </div>
+        </section>
+      </div>
+
+      <div class="row">
+        <button type="button" class="btn solid" id="add">Add to card</button>
+        <button type="button" class="btn" id="clear">Clear</button>
+        <button type="button" class="btn" id="example">Example</button>
+      </div>
+
+      <section class="card">
+        <h2>Saving <span class="tag" id="saveState">draft saved</span></h2>
+        <div class="body">
+          <p class="note"><b>Nothing is lost when you close the tab.</b> What you are typing is written
+            to this browser after every keystroke and comes back when you reopen. The card is stored
+            the same way. Nothing to press.</p>
+          <div class="row">
+            <button type="button" class="btn solid" id="backup">Save a backup file</button>
+            <button type="button" class="btn" id="restore">Load a backup</button>
+            <button type="button" class="btn" id="copy">Copy card as text</button>
+          </div>
+          <input type="file" id="restoreFile" accept="application/json,.json" hidden>
+          <p class="note" id="saveMsg" hidden></p>
+          <p class="note"><b>Browser storage is not a vault.</b> It does not follow you to your phone
+            and it goes away if you clear site data. Take a backup file at the end of a night you care
+            about — that is the copy that survives a new laptop.</p>
+        </div>
+      </section>
+    </div>
+
+    <div class="rail">
+      <div class="call" id="call"></div>
+
+      <section class="card">
+        <h2>Where each source lands <span class="tag" id="unitTag">runs</span></h2>
+        <div class="body">
+          <div class="scale" id="scale"></div>
+          <div class="scaleLab" id="scaleLab"></div>
+          <div class="est" id="est"></div>
+        </div>
+      </section>
+
+      <section class="card" id="deltaCard">
+        <h2>Tonight-only adjustments</h2>
+        <div class="body"><div class="est" id="deltas"></div></div>
+      </section>
+
+      <section class="card">
+        <h2>Why</h2>
+        <div class="body"><ul class="why" id="why"></ul></div>
+      </section>
+    </div>
+  </div>
+
+  <section class="card" style="margin-top:20px">
+    <h2>Tonight's card <span class="tag" id="cardCount"></span></h2>
+    <div id="cardTable"></div>
+  </section>
+
+  <section class="card" style="margin-top:20px">
+    <h2>Is it working <span class="tag">enter finals on the card above</span></h2>
+    <div class="body" id="calibBox"></div>
+  </section>
+</div>
+<script>
+(function () {
+  "use strict";
+  var $ = function (id) { return document.getElementById(id); };
+
+  /* ====================================================================
+     Ported from totals/fullgame.py. Every constant is the same value the
+     package uses; web/fullgame-cases.json is replayed through this page in
+     a browser on every change and checked against the package, because a
+     drift between the two is the bug this project has shipped most often.
+  ==================================================================== */
+  var LEAGUE_COMBINED_RPG = 9.04;
+  var LEAGUE_RPG = LEAGUE_COMBINED_RPG / 2;
+  var LEAGUE_STARTER_ERA = 4.16, LEAGUE_BULLPEN_ERA = 4.05;
+  var STARTER_INNINGS = 5.4, BULLPEN_INNINGS = 9.0 - STARTER_INNINGS;
+  var UNEARNED = 1.08;
+  var RESIDUAL_SD = { MLB: 4.39, WNBA: 11.51 };
+  var PHI = { MLB: RESIDUAL_SD.MLB * RESIDUAL_SD.MLB / LEAGUE_COMBINED_RPG, WNBA: 1.0 };
+  var WEIGHTS = {
+    MLB:  { market: 4.0, starters: 1.6, bullpens: 0.8, form: 0.8, h2h: 0.5 },
+    WNBA: { market: 3.0, form: 1.6, h2h: 1.0 }
+  };
+  var H2H_FULL_WEIGHT_AT = 4;
+  var BANDS = [[0.62, "MAX"], [0.57, "STRONG"], [0.53, "LEAN"], [0.00, "COIN FLIP"]];
+  var WIND_DEAD = 8.0, WIND_PER_MPH = 0.10;
+  var TEMP_BASE = 70.0, TEMP_PER_DEG = 0.008;
+  var SPLIT_MIN_GAP = 20, SPLIT_RUNS = 0.30;
+  var PTS_STARTER = 2.0, PTS_LEADER = 3.5;
+  var PLAUSIBLE = { era: [0, 15], park: [70, 130], mlb_total: [4, 20], wnba_total: [110, 230] };
+
+  function ok(v, w) { return v !== null && v >= PLAUSIBLE[w][0] && v <= PLAUSIBLE[w][1]; }
+  function num(id) { var v = parseFloat($(id).value); return isFinite(v) ? v : null; }
+  function txt(id) { return ($(id).value || "").trim(); }
+  function sgn(v, d) { return (v >= 0 ? "+" : "") + v.toFixed(d === undefined ? 2 : d); }
+
+  /* Lanczos log-gamma, g=7. The negative binomial needs a non-integer
+     shape parameter, so a factorial will not do. */
+  var LG = [676.5203681218851, -1259.1392167224028, 771.32342877765313,
+            -176.61502916214059, 12.507343278686905, -0.13857109526572012,
+            9.9843695780195716e-6, 1.5056327351493116e-7];
+  function lgamma(x) {
+    if (x < 0.5) return Math.log(Math.PI / Math.sin(Math.PI * x)) - lgamma(1 - x);
+    x -= 1;
+    var a = 0.99999999999980993, t = x + 7.5;
+    for (var i = 0; i < 8; i++) a += LG[i] / (x + i + 1);
+    return 0.5 * Math.log(2 * Math.PI) + (x + 0.5) * Math.log(t) - t + Math.log(a);
+  }
+
+  function nbPmf(k, mu, phi) {
+    if (k < 0 || mu <= 0) return 0;
+    if (phi <= 1 + 1e-12) return Math.exp(k * Math.log(mu) - mu - lgamma(k + 1));
+    var r = mu / (phi - 1), p = r / (r + mu);
+    return Math.exp(lgamma(k + r) - lgamma(r) - lgamma(k + 1)
+                    + r * Math.log(p) + k * Math.log1p(-p));
+  }
+
+  /* (over, push, under). The push term is the whole point: on a line of 8 a
+     game landing on exactly 8 is neither won nor lost, and a continuous model
+     has no way to say so — it hands that mass to the two sides. */
+  function nbSplit(line, mu, phi) {
+    if (mu <= 0) return [0, 0, 1];
+    var top = Math.max(60, Math.round(mu + 12 * Math.sqrt(Math.max(mu * phi, 1))));
+    var under = 0, push = 0, total = 0;
+    for (var k = 0; k <= top; k++) {
+      var pk = nbPmf(k, mu, phi);
+      total += pk;
+      if (k < line) under += pk; else if (k === line) push += pk;
+    }
+    var over = Math.max(0, total - under - push);
+    if (total > 0) { under /= total; push /= total; over /= total; }
+    return [over, push, under];
+  }
+
+  /* erf to full double precision, via the regularised lower incomplete gamma:
+     erf(x) = sign(x) * P(1/2, x^2). Series below a+1, continued fraction above.
+
+     The Abramowitz & Stegun 7.1.26 approximation that was here is only good to
+     ~1.5e-7, and that was enough to break two things against the Python: it
+     flipped the side on a dead-even WNBA card, and it moved the fair-total
+     bisection by ~4e-5 points because the inversion divides the probability
+     error by a small density. An approximation good enough to display is not
+     good enough to invert. */
+  function gammpHalf(x2) {
+    var a = 0.5;
+    if (x2 < a + 1) {                      // series
+      var ap = a, sum = 1 / a, del = sum;
+      for (var i = 1; i < 300; i++) {
+        ap += 1; del *= x2 / ap; sum += del;
+        if (Math.abs(del) < Math.abs(sum) * 1e-17) break;
+      }
+      return sum * Math.exp(-x2 + a * Math.log(x2) - lgamma(a));
+    }
+    var tiny = 1e-300;                      // continued fraction (Lentz)
+    var b = x2 + 1 - a, c = 1 / tiny, d = 1 / b, h = d;
+    for (var j = 1; j < 300; j++) {
+      var an = -j * (j - a);
+      b += 2; d = an * d + b; if (Math.abs(d) < tiny) d = tiny;
+      c = b + an / c; if (Math.abs(c) < tiny) c = tiny;
+      d = 1 / d;
+      var dl = d * c; h *= dl;
+      if (Math.abs(dl - 1) < 1e-17) break;
+    }
+    return 1 - Math.exp(-x2 + a * Math.log(x2) - lgamma(a)) * h;
+  }
+  function erf(x) {
+    if (x === 0) return 0;
+    var s = x < 0 ? -1 : 1;
+    return s * gammpHalf(x * x);
+  }
+  function ncdf(x) { return 0.5 * (1 + erf(x / Math.SQRT2)); }
+
+  function normalSplit(line, mu, sd) {
+    if (Math.abs(line - Math.round(line)) < 1e-9) {
+      var lo = ncdf(((line - 0.5) - mu) / sd), hi = ncdf(((line + 0.5) - mu) / sd);
+      return [1 - hi, Math.max(0, hi - lo), lo];
+    }
+    var over = 1 - ncdf((line - mu) / sd);
+    return [over, 0, 1 - over];
+  }
+
+  function splitFor(sport, line, mu) {
+    return sport === "MLB" ? nbSplit(line, mu, PHI.MLB)
+                           : normalSplit(line, mu, RESIDUAL_SD.WNBA);
+  }
+
+  function implied(price) {
+    return price < 0 ? (-price) / ((-price) + 100) : 100 / (price + 100);
+  }
+
+  /* The market's real fair total, recovered from the two prices. A posted
+     line is rounded to the half run; the prices are not. */
+  function fairTotal(sport, line, op, up) {
+    var quoted = op !== null && up !== null;
+    if (!quoted) { op = -110; up = -110; }
+    var o = implied(op), u = implied(up), s = o + u, pOver = o / s;
+    var lo = Math.max(0.5, line - 4), hi = line + 4;
+    for (var i = 0; i < 80; i++) {
+      var mid = (lo + hi) / 2, sp = splitFor(sport, line, mid);
+      /* Prices are quoted on the RESOLVED outcome. A push refunds, so it sits
+         outside the pricing — a book at -110/-110 on a total of 8 says the two
+         sides are even GIVEN it resolves, not that P(over) is 50% outright. */
+      var live = sp[0] + sp[2];
+      var conditional = live > 0 ? sp[0] / live : 0.5;
+      if (conditional < pOver) lo = mid; else hi = mid;
+    }
+    var mu = (lo + hi) / 2;
+    var hold = o + u - 1;
+    var why = quoted
+      ? (sgn(op, 0) + "/" + sgn(up, 0) + " de-vigs to " + (pOver * 100).toFixed(1) +
+         "% over (" + (hold * 100).toFixed(2) + "% hold), which is the market saying fair is " +
+         mu.toFixed(2) + " rather than the " + line + " it posted.")
+      : ("No prices given, so an evenly-priced market is assumed. A line of " + line +
+         " splitting 50/50 implies a mean of " + mu.toFixed(2) + " — run totals are " +
+         "right-skewed, so the average game finishes above the number that divides the sides.");
+    return [mu, why];
+  }
+
+  function est(name, total, weight, detail) {
+    return { name: name, total: total, weight: weight, detail: detail };
+  }
+  function delta(name, runs, detail) { return { name: name, runs: runs, detail: detail }; }
+  function h2hWeight(base, n) { return base * Math.min(1, Math.max(0, n) / H2H_FULL_WEIGHT_AT); }
+  function parkScale(pf) { return ok(pf, "park") ? pf / 100 : 1; }
+
+  /* Differential, never absolute. An absolute projection needs a league-average
+     total to calibrate against, and picking that number wrong is exactly what
+     put a permanent over-lean in the model this replaces. */
+  function armDiff(era, league, innings, oppRpg) {
+    if (!ok(era, "era")) return null;
+    var gap = (era - league) * (innings / 9) * UNEARNED;
+    if (oppRpg !== null && oppRpg > 0) gap *= oppRpg / LEAGUE_RPG;
+    return gap;
+  }
+
+  // ---- MLB -----------------------------------------------------------
+  function readMlb() {
+    var line = num("line");
+    if (!ok(line, "mlb_total")) return null;
+    var w = WEIGHTS.MLB, park = parkScale(num("pf")), notes = [];
+    var fa = fairTotal("MLB", line, num("op"), num("up"));
+    var anchor = fa[0];
+    var estimates = [est("Market", anchor, w.market, fa[1])];
+
+    var ae = num("aera"), he = num("hera"), arpg = num("arpg"), hrpg = num("hrpg");
+    var a = armDiff(ae, LEAGUE_STARTER_ERA, STARTER_INNINGS, hrpg);
+    var h = armDiff(he, LEAGUE_STARTER_ERA, STARTER_INNINGS, arpg);
+    if (a !== null && h !== null) {
+      var gap = (a + h) * park;
+      estimates.push(est("Starters", anchor + gap, w.starters,
+        "Away " + ae.toFixed(2) + " and home " + he.toFixed(2) + " against a " +
+        LEAGUE_STARTER_ERA.toFixed(2) + " league starter ERA, over the " +
+        STARTER_INNINGS.toFixed(1) + " innings a start now covers: " + sgn(gap) +
+        " runs on the line. Two league-average arms move it by exactly zero, which is what " +
+        "keeps this from carrying a hidden lean."));
+    } else if (a !== null || h !== null) {
+      notes.push("Only one starter's ERA is in. A differential needs both arms, so the " +
+                 "starters are out of the blend and their weight has gone to what is left.");
+    }
+
+    var abp = armDiff(num("abp"), LEAGUE_BULLPEN_ERA, BULLPEN_INNINGS, hrpg);
+    var hbp = armDiff(num("hbp"), LEAGUE_BULLPEN_ERA, BULLPEN_INNINGS, arpg);
+    if (abp !== null && hbp !== null) {
+      var bgap = (abp + hbp) * park;
+      estimates.push(est("Bullpens", anchor + bgap, w.bullpens,
+        "Away " + num("abp").toFixed(2) + " and home " + num("hbp").toFixed(2) + " against a " +
+        LEAGUE_BULLPEN_ERA.toFixed(2) + " league pen, over the " + BULLPEN_INNINGS.toFixed(1) +
+        " innings they cover: " + sgn(bgap) + " runs. This is the half of the game first-five " +
+        "threw away, and it is back because the market being bet is the full nine."));
+    }
+
+    var a10 = num("al10"), h10 = num("hl10");
+    if (a10 !== null && h10 !== null) {
+      var avg = (a10 + h10) / 2;
+      estimates.push(est("Last 10", avg * park, w.form,
+        "Last-ten combined totals average " + avg.toFixed(1) + ". Measured t = −0.07 against " +
+        "the residual on 116 logged games, so it is weighted to move a close card and not to " +
+        "overturn the market."));
+    }
+
+    var hv = num("h2h"), hn = num("h2hn");
+    if (hv !== null && hn) {
+      estimates.push(est("Head to head (" + hn + ")", hv * park, h2hWeight(w.h2h, hn),
+        hn + " meetings averaging " + hv.toFixed(1) + ". Measured t = −0.40, the weakest thing " +
+        "in the blend." + (hn < H2H_FULL_WEIGHT_AT ? " Discounted to " + hn + "/" +
+        H2H_FULL_WEIGHT_AT + " of its weight because it rests on " + hn + " meeting(s)." : "")));
+    } else if (hv === null) {
+      notes.push("No head-to-head. Its weight has been redistributed across the estimates " +
+                 "that are present.");
+    }
+
+    var deltas = [];
+    if ($("dome").checked) {
+      deltas.push(delta("Roof shut", 0, "Closed roof — wind and temperature both out."));
+    } else {
+      var mph = num("mph"), dir = $("dir").value;
+      if (mph !== null && dir) {
+        if (dir === "cross") {
+          deltas.push(delta("Wind", 0, mph.toFixed(0) +
+            " mph across the field, which carries a fly ball neither way."));
+        } else {
+          var eff = Math.max(0, mph - WIND_DEAD), r = eff * WIND_PER_MPH * park;
+          deltas.push(delta("Wind", dir === "out" ? r : -r, mph.toFixed(0) + " mph blowing " +
+            dir + "; nothing counts under " + WIND_DEAD + " mph, then " + WIND_PER_MPH.toFixed(2) +
+            " runs per mph over it. The one input on this page the market prices imperfectly, " +
+            "because it changes after the number posts."));
+        }
+      }
+      var tp = num("temp");
+      if (tp !== null) deltas.push(delta("Temperature", (tp - TEMP_BASE) * TEMP_PER_DEG,
+        tp.toFixed(0) + "°F against a " + TEMP_BASE + "° baseline."));
+    }
+
+    var tk = num("tick"), cs = num("cash");
+    if (tk !== null && cs !== null) {
+      var g = tk - cs;
+      if (Math.abs(g) >= SPLIT_MIN_GAP) {
+        deltas.push(delta("Money split", g > 0 ? -SPLIT_RUNS : SPLIT_RUNS,
+          "Over holds " + tk.toFixed(0) + "% of tickets but " + cs.toFixed(0) + "% of money, a " +
+          Math.abs(g).toFixed(0) + "-point gap. Small bets on the over, big money on the " +
+          (g > 0 ? "under" : "over") + ". Capped flat: the direction is documented, the size " +
+          "is not."));
+      }
+    }
+
+    var opened = num("opened");
+    if (opened !== null && Math.abs(opened - line) > 1e-9) {
+      notes.push("The number moved " + opened + " to " + line + " (" + sgn(line - opened, 1) +
+        "). That is NOT scored — the current line is the anchor, so the move is already inside " +
+        "it and subtracting it again would double-count. It is here because a large move " +
+        "against your side is worth knowing before you bet.");
+    }
+    return assemble("MLB", txt("away") || "Away", txt("home") || "Home", line,
+                    estimates, deltas, notes);
+  }
+
+  // ---- WNBA ----------------------------------------------------------
+  function readWnba() {
+    var line = num("line");
+    if (!ok(line, "wnba_total")) return null;
+    var w = WEIGHTS.WNBA, notes = [];
+    var fa = fairTotal("WNBA", line, num("op"), num("up"));
+    var estimates = [est("Market", fa[0], w.market, fa[1])];
+
+    var a = num("wal10"), h = num("whl10");
+    if (a !== null && h !== null) {
+      estimates.push(est("Last 10", (a + h) / 2, w.form,
+        "Combined totals over the last ten average " + a.toFixed(1) + " away and " +
+        h.toFixed(1) + " home, blending to " + ((a + h) / 2).toFixed(1) + ". Ten games is a " +
+        "third of a WNBA season and there is no starting-pitcher equivalent to lean on."));
+    }
+    var hv = num("wh2h"), hn = num("wh2hn");
+    if (hv !== null && hn) {
+      estimates.push(est("Head to head (" + hn + ")", hv, h2hWeight(w.h2h, hn),
+        hn + " meetings averaging " + hv.toFixed(1) + "." +
+        (hn < H2H_FULL_WEIGHT_AT ? " Discounted to " + hn + "/" + H2H_FULL_WEIGHT_AT +
+         " of its weight for sample size." : "")));
+    } else {
+      notes.push("No head-to-head on file. Its weight has gone to the market and the last ten, " +
+                 "which now carry the blend between them.");
+    }
+
+    var deltas = [];
+    [["Away", num("aout"), $("alead").checked], ["Home", num("hout"), $("hlead").checked]]
+      .forEach(function (r) {
+        var out = r[1] || 0;
+        if (out <= 0 && !r[2]) return;
+        var pts = out * PTS_STARTER + (r[2] ? PTS_LEADER - PTS_STARTER : 0);
+        deltas.push(delta(r[0] + " absences", -pts, out + " rotation player(s) out" +
+          (r[2] ? ", including their leading scorer" : "") + ". A twelve-deep roster with " +
+          "starters at 32+ minutes has no bench to absorb it: " + pts.toFixed(1) +
+          " points off the total."));
+      });
+
+    var opened = num("opened");
+    if (opened !== null && Math.abs(opened - line) > 1e-9) {
+      notes.push("The number moved " + opened + " to " + line + " (" + sgn(line - opened, 1) +
+                 "). Not scored — it is already inside the current line.");
+    }
+    return assemble("WNBA", txt("away") || "Away", txt("home") || "Home", line,
+                    estimates, deltas, notes);
+  }
+
+  function assemble(sport, away, home, line, estimates, deltas, notes) {
+    var tw = 0, sum = 0;
+    estimates.forEach(function (e) { tw += e.weight; sum += e.total * e.weight; });
+    var dsum = 0; deltas.forEach(function (d) { dsum += d.runs; });
+    var projected = sum / tw + dsum;
+    var sp = splitFor(sport, line, projected);
+    var over = sp[0], push = sp[1], under = sp[2];
+    /* Tie goes to the over by rule, in both implementations. A half-point
+       disagreement between the Python and the browser flipped a card once. */
+    var side = over >= under - 1e-9 ? "OVER" : "UNDER";
+    var pSide = side === "OVER" ? over : under;
+    /* The band and the headline read the RESOLVED probability. On a total of 8
+       with a 9.6% push, a 47.2% over is really a 52.2% bet — reading the raw
+       figure called that a coin flip and it is not one. */
+    var live = over + under;
+    var pResolved = live > 0 ? pSide / live : 0.5;
+    var band = "COIN FLIP";
+    for (var i = 0; i < BANDS.length; i++) { if (pResolved >= BANDS[i][0]) { band = BANDS[i][1]; break; } }
+    /* Even money is +100 by convention; without the tolerance the sign flips on
+       a floating-point hair and an identical coin flip prints -100 then +100. */
+    var fair = Math.abs(pResolved - 0.5) < 1e-9 ? 100
+             : (pResolved > 0.5 ? -100 * pResolved / (1 - pResolved)
+                                : 100 * (1 - pResolved) / pResolved);
+
+    if (estimates.length === 1 && !deltas.length) notes.push(
+      "Nothing entered but the number, so the forecast IS the market and the answer is a coin " +
+      "flip. That is the correct answer to a question with no information in it, not the model " +
+      "being coy.");
+    if (push > 0.02) notes.push("The line is a whole number, so " + (push * 100).toFixed(1) +
+      "% of the time this pushes and the stake comes back. That probability is real and a model " +
+      "that treats runs as continuous silently hands it to the two sides instead.");
+    if (band === "MAX") notes.push("Top band. Re-read the inputs before acting — in this project " +
+      "a spectacular number has more often been a mistyped one than an edge.");
+
+    return { sport: sport, away: away, home: home, matchup: away + " @ " + home, line: line,
+             projected: projected, pOver: over, pPush: push, pUnder: under, pSide: pSide,
+             pResolved: pResolved, side: side, band: band, fair: fair, estimates: estimates, deltas: deltas,
+             notes: notes, totalWeight: tw, hot: band !== "COIN FLIP" };
+  }
+
+  function edgeVs(f, price) {
+    var live = f.pOver + f.pUnder;
+    if (live <= 0) return 0;
+    var payout = price > 0 ? price / 100 : 100 / -price;
+    return f.pSide * payout - (live - f.pSide);
+  }
+
+  // ---- rendering -------------------------------------------------------
+  var sport = "MLB", last = null;
+  function fmt(v) { return sport === "WNBA" ? v.toFixed(1) : v.toFixed(2); }
+
+  function render() {
+    var f = sport === "MLB" ? readMlb() : readWnba();
+    last = f;
+    var c = $("call");
+    if (!f) {
+      c.className = "call";
+      delete c.dataset.pOver; delete c.dataset.projected; delete c.dataset.pPush;
+      c.innerHTML = '<div class="ctop"><span class="band">AWAITING A NUMBER</span></div>' +
+        '<p class="cline">Enter the posted total to get a call. Everything else is optional — ' +
+        'the model works with whatever it has and re-weights around the gaps. Add the two ' +
+        'prices and it stops guessing what the market really means.</p>';
+      $("scale").innerHTML = ""; $("scaleLab").innerHTML = "";
+      $("est").innerHTML = '<p class="note">Nothing to blend yet.</p>';
+      $("deltaCard").hidden = true; $("why").innerHTML = "";
+      return;
+    }
+
+    var lo = f.side.toLowerCase();
+    c.className = "call" + (f.hot ? " hot" : "");
+    c.dataset.pOver = f.pOver.toFixed(10);
+    c.dataset.pResolved = f.pResolved.toFixed(10);
+    c.dataset.fair = f.fair.toFixed(6);
+    c.dataset.pPush = f.pPush.toFixed(10);
+    c.dataset.projected = f.projected.toFixed(10);
+
+    var posted = f.side === "OVER" ? num("op") : num("up");
+    var edge = posted === null ? null : edgeVs(f, posted);
+    var bandCls = f.band === "MAX" ? " max" : (f.hot ? " hot" : "");
+
+    c.innerHTML =
+      '<div class="ctop"><span class="band' + bandCls + '">' + f.band + "</span>" +
+      '<span class="pick ' + lo + '">' + f.side + " " + f.line + "</span>" +
+      '<span class="pct ' + lo + '">' + (f.pResolved * 100).toFixed(1) + "%</span></div>" +
+      '<p class="cline"><b>' + f.matchup + "</b> · projected <b>" + fmt(f.projected) +
+        "</b> against a line of " + f.line + " (" + sgn(f.projected - f.line, 2) + ")</p>" +
+      '<div class="split3">' +
+        '<i class="o" style="width:' + (f.pOver * 100) + '%">' +
+          (f.pOver > 0.13 ? "OVER " + (f.pOver * 100).toFixed(1) + "%" : "") + "</i>" +
+        /* The segment is only as wide as the probability, so a 9% push cannot
+           hold the word PUSH and the number both — it clipped to "USH 8.9".
+           The number alone fits from about 5%; below that nothing does. */
+        (f.pPush > 0.001 ? '<i class="p" style="width:' + (f.pPush * 100) + '%" title="Push ' +
+          (f.pPush * 100).toFixed(1) + '%">' +
+          (f.pPush > 0.13 ? "PUSH " + (f.pPush * 100).toFixed(1) + "%"
+           : f.pPush > 0.05 ? (f.pPush * 100).toFixed(1) + "%" : "") + "</i>" : "") +
+        '<i class="u" style="width:' + (f.pUnder * 100) + '%">' +
+          (f.pUnder > 0.13 ? (f.pUnder * 100).toFixed(1) + "% UNDER" : "") + "</i>" +
+      "</div>" +
+      '<div class="price">' +
+        '<div><p class="k">Fair price</p><p class="v">' + sgn(f.fair, 0) + "</p></div>" +
+        '<div><p class="k">You get</p><p class="v">' +
+          (posted === null ? "—" : sgn(posted, 0)) + "</p></div>" +
+        '<div><p class="k">Edge</p><p class="v ' +
+          (edge === null ? "" : edge > 0 ? "good" : "bad") + '">' +
+          (edge === null ? "—" : (edge * 100).toFixed(1) + "%") + "</p></div></div>";
+
+    // where each source lands
+    var vals = f.estimates.map(function (e) { return e.total; }).concat([f.line, f.projected]);
+    var mn = Math.min.apply(null, vals), mx = Math.max.apply(null, vals);
+    var pad = Math.max((mx - mn) * 0.25, sport === "WNBA" ? 4 : 0.4);
+    mn -= pad; mx += pad;
+    var at = function (v) { return (v - mn) / (mx - mn) * 100; };
+    var linePct = at(f.line);
+    $("scale").innerHTML =
+      '<div class="zone u" style="left:0;width:' + linePct + '%"></div>' +
+      '<div class="zone o" style="left:' + linePct + '%;right:0"></div>' +
+      f.estimates.map(function (e) {
+        return '<div class="dot" title="' + e.name + '" style="left:' + at(e.total) +
+          '%;background:var(--' + (e.total >= f.line ? "over" : "under") + ')"></div>';
+      }).join("") +
+      '<div class="lineMark" style="left:' + linePct + '%"></div>' +
+      '<div class="proj" style="left:' + at(f.projected) + '%;color:var(--' + lo +
+        ');background:var(--' + lo + ')"></div>';
+    var projPct = at(f.projected), stacked = Math.abs(projPct - linePct) < 11;
+    $("scaleLab").innerHTML =
+      '<span style="left:' + linePct + '%">line ' + f.line + "</span>" +
+      '<span style="left:' + projPct + '%;color:var(--' + lo + ');font-weight:600' +
+        (stacked ? ";top:13px" : "") + '">' + fmt(f.projected) + "</span>";
+
+    $("est").innerHTML = f.estimates.map(function (e) {
+      var share = e.weight / f.totalWeight * 100;
+      var cls = e.name === "Market" ? "m" : (e.total >= f.line ? "o" : "u");
+      var tcls = e.name === "Market" ? "" : (e.total >= f.line ? "o" : "u");
+      return '<div class="erow"><div>' +
+        '<div class="ehead"><span class="ename">' + e.name + "</span>" +
+        '<span class="eshare">' + share.toFixed(0) + "% of weight</span></div>" +
+        '<div class="wbar"><i class="' + cls + '" style="width:' + share + '%"></i></div></div>' +
+        '<div class="etot ' + tcls + '">' + fmt(e.total) + "</div></div>";
+    }).join("");
+
+    $("deltaCard").hidden = f.deltas.length === 0;
+    if (f.deltas.length) {
+      var dmax = 0;
+      f.deltas.forEach(function (d) { dmax = Math.max(dmax, Math.abs(d.runs)); });
+      dmax = Math.max(dmax, sport === "WNBA" ? 2 : 0.2);
+      $("deltas").innerHTML = f.deltas.map(function (d) {
+        var wpc = Math.abs(d.runs) / dmax * 50;
+        var cls = d.runs > 0 ? "o" : d.runs < 0 ? "u" : "";
+        var style = d.runs >= 0 ? "left:50%;width:" + wpc + "%" : "right:50%;width:" + wpc + "%";
+        return '<div class="drow"><div class="dname">' + d.name + "</div>" +
+          '<div class="dtrack"><div class="mid"></div>' +
+          (d.runs === 0 ? "" : '<span class="' + cls + '" style="' + style + '"></span>') +
+          "</div>" + '<div class="damt ' + cls + '">' + sgn(d.runs, 2) + "</div></div>";
+      }).join("");
+    }
+
+    $("why").innerHTML = f.estimates.map(function (e) {
+      return "<li><b>" + e.name + " · " + fmt(e.total) + ", " +
+        (e.weight / f.totalWeight * 100).toFixed(0) + "% of the weight.</b> " + e.detail + "</li>";
+    }).concat(f.deltas.map(function (d) {
+      return "<li><b>" + d.name + " " + sgn(d.runs, 2) + ".</b> " + d.detail + "</li>";
+    })).concat(f.notes.map(function (n) {
+      return '<li><span class="flag">' + n + "</span></li>";
+    })).join("");
+  }
+
+  // ---- the card --------------------------------------------------------
+  var KEY = "callsheet.fullgame.card.v1";
+  var DRAFT_KEY = "callsheet.fullgame.draft.v1";
+  var card = [];
+  try { card = JSON.parse(localStorage.getItem(KEY) || "[]"); } catch (e) { card = []; }
+  function save() {
+    try { localStorage.setItem(KEY, JSON.stringify(card)); }
+    catch (e) { $("saveState").textContent = "this browser is not storing anything"; }
+  }
+
+  /* A row grades itself once the final total is entered. Pushes are recorded
+     as pushes rather than folded into either column — they refund, so counting
+     one as a win or a loss corrupts the calibration measure that follows. */
+  function outcome(row) {
+    if (row.final === null || row.final === undefined || row.final === "") return null;
+    var f = parseFloat(row.final);
+    if (!isFinite(f)) return null;
+    if (Math.abs(f - row.line) < 1e-9) return "PUSH";
+    var went = f > row.line ? "OVER" : "UNDER";
+    return went === row.side ? "WIN" : "LOSS";
+  }
+
+  function renderCard() {
+    $("cardCount").textContent = card.length ? card.length + " games" : "";
+    if (!card.length) {
+      $("cardTable").innerHTML = '<p class="empty">Nothing on the card yet. Work a game out ' +
+        'above and press "Add to card". Click a row later to load it back in, and type the ' +
+        "final total to grade it.</p>";
+      renderCalib();
+      return;
+    }
+    $("cardTable").innerHTML = '<div class="scroll"><table><thead><tr>' +
+      "<th>Game</th><th>Sport</th><th>Line</th><th>Proj</th><th>Call</th><th>Prob</th>" +
+      "<th>Band</th><th>Final</th><th>Result</th><th></th></tr></thead><tbody>" +
+      card.map(function (s, i) {
+        var bc = s.band === "MAX" ? " max" : (s.band !== "COIN FLIP" ? " hot" : "");
+        var res = outcome(s);
+        return '<tr class="pick-row">' +
+          '<td><button class="openbtn" data-open="' + i + '" title="Load this game back into the form">' +
+            s.matchup + "</button></td>" +
+          '<td class="n"><span class="cell">' + s.sport + "</span></td>" +
+          '<td class="n"><span class="cell">' + s.line + "</span></td>" +
+          '<td class="n"><span class="cell">' + s.projected + "</span></td>" +
+          '<td><span class="cell"><span class="chip ' + (s.side === "OVER" ? "o" : "u") + '">' +
+            s.side + "</span></span></td>" +
+          '<td class="n"><span class="cell">' + s.prob + "%</span></td>" +
+          '<td><span class="cell"><span class="chip' + bc + '">' + s.band + "</span></span></td>" +
+          '<td><span class="cell"><input class="grade" type="number" step="1" inputmode="numeric" ' +
+            'data-final="' + i + '" value="' + (s.final == null ? "" : s.final) +
+            '" placeholder="—" aria-label="Final total"></span></td>' +
+          '<td><span class="cell">' + (res ? '<span class="res ' + res.toLowerCase() + '">' +
+            res + "</span>" : '<span class="eshare">ungraded</span>') + "</span></td>" +
+          '<td style="text-align:right"><span class="cell"><button class="x" data-del="' + i +
+            '" aria-label="Remove">×</button></span></td></tr>';
+      }).join("") + "</tbody></table></div>";
+
+    $("cardTable").querySelectorAll("[data-del]").forEach(function (b) {
+      b.addEventListener("click", function () { card.splice(+b.dataset.del, 1); save(); renderCard(); });
+    });
+    $("cardTable").querySelectorAll("[data-open]").forEach(function (b) {
+      b.addEventListener("click", function () { restore(card[+b.dataset.open]); });
+    });
+    $("cardTable").querySelectorAll("[data-final]").forEach(function (el) {
+      el.addEventListener("input", function () {
+        card[+el.dataset.final].final = el.value === "" ? null : el.value;
+        save(); renderCard();
+      });
+    });
+    renderCalib();
+  }
+
+  /* ---- is it working --------------------------------------------------
+     The single most important property of a forecaster, and the thing every
+     earlier model in this project had no way to check. A model can name the
+     right side more often than not and still be useless if its confidence is
+     fiction, because the confidence is what sizes the bet. */
+  function renderCalib() {
+    var rows = [];
+    var pushes = 0;
+    card.forEach(function (s) {
+      var r = outcome(s);
+      if (r === null) return;
+      if (r === "PUSH") { pushes++; return; }
+      rows.push([parseFloat(s.prob) / 100, r === "WIN"]);
+    });
+    var box = $("calibBox");
+    if (rows.length === 0) {
+      box.innerHTML = '<p class="note">Type the final combined total into the <b>Final</b> column ' +
+        'on any row and it grades itself. Once games are graded, this panel reports whether a 60% ' +
+        'call actually wins 60% of the time — which is the only question that matters, because the ' +
+        'confidence is what sizes the bet.</p>' +
+        (pushes ? '<p class="note">' + pushes + ' push(es) recorded and correctly excluded — ' +
+          'they refund, so counting one as a win or a loss would corrupt the measure.</p>' : "");
+      return;
+    }
+    var n = rows.length;
+    var brier = 0, ll = 0, hits = 0, meanP = 0;
+    rows.forEach(function (r) {
+      var p = r[0], w = r[1] ? 1 : 0;
+      brier += (p - w) * (p - w);
+      ll += -Math.log(Math.max(w ? p : 1 - p, 1e-12));
+      hits += w; meanP += p;
+    });
+    brier /= n; ll /= n; var hit = hits / n; meanP /= n;
+    var gap = hit - meanP;
+    var se = Math.sqrt(Math.max(meanP * (1 - meanP), 1e-9) / n);
+
+    var verdict, cls;
+    if (n < 50) {
+      verdict = n + " graded call" + (n === 1 ? "" : "s") + " is not enough to judge anything — " +
+        "one standard error on the hit rate is " + (se * 100).toFixed(1) + " points. Keep logging.";
+      cls = "";
+    } else {
+      var problems = [];
+      if (Math.abs(gap) > 2 * se) problems.push("Miscalibrated: it says " +
+        (meanP * 100).toFixed(1) + "% and does " + (hit * 100).toFixed(1) + "%, a gap of " +
+        sgn(gap * 100, 1) + " against a standard error of " + (se * 100).toFixed(1) +
+        ". The side may still be right; the confidence is not.");
+      if (brier >= 0.25) problems.push("Brier " + brier.toFixed(4) + " is at or above the 0.25 a " +
+        "coin flip scores, so this is not adding information and should not be sized on.");
+      verdict = problems.length ? problems.join(" ")
+        : "Calibrated within noise (" + sgn(gap * 100, 1) + " points against a " +
+          (se * 100).toFixed(1) + "-point standard error), Brier " + brier.toFixed(4) + ".";
+      cls = problems.length ? " bad" : " good";
+    }
+
+    var edges = [[0.50, 0.53, "50-53%"], [0.53, 0.57, "53-57%"],
+                 [0.57, 0.62, "57-62%"], [0.62, 1.01, "62%+"]];
+    var buckets = edges.map(function (e) {
+      var sub = rows.filter(function (r) { return r[0] >= e[0] && r[0] < e[1]; });
+      if (!sub.length) return "";
+      var said = sub.reduce(function (a, r) { return a + r[0]; }, 0) / sub.length;
+      var did = sub.reduce(function (a, r) { return a + (r[1] ? 1 : 0); }, 0) / sub.length;
+      return '<div><p class="k">' + e[2] + " · n=" + sub.length + '</p><p class="v">' +
+        (did * 100).toFixed(0) + "%</p><p class=\"k\">said " + (said * 100).toFixed(0) +
+        "%</p></div>";
+    }).join("");
+
+    box.innerHTML =
+      '<div class="calib">' +
+        '<div><p class="k">Graded</p><p class="v">' + n + "</p></div>" +
+        '<div><p class="k">Record</p><p class="v">' + hits + "-" + (n - hits) + "</p></div>" +
+        '<div><p class="k">Said</p><p class="v">' + (meanP * 100).toFixed(1) + "%</p></div>" +
+        '<div><p class="k">Did</p><p class="v">' + (hit * 100).toFixed(1) + "%</p></div>" +
+        '<div><p class="k">Brier</p><p class="v">' + brier.toFixed(3) + "</p></div>" +
+        '<div><p class="k">Log loss</p><p class="v">' + ll.toFixed(3) + "</p></div>" +
+      "</div>" +
+      (buckets ? '<div class="calib" style="margin-top:1px">' + buckets + "</div>" : "") +
+      '<p class="verdict' + cls + '">' + verdict + "</p>" +
+      (pushes ? '<p class="note">' + pushes + " push(es) excluded — they refund, so counting one " +
+        "as a win or a loss would corrupt the measure.</p>" : "") +
+      '<p class="note">A coin flip scores <b>0.25</b> on Brier. Lower is better; at or above it, ' +
+      "the model is not adding information over guessing.</p>";
+  }
+
+  // ---- wiring ----------------------------------------------------------
+  var MLB_IDS = ["away","home","line","op","up","opened","gdate","aera","hera","arpg","hrpg",
+                 "abp","hbp","al10","hl10","h2h","h2hn","pf","mph","dir","temp","tick","cash"];
+  var WNBA_IDS = ["away","home","line","op","up","opened","gdate","wal10","whl10",
+                  "wh2h","wh2hn","aout","hout"];
+  var ALL = MLB_IDS.concat(WNBA_IDS).filter(function (v, i, a) { return a.indexOf(v) === i; });
+  var CHECKS = ["dome","alead","hlead"];
+
+  function snapshot() {
+    var v = {};
+    ALL.forEach(function (id) { v[id] = $(id).value; });
+    CHECKS.forEach(function (id) { v[id] = $(id).checked; });
+    return v;
+  }
+  function saveDraft() {
+    try {
+      localStorage.setItem(DRAFT_KEY, JSON.stringify({ sport: sport, inputs: snapshot() }));
+      $("saveState").textContent = "draft saved";
+    } catch (e) { $("saveState").textContent = "this browser is not storing anything"; }
+  }
+  function loadDraft() {
+    var d = null;
+    try { d = JSON.parse(localStorage.getItem(DRAFT_KEY) || "null"); } catch (e) { return false; }
+    if (!d || !d.inputs) return false;
+    setSport(d.sport, true);
+    ALL.forEach(function (id) { $(id).value = d.inputs[id] || ""; });
+    CHECKS.forEach(function (id) { $(id).checked = !!d.inputs[id]; });
+    return true;
+  }
+  function restore(row) {
+    if (!row) return;
+    setSport(row.sport, true);
+    ALL.forEach(function (id) { $(id).value = (row.inputs && row.inputs[id]) || ""; });
+    CHECKS.forEach(function (id) { $(id).checked = !!(row.inputs && row.inputs[id]); });
+    render(); saveDraft();
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  }
+  function say(msg) { var el = $("saveMsg"); el.hidden = false; el.innerHTML = msg; }
+
+  function setSport(s, quiet) {
+    sport = s === "WNBA" ? "WNBA" : "MLB";
+    var mlb = sport === "MLB";
+    $("m-mlb").setAttribute("aria-pressed", String(mlb));
+    $("m-wnba").setAttribute("aria-pressed", String(!mlb));
+    $("mlbFields").hidden = !mlb;
+    $("wnbaFields").hidden = mlb;
+    $("eyebrow").textContent = mlb ? "MLB · full game" : "WNBA · full game";
+    $("lineLabel").textContent = "Total";
+    $("unitTag").textContent = mlb ? "runs" : "points";
+    $("line").placeholder = mlb ? "8.5" : "162.5";
+    if (!quiet) render();
+  }
+  $("m-mlb").addEventListener("click", function () { setSport("MLB"); saveDraft(); });
+  $("m-wnba").addEventListener("click", function () { setSport("WNBA"); saveDraft(); });
+
+  function onEdit() { render(); saveDraft(); }
+  ALL.concat(CHECKS).forEach(function (id) {
+    var el = $(id);
+    el.addEventListener("input", onEdit);
+    el.addEventListener("change", onEdit);
+  });
+
+  $("clear").addEventListener("click", function () {
+    ALL.forEach(function (id) { $(id).value = ""; });
+    CHECKS.forEach(function (id) { $(id).checked = false; });
+    render(); saveDraft();
+  });
+
+  /* The form ships blank on purpose. An earlier build pre-filled the weather
+     and the umpire, so every fresh game silently inherited a fabricated edge. */
+  $("example").addEventListener("click", function () {
+    var V = sport === "MLB"
+      ? { away: "Orioles", home: "Rockies", line: 11.5, op: -115, up: -105, opened: 11,
+          aera: 4.62, hera: 5.48, arpg: 4.71, hrpg: 4.38, abp: 4.10, hbp: 5.35,
+          al10: 9.6, hl10: 11.2, h2h: 12.5, h2hn: 3, pf: 112, mph: 12, dir: "out", temp: 78 }
+      : { away: "Fever", home: "Wings", line: 162.5, op: -110, up: -110,
+          wal10: 168.2, whl10: 171.4, wh2h: 174.0, wh2hn: 3, aout: 1 };
+    ALL.forEach(function (id) { $(id).value = ""; });
+    CHECKS.forEach(function (id) { $(id).checked = false; });
+    Object.keys(V).forEach(function (k) { $(k).value = V[k]; });
+    render(); saveDraft();
+  });
+
+  $("add").addEventListener("click", function () {
+    if (!last) return;
+    card.unshift({ matchup: last.matchup, sport: last.sport, line: last.line,
+                   projected: fmt(last.projected), side: last.side,
+                   prob: (last.pResolved * 100).toFixed(1), band: last.band,
+                   fair: last.fair.toFixed(0), final: null, inputs: snapshot() });
+    save(); renderCard();
+  });
+
+  // ---- backup / restore / copy -----------------------------------------
+  function backupBlob() {
+    return JSON.stringify({ format: "callsheet.backup", version: 2,
+      savedAt: new Date().toISOString(), card: card,
+      draft: { sport: sport, inputs: snapshot() } }, null, 2);
+  }
+  function cardAsText() {
+    if (!card.length) return "Nothing on the card.";
+    return ["GAME\tSPORT\tLINE\tPROJ\tCALL\tPROB\tBAND\tFINAL\tRESULT"].concat(
+      card.map(function (s) {
+        return [s.matchup, s.sport, s.line, s.projected, s.side, s.prob + "%", s.band,
+                s.final == null ? "" : s.final, outcome(s) || ""].join("\t");
+      })).join("\n");
+  }
+
+  var downloads = null;
+  if (window.claude && typeof window.claude.use === "function") {
+    /* Resolves later than this script and null when the view cannot run it, so
+       the button stays hidden until it is known to work rather than being
+       offered and then failing. */
+    window.claude.use("downloads").then(function (d) {
+      downloads = d;
+      $("backup").hidden = !d;
+      if (!d) say("This view cannot save files, so the backup button is hidden. " +
+                  "<b>Copy card as text</b> still works — paste it somewhere safe.");
+    }).catch(function () { $("backup").hidden = true; });
+  } else { $("backup").hidden = true; }
+
+  $("backup").addEventListener("click", function () {
+    if (!downloads) return;
+    downloads.save({ filename: "call-sheet-" + new Date().toISOString().slice(0, 10) + ".json",
+                     data: backupBlob() })
+      .then(function () { say("Backup saved. Load it with <b>Load a backup</b> on any device."); })
+      .catch(function (err) {
+        var code = (err && err.code) || "unavailable";
+        say(code === "declined"
+          ? "Save cancelled — nothing was written. Your card is still here."
+          : "Could not save the file (<code>" + code + "</code>). Use <b>Copy card as text</b> " +
+            "and paste it somewhere safe instead.");
+      });
+  });
+
+  $("restore").addEventListener("click", function () { $("restoreFile").click(); });
+  $("restoreFile").addEventListener("change", function () {
+    var file = this.files && this.files[0];
+    if (!file) return;
+    var reader = new FileReader();
+    reader.onload = function () {
+      var data;
+      try { data = JSON.parse(String(reader.result)); }
+      catch (e) { return say("That file is not a Call Sheet backup — it is not readable JSON."); }
+      if (!data || data.format !== "callsheet.backup" || !Array.isArray(data.card)) {
+        return say("That file is not a Call Sheet backup. Nothing was changed.");
+      }
+      /* Merge rather than replace: restoring onto a machine that already has a
+         night on it must not silently delete that night. */
+      var seen = {};
+      card.forEach(function (r) { seen[r.matchup + "|" + r.line + "|" + r.prob] = true; });
+      var added = 0;
+      data.card.forEach(function (r) {
+        var k = r.matchup + "|" + r.line + "|" + r.prob;
+        if (!seen[k]) { card.push(r); seen[k] = true; added++; }
+      });
+      save(); renderCard();
+      if (data.draft && data.draft.inputs) { restore({ sport: data.draft.sport, inputs: data.draft.inputs }); }
+      say("Loaded. <b>" + added + "</b> game(s) added to the card" +
+          (added < data.card.length ? ", " + (data.card.length - added) +
+           " already there and left alone." : "."));
+    };
+    reader.readAsText(file);
+    this.value = "";
+  });
+
+  $("copy").addEventListener("click", function () {
+    var text = cardAsText();
+    var fallback = function () {
+      say("Clipboard unavailable. Here it is to copy by hand:<br>" +
+          '<textarea readonly rows="6" style="width:100%;font:500 12px/1.5 var(--mono)">' +
+          text.replace(/</g, "&lt;") + "</textarea>");
+    };
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(text)
+        .then(function () { say("Card copied. Paste it into a note or a spreadsheet."); })
+        .catch(fallback);
+    } else { fallback(); }
+  });
+
+  setSport("MLB", true);
+  loadDraft();
+  render();
+  renderCard();
+})();
+</script>

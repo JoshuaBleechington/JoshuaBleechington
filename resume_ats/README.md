@@ -138,6 +138,13 @@ which of your bullets carry no numbers. Every entry is a prompt to answer from
 your own history. The file is for you and is never part of the document you
 send.
 
+**Nothing from the original is lost.** Rebuilding from parsed structure risks
+dropping whatever the parser did not attach to a role or a recognised section:
+a position written without dates, a PATENTS or LANGUAGES block, an award list
+under an unusual heading. Those are kept in place and in source order, and a
+final pass verifies the rebuild against the original, carrying anything still
+unplaced into an Additional Information section rather than losing it.
+
 **When it refuses.** Tailoring can only rearrange what came out of the file. If
 the source is a graphic-led layout whose dates and headings never became text,
 the rebuild would be faithful to a parse that already lost most of the resume,
@@ -256,7 +263,7 @@ collapses and the audit reports no bullet points, the export dropped them.
 python -m pytest tests -q
 ```
 
-128 tests cover extraction, section parsing, requirement mining, matching
+135 tests cover extraction, section parsing, requirement mining, matching
 precision, the parsing audit, scoring behaviour, document generation and the
 CLI. The tailoring tests pin the integrity guarantees hardest: no invented
 numbers, no unevidenced skills in the file, and advice to the candidate never

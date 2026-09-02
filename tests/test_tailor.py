@@ -504,3 +504,83 @@ BS Engineering
                       if b.kind == "body" and "Presales leader" in "".join(r.text for r in b.runs)]
     assert len(summary_blocks) == 1
     assert "managed services and IT outsourcing" in "".join(r.text for r in summary_blocks[0].runs)
+
+
+# -- nothing from the original may be lost -----------------------------------
+
+RAGGED = """Alex Roe
+alex@example.com | (555) 010-2233
+
+SUMMARY
+Solutions leader in managed services.
+
+PROFESSIONAL EXPERIENCE
+
+Senior Director | Acme | Jan 2018 - Present
+- Led presales pursuits worth $20M in total contract value.
+
+Consultant | Betaco
+- Advised clients on managed services strategy and delivery.
+
+PATENTS
+US 9,123,456 - Method for adaptive routing in distributed networks
+
+LANGUAGES
+Fluent in Spanish and conversational in Portuguese
+
+EDUCATION
+BS Engineering, State University
+"""
+
+
+def test_a_position_without_dates_is_not_dropped():
+    out = tailor.build(from_string(RAGGED), parse_jd(JD), default_lexicon())
+    assert "Betaco" in out.text
+    assert "Advised clients on managed services strategy" in out.text
+
+
+def test_a_section_under_an_unrecognised_heading_survives():
+    out = tailor.build(from_string(RAGGED), parse_jd(JD), default_lexicon())
+    assert "9,123,456" in out.text
+    assert "adaptive routing" in out.text
+    assert "Spanish" in out.text
+
+
+def test_the_rescue_net_does_not_fire_when_content_is_placed_properly():
+    """The safety net is a last resort, not the normal path."""
+    out = tailor.build(from_string(RAGGED), parse_jd(JD), default_lexicon())
+    assert "ADDITIONAL INFORMATION" not in out.text
+    assert "9,123,456" in out.text and "Spanish" in out.text
+
+
+def test_an_unrecognised_block_keeps_its_own_heading_and_content():
+    out = tailor.build(from_string(RAGGED), parse_jd(JD), default_lexicon())
+    text = out.text
+    assert text.index("PATENTS") < text.index("9,123,456")
+    assert text.index("LANGUAGES") < text.index("Spanish")
+
+
+def test_an_undated_position_keeps_its_own_bullet():
+    out = tailor.build(from_string(RAGGED), parse_jd(JD), default_lexicon())
+    text = out.text
+    assert text.index("Consultant | Betaco") < text.index("Advised clients on managed services")
+    assert "delivery. US 9,123,456" not in text
+
+
+def test_every_dated_position_survives_tailoring():
+    out = tailor.build(from_string(STACKED_RESUME), parse_jd(JD), default_lexicon())
+    source_roles = parse_resume(STACKED_RESUME).roles
+    assert len(source_roles) == 2
+    for role in source_roles:
+        assert role.organization in out.text
+        for bullet in role.bullets:
+            assert bullet in out.text
+
+
+def test_the_cover_letter_is_still_dropped_not_rescued():
+    """The rescue pass must not resurrect prose we deliberately removed."""
+    source = ("Cover Letter\nDear Hiring Manager,\nI am writing to express my sincere "
+              "interest in this position and my lifelong passion for excellence.\n\n" + RAGGED)
+    out = tailor.build(from_string(source), parse_jd(JD), default_lexicon())
+    assert "passion for excellence" not in out.text
+    assert "9,123,456" in out.text

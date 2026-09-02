@@ -162,6 +162,7 @@ class Role:
     end: Optional[Tuple[int, int]] = None
     is_current: bool = False
     bullets: List[str] = field(default_factory=list)
+    trailing: List[str] = field(default_factory=list)
     text: str = ""
 
     @property
@@ -416,6 +417,7 @@ def parse_roles(experience_text: str, banners: Optional[Set[str]] = None) -> Lis
     current: Optional[Role] = None
     buffer: List[str] = []
     recent: List[str] = []
+    in_trailing = False
 
     def flush() -> None:
         if current is not None:
@@ -459,6 +461,7 @@ def parse_roles(experience_text: str, banners: Optional[Set[str]] = None) -> Lis
             current = Role(heading=line, start=start, end=end, is_current=is_current)
             current.title, current.organization = title, org
             recent = []
+            in_trailing = False
             continue
         if current is None:
             if not is_bullet(raw):
@@ -471,14 +474,41 @@ def parse_roles(experience_text: str, banners: Optional[Set[str]] = None) -> Lis
             recent.append(line)
             if len(recent) > 3:
                 recent.pop(0)
+
+        # A heading or an undated role line inside the experience block ends
+        # the run of bullets. Everything after it belongs to that new block,
+        # in order, until the next dated position. Without this, whole
+        # sections were glued onto the end of the previous bullet and survived
+        # only as an unreadable run-on line.
+        if not is_bullet(raw) and _starts_new_block(raw):
+            in_trailing = True
+            current.trailing.append(line)
+            continue
+        if in_trailing:
+            current.trailing.append(("- " + strip_bullet(raw)) if is_bullet(raw) else line)
+            continue
         if is_bullet(raw):
             current.bullets.append(strip_bullet(raw))
         elif current.bullets:
-            # Wrapped continuation of the previous bullet.
             current.bullets[-1] = (current.bullets[-1] + " " + line).strip()
+        else:
+            current.trailing.append(line)
 
     flush()
     return roles
+
+
+def _starts_new_block(raw: str) -> bool:
+    """True when a line opens something new rather than continuing a bullet."""
+    line = raw.strip()
+    if not line:
+        return False
+    if _match_heading(line) or _looks_like_heading(line):
+        return True
+    # A role heading: "Title | Company" or a line carrying a date range.
+    if "|" in line and len(line) < 120:
+        return True
+    return bool(DATE_RANGE_RE.search(line)) and not raw[:1].isspace()
 
 
 def _split_title_org(line: str) -> Tuple[str, str]:
@@ -513,7 +543,8 @@ def collect_bullets(text: str) -> List[str]:
             continue
         stripped = raw.strip()
         # A continuation line is indented and does not start a new construct.
-        if open_bullet and stripped and raw[:1] in " \t" and not _match_heading(raw):
+        if (open_bullet and stripped and raw[:1] in " \t"
+                and not _match_heading(raw) and not _starts_new_block(raw)):
             out[-1] = (out[-1] + " " + stripped).strip()
         else:
             open_bullet = False

@@ -400,6 +400,17 @@ def build(
                                                space_after=50))
                 for bullet in role.bullets:
                     result.blocks.append(Block([Run(_clean(bullet), size=20)], kind="bullet"))
+                # Content that follows the bullets inside this role's block:
+                # an undated position, a PATENTS or LANGUAGES list. Kept in
+                # source order so it still reads as what it was.
+                for line in role.trailing:
+                    if line.startswith("- "):
+                        result.blocks.append(
+                            Block([Run(_clean(line[2:]), size=20)], kind="bullet"))
+                    else:
+                        result.blocks.append(
+                            Block([Run(_clean(line), bold=True, size=20)],
+                                  space_before=120, space_after=20))
             continue
 
         body = resume.section(key)
@@ -423,6 +434,15 @@ def build(
         "Rebuilt as single-column body text with standard headings, native "
         "Word bullets and dates on the title line: no tables, text boxes, "
         "columns, headers, footers or images."))
+
+    # ---- nothing from the original may be lost ---------------------------
+    rescued = _rescue_dropped_content(repaired, result, resume)
+    if rescued:
+        result.changes.append(Change(
+            "structure",
+            f"Carried {len(rescued)} line(s) the rebuild did not otherwise place "
+            "into an Additional Information section, so nothing from the "
+            "original is lost. Move them where they belong."))
 
     # ---- what only the candidate can supply -----------------------------
     if absent:
@@ -496,6 +516,31 @@ def _source_warnings(text: str, resume: Resume) -> List[str]:
     if not resume.contact.email:
         warnings.append("No email address could be read from the original.")
     return warnings
+
+
+# Openers chosen so the finished bullet starts with a strong action verb,
+# which is what the writing component and a human reader both look for.
+_SKELETON_VERBS = (
+    ("strategy", "Defined"), ("design", "Designed"), ("architecture", "Architected"),
+    ("model", "Designed"), ("analytics", "Built"), ("data", "Built"),
+    ("platform", "Delivered"), ("enablement", "Delivered"), ("training", "Delivered"),
+    ("management", "Led"), ("leadership", "Led"), ("team", "Led"),
+    ("practice", "Built"), ("program", "Led"), ("transformation", "Led"),
+    ("consulting", "Led"), ("development", "Drove"), ("growth", "Drove"),
+    ("partners", "Built"), ("partnerships", "Built"), ("workshops", "Ran"),
+    ("reviews", "Ran"), ("governance", "Owned"), ("operations", "Owned"),
+)
+
+
+def _bullet_skeleton(term: str) -> str:
+    """A fill-in-the-blank bullet built around the posting's exact wording."""
+    lowered = term.lower()
+    verb = "Led"
+    for token, candidate in _SKELETON_VERBS:
+        if token in lowered:
+            verb = candidate
+            break
+    return f"{verb} ______ {term} for ______, delivering ______."
 
 
 def _is_whole_requirement(line: str) -> bool:
@@ -574,6 +619,28 @@ def notes_markdown(result: TailorResult, jd: JobDescription, report=None) -> str
             lines.append("")
 
     if report is not None:
+        gaps = [m for m in report.missing(24) if m.requirement.known_skill
+                or len(m.requirement.term.split()) > 1][:10]
+        if gaps:
+            lines.append("## Ready-to-fill bullets for the biggest gaps")
+            lines.append("")
+            lines.append("Each skeleton already carries the posting's exact wording, so once you "
+                         "fill the blanks it lands as a keyword match *and* as demonstrated work. "
+                         "Fill them from what you actually did. **If you cannot complete one "
+                         "truthfully, delete it** -- a keyword you cannot speak to in the "
+                         "interview costs more than the one it gained you.")
+            lines.append("")
+            for match in gaps:
+                req = match.requirement
+                term = req.term
+                context = (req.contexts[0] if req.contexts else "").strip()
+                lines.append(f"- [ ] **{term}**"
+                             + ("  _(stated as required)_" if req.required else ""))
+                lines.append(f"      `{_bullet_skeleton(term)}`")
+                if context:
+                    lines.append(f"      <sub>posting: \u201c{context[:120]}\u201d</sub>")
+            lines.append("")
+
         missing = report.missing(20)
         if missing:
             lines.append("## Missing keywords, ranked by how hard the posting leans on them")
@@ -599,6 +666,65 @@ def notes_markdown(result: TailorResult, jd: JobDescription, report=None) -> str
     lines.append("_Generated alongside the tailored resume. This file is for you — do not "
                  "send it with an application._")
     return "\n".join(lines) + "\n"
+
+
+def _rescue_dropped_content(source: str, result: TailorResult, resume: Resume) -> List[str]:
+    """Append anything from the original the rebuild did not carry over.
+
+    Rebuilding from parsed structure means content the parser never attached to
+    a role or a recognised section simply disappears: a position written
+    without dates, a PATENTS or MILITARY SERVICE block, an award list under an
+    unusual heading. Silently dropping a line from someone's resume is the
+    worst thing this tool could do, so the rebuild is verified against the
+    source and anything missing is carried through rather than lost.
+    """
+    from .text import tokenize
+
+    placed = " ".join(tokenize(to_text(result)))
+    placed_words = set(placed.split())
+
+    # The cover letter is dropped deliberately; do not rescue it.
+    head = " ".join(source.split())[:2500].lower()
+    skip_prefix = 0
+    if any(marker in head for marker in COVER_LETTER_MARKERS):
+        for i, line in enumerate(source.splitlines()):
+            if _match_section_heading(line):
+                skip_prefix = i
+                break
+
+    contact_bits = {b.lower() for b in (
+        resume.contact.email, resume.contact.phone, resume.contact.linkedin,
+        resume.contact.github, resume.contact.location, resume.contact.name_guess) if b}
+
+    missing: List[str] = []
+    for raw in source.splitlines()[skip_prefix:]:
+        line = " ".join(raw.split())
+        if len(line.split()) < 5:
+            continue
+        if line.lower() in contact_bits:
+            continue
+        words = [w for w in tokenize(line) if len(w) > 2]
+        if not words:
+            continue
+        covered = sum(1 for w in words if w in placed_words) / len(words)
+        # Below this, the line's substance is genuinely absent rather than
+        # merely reformatted.
+        if covered < 0.6:
+            missing.append(line.lstrip("-\u2022* ").strip())
+
+    if missing:
+        result.blocks.append(Block(
+            [Run("ADDITIONAL INFORMATION", bold=True, size=21, color="222222")],
+            kind="heading", space_before=220, space_after=90, rule_below=True))
+        for line in missing:
+            result.blocks.append(Block([Run(_clean(line), size=20)], kind="bullet"))
+        result.text = to_text(result)
+    return missing
+
+
+def _match_section_heading(line: str):
+    from .resume import _match_heading
+    return _match_heading(line)
 
 
 def to_text(result: TailorResult) -> str:

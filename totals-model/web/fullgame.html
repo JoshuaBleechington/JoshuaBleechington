@@ -708,10 +708,28 @@
 
   /* The market's real fair total, recovered from the two prices. A posted
      line is rounded to the half run; the prices are not. */
+  /* A wide market is not a sharper opinion, it is a less certain one.
+
+     A total entered at 8.5 when the main number had moved to 9 picked up an
+     ALTERNATE-line quote of -150/-110 — a 12.4% hold where every other game
+     that night sat at 2.4-4.8%. Proportional de-vig read 53.4% over and pushed
+     the card from LEAN to STRONG on what was mostly markup rather than opinion.
+     So the deviation from even is shrunk by how far the hold exceeds a normal
+     main-line one.
+
+     This is NOT Shin's method, which was tried first. Shin corrects
+     favourite-longshot bias and moves the favourite UP; it would have made the
+     alternate line more confident, not less. */
+  var HOLD_REFERENCE = 0.05;
+  function marketConfidence(h) { return h <= HOLD_REFERENCE ? 1 : HOLD_REFERENCE / h; }
+
   function fairTotal(sport, line, op, up) {
     var quoted = op !== null && up !== null;
     if (!quoted) { op = -110; up = -110; }
-    var o = implied(op), u = implied(up), s = o + u, pOver = o / s;
+    var o = implied(op), u = implied(up), s = o + u;
+    var bookHold = s - 1, conf = marketConfidence(bookHold);
+    var rawOver = o / s;
+    var pOver = 0.5 + (rawOver - 0.5) * conf;
     var lo = Math.max(0.5, line - 4), hi = line + 4;
     for (var i = 0; i < 80; i++) {
       var mid = (lo + hi) / 2, sp = splitFor(sport, line, mid);
@@ -723,11 +741,18 @@
       if (conditional < pOver) lo = mid; else hi = mid;
     }
     var mu = (lo + hi) / 2;
-    var hold = o + u - 1;
+    var tail = conf < 1
+      ? " That is a " + (bookHold * 100).toFixed(1) + "% hold where a main line runs " +
+        (HOLD_REFERENCE * 100).toFixed(0) + "% — most likely an ALTERNATE line rather than the " +
+        "main number. A wide market is a less certain one, not a sharper one, so the read has " +
+        "been pulled back from " + (rawOver * 100).toFixed(1) + "% toward even and only " +
+        (conf * 100).toFixed(0) + "% of it is kept. Enter the main line and its prices if you " +
+        "have them."
+      : "";
     var why = quoted
       ? (sgn(op, 0) + "/" + sgn(up, 0) + " de-vigs to " + (pOver * 100).toFixed(1) +
-         "% over (" + (hold * 100).toFixed(2) + "% hold), which is the market saying fair is " +
-         mu.toFixed(2) + " rather than the " + line + " it posted.")
+         "% over (" + (bookHold * 100).toFixed(2) + "% hold), which is the market saying fair is " +
+         mu.toFixed(2) + " rather than the " + line + " it posted." + tail)
       : ("No prices given, so an evenly-priced market is assumed. A line of " + line +
          " splitting 50/50 implies a mean of " + mu.toFixed(2) + " — run totals are " +
          "right-skewed, so the average game finishes above the number that divides the sides.");

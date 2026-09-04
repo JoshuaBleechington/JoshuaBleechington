@@ -26,6 +26,8 @@ from totals.fullgame import (
     calibration,
     devig,
     fair_total,
+    hold,
+    market_confidence,
     forecast_mlb,
     forecast_wnba,
     h2h_weight,
@@ -227,6 +229,80 @@ class TestThePricesAreInformation(unittest.TestCase):
         self.assertAlmostEqual(plain.p_resolved, 0.5, places=9)
         self.assertEqual(priced.side, "OVER")
         self.assertGreater(priced.p_resolved, 0.52)
+
+
+class TestAWideMarketIsALessCertainOne(unittest.TestCase):
+    """Found on 2026-09-04 from a real card.
+
+    A total entered at 8.5 when the main number had moved to 9 picked up an
+    ALTERNATE-line quote of -150/-110: a 12.4% hold where every other game that
+    night sat at 2.4-4.8%. Proportional de-vig read 53.4% over and pushed the
+    card from LEAN to STRONG on what was mostly markup rather than opinion.
+    """
+
+    def test_a_normal_hold_is_left_completely_alone(self):
+        for op, up in ((-110, -110), (-115, -105), (-120, 100), (-105, -115),
+                       (100, -110), (-250, 200)):
+            self.assertLessEqual(hold(op, up), 0.05 + 1e-9)
+            self.assertAlmostEqual(market_confidence(hold(op, up)), 1.0)
+            raw, _ = devig(op, up, shrink=False)
+            shrunk, _ = devig(op, up)
+            self.assertAlmostEqual(raw, shrunk, places=12,
+                                   msg=f"{op}/{up} must be untouched")
+
+    def test_a_wide_market_is_pulled_back_toward_even(self):
+        raw, _ = devig(-150, -110, shrink=False)
+        shrunk, _ = devig(-150, -110)
+        self.assertGreater(raw, shrunk)
+        self.assertGreater(shrunk, 0.5)          # never flips the side
+        self.assertAlmostEqual(hold(-150, -110), 0.1238, places=4)
+        self.assertAlmostEqual(market_confidence(0.1238), 0.05 / 0.1238, places=6)
+
+    def test_the_shrink_never_crosses_even_or_changes_direction(self):
+        for op, up in ((-150, -110), (-300, -110), (-110, -300), (500, -110)):
+            raw, _ = devig(op, up, shrink=False)
+            shrunk, _ = devig(op, up)
+            self.assertEqual(raw > 0.5, shrunk > 0.5)
+            self.assertLessEqual(abs(shrunk - 0.5), abs(raw - 0.5) + 1e-12)
+
+    def test_a_symmetric_quote_stays_exactly_even_at_any_hold(self):
+        """Neutrality must survive the change. A shrink toward even cannot
+        move something that is already even."""
+        for op in (-110, -105, -150, -400):
+            p_over, p_under = devig(op, op)
+            self.assertAlmostEqual(p_over, 0.5, places=12)
+            self.assertAlmostEqual(p_under, 0.5, places=12)
+
+    def test_it_says_the_quote_looks_like_an_alternate_line(self):
+        _, why = fair_total("MLB", 8.5, -150, -110)
+        self.assertIn("ALTERNATE line", why)
+        self.assertIn("12.4% hold", why)
+        _, normal = fair_total("MLB", 8.5, -115, -105)
+        self.assertNotIn("ALTERNATE", normal)
+
+    def test_the_real_card_moves_by_about_a_point_and_a_half(self):
+        kw = dict(away_starter_era=3.46, home_starter_era=3.32, away_rpg=4.24,
+                  home_rpg=4.91, away_bullpen_era=4.00, home_bullpen_era=5.15,
+                  away_last10_total=8.9, home_last10_total=9.8, h2h_total=12.0,
+                  h2h_meetings=2, park_factor=106, wind_mph=11.8,
+                  wind_direction="out", temp_f=96.5, ticket_pct_over=55,
+                  money_pct_over=59)
+        f = forecast_mlb("MIA @ KC", 8.5, over_price=-150, under_price=-110, **kw)
+        self.assertEqual(f.side, "OVER")
+        self.assertLess(f.p_resolved, 0.575)     # was 58.7% before the change
+        self.assertGreater(f.p_resolved, 0.56)
+
+    def test_shin_is_deliberately_not_used(self):
+        """Shin corrects favourite-longshot bias and moves the favourite UP.
+
+        It is a real effect and the wrong one here: under Shin a -150/-110 quote
+        reads 53.8% against proportional's 53.4%, which would have made the
+        alternate line MORE confident rather than less. This pins the direction
+        so nobody re-adds it thinking it fixes this.
+        """
+        raw, _ = devig(-150, -110, shrink=False)
+        shrunk, _ = devig(-150, -110)
+        self.assertLess(shrunk, raw)             # we go DOWN, Shin goes up
 
 
 class TestItAlwaysAnswers(unittest.TestCase):

@@ -1286,5 +1286,85 @@
       "estimates": 2,
       "deltas": 0
     }
+  },
+  {
+    "sport": "MLB",
+    "name": "an alternate line at a 12% hold",
+    "inputs": {
+      "away": "Marlins",
+      "home": "Royals",
+      "line": 8.5,
+      "op": -150,
+      "up": -110,
+      "opened": null,
+      "aera": 3.46,
+      "hera": 3.32,
+      "arpg": 4.24,
+      "hrpg": 4.91,
+      "abp": 4.0,
+      "hbp": 5.15,
+      "al10": 8.9,
+      "hl10": 9.8,
+      "h2h": 12.0,
+      "h2hn": 2,
+      "pf": 106,
+      "mph": 11.8,
+      "dir": "out",
+      "temp": 96.5,
+      "dome": null,
+      "tick": 55,
+      "cash": 59
+    },
+    "expect": {
+      "side": "OVER",
+      "band": "STRONG",
+      "p_side": 0.57059829,
+      "p_resolved": 0.57059829,
+      "p_push": 0.0,
+      "projected": 9.82093272,
+      "fair": -132.8822,
+      "estimates": 5,
+      "deltas": 2
+    }
+  },
+  {
+    "sport": "MLB",
+    "name": "the same game at the main line",
+    "inputs": {
+      "away": "Marlins",
+      "home": "Royals",
+      "line": 9,
+      "op": -110,
+      "up": -110,
+      "opened": null,
+      "aera": 3.46,
+      "hera": 3.32,
+      "arpg": 4.24,
+      "hrpg": 4.91,
+      "abp": 4.0,
+      "hbp": 5.15,
+      "al10": 8.9,
+      "hl10": 9.8,
+      "h2h": 12.0,
+      "h2hn": 2,
+      "pf": 106,
+      "mph": 11.8,
+      "dir": "out",
+      "temp": 96.5,
+      "dome": null,
+      "tick": 55,
+      "cash": 59
+    },
+    "expect": {
+      "side": "OVER",
+      "band": "LEAN",
+      "p_side": 0.50656037,
+      "p_resolved": 0.55652112,
+      "p_push": 0.08977332,
+      "projected": 10.11779104,
+      "fair": -125.4899,
+      "estimates": 5,
+      "deltas": 2
+    }
   }
 ]

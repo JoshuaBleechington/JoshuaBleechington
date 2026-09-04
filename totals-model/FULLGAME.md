@@ -67,6 +67,47 @@ come back over 50.0 / under 40.5 — a lean the market never expressed.
 9.6% push, a 47.2% over is a **52.2% bet**. Reading the raw figure called that a
 coin flip and it is not one.
 
+## A wide market is a less certain one
+
+Added 2026-09-04, from a real card. A total entered at 8.5 when the main number
+had moved to 9 picked up an **alternate-line** quote of −150/−110 — a **12.4%
+hold** where every other game that night sat at 2.4–4.8%. De-vigging that
+proportionally read 53.4% over and pushed the card from LEAN to STRONG on what
+was mostly markup rather than opinion.
+
+Proportional de-vig assumes the margin splits between the two sides in
+proportion to their probabilities. That is harmless at a 5% hold and
+increasingly arbitrary at 12%. So the de-vigged deviation from even is now
+shrunk by how far the hold exceeds a normal main-line one:
+
+```
+confidence = min(1, 5% / hold)
+p_over     = 0.5 + (p_devig − 0.5) × confidence
+```
+
+| quote | hold | keep | raw | shrunk |
+|---|---|---|---|---|
+| −110/−110 | 4.8% | 100% | 50.0% | 50.0% |
+| −120/+100 | 4.6% | 100% | 52.2% | 52.2% |
+| **−150/−110** | **12.4%** | **40%** | **53.4%** | **51.4%** |
+| −180/+140 | 6.0% | 84% | 60.7% | 59.0% |
+
+It never flips a side, never crosses even, and leaves a symmetric quote exactly
+even at any hold — so the neutrality property survives untouched. Across the
+eighteen games logged to that date, **one changed, by 1.6 points.**
+
+The estimate also says out loud when it thinks it is looking at an alternate
+line, and tells you to enter the main number instead.
+
+### Shin's method was tried first and rejected
+
+Shin corrects favourite–longshot bias, and it moves the favourite **up**:
+−150/−110 reads **53.8%** under Shin against 53.4% proportional. That is a real
+effect and the wrong one here — it would have made the alternate line *more*
+confident, not less, and it adds confidence across the board that an 18-game
+record cannot justify. There is a test pinning the direction so it does not get
+re-added on the theory that it fixes this.
+
 ## Architecture
 
 ```
@@ -132,12 +173,14 @@ cheap. To update, change those four numbers and nothing else.
 
 ## Verification
 
-- `tests/test_fullgame.py` — 51 tests. Neutrality to nine decimal places, the
+- `tests/test_fullgame.py` — 58 tests. Neutrality to nine decimal places, the
   distribution's mean and spread against the measured 4.39, push arithmetic,
   price inversion, the resolved-probability band, calibration detection of an
   overconfident model, and the guards.
-- `web/fullgame-cases.json` — 34 games generated from the package.
-- `tools_check_fullgame_page.js` — replays all 34 in a real browser against side,
+- `web/fullgame-cases.json` — 36 games generated from the package by
+  `tools_gen_fullgame_cases.py`, which recomputes only the expectations so a
+  model change never means hand-editing a probability.
+- `tools_check_fullgame_page.js` — replays all 36 in a real browser against side,
   band, resolved probability, push, projection, fair price, estimate and delta
   counts, and that green appears only when confident. Then it stores a game,
   grades it a loss, grades a second as a push, checks the push is excluded from

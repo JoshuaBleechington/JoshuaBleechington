@@ -233,11 +233,53 @@ def implied(price: float) -> float:
     return (-price) / ((-price) + 100.0) if price < 0 else 100.0 / (price + 100.0)
 
 
-def devig(over_price: float, under_price: float) -> tuple[float, float]:
-    """Strip the hold proportionally. Returns (fair P over, fair P under)."""
+def hold(over_price: float, under_price: float) -> float:
+    """The bookmaker's margin on the pair. Main-line totals run 4-5%."""
+    return implied(over_price) + implied(under_price) - 1.0
+
+
+# A wide market is not a sharper opinion, it is a less certain one.
+#
+# Found on 2026-09-04: a total entered at 8.5 when the main number had moved to
+# 9 picked up an ALTERNATE-line quote of -150/-110 -- a 12.4% hold where every
+# other game on that card sat at 2.4-4.8%. De-vigging that proportionally read
+# 53.4% over and pushed the card from LEAN to STRONG.
+#
+# Proportional de-vig assumes the margin splits between the two sides in
+# proportion to their probabilities. That assumption is harmless at a 5% hold
+# and increasingly arbitrary at 12%, because most of what is being split is
+# markup rather than opinion. So the de-vigged deviation from even is shrunk by
+# how far the hold exceeds a normal main-line one, and the answer regresses
+# toward the no-information point instead of toward a number the quote never
+# really expressed.
+#
+# Note this is NOT Shin's method, which was the first thing tried. Shin corrects
+# favourite-longshot bias and moves the favourite UP (-150/-110 reads 53.8%
+# under Shin against 53.4% proportional). That is a real effect and the wrong
+# one here: it would have made the alt line more confident, not less.
+HOLD_REFERENCE = 0.05
+
+
+def market_confidence(book_hold: float) -> float:
+    """How much of a de-vigged deviation from even to keep, 0 to 1."""
+    if book_hold <= HOLD_REFERENCE:
+        return 1.0
+    return HOLD_REFERENCE / book_hold
+
+
+def devig(over_price: float, under_price: float,
+          shrink: bool = True) -> tuple[float, float]:
+    """Strip the hold. Returns (fair P over, fair P under).
+
+    With ``shrink`` the deviation from even is regressed for an unusually wide
+    market; pass False for the raw proportional figure.
+    """
     o, u = implied(over_price), implied(under_price)
     s = o + u
-    return o / s, u / s
+    p_over = o / s
+    if shrink:
+        p_over = 0.5 + (p_over - 0.5) * market_confidence(s - 1.0)
+    return p_over, 1.0 - p_over
 
 
 def fair_total(sport: str, line: float, over_price: float | None,
@@ -281,17 +323,27 @@ def fair_total(sport: str, line: float, over_price: float | None,
         else:
             hi = mid
     mu = (lo + hi) / 2.0
-    hold = implied(over_price) + implied(under_price) - 1.0
+    book_hold = hold(over_price, under_price)
+    conf = market_confidence(book_hold)
     if not quoted:
         return mu, (
             f"No prices given, so an evenly-priced market is assumed. A line of {line:g} "
             f"splitting 50/50 implies a mean of {mu:.2f} — run totals are right-skewed, "
             "so the average game finishes above the number that divides the two sides."
         )
+    raw, _ = devig(over_price, under_price, shrink=False)
+    tail = ""
+    if conf < 1.0:
+        tail = (f" That is a {book_hold * 100:.1f}% hold where a main line runs "
+                f"{HOLD_REFERENCE * 100:.0f}% — most likely an ALTERNATE line rather than "
+                f"the main number. A wide market is a less certain one, not a sharper one, "
+                f"so the read has been pulled back from {raw * 100:.1f}% toward even and only "
+                f"{conf * 100:.0f}% of it is kept. Enter the main line and its prices if you "
+                f"have them.")
     return mu, (
         f"{over_price:+.0f}/{under_price:+.0f} de-vigs to {p_over * 100:.1f}% over "
-        f"({hold * 100:.2f}% hold), which is the market saying fair is {mu:.2f} "
-        f"rather than the {line:g} it posted."
+        f"({book_hold * 100:.2f}% hold), which is the market saying fair is {mu:.2f} "
+        f"rather than the {line:g} it posted." + tail
     )
 
 

@@ -263,7 +263,7 @@ collapses and the audit reports no bullet points, the export dropped them.
 python -m pytest tests -q
 ```
 
-176 tests cover extraction, section parsing, requirement mining, matching
+197 tests cover extraction, section parsing, requirement mining, matching
 precision, the parsing audit, scoring behaviour, document generation and the
 CLI. The tailoring tests pin the integrity guarantees hardest: no invented
 numbers, no unevidenced skills in the file, and advice to the candidate never

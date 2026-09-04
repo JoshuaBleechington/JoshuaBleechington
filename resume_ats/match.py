@@ -99,6 +99,7 @@ class ResumeIndex:
         ]
         # Bucket vocabulary by first letter to keep fuzzy search linear enough.
         self._vocab: Set[str] = set(self.stems)
+        self.vocabulary = self._vocab
         self._by_initial: Dict[str, List[str]] = {}
         for word in self._vocab:
             self._by_initial.setdefault(word[:1], []).append(word)

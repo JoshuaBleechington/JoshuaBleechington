@@ -19,6 +19,8 @@ generated file.
 
 from __future__ import annotations
 
+import re
+
 from dataclasses import dataclass, field
 from typing import Dict, List, Optional, Sequence, Tuple
 
@@ -28,9 +30,10 @@ from .extract import Document
 from .jd import JobDescription
 from .match import ResumeIndex, match_requirements
 from .parseability import COVER_LETTER_MARKERS
-from .resume import MONTHS, Resume, Role, repeated_lines
+from .resume import (MONTHS, STRONG_VERB_STEMS, Resume, Role, opener_strength,
+                     repeated_lines)
 from .resume import parse as parse_resume
-from .text import repair_layout
+from .text import STOPWORDS, repair_layout, stem, tokenize
 
 MONTH_NAMES = ["January", "February", "March", "April", "May", "June",
                "July", "August", "September", "October", "November", "December"]
@@ -77,6 +80,8 @@ class TailorResult:
     resume: Optional[Resume] = None
     headline: str = ""
     source_warnings: List[str] = field(default_factory=list)
+    confirmed_added: List[str] = field(default_factory=list)
+    rewritten_bullets: List[Tuple[str, str]] = field(default_factory=list)
 
     @property
     def source_is_usable(self) -> bool:
@@ -235,6 +240,69 @@ def pair_forms(a: str, b: str) -> str:
     return f"{a} ({b})"
 
 
+# Derivational endings, stripped only when deciding whether the resume
+# evidences a posting's term. The main stemmer deliberately stays shallow --
+# collapsing "management" into "manage" everywhere would make unrelated terms
+# collide during scoring -- but for "does this resume show this skill at all",
+# "leadership" and "leading" are the same thing and should be treated as such.
+_DERIVATIONAL = ("ship", "ments", "ment", "nesses", "ness", "ities", "ity",
+                 "ances", "ance", "ences", "ence", "ations", "ation", "ions",
+                 "ion", "ives", "ive", "ally", "ly", "ers", "er")
+
+
+def _deep_stem(word: str) -> str:
+    """Strip derivational endings until a shared root shows through.
+
+    Applied repeatedly, because the endings stack: "leadership" needs both
+    -ship and -er removed before it meets "leading" at "lead".
+    """
+    low = word.lower()
+    root = stem(_PAST_TO_BARE.get(low, low))
+    for _ in range(3):
+        for ending in _DERIVATIONAL:
+            if root.endswith(ending) and len(root) - len(ending) >= 4:
+                root = root[: -len(ending)]
+                break
+        else:
+            break
+    if root.endswith("e") and len(root) > 4:
+        root = root[:-1]          # manage/managing meet at "manag"
+    return stem(root)
+
+
+def _words_all_present(term: str, index: ResumeIndex) -> str:
+    """The resume's own phrasing for a term whose every content word it uses.
+
+    The lexicon catches renamings it has been taught ("presales" for "solution
+    consulting"). This catches the rest: a posting asking for "executive
+    leadership" against a resume that says "leading a team of Executive
+    Directors" is asking for something the resume plainly evidences, just not
+    in that word order. Every content word has to appear -- "continuous
+    improvement" is not evidenced by "quality improvement" alone -- and they
+    have to appear near each other, so two unrelated mentions on opposite
+    pages do not combine into a skill nobody claimed.
+    """
+    words = [w for w in tokenize(term) if w not in STOPWORDS]
+    if len(words) < 2:
+        return ""
+    stems = [_deep_stem(w) for w in words]
+    deep_index = [_deep_stem(t) for t in index.tokens]
+    if any(st not in set(deep_index) for st in stems):
+        return ""
+    window = len(stems) + 6
+    positions = {st: [i for i, t in enumerate(deep_index) if t == st] for st in stems}
+    for anchor in positions[stems[0]]:
+        near = [
+            st for st in stems[1:]
+            if any(abs(p - anchor) <= window for p in positions[st])
+        ]
+        if len(near) == len(stems) - 1:
+            lo = max(0, anchor - window)
+            hi = min(len(index.tokens), anchor + window)
+            return " ".join(index.tokens[lo:hi])
+    return ""
+
+
 def _evidenced_gap_terms(
     jd: JobDescription, resume: Resume, index: ResumeIndex, lexicon: SkillLexicon
 ) -> Tuple[List[str], List[str]]:
@@ -266,6 +334,11 @@ def _evidenced_gap_terms(
                 if found:
                     resume_form = surface
                     break
+        if not resume_form and _words_all_present(term, index):
+            # Evidenced, but scattered: adding the posting's phrasing to the
+            # competencies makes a literal index find what a reader already
+            # would. Nothing is added to an achievement on this basis.
+            resume_form = term
         if resume_form:
             if len(addable) < MAX_ADDED_TERMS:
                 addable.append((term, resume_form))
@@ -319,15 +392,332 @@ def _title_case_term(term: str, acronyms: Optional[set] = None) -> str:
     return " ".join(out)
 
 
+
+# ---------------------------------------------------------------- rewriting --
+#
+# Everything here rewrites a claim the candidate already made. It changes how a
+# sentence is worded, never what it asserts: no number, employer, credential or
+# skill enters a bullet that was not already in it. A rewrite that cannot keep
+# that promise is not applied.
+
+# Duty-listing openers, and the strong verb that says the same thing about the
+# same object. "Responsible for managing X" is a claim to have managed X, so
+# "Managed X" is the same assertion in the voice a reader credits.
+# Each rule is (pattern, replacement, replacement_supplies_the_verb). When the
+# replacement is empty the next word has to become the finite verb; when it is
+# a verb already, the rest of the sentence is left alone.
+# Each rule is (pattern, verb_form, noun_form).
+#
+# Stripping a duty phrase leaves either a verb ("responsible for MANAGING X")
+# or a noun ("responsible for THE DELIVERY of X"). The first is conjugated;
+# the second needs a verb put in front of it. Both say what the original said:
+# "responsible for X" and "owned X" are the same claim about the same X, and
+# "assisted with X" becomes "supported X", never "led X".
+_OPENER_REWRITES = [
+    (r"^responsible for (?:the )?(?:overall )?", "", "Owned "),
+    (r"^responsibilities included ", "", "Owned "),
+    (r"^duties included ", "", "Owned "),
+    (r"^accountable for (?:the )?", "", "Owned "),
+    (r"^tasked with ", "", "Drove "),
+    (r"^charged with ", "", "Drove "),
+    (r"^helped (?:to )?", "", "Supported "),
+    (r"^assisted (?:with|in) ", "", "Supported "),
+    (r"^assisted ", "", "Supported "),
+    (r"^worked with ", "", "Partnered with "),
+    (r"^worked on ", "", "Drove "),
+    (r"^worked to ", "", ""),
+    (r"^participated in ", "", "Contributed to "),
+    (r"^involved in ", "", "Contributed to "),
+    (r"^handled ", "Managed ", "Managed "),
+]
+
+_IRREGULAR_PAST = {
+    "leading": "Led", "running": "Ran", "building": "Built", "driving": "Drove",
+    "growing": "Grew", "holding": "Held", "keeping": "Kept", "winning": "Won",
+    "overseeing": "Oversaw", "rebuilding": "Rebuilt", "setting": "Set",
+    "writing": "Wrote", "making": "Made", "meeting": "Met", "bringing": "Brought",
+    "finding": "Found", "selling": "Sold", "spending": "Spent", "taking": "Took",
+    "teaching": "Taught", "beginning": "Began", "choosing": "Chose",
+    "rising": "Rose", "sending": "Sent", "speaking": "Spoke", "standing": "Stood",
+}
+
+# Padding that costs a reader time and an index nothing.
+_FILLER = [
+    (r"\bin order to\b", "to"),
+    (r"\bwith the goal of\b", "to"),
+    (r"\bfor the purpose of\b", "to"),
+    (r"\bwas able to\b", ""),
+    (r"\bsuccessfully\b", ""),
+    (r"\beffectively\b", ""),
+    (r"\bconsistently\b", ""),
+    (r"\bvery\b", ""),
+    (r"\butilis|utiliz", "us"),
+    (r"\ba variety of\b", ""),
+    (r"\bvarious\b", ""),
+    (r"\bnumerous\b", ""),
+    (r"\ba number of\b", ""),
+]
+
+
+# Verbs the strong-opener list does not carry, but which a stripped duty
+# phrase routinely leaves leading the sentence. Only used to decide that the
+# leading word IS a verb -- never to claim the bullet is strongly written.
+_EXTRA_BARE_VERBS = frozenset("""
+improve manage use utilise utilize ensure maintain provide execute identify
+review plan handle support serve deliver run own drive lead build create
+develop coordinate organise organize oversee report track prepare conduct
+""".split())
+
+_IRREGULAR_BARE = {
+    "lead": "Led", "run": "Ran", "build": "Built", "drive": "Drove",
+    "grow": "Grew", "hold": "Held", "keep": "Kept", "win": "Won",
+    "oversee": "Oversaw", "rebuild": "Rebuilt", "set": "Set", "write": "Wrote",
+    "make": "Made", "meet": "Met", "bring": "Brought", "find": "Found",
+    "sell": "Sold", "spend": "Spent", "take": "Took", "teach": "Taught",
+    "begin": "Began", "choose": "Chose", "rise": "Rose", "send": "Sent",
+    "speak": "Spoke", "stand": "Stood", "cut": "Cut", "put": "Put",
+}
+
+
+def _regular_past(root: str) -> str:
+    """The past tense of a regular verb given its bare root."""
+    if root.endswith("e"):
+        return (root + "d").capitalize()
+    if root.endswith("y") and len(root) > 1 and root[-2] not in "aeiou":
+        return (root[:-1] + "ied").capitalize()
+    if (len(root) > 2 and root[-1] not in "aeiouwxy"
+            and root[-2] in "aeiou" and root[-3] not in "aeiou"):
+        return (root + root[-1] + "ed").capitalize()   # plan -> planned
+    return (root + "ed").capitalize()
+
+
+# "led" has to reach "lead" for a posting's "leadership" to find it.
+_PAST_TO_BARE = {past.lower(): bare for bare, past in _IRREGULAR_BARE.items()}
+
+_ALREADY_PAST = frozenset(
+    v.lower() for v in list(_IRREGULAR_PAST.values()) + list(_IRREGULAR_BARE.values()))
+
+
+def _to_past(word: str) -> str:
+    """Past tense for the verb now leading a bullet, or "" if it is not one.
+
+    A bullet that has had its duty phrase stripped opens on either a gerund
+    ("managing") or a bare infinitive ("improve"). Anything else is a noun, and
+    stripping would have left a fragment rather than a sentence -- so the
+    caller must abandon the rewrite instead.
+    """
+    low = word.lower().strip(".,;:")
+    if not low.isalpha():
+        return ""
+    # Already past tense: conjugating again gives "Ledded" / "Managedded".
+    if low.endswith("ed") or low in _ALREADY_PAST:
+        return ""
+    if low in _IRREGULAR_PAST:
+        return _IRREGULAR_PAST[low]
+    if low in _IRREGULAR_BARE:
+        return _IRREGULAR_BARE[low]
+    if low.endswith("ing") and len(low) >= 6:
+        root = low[:-3]
+        if root.endswith(("at", "iz", "is", "ur", "or", "id", "ut", "iv", "in",
+                          "ag", "us", "il", "er", "ol", "ac", "it")):
+            return (root + "ed").capitalize()
+        if len(root) > 2 and root[-1] == root[-2] and root[-1] not in "aeiou":
+            return (root[:-1] + "ed").capitalize()
+        return _regular_past(root)
+    # A bare verb is only recognised as one if the vocabulary knows it; a noun
+    # here means the strip left no subject doing anything.
+    if stem(low) in STRONG_VERB_STEMS or low in _EXTRA_BARE_VERBS:
+        return _regular_past(low)
+    return ""
+
+
+def _tidy(text: str) -> str:
+    text = re.sub(r"\s{2,}", " ", text).strip()
+    text = re.sub(r"\s+([,.;:])", r"\1", text)
+    return text
+
+
+def reasons_include_opener(reasons) -> bool:
+    return any("duty phrase" in r for r in reasons)
+
+
+def _lead_with_a_finite_verb(text: str) -> Tuple[str, set]:
+    """Conjugate the verb a stripped bullet now opens on.
+
+    Returns ("", "") when the leading word is not a verb at all -- stripping
+    the duty phrase off "Assisted with the migration of 40 servers" leaves a
+    noun phrase, and no amount of conjugation makes that a sentence.
+    """
+    first = text.split(" ", 1)[0]
+    past = _to_past(first)
+    if not past:
+        return "", set()
+    changed = {first.lower().strip(".,;:")}
+    rest = text[len(first):]
+    # "building and leading X" reads wrong as "Built and leading X".
+    pair = re.match(r"^(\s+and\s+)(\w+ing)\b", rest)
+    if pair:
+        second = _to_past(pair.group(2))
+        if second:
+            changed.add(pair.group(2).lower())
+            rest = pair.group(1) + second.lower() + rest[pair.end():]
+    return past + rest, changed
+
+
+def strengthen_bullet(bullet: str) -> Tuple[str, str]:
+    """Rewrite a duty-listing bullet as the accomplishment it describes.
+
+    Returns the rewritten bullet and a short reason, or the original and "" if
+    nothing could be improved without changing the claim.
+    """
+    original = bullet.strip()
+    if not original:
+        return bullet, ""
+    text = original
+    reasons = []
+
+    lowered = text.lower()
+    changed_verb: set = set()
+    for pattern, verb_form, noun_form in _OPENER_REWRITES:
+        m = re.match(pattern, lowered)
+        if not m:
+            continue
+        remainder = _tidy(text[m.end():])
+        if not remainder:
+            return original, ""
+        if verb_form:
+            # The rule supplies the verb itself; the remainder is its object.
+            text = verb_form + remainder[0].lower() + remainder[1:]
+            reasons.append("opened with the action instead of a duty phrase")
+            break
+        led, verbs = _lead_with_a_finite_verb(remainder)
+        if led:
+            text, changed_verb = led, verbs
+        elif noun_form:
+            text = noun_form + remainder[0].lower() + remainder[1:]
+        else:
+            return original, ""      # a fragment either way; leave it be
+        reasons.append("opened with the action instead of a duty phrase")
+        break
+
+    text = _tidy(text)
+    if not text:
+        return original, ""
+
+    for pattern, replacement in _FILLER:
+        new = re.sub(pattern, replacement, text, flags=re.I)
+        if new != text:
+            text = new
+            if "cut filler" not in reasons:
+                reasons.append("cut filler")
+
+    text = _tidy(text)
+    if text and not reasons_include_opener(reasons):
+        led, verbs = _lead_with_a_finite_verb(text)
+        if led and led != text:
+            text, changed_verb = led, verbs
+    if text:
+        text = text[0].upper() + text[1:]
+
+    # Guards. A rewrite that loses content, or leaves a fragment, is dropped.
+    if not text or text == original:
+        return original, ""
+    if len(text.split()) < 4:
+        return original, ""
+    if _lost_content(original, text, changed_verb):
+        return original, ""
+    if opener_strength(text) == "weak":
+        return original, ""
+    return text, "; ".join(reasons)
+
+
+_REWRITE_DROPPABLE = {
+    "responsible", "for", "the", "overall", "responsibilities", "included",
+    "duties", "tasked", "charged", "with", "accountable", "helped", "to",
+    "assisted", "in", "worked", "on", "participated", "involved", "handled",
+    "successfully", "effectively", "consistently", "very", "various",
+    "numerous", "a", "number", "of", "variety", "was", "able", "order",
+    "goal", "purpose", "supported", "served", "as",
+    # Rewritten by the filler rules above, so their disappearance is expected.
+    "utilize", "utilise", "utilized", "utilised", "utilizing", "utilising",
+}
+
+
+def _lost_content(before: str, after: str, changed_verb=()) -> bool:
+    """True if the rewrite dropped a word that carried meaning.
+
+    Numbers and proper nouns are the ones that matter: losing one would turn a
+    wording change into a change of claim.
+    """
+    def carried(text):
+        out = set()
+        for w in re.findall(r"[A-Za-z0-9$%][\w$%.,-]*", text):
+            low = w.lower().strip(".,")
+            if low in _REWRITE_DROPPABLE:
+                continue
+            out.add(low)
+        return out
+    missing = carried(before) - carried(after) - set(changed_verb)
+    for word in missing:
+        if any(ch.isdigit() for ch in word):
+            return True
+        if word not in _REWRITE_DROPPABLE:
+            # A stemmed match covers manage/managing/managed.
+            if not any(stem(word) == stem(w) for w in carried(after)):
+                return True
+    return False
+
+
+
+def align_wording(bullet: str, pairs: Sequence[Tuple[str, str]]) -> Tuple[str, List[str]]:
+    """Say the same thing in the posting's vocabulary.
+
+    ``pairs`` is (posting_form, resume_form) for skills the resume already
+    evidences under another name. Replacing the resume's phrase with the
+    posting's changes which words an index matches, not what the bullet
+    claims. A substitution that would break the sentence is skipped.
+    """
+    text = bullet
+    used: List[str] = []
+    for posting_form, resume_form in pairs:
+        if len(resume_form) < 4:
+            continue
+        pattern = re.compile(r"\b" + re.escape(resume_form) + r"\b", re.I)
+        m = pattern.search(text)
+        if not m:
+            continue
+        # Only swap whole noun phrases, and only when the replacement carries
+        # the same grammatical number, or the sentence stops reading properly.
+        if resume_form.endswith("s") != posting_form.endswith("s"):
+            continue
+        replacement = posting_form
+        if m.group(0)[:1].isupper():
+            replacement = posting_form[:1].upper() + posting_form[1:]
+        candidate = text[:m.start()] + replacement + text[m.end():]
+        if _lost_content(text, candidate, {resume_form.lower()}):
+            continue
+        text = candidate
+        used.append(posting_form)
+    return text, used
+
+
 def build(
     document: Document,
     jd: JobDescription,
     lexicon: Optional[SkillLexicon] = None,
     *,
     headline: Optional[str] = None,
+    confirmed_skills: Optional[Sequence[str]] = None,
 ) -> TailorResult:
-    """Produce the tailored document, its change log and the manual work list."""
+    """Produce the tailored document, its change log and the manual work list.
+
+    ``confirmed_skills`` are terms the candidate has told us they genuinely
+    have but never wrote down. They are added to the competencies list on that
+    say-so, and never attached to an achievement -- a skill someone confirms is
+    a skill; it is not evidence that they did any particular thing with it.
+    """
     lexicon = lexicon or default_lexicon()
+    confirmed = [t.strip() for t in (confirmed_skills or []) if t.strip()]
     result = TailorResult()
 
     repaired, repairs = repair_layout(document.text)
@@ -391,6 +781,19 @@ def build(
             added_display.append(posting_display)
     competencies.extend(added_display)
 
+    if confirmed:
+        confirmed_display = [_title_case_term(t.lower(), acronyms) for t in confirmed]
+        already = {c.lower() for c in competencies}
+        fresh = [c for c in confirmed_display if c.lower() not in already]
+        competencies.extend(fresh)
+        if fresh:
+            result.confirmed_added = fresh
+            result.changes.append(Change(
+                "terminology",
+                "Added skills you confirmed you hold but had not written down: "
+                f"{', '.join(fresh)}. They are listed as skills only -- no "
+                "achievement claims them."))
+
     if added_display:
         result.changes.append(Change(
             "terminology",
@@ -409,6 +812,9 @@ def build(
         [weights.get(w, 0.0) for w in (t.lower(), t.lower().split(" (")[0])] or [0.0]))
 
     # ---- body ----------------------------------------------------------
+    aligned_terms: set = set()
+    rewritten: List[Tuple[str, str]] = []
+
     def heading(text: str) -> None:
         result.blocks.append(Block([Run(_clean(text), bold=True, size=21, color="222222")],
                                    kind="heading", space_before=220, space_after=90,
@@ -449,7 +855,15 @@ def build(
                     result.blocks.append(Block([Run(dates, italic=True, size=19, color="444444")],
                                                space_after=50))
                 for bullet in role.bullets:
-                    result.blocks.append(Block([Run(_clean(bullet), size=20)], kind="bullet"))
+                    written = _clean(bullet)
+                    written, swapped = align_wording(written, addable)
+                    for term in swapped:
+                        aligned_terms.add(term)
+                    stronger, why = strengthen_bullet(written)
+                    if why:
+                        rewritten.append((written, stronger))
+                        written = stronger
+                    result.blocks.append(Block([Run(written, size=20)], kind="bullet"))
                 # Content that follows the bullets inside this role's block:
                 # an undated position, a PATENTS or LANGUAGES list. Kept in
                 # source order so it still reads as what it was.
@@ -486,7 +900,25 @@ def build(
         "columns, headers, footers or images."))
 
     # ---- nothing from the original may be lost ---------------------------
-    rescued = _rescue_dropped_content(repaired, result, resume)
+    if rewritten:
+        result.rewritten_bullets = rewritten
+        result.changes.append(Change(
+            "writing",
+            f"Rewrote {len(rewritten)} duty-listing bullet(s) to open on the "
+            "action instead: the claim is unchanged, the voice is the one a "
+            "reader credits."))
+    if aligned_terms:
+        result.changes.append(Change(
+            "terminology",
+            "Swapped the resume's wording for the posting's inside "
+            f"{len(aligned_terms)} skill(s) it already evidences: "
+            f"{', '.join(sorted(aligned_terms))}."))
+
+    # A rewritten bullet no longer matches its source line, so the rescue net
+    # has to be told it was placed -- otherwise it "recovers" the original
+    # wording into Additional Information and the resume says it twice.
+    rescued = _rescue_dropped_content(
+        repaired, result, resume, placed_extra=[was for was, _ in rewritten])
     if rescued:
         result.changes.append(Change(
             "structure",
@@ -495,6 +927,9 @@ def build(
             "original is lost. Move them where they belong."))
 
     # ---- what only the candidate can supply -----------------------------
+    # A skill the candidate has already confirmed is no longer theirs to add.
+    confirmed_lower = {c.lower() for c in confirmed}
+    absent = [t for t in absent if t.lower() not in confirmed_lower]
     if absent:
         result.manual.append(ManualItem(
             "missing-keyword",
@@ -504,6 +939,7 @@ def build(
 
     for role in resume.roles[:1]:
         from .resume import METRIC_RE
+
         quantified = sum(1 for b in role.bullets if METRIC_RE.search(b))
         if role.bullets and quantified == 0:
             result.manual.append(ManualItem(
@@ -718,7 +1154,8 @@ def notes_markdown(result: TailorResult, jd: JobDescription, report=None) -> str
     return "\n".join(lines) + "\n"
 
 
-def _rescue_dropped_content(source: str, result: TailorResult, resume: Resume) -> List[str]:
+def _rescue_dropped_content(source: str, result: TailorResult, resume: Resume,
+                            placed_extra: Optional[Sequence[str]] = None) -> List[str]:
     """Append anything from the original the rebuild did not carry over.
 
     Rebuilding from parsed structure means content the parser never attached to
@@ -731,6 +1168,8 @@ def _rescue_dropped_content(source: str, result: TailorResult, resume: Resume) -
     from .text import tokenize
 
     placed = " ".join(tokenize(to_text(result)))
+    for line in placed_extra or []:
+        placed += " " + " ".join(tokenize(line))
     placed_words = set(placed.split())
 
     # The cover letter is dropped deliberately; do not rescue it.

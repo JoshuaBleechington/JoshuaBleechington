@@ -211,6 +211,11 @@ def _collect_jd_paths(entries: Sequence[str]) -> List[str]:
     return paths
 
 
+def _confirmed(args: argparse.Namespace) -> list:
+    """Skills the candidate has told us they hold, from --confirm."""
+    return [t.strip() for t in getattr(args, "confirm", "").split(",") if t.strip()]
+
+
 def cmd_tailor_batch(args: argparse.Namespace) -> int:
     """Tailor one resume against many postings, one document each."""
     from . import tailor as tailor_mod
@@ -238,7 +243,8 @@ def cmd_tailor_batch(args: argparse.Namespace) -> int:
             print(f"skipping {jd_path}: {exc}", file=sys.stderr)
             continue
         jd = parse_jd(jd_text, lexicon)
-        result = tailor_mod.build(document, jd, lexicon, headline=args.headline)
+        result = tailor_mod.build(document, jd, lexicon, headline=args.headline,
+                              confirmed_skills=_confirmed(args))
         if result.source_warnings and not args.force:
             print("error: the resume could not be rebuilt faithfully; "
                   "run `tailor` on a single posting to see why", file=sys.stderr)
@@ -289,7 +295,8 @@ def cmd_tailor(args: argparse.Namespace) -> int:
     jd_text = _read_source(args.jd, args.jd_text, "jd")
     jd = parse_jd(jd_text, lexicon)
 
-    result = tailor_mod.build(document, jd, lexicon, headline=args.headline)
+    result = tailor_mod.build(document, jd, lexicon, headline=args.headline,
+                              confirmed_skills=_confirmed(args))
 
     if result.source_warnings and not args.force:
         print("Cannot rebuild faithfully from this file.\n", file=sys.stderr)
@@ -476,6 +483,11 @@ def build_parser() -> argparse.ArgumentParser:
     p_tailor.add_argument("--outdir", help="where batch output goes (default: applications/)")
     p_tailor.add_argument("--notes", metavar="PATH",
                           help="also write a markdown working list of what only you can add")
+    p_tailor.add_argument("--confirm", metavar="TERMS", default="",
+                          help="comma-separated skills you confirm you hold but "
+                               "never wrote down; they are added to the "
+                               "competencies list on your say-so and never "
+                               "attached to an achievement")
     p_tailor.add_argument("--force", action="store_true",
                           help="write the file even when the source is too damaged to rebuild faithfully")
     add_common(p_tailor)

@@ -24,7 +24,12 @@ _QUOTES = {
 
 # Bullet glyphs that resumes use.  Normalised to "-" so bullet detection is
 # not a guessing game later.
-BULLET_CHARS = "-•‣▪●◦⁃∙·‧–—*+>"
+# Includes the dingbat arrows, checks, diamonds and squares that word
+# processors offer in the bullet gallery -- a resume using any of them read
+# as having no bullets at all, which cost it the whole writing component.
+BULLET_CHARS = ("-•‣▪●◦⁃∙·‧–—*+>"
+                "▫■□◾◆◇♦▸▹▶▷»›"
+                "➢➤➣➔→⇒✓✔❑❖❋✦✧★☆✱")
 _BULLET_RE = re.compile(r"^[\s%s]{0,6}[%s]\s+" % (re.escape(BULLET_CHARS), re.escape(BULLET_CHARS)))
 
 STOPWORDS = frozenset("""
@@ -189,6 +194,15 @@ def dedupe(items: Iterable[str]) -> List[str]:
 # no parser sees a single bullet point.  These characters essentially never
 # start a real English line, which is what makes the repair safe.
 BROKEN_BULLETS = "\u00fc\u00a7\u00d8\u00fe\u00a4\u00a8"
+# Word writes Symbol- and Wingdings-font bullets into the private use area.
+# U+F0B7 is the default Word bullet; extractors hand it straight through, and
+# nothing downstream recognises it. The whole block is symbol-font output, so
+# any of it at the head of a line is a bullet, never a word.
+_PUA_BULLET_RE = re.compile(r"^([ \t]*)[\uf020-\uf0ff]+([ \t]+|(?=[A-Z(]))")
+# A second-level Word bullet exports as a bare lowercase "o". Only treated as
+# a marker when the document does it more than once, so a line that genuinely
+# opens with the word is left alone.
+_WORD_O_RE = re.compile(r"^([ \t]*)o([ \t]+)(?=[A-Z(])")
 _BROKEN_BULLET_RE = re.compile(r"^([ \t]*)[%s]([ \t]+|(?=[A-Z]))" % re.escape(BROKEN_BULLETS))
 _LONE_BROKEN_RE = re.compile(r"^[ \t]*[%s][ \t]*$" % re.escape(BROKEN_BULLETS))
 
@@ -222,16 +236,38 @@ def repair_layout(text: str) -> Tuple[str, List[str]]:
     notes: List[str] = []
     out: List[str] = []
     broken = 0
-    for raw in text.splitlines():
+    pua = 0
+    lines = text.splitlines()
+
+    # "o" is only a marker if the document uses it as one repeatedly.
+    word_o = sum(1 for raw in lines if _WORD_O_RE.match(raw))
+    use_word_o = word_o >= 2
+
+    for raw in lines:
         if _LONE_BROKEN_RE.match(raw):
             broken += 1
             continue  # an orphaned bullet glyph with no text of its own
-        repaired, n = _BROKEN_BULLET_RE.subn(r"\1- ", raw)
+        repaired, n = _PUA_BULLET_RE.subn(r"\1- ", raw)
+        pua += n
+        if not n and use_word_o:
+            repaired = _WORD_O_RE.sub(r"\1- ", repaired)
+        repaired, n = _BROKEN_BULLET_RE.subn(r"\1- ", repaired)
         broken += n
         out.append(repaired)
     if broken:
         notes.append(
             f"{broken} bullet(s) used a symbol font that exports as a stray "
             "letter, so no parser would have recognised them as bullets"
+        )
+    if pua:
+        notes.append(
+            f"{pua} bullet(s) came through as a private-use symbol-font "
+            "character (Word's default bullet does this), which reads as an "
+            "unprintable box rather than a list marker"
+        )
+    if use_word_o:
+        notes.append(
+            f"{word_o} second-level bullet(s) exported as a bare letter \"o\" "
+            "instead of a list marker"
         )
     return "\n".join(out), notes

@@ -164,6 +164,7 @@ class Role:
     bullets: List[str] = field(default_factory=list)
     trailing: List[str] = field(default_factory=list)
     text: str = ""
+    unmarked_bullets: bool = False
 
     @property
     def months(self) -> int:
@@ -600,7 +601,35 @@ def parse_roles(experience_text: str, banners: Optional[Set[str]] = None) -> Lis
             current.trailing.append(line)
 
     flush()
+    for role in roles:
+        _promote_unmarked_bullets(role)
     return roles
+
+
+# A resume pasted out of Word often arrives with its list markers gone: Word
+# stores them as numbering, not as text, so the glyph never reaches the
+# clipboard. The accomplishment lines are still there and still counted for
+# keywords, but with nothing marking them the writing component reported "no
+# bullet points detected" on a resume full of them.
+_ACCOMPLISHMENT_MIN_CHARS = 40
+
+
+def _promote_unmarked_bullets(role: Role) -> None:
+    """Read a role's unmarked prose lines as the bullets they plainly are."""
+    if role.bullets or len(role.trailing) < 2:
+        return
+    for line in role.trailing:
+        if len(line) < _ACCOMPLISHMENT_MIN_CHARS:
+            return
+        if _starts_new_block(line) or _looks_like_heading(line):
+            return
+        if _has_date_range(line) or line.endswith(":"):
+            return
+        if not line[:1].isupper():
+            return
+    role.bullets = list(role.trailing)
+    role.trailing = []
+    role.unmarked_bullets = True
 
 
 def _has_date_range(line: str) -> bool:

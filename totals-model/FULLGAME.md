@@ -185,7 +185,9 @@ cheap. To update, change those four numbers and nothing else.
   counts, and that green appears only when confident. Then it stores a game,
   grades it a loss, grades a second as a push, checks the push is excluded from
   calibration, reloads the browser and asserts the card, the grades and the
-  half-typed draft all survive.
+  half-typed draft all survive. Last it checks the roof marker: a domed game is
+  tagged, an open-air one is not, and a basketball row does not inherit a
+  left-over tick from the ballgame before it.
 
 The browser needed a **full-precision erf** for this to pass. The Abramowitz &
 Stegun approximation that had been in every page in this project is good to

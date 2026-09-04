@@ -170,6 +170,53 @@ const CHECKS = ["dome", "alead", "hlead"];
   chk(after.graded.includes('PUSH') && after.graded.includes('LOSS'),
       'card: the grades survived too', after.graded.join(','));
 
+  // ---- the roof marker -------------------------------------------------
+  // Runs last: it adds rows, so it must not disturb the counts asserted above.
+  const roof = await pg.evaluate(async () => {
+    const set = (id, v) => {
+      const el = document.getElementById(id);
+      el.value = String(v);
+      el.dispatchEvent(new Event('input', { bubbles: true }));
+    };
+    const add = async () => {
+      await new Promise(r => setTimeout(r, 50));
+      document.getElementById('add').click();
+      await new Promise(r => setTimeout(r, 60));
+    };
+    const first = () => document.querySelector('#cardTable tbody tr .openbtn');
+
+    document.getElementById('m-mlb').click();
+    document.getElementById('clear').click();
+    set('away', 'Rays'); set('home', 'Astros'); set('line', 8.5);
+    document.getElementById('dome').checked = true;
+    document.getElementById('dome').dispatchEvent(new Event('change', { bubbles: true }));
+    await add();
+    const domed = first().textContent.trim();
+
+    // The box stays ticked across a sport switch; a WNBA row must not inherit it.
+    document.getElementById('m-wnba').click();
+    set('away', 'Fever'); set('home', 'Wings'); set('line', 162.5);
+    await add();
+    const wnba = first().textContent.trim();
+
+    document.getElementById('m-mlb').click();
+    document.getElementById('clear').click();
+    set('away', 'Cubs'); set('home', 'Reds'); set('line', 9);
+    await add();
+
+    return {
+      domed, wnba,
+      open: first().textContent.trim(),
+      chips: document.querySelectorAll('#cardTable .chip.dome').length,
+      count: document.getElementById('cardCount').textContent.trim(),
+    };
+  });
+  chk(/Dome$/.test(roof.domed), 'roof: a game with the roof shut is marked on the card', roof.domed);
+  chk(!/Dome/.test(roof.open), 'roof: an open-air game is not marked', roof.open);
+  chk(!/Dome/.test(roof.wnba), 'roof: a WNBA row does not inherit a left-over tick', roof.wnba);
+  chk(roof.chips === 1, 'roof: exactly one row carries the marker', String(roof.chips));
+  chk(/1 under a roof/.test(roof.count), 'roof: the header counts the domed games', roof.count);
+
   if (errs.length) { console.log('PAGE ERRORS:\n' + errs.join('\n')); fails++; }
   console.log(fails ? `\n${fails} FAILED` : `\nall checks passed (${CASES.length} cases)`);
   await b.close();

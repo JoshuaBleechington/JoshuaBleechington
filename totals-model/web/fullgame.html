@@ -270,6 +270,11 @@
   .chip.max { background: var(--go-deep); color: #fff; }
   .chip.o { background: var(--over); color: #fff; }
   .chip.u { background: var(--under); color: #fff; }
+  /* Washed rather than filled, so a roof marker never competes with the two
+     chips that mean something — the side and the band. It is a fact about the
+     venue, not a call. */
+  .chip.dome { background: var(--under-wash); color: var(--under);
+               padding: 3px 6px; margin-left: 7px; vertical-align: 1px; }
   .empty { padding: 20px 15px; color: var(--muted); font-size: 13px; }
   .x { border: 0; background: transparent; color: var(--muted); cursor: pointer;
        font-size: 17px; line-height: 1; padding: 3px 7px; border-radius: 4px; }
@@ -1113,8 +1118,21 @@
     return went === row.side ? "WIN" : "LOSS";
   }
 
+  /* Read back off the stored inputs rather than a new field, so every game
+     already on the card — including one restored from an old backup — shows
+     its roof without anything needing to be re-entered. */
+  function isDomed(row) {
+    // MLB only. The roof box lives in the MLB fields and stays ticked when the
+    // sport is switched, so an unguarded read would mark every basketball game
+    // that followed a domed ballgame — and indoors is not news in the WNBA.
+    return !!(row && row.sport === "MLB" && row.inputs && row.inputs.dome);
+  }
+
   function renderCard() {
-    $("cardCount").textContent = card.length ? card.length + " games" : "";
+    var domed = card.filter(isDomed).length;
+    $("cardCount").textContent = card.length
+      ? card.length + " games" + (domed ? " · " + domed + " under a roof" : "")
+      : "";
     if (!card.length) {
       $("cardTable").innerHTML = '<p class="empty">Nothing on the card yet. Work a game out ' +
         'above and press "Add to card". Click a row later to load it back in, and type the ' +
@@ -1130,7 +1148,9 @@
         var res = outcome(s);
         return '<tr class="pick-row">' +
           '<td><button class="openbtn" data-open="' + i + '" title="Load this game back into the form">' +
-            s.matchup + "</button></td>" +
+            s.matchup + (isDomed(s)
+              ? ' <span class="chip dome" title="Roof shut — wind and temperature both dropped ' +
+                'out of this read">Dome</span>' : "") + "</button></td>" +
           '<td class="n"><span class="cell">' + s.sport + "</span></td>" +
           '<td class="n"><span class="cell">' + s.line + "</span></td>" +
           '<td class="n"><span class="cell">' + s.projected + "</span></td>" +
@@ -1346,10 +1366,10 @@
   }
   function cardAsText() {
     if (!card.length) return "Nothing on the card.";
-    return ["GAME\tSPORT\tLINE\tPROJ\tCALL\tPROB\tBAND\tFINAL\tRESULT"].concat(
+    return ["GAME\tSPORT\tROOF\tLINE\tPROJ\tCALL\tPROB\tBAND\tFINAL\tRESULT"].concat(
       card.map(function (s) {
-        return [s.matchup, s.sport, s.line, s.projected, s.side, s.prob + "%", s.band,
-                s.final == null ? "" : s.final, outcome(s) || ""].join("\t");
+        return [s.matchup, s.sport, isDomed(s) ? "DOME" : "", s.line, s.projected, s.side,
+                s.prob + "%", s.band, s.final == null ? "" : s.final, outcome(s) || ""].join("\t");
       })).join("\n");
   }
 

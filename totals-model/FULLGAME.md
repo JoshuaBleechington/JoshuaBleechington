@@ -157,6 +157,13 @@ one into either column corrupts the measure. Brier, log loss, bucketed
 said-vs-did, and a verdict that says plainly when the thing is miscalibrated or
 below the 0.25 a coin flip scores.
 
+The page also breaks the record down **band by band** — covered, missed, hit
+rate, what it said, the gap, and pushes kept in their own column. The bands are
+the units the decision is actually made in; nobody stakes off "56.3%", they
+stake off STRONG. The test is whether the bands *order*: a model that wins
+overall but whose STRONG is no better than its COIN FLIP is telling you nothing
+about how much to put on, which is the only thing the confidence is for.
+
 Under 50 graded calls it refuses to judge and says so.
 
 ## The league constants
@@ -185,7 +192,9 @@ cheap. To update, change those four numbers and nothing else.
   counts, and that green appears only when confident. Then it stores a game,
   grades it a loss, grades a second as a push, checks the push is excluded from
   calibration, reloads the browser and asserts the card, the grades and the
-  half-typed draft all survive. Last it checks the roof marker: a domed game is
+  half-typed draft all survive. It loads a hand-built card of known results and
+  checks the per-band table reports 2-0, 1-1 and 0-1 with the push in its own
+  column and an empty band left out. Last it checks the roof marker: a domed game is
   tagged, an open-air one is not, and a basketball row does not inherit a
   left-over tick from the ballgame before it.
 

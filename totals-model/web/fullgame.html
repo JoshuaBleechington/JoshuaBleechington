@@ -1121,6 +1121,10 @@
   /* Read back off the stored inputs rather than a new field, so every game
      already on the card — including one restored from an old backup — shows
      its roof without anything needing to be re-entered. */
+  function bandClass(band) {
+    return band === "MAX" ? " max" : (band !== "COIN FLIP" ? " hot" : "");
+  }
+
   function isDomed(row) {
     // MLB only. The roof box lives in the MLB fields and stays ticked when the
     // sport is switched, so an unguarded read would mark every basketball game
@@ -1144,7 +1148,7 @@
       "<th>Game</th><th>Sport</th><th>Line</th><th>Proj</th><th>Call</th><th>Prob</th>" +
       "<th>Band</th><th>Final</th><th>Result</th><th></th></tr></thead><tbody>" +
       card.map(function (s, i) {
-        var bc = s.band === "MAX" ? " max" : (s.band !== "COIN FLIP" ? " hot" : "");
+        var bc = bandClass(s.band);
         var res = outcome(s);
         return '<tr class="pick-row">' +
           '<td><button class="openbtn" data-open="' + i + '" title="Load this game back into the form">' +
@@ -1190,11 +1194,19 @@
   function renderCalib() {
     var rows = [];
     var pushes = 0;
+    /* Per band as well as per probability bucket. The bands are what actually
+       sizes a bet — nobody stakes off "56.3%", they stake off STRONG — so the
+       record has to be readable in the same units the decision is made in. */
+    var byBand = {};
     card.forEach(function (s) {
       var r = outcome(s);
       if (r === null) return;
-      if (r === "PUSH") { pushes++; return; }
-      rows.push([parseFloat(s.prob) / 100, r === "WIN"]);
+      var b = byBand[s.band] || (byBand[s.band] = { w: 0, l: 0, push: 0, said: 0 });
+      if (r === "PUSH") { pushes++; b.push++; return; }
+      var p = parseFloat(s.prob) / 100, win = r === "WIN";
+      rows.push([p, win]);
+      b.said += p;
+      if (win) b.w++; else b.l++;
     });
     var box = $("calibBox");
     if (rows.length === 0) {
@@ -1243,11 +1255,36 @@
       var sub = rows.filter(function (r) { return r[0] >= e[0] && r[0] < e[1]; });
       if (!sub.length) return "";
       var said = sub.reduce(function (a, r) { return a + r[0]; }, 0) / sub.length;
-      var did = sub.reduce(function (a, r) { return a + (r[1] ? 1 : 0); }, 0) / sub.length;
-      return '<div><p class="k">' + e[2] + " · n=" + sub.length + '</p><p class="v">' +
-        (did * 100).toFixed(0) + "%</p><p class=\"k\">said " + (said * 100).toFixed(0) +
-        "%</p></div>";
+      var won = sub.reduce(function (a, r) { return a + (r[1] ? 1 : 0); }, 0);
+      return '<div><p class="k">' + e[2] + '</p><p class="v">' +
+        (won / sub.length * 100).toFixed(0) + "%</p><p class=\"k\">" + won + "-" +
+        (sub.length - won) + " · said " + (said * 100).toFixed(0) + "%</p></div>";
     }).join("");
+
+    /* Covered vs did not, band by band. A model can be right overall and still
+       be worthless if its top band is no better than its bottom one — the whole
+       point of a band is that it orders. */
+    var bandRows = BANDS.map(function (b) { return b[1]; }).map(function (name) {
+      var t = byBand[name];
+      if (!t || (t.w + t.l + t.push) === 0) return "";
+      var n = t.w + t.l;
+      var didPct = n ? (t.w / n * 100) : null;
+      var saidPct = n ? (t.said / n * 100) : null;
+      var gap = n ? didPct - saidPct : null;
+      return "<tr>" +
+        '<td><span class="cell"><span class="chip' + bandClass(name) + '">' + name +
+          "</span></span></td>" +
+        '<td class="n"><span class="cell">' + t.w + "-" + t.l + "</span></td>" +
+        '<td class="n"><span class="cell">' + (n ? didPct.toFixed(0) + "%" : "—") + "</span></td>" +
+        '<td class="n"><span class="cell">' + (n ? saidPct.toFixed(1) + "%" : "—") + "</span></td>" +
+        '<td class="n"><span class="cell">' + (n ? sgn(gap, 1) : "—") + "</span></td>" +
+        '<td class="n"><span class="cell">' + (t.push || "—") + "</span></td></tr>";
+    }).join("");
+    var bandTable = bandRows
+      ? '<div class="scroll" style="margin-top:2px"><table><thead><tr><th>Band</th>' +
+        "<th>Covered–missed</th><th>Hit</th><th>Said</th><th>Gap</th><th>Push</th>" +
+        "</tr></thead><tbody>" + bandRows + "</tbody></table></div>"
+      : "";
 
     box.innerHTML =
       '<div class="calib">' +
@@ -1259,6 +1296,11 @@
         '<div><p class="k">Log loss</p><p class="v">' + ll.toFixed(3) + "</p></div>" +
       "</div>" +
       (buckets ? '<div class="calib" style="margin-top:1px">' + buckets + "</div>" : "") +
+      bandTable +
+      (bandTable ? '<p class="note"><b>Read the bands top to bottom, not the total.</b> The ' +
+        "question is whether MAX beats STRONG beats LEAN beats COIN FLIP. A model that wins " +
+        "overall but whose bands do not order is telling you nothing about how much to stake, " +
+        "which is the only thing the confidence is for.</p>" : "") +
       '<p class="verdict' + cls + '">' + verdict + "</p>" +
       (pushes ? '<p class="note">' + pushes + " push(es) excluded — they refund, so counting one " +
         "as a win or a loss would corrupt the measure.</p>" : "") +

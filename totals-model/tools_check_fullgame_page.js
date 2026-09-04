@@ -170,6 +170,46 @@ const CHECKS = ["dome", "alead", "hlead"];
   chk(after.graded.includes('PUSH') && after.graded.includes('LOSS'),
       'card: the grades survived too', after.graded.join(','));
 
+  // ---- the per-band record --------------------------------------------
+  // Loads a known card straight into storage and reloads, so the expected
+  // win/loss/push per band is arithmetic rather than whatever the engine
+  // happens to say for some inputs.
+  await pg.evaluate(() => {
+    const mk = (band, prob, line, final) =>
+      ({ matchup: band + ' ' + final, sport: 'MLB', line, projected: '9.00',
+         side: 'OVER', prob, band, fair: '-120', final, inputs: {} });
+    localStorage.setItem('callsheet.fullgame.card.v1', JSON.stringify([
+      mk('STRONG', '58.0', 8.5, '10'),      // over, covered
+      mk('STRONG', '59.0', 8.5, '10'),      // over, covered
+      mk('LEAN', '54.0', 8.5, '4'),         // under, missed
+      mk('LEAN', '55.0', 8.5, '12'),        // over, covered
+      mk('COIN FLIP', '51.0', 8.5, '2'),    // under, missed
+      mk('COIN FLIP', '52.0', 8, '8'),      // push
+    ]));
+  });
+  await pg.reload();
+  await pg.waitForTimeout(400);
+  const bands = await pg.evaluate(() => ({
+    table: [...document.querySelectorAll('#calibBox table tbody tr')].map(
+      r => [...r.querySelectorAll('td')].map(c => c.textContent.trim())),
+  }));
+  const row = n => (bands.table.find(r => r[0] === n) || []);
+  chk(row('STRONG')[1] === '2-0', 'bands: STRONG covered 2, missed 0', JSON.stringify(row('STRONG')));
+  chk(row('LEAN')[1] === '1-1', 'bands: LEAN covered 1, missed 1', JSON.stringify(row('LEAN')));
+  chk(row('COIN FLIP')[1] === '0-1',
+      'bands: COIN FLIP covered 0, missed 1 — the push is not counted as either',
+      JSON.stringify(row('COIN FLIP')));
+  chk(row('COIN FLIP')[5] === '1', 'bands: the push is reported in its own column',
+      JSON.stringify(row('COIN FLIP')));
+  chk(row('STRONG')[2] === '100%' && row('LEAN')[2] === '50%',
+      'bands: the hit rate matches the record', JSON.stringify(bands.table));
+  chk(!row('MAX').length, 'bands: a band with no graded games is left out',
+      JSON.stringify(bands.table));
+
+  await pg.evaluate(() => localStorage.clear());
+  await pg.reload();
+  await pg.waitForTimeout(400);
+
   // ---- the roof marker -------------------------------------------------
   // Runs last: it adds rows, so it must not disturb the counts asserted above.
   const roof = await pg.evaluate(async () => {

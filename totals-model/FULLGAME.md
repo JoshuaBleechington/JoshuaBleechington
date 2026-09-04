@@ -108,6 +108,60 @@ confident, not less, and it adds confidence across the board that an 18-game
 record cannot justify. There is a test pinning the direction so it does not get
 re-added on the theory that it fixes this.
 
+## A measured-null input cannot buy a band
+
+Detroit at Cleveland, 4 September. Head to head at 6.4 over nine meetings, plus
+a public-money flag, dragged a card into an UNDER **LEAN** — against the price,
+and against a market-plus-arms read that said OVER. It went twelve runs.
+
+Twelve was a 19.6% outcome, so the loss proves nothing. The reasoning was the
+problem: **the two loudest voices on that card were the two the model itself
+documents as worth nothing.**
+
+```
+Market            8.74   w 4.00        remove H2H     -1.6 pts
+Bullpens          8.60   w 0.80        remove split   -3.2 pts
+Last 10           8.77   w 0.80        ------------------------
+Starters          7.99   w 1.60        market + arms only: OVER 50.5%
+Head to head (9)  6.27   w 0.50        full blend:        UNDER 54.0%
+```
+
+So the band is now cut from the **less confident of two reads**: the full blend,
+and the same blend with `mechanism=False` inputs deleted. If deleting them
+changes the side, the band is held at COIN FLIP.
+
+Three MLB inputs are tagged. Form and head to head because they measured null
+against the residual on 116 games (t = −0.07 and t = −0.40) and are absolutes
+rather than differentials. The money split because its coefficient is a flat
+hand-capped 0.30 — the direction is documented, the size is not.
+
+**The headline probability is untouched.** The gate governs the band only. The
+probability is the best estimate of what happens; the band is the
+recommendation. Moving the first to justify the second would corrupt the
+calibration measure, which reads the probability.
+
+Across the 33 logged cards it moves 9, and all four STRONGs become LEAN:
+
+| | before | after |
+|---|---|---|
+| STRONG | 4-0 | — |
+| LEAN | 4-2 | 8-0 |
+| COIN FLIP | 4-4 | 4-6 |
+
+**That 8-0 is not evidence and must not be read as any.** The rule was written
+after looking at which of these games lost, on eighteen settled calls. The
+justification is the a-priori one — measured t-statistics and a hand-capped
+coefficient — and nothing else. The table is here to show the blast radius, not
+to argue the rule works.
+
+### Not applied to WNBA
+
+Those t-statistics come from an MLB residual study. No equivalent exists for
+WNBA, where last-ten is the load-bearing input and there is no starting-pitcher
+equivalent to fall back on. Demoting an input on evidence is discipline;
+demoting one on a hunch is exactly the unjustified coefficient this model exists
+to remove, so nothing in WNBA is tagged and the gate is a no-op there.
+
 ## Architecture
 
 ```
@@ -180,16 +234,21 @@ cheap. To update, change those four numbers and nothing else.
 
 ## Verification
 
-- `tests/test_fullgame.py` — 58 tests. Neutrality to nine decimal places, the
-  distribution's mean and spread against the measured 4.39, push arithmetic,
-  price inversion, the resolved-probability band, calibration detection of an
-  overconfident model, and the guards.
+- `tests/test_fullgame.py` — 68 tests, including the corroboration gate: the
+  Tigers card held at COIN FLIP, the headline probability provably untouched, a
+  no-soft-input card identical to twelve decimal places, the gate acting as a
+  veto rather than a tax, the band never exceeding either read, and WNBA
+  tagging nothing. Plus neutrality to nine decimal places, the distribution's
+  mean and spread against the measured 4.39, push arithmetic, price inversion,
+  the resolved-probability band, calibration detection of an overconfident
+  model, and the guards.
 - `web/fullgame-cases.json` — 36 games generated from the package by
   `tools_gen_fullgame_cases.py`, which recomputes only the expectations so a
   model change never means hand-editing a probability.
 - `tools_check_fullgame_page.js` — replays all 36 in a real browser against side,
   band, resolved probability, push, projection, fair price, estimate and delta
-  counts, and that green appears only when confident. Then it stores a game,
+  counts, the gate's core projection and core probability, the struck-through
+  band appearing only when held, and that green appears only when confident. Then it stores a game,
   grades it a loss, grades a second as a push, checks the push is excluded from
   calibration, reloads the browser and asserts the card, the grades and the
   half-typed draft all survive. It loads a hand-built card of known results and

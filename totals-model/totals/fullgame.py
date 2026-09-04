@@ -123,6 +123,28 @@ H2H_FULL_WEIGHT_AT = 4.0
 # flip. COIN FLIP is an answer, not a refusal.
 BANDS = ((0.62, "MAX"), (0.57, "STRONG"), (0.53, "LEAN"), (0.00, "COIN FLIP"))
 
+# --- corroboration ---------------------------------------------------------
+# An input that was MEASURED to be worth nothing may move the forecast. It may
+# not, on its own, buy a confidence band.
+#
+# Three of the MLB inputs are tagged `mechanism=False`. Form and head to head
+# because they measured null against the residual on 116 games (t = -0.07 and
+# t = -0.40) and because they are absolutes rather than differentials, so they
+# lean toward the league mean regardless of where the line sits. The public
+# money split because its coefficient is a flat hand-capped 0.30 -- the
+# direction is documented, the size is not.
+#
+# The band is therefore cut from the LESS confident of two reads: the full
+# blend, and the same blend with those three deleted. If deleting them changes
+# the side, there is no call and the band is held at COIN FLIP.
+#
+# This is deliberately not applied to WNBA, and the reason matters. The t
+# statistics above come from an MLB residual study; no equivalent study exists
+# for WNBA, where last-ten is the load-bearing input and there is no
+# starting-pitcher equivalent to fall back on. Demoting an input on evidence is
+# discipline. Demoting one on a hunch is the sort of unjustified coefficient
+# this model exists to remove, so no WNBA input is tagged.
+
 # Tonight-only physical factors, full-game coefficients.
 WIND_DEAD_MPH = 8.0
 WIND_RUNS_PER_MPH = 0.10
@@ -357,10 +379,14 @@ class Estimate:
     total: float
     weight: float
     detail: str
+    #: False for an input measured to be worth ~nothing, or capped by hand. It
+    #: still moves the forecast; it just cannot buy a band on its own.
+    mechanism: bool = True
 
     def to_dict(self) -> dict[str, Any]:
         return {"name": self.name, "total": round(self.total, 3),
-                "weight": round(self.weight, 4), "detail": self.detail}
+                "weight": round(self.weight, 4), "detail": self.detail,
+                "mechanism": self.mechanism}
 
 
 @dataclass
@@ -368,9 +394,11 @@ class Delta:
     name: str
     runs: float
     detail: str
+    mechanism: bool = True
 
     def to_dict(self) -> dict[str, Any]:
-        return {"name": self.name, "runs": round(self.runs, 3), "detail": self.detail}
+        return {"name": self.name, "runs": round(self.runs, 3), "detail": self.detail,
+                "mechanism": self.mechanism}
 
 
 @dataclass
@@ -387,6 +415,13 @@ class Forecast:
     estimates: list[Estimate]
     deltas: list[Delta]
     notes: list[str] = field(default_factory=list)
+    #: The same blend with the measured-null and hand-capped inputs deleted.
+    projected_corroborated: float = 0.0
+    #: `p_resolved` of that read, on the side the full blend named. Below 0.5
+    #: means the soft inputs are the only reason for the side.
+    p_corroborated: float = 0.5
+    #: What the band would have been without the gate. Shown, never acted on.
+    band_ungated: str = "COIN FLIP"
 
     @property
     def p_side(self) -> float:
@@ -438,6 +473,9 @@ class Forecast:
             "p_under": round(self.p_under, 5), "p_side": round(self.p_side, 5),
             "p_resolved": round(self.p_resolved, 5),
             "side": self.side, "band": self.band,
+            "band_ungated": self.band_ungated,
+            "projected_corroborated": round(self.projected_corroborated, 3),
+            "p_corroborated": round(self.p_corroborated, 5),
             "fair_price": round(self.fair_price, 1),
             "estimates": [e.to_dict() for e in self.estimates],
             "deltas": [d.to_dict() for d in self.deltas],
@@ -565,7 +603,7 @@ def forecast_mlb(
             "Last 10", avg * park, w["form"],
             f"Last-ten combined totals average {avg:.1f}. Measured t = -0.07 against the "
             "residual on 116 logged games, so it is weighted to move a close card and "
-            "not to overturn the market."))
+            "not to overturn the market.", mechanism=False))
 
     if h2h_total is not None and h2h_meetings:
         weight = h2h_weight(w["h2h"], h2h_meetings)
@@ -576,7 +614,7 @@ def forecast_mlb(
         estimates.append(Estimate(
             f"Head to head ({h2h_meetings:.0f})", h2h_total * park, weight,
             f"{h2h_meetings:.0f} meetings averaging {h2h_total:.1f}. Measured t = -0.40, "
-            "the weakest thing in the blend." + thin))
+            "the weakest thing in the blend." + thin, mechanism=False))
     elif h2h_total is None:
         notes.append("No head-to-head. Its weight has been redistributed across the "
                      "estimates that are present.")
@@ -612,7 +650,7 @@ def forecast_mlb(
                 f"Over holds {ticket_pct_over:.0f}% of tickets but {money_pct_over:.0f}% "
                 f"of money, a {abs(gap):.0f}-point gap. Small bets on the over, big money "
                 f"on the {'under' if gap > 0 else 'over'}. Capped flat: the direction is "
-                "documented, the size is not."))
+                "documented, the size is not.", mechanism=False))
 
     if opened is not None and abs(opened - line) > 1e-9:
         notes.append(
@@ -709,8 +747,45 @@ def _assemble(sport, matchup, line, estimates, deltas, notes) -> Forecast:
     side = "OVER" if over >= under - 1e-9 else "UNDER"
     p_side = over if side == "OVER" else under
     live = over + under
-    band = next(name for floor, name in BANDS
-                if (p_side / live if live > 0 else 0.5) >= floor)
+    p_resolved = p_side / live if live > 0 else 0.5
+    band_ungated = next(name for floor, name in BANDS if p_resolved >= floor)
+
+    # --- corroboration -----------------------------------------------------
+    # Re-run the blend with the measured-null and hand-capped inputs deleted,
+    # and read the result on the side the full blend named. Nothing is tagged
+    # when only the market and the arms are in, so this is a no-op on those
+    # cards rather than an approximation of one.
+    core = [e for e in estimates if e.mechanism]
+    core_w = sum(e.weight for e in core)
+    if core_w > 0:
+        core_blend = sum(e.total * e.weight for e in core) / core_w
+        core_proj = core_blend + sum(d.runs for d in deltas if d.mechanism)
+    else:
+        core_proj = projected
+    c_over, _c_push, c_under = split_for(sport, line, core_proj)
+    c_live = c_over + c_under
+    c_side = c_over if side == "OVER" else c_under
+    p_corroborated = c_side / c_live if c_live > 0 else 0.5
+
+    if p_corroborated < 0.5:
+        # The soft inputs are not merely adding confidence, they are the reason
+        # for the side. That is not a bet.
+        band = "COIN FLIP"
+    else:
+        band = next(name for floor, name in BANDS
+                    if min(p_resolved, p_corroborated) >= floor)
+
+    if band != band_ungated:
+        notes.append(
+            f"Held at {band}, down from {band_ungated}. Delete last ten, head to head "
+            f"and the money split -- the inputs measured worth nothing and the one "
+            f"capped by hand -- and this card reads "
+            + (f"{'OVER' if side == 'UNDER' else 'UNDER'} "
+               f"{(1 - p_corroborated) * 100:.1f}%, the other side."
+               if p_corroborated < 0.5 else
+               f"{side} {p_corroborated * 100:.1f}% rather than "
+               f"{p_resolved * 100:.1f}%.")
+            + " Those inputs may move a forecast; they may not buy a band on their own.")
 
     if len(estimates) == 1 and not deltas:
         notes.append("Nothing entered but the number, so the forecast IS the market and "
@@ -725,7 +800,10 @@ def _assemble(sport, matchup, line, estimates, deltas, notes) -> Forecast:
         notes.append("Top band. Re-read the inputs before acting — in this project a "
                      "spectacular number has more often been a mistyped one than an edge.")
     return Forecast(sport, matchup, line, projected, over, push, under,
-                    side, band, estimates, deltas, notes)
+                    side, band, estimates, deltas, notes,
+                    projected_corroborated=core_proj,
+                    p_corroborated=p_corroborated,
+                    band_ungated=band_ungated)
 
 
 # ===========================================================================

@@ -55,9 +55,11 @@ def main() -> None:
     for c in cases:
         f = build(c)
         c["expect"] = {
-            "side": f.side, "band": f.band,
+            "side": f.side, "band": f.band, "band_ungated": f.band_ungated,
             "p_side": round(f.p_side, 8), "p_resolved": round(f.p_resolved, 8),
+            "p_corroborated": round(f.p_corroborated, 8),
             "p_push": round(f.p_push, 8), "projected": round(f.projected, 8),
+            "projected_core": round(f.projected_corroborated, 8),
             "fair": round(f.fair_price, 4),
             "estimates": len(f.estimates), "deltas": len(f.deltas),
         }

@@ -175,6 +175,10 @@
           color: var(--ink-2); border: 1px solid var(--rule-firm); }
   .band.hot  { background: var(--go); color: #fff; border-color: var(--go); }
   .band.max  { background: var(--go-deep); color: #fff; border-color: var(--go-deep); }
+  /* Struck through: the band the corroboration gate took away. */
+  .held { font: 700 10px/1 var(--sans); letter-spacing: .07em; text-transform: uppercase;
+          color: var(--warn); text-decoration: line-through; text-decoration-thickness: 1px;
+          align-self: center; }
   .pick { font: 900 30px/1 var(--sans); letter-spacing: -.03em; }
   .pick.over { color: var(--over); } .pick.under { color: var(--under); }
   .pct { font: 700 30px/1 var(--mono); margin-left: auto; }
@@ -764,10 +768,16 @@
     return [mu, why];
   }
 
-  function est(name, total, weight, detail) {
-    return { name: name, total: total, weight: weight, detail: detail };
+  /* `mechanism` is false for an input measured to be worth ~nothing, or capped
+     by hand. It still moves the forecast; it just cannot buy a band on its own.
+     See the corroboration block in assemble(). */
+  function est(name, total, weight, detail, mechanism) {
+    return { name: name, total: total, weight: weight, detail: detail,
+             mechanism: mechanism !== false };
   }
-  function delta(name, runs, detail) { return { name: name, runs: runs, detail: detail }; }
+  function delta(name, runs, detail, mechanism) {
+    return { name: name, runs: runs, detail: detail, mechanism: mechanism !== false };
+  }
   function h2hWeight(base, n) { return base * Math.min(1, Math.max(0, n) / H2H_FULL_WEIGHT_AT); }
   function parkScale(pf) { return ok(pf, "park") ? pf / 100 : 1; }
 
@@ -823,7 +833,7 @@
       estimates.push(est("Last 10", avg * park, w.form,
         "Last-ten combined totals average " + avg.toFixed(1) + ". Measured t = −0.07 against " +
         "the residual on 116 logged games, so it is weighted to move a close card and not to " +
-        "overturn the market."));
+        "overturn the market.", false));
     }
 
     var hv = num("h2h"), hn = num("h2hn");
@@ -831,7 +841,7 @@
       estimates.push(est("Head to head (" + hn + ")", hv * park, h2hWeight(w.h2h, hn),
         hn + " meetings averaging " + hv.toFixed(1) + ". Measured t = −0.40, the weakest thing " +
         "in the blend." + (hn < H2H_FULL_WEIGHT_AT ? " Discounted to " + hn + "/" +
-        H2H_FULL_WEIGHT_AT + " of its weight because it rests on " + hn + " meeting(s)." : "")));
+        H2H_FULL_WEIGHT_AT + " of its weight because it rests on " + hn + " meeting(s)." : ""), false));
     } else if (hv === null) {
       notes.push("No head-to-head. Its weight has been redistributed across the estimates " +
                  "that are present.");
@@ -867,7 +877,7 @@
           "Over holds " + tk.toFixed(0) + "% of tickets but " + cs.toFixed(0) + "% of money, a " +
           Math.abs(g).toFixed(0) + "-point gap. Small bets on the over, big money on the " +
           (g > 0 ? "under" : "over") + ". Capped flat: the direction is documented, the size " +
-          "is not."));
+          "is not.", false));
       }
     }
 
@@ -945,8 +955,57 @@
        figure called that a coin flip and it is not one. */
     var live = over + under;
     var pResolved = live > 0 ? pSide / live : 0.5;
-    var band = "COIN FLIP";
-    for (var i = 0; i < BANDS.length; i++) { if (pResolved >= BANDS[i][0]) { band = BANDS[i][1]; break; } }
+    var bandUngated = "COIN FLIP";
+    for (var i = 0; i < BANDS.length; i++) {
+      if (pResolved >= BANDS[i][0]) { bandUngated = BANDS[i][1]; break; }
+    }
+
+    /* --- corroboration ---------------------------------------------------
+       An input MEASURED to be worth nothing may move the forecast. It may not,
+       on its own, buy a confidence band.
+
+       Re-run the blend with last ten, head to head and the money split deleted
+       — the two that measured null against the residual (t = −0.07, t = −0.40)
+       and the one whose coefficient is a flat hand-cap — and read the result on
+       the side the full blend named. The band is cut from the LESS confident of
+       the two. If deleting them changes the side, there is no call.
+
+       Nothing is tagged on a card holding only the market and the arms, so this
+       is an actual no-op there rather than an approximation of one. Nothing is
+       tagged in WNBA at all: the t statistics come from an MLB study, and
+       demoting an input on a hunch is the kind of unjustified coefficient this
+       model exists to remove. */
+    var cw = 0, csum = 0, cdelta = 0;
+    estimates.forEach(function (e) { if (e.mechanism) { cw += e.weight; csum += e.total * e.weight; } });
+    deltas.forEach(function (d) { if (d.mechanism) { cdelta += d.runs; } });
+    var coreProj = cw > 0 ? csum / cw + cdelta : projected;
+    var csp = splitFor(sport, line, coreProj);
+    var cLive = csp[0] + csp[2];
+    var cSide = side === "OVER" ? csp[0] : csp[2];
+    var pCorroborated = cLive > 0 ? cSide / cLive : 0.5;
+
+    var band;
+    if (pCorroborated < 0.5) {
+      band = "COIN FLIP";
+    } else {
+      band = "COIN FLIP";
+      var gatedP = Math.min(pResolved, pCorroborated);
+      for (var j = 0; j < BANDS.length; j++) {
+        if (gatedP >= BANDS[j][0]) { band = BANDS[j][1]; break; }
+      }
+    }
+    if (band !== bandUngated) {
+      notes.push("Held at <b>" + band + "</b>, down from " + bandUngated + ". Delete last ten, " +
+        "head to head and the money split — the inputs measured worth nothing and the one " +
+        "capped by hand — and this card reads " +
+        (pCorroborated < 0.5
+          ? "<b>" + (side === "UNDER" ? "OVER" : "UNDER") + " " +
+            ((1 - pCorroborated) * 100).toFixed(1) + "%, the other side</b>."
+          : "<b>" + side + " " + (pCorroborated * 100).toFixed(1) + "%</b> rather than " +
+            (pResolved * 100).toFixed(1) + "%.") +
+        " Those inputs may move a forecast; they may not buy a band on their own.");
+    }
+
     /* Even money is +100 by convention; without the tolerance the sign flips on
        a floating-point hair and an identical coin flip prints -100 then +100. */
     var fair = Math.abs(pResolved - 0.5) < 1e-9 ? 100
@@ -965,7 +1024,9 @@
 
     return { sport: sport, away: away, home: home, matchup: away + " @ " + home, line: line,
              projected: projected, pOver: over, pPush: push, pUnder: under, pSide: pSide,
-             pResolved: pResolved, side: side, band: band, fair: fair, estimates: estimates, deltas: deltas,
+             pResolved: pResolved, side: side, band: band, bandUngated: bandUngated,
+             projectedCore: coreProj, pCorroborated: pCorroborated,
+             fair: fair, estimates: estimates, deltas: deltas,
              notes: notes, totalWeight: tw, hot: band !== "COIN FLIP" };
   }
 
@@ -1004,13 +1065,22 @@
     c.dataset.fair = f.fair.toFixed(6);
     c.dataset.pPush = f.pPush.toFixed(10);
     c.dataset.projected = f.projected.toFixed(10);
+    c.dataset.band = f.band;
+    c.dataset.bandUngated = f.bandUngated;
+    c.dataset.pCorroborated = f.pCorroborated.toFixed(10);
+    c.dataset.projectedCore = f.projectedCore.toFixed(10);
 
     var posted = f.side === "OVER" ? num("op") : num("up");
     var edge = posted === null ? null : edgeVs(f, posted);
     var bandCls = f.band === "MAX" ? " max" : (f.hot ? " hot" : "");
+    /* The band the gate took away is shown next to the one it left, so a held
+       card reads as a decision rather than as the model being quiet. */
+    var heldTag = f.band !== f.bandUngated
+      ? '<span class="held" title="Held down: the measured-null inputs were the only ' +
+        'thing carrying it">not ' + f.bandUngated + "</span>" : "";
 
     c.innerHTML =
-      '<div class="ctop"><span class="band' + bandCls + '">' + f.band + "</span>" +
+      '<div class="ctop"><span class="band' + bandCls + '">' + f.band + "</span>" + heldTag +
       '<span class="pick ' + lo + '">' + f.side + " " + f.line + "</span>" +
       '<span class="pct ' + lo + '">' + (f.pResolved * 100).toFixed(1) + "%</span></div>" +
       '<p class="cline"><b>' + f.matchup + "</b> · projected <b>" + fmt(f.projected) +

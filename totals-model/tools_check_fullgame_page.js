@@ -74,6 +74,10 @@ const CHECKS = ["dome", "alead", "hlead"];
         pPush: parseFloat(call.dataset.pPush),
         pResolved: parseFloat(call.dataset.pResolved),
         projected: parseFloat(call.dataset.projected),
+        projectedCore: parseFloat(call.dataset.projectedCore),
+        pCorroborated: parseFloat(call.dataset.pCorroborated),
+        bandUngated: call.dataset.bandUngated,
+        held: !!document.querySelector('#call .held'),
         fair: parseFloat(call.dataset.fair),
         estimates: document.querySelectorAll('#est .erow').length,
         deltas: document.getElementById('deltaCard').hidden
@@ -98,6 +102,19 @@ const CHECKS = ["dome", "alead", "hlead"];
         `page said ${(got.pPush * 100).toFixed(4)}%`);
     chk(Math.abs(got.projected - w.projected) < 1e-6,
         `${tag}: projected ${w.projected.toFixed(4)}`, `page said ${got.projected}`);
+    // The corroboration gate: the browser must reach the same held band, the
+    // same core projection and the same core probability as the package.
+    chk(got.bandUngated === w.band_ungated,
+        `${tag}: ungated band ${w.band_ungated}`, `page said ${got.bandUngated}`);
+    chk(Math.abs(got.projectedCore - w.projected_core) < 1e-6,
+        `${tag}: core projection ${w.projected_core.toFixed(4)}`,
+        `page said ${got.projectedCore}`);
+    chk(Math.abs(got.pCorroborated - w.p_corroborated) < 1e-4,
+        `${tag}: corroborated ${(w.p_corroborated * 100).toFixed(2)}%`,
+        `page said ${(got.pCorroborated * 100).toFixed(4)}%`);
+    chk(got.held === (w.band !== w.band_ungated),
+        `${tag}: the struck-through band shows only when held`,
+        `held=${got.held} band=${w.band} ungated=${w.band_ungated}`);
     chk(Math.abs(got.fair - w.fair) < 0.05,
         `${tag}: fair ${w.fair.toFixed(1)}`, `page said ${got.fair}`);
     chk(Math.abs(got.pct - got.pResolved * 100) < 0.051,

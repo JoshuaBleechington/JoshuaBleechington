@@ -398,6 +398,138 @@ class TestHeadToHeadSampleSize(unittest.TestCase):
         self.assertAlmostEqual(h.weight, WEIGHTS["MLB"]["h2h"] / H2H_FULL_WEIGHT_AT)
 
 
+class TestSoftInputsCannotBuyABand(unittest.TestCase):
+    """A measured-null input may move the forecast. It may not be the bet.
+
+    The Tigers/Guardians card is the reason this exists. Head to head at 6.4
+    over nine meetings and a public-money flag dragged a card the market and
+    both pitching staffs read as a coin flip into an UNDER LEAN, against the
+    price. It went twelve runs. The outcome was a 1-in-5 tail and proves
+    nothing; the reasoning was the problem.
+    """
+
+    #: The real card, as logged.
+    TIGERS = dict(
+        line=8.0, over_price=-120, under_price=100,
+        away_starter_era=3.24, home_starter_era=3.77,
+        away_rpg=4.05, home_rpg=4.12,
+        away_bullpen_era=4.00, home_bullpen_era=3.73,
+        away_last10_total=9.0, home_last10_total=8.9,
+        h2h_total=6.4, h2h_meetings=9, park_factor=98,
+        wind_mph=6, wind_direction="cross", temp_f=76,
+        ticket_pct_over=67, money_pct_over=38,
+    )
+
+    def test_the_card_that_prompted_this_is_held_at_a_coin_flip(self):
+        f = forecast_mlb("Tigers @ Guardians", **self.TIGERS)
+        self.assertEqual(f.side, "UNDER")
+        self.assertEqual(f.band_ungated, "LEAN")
+        self.assertEqual(f.band, "COIN FLIP")
+        # The core read names the OTHER side, which is the whole point.
+        self.assertLess(f.p_corroborated, 0.5)
+
+    def test_the_headline_probability_is_untouched(self):
+        """The gate governs the band, never the forecast.
+
+        The probability is the best estimate of what happens; the band is the
+        recommendation. Silently moving the first to justify the second would
+        corrupt the calibration measure, which reads the probability.
+        """
+        f = forecast_mlb("Tigers @ Guardians", **self.TIGERS)
+        self.assertAlmostEqual(f.p_resolved, 0.5397, places=3)
+        self.assertAlmostEqual(f.projected, 8.164, places=2)
+
+    def test_it_says_plainly_that_it_pulled_the_band(self):
+        f = forecast_mlb("Tigers @ Guardians", **self.TIGERS)
+        note = next(n for n in f.notes if "Held at" in n)
+        self.assertIn("COIN FLIP", note)
+        self.assertIn("LEAN", note)
+        self.assertIn("the other side", note)
+
+    def test_a_card_with_no_soft_inputs_is_left_completely_alone(self):
+        """Not an approximation of a no-op -- an actual one."""
+        bare = dict(line=8.5, over_price=-115, under_price=-105,
+                    away_starter_era=2.90, home_starter_era=5.40,
+                    away_bullpen_era=3.10, home_bullpen_era=5.10)
+        f = forecast_mlb("a @ b", **bare)
+        self.assertEqual(f.band, f.band_ungated)
+        self.assertAlmostEqual(f.projected_corroborated, f.projected, places=12)
+        self.assertAlmostEqual(f.p_corroborated, f.p_resolved, places=12)
+        self.assertFalse(any("Held at" in n for n in f.notes))
+
+    def test_soft_inputs_agreeing_with_the_core_keep_the_band(self):
+        """The gate is a veto, not a tax. Corroborated confidence survives."""
+        kw = dict(line=8.5, over_price=-110, under_price=-110,
+                  away_starter_era=6.20, home_starter_era=6.40,
+                  away_bullpen_era=5.90, home_bullpen_era=5.80)
+        core = forecast_mlb("a @ b", **kw)
+        withsoft = forecast_mlb("a @ b", away_last10_total=11.0,
+                                home_last10_total=11.4, **kw)
+        self.assertEqual(core.side, "OVER")
+        self.assertEqual(withsoft.side, "OVER")
+        self.assertEqual(withsoft.band, withsoft.band_ungated)
+        self.assertNotEqual(withsoft.band, "COIN FLIP")
+
+    def test_soft_inputs_can_still_cut_confidence(self):
+        """Deleting them is never allowed to RAISE the band."""
+        kw = dict(line=8.5, over_price=-110, under_price=-110,
+                  away_starter_era=6.20, home_starter_era=6.40,
+                  away_bullpen_era=5.90, home_bullpen_era=5.80)
+        cut = forecast_mlb("a @ b", away_last10_total=7.0,
+                           home_last10_total=7.2, **kw)
+        self.assertLessEqual(BANDS_ORDER[cut.band], BANDS_ORDER[cut.band_ungated])
+
+    def test_the_band_never_exceeds_either_read(self):
+        """min(), stated as a property rather than trusted to one example."""
+        for h2h in (4.0, 6.0, 8.0, 10.0, 14.0):
+            for split in ((70, 30), (30, 70), (50, 50)):
+                f = forecast_mlb(
+                    "a @ b", line=8.5, over_price=-110, under_price=-110,
+                    away_starter_era=3.10, home_starter_era=3.30,
+                    away_bullpen_era=3.40, home_bullpen_era=3.20,
+                    h2h_total=h2h, h2h_meetings=6,
+                    ticket_pct_over=split[0], money_pct_over=split[1])
+                floor = next(fl for fl, n in BANDS if n == f.band)
+                if f.band != "COIN FLIP":
+                    self.assertGreaterEqual(f.p_resolved, floor)
+                    self.assertGreaterEqual(f.p_corroborated, floor)
+
+    def test_wind_and_temperature_are_mechanism_and_survive_the_gate(self):
+        """Wind is the one input the market prices imperfectly. It is not soft."""
+        f = forecast_mlb("a @ b", line=8.5, wind_mph=25, wind_direction="out",
+                         away_starter_era=4.16, home_starter_era=4.16)
+        wind = next(d for d in f.deltas if d.name == "Wind")
+        self.assertTrue(wind.mechanism)
+        self.assertGreater(f.projected_corroborated, f.line)
+
+    def test_the_three_soft_inputs_are_the_only_ones_tagged(self):
+        f = forecast_mlb(
+            "a @ b", line=8.5, away_starter_era=3.9, home_starter_era=4.4,
+            away_bullpen_era=3.8, home_bullpen_era=4.3,
+            away_last10_total=9.0, home_last10_total=9.2,
+            h2h_total=9.1, h2h_meetings=5, wind_mph=14, wind_direction="out",
+            temp_f=84, ticket_pct_over=70, money_pct_over=40)
+        soft = {e.name for e in f.estimates if not e.mechanism}
+        soft |= {d.name for d in f.deltas if not d.mechanism}
+        self.assertEqual(soft, {"Last 10", "Head to head (5)", "Money split"})
+
+    def test_wnba_tags_nothing_because_nothing_was_measured_null_there(self):
+        """The t-statistics behind the gate come from an MLB study.
+
+        Demoting a WNBA input on a hunch would be exactly the unjustified
+        coefficient this model exists to remove.
+        """
+        f = forecast_wnba("a @ b", 162.5, away_last10_total=171.0,
+                          home_last10_total=173.0, h2h_total=178.0, h2h_meetings=5)
+        self.assertTrue(all(e.mechanism for e in f.estimates))
+        self.assertTrue(all(d.mechanism for d in f.deltas))
+        self.assertEqual(f.band, f.band_ungated)
+        self.assertAlmostEqual(f.p_corroborated, f.p_resolved, places=12)
+
+
+BANDS_ORDER = {name: i for i, (_floor, name) in enumerate(BANDS)}
+
+
 class TestWeatherAndPark(unittest.TestCase):
     def test_wind_out_and_in_mirror(self):
         out = forecast_mlb("a @ b", 8.5, wind_mph=20, wind_direction="out")

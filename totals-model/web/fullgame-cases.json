@@ -30,10 +30,13 @@
     "expect": {
       "side": "OVER",
       "band": "COIN FLIP",
+      "band_ungated": "COIN FLIP",
       "p_side": 0.5,
       "p_resolved": 0.5,
+      "p_corroborated": 0.5,
       "p_push": 0.0,
       "projected": 9.04323383,
+      "projected_core": 9.04323383,
       "fair": 100.0,
       "estimates": 1,
       "deltas": 0
@@ -70,10 +73,13 @@
     "expect": {
       "side": "OVER",
       "band": "COIN FLIP",
+      "band_ungated": "COIN FLIP",
       "p_side": 0.45205034,
       "p_resolved": 0.5,
+      "p_corroborated": 0.5,
       "p_push": 0.09589932,
       "projected": 8.53530549,
+      "projected_core": 8.53530549,
       "fair": 100.0,
       "estimates": 1,
       "deltas": 0
@@ -110,10 +116,13 @@
     "expect": {
       "side": "OVER",
       "band": "COIN FLIP",
+      "band_ungated": "COIN FLIP",
       "p_side": 0.5,
       "p_resolved": 0.5,
+      "p_corroborated": 0.5,
       "p_push": 0.0,
       "projected": 9.04323383,
+      "projected_core": 9.04323383,
       "fair": 100.0,
       "estimates": 3,
       "deltas": 1
@@ -150,10 +159,13 @@
     "expect": {
       "side": "OVER",
       "band": "COIN FLIP",
+      "band_ungated": "COIN FLIP",
       "p_side": 0.52173913,
       "p_resolved": 0.52173913,
+      "p_corroborated": 0.52173913,
       "p_push": 0.0,
       "projected": 9.27804496,
+      "projected_core": 9.27804496,
       "fair": -109.0909,
       "estimates": 1,
       "deltas": 0
@@ -190,10 +202,13 @@
     "expect": {
       "side": "UNDER",
       "band": "COIN FLIP",
+      "band_ungated": "COIN FLIP",
       "p_side": 0.51083424,
       "p_resolved": 0.51083424,
+      "p_corroborated": 0.51083424,
       "p_push": 0.0,
       "projected": 8.92741144,
+      "projected_core": 8.92741144,
       "fair": -104.4297,
       "estimates": 1,
       "deltas": 0
@@ -230,10 +245,13 @@
     "expect": {
       "side": "OVER",
       "band": "COIN FLIP",
+      "band_ungated": "COIN FLIP",
       "p_side": 0.5,
       "p_resolved": 0.5,
+      "p_corroborated": 0.5,
       "p_push": 0.0,
       "projected": 9.04323383,
+      "projected_core": 9.04323383,
       "fair": 100.0,
       "estimates": 1,
       "deltas": 0
@@ -270,10 +288,13 @@
     "expect": {
       "side": "UNDER",
       "band": "LEAN",
+      "band_ungated": "LEAN",
       "p_side": 0.55814505,
       "p_resolved": 0.55814505,
+      "p_corroborated": 0.55814505,
       "p_push": 0.0,
       "projected": 8.42855954,
+      "projected_core": 8.42855954,
       "fair": -126.3186,
       "estimates": 2,
       "deltas": 0
@@ -310,10 +331,13 @@
     "expect": {
       "side": "OVER",
       "band": "LEAN",
+      "band_ungated": "LEAN",
       "p_side": 0.56372648,
       "p_resolved": 0.56372648,
+      "p_corroborated": 0.56372648,
       "p_push": 0.0,
       "projected": 9.74307383,
+      "projected_core": 9.74307383,
       "fair": -129.214,
       "estimates": 2,
       "deltas": 0
@@ -350,10 +374,13 @@
     "expect": {
       "side": "OVER",
       "band": "LEAN",
+      "band_ungated": "LEAN",
       "p_side": 0.48336536,
       "p_resolved": 0.53133585,
+      "p_corroborated": 0.53133585,
       "p_push": 0.0902828,
       "projected": 9.85566813,
+      "projected_core": 9.85566813,
       "fair": -113.3724,
       "estimates": 2,
       "deltas": 0
@@ -390,10 +417,13 @@
     "expect": {
       "side": "OVER",
       "band": "COIN FLIP",
+      "band_ungated": "COIN FLIP",
       "p_side": 0.5,
       "p_resolved": 0.5,
+      "p_corroborated": 0.5,
       "p_push": 0.0,
       "projected": 9.04323383,
+      "projected_core": 9.04323383,
       "fair": 100.0,
       "estimates": 1,
       "deltas": 0
@@ -430,10 +460,13 @@
     "expect": {
       "side": "OVER",
       "band": "COIN FLIP",
+      "band_ungated": "COIN FLIP",
       "p_side": 0.51934707,
       "p_resolved": 0.51934707,
+      "p_corroborated": 0.51934707,
       "p_push": 0.0,
       "projected": 9.25203383,
+      "projected_core": 9.25203383,
       "fair": -108.0503,
       "estimates": 2,
       "deltas": 0
@@ -470,10 +503,13 @@
     "expect": {
       "side": "UNDER",
       "band": "COIN FLIP",
+      "band_ungated": "COIN FLIP",
       "p_side": 0.52668267,
       "p_resolved": 0.52668267,
+      "p_corroborated": 0.52668267,
       "p_push": 0.0,
       "projected": 8.75919383,
+      "projected_core": 8.75919383,
       "fair": -111.2747,
       "estimates": 3,
       "deltas": 0
@@ -509,11 +545,14 @@
     },
     "expect": {
       "side": "OVER",
-      "band": "LEAN",
+      "band": "COIN FLIP",
+      "band_ungated": "LEAN",
       "p_side": 0.53346267,
       "p_resolved": 0.53346267,
+      "p_corroborated": 0.5,
       "p_push": 0.0,
       "projected": 9.40621421,
+      "projected_core": 9.04323383,
       "fair": -114.3451,
       "estimates": 3,
       "deltas": 0
@@ -550,10 +589,13 @@
     "expect": {
       "side": "OVER",
       "band": "COIN FLIP",
+      "band_ungated": "COIN FLIP",
       "p_side": 0.51114068,
       "p_resolved": 0.51114068,
+      "p_corroborated": 0.5,
       "p_push": 0.0,
       "projected": 9.16313584,
+      "projected_core": 9.04323383,
       "fair": -104.5578,
       "estimates": 2,
       "deltas": 0
@@ -590,10 +632,13 @@
     "expect": {
       "side": "OVER",
       "band": "MAX",
+      "band_ungated": "MAX",
       "p_side": 0.62363617,
       "p_resolved": 0.62363617,
+      "p_corroborated": 0.62363617,
       "p_push": 0.0,
       "projected": 10.44323383,
+      "projected_core": 10.44323383,
       "fair": -165.7003,
       "estimates": 1,
       "deltas": 1
@@ -630,10 +675,13 @@
     "expect": {
       "side": "UNDER",
       "band": "MAX",
+      "band_ungated": "MAX",
       "p_side": 0.63357514,
       "p_resolved": 0.63357514,
+      "p_corroborated": 0.63357514,
       "p_push": 0.0,
       "projected": 7.64323383,
+      "projected_core": 7.64323383,
       "fair": -172.9072,
       "estimates": 1,
       "deltas": 1
@@ -670,10 +718,13 @@
     "expect": {
       "side": "OVER",
       "band": "COIN FLIP",
+      "band_ungated": "COIN FLIP",
       "p_side": 0.5,
       "p_resolved": 0.5,
+      "p_corroborated": 0.5,
       "p_push": 0.0,
       "projected": 9.04323383,
+      "projected_core": 9.04323383,
       "fair": 100.0,
       "estimates": 1,
       "deltas": 1
@@ -710,10 +761,13 @@
     "expect": {
       "side": "OVER",
       "band": "COIN FLIP",
+      "band_ungated": "COIN FLIP",
       "p_side": 0.5,
       "p_resolved": 0.5,
+      "p_corroborated": 0.5,
       "p_push": 0.0,
       "projected": 9.04323383,
+      "projected_core": 9.04323383,
       "fair": 100.0,
       "estimates": 1,
       "deltas": 1
@@ -750,10 +804,13 @@
     "expect": {
       "side": "OVER",
       "band": "COIN FLIP",
+      "band_ungated": "COIN FLIP",
       "p_side": 0.5,
       "p_resolved": 0.5,
+      "p_corroborated": 0.5,
       "p_push": 0.0,
       "projected": 11.04336939,
+      "projected_core": 11.04336939,
       "fair": 100.0,
       "estimates": 1,
       "deltas": 0
@@ -790,10 +847,13 @@
     "expect": {
       "side": "OVER",
       "band": "STRONG",
+      "band_ungated": "STRONG",
       "p_side": 0.57290539,
       "p_resolved": 0.57290539,
+      "p_corroborated": 0.57290539,
       "p_push": 0.0,
       "projected": 9.84719817,
+      "projected_core": 9.84719817,
       "fair": -134.1402,
       "estimates": 2,
       "deltas": 0
@@ -830,10 +890,13 @@
     "expect": {
       "side": "OVER",
       "band": "LEAN",
+      "band_ungated": "LEAN",
       "p_side": 0.5620853,
       "p_resolved": 0.5620853,
+      "p_corroborated": 0.5620853,
       "p_push": 0.0,
       "projected": 9.72455954,
+      "projected_core": 9.72455954,
       "fair": -128.355,
       "estimates": 2,
       "deltas": 0
@@ -870,10 +933,13 @@
     "expect": {
       "side": "UNDER",
       "band": "COIN FLIP",
+      "band_ungated": "COIN FLIP",
       "p_side": 0.52819262,
       "p_resolved": 0.52819262,
+      "p_corroborated": 0.5,
       "p_push": 0.0,
       "projected": 8.74323383,
+      "projected_core": 9.04323383,
       "fair": -111.9509,
       "estimates": 1,
       "deltas": 1
@@ -910,10 +976,13 @@
     "expect": {
       "side": "OVER",
       "band": "COIN FLIP",
+      "band_ungated": "COIN FLIP",
       "p_side": 0.5,
       "p_resolved": 0.5,
+      "p_corroborated": 0.5,
       "p_push": 0.0,
       "projected": 10.04330861,
+      "projected_core": 10.04330861,
       "fair": 100.0,
       "estimates": 1,
       "deltas": 0
@@ -950,10 +1019,13 @@
     "expect": {
       "side": "OVER",
       "band": "MAX",
+      "band_ungated": "MAX",
       "p_side": 0.59686886,
       "p_resolved": 0.65575145,
+      "p_corroborated": 0.65575145,
       "p_push": 0.08979407,
       "projected": 10.12405977,
+      "projected_core": 10.12405977,
       "fair": -190.4878,
       "estimates": 2,
       "deltas": 1
@@ -990,10 +1062,13 @@
     "expect": {
       "side": "OVER",
       "band": "STRONG",
+      "band_ungated": "STRONG",
       "p_side": 0.58058015,
       "p_resolved": 0.58058015,
+      "p_corroborated": 0.58286326,
       "p_push": 0.0,
       "projected": 13.07576906,
+      "projected_core": 13.10608604,
       "fair": -138.4246,
       "estimates": 5,
       "deltas": 2
@@ -1030,10 +1105,13 @@
     "expect": {
       "side": "UNDER",
       "band": "MAX",
+      "band_ungated": "MAX",
       "p_side": 0.72629099,
       "p_resolved": 0.72629099,
+      "p_corroborated": 0.68512168,
       "p_push": 0.0,
       "projected": 7.51052212,
+      "projected_core": 7.98434692,
       "fair": -265.3515,
       "estimates": 5,
       "deltas": 2
@@ -1061,10 +1139,13 @@
     "expect": {
       "side": "OVER",
       "band": "COIN FLIP",
+      "band_ungated": "COIN FLIP",
       "p_side": 0.5,
       "p_resolved": 0.5,
+      "p_corroborated": 0.5,
       "p_push": 0.0,
       "projected": 162.5,
+      "projected_core": 162.5,
       "fair": 100.0,
       "estimates": 1,
       "deltas": 0
@@ -1092,10 +1173,13 @@
     "expect": {
       "side": "OVER",
       "band": "COIN FLIP",
+      "band_ungated": "COIN FLIP",
       "p_side": 0.4826752,
       "p_resolved": 0.5,
+      "p_corroborated": 0.5,
       "p_push": 0.0346496,
       "projected": 162.0,
+      "projected_core": 162.0,
       "fair": 100.0,
       "estimates": 1,
       "deltas": 0
@@ -1123,10 +1207,13 @@
     "expect": {
       "side": "OVER",
       "band": "STRONG",
+      "band_ungated": "STRONG",
       "p_side": 0.61008097,
       "p_resolved": 0.61008097,
+      "p_corroborated": 0.61008097,
       "p_push": 0.0,
       "projected": 161.7173913,
+      "projected_core": 161.7173913,
       "fair": -156.4635,
       "estimates": 2,
       "deltas": 0
@@ -1154,10 +1241,13 @@
     "expect": {
       "side": "OVER",
       "band": "MAX",
+      "band_ungated": "MAX",
       "p_side": 0.65765333,
       "p_resolved": 0.65765333,
+      "p_corroborated": 0.65765333,
       "p_push": 0.0,
       "projected": 165.17383178,
+      "projected_core": 165.17383178,
       "fair": -192.1016,
       "estimates": 3,
       "deltas": 0
@@ -1185,10 +1275,13 @@
     "expect": {
       "side": "OVER",
       "band": "STRONG",
+      "band_ungated": "STRONG",
       "p_side": 0.57512458,
       "p_resolved": 0.59519654,
+      "p_corroborated": 0.59519654,
       "p_push": 0.03372324,
       "projected": 162.68041237,
+      "projected_core": 162.68041237,
       "fair": -147.0335,
       "estimates": 3,
       "deltas": 0
@@ -1216,10 +1309,13 @@
     "expect": {
       "side": "OVER",
       "band": "LEAN",
+      "band_ungated": "LEAN",
       "p_side": 0.54061517,
       "p_resolved": 0.54061517,
+      "p_corroborated": 0.54061517,
       "p_push": 0.0,
       "projected": 161.67383178,
+      "projected_core": 161.67383178,
       "fair": -117.6824,
       "estimates": 3,
       "deltas": 1
@@ -1247,10 +1343,13 @@
     "expect": {
       "side": "UNDER",
       "band": "MAX",
+      "band_ungated": "MAX",
       "p_side": 0.66731684,
       "p_resolved": 0.68862371,
+      "p_corroborated": 0.68862371,
       "p_push": 0.03094124,
       "projected": 159.52173913,
+      "projected_core": 159.52173913,
       "fair": -221.1548,
       "estimates": 2,
       "deltas": 2
@@ -1278,10 +1377,13 @@
     "expect": {
       "side": "OVER",
       "band": "LEAN",
+      "band_ungated": "LEAN",
       "p_side": 0.53321526,
       "p_resolved": 0.53321526,
+      "p_corroborated": 0.53321526,
       "p_push": 0.0,
       "projected": 163.45941306,
+      "projected_core": 163.45941306,
       "fair": -114.2315,
       "estimates": 2,
       "deltas": 0
@@ -1317,11 +1419,14 @@
     },
     "expect": {
       "side": "OVER",
-      "band": "STRONG",
+      "band": "LEAN",
+      "band_ungated": "STRONG",
       "p_side": 0.57059829,
       "p_resolved": 0.57059829,
+      "p_corroborated": 0.55057706,
       "p_push": 0.0,
       "projected": 9.82093272,
+      "projected_core": 9.59556387,
       "fair": -132.8822,
       "estimates": 5,
       "deltas": 2
@@ -1358,10 +1463,13 @@
     "expect": {
       "side": "OVER",
       "band": "LEAN",
+      "band_ungated": "LEAN",
       "p_side": 0.50656037,
       "p_resolved": 0.55652112,
+      "p_corroborated": 0.5396045,
       "p_push": 0.08977332,
       "projected": 10.11779104,
+      "projected_core": 9.94112551,
       "fair": -125.4899,
       "estimates": 5,
       "deltas": 2

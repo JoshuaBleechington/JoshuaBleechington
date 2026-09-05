@@ -187,6 +187,55 @@ const CHECKS = ["dome", "alead", "hlead"];
   chk(after.graded.includes('PUSH') && after.graded.includes('LOSS'),
       'card: the grades survived too', after.graded.join(','));
 
+  // ---- rescoring a card scored by an older build -----------------------
+  // The real failure this guards: two pre-gate STRONGs sat in a live card the
+  // gate would have refused, because a row keeps the band it was added with.
+  const rescore = await pg.evaluate(async () => {
+    const inputs = {
+      away: 'Tigers', home: 'Guardians', line: '8.0', op: '-120', up: '100',
+      aera: '3.24', hera: '3.77', arpg: '4.05', hrpg: '4.12',
+      abp: '4.00', hbp: '3.73', al10: '9.0', hl10: '8.9',
+      h2h: '6.4', h2hn: '9', pf: '98', mph: '6', dir: 'cross', temp: '76',
+      tick: '67', cash: '38', dome: false,
+    };
+    // Stored as an older build scored it: UNDER, LEAN.
+    localStorage.setItem('callsheet.fullgame.card.v1', JSON.stringify([{
+      matchup: 'Tigers @ Guardians', sport: 'MLB', line: 8.0, projected: '8.16',
+      side: 'UNDER', prob: '54.0', band: 'LEAN', fair: '-117', final: '12', inputs,
+    }]));
+  }).then(() => pg.reload()).then(() => pg.waitForTimeout(450)).then(() => pg.evaluate(() => {
+    const before = {
+      band: document.querySelector('#cardTable td:nth-child(7) .chip').textContent.trim(),
+      stale: (document.querySelector('#cardTable .chip.stale') || {}).textContent,
+      result: document.querySelector('#cardTable .res').textContent.trim(),
+    };
+    document.getElementById('rescore').click();
+    return new Promise(r => setTimeout(() => r({
+      before,
+      after: document.querySelector('#cardTable td:nth-child(7) .chip').textContent.trim(),
+      stillStale: !!document.querySelector('#cardTable .chip.stale'),
+      result: document.querySelector('#cardTable .res').textContent.trim(),
+      final: document.querySelector('[data-final="0"]').value,
+      msg: document.getElementById('saveMsg').textContent,
+    }), 250));
+  }));
+  chk(rescore.before.band === 'LEAN', 'rescore: the stored band is shown as stored',
+      rescore.before.band);
+  chk(/now COIN FLIP/.test(rescore.before.stale || ''),
+      'rescore: a row the current model scores differently is marked stale',
+      String(rescore.before.stale));
+  chk(rescore.after === 'COIN FLIP', 'rescore: pressing it adopts the current model',
+      rescore.after);
+  chk(!rescore.stillStale, 'rescore: the stale mark clears once rescored',
+      String(rescore.stillStale));
+  chk(rescore.final === '12' && rescore.result === 'LOSS',
+      'rescore: the final and its grade are never touched',
+      `final=${rescore.final} result=${rescore.result}`);
+
+  await pg.evaluate(() => localStorage.clear());
+  await pg.reload();
+  await pg.waitForTimeout(400);
+
   // ---- the per-band record --------------------------------------------
   // Loads a known card straight into storage and reloads, so the expected
   // win/loss/push per band is arithmetic rather than whatever the engine

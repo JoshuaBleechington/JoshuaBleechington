@@ -279,6 +279,9 @@
      venue, not a call. */
   .chip.dome { background: var(--under-wash); color: var(--under);
                padding: 3px 6px; margin-left: 7px; vertical-align: 1px; }
+  /* This row was scored by an older build and the model has since changed. */
+  .chip.stale { background: transparent; color: var(--warn);
+                border: 1px dashed var(--warn); padding: 3px 5px; margin-left: 6px; }
   .empty { padding: 20px 15px; color: var(--muted); font-size: 13px; }
   .x { border: 0; background: transparent; color: var(--muted); cursor: pointer;
        font-size: 17px; line-height: 1; padding: 3px 7px; border-radius: 4px; }
@@ -541,10 +544,16 @@
           <div class="row">
             <button type="button" class="btn solid" id="backup">Save a backup file</button>
             <button type="button" class="btn" id="restore">Load a backup</button>
+            <button type="button" class="btn" id="rescore">Rescore card</button>
             <button type="button" class="btn" id="copy">Copy card as text</button>
           </div>
           <input type="file" id="restoreFile" accept="application/json,.json" hidden>
           <p class="note" id="saveMsg" hidden></p>
+          <p class="note"><b>Rescore re-runs every game on the card through the model as it
+            stands today</b>, from the inputs each row already stores. A row keeps the band it
+            was given when you added it, so after a change to the model a card can hold calls
+            the current model would not make — rows like that are marked. Finals and results are
+            never touched.</p>
           <p class="note"><b>Browser storage is not a vault.</b> It does not follow you to your phone
             and it goes away if you clear site data. Take a backup file at the end of a night you care
             about — that is the copy that survives a new laptop.</p>
@@ -617,8 +626,21 @@
   var PLAUSIBLE = { era: [0, 15], park: [70, 130], mlb_total: [4, 20], wnba_total: [110, 230] };
 
   function ok(v, w) { return v !== null && v >= PLAUSIBLE[w][0] && v <= PLAUSIBLE[w][1]; }
-  function num(id) { var v = parseFloat($(id).value); return isFinite(v) ? v : null; }
-  function txt(id) { return ($(id).value || "").trim(); }
+  /* The engine reads its inputs through these three, never off the DOM
+     directly, so the same code can score the live form or a stored card row.
+     A card row that could not be re-scored is a card row that silently keeps
+     the band of whatever model version happened to be loaded when it was
+     added -- which is exactly how two pre-gate STRONGs survived into a card
+     the gate would have refused. */
+  var SRC = null;   // null = read the live form
+  function raw(id) {
+    if (SRC) return SRC[id];
+    var el = $(id);
+    return el.type === "checkbox" ? el.checked : el.value;
+  }
+  function num(id) { var v = parseFloat(raw(id)); return isFinite(v) ? v : null; }
+  function txt(id) { var v = raw(id); return String(v === undefined || v === null ? "" : v).trim(); }
+  function checked(id) { return !!raw(id); }
   function sgn(v, d) { return (v >= 0 ? "+" : "") + v.toFixed(d === undefined ? 2 : d); }
 
   /* Lanczos log-gamma, g=7. The negative binomial needs a non-integer
@@ -848,10 +870,10 @@
     }
 
     var deltas = [];
-    if ($("dome").checked) {
+    if (checked("dome")) {
       deltas.push(delta("Roof shut", 0, "Closed roof — wind and temperature both out."));
     } else {
-      var mph = num("mph"), dir = $("dir").value;
+      var mph = num("mph"), dir = txt("dir");
       if (mph !== null && dir) {
         if (dir === "cross") {
           deltas.push(delta("Wind", 0, mph.toFixed(0) +
@@ -919,7 +941,7 @@
     }
 
     var deltas = [];
-    [["Away", num("aout"), $("alead").checked], ["Home", num("hout"), $("hlead").checked]]
+    [["Away", num("aout"), checked("alead")], ["Home", num("hout"), checked("hlead")]]
       .forEach(function (r) {
         var out = r[1] || 0;
         if (out <= 0 && !r[2]) return;
@@ -1040,6 +1062,17 @@
   // ---- rendering -------------------------------------------------------
   var sport = "MLB", last = null;
   function fmt(v) { return sport === "WNBA" ? v.toFixed(1) : v.toFixed(2); }
+
+  /* Score a stored card row with the engine as it stands today, rather than
+     trusting the band that was frozen into the row when it was added. */
+  function scoreInputs(sp, inputs) {
+    if (!inputs) return null;
+    var prev = SRC;
+    SRC = inputs;
+    try { return sp === "WNBA" ? readWnba() : readMlb(); }
+    catch (e) { return null; }
+    finally { SRC = prev; }
+  }
 
   function render() {
     var f = sport === "MLB" ? readMlb() : readWnba();
@@ -1220,6 +1253,14 @@
       card.map(function (s, i) {
         var bc = bandClass(s.band);
         var res = outcome(s);
+        /* A row scored by an older build keeps that build's band forever. Say
+           so on the row instead of letting it pass as a current call. */
+        var now = scoreInputs(s.sport, s.inputs);
+        var stale = now && now.band !== s.band
+          ? ' <span class="chip stale" title="Scored by an earlier build. The model as it ' +
+            "stands now says " + now.side + " " + (now.pResolved * 100).toFixed(1) + "% · " +
+            now.band + '. Press Rescore to update.">now ' + now.band + "</span>"
+          : "";
         return '<tr class="pick-row">' +
           '<td><button class="openbtn" data-open="' + i + '" title="Load this game back into the form">' +
             s.matchup + (isDomed(s)
@@ -1231,7 +1272,8 @@
           '<td><span class="cell"><span class="chip ' + (s.side === "OVER" ? "o" : "u") + '">' +
             s.side + "</span></span></td>" +
           '<td class="n"><span class="cell">' + s.prob + "%</span></td>" +
-          '<td><span class="cell"><span class="chip' + bc + '">' + s.band + "</span></span></td>" +
+          '<td><span class="cell"><span class="chip' + bc + '">' + s.band + "</span>" +
+            stale + "</span></td>" +
           '<td><span class="cell"><input class="grade" type="number" step="1" inputmode="numeric" ' +
             'data-final="' + i + '" value="' + (s.final == null ? "" : s.final) +
             '" placeholder="—" aria-label="Final total"></span></td>' +
@@ -1468,6 +1510,30 @@
                    prob: (last.pResolved * 100).toFixed(1), band: last.band,
                    fair: last.fair.toFixed(0), final: null, inputs: snapshot() });
     save(); renderCard();
+  });
+
+  /* Re-run every stored row through the current engine. The finals and the
+     grading are left alone -- what happened on the field is not a model
+     output, and a rescore that moved it would make the calibration panel
+     unfalsifiable. */
+  $("rescore").addEventListener("click", function () {
+    var moved = 0, skipped = 0;
+    card.forEach(function (s) {
+      var now = scoreInputs(s.sport, s.inputs);
+      if (!now) { skipped++; return; }
+      if (now.band !== s.band || now.side !== s.side) moved++;
+      s.line = now.line;
+      s.projected = fmt(now.projected);
+      s.side = now.side;
+      s.prob = (now.pResolved * 100).toFixed(1);
+      s.band = now.band;
+      s.fair = now.fair.toFixed(0);
+    });
+    save(); renderCard();
+    say("Rescored <b>" + (card.length - skipped) + "</b> game(s) against the current model. " +
+        "<b>" + moved + "</b> changed side or band" +
+        (skipped ? ", " + skipped + " skipped for want of stored inputs" : "") +
+        ". Finals and results were not touched.");
   });
 
   // ---- backup / restore / copy -----------------------------------------

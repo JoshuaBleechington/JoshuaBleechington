@@ -1,0 +1,30 @@
+Joshua Bleechington
+Denver, CO | josh@example.com | (555) 010-2233
+linkedin.com/in/joshua-bleechington-cissp-5379a72a3 | github.com/JoshuaBleechington
+
+PROFESSIONAL SUMMARY
+Security analyst with hands-on experience in vulnerability management, threat
+hunting, and identity monitoring across cloud and hybrid environments.
+
+TECHNICAL SKILLS
+Splunk, Microsoft Sentinel, Entra ID, Tenable, Wireshark, Python, PowerShell, KQL,
+NIST CSF, ISO 27001, MITRE ATT&CK, Azure, incident response
+
+PROFESSIONAL EXPERIENCE
+
+Security Analyst | Contoso Financial | Mar 2022 - Present
+- Led vulnerability management program across 1,200 endpoints, reducing critical
+  findings by 63% in nine months.
+- Built threat hunting playbooks in Microsoft Sentinel using KQL, uncovering 14
+  previously undetected Tor-based exfiltration attempts.
+- Responsible for weekly reporting to the security manager.
+
+IT Support Specialist | Northwind Health | Jun 2019 - Feb 2022
+- Administered Active Directory and Entra ID accounts for 800 users.
+- Assisted with endpoint patching and remediation tickets.
+
+EDUCATION
+B.S. Information Technology, Metro State University, 2019
+
+CERTIFICATIONS
+CISSP, CompTIA Security+

@@ -28,6 +28,12 @@
 
 ---
 
+### 🧰 Tools
+
+- [Resume ATS Scanner — score resumes against job descriptions](https://github.com/JoshuaBleechington/JoshuaBleechington/tree/main/resume_ats)
+
+---
+
 ### 📡 Connect With Me
 
 [![LinkedIn](https://img.shields.io/badge/LinkedIn-Joshua_Bleechington-0077B5?style=flat&logo=linkedin&logoColor=white)](https://www.linkedin.com/in/joshua-bleechington-cissp-5379a72a3)

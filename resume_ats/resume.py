@@ -404,19 +404,19 @@ def _strip_location(text: str) -> str:
     return _LOCATION_TAIL_RE.sub("", text).strip(" ,|-")
 
 
-def _looks_like_org(line: str) -> bool:
-    """Decide whether a heading line names the employer or the job.
+def _org_score(line: str) -> int:
+    """How strongly a heading line reads as the employer rather than the job.
 
-    Reading only the all-caps case put "Acme Corp - Phoenix, AZ" in the job
-    title slot and lost the real title entirely, so this weighs the signals
-    that actually separate the two: a legal suffix or a trailing location says
-    employer, a role noun says title.
+    Positive means employer, negative means job title. Reading only the
+    all-caps case put "Acme Corp - Phoenix, AZ" in the job title slot and lost
+    the real title entirely, so this weighs the signals that actually separate
+    the two: a legal suffix or a trailing location says employer, a role noun
+    says title.
     """
     text = " ".join(line.split()).strip(" ,|")
     if not text:
-        return False
-    lowered = text.lower()
-    words = re.split(r"[\s,]+", lowered)
+        return 0
+    words = re.split(r"[\s,]+", text.lower())
 
     score = 0
     if _ORG_LINE_RE.match(text):
@@ -424,60 +424,80 @@ def _looks_like_org(line: str) -> bool:
     if any(w.strip(".,") in _ORG_SUFFIXES for w in words):
         score += 3
     # A trailing "City, ST" is how an employer line usually carries location.
-    if re.search(r",\s*[A-Z]{2}\b\s*$", text) or re.search(r"[-\u2013\u2014]\s*[A-Z][a-z]+,\s*[A-Z]{2}\b", text):
+    if (re.search(r",\s*[A-Z]{2}\b\s*$", text)
+            or re.search(r"[-\u2013\u2014]\s*[A-Z][a-z]+,\s*[A-Z]{2}\b", text)):
         score += 2
     if any(w in _TITLE_WORDS for w in words):
         score -= 3
-    return score > 0
+    return score
 
 
-def _borrow_heading(candidates: Sequence[str]) -> Tuple[str, str, List[str]]:
-    """Recover a title and employer from the lines around a bare date line.
+def _looks_like_org(line: str) -> bool:
+    return _org_score(line) > 0
+
+
+def _tidy_org(text: str) -> str:
+    """Clean an employer name for display.
+
+    Only the empty bracket left behind when a "(dates)" suffix is parsed off,
+    and the location tail. An employer shouted in capitals is left exactly as
+    the author wrote it: case means nothing to an index, and title-casing
+    cannot recover "CompuCom" from "COMPUCOM" -- it produces "Compucom" and
+    quietly misspells the company on someone's resume.
+    """
+    text = _strip_location(text)
+    text = re.sub(r"\(\s*\)|\[\s*\]", "", text).strip(" ,|-")
+    return " ".join(text.split())
+
+
+def _assign_title_org(parts: Sequence[str]) -> Tuple[str, str, Set[int]]:
+    """Work out which of a role's naming lines is the title and which the job.
+
+    Decided by what each line looks like, never by the order they appear in:
+    resumes put the employer first as often as the title, and reading position
+    instead of content is what deleted one of the two. The returned index set
+    says which inputs were actually consumed, so a line that contributed
+    nothing is left where it was rather than silently dropped.
+    """
+    cleaned = [(i, " ".join(p.split()).strip(" ,|"))
+               for i, p in enumerate(parts) if p and p.strip()]
+    if not cleaned:
+        return "", "", set()
+    if len(cleaned) == 1:
+        idx, only = cleaned[0]
+        title, org = _split_title_org(only)
+        if org:
+            return title, _tidy_org(org), {idx}
+        if _looks_like_org(only):
+            return "", _tidy_org(only), {idx}
+        return only, "", {idx}
+
+    (i_first, first), (i_second, second) = cleaned[0], cleaned[1]
+    # The higher employer score is the employer. A tie keeps the common
+    # "title then employer" order.
+    if _org_score(first) > _org_score(second):
+        return second, _tidy_org(first), {i_first, i_second}
+    return first, _tidy_org(second), {i_first, i_second}
+
+
+def _borrow_heading(candidates: Sequence[str], want: int = 2) -> List[str]:
+    """Usable naming lines from around a bare date line.
 
     Resumes stack the block as employer / title / dates on separate lines, and
-    the dated line then carries no name at all.  Reading only that line lost
+    the dated line then carries no name at all. Reading only that line lost
     every job title and employer -- each role rendered as "Position".
     """
-    usable: List[Tuple[str, str]] = []   # (original line, cleaned text)
+    usable: List[str] = []
     for line in candidates:
         # Collapse tabs first: a resume that tab-aligns its heading would
         # otherwise fail the employer test and land as the job title.
         cleaned = " ".join(line.split())
         if not cleaned or len(cleaned) > 120 or is_bullet(cleaned):
             continue
-        usable.append((line, cleaned))
-        if len(usable) == 2:
+        usable.append(line)
+        if len(usable) >= want:
             break
-    if not usable:
-        return "", "", []
-
-    used = [line for line, _ in usable]
-    texts = [text for _, text in usable]
-
-    if len(texts) == 1:
-        # A single line may carry both ("Cloud Security Analyst | Acme Corp").
-        title, org = _split_title_org(texts[0])
-        if not org and _looks_like_org(texts[0]):
-            return "", _strip_location(texts[0]), used
-        return (title or texts[0]), _strip_location(org) if org else org, used
-
-    first, second = texts[0], texts[1]
-    org_flags = (_looks_like_org(first), _looks_like_org(second))
-    if org_flags[0] != org_flags[1]:
-        org, title = (first, second) if org_flags[0] else (second, first)
-        org = _strip_location(org)
-    else:
-        # Neither line announces itself as the employer, so fall back to the
-        # role vocabulary: the line naming a role is the title, the other is
-        # the company. Reading the first line as the title regardless dropped
-        # the employer whenever the company came first.
-        first_is_title = any(w in _TITLE_WORDS for w in re.split(r"[\s,]+", first.lower()))
-        second_is_title = any(w in _TITLE_WORDS for w in re.split(r"[\s,]+", second.lower()))
-        if second_is_title and not first_is_title:
-            org, title = _strip_location(first), second
-        else:
-            title, org = first, _strip_location(second)
-    return title, org, used
+    return usable
 
 
 def parse_roles(experience_text: str, banners: Optional[Set[str]] = None) -> List[Role]:
@@ -549,18 +569,29 @@ def parse_roles(experience_text: str, banners: Optional[Set[str]] = None) -> Lis
         has_dates = _has_date_range(line)
         if has_dates and not is_bullet(raw):
             title, org = _split_title_org(line)
+            if org:
+                org = _tidy_org(org)
             if title in banners:
                 title = ""
             if not title or not org:
-                # Look behind first (employer / title / dates), then ahead
-                # (dates / employer / title).
-                sources = list(reversed(recent)) or lookahead(index)
-                borrowed_title, borrowed_org, used = _borrow_heading(sources)
-                if not title and borrowed_title and borrowed_title not in banners:
-                    title = borrowed_title
-                if not org and borrowed_org:
-                    org = borrowed_org
-                disown(used)
+                # Whatever naming material this role has, from the date line
+                # itself and from the lines around it, is pooled and then
+                # sorted into the two slots by what each line looks like.
+                own = [p for p in (title, org) if p]
+                borrowed = []
+                if len(own) < 2:
+                    # Look behind first (employer / title / dates), then ahead
+                    # (dates / employer / title).
+                    sources = list(reversed(recent)) or lookahead(index)
+                    borrowed = _borrow_heading(sources, want=2 - len(own))
+                title, org, used = _assign_title_org(own + borrowed)
+                if title in banners:
+                    title = ""
+                # Only lines the assignment actually consumed are taken off the
+                # previous role. Disowning one that contributed nothing deleted
+                # it from the resume altogether.
+                disown([line for offset, line in enumerate(borrowed)
+                        if len(own) + offset in used])
             flush()
             buffer = [line]
             start, end, is_current = parse_dates(line)

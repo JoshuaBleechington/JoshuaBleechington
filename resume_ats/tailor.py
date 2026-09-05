@@ -30,8 +30,8 @@ from .extract import Document
 from .jd import JobDescription
 from .match import ResumeIndex, match_requirements
 from .parseability import COVER_LETTER_MARKERS
-from .resume import (MONTHS, STRONG_VERB_STEMS, Resume, Role, opener_strength,
-                     repeated_lines)
+from .resume import (MONTHS, STRONG_VERB_STEMS, Resume, Role, _strip_location,
+                     opener_strength, repeated_lines)
 from .resume import parse as parse_resume
 from .text import STOPWORDS, repair_layout, stem, tokenize
 
@@ -1185,12 +1185,30 @@ def _rescue_dropped_content(source: str, result: TailorResult, resume: Resume,
         resume.contact.email, resume.contact.phone, resume.contact.linkedin,
         resume.contact.github, resume.contact.location, resume.contact.name_guess) if b}
 
+    # A role heading is reprinted in the rebuild's own format, with the
+    # location split off the employer. Judged only on word coverage it looks
+    # like lost content, and gets "rescued" -- printing the employer twice.
+    heading_names = [n for role in resume.roles
+                     for n in (role.organization, role.title) if n]
+
+    def is_role_heading(line: str) -> bool:
+        base = _strip_location(line)
+        rest = base
+        for name in heading_names:
+            rest = re.sub(re.escape(name), " ", rest, flags=re.I)
+        if rest == base:
+            return False          # no role name in it; not a heading
+        rest = re.sub(r"[,|\u2013\u2014-]", " ", rest)
+        return len(rest.split()) <= 2
+
     missing: List[str] = []
     for raw in source.splitlines()[skip_prefix:]:
         line = " ".join(raw.split())
         if len(line.split()) < 5:
             continue
         if line.lower() in contact_bits:
+            continue
+        if is_role_heading(line):
             continue
         words = [w for w in tokenize(line) if len(w) > 2]
         if not words:

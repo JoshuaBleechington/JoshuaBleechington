@@ -136,7 +136,7 @@ class TestPushesArePricedOut(unittest.TestCase):
         f = forecast_mlb("a @ b", 8, over_price=-140, under_price=120)
         self.assertLess(f.p_side, 0.53)          # raw looks like a coin flip
         self.assertGreater(f.p_resolved, 0.56)   # resolved is a real lean
-        self.assertEqual(f.band, "LEAN")
+        self.assertEqual(f.band, "BET")
 
     def test_even_money_prints_as_plus_one_hundred_not_minus(self):
         """Without a tolerance the sign flips on a floating-point hair and an
@@ -423,8 +423,8 @@ class TestSoftInputsCannotBuyABand(unittest.TestCase):
     def test_the_card_that_prompted_this_is_held_at_a_coin_flip(self):
         f = forecast_mlb("Tigers @ Guardians", **self.TIGERS)
         self.assertEqual(f.side, "UNDER")
-        self.assertEqual(f.band_ungated, "LEAN")
-        self.assertEqual(f.band, "COIN FLIP")
+        self.assertEqual(f.band_ungated, "BET")
+        self.assertEqual(f.band, "NO BET")
         # The core read names the OTHER side, which is the whole point.
         self.assertLess(f.p_corroborated, 0.5)
 
@@ -442,8 +442,8 @@ class TestSoftInputsCannotBuyABand(unittest.TestCase):
     def test_it_says_plainly_that_it_pulled_the_band(self):
         f = forecast_mlb("Tigers @ Guardians", **self.TIGERS)
         note = next(n for n in f.notes if "Held at" in n)
-        self.assertIn("COIN FLIP", note)
-        self.assertIn("LEAN", note)
+        self.assertIn("NO BET", note)
+        self.assertIn("BET", note)
         self.assertIn("the other side", note)
 
     def test_a_card_with_no_soft_inputs_is_left_completely_alone(self):
@@ -468,7 +468,7 @@ class TestSoftInputsCannotBuyABand(unittest.TestCase):
         self.assertEqual(core.side, "OVER")
         self.assertEqual(withsoft.side, "OVER")
         self.assertEqual(withsoft.band, withsoft.band_ungated)
-        self.assertNotEqual(withsoft.band, "COIN FLIP")
+        self.assertNotEqual(withsoft.band, "NO BET")
 
     def test_soft_inputs_can_still_cut_confidence(self):
         """Deleting them is never allowed to RAISE the band."""
@@ -490,7 +490,7 @@ class TestSoftInputsCannotBuyABand(unittest.TestCase):
                     h2h_total=h2h, h2h_meetings=6,
                     ticket_pct_over=split[0], money_pct_over=split[1])
                 floor = next(fl for fl, n in BANDS if n == f.band)
-                if f.band != "COIN FLIP":
+                if f.band != "NO BET":
                     self.assertGreaterEqual(f.p_resolved, floor)
                     self.assertGreaterEqual(f.p_corroborated, floor)
 

@@ -618,7 +618,21 @@
     WNBA: { market: 3.0, form: 1.6, h2h: 1.0 }
   };
   var H2H_FULL_WEIGHT_AT = 4;
-  var BANDS = [[0.62, "MAX"], [0.57, "STRONG"], [0.53, "LEAN"], [0.00, "COIN FLIP"]];
+  /* The band says what to DO, not how far from even it is. These read MAX /
+     STRONG / LEAN / COIN FLIP, which left the reader to translate "LEAN 56.5%"
+     into an action -- and made a 56.5% call that lost look like a broken model
+     rather than the 43.5% of the time it is meant to lose. Floors unchanged to
+     the decimal; only the words. */
+  var BANDS = [[0.62, "MAX BET"], [0.57, "STRONG BET"], [0.53, "BET"], [0.00, "NO BET"]];
+  var NOBET = BANDS[BANDS.length - 1][1];
+  /* Measured, not chosen: across the logged card the model has said 54.2% and
+     done 51.1%. Until that closes, a margin thinner than this is not a margin. */
+  var OVERCONFIDENCE = 3.0;
+  /* Card rows written before the rename, so an old backup still groups with the
+     new names instead of splitting the record across two spellings. */
+  var LEGACY_BANDS = { "MAX": "MAX BET", "STRONG": "STRONG BET",
+                       "LEAN": "BET", "COIN FLIP": "NO BET" };
+  function bandName(b) { return LEGACY_BANDS[b] || b; }
   var WIND_DEAD = 8.0, WIND_PER_MPH = 0.10;
   var TEMP_BASE = 70.0, TEMP_PER_DEG = 0.008;
   var SPLIT_MIN_GAP = 20, SPLIT_RUNS = 0.30;
@@ -977,7 +991,7 @@
        figure called that a coin flip and it is not one. */
     var live = over + under;
     var pResolved = live > 0 ? pSide / live : 0.5;
-    var bandUngated = "COIN FLIP";
+    var bandUngated = NOBET;
     for (var i = 0; i < BANDS.length; i++) {
       if (pResolved >= BANDS[i][0]) { bandUngated = BANDS[i][1]; break; }
     }
@@ -1008,9 +1022,9 @@
 
     var band;
     if (pCorroborated < 0.5) {
-      band = "COIN FLIP";
+      band = NOBET;
     } else {
-      band = "COIN FLIP";
+      band = NOBET;
       var gatedP = Math.min(pResolved, pCorroborated);
       for (var j = 0; j < BANDS.length; j++) {
         if (gatedP >= BANDS[j][0]) { band = BANDS[j][1]; break; }
@@ -1041,7 +1055,7 @@
     if (push > 0.02) notes.push("The line is a whole number, so " + (push * 100).toFixed(1) +
       "% of the time this pushes and the stake comes back. That probability is real and a model " +
       "that treats runs as continuous silently hands it to the two sides instead.");
-    if (band === "MAX") notes.push("Top band. Re-read the inputs before acting — in this project " +
+    if (band === BANDS[0][1]) notes.push("Top band. Re-read the inputs before acting — in this project " +
       "a spectacular number has more often been a mistyped one than an edge.");
 
     return { sport: sport, away: away, home: home, matchup: away + " @ " + home, line: line,
@@ -1049,7 +1063,7 @@
              pResolved: pResolved, side: side, band: band, bandUngated: bandUngated,
              projectedCore: coreProj, pCorroborated: pCorroborated,
              fair: fair, estimates: estimates, deltas: deltas,
-             notes: notes, totalWeight: tw, hot: band !== "COIN FLIP" };
+             notes: notes, totalWeight: tw, hot: band !== NOBET };
   }
 
   function edgeVs(f, price) {
@@ -1105,7 +1119,7 @@
 
     var posted = f.side === "OVER" ? num("op") : num("up");
     var edge = posted === null ? null : edgeVs(f, posted);
-    var bandCls = f.band === "MAX" ? " max" : (f.hot ? " hot" : "");
+    var bandCls = f.band === BANDS[0][1] ? " max" : (f.hot ? " hot" : "");
     /* The band the gate took away is shown next to the one it left, so a held
        card reads as a decision rather than as the model being quiet. */
     var heldTag = f.band !== f.bandUngated
@@ -1137,7 +1151,19 @@
           (posted === null ? "—" : sgn(posted, 0)) + "</p></div>" +
         '<div><p class="k">Edge</p><p class="v ' +
           (edge === null ? "" : edge > 0 ? "good" : "bad") + '">' +
-          (edge === null ? "—" : (edge * 100).toFixed(1) + "%") + "</p></div></div>";
+          (edge === null ? "—" : (edge * 100).toFixed(1) + "%") + "</p></div></div>" +
+        /* The gap between what the model says and what the PRICE demands is the
+           thing a probability alone hides. 56.5% looks like a big call until you
+           notice -118 already needs 54.1% of the time to break even. */
+        (posted === null ? "" :
+          '<p class="cline">The model says <b>' + (f.pResolved * 100).toFixed(1) +
+          "%</b>; " + sgn(posted, 0) + " needs <b>" + (implied(posted) * 100).toFixed(1) +
+          "%</b> just to break even. Your margin is <b>" +
+          sgn((f.pResolved - implied(posted)) * 100, 1) + " points</b>" +
+          (f.pResolved - implied(posted) < 0.03
+            ? " — thinner than the " + OVERCONFIDENCE.toFixed(0) + " points this model has " +
+              "been running overconfident, so treat it as no margin at all."
+            : ".") + "</p>");
 
     // where each source lands
     var vals = f.estimates.map(function (e) { return e.total; }).concat([f.line, f.projected]);
@@ -1225,7 +1251,8 @@
      already on the card — including one restored from an old backup — shows
      its roof without anything needing to be re-entered. */
   function bandClass(band) {
-    return band === "MAX" ? " max" : (band !== "COIN FLIP" ? " hot" : "");
+    var b = bandName(band);
+    return b === BANDS[0][1] ? " max" : (b !== NOBET ? " hot" : "");
   }
 
   function isDomed(row) {
@@ -1272,7 +1299,7 @@
           '<td><span class="cell"><span class="chip ' + (s.side === "OVER" ? "o" : "u") + '">' +
             s.side + "</span></span></td>" +
           '<td class="n"><span class="cell">' + s.prob + "%</span></td>" +
-          '<td><span class="cell"><span class="chip' + bc + '">' + s.band + "</span>" +
+          '<td><span class="cell"><span class="chip' + bc + '">' + bandName(s.band) + "</span>" +
             stale + "</span></td>" +
           '<td><span class="cell"><input class="grade" type="number" step="1" inputmode="numeric" ' +
             'data-final="' + i + '" value="' + (s.final == null ? "" : s.final) +
@@ -1313,7 +1340,8 @@
     card.forEach(function (s) {
       var r = outcome(s);
       if (r === null) return;
-      var b = byBand[s.band] || (byBand[s.band] = { w: 0, l: 0, push: 0, said: 0 });
+      var nm = bandName(s.band);
+      var b = byBand[nm] || (byBand[nm] = { w: 0, l: 0, push: 0, said: 0 });
       if (r === "PUSH") { pushes++; b.push++; return; }
       var p = parseFloat(s.prob) / 100, win = r === "WIN";
       rows.push([p, win]);

@@ -119,9 +119,19 @@ WEIGHTS = {
 # One meeting is not eight meetings' worth of evidence.
 H2H_FULL_WEIGHT_AT = 4.0
 
-# Bands. Every card gets a side; the band only describes distance from a coin
-# flip. COIN FLIP is an answer, not a refusal.
-BANDS = ((0.62, "MAX"), (0.57, "STRONG"), (0.53, "LEAN"), (0.00, "COIN FLIP"))
+# Bands. Every card gets a side; the band says what to do about it.
+#
+# These were called MAX / STRONG / LEAN / COIN FLIP, which described a distance
+# from even and left the reader to work out whether that was a bet. It is not a
+# reader's job to translate "LEAN 56.5%" into an action, and a 56.5% call losing
+# then reads as a broken model rather than as the 43.5% of the time it is
+# supposed to lose. The floors are unchanged to the decimal -- only the words.
+BANDS = ((0.62, "MAX BET"), (0.57, "STRONG BET"), (0.53, "BET"), (0.00, "NO BET"))
+
+#: Card rows written before the rename. Kept so an old backup still groups with
+#: the new names instead of splitting the record across two spellings.
+LEGACY_BANDS = {"MAX": "MAX BET", "STRONG": "STRONG BET",
+                "LEAN": "BET", "COIN FLIP": "NO BET"}
 
 # --- corroboration ---------------------------------------------------------
 # An input that was MEASURED to be worth nothing may move the forecast. It may
@@ -136,7 +146,7 @@ BANDS = ((0.62, "MAX"), (0.57, "STRONG"), (0.53, "LEAN"), (0.00, "COIN FLIP"))
 #
 # The band is therefore cut from the LESS confident of two reads: the full
 # blend, and the same blend with those three deleted. If deleting them changes
-# the side, there is no call and the band is held at COIN FLIP.
+# the side, there is no call and the band is held at NO BET.
 #
 # This is deliberately not applied to WNBA, and the reason matters. The t
 # statistics above come from an MLB residual study; no equivalent study exists
@@ -421,7 +431,7 @@ class Forecast:
     #: means the soft inputs are the only reason for the side.
     p_corroborated: float = 0.5
     #: What the band would have been without the gate. Shown, never acted on.
-    band_ungated: str = "COIN FLIP"
+    band_ungated: str = "NO BET"
 
     @property
     def p_side(self) -> float:
@@ -770,7 +780,7 @@ def _assemble(sport, matchup, line, estimates, deltas, notes) -> Forecast:
     if p_corroborated < 0.5:
         # The soft inputs are not merely adding confidence, they are the reason
         # for the side. That is not a bet.
-        band = "COIN FLIP"
+        band = BANDS[-1][1]
     else:
         band = next(name for floor, name in BANDS
                     if min(p_resolved, p_corroborated) >= floor)
@@ -796,7 +806,7 @@ def _assemble(sport, matchup, line, estimates, deltas, notes) -> Forecast:
                      "pushes and the stake comes back. That probability is real and a "
                      "model that treats runs as continuous silently hands it to the two "
                      "sides instead.")
-    if band == "MAX":
+    if band == BANDS[0][1]:
         notes.append("Top band. Re-read the inputs before acting — in this project a "
                      "spectacular number has more often been a mistyped one than an edge.")
     return Forecast(sport, matchup, line, projected, over, push, under,

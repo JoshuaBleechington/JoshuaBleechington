@@ -91,7 +91,7 @@ const CHECKS = ["dome", "alead", "hlead"];
     }, [c.sport, c.inputs, ALL, CHECKS]);
 
     const w = c.expect, tag = `${c.sport} · ${c.name}`;
-    const confident = w.band !== 'COIN FLIP';
+    const confident = w.band !== 'NO BET';
     chk(got.side === w.side, `${tag}: ${w.side}`, `page said ${got.side}`);
     chk(got.band === w.band, `${tag}: ${w.band}`, `page said ${got.band}`);
     chk(Math.abs(got.pResolved - w.p_resolved) < 1e-4,
@@ -201,7 +201,7 @@ const CHECKS = ["dome", "alead", "hlead"];
     // Stored as an older build scored it: UNDER, LEAN.
     localStorage.setItem('callsheet.fullgame.card.v1', JSON.stringify([{
       matchup: 'Tigers @ Guardians', sport: 'MLB', line: 8.0, projected: '8.16',
-      side: 'UNDER', prob: '54.0', band: 'LEAN', fair: '-117', final: '12', inputs,
+      side: 'UNDER', prob: '54.0', band: 'BET', fair: '-117', final: '12', inputs,
     }]));
   }).then(() => pg.reload()).then(() => pg.waitForTimeout(450)).then(() => pg.evaluate(() => {
     const before = {
@@ -219,12 +219,12 @@ const CHECKS = ["dome", "alead", "hlead"];
       msg: document.getElementById('saveMsg').textContent,
     }), 250));
   }));
-  chk(rescore.before.band === 'LEAN', 'rescore: the stored band is shown as stored',
+  chk(rescore.before.band === 'BET', 'rescore: the stored band is shown as stored',
       rescore.before.band);
-  chk(/now COIN FLIP/.test(rescore.before.stale || ''),
+  chk(/now NO BET/.test(rescore.before.stale || ''),
       'rescore: a row the current model scores differently is marked stale',
       String(rescore.before.stale));
-  chk(rescore.after === 'COIN FLIP', 'rescore: pressing it adopts the current model',
+  chk(rescore.after === 'NO BET', 'rescore: pressing it adopts the current model',
       rescore.after);
   chk(!rescore.stillStale, 'rescore: the stale mark clears once rescored',
       String(rescore.stillStale));
@@ -245,12 +245,12 @@ const CHECKS = ["dome", "alead", "hlead"];
       ({ matchup: band + ' ' + final, sport: 'MLB', line, projected: '9.00',
          side: 'OVER', prob, band, fair: '-120', final, inputs: {} });
     localStorage.setItem('callsheet.fullgame.card.v1', JSON.stringify([
-      mk('STRONG', '58.0', 8.5, '10'),      // over, covered
-      mk('STRONG', '59.0', 8.5, '10'),      // over, covered
-      mk('LEAN', '54.0', 8.5, '4'),         // under, missed
-      mk('LEAN', '55.0', 8.5, '12'),        // over, covered
-      mk('COIN FLIP', '51.0', 8.5, '2'),    // under, missed
-      mk('COIN FLIP', '52.0', 8, '8'),      // push
+      mk('STRONG BET', '58.0', 8.5, '10'),      // over, covered
+      mk('STRONG BET', '59.0', 8.5, '10'),      // over, covered
+      mk('BET', '54.0', 8.5, '4'),         // under, missed
+      mk('BET', '55.0', 8.5, '12'),        // over, covered
+      mk('NO BET', '51.0', 8.5, '2'),    // under, missed
+      mk('NO BET', '52.0', 8, '8'),      // push
     ]));
   });
   await pg.reload();
@@ -260,16 +260,16 @@ const CHECKS = ["dome", "alead", "hlead"];
       r => [...r.querySelectorAll('td')].map(c => c.textContent.trim())),
   }));
   const row = n => (bands.table.find(r => r[0] === n) || []);
-  chk(row('STRONG')[1] === '2-0', 'bands: STRONG covered 2, missed 0', JSON.stringify(row('STRONG')));
-  chk(row('LEAN')[1] === '1-1', 'bands: LEAN covered 1, missed 1', JSON.stringify(row('LEAN')));
-  chk(row('COIN FLIP')[1] === '0-1',
-      'bands: COIN FLIP covered 0, missed 1 — the push is not counted as either',
-      JSON.stringify(row('COIN FLIP')));
-  chk(row('COIN FLIP')[5] === '1', 'bands: the push is reported in its own column',
-      JSON.stringify(row('COIN FLIP')));
-  chk(row('STRONG')[2] === '100%' && row('LEAN')[2] === '50%',
+  chk(row('STRONG BET')[1] === '2-0', 'bands: STRONG BET covered 2, missed 0', JSON.stringify(row('STRONG BET')));
+  chk(row('BET')[1] === '1-1', 'bands: BET covered 1, missed 1', JSON.stringify(row('BET')));
+  chk(row('NO BET')[1] === '0-1',
+      'bands: NO BET covered 0, missed 1 — the push is not counted as either',
+      JSON.stringify(row('NO BET')));
+  chk(row('NO BET')[5] === '1', 'bands: the push is reported in its own column',
+      JSON.stringify(row('NO BET')));
+  chk(row('STRONG BET')[2] === '100%' && row('BET')[2] === '50%',
       'bands: the hit rate matches the record', JSON.stringify(bands.table));
-  chk(!row('MAX').length, 'bands: a band with no graded games is left out',
+  chk(!row('MAX BET').length, 'bands: a band with no graded games is left out',
       JSON.stringify(bands.table));
 
   await pg.evaluate(() => localStorage.clear());

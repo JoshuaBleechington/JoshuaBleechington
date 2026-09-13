@@ -1,4 +1,4 @@
-"""Full-game MLB and WNBA totals, modelled as a distribution rather than a mean.
+"""Full-game MLB totals, modelled as a distribution rather than a mean.
 
 This replaces the first-five model. Three things in the version before it were
 wrong in ways worth naming, because each one is a class of error rather than a
@@ -84,23 +84,14 @@ BULLPEN_INNINGS = 9.0 - STARTER_INNINGS
 UNEARNED_MULTIPLIER = 1.08     # ERA counts earned runs; totals settle on all
 
 # Measured, not chosen: the standard deviation of (final total - posted line)
-# over 116 settled MLB games. WNBA is 11.51 over only 13 logged totals, which
-# is far too few to trust as a point estimate; it is used because it is the
-# only measurement available.
-RESIDUAL_SD = {"MLB": 4.39, "WNBA": 11.51}
+# over 116 settled MLB games.
+RESIDUAL_SD = {"MLB": 4.39}
 
 # Overdispersion, phi = variance / mean, derived rather than picked:
 # 4.39^2 / 9.04 = 2.13. Holding phi constant rather than the variance means
 # the spread scales with the size of the game, which is how count data
 # behaves -- a projected 12-run game is genuinely noisier than a 6-run one.
-DISPERSION_PHI = {
-    "MLB": RESIDUAL_SD["MLB"] ** 2 / LEAGUE_COMBINED_RPG,
-    "WNBA": 1.0,               # basketball totals are ~160; a count model is
-}                              # the wrong family, so WNBA stays normal
-
-WNBA_LEAGUE_TOTAL = 160.0
-
-SPORTS = ("MLB", "WNBA")
+DISPERSION_PHI = {"MLB": RESIDUAL_SD["MLB"] ** 2 / LEAGUE_COMBINED_RPG}
 
 # Weights. The market is the largest single weight because it is the one thing
 # this project has measured: over 116 logged games the posted line beat a
@@ -113,7 +104,6 @@ SPORTS = ("MLB", "WNBA")
 WEIGHTS = {
     "MLB": {"market": 4.0, "starters": 1.6, "bullpens": 0.8,
             "form": 0.8, "h2h": 0.5},
-    "WNBA": {"market": 3.0, "form": 1.6, "h2h": 1.0},
 }
 
 # One meeting is not eight meetings' worth of evidence.
@@ -148,12 +138,10 @@ LEGACY_BANDS = {"MAX": "MAX BET", "STRONG": "STRONG BET",
 # blend, and the same blend with those three deleted. If deleting them changes
 # the side, there is no call and the band is held at NO BET.
 #
-# This is deliberately not applied to WNBA, and the reason matters. The t
-# statistics above come from an MLB residual study; no equivalent study exists
-# for WNBA, where last-ten is the load-bearing input and there is no
-# starting-pitcher equivalent to fall back on. Demoting an input on evidence is
-# discipline. Demoting one on a hunch is the sort of unjustified coefficient
-# this model exists to remove, so no WNBA input is tagged.
+# Nothing outside MLB is ever tagged, and the reason matters. The t statistics
+# above come from an MLB residual study; no equivalent exists for any other
+# book here. Demoting an input on evidence is discipline. Demoting one on a
+# hunch is the sort of unjustified coefficient this model exists to remove.
 
 # Tonight-only physical factors, full-game coefficients.
 WIND_DEAD_MPH = 8.0
@@ -169,7 +157,6 @@ PLAUSIBLE = {
     "era": (0.00, 15.0),
     "park": (70.0, 130.0),
     "mlb_total": (4.0, 20.0),
-    "wnba_total": (110.0, 230.0),
     "price": (-100000.0, 100000.0),
 }
 
@@ -234,26 +221,10 @@ def nb_split(line: float, mu: float, phi: float) -> tuple[float, float, float]:
     return over, push, under
 
 
-def normal_split(line: float, mu: float, sd: float) -> tuple[float, float, float]:
-    """WNBA: totals near 160 are not a count problem. No push on a half line."""
-    z = (mu - line) / sd
-    over = 0.5 * (1.0 + math.erf(z / math.sqrt(2.0)))
-    push = 0.0
-    if abs(line - round(line)) < 1e-9:
-        # a whole-number basketball total can push; approximate the mass in
-        # the one-point bin around it rather than pretending it cannot
-        lo = 0.5 * (1.0 + math.erf(((line - 0.5) - mu) / (sd * math.sqrt(2.0))))
-        hi = 0.5 * (1.0 + math.erf(((line + 0.5) - mu) / (sd * math.sqrt(2.0))))
-        push = max(0.0, hi - lo)
-        over = 1.0 - hi
-        return over, push, lo
-    return over, push, 1.0 - over
-
-
 def split_for(sport: str, line: float, mu: float) -> tuple[float, float, float]:
     if sport == "MLB":
         return nb_split(line, mu, DISPERSION_PHI["MLB"])
-    return normal_split(line, mu, RESIDUAL_SD["WNBA"])
+    return nb_split(line, mu, DISPERSION_PHI["MLB"])
 
 
 # ===========================================================================
@@ -673,73 +644,7 @@ def forecast_mlb(
 
 
 # ===========================================================================
-# WNBA
 # ===========================================================================
-
-def forecast_wnba(
-    matchup: str,
-    line: float,
-    over_price: float | None = None,
-    under_price: float | None = None,
-    away_last10_total: float | None = None,
-    home_last10_total: float | None = None,
-    h2h_total: float | None = None,
-    h2h_meetings: float | None = None,
-    away_starters_out: int = 0,
-    home_starters_out: int = 0,
-    away_leading_scorer_out: bool = False,
-    home_leading_scorer_out: bool = False,
-    opened: float | None = None,
-) -> Forecast:
-    if not _ok(line, "wnba_total"):
-        raise ValueError(f"total {line!r} is outside {PLAUSIBLE['wnba_total']}")
-
-    w = WEIGHTS["WNBA"]
-    notes: list[str] = []
-    anchor, anchor_detail = fair_total("WNBA", line, over_price, under_price)
-    estimates = [Estimate("Market", anchor, w["market"], anchor_detail)]
-
-    if away_last10_total is not None and home_last10_total is not None:
-        avg = (away_last10_total + home_last10_total) / 2.0
-        estimates.append(Estimate(
-            "Last 10", avg, w["form"],
-            f"Combined totals over the last ten average {away_last10_total:.1f} away and "
-            f"{home_last10_total:.1f} home, blending to {avg:.1f}. Ten games is a third of "
-            "a WNBA season and there is no starting-pitcher equivalent to lean on."))
-
-    if h2h_total is not None and h2h_meetings:
-        weight = h2h_weight(w["h2h"], h2h_meetings)
-        thin = ""
-        if h2h_meetings < H2H_FULL_WEIGHT_AT:
-            thin = (f" Discounted to {h2h_meetings:.0f}/{H2H_FULL_WEIGHT_AT:.0f} of its "
-                    "weight for sample size.")
-        estimates.append(Estimate(
-            f"Head to head ({h2h_meetings:.0f})", h2h_total, weight,
-            f"{h2h_meetings:.0f} meetings averaging {h2h_total:.1f}." + thin))
-    else:
-        notes.append("No head-to-head on file. Its weight has gone to the market and the "
-                     "last ten, which now carry the blend between them.")
-
-    deltas: list[Delta] = []
-    for team, out, leader in (("Away", away_starters_out, away_leading_scorer_out),
-                              ("Home", home_starters_out, home_leading_scorer_out)):
-        if out <= 0 and not leader:
-            continue
-        pts = out * POINTS_PER_STARTER_OUT
-        if leader:
-            pts += POINTS_LEADING_SCORER_OUT - POINTS_PER_STARTER_OUT
-        deltas.append(Delta(f"{team} absences", -pts,
-            f"{out} rotation player(s) out"
-            + (", including their leading scorer" if leader else "") +
-            f". A twelve-deep roster with starters at 32+ minutes has no bench to absorb "
-            f"it: {pts:.1f} points off the total."))
-
-    if opened is not None and abs(opened - line) > 1e-9:
-        notes.append(f"The number moved {opened:g} to {line:g} ({line - opened:+.1f}). Not "
-                     "scored — it is already inside the current line.")
-
-    return _assemble("WNBA", matchup, line, estimates, deltas, notes)
-
 
 # ===========================================================================
 

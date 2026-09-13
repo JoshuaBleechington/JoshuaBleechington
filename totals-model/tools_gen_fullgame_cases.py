@@ -39,15 +39,7 @@ def build(case):
             wind_direction=i.get("dir") or None, temp_f=n(i.get("temp")),
             dome=bool(i.get("dome")), ticket_pct_over=n(i.get("tick")),
             money_pct_over=n(i.get("cash")), opened=n(i.get("opened")))
-    return F.forecast_wnba(
-        name, ln, over_price=n(i.get("op")), under_price=n(i.get("up")),
-        away_last10_total=n(i.get("wal10")), home_last10_total=n(i.get("whl10")),
-        h2h_total=n(i.get("wh2h")), h2h_meetings=n(i.get("wh2hn")),
-        away_starters_out=int(n(i.get("aout")) or 0),
-        home_starters_out=int(n(i.get("hout")) or 0),
-        away_leading_scorer_out=bool(i.get("alead")),
-        home_leading_scorer_out=bool(i.get("hlead")),
-        opened=n(i.get("opened")))
+
 
 
 def main() -> None:

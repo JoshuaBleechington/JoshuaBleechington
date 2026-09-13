@@ -154,13 +154,16 @@ justification is the a-priori one — measured t-statistics and a hand-capped
 coefficient — and nothing else. The table is here to show the blast radius, not
 to argue the rule works.
 
-### Not applied to WNBA
+### Not applied outside MLB
 
-Those t-statistics come from an MLB residual study. No equivalent exists for
-WNBA, where last-ten is the load-bearing input and there is no starting-pitcher
-equivalent to fall back on. Demoting an input on evidence is discipline;
-demoting one on a hunch is exactly the unjustified coefficient this model exists
-to remove, so nothing in WNBA is tagged and the gate is a no-op there.
+Those t-statistics come from an MLB residual study. No equivalent exists for any
+other book here. Demoting an input on evidence is discipline; demoting one on a
+hunch is exactly the unjustified coefficient this model exists to remove, so
+nothing outside MLB is tagged.
+
+The WNBA model has been deleted outright rather than archived — dead code with
+passing tests is the thing that rots. Its slot on the page is now **NFL
+spreads**; see `NFL.md`.
 
 ## Architecture
 

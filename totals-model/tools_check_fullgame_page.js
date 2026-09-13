@@ -20,10 +20,9 @@ const CASES = JSON.parse(
 
 const MLB_IDS = ["away","home","line","op","up","opened","gdate","aera","hera","arpg","hrpg",
                  "abp","hbp","al10","hl10","h2h","h2hn","pf","mph","dir","temp","tick","cash"];
-const WNBA_IDS = ["away","home","line","op","up","opened","gdate","wal10","whl10",
-                  "wh2h","wh2hn","aout","hout"];
-const ALL = [...new Set([...MLB_IDS, ...WNBA_IDS])];
-const CHECKS = ["dome", "alead", "hlead"];
+const NFL_IDS = ["away","home","line","op","up","gdate","anet","hnet","gp","nopened"];
+const ALL = [...new Set([...MLB_IDS, ...NFL_IDS])];
+const CHECKS = ["dome", "aqb", "hqb"];
 
 (async () => {
   const b = await chromium.launch({
@@ -49,7 +48,7 @@ const CHECKS = ["dome", "alead", "hlead"];
 
   for (const c of CASES) {
     const got = await pg.evaluate(async ([sport, inputs, ids, checks]) => {
-      document.getElementById(sport === 'WNBA' ? 'm-wnba' : 'm-mlb').click();
+      document.getElementById(sport === 'NFL' ? 'm-nfl' : 'm-mlb').click();
       ids.forEach(id => { document.getElementById(id).value = ''; });
       checks.forEach(id => { document.getElementById(id).checked = false; });
       for (const [k, v] of Object.entries(inputs)) {
@@ -299,11 +298,11 @@ const CHECKS = ["dome", "alead", "hlead"];
     await add();
     const domed = first().textContent.trim();
 
-    // The box stays ticked across a sport switch; a WNBA row must not inherit it.
-    document.getElementById('m-wnba').click();
-    set('away', 'Fever'); set('home', 'Wings'); set('line', 162.5);
+    // The box stays ticked across a sport switch; an NFL row must not inherit it.
+    document.getElementById('m-nfl').click();
+    set('away', 'Jets'); set('home', 'Bills'); set('line', -6.5);
     await add();
-    const wnba = first().textContent.trim();
+    const nfl = first().textContent.trim();
 
     document.getElementById('m-mlb').click();
     document.getElementById('clear').click();
@@ -311,7 +310,7 @@ const CHECKS = ["dome", "alead", "hlead"];
     await add();
 
     return {
-      domed, wnba,
+      domed, nfl,
       open: first().textContent.trim(),
       chips: document.querySelectorAll('#cardTable .chip.dome').length,
       count: document.getElementById('cardCount').textContent.trim(),
@@ -319,7 +318,7 @@ const CHECKS = ["dome", "alead", "hlead"];
   });
   chk(/Dome$/.test(roof.domed), 'roof: a game with the roof shut is marked on the card', roof.domed);
   chk(!/Dome/.test(roof.open), 'roof: an open-air game is not marked', roof.open);
-  chk(!/Dome/.test(roof.wnba), 'roof: a WNBA row does not inherit a left-over tick', roof.wnba);
+  chk(!/Dome/.test(roof.nfl), 'roof: an NFL row does not inherit a left-over tick', roof.nfl);
   chk(roof.chips === 1, 'roof: exactly one row carries the marker', String(roof.chips));
   chk(/1 under a roof/.test(roof.count), 'roof: the header counts the domed games', roof.count);
 

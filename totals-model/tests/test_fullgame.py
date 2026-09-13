@@ -29,7 +29,6 @@ from totals.fullgame import (
     hold,
     market_confidence,
     forecast_mlb,
-    forecast_wnba,
     h2h_weight,
     implied,
     nb_pmf,
@@ -309,7 +308,7 @@ class TestItAlwaysAnswers(unittest.TestCase):
     def test_every_card_gets_a_side(self):
         for f in (forecast_mlb("a @ b", 8.5),
                   forecast_mlb("a @ b", 9.0, away_starter_era=6.0, home_starter_era=2.0),
-                  forecast_wnba("a @ b", 162.5)):
+                  forecast_mlb("a @ b", 11.5, over_price=-130, under_price=110)):
             self.assertIn(f.side, ("OVER", "UNDER"))
             self.assertIn(f.band, [name for _, name in BANDS])
 
@@ -319,10 +318,10 @@ class TestItAlwaysAnswers(unittest.TestCase):
         self.assertGreater(f.p_under, f.p_over)
 
     def test_missing_inputs_reweight_rather_than_stall(self):
-        with_h2h = forecast_wnba("a @ b", 160.0, away_last10_total=170.0,
-                                 home_last10_total=170.0, h2h_total=170.0, h2h_meetings=4)
-        without = forecast_wnba("a @ b", 160.0, away_last10_total=170.0,
-                                home_last10_total=170.0)
+        with_h2h = forecast_mlb("a @ b", 8.5, away_last10_total=10.0,
+                                home_last10_total=10.0, h2h_total=11.0, h2h_meetings=4)
+        without = forecast_mlb("a @ b", 8.5, away_last10_total=10.0,
+                               home_last10_total=10.0)
         self.assertGreater(with_h2h.projected, without.projected)
         self.assertIn("No head-to-head", " ".join(without.notes))
 
@@ -385,10 +384,10 @@ class TestHeadToHeadSampleSize(unittest.TestCase):
         self.assertAlmostEqual(h2h_weight(1.0, 0), 0.00)
 
     def test_one_meeting_still_beats_leaving_it_out(self):
-        without = forecast_wnba("a @ b", 160.0, away_last10_total=165.0,
-                                home_last10_total=165.0)
-        with_one = forecast_wnba("a @ b", 160.0, away_last10_total=165.0,
-                                 home_last10_total=165.0, h2h_total=185.0, h2h_meetings=1)
+        without = forecast_mlb("a @ b", 8.5, away_last10_total=9.0,
+                               home_last10_total=9.0)
+        with_one = forecast_mlb("a @ b", 8.5, away_last10_total=9.0,
+                                home_last10_total=9.0, h2h_total=14.0, h2h_meetings=1)
         self.assertGreater(with_one.projected, without.projected)
 
     def test_a_thin_head_to_head_says_it_was_discounted(self):
@@ -513,20 +512,6 @@ class TestSoftInputsCannotBuyABand(unittest.TestCase):
         soft |= {d.name for d in f.deltas if not d.mechanism}
         self.assertEqual(soft, {"Last 10", "Head to head (5)", "Money split"})
 
-    def test_wnba_tags_nothing_because_nothing_was_measured_null_there(self):
-        """The t-statistics behind the gate come from an MLB study.
-
-        Demoting a WNBA input on a hunch would be exactly the unjustified
-        coefficient this model exists to remove.
-        """
-        f = forecast_wnba("a @ b", 162.5, away_last10_total=171.0,
-                          home_last10_total=173.0, h2h_total=178.0, h2h_meetings=5)
-        self.assertTrue(all(e.mechanism for e in f.estimates))
-        self.assertTrue(all(d.mechanism for d in f.deltas))
-        self.assertEqual(f.band, f.band_ungated)
-        self.assertAlmostEqual(f.p_corroborated, f.p_resolved, places=12)
-
-
 BANDS_ORDER = {name: i for i, (_floor, name) in enumerate(BANDS)}
 
 
@@ -584,9 +569,9 @@ class TestWeatherAndPark(unittest.TestCase):
 class TestGuards(unittest.TestCase):
     def test_an_impossible_line_is_refused(self):
         with self.assertRaises(ValueError):
-            forecast_mlb("a @ b", 162.5)          # WNBA number in the MLB box
+            forecast_mlb("a @ b", 162.5)          # a basketball number
         with self.assertRaises(ValueError):
-            forecast_wnba("a @ b", 8.5)           # MLB number in the WNBA box
+            forecast_mlb("a @ b", 1.5)            # no MLB total is ever this low
 
     def test_an_impossible_era_is_ignored_rather_than_believed(self):
         f = forecast_mlb("a @ b", 8.5, away_starter_era=99.0, home_starter_era=4.16)

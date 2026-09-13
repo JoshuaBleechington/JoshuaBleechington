@@ -340,12 +340,13 @@
       <div class="eyebrow" id="eyebrow">MLB · full game</div>
       <h1>Call Sheet</h1>
       <p>Anchors on what the market is really on — the prices, not the rounded number —
-         then adjusts for what tonight changes. Names a side on every card, and grades
-         itself once the games land.</p>
+         then adjusts for what today changes. <b>MLB</b> attacks the total; <b>NFL</b> attacks
+         the spread, because NFL margins are lumpy enough that pricing the key numbers beats
+         guessing the winner. Names a side on every card and grades itself once the games land.</p>
     </div>
     <div class="modes" role="group" aria-label="Sport">
       <button type="button" id="m-mlb" aria-pressed="true">MLB</button>
-      <button type="button" id="m-wnba" aria-pressed="false">WNBA</button>
+      <button type="button" id="m-nfl" aria-pressed="false">NFL</button>
     </div>
   </header>
 
@@ -479,52 +480,61 @@
         </section>
       </div>
 
-      <div id="wnbaFields" class="stack" hidden>
+      <div id="nflFields" class="stack" hidden>
         <section class="card">
-          <h2>Last 10 <span class="tag">the load-bearing input</span></h2>
+          <h2>The number <span class="tag">home team's spread</span></h2>
           <div class="body">
-            <div class="grid2">
-              <div class="f"><label for="wal10">Away last-10 avg total</label><input id="wal10" type="number" step="0.1" inputmode="decimal" placeholder="168.2"></div>
-              <div class="f"><label for="whl10">Home last-10 avg total</label><input id="whl10" type="number" step="0.1" inputmode="decimal" placeholder="171.4"></div>
-            </div>
-            <div class="links">
-              <a href="https://www.covers.com/sport/basketball/wnba/matchups" target="_blank" rel="noopener">Covers · WNBA</a>
-              <a href="https://www.teamrankings.com/wnba/stat/points-per-game" target="_blank" rel="noopener">TeamRankings</a>
-            </div>
-            <p class="note">Each side's <b>combined game total</b> over its last ten — both teams' points
-              added. Ten games is a third of a WNBA season, and there is no starting-pitcher equivalent
-              here to lean on.</p>
+            <p class="note"><b>Enter the spread from the HOME team's side.</b> −3.5 means the home
+              side is favoured by three and a half; +6 means they are getting six. The model works
+              in margin — home points minus away points — throughout.</p>
+            <p class="note"><b>This model attacks the spread, not the total, and the reason is the
+              shape of the sport.</b> NFL margins are violently lumpy: a margin of exactly 3 happens
+              in about <b>9.5%</b> of games and 7 in about <b>6.5%</b>. Totals have nothing like it.
+              A model that prices that lumpiness can tell you what half a point is worth without
+              having to out-guess the market about who wins.</p>
           </div>
         </section>
+
         <section class="card">
-          <h2>Head to head <span class="tag">optional</span></h2>
+          <h2>Power rating <span class="tag">net points per game</span></h2>
           <div class="body">
             <div class="grid2">
-              <div class="f"><label for="wh2h">H2H avg total</label><input id="wh2h" type="number" step="0.1" inputmode="decimal" placeholder="174.0"></div>
-              <div class="f"><label for="wh2hn">Meetings</label><input id="wh2hn" type="number" step="1" inputmode="numeric" placeholder="3"></div>
+              <div class="f"><label for="anet">Away net points/game</label><input id="anet" type="number" step="0.1" inputmode="decimal" placeholder="-3.1"></div>
+              <div class="f"><label for="hnet">Home net points/game</label><input id="hnet" type="number" step="0.1" inputmode="decimal" placeholder="4.2"></div>
             </div>
-            <p class="note"><b>Put it in even if they have met once.</b> The weight scales by meetings ÷ 4,
-              so one counts a quarter and four or more count in full. Judging the sample is the model's
-              job. Leave it blank only if they genuinely have not met — the weight then redistributes.</p>
+            <div class="grid2">
+              <div class="f"><label for="gp">Games played</label><input id="gp" type="number" step="1" min="0" max="25" inputmode="numeric" placeholder="6"></div>
+              <div class="f"><label for="opened">Opened at</label><input id="nopened" type="number" step="0.5" inputmode="decimal" placeholder="-3"></div>
+            </div>
+            <div class="links">
+              <a href="https://www.pro-football-reference.com/years/2026/" target="_blank" rel="noopener">PFR · team stats</a>
+              <a href="https://www.teamrankings.com/nfl/stat/point-differential-per-game" target="_blank" rel="noopener">TeamRankings · net points</a>
+            </div>
+            <p class="note"><b>Points scored minus points allowed, per game</b>, for the season. Both
+              teams or neither — it is scored as a differential, so two league-average sides move the
+              number by <b>exactly zero</b>.</p>
+            <p class="note"><b>Games played is not optional, it is the whole honesty of this input.</b>
+              A net-points rating earns full weight at eight games and a fraction of it before that.
+              In week 2 it is one game of noise and the model will say so by barely moving.</p>
           </div>
         </section>
+
         <section class="card">
-          <h2>Absences <span class="tag">worth more here than anywhere</span></h2>
+          <h2>Quarterback <span class="tag">shown, never scored</span></h2>
           <div class="body">
-            <div class="grid2">
-              <div class="f"><label for="aout">Away starters out</label><input id="aout" type="number" step="1" min="0" inputmode="numeric" placeholder="0"></div>
-              <div class="f"><label for="hout">Home starters out</label><input id="hout" type="number" step="1" min="0" inputmode="numeric" placeholder="0"></div>
-            </div>
-            <label class="check"><input type="checkbox" id="alead"> Away's leading scorer is out</label>
-            <label class="check"><input type="checkbox" id="hlead"> Home's leading scorer is out</label>
+            <label class="check"><input type="checkbox" id="aqb"> Away starting QB is out</label>
+            <label class="check"><input type="checkbox" id="hqb"> Home starting QB is out</label>
             <div class="links">
-              <a href="https://www.espn.com/wnba/injuries" target="_blank" rel="noopener">ESPN · injuries</a>
-              <a href="https://www.rotowire.com/basketball/injury-report.php?league=WNBA" target="_blank" rel="noopener">RotoWire · injuries</a>
+              <a href="https://www.espn.com/nfl/injuries" target="_blank" rel="noopener">ESPN · injuries</a>
+              <a href="https://www.rotowire.com/football/injury-report.php" target="_blank" rel="noopener">RotoWire · injuries</a>
             </div>
-            <p class="note">2.0 points per rotation player, 3.5 if it is their leading scorer. A
-              twelve-deep roster with starters at 32+ minutes has no bench to absorb a loss.
-              <b>Check whether the line already moved on it</b> — when Caitlin Clark was ruled out the
-              Fever line went −11 to −6 on the announcement.</p>
+            <p class="note">A starting quarterback is the largest single swing in the sport, worth
+              roughly <b>5 points</b> — and it is <b>deliberately not scored here</b>. An NFL line
+              moves three to seven points on the announcement, so it is already inside the number you
+              are reading and counting it again would double it.</p>
+            <p class="note"><b>Use it as a check instead.</b> Tick the box, then look at whether the
+              line actually moved. If a starter is out and the number has not moved, the market does
+              not believe the report — and you should find out why before it does.</p>
           </div>
         </section>
       </div>
@@ -611,11 +621,10 @@
   var LEAGUE_STARTER_ERA = 4.16, LEAGUE_BULLPEN_ERA = 4.05;
   var STARTER_INNINGS = 5.4, BULLPEN_INNINGS = 9.0 - STARTER_INNINGS;
   var UNEARNED = 1.08;
-  var RESIDUAL_SD = { MLB: 4.39, WNBA: 11.51 };
-  var PHI = { MLB: RESIDUAL_SD.MLB * RESIDUAL_SD.MLB / LEAGUE_COMBINED_RPG, WNBA: 1.0 };
+  var RESIDUAL_SD = { MLB: 4.39 };
+  var PHI = { MLB: RESIDUAL_SD.MLB * RESIDUAL_SD.MLB / LEAGUE_COMBINED_RPG };
   var WEIGHTS = {
-    MLB:  { market: 4.0, starters: 1.6, bullpens: 0.8, form: 0.8, h2h: 0.5 },
-    WNBA: { market: 3.0, form: 1.6, h2h: 1.0 }
+    MLB:  { market: 4.0, starters: 1.6, bullpens: 0.8, form: 0.8, h2h: 0.5 }
   };
   var H2H_FULL_WEIGHT_AT = 4;
   /* The band says what to DO, not how far from even it is. These read MAX /
@@ -637,7 +646,7 @@
   var TEMP_BASE = 70.0, TEMP_PER_DEG = 0.008;
   var SPLIT_MIN_GAP = 20, SPLIT_RUNS = 0.30;
   var PTS_STARTER = 2.0, PTS_LEADER = 3.5;
-  var PLAUSIBLE = { era: [0, 15], park: [70, 130], mlb_total: [4, 20], wnba_total: [110, 230] };
+  var PLAUSIBLE = { era: [0, 15], park: [70, 130], mlb_total: [4, 20] };
 
   function ok(v, w) { return v !== null && v >= PLAUSIBLE[w][0] && v <= PLAUSIBLE[w][1]; }
   /* The engine reads its inputs through these three, never off the DOM
@@ -700,7 +709,7 @@
 
      The Abramowitz & Stegun 7.1.26 approximation that was here is only good to
      ~1.5e-7, and that was enough to break two things against the Python: it
-     flipped the side on a dead-even WNBA card, and it moved the fair-total
+     flipped the side on a dead-even card, and it moved the fair-total
      bisection by ~4e-5 points because the inversion divides the probability
      error by a small density. An approximation good enough to display is not
      good enough to invert. */
@@ -743,8 +752,7 @@
   }
 
   function splitFor(sport, line, mu) {
-    return sport === "MLB" ? nbSplit(line, mu, PHI.MLB)
-                           : normalSplit(line, mu, RESIDUAL_SD.WNBA);
+    return nbSplit(line, mu, PHI.MLB);   // MLB only; NFL has its own margin model
   }
 
   function implied(price) {
@@ -928,51 +936,240 @@
                     estimates, deltas, notes);
   }
 
-  // ---- WNBA ----------------------------------------------------------
-  function readWnba() {
-    var line = num("line");
-    if (!ok(line, "wnba_total")) return null;
-    var w = WEIGHTS.WNBA, notes = [];
-    var fa = fairTotal("WNBA", line, num("op"), num("up"));
-    var estimates = [est("Market", fa[0], w.market, fa[1])];
+  // ---- NFL -----------------------------------------------------------
+  /* ====================================================================
+     NFL SPREADS — ported from totals/nfl.py, same constants.
 
-    var a = num("wal10"), h = num("whl10");
-    if (a !== null && h !== null) {
-      estimates.push(est("Last 10", (a + h) / 2, w.form,
-        "Combined totals over the last ten average " + a.toFixed(1) + " away and " +
-        h.toFixed(1) + " home, blending to " + ((a + h) / 2).toFixed(1) + ". Ten games is a " +
-        "third of a WNBA season and there is no starting-pitcher equivalent to lean on."));
+     Why the spread and not the total: NFL margins are violently discrete. A
+     margin of exactly 3 lands in ~9.5% of games and 7 in ~6.5%. The MLB model's
+     best feature is getting P(push) exactly on a discrete distribution, and here
+     the effect is several times larger. Totals have no comparable structure.
+
+     The payoff is an edge that needs no opinion: "what is half a point worth"
+     is arithmetic on this distribution, checkable game by game, and does not
+     need the thousands of settled bets that proving a forecasting edge does.
+  ==================================================================== */
+  var MARGIN_SD = 13.5;
+  var HOME_FIELD = 1.6;
+  var RATING_STABLE_AT = 8.0;
+  var RATING_SHRINK = 0.70;
+  var NFL_WEIGHTS = { market: 4.0, rating: 1.2 };
+  var QB_POINTS = 5.0;
+
+  /* FITTED, not chosen: each is the ratio of the published frequency for that
+     margin to what a smooth curve of the same width gives. The fit contradicts
+     the folklore — 4 and 6 come in BELOW 1.0, meaning they are RARER than a
+     smooth curve predicts, because 3 and 7 take the mass. */
+  var KEY_NUMBERS = { 3: 1.73, 7: 1.30, 10: 1.01, 14: 0.99, 17: 0.88,
+                      6: 0.87, 4: 0.74, 1: 0.52 };
+
+  function keyMultiplier(m) {
+    var k = KEY_NUMBERS[Math.abs(Math.round(m))];
+    return k === undefined ? 1.0 : k;
+  }
+
+  /* `loc` is the LOCATION of the kernel, not the mean of the result — the
+     multipliers sit on absolute margins, so away from zero they pull the
+     distribution off centre by up to 0.15 points. marginMean() reports the
+     real thing; printing the location as an expected margin would be a lie. */
+  function marginPmf(loc, sd) {
+    sd = sd || MARGIN_SD;
+    var lo = Math.round(loc - 6 * sd), hi = Math.round(loc + 6 * sd);
+    var out = {}, total = 0;
+    for (var m = lo; m <= hi; m++) {
+      if (m === 0) continue;          // regulation ties effectively never happen
+      var z = (m - loc) / sd;
+      var v = Math.exp(-0.5 * z * z) * keyMultiplier(m);
+      out[m] = v; total += v;
     }
-    var hv = num("wh2h"), hn = num("wh2hn");
-    if (hv !== null && hn) {
-      estimates.push(est("Head to head (" + hn + ")", hv, h2hWeight(w.h2h, hn),
-        hn + " meetings averaging " + hv.toFixed(1) + "." +
-        (hn < H2H_FULL_WEIGHT_AT ? " Discounted to " + hn + "/" + H2H_FULL_WEIGHT_AT +
-         " of its weight for sample size." : "")));
-    } else {
-      notes.push("No head-to-head on file. Its weight has gone to the market and the last ten, " +
-                 "which now carry the blend between them.");
+    for (var k in out) out[k] /= total;
+    return out;
+  }
+
+  function marginMean(loc, sd) {
+    var pmf = marginPmf(loc, sd), mean = 0;
+    for (var k in pmf) mean += (+k) * pmf[k];
+    return mean;
+  }
+
+  /* (home covers, push, away covers) for a HOME spread. Home covers when the
+     margin beats -spread; it pushes when it lands exactly on it, which is only
+     possible on a whole number — and on 3 that is over 5% of all games. */
+  function marginSplit(spread, loc, sd) {
+    var pmf = marginPmf(loc, sd), need = -spread;
+    var home = 0, push = 0, away = 0;
+    for (var k in pmf) {
+      var m = +k;
+      if (Math.abs(m - need) < 1e-9) push += pmf[k];
+      else if (m > need) home += pmf[k];
+      else away += pmf[k];
+    }
+    return [home, push, away];
+  }
+
+  /* American odds as a CONTINUOUS scale so cents can be subtracted. They jump
+     from +100 to -100 for the same bet, so subtracting directly reports a
+     ten-cent move as two hundred — which it did, until a test caught it. */
+  function priceIndex(p) {
+    p = Math.min(Math.max(p, 1e-9), 1 - 1e-9);
+    return p >= 0.5 ? 100 * p / (1 - p) - 100 : 100 - 100 * (1 - p) / p;
+  }
+
+  /* The part of this model that needs no opinion to be useful. */
+  function halfPointValue(spread, loc) {
+    var b = marginSplit(spread, loc), bl = b[0] + b[2];
+    var base = bl > 0 ? b[0] / bl : 0.5;
+    var g = marginSplit(spread + 0.5, loc), gl = g[0] + g[2];
+    var better = gl > 0 ? g[0] / gl : 0.5;
+    return { to: spread + 0.5, gain: better - base, pushOut: b[1],
+             cents: Math.abs(priceIndex(better) - priceIndex(base)) };
+  }
+
+  function fairMargin(spread, hp, ap) {
+    var quoted = hp !== null && ap !== null;
+    if (!quoted) { hp = -110; ap = -110; }
+    var h = implied(hp), a = implied(ap), sum = h + a;
+    var bookHold = sum - 1, conf = marketConfidence(bookHold);
+    var raw = h / sum;
+    var pHome = 0.5 + (raw - 0.5) * conf;
+    /* The candidate is a MARGIN, so it lives near -spread. Bracketing around
+       `spread` put the root outside the range on every home favourite. */
+    var lo = -spread - 12, hi = -spread + 12;
+    for (var i = 0; i < 80; i++) {
+      var mid = (lo + hi) / 2;
+      var sp = marginSplit(spread, mid), live = sp[0] + sp[2];
+      var cond = live > 0 ? sp[0] / live : 0.5;
+      if (cond < pHome) lo = mid; else hi = mid;
+    }
+    var loc = (lo + hi) / 2;
+    var tail = conf < 1
+      ? " That is a " + (bookHold * 100).toFixed(1) + "% hold where a main line runs " +
+        (HOLD_REFERENCE * 100).toFixed(0) + "% — most likely an alternate number. A wide " +
+        "market is a less certain one, so the read has been pulled back from " +
+        (raw * 100).toFixed(1) + "% toward even and only " + (conf * 100).toFixed(0) + "% kept."
+      : "";
+    var why = quoted
+      ? sgn(hp, 0) + "/" + sgn(ap, 0) + " de-vigs to " + (pHome * 100).toFixed(1) +
+        "% home (" + (bookHold * 100).toFixed(2) + "% hold), which is the market saying the " +
+        "true margin is " + sgn(loc) + " rather than the " + sgn(-spread, 1) +
+        " the posted number implies." + tail
+      : "No prices given, so −110 both ways is assumed. A home line of " + sgn(spread, 1) +
+        " priced evenly implies a true margin of " + sgn(loc) + ". Note these are NOT the " +
+        "same number — the key numbers break that intuition, which is the whole point.";
+    return [loc, why];
+  }
+
+  function ratingWeight(base, games) {
+    if (games === null) return 0;
+    return base * Math.min(1, Math.max(0, games) / RATING_STABLE_AT);
+  }
+
+  function readNfl() {
+    var spread = num("line");
+    if (spread === null || spread < -30 || spread > 30) return null;
+    var notes = [];
+    var fa = fairMargin(spread, num("op"), num("up"));
+    var anchor = fa[0];
+    var estimates = [est("Market", anchor, NFL_WEIGHTS.market, fa[1])];
+
+    var an = num("anet"), hn = num("hnet"), gp = num("gp");
+    if (an !== null && hn !== null) {
+      var w = ratingWeight(NFL_WEIGHTS.rating, gp);
+      if (w > 0) {
+        var raw = (hn - an) * RATING_SHRINK;
+        var thin = gp !== null && gp < RATING_STABLE_AT
+          ? " Discounted to " + gp + "/" + RATING_STABLE_AT + " of its weight: a net-points " +
+            "rating on " + gp + " game(s) is mostly noise."
+          : "";
+        estimates.push(est("Power rating", anchor + raw, w,
+          "Home " + sgn(hn, 1) + " and away " + sgn(an, 1) + " net points per game, regressed " +
+          "at " + RATING_SHRINK.toFixed(2) + ", is " + sgn(raw, 1) + " points of margin. Two " +
+          "league-average teams move this by exactly zero." + thin));
+      } else {
+        notes.push("No games played entered, so the power rating is out of the blend. Early in " +
+                   "a season that is the honest answer, not a gap.");
+      }
+    } else if (an !== null || hn !== null) {
+      notes.push("Only one team's net points is in. A differential needs both, so the rating is " +
+                 "out of the blend and its weight has gone to the market.");
     }
 
-    var deltas = [];
-    [["Away", num("aout"), checked("alead")], ["Home", num("hout"), checked("hlead")]]
-      .forEach(function (r) {
-        var out = r[1] || 0;
-        if (out <= 0 && !r[2]) return;
-        var pts = out * PTS_STARTER + (r[2] ? PTS_LEADER - PTS_STARTER : 0);
-        deltas.push(delta(r[0] + " absences", -pts, out + " rotation player(s) out" +
-          (r[2] ? ", including their leading scorer" : "") + ". A twelve-deep roster with " +
-          "starters at 32+ minutes has no bench to absorb it: " + pts.toFixed(1) +
-          " points off the total."));
-      });
-
-    var opened = num("opened");
-    if (opened !== null && Math.abs(opened - line) > 1e-9) {
-      notes.push("The number moved " + opened + " to " + line + " (" + sgn(line - opened, 1) +
-                 "). Not scored — it is already inside the current line.");
+    if (checked("aqb") || checked("hqb")) {
+      var who = checked("hqb") && !checked("aqb") ? "Home"
+              : (checked("aqb") && !checked("hqb") ? "Away" : "Both");
+      notes.push(who + " starting quarterback out. Worth roughly " + QB_POINTS.toFixed(0) +
+        " points, and it is <b>NOT scored here</b> — an NFL line moves three to seven points on " +
+        "the announcement, so it is already inside the number you are reading. Check whether the " +
+        "line actually moved; if it has not, the market does not believe the report.");
     }
-    return assemble("WNBA", txt("away") || "Away", txt("home") || "Home", line,
-                    estimates, deltas, notes);
+    var op = num("nopened");
+    if (op !== null && Math.abs(op - spread) > 1e-9) {
+      notes.push("The number moved " + sgn(op, 1) + " to " + sgn(spread, 1) + " (" +
+        sgn(spread - op, 1) + "). Not scored — the current line is the anchor. It is here " +
+        "because a move <b>through a key number</b> is worth seeing before you bet.");
+    }
+    return assembleNfl(txt("away") || "Away", txt("home") || "Home", spread,
+                       estimates, deltas_none(), notes);
+  }
+
+  function deltas_none() { return []; }
+
+  /* Deliberately separate from assemble(). The MLB path is not touched by any
+     of this, which is the point — one model going wrong must not take the
+     other with it. */
+  function assembleNfl(away, home, spread, estimates, deltas, notes) {
+    var tw = 0, sum = 0;
+    estimates.forEach(function (e) { tw += e.weight; sum += e.total * e.weight; });
+    var loc = sum / tw;
+    var sp = marginSplit(spread, loc);
+    var pHome = sp[0], push = sp[1], pAway = sp[2];
+    var side = pHome >= pAway - 1e-9 ? "HOME" : "AWAY";
+    var pSide = side === "HOME" ? pHome : pAway;
+    var live = pHome + pAway;
+    var pResolved = live > 0 ? pSide / live : 0.5;
+    var band = NOBET;
+    for (var i = 0; i < BANDS.length; i++) {
+      if (pResolved >= BANDS[i][0]) { band = BANDS[i][1]; break; }
+    }
+    var fair = Math.abs(pResolved - 0.5) < 1e-9 ? 100
+             : (pResolved > 0.5 ? -100 * pResolved / (1 - pResolved)
+                                : 100 * (1 - pResolved) / pResolved);
+    var hp = halfPointValue(spread, loc);
+
+    if (Math.abs(spread - Math.round(spread)) < 1e-9 && push > 0.02) {
+      notes.push("The number is whole, so <b>" + (push * 100).toFixed(1) + "% of the time this " +
+        "pushes</b> and the stake comes back. On a key number that is the largest single outcome " +
+        "on the board, and a model treating margins as continuous hands it to the two sides.");
+    }
+    var key = Math.abs(Math.round(-spread));
+    if (KEY_NUMBERS[key] !== undefined && KEY_NUMBERS[key] > 1) {
+      notes.push("This line sits on <b>" + key + "</b>, a genuine key number — margins land there " +
+        KEY_NUMBERS[key].toFixed(2) + "× as often as a smooth curve says.");
+    }
+    notes.push("Half a point to <b>" + sgn(hp.to, 1) + "</b> is worth <b>" +
+      hp.cents.toFixed(0) + " cents</b>" + (hp.pushOut > 0.001
+        ? " and removes a " + (hp.pushOut * 100).toFixed(1) + "% push" : "") +
+      ". Books charge a flat 20–25 for it. " + (hp.cents >= 20
+        ? "Here that is roughly fair."
+        : "<b>Here that is an overcharge — do not buy it.</b> Use this to shop books instead: " +
+          "take a better number whenever it costs less than " + hp.cents.toFixed(0) + " cents."));
+    if (estimates.length === 1) {
+      notes.push("Nothing entered but the number, so the forecast IS the market and the answer " +
+        "is a coin flip. That is the correct answer to a question with no information in it.");
+    }
+    if (band === BANDS[0][1]) {
+      notes.push("Top band. Re-read the inputs before acting — in this project a spectacular " +
+        "number has more often been a mistyped one than an edge.");
+    }
+    /* Shaped like the MLB forecast so render() and the card need no special
+       casing: pOver carries HOME, pUnder carries AWAY. */
+    return { sport: "NFL", away: away, home: home, matchup: away + " @ " + home,
+             line: spread, projected: loc, expected: marginMean(loc),
+             pOver: pHome, pPush: push, pUnder: pAway, pSide: pSide,
+             pResolved: pResolved, side: side, band: band, bandUngated: band,
+             projectedCore: loc, pCorroborated: pResolved,
+             fair: fair, halfPoint: hp, estimates: estimates, deltas: deltas,
+             notes: notes, totalWeight: tw, hot: band !== NOBET };
   }
 
   function assemble(sport, away, home, line, estimates, deltas, notes) {
@@ -1008,7 +1205,7 @@
 
        Nothing is tagged on a card holding only the market and the arms, so this
        is an actual no-op there rather than an approximation of one. Nothing is
-       tagged in WNBA at all: the t statistics come from an MLB study, and
+       tagged outside MLB at all: the t statistics come from an MLB study, and
        demoting an input on a hunch is the kind of unjustified coefficient this
        model exists to remove. */
     var cw = 0, csum = 0, cdelta = 0;
@@ -1075,7 +1272,7 @@
 
   // ---- rendering -------------------------------------------------------
   var sport = "MLB", last = null;
-  function fmt(v) { return sport === "WNBA" ? v.toFixed(1) : v.toFixed(2); }
+  function fmt(v) { return sport === "NFL" ? sgn(v, 1) : v.toFixed(2); }
 
   /* Score a stored card row with the engine as it stands today, rather than
      trusting the band that was frozen into the row when it was added. */
@@ -1083,13 +1280,13 @@
     if (!inputs) return null;
     var prev = SRC;
     SRC = inputs;
-    try { return sp === "WNBA" ? readWnba() : readMlb(); }
+    try { return sp === "NFL" ? readNfl() : readMlb(); }
     catch (e) { return null; }
     finally { SRC = prev; }
   }
 
   function render() {
-    var f = sport === "MLB" ? readMlb() : readWnba();
+    var f = sport === "MLB" ? readMlb() : readNfl();
     last = f;
     var c = $("call");
     if (!f) {
@@ -1168,7 +1365,7 @@
     // where each source lands
     var vals = f.estimates.map(function (e) { return e.total; }).concat([f.line, f.projected]);
     var mn = Math.min.apply(null, vals), mx = Math.max.apply(null, vals);
-    var pad = Math.max((mx - mn) * 0.25, sport === "WNBA" ? 4 : 0.4);
+    var pad = Math.max((mx - mn) * 0.25, sport === "NFL" ? 1.5 : 0.4);
     mn -= pad; mx += pad;
     var at = function (v) { return (v - mn) / (mx - mn) * 100; };
     var linePct = at(f.line);
@@ -1203,7 +1400,7 @@
     if (f.deltas.length) {
       var dmax = 0;
       f.deltas.forEach(function (d) { dmax = Math.max(dmax, Math.abs(d.runs)); });
-      dmax = Math.max(dmax, sport === "WNBA" ? 2 : 0.2);
+      dmax = Math.max(dmax, sport === "NFL" ? 1.0 : 0.2);
       $("deltas").innerHTML = f.deltas.map(function (d) {
         var wpc = Math.abs(d.runs) / dmax * 50;
         var cls = d.runs > 0 ? "o" : d.runs < 0 ? "u" : "";
@@ -1242,6 +1439,14 @@
     if (row.final === null || row.final === undefined || row.final === "") return null;
     var f = parseFloat(row.final);
     if (!isFinite(f)) return null;
+    /* An NFL row stores a SPREAD, not a total, and its Final is the margin —
+       home points minus away points, negative if the away side won. Home covers
+       when the margin beats -spread and pushes when it lands exactly on it. */
+    if (row.sport === "NFL") {
+      var need = -row.line;
+      if (Math.abs(f - need) < 1e-9) return "PUSH";
+      return ((f > need ? "HOME" : "AWAY") === row.side) ? "WIN" : "LOSS";
+    }
     if (Math.abs(f - row.line) < 1e-9) return "PUSH";
     var went = f > row.line ? "OVER" : "UNDER";
     return went === row.side ? "WIN" : "LOSS";
@@ -1258,7 +1463,7 @@
   function isDomed(row) {
     // MLB only. The roof box lives in the MLB fields and stays ticked when the
     // sport is switched, so an unguarded read would mark every basketball game
-    // that followed a domed ballgame — and indoors is not news in the WNBA.
+    // that followed a domed ballgame, and a roof is not an NFL spread input.
     return !!(row && row.sport === "MLB" && row.inputs && row.inputs.dome);
   }
 
@@ -1303,7 +1508,12 @@
             stale + "</span></td>" +
           '<td><span class="cell"><input class="grade" type="number" step="1" inputmode="numeric" ' +
             'data-final="' + i + '" value="' + (s.final == null ? "" : s.final) +
-            '" placeholder="—" aria-label="Final total"></span></td>' +
+            '" placeholder="' + (s.sport === "NFL" ? "±" : "—") + '" title="' +
+            (s.sport === "NFL"
+              ? "Final MARGIN: home points minus away points. Negative if the away side won."
+              : "Final combined total, both teams' runs added.") +
+            '" aria-label="' + (s.sport === "NFL" ? "Final margin, home minus away"
+                                                  : "Final total") + '"></span></td>' +
           '<td><span class="cell">' + (res ? '<span class="res ' + res.toLowerCase() + '">' +
             res + "</span>" : '<span class="eshare">ungraded</span>') + "</span></td>" +
           '<td style="text-align:right"><span class="cell"><button class="x" data-del="' + i +
@@ -1451,10 +1661,9 @@
   // ---- wiring ----------------------------------------------------------
   var MLB_IDS = ["away","home","line","op","up","opened","gdate","aera","hera","arpg","hrpg",
                  "abp","hbp","al10","hl10","h2h","h2hn","pf","mph","dir","temp","tick","cash"];
-  var WNBA_IDS = ["away","home","line","op","up","opened","gdate","wal10","whl10",
-                  "wh2h","wh2hn","aout","hout"];
-  var ALL = MLB_IDS.concat(WNBA_IDS).filter(function (v, i, a) { return a.indexOf(v) === i; });
-  var CHECKS = ["dome","alead","hlead"];
+  var NFL_IDS = ["away","home","line","op","up","gdate","anet","hnet","gp","nopened"];
+  var ALL = MLB_IDS.concat(NFL_IDS).filter(function (v, i, a) { return a.indexOf(v) === i; });
+  var CHECKS = ["dome","aqb","hqb"];
 
   function snapshot() {
     var v = {};
@@ -1488,20 +1697,24 @@
   function say(msg) { var el = $("saveMsg"); el.hidden = false; el.innerHTML = msg; }
 
   function setSport(s, quiet) {
-    sport = s === "WNBA" ? "WNBA" : "MLB";
+    sport = s === "NFL" ? "NFL" : "MLB";
     var mlb = sport === "MLB";
     $("m-mlb").setAttribute("aria-pressed", String(mlb));
-    $("m-wnba").setAttribute("aria-pressed", String(!mlb));
+    $("m-nfl").setAttribute("aria-pressed", String(!mlb));
     $("mlbFields").hidden = !mlb;
-    $("wnbaFields").hidden = mlb;
-    $("eyebrow").textContent = mlb ? "MLB · full game" : "WNBA · full game";
-    $("lineLabel").textContent = "Total";
-    $("unitTag").textContent = mlb ? "runs" : "points";
-    $("line").placeholder = mlb ? "8.5" : "162.5";
+    $("nflFields").hidden = mlb;
+    $("eyebrow").textContent = mlb ? "MLB · full game total" : "NFL · spread";
+    $("lineLabel").textContent = mlb ? "Total" : "Home spread";
+    $("unitTag").textContent = mlb ? "runs" : "margin, home minus away";
+    $("line").placeholder = mlb ? "8.5" : "-3.5";
+    $("op").previousElementSibling && ($("op").previousElementSibling.textContent =
+      mlb ? "Over price" : "Home price");
+    $("up").previousElementSibling && ($("up").previousElementSibling.textContent =
+      mlb ? "Under price" : "Away price");
     if (!quiet) render();
   }
   $("m-mlb").addEventListener("click", function () { setSport("MLB"); saveDraft(); });
-  $("m-wnba").addEventListener("click", function () { setSport("WNBA"); saveDraft(); });
+  $("m-nfl").addEventListener("click", function () { setSport("NFL"); saveDraft(); });
 
   function onEdit() { render(); saveDraft(); }
   ALL.concat(CHECKS).forEach(function (id) {
@@ -1523,8 +1736,8 @@
       ? { away: "Orioles", home: "Rockies", line: 11.5, op: -115, up: -105, opened: 11,
           aera: 4.62, hera: 5.48, arpg: 4.71, hrpg: 4.38, abp: 4.10, hbp: 5.35,
           al10: 9.6, hl10: 11.2, h2h: 12.5, h2hn: 3, pf: 112, mph: 12, dir: "out", temp: 78 }
-      : { away: "Fever", home: "Wings", line: 162.5, op: -110, up: -110,
-          wal10: 168.2, whl10: 171.4, wh2h: 174.0, wh2hn: 3, aout: 1 };
+      : { away: "Jets", home: "Bills", line: -6.5, op: -110, up: -110,
+          anet: -3.1, hnet: 4.2, gp: 6, nopened: -6 };
     ALL.forEach(function (id) { $(id).value = ""; });
     CHECKS.forEach(function (id) { $(id).checked = false; });
     Object.keys(V).forEach(function (k) { $(k).value = V[k]; });

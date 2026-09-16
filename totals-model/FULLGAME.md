@@ -192,6 +192,43 @@ asserts that tripling every weight changes no forecast.
 Head to head is discounted by `meetings / 4`, so one meeting counts a quarter.
 Enter it anyway — judging the sample is the model's job.
 
+## The team box is a controlled list
+
+Added 2026-09-16, after a question about which teams tend to go over turned up
+something else first: across 67 logged games the free-text team field had
+produced **fifty spellings of thirty clubs**. St Louis alone appeared as
+`St Louis Cardinals`, `St Louis`, `ST louis Cardinals`, `Cardinals` and
+`St Louis Cardninals` — plus `Cleveland Gaurdians`, `Houston Astro`,
+`Boston RedSox`, `Cincinnati Red`, and several pairs differing only by a
+trailing space.
+
+This is not cosmetic. Splitting a sample manufactures results: unmerged, **27 of
+those 50 names carried a flawless over or under record**, and coin flips at the
+same sample sizes predict 26.4. Any breakdown by team, park, or division was
+reading fragmentation as signal.
+
+The fix is a datalist of the thirty MLB (or thirty-two NFL) clubs plus an
+ordered first-hit-wins matcher. Three properties matter and each has a test:
+
+- **Ordered, because patterns overlap.** `Red Sox` is tested before `Reds` or
+  the word `red` captures it. Same for `White Sox`.
+- **Scoped by sport, not global.** `Arizona` is the Diamondbacks in MLB and the
+  Cardinals in NFL; `SF` is the Giants or the 49ers. Cardinals and Giants are
+  each a club in both leagues.
+- **Ambiguous input is left exactly as typed.** `Chicago`, `LA` and `NY` name
+  two clubs apiece, and an unknown string comes back unchanged. A wrong merge is
+  worse than no merge, and losing what someone typed is worse than both.
+
+Rows logged before this run through a one-time backfill on load. It rewrites the
+**name only** — finals, bands, probabilities and grades are untouched, the same
+rule the rescore button follows, and four tests pin it.
+
+After merging, the answer to the original question was: 30 teams, 130 graded
+appearances, median 4 per club, **nothing survives a Sidak correction** (best is
+the Astros at z = −2.30 against a 3.14 threshold). At four appearances the
+smallest detectable bias is 70 points. The Rockies' 3-0 has a Wilson interval of
+43.8%–100%.
+
 ## What is deliberately not here
 
 **Line movement as a term.** The gate model subtracted it, correctly, because it

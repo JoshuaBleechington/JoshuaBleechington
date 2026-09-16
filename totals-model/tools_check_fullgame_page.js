@@ -322,6 +322,103 @@ const CHECKS = ["dome", "aqb", "hqb"];
   chk(roof.chips === 1, 'roof: exactly one row carries the marker', String(roof.chips));
   chk(/1 under a roof/.test(roof.count), 'roof: the header counts the domed games', roof.count);
 
+  // ---- team names are merged to one spelling per club --------------------
+  // A free-text box had produced fifty spellings of thirty MLB clubs across
+  // the logged card, which manufactures perfect records out of nothing when
+  // anything is grouped by team.
+  const teams = await pg.evaluate(async () => {
+    const shown = (name, sport) => {
+      document.getElementById(sport === 'NFL' ? 'm-nfl' : 'm-mlb').click();
+      const a = document.getElementById('away'), h = document.getElementById('home'),
+            l = document.getElementById('line');
+      a.value = name; h.value = 'Rockies';
+      l.value = sport === 'NFL' ? '-3.5' : '8.5';
+      [a, h, l].forEach(e => e.dispatchEvent(new Event('input', { bubbles: true })));
+      const el = document.querySelector('.cline b');
+      return el ? el.textContent.split(' @ ')[0] : null;
+    };
+    const spellings = ['St Louis Cardinals', 'St Louis', 'ST louis Cardinals',
+                       'Cardinals', 'St Louis Cardninals', 'Cardinals '];
+    const out = {
+      stl: [...new Set(spellings.map(s => shown(s, 'MLB')))],
+      typos: [shown('Cleveland Gaurdians', 'MLB'), shown('Houston Astro', 'MLB'),
+              shown('Boston RedSox', 'MLB'), shown('Cincinnati Red', 'MLB'),
+              shown('Chicago WhiteSox', 'MLB')],
+      // the same city is a different club in each league
+      arizona: [shown('Arizona', 'MLB'), shown('Arizona', 'NFL')],
+      kc: [shown('Kansas City', 'MLB'), shown('Kansas City', 'NFL')],
+      sf: [shown('SF', 'MLB'), shown('SF', 'NFL')],
+      // ambiguous or unknown input must survive untouched
+      ambiguous: ['Chicago', 'LA', 'NY', 'Some Local Nine'].map(s => shown(s, 'MLB')),
+    };
+    document.getElementById('m-mlb').click();
+    out.mlbList = [...document.getElementById('teamList').options].map(o => o.value);
+    document.getElementById('m-nfl').click();
+    out.nflList = [...document.getElementById('teamList').options].map(o => o.value);
+    document.getElementById('m-mlb').click();
+    return out;
+  });
+  chk(teams.stl.length === 1 && teams.stl[0] === 'Cardinals',
+      'teams: six spellings of St Louis collapse to one', teams.stl.join('|'));
+  chk(JSON.stringify(teams.typos) ===
+      JSON.stringify(['Guardians', 'Astros', 'Red Sox', 'Reds', 'White Sox']),
+      'teams: typos and run-together names resolve, and red/sox does not collide',
+      teams.typos.join('|'));
+  chk(JSON.stringify(teams.arizona) === JSON.stringify(['Diamondbacks', 'Cardinals']),
+      'teams: a city maps by sport, not globally', teams.arizona.join('|'));
+  chk(JSON.stringify(teams.kc) === JSON.stringify(['Royals', 'Chiefs']),
+      'teams: Kansas City is scoped too', teams.kc.join('|'));
+  chk(JSON.stringify(teams.sf) === JSON.stringify(['Giants', '49ers']),
+      'teams: SF is Giants in MLB and 49ers in NFL', teams.sf.join('|'));
+  chk(JSON.stringify(teams.ambiguous) ===
+      JSON.stringify(['Chicago', 'LA', 'NY', 'Some Local Nine']),
+      'teams: ambiguous and unknown input is left exactly as typed',
+      teams.ambiguous.join('|'));
+  chk(teams.mlbList.length === 30, 'teams: the MLB list offers all thirty clubs',
+      String(teams.mlbList.length));
+  chk(teams.nflList.length === 32, 'teams: the NFL list offers all thirty-two clubs',
+      String(teams.nflList.length));
+
+  // ---- the one-time backfill of rows logged before normalisation ---------
+  // It must rewrite the NAME and nothing else. A migration that moved a final
+  // or a grade would make the calibration panel unfalsifiable.
+  await pg.evaluate(() => {
+    localStorage.setItem('callsheet.fullgame.card.v1', JSON.stringify([
+      { matchup: 'St Louis Cardninals @ Cincinnati Red', sport: 'MLB', line: 8.5,
+        projected: '9.10', side: 'OVER', prob: '55.5', band: 'BET', fair: '-125',
+        final: '11', inputs: { away: 'St Louis Cardninals', home: 'Cincinnati Red',
+                               line: '8.5', op: '-110', up: '-110' } },
+      { matchup: 'Some Local Nine @ Chicago', sport: 'MLB', line: 7.5,
+        projected: '8.00', side: 'UNDER', prob: '52.0', band: 'NO BET', fair: '-104',
+        final: '6', inputs: { away: 'Some Local Nine', home: 'Chicago',
+                              line: '7.5', op: '-110', up: '-110' } },
+    ]));
+  });
+  await pg.reload();
+  await pg.waitForTimeout(400);
+  const mig = await pg.evaluate(() => {
+    const rows = JSON.parse(localStorage.getItem('callsheet.fullgame.card.v1') || '[]');
+    return {
+      matchups: rows.map(r => r.matchup),
+      finals: rows.map(r => r.final),
+      bands: rows.map(r => r.band),
+      probs: rows.map(r => r.prob),
+      grades: [...document.querySelectorAll('#cardTable .res')].map(e => e.textContent.trim()),
+    };
+  });
+  chk(mig.matchups[0] === 'Cardinals @ Reds',
+      'backfill: a messy stored row is merged to canonical names', mig.matchups[0]);
+  chk(mig.matchups[1] === 'Some Local Nine @ Chicago',
+      'backfill: a row it cannot resolve is left untouched', mig.matchups[1]);
+  chk(JSON.stringify(mig.finals) === JSON.stringify(['11', '6']),
+      'backfill: the finals are not touched', mig.finals.join('|'));
+  chk(JSON.stringify(mig.bands) === JSON.stringify(['BET', 'NO BET']),
+      'backfill: the stored bands are not touched', mig.bands.join('|'));
+  chk(JSON.stringify(mig.probs) === JSON.stringify(['55.5', '52.0']),
+      'backfill: the stored probabilities are not touched', mig.probs.join('|'));
+  chk(JSON.stringify(mig.grades) === JSON.stringify(['WIN', 'WIN']),
+      'backfill: the grades still read the same', mig.grades.join('|'));
+
   if (errs.length) { console.log('PAGE ERRORS:\n' + errs.join('\n')); fails++; }
   console.log(fails ? `\n${fails} FAILED` : `\nall checks passed (${CASES.length} cases)`);
   await b.close();

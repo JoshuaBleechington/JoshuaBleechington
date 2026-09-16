@@ -357,9 +357,10 @@
         <h2>The number <span class="tag">prices matter more than the line</span></h2>
         <div class="body">
           <div class="grid2">
-            <div class="f"><label for="away">Away</label><input id="away" type="text" placeholder="Orioles"></div>
-            <div class="f"><label for="home">Home</label><input id="home" type="text" placeholder="Rockies"></div>
+            <div class="f"><label for="away">Away</label><input id="away" type="text" list="teamList" autocomplete="off" placeholder="Orioles"></div>
+            <div class="f"><label for="home">Home</label><input id="home" type="text" list="teamList" autocomplete="off" placeholder="Rockies"></div>
           </div>
+          <datalist id="teamList"></datalist>
           <div class="grid3">
             <div class="f"><label for="line" id="lineLabel">Total</label><input id="line" type="number" step="0.5" inputmode="decimal" placeholder="8.5"></div>
             <div class="f"><label for="op">Over price</label><input id="op" type="number" step="5" inputmode="numeric" placeholder="-110"></div>
@@ -704,6 +705,112 @@
   function num(id) { var v = parseFloat(raw(id)); return isFinite(v) ? v : null; }
   function txt(id) { var v = raw(id); return String(v === undefined || v === null ? "" : v).trim(); }
   function checked(id) { return !!raw(id); }
+
+  /* ---- team names -------------------------------------------------------
+     A free-text team box fragments the log. Across 67 logged games it had
+     produced FIFTY spellings of thirty clubs -- St Louis alone appeared as
+     "St Louis Cardinals", "St Louis", "ST louis Cardinals", "Cardinals" and
+     "St Louis Cardninals", each carrying its own tidy 1-0 record. Splitting a
+     sample that way manufactures perfect records out of nothing: unmerged,
+     27 of those 50 names had a flawless over or under mark, and coin flips at
+     the same sample sizes predict 26.4.
+
+     Matching is ORDERED and first-hit-wins, because several patterns overlap
+     -- "Red Sox" has to be tested before "Reds" or the word `red` captures it.
+     Genuinely ambiguous input is left exactly as typed: "Chicago", "LA" and
+     "NY" name two clubs each, and a wrong merge is worse than no merge.
+
+     Scoped by sport, which is not optional: Cardinals and Giants are both an
+     MLB club and an NFL one. */
+  var TEAM_PATTERNS = {
+    MLB: [
+      ["Red Sox",      /red\s*sox|\bbos\b|boston/],
+      ["White Sox",    /white\s*sox|whitesox|\bcws\b|\bchw\b/],
+      ["Reds",         /cincinnati|\bcin\b|\breds?\b/],
+      ["Diamondbacks", /d[\s-]?backs|diamondback|\baz\b|\bari\b|arizona/],
+      ["Braves",       /brave|atlanta|\batl\b/],
+      ["Orioles",      /oriole|baltimore|\bbal\b|\bo's\b/],
+      ["Cubs",         /\bcubs?\b|chicago cub|\bchc\b/],
+      ["Guardians",    /guardian|gaurdian|cleveland|\bcle\b|indians/],
+      ["Rockies",      /rockie|colorado|\bcol\b/],
+      ["Tigers",       /tiger|detroit|\bdet\b/],
+      ["Astros",       /astro|houston|\bhou\b/],
+      ["Royals",       /royal|kansas|\bkc\b/],
+      ["Angels",       /angel|\blaa\b|anaheim/],
+      ["Dodgers",      /dodger|\blad\b/],
+      ["Marlins",      /marlin|miami|\bmia\b/],
+      ["Brewers",      /brewer|milwaukee|\bmil\b/],
+      ["Twins",        /\btwins?\b|minnesota|\bmin\b/],
+      ["Mets",         /\bmets?\b|\bnym\b/],
+      ["Yankees",      /yankee|\bnyy\b/],
+      ["Athletics",    /athletic|\ba's\b|\boak\b|oakland/],
+      ["Phillies",     /phillie|\bphils?\b|philadelphia|\bphi\b/],
+      ["Pirates",      /pirate|pittsburgh|\bpit\b|\bbucs\b/],
+      ["Padres",       /padre|san diego|\bsd\b|\bsdp\b/],
+      ["Giants",       /giant|san francisco|\bsf\b|\bsfg\b/],
+      ["Mariners",     /mariner|seattle|\bsea\b/],
+      ["Cardinals",    /cardin|cardni|\bcards\b|st\.?\s*louis|\bstl\b/],
+      ["Rays",         /\brays?\b|tampa|\btb\b|\btbr\b/],
+      ["Rangers",      /ranger|texas|\btex\b/],
+      ["Blue Jays",    /blue\s*jay|bluejay|\bjays\b|toronto|\btor\b/],
+      ["Nationals",    /national|\bnats\b|washington|\bwsh\b|\bwas\b/]
+    ],
+    NFL: [
+      ["49ers",        /49ers|niners|san francisco|\bsf\b/],
+      ["Cardinals",    /cardin|\bcards\b|arizona|\bari\b|\baz\b/],
+      ["Falcons",      /falcon|atlanta|\batl\b/],
+      ["Ravens",       /raven|baltimore|\bbal\b/],
+      ["Bills",        /\bbills?\b|buffalo|\bbuf\b/],
+      ["Panthers",     /panther|carolina|\bcar\b/],
+      ["Bears",        /\bbears?\b|chicago bear|\bchi\b/],
+      ["Bengals",      /bengal|cincinnati|\bcin\b/],
+      ["Browns",       /\bbrowns?\b|cleveland|\bcle\b/],
+      ["Cowboys",      /cowboy|dallas|\bdal\b/],
+      ["Broncos",      /bronco|denver|\bden\b/],
+      ["Lions",        /\blions?\b|detroit|\bdet\b/],
+      ["Packers",      /packer|green\s*bay|\bgb\b/],
+      ["Texans",       /texan|houston|\bhou\b/],
+      ["Colts",        /\bcolts?\b|indianapolis|\bind\b/],
+      ["Jaguars",      /jaguar|\bjags\b|jacksonville|\bjax\b/],
+      ["Chiefs",       /chief|kansas|\bkc\b/],
+      ["Raiders",      /raider|las vegas|\blv\b|oakland/],
+      ["Chargers",     /charger|\blac\b/],
+      ["Rams",         /\brams?\b|\blar\b/],
+      ["Dolphins",     /dolphin|\bfins\b|miami|\bmia\b/],
+      ["Vikings",      /viking|\bvikes\b|minnesota|\bmin\b/],
+      ["Patriots",     /patriot|\bpats\b|new england|\bne\b/],
+      ["Saints",       /\bsaints?\b|new orleans|\bno\b/],
+      ["Giants",       /giant|\bnyg\b/],
+      ["Jets",         /\bjets?\b|\bnyj\b/],
+      ["Eagles",       /eagle|philadelphia|\bphi\b/],
+      ["Steelers",     /steeler|pittsburgh|\bpit\b/],
+      ["Seahawks",     /seahawk|\bhawks\b|seattle|\bsea\b/],
+      ["Buccaneers",   /buccaneer|\bbucs\b|tampa|\btb\b/],
+      ["Titans",       /titan|tennessee|\bten\b/],
+      ["Commanders",   /commander|\bcommies\b|washington|\bwsh\b|\bwas\b/]
+    ]
+  };
+
+  function teamsFor(sport) {
+    return TEAM_PATTERNS[sport === "NFL" ? "NFL" : "MLB"]
+      .map(function (p) { return p[0]; }).sort();
+  }
+
+  /* Returns the canonical club, or the input unchanged when nothing matches.
+     Never returns empty for non-empty input -- losing what someone typed is a
+     worse failure than leaving it unmerged. */
+  function canonTeam(sRaw, sport) {
+    var s = String(sRaw === undefined || sRaw === null ? "" : sRaw).trim();
+    if (!s) return "";
+    var low = s.toLowerCase();
+    var list = TEAM_PATTERNS[sport === "NFL" ? "NFL" : "MLB"];
+    for (var i = 0; i < list.length; i++) {
+      if (list[i][1].test(low)) return list[i][0];
+    }
+    return s;
+  }
+
+  function teamName(id, sport) { return canonTeam(txt(id), sport); }
   function sgn(v, d) { return (v >= 0 ? "+" : "") + v.toFixed(d === undefined ? 2 : d); }
 
   /* Lanczos log-gamma, g=7. The negative binomial needs a non-integer
@@ -1001,7 +1108,7 @@
         "it and subtracting it again would double-count. It is here because a large move " +
         "against your side is worth knowing before you bet.");
     }
-    return assemble("MLB", txt("away") || "Away", txt("home") || "Home", line,
+    return assemble("MLB", teamName("away", "MLB") || "Away", teamName("home", "MLB") || "Home", line,
                     estimates, deltas, notes);
   }
 
@@ -1177,7 +1284,7 @@
         sgn(spread - op, 1) + "). Not scored — the current line is the anchor. It is here " +
         "because a move <b>through a key number</b> is worth seeing before you bet.");
     }
-    return assembleNfl(txt("away") || "Away", txt("home") || "Home", spread,
+    return assembleNfl(teamName("away", "NFL") || "Away", teamName("home", "NFL") || "Home", spread,
                        estimates, deltas_none(), notes);
   }
 
@@ -1596,6 +1703,26 @@
     catch (e) { $("saveState").textContent = "this browser is not storing anything"; }
   }
 
+  /* One-time backfill of rows logged before the team box was normalised.
+     It rewrites the NAME and nothing else -- no final, no grade, no band, no
+     probability. What happened on the field is not a model output and a
+     migration that touched it would make the calibration panel unfalsifiable,
+     which is the same rule the rescore button follows. */
+  (function normaliseStoredTeams() {
+    var fixed = 0;
+    card.forEach(function (row) {
+      if (!row || !row.inputs) return;
+      var a = canonTeam(row.inputs.away, row.sport);
+      var h = canonTeam(row.inputs.home, row.sport);
+      if (a === row.inputs.away && h === row.inputs.home) return;
+      row.inputs.away = a;
+      row.inputs.home = h;
+      if (a && h) row.matchup = a + " @ " + h;
+      fixed++;
+    });
+    if (fixed) save();
+  }());
+
   /* A row grades itself once the final total is entered. Pushes are recorded
      as pushes rather than folded into either column — they refund, so counting
      one as a win or a loss corrupts the calibration measure that follows. */
@@ -1875,6 +2002,11 @@
       mlb ? "Over price" : "Home price");
     $("up").previousElementSibling && ($("up").previousElementSibling.textContent =
       mlb ? "Under price" : "Away price");
+    $("away").placeholder = mlb ? "Orioles" : "Eagles";
+    $("home").placeholder = mlb ? "Rockies" : "Cowboys";
+    $("teamList").innerHTML = teamsFor(sport).map(function (t) {
+      return '<option value="' + t + '"></option>';
+    }).join("");
     if (!quiet) render();
   }
   $("m-mlb").addEventListener("click", function () { setSport("MLB"); saveDraft(); });

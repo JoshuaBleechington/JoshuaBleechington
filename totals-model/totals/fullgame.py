@@ -722,6 +722,109 @@ def _assemble(sport, matchup, line, estimates, deltas, notes) -> Forecast:
 
 
 # ===========================================================================
+# ALTERNATE LINES
+#
+# The strongest thing this file can do, and the only part that does not need the
+# model to be right about anything.
+#
+# A book prices its main line efficiently -- that is the one fact this project
+# has actually established, over 116 games. But it prices the ALTERNATE ladder
+# off a template, and templates are coarse. Given the market's own fair total,
+# recovered from the two main-line prices, the fair price at every other number
+# is arithmetic on the same distribution. Comparing that to what the book offers
+# is a RELATIVE judgement: it needs the main line to be efficient, and nothing
+# else. No opinion about who wins, no forecasting edge, no thousands of settled
+# bets to prove.
+# ===========================================================================
+
+def _price_index(p: float) -> float:
+    """American odds as a CONTINUOUS scale, so cents can be subtracted.
+
+    They are discontinuous at the century -- +100 and -100 are the same bet --
+    so subtracting them directly reports a ten-cent move as two hundred. This
+    maps ... +120, +110, 100, -110, -120 ... onto ... -20, -10, 0, +10, +20 ...
+    """
+    p = min(max(p, 1e-9), 1 - 1e-9)
+    if p >= 0.5:
+        return 100.0 * p / (1.0 - p) - 100.0
+    return 100.0 - 100.0 * (1.0 - p) / p
+
+
+def price_for(p: float) -> float:
+    """Fair American odds for a resolved-outcome probability."""
+    if abs(p - 0.5) < 1e-9:
+        return 100.0
+    return -100.0 * p / (1.0 - p) if p > 0.5 else 100.0 * (1.0 - p) / p
+
+
+def cents_between(p_fair: float, offered: float) -> float:
+    """How many cents better than fair the offered price is. Positive is value.
+
+    The sign was backwards on the first pass and a test caught it: the index
+    rises with implied probability, and a HIGHER implied probability is a WORSE
+    price for the bettor -- you are laying more for the same outcome. So fair
+    comes first. A test now pins that this never disagrees in sign with the
+    expected value, which is the thing it is a proxy for.
+    """
+    return _price_index(p_fair) - _price_index(implied(offered))
+
+
+@dataclass
+class AltRung:
+    line: float
+    p_over: float          # resolved, push excluded
+    p_push: float
+    fair_over: float
+    fair_under: float
+
+    def to_dict(self) -> dict[str, Any]:
+        return {"line": self.line, "p_over": round(self.p_over, 5),
+                "p_push": round(self.p_push, 5),
+                "fair_over": round(self.fair_over, 1),
+                "fair_under": round(self.fair_under, 1)}
+
+
+def alt_ladder(sport: str, main_line: float, over_price: float | None = None,
+               under_price: float | None = None, span: float = 3.0,
+               step: float = 0.5, mu: float | None = None) -> list[AltRung]:
+    """Fair prices at every alternate total around `main_line`.
+
+    `mu` overrides the anchor, so the same function serves both ladders: the
+    MARKET one (leave it None -- derived from the main line's own prices, and
+    the one worth acting on) and the MODEL one (pass the blended projection,
+    which is only as good as the model).
+    """
+    if mu is None:
+        mu, _why = fair_total(sport, main_line, over_price, under_price)
+    rungs = []
+    steps = int(round(span / step))
+    for k in range(-steps, steps + 1):
+        line = round(main_line + k * step, 2)
+        if line <= 0:
+            continue
+        over, push, under = split_for(sport, line, mu)
+        live = over + under
+        p_over = over / live if live > 0 else 0.5
+        rungs.append(AltRung(line, p_over, push,
+                             price_for(p_over), price_for(1.0 - p_over)))
+    return rungs
+
+
+def alt_edge(rung: AltRung, side: str, offered: float) -> dict[str, Any]:
+    """What the book is giving away, or taking, on one alternate rung."""
+    p = rung.p_over if side == "OVER" else 1.0 - rung.p_over
+    fair = rung.fair_over if side == "OVER" else rung.fair_under
+    payout = (offered / 100.0) if offered > 0 else (100.0 / -offered)
+    return {
+        "line": rung.line, "side": side, "offered": offered, "fair": fair,
+        "cents": cents_between(p, offered),
+        "ev_per_unit": p * payout - (1.0 - p),
+        "p_resolved": p,
+        "p_push": rung.p_push,
+    }
+
+
+# ===========================================================================
 # Whether any of this works
 # ===========================================================================
 

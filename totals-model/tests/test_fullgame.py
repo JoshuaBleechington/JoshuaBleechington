@@ -37,6 +37,10 @@ from totals.fullgame import (
     sensitivity,
     slate,
     split_for,
+    alt_ladder,
+    alt_edge,
+    cents_between,
+    price_for,
 )
 
 
@@ -576,6 +580,101 @@ class TestGuards(unittest.TestCase):
     def test_an_impossible_era_is_ignored_rather_than_believed(self):
         f = forecast_mlb("a @ b", 8.5, away_starter_era=99.0, home_starter_era=4.16)
         self.assertNotIn("Starters", [e.name for e in f.estimates])
+
+
+class TestAlternateLines(unittest.TestCase):
+    """The one thing here that does not need the model to be right.
+
+    A book prices its MAIN line efficiently -- that is the single fact this
+    project has established. It prices the alternate ladder off a template. So
+    the fair price at every other number is arithmetic on the market's own
+    distribution, and comparing it to what the book offers is a relative
+    judgement that needs no forecasting edge at all.
+    """
+
+    def test_the_main_rung_reproduces_the_main_line(self):
+        rungs = alt_ladder("MLB", 8.5, -115, -105, span=2.0)
+        main = next(r for r in rungs if abs(r.line - 8.5) < 1e-9)
+        f = forecast_mlb("a @ b", 8.5, over_price=-115, under_price=-105)
+        market = next(e for e in f.estimates if e.name == "Market")
+        over, _push, under = split_for("MLB", 8.5, market.total)
+        self.assertAlmostEqual(main.p_over, over / (over + under), places=9)
+
+    def test_the_ladder_is_monotone(self):
+        """A higher total can only ever be harder to go over."""
+        rungs = alt_ladder("MLB", 8.5, -110, -110, span=3.0)
+        for a, b in zip(rungs, rungs[1:]):
+            self.assertGreater(a.p_over, b.p_over,
+                               f"{a.line} -> {b.line} did not fall")
+
+    def test_only_whole_numbers_push(self):
+        for r in alt_ladder("MLB", 8.5, -110, -110, span=2.0):
+            if abs(r.line - round(r.line)) < 1e-9:
+                self.assertGreater(r.p_push, 0.05)
+            else:
+                self.assertAlmostEqual(r.p_push, 0.0, places=9)
+
+    def test_the_two_sides_of_a_rung_are_complementary(self):
+        for r in alt_ladder("MLB", 9.0, -120, 100, span=2.0):
+            self.assertAlmostEqual(implied(r.fair_over) + implied(r.fair_under),
+                                   1.0, places=6)
+
+    def test_cents_and_expected_value_never_disagree_in_sign(self):
+        """The bug this caught.
+
+        The index rises with implied probability and a higher implied
+        probability is a WORSE price, so the subtraction was backwards: a book
+        offering +145 where fair was +195 reported as FIFTY CENTS OF VALUE while
+        its expected value was -0.17 a unit.
+        """
+        rungs = alt_ladder("MLB", 8.5, -115, -105, span=3.0)
+        for r in rungs:
+            for side in ("OVER", "UNDER"):
+                fair = r.fair_over if side == "OVER" else r.fair_under
+                for offered in (fair - 60, fair - 20, fair + 20, fair + 60,
+                                -110, 100, 150, -200):
+                    e = alt_edge(r, side, offered)
+                    if abs(e["cents"]) < 1e-6:
+                        continue
+                    self.assertEqual(
+                        e["cents"] > 0, e["ev_per_unit"] > 0,
+                        f"{side} {r.line} fair {fair:+.0f} offered {offered:+.0f}: "
+                        f"{e['cents']:+.1f} cents but EV {e['ev_per_unit']:+.4f}")
+
+    def test_the_fair_price_is_exactly_zero_edge(self):
+        for r in alt_ladder("MLB", 8.5, -110, -110, span=2.0):
+            for side in ("OVER", "UNDER"):
+                fair = r.fair_over if side == "OVER" else r.fair_under
+                e = alt_edge(r, side, fair)
+                self.assertAlmostEqual(e["cents"], 0.0, places=6)
+                self.assertAlmostEqual(e["ev_per_unit"], 0.0, places=6)
+
+    def test_a_better_price_is_always_worth_more(self):
+        r = next(x for x in alt_ladder("MLB", 8.5, -110, -110, span=2.0)
+                 if abs(x.line - 10.5) < 1e-9)
+        worse = alt_edge(r, "OVER", 150)
+        better = alt_edge(r, "OVER", 250)
+        self.assertGreater(better["cents"], worse["cents"])
+        self.assertGreater(better["ev_per_unit"], worse["ev_per_unit"])
+
+    def test_the_model_ladder_can_be_asked_for_separately(self):
+        """Two ladders, and the difference between them matters.
+
+        The MARKET ladder needs only the main line to be efficient. The MODEL
+        ladder is only as good as the model, which on 106 logged games has added
+        nothing over the base rate. They must not be confused.
+        """
+        market = alt_ladder("MLB", 8.5, -110, -110, span=1.0)
+        model = alt_ladder("MLB", 8.5, -110, -110, span=1.0, mu=10.5)
+        self.assertGreater(model[0].p_over, market[0].p_over)
+
+    def test_a_pushable_rung_prices_on_the_resolved_outcome(self):
+        r = next(x for x in alt_ladder("MLB", 8.5, -110, -110, span=1.0)
+                 if abs(x.line - 9.0) < 1e-9)
+        self.assertGreater(r.p_push, 0.05)
+        # the two fair prices must still be a complete book once the push is out
+        self.assertAlmostEqual(implied(r.fair_over) + implied(r.fair_under),
+                               1.0, places=6)
 
 
 class TestCalibration(unittest.TestCase):

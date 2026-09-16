@@ -202,6 +202,55 @@ displayed, never scored.
 **Park factor on the market anchor.** The posted number already holds the park.
 It scales the differentials and the wind and nothing else.
 
+## Alternate lines
+
+Added 2026-09-16, and it is the strongest thing in this file because it is the
+only part that **does not need the model to be right about anything**.
+
+A book prices its **main** line sharply — that is the single fact this project
+has actually established, over 116 games. It prices the **alternate ladder off a
+template**, and templates are coarse. Given the market's own fair total,
+recovered from the two main-line prices, the fair price at every other rung is
+arithmetic on the same distribution:
+
+```
+main 8.5 at -115/-105  ->  market fair total 8.57
+
+  alt    push    fair over   fair under
+  7.5     —         -154        +154
+  8      9.5%       -130        +130
+  8.5     —         -104        +104   <- main
+  9      9.0%       +116        -116
+  10     8.2%       +171        -171
+  10.5    —         +195        -195
+```
+
+So if a book shows OVER 10.5 at **+250** when its own main line implies +195,
+that is **55 cents of value and +0.186 a unit** — and the judgement needed none
+of the pitching inputs, none of the weather, and no opinion about who wins. It
+needs the main line to be efficient, and nothing else.
+
+At **+145** the same rung is 50 cents *worse* than fair. That is the template
+charging you for the move.
+
+### The sign was backwards and a test caught it
+
+`_price_index` rises with implied probability, and a **higher implied
+probability is a worse price** — you are laying more for the same outcome. The
+first version subtracted the wrong way round and reported a book offering +145
+against a fair +195 as **fifty cents of value** while its expected value was
+−0.17 a unit. There is now a test that sweeps the whole ladder, both sides, and
+eight prices per rung asserting that cents and expected value never disagree in
+sign.
+
+### Two ladders, and they must not be confused
+
+`alt_ladder()` takes an optional `mu`. Left alone it uses the **market** anchor —
+the number the book itself is standing on, and the one worth acting on. Passed
+the blended projection it gives the **model** ladder, which is only as good as
+the model. On 106 logged games the model has added nothing over the base rate,
+so the page shows the market ladder.
+
 ## Does it work
 
 `calibration()` and the page's **Is it working** panel answer the only question

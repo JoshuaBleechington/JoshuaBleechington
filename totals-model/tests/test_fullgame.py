@@ -15,6 +15,11 @@ from totals.fullgame import (
     BANDS,
     BULLPEN_INNINGS,
     DISPERSION_PHI,
+    ERA_OVERDISPERSION,
+    ERA_STABLE_AT,
+    STARTER_TALENT_SD,
+    era_weight,
+    shrink_era,
     H2H_FULL_WEIGHT_AT,
     LEAGUE_BULLPEN_ERA,
     LEAGUE_COMBINED_RPG,
@@ -580,6 +585,101 @@ class TestGuards(unittest.TestCase):
     def test_an_impossible_era_is_ignored_rather_than_believed(self):
         f = forecast_mlb("a @ b", 8.5, away_starter_era=99.0, home_starter_era=4.16)
         self.assertNotIn("Starters", [e.name for e in f.estimates])
+
+
+class TestAStarterERAIsAMeasurement(unittest.TestCase):
+    """A short season is a noisy season, and the model has to know it.
+
+    Before this block a call-up's 5.24 in 22 innings carried exactly the
+    authority of an ace's 5.24 in 190. The fix is empirical Bayes on the
+    innings count. What these tests mostly pin is that it is SAFE: it is off
+    unless asked for, it only ever pulls toward the league, and it can never
+    invent a number more extreme than the one typed.
+    """
+
+    def test_a_blank_innings_field_changes_absolutely_nothing(self):
+        """The whole feature has to be invisible to every card logged before it.
+
+        This is the guarantee the change stands on. If it fails, a back
+        catalogue of graded cards silently re-scores and the record is gone.
+        """
+        for line, aera, hera in ((8.5, 5.24, 5.53), (9.0, 2.10, 6.40),
+                                 (7.5, 4.16, 4.16), (11.0, 3.01, 3.99)):
+            plain = forecast_mlb("a @ b", line, over_price=-110, under_price=-110,
+                                 away_starter_era=aera, home_starter_era=hera)
+            blank = forecast_mlb("a @ b", line, over_price=-110, under_price=-110,
+                                 away_starter_era=aera, home_starter_era=hera,
+                                 away_starter_ip=None, home_starter_ip=None)
+            self.assertEqual(plain.projected, blank.projected)
+            self.assertEqual(plain.p_resolved, blank.p_resolved)
+            self.assertEqual(plain.band, blank.band)
+            self.assertEqual(plain.side, blank.side)
+
+    def test_the_stabilisation_point_is_derived_not_chosen(self):
+        """ERA_STABLE_AT must fall out of the other two constants.
+
+        If someone edits it by hand to tune a backtest, this fails -- which is
+        the point. It is 9 * overdispersion * league ERA / talent variance.
+        """
+        expected = (9.0 * ERA_OVERDISPERSION * LEAGUE_STARTER_ERA
+                    / STARTER_TALENT_SD ** 2)
+        self.assertAlmostEqual(ERA_STABLE_AT, expected, places=9)
+        self.assertAlmostEqual(era_weight(ERA_STABLE_AT), 0.5, places=9,
+                               msg="at the stabilisation point it is a 50/50 split")
+
+    def test_more_innings_is_always_more_trust_and_never_full_trust(self):
+        last = -1.0
+        for ip in (1, 10, 22.1, 60, 90.7, 143.1, 190, 300):
+            w = era_weight(ip)
+            self.assertGreater(w, last, "weight must rise with innings")
+            self.assertGreater(w, 0.0)
+            self.assertLess(w, 1.0, "a season is a sample, never a reading")
+            last = w
+
+    def test_shrinking_only_ever_pulls_toward_the_league(self):
+        """It can move a number in, never out, and never past the prior."""
+        for era in (1.20, 2.80, 4.16, 5.24, 7.90):
+            for ip in (5, 22.1, 90, 143.1, 220):
+                out = shrink_era(era, ip)
+                lo, hi = sorted((era, LEAGUE_STARTER_ERA))
+                self.assertGreaterEqual(out, lo - 1e-12)
+                self.assertLessEqual(out, hi + 1e-12)
+                self.assertLessEqual(abs(out - LEAGUE_STARTER_ERA),
+                                     abs(era - LEAGUE_STARTER_ERA) + 1e-12)
+
+    def test_a_league_average_arm_is_untouched_by_any_sample_size(self):
+        """Shrinking toward the mean cannot move something already at it."""
+        for ip in (1, 22.1, 90.7, 200, None):
+            self.assertAlmostEqual(shrink_era(LEAGUE_STARTER_ERA, ip),
+                                   LEAGUE_STARTER_ERA, places=12)
+
+    def test_the_same_era_moves_the_card_less_on_fewer_innings(self):
+        """The ordering that makes the feature worth having at all."""
+        def proj(ip):
+            return forecast_mlb("a @ b", 8.5, over_price=-110, under_price=-110,
+                                away_starter_era=6.50, home_starter_era=4.16,
+                                away_starter_ip=ip, home_starter_ip=200.0).projected
+        self.assertLess(proj(20), proj(80))
+        self.assertLess(proj(80), proj(180))
+        self.assertLess(proj(180), proj(None), "blank must be the most credulous")
+
+    def test_an_implausible_innings_count_is_ignored_rather_than_believed(self):
+        """Same posture as an implausible ERA: fall back, do not extrapolate."""
+        for junk in (-5.0, 0.0, 9999.0):
+            self.assertEqual(era_weight(junk), 1.0)
+
+    def test_the_card_says_when_it_has_discounted_an_arm(self):
+        f = forecast_mlb("a @ b", 8.5, over_price=-110, under_price=-110,
+                         away_starter_era=5.24, home_starter_era=5.53,
+                         away_starter_ip=22.1, home_starter_ip=143.1)
+        detail = next(e for e in f.estimates if e.name == "Starters").detail
+        self.assertIn("22.1 IP", detail)
+        self.assertIn("sample size", detail)
+        plain = forecast_mlb("a @ b", 8.5, over_price=-110, under_price=-110,
+                             away_starter_era=5.24, home_starter_era=5.53)
+        self.assertNotIn("sample size",
+                         next(e for e in plain.estimates if e.name == "Starters").detail,
+                         "a card with no innings typed must not claim a discount")
 
 
 class TestAlternateLines(unittest.TestCase):

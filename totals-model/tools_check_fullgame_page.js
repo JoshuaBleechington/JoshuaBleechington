@@ -18,7 +18,7 @@ const fs = require('fs');
 const CASES = JSON.parse(
   fs.readFileSync(path.join(__dirname, 'web/fullgame-cases.json'), 'utf8'));
 
-const MLB_IDS = ["away","home","line","op","up","opened","gdate","aera","hera","arpg","hrpg",
+const MLB_IDS = ["away","home","line","op","up","opened","gdate","aera","hera","aip","hip","arpg","hrpg",
                  "abp","hbp","al10","hl10","h2h","h2hn","pf","mph","dir","temp","tick","cash"];
 const NFL_IDS = ["away","home","line","op","up","gdate","anet","hnet","gp","nopened"];
 const ALL = [...new Set([...MLB_IDS, ...NFL_IDS])];

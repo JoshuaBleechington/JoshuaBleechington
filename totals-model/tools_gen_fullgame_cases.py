@@ -31,6 +31,7 @@ def build(case):
         return F.forecast_mlb(
             name, ln, over_price=n(i.get("op")), under_price=n(i.get("up")),
             away_starter_era=n(i.get("aera")), home_starter_era=n(i.get("hera")),
+            away_starter_ip=n(i.get("aip")), home_starter_ip=n(i.get("hip")),
             away_rpg=n(i.get("arpg")), home_rpg=n(i.get("hrpg")),
             away_bullpen_era=n(i.get("abp")), home_bullpen_era=n(i.get("hbp")),
             away_last10_total=n(i.get("al10")), home_last10_total=n(i.get("hl10")),

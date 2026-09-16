@@ -393,6 +393,14 @@
               <div class="f"><label for="hera">Home starter ERA</label><input id="hera" type="number" step="0.01" inputmode="decimal" placeholder="4.16"></div>
             </div>
             <div class="grid2">
+              <div class="f"><label for="aip">Away starter IP <span class="tag">optional</span></label><input id="aip" type="number" step="0.1" inputmode="decimal" placeholder="blank = trust it"></div>
+              <div class="f"><label for="hip">Home starter IP <span class="tag">optional</span></label><input id="hip" type="number" step="0.1" inputmode="decimal" placeholder="blank = trust it"></div>
+            </div>
+            <p class="muted">Innings behind each ERA. Fill them in and a short season gets
+              pulled toward league average — a 5.24 in 22 innings is a reading with a
+              ±1.7 error bar, not a fact. Leave them blank and the ERA goes in at face
+              value, exactly as before.</p>
+            <div class="grid2">
               <div class="f"><label for="arpg">Away runs/game</label><input id="arpg" type="number" step="0.01" inputmode="decimal" placeholder="4.52"></div>
               <div class="f"><label for="hrpg">Home runs/game</label><input id="hrpg" type="number" step="0.01" inputmode="decimal" placeholder="4.52"></div>
             </div>
@@ -645,6 +653,14 @@
   var LEAGUE_STARTER_ERA = 4.16, LEAGUE_BULLPEN_ERA = 4.05;
   var STARTER_INNINGS = 5.4, BULLPEN_INNINGS = 9.0 - STARTER_INNINGS;
   var UNEARNED = 1.08;
+  // An ERA is a measurement and a short one is noisy. Both derived, not picked:
+  // earned runs run 1.75x Poisson variance, and true starter talent is spread
+  // about 0.85 (observed 1.05 with 0.60 of that noise at a full season's
+  // innings; variances subtract). Those two give the innings count at which a
+  // starter's own number is worth exactly as much as the league prior.
+  var ERA_OVERDISPERSION = 1.75, STARTER_TALENT_SD = 0.85;
+  var ERA_STABLE_AT = 9 * ERA_OVERDISPERSION * LEAGUE_STARTER_ERA
+                      / (STARTER_TALENT_SD * STARTER_TALENT_SD);
   var RESIDUAL_SD = { MLB: 4.39 };
   var PHI = { MLB: RESIDUAL_SD.MLB * RESIDUAL_SD.MLB / LEAGUE_COMBINED_RPG };
   var WEIGHTS = {
@@ -670,7 +686,7 @@
   var TEMP_BASE = 70.0, TEMP_PER_DEG = 0.008;
   var SPLIT_MIN_GAP = 20, SPLIT_RUNS = 0.30;
   var PTS_STARTER = 2.0, PTS_LEADER = 3.5;
-  var PLAUSIBLE = { era: [0, 15], park: [70, 130], mlb_total: [4, 20] };
+  var PLAUSIBLE = { era: [0, 15], park: [70, 130], mlb_total: [4, 20], innings: [0, 400] };
 
   function ok(v, w) { return v !== null && v >= PLAUSIBLE[w][0] && v <= PLAUSIBLE[w][1]; }
   /* The engine reads its inputs through these three, never off the DOM
@@ -852,6 +868,19 @@
   /* Differential, never absolute. An absolute projection needs a league-average
      total to calibrate against, and picking that number wrong is exactly what
      put a permanent over-lean in the model this replaces. */
+  // How much of a starter's own ERA survives, on his innings count. Returns 1
+  // when innings are blank, which is what keeps every previously logged card
+  // scoring exactly as it did.
+  function eraWeight(ip) {
+    if (ip === null || !ok(ip, "innings") || ip <= 0) return 1;
+    return ip / (ip + ERA_STABLE_AT);
+  }
+
+  function shrinkEra(era, ip) {
+    if (era === null) return null;
+    return LEAGUE_STARTER_ERA + eraWeight(ip) * (era - LEAGUE_STARTER_ERA);
+  }
+
   function armDiff(era, league, innings, oppRpg) {
     if (!ok(era, "era")) return null;
     var gap = (era - league) * (innings / 9) * UNEARNED;
@@ -869,16 +898,32 @@
     var estimates = [est("Market", anchor, w.market, fa[1])];
 
     var ae = num("aera"), he = num("hera"), arpg = num("arpg"), hrpg = num("hrpg");
-    var a = armDiff(ae, LEAGUE_STARTER_ERA, STARTER_INNINGS, hrpg);
-    var h = armDiff(he, LEAGUE_STARTER_ERA, STARTER_INNINGS, arpg);
+    var aip = num("aip"), hip = num("hip");
+    var aw = eraWeight(aip), hw = eraWeight(hip);
+    var aeUsed = shrinkEra(ae, aip), heUsed = shrinkEra(he, hip);
+    var a = armDiff(aeUsed, LEAGUE_STARTER_ERA, STARTER_INNINGS, hrpg);
+    var h = armDiff(heUsed, LEAGUE_STARTER_ERA, STARTER_INNINGS, arpg);
     if (a !== null && h !== null) {
       var gap = (a + h) * park;
+      var shrunk = "";
+      if (aw < 1 || hw < 1) {
+        var parts = [];
+        if (aw < 1) parts.push("away " + ae.toFixed(2) + " over " + aip.toFixed(1) +
+          " IP is worth " + Math.round(aw * 100) + "% of itself, so it enters at " +
+          aeUsed.toFixed(2));
+        if (hw < 1) parts.push("home " + he.toFixed(2) + " over " + hip.toFixed(1) +
+          " IP is worth " + Math.round(hw * 100) + "% of itself, so it enters at " +
+          heUsed.toFixed(2));
+        shrunk = " Pulled toward the league on sample size: " + parts.join("; ") +
+          ". An ERA is worth half the league prior at " + Math.round(ERA_STABLE_AT) +
+          " innings, which is why a short season cannot carry a card.";
+      }
       estimates.push(est("Starters", anchor + gap, w.starters,
-        "Away " + ae.toFixed(2) + " and home " + he.toFixed(2) + " against a " +
+        "Away " + aeUsed.toFixed(2) + " and home " + heUsed.toFixed(2) + " against a " +
         LEAGUE_STARTER_ERA.toFixed(2) + " league starter ERA, over the " +
         STARTER_INNINGS.toFixed(1) + " innings a start now covers: " + sgn(gap) +
         " runs on the line. Two league-average arms move it by exactly zero, which is what " +
-        "keeps this from carrying a hidden lean."));
+        "keeps this from carrying a hidden lean." + shrunk));
     } else if (a !== null || h !== null) {
       notes.push("Only one starter's ERA is in. A differential needs both arms, so the " +
                  "starters are out of the blend and their weight has gone to what is left.");
@@ -1778,7 +1823,7 @@
   }
 
   // ---- wiring ----------------------------------------------------------
-  var MLB_IDS = ["away","home","line","op","up","opened","gdate","aera","hera","arpg","hrpg",
+  var MLB_IDS = ["away","home","line","op","up","opened","gdate","aera","hera","aip","hip","arpg","hrpg",
                  "abp","hbp","al10","hl10","h2h","h2hn","pf","mph","dir","temp","tick","cash"];
   var NFL_IDS = ["away","home","line","op","up","gdate","anet","hnet","gp","nopened"];
   var ALL = MLB_IDS.concat(NFL_IDS).filter(function (v, i, a) { return a.indexOf(v) === i; });

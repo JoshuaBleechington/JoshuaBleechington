@@ -83,6 +83,40 @@ STARTER_INNINGS = 5.4
 BULLPEN_INNINGS = 9.0 - STARTER_INNINGS
 UNEARNED_MULTIPLIER = 1.08     # ERA counts earned runs; totals settle on all
 
+# --- how much a starter's own ERA is worth knowing -------------------------
+# An ERA is a measurement, and a short one is a noisy measurement. Without
+# this block a September call-up's 5.24 in 22 innings carries exactly the
+# authority of an ace's 5.24 in 190, which is plainly wrong and was costing
+# whole runs of projection on call-up starts.
+#
+# Two numbers turn an innings count into a weight. Both are derived.
+#
+# ERA_OVERDISPERSION -- earned runs are not Poisson. They arrive in clusters,
+# because the event that scores a run tends to score the two men already on.
+# Measured at 1.75x Poisson variance, the same figure used elsewhere here.
+#
+# STARTER_TALENT_SD -- qualified starters' ERAs are spread about 1.05 apart.
+# At a full season's ~150 innings the measurement noise alone is 0.60. Real
+# spread and noise add in variance, so they subtract the same way:
+# sqrt(1.05^2 - 0.60^2) = 0.86. Most of the gap between two starters at this
+# point in a season is real talent. Not all of it.
+ERA_OVERDISPERSION = 1.75
+STARTER_TALENT_SD = 0.85
+
+# The innings count at which a starter's own number is worth exactly as much
+# as the league prior -- where you would split the difference 50/50. This is
+# not chosen. It falls out of the two constants above:
+#
+#   measurement variance of an ERA over n innings = 9 * overdispersion * ERA / n
+#   weight on the observation = talent_var / (talent_var + measurement_var)
+#                             = n / (n + 9 * overdispersion * ERA / talent_var)
+#
+# The trailing term is this constant, about 91 innings. A call-up with 22
+# innings keeps 20% of his own ERA and takes 80% of the league's. A starter
+# at 143 innings keeps 61%. Nobody ever keeps 100%, which is correct: a
+# season is a sample, not a reading.
+ERA_STABLE_AT = 9.0 * ERA_OVERDISPERSION * LEAGUE_STARTER_ERA / STARTER_TALENT_SD ** 2
+
 # Measured, not chosen: the standard deviation of (final total - posted line)
 # over 116 settled MLB games.
 RESIDUAL_SD = {"MLB": 4.39}
@@ -155,6 +189,7 @@ POINTS_LEADING_SCORER_OUT = 3.5
 
 PLAUSIBLE = {
     "era": (0.00, 15.0),
+    "innings": (0.0, 400.0),
     "park": (70.0, 130.0),
     "mlb_total": (4.0, 20.0),
     "price": (-100000.0, 100000.0),
@@ -487,6 +522,36 @@ def park_scale(park_factor: float | None) -> float:
     return park_factor / 100.0 if _ok(park_factor, "park") else 1.0
 
 
+def era_weight(innings: float | None) -> float:
+    """How much of a starter's own ERA survives, given his innings count.
+
+    Returns 1.0 when innings are unknown. That is deliberate and it is what
+    keeps this change invisible to every card logged before it existed: leave
+    the field blank and the ERA goes in at face value, exactly as it always
+    did. The weight only ever comes down, never up, so supplying innings can
+    only ever pull a starter toward league average -- it cannot manufacture
+    an extreme.
+    """
+    if innings is None or not _ok(innings, "innings") or innings <= 0:
+        return 1.0
+    return innings / (innings + ERA_STABLE_AT)
+
+
+def shrink_era(era: float | None, innings: float | None,
+               league: float = LEAGUE_STARTER_ERA) -> float | None:
+    """A starter's ERA pulled toward the league on the strength of its sample.
+
+    Empirical Bayes, with the league mean as the prior and the innings count
+    setting the weight. The posted 5.24 of a man with 22 innings is not a
+    claim that he allows 5.24 runs per nine; it is a noisy reading whose 68%
+    interval runs from 3.5 to 7.0. This returns the middle of what the number
+    actually supports.
+    """
+    if era is None:
+        return None
+    return league + era_weight(innings) * (era - league)
+
+
 def arm_differential(era: float | None, league: float, innings: float,
                      opponent_rpg: float | None) -> float | None:
     """What this arm is worth RELATIVE to a league-average one, in runs.
@@ -516,6 +581,8 @@ def forecast_mlb(
     under_price: float | None = None,
     away_starter_era: float | None = None,
     home_starter_era: float | None = None,
+    away_starter_ip: float | None = None,
+    home_starter_ip: float | None = None,
     away_rpg: float | None = None,
     home_rpg: float | None = None,
     away_bullpen_era: float | None = None,
@@ -544,10 +611,30 @@ def forecast_mlb(
     estimates = [Estimate("Market", anchor, w["market"], anchor_detail)]
 
     # --- starters, as a differential ---------------------------------------
-    a = arm_differential(away_starter_era, LEAGUE_STARTER_ERA, STARTER_INNINGS, home_rpg)
-    h = arm_differential(home_starter_era, LEAGUE_STARTER_ERA, STARTER_INNINGS, away_rpg)
+    # Each ERA is first pulled toward the league by how many innings stand
+    # behind it. Blank innings means no pull at all, so a card typed the old
+    # way scores the old way to the decimal.
+    aw, hw = era_weight(away_starter_ip), era_weight(home_starter_ip)
+    away_era_used = shrink_era(away_starter_era, away_starter_ip)
+    home_era_used = shrink_era(home_starter_era, home_starter_ip)
+    a = arm_differential(away_era_used, LEAGUE_STARTER_ERA, STARTER_INNINGS, home_rpg)
+    h = arm_differential(home_era_used, LEAGUE_STARTER_ERA, STARTER_INNINGS, away_rpg)
     if a is not None and h is not None:
         gap = (a + h) * park
+        shrunk = ""
+        if aw < 1.0 or hw < 1.0:
+            parts = []
+            if aw < 1.0:
+                parts.append(f"away {away_starter_era:.2f} over {away_starter_ip:.1f} IP "
+                             f"is worth {aw:.0%} of itself, so it enters at "
+                             f"{away_era_used:.2f}")
+            if hw < 1.0:
+                parts.append(f"home {home_starter_era:.2f} over {home_starter_ip:.1f} IP "
+                             f"is worth {hw:.0%} of itself, so it enters at "
+                             f"{home_era_used:.2f}")
+            shrunk = (" Pulled toward the league on sample size: " + "; ".join(parts) +
+                      f". An ERA is worth half the league prior at {ERA_STABLE_AT:.0f} "
+                      "innings, which is why a short season cannot carry a card.")
         # Anchored to the market's FAIR mean, not the posted line. Anchoring a
         # differential to the line while the market estimate sits at the fair
         # mean makes a zero differential drag the blend down toward the line --
@@ -555,11 +642,11 @@ def forecast_mlb(
         # the same class of hidden lean this rewrite exists to remove.
         estimates.append(Estimate(
             "Starters", anchor + gap, w["starters"],
-            f"Away {away_starter_era:.2f} and home {home_starter_era:.2f} against a "
+            f"Away {away_era_used:.2f} and home {home_era_used:.2f} against a "
             f"{LEAGUE_STARTER_ERA:.2f} league starter ERA, over the {STARTER_INNINGS:.1f} "
             f"innings a start now covers: {gap:+.2f} runs on the line. Two league-average "
             "arms move it by exactly zero, which is what keeps this from carrying a "
-            "hidden lean."))
+            "hidden lean." + shrunk))
     elif a is not None or h is not None:
         notes.append("Only one starter's ERA is in. A differential needs both arms, so "
                      "the starters are out of the blend and their weight has gone to "

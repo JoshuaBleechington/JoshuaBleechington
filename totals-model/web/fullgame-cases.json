@@ -25,7 +25,9 @@
       "temp": null,
       "dome": null,
       "tick": null,
-      "cash": null
+      "cash": null,
+      "aip": null,
+      "hip": null
     },
     "expect": {
       "side": "OVER",
@@ -68,7 +70,9 @@
       "temp": null,
       "dome": null,
       "tick": null,
-      "cash": null
+      "cash": null,
+      "aip": null,
+      "hip": null
     },
     "expect": {
       "side": "OVER",
@@ -111,7 +115,9 @@
       "temp": 70,
       "dome": null,
       "tick": null,
-      "cash": null
+      "cash": null,
+      "aip": null,
+      "hip": null
     },
     "expect": {
       "side": "OVER",
@@ -154,7 +160,9 @@
       "temp": null,
       "dome": null,
       "tick": null,
-      "cash": null
+      "cash": null,
+      "aip": null,
+      "hip": null
     },
     "expect": {
       "side": "OVER",
@@ -197,7 +205,9 @@
       "temp": null,
       "dome": null,
       "tick": null,
-      "cash": null
+      "cash": null,
+      "aip": null,
+      "hip": null
     },
     "expect": {
       "side": "UNDER",
@@ -240,7 +250,9 @@
       "temp": null,
       "dome": null,
       "tick": null,
-      "cash": null
+      "cash": null,
+      "aip": null,
+      "hip": null
     },
     "expect": {
       "side": "OVER",
@@ -283,7 +295,9 @@
       "temp": null,
       "dome": null,
       "tick": null,
-      "cash": null
+      "cash": null,
+      "aip": null,
+      "hip": null
     },
     "expect": {
       "side": "UNDER",
@@ -326,7 +340,9 @@
       "temp": null,
       "dome": null,
       "tick": null,
-      "cash": null
+      "cash": null,
+      "aip": null,
+      "hip": null
     },
     "expect": {
       "side": "OVER",
@@ -369,7 +385,9 @@
       "temp": null,
       "dome": null,
       "tick": null,
-      "cash": null
+      "cash": null,
+      "aip": null,
+      "hip": null
     },
     "expect": {
       "side": "OVER",
@@ -412,7 +430,9 @@
       "temp": null,
       "dome": null,
       "tick": null,
-      "cash": null
+      "cash": null,
+      "aip": null,
+      "hip": null
     },
     "expect": {
       "side": "OVER",
@@ -455,7 +475,9 @@
       "temp": null,
       "dome": null,
       "tick": null,
-      "cash": null
+      "cash": null,
+      "aip": null,
+      "hip": null
     },
     "expect": {
       "side": "OVER",
@@ -498,7 +520,9 @@
       "temp": null,
       "dome": null,
       "tick": null,
-      "cash": null
+      "cash": null,
+      "aip": null,
+      "hip": null
     },
     "expect": {
       "side": "UNDER",
@@ -541,7 +565,9 @@
       "temp": null,
       "dome": null,
       "tick": null,
-      "cash": null
+      "cash": null,
+      "aip": null,
+      "hip": null
     },
     "expect": {
       "side": "OVER",
@@ -584,7 +610,9 @@
       "temp": null,
       "dome": null,
       "tick": null,
-      "cash": null
+      "cash": null,
+      "aip": null,
+      "hip": null
     },
     "expect": {
       "side": "OVER",
@@ -627,7 +655,9 @@
       "temp": null,
       "dome": null,
       "tick": null,
-      "cash": null
+      "cash": null,
+      "aip": null,
+      "hip": null
     },
     "expect": {
       "side": "OVER",
@@ -670,7 +700,9 @@
       "temp": null,
       "dome": null,
       "tick": null,
-      "cash": null
+      "cash": null,
+      "aip": null,
+      "hip": null
     },
     "expect": {
       "side": "UNDER",
@@ -713,7 +745,9 @@
       "temp": null,
       "dome": null,
       "tick": null,
-      "cash": null
+      "cash": null,
+      "aip": null,
+      "hip": null
     },
     "expect": {
       "side": "OVER",
@@ -756,7 +790,9 @@
       "temp": 98,
       "dome": true,
       "tick": null,
-      "cash": null
+      "cash": null,
+      "aip": null,
+      "hip": null
     },
     "expect": {
       "side": "OVER",
@@ -799,7 +835,9 @@
       "temp": null,
       "dome": null,
       "tick": null,
-      "cash": null
+      "cash": null,
+      "aip": null,
+      "hip": null
     },
     "expect": {
       "side": "OVER",
@@ -842,7 +880,9 @@
       "temp": null,
       "dome": null,
       "tick": null,
-      "cash": null
+      "cash": null,
+      "aip": null,
+      "hip": null
     },
     "expect": {
       "side": "OVER",
@@ -885,7 +925,9 @@
       "temp": null,
       "dome": null,
       "tick": null,
-      "cash": null
+      "cash": null,
+      "aip": null,
+      "hip": null
     },
     "expect": {
       "side": "OVER",
@@ -928,7 +970,9 @@
       "temp": null,
       "dome": null,
       "tick": 76,
-      "cash": 46
+      "cash": 46,
+      "aip": null,
+      "hip": null
     },
     "expect": {
       "side": "UNDER",
@@ -971,7 +1015,9 @@
       "temp": null,
       "dome": null,
       "tick": null,
-      "cash": null
+      "cash": null,
+      "aip": null,
+      "hip": null
     },
     "expect": {
       "side": "OVER",
@@ -1014,7 +1060,9 @@
       "temp": null,
       "dome": null,
       "tick": null,
-      "cash": null
+      "cash": null,
+      "aip": null,
+      "hip": null
     },
     "expect": {
       "side": "OVER",
@@ -1057,7 +1105,9 @@
       "temp": 78,
       "dome": null,
       "tick": null,
-      "cash": null
+      "cash": null,
+      "aip": null,
+      "hip": null
     },
     "expect": {
       "side": "OVER",
@@ -1100,7 +1150,9 @@
       "temp": 52,
       "dome": null,
       "tick": null,
-      "cash": null
+      "cash": null,
+      "aip": null,
+      "hip": null
     },
     "expect": {
       "side": "UNDER",
@@ -1143,7 +1195,9 @@
       "temp": 96.5,
       "dome": null,
       "tick": 55,
-      "cash": 59
+      "cash": 59,
+      "aip": null,
+      "hip": null
     },
     "expect": {
       "side": "OVER",
@@ -1186,7 +1240,9 @@
       "temp": 96.5,
       "dome": null,
       "tick": 55,
-      "cash": 59
+      "cash": 59,
+      "aip": null,
+      "hip": null
     },
     "expect": {
       "side": "OVER",
@@ -1201,6 +1257,231 @@
       "fair": -125.4899,
       "estimates": 5,
       "deltas": 2
+    }
+  },
+  {
+    "sport": "MLB",
+    "name": "starter innings blank scores exactly as before",
+    "inputs": {
+      "away": null,
+      "home": null,
+      "line": 8.5,
+      "op": -110,
+      "up": -110,
+      "opened": null,
+      "aera": 5.24,
+      "hera": 5.53,
+      "arpg": 4.4,
+      "hrpg": 4.6,
+      "abp": 3.95,
+      "hbp": 3.9,
+      "al10": null,
+      "hl10": null,
+      "h2h": null,
+      "h2hn": null,
+      "pf": null,
+      "mph": null,
+      "dir": null,
+      "temp": null,
+      "dome": null,
+      "tick": null,
+      "cash": null,
+      "aip": null,
+      "hip": null
+    },
+    "expect": {
+      "side": "OVER",
+      "band": "BET",
+      "band_ungated": "BET",
+      "p_side": 0.53507709,
+      "p_resolved": 0.53507709,
+      "p_corroborated": 0.53507709,
+      "p_push": 0.0,
+      "projected": 9.42395772,
+      "projected_core": 9.42395772,
+      "fair": -115.0894,
+      "estimates": 3,
+      "deltas": 0
+    }
+  },
+  {
+    "sport": "MLB",
+    "name": "a call-up's ERA is discounted to a fifth of itself",
+    "inputs": {
+      "away": null,
+      "home": null,
+      "line": 8.5,
+      "op": -110,
+      "up": -110,
+      "opened": null,
+      "aera": 5.24,
+      "hera": 5.53,
+      "arpg": 4.4,
+      "hrpg": 4.6,
+      "abp": 3.95,
+      "hbp": 3.9,
+      "al10": null,
+      "hl10": null,
+      "h2h": null,
+      "h2hn": null,
+      "pf": null,
+      "mph": null,
+      "dir": null,
+      "temp": null,
+      "dome": null,
+      "tick": null,
+      "cash": null,
+      "aip": 22.1,
+      "hip": 143.1
+    },
+    "expect": {
+      "side": "OVER",
+      "band": "NO BET",
+      "band_ungated": "NO BET",
+      "p_side": 0.51427105,
+      "p_resolved": 0.51427105,
+      "p_corroborated": 0.51427105,
+      "p_push": 0.0,
+      "projected": 9.19698608,
+      "projected_core": 9.19698608,
+      "fair": -105.8761,
+      "estimates": 3,
+      "deltas": 0
+    }
+  },
+  {
+    "sport": "MLB",
+    "name": "two full seasons are discounted only mildly",
+    "inputs": {
+      "away": null,
+      "home": null,
+      "line": 8.5,
+      "op": -110,
+      "up": -110,
+      "opened": null,
+      "aera": 5.24,
+      "hera": 5.53,
+      "arpg": 4.4,
+      "hrpg": 4.6,
+      "abp": 3.95,
+      "hbp": 3.9,
+      "al10": null,
+      "hl10": null,
+      "h2h": null,
+      "h2hn": null,
+      "pf": null,
+      "mph": null,
+      "dir": null,
+      "temp": null,
+      "dome": null,
+      "tick": null,
+      "cash": null,
+      "aip": 185.0,
+      "hip": 190.0
+    },
+    "expect": {
+      "side": "OVER",
+      "band": "NO BET",
+      "band_ungated": "NO BET",
+      "p_side": 0.52334979,
+      "p_resolved": 0.52334979,
+      "p_corroborated": 0.52334979,
+      "p_push": 0.0,
+      "projected": 9.29558519,
+      "projected_core": 9.29558519,
+      "fair": -109.7975,
+      "estimates": 3,
+      "deltas": 0
+    }
+  },
+  {
+    "sport": "MLB",
+    "name": "innings on one arm only still shrinks that arm",
+    "inputs": {
+      "away": null,
+      "home": null,
+      "line": 8.5,
+      "op": -110,
+      "up": -110,
+      "opened": null,
+      "aera": 5.24,
+      "hera": 5.53,
+      "arpg": 4.4,
+      "hrpg": 4.6,
+      "abp": 3.95,
+      "hbp": 3.9,
+      "al10": null,
+      "hl10": null,
+      "h2h": null,
+      "h2hn": null,
+      "pf": null,
+      "mph": null,
+      "dir": null,
+      "temp": null,
+      "dome": null,
+      "tick": null,
+      "cash": null,
+      "aip": 30.0,
+      "hip": null
+    },
+    "expect": {
+      "side": "OVER",
+      "band": "NO BET",
+      "band_ungated": "NO BET",
+      "p_side": 0.52285205,
+      "p_resolved": 0.52285205,
+      "p_corroborated": 0.52285205,
+      "p_push": 0.0,
+      "projected": 9.29016254,
+      "projected_core": 9.29016254,
+      "fair": -109.5786,
+      "estimates": 3,
+      "deltas": 0
+    }
+  },
+  {
+    "sport": "MLB",
+    "name": "an absurd innings count is ignored, not believed",
+    "inputs": {
+      "away": null,
+      "home": null,
+      "line": 8.5,
+      "op": -110,
+      "up": -110,
+      "opened": null,
+      "aera": 5.24,
+      "hera": 5.53,
+      "arpg": 4.4,
+      "hrpg": 4.6,
+      "abp": 3.95,
+      "hbp": 3.9,
+      "al10": null,
+      "hl10": null,
+      "h2h": null,
+      "h2hn": null,
+      "pf": null,
+      "mph": null,
+      "dir": null,
+      "temp": null,
+      "dome": null,
+      "tick": null,
+      "cash": null,
+      "aip": 9999.0,
+      "hip": -4.0
+    },
+    "expect": {
+      "side": "OVER",
+      "band": "BET",
+      "band_ungated": "BET",
+      "p_side": 0.53507709,
+      "p_resolved": 0.53507709,
+      "p_corroborated": 0.53507709,
+      "p_push": 0.0,
+      "projected": 9.42395772,
+      "projected_core": 9.42395772,
+      "fair": -115.0894,
+      "estimates": 3,
+      "deltas": 0
     }
   }
 ]

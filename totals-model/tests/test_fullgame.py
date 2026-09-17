@@ -1015,3 +1015,54 @@ class TestSlate(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class TestInningsMustBeFilledOnBothSidesOrNeither(unittest.TestCase):
+    """A blank innings box is not neutral, and that is easy to miss.
+
+    Blank means "trust this ERA in full", which is more authority than 210
+    innings earns. So shrinking one arm while the other keeps full trust tilts
+    the differential toward whichever box was left empty -- on a 3.00 against
+    5.50 card it flips the side on which box got typed into.
+    """
+
+    KW = dict(over_price=-110, under_price=-110,
+              away_starter_era=3.00, home_starter_era=5.50)
+    WARN = "one starter and not the other"
+
+    def _warned(self, f):
+        return any(self.WARN in n for n in f.notes)
+
+    def test_a_one_sided_fill_can_flip_the_side(self):
+        away = forecast_mlb("a @ b", 8.5, away_starter_ip=165.1, **self.KW)
+        home = forecast_mlb("a @ b", 8.5, home_starter_ip=165.1, **self.KW)
+        self.assertNotEqual(away.side, home.side,
+                            "if this stops flipping the warning can go")
+
+    def test_a_one_sided_fill_is_called_out(self):
+        for kw in ({"away_starter_ip": 165.1}, {"home_starter_ip": 190.0}):
+            self.assertTrue(self._warned(forecast_mlb("a @ b", 8.5, **kw, **self.KW)))
+
+    def test_both_or_neither_is_not_warned_about(self):
+        self.assertFalse(self._warned(forecast_mlb("a @ b", 8.5, **self.KW)))
+        self.assertFalse(self._warned(forecast_mlb(
+            "a @ b", 8.5, away_starter_ip=165.1, home_starter_ip=190.0, **self.KW)))
+
+    def test_an_ignored_innings_count_does_not_trip_the_warning(self):
+        """An implausible figure falls back to full trust, so the card is
+        effectively 'neither' and must not claim a one-sided fill."""
+        self.assertFalse(self._warned(forecast_mlb(
+            "a @ b", 8.5, away_starter_ip=9999.0, **self.KW)))
+
+    def test_baseball_notation_does_not_need_converting(self):
+        """165.1 means 165 and a third. Typing the decimal is harmless.
+
+        Pinned as a bound on the error rather than as equality: the gap is
+        0.00065 of weight at its worst, which is well under a thousandth of an
+        ERA point on the projection and not worth asking anyone to convert.
+        """
+        for whole in (60, 100, 165, 210):
+            for tenth, third in ((0.1, 1 / 3), (0.2, 2 / 3)):
+                self.assertLess(
+                    abs(era_weight(whole + tenth) - era_weight(whole + third)), 0.001,
+                    f"{whole}.{int(tenth * 10)} drifts too far from the true fraction")

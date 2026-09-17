@@ -1079,6 +1079,17 @@
         STARTER_INNINGS.toFixed(1) + " innings a start now covers: " + sgn(gap) +
         " runs on the line. Two league-average arms move it by exactly zero, which is what " +
         "keeps this from carrying a hidden lean." + shrunk));
+      /* A BLANK innings box is not "no shrinkage needed" — it is "trust this
+         arm completely", which is more than 210 innings earns. Filling one side
+         and leaving the other empty makes the empty arm artificially dominant;
+         on a 3.00-against-5.50 card it flips the side on which box got typed. */
+      if ((aw < 1) !== (hw < 1)) {
+        notes.push("Innings are in for one starter and not the other. A blank innings box " +
+          "means the ERA is trusted in full — more than any real innings count earns — so " +
+          "shrinking one arm while the other keeps full authority tilts the differential " +
+          "toward whichever box was left empty. On a close card that alone can flip the " +
+          "side. Fill in both or neither.");
+      }
     } else if (a !== null || h !== null) {
       notes.push("Only one starter's ERA is in. A differential needs both arms, so the " +
                  "starters are out of the blend and their weight has gone to what is left.");

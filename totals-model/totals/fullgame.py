@@ -715,6 +715,18 @@ def forecast_mlb(
             f"innings a start now covers: {gap:+.2f} runs on the line. Two league-average "
             "arms move it by exactly zero, which is what keeps this from carrying a "
             "hidden lean." + shrunk))
+        # A BLANK innings box is not "no shrinkage needed" -- it is "trust this
+        # arm completely", which is more than 210 innings earns. So filling one
+        # side and leaving the other empty makes the empty arm artificially
+        # dominant, and on a 3.00-against-5.50 card it flips the side purely on
+        # which box got typed into.
+        if (aw < 1.0) != (hw < 1.0):
+            notes.append(
+                "Innings are in for one starter and not the other. A blank innings box "
+                "means the ERA is trusted in full — more than any real innings count "
+                "earns — so shrinking one arm while the other keeps full authority "
+                "tilts the differential toward whichever box was left empty. On a close "
+                "card that alone can flip the side. Fill in both or neither.")
     elif a is not None or h is not None:
         notes.append("Only one starter's ERA is in. A differential needs both arms, so "
                      "the starters are out of the blend and their weight has gone to "

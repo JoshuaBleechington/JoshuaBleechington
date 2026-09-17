@@ -926,11 +926,45 @@
   var HOLD_REFERENCE = 0.05;
   function marketConfidence(h) { return h <= HOLD_REFERENCE ? 1 : HOLD_REFERENCE / h; }
 
+  /* ---- one price is not no price ----------------------------------------
+     A card with the over filled in and the under box empty used to have its
+     price discarded: the fallback was "assume -110/-110" and the heaviest
+     input on the board (weight 4.0) went in blind. On a real Brewers/Pirates
+     card that cost 1.8 points of probability.
+
+     The missing side is reconstructed by assuming the book charged its usual
+     margin. Both numbers are MEASURED across 133 priced cards in the logged
+     book: 5th pct 4.34% | 25th 4.62% | median 4.71% | 75th 6.44% | 90th 6.80%.
+
+     The point estimate uses the median. The CONFIDENCE is cut against the 90th
+     percentile, because a reconstructed quote is a less certain thing than a
+     real one and must not inherit the same authority — the same posture as the
+     corroboration gate, which acts on the less confident of two readings.
+
+     Hiding one side of all 133 two-priced cards and rebuilding it lands 73-78%
+     closer to the true answer than discarding the price; 122 of 133 improve. */
+  var TYPICAL_HOLD = 0.047, HOLD_90TH = 0.068;
+
+  function completePair(op, up) {
+    var haveO = op !== null, haveU = up !== null;
+    if (haveO === haveU) return null;
+    var known = implied(haveO ? op : up);
+    var other = (1 + TYPICAL_HOLD) - known;
+    // Too lopsided for the usual margin to cover: not a main line. Fall back
+    // rather than invent a price on the far side of certainty.
+    if (!(other > 0.01 && other < 0.99)) return null;
+    var otherPrice = priceFor(other);
+    return haveO ? [op, otherPrice] : [otherPrice, up];
+  }
+
   function fairTotal(sport, line, op, up) {
     var quoted = op !== null && up !== null;
+    var rebuilt = quoted ? null : completePair(op, up);
+    if (rebuilt) { op = rebuilt[0]; up = rebuilt[1]; quoted = true; }
     if (!quoted) { op = -110; up = -110; }
     var o = implied(op), u = implied(up), s = o + u;
-    var bookHold = s - 1, conf = marketConfidence(bookHold);
+    var bookHold = s - 1;
+    var conf = marketConfidence(rebuilt ? HOLD_90TH : bookHold);
     var rawOver = o / s;
     var pOver = 0.5 + (rawOver - 0.5) * conf;
     var lo = Math.max(0.5, line - 4), hi = line + 4;
@@ -952,7 +986,18 @@
         (conf * 100).toFixed(0) + "% of it is kept. Enter the main line and its prices if you " +
         "have them."
       : "";
-    var why = quoted
+    var why = rebuilt
+      ? ("Only one price was given, so the other side was reconstructed at the " +
+         (TYPICAL_HOLD * 100).toFixed(1) + "% hold this book typically charges (measured " +
+         "across the logged card), giving " + sgn(op, 0) + "/" + sgn(up, 0) + ". That " +
+         "de-vigs to " + (pOver * 100).toFixed(1) + "% over and puts fair at " + mu.toFixed(2) +
+         " rather than the " + line + " posted — a one-sided price still says which way the " +
+         "market leans. Because the hold here is assumed rather than observed, the confidence " +
+         "is cut against the " + (HOLD_90TH * 100).toFixed(1) + "% this book charges at its " +
+         "90th percentile, so only " + (conf * 100).toFixed(0) + "% of the " +
+         (rawOver * 100).toFixed(1) + "% read is kept. Enter both prices and none of this " +
+         "guesswork is needed.")
+      : quoted
       ? (sgn(op, 0) + "/" + sgn(up, 0) + " de-vigs to " + (pOver * 100).toFixed(1) +
          "% over (" + (bookHold * 100).toFixed(2) + "% hold), which is the market saying fair is " +
          mu.toFixed(2) + " rather than the " + line + " it posted." + tail)

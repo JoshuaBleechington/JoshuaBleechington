@@ -297,6 +297,50 @@ def hold(over_price: float, under_price: float) -> float:
 # one here: it would have made the alt line more confident, not less.
 HOLD_REFERENCE = 0.05
 
+# --- one price is not no price ---------------------------------------------
+# A card with the over at -120 and the under box left empty used to have its
+# price thrown away entirely: `fair_total` fell back to "assume -110/-110" and
+# the heaviest input on the board (weight 4.0) went in blind. On a real card
+# that cost 1.8 points of probability -- a -120 over is the book saying fair
+# sits north of the posted number, and that survives perfectly well without its
+# partner.
+#
+# The missing side is reconstructed by assuming the book charged its usual
+# margin. Both numbers below are MEASURED on 133 priced cards in the logged
+# book, not chosen:
+#
+#     5th pct 4.34% | 25th 4.62% | median 4.71% | 75th 6.44% | 90th 6.80%
+#
+# The point estimate uses the median. The CONFIDENCE uses the 90th percentile,
+# because a reconstructed quote is a less certain thing than a real one and
+# should not be handed the same authority. That is the same posture as the
+# corroboration gate: when two readings are available, act on the less
+# confident one. At a -120 over it keeps 51.5% rather than the 52.0% a real
+# 4.71%-hold pair would have given.
+TYPICAL_HOLD = 0.047
+HOLD_90TH = 0.068
+
+
+def complete_pair(over_price: float | None,
+                  under_price: float | None) -> tuple[float, float] | None:
+    """Reconstruct a missing side of a quote at the book's usual margin.
+
+    Returns None when both sides are present (nothing to do) or when neither
+    is (nothing to work from).
+    """
+    have_o = over_price is not None
+    have_u = under_price is not None
+    if have_o == have_u:
+        return None
+    known = implied(over_price if have_o else under_price)
+    other = (1.0 + TYPICAL_HOLD) - known
+    # A quote so lopsided that the usual margin cannot cover it is not a main
+    # line. Fall back rather than invent a price on the far side of certainty.
+    if not (0.01 < other < 0.99):
+        return None
+    other_price = price_for(other)
+    return (over_price, other_price) if have_o else (other_price, under_price)
+
 
 def market_confidence(book_hold: float) -> float:
     """How much of a de-vigged deviation from even to keep, 0 to 1."""
@@ -305,18 +349,24 @@ def market_confidence(book_hold: float) -> float:
     return HOLD_REFERENCE / book_hold
 
 
-def devig(over_price: float, under_price: float,
-          shrink: bool = True) -> tuple[float, float]:
+def devig(over_price: float, under_price: float, shrink: bool = True,
+          confidence_hold: float | None = None) -> tuple[float, float]:
     """Strip the hold. Returns (fair P over, fair P under).
 
     With ``shrink`` the deviation from even is regressed for an unusually wide
     market; pass False for the raw proportional figure.
+
+    ``confidence_hold`` cuts the confidence against a different hold than the
+    one the pair actually shows. It exists for a reconstructed quote, whose
+    hold is assumed rather than observed and which therefore must not inherit
+    the full authority of a real one.
     """
     o, u = implied(over_price), implied(under_price)
     s = o + u
     p_over = o / s
     if shrink:
-        p_over = 0.5 + (p_over - 0.5) * market_confidence(s - 1.0)
+        against = (s - 1.0) if confidence_hold is None else confidence_hold
+        p_over = 0.5 + (p_over - 0.5) * market_confidence(against)
     return p_over, 1.0 - p_over
 
 
@@ -331,6 +381,10 @@ def fair_total(sport: str, line: float, over_price: float | None,
     and the previous model threw it away.
     """
     quoted = over_price is not None and under_price is not None
+    rebuilt = None if quoted else complete_pair(over_price, under_price)
+    if rebuilt is not None:
+        over_price, under_price = rebuilt
+        quoted = True
     if not quoted:
         # A posted line is NOT a mean. It is the point the market believes
         # splits the two sides evenly, and for a right-skewed count
@@ -343,7 +397,8 @@ def fair_total(sport: str, line: float, over_price: float | None,
         # assumption is an evenly-priced market, -110 both ways, and the
         # anchor is solved for exactly as it is when prices are given.
         over_price, under_price = -110.0, -110.0
-    p_over, _ = devig(over_price, under_price)
+    p_over, _ = devig(over_price, under_price,
+                      confidence_hold=None if rebuilt is None else HOLD_90TH)
     lo, hi = max(0.5, line - 4.0), line + 4.0
     for _ in range(80):                        # bisection: monotone in mu
         mid = (lo + hi) / 2.0
@@ -370,6 +425,19 @@ def fair_total(sport: str, line: float, over_price: float | None,
             "so the average game finishes above the number that divides the two sides."
         )
     raw, _ = devig(over_price, under_price, shrink=False)
+    if rebuilt is not None:
+        kept = market_confidence(HOLD_90TH)
+        return mu, (
+            f"Only one price was given, so the other side was reconstructed at the "
+            f"{TYPICAL_HOLD * 100:.1f}% hold this book typically charges (measured across the "
+            f"logged card), giving {over_price:+.0f}/{under_price:+.0f}. That de-vigs to "
+            f"{p_over * 100:.1f}% over and puts fair at {mu:.2f} rather than the {line:g} "
+            f"posted — a one-sided price still says which way the market leans. Because the "
+            f"hold here is assumed rather than observed, the confidence is cut against the "
+            f"{HOLD_90TH * 100:.1f}% this book charges at its 90th percentile, so only "
+            f"{kept * 100:.0f}% of the {raw * 100:.1f}% read is kept. Enter both prices and "
+            f"none of this guesswork is needed."
+        )
     tail = ""
     if conf < 1.0:
         tail = (f" That is a {book_hold * 100:.1f}% hold where a main line runs "

@@ -314,6 +314,75 @@ displayed, never scored.
 **Park factor on the market anchor.** The posted number already holds the park.
 It scales the differentials and the wind and nothing else.
 
+## One price is not no price
+
+Added 2026-09-17, from a real card: Brewers at Pirates, over **−120**, under box
+left empty. The model reported OVER 51.3%.
+
+`fair_total` required *both* prices to de-vig. With one side missing it fell
+back to "assume −110/−110" and **threw the price away entirely** — so the input
+carrying weight 4.0, the heaviest thing in the blend, went in blind. A −120 over
+is the book saying fair sits north of the posted number, and that survives
+perfectly well without its partner.
+
+### The missing side is reconstructed, not invented
+
+Assume the book charged its usual margin, and solve for the other price. Both
+constants are **measured across 133 priced cards in the logged book**, not
+chosen:
+
+| 5th | 25th | median | 75th | 90th | 95th |
+|---|---|---|---|---|---|
+| 4.34% | 4.62% | **4.71%** | 6.44% | **6.80%** | 7.11% |
+
+The point estimate uses the **median**. The confidence is cut against the **90th
+percentile**, because a reconstructed quote is a less certain thing than a real
+one and must not inherit the same authority. That is the same posture as the
+corroboration gate: when two readings are available, act on the less confident.
+
+A lone −120 over therefore reads 51.5% rather than the 52.1% a real 4.71%-hold
+pair would have given, and the card says so in full:
+
+> *Only one price was given, so the other side was reconstructed at the 4.7%
+> hold this book typically charges… Because the hold here is assumed rather than
+> observed, the confidence is cut against the 6.8% this book charges at its 90th
+> percentile, so only 74% of the 52.1% read is kept. Enter both prices and none
+> of this guesswork is needed.*
+
+### The ablation, which is the real test
+
+Hide one side of all 133 two-priced cards, rebuild it, and compare against the
+answer the full quote actually gives:
+
+| | mean projection error | wrong side | wrong band |
+|---|---|---|---|
+| price discarded (old) | 0.209 runs | 14 | 43 |
+| **reconstructed, under hidden** | **0.056 runs** | **4** | **14** |
+| **reconstructed, over hidden** | **0.046 runs** | **4** | **13** |
+
+**73–78% closer**, and **122 of 133 cards improve** against 11 that get worse
+(z = 9.6). Graded against the real finals on 122 settled cards, Brier goes
+0.2478 → 0.2442, against 0.2448 for the true two-priced answer — it lands on
+the truth rather than merely nearer it.
+
+### Guards
+
+It fires **only** when exactly one price is present. Both prices, or neither,
+behave exactly as before — all 33 pre-existing fixtures regenerate
+byte-identical. A quote so lopsided that the usual margin cannot cover it
+(roughly +1650 or longer) falls back rather than inventing a price on the far
+side of certainty.
+
+One test expectation of mine was wrong and the suite caught it: I asserted a
+lone −140 over and a lone −140 under move the anchor by the same number of runs.
+They do not, and should not — the reconstruction is exactly symmetric in
+*probability*, but the run distribution is right-skewed, so the map from
+probability to mean is not linear. The test now pins the property that is
+actually true.
+
+The card that prompted this goes from OVER 51.3% to **OVER 52.6%**, and is still
+NO BET: −120 demands 54.55%, so the margin is −1.96 points either way.
+
 ## A starter's ERA is a measurement, not a reading
 
 Added 2026-09-16, **off by default**, and the backtest below does not prove it

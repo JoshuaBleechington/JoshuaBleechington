@@ -35,6 +35,9 @@ from totals.fullgame import (
     fair_total,
     hold,
     market_confidence,
+    complete_pair,
+    TYPICAL_HOLD,
+    HOLD_90TH,
     forecast_mlb,
     h2h_weight,
     implied,
@@ -587,6 +590,100 @@ class TestGuards(unittest.TestCase):
     def test_an_impossible_era_is_ignored_rather_than_believed(self):
         f = forecast_mlb("a @ b", 8.5, away_starter_era=99.0, home_starter_era=4.16)
         self.assertNotIn("Starters", [e.name for e in f.estimates])
+
+
+class TestOnePriceIsNotNoPrice(unittest.TestCase):
+    """A card with only the over filled in used to throw the price away.
+
+    `fair_total` fell back to "assume -110/-110" and the heaviest input on the
+    board went in blind. On a real Brewers/Pirates card that cost 1.8 points of
+    probability. A -120 over is the book saying fair sits north of the posted
+    number, and that survives without its partner.
+    """
+
+    def test_a_complete_quote_is_left_alone(self):
+        """The whole change must be invisible when both prices are given."""
+        self.assertIsNone(complete_pair(-120, 100))
+        for op, up in ((-110, -110), (-120, 100), (-150, 125), (105, -125)):
+            a = forecast_mlb("a @ b", 8.5, over_price=op, under_price=up)
+            self.assertEqual(a.projected, forecast_mlb(
+                "a @ b", 8.5, over_price=op, under_price=up).projected)
+            self.assertNotIn("reconstructed", a.estimates[0].detail)
+
+    def test_no_price_at_all_still_falls_back_the_old_way(self):
+        self.assertIsNone(complete_pair(None, None))
+        f = forecast_mlb("a @ b", 8.5)
+        self.assertAlmostEqual(f.p_resolved, 0.5, places=9)
+        self.assertIn("No prices given", f.estimates[0].detail)
+
+    def test_a_lone_over_price_pushes_the_anchor_up(self):
+        blind = fair_total("MLB", 8.5, None, None)[0]
+        lone = fair_total("MLB", 8.5, -120, None)[0]
+        self.assertGreater(lone, blind, "a -120 over says fair is north of the line")
+        self.assertIn("reconstructed", fair_total("MLB", 8.5, -120, None)[1])
+
+    def test_a_lone_under_price_pushes_the_anchor_down(self):
+        blind = fair_total("MLB", 8.5, None, None)[0]
+        lone = fair_total("MLB", 8.5, None, -120)[0]
+        self.assertLess(lone, blind)
+
+    def test_the_two_sides_are_mirror_images_in_probability(self):
+        """A lone -140 over and a lone -140 under must lean equally hard.
+
+        The symmetry lives in the PROBABILITY, not in the mean. Asserting that
+        the anchor moves by the same number of runs each way fails by 0.012,
+        and that failure is correct: the run distribution is right-skewed, so
+        the map from probability to mean is not linear. The reconstruction
+        itself is exactly symmetric and that is what gets pinned.
+        """
+        for price in (-120, -140, -175):
+            o = complete_pair(price, None)
+            u = complete_pair(None, price)
+            self.assertAlmostEqual(devig(*o, shrink=False)[0] - 0.5,
+                                   0.5 - devig(*u, shrink=False)[0], places=12)
+        # and the anchor still moves the right way on each side
+        blind = fair_total("MLB", 8.5, None, None)[0]
+        self.assertGreater(fair_total("MLB", 8.5, -140, None)[0], blind)
+        self.assertLess(fair_total("MLB", 8.5, None, -140)[0], blind)
+
+    def test_a_reconstructed_quote_does_not_get_full_authority(self):
+        """Its hold is assumed, not observed, so it is cut against the 90th
+        percentile of what this book actually charges."""
+        rebuilt = complete_pair(-120, None)
+        raw, _ = devig(rebuilt[0], rebuilt[1], shrink=False)
+        kept, _ = devig(rebuilt[0], rebuilt[1], confidence_hold=HOLD_90TH)
+        self.assertLess(abs(kept - 0.5), abs(raw - 0.5))
+        self.assertAlmostEqual(kept - 0.5, (raw - 0.5) * market_confidence(HOLD_90TH),
+                               places=9)
+        self.assertLess(market_confidence(HOLD_90TH), 1.0)
+
+    def test_it_never_invents_a_price_past_certainty(self):
+        """A longshot so long the usual hold cannot cover it falls back."""
+        self.assertIsNone(complete_pair(+2000, None))
+        f = forecast_mlb("a @ b", 8.5, over_price=+2000)
+        self.assertIn("No prices given", f.estimates[0].detail)
+
+    def test_the_reconstruction_beats_discarding_the_price(self):
+        """The property the whole change rests on, on real-shaped quotes.
+
+        Measured across 133 logged two-priced cards it lands 73-78% closer to
+        the true answer and 122 of 133 improve; this pins the direction.
+        """
+        for op, up in ((-120, 100), (-140, 105), (-150, 120), (-105, -115), (100, -120)):
+            truth = fair_total("MLB", 8.5, op, up)[0]
+            blind = fair_total("MLB", 8.5, None, None)[0]
+            rebuilt_o = fair_total("MLB", 8.5, op, None)[0]
+            rebuilt_u = fair_total("MLB", 8.5, None, up)[0]
+            for got in (rebuilt_o, rebuilt_u):
+                self.assertLess(abs(got - truth), abs(blind - truth),
+                                f"{op}/{up}: reconstruction was no better than discarding")
+
+    def test_the_measured_hold_constants_are_what_the_book_charges(self):
+        """These are measured on the logged card, so they must stay ordered and
+        stay in the range a main line actually trades at."""
+        self.assertLess(TYPICAL_HOLD, HOLD_90TH)
+        self.assertLess(0.02, TYPICAL_HOLD)
+        self.assertLess(HOLD_90TH, 0.10)
 
 
 class TestTheGuardIsMeasuredNotRemembered(unittest.TestCase):

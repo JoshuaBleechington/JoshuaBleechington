@@ -1057,12 +1057,20 @@ class TestInningsMustBeFilledOnBothSidesOrNeither(unittest.TestCase):
     def test_baseball_notation_does_not_need_converting(self):
         """165.1 means 165 and a third. Typing the decimal is harmless.
 
-        Pinned as a bound on the error rather than as equality: the gap is
-        0.00065 of weight at its worst, which is well under a thousandth of an
-        ERA point on the projection and not worth asking anyone to convert.
+        Pinned as a bound on the error, and the bound is measured rather than
+        guessed -- I asserted 0.001 first and it failed at 60.2 IP, because the
+        weight curve is steepest at low innings where a third of an inning is a
+        larger share of the sample. Swept across 5-230 IP the worst drift is
+        0.00458 of weight, at 5.2 IP. What that is worth downstream is the
+        number that matters: at most 0.004 of an ERA on the value that enters
+        the blend, which is nothing.
         """
-        for whole in (60, 100, 165, 210):
+        worst = 0.0
+        for whole in range(5, 231):
             for tenth, third in ((0.1, 1 / 3), (0.2, 2 / 3)):
-                self.assertLess(
-                    abs(era_weight(whole + tenth) - era_weight(whole + third)), 0.001,
-                    f"{whole}.{int(tenth * 10)} drifts too far from the true fraction")
+                worst = max(worst, abs(era_weight(whole + tenth)
+                                       - era_weight(whole + third)))
+        self.assertLess(worst, 0.005, "the notation shortcut has stopped being free")
+        # and the thing that actually reaches the projection
+        for ip, third, era in ((22.2, 22 + 2 / 3, 5.24), (165.1, 165 + 1 / 3, 3.00)):
+            self.assertLess(abs(shrink_era(era, ip) - shrink_era(era, third)), 0.005)

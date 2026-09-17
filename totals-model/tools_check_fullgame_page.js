@@ -419,6 +419,66 @@ const CHECKS = ["dome", "aqb", "hqb"];
   chk(JSON.stringify(mig.grades) === JSON.stringify(['WIN', 'WIN']),
       'backfill: the grades still read the same', mig.grades.join('|'));
 
+  // ---- the guard is measured, not remembered -----------------------------
+  // It replaced a hardcoded OVERCONFIDENCE = 3.0 whose comment claimed a live
+  // measurement that had since gone stale.
+  const seed = async (rows) => {
+    await pg.evaluate((rows) => {
+      localStorage.setItem('callsheet.fullgame.card.v1', JSON.stringify(rows));
+    }, rows);
+    await pg.reload();
+    await pg.waitForTimeout(300);
+    return pg.evaluate(() => {
+      const g = document.getElementById('guardNote'), s = document.getElementById('spreadNote');
+      return {
+        guard: g ? g.textContent : null,
+        spread: s ? s.textContent : null,
+        margin: (document.querySelectorAll('.cline')[1] || {}).textContent || '',
+      };
+    });
+  };
+  const mk = (prob, line, final) => ({
+    matchup: 'Reds @ Cubs', sport: 'MLB', line, projected: '9.0', side: 'OVER',
+    prob: String(prob), band: 'BET', fair: '-120', final: String(final),
+    inputs: { away: 'Reds', home: 'Cubs', line: String(line), op: '-110', up: '-110' },
+  });
+
+  // an ungraded card cannot establish any margin
+  const none = await seed([{ ...mk(55, 8.5, 9), final: null }]);
+  chk(none.guard === null, 'guard: an ungraded card prints no measured guard',
+      String(none.guard));
+
+  // a perfectly calibrated long card: bias 0, guard is pure noise and small
+  const calm = [];
+  for (let i = 0; i < 400; i++) calm.push(mk(55, 8.5, i % 100 < 55 ? 9 : 8));
+  const good = await seed(calm);
+  chk(/Margin guard: 2\.5 points/.test(good.guard),
+      'guard: 400 calibrated calls give a 2.5-point guard, all of it noise',
+      good.guard);
+  chk(/overconfidence 0\.0 points/i.test(good.guard),
+      'guard: beating your stated number does not earn a thinner bet', good.guard);
+
+  // an overconfident card carries the bias on top of the noise
+  const hot = [];
+  for (let i = 0; i < 400; i++) hot.push(mk(70, 8.5, i % 100 < 45 ? 9 : 8));
+  const bad = await seed(hot);
+  chk(/overconfidence 2[45]\.\d points/i.test(bad.guard),
+      'guard: a measured overconfidence is carried in full', bad.guard);
+  chk(parseFloat(bad.guard.match(/Margin guard: ([\d.]+)/)[1]) > 25,
+      'guard: and the guard exceeds it once noise is added', bad.guard);
+
+  // the dispersion check reports, and flags when the constant is outside
+  chk(/assumes 4\.39/.test(bad.spread), 'spread: it names the constant in use', bad.spread);
+  const tight = [];
+  for (let i = 0; i < 200; i++) tight.push(mk(55, 8.5, i % 2 ? 9 : 8));
+  const narrow = await seed(tight);
+  chk(/outside/i.test(narrow.spread),
+      'spread: a spread far from 4.39 is flagged rather than silently refitted',
+      narrow.spread);
+  chk(/assumes 4\.39/.test(narrow.spread),
+      'spread: and the constant is still 4.39 — it reports, it never refits',
+      narrow.spread);
+
   if (errs.length) { console.log('PAGE ERRORS:\n' + errs.join('\n')); fails++; }
   console.log(fails ? `\n${fails} FAILED` : `\nall checks passed (${CASES.length} cases)`);
   await b.close();

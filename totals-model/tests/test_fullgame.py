@@ -29,6 +29,8 @@ from totals.fullgame import (
     WEIGHTS,
     arm_differential,
     calibration,
+    margin_guard,
+    residual_spread,
     devig,
     fair_total,
     hold,
@@ -585,6 +587,81 @@ class TestGuards(unittest.TestCase):
     def test_an_impossible_era_is_ignored_rather_than_believed(self):
         f = forecast_mlb("a @ b", 8.5, away_starter_era=99.0, home_starter_era=4.16)
         self.assertNotIn("Starters", [e.name for e in f.estimates])
+
+
+class TestTheGuardIsMeasuredNotRemembered(unittest.TestCase):
+    """A constant that cites a live measurement is the one that goes stale.
+
+    The page carried `OVERCONFIDENCE = 3.0` with the comment "measured, not
+    chosen: the model has said 54.2% and done 51.1%". True when written, false
+    by 110 graded calls (55.41% against 55.45%). Nobody re-checks a number that
+    claims it was measured, so it is computed now.
+    """
+
+    def test_an_underconfident_model_does_not_earn_extra_margin(self):
+        """Doing better than you said is not a licence to bet thinner."""
+        recs = [(0.55, i % 100 < 70) for i in range(400)]     # says 55, does 70
+        g = margin_guard(recs)
+        self.assertEqual(g.bias, 0.0)
+        self.assertGreater(g.points, 0.0, "noise alone still floors it")
+
+    def test_a_measured_overconfidence_is_carried_in_full(self):
+        recs = [(0.60, i % 100 < 45) for i in range(400)]     # says 60, does 45
+        g = margin_guard(recs)
+        self.assertAlmostEqual(g.bias, 0.15, places=6)
+        self.assertGreater(g.points, 0.15)
+
+    def test_the_guard_tightens_as_the_card_grows(self):
+        """The property the hardcoded 3.0 could never have."""
+        last = float("inf")
+        for n in (50, 110, 400, 1000, 4000):
+            g = margin_guard([(0.55, i % 100 < 55) for i in range(n)])
+            self.assertLess(g.points, last)
+            last = g.points
+
+    def test_a_thin_card_blocks_everything_without_a_special_case(self):
+        """At ten calls one standard error is enormous, which IS the answer."""
+        g = margin_guard([(0.55, i % 2 == 0) for i in range(10)])
+        self.assertGreater(g.points, 0.10,
+                           "ten calls cannot establish a margin of any size")
+
+    def test_no_graded_calls_is_not_a_clean_bill_of_health(self):
+        g = margin_guard([])
+        self.assertEqual(g.n, 0)
+        self.assertEqual(g.points, float("inf"))
+        self.assertIn("unmeasured", g.detail)
+
+    def test_the_spread_check_reports_rather_than_refits(self):
+        """It must never quietly move RESIDUAL_SD. Chasing a fortnight's
+        residuals is how a dispersion parameter ends up fitting noise."""
+        tight = residual_spread([0.2, -0.3, 0.1, -0.2, 0.25, -0.15] * 30)
+        self.assertFalse(tight.consistent)
+        self.assertIn("OUTSIDE", tight.detail)
+        self.assertEqual(tight.assumed, RESIDUAL_SD["MLB"],
+                         "the constant is reported, never rewritten")
+        self.assertEqual(RESIDUAL_SD["MLB"], 4.39)
+
+    def test_a_spread_matching_the_constant_is_reported_as_settled(self):
+        import random
+        rng = random.Random(7)
+        got = residual_spread([rng.gauss(1.0, 4.39) for _ in range(600)])
+        self.assertTrue(got.consistent)
+        self.assertLessEqual(got.lo, 4.39)
+        self.assertGreaterEqual(got.hi, 4.39)
+
+    def test_the_interval_brackets_the_true_spread(self):
+        """The chi-square approximation has to actually cover."""
+        import random
+        rng = random.Random(11)
+        covered = 0
+        for _ in range(200):
+            got = residual_spread([rng.gauss(0.0, 4.0) for _ in range(120)], assumed=4.0)
+            covered += got.consistent
+        self.assertGreater(covered, 180, f"95% interval covered only {covered}/200")
+
+    def test_too_few_games_refuses_to_measure_a_spread(self):
+        got = residual_spread([1.0, -2.0])
+        self.assertIn("not enough", got.detail)
 
 
 class TestAStarterERAIsAMeasurement(unittest.TestCase):

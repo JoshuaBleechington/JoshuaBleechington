@@ -192,6 +192,81 @@ asserts that tripling every weight changes no forecast.
 Head to head is discounted by `meetings / 4`, so one meeting counts a quarter.
 Enter it anyway — judging the sample is the model's job.
 
+## No constant may cite a measurement it does not re-take
+
+Added 2026-09-17, after an outside audit of this model. That audit made five
+claims. Two it retracted itself, one does not survive checking, and two are
+real. All five are written down because which ones failed is the useful part.
+
+### Retracted by the auditor, correctly
+
+**"Side selection writes UNDER on picks whose projection says OVER."** It reads
+the side from the probability split, which is right. With `phi = 2.13` the run
+distribution is right-skewed, so the mean sits about half a run above the
+median, and a projection of 7.93 on a 7.5 line genuinely is UNDER 51.1%. A mean
+above the line does not imply the over.
+
+**"The de-vig is broken."** Misread screenshots. `fairTotal` was correct.
+
+### Does not survive checking
+
+**"Overs and unders are miscalibrated in opposite directions, so one constant
+averages two errors."** The numbers replicate almost exactly — over calls say
+56.14% and do 62.82%; under calls say 53.62% and do 37.50%, a 22.8-point split
+at z = +2.17. The diagnosis is still wrong. Games in this window went over
+**62.7%**, and:
+
+| side | n | model hits | blind ticket | model edge |
+|---|---|---|---|---|
+| OVER | 78 | 62.8% | 62.7% | **+0.1** |
+| UNDER | 32 | 37.5% | 37.3% | **+0.2** |
+
+Both sides land within a fifth of a point of their blind-ticket rate. The split
+is the window running over, not a defect in the model. Correcting it would have
+fitted a hot fortnight, which is the exact failure this project exists to avoid.
+
+**"`RESIDUAL_SD = 4.39` is too high."** Measured over 112 settled games it is
+**3.90**, 95% interval **3.44 to 4.49** — 4.39 is inside. The push rate fits too:
+33 whole-number lines predicted 3.1 pushes against 2 observed, −0.7 sigma. Not
+established, so the constant does not move.
+
+### Real, and fixed
+
+The auditor was right about something more general than the number it was
+aiming at. `OVERCONFIDENCE = 3.0` sat in the page under this comment:
+
+> *Measured, not chosen: across the logged card the model has said 54.2% and
+> done 51.1%.*
+
+That was true when written. At 110 graded calls the model says **55.41%** and
+does **55.45%** — a gap of **+0.05**. The constant was frozen; the measurement
+it cited had moved. **A number labelled "measured" is the one nobody goes back
+to re-check**, which makes it more dangerous than an honest guess.
+
+It is now computed, from two parts that are both real:
+
+```
+guard = max(0, says - does)  +  sqrt(p(1-p)/n)
+        \___ measured bias __/   \___ its standard error ___/
+```
+
+Running *under*confident is floored at zero — beating your stated number does
+not buy a thinner bet. And a gap you cannot tell from zero is not a gap, so the
+standard error is added rather than ignored. At 110 graded calls that is **4.7
+points**, wider than the 3.0 it replaces, because 3.0 was pretending to know
+something. It tightens on its own: 3.5 at 200 calls, 2.5 at 400, 1.6 at 1000.
+There is no constant left to go stale.
+
+`RESIDUAL_SD` gets the same treatment in the opposite direction: the calibration
+panel now prints the live measured spread of (final − line) with its confidence
+interval, against the constant in use, and says plainly when the constant falls
+outside it. It **reports and never refits** — re-fitting a dispersion parameter
+to each fortnight's residuals is how a model ends up chasing its own noise — and
+a test pins that `RESIDUAL_SD` is still 4.39 after being handed a sample far
+tighter than it.
+
+Neither change touches the forecast. All 33 fixtures regenerate byte-identical.
+
 ## The team box is a controlled list
 
 Added 2026-09-16, after a question about which teams tend to go over turned up

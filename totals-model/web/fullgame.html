@@ -675,9 +675,12 @@
      the decimal; only the words. */
   var BANDS = [[0.62, "MAX BET"], [0.57, "STRONG BET"], [0.53, "BET"], [0.00, "NO BET"]];
   var NOBET = BANDS[BANDS.length - 1][1];
-  /* Measured, not chosen: across the logged card the model has said 54.2% and
-     done 51.1%. Until that closes, a margin thinner than this is not a margin. */
-  var OVERCONFIDENCE = 3.0;
+  /* This was `OVERCONFIDENCE = 3.0`, with the comment "measured, not chosen:
+     the model has said 54.2% and done 51.1%". That was true when it was
+     written and is not true now -- at 110 graded calls the model says 55.41%
+     and does 55.45%, a gap of +0.05. A frozen number that cites a live
+     measurement is worse than an honest guess, because nobody goes back to
+     re-check something labelled "measured". It is computed in marginGuard(). */
   /* Card rows written before the rename, so an old backup still groups with the
      new names instead of splitting the record across two spellings. */
   var LEGACY_BANDS = { "MAX": "MAX BET", "STRONG": "STRONG BET",
@@ -1529,15 +1532,23 @@
         /* The gap between what the model says and what the PRICE demands is the
            thing a probability alone hides. 56.5% looks like a big call until you
            notice -118 already needs 54.1% of the time to break even. */
-        (posted === null ? "" :
-          '<p class="cline">The model says <b>' + (f.pResolved * 100).toFixed(1) +
-          "%</b>; " + sgn(posted, 0) + " needs <b>" + (implied(posted) * 100).toFixed(1) +
-          "%</b> just to break even. Your margin is <b>" +
-          sgn((f.pResolved - implied(posted)) * 100, 1) + " points</b>" +
-          (f.pResolved - implied(posted) < 0.03
-            ? " — thinner than the " + OVERCONFIDENCE.toFixed(0) + " points this model has " +
-              "been running overconfident, so treat it as no margin at all."
-            : ".") + "</p>");
+        (posted === null ? "" : (function () {
+          var mg = marginGuard(), margin = f.pResolved - implied(posted);
+          var why = !mg.measured
+            ? " — and with no graded calls on the card, this model's calibration is " +
+              "entirely unmeasured, so no margin here is established."
+            : margin < mg.points
+              ? " — thinner than the " + (mg.points * 100).toFixed(1) + " points this " +
+                "model's record can resolve (" + (mg.bias * 100).toFixed(1) +
+                " measured overconfidence plus a " + (mg.noise * 100).toFixed(1) +
+                "-point standard error over " + mg.n + " graded calls), so treat it as " +
+                "no margin at all."
+              : ".";
+          return '<p class="cline">The model says <b>' + (f.pResolved * 100).toFixed(1) +
+            "%</b>; " + sgn(posted, 0) + " needs <b>" + (implied(posted) * 100).toFixed(1) +
+            "%</b> just to break even. Your margin is <b>" + sgn(margin * 100, 1) +
+            " points</b>" + why + "</p>";
+        }()));
 
     // where each source lands
     var vals = f.estimates.map(function (e) { return e.total; }).concat([f.line, f.projected]);
@@ -1831,6 +1842,84 @@
      earlier model in this project had no way to check. A model can name the
      right side more often than not and still be useless if its confidence is
      fiction, because the confidence is what sizes the bet. */
+  /* How many points of margin over break-even are indistinguishable from none.
+     Two real parts, no constant to go stale:
+
+       bias  -- how overconfident the model has ACTUALLY been, floored at zero.
+                Running underconfident does not buy anyone a thinner bet.
+       noise -- the standard error on that hit rate. A gap you cannot tell from
+                zero is not a gap, and at 110 calls one SE is still 4.7 points.
+
+     It tightens on its own as the card grows: 4.7 points at 110 graded calls,
+     3.5 at 200, 2.5 at 400, 1.6 at 1000. */
+  function marginGuard() {
+    var said = 0, hits = 0, n = 0;
+    (typeof card === "undefined" ? [] : card).forEach(function (s) {
+      var r = outcome(s);
+      if (r === null || r === "PUSH") return;
+      said += parseFloat(s.prob) / 100;
+      hits += r === "WIN" ? 1 : 0;
+      n++;
+    });
+    if (!n) return { points: Infinity, n: 0, bias: 0, noise: Infinity, measured: false };
+    var meanP = said / n, hit = hits / n;
+    var bias = Math.max(0, meanP - hit);
+    var noise = Math.sqrt(Math.max(meanP * (1 - meanP), 1e-9) / n);
+    return { points: bias + noise, n: n, bias: bias, noise: noise,
+             meanP: meanP, hit: hit, measured: true };
+  }
+
+  /* The measured spread of (final - line) against the RESIDUAL_SD the model
+     assumes. RESIDUAL_SD sets PHI, PHI sets the skew, and the skew sets how far
+     above the line the distribution's mean sits -- so if it drifts, everything
+     downstream drifts with it. This REPORTS; it never refits. Chasing a
+     fortnight's residuals is how a dispersion parameter ends up fitting noise. */
+  function chi2Quantile(p, k) {
+    var z = invNorm(p), t = 1 - 2 / (9 * k) + z * Math.sqrt(2 / (9 * k));
+    return k * t * t * t;
+  }
+  function invNorm(p) {
+    var a = [-3.969683028665376e+01, 2.209460984245205e+02, -2.759285104469687e+02,
+             1.383577518672690e+02, -3.066479806614716e+01, 2.506628277459239e+00],
+        b = [-5.447609879822406e+01, 1.615858368580409e+02, -1.556989798598866e+02,
+             6.680131188771972e+01, -1.328068155288572e+01],
+        c = [-7.784894002430293e-03, -3.223964580411365e-01, -2.400758277161838e+00,
+             -2.549732539343734e+00, 4.374664141464968e+00, 2.938163982698783e+00],
+        d = [7.784695709041462e-03, 3.224671290700398e-01, 2.445134137142996e+00,
+             3.754408661907416e+00], q, r;
+    if (p < 0.02425) {
+      q = Math.sqrt(-2 * Math.log(p));
+      return (((((c[0]*q+c[1])*q+c[2])*q+c[3])*q+c[4])*q+c[5]) /
+             ((((d[0]*q+d[1])*q+d[2])*q+d[3])*q+1);
+    }
+    if (p > 1 - 0.02425) {
+      q = Math.sqrt(-2 * Math.log(1 - p));
+      return -(((((c[0]*q+c[1])*q+c[2])*q+c[3])*q+c[4])*q+c[5]) /
+              ((((d[0]*q+d[1])*q+d[2])*q+d[3])*q+1);
+    }
+    q = p - 0.5; r = q * q;
+    return (((((a[0]*r+a[1])*r+a[2])*r+a[3])*r+a[4])*r+a[5])*q /
+           (((((b[0]*r+b[1])*r+b[2])*r+b[3])*r+b[4])*r+1);
+  }
+  function residualSpread() {
+    var xs = [];
+    (typeof card === "undefined" ? [] : card).forEach(function (s) {
+      if (s.sport !== "MLB") return;
+      var f = parseFloat(s.final), ln = parseFloat(s.line);
+      if (isFinite(f) && isFinite(ln)) xs.push(f - ln);
+    });
+    var n = xs.length;
+    if (n < 3) return null;
+    var mean = xs.reduce(function (a, x) { return a + x; }, 0) / n;
+    var sd = Math.sqrt(xs.reduce(function (a, x) { return a + (x-mean)*(x-mean); }, 0) / (n-1));
+    var k = n - 1;
+    var lo = sd * Math.sqrt(k / chi2Quantile(0.975, k));
+    var hi = sd * Math.sqrt(k / chi2Quantile(0.025, k));
+    var assumed = RESIDUAL_SD.MLB;
+    return { n: n, sd: sd, lo: lo, hi: hi, assumed: assumed,
+             ok: lo <= assumed && assumed <= hi };
+  }
+
   function renderCalib() {
     var rows = [];
     var pushes = 0;
@@ -1946,7 +2035,28 @@
       (pushes ? '<p class="note">' + pushes + " push(es) excluded — they refund, so counting one " +
         "as a win or a loss would corrupt the measure.</p>" : "") +
       '<p class="note">A coin flip scores <b>0.25</b> on Brier. Lower is better; at or above it, ' +
-      "the model is not adding information over guessing.</p>";
+      "the model is not adding information over guessing.</p>" +
+      /* The two constants that used to be frozen, now shown live so drift is
+         visible instead of needing someone to remember to re-measure. */
+      (function () {
+        var mg = marginGuard(), rs = residualSpread(), out = "";
+        if (mg.measured) out += '<p class="note" id="guardNote"><b>Margin guard: ' +
+          (mg.points * 100).toFixed(1) + " points.</b> " +
+          "Measured overconfidence " + (mg.bias * 100).toFixed(1) + " points plus a " +
+          (mg.noise * 100).toFixed(1) + "-point standard error over " + mg.n +
+          " graded calls. A margin under this cannot be told apart from none. It tightens " +
+          "on its own as the card grows — there is no constant here to go stale.</p>";
+        if (rs) out += '<p class="note' + (rs.ok ? "" : " bad") + '" id="spreadNote">' +
+          "<b>Dispersion check:</b> over " + rs.n + " settled games the spread of " +
+          "(final − line) measures <b>" + rs.sd.toFixed(2) + "</b> runs, 95% interval " +
+          rs.lo.toFixed(2) + " to " + rs.hi.toFixed(2) + ". The model assumes " +
+          rs.assumed.toFixed(2) + ", which is " + (rs.ok
+            ? "inside that interval — nothing to change."
+            : "<b>outside</b> it. This constant sets the dispersion, the dispersion sets " +
+              "the skew, and the skew sets how far above the line the distribution's mean " +
+              "sits, so everything downstream moves with it.") + "</p>";
+        return out;
+      }());
   }
 
   // ---- wiring ----------------------------------------------------------

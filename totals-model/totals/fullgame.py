@@ -999,6 +999,142 @@ def calibration(records: Iterable[tuple[float, bool]]) -> Calibration:
     return Calibration(n, brier, log_loss, hit, mean_p, buckets, verdict)
 
 
+@dataclass
+class MarginGuard:
+    """How many points of margin over break-even are indistinguishable from none.
+
+    The page used to carry a hand-written `OVERCONFIDENCE = 3.0`, whose comment
+    claimed it was "measured, not chosen: the model has said 54.2% and done
+    51.1%". That measurement was real when it was taken and is no longer true --
+    on 110 graded calls the model now says 55.41% and does 55.45%, a gap of
+    +0.05. A frozen constant that cites a live measurement goes stale silently,
+    which is worse than an honest guess, because nobody re-checks a number that
+    says it was measured.
+
+    So it is computed instead, from two parts that are both real:
+
+      bias  -- how overconfident the model has actually been, floored at zero.
+               Running UNDERconfident does not buy anyone extra margin.
+      noise -- the standard error on that hit rate. A gap you cannot tell from
+               zero is not a gap, and at 110 calls one standard error is still
+               4.8 points.
+
+    The sum tightens on its own as the card grows -- 4.8 points at 110 calls,
+    2.5 at 400, 1.6 at 1000 -- with no constant to go stale.
+    """
+
+    points: float
+    n: int
+    bias: float
+    noise: float
+    detail: str
+
+
+def margin_guard(records: Iterable[tuple[float, bool]]) -> MarginGuard:
+    """`records` as for `calibration()`: (probability given, did it win)."""
+    rows = [(float(p), bool(w)) for p, w in records]
+    n = len(rows)
+    if n == 0:
+        return MarginGuard(
+            float("inf"), 0, 0.0, float("inf"),
+            "No graded calls yet, so the model's calibration is entirely "
+            "unmeasured. Nothing here has an established margin.")
+    mean_p = sum(p for p, _ in rows) / n
+    hit = sum(w for _, w in rows) / n
+    bias = max(0.0, mean_p - hit)
+    noise = math.sqrt(max(mean_p * (1.0 - mean_p), 1e-9) / n)
+    points = bias + noise
+    return MarginGuard(
+        points, n, bias, noise,
+        f"Over {n} graded calls the model says {mean_p * 100:.1f}% and does "
+        f"{hit * 100:.1f}%. Overconfidence {bias * 100:.1f} points, standard error "
+        f"{noise * 100:.1f}. A margin under {points * 100:.1f} points cannot be "
+        "told apart from no margin at all.")
+
+
+@dataclass
+class ResidualSpread:
+    """The measured spread of (final - line), against the constant in use.
+
+    `RESIDUAL_SD` sets `DISPERSION_PHI`, which sets the skew, which sets how far
+    above the line the distribution's mean sits. It was measured once, over 116
+    games, and then frozen. This makes the drift visible instead of requiring
+    someone to remember to go and re-measure it.
+
+    It deliberately does NOT change the constant. A sample standard deviation is
+    a noisy thing -- at 112 games the 95% interval is roughly a full run wide --
+    and re-fitting a dispersion parameter to every fortnight is how a model ends
+    up chasing its own residuals.
+    """
+
+    n: int
+    measured: float
+    lo: float
+    hi: float
+    assumed: float
+    consistent: bool
+    detail: str
+
+
+def _chi2_quantile(p: float, k: int) -> float:
+    """Wilson-Hilferty. Accurate to a fraction of a percent above k = 30."""
+    z = _inv_norm(p)
+    t = 1.0 - 2.0 / (9.0 * k) + z * math.sqrt(2.0 / (9.0 * k))
+    return k * t ** 3
+
+
+def _inv_norm(p: float) -> float:
+    """Acklam's inverse normal CDF, plenty accurate for a confidence interval."""
+    a = [-3.969683028665376e+01, 2.209460984245205e+02, -2.759285104469687e+02,
+         1.383577518672690e+02, -3.066479806614716e+01, 2.506628277459239e+00]
+    b = [-5.447609879822406e+01, 1.615858368580409e+02, -1.556989798598866e+02,
+         6.680131188771972e+01, -1.328068155288572e+01]
+    c = [-7.784894002430293e-03, -3.223964580411365e-01, -2.400758277161838e+00,
+         -2.549732539343734e+00, 4.374664141464968e+00, 2.938163982698783e+00]
+    d = [7.784695709041462e-03, 3.224671290700398e-01, 2.445134137142996e+00,
+         3.754408661907416e+00]
+    pl, ph = 0.02425, 1 - 0.02425
+    if p < pl:
+        q = math.sqrt(-2 * math.log(p))
+        return (((((c[0]*q+c[1])*q+c[2])*q+c[3])*q+c[4])*q+c[5]) / \
+               ((((d[0]*q+d[1])*q+d[2])*q+d[3])*q+1)
+    if p > ph:
+        q = math.sqrt(-2 * math.log(1 - p))
+        return -(((((c[0]*q+c[1])*q+c[2])*q+c[3])*q+c[4])*q+c[5]) / \
+                ((((d[0]*q+d[1])*q+d[2])*q+d[3])*q+1)
+    q = p - 0.5
+    r = q * q
+    return (((((a[0]*r+a[1])*r+a[2])*r+a[3])*r+a[4])*r+a[5])*q / \
+           (((((b[0]*r+b[1])*r+b[2])*r+b[3])*r+b[4])*r+1)
+
+
+def residual_spread(residuals: Iterable[float],
+                    assumed: float | None = None) -> ResidualSpread:
+    """`residuals` are (final total - posted line), pushes included."""
+    xs = [float(x) for x in residuals]
+    n = len(xs)
+    if assumed is None:
+        assumed = RESIDUAL_SD["MLB"]
+    if n < 3:
+        return ResidualSpread(n, 0.0, 0.0, float("inf"), assumed, True,
+                              f"{n} settled games is not enough to measure a spread.")
+    mean = sum(xs) / n
+    var = sum((x - mean) ** 2 for x in xs) / (n - 1)
+    sd = math.sqrt(var)
+    k = n - 1
+    lo = sd * math.sqrt(k / _chi2_quantile(0.975, k))
+    hi = sd * math.sqrt(k / _chi2_quantile(0.025, k))
+    ok = lo <= assumed <= hi
+    return ResidualSpread(
+        n, sd, lo, hi, assumed, ok,
+        f"Over {n} settled games the spread of (final - line) measures {sd:.2f} "
+        f"runs, 95% interval {lo:.2f} to {hi:.2f}. The model assumes {assumed:.2f}, "
+        + ("which is inside that interval, so there is nothing to change yet."
+           if ok else
+           "which is OUTSIDE that interval. The dispersion constant, and the skew "
+           "it sets, no longer match the games being logged."))
+
+
 def sensitivity(error: float = 0.20) -> dict[str, float]:
     """How much a wrong league constant costs, in runs on the projection.
 

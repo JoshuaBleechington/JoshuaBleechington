@@ -1,0 +1,590 @@
+# Call Sheet — the full-game model
+
+Built 2026-09-02, replacing the first-five forecaster. It names OVER or UNDER on
+every card with a probability, models the push, reads the prices, and grades
+itself once the games land.
+
+## What went wrong in the version before it
+
+Three failures, each a class of error rather than a typo. They are written down
+because the fix in every case was a change of *shape*, not a better constant.
+
+### 1. The calibration anchor was a number I picked
+
+The F5 pitcher estimate was scaled so two league-average starters projected
+4.66 runs — 53.6% of an 8.70 full-game average, and I chose both of those.
+Books post 4.5 for an average first five, so **every projection carried +0.16
+runs toward the over before a single input was read.** A game with no
+information came back OVER 50.8%.
+
+That bias is why four of four calls on 2026-08-31 were overs. It does not
+explain a 4.25-run miss at Coors, and I am not claiming it does.
+
+**The fix is a shape that cannot hold the bug.** Every statistical estimate is
+now a **differential** against the market's fair total. Two league-average
+starters move it by exactly zero; league-average everything returns exactly
+50.0%. That is arithmetic, not a calibration that came out right, and there are
+tests at eight decimal places.
+
+It also makes the unverifiable league constants cheap to be wrong about. A 0.20
+error in league ERA now moves a projection **0.07 runs**. `sensitivity()`
+prints the damage and a test pins it under 0.10.
+
+### 2. The normal distribution cannot push
+
+F5 lines are halves, so it never came up. Full-game totals are frequently whole
+numbers — 8 and 9 were both on the last board — and a game landing on exactly 8
+against a line of 8 is a **push**, not a loss. Treating runs as continuous
+silently redistributed that mass onto the two sides and overstated both.
+
+Runs are counts and combined totals are overdispersed relative to Poisson, so
+this uses a **negative binomial** with `phi = variance/mean = 4.39² / 9.04 =
+2.13`, derived rather than picked. It gives an exact P(push) — about **9% on a
+whole number** — and it captures the right skew a normal misses. Fifteen-run
+games happen; minus-two-run games do not.
+
+That skew matters beyond the push: **a posted line is the point that splits the
+two sides evenly, not the average.** The mean of an MLB total sits about half a
+run above it. Treating the line as a mean made an empty card come back UNDER
+55.1%.
+
+### 3. The prices were thrown away
+
+A posted total is rounded to the half run. The prices are not. Over −120 with
+the under at +100 is the book saying fair sits well north of the number it
+posted, and de-vigging the pair and inverting through the distribution recovers
+it to a hundredth of a run. The old model read the line and ignored the two
+most informative numbers on the board.
+
+## Two more found while building it
+
+**Prices are quoted on the resolved outcome.** A book at −110/−110 on a total of
+8 says the sides are even *given it resolves*, not that P(over) is 50% outright.
+Matching the unconditional probability made an empty card on a whole number
+come back over 50.0 / under 40.5 — a lean the market never expressed.
+
+**The band has to read the resolved probability too.** On a total of 8 with a
+9.6% push, a 47.2% over is a **52.2% bet**. Reading the raw figure called that a
+coin flip and it is not one.
+
+## A wide market is a less certain one
+
+Added 2026-09-04, from a real card. A total entered at 8.5 when the main number
+had moved to 9 picked up an **alternate-line** quote of −150/−110 — a **12.4%
+hold** where every other game that night sat at 2.4–4.8%. De-vigging that
+proportionally read 53.4% over and pushed the card from LEAN to STRONG on what
+was mostly markup rather than opinion.
+
+Proportional de-vig assumes the margin splits between the two sides in
+proportion to their probabilities. That is harmless at a 5% hold and
+increasingly arbitrary at 12%. So the de-vigged deviation from even is now
+shrunk by how far the hold exceeds a normal main-line one:
+
+```
+confidence = min(1, 5% / hold)
+p_over     = 0.5 + (p_devig − 0.5) × confidence
+```
+
+| quote | hold | keep | raw | shrunk |
+|---|---|---|---|---|
+| −110/−110 | 4.8% | 100% | 50.0% | 50.0% |
+| −120/+100 | 4.6% | 100% | 52.2% | 52.2% |
+| **−150/−110** | **12.4%** | **40%** | **53.4%** | **51.4%** |
+| −180/+140 | 6.0% | 84% | 60.7% | 59.0% |
+
+It never flips a side, never crosses even, and leaves a symmetric quote exactly
+even at any hold — so the neutrality property survives untouched. Across the
+eighteen games logged to that date, **one changed, by 1.6 points.**
+
+The estimate also says out loud when it thinks it is looking at an alternate
+line, and tells you to enter the main number instead.
+
+### Shin's method was tried first and rejected
+
+Shin corrects favourite–longshot bias, and it moves the favourite **up**:
+−150/−110 reads **53.8%** under Shin against 53.4% proportional. That is a real
+effect and the wrong one here — it would have made the alternate line *more*
+confident, not less, and it adds confidence across the board that an 18-game
+record cannot justify. There is a test pinning the direction so it does not get
+re-added on the theory that it fixes this.
+
+## A measured-null input cannot buy a band
+
+Detroit at Cleveland, 4 September. Head to head at 6.4 over nine meetings, plus
+a public-money flag, dragged a card into an UNDER **LEAN** — against the price,
+and against a market-plus-arms read that said OVER. It went twelve runs.
+
+Twelve was a 19.6% outcome, so the loss proves nothing. The reasoning was the
+problem: **the two loudest voices on that card were the two the model itself
+documents as worth nothing.**
+
+```
+Market            8.74   w 4.00        remove H2H     -1.6 pts
+Bullpens          8.60   w 0.80        remove split   -3.2 pts
+Last 10           8.77   w 0.80        ------------------------
+Starters          7.99   w 1.60        market + arms only: OVER 50.5%
+Head to head (9)  6.27   w 0.50        full blend:        UNDER 54.0%
+```
+
+So the band is now cut from the **less confident of two reads**: the full blend,
+and the same blend with `mechanism=False` inputs deleted. If deleting them
+changes the side, the band is held at COIN FLIP.
+
+Three MLB inputs are tagged. Form and head to head because they measured null
+against the residual on 116 games (t = −0.07 and t = −0.40) and are absolutes
+rather than differentials. The money split because its coefficient is a flat
+hand-capped 0.30 — the direction is documented, the size is not.
+
+**The headline probability is untouched.** The gate governs the band only. The
+probability is the best estimate of what happens; the band is the
+recommendation. Moving the first to justify the second would corrupt the
+calibration measure, which reads the probability.
+
+Across the 33 logged cards it moves 9, and all four STRONGs become LEAN:
+
+| | before | after |
+|---|---|---|
+| STRONG | 4-0 | — |
+| LEAN | 4-2 | 8-0 |
+| COIN FLIP | 4-4 | 4-6 |
+
+**That 8-0 is not evidence and must not be read as any.** The rule was written
+after looking at which of these games lost, on eighteen settled calls. The
+justification is the a-priori one — measured t-statistics and a hand-capped
+coefficient — and nothing else. The table is here to show the blast radius, not
+to argue the rule works.
+
+### Not applied outside MLB
+
+Those t-statistics come from an MLB residual study. No equivalent exists for any
+other book here. Demoting an input on evidence is discipline; demoting one on a
+hunch is exactly the unjustified coefficient this model exists to remove, so
+nothing outside MLB is tagged.
+
+The WNBA model has been deleted outright rather than archived — dead code with
+passing tests is the thing that rots. Its slot on the page is now **NFL
+spreads**; see `NFL.md`.
+
+## Architecture
+
+```
+anchor    = fair total, solved from the two prices through the distribution
+estimates = anchor + differential   (starters, bullpens)
+          | absolute total          (last 10, head to head)
+projected = Σ(wᵢ·eᵢ)/Σ(wᵢ) + Σ(deltas)      ← wind, temperature, splits
+(over, push, under) = NegBin(projected, phi) split at the line
+```
+
+| | market | starters | bullpens | form | h2h |
+|---|---|---|---|---|---|
+| **MLB** | 4.0 | 1.6 | 0.8 | 0.8 | 0.5 |
+| **WNBA** | 3.0 | — | — | 1.6 | 1.0 |
+
+The market carries the largest weight because it is the one thing this project
+has measured: over 116 logged games the posted line beat a fourteen-input model
+on mean absolute error, 3.58 to 3.61.
+
+**Missing inputs re-weight themselves** — a term absent from both sums leaves the
+survivors renormalised. **No caps are needed**: a weighted mean is bounded by its
+own inputs, where the summed-adjustment models it replaced were not. A test
+asserts that tripling every weight changes no forecast.
+
+Head to head is discounted by `meetings / 4`, so one meeting counts a quarter.
+Enter it anyway — judging the sample is the model's job.
+
+## No constant may cite a measurement it does not re-take
+
+Added 2026-09-17, after an outside audit of this model. That audit made five
+claims. Two it retracted itself, one does not survive checking, and two are
+real. All five are written down because which ones failed is the useful part.
+
+### Retracted by the auditor, correctly
+
+**"Side selection writes UNDER on picks whose projection says OVER."** It reads
+the side from the probability split, which is right. With `phi = 2.13` the run
+distribution is right-skewed, so the mean sits about half a run above the
+median, and a projection of 7.93 on a 7.5 line genuinely is UNDER 51.1%. A mean
+above the line does not imply the over.
+
+**"The de-vig is broken."** Misread screenshots. `fairTotal` was correct.
+
+### Does not survive checking
+
+**"Overs and unders are miscalibrated in opposite directions, so one constant
+averages two errors."** The numbers replicate almost exactly — over calls say
+56.14% and do 62.82%; under calls say 53.62% and do 37.50%, a 22.8-point split
+at z = +2.17. The diagnosis is still wrong. Games in this window went over
+**62.7%**, and:
+
+| side | n | model hits | blind ticket | model edge |
+|---|---|---|---|---|
+| OVER | 78 | 62.8% | 62.7% | **+0.1** |
+| UNDER | 32 | 37.5% | 37.3% | **+0.2** |
+
+Both sides land within a fifth of a point of their blind-ticket rate. The split
+is the window running over, not a defect in the model. Correcting it would have
+fitted a hot fortnight, which is the exact failure this project exists to avoid.
+
+**"`RESIDUAL_SD = 4.39` is too high."** Measured over 112 settled games it is
+**3.90**, 95% interval **3.44 to 4.49** — 4.39 is inside. The push rate fits too:
+33 whole-number lines predicted 3.1 pushes against 2 observed, −0.7 sigma. Not
+established, so the constant does not move.
+
+### Real, and fixed
+
+The auditor was right about something more general than the number it was
+aiming at. `OVERCONFIDENCE = 3.0` sat in the page under this comment:
+
+> *Measured, not chosen: across the logged card the model has said 54.2% and
+> done 51.1%.*
+
+That was true when written. At 110 graded calls the model says **55.41%** and
+does **55.45%** — a gap of **+0.05**. The constant was frozen; the measurement
+it cited had moved. **A number labelled "measured" is the one nobody goes back
+to re-check**, which makes it more dangerous than an honest guess.
+
+It is now computed, from two parts that are both real:
+
+```
+guard = max(0, says - does)  +  sqrt(p(1-p)/n)
+        \___ measured bias __/   \___ its standard error ___/
+```
+
+Running *under*confident is floored at zero — beating your stated number does
+not buy a thinner bet. And a gap you cannot tell from zero is not a gap, so the
+standard error is added rather than ignored. At 110 graded calls that is **4.7
+points**, wider than the 3.0 it replaces, because 3.0 was pretending to know
+something. It tightens on its own: 3.5 at 200 calls, 2.5 at 400, 1.6 at 1000.
+There is no constant left to go stale.
+
+`RESIDUAL_SD` gets the same treatment in the opposite direction: the calibration
+panel now prints the live measured spread of (final − line) with its confidence
+interval, against the constant in use, and says plainly when the constant falls
+outside it. It **reports and never refits** — re-fitting a dispersion parameter
+to each fortnight's residuals is how a model ends up chasing its own noise — and
+a test pins that `RESIDUAL_SD` is still 4.39 after being handed a sample far
+tighter than it.
+
+Neither change touches the forecast. All 33 fixtures regenerate byte-identical.
+
+## The team box is a controlled list
+
+Added 2026-09-16, after a question about which teams tend to go over turned up
+something else first: across 67 logged games the free-text team field had
+produced **fifty spellings of thirty clubs**. St Louis alone appeared as
+`St Louis Cardinals`, `St Louis`, `ST louis Cardinals`, `Cardinals` and
+`St Louis Cardninals` — plus `Cleveland Gaurdians`, `Houston Astro`,
+`Boston RedSox`, `Cincinnati Red`, and several pairs differing only by a
+trailing space.
+
+This is not cosmetic. Splitting a sample manufactures results: unmerged, **27 of
+those 50 names carried a flawless over or under record**, and coin flips at the
+same sample sizes predict 26.4. Any breakdown by team, park, or division was
+reading fragmentation as signal.
+
+The fix is a datalist of the thirty MLB (or thirty-two NFL) clubs plus an
+ordered first-hit-wins matcher. Three properties matter and each has a test:
+
+- **Ordered, because patterns overlap.** `Red Sox` is tested before `Reds` or
+  the word `red` captures it. Same for `White Sox`.
+- **Scoped by sport, not global.** `Arizona` is the Diamondbacks in MLB and the
+  Cardinals in NFL; `SF` is the Giants or the 49ers. Cardinals and Giants are
+  each a club in both leagues.
+- **Ambiguous input is left exactly as typed.** `Chicago`, `LA` and `NY` name
+  two clubs apiece, and an unknown string comes back unchanged. A wrong merge is
+  worse than no merge, and losing what someone typed is worse than both.
+
+Rows logged before this run through a one-time backfill on load. It rewrites the
+**name only** — finals, bands, probabilities and grades are untouched, the same
+rule the rescore button follows, and four tests pin it.
+
+After merging, the answer to the original question was: 30 teams, 130 graded
+appearances, median 4 per club, **nothing survives a Sidak correction** (best is
+the Astros at z = −2.30 against a 3.14 threshold). At four appearances the
+smallest detectable bias is 70 points. The Rockies' 3-0 has a Wilson interval of
+43.8%–100%.
+
+## What is deliberately not here
+
+**Line movement as a term.** The gate model subtracted it, correctly, because it
+scored news against the number. Here the current line *is* the anchor, so a move
+is already inside it and subtracting it again would double-count. It is
+displayed, never scored.
+
+**Park factor on the market anchor.** The posted number already holds the park.
+It scales the differentials and the wind and nothing else.
+
+## One price is not no price
+
+Added 2026-09-17, from a real card: Brewers at Pirates, over **−120**, under box
+left empty. The model reported OVER 51.3%.
+
+`fair_total` required *both* prices to de-vig. With one side missing it fell
+back to "assume −110/−110" and **threw the price away entirely** — so the input
+carrying weight 4.0, the heaviest thing in the blend, went in blind. A −120 over
+is the book saying fair sits north of the posted number, and that survives
+perfectly well without its partner.
+
+### The missing side is reconstructed, not invented
+
+Assume the book charged its usual margin, and solve for the other price. Both
+constants are **measured across 133 priced cards in the logged book**, not
+chosen:
+
+| 5th | 25th | median | 75th | 90th | 95th |
+|---|---|---|---|---|---|
+| 4.34% | 4.62% | **4.71%** | 6.44% | **6.80%** | 7.11% |
+
+The point estimate uses the **median**. The confidence is cut against the **90th
+percentile**, because a reconstructed quote is a less certain thing than a real
+one and must not inherit the same authority. That is the same posture as the
+corroboration gate: when two readings are available, act on the less confident.
+
+A lone −120 over therefore reads 51.5% rather than the 52.1% a real 4.71%-hold
+pair would have given, and the card says so in full:
+
+> *Only one price was given, so the other side was reconstructed at the 4.7%
+> hold this book typically charges… Because the hold here is assumed rather than
+> observed, the confidence is cut against the 6.8% this book charges at its 90th
+> percentile, so only 74% of the 52.1% read is kept. Enter both prices and none
+> of this guesswork is needed.*
+
+### The ablation, which is the real test
+
+Hide one side of all 133 two-priced cards, rebuild it, and compare against the
+answer the full quote actually gives:
+
+| | mean projection error | wrong side | wrong band |
+|---|---|---|---|
+| price discarded (old) | 0.209 runs | 14 | 43 |
+| **reconstructed, under hidden** | **0.056 runs** | **4** | **14** |
+| **reconstructed, over hidden** | **0.046 runs** | **4** | **13** |
+
+**73–78% closer**, and **122 of 133 cards improve** against 11 that get worse
+(z = 9.6). Graded against the real finals on 122 settled cards, Brier goes
+0.2478 → 0.2442, against 0.2448 for the true two-priced answer — it lands on
+the truth rather than merely nearer it.
+
+### Guards
+
+It fires **only** when exactly one price is present. Both prices, or neither,
+behave exactly as before — all 33 pre-existing fixtures regenerate
+byte-identical. A quote so lopsided that the usual margin cannot cover it
+(roughly +1650 or longer) falls back rather than inventing a price on the far
+side of certainty.
+
+One test expectation of mine was wrong and the suite caught it: I asserted a
+lone −140 over and a lone −140 under move the anchor by the same number of runs.
+They do not, and should not — the reconstruction is exactly symmetric in
+*probability*, but the run distribution is right-skewed, so the map from
+probability to mean is not linear. The test now pins the property that is
+actually true.
+
+The card that prompted this goes from OVER 51.3% to **OVER 52.6%**, and is still
+NO BET: −120 demands 54.55%, so the margin is −1.96 points either way.
+
+## A starter's ERA is a measurement, not a reading
+
+Added 2026-09-16, **off by default**, and the backtest below does not prove it
+works. Read the whole section before turning it on.
+
+### The problem is real and is pure arithmetic
+
+Until this change, `arm_differential` took whatever ERA it was handed at face
+value. A September call-up's 5.24 in 22 innings carried exactly the authority of
+an ace's 5.24 in 190. That is plainly wrong, and the size of the error is not
+debatable:
+
+```
+Liberatore  5.53 on 143.1 IP   1 SD = 0.68    68% band  4.85 - 6.21
+Molina      5.24 on  22.1 IP   1 SD = 1.72    68% band  3.52 - 6.96
+```
+
+Measurement sd of an ERA over `n` innings is `sqrt(9 * overdispersion * ERA / n)`.
+At 22 innings that is 1.72 — the number could honestly be anywhere from a good
+starter to an unplayable one, and the model was reading it to two decimals.
+
+### The correction, and why its constant is not a dial
+
+Empirical Bayes, league mean as the prior:
+
+```
+weight on the observation = n / (n + ERA_STABLE_AT)
+ERA_STABLE_AT = 9 * ERA_OVERDISPERSION * LEAGUE_STARTER_ERA / STARTER_TALENT_SD^2
+              = 9 * 1.75 * 4.16 / 0.85^2
+              = 90.7 innings
+```
+
+Both inputs are derived. `ERA_OVERDISPERSION = 1.75` is the same clustering
+factor used elsewhere here. `STARTER_TALENT_SD = 0.85` comes from subtracting
+variances: qualified starters' ERAs are spread about 1.05, of which 0.60 is
+measurement noise at a full season's innings, and `sqrt(1.05^2 - 0.60^2) = 0.86`.
+
+`ERA_STABLE_AT` is therefore **computed, and a test fails if anyone edits it by
+hand** — which is exactly the sort of quiet backtest-tuning this project exists
+to prevent.
+
+A call-up at 22 IP keeps 20% of his own number. A starter at 143 IP keeps 61%.
+Nobody keeps 100%, which is correct: a season is a sample.
+
+### What the backtest actually said
+
+67 logged games, 65 gradeable. No innings are recorded in the log, so the real
+feature **cannot be tested directly**. What was tested is the direction it
+pushes, by shrinking both starters globally and sweeping the weight:
+
+| keep | says | does | Brier |
+|---|---|---|---|
+| 100% (today) | 54.41% | 49.23% | 0.2500 |
+| 61% | 53.81% | 52.31% | 0.2470 |
+| 20% | 53.33% | 53.85% | 0.2440 |
+| 0% | 53.19% | 56.92% | 0.2427 |
+
+Brier improves monotonically. It is tempting to call that a win. It is not:
+
+1. **The best score is at keep-0%.** That is the instruction *delete the starter
+   input*, not *shrink it by sample size*. A test that cannot separate those two
+   has not validated this feature.
+2. **The improvement does not survive the sweep.** Best paired t = 2.11 over ten
+   looks; Sidak needs 2.80.
+3. **The mechanism test found nothing.** If over-trusted starter ERAs were the
+   problem, cards where the starters pull hardest should be the worst
+   calibrated. Split three ways by how far the starters move the blend, the gaps
+   are −3.34 (n=18), −6.87 (n=19), −5.21 (n=28). No pattern, and the middle
+   bucket is the worst.
+
+### So it ships off
+
+Blank innings reproduces the old behaviour **bit for bit** — verified on all 67
+logged cards and pinned by `test_a_blank_innings_field_changes_absolutely_nothing`.
+All 28 pre-existing fixtures regenerated byte-identical.
+
+It is not a small change when switched on. With both starters at a realistic 150
+IP, 38 of 67 cards move by more than half a point and **13 change band, all of
+them downward**. The old model went 4-8 on those 13, which is suggestive and is
+also n=13, which is nothing.
+
+The honest position: the a-priori case is strong and the empirical case is
+absent. Type the innings when a starter is genuinely short-sample — a call-up, a
+returning injury, an opener — and leave them blank otherwise until there are
+enough logged games to settle it.
+
+## Alternate lines
+
+Added 2026-09-16, and it is the strongest thing in this file because it is the
+only part that **does not need the model to be right about anything**.
+
+A book prices its **main** line sharply — that is the single fact this project
+has actually established, over 116 games. It prices the **alternate ladder off a
+template**, and templates are coarse. Given the market's own fair total,
+recovered from the two main-line prices, the fair price at every other rung is
+arithmetic on the same distribution:
+
+```
+main 8.5 at -115/-105  ->  market fair total 8.57
+
+  alt    push    fair over   fair under
+  7.5     —         -154        +154
+  8      9.5%       -130        +130
+  8.5     —         -104        +104   <- main
+  9      9.0%       +116        -116
+  10     8.2%       +171        -171
+  10.5    —         +195        -195
+```
+
+So if a book shows OVER 10.5 at **+250** when its own main line implies +195,
+that is **55 cents of value and +0.186 a unit** — and the judgement needed none
+of the pitching inputs, none of the weather, and no opinion about who wins. It
+needs the main line to be efficient, and nothing else.
+
+At **+145** the same rung is 50 cents *worse* than fair. That is the template
+charging you for the move.
+
+### The sign was backwards and a test caught it
+
+`_price_index` rises with implied probability, and a **higher implied
+probability is a worse price** — you are laying more for the same outcome. The
+first version subtracted the wrong way round and reported a book offering +145
+against a fair +195 as **fifty cents of value** while its expected value was
+−0.17 a unit. There is now a test that sweeps the whole ladder, both sides, and
+eight prices per rung asserting that cents and expected value never disagree in
+sign.
+
+### Two ladders, and they must not be confused
+
+`alt_ladder()` takes an optional `mu`. Left alone it uses the **market** anchor —
+the number the book itself is standing on, and the one worth acting on. Passed
+the blended projection it gives the **model** ladder, which is only as good as
+the model. On 106 logged games the model has added nothing over the base rate,
+so the page shows the market ladder.
+
+## Does it work
+
+`calibration()` and the page's **Is it working** panel answer the only question
+that matters: does a 60% call win 60% of the time? A model can name the right
+side more often than not and still be useless if its confidence is fiction,
+because the confidence is what sizes the bet.
+
+Pushes are excluded rather than counted either way — they refund, and folding
+one into either column corrupts the measure. Brier, log loss, bucketed
+said-vs-did, and a verdict that says plainly when the thing is miscalibrated or
+below the 0.25 a coin flip scores.
+
+The page also breaks the record down **band by band** — covered, missed, hit
+rate, what it said, the gap, and pushes kept in their own column. The bands are
+the units the decision is actually made in; nobody stakes off "56.3%", they
+stake off STRONG. The test is whether the bands *order*: a model that wins
+overall but whose STRONG is no better than its COIN FLIP is telling you nothing
+about how much to put on, which is the only thing the confidence is for.
+
+Under 50 graded calls it refuses to judge and says so.
+
+## The league constants
+
+`LEAGUE_COMBINED_RPG = 9.04`, `LEAGUE_STARTER_ERA = 4.16`,
+`LEAGUE_BULLPEN_ERA = 4.05`, `STARTER_INNINGS = 5.4`.
+
+**These come from a web search summary and could not be verified.**
+Baseball-Reference, FanGraphs, ESPN, StatMuse and TeamRankings all refuse the
+connection from this sandbox, and that search layer has already been caught in
+this project returning team assignments backwards. They are quarantined in one
+block, dated, and the differential architecture is what keeps an error in them
+cheap. To update, change those four numbers and nothing else.
+
+## Verification
+
+- `tests/test_fullgame.py` — 68 tests, including the corroboration gate: the
+  Tigers card held at COIN FLIP, the headline probability provably untouched, a
+  no-soft-input card identical to twelve decimal places, the gate acting as a
+  veto rather than a tax, the band never exceeding either read, and WNBA
+  tagging nothing. Plus neutrality to nine decimal places, the distribution's
+  mean and spread against the measured 4.39, push arithmetic, price inversion,
+  the resolved-probability band, calibration detection of an overconfident
+  model, and the guards.
+- `web/fullgame-cases.json` — 36 games generated from the package by
+  `tools_gen_fullgame_cases.py`, which recomputes only the expectations so a
+  model change never means hand-editing a probability.
+- `tools_check_fullgame_page.js` — replays all 36 in a real browser against side,
+  band, resolved probability, push, projection, fair price, estimate and delta
+  counts, the gate's core projection and core probability, the struck-through
+  band appearing only when held, and that green appears only when confident. Then it stores a game,
+  grades it a loss, grades a second as a push, checks the push is excluded from
+  calibration, reloads the browser and asserts the card, the grades and the
+  half-typed draft all survive. It loads a hand-built card of known results and
+  checks the per-band table reports 2-0, 1-1 and 0-1 with the push in its own
+  column and an empty band left out. Last it checks the roof marker: a domed game is
+  tagged, an open-air one is not, and a basketball row does not inherit a
+  left-over tick from the ballgame before it.
+
+The browser needed a **full-precision erf** for this to pass. The Abramowitz &
+Stegun approximation that had been in every page in this project is good to
+1.5e-7, which was enough to flip the side on a dead-even WNBA card and to move
+the fair-total bisection by 4e-5. An approximation good enough to display is not
+good enough to invert.
+
+## Retired
+
+`totals/forecast.py` and its page are deleted, not archived — dead code with
+passing tests is the thing that rots. The gate models (`gameday.py`, `late.py`,
+`confidence.py`, `spread.py`) stay: they answer a different question ("should I
+bet?") and are documented as retired in `GAMEDAY.md`.

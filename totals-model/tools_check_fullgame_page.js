@@ -204,14 +204,14 @@ const CHECKS = ["dome", "aqb", "hqb"];
     }]));
   }).then(() => pg.reload()).then(() => pg.waitForTimeout(450)).then(() => pg.evaluate(() => {
     const before = {
-      band: document.querySelector('#cardTable td:nth-child(7) .chip').textContent.trim(),
+      band: document.querySelector('#cardTable td:nth-child(8) .chip').textContent.trim(),
       stale: (document.querySelector('#cardTable .chip.stale') || {}).textContent,
       result: document.querySelector('#cardTable .res').textContent.trim(),
     };
     document.getElementById('rescore').click();
     return new Promise(r => setTimeout(() => r({
       before,
-      after: document.querySelector('#cardTable td:nth-child(7) .chip').textContent.trim(),
+      after: document.querySelector('#cardTable td:nth-child(8) .chip').textContent.trim(),
       stillStale: !!document.querySelector('#cardTable .chip.stale'),
       result: document.querySelector('#cardTable .res').textContent.trim(),
       final: document.querySelector('[data-final="0"]').value,
@@ -478,6 +478,56 @@ const CHECKS = ["dome", "aqb", "hqb"];
   chk(/assumes 4\.39/.test(narrow.spread),
       'spread: and the constant is still 4.39 — it reports, it never refits',
       narrow.spread);
+
+  // ---- the date column ---------------------------------------------------
+  // It must never be a day early. `new Date("2026-09-17")` parses as UTC
+  // midnight and renders as the 16th anywhere west of Greenwich, so the page
+  // splits the string instead of constructing a Date. This runs the browser in
+  // a US Pacific timezone, where that bug WOULD show.
+  const tzPage = await b.newPage({ timezoneId: 'America/Los_Angeles' });
+  await tzPage.goto('file://' + path.join(__dirname, 'web/fullgame.html'));
+  await tzPage.waitForTimeout(300);
+  const dates = await tzPage.evaluate(async () => {
+    const iso = d => d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') +
+                     '-' + String(d.getDate()).padStart(2, '0');
+    const today = iso(new Date());
+    localStorage.setItem('callsheet.fullgame.card.v1', JSON.stringify([
+      { matchup: 'Reds @ Cubs', sport: 'MLB', line: 8.5, projected: '9.0', side: 'OVER',
+        prob: '55.0', band: 'BET', fair: '-120', final: null,
+        inputs: { away: 'Reds', home: 'Cubs', line: '8.5', gdate: '2026-08-01' } },
+      { matchup: 'Rays @ Jays', sport: 'MLB', line: 7.5, projected: '8.0', side: 'OVER',
+        prob: '54.0', band: 'BET', fair: '-118', final: null,
+        inputs: { away: 'Rays', home: 'Blue Jays', line: '7.5', gdate: today } },
+      { matchup: 'Mets @ Phillies', sport: 'MLB', line: 8.5, projected: '9.0', side: 'OVER',
+        prob: '53.0', band: 'BET', fair: '-113', final: null,
+        inputs: { away: 'Mets', home: 'Phillies', line: '8.5', gdate: '' } },
+    ]));
+    location.reload();
+    return null;
+  });
+  await tzPage.waitForTimeout(600);
+  const dcol = await tzPage.evaluate(() => ({
+    header: [...document.querySelectorAll('#cardTable th')].map(t => t.textContent.trim()),
+    cells: [...document.querySelectorAll('#cardTable .gdate')].map(e => ({
+      text: e.textContent.trim(), title: e.getAttribute('title'),
+      today: e.classList.contains('today'),
+    })),
+  }));
+  chk(dcol.header[1] === 'Date', 'date: the column sits next to the game',
+      dcol.header.join('|'));
+  chk(dcol.cells[0] && dcol.cells[0].text === 'Aug 1',
+      'date: 2026-08-01 renders as Aug 1 in a US Pacific browser, not Jul 31',
+      dcol.cells[0] && dcol.cells[0].text);
+  chk(dcol.cells[0] && dcol.cells[0].title === '2026-08-01',
+      'date: the full date is on the tooltip', dcol.cells[0] && dcol.cells[0].title);
+  chk(dcol.cells[1] && dcol.cells[1].today === true,
+      "date: today's game is marked", JSON.stringify(dcol.cells[1]));
+  chk(dcol.cells[0] && dcol.cells[0].today === false,
+      'date: another day is not marked as today', JSON.stringify(dcol.cells[0]));
+  chk(dcol.cells[2] && dcol.cells[2].text === '\u2014',
+      'date: a row with no date shows a dash rather than a wrong day',
+      dcol.cells[2] && dcol.cells[2].text);
+  await tzPage.close();
 
   if (errs.length) { console.log('PAGE ERRORS:\n' + errs.join('\n')); fails++; }
   console.log(fails ? `\n${fails} FAILED` : `\nall checks passed (${CASES.length} cases)`);

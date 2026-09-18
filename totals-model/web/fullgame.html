@@ -282,6 +282,10 @@
   /* This row was scored by an older build and the model has since changed. */
   .chip.stale { background: transparent; color: var(--warn);
                 border: 1px dashed var(--warn); padding: 3px 5px; margin-left: 6px; }
+  /* Game date, so a card spanning several nights can be read at a glance. */
+  .gdate { font: 500 11px/1 var(--mono); color: var(--muted); white-space: nowrap; }
+  .gdate.today { color: var(--ink); font-weight: 700; }
+  .gdate.today::before { content: "\2022 "; color: var(--go); }
   .empty { padding: 20px 15px; color: var(--muted); font-size: 13px; }
   .x { border: 0; background: transparent; color: var(--muted); cursor: pointer;
        font-size: 17px; line-height: 1; padding: 3px 7px; border-radius: 4px; }
@@ -1825,6 +1829,25 @@
     return !!(row && row.sport === "MLB" && row.inputs && row.inputs.dome);
   }
 
+  /* Formats the stored YYYY-MM-DD WITHOUT constructing a Date. `new
+     Date("2026-09-17")` parses as UTC midnight, which renders as the 16th for
+     anyone west of Greenwich -- a date column that is silently a day early is
+     worse than no date column. The string is split and mapped instead. */
+  var MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun",
+                "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+  function todayISO() {
+    var d = new Date();
+    return d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") +
+           "-" + String(d.getDate()).padStart(2, "0");
+  }
+  function gameDate(iso) {
+    var m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(iso || "").trim());
+    if (!m) return { text: "\u2014", title: "No date entered for this game", today: false };
+    var mon = MONTHS[+m[2] - 1] || m[2];
+    var now = todayISO();
+    return { text: mon + " " + +m[3], title: m[0], today: m[0] === now };
+  }
+
   function renderCard() {
     var domed = card.filter(isDomed).length;
     $("cardCount").textContent = card.length
@@ -1838,13 +1861,14 @@
       return;
     }
     $("cardTable").innerHTML = '<div class="scroll"><table><thead><tr>' +
-      "<th>Game</th><th>Sport</th><th>Line</th><th>Proj</th><th>Call</th><th>Prob</th>" +
+      "<th>Game</th><th>Date</th><th>Sport</th><th>Line</th><th>Proj</th><th>Call</th><th>Prob</th>" +
       "<th>Band</th><th>Final</th><th>Result</th><th></th></tr></thead><tbody>" +
       card.map(function (s, i) {
         var bc = bandClass(s.band);
         var res = outcome(s);
         /* A row scored by an older build keeps that build's band forever. Say
            so on the row instead of letting it pass as a current call. */
+        var gd = gameDate(s.inputs && s.inputs.gdate);
         var now = scoreInputs(s.sport, s.inputs);
         var stale = now && now.band !== s.band
           ? ' <span class="chip stale" title="Scored by an earlier build. The model as it ' +
@@ -1856,6 +1880,8 @@
             s.matchup + (isDomed(s)
               ? ' <span class="chip dome" title="Roof shut — wind and temperature both dropped ' +
                 'out of this read">Dome</span>' : "") + "</button></td>" +
+          '<td><span class="cell"><span class="gdate' + (gd.today ? " today" : "") +
+            '" title="' + gd.title + '">' + gd.text + "</span></span></td>" +
           '<td class="n"><span class="cell">' + s.sport + "</span></td>" +
           '<td class="n"><span class="cell">' + s.line + "</span></td>" +
           '<td class="n"><span class="cell">' + s.projected + "</span></td>" +
@@ -2253,9 +2279,10 @@
   }
   function cardAsText() {
     if (!card.length) return "Nothing on the card.";
-    return ["GAME\tSPORT\tROOF\tLINE\tPROJ\tCALL\tPROB\tBAND\tFINAL\tRESULT"].concat(
+    return ["GAME\tDATE\tSPORT\tROOF\tLINE\tPROJ\tCALL\tPROB\tBAND\tFINAL\tRESULT"].concat(
       card.map(function (s) {
-        return [s.matchup, s.sport, isDomed(s) ? "DOME" : "", s.line, s.projected, s.side,
+        return [s.matchup, (s.inputs && s.inputs.gdate) || "", s.sport,
+                isDomed(s) ? "DOME" : "", s.line, s.projected, s.side,
                 s.prob + "%", s.band, s.final == null ? "" : s.final, outcome(s) || ""].join("\t");
       })).join("\n");
   }

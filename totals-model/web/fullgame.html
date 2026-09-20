@@ -321,6 +321,27 @@
   .split3 .p { background: var(--muted); }
   .split3 .u { background: var(--under); }
 
+  /* --- the run distribution ---
+     One row per possible final total, bar length relative to the likeliest
+     score, coloured by which side of the line it falls on. The line is drawn
+     BETWEEN two rows, where a half-run line actually sits. */
+  .srow { display: grid; grid-template-columns: 30px 1fr 46px 62px; gap: 8px;
+          align-items: center; height: 17px; }
+  .sk { font: 500 10.5px/1 var(--mono); color: var(--muted); text-align: right; }
+  .sbar { background: var(--surface-2); border-radius: 3px; height: 11px; overflow: hidden; }
+  .sbar i { display: block; height: 100%; border-radius: 3px; background: var(--rule-firm); }
+  .srow.o .sbar i { background: var(--over); }
+  .srow.u .sbar i { background: var(--under); }
+  .srow.push .sbar i { background: var(--muted); }
+  .sp { font: 500 10.5px/1 var(--mono); color: var(--ink-2); text-align: right; }
+  .sm { font: 700 8.5px/1 var(--sans); letter-spacing: .08em; text-transform: uppercase;
+        color: var(--muted); }
+  .sline { position: relative; height: 11px; margin: 1px 0; }
+  .sline::before { content: ""; position: absolute; left: 38px; right: 0; top: 5px;
+                   border-top: 2px dashed var(--ink); }
+  .sline span { position: absolute; left: 0; top: 0; width: 30px; text-align: right;
+                font: 700 10px/11px var(--mono); color: var(--ink); }
+
   /* --- price / edge --- */
   .price { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1px;
            background: var(--rule); border: 1px solid var(--rule);
@@ -631,27 +652,12 @@
         <div class="body"><ul class="why" id="why"></ul></div>
       </section>
 
-      <section class="card" id="altCard">
-        <h2>Alternate lines <span class="tag">priced off the main number</span></h2>
+      <section class="card" id="shapeCard">
+        <h2>What this total looks like <span class="tag" id="shapeTag"></span></h2>
         <div class="body">
-          <p class="note"><b>This is the one thing here that does not need the model to be
-            right.</b> A book prices its <b>main</b> line sharply — that is the single fact this
-            project has actually established. It prices the <b>alternate ladder off a template</b>,
-            and templates are coarse. Given the market's own fair number, recovered from the two
-            main-line prices, the fair price at every other rung is arithmetic on the same
-            distribution.</p>
-          <div id="altLadder"></div>
-          <div class="grid3">
-            <div class="f"><label for="altLine">Alt line</label><input id="altLine" type="number" step="0.5" inputmode="decimal" placeholder="10.5"></div>
-            <div class="f"><label for="altSide">Side</label>
-              <select id="altSide"><option value="OVER">Over</option><option value="UNDER">Under</option></select></div>
-            <div class="f"><label for="altPrice">Book's price</label><input id="altPrice" type="number" step="5" inputmode="numeric" placeholder="+195"></div>
-          </div>
-          <div id="altVerdict"></div>
-          <p class="note"><b>Enter the MAIN line and its two prices above, then the alt you are
-            being offered.</b> Positive cents means the book is giving you a better price than its
-            own main number implies. That is a relative judgement — it needs the main line to be
-            efficient and nothing else.</p>
+          <div id="shape"></div>
+          <div id="shapeRead"></div>
+          <div id="trackRecord"></div>
         </div>
       </section>
     </div>
@@ -1600,7 +1606,7 @@
       $("scale").innerHTML = ""; $("scaleLab").innerHTML = "";
       $("est").innerHTML = '<p class="note">Nothing to blend yet.</p>';
       $("deltaCard").hidden = true; $("why").innerHTML = "";
-      renderAlt(null);
+      renderShape(null);
       return;
     }
 
@@ -1743,99 +1749,162 @@
       return '<li><span class="flag">' + n + "</span></li>";
     })).join("");
 
-    renderAlt(f);
+    renderShape(f);
   }
 
-  /* ---- alternate lines -------------------------------------------------
-     The strongest thing on this page, and the only part that does not need the
-     model to be right about anything. The book's main line is sharp; its
-     alternate ladder is a template. Given the market's own fair number the fair
-     price at every other rung is arithmetic on the same distribution, so a
-     mispriced rung is a relative judgement rather than a forecast. */
-  function priceIndexMlb(p) {
-    p = Math.min(Math.max(p, 1e-9), 1 - 1e-9);
-    return p >= 0.5 ? 100 * p / (1 - p) - 100 : 100 - 100 * (1 - p) / p;
-  }
   function priceFor(p) {
     if (Math.abs(p - 0.5) < 1e-9) return 100;
     return p > 0.5 ? -100 * p / (1 - p) : 100 * (1 - p) / p;
   }
-  /* Sign matters and was wrong first time: the index rises with implied
-     probability, and a HIGHER implied probability is a WORSE price. */
-  function centsBetween(pFair, offered) {
-    return priceIndexMlb(pFair) - priceIndexMlb(implied(offered));
-  }
 
-  function altLadder(mu, mainLine, span) {
-    var out = [], steps = Math.round((span || 3) / 0.5);
-    for (var k = -steps; k <= steps; k++) {
-      var line = Math.round((mainLine + k * 0.5) * 100) / 100;
-      if (line <= 0) continue;
-      var sp = nbSplit(line, mu, PHI.MLB);
-      var live = sp[0] + sp[2];
-      var pOver = live > 0 ? sp[0] / live : 0.5;
-      out.push({ line: line, pOver: pOver, pPush: sp[1],
-                 fairOver: priceFor(pOver), fairUnder: priceFor(1 - pOver) });
-    }
-    return out;
-  }
+  /* ---- what the total actually looks like -------------------------------
+     This replaced the alternate-line ladder, which answered a question about
+     the BOOK'S pricing rather than about the bet in front of you.
 
-  function renderAlt(f) {
-    var box = $("altLadder"), verdict = $("altVerdict");
-    if (!f || f.sport !== "MLB") {
-      $("altCard").hidden = true;
-      return;
-    }
-    $("altCard").hidden = false;
-    /* The MARKET rung, not the model's. The market estimate is the anchor the
-       book itself is standing on; the blended projection is only as good as the
-       model, which on 106 logged games has added nothing over the base rate. */
-    var market = f.estimates[0].total;
-    var rungs = altLadder(market, f.line, 3);
-    box.innerHTML = '<div class="scroll"><table><thead><tr><th>Alt</th><th>Push</th>' +
-      "<th>Fair over</th><th>Fair under</th></tr></thead><tbody>" +
-      rungs.map(function (r) {
-        var isMain = Math.abs(r.line - f.line) < 1e-9;
-        return '<tr' + (isMain ? ' class="pick-row"' : "") + '>' +
-          '<td class="n"><span class="cell">' + (isMain ? "<b>" : "") + r.line +
-            (isMain ? " ·main</b>" : "") + "</span></td>" +
-          '<td class="n"><span class="cell">' +
-            (r.pPush > 0.001 ? (r.pPush * 100).toFixed(1) + "%" : "—") + "</span></td>" +
-          '<td class="n"><span class="cell">' + sgn(r.fairOver, 0) + "</span></td>" +
-          '<td class="n"><span class="cell">' + sgn(r.fairUnder, 0) + "</span></td></tr>";
-      }).join("") + "</tbody></table></div>";
+     The panel exists because of a real confusion, and one worth curing
+     permanently: a card can project 8.62 on a line of 8.5 and still read UNDER
+     at 54%, which looks like a contradiction and is not. Runs cannot go below
+     zero and can go to sixteen, so the distribution is right-skewed: the MEAN
+     sits above the MEDIAN. The model bets the median. Printing the whole
+     distribution with the line drawn through it makes that visible instead of
+     asking anyone to take it on faith.
 
-    var al = num("altLine"), ap = num("altPrice"), side = $("altSide").value;
-    if (al === null || ap === null) {
-      verdict.innerHTML = '<p class="note">Enter an alt line and the price the book is showing ' +
-        "to see whether it beats the main number.</p>";
-      return;
+     Everything here is read off the same negative binomial the probability
+     comes from. Nothing new is estimated and no constant is introduced. */
+  var SHAPE_LO = 0.004;   // stop drawing rows below 0.4% and fold them into +
+
+  function renderShape(f) {
+    var box = $("shape"), read = $("shapeRead"), rec = $("trackRecord");
+    if (!f || f.sport !== "MLB") { $("shapeCard").hidden = true; return; }
+    $("shapeCard").hidden = false;
+    $("shapeTag").textContent = "line " + f.line;
+
+    var mu = f.projected, rows = [], cum = 0, k, pk;
+    for (k = 0; k < 40; k++) {
+      pk = nbPmf(k, mu, PHI.MLB);
+      rows.push({ k: k, p: pk });
+      cum += pk;
     }
-    var sp = nbSplit(al, market, PHI.MLB);
-    var live = sp[0] + sp[2];
-    var pOver = live > 0 ? sp[0] / live : 0.5;
-    var p = side === "OVER" ? pOver : 1 - pOver;
-    var fair = priceFor(p);
-    var cents = centsBetween(p, ap);
-    var payout = ap > 0 ? ap / 100 : 100 / -ap;
-    var ev = p * payout - (1 - p);
-    var good = cents > 0;
-    verdict.innerHTML =
-      '<div class="price">' +
-        '<div><p class="k">Fair</p><p class="v">' + sgn(fair, 0) + "</p></div>" +
-        '<div><p class="k">Offered</p><p class="v">' + sgn(ap, 0) + "</p></div>" +
-        '<div><p class="k">Edge</p><p class="v ' + (good ? "good" : "bad") + '">' +
-          sgn(cents, 0) + "c</p></div>" +
+    /* Renormalised over the same support nbSplit uses, so the percentages here
+       add up to the probability on the banner rather than to something 0.3%
+       short of it. */
+    rows.forEach(function (r) { r.p /= cum; });
+
+    var first = 0, last = rows.length - 1;
+    while (first < last && rows[first].p < SHAPE_LO) first++;
+    while (last > first && rows[last].p < SHAPE_LO) last--;
+    var tail = 0;
+    rows.slice(last + 1).forEach(function (r) { tail += r.p; });
+    var head = 0;
+    rows.slice(0, first).forEach(function (r) { head += r.p; });
+
+    var shown = rows.slice(first, last + 1);
+    var peak = Math.max.apply(null, shown.map(function (r) { return r.p; }));
+    var mode = rows.reduce(function (a, b) { return b.p > a.p ? b : a; }).k;
+    var median = 0, run = 0;
+    for (k = 0; k < rows.length; k++) { run += rows[k].p; if (run >= 0.5) { median = k; break; } }
+
+    function bar(label, p, cls, mark) {
+      return '<div class="srow' + (cls ? " " + cls : "") + '">' +
+        '<span class="sk">' + label + "</span>" +
+        '<span class="sbar"><i style="width:' + (p / peak * 100).toFixed(2) + '%"></i></span>' +
+        '<span class="sp">' + (p * 100).toFixed(1) + "%</span>" +
+        '<span class="sm">' + (mark || "") + "</span></div>";
+    }
+
+    var html = "";
+    /* "<=0" is a silly way to write "0", and the head is usually exactly that. */
+    if (head > 0) html += bar(first === 1 ? "0" : "&le;" + (first - 1), head, "u", "");
+    shown.forEach(function (r) {
+      /* A whole-number line is a PUSH on its own number, not a loss — the one
+         row on this chart that is neither side. */
+      var cls = Math.abs(r.k - f.line) < 1e-9 ? "push" : (r.k > f.line ? "o" : "u");
+      var mark = Math.abs(r.k - f.line) < 1e-9 ? "push"
+               : r.k === mode ? "likeliest" : "";
+      html += bar(String(r.k), r.p, cls, mark);
+      if (r.k < f.line && f.line < r.k + 1) {
+        html += '<div class="sline"><span>' + f.line + "</span></div>";
+      }
+    });
+    if (tail > 0) html += bar(last + 1 + "+", tail, "o", "");
+    box.innerHTML = html;
+
+    /* The lesson, stated in words next to the picture that proves it. */
+    var gap = mu - median;
+    read.innerHTML =
+      '<div class="calib">' +
+        '<div><p class="k">Average game</p><p class="v">' + fmt(mu) + "</p></div>" +
+        '<div><p class="k">Typical game</p><p class="v">' + median + "</p></div>" +
+        '<div><p class="k">Likeliest score</p><p class="v">' + mode + "</p></div>" +
       "</div>" +
-      '<p class="note">' + (good
-        ? "<b>The book is paying you " + cents.toFixed(0) + " cents more than its own main " +
-          "line implies</b> on " + side + " " + al + ". Expected value <b>" + sgn(ev, 3) +
-          "</b> per unit staked."
-        : "<b>That is " + Math.abs(cents).toFixed(0) + " cents worse than fair.</b> The main " +
-          "number says " + side + " " + al + " should pay " + sgn(fair, 0) + ". Expected value " +
-          sgn(ev, 3) + " per unit — this is the template charging you for the move.") +
-        (sp[1] > 0.001 ? " Note " + (sp[1] * 100).toFixed(1) + "% of games land exactly on " +
-          al + " and refund." : "") + "</p>";
+      '<p class="note">' + (gap > 0.05
+        ? "<b>The average sits " + gap.toFixed(2) + " runs above the typical game.</b> " +
+          "Runs stop at zero and keep going at the top, so a handful of blowouts drag the " +
+          "average up with no low-scoring mirror image to drag it back. That is why a " +
+          "projection <b>above</b> the line can still be an <b>under</b>: on this card the " +
+          "over only becomes the favourite once the projection clears <b>" +
+          fmt(crossing(f.line)) + "</b>, not " + f.line + "."
+        : "The average and the typical game are close here, so the line sits near the " +
+          "middle of the distribution and the call rests on the blend rather than on the " +
+          "shape.") + "</p>";
+
+    rec.innerHTML = trackRecord(f.pResolved);
+  }
+
+  /* The projection at which the over stops being the underdog, for this line.
+     Solved on the same distribution, not a stored constant -- though it lands
+     within a thousandth of line + 0.543 at every MLB number, which is worth
+     knowing as a rule of thumb. */
+  function crossing(line) {
+    var lo = Math.max(0.2, line - 1), hi = line + 4;
+    for (var i = 0; i < 80; i++) {
+      var mid = (lo + hi) / 2, sp = nbSplit(line, mid, PHI.MLB);
+      var live = sp[0] + sp[2];
+      if ((live > 0 ? sp[0] / live : 0.5) < 0.5) lo = mid; else hi = mid;
+    }
+    return (lo + hi) / 2;
+  }
+
+  /* ---- and what this model has actually done at this number --------------
+     A probability is a claim. This is the only place on the page that checks
+     it against the reader's own graded card, at the confidence THIS card is
+     being offered at, rather than over everything at once. Buckets are the
+     band floors -- no new constants, and it matches the colour of the
+     headline. */
+  function trackRecord(p) {
+    var lvl = pctLevel(p);
+    var lo = lvl === "lv3" ? BANDS[0][0] : lvl === "lv2" ? BANDS[1][0]
+           : lvl === "lv1" ? BANDS[2][0] : 0;
+    var hi = lvl === "lv3" ? 1 : lvl === "lv2" ? BANDS[0][0]
+           : lvl === "lv1" ? BANDS[1][0] : BANDS[2][0];
+    var label = lvl === "" ? "under " + (BANDS[2][0] * 100).toFixed(0) + "%"
+              : (lo * 100).toFixed(0) + "–" + (hi >= 1 ? "100" : (hi * 100).toFixed(0)) + "%";
+
+    var w = 0, l = 0, says = 0, n = 0;
+    card.forEach(function (s) {
+      if (s.sport !== "MLB") return;
+      var pr = parseFloat(s.prob) / 100, fin = parseFloat(s.final), ln = parseFloat(s.line);
+      if (!isFinite(pr) || !isFinite(fin) || !isFinite(ln)) return;
+      if (pr < lo || pr >= hi) return;
+      if (Math.abs(fin - ln) < 1e-9) return;              // a push is neither
+      n++; says += pr;
+      if ((s.side === "OVER") === (fin > ln)) w++; else l++;
+    });
+
+    if (n < 5) {
+      return '<p class="note"><b>At ' + label + ", this card has " + n + " graded call" +
+        (n === 1 ? "" : "s") + ".</b> That is not a record, it is an anecdote — enter finals " +
+        "on the card below and this fills in.</p>";
+    }
+    var does = w / n, said = says / n, se = Math.sqrt(does * (1 - does) / n);
+    var off = does - said;
+    return '<p class="note"><b>What this model has done at ' + label + ": " + w + "-" + l +
+      " (" + (does * 100).toFixed(1) + "%) over " + n + " graded calls.</b> It said " +
+      (said * 100).toFixed(1) + "% and did " + (does * 100).toFixed(1) + "%, " +
+      sgn(off * 100, 1) + " points. At " + n + " calls one standard error is " +
+      (se * 100).toFixed(1) + " points, so " + (Math.abs(off) > 2 * se
+        ? "<b>that gap is larger than the noise</b> and is worth treating as real."
+        : "that gap is inside the noise and is not established either way.") + "</p>";
   }
 
   // ---- the card --------------------------------------------------------
@@ -2041,6 +2110,11 @@
       });
     });
     renderCalib();
+    /* Typing a final changes the record this card is being measured against,
+       so the track record beside the call has to move with it. */
+    if (last && last.sport === "MLB" && $("trackRecord")) {
+      $("trackRecord").innerHTML = trackRecord(last.pResolved);
+    }
   }
 
   /* ---- is it working --------------------------------------------------
@@ -2329,12 +2403,6 @@
   $("m-nfl").addEventListener("click", function () { setSport("NFL"); saveDraft(); });
 
   function onEdit() { render(); saveDraft(); }
-  /* The alt inputs drive only the alternate panel, so they re-render without
-     touching the draft -- they describe a price you are shopping, not the game. */
-  ["altLine", "altSide", "altPrice"].forEach(function (id) {
-    $(id).addEventListener("input", function () { renderAlt(last); });
-    $(id).addEventListener("change", function () { renderAlt(last); });
-  });
   ALL.concat(CHECKS).forEach(function (id) {
     var el = $(id);
     el.addEventListener("input", onEdit);

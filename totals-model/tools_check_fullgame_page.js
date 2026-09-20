@@ -663,6 +663,117 @@ const CHECKS = ["dome", "aqb", "hqb"];
   chk(!/of tickets but/.test(split.quiet.why),
       'split: a gap under the threshold says nothing at all', split.quiet.why.slice(0, 120));
 
+  // ---- what this total looks like ---------------------------------------
+  // Replaced the alternate-line ladder. The chart is read off the same negative
+  // binomial the banner's probability comes from, so the two must agree exactly
+  // -- a picture that disagreed with the number above it would be worse than no
+  // picture at all.
+  const shape = await pg.evaluate(async () => {
+    const fill = async (vals) => {
+      ['away','home','line','op','up','aera','hera','abp','hbp','arpg','hrpg',
+       'al10','hl10','h2h','h2hn','pf','mph','temp','tick','cash','opened','gdate','aip','hip']
+        .forEach(id => {
+          const el = document.getElementById(id);
+          el.value = vals[id] === undefined ? '' : vals[id];
+          el.dispatchEvent(new Event('input', { bubbles: true }));
+        });
+      await new Promise(r => setTimeout(r, 60));
+      const c = document.getElementById('call');
+      const rows = [...document.querySelectorAll('#shape .srow')].map(r => ({
+        k: r.querySelector('.sk').textContent.trim(),
+        p: parseFloat(r.querySelector('.sp').textContent) / 100,
+        side: r.classList.contains('o') ? 'o'
+            : r.classList.contains('push') ? 'push' : 'u',
+        mark: r.querySelector('.sm').textContent.trim(),
+      }));
+      const sum = s => rows.filter(r => r.side === s)
+                           .reduce((a, r) => a + r.p, 0);
+      return {
+        rows, over: sum('o'), under: sum('u'), push: sum('push'),
+        pOver: parseFloat(c.dataset.pOver), pPush: parseFloat(c.dataset.pPush),
+        lines: document.querySelectorAll('#shape .sline').length,
+        read: document.getElementById('shapeRead').textContent,
+        track: document.getElementById('trackRecord').textContent,
+        hidden: document.getElementById('shapeCard').hidden,
+      };
+    };
+    const base = { away: 'Braves', home: 'Astros', op: '100', up: '-130',
+                   aera: '3.07', hera: '3.43', arpg: '3.87', hrpg: '4.79',
+                   abp: '3.58', hbp: '4.20' };
+    return { half: await fill(Object.assign({}, base, { line: '8.5' })),
+             whole: await fill(Object.assign({}, base, { line: '9' })) };
+  });
+  chk(shape.half.hidden === false, 'shape: the panel is drawn for an MLB card');
+  // These sums are of the PRINTED percentages, each rounded to a tenth of a
+  // point, so the tolerance has to be the accumulated rounding and nothing
+  // tighter -- half a tenth per row. A fixed 0.002 failed at 23 rows and the
+  // page was right.
+  const slack = n => n * 0.0005 + 1e-9;
+  chk(Math.abs(shape.half.over - shape.half.pOver) < slack(shape.half.rows.length),
+      'shape: the bars above the line sum to the page\'s own OVER probability',
+      `chart ${(shape.half.over * 100).toFixed(2)}% vs ${(shape.half.pOver * 100).toFixed(2)}%`);
+  chk(Math.abs(shape.half.over + shape.half.under + shape.half.push - 1)
+        < slack(shape.half.rows.length),
+      'shape: and the whole chart sums to one',
+      String(shape.half.over + shape.half.under + shape.half.push));
+  chk(shape.half.push === 0 && shape.half.lines === 1,
+      'shape: a half-run line has no push row and is drawn between two scores',
+      `push=${shape.half.push} lines=${shape.half.lines}`);
+  chk(Math.abs(shape.whole.push - shape.whole.pPush) < 0.001 && shape.whole.lines === 0,
+      'shape: a whole-number line gets a push row matching the banner, and no rule',
+      `push ${(shape.whole.push * 100).toFixed(2)}% vs ${(shape.whole.pPush * 100).toFixed(2)}%`);
+  chk(shape.whole.rows.filter(r => r.mark === 'push').length === 1,
+      'shape: the push row is labelled');
+  chk(shape.half.rows.filter(r => r.mark === 'likeliest').length === 1,
+      'shape: exactly one score is marked the likeliest');
+  // The lesson the panel exists to teach: mean above median, and the crossing.
+  chk(/9\.04/.test(shape.half.read),
+      'shape: it names the projection the over needs on an 8.5 line',
+      shape.half.read.slice(0, 200));
+  chk(/10\.04/.test(shape.whole.read) === false && /9\.54/.test(shape.whole.read),
+      'shape: and line + 0.543 on a 9', shape.whole.read.slice(0, 200));
+  chk(/0 graded calls/.test(shape.half.track),
+      'shape: with an empty card the track record says so rather than inventing one',
+      shape.half.track.slice(0, 120));
+
+  // and it fills in once the card has graded calls in that bucket
+  await pg.evaluate(async () => {
+    const mk = (prob, line, side, final) =>
+      ({ matchup: 'x', sport: 'MLB', line, projected: '9.0', side, prob,
+         band: 'BET', fair: '-120', final, inputs: {} });
+    localStorage.setItem('callsheet.fullgame.card.v1', JSON.stringify([
+      mk('54.0', 8.5, 'OVER', '10'),   // won
+      mk('55.0', 8.5, 'OVER', '10'),   // won
+      mk('56.0', 8.5, 'UNDER', '2'),   // won
+      mk('54.5', 8.5, 'OVER', '3'),    // lost
+      mk('53.5', 8.5, 'OVER', '4'),    // lost
+      mk('55.5', 9.0, 'OVER', '9'),    // push -- must not count either way
+      mk('59.0', 8.5, 'OVER', '3'),    // a different bucket
+    ]));
+  });
+  await pg.reload();
+  await pg.waitForTimeout(400);
+  const filled = await pg.evaluate(async () => {
+    ['away','home','line','op','up','aera','hera','abp','hbp','arpg','hrpg']
+      .forEach((id, i) => {
+        const v = { away: 'Braves', home: 'Astros', line: '8.5', op: '100', up: '-130',
+                    aera: '3.07', hera: '3.43', abp: '3.58', hbp: '4.20',
+                    arpg: '3.87', hrpg: '4.79' }[id];
+        const el = document.getElementById(id);
+        el.value = v; el.dispatchEvent(new Event('input', { bubbles: true }));
+      });
+    await new Promise(r => setTimeout(r, 80));
+    return document.getElementById('trackRecord').textContent;
+  });
+  chk(/3-2/.test(filled),
+      'track: the 53-57% bucket reports 3-2 from the seeded card', filled.slice(0, 200));
+  chk(/over 5 graded calls/.test(filled),
+      'track: the push is excluded and the other bucket is not counted',
+      filled.slice(0, 200));
+  chk(/inside the noise/.test(filled),
+      'track: a 5-call gap is reported as unresolved, not as a finding',
+      filled.slice(0, 220));
+
   if (errs.length) { console.log('PAGE ERRORS:\n' + errs.join('\n')); fails++; }
   console.log(fails ? `\n${fails} FAILED` : `\nall checks passed (${CASES.length} cases)`);
   await b.close();

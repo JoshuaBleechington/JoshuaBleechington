@@ -130,10 +130,18 @@ So the band is now cut from the **less confident of two reads**: the full blend,
 and the same blend with `mechanism=False` inputs deleted. If deleting them
 changes the side, the band is held at COIN FLIP.
 
-Three MLB inputs are tagged. Form and head to head because they measured null
-against the residual on 116 games (t = −0.07 and t = −0.40) and are absolutes
-rather than differentials. The money split because its coefficient is a flat
-hand-capped 0.30 — the direction is documented, the size is not.
+**This paragraph is out of date and is kept as written for the history.** At the
+time, three MLB inputs were tagged: form and head to head, because they measured
+null against the residual on 116 games (t = −0.07 and t = −0.40) and are
+absolutes rather than differentials; and the money split, because its
+coefficient was a flat hand-capped 0.30 — the direction documented, the size not.
+
+Since then the **starters** were tagged too, on the same a-priori rule (below),
+and the **money split is no longer scored at all**, so it can no longer be soft —
+there is nothing left of it to tag. The current set is starters, form and head to
+head. Note what that does to the Detroit card that motivated this whole section:
+without the split it no longer reaches a bet on either read, so the gate has
+nothing left to do there.
 
 **The headline probability is untouched.** The gate governs the band only. The
 probability is the best estimate of what happens; the band is the
@@ -768,7 +776,85 @@ absent. Type the innings when a starter is genuinely short-sample — a call-up,
 returning injury, an opener — and leave them blank otherwise until there are
 enough logged games to settle it.
 
-## Alternate lines
+## What this total looks like
+
+Added 2026-09-20, replacing the alternate-line panel on the page, on request.
+
+It draws the full run distribution — one bar per possible final score, coloured
+by which side of the line it falls on, with the line ruled through it — plus the
+average, the median and the modal score, and then the model's own graded record
+at this card's confidence.
+
+### Why this, of all the things that could go there
+
+Because of a real question, asked about a real card: *"the model will say under
+at 54% chance for 8.5 on the braves/astros game but have the projected at 8.62.
+Wouldn't the projected line be lower if the model thinks the game is going to go
+under?"*
+
+That is the single most important thing to understand about this model and it
+was nowhere on the page. The answer is that runs cannot go below zero and can go
+to sixteen, so the distribution is right-skewed and **the mean sits above the
+median**. The model bets the median.
+
+```
+  runs   chance   running total
+    7    9.89%       44.40%   <- the single likeliest score
+    8    9.59%       53.99%   <- UNDER wins here and below
+    9    8.83%       62.82%
+   13+               12.93%   <- the tail that drags the average up
+                  mean 8.62, median 8
+```
+
+Solved on the distribution at every line, the crossing is astonishingly stable:
+
+```
+  line  6.5 -> over is the favourite once the projection passes  7.043
+  line  7.5 ->                                                   8.043
+  line  8.5 ->                                                   9.043
+  line 11.5 ->                                                  12.043
+```
+
+**Line + 0.543, every time.** The panel computes it per card rather than storing
+it, but that is the rule of thumb. It is also why "projection above the line, so
+bet the over" is a trap — it writes OVER on that Braves card and loses. An
+outside audit of this model made exactly that error and reported it as a bug.
+
+Everything on the chart is read off the same negative binomial the banner's
+probability comes from. Nothing new is estimated, no constant is introduced, and
+the browser check asserts the bars sum to the page's own probabilities, so a
+picture that disagreed with the number above it would fail the build.
+
+### And the second half: what the model has actually done here
+
+Under the chart, the model's graded record **at this card's confidence**, bucketed
+by the band floors — no new constants, and it matches the colour of the headline.
+
+```
+What this model has done at 53-57%: 39-28 (58.2%) over 67 graded calls.
+It said 54.6% and did 58.2%, +3.6 points. At 67 calls one standard error
+is 6.0 points, so that gap is inside the noise and is not established.
+```
+
+Under five graded calls in the bucket it refuses to report a rate at all and says
+so. Pushes are excluded. This is the only place on the page that checks a
+probability against the reader's own log at the number being offered, rather than
+over everything at once.
+
+### What was given up
+
+The alternate-line panel was, on the evidence, the best-supported feature here —
+it is the only part that **did not need the model to be right about anything**. A
+book prices its main line sharply and its alternate ladder off a coarse template,
+so a mispriced rung was a relative judgement rather than a forecast. Removing it
+from the page is a real loss and worth stating plainly.
+
+`alt_ladder()` and `alt_edge()` remain in `totals/fullgame.py` with their tests,
+including the sign fix below — the arithmetic did not stop being correct. Only
+the panel is gone. To put it back, restore the `#altCard` section and `renderAlt`
+from the history of `web/fullgame.html`.
+
+## Alternate lines (the package function)
 
 Added 2026-09-16, and it is the strongest thing in this file because it is the
 only part that **does not need the model to be right about anything**.
@@ -863,7 +949,7 @@ cheap. To update, change those four numbers and nothing else.
 - `web/fullgame-cases.json` — 38 games generated from the package by
   `tools_gen_fullgame_cases.py`, which recomputes only the expectations so a
   model change never means hand-editing a probability.
-- `tools_check_fullgame_page.js` — 707 checks. It replays all 38 in a real browser against side,
+- `tools_check_fullgame_page.js` — 726 checks. It replays all 38 in a real browser against side,
   band, resolved probability, push, projection, fair price, estimate and delta
   counts, the gate's core projection and core probability, the core chip showing
   the corroborated probability on every card and turning amber only when held,
@@ -874,7 +960,12 @@ cheap. To update, change those four numbers and nothing else.
   half-typed draft all survive. It loads a hand-built card of known results and
   checks the per-band table reports 2-0, 1-1 and 0-1 with the push in its own
   column and an empty band left out, and that the card's Prob column is tinted at
-  the same floors as the banner. Last it checks the roof marker: a domed game is
+  the same floors as the banner. It checks that the money split moves the
+  projection, the probability and the band by exactly nothing while still
+  printing its note, and that the run-distribution chart's bars sum to the
+  page's own over, push and under probabilities, that the push row appears only
+  on a whole number, and that the track record reports 3-2 from a seeded card
+  with the push excluded. Last it checks the roof marker: a domed game is
   tagged, an open-air one is not, and a basketball row does not inherit a
   left-over tick from the ballgame before it.
 

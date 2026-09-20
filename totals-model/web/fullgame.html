@@ -1082,7 +1082,10 @@
         LEAGUE_STARTER_ERA.toFixed(2) + " league starter ERA, over the " +
         STARTER_INNINGS.toFixed(1) + " innings a start now covers: " + sgn(gap) +
         " runs on the line. Two league-average arms move it by exactly zero, which is what " +
-        "keeps this from carrying a hidden lean." + shrunk));
+        "keeps this from carrying a hidden lean." + shrunk +
+        " Measured null against the market's error on 156 games (r = \u2212" +
+        "0.076, t = \u22120.95, sign backwards), so it moves this projection but cannot " +
+        "buy a band on its own.", false));
       /* A BLANK innings box is not "no shrinkage needed" — it is "trust this
          arm completely", which is more than 210 innings earns. Filling one side
          and leaving the other empty makes the empty arm artificially dominant;

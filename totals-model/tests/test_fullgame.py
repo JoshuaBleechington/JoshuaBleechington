@@ -461,8 +461,8 @@ class TestSoftInputsCannotBuyABand(unittest.TestCase):
 
     def test_a_card_with_no_soft_inputs_is_left_completely_alone(self):
         """Not an approximation of a no-op -- an actual one."""
+        # Market and bullpens only: the two inputs still carrying a mechanism.
         bare = dict(line=8.5, over_price=-115, under_price=-105,
-                    away_starter_era=2.90, home_starter_era=5.40,
                     away_bullpen_era=3.10, home_bullpen_era=5.10)
         f = forecast_mlb("a @ b", **bare)
         self.assertEqual(f.band, f.band_ungated)
@@ -471,10 +471,12 @@ class TestSoftInputsCannotBuyABand(unittest.TestCase):
         self.assertFalse(any("Held at" in n for n in f.notes))
 
     def test_soft_inputs_agreeing_with_the_core_keep_the_band(self):
-        """The gate is a veto, not a tax. Corroborated confidence survives."""
+        """The gate is a veto, not a tax. Corroborated confidence survives.
+
+        The core is the market and the bullpens; everything else is soft now.
+        """
         kw = dict(line=8.5, over_price=-110, under_price=-110,
-                  away_starter_era=6.20, home_starter_era=6.40,
-                  away_bullpen_era=5.90, home_bullpen_era=5.80)
+                  away_bullpen_era=6.90, home_bullpen_era=6.80)
         core = forecast_mlb("a @ b", **kw)
         withsoft = forecast_mlb("a @ b", away_last10_total=11.0,
                                 home_last10_total=11.4, **kw)
@@ -486,8 +488,7 @@ class TestSoftInputsCannotBuyABand(unittest.TestCase):
     def test_soft_inputs_can_still_cut_confidence(self):
         """Deleting them is never allowed to RAISE the band."""
         kw = dict(line=8.5, over_price=-110, under_price=-110,
-                  away_starter_era=6.20, home_starter_era=6.40,
-                  away_bullpen_era=5.90, home_bullpen_era=5.80)
+                  away_bullpen_era=6.90, home_bullpen_era=6.80)
         cut = forecast_mlb("a @ b", away_last10_total=7.0,
                            home_last10_total=7.2, **kw)
         self.assertLessEqual(BANDS_ORDER[cut.band], BANDS_ORDER[cut.band_ungated])
@@ -515,7 +516,15 @@ class TestSoftInputsCannotBuyABand(unittest.TestCase):
         self.assertTrue(wind.mechanism)
         self.assertGreater(f.projected_corroborated, f.line)
 
-    def test_the_three_soft_inputs_are_the_only_ones_tagged(self):
+    def test_exactly_the_four_measured_null_inputs_are_tagged(self):
+        """Starters joined the list on 2026-09-20.
+
+        Measured the same way as the others on 156 settled games: r = -0.076
+        against the market's error, t = -0.95, sign backwards. Worst MAE of any
+        real input (3.157 against the market's 2.803), and the blend containing
+        it predicts finals worse than the market anchor alone. A stronger case
+        than either form or head to head had when they were tagged.
+        """
         f = forecast_mlb(
             "a @ b", line=8.5, away_starter_era=3.9, home_starter_era=4.4,
             away_bullpen_era=3.8, home_bullpen_era=4.3,
@@ -524,7 +533,11 @@ class TestSoftInputsCannotBuyABand(unittest.TestCase):
             temp_f=84, ticket_pct_over=70, money_pct_over=40)
         soft = {e.name for e in f.estimates if not e.mechanism}
         soft |= {d.name for d in f.deltas if not d.mechanism}
-        self.assertEqual(soft, {"Last 10", "Head to head (5)", "Money split"})
+        self.assertEqual(
+            soft, {"Starters", "Last 10", "Head to head (5)", "Money split"})
+        # and the market and the bullpens are what is left standing
+        hard = {e.name for e in f.estimates if e.mechanism}
+        self.assertEqual(hard, {"Market", "Bullpens"})
 
 BANDS_ORDER = {name: i for i, (_floor, name) in enumerate(BANDS)}
 
@@ -1074,3 +1087,69 @@ class TestInningsMustBeFilledOnBothSidesOrNeither(unittest.TestCase):
         # and the thing that actually reaches the projection
         for ip, third, era in ((22.2, 22 + 2 / 3, 5.24), (165.1, 165 + 1 / 3, 3.00)):
             self.assertLess(abs(shrink_era(era, ip) - shrink_era(era, third)), 0.005)
+
+
+class TestStartersAreMeasuredNullToo(unittest.TestCase):
+    """Tagged 2026-09-20, and the reason is written down so it can be undone.
+
+    The case is NOT the backtest. Tagging starters gains +2.46u across 160
+    logged cards, but the basket it stops betting went 14-15 against a claimed
+    56.2% -- z = -0.85, indistinguishable from noise, and it was picked after
+    fourteen configurations had been tried against the same log.
+
+    The case is the rule this model already runs on: an input measured null
+    against the market's error does not get to buy a band. On 156 settled games
+    the starter differential correlates with that error at r = -0.076,
+    t = -0.95, SIGN BACKWARDS. Form was tagged at t = -0.07 and head to head at
+    t = -0.40. Starters fails harder than either.
+
+    If a later re-measure on 400+ games finds a real positive correlation, take
+    the tag off. That is what this class is for.
+    """
+
+    def test_starters_still_move_the_projection(self):
+        """Demoted, not deleted. The weight is untouched at 1.6."""
+        self.assertEqual(WEIGHTS["MLB"]["starters"], 1.6)
+        flat = forecast_mlb("a @ b", 8.5, over_price=-110, under_price=-110,
+                            away_starter_era=4.16, home_starter_era=4.16)
+        steep = forecast_mlb("a @ b", 8.5, over_price=-110, under_price=-110,
+                             away_starter_era=6.50, home_starter_era=6.50)
+        self.assertGreater(steep.projected, flat.projected + 0.5)
+        self.assertGreater(steep.p_resolved, flat.p_resolved)
+
+    def test_but_they_can_no_longer_buy_a_band_alone(self):
+        """Two awful starters and nothing else is no longer a bet."""
+        f = forecast_mlb("a @ b", 8.5, over_price=-110, under_price=-110,
+                         away_starter_era=6.50, home_starter_era=6.50)
+        self.assertEqual(f.side, "OVER")
+        self.assertNotEqual(f.band_ungated, "NO BET")
+        self.assertEqual(f.band, "NO BET")
+
+    def test_the_bullpens_can_still_carry_a_card(self):
+        """The core is market + bullpens. Something has to survive the gate or
+        the model can never name a bet at all."""
+        f = forecast_mlb("a @ b", 8.5, over_price=-110, under_price=-110,
+                         away_bullpen_era=7.40, home_bullpen_era=7.20)
+        self.assertEqual(f.side, "OVER")
+        self.assertEqual(f.band, f.band_ungated)
+        self.assertNotEqual(f.band, "NO BET")
+
+    def test_the_probability_is_untouched_by_the_tag(self):
+        """The gate governs the band and never the forecast, so the calibration
+        record carries across the change unbroken."""
+        kw = dict(line=8.5, over_price=-110, under_price=-110,
+                  away_starter_era=6.50, home_starter_era=5.90,
+                  away_bullpen_era=4.10, home_bullpen_era=4.00)
+        f = forecast_mlb("a @ b", **kw)
+        # p_resolved is built from the full blend, which still contains starters
+        self.assertGreater(f.p_resolved, 0.55)
+        self.assertAlmostEqual(f.projected, f.estimates[0].total + sum(
+            (e.total - f.estimates[0].total) * e.weight for e in f.estimates[1:]
+        ) / sum(e.weight for e in f.estimates), places=6)
+
+    def test_the_card_says_why_it_was_demoted(self):
+        f = forecast_mlb("a @ b", 8.5, away_starter_era=3.0, home_starter_era=3.0)
+        detail = next(e for e in f.estimates if e.name == "Starters").detail
+        self.assertIn("Measured null", detail)
+        self.assertIn("156 games", detail)
+        self.assertIn("cannot buy a band", detail)

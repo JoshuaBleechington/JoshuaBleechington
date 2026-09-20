@@ -314,6 +314,74 @@ displayed, never scored.
 **Park factor on the market anchor.** The posted number already holds the park.
 It scales the differentials and the wind and nothing else.
 
+## The starters measure null too
+
+Added 2026-09-20, after being asked to find whichever version of this model was
+the most accurate and go back to it. The honest answer is that there isn't one.
+
+### Accuracy has never changed
+
+Every version of the model, scored on the same 160 logged cards:
+
+| version | says | does | Brier | record | units |
+|---|---|---|---|---|---|
+| 02 Sep — the full-game rebuild | 55.11% | 55.26% | 0.2449 | 57-43 | +1.38u |
+| 04 Sep — + wide-market pullback | 54.82% | 54.61% | 0.2457 | 55-42 | +0.98u |
+| 04 Sep — + the corroboration gate | 54.82% | 54.61% | 0.2457 | 44-33 | +1.06u |
+| 07 Sep | 54.82% | 54.61% | 0.2457 | 44-33 | +1.06u |
+| 18 Sep | 54.83% | 54.61% | 0.2456 | 44-33 | +1.06u |
+| **20 Sep — starters tagged** | 54.79% | 54.61% | 0.2451 | **33-17** | **+7.29u** |
+
+**The entire Brier range across the model's life is 0.2449 to 0.2457.** 112 of
+160 cards are bit-identical from the first build to today, and the largest any
+card has ever moved is 2.38 points. The forecast has never improved and has
+never degraded.
+
+**Every gain has come from betting less.** The gate cut 23 bets; this cuts 27
+more. The decision rule is the only lever that has ever moved anything, which
+is worth knowing before reaching for the weights again.
+
+### Why the starters were demoted
+
+Three independent measurements, none of them a sweep:
+
+- **Correlation with the market's error**, the same test that tagged form and
+  head to head: `r = -0.076, t = -0.95` on 156 settled games — null, and the
+  **sign points backwards**. Form was tagged at t = -0.07, head to head at
+  t = -0.40. Starters fails harder than either.
+- **Mean absolute error against the final**: 3.157, the worst of any real input
+  (market 2.803, bullpens 2.813, form 2.850).
+- **The blend is worse than its own anchor**: the full projection scores 2.868
+  against the market anchor's 2.803. Everything the model adds on top of the
+  market makes it less accurate.
+
+Leaving it untagged was the inconsistency. It keeps its 1.6 weight and still
+moves every projection — it simply may no longer buy a band alone.
+
+### What the backtest is, and is not
+
+Tagging gains **+2.46u** across the log. That is not the justification and must
+not be read as one. The 29 bets it stops taking went **14-15 (48.3%)** against a
+claimed 56.2% — `z = -0.85`, indistinguishable from noise — and it was chosen
+after fourteen configurations had been tried against the same games, where
+Sidak needs |z| > 2.88.
+
+What makes the dropped basket worth dropping is not that it lost. It is that a
+coin flip at prices needing **53.2%** is a losing basket by arithmetic.
+
+### It cannot corrupt the record
+
+The gate governs the band and never the probability, so **all 160 probabilities
+are unchanged to twelve decimals** and the calibration history carries across
+the change unbroken. A test pins that.
+
+### How to undo it
+
+If a re-measure at 400+ games finds a real positive correlation between the
+starter differential and the market's error, take the tag off. At n=156 the
+smallest detectable |r| is 0.160 and the observed is 0.076, so this is a
+demotion on the evidence available, not a verdict.
+
 ## One price is not no price
 
 Added 2026-09-17, from a real card: Brewers at Pirates, over **−120**, under box

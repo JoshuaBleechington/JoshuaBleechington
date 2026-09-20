@@ -161,15 +161,26 @@ LEGACY_BANDS = {"MAX": "MAX BET", "STRONG": "STRONG BET",
 # An input that was MEASURED to be worth nothing may move the forecast. It may
 # not, on its own, buy a confidence band.
 #
-# Three of the MLB inputs are tagged `mechanism=False`. Form and head to head
+# Four of the MLB inputs are tagged `mechanism=False`. Form and head to head
 # because they measured null against the residual on 116 games (t = -0.07 and
 # t = -0.40) and because they are absolutes rather than differentials, so they
 # lean toward the league mean regardless of where the line sits. The public
 # money split because its coefficient is a flat hand-capped 0.30 -- the
 # direction is documented, the size is not.
 #
+# And, added 2026-09-20, THE STARTERS. Measured the same way on 156 settled
+# games, the starter differential correlates with the market's error at
+# r = -0.076, t = -0.95 -- null, and pointing the wrong way. It also carries
+# the worst mean absolute error of any real input on the board (3.157 against
+# the market's 2.803), and the full blend containing it predicts finals WORSE
+# than the market anchor alone (2.868 against 2.803).
+#
+# That is a stronger case than either of the two already tagged, so leaving it
+# untagged was the inconsistency. It keeps its 1.6 weight and still moves every
+# projection; it simply may no longer buy a band by itself.
+#
 # The band is therefore cut from the LESS confident of two reads: the full
-# blend, and the same blend with those three deleted. If deleting them changes
+# blend, and the same blend with those four deleted. If deleting them changes
 # the side, there is no call and the band is held at NO BET.
 #
 # Nothing outside MLB is ever tagged, and the reason matters. The t statistics
@@ -714,7 +725,10 @@ def forecast_mlb(
             f"{LEAGUE_STARTER_ERA:.2f} league starter ERA, over the {STARTER_INNINGS:.1f} "
             f"innings a start now covers: {gap:+.2f} runs on the line. Two league-average "
             "arms move it by exactly zero, which is what keeps this from carrying a "
-            "hidden lean." + shrunk))
+            "hidden lean." + shrunk +
+            " Measured null against the market's error on 156 games (r = -0.076, "
+            "t = -0.95, sign backwards), so it moves this projection but cannot buy "
+            "a band on its own.", mechanism=False))
         # A BLANK innings box is not "no shrinkage needed" -- it is "trust this
         # arm completely", which is more than 210 innings earns. So filling one
         # side and leaving the other empty makes the empty arm artificially

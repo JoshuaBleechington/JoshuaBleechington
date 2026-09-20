@@ -361,6 +361,81 @@ The dome check asserted `/Dome$/` — the chip anchored to the END of the row
 text. That broke the moment a second chip could follow it. The page was right
 and the test was over-specific; it now matches the chip itself.
 
+## The banner says how likely, not what to do
+
+Added 2026-09-20, on request: *"I don't like the no bet/bet banner anymore. If
+the percentage is high enough on the probability then fine make it green or
+something. But I'd rather have the probability percentage and not so much the
+details for the fair price and etc. I think the no bets are not helping and I'd
+rather make the fine call myself and would rather the model tell the likelihood
+of the total."*
+
+The headline is now the resolved probability, at 42px, tinted at the band
+floors — plain below 53%, ink at 53%, green at 57%, deep green at 62%. The
+words MAX BET / STRONG BET / BET / NO BET no longer appear on the banner. The
+card's Prob column is tinted the same way, so the slate reads by colour.
+
+### Nothing about the model changed
+
+Not one number. `readMlb()` and `readNfl()` are untouched; the band is still
+computed, still written to `dataset.band`, still stored on every card row, and
+the band-by-band record and the calibration panel still run off it. This is
+presentation only. Every one of the 375 package tests and 600-odd browser
+checks passes unchanged apart from the ones that asserted on the banner's
+markup.
+
+That distinction matters more here than usual, because the bands are the only
+thing in this project that has ever earned anything:
+
+```
+n=168   MAX BET 1-1 | STRONG BET 9-3 (75.0%) | BET 39-28 (58.2%) | NO BET 46-41 (52.9%)
+```
+
+Removing the word from the banner does not remove that ordering; it moves the
+decision to the reader, which is what was asked for.
+
+### The core read is now the banner's only warning
+
+With the verdict gone, a held card had nothing left to say that it was held.
+So the corroborated probability — the same game with the measured-null inputs
+(starters, form, head-to-head) deleted — is drawn as a chip beside the pick on
+**every** card, not only the gated ones, and turns amber when the two reads
+disagree by a whole band.
+
+The case that forced this, from the night the change was asked for:
+
+```
+Athletics @ Guardians   6.5   full 58.7%   core 51.0%   final 1 run
+```
+
+58.7% in green with nothing beside it would have read as the best card on the
+slate. It was the worst. `core 51.0%` in amber is the whole of the warning the
+verdict used to carry, and it is now permanent furniture rather than something
+that only shows up on a subset of cards.
+
+### The price is a footnote
+
+The three price boxes — Fair price / You get / Edge, each set at 17px, the same
+visual weight as the call — collapsed into one muted line:
+
+```
+-110 needs 52.4% to break even, so you are +6.3 points above the price.
+Fair -142, edge 11.8%.
+```
+
+Nothing was dropped. The fair price, the posted price, the edge, the break-even
+number, the margin and the margin-guard warning are all still there, in the
+order that reads as a sentence, in small grey text under the call. A likelihood
+is only worth what the book charges for it, so the price stays; it just stops
+competing with the number it qualifies.
+
+### What this cannot fix
+
+It does not make the model better. It makes the model quieter about a decision
+it was making on the reader's behalf. If the record gets worse from here — if
+cards the gate used to hold start getting bet — that is the cost of the change,
+and the band-by-band table is where it will show up. It is still on the page.
+
 ## The starters measure null too
 
 Added 2026-09-20, after being asked to find whichever version of this model was
@@ -668,7 +743,7 @@ cheap. To update, change those four numbers and nothing else.
 
 ## Verification
 
-- `tests/test_fullgame.py` — 68 tests, including the corroboration gate: the
+- `tests/test_fullgame.py` — 116 tests (375 across the suite), including the corroboration gate: the
   Tigers card held at COIN FLIP, the headline probability provably untouched, a
   no-soft-input card identical to twelve decimal places, the gate acting as a
   veto rather than a tax, the band never exceeding either read, and WNBA
@@ -676,18 +751,21 @@ cheap. To update, change those four numbers and nothing else.
   mean and spread against the measured 4.39, push arithmetic, price inversion,
   the resolved-probability band, calibration detection of an overconfident
   model, and the guards.
-- `web/fullgame-cases.json` — 36 games generated from the package by
+- `web/fullgame-cases.json` — 38 games generated from the package by
   `tools_gen_fullgame_cases.py`, which recomputes only the expectations so a
   model change never means hand-editing a probability.
-- `tools_check_fullgame_page.js` — replays all 36 in a real browser against side,
+- `tools_check_fullgame_page.js` — 707 checks. It replays all 38 in a real browser against side,
   band, resolved probability, push, projection, fair price, estimate and delta
-  counts, the gate's core projection and core probability, the struck-through
-  band appearing only when held, and that green appears only when confident. Then it stores a game,
+  counts, the gate's core projection and core probability, the core chip showing
+  the corroborated probability on every card and turning amber only when held,
+  the headline tinted at the band floors, the banner printing no verdict at all,
+  and that green appears only when confident. Then it stores a game,
   grades it a loss, grades a second as a push, checks the push is excluded from
   calibration, reloads the browser and asserts the card, the grades and the
   half-typed draft all survive. It loads a hand-built card of known results and
   checks the per-band table reports 2-0, 1-1 and 0-1 with the push in its own
-  column and an empty band left out. Last it checks the roof marker: a domed game is
+  column and an empty band left out, and that the card's Prob column is tinted at
+  the same floors as the banner. Last it checks the roof marker: a domed game is
   tagged, an open-air one is not, and a basketball row does not inherit a
   left-over tick from the ballgame before it.
 

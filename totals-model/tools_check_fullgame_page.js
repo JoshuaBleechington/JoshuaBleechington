@@ -66,9 +66,15 @@ const CHECKS = ["dome", "aqb", "hqb"];
       const pick = document.querySelector('#call .pick');
       const pct = document.querySelector('#call .pct');
       return {
-        band: document.querySelector('#call .band').textContent.trim(),
+        band: call.dataset.band,
         side: pick ? pick.textContent.trim().split(' ')[0] : null,
         pct: pct ? parseFloat(pct.textContent) : null,
+        pctLevel: pct ? (['lv1', 'lv2', 'lv3'].find(c => pct.classList.contains(c)) || '') : null,
+        core: (() => {
+          const el = document.querySelector('#call .core');
+          return el ? parseFloat(el.textContent.replace(/[^0-9.]/g, '')) : null;
+        })(),
+        text: call.textContent,
         pOver: parseFloat(call.dataset.pOver),
         pPush: parseFloat(call.dataset.pPush),
         pResolved: parseFloat(call.dataset.pResolved),
@@ -82,10 +88,6 @@ const CHECKS = ["dome", "aqb", "hqb"];
         deltas: document.getElementById('deltaCard').hidden
           ? 0 : document.querySelectorAll('#deltas .drow').length,
         hot: call.classList.contains('hot'),
-        bandHot: (() => {
-          const el = document.querySelector('#call .band');
-          return el.classList.contains('hot') || el.classList.contains('max');
-        })(),
       };
     }, [c.sport, c.inputs, ALL, CHECKS]);
 
@@ -112,8 +114,13 @@ const CHECKS = ["dome", "aqb", "hqb"];
         `${tag}: corroborated ${(w.p_corroborated * 100).toFixed(2)}%`,
         `page said ${(got.pCorroborated * 100).toFixed(4)}%`);
     chk(got.held === (w.band !== w.band_ungated),
-        `${tag}: the struck-through band shows only when held`,
+        `${tag}: the core chip is flagged amber only when the gate bites`,
         `held=${got.held} band=${w.band} ungated=${w.band_ungated}`);
+    // The core read replaced the verdict word as the banner's warning, so it
+    // has to be on every card, not only the held ones.
+    chk(Math.abs(got.core - w.p_corroborated * 100) < 0.051,
+        `${tag}: the core chip shows ${(w.p_corroborated * 100).toFixed(1)}%`,
+        `chip said ${got.core}`);
     chk(Math.abs(got.fair - w.fair) < 0.05,
         `${tag}: fair ${w.fair.toFixed(1)}`, `page said ${got.fair}`);
     chk(Math.abs(got.pct - got.pResolved * 100) < 0.051,
@@ -122,9 +129,17 @@ const CHECKS = ["dome", "aqb", "hqb"];
     chk(got.estimates === w.estimates, `${tag}: ${w.estimates} estimates`,
         `page drew ${got.estimates}`);
     chk(got.deltas === w.deltas, `${tag}: ${w.deltas} deltas`, `page drew ${got.deltas}`);
-    chk(got.hot === confident && got.bandHot === confident,
-        `${tag}: green only when it is confident`,
-        `hot=${got.hot} band=${got.bandHot} for ${w.band}`);
+    chk(got.hot === confident,
+        `${tag}: green only when it is confident`, `hot=${got.hot} for ${w.band}`);
+    // The verdict word is gone from the banner; the colour of the headline
+    // carries it instead, at the same floors the bands have always used.
+    const lvl = w.p_resolved >= 0.62 ? 'lv3' : w.p_resolved >= 0.57 ? 'lv2'
+              : w.p_resolved >= 0.53 ? 'lv1' : '';
+    chk(got.pctLevel === lvl, `${tag}: the headline is tinted ${lvl || 'plain'}`,
+        `page used ${got.pctLevel || 'plain'} at ${(w.p_resolved * 100).toFixed(1)}%`);
+    chk(!/\bNO BET\b|\bMAX BET\b|\bSTRONG BET\b/.test(got.text),
+        `${tag}: the banner does not print a verdict`,
+        got.text.slice(0, 120));
   }
 
   // ---- the card: store, grade, calibrate, reload -----------------------
@@ -268,6 +283,18 @@ const CHECKS = ["dome", "aqb", "hqb"];
       JSON.stringify(row('NO BET')));
   chk(row('STRONG BET')[2] === '100%' && row('BET')[2] === '50%',
       'bands: the hit rate matches the record', JSON.stringify(bands.table));
+
+  // The card reads the way the banner does: the probability carries the colour,
+  // at the band floors, so the eye finds the likely games without the verdict.
+  const tint = await pg.evaluate(() =>
+    [...document.querySelectorAll('#cardTable tbody tr')].map(r => {
+      const el = r.querySelector('.plv');
+      return el ? el.textContent.trim() + ':' +
+        (['lv1', 'lv2', 'lv3'].find(c => el.classList.contains(c)) || 'plain') : 'none';
+    }));
+  chk(JSON.stringify(tint) === JSON.stringify(
+        ['58.0%:lv2', '59.0%:lv2', '54.0%:lv1', '55.0%:lv1', '51.0%:plain', '52.0%:plain']),
+      'card: the probability column is tinted at the band floors', JSON.stringify(tint));
   chk(!row('MAX BET').length, 'bands: a band with no graded games is left out',
       JSON.stringify(bands.table));
 

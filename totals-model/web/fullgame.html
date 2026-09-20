@@ -175,16 +175,31 @@
           color: var(--ink-2); border: 1px solid var(--rule-firm); }
   .band.hot  { background: var(--go); color: #fff; border-color: var(--go); }
   .band.max  { background: var(--go-deep); color: #fff; border-color: var(--go-deep); }
-  /* Struck through: the band the corroboration gate took away. */
-  .held { font: 700 10px/1 var(--sans); letter-spacing: .07em; text-transform: uppercase;
-          color: var(--warn); text-decoration: line-through; text-decoration-thickness: 1px;
-          align-self: center; }
   .pick { font: 900 30px/1 var(--sans); letter-spacing: -.03em; }
   .pick.over { color: var(--over); } .pick.under { color: var(--under); }
-  .pct { font: 700 30px/1 var(--mono); margin-left: auto; }
-  .pct.over { color: var(--over); } .pct.under { color: var(--under); }
+  /* The headline is the likelihood, and its colour IS the strength. The band
+     floors that used to print BET / NO BET across the top now only tint this
+     number, so the reader sees how likely the total is and makes the call. */
+  .pct { font: 800 42px/1 var(--mono); margin-left: auto; letter-spacing: -.02em;
+         color: var(--muted); }
+  .plv { font-weight: 700; color: var(--muted); }
+  .pct.lv1, .plv.lv1 { color: var(--ink); }
+  .pct.lv2, .plv.lv2 { color: var(--go); }
+  .pct.lv3, .plv.lv3 { color: var(--go-deep); }
+  .plab { flex-basis: 100%; margin: 5px 0 0; text-align: right; font: 700 10px/1 var(--sans);
+          letter-spacing: .09em; text-transform: uppercase; color: var(--muted); }
+  /* The second read: the same game with the measured-null inputs deleted. It
+     is the only warning left once the verdict word is gone, so it is always
+     drawn -- amber when the two reads disagree by a whole band. */
+  .core { font: 700 10px/1 var(--sans); letter-spacing: .07em; text-transform: uppercase;
+          color: var(--muted); border: 1px solid var(--rule-firm); border-radius: 5px;
+          padding: 5px 8px; align-self: center; white-space: nowrap; }
+  .core.held { color: var(--warn); border-color: var(--warn); }
   .cline { margin: 12px 0 0; font-size: 13px; color: var(--ink-2); line-height: 1.5; }
   .cline b { color: var(--ink); }
+  .fine { margin: 10px 0 0; font-size: 12px; color: var(--muted); line-height: 1.5; }
+  .fine b { color: var(--ink-2); }
+  .fine b.good { color: var(--go); } .fine b.bad { color: var(--over); }
 
   /* probability split */
   .split { display: flex; height: 30px; border-radius: 7px; overflow: hidden;
@@ -693,6 +708,16 @@
   var LEGACY_BANDS = { "MAX": "MAX BET", "STRONG": "STRONG BET",
                        "LEAN": "BET", "COIN FLIP": "NO BET" };
   function bandName(b) { return LEGACY_BANDS[b] || b; }
+  /* The colour a likelihood is drawn in, on the banner and on the card alike.
+     Same floors as the bands, because they are the only floors this project has
+     ever measured — the banner stopped printing the word and prints the number
+     in this colour instead, so the reader gets the likelihood and makes the
+     call. The band itself is still computed, still stored on every row and
+     still what the band-by-band record and the calibration panel are built on. */
+  function pctLevel(p) {
+    return p >= BANDS[0][0] ? "lv3" : p >= BANDS[1][0] ? "lv2"
+         : p >= BANDS[2][0] ? "lv1" : "";
+  }
   var WIND_DEAD = 8.0, WIND_PER_MPH = 0.10;
   var TEMP_BASE = 70.0, TEMP_PER_DEG = 0.008;
   var SPLIT_MIN_GAP = 20, SPLIT_RUNS = 0.30;
@@ -1576,17 +1601,28 @@
 
     var posted = f.side === "OVER" ? num("op") : num("up");
     var edge = posted === null ? null : edgeVs(f, posted);
-    var bandCls = f.band === BANDS[0][1] ? " max" : (f.hot ? " hot" : "");
-    /* The band the gate took away is shown next to the one it left, so a held
-       card reads as a decision rather than as the model being quiet. */
-    var heldTag = f.band !== f.bandUngated
-      ? '<span class="held" title="Held down: the measured-null inputs were the only ' +
-        'thing carrying it">not ' + f.bandUngated + "</span>" : "";
+    /* The headline used to be the word BET or NO BET. It is the likelihood now:
+       the same number, coloured at the same measured floors, with the call left
+       to the reader. The band is still computed and still stored on the card,
+       because the band-by-band record and the calibration panel are the only
+       evidence this model has ever produced. */
+    var lvl = pctLevel(f.pResolved);
+    /* The one warning the verdict word used to carry: a card whose likelihood
+       rests on inputs this project has measured as worthless reads high here
+       and ordinary in the core. 20 Sept: Athletics @ Guardians, 58.7% full,
+       51.0% core, final 1 run. */
+    var gated = f.band !== f.bandUngated;
+    var coreTag = '<span class="core' + (gated ? " held" : "") + '" title="' +
+      (gated ? "The measured-null inputs were the only thing carrying this one."
+             : "The same game with the measured-null inputs deleted.") +
+      ' Core projection ' + fmt(f.projectedCore) + '.">core ' +
+      (f.pCorroborated * 100).toFixed(1) + "%</span>";
 
     c.innerHTML =
-      '<div class="ctop"><span class="band' + bandCls + '">' + f.band + "</span>" + heldTag +
-      '<span class="pick ' + lo + '">' + f.side + " " + f.line + "</span>" +
-      '<span class="pct ' + lo + '">' + (f.pResolved * 100).toFixed(1) + "%</span></div>" +
+      '<div class="ctop">' +
+      '<span class="pick ' + lo + '">' + f.side + " " + f.line + "</span>" + coreTag +
+      '<span class="pct ' + lvl + '">' + (f.pResolved * 100).toFixed(1) + "%</span>" +
+      '<p class="plab">chance of the ' + lo + "</p></div>" +
       '<p class="cline"><b>' + f.matchup + "</b> · projected <b>" + fmt(f.projected) +
         "</b> against a line of " + f.line + " (" + sgn(f.projected - f.line, 2) + ")</p>" +
       '<div class="split3">' +
@@ -1602,33 +1638,34 @@
         '<i class="u" style="width:' + (f.pUnder * 100) + '%">' +
           (f.pUnder > 0.13 ? (f.pUnder * 100).toFixed(1) + "% UNDER" : "") + "</i>" +
       "</div>" +
-      '<div class="price">' +
-        '<div><p class="k">Fair price</p><p class="v">' + sgn(f.fair, 0) + "</p></div>" +
-        '<div><p class="k">You get</p><p class="v">' +
-          (posted === null ? "—" : sgn(posted, 0)) + "</p></div>" +
-        '<div><p class="k">Edge</p><p class="v ' +
-          (edge === null ? "" : edge > 0 ? "good" : "bad") + '">' +
-          (edge === null ? "—" : (edge * 100).toFixed(1) + "%") + "</p></div></div>" +
-        /* The gap between what the model says and what the PRICE demands is the
-           thing a probability alone hides. 56.5% looks like a big call until you
-           notice -118 already needs 54.1% of the time to break even. */
-        (posted === null ? "" : (function () {
-          var mg = marginGuard(), margin = f.pResolved - implied(posted);
-          var why = !mg.measured
-            ? " — and with no graded calls on the card, this model's calibration is " +
-              "entirely unmeasured, so no margin here is established."
-            : margin < mg.points
-              ? " — thinner than the " + (mg.points * 100).toFixed(1) + " points this " +
-                "model's record can resolve (" + (mg.bias * 100).toFixed(1) +
-                " measured overconfidence plus a " + (mg.noise * 100).toFixed(1) +
-                "-point standard error over " + mg.n + " graded calls), so treat it as " +
-                "no margin at all."
-              : ".";
-          return '<p class="cline">The model says <b>' + (f.pResolved * 100).toFixed(1) +
-            "%</b>; " + sgn(posted, 0) + " needs <b>" + (implied(posted) * 100).toFixed(1) +
-            "%</b> just to break even. Your margin is <b>" + sgn(margin * 100, 1) +
-            " points</b>" + why + "</p>";
-        }()));
+        /* The price used to get three boxes the size of the headline. It is one
+           quiet line now: a likelihood is only worth what the book charges for
+           it, and 56.5% stops looking big the moment you read that -118 already
+           needs 54.1% -- but that is a footnote to the number above, not a
+           rival to it. */
+        (posted === null
+          ? '<p class="fine">Fair price <b>' + sgn(f.fair, 0) + "</b>. Enter what the " +
+            "book is paying and this line will tell you what it needs to break even.</p>"
+          : (function () {
+              var mg = marginGuard(), need = implied(posted);
+              var margin = f.pResolved - need;
+              var why = !mg.measured
+                ? " With no graded calls on the card, this model's calibration is " +
+                  "entirely unmeasured, so no margin here is established."
+                : margin < mg.points
+                  ? " That is thinner than the " + (mg.points * 100).toFixed(1) +
+                    " points this model's record can resolve (" + (mg.bias * 100).toFixed(1) +
+                    " measured overconfidence plus a " + (mg.noise * 100).toFixed(1) +
+                    "-point standard error over " + mg.n + " graded calls), so treat it " +
+                    "as no margin at all."
+                  : "";
+              return '<p class="fine">' + sgn(posted, 0) + " needs <b>" +
+                (need * 100).toFixed(1) + "%</b> to break even, so you are <b class=\"" +
+                (margin > 0 ? "good" : "bad") + '">' + sgn(margin * 100, 1) +
+                " points</b> " + (margin > 0 ? "above" : "below") + " the price." + why +
+                " Fair " + sgn(f.fair, 0) + ", edge " +
+                (edge === null ? "—" : (edge * 100).toFixed(1) + "%") + ".</p>";
+            }()));
 
     // where each source lands
     var vals = f.estimates.map(function (e) { return e.total; }).concat([f.line, f.projected]);
@@ -1956,7 +1993,8 @@
           '<td class="n"><span class="cell">' + s.projected + "</span></td>" +
           '<td><span class="cell"><span class="chip ' + (s.side === "OVER" ? "o" : "u") + '">' +
             s.side + "</span></span></td>" +
-          '<td class="n"><span class="cell">' + s.prob + "%</span></td>" +
+          '<td class="n"><span class="cell"><span class="plv ' +
+            pctLevel(parseFloat(s.prob) / 100) + '">' + s.prob + "%</span></span></td>" +
           '<td><span class="cell"><span class="chip' + bc + '">' + bandName(s.band) + "</span>" +
             stale + "</span></td>" +
           '<td><span class="cell"><input class="grade" type="number" step="1" inputmode="numeric" ' +

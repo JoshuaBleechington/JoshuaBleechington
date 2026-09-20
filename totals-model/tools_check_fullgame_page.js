@@ -616,6 +616,53 @@ const CHECKS = ["dome", "aqb", "hqb"];
   chk(/4 with missing inputs/.test(gap.count),
       'gaps: the header counts the flagged rows', gap.count);
 
+  // ---- the money split is shown and never scored ------------------------
+  // It moved the projection a flat 0.30 runs on a 20-point gap. Over 172 logged
+  // games that pointed the right way 27 of the 58 times it fired. It is a note
+  // now, and the browser must agree with the package that it moves nothing.
+  const split = await pg.evaluate(async () => {
+    const base = { away: 'Reds', home: 'Cubs', line: '8.5', op: '-115', up: '-105',
+                   aera: '3.9', hera: '4.1', abp: '3.8', hbp: '4.2',
+                   arpg: '4.4', hrpg: '4.5' };
+    const read = async (tick, cash) => {
+      const all = Object.assign({}, base, { tick, cash });
+      ['away','home','line','op','up','aera','hera','abp','hbp','arpg','hrpg','tick','cash',
+       'al10','hl10','h2h','h2hn','pf','mph','temp','opened','gdate','aip','hip']
+        .forEach(id => {
+          const el = document.getElementById(id);
+          el.value = all[id] === undefined ? '' : all[id];
+          el.dispatchEvent(new Event('input', { bubbles: true }));
+        });
+      await new Promise(r => setTimeout(r, 40));
+      const c = document.getElementById('call');
+      return {
+        proj: c.dataset.projected, p: c.dataset.pResolved, band: c.dataset.band,
+        deltas: document.getElementById('deltaCard').hidden
+          ? 0 : document.querySelectorAll('#deltas .drow').length,
+        why: document.getElementById('why').textContent,
+      };
+    };
+    return { none: await read('', ''), heavyUnder: await read('90', '30'),
+             heavyOver: await read('30', '90'), quiet: await read('60', '55') };
+  });
+  chk(split.heavyUnder.proj === split.none.proj && split.heavyOver.proj === split.none.proj,
+      'split: a 60-point gap either way moves the projection by exactly nothing',
+      `none=${split.none.proj} under=${split.heavyUnder.proj} over=${split.heavyOver.proj}`);
+  chk(split.heavyUnder.p === split.none.p && split.heavyUnder.band === split.none.band,
+      'split: and it cannot move the probability or the band',
+      `${split.heavyUnder.p}/${split.heavyUnder.band} vs ${split.none.p}/${split.none.band}`);
+  chk(split.heavyUnder.deltas === split.none.deltas,
+      'split: it is not a tonight-only adjustment any more',
+      `${split.heavyUnder.deltas} vs ${split.none.deltas}`);
+  chk(/60-point gap/.test(split.heavyUnder.why) && /NOT scored/.test(split.heavyUnder.why),
+      'split: but a real gap is still reported, and says it was not scored',
+      split.heavyUnder.why.slice(0, 160));
+  chk(/big money on the under/.test(split.heavyUnder.why)
+      && /big money on the over/.test(split.heavyOver.why),
+      'split: the direction reads the right way round');
+  chk(!/of tickets but/.test(split.quiet.why),
+      'split: a gap under the threshold says nothing at all', split.quiet.why.slice(0, 120));
+
   if (errs.length) { console.log('PAGE ERRORS:\n' + errs.join('\n')); fails++; }
   console.log(fails ? `\n${fails} FAILED` : `\nall checks passed (${CASES.length} cases)`);
   await b.close();

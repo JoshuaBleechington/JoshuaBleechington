@@ -361,6 +361,115 @@ The dome check asserted `/Dome$/` — the chip anchored to the END of the row
 text. That broke the moment a second chip could follow it. The page was right
 and the test was over-specific; it now matches the chip itself.
 
+## The money split is shown and never scored
+
+Added 2026-09-20, on the observation that *"the over tickets and money doesn't
+seem to matter either."* It doesn't.
+
+It used to move the projection a flat **0.30 runs** whenever tickets and money
+on the over were **20 points** apart. Both constants were picked by hand, and
+the code's own comment admitted it: *"Capped flat: the direction is documented,
+the size is not."*
+
+### What the log says
+
+Residual = final minus the market's own fair mean. A positive gap (more tickets
+than money on the over) is supposed to mean big money on the under, so the
+residual should come out **negative**. Over 172 settled games:
+
+```
+all 161 cards with both percentages   r = +0.0220   t = +0.28
+only the 58 where the delta fires     r = +0.0500   t = +0.37
+```
+
+Near zero, and the sign is **backwards** — the gap is associated with slightly
+*more* runs while the model subtracted them. On the 58 cards that fired, the
+delta pointed the right way **27 times, 46.6%**, z = −0.53 against a coin.
+
+It cannot be rescued by moving the threshold. Sweeping it:
+
+```
+  5 pts  n=128  right 46.1%   25 pts  n= 34  right 50.0%
+ 10 pts  n= 99  right 48.5%   30 pts  n= 28  right 46.4%
+ 15 pts  n= 82  right 46.3%   35 pts  n= 20  right 45.0%
+ 20 pts  n= 58  right 46.6%   40 pts  n= 14  right 42.9%
+```
+
+Not one cut beats a coin. Best |z| over eight thresholds is 0.88 against a Sidak
+requirement of 2.73 — and those samples are nested, so that is really one
+observation, not eight.
+
+### What the log does NOT say
+
+**It does not prove the split is worthless.** A true 0.30-run edge against a
+4.39-run spread is the delta pointing right 52.7% of the time, not 50%. Telling
+52.7% from 50% at 95% with 80% power needs about **2,644 firing cards**. There
+are 58. The 95% ceiling on 27/58 is 59.4%, which corresponds to an effect of up
+to +1.04 runs — that ceiling does not exclude 0.30.
+
+So this is not "measured null" in the way the starters are. It is: *no evidence,
+in a test that could only have caught something three times larger than the
+constant being claimed.*
+
+### Which is exactly why it goes
+
+The deciding argument is structural, not statistical. Compare the starters: they
+are continuous, and their size is **arithmetic** — ERA gap × innings × the
+unearned multiplier. Nothing was chosen. They measured null and were demoted to
+`mechanism=False`, but kept, because the number they produce is derived.
+
+The split has a hand-picked threshold and a hand-picked magnitude, and no
+derivation for either. This model already has a category for exactly that, and
+has had from the start: **shown, never scored** — the opening line, and the NFL
+quarterback. Both are things worth seeing before you bet with no honest number
+to attach. The split belongs there and always did. Putting it there is not a new
+rule; it is an existing rule finally applied.
+
+It is still on the page, still entered, and a 20-point gap still prints a note
+saying which way the money went — and saying that it was not scored.
+
+### What it cost
+
+```
+                    n     says     does    Brier     MAE
+with the split     168   54.72%   56.55%   0.24470   2.8090
+split deleted      168   54.23%   55.36%   0.24471   2.7944
+```
+
+Brier is identical to the fourth decimal. MAE is 0.0146 runs *better* without
+it. `does` drops 1.19 points because the side flips on 10 cards, and on those 10
+the split's side went 6-4 while the other went 4-6 — a two-card difference on
+ten cards, which is nothing.
+
+Band by band:
+
+```
+with the split   MAX 0-1 | STRONG 8-1 | BET 29-17 | NO BET 58-54
+split deleted    MAX 0-1 | STRONG 9-1 | BET 26-17 | NO BET 58-56
+```
+
+**Be honest about this: the deletion is not an improvement.** Every number above
+is inside the noise. The case for it is that the model should not carry a
+coefficient nobody can derive and nobody can measure, not that removing it makes
+better calls.
+
+### It was bigger than it looked
+
+A delta is applied to the projection at **full strength**, after the blend —
+unlike an estimate, which gets diluted by its weight. So this "small" input was
+worth a straight 0.30 runs, larger than almost anything else on the card. The
+Tigers @ Guardians card that motivated the corroboration gate in the first place
+moved from 53.97% to 50.78% when it came out, and now falls under the bet floor
+on its own. `TestSoftInputsCannotBuyABand` keeps that card for the history and
+tests the gate against a live 20 Sept card instead.
+
+### How to undo it
+
+In `totals/fullgame.py` and `web/fullgame.html`, the note that begins *"Over
+holds …% of tickets"* was a `Delta`/`delta` call tagged `mechanism=False`. Turn
+it back into one and regenerate `web/fullgame-cases.json`. One fixture changes:
+the split-only card goes from 1 delta back to 0.
+
 ## The banner says how likely, not what to do
 
 Added 2026-09-20, on request: *"I don't like the no bet/bet banner anymore. If

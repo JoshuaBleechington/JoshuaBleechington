@@ -975,18 +975,18 @@
       "hip": null
     },
     "expect": {
-      "side": "UNDER",
+      "side": "OVER",
       "band": "NO BET",
       "band_ungated": "NO BET",
-      "p_side": 0.52819262,
-      "p_resolved": 0.52819262,
+      "p_side": 0.5,
+      "p_resolved": 0.5,
       "p_corroborated": 0.5,
       "p_push": 0.0,
-      "projected": 8.74323383,
+      "projected": 9.04323383,
       "projected_core": 9.04323383,
-      "fair": -111.9509,
+      "fair": 100.0,
       "estimates": 1,
-      "deltas": 1
+      "deltas": 0
     }
   },
   {

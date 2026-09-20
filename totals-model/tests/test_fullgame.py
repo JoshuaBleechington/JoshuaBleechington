@@ -433,13 +433,37 @@ class TestSoftInputsCannotBuyABand(unittest.TestCase):
         ticket_pct_over=67, money_pct_over=38,
     )
 
-    def test_the_card_that_prompted_this_is_held_at_a_coin_flip(self):
+    #: A live card the gate still holds, from 20 Sept. Kept because the Tigers
+    #: card above no longer reaches a bet on either read, so it can no longer
+    #: demonstrate the thing this class exists to test.
+    BRAVES = dict(
+        line=8.5, over_price=100, under_price=-130,
+        away_starter_era=3.07, home_starter_era=3.43,
+        away_starter_ip=137.2, home_starter_ip=97.0,
+        away_rpg=3.87, home_rpg=4.79,
+        away_bullpen_era=3.58, home_bullpen_era=4.20,
+        away_last10_total=9.9, home_last10_total=7.8,
+        h2h_total=8.5, h2h_meetings=2, park_factor=99,
+        temp_f=91, dome=True, ticket_pct_over=96, money_pct_over=96,
+    )
+
+    def test_the_card_that_prompted_this_no_longer_reaches_a_bet_at_all(self):
+        """It used to read BET ungated and be held to NO BET. Three points of
+        that came from the money split, which is not scored any more, so the
+        card now falls under the floor on its own and the gate has nothing left
+        to do. The class keeps it because it is why the gate was built."""
         f = forecast_mlb("Tigers @ Guardians", **self.TIGERS)
         self.assertEqual(f.side, "UNDER")
+        self.assertEqual(f.band_ungated, "NO BET")
+        self.assertEqual(f.band, "NO BET")
+        # The core read still names the OTHER side, which was always the point.
+        self.assertLess(f.p_corroborated, 0.5)
+
+    def test_a_live_card_is_still_held(self):
+        f = forecast_mlb("Braves @ Astros", **self.BRAVES)
         self.assertEqual(f.band_ungated, "BET")
         self.assertEqual(f.band, "NO BET")
-        # The core read names the OTHER side, which is the whole point.
-        self.assertLess(f.p_corroborated, 0.5)
+        self.assertGreater(f.p_resolved, f.p_corroborated)
 
     def test_the_headline_probability_is_untouched(self):
         """The gate governs the band, never the forecast.
@@ -449,15 +473,16 @@ class TestSoftInputsCannotBuyABand(unittest.TestCase):
         corrupt the calibration measure, which reads the probability.
         """
         f = forecast_mlb("Tigers @ Guardians", **self.TIGERS)
-        self.assertAlmostEqual(f.p_resolved, 0.5397, places=3)
-        self.assertAlmostEqual(f.projected, 8.164, places=2)
+        self.assertAlmostEqual(f.p_resolved, 0.5078, places=3)
+        self.assertAlmostEqual(f.projected, 8.462, places=2)
+        g = forecast_mlb("Braves @ Astros", **self.BRAVES)
+        self.assertAlmostEqual(g.p_resolved, 0.5399, places=3)
 
     def test_it_says_plainly_that_it_pulled_the_band(self):
-        f = forecast_mlb("Tigers @ Guardians", **self.TIGERS)
+        f = forecast_mlb("Braves @ Astros", **self.BRAVES)
         note = next(n for n in f.notes if "Held at" in n)
         self.assertIn("NO BET", note)
         self.assertIn("BET", note)
-        self.assertIn("the other side", note)
 
     def test_a_card_with_no_soft_inputs_is_left_completely_alone(self):
         """Not an approximation of a no-op -- an actual one."""
@@ -533,8 +558,9 @@ class TestSoftInputsCannotBuyABand(unittest.TestCase):
             temp_f=84, ticket_pct_over=70, money_pct_over=40)
         soft = {e.name for e in f.estimates if not e.mechanism}
         soft |= {d.name for d in f.deltas if not d.mechanism}
-        self.assertEqual(
-            soft, {"Starters", "Last 10", "Head to head (5)", "Money split"})
+        # The money split used to be in this set. It is not scored at all now,
+        # so it cannot be soft — there is nothing left of it to tag.
+        self.assertEqual(soft, {"Starters", "Last 10", "Head to head (5)"})
         # and the market and the bullpens are what is left standing
         hard = {e.name for e in f.estimates if e.mechanism}
         self.assertEqual(hard, {"Market", "Bullpens"})
@@ -1167,12 +1193,16 @@ class TestAPercentageOutsideAHundredIsATypo(unittest.TestCase):
               away_starter_era=3.49, home_starter_era=3.70,
               away_bullpen_era=3.41, home_bullpen_era=4.10)
 
+    @staticmethod
+    def _split_note(f):
+        return [n for n in f.notes if "of tickets but" in n]
+
     def test_the_real_card_now_scores_as_if_the_field_were_empty(self):
         bad = forecast_mlb("Braves @ Astros", ticket_pct_over=89,
                            money_pct_over=925, **self.KW)
         absent = forecast_mlb("Braves @ Astros", ticket_pct_over=89, **self.KW)
         self.assertAlmostEqual(bad.projected, absent.projected, places=12)
-        self.assertNotIn("Money split", [d.name for d in bad.deltas])
+        self.assertEqual(self._split_note(bad), [])
 
     def test_it_says_so_rather_than_failing_silently(self):
         f = forecast_mlb("a @ b", ticket_pct_over=89, money_pct_over=925, **self.KW)
@@ -1182,14 +1212,69 @@ class TestAPercentageOutsideAHundredIsATypo(unittest.TestCase):
 
     def test_a_real_percentage_still_works(self):
         f = forecast_mlb("a @ b", ticket_pct_over=89, money_pct_over=40, **self.KW)
-        self.assertIn("Money split", [d.name for d in f.deltas])
+        self.assertEqual(len(self._split_note(f)), 1)
         self.assertFalse(any("percentage" in n for n in f.notes))
 
     def test_both_ends_of_the_window_are_guarded(self):
         for tick, cash in ((-5, 40), (89, -1), (101, 40), (89, 1000)):
             f = forecast_mlb("a @ b", ticket_pct_over=tick, money_pct_over=cash, **self.KW)
-            self.assertNotIn("Money split", [d.name for d in f.deltas],
+            self.assertEqual(self._split_note(f), [],
                              f"{tick}/{cash} should have been dropped")
         # and the boundaries themselves are valid
         edge = forecast_mlb("a @ b", ticket_pct_over=100, money_pct_over=0, **self.KW)
-        self.assertIn("Money split", [d.name for d in edge.deltas])
+        self.assertEqual(len(self._split_note(edge)), 1)
+
+
+class TestTheMoneySplitIsShownAndNeverScored(unittest.TestCase):
+    """It moved the projection a flat 0.30 runs on a 20-point gap. Across 172
+    logged games that pointed the RIGHT way 27 of the 58 times it fired — 46.6%
+    against a coin's 50% — and no threshold from 5 to 40 points did better. The
+    direction is documented, the size never was, so it joins the opening line
+    and the NFL quarterback: shown, never scored."""
+
+    KW = dict(line=8.5, over_price=-118, under_price=-102,
+              away_starter_era=3.49, home_starter_era=3.70,
+              away_bullpen_era=3.41, home_bullpen_era=4.10)
+
+    def test_it_moves_the_projection_by_exactly_nothing(self):
+        blank = forecast_mlb("a @ b", **self.KW)
+        for tick, cash in ((90, 30), (30, 90), (50, 50), (100, 0), (0, 100)):
+            f = forecast_mlb("a @ b", ticket_pct_over=tick, money_pct_over=cash, **self.KW)
+            self.assertAlmostEqual(f.projected, blank.projected, places=12,
+                                   msg=f"{tick}/{cash} moved the projection")
+            self.assertAlmostEqual(f.p_resolved, blank.p_resolved, places=12,
+                                   msg=f"{tick}/{cash} moved the probability")
+            self.assertEqual(f.band, blank.band)
+            self.assertEqual(f.side, blank.side)
+
+    def test_it_is_not_a_delta_any_more(self):
+        f = forecast_mlb("a @ b", ticket_pct_over=90, money_pct_over=30, **self.KW)
+        self.assertNotIn("Money split", [d.name for d in f.deltas])
+
+    def test_but_a_real_gap_is_still_reported(self):
+        f = forecast_mlb("a @ b", ticket_pct_over=90, money_pct_over=30, **self.KW)
+        note = next(n for n in f.notes if "of tickets but" in n)
+        self.assertIn("60-point gap", note)
+        self.assertIn("big money on the under", note)
+        # and it says plainly that it did not touch the number
+        self.assertIn("NOT scored", note)
+
+    def test_the_direction_reads_the_right_way_round(self):
+        under = forecast_mlb("a @ b", ticket_pct_over=90, money_pct_over=30, **self.KW)
+        over = forecast_mlb("a @ b", ticket_pct_over=30, money_pct_over=90, **self.KW)
+        self.assertIn("big money on the under",
+                      next(n for n in under.notes if "of tickets but" in n))
+        self.assertIn("big money on the over",
+                      next(n for n in over.notes if "of tickets but" in n))
+
+    def test_a_gap_under_the_threshold_says_nothing_at_all(self):
+        f = forecast_mlb("a @ b", ticket_pct_over=60, money_pct_over=45, **self.KW)
+        self.assertEqual([n for n in f.notes if "of tickets but" in n], [])
+
+    def test_it_cannot_buy_a_band_it_no_longer_earns(self):
+        """The old delta was tagged mechanism=False so it could not corroborate.
+        Deleting it must not have handed the gate back a vote."""
+        f = forecast_mlb("a @ b", ticket_pct_over=95, money_pct_over=20, **self.KW)
+        blank = forecast_mlb("a @ b", **self.KW)
+        self.assertAlmostEqual(f.p_corroborated, blank.p_corroborated, places=12)
+        self.assertEqual(f.band, blank.band)

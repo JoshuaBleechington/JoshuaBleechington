@@ -193,6 +193,13 @@ WIND_DEAD_MPH = 8.0
 WIND_RUNS_PER_MPH = 0.10
 TEMP_BASE_F = 70.0
 TEMP_RUNS_PER_DEG = 0.008
+# The ticket/money split is SHOWN AND NEVER SCORED, the same posture this model
+# takes toward the opening line and an NFL quarterback: the direction is
+# documented, the size is not, and an undocumented size is a guess wearing a
+# constant's clothes. Both numbers below were picked by hand, and on 172 logged
+# games the delta they drove pointed the RIGHT way 27 of the 58 times it fired
+# — 46.6%, against a coin's 50%. They are kept only to draw the threshold the
+# page tells you about.
 PUBLIC_SPLIT_MIN_GAP = 20.0
 PUBLIC_SPLIT_RUNS = 0.30
 POINTS_PER_STARTER_OUT = 2.0
@@ -819,15 +826,20 @@ def forecast_mlb(
     if not _ok(money_pct_over, "percent"):
         money_pct_over = None
 
+    # Shown, never scored — see PUBLIC_SPLIT_MIN_GAP. This used to move the
+    # projection a flat 0.30 runs. It is a note now, for the same reason the
+    # opening line is a note: it is worth seeing before you bet and there is no
+    # honest number to attach to it.
     if ticket_pct_over is not None and money_pct_over is not None:
         gap = ticket_pct_over - money_pct_over
         if abs(gap) >= PUBLIC_SPLIT_MIN_GAP:
-            deltas.append(Delta("Money split",
-                -PUBLIC_SPLIT_RUNS if gap > 0 else PUBLIC_SPLIT_RUNS,
+            notes.append(
                 f"Over holds {ticket_pct_over:.0f}% of tickets but {money_pct_over:.0f}% "
                 f"of money, a {abs(gap):.0f}-point gap. Small bets on the over, big money "
-                f"on the {'under' if gap > 0 else 'over'}. Capped flat: the direction is "
-                "documented, the size is not.", mechanism=False))
+                f"on the {'under' if gap > 0 else 'over'}. That is NOT scored: over 172 "
+                "logged games the adjustment it used to drive pointed the right way 27 of "
+                "the 58 times it fired, and no threshold from 5 to 40 points does better "
+                "than a coin. Read it, do not add it.")
 
     if opened is not None and abs(opened - line) > 1e-9:
         notes.append(

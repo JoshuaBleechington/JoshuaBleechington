@@ -491,8 +491,8 @@
             </div>
             <div class="grid3">
               <div class="f"><label for="temp">Temp °F</label><input id="temp" type="number" step="1" inputmode="numeric" placeholder="72"></div>
-              <div class="f"><label for="tick">Over % tickets</label><input id="tick" type="number" step="1" min="0" max="100" inputmode="numeric" placeholder="72"></div>
-              <div class="f"><label for="cash">Over % money</label><input id="cash" type="number" step="1" min="0" max="100" inputmode="numeric" placeholder="59"></div>
+              <div class="f"><label for="tick">Over % tickets <span class="tag">shown</span></label><input id="tick" type="number" step="1" min="0" max="100" inputmode="numeric" placeholder="72"></div>
+              <div class="f"><label for="cash">Over % money <span class="tag">shown</span></label><input id="cash" type="number" step="1" min="0" max="100" inputmode="numeric" placeholder="59"></div>
             </div>
             <label class="check"><input type="checkbox" id="dome"> Roof shut — wind and temp both drop out</label>
             <div class="links">
@@ -507,6 +507,13 @@
             <p class="note">Park factor scales the differentials and the wind, <b>never the market
               anchor</b>. The posted number already holds the park; counting it twice is the double
               count that put the old fourteen-input model behind the naked line.</p>
+            <p class="note"><b>The ticket/money split is shown and never scored</b>, the same as the
+              opening line. It used to move the number a flat 0.30 runs on a 20-point gap. Over
+              <b>172 logged games</b> that adjustment pointed the <b>right way 27 of the 58 times it
+              fired — 46.6%</b>, and no threshold from 5 to 40 points beats a coin. The direction is
+              documented, the size never was. <b>Still worth entering</b>: a 30-point gap against
+              your side is a thing to see before you bet, and it now tells you instead of quietly
+              moving the answer.</p>
           </div>
         </section>
       </div>
@@ -720,6 +727,12 @@
   }
   var WIND_DEAD = 8.0, WIND_PER_MPH = 0.10;
   var TEMP_BASE = 70.0, TEMP_PER_DEG = 0.008;
+  /* The ticket/money split is SHOWN AND NEVER SCORED, the same posture this
+     model takes toward the opening line and an NFL quarterback: the direction
+     is documented, the size is not. Both numbers were picked by hand, and on
+     172 logged games the delta they drove pointed the RIGHT way 27 of the 58
+     times it fired — 46.6% against a coin's 50%. Kept only to draw the
+     threshold the page tells you about. */
   var SPLIT_MIN_GAP = 20, SPLIT_RUNS = 0.30;
   var PTS_STARTER = 2.0, PTS_LEADER = 3.5;
   var PLAUSIBLE = { era: [0, 15], park: [70, 130], mlb_total: [4, 20], innings: [0, 400],
@@ -1198,14 +1211,18 @@
     });
     if (!ok(tk, "percent")) tk = null;
     if (!ok(cs, "percent")) cs = null;
+    /* Shown, never scored — see SPLIT_MIN_GAP. This used to move the projection
+       a flat 0.30 runs. It is a note now, for the same reason the opening line
+       is a note: worth seeing before you bet, with no honest number to attach. */
     if (tk !== null && cs !== null) {
       var g = tk - cs;
       if (Math.abs(g) >= SPLIT_MIN_GAP) {
-        deltas.push(delta("Money split", g > 0 ? -SPLIT_RUNS : SPLIT_RUNS,
-          "Over holds " + tk.toFixed(0) + "% of tickets but " + cs.toFixed(0) + "% of money, a " +
-          Math.abs(g).toFixed(0) + "-point gap. Small bets on the over, big money on the " +
-          (g > 0 ? "under" : "over") + ". Capped flat: the direction is documented, the size " +
-          "is not.", false));
+        notes.push("Over holds " + tk.toFixed(0) + "% of tickets but " + cs.toFixed(0) +
+          "% of money, a " + Math.abs(g).toFixed(0) + "-point gap. Small bets on the over, " +
+          "big money on the " + (g > 0 ? "under" : "over") + ". That is NOT scored: over 172 " +
+          "logged games the adjustment it used to drive pointed the right way 27 of the 58 " +
+          "times it fired, and no threshold from 5 to 40 points does better than a coin. " +
+          "Read it, do not add it.");
       }
     }
 

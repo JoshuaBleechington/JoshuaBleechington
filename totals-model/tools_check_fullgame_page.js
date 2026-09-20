@@ -701,7 +701,14 @@ const CHECKS = ["dome", "aqb", "hqb"];
                    aera: '3.07', hera: '3.43', arpg: '3.87', hrpg: '4.79',
                    abp: '3.58', hbp: '4.20' };
     return { half: await fill(Object.assign({}, base, { line: '8.5' })),
-             whole: await fill(Object.assign({}, base, { line: '9' })) };
+             whole: await fill(Object.assign({}, base, { line: '9' })),
+             // A card whose median lands ON a whole-number line, which is the
+             // only case that is a push. Raising the line alone cannot do it:
+             // the market anchor moves with the line, so the median follows.
+             atLine: await fill({ away: 'Cubs', home: 'Reds', line: '9',
+                                  op: '-110', up: '-110', aera: '3.90', hera: '4.60',
+                                  arpg: '4.8', hrpg: '5.1', abp: '4.10', hbp: '4.80',
+                                  al10: '5.1', hl10: '5.4', pf: '104', temp: '78' }) };
   });
   chk(shape.half.hidden === false, 'shape: the panel is drawn for an MLB card');
   // These sums are of the PRINTED percentages, each rounded to a tenth of a
@@ -732,6 +739,25 @@ const CHECKS = ["dome", "aqb", "hqb"];
       shape.half.read.slice(0, 200));
   chk(/10\.04/.test(shape.whole.read) === false && /9\.54/.test(shape.whole.read),
       'shape: and line + 0.543 on a 9', shape.whole.read.slice(0, 200));
+  // The third tile is the crossing, not the modal score. The modal score
+  // decides nothing and read as a contradiction on a card calling the over.
+  chk(/Over needs/.test(shape.half.read) && !/Likeliest score/.test(shape.half.read),
+      'shape: the third tile is the projection the over needs, not the modal score',
+      shape.half.read.slice(0, 120));
+  chk(/every score above the line added together/.test(shape.half.read),
+      'shape: and it says in words that the over is a sum, not one bar',
+      shape.half.read.slice(0, 200));
+  chk(/Typical game\s*8\s*an under/i.test(shape.half.read.replace(/\s+/g, ' ')),
+      'shape: the typical game is labelled with the side it falls on',
+      shape.half.read.replace(/\s+/g, ' ').slice(0, 200));
+  // The median lands ON a line of 8 here, which is a push and not an under --
+  // the 9 fixture's median is 8, a genuine under, so it cannot test this.
+  chk(/Typical game\s*9\s*a push/i.test(shape.atLine.read.replace(/\s+/g, ' ')),
+      'shape: a median sitting on a whole-number line is called a push',
+      shape.atLine.read.replace(/\s+/g, ' ').slice(0, 200));
+  chk(/Typical game\s*8\s*an under/i.test(shape.whole.read.replace(/\s+/g, ' ')),
+      'shape: and a median below the line is still an under',
+      shape.whole.read.replace(/\s+/g, ' ').slice(0, 200));
   chk(/0 graded calls/.test(shape.half.track),
       'shape: with an empty card the track record says so rather than inventing one',
       shape.half.track.slice(0, 120));
@@ -754,13 +780,17 @@ const CHECKS = ["dome", "aqb", "hqb"];
   await pg.reload();
   await pg.waitForTimeout(400);
   const filled = await pg.evaluate(async () => {
-    ['away','home','line','op','up','aera','hera','abp','hbp','arpg','hrpg']
-      .forEach((id, i) => {
-        const v = { away: 'Braves', home: 'Astros', line: '8.5', op: '100', up: '-130',
-                    aera: '3.07', hera: '3.43', abp: '3.58', hbp: '4.20',
-                    arpg: '3.87', hrpg: '4.79' }[id];
+    // Every field, not just the ones being set -- an earlier case left park and
+    // temperature behind and quietly moved this card into the next bucket.
+    const v = { away: 'Braves', home: 'Astros', line: '8.5', op: '100', up: '-130',
+                aera: '3.07', hera: '3.43', abp: '3.58', hbp: '4.20',
+                arpg: '3.87', hrpg: '4.79' };
+    ['away','home','line','op','up','aera','hera','abp','hbp','arpg','hrpg',
+     'al10','hl10','h2h','h2hn','pf','mph','dir','temp','tick','cash','opened','gdate','aip','hip']
+      .forEach(id => {
         const el = document.getElementById(id);
-        el.value = v; el.dispatchEvent(new Event('input', { bubbles: true }));
+        el.value = v[id] === undefined ? '' : v[id];
+        el.dispatchEvent(new Event('input', { bubbles: true }));
       });
     await new Promise(r => setTimeout(r, 80));
     return document.getElementById('trackRecord').textContent;

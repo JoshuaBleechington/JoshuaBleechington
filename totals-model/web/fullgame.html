@@ -341,6 +341,12 @@
                    border-top: 2px dashed var(--ink); }
   .sline span { position: absolute; left: 0; top: 0; width: 30px; text-align: right;
                 font: 700 10px/11px var(--mono); color: var(--ink); }
+  /* Which side of the line a tile's number falls on, said in words next to it
+     rather than left for the reader to work out against the line. */
+  .tile-note { font: 700 9px/1 var(--sans); letter-spacing: .07em; text-transform: uppercase;
+               vertical-align: 2px; margin-left: 3px; }
+  .tile-note.o { color: var(--over); } .tile-note.u { color: var(--under); }
+  .tile-note.p { color: var(--muted); }
 
   /* --- price / edge --- */
   .price { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1px;
@@ -1831,19 +1837,43 @@
 
     /* The lesson, stated in words next to the picture that proves it. */
     var gap = mu - median;
+    /* The third tile used to be the modal score, and it misled twice: a reader
+       sees "likeliest 7" on a card calling the OVER and reads it as a
+       contradiction. It is not — 7 is one bar at 9.7%, while the over is every
+       bar above the line added together. The modal score decides nothing, so
+       the tile now holds the number that DOES decide it: the projection at
+       which the over stops being the underdog. The chart still labels the modal
+       bar, where it is a description rather than a verdict. */
+    var cross = crossing(f.line);
+    var side = mu >= cross ? "over" : "under";
+    /* A whole-number line makes its own score a PUSH, not an under. Saying
+       "an under" there would be wrong, and on a 9 it is 9% of all games. */
+    function sideOf(k, line) {
+      return Math.abs(k - line) < 1e-9 ? ["a push", "p"]
+           : k > line ? ["an over", "o"] : ["an under", "u"];
+    }
     read.innerHTML =
       '<div class="calib">' +
         '<div><p class="k">Average game</p><p class="v">' + fmt(mu) + "</p></div>" +
-        '<div><p class="k">Typical game</p><p class="v">' + median + "</p></div>" +
-        '<div><p class="k">Likeliest score</p><p class="v">' + mode + "</p></div>" +
+        '<div><p class="k">Typical game</p><p class="v">' + median +
+          ' <span class="tile-note ' + sideOf(median, f.line)[1] + '">' +
+          sideOf(median, f.line)[0] + "</span></p></div>" +
+        '<div><p class="k">Over needs</p><p class="v">' + fmt(cross) +
+          ' <span class="tile-note ' + (side === "over" ? "o" : "u") + '">' +
+          (side === "over" ? "cleared" : "short") + "</span></p></div>" +
       "</div>" +
+      '<p class="note"><b>The over is every score above the line added together, ' +
+        "not the likeliest one.</b> On this card the single likeliest score is <b>" + mode +
+        "</b>, which is " + sideOf(mode, f.line)[0] + " on " +
+        f.line + " — but it is only " +
+        (rows[mode].p * 100).toFixed(1) + "% of the distribution on its own. What decides " +
+        "the call is the whole of each side.</p>" +
       '<p class="note">' + (gap > 0.05
         ? "<b>The average sits " + gap.toFixed(2) + " runs above the typical game.</b> " +
           "Runs stop at zero and keep going at the top, so a handful of blowouts drag the " +
-          "average up with no low-scoring mirror image to drag it back. That is why a " +
-          "projection <b>above</b> the line can still be an <b>under</b>: on this card the " +
-          "over only becomes the favourite once the projection clears <b>" +
-          fmt(crossing(f.line)) + "</b>, not " + f.line + "."
+          "average up with no low-scoring mirror image to drag it back. That is why the " +
+          "over needs <b>" + fmt(cross) + "</b> rather than " + f.line + ", and why a " +
+          "projection above the line can still be an under."
         : "The average and the typical game are close here, so the line sits near the " +
           "middle of the distribution and the call rests on the blend rather than on the " +
           "shape.") + "</p>";

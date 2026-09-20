@@ -825,6 +825,47 @@ probability comes from. Nothing new is estimated, no constant is introduced, and
 the browser check asserts the bars sum to the page's own probabilities, so a
 picture that disagreed with the number above it would fail the build.
 
+### The third tile is the crossing, not the modal score
+
+It was "Likeliest score" for about an hour and misled twice in that time. Marlins
+@ Padres, line 7.5, projected 8.89, called OVER at 58.1%:
+
+```
+  score  chance   side       running
+    7     9.70%   UNDER       41.89%   <- likeliest single score
+        ------------ line 7.5 ------------
+    8     9.56%   OVER        51.45%   <- the typical game
+    9     8.94%   OVER        60.39%
+   10     8.00%   OVER        68.39%   <- what happened
+   11+   24.11%   OVER
+```
+
+"Likeliest 7" on a card calling the over reads as a contradiction and is not one.
+7 is the most likely *single* score, at 9.70%. The over is not running against 7;
+it is running against **everything at 7 and below**, which is 41.89%. There are
+more ways to go over than under and each is nearly as likely as 7. The modal
+score decides nothing.
+
+So the tile now holds the number that does decide it — the projection at which
+the over stops being the underdog — and says whether this card cleared it. The
+typical-game tile says which side it falls on in words (an over / an under / **a
+push**, when the median lands exactly on a whole-number line). The chart still
+labels the modal bar, where it is a description rather than a verdict, and a
+sentence under the tiles states the point directly.
+
+Note the two cards side by side, both correct:
+
+| | Braves/Astros | Marlins/Padres |
+|---|---|---|
+| line | 8.5 | 7.5 |
+| projection | 8.62 | 8.89 |
+| over needs | **9.04** | **8.04** |
+| verdict | short → UNDER | cleared → OVER |
+| typical game | 8, an under | 8, an over |
+| final | 6 ✓ | 10 ✓ |
+
+Same median, opposite call, because the line moved a run.
+
 ### And the second half: what the model has actually done here
 
 Under the chart, the model's graded record **at this card's confidence**, bucketed
@@ -949,7 +990,7 @@ cheap. To update, change those four numbers and nothing else.
 - `web/fullgame-cases.json` — 38 games generated from the package by
   `tools_gen_fullgame_cases.py`, which recomputes only the expectations so a
   model change never means hand-editing a probability.
-- `tools_check_fullgame_page.js` — 726 checks. It replays all 38 in a real browser against side,
+- `tools_check_fullgame_page.js` — 731 checks. It replays all 38 in a real browser against side,
   band, resolved probability, push, projection, fair price, estimate and delta
   counts, the gate's core projection and core probability, the core chip showing
   the corroborated probability on every card and turning amber only when held,

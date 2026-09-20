@@ -314,6 +314,53 @@ displayed, never scored.
 **Park factor on the market anchor.** The posted number already holds the park.
 It scales the differentials and the wind and nothing else.
 
+## A blank field does not warn you
+
+Added 2026-09-20, from two rows that sat incomplete through three separate
+re-saves while the card looked finished.
+
+`Blue Jays @ Rangers` had both runs/game blank and `Cubs @ Reds` had the away
+last-10 blank. Nothing on screen said so. The estimate simply drops out of the
+blend and the row renders exactly like a complete one — so the reported
+probability rests on less than it appears to, and there is no way to tell.
+
+Two guards, both display-only. Neither can move a probability or a band.
+
+### The missing-input chip
+
+A row now carries a `n missing` chip naming what is absent, and the header
+counts the flagged rows. Only fields whose absence actually changes the
+forecast are listed:
+
+| group | flagged when |
+|---|---|
+| prices | **both** are blank — one alone is reconstructed |
+| starter ERAs | either is blank; the pair drops as a unit |
+| bullpen ERAs | either is blank |
+| last-10 totals | either is blank |
+| runs/game | either is blank |
+
+Park factor, weather and the public split are genuinely optional and are never
+flagged. Run against the real 174-row card it flags exactly four, which is the
+correct answer.
+
+### A percentage outside 0-100 is a typo
+
+A logged card carried `money% = 925`, meaning 92.5. The split delta fired at
+full strength on it and moved that projection **0.30 runs**. The model now drops
+it and says so, the same posture it already takes to an implausible ERA:
+
+> *The money percentage reads 925, which is not a percentage. It has been
+> dropped rather than scored — check for a missing decimal point.*
+
+A test pins that 925 now scores bit-identically to the field being empty.
+
+### One assertion of mine was too specific
+
+The dome check asserted `/Dome$/` — the chip anchored to the END of the row
+text. That broke the moment a second chip could follow it. The page was right
+and the test was over-specific; it now matches the chip itself.
+
 ## The starters measure null too
 
 Added 2026-09-20, after being asked to find whichever version of this model was

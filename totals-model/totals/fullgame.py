@@ -201,6 +201,7 @@ POINTS_LEADING_SCORER_OUT = 3.5
 PLAUSIBLE = {
     "era": (0.00, 15.0),
     "innings": (0.0, 400.0),
+    "percent": (0.0, 100.0),
     "park": (70.0, 130.0),
     "mlb_total": (4.0, 20.0),
     "price": (-100000.0, 100000.0),
@@ -803,6 +804,20 @@ def forecast_mlb(
         if temp_f is not None:
             deltas.append(Delta("Temperature", (temp_f - TEMP_BASE_F) * TEMP_RUNS_PER_DEG,
                 f"{temp_f:.0f}°F against a {TEMP_BASE_F:.0f}° baseline."))
+
+    # A percentage outside 0-100 is not a reading, it is a typo. A logged card
+    # once carried money% = 925 (for 92.5) and the split delta fired at full
+    # strength on it, moving that projection 0.30 runs. Same posture as an
+    # implausible ERA: drop it and say so rather than believe it.
+    for _name, _val in (("ticket", ticket_pct_over), ("money", money_pct_over)):
+        if _val is not None and not _ok(_val, "percent"):
+            notes.append(
+                f"The {_name} percentage reads {_val:g}, which is not a percentage. It has "
+                "been dropped rather than scored — check for a missing decimal point.")
+    if not _ok(ticket_pct_over, "percent"):
+        ticket_pct_over = None
+    if not _ok(money_pct_over, "percent"):
+        money_pct_over = None
 
     if ticket_pct_over is not None and money_pct_over is not None:
         gap = ticket_pct_over - money_pct_over

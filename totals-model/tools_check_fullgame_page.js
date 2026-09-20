@@ -316,7 +316,10 @@ const CHECKS = ["dome", "aqb", "hqb"];
       count: document.getElementById('cardCount').textContent.trim(),
     };
   });
-  chk(/Dome$/.test(roof.domed), 'roof: a game with the roof shut is marked on the card', roof.domed);
+  // Matches the CHIP, not a string suffix. It used to assert /Dome$/, which
+  // broke the moment a second chip (missing inputs) could follow it on the
+  // same row -- the assertion was over-specific, not the page wrong.
+  chk(/\bDome\b/.test(roof.domed), 'roof: a game with the roof shut is marked on the card', roof.domed);
   chk(!/Dome/.test(roof.open), 'roof: an open-air game is not marked', roof.open);
   chk(!/Dome/.test(roof.nfl), 'roof: an NFL row does not inherit a left-over tick', roof.nfl);
   chk(roof.chips === 1, 'roof: exactly one row carries the marker', String(roof.chips));
@@ -528,6 +531,63 @@ const CHECKS = ["dome", "aqb", "hqb"];
       'date: a row with no date shows a dash rather than a wrong day',
       dcol.cells[2] && dcol.cells[2].text);
   await tzPage.close();
+
+  // ---- the missing-input chip -------------------------------------------
+  // A blank field does not warn you: the estimate just vanishes from the blend
+  // and the row looks complete. Two rows sat blank through three re-saves.
+  const seedRows = async (rows) => {
+    await pg.evaluate((rows) => {
+      localStorage.setItem('callsheet.fullgame.card.v1', JSON.stringify(rows));
+    }, rows);
+    await pg.reload();
+    await pg.waitForTimeout(350);
+    return pg.evaluate(() => ({
+      count: document.getElementById('cardCount').textContent.trim(),
+      rows: [...document.querySelectorAll('#cardTable tbody tr')].map(tr => {
+        const c = tr.querySelector('.chip.gap');
+        return { chip: c ? c.textContent.trim() : null,
+                 why: c ? c.getAttribute('title') : null };
+      }),
+    }));
+  };
+  const gapRow = (name, extra) => ({
+    matchup: name, sport: 'MLB', line: 8.5, projected: '9.0', side: 'OVER',
+    prob: '55.0', band: 'BET', fair: '-120', final: null,
+    inputs: Object.assign({
+      away: 'Reds', home: 'Cubs', line: '8.5', gdate: '2026-08-01',
+      op: '-115', up: '-105', aera: '3.9', hera: '4.1', abp: '3.8', hbp: '4.2',
+      al10: '9.0', hl10: '9.2', arpg: '4.4', hrpg: '4.5', pf: '99',
+      tick: '60', cash: '55',
+    }, extra),
+  });
+
+  const gap = await seedRows([
+    gapRow('Complete row', {}),
+    gapRow('No runs per game', { arpg: '', hrpg: '' }),
+    gapRow('One last ten', { al10: '' }),
+    gapRow('Bad percentage', { cash: '925' }),
+    gapRow('One price only', { up: '' }),
+    gapRow('No prices at all', { op: '', up: '' }),
+    gapRow('Optional stuff blank', { pf: '', tick: '', cash: '' }),
+  ]);
+  chk(gap.rows[0].chip === null, 'gaps: a complete row is not flagged', gap.rows[0].chip);
+  chk(/a runs\/game/.test(gap.rows[1].why || ''), 'gaps: both runs/game blank is flagged',
+      gap.rows[1].why);
+  chk(/a last-10 total/.test(gap.rows[2].why || ''),
+      'gaps: one last-10 blank is flagged, because the pair drops as a unit',
+      gap.rows[2].why);
+  chk(/bad percentage \(925\)/.test(gap.rows[3].why || ''),
+      'gaps: a percentage over 100 is flagged as a typo', gap.rows[3].why);
+  chk(gap.rows[4].chip === null,
+      'gaps: ONE price is not flagged — the other side is reconstructed',
+      gap.rows[4].why);
+  chk(/both prices/.test(gap.rows[5].why || ''),
+      'gaps: both prices missing IS flagged', gap.rows[5].why);
+  chk(gap.rows[6].chip === null,
+      'gaps: park and the public split are optional and are not flagged',
+      gap.rows[6].why);
+  chk(/4 with missing inputs/.test(gap.count),
+      'gaps: the header counts the flagged rows', gap.count);
 
   if (errs.length) { console.log('PAGE ERRORS:\n' + errs.join('\n')); fails++; }
   console.log(fails ? `\n${fails} FAILED` : `\nall checks passed (${CASES.length} cases)`);

@@ -279,6 +279,9 @@
      venue, not a call. */
   .chip.dome { background: var(--under-wash); color: var(--under);
                padding: 3px 6px; margin-left: 7px; vertical-align: 1px; }
+  /* Key inputs missing, so an estimate silently dropped out of the blend. */
+  .chip.gap { background: transparent; color: var(--muted);
+              border: 1px dashed var(--muted); padding: 3px 5px; margin-left: 6px; }
   /* This row was scored by an older build and the model has since changed. */
   .chip.stale { background: transparent; color: var(--warn);
                 border: 1px dashed var(--warn); padding: 3px 5px; margin-left: 6px; }
@@ -694,7 +697,8 @@
   var TEMP_BASE = 70.0, TEMP_PER_DEG = 0.008;
   var SPLIT_MIN_GAP = 20, SPLIT_RUNS = 0.30;
   var PTS_STARTER = 2.0, PTS_LEADER = 3.5;
-  var PLAUSIBLE = { era: [0, 15], park: [70, 130], mlb_total: [4, 20], innings: [0, 400] };
+  var PLAUSIBLE = { era: [0, 15], park: [70, 130], mlb_total: [4, 20], innings: [0, 400],
+                  percent: [0, 100] };
 
   function ok(v, w) { return v !== null && v >= PLAUSIBLE[w][0] && v <= PLAUSIBLE[w][1]; }
   /* The engine reads its inputs through these three, never off the DOM
@@ -1155,7 +1159,20 @@
         tp.toFixed(0) + "°F against a " + TEMP_BASE + "° baseline."));
     }
 
+    /* A percentage outside 0-100 is not a reading, it is a typo. A logged card
+       carried money% = 925 (for 92.5) and the split delta fired at full strength
+       on it, moving that projection 0.30 runs. Same posture as an implausible
+       ERA: drop it and say so rather than believe it. */
     var tk = num("tick"), cs = num("cash");
+    [["tick", tk, "ticket"], ["cash", cs, "money"]].forEach(function (pair) {
+      if (pair[1] !== null && !ok(pair[1], "percent")) {
+        notes.push("The " + pair[2] + " percentage reads " + pair[1] +
+          ", which is not a percentage. It has been dropped rather than scored \u2014 " +
+          "check for a missing decimal point.");
+      }
+    });
+    if (!ok(tk, "percent")) tk = null;
+    if (!ok(cs, "percent")) cs = null;
     if (tk !== null && cs !== null) {
       var g = tk - cs;
       if (Math.abs(g) >= SPLIT_MIN_GAP) {
@@ -1851,10 +1868,52 @@
     return { text: mon + " " + +m[3], title: m[0], today: m[0] === now };
   }
 
+  /* What is MISSING from a stored row, named by what it costs.
+     A blank field does not warn you -- the estimate just vanishes from the
+     blend and the card looks complete. On 20 Sept two rows sat with blanks
+     through three separate re-saves because nothing on screen said so.
+
+     Only fields whose absence actually changes the forecast are listed. Park
+     factor and weather are genuinely optional and are not flagged. One missing
+     price is not flagged either, because the other side is reconstructed. */
+  var MLB_GAPS = [
+    [["op", "up"], "both prices", "and"],
+    [["aera", "hera"], "a starter ERA", "or"],
+    [["abp", "hbp"], "a bullpen ERA", "or"],
+    [["al10", "hl10"], "a last-10 total", "or"],
+    [["arpg", "hrpg"], "a runs/game", "or"]
+  ];
+  var NFL_GAPS = [
+    [["op", "up"], "both prices", "and"],
+    [["anet", "hnet"], "a net rating", "or"],
+    [["gp"], "games played", "or"]
+  ];
+  function rowGaps(s) {
+    var i = s.inputs || {};
+    var blank = function (k) { return !String(i[k] === undefined ? "" : i[k]).trim(); };
+    var out = [];
+    (s.sport === "NFL" ? NFL_GAPS : MLB_GAPS).forEach(function (g) {
+      var miss = g[0].filter(blank);
+      if (!miss.length) return;
+      // "and" groups only matter when EVERY field is blank (one price is rebuilt)
+      if (g[2] === "and" && miss.length < g[0].length) return;
+      out.push(g[1]);
+    });
+    // a percentage outside 0-100 is a typo, not a reading
+    ["tick", "cash"].forEach(function (k) {
+      var v = parseFloat(i[k]);
+      if (isFinite(v) && (v < 0 || v > 100)) out.push("a bad percentage (" + i[k] + ")");
+    });
+    return out;
+  }
+
   function renderCard() {
     var domed = card.filter(isDomed).length;
     $("cardCount").textContent = card.length
-      ? card.length + " games" + (domed ? " · " + domed + " under a roof" : "")
+      ? card.length + " games" + (domed ? " · " + domed + " under a roof" : "") +
+        (card.filter(function (s) { return rowGaps(s).length; }).length
+          ? " · " + card.filter(function (s) { return rowGaps(s).length; }).length +
+            " with missing inputs" : "")
       : "";
     if (!card.length) {
       $("cardTable").innerHTML = '<p class="empty">Nothing on the card yet. Work a game out ' +
@@ -1871,6 +1930,7 @@
         var res = outcome(s);
         /* A row scored by an older build keeps that build's band forever. Say
            so on the row instead of letting it pass as a current call. */
+        var gaps = rowGaps(s);
         var gd = gameDate(s.inputs && s.inputs.gdate);
         var now = scoreInputs(s.sport, s.inputs);
         var stale = now && now.band !== s.band
@@ -1882,7 +1942,13 @@
           '<td><button class="openbtn" data-open="' + i + '" title="Load this game back into the form">' +
             s.matchup + (isDomed(s)
               ? ' <span class="chip dome" title="Roof shut — wind and temperature both dropped ' +
-                'out of this read">Dome</span>' : "") + "</button></td>" +
+                'out of this read">Dome</span>' : "") +
+            (gaps.length
+              ? ' <span class="chip gap" title="Missing ' + gaps.join(", ") +
+                '. Those inputs are not in this card\'s blend, so the call rests on less ' +
+                'than it looks like. Click the row to fill them in.">' + gaps.length +
+                " missing</span>"
+              : "") + "</button></td>" +
           '<td><span class="cell"><span class="gdate' + (gd.today ? " today" : "") +
             '" title="' + gd.title + '">' + gd.text + "</span></span></td>" +
           '<td class="n"><span class="cell">' + s.sport + "</span></td>" +

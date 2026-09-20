@@ -1153,3 +1153,43 @@ class TestStartersAreMeasuredNullToo(unittest.TestCase):
         self.assertIn("Measured null", detail)
         self.assertIn("156 games", detail)
         self.assertIn("cannot buy a band", detail)
+
+
+class TestAPercentageOutsideAHundredIsATypo(unittest.TestCase):
+    """A logged card carried money% = 925, meaning 92.5.
+
+    The split delta fired at full strength on it and moved that projection 0.30
+    runs. Nothing on screen said anything was wrong. Same posture as an
+    implausible ERA: drop it and say so, rather than believe it.
+    """
+
+    KW = dict(line=8.5, over_price=-118, under_price=-102,
+              away_starter_era=3.49, home_starter_era=3.70,
+              away_bullpen_era=3.41, home_bullpen_era=4.10)
+
+    def test_the_real_card_now_scores_as_if_the_field_were_empty(self):
+        bad = forecast_mlb("Braves @ Astros", ticket_pct_over=89,
+                           money_pct_over=925, **self.KW)
+        absent = forecast_mlb("Braves @ Astros", ticket_pct_over=89, **self.KW)
+        self.assertAlmostEqual(bad.projected, absent.projected, places=12)
+        self.assertNotIn("Money split", [d.name for d in bad.deltas])
+
+    def test_it_says_so_rather_than_failing_silently(self):
+        f = forecast_mlb("a @ b", ticket_pct_over=89, money_pct_over=925, **self.KW)
+        note = next(n for n in f.notes if "percentage" in n)
+        self.assertIn("925", note)
+        self.assertIn("decimal", note)
+
+    def test_a_real_percentage_still_works(self):
+        f = forecast_mlb("a @ b", ticket_pct_over=89, money_pct_over=40, **self.KW)
+        self.assertIn("Money split", [d.name for d in f.deltas])
+        self.assertFalse(any("percentage" in n for n in f.notes))
+
+    def test_both_ends_of_the_window_are_guarded(self):
+        for tick, cash in ((-5, 40), (89, -1), (101, 40), (89, 1000)):
+            f = forecast_mlb("a @ b", ticket_pct_over=tick, money_pct_over=cash, **self.KW)
+            self.assertNotIn("Money split", [d.name for d in f.deltas],
+                             f"{tick}/{cash} should have been dropped")
+        # and the boundaries themselves are valid
+        edge = forecast_mlb("a @ b", ticket_pct_over=100, money_pct_over=0, **self.KW)
+        self.assertIn("Money split", [d.name for d in edge.deltas])

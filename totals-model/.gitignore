@@ -1,2 +1,11 @@
 __pycache__/
 *.pyc
+
+# tools_check_*_page.js drives a real browser through Playwright, which is not
+# declared anywhere because the browser itself is already on the machine
+# (CHROMIUM_PATH, defaulting to /opt/pw-browsers/chromium). Running the checks
+# means `npm install playwright` first, and that drops these three in the
+# working tree. They are a dependency download, not part of the project.
+node_modules/
+package.json
+package-lock.json

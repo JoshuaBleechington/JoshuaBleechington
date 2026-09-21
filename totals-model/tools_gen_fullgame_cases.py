@@ -40,7 +40,16 @@ def build(case):
             wind_direction=i.get("dir") or None, temp_f=n(i.get("temp")),
             dome=bool(i.get("dome")), ticket_pct_over=n(i.get("tick")),
             money_pct_over=n(i.get("cash")), opened=n(i.get("opened")))
-
+    if case["sport"] == "WNBA":
+        return F.forecast_wnba(
+            name, ln, over_price=n(i.get("op")), under_price=n(i.get("up")),
+            away_pace=n(i.get("apace")), home_pace=n(i.get("hpace")),
+            away_off_rating=n(i.get("aort")), home_off_rating=n(i.get("hort")),
+            away_def_rating=n(i.get("adrt")), home_def_rating=n(i.get("hdrt")),
+            away_rest_days=n(i.get("arest")), home_rest_days=n(i.get("hrest")),
+            away_last5_total=n(i.get("al5")), home_last5_total=n(i.get("hl5")),
+            playoff=bool(i.get("playoff")))
+    raise ValueError("unknown sport " + case["sport"])
 
 
 def main() -> None:

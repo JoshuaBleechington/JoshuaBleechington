@@ -776,6 +776,138 @@ absent. Type the innings when a starter is genuinely short-sample — a call-up,
 returning injury, an opener — and leave them blank otherwise until there are
 enough logged games to settle it.
 
+## The WNBA book, and the NFL one leaving
+
+Added 2026-09-21, on request: NFL removed from the call sheet because it was
+never used, WNBA added in its place, for totals, "but have it hunt unders lol".
+
+### What was removed
+
+The NFL mode, its fields, its engine and its fixtures are gone from
+`web/fullgame.html`. It attacked the SPREAD rather than the total, which meant
+it carried its own margin distribution, its own key-number table, its own
+half-point pricer and a separate grading rule where Final meant margin rather
+than a combined score. All of that is out, and the card's grading is one rule
+again.
+
+`totals/nfl.py`, `NFL.md`, `tools_check_nfl_page.js` and `tools_gen_nfl_cases.py`
+are **left in the repository**. The request was to take it off the call sheet,
+the arithmetic in the package did not stop being correct, and git has it either
+way. Say the word and the package goes too.
+
+### The architecture is the MLB one, not the old WNBA one
+
+`totals/wnba.py` already existed and is a good model — pace times efficiency,
+rest penalties, an overtime term. It is also **absolute**: it builds a total out
+of four ratings and a pace, which means a stale league constant sets the level
+and every card leans the same way. That is failure #1 at the top of this file.
+
+`forecast_wnba()` is new, and it is anchored. Both estimates are written as a
+multiplicative factor against the market's own fair total:
+
+```
+possessions = pace_A x pace_B / league_pace
+ppp         = (off_A x def_B + off_B x def_A) / 2 / league_rating
+estimate    = market_anchor x (possessions / league_pace) x (ppp / league_rating)
+```
+
+Six league-average inputs give a factor of exactly 1, so the estimate IS the
+anchor. Measured: **2.8e-14**, which is floating-point zero. The same property
+the MLB book has, and for the same reason — it is arithmetic, not a calibration
+that came out right.
+
+It also makes the league constants cheap to be wrong about, which matters here
+because one of them is openly uncertain (below).
+
+### The distribution is different, and the page says so
+
+Runs are overdispersed counts, so MLB gets a negative binomial and its right
+skew — which is why an MLB projection above the line can still be an under, and
+why the crossing sits at line + 0.543.
+
+A basketball total is a sum of roughly a hundred and sixty near-independent
+scoring events, so it is near-symmetric. `normal_split()` is a **discretised**
+normal: the mean and median coincide, the crossing lands on the line itself,
+and a whole-number line still gets a real ~3.5% push instead of having it
+handed to the two sides. The shape panel prints the WNBA lesson rather than the
+MLB one, because printing "the average sits above the typical game" over a
+symmetric chart would teach something false.
+
+### The constants, including one I am not sure about
+
+| | value | where it came from |
+|---|---|---|
+| `WNBA_LEAGUE_PACE` | **83.1** | 2026 league average, an all-time high. Replaces the 80.0 the old model carried. Possessions per **40** minutes — a pace lifted from an NBA-shaped table is wrong by a fifth. |
+| `WNBA_LEAGUE_RATING` | **107.0** | **Not** the published 104.9, deliberately. |
+| `WNBA_TOTAL_SD` | **11.5** | Inherited, and **unverified on this architecture**. |
+| `WNBA_B2B_PENALTY` | 2.0 | Hand-sized. Tagged. |
+| `WNBA_SHORT_REST_PENALTY` | 1.0 | Hand-sized. Tagged. |
+
+The rating is the interesting one. The published 2026 figure is 104.9 and this
+uses 107.0, because the older model calibrated it against the **market** rather
+than against published tables — pace figures and efficiency ratings are computed
+off different possession estimates, and combining them through an identity that
+assumes a shared denominator measurably made that model worse. Since this
+architecture is anchored, the constant can only rescale a deviation and cannot
+put a lean on the level, so the market calibration is kept until there is a WNBA
+log to redo it against. **This is the weakest number in the book and it is
+labelled as such.**
+
+2026 is also a record-scoring season — 87.1 points per team per game, pace 83.1,
+offensive rating 104.9 — which is worth knowing before hunting unders in it.
+
+### "Have it hunt unders" — what was and was not done
+
+**The forecast is not tilted.** Asked directly, and the answer was the neutral
+model. Subtracting points to make unders come up more often is the exact bug
+that broke the first version of this project, and it would make the calibration
+panel and the band record meaningless, because every number on the page would
+be shifted by a constant nobody could justify.
+
+**The page hunts them instead.** Two checkboxes on the card:
+
+- **Unders first** ranks the whole slate by P(under), overs included — an OVER
+  52% card is an UNDER 48% card, and for hunting purposes that is the number
+  that sorts.
+- **Unders only** hides the overs.
+
+There is a browser check asserting the stored card is byte-identical before and
+after the lens is used. It is a view, not a thumb on the scale.
+
+The one honest mechanism for finding unders is in the model already, and it is
+**rest**: a back-to-back takes 2.0 off that team's offensive rating and one
+day's rest takes 1.0, applied across the projected possession count. It can only
+ever push the total DOWN — there is no well-rested bonus — and there is a test
+pinning that. Its size is a guess, so it is a `mechanism=False` delta and the
+corroboration gate can refuse a card that only it is carrying.
+
+### The playoff flag moves nothing, on purpose
+
+Playoffs start 27 September. Playoff basketball is widely held to be lower
+scoring, and that belief is exactly the kind of thing this project has been
+wrong about before — the money split was "documented direction, undocumented
+size" too, and it measured null over 172 games.
+
+So the checkbox is a **label**. It moves the number by zero, there is a test at
+twelve decimals, and it marks the row so the regular-season and playoff records
+can be compared from a real log. If a gap shows up with enough games behind it,
+it earns a coefficient then.
+
+### Verification
+
+16 WNBA fixtures generated from the package and replayed in a real browser, so
+the page and `totals/fullgame.py` are pinned to the same numbers — the drift
+between those two is the bug this project has shipped most often, and the WNBA
+book had no cross-check at all until they existed. Writing them immediately
+caught a live one: `render()` still dispatched `sport === "MLB" ? readMlb() :
+readNfl()`, so every WNBA card threw a ReferenceError and silently left the
+previous card on screen.
+
+Plus 24 package tests covering neutrality to ten decimals, the push arithmetic,
+the direction of every input, rest being one-directional, two days' rest being a
+true no-op, the tagging, the gate refusing a rest-only card, the playoff flag
+being inert, and a partial input set being dropped rather than half-applied.
+
 ## What this total looks like
 
 Added 2026-09-20, replacing the alternate-line panel on the page, on request.
@@ -979,7 +1111,7 @@ cheap. To update, change those four numbers and nothing else.
 
 ## Verification
 
-- `tests/test_fullgame.py` — 116 tests (375 across the suite), including the corroboration gate: the
+- `tests/test_fullgame.py` — 140 tests (398 across the suite), including the corroboration gate: the
   Tigers card held at COIN FLIP, the headline probability provably untouched, a
   no-soft-input card identical to twelve decimal places, the gate acting as a
   veto rather than a tax, the band never exceeding either read, and WNBA
@@ -987,10 +1119,10 @@ cheap. To update, change those four numbers and nothing else.
   mean and spread against the measured 4.39, push arithmetic, price inversion,
   the resolved-probability band, calibration detection of an overconfident
   model, and the guards.
-- `web/fullgame-cases.json` — 38 games generated from the package by
+- `web/fullgame-cases.json` — 54 games (38 MLB, 16 WNBA) generated from the package by
   `tools_gen_fullgame_cases.py`, which recomputes only the expectations so a
   model change never means hand-editing a probability.
-- `tools_check_fullgame_page.js` — 731 checks. It replays all 38 in a real browser against side,
+- `tools_check_fullgame_page.js` — 1009 checks. It replays all 54 in a real browser against side,
   band, resolved probability, push, projection, fair price, estimate and delta
   counts, the gate's core projection and core probability, the core chip showing
   the corroborated probability on every card and turning amber only when held,
@@ -1001,7 +1133,11 @@ cheap. To update, change those four numbers and nothing else.
   half-typed draft all survive. It loads a hand-built card of known results and
   checks the per-band table reports 2-0, 1-1 and 0-1 with the push in its own
   column and an empty band left out, and that the card's Prob column is tinted at
-  the same floors as the banner. It checks that the money split moves the
+  the same floors as the banner. It checks the unders-first lens reorders and
+  filters the card while leaving the stored rows byte-identical, that a WNBA row
+  does not inherit a left-over roof tick, and that the thirteen-club WNBA roster
+  resolves by city without colliding with the MLB one. It checks that the money
+  split moves the
   projection, the probability and the band by exactly nothing while still
   printing its note, and that the run-distribution chart's bars sum to the
   page's own over, push and under probabilities, that the push row appears only

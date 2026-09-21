@@ -138,7 +138,36 @@ DISPERSION_PHI = {"MLB": RESIDUAL_SD["MLB"] ** 2 / LEAGUE_COMBINED_RPG}
 WEIGHTS = {
     "MLB": {"market": 4.0, "starters": 1.6, "bullpens": 0.8,
             "form": 0.8, "h2h": 0.5},
+    # A priori and labelled as such: there is no WNBA log to fit these to yet.
+    # The market keeps the dominant weight it earned in MLB, where it has the
+    # best MAE of any input by a distance. Pace and efficiency split what is
+    # left evenly, because nothing yet says which of the two matters more.
+    "WNBA": {"market": 4.0, "pace": 1.2, "efficiency": 1.2, "form": 0.8},
 }
+
+# WNBA league baselines. Checked 2026-09-21.
+#
+# Possessions per 40 MINUTES -- WNBA games are 40, not 48, so a pace figure
+# lifted from an NBA-shaped table is wrong by a fifth. 83.1 is the 2026 league
+# average and an all-time high, replacing the 80.0 the older totals/wnba.py
+# carried.
+WNBA_LEAGUE_PACE = 83.1
+# Points per 100 possessions. Deliberately NOT the published 104.9. The older
+# model calibrated this against the MARKET instead, because pace figures and
+# efficiency ratings are computed off different possession estimates and cannot
+# be combined by an identity that assumes a shared denominator -- doing it that
+# way measurably made that model worse. This architecture is anchored on the
+# market, so the constant only scales deviations and cannot put a lean on the
+# level; the market calibration is kept until a WNBA log exists to redo it.
+WNBA_LEAGUE_RATING = 107.0
+# Spread of a final WNBA total around its projection, inherited from
+# totals/wnba.py and UNVERIFIED on this architecture. residual_spread() will
+# report it against the log once there are games in it.
+WNBA_TOTAL_SD = 11.5
+# Rating points taken off a tired offence. The direction is documented; the
+# size is a guess, so the delta it drives is tagged mechanism=False.
+WNBA_B2B_PENALTY = 2.0
+WNBA_SHORT_REST_PENALTY = 1.0
 
 # One meeting is not eight meetings' worth of evidence.
 H2H_FULL_WEIGHT_AT = 4.0
@@ -211,6 +240,12 @@ PLAUSIBLE = {
     "percent": (0.0, 100.0),
     "park": (70.0, 130.0),
     "mlb_total": (4.0, 20.0),
+    # A WNBA total under 120 or over 220 is a typo, not a line. The pace and
+    # rating windows are wide on purpose: they only have to catch a misplaced
+    # decimal, not police a genuine outlier.
+    "wnba_total": (120.0, 220.0),
+    "pace": (60.0, 110.0),
+    "rating": (70.0, 140.0),
     "price": (-100000.0, 100000.0),
 }
 
@@ -248,6 +283,11 @@ def nb_pmf(k: int, mu: float, phi: float) -> float:
     )
 
 
+def _ncdf(x: float) -> float:
+    """Standard normal CDF, to full double precision via math.erf."""
+    return 0.5 * (1.0 + math.erf(x / math.sqrt(2.0)))
+
+
 def nb_split(line: float, mu: float, phi: float) -> tuple[float, float, float]:
     """(P over, P push, P under) for a total of `line` given a mean of `mu`.
 
@@ -275,9 +315,30 @@ def nb_split(line: float, mu: float, phi: float) -> tuple[float, float, float]:
     return over, push, under
 
 
+def normal_split(line: float, mu: float, sd: float) -> tuple[float, float, float]:
+    """(over, push, under) for a DISCRETISED normal.
+
+    Basketball totals are sums of roughly a hundred and sixty near-independent
+    scoring events, so a normal is the right shape -- and a symmetric one, which
+    is the useful difference from the baseball book: the mean and the median sit
+    on top of each other and the side flips at the line rather than half a run
+    above it.
+
+    Discretised, because a final total is an integer. A continuous normal puts
+    zero mass on a whole-number line and hands a real ~3.5% push to the two
+    sides, which is the same bug the MLB book was built to avoid.
+    """
+    if abs(line - round(line)) < 1e-9:
+        lo = _ncdf((line - 0.5 - mu) / sd)
+        hi = _ncdf((line + 0.5 - mu) / sd)
+        return 1.0 - hi, max(0.0, hi - lo), lo
+    over = 1.0 - _ncdf((line - mu) / sd)
+    return over, 0.0, 1.0 - over
+
+
 def split_for(sport: str, line: float, mu: float) -> tuple[float, float, float]:
-    if sport == "MLB":
-        return nb_split(line, mu, DISPERSION_PHI["MLB"])
+    if sport == "WNBA":
+        return normal_split(line, mu, WNBA_TOTAL_SD)
     return nb_split(line, mu, DISPERSION_PHI["MLB"])
 
 
@@ -855,6 +916,138 @@ def forecast_mlb(
 # ===========================================================================
 
 # ===========================================================================
+
+def rest_penalty(days: float | None) -> float:
+    """Rating points off a tired offence. Two days is the baseline and costs
+    nothing; this is the one hand-sized coefficient in the WNBA book."""
+    if days is None:
+        return 0.0
+    if days <= 0:
+        return WNBA_B2B_PENALTY
+    if days <= 1:
+        return WNBA_SHORT_REST_PENALTY
+    return 0.0
+
+
+def forecast_wnba(
+    matchup: str,
+    line: float,
+    *,
+    over_price: float | None = None,
+    under_price: float | None = None,
+    away_pace: float | None = None,
+    home_pace: float | None = None,
+    away_off_rating: float | None = None,
+    home_off_rating: float | None = None,
+    away_def_rating: float | None = None,
+    home_def_rating: float | None = None,
+    away_rest_days: float | None = None,
+    home_rest_days: float | None = None,
+    away_last5_total: float | None = None,
+    home_last5_total: float | None = None,
+    playoff: bool = False,
+) -> Forecast:
+    """A WNBA total, on the same architecture as the MLB book.
+
+    Anchor on what the two prices really say, then move off that anchor by
+    DIFFERENTIALS only. A basketball total decomposes cleanly into how many
+    possessions and how many points per possession, so those are the two
+    estimates.
+
+    Both are written as a multiplicative factor against the market anchor,
+    which buys the same guarantee the MLB book has: six league-average inputs
+    move the number by EXACTLY ZERO. Not approximately -- there is a test at
+    twelve decimals. That property is also what makes the league constants
+    cheap to be wrong about, since they sit inside a ratio and can only rescale
+    a deviation, never set the level.
+    """
+    w = WEIGHTS["WNBA"]
+    notes: list[str] = []
+    anchor, why = fair_total("WNBA", line, over_price, under_price)
+    estimates = [Estimate("Market", anchor, w["market"], why)]
+    deltas: list[Delta] = []
+
+    # --- pace: how many possessions ---------------------------------------
+    possessions = WNBA_LEAGUE_PACE
+    if (away_pace is not None and home_pace is not None
+            and _ok(away_pace, "pace") and _ok(home_pace, "pace")):
+        possessions = away_pace * home_pace / WNBA_LEAGUE_PACE
+        estimates.append(Estimate(
+            "Pace", anchor * (possessions / WNBA_LEAGUE_PACE), w["pace"],
+            f"Pace {away_pace:.1f} and {home_pace:.1f} against a league "
+            f"{WNBA_LEAGUE_PACE:.1f} give {possessions:.1f} possessions, "
+            f"{possessions - WNBA_LEAGUE_PACE:+.1f} on league average. Two average "
+            f"paces would land exactly on the market number."))
+    elif away_pace is not None or home_pace is not None:
+        notes.append(
+            "Pace was entered for one side only. It is scored as a gap between the two "
+            "teams and the league, so a single figure has nothing to be a gap from -- it "
+            "has been dropped rather than half-applied.")
+
+    # --- efficiency: points per possession ---------------------------------
+    four = (away_off_rating, home_off_rating, away_def_rating, home_def_rating)
+    if all(v is not None and _ok(v, "rating") for v in four):
+        # Each offence against the defence it actually faces. Averaging the
+        # four ratings instead would call a 110-into-98 the same game as a
+        # 110-into-112, and those are not the same game.
+        away_ppp = away_off_rating * home_def_rating / WNBA_LEAGUE_RATING
+        home_ppp = home_off_rating * away_def_rating / WNBA_LEAGUE_RATING
+        avg = (away_ppp + home_ppp) / 2.0
+        estimates.append(Estimate(
+            "Efficiency", anchor * (avg / WNBA_LEAGUE_RATING), w["efficiency"],
+            f"Away {away_off_rating:.1f} into {home_def_rating:.1f} gives {away_ppp:.1f} "
+            f"per 100; home {home_off_rating:.1f} into {away_def_rating:.1f} gives "
+            f"{home_ppp:.1f}. Average {avg:.1f} against a league "
+            f"{WNBA_LEAGUE_RATING:.1f} -- {avg - WNBA_LEAGUE_RATING:+.1f} per 100."))
+    elif any(v is not None for v in four):
+        notes.append(
+            "The four efficiency ratings have to be filled in together -- each offence is "
+            "scored against the defence opposite it. A partial set has been dropped "
+            "rather than half-applied.")
+
+    # --- rest --------------------------------------------------------------
+    # A DELTA rather than an estimate: it is a points adjustment derived from
+    # the possession count, not an independent read of the total. Tagged
+    # mechanism=False because its size is a guess, so the corroboration gate
+    # can refuse a card that only it is carrying. It can only push DOWN, which
+    # is the honest mechanism behind hunting unders -- tired legs score less.
+    pen = rest_penalty(away_rest_days) + rest_penalty(home_rest_days)
+    if pen > 0:
+        who = []
+        if rest_penalty(away_rest_days) > 0:
+            who.append("away on " + ("no rest" if (away_rest_days or 0) <= 0 else "one day"))
+        if rest_penalty(home_rest_days) > 0:
+            who.append("home on " + ("no rest" if (home_rest_days or 0) <= 0 else "one day"))
+        deltas.append(Delta(
+            "Rest", -pen * possessions / 100.0,
+            f"{' and '.join(who)}. That is {pen:.1f} rating points off across "
+            f"{possessions:.1f} possessions. The direction is documented, the size is a "
+            f"guess inherited from the older WNBA model, so it is tagged and cannot buy a "
+            f"band on its own.",
+            mechanism=False))
+
+    # --- form: an absolute, and tagged like MLB form ------------------------
+    if away_last5_total is not None and home_last5_total is not None:
+        estimates.append(Estimate(
+            "Last 5", (away_last5_total + home_last5_total) / 2.0, w["form"],
+            f"Last five combined totals average {away_last5_total:.1f} and "
+            f"{home_last5_total:.1f}. An absolute rather than a differential, and tagged "
+            f"measured-null for the same reason MLB form is.",
+            mechanism=False))
+    elif away_last5_total is not None or home_last5_total is not None:
+        notes.append("Last-5 totals were entered for one side only. The pair is scored as "
+                     "a unit and has been dropped.")
+
+    if playoff:
+        notes.append(
+            "Marked a PLAYOFF game. That moves this number by ZERO. Playoff basketball is "
+            "widely held to be lower scoring, and that belief is exactly the kind of thing "
+            "this project has been wrong about before -- the flag is on the row so the two "
+            "records can be compared from a real log. If a gap shows up with enough games "
+            "behind it, it earns a coefficient then.")
+
+    return _assemble("WNBA", matchup, line, estimates, deltas, notes)
+
 
 def _assemble(sport, matchup, line, estimates, deltas, notes) -> Forecast:
     tw = sum(e.weight for e in estimates)

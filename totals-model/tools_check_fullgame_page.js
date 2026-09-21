@@ -20,9 +20,10 @@ const CASES = JSON.parse(
 
 const MLB_IDS = ["away","home","line","op","up","opened","gdate","aera","hera","aip","hip","arpg","hrpg",
                  "abp","hbp","al10","hl10","h2h","h2hn","pf","mph","dir","temp","tick","cash"];
-const NFL_IDS = ["away","home","line","op","up","gdate","anet","hnet","gp","nopened"];
-const ALL = [...new Set([...MLB_IDS, ...NFL_IDS])];
-const CHECKS = ["dome", "aqb", "hqb"];
+const WNBA_IDS = ["away","home","line","op","up","opened","gdate",
+                  "apace","hpace","aort","hort","adrt","hdrt","arest","hrest","al5","hl5"];
+const ALL = [...new Set([...MLB_IDS, ...WNBA_IDS])];
+const CHECKS = ["dome", "playoff"];
 
 (async () => {
   const b = await chromium.launch({
@@ -48,7 +49,7 @@ const CHECKS = ["dome", "aqb", "hqb"];
 
   for (const c of CASES) {
     const got = await pg.evaluate(async ([sport, inputs, ids, checks]) => {
-      document.getElementById(sport === 'NFL' ? 'm-nfl' : 'm-mlb').click();
+      document.getElementById(sport === 'WNBA' ? 'm-wnba' : 'm-mlb').click();
       ids.forEach(id => { document.getElementById(id).value = ''; });
       checks.forEach(id => { document.getElementById(id).checked = false; });
       for (const [k, v] of Object.entries(inputs)) {
@@ -325,11 +326,12 @@ const CHECKS = ["dome", "aqb", "hqb"];
     await add();
     const domed = first().textContent.trim();
 
-    // The box stays ticked across a sport switch; an NFL row must not inherit it.
-    document.getElementById('m-nfl').click();
-    set('away', 'Jets'); set('home', 'Bills'); set('line', -6.5);
+    // The box stays ticked across a sport switch; a WNBA row must not inherit
+    // it -- a basketball game has no roof to shut.
+    document.getElementById('m-wnba').click();
+    set('away', 'Aces'); set('home', 'Lynx'); set('line', 161.5);
     await add();
-    const nfl = first().textContent.trim();
+    const wnba = first().textContent.trim();
 
     document.getElementById('m-mlb').click();
     document.getElementById('clear').click();
@@ -337,7 +339,7 @@ const CHECKS = ["dome", "aqb", "hqb"];
     await add();
 
     return {
-      domed, nfl,
+      domed, wnba,
       open: first().textContent.trim(),
       chips: document.querySelectorAll('#cardTable .chip.dome').length,
       count: document.getElementById('cardCount').textContent.trim(),
@@ -348,7 +350,7 @@ const CHECKS = ["dome", "aqb", "hqb"];
   // same row -- the assertion was over-specific, not the page wrong.
   chk(/\bDome\b/.test(roof.domed), 'roof: a game with the roof shut is marked on the card', roof.domed);
   chk(!/Dome/.test(roof.open), 'roof: an open-air game is not marked', roof.open);
-  chk(!/Dome/.test(roof.nfl), 'roof: an NFL row does not inherit a left-over tick', roof.nfl);
+  chk(!/Dome/.test(roof.wnba), 'roof: a WNBA row does not inherit a left-over tick', roof.wnba);
   chk(roof.chips === 1, 'roof: exactly one row carries the marker', String(roof.chips));
   chk(/1 under a roof/.test(roof.count), 'roof: the header counts the domed games', roof.count);
 
@@ -358,11 +360,11 @@ const CHECKS = ["dome", "aqb", "hqb"];
   // anything is grouped by team.
   const teams = await pg.evaluate(async () => {
     const shown = (name, sport) => {
-      document.getElementById(sport === 'NFL' ? 'm-nfl' : 'm-mlb').click();
+      document.getElementById(sport === 'WNBA' ? 'm-wnba' : 'm-mlb').click();
       const a = document.getElementById('away'), h = document.getElementById('home'),
             l = document.getElementById('line');
       a.value = name; h.value = 'Rockies';
-      l.value = sport === 'NFL' ? '-3.5' : '8.5';
+      l.value = sport === 'WNBA' ? '161.5' : '8.5';
       [a, h, l].forEach(e => e.dispatchEvent(new Event('input', { bubbles: true })));
       const el = document.querySelector('.cline b');
       return el ? el.textContent.split(' @ ')[0] : null;
@@ -375,16 +377,16 @@ const CHECKS = ["dome", "aqb", "hqb"];
               shown('Boston RedSox', 'MLB'), shown('Cincinnati Red', 'MLB'),
               shown('Chicago WhiteSox', 'MLB')],
       // the same city is a different club in each league
-      arizona: [shown('Arizona', 'MLB'), shown('Arizona', 'NFL')],
-      kc: [shown('Kansas City', 'MLB'), shown('Kansas City', 'NFL')],
-      sf: [shown('SF', 'MLB'), shown('SF', 'NFL')],
+      chicago: [shown('Chicago Cubs', 'MLB'), shown('Chicago Sky', 'WNBA')],
+      lv: [shown('Las Vegas', 'WNBA'), shown('Seattle', 'WNBA')],
+      gs: [shown('Golden State', 'WNBA'), shown('Connecticut', 'WNBA')],
       // ambiguous or unknown input must survive untouched
       ambiguous: ['Chicago', 'LA', 'NY', 'Some Local Nine'].map(s => shown(s, 'MLB')),
     };
     document.getElementById('m-mlb').click();
     out.mlbList = [...document.getElementById('teamList').options].map(o => o.value);
-    document.getElementById('m-nfl').click();
-    out.nflList = [...document.getElementById('teamList').options].map(o => o.value);
+    document.getElementById('m-wnba').click();
+    out.wnbaList = [...document.getElementById('teamList').options].map(o => o.value);
     document.getElementById('m-mlb').click();
     return out;
   });
@@ -394,20 +396,20 @@ const CHECKS = ["dome", "aqb", "hqb"];
       JSON.stringify(['Guardians', 'Astros', 'Red Sox', 'Reds', 'White Sox']),
       'teams: typos and run-together names resolve, and red/sox does not collide',
       teams.typos.join('|'));
-  chk(JSON.stringify(teams.arizona) === JSON.stringify(['Diamondbacks', 'Cardinals']),
-      'teams: a city maps by sport, not globally', teams.arizona.join('|'));
-  chk(JSON.stringify(teams.kc) === JSON.stringify(['Royals', 'Chiefs']),
-      'teams: Kansas City is scoped too', teams.kc.join('|'));
-  chk(JSON.stringify(teams.sf) === JSON.stringify(['Giants', '49ers']),
-      'teams: SF is Giants in MLB and 49ers in NFL', teams.sf.join('|'));
+  chk(JSON.stringify(teams.chicago) === JSON.stringify(['Cubs', 'Sky']),
+      'teams: a city maps by sport, not globally', teams.chicago.join('|'));
+  chk(JSON.stringify(teams.lv) === JSON.stringify(['Aces', 'Storm']),
+      'teams: the WNBA roster resolves by city', teams.lv.join('|'));
+  chk(JSON.stringify(teams.gs) === JSON.stringify(['Valkyries', 'Sun']),
+      'teams: including the expansion side', teams.gs.join('|'));
   chk(JSON.stringify(teams.ambiguous) ===
       JSON.stringify(['Chicago', 'LA', 'NY', 'Some Local Nine']),
       'teams: ambiguous and unknown input is left exactly as typed',
       teams.ambiguous.join('|'));
   chk(teams.mlbList.length === 30, 'teams: the MLB list offers all thirty clubs',
       String(teams.mlbList.length));
-  chk(teams.nflList.length === 32, 'teams: the NFL list offers all thirty-two clubs',
-      String(teams.nflList.length));
+  chk(teams.wnbaList.length === 13, 'teams: the WNBA list offers all thirteen clubs',
+      String(teams.wnbaList.length));
 
   // ---- the one-time backfill of rows logged before normalisation ---------
   // It must rewrite the NAME and nothing else. A migration that moved a final
@@ -803,6 +805,65 @@ const CHECKS = ["dome", "aqb", "hqb"];
   chk(/inside the noise/.test(filled),
       'track: a 5-call gap is reported as unresolved, not as a finding',
       filled.slice(0, 220));
+
+  // ---- the unders-first lens --------------------------------------------
+  // Asked for as "have it hunt unders". It is a VIEW: it must reorder and hide
+  // rows and must never touch a probability. The check that matters is the
+  // last one -- the stored card is identical before and after.
+  await pg.evaluate(() => { localStorage.clear(); });
+  await pg.reload();
+  await pg.waitForTimeout(300);
+  const lens = await pg.evaluate(async () => {
+    const mk = (m, side, prob) => ({ matchup: m, sport: 'WNBA', line: 161.5,
+      projected: '160.0', side, prob, band: 'BET', fair: '-120', final: null, inputs: {} });
+    localStorage.setItem('callsheet.fullgame.card.v1', JSON.stringify([
+      mk('Wings @ Dream', 'OVER', '53.8'),
+      mk('Aces @ Lynx', 'UNDER', '58.2'),
+      mk('Sky @ Mercury', 'UNDER', '51.3'),
+      mk('Sun @ Storm', 'OVER', '61.0'),
+    ]));
+    return true;
+  });
+  await pg.reload();
+  await pg.waitForTimeout(350);
+  const names = () => pg.evaluate(() =>
+    [...document.querySelectorAll('#cardTable tbody tr .openbtn')]
+      .map(b => b.textContent.trim().split(' ')[0]));
+  const cardBefore = await pg.evaluate(() => localStorage.getItem('callsheet.fullgame.card.v1'));
+  const plain = await names();
+  const tick = (id, on) => pg.evaluate(([id, on]) => {
+    const e = document.getElementById(id);
+    e.checked = on; e.dispatchEvent(new Event('change', { bubbles: true }));
+  }, [id, on]);
+  await tick('underFirst', true);
+  await pg.waitForTimeout(150);
+  const sorted = await names();
+  await tick('underOnly', true);
+  await pg.waitForTimeout(150);
+  const only = await names();
+  const count = await pg.evaluate(() =>
+    document.getElementById('cardCount').textContent.trim());
+  await pg.reload();
+  await pg.waitForTimeout(350);
+  const persisted = await pg.evaluate(() => ({
+    first: document.getElementById('underFirst').checked,
+    only: document.getElementById('underOnly').checked,
+  }));
+  const cardAfter = await pg.evaluate(() => localStorage.getItem('callsheet.fullgame.card.v1'));
+
+  chk(JSON.stringify(plain) === JSON.stringify(['Wings', 'Aces', 'Sky', 'Sun']),
+      'lens: off, the card is in the order it was entered', plain.join('|'));
+  // P(under) is 58.2, 51.3 for the two unders and 46.2, 39.0 for the two overs
+  chk(JSON.stringify(sorted) === JSON.stringify(['Aces', 'Sky', 'Wings', 'Sun']),
+      'lens: unders first ranks the whole slate by P(under), overs included',
+      sorted.join('|'));
+  chk(JSON.stringify(only) === JSON.stringify(['Aces', 'Sky']),
+      'lens: unders only hides the overs', only.join('|'));
+  chk(/2 of 4 games/.test(count), 'lens: and the header says what it is hiding', count);
+  chk(persisted.first && persisted.only, 'lens: the choice survives a reload',
+      JSON.stringify(persisted));
+  // The whole point: a lens, not a thumb on the scale.
+  chk(cardBefore === cardAfter, 'lens: it does not touch a single stored probability');
 
   if (errs.length) { console.log('PAGE ERRORS:\n' + errs.join('\n')); fails++; }
   console.log(fails ? `\n${fails} FAILED` : `\nall checks passed (${CASES.length} cases)`);

@@ -39,6 +39,12 @@ from totals.fullgame import (
     TYPICAL_HOLD,
     HOLD_90TH,
     forecast_mlb,
+    forecast_wnba,
+    normal_split,
+    rest_penalty,
+    WNBA_LEAGUE_PACE,
+    WNBA_LEAGUE_RATING,
+    WNBA_TOTAL_SD,
     h2h_weight,
     implied,
     nb_pmf,
@@ -1278,3 +1284,154 @@ class TestTheMoneySplitIsShownAndNeverScored(unittest.TestCase):
         blank = forecast_mlb("a @ b", **self.KW)
         self.assertAlmostEqual(f.p_corroborated, blank.p_corroborated, places=12)
         self.assertEqual(f.band, blank.band)
+
+
+class TestWnbaIsNeutralByArithmetic(unittest.TestCase):
+    """The property the whole architecture exists for, ported to basketball.
+
+    Six league-average inputs must move the number by EXACTLY zero. Not
+    approximately: the estimates are multiplicative factors against the market
+    anchor, so a league-average card reduces to the anchor as arithmetic. The
+    first version of this project carried +0.16 runs of permanent lean toward
+    the over because a constant was chosen rather than derived, and this test
+    is what makes that impossible to reintroduce here.
+    """
+
+    BASE = dict(line=161.5, over_price=-110, under_price=-110)
+
+    def test_a_league_average_card_is_the_market(self):
+        blank = forecast_wnba("a @ b", **self.BASE)
+        full = forecast_wnba(
+            "a @ b", away_pace=WNBA_LEAGUE_PACE, home_pace=WNBA_LEAGUE_PACE,
+            away_off_rating=WNBA_LEAGUE_RATING, home_off_rating=WNBA_LEAGUE_RATING,
+            away_def_rating=WNBA_LEAGUE_RATING, home_def_rating=WNBA_LEAGUE_RATING,
+            away_rest_days=2, home_rest_days=2, **self.BASE)
+        self.assertAlmostEqual(full.projected, blank.projected, places=10)
+        self.assertAlmostEqual(full.p_resolved, blank.p_resolved, places=12)
+
+    def test_an_even_market_is_exactly_a_coin_flip(self):
+        f = forecast_wnba("a @ b", **self.BASE)
+        self.assertAlmostEqual(f.p_resolved, 0.5, places=12)
+
+    def test_the_anchor_sits_ON_the_line_not_above_it(self):
+        """The useful difference from the baseball book.
+
+        An MLB empty card projects line + 0.543, because a run total is
+        right-skewed and the posted line is its median rather than its mean. A
+        basketball total is near-symmetric, so the two coincide and the anchor
+        lands on the number. Getting this backwards would put a permanent lean
+        on every WNBA card.
+        """
+        f = forecast_wnba("a @ b", **self.BASE)
+        self.assertAlmostEqual(f.projected, 161.5, places=6)
+
+
+class TestWnbaDistributionCanPush(unittest.TestCase):
+    def test_a_whole_number_line_has_a_real_push(self):
+        f = forecast_wnba("a @ b", line=162, over_price=-110, under_price=-110)
+        # 1 / (sd * sqrt(2*pi)) at the mean, ~3.5% for sd 11.5
+        self.assertGreater(f.p_push, 0.03)
+        self.assertLess(f.p_push, 0.04)
+
+    def test_a_half_point_line_cannot_push(self):
+        f = forecast_wnba("a @ b", line=161.5, over_price=-110, under_price=-110)
+        self.assertEqual(f.p_push, 0.0)
+
+    def test_the_three_outcomes_sum_to_one(self):
+        for line in (155, 161.5, 162, 170.5):
+            f = forecast_wnba("a @ b", line=line, over_price=-115, under_price=-105)
+            self.assertAlmostEqual(f.p_over + f.p_push + f.p_under, 1.0, places=9)
+
+
+class TestWnbaInputsPointTheRightWay(unittest.TestCase):
+    BASE = dict(line=161.5, over_price=-110, under_price=-110)
+    FLAT = dict(away_off_rating=107.0, home_off_rating=107.0,
+                away_def_rating=107.0, home_def_rating=107.0)
+
+    def test_faster_teams_raise_the_total(self):
+        fast = forecast_wnba("a @ b", away_pace=88.0, home_pace=87.0, **self.BASE)
+        slow = forecast_wnba("a @ b", away_pace=78.0, home_pace=79.0, **self.BASE)
+        self.assertGreater(fast.projected, slow.projected)
+
+    def test_better_offence_raises_it_and_better_defence_lowers_it(self):
+        good_o = forecast_wnba("a @ b", away_off_rating=115.0, home_off_rating=107.0,
+                               away_def_rating=107.0, home_def_rating=107.0, **self.BASE)
+        good_d = forecast_wnba("a @ b", away_off_rating=107.0, home_off_rating=107.0,
+                               away_def_rating=97.0, home_def_rating=107.0, **self.BASE)
+        flat = forecast_wnba("a @ b", **dict(self.FLAT, **self.BASE))
+        self.assertGreater(good_o.projected, flat.projected)
+        self.assertLess(good_d.projected, flat.projected)
+
+    def test_rest_can_only_push_the_total_down(self):
+        """It is the one honest mechanism behind hunting unders, and it is
+        one-directional by construction: there is no well-rested bonus."""
+        flat = forecast_wnba("a @ b", **dict(self.FLAT, **self.BASE))
+        for a, h in ((0, 0), (0, 2), (1, 1), (1, 3)):
+            tired = forecast_wnba("a @ b", away_rest_days=a, home_rest_days=h,
+                                  **dict(self.FLAT, **self.BASE))
+            self.assertLess(tired.projected, flat.projected, f"{a}/{h}")
+
+    def test_two_days_rest_or_more_is_the_baseline_and_moves_nothing(self):
+        flat = forecast_wnba("a @ b", **dict(self.FLAT, **self.BASE))
+        for days in (2, 3, 7):
+            f = forecast_wnba("a @ b", away_rest_days=days, home_rest_days=days,
+                              **dict(self.FLAT, **self.BASE))
+            self.assertAlmostEqual(f.projected, flat.projected, places=12)
+
+
+class TestWnbaTagsWhatItCannotJustify(unittest.TestCase):
+    BASE = dict(line=161.5, over_price=-110, under_price=-110)
+
+    def test_rest_and_form_are_tagged_but_pace_and_efficiency_are_not(self):
+        f = forecast_wnba(
+            "a @ b", away_pace=85.0, home_pace=84.0,
+            away_off_rating=110.0, home_off_rating=104.0,
+            away_def_rating=101.0, home_def_rating=108.0,
+            away_rest_days=0, home_rest_days=2,
+            away_last5_total=170.0, home_last5_total=166.0, **self.BASE)
+        soft = {e.name for e in f.estimates if not e.mechanism}
+        soft |= {d.name for d in f.deltas if not d.mechanism}
+        self.assertEqual(soft, {"Last 5", "Rest"})
+        hard = {e.name for e in f.estimates if e.mechanism}
+        self.assertEqual(hard, {"Market", "Pace", "Efficiency"})
+
+    def test_rest_alone_cannot_buy_a_band(self):
+        """A card carried only by the hand-sized coefficient is held, exactly
+        as an MLB card carried only by form and head-to-head is."""
+        f = forecast_wnba("a @ b", away_rest_days=0, home_rest_days=0, **self.BASE)
+        self.assertEqual(f.band, "NO BET")
+        # the forecast itself still moved -- the gate governs the band only
+        blank = forecast_wnba("a @ b", **self.BASE)
+        self.assertLess(f.projected, blank.projected)
+
+    def test_the_playoff_flag_moves_the_number_by_exactly_zero(self):
+        off = forecast_wnba("a @ b", **self.BASE)
+        on = forecast_wnba("a @ b", playoff=True, **self.BASE)
+        self.assertAlmostEqual(on.projected, off.projected, places=12)
+        self.assertAlmostEqual(on.p_resolved, off.p_resolved, places=12)
+        self.assertEqual(on.band, off.band)
+        self.assertTrue(any("PLAYOFF" in n for n in on.notes))
+
+
+class TestWnbaPartialInputsAreDroppedNotHalfApplied(unittest.TestCase):
+    BASE = dict(line=161.5, over_price=-110, under_price=-110)
+
+    def test_one_pace_is_no_pace(self):
+        blank = forecast_wnba("a @ b", **self.BASE)
+        one = forecast_wnba("a @ b", away_pace=90.0, **self.BASE)
+        self.assertAlmostEqual(one.projected, blank.projected, places=12)
+        self.assertNotIn("Pace", [e.name for e in one.estimates])
+        self.assertTrue(any("one side only" in n for n in one.notes))
+
+    def test_three_ratings_are_no_ratings(self):
+        blank = forecast_wnba("a @ b", **self.BASE)
+        three = forecast_wnba("a @ b", away_off_rating=115.0, home_off_rating=104.0,
+                              away_def_rating=99.0, **self.BASE)
+        self.assertAlmostEqual(three.projected, blank.projected, places=12)
+        self.assertNotIn("Efficiency", [e.name for e in three.estimates])
+
+    def test_an_implausible_reading_is_refused(self):
+        blank = forecast_wnba("a @ b", **self.BASE)
+        # 831 is 83.1 with a lost decimal point
+        typo = forecast_wnba("a @ b", away_pace=831.0, home_pace=83.1, **self.BASE)
+        self.assertAlmostEqual(typo.projected, blank.projected, places=12)

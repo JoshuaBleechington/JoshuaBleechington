@@ -14,6 +14,7 @@
 const { chromium } = require('playwright');
 const path = require('path');
 const fs = require('fs');
+const { execSync } = require('child_process');
 
 const CASES = JSON.parse(
   fs.readFileSync(path.join(__dirname, 'web/fullgame-cases.json'), 'utf8'));
@@ -1026,6 +1027,31 @@ const CHECKS = ["dome", "playoff"];
   chk(!/Head to head \(/.test((held.mlb.why.match(/Held at[^.]*\./) || [''])[0]),
       'held: the meeting count is dropped from the sentence',
       (held.mlb.why.match(/Held at[^.]*\./) || [''])[0]);
+
+  // ---- the build stamp ----------------------------------------------------
+  // Twice now a fix has landed and the page kept showing the old text, and
+  // there was no way to tell a bug in the fix from a cached copy of the file.
+  // The stamp answers that in one glance -- but only if it is current, so it is
+  // enforced rather than trusted: with the page edited and not yet committed it
+  // must read today; with the page committed it must match the date of the
+  // commit that last touched it.
+  const stamp = await pg.evaluate(() => {
+    const el = document.getElementById('build');
+    return el ? el.textContent.trim() : null;
+  });
+  const git = (cmd) => execSync(cmd, { cwd: __dirname, encoding: 'utf8' }).trim();
+  let want, why;
+  try {
+    if (git('git status --porcelain -- web/fullgame.html')) {
+      want = git("date +%Y-%m-%d");
+      why = 'the page is edited and not committed, so the stamp must read today';
+    } else {
+      want = git('git log -1 --format=%cs -- web/fullgame.html');
+      why = 'the page is committed, so the stamp must match that commit';
+    }
+  } catch (e) { want = stamp; why = 'no git here, stamp left unchecked'; }
+  chk(stamp === want, `build: the stamp is current (${why})`,
+      `page says ${stamp}, expected ${want}`);
 
   if (errs.length) { console.log('PAGE ERRORS:\n' + errs.join('\n')); fails++; }
   console.log(fails ? `\n${fails} FAILED` : `\nall checks passed (${CASES.length} cases)`);

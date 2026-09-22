@@ -98,6 +98,10 @@
   header.top p { margin: 6px 0 0; color: var(--ink-2); font-size: 13.5px; max-width: 62ch; }
   .eyebrow { font-size: 10.5px; font-weight: 700; text-transform: uppercase;
              letter-spacing: .14em; color: var(--muted); }
+  /* Which copy of this file is actually running. Twice now a fix has been made
+     and the page kept showing the old text, and there was no way to tell a bug
+     from a cached download. Now there is. */
+  .build { font-weight: 600; letter-spacing: .08em; opacity: .55; }
 
   .modes { display: flex; gap: 2px; padding: 3px; background: var(--surface-2);
            border: 1px solid var(--rule); border-radius: 9px; }
@@ -391,7 +395,8 @@
 
   <header class="top">
     <div>
-      <div class="eyebrow" id="eyebrow">MLB · full game</div>
+      <div class="eyebrow"><span id="eyebrow">MLB · full game</span>
+        <span class="build">· build <span id="build">2026-09-22</span></span></div>
       <h1>Call Sheet</h1>
       <p>Anchors on what the market is really on — the prices, not the rounded number —
          then adjusts for what today changes. Both books attack the <b>total</b>: MLB runs,

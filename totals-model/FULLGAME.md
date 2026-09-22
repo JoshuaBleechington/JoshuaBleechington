@@ -776,6 +776,83 @@ absent. Type the innings when a starter is genuinely short-sample — a call-up,
 returning injury, an opener — and leave them blank otherwise until there are
 enough logged games to settle it.
 
+## Wind measures null, and I have not removed it
+
+Tested 2026-09-22, after a Twins @ Giants card where wind alone was worth +0.66
+runs and promoted it from BET to STRONG BET. It lost. The question was whether
+wind has earned its coefficient.
+
+### The cleanest test is flat
+
+No model involved — just the direction against what the market missed, on 130
+settled open-air cards:
+
+```
+  blowing OUT   n=38   mean residual  +0.08 runs   t = +0.14
+  blowing IN    n=21   mean residual  +0.21 runs   t = +0.28
+  ACROSS        n=71   mean residual  +0.05 runs   t = +0.11
+
+  OUT minus IN = -0.14 runs, t = -0.15
+```
+
+If wind mattered, OUT would sit clearly above IN. It sits **below**. That is the
+whole case against it in one line.
+
+### And the coefficient cannot be distinguished from zero
+
+Sweeping `WIND_RUNS_PER_MPH` against mean absolute error on the same 130 games:
+
+```
+  0.000 -> MAE 2.7700      0.100 -> MAE 2.7695   <- current
+  0.025 -> MAE 2.7698      0.150 -> MAE 2.7695
+  0.050 -> MAE 2.7697      0.200 -> MAE 2.7724
+  0.075 -> MAE 2.7696
+```
+
+**Deleting the term entirely costs 0.0005 runs of accuracy.** The curve is flat
+across the entire plausible range.
+
+### What argues the other way, honestly
+
+Unlike the money split, the sign is **right**, not backwards:
+
+```
+  wind adjustment vs residual, all open-air   r = +0.092   t = +1.05
+  wind adjustment vs residual, when it fires  r = +0.247   t = +1.40
+  mph vs residual, blowing out only           r = +0.429   t = +2.07   n=21
+```
+
+That last cut is the only interesting number on the page, and its slope is
+**+0.347 runs per mph** — three and a half times the 0.10 the model uses. If it
+is real, the term is too SMALL rather than too big.
+
+It does not survive multiplicity. About fourteen cuts were looked at here; Sidak
+needs |t| > 2.91 and the best is 2.07.
+
+### Blast radius
+
+```
+  wind changes the BAND on 11 of 130 open-air cards
+  it changes the SIDE on 3
+  9 promotions, 2 demotions; the promoted cards went 7-2
+```
+
+### So it stays, tagged, and here is why that is not a double standard
+
+The money split was deleted on a hand-picked threshold, a hand-picked size,
+**and a backwards sign**. Wind has the first two and not the third, plus a real
+physical mechanism and the strongest single cut in the study pointing the right
+way at a larger coefficient.
+
+Deleting it on this evidence would be as unjustified as the coefficient itself.
+What the log supports is that wind must not be able to **buy a band on its own** —
+which is what the corroboration gate is for, and the Twins card is exactly the
+failure: a card promoted a whole band by an input that measures null.
+
+**Not applied without a decision.** This is a behaviour change on a live input
+and the evidence is genuinely ambiguous, so it is written down here rather than
+shipped.
+
 ## The WNBA book, and the NFL one leaving
 
 Added 2026-09-21, on request: NFL removed from the call sheet because it was
@@ -1105,10 +1182,22 @@ book prices its main line sharply and its alternate ladder off a coarse template
 so a mispriced rung was a relative judgement rather than a forecast. Removing it
 from the page is a real loss and worth stating plainly.
 
-`alt_ladder()` and `alt_edge()` remain in `totals/fullgame.py` with their tests,
-including the sign fix below — the arithmetic did not stop being correct. Only
-the panel is gone. To put it back, restore the `#altCard` section and `renderAlt`
-from the history of `web/fullgame.html`.
+**The panel came back on 2026-09-22**, on request: *"I like being able to look
+for alternative lines that have a high probability of hitting."* It returned
+reframed. The old one led with price — fair over, fair under, cents of edge. The
+new one leads with the **chance of hitting** at every rung, tinted at the same
+floors as the headline, with what the rung is worth demoted to a second column
+and the book's own price entered separately to compare against. That matches the
+question actually being asked of it and matches the rest of the page, which
+stopped leading with prices in September.
+
+It still runs off the **market** estimate and never the blend, which is the
+property that makes it worth having: it does not need the model to be right. A
+browser check pins exactly that — loading the blend with extreme ERAs, bullpens,
+runs/game and form must move the ladder by nothing at all.
+
+Ladder shape is per sport: 13 rungs at half a run for MLB, 11 rungs at two points
+for WNBA.
 
 ## Alternate lines (the package function)
 
@@ -1205,7 +1294,7 @@ cheap. To update, change those four numbers and nothing else.
 - `web/fullgame-cases.json` — 54 games (38 MLB, 16 WNBA) generated from the package by
   `tools_gen_fullgame_cases.py`, which recomputes only the expectations so a
   model change never means hand-editing a probability.
-- `tools_check_fullgame_page.js` — 1009 checks. It replays all 54 in a real browser against side,
+- `tools_check_fullgame_page.js` — 1015 checks. It replays all 54 in a real browser against side,
   band, resolved probability, push, projection, fair price, estimate and delta
   counts, the gate's core projection and core probability, the core chip showing
   the corroborated probability on every card and turning amber only when held,

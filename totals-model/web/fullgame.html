@@ -679,6 +679,27 @@
         <div class="body"><div class="est" id="deltas"></div></div>
       </section>
 
+      <section class="card" id="altCard">
+        <h2>Alternate lines <span class="tag">chance of hitting</span></h2>
+        <div class="body">
+          <div id="altLadder"></div>
+          <p class="note"><b>This is the one thing on the page that does not need the model
+            to be right.</b> A book prices its <b>main</b> line sharply — the single fact this
+            project has actually established. It prices the <b>alternate ladder off a
+            template</b>, and templates are coarse. Given the market's own fair number,
+            recovered from the two main-line prices, the chance at every other rung is
+            arithmetic on the same distribution. It uses the <b>market</b> estimate, never the
+            blend.</p>
+          <div class="grid3">
+            <div class="f"><label for="altLine">Alt line</label><input id="altLine" type="number" step="0.5" inputmode="decimal" placeholder="10.5"></div>
+            <div class="f"><label for="altSide">Side</label>
+              <select id="altSide"><option value="UNDER">Under</option><option value="OVER">Over</option></select></div>
+            <div class="f"><label for="altPrice">Book's price</label><input id="altPrice" type="number" step="5" inputmode="numeric" placeholder="-260"></div>
+          </div>
+          <div id="altVerdict"></div>
+        </div>
+      </section>
+
       <section class="card">
         <h2>Why</h2>
         <div class="body"><ul class="why" id="why"></ul></div>
@@ -1558,6 +1579,7 @@
       $("est").innerHTML = '<p class="note">Nothing to blend yet.</p>';
       $("deltaCard").hidden = true; $("why").innerHTML = "";
       renderShape(null);
+      renderAlt(null);
       return;
     }
 
@@ -1701,11 +1723,60 @@
     })).join("");
 
     renderShape(f);
+    renderAlt(f);
   }
 
   function priceFor(p) {
     if (Math.abs(p - 0.5) < 1e-9) return 100;
     return p > 0.5 ? -100 * p / (1 - p) : 100 * (1 - p) / p;
+  }
+  /* American odds as a CONTINUOUS scale, so two prices can be subtracted.
+     The sign was wrong the first time this shipped: the index rises with
+     implied probability, and a HIGHER implied probability is a WORSE price. */
+  function priceIndex(p) {
+    p = Math.min(Math.max(p, 1e-9), 1 - 1e-9);
+    return p >= 0.5 ? 100 * p / (1 - p) - 100 : 100 - 100 * (1 - p) / p;
+  }
+  function centsBetween(pFair, offered) {
+    return priceIndex(pFair) - priceIndex(implied(offered));
+  }
+
+  /* ---- alternate lines --------------------------------------------------
+     Restored on request: "I like being able to look for alternative lines that
+     have a high probability of hitting."
+
+     This is the one panel on the page that does NOT need the model to be
+     right about anything, and it is why it is worth having back. A book prices
+     its MAIN line sharply -- the single thing this project has actually
+     established, over 177 cards -- and prices the alternate ladder off a
+     coarse template. Given the market's own fair number, recovered from the
+     two main-line prices, the chance of every other rung is arithmetic on the
+     same distribution. A mispriced rung is then a relative judgement rather
+     than a forecast.
+
+     It runs off the MARKET estimate, never the blended projection. That is
+     deliberate: the blend is only as good as the model, and the model has not
+     beaten the base rate on any input yet. The market has.
+
+     The ladder leads with the CHANCE OF HITTING rather than the price, because
+     that is the question being asked of it -- "how likely is this to land" --
+     and it matches the rest of the page, which stopped leading with prices. */
+  function altStep(sport) { return sport === "WNBA" ? 2 : 0.5; }
+  function altSpan(sport) { return sport === "WNBA" ? 10 : 3; }
+
+  function altLadder(mu, mainLine, sport) {
+    var step = altStep(sport), span = altSpan(sport);
+    var out = [], steps = Math.round(span / step);
+    for (var k = -steps; k <= steps; k++) {
+      var line = Math.round((mainLine + k * step) * 100) / 100;
+      if (line <= 0) continue;
+      var sp = splitFor(sport, line, mu);
+      var live = sp[0] + sp[2];
+      var pOver = live > 0 ? sp[0] / live : 0.5;
+      out.push({ line: line, pOver: pOver, pUnder: 1 - pOver, pPush: sp[1],
+                 fairOver: priceFor(pOver), fairUnder: priceFor(1 - pOver) });
+    }
+    return out;
   }
 
   /* ---- what the total actually looks like -------------------------------
@@ -1907,6 +1978,68 @@
           "shape.") + "</p>";
 
     rec.innerHTML = trackRecord(f.pResolved);
+  }
+
+  function renderAlt(f) {
+    var box = $("altLadder"), verdict = $("altVerdict");
+    if (!f) { $("altCard").hidden = true; return; }
+    $("altCard").hidden = false;
+    /* The MARKET rung, not the model's. See the note by altLadder. */
+    var market = f.estimates[0].total;
+    var rungs = altLadder(market, f.line, f.sport);
+
+    box.innerHTML = '<div class="scroll"><table><thead><tr>' +
+      "<th>Line</th><th class=\"n\">Under hits</th><th class=\"n\">pays</th>" +
+      "<th class=\"n\">Over hits</th><th class=\"n\">pays</th></tr></thead><tbody>" +
+      rungs.map(function (r) {
+        var isMain = Math.abs(r.line - f.line) < 1e-9;
+        /* The thing being looked for: a rung with a high chance of landing.
+           Tinted at the same floors the headline uses, so the eye reads the
+           two panels the same way. */
+        var uc = pctLevel(r.pUnder), oc = pctLevel(r.pOver);
+        return '<tr' + (isMain ? ' class="pick-row"' : "") + '>' +
+          '<td class="n"><span class="cell">' + (isMain ? "<b>" : "") + r.line +
+            (isMain ? " ·main</b>" : "") + "</span></td>" +
+          '<td class="n"><span class="cell"><span class="plv ' + uc + '">' +
+            (r.pUnder * 100).toFixed(1) + "%</span></span></td>" +
+          '<td class="n"><span class="cell">' + sgn(r.fairUnder, 0) + "</span></td>" +
+          '<td class="n"><span class="cell"><span class="plv ' + oc + '">' +
+            (r.pOver * 100).toFixed(1) + "%</span></span></td>" +
+          '<td class="n"><span class="cell">' + sgn(r.fairOver, 0) + "</span></td></tr>";
+      }).join("") + "</tbody></table></div>";
+
+    var al = num("altLine"), ap = num("altPrice"), side = $("altSide").value;
+    if (al === null || ap === null) {
+      verdict.innerHTML = '<p class="note"><b>"Pays" is what the rung is worth, not what ' +
+        "the book is offering.</b> Enter an alt line and the price you are actually being " +
+        "shown to see whether it beats the main number.</p>";
+      return;
+    }
+    var sp = splitFor(f.sport, al, market);
+    var live = sp[0] + sp[2];
+    var pOver = live > 0 ? sp[0] / live : 0.5;
+    var p = side === "OVER" ? pOver : 1 - pOver;
+    var fair = priceFor(p), cents = centsBetween(p, ap);
+    var payout = ap > 0 ? ap / 100 : 100 / -ap;
+    var ev = p * payout - (1 - p);
+    var good = cents > 0;
+    verdict.innerHTML =
+      '<div class="calib" style="margin-top:12px">' +
+        '<div><p class="k">Chance it hits</p><p class="v ' + pctLevel(p) + '">' +
+          (p * 100).toFixed(1) + "%</p></div>" +
+        '<div><p class="k">Worth</p><p class="v">' + sgn(fair, 0) + "</p></div>" +
+        '<div><p class="k">You get</p><p class="v">' + sgn(ap, 0) + "</p></div>" +
+      "</div>" +
+      '<p class="fine">' + (good
+        ? "<b>The book is paying you " + cents.toFixed(0) + " cents more than its own main " +
+          "line implies</b> on " + side + " " + al + ". Expected value <b>" + sgn(ev, 3) +
+          "</b> per unit staked."
+        : "<b>That is " + Math.abs(cents).toFixed(0) + " cents worse than fair.</b> The main " +
+          "number says " + side + " " + al + " should pay " + sgn(fair, 0) + ". Expected " +
+          "value " + sgn(ev, 3) + " per unit — this is the template charging you for the " +
+          "move.") +
+        (sp[1] > 0.001 ? " Note " + (sp[1] * 100).toFixed(1) + "% of games land exactly on " +
+          al + " and refund." : "") + "</p>";
   }
 
   /* The projection at which the over stops being the underdog, for this line.
@@ -2661,6 +2794,13 @@
 
   setSport("MLB", true);
   loadDraft();
+  /* The alt inputs drive only this panel, so they re-render without touching
+     the draft -- they describe a price being shopped, not the game. */
+  ["altLine", "altSide", "altPrice"].forEach(function (id) {
+    $(id).addEventListener("input", function () { renderAlt(last); });
+    $(id).addEventListener("change", function () { renderAlt(last); });
+  });
+
   loadLens();
   ["underFirst", "underOnly"].forEach(function (id) {
     $(id).addEventListener("change", function () { saveLens(); renderCard(); });

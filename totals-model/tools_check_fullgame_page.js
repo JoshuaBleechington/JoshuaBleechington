@@ -865,6 +865,61 @@ const CHECKS = ["dome", "playoff"];
   // The whole point: a lens, not a thumb on the scale.
   chk(cardBefore === cardAfter, 'lens: it does not touch a single stored probability');
 
+  // ---- the alternate ladder ---------------------------------------------
+  // Restored probability-first. The check that matters is the last one: it must
+  // run off the MARKET estimate, never the blend. If it ever starts using the
+  // projection, the one panel here that does not need the model to be right
+  // silently starts needing it.
+  const alt = await pg.evaluate(async () => {
+    const fill = async (vals, sport) => {
+      document.getElementById(sport === 'WNBA' ? 'm-wnba' : 'm-mlb').click();
+      ['away','home','line','op','up','aera','hera','abp','hbp','arpg','hrpg',
+       'al10','hl10','h2h','h2hn','pf','mph','dir','temp','tick','cash','opened','gdate',
+       'aip','hip','apace','hpace','aort','hort','adrt','hdrt','arest','hrest','al5','hl5',
+       'altLine','altPrice'].forEach(id => {
+        const el = document.getElementById(id);
+        if (!el) return;
+        el.value = vals[id] === undefined ? '' : vals[id];
+        el.dispatchEvent(new Event('input', { bubbles: true }));
+      });
+      await new Promise(r => setTimeout(r, 60));
+      return [...document.querySelectorAll('#altLadder tbody tr')].map(tr => {
+        const td = [...tr.querySelectorAll('td')].map(c => c.textContent.trim());
+        return { line: td[0], under: parseFloat(td[1]), over: parseFloat(td[3]),
+                 main: /main/.test(td[0]) };
+      });
+    };
+    const base = { away: 'Cubs', home: 'Reds', line: '9', op: '-150', up: '115' };
+    const plain = await fill(base, 'MLB');
+    // Inputs that move the BLEND but leave the two main-line prices alone.
+    const loaded = await fill(Object.assign({}, base, {
+      aera: '6.50', hera: '6.50', abp: '6.00', hbp: '6.00',
+      arpg: '6.00', hrpg: '6.00', al10: '13.0', hl10: '13.0' }), 'MLB');
+    const wnba = await fill({ away: 'Dream', home: 'Liberty', line: '179.5',
+                              op: '100', up: '-130' }, 'WNBA');
+    document.getElementById('m-mlb').click();
+    return { plain, loaded, wnba };
+  });
+
+  chk(alt.plain.length === 13, 'alt: an MLB ladder is 13 rungs at half a run',
+      String(alt.plain.length));
+  chk(alt.wnba.length === 11, 'alt: a WNBA ladder is 11 rungs at two points',
+      String(alt.wnba.length));
+  chk(alt.plain.filter(r => r.main).length === 1 &&
+      alt.wnba.filter(r => r.main).length === 1,
+      'alt: exactly one rung is marked as the main number');
+  chk(alt.plain.every((r, i) => i === 0 || r.under >= alt.plain[i - 1].under),
+      'alt: the chance of the under rises as the line does',
+      alt.plain.map(r => r.under).join('>'));
+  chk(alt.plain.every(r => Math.abs(r.under + r.over - 100) < 0.15),
+      'alt: under and over sum to one at every rung (push sits outside)',
+      alt.plain.map(r => (r.under + r.over).toFixed(1)).join('|'));
+  // The one that pins the design decision.
+  chk(JSON.stringify(alt.plain) === JSON.stringify(alt.loaded),
+      'alt: the ladder is priced off the MARKET, so loading the blend moves nothing',
+      'plain ' + alt.plain.map(r => r.under).join(',') +
+      ' vs loaded ' + alt.loaded.map(r => r.under).join(','));
+
   if (errs.length) { console.log('PAGE ERRORS:\n' + errs.join('\n')); fails++; }
   console.log(fails ? `\n${fails} FAILED` : `\nall checks passed (${CASES.length} cases)`);
   await b.close();

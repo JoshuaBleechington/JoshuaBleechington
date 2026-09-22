@@ -962,6 +962,71 @@ const CHECKS = ["dome", "playoff"];
   chk(/PACE\/40/.test(copy.text),
       'wnba: the prose names the exact column to read', 'PACE/40 not mentioned');
 
+  // ---- the held note names the inputs it actually deleted -----------------
+  // Reported from the page: a held WNBA card told the reader to delete "last
+  // ten, head to head and the money split". The gate's arithmetic was right --
+  // it deletes whatever is tagged -- but the sentence was three MLB names typed
+  // in by hand, and they went stale twice over. The names are read off the same
+  // flag the gate reads now, so the sentence cannot describe a different blend.
+  const held = await pg.evaluate(async () => {
+    const fill = async (vals, sport) => {
+      document.getElementById(sport === 'WNBA' ? 'm-wnba' : 'm-mlb').click();
+      ['away','home','line','op','up','aera','hera','abp','hbp','arpg','hrpg',
+       'al10','hl10','h2h','h2hn','pf','mph','dir','temp','tick','cash','opened','gdate',
+       'aip','hip','apace','hpace','aort','hort','adrt','hdrt','arest','hrest','al5','hl5']
+        .forEach(id => {
+          const el = document.getElementById(id);
+          if (!el) return;
+          el.value = vals[id] === undefined ? '' : vals[id];
+          el.dispatchEvent(new Event('input', { bubbles: true }));
+        });
+      const roof = document.getElementById('dome');
+      roof.checked = !!vals.dome;
+      roof.dispatchEvent(new Event('change', { bubbles: true }));
+      await new Promise(r => setTimeout(r, 60));
+      const c = document.getElementById('call');
+      return { why: document.getElementById('why').textContent,
+               band: c.dataset.band, ungated: c.dataset.bandUngated };
+    };
+    // Sparks @ Aces, 22 Sept, exactly as logged -- the card in the report.
+    const wnba = await fill({ away: 'Sparks', home: 'Aces', line: '181.5',
+      op: '110', up: '-145', apace: '82.66', hpace: '80.58', aort: '105.7',
+      hort: '112.7', adrt: '110.5', hdrt: '106.2', arest: '1', hrest: '1',
+      al5: '169.5', hl5: '175.4' }, 'WNBA');
+    // One tagged input on its own: the sentence must read as a name, not a list.
+    const lone = await fill({ away: 'Sparks', home: 'Aces', line: '161.5',
+      op: '-110', up: '-110', arest: '0', hrest: '0' }, 'WNBA');
+    // Braves @ Astros, 20 Sept -- the live MLB card the gate still holds.
+    const mlb = await fill({ away: 'Braves', home: 'Astros', line: '8.5',
+      op: '100', up: '-130', aera: '3.07', hera: '3.43', aip: '137.2', hip: '97.0',
+      arpg: '3.87', hrpg: '4.79', abp: '3.58', hbp: '4.20', al10: '9.9', hl10: '7.8',
+      h2h: '8.5', h2hn: '2', pf: '99', temp: '91', tick: '96', cash: '96',
+      dome: true }, 'MLB');
+    document.getElementById('m-mlb').click();
+    return { wnba, lone, mlb };
+  });
+  chk(/Held at/.test(held.wnba.why) && held.wnba.band === 'NO BET',
+      'held: the Sparks card is held in the browser too',
+      `${held.wnba.band} from ${held.wnba.ungated}`);
+  chk(/Delete Last 5 and Rest/.test(held.wnba.why),
+      'held: a WNBA card names the two inputs that sport actually tags',
+      (held.wnba.why.match(/Held at[^.]*\./) || [''])[0]);
+  chk(!/head to head|Head to head|money split|last ten|Last 10|Starters/
+        .test((held.wnba.why.match(/Held at[\s\S]*?other side\./) || [''])[0]),
+      'held: and never names an input the WNBA model does not have',
+      (held.wnba.why.match(/Held at[\s\S]*?other side\./) || [''])[0]);
+  chk(/Delete Rest — measured null/.test(held.lone.why),
+      'held: one tagged input reads as a name, not a one-item list',
+      (held.lone.why.match(/Held at[^.]*\./) || [''])[0]);
+  chk(/Delete Starters, Last 10 and Head to head/.test(held.mlb.why),
+      'held: an MLB card names the starters the hand-written sentence forgot',
+      (held.mlb.why.match(/Held at[^.]*\./) || [''])[0]);
+  chk(!/money split/.test((held.mlb.why.match(/Held at[\s\S]*?on their own\./) || [''])[0]),
+      'held: and no longer names the money split, which nothing scores any more');
+  chk(!/Head to head \(/.test((held.mlb.why.match(/Held at[^.]*\./) || [''])[0]),
+      'held: the meeting count is dropped from the sentence',
+      (held.mlb.why.match(/Held at[^.]*\./) || [''])[0]);
+
   if (errs.length) { console.log('PAGE ERRORS:\n' + errs.join('\n')); fails++; }
   console.log(fails ? `\n${fails} FAILED` : `\nall checks passed (${CASES.length} cases)`);
   await b.close();

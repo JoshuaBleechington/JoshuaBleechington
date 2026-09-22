@@ -1146,6 +1146,29 @@ def forecast_wnba(
     return _assemble("WNBA", matchup, line, estimates, deltas, notes)
 
 
+def _tagged_phrase(estimates, deltas) -> str:
+    """Name the inputs the corroboration gate actually deleted, in order.
+
+    This used to be three names written into the sentence by hand. They went
+    stale twice over: the money split stopped being scored, and the WNBA model
+    arrived with a different set of tagged inputs entirely -- so a WNBA card
+    that had been held was telling the reader to delete a head-to-head estimate
+    that does not exist in that sport. The list is built from the same
+    `mechanism` flag the gate reads, so the sentence cannot describe a blend
+    other than the one on the card.
+    """
+    names = [e.name for e in estimates if not e.mechanism]
+    names += [d.name for d in deltas if not d.mechanism]
+    # "Head to head (3)" carries its meeting count for the weight table; in a
+    # sentence the count is noise.
+    names = [n.split(" (")[0] for n in names]
+    if not names:
+        return "the tagged inputs"
+    if len(names) == 1:
+        return names[0]
+    return ", ".join(names[:-1]) + " and " + names[-1]
+
+
 def _assemble(sport, matchup, line, estimates, deltas, notes) -> Forecast:
     tw = sum(e.weight for e in estimates)
     if tw <= 0:
@@ -1190,9 +1213,8 @@ def _assemble(sport, matchup, line, estimates, deltas, notes) -> Forecast:
 
     if band != band_ungated:
         notes.append(
-            f"Held at {band}, down from {band_ungated}. Delete last ten, head to head "
-            f"and the money split -- the inputs measured worth nothing and the one "
-            f"capped by hand -- and this card reads "
+            f"Held at {band}, down from {band_ungated}. Delete {_tagged_phrase(estimates, deltas)} "
+            f"-- measured null or sized by hand -- and this card reads "
             + (f"{'OVER' if side == 'UNDER' else 'UNDER'} "
                f"{(1 - p_corroborated) * 100:.1f}%, the other side."
                if p_corroborated < 0.5 else

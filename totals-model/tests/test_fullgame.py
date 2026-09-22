@@ -1416,6 +1416,76 @@ class TestWnbaTagsWhatItCannotJustify(unittest.TestCase):
         self.assertTrue(any("PLAYOFF" in n for n in on.notes))
 
 
+class TestTheHeldNoteNamesTheInputsItActuallyDeleted(unittest.TestCase):
+    """Reported from the page: a held WNBA card told the reader to delete "last
+    ten, head to head and the money split".
+
+    The gate's arithmetic was right -- it deletes whatever carries
+    mechanism=False -- but the sentence describing it was three MLB names typed
+    in by hand. They went stale twice: the money split stopped being scored, and
+    the WNBA arrived carrying a different set of tagged inputs entirely. So the
+    note named two inputs the sport does not have, one input no sport scores any
+    more, and left out the starters, which MLB really does delete.
+
+    The names now come off the same flag the gate reads, so the sentence cannot
+    describe a blend other than the one on the card.
+    """
+
+    #: Sparks @ Aces, 22 Sept, exactly as logged -- the card in the report.
+    SPARKS = dict(
+        line=181.5, over_price=110, under_price=-145,
+        away_pace=82.66, home_pace=80.58,
+        away_off_rating=105.7, home_off_rating=112.7,
+        away_def_rating=110.5, home_def_rating=106.2,
+        away_rest_days=1, home_rest_days=1,
+        away_last5_total=169.5, home_last5_total=175.4,
+    )
+
+    def test_a_held_wnba_card_names_last_five_and_rest(self):
+        f = forecast_wnba("Sparks @ Aces", **self.SPARKS)
+        self.assertEqual(f.band, "NO BET")
+        self.assertEqual(f.band_ungated, "STRONG BET")
+        note = next(n for n in f.notes if "Held at" in n)
+        self.assertIn("Delete Last 5 and Rest", note)
+
+    def test_a_held_wnba_card_never_mentions_the_mlb_inputs(self):
+        f = forecast_wnba("Sparks @ Aces", **self.SPARKS)
+        note = next(n for n in f.notes if "Held at" in n)
+        for absent in ("head to head", "Head to head", "money split",
+                       "last ten", "Last 10", "Starters"):
+            self.assertNotIn(absent, note)
+
+    def test_the_arithmetic_the_note_describes_was_never_wrong(self):
+        """Only the prose was broken, so the number it quotes is unchanged."""
+        f = forecast_wnba("Sparks @ Aces", **self.SPARKS)
+        self.assertAlmostEqual(f.p_corroborated, 0.4807, places=3)
+        self.assertIn("OVER 51.9%, the other side",
+                      next(n for n in f.notes if "Held at" in n))
+
+    def test_a_held_mlb_card_names_the_starters_the_old_sentence_forgot(self):
+        f = forecast_mlb("Braves @ Astros",
+                         **TestSoftInputsCannotBuyABand.BRAVES)
+        note = next(n for n in f.notes if "Held at" in n)
+        self.assertIn("Delete Starters, Last 10 and Head to head", note)
+        self.assertNotIn("money split", note)
+
+    def test_the_meeting_count_is_dropped_from_the_sentence(self):
+        """"Head to head (2)" earns its count in the weight table. In a
+        sentence the count reads as a typo."""
+        f = forecast_mlb("Braves @ Astros",
+                         **TestSoftInputsCannotBuyABand.BRAVES)
+        self.assertTrue(any(e.name.startswith("Head to head (")
+                            for e in f.estimates))
+        note = next(n for n in f.notes if "Held at" in n)
+        self.assertNotIn("Head to head (", note)
+
+    def test_one_tagged_input_reads_as_a_name_not_a_list(self):
+        f = forecast_wnba("a @ b", line=161.5, over_price=-110, under_price=-110,
+                          away_rest_days=0, home_rest_days=0)
+        note = next(n for n in f.notes if "Held at" in n)
+        self.assertIn("Delete Rest --", note)
+
+
 class TestWnbaPartialInputsAreDroppedNotHalfApplied(unittest.TestCase):
     BASE = dict(line=161.5, over_price=-110, under_price=-110)
 

@@ -1071,6 +1071,49 @@ the exact column (`PACE/40`) to read. The rating placeholders were stale the
 same way — 104.9, the published figure this model deliberately does not use —
 and are now 107.5.
 
+### The held note named inputs that sport does not have
+
+Reported from the page, on the Sparks @ Aces card of 22 Sept: the WHY section
+said the card was **held at NO BET, down from STRONG BET**, and then told the
+reader to *"delete last ten, head to head and the money split"*. The WNBA model
+has no last-ten estimate, no head-to-head estimate and does not score a money
+split. Neither does MLB any more, on the last of those.
+
+The gate's arithmetic was never wrong. It deletes whatever carries
+`mechanism=False` and reads the result on the side the full blend named; on that
+card it deleted **Last 5** and **Rest**, and the 51.9% it quoted was correct.
+What was wrong was the sentence describing it — three MLB names typed into an
+f-string when MLB was the only sport in the file. They went stale twice over:
+
+- the money split stopped being a scored delta and became a note, so the
+  sentence named an input nothing deletes because nothing scores it;
+- the starters were tagged `mechanism=False` (t = −0.95, sign backwards) and the
+  sentence never mentioned them, so on a held MLB card it under-reported what
+  the gate had actually thrown away;
+- the WNBA arrived with its own tagged pair and inherited the MLB sentence
+  wholesale.
+
+The list is now built from the same flag the gate reads, in the order the inputs
+appear in the blend, so the sentence cannot describe a blend other than the one
+on the card. A trailing meeting count is stripped — `Head to head (2)` earns its
+count in the weight table, but in a sentence it reads as a typo. The same card
+now says:
+
+> Held at NO BET, down from STRONG BET. Delete **Last 5 and Rest** — measured
+> null or sized by hand — and this card reads OVER 51.9%, the other side.
+
+and the Braves @ Astros card says `Delete Starters, Last 10 and Head to head`.
+
+Six package tests and seven browser checks pin it, including one asserting that
+a held WNBA card's note contains none of the strings *head to head*, *money
+split*, *last ten*, *Last 10* or *Starters*, and one that a single tagged input
+reads as a name rather than a one-item list. No fixture changed: the note is
+prose, and every probability, projection and band is exactly what it was.
+
+The general lesson is the one from the pace copy two sections up — a sentence
+that describes a computation, written by hand next to it, is a second
+implementation that nothing can fail. Both are now derived.
+
 ### What the correction does to the two logged games
 
 ```
@@ -1386,7 +1429,7 @@ cheap. To update, change those four numbers and nothing else.
 
 ## Verification
 
-- `tests/test_fullgame.py` — 153 tests (411 across the suite), including the corroboration gate: the
+- `tests/test_fullgame.py` — 158 tests (417 across the suite), including the corroboration gate: the
   Tigers card held at COIN FLIP, the headline probability provably untouched, a
   no-soft-input card identical to twelve decimal places, the gate acting as a
   veto rather than a tax, the band never exceeding either read, and WNBA
@@ -1397,7 +1440,7 @@ cheap. To update, change those four numbers and nothing else.
 - `web/fullgame-cases.json` — 58 games (42 MLB, 16 WNBA) generated from the package by
   `tools_gen_fullgame_cases.py`, which recomputes only the expectations so a
   model change never means hand-editing a probability.
-- `tools_check_fullgame_page.js` — 1089 checks. It replays all 58 in a real browser against side,
+- `tools_check_fullgame_page.js` — 1096 checks. It replays all 58 in a real browser against side,
   band, resolved probability, push, projection, fair price, estimate and delta
   counts, the gate's core projection and core probability, the core chip showing
   the corroborated probability on every card and turning amber only when held,

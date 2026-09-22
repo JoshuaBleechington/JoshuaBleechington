@@ -1180,6 +1180,22 @@
   function delta(name, runs, detail, mechanism) {
     return { name: name, runs: runs, detail: detail, mechanism: mechanism !== false };
   }
+  /* Name the inputs the gate actually deleted, read off the same flag the gate
+     reads. The held note used to list three MLB names written in by hand; they
+     went stale when the money split stopped being scored, and again when the
+     WNBA arrived carrying a different set entirely — a held WNBA card was
+     telling the reader to delete a head-to-head estimate that sport does not
+     have. "Head to head (3)" keeps its meeting count in the weight table; in a
+     sentence the count is noise. */
+  function taggedPhrase(estimates, deltas) {
+    var names = [];
+    estimates.forEach(function (e) { if (!e.mechanism) names.push(e.name); });
+    deltas.forEach(function (d) { if (!d.mechanism) names.push(d.name); });
+    names = names.map(function (n) { return n.split(" (")[0]; });
+    if (!names.length) return "the tagged inputs";
+    if (names.length === 1) return names[0];
+    return names.slice(0, -1).join(", ") + " and " + names[names.length - 1];
+  }
   function h2hWeight(base, n) { return base * Math.min(1, Math.max(0, n) / H2H_FULL_WEIGHT_AT); }
   function parkScale(pf) { return ok(pf, "park") ? pf / 100 : 1; }
 
@@ -1536,17 +1552,19 @@
        An input MEASURED to be worth nothing may move the forecast. It may not,
        on its own, buy a confidence band.
 
-       Re-run the blend with last ten, head to head and the money split deleted
-       — the two that measured null against the residual (t = −0.07, t = −0.40)
-       and the one whose coefficient is a flat hand-cap — and read the result on
-       the side the full blend named. The band is cut from the LESS confident of
-       the two. If deleting them changes the side, there is no call.
+       Re-run the blend with every tagged input deleted — in MLB the starters,
+       last ten and head to head, which measured null against the residual
+       (t = −0.95, t = −0.07, t = −0.40); in the WNBA last 5, tagged for the
+       same reason MLB form is, and the rest penalty, whose direction is
+       documented but whose size is a guess — and read the result on the side
+       the full blend named. The band is cut from the LESS confident of the two.
+       If deleting them changes the side, there is no call.
 
        Nothing is tagged on a card holding only the market and the arms, so this
-       is an actual no-op there rather than an approximation of one. Nothing is
-       tagged outside MLB at all: the t statistics come from an MLB study, and
-       demoting an input on a hunch is the kind of unjustified coefficient this
-       model exists to remove. */
+       is an actual no-op there rather than an approximation of one. The held
+       note names the inputs it deleted from the flag rather than from a list
+       written by hand, because a hand-written list went stale the moment a
+       second sport arrived. */
     var cw = 0, csum = 0, cdelta = 0;
     estimates.forEach(function (e) { if (e.mechanism) { cw += e.weight; csum += e.total * e.weight; } });
     deltas.forEach(function (d) { if (d.mechanism) { cdelta += d.runs; } });
@@ -1567,9 +1585,9 @@
       }
     }
     if (band !== bandUngated) {
-      notes.push("Held at <b>" + band + "</b>, down from " + bandUngated + ". Delete last ten, " +
-        "head to head and the money split — the inputs measured worth nothing and the one " +
-        "capped by hand — and this card reads " +
+      notes.push("Held at <b>" + band + "</b>, down from " + bandUngated + ". Delete " +
+        taggedPhrase(estimates, deltas) + " — measured null or sized by hand — " +
+        "and this card reads " +
         (pCorroborated < 0.5
           ? "<b>" + (side === "UNDER" ? "OVER" : "UNDER") + " " +
             ((1 - pCorroborated) * 100).toFixed(1) + "%, the other side</b>."

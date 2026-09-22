@@ -1298,20 +1298,25 @@
      size of a deviation slightly and cannot put a permanent lean on the level
      the way the old absolute model could. */
   var WNBA = {
-    /* Possessions per 40 minutes. WNBA games are 40, not 48, so a pace figure
-       taken from an NBA-shaped table is wrong by a fifth. 83.1 is the 2026
-       league average and an all-time high — checked 21 Sept 2026, replacing
-       the 80.0 the older model carried. */
-    PACE: 83.1,
-    /* Points per 100 possessions. NOT the published 104.9, deliberately.
-       The older model calibrated this against the MARKET rather than against
-       published tables, because pace figures and efficiency ratings come off
-       different possession estimates and cannot be combined by an identity
-       that assumes they share a denominator — doing it that way measurably
-       made that model worse. Anchored architecture means this constant only
-       scales deviations, so the market calibration is kept until a WNBA log
-       exists to re-measure it against. */
-    RATING: 107.0,
+    /* Possessions per 40 minutes, mean PACE/40 across the fifteen clubs on
+       stats.wnba.com (Teams General Advanced, 2026) — the SAME TABLE the team
+       figures are entered from, which is the whole point and what the first
+       version got wrong. It shipped at 83.1 from a summary article while the
+       paces being entered averaged 80.5, so every card carried 1.5-2 points of
+       permanent under lean and the model called the under on everything. That
+       is a stuck clock, not an edge. Three sources, three answers for the same
+       concept: stats.wnba.com 80.59, basketball-reference 79.30, the summary
+       83.10. If the source of the inputs changes, this and RATING must be
+       re-derived from the new table TOGETHER. */
+    PACE: 80.59,
+    /* Mean OFFRTG from that same table. The check that the two constants share
+       a possession denominator: mean OFFRTG 107.52 against mean DEFRTG 107.47.
+       Every point scored is a point allowed, so those must agree — and when
+       they do, pace and efficiency can be combined. That test FAILED on the
+       numbers this model shipped with. The old 107.0, reached by calibrating
+       against the market rather than any table, was within 0.5 of the truth;
+       the market calibration was sound and the pace was what was broken. */
+    RATING: 107.5,
     /* Spread of a final WNBA total around its projection, from the older
        model. Unverified on this architecture; the residual-spread check will
        report it against the log once there are games in it. */

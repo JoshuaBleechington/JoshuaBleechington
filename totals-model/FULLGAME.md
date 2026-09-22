@@ -833,12 +833,95 @@ handed to the two sides. The shape panel prints the WNBA lesson rather than the
 MLB one, because printing "the average sits above the typical game" over a
 symmetric chart would teach something false.
 
+### The pace constant was wrong, and it was wrong in the way the old model warned about
+
+Caught 2026-09-22, on the first two WNBA cards ever logged. Both said UNDER,
+both were bet, both won — by **half a point each**, 179 on a 179.5 and 173 on a
+173.5. Two half-point escapes is not a validated model, and the decomposition
+said so immediately:
+
+```
+                   model said   market said   final   model off by   line off by
+Dream @ Liberty       174.8        179.5       179        4.2           0.5
+Wings @ Mercury       169.8        173.5       173        3.2           0.5
+```
+
+**The market beat the model on both.** The model moved four points off a number
+that turned out to be nearly perfect and got paid anyway. The tell was in the
+inputs: all four team paces entered were BELOW the league constant, which under
+a correct constant should happen about a quarter of the time.
+
+It shipped at **83.1**, from a web-search summary. The paces actually being
+entered come from stats.wnba.com's `PACE/40` column and average **80.59**. Every
+card therefore carried 1.5–2 points of permanent under lean — the model called
+the under on everything, which is a stuck clock rather than an edge, and is the
+exact failure `totals/wnba.py` warns about in its own comments. It happened
+anyway, one day after shipping.
+
+**The fix is not a better guess. It is taking both constants off the same table
+as the inputs, and then proving they are internally consistent.**
+
+```
+stats.wnba.com, Teams General Advanced, 2026, fifteen clubs
+  mean PACE/40   80.59     <- what the inputs are on, so what the model uses
+  mean OFFRTG   107.52
+  mean DEFRTG   107.47
+```
+
+Offence and defence agreeing to **0.05** is the identity check: every point
+scored is a point allowed, so the league's mean offensive and defensive ratings
+must be equal, and when they are, the two columns share a possession denominator
+and can legitimately be combined. That test **failed** on the numbers this model
+shipped with, which is precisely why the older model's author refused to take
+ratings from published tables at all.
+
+Three sources, three answers for the same concept:
+
+| source | league pace | league rating |
+|---|---|---|
+| **stats.wnba.com PACE/40** | **80.59** | **107.5** |
+| basketball-reference | 79.30 | 109.2 |
+| the web summary that caused the bug | 83.10 | 104.9 |
+
+None of them are wrong; they are different possession formulas. They are simply
+not interchangeable, and mixing them is what broke it.
+
+Worth recording: the rating constant was **107.0**, reached by calibrating the
+old model against the market rather than from any table, and the true figure is
+107.5. The market calibration was sound all along. It was the pace that was
+broken.
+
+### What the correction does to the two logged games
+
+```
+                  was                          now
+Dream @ Liberty   UNDER 65.8%  BET             UNDER 61.1%  NO BET
+                  projected 174.8, off by 4.2  projected 176.2, off by 2.8
+Wings @ Mercury   UNDER 62.6%  BET             UNDER 58.0%  NO BET
+                  projected 169.8, off by 3.2  projected 171.2, off by 1.8
+```
+
+Closer to the finals on both, less confident on both, and — the part that
+matters — **both now band NO BET**, because the corroboration gate bites once
+the phantom pace lean is gone. The core reads are 49.1% and 51.4%: with the
+tagged inputs deleted these are coin flips, which is what two games decided by
+half a point actually were.
+
+So the corrected model would not have bet either winner. That is not a claim the
+fix makes money. It is the fix correctly identifying two coin flips as coin
+flips, and it is justified by the source-table argument and the identity check —
+**not** by the fact that it also improved both games. Two games prove nothing
+either way.
+
+Rows already on the card keep the band they were scored with. Press **Rescore**
+to bring them onto the corrected constants; finals and results are never touched.
+
 ### The constants, including one I am not sure about
 
 | | value | where it came from |
 |---|---|---|
-| `WNBA_LEAGUE_PACE` | **83.1** | 2026 league average, an all-time high. Replaces the 80.0 the old model carried. Possessions per **40** minutes — a pace lifted from an NBA-shaped table is wrong by a fifth. |
-| `WNBA_LEAGUE_RATING` | **107.0** | **Not** the published 104.9, deliberately. |
+| `WNBA_LEAGUE_PACE` | **80.59** | Mean `PACE/40` on stats.wnba.com, the same table the inputs come from. Shipped at 83.1 and was wrong; see above. |
+| `WNBA_LEAGUE_RATING` | **107.5** | Mean `OFFRTG` on the same table, and it passes the offence/defence identity check. |
 | `WNBA_TOTAL_SD` | **11.5** | Inherited, and **unverified on this architecture**. |
 | `WNBA_B2B_PENALTY` | 2.0 | Hand-sized. Tagged. |
 | `WNBA_SHORT_REST_PENALTY` | 1.0 | Hand-sized. Tagged. |

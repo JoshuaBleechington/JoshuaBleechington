@@ -145,21 +145,47 @@ WEIGHTS = {
     "WNBA": {"market": 4.0, "pace": 1.2, "efficiency": 1.2, "form": 0.8},
 }
 
-# WNBA league baselines. Checked 2026-09-21.
+# WNBA league baselines. Re-derived 2026-09-22 from stats.wnba.com, Teams
+# General Advanced, 2026 regular season -- the SAME TABLE the team figures are
+# entered from. That last clause is the whole point and the first version got
+# it wrong.
 #
-# Possessions per 40 MINUTES -- WNBA games are 40, not 48, so a pace figure
-# lifted from an NBA-shaped table is wrong by a fifth. 83.1 is the 2026 league
-# average and an all-time high, replacing the 80.0 the older totals/wnba.py
-# carried.
-WNBA_LEAGUE_PACE = 83.1
-# Points per 100 possessions. Deliberately NOT the published 104.9. The older
-# model calibrated this against the MARKET instead, because pace figures and
-# efficiency ratings are computed off different possession estimates and cannot
-# be combined by an identity that assumes a shared denominator -- doing it that
-# way measurably made that model worse. This architecture is anchored on the
-# market, so the constant only scales deviations and cannot put a lean on the
-# level; the market calibration is kept until a WNBA log exists to redo it.
-WNBA_LEAGUE_RATING = 107.0
+# It shipped with pace 83.1, taken from a summary article. The team paces
+# actually being entered averaged 80.5, so every card carried a permanent
+# under lean of 1.5-2 points: the model called the under on everything, which
+# is a stuck clock rather than an edge. totals/wnba.py warns about exactly this
+# failure in its own comments and it happened anyway.
+#
+# The fix is not a better guess. It is taking BOTH constants off the same table
+# as the inputs, and then checking that they are internally consistent -- which
+# they now are, and verifiably:
+#
+#   mean PACE/40 across the fifteen clubs  = 80.59
+#   mean OFFRTG                            = 107.52
+#   mean DEFRTG                            = 107.47
+#
+# Offence and defence agreeing to 0.05 IS the identity check. Every point
+# scored is a point allowed, so the league's mean offensive and defensive
+# ratings must be equal; when they are, the two columns share a possession
+# denominator and can be combined. That test failed on the numbers this model
+# shipped with, and it is why the old model's author refused to take ratings
+# from published tables at all.
+#
+# Three sources give three different answers for the same concept, which is the
+# lesson in one line:
+#
+#   stats.wnba.com PACE/40   80.59   <- what the inputs are on, so what is used
+#   basketball-reference     79.30       different possession formula
+#   a web summary            83.10       the number that caused the bug
+#
+# If the source of the team figures ever changes, BOTH of these must be
+# re-derived from the new table together. They are not interchangeable.
+WNBA_LEAGUE_PACE = 80.59
+# Points per 100 possessions, mean OFFRTG from the same table. Worth recording
+# that the previous value of 107.0 -- reached by calibrating the OLD model
+# against the market rather than from any table -- was within 0.5 of this. The
+# market calibration was sound; it was the pace that was broken.
+WNBA_LEAGUE_RATING = 107.5
 # Spread of a final WNBA total around its projection, inherited from
 # totals/wnba.py and UNVERIFIED on this architecture. residual_spread() will
 # report it against the log once there are games in it.

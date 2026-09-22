@@ -1052,6 +1052,25 @@ old model against the market rather than from any table, and the true figure is
 107.5. The market calibration was sound all along. It was the pace that was
 broken.
 
+### The copy went stale and nothing caught it
+
+Reported by the reader the next day: the pace card still said **83.1** in its
+placeholders and its prose, a day after the constant became 80.59. So the page
+was telling him to enter a number the model was no longer calibrated against —
+harmless in itself, because the constant is what does the arithmetic, but it is
+the worst kind of documentation bug: it teaches the wrong thing confidently.
+
+The cause is worth naming. Nothing tied the copy to the constant. The constant
+lived in the script, the placeholder lived in the markup, and a change to one
+could not fail the other.
+
+There is now a browser check that reads the placeholders and the prose straight
+out of the rendered page and asserts they carry the live constants, that no
+superseded figure is presented as a number to enter, and that the prose names
+the exact column (`PACE/40`) to read. The rating placeholders were stale the
+same way — 104.9, the published figure this model deliberately does not use —
+and are now 107.5.
+
 ### What the correction does to the two logged games
 
 ```
@@ -1378,7 +1397,7 @@ cheap. To update, change those four numbers and nothing else.
 - `web/fullgame-cases.json` — 58 games (42 MLB, 16 WNBA) generated from the package by
   `tools_gen_fullgame_cases.py`, which recomputes only the expectations so a
   model change never means hand-editing a probability.
-- `tools_check_fullgame_page.js` — 1084 checks. It replays all 58 in a real browser against side,
+- `tools_check_fullgame_page.js` — 1089 checks. It replays all 58 in a real browser against side,
   band, resolved probability, push, projection, fair price, estimate and delta
   counts, the gate's core projection and core probability, the core chip showing
   the corroborated probability on every card and turning amber only when held,

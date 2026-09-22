@@ -561,16 +561,23 @@
           <h2>Pace <span class="tag">how many possessions</span></h2>
           <div class="body">
             <div class="grid2">
-              <div class="f"><label for="apace">Away pace</label><input id="apace" type="number" step="0.1" inputmode="decimal" placeholder="83.1"></div>
-              <div class="f"><label for="hpace">Home pace</label><input id="hpace" type="number" step="0.1" inputmode="decimal" placeholder="83.1"></div>
+              <div class="f"><label for="apace">Away pace</label><input id="apace" type="number" step="0.01" inputmode="decimal" placeholder="80.59"></div>
+              <div class="f"><label for="hpace">Home pace</label><input id="hpace" type="number" step="0.01" inputmode="decimal" placeholder="80.59"></div>
             </div>
             <div class="links">
+              <a href="https://www.wnba.com/stats/teams/advanced" target="_blank" rel="noopener">stats.wnba.com · teams advanced</a>
               <a href="https://www.statmuse.com/wnba/ask/2026-wnba-team-offensive-rating-and-defensive-rating-and-pace-at-all-game" target="_blank" rel="noopener">StatMuse · pace &amp; ratings</a>
-              <a href="https://www.espn.com/wnba/stats/team" target="_blank" rel="noopener">ESPN · team stats</a>
             </div>
-            <p class="note"><b>Possessions per 40 minutes</b> — WNBA games are 40, not 48, so a
-              pace figure scraped from an NBA-shaped table will be wrong. League average is
-              <b>83.1</b> this season, a record high.</p>
+            <p class="note"><b>Use the <code>PACE/40</code> column on stats.wnba.com</b>, not
+              <code>PACE</code>. WNBA games are 40 minutes, not 48, and the two columns differ by
+              about a fifth. League average on that column is <b>80.59</b>, which is the number
+              the model is calibrated against.</p>
+            <p class="note"><b>Both constants have to come off the same table as your inputs.</b>
+              This shipped with 83.1 from a summary article while the paces being entered
+              averaged 80.5, and every card carried one to two points of phantom under lean —
+              the model called the under on everything, which is a stuck clock rather than an
+              edge. basketball-reference says 79.3 for the same concept. None of them are wrong;
+              they are different possession formulas and are <b>not interchangeable</b>.</p>
             <p class="note"><b>Both teams or neither.</b> Scored as a differential: two
               league-average paces move the total by <b>exactly zero</b>. That is arithmetic, not
               a calibration that came out right.</p>
@@ -581,18 +588,23 @@
           <h2>Efficiency <span class="tag">points per 100 possessions</span></h2>
           <div class="body">
             <div class="grid2">
-              <div class="f"><label for="aort">Away offensive rating</label><input id="aort" type="number" step="0.1" inputmode="decimal" placeholder="104.9"></div>
-              <div class="f"><label for="hort">Home offensive rating</label><input id="hort" type="number" step="0.1" inputmode="decimal" placeholder="104.9"></div>
+              <div class="f"><label for="aort">Away offensive rating</label><input id="aort" type="number" step="0.1" inputmode="decimal" placeholder="107.5"></div>
+              <div class="f"><label for="hort">Home offensive rating</label><input id="hort" type="number" step="0.1" inputmode="decimal" placeholder="107.5"></div>
             </div>
             <div class="grid2">
-              <div class="f"><label for="adrt">Away defensive rating</label><input id="adrt" type="number" step="0.1" inputmode="decimal" placeholder="104.9"></div>
-              <div class="f"><label for="hdrt">Home defensive rating</label><input id="hdrt" type="number" step="0.1" inputmode="decimal" placeholder="104.9"></div>
+              <div class="f"><label for="adrt">Away defensive rating</label><input id="adrt" type="number" step="0.1" inputmode="decimal" placeholder="107.5"></div>
+              <div class="f"><label for="hdrt">Home defensive rating</label><input id="hdrt" type="number" step="0.1" inputmode="decimal" placeholder="107.5"></div>
             </div>
             <p class="note">Each offence is scored against <b>the defence it actually faces</b>,
               not against the league. A 110 offence into a 98 defence is a different game from a
               110 into a 112, and the average of the two ratings hides that.</p>
             <p class="note"><b>All four or none.</b> Same differential treatment — four
               league-average ratings move the total by zero.</p>
+            <p class="note"><b><code>OFFRTG</code> and <code>DEFRTG</code> from the same table as
+              the pace.</b> League average is <b>107.5</b> on that basis. The check that the two
+              constants share a possession denominator: mean OFFRTG 107.52 against mean DEFRTG
+              107.47 across the fifteen clubs. Every point scored is a point allowed, so those
+              must agree — and that test <b>failed</b> on the numbers this shipped with.</p>
           </div>
         </section>
 

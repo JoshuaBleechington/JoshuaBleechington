@@ -931,6 +931,37 @@ const CHECKS = ["dome", "playoff"];
       'wind: the dropdown offers quartering in both directions, ordered out-to-in',
       windUi.join('|'));
 
+  // ---- the copy must not drift from the constants --------------------------
+  // The WNBA pace constant was corrected 80.59 <- 83.1 and the placeholders and
+  // the prose were left saying 83.1, so the page told the reader to enter a
+  // number the model was no longer calibrated against. Nothing tied the two
+  // together, so nothing caught it. This does.
+  const copy = await pg.evaluate(() => ({
+    apace: document.getElementById('apace').placeholder,
+    hpace: document.getElementById('hpace').placeholder,
+    aort: document.getElementById('aort').placeholder,
+    hort: document.getElementById('hort').placeholder,
+    adrt: document.getElementById('adrt').placeholder,
+    hdrt: document.getElementById('hdrt').placeholder,
+    text: document.getElementById('wnbaFields').textContent,
+  }));
+  const PACE = '80.59', RATING = '107.5';
+  chk(copy.apace === PACE && copy.hpace === PACE,
+      `wnba: the pace placeholders are the constant in use (${PACE})`,
+      `${copy.apace} / ${copy.hpace}`);
+  chk([copy.aort, copy.hort, copy.adrt, copy.hdrt].every(v => v === RATING),
+      `wnba: the rating placeholders are the constant in use (${RATING})`,
+      [copy.aort, copy.hort, copy.adrt, copy.hdrt].join('/'));
+  chk(copy.text.includes(PACE) && copy.text.includes(RATING),
+      'wnba: the prose quotes both live constants', 'prose is missing one of them');
+  // 83.1 may appear ONLY as the history of the bug, never as an instruction.
+  chk(!/League average on that column is [^.]*83\.1/.test(copy.text) &&
+      !/104\.9/.test(copy.text),
+      'wnba: no superseded constant is presented as a number to enter',
+      copy.text.slice(0, 200));
+  chk(/PACE\/40/.test(copy.text),
+      'wnba: the prose names the exact column to read', 'PACE/40 not mentioned');
+
   if (errs.length) { console.log('PAGE ERRORS:\n' + errs.join('\n')); fails++; }
   console.log(fails ? `\n${fails} FAILED` : `\nall checks passed (${CASES.length} cases)`);
   await b.close();

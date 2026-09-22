@@ -518,7 +518,7 @@
               <div class="f"><label for="pf">Park factor</label><input id="pf" type="number" step="1" inputmode="numeric" placeholder="100"></div>
               <div class="f"><label for="mph">Wind mph</label><input id="mph" type="number" step="1" inputmode="numeric" placeholder="10"></div>
               <div class="f"><label for="dir">Blowing</label>
-                <select id="dir"><option value="">—</option><option value="out">Out</option><option value="in">In</option><option value="cross">Across</option></select></div>
+                <select id="dir"><option value="">—</option><option value="out">Out</option><option value="quarter-out">Quartering out</option><option value="cross">Across</option><option value="quarter-in">Quartering in</option><option value="in">In</option></select></div>
             </div>
             <div class="grid3">
               <div class="f"><label for="temp">Temp °F</label><input id="temp" type="number" step="1" inputmode="numeric" placeholder="72"></div>
@@ -531,6 +531,13 @@
               <a href="https://baseballsavant.mlb.com/leaderboard/statcast-park-factors" target="_blank" rel="noopener">Statcast · park factors</a>
               <a href="https://www.actionnetwork.com/mlb/public-betting" target="_blank" rel="noopener">Action · public betting</a>
             </div>
+            <p class="note"><b>Only the part of the wind blowing along the home-to-centre axis
+              carries a ball.</b> A reported compass bearing is almost never straight in or
+              straight out — Outlier draws the park-relative diagram, so read it and pick
+              <b>quartering</b> when the arrow crosses the field at a diagonal. It keeps
+              cos(45°) of the speed. On a 14.9 mph ENE wind at Yankee Stadium that is the
+              difference between a BET and no bet, because the 8 mph dead zone is taken off
+              the <b>resolved</b> figure, not the raw one.</p>
             <p class="note"><b>Wind is the only thing on this page the market prices imperfectly</b>,
               because it changes after the number posts. Everything else here is published and already
               inside the line. Read the <b>hourly row, never the card headline</b> — “8 mph wind blowing
@@ -790,6 +797,38 @@
          : p >= BANDS[2][0] ? "lv1" : "";
   }
   var WIND_DEAD = 8.0, WIND_PER_MPH = 0.10;
+  /* Only the component ALONG the home-to-centre axis carries a fly ball. The
+     model had no way to say so: it took one direction word and the full speed,
+     so a wind arriving at a diagonal was scored as if it blew straight in.
+
+     22 Sept 2026, Rays @ Yankees. Outlier reported ENE 14.9 mph and Yankee
+     Stadium's axis runs roughly north-northeast, so that wind arrives about 45
+     degrees off it — near 10.5 mph along the axis, near 10.5 across. Entered as
+     "in" at 14.9 it takes 0.71 runs off and calls a BET; resolved, the axial
+     component barely clears the dead zone, the adjustment is 0.26, and there is
+     no bet.
+
+     cos(45°). Geometry, not a fitted coefficient, and the only number this
+     introduces. The alternative was a table of thirty park orientations, which
+     cannot be verified from inside this project — every source for it refuses
+     the connection — and would be exactly the unchecked constant this model
+     exists to remove. Outlier already draws the park-relative diagram; this
+     just gives the model the vocabulary to accept what the reader can see. */
+  var WIND_QUARTERING = Math.cos(45 * Math.PI / 180);
+
+  /* (axial, label); axial positive is blowing OUT, null when it does not
+     resolve. Mirrors resolve_wind() in totals/fullgame.py exactly. */
+  function resolveWind(speed, direction) {
+    var d = String(direction || "").trim().toLowerCase()
+      .replace(/_/g, "-").replace(/ /g, "-");
+    if (d === "out") return [speed, "blowing out"];
+    if (d === "in") return [-speed, "blowing in"];
+    if (d === "quarter-out" || d === "quartering-out" || d === "qout")
+      return [speed * WIND_QUARTERING, "quartering out"];
+    if (d === "quarter-in" || d === "quartering-in" || d === "qin")
+      return [-speed * WIND_QUARTERING, "quartering in"];
+    return [null, ""];
+  }
   var TEMP_BASE = 70.0, TEMP_PER_DEG = 0.008;
   /* The ticket/money split is SHOWN AND NEVER SCORED, the same posture this
      model takes toward the opening line and an NFL quarterback: the direction
@@ -1247,15 +1286,26 @@
     } else {
       var mph = num("mph"), dir = txt("dir");
       if (mph !== null && dir) {
-        if (dir === "cross") {
+        var rw = resolveWind(mph, dir), axial = rw[0];
+        if (axial !== null) {
+          /* The dead zone applies to the RESOLVED component, not the raw
+             speed, which is the whole point of this. On the card that
+             prompted it, 14.9 raw sits 6.9 mph over the zone while its axial
+             10.5 sits only 2.5 over — the adjustment falls by nearly two
+             thirds once it is resolved. */
+          var eff = Math.max(0, Math.abs(axial) - WIND_DEAD);
+          var r = eff * WIND_PER_MPH * park;
+          deltas.push(delta("Wind", axial > 0 ? r : -r,
+            mph.toFixed(0) + " mph " + rw[1] +
+            (Math.abs(Math.abs(axial) - mph) > 1e-9
+              ? ", so " + Math.abs(axial).toFixed(1) + " mph along the home-to-centre axis"
+              : "") +
+            ". Nothing counts under " + WIND_DEAD + " mph of AXIAL wind, then " +
+            WIND_PER_MPH.toFixed(2) + " runs per mph over it. The one input on this page " +
+            "the market prices imperfectly, because it changes after the number posts."));
+        } else if (dir === "cross") {
           deltas.push(delta("Wind", 0, mph.toFixed(0) +
-            " mph across the field, which carries a fly ball neither way."));
-        } else {
-          var eff = Math.max(0, mph - WIND_DEAD), r = eff * WIND_PER_MPH * park;
-          deltas.push(delta("Wind", dir === "out" ? r : -r, mph.toFixed(0) + " mph blowing " +
-            dir + "; nothing counts under " + WIND_DEAD + " mph, then " + WIND_PER_MPH.toFixed(2) +
-            " runs per mph over it. The one input on this page the market prices imperfectly, " +
-            "because it changes after the number posts."));
+            " mph straight across the field, which carries a fly ball neither way."));
         }
       }
       var tp = num("temp");

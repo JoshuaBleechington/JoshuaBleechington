@@ -920,6 +920,17 @@ const CHECKS = ["dome", "playoff"];
       'plain ' + alt.plain.map(r => r.under).join(',') +
       ' vs loaded ' + alt.loaded.map(r => r.under).join(','));
 
+  // ---- the wind resolver -------------------------------------------------
+  // Only the component along the home-to-centre axis carries a ball. The
+  // browser must resolve it the same way the package does, and the dropdown
+  // must actually offer the new directions.
+  const windUi = await pg.evaluate(() =>
+    [...document.querySelectorAll('#dir option')].map(o => o.value));
+  chk(JSON.stringify(windUi) ===
+      JSON.stringify(['', 'out', 'quarter-out', 'cross', 'quarter-in', 'in']),
+      'wind: the dropdown offers quartering in both directions, ordered out-to-in',
+      windUi.join('|'));
+
   if (errs.length) { console.log('PAGE ERRORS:\n' + errs.join('\n')); fails++; }
   console.log(fails ? `\n${fails} FAILED` : `\nall checks passed (${CASES.length} cases)`);
   await b.close();

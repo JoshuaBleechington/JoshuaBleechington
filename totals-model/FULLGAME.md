@@ -776,6 +776,90 @@ absent. Type the innings when a starter is genuinely short-sample — a call-up,
 returning injury, an opener — and leave them blank otherwise until there are
 enough logged games to settle it.
 
+## Only the axial wind carries a ball
+
+Added 2026-09-22, from a live card an hour before first pitch.
+
+Rays @ Yankees. Outlier reported **ENE 14.9 mph** at Yankee Stadium. Entered as
+`in` at 14.9 the model took **0.71 runs** off the total and called a BET at +6.0
+points of margin. But ENE is a compass bearing — the direction the wind comes
+*from* — and Yankee Stadium's home-to-centre axis runs roughly north-northeast,
+so that wind arrives about **45 degrees off the axis**: near 10.5 mph along it
+and near 10.5 mph across. Only the axial part carries a fly ball. The rest
+pushes the ball sideways, which changes where it lands and not how far it goes.
+
+The model had no vocabulary for this. One direction word, the full speed.
+
+### The dead zone is what makes it matter
+
+```
+  14.9 raw    clears the 8 mph dead zone by 6.9   ->  0.71 runs
+  10.5 axial  clears it by 2.5                    ->  0.26 runs
+```
+
+Cutting the speed by 29% cuts the adjustment by **63%**, because the threshold is
+subtracted first. That is the difference between a bet and no bet:
+
+```
+  wind straight in, at face value      proj 6.486   UNDER 56.0%   BET
+  the same wind quartering in          proj 6.936   UNDER 51.1%   NO BET
+  the same wind quartering out         proj 7.458   OVER  54.3%   BET
+  11 mph quartering (7.8 axial)        proj 7.197   OVER  51.6%   NO BET
+```
+
+That last row is the cleanest statement of the idea: 11 mph is over the dead
+zone, and once resolved it is under it, so it correctly does nothing at all.
+
+### What was built, and what was refused
+
+`resolve_wind()` takes the direction word and returns the axial component.
+`out` and `in` return the full speed exactly as before; `quarter-out` and
+`quarter-in` return **cos(45°)** of it; `cross` and anything unrecognised return
+None and score zero.
+
+**cos(45°) is the only number this introduces.** It is geometry, not a fitted
+coefficient.
+
+The obvious design was a table of thirty park orientations, resolving a reported
+compass bearing automatically. **It was refused**, for a reason this file has
+recorded before: every source for that data — andrewclem.com, baseball-almanac,
+fangraphs, ballparks.com — refuses the connection from inside this project. A
+hardcoded table of thirty bearings half-remembered would be precisely the
+unchecked constant this model exists to remove, and it would be wrong in a way
+that *flips the sign* of the largest single input on the card.
+
+So the orientation knowledge stays where it already is and is already correct:
+the park-relative diagram Outlier draws. The model just gained the vocabulary to
+accept what the reader can see in it.
+
+`bearing_to_axial()` — the correct general form, resolving a compass bearing
+against a park axis — **is** implemented and tested, and is deliberately **not
+wired in**. It is there so the geometry does not have to be re-derived if a
+verified orientation table ever arrives.
+
+### It cannot be backtested, and that is not a hedge
+
+Every MLB row ever logged stores a direction WORD, never a bearing:
+
+```
+  cross 71 · blank 46 · out 38 · in 23
+```
+
+There is no historical bearing to resolve against. Any number reported here as a
+backtest would have been invented. What *was* tested, and is the property that
+matters:
+
+**All 178 logged MLB rows rescore to the identical probability.** Not close —
+zero rows moved. `out`, `in` and `cross` are untouched by construction, so the
+change cannot disturb a single graded call or a single band in the record.
+
+Going forward the choice is logged on the row, so in a few weeks there will be
+enough quartering cards to ask whether resolving helps. Until then this rests on
+geometry, not evidence, and it is worth being explicit that those are different
+things — the wind coefficient it operates on **still measures null** (see below),
+and resolving a null term more precisely does not make it predictive. What it
+does is stop the term being applied at a magnitude the reading never supported.
+
 ## Wind measures null, and I have not removed it
 
 Tested 2026-09-22, after a Twins @ Giants card where wind alone was worth +0.66
@@ -1283,7 +1367,7 @@ cheap. To update, change those four numbers and nothing else.
 
 ## Verification
 
-- `tests/test_fullgame.py` — 140 tests (398 across the suite), including the corroboration gate: the
+- `tests/test_fullgame.py` — 153 tests (411 across the suite), including the corroboration gate: the
   Tigers card held at COIN FLIP, the headline probability provably untouched, a
   no-soft-input card identical to twelve decimal places, the gate acting as a
   veto rather than a tax, the band never exceeding either read, and WNBA
@@ -1291,10 +1375,10 @@ cheap. To update, change those four numbers and nothing else.
   mean and spread against the measured 4.39, push arithmetic, price inversion,
   the resolved-probability band, calibration detection of an overconfident
   model, and the guards.
-- `web/fullgame-cases.json` — 54 games (38 MLB, 16 WNBA) generated from the package by
+- `web/fullgame-cases.json` — 58 games (42 MLB, 16 WNBA) generated from the package by
   `tools_gen_fullgame_cases.py`, which recomputes only the expectations so a
   model change never means hand-editing a probability.
-- `tools_check_fullgame_page.js` — 1015 checks. It replays all 54 in a real browser against side,
+- `tools_check_fullgame_page.js` — 1084 checks. It replays all 58 in a real browser against side,
   band, resolved probability, push, projection, fair price, estimate and delta
   counts, the gate's core projection and core probability, the core chip showing
   the corroborated probability on every card and turning amber only when held,

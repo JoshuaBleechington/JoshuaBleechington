@@ -246,6 +246,21 @@ LEGACY_BANDS = {"MAX": "MAX BET", "STRONG": "STRONG BET",
 # Tonight-only physical factors, full-game coefficients.
 WIND_DEAD_MPH = 8.0
 WIND_RUNS_PER_MPH = 0.10
+# Only the component ALONG the home-to-centre axis carries a fly ball. A wind
+# arriving at a diagonal is doing part of its work sideways, and the model had
+# no way to say so: it took one direction word and the full speed, so a
+# quartering wind was scored as though it blew straight in.
+#
+# 22 Sept 2026, Rays @ Yankees. Outlier reported ENE 14.9 mph. Yankee Stadium's
+# home-to-centre axis runs roughly north-northeast, so that wind arrives about
+# 45 degrees off it -- near 10.5 mph along the axis and near 10.5 across. Enter
+# it as "in" at 14.9 and the model takes 0.71 runs off the total and calls a
+# BET. Resolve it and the axial component is barely over the dead zone, the
+# adjustment is 0.26, and there is no bet.
+#
+# This constant is cos(45 degrees). It is geometry, not a fitted coefficient,
+# and it is the only number this change introduces.
+WIND_QUARTERING = math.cos(math.radians(45.0))
 TEMP_BASE_F = 70.0
 TEMP_RUNS_PER_DEG = 0.008
 # The ticket/money split is SHOWN AND NEVER SCORED, the same posture this model
@@ -692,6 +707,53 @@ def h2h_weight(base: float, meetings: float) -> float:
     return base * min(1.0, max(0.0, meetings) / H2H_FULL_WEIGHT_AT)
 
 
+def resolve_wind(speed: float, direction: str) -> tuple[float | None, str]:
+    """Split a wind reading into the component that actually carries a ball.
+
+    Returns (axial_mph, label), where axial is positive blowing OUT, negative
+    blowing IN, and None when the direction is not one this resolves (a pure
+    crosswind, or an unrecognised word).
+
+    Only the component along the home-plate-to-centre-field axis moves a fly
+    ball toward or away from the fence. A wind at a diagonal spends the rest of
+    itself pushing the ball sideways, which changes where it lands but not how
+    far it carries.
+
+    The quartering factor is cos(45 degrees). That is geometry rather than a
+    fitted constant, and it is deliberately the ONLY number this introduces --
+    the alternative was a table of thirty park orientations, which cannot be
+    verified from inside this project (every source for it refuses the
+    connection) and would be exactly the sort of unchecked constant this model
+    exists to remove. The reader is looking at a park-relative diagram in
+    Outlier already; this just gives the model the vocabulary to accept what
+    that diagram shows.
+    """
+    d = (direction or "").strip().lower().replace("_", "-").replace(" ", "-")
+    if d == "out":
+        return speed, "blowing out"
+    if d == "in":
+        return -speed, "blowing in"
+    if d in ("quarter-out", "quartering-out", "qout"):
+        return speed * WIND_QUARTERING, "quartering out"
+    if d in ("quarter-in", "quartering-in", "qin"):
+        return -speed * WIND_QUARTERING, "quartering in"
+    return None, ""
+
+
+def bearing_to_axial(speed: float, from_bearing: float, park_axis: float) -> tuple[float, float]:
+    """(axial, cross) for a wind reported as coming FROM `from_bearing`.
+
+    Both bearings in degrees clockwise from north; `park_axis` is home plate to
+    centre field. Positive axial is blowing OUT. Provided and tested because it
+    is the correct general form, and so that a verified table of park
+    orientations can be dropped in later without re-deriving the geometry. It
+    is NOT wired into the forecast, because no such table exists here yet.
+    """
+    toward = (from_bearing + 180.0) % 360.0
+    theta = math.radians(toward - park_axis)
+    return speed * math.cos(theta), abs(speed * math.sin(theta))
+
+
 def park_scale(park_factor: float | None) -> float:
     return park_factor / 100.0 if _ok(park_factor, "park") else 1.0
 
@@ -883,18 +945,27 @@ def forecast_mlb(
     else:
         if wind_mph is not None and wind_direction:
             d = wind_direction.strip().lower()
-            if d in ("out", "in"):
-                eff = max(0.0, wind_mph - WIND_DEAD_MPH)
+            axial, label = resolve_wind(wind_mph, d)
+            if axial is not None:
+                # The dead zone applies to the RESOLVED component, not the raw
+                # speed, which is the whole point. On the card that prompted
+                # this, 14.9 raw sits 6.9 mph over the zone while its axial
+                # 10.5 sits only 2.5 over -- the adjustment falls by nearly
+                # two thirds once it is resolved.
+                eff = max(0.0, abs(axial) - WIND_DEAD_MPH)
                 runs = eff * WIND_RUNS_PER_MPH * park
-                deltas.append(Delta("Wind", runs if d == "out" else -runs,
-                    f"{wind_mph:.0f} mph blowing {d}; nothing counts under "
-                    f"{WIND_DEAD_MPH:.0f} mph, then {WIND_RUNS_PER_MPH:.2f} runs per mph "
-                    "over it. The one input on this page the market prices imperfectly, "
-                    "because it changes after the number posts."))
+                deltas.append(Delta("Wind", runs if axial > 0 else -runs,
+                    f"{wind_mph:.0f} mph {label}" + (
+                        f", so {abs(axial):.1f} mph along the home-to-centre axis"
+                        if abs(abs(axial) - wind_mph) > 1e-9 else "") +
+                    f". Nothing counts under {WIND_DEAD_MPH:.0f} mph of AXIAL wind, then "
+                    f"{WIND_RUNS_PER_MPH:.2f} runs per mph over it. The one input on this "
+                    "page the market prices imperfectly, because it changes after the "
+                    "number posts."))
             elif d == "cross":
                 deltas.append(Delta("Wind", 0.0,
-                    f"{wind_mph:.0f} mph across the field, which carries a fly ball "
-                    "neither way."))
+                    f"{wind_mph:.0f} mph straight across the field, which carries a fly "
+                    "ball neither way."))
         if temp_f is not None:
             deltas.append(Delta("Temperature", (temp_f - TEMP_BASE_F) * TEMP_RUNS_PER_DEG,
                 f"{temp_f:.0f}°F against a {TEMP_BASE_F:.0f}° baseline."))

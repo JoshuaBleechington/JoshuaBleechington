@@ -40,6 +40,9 @@ from totals.fullgame import (
     HOLD_90TH,
     forecast_mlb,
     forecast_wnba,
+    resolve_wind,
+    bearing_to_axial,
+    WIND_QUARTERING,
     normal_split,
     rest_penalty,
     WNBA_LEAGUE_PACE,
@@ -1435,3 +1438,125 @@ class TestWnbaPartialInputsAreDroppedNotHalfApplied(unittest.TestCase):
         # 831 is 83.1 with a lost decimal point
         typo = forecast_wnba("a @ b", away_pace=831.0, home_pace=83.1, **self.BASE)
         self.assertAlmostEqual(typo.projected, blank.projected, places=12)
+
+
+class TestOnlyTheAxialWindCarriesABall(unittest.TestCase):
+    """A wind arriving at a diagonal does part of its work sideways.
+
+    The model took one direction word and the full speed, so a quartering wind
+    was scored as though it blew straight in. Rays @ Yankees, 22 Sept 2026:
+    Outlier reported ENE 14.9 mph at a park whose axis runs north-northeast, so
+    roughly 10.5 mph of it was axial and 10.5 across. Entered at face value it
+    moved the total 0.71 runs and bought a BET; resolved, it moves 0.26 and
+    there is no bet.
+    """
+
+    KW = dict(line=6.5, over_price=-120, under_price=100,
+              away_starter_era=2.94, home_starter_era=2.95,
+              away_bullpen_era=4.16, home_bullpen_era=3.13)
+
+    def test_the_quartering_factor_is_geometry_not_a_guess(self):
+        self.assertAlmostEqual(WIND_QUARTERING, math.sqrt(0.5), places=12)
+
+    def test_straight_in_and_out_are_untouched(self):
+        """The change must not move a single card already in the log."""
+        self.assertEqual(resolve_wind(14.9, "out")[0], 14.9)
+        self.assertEqual(resolve_wind(14.9, "in")[0], -14.9)
+        self.assertIsNone(resolve_wind(14.9, "cross")[0])
+        self.assertIsNone(resolve_wind(14.9, "")[0])
+        self.assertIsNone(resolve_wind(14.9, "nonsense")[0])
+
+    def test_quartering_keeps_cos_45_of_the_speed(self):
+        self.assertAlmostEqual(resolve_wind(14.9, "quarter-in")[0],
+                               -14.9 * math.sqrt(0.5), places=12)
+        self.assertAlmostEqual(resolve_wind(14.9, "quarter-out")[0],
+                               14.9 * math.sqrt(0.5), places=12)
+
+    def test_the_spellings_a_stored_row_might_carry_all_resolve(self):
+        for word in ("quarter-in", "quartering-in", "QUARTERING IN", "qin", "Quarter_In"):
+            self.assertLess(resolve_wind(10.0, word)[0], 0, word)
+        for word in ("quarter-out", "quartering-out", "QUARTERING OUT", "qout"):
+            self.assertGreater(resolve_wind(10.0, word)[0], 0, word)
+
+    def test_a_quartering_wind_moves_the_total_less_than_a_straight_one(self):
+        straight = forecast_mlb("a @ b", wind_mph=14.9, wind_direction="in", **self.KW)
+        quarter = forecast_mlb("a @ b", wind_mph=14.9, wind_direction="quarter-in", **self.KW)
+        none_ = forecast_mlb("a @ b", **self.KW)
+        sw = next(d.runs for d in straight.deltas if d.name == "Wind")
+        qw = next(d.runs for d in quarter.deltas if d.name == "Wind")
+        self.assertLess(sw, qw)          # both negative; the quartering one is smaller
+        self.assertLess(qw, 0.0)
+        self.assertGreater(none_.projected, quarter.projected)
+        self.assertGreater(quarter.projected, straight.projected)
+
+    def test_the_dead_zone_bites_the_resolved_speed_not_the_raw_one(self):
+        """The reason this matters so much. 14.9 raw clears the 8 mph zone by
+        6.9; its axial 10.5 clears it by only 2.5, so the adjustment falls by
+        far more than the 29% the speed did."""
+        straight = forecast_mlb("a @ b", wind_mph=14.9, wind_direction="in", **self.KW)
+        quarter = forecast_mlb("a @ b", wind_mph=14.9, wind_direction="quarter-in", **self.KW)
+        sw = abs(next(d.runs for d in straight.deltas if d.name == "Wind"))
+        qw = abs(next(d.runs for d in quarter.deltas if d.name == "Wind"))
+        self.assertLess(qw / sw, 0.45)          # not the 0.707 of the raw speed
+        self.assertGreater(qw / sw, 0.30)
+
+    def test_a_quartering_wind_under_the_zone_once_resolved_does_nothing(self):
+        """11 mph raw is over the dead zone; quartered it is 7.8 and under it."""
+        f = forecast_mlb("a @ b", wind_mph=11.0, wind_direction="quarter-in", **self.KW)
+        blank = forecast_mlb("a @ b", **self.KW)
+        self.assertAlmostEqual(f.projected, blank.projected, places=12)
+
+    def test_the_card_that_prompted_it_stops_being_a_bet(self):
+        card = dict(line=6.5, over_price=-120, under_price=100,
+                    away_starter_era=2.94, home_starter_era=2.95,
+                    away_starter_ip=171.1, home_starter_ip=76.1,
+                    away_rpg=4.03, home_rpg=3.72,
+                    away_bullpen_era=4.16, home_bullpen_era=3.13,
+                    away_last10_total=6.7, home_last10_total=10.0,
+                    h2h_total=7.6, h2h_meetings=9, park_factor=103, temp_f=65.4)
+        face = forecast_mlb("Rays @ Yankees", wind_mph=14.9,
+                            wind_direction="in", **card)
+        real = forecast_mlb("Rays @ Yankees", wind_mph=14.9,
+                            wind_direction="quarter-in", **card)
+        self.assertEqual(face.side, "UNDER")
+        self.assertNotEqual(face.band, "NO BET")
+        self.assertEqual(real.band, "NO BET")
+        self.assertLess(real.p_resolved, face.p_resolved)
+
+
+class TestTheGeneralBearingResolver(unittest.TestCase):
+    """Correct general form, tested, and deliberately NOT wired in.
+
+    It needs a table of thirty park orientations to be useful, and no such
+    table can be verified from inside this project -- every source for it
+    refuses the connection. It is here so the geometry does not have to be
+    re-derived if a verified table ever arrives.
+    """
+
+    def test_a_wind_from_dead_behind_home_blows_straight_out(self):
+        # park axis due north; wind FROM the south blows toward the north
+        axial, cross = bearing_to_axial(10.0, 180.0, 0.0)
+        self.assertAlmostEqual(axial, 10.0, places=9)
+        self.assertAlmostEqual(cross, 0.0, places=9)
+
+    def test_a_wind_from_centre_field_blows_straight_in(self):
+        axial, cross = bearing_to_axial(10.0, 0.0, 0.0)
+        self.assertAlmostEqual(axial, -10.0, places=9)
+        self.assertAlmostEqual(cross, 0.0, places=9)
+
+    def test_a_wind_off_the_foul_line_is_pure_crosswind(self):
+        axial, cross = bearing_to_axial(10.0, 90.0, 0.0)
+        self.assertAlmostEqual(axial, 0.0, places=9)
+        self.assertAlmostEqual(cross, 10.0, places=9)
+
+    def test_it_reproduces_the_yankee_stadium_reading(self):
+        # ENE is 67.5 degrees; the park axis runs about 27
+        axial, cross = bearing_to_axial(14.9, 67.5, 27.0)
+        self.assertLess(axial, 0)                       # blowing in
+        self.assertAlmostEqual(abs(axial), 11.3, delta=0.2)
+        self.assertAlmostEqual(cross, 9.7, delta=0.2)
+
+    def test_the_components_conserve_the_wind(self):
+        for bearing in range(0, 360, 15):
+            axial, cross = bearing_to_axial(12.0, float(bearing), 27.0)
+            self.assertAlmostEqual(math.hypot(axial, cross), 12.0, places=9)

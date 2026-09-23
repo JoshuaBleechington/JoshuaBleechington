@@ -7,7 +7,7 @@ top of Call Sheet #1 without touching it.
 - Page: `web/callsheet2.html`, assembled by `tools_build_callsheet2.py` from
   `web/callsheet2.head.html` + Call Sheet #1's engine block + `web/callsheet2.tail.js`
 - Fixtures: `web/callsheet2-cases.json` (62 cases) from `tools_gen_callsheet2_cases.py`
-- Browser harness: `tools_check_callsheet2_page.js` (976 checks)
+- Browser harness: `tools_check_callsheet2_page.js` (987 checks)
 
 ## What it answers
 
@@ -177,6 +177,20 @@ pushes on whole numbers. Units are at the stored price.
 Picks are frozen when added. **Rescore** re-runs ungraded rows through the model
 as it stands today and leaves graded rows alone — a pick that has been graded is
 a record, not a draft.
+
+**Graded rows lock.** Once both finals are in, the row's score boxes go
+read-only and its remove button disappears; the only way back is the row's own
+*unlock*, which exists for correcting a typo and lasts until the page is
+reopened. Nothing about the lock is stored — the finals are the lock. Opening a
+graded row into the form (from the card, a pick card or a board row) shows it
+**locked**: every input, the sport toggle, the paste box and Add are disabled
+until Clear, so a record cannot be edited or logged twice by accident.
+
+**Opening a graded row grades the rail.** While the form holds exactly that
+row's inputs, "This matchup, ranked" prints the final score and the card's
+record above the list, and each market carries its win / loss / push chip and a
+coloured edge. The rail and the card row grade from the same finals with the
+same function, so they cannot disagree.
 
 "Is it working" shows per market: record, *says* (mean stated probability),
 *does* (hit rate) with its standard error, and units. Plus the two **top-4

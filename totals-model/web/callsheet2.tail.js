@@ -421,6 +421,16 @@
     var byProb = !$("byEdge").checked;
     $("rankTag").textContent = byProb ? "by chance to hit" : "by edge";
     var ranked = rankMarkets(m.markets, byProb), html = "", cap = legCap();
+    var gradedRow = openedFinals(), fin = gradedRow ? gradedRow.finals : null;
+    if (gradedRow) {
+      var w = 0, l = 0, pu = 0;
+      ranked.forEach(function (mk) { var r = gradeMarket(mk, fin); if (r === "win") w++; else if (r === "loss") l++; else if (r === "push") pu++; });
+      var f5 = (fin.f5a !== undefined && fin.f5a !== "" && fin.f5h !== undefined && fin.f5h !== "")
+        ? ' · after five ' + esc(fin.f5a) + '–' + esc(fin.f5h) : '';
+      html += '<div class="final"><b>Final: ' + esc(m.away) + ' ' + esc(fin.fa || "?") + ', ' + esc(m.home) + ' ' + esc(fin.fh || "?") + '</b>' + f5 +
+        ' · this card went <b>' + w + '-' + l + (pu ? '-' + pu : '') + '</b>.' +
+        (formLocked ? ' <b>Locked</b> — a graded row is a record. Press Clear to start a new card.' : ' Edit anything and the grading clears.') + '</div>';
+    }
     /* When the likeliest pick is priced beyond the parlay cap, the first one
        inside it is the second choice for a leg, and is marked as such. */
     var altIdx = -1;
@@ -430,14 +440,17 @@
     ranked.forEach(function (mk, i) {
       var top = i === 0 && mk.edge !== null && mk.edge > 0;
       var beyond = byProb && mk.price !== null && !withinCap(mk.price, cap);
+      var res = fin ? gradeMarket(mk, fin) : null;
       var eCls = mk.edge === null ? "" : (mk.edge > 0 ? "pos" : "neg");
-      html += '<div class="mk' + (top ? " top" : "") + (i === altIdx ? " alt" : "") + (mk.edge !== null && mk.edge <= 0 ? " neg" : "") + '" data-key="' + mk.key + '">' +
+      html += '<div class="mk' + (top ? " top" : "") + (i === altIdx ? " alt" : "") + (mk.edge !== null && mk.edge <= 0 ? " neg" : "") +
+        (res ? " " + res : "") + '" data-key="' + mk.key + '"' + (res ? ' data-result="' + res + '"' : '') + '>' +
         '<div class="rk">' + (i + 1) + '</div>' +
         '<div><div class="pick ' + sideClass(mk.side) + '">' + esc(mk.pick) +
           (mk.band ? '<span class="band' + (mk.band === "NO BET" ? "" : " hot") + '">' + esc(mk.band) + '</span>' : "") +
           (!mk.anchored ? '<span class="derived">derived</span>' : "") +
           (beyond ? '<span class="cap">beyond ' + sgn(cap, 0) + '</span>' : "") +
-          (i === altIdx ? '<span class="cap" style="color:var(--go);border-color:var(--go)">2nd choice · parlay leg</span>' : "") + '</div>' +
+          (i === altIdx ? '<span class="cap" style="color:var(--go);border-color:var(--go)">2nd choice · parlay leg</span>' : "") +
+          (res ? '<span class="chip ' + res + '" style="margin-left:8px;vertical-align:2px">' + res + '</span>' : "") + '</div>' +
           '<div class="lab">' + esc(mk.label) + '</div></div>' +
         '<div class="nums"><div class="p">' + (mk.p * 100).toFixed(1) + '%</div>' +
           '<div class="e ' + eCls + '">' + (mk.edge === null ? "no price" :
@@ -579,13 +592,45 @@
     });
     $("board").innerHTML = h + '</tbody></table>';
   }
+  /* The row last opened into the form. While the form still holds exactly
+     that row's inputs, the rail grades itself against the row's finals; the
+     first edit turns the rail back into a hypothetical and the grading goes. */
+  var opened = null;
   function openRow(id) {
     var row = card.filter(function (r) { return String(r.id) === String(id); })[0]; if (!row) return;
-    setSport(row.sport, true); restore(row.inputs); onEdit();
+    setSport(row.sport, true); restore(row.inputs);
+    opened = { id: row.id, snap: JSON.stringify(snapshot()), row: row };
+    setFormLock(rowLocked(row));
+    onEdit();
     window.scrollTo({ top: 0, behavior: "smooth" });
+  }
+  /* A graded row opened into the form is a record, so the form is read-only
+     until Clear. Add is off too: a locked row must not be logged twice. */
+  var formLocked = false;
+  function setFormLock(on) {
+    formLocked = !!on;
+    ALL.concat(CHECKS).forEach(function (id) { $(id).disabled = formLocked; });
+    ["paste", "pasteFill", "add", "example", "m-mlb", "m-wnba"].forEach(function (id) { $(id).disabled = formLocked; });
+    $("lockNote").hidden = !formLocked;
+  }
+  function openedFinals() {
+    if (!opened) return null;
+    if (JSON.stringify(snapshot()) !== opened.snap) return null;
+    var fin = opened.row.finals || {};
+    var has = ["fa", "fh", "f5a", "f5h"].some(function (k) { return fin[k] !== undefined && fin[k] !== ""; });
+    return has ? opened.row : null;
   }
 
   /* ---- the card ------------------------------------------------------------ */
+  /* A row is LOCKED once both finals are in. Its score boxes go read-only and
+     it cannot be removed; the only way back is the row's own unlock, which is
+     for correcting a typo and lasts until the page is reloaded. Nothing about
+     the lock is stored -- the finals are the lock. */
+  function rowLocked(r) {
+    var fin = r.finals || {};
+    return fin.fa !== undefined && fin.fa !== "" && fin.fh !== undefined && fin.fh !== "" && !unlocked[r.id];
+  }
+  var unlocked = {};
   function renderCard() {
     $("cardCount").textContent = card.length ? card.length + " matchups" : "";
     if (!card.length) { $("cardTable").innerHTML = '<div class="empty">Nothing on the card yet.</div>'; return; }
@@ -600,15 +645,20 @@
           (mk.p * 100).toFixed(1) + '%' + (mk.price !== null ? ' ' + sgn(mk.price, 0) + ' <span class="edge ' + (mk.edge > 0 ? 'pos' : 'neg') + '">' + sgn(mk.edge * 100, 1) + '</span>' : '') +
           (res ? ' <span class="chip ' + res + '">' + res + '</span>' : '') + '</span>';
       }).join("");
+      var lk = rowLocked(r), ro = lk ? ' readonly' : '';
       var f5 = r.sport === "MLB"
-        ? '<span class="finals"><span class="l">F5</span><input class="grade" data-id="' + r.id + '" data-k="f5a" value="' + esc(fin.f5a || "") + '" placeholder="A" inputmode="numeric">' +
-          '<input class="grade" data-id="' + r.id + '" data-k="f5h" value="' + esc(fin.f5h || "") + '" placeholder="H" inputmode="numeric"></span>' : '';
+        ? '<span class="finals"><span class="l">F5</span><input class="grade" data-id="' + r.id + '" data-k="f5a" value="' + esc(fin.f5a || "") + '" placeholder="A" inputmode="numeric"' + ro + '>' +
+          '<input class="grade" data-id="' + r.id + '" data-k="f5h" value="' + esc(fin.f5h || "") + '" placeholder="H" inputmode="numeric"' + ro + '></span>' : '';
       h += '<tr><td><span class="gdate' + (r.gdate === today ? ' today' : '') + '">' + esc(gameDate(r.gdate)) + '</span></td>' +
         '<td><button type="button" class="openbtn" data-open="' + r.id + '" title="Load into the form"><b>' + esc(r.matchup) + '</b><br><span class="gdate">' + esc(r.sport) + '</span></button></td>' +
         '<td><div class="rowmk">' + mks + '</div></td>' +
-        '<td><span class="finals"><span class="l">FINAL</span><input class="grade" data-id="' + r.id + '" data-k="fa" value="' + esc(fin.fa || "") + '" placeholder="A" inputmode="numeric">' +
-          '<input class="grade" data-id="' + r.id + '" data-k="fh" value="' + esc(fin.fh || "") + '" placeholder="H" inputmode="numeric"></span> ' + f5 + '</td>' +
-        '<td><button type="button" class="x" data-del="' + r.id + '" title="Remove">×</button></td></tr>';
+        '<td' + (lk ? ' class="locked"' : '') + '><span class="finals"><span class="l">FINAL</span><input class="grade" data-id="' + r.id + '" data-k="fa" value="' + esc(fin.fa || "") + '" placeholder="A" inputmode="numeric"' + ro + '>' +
+          '<input class="grade" data-id="' + r.id + '" data-k="fh" value="' + esc(fin.fh || "") + '" placeholder="H" inputmode="numeric"' + ro + '></span> ' + f5 +
+          (lk ? ' <span class="lock" title="Graded and locked">&#128274;</span>' : '') + '</td>' +
+        '<td>' + (lk
+          ? '<button type="button" class="x unlock" data-unlock="' + r.id + '" title="Unlock to correct the score">unlock</button>'
+          : (unlocked[r.id] ? '<button type="button" class="x unlock" data-relock="' + r.id + '" title="Lock again">lock</button>' : '') +
+            '<button type="button" class="x" data-del="' + r.id + '" title="Remove">×</button>') + '</td></tr>';
     });
     $("cardTable").innerHTML = h + '</tbody></table>';
   }
@@ -721,10 +771,10 @@
     var dl = $("teamList"); dl.innerHTML = teamsFor(s).map(function (t) { return '<option value="' + esc(t) + '">'; }).join("");
     if (!quiet) onEdit();
   }
-  function onEdit() { render(); saveDraft(); }
+  function onEdit() { render(); if (!formLocked) saveDraft(); }
   function nextId() { return card.reduce(function (m, r) { return Math.max(m, r.id || 0); }, 0) + 1; }
   function addToCard() {
-    if (!last) return;
+    if (!last || formLocked) return;
     var inputs = snapshot();
     var row = { id: nextId(), sport: sport, away: last.away, home: last.home, matchup: last.matchup,
                 gdate: inputs.gdate || todayISO(), inputs: inputs, markets: slimMarkets(last.markets), finals: {} };
@@ -733,6 +783,7 @@
   }
   function say(msg) { var el = $("saveMsg"); el.hidden = false; el.innerHTML = msg; }
   function clearForm() {
+    setFormLock(false); opened = null;
     ALL.forEach(function (id) { if (id !== "gdate") $(id).value = ""; });
     CHECKS.forEach(function (id) { $(id).checked = false; });
     onEdit();
@@ -793,6 +844,7 @@
   $("cardTable").addEventListener("input", function (e) {
     var t = e.target; if (!t.classList.contains("grade")) return;
     var row = card.filter(function (r) { return String(r.id) === t.dataset.id; })[0]; if (!row) return;
+    if (t.readOnly) return;
     row.finals = row.finals || {}; row.finals[t.dataset.k] = t.value;
     save(); renderBoard(); renderCalib();
     // re-grade the chips in place without re-rendering the input being typed in
@@ -806,9 +858,21 @@
       }).join("");
     });
   });
+  $("cardTable").addEventListener("change", function (e) {
+    var t = e.target; if (!t.classList.contains("grade")) return;
+    var row = card.filter(function (r) { return String(r.id) === t.dataset.id; })[0]; if (!row) return;
+    if (rowLocked(row)) { renderCard(); if (opened && opened.id === row.id) { opened.row = row; render(); } }
+  });
   $("cardTable").addEventListener("click", function (e) {
     var b = e.target.closest("button"); if (!b) return;
-    if (b.dataset.del) {
+    if (b.dataset.unlock) {
+      unlocked[b.dataset.unlock] = true; renderCard();
+      say("Unlocked <b>one row</b> to correct its score. It locks again when you press lock, or when the page is reopened.");
+    } else if (b.dataset.relock) {
+      delete unlocked[b.dataset.relock]; renderCard();
+    } else if (b.dataset.del) {
+      var victim = card.filter(function (r) { return String(r.id) === b.dataset.del; })[0];
+      if (victim && rowLocked(victim)) return;
       card = card.filter(function (r) { return String(r.id) !== b.dataset.del; });
       save(); renderCard(); renderBoard(); renderCalib();
     } else if (b.dataset.open) {

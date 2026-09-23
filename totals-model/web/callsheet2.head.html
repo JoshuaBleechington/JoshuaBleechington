@@ -196,6 +196,19 @@
              padding: 3px 5px; border: 1px dashed var(--warn); border-radius: 4px; color: var(--warn); margin-left: 6px; vertical-align: 2px; }
   .mk.alt { border-color: var(--go); }
   .mk.alt .rk { color: var(--go); }
+  /* A graded rail: the row last opened has finals, so each market shows how
+     it landed. Colour on the edge, chip on the pick; the numbers are untouched. */
+  .mk.win { border-color: var(--go); box-shadow: inset 4px 0 0 var(--go); }
+  .mk.loss { border-color: var(--bad); box-shadow: inset 4px 0 0 var(--bad); opacity: .82; }
+  .mk.push { box-shadow: inset 4px 0 0 var(--muted); }
+  .final { font-size: 12.5px; color: var(--ink-2); line-height: 1.5; padding: 9px 12px; border-radius: 8px;
+           background: var(--surface-2); border: 1px solid var(--rule); }
+  .final b { color: var(--ink); }
+  td.locked .grade { background: var(--surface-2); color: var(--ink-2); border-style: dashed; }
+  .lock { font-size: 13px; vertical-align: 1px; margin-left: 4px; }
+  .x.unlock { font: 700 10px/1 var(--sans); letter-spacing: .06em; text-transform: uppercase; }
+  .f input:disabled, .f select:disabled, .f textarea:disabled { background: var(--surface-2); color: var(--ink-2); border-style: dashed; cursor: not-allowed; }
+  .btn:disabled, .modes button:disabled { opacity: .45; cursor: not-allowed; }
   .pk .n1 { font: 900 12px/1 var(--sans); color: var(--edge); letter-spacing: .08em; }
   .pk .n2 { font: 800 16px/1.15 var(--sans); }
   .pk .n3 { font: 500 11.5px/1.4 var(--mono); color: var(--ink-2); }
@@ -461,6 +474,8 @@
         </section>
       </div>
 
+      <p class="note" id="lockNote" hidden><b>&#128274; This row is graded and locked.</b> The inputs and the
+        result are the record and cannot be changed here. Press <b>Clear</b> to start a new card.</p>
       <div class="row">
         <button type="button" class="btn solid" id="add">Add to card</button>
         <button type="button" class="btn" id="clear">Clear</button>

@@ -127,6 +127,9 @@ const CHECKS = ["dome","playoff"];
     const type = (el, v) => { el.value = v; el.dispatchEvent(new Event('input', { bubbles: true })); };
     type(inp('1', 'fa'), '1'); type(inp('1', 'fh'), '1'); type(inp('1', 'f5a'), '1'); type(inp('1', 'f5h'), '0');
     await wait();
+    // a real user leaves the box, which fires change and locks the row
+    inp('1', 'f5h').dispatchEvent(new Event('change', { bubbles: true }));
+    await wait();
     const stored = JSON.parse(localStorage.getItem('callsheet2.card.v1'));
     const g1 = stored.find(r => r.id === 1);
     const chips = [...document.querySelectorAll('#cardTable tr')].find(tr => /Rays @ Yankees/.test(tr.textContent))
@@ -246,6 +249,72 @@ const CHECKS = ["dome","playoff"];
       sides.byProb.map(m => m.p).join(' > '));
   chk(sides.byProb[0].p > 60 && sides.byProb[0].p >= Math.max(...sides.byProb.map(m => m.p)),
       'rank by probability: the likeliest thing on the card leads, whichever market it is', JSON.stringify(sides.byProb[0]));
+
+  // ---- opening a graded row grades the rail; editing clears it ------------------
+  const railGrade = await pg.evaluate(async () => {
+    const wait = () => new Promise(r => setTimeout(r, 50));
+    document.getElementById('byEdge').checked = true; document.getElementById('byEdge').dispatchEvent(new Event('change'));
+    const btn = [...document.querySelectorAll('#cardTable [data-open]')].find(b => /Rays @ Yankees/.test(b.textContent));
+    btn.click(); await wait();
+    const rail = [...document.querySelectorAll('#markets .mk')].map(el => ({
+      pick: el.querySelector('.pick').childNodes[0].textContent.trim(), res: el.dataset.result || '',
+      cls: el.className }));
+    const finalLine = (document.querySelector('#markets .final') || {}).textContent || '';
+    // the chips on the card row must agree with the rail, market by market
+    const rowChips = {};
+    const tr = [...document.querySelectorAll('#cardTable tr')].find(t => /Rays @ Yankees/.test(t.textContent));
+    tr.querySelectorAll('.rowmk .m').forEach(c => { rowChips[c.querySelector('.chip').textContent] = (c.querySelector('.chip.win,.chip.loss,.chip.push') || {}).textContent || ''; });
+    // the form is locked: inputs disabled, Add disabled, the lock note shown
+    const locked = { temp: document.getElementById('temp').disabled, add: document.getElementById('add').disabled,
+                     note: !document.getElementById('lockNote').hidden, dome: document.getElementById('dome').disabled };
+    // Clear releases it; then editing an input on a fresh form shows no grading
+    document.getElementById('clear').click(); await wait();
+    const released = { temp: document.getElementById('temp').disabled, add: document.getElementById('add').disabled, note: !document.getElementById('lockNote').hidden };
+    const el = document.getElementById('temp'); el.value = '66'; el.dispatchEvent(new Event('input', { bubbles: true }));
+    await wait();
+    const after = [...document.querySelectorAll('#markets .mk')].filter(e => e.dataset.result).length;
+    const finalAfter = !!document.querySelector('#markets .final');
+    return { rail, finalLine, rowChips, after, finalAfter, locked, released };
+  });
+  chk(railGrade.rail.length >= 4 && railGrade.rail.every(m => /^(win|loss|push)$/.test(m.res)),
+      'rail: opening a graded row grades every market on the rail', JSON.stringify(railGrade.rail));
+  chk(railGrade.rail.every(m => railGrade.rowChips[m.pick] === m.res),
+      'rail: the rail agrees with the card row, market by market', JSON.stringify({ rail: railGrade.rail, row: railGrade.rowChips }));
+  chk(/Final: Rays 1, Yankees 1/.test(railGrade.finalLine) && /after five 1–0/.test(railGrade.finalLine) && /went/.test(railGrade.finalLine),
+      'rail: the final score and the card record are printed above the list', railGrade.finalLine);
+  chk(railGrade.locked.temp && railGrade.locked.add && railGrade.locked.note && railGrade.locked.dome,
+      'lock: a graded row opened into the form disables every input, the checkboxes and Add, and says why', JSON.stringify(railGrade.locked));
+  chk(!railGrade.released.temp && !railGrade.released.add && !railGrade.released.note, 'lock: Clear releases the form', JSON.stringify(railGrade.released));
+  chk(railGrade.after === 0 && !railGrade.finalAfter, 'rail: after Clear the rail carries no grading', `${railGrade.after} still graded, final line ${railGrade.finalAfter}`);
+
+  // ---- locked rows on the card -----------------------------------------------------
+  const lockRow = await pg.evaluate(async () => {
+    const wait = () => new Promise(r => setTimeout(r, 50));
+    const tr = () => [...document.querySelectorAll('#cardTable tr')].find(t => /Rays @ Yankees/.test(t.textContent));
+    const before = { ro: [...tr().querySelectorAll('.grade')].every(i => i.readOnly), del: !!tr().querySelector('[data-del]'),
+                     unlock: !!tr().querySelector('[data-unlock]'), lock: !!tr().querySelector('.lock') };
+    // typing into a locked box must not change the stored final
+    const fa = tr().querySelector('.grade[data-k="fa"]'); fa.value = '9'; fa.dispatchEvent(new Event('input', { bubbles: true })); await wait();
+    const storedAfterType = JSON.parse(localStorage.getItem('callsheet2.card.v1')).find(r => r.id === 1).finals.fa;
+    // unlock, correct, relock
+    tr().querySelector('[data-unlock]').click(); await wait();
+    const open = { ro: [...tr().querySelectorAll('.grade')].every(i => i.readOnly), del: !!tr().querySelector('[data-del]'), relock: !!tr().querySelector('[data-relock]') };
+    const fa2 = tr().querySelector('.grade[data-k="fa"]'); fa2.value = '2'; fa2.dispatchEvent(new Event('input', { bubbles: true })); await wait();
+    const storedAfterFix = JSON.parse(localStorage.getItem('callsheet2.card.v1')).find(r => r.id === 1).finals.fa;
+    tr().querySelector('[data-relock]').click(); await wait();
+    const again = { ro: [...tr().querySelectorAll('.grade')].every(i => i.readOnly), del: !!tr().querySelector('[data-del]') };
+    // an ungraded row is still fully editable and removable
+    const tr2 = [...document.querySelectorAll('#cardTable tr')].find(t => /Rockies @ Dodgers/.test(t.textContent));
+    const ungraded = { ro: [...tr2.querySelectorAll('.grade')].some(i => i.readOnly), del: !!tr2.querySelector('[data-del]') };
+    return { before, storedAfterType, open, storedAfterFix, again, ungraded };
+  });
+  chk(lockRow.before.ro && !lockRow.before.del && lockRow.before.unlock && lockRow.before.lock,
+      'lock: a graded row is read-only, cannot be removed, and offers unlock', JSON.stringify(lockRow.before));
+  chk(lockRow.storedAfterType === '1', 'lock: typing into a locked box changes nothing stored', String(lockRow.storedAfterType));
+  chk(!lockRow.open.ro && lockRow.open.del && lockRow.open.relock && lockRow.storedAfterFix === '2',
+      'lock: unlock lets a typo be corrected and offers lock again', JSON.stringify(lockRow.open) + ' fa=' + lockRow.storedAfterFix);
+  chk(lockRow.again.ro && !lockRow.again.del, 'lock: lock again restores the guard', JSON.stringify(lockRow.again));
+  chk(!lockRow.ungraded.ro && lockRow.ungraded.del, 'lock: an ungraded row stays editable and removable', JSON.stringify(lockRow.ungraded));
 
   // ---- rescore leaves a graded row frozen ---------------------------------------
   const rescore = await pg.evaluate(async () => {

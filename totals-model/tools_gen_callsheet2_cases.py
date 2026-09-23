@@ -50,6 +50,11 @@ def total_kwargs(sport, i):
         playoff=bool(i.get("playoff")))
 
 
+def tt_kwargs(i):
+    return dict(away_tt_line=n(i.get("atl")), away_tt_over=n(i.get("atop")), away_tt_under=n(i.get("atup")),
+                home_tt_line=n(i.get("htl")), home_tt_over=n(i.get("htop")), home_tt_under=n(i.get("htup")))
+
+
 def build(case):
     i = case["inputs"]
     away, home = i.get("away") or "Away", i.get("home") or "Home"
@@ -59,26 +64,29 @@ def build(case):
             under_price=n(i.get("up")), home_ml=n(i.get("hml")), away_ml=n(i.get("aml")),
             run_line=n(i.get("rl")), rl_home_price=n(i.get("rlh")), rl_away_price=n(i.get("rla")),
             f5_line=n(i.get("f5line")), f5_over_price=n(i.get("f5op")), f5_under_price=n(i.get("f5up")),
-            **total_kwargs("MLB", i))
+            **tt_kwargs(i), **total_kwargs("MLB", i))
     return C.forecast_matchup_wnba(
         away, home, total_line=float(i["line"]), over_price=n(i.get("op")),
         under_price=n(i.get("up")), home_ml=n(i.get("hml")), away_ml=n(i.get("aml")),
         spread=n(i.get("sp")), spread_home_price=n(i.get("sph")), spread_away_price=n(i.get("spa")),
-        **total_kwargs("WNBA", i))
+        **tt_kwargs(i), **total_kwargs("WNBA", i))
 
 
 #: Boards laid over the #1 fixtures, cycled so every shape gets covered:
 #: full board, moneyline only, no sides at all, dog at home, whole-number lines.
 MLB_BOARDS = [
-    dict(hml="-150", aml="130", rl="-1.5", rlh="120", rla="-140", f5line="3.5", f5op="-115", f5up="-105"),
+    dict(hml="-150", aml="130", rl="-1.5", rlh="120", rla="-140", f5line="3.5", f5op="-115", f5up="-105",
+         atl="2.5", atop="-105", atup="-115", htl="3.5", htop="-120", htup="100"),
     dict(hml="-120", aml="100"),
     dict(),
     dict(hml="140", aml="-160", rl="1.5", rlh="-170", rla="145", f5line="4.5", f5op="-110", f5up="-110"),
-    dict(hml="-110", aml="-110", rl="-1", rlh="-105", rla="-115", f5line="4", f5op="-120", f5up="100"),
+    dict(hml="-110", aml="-110", rl="-1", rlh="-105", rla="-115", f5line="4", f5op="-120", f5up="100",
+         atl="4", atop="-110", atup="-110", htl="4.5"),
     dict(hml="-250", aml="210", f5line="5.5", f5op="100", f5up="-120"),
 ]
 WNBA_BOARDS = [
-    dict(hml="-190", aml="160", sp="-4.5", sph="-110", spa="-110"),
+    dict(hml="-190", aml="160", sp="-4.5", sph="-110", spa="-110",
+         atl="77.5", atop="-110", atup="-110", htl="83.5", htop="-115", htup="-105"),
     dict(sp="-2", sph="-115", spa="-105"),
     dict(hml="-135", aml="115"),
     dict(),
@@ -93,6 +101,9 @@ EXTRA = [
      "inputs": {"away": "A", "home": "B", "line": "8.5", "op": "-160", "up": "130", "hml": "-110", "aml": "-110"}},
     {"sport": "MLB", "name": "no prices anywhere: probabilities, no ranking",
      "inputs": {"away": "A", "home": "B", "line": "8.5"}},
+    {"sport": "MLB", "name": "team totals need the moneyline",
+     "inputs": {"away": "A", "home": "B", "line": "8.5", "op": "-110", "up": "-110",
+                "atl": "4.5", "atop": "-110", "atup": "-110"}},
     {"sport": "WNBA", "name": "pick-em spread is a coin-flip moneyline",
      "inputs": {"away": "A", "home": "B", "line": "165.5", "op": "-110", "up": "-110",
                 "sp": "0", "sph": "-110", "spa": "-110", "hml": "-105", "aml": "-115"}},

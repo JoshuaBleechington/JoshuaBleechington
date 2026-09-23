@@ -3,11 +3,11 @@
 One matchup, every market the book posts on it, ranked. Built 23 Sept 2026 on
 top of Call Sheet #1 without touching it.
 
-- Package: `totals/callsheet2.py` (38 tests in `tests/test_callsheet2.py`)
+- Package: `totals/callsheet2.py` (49 tests across `tests/test_callsheet2.py` and `tests/test_callsheet2_team_totals.py`)
 - Page: `web/callsheet2.html`, assembled by `tools_build_callsheet2.py` from
   `web/callsheet2.head.html` + Call Sheet #1's engine block + `web/callsheet2.tail.js`
-- Fixtures: `web/callsheet2-cases.json` (62 cases) from `tools_gen_callsheet2_cases.py`
-- Browser harness: `tools_check_callsheet2_page.js` (961 checks)
+- Fixtures: `web/callsheet2-cases.json` (63 cases) from `tools_gen_callsheet2_cases.py`
+- Browser harness: `tools_check_callsheet2_page.js` (1,114 checks)
 
 ## What it answers
 
@@ -48,6 +48,7 @@ derivative market is arithmetic on the run distribution #1 already uses:
 | run line ±1.5 | P(margin ≥ 2) etc. on the same pair; the tied mass moved to ±1 |
 | first five | anchored on the F5 market's own prices, moved by the starters over five innings and the weather over 5/9 of the game; **no bullpens** |
 | total | Call Sheet #1 |
+| team totals | each side's own mean from the same pair, read against its team-total line; WNBA on a per-team SD of 7.96, derived from the total and margin SDs (4s² = 11.5² + 11.0²) |
 
 So a pick here is never "the model thinks the Yankees are better." It is "the
 book's own total and moneyline imply the Yankees cover −1.5 at X%, and the book
@@ -60,6 +61,14 @@ probable starters when it posted it. So the arms, the pens and the lineups move
 the total and the first five — where they are a differential against a number
 that does not already contain them — and nothing else. The total forecast's
 move is applied to both team means in proportion; the split is the market's.
+
+### Team totals come free
+
+Books template team totals off the same total and moneyline, rounded to the
+half run. The split here is not rounded, so a team-total row asks whether the
+book's rounding went your way. They are marked *derived* and need the
+moneyline; a line without prices gets a probability and no rank. Each side is
+graded on that side's runs alone, and the two share one calibration tile.
 
 ## Ranked by edge, not by probability
 

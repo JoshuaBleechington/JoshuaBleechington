@@ -29,6 +29,9 @@
   var F5_PHI = PHI.MLB;           // UNMEASURED and too wide: conservative
   var DEFAULT_RUN_LINE = 1.5;
   var KMAX = 40;
+  /* One WNBA side's spread, derived from the two constants already in use:
+     Var(total) + Var(margin) = 4 s^2, so s = sqrt((11.5^2 + 11.0^2) / 4). */
+  var WNBA_TEAM_SD = Math.sqrt((WNBA.SD * WNBA.SD + WNBA_MARGIN_SD * WNBA_MARGIN_SD) / 4);
 
   function teamPmf(mu, phi) {
     var pm = [], s = 0;
@@ -132,6 +135,25 @@
     return m;
   }
 
+  var TT_NOTE = "Derived from the split, not from the team-total prices: the book's total and moneyline " +
+    "say how many this side is expected to score, and this is that number read against the team-total " +
+    "line. Books template team totals off exactly those two numbers, so a disagreement here is usually " +
+    "the rounding of a half-run line — and at a half-run line the rounding is the whole edge.";
+  function teamTotals(sp, away, home, lamA, lamH) {
+    var out = [];
+    [["tta", away, lamA, num("atl"), num("atop"), num("atup")],
+     ["tth", home, lamH, num("htl"), num("htop"), num("htup")]].forEach(function (t) {
+      var key = t[0], team = t[1], lam = t[2], line = t[3], over = t[4], under = t[5];
+      if (line === null) return;
+      var pr = sp === "WNBA" ? normalSplit(line, lam, WNBA_TEAM_SD) : nbSplit(line, lam, TEAM_PHI);
+      out.push(pickOf(key, team + " team total " + line,
+        [sideOf(team + " OVER " + line, "OVER", pr[0], pr[1], over),
+         sideOf(team + " UNDER " + line, "UNDER", pr[2], pr[1], under)],
+        false, "", [TT_NOTE, "The split has " + team + " at " + lam.toFixed(2) + " " + (sp === "WNBA" ? "points" : "runs") + " against " + line + "."]));
+    });
+    return out;
+  }
+
   /* ---- MLB ---------------------------------------------------------------- */
   function forecastMatchupMlb() {
     var f = readMlb();
@@ -182,9 +204,12 @@
          "Walk-offs truncate the home margin — a home side that wins in the ninth or later wins by exactly " +
          "what it needed — so this distribution overstates how often a home favourite covers −1.5. " +
          "Direction known, size unmeasured."]));
+      markets = markets.concat(teamTotals("MLB", away, home, lamA, lamH));
     } else {
-      notes.push("No moneyline entered, so there is no split and no moneyline or run line on this card. " +
+      notes.push("No moneyline entered, so there is no split and no moneyline, run line or team total on this card. " +
         "Both prices are needed — one side's price says the lean, both say the hold.");
+      if (num("atl") !== null || num("htl") !== null) notes.push("Team-total lines were entered but cannot be priced " +
+        "without the moneyline: they are read off the split, and the moneyline is what makes the split.");
     }
 
     if (f5line !== null) {
@@ -270,6 +295,7 @@
          "for a wide hold. It is here so the day board can rank it against the totals honestly, not because " +
          "it can find value on its own."]));
     }
+    markets = markets.concat(teamTotals("WNBA", away, home, lamA, lamH));
     return { sport: "WNBA", away: away, home: home, matchup: away + " @ " + home, markets: markets,
              lamHome: lamH, lamAway: lamA, total: f, notes: notes };
   }
@@ -287,7 +313,7 @@
   /* ---- grading ---------------------------------------------------------- */
   function lineOf(mk) {
     var m;
-    if (mk.key === "total" || mk.key === "f5") { m = /([0-9]+(?:\.[0-9]+)?)\s*$/.exec(mk.pick); return m ? +m[1] : 0; }
+    if (mk.key === "total" || mk.key === "f5" || mk.key === "tta" || mk.key === "tth") { m = /([0-9]+(?:\.[0-9]+)?)\s*$/.exec(mk.pick); return m ? +m[1] : 0; }
     if (mk.key === "ml") return 0;
     m = /([+-][0-9]+(?:\.[0-9]+)?)\s*$/.exec(mk.pick);
     var v = m ? +m[1] : 0;
@@ -297,8 +323,10 @@
     var fh = fin ? parseFloat(fin.fh) : NaN, fa = fin ? parseFloat(fin.fa) : NaN;
     var f5h = fin ? parseFloat(fin.f5h) : NaN, f5a = fin ? parseFloat(fin.f5a) : NaN;
     var line = lineOf(mk), total;
-    if (mk.key === "total" || mk.key === "f5") {
+    if (mk.key === "total" || mk.key === "f5" || mk.key === "tta" || mk.key === "tth") {
       if (mk.key === "f5") { if (!isFinite(f5h) || !isFinite(f5a)) return null; total = f5h + f5a; }
+      else if (mk.key === "tta") { if (!isFinite(fa)) return null; total = fa; }
+      else if (mk.key === "tth") { if (!isFinite(fh)) return null; total = fh; }
       else { if (!isFinite(fh) || !isFinite(fa)) return null; total = fh + fa; }
       if (Math.abs(total - line) < 1e-9) return "push";
       return ((mk.side === "OVER") ? total > line : total < line) ? "win" : "loss";
@@ -318,9 +346,9 @@
   /* ---- reading the form / storage ---------------------------------------- */
   var MLB_IDS = ["away","home","line","op","up","opened","gdate","aera","hera","aip","hip","arpg","hrpg",
                  "abp","hbp","al10","hl10","h2h","h2hn","pf","mph","dir","temp","tick","cash",
-                 "hml","aml","rl","rlh","rla","f5line","f5op","f5up"];
+                 "hml","aml","rl","rlh","rla","f5line","f5op","f5up","atl","atop","atup","htl","htop","htup"];
   var WNBA_IDS = ["away","home","line","op","up","opened","gdate","apace","hpace","aort","hort","adrt","hdrt",
-                  "arest","hrest","al5","hl5","hml","aml","sp","sph","spa"];
+                  "arest","hrest","al5","hl5","hml","aml","sp","sph","spa","atl","atop","atup","htl","htop","htup"];
   var ALL = MLB_IDS.concat(WNBA_IDS).filter(function (v, i, a) { return a.indexOf(v) === i; });
   var CHECKS = ["dome","playoff"];
   function snapshot() {
@@ -501,7 +529,8 @@
 
   /* ---- is it working, per market ------------------------------------------- */
   function renderCalib() {
-    var keys = [["total","Full-game total"],["f5","First five"],["ml","Moneyline"],["rl","Run line"],["spread","Spread"]];
+    var keys = [["total","Full-game total"],["f5","First five"],["ml","Moneyline"],["rl","Run line"],["spread","Spread"],["tt","Team totals"]];
+    var statKey = function (k) { return k === "tta" || k === "tth" ? "tt" : k; };
     var box = $("calibBox"), h = '', any = false;
     var stats = {};
     keys.forEach(function (k) { stats[k[0]] = { n: 0, w: 0, l: 0, p: 0, says: 0, units: 0, label: k[1] }; });
@@ -511,7 +540,7 @@
       (r.markets || []).forEach(function (mk) {
         var res = gradeMarket(mk, r.finals);
         if (res === null) return;
-        var s = stats[mk.key]; if (!s) return;
+        var s = stats[statKey(mk.key)]; if (!s) return;
         any = true;
         if (res === "push") { s.p++; return; }
         s.n++; s.says += mk.p; s.w += res === "win" ? 1 : 0; s.l += res === "loss" ? 1 : 0; s.units += unitsOf(mk, res);
@@ -624,11 +653,13 @@
     if (sport === "MLB") {
       restore({ away: "Rays", home: "Yankees", line: "6.5", op: "-120", up: "105", gdate: $("gdate").value,
         aml: "130", hml: "-150", rl: "-1.5", rlh: "120", rla: "-140", f5line: "3.5", f5op: "-115", f5up: "-105",
+        atl: "2.5", atop: "-105", atup: "-115", htl: "3.5", htop: "-120", htup: "100",
         aera: "2.94", hera: "2.95", aip: "171.1", hip: "76.1", arpg: "4.03", hrpg: "3.72", abp: "4.16", hbp: "3.13",
         al10: "6.7", hl10: "10", h2h: "7.6", h2hn: "9", pf: "103", mph: "15", dir: "quarter-in", temp: "65", tick: "94", cash: "92" });
     } else {
       restore({ away: "Sun", home: "Mystics", line: "162.5", op: "118", up: "-155", gdate: $("gdate").value,
         aml: "160", hml: "-190", sp: "-4.5", sph: "-110", spa: "-110",
+        atl: "77.5", atop: "-110", atup: "-110", htl: "83.5", htop: "-115", htup: "-105",
         apace: "80.39", hpace: "78.79", aort: "97.6", hort: "104.2", adrt: "109.7", hdrt: "103.4",
         arest: "1", hrest: "1", al5: "175.0", hl5: "172.2" });
     }

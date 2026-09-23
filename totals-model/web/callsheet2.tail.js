@@ -132,6 +132,42 @@
     return m;
   }
 
+  /* Call Sheet #1's total as a 2.0 market. The BAND is #1's verdict on #1's
+     SIDE, the likelier side; the side picked here is the better PRICE, which
+     on a lopsided quote can be the other one. When they differ the band does
+     not travel -- a BET on the over is not a BET on the under. band1/side1
+     carry #1's verdict regardless, for the rank-by-probability view. */
+  function totalMarket(f, line, op, up, dp) {
+    var m = pickOf("total", "Full-game total " + line,
+      [sideOf("OVER " + line, "OVER", f.pOver, f.pPush, op),
+       sideOf("UNDER " + line, "UNDER", f.pUnder, f.pPush, up)],
+      true, f.band, ["Call Sheet #1's number, unchanged: projected " + f.projected.toFixed(dp) + ", " + f.band + "."]);
+    m.band1 = f.band; m.side1 = f.side;
+    if (m.side !== f.side) {
+      m.band = "";
+      m.notes.push("Call Sheet #1 names <b>" + f.side + " " + line + "</b> at " + (f.pResolved * 100).toFixed(1) + "% (" + f.band +
+        "). This side is picked on PRICE, not likelihood — the book is charging so much for the " + f.side.toLowerCase() +
+        " that the " + m.side.toLowerCase() + " is the better bet even though it is the less likely result. #1's band stays with #1's side.");
+    }
+    return m;
+  }
+
+  /* The likelier side of a market, for the rank-by-probability view. The
+     stored pick is the better PRICE; asked to rank by probability, the reader
+     means the side more likely to hit, which can be the other one. */
+  var FLIP = { OVER: "UNDER", UNDER: "OVER", HOME: "AWAY", AWAY: "HOME" };
+  function likelier(mk) {
+    if (!mk.other || mk.other.p <= mk.p + 1e-9) return mk;
+    var o = mk.other, side = FLIP[mk.side] || mk.side;
+    return { key: mk.key, label: mk.label, pick: o.pick, side: side, p: o.p, pPush: mk.pPush,
+             price: o.price, breakeven: o.price === null || o.price === undefined ? null : implied(o.price),
+             edge: o.edge === undefined ? null : o.edge, fair: priceFor(o.p), anchored: mk.anchored,
+             band: (mk.side1 && side === mk.side1) ? (mk.band1 || "") : "",
+             band1: mk.band1, side1: mk.side1, notes: mk.notes,
+             other: { pick: mk.pick, p: mk.p, price: mk.price, edge: mk.edge }, flipped: true };
+  }
+  function viewOf(mk, byProb) { return byProb ? likelier(mk) : mk; }
+
   /* ---- MLB ---------------------------------------------------------------- */
   function forecastMatchupMlb() {
     var f = readMlb();
@@ -141,10 +177,7 @@
     var f5line = num("f5line"), f5op = num("f5op"), f5up = num("f5up");
     var notes = [], markets = [];
 
-    markets.push(pickOf("total", "Full-game total " + line,
-      [sideOf("OVER " + line, "OVER", f.pOver, f.pPush, op),
-       sideOf("UNDER " + line, "UNDER", f.pUnder, f.pPush, up)],
-      true, f.band, ["Call Sheet #1's number, unchanged: projected " + f.projected.toFixed(2) + ", " + f.band + "."]));
+    markets.push(totalMarket(f, line, op, up, 2));
 
     var anchor = f.estimates.filter(function (e) { return e.name === "Market"; })[0].total;
     var lamH = null, lamA = null;
@@ -223,10 +256,7 @@
     var op = num("op"), up = num("up"), hml = num("hml"), aml = num("aml");
     var sp = num("sp"), sph = num("sph"), spa = num("spa");
     var notes = [], markets = [];
-    markets.push(pickOf("total", "Full-game total " + line,
-      [sideOf("OVER " + line, "OVER", f.pOver, f.pPush, op),
-       sideOf("UNDER " + line, "UNDER", f.pUnder, f.pPush, up)],
-      true, f.band, ["Call Sheet #1's number, unchanged: projected " + f.projected.toFixed(1) + ", " + f.band + "."]));
+    markets.push(totalMarket(f, line, op, up, 1));
 
     var margin = null, src = "";
     if (sp !== null) {
@@ -275,7 +305,7 @@
   }
 
   function rankMarkets(markets, byProb) {
-    return markets.slice().sort(function (a, b) {
+    return markets.map(function (m) { return viewOf(m, byProb); }).sort(function (a, b) {
       if (byProb) return b.p - a.p;
       var an = a.edge === null ? 1 : 0, bn = b.edge === null ? 1 : 0;
       if (an !== bn) return an - bn;
@@ -339,7 +369,7 @@
     return ms.map(function (m) {
       return { key: m.key, label: m.label, pick: m.pick, side: m.side, p: +m.p.toFixed(5), pPush: +m.pPush.toFixed(5),
                price: m.price, edge: m.edge === null ? null : +m.edge.toFixed(5), fair: +m.fair.toFixed(1),
-               anchored: m.anchored, band: m.band, other: m.other };
+               anchored: m.anchored, band: m.band, band1: m.band1, side1: m.side1, other: m.other };
     });
   }
 
@@ -388,8 +418,8 @@
     last = m;
     var box = $("markets"), why = $("why");
     if (!m) { box.innerHTML = '<div class="empty">Enter a total to start. Add both moneyline prices for the sides.</div>'; why.innerHTML = ""; return; }
-    var byProb = $("byProb").checked;
-    $("rankTag").textContent = byProb ? "by probability" : "by edge";
+    var byProb = !$("byEdge").checked;
+    $("rankTag").textContent = byProb ? "by chance to hit" : "by edge";
     var ranked = rankMarkets(m.markets, byProb), html = "";
     ranked.forEach(function (mk, i) {
       var top = i === 0 && mk.edge !== null && mk.edge > 0;
@@ -423,7 +453,8 @@
     var rows = [];
     card.forEach(function (r) {
       if ((r.gdate || "") !== dateISO) return;
-      (r.markets || []).forEach(function (mk) {
+      (r.markets || []).forEach(function (mk0) {
+        var mk = viewOf(mk0, byProb);
         if (mk.edge === null || mk.edge === undefined) return;
         rows.push({ row: r, mk: mk });
       });
@@ -439,7 +470,7 @@
     return rows;
   }
   function renderBoard() {
-    var dateISO = $("boardDate").value || todayISO(), byProb = $("byProb").checked;
+    var dateISO = $("boardDate").value || todayISO(), byProb = !$("byEdge").checked;
     var rows = boardRows(dateISO, byProb);
     $("boardCount").textContent = rows.length ? rows.length + " priced markets on " + gameDate(dateISO) : "nothing logged for " + gameDate(dateISO);
     var picks = rows.slice(0, 4), ph = "";
@@ -451,6 +482,17 @@
           (res ? ' · <span class="chip ' + res + '">' + res + '</span>' : '') + '</div>' +
         '<div class="n4">' + esc(x.row.matchup) + ' · ' + esc(x.mk.label) + '</div></div>';
     });
+    if (picks.length >= 2) {
+      var pAll = picks.reduce(function (a, x) { return a * x.mk.p; }, 1);
+      var shared = picks.filter(function (x) { return x.corr.length; }).length;
+      var pushes = picks.filter(function (x) { return x.mk.pPush > 0.005; }).length;
+      ph += '<div class="pk parlay" style="grid-column:1/-1;border-style:dashed"><div class="n1">ALL ' + picks.length + ' HIT</div>' +
+        '<div class="n2">' + (pAll * 100).toFixed(1) + '% · fair parlay ' + sgn(priceFor(pAll), 0) + ' (' + (1 / pAll).toFixed(2) + '×)</div>' +
+        '<div class="n4">Assumes the ' + picks.length + ' are independent' +
+        (shared ? ' — <b>' + shared + ' share a game with another pick</b>, so the true chance is not this number' : '') +
+        (pushes ? '; ' + pushes + ' can push, which most apps void to a smaller parlay' : '') +
+        '. A boosted payout above ' + (1 / pAll).toFixed(2) + '× is a parlay worth having.</div></div>';
+    }
     $("picks").innerHTML = ph;
     if (!rows.length) { $("board").innerHTML = '<div class="empty">Add today\'s matchups to the card and every priced market lands here, best edge first.</div>'; return; }
     var h = '<table><thead><tr><th>#</th><th>Matchup</th><th>Market</th><th>Pick</th><th>Chance</th><th>Price</th><th>Needs</th><th>Edge</th><th>Fair</th><th>Result</th></tr></thead><tbody>';
@@ -505,7 +547,8 @@
     var box = $("calibBox"), h = '', any = false;
     var stats = {};
     keys.forEach(function (k) { stats[k[0]] = { n: 0, w: 0, l: 0, p: 0, says: 0, units: 0, label: k[1] }; });
-    var top = { n: 0, w: 0, l: 0, p: 0, says: 0, units: 0, label: "Top-4 rule" };
+    var top = { n: 0, w: 0, l: 0, p: 0, says: 0, units: 0, label: "Top-4 by chance" };
+    var topE = { n: 0, w: 0, l: 0, p: 0, says: 0, units: 0, label: "Top-4 by edge" };
     var dates = {};
     card.forEach(function (r) {
       (r.markets || []).forEach(function (mk) {
@@ -519,11 +562,13 @@
       if (r.gdate) dates[r.gdate] = true;
     });
     Object.keys(dates).forEach(function (d) {
-      boardRows(d, false).slice(0, 4).forEach(function (x) {
-        var res = gradeMarket(x.mk, x.row.finals);
-        if (res === null) return;
-        if (res === "push") { top.p++; return; }
-        top.n++; top.says += x.mk.p; top.w += res === "win" ? 1 : 0; top.l += res === "loss" ? 1 : 0; top.units += unitsOf(x.mk, res);
+      [[true, top], [false, topE]].forEach(function (rule) {
+        boardRows(d, rule[0]).slice(0, 4).forEach(function (x) {
+          var res = gradeMarket(x.mk, x.row.finals), t = rule[1];
+          if (res === null) return;
+          if (res === "push") { t.p++; return; }
+          t.n++; t.says += x.mk.p; t.w += res === "win" ? 1 : 0; t.l += res === "loss" ? 1 : 0; t.units += unitsOf(x.mk, res);
+        });
       });
     });
     if (!any) { box.innerHTML = '<p class="note">Enter finals on the card — away and home runs, and the first-five runs for MLB — and every market grades itself.</p>'; return; }
@@ -534,14 +579,14 @@
       return '<div><p class="k">' + esc(s.label) + '</p><p class="v">' + s.w + '-' + s.l + (s.p ? '-' + s.p : '') + '</p>' +
         '<p class="s">' + (s.n ? 'says ' + says.toFixed(1) + '% · does ' + does.toFixed(1) + '% (±' + se.toFixed(1) + ') · ' + sgn(s.units, 2) + 'u' : 'pushes only') + '</p></div>';
     };
-    h += '<div class="calib">' + keys.map(function (k) { return tiles(stats[k[0]]); }).join('') + tiles(top) + '</div>';
+    h += '<div class="calib">' + keys.map(function (k) { return tiles(stats[k[0]]); }).join('') + tiles(top) + tiles(topE) + '</div>';
     var totalN = keys.reduce(function (a, k) { return a + stats[k[0]].n; }, 0);
     h += '<div class="verdict">' + (totalN < 30
       ? '<b>' + totalN + ' graded markets.</b> Nothing here can be read yet — one standard error on a hit rate is ' +
         (totalN ? (100 / Math.sqrt(totalN) / 2).toFixed(0) : '—') + ' points at this size. The number to watch first is the run line, ' +
-        'because it is the market this sheet derives rather than anchors, and the top-4 rule, because it is the reason the sheet exists.'
+        'because it is the market this sheet derives rather than anchors, and the two top-4 rules, because choosing between them is the reason the sheet exists.'
       : '<b>' + totalN + ' graded markets.</b> Compare each market\'s <i>does</i> against its <i>says</i> before believing either; ' +
-        'and compare the top-4 rule against the blind rate of everything logged, not against 50%.') + '</div>';
+        'and compare each top-4 rule against the blind rate of everything logged, not against 50%. Chance and edge will name different fours most nights; the units column is the referee.') + '</div>';
     box.innerHTML = h;
   }
 
@@ -639,8 +684,8 @@
                             card: card, draft: { sport: sport, inputs: snapshot() } }, null, 2);
   }
   function boardAsText() {
-    var dateISO = $("boardDate").value || todayISO(), rows = boardRows(dateISO, $("byProb").checked);
-    var out = ["Call Sheet 2.0 — " + gameDate(dateISO) + " — ranked by " + ($("byProb").checked ? "probability" : "edge")];
+    var dateISO = $("boardDate").value || todayISO(), rows = boardRows(dateISO, !$("byEdge").checked);
+    var out = ["Call Sheet 2.0 — " + gameDate(dateISO) + " — ranked by " + (!$("byEdge").checked ? "chance to hit" : "edge")];
     rows.forEach(function (x) {
       out.push((x.rank <= 4 ? "* " : "  ") + x.rank + ". " + x.row.matchup + " — " + x.mk.pick + "  " + (x.mk.p * 100).toFixed(1) + "%  " +
         sgn(x.mk.price, 0) + "  edge " + sgn(x.mk.edge * 100, 1) + (x.corr.length ? "  (same game as #" + x.corr.join(", #") + ")" : ""));
@@ -652,7 +697,7 @@
   $("m-wnba").addEventListener("click", function () { setSport("WNBA"); });
   ALL.forEach(function (id) { $(id).addEventListener("input", onEdit); $(id).addEventListener("change", onEdit); });
   CHECKS.forEach(function (id) { $(id).addEventListener("change", onEdit); });
-  $("byProb").addEventListener("change", function () { render(); renderBoard(); });
+  $("byEdge").addEventListener("change", function () { render(); renderBoard(); });
   $("boardDate").addEventListener("change", renderBoard);
   $("add").addEventListener("click", addToCard);
   $("clear").addEventListener("click", clearForm);

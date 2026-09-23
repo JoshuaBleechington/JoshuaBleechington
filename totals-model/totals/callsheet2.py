@@ -254,6 +254,31 @@ def _side(pick: str, side: str, p_raw: float, p_push: float, price: float | None
             "breakeven": be, "edge": edge, "ev": ev}
 
 
+def _total_market(f: Forecast, line: float, over_price, under_price, dp: int) -> Market:
+    """Call Sheet #1's total as a 2.0 market.
+
+    The BAND is #1's verdict on #1's SIDE -- the likelier side. The side this
+    sheet picks is the better PRICE, which on a lopsided quote can be the less
+    likely side. When the two differ the band must not travel: a BET on the
+    over is not a BET on the under, and printing it there was a bug found on
+    the first live card that had one.
+    """
+    m = _pick(
+        "total", f"Full-game total {line:g}",
+        [_side(f"OVER {line:g}", "OVER", f.p_over, f.p_push, over_price),
+         _side(f"UNDER {line:g}", "UNDER", f.p_under, f.p_push, under_price)],
+        anchored=True, band=f.band,
+        notes=[f"Call Sheet #1's number, unchanged: projected {f.projected:.{dp}f}, {f.band}."])
+    if m.side != f.side:
+        m.band = ""
+        m.notes.append(
+            f"Call Sheet #1 names {f.side} {line:g} at {f.p_resolved * 100:.1f}% ({f.band}). This "
+            f"side is picked on PRICE, not likelihood -- the book is charging so much for the "
+            f"{f.side.lower()} that the {m.side.lower()} is the better bet even though it is the "
+            "less likely result. #1's band stays with #1's side.")
+    return m
+
+
 # ===========================================================================
 # The two-team run distribution (MLB)
 # ===========================================================================
@@ -359,12 +384,7 @@ def forecast_matchup_mlb(
     markets: list[Market] = []
 
     # --- full-game total: Call Sheet #1, verbatim ---------------------------
-    markets.append(_pick(
-        "total", f"Full-game total {total_line:g}",
-        [_side(f"OVER {total_line:g}", "OVER", f.p_over, f.p_push, over_price),
-         _side(f"UNDER {total_line:g}", "UNDER", f.p_under, f.p_push, under_price)],
-        anchored=True, band=f.band,
-        notes=[f"Call Sheet #1's number, unchanged: projected {f.projected:.2f}, {f.band}."]))
+    markets.append(_total_market(f, total_line, over_price, under_price, 2))
 
     # --- the split ----------------------------------------------------------
     anchor = next(e.total for e in f.estimates if e.name == "Market")
@@ -519,12 +539,7 @@ def forecast_matchup_wnba(
     notes: list[str] = []
     f = forecast_wnba(f"{away} @ {home}", total_line, over_price=over_price,
                       under_price=under_price, **total_inputs)
-    markets: list[Market] = [_pick(
-        "total", f"Full-game total {total_line:g}",
-        [_side(f"OVER {total_line:g}", "OVER", f.p_over, f.p_push, over_price),
-         _side(f"UNDER {total_line:g}", "UNDER", f.p_under, f.p_push, under_price)],
-        anchored=True, band=f.band,
-        notes=[f"Call Sheet #1's number, unchanged: projected {f.projected:.1f}, {f.band}."])]
+    markets: list[Market] = [_total_market(f, total_line, over_price, under_price, 1)]
 
     # --- the margin, from whichever of the two the book posted -----------------
     margin: float | None = None

@@ -296,7 +296,7 @@
           "edge": -0.02173913,
           "fair": 109.0909,
           "anchored": true,
-          "band": "NO BET"
+          "band": ""
         },
         {
           "key": "f5",
@@ -390,7 +390,7 @@
           "edge": -0.02302936,
           "fair": 104.4297,
           "anchored": true,
-          "band": "NO BET"
+          "band": ""
         },
         {
           "key": "ml",
@@ -2976,7 +2976,7 @@
           "edge": -0.0243943,
           "fair": 100.2342,
           "anchored": true,
-          "band": "NO BET"
+          "band": ""
         },
         {
           "key": "rl",
@@ -3046,7 +3046,7 @@
           "edge": 0.4515787,
           "fair": 100.3214,
           "anchored": true,
-          "band": "NO BET"
+          "band": ""
         },
         {
           "key": "rl",
@@ -3134,7 +3134,7 @@
           "edge": -0.02094855,
           "fair": 108.7458,
           "anchored": true,
-          "band": "NO BET"
+          "band": ""
         },
         {
           "key": "ml",
@@ -4473,7 +4473,7 @@
           "edge": -0.01630511,
           "fair": 106.7419,
           "anchored": true,
-          "band": "NO BET"
+          "band": ""
         },
         {
           "key": "rl",
@@ -4576,7 +4576,7 @@
           "edge": -0.02048325,
           "fair": 141.3714,
           "anchored": true,
-          "band": "STRONG BET"
+          "band": ""
         },
         {
           "key": "ml",

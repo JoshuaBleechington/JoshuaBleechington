@@ -3,11 +3,11 @@
 One matchup, every market the book posts on it, ranked. Built 23 Sept 2026 on
 top of Call Sheet #1 without touching it.
 
-- Package: `totals/callsheet2.py` (38 tests in `tests/test_callsheet2.py`)
+- Package: `totals/callsheet2.py` (40 tests in `tests/test_callsheet2.py`)
 - Page: `web/callsheet2.html`, assembled by `tools_build_callsheet2.py` from
   `web/callsheet2.head.html` + Call Sheet #1's engine block + `web/callsheet2.tail.js`
 - Fixtures: `web/callsheet2-cases.json` (62 cases) from `tools_gen_callsheet2_cases.py`
-- Browser harness: `tools_check_callsheet2_page.js` (961 checks)
+- Browser harness: `tools_check_callsheet2_page.js` (970 checks)
 
 ## What it answers
 
@@ -61,22 +61,40 @@ the total and the first five — where they are a differential against a number
 that does not already contain them — and nothing else. The total forecast's
 move is applied to both team means in proportion; the split is the market's.
 
-## Ranked by edge, not by probability
+## Ranked by chance to hit, with the edge on every row
 
-The card lists probability first because that is the question being asked, but
-it **ranks by edge**: the model's probability minus the probability the price
-demands. A −180 favourite at 64% is a 64% chance to hit and a losing bet. A
-+105 under at 55.6% is a 55.6% chance and the best bet on the board. Ranked by
-probability alone, the top four every night would be the heaviest favourites,
-which is the surest way there is to lose money slowly.
+Both sides of every market are evaluated. The **pick** stored on a row is the
+side with the better price — the higher edge — because that is the honest
+answer to "which side of this market, if any". When both sides are priced
+above their probability the market says so and its edge is negative.
 
-Both sides of every market are evaluated and the side with the higher edge is
-the pick. That can be the less likely side: over at −160 needs 61.5%, under at
-+130 needs 43.5%, and a 52/48 market makes the 48% under the better bet. When
-neither side clears its price the market says so and sinks.
+The **order** is by chance to hit. That was the user's call on 23 Sept, and it
+is the right call for how the sheet is used: the picks go into boosted parlays,
+where the price is fixed outside the sheet by the boost and the probability is
+what compounds. The board therefore shows the *likelier* side of each market
+(which on a lopsided quote can be the opposite of the stored pick), ranks by
+that chance, marks the top four, and prices them as a parlay — the product of
+the four probabilities, the fair parlay price, and a warning when two of the
+four share a game and the product is therefore not the true chance.
 
-A "rank by probability instead" toggle exists so the difference can be seen.
-It is not the default and the record is kept on the default.
+A **rank by edge** toggle re-orders for straight bets at the posted price,
+showing the stored picks. The record keeps **both** rules — *Top-4 by chance*
+and *Top-4 by edge* each get a calibration tile — because they will name
+different fours most nights and only the units column can say which one pays.
+
+The moneyline will sit at or near the top of a chance-ranked board most nights
+and never at the top of an edge-ranked one, and that is not a contradiction:
+the moneyline is the anchor, so its probability is the market's and its edge
+is only ever the vig. What the sheet adds to a moneyline pick is the *rest* of
+the board around it.
+
+### Call Sheet #1's band stays with #1's side
+
+Found on the first live card with a lopsided quote: the total's BET chip was
+printed on the side this sheet had picked for price, which was the opposite of
+the side #1 had named. A BET on the over is not a BET on the under. The band now
+travels only when the two sides agree; otherwise the row says #1 named the
+other side, at what probability, and that this side is picked on price.
 
 ## Why this is the honest answer to "is 55% a bet"
 
@@ -140,9 +158,10 @@ as it stands today and leaves graded rows alone — a pick that has been graded 
 a record, not a draft.
 
 "Is it working" shows per market: record, *says* (mean stated probability),
-*does* (hit rate) with its standard error, and units. Plus the **top-4 rule**:
-for every date on the card, the four rows the board would have ranked first,
-graded. That is the reason the sheet exists, so it has its own tile. It is
+*does* (hit rate) with its standard error, and units. Plus the two **top-4
+rules**: for every date on the card, the four rows each ranking would have put
+first, graded. Choosing between them is the reason the sheet exists, so each
+has its own tile. It is
 computed from frozen picks, retrospectively — a row added late in the day could
 displace an earlier top-4 member, so it is a fair record of the rule but not a
 perfect record of what was on screen at bet time.

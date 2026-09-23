@@ -351,3 +351,31 @@ class TestGrading(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class TestTheBandStaysWithCallSheetOnesSide(unittest.TestCase):
+    """Found on the first live card with a lopsided quote: the total's BET
+    chip was printed on the side this sheet picked for PRICE, which was the
+    opposite of the side #1 had named. A BET on the over is not a BET on the
+    under."""
+
+    def test_the_band_travels_when_the_sides_agree(self):
+        m = forecast_matchup_mlb("Rays", "Yankees", **BOARD, **RAYS)
+        t = next(mk for mk in m.markets if mk.key == "total")
+        self.assertEqual(t.side, m.total.side)
+        self.assertEqual(t.band, m.total.band)
+
+    def test_and_does_not_when_they_differ(self):
+        # -170/+140 on 8.5: the market leans over hard, two good starters pull
+        # the blend back to a modest over. #1 names OVER 54.8% and bands it;
+        # the under at +140 needs only 41.7% and is the better price.
+        m = forecast_matchup_mlb("a", "b", total_line=8.5, over_price=-170, under_price=140,
+                                 home_ml=-110, away_ml=-110,
+                                 away_starter_era=2.5, home_starter_era=2.5)
+        t = next(mk for mk in m.markets if mk.key == "total")
+        self.assertEqual(m.total.side, "OVER")
+        self.assertNotEqual(m.total.band, "NO BET")
+        self.assertEqual(t.side, "UNDER")
+        self.assertEqual(t.band, "")
+        self.assertTrue(any("picked on PRICE" in n for n in t.notes))
+        self.assertTrue(any(m.total.band in n for n in t.notes))

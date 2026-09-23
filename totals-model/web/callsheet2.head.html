@@ -230,8 +230,9 @@
         <span class="build">· build <span id="build">2026-09-23</span></span></div>
       <h1>Call Sheet <em>2.0</em></h1>
       <p>One matchup, every market the book posts on it — the full-game total, the first five,
-         the moneyline and the run line — priced off the book's own numbers and <b>ranked by edge</b>.
-         Then a day board that puts tonight's whole card in one order and marks the four to look at.
+         the moneyline and the run line — priced off the book's own numbers and <b>ranked by chance to hit</b>,
+         with the edge against the price on every row. Then a day board that puts tonight's whole card in
+         one order, marks the four to look at, and prices them as a parlay.
          Call Sheet #1 is untouched; its total is this sheet's total to the last digit.</p>
     </div>
     <div class="modes" role="group" aria-label="Sport">
@@ -476,14 +477,14 @@
 
     <div class="rail">
       <section class="card">
-        <h2>This matchup, ranked <span class="tag" id="rankTag">by edge</span></h2>
+        <h2>This matchup, ranked <span class="tag" id="rankTag">by chance to hit</span></h2>
         <div class="body">
           <div id="markets" class="mklist"></div>
-          <p class="note"><b>Probability is the question; edge is the order.</b> Each row shows how
-            likely the pick is to hit and, in gold or red, how far above or below the price's
-            break-even that is. A 64% favourite at −180 is a 64% chance and a losing bet; a 55% under
-            at +105 is the best thing on the board. Ranked by probability alone, the top of every card
-            would be the heaviest favourite.</p>
+          <p class="note"><b>Ordered by how likely each pick is to hit</b>, because that is what compounds
+            in a parlay and what an odds boost is spent on. The gold or red figure on every row is the edge:
+            how far above or below the price's break-even that chance is. A 64% favourite at −180 is a 64%
+            chance and, at that price, a losing bet — the boost is what makes it worth taking. Tick <i>rank by
+            edge</i> to see the board the way a straight-bet player would.</p>
         </div>
       </section>
       <section class="card">
@@ -497,12 +498,17 @@
     <h2>Day board
       <span class="row" style="gap:8px">
         <label class="f" style="flex-direction:row;align-items:center;gap:6px"><span class="tag">date</span><input id="boardDate" type="date" style="padding:6px 8px;font-size:13px"></label>
-        <label class="check" style="font-size:12px"><input type="checkbox" id="byProb"> Rank by probability instead</label>
+        <label class="check" style="font-size:12px"><input type="checkbox" id="byEdge"> Rank by edge instead</label>
         <span class="tag" id="boardCount"></span>
       </span></h2>
     <div class="body">
       <div id="picks" class="picks"></div>
       <div class="scroll"><div id="board"></div></div>
+      <p class="note"><b>Ranked by chance to hit</b>, showing the likelier side of every market. The <b>all four
+        hit</b> figure under the picks is the parlay probability assuming the four are independent — compare it
+        to what the boosted parlay pays: a payout better than 1 ÷ that chance is a parlay worth having. Two
+        picks from the same game are not independent, and the figure says so. <b>Rank by edge instead</b>
+        re-orders for straight bets at the posted price; the record keeps both rules.</p>
       <p class="note"><b>The four at the top are the four to look at, not the four to bet.</b> Two markets
         on the same game are one bet in disguise — a run line and an under both cash on a pitchers' duel —
         so a row that shares a game with a higher one is flagged <i>corr</i>. Re-read the inputs on anything

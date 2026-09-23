@@ -51,7 +51,7 @@ const CHECKS = ["dome","playoff"];
   // ---- fixtures ---------------------------------------------------------------
   const fill = async (sport, inputs) => pg.evaluate(async ([sport, inputs, ids, checks]) => {
     document.getElementById(sport === 'WNBA' ? 'm-wnba' : 'm-mlb').click();
-    document.getElementById('byProb').checked = false;
+    document.getElementById('byEdge').checked = true;
     ids.forEach(id => { document.getElementById(id).value = ''; });
     checks.forEach(id => { document.getElementById(id).checked = false; });
     for (const [k, v] of Object.entries(inputs)) {
@@ -95,6 +95,7 @@ const CHECKS = ["dome","playoff"];
     const clear = () => document.getElementById('clear').click();
     const wait = () => new Promise(r => setTimeout(r, 40));
     document.getElementById('m-mlb').click();
+    document.getElementById('byEdge').checked = true;
     document.getElementById('boardDate').value = '2026-09-22';
     // game 1: Rays @ Yankees, full board
     clear(); set('gdate', '2026-09-22'); set('away', 'Rays'); set('home', 'Yankees');
@@ -118,7 +119,7 @@ const CHECKS = ["dome","playoff"];
                matchup: td[1].textContent.trim(), pick: td[3].querySelector('.chip').textContent,
                edge: parseFloat(td[7].textContent), pick4: tr.classList.contains('pick4') };
     });
-    const picks = [...document.querySelectorAll('#picks .pk .n2')].map(e => e.textContent);
+    const picks = [...document.querySelectorAll('#picks .pk:not(.parlay) .n2')].map(e => e.textContent);
     // grade game 1: Rays 1, Yankees 1 (2 runs), F5 1-0
     const inp = (id, k) => document.querySelector(`.grade[data-id="${id}"][data-k="${k}"]`);
     const type = (el, v) => { el.value = v; el.dispatchEvent(new Event('input', { bubbles: true })); };
@@ -153,9 +154,53 @@ const CHECKS = ["dome","playoff"];
   chk(by['UNDER 6.5'] === 'win', 'grade: UNDER 6.5 on a 1-1 game is a win', JSON.stringify(by));
   chk(by['F5 UNDER 3.5'] === 'win', 'grade: F5 UNDER 3.5 on a 1-0 first five is a win', JSON.stringify(by));
   chk((by['Rays +1.5'] === 'win') || (by['Yankees -1.5'] === 'loss'), 'grade: a one-run home win is a cover for the dog', JSON.stringify(by));
-  chk(/Full-game total/.test(flow.calib) && /First five/.test(flow.calib) && /Top-4 rule/.test(flow.calib),
-      'calib: per-market tiles and the top-4 rule are drawn once something is graded', flow.calib.slice(0, 200));
+  chk(/Full-game total/.test(flow.calib) && /First five/.test(flow.calib) && /Top-4 by chance/.test(flow.calib) && /Top-4 by edge/.test(flow.calib),
+      'calib: per-market tiles and BOTH top-4 rules are drawn once something is graded', flow.calib.slice(0, 200));
   chk(flow.boardAfter.filter(Boolean).length >= 3, 'board: results appear on the board rows once graded', flow.boardAfter.join('|'));
+
+  // ---- the default is chance to hit, and the four are priced as a parlay ----------
+  const dflt = await pg.evaluate(async () => {
+    document.getElementById('byEdge').checked = false; document.getElementById('byEdge').dispatchEvent(new Event('change'));
+    await new Promise(r => setTimeout(r, 50));
+    const rows = [...document.querySelectorAll('#board tbody tr')].map(tr => parseFloat(tr.querySelectorAll('td')[4].textContent));
+    const parlay = (document.querySelector('#picks .pk.parlay') || {}).textContent || '';
+    const tag = document.getElementById('rankTag').textContent;
+    return { rows, parlay, tag, checked: document.getElementById('byEdge').checked };
+  });
+  chk(!dflt.checked && dflt.tag === 'by chance to hit', 'default: the board and the rail rank by chance to hit unless edge is ticked', dflt.tag);
+  chk(dflt.rows.every((p, i) => i === 0 || p <= dflt.rows[i - 1] + 1e-9), 'default: board ordered by chance, best first', dflt.rows.join(' > '));
+  chk(/ALL 4 HIT/.test(dflt.parlay) && /fair parlay/.test(dflt.parlay), 'parlay: the four picks carry an all-four-hit chance and a fair parlay price', dflt.parlay.slice(0, 120));
+  chk(/share a game/.test(dflt.parlay), 'parlay: warns when picks share a game', dflt.parlay.slice(0, 200));
+
+  // ---- the band stays with #1's side; rank-by-probability shows the likelier side --
+  const sides = await pg.evaluate(async () => {
+    document.getElementById('m-mlb').click(); document.getElementById('clear').click();
+    document.getElementById('byEdge').checked = true; document.getElementById('byEdge').dispatchEvent(new Event('change'));
+    const set = (id, v) => { const el = document.getElementById(id); el.value = v; el.dispatchEvent(new Event('input', { bubbles: true })); };
+    set('line', '8.5'); set('op', '-170'); set('up', '140'); set('hml', '-110'); set('aml', '-110');
+    set('aera', '2.5'); set('hera', '2.5');
+    await new Promise(r => setTimeout(r, 50));
+    const read = () => [...document.querySelectorAll('#markets .mk')].map(el => ({
+      key: el.dataset.key, pick: el.querySelector('.pick').childNodes[0].textContent.trim(),
+      band: (el.querySelector('.band') || {}).textContent || '', p: parseFloat(el.querySelector('.p').textContent) }));
+    const byEdge = read();
+    const detail = document.querySelector('#markets .mkdetail').textContent;
+    document.getElementById('byEdge').checked = false; document.getElementById('byEdge').dispatchEvent(new Event('change'));
+    await new Promise(r => setTimeout(r, 50));
+    const byProb = read();
+    document.getElementById('byEdge').checked = true; document.getElementById('byEdge').dispatchEvent(new Event('change'));
+    return { byEdge, byProb, detail };
+  });
+  const tEdge = sides.byEdge.find(m => m.key === 'total'), tProb = sides.byProb.find(m => m.key === 'total');
+  chk(tEdge && /^UNDER/.test(tEdge.pick) && tEdge.band === '', 'band: the under is picked on price and carries NO band',
+      JSON.stringify(tEdge));
+  chk(/picked on PRICE/.test(sides.detail) && /OVER 8.5/.test(sides.detail), 'band: the note says #1 named the OVER', sides.detail.slice(0, 200));
+  chk(tProb && /^OVER/.test(tProb.pick) && tProb.band === 'BET', 'rank by probability: shows the likelier side, and #1\'s band comes with it',
+      JSON.stringify(tProb));
+  chk(sides.byProb.every((m, i) => i === 0 || m.p <= sides.byProb[i - 1].p), 'rank by probability: ordered by chance, best first',
+      sides.byProb.map(m => m.p).join(' > '));
+  chk(sides.byProb[0].p > 60 && sides.byProb[0].p >= Math.max(...sides.byProb.map(m => m.p)),
+      'rank by probability: the likeliest thing on the card leads, whichever market it is', JSON.stringify(sides.byProb[0]));
 
   // ---- rescore leaves a graded row frozen ---------------------------------------
   const rescore = await pg.evaluate(async () => {

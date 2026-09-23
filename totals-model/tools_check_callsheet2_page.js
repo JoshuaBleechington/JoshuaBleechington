@@ -120,6 +120,8 @@ const CHECKS = ["dome","playoff"];
                edge: parseFloat(td[7].textContent), pick4: tr.classList.contains('pick4') };
     });
     const picks = [...document.querySelectorAll('#picks .pk:not(.parlay) .n2')].map(e => e.textContent);
+    const bests = [...document.querySelectorAll('#bestBets .pk .n2')].map(e => e.textContent);
+    const swaps = [...document.querySelectorAll('#picks .pk .swap')].map(e => e.textContent);
     // grade game 1: Rays 1, Yankees 1 (2 runs), F5 1-0
     const inp = (id, k) => document.querySelector(`.grade[data-id="${id}"][data-k="${k}"]`);
     const type = (el, v) => { el.value = v; el.dispatchEvent(new Event('input', { bubbles: true })); };
@@ -132,7 +134,7 @@ const CHECKS = ["dome","playoff"];
     const graded = [...chips].map(c => ({ pick: c.querySelector('.chip').textContent, res: (c.querySelector('.chip.win,.chip.loss,.chip.push') || {}).textContent || '' }));
     const calib = document.getElementById('calibBox').textContent;
     const boardAfter = [...document.querySelectorAll('#board tbody tr')].map(tr => (tr.querySelector('td:last-child .chip') || {}).textContent || '');
-    return { rows, picks, stored: stored.length, finals: g1.finals, graded, calib, boardAfter, markets1: g1.markets.map(m => m.key) };
+    return { rows, picks, bests, swaps, stored: stored.length, finals: g1.finals, graded, calib, boardAfter, markets1: g1.markets.map(m => m.key) };
   });
   chk(flow.stored === 3, 'log: three matchups stored', String(flow.stored));
   chk(flow.rows.length === 6 && !flow.rows.some(r => /Mets/.test(r.matchup)),
@@ -140,22 +142,29 @@ const CHECKS = ["dome","playoff"];
       flow.rows.map(r => r.matchup + ' ' + r.pick).join(' | '));
   chk(flow.rows.every((r, i) => i === 0 || r.edge <= flow.rows[i - 1].edge), 'board: ordered by edge, best first',
       flow.rows.map(r => r.edge).join(' > '));
-  chk(flow.rows.filter(r => r.pick4).length === 4 && flow.picks.length === 4, 'board: exactly four picks are marked, and the four cards match',
-      `${flow.rows.filter(r => r.pick4).length} marked, ${flow.picks.length} cards`);
-  chk(flow.picks.join('|') === flow.rows.slice(0, 4).map(r => r.pick).join('|'), 'board: the pick cards are the top four rows in order',
-      flow.picks.join('|') + ' vs ' + flow.rows.slice(0, 4).map(r => r.pick).join('|'));
+  // With the table on edge, the marked rows are the best straight bets: positive edge only, up to four.
+  chk(flow.rows.filter(r => r.pick4).length === flow.bests.length && flow.bests.length >= 1 && flow.bests.length <= 4,
+      'board: the rows marked in the table are the best straight bets, positive edge only',
+      `${flow.rows.filter(r => r.pick4).length} marked, ${flow.bests.length} cards`);
+  chk(flow.bests.join('|') === flow.rows.filter(r => r.edge > 0).slice(0, 4).map(r => r.pick).join('|'),
+      'board: the straight-bet cards are the top positive-edge rows in order',
+      flow.bests.join('|') + ' vs ' + flow.rows.filter(r => r.edge > 0).slice(0, 4).map(r => r.pick).join('|'));
+  // The parlay four is one leg per game: two games logged on the 22nd, so two legs.
+  chk(flow.picks.length === 2, 'parlay: one leg per game, so two games give two legs', flow.picks.join('|'));
+  chk(flow.swaps.length === 1 && /Instead of Dodgers ML/.test(flow.swaps[0]) && /-300/.test(flow.swaps[0]),
+      'parlay: the -300 favourite is swapped for the next-likeliest market on its game, and the card says so', flow.swaps.join('|'));
   chk(!flow.rows[0].corr && flow.rows.slice(1).some(r => r.corr), 'board: the first row is never flagged; a later same-game row is',
       flow.rows.map(r => r.corr).join(','));
-  chk(flow.rows[flow.rows.length - 1].matchup.indexOf('Rockies') === 0 || flow.rows.some(r => /Dodgers|Rockies/.test(r.pick) && r.edge < 0),
-      'board: the -300 favourite sits at the bottom with a negative edge, however likely it is to win',
+  chk(flow.rows.some(r => /Dodgers|Rockies/.test(r.pick) && r.edge < 0) && !flow.bests.some(p => /ML/.test(p) && /Dodgers/.test(p)),
+      'board: the -300 favourite has a negative edge and is not a straight bet, however likely it is to win',
       flow.rows.map(r => r.pick + ' ' + r.edge).join(' | '));
   chk(flow.finals.fa === '1' && flow.finals.fh === '1' && flow.finals.f5h === '0', 'grade: finals are stored on the row', JSON.stringify(flow.finals));
   const by = Object.fromEntries(flow.graded.map(g => [g.pick, g.res]));
   chk(by['UNDER 6.5'] === 'win', 'grade: UNDER 6.5 on a 1-1 game is a win', JSON.stringify(by));
   chk(by['F5 UNDER 3.5'] === 'win', 'grade: F5 UNDER 3.5 on a 1-0 first five is a win', JSON.stringify(by));
   chk((by['Rays +1.5'] === 'win') || (by['Yankees -1.5'] === 'loss'), 'grade: a one-run home win is a cover for the dog', JSON.stringify(by));
-  chk(/Full-game total/.test(flow.calib) && /First five/.test(flow.calib) && /Top-4 by chance/.test(flow.calib) && /Top-4 by edge/.test(flow.calib),
-      'calib: per-market tiles and BOTH top-4 rules are drawn once something is graded', flow.calib.slice(0, 200));
+  chk(/Full-game total/.test(flow.calib) && /First five/.test(flow.calib) && /parlay four/.test(flow.calib) && /Best straight bets/.test(flow.calib),
+      'calib: per-market tiles and BOTH fours are drawn once something is graded', flow.calib.slice(0, 200));
   chk(flow.boardAfter.filter(Boolean).length >= 3, 'board: results appear on the board rows once graded', flow.boardAfter.join('|'));
 
   // ---- the default is chance to hit, and the four are priced as a parlay ----------
@@ -169,8 +178,44 @@ const CHECKS = ["dome","playoff"];
   });
   chk(!dflt.checked && dflt.tag === 'by chance to hit', 'default: the board and the rail rank by chance to hit unless edge is ticked', dflt.tag);
   chk(dflt.rows.every((p, i) => i === 0 || p <= dflt.rows[i - 1] + 1e-9), 'default: board ordered by chance, best first', dflt.rows.join(' > '));
-  chk(/ALL 4 HIT/.test(dflt.parlay) && /fair parlay/.test(dflt.parlay), 'parlay: the four picks carry an all-four-hit chance and a fair parlay price', dflt.parlay.slice(0, 120));
-  chk(/share a game/.test(dflt.parlay), 'parlay: warns when picks share a game', dflt.parlay.slice(0, 200));
+  chk(/ALL 2 HIT/.test(dflt.parlay) && /fair parlay/.test(dflt.parlay), 'parlay: the legs carry an all-hit chance and a fair parlay price', dflt.parlay.slice(0, 120));
+
+  // ---- the cap, the second choice on the rail, and clicking through ---------------
+  const capFlow = await pg.evaluate(async () => {
+    const wait = () => new Promise(r => setTimeout(r, 50));
+    const set = (id, v) => { const el = document.getElementById(id); el.value = v; el.dispatchEvent(new Event('input', { bubbles: true })); };
+    // rail: load the -300 game; by chance the ML leads and is beyond the cap, so a second choice is marked
+    document.getElementById('byEdge').checked = false; document.getElementById('byEdge').dispatchEvent(new Event('change'));
+    set('legCap', '-170'); await wait();
+    const openBtn = [...document.querySelectorAll('#cardTable [data-open]')].find(b => /Rockies/.test(b.textContent));
+    openBtn.click(); await wait();
+    const rail = [...document.querySelectorAll('#markets .mk')].map(el => ({
+      pick: el.querySelector('.pick').childNodes[0].textContent.trim(), alt: el.classList.contains('alt'),
+      caps: [...el.querySelectorAll('.cap')].map(c => c.textContent) }));
+    // raise the cap so the ML is inside it: no swap, no second choice
+    set('legCap', '-400'); await wait();
+    const railOpen = [...document.querySelectorAll('#markets .mk')].some(el => el.classList.contains('alt') || el.querySelector('.cap'));
+    const swapsOpen = document.querySelectorAll('#picks .pk .swap').length;
+    set('legCap', '-170'); await wait();
+    // click a pick card: the form loads that matchup
+    document.getElementById('clear').click(); await wait();
+    const card1 = document.querySelector('#picks .pk[data-open]');
+    card1.click(); await wait();
+    const loadedFromCard = document.getElementById('away').value + ' @ ' + document.getElementById('home').value;
+    const wanted = card1.querySelector('.n4').textContent.split(' · ')[0];
+    document.getElementById('clear').click(); await wait();
+    const row1 = document.querySelector('#board tr[data-open]');
+    row1.querySelector('td').click(); await wait();
+    const loadedFromRow = document.getElementById('away').value + ' @ ' + document.getElementById('home').value;
+    const wantedRow = row1.querySelectorAll('td')[1].textContent.replace(/\s*MLB\s*$/, '').trim();
+    return { rail, railOpen, swapsOpen, loadedFromCard, wanted, loadedFromRow, wantedRow, cap: document.getElementById('legCap').value };
+  });
+  chk(capFlow.rail[0] && /Dodgers ML/.test(capFlow.rail[0].pick) && capFlow.rail[0].caps.some(c => /beyond -170/.test(c)),
+      'cap: the -300 moneyline leads by chance and is marked beyond the cap', JSON.stringify(capFlow.rail[0]));
+  chk(capFlow.rail.some(m => m.alt && m.caps.some(c => /2nd choice/.test(c))), 'cap: the first market inside the cap is marked as the second choice', JSON.stringify(capFlow.rail));
+  chk(!capFlow.railOpen && capFlow.swapsOpen === 0, 'cap: raising the cap to -400 removes the marks and the swap', `rail=${capFlow.railOpen} swaps=${capFlow.swapsOpen}`);
+  chk(capFlow.loadedFromCard === capFlow.wanted, 'click: a pick card loads its matchup into the form', `${capFlow.loadedFromCard} vs ${capFlow.wanted}`);
+  chk(capFlow.loadedFromRow === capFlow.wantedRow, 'click: a board row loads its matchup into the form', `${capFlow.loadedFromRow} vs ${capFlow.wantedRow}`);
 
   // ---- the band stays with #1's side; rank-by-probability shows the likelier side --
   const sides = await pg.evaluate(async () => {

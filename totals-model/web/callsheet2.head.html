@@ -187,6 +187,15 @@
   .edge.pos { color: var(--edge); } .edge.neg { color: var(--bad); }
   .picks { display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: 9px; }
   .pk { border: 1px solid var(--edge); background: var(--edge-wash); border-radius: 9px; padding: 11px 13px; display: grid; gap: 4px; }
+  .pk[data-open], tr[data-open] { cursor: pointer; }
+  .pk[data-open]:hover { border-color: var(--ink); }
+  .pk.straight { border-color: var(--go); background: var(--go-wash); }
+  .pk.straight .n1 { color: var(--go); }
+  .pk .swap { font-size: 11px; color: var(--warn); }
+  .mk .cap { display: inline-block; font: 700 9px/1 var(--sans); letter-spacing: .08em; text-transform: uppercase;
+             padding: 3px 5px; border: 1px dashed var(--warn); border-radius: 4px; color: var(--warn); margin-left: 6px; vertical-align: 2px; }
+  .mk.alt { border-color: var(--go); }
+  .mk.alt .rk { color: var(--go); }
   .pk .n1 { font: 900 12px/1 var(--sans); color: var(--edge); letter-spacing: .08em; }
   .pk .n2 { font: 800 16px/1.15 var(--sans); }
   .pk .n3 { font: 500 11.5px/1.4 var(--mono); color: var(--ink-2); }
@@ -498,17 +507,24 @@
     <h2>Day board
       <span class="row" style="gap:8px">
         <label class="f" style="flex-direction:row;align-items:center;gap:6px"><span class="tag">date</span><input id="boardDate" type="date" style="padding:6px 8px;font-size:13px"></label>
-        <label class="check" style="font-size:12px"><input type="checkbox" id="byEdge"> Rank by edge instead</label>
+        <label class="f" style="flex-direction:row;align-items:center;gap:6px" title="A parlay leg priced worse than this is swapped for the next-likeliest market on the same game"><span class="tag">leg cap</span><input id="legCap" type="number" step="5" value="-170" style="padding:6px 8px;font-size:13px;width:84px"></label>
+        <label class="check" style="font-size:12px"><input type="checkbox" id="byEdge"> Rank table by edge</label>
         <span class="tag" id="boardCount"></span>
       </span></h2>
     <div class="body">
+      <div class="subhead">The parlay four <span class="tag">likeliest leg per game, within your price cap</span></div>
       <div id="picks" class="picks"></div>
+      <div class="subhead">Best straight bets <span class="tag">by edge — the price beats the chance</span></div>
+      <div id="bestBets" class="picks"></div>
       <div class="scroll"><div id="board"></div></div>
-      <p class="note"><b>Ranked by chance to hit</b>, showing the likelier side of every market. The <b>all four
-        hit</b> figure under the picks is the parlay probability assuming the four are independent — compare it
-        to what the boosted parlay pays: a payout better than 1 ÷ that chance is a parlay worth having. Two
-        picks from the same game are not independent, and the figure says so. <b>Rank by edge instead</b>
-        re-orders for straight bets at the posted price; the record keeps both rules.</p>
+      <p class="note"><b>The parlay four</b> takes the likeliest priced market from each game, one leg per game,
+        and keeps the four likeliest. A leg priced worse than the <b>leg cap</b> (−170 by default) is swapped for
+        the next-likeliest market on the same game, and the card says what it replaced — a −275 favourite is a
+        fine result and a poor parlay leg. <b>All four hit</b> is the product of the four chances: compare it to
+        what the boosted parlay pays, and a payout better than that multiple is a parlay worth having.</p>
+      <p class="note"><b>Best straight bets</b> is the other ranking — the edge, where the chance beats what the
+        price needs — and only rows with a positive edge qualify. Both fours are graded separately in the record.
+        Click any pick card or table row to load that matchup into the form.</p>
       <p class="note"><b>The four at the top are the four to look at, not the four to bet.</b> Two markets
         on the same game are one bet in disguise — a run line and an under both cash on a pitchers' duel —
         so a row that shares a game with a higher one is flagged <i>corr</i>. Re-read the inputs on anything

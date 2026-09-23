@@ -420,15 +420,24 @@
     if (!m) { box.innerHTML = '<div class="empty">Enter a total to start. Add both moneyline prices for the sides.</div>'; why.innerHTML = ""; return; }
     var byProb = !$("byEdge").checked;
     $("rankTag").textContent = byProb ? "by chance to hit" : "by edge";
-    var ranked = rankMarkets(m.markets, byProb), html = "";
+    var ranked = rankMarkets(m.markets, byProb), html = "", cap = legCap();
+    /* When the likeliest pick is priced beyond the parlay cap, the first one
+       inside it is the second choice for a leg, and is marked as such. */
+    var altIdx = -1;
+    if (byProb && ranked.length && ranked[0].price !== null && !withinCap(ranked[0].price, cap)) {
+      altIdx = ranked.findIndex(function (mk) { return withinCap(mk.price, cap); });
+    }
     ranked.forEach(function (mk, i) {
       var top = i === 0 && mk.edge !== null && mk.edge > 0;
+      var beyond = byProb && mk.price !== null && !withinCap(mk.price, cap);
       var eCls = mk.edge === null ? "" : (mk.edge > 0 ? "pos" : "neg");
-      html += '<div class="mk' + (top ? " top" : "") + (mk.edge !== null && mk.edge <= 0 ? " neg" : "") + '" data-key="' + mk.key + '">' +
+      html += '<div class="mk' + (top ? " top" : "") + (i === altIdx ? " alt" : "") + (mk.edge !== null && mk.edge <= 0 ? " neg" : "") + '" data-key="' + mk.key + '">' +
         '<div class="rk">' + (i + 1) + '</div>' +
         '<div><div class="pick ' + sideClass(mk.side) + '">' + esc(mk.pick) +
           (mk.band ? '<span class="band' + (mk.band === "NO BET" ? "" : " hot") + '">' + esc(mk.band) + '</span>' : "") +
-          (!mk.anchored ? '<span class="derived">derived</span>' : "") + '</div>' +
+          (!mk.anchored ? '<span class="derived">derived</span>' : "") +
+          (beyond ? '<span class="cap">beyond ' + sgn(cap, 0) + '</span>' : "") +
+          (i === altIdx ? '<span class="cap" style="color:var(--go);border-color:var(--go)">2nd choice · parlay leg</span>' : "") + '</div>' +
           '<div class="lab">' + esc(mk.label) + '</div></div>' +
         '<div class="nums"><div class="p">' + (mk.p * 100).toFixed(1) + '%</div>' +
           '<div class="e ' + eCls + '">' + (mk.edge === null ? "no price" :
@@ -449,6 +458,47 @@
   }
 
   /* ---- the day board ------------------------------------------------------- */
+  /* The price a parlay leg may not be worse than. American odds, so "within
+     the cap" means price >= cap: -150 is inside -170, -200 is not, +120 is. */
+  var CAP_KEY = "callsheet2.cap.v1", DEFAULT_CAP = -170;
+  function legCap() {
+    var v = parseFloat($("legCap").value);
+    return isFinite(v) ? v : DEFAULT_CAP;
+  }
+  function withinCap(price, cap) { return price !== null && price !== undefined && price >= cap; }
+
+  /* One leg per game: the likeliest priced market inside the cap. When the
+     game's likeliest market is OUTSIDE the cap the leg is the next one down,
+     and the card says what it replaced. Four games, likeliest first. */
+  function parlayFour(dateISO, cap) {
+    var byGame = {};
+    boardRows(dateISO, true).forEach(function (x) {
+      var g = byGame[x.row.id] || (byGame[x.row.id] = { row: x.row, all: [] });
+      g.all.push(x);
+    });
+    var legs = [];
+    Object.keys(byGame).forEach(function (id) {
+      var g = byGame[id];
+      g.all.sort(function (a, b) { return b.mk.p - a.mk.p; });
+      var top = g.all[0];
+      var leg = g.all.filter(function (x) { return withinCap(x.mk.price, cap); })[0];
+      if (!leg) return;
+      legs.push({ row: g.row, mk: leg.mk, swapped: leg !== top ? top.mk : null, rank: 0, corr: [] });
+    });
+    legs.sort(function (a, b) { return b.mk.p - a.mk.p; });
+    legs.forEach(function (l, i) { l.rank = i + 1; });
+    return legs.slice(0, 4);
+  }
+  /* Straight bets: the stored picks (better price per market), positive edge
+     only, best edge first. Same-game rows are flagged, not removed. */
+  function bestBets(dateISO) {
+    var rows = boardRows(dateISO, false).filter(function (x) { return x.mk.edge > 0; });
+    rows.forEach(function (x, i) {
+      x.rank = i + 1;
+      x.corr = rows.slice(0, i).filter(function (o) { return o.row.id === x.row.id; }).map(function (o) { return o.rank; });
+    });
+    return rows.slice(0, 4);
+  }
   function boardRows(dateISO, byProb) {
     var rows = [];
     card.forEach(function (r) {
@@ -469,36 +519,53 @@
     });
     return rows;
   }
+  function pickCard(x, cls, extra) {
+    var res = gradeMarket(x.mk, x.row.finals);
+    return '<div class="pk ' + cls + '" data-open="' + x.row.id + '" title="Load ' + esc(x.row.matchup) + ' into the form">' +
+      '<div class="n1">#' + x.rank + (x.corr && x.corr.length ? ' · same game as #' + x.corr.join(', #') : '') + '</div>' +
+      '<div class="n2">' + esc(x.mk.pick) + '</div>' +
+      '<div class="n3">' + (x.mk.p * 100).toFixed(1) + '% · ' + (x.mk.price !== null ? sgn(x.mk.price, 0) + ' · edge ' + sgn(x.mk.edge * 100, 1) : 'no price') +
+        (res ? ' · <span class="chip ' + res + '">' + res + '</span>' : '') + '</div>' +
+      '<div class="n4">' + esc(x.row.matchup) + ' · ' + esc(x.mk.label) + '</div>' + (extra || '') + '</div>';
+  }
   function renderBoard() {
-    var dateISO = $("boardDate").value || todayISO(), byProb = !$("byEdge").checked;
+    var dateISO = $("boardDate").value || todayISO(), byProb = !$("byEdge").checked, cap = legCap();
+    try { localStorage.setItem(CAP_KEY, String(cap)); } catch (e) {}
     var rows = boardRows(dateISO, byProb);
     $("boardCount").textContent = rows.length ? rows.length + " priced markets on " + gameDate(dateISO) : "nothing logged for " + gameDate(dateISO);
-    var picks = rows.slice(0, 4), ph = "";
-    picks.forEach(function (x) {
-      var res = gradeMarket(x.mk, x.row.finals);
-      ph += '<div class="pk"><div class="n1">#' + x.rank + (x.corr.length ? ' · same game as #' + x.corr.join(', #') : '') + '</div>' +
-        '<div class="n2">' + esc(x.mk.pick) + '</div>' +
-        '<div class="n3">' + (x.mk.p * 100).toFixed(1) + '% · ' + (x.mk.price !== null ? sgn(x.mk.price, 0) + ' · edge ' + sgn(x.mk.edge * 100, 1) : 'no price') +
-          (res ? ' · <span class="chip ' + res + '">' + res + '</span>' : '') + '</div>' +
-        '<div class="n4">' + esc(x.row.matchup) + ' · ' + esc(x.mk.label) + '</div></div>';
+
+    // --- the parlay four ---
+    var legs = parlayFour(dateISO, cap), ph = "";
+    legs.forEach(function (x) {
+      ph += pickCard(x, "", x.swapped
+        ? '<div class="swap">Instead of ' + esc(x.swapped.pick) + ' ' + (x.swapped.p * 100).toFixed(1) + '% at ' + sgn(x.swapped.price, 0) +
+          ' — beyond your ' + sgn(cap, 0) + ' cap.</div>' : '');
     });
-    if (picks.length >= 2) {
-      var pAll = picks.reduce(function (a, x) { return a * x.mk.p; }, 1);
-      var shared = picks.filter(function (x) { return x.corr.length; }).length;
-      var pushes = picks.filter(function (x) { return x.mk.pPush > 0.005; }).length;
-      ph += '<div class="pk parlay" style="grid-column:1/-1;border-style:dashed"><div class="n1">ALL ' + picks.length + ' HIT</div>' +
+    if (legs.length >= 2) {
+      var pAll = legs.reduce(function (a, x) { return a * x.mk.p; }, 1);
+      var pushes = legs.filter(function (x) { return x.mk.pPush > 0.005; }).length;
+      ph += '<div class="pk parlay" style="grid-column:1/-1;border-style:dashed"><div class="n1">ALL ' + legs.length + ' HIT</div>' +
         '<div class="n2">' + (pAll * 100).toFixed(1) + '% · fair parlay ' + sgn(priceFor(pAll), 0) + ' (' + (1 / pAll).toFixed(2) + '×)</div>' +
-        '<div class="n4">Assumes the ' + picks.length + ' are independent' +
-        (shared ? ' — <b>' + shared + ' share a game with another pick</b>, so the true chance is not this number' : '') +
+        '<div class="n4">One leg per game, so the ' + legs.length + ' are as independent as baseball gets' +
         (pushes ? '; ' + pushes + ' can push, which most apps void to a smaller parlay' : '') +
         '. A boosted payout above ' + (1 / pAll).toFixed(2) + '× is a parlay worth having.</div></div>';
+    } else if (!legs.length && rows.length) {
+      ph += '<div class="empty">Nothing on this date is priced inside ' + sgn(cap, 0) + '. Raise the cap or add games.</div>';
     }
     $("picks").innerHTML = ph;
+
+    // --- best straight bets ---
+    var bets = bestBets(dateISO), bh = "";
+    bets.forEach(function (x) { bh += pickCard(x, "straight"); });
+    if (!bets.length && rows.length) bh = '<div class="empty">No market on this date is priced below its chance. The book has every side covered tonight.</div>';
+    $("bestBets").innerHTML = bh;
+
     if (!rows.length) { $("board").innerHTML = '<div class="empty">Add today\'s matchups to the card and every priced market lands here, best edge first.</div>'; return; }
     var h = '<table><thead><tr><th>#</th><th>Matchup</th><th>Market</th><th>Pick</th><th>Chance</th><th>Price</th><th>Needs</th><th>Edge</th><th>Fair</th><th>Result</th></tr></thead><tbody>';
     rows.forEach(function (x) {
       var mk = x.mk, res = gradeMarket(mk, x.row.finals);
-      h += '<tr class="' + (x.rank <= 4 ? 'pick4' : '') + '">' +
+      var inFour = (byProb ? legs : bets).some(function (y) { return y.row.id === x.row.id && y.mk.pick === mk.pick; });
+      h += '<tr class="' + (inFour ? 'pick4' : '') + '" data-open="' + x.row.id + '" title="Load ' + esc(x.row.matchup) + ' into the form">' +
         '<td><span class="rank">' + x.rank + '</span>' + (x.corr.length ? '<span class="chip corr">corr #' + x.corr.join(' #') + '</span>' : '') + '</td>' +
         '<td>' + esc(x.row.matchup) + ' <span class="gdate">' + esc(x.row.sport) + '</span></td>' +
         '<td>' + esc(mk.label) + (!mk.anchored ? ' <span class="chip dim">derived</span>' : '') + '</td>' +
@@ -511,6 +578,11 @@
         '<td>' + (res ? '<span class="chip ' + res + '">' + res + '</span>' : '<span class="gdate">—</span>') + '</td></tr>';
     });
     $("board").innerHTML = h + '</tbody></table>';
+  }
+  function openRow(id) {
+    var row = card.filter(function (r) { return String(r.id) === String(id); })[0]; if (!row) return;
+    setSport(row.sport, true); restore(row.inputs); onEdit();
+    window.scrollTo({ top: 0, behavior: "smooth" });
   }
 
   /* ---- the card ------------------------------------------------------------ */
@@ -547,8 +619,9 @@
     var box = $("calibBox"), h = '', any = false;
     var stats = {};
     keys.forEach(function (k) { stats[k[0]] = { n: 0, w: 0, l: 0, p: 0, says: 0, units: 0, label: k[1] }; });
-    var top = { n: 0, w: 0, l: 0, p: 0, says: 0, units: 0, label: "Top-4 by chance" };
-    var topE = { n: 0, w: 0, l: 0, p: 0, says: 0, units: 0, label: "Top-4 by edge" };
+    var top = { n: 0, w: 0, l: 0, p: 0, says: 0, units: 0, label: "The parlay four" };
+    var topE = { n: 0, w: 0, l: 0, p: 0, says: 0, units: 0, label: "Best straight bets" };
+    var cap = legCap();
     var dates = {};
     card.forEach(function (r) {
       (r.markets || []).forEach(function (mk) {
@@ -562,8 +635,8 @@
       if (r.gdate) dates[r.gdate] = true;
     });
     Object.keys(dates).forEach(function (d) {
-      [[true, top], [false, topE]].forEach(function (rule) {
-        boardRows(d, rule[0]).slice(0, 4).forEach(function (x) {
+      [[parlayFour(d, cap), top], [bestBets(d), topE]].forEach(function (rule) {
+        rule[0].forEach(function (x) {
           var res = gradeMarket(x.mk, x.row.finals), t = rule[1];
           if (res === null) return;
           if (res === "push") { t.p++; return; }
@@ -584,9 +657,9 @@
     h += '<div class="verdict">' + (totalN < 30
       ? '<b>' + totalN + ' graded markets.</b> Nothing here can be read yet — one standard error on a hit rate is ' +
         (totalN ? (100 / Math.sqrt(totalN) / 2).toFixed(0) : '—') + ' points at this size. The number to watch first is the run line, ' +
-        'because it is the market this sheet derives rather than anchors, and the two top-4 rules, because choosing between them is the reason the sheet exists.'
+        'because it is the market this sheet derives rather than anchors, and the two fours, because choosing between them is the reason the sheet exists.'
       : '<b>' + totalN + ' graded markets.</b> Compare each market\'s <i>does</i> against its <i>says</i> before believing either; ' +
-        'and compare each top-4 rule against the blind rate of everything logged, not against 50%. Chance and edge will name different fours most nights; the units column is the referee.') + '</div>';
+        'and compare each four against the blind rate of everything logged, not against 50%. The parlay four and the straight bets will differ most nights; the units column is the referee.') + '</div>';
     box.innerHTML = h;
   }
 
@@ -685,7 +758,17 @@
   }
   function boardAsText() {
     var dateISO = $("boardDate").value || todayISO(), rows = boardRows(dateISO, !$("byEdge").checked);
-    var out = ["Call Sheet 2.0 — " + gameDate(dateISO) + " — ranked by " + (!$("byEdge").checked ? "chance to hit" : "edge")];
+    var out = ["Call Sheet 2.0 — " + gameDate(dateISO)];
+    out.push("THE PARLAY FOUR (one leg per game, within " + sgn(legCap(), 0) + ")");
+    parlayFour(dateISO, legCap()).forEach(function (x) {
+      out.push("  " + x.rank + ". " + x.row.matchup + " — " + x.mk.pick + "  " + (x.mk.p * 100).toFixed(1) + "%  " + sgn(x.mk.price, 0) +
+        (x.swapped ? "  (instead of " + x.swapped.pick + " at " + sgn(x.swapped.price, 0) + ")" : ""));
+    });
+    out.push("BEST STRAIGHT BETS (by edge)");
+    bestBets(dateISO).forEach(function (x) {
+      out.push("  " + x.rank + ". " + x.row.matchup + " — " + x.mk.pick + "  " + (x.mk.p * 100).toFixed(1) + "%  " + sgn(x.mk.price, 0) + "  edge " + sgn(x.mk.edge * 100, 1));
+    });
+    out.push("EVERY PRICED MARKET — ranked by " + (!$("byEdge").checked ? "chance to hit" : "edge"));
     rows.forEach(function (x) {
       out.push((x.rank <= 4 ? "* " : "  ") + x.rank + ". " + x.row.matchup + " — " + x.mk.pick + "  " + (x.mk.p * 100).toFixed(1) + "%  " +
         sgn(x.mk.price, 0) + "  edge " + sgn(x.mk.edge * 100, 1) + (x.corr.length ? "  (same game as #" + x.corr.join(", #") + ")" : ""));
@@ -698,6 +781,10 @@
   ALL.forEach(function (id) { $(id).addEventListener("input", onEdit); $(id).addEventListener("change", onEdit); });
   CHECKS.forEach(function (id) { $(id).addEventListener("change", onEdit); });
   $("byEdge").addEventListener("change", function () { render(); renderBoard(); });
+  $("legCap").addEventListener("input", function () { render(); renderBoard(); renderCalib(); });
+  $("picks").addEventListener("click", function (e) { var t = e.target.closest("[data-open]"); if (t) openRow(t.dataset.open); });
+  $("bestBets").addEventListener("click", function (e) { var t = e.target.closest("[data-open]"); if (t) openRow(t.dataset.open); });
+  $("board").addEventListener("click", function (e) { var t = e.target.closest("tr[data-open]"); if (t) openRow(t.dataset.open); });
   $("boardDate").addEventListener("change", renderBoard);
   $("add").addEventListener("click", addToCard);
   $("clear").addEventListener("click", clearForm);
@@ -725,9 +812,7 @@
       card = card.filter(function (r) { return String(r.id) !== b.dataset.del; });
       save(); renderCard(); renderBoard(); renderCalib();
     } else if (b.dataset.open) {
-      var row = card.filter(function (r) { return String(r.id) === b.dataset.open; })[0]; if (!row) return;
-      setSport(row.sport, true); restore(row.inputs); onEdit();
-      window.scrollTo({ top: 0, behavior: "smooth" });
+      openRow(b.dataset.open);
     }
   });
   $("backup").addEventListener("click", function () {
@@ -787,6 +872,7 @@
 
   if (!$("gdate").value) $("gdate").value = todayISO();
   $("boardDate").value = todayISO();
+  try { var savedCap = parseFloat(localStorage.getItem(CAP_KEY)); if (isFinite(savedCap)) $("legCap").value = savedCap; } catch (e) {}
   if (!loadDraft()) setSport("MLB", true);
   else if ($("gdate").value === "") $("gdate").value = todayISO();
   render(); renderCard(); renderBoard(); renderCalib();

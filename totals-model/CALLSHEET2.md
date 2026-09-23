@@ -7,7 +7,7 @@ top of Call Sheet #1 without touching it.
 - Page: `web/callsheet2.html`, assembled by `tools_build_callsheet2.py` from
   `web/callsheet2.head.html` + Call Sheet #1's engine block + `web/callsheet2.tail.js`
 - Fixtures: `web/callsheet2-cases.json` (62 cases) from `tools_gen_callsheet2_cases.py`
-- Browser harness: `tools_check_callsheet2_page.js` (970 checks)
+- Browser harness: `tools_check_callsheet2_page.js` (976 checks)
 
 ## What it answers
 
@@ -138,10 +138,31 @@ Read this before trusting a number.
 
 ## The day board
 
-Every priced market on the card for a chosen date, best edge first. The top four
-are marked and drawn as cards. A row that shares a game with a higher-ranked one
-is flagged *corr* — a run line and an under both cash on a pitchers' duel, so
-they are one bet in disguise. Flagged, not removed; the reader decides.
+Every priced market on the card for a chosen date, in one table, with two
+groups of picks above it. **Click any pick card or table row** and that matchup
+loads into the form.
+
+**The parlay four.** One leg per game — the likeliest priced market on that
+game — and the four likeliest legs. A leg priced worse than the **leg cap**
+(−170 by default, set on the board and remembered) is swapped for the
+next-likeliest market on the same game, and the card says what it replaced:
+"Instead of Braves ML 70.2% at −275 — beyond your −170 cap." One leg per game
+is what makes the *all four hit* figure honest: the product of four chances is
+only a probability when the four are independent, and two markets on one game
+never are. Under the four: the product, the fair parlay price, and the multiple
+a boosted payout has to beat.
+
+On the matchup rail the same rule shows as a mark: when the likeliest pick is
+beyond the cap it is tagged *beyond −170* and the first market inside the cap is
+tagged *2nd choice · parlay leg*.
+
+**Best straight bets.** The other ranking — the stored picks (better price per
+market), positive edge only, best edge first, up to four, same-game rows
+flagged. Nothing with a negative edge qualifies, so on a night the book has
+every side covered this group is empty and says so.
+
+The table below both groups ranks every priced market by chance to hit (or by
+edge, with the toggle) and highlights whichever four the toggle corresponds to.
 
 The board reads the **frozen** markets on each row — what the model said when
 the row was added — so what it shows today is what will be graded tomorrow.
@@ -159,9 +180,9 @@ a record, not a draft.
 
 "Is it working" shows per market: record, *says* (mean stated probability),
 *does* (hit rate) with its standard error, and units. Plus the two **top-4
-rules**: for every date on the card, the four rows each ranking would have put
-first, graded. Choosing between them is the reason the sheet exists, so each
-has its own tile. It is
+fours**: for every date on the card, *the parlay four* (as the board defines
+it, at the current cap) and *best straight bets*, graded. Choosing between them
+is the reason the sheet exists, so each has its own tile. It is
 computed from frozen picks, retrospectively — a row added late in the day could
 displace an earlier top-4 member, so it is a fair record of the rule but not a
 perfect record of what was on screen at bet time.

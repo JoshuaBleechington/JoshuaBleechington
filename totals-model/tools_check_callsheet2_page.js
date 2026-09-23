@@ -18,7 +18,7 @@ const { execSync } = require('child_process');
 const CASES = JSON.parse(fs.readFileSync(path.join(__dirname, 'web/callsheet2-cases.json'), 'utf8'));
 const IDS = ["away","home","line","op","up","opened","gdate","aera","hera","aip","hip","arpg","hrpg",
              "abp","hbp","al10","hl10","h2h","h2hn","pf","mph","dir","temp","tick","cash",
-             "hml","aml","rl","rlh","rla","f5line","f5op","f5up","atl","atop","atup","htl","htop","htup",
+             "hml","aml","rl","rlh","rla","f5line","f5op","f5up",
              "apace","hpace","aort","hort","adrt","hdrt","arest","hrest","al5","hl5","sp","sph","spa"];
 const CHECKS = ["dome","playoff"];
 
@@ -100,7 +100,6 @@ const CHECKS = ["dome","playoff"];
     clear(); set('gdate', '2026-09-22'); set('away', 'Rays'); set('home', 'Yankees');
     set('line', '6.5'); set('op', '-120'); set('up', '105'); set('aml', '130'); set('hml', '-150');
     set('rl', '-1.5'); set('rlh', '120'); set('rla', '-140'); set('f5line', '3.5'); set('f5op', '-115'); set('f5up', '-105');
-    set('atl', '2.5'); set('atop', '-105'); set('atup', '-115'); set('htl', '3.5'); set('htop', '-120'); set('htup', '100');
     set('aera', '2.94'); set('hera', '2.95'); set('mph', '15'); set('dir', 'in'); set('temp', '65'); set('pf', '103');
     await wait(); document.getElementById('add').click(); await wait();
     // game 2: a heavy favourite, moneyline only
@@ -135,8 +134,8 @@ const CHECKS = ["dome","playoff"];
     return { rows, picks, stored: stored.length, finals: g1.finals, graded, calib, boardAfter, markets1: g1.markets.map(m => m.key) };
   });
   chk(flow.stored === 3, 'log: three matchups stored', String(flow.stored));
-  chk(flow.rows.length === 8 && !flow.rows.some(r => /Mets/.test(r.matchup)),
-      'board: 22 Sept shows the 6 priced markets of game 1 plus game 2\'s total and moneyline, and not 21 Sept',
+  chk(flow.rows.length === 6 && !flow.rows.some(r => /Mets/.test(r.matchup)),
+      'board: 22 Sept shows the 4 priced markets of game 1 plus game 2\'s total and moneyline, and not 21 Sept',
       flow.rows.map(r => r.matchup + ' ' + r.pick).join(' | '));
   chk(flow.rows.every((r, i) => i === 0 || r.edge <= flow.rows[i - 1].edge), 'board: ordered by edge, best first',
       flow.rows.map(r => r.edge).join(' > '));
@@ -154,9 +153,6 @@ const CHECKS = ["dome","playoff"];
   chk(by['UNDER 6.5'] === 'win', 'grade: UNDER 6.5 on a 1-1 game is a win', JSON.stringify(by));
   chk(by['F5 UNDER 3.5'] === 'win', 'grade: F5 UNDER 3.5 on a 1-0 first five is a win', JSON.stringify(by));
   chk((by['Rays +1.5'] === 'win') || (by['Yankees -1.5'] === 'loss'), 'grade: a one-run home win is a cover for the dog', JSON.stringify(by));
-  chk((by['Rays UNDER 2.5'] === 'win' || by['Rays OVER 2.5'] === 'loss') && (by['Yankees UNDER 3.5'] === 'win' || by['Yankees OVER 3.5'] === 'loss'),
-      'grade: each team total is graded on THAT team\'s runs alone', JSON.stringify(by));
-  chk(/Team totals/.test(flow.calib), 'calib: the two team-total markets share one tile', flow.calib.slice(0, 300));
   chk(/Full-game total/.test(flow.calib) && /First five/.test(flow.calib) && /Top-4 rule/.test(flow.calib),
       'calib: per-market tiles and the top-4 rule are drawn once something is graded', flow.calib.slice(0, 200));
   chk(flow.boardAfter.filter(Boolean).length >= 3, 'board: results appear on the board rows once graded', flow.boardAfter.join('|'));

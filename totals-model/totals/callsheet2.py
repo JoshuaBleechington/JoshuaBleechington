@@ -76,8 +76,7 @@ from typing import Any
 from .fullgame import (
     BANDS, DISPERSION_PHI, HOLD_REFERENCE, STARTER_INNINGS, WEIGHTS,
     WNBA_TOTAL_SD, Forecast, _ncdf, devig, fair_total, forecast_mlb,
-    forecast_wnba, hold, implied, market_confidence, nb_pmf, nb_split,
-    normal_split, price_for,
+    forecast_wnba, hold, implied, market_confidence, nb_pmf, nb_split, price_for,
 )
 
 # ===========================================================================
@@ -109,15 +108,6 @@ F5_PHI = DISPERSION_PHI["MLB"]
 
 #: A run line the book posts is a whole number and a half; the default.
 DEFAULT_RUN_LINE = 1.5
-
-#: Spread of ONE WNBA team's score, derived from the two constants already in
-#: use rather than picked. If each side's points have variance s^2 and the two
-#: sides correlate at rho, then Var(total) = 2 s^2 (1 + rho) and
-#: Var(margin) = 2 s^2 (1 - rho); adding the two gives 4 s^2 = 11.5^2 + 11.0^2.
-#: (rho comes out at +0.04 -- the two sides of a basketball game barely move
-#: together, which is what makes a team total nearly independent of the
-#: other side's.)
-WNBA_TEAM_SD = math.sqrt((WNBA_TOTAL_SD ** 2 + WNBA_MARGIN_SD ** 2) / 4.0)
 
 #: How far to sum the per-team pmf. Twenty-five runs by one side is beyond
 #: the tail of anything the log holds (the 25-run game of 22 Sept was BOTH
@@ -315,43 +305,6 @@ def solve_split(total_mean: float, p_home: float, phi: float = TEAM_PHI) -> tupl
     return lam_h, total_mean - lam_h
 
 
-def team_total_probs(lam: float, line: float, phi: float = TEAM_PHI) -> tuple[float, float, float]:
-    """(P over, P push, P under) for ONE side's runs against its team-total line."""
-    return nb_split(line, lam, phi)
-
-
-TT_NOTE = (
-    "Derived from the split, not from the team-total prices: the book's total and "
-    "moneyline say how many this side is expected to score, and this is that number "
-    "read against the team-total line. Books template team totals off exactly those "
-    "two numbers, so a disagreement here is usually the rounding of a half-run line "
-    "-- and at a half-run line the rounding is the whole edge.")
-
-
-def _team_totals(sport: str, away: str, home: str, lam_away: float, lam_home: float,
-                 away_tt_line, away_tt_over, away_tt_under,
-                 home_tt_line, home_tt_over, home_tt_under) -> list[Market]:
-    out: list[Market] = []
-    for key, team, lam, line, over, under in (
-            ("tta", away, lam_away, away_tt_line, away_tt_over, away_tt_under),
-            ("tth", home, lam_home, home_tt_line, home_tt_over, home_tt_under)):
-        if line is None:
-            continue
-        if sport == "WNBA":
-            o, pu, u = normal_split(line, lam, WNBA_TEAM_SD)
-            unit = "points"
-        else:
-            o, pu, u = team_total_probs(lam, line)
-            unit = "runs"
-        out.append(_pick(
-            key, f"{team} team total {line:g}",
-            [_side(f"{team} OVER {line:g}", "OVER", o, pu, over),
-             _side(f"{team} UNDER {line:g}", "UNDER", u, pu, under)],
-            anchored=False,
-            notes=[TT_NOTE, f"The split has {team} at {lam:.2f} {unit} against {line:g}."]))
-    return out
-
-
 def run_line_probs(lam_home: float, lam_away: float, home_line: float,
                    phi: float = TEAM_PHI) -> tuple[float, float, float]:
     """(P home covers, P push, P away covers) for the home side at `home_line`
@@ -395,12 +348,6 @@ def forecast_matchup_mlb(
     f5_line: float | None = None,
     f5_over_price: float | None = None,
     f5_under_price: float | None = None,
-    away_tt_line: float | None = None,
-    away_tt_over: float | None = None,
-    away_tt_under: float | None = None,
-    home_tt_line: float | None = None,
-    home_tt_over: float | None = None,
-    home_tt_under: float | None = None,
     **total_inputs: Any,
 ) -> Matchup:
     """Everything the book posts on one MLB game, priced off its own numbers.
@@ -478,19 +425,10 @@ def forecast_matchup_mlb(
              _side(away_pick, "AWAY", fl, pu, rl_away_price)],
             anchored=rl_home_price is not None and rl_away_price is not None,
             notes=rl_notes))
-
-        # --- team totals ----------------------------------------------------
-        markets.extend(_team_totals(
-            "MLB", away, home, lam_a, lam_h, away_tt_line, away_tt_over, away_tt_under,
-            home_tt_line, home_tt_over, home_tt_under))
     else:
-        notes.append("No moneyline entered, so there is no split and no moneyline, run "
-                     "line or team total on this card. Both prices are needed -- one "
-                     "side's price says the lean, both say the hold.")
-        if away_tt_line is not None or home_tt_line is not None:
-            notes.append("Team-total lines were entered but cannot be priced without the "
-                         "moneyline: they are read off the split, and the moneyline is "
-                         "what makes the split.")
+        notes.append("No moneyline entered, so there is no split and no moneyline or "
+                     "run line on this card. Both prices are needed -- one side's price "
+                     "says the lean, both say the hold.")
 
     # --- first five -----------------------------------------------------------
     if f5_line is not None:
@@ -576,12 +514,6 @@ def forecast_matchup_wnba(
     spread: float | None = None,          # HOME side's line, e.g. -4.5
     spread_home_price: float | None = None,
     spread_away_price: float | None = None,
-    away_tt_line: float | None = None,
-    away_tt_over: float | None = None,
-    away_tt_under: float | None = None,
-    home_tt_line: float | None = None,
-    home_tt_over: float | None = None,
-    home_tt_under: float | None = None,
     **total_inputs: Any,
 ) -> Matchup:
     notes: list[str] = []
@@ -654,11 +586,6 @@ def forecast_matchup_wnba(
                    "ever the vig regressed for a wide hold. It is here so the day board can "
                    "rank it against the totals honestly, not because it can find value on "
                    "its own."]))
-
-    # --- team totals ------------------------------------------------------------
-    markets.extend(_team_totals(
-        "WNBA", away, home, lam_a, lam_h, away_tt_line, away_tt_over, away_tt_under,
-        home_tt_line, home_tt_over, home_tt_under))
     return Matchup("WNBA", away, home, markets, lam_h, lam_a, f, notes)
 
 
@@ -705,19 +632,11 @@ def grade(market: Market, *, home_runs: float | None, away_runs: float | None,
     """'win' | 'loss' | 'push' | None (not gradeable yet)."""
     key, side = market.key, market.side
     line = _line_of(market)
-    if key in ("total", "f5", "tta", "tth"):
+    if key in ("total", "f5"):
         if key == "f5":
             if f5_home is None or f5_away is None:
                 return None
             total = f5_home + f5_away
-        elif key == "tta":
-            if away_runs is None:
-                return None
-            total = away_runs
-        elif key == "tth":
-            if home_runs is None:
-                return None
-            total = home_runs
         else:
             if home_runs is None or away_runs is None:
                 return None
@@ -741,7 +660,7 @@ def grade(market: Market, *, home_runs: float | None, away_runs: float | None,
 
 def _line_of(market: Market) -> float:
     import re
-    if market.key in ("total", "f5", "tta", "tth"):
+    if market.key in ("total", "f5"):
         m = re.search(r"([0-9]+(?:\.[0-9]+)?)\s*$", market.pick)
         return float(m.group(1)) if m else 0.0
     if market.key == "ml":

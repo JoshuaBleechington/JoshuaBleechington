@@ -7,7 +7,7 @@ top of Call Sheet #1 without touching it.
 - Page: `web/callsheet2.html`, assembled by `tools_build_callsheet2.py` from
   `web/callsheet2.head.html` + Call Sheet #1's engine block + `web/callsheet2.tail.js`
 - Fixtures: `web/callsheet2-cases.json` (62 cases) from `tools_gen_callsheet2_cases.py`
-- Browser harness: `tools_check_callsheet2_page.js` (987 checks)
+- Browser harness: `tools_check_callsheet2_page.js` (986 checks)
 
 ## What it answers
 
@@ -61,32 +61,35 @@ the total and the first five — where they are a differential against a number
 that does not already contain them — and nothing else. The total forecast's
 move is applied to both team means in proportion; the split is the market's.
 
-## Ranked by chance to hit, with the edge on every row
+## The rail ranks by edge; the board serves both
 
-Both sides of every market are evaluated. The **pick** stored on a row is the
-side with the better price — the higher edge — because that is the honest
-answer to "which side of this market, if any". When both sides are priced
-above their probability the market says so and its edge is negative.
+Both sides of every market are evaluated. The **pick** on a row is the side
+with the better price — the higher edge — because that is the honest answer to
+"which side of this market, if any". When both sides are priced above their
+probability the market says so and its edge is negative.
 
-The **order** is by chance to hit. That was the user's call on 23 Sept, and it
-is the right call for how the sheet is used: the picks go into boosted parlays,
-where the price is fixed outside the sheet by the boost and the probability is
-what compounds. The board therefore shows the *likelier* side of each market
-(which on a lopsided quote can be the opposite of the stored pick), ranks by
-that chance, marks the top four, and prices them as a parlay — the product of
-the four probabilities, the fair parlay price, and a warning when two of the
-four share a game and the product is therefore not the true chance.
+**"This matchup, ranked" orders by edge.** Probability is the big number on
+every row; edge, in gold or red, is the order. This went to chance-to-hit for
+an afternoon on 23 Sept and came back the same evening, after the first two
+graded games showed the shape of the argument: a 62% favourite at −185 lost
+and the edge picks on the same card went 3-1. Two games are not evidence and
+the record tiles exist to gather it, but the user chose the edge order having
+seen it, and that is the order the rail keeps.
 
-A **rank by edge** toggle re-orders for straight bets at the posted price,
-showing the stored picks. The record keeps **both** rules — *Top-4 by chance*
-and *Top-4 by edge* each get a calibration tile — because they will name
-different fours most nights and only the units column can say which one pays.
+The rail also carries the parlay marks, named so they cannot be misread: the
+likeliest priced thing on the game (green *parlay leg* when it is inside the
+leg cap, amber *likeliest … beyond* when it is not) and, when it is beyond,
+the *2nd choice · parlay leg* that would take its place. Those marks describe
+the likelier side of a market, which is not always the side the row shows.
 
-The moneyline will sit at or near the top of a chance-ranked board most nights
-and never at the top of an edge-ranked one, and that is not a contradiction:
-the moneyline is the anchor, so its probability is the market's and its edge
-is only ever the vig. What the sheet adds to a moneyline pick is the *rest* of
-the board around it.
+**The day board serves both uses.** *The parlay four* is by chance to hit,
+one leg per game, inside the cap. *Best straight bets* is by edge, positive
+edge only. The table beneath them orders by chance unless *rank table by edge*
+is ticked; the toggle touches the table only.
+
+The moneyline will lead a chance ranking most nights and never an edge one,
+and that is not a contradiction: the moneyline is the anchor, so its
+probability is the market's and its edge is only ever the vig.
 
 ### Call Sheet #1's band stays with #1's side
 

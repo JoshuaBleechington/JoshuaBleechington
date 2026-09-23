@@ -418,9 +418,11 @@
     last = m;
     var box = $("markets"), why = $("why");
     if (!m) { box.innerHTML = '<div class="empty">Enter a total to start. Add both moneyline prices for the sides.</div>'; why.innerHTML = ""; return; }
-    var byProb = !$("byEdge").checked;
-    $("rankTag").textContent = byProb ? "by chance to hit" : "by edge";
-    var ranked = rankMarkets(m.markets, byProb), html = "", cap = legCap();
+    /* The rail ranks by EDGE, always: the toggle on the day board orders the
+       table, not this list. Probability stays the big number on every row. */
+    var byProb = false;
+    $("rankTag").textContent = "by edge";
+    var ranked = rankMarkets(m.markets, false), html = "", cap = legCap();
     var gradedRow = openedFinals(), fin = gradedRow ? gradedRow.finals : null;
     if (gradedRow) {
       var w = 0, l = 0, pu = 0;
@@ -431,25 +433,33 @@
         ' · this card went <b>' + w + '-' + l + (pu ? '-' + pu : '') + '</b>.' +
         (formLocked ? ' <b>Locked</b> — a graded row is a record. Press Clear to start a new card.' : ' Edit anything and the grading clears.') + '</div>';
     }
-    /* When the likeliest pick is priced beyond the parlay cap, the first one
-       inside it is the second choice for a leg, and is marked as such. */
-    var altIdx = -1;
-    if (byProb && ranked.length && ranked[0].price !== null && !withinCap(ranked[0].price, cap)) {
-      altIdx = ranked.findIndex(function (mk) { return withinCap(mk.price, cap); });
-    }
+    /* The parlay-leg marks are about the LIKELIEST side of each market, which
+       is not always the side this list shows (the list shows the better
+       price). So they are computed on the likelier views and printed with the
+       pick named: the likeliest thing on the game, whether it is inside the
+       cap, and if not, which market is the second choice for a leg. */
+    var likely = m.markets.map(function (mk) { return likelier(mk); })
+      .filter(function (v) { return v.price !== null; })
+      .sort(function (a, b) { return b.p - a.p; });
+    var leadKey = likely.length ? likely[0].key : null;
+    var leadBeyond = likely.length && !withinCap(likely[0].price, cap);
+    var second = leadBeyond ? likely.filter(function (v) { return withinCap(v.price, cap); })[0] : null;
+    var byKey = {}; likely.forEach(function (v) { byKey[v.key] = v; });
     ranked.forEach(function (mk, i) {
       var top = i === 0 && mk.edge !== null && mk.edge > 0;
-      var beyond = byProb && mk.price !== null && !withinCap(mk.price, cap);
+      var lv = byKey[mk.key];
+      var isLead = mk.key === leadKey, isSecond = second && mk.key === second.key;
       var res = fin ? gradeMarket(mk, fin) : null;
       var eCls = mk.edge === null ? "" : (mk.edge > 0 ? "pos" : "neg");
-      html += '<div class="mk' + (top ? " top" : "") + (i === altIdx ? " alt" : "") + (mk.edge !== null && mk.edge <= 0 ? " neg" : "") +
+      html += '<div class="mk' + (top ? " top" : "") + (isSecond ? " alt" : "") + (mk.edge !== null && mk.edge <= 0 ? " neg" : "") +
         (res ? " " + res : "") + '" data-key="' + mk.key + '"' + (res ? ' data-result="' + res + '"' : '') + '>' +
         '<div class="rk">' + (i + 1) + '</div>' +
         '<div><div class="pick ' + sideClass(mk.side) + '">' + esc(mk.pick) +
           (mk.band ? '<span class="band' + (mk.band === "NO BET" ? "" : " hot") + '">' + esc(mk.band) + '</span>' : "") +
           (!mk.anchored ? '<span class="derived">derived</span>' : "") +
-          (beyond ? '<span class="cap">beyond ' + sgn(cap, 0) + '</span>' : "") +
-          (i === altIdx ? '<span class="cap" style="color:var(--go);border-color:var(--go)">2nd choice · parlay leg</span>' : "") +
+          (isLead && leadBeyond ? '<span class="cap">likeliest: ' + esc(lv.pick) + ' ' + (lv.p * 100).toFixed(1) + '% at ' + sgn(lv.price, 0) + ' · beyond ' + sgn(cap, 0) + '</span>' : "") +
+          (isLead && !leadBeyond ? '<span class="cap" style="color:var(--go);border-color:var(--go)">parlay leg: ' + esc(lv.pick) + ' ' + (lv.p * 100).toFixed(1) + '%</span>' : "") +
+          (isSecond ? '<span class="cap" style="color:var(--go);border-color:var(--go)">2nd choice · parlay leg: ' + esc(lv.pick) + ' ' + (lv.p * 100).toFixed(1) + '% at ' + sgn(lv.price, 0) + '</span>' : "") +
           (res ? '<span class="chip ' + res + '" style="margin-left:8px;vertical-align:2px">' + res + '</span>' : "") + '</div>' +
           '<div class="lab">' + esc(mk.label) + '</div></div>' +
         '<div class="nums"><div class="p">' + (mk.p * 100).toFixed(1) + '%</div>' +
@@ -831,7 +841,7 @@
   $("m-wnba").addEventListener("click", function () { setSport("WNBA"); });
   ALL.forEach(function (id) { $(id).addEventListener("input", onEdit); $(id).addEventListener("change", onEdit); });
   CHECKS.forEach(function (id) { $(id).addEventListener("change", onEdit); });
-  $("byEdge").addEventListener("change", function () { render(); renderBoard(); });
+  $("byEdge").addEventListener("change", function () { renderBoard(); });
   $("legCap").addEventListener("input", function () { render(); renderBoard(); renderCalib(); });
   $("picks").addEventListener("click", function (e) { var t = e.target.closest("[data-open]"); if (t) openRow(t.dataset.open); });
   $("bestBets").addEventListener("click", function (e) { var t = e.target.closest("[data-open]"); if (t) openRow(t.dataset.open); });

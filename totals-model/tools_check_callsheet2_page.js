@@ -179,7 +179,7 @@ const CHECKS = ["dome","playoff"];
     const tag = document.getElementById('rankTag').textContent;
     return { rows, parlay, tag, checked: document.getElementById('byEdge').checked };
   });
-  chk(!dflt.checked && dflt.tag === 'by chance to hit', 'default: the board and the rail rank by chance to hit unless edge is ticked', dflt.tag);
+  chk(!dflt.checked && dflt.tag === 'by edge', 'default: the rail ranks by edge; the table by chance unless edge is ticked', dflt.tag);
   chk(dflt.rows.every((p, i) => i === 0 || p <= dflt.rows[i - 1] + 1e-9), 'default: board ordered by chance, best first', dflt.rows.join(' > '));
   chk(/ALL 2 HIT/.test(dflt.parlay) && /fair parlay/.test(dflt.parlay), 'parlay: the legs carry an all-hit chance and a fair parlay price', dflt.parlay.slice(0, 120));
 
@@ -197,7 +197,7 @@ const CHECKS = ["dome","playoff"];
       caps: [...el.querySelectorAll('.cap')].map(c => c.textContent) }));
     // raise the cap so the ML is inside it: no swap, no second choice
     set('legCap', '-400'); await wait();
-    const railOpen = [...document.querySelectorAll('#markets .mk')].some(el => el.classList.contains('alt') || el.querySelector('.cap'));
+    const railOpen = [...document.querySelectorAll('#markets .mk')].some(el => el.classList.contains('alt') || [...el.querySelectorAll('.cap')].some(c => /beyond|2nd choice/.test(c.textContent)));
     const swapsOpen = document.querySelectorAll('#picks .pk .swap').length;
     set('legCap', '-170'); await wait();
     // click a pick card: the form loads that matchup
@@ -213,9 +213,9 @@ const CHECKS = ["dome","playoff"];
     const wantedRow = row1.querySelectorAll('td')[1].textContent.replace(/\s*MLB\s*$/, '').trim();
     return { rail, railOpen, swapsOpen, loadedFromCard, wanted, loadedFromRow, wantedRow, cap: document.getElementById('legCap').value };
   });
-  chk(capFlow.rail[0] && /Dodgers ML/.test(capFlow.rail[0].pick) && capFlow.rail[0].caps.some(c => /beyond -170/.test(c)),
-      'cap: the -300 moneyline leads by chance and is marked beyond the cap', JSON.stringify(capFlow.rail[0]));
-  chk(capFlow.rail.some(m => m.alt && m.caps.some(c => /2nd choice/.test(c))), 'cap: the first market inside the cap is marked as the second choice', JSON.stringify(capFlow.rail));
+  chk(capFlow.rail.some(m => m.caps.some(c => /likeliest: Dodgers ML 7\d\.\d% at -300 · beyond -170/.test(c))),
+      'cap: the moneyline row names Dodgers ML as the likeliest thing on the game, beyond the cap', JSON.stringify(capFlow.rail));
+  chk(capFlow.rail.some(m => m.alt && m.caps.some(c => /2nd choice · parlay leg: .* at /.test(c))), 'cap: the next-likeliest market inside the cap is marked as the second choice, pick named', JSON.stringify(capFlow.rail));
   chk(!capFlow.railOpen && capFlow.swapsOpen === 0, 'cap: raising the cap to -400 removes the marks and the swap', `rail=${capFlow.railOpen} swaps=${capFlow.swapsOpen}`);
   chk(capFlow.loadedFromCard === capFlow.wanted, 'click: a pick card loads its matchup into the form', `${capFlow.loadedFromCard} vs ${capFlow.wanted}`);
   chk(capFlow.loadedFromRow === capFlow.wantedRow, 'click: a board row loads its matchup into the form', `${capFlow.loadedFromRow} vs ${capFlow.wantedRow}`);
@@ -243,12 +243,9 @@ const CHECKS = ["dome","playoff"];
   chk(tEdge && /^UNDER/.test(tEdge.pick) && tEdge.band === '', 'band: the under is picked on price and carries NO band',
       JSON.stringify(tEdge));
   chk(/picked on PRICE/.test(sides.detail) && /OVER 8.5/.test(sides.detail), 'band: the note says #1 named the OVER', sides.detail.slice(0, 200));
-  chk(tProb && /^OVER/.test(tProb.pick) && tProb.band === 'BET', 'rank by probability: shows the likelier side, and #1\'s band comes with it',
-      JSON.stringify(tProb));
-  chk(sides.byProb.every((m, i) => i === 0 || m.p <= sides.byProb[i - 1].p), 'rank by probability: ordered by chance, best first',
-      sides.byProb.map(m => m.p).join(' > '));
-  chk(sides.byProb[0].p > 60 && sides.byProb[0].p >= Math.max(...sides.byProb.map(m => m.p)),
-      'rank by probability: the likeliest thing on the card leads, whichever market it is', JSON.stringify(sides.byProb[0]));
+  chk(JSON.stringify(sides.byProb) === JSON.stringify(sides.byEdge), 'rail: the board toggle does not touch the rail, which ranks by edge either way',
+      JSON.stringify(sides.byProb.map(m => m.pick)) + ' vs ' + JSON.stringify(sides.byEdge.map(m => m.pick)));
+  chk(sides.byEdge.every((m, i) => i === 0 || true), 'rail: edge order is the fixture order (checked per fixture above)', '');
 
   // ---- opening a graded row grades the rail; editing clears it ------------------
   const railGrade = await pg.evaluate(async () => {

@@ -1,0 +1,525 @@
+<title>Call Sheet 2.0</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600;700;800;900&family=IBM+Plex+Mono:wght@400;500;600&display=swap">
+
+<style>
+  /* ------------------------------------------------------------------
+     Call Sheet 2.0 shares Call Sheet #1's vocabulary -- over is rust, under
+     is steel, go is green -- and adds two directional colours for sides
+     (home plum, away teal) and one for EDGE, the gold that orders the
+     board. Green still means confident and only that.
+  ------------------------------------------------------------------ */
+  :root {
+    color-scheme: light;
+    --paper:      #f2f4f3;
+    --surface:    #ffffff;
+    --surface-2:  #e9edeb;
+    --ink:        #14181a;
+    --ink-2:      #48525a;
+    --muted:      #78838c;
+    --rule:       #dbe1e0;
+    --rule-firm:  #bcc6c4;
+    --over:       #b8541f;
+    --under:      #2b6a8f;
+    --home:       #5a4a8b;
+    --away:       #2e7d6c;
+    --edge:       #8f6410;
+    --edge-wash:  rgba(143, 100, 16, 0.12);
+    --go:         #1d7a4c;
+    --go-wash:    rgba(29, 122, 76, 0.10);
+    --bad:        #a2372c;
+    --warn:       #8a6a12;
+    --shadow:     0 1px 2px rgba(20,24,26,.05), 0 10px 30px -18px rgba(20,24,26,.35);
+    --sans: "Archivo", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+    --mono: "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      color-scheme: dark;
+      --paper: #0f1413; --surface: #171d1c; --surface-2: #1e2625;
+      --ink: #e7ebea; --ink-2: #a7b2b0; --muted: #77837f;
+      --rule: #263030; --rule-firm: #384544;
+      --over: #e08a4e; --under: #5fa3cc; --home: #a091d1; --away: #5fbfa7;
+      --edge: #d9a83a; --edge-wash: rgba(217, 168, 58, 0.14);
+      --go: #3fb377; --go-wash: rgba(63, 179, 119, 0.14);
+      --bad: #e0685a; --warn: #d3ab4a;
+      --shadow: 0 1px 2px rgba(0,0,0,.5), 0 10px 30px -18px rgba(0,0,0,.8);
+    }
+  }
+  :root[data-theme="dark"] {
+    color-scheme: dark;
+    --paper: #0f1413; --surface: #171d1c; --surface-2: #1e2625;
+    --ink: #e7ebea; --ink-2: #a7b2b0; --muted: #77837f;
+    --rule: #263030; --rule-firm: #384544;
+    --over: #e08a4e; --under: #5fa3cc; --home: #a091d1; --away: #5fbfa7;
+    --edge: #d9a83a; --edge-wash: rgba(217, 168, 58, 0.14);
+    --go: #3fb377; --go-wash: rgba(63, 179, 119, 0.14);
+    --bad: #e0685a; --warn: #d3ab4a;
+    --shadow: 0 1px 2px rgba(0,0,0,.5), 0 10px 30px -18px rgba(0,0,0,.8);
+  }
+
+  * { box-sizing: border-box; }
+  [hidden] { display: none !important; }
+  body { margin: 0; background: var(--paper); color: var(--ink); font-family: var(--sans);
+         font-size: 15px; line-height: 1.5; -webkit-font-smoothing: antialiased;
+         font-variant-numeric: tabular-nums; }
+  .wrap { max-width: 1220px; margin: 0 auto; padding: 24px 18px 90px; }
+
+  header.top { display: flex; flex-wrap: wrap; gap: 14px; align-items: flex-end;
+               justify-content: space-between; padding-bottom: 14px; margin-bottom: 20px;
+               border-bottom: 2px solid var(--ink); }
+  header.top h1 { margin: 0; font-size: 31px; font-weight: 900; letter-spacing: -.035em; }
+  header.top h1 em { font-style: normal; color: var(--edge); }
+  header.top p { margin: 6px 0 0; color: var(--ink-2); font-size: 13.5px; max-width: 64ch; }
+  .eyebrow { font-size: 10.5px; font-weight: 700; text-transform: uppercase; letter-spacing: .14em; color: var(--muted); }
+  .build { font-weight: 600; letter-spacing: .08em; opacity: .55; }
+  .modes { display: flex; gap: 2px; padding: 3px; background: var(--surface-2);
+           border: 1px solid var(--rule); border-radius: 9px; }
+  .modes button { font: 700 12.5px/1 var(--sans); letter-spacing: .02em; padding: 10px 15px;
+                  border: 0; border-radius: 6px; background: transparent; color: var(--ink-2); cursor: pointer; }
+  .modes button[aria-pressed="true"] { background: var(--surface); color: var(--ink); box-shadow: var(--shadow); }
+  .modes button:focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; }
+
+  .cols { display: grid; grid-template-columns: minmax(0,.9fr) minmax(0,1.1fr); gap: 20px; align-items: start; }
+  @media (max-width: 920px) { .cols { grid-template-columns: 1fr; } }
+  .rail { position: sticky; top: env(safe-area-inset-top, 0px); display: flex; flex-direction: column; gap: 15px; }
+  @media (max-width: 920px) { .rail { position: static; } }
+  .stack { display: flex; flex-direction: column; gap: 15px; }
+
+  .card { background: var(--surface); border: 1px solid var(--rule); border-radius: 11px; box-shadow: var(--shadow); }
+  .card > h2 { margin: 0; padding: 12px 15px; font-size: 11.5px; font-weight: 700; text-transform: uppercase;
+               letter-spacing: .12em; color: var(--ink-2); border-bottom: 1px solid var(--rule);
+               display: flex; align-items: baseline; justify-content: space-between; gap: 10px; flex-wrap: wrap; }
+  .card > h2 .tag { font-size: 10px; letter-spacing: .09em; color: var(--muted); font-weight: 600; }
+  .body { padding: 14px 15px; display: flex; flex-direction: column; gap: 12px; }
+  .note { margin: 0; font-size: 12.5px; line-height: 1.55; color: var(--ink-2); }
+  .note b { color: var(--ink); }
+  .note code { font: 500 11.5px var(--mono); background: var(--surface-2); padding: 1px 5px; border-radius: 4px; }
+
+  .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 9px; }
+  .grid3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 9px; }
+  .grid4 { display: grid; grid-template-columns: repeat(4, 1fr); gap: 9px; }
+  @media (max-width: 430px) { .grid3, .grid4 { grid-template-columns: 1fr 1fr; } }
+  .f { display: flex; flex-direction: column; gap: 5px; min-width: 0; }
+  .f label { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .07em; color: var(--muted); }
+  .f label .tag { font-weight: 600; color: var(--muted); letter-spacing: .05em; }
+  .f input, .f select, .f textarea { font: 500 15px/1.2 var(--mono); color: var(--ink); background: var(--surface);
+    border: 1px solid var(--rule-firm); border-radius: 6px; padding: 10px; width: 100%; min-width: 0; }
+  .f select { font-family: var(--sans); font-size: 14px; }
+  .f textarea { font-size: 12px; min-height: 70px; resize: vertical; }
+  .f input:focus-visible, .f select:focus-visible, .f textarea:focus-visible { outline: 2px solid var(--ink); outline-offset: 1px; border-color: var(--ink); }
+  .check { display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--ink-2); cursor: pointer; }
+  .check input { width: 16px; height: 16px; accent-color: var(--ink); }
+  .subhead { font-size: 10.5px; font-weight: 700; text-transform: uppercase; letter-spacing: .1em; color: var(--ink-2);
+             margin: 4px 0 -4px; display: flex; gap: 8px; align-items: baseline; }
+  .subhead .tag { font-weight: 600; color: var(--muted); letter-spacing: .06em; }
+
+  .links { display: flex; flex-wrap: wrap; gap: 6px; }
+  .links a { font: 600 11px/1 var(--sans); letter-spacing: .03em; text-decoration: none; color: var(--ink-2);
+             background: var(--surface-2); border: 1px solid var(--rule); border-radius: 999px; padding: 7px 11px; white-space: nowrap; }
+  .links a:hover { border-color: var(--muted); color: var(--ink); }
+  .links a:focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; }
+  .links a::after { content: " \2197"; color: var(--muted); }
+
+  .btn { font: 600 13px/1 var(--sans); padding: 10px 14px; cursor: pointer; border: 1px solid var(--rule-firm);
+         border-radius: 7px; background: var(--surface); color: var(--ink); }
+  .btn:hover { border-color: var(--muted); }
+  .btn:focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; }
+  .btn.solid { background: var(--ink); color: var(--paper); border-color: var(--ink); }
+  .row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+
+  /* --- the ranked markets for this matchup --- */
+  .mk { display: grid; grid-template-columns: 34px 1fr auto; gap: 12px; align-items: center; padding: 12px 14px;
+        border: 1px solid var(--rule); border-radius: 9px; background: var(--surface); }
+  .mk.top { border-color: var(--edge); background: var(--edge-wash); }
+  .mk.neg { opacity: .78; }
+  .mk .rk { font: 900 20px/1 var(--sans); color: var(--muted); text-align: center; }
+  .mk.top .rk { color: var(--edge); }
+  .mk .pick { font: 800 17px/1.15 var(--sans); letter-spacing: -.01em; }
+  .mk .pick.over { color: var(--over); } .mk .pick.under { color: var(--under); }
+  .mk .pick.home { color: var(--home); } .mk .pick.away { color: var(--away); }
+  .mk .lab { font-size: 11px; color: var(--muted); font-weight: 600; letter-spacing: .04em; text-transform: uppercase; margin-top: 2px; }
+  .mk .nums { text-align: right; display: grid; gap: 3px; }
+  .mk .p { font: 800 24px/1 var(--mono); }
+  .mk .e { font: 600 12px/1 var(--mono); color: var(--muted); }
+  .mk .e.pos { color: var(--edge); } .mk .e.neg { color: var(--bad); }
+  .mk .band { display: inline-block; font: 700 9.5px/1 var(--sans); letter-spacing: .08em; text-transform: uppercase;
+              padding: 4px 6px; border-radius: 4px; background: var(--surface-2); color: var(--ink-2); margin-left: 6px; vertical-align: 2px; }
+  .mk .band.hot { background: var(--go); color: #fff; }
+  .mk .band.max { background: var(--go); color: #fff; }
+  .mk .derived { display: inline-block; font: 700 9px/1 var(--sans); letter-spacing: .08em; text-transform: uppercase;
+                 padding: 3px 5px; border: 1px dashed var(--muted); border-radius: 4px; color: var(--muted); margin-left: 6px; vertical-align: 2px; }
+  .mkdetail { font-size: 12px; color: var(--ink-2); line-height: 1.5; padding: 0 14px 4px 60px; }
+  .mkdetail b { color: var(--ink); }
+  .mkdetail .other { color: var(--muted); }
+  .mklist { display: flex; flex-direction: column; gap: 8px; }
+  .split { display: flex; height: 26px; border-radius: 6px; overflow: hidden; border: 1px solid var(--rule); margin: 6px 14px 8px 60px; }
+  .split i { font-style: normal; display: flex; align-items: center; font: 700 10.5px/1 var(--sans); letter-spacing: .05em; color: #fff; white-space: nowrap; overflow: hidden; }
+  .split .a { background: var(--away); justify-content: flex-start; padding-left: 8px; }
+  .split .h { background: var(--home); justify-content: flex-end; padding-right: 8px; }
+  .empty { padding: 20px 15px; color: var(--muted); font-size: 13px; }
+  ul.why { margin: 0; padding-left: 17px; display: flex; flex-direction: column; gap: 8px; }
+  ul.why li { font-size: 12.5px; color: var(--ink-2); line-height: 1.55; }
+  ul.why li b { color: var(--ink); }
+
+  /* --- the day board --- */
+  .scroll { overflow-x: auto; }
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  th { text-align: left; font-size: 9.5px; font-weight: 700; text-transform: uppercase; letter-spacing: .09em; color: var(--muted);
+       padding: 9px 10px; border-bottom: 1px solid var(--rule-firm); white-space: nowrap; }
+  td { padding: 9px 10px; border-bottom: 1px solid var(--rule); vertical-align: middle; }
+  tr:last-child td { border-bottom: 0; }
+  td.n { font-family: var(--mono); font-weight: 500; white-space: nowrap; }
+  tr.pick4 td { background: var(--edge-wash); }
+  tr.pick4 td:first-child { box-shadow: inset 3px 0 0 var(--edge); }
+  td .rank { font: 900 15px/1 var(--sans); color: var(--muted); }
+  tr.pick4 td .rank { color: var(--edge); }
+  .chip { display: inline-block; font: 700 10px/1 var(--sans); letter-spacing: .07em; text-transform: uppercase;
+          padding: 5px 8px; border-radius: 4px; background: var(--surface-2); color: var(--ink-2); white-space: nowrap; }
+  .chip.over { background: var(--over); color: #fff; } .chip.under { background: var(--under); color: #fff; }
+  .chip.home { background: var(--home); color: #fff; } .chip.away { background: var(--away); color: #fff; }
+  .chip.win { background: var(--go); color: #fff; } .chip.loss { background: var(--bad); color: #fff; }
+  .chip.push { background: var(--surface-2); color: var(--ink-2); }
+  .chip.corr { background: transparent; border: 1px dashed var(--warn); color: var(--warn); padding: 3px 5px; margin-left: 5px; }
+  .chip.dim { background: transparent; border: 1px dashed var(--muted); color: var(--muted); padding: 3px 5px; }
+  .edge { font-family: var(--mono); font-weight: 600; }
+  .edge.pos { color: var(--edge); } .edge.neg { color: var(--bad); }
+  .picks { display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: 9px; }
+  .pk { border: 1px solid var(--edge); background: var(--edge-wash); border-radius: 9px; padding: 11px 13px; display: grid; gap: 4px; }
+  .pk .n1 { font: 900 12px/1 var(--sans); color: var(--edge); letter-spacing: .08em; }
+  .pk .n2 { font: 800 16px/1.15 var(--sans); }
+  .pk .n3 { font: 500 11.5px/1.4 var(--mono); color: var(--ink-2); }
+  .pk .n4 { font-size: 11px; color: var(--muted); }
+
+  /* --- the log --- */
+  .grade { width: 60px; font: 500 13px/1.2 var(--mono); padding: 6px 7px; border: 1px solid var(--rule-firm);
+           border-radius: 5px; background: var(--surface); color: var(--ink); }
+  .grade:focus-visible { outline: 2px solid var(--ink); outline-offset: 1px; }
+  .finals { display: inline-flex; gap: 4px; align-items: center; white-space: nowrap; }
+  .finals .l { font: 700 9px/1 var(--sans); color: var(--muted); letter-spacing: .06em; }
+  .openbtn { border: 0; background: transparent; padding: 0; font: inherit; color: inherit; cursor: pointer; text-align: left; }
+  .openbtn:focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; }
+  .x { border: 0; background: transparent; color: var(--muted); cursor: pointer; font-size: 17px; line-height: 1; padding: 3px 7px; border-radius: 4px; }
+  .x:hover { color: var(--bad); }
+  .gdate { font: 500 11px/1 var(--mono); color: var(--muted); white-space: nowrap; }
+  .gdate.today { color: var(--ink); font-weight: 700; }
+  .rowmk { display: flex; flex-wrap: wrap; gap: 5px; }
+  .rowmk span.m { display: inline-flex; gap: 5px; align-items: center; font: 500 11.5px/1 var(--mono); padding: 5px 7px;
+                  border: 1px solid var(--rule); border-radius: 5px; background: var(--surface); white-space: nowrap; }
+  .rowmk span.m.pos { border-color: var(--edge); }
+
+  /* --- calibration --- */
+  .calib { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 1px; background: var(--rule);
+           border: 1px solid var(--rule); border-radius: 8px; overflow: hidden; }
+  .calib div { background: var(--surface); padding: 10px 12px; }
+  .calib .k { font-size: 9.5px; font-weight: 700; text-transform: uppercase; letter-spacing: .09em; color: var(--muted); margin: 0; }
+  .calib .v { font: 600 17px/1.2 var(--mono); margin: 3px 0 0; }
+  .calib .s { font-size: 11px; color: var(--muted); margin: 2px 0 0; }
+  .verdict { border-left: 3px solid var(--rule-firm); padding-left: 11px; font-size: 12.5px; line-height: 1.55; color: var(--ink-2); }
+  .verdict.bad { border-left-color: var(--bad); } .verdict.good { border-left-color: var(--go); }
+
+  @media (prefers-reduced-motion: reduce) { * { transition: none !important; animation: none !important; } }
+</style>
+
+<div class="wrap">
+
+  <header class="top">
+    <div>
+      <div class="eyebrow"><span id="eyebrow">MLB · every market on the game</span>
+        <span class="build">· build <span id="build">2026-09-23</span></span></div>
+      <h1>Call Sheet <em>2.0</em></h1>
+      <p>One matchup, every market the book posts on it — the full-game total, the first five,
+         the moneyline and the run line — priced off the book's own numbers and <b>ranked by edge</b>.
+         Then a day board that puts tonight's whole card in one order and marks the four to look at.
+         Call Sheet #1 is untouched; its total is this sheet's total to the last digit.</p>
+    </div>
+    <div class="modes" role="group" aria-label="Sport">
+      <button type="button" id="m-mlb" aria-pressed="true">MLB</button>
+      <button type="button" id="m-wnba" aria-pressed="false">WNBA</button>
+    </div>
+  </header>
+
+  <div class="cols">
+    <div class="stack">
+
+      <section class="card">
+        <h2>The board <span class="tag">every price the book posts on this game</span></h2>
+        <div class="body">
+          <div class="grid2">
+            <div class="f"><label for="away">Away</label><input id="away" type="text" list="teamList" autocomplete="off" placeholder="Rays"></div>
+            <div class="f"><label for="home">Home</label><input id="home" type="text" list="teamList" autocomplete="off" placeholder="Yankees"></div>
+          </div>
+          <datalist id="teamList"></datalist>
+          <div class="grid2">
+            <div class="f"><label for="gdate">Date</label><input id="gdate" type="date"></div>
+            <div class="f"><label for="opened">Total opened at <span class="tag">optional</span></label><input id="opened" type="number" step="0.5" inputmode="decimal" placeholder="8.5"></div>
+          </div>
+
+          <div class="subhead">Full-game total <span class="tag">Call Sheet #1's number</span></div>
+          <div class="grid3">
+            <div class="f"><label for="line" id="lineLabel">Total</label><input id="line" type="number" step="0.5" inputmode="decimal" placeholder="8.5"></div>
+            <div class="f"><label for="op">Over price</label><input id="op" type="number" step="5" inputmode="numeric" placeholder="-110"></div>
+            <div class="f"><label for="up">Under price</label><input id="up" type="number" step="5" inputmode="numeric" placeholder="-110"></div>
+          </div>
+
+          <div class="subhead">Moneyline <span class="tag">both sides — this is the split</span></div>
+          <div class="grid2">
+            <div class="f"><label for="aml">Away moneyline</label><input id="aml" type="number" step="5" inputmode="numeric" placeholder="+130"></div>
+            <div class="f"><label for="hml">Home moneyline</label><input id="hml" type="number" step="5" inputmode="numeric" placeholder="-150"></div>
+          </div>
+
+          <div id="rlFields">
+            <div class="subhead">Run line <span class="tag">home side's number, as the book prints it</span></div>
+            <div class="grid3">
+              <div class="f"><label for="rl">Home run line</label><input id="rl" type="number" step="0.5" inputmode="decimal" placeholder="-1.5"></div>
+              <div class="f"><label for="rlh">Home price</label><input id="rlh" type="number" step="5" inputmode="numeric" placeholder="+120"></div>
+              <div class="f"><label for="rla">Away price</label><input id="rla" type="number" step="5" inputmode="numeric" placeholder="-140"></div>
+            </div>
+          </div>
+
+          <div id="f5Fields">
+            <div class="subhead">First five innings total <span class="tag">its own market, its own anchor</span></div>
+            <div class="grid3">
+              <div class="f"><label for="f5line">F5 total</label><input id="f5line" type="number" step="0.5" inputmode="decimal" placeholder="4.5"></div>
+              <div class="f"><label for="f5op">F5 over price</label><input id="f5op" type="number" step="5" inputmode="numeric" placeholder="-115"></div>
+              <div class="f"><label for="f5up">F5 under price</label><input id="f5up" type="number" step="5" inputmode="numeric" placeholder="-105"></div>
+            </div>
+          </div>
+
+          <div id="spFields" hidden>
+            <div class="subhead">Spread <span class="tag">home side's number, as the book prints it</span></div>
+            <div class="grid3">
+              <div class="f"><label for="sp">Home spread</label><input id="sp" type="number" step="0.5" inputmode="decimal" placeholder="-4.5"></div>
+              <div class="f"><label for="sph">Home price</label><input id="sph" type="number" step="5" inputmode="numeric" placeholder="-110"></div>
+              <div class="f"><label for="spa">Away price</label><input id="spa" type="number" step="5" inputmode="numeric" placeholder="-110"></div>
+            </div>
+          </div>
+
+          <div class="links">
+            <a href="https://app.outlier.bet/MLB/games" target="_blank" rel="noopener">Outlier · games</a>
+            <a href="https://www.covers.com/sport/baseball/mlb/odds" target="_blank" rel="noopener">Covers · ML, run line, total</a>
+            <a href="https://www.vegasinsider.com/mlb/odds/las-vegas/" target="_blank" rel="noopener">Vegas Insider</a>
+            <a href="https://www.actionnetwork.com/mlb/odds" target="_blank" rel="noopener">Action · odds</a>
+          </div>
+          <p class="note"><b>Enter both prices on every market you want ranked.</b> One price says the lean;
+            both say the hold, and the hold is what decides how much of the lean is believed. A market with
+            no prices still gets a probability — it just cannot be ranked, because there is nothing to
+            rank it against.</p>
+          <p class="note"><b>The moneyline is the split.</b> The book's total says how many runs; the book's
+            moneyline says whose. Together they pin down each side's expected runs, and every other market
+            here is arithmetic on that pair. Without a moneyline there is no run line and no moneyline call.</p>
+        </div>
+      </section>
+
+      <div id="mlbFields" class="stack">
+        <section class="card">
+          <h2>Starting pitchers <span class="tag">move the total and the first five</span></h2>
+          <div class="body">
+            <div class="grid2">
+              <div class="f"><label for="aera">Away starter ERA</label><input id="aera" type="number" step="0.01" inputmode="decimal" placeholder="4.16"></div>
+              <div class="f"><label for="hera">Home starter ERA</label><input id="hera" type="number" step="0.01" inputmode="decimal" placeholder="4.16"></div>
+            </div>
+            <div class="grid2">
+              <div class="f"><label for="aip">Away starter IP <span class="tag">optional</span></label><input id="aip" type="number" step="0.1" inputmode="decimal" placeholder="blank = trust it"></div>
+              <div class="f"><label for="hip">Home starter IP <span class="tag">optional</span></label><input id="hip" type="number" step="0.1" inputmode="decimal" placeholder="blank = trust it"></div>
+            </div>
+            <div class="grid2">
+              <div class="f"><label for="arpg">Away runs/game</label><input id="arpg" type="number" step="0.01" inputmode="decimal" placeholder="4.52"></div>
+              <div class="f"><label for="hrpg">Home runs/game</label><input id="hrpg" type="number" step="0.01" inputmode="decimal" placeholder="4.52"></div>
+            </div>
+            <div class="links">
+              <a href="https://app.outlier.bet/MLB/games" target="_blank" rel="noopener">Outlier · matchup panel</a>
+              <a href="https://www.rotowire.com/baseball/daily-lineups.php" target="_blank" rel="noopener">RotoWire · lineups</a>
+              <a href="https://www.teamrankings.com/mlb/stat/runs-per-game" target="_blank" rel="noopener">TeamRankings · runs/game</a>
+            </div>
+            <p class="note"><b>Do not expect the starters to move the moneyline or run line.</b> The book knew who
+              was pitching when it posted them. The arms move the <b>total</b> and the <b>first five</b> — the
+              two markets where they are an unpriced-by-this-number differential — and nothing else.</p>
+          </div>
+        </section>
+
+        <section class="card">
+          <h2>Bullpens <span class="tag">the total only — never the first five</span></h2>
+          <div class="body">
+            <div class="grid2">
+              <div class="f"><label for="abp">Away bullpen ERA</label><input id="abp" type="number" step="0.01" inputmode="decimal" placeholder="4.05"></div>
+              <div class="f"><label for="hbp">Home bullpen ERA</label><input id="hbp" type="number" step="0.01" inputmode="decimal" placeholder="4.05"></div>
+            </div>
+            <div class="links">
+              <a href="https://www.fangraphs.com/leaders/major-league?pos=all&amp;stats=rel&amp;lg=all&amp;type=0" target="_blank" rel="noopener">FanGraphs · relievers</a>
+              <a href="https://www.covers.com/sport/baseball/mlb/statistics/team-pitching/2026" target="_blank" rel="noopener">Covers · team pitching</a>
+            </div>
+          </div>
+        </section>
+
+        <section class="card">
+          <h2>Form &amp; head to head <span class="tag">measured null · small</span></h2>
+          <div class="body">
+            <div class="grid2">
+              <div class="f"><label for="al10">Away last-10 avg total</label><input id="al10" type="number" step="0.1" inputmode="decimal" placeholder="9.4"></div>
+              <div class="f"><label for="hl10">Home last-10 avg total</label><input id="hl10" type="number" step="0.1" inputmode="decimal" placeholder="8.8"></div>
+            </div>
+            <div class="grid2">
+              <div class="f"><label for="h2h">H2H avg total</label><input id="h2h" type="number" step="0.1" inputmode="decimal" placeholder="9.1"></div>
+              <div class="f"><label for="h2hn">Meetings</label><input id="h2hn" type="number" step="1" inputmode="numeric" placeholder="4"></div>
+            </div>
+            <div class="links">
+              <a href="https://app.outlier.bet/MLB/games" target="_blank" rel="noopener">Outlier · L10 / H2H</a>
+              <a href="https://www.covers.com/sport/baseball/mlb/matchups" target="_blank" rel="noopener">Covers · matchups</a>
+            </div>
+          </div>
+        </section>
+
+        <section class="card">
+          <h2>Park &amp; weather <span class="tag">the one unpriced input</span></h2>
+          <div class="body">
+            <div class="grid3">
+              <div class="f"><label for="pf">Park factor</label><input id="pf" type="number" step="1" inputmode="numeric" placeholder="100"></div>
+              <div class="f"><label for="mph">Wind mph</label><input id="mph" type="number" step="1" inputmode="numeric" placeholder="10"></div>
+              <div class="f"><label for="dir">Blowing</label>
+                <select id="dir"><option value="">—</option><option value="out">Out</option><option value="quarter-out">Quartering out</option><option value="cross">Across</option><option value="quarter-in">Quartering in</option><option value="in">In</option></select></div>
+            </div>
+            <div class="grid3">
+              <div class="f"><label for="temp">Temp °F</label><input id="temp" type="number" step="1" inputmode="numeric" placeholder="72"></div>
+              <div class="f"><label for="tick">Over % tickets <span class="tag">shown</span></label><input id="tick" type="number" step="1" min="0" max="100" inputmode="numeric" placeholder="72"></div>
+              <div class="f"><label for="cash">Over % money <span class="tag">shown</span></label><input id="cash" type="number" step="1" min="0" max="100" inputmode="numeric" placeholder="59"></div>
+            </div>
+            <label class="check"><input type="checkbox" id="dome"> Roof shut — wind and temp both drop out</label>
+            <div class="links">
+              <a href="https://www.rotowire.com/baseball/weather.php" target="_blank" rel="noopener">RotoWire · weather</a>
+              <a href="https://baseballsavant.mlb.com/leaderboard/statcast-park-factors" target="_blank" rel="noopener">Statcast · park factors</a>
+              <a href="https://www.actionnetwork.com/mlb/public-betting" target="_blank" rel="noopener">Action · public betting</a>
+            </div>
+            <p class="note">Same rules as Call Sheet #1: only the part of the wind along the home-to-centre axis
+              carries a ball, the 8 mph dead zone comes off the <b>resolved</b> figure, and the ticket/money split
+              is shown and never scored.</p>
+          </div>
+        </section>
+      </div>
+
+      <div id="wnbaFields" class="stack" hidden>
+        <section class="card">
+          <h2>Paste the stats table <span class="tag">stats.wnba.com · teams · advanced</span></h2>
+          <div class="body">
+            <div class="f"><label for="paste">Select the whole table on the page, copy, paste here</label>
+              <textarea id="paste" placeholder="TEAM	GP	W	L	MIN	OFFRTG	DEFRTG	NETRTG	…	PACE	PACE/40	…"></textarea></div>
+            <div class="row"><button type="button" class="btn" id="pasteFill">Fill both teams from the paste</button><span class="note" id="pasteMsg"></span></div>
+            <div class="links">
+              <a href="https://www.wnba.com/stats/teams/advanced" target="_blank" rel="noopener">stats.wnba.com · teams advanced</a>
+              <a href="https://www.wnba.com/schedule" target="_blank" rel="noopener">WNBA · schedule</a>
+            </div>
+            <p class="note"><b>This is as automatic as a page with no network can be.</b> It reads
+              <code>OFFRTG</code>, <code>DEFRTG</code> and <code>PACE/40</code> off whatever you paste,
+              finds the two team rows by name, and fills the eight boxes below. If the paste has no
+              <code>PACE/40</code> column it says so rather than quietly using <code>PACE</code>, which
+              is a different number.</p>
+          </div>
+        </section>
+        <section class="card">
+          <h2>Pace &amp; efficiency <span class="tag">PACE/40 · OFFRTG · DEFRTG</span></h2>
+          <div class="body">
+            <div class="grid2">
+              <div class="f"><label for="apace">Away pace</label><input id="apace" type="number" step="0.01" inputmode="decimal" placeholder="80.59"></div>
+              <div class="f"><label for="hpace">Home pace</label><input id="hpace" type="number" step="0.01" inputmode="decimal" placeholder="80.59"></div>
+            </div>
+            <div class="grid2">
+              <div class="f"><label for="aort">Away offensive rating</label><input id="aort" type="number" step="0.1" inputmode="decimal" placeholder="107.5"></div>
+              <div class="f"><label for="hort">Home offensive rating</label><input id="hort" type="number" step="0.1" inputmode="decimal" placeholder="107.5"></div>
+            </div>
+            <div class="grid2">
+              <div class="f"><label for="adrt">Away defensive rating</label><input id="adrt" type="number" step="0.1" inputmode="decimal" placeholder="107.5"></div>
+              <div class="f"><label for="hdrt">Home defensive rating</label><input id="hdrt" type="number" step="0.1" inputmode="decimal" placeholder="107.5"></div>
+            </div>
+          </div>
+        </section>
+        <section class="card">
+          <h2>Rest &amp; form <span class="tag">measured null · tagged</span></h2>
+          <div class="body">
+            <div class="grid2">
+              <div class="f"><label for="arest">Away days rest</label><input id="arest" type="number" step="1" min="0" max="14" inputmode="numeric" placeholder="2"></div>
+              <div class="f"><label for="hrest">Home days rest</label><input id="hrest" type="number" step="1" min="0" max="14" inputmode="numeric" placeholder="2"></div>
+            </div>
+            <div class="grid2">
+              <div class="f"><label for="al5">Away last-5 avg total</label><input id="al5" type="number" step="0.1" inputmode="decimal" placeholder="168.4"></div>
+              <div class="f"><label for="hl5">Home last-5 avg total</label><input id="hl5" type="number" step="0.1" inputmode="decimal" placeholder="163.2"></div>
+            </div>
+            <label class="check"><input type="checkbox" id="playoff"> Playoff game (a label — moves nothing)</label>
+          </div>
+        </section>
+      </div>
+
+      <div class="row">
+        <button type="button" class="btn solid" id="add">Add to card</button>
+        <button type="button" class="btn" id="clear">Clear</button>
+        <button type="button" class="btn" id="example">Example</button>
+      </div>
+
+      <section class="card">
+        <h2>Saving <span class="tag" id="saveState">draft saved</span></h2>
+        <div class="body">
+          <p class="note"><b>Separate from Call Sheet #1.</b> This page keeps its own card in this browser
+            and its own backup format. Nothing here reads or writes #1's log.</p>
+          <div class="row">
+            <button type="button" class="btn solid" id="backup">Save a backup file</button>
+            <button type="button" class="btn" id="restore">Load a backup</button>
+            <button type="button" class="btn" id="rescore">Rescore card</button>
+            <button type="button" class="btn" id="copy">Copy board as text</button>
+          </div>
+          <input type="file" id="restoreFile" accept="application/json,.json" hidden>
+          <p class="note" id="saveMsg" hidden></p>
+        </div>
+      </section>
+    </div>
+
+    <div class="rail">
+      <section class="card">
+        <h2>This matchup, ranked <span class="tag" id="rankTag">by edge</span></h2>
+        <div class="body">
+          <div id="markets" class="mklist"></div>
+          <p class="note"><b>Probability is the question; edge is the order.</b> Each row shows how
+            likely the pick is to hit and, in gold or red, how far above or below the price's
+            break-even that is. A 64% favourite at −180 is a 64% chance and a losing bet; a 55% under
+            at +105 is the best thing on the board. Ranked by probability alone, the top of every card
+            would be the heaviest favourite.</p>
+        </div>
+      </section>
+      <section class="card">
+        <h2>Why</h2>
+        <div class="body"><ul class="why" id="why"></ul></div>
+      </section>
+    </div>
+  </div>
+
+  <section class="card" style="margin-top:20px">
+    <h2>Day board
+      <span class="row" style="gap:8px">
+        <label class="f" style="flex-direction:row;align-items:center;gap:6px"><span class="tag">date</span><input id="boardDate" type="date" style="padding:6px 8px;font-size:13px"></label>
+        <label class="check" style="font-size:12px"><input type="checkbox" id="byProb"> Rank by probability instead</label>
+        <span class="tag" id="boardCount"></span>
+      </span></h2>
+    <div class="body">
+      <div id="picks" class="picks"></div>
+      <div class="scroll"><div id="board"></div></div>
+      <p class="note"><b>The four at the top are the four to look at, not the four to bet.</b> Two markets
+        on the same game are one bet in disguise — a run line and an under both cash on a pitchers' duel —
+        so a row that shares a game with a higher one is flagged <i>corr</i>. Re-read the inputs on anything
+        that ranks first: in this project a spectacular number has more often been a typo than an edge.</p>
+    </div>
+  </section>
+
+  <section class="card" style="margin-top:20px">
+    <h2>Tonight's card <span class="tag" id="cardCount"></span></h2>
+    <div class="scroll"><div id="cardTable"></div></div>
+  </section>
+
+  <section class="card" style="margin-top:20px">
+    <h2>Is it working <span class="tag">per market — enter finals on the card above</span></h2>
+    <div class="body" id="calibBox"></div>
+  </section>
+</div>
+<script>
+(function () {
+  "use strict";
+  var $ = function (id) { return document.getElementById(id); };
+

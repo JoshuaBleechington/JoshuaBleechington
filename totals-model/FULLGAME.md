@@ -1427,9 +1427,19 @@ this project returning team assignments backwards. They are quarantined in one
 block, dated, and the differential architecture is what keeps an error in them
 cheap. To update, change those four numbers and nothing else.
 
+## Call Sheet 2.0 shares this engine
+
+`web/fullgame.html` carries two sentinel comments, `ENGINE BLOCK` and `END
+ENGINE BLOCK`, around everything from the constants to `scoreInputs()`.
+`tools_build_callsheet2.py` copies that block verbatim into
+`web/callsheet2.html`, and the 2.0 harness asserts the two copies are
+byte-identical — so a change to the model here is a rebuild there, never a
+second hand-written copy. See `CALLSHEET2.md`. Nothing about this page's
+behaviour changed; the sentinels are comments.
+
 ## Verification
 
-- `tests/test_fullgame.py` — 158 tests (417 across the suite), including the corroboration gate: the
+- `tests/test_fullgame.py` — 158 tests (455 across the suite), including the corroboration gate: the
   Tigers card held at COIN FLIP, the headline probability provably untouched, a
   no-soft-input card identical to twelve decimal places, the gate acting as a
   veto rather than a tax, the band never exceeding either read, and WNBA
@@ -1440,7 +1450,7 @@ cheap. To update, change those four numbers and nothing else.
 - `web/fullgame-cases.json` — 58 games (42 MLB, 16 WNBA) generated from the package by
   `tools_gen_fullgame_cases.py`, which recomputes only the expectations so a
   model change never means hand-editing a probability.
-- `tools_check_fullgame_page.js` — 1096 checks. It replays all 58 in a real browser against side,
+- `tools_check_fullgame_page.js` — 1097 checks (the last is the build stamp). It replays all 58 in a real browser against side,
   band, resolved probability, push, projection, fair price, estimate and delta
   counts, the gate's core projection and core probability, the core chip showing
   the corroborated probability on every card and turning amber only when held,

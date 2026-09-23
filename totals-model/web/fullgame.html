@@ -396,7 +396,7 @@
   <header class="top">
     <div>
       <div class="eyebrow"><span id="eyebrow">MLB · full game</span>
-        <span class="build">· build <span id="build">2026-09-22</span></span></div>
+        <span class="build">· build <span id="build">2026-09-23</span></span></div>
       <h1>Call Sheet</h1>
       <p>Anchors on what the market is really on — the prices, not the rounded number —
          then adjusts for what today changes. Both books attack the <b>total</b>: MLB runs,
@@ -760,6 +760,10 @@
   "use strict";
   var $ = function (id) { return document.getElementById(id); };
 
+  /* ===== ENGINE BLOCK. Shared VERBATIM with callsheet2.html: the browser harness
+     asserts the two copies are byte-identical, so a change here is a change there.
+     Everything from the constants to scoreInputs() is the model; nothing below
+     the closing sentinel is. ===== */
   /* ====================================================================
      Ported from totals/fullgame.py. Every constant is the same value the
      package uses; web/fullgame-cases.json is replayed through this page in
@@ -1649,6 +1653,7 @@
     finally { SRC = prev; }
   }
 
+  /* ===== END ENGINE BLOCK ===== */
   function render() {
     var f = sport === "WNBA" ? readWnba() : readMlb();
     last = f;

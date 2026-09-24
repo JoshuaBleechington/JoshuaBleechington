@@ -7,7 +7,7 @@ top of Call Sheet #1 without touching it.
 - Page: `web/callsheet2.html`, assembled by `tools_build_callsheet2.py` from
   `web/callsheet2.head.html` + Call Sheet #1's engine block + `web/callsheet2.tail.js`
 - Fixtures: `web/callsheet2-cases.json` (62 cases) from `tools_gen_callsheet2_cases.py`
-- Browser harness: `tools_check_callsheet2_page.js` (995 checks)
+- Browser harness: `tools_check_callsheet2_page.js` (1,000 checks)
 
 ## What it answers
 
@@ -84,7 +84,11 @@ the likelier side of a market, which is not always the side the row shows.
 
 **The day board serves both uses.** *The parlay four* is by chance to hit,
 one leg per game, inside the cap. *Best straight bets* is by edge, positive
-edge only. The table beneath them orders by chance unless *rank table by edge*
+edge only. **One sport only** runs the same two rules once per sport, MLB and
+WNBA side by side, each with its own parlay legs (and their all-hit price) and
+its own straight bets, so a night can be read as just one sport at a glance; a
+column appears only when that sport has games on the date. The table beneath
+them orders by chance unless *rank table by edge*
 is ticked; the toggle touches the table only.
 
 The moneyline will lead a chance ranking most nights and never an edge one,

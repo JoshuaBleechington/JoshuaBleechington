@@ -674,37 +674,49 @@
   }
 
   /* ---- is it working, per market ------------------------------------------- */
+  /* One block per sport. The markets differ (first five and run line are
+     baseball; the spread is basketball), the distributions differ, and a
+     record that pooled them would hide which book is working. The two fours
+     are split the same way: each leg is credited to the sport it came from. */
   function renderCalib() {
-    var keys = [["total","Full-game total"],["f5","First five"],["ml","Moneyline"],["rl","Run line"],["spread","Spread"]];
-    var box = $("calibBox"), h = '', any = false;
-    var stats = {};
-    keys.forEach(function (k) { stats[k[0]] = { n: 0, w: 0, l: 0, p: 0, says: 0, units: 0, label: k[1] }; });
-    var top = { n: 0, w: 0, l: 0, p: 0, says: 0, units: 0, label: "The parlay four" };
-    var topE = { n: 0, w: 0, l: 0, p: 0, says: 0, units: 0, label: "Best straight bets" };
-    var cap = legCap();
+    var KEYS = { MLB: [["total","Full-game total"],["f5","First five"],["ml","Moneyline"],["rl","Run line"]],
+                 WNBA: [["total","Full-game total"],["ml","Moneyline"],["spread","Spread"]] };
+    var box = $("calibBox"), cap = legCap();
+    var fresh = function (label) { return { n: 0, w: 0, l: 0, p: 0, says: 0, units: 0, label: label }; };
+    var bySport = {};
+    ["MLB", "WNBA"].forEach(function (sp) {
+      var b = { stats: {}, top: fresh("The parlay four"), topE: fresh("Best straight bets"), any: false };
+      KEYS[sp].forEach(function (k) { b.stats[k[0]] = fresh(k[1]); });
+      bySport[sp] = b;
+    });
+    var tally = function (t, mk, res) {
+      if (res === "push") { t.p++; return; }
+      t.n++; t.says += mk.p; t.w += res === "win" ? 1 : 0; t.l += res === "loss" ? 1 : 0; t.units += unitsOf(mk, res);
+    };
     var dates = {};
     card.forEach(function (r) {
+      var b = bySport[r.sport]; if (!b) return;
       (r.markets || []).forEach(function (mk) {
         var res = gradeMarket(mk, r.finals);
         if (res === null) return;
-        var s = stats[mk.key]; if (!s) return;
-        any = true;
-        if (res === "push") { s.p++; return; }
-        s.n++; s.says += mk.p; s.w += res === "win" ? 1 : 0; s.l += res === "loss" ? 1 : 0; s.units += unitsOf(mk, res);
+        var st = b.stats[mk.key]; if (!st) return;
+        b.any = true; tally(st, mk, res);
       });
       if (r.gdate) dates[r.gdate] = true;
     });
     Object.keys(dates).forEach(function (d) {
-      [[parlayFour(d, cap), top], [bestBets(d), topE]].forEach(function (rule) {
+      [[parlayFour(d, cap), "top"], [bestBets(d), "topE"]].forEach(function (rule) {
         rule[0].forEach(function (x) {
-          var res = gradeMarket(x.mk, x.row.finals), t = rule[1];
-          if (res === null) return;
-          if (res === "push") { t.p++; return; }
-          t.n++; t.says += x.mk.p; t.w += res === "win" ? 1 : 0; t.l += res === "loss" ? 1 : 0; t.units += unitsOf(x.mk, res);
+          var res = gradeMarket(x.mk, x.row.finals), b = bySport[x.row.sport];
+          if (res === null || !b) return;
+          tally(b[rule[1]], x.mk, res);
         });
       });
     });
-    if (!any) { box.innerHTML = '<p class="note">Enter finals on the card — away and home runs, and the first-five runs for MLB — and every market grades itself.</p>'; return; }
+    if (!bySport.MLB.any && !bySport.WNBA.any) {
+      box.innerHTML = '<p class="note">Enter finals on the card — away and home runs, and the first-five runs for MLB — and every market grades itself, one block per sport.</p>';
+      return;
+    }
     var tiles = function (s) {
       if (!s.n && !s.p) return '';
       var says = s.n ? s.says / s.n * 100 : 0, does = s.n ? s.w / s.n * 100 : 0;
@@ -712,16 +724,25 @@
       return '<div><p class="k">' + esc(s.label) + '</p><p class="v">' + s.w + '-' + s.l + (s.p ? '-' + s.p : '') + '</p>' +
         '<p class="s">' + (s.n ? 'says ' + says.toFixed(1) + '% · does ' + does.toFixed(1) + '% (±' + se.toFixed(1) + ') · ' + sgn(s.units, 2) + 'u' : 'pushes only') + '</p></div>';
     };
-    h += '<div class="calib">' + keys.map(function (k) { return tiles(stats[k[0]]); }).join('') + tiles(top) + tiles(topE) + '</div>';
-    var totalN = keys.reduce(function (a, k) { return a + stats[k[0]].n; }, 0);
-    h += '<div class="verdict">' + (totalN < 30
-      ? '<b>' + totalN + ' graded markets.</b> Nothing here can be read yet — one standard error on a hit rate is ' +
-        (totalN ? (100 / Math.sqrt(totalN) / 2).toFixed(0) : '—') + ' points at this size. The number to watch first is the run line, ' +
-        'because it is the market this sheet derives rather than anchors, and the two fours, because choosing between them is the reason the sheet exists.'
-      : '<b>' + totalN + ' graded markets.</b> Compare each market\'s <i>does</i> against its <i>says</i> before believing either; ' +
-        'and compare each four against the blind rate of everything logged, not against 50%. The parlay four and the straight bets will differ most nights; the units column is the referee.') + '</div>';
+    var h = '';
+    ["MLB", "WNBA"].forEach(function (sp) {
+      var b = bySport[sp];
+      if (!b.any) return;
+      var totalN = KEYS[sp].reduce(function (a, k) { return a + b.stats[k[0]].n; }, 0);
+      var graded = card.filter(function (r) { return r.sport === sp && (r.markets || []).some(function (mk) { return gradeMarket(mk, r.finals) !== null; }); }).length;
+      h += '<div class="subhead" data-sport="' + sp + '">' + sp + ' <span class="tag">' + graded + ' graded game' + (graded === 1 ? '' : 's') + ' · ' + totalN + ' graded markets</span></div>';
+      h += '<div class="calib" data-sport="' + sp + '">' + KEYS[sp].map(function (k) { return tiles(b.stats[k[0]]); }).join('') + tiles(b.top) + tiles(b.topE) + '</div>';
+      h += '<div class="verdict">' + (totalN < 30
+        ? '<b>' + totalN + ' graded ' + sp + ' markets.</b> Nothing here can be read yet — one standard error on a hit rate is ' +
+          (totalN ? (100 / Math.sqrt(totalN) / 2).toFixed(0) : '—') + ' points at this size. ' +
+          (sp === "MLB" ? 'The number to watch first is the run line, because it is the market this sheet derives rather than anchors, and the two fours, because choosing between them is the reason the sheet exists.'
+                        : 'With seven games in the season book and this sheet newer than that, the WNBA block will read as noise for weeks; it is here so the two sports never get pooled.')
+        : '<b>' + totalN + ' graded ' + sp + ' markets.</b> Compare each market\'s <i>does</i> against its <i>says</i> before believing either; ' +
+          'and compare each four against the blind rate of everything logged, not against 50%. The parlay four and the straight bets will differ most nights; the units column is the referee.') + '</div>';
+    });
     box.innerHTML = h;
   }
+
 
   /* ---- the WNBA paste ------------------------------------------------------ */
   function parseWnbaPaste(text) {

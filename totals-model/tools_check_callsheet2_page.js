@@ -168,6 +168,34 @@ const CHECKS = ["dome","playoff"];
   chk((by['Rays +1.5'] === 'win') || (by['Yankees -1.5'] === 'loss'), 'grade: a one-run home win is a cover for the dog', JSON.stringify(by));
   chk(/Full-game total/.test(flow.calib) && /First five/.test(flow.calib) && /parlay four/.test(flow.calib) && /Best straight bets/.test(flow.calib),
       'calib: per-market tiles and BOTH fours are drawn once something is graded', flow.calib.slice(0, 200));
+
+  // ---- the record is split by sport -------------------------------------------------
+  const split = await pg.evaluate(async () => {
+    const wait = () => new Promise(r => setTimeout(r, 40));
+    const set = (id, v) => { const el = document.getElementById(id); el.value = v; el.dispatchEvent(new Event('input', { bubbles: true })); };
+    const before = { mlb: !!document.querySelector('#calibBox .calib[data-sport="MLB"]'), wnba: !!document.querySelector('#calibBox .calib[data-sport="WNBA"]') };
+    // log and grade a WNBA game
+    document.getElementById('clear').click(); document.getElementById('m-wnba').click(); await wait();
+    set('gdate', '2026-09-22'); set('away', 'Sun'); set('home', 'Mystics'); set('line', '162.5'); set('op', '118'); set('up', '-155');
+    set('aml', '160'); set('hml', '-190'); set('sp', '-4.5'); set('sph', '-110'); set('spa', '-110');
+    await wait(); document.getElementById('add').click(); await wait();
+    const stored = JSON.parse(localStorage.getItem('callsheet2.card.v1'));
+    const w = stored.find(r => r.sport === 'WNBA');
+    const inp = (k) => document.querySelector(`.grade[data-id="${w.id}"][data-k="${k}"]`);
+    const type = (el, v) => { el.value = v; el.dispatchEvent(new Event('input', { bubbles: true })); };
+    type(inp('fa'), '70'); type(inp('fh'), '78'); inp('fh').dispatchEvent(new Event('change', { bubbles: true })); await wait();
+    const mlb = document.querySelector('#calibBox .calib[data-sport="MLB"]'), wnba = document.querySelector('#calibBox .calib[data-sport="WNBA"]');
+    const heads = [...document.querySelectorAll('#calibBox .subhead')].map(e => e.textContent);
+    return { before, mlb: mlb ? mlb.textContent : '', wnba: wnba ? wnba.textContent : '', heads,
+             mlbHasF5: !!(mlb && /First five/.test(mlb.textContent)), wnbaHasSpread: !!(wnba && /Spread/.test(wnba.textContent)),
+             wnbaHasF5: !!(wnba && /First five/.test(wnba.textContent)), mlbHasSpread: !!(mlb && /Spread/.test(mlb.textContent)) };
+  });
+  chk(split.before.mlb && !split.before.wnba, 'calib: with only MLB graded, only the MLB block is drawn', JSON.stringify(split.before));
+  chk(split.mlb && split.wnba, 'calib: once a WNBA game is graded there are two blocks', split.heads.join(' | '));
+  chk(split.heads.length === 2 && /^MLB/.test(split.heads[0]) && /^WNBA/.test(split.heads[1]), 'calib: the blocks are headed MLB then WNBA, with their counts', split.heads.join(' | '));
+  chk(split.mlbHasF5 && !split.mlbHasSpread && split.wnbaHasSpread && !split.wnbaHasF5,
+      'calib: each block carries only its own markets (F5 and run line are MLB, spread is WNBA)', `MLB f5=${split.mlbHasF5} spread=${split.mlbHasSpread}; WNBA spread=${split.wnbaHasSpread} f5=${split.wnbaHasF5}`);
+  chk(/Full-game total\s*0-1/.test(split.wnba), 'calib: the WNBA total (UNDER 162.5) graded a loss from a 70-78 final', split.wnba.slice(0, 120));
   chk(flow.boardAfter.filter(Boolean).length >= 3, 'board: results appear on the board rows once graded', flow.boardAfter.join('|'));
 
   // ---- the default is chance to hit, and the four are priced as a parlay ----------
@@ -181,7 +209,7 @@ const CHECKS = ["dome","playoff"];
   });
   chk(!dflt.checked && dflt.tag === 'by edge', 'default: the rail ranks by edge; the table by chance unless edge is ticked', dflt.tag);
   chk(dflt.rows.every((p, i) => i === 0 || p <= dflt.rows[i - 1] + 1e-9), 'default: board ordered by chance, best first', dflt.rows.join(' > '));
-  chk(/ALL 2 HIT/.test(dflt.parlay) && /fair parlay/.test(dflt.parlay), 'parlay: the legs carry an all-hit chance and a fair parlay price', dflt.parlay.slice(0, 120));
+  chk(/ALL 3 HIT/.test(dflt.parlay) && /fair parlay/.test(dflt.parlay), 'parlay: three games on the 22nd give three legs, with an all-hit chance and a fair parlay price', dflt.parlay.slice(0, 120));
 
   // ---- the cap, the second choice on the rail, and clicking through ---------------
   const capFlow = await pg.evaluate(async () => {

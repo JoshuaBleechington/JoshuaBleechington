@@ -7,7 +7,7 @@ top of Call Sheet #1 without touching it.
 - Page: `web/callsheet2.html`, assembled by `tools_build_callsheet2.py` from
   `web/callsheet2.head.html` + Call Sheet #1's engine block + `web/callsheet2.tail.js`
 - Fixtures: `web/callsheet2-cases.json` (62 cases) from `tools_gen_callsheet2_cases.py`
-- Browser harness: `tools_check_callsheet2_page.js` (986 checks)
+- Browser harness: `tools_check_callsheet2_page.js` (991 checks)
 
 ## What it answers
 
@@ -195,7 +195,12 @@ record above the list, and each market carries its win / loss / push chip and a
 coloured edge. The rail and the card row grade from the same finals with the
 same function, so they cannot disagree.
 
-"Is it working" shows per market: record, *says* (mean stated probability),
+"Is it working" is split by sport — an MLB block and a WNBA block, each drawn
+only once that sport has a graded market — because the markets differ (first
+five and run line are baseball, the spread is basketball), the distributions
+differ, and a pooled record would hide which book is working. Each leg of the
+two fours is credited to the sport it came from. Within a block it shows per
+market: record, *says* (mean stated probability),
 *does* (hit rate) with its standard error, and units. Plus the two **top-4
 fours**: for every date on the card, *the parlay four* (as the board defines
 it, at the current cap) and *best straight bets*, graded. Choosing between them

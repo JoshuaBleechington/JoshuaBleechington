@@ -3,11 +3,11 @@
 One matchup, every market the book posts on it, ranked. Built 23 Sept 2026 on
 top of Call Sheet #1 without touching it.
 
-- Package: `totals/callsheet2.py` (40 tests in `tests/test_callsheet2.py`)
+- Package: `totals/callsheet2.py` (41 tests in `tests/test_callsheet2.py`)
 - Page: `web/callsheet2.html`, assembled by `tools_build_callsheet2.py` from
   `web/callsheet2.head.html` + Call Sheet #1's engine block + `web/callsheet2.tail.js`
 - Fixtures: `web/callsheet2-cases.json` (62 cases) from `tools_gen_callsheet2_cases.py`
-- Browser harness: `tools_check_callsheet2_page.js` (991 checks)
+- Browser harness: `tools_check_callsheet2_page.js` (995 checks)
 
 ## What it answers
 
@@ -180,6 +180,12 @@ pushes on whole numbers. Units are at the stored price.
 Picks are frozen when added. **Rescore** re-runs ungraded rows through the model
 as it stands today and leaves graded rows alone — a pick that has been graded is
 a record, not a draft.
+
+**An impossible first five refuses to grade.** A side's runs after five
+innings cannot exceed its final. Five rows on the first graded night (23 Sept)
+had exactly that, so the F5 market on such a row shows *F5 > final — recheck*
+instead of a result and is left out of the record until the score is fixed.
+The other three markets on the row grade normally.
 
 **Graded rows lock.** Once both finals are in, the row's score boxes go
 read-only and its remove button disappears; the only way back is the row's own

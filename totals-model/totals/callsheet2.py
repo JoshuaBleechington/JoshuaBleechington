@@ -644,13 +644,22 @@ def day_board(matchups: list[Matchup], top: int = 4) -> list[BoardRow]:
 
 def grade(market: Market, *, home_runs: float | None, away_runs: float | None,
           f5_home: float | None = None, f5_away: float | None = None) -> str | None:
-    """'win' | 'loss' | 'push' | None (not gradeable yet)."""
+    """'win' | 'loss' | 'push' | 'invalid' | None (not gradeable yet).
+
+    'invalid' is a first five that cannot have happened: a side's runs after
+    five innings exceed its final. Five rows on the first graded night had
+    exactly that, so the market refuses to grade and says so rather than
+    scoring a number that is impossible.
+    """
     key, side = market.key, market.side
     line = _line_of(market)
     if key in ("total", "f5"):
         if key == "f5":
             if f5_home is None or f5_away is None:
                 return None
+            if ((home_runs is not None and f5_home > home_runs + 1e-9)
+                    or (away_runs is not None and f5_away > away_runs + 1e-9)):
+                return "invalid"
             total = f5_home + f5_away
         else:
             if home_runs is None or away_runs is None:

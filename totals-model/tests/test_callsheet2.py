@@ -340,6 +340,13 @@ class TestGrading(unittest.TestCase):
         self.assertEqual(grade(f5, home_runs=3, away_runs=2, f5_home=2, f5_away=1),
                          "win" if under else "loss")
 
+    def test_a_first_five_above_the_final_is_invalid_not_graded(self):
+        f5 = self.by["f5"]
+        self.assertEqual(grade(f5, home_runs=9, away_runs=2, f5_home=1, f5_away=10), "invalid")
+        self.assertEqual(grade(f5, home_runs=1, away_runs=5, f5_home=2, f5_away=2), "invalid")
+        self.assertIn(grade(f5, home_runs=1, away_runs=4, f5_home=1, f5_away=4), ("win", "loss", "push"))
+        self.assertIn(grade(f5, home_runs=None, away_runs=None, f5_home=8, f5_away=0), ("win", "loss", "push"))
+
     def test_whole_number_pushes(self):
         m = forecast_matchup_mlb("a", "b", total_line=8.0, over_price=-110, under_price=-110,
                                  home_ml=-140, away_ml=120, run_line=-1.0,

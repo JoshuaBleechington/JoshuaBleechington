@@ -328,7 +328,14 @@
     var f5h = fin ? parseFloat(fin.f5h) : NaN, f5a = fin ? parseFloat(fin.f5a) : NaN;
     var line = lineOf(mk), total;
     if (mk.key === "total" || mk.key === "f5") {
-      if (mk.key === "f5") { if (!isFinite(f5h) || !isFinite(f5a)) return null; total = f5h + f5a; }
+      if (mk.key === "f5") {
+        if (!isFinite(f5h) || !isFinite(f5a)) return null;
+        /* A side's runs after five cannot exceed its final. Five rows on the
+           first graded night had exactly that, so the market refuses to grade
+           and says so rather than scoring a number that cannot have happened. */
+        if ((isFinite(fa) && f5a > fa + 1e-9) || (isFinite(fh) && f5h > fh + 1e-9)) return "invalid";
+        total = f5h + f5a;
+      }
       else { if (!isFinite(fh) || !isFinite(fa)) return null; total = fh + fa; }
       if (Math.abs(total - line) < 1e-9) return "push";
       return ((mk.side === "OVER") ? total > line : total < line) ? "win" : "loss";
@@ -340,8 +347,9 @@
     if (Math.abs(x) < 1e-9) return "push";
     return ((x > 0) === (mk.side === "HOME")) ? "win" : "loss";
   }
+  function resText(res) { return res === "invalid" ? "F5 > final — recheck" : res; }
   function unitsOf(mk, res) {
-    if (res === null || res === "push" || mk.price === null) return 0;
+    if (res === null || res === "push" || res === "invalid" || mk.price === null) return 0;
     return res === "win" ? payout(mk.price) : -1;
   }
 
@@ -460,7 +468,7 @@
           (isLead && leadBeyond ? '<span class="cap">likeliest: ' + esc(lv.pick) + ' ' + (lv.p * 100).toFixed(1) + '% at ' + sgn(lv.price, 0) + ' · beyond ' + sgn(cap, 0) + '</span>' : "") +
           (isLead && !leadBeyond ? '<span class="cap" style="color:var(--go);border-color:var(--go)">parlay leg: ' + esc(lv.pick) + ' ' + (lv.p * 100).toFixed(1) + '%</span>' : "") +
           (isSecond ? '<span class="cap" style="color:var(--go);border-color:var(--go)">2nd choice · parlay leg: ' + esc(lv.pick) + ' ' + (lv.p * 100).toFixed(1) + '% at ' + sgn(lv.price, 0) + '</span>' : "") +
-          (res ? '<span class="chip ' + res + '" style="margin-left:8px;vertical-align:2px">' + res + '</span>' : "") + '</div>' +
+          (res ? '<span class="chip ' + res + '" style="margin-left:8px;vertical-align:2px">' + resText(res) + '</span>' : "") + '</div>' +
           '<div class="lab">' + esc(mk.label) + '</div></div>' +
         '<div class="nums"><div class="p">' + (mk.p * 100).toFixed(1) + '%</div>' +
           '<div class="e ' + eCls + '">' + (mk.edge === null ? "no price" :
@@ -548,7 +556,7 @@
       '<div class="n1">#' + x.rank + (x.corr && x.corr.length ? ' · same game as #' + x.corr.join(', #') : '') + '</div>' +
       '<div class="n2">' + esc(x.mk.pick) + '</div>' +
       '<div class="n3">' + (x.mk.p * 100).toFixed(1) + '% · ' + (x.mk.price !== null ? sgn(x.mk.price, 0) + ' · edge ' + sgn(x.mk.edge * 100, 1) : 'no price') +
-        (res ? ' · <span class="chip ' + res + '">' + res + '</span>' : '') + '</div>' +
+        (res ? ' · <span class="chip ' + res + '">' + resText(res) + '</span>' : '') + '</div>' +
       '<div class="n4">' + esc(x.row.matchup) + ' · ' + esc(x.mk.label) + '</div>' + (extra || '') + '</div>';
   }
   function renderBoard() {
@@ -598,7 +606,7 @@
         '<td class="n">' + (implied(mk.price) * 100).toFixed(1) + '%</td>' +
         '<td class="n"><span class="edge ' + (mk.edge > 0 ? 'pos' : 'neg') + '">' + sgn(mk.edge * 100, 1) + '</span></td>' +
         '<td class="n">' + sgn(mk.fair, 0) + '</td>' +
-        '<td>' + (res ? '<span class="chip ' + res + '">' + res + '</span>' : '<span class="gdate">—</span>') + '</td></tr>';
+        '<td>' + (res ? '<span class="chip ' + res + '">' + resText(res) + '</span>' : '<span class="gdate">—</span>') + '</td></tr>';
     });
     $("board").innerHTML = h + '</tbody></table>';
   }
@@ -653,7 +661,7 @@
         var res = gradeMarket(mk, fin);
         return '<span class="m' + (mk.edge !== null && mk.edge > 0 ? ' pos' : '') + '"><span class="chip ' + sideClass(mk.side) + '">' + esc(mk.pick) + '</span>' +
           (mk.p * 100).toFixed(1) + '%' + (mk.price !== null ? ' ' + sgn(mk.price, 0) + ' <span class="edge ' + (mk.edge > 0 ? 'pos' : 'neg') + '">' + sgn(mk.edge * 100, 1) + '</span>' : '') +
-          (res ? ' <span class="chip ' + res + '">' + res + '</span>' : '') + '</span>';
+          (res ? ' <span class="chip ' + res + '">' + resText(res) + '</span>' : '') + '</span>';
       }).join("");
       var lk = rowLocked(r), ro = lk ? ' readonly' : '';
       var f5 = r.sport === "MLB"
@@ -698,7 +706,7 @@
       var b = bySport[r.sport]; if (!b) return;
       (r.markets || []).forEach(function (mk) {
         var res = gradeMarket(mk, r.finals);
-        if (res === null) return;
+        if (res === null || res === "invalid") return;
         var st = b.stats[mk.key]; if (!st) return;
         b.any = true; tally(st, mk, res);
       });
@@ -708,7 +716,7 @@
       [[parlayFour(d, cap), "top"], [bestBets(d), "topE"]].forEach(function (rule) {
         rule[0].forEach(function (x) {
           var res = gradeMarket(x.mk, x.row.finals), b = bySport[x.row.sport];
-          if (res === null || !b) return;
+          if (res === null || res === "invalid" || !b) return;
           tally(b[rule[1]], x.mk, res);
         });
       });
@@ -885,7 +893,7 @@
         var res = gradeMarket(mk, fin);
         return '<span class="m' + (mk.edge !== null && mk.edge > 0 ? ' pos' : '') + '"><span class="chip ' + sideClass(mk.side) + '">' + esc(mk.pick) + '</span>' +
           (mk.p * 100).toFixed(1) + '%' + (mk.price !== null ? ' ' + sgn(mk.price, 0) + ' <span class="edge ' + (mk.edge > 0 ? 'pos' : 'neg') + '">' + sgn(mk.edge * 100, 1) + '</span>' : '') +
-          (res ? ' <span class="chip ' + res + '">' + res + '</span>' : '') + '</span>';
+          (res ? ' <span class="chip ' + res + '">' + resText(res) + '</span>' : '') + '</span>';
       }).join("");
     });
   });

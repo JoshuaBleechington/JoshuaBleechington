@@ -312,6 +312,25 @@ const CHECKS = ["dome","playoff"];
   chk(!railGrade.released.temp && !railGrade.released.add && !railGrade.released.note, 'lock: Clear releases the form', JSON.stringify(railGrade.released));
   chk(railGrade.after === 0 && !railGrade.finalAfter, 'rail: after Clear the rail carries no grading', `${railGrade.after} still graded, final line ${railGrade.finalAfter}`);
 
+  // ---- an impossible first five refuses to grade ------------------------------------
+  const badF5 = await pg.evaluate(async () => {
+    const wait = () => new Promise(r => setTimeout(r, 50));
+    const tr = () => [...document.querySelectorAll('#cardTable tr')].find(t => /Rays @ Yankees/.test(t.textContent));
+    tr().querySelector('[data-unlock]').click(); await wait();
+    const set = (k, v) => { const el = tr().querySelector(`.grade[data-k="${k}"]`); el.value = v; el.dispatchEvent(new Event('input', { bubbles: true })); };
+    set('f5a', '10'); await wait();
+    const chips = [...tr().querySelectorAll('.rowmk .m')].map(c => ({ pick: c.querySelector('.chip').textContent, res: (c.querySelector('.chip.win,.chip.loss,.chip.push,.chip.invalid') || {}).textContent || '' }));
+    const calib = document.getElementById('calibBox').textContent;
+    set('f5a', '1'); await wait();
+    const fixed = [...tr().querySelectorAll('.rowmk .m')].map(c => (c.querySelector('.chip.win,.chip.loss,.chip.push,.chip.invalid') || {}).textContent || '');
+    tr().querySelector('[data-relock]').click(); await wait();
+    return { chips, calib, fixed };
+  });
+  chk(badF5.chips.some(c => /^F5/.test(c.pick) && /F5 > final/.test(c.res)), 'f5 guard: an F5 above the final shows a recheck chip instead of a grade', JSON.stringify(badF5.chips));
+  chk(badF5.chips.filter(c => !/^F5/.test(c.pick)).every(c => /^(win|loss|push)$/.test(c.res)), 'f5 guard: the other markets on the row still grade', JSON.stringify(badF5.chips));
+  chk(!/First five\s*1-0/.test(badF5.calib), 'f5 guard: the invalid first five is not counted in the record', badF5.calib.slice(0, 160));
+  chk(badF5.fixed.every(r => /^(win|loss|push)$/.test(r)), 'f5 guard: correcting the F5 grades it again', badF5.fixed.join('|'));
+
   // ---- locked rows on the card -----------------------------------------------------
   const lockRow = await pg.evaluate(async () => {
     const wait = () => new Promise(r => setTimeout(r, 50));

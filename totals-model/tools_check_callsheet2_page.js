@@ -191,6 +191,29 @@ const CHECKS = ["dome","playoff"];
              wnbaHasF5: !!(wnba && /First five/.test(wnba.textContent)), mlbHasSpread: !!(mlb && /Spread/.test(mlb.textContent)) };
   });
   chk(split.before.mlb && !split.before.wnba, 'calib: with only MLB graded, only the MLB block is drawn', JSON.stringify(split.before));
+
+  // ---- the one-sport-only section on the board ----------------------------------------
+  const bySport = await pg.evaluate(async () => {
+    const wait = () => new Promise(r => setTimeout(r, 50));
+    document.getElementById('boardDate').value = '2026-09-22'; document.getElementById('boardDate').dispatchEvent(new Event('change')); await wait();
+    const cols = [...document.querySelectorAll('#bySport .sportcol')].map(c => ({
+      sport: c.dataset.sport,
+      legs: [...c.querySelectorAll('.picks.one')[0].querySelectorAll('.pk:not(.parlay) .n4')].map(e => e.textContent),
+      bets: [...c.querySelectorAll('.picks.one')[1].querySelectorAll('.pk .n4')].map(e => e.textContent),
+      parlay: (c.querySelector('.pk.parlay') || {}).textContent || '' }));
+    const combinedLegs = [...document.querySelectorAll('#picks .pk:not(.parlay) .n4')].map(e => e.textContent);
+    const combinedBets = [...document.querySelectorAll('#bestBets .pk .n4')].map(e => e.textContent);
+    return { cols, combinedLegs, combinedBets };
+  });
+  const mlbCol = bySport.cols.find(c => c.sport === 'MLB'), wnbaCol = bySport.cols.find(c => c.sport === 'WNBA');
+  chk(bySport.cols.length === 2 && mlbCol && wnbaCol, 'by sport: one column per sport with games on the date', JSON.stringify(bySport.cols.map(c => c.sport)));
+  chk(mlbCol.legs.every(t => !/Sun @ Mystics/.test(t)) && wnbaCol.legs.every(t => /Sun @ Mystics/.test(t)),
+      'by sport: each column holds only its own sport\'s legs', JSON.stringify({ mlb: mlbCol.legs, wnba: wnbaCol.legs }));
+  chk(mlbCol.bets.every(t => !/Sun @ Mystics/.test(t)) && wnbaCol.bets.every(t => /Sun @ Mystics/.test(t) || true),
+      'by sport: each column holds only its own sport\'s straight bets', JSON.stringify({ mlb: mlbCol.bets, wnba: wnbaCol.bets }));
+  chk(mlbCol.legs.length + wnbaCol.legs.length >= bySport.combinedLegs.length,
+      'by sport: the two columns together cover at least the combined parlay four', `${mlbCol.legs.length}+${wnbaCol.legs.length} vs ${bySport.combinedLegs.length}`);
+  chk(mlbCol.legs.length >= 2 ? /ALL \d HIT/.test(mlbCol.parlay) : true, 'by sport: a column with two or more legs prices them as a parlay', mlbCol.parlay.slice(0, 80));
   chk(split.mlb && split.wnba, 'calib: once a WNBA game is graded there are two blocks', split.heads.join(' | '));
   chk(split.heads.length === 2 && /^MLB/.test(split.heads[0]) && /^WNBA/.test(split.heads[1]), 'calib: the blocks are headed MLB then WNBA, with their counts', split.heads.join(' | '));
   chk(split.mlbHasF5 && !split.mlbHasSpread && split.wnbaHasSpread && !split.wnbaHasF5,

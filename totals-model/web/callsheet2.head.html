@@ -189,6 +189,12 @@
   .edge.pos { color: var(--edge); } .edge.neg { color: var(--bad); }
   .picks { display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: 9px; }
   .pk { border: 1px solid var(--edge); background: var(--edge-wash); border-radius: 9px; padding: 11px 13px; display: grid; gap: 4px; }
+  .sports { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 14px; }
+  .sportcol { border: 1px solid var(--rule); border-radius: 10px; padding: 12px 13px; background: var(--surface-2); display: grid; gap: 8px; align-content: start; }
+  .sportcol .subhead { margin: 0; }
+  .sportcol .lbl { font: 700 9.5px/1 var(--sans); letter-spacing: .09em; text-transform: uppercase; color: var(--muted); margin-top: 4px; }
+  .picks.one { grid-template-columns: 1fr; gap: 7px; }
+  .picks.one .pk { padding: 9px 11px; }
   .pk[data-open], tr[data-open] { cursor: pointer; }
   .pk[data-open]:hover { border-color: var(--ink); }
   .pk.straight { border-color: var(--go); background: var(--go-wash); }
@@ -533,6 +539,8 @@
       <div id="picks" class="picks"></div>
       <div class="subhead">Best straight bets <span class="tag">by edge — the price beats the chance</span></div>
       <div id="bestBets" class="picks"></div>
+      <div class="subhead">One sport only <span class="tag">the same two rules, MLB and WNBA apart — for a night you want just one</span></div>
+      <div id="bySport" class="sports"></div>
       <div class="scroll"><div id="board"></div></div>
       <p class="note"><b>The parlay four</b> takes the likeliest priced market from each game, one leg per game,
         and keeps the four likeliest. A leg priced worse than the <b>leg cap</b> (−170 by default) is swapped for

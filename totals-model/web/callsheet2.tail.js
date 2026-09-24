@@ -501,9 +501,10 @@
   /* One leg per game: the likeliest priced market inside the cap. When the
      game's likeliest market is OUTSIDE the cap the leg is the next one down,
      and the card says what it replaced. Four games, likeliest first. */
-  function parlayFour(dateISO, cap) {
+  function parlayFour(dateISO, cap, sport) {
     var byGame = {};
     boardRows(dateISO, true).forEach(function (x) {
+      if (sport && x.row.sport !== sport) return;
       var g = byGame[x.row.id] || (byGame[x.row.id] = { row: x.row, all: [] });
       g.all.push(x);
     });
@@ -522,8 +523,8 @@
   }
   /* Straight bets: the stored picks (better price per market), positive edge
      only, best edge first. Same-game rows are flagged, not removed. */
-  function bestBets(dateISO) {
-    var rows = boardRows(dateISO, false).filter(function (x) { return x.mk.edge > 0; });
+  function bestBets(dateISO, sport) {
+    var rows = boardRows(dateISO, false).filter(function (x) { return x.mk.edge > 0 && (!sport || x.row.sport === sport); });
     rows.forEach(function (x, i) {
       x.rank = i + 1;
       x.corr = rows.slice(0, i).filter(function (o) { return o.row.id === x.row.id; }).map(function (o) { return o.rank; });
@@ -590,6 +591,29 @@
     bets.forEach(function (x) { bh += pickCard(x, "straight"); });
     if (!bets.length && rows.length) bh = '<div class="empty">No market on this date is priced below its chance. The book has every side covered tonight.</div>';
     $("bestBets").innerHTML = bh;
+
+    // --- by sport: the same two rules, one sport at a time ---
+    var sh = "";
+    ["MLB", "WNBA"].forEach(function (sp) {
+      var games = card.filter(function (r) { return (r.gdate || "") === dateISO && r.sport === sp; }).length;
+      if (!games) return;
+      var sl = parlayFour(dateISO, cap, sp), sb = bestBets(dateISO, sp);
+      var col = '<div class="sportcol" data-sport="' + sp + '"><div class="subhead">' + sp + ' <span class="tag">' + games + ' game' + (games === 1 ? '' : 's') + ' logged</span></div>';
+      col += '<div class="lbl">Parlay legs</div><div class="picks one">';
+      sl.forEach(function (x) {
+        col += pickCard(x, "", x.swapped ? '<div class="swap">Instead of ' + esc(x.swapped.pick) + ' ' + (x.swapped.p * 100).toFixed(1) + '% at ' + sgn(x.swapped.price, 0) + ' — beyond your ' + sgn(cap, 0) + ' cap.</div>' : '');
+      });
+      if (sl.length >= 2) {
+        var pAll2 = sl.reduce(function (a, x) { return a * x.mk.p; }, 1);
+        col += '<div class="pk parlay" style="border-style:dashed"><div class="n1">ALL ' + sl.length + ' HIT</div><div class="n2">' + (pAll2 * 100).toFixed(1) + '% · fair ' + sgn(priceFor(pAll2), 0) + ' (' + (1 / pAll2).toFixed(2) + '×)</div></div>';
+      } else if (!sl.length) col += '<div class="empty">Nothing priced inside ' + sgn(cap, 0) + '.</div>';
+      col += '</div><div class="lbl">Straight bets</div><div class="picks one">';
+      sb.forEach(function (x) { col += pickCard(x, "straight"); });
+      if (!sb.length) col += '<div class="empty">No positive edge in ' + sp + ' tonight.</div>';
+      col += '</div></div>';
+      sh += col;
+    });
+    $("bySport").innerHTML = sh;
 
     if (!rows.length) { $("board").innerHTML = '<div class="empty">Add today\'s matchups to the card and every priced market lands here, best edge first.</div>'; return; }
     var h = '<table><thead><tr><th>#</th><th>Matchup</th><th>Market</th><th>Pick</th><th>Chance</th><th>Price</th><th>Needs</th><th>Edge</th><th>Fair</th><th>Result</th></tr></thead><tbody>';
@@ -858,6 +882,13 @@
     bestBets(dateISO).forEach(function (x) {
       out.push("  " + x.rank + ". " + x.row.matchup + " — " + x.mk.pick + "  " + (x.mk.p * 100).toFixed(1) + "%  " + sgn(x.mk.price, 0) + "  edge " + sgn(x.mk.edge * 100, 1));
     });
+    ["MLB", "WNBA"].forEach(function (sp) {
+      var sl = parlayFour(dateISO, legCap(), sp), sb = bestBets(dateISO, sp);
+      if (!sl.length && !sb.length) return;
+      out.push(sp + " ONLY");
+      sl.forEach(function (x) { out.push("  leg " + x.rank + ". " + x.row.matchup + " — " + x.mk.pick + "  " + (x.mk.p * 100).toFixed(1) + "%  " + sgn(x.mk.price, 0)); });
+      sb.forEach(function (x) { out.push("  bet " + x.rank + ". " + x.row.matchup + " — " + x.mk.pick + "  " + (x.mk.p * 100).toFixed(1) + "%  " + sgn(x.mk.price, 0) + "  edge " + sgn(x.mk.edge * 100, 1)); });
+    });
     out.push("EVERY PRICED MARKET — ranked by " + (!$("byEdge").checked ? "chance to hit" : "edge"));
     rows.forEach(function (x) {
       out.push((x.rank <= 4 ? "* " : "  ") + x.rank + ". " + x.row.matchup + " — " + x.mk.pick + "  " + (x.mk.p * 100).toFixed(1) + "%  " +
@@ -874,6 +905,7 @@
   $("legCap").addEventListener("input", function () { render(); renderBoard(); renderCalib(); });
   $("picks").addEventListener("click", function (e) { var t = e.target.closest("[data-open]"); if (t) openRow(t.dataset.open); });
   $("bestBets").addEventListener("click", function (e) { var t = e.target.closest("[data-open]"); if (t) openRow(t.dataset.open); });
+  $("bySport").addEventListener("click", function (e) { var t = e.target.closest("[data-open]"); if (t) openRow(t.dataset.open); });
   $("board").addEventListener("click", function (e) { var t = e.target.closest("tr[data-open]"); if (t) openRow(t.dataset.open); });
   $("boardDate").addEventListener("change", renderBoard);
   $("add").addEventListener("click", addToCard);

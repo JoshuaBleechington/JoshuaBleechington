@@ -1145,7 +1145,7 @@ to bring them onto the corrected constants; finals and results are never touched
 |---|---|---|
 | `WNBA_LEAGUE_PACE` | **80.59** | Mean `PACE/40` on stats.wnba.com, the same table the inputs come from. Shipped at 83.1 and was wrong; see above. |
 | `WNBA_LEAGUE_RATING` | **107.5** | Mean `OFFRTG` on the same table, and it passes the offence/defence identity check. |
-| `WNBA_TOTAL_SD` | **11.5** | Inherited, and **unverified on this architecture**. |
+| `WNBA_TOTAL_SD` | **16.0** | Measured 25 Sept 2026 on the first 14 settled WNBA games: (final − line) spread 16.4, 95% interval 11.9–26.4, which put the inherited 11.5 outside it. `residual_spread()` keeps measuring it. |
 | `WNBA_B2B_PENALTY` | 2.0 | Hand-sized. Tagged. |
 | `WNBA_SHORT_REST_PENALTY` | 1.0 | Hand-sized. Tagged. |
 
@@ -1427,6 +1427,23 @@ this project returning team assignments backwards. They are quarantined in one
 block, dated, and the differential architecture is what keeps an error in them
 cheap. To update, change those four numbers and nothing else.
 
+### The WNBA spread was the first constant the log overturned
+
+`WNBA_TOTAL_SD` shipped at 11.5, inherited and marked unverified. The first
+fourteen settled WNBA games (21–24 Sept 2026) measured the spread of
+(final − line) at 16.4 with a 95% interval of 11.9 to 26.4; three of the last
+seven missed the line by 21 or more, which 11.5 says should almost never
+happen. On 25 Sept it moved to 16.0. Nothing about the direction of any call
+changed — the projection is the same number — but every WNBA chance shrank
+toward 50%: a 4.2-point lean is 60% where it was 64%, and BET now needs a
+lean of 1.2 points, STRONG BET 2.9, MAX BET 5.0. On the seven WNBA totals in
+the 2.0 log the 9/24 Valkyries @ Sparks under went from STRONG BET (61.5%)
+to BET (58.6%) and the Sky @ Mystics under from 58.7% to 56.3%; the rest
+stayed NO BET. The page's dispersion check now runs once per sport against
+that sport's own constant — the WNBA note appears under *Is it working* once
+three WNBA games are settled — and 16 is the number to revisit when the
+interval narrows.
+
 ## Call Sheet 2.0 shares this engine
 
 `web/fullgame.html` carries two sentinel comments, `ENGINE BLOCK` and `END
@@ -1450,7 +1467,7 @@ behaviour changed; the sentinels are comments.
 - `web/fullgame-cases.json` — 58 games (42 MLB, 16 WNBA) generated from the package by
   `tools_gen_fullgame_cases.py`, which recomputes only the expectations so a
   model change never means hand-editing a probability.
-- `tools_check_fullgame_page.js` — 1097 checks (the last is the build stamp). It replays all 58 in a real browser against side,
+- `tools_check_fullgame_page.js` — 1101 checks (the last is the build stamp). It replays all 58 in a real browser against side,
   band, resolved probability, push, projection, fair price, estimate and delta
   counts, the gate's core projection and core probability, the core chip showing
   the corroborated probability on every card and turning amber only when held,

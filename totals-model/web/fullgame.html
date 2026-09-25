@@ -396,7 +396,7 @@
   <header class="top">
     <div>
       <div class="eyebrow"><span id="eyebrow">MLB · full game</span>
-        <span class="build">· build <span id="build">2026-09-23</span></span></div>
+        <span class="build">· build <span id="build">2026-09-25</span></span></div>
       <h1>Call Sheet</h1>
       <p>Anchors on what the market is really on — the prices, not the rounded number —
          then adjusts for what today changes. Both books attack the <b>total</b>: MLB runs,
@@ -1139,7 +1139,7 @@
     var pOver = 0.5 + (rawOver - 0.5) * conf;
     /* The bracket the anchor is solved inside. Four runs covers any MLB price
        skew; a WNBA total moves further per cent of price because its spread is
-       11.5 points rather than 4.39 runs, so it needs a wider one. */
+       16 points rather than 4.39 runs, so it needs a wider one. */
     var span = sport === "WNBA" ? 20 : 4;
     var lo = Math.max(0.5, line - span), hi = line + span;
     for (var i = 0; i < 80; i++) {
@@ -1427,10 +1427,12 @@
        against the market rather than any table, was within 0.5 of the truth;
        the market calibration was sound and the pace was what was broken. */
     RATING: 107.5,
-    /* Spread of a final WNBA total around its projection, from the older
-       model. Unverified on this architecture; the residual-spread check will
-       report it against the log once there are games in it. */
-    SD: 11.5,
+    /* Spread of a final WNBA total around its projection. The older model's
+       11.5 was unverified here; the first 14 settled WNBA games in the log
+       (21-24 Sept 2026) measured (final - line) at 16.4, 95% interval 11.9 to
+       26.4, so on 25 Sept it moved to 16. Every WNBA chance shrinks toward
+       50% with it; the residual-spread check keeps measuring it. */
+    SD: 16.0,
     B2B: 2.0,      // rating points off a back-to-back offence
     SHORT: 1.0     // ... and off a single day's rest
   };
@@ -1928,7 +1930,7 @@
     $("shapeCard").hidden = false;
     $("shapeTag").textContent = "line " + f.line;
 
-    /* A WNBA total runs to ~220 with a spread of 11.5, so one bar per point
+    /* A WNBA total runs to ~220 with a spread of 16, so one bar per point
        would be seventy rows of nothing. They are bucketed instead — and the
        buckets are built OUTWARD FROM THE LINE so the line is always a bucket
        boundary. A bucket straddling the line would contain both winners and
@@ -2513,10 +2515,13 @@
     return (((((a[0]*r+a[1])*r+a[2])*r+a[3])*r+a[4])*r+a[5])*q /
            (((((b[0]*r+b[1])*r+b[2])*r+b[3])*r+b[4])*r+1);
   }
-  function residualSpread() {
+  /* One sport at a time, against that sport's own constant: 4.39 runs for
+     MLB, WNBA.SD points for the WNBA. The WNBA check is what moved that
+     constant from 11.5 to 16 on 25 Sept 2026, on fourteen settled games. */
+  function residualSpread(sp) {
     var xs = [];
     (typeof card === "undefined" ? [] : card).forEach(function (s) {
-      if (s.sport !== "MLB") return;
+      if (s.sport !== sp) return;
       var f = parseFloat(s.final), ln = parseFloat(s.line);
       if (isFinite(f) && isFinite(ln)) xs.push(f - ln);
     });
@@ -2527,8 +2532,8 @@
     var k = n - 1;
     var lo = sd * Math.sqrt(k / chi2Quantile(0.975, k));
     var hi = sd * Math.sqrt(k / chi2Quantile(0.025, k));
-    var assumed = RESIDUAL_SD.MLB;
-    return { n: n, sd: sd, lo: lo, hi: hi, assumed: assumed,
+    var assumed = sp === "WNBA" ? WNBA.SD : RESIDUAL_SD.MLB;
+    return { sport: sp, n: n, sd: sd, lo: lo, hi: hi, assumed: assumed,
              ok: lo <= assumed && assumed <= hi };
   }
 
@@ -2651,22 +2656,29 @@
       /* The two constants that used to be frozen, now shown live so drift is
          visible instead of needing someone to remember to re-measure. */
       (function () {
-        var mg = marginGuard(), rs = residualSpread(), out = "";
+        var mg = marginGuard(), out = "";
         if (mg.measured) out += '<p class="note" id="guardNote"><b>Margin guard: ' +
           (mg.points * 100).toFixed(1) + " points.</b> " +
           "Measured overconfidence " + (mg.bias * 100).toFixed(1) + " points plus a " +
           (mg.noise * 100).toFixed(1) + "-point standard error over " + mg.n +
           " graded calls. A margin under this cannot be told apart from none. It tightens " +
           "on its own as the card grows — there is no constant here to go stale.</p>";
-        if (rs) out += '<p class="note' + (rs.ok ? "" : " bad") + '" id="spreadNote">' +
-          "<b>Dispersion check:</b> over " + rs.n + " settled games the spread of " +
-          "(final − line) measures <b>" + rs.sd.toFixed(2) + "</b> runs, 95% interval " +
-          rs.lo.toFixed(2) + " to " + rs.hi.toFixed(2) + ". The model assumes " +
-          rs.assumed.toFixed(2) + ", which is " + (rs.ok
-            ? "inside that interval — nothing to change."
-            : "<b>outside</b> it. This constant sets the dispersion, the dispersion sets " +
-              "the skew, and the skew sets how far above the line the distribution's mean " +
-              "sits, so everything downstream moves with it.") + "</p>";
+        [["MLB", "spreadNote", "runs"], ["WNBA", "spreadNoteWnba", "points"]].forEach(function (t) {
+          var rs = residualSpread(t[0]);
+          if (!rs) return;
+          out += '<p class="note' + (rs.ok ? "" : " bad") + '" id="' + t[1] + '">' +
+            "<b>Dispersion check, " + t[0] + ":</b> over " + rs.n + " settled games the spread of " +
+            "(final − line) measures <b>" + rs.sd.toFixed(2) + "</b> " + t[2] + ", 95% interval " +
+            rs.lo.toFixed(2) + " to " + rs.hi.toFixed(2) + ". The model assumes " +
+            rs.assumed.toFixed(2) + ", which is " + (rs.ok
+              ? "inside that interval — nothing to change."
+              : "<b>outside</b> it. " + (t[0] === "MLB"
+                ? "This constant sets the dispersion, the dispersion sets the skew, and the " +
+                  "skew sets how far above the line the distribution's mean sits, so " +
+                  "everything downstream moves with it."
+                : "This constant sets how far every WNBA chance sits from 50%, so every " +
+                  "band on a WNBA card moves with it.")) + "</p>";
+        });
         return out;
       }());
   }

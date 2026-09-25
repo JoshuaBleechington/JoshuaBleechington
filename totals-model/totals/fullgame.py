@@ -186,10 +186,14 @@ WNBA_LEAGUE_PACE = 80.59
 # against the market rather than from any table -- was within 0.5 of this. The
 # market calibration was sound; it was the pace that was broken.
 WNBA_LEAGUE_RATING = 107.5
-# Spread of a final WNBA total around its projection, inherited from
-# totals/wnba.py and UNVERIFIED on this architecture. residual_spread() will
-# report it against the log once there are games in it.
-WNBA_TOTAL_SD = 11.5
+# Spread of a final WNBA total around its projection. The inherited 11.5 from
+# totals/wnba.py was unverified on this architecture; the first 14 settled
+# WNBA games in the log (21-24 Sept 2026) measured (final - line) at 16.4,
+# 95% interval 11.9 to 26.4, which put 11.5 outside it, so on 25 Sept it
+# moved to 16. Every WNBA chance shrinks toward 50% with it: a 4.2-point lean
+# is 60% here where it was 64%, and BET now needs a lean of 1.2 points,
+# STRONG BET 2.9, MAX BET 5.0. residual_spread() keeps measuring it.
+WNBA_TOTAL_SD = 16.0
 # Rating points taken off a tired offence. The direction is documented; the
 # size is a guess, so the delta it drives is tagged mechanism=False.
 WNBA_B2B_PENALTY = 2.0

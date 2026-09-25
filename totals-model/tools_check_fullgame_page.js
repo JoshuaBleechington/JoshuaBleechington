@@ -463,9 +463,11 @@ const CHECKS = ["dome", "playoff"];
     await pg.waitForTimeout(300);
     return pg.evaluate(() => {
       const g = document.getElementById('guardNote'), s = document.getElementById('spreadNote');
+      const sw = document.getElementById('spreadNoteWnba');
       return {
         guard: g ? g.textContent : null,
         spread: s ? s.textContent : null,
+        spreadWnba: sw ? sw.textContent : null,
         margin: (document.querySelectorAll('.cline')[1] || {}).textContent || '',
       };
     });
@@ -511,6 +513,22 @@ const CHECKS = ["dome", "playoff"];
   chk(/assumes 4\.39/.test(narrow.spread),
       'spread: and the constant is still 4.39 — it reports, it never refits',
       narrow.spread);
+  chk(narrow.spreadWnba === null, 'spread: no WNBA note on a card with no settled WNBA games', String(narrow.spreadWnba));
+  // The WNBA gets its own check against its own constant. The user's first fourteen
+  // settled games measured 16.4 and moved it from 11.5 to 16 on 25 Sept 2026.
+  const wk = (line, final) => ({
+    matchup: 'Sky @ Mystics', sport: 'WNBA', line, projected: '166.0', side: 'UNDER',
+    prob: '55.0', band: 'BET', fair: '-120', final: String(final),
+    inputs: { away: 'Sky', home: 'Mystics', line: String(line), op: '-110', up: '-110' },
+  });
+  const wnbaSpread = await seed([wk(168.5, 194), wk(174.5, 148), wk(172.5, 194), wk(182.5, 152),
+                                 wk(158.5, 151), wk(175.5, 182), wk(168.5, 176)]);
+  chk(wnbaSpread.spread === null && /Dispersion check, WNBA/.test(wnbaSpread.spreadWnba || ''),
+      'spread: settled WNBA games get their own dispersion note, and the MLB one stays away', String(wnbaSpread.spreadWnba).slice(0, 120));
+  chk(/assumes 16\.00/.test(wnbaSpread.spreadWnba || '') && /points/.test(wnbaSpread.spreadWnba || ''),
+      'spread: the WNBA note names the WNBA constant, in points', wnbaSpread.spreadWnba);
+  chk(/inside that interval/.test(wnbaSpread.spreadWnba || ''),
+      'spread: the seven 9/23-24 games, spread ~20, put 16 inside their wide interval', wnbaSpread.spreadWnba);
 
   // ---- the date column ---------------------------------------------------
   // It must never be a day early. `new Date("2026-09-17")` parses as UTC

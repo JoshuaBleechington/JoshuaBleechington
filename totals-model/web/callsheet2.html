@@ -956,7 +956,7 @@
     var pOver = 0.5 + (rawOver - 0.5) * conf;
     /* The bracket the anchor is solved inside. Four runs covers any MLB price
        skew; a WNBA total moves further per cent of price because its spread is
-       11.5 points rather than 4.39 runs, so it needs a wider one. */
+       16 points rather than 4.39 runs, so it needs a wider one. */
     var span = sport === "WNBA" ? 20 : 4;
     var lo = Math.max(0.5, line - span), hi = line + span;
     for (var i = 0; i < 80; i++) {
@@ -1244,10 +1244,12 @@
        against the market rather than any table, was within 0.5 of the truth;
        the market calibration was sound and the pace was what was broken. */
     RATING: 107.5,
-    /* Spread of a final WNBA total around its projection, from the older
-       model. Unverified on this architecture; the residual-spread check will
-       report it against the log once there are games in it. */
-    SD: 11.5,
+    /* Spread of a final WNBA total around its projection. The older model's
+       11.5 was unverified here; the first 14 settled WNBA games in the log
+       (21-24 Sept 2026) measured (final - line) at 16.4, 95% interval 11.9 to
+       26.4, so on 25 Sept it moved to 16. Every WNBA chance shrinks toward
+       50% with it; the residual-spread check keeps measuring it. */
+    SD: 16.0,
     B2B: 2.0,      // rating points off a back-to-back offence
     SHORT: 1.0     // ... and off a single day's rest
   };

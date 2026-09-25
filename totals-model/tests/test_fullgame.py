@@ -1332,9 +1332,9 @@ class TestWnbaIsNeutralByArithmetic(unittest.TestCase):
 class TestWnbaDistributionCanPush(unittest.TestCase):
     def test_a_whole_number_line_has_a_real_push(self):
         f = forecast_wnba("a @ b", line=162, over_price=-110, under_price=-110)
-        # 1 / (sd * sqrt(2*pi)) at the mean, ~3.5% for sd 11.5
-        self.assertGreater(f.p_push, 0.03)
-        self.assertLess(f.p_push, 0.04)
+        # 1 / (sd * sqrt(2*pi)) at the mean, ~2.5% for sd 16
+        self.assertGreater(f.p_push, 0.02)
+        self.assertLess(f.p_push, 0.03)
 
     def test_a_half_point_line_cannot_push(self):
         f = forecast_wnba("a @ b", line=161.5, over_price=-110, under_price=-110)
@@ -1444,7 +1444,8 @@ class TestTheHeldNoteNamesTheInputsItActuallyDeleted(unittest.TestCase):
     def test_a_held_wnba_card_names_last_five_and_rest(self):
         f = forecast_wnba("Sparks @ Aces", **self.SPARKS)
         self.assertEqual(f.band, "NO BET")
-        self.assertEqual(f.band_ungated, "STRONG BET")
+        # STRONG BET at the inherited spread of 11.5; BET since the spread moved to 16 (25 Sept)
+        self.assertEqual(f.band_ungated, "BET")
         note = next(n for n in f.notes if "Held at" in n)
         self.assertIn("Delete Last 5 and Rest", note)
 
@@ -1458,8 +1459,9 @@ class TestTheHeldNoteNamesTheInputsItActuallyDeleted(unittest.TestCase):
     def test_the_arithmetic_the_note_describes_was_never_wrong(self):
         """Only the prose was broken, so the number it quotes is unchanged."""
         f = forecast_wnba("Sparks @ Aces", **self.SPARKS)
-        self.assertAlmostEqual(f.p_corroborated, 0.4807, places=3)
-        self.assertIn("OVER 51.9%, the other side",
+        # 0.4807 and "OVER 51.9%" at the inherited spread of 11.5; the wider spread of 16 pulls both toward 50%
+        self.assertAlmostEqual(f.p_corroborated, 0.4978, places=3)
+        self.assertIn("OVER 50.2%, the other side",
                       next(n for n in f.notes if "Held at" in n))
 
     def test_a_held_mlb_card_names_the_starters_the_old_sentence_forgot(self):

@@ -202,6 +202,10 @@
   .pk .swap { font-size: 11px; color: var(--warn); }
   .mk .cap { display: inline-block; font: 700 9px/1 var(--sans); letter-spacing: .08em; text-transform: uppercase;
              padding: 3px 5px; border: 1px dashed var(--warn); border-radius: 4px; color: var(--warn); margin-left: 6px; vertical-align: 2px; }
+  /* The two labels: a solid, quiet chip, so it never reads as a call. */
+  .mk .cap.tagm { color: var(--ink-2); border: 1px solid var(--rule-firm); }
+  .openbtn .tagm { display: inline-block; font: 700 9px/1 var(--sans); letter-spacing: .08em; text-transform: uppercase;
+                   padding: 3px 5px; border: 1px solid var(--rule-firm); border-radius: 4px; color: var(--ink-2); margin: 4px 4px 0 0; }
   .mk.alt { border-color: var(--go); }
   .mk.alt .rk { color: var(--go); }
   /* A graded rail: the row last opened has finals, so each market shows how
@@ -518,7 +522,11 @@
             favourite at −185 is a 62% chance and a losing bet; a 53% under at −110 is the better bet on the same
             game. The green mark is this game's parlay leg — Call Sheet #1's BET on the total when that side clears
             its price inside your leg cap, otherwise the side with the best chance against its price — and an amber
-            mark names the likeliest thing on the game when it is priced beyond the cap.</p>
+            mark names the likeliest thing on the game when it is priced beyond the cap. Two grey chips on the
+            total are <b>labels, not adjustments</b>: <b>cold-under profile</b> (total 7 or lower, wind in at 10 mph
+            or more, both pens under 3.75, a last ten below the line) and <b>same lean</b> or <b>split lean</b>
+            (whether the full-game pick and the first-five pick agree). Neither moves a number; each has its own
+            line in the record below, so it can earn one.</p>
         </div>
       </section>
       <section class="card">
@@ -1909,6 +1917,7 @@
     var byProb = false;
     $("rankTag").textContent = "by edge";
     var ranked = rankMarkets(m.markets, false), html = "", cap = legCap();
+    var railMarks = markChips(marksOf(sport, snapshot(), m.markets), "cap tagm");
     var gradedRow = openedFinals(), fin = gradedRow ? gradedRow.finals : null;
     if (gradedRow) {
       var w = 0, l = 0, pu = 0;
@@ -1941,6 +1950,7 @@
         '<div><div class="pick ' + sideClass(mk.side) + '">' + esc(mk.pick) +
           (mk.band ? '<span class="band' + (mk.band === "NO BET" ? "" : " hot") + '">' + esc(mk.band) + '</span>' : "") +
           (!mk.anchored ? '<span class="derived">derived</span>' : "") +
+          (mk.key === "total" ? railMarks : "") +
           (isLeg ? '<span class="cap" style="color:var(--go);border-color:var(--go)">parlay leg: ' + esc(leg.pick) + ' ' + (leg.p * 100).toFixed(1) + '% at ' + sgn(leg.price, 0) + ' · ' + valueRatio(leg).toFixed(3) + '× its price' + (bandOf(leg) ? ' · #1 says ' + esc(bandOf(leg)) : '') + '</span>' : "") +
           (beyondLikely && mk.key === beyondLikely.key ? '<span class="cap">likeliest: ' + esc(beyondLikely.pick) + ' ' + (beyondLikely.p * 100).toFixed(1) + '% at ' + sgn(beyondLikely.price, 0) + ' · beyond ' + sgn(cap, 0) + '</span>' : "") +
           (res ? '<span class="chip ' + res + '" style="margin-left:8px;vertical-align:2px">' + resText(res) + '</span>' : "") + '</div>' +
@@ -2236,7 +2246,8 @@
         ? '<span class="finals"><span class="l">F5</span><input class="grade" data-id="' + r.id + '" data-k="f5a" value="' + esc(fin.f5a || "") + '" placeholder="A" inputmode="numeric"' + ro + '>' +
           '<input class="grade" data-id="' + r.id + '" data-k="f5h" value="' + esc(fin.f5h || "") + '" placeholder="H" inputmode="numeric"' + ro + '></span>' : '';
       h += '<tr><td><span class="gdate' + (r.gdate === today ? ' today' : '') + '">' + esc(gameDate(r.gdate)) + '</span></td>' +
-        '<td><button type="button" class="openbtn" data-open="' + r.id + '" title="Load into the form"><b>' + esc(r.matchup) + '</b><br><span class="gdate">' + esc(r.sport) + '</span></button></td>' +
+        '<td><button type="button" class="openbtn" data-open="' + r.id + '" title="Load into the form"><b>' + esc(r.matchup) + '</b><br><span class="gdate">' + esc(r.sport) + '</span>' +
+          markChips(marksOf(r.sport, r.inputs, r.markets), "tagm") + '</button></td>' +
         '<td><div class="rowmk">' + mks + '</div></td>' +
         '<td' + (lk ? ' class="locked"' : '') + '><span class="finals"><span class="l">FINAL</span><input class="grade" data-id="' + r.id + '" data-k="fa" value="' + esc(fin.fa || "") + '" placeholder="A" inputmode="numeric"' + ro + '>' +
           '<input class="grade" data-id="' + r.id + '" data-k="fh" value="' + esc(fin.fh || "") + '" placeholder="H" inputmode="numeric"' + ro + '></span> ' + f5 +
@@ -2254,6 +2265,42 @@
      baseball; the spread is basketball), the distributions differ, and a
      record that pooled them would hide which book is working. The two fours
      are split the same way: each leg is credited to the sport it came from. */
+  /* ---- two LABELS, never adjustments --------------------------------------
+     Both are read off the stored inputs and markets, so every row already on
+     the card carries them, and neither moves a number. They exist so the
+     record can be split by them; if a split holds up over enough games it
+     earns a coefficient then, the way the wind did. Added 25 Sept 2026.
+
+     cold-under profile (MLB): total 7 or lower, wind in (in or quartering in)
+     at 10 mph or more, both bullpens under 3.75, and at least one team's last
+     ten below the line. Guardians @ Red Sox on 23 and 24 Sept -- 1-0 both
+     nights -- is the archetype; Rays @ Yankees the same nights looked alike,
+     failed on the Rays' pen and the Yankees' form, and went 11 and 10.
+
+     same / split lean (MLB): whether the sheet's pick on the full-game total
+     and its pick on the first five are the same side. On the first 21 games
+     the full-game pick went 11-4 when they agreed and 2-4 when they split. */
+  /* numOf, not num: the engine block owns num(id), which reads a form field. */
+  function numOf(v) { var x = parseFloat(v); return isFinite(x) ? x : null; }
+  function marksOf(sp, inputs, markets) {
+    var out = { profile: "", lean: "" };
+    if (sp !== "MLB" || !inputs) return out;
+    var line = numOf(inputs.line), mph = numOf(inputs.mph), dir = String(inputs.dir || "");
+    var abp = numOf(inputs.abp), hbp = numOf(inputs.hbp), al = numOf(inputs.al10), hl = numOf(inputs.hl10);
+    if (line !== null && line <= 7 && (dir === "in" || dir === "quarter-in") && mph !== null && mph >= 10 &&
+        abp !== null && hbp !== null && abp < 3.75 && hbp < 3.75 &&
+        ((al !== null && al < line) || (hl !== null && hl < line))) out.profile = "cold-under profile";
+    var tot = null, f5 = null;
+    (markets || []).forEach(function (mk) { if (mk.key === "total") tot = mk; if (mk.key === "f5") f5 = mk; });
+    if (tot && f5) out.lean = tot.side === f5.side ? "same lean" : "split lean";
+    return out;
+  }
+  function markChips(tg, cls) {
+    var h = "";
+    if (tg.profile) h += '<span class="' + cls + '">' + esc(tg.profile) + '</span>';
+    if (tg.lean) h += '<span class="' + cls + '">' + esc(tg.lean) + '</span>';
+    return h;
+  }
   function renderCalib() {
     var KEYS = { MLB: [["total","Full-game total"],["f5","First five"],["ml","Moneyline"],["rl","Run line"]],
                  WNBA: [["total","Full-game total"],["ml","Moneyline"],["spread","Spread"]] };
@@ -2262,7 +2309,7 @@
        against away -- and the full-game total keeps the record of the rows
        that carried Call Sheet #1's verdict, because the parlay legs lean on
        it. Asked for on 25 Sept: "how many of the 17-10 went over vs under". */
-    var fresh = function (label) { return { n: 0, w: 0, l: 0, p: 0, says: 0, units: 0, label: label, sides: {}, verdict: null }; };
+    var fresh = function (label) { return { n: 0, w: 0, l: 0, p: 0, says: 0, units: 0, label: label, sides: {}, verdict: null, profile: null, lean: {} }; };
     var bySport = {};
     ["MLB", "WNBA"].forEach(function (sp) {
       var b = { stats: {}, top: fresh("The parlay four"), topE: fresh("Best straight bets"), any: false };
@@ -2270,11 +2317,16 @@
       bySport[sp] = b;
     });
     var count = function (c, res) { if (res === "push") c.p++; else if (res === "win") c.w++; else c.l++; };
-    var tally = function (t, mk, res, bySide) {
-      if (bySide) {
+    var tally = function (t, mk, res, row) {
+      if (row) {
         var sd = t.sides[mk.side] || (t.sides[mk.side] = { w: 0, l: 0, p: 0 });
         count(sd, res);
         if (mk.key === "total" && bandOf(mk)) { count(t.verdict || (t.verdict = { w: 0, l: 0, p: 0 }), res); }
+        if (mk.key === "total" || mk.key === "f5") {
+          var tg = marksOf(row.sport, row.inputs, row.markets);
+          if (tg.profile) count(t.profile || (t.profile = { w: 0, l: 0, p: 0 }), res);
+          if (tg.lean) count(t.lean[tg.lean] || (t.lean[tg.lean] = { w: 0, l: 0, p: 0 }), res);
+        }
       }
       if (res === "push") { t.p++; return; }
       t.n++; t.says += mk.p; t.w += res === "win" ? 1 : 0; t.l += res === "loss" ? 1 : 0; t.units += unitsOf(mk, res);
@@ -2286,7 +2338,7 @@
         var res = gradeMarket(mk, r.finals);
         if (res === null || res === "invalid") return;
         var st = b.stats[mk.key]; if (!st) return;
-        b.any = true; tally(st, mk, res, true);
+        b.any = true; tally(st, mk, res, r);
       });
       if (r.gdate) dates[r.gdate] = true;
     });
@@ -2311,6 +2363,8 @@
       var order = ["OVER", "UNDER", "HOME", "AWAY"], parts = [];
       order.forEach(function (sd) { if (s.sides[sd]) parts.push(sd.toLowerCase() + ' ' + rec(s.sides[sd])); });
       if (s.verdict) parts.push('#1 BET or better ' + rec(s.verdict));
+      if (s.profile) parts.push('cold-under profile ' + rec(s.profile));
+      ["same lean", "split lean"].forEach(function (k) { if (s.lean[k]) parts.push(k + ' ' + rec(s.lean[k])); });
       return '<div><p class="k">' + esc(s.label) + '</p><p class="v">' + s.w + '-' + s.l + (s.p ? '-' + s.p : '') + '</p>' +
         '<p class="s">' + (s.n ? 'says ' + says.toFixed(1) + '% · does ' + does.toFixed(1) + '% (±' + se.toFixed(1) + ') · ' + sgn(s.units, 2) + 'u' : 'pushes only') + '</p>' +
         (parts.length ? '<p class="s sides">' + esc(parts.join(' · ')) + '</p>' : '') + '</div>';

@@ -202,6 +202,10 @@
   .pk .swap { font-size: 11px; color: var(--warn); }
   .mk .cap { display: inline-block; font: 700 9px/1 var(--sans); letter-spacing: .08em; text-transform: uppercase;
              padding: 3px 5px; border: 1px dashed var(--warn); border-radius: 4px; color: var(--warn); margin-left: 6px; vertical-align: 2px; }
+  /* The two labels: a solid, quiet chip, so it never reads as a call. */
+  .mk .cap.tagm { color: var(--ink-2); border: 1px solid var(--rule-firm); }
+  .openbtn .tagm { display: inline-block; font: 700 9px/1 var(--sans); letter-spacing: .08em; text-transform: uppercase;
+                   padding: 3px 5px; border: 1px solid var(--rule-firm); border-radius: 4px; color: var(--ink-2); margin: 4px 4px 0 0; }
   .mk.alt { border-color: var(--go); }
   .mk.alt .rk { color: var(--go); }
   /* A graded rail: the row last opened has finals, so each market shows how
@@ -518,7 +522,11 @@
             favourite at −185 is a 62% chance and a losing bet; a 53% under at −110 is the better bet on the same
             game. The green mark is this game's parlay leg — Call Sheet #1's BET on the total when that side clears
             its price inside your leg cap, otherwise the side with the best chance against its price — and an amber
-            mark names the likeliest thing on the game when it is priced beyond the cap.</p>
+            mark names the likeliest thing on the game when it is priced beyond the cap. Two grey chips on the
+            total are <b>labels, not adjustments</b>: <b>cold-under profile</b> (total 7 or lower, wind in at 10 mph
+            or more, both pens under 3.75, a last ten below the line) and <b>same lean</b> or <b>split lean</b>
+            (whether the full-game pick and the first-five pick agree). Neither moves a number; each has its own
+            line in the record below, so it can earn one.</p>
         </div>
       </section>
       <section class="card">

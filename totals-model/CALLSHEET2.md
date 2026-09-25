@@ -7,7 +7,7 @@ top of Call Sheet #1 without touching it.
 - Page: `web/callsheet2.html`, assembled by `tools_build_callsheet2.py` from
   `web/callsheet2.head.html` + Call Sheet #1's engine block + `web/callsheet2.tail.js`
 - Fixtures: `web/callsheet2-cases.json` (62 cases) from `tools_gen_callsheet2_cases.py`
-- Browser harness: `tools_check_callsheet2_page.js` (1,011 checks)
+- Browser harness: `tools_check_callsheet2_page.js` (1,017 checks)
 
 ## What it answers
 
@@ -246,7 +246,21 @@ line, the same record **by side**: over against under on the totals and the
 first five, home against away on the moneyline, run line and spread, so a
 17-10 can be read as the unders carrying it or not. The full-game tile also
 keeps the record of the rows that carried #1's verdict (BET or better), the
-rows the parlay legs lean on. Asked for on 25 Sept. Plus the two **top-4
+rows the parlay legs lean on. Asked for on 25 Sept.
+
+Two more lines come from **labels**, which are the sheet's way of testing a
+hunch without betting on it: a label moves no number, it only splits the
+record. *Cold-under profile* (MLB) marks a card with a total of 7 or lower,
+wind in at 10 mph or more, both bullpens under 3.75 and at least one team's
+last ten below the line — Guardians @ Red Sox on 23 and 24 Sept, 1-0 both
+nights, is the archetype, and Rays @ Yankees the same nights, which looked
+alike, failed it on the Rays' pen and went 11 and 10. *Same lean* / *split
+lean* marks whether the full-game pick and the first-five pick are the same
+side; on the first 21 games the full-game pick went 11-4 when they agreed and
+2-4 when they split. Both chips show on the rail and on the card table, in
+grey, and each has its own record on the two total tiles. If a label's record
+holds up at forty or more games it earns a coefficient then; if not it cost
+nothing. Plus the two **top-4
 fours**: for every date on the card, *the parlay four* (as the board defines
 it, at the current cap) and *best straight bets*, graded. Choosing between them
 is the reason the sheet exists, so each has its own tile. It is

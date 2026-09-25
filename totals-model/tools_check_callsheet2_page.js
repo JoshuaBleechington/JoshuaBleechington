@@ -178,6 +178,8 @@ const CHECKS = ["dome","playoff"];
   chk(/Full-game total[\s\S]*under 1-0/.test(flow.calib) && /First five[\s\S]*under 1-0/.test(flow.calib) && !/over \d/.test(flow.calib),
       'record: each total tile carries its record by side, and a side with no graded pick is not printed', flow.calib.slice(0, 400));
   chk(/#1 BET or better 1-0/.test(flow.calib), 'record: the full-game tile keeps the record of the rows that carried #1\'s verdict', flow.calib.slice(0, 400));
+  chk(/Full-game total[\s\S]*same lean 1-0/.test(flow.calib) && /First five[\s\S]*same lean 1-0/.test(flow.calib) && !/split lean/.test(flow.calib) && !/cold-under/.test(flow.calib),
+      'record: both total tiles carry the lean record (the fixture agrees on the under, and has no pens so no profile)', flow.calib.slice(0, 500));
   chk(/Full-game total/.test(flow.calib) && /First five/.test(flow.calib) && /parlay four/.test(flow.calib) && /Best straight bets/.test(flow.calib),
       'calib: per-market tiles and BOTH fours are drawn once something is graded', flow.calib.slice(0, 200));
 
@@ -295,6 +297,47 @@ const CHECKS = ["dome","playoff"];
   chk(parlayCard.legs.length === 2 && parlayCard.legs.every(l => l.band) && legRatio(parlayCard.legs[0]) >= legRatio(parlayCard.legs[1]),
       'parlay: two verdict legs rank by value, the richer first', parlayCard.legs.map(l => l.game.slice(0, 18) + ' ' + l.pick + (l.band ? ' [' + l.band + ']' : '') + ' ' + legRatio(l).toFixed(3)).join(' | '));
   chk(parlayCard.rail.some(t => /parlay leg: UNDER 6.5 .* · #1 says BET/.test(t)), 'rail: the green mark names the verdict leg and #1\'s call', parlayCard.rail.join(' | '));
+
+  // ---- the two labels: cold-under profile and same / split lean ------------------
+  const marks = await pg.evaluate(async () => {
+    const wait = () => new Promise(r => setTimeout(r, 50));
+    const set = (id, v) => { const el = document.getElementById(id); el.value = v; el.dispatchEvent(new Event('input', { bubbles: true })); };
+    const read = () => [...document.querySelectorAll('#markets .mk[data-key="total"] .cap.tagm')].map(e => e.textContent);
+    const sides = () => [...document.querySelectorAll('#markets .mk')].map(e => e.dataset.key + ':' + e.querySelector('.pick').textContent.split(' ')[0]).filter(x => /^(total|f5):/.test(x)).sort().join(' ');
+    document.getElementById('clear').click(); document.getElementById('m-mlb').click(); await wait();
+    // Guardians @ Red Sox, 24 Sept, as logged: the archetype
+    set('away', 'Guardians'); set('home', 'Red Sox'); set('line', '6.5'); set('op', '-118'); set('up', '-102');
+    set('aera', '4.30'); set('hera', '3.12'); set('abp', '3.61'); set('hbp', '3.28'); set('al10', '8.3'); set('hl10', '5.5');
+    set('mph', '13'); set('dir', 'in'); set('temp', '58'); set('f5line', '3.5'); set('f5op', '-115'); set('f5up', '-115');
+    await wait(); const guardians = read(), gSides = sides();
+    // Rays @ Yankees, 24 Sept: the Rays' pen (4.11) and both last tens above the line fail it
+    set('away', 'Rays'); set('home', 'Yankees'); set('line', '6'); set('op', '-110'); set('up', '-110');
+    set('aera', '4.18'); set('hera', '2.57'); set('abp', '4.11'); set('hbp', '3.12'); set('al10', '7.4'); set('hl10', '8.2');
+    set('f5line', '3'); await wait(); const rays = read();
+    // the same card with the first five leaning the other way from the full game
+    set('mph', '15'); set('dir', 'out'); set('abp', '5.4'); set('hbp', '5.6'); set('aera', '2.4'); set('hera', '2.5'); set('temp', '88');
+    await wait(); const other = read(), oSides = sides();
+    // add it under names no other fixture uses, read the row's chips, then remove the row so the later
+    // fixtures (which find rows by name) see the card exactly as they left it
+    set('away', 'Twins'); set('home', 'Tigers'); await wait();
+    document.getElementById('add').click(); await wait();
+    const row = () => [...document.querySelectorAll('#cardTable tr')].find(t => /Twins @ Tigers/.test(t.textContent));
+    const cardChips = [...row().querySelectorAll('.openbtn .tagm')].map(e => e.textContent);
+    row().querySelector('[data-del]').click(); await wait();
+    const gone = !row();
+    document.getElementById('clear').click(); await wait();
+    return { guardians, gSides, rays, other, oSides, cardChips, gone };
+  });
+  chk(marks.guardians.join('|') === 'cold-under profile|same lean',
+      'labels: the Guardians @ Red Sox card carries the profile and the two totals agree', marks.guardians.join('|') + ' :: ' + marks.gSides);
+  chk(marks.rays.length === 1 && /lean$/.test(marks.rays[0]),
+      'labels: Rays @ Yankees fails the profile on the pen and the form, and keeps only its lean chip', marks.rays.join('|'));
+  const oSame = /f5:(\w+)/.exec(marks.oSides)[1] === /total:(\w+)/.exec(marks.oSides)[1];
+  chk(marks.other.join('|') === (oSame ? 'same lean' : 'split lean'),
+      'labels: the lean chip says whether the first five and the full game agree', marks.other.join('|') + ' :: ' + marks.oSides);
+  chk(marks.cardChips.length >= 1 && marks.cardChips.every(t => /lean$|profile$/.test(t)),
+      'labels: the card table shows the same chips on the row', marks.cardChips.join('|'));
+  chk(marks.gone, 'labels: the fixture row is removed again', String(marks.gone));
 
   // ---- the cap, the second choice on the rail, and clicking through ---------------
   const capFlow = await pg.evaluate(async () => {

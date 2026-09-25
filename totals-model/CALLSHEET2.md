@@ -7,7 +7,7 @@ top of Call Sheet #1 without touching it.
 - Page: `web/callsheet2.html`, assembled by `tools_build_callsheet2.py` from
   `web/callsheet2.head.html` + Call Sheet #1's engine block + `web/callsheet2.tail.js`
 - Fixtures: `web/callsheet2-cases.json` (62 cases) from `tools_gen_callsheet2_cases.py`
-- Browser harness: `tools_check_callsheet2_page.js` (1,009 checks)
+- Browser harness: `tools_check_callsheet2_page.js` (1,011 checks)
 
 ## What it answers
 
@@ -241,7 +241,12 @@ five and run line are baseball, the spread is basketball), the distributions
 differ, and a pooled record would hide which book is working. Each leg of the
 two fours is credited to the sport it came from. Within a block it shows per
 market: record, *says* (mean stated probability),
-*does* (hit rate) with its standard error, and units. Plus the two **top-4
+*does* (hit rate) with its standard error, and units — and, on a second
+line, the same record **by side**: over against under on the totals and the
+first five, home against away on the moneyline, run line and spread, so a
+17-10 can be read as the unders carrying it or not. The full-game tile also
+keeps the record of the rows that carried #1's verdict (BET or better), the
+rows the parlay legs lean on. Asked for on 25 Sept. Plus the two **top-4
 fours**: for every date on the card, *the parlay four* (as the board defines
 it, at the current cap) and *best straight bets*, graded. Choosing between them
 is the reason the sheet exists, so each has its own tile. It is

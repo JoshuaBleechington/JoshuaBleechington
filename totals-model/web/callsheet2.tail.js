@@ -780,14 +780,24 @@
     var KEYS = { MLB: [["total","Full-game total"],["f5","First five"],["ml","Moneyline"],["rl","Run line"]],
                  WNBA: [["total","Full-game total"],["ml","Moneyline"],["spread","Spread"]] };
     var box = $("calibBox"), cap = legCap();
-    var fresh = function (label) { return { n: 0, w: 0, l: 0, p: 0, says: 0, units: 0, label: label }; };
+    /* Each tile also keeps the record BY SIDE -- over against under, home
+       against away -- and the full-game total keeps the record of the rows
+       that carried Call Sheet #1's verdict, because the parlay legs lean on
+       it. Asked for on 25 Sept: "how many of the 17-10 went over vs under". */
+    var fresh = function (label) { return { n: 0, w: 0, l: 0, p: 0, says: 0, units: 0, label: label, sides: {}, verdict: null }; };
     var bySport = {};
     ["MLB", "WNBA"].forEach(function (sp) {
       var b = { stats: {}, top: fresh("The parlay four"), topE: fresh("Best straight bets"), any: false };
       KEYS[sp].forEach(function (k) { b.stats[k[0]] = fresh(k[1]); });
       bySport[sp] = b;
     });
-    var tally = function (t, mk, res) {
+    var count = function (c, res) { if (res === "push") c.p++; else if (res === "win") c.w++; else c.l++; };
+    var tally = function (t, mk, res, bySide) {
+      if (bySide) {
+        var sd = t.sides[mk.side] || (t.sides[mk.side] = { w: 0, l: 0, p: 0 });
+        count(sd, res);
+        if (mk.key === "total" && bandOf(mk)) { count(t.verdict || (t.verdict = { w: 0, l: 0, p: 0 }), res); }
+      }
       if (res === "push") { t.p++; return; }
       t.n++; t.says += mk.p; t.w += res === "win" ? 1 : 0; t.l += res === "loss" ? 1 : 0; t.units += unitsOf(mk, res);
     };
@@ -798,7 +808,7 @@
         var res = gradeMarket(mk, r.finals);
         if (res === null || res === "invalid") return;
         var st = b.stats[mk.key]; if (!st) return;
-        b.any = true; tally(st, mk, res);
+        b.any = true; tally(st, mk, res, true);
       });
       if (r.gdate) dates[r.gdate] = true;
     });
@@ -819,8 +829,13 @@
       if (!s.n && !s.p) return '';
       var says = s.n ? s.says / s.n * 100 : 0, does = s.n ? s.w / s.n * 100 : 0;
       var se = s.n ? Math.sqrt(Math.max(does / 100 * (1 - does / 100), 1e-9) / s.n) * 100 : 0;
+      var rec = function (c) { return c.w + '-' + c.l + (c.p ? '-' + c.p : ''); };
+      var order = ["OVER", "UNDER", "HOME", "AWAY"], parts = [];
+      order.forEach(function (sd) { if (s.sides[sd]) parts.push(sd.toLowerCase() + ' ' + rec(s.sides[sd])); });
+      if (s.verdict) parts.push('#1 BET or better ' + rec(s.verdict));
       return '<div><p class="k">' + esc(s.label) + '</p><p class="v">' + s.w + '-' + s.l + (s.p ? '-' + s.p : '') + '</p>' +
-        '<p class="s">' + (s.n ? 'says ' + says.toFixed(1) + '% · does ' + does.toFixed(1) + '% (±' + se.toFixed(1) + ') · ' + sgn(s.units, 2) + 'u' : 'pushes only') + '</p></div>';
+        '<p class="s">' + (s.n ? 'says ' + says.toFixed(1) + '% · does ' + does.toFixed(1) + '% (±' + se.toFixed(1) + ') · ' + sgn(s.units, 2) + 'u' : 'pushes only') + '</p>' +
+        (parts.length ? '<p class="s sides">' + esc(parts.join(' · ')) + '</p>' : '') + '</div>';
     };
     var h = '';
     ["MLB", "WNBA"].forEach(function (sp) {

@@ -174,6 +174,10 @@ const CHECKS = ["dome","playoff"];
   chk(by['UNDER 6.5'] === 'win', 'grade: UNDER 6.5 on a 1-1 game is a win', JSON.stringify(by));
   chk(by['F5 UNDER 3.5'] === 'win', 'grade: F5 UNDER 3.5 on a 1-0 first five is a win', JSON.stringify(by));
   chk((by['Rays +1.5'] === 'win') || (by['Yankees -1.5'] === 'loss'), 'grade: a one-run home win is a cover for the dog', JSON.stringify(by));
+  // Rays 1, Yankees 1 on a 6.5 total and 1-0 through five on 3.5: both unders won, so each tile says so by side.
+  chk(/Full-game total[\s\S]*under 1-0/.test(flow.calib) && /First five[\s\S]*under 1-0/.test(flow.calib) && !/over \d/.test(flow.calib),
+      'record: each total tile carries its record by side, and a side with no graded pick is not printed', flow.calib.slice(0, 400));
+  chk(/#1 BET or better 1-0/.test(flow.calib), 'record: the full-game tile keeps the record of the rows that carried #1\'s verdict', flow.calib.slice(0, 400));
   chk(/Full-game total/.test(flow.calib) && /First five/.test(flow.calib) && /parlay four/.test(flow.calib) && /Best straight bets/.test(flow.calib),
       'calib: per-market tiles and BOTH fours are drawn once something is graded', flow.calib.slice(0, 200));
 

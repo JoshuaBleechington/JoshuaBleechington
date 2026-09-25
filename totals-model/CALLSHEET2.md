@@ -7,7 +7,7 @@ top of Call Sheet #1 without touching it.
 - Page: `web/callsheet2.html`, assembled by `tools_build_callsheet2.py` from
   `web/callsheet2.head.html` + Call Sheet #1's engine block + `web/callsheet2.tail.js`
 - Fixtures: `web/callsheet2-cases.json` (62 cases) from `tools_gen_callsheet2_cases.py`
-- Browser harness: `tools_check_callsheet2_page.js` (1,000 checks)
+- Browser harness: `tools_check_callsheet2_page.js` (1,009 checks)
 
 ## What it answers
 
@@ -76,15 +76,17 @@ and the edge picks on the same card went 3-1. Two games are not evidence and
 the record tiles exist to gather it, but the user chose the edge order having
 seen it, and that is the order the rail keeps.
 
-The rail also carries the parlay marks, named so they cannot be misread: the
-likeliest priced thing on the game (green *parlay leg* when it is inside the
-leg cap, amber *likeliest … beyond* when it is not) and, when it is beyond,
-the *2nd choice · parlay leg* that would take its place. Those marks describe
-the likelier side of a market, which is not always the side the row shows.
+The rail also carries the parlay marks, named so they cannot be misread: a
+green *parlay leg* on the game's leg (the side, its chance, its price, its
+value ratio and, when #1 has a verdict on it, *#1 says BET*), and an amber
+*likeliest … beyond* naming the likeliest priced thing on the game when that
+is priced beyond the leg cap. The green mark can sit on the side opposite the
+one the row shows, because the row shows the better price and the leg rule
+has its own order (below).
 
-**The day board serves both uses.** *The parlay four* is by chance to hit,
-one leg per game, inside the cap. *Best straight bets* is by edge, positive
-edge only. **One sport only** runs the same two rules once per sport, MLB and
+**The day board serves both uses.** *The parlay four* is one leg per game,
+inside the cap: #1's verdict on the total when it clears its price, else the
+best value side. *Best straight bets* is by edge, positive edge only. **One sport only** runs the same two rules once per sport, MLB and
 WNBA side by side, each with its own parlay legs (and their all-hit price) and
 its own straight bets, so a night can be read as just one sport at a glance; a
 column appears only when that sport has games on the date. The table beneath
@@ -149,19 +151,47 @@ Every priced market on the card for a chosen date, in one table, with two
 groups of picks above it. **Click any pick card or table row** and that matchup
 loads into the form.
 
-**The parlay four.** One leg per game — the likeliest priced market on that
-game — and the four likeliest legs. A leg priced worse than the **leg cap**
-(−170 by default, set on the board and remembered) is swapped for the
-next-likeliest market on the same game, and the card says what it replaced:
-"Instead of Braves ML 70.2% at −275 — beyond your −170 cap." One leg per game
-is what makes the *all four hit* figure honest: the product of four chances is
-only a probability when the four are independent, and two markets on one game
-never are. Under the four: the product, the fair parlay price, and the multiple
-a boosted payout has to beat.
+**The parlay four.** One leg per game, in two tiers.
 
-On the matchup rail the same rule shows as a mark: when the likeliest pick is
-beyond the cap it is tagged *beyond −170* and the first market inside the cap is
-tagged *2nd choice · parlay leg*.
+1. *Call Sheet #1's verdict.* A full-game total that #1 calls BET, STRONG
+   BET or MAX BET, on #1's side, when that side also clears its price inside
+   the **leg cap** (−170 by default, set on the board and remembered). The
+   verdict is the one mark on the board that carries #1's corroboration gate
+   — a total is only BET when the inputs agree with each other — and the user
+   asked for these legs by name ("the ones saying bet or strong bet").
+2. *Best value.* On a game with no such total: the side, of any market priced
+   inside the cap, with the highest chance-to-breakeven ratio.
+
+In both tiers only a side whose ratio clears one qualifies. A parlay's
+expected return is the product over its legs of (chance ÷ what the price
+needs) — the boost multiplies the whole thing and does not change which legs
+are best — so a leg priced above its chance drags the parlay down however
+often it hits, and a 55% over at −120 beats a 61% dog at −155. Across games
+the verdict legs rank first, then by ratio. Fewer than four games qualifying
+means fewer legs, and the card says so. Each leg card says what it is — *Call
+Sheet #1 says BET on this total and it clears its price*, naming the
+richer-priced side it passed over when there is one — and names the likelier
+side on the game when that differs. Under the four: the all-hit chance (the
+product of the chances), the fair parlay price, **worth N×** — the product of
+the ratios, the parlay's value before any boost — and how many of the legs
+carry #1's verdict.
+
+How it got here. The first rule was "likeliest leg per game". It went on 25
+Sept, after White Sox @ Royals on the 24th: the likeliest leg inside the cap was Royals +1.5 at
+−155 (61.3%, ratio 1.008) and the sheet's straight-bet pick was over 8.5 at
+−120 (55.3%, ratio 1.014, #1: BET). The game went 9–1 White Sox: the over
+cashed early and the run line lost. The value tier came from that; the
+verdict tier came the same day, from the user's preference, and was tested
+against the two nights logged before it went in: #1's verdict totals went 6-3
+on their own; the two-tier rule's legs went 5-3 (3-1 and 2-2) against 4-3-1
+for value alone (2-2 and 2-1-1) and 5-3 for likeliest alone; the two-tier
+parlays were worth 1.21× and 1.57× fair against 1.34× and 1.60× for value
+alone. Neither rule landed a four-leg parlay on either night. Two nights are
+not evidence for any of this; the record tile keeps score, and the value
+tier is still there underneath for the games #1 has no call on.
+
+On the matchup rail the same rule shows as the green *parlay leg* mark, with
+*#1 says BET* appended when the leg is a verdict leg.
 
 **Best straight bets.** The other ranking — the stored picks (better price per
 market), positive edge only, best edge first, up to four, same-game rows

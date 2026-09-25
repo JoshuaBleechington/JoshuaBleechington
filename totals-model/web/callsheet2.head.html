@@ -144,10 +144,10 @@
   .mk .p { font: 800 24px/1 var(--mono); }
   .mk .e { font: 600 12px/1 var(--mono); color: var(--muted); }
   .mk .e.pos { color: var(--edge); } .mk .e.neg { color: var(--bad); }
-  .mk .band { display: inline-block; font: 700 9.5px/1 var(--sans); letter-spacing: .08em; text-transform: uppercase;
+  .mk .band, .pk .band { display: inline-block; font: 700 9.5px/1 var(--sans); letter-spacing: .08em; text-transform: uppercase;
               padding: 4px 6px; border-radius: 4px; background: var(--surface-2); color: var(--ink-2); margin-left: 6px; vertical-align: 2px; }
-  .mk .band.hot { background: var(--go); color: #fff; }
-  .mk .band.max { background: var(--go); color: #fff; }
+  .mk .band.hot, .pk .band.hot { background: var(--go); color: #fff; }
+  .mk .band.max, .pk .band.max { background: var(--go); color: #fff; }
   .mk .derived { display: inline-block; font: 700 9px/1 var(--sans); letter-spacing: .08em; text-transform: uppercase;
                  padding: 3px 5px; border: 1px dashed var(--muted); border-radius: 4px; color: var(--muted); margin-left: 6px; vertical-align: 2px; }
   .mkdetail { font-size: 12px; color: var(--ink-2); line-height: 1.5; padding: 0 14px 4px 60px; }
@@ -257,7 +257,7 @@
   <header class="top">
     <div>
       <div class="eyebrow"><span id="eyebrow">MLB · every market on the game</span>
-        <span class="build">· build <span id="build">2026-09-24</span></span></div>
+        <span class="build">· build <span id="build">2026-09-25</span></span></div>
       <h1>Call Sheet <em>2.0</em></h1>
       <p>One matchup, every market the book posts on it — the full-game total, the first five,
          the moneyline and the run line — priced off the book's own numbers and <b>ranked by edge</b>, with
@@ -515,8 +515,9 @@
           <p class="note"><b>Probability is the big number; edge is the order.</b> Each row shows how likely
             the pick is to hit and, in gold or red, how far above or below the price's break-even that is. A 62%
             favourite at −185 is a 62% chance and a losing bet; a 53% under at −110 is the better bet on the same
-            game. The green marks are for the parlay: the likeliest thing on this game and, if it is priced beyond
-            your leg cap, the second choice that would take its place.</p>
+            game. The green mark is this game's parlay leg — Call Sheet #1's BET on the total when that side clears
+            its price inside your leg cap, otherwise the side with the best chance against its price — and an amber
+            mark names the likeliest thing on the game when it is priced beyond the cap.</p>
         </div>
       </section>
       <section class="card">
@@ -530,23 +531,29 @@
     <h2>Day board
       <span class="row" style="gap:8px">
         <label class="f" style="flex-direction:row;align-items:center;gap:6px"><span class="tag">date</span><input id="boardDate" type="date" style="padding:6px 8px;font-size:13px"></label>
-        <label class="f" style="flex-direction:row;align-items:center;gap:6px" title="A parlay leg priced worse than this is swapped for the next-likeliest market on the same game"><span class="tag">leg cap</span><input id="legCap" type="number" step="5" value="-170" style="padding:6px 8px;font-size:13px;width:84px"></label>
+        <label class="f" style="flex-direction:row;align-items:center;gap:6px" title="A side priced worse than this cannot be a parlay leg; the game's leg comes from what is priced inside it"><span class="tag">leg cap</span><input id="legCap" type="number" step="5" value="-170" style="padding:6px 8px;font-size:13px;width:84px"></label>
         <label class="check" style="font-size:12px"><input type="checkbox" id="byEdge"> Rank table by edge</label>
         <span class="tag" id="boardCount"></span>
       </span></h2>
     <div class="body">
-      <div class="subhead">The parlay four <span class="tag">likeliest leg per game, within your price cap</span></div>
+      <div class="subhead">The parlay four <span class="tag">#1's BET on the total first, else the best value side — one per game, inside your cap, only if it clears its price</span></div>
       <div id="picks" class="picks"></div>
       <div class="subhead">Best straight bets <span class="tag">by edge — the price beats the chance</span></div>
       <div id="bestBets" class="picks"></div>
       <div class="subhead">One sport only <span class="tag">the same two rules, MLB and WNBA apart — for a night you want just one</span></div>
       <div id="bySport" class="sports"></div>
       <div class="scroll"><div id="board"></div></div>
-      <p class="note"><b>The parlay four</b> takes the likeliest priced market from each game, one leg per game,
-        and keeps the four likeliest. A leg priced worse than the <b>leg cap</b> (−170 by default) is swapped for
-        the next-likeliest market on the same game, and the card says what it replaced — a −275 favourite is a
-        fine result and a poor parlay leg. <b>All four hit</b> is the product of the four chances: compare it to
-        what the boosted parlay pays, and a payout better than that multiple is a parlay worth having.</p>
+      <p class="note"><b>The parlay four</b> takes one leg per game, in two tiers. First, Call Sheet #1's verdict:
+        a full-game total #1 calls <b>BET</b>, <b>STRONG BET</b> or <b>MAX BET</b>, on #1's side, when that side
+        also clears its price inside your <b>leg cap</b> (−170 by default) — the one mark on the board that
+        carries #1's corroboration gate. Second, on a game with no such total: the side, of any market priced
+        inside the cap, with the best chance against what its price needs. In both tiers only a side that clears
+        its price qualifies — a parlay's return is the product of those ratios, a boost multiplies the whole
+        thing, and a leg priced above its chance drags it down however often it hits, so a 55% over at −120
+        beats a 61% dog at −155. Verdict legs rank first, then by value; the card names what each leg passed on.
+        On a thin night you get three, or two, and the card says why. <b>All four hit</b> is the product of the
+        chances — a boosted payout above that multiple beats fair outright — and <b>worth N×</b> is the product
+        of the ratios, the parlay's value before any boost.</p>
       <p class="note"><b>Best straight bets</b> is the other ranking — the edge, where the chance beats what the
         price needs — and only rows with a positive edge qualify. Both fours are graded separately in the record.
         Click any pick card or table row to load that matchup into the form.</p>

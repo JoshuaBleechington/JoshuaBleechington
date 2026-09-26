@@ -645,7 +645,8 @@
       '<div class="n2">' + esc(x.mk.pick) + (bandOf(x.mk) ? ' <span class="band hot">' + esc(bandOf(x.mk)) + '</span>' : '') + '</div>' +
       '<div class="n3">' + (x.mk.p * 100).toFixed(1) + '% · ' + (x.mk.price !== null ? sgn(x.mk.price, 0) + ' · edge ' + sgn(x.mk.edge * 100, 1) : 'no price') +
         (res ? ' · <span class="chip ' + res + '">' + resText(res) + '</span>' : '') + '</div>' +
-      '<div class="n4">' + esc(x.row.matchup) + ' · ' + esc(x.mk.label) + '</div>' + (extra || '') + '</div>';
+      '<div class="n4">' + esc(x.row.matchup) + ' · ' + esc(x.mk.label) +
+        (x.mk.key === "total" && marksOf(x.row.sport, x.row.inputs, x.row.markets).grain ? ' <span class="tagm warn">over against the grain</span>' : '') + '</div>' + (extra || '') + '</div>';
   }
   function renderBoard() {
     var dateISO = $("boardDate").value || todayISO(), byProb = !$("byEdge").checked, cap = legCap();
@@ -796,9 +797,30 @@
      the full-game pick went 11-4 when they agreed and 2-4 when they split. */
   /* numOf, not num: the engine block owns num(id), which reads a form field. */
   function numOf(v) { var x = parseFloat(v); return isFinite(x) ? x : null; }
+  /* over against the grain (MLB): the sheet's pick is the OVER, and at least
+     one of three things the market can see leans under -- the book's two
+     prices (implied over below implied under by a point), the two last-ten
+     averages (a run or more under the line), or 80%+ of the money. On the 224
+     graded MLB totals across both sheets (2-25 Sept 2026) an over with none
+     of those against it went 79-44 (64%); an over with any of them against it
+     went 11-15 (42%). The same three signals say nothing about unders, which
+     ran 37-38 with or without them, so unders get no chip. Sept 12 and 20,
+     the two best days on record, were over-heavy nights with every signal
+     agreeing. A label, not an adjustment: it has its own record line. */
+  function grainOf(side, inputs) {
+    if (side !== "OVER") return "";
+    var line = numOf(inputs.line), op = numOf(inputs.op), up = numOf(inputs.up);
+    var al = numOf(inputs.al10), hl = numOf(inputs.hl10), cash = numOf(inputs.cash);
+    var against = 0;
+    if (op !== null && up !== null && implied(up) - implied(op) > 0.01) against++;
+    if (al !== null && hl !== null && line !== null && (al + hl) / 2 <= line - 1) against++;
+    if (cash !== null && cash <= 20) against++;
+    return against ? "over against the grain" : "";
+  }
   function marksOf(sp, inputs, markets) {
-    var out = { profile: "", lean: "" };
+    var out = { profile: "", lean: "", grain: "" };
     if (sp !== "MLB" || !inputs) return out;
+    (markets || []).forEach(function (mk) { if (mk.key === "total") out.grain = grainOf(mk.side, inputs); });
     var line = numOf(inputs.line), mph = numOf(inputs.mph), dir = String(inputs.dir || "");
     var abp = numOf(inputs.abp), hbp = numOf(inputs.hbp), al = numOf(inputs.al10), hl = numOf(inputs.hl10);
     if (line !== null && line <= 7 && (dir === "in" || dir === "quarter-in") && mph !== null && mph >= 10 &&
@@ -811,6 +833,7 @@
   }
   function markChips(tg, cls) {
     var h = "";
+    if (tg.grain) h += '<span class="' + cls + ' warn">' + esc(tg.grain) + '</span>';
     if (tg.profile) h += '<span class="' + cls + '">' + esc(tg.profile) + '</span>';
     if (tg.lean) h += '<span class="' + cls + '">' + esc(tg.lean) + '</span>';
     return h;
@@ -823,7 +846,7 @@
        against away -- and the full-game total keeps the record of the rows
        that carried Call Sheet #1's verdict, because the parlay legs lean on
        it. Asked for on 25 Sept: "how many of the 17-10 went over vs under". */
-    var fresh = function (label) { return { n: 0, w: 0, l: 0, p: 0, says: 0, units: 0, label: label, sides: {}, verdict: null, profile: null, lean: {} }; };
+    var fresh = function (label) { return { n: 0, w: 0, l: 0, p: 0, says: 0, units: 0, label: label, sides: {}, verdict: null, profile: null, lean: {}, grain: null }; };
     var bySport = {};
     ["MLB", "WNBA"].forEach(function (sp) {
       var b = { stats: {}, top: fresh("The parlay four"), topE: fresh("Best straight bets"), any: false };
@@ -839,6 +862,7 @@
         if (mk.key === "total" || mk.key === "f5") {
           var tg = marksOf(row.sport, row.inputs, row.markets);
           if (tg.profile) count(t.profile || (t.profile = { w: 0, l: 0, p: 0 }), res);
+          if (tg.grain && mk.key === "total") count(t.grain || (t.grain = { w: 0, l: 0, p: 0 }), res);
           if (tg.lean) count(t.lean[tg.lean] || (t.lean[tg.lean] = { w: 0, l: 0, p: 0 }), res);
         }
       }
@@ -878,6 +902,7 @@
       order.forEach(function (sd) { if (s.sides[sd]) parts.push(sd.toLowerCase() + ' ' + rec(s.sides[sd])); });
       if (s.verdict) parts.push('#1 BET or better ' + rec(s.verdict));
       if (s.profile) parts.push('cold-under profile ' + rec(s.profile));
+      if (s.grain) parts.push('over against the grain ' + rec(s.grain));
       ["same lean", "split lean"].forEach(function (k) { if (s.lean[k]) parts.push(k + ' ' + rec(s.lean[k])); });
       return '<div><p class="k">' + esc(s.label) + '</p><p class="v">' + s.w + '-' + s.l + (s.p ? '-' + s.p : '') + '</p>' +
         '<p class="s">' + (s.n ? 'says ' + says.toFixed(1) + '% · does ' + does.toFixed(1) + '% (±' + se.toFixed(1) + ') · ' + sgn(s.units, 2) + 'u' : 'pushes only') + '</p>' +

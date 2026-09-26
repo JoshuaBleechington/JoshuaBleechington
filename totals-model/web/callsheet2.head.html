@@ -206,6 +206,9 @@
   .mk .cap.tagm { color: var(--ink-2); border: 1px solid var(--rule-firm); }
   .openbtn .tagm { display: inline-block; font: 700 9px/1 var(--sans); letter-spacing: .08em; text-transform: uppercase;
                    padding: 3px 5px; border: 1px solid var(--rule-firm); border-radius: 4px; color: var(--ink-2); margin: 4px 4px 0 0; }
+  .mk .cap.tagm.warn, .openbtn .tagm.warn, .pk .tagm.warn { color: var(--warn); border-color: var(--warn); }
+  .pk .tagm { display: inline-block; font: 700 9px/1 var(--sans); letter-spacing: .08em; text-transform: uppercase;
+              padding: 3px 5px; border: 1px solid var(--rule-firm); border-radius: 4px; color: var(--ink-2); margin-left: 4px; vertical-align: 1px; }
   .mk.alt { border-color: var(--go); }
   .mk.alt .rk { color: var(--go); }
   /* A graded rail: the row last opened has finals, so each market shows how
@@ -262,7 +265,7 @@
   <header class="top">
     <div>
       <div class="eyebrow"><span id="eyebrow">MLB · every market on the game</span>
-        <span class="build">· build <span id="build">2026-09-25</span></span></div>
+        <span class="build">· build <span id="build">2026-09-26</span></span></div>
       <h1>Call Sheet <em>2.0</em></h1>
       <p>One matchup, every market the book posts on it — the full-game total, the first five,
          the moneyline and the run line — priced off the book's own numbers and <b>ranked by edge</b>, with
@@ -525,8 +528,10 @@
             mark names the likeliest thing on the game when it is priced beyond the cap. Two grey chips on the
             total are <b>labels, not adjustments</b>: <b>cold-under profile</b> (total 7 or lower, wind in at 10 mph
             or more, both pens under 3.75, a last ten below the line) and <b>same lean</b> or <b>split lean</b>
-            (whether the full-game pick and the first-five pick agree). Neither moves a number; each has its own
-            line in the record below, so it can earn one.</p>
+            (whether the full-game pick and the first-five pick agree). An amber <b>over against the grain</b> chip
+            marks an over that the book's prices, the last ten, or 80%+ of the money leans against — overs like
+            that are 11-15 on the season book against 79-44 for the rest. None of these moves a number; each has
+            its own line in the record below, so it can earn one.</p>
         </div>
       </section>
       <section class="card">

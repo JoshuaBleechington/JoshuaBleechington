@@ -7,7 +7,7 @@ top of Call Sheet #1 without touching it.
 - Page: `web/callsheet2.html`, assembled by `tools_build_callsheet2.py` from
   `web/callsheet2.head.html` + Call Sheet #1's engine block + `web/callsheet2.tail.js`
 - Fixtures: `web/callsheet2-cases.json` (62 cases) from `tools_gen_callsheet2_cases.py`
-- Browser harness: `tools_check_callsheet2_page.js` (1,017 checks)
+- Browser harness: `tools_check_callsheet2_page.js` (1,020 checks)
 
 ## What it answers
 
@@ -260,7 +260,22 @@ side; on the first 21 games the full-game pick went 11-4 when they agreed and
 2-4 when they split. Both chips show on the rail and on the card table, in
 grey, and each has its own record on the two total tiles. If a label's record
 holds up at forty or more games it earns a coefficient then; if not it cost
-nothing. Plus the two **top-4
+nothing.
+
+A third label came on 26 Sept from asking what the two best days on record
+(12 and 20 Sept, 6-1 and 11-3) had in common. Both were over-heavy nights on
+which the market agreed with every over: the book's prices leaned over, the
+last tens sat above the line, the public money was on the over. Tested on
+all 224 graded MLB totals across both sheets: an over with none of those
+three against it went 79-44 (64%); an over with any of them against it went
+11-15 (42%); unders were 37-38 with or without them. So *over against the
+grain* marks an over pick where the two prices lean under (implied over a
+point below implied under), the two last tens average a run or more under
+the line, or 80%+ of the money is on the under. It shows amber on the rail,
+the card table and the pick cards, and has its own record line on the
+full-game tile. Unders get no chip: the same signals said nothing about
+them. Like the other labels it moves no number; if it holds at forty games
+it earns a place in the corroboration gate. Plus the two **top-4
 fours**: for every date on the card, *the parlay four* (as the board defines
 it, at the current cap) and *best straight bets*, graded. Choosing between them
 is the reason the sheet exists, so each has its own tile. It is

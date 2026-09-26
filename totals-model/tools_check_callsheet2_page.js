@@ -317,6 +317,17 @@ const CHECKS = ["dome","playoff"];
     // the same card with the first five leaning the other way from the full game
     set('mph', '15'); set('dir', 'out'); set('abp', '5.4'); set('hbp', '5.6'); set('aera', '2.4'); set('hera', '2.5'); set('temp', '88');
     await wait(); const other = read(), oSides = sides();
+    // an OVER the market leans against: prices favour the under, both last tens sit a run under the line, 15% of the money
+    set('away', 'Rockies'); set('home', 'Athletics'); set('line', '8.5'); set('op', '100'); set('up', '-120');
+    set('aera', '5.50'); set('hera', '5.80'); set('abp', '5.20'); set('hbp', '5.40'); set('al10', '7.0'); set('hl10', '7.2');
+    set('mph', '15'); set('dir', 'out'); set('temp', '88'); set('cash', '15'); set('tick', '20');
+    await wait();
+    const grainPick = document.querySelector('#markets .mk[data-key="total"] .pick').childNodes[0].textContent.trim();
+    const grainChips = read();
+    set('al10', '9.5'); set('hl10', '9.8'); set('cash', '85'); set('tick', '80'); set('op', '-120'); set('up', '100'); await wait();
+    const grainPick2 = document.querySelector('#markets .mk[data-key="total"] .pick').childNodes[0].textContent.trim();
+    const grainChips2 = read();
+    set('cash', ''); set('tick', ''); set('op', '-110'); set('up', '-110'); set('al10', ''); set('hl10', ''); set('mph', ''); set('dir', ''); set('temp', ''); set('abp', ''); set('hbp', ''); set('aera', '4.30'); set('hera', '3.12'); await wait();
     // add it under names no other fixture uses, read the row's chips, then remove the row so the later
     // fixtures (which find rows by name) see the card exactly as they left it
     set('away', 'Twins'); set('home', 'Tigers'); await wait();
@@ -326,7 +337,7 @@ const CHECKS = ["dome","playoff"];
     row().querySelector('[data-del]').click(); await wait();
     const gone = !row();
     document.getElementById('clear').click(); await wait();
-    return { guardians, gSides, rays, other, oSides, cardChips, gone };
+    return { guardians, gSides, rays, other, oSides, cardChips, gone, grainPick, grainChips, grainPick2, grainChips2 };
   });
   chk(marks.guardians.join('|') === 'cold-under profile|same lean',
       'labels: the Guardians @ Red Sox card carries the profile and the two totals agree', marks.guardians.join('|') + ' :: ' + marks.gSides);
@@ -338,6 +349,11 @@ const CHECKS = ["dome","playoff"];
   chk(marks.cardChips.length >= 1 && marks.cardChips.every(t => /lean$|profile$/.test(t)),
       'labels: the card table shows the same chips on the row', marks.cardChips.join('|'));
   chk(marks.gone, 'labels: the fixture row is removed again', String(marks.gone));
+  chk(/^OVER/.test(marks.grainPick) && marks.grainChips[0] === 'over against the grain',
+      'labels: an over the prices, the last tens and the money all lean against is marked "over against the grain"', marks.grainPick + ' :: ' + marks.grainChips.join('|'));
+  chk(/^OVER/.test(marks.grainPick2) && !marks.grainChips2.some(t => /grain/.test(t)),
+      'labels: the same over with every signal agreeing carries no grain chip', marks.grainPick2 + ' :: ' + marks.grainChips2.join('|'));
+  chk(!marks.guardians.some(t => /grain/.test(t)), 'labels: an under never gets a grain chip', marks.guardians.join('|'));
 
   // ---- the cap, the second choice on the rail, and clicking through ---------------
   const capFlow = await pg.evaluate(async () => {

@@ -255,13 +255,15 @@ const CHECKS = ["dome","playoff"];
     const wait = () => new Promise(r => setTimeout(r, 50));
     const set = (id, v) => { const el = document.getElementById(id); el.value = v; el.dispatchEvent(new Event('input', { bubbles: true })); };
     document.getElementById('clear').click(); document.getElementById('m-mlb').click(); await wait();
-    // Two strong starters, no wind, a mild night: #1 calls the under a BET (59%), and at -135 it clears its price
-    // (1.028x). The first-five under, starters only, is 54.7% at -110 (1.045x) -- the richer price on the same
-    // game with NO verdict on it. The verdict must still be the leg. (Both markets are anchored on their own
-    // quote, so moving prices alone barely moves either ratio; the starters are the lever.)
+    // Two strong pens and two cold last tens, no wind, a mild night: #1 calls the under a BET (58%), and at -135
+    // it clears its price (1.010x). The first-five under, moved by the two strong starters alone, is 54.7% at
+    // -110 (1.045x) -- the richer price on the same game with NO verdict on it. The verdict must still be the
+    // leg. (Since 26 Sept the full game lists the starters and does not score them, so the pens and the form
+    // carry the full-game under here; the starters carry the first five.)
     set('gdate', '2026-09-22'); set('away', 'Guardians'); set('home', 'Red Sox'); set('line', '6.5'); set('op', '115'); set('up', '-135');
     set('aml', '115'); set('hml', '-135'); set('f5line', '3.5'); set('f5op', '-110'); set('f5up', '-110');
-    set('aera', '2.60'); set('hera', '2.70'); set('aip', '166.2'); set('hip', '157'); set('mph', ''); set('dir', ''); set('temp', '72');
+    set('aera', '2.60'); set('hera', '2.70'); set('aip', '166.2'); set('hip', '157'); set('abp', '2.90'); set('hbp', '3.00');
+    set('al10', '5.5'); set('hl10', '5.8'); set('mph', ''); set('dir', ''); set('temp', '72');
     await wait(); document.getElementById('add').click(); await wait();
     const card = (document.querySelector('#picks .pk.parlay') || {}).textContent || '';
     const pickOf = e => e.firstChild.textContent.trim();

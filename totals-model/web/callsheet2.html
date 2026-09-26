@@ -1015,9 +1015,12 @@
   /* `mechanism` is false for an input measured to be worth ~nothing, or capped
      by hand. It still moves the forecast; it just cannot buy a band on its own.
      See the corroboration block in assemble(). */
-  function est(name, total, weight, detail, mechanism) {
+  /* `scored` false: listed and carrying a weight for anything else that reads
+     it (the first five), but the full-game blend ignores it. The starters,
+     since 26 Sept 2026 -- see readMlb(). */
+  function est(name, total, weight, detail, mechanism, scored) {
     return { name: name, total: total, weight: weight, detail: detail,
-             mechanism: mechanism !== false };
+             mechanism: mechanism !== false, scored: scored !== false };
   }
   function delta(name, runs, detail, mechanism) {
     return { name: name, runs: runs, detail: detail, mechanism: mechanism !== false };
@@ -1031,7 +1034,7 @@
      sentence the count is noise. */
   function taggedPhrase(estimates, deltas) {
     var names = [];
-    estimates.forEach(function (e) { if (!e.mechanism) names.push(e.name); });
+    estimates.forEach(function (e) { if (!e.mechanism && e.scored) names.push(e.name); });
     deltas.forEach(function (d) { if (!d.mechanism) names.push(d.name); });
     names = names.map(function (n) { return n.split(" (")[0]; });
     if (!names.length) return "the tagged inputs";
@@ -1094,15 +1097,22 @@
           ". An ERA is worth half the league prior at " + Math.round(ERA_STABLE_AT) +
           " innings, which is why a short season cannot carry a card.";
       }
+      /* SHOWN, NOT SCORED, since 26 Sept 2026. Re-scoring all 229 graded MLB
+         totals (1-25 Sept) with the starters out of the full-game blend changed
+         the side on 24 cards, and those went 17-7 WITHOUT the starters -- 7-17
+         with them; hit rate 55.8% -> 60.3%, in both halves of the dates. The
+         market already carries the probable starters; a season ERA adds noise.
+         The estimate stays listed, and the first five still scores it. */
       estimates.push(est("Starters", anchor + gap, w.starters,
         "Away " + aeUsed.toFixed(2) + " and home " + heUsed.toFixed(2) + " against a " +
         LEAGUE_STARTER_ERA.toFixed(2) + " league starter ERA, over the " +
         STARTER_INNINGS.toFixed(1) + " innings a start now covers: " + sgn(gap) +
-        " runs on the line. Two league-average arms move it by exactly zero, which is what " +
-        "keeps this from carrying a hidden lean." + shrunk +
-        " Measured null against the market's error on 156 games (r = \u2212" +
-        "0.076, t = \u22120.95, sign backwards), so it moves this projection but cannot " +
-        "buy a band on its own.", false));
+        " runs on the line." + shrunk +
+        " SHOWN, NOT SCORED in the full-game blend: on the 229 graded games to 25 Sept the " +
+        "starters flipped 24 picks, and those went 7-17 with them in and 17-7 without. The " +
+        "market already has the probable starters in the line; what a season ERA adds on top " +
+        "is mostly noise. The first five still scores this gap, because over five innings it " +
+        "is the only thing on the mound.", false, false));
       /* A BLANK innings box is not "no shrinkage needed" — it is "trust this
          arm completely", which is more than 210 innings earns. Filling one side
          and leaving the other empty makes the empty arm artificially dominant;
@@ -1111,12 +1121,12 @@
         notes.push("Innings are in for one starter and not the other. A blank innings box " +
           "means the ERA is trusted in full — more than any real innings count earns — so " +
           "shrinking one arm while the other keeps full authority tilts the differential " +
-          "toward whichever box was left empty. On a close card that alone can flip the " +
-          "side. Fill in both or neither.");
+          "toward whichever box was left empty. On a close first-five card that alone can " +
+          "flip the side. Fill in both or neither.");
       }
     } else if (a !== null || h !== null) {
-      notes.push("Only one starter's ERA is in. A differential needs both arms, so the " +
-                 "starters are out of the blend and their weight has gone to what is left.");
+      notes.push("Only one starter's ERA is in. A differential needs both arms, so there is " +
+                 "no starter read on this card and the first five has nothing but its own market.");
     }
 
     var abp = armDiff(num("abp"), LEAGUE_BULLPEN_ERA, BULLPEN_INNINGS, hrpg);
@@ -1372,8 +1382,11 @@
   }
 
   function assemble(sport, away, home, line, estimates, deltas, notes) {
+    /* An estimate with scored=false is listed but ignored here and in the
+       corroboration read -- the starters, since 26 Sept 2026. */
+    var scored = estimates.filter(function (e) { return e.scored !== false; });
     var tw = 0, sum = 0;
-    estimates.forEach(function (e) { tw += e.weight; sum += e.total * e.weight; });
+    scored.forEach(function (e) { tw += e.weight; sum += e.total * e.weight; });
     var dsum = 0; deltas.forEach(function (d) { dsum += d.runs; });
     var projected = sum / tw + dsum;
     var sp = splitFor(sport, line, projected);
@@ -1410,7 +1423,7 @@
        written by hand, because a hand-written list went stale the moment a
        second sport arrived. */
     var cw = 0, csum = 0, cdelta = 0;
-    estimates.forEach(function (e) { if (e.mechanism) { cw += e.weight; csum += e.total * e.weight; } });
+    scored.forEach(function (e) { if (e.mechanism) { cw += e.weight; csum += e.total * e.weight; } });
     deltas.forEach(function (d) { if (d.mechanism) { cdelta += d.runs; } });
     var coreProj = cw > 0 ? csum / cw + cdelta : projected;
     var csp = splitFor(sport, line, coreProj);
@@ -1446,7 +1459,7 @@
              : (pResolved > 0.5 ? -100 * pResolved / (1 - pResolved)
                                 : 100 * (1 - pResolved) / pResolved);
 
-    if (estimates.length === 1 && !deltas.length) notes.push(
+    if (scored.length === 1 && !deltas.length) notes.push(
       "Nothing entered but the number, so the forecast IS the market and the answer is a coin " +
       "flip. That is the correct answer to a question with no information in it, not the model " +
       "being coy.");
@@ -1719,8 +1732,9 @@
       if (starters) {
         var gap = (starters.total - anchor) * (F5_INNINGS / STARTER_INNINGS);
         est5.push([muF5 + gap, starters.weight]);
-        f5notes.push("Starters: " + sgn(gap) + " runs over five innings, at the same weight the full-game " +
-          "blend gives them. No bullpens — they do not pitch in the first five, which is the whole reason " +
+        f5notes.push("Starters: " + sgn(gap) + " runs over five innings, at weight " + starters.weight + ". The full " +
+          "game stopped scoring the starters on 26 Sept (they flipped picks the wrong way there); here they are the " +
+          "only thing on the mound, so they stay. No bullpens — they do not pitch in the first five, which is the whole reason " +
           "this market exists.");
       }
       var d5 = f.deltas.reduce(function (a, d) { return a + d.runs; }, 0) * F5_SHARE;

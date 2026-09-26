@@ -462,8 +462,10 @@ def forecast_matchup_mlb(
             gap = (starters.total - anchor) * (F5_INNINGS / STARTER_INNINGS)
             est.append((mu_f5 + gap, starters.weight))
             f5_notes.append(
-                f"Starters: {gap:+.2f} runs over five innings, at the same weight the "
-                "full-game blend gives them. No bullpens -- they do not pitch in the first "
+                f"Starters: {gap:+.2f} runs over five innings, at weight "
+                f"{starters.weight:g}. The full game stopped scoring the starters on 26 Sept "
+                "(they flipped picks the wrong way there); here they are the only thing on "
+                "the mound, so they stay. No bullpens -- they do not pitch in the first "
                 "five, which is the whole reason this market exists.")
         deltas = sum(d.runs for d in f.deltas) * F5_SHARE
         tw = sum(w for _, w in est)

@@ -214,39 +214,43 @@ const CHECKS = ["dome", "playoff"];
       h2h: '6.4', h2hn: '9', pf: '98', mph: '6', dir: 'cross', temp: '76',
       tick: '67', cash: '38', dome: false,
     };
-    // Stored as an older build scored it: UNDER, LEAN.
-    localStorage.setItem('callsheet.fullgame.card.v1', JSON.stringify([{
-      matchup: 'Tigers @ Guardians', sport: 'MLB', line: 8.0, projected: '8.16',
-      side: 'UNDER', prob: '54.0', band: 'BET', fair: '-117', final: '12', inputs,
-    }]));
+    // Two copies stored as an older build scored them: UNDER, BET. The first
+    // is ungraded and gets rescored; the second has a final and is a record.
+    // The current model reads this card OVER (the starters that pulled it under
+    // are shown, not scored, since 26 Sept), so a rescore that touched the
+    // graded row would turn its logged LOSS into a WIN.
+    const row = { matchup: 'Tigers @ Guardians', sport: 'MLB', line: 8.0, projected: '8.16',
+                  side: 'UNDER', prob: '54.0', band: 'BET', fair: '-117', inputs };
+    localStorage.setItem('callsheet.fullgame.card.v1', JSON.stringify([
+      Object.assign({ final: null }, row), Object.assign({ final: '12' }, row)]));
   }).then(() => pg.reload()).then(() => pg.waitForTimeout(450)).then(() => pg.evaluate(() => {
-    const before = {
-      band: document.querySelector('#cardTable td:nth-child(8) .chip').textContent.trim(),
-      stale: (document.querySelector('#cardTable .chip.stale') || {}).textContent,
-      result: document.querySelector('#cardTable .res').textContent.trim(),
-    };
+    const cell = (i, sel) => document.querySelector(`#cardTable tbody tr:nth-child(${i}) ${sel}`);
+    const read = () => ({
+      band0: cell(1, 'td:nth-child(8) .chip').textContent.trim(), stale0: !!cell(1, '.chip.stale'),
+      side0: cell(1, 'td:nth-child(6) .chip').textContent.trim(),
+      band1: cell(2, 'td:nth-child(8) .chip').textContent.trim(), stale1: (cell(2, '.chip.stale') || {}).textContent,
+      side1: cell(2, 'td:nth-child(6) .chip').textContent.trim(),
+      result1: (cell(2, '.res') || {}).textContent || '', final1: cell(2, '[data-final]').value,
+    });
+    const before = read();
     document.getElementById('rescore').click();
-    return new Promise(r => setTimeout(() => r({
-      before,
-      after: document.querySelector('#cardTable td:nth-child(8) .chip').textContent.trim(),
-      stillStale: !!document.querySelector('#cardTable .chip.stale'),
-      result: document.querySelector('#cardTable .res').textContent.trim(),
-      final: document.querySelector('[data-final="0"]').value,
-      msg: document.getElementById('saveMsg').textContent,
-    }), 250));
+    return new Promise(r => setTimeout(() => r({ before, after: read(), msg: document.getElementById('saveMsg').textContent }), 250));
   }));
-  chk(rescore.before.band === 'BET', 'rescore: the stored band is shown as stored',
-      rescore.before.band);
-  chk(/now NO BET/.test(rescore.before.stale || ''),
-      'rescore: a row the current model scores differently is marked stale',
-      String(rescore.before.stale));
-  chk(rescore.after === 'NO BET', 'rescore: pressing it adopts the current model',
-      rescore.after);
-  chk(!rescore.stillStale, 'rescore: the stale mark clears once rescored',
-      String(rescore.stillStale));
-  chk(rescore.final === '12' && rescore.result === 'LOSS',
+  chk(rescore.before.band0 === 'BET' && rescore.before.band1 === 'BET', 'rescore: the stored band is shown as stored',
+      rescore.before.band0 + ' / ' + rescore.before.band1);
+  chk(/now NO BET/.test(rescore.before.stale1 || '') && rescore.before.stale0,
+      'rescore: a row the current model scores differently is marked stale, graded or not',
+      String(rescore.before.stale1));
+  chk(rescore.after.band0 === 'NO BET' && rescore.after.side0 === 'OVER' && !rescore.after.stale0,
+      'rescore: pressing it adopts the current model on the ungraded row, side and band, and clears its stale mark',
+      JSON.stringify(rescore.after));
+  chk(rescore.after.band1 === 'BET' && rescore.after.side1 === 'UNDER' && /now NO BET/.test(rescore.after.stale1 || ''),
+      'rescore: the graded row keeps its stored side and band, and its stale mark, because it is a record',
+      JSON.stringify(rescore.after));
+  chk(rescore.after.final1 === '12' && rescore.after.result1.trim() === 'LOSS',
       'rescore: the final and its grade are never touched',
-      `final=${rescore.final} result=${rescore.result}`);
+      `final=${rescore.after.final1} result=${rescore.after.result1}`);
+  chk(/1 graded row\(s\) left exactly as logged/.test(rescore.msg), 'rescore: the message says the graded row was left alone', rescore.msg);
 
   await pg.evaluate(() => localStorage.clear());
   await pg.reload();
@@ -692,7 +696,7 @@ const CHECKS = ["dome", "playoff"];
   const shape = await pg.evaluate(async () => {
     const fill = async (vals) => {
       ['away','home','line','op','up','aera','hera','abp','hbp','arpg','hrpg',
-       'al10','hl10','h2h','h2hn','pf','mph','temp','tick','cash','opened','gdate','aip','hip']
+       'al10','hl10','h2h','h2hn','pf','mph','dir','temp','tick','cash','opened','gdate','aip','hip']
         .forEach(id => {
           const el = document.getElementById(id);
           el.value = vals[id] === undefined ? '' : vals[id];
@@ -718,9 +722,12 @@ const CHECKS = ["dome", "playoff"];
         hidden: document.getElementById('shapeCard').hidden,
       };
     };
+    // Two strong pens and a 12 mph wind in pull the projection under the
+    // line. The two good starters used to do that on their own; since 26 Sept
+    // the full game lists them and does not score them.
     const base = { away: 'Braves', home: 'Astros', op: '100', up: '-130',
                    aera: '3.07', hera: '3.43', arpg: '3.87', hrpg: '4.79',
-                   abp: '3.58', hbp: '4.20' };
+                   abp: '2.60', hbp: '2.80', mph: '12', dir: 'in' };
     return { half: await fill(Object.assign({}, base, { line: '8.5' })),
              whole: await fill(Object.assign({}, base, { line: '9' })),
              // A card whose median lands ON a whole-number line, which is the
@@ -803,8 +810,10 @@ const CHECKS = ["dome", "playoff"];
   const filled = await pg.evaluate(async () => {
     // Every field, not just the ones being set -- an earlier case left park and
     // temperature behind and quietly moved this card into the next bucket.
+    // Two strong pens land this card at 54.1%, in the 53-57% bucket; the two
+    // good starters used to, and are shown-not-scored since 26 Sept.
     const v = { away: 'Braves', home: 'Astros', line: '8.5', op: '100', up: '-130',
-                aera: '3.07', hera: '3.43', abp: '3.58', hbp: '4.20',
+                aera: '3.07', hera: '3.43', abp: '2.60', hbp: '2.80',
                 arpg: '3.87', hrpg: '4.79' };
     ['away','home','line','op','up','aera','hera','abp','hbp','arpg','hrpg',
      'al10','hl10','h2h','h2hn','pf','mph','dir','temp','tick','cash','opened','gdate','aip','hip']
@@ -1015,12 +1024,13 @@ const CHECKS = ["dome", "playoff"];
     // One tagged input on its own: the sentence must read as a name, not a list.
     const lone = await fill({ away: 'Sparks', home: 'Aces', line: '161.5',
       op: '-110', up: '-110', arest: '0', hrest: '0' }, 'WNBA');
-    // Braves @ Astros, 20 Sept -- the live MLB card the gate still holds.
+    // A card the gate holds since 26 Sept: the market and two league-average
+    // pens read a coin flip and only the two tagged inputs carry it to BET.
+    // (Braves @ Astros of 20 Sept held while the starters were scored; it no
+    // longer reaches a bet on either read.)
     const mlb = await fill({ away: 'Braves', home: 'Astros', line: '8.5',
-      op: '100', up: '-130', aera: '3.07', hera: '3.43', aip: '137.2', hip: '97.0',
-      arpg: '3.87', hrpg: '4.79', abp: '3.58', hbp: '4.20', al10: '9.9', hl10: '7.8',
-      h2h: '8.5', h2hn: '2', pf: '99', temp: '91', tick: '96', cash: '96',
-      dome: true }, 'MLB');
+      op: '-110', up: '-110', aera: '2.50', hera: '2.60', abp: '4.05', hbp: '4.05',
+      al10: '11.5', hl10: '11.0', h2h: '12.0', h2hn: '8' }, 'MLB');
     document.getElementById('m-mlb').click();
     return { wnba, lone, mlb };
   });
@@ -1037,8 +1047,8 @@ const CHECKS = ["dome", "playoff"];
   chk(/Delete Rest — measured null/.test(held.lone.why),
       'held: one tagged input reads as a name, not a one-item list',
       (held.lone.why.match(/Held at[^.]*\./) || [''])[0]);
-  chk(/Delete Starters, Last 10 and Head to head/.test(held.mlb.why),
-      'held: an MLB card names the starters the hand-written sentence forgot',
+  chk(/Delete Last 10 and Head to head/.test(held.mlb.why),
+      'held: an MLB card names the two inputs the gate deletes, and not the starters it no longer scores',
       (held.mlb.why.match(/Held at[^.]*\./) || [''])[0]);
   chk(!/money split/.test((held.mlb.why.match(/Held at[\s\S]*?on their own\./) || [''])[0]),
       'held: and no longer names the money split, which nothing scores any more');

@@ -228,8 +228,9 @@
       if (starters) {
         var gap = (starters.total - anchor) * (F5_INNINGS / STARTER_INNINGS);
         est5.push([muF5 + gap, starters.weight]);
-        f5notes.push("Starters: " + sgn(gap) + " runs over five innings, at the same weight the full-game " +
-          "blend gives them. No bullpens — they do not pitch in the first five, which is the whole reason " +
+        f5notes.push("Starters: " + sgn(gap) + " runs over five innings, at weight " + starters.weight + ". The full " +
+          "game stopped scoring the starters on 26 Sept (they flipped picks the wrong way there); here they are the " +
+          "only thing on the mound, so they stay. No bullpens — they do not pitch in the first five, which is the whole reason " +
           "this market exists.");
       }
       var d5 = f.deltas.reduce(function (a, d) { return a + d.runs; }, 0) * F5_SHARE;

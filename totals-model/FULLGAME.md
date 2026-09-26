@@ -621,6 +621,48 @@ starter differential and the market's error, take the tag off. At n=156 the
 smallest detectable |r| is 0.160 and the observed is 0.076, so this is a
 demotion on the evidence available, not a verdict.
 
+### Shown, not scored (26 Sept 2026)
+
+The tag was not enough. Re-scoring all 229 graded MLB totals in the two logs
+(1–25 Sept) under different weight sets, split into first-half and
+second-half dates so a winner had to win out of sample:
+
+| Weights | All 229 | First half | Second half |
+|---|---|---|---|
+| As built (market 4.0, starters 1.6, pens 0.8, form 0.8, h2h 0.5) | 125-99, 55.8%, +3.6u | 51.9% | 59.3% |
+| Market halved, quartered, or removed | 55.8% → 54.5%, units to zero or below | worse | worse |
+| Market only | 138-86, 61.6%, +27.8u | 65.1% | 58.5% |
+| Starters off | 135-89, 60.3%, +23.1u | 62.3% | 58.5% |
+| Form doubled | 58.9%, +17.3u | 55.7% | 61.9% |
+| Head to head off | 58.9%, +17.0u | 57.5% | 60.2% |
+
+Every cut to the market weight made the sheet worse; the book's prices on
+their own hit 61.6%. There is no line-shading to exploit — the prices are the
+sharpest input on the card. The clear finding is the starters: taking them
+out of the full-game blend changed the side on 24 cards, and those 24 went
+17-7 without the starters, 7-17 with them, in both halves of the dates. The
+market already carries the probable starters in the line; what a season ERA
+adds on top is mostly the noise in a season ERA, and noise moves a pick at
+random or worse.
+
+So the starters estimate is now **shown, not scored**: `Estimate.scored =
+False`. It is still built (the innings shrinkage still applies), still listed
+under *Where each source lands* with "shown, not scored" where its share of
+the weight used to be, and the **first five still scores it** at
+`WEIGHTS["MLB"]["starters"]`, because over five innings the starters are the
+only thing on the mound and that market is anchored on its own line. The
+full-game projection, the corroboration read and the held note all ignore
+it. Head to head and form were left alone: 11-pick findings, to be re-run at
+300 games. If a re-measure on 400+ games finds the starters helping, flip
+`scored` back — the estimate and its detail are there to be flipped.
+
+One consequence was found the same day and closed. **Rescore now leaves
+graded rows alone.** It used to re-run every row, side included; with the
+starters unscored that would have flipped 24 *graded* picks, 17 of them from
+a logged loss to a logged win, which is exactly how a model change would
+grade itself. A graded row is a record: the stale chip still shows what the
+current model would say, and only ungraded rows adopt it.
+
 ## One price is not no price
 
 Added 2026-09-17, from a real card: Brewers at Pirates, over **−120**, under box
@@ -1467,7 +1509,7 @@ behaviour changed; the sentinels are comments.
 - `web/fullgame-cases.json` — 58 games (42 MLB, 16 WNBA) generated from the package by
   `tools_gen_fullgame_cases.py`, which recomputes only the expectations so a
   model change never means hand-editing a probability.
-- `tools_check_fullgame_page.js` — 1101 checks (the last is the build stamp). It replays all 58 in a real browser against side,
+- `tools_check_fullgame_page.js` — 1102 checks (the last is the build stamp). It replays all 58 in a real browser against side,
   band, resolved probability, push, projection, fair price, estimate and delta
   counts, the gate's core projection and core probability, the core chip showing
   the corroborated probability on every card and turning amber only when held,

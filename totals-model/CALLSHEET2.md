@@ -46,7 +46,7 @@ derivative market is arithmetic on the run distribution #1 already uses:
 |---|---|
 | moneyline | P(home > away) on the pair, with a nine-inning tie split in the ratio the decided games showed |
 | run line ±1.5 | P(margin ≥ 2) etc. on the same pair; the tied mass moved to ±1 |
-| first five | anchored on the F5 market's own prices, moved by the starters over five innings and the weather over 5/9 of the game; **no bullpens** |
+| first five | anchored on the F5 market's own prices, moved by the starters over five innings and the weather over 5/9 of the game; **no bullpens**. The starters are scored here and, since 26 Sept, *shown and not scored* in the full game — see FULLGAME.md, "Shown, not scored" |
 | total | Call Sheet #1 |
 
 So a pick here is never "the model thinks the Yankees are better." It is "the

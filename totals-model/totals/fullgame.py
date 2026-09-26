@@ -136,6 +136,10 @@ DISPERSION_PHI = {"MLB": RESIDUAL_SD["MLB"] ** 2 / LEAGUE_COMBINED_RPG}
 # head-to-head both measured null against the residual (t = -0.07 and t =
 # -0.40), which is why they are small and say so.
 WEIGHTS = {
+    # `starters` is the FIRST FIVE's weight for the starter differential; the
+    # full-game blend stopped scoring the starters on 26 Sept 2026 (the
+    # estimate is still built and listed, flagged scored=False). See
+    # forecast_mlb() for the measurement behind that.
     "MLB": {"market": 4.0, "starters": 1.6, "bullpens": 0.8,
             "form": 0.8, "h2h": 0.5},
     # A priori and labelled as such: there is no WNBA log to fit these to yet.
@@ -591,11 +595,16 @@ class Estimate:
     #: False for an input measured to be worth ~nothing, or capped by hand. It
     #: still moves the forecast; it just cannot buy a band on its own.
     mechanism: bool = True
+    #: False for an input that is SHOWN AND NOT SCORED in the full-game blend:
+    #: it is computed, listed and carries a weight for anything else that reads
+    #: it (the first five), but the projection ignores it. The starters, since
+    #: 26 Sept 2026 -- see forecast_mlb().
+    scored: bool = True
 
     def to_dict(self) -> dict[str, Any]:
         return {"name": self.name, "total": round(self.total, 3),
                 "weight": round(self.weight, 4), "detail": self.detail,
-                "mechanism": self.mechanism}
+                "mechanism": self.mechanism, "scored": self.scored}
 
 
 @dataclass
@@ -880,16 +889,31 @@ def forecast_mlb(
         # mean makes a zero differential drag the blend down toward the line --
         # two league-average staffs came back UNDER 51.9% that way, which is
         # the same class of hidden lean this rewrite exists to remove.
+        #
+        # SHOWN, NOT SCORED, since 26 Sept 2026. The starters were first
+        # measured null against the market's error (156 games, r = -0.076,
+        # t = -0.95, sign backwards) and tagged so they could not buy a band.
+        # The tag was not enough: re-scoring all 229 graded MLB totals (1-25
+        # Sept) with the starters out of the full-game blend changed the side
+        # on 24 cards, and those 24 went 17-7 WITHOUT the starters -- 7-17 with
+        # them. Hit rate 55.8% -> 60.3%, both halves of the dates. The market
+        # already carries the probable starters; what this adds is the noise
+        # in a season ERA, and noise moves a pick at random or worse. The
+        # estimate stays: it is listed on the card, and the FIRST FIVE still
+        # scores it at this weight, because over five innings the starters
+        # are the only thing on the mound and that market is anchored on its
+        # own line.
         estimates.append(Estimate(
             "Starters", anchor + gap, w["starters"],
             f"Away {away_era_used:.2f} and home {home_era_used:.2f} against a "
             f"{LEAGUE_STARTER_ERA:.2f} league starter ERA, over the {STARTER_INNINGS:.1f} "
-            f"innings a start now covers: {gap:+.2f} runs on the line. Two league-average "
-            "arms move it by exactly zero, which is what keeps this from carrying a "
-            "hidden lean." + shrunk +
-            " Measured null against the market's error on 156 games (r = -0.076, "
-            "t = -0.95, sign backwards), so it moves this projection but cannot buy "
-            "a band on its own.", mechanism=False))
+            f"innings a start now covers: {gap:+.2f} runs on the line." + shrunk +
+            " SHOWN, NOT SCORED in the full-game blend: on the 229 graded games to 25 "
+            "Sept the starters flipped 24 picks, and those went 7-17 with them in and "
+            "17-7 without. The market already has the probable starters in the line; "
+            "what a season ERA adds on top is mostly noise. The first five still "
+            "scores this gap, because over five innings it is the only thing on the "
+            "mound.", mechanism=False, scored=False))
         # A BLANK innings box is not "no shrinkage needed" -- it is "trust this
         # arm completely", which is more than 210 innings earns. So filling one
         # side and leaving the other empty makes the empty arm artificially
@@ -901,11 +925,11 @@ def forecast_mlb(
                 "means the ERA is trusted in full — more than any real innings count "
                 "earns — so shrinking one arm while the other keeps full authority "
                 "tilts the differential toward whichever box was left empty. On a close "
-                "card that alone can flip the side. Fill in both or neither.")
+                "first-five card that alone can flip the side. Fill in both or neither.")
     elif a is not None or h is not None:
         notes.append("Only one starter's ERA is in. A differential needs both arms, so "
-                     "the starters are out of the blend and their weight has gone to "
-                     "what is left.")
+                     "there is no starter read on this card and the first five has "
+                     "nothing but its own market.")
 
     # --- bullpens ----------------------------------------------------------
     ab = arm_differential(away_bullpen_era, LEAGUE_BULLPEN_ERA, BULLPEN_INNINGS, home_rpg)
@@ -1161,7 +1185,7 @@ def _tagged_phrase(estimates, deltas) -> str:
     `mechanism` flag the gate reads, so the sentence cannot describe a blend
     other than the one on the card.
     """
-    names = [e.name for e in estimates if not e.mechanism]
+    names = [e.name for e in estimates if not e.mechanism and e.scored]
     names += [d.name for d in deltas if not d.mechanism]
     # "Head to head (3)" carries its meeting count for the weight table; in a
     # sentence the count is noise.
@@ -1174,10 +1198,13 @@ def _tagged_phrase(estimates, deltas) -> str:
 
 
 def _assemble(sport, matchup, line, estimates, deltas, notes) -> Forecast:
-    tw = sum(e.weight for e in estimates)
+    # An estimate flagged scored=False is listed but ignored here and in the
+    # corroboration read below -- the starters, since 26 Sept 2026.
+    scored = [e for e in estimates if e.scored]
+    tw = sum(e.weight for e in scored)
     if tw <= 0:
         raise ValueError("no estimates to blend")
-    blended = sum(e.total * e.weight for e in estimates) / tw
+    blended = sum(e.total * e.weight for e in scored) / tw
     projected = blended + sum(d.runs for d in deltas)
 
     over, push, under = split_for(sport, line, projected)
@@ -1195,7 +1222,7 @@ def _assemble(sport, matchup, line, estimates, deltas, notes) -> Forecast:
     # and read the result on the side the full blend named. Nothing is tagged
     # when only the market and the arms are in, so this is a no-op on those
     # cards rather than an approximation of one.
-    core = [e for e in estimates if e.mechanism]
+    core = [e for e in scored if e.mechanism]
     core_w = sum(e.weight for e in core)
     if core_w > 0:
         core_blend = sum(e.total * e.weight for e in core) / core_w
@@ -1226,7 +1253,7 @@ def _assemble(sport, matchup, line, estimates, deltas, notes) -> Forecast:
                f"{p_resolved * 100:.1f}%.")
             + " Those inputs may move a forecast; they may not buy a band on their own.")
 
-    if len(estimates) == 1 and not deltas:
+    if len(scored) == 1 and not deltas:
         notes.append("Nothing entered but the number, so the forecast IS the market and "
                      "the answer is a coin flip. That is the correct answer to a question "
                      "with no information in it, not the model being coy.")
@@ -1581,8 +1608,10 @@ def sensitivity(error: float = 0.20) -> dict[str, float]:
     starters and bullpens only, and only through their share of the weight.
     """
     w = WEIGHTS["MLB"]
-    tw = sum(w.values())
-    starter = error * (STARTER_INNINGS / 9.0) * UNEARNED_MULTIPLIER * 2 * w["starters"] / tw
+    # The starters are shown, not scored, in the full game (26 Sept 2026), so
+    # a wrong league starter ERA costs the projection nothing.
+    tw = sum(v for k, v in w.items() if k != "starters")
+    starter = 0.0
     pen = error * (BULLPEN_INNINGS / 9.0) * UNEARNED_MULTIPLIER * 2 * w["bullpens"] / tw
     return {"league_era_error": error, "runs_on_projection": starter + pen,
             "starters_share": starter, "bullpens_share": pen}

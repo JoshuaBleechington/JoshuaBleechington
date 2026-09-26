@@ -7,7 +7,7 @@ top of Call Sheet #1 without touching it.
 - Page: `web/callsheet2.html`, assembled by `tools_build_callsheet2.py` from
   `web/callsheet2.head.html` + Call Sheet #1's engine block + `web/callsheet2.tail.js`
 - Fixtures: `web/callsheet2-cases.json` (62 cases) from `tools_gen_callsheet2_cases.py`
-- Browser harness: `tools_check_callsheet2_page.js` (1,020 checks)
+- Browser harness: `tools_check_callsheet2_page.js` (1,027 checks)
 
 ## What it answers
 
@@ -86,7 +86,7 @@ has its own order (below).
 
 **The day board serves both uses.** *The parlay four* is one leg per game,
 inside the cap: #1's verdict on the total when it clears its price, else the
-best value side. *Best straight bets* is by edge, positive edge only. **One sport only** runs the same two rules once per sport, MLB and
+best value side. *Best straight bets* is #1's verdicts first, then by edge. **One sport only** runs the same two rules once per sport, MLB and
 WNBA side by side, each with its own parlay legs (and their all-hit price) and
 its own straight bets, so a night can be read as just one sport at a glance; a
 column appears only when that sport has games on the date. The table beneath
@@ -193,10 +193,17 @@ tier is still there underneath for the games #1 has no call on.
 On the matchup rail the same rule shows as the green *parlay leg* mark, with
 *#1 says BET* appended when the leg is a verdict leg.
 
-**Best straight bets.** The other ranking — the stored picks (better price per
-market), positive edge only, best edge first, up to four, same-game rows
-flagged. Nothing with a negative edge qualifies, so on a night the book has
-every side covered this group is empty and says so.
+**Best straight bets.** The other list, up to eight, in two tiers, same-game
+rows flagged. First, *verdict*: every full-game total Call Sheet #1 calls BET
+or better on #1's side, best edge first, with the green chip — including one
+whose price is steeper than its chance (a BET at 58.2% priced −155 needs
+60.8%), which stays on the list, drawn dashed, with a line saying the verdict
+is there and the price is not. Second, *value*: every other stored pick with
+a positive edge, best edge first, marked as there on the price alone. Asked
+for on 26 Sept after Guardians @ Royals the night before: over 7 was #1's
+BET at 54.1% but priced −125, edge −1.5, so the old positive-edge-only rule
+left it off; it won 12-7. The verdict tier is the sheet's best record (39-23
+on #1, 7-2 here), so it leads; the price decides the size, not the listing.
 
 The table below both groups ranks every priced market by chance to hit (or by
 edge, with the toggle) and highlights whichever four the toggle corresponds to.

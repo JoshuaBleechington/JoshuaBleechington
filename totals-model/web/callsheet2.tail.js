@@ -522,8 +522,8 @@
      the stored pick alone, and bothSides() gives the flipped side no band. */
   function bandOf(v) {
     if (v.key !== "total") return "";
-    if (v.side1) return v.side === v.side1 ? (v.band1 || "") : "";
-    return v.band || "";
+    var b = v.side1 ? (v.side === v.side1 ? (v.band1 || "") : "") : (v.band || "");
+    return b === "NO BET" ? "" : b;   // NO BET is the absence of a verdict, not one
   }
   function bandTier(v) { return TIERS[bandOf(v)] || 0; }
   function valueRatio(mk) { return mk.price === null || mk.price === undefined ? 0 : mk.p / implied(mk.price); }
@@ -580,13 +580,36 @@
   }
   /* Straight bets: the stored picks (better price per market), positive edge
      only, best edge first. Same-game rows are flagged, not removed. */
+  /* Straight bets, up to eight, in two tiers. First, Call Sheet #1's VERDICT:
+     every full-game total #1 calls BET or better on #1's side, best edge
+     first -- including one whose price is steeper than its chance, which is
+     listed with the green chip and a line saying the price is the problem,
+     because the verdict tier has been the sheet's best record (39-23 on #1,
+     7-2 here) and a verdict at -125 that won (Guardians @ Royals, 25 Sept,
+     over 7, 54.1%, edge -1.5) used to be left off for the edge alone. Second,
+     VALUE: every other stored pick with a positive edge, best edge first --
+     first fives and run lines, usually. Asked for on 26 Sept: "show the market
+     it chose that shows the green BET next to it, and give me up to eight." */
   function bestBets(dateISO, sport) {
-    var rows = boardRows(dateISO, false).filter(function (x) { return x.mk.edge > 0 && (!sport || x.row.sport === sport); });
+    var all = boardRows(dateISO, false).filter(function (x) { return !sport || x.row.sport === sport; });
+    var verdict = all.filter(function (x) { return x.mk.key === "total" && bandOf(x.mk); });
+    var value = all.filter(function (x) { return !(x.mk.key === "total" && bandOf(x.mk)) && x.mk.edge > 0; });
+    verdict.forEach(function (x) { x.tier = "verdict"; x.thin = x.mk.edge <= 0; });
+    value.forEach(function (x) { x.tier = "value"; x.thin = false; });
+    var rows = verdict.concat(value).slice(0, 8);
     rows.forEach(function (x, i) {
       x.rank = i + 1;
       x.corr = rows.slice(0, i).filter(function (o) { return o.row.id === x.row.id; }).map(function (o) { return o.rank; });
     });
-    return rows.slice(0, 4);
+    return rows;
+  }
+  function betNote(x) {
+    if (x.tier === "verdict" && x.thin) {
+      return '<div class="swap">#1 says <b>' + esc(bandOf(x.mk)) + '</b>, but ' + sgn(x.mk.price, 0) + ' needs ' + (implied(x.mk.price) * 100).toFixed(1) +
+        '% and the sheet says ' + (x.mk.p * 100).toFixed(1) + '%. The verdict is there; the price is not. Shop it, or size it down.</div>';
+    }
+    if (x.tier === "value") return '<div class="swap">No verdict on this market — it is here on the price alone.</div>';
+    return '';
   }
   function boardRows(dateISO, byProb) {
     var rows = [];
@@ -663,7 +686,7 @@
 
     // --- best straight bets ---
     var bets = bestBets(dateISO), bh = "";
-    bets.forEach(function (x) { bh += pickCard(x, "straight"); });
+    bets.forEach(function (x) { bh += pickCard(x, "straight" + (x.thin ? " thin" : ""), betNote(x)); });
     if (!bets.length && rows.length) bh = '<div class="empty">No market on this date is priced below its chance. The book has every side covered tonight.</div>';
     $("bestBets").innerHTML = bh;
 
@@ -678,7 +701,7 @@
       sl.forEach(function (x) { col += pickCard(x, "", legNote(x)); });
       col += parlayCard(sl, cap, games, false);
       col += '</div><div class="lbl">Straight bets</div><div class="picks one">';
-      sb.forEach(function (x) { col += pickCard(x, "straight"); });
+      sb.forEach(function (x) { col += pickCard(x, "straight" + (x.thin ? " thin" : ""), betNote(x)); });
       if (!sb.length) col += '<div class="empty">No positive edge in ' + sp + ' tonight.</div>';
       col += '</div></div>';
       sh += col;
@@ -1031,9 +1054,10 @@
       out.push("  " + x.rank + ". " + x.row.matchup + " — " + x.mk.pick + "  " + (x.mk.p * 100).toFixed(1) + "%  " + sgn(x.mk.price, 0) +
         "  " + x.ratio.toFixed(3) + "x" + (x.band ? "  [#1: " + x.band + "]" : "") + (x.likeliest ? "  (likelier: " + x.likeliest.pick + " at " + sgn(x.likeliest.price, 0) + ")" : ""));
     });
-    out.push("BEST STRAIGHT BETS (by edge)");
+    out.push("BEST STRAIGHT BETS (#1's verdicts first, then by edge)");
     bestBets(dateISO).forEach(function (x) {
-      out.push("  " + x.rank + ". " + x.row.matchup + " — " + x.mk.pick + "  " + (x.mk.p * 100).toFixed(1) + "%  " + sgn(x.mk.price, 0) + "  edge " + sgn(x.mk.edge * 100, 1));
+      out.push("  " + x.rank + ". " + x.row.matchup + " — " + x.mk.pick + "  " + (x.mk.p * 100).toFixed(1) + "%  " + sgn(x.mk.price, 0) + "  edge " + sgn(x.mk.edge * 100, 1) +
+        (x.tier === "verdict" ? "  [#1: " + bandOf(x.mk) + (x.thin ? ", price steeper than the chance" : "") + "]" : "  [value]"));
     });
     ["MLB", "WNBA"].forEach(function (sp) {
       var sl = parlayFour(dateISO, legCap(), sp), sb = bestBets(dateISO, sp);

@@ -124,6 +124,7 @@ const CHECKS = ["dome","playoff"];
     const picks = [...document.querySelectorAll('#picks .pk:not(.parlay) .n2')].map(pickOf);
     const pickBands = [...document.querySelectorAll('#picks .pk:not(.parlay) .n2')].map(e => (e.querySelector('.band') || {}).textContent || '');
     const bests = [...document.querySelectorAll('#bestBets .pk .n2')].map(pickOf);
+    const bestBands = [...document.querySelectorAll('#bestBets .pk .n2')].map(e => (e.querySelector('.band') || {}).textContent || '');
     const swaps = [...document.querySelectorAll('#picks .pk .swap')].map(e => e.textContent);
     // grade game 1: Rays 1, Yankees 1 (2 runs), F5 1-0
     const inp = (id, k) => document.querySelector(`.grade[data-id="${id}"][data-k="${k}"]`);
@@ -140,7 +141,7 @@ const CHECKS = ["dome","playoff"];
     const graded = [...chips].map(c => ({ pick: c.querySelector('.chip').textContent, res: (c.querySelector('.chip.win,.chip.loss,.chip.push') || {}).textContent || '' }));
     const calib = document.getElementById('calibBox').textContent;
     const boardAfter = [...document.querySelectorAll('#board tbody tr')].map(tr => (tr.querySelector('td:last-child .chip') || {}).textContent || '');
-    return { rows, picks, pickBands, bests, swaps, stored: stored.length, finals: g1.finals, graded, calib, boardAfter, markets1: g1.markets.map(m => m.key) };
+    return { rows, picks, pickBands, bests, bestBands, swaps, stored: stored.length, finals: g1.finals, graded, calib, boardAfter, markets1: g1.markets.map(m => m.key) };
   });
   chk(flow.stored === 3, 'log: three matchups stored', String(flow.stored));
   chk(flow.rows.length === 6 && !flow.rows.some(r => /Mets/.test(r.matchup)),
@@ -148,13 +149,16 @@ const CHECKS = ["dome","playoff"];
       flow.rows.map(r => r.matchup + ' ' + r.pick).join(' | '));
   chk(flow.rows.every((r, i) => i === 0 || r.edge <= flow.rows[i - 1].edge), 'board: ordered by edge, best first',
       flow.rows.map(r => r.edge).join(' > '));
-  // With the table on edge, the marked rows are the best straight bets: positive edge only, up to four.
-  chk(flow.rows.filter(r => r.pick4).length === flow.bests.length && flow.bests.length >= 1 && flow.bests.length <= 4,
-      'board: the rows marked in the table are the best straight bets, positive edge only',
+  // With the table on edge, the marked rows are the best straight bets: #1's verdict totals first, then the
+  // positive-edge rows in order, up to eight. Game 1's UNDER 6.5 is a BET, so it leads whatever its edge rank.
+  chk(flow.rows.filter(r => r.pick4).length === flow.bests.length && flow.bests.length >= 1 && flow.bests.length <= 8,
+      'board: the rows marked in the table are the best straight bets, up to eight',
       `${flow.rows.filter(r => r.pick4).length} marked, ${flow.bests.length} cards`);
-  chk(flow.bests.join('|') === flow.rows.filter(r => r.edge > 0).slice(0, 4).map(r => r.pick).join('|'),
-      'board: the straight-bet cards are the top positive-edge rows in order',
-      flow.bests.join('|') + ' vs ' + flow.rows.filter(r => r.edge > 0).slice(0, 4).map(r => r.pick).join('|'));
+  chk(flow.bests[0] === 'UNDER 6.5' && flow.bestBands[0] === 'BET',
+      'board: the first straight bet is #1\'s verdict total, with its green chip', flow.bests.join('|') + ' :: ' + flow.bestBands.join('|'));
+  chk(flow.bests.slice(1).join('|') === flow.rows.filter(r => r.edge > 0 && r.pick !== 'UNDER 6.5').slice(0, 7).map(r => r.pick).join('|'),
+      'board: after the verdicts come the positive-edge rows in order',
+      flow.bests.join('|') + ' vs ' + flow.rows.filter(r => r.edge > 0 && r.pick !== 'UNDER 6.5').map(r => r.pick).join('|'));
   // The parlay legs: one per game, only where a side clears its price inside the cap.
   // Game 1 (Rays @ Yankees) has several; game 2 (Rockies @ Dodgers, -110/-110 and a -300 ML) has none.
   chk(flow.picks.length === 1 && flow.picks[0] === 'UNDER 6.5',
@@ -299,6 +303,36 @@ const CHECKS = ["dome","playoff"];
   chk(parlayCard.legs.length === 2 && parlayCard.legs.every(l => l.band) && legRatio(parlayCard.legs[0]) >= legRatio(parlayCard.legs[1]),
       'parlay: two verdict legs rank by value, the richer first', parlayCard.legs.map(l => l.game.slice(0, 18) + ' ' + l.pick + (l.band ? ' [' + l.band + ']' : '') + ' ' + legRatio(l).toFixed(3)).join(' | '));
   chk(parlayCard.rail.some(t => /parlay leg: UNDER 6.5 .* · #1 says BET/.test(t)), 'rail: the green mark names the verdict leg and #1\'s call', parlayCard.rail.join(' | '));
+
+  // ---- a verdict the price does not clear still makes the straight bets -----------
+  const thin = await pg.evaluate(async () => {
+    const wait = () => new Promise(r => setTimeout(r, 50));
+    const set = (id, v) => { const el = document.getElementById(id); el.value = v; el.dispatchEvent(new Event('input', { bubbles: true })); };
+    document.getElementById('clear').click(); document.getElementById('m-mlb').click(); await wait();
+    // Guardians @ Royals, 26 Sept, as logged: #1 calls OVER 7.5 a BET at 58.2%, priced -155 (needs 60.8%)
+    set('gdate', '2026-09-22'); set('away', 'Guardians'); set('home', 'Royals'); set('line', '7.5'); set('op', '-155'); set('up', '118');
+    set('aml', '-115'); set('hml', '-105'); set('rl', '1.5'); set('rlh', '-180'); set('rla', '145'); set('f5line', '4.5'); set('f5op', '-115'); set('f5up', '-110');
+    set('aera', '4.35'); set('hera', '3.33'); set('aip', '182'); set('hip', '194.3'); set('arpg', '4.12'); set('hrpg', '4.98'); set('abp', '3.53'); set('hbp', '5.05');
+    set('al10', '8.7'); set('hl10', '11.7'); set('h2h', '9.5'); set('h2hn', '10'); set('pf', '99'); set('mph', '8.6'); set('dir', 'cross'); set('temp', '74'); set('tick', '65'); set('cash', '70');
+    await wait();
+    const rail = [...document.querySelectorAll('#markets .mk[data-key="total"] .pick')].map(e => e.textContent)[0] || '';
+    document.getElementById('add').click(); await wait();
+    const cards = [...document.querySelectorAll('#bestBets .pk')].map(e => ({
+      pick: e.querySelector('.n2').firstChild.textContent.trim(), band: (e.querySelector('.n2 .band') || {}).textContent || '',
+      n3: e.querySelector('.n3').textContent, note: (e.querySelector('.swap') || {}).textContent || '', thin: e.classList.contains('thin') }));
+    const row = () => [...document.querySelectorAll('#cardTable tr')].find(t => /Guardians @ Royals/.test(t.textContent));
+    row().querySelector('[data-del]').click(); await wait();
+    document.getElementById('clear').click(); await wait();
+    return { rail, cards, gone: !row() };
+  });
+  const gr = thin.cards.find(c => c.pick === 'OVER 7.5') || {};
+  chk(/OVER 7.5/.test(thin.rail) && /BET/.test(thin.rail), 'thin: the fixture reads OVER 7.5 with #1\'s BET on the rail', thin.rail);
+  chk(gr.band === 'BET' && gr.thin && /edge -/.test(gr.n3), 'straight bets: a verdict whose price is steeper than its chance is listed, dashed, with its chip and its negative edge', JSON.stringify(gr));
+  chk(/#1 says BET, but -155 needs 60\.8% and the sheet says 58\.2%/.test(gr.note), 'straight bets: and the card says the verdict is there and the price is not', gr.note);
+  const firstValue = thin.cards.findIndex(c => !c.band), lastVerdict = thin.cards.map(c => !!c.band).lastIndexOf(true);
+  chk(firstValue === -1 || firstValue > lastVerdict, 'straight bets: every verdict, thin or not, ranks ahead of every value pick', thin.cards.map(c => c.pick + (c.band ? ' [' + c.band + ']' : '')).join(' | '));
+  chk(thin.cards.filter(c => !c.band).every(c => /price alone/.test(c.note)), 'straight bets: value picks say they are there on the price alone', thin.cards.filter(c => !c.band).map(c => c.note).join(' | '));
+  chk(thin.cards.length <= 8 && thin.gone, 'straight bets: at most eight, and the fixture row is removed again', String(thin.cards.length));
 
   // ---- the two labels: cold-under profile and same / split lean ------------------
   const marks = await pg.evaluate(async () => {

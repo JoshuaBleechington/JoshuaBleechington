@@ -266,7 +266,7 @@
   <header class="top">
     <div>
       <div class="eyebrow"><span id="eyebrow">MLB · every market on the game</span>
-        <span class="build">· build <span id="build">2026-09-26</span></span></div>
+        <span class="build">· build <span id="build">2026-09-27</span></span></div>
       <h1>Call Sheet <em>2.0</em></h1>
       <p>One matchup, every market the book posts on it — the full-game total, the first five,
          the moneyline and the run line — priced off the book's own numbers and <b>ranked by edge</b>, with
@@ -561,8 +561,9 @@
       <p class="note"><b>The parlay four</b> takes one leg per game, in two tiers. First, Call Sheet #1's verdict:
         a full-game total #1 calls <b>BET</b>, <b>STRONG BET</b> or <b>MAX BET</b>, on #1's side, when that side
         also clears its price inside your <b>leg cap</b> (−170 by default) — the one mark on the board that
-        carries #1's corroboration gate. Second, on a game with no such total: the side, of any market priced
-        inside the cap, with the best chance against what its price needs. In both tiers only a side that clears
+        carries #1's corroboration gate. Second, on a game with no such total: the side, of the total or the first
+        five priced inside the cap, with the best chance against what its price needs — never the moneyline or
+        the run line, which are shown, not picked. In both tiers only a side that clears
         its price qualifies — a parlay's return is the product of those ratios, a boost multiplies the whole
         thing, and a leg priced above its chance drags it down however often it hits, so a 55% over at −120
         beats a 61% dog at −155. Verdict legs rank first, then by value; the card names what each leg passed on.
@@ -572,9 +573,12 @@
       <p class="note"><b>Best straight bets</b> is the other list, up to eight, in two tiers. First, every full-game
         total Call Sheet #1 calls <b>BET</b> or better, best edge first, with the green chip on it — including one
         whose price is steeper than its chance, which stays on the list with a line saying so, because the verdict
-        tier is the sheet's best record and a verdict at −125 has won before. Second, every other pick with a
-        positive edge, best edge first, marked as here on the price alone. Both lists are graded separately in the
-        record. Click any pick card or table row to load that matchup into the form.</p>
+        tier is the sheet's best record and a verdict at −125 has won before. Second, every other <b>total or first
+        five</b> with a positive edge, best edge first, marked as here on the price alone. The moneyline and the
+        run line are <b>shown, not picked</b>: derived from the book's own moneyline with nothing behind them, and
+        22-30 on the first 52 graded games against a claimed 52.5%. They stay on the rail, the table and the
+        record so the tally keeps running, and come back if the run line reads calibrated at 150 picks. Both lists
+        are graded separately in the record. Click any pick card or table row to load that matchup into the form.</p>
       <p class="note"><b>The four at the top are the four to look at, not the four to bet.</b> Two markets
         on the same game are one bet in disguise — a run line and an under both cash on a pitchers' duel —
         so a row that shares a game with a higher one is flagged <i>corr</i>. Re-read the inputs on anything
@@ -1974,6 +1978,7 @@
           (mk.band ? '<span class="band' + (mk.band === "NO BET" ? "" : " hot") + '">' + esc(mk.band) + '</span>' : "") +
           (!mk.anchored ? '<span class="derived">derived</span>' : "") +
           (mk.key === "total" ? railMarks : "") +
+          (!pickable(mk) ? '<span class="cap tagm" title="Derived from the book\'s own moneyline with no team information behind it. On the first 52 graded games the run line said 52.5% and did 42.3%, so it is listed and graded but never a straight bet or a parlay leg.">shown, not picked</span>' : "") +
           (isLeg ? '<span class="cap" style="color:var(--go);border-color:var(--go)">parlay leg: ' + esc(leg.pick) + ' ' + (leg.p * 100).toFixed(1) + '% at ' + sgn(leg.price, 0) + ' · ' + valueRatio(leg).toFixed(3) + '× its price' + (bandOf(leg) ? ' · #1 says ' + esc(bandOf(leg)) : '') + '</span>' : "") +
           (beyondLikely && mk.key === beyondLikely.key ? '<span class="cap">likeliest: ' + esc(beyondLikely.pick) + ' ' + (beyondLikely.p * 100).toFixed(1) + '% at ' + sgn(beyondLikely.price, 0) + ' · beyond ' + sgn(cap, 0) + '</span>' : "") +
           (res ? '<span class="chip ' + res + '" style="margin-left:8px;vertical-align:2px">' + resText(res) + '</span>' : "") + '</div>' +
@@ -2048,6 +2053,7 @@
   function gameLeg(markets, cap) {
     var inCap = [], clears = [];
     (markets || []).forEach(function (mk) {
+      if (!pickable(mk)) return;   // the moneyline and run line are shown, not picked
       bothSides(mk).forEach(function (v) {
         if (!withinCap(v.price, cap)) return;
         inCap.push(v);
@@ -2098,10 +2104,23 @@
      VALUE: every other stored pick with a positive edge, best edge first --
      first fives and run lines, usually. Asked for on 26 Sept: "show the market
      it chose that shows the green BET next to it, and give me up to eight." */
+  /* SHOWN, NOT PICKED: the moneyline and the run line (and the WNBA spread).
+     They are derived from the book's own moneyline with no team information
+     behind them, and on the first 52 graded MLB games the run line said 52.5%
+     and did 42.3% (22-30, -10.15u); the picks with a positive edge, the ones
+     that reached the straight bets, said 60.6% and did 45.0% (9-11). The
+     moneyline is calibrated (42.2% said, 42.3% done) and, being read off its
+     own price, never clears it. So neither can be a straight bet or a parlay
+     leg from 27 Sept. They stay on the rail, the board and the record, chipped
+     "shown, not picked", so the tally keeps running; if the run line reads
+     calibrated at 150 picks it comes back. The totals and the first five --
+     the two markets the model has inputs for -- are the pickable ones:
+     62.7% and 62.5% over the same games. */
+  function pickable(mk) { return mk.key === "total" || mk.key === "f5"; }
   function bestBets(dateISO, sport) {
     var all = boardRows(dateISO, false).filter(function (x) { return !sport || x.row.sport === sport; });
     var verdict = all.filter(function (x) { return x.mk.key === "total" && bandOf(x.mk); });
-    var value = all.filter(function (x) { return !(x.mk.key === "total" && bandOf(x.mk)) && x.mk.edge > 0; });
+    var value = all.filter(function (x) { return pickable(x.mk) && !(x.mk.key === "total" && bandOf(x.mk)) && x.mk.edge > 0; });
     verdict.forEach(function (x) { x.tier = "verdict"; x.thin = x.mk.edge <= 0; });
     value.forEach(function (x) { x.tier = "value"; x.thin = false; });
     var rows = verdict.concat(value).slice(0, 8);
@@ -2224,7 +2243,7 @@
       h += '<tr class="' + (inFour ? 'pick4' : '') + '" data-open="' + x.row.id + '" title="Load ' + esc(x.row.matchup) + ' into the form">' +
         '<td><span class="rank">' + x.rank + '</span>' + (x.corr.length ? '<span class="chip corr">corr #' + x.corr.join(' #') + '</span>' : '') + '</td>' +
         '<td>' + esc(x.row.matchup) + ' <span class="gdate">' + esc(x.row.sport) + '</span></td>' +
-        '<td>' + esc(mk.label) + (!mk.anchored ? ' <span class="chip dim">derived</span>' : '') + '</td>' +
+        '<td>' + esc(mk.label) + (!mk.anchored ? ' <span class="chip dim">derived</span>' : '') + (!pickable(mk) ? ' <span class="chip dim">not picked</span>' : '') + '</td>' +
         '<td><span class="chip ' + sideClass(mk.side) + '">' + esc(mk.pick) + '</span>' + (mk.band && mk.band !== "NO BET" ? ' <span class="chip">' + esc(mk.band) + '</span>' : '') + '</td>' +
         '<td class="n">' + (mk.p * 100).toFixed(1) + '%</td>' +
         '<td class="n">' + sgn(mk.price, 0) + '</td>' +
@@ -2451,7 +2470,7 @@
       h += '<div class="verdict">' + (totalN < 30
         ? '<b>' + totalN + ' graded ' + sp + ' markets.</b> Nothing here can be read yet — one standard error on a hit rate is ' +
           (totalN ? (100 / Math.sqrt(totalN) / 2).toFixed(0) : '—') + ' points at this size. ' +
-          (sp === "MLB" ? 'The number to watch first is the run line, because it is the market this sheet derives rather than anchors, and the two fours, because choosing between them is the reason the sheet exists.'
+          (sp === "MLB" ? 'The run line and the moneyline are shown, not picked, since 27 Sept: watch whether the run line\'s <i>does</i> climbs back toward its <i>says</i>; it comes back at 150 picks if it does. The two fours are the reason the sheet exists.'
                         : 'With seven games in the season book and this sheet newer than that, the WNBA block will read as noise for weeks; it is here so the two sports never get pooled.')
         : '<b>' + totalN + ' graded ' + sp + ' markets.</b> Compare each market\'s <i>does</i> against its <i>says</i> before believing either; ' +
           'and compare each four against the blind rate of everything logged, not against 50%. The parlay four and the straight bets will differ most nights; the units column is the referee.') + '</div>';

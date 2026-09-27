@@ -7,7 +7,7 @@ top of Call Sheet #1 without touching it.
 - Page: `web/callsheet2.html`, assembled by `tools_build_callsheet2.py` from
   `web/callsheet2.head.html` + Call Sheet #1's engine block + `web/callsheet2.tail.js`
 - Fixtures: `web/callsheet2-cases.json` (62 cases) from `tools_gen_callsheet2_cases.py`
-- Browser harness: `tools_check_callsheet2_page.js` (1,027 checks)
+- Browser harness: `tools_check_callsheet2_page.js` (1,028 checks)
 
 ## What it answers
 
@@ -44,8 +44,8 @@ derivative market is arithmetic on the run distribution #1 already uses:
 
 | market | how |
 |---|---|
-| moneyline | P(home > away) on the pair, with a nine-inning tie split in the ratio the decided games showed |
-| run line ±1.5 | P(margin ≥ 2) etc. on the same pair; the tied mass moved to ±1 |
+| moneyline | P(home > away) on the pair, with a nine-inning tie split in the ratio the decided games showed. **Shown, not picked** since 27 Sept (below) |
+| run line ±1.5 | P(margin ≥ 2) etc. on the same pair; the tied mass moved to ±1. **Shown, not picked** since 27 Sept (below) |
 | first five | anchored on the F5 market's own prices, moved by the starters over five innings and the weather over 5/9 of the game; **no bullpens**. The starters are scored here and, since 26 Sept, *shown and not scored* in the full game — see FULLGAME.md, "Shown, not scored" |
 | total | Call Sheet #1 |
 
@@ -54,6 +54,21 @@ book's own total and moneyline imply the Yankees cover −1.5 at X%, and the boo
 is charging a price that needs Y%." That is a relative judgement between two of
 the book's own quotes, and it is the only kind of judgement this project has
 evidence it can make.
+
+**Shown, not picked (27 Sept 2026).** On the first 52 graded MLB games the
+run line said 52.5% and did 42.3% (22-30, −10.15u); the run-line picks with a
+positive edge, the ones that reached the straight bets, said 60.6% and did
+45.0% (9-11); the home side of the run line went 18-29. The moneyline is
+calibrated (42.2% said, 42.3% done) and, read off its own price, never
+clears it. The totals and the first five, the two markets the model has
+inputs for, went 62.7% and 62.5% over the same games. So the moneyline and
+the run line (and the WNBA spread, which is the same construction) are
+**shown, not picked**: still on the rail with their chance, price and edge,
+still on the board table, still graded on the record tiles, chipped *shown,
+not picked* — but never a straight bet and never a parlay leg. The tally
+keeps running; if the run line's *does* is back within a standard error of
+its *says* at 150 picks it comes back. The margin distribution itself is not
+being refit on 52 games. `pickable()` in the page is the one switch.
 
 **Nothing per-team we hold is unpriced by the moneyline.** The book knew the
 probable starters when it posted it. So the arms, the pens and the lineups move

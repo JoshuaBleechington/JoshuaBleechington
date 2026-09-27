@@ -156,18 +156,23 @@ const CHECKS = ["dome","playoff"];
       `${flow.rows.filter(r => r.pick4).length} marked, ${flow.bests.length} cards`);
   chk(flow.bests[0] === 'UNDER 6.5' && flow.bestBands[0] === 'BET',
       'board: the first straight bet is #1\'s verdict total, with its green chip', flow.bests.join('|') + ' :: ' + flow.bestBands.join('|'));
-  chk(flow.bests.slice(1).join('|') === flow.rows.filter(r => r.edge > 0 && r.pick !== 'UNDER 6.5').slice(0, 7).map(r => r.pick).join('|'),
-      'board: after the verdicts come the positive-edge rows in order',
+  // ... and only totals and first fives: the moneyline and run line are shown, not picked (27 Sept).
+  const pickableRow = r => !/ML$|[+-]1\.5$/.test(r.pick);
+  chk(flow.bests.slice(1).join('|') === flow.rows.filter(r => r.edge > 0 && r.pick !== 'UNDER 6.5' && pickableRow(r)).slice(0, 7).map(r => r.pick).join('|'),
+      'board: after the verdicts come the positive-edge totals and first fives in order, never a run line or moneyline',
       flow.bests.join('|') + ' vs ' + flow.rows.filter(r => r.edge > 0 && r.pick !== 'UNDER 6.5').map(r => r.pick).join('|'));
+  chk(flow.rows.some(r => /Rays \+1\.5/.test(r.pick) && r.edge > 0) && !flow.bests.some(p => /Rays \+1\.5/.test(p)),
+      'board: a run line with a positive edge is on the table but not among the straight bets', flow.bests.join('|'));
   // The parlay legs: one per game, only where a side clears its price inside the cap.
   // Game 1 (Rays @ Yankees) has several; game 2 (Rockies @ Dodgers, -110/-110 and a -300 ML) has none.
   chk(flow.picks.length === 1 && flow.picks[0] === 'UNDER 6.5',
       'parlay: only the game with a leg that clears its price contributes one, and it is #1\'s BET on the total', flow.picks.join('|'));
   chk(flow.pickBands.length === 1 && flow.pickBands[0] === 'BET',
       'parlay: the leg card carries Call Sheet #1\'s band chip', flow.pickBands.join('|'));
+  // The likelier side is read among the PICKABLE sides only: Rays +1.5 (62.8%) is on the game but shown, not picked.
   chk(flow.swaps.length === 2 && /Call Sheet #1 says BET on this total and it clears its price/.test(flow.swaps[0]) &&
-      /Likelier on this game: Rays \+1.5/.test(flow.swaps[1]) && /better value/.test(flow.swaps[1]),
-      'parlay: the card says the leg is #1\'s verdict and names the likelier side it passed on', flow.swaps.join('|'));
+      /Likelier on this game: F5 UNDER 3\.5/.test(flow.swaps[1]) && /better value/.test(flow.swaps[1]) && !/Rays \+1\.5/.test(flow.swaps.join('|')),
+      'parlay: the card says the leg is #1\'s verdict and names the likelier pickable side it passed on, never the run line', flow.swaps.join('|'));
   chk(!flow.rows[0].corr && flow.rows.slice(1).some(r => r.corr), 'board: the first row is never flagged; a later same-game row is',
       flow.rows.map(r => r.corr).join(','));
   chk(flow.rows.some(r => /Dodgers|Rockies/.test(r.pick) && r.edge < 0) && !flow.bests.some(p => /ML/.test(p) && /Dodgers/.test(p)),

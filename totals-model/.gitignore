@@ -9,3 +9,7 @@ __pycache__/
 node_modules/
 package.json
 package-lock.json
+
+# The slate script writes its daily files next to itself when run there.
+slate/slate-*.json
+slate/grade-*.json

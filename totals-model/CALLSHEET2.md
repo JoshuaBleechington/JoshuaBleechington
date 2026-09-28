@@ -268,7 +268,15 @@ The loader's rules, in order, and each is a harness check:
   the card. The list survives a reload and carries across a finals file.
 - A file that is not a slate (a backup, say) is refused with the reason.
 
-Added 28 Sept 2026; the script that writes it is the next piece.
+Added 28 Sept 2026. `slate/slate.py` writes it: MLB's public stats feed for
+the starters and their season lines, team runs per game, a bullpen ERA built
+from the active roster's relievers, the last ten totals, the season series
+and the posted lineups (with anyone missing from the last game's order named
+in a note), and Open-Meteo's forecast at the park for the wind, resolved
+against the centre-field bearing in `slate/parks.json`. `slate.py grade`
+writes the finals file from the linescore. It is Python 3 with no
+dependencies, has an offline `--selftest`, and `slate/README.md` covers the
+setup. The WNBA is still typed by hand.
 
 ## Grading and the record
 

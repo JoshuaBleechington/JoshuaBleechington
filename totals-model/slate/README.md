@@ -10,8 +10,9 @@ else: no packages, no account, no key.
 | On the sheet | Where it comes from |
 | --- | --- |
 | Starters, their ERA and innings | MLB's stats feed, probable pitchers and season pitching line |
+| Each starter's last five starts, ERA and innings | The pitcher's game log. **Shown on the sheet, not scored**: recorded so recent form can be tested against the record |
 | Runs per game, both teams | MLB's stats feed, season team hitting |
-| Bullpen ERA, both teams | Built from the active roster: every pitcher whose starts are fewer than half his appearances, minus today's starters, earned runs over innings |
+| Bullpen ERA, both teams | Built from the active roster: every pitcher whose starts are fewer than half his appearances, minus today's starters, earned runs over innings. Both numbers are printed: the whole roster and the **top five by appearances**. In the regular season the roster number goes on the sheet; in the **postseason the top five** does, because the mop-up arms do not pitch in October |
 | Last-10 average total, both teams | The team's last ten finished games on the feed |
 | Head-to-head average and meetings | Every finished meeting this season |
 | Wind mph, direction, temp | Open-Meteo's forecast at the park for first pitch and the two hours after, resolved to out / quarter-out / cross / quarter-in / in against the park's centre-field bearing in `parks.json`. If MLB has posted its own stadium wind, that wins. |

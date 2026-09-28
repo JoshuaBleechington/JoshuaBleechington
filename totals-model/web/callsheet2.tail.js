@@ -357,7 +357,10 @@
   /* ---- reading the form / storage ---------------------------------------- */
   var MLB_IDS = ["away","home","line","op","up","opened","gdate","aera","hera","aip","hip","arpg","hrpg",
                  "abp","hbp","al10","hl10","h2h","h2hn","pf","mph","dir","temp","tick","cash",
-                 "hml","aml","rl","rlh","rla","f5line","f5op","f5up"];
+                 "hml","aml","rl","rlh","rla","f5line","f5op","f5up",
+                 /* shown, not scored: the last five starts, recorded since 28 Sept so
+                    recent form can be tested against the record rather than assumed */
+                 "al5era","hl5era","al5ip","hl5ip"];
   var WNBA_IDS = ["away","home","line","op","up","opened","gdate","apace","hpace","aort","hort","adrt","hdrt",
                   "arest","hrest","al5","hl5","hml","aml","sp","sph","spa"];
   var ALL = MLB_IDS.concat(WNBA_IDS).filter(function (v, i, a) { return a.indexOf(v) === i; });
@@ -486,7 +489,17 @@
               '<i class="h" style="width:' + (100 - ha).toFixed(1) + '%">' + m.lamHome.toFixed(sport === "WNBA" ? 1 : 2) + ' ' + esc(m.home) + '</i></div>';
     }
     box.innerHTML = html;
-    why.innerHTML = m.notes.concat(m.total.notes).map(function (n) { return "<li>" + n + "</li>"; }).join("");
+    why.innerHTML = m.notes.concat(m.total.notes).concat(lastFiveNote()).map(function (n) { return "<li>" + n + "</li>"; }).join("");
+  }
+  /* The last five starts ride along on the row and the rail but touch no
+     number. The line names them so a reader knows they were seen. */
+  function lastFiveNote() {
+    if (sport !== "MLB") return [];
+    var a = $("al5era").value, h = $("hl5era").value, ai = $("al5ip").value, hi = $("hl5ip").value;
+    if (a === "" && h === "") return [];
+    var part = function (nm, era, ip) { return era === "" ? esc(nm) + " —" : esc(nm) + " " + esc(era) + (ip !== "" ? " in " + esc(ip) + " IP" : ""); };
+    return ["<b>Last five starts, shown, not scored:</b> " + part($("away").value || "away", a, ai) + "; " + part($("home").value || "home", h, hi) +
+            ". Recorded so recent form can be tested against the record; the season line is what the first five scores."];
   }
 
   /* ---- the day board ------------------------------------------------------- */
@@ -1192,7 +1205,7 @@
   var SLATE_KEY = "callsheet2.slate.v1";
   var slate = null;
   try { slate = JSON.parse(localStorage.getItem(SLATE_KEY) || "null"); } catch (e) { slate = null; }
-  var SLATE_FIELDS = ["aera","hera","aip","hip","arpg","hrpg","abp","hbp","al10","hl10","h2h","h2hn","pf","mph","dir","temp","tick","cash",
+  var SLATE_FIELDS = ["aera","hera","aip","hip","al5era","hl5era","al5ip","hl5ip","arpg","hrpg","abp","hbp","al10","hl10","h2h","h2hn","pf","mph","dir","temp","tick","cash",
                       "apace","hpace","aort","hort","adrt","hdrt","arest","hrest","al5","hl5"];
   function blank(v) { return v === undefined || v === null || String(v).trim() === ""; }
   function sameGame(row, g) {
@@ -1254,6 +1267,7 @@
       var meta = [];
       if (st.away || st.home) meta.push(esc(st.away || "?") + " v " + esc(st.home || "?"));
       if (!blank(i.aera) && !blank(i.hera)) meta.push("ERA " + esc(i.aera) + "/" + esc(i.hera));
+      if (!blank(i.al5era) && !blank(i.hl5era)) meta.push("last 5 " + esc(i.al5era) + "/" + esc(i.hl5era));
       if (!blank(i.abp) && !blank(i.hbp)) meta.push("pens " + esc(i.abp) + "/" + esc(i.hbp));
       if (!blank(i.al10) && !blank(i.hl10)) meta.push("L10 " + esc(i.al10) + "/" + esc(i.hl10));
       if (i.dome) meta.push("roof"); else if (!blank(i.mph)) meta.push("wind " + esc(i.mph) + (i.dir ? " " + esc(i.dir) : "") + (!blank(i.temp) ? " · " + esc(i.temp) + "°F" : ""));

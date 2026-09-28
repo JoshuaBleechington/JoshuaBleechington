@@ -176,13 +176,13 @@ def parse_mlb_wind(s):
     return None
 
 
-def bullpen_era(people, exclude_ids=()):
+def bullpen_era(people, exclude_ids=(), top=None):
     """Aggregate ER and IP over the roster's relievers: pitchers whose starts
     are fewer than half their appearances, minus today's probable starters.
+    With top=N, only the N most-used relievers (by appearances, then innings)
+    count: the October pen, where the mop-up arms never pitch.
     Returns (era, arms, innings) or (None, 0, 0.0) when nothing qualifies."""
-    er = 0.0
-    ip = 0.0
-    arms = 0
+    arms = []
     for p in people:
         if p.get("id") in exclude_ids:
             continue
@@ -194,12 +194,33 @@ def bullpen_era(people, exclude_ids=()):
         innings = ip_decimal(st.get("inningsPitched")) or 0.0
         if gp == 0 or innings <= 0 or gs * 2 >= gp:
             continue
-        er += float(st.get("earnedRuns") or 0)
-        ip += innings
-        arms += 1
+        arms.append((gp, innings, float(st.get("earnedRuns") or 0)))
+    if top:
+        arms.sort(key=lambda a: (-a[0], -a[1]))
+        arms = arms[:top]
+    ip = sum(a[1] for a in arms)
+    er = sum(a[2] for a in arms)
     if ip <= 0:
         return (None, 0, 0.0)
-    return (9.0 * er / ip, arms, ip)
+    return (9.0 * er / ip, len(arms), ip)
+
+
+def last_starts(splits, n=5):
+    """A pitcher's game log -> (era, innings, starts) over his last n starts.
+    Relief appearances are skipped. (None, 0.0, 0) with no starts at all."""
+    starts = []
+    for sp in splits or []:
+        st = sp.get("stat") or {}
+        if int(st.get("gamesStarted") or 0) < 1:
+            continue
+        starts.append((sp.get("date") or "", ip_decimal(st.get("inningsPitched")) or 0.0, float(st.get("earnedRuns") or 0)))
+    starts.sort(key=lambda s: s[0])
+    tail = starts[-n:]
+    ip = sum(s[1] for s in tail)
+    er = sum(s[2] for s in tail)
+    if not tail or ip <= 0:
+        return (None, 0.0, len(tail))
+    return (9.0 * er / ip, ip, len(tail))
 
 
 def season_split(person):
@@ -328,6 +349,14 @@ def pitcher_season(pid, season):
     return None
 
 
+def pitcher_gamelog(pid, season):
+    d = api("/people/%d/stats" % pid, stats="gameLog", group="pitching", season=season)
+    out = []
+    for block in d.get("stats") or []:
+        out.extend(block.get("splits") or [])
+    return out
+
+
 def team_hitting(team_id, season):
     d = api("/teams/%d/stats" % team_id, stats="season", group="hitting", season=season)
     for block in d.get("stats") or []:
@@ -421,16 +450,18 @@ def build_game(g, parks, date_iso, season, log):
     status = ((g.get("status") or {}).get("detailedState")) or ""
     first = parse_utc(g.get("gameDate") or (date_iso + "T00:00:00Z"))
     venue = g.get("venue") or {}
-    inputs = {k: "" for k in ("aera", "hera", "aip", "hip", "arpg", "hrpg", "abp", "hbp",
+    inputs = {k: "" for k in ("aera", "hera", "aip", "hip", "al5era", "hl5era", "al5ip", "hl5ip", "arpg", "hrpg", "abp", "hbp",
                               "al10", "hl10", "h2h", "h2hn", "pf", "mph", "dir", "temp")}
     inputs["dome"] = False
     notes = []
     starters = {"away": "", "home": ""}
     lineups = {"away": [], "home": []}
-    out = {"sport": "MLB", "gdate": date_iso, "away": away, "home": home, "gamePk": gpk,
+    pens = {"away": {}, "home": {}}
+    playoff = (g.get("gameType") or "R") != "R"
+    out = {"sport": "MLB", "gdate": date_iso, "away": away, "home": home, "gamePk": gpk, "playoff": playoff,
            "first_pitch_utc": first.strftime("%Y-%m-%dT%H:%M:%SZ"), "venue": venue.get("name") or "",
-           "status": status, "starters": starters, "inputs": inputs, "lineups": lineups, "notes": notes}
-    log("%s @ %s  (%s, first pitch %s UTC, %s)" % (away, home, venue.get("name") or "venue ?", first.strftime("%H:%M"), status or "scheduled"))
+           "status": status, "starters": starters, "inputs": inputs, "pens": pens, "lineups": lineups, "notes": notes}
+    log("%s @ %s  (%s, first pitch %s UTC, %s%s)" % (away, home, venue.get("name") or "venue ?", first.strftime("%H:%M"), status or "scheduled", ", postseason" if playoff else ""))
     if status.lower().startswith(("postponed", "cancelled", "canceled", "suspended")):
         notes.append("Game is %s." % status.lower())
 
@@ -459,6 +490,20 @@ def build_game(g, parks, date_iso, season, log):
         except Exception as e:  # noqa: BLE001 - every piece is best-effort
             notes.append("Could not fetch %s's season line: %s" % (starters[side], e))
             log("  %s starter: %s  (stats failed: %s)" % (side, starters[side], e))
+        # the last five starts: shown on the sheet, not scored, recorded for the test
+        p = "a" if side == "away" else "h"
+        try:
+            era5, ip5, n5 = last_starts(pitcher_gamelog(pid, season), 5)
+            if era5 is not None:
+                inputs[p + "l5era"] = fmt(era5, 2)
+                inputs[p + "l5ip"] = fmt(ip5, 1)
+                log("  %s starter, last %d start%s: %s ERA in %s IP" % (side, n5, "" if n5 == 1 else "s", inputs[p + "l5era"], inputs[p + "l5ip"]))
+                if n5 < 5:
+                    notes.append("%s has only %d start%s this season; the last-five line is over those." % (starters[side], n5, "" if n5 == 1 else "s"))
+            else:
+                log("  %s starter, last 5 starts: none on the log" % side)
+        except Exception as e:  # noqa: BLE001
+            notes.append("Could not fetch %s's game log: %s" % (starters[side], e))
 
     # runs per game, bullpen, last ten, head to head
     season_start = "%s-03-01" % season
@@ -478,9 +523,17 @@ def build_game(g, parks, date_iso, season, log):
         try:
             people = roster_pitchers(tid, season)
             era, arms, ip = bullpen_era(people, exclude_ids=set(pids))
-            if era is not None:
-                inputs[p + "bp"] = fmt(era, 2)
-            log("  %s bullpen ERA: %s (%d relievers on the active roster, %.1f IP)" % (side, inputs[p + "bp"] or "?", arms, ip))
+            era5, arms5, ip5 = bullpen_era(people, exclude_ids=set(pids), top=5)
+            pens[side] = {"roster": fmt(era, 2), "roster_arms": arms, "top5": fmt(era5, 2), "top5_arms": arms5}
+            # The October pen is the top five by appearances; the whole roster
+            # averages in arms who will not pitch a leveraged inning.
+            use = era5 if (playoff and era5 is not None) else era
+            if use is not None:
+                inputs[p + "bp"] = fmt(use, 2)
+            log("  %s bullpen ERA: %s over the roster (%d relievers, %.1f IP); top five by appearances %s (%.1f IP)%s" %
+                (side, fmt(era, 2) or "?", arms, ip, fmt(era5, 2) or "?", ip5, "  -> using the top five: postseason" if playoff else ""))
+            if playoff and era5 is not None:
+                notes.append("%s pen is the top five relievers by appearances, %s (whole roster %s): postseason." % (away if side == "away" else home, fmt(era5, 2), fmt(era, 2)))
         except Exception as e:  # noqa: BLE001
             notes.append("Could not build %s bullpen ERA: %s" % (side, e))
         try:
@@ -707,6 +760,21 @@ def selftest():
     era2, arms2, _ = bullpen_era(people, exclude_ids={2})
     check("excluding an arm", arms2 == 1 and abs(era2 - 6.0) < 1e-9)
     check("empty -> None", bullpen_era([]) == (None, 0, 0.0))
+    seven = _canned_people(1000)["people"]
+    era7, arms7, ip7 = bullpen_era(seven)
+    check("seven-arm roster pen 108 ER / 260 IP = 3.74", arms7 == 7 and abs(ip7 - 260.0) < 1e-9 and abs(era7 - 9.0 * 108 / 260) < 1e-9)
+    era5, arms5, ip5 = bullpen_era(seven, top=5)
+    check("top five by appearances drops the two least used: 95 ER / 225 IP = 3.80", arms5 == 5 and abs(ip5 - 225.0) < 1e-9 and abs(era5 - 3.8) < 1e-9)
+    era1, arms1, _ = bullpen_era(seven, top=1)
+    check("top one is the most-used arm", arms1 == 1 and abs(era1 - 3.0) < 1e-9)
+
+    print("last five starts")
+    lg = _canned_gamelog(501)["stats"][0]["splits"]
+    e5, i5, n5 = last_starts(lg, 5)
+    check("last five starts skip relief and older starts: 9 ER / 29 IP", n5 == 5 and abs(i5 - 29.0) < 1e-9 and abs(e5 - 9.0 * 9 / 29) < 1e-9)
+    e3, i3, n3 = last_starts(_canned_gamelog(601)["stats"][0]["splits"], 5)
+    check("three starts only", n3 == 3 and abs(i3 - 13.3333) < 0.001 and abs(e3 - 6.75) < 0.001)
+    check("no starts -> None", last_starts([{"date": "2026-09-01", "stat": {"gamesStarted": 0, "inningsPitched": "1.0", "earnedRuns": 0}}]) == (None, 0.0, 0))
 
     print("recent games")
     def fin(a, h, code="F"):
@@ -760,8 +828,11 @@ def selftest():
     check("teams", row["away"] == "Diamondbacks" and row["home"] == "Padres" and row["sport"] == "MLB")
     check("starters named", row["starters"] == {"away": "Away Ace", "home": "Home Ace"})
     check("era and ip", i["aera"] == "3.31" and i["aip"] == "111.3" and i["hera"] == "4.01")
+    check("last five on the slate", i["al5era"] == "2.79" and i["al5ip"] == "29.0" and i["hl5era"] == "6.75" and i["hl5ip"] == "13.3")
+    check("short log noted", any("Home Ace has only 3 starts" in n for n in row["notes"]))
     check("runs per game", i["arpg"] == "4.48" and i["hrpg"] == "4.20")
-    check("bullpen from roster", i["abp"] == "4.00" and i["hbp"] == "4.00")
+    check("regular season: bullpen over the whole roster", i["abp"] == "3.74" and i["hbp"] == "3.74" and row["playoff"] is False)
+    check("both pens on the record", row["pens"]["away"]["top5"] == "3.80" and row["pens"]["away"]["roster"] == "3.74")
     check("last ten", i["al10"] == "9.0" and i["hl10"] == "9.0")
     check("head to head", i["h2h"] == "9.0" and i["h2hn"] == "2")
     check("wind resolved", i["mph"] == "9" and i["dir"] == "out" and i["temp"] == "72" and i["dome"] is False)
@@ -771,6 +842,17 @@ def selftest():
     check("home lineup not posted noted", any("Padres lineup not posted" in n for n in row["notes"]))
     doc = {"format": FORMAT, "version": VERSION, "date": "2026-09-28", "games": [row]}
     check("document round-trips as JSON", json.loads(json.dumps(doc))["games"][0]["inputs"]["dir"] == "out")
+
+    # the same game as a postseason game: the pen becomes the top five
+    fetch_json = fake
+    try:
+        pg = canned_schedule()["dates"][0]["games"][0]
+        pg["gameType"] = "F"
+        prow = build_game(pg, parks, "2026-09-28", "2026", lines.append)
+    finally:
+        fetch_json = real
+    check("postseason: the pen is the top five by appearances", prow["playoff"] is True and prow["inputs"]["abp"] == "3.80" and prow["inputs"]["hbp"] == "3.80")
+    check("postseason pen noted with the roster number", any("top five relievers by appearances, 3.80 (whole roster 3.74)" in n for n in prow["notes"]))
 
     gr = grade_game(canned_final(), lines.append)
     check("grade finals", gr["finals"] == {"fa": "4", "fh": "9", "f5a": "0", "f5h": "3"})
@@ -803,6 +885,36 @@ def canned_final():
                                       {"away": {"runs": 0}, "home": {"runs": 0}}, {"away": {"runs": 4}, "home": {"runs": 6}}]}}
 
 
+def _canned_people(base):
+    """A rotation arm plus seven relievers with distinct usage, so the top-five
+    pen (by appearances) is a different number from the whole-roster pen."""
+    def arm(k, gp, gs, ip, er):
+        return {"id": base + k, "stats": [{"group": {"displayName": "pitching"}, "splits": [{"stat": {"gamesPlayed": gp, "gamesStarted": gs, "inningsPitched": ip, "earnedRuns": er}}]}]}
+    return {"people": [
+        arm(1, 30, 30, "180.0", 60),   # a starter: never in the pen
+        arm(2, 60, 0, "60.0", 20),     # 3.00, most used
+        arm(3, 40, 0, "30.0", 20),     # 6.00
+        arm(4, 55, 0, "50.0", 10),
+        arm(5, 50, 0, "45.0", 15),
+        arm(6, 45, 0, "40.0", 30),
+        arm(7, 20, 0, "25.0", 5),      # rarely used: out of the top five
+        arm(8, 10, 0, "10.0", 8),      # rarely used: out of the top five
+    ]}
+
+
+def _canned_gamelog(pid):
+    def game(date, gs, ip, er):
+        return {"date": date, "stat": {"gamesStarted": gs, "inningsPitched": ip, "earnedRuns": er}}
+    if pid == 501:
+        splits = [game("2026-08-01", 1, "3.0", 5),    # sixth-last start: dropped
+                  game("2026-08-07", 1, "6.0", 1), game("2026-08-13", 1, "5.0", 2), game("2026-08-19", 1, "7.0", 0),
+                  game("2026-08-22", 0, "1.0", 3),    # relief appearance: skipped
+                  game("2026-08-25", 1, "5.0", 4), game("2026-08-31", 1, "6.0", 2)]
+    else:
+        splits = [game("2026-09-05", 1, "4.0", 3), game("2026-09-12", 1, "5.0", 3), game("2026-09-19", 1, "4.1", 4)]
+    return {"stats": [{"group": {"displayName": "pitching"}, "splits": splits}]}
+
+
 def _canned():
     def pitcher(era, ip):
         return {"stats": [{"splits": [{"stat": {"era": era, "inningsPitched": ip}}]}]}
@@ -810,15 +922,10 @@ def _canned():
     def hitting(runs, gp):
         return {"stats": [{"splits": [{"stat": {"runs": runs, "gamesPlayed": gp}}]}]}
 
-    def people(base):
-        return {"people": [
-            {"id": base + 1, "stats": [{"group": {"displayName": "pitching"}, "splits": [{"stat": {"gamesPlayed": 30, "gamesStarted": 30, "inningsPitched": "180.0", "earnedRuns": 60}}]}]},
-            {"id": base + 2, "stats": [{"group": {"displayName": "pitching"}, "splits": [{"stat": {"gamesPlayed": 60, "gamesStarted": 0, "inningsPitched": "60.0", "earnedRuns": 20}}]}]},
-            {"id": base + 3, "stats": [{"group": {"displayName": "pitching"}, "splits": [{"stat": {"gamesPlayed": 40, "gamesStarted": 0, "inningsPitched": "30.0", "earnedRuns": 20}}]}]},
-        ]}
+    people = _canned_people
 
     def roster(base):
-        return {"roster": [{"person": {"id": base + k}, "position": {"abbreviation": "P"}} for k in (1, 2, 3)]}
+        return {"roster": [{"person": {"id": base + k}, "position": {"abbreviation": "P"}} for k in range(1, 9)]}
 
     def recent(tid):
         gs = []
@@ -847,6 +954,8 @@ def _canned():
                                                              "ID504": {"person": {"id": 504, "fullName": "Benched Guy"}}}},
         "home": {"battingOrder": [], "players": {}}}}
     return [
+        ("/people/501/stats?stats=gameLog", _canned_gamelog(501)),
+        ("/people/601/stats?stats=gameLog", _canned_gamelog(601)),
         ("/people/501/stats", pitcher("3.31", "111.1")),
         ("/people/601/stats", pitcher("4.01", "134.2")),
         ("/teams/109/stats", hitting(699, 156)),

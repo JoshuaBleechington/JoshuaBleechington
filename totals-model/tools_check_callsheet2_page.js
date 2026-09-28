@@ -18,7 +18,7 @@ const { execSync } = require('child_process');
 const CASES = JSON.parse(fs.readFileSync(path.join(__dirname, 'web/callsheet2-cases.json'), 'utf8'));
 const IDS = ["away","home","line","op","up","opened","gdate","aera","hera","aip","hip","arpg","hrpg",
              "abp","hbp","al10","hl10","h2h","h2hn","pf","mph","dir","temp","tick","cash",
-             "hml","aml","rl","rlh","rla","f5line","f5op","f5up",
+             "hml","aml","rl","rlh","rla","f5line","f5op","f5up","al5era","hl5era","al5ip","hl5ip",
              "apace","hpace","aort","hort","adrt","hdrt","arest","hrest","al5","hl5","sp","sph","spa"];
 const CHECKS = ["dome","playoff"];
 
@@ -413,7 +413,7 @@ const CHECKS = ["dome","playoff"];
              yAera: y.inputs.aera, yFinals: y.finals }; })()`);
   await pg.setInputFiles('#slateFile', slateFile({ format: 'callsheet2.slate', version: 1, date: '2026-09-22', generated: '2026-09-22T16:00:00Z', games: [
     { sport: 'MLB', gdate: '2026-09-22', away: 'Cubs', home: 'Reds', starters: { away: 'A. Pitcher', home: 'B. Pitcher' },
-      inputs: { aera: '3.90', hera: '4.60', aip: '150', hip: '140', abp: '2.60', hbp: '2.80', arpg: '4.8', hrpg: '5.1', al10: '9.1', hl10: '9.4', pf: '104', mph: '12', dir: 'out', temp: '78', line: '99', op: '-999' } },
+      inputs: { aera: '3.90', hera: '4.60', aip: '150', hip: '140', al5era: '2.50', hl5era: '6.10', al5ip: '29.2', hl5ip: '24', abp: '2.60', hbp: '2.80', arpg: '4.8', hrpg: '5.1', al10: '9.1', hl10: '9.4', pf: '104', mph: '12', dir: 'out', temp: '78', line: '99', op: '-999' } },
     { sport: 'MLB', gdate: '2026-09-22', away: 'Rays', home: 'Yankees', inputs: { aera: '9.99', hera: '9.99', abp: '9.99', hbp: '9.99' }, finals: { fa: '7', fh: '7', f5a: '3', f5h: '3' } },
     { sport: 'MLB', gdate: '2026-09-22', away: 'Twins', home: 'Tigers', starters: { away: 'C. Arm', home: 'D. Arm' }, notes: ['Star X out of the lineup'],
       inputs: { aera: '4.10', hera: '3.30', aip: '120', hip: '160', abp: '4.00', hbp: '3.70', arpg: '4.4', hrpg: '4.6', al10: '8.2', hl10: '7.9', mph: '5', dir: 'cross', temp: '70' } } ] }));
@@ -426,6 +426,26 @@ const CHECKS = ["dome","playoff"];
   chk(before.aera === '' && after.inputs.aera === '3.90' && after.inputs.abp === '2.60' && after.inputs.dir === 'out',
       'slate: blank inputs on an ungraded row are filled from the slate', JSON.stringify({ before: before.aera, after: after.inputs.aera }));
   chk(after.inputs.line === '9' && after.inputs.op === '-110', 'slate: a typed value is never overwritten, and lines and prices are never read from a slate', after.inputs.line + ' ' + after.inputs.op);
+  chk(after.inputs.al5era === '2.50' && after.inputs.hl5era === '6.10' && after.inputs.al5ip === '29.2' && after.inputs.hl5ip === '24',
+      'last five: the slate fills the four shown-not-scored fields and the row keeps them', JSON.stringify([after.inputs.al5era, after.inputs.hl5era, after.inputs.al5ip, after.inputs.hl5ip]));
+  // the last five touch no number: the rail reads the same with the four fields blanked
+  const l5why = await pg.evaluate(async () => {
+    const wait = () => new Promise(r => setTimeout(r, 60));
+    const set = (id, v) => { const el = document.getElementById(id); el.value = v; el.dispatchEvent(new Event('input', { bubbles: true })); };
+    const tr = [...document.querySelectorAll('#cardTable tr')].find(t => /Cubs @ Reds/.test(t.textContent));
+    tr.querySelector('[data-open]').click(); await wait();
+    const v = id => document.getElementById(id).value;
+    const nums = () => [...document.querySelectorAll('#markets .p')].map(e => e.textContent).join('|');
+    const out = { al5era: v('al5era'), hl5ip: v('hl5ip'), why: document.getElementById('why').textContent, withNums: nums() };
+    set('al5era', ''); set('hl5era', ''); set('al5ip', ''); set('hl5ip', ''); await wait();
+    out.bareNums = nums(); out.bareWhy = document.getElementById('why').textContent;
+    document.getElementById('clear').click(); await wait();
+    return out;
+  });
+  chk(l5why.al5era === '2.50' && l5why.hl5ip === '24' && /Last five starts, shown, not scored/.test(l5why.why) && /Cubs 2\.50 in 29\.2 IP/.test(l5why.why) && /Reds 6\.10 in 24 IP/.test(l5why.why),
+      'last five: opening the row restores the fields and the why list names them as shown, not scored', JSON.stringify(l5why).slice(0, 300));
+  chk(l5why.withNums === l5why.bareNums && l5why.withNums.length > 0 && !/Last five starts/.test(l5why.bareWhy),
+      'last five: shown, not scored — every market reads the same with the four fields blank, and the line goes away', l5why.withNums + ' vs ' + l5why.bareNums);
   chk(Math.abs(after.p - before.p) > 0.005, 'slate: the filled row is rescored (two strong pens moved the total)', `${before.p} -> ${after.p}`);
   chk(JSON.stringify(after.finals) === JSON.stringify(before.finals) && !after.finals.fa, 'slate: a game with no finals in the file leaves the row ungraded', JSON.stringify(after.finals));
   chk(after.yAera === before.yAera && after.yAera !== '9.99' && JSON.stringify(after.yFinals) === JSON.stringify(before.yFinals),

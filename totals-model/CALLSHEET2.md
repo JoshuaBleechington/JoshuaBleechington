@@ -7,7 +7,7 @@ top of Call Sheet #1 without touching it.
 - Page: `web/callsheet2.html`, assembled by `tools_build_callsheet2.py` from
   `web/callsheet2.head.html` + Call Sheet #1's engine block + `web/callsheet2.tail.js`
 - Fixtures: `web/callsheet2-cases.json` (62 cases) from `tools_gen_callsheet2_cases.py`
-- Browser harness: `tools_check_callsheet2_page.js` (1,040 checks)
+- Browser harness: `tools_check_callsheet2_page.js` (1,043 checks)
 
 ## What it answers
 
@@ -277,6 +277,22 @@ against the centre-field bearing in `slate/parks.json`. `slate.py grade`
 writes the finals file from the linescore. It is Python 3 with no
 dependencies, has an offline `--selftest`, and `slate/README.md` covers the
 setup. The WNBA is still typed by hand.
+
+**The last five starts** (`al5era`, `hl5era`, `al5ip`, `hl5ip`) are four
+form fields the slate fills and the row keeps, **shown, not scored**: the
+rail's why list names them, and a harness check proves every market reads
+the same with them blank. They exist because "would the last five beat the
+season line?" was asked on 28 Sept and could not be answered — the log had
+never recorded them. Five starts is 25–30 innings, and the season line
+already shrinks a sample that short toward the league, so nothing moves
+until the record says it should.
+
+**The postseason pen.** The script builds two bullpen ERAs, the whole active
+roster and the top five relievers by appearances, and prints both. In the
+regular season the roster number goes on the sheet; in the postseason the
+top five does, because the arms that never pitch a leveraged inning in
+October drag the roster number toward the middle. The row's note names both
+numbers. Nothing in the engine changes: the pen field is the pen field.
 
 ## Grading and the record
 

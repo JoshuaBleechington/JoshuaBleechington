@@ -44,6 +44,14 @@ python3 slate.py --selftest
 On Windows the command is `python` rather than `python3`. It should end with
 `all checks passed`.
 
+## The short cut (Windows)
+
+Two batch files sit beside the script. **Run slate.bat** does the pre-game
+run and **Grade yesterday.bat** does the morning one. Double-click, read the
+window, press any key to close it. They run the same commands as below from
+their own folder, so nothing needs typing. Right-click either one and choose
+*Send to → Desktop (create shortcut)* to have it on the desktop.
+
 ## Every day, twice
 
 **Before the games**, ideally within a couple of hours of first pitch so the

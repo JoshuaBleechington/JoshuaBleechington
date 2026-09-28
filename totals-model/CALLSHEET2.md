@@ -7,7 +7,7 @@ top of Call Sheet #1 without touching it.
 - Page: `web/callsheet2.html`, assembled by `tools_build_callsheet2.py` from
   `web/callsheet2.head.html` + Call Sheet #1's engine block + `web/callsheet2.tail.js`
 - Fixtures: `web/callsheet2-cases.json` (62 cases) from `tools_gen_callsheet2_cases.py`
-- Browser harness: `tools_check_callsheet2_page.js` (1,028 checks)
+- Browser harness: `tools_check_callsheet2_page.js` (1,040 checks)
 
 ## What it answers
 
@@ -225,6 +225,50 @@ edge, with the toggle) and highlights whichever four the toggle corresponds to.
 
 The board reads the **frozen** markets on each row — what the model said when
 the row was added — so what it shows today is what will be graded tomorrow.
+
+## The slate
+
+The sheet cannot fetch anything, so the daily inputs arrive as a file:
+`slate/slate.py` runs on the user's own computer and writes one JSON per
+run, and **Load slate** (in *Saving*) reads it. The format is the contract
+between the two and is versioned:
+
+```json
+{ "format": "callsheet2.slate", "version": 1, "date": "2026-09-28",
+  "generated": "2026-09-28T16:00:00Z",
+  "games": [ {
+    "sport": "MLB", "gdate": "2026-09-28", "away": "Diamondbacks", "home": "Padres",
+    "starters": { "away": "Name", "home": "Name" },
+    "inputs": { "aera": "3.31", "hera": "4.01", "aip": "111.3", "hip": "134.7",
+                "abp": "4.00", "hbp": "3.50", "arpg": "4.48", "hrpg": "4.20",
+                "al10": "11.3", "hl10": "10.7", "pf": "", "mph": "6", "dir": "cross",
+                "temp": "81", "dome": false },
+    "notes": [ "Star X out of the lineup" ],
+    "finals": { "fa": "4", "fh": "9", "f5a": "0", "f5h": "3" } } ] }
+```
+
+`inputs` holds any of the form's input fields *except* the number, the
+prices and the side lines — a slate never carries a line or a price, and
+the loader ignores them if present. `finals` is present only in the morning
+file. Team names are matched through the same canonical-name table the
+form uses, on the game date and sport.
+
+The loader's rules, in order, and each is a harness check:
+
+- A game already on the card, **ungraded**: blank input fields are filled
+  from the slate; typed values are never overwritten; the row is rescored
+  through the current model, as Rescore would do.
+- A game already on the card, **graded**: nothing is touched, inputs or
+  finals, however the file reads. A graded row is a record.
+- `finals` on a row that has none: written, and the row locks as if typed.
+- A game not on the card: listed under **Today's slate** with its starters,
+  a one-line summary of its inputs and any notes; **Fill form** puts its
+  inputs into the form, and the user adds the total, the prices and the
+  side lines and presses Add. The game leaves the list the moment it is on
+  the card. The list survives a reload and carries across a finals file.
+- A file that is not a slate (a backup, say) is refused with the reason.
+
+Added 28 Sept 2026; the script that writes it is the next piece.
 
 ## Grading and the record
 

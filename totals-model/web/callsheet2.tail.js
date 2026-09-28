@@ -782,6 +782,7 @@
   }
   var unlocked = {};
   function renderCard() {
+    if (typeof renderSlate === "function") renderSlate();
     $("cardCount").textContent = card.length ? card.length + " matchups" : "";
     if (!card.length) { $("cardTable").innerHTML = '<div class="empty">Nothing on the card yet.</div>'; return; }
     var today = todayISO();
@@ -1178,6 +1179,115 @@
     rd.readAsText(f);
     this.value = "";
   });
+  /* ---- the slate --------------------------------------------------------------
+     A file written by slate/slate.py on the user's own machine -- this page
+     cannot fetch anything -- holding today's games with the inputs the model
+     wants already filled (starters, pens, runs per game, last tens, weather
+     resolved to a direction) and, the next morning, the finals. The loader
+     never overwrites a typed value and never touches a graded row: it fills
+     BLANKS on ungraded rows and rescores them (as Rescore would), writes
+     finals only where a row has none, and lists the games not yet on the
+     card so one click puts each into the form with everything but the lines
+     and prices filled. Lines and prices are never in a slate. 28 Sept 2026. */
+  var SLATE_KEY = "callsheet2.slate.v1";
+  var slate = null;
+  try { slate = JSON.parse(localStorage.getItem(SLATE_KEY) || "null"); } catch (e) { slate = null; }
+  var SLATE_FIELDS = ["aera","hera","aip","hip","arpg","hrpg","abp","hbp","al10","hl10","h2h","h2hn","pf","mph","dir","temp","tick","cash",
+                      "apace","hpace","aort","hort","adrt","hdrt","arest","hrest","al5","hl5"];
+  function blank(v) { return v === undefined || v === null || String(v).trim() === ""; }
+  function sameGame(row, g) {
+    var sp = g.sport === "WNBA" ? "WNBA" : "MLB";
+    return (row.gdate || "") === (g.gdate || "") && row.sport === sp &&
+      canonTeam(row.away, sp) === canonTeam(g.away, sp) && canonTeam(row.home, sp) === canonTeam(g.home, sp);
+  }
+  function rowGraded(r) { return (r.markets || []).some(function (mk) { return gradeMarket(mk, r.finals) !== null; }); }
+  function hasFinals(fin) { return !!fin && !blank(fin.fa) && !blank(fin.fh); }
+  function saveSlate() { try { if (slate) localStorage.setItem(SLATE_KEY, JSON.stringify(slate)); else localStorage.removeItem(SLATE_KEY); } catch (e) {} }
+  function applySlate(d, name) {
+    if (!d || d.format !== "callsheet2.slate" || !Array.isArray(d.games)) throw new Error("not a Call Sheet 2.0 slate");
+    var filled = 0, graded = 0, frozen = 0, pending = 0;
+    d.games.forEach(function (g) {
+      var row = card.filter(function (r) { return sameGame(r, g); })[0];
+      if (!row) { if (g.inputs) pending++; return; }
+      var isGraded = rowGraded(row);
+      if (g.inputs) {
+        if (isGraded) { frozen++; }
+        else {
+          var changed = false;
+          SLATE_FIELDS.forEach(function (k) {
+            if (blank(g.inputs[k]) || !blank(row.inputs[k])) return;
+            row.inputs[k] = String(g.inputs[k]); changed = true;
+          });
+          if (g.inputs.dome === true && !row.inputs.dome) { row.inputs.dome = true; changed = true; }
+          if (changed) { var m = scoreMatchup(row.sport, row.inputs); if (m) row.markets = slimMarkets(m.markets); filled++; }
+        }
+      }
+      if (hasFinals(g.finals)) {
+        if (hasFinals(row.finals)) { if (!g.inputs) frozen++; }
+        else {
+          var fin = {};
+          ["fa","fh","f5a","f5h"].forEach(function (k) { if (!blank(g.finals[k])) fin[k] = String(g.finals[k]); });
+          row.finals = fin; graded++;
+        }
+      }
+    });
+    /* The pending list carries over: a finals file has no inputs and must not
+       empty it, and a fresh slate replaces only the games it names. */
+    var incoming = d.games.filter(function (g) { return !!g.inputs; });
+    var kept = ((slate && slate.games) || []).filter(function (k) {
+      return !incoming.some(function (g) { return (k.gdate || "") === (g.gdate || "") && sameGame({ gdate: k.gdate, sport: k.sport === "WNBA" ? "WNBA" : "MLB", away: k.away, home: k.home }, g); });
+    });
+    slate = { name: name || (slate && slate.name) || "", date: d.date || (slate && slate.date) || "", generated: d.generated || "", games: kept.concat(incoming) };
+    saveSlate(); save(); renderCard(); renderBoard(); renderCalib();
+    say("Slate " + (name ? "<b>" + esc(name) + "</b> " : "") + "loaded: <b>" + filled + "</b> row" + (filled === 1 ? "" : "s") + " filled in, <b>" + graded + "</b> graded, " +
+        "<b>" + pending + "</b> not yet on the card" + (frozen ? ", " + frozen + " graded row" + (frozen === 1 ? "" : "s") + " left exactly as logged" : "") +
+        ". Typed values were not overwritten; lines and prices are never in a slate.");
+  }
+  function renderSlate() {
+    var box = $("slateCard"); if (!box) return;
+    if (!slate || !slate.games || !slate.games.length) { box.hidden = true; return; }
+    var pend = slate.games.map(function (g, i) { return { g: g, i: i }; }).filter(function (x) { return !card.some(function (r) { return sameGame(r, x.g); }); });
+    box.hidden = false;
+    $("slateTag").textContent = (slate.date ? gameDate(slate.date) + " · " : "") + pend.length + " not yet on the card" + (slate.name ? " · " + slate.name : "");
+    $("slateList").innerHTML = pend.length ? pend.map(function (x) {
+      var g = x.g, i = g.inputs || {}, st = g.starters || {};
+      var meta = [];
+      if (st.away || st.home) meta.push(esc(st.away || "?") + " v " + esc(st.home || "?"));
+      if (!blank(i.aera) && !blank(i.hera)) meta.push("ERA " + esc(i.aera) + "/" + esc(i.hera));
+      if (!blank(i.abp) && !blank(i.hbp)) meta.push("pens " + esc(i.abp) + "/" + esc(i.hbp));
+      if (!blank(i.al10) && !blank(i.hl10)) meta.push("L10 " + esc(i.al10) + "/" + esc(i.hl10));
+      if (i.dome) meta.push("roof"); else if (!blank(i.mph)) meta.push("wind " + esc(i.mph) + (i.dir ? " " + esc(i.dir) : "") + (!blank(i.temp) ? " · " + esc(i.temp) + "°F" : ""));
+      var notes = (g.notes || []).map(function (n) { return '<div class="sn">' + esc(n) + '</div>'; }).join("");
+      return '<div class="sg"><div><b>' + esc(g.away) + ' @ ' + esc(g.home) + '</b> <span class="gdate">' + esc(g.sport || "MLB") + '</span>' +
+        '<div class="meta">' + meta.join(" · ") + '</div>' + notes + '</div>' +
+        '<button type="button" class="btn" data-slate="' + x.i + '">Fill form</button></div>';
+    }).join("") : '<div class="empty">Every game in this slate is on the card.</div>';
+  }
+  function fillFromSlate(i) {
+    var g = slate && slate.games && slate.games[i]; if (!g) return;
+    setSport(g.sport === "WNBA" ? "WNBA" : "MLB", true);
+    clearForm();
+    var v = { away: g.away, home: g.home, gdate: g.gdate || todayISO() };
+    SLATE_FIELDS.forEach(function (k) { if (!blank((g.inputs || {})[k])) v[k] = String(g.inputs[k]); });
+    if (g.inputs && g.inputs.dome === true) v.dome = true;
+    restore(v); onEdit();
+    say("<b>" + esc(g.away) + " @ " + esc(g.home) + "</b> is in the form with the slate's inputs. Type the total, the prices and the side lines, then Add to card.");
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  }
+  $("loadSlate").addEventListener("click", function () { $("slateFile").click(); });
+  $("slateFile").addEventListener("change", function () {
+    var f = this.files && this.files[0]; if (!f) return;
+    var rd = new FileReader();
+    rd.onload = function () {
+      try { applySlate(JSON.parse(rd.result), f.name); }
+      catch (e) { say("Could not load that slate: " + esc(e.message) + ". A slate is the file slate/slate.py writes; a backup goes under Load a backup."); }
+    };
+    rd.readAsText(f);
+    this.value = "";
+  });
+  $("slateList").addEventListener("click", function (e) { var t = e.target.closest("[data-slate]"); if (t) fillFromSlate(+t.dataset.slate); });
+  $("slateClear").addEventListener("click", function () { slate = null; saveSlate(); renderSlate(); });
+
   $("rescore").addEventListener("click", function () {
     var n = 0, kept = 0;
     card.forEach(function (r) {

@@ -208,6 +208,11 @@
                    padding: 3px 5px; border: 1px solid var(--rule-firm); border-radius: 4px; color: var(--ink-2); margin: 4px 4px 0 0; }
   .mk .cap.tagm.warn, .openbtn .tagm.warn, .pk .tagm.warn { color: var(--warn); border-color: var(--warn); }
   .pk.thin { border-style: dashed; }
+  /* the slate panel */
+  .slate .sg { display: flex; justify-content: space-between; align-items: center; gap: 10px; padding: 10px 12px;
+               border: 1px solid var(--rule); border-radius: 8px; margin-bottom: 8px; }
+  .slate .meta { font: 500 11.5px/1.5 var(--mono); color: var(--ink-2); margin-top: 2px; }
+  .slate .sn { font-size: 12px; color: var(--warn); margin-top: 3px; }
   .pk .tagm { display: inline-block; font: 700 9px/1 var(--sans); letter-spacing: .08em; text-transform: uppercase;
               padding: 3px 5px; border: 1px solid var(--rule-firm); border-radius: 4px; color: var(--ink-2); margin-left: 4px; vertical-align: 1px; }
   .mk.alt { border-color: var(--go); }
@@ -266,7 +271,7 @@
   <header class="top">
     <div>
       <div class="eyebrow"><span id="eyebrow">MLB · every market on the game</span>
-        <span class="build">· build <span id="build">2026-09-27</span></span></div>
+        <span class="build">· build <span id="build">2026-09-28</span></span></div>
       <h1>Call Sheet <em>2.0</em></h1>
       <p>One matchup, every market the book posts on it — the full-game total, the first five,
          the moneyline and the run line — priced off the book's own numbers and <b>ranked by edge</b>, with
@@ -509,9 +514,27 @@
             <button type="button" class="btn" id="restore">Load a backup</button>
             <button type="button" class="btn" id="rescore">Rescore card</button>
             <button type="button" class="btn" id="copy">Copy board as text</button>
+            <button type="button" class="btn" id="loadSlate">Load slate</button>
           </div>
           <input type="file" id="restoreFile" accept="application/json,.json" hidden>
+          <input type="file" id="slateFile" accept="application/json,.json" hidden>
           <p class="note" id="saveMsg" hidden></p>
+          <p class="note"><b>Load slate</b> reads the file <code>slate/slate.py</code> writes on your own computer: today's
+            games with the starters, pens, runs per game, last tens and weather already filled, and the next morning
+            the finals. It fills blanks on ungraded rows and rescores them, writes finals only where a row has none,
+            never overwrites a value you typed, never touches a graded row, and lists the games not yet on the card
+            below so one click puts each into the form. Lines and prices are never in a slate; those are still yours.</p>
+        </div>
+      </section>
+
+      <section class="card" id="slateCard" hidden>
+        <h2>Today's slate <span class="tag" id="slateTag"></span>
+          <button type="button" class="x unlock" id="slateClear" title="Forget this slate">clear</button></h2>
+        <div class="body">
+          <div id="slateList" class="slate"></div>
+          <p class="note">Each game here came from the slate and is not on the card yet. <b>Fill form</b> loads its
+            inputs; you add the total, the prices and the side lines, then Add to card. A game drops off this list
+            the moment it is on the card.</p>
         </div>
       </section>
     </div>

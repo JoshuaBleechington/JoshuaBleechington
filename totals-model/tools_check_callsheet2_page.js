@@ -396,6 +396,82 @@ const CHECKS = ["dome","playoff"];
       'labels: the same over with every signal agreeing carries no grain chip', marks.grainPick2 + ' :: ' + marks.grainChips2.join('|'));
   chk(!marks.guardians.some(t => /grain/.test(t)), 'labels: an under never gets a grain chip', marks.guardians.join('|'));
 
+  // ---- the slate loader -----------------------------------------------------------
+  const slateFile = (obj, name) => ({ name: name || 'slate-2026-09-22.json', mimeType: 'application/json', buffer: Buffer.from(JSON.stringify(obj)) });
+  await pg.evaluate(async () => {
+    const wait = () => new Promise(r => setTimeout(r, 50));
+    const set = (id, v) => { const el = document.getElementById(id); el.value = v; el.dispatchEvent(new Event('input', { bubbles: true })); };
+    document.getElementById('clear').click(); document.getElementById('m-mlb').click(); await wait();
+    // an ungraded row with only the number and the prices typed, for the slate to fill
+    set('gdate', '2026-09-22'); set('away', 'Cubs'); set('home', 'Reds'); set('line', '9'); set('op', '-110'); set('up', '-110'); set('aml', '-120'); set('hml', '100');
+    await wait(); document.getElementById('add').click(); await wait();
+    document.getElementById('clear').click(); await wait();
+  });
+  const rowOf = (name) => `JSON.parse(localStorage.getItem('callsheet2.card.v1')).find(r => r.matchup === '${name}')`;
+  const before = await pg.evaluate(`(() => { const c = ${rowOf('Cubs @ Reds')}, y = ${rowOf('Rays @ Yankees')};
+    return { p: c.markets.find(m => m.key === 'total').p, aera: c.inputs.aera, line: c.inputs.line, finals: c.finals,
+             yAera: y.inputs.aera, yFinals: y.finals }; })()`);
+  await pg.setInputFiles('#slateFile', slateFile({ format: 'callsheet2.slate', version: 1, date: '2026-09-22', generated: '2026-09-22T16:00:00Z', games: [
+    { sport: 'MLB', gdate: '2026-09-22', away: 'Cubs', home: 'Reds', starters: { away: 'A. Pitcher', home: 'B. Pitcher' },
+      inputs: { aera: '3.90', hera: '4.60', aip: '150', hip: '140', abp: '2.60', hbp: '2.80', arpg: '4.8', hrpg: '5.1', al10: '9.1', hl10: '9.4', pf: '104', mph: '12', dir: 'out', temp: '78', line: '99', op: '-999' } },
+    { sport: 'MLB', gdate: '2026-09-22', away: 'Rays', home: 'Yankees', inputs: { aera: '9.99', hera: '9.99', abp: '9.99', hbp: '9.99' }, finals: { fa: '7', fh: '7', f5a: '3', f5h: '3' } },
+    { sport: 'MLB', gdate: '2026-09-22', away: 'Twins', home: 'Tigers', starters: { away: 'C. Arm', home: 'D. Arm' }, notes: ['Star X out of the lineup'],
+      inputs: { aera: '4.10', hera: '3.30', aip: '120', hip: '160', abp: '4.00', hbp: '3.70', arpg: '4.4', hrpg: '4.6', al10: '8.2', hl10: '7.9', mph: '5', dir: 'cross', temp: '70' } } ] }));
+  await pg.waitForTimeout(400);
+  const after = await pg.evaluate(`(() => { const c = ${rowOf('Cubs @ Reds')}, y = ${rowOf('Rays @ Yankees')};
+    return { p: c.markets.find(m => m.key === 'total').p, inputs: c.inputs, finals: c.finals, yAera: y.inputs.aera, yFinals: y.finals,
+             msg: document.getElementById('saveMsg').textContent, hidden: document.getElementById('slateCard').hidden,
+             tag: document.getElementById('slateTag').textContent, list: document.getElementById('slateList').textContent,
+             games: [...document.querySelectorAll('#slateList .sg')].length }; })()`);
+  chk(before.aera === '' && after.inputs.aera === '3.90' && after.inputs.abp === '2.60' && after.inputs.dir === 'out',
+      'slate: blank inputs on an ungraded row are filled from the slate', JSON.stringify({ before: before.aera, after: after.inputs.aera }));
+  chk(after.inputs.line === '9' && after.inputs.op === '-110', 'slate: a typed value is never overwritten, and lines and prices are never read from a slate', after.inputs.line + ' ' + after.inputs.op);
+  chk(Math.abs(after.p - before.p) > 0.005, 'slate: the filled row is rescored (two strong pens moved the total)', `${before.p} -> ${after.p}`);
+  chk(JSON.stringify(after.finals) === JSON.stringify(before.finals) && !after.finals.fa, 'slate: a game with no finals in the file leaves the row ungraded', JSON.stringify(after.finals));
+  chk(after.yAera === before.yAera && after.yAera !== '9.99' && JSON.stringify(after.yFinals) === JSON.stringify(before.yFinals),
+      'slate: a graded row keeps its inputs and its finals whatever the file says', JSON.stringify({ aera: after.yAera, finals: after.yFinals }));
+  chk(!after.hidden && after.games === 1 && /Twins @ Tigers/.test(after.list) && /C\. Arm v D\. Arm/.test(after.list) && /Star X out of the lineup/.test(after.list) && !/Cubs @ Reds/.test(after.list),
+      'slate: only the game not on the card is listed, with its starters and its note', after.list.slice(0, 200));
+  chk(/1 not yet on the card/.test(after.tag) && /1 rows? filled in/.test(after.msg) && /0 graded/.test(after.msg) && /1 graded row left exactly as logged/.test(after.msg),
+      'slate: the tag and the message count what happened', after.tag + ' :: ' + after.msg);
+  // the finals file the next morning
+  await pg.setInputFiles('#slateFile', slateFile({ format: 'callsheet2.slate', version: 1, date: '2026-09-22', games: [
+    { sport: 'MLB', gdate: '2026-09-22', away: 'Cubs', home: 'Reds', finals: { fa: '5', fh: '3', f5a: '2', f5h: '1' } },
+    { sport: 'MLB', gdate: '2026-09-22', away: 'Rays', home: 'Yankees', finals: { fa: '7', fh: '7' } } ] }, 'grade-2026-09-22.json'));
+  await pg.waitForTimeout(400);
+  const graded = await pg.evaluate(`(() => { const c = ${rowOf('Cubs @ Reds')}, y = ${rowOf('Rays @ Yankees')};
+    const tr = [...document.querySelectorAll('#cardTable tr')].find(t => /Cubs @ Reds/.test(t.textContent));
+    return { finals: c.finals, locked: !!tr.querySelector('.lock'), res: (tr.querySelector('.rowmk .chip.win,.rowmk .chip.loss') || {}).textContent || '',
+             yFinals: y.finals, msg: document.getElementById('saveMsg').textContent }; })()`);
+  chk(graded.finals.fa === '5' && graded.finals.f5h === '1' && graded.locked && /WIN|LOSS/i.test(graded.res),
+      'slate: a finals file grades and locks a row that had no finals', JSON.stringify(graded));
+  chk(JSON.stringify(graded.yFinals) === JSON.stringify(before.yFinals) && /1 graded row left exactly as logged/.test(graded.msg),
+      'slate: a row that already had finals keeps them', JSON.stringify(graded.yFinals) + ' :: ' + graded.msg);
+  // fill the form from the slate panel, then a bad file
+  const filled = await pg.evaluate(async () => {
+    const wait = () => new Promise(r => setTimeout(r, 60));
+    document.querySelector('#slateList [data-slate]').click(); await wait();
+    const v = id => document.getElementById(id).value;
+    return { away: v('away'), home: v('home'), gdate: v('gdate'), aera: v('aera'), abp: v('hbp'), line: v('line'), op: v('op'), msg: document.getElementById('saveMsg').textContent };
+  });
+  chk(filled.away === 'Twins' && filled.home === 'Tigers' && filled.gdate === '2026-09-22' && filled.aera === '4.10' && filled.abp === '3.70' && filled.line === '' && filled.op === '',
+      'slate: Fill form loads the game\'s inputs and leaves the lines and prices for the user', JSON.stringify(filled));
+  await pg.setInputFiles('#slateFile', slateFile({ format: 'callsheet2.backup', version: 1, card: [] }, 'callsheet2-backup.json'));
+  await pg.waitForTimeout(300);
+  const bad = await pg.evaluate(() => document.getElementById('saveMsg').textContent);
+  chk(/Could not load that slate/.test(bad) && /not a Call Sheet 2.0 slate/.test(bad), 'slate: a backup handed to Load slate is refused with a reason', bad);
+  // tidy up: forget the slate, remove the fixture row (unlock, then delete), clear the form
+  const tidy = await pg.evaluate(async () => {
+    const wait = () => new Promise(r => setTimeout(r, 60));
+    document.getElementById('slateClear').click(); await wait();
+    const tr = () => [...document.querySelectorAll('#cardTable tr')].find(t => /Cubs @ Reds/.test(t.textContent));
+    tr().querySelector('[data-unlock]').click(); await wait();
+    tr().querySelector('[data-del]').click(); await wait();
+    document.getElementById('clear').click(); await wait();
+    return { hidden: document.getElementById('slateCard').hidden, gone: !tr(), stored: localStorage.getItem('callsheet2.slate.v1') };
+  });
+  chk(tidy.hidden && tidy.gone && tidy.stored === null, 'slate: clear forgets the slate and the fixture row is removed', JSON.stringify(tidy));
+
   // ---- the cap, the second choice on the rail, and clicking through ---------------
   const capFlow = await pg.evaluate(async () => {
     const wait = () => new Promise(r => setTimeout(r, 50));

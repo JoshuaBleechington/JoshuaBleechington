@@ -7,7 +7,7 @@ top of Call Sheet #1 without touching it.
 - Page: `web/callsheet2.html`, assembled by `tools_build_callsheet2.py` from
   `web/callsheet2.head.html` + Call Sheet #1's engine block + `web/callsheet2.tail.js`
 - Fixtures: `web/callsheet2-cases.json` (62 cases) from `tools_gen_callsheet2_cases.py`
-- Browser harness: `tools_check_callsheet2_page.js` (1,043 checks)
+- Browser harness: `tools_check_callsheet2_page.js` (1,048 checks)
 
 ## What it answers
 
@@ -293,6 +293,19 @@ regular season the roster number goes on the sheet; in the postseason the
 top five does, because the arms that never pitch a leveraged inning in
 October drag the roster number toward the middle. The row's note names both
 numbers. Nothing in the engine changes: the pen field is the pen field.
+
+## One row per matchup per date
+
+Adding a game that is already on the card for that date **replaces** the
+row's inputs and picks rather than logging it twice — a second Add is a
+corrected line, not a second game — and a graded row is refused, because it
+is a record. A card written before 29 Sept could hold the same ungraded game
+twice with identical inputs (Add pressed twice); the later copy is dropped
+once, on load. Cubs @ Padres reached the 29 Sept board twice, and every
+straight bet on it with it, which is what prompted this.
+
+The **One sport only** columns appear only on a date with both sports. With
+one, they repeated the two lists above word for word and read as duplicates.
 
 ## Grading and the record
 

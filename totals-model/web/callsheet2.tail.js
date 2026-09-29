@@ -388,6 +388,17 @@
   var KEY = "callsheet2.card.v1", DRAFT_KEY = "callsheet2.draft.v1";
   var card = [];
   try { card = JSON.parse(localStorage.getItem(KEY) || "[]"); } catch (e) { card = []; }
+  /* A card written before 29 Sept could hold the same ungraded game twice with
+     identical inputs (Add pressed twice). Drop the later copy once, on load. */
+  (function () {
+    var seen = [], keep = [];
+    card.forEach(function (r) {
+      var twin = !rowGraded(r) && seen.some(function (s) { return !rowGraded(s) && sameGame(s, { sport: r.sport, gdate: r.gdate, away: r.away, home: r.home }) &&
+                                                                   JSON.stringify(s.inputs) === JSON.stringify(r.inputs); });
+      if (!twin) { seen.push(r); keep.push(r); }
+    });
+    if (keep.length !== card.length) { card = keep; try { localStorage.setItem(KEY, JSON.stringify(card)); } catch (e) {} }
+  })();
   function save() {
     try { localStorage.setItem(KEY, JSON.stringify(card)); }
     catch (e) { $("saveState").textContent = "this browser is not storing anything"; }
@@ -719,8 +730,12 @@
     $("bestBets").innerHTML = bh;
 
     // --- by sport: the same two rules, one sport at a time ---
+    /* Only when the date has BOTH sports. With one, the columns repeat the
+       two lists above word for word, which read as duplicates (29 Sept). */
     var sh = "";
-    ["MLB", "WNBA"].forEach(function (sp) {
+    var sportsOn = ["MLB", "WNBA"].filter(function (sp) { return card.some(function (r) { return (r.gdate || "") === dateISO && r.sport === sp; }); });
+    $("bySportHead").hidden = sportsOn.length < 2;
+    (sportsOn.length < 2 ? [] : sportsOn).forEach(function (sp) {
       var games = card.filter(function (r) { return (r.gdate || "") === dateISO && r.sport === sp; }).length;
       if (!games) return;
       var sl = parlayFour(dateISO, cap, sp), sb = bestBets(dateISO, sp);
@@ -1041,11 +1056,28 @@
   }
   function onEdit() { render(); if (!formLocked) saveDraft(); }
   function nextId() { return card.reduce(function (m, r) { return Math.max(m, r.id || 0); }, 0) + 1; }
+  /* One row per matchup per date. Adding a game that is already on the card
+     REPLACES that row's inputs and picks rather than logging it twice -- a
+     second Add is a corrected line, not a second game -- and a graded row is
+     refused, because it is a record. Cubs @ Padres reached the 29 Sept board
+     twice, and every straight bet on it with it. */
   function addToCard() {
     if (!last || formLocked) return;
     var inputs = snapshot();
+    var gdate = inputs.gdate || todayISO();
+    var dup = card.filter(function (r) { return sameGame(r, { sport: sport, gdate: gdate, away: last.away, home: last.home }); })[0];
+    if (dup && rowGraded(dup)) {
+      say("<b>" + esc(last.matchup) + "</b> on " + esc(gameDate(gdate)) + " is already on the card and graded. A graded row is a record, so nothing was added; press Clear to start a new card.");
+      return;
+    }
+    if (dup) {
+      dup.inputs = inputs; dup.markets = slimMarkets(last.markets); dup.away = last.away; dup.home = last.home; dup.matchup = last.matchup;
+      save(); renderCard(); renderBoard(); renderCalib();
+      say("Updated <b>" + esc(dup.matchup) + "</b>, already on the card for " + esc(gameDate(gdate)) + ": its inputs and picks were replaced with what is in the form. One row per matchup per date, so nothing was logged twice.");
+      return;
+    }
     var row = { id: nextId(), sport: sport, away: last.away, home: last.home, matchup: last.matchup,
-                gdate: inputs.gdate || todayISO(), inputs: inputs, markets: slimMarkets(last.markets), finals: {} };
+                gdate: gdate, inputs: inputs, markets: slimMarkets(last.markets), finals: {} };
     card.push(row); save(); renderCard(); renderBoard(); renderCalib();
     say("Added <b>" + esc(row.matchup) + "</b> with " + row.markets.length + " market" + (row.markets.length === 1 ? "" : "s") + ". Picks are frozen as logged; enter finals to grade them.");
   }

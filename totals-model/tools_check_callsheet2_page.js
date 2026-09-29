@@ -492,6 +492,49 @@ const CHECKS = ["dome","playoff"];
   });
   chk(tidy.hidden && tidy.gone && tidy.stored === null, 'slate: clear forgets the slate and the fixture row is removed', JSON.stringify(tidy));
 
+  // ---- one row per matchup per date ------------------------------------------------
+  const dupe = await pg.evaluate(async () => {
+    const wait = () => new Promise(r => setTimeout(r, 60));
+    const set = (id, v) => { const el = document.getElementById(id); el.value = v; el.dispatchEvent(new Event('input', { bubbles: true })); };
+    const rows = () => JSON.parse(localStorage.getItem('callsheet2.card.v1'));
+    const n0 = rows().length;
+    document.getElementById('clear').click(); document.getElementById('m-mlb').click(); await wait();
+    set('gdate', '2026-09-22'); set('away', 'Twins'); set('home', 'Tigers'); set('line', '8.5'); set('op', '-110'); set('up', '-110');
+    await wait(); document.getElementById('add').click(); await wait();
+    const n1 = rows().length, first = rows().find(r => r.matchup === 'Twins @ Tigers');
+    set('line', '9'); await wait(); document.getElementById('add').click(); await wait();
+    const n2 = rows().length, again = rows().find(r => r.matchup === 'Twins @ Tigers'), msg2 = document.getElementById('saveMsg').textContent;
+    const bets = [...document.querySelectorAll('#bestBets .pk .n4')].map(e => e.textContent).filter(t => /Twins @ Tigers/.test(t)).length;
+    // a graded row is refused: Rays @ Yankees on 22 Sept carries finals
+    document.getElementById('clear').click(); await wait();
+    set('gdate', '2026-09-22'); set('away', 'Rays'); set('home', 'Yankees'); set('line', '7.5'); set('op', '-110'); set('up', '-110');
+    await wait(); document.getElementById('add').click(); await wait();
+    const n3 = rows().length, msg3 = document.getElementById('saveMsg').textContent;
+    const rays = rows().filter(r => r.matchup === 'Rays @ Yankees' && r.gdate === '2026-09-22');
+    // tidy: remove the Twins row
+    const tr = [...document.querySelectorAll('#cardTable tr')].find(t => /Twins @ Tigers/.test(t.textContent));
+    tr.querySelector('[data-del]').click(); await wait();
+    document.getElementById('clear').click(); await wait();
+    return { n0, n1, n2, n3, firstId: first && first.id, againId: again && again.id, line: again && again.inputs.line, msg2, msg3, bets, rays: rays.length, raysLine: rays[0] && rays[0].inputs.line, n4: rows().length };
+  });
+  chk(dupe.n1 === dupe.n0 + 1 && dupe.n2 === dupe.n1 && dupe.firstId === dupe.againId && dupe.line === '9' && /Updated/.test(dupe.msg2) && /nothing was logged twice/.test(dupe.msg2),
+      'card: adding a game already on the card for that date updates the row instead of logging it twice', JSON.stringify(dupe));
+  chk(dupe.bets <= 1, 'card: the straight bets carry that game at most once per market', String(dupe.bets));
+  chk(dupe.n3 === dupe.n2 && dupe.rays === 1 && dupe.raysLine !== '7.5' && /already on the card and graded/.test(dupe.msg3),
+      'card: a graded row is refused, not replaced, when the same game is added again', JSON.stringify({ n2: dupe.n2, n3: dupe.n3, rays: dupe.rays, line: dupe.raysLine, msg: dupe.msg3 }));
+  chk(dupe.n4 === dupe.n0, 'card: the fixture row is removed again', `${dupe.n4} vs ${dupe.n0}`);
+  const oneSport = await pg.evaluate(async () => {
+    const wait = () => new Promise(r => setTimeout(r, 60));
+    const bd = document.getElementById('boardDate');
+    bd.value = '2026-09-21'; bd.dispatchEvent(new Event('change')); await wait();
+    const one = { head: document.getElementById('bySportHead').hidden, cols: document.querySelectorAll('#bySport .sportcol').length };
+    bd.value = '2026-09-22'; bd.dispatchEvent(new Event('change')); await wait();
+    const two = { head: document.getElementById('bySportHead').hidden, cols: document.querySelectorAll('#bySport .sportcol').length };
+    return { one, two };
+  });
+  chk(oneSport.one.head === true && oneSport.one.cols === 0 && oneSport.two.head === false && oneSport.two.cols === 2,
+      'by sport: the columns appear only on a date with both sports, so a one-sport night shows no repeated lists', JSON.stringify(oneSport));
+
   // ---- the cap, the second choice on the rail, and clicking through ---------------
   const capFlow = await pg.evaluate(async () => {
     const wait = () => new Promise(r => setTimeout(r, 50));

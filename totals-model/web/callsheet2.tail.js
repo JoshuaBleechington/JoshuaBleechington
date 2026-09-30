@@ -349,6 +349,21 @@
     return ((x > 0) === (mk.side === "HOME")) ? "win" : "loss";
   }
   function resText(res) { return res === "invalid" ? "F5 > final — recheck" : res; }
+  /* ---- the closing line ---------------------------------------------------
+     How far the pick beat the number the market closed at, in runs (points
+     in the WNBA): positive when the close moved AWAY from the side taken --
+     an over at 7 that closed 7.5, an under at 6.5 that closed 6. A pick that
+     beats the close on average is an edge whatever last night did; one that
+     loses to it on average is luck however the week went. Totals and first
+     fives only, because those are the picks; the close is typed on the card
+     the next morning with the finals. Nothing here moves a number. 30 Sept. */
+  function clvOf(mk, row) {
+    var c = (row && row.close) || {};
+    var v = mk.key === "total" ? parseFloat(c.ctot) : mk.key === "f5" ? parseFloat(c.cf5) : NaN;
+    if (!isFinite(v)) return null;
+    var line = lineOf(mk);
+    return mk.side === "OVER" ? v - line : line - v;
+  }
   function unitsOf(mk, res) {
     if (res === null || res === "push" || res === "invalid" || mk.price === null) return 0;
     return res === "win" ? payout(mk.price) : -1;
@@ -825,6 +840,11 @@
           (res ? ' <span class="chip ' + res + '">' + resText(res) + '</span>' : '') + '</span>';
       }).join("");
       var lk = rowLocked(r), ro = lk ? ' readonly' : '';
+      var cl = r.close || {};
+      /* The close is never read-only: it is typed the morning after, often
+         after the finals have already locked the row. */
+      var close = '<span class="finals"><span class="l">CLOSE</span><input class="grade close" data-id="' + r.id + '" data-k="ctot" value="' + esc(cl.ctot || "") + '" placeholder="' + (r.sport === "WNBA" ? "tot" : "tot") + '" inputmode="decimal" title="The full-game total the market closed at">' +
+        (r.sport === "MLB" ? '<input class="grade close" data-id="' + r.id + '" data-k="cf5" value="' + esc(cl.cf5 || "") + '" placeholder="F5" inputmode="decimal" title="The first-five total the market closed at">' : '') + '</span>';
       var f5 = r.sport === "MLB"
         ? '<span class="finals"><span class="l">F5</span><input class="grade" data-id="' + r.id + '" data-k="f5a" value="' + esc(fin.f5a || "") + '" placeholder="A" inputmode="numeric"' + ro + '>' +
           '<input class="grade" data-id="' + r.id + '" data-k="f5h" value="' + esc(fin.f5h || "") + '" placeholder="H" inputmode="numeric"' + ro + '></span>' : '';
@@ -834,7 +854,7 @@
         '<td><div class="rowmk">' + mks + '</div></td>' +
         '<td' + (lk ? ' class="locked"' : '') + '><span class="finals"><span class="l">FINAL</span><input class="grade" data-id="' + r.id + '" data-k="fa" value="' + esc(fin.fa || "") + '" placeholder="A" inputmode="numeric"' + ro + '>' +
           '<input class="grade" data-id="' + r.id + '" data-k="fh" value="' + esc(fin.fh || "") + '" placeholder="H" inputmode="numeric"' + ro + '></span> ' + f5 +
-          (lk ? ' <span class="lock" title="Graded and locked">&#128274;</span>' : '') + '</td>' +
+          (lk ? ' <span class="lock" title="Graded and locked">&#128274;</span>' : '') + '<br>' + close + '</td>' +
         '<td>' + (lk
           ? '<button type="button" class="x unlock" data-unlock="' + r.id + '" title="Unlock to correct the score">unlock</button>'
           : (unlocked[r.id] ? '<button type="button" class="x unlock" data-relock="' + r.id + '" title="Lock again">lock</button>' : '') +
@@ -914,7 +934,8 @@
        against away -- and the full-game total keeps the record of the rows
        that carried Call Sheet #1's verdict, because the parlay legs lean on
        it. Asked for on 25 Sept: "how many of the 17-10 went over vs under". */
-    var fresh = function (label) { return { n: 0, w: 0, l: 0, p: 0, says: 0, units: 0, label: label, sides: {}, verdict: null, profile: null, lean: {}, grain: null }; };
+    var fresh = function (label) { return { n: 0, w: 0, l: 0, p: 0, says: 0, units: 0, label: label, sides: {}, verdict: null, profile: null, lean: {}, grain: null,
+                                            clv: { n: 0, beat: 0, lost: 0, even: 0, runs: 0 } }; };
     var bySport = {};
     ["MLB", "WNBA"].forEach(function (sp) {
       var b = { stats: {}, top: fresh("The parlay four"), topE: fresh("Best straight bets"), any: false };
@@ -922,7 +943,9 @@
       bySport[sp] = b;
     });
     var count = function (c, res) { if (res === "push") c.p++; else if (res === "win") c.w++; else c.l++; };
-    var tally = function (t, mk, res, row) {
+    var tally = function (t, mk, res, row, clvRow) {
+      var cl = clvOf(mk, clvRow || row);
+      if (cl !== null) { t.clv.n++; t.clv.runs += cl; if (cl > 1e-9) t.clv.beat++; else if (cl < -1e-9) t.clv.lost++; else t.clv.even++; }
       if (row) {
         var sd = t.sides[mk.side] || (t.sides[mk.side] = { w: 0, l: 0, p: 0 });
         count(sd, res);
@@ -953,7 +976,7 @@
         rule[0].forEach(function (x) {
           var res = gradeMarket(x.mk, x.row.finals), b = bySport[x.row.sport];
           if (res === null || res === "invalid" || !b) return;
-          tally(b[rule[1]], x.mk, res);
+          tally(b[rule[1]], x.mk, res, null, x.row);
         });
       });
     });
@@ -961,7 +984,7 @@
       box.innerHTML = '<p class="note">Enter finals on the card — away and home runs, and the first-five runs for MLB — and every market grades itself, one block per sport.</p>';
       return;
     }
-    var tiles = function (s) {
+    var tiles = function (s, unit) {
       if (!s.n && !s.p) return '';
       var says = s.n ? s.says / s.n * 100 : 0, does = s.n ? s.w / s.n * 100 : 0;
       var se = s.n ? Math.sqrt(Math.max(does / 100 * (1 - does / 100), 1e-9) / s.n) * 100 : 0;
@@ -972,6 +995,7 @@
       if (s.profile) parts.push('cold-under profile ' + rec(s.profile));
       if (s.grain) parts.push('over against the grain ' + rec(s.grain));
       ["same lean", "split lean"].forEach(function (k) { if (s.lean[k]) parts.push(k + ' ' + rec(s.lean[k])); });
+      if (s.clv.n) parts.push('beat the close ' + s.clv.beat + '-' + s.clv.lost + (s.clv.even ? '-' + s.clv.even : '') + ' · ' + sgn(s.clv.runs / s.clv.n, 2) + ' ' + (unit || 'runs') + ' avg');
       return '<div><p class="k">' + esc(s.label) + '</p><p class="v">' + s.w + '-' + s.l + (s.p ? '-' + s.p : '') + '</p>' +
         '<p class="s">' + (s.n ? 'says ' + says.toFixed(1) + '% · does ' + does.toFixed(1) + '% (±' + se.toFixed(1) + ') · ' + sgn(s.units, 2) + 'u' : 'pushes only') + '</p>' +
         (parts.length ? '<p class="s sides">' + esc(parts.join(' · ')) + '</p>' : '') + '</div>';
@@ -983,7 +1007,8 @@
       var totalN = KEYS[sp].reduce(function (a, k) { return a + b.stats[k[0]].n; }, 0);
       var graded = card.filter(function (r) { return r.sport === sp && (r.markets || []).some(function (mk) { return gradeMarket(mk, r.finals) !== null; }); }).length;
       h += '<div class="subhead" data-sport="' + sp + '">' + sp + ' <span class="tag">' + graded + ' graded game' + (graded === 1 ? '' : 's') + ' · ' + totalN + ' graded markets</span></div>';
-      h += '<div class="calib" data-sport="' + sp + '">' + KEYS[sp].map(function (k) { return tiles(b.stats[k[0]]); }).join('') + tiles(b.top) + tiles(b.topE) + '</div>';
+      var unit = sp === "WNBA" ? "pts" : "runs";
+      h += '<div class="calib" data-sport="' + sp + '">' + KEYS[sp].map(function (k) { return tiles(b.stats[k[0]], unit); }).join('') + tiles(b.top, unit) + tiles(b.topE, unit) + '</div>';
       h += '<div class="verdict">' + (totalN < 30
         ? '<b>' + totalN + ' graded ' + sp + ' markets.</b> Nothing here can be read yet — one standard error on a hit rate is ' +
           (totalN ? (100 / Math.sqrt(totalN) / 2).toFixed(0) : '—') + ' points at this size. ' +
@@ -1153,6 +1178,9 @@
   $("cardTable").addEventListener("input", function (e) {
     var t = e.target; if (!t.classList.contains("grade")) return;
     var row = card.filter(function (r) { return String(r.id) === t.dataset.id; })[0]; if (!row) return;
+    if (t.dataset.k === "ctot" || t.dataset.k === "cf5") {
+      row.close = row.close || {}; row.close[t.dataset.k] = t.value; save(); renderCalib(); return;
+    }
     if (t.readOnly) return;
     row.finals = row.finals || {}; row.finals[t.dataset.k] = t.value;
     save(); renderBoard(); renderCalib();
@@ -1169,6 +1197,7 @@
   });
   $("cardTable").addEventListener("change", function (e) {
     var t = e.target; if (!t.classList.contains("grade")) return;
+    if (t.classList.contains("close")) return;
     var row = card.filter(function (r) { return String(r.id) === t.dataset.id; })[0]; if (!row) return;
     if (rowLocked(row)) { renderCard(); if (opened && opened.id === row.id) { opened.row = row; render(); } }
   });

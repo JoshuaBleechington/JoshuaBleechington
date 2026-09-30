@@ -7,7 +7,7 @@ top of Call Sheet #1 without touching it.
 - Page: `web/callsheet2.html`, assembled by `tools_build_callsheet2.py` from
   `web/callsheet2.head.html` + Call Sheet #1's engine block + `web/callsheet2.tail.js`
 - Fixtures: `web/callsheet2-cases.json` (62 cases) from `tools_gen_callsheet2_cases.py`
-- Browser harness: `tools_check_callsheet2_page.js` (1,048 checks)
+- Browser harness: `tools_check_callsheet2_page.js` (1,053 checks)
 
 ## What it answers
 
@@ -306,6 +306,21 @@ straight bet on it with it, which is what prompted this.
 
 The **One sport only** columns appear only on a date with both sports. With
 one, they repeated the two lists above word for word and read as duplicates.
+
+## The closing line
+
+Each card row has two **CLOSE** boxes beside the finals: the full-game total
+and (MLB) the first-five total the market closed at, typed the next morning
+with the finals. They are never locked — the row has usually locked on its
+finals by then — and they move nothing. The record then keeps **beat the
+close** per market and for the two fours: how often the close moved away
+from the side taken and by how much on average (an over at 7 that closed
+7.5 is +0.5; an under at 6.5 that closed 6 is +0.5; a close on the line is
+even). Totals and first fives only, because those are the picks. A pick that
+beats the close on average is an edge whatever last night did; one that
+loses to it on average is luck however the week went. Added 30 Sept 2026
+after four of six lines moved before first pitch on the 29th and the sheet
+had no way to say whether the moves were for or against it.
 
 ## Grading and the record
 

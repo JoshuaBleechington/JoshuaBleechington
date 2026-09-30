@@ -535,6 +535,38 @@ const CHECKS = ["dome","playoff"];
   chk(oneSport.one.head === true && oneSport.one.cols === 0 && oneSport.two.head === false && oneSport.two.cols === 2,
       'by sport: the columns appear only on a date with both sports, so a one-sport night shows no repeated lists', JSON.stringify(oneSport));
 
+  // ---- the closing line ------------------------------------------------------------
+  const clv = await pg.evaluate(async () => {
+    const wait = () => new Promise(r => setTimeout(r, 80));
+    const rows = () => JSON.parse(localStorage.getItem('callsheet2.card.v1'));
+    const rays = rows().find(r => r.matchup === 'Rays @ Yankees' && r.gdate === '2026-09-22');
+    const tot = rays.markets.find(m => m.key === 'total'), f5 = rays.markets.find(m => m.key === 'f5');
+    const lineOf = mk => +(/([0-9]+(?:\.[0-9]+)?)\s*$/.exec(mk.pick)[1]);
+    const tr = [...document.querySelectorAll('#cardTable tr')].find(t => /Rays @ Yankees/.test(t.textContent) && /Sep 22/.test(t.textContent));
+    const locked = !!tr.querySelector('[data-unlock]');
+    const cin = tr.querySelector('input[data-k="ctot"]'), fin = tr.querySelector('input[data-k="cf5"]');
+    const editable = cin && !cin.readOnly && fin && !fin.readOnly;
+    // a close half a run AWAY from the side taken beats the close by +0.5; the F5 close on the line is even
+    const beat = tot.side === 'OVER' ? lineOf(tot) + 0.5 : lineOf(tot) - 0.5;
+    cin.value = String(beat); cin.dispatchEvent(new Event('input', { bubbles: true })); await wait();
+    fin.value = String(lineOf(f5)); fin.dispatchEvent(new Event('input', { bubbles: true })); await wait();
+    const stored = rows().find(r => r.matchup === 'Rays @ Yankees' && r.gdate === '2026-09-22').close;
+    const calib = document.getElementById('calibBox').innerText;
+    const totTile = [...document.querySelectorAll('#calibBox .calib[data-sport="MLB"] > div')].find(d => /Full-game total/.test(d.textContent));
+    const f5Tile = [...document.querySelectorAll('#calibBox .calib[data-sport="MLB"] > div')].find(d => /First five/.test(d.textContent));
+    const markets = document.getElementById('cardTable').innerText;
+    // clear it again so later fixtures see the card as they left it
+    cin.value = ''; cin.dispatchEvent(new Event('input', { bubbles: true })); fin.value = ''; fin.dispatchEvent(new Event('input', { bubbles: true })); await wait();
+    const after = rows().find(r => r.matchup === 'Rays @ Yankees' && r.gdate === '2026-09-22').close;
+    const gone = !/beat the close/.test(document.getElementById('calibBox').innerText);
+    return { locked, editable, stored, totTile: totTile && totTile.innerText, f5Tile: f5Tile && f5Tile.innerText, after, gone, rowLocked: !!tr.querySelector('[data-unlock]') };
+  });
+  chk(clv.locked && clv.editable, 'close: the CLOSE boxes stay editable on a graded, locked row', JSON.stringify({ locked: clv.locked, editable: clv.editable }));
+  chk(clv.stored && /\d/.test(clv.stored.ctot) && /\d/.test(clv.stored.cf5), 'close: typed closes are stored on the row', JSON.stringify(clv.stored));
+  chk(clv.totTile && /beat the close 1-0 · \+0\.50 runs avg/.test(clv.totTile), 'close: the total tile counts a close half a run away from the side as beating it by +0.50', clv.totTile);
+  chk(clv.f5Tile && /beat the close 0-0-1 · \+0\.00 runs avg/.test(clv.f5Tile), 'close: a close on the line is even, not beaten', clv.f5Tile);
+  chk(clv.after && clv.after.ctot === '' && clv.after.cf5 === '' && clv.gone, 'close: clearing the boxes clears the record line', JSON.stringify(clv.after));
+
   // ---- the cap, the second choice on the rail, and clicking through ---------------
   const capFlow = await pg.evaluate(async () => {
     const wait = () => new Promise(r => setTimeout(r, 50));
@@ -659,21 +691,21 @@ const CHECKS = ["dome","playoff"];
   const lockRow = await pg.evaluate(async () => {
     const wait = () => new Promise(r => setTimeout(r, 50));
     const tr = () => [...document.querySelectorAll('#cardTable tr')].find(t => /Rays @ Yankees/.test(t.textContent));
-    const before = { ro: [...tr().querySelectorAll('.grade')].every(i => i.readOnly), del: !!tr().querySelector('[data-del]'),
+    const before = { ro: [...tr().querySelectorAll('.grade:not(.close)')].every(i => i.readOnly), del: !!tr().querySelector('[data-del]'),
                      unlock: !!tr().querySelector('[data-unlock]'), lock: !!tr().querySelector('.lock') };
     // typing into a locked box must not change the stored final
     const fa = tr().querySelector('.grade[data-k="fa"]'); fa.value = '9'; fa.dispatchEvent(new Event('input', { bubbles: true })); await wait();
     const storedAfterType = JSON.parse(localStorage.getItem('callsheet2.card.v1')).find(r => r.id === 1).finals.fa;
     // unlock, correct, relock
     tr().querySelector('[data-unlock]').click(); await wait();
-    const open = { ro: [...tr().querySelectorAll('.grade')].every(i => i.readOnly), del: !!tr().querySelector('[data-del]'), relock: !!tr().querySelector('[data-relock]') };
+    const open = { ro: [...tr().querySelectorAll('.grade:not(.close)')].every(i => i.readOnly), del: !!tr().querySelector('[data-del]'), relock: !!tr().querySelector('[data-relock]') };
     const fa2 = tr().querySelector('.grade[data-k="fa"]'); fa2.value = '2'; fa2.dispatchEvent(new Event('input', { bubbles: true })); await wait();
     const storedAfterFix = JSON.parse(localStorage.getItem('callsheet2.card.v1')).find(r => r.id === 1).finals.fa;
     tr().querySelector('[data-relock]').click(); await wait();
-    const again = { ro: [...tr().querySelectorAll('.grade')].every(i => i.readOnly), del: !!tr().querySelector('[data-del]') };
+    const again = { ro: [...tr().querySelectorAll('.grade:not(.close)')].every(i => i.readOnly), del: !!tr().querySelector('[data-del]') };
     // an ungraded row is still fully editable and removable
     const tr2 = [...document.querySelectorAll('#cardTable tr')].find(t => /Rockies @ Dodgers/.test(t.textContent));
-    const ungraded = { ro: [...tr2.querySelectorAll('.grade')].some(i => i.readOnly), del: !!tr2.querySelector('[data-del]') };
+    const ungraded = { ro: [...tr2.querySelectorAll('.grade:not(.close)')].some(i => i.readOnly), del: !!tr2.querySelector('[data-del]') };
     return { before, storedAfterType, open, storedAfterFix, again, ungraded };
   });
   chk(lockRow.before.ro && !lockRow.before.del && lockRow.before.unlock && lockRow.before.lock,

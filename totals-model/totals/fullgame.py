@@ -296,6 +296,13 @@ PLAUSIBLE = {
     "pace": (60.0, 110.0),
     "rating": (70.0, 140.0),
     "price": (-100000.0, 100000.0),
+    # NHL (totals/nhl.py). A goal total outside 3.5-9.5 is a typo; a save
+    # percentage outside .850-.960 is a misplaced decimal, not a goalie.
+    "nhl_total": (3.5, 9.5),
+    "nhl_period": (0.5, 4.5),
+    "save_pct": (0.850, 0.960),
+    "shots": (15.0, 45.0),
+    "shots_faced": (0.0, 3000.0),
 }
 
 
@@ -385,7 +392,21 @@ def normal_split(line: float, mu: float, sd: float) -> tuple[float, float, float
     return over, 0.0, 1.0 - over
 
 
+#: A sport that needs a distribution of its own registers it here by name
+#: (totals/nhl.py: the goal total is a regulation count plus an empty-net
+#: lump plus the overtime goal, which no single NB reproduces). The anchor
+#: solve, the blend and the corroboration read all go through split_for, so a
+#: registered sport inherits every rule in this file without copying any.
+_SPLITS: dict[str, Any] = {}
+
+
+def register_split(sport: str, fn) -> None:
+    _SPLITS[sport] = fn
+
+
 def split_for(sport: str, line: float, mu: float) -> tuple[float, float, float]:
+    if sport in _SPLITS:
+        return _SPLITS[sport](line, mu)
     if sport == "WNBA":
         return normal_split(line, mu, WNBA_TOTAL_SD)
     return nb_split(line, mu, DISPERSION_PHI["MLB"])

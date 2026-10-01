@@ -460,7 +460,7 @@
        table, not this list. Probability stays the big number on every row. */
     var byProb = false;
     $("rankTag").textContent = "by edge";
-    var ranked = rankMarkets(m.markets, false), html = "", cap = legCap();
+    var ranked = rankMarkets(m.markets, false), html = "";
     var railMarks = markChips(marksOf(sport, snapshot(), m.markets), "cap tagm");
     var gradedRow = openedFinals(), fin = gradedRow ? gradedRow.finals : null;
     if (gradedRow) {
@@ -472,17 +472,12 @@
         ' · this card went <b>' + w + '-' + l + (pu ? '-' + pu : '') + '</b>.' +
         (formLocked ? ' <b>Locked</b> — a graded row is a record. Press Clear to start a new card.' : ' Edit anything and the grading clears.') + '</div>';
     }
-    /* The parlay-leg marks are about the LIKELIEST side of each market, which
-       is not always the side this list shows (the list shows the better
-       price). So they are computed on the likelier views and printed with the
-       pick named: the likeliest thing on the game, whether it is inside the
-       cap, and if not, which market is the second choice for a leg. */
     /* The parlay leg for this game -- gameLeg(): Call Sheet #1's BET on the
-       total when it clears its price, else the best value side inside the
-       cap, and nothing when no side clears its price. */
-    var leg = gameLeg(m.markets, cap).leg;
-    var beyondLikely = m.markets.map(likelier).filter(function (v) { return v.price !== null && !withinCap(v.price, cap); })
-      .sort(function (a, b) { return b.p - a.p; })[0];
+       total when it clears its price, else the best value side at any price,
+       and nothing when no side clears its price. The leg can sit on the side
+       opposite the one this list shows (the list shows the better price), so
+       the mark names its pick. */
+    var leg = gameLeg(m.markets).leg;
     ranked.forEach(function (mk, i) {
       var top = i === 0 && mk.edge !== null && mk.edge > 0;
       var isLeg = leg && mk.key === leg.key;
@@ -497,7 +492,6 @@
           (mk.key === "total" ? railMarks : "") +
           (!pickable(mk) ? '<span class="cap tagm" title="Derived from the book\'s own moneyline with no team information behind it. On the first 52 graded games the run line said 52.5% and did 42.3%, so it is listed and graded but never a straight bet or a parlay leg.">shown, not picked</span>' : "") +
           (isLeg ? '<span class="cap" style="color:var(--go);border-color:var(--go)">parlay leg: ' + esc(leg.pick) + ' ' + (leg.p * 100).toFixed(1) + '% at ' + sgn(leg.price, 0) + ' · ' + valueRatio(leg).toFixed(3) + '× its price' + (bandOf(leg) ? ' · #1 says ' + esc(bandOf(leg)) : '') + '</span>' : "") +
-          (beyondLikely && mk.key === beyondLikely.key ? '<span class="cap">likeliest: ' + esc(beyondLikely.pick) + ' ' + (beyondLikely.p * 100).toFixed(1) + '% at ' + sgn(beyondLikely.price, 0) + ' · beyond ' + sgn(cap, 0) + '</span>' : "") +
           (res ? '<span class="chip ' + res + '" style="margin-left:8px;vertical-align:2px">' + resText(res) + '</span>' : "") + '</div>' +
           '<div class="lab">' + esc(mk.label) + '</div></div>' +
         '<div class="nums"><div class="p">' + (mk.p * 100).toFixed(1) + '%</div>' +
@@ -529,33 +523,30 @@
   }
 
   /* ---- the day board ------------------------------------------------------- */
-  /* The price a parlay leg may not be worse than. American odds, so "within
-     the cap" means price >= cap: -150 is inside -170, -200 is not, +120 is. */
-  var CAP_KEY = "callsheet2.cap.v1", DEFAULT_CAP = -170;
-  function legCap() {
-    var v = parseFloat($("legCap").value);
-    return isFinite(v) ? v : DEFAULT_CAP;
-  }
-  function withinCap(price, cap) { return price !== null && price !== undefined && price >= cap; }
-
   /* One leg per game, in two tiers. First: Call Sheet #1's verdict -- a
      full-game total #1 calls BET, STRONG BET or MAX BET, on #1's side, when
-     that side also clears its price inside the cap. The verdict is the one
-     mark on the board that carries #1's corroboration gate, and the user
-     asked for these legs by name on 25 Sept ("the ones saying bet or strong
-     bet"). Second, on a game with no such total: the side, of any priced
-     market inside the cap, with the best chance-to-breakeven ratio. In both
-     tiers only a side whose ratio clears one qualifies: a parlay's return is
-     the product over its legs of (chance / what the price needs), the boost
-     multiplies the whole thing, and a leg priced above its chance drags it
-     down however often it hits. Fewer than four games qualifying means fewer
-     legs, and the card says so. Across games the verdict legs rank first,
-     then by ratio. Over the two nights logged, #1's verdict totals went 6-3
-     and this rule's legs 5-3 against 4-3-1 for value ratio alone -- not
-     evidence, but not against it either; the record tile keeps score. The
-     value tier came first, on 24 Sept, from White Sox @ Royals: over 8.5 at
-     -120 (55.3%, ratio 1.014, #1: BET) against Royals +1.5 at -155 (61.3%,
-     ratio 1.008) -- the likelier leg was the worse one, 9-1 White Sox. */
+     that side also clears its price. The verdict is the one mark on the board
+     that carries #1's corroboration gate, and the user asked for these legs
+     by name on 25 Sept ("the ones saying bet or strong bet"). Second, on a
+     game with no such total: the side, of any priced market, with the best
+     chance-to-breakeven ratio. In both tiers only a side whose ratio clears
+     one qualifies: a parlay's return is the product over its legs of (chance
+     / what the price needs), the boost multiplies the whole thing, and a leg
+     priced above its chance drags it down however often it hits. Fewer than
+     four games qualifying means fewer legs, and the card says so. Across
+     games the verdict legs rank first, then by ratio. Over the two nights
+     logged, #1's verdict totals went 6-3 and this rule's legs 5-3 against
+     4-3-1 for value ratio alone -- not evidence, but not against it either;
+     the record tile keeps score. The value tier came first, on 24 Sept, from
+     White Sox @ Royals: over 8.5 at -120 (55.3%, ratio 1.014, #1: BET)
+     against Royals +1.5 at -155 (61.3%, ratio 1.008) -- the likelier leg was
+     the worse one, 9-1 White Sox.
+     There is no price cap. The board carried one (-170, set on the board)
+     from 24 Sept to 1 Oct, when the user asked for it to go: a side priced
+     steeper than -170 that still clears its price is a leg on the same terms
+     as any other, and the ratio test already refuses the side that does not.
+     Pickable markets are totals and first fives, so the steep moneyline the
+     cap was written against never reaches this rule anyway. */
   var TIERS = { "MAX BET": 3, "STRONG BET": 2, "BET": 1 };
   /* Call Sheet #1's verdict on a side: the full-game total only, and only on
      #1's side. Rows logged before band1/side1 were stored carry the band on
@@ -573,25 +564,25 @@
     var rb = valueRatio(b), rv = valueRatio(v);
     return (rv > rb + 1e-12 || (Math.abs(rv - rb) <= 1e-12 && v.p > b.p)) ? v : b;
   }
-  /* One game's leg, with what it passed over: the likeliest side inside the
-     cap and, for a verdict leg, the richer-priced side. `inCap` says whether
-     anything was priced inside the cap at all, so a game whose sides are all
-     priced above their chance counts as passed over, not as unpriced. */
-  function gameLeg(markets, cap) {
-    var inCap = [], clears = [];
+  /* One game's leg, with what it passed over: the likeliest priced side and,
+     for a verdict leg, the richer-priced side. `priced` says whether anything
+     pickable had a price at all, so a game whose sides are all priced above
+     their chance counts as passed over, not as unpriced. */
+  function gameLeg(markets) {
+    var priced = [], clears = [];
     (markets || []).forEach(function (mk) {
       if (!pickable(mk)) return;   // the moneyline and run line are shown, not picked
       bothSides(mk).forEach(function (v) {
-        if (!withinCap(v.price, cap)) return;
-        inCap.push(v);
+        if (v.price === null || v.price === undefined) return;
+        priced.push(v);
         if (valueRatio(v) > 1) clears.push(v);
       });
     });
-    if (!clears.length) return { leg: null, inCap: inCap.length > 0, likeliest: null, richer: null };
+    if (!clears.length) return { leg: null, priced: priced.length > 0, likeliest: null, richer: null };
     var leg = clears.reduce(betterLeg);
-    var likeliest = inCap.reduce(function (b, v) { return v.p > b.p ? v : b; });
+    var likeliest = priced.reduce(function (b, v) { return v.p > b.p ? v : b; });
     var richer = clears.reduce(function (b, v) { return valueRatio(v) > valueRatio(b) ? v : b; });
-    return { leg: leg, inCap: true,
+    return { leg: leg, priced: true,
              likeliest: likeliest.pick !== leg.pick ? likeliest : null,
              richer: richer.pick !== leg.pick ? richer : null };
   }
@@ -603,13 +594,13 @@
                   fair: priceFor(o.p), anchored: mk.anchored, band: "", band1: mk.band1, side1: mk.side1, notes: mk.notes,
                   other: { pick: mk.pick, p: mk.p, price: mk.price, edge: mk.edge } }];
   }
-  function parlayFour(dateISO, cap, sport) {
+  function parlayFour(dateISO, sport) {
     var legs = [], skipped = 0;
     card.forEach(function (r) {
       if ((r.gdate || "") !== dateISO) return;
       if (sport && r.sport !== sport) return;
-      var g = gameLeg(r.markets, cap);
-      if (!g.leg) { if (g.inCap) skipped++; return; }
+      var g = gameLeg(r.markets);
+      if (!g.leg) { if (g.priced) skipped++; return; }
       legs.push({ row: r, mk: g.leg, ratio: valueRatio(g.leg), tier: bandTier(g.leg), band: bandOf(g.leg),
                   likeliest: g.likeliest, richer: g.richer, rank: 0, corr: [] });
     });
@@ -697,7 +688,7 @@
     }
     return s;
   }
-  function parlayCard(legs, cap, nRows, wide) {
+  function parlayCard(legs, nRows, wide) {
     if (legs.length >= 2) {
       var pAll = legs.reduce(function (a, x) { return a * x.mk.p; }, 1);
       var rAll = legs.reduce(function (a, x) { return a * x.ratio; }, 1);
@@ -708,12 +699,12 @@
         '<div class="n4">' + (verdicts === legs.length ? 'Every leg' : verdicts === 0 ? 'No leg' : verdicts + ' of the ' + legs.length + ' legs') + (verdicts >= 2 && verdicts < legs.length ? ' carry' : ' carries') + ' Call Sheet #1\'s BET or better' +
         (verdicts < legs.length ? (verdicts ? '; the rest are' : '; these are') + ' the best value side on their game' : '') +
         '. Every leg clears its own price, so the parlay is worth more than the book\'s multiplied odds before any boost' +
-        (legs.skipped ? '; ' + legs.skipped + ' game' + (legs.skipped === 1 ? '' : 's') + ' had no leg worth taking inside ' + sgn(cap, 0) : '') +
+        (legs.skipped ? '; ' + legs.skipped + ' game' + (legs.skipped === 1 ? '' : 's') + ' had no side that clears its price' : '') +
         (pushes ? '; ' + pushes + ' can push, which most apps void to a smaller parlay' : '') +
         '. A boosted payout above ' + (1 / pAll).toFixed(2) + '× beats fair outright.</div></div>';
     }
-    if (!legs.length && nRows) return '<div class="empty">No leg on this date clears its price inside ' + sgn(cap, 0) + '. Nothing to parlay tonight.</div>';
-    if (legs.length === 1) return '<div class="empty">Only one leg clears its price inside ' + sgn(cap, 0) + ' — not a parlay; it is under best straight bets if the edge is there.</div>';
+    if (!legs.length && nRows) return '<div class="empty">No leg on this date clears its price. Nothing to parlay tonight.</div>';
+    if (legs.length === 1) return '<div class="empty">Only one leg clears its price — not a parlay; it is under best straight bets if the edge is there.</div>';
     return '';
   }
   function pickCard(x, cls, extra) {
@@ -727,15 +718,14 @@
         (x.mk.key === "total" && marksOf(x.row.sport, x.row.inputs, x.row.markets).grain ? ' <span class="tagm warn">over against the grain</span>' : '') + '</div>' + (extra || '') + '</div>';
   }
   function renderBoard() {
-    var dateISO = $("boardDate").value || todayISO(), byProb = !$("byEdge").checked, cap = legCap();
-    try { localStorage.setItem(CAP_KEY, String(cap)); } catch (e) {}
+    var dateISO = $("boardDate").value || todayISO(), byProb = !$("byEdge").checked;
     var rows = boardRows(dateISO, byProb);
     $("boardCount").textContent = rows.length ? rows.length + " priced markets on " + gameDate(dateISO) : "nothing logged for " + gameDate(dateISO);
 
     // --- the parlay four ---
-    var legs = parlayFour(dateISO, cap), ph = "";
+    var legs = parlayFour(dateISO), ph = "";
     legs.forEach(function (x) { ph += pickCard(x, "", legNote(x)); });
-    ph += parlayCard(legs, cap, rows.length, true);
+    ph += parlayCard(legs, rows.length, true);
     $("picks").innerHTML = ph;
 
     // --- best straight bets ---
@@ -753,11 +743,11 @@
     (sportsOn.length < 2 ? [] : sportsOn).forEach(function (sp) {
       var games = card.filter(function (r) { return (r.gdate || "") === dateISO && r.sport === sp; }).length;
       if (!games) return;
-      var sl = parlayFour(dateISO, cap, sp), sb = bestBets(dateISO, sp);
+      var sl = parlayFour(dateISO, sp), sb = bestBets(dateISO, sp);
       var col = '<div class="sportcol" data-sport="' + sp + '"><div class="subhead">' + sp + ' <span class="tag">' + games + ' game' + (games === 1 ? '' : 's') + ' logged</span></div>';
       col += '<div class="lbl">Parlay legs</div><div class="picks one">';
       sl.forEach(function (x) { col += pickCard(x, "", legNote(x)); });
-      col += parlayCard(sl, cap, games, false);
+      col += parlayCard(sl, games, false);
       col += '</div><div class="lbl">Straight bets</div><div class="picks one">';
       sb.forEach(function (x) { col += pickCard(x, "straight" + (x.thin ? " thin" : ""), betNote(x)); });
       if (!sb.length) col += '<div class="empty">No positive edge in ' + sp + ' tonight.</div>';
@@ -929,7 +919,7 @@
   function renderCalib() {
     var KEYS = { MLB: [["total","Full-game total"],["f5","First five"],["ml","Moneyline"],["rl","Run line"]],
                  WNBA: [["total","Full-game total"],["ml","Moneyline"],["spread","Spread"]] };
-    var box = $("calibBox"), cap = legCap();
+    var box = $("calibBox");
     /* Each tile also keeps the record BY SIDE -- over against under, home
        against away -- and the full-game total keeps the record of the rows
        that carried Call Sheet #1's verdict, because the parlay legs lean on
@@ -972,7 +962,7 @@
       if (r.gdate) dates[r.gdate] = true;
     });
     Object.keys(dates).forEach(function (d) {
-      [[parlayFour(d, cap), "top"], [bestBets(d), "topE"]].forEach(function (rule) {
+      [[parlayFour(d), "top"], [bestBets(d), "topE"]].forEach(function (rule) {
         rule[0].forEach(function (x) {
           var res = gradeMarket(x.mk, x.row.finals), b = bySport[x.row.sport];
           if (res === null || res === "invalid" || !b) return;
@@ -1135,8 +1125,8 @@
   function boardAsText() {
     var dateISO = $("boardDate").value || todayISO(), rows = boardRows(dateISO, !$("byEdge").checked);
     var out = ["Call Sheet 2.0 — " + gameDate(dateISO)];
-    out.push("THE PARLAY FOUR (one leg per game, within " + sgn(legCap(), 0) + ")");
-    parlayFour(dateISO, legCap()).forEach(function (x) {
+    out.push("THE PARLAY FOUR (one leg per game, any price it clears)");
+    parlayFour(dateISO).forEach(function (x) {
       out.push("  " + x.rank + ". " + x.row.matchup + " — " + x.mk.pick + "  " + (x.mk.p * 100).toFixed(1) + "%  " + sgn(x.mk.price, 0) +
         "  " + x.ratio.toFixed(3) + "x" + (x.band ? "  [#1: " + x.band + "]" : "") + (x.likeliest ? "  (likelier: " + x.likeliest.pick + " at " + sgn(x.likeliest.price, 0) + ")" : ""));
     });
@@ -1146,7 +1136,7 @@
         (x.tier === "verdict" ? "  [#1: " + bandOf(x.mk) + (x.thin ? ", price steeper than the chance" : "") + "]" : "  [value]"));
     });
     ["MLB", "WNBA"].forEach(function (sp) {
-      var sl = parlayFour(dateISO, legCap(), sp), sb = bestBets(dateISO, sp);
+      var sl = parlayFour(dateISO, sp), sb = bestBets(dateISO, sp);
       if (!sl.length && !sb.length) return;
       out.push(sp + " ONLY");
       sl.forEach(function (x) { out.push("  leg " + x.rank + ". " + x.row.matchup + " — " + x.mk.pick + "  " + (x.mk.p * 100).toFixed(1) + "%  " + sgn(x.mk.price, 0)); });
@@ -1165,7 +1155,6 @@
   ALL.forEach(function (id) { $(id).addEventListener("input", onEdit); $(id).addEventListener("change", onEdit); });
   CHECKS.forEach(function (id) { $(id).addEventListener("change", onEdit); });
   $("byEdge").addEventListener("change", function () { renderBoard(); });
-  $("legCap").addEventListener("input", function () { render(); renderBoard(); renderCalib(); });
   $("picks").addEventListener("click", function (e) { var t = e.target.closest("[data-open]"); if (t) openRow(t.dataset.open); });
   $("bestBets").addEventListener("click", function (e) { var t = e.target.closest("[data-open]"); if (t) openRow(t.dataset.open); });
   $("bySport").addEventListener("click", function (e) { var t = e.target.closest("[data-open]"); if (t) openRow(t.dataset.open); });
@@ -1384,7 +1373,6 @@
 
   if (!$("gdate").value) $("gdate").value = todayISO();
   $("boardDate").value = todayISO();
-  try { var savedCap = parseFloat(localStorage.getItem(CAP_KEY)); if (isFinite(savedCap)) $("legCap").value = savedCap; } catch (e) {}
   if (!loadDraft()) setSport("MLB", true);
   else if ($("gdate").value === "") $("gdate").value = todayISO();
   render(); renderCard(); renderBoard(); renderCalib();

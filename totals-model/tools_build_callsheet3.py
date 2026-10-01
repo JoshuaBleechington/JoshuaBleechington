@@ -160,7 +160,6 @@ def tail() -> str:
              '    } else {\n      restore({ away: "Sun", home: "Mystics"', "example")
     t = every(t, '"callsheet2.card.v1"', '"callsheet3.card.v1"', "card key", 1)
     t = every(t, '"callsheet2.draft.v1"', '"callsheet3.draft.v1"', "draft key", 1)
-    t = every(t, '"callsheet2.cap.v1"', '"callsheet3.cap.v1"', "cap key", 1)
     t = every(t, '"callsheet2.slate.v1"', '"callsheet3.slate.v1"', "slate key", 1)
     t = once(t, 'format: "callsheet2.backup"', 'format: "callsheet3.backup"', "backup format")
     t = once(t, 'name = "callsheet2-" + todayISO() + ".json"', 'name = "callsheet3-" + todayISO() + ".json"', "backup name")

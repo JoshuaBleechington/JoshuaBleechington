@@ -91,13 +91,11 @@ and the edge picks on the same card went 3-1. Two games are not evidence and
 the record tiles exist to gather it, but the user chose the edge order having
 seen it, and that is the order the rail keeps.
 
-The rail also carries the parlay marks, named so they cannot be misread: a
+The rail also carries the parlay mark, named so it cannot be misread: a
 green *parlay leg* on the game's leg (the side, its chance, its price, its
-value ratio and, when #1 has a verdict on it, *#1 says BET*), and an amber
-*likeliest … beyond* naming the likeliest priced thing on the game when that
-is priced beyond the leg cap. The green mark can sit on the side opposite the
-one the row shows, because the row shows the better price and the leg rule
-has its own order (below).
+value ratio and, when #1 has a verdict on it, *#1 says BET*). The green mark
+can sit on the side opposite the one the row shows, because the row shows the
+better price and the leg rule has its own order (below).
 
 **The day board serves both uses.** *The parlay four* is one leg per game,
 inside the cap: #1's verdict on the total when it clears its price, else the
@@ -169,13 +167,20 @@ loads into the form.
 **The parlay four.** One leg per game, in two tiers.
 
 1. *Call Sheet #1's verdict.* A full-game total that #1 calls BET, STRONG
-   BET or MAX BET, on #1's side, when that side also clears its price inside
-   the **leg cap** (−170 by default, set on the board and remembered). The
+   BET or MAX BET, on #1's side, when that side also clears its price. The
    verdict is the one mark on the board that carries #1's corroboration gate
    — a total is only BET when the inputs agree with each other — and the user
    asked for these legs by name ("the ones saying bet or strong bet").
-2. *Best value.* On a game with no such total: the side, of any market priced
-   inside the cap, with the highest chance-to-breakeven ratio.
+2. *Best value.* On a game with no such total: the side, of any priced
+   market, with the highest chance-to-breakeven ratio.
+
+There is no price cap. The board carried one (−170, set on the board and
+remembered) from 24 Sept to 1 Oct, when the user asked for it to go. A side
+priced steeper than −170 that still clears its price is a leg on the same
+terms as any other; the ratio test already refuses the side that does not,
+and the steep moneylines the cap was written against are shown, not picked,
+so they never reached the rule anyway. The record tile for the parlay four
+is recomputed under the current rule, so the change can move past nights.
 
 In both tiers only a side whose ratio clears one qualifies. A parlay's
 expected return is the product over its legs of (chance ÷ what the price

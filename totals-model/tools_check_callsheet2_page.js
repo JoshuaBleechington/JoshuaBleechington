@@ -163,7 +163,7 @@ const CHECKS = ["dome","playoff"];
       flow.bests.join('|') + ' vs ' + flow.rows.filter(r => r.edge > 0 && r.pick !== 'UNDER 6.5').map(r => r.pick).join('|'));
   chk(flow.rows.some(r => /Rays \+1\.5/.test(r.pick) && r.edge > 0) && !flow.bests.some(p => /Rays \+1\.5/.test(p)),
       'board: a run line with a positive edge is on the table but not among the straight bets', flow.bests.join('|'));
-  // The parlay legs: one per game, only where a side clears its price inside the cap.
+  // The parlay legs: one per game, only where a side clears its price (no price cap since 1 Oct).
   // Game 1 (Rays @ Yankees) has several; game 2 (Rockies @ Dodgers, -110/-110 and a -300 ML) has none.
   chk(flow.picks.length === 1 && flow.picks[0] === 'UNDER 6.5',
       'parlay: only the game with a leg that clears its price contributes one, and it is #1\'s BET on the total', flow.picks.join('|'));
@@ -290,7 +290,7 @@ const CHECKS = ["dome","playoff"];
     const text = await (async () => { document.getElementById('copy').click(); await wait(); return ''; })();
     return { card, legs, ratios, band1: total.band1, side1: total.side1, rail };
   });
-  chk(/ALL 2 HIT/.test(parlayCard.card) && /fair parlay/.test(parlayCard.card) && /worth/.test(parlayCard.card) && /2 games had no leg worth taking/.test(parlayCard.card),
+  chk(/ALL 2 HIT/.test(parlayCard.card) && /fair parlay/.test(parlayCard.card) && /worth/.test(parlayCard.card) && /2 games had no side that clears its price/.test(parlayCard.card),
       'parlay: two games with a leg that clears its price make a parlay card with the all-hit chance, fair price, value multiple and the count of games passed over', parlayCard.card.slice(0, 220));
   // Both legs on this date carry a verdict: Rays @ Yankees UNDER 6.5 (BET) and this one (BET).
   chk(/Every leg carries Call Sheet #1's BET or better\. Every leg clears its own price/.test(parlayCard.card),
@@ -567,23 +567,18 @@ const CHECKS = ["dome","playoff"];
   chk(clv.f5Tile && /beat the close 0-0-1 · \+0\.00 runs avg/.test(clv.f5Tile), 'close: a close on the line is even, not beaten', clv.f5Tile);
   chk(clv.after && clv.after.ctot === '' && clv.after.cf5 === '' && clv.gone, 'close: clearing the boxes clears the record line', JSON.stringify(clv.after));
 
-  // ---- the cap, the second choice on the rail, and clicking through ---------------
+  // ---- no price cap, the rail on a game with no leg, and clicking through ----------
   const capFlow = await pg.evaluate(async () => {
     const wait = () => new Promise(r => setTimeout(r, 50));
-    const set = (id, v) => { const el = document.getElementById(id); el.value = v; el.dispatchEvent(new Event('input', { bubbles: true })); };
-    // rail: load the -300 game; by chance the ML leads and is beyond the cap, so a second choice is marked
+    // rail: load the -300 game; the ML is shown, not picked, and nothing pickable clears its price, so no leg
     document.getElementById('byEdge').checked = false; document.getElementById('byEdge').dispatchEvent(new Event('change'));
-    set('legCap', '-170'); await wait();
     const openBtn = [...document.querySelectorAll('#cardTable [data-open]')].find(b => /Rockies/.test(b.textContent));
     openBtn.click(); await wait();
     const rail = [...document.querySelectorAll('#markets .mk')].map(el => ({
       pick: el.querySelector('.pick').childNodes[0].textContent.trim(), alt: el.classList.contains('alt'),
       caps: [...el.querySelectorAll('.cap')].map(c => c.textContent) }));
-    // raise the cap so the ML is inside it: no swap, no second choice
-    set('legCap', '-400'); await wait();
-    const railOpen = [...document.querySelectorAll('#markets .mk')].some(el => [...el.querySelectorAll('.cap')].some(c => /beyond/.test(c.textContent)));
-    const swapsOpen = document.querySelectorAll('#picks .pk .swap').length;
-    set('legCap', '-170'); await wait();
+    const capBox = !!document.getElementById('legCap');
+    const capWords = /leg cap|inside your cap|beyond -\d+/.test(document.body.innerText);
     // click a pick card: the form loads that matchup
     document.getElementById('clear').click(); await wait();
     const card1 = document.querySelector('#picks .pk[data-open]');
@@ -595,12 +590,11 @@ const CHECKS = ["dome","playoff"];
     row1.querySelector('td').click(); await wait();
     const loadedFromRow = document.getElementById('away').value + ' @ ' + document.getElementById('home').value;
     const wantedRow = row1.querySelectorAll('td')[1].textContent.replace(/\s*MLB\s*$/, '').trim();
-    return { rail, railOpen, swapsOpen, loadedFromCard, wanted, loadedFromRow, wantedRow, cap: document.getElementById('legCap').value };
+    return { rail, capBox, capWords, loadedFromCard, wanted, loadedFromRow, wantedRow };
   });
-  chk(capFlow.rail.some(m => m.caps.some(c => /likeliest: Dodgers ML 7\d\.\d% at -300 · beyond -170/.test(c))),
-      'cap: the moneyline row names Dodgers ML as the likeliest thing on the game, beyond the cap', JSON.stringify(capFlow.rail));
-  chk(!capFlow.rail.some(m => m.alt), 'cap: no leg is marked on a game where nothing clears its price', JSON.stringify(capFlow.rail));
-  chk(!capFlow.railOpen, 'cap: raising the cap to -400 removes the beyond mark', `rail=${capFlow.railOpen}`);
+  chk(!capFlow.capBox && !capFlow.capWords, 'cap: there is no leg-cap box and no cap wording left on the page', `box=${capFlow.capBox} words=${capFlow.capWords}`);
+  chk(!capFlow.rail.some(m => m.caps.some(c => /likeliest|beyond/.test(c))), 'cap: the rail no longer carries a likeliest-beyond-the-cap chip', JSON.stringify(capFlow.rail));
+  chk(!capFlow.rail.some(m => m.alt), 'cap: no leg is marked on a game where nothing pickable clears its price', JSON.stringify(capFlow.rail));
   chk(capFlow.loadedFromCard === capFlow.wanted, 'click: a pick card loads its matchup into the form', `${capFlow.loadedFromCard} vs ${capFlow.wanted}`);
   chk(capFlow.loadedFromRow === capFlow.wantedRow, 'click: a board row loads its matchup into the form', `${capFlow.loadedFromRow} vs ${capFlow.wantedRow}`);
 

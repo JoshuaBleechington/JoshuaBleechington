@@ -192,7 +192,22 @@
   }
 
   /* ---- the matchup ---------------------------------------------------------- */
+  /* The one line the user reads before ticking the boxes: each side's goalie
+     line as the sheet will score it, or that there is none. */
+  function nhlGoalieSummary() {
+    var el = $("goalieSummary"); if (!el) return;
+    var parts = [];
+    [["Away", "agsv", "agsh"], ["Home", "hgsv", "hgsh"]].forEach(function (s) {
+      var sv = num(s[1]), sh = num(s[2]);
+      if (sv === null) { parts.push("<b>" + s[0] + "</b>: no goalie line (league average)"); return; }
+      var used = shrinkSv(sv, sh), w = svWeight(sh);
+      parts.push("<b>" + s[0] + "</b> " + sv.toFixed(3) + (sh !== null ? " on " + sh.toFixed(0) + " shots" : ", shots blank") +
+                 (w < 1 ? " → scored as " + used.toFixed(3) : " → trusted in full"));
+    });
+    el.innerHTML = parts.join(" · ") + ". Open the boxes below to change a line.";
+  }
   function forecastMatchupNhl() {
+    nhlGoalieSummary();
     var f = readNhl();
     var away = f.away, home = f.home, line = f.line;
     var op = num("op"), up = num("up"), hml = num("hml"), aml = num("aml");

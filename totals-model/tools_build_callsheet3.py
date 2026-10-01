@@ -23,7 +23,7 @@ import sys
 ROOT = pathlib.Path(__file__).parent / "web"
 OPEN = "  /* ===== ENGINE BLOCK."
 CLOSE = "  /* ===== END ENGINE BLOCK ===== */"
-STAMP = "2026-10-01"   # bumped by hand when 3.0's own sources change
+STAMP = "2026-10-01"   # bumped by hand when 3.0's own sources change (the harness checks it)
 
 
 def engine_block() -> str:
@@ -61,6 +61,16 @@ def head() -> str:
     h = once(h, '          <div id="spFields" hidden>', board + '          <div id="spFields" hidden>', "board sections")
     h = once(h, '      <div id="wnbaFields" class="stack" hidden>', fields + '      <div id="wnbaFields" class="stack" hidden>', "NHL fields")
     h = re.sub(r'<span id="build">\d{4}-\d{2}-\d{2}</span>', f'<span id="build">{STAMP}</span>', h, count=1)
+    h = once(h, "  @media (prefers-reduced-motion: reduce) { * { transition: none !important; animation: none !important; } }\n</style>",
+             "  /* the folded card: what the slate fills, out of the way until it is wanted */\n"
+             "  details.fold > summary { cursor: pointer; list-style: none; padding: 12px 15px; font-size: 11.5px; font-weight: 700; text-transform: uppercase;\n"
+             "    letter-spacing: .12em; color: var(--ink-2); display: flex; align-items: baseline; justify-content: space-between; gap: 10px; flex-wrap: wrap; }\n"
+             "  details.fold > summary::-webkit-details-marker { display: none; }\n"
+             "  details.fold > summary::after { content: \"+\"; font: 700 15px var(--mono); color: var(--muted); }\n"
+             "  details.fold[open] > summary::after { content: \"\\2212\"; }\n"
+             "  details.fold[open] > summary { border-bottom: 1px solid var(--rule); }\n"
+             "  details.fold > summary .tag { font-size: 10px; letter-spacing: .09em; color: var(--muted); font-weight: 600; text-transform: none; }\n"
+             "  @media (prefers-reduced-motion: reduce) { * { transition: none !important; animation: none !important; } }\n</style>", "fold css")
     h = once(h, "<p>One matchup, every market the book posts on it — the full-game total, the first five,\n         the moneyline and the run line — priced off",
              "<p>One matchup, every market the book posts on it — in baseball the full-game total, the first five,\n         the moneyline and the run line; in hockey the total, the first period, the moneyline and the puck line — priced off", "header copy")
     h = once(h, "Call Sheet #1 is untouched; its total is this sheet's total to the last digit.</p>",

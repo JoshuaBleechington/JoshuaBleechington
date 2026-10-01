@@ -658,6 +658,321 @@ def grade_game(g, log):
             "gamePk": int(g.get("gamePk") or 0), "finals": fin, "notes": notes}
 
 
+# ---- NHL -------------------------------------------------------------------
+# The league's public feed (api-web.nhle.com, api.nhle.com/stats/rest), no
+# login. Per game: the two goalies with season save percentage and shots
+# faced and a LIKELY starter (the slate cannot see the confirmed one; the
+# sheet asks you to confirm), shots for per game, power play and kill, the
+# last ten totals, the season series, rest days. The grade file carries the
+# final (overtime and shootout included, as the league records it) and the
+# first-period score in the sheet's period boxes.
+
+NHL_WEB = "https://api-web.nhle.com/v1"
+NHL_STATS = "https://api.nhle.com/stats/rest/en"
+NHL_NICK = {
+    "ANA": "Ducks", "BOS": "Bruins", "BUF": "Sabres", "CGY": "Flames", "CAR": "Hurricanes",
+    "CHI": "Blackhawks", "COL": "Avalanche", "CBJ": "Blue Jackets", "DAL": "Stars", "DET": "Red Wings",
+    "EDM": "Oilers", "FLA": "Panthers", "LAK": "Kings", "MIN": "Wild", "MTL": "Canadiens",
+    "NSH": "Predators", "NJD": "Devils", "NYI": "Islanders", "NYR": "Rangers", "OTT": "Senators",
+    "PHI": "Flyers", "PIT": "Penguins", "SJS": "Sharks", "SEA": "Kraken", "STL": "Blues",
+    "TBL": "Lightning", "TOR": "Maple Leafs", "UTA": "Mammoth", "VAN": "Canucks", "VGK": "Golden Knights",
+    "WSH": "Capitals", "WPG": "Jets",
+}
+
+
+def nhl_api(path):
+    return fetch_json(NHL_WEB + path)
+
+
+def nhl_name(team):
+    """The nickname the sheet's NHL table canonicalises to."""
+    ab = (team or {}).get("abbrev") or ""
+    if ab in NHL_NICK:
+        return NHL_NICK[ab]
+    cn = (team or {}).get("commonName") or {}
+    if isinstance(cn, dict) and cn.get("default"):
+        return cn["default"]
+    return ab or "?"
+
+
+def nhl_schedule(date_iso):
+    d = nhl_api("/schedule/%s" % date_iso)
+    out = []
+    for day in d.get("gameWeek") or []:
+        if day.get("date") == date_iso:
+            out.extend(day.get("games") or [])
+    return out
+
+
+def nhl_final(game):
+    st = str(game.get("gameState") or "").upper()
+    return st in ("OFF", "FINAL")
+
+
+def nhl_season_id(games, date_iso):
+    for g in games:
+        if g.get("season"):
+            return str(g["season"])
+    y = int(date_iso[:4])
+    return "%d%d" % (y, y + 1) if int(date_iso[5:7]) >= 8 else "%d%d" % (y - 1, y)
+
+
+def nhl_team_summary(season_id):
+    """One row per team from the stats REST summary report, keyed by team id."""
+    q = urllib.parse.urlencode({"cayenneExp": "seasonId=%s and gameTypeId=2" % season_id, "limit": -1})
+    d = fetch_json(NHL_STATS + "/team/summary?" + q)
+    return {int(r["teamId"]): r for r in (d.get("data") or []) if r.get("teamId") is not None}
+
+
+def nhl_club_goalies(abbrev):
+    d = nhl_api("/club-stats/%s/now" % abbrev)
+    out = []
+    for g in d.get("goalies") or []:
+        name = " ".join(x for x in [(g.get("firstName") or {}).get("default") if isinstance(g.get("firstName"), dict) else g.get("firstName"),
+                                    (g.get("lastName") or {}).get("default") if isinstance(g.get("lastName"), dict) else g.get("lastName")] if x)
+        sv = g.get("savePercentage", g.get("savePctg"))
+        out.append({"id": g.get("playerId"), "name": name or str(g.get("playerId")),
+                    "sv": None if sv in (None, "") else float(sv),
+                    "shots": int(g.get("shotsAgainst") or 0), "gp": int(g.get("gamesPlayed") or 0),
+                    "gs": int(g.get("gamesStarted") or 0)})
+    return out
+
+
+def nhl_club_games(abbrev):
+    d = nhl_api("/club-schedule-season/%s/now" % abbrev)
+    games = [g for g in (d.get("games") or []) if str(g.get("gameType", 2)) in ("2", "3")]
+    games.sort(key=lambda g: g.get("gameDate") or "")
+    return games
+
+
+def nhl_game_total(g):
+    a = (g.get("awayTeam") or {}).get("score")
+    h = (g.get("homeTeam") or {}).get("score")
+    if a is None or h is None:
+        return None
+    return int(a) + int(h)
+
+
+def nhl_last_n_avg(games, before_iso, n=10):
+    fin = [g for g in games if nhl_final(g) and (g.get("gameDate") or "") < before_iso and nhl_game_total(g) is not None]
+    tail = fin[-n:]
+    if not tail:
+        return (None, 0, fin)
+    return (sum(nhl_game_total(g) for g in tail) / float(len(tail)), len(tail), fin)
+
+
+def nhl_rest_days(fin_games, date_iso):
+    if not fin_games:
+        return None
+    last = fin_games[-1].get("gameDate") or ""
+    try:
+        return (dt.date.fromisoformat(date_iso) - dt.date.fromisoformat(last)).days - 1
+    except ValueError:
+        return None
+
+
+def nhl_last_starter(game_id, abbrev):
+    """Who started the team's last game, from its boxscore."""
+    box = nhl_api("/gamecenter/%s/boxscore" % game_id)
+    pbg = box.get("playerByGameStats") or {}
+    side = "awayTeam" if ((box.get("awayTeam") or {}).get("abbrev") == abbrev) else "homeTeam"
+    for g in (pbg.get(side) or {}).get("goalies") or []:
+        if g.get("starter"):
+            return g.get("playerId")
+    return None
+
+
+def nhl_likely_starter(goalies, rest_days, last_starter_id):
+    """The slate's guess at tonight's goalie: on a back to back, the one who
+    did NOT start yesterday; otherwise the one with the most starts. Never
+    confirmed -- the sheet says so and the user confirms."""
+    if not goalies:
+        return None, "no goalies on the club page"
+    pool = list(goalies)
+    why = "most starts this season"
+    if rest_days is not None and rest_days <= 0 and last_starter_id is not None and len(pool) > 1:
+        rested = [g for g in pool if g["id"] != last_starter_id]
+        if rested:
+            pool = rested
+            why = "back to back: the goalie who did not start yesterday"
+    pool.sort(key=lambda g: (-g["gs"], -g["gp"], -g["shots"]))
+    if pool[0]["gs"] == 0 and pool[0]["gp"] == 0:
+        why = "no starts logged yet this season; a guess"
+    return pool[0], why
+
+
+def p1_from_landing(landing):
+    """First-period goals (away, home) from a game's landing page linescore."""
+    ls = ((landing or {}).get("summary") or {}).get("linescore") or {}
+    for p in ls.get("byPeriod") or []:
+        num = (p.get("periodDescriptor") or {}).get("number", p.get("period"))
+        if num == 1 and p.get("away") is not None and p.get("home") is not None:
+            return int(p["away"]), int(p["home"])
+    goals = ((landing or {}).get("summary") or {}).get("scoring") or []
+    for per in goals:
+        if (per.get("periodDescriptor") or {}).get("number") == 1:
+            a = h = 0
+            for g in per.get("goals") or []:
+                if g.get("teamAbbrev") and (landing.get("awayTeam") or {}).get("abbrev") == (g.get("teamAbbrev") or {}).get("default", g.get("teamAbbrev")):
+                    a += 1
+                else:
+                    h += 1
+            return a, h
+    return None, None
+
+
+def build_nhl_game(g, date_iso, season_id, summary, log):
+    away_t, home_t = g.get("awayTeam") or {}, g.get("homeTeam") or {}
+    away, home = nhl_name(away_t), nhl_name(home_t)
+    aab, hab = away_t.get("abbrev") or "", home_t.get("abbrev") or ""
+    gid = g.get("id")
+    start = str(g.get("startTimeUTC") or "")
+    state = str(g.get("gameState") or "")
+    inputs = {k: "" for k in ("agsv", "hgsv", "agsh", "hgsh", "asf", "hsf", "app", "hpp", "apk", "hpk",
+                              "al10", "hl10", "h2h", "h2hn", "arest", "hrest")}
+    notes, starters = [], {"away": "", "home": ""}
+    out = {"sport": "NHL", "gdate": date_iso, "away": away, "home": home, "gameId": gid, "first_puck_utc": start,
+           "venue": ((g.get("venue") or {}).get("default") if isinstance(g.get("venue"), dict) else g.get("venue")) or "",
+           "status": state, "starters": starters, "goalies": {"away": [], "home": []}, "inputs": inputs, "notes": notes}
+    log("%s @ %s  (%s, %s UTC, %s)" % (away, home, out["venue"] or "venue ?", start[11:16] if len(start) >= 16 else "?", state or "scheduled"))
+
+    for side, t, ab in (("away", away_t, aab), ("home", home_t, hab)):
+        p = "a" if side == "away" else "h"
+        nick = away if side == "away" else home
+        # team rates from the summary report
+        row = summary.get(int(t.get("id") or -1)) if summary else None
+        if row:
+            try:
+                if row.get("shotsForPerGame") is not None:
+                    inputs[p + "sf"] = fmt(float(row["shotsForPerGame"]), 1)
+                if row.get("powerPlayPct") is not None:
+                    inputs[p + "pp"] = fmt(float(row["powerPlayPct"]) * 100.0, 1)
+                if row.get("penaltyKillPct") is not None:
+                    inputs[p + "pk"] = fmt(float(row["penaltyKillPct"]) * 100.0, 1)
+                log("  %s shots for %s/g, PP %s%%, PK %s%% (%s games)" % (side, inputs[p + "sf"] or "?", inputs[p + "pp"] or "?", inputs[p + "pk"] or "?", row.get("gamesPlayed", "?")))
+            except (TypeError, ValueError) as e:
+                notes.append("Could not read %s team rates: %s" % (nick, e))
+        else:
+            notes.append("%s has no row on the season summary yet (first games of the year).")
+        # recent games, rest, head to head
+        fin = []
+        try:
+            games = nhl_club_games(ab)
+            avg, n, fin = nhl_last_n_avg(games, date_iso, 10)
+            if avg is not None:
+                inputs[p + "l10"] = fmt(avg, 1)
+            if n < 10:
+                notes.append("%s last-ten average is over %d game%s only." % (nick, n, "" if n == 1 else "s"))
+            rest = nhl_rest_days(fin, date_iso)
+            if rest is not None:
+                inputs[p + "rest"] = str(max(0, rest))
+            log("  %s last-10 avg total: %s (%d games); rest %s day(s)" % (side, inputs[p + "l10"] or "?", n, inputs[p + "rest"] or "?"))
+            if side == "away":
+                opp = hab
+                h2h = [x for x in fin if (x.get("awayTeam") or {}).get("abbrev") == opp or (x.get("homeTeam") or {}).get("abbrev") == opp]
+                if h2h:
+                    inputs["h2h"] = fmt(sum(nhl_game_total(x) for x in h2h) / float(len(h2h)), 1)
+                    inputs["h2hn"] = str(len(h2h))
+                log("  head-to-head: %s over %s meeting%s" % (inputs["h2h"] or "none yet", inputs["h2hn"] or "0", "" if inputs["h2hn"] == "1" else "s"))
+        except Exception as e:  # noqa: BLE001
+            notes.append("Could not fetch %s recent games: %s" % (nick, e))
+        # goalies
+        try:
+            goalies = nhl_club_goalies(ab)
+            out["goalies"][side] = [{"name": x["name"], "sv": x["sv"], "shots": x["shots"], "gs": x["gs"]} for x in goalies]
+            last_id = None
+            if fin and inputs[p + "rest"] == "0":
+                try:
+                    last_id = nhl_last_starter(fin[-1].get("id"), ab)
+                except Exception as e:  # noqa: BLE001
+                    log("  %s: could not read yesterday's starter (%s)" % (side, e))
+            pick, why = nhl_likely_starter(goalies, int(inputs[p + "rest"]) if inputs[p + "rest"] != "" else None, last_id)
+            if pick:
+                starters[side] = pick["name"]
+                if pick["sv"] is not None and pick["shots"] > 0:
+                    inputs[p + "gsv"] = "%.3f" % pick["sv"]
+                    inputs[p + "gsh"] = str(pick["shots"])
+                else:
+                    notes.append("%s's likely starter %s has no shots this season; save percentage left blank." % (nick, pick["name"]))
+                notes.append("%s likely starter: %s (%s). NOT confirmed: check Daily Faceoff and tick the box." % (nick, pick["name"], why))
+                others = ", ".join("%s %s/%d" % (x["name"], "%.3f" % x["sv"] if x["sv"] is not None else "?", x["shots"]) for x in goalies if x is not pick)
+                log("  %s goalie: %s  SV %s on %s shots  [%s]%s" % (side, pick["name"], inputs[p + "gsv"] or "?", inputs[p + "gsh"] or "?", why, ("; others: " + others) if others else ""))
+            else:
+                notes.append("%s: %s." % (nick, why))
+        except Exception as e:  # noqa: BLE001
+            notes.append("Could not fetch %s goalies: %s" % (nick, e))
+    for n in notes:
+        log("  note: " + n)
+    return out
+
+
+def grade_nhl_game(g, log):
+    away, home = nhl_name(g.get("awayTeam")), nhl_name(g.get("homeTeam"))
+    if not nhl_final(g):
+        log("%s @ %s: %s, not final; skipped" % (away, home, g.get("gameState") or "not started"))
+        return None
+    fa, fh = (g.get("awayTeam") or {}).get("score"), (g.get("homeTeam") or {}).get("score")
+    fin = {"fa": str(int(fa)), "fh": str(int(fh))}
+    notes = []
+    try:
+        p1a, p1h = p1_from_landing(nhl_api("/gamecenter/%s/landing" % g.get("id")))
+        if p1a is not None:
+            fin["f5a"], fin["f5h"] = str(p1a), str(p1h)
+        else:
+            notes.append("No first-period linescore on the feed; type the period score by hand.")
+    except Exception as e:  # noqa: BLE001
+        notes.append("Could not fetch the period score: %s" % e)
+    how = ((g.get("gameOutcome") or {}).get("lastPeriodType") or "").upper()
+    log("%s @ %s: final %s-%s%s, after one %s-%s" % (away, home, fin["fa"], fin["fh"], " (%s)" % how if how in ("OT", "SO") else "", fin.get("f5a", "?"), fin.get("f5h", "?")))
+    return {"sport": "NHL", "gdate": "", "away": away, "home": home, "gameId": g.get("id"), "finals": fin, "notes": notes}
+
+
+def make_nhl_slate(date_iso, out_dir, log):
+    games = nhl_schedule(date_iso)
+    if not games:
+        log("No NHL games on the feed for %s." % date_iso)
+    season_id = nhl_season_id(games, date_iso)
+    summary = {}
+    try:
+        summary = nhl_team_summary(season_id)
+    except Exception as e:  # noqa: BLE001
+        log("Could not fetch the team summary report (%s); shots and special teams will be blank." % e)
+    rows = []
+    for g in games:
+        try:
+            rows.append(build_nhl_game(g, date_iso, season_id, summary, log))
+        except Exception as e:  # noqa: BLE001
+            log("%s @ %s: FAILED (%s); left out of the slate" % (nhl_name(g.get("awayTeam")), nhl_name(g.get("homeTeam")), e))
+        log("")
+    doc = {"format": FORMAT, "version": VERSION, "date": date_iso, "generated": now_utc(),
+           "source": "slate.py nhl: NHL public feed", "games": rows}
+    path = os.path.join(out_dir, "nhl-slate-%s.json" % date_iso)
+    with open(path, "w", encoding="utf-8") as f:
+        json.dump(doc, f, indent=1)
+    log("Wrote %s with %d game%s. Open Call Sheet 3.0 -> Saving -> Load slate. Confirm each goalie before betting." % (path, len(rows), "" if len(rows) == 1 else "s"))
+    return path
+
+
+def make_nhl_grade(date_iso, out_dir, log):
+    games = nhl_schedule(date_iso)
+    rows = []
+    for g in games:
+        try:
+            r = grade_nhl_game(g, log)
+            if r:
+                r["gdate"] = date_iso
+                rows.append(r)
+        except Exception as e:  # noqa: BLE001
+            log("a game failed to grade: %s" % e)
+    doc = {"format": FORMAT, "version": VERSION, "date": date_iso, "generated": now_utc(),
+           "source": "slate.py nhl-grade: NHL public feed", "games": rows}
+    path = os.path.join(out_dir, "nhl-grade-%s.json" % date_iso)
+    with open(path, "w", encoding="utf-8") as f:
+        json.dump(doc, f, indent=1)
+    log("Wrote %s with %d final%s. Load it into Call Sheet 3.0 the same way; graded rows are never touched." % (path, len(rows), "" if len(rows) == 1 else "s"))
+    return path
+
+
 # ---- modes -----------------------------------------------------------------
 
 def make_slate(date_iso, out_dir, log):
@@ -858,6 +1173,50 @@ def selftest():
     check("grade finals", gr["finals"] == {"fa": "4", "fh": "9", "f5a": "0", "f5h": "3"})
     check("grade skips live game", grade_game(canned_schedule()["dates"][0]["games"][0], lines.append) is None)
 
+    print("nhl")
+    check("nickname by abbrev", nhl_name({"abbrev": "TOR"}) == "Maple Leafs" and nhl_name({"abbrev": "UTA"}) == "Mammoth")
+    check("nickname fallback", nhl_name({"abbrev": "XXX", "commonName": {"default": "Isotopes"}}) == "Isotopes")
+    check("season id from the date", nhl_season_id([], "2026-10-07") == "20262027" and nhl_season_id([], "2027-03-01") == "20262027")
+    gl = [{"id": 1, "name": "Starter", "sv": 0.915, "shots": 1500, "gp": 50, "gs": 50},
+          {"id": 2, "name": "Backup", "sv": 0.900, "shots": 400, "gp": 15, "gs": 14}]
+    check("likely starter: most starts", nhl_likely_starter(gl, 2, None)[0]["name"] == "Starter")
+    check("likely starter: back to back goes to the rested goalie", nhl_likely_starter(gl, 0, 1)[0]["name"] == "Backup")
+    check("likely starter: back to back, starter rested yesterday", nhl_likely_starter(gl, 0, 2)[0]["name"] == "Starter")
+    check("no goalies", nhl_likely_starter([], 1, None)[0] is None)
+    def ng(date, a, h, state="OFF", aab="TOR", hab="MTL", gid=1):
+        return {"id": gid, "gameDate": date, "gameState": state, "awayTeam": {"abbrev": aab, "score": a}, "homeTeam": {"abbrev": hab, "score": h}}
+    gs = [ng("2026-10-%02d" % d, 2, 3) for d in range(1, 13)] + [ng("2026-10-14", 1, 1, "FUT")]
+    avg, n, fin = nhl_last_n_avg(gs, "2026-10-13", 10)
+    check("last ten: finals before the date only", n == 10 and abs(avg - 5.0) < 1e-9 and len(fin) == 12)
+    check("rest days from the last final", nhl_rest_days(fin, "2026-10-13") == 0 and nhl_rest_days(fin, "2026-10-15") == 2)
+    land = {"summary": {"linescore": {"byPeriod": [{"periodDescriptor": {"number": 1}, "away": 1, "home": 0}, {"periodDescriptor": {"number": 2}, "away": 0, "home": 2}]}}}
+    check("first period from the linescore", p1_from_landing(land) == (1, 0))
+    check("no linescore -> None", p1_from_landing({}) == (None, None))
+    # one hockey game through canned payloads
+    nhl_canned = _canned_nhl()
+    def fake_nhl(url, tries=3):
+        for key, payload in nhl_canned:
+            if key in url:
+                return payload
+        raise RuntimeError("no canned payload for " + url)
+    fetch_json = fake_nhl
+    try:
+        lines2 = []
+        row = build_nhl_game(nhl_schedule("2026-10-07")[0], "2026-10-07", "20262027", nhl_team_summary("20262027"), lines2.append)
+        gr2 = grade_nhl_game(nhl_schedule("2026-10-06")[0], lines2.append)
+    finally:
+        fetch_json = real
+    i = row["inputs"]
+    check("nhl teams", row["away"] == "Rangers" and row["home"] == "Bruins" and row["sport"] == "NHL")
+    check("nhl team rates", i["asf"] == "31.2" and i["hsf"] == "33.4" and i["app"] == "22.1" and i["hpk"] == "78.1")
+    # the Rangers are on a back to back and Igor started yesterday, so the slate names the backup
+    check("nhl goalies: likely starters with sv and shots", row["starters"] == {"away": "Jonathan Q", "home": "Jeremy S"} and i["agsv"] == "0.902" and i["agsh"] == "500" and i["hgsv"] == "0.921" and i["hgsh"] == "1900")
+    check("nhl rest and last ten", i["arest"] == "0" and i["hrest"] == "2" and i["al10"] == "5.9" and i["hl10"] == "6.4")
+    check("nhl head to head", i["h2h"] == "5.5" and i["h2hn"] == "2")
+    check("nhl: the back-to-back side gets the rested goalie", any("did not start yesterday" in n for n in row["notes"]))
+    check("nhl: never confirmed", all("NOT confirmed" in n for n in row["notes"] if "likely starter" in n))
+    check("nhl grade: final with the period score", gr2["finals"] == {"fa": "2", "fh": "3", "f5a": "1", "f5h": "0"})
+
     print()
     if fails:
         print("%d check%s failed: %s" % (len(fails), "" if len(fails) == 1 else "s", ", ".join(fails)))
@@ -973,12 +1332,53 @@ def _canned():
     ]
 
 
+def _canned_nhl():
+    def game(gid, date, aab, hab, a=None, h=None, state="FUT"):
+        return {"id": gid, "season": 20262027, "gameType": 2, "gameDate": date, "startTimeUTC": date + "T23:00:00Z",
+                "gameState": state, "venue": {"default": "TD Garden"},
+                "awayTeam": {"id": 3 if aab == "NYR" else 6, "abbrev": aab, "score": a},
+                "homeTeam": {"id": 6 if hab == "BOS" else 3, "abbrev": hab, "score": h}}
+    sched7 = {"gameWeek": [{"date": "2026-10-07", "games": [game(2026020010, "2026-10-07", "NYR", "BOS")]}]}
+    sched6 = {"gameWeek": [{"date": "2026-10-06", "games": [game(2026020005, "2026-10-06", "NYR", "BOS", 2, 3, "OFF")]}]}
+    summary = {"data": [
+        {"teamId": 3, "teamFullName": "New York Rangers", "gamesPlayed": 10, "shotsForPerGame": 31.2, "powerPlayPct": 0.221, "penaltyKillPct": 0.802},
+        {"teamId": 6, "teamFullName": "Boston Bruins", "gamesPlayed": 10, "shotsForPerGame": 33.4, "powerPlayPct": 0.248, "penaltyKillPct": 0.781}]}
+    def club(abbrev, goalies):
+        return {"goalies": [{"playerId": pid, "firstName": {"default": fn}, "lastName": {"default": ln}, "savePercentage": sv,
+                             "shotsAgainst": sh, "gamesPlayed": gp, "gamesStarted": gs} for pid, fn, ln, sv, sh, gp, gs in goalies]}
+    nyr = club("NYR", [(1, "Igor", "S", 0.912, 1400, 48, 47), (2, "Jonathan", "Q", 0.902, 500, 18, 17)])
+    bos = club("BOS", [(3, "Jeremy", "S", 0.921, 1900, 60, 60), (4, "Joonas", "K", 0.898, 300, 12, 11)])
+    def season(abbrev, opp, last_dates, totals, h2h_dates):
+        gs = []
+        for k, d in enumerate(last_dates):
+            o = opp if d in h2h_dates else "XXX"
+            gs.append({"id": 900 + k, "gameType": 2, "gameDate": d, "gameState": "OFF",
+                       "awayTeam": {"abbrev": abbrev, "score": totals[k] - 2}, "homeTeam": {"abbrev": o, "score": 2}})
+        return {"games": gs}
+    nyr_dates = ["2026-09-%02d" % d for d in range(20, 30)] + ["2026-10-06"]
+    bos_dates = ["2026-09-%02d" % d for d in range(20, 30)] + ["2026-10-04"]
+    # eleven finals; the last ten average 5.9, and the two meetings with Boston (28 Sept, 6 Oct) average 5.5
+    nyr_season = season("NYR", "BOS", nyr_dates, [7, 6, 6, 6, 6, 6, 6, 6, 5, 6, 6], ["2026-09-28", "2026-10-06"])
+    bos_season = season("BOS", "NYR", bos_dates, [6, 6, 7, 7, 6, 6, 7, 6, 6, 7, 6], [])
+    box = {"awayTeam": {"abbrev": "NYR"}, "homeTeam": {"abbrev": "XXX"},
+           "playerByGameStats": {"awayTeam": {"goalies": [{"playerId": 1, "starter": True}, {"playerId": 2, "starter": False}]}, "homeTeam": {"goalies": []}}}
+    landing = {"summary": {"linescore": {"byPeriod": [{"periodDescriptor": {"number": 1}, "away": 1, "home": 0},
+                                                      {"periodDescriptor": {"number": 2}, "away": 1, "home": 2}, {"periodDescriptor": {"number": 3}, "away": 0, "home": 1}]}}}
+    return [
+        ("/schedule/2026-10-07", sched7), ("/schedule/2026-10-06", sched6),
+        ("team/summary", summary),
+        ("/club-stats/NYR/", nyr), ("/club-stats/BOS/", bos),
+        ("/club-schedule-season/NYR/", nyr_season), ("/club-schedule-season/BOS/", bos_season),
+        ("/boxscore", box), ("/landing", landing),
+    ]
+
+
 # ---- main ------------------------------------------------------------------
 
 def main(argv=None):
     ap = argparse.ArgumentParser(description="Write the day's slate (or yesterday's finals) for Call Sheet 2.0.")
-    ap.add_argument("mode", nargs="?", choices=["slate", "grade"], default="slate",
-                    help="slate (default): today's inputs. grade: finals for grading.")
+    ap.add_argument("mode", nargs="?", choices=["slate", "grade", "nhl", "nhl-grade"], default="slate",
+                    help="slate (default): today's MLB inputs. grade: MLB finals. nhl: today's NHL inputs. nhl-grade: NHL finals.")
     ap.add_argument("--date", help="YYYY-MM-DD. Default: today for slate, yesterday for grade.")
     ap.add_argument("--out", default=".", help="folder to write into (default: where you run it)")
     ap.add_argument("--selftest", action="store_true", help="run the offline checks and exit")
@@ -997,7 +1397,7 @@ def main(argv=None):
             print("--date must look like 2026-09-28")
             return 2
     else:
-        date_iso = (today if a.mode == "slate" else today - dt.timedelta(days=1)).isoformat()
+        date_iso = (today if a.mode in ("slate", "nhl") else today - dt.timedelta(days=1)).isoformat()
     lines = []
 
     def log(s):
@@ -1007,6 +1407,10 @@ def main(argv=None):
     try:
         if a.mode == "grade":
             path = make_grade(date_iso, a.out, log)
+        elif a.mode == "nhl":
+            path = make_nhl_slate(date_iso, a.out, log)
+        elif a.mode == "nhl-grade":
+            path = make_nhl_grade(date_iso, a.out, log)
         else:
             path = make_slate(date_iso, a.out, log)
     except Exception as e:  # noqa: BLE001

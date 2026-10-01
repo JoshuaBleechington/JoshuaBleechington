@@ -24,6 +24,23 @@ book and are typed. The **park factor** is also left blank (fill it from
 your usual source, or leave it). The **WNBA** is not covered: pace, ratings,
 rest and last five still come from a stats site by hand.
 
+## Hockey (Call Sheet 3.0)
+
+Two more double-click files: **Run NHL slate.bat** before the games and
+**Grade NHL yesterday.bat** the morning after, or `python3 slate.py nhl` and
+`python3 slate.py nhl-grade`. They write `nhl-slate-DATE.json` and
+`nhl-grade-DATE.json`, which load into Call Sheet 3.0 the same way.
+
+| On the sheet | Where it comes from |
+| --- | --- |
+| Goalies: the likely starter, save %, shots faced | The club's goalie page. On a back to back the slate names the goalie who did **not** start yesterday; otherwise the one with the most starts. **Never confirmed**: the sheet says so until you check Daily Faceoff and tick the box |
+| Shots for per game, power play %, penalty kill % | The league's team summary report |
+| Last-10 average total, rest days, head to head | The club's season schedule |
+| Finals and the first-period score | The game page the next morning. A shootout win is a one-goal margin, as the league records it |
+
+The two goalies' lines are both printed, so if Daily Faceoff names the other
+one you can type his save % and shots over the slate's.
+
 ## Setup, once
 
 **Mac.** Open Terminal and type `python3 --version`. If it prints a version,

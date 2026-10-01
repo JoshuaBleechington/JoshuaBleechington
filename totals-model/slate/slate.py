@@ -667,6 +667,10 @@ def grade_game(g, log):
 # final (overtime and shootout included, as the league records it) and the
 # first-period score in the sheet's period boxes.
 
+#: Team rates (shots, special teams, last ten) go on the sheet at face value,
+#: so they wait for this many games. The goalies do not: the sheet shrinks a
+#: save percentage by its shots, so a goalie can go in from the first start.
+MIN_TEAM_GAMES = 5
 NHL_WEB = "https://api-web.nhle.com/v1"
 NHL_STATS = "https://api.nhle.com/stats/rest/en"
 NHL_NICK = {
@@ -843,26 +847,37 @@ def build_nhl_game(g, date_iso, season_id, summary, log):
         row = summary.get(int(t.get("id") or -1)) if summary else None
         if row:
             try:
-                if row.get("shotsForPerGame") is not None:
-                    inputs[p + "sf"] = fmt(float(row["shotsForPerGame"]), 1)
-                if row.get("powerPlayPct") is not None:
-                    inputs[p + "pp"] = fmt(float(row["powerPlayPct"]) * 100.0, 1)
-                if row.get("penaltyKillPct") is not None:
-                    inputs[p + "pk"] = fmt(float(row["penaltyKillPct"]) * 100.0, 1)
-                log("  %s shots for %s/g, PP %s%%, PK %s%% (%s games)" % (side, inputs[p + "sf"] or "?", inputs[p + "pp"] or "?", inputs[p + "pk"] or "?", row.get("gamesPlayed", "?")))
+                gp = int(row.get("gamesPlayed") or 0)
+                # A one-game season is not a sample. Shots per game, the power
+                # play and the kill go on the sheet at face value, so they wait
+                # for MIN_TEAM_GAMES; the goalies are shrunk by the sheet and
+                # can go in from the first shot.
+                if gp >= MIN_TEAM_GAMES:
+                    if row.get("shotsForPerGame") is not None:
+                        inputs[p + "sf"] = fmt(float(row["shotsForPerGame"]), 1)
+                    if row.get("powerPlayPct") is not None:
+                        inputs[p + "pp"] = fmt(float(row["powerPlayPct"]) * 100.0, 1)
+                    if row.get("penaltyKillPct") is not None:
+                        inputs[p + "pk"] = fmt(float(row["penaltyKillPct"]) * 100.0, 1)
+                    log("  %s shots for %s/g, PP %s%%, PK %s%% (%d games)" % (side, inputs[p + "sf"] or "?", inputs[p + "pp"] or "?", inputs[p + "pk"] or "?", gp))
+                else:
+                    notes.append("%s has %d game%s this season: shots, power play and kill left blank until %d." % (nick, gp, "" if gp == 1 else "s", MIN_TEAM_GAMES))
+                    log("  %s shots %s/g, PP %s%%, PK %s%% on %d game%s: left blank until %d" % (side, row.get("shotsForPerGame", "?"), row.get("powerPlayPct", "?"), row.get("penaltyKillPct", "?"), gp, "" if gp == 1 else "s", MIN_TEAM_GAMES))
             except (TypeError, ValueError) as e:
                 notes.append("Could not read %s team rates: %s" % (nick, e))
         else:
-            notes.append("%s has no row on the season summary yet (first games of the year).")
+            notes.append("%s has no row on the season summary yet (first games of the year)." % nick)
         # recent games, rest, head to head
         fin = []
         try:
             games = nhl_club_games(ab)
             avg, n, fin = nhl_last_n_avg(games, date_iso, 10)
-            if avg is not None:
+            if avg is not None and n >= MIN_TEAM_GAMES:
                 inputs[p + "l10"] = fmt(avg, 1)
-            if n < 10:
-                notes.append("%s last-ten average is over %d game%s only." % (nick, n, "" if n == 1 else "s"))
+            if n < MIN_TEAM_GAMES:
+                notes.append("%s has %d final%s this season: the last-ten box is left blank until %d." % (nick, n, "" if n == 1 else "s", MIN_TEAM_GAMES))
+            elif n < 10:
+                notes.append("%s last-ten average is over %d games only." % (nick, n))
             rest = nhl_rest_days(fin, date_iso)
             if rest is not None:
                 inputs[p + "rest"] = str(max(0, rest))

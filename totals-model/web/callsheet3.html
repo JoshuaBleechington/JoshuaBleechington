@@ -2930,9 +2930,16 @@
         });
       });
     });
+    /* Every sport gets a block, graded or not: a sport with nothing graded
+       shows its heading and what to type, so the section always says which
+       books it keeps (asked for on 1 Oct, when the WNBA and NHL blocks were
+       invisible until their first graded game). */
+    var EMPTY_NOTE = { MLB: "Nothing graded yet. Type the final and the first-five score on the card and the four markets grade themselves.",
+                       NHL: "Nothing graded yet. Type the final and the first-period score on the card and the four markets grade themselves; a shootout win grades as a one-goal margin.",
+                       WNBA: "Nothing graded yet. Type the final on the card and the three markets grade themselves. The WNBA log on 2.0 comes over with Load a backup." };
+    var h = '';
     if (!bySport.MLB.any && !bySport.NHL.any && !bySport.WNBA.any) {
-      box.innerHTML = '<p class="note">Enter finals on the card — away and home runs, and the first-five runs for MLB — and every market grades itself, one block per sport.</p>';
-      return;
+      h += '<p class="note">Enter finals on the card — away and home runs, and the first-five runs for MLB — and every market grades itself, one block per sport.</p>';
     }
     var tiles = function (s, unit) {
       if (!s.n && !s.p) return '';
@@ -2950,10 +2957,13 @@
         '<p class="s">' + (s.n ? 'says ' + says.toFixed(1) + '% · does ' + does.toFixed(1) + '% (±' + se.toFixed(1) + ') · ' + sgn(s.units, 2) + 'u' : 'pushes only') + '</p>' +
         (parts.length ? '<p class="s sides">' + esc(parts.join(' · ')) + '</p>' : '') + '</div>';
     };
-    var h = '';
     ["MLB", "NHL", "WNBA"].forEach(function (sp) {
       var b = bySport[sp];
-      if (!b.any) return;
+      if (!b.any) {
+        h += '<div class="subhead" data-sport="' + sp + '">' + sp + ' <span class="tag">nothing graded yet</span></div>' +
+             '<div class="verdict" data-sport="' + sp + '">' + esc(EMPTY_NOTE[sp]) + '</div>';
+        return;
+      }
       var totalN = KEYS[sp].reduce(function (a, k) { return a + b.stats[k[0]].n; }, 0);
       var graded = card.filter(function (r) { return r.sport === sp && (r.markets || []).some(function (mk) { return gradeMarket(mk, r.finals) !== null; }); }).length;
       h += '<div class="subhead" data-sport="' + sp + '">' + sp + ' <span class="tag">' + graded + ' graded game' + (graded === 1 ? '' : 's') + ' · ' + totalN + ' graded markets</span></div>';

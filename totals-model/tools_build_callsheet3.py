@@ -131,6 +131,9 @@ def tail() -> str:
              '                 WNBA: [["total","Full-game total"],["ml","Moneyline"],["spread","Spread"]] };', "calib keys")
     t = every(t, '["MLB", "WNBA"]', '["MLB", "NHL", "WNBA"]', "sport loops", 4)
     t = once(t, 'if (!bySport.MLB.any && !bySport.WNBA.any)', 'if (!bySport.MLB.any && !bySport.NHL.any && !bySport.WNBA.any)', "any graded")
+    t = once(t, '                       WNBA: "Nothing graded yet. Type the final on the card and the three markets grade themselves." };',
+             '                       NHL: "Nothing graded yet. Type the final and the first-period score on the card and the four markets grade themselves; a shootout win grades as a one-goal margin.",\n'
+             '                       WNBA: "Nothing graded yet. Type the final on the card and the three markets grade themselves. The WNBA log on 2.0 comes over with Load a backup." };', "empty notes")
     t = once(t, 'var unit = sp === "WNBA" ? "pts" : "runs";', 'var unit = sp === "WNBA" ? "pts" : sp === "NHL" ? "goals" : "runs";', "unit")
     t = once(t, ": 'With seven games in the season book",
              ": sp === \"NHL\" ? 'The puck line and the moneyline are shown, not picked, from the first game: every constant in the hockey book is a priori, and the record decides which earns a weight. The total and the first period are the pickable markets.' : 'With seven games in the season book", "calib verdict")

@@ -39,7 +39,11 @@ Two more double-click files: **Run NHL slate.bat** before the games and
 | Finals and the first-period score | The game page the next morning. A shootout win is a one-goal margin, as the league records it |
 
 The two goalies' lines are both printed, so if Daily Faceoff names the other
-one you can type his save % and shots over the slate's.
+one you can type his save % and shots over the slate's. A team that has not
+played yet gets last season's goalie lines, shots halved, with a note.
+Shots per game, special teams and the last ten wait until a team has five
+games; before that the boxes stay blank and the sheet is the market plus
+the goalies.
 
 ## Setup, once
 

@@ -728,8 +728,42 @@ def nhl_team_summary(season_id):
     return {int(r["teamId"]): r for r in (d.get("data") or []) if r.get("teamId") is not None}
 
 
-def nhl_club_goalies(abbrev):
-    d = nhl_api("/club-stats/%s/now" % abbrev)
+def nhl_prev_season(season_id):
+    y = int(str(season_id)[:4])
+    return "%d%d" % (y - 1, y)
+
+
+def nhl_roster_goalie_ids(abbrev):
+    d = nhl_api("/roster/%s/current" % abbrev)
+    return set(int(g["id"]) for g in (d.get("goalies") or []) if g.get("id") is not None)
+
+
+def nhl_club_goalies(abbrev, season_id=None):
+    """This season's goalies from the club page. When nobody has a shot yet
+    (a team that has not played), LAST season's page for the goalies still
+    on the roster, with the shots halved so a year-old line counts as
+    evidence but not as much as this year's will. Each entry says which."""
+    out = _club_goalies(nhl_api("/club-stats/%s/now" % abbrev))
+    if any(g["shots"] > 0 for g in out) or not season_id:
+        return out
+    prev = nhl_prev_season(season_id)
+    try:
+        roster = nhl_roster_goalie_ids(abbrev)
+    except Exception:  # noqa: BLE001
+        roster = set()
+    last = _club_goalies(nhl_api("/club-stats/%s/%s/2" % (abbrev, prev)))
+    kept = []
+    for g in last:
+        if roster and g["id"] not in roster:
+            continue
+        g = dict(g)
+        g["shots"] = g["shots"] // 2
+        g["season"] = prev
+        kept.append(g)
+    return kept or out
+
+
+def _club_goalies(d):
     out = []
     for g in d.get("goalies") or []:
         name = " ".join(x for x in [(g.get("firstName") or {}).get("default") if isinstance(g.get("firstName"), dict) else g.get("firstName"),
@@ -738,7 +772,7 @@ def nhl_club_goalies(abbrev):
         out.append({"id": g.get("playerId"), "name": name or str(g.get("playerId")),
                     "sv": None if sv in (None, "") else float(sv),
                     "shots": int(g.get("shotsAgainst") or 0), "gp": int(g.get("gamesPlayed") or 0),
-                    "gs": int(g.get("gamesStarted") or 0)})
+                    "gs": int(g.get("gamesStarted") or 0), "season": None})
     return out
 
 
@@ -893,8 +927,10 @@ def build_nhl_game(g, date_iso, season_id, summary, log):
             notes.append("Could not fetch %s recent games: %s" % (nick, e))
         # goalies
         try:
-            goalies = nhl_club_goalies(ab)
-            out["goalies"][side] = [{"name": x["name"], "sv": x["sv"], "shots": x["shots"], "gs": x["gs"]} for x in goalies]
+            goalies = nhl_club_goalies(ab, season_id)
+            out["goalies"][side] = [{"name": x["name"], "sv": x["sv"], "shots": x["shots"], "gs": x["gs"], "season": x.get("season")} for x in goalies]
+            if goalies and goalies[0].get("season"):
+                notes.append("%s has not played yet: the goalie lines are LAST season's (%s), shots halved." % (nick, goalies[0]["season"]))
             last_id = None
             if fin and inputs[p + "rest"] == "0":
                 try:
@@ -1231,6 +1267,14 @@ def selftest():
     check("nhl: the back-to-back side gets the rested goalie", any("did not start yesterday" in n for n in row["notes"]))
     check("nhl: never confirmed", all("NOT confirmed" in n for n in row["notes"] if "likely starter" in n))
     check("nhl grade: final with the period score", gr2["finals"] == {"fa": "2", "fh": "3", "f5a": "1", "f5h": "0"})
+    check("previous season id", nhl_prev_season("20262027") == "20252026")
+    fetch_json = fake_nhl
+    try:
+        sjs = nhl_club_goalies("SJS", "20262027")
+    finally:
+        fetch_json = real
+    check("a team with no games falls back to last season's goalies still on the roster, shots halved",
+          len(sjs) == 1 and sjs[0]["name"] == "Yaroslav A" and sjs[0]["shots"] == 800 and sjs[0]["season"] == "20252026")
 
     print()
     if fails:
@@ -1379,9 +1423,13 @@ def _canned_nhl():
            "playerByGameStats": {"awayTeam": {"goalies": [{"playerId": 1, "starter": True}, {"playerId": 2, "starter": False}]}, "homeTeam": {"goalies": []}}}
     landing = {"summary": {"linescore": {"byPeriod": [{"periodDescriptor": {"number": 1}, "away": 1, "home": 0},
                                                       {"periodDescriptor": {"number": 2}, "away": 1, "home": 2}, {"periodDescriptor": {"number": 3}, "away": 0, "home": 1}]}}}
+    sjs_now = {"goalies": []}
+    sjs_last = club("SJS", [(7, "Yaroslav", "A", 0.908, 1600, 55, 54), (8, "Gone", "Guy", 0.900, 600, 20, 19)])
+    sjs_roster = {"goalies": [{"id": 7}, {"id": 9}]}
     return [
         ("/schedule/2026-10-07", sched7), ("/schedule/2026-10-06", sched6),
         ("team/summary", summary),
+        ("/club-stats/SJS/now", sjs_now), ("/club-stats/SJS/20252026/2", sjs_last), ("/roster/SJS/current", sjs_roster),
         ("/club-stats/NYR/", nyr), ("/club-stats/BOS/", bos),
         ("/club-schedule-season/NYR/", nyr_season), ("/club-schedule-season/BOS/", bos_season),
         ("/boxscore", box), ("/landing", landing),

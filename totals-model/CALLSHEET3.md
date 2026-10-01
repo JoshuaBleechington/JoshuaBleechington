@@ -1,10 +1,9 @@
-# Call Sheet 3.0 — MLB and NHL on one page
+# Call Sheet 3.0 — MLB, NHL and WNBA on one page
 
-`web/callsheet3.html`, published as its own artifact. Built 1 October 2026,
-a week before the NHL season, when the WNBA book was retired from the daily
-routine (its totals leaned under by construction and the playoffs ran over;
-its spreads were 14-1 on a rule the sheet could not know anything about).
-The hockey book is priced from **BetMGM**.
+`web/callsheet3.html`, published as its own artifact. Built 1 October 2026
+for the start of the NHL season, as MLB and NHL only; the WNBA button was
+switched on the same day when the user asked for all three books on one
+page, to keep one log. The hockey book is priced from **BetMGM**.
 
 - Engine, Python: `totals/nhl.py` (35 tests in `tests/test_nhl.py`)
 - Engine, browser: `web/nhl.engine.js`, ported line for line
@@ -31,11 +30,12 @@ is a mutable binding in the same scope), the plausibility windows are added
 to the engine's `PLAUSIBLE` object, and the team table gets an NHL page the
 same way. The Python does the equivalent through `fullgame.register_split`.
 
-The MLB half is Call Sheet 2.0 to the digit: the MLB fixtures in
-`callsheet3-cases.json` are 2.0's, unchanged. The WNBA code paths are
-carried but the WNBA button is hidden; the WNBA log stays on 2.0. **Load a
-backup** accepts a 2.0 backup and carries its MLB rows over, dropping the
-WNBA rows with a message, so the baseball log moves here intact.
+The MLB and WNBA pages are Call Sheet 2.0 to the digit: their fixtures in
+`callsheet3-cases.json` are 2.0's, unchanged. **Load a backup** takes a 3.0
+backup as a restore (it replaces the card) and a 2.0 backup as a move: its
+rows, baseball and basketball alike, join the card, a matchup already here
+(same sport, teams and date) is left as it is, and incoming rows take fresh
+ids. So the 2.0 log can be brought over more than once without doubling.
 
 ## The hockey book
 

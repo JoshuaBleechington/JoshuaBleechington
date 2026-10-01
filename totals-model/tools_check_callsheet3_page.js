@@ -168,7 +168,8 @@ const CHECKS = ["dome","playoff","agconf","hgconf"];
     const v = id => document.getElementById(id).value;
     const form = { away: v('away'), home: v('home'), agsv: v('agsv'), hgsh: v('hgsh'), asf: v('asf'), apk: v('apk'), arest: v('arest'), line: v('line'), pressed: document.getElementById('m-nhl').getAttribute('aria-pressed') };
     document.getElementById('slateClear').click(); document.getElementById('clear').click(); await wait();
-    // a 2.0 backup with an MLB row and a WNBA row
+    // a 2.0 backup with an MLB row and a WNBA row: both join the card, and loading it twice adds nothing
+    const before = JSON.parse(localStorage.getItem('callsheet3.card.v1') || '[]');
     const b2 = { format: 'callsheet2.backup', version: 1, card: [
       { id: 1, sport: 'MLB', away: 'Rays', home: 'Yankees', matchup: 'Rays @ Yankees', gdate: '2026-09-22', inputs: { away: 'Rays', home: 'Yankees', line: '6.5', op: '-110', up: '-110', gdate: '2026-09-22' }, markets: [{ key: 'total', label: 'Full-game total 6.5', pick: 'UNDER 6.5', side: 'UNDER', p: 0.52, pPush: 0, price: -110, edge: -0.004, fair: -108, anchored: true, band: 'NO BET', other: { pick: 'OVER 6.5', p: 0.48, price: -110, edge: -0.044 } }], finals: { fa: '2', fh: '3' } },
       { id: 2, sport: 'WNBA', away: 'Sun', home: 'Mystics', matchup: 'Sun @ Mystics', gdate: '2026-09-22', inputs: { away: 'Sun', home: 'Mystics', line: '162.5', gdate: '2026-09-22' }, markets: [], finals: {} } ] };
@@ -176,14 +177,24 @@ const CHECKS = ["dome","playoff","agconf","hgconf"];
     const inp2 = document.getElementById('restoreFile'); inp2.files = dt2.files; inp2.dispatchEvent(new Event('change', { bubbles: true })); await wait();
     const card = JSON.parse(localStorage.getItem('callsheet3.card.v1'));
     const msg = document.getElementById('saveMsg').textContent;
-    return { list, form, card: card.map(r => r.sport + ':' + r.matchup), msg };
+    const dt3 = new DataTransfer(); dt3.items.add(new File([JSON.stringify(b2)], 'callsheet2-2026-09-30.json', { type: 'application/json' }));
+    inp2.files = dt3.files; inp2.dispatchEvent(new Event('change', { bubbles: true })); await wait();
+    const again = JSON.parse(localStorage.getItem('callsheet3.card.v1'));
+    const msg2 = document.getElementById('saveMsg').textContent;
+    const wnbaBtn = document.getElementById('m-wnba');
+    return { list, form, before: before.length, card: card.map(r => r.sport + ':' + r.matchup), ids: card.map(r => r.id), msg,
+             again: again.length, msg2, wnbaHidden: wnbaBtn.hidden, wnbaOffset: wnbaBtn.offsetParent !== null };
   });
   chk(/Oilers @ Flames/.test(slate.list) && /SV 0\.908\/0\.916/.test(slate.list) && /Skinner v Wolf/.test(slate.list) && /likely the backup/.test(slate.list),
       'slate: a hockey game lists with its goalies, save percentages and note', slate.list.slice(0, 200));
   chk(slate.form.pressed === 'true' && slate.form.away === 'Oilers' && slate.form.agsv === '0.908' && slate.form.hgsh === '1300' && slate.form.asf === '30.1' && slate.form.apk === '78.0' && slate.form.arest === '0' && slate.form.line === '',
       'slate: Fill form switches to NHL and fills the goalie, shot, special-teams and rest boxes, never the line', JSON.stringify(slate.form));
-  chk(slate.card.length === 1 && slate.card[0] === 'MLB:Rays @ Yankees' && /MLB matchups from the 2.0 backup/.test(slate.msg) && /1 WNBA row stayed on 2.0/.test(slate.msg),
-      'backup: a 2.0 backup carries its MLB rows over and leaves the WNBA on 2.0', JSON.stringify(slate));
+  chk(slate.card.length === slate.before + 2 && slate.card.includes('MLB:Rays @ Yankees') && slate.card.includes('WNBA:Sun @ Mystics') && /Brought 2 matchups over from the 2.0 backup/.test(slate.msg),
+      'backup: a 2.0 backup brings its MLB and WNBA rows over and keeps what was already on the card', JSON.stringify({ before: slate.before, card: slate.card, msg: slate.msg }));
+  chk(new Set(slate.ids).size === slate.ids.length, 'backup: rows brought over take ids that collide with nothing on the card', slate.ids.join(','));
+  chk(slate.again === slate.card.length && /Brought 0 matchups over/.test(slate.msg2) && /2 already here were left as they are/.test(slate.msg2),
+      'backup: loading the same 2.0 backup again adds nothing and says so', `${slate.again} vs ${slate.card.length} · ${slate.msg2}`);
+  chk(!slate.wnbaHidden && slate.wnbaOffset, 'sport: the WNBA button is on the page', `hidden=${slate.wnbaHidden} shown=${slate.wnbaOffset}`);
 
   // ---- the team tables are scoped by sport ---------------------------------------------
   const teams = await pg.evaluate(async () => {

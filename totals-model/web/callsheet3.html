@@ -282,7 +282,8 @@
         <span class="build">· build <span id="build">2026-10-01</span></span></div>
       <h1>Call Sheet <em>3.0</em></h1>
       <p>One matchup, every market the book posts on it — in baseball the full-game total, the first five,
-         the moneyline and the run line; in hockey the total, the first period, the moneyline and the puck line — priced off the book's own numbers and <b>ranked by edge</b>, with
+         the moneyline and the run line; in hockey the total, the first period, the moneyline and the puck line;
+         in basketball the total, the moneyline and the spread — priced off the book's own numbers and <b>ranked by edge</b>, with
          the chance to hit as the big number on every row. Then a day board with the parlay four, the best
          straight bets, and tonight's whole card in one order.
          Call Sheet #1 is untouched; its MLB total is this sheet's total to the last digit. The hockey book is new on 1 Oct 2026 and every constant in it is a priori; the record decides.</p>
@@ -290,7 +291,7 @@
     <div class="modes" role="group" aria-label="Sport">
       <button type="button" id="m-mlb" aria-pressed="true">MLB</button>
       <button type="button" id="m-nhl" aria-pressed="false">NHL</button>
-      <button type="button" id="m-wnba" aria-pressed="false" hidden>WNBA</button>
+      <button type="button" id="m-wnba" aria-pressed="false">WNBA</button>
     </div>
   </header>
 
@@ -604,7 +605,8 @@
         <h2>Saving <span class="tag" id="saveState">draft saved</span></h2>
         <div class="body">
           <p class="note"><b>Separate from Call Sheet #1 and 2.0.</b> This page keeps its own card in this browser.
-            Load a backup accepts a 2.0 backup too and carries its MLB rows over, so the baseball log moves here intact.</p>
+            Load a backup accepts a 2.0 backup too: its rows, baseball and basketball alike, join the card here, and a
+            matchup already on the card is left as it is, so the 2.0 log can be brought over more than once without doubling.</p>
           <div class="row">
             <button type="button" class="btn solid" id="backup">Save a backup file</button>
             <button type="button" class="btn" id="restore">Load a backup</button>
@@ -672,7 +674,7 @@
       <div id="picks" class="picks"></div>
       <div class="subhead">Best straight bets <span class="tag">#1's BET or better first, then the best edges — up to eight</span></div>
       <div id="bestBets" class="picks"></div>
-      <div class="subhead" id="bySportHead">One sport only <span class="tag">the same two rules, MLB and WNBA apart — only on a night with both</span></div>
+      <div class="subhead" id="bySportHead">One sport only <span class="tag">the same two rules, one sport at a time — only on a night with more than one</span></div>
       <div id="bySport" class="sports"></div>
       <div class="scroll"><div id="board"></div></div>
       <p class="note"><b>The parlay four</b> takes one leg per game, in two tiers. First, Call Sheet #1's verdict:
@@ -3201,13 +3203,27 @@
       try {
         var d = JSON.parse(rd.result);
         if ((d.format !== "callsheet3.backup" && d.format !== "callsheet2.backup") || !Array.isArray(d.card)) throw new Error("not a Call Sheet 3.0 or 2.0 backup");
-        /* A 2.0 backup carries the baseball log over; its WNBA rows stay on 2.0. */
-        var dropped = 0;
-        if (d.format === "callsheet2.backup") { var keep = d.card.filter(function (r) { return r.sport !== "WNBA"; }); dropped = d.card.length - keep.length; d.card = keep; }
-        card = d.card; save(); renderCard(); renderBoard(); renderCalib();
-        if (dropped) say("Loaded <b>" + card.length + "</b> MLB matchups from the 2.0 backup " + esc(f.name) + "; " + dropped + " WNBA row" + (dropped === 1 ? "" : "s") + " stayed on 2.0.");
-        if (d.draft && d.draft.inputs) { setSport(sportOf(d.draft.sport), true); restore(d.draft.inputs); onEdit(); }
-        if (!dropped) say("Loaded <b>" + card.length + "</b> matchups from " + esc(f.name) + ".");
+        /* A 3.0 backup is a restore: it replaces the card. A 2.0 backup is a
+           move: its rows join the card, baseball and basketball alike, and a
+           matchup already here (same sport, teams and date) is left as it
+           is, so the 2.0 log can be brought over more than once without
+           doubling. Incoming rows take fresh ids; 2.0 and 3.0 number their
+           rows apart. */
+        var moved = d.format === "callsheet2.backup", added = 0, kept = 0;
+        if (moved) {
+          var have = {}; card.forEach(function (r) { have[r.sport + "|" + r.matchup + "|" + (r.gdate || "")] = true; });
+          var id = nextId();
+          d.card.forEach(function (r) {
+            var k = r.sport + "|" + r.matchup + "|" + (r.gdate || "");
+            if (have[k]) { kept++; return; }
+            have[k] = true; r.id = id++; card.push(r); added++;
+          });
+        } else card = d.card;
+        save(); renderCard(); renderBoard(); renderCalib();
+        if (moved) say("Brought <b>" + added + "</b> matchup" + (added === 1 ? "" : "s") + " over from the 2.0 backup " + esc(f.name) +
+          (kept ? "; " + kept + " already here " + (kept === 1 ? "was" : "were") + " left as " + (kept === 1 ? "it is" : "they are") : "") + ".");
+        if (!moved && d.draft && d.draft.inputs) { setSport(sportOf(d.draft.sport), true); restore(d.draft.inputs); onEdit(); }
+        if (!moved) say("Loaded <b>" + card.length + "</b> matchups from " + esc(f.name) + ".");
       } catch (e) { say("Could not load that file: " + esc(e.message) + ". Call Sheet #1 backups do not load here — the two sheets keep separate logs."); }
     };
     rd.readAsText(f);

@@ -1,7 +1,8 @@
 """Build web/callsheet3-cases.json from the package.
 
-The MLB cases are Call Sheet 2.0's, unchanged, because 3.0 carries 2.0's
-baseball page verbatim and must reach the same numbers. The NHL cases are
+The MLB and WNBA cases are Call Sheet 2.0's, unchanged, because 3.0 carries
+2.0's baseball and basketball pages verbatim and must reach the same
+numbers. The NHL cases are
 written here and their expectations come from totals/nhl.py, so a change to
 the hockey model regenerates them without anyone hand-editing a probability.
 
@@ -83,13 +84,13 @@ NHL_CASES = [
 
 
 def main() -> None:
-    cases = [c for c in json.loads(SRC.read_text()) if c["sport"] == "MLB"]
+    cases = [c for c in json.loads(SRC.read_text()) if c["sport"] in ("MLB", "WNBA")]
     for c in cases:
         c.pop("expect", None)
     cases.extend({"sport": "NHL", "name": c["name"], "inputs": dict(c["inputs"])} for c in NHL_CASES)
     from tools_gen_callsheet2_cases import build as build_mlb
     for c in cases:
-        m = build_mlb(c) if c["sport"] == "MLB" else build_nhl(c["inputs"])
+        m = build_nhl(c["inputs"]) if c["sport"] == "NHL" else build_mlb(c)
         c["expect"] = {
             "lam_home": None if m.lam_home is None else round(m.lam_home, 8),
             "lam_away": None if m.lam_away is None else round(m.lam_away, 8),
@@ -102,7 +103,8 @@ def main() -> None:
             } for mk in m.ranked()],
         }
     OUT.write_text(json.dumps(cases, indent=2) + "\n")
-    print(f"{len(cases)} cases written ({sum(1 for c in cases if c['sport'] == 'NHL')} NHL)")
+    by = {sp: sum(1 for c in cases if c["sport"] == sp) for sp in ("MLB", "NHL", "WNBA")}
+    print(f"{len(cases)} cases written ({by['MLB']} MLB, {by['NHL']} NHL, {by['WNBA']} WNBA)")
 
 
 if __name__ == "__main__":

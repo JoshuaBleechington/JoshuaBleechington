@@ -3164,6 +3164,1004 @@
     }
   },
   {
+    "sport": "WNBA",
+    "name": "empty card is a coin flip",
+    "inputs": {
+      "away": "Aces",
+      "home": "Lynx",
+      "line": 161.5,
+      "op": -110,
+      "up": -110,
+      "opened": null,
+      "apace": null,
+      "hpace": null,
+      "aort": null,
+      "hort": null,
+      "adrt": null,
+      "hdrt": null,
+      "arest": null,
+      "hrest": null,
+      "al5": null,
+      "hl5": null,
+      "playoff": false,
+      "hml": "-190",
+      "aml": "160",
+      "sp": "-4.5",
+      "sph": "-110",
+      "spa": "-110"
+    },
+    "expect": {
+      "lam_home": 83.0,
+      "lam_away": 78.5,
+      "projected": 161.5,
+      "markets": [
+        {
+          "key": "ml",
+          "pick": "Lynx ML",
+          "side": "HOME",
+          "p": 0.65876353,
+          "p_push": 0.0,
+          "price": -190.0,
+          "edge": 0.00359111,
+          "fair": -193.0519,
+          "anchored": true,
+          "band": ""
+        },
+        {
+          "key": "total",
+          "pick": "OVER 161.5",
+          "side": "OVER",
+          "p": 0.5,
+          "p_push": 0.0,
+          "price": -110.0,
+          "edge": -0.02380952,
+          "fair": 100.0,
+          "anchored": true,
+          "band": "NO BET"
+        },
+        {
+          "key": "spread",
+          "pick": "Lynx -4.5",
+          "side": "HOME",
+          "p": 0.5,
+          "p_push": 0.0,
+          "price": -110.0,
+          "edge": -0.02380952,
+          "fair": 100.0,
+          "anchored": true,
+          "band": ""
+        }
+      ]
+    }
+  },
+  {
+    "sport": "WNBA",
+    "name": "empty card on a whole number",
+    "inputs": {
+      "away": "Aces",
+      "home": "Lynx",
+      "line": 162,
+      "op": -110,
+      "up": -110,
+      "opened": null,
+      "apace": null,
+      "hpace": null,
+      "aort": null,
+      "hort": null,
+      "adrt": null,
+      "hdrt": null,
+      "arest": null,
+      "hrest": null,
+      "al5": null,
+      "hl5": null,
+      "playoff": false,
+      "sp": "-2",
+      "sph": "-115",
+      "spa": "-105"
+    },
+    "expect": {
+      "lam_home": 82.14411756,
+      "lam_away": 79.85588244,
+      "projected": 162.0,
+      "markets": [
+        {
+          "key": "spread",
+          "pick": "Aces +2",
+          "side": "AWAY",
+          "p": 0.48916576,
+          "p_push": 0.03624256,
+          "price": -105.0,
+          "edge": -0.02302936,
+          "fair": 104.4297,
+          "anchored": true,
+          "band": ""
+        },
+        {
+          "key": "total",
+          "pick": "OVER 162",
+          "side": "OVER",
+          "p": 0.5,
+          "p_push": 0.02492983,
+          "price": -110.0,
+          "edge": -0.02380952,
+          "fair": 100.0,
+          "anchored": true,
+          "band": "NO BET"
+        },
+        {
+          "key": "ml",
+          "pick": "Lynx ML",
+          "side": "HOME",
+          "p": 0.58239386,
+          "p_push": 0.0,
+          "price": null,
+          "edge": null,
+          "fair": -139.4601,
+          "anchored": false,
+          "band": ""
+        }
+      ]
+    }
+  },
+  {
+    "sport": "WNBA",
+    "name": "every input league average moves nothing",
+    "inputs": {
+      "away": "Aces",
+      "home": "Lynx",
+      "line": 161.5,
+      "op": -110,
+      "up": -110,
+      "opened": null,
+      "apace": 83.1,
+      "hpace": 83.1,
+      "aort": 107.0,
+      "hort": 107.0,
+      "adrt": 107.0,
+      "hdrt": 107.0,
+      "arest": 2,
+      "hrest": 2,
+      "al5": null,
+      "hl5": null,
+      "playoff": false,
+      "hml": "-135",
+      "aml": "115"
+    },
+    "expect": {
+      "lam_home": 82.29448819,
+      "lam_away": 80.840092,
+      "projected": 163.13458019,
+      "markets": [
+        {
+          "key": "total",
+          "pick": "OVER 161.5",
+          "side": "OVER",
+          "p": 0.54068566,
+          "p_push": 0.0,
+          "price": -110.0,
+          "edge": 0.01687614,
+          "fair": -117.7158,
+          "anchored": true,
+          "band": "BET"
+        },
+        {
+          "key": "ml",
+          "pick": "Aces ML",
+          "side": "AWAY",
+          "p": 0.447406,
+          "p_push": 0.0,
+          "price": 115.0,
+          "edge": -0.01771028,
+          "fair": 123.5106,
+          "anchored": true,
+          "band": ""
+        }
+      ]
+    }
+  },
+  {
+    "sport": "WNBA",
+    "name": "two fast teams",
+    "inputs": {
+      "away": "Valkyries",
+      "home": "Wings",
+      "line": 167.5,
+      "op": -105,
+      "up": -115,
+      "opened": null,
+      "apace": 88.0,
+      "hpace": 86.5,
+      "aort": 107.0,
+      "hort": 107.0,
+      "adrt": 107.0,
+      "hdrt": 107.0,
+      "arest": null,
+      "hrest": null,
+      "al5": null,
+      "hl5": null,
+      "playoff": false
+    },
+    "expect": {
+      "lam_home": null,
+      "lam_away": null,
+      "projected": 172.16332133,
+      "markets": [
+        {
+          "key": "total",
+          "pick": "OVER 167.5",
+          "side": "OVER",
+          "p": 0.61464931,
+          "p_push": 0.0,
+          "price": -105.0,
+          "edge": 0.10245419,
+          "fair": -159.5039,
+          "anchored": true,
+          "band": "STRONG BET"
+        }
+      ]
+    }
+  },
+  {
+    "sport": "WNBA",
+    "name": "two slow teams",
+    "inputs": {
+      "away": "Sun",
+      "home": "Mystics",
+      "line": 155.5,
+      "op": -115,
+      "up": -105,
+      "opened": null,
+      "apace": 78.0,
+      "hpace": 79.5,
+      "aort": 107.0,
+      "hort": 107.0,
+      "adrt": 107.0,
+      "hdrt": 107.0,
+      "arest": null,
+      "hrest": null,
+      "al5": null,
+      "hl5": null,
+      "playoff": false,
+      "hml": "120",
+      "aml": "-140",
+      "sp": "3.5",
+      "sph": "-120",
+      "spa": "100"
+    },
+    "expect": {
+      "lam_home": 75.72027651,
+      "lam_away": 78.62056845,
+      "projected": 154.34084497,
+      "markets": [
+        {
+          "key": "ml",
+          "pick": "Sun ML",
+          "side": "AWAY",
+          "p": 0.60398016,
+          "p_push": 0.0,
+          "price": -140.0,
+          "edge": 0.02064683,
+          "fair": -152.5126,
+          "anchored": true,
+          "band": ""
+        },
+        {
+          "key": "total",
+          "pick": "UNDER 155.5",
+          "side": "UNDER",
+          "p": 0.52887698,
+          "p_push": 0.0,
+          "price": -105.0,
+          "edge": 0.01668186,
+          "fair": -112.2588,
+          "anchored": true,
+          "band": "NO BET"
+        },
+        {
+          "key": "spread",
+          "pick": "Sun -3.5",
+          "side": "AWAY",
+          "p": 0.47826087,
+          "p_push": 0.0,
+          "price": 100.0,
+          "edge": -0.02173913,
+          "fair": 109.0909,
+          "anchored": true,
+          "band": ""
+        }
+      ]
+    }
+  },
+  {
+    "sport": "WNBA",
+    "name": "good offence into bad defence",
+    "inputs": {
+      "away": "Lynx",
+      "home": "Sparks",
+      "line": 170.5,
+      "op": -120,
+      "up": 100,
+      "opened": null,
+      "apace": 83.1,
+      "hpace": 83.1,
+      "aort": 112.0,
+      "hort": 104.0,
+      "adrt": 108.0,
+      "hdrt": 115.0,
+      "arest": null,
+      "hrest": null,
+      "al5": null,
+      "hl5": null,
+      "playoff": false,
+      "hml": "-190",
+      "aml": "160",
+      "sp": "-4.5",
+      "sph": "-110",
+      "spa": "-110"
+    },
+    "expect": {
+      "lam_home": 89.64728717,
+      "lam_away": 85.14728717,
+      "projected": 174.79457434,
+      "markets": [
+        {
+          "key": "total",
+          "pick": "OVER 170.5",
+          "side": "OVER",
+          "p": 0.60580847,
+          "p_push": 0.0,
+          "price": -120.0,
+          "edge": 0.06035393,
+          "fair": -153.6838,
+          "anchored": true,
+          "band": "STRONG BET"
+        },
+        {
+          "key": "ml",
+          "pick": "Sparks ML",
+          "side": "HOME",
+          "p": 0.65876353,
+          "p_push": 0.0,
+          "price": -190.0,
+          "edge": 0.00359111,
+          "fair": -193.0519,
+          "anchored": true,
+          "band": ""
+        },
+        {
+          "key": "spread",
+          "pick": "Sparks -4.5",
+          "side": "HOME",
+          "p": 0.5,
+          "p_push": 0.0,
+          "price": -110.0,
+          "edge": -0.02380952,
+          "fair": 100.0,
+          "anchored": true,
+          "band": ""
+        }
+      ]
+    }
+  },
+  {
+    "sport": "WNBA",
+    "name": "both defences elite",
+    "inputs": {
+      "away": "Valkyries",
+      "home": "Liberty",
+      "line": 156.5,
+      "op": 100,
+      "up": -120,
+      "opened": null,
+      "apace": 81.0,
+      "hpace": 80.0,
+      "aort": 103.0,
+      "hort": 105.0,
+      "adrt": 96.0,
+      "hdrt": 98.0,
+      "arest": null,
+      "hrest": null,
+      "al5": null,
+      "hl5": null,
+      "playoff": false,
+      "sp": "-2",
+      "sph": "-115",
+      "spa": "-105"
+    },
+    "expect": {
+      "lam_home": 77.06986524,
+      "lam_away": 74.78163011,
+      "projected": 151.85149534,
+      "markets": [
+        {
+          "key": "total",
+          "pick": "UNDER 156.5",
+          "side": "UNDER",
+          "p": 0.61429519,
+          "p_push": 0.0,
+          "price": -120.0,
+          "edge": 0.06884064,
+          "fair": -159.2656,
+          "anchored": true,
+          "band": "STRONG BET"
+        },
+        {
+          "key": "spread",
+          "pick": "Valkyries +2",
+          "side": "AWAY",
+          "p": 0.48916576,
+          "p_push": 0.03624256,
+          "price": -105.0,
+          "edge": -0.02302936,
+          "fair": 104.4297,
+          "anchored": true,
+          "band": ""
+        },
+        {
+          "key": "ml",
+          "pick": "Liberty ML",
+          "side": "HOME",
+          "p": 0.58239386,
+          "p_push": 0.0,
+          "price": null,
+          "edge": null,
+          "fair": -139.4601,
+          "anchored": false,
+          "band": ""
+        }
+      ]
+    }
+  },
+  {
+    "sport": "WNBA",
+    "name": "back to back on both sides",
+    "inputs": {
+      "away": "Sky",
+      "home": "Mercury",
+      "line": 163.5,
+      "op": -110,
+      "up": -110,
+      "opened": null,
+      "apace": 83.1,
+      "hpace": 83.1,
+      "aort": 107.0,
+      "hort": 107.0,
+      "adrt": 107.0,
+      "hdrt": 107.0,
+      "arest": 0,
+      "hrest": 0,
+      "al5": null,
+      "hl5": null,
+      "playoff": false,
+      "hml": "-135",
+      "aml": "115"
+    },
+    "expect": {
+      "lam_home": 81.59084594,
+      "lam_away": 80.13644975,
+      "projected": 161.72729568,
+      "markets": [
+        {
+          "key": "total",
+          "pick": "UNDER 163.5",
+          "side": "UNDER",
+          "p": 0.54411016,
+          "p_push": 0.0,
+          "price": -110.0,
+          "edge": 0.02030063,
+          "fair": -119.3512,
+          "anchored": true,
+          "band": "NO BET"
+        },
+        {
+          "key": "ml",
+          "pick": "Sky ML",
+          "side": "AWAY",
+          "p": 0.447406,
+          "p_push": 0.0,
+          "price": 115.0,
+          "edge": -0.01771028,
+          "fair": 123.5106,
+          "anchored": true,
+          "band": ""
+        }
+      ]
+    }
+  },
+  {
+    "sport": "WNBA",
+    "name": "one side on short rest",
+    "inputs": {
+      "away": "Fever",
+      "home": "Storm",
+      "line": 164.5,
+      "op": -110,
+      "up": -110,
+      "opened": null,
+      "apace": 84.0,
+      "hpace": 83.0,
+      "aort": 108.0,
+      "hort": 106.0,
+      "adrt": 105.0,
+      "hdrt": 107.0,
+      "arest": 1,
+      "hrest": 3,
+      "al5": null,
+      "hl5": null,
+      "playoff": false
+    },
+    "expect": {
+      "lam_home": null,
+      "lam_away": null,
+      "projected": 165.33219715,
+      "markets": [
+        {
+          "key": "total",
+          "pick": "OVER 164.5",
+          "side": "OVER",
+          "p": 0.52074056,
+          "p_push": 0.0,
+          "price": -110.0,
+          "edge": -0.00306896,
+          "fair": -108.6553,
+          "anchored": true,
+          "band": "NO BET"
+        }
+      ]
+    }
+  },
+  {
+    "sport": "WNBA",
+    "name": "rest alone cannot buy a band",
+    "inputs": {
+      "away": "Dream",
+      "home": "Sun",
+      "line": 158.5,
+      "op": -110,
+      "up": -110,
+      "opened": null,
+      "apace": null,
+      "hpace": null,
+      "aort": null,
+      "hort": null,
+      "adrt": null,
+      "hdrt": null,
+      "arest": 0,
+      "hrest": 0,
+      "al5": null,
+      "hl5": null,
+      "playoff": false,
+      "hml": "120",
+      "aml": "-140",
+      "sp": "3.5",
+      "sph": "-120",
+      "spa": "100"
+    },
+    "expect": {
+      "lam_home": 76.18805403,
+      "lam_away": 79.08834597,
+      "projected": 155.2764,
+      "markets": [
+        {
+          "key": "total",
+          "pick": "UNDER 158.5",
+          "side": "UNDER",
+          "p": 0.57983641,
+          "p_push": 0.0,
+          "price": -110.0,
+          "edge": 0.05602689,
+          "fair": -138.0025,
+          "anchored": true,
+          "band": "NO BET"
+        },
+        {
+          "key": "ml",
+          "pick": "Dream ML",
+          "side": "AWAY",
+          "p": 0.60398016,
+          "p_push": 0.0,
+          "price": -140.0,
+          "edge": 0.02064683,
+          "fair": -152.5126,
+          "anchored": true,
+          "band": ""
+        },
+        {
+          "key": "spread",
+          "pick": "Dream -3.5",
+          "side": "AWAY",
+          "p": 0.47826087,
+          "p_push": 0.0,
+          "price": 100.0,
+          "edge": -0.02173913,
+          "fair": 109.0909,
+          "anchored": true,
+          "band": ""
+        }
+      ]
+    }
+  },
+  {
+    "sport": "WNBA",
+    "name": "form alone is tagged too",
+    "inputs": {
+      "away": "Wings",
+      "home": "Sky",
+      "line": 169.5,
+      "op": -110,
+      "up": -110,
+      "opened": null,
+      "apace": null,
+      "hpace": null,
+      "aort": null,
+      "hort": null,
+      "adrt": null,
+      "hdrt": null,
+      "arest": null,
+      "hrest": null,
+      "al5": 178.0,
+      "hl5": 176.0,
+      "playoff": false,
+      "hml": "-190",
+      "aml": "160",
+      "sp": "-4.5",
+      "sph": "-110",
+      "spa": "-110"
+    },
+    "expect": {
+      "lam_home": 87.625,
+      "lam_away": 83.125,
+      "projected": 170.75,
+      "markets": [
+        {
+          "key": "total",
+          "pick": "OVER 169.5",
+          "side": "OVER",
+          "p": 0.53113569,
+          "p_push": 0.0,
+          "price": -110.0,
+          "edge": 0.00732617,
+          "fair": -113.2813,
+          "anchored": true,
+          "band": "NO BET"
+        },
+        {
+          "key": "ml",
+          "pick": "Sky ML",
+          "side": "HOME",
+          "p": 0.65876353,
+          "p_push": 0.0,
+          "price": -190.0,
+          "edge": 0.00359111,
+          "fair": -193.0519,
+          "anchored": true,
+          "band": ""
+        },
+        {
+          "key": "spread",
+          "pick": "Sky -4.5",
+          "side": "HOME",
+          "p": 0.5,
+          "p_push": 0.0,
+          "price": -110.0,
+          "edge": -0.02380952,
+          "fair": 100.0,
+          "anchored": true,
+          "band": ""
+        }
+      ]
+    }
+  },
+  {
+    "sport": "WNBA",
+    "name": "a playoff flag moves nothing",
+    "inputs": {
+      "away": "Lynx",
+      "home": "Aces",
+      "line": 159.5,
+      "op": -110,
+      "up": -110,
+      "opened": null,
+      "apace": 82.0,
+      "hpace": 81.5,
+      "aort": 106.0,
+      "hort": 108.0,
+      "adrt": 101.0,
+      "hdrt": 103.0,
+      "arest": null,
+      "hrest": null,
+      "al5": null,
+      "hl5": null,
+      "playoff": true,
+      "sp": "-2",
+      "sph": "-115",
+      "spa": "-105"
+    },
+    "expect": {
+      "lam_home": 80.49520901,
+      "lam_away": 78.20697389,
+      "projected": 158.7021829,
+      "markets": [
+        {
+          "key": "total",
+          "pick": "UNDER 159.5",
+          "side": "UNDER",
+          "p": 0.51988445,
+          "p_push": 0.0,
+          "price": -110.0,
+          "edge": -0.00392508,
+          "fair": -108.2832,
+          "anchored": true,
+          "band": "NO BET"
+        },
+        {
+          "key": "spread",
+          "pick": "Lynx +2",
+          "side": "AWAY",
+          "p": 0.48916576,
+          "p_push": 0.03624256,
+          "price": -105.0,
+          "edge": -0.02302936,
+          "fair": 104.4297,
+          "anchored": true,
+          "band": ""
+        },
+        {
+          "key": "ml",
+          "pick": "Aces ML",
+          "side": "HOME",
+          "p": 0.58239386,
+          "p_push": 0.0,
+          "price": null,
+          "edge": null,
+          "fair": -139.4601,
+          "anchored": false,
+          "band": ""
+        }
+      ]
+    }
+  },
+  {
+    "sport": "WNBA",
+    "name": "one price only is reconstructed",
+    "inputs": {
+      "away": "Aces",
+      "home": "Storm",
+      "line": 165.5,
+      "op": -130,
+      "up": null,
+      "opened": null,
+      "apace": null,
+      "hpace": null,
+      "aort": null,
+      "hort": null,
+      "adrt": null,
+      "hdrt": null,
+      "arest": null,
+      "hrest": null,
+      "al5": null,
+      "hl5": null,
+      "playoff": false,
+      "hml": "-135",
+      "aml": "115"
+    },
+    "expect": {
+      "lam_home": 84.06523205,
+      "lam_away": 82.61083586,
+      "projected": 166.67606792,
+      "markets": [
+        {
+          "key": "ml",
+          "pick": "Aces ML",
+          "side": "AWAY",
+          "p": 0.447406,
+          "p_push": 0.0,
+          "price": 115.0,
+          "edge": -0.01771028,
+          "fair": 123.5106,
+          "anchored": true,
+          "band": ""
+        },
+        {
+          "key": "total",
+          "pick": "OVER 165.5",
+          "side": "OVER",
+          "p": 0.52929757,
+          "p_push": 0.0,
+          "price": -130.0,
+          "edge": -0.03591982,
+          "fair": -112.4484,
+          "anchored": true,
+          "band": "NO BET"
+        }
+      ]
+    }
+  },
+  {
+    "sport": "WNBA",
+    "name": "pace on one side only is dropped",
+    "inputs": {
+      "away": "Sun",
+      "home": "Dream",
+      "line": 160.5,
+      "op": -110,
+      "up": -110,
+      "opened": null,
+      "apace": 85.0,
+      "hpace": null,
+      "aort": null,
+      "hort": null,
+      "adrt": null,
+      "hdrt": null,
+      "arest": null,
+      "hrest": null,
+      "al5": null,
+      "hl5": null,
+      "playoff": false
+    },
+    "expect": {
+      "lam_home": null,
+      "lam_away": null,
+      "projected": 160.5,
+      "markets": [
+        {
+          "key": "total",
+          "pick": "OVER 160.5",
+          "side": "OVER",
+          "p": 0.5,
+          "p_push": 0.0,
+          "price": -110.0,
+          "edge": -0.02380952,
+          "fair": 100.0,
+          "anchored": true,
+          "band": "NO BET"
+        }
+      ]
+    }
+  },
+  {
+    "sport": "WNBA",
+    "name": "a partial rating set is dropped",
+    "inputs": {
+      "away": "Sky",
+      "home": "Fever",
+      "line": 166.5,
+      "op": -110,
+      "up": -110,
+      "opened": null,
+      "apace": null,
+      "hpace": null,
+      "aort": 110.0,
+      "hort": 108.0,
+      "adrt": null,
+      "hdrt": null,
+      "arest": null,
+      "hrest": null,
+      "al5": null,
+      "hl5": null,
+      "playoff": false,
+      "hml": "120",
+      "aml": "-140",
+      "sp": "3.5",
+      "sph": "-120",
+      "spa": "100"
+    },
+    "expect": {
+      "lam_home": 81.79985403,
+      "lam_away": 84.70014597,
+      "projected": 166.5,
+      "markets": [
+        {
+          "key": "ml",
+          "pick": "Sky ML",
+          "side": "AWAY",
+          "p": 0.60398016,
+          "p_push": 0.0,
+          "price": -140.0,
+          "edge": 0.02064683,
+          "fair": -152.5126,
+          "anchored": true,
+          "band": ""
+        },
+        {
+          "key": "spread",
+          "pick": "Sky -3.5",
+          "side": "AWAY",
+          "p": 0.47826087,
+          "p_push": 0.0,
+          "price": 100.0,
+          "edge": -0.02173913,
+          "fair": 109.0909,
+          "anchored": true,
+          "band": ""
+        },
+        {
+          "key": "total",
+          "pick": "OVER 166.5",
+          "side": "OVER",
+          "p": 0.5,
+          "p_push": 0.0,
+          "price": -110.0,
+          "edge": -0.02380952,
+          "fair": 100.0,
+          "anchored": true,
+          "band": "NO BET"
+        }
+      ]
+    }
+  },
+  {
+    "sport": "WNBA",
+    "name": "everything at once",
+    "inputs": {
+      "away": "Valkyries",
+      "home": "Lynx",
+      "line": 160.5,
+      "op": -115,
+      "up": -105,
+      "opened": null,
+      "apace": 80.5,
+      "hpace": 82.0,
+      "aort": 105.0,
+      "hort": 110.0,
+      "adrt": 99.0,
+      "hdrt": 102.0,
+      "arest": 1,
+      "hrest": 2,
+      "al5": 158.0,
+      "hl5": 162.0,
+      "playoff": false,
+      "hml": "-190",
+      "aml": "160",
+      "sp": "-4.5",
+      "sph": "-110",
+      "spa": "-110"
+    },
+    "expect": {
+      "lam_home": 81.59758581,
+      "lam_away": 77.09758581,
+      "projected": 158.69517161,
+      "markets": [
+        {
+          "key": "total",
+          "pick": "UNDER 160.5",
+          "side": "UNDER",
+          "p": 0.54490614,
+          "p_push": 0.0,
+          "price": -105.0,
+          "edge": 0.03271102,
+          "fair": -119.7349,
+          "anchored": true,
+          "band": "NO BET"
+        },
+        {
+          "key": "ml",
+          "pick": "Lynx ML",
+          "side": "HOME",
+          "p": 0.65876353,
+          "p_push": 0.0,
+          "price": -190.0,
+          "edge": 0.00359111,
+          "fair": -193.0519,
+          "anchored": true,
+          "band": ""
+        },
+        {
+          "key": "spread",
+          "pick": "Lynx -4.5",
+          "side": "HOME",
+          "p": 0.5,
+          "p_push": 0.0,
+          "price": -110.0,
+          "edge": -0.02380952,
+          "fair": 100.0,
+          "anchored": true,
+          "band": ""
+        }
+      ]
+    }
+  },
+  {
     "sport": "MLB",
     "name": "wind straight in, at face value",
     "inputs": {
@@ -3631,6 +4629,65 @@
           "fair": 100.0,
           "anchored": true,
           "band": "NO BET"
+        }
+      ]
+    }
+  },
+  {
+    "sport": "WNBA",
+    "name": "pick-em spread is a coin-flip moneyline",
+    "inputs": {
+      "away": "A",
+      "home": "B",
+      "line": "165.5",
+      "op": "-110",
+      "up": "-110",
+      "sp": "0",
+      "sph": "-110",
+      "spa": "-110",
+      "hml": "-105",
+      "aml": "-115"
+    },
+    "expect": {
+      "lam_home": 82.75,
+      "lam_away": 82.75,
+      "projected": 165.5,
+      "markets": [
+        {
+          "key": "ml",
+          "pick": "B ML",
+          "side": "HOME",
+          "p": 0.5,
+          "p_push": 0.0,
+          "price": -105.0,
+          "edge": -0.01219512,
+          "fair": 100.0,
+          "anchored": true,
+          "band": ""
+        },
+        {
+          "key": "total",
+          "pick": "OVER 165.5",
+          "side": "OVER",
+          "p": 0.5,
+          "p_push": 0.0,
+          "price": -110.0,
+          "edge": -0.02380952,
+          "fair": 100.0,
+          "anchored": true,
+          "band": "NO BET"
+        },
+        {
+          "key": "spread",
+          "pick": "B +0",
+          "side": "HOME",
+          "p": 0.5,
+          "p_push": 0.0,
+          "price": -110.0,
+          "edge": -0.02380952,
+          "fair": 100.0,
+          "anchored": true,
+          "band": ""
         }
       ]
     }

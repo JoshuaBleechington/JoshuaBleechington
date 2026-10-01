@@ -1,4 +1,4 @@
-"""Assemble web/callsheet3.html -- Call Sheet 3.0: MLB and NHL on one page.
+"""Assemble web/callsheet3.html -- Call Sheet 3.0: MLB, NHL and WNBA on one page.
 
     python3 tools_build_callsheet3.py
 
@@ -57,7 +57,7 @@ def head() -> str:
     h = once(h, "<h1>Call Sheet <em>2.0</em></h1>", "<h1>Call Sheet <em>3.0</em></h1>", "h1")
     h = once(h, '<button type="button" id="m-mlb" aria-pressed="true">MLB</button>\n      <button type="button" id="m-wnba" aria-pressed="false">WNBA</button>',
              '<button type="button" id="m-mlb" aria-pressed="true">MLB</button>\n      <button type="button" id="m-nhl" aria-pressed="false">NHL</button>\n'
-             '      <button type="button" id="m-wnba" aria-pressed="false" hidden>WNBA</button>', "sport buttons")
+             '      <button type="button" id="m-wnba" aria-pressed="false">WNBA</button>', "sport buttons")
     h = once(h, '          <div id="spFields" hidden>', board + '          <div id="spFields" hidden>', "board sections")
     h = once(h, '      <div id="wnbaFields" class="stack" hidden>', fields + '      <div id="wnbaFields" class="stack" hidden>', "NHL fields")
     h = re.sub(r'<span id="build">\d{4}-\d{2}-\d{2}</span>', f'<span id="build">{STAMP}</span>', h, count=1)
@@ -72,11 +72,13 @@ def head() -> str:
              "  details.fold > summary .tag { font-size: 10px; letter-spacing: .09em; color: var(--muted); font-weight: 600; text-transform: none; }\n"
              "  @media (prefers-reduced-motion: reduce) { * { transition: none !important; animation: none !important; } }\n</style>", "fold css")
     h = once(h, "<p>One matchup, every market the book posts on it — the full-game total, the first five,\n         the moneyline and the run line — priced off",
-             "<p>One matchup, every market the book posts on it — in baseball the full-game total, the first five,\n         the moneyline and the run line; in hockey the total, the first period, the moneyline and the puck line — priced off", "header copy")
+             "<p>One matchup, every market the book posts on it — in baseball the full-game total, the first five,\n         the moneyline and the run line; in hockey the total, the first period, the moneyline and the puck line;\n         in basketball the total, the moneyline and the spread — priced off", "header copy")
     h = once(h, "Call Sheet #1 is untouched; its total is this sheet's total to the last digit.</p>",
              "Call Sheet #1 is untouched; its MLB total is this sheet's total to the last digit. The hockey book is new on 1 Oct 2026 and every constant in it is a priori; the record decides.</p>", "header tail")
     h = once(h, "<b>Separate from Call Sheet #1.</b> This page keeps its own card in this browser\n            and its own backup format. Nothing here reads or writes #1's log.",
-             "<b>Separate from Call Sheet #1 and 2.0.</b> This page keeps its own card in this browser.\n            Load a backup accepts a 2.0 backup too and carries its MLB rows over, so the baseball log moves here intact.", "saving note")
+             "<b>Separate from Call Sheet #1 and 2.0.</b> This page keeps its own card in this browser.\n            Load a backup accepts a 2.0 backup too: its rows, baseball and basketball alike, join the card here, and a\n            matchup already on the card is left as it is, so the 2.0 log can be brought over more than once without doubling.", "saving note")
+    h = once(h, "the same two rules, MLB and WNBA apart — only on a night with both",
+             "the same two rules, one sport at a time — only on a night with more than one", "by-sport head")
     h = once(h, "its own line in the record below, so it can earn one.</p>",
              "its own line in the record below, so it can earn one. The three labels are baseball's; the hockey book "
              "starts with none and earns its own from the record.</p>", "rail note")
@@ -164,15 +166,31 @@ def tail() -> str:
     t = once(t, 'format: "callsheet2.backup"', 'format: "callsheet3.backup"', "backup format")
     t = once(t, 'name = "callsheet2-" + todayISO() + ".json"', 'name = "callsheet3-" + todayISO() + ".json"', "backup name")
     t = once(t, '        if (d.format !== "callsheet2.backup" || !Array.isArray(d.card)) throw new Error("not a Call Sheet 2.0 backup");\n'
-                '        card = d.card; save(); renderCard(); renderBoard(); renderCalib();',
+                '        card = d.card; save(); renderCard(); renderBoard(); renderCalib();\n'
+                '        if (d.draft && d.draft.inputs) {',
              '        if ((d.format !== "callsheet3.backup" && d.format !== "callsheet2.backup") || !Array.isArray(d.card)) throw new Error("not a Call Sheet 3.0 or 2.0 backup");\n'
-             '        /* A 2.0 backup carries the baseball log over; its WNBA rows stay on 2.0. */\n'
-             '        var dropped = 0;\n'
-             '        if (d.format === "callsheet2.backup") { var keep = d.card.filter(function (r) { return r.sport !== "WNBA"; }); dropped = d.card.length - keep.length; d.card = keep; }\n'
-             '        card = d.card; save(); renderCard(); renderBoard(); renderCalib();\n'
-             '        if (dropped) say("Loaded <b>" + card.length + "</b> MLB matchups from the 2.0 backup " + esc(f.name) + "; " + dropped + " WNBA row" + (dropped === 1 ? "" : "s") + " stayed on 2.0.");', "restore")
+             '        /* A 3.0 backup is a restore: it replaces the card. A 2.0 backup is a\n'
+             '           move: its rows join the card, baseball and basketball alike, and a\n'
+             '           matchup already here (same sport, teams and date) is left as it\n'
+             '           is, so the 2.0 log can be brought over more than once without\n'
+             '           doubling. Incoming rows take fresh ids; 2.0 and 3.0 number their\n'
+             '           rows apart. */\n'
+             '        var moved = d.format === "callsheet2.backup", added = 0, kept = 0;\n'
+             '        if (moved) {\n'
+             '          var have = {}; card.forEach(function (r) { have[r.sport + "|" + r.matchup + "|" + (r.gdate || "")] = true; });\n'
+             '          var id = nextId();\n'
+             '          d.card.forEach(function (r) {\n'
+             '            var k = r.sport + "|" + r.matchup + "|" + (r.gdate || "");\n'
+             '            if (have[k]) { kept++; return; }\n'
+             '            have[k] = true; r.id = id++; card.push(r); added++;\n'
+             '          });\n'
+             '        } else card = d.card;\n'
+             '        save(); renderCard(); renderBoard(); renderCalib();\n'
+             '        if (moved) say("Brought <b>" + added + "</b> matchup" + (added === 1 ? "" : "s") + " over from the 2.0 backup " + esc(f.name) +\n'
+             '          (kept ? "; " + kept + " already here " + (kept === 1 ? "was" : "were") + " left as " + (kept === 1 ? "it is" : "they are") : "") + ".");\n'
+             '        if (!moved && d.draft && d.draft.inputs) {', "restore")
     t = once(t, 'say("Loaded <b>" + card.length + "</b> matchups from " + esc(f.name) + ".");',
-             'if (!dropped) say("Loaded <b>" + card.length + "</b> matchups from " + esc(f.name) + ".");', "restore message")
+             'if (!moved) say("Loaded <b>" + card.length + "</b> matchups from " + esc(f.name) + ".");', "restore message")
     t = once(t, '  var SLATE_FIELDS = ["aera","hera","aip","hip","al5era","hl5era","al5ip","hl5ip","arpg","hrpg","abp","hbp","al10","hl10","h2h","h2hn","pf","mph","dir","temp","tick","cash",\n'
                 '                      "apace","hpace","aort","hort","adrt","hdrt","arest","hrest","al5","hl5"];',
              '  var SLATE_FIELDS = ["aera","hera","aip","hip","al5era","hl5era","al5ip","hl5ip","arpg","hrpg","abp","hbp","al10","hl10","h2h","h2hn","pf","mph","dir","temp","tick","cash",\n'

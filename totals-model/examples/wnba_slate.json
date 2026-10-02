@@ -1,0 +1,19 @@
+{
+  "games": [
+    {
+      "away": { "name": "Aces", "pace": 81.5, "off_rating": 108.0, "def_rating": 99.5, "rest_days": 2 },
+      "home": { "name": "Liberty", "pace": 79.0, "off_rating": 109.5, "def_rating": 96.0, "rest_days": 3 },
+      "market": { "line": 167.5, "over_odds": -110, "under_odds": -110 }
+    },
+    {
+      "away": { "name": "Sky", "pace": 78.0, "off_rating": 96.5, "def_rating": 104.0, "rest_days": 0 },
+      "home": { "name": "Sun", "pace": 77.5, "off_rating": 100.0, "def_rating": 95.5, "rest_days": 2 },
+      "market": { "line": 158.5, "over_odds": -105, "under_odds": -115 }
+    },
+    {
+      "away": { "name": "Fever", "pace": 84.0, "off_rating": 103.0, "def_rating": 103.5, "rest_days": 1 },
+      "home": { "name": "Mystics", "pace": 82.0, "off_rating": 98.0, "def_rating": 105.0, "rest_days": 1 },
+      "market": { "line": 170.5, "over_odds": -112, "under_odds": -108 }
+    }
+  ]
+}

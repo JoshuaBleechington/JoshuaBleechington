@@ -1,0 +1,75 @@
+<!-- BOARD: the two NHL side markets, inserted into the board card next to the run line and first five -->
+          <div id="plFields" hidden>
+            <div class="subhead">Puck line <span class="tag">home side's number, as BetMGM prints it</span></div>
+            <div class="grid3">
+              <div class="f"><label for="pl">Home puck line</label><input id="pl" type="number" step="0.5" inputmode="decimal" placeholder="-1.5"></div>
+              <div class="f"><label for="plh">Home price</label><input id="plh" type="number" step="5" inputmode="numeric" placeholder="+180"></div>
+              <div class="f"><label for="pla">Away price</label><input id="pla" type="number" step="5" inputmode="numeric" placeholder="-220"></div>
+            </div>
+          </div>
+
+          <div id="p1Fields" hidden>
+            <div class="subhead">First period total <span class="tag">its own market, its own anchor</span></div>
+            <div class="grid3">
+              <div class="f"><label for="p1line">P1 total</label><input id="p1line" type="number" step="0.5" inputmode="decimal" placeholder="1.5"></div>
+              <div class="f"><label for="p1op">P1 over price</label><input id="p1op" type="number" step="5" inputmode="numeric" placeholder="-120"></div>
+              <div class="f"><label for="p1up">P1 under price</label><input id="p1up" type="number" step="5" inputmode="numeric" placeholder="+100"></div>
+            </div>
+          </div>
+<!-- ===== FIELDS: the NHL inputs. What you do is on top; what the slate fills is folded below it ===== -->
+      <div id="nhlFields" class="stack" hidden>
+        <section class="card">
+          <h2>Goalies <span class="tag">the one thing to confirm before you bet</span></h2>
+          <div class="body">
+            <p class="note" id="goalieSummary">No goalie lines yet — load the slate, or open the boxes below.</p>
+            <div class="grid2">
+              <label class="check"><input type="checkbox" id="agconf"> Away starter confirmed</label>
+              <label class="check"><input type="checkbox" id="hgconf"> Home starter confirmed</label>
+            </div>
+            <div class="links">
+              <a href="https://www.dailyfaceoff.com/starting-goalies" target="_blank" rel="noopener">Daily Faceoff · starting goalies</a>
+            </div>
+            <p class="note">The slate names each side's <b>likely</b> starter and fills his line. A late change in net is the one
+              thing a hockey market prices imperfectly, so check Daily Faceoff, tick the boxes, and if the other goalie is
+              starting, open the boxes below and type his line over the slate's (the slate's printout lists both).</p>
+          </div>
+        </section>
+
+        <details class="card fold" id="nhlSlateBoxes">
+          <summary><span>Filled by the slate</span> <span class="tag">goalie lines, shots, special teams, form, rest — open to check or edit</span></summary>
+          <div class="body">
+            <div class="grid2">
+              <div class="f"><label for="agsv">Away goalie save %</label><input id="agsv" type="number" step="0.001" inputmode="decimal" placeholder=".905"></div>
+              <div class="f"><label for="hgsv">Home goalie save %</label><input id="hgsv" type="number" step="0.001" inputmode="decimal" placeholder=".905"></div>
+            </div>
+            <div class="grid2">
+              <div class="f"><label for="agsh">Away goalie shots faced</label><input id="agsh" type="number" step="1" inputmode="numeric" placeholder="both or neither"></div>
+              <div class="f"><label for="hgsh">Home goalie shots faced</label><input id="hgsh" type="number" step="1" inputmode="numeric" placeholder="both or neither"></div>
+            </div>
+            <div class="grid2">
+              <div class="f"><label for="asf">Away shots for / game</label><input id="asf" type="number" step="0.1" inputmode="decimal" placeholder="30.0"></div>
+              <div class="f"><label for="hsf">Home shots for / game</label><input id="hsf" type="number" step="0.1" inputmode="decimal" placeholder="30.0"></div>
+            </div>
+            <div class="grid4">
+              <div class="f"><label for="app">Away PP %</label><input id="app" type="number" step="0.1" inputmode="decimal" placeholder="21.0"></div>
+              <div class="f"><label for="hpp">Home PP %</label><input id="hpp" type="number" step="0.1" inputmode="decimal" placeholder="21.0"></div>
+              <div class="f"><label for="apk">Away PK %</label><input id="apk" type="number" step="0.1" inputmode="decimal" placeholder="79.0"></div>
+              <div class="f"><label for="hpk">Home PK %</label><input id="hpk" type="number" step="0.1" inputmode="decimal" placeholder="79.0"></div>
+            </div>
+            <div class="grid2">
+              <div class="f"><label for="al10">Away last-10 avg total</label><input id="al10" type="number" step="0.1" inputmode="decimal" placeholder="6.2"></div>
+              <div class="f"><label for="hl10">Home last-10 avg total</label><input id="hl10" type="number" step="0.1" inputmode="decimal" placeholder="5.8"></div>
+            </div>
+            <div class="grid4">
+              <div class="f"><label for="h2h">H2H avg total</label><input id="h2h" type="number" step="0.1" inputmode="decimal" placeholder="6.0"></div>
+              <div class="f"><label for="h2hn">Meetings</label><input id="h2hn" type="number" step="1" inputmode="numeric" placeholder="2"></div>
+              <div class="f"><label for="arest">Away days rest</label><input id="arest" type="number" step="1" min="0" max="14" inputmode="numeric" placeholder="1"></div>
+              <div class="f"><label for="hrest">Home days rest</label><input id="hrest" type="number" step="1" min="0" max="14" inputmode="numeric" placeholder="2"></div>
+            </div>
+            <p class="note">A save percentage is shrunk toward the league by the shots behind it, so the two goalie boxes travel
+              as a pair: both or neither, on each side. Shots, special teams and the last ten wait until a team has five
+              games; until then the slate leaves them blank and the sheet is the market plus the goalies. Special teams and
+              form are tagged and cannot buy a band; a back to back (0 days rest) is shown, not scored.</p>
+          </div>
+        </details>
+      </div>

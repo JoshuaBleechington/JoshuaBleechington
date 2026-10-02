@@ -1,0 +1,5 @@
+# The scorer itself runs on the standard library alone.
+# PDF resumes need one reader:
+pdfminer.six>=20221105
+# Tests:
+pytest>=7.0

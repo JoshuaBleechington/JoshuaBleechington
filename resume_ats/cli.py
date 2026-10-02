@@ -1,0 +1,521 @@
+"""Command line interface."""
+
+from __future__ import annotations
+
+import argparse
+import json
+import os
+import sys
+from typing import List, Optional, Sequence
+
+from . import __version__
+from .aliases import default_lexicon
+from .extract import Document, ExtractionError, extract, from_string
+from .jd import parse as parse_jd
+from .report import render_html, render_json, render_markdown, render_terminal
+from .score import ScoreReport, score as run_score
+
+EPILOG = """\
+examples:
+  resume-ats score resume.docx job.txt
+  resume-ats score resume.pdf --jd-text "$(pbpaste)" --format markdown -o report.md
+  resume-ats score resume.docx job.txt --format html -o report.html
+  resume-ats audit resume.docx
+  resume-ats compare v1.docx v2.docx v3.docx --jd job.txt
+  resume-ats tailor resume.docx job.txt -o tailored.docx --notes notes.md
+  resume-ats tailor resume.docx --jobs postings/ --outdir applications/
+  resume-ats keywords job.txt --top 40
+"""
+
+
+def _read_source(path: Optional[str], text: Optional[str], label: str) -> str:
+    if text is not None:
+        return text
+    if path in ("-", None):
+        if sys.stdin.isatty():
+            raise SystemExit(f"error: no {label} provided (pass a file path, --{label}-text, or pipe stdin)")
+        return sys.stdin.read()
+    doc = extract(path)
+    for warning in doc.warnings:
+        print(f"warning: {warning}", file=sys.stderr)
+    return doc.text
+
+
+def _load_resume(path: Optional[str], text: Optional[str]) -> Document:
+    if text is not None:
+        return from_string(text, "<--resume-text>")
+    if path in ("-", None):
+        if sys.stdin.isatty():
+            raise SystemExit("error: no resume provided")
+        return from_string(sys.stdin.read(), "<stdin>")
+    return extract(path)
+
+
+def _emit(text: str, out: Optional[str]) -> None:
+    if out:
+        with open(out, "w", encoding="utf-8") as fh:
+            fh.write(text)
+        print(f"wrote {out}", file=sys.stderr)
+    else:
+        print(text)
+
+
+def _render(report: ScoreReport, fmt: str, color: bool, verbose: bool) -> str:
+    if fmt == "json":
+        return render_json(report)
+    if fmt == "markdown":
+        return render_markdown(report)
+    if fmt == "html":
+        return render_html(report)
+    return render_terminal(report, color=color, verbose=verbose)
+
+
+def cmd_score(args: argparse.Namespace) -> int:
+    lexicon = default_lexicon()
+    if args.aliases:
+        lexicon.load_extra(args.aliases)
+
+    document = _load_resume(args.resume, args.resume_text)
+    jd_text = _read_source(args.jd, args.jd_text, "jd")
+    jd = parse_jd(jd_text, lexicon)
+    if args.title:
+        jd.title = args.title
+
+    report = run_score(document, jd, lexicon)
+    color = sys.stdout.isatty() and not args.no_color and not args.output
+    _emit(_render(report, args.format, color, args.verbose), args.output)
+
+    if args.min_score is not None and report.total < args.min_score:
+        print(
+            f"score {report.total:.1f} is below the --min-score threshold of {args.min_score}",
+            file=sys.stderr,
+        )
+        return 2
+    return 0
+
+
+def cmd_audit(args: argparse.Namespace) -> int:
+    """Format-only check: no job description needed."""
+    from .parseability import audit as run_audit
+    from .resume import parse as parse_resume
+
+    from .text import repair_layout
+
+    document = _load_resume(args.resume, None)
+    repaired, repairs = repair_layout(document.text)
+    resume = parse_resume(repaired)
+    result = run_audit(document, resume, repairs)
+
+    if args.format == "json":
+        payload = {
+            "file": document.source,
+            "kind": document.kind,
+            "extractor": document.extractor,
+            "words": document.word_count,
+            "parse_score": result.score,
+            "sections_found": resume.section_order,
+            "roles_found": len(resume.roles),
+            "years_experience": resume.years_experience,
+            "contact": {
+                "email": resume.contact.email,
+                "phone": resume.contact.phone,
+                "linkedin": resume.contact.linkedin,
+                "name": resume.contact.name_guess,
+            },
+            "findings": [
+                {"severity": f.severity, "code": f.code, "message": f.message, "fix": f.fix}
+                for f in result.sorted_findings()
+            ],
+        }
+        _emit(json.dumps(payload, indent=2), args.output)
+        return 0 if result.count("blocker") == 0 else 2
+
+    lines: List[str] = []
+    lines.append(f"ATS PARSE AUDIT — {document.source}")
+    lines.append("─" * 72)
+    lines.append(f"Format: {document.kind}   Reader: {document.extractor}   Words: {document.word_count}")
+    lines.append(f"Parse-safety score: {result.score:.0f}/100")
+    lines.append(f"Sections detected: {', '.join(resume.section_order) or 'none'}")
+    lines.append(f"Positions detected: {len(resume.roles)}   Experience evidenced: {resume.years_experience} years")
+    contact = resume.contact
+    lines.append(
+        f"Contact parsed: name={contact.name_guess or '-'} email={contact.email or '-'} "
+        f"phone={contact.phone or '-'}"
+    )
+    lines.append("")
+    if not result.findings:
+        lines.append("No parsing problems detected.")
+    for finding in result.sorted_findings():
+        lines.append(f"  [{finding.severity.upper():<7}] {finding.message}")
+        if finding.fix:
+            lines.append(f"            -> {finding.fix}")
+    lines.append("")
+    lines.append("This checks whether an ATS can read the file. It says nothing about")
+    lines.append("how well the content matches any particular job.")
+    _emit("\n".join(lines), args.output)
+    return 0 if result.count("blocker") == 0 else 2
+
+
+def cmd_keywords(args: argparse.Namespace) -> int:
+    """Show what the tool mined from a posting, and how it weighted it."""
+    lexicon = default_lexicon()
+    if args.aliases:
+        lexicon.load_extra(args.aliases)
+    jd_text = _read_source(args.jd, args.jd_text, "jd")
+    jd = parse_jd(jd_text, lexicon)
+
+    if args.format == "json":
+        payload = {
+            "title": jd.title,
+            "min_years": jd.min_years,
+            "min_degree": jd.min_degree,
+            "clearance": jd.clearance,
+            "terms": [
+                {"term": r.display, "weight": round(r.weight, 2), "count": r.count,
+                 "required": r.required, "preferred": r.preferred,
+                 "known_skill": r.known_skill, "category": r.category}
+                for r in jd.top(args.top)
+            ],
+        }
+        _emit(json.dumps(payload, indent=2), args.output)
+        return 0
+
+    lines = [f"POSTING: {jd.title or '(title not detected)'}", "─" * 72]
+    if jd.min_years:
+        lines.append(f"Minimum experience: {jd.min_years:.0f} years")
+    if jd.min_degree:
+        lines.append(f"Minimum education:  {jd.min_degree}")
+    if jd.clearance:
+        lines.append(f"Clearance:          {jd.clearance}")
+    lines.append("")
+    lines.append(f"{'weight':>7}  {'req':>3} {'pref':>4}  term")
+    for req in jd.top(args.top):
+        lines.append(
+            f"{req.weight:7.2f}  {'y' if req.required else '-':>3} "
+            f"{'y' if req.preferred else '-':>4}  {req.display}"
+        )
+    _emit("\n".join(lines), args.output)
+    return 0
+
+
+def _collect_jd_paths(entries: Sequence[str]) -> List[str]:
+    """Expand files and directories into a sorted list of job-description files."""
+    paths: List[str] = []
+    for entry in entries:
+        if os.path.isdir(entry):
+            for name in sorted(os.listdir(entry)):
+                if name.lower().endswith((".txt", ".md", ".markdown")):
+                    paths.append(os.path.join(entry, name))
+        else:
+            paths.append(entry)
+    return paths
+
+
+def _confirmed(args: argparse.Namespace) -> list:
+    """Skills the candidate has told us they hold, from --confirm."""
+    return [t.strip() for t in getattr(args, "confirm", "").split(",") if t.strip()]
+
+
+def cmd_tailor_batch(args: argparse.Namespace) -> int:
+    """Tailor one resume against many postings, one document each."""
+    from . import tailor as tailor_mod
+    from .score import score as run_score
+
+    lexicon = default_lexicon()
+    if args.aliases:
+        lexicon.load_extra(args.aliases)
+
+    document = _load_resume(args.resume, args.resume_text)
+    jd_paths = _collect_jd_paths(args.jobs)
+    if not jd_paths:
+        print("error: no job descriptions found", file=sys.stderr)
+        return 1
+
+    outdir = args.outdir or "applications"
+    os.makedirs(outdir, exist_ok=True)
+
+    rows = []
+    for jd_path in jd_paths:
+        stem = os.path.splitext(os.path.basename(jd_path))[0]
+        try:
+            jd_text = extract(jd_path).text
+        except ExtractionError as exc:
+            print(f"skipping {jd_path}: {exc}", file=sys.stderr)
+            continue
+        jd = parse_jd(jd_text, lexicon)
+        result = tailor_mod.build(document, jd, lexicon, headline=args.headline,
+                              confirmed_skills=_confirmed(args))
+        if result.source_warnings and not args.force:
+            print("error: the resume could not be rebuilt faithfully; "
+                  "run `tailor` on a single posting to see why", file=sys.stderr)
+            return 2
+
+        doc_path = os.path.join(outdir, f"{stem}.docx")
+        tailor_mod.save(result, doc_path)
+        before = run_score(document, jd, lexicon)
+        after = run_score(extract(doc_path), jd, lexicon)
+        notes_path = os.path.join(outdir, f"{stem}-notes.md")
+        with open(notes_path, "w", encoding="utf-8") as fh:
+            fh.write(tailor_mod.notes_markdown(result, jd, after))
+        rows.append((stem, jd.title, before.total, after.total, after.band,
+                     len(after.failed_gates)))
+
+    rows.sort(key=lambda r: -r[3])
+    if args.format == "json":
+        print(json.dumps([
+            {"posting": r[0], "title": r[1], "before": r[2], "after": r[3],
+             "band": r[4], "unmet_gates": r[5]} for r in rows], indent=2))
+        return 0
+
+    pad = max((len(r[0]) for r in rows), default=10)
+    out = [f"{len(rows)} tailored resume(s) written to {outdir}/", "-" * (pad + 40),
+           f"{'posting'.ljust(pad)}  before  after  band"]
+    for stem, _, before, after, band, gates in rows:
+        flag = f"  ({gates} unmet requirement{'s' if gates != 1 else ''})" if gates else ""
+        out.append(f"{stem.ljust(pad)}  {before:6.1f} {after:6.1f}  {band}{flag}")
+    out += ["", "Each posting also has a -notes.md working list of what only you can add.",
+            "Apply to the strongest matches first."]
+    _emit("\n".join(out), None)
+    return 0
+
+
+def cmd_tailor(args: argparse.Namespace) -> int:
+    """Rebuild a resume as an ATS-aligned .docx aimed at one posting."""
+    from . import tailor as tailor_mod
+    from .score import score as run_score
+
+    if getattr(args, "jobs", None):
+        return cmd_tailor_batch(args)
+
+    lexicon = default_lexicon()
+    if args.aliases:
+        lexicon.load_extra(args.aliases)
+
+    document = _load_resume(args.resume, args.resume_text)
+    jd_text = _read_source(args.jd, args.jd_text, "jd")
+    jd = parse_jd(jd_text, lexicon)
+
+    result = tailor_mod.build(document, jd, lexicon, headline=args.headline,
+                              confirmed_skills=_confirmed(args))
+
+    if result.source_warnings and not args.force:
+        print("Cannot rebuild faithfully from this file.\n", file=sys.stderr)
+        for warning in result.source_warnings:
+            print(f"  - {_wrap_cli(warning, 74)}", file=sys.stderr)
+        print(
+            "\nTailoring can only rearrange what came out of the file, and too much\n"
+            "of this one never reached the parser. Export the resume as .docx (or\n"
+            "save a text-based PDF) and run this again on that. Use --force to\n"
+            "write the file anyway, knowing it will be missing content.",
+            file=sys.stderr)
+        return 2
+
+    out_path = args.output or "tailored-resume.docx"
+    tailor_mod.save(result, out_path)
+
+    before = run_score(document, jd, lexicon)
+    after = run_score(extract(out_path) if not out_path.lower().endswith((".txt", ".md"))
+                      else from_string(result.text, out_path), jd, lexicon)
+
+    notes_path = args.notes
+    if notes_path:
+        with open(notes_path, "w", encoding="utf-8") as fh:
+            fh.write(tailor_mod.notes_markdown(result, jd, after))
+
+    if args.format == "json":
+        payload = {
+            "output": out_path,
+            "headline": result.headline,
+            "source_warnings": result.source_warnings,
+            "score_before": before.total,
+            "score_after": after.total,
+            "changes": [{"category": c.category, "detail": c.detail} for c in result.changes],
+            "manual": [{"kind": m.kind, "detail": m.detail} for m in result.manual],
+            "notes": notes_path,
+        }
+        print(json.dumps(payload, indent=2))
+        return 0
+
+    width = 78
+    out = []
+    if result.source_warnings:
+        out.append("WARNING: the source file was damaged; content is missing from the rebuild.")
+        for warning in result.source_warnings:
+            out.append(f"  - {_wrap_cli(warning, width - 4)}")
+        out.append("")
+    out += [f"TAILORED RESUME WRITTEN -> {out_path}", "-" * width,
+           f"Target: {jd.title or '(title not detected)'}",
+           f"Score against this posting: {before.total:.1f} -> {after.total:.1f}", ""]
+
+    out.append("CHANGES APPLIED")
+    for change in result.changes:
+        out.append(f"  [{change.category}] {_wrap_cli(change.detail, width - 4)}")
+
+    if result.manual:
+        out += ["", "ONLY YOU CAN DO THESE (deliberately not written into the file)"]
+        for item in result.manual:
+            out.append(f"  - {_wrap_cli(item.detail, width - 4)}")
+
+    if notes_path:
+        out += ["", f"Working list written -> {notes_path}"]
+
+    out += ["", "This rebuilds and re-words what your resume already says. It never adds",
+            "an achievement, number, employer or skill you did not write yourself.",
+            "Read the result before you send it."]
+    _emit("\n".join(out), None)
+    return 0
+
+
+def _wrap_cli(text: str, width: int, indent: str = "      ") -> str:
+    words, lines, current = text.split(), [], ""
+    for word in words:
+        if len(current) + len(word) + 1 > width:
+            lines.append(current)
+            current = word
+        else:
+            current = f"{current} {word}".strip()
+    if current:
+        lines.append(current)
+    return ("\n" + indent).join(lines)
+
+
+def cmd_compare(args: argparse.Namespace) -> int:
+    """Score several resume versions against one posting, best first."""
+    lexicon = default_lexicon()
+    if args.aliases:
+        lexicon.load_extra(args.aliases)
+    jd_text = _read_source(args.jd, args.jd_text, "jd")
+    jd = parse_jd(jd_text, lexicon)
+
+    rows = []
+    for path in args.resumes:
+        try:
+            document = extract(path)
+        except ExtractionError as exc:
+            print(f"skipping {path}: {exc}", file=sys.stderr)
+            continue
+        report = run_score(document, jd, lexicon)
+        rows.append((report.total, os.path.basename(path), report))
+
+    if not rows:
+        print("no resumes could be read", file=sys.stderr)
+        return 1
+    rows.sort(key=lambda r: -r[0])
+
+    if args.format == "json":
+        _emit(json.dumps([
+            {"file": name, "total": total, "band": rep.band,
+             "components": {c.name: round(c.score, 1) for c in rep.components}}
+            for total, name, rep in rows
+        ], indent=2), args.output)
+        return 0
+
+    names = [n for _, n, _ in rows]
+    pad = max(len(n) for n in names)
+    comp_names = [c.name for c in rows[0][2].components]
+    header = f"{'resume'.ljust(pad)}  total  " + "  ".join(c[:5].rjust(5) for c in comp_names)
+    lines = [f"COMPARING {len(rows)} VERSIONS AGAINST: {jd.title or 'the posting'}", "─" * len(header), header]
+    for total, name, rep in rows:
+        scores = "  ".join(f"{c.score:5.0f}" for c in rep.components)
+        lines.append(f"{name.ljust(pad)}  {total:5.1f}  {scores}")
+    lines.append("")
+    lines.append(f"Best: {rows[0][1]} ({rows[0][0]:.1f}, {rows[0][2].band})")
+    _emit("\n".join(lines), args.output)
+    return 0
+
+
+def build_parser() -> argparse.ArgumentParser:
+    parser = argparse.ArgumentParser(
+        prog="resume-ats",
+        description="Score a resume against a job description the way an applicant "
+                    "tracking system would.",
+        epilog=EPILOG,
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+    )
+    parser.add_argument("--version", action="version", version=f"resume-ats {__version__}")
+    sub = parser.add_subparsers(dest="command", required=True)
+
+    def add_common(p: argparse.ArgumentParser) -> None:
+        p.add_argument("-o", "--output", help="write to a file instead of stdout")
+        p.add_argument("--aliases", help="extra alias JSON file to merge into the lexicon")
+
+    p_score = sub.add_parser("score", help="score a resume against a job description")
+    p_score.add_argument("resume", nargs="?", help="resume file (.docx, .pdf, .txt, .md) or - for stdin")
+    p_score.add_argument("jd", nargs="?", help="job description file, or - for stdin")
+    p_score.add_argument("--resume-text", help="pass resume text directly")
+    p_score.add_argument("--jd-text", help="pass job description text directly")
+    p_score.add_argument("--title", help="override the detected job title")
+    p_score.add_argument("-f", "--format", default="text",
+                         choices=["text", "markdown", "json", "html"])
+    p_score.add_argument("-v", "--verbose", action="store_true", help="show job-description context for gaps")
+    p_score.add_argument("--no-color", action="store_true")
+    p_score.add_argument("--min-score", type=float,
+                         help="exit with status 2 if the score is below this value")
+    add_common(p_score)
+    p_score.set_defaults(func=cmd_score)
+
+    p_audit = sub.add_parser("audit", help="check a resume's ATS-readability (no job description)")
+    p_audit.add_argument("resume", nargs="?", help="resume file or - for stdin")
+    p_audit.add_argument("-f", "--format", default="text", choices=["text", "json"])
+    add_common(p_audit)
+    p_audit.set_defaults(func=cmd_audit)
+
+    p_kw = sub.add_parser("keywords", help="show the weighted terms mined from a posting")
+    p_kw.add_argument("jd", nargs="?", help="job description file or - for stdin")
+    p_kw.add_argument("--jd-text", help="pass job description text directly")
+    p_kw.add_argument("--top", type=int, default=40)
+    p_kw.add_argument("-f", "--format", default="text", choices=["text", "json"])
+    add_common(p_kw)
+    p_kw.set_defaults(func=cmd_keywords)
+
+    p_tailor = sub.add_parser(
+        "tailor",
+        help="rebuild a resume as an ATS-aligned .docx aimed at one posting")
+    p_tailor.add_argument("resume", nargs="?", help="resume file or - for stdin")
+    p_tailor.add_argument("jd", nargs="?", help="job description file, or - for stdin")
+    p_tailor.add_argument("--resume-text", help="pass resume text directly")
+    p_tailor.add_argument("--jd-text", help="pass job description text directly")
+    p_tailor.add_argument("--headline",
+                          help="headline to put under the name (defaults to the posting's title)")
+    p_tailor.add_argument("-f", "--format", default="text", choices=["text", "json"])
+    p_tailor.add_argument("--jobs", nargs="+", metavar="PATH",
+                          help="tailor against several postings at once (files or a directory)")
+    p_tailor.add_argument("--outdir", help="where batch output goes (default: applications/)")
+    p_tailor.add_argument("--notes", metavar="PATH",
+                          help="also write a markdown working list of what only you can add")
+    p_tailor.add_argument("--confirm", metavar="TERMS", default="",
+                          help="comma-separated skills you confirm you hold but "
+                               "never wrote down; they are added to the "
+                               "competencies list on your say-so and never "
+                               "attached to an achievement")
+    p_tailor.add_argument("--force", action="store_true",
+                          help="write the file even when the source is too damaged to rebuild faithfully")
+    add_common(p_tailor)
+    p_tailor.set_defaults(func=cmd_tailor)
+
+    p_cmp = sub.add_parser("compare", help="rank several resume versions against one posting")
+    p_cmp.add_argument("resumes", nargs="+", help="resume files to compare")
+    p_cmp.add_argument("--jd", required=False, help="job description file")
+    p_cmp.add_argument("--jd-text", help="pass job description text directly")
+    p_cmp.add_argument("-f", "--format", default="text", choices=["text", "json"])
+    add_common(p_cmp)
+    p_cmp.set_defaults(func=cmd_compare)
+    return parser
+
+
+def main(argv: Optional[Sequence[str]] = None) -> int:
+    parser = build_parser()
+    args = parser.parse_args(argv)
+    try:
+        return int(args.func(args) or 0)
+    except ExtractionError as exc:
+        print(f"error: {exc}", file=sys.stderr)
+        return 1
+    except BrokenPipeError:
+        return 0
+    except KeyboardInterrupt:
+        return 130
+
+
+if __name__ == "__main__":
+    sys.exit(main())

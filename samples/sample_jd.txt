@@ -1,0 +1,32 @@
+Cybersecurity Analyst II
+
+About Us
+Contoso is a leading financial services firm. We are an equal opportunity employer
+and offer competitive salary, 401k matching, dental and vision insurance, and
+unlimited PTO.
+
+Responsibilities
+- Monitor and triage security alerts in Splunk Enterprise Security and escalate
+  confirmed incidents.
+- Lead incident response investigations end to end, including containment and
+  root cause analysis.
+- Perform threat hunting across endpoint and network telemetry using MITRE ATT&CK.
+- Run the vulnerability management lifecycle with Tenable, tracking remediation SLAs.
+- Support cloud security posture management in AWS.
+
+Minimum Qualifications
+- Bachelor's degree in Computer Science, Information Security, or related field.
+- Minimum of 4 years of experience in a security operations center.
+- Must have hands-on experience with SIEM platforms, required expertise in Splunk.
+- Strong knowledge of incident response and digital forensics.
+- Experience with Python scripting for automation.
+- Familiarity with NIST CSF and ISO 27001.
+
+Preferred Qualifications
+- CISSP or GCIH certification preferred.
+- Experience with SOAR platforms and playbook automation is a plus.
+- Kubernetes security experience is nice to have.
+- Terraform and infrastructure as code a plus.
+
+Benefits
+We offer stock options, remote flexibility, and a generous 401k.

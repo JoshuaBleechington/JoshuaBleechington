@@ -218,6 +218,37 @@ phrases, and fragments that only ever appear inside a stronger term are
 suppressed, so `security operations center` is reported once rather than as
 four overlapping gaps.
 
+### What the miner refuses to count
+
+A posting is prose, and an n-gram window over prose produces far more
+fragments than skills. Measured against a real hospice posting, over a third
+of the keyword weight was going to things like `decisions support
+exceptional`, `ensures agency`, `providing`, the hiring manager's title and
+the office's city -- terms no resume could honestly contain, each of which
+lowered the ceiling an honest candidate could reach. The miner now drops:
+
+- phrases that open or close on a verb (`drive performance`, `decision reflects`),
+  bare gerunds and participles (`providing`, `resourced`), and phrases that
+  trail off into a modifier (`travel regularly`, `provide operational`);
+- three-word phrases the posting used once, unless the lexicon or the author's
+  own capitalisation vouches for them -- `CMS Conditions of Participation`
+  survives, `trusted thought partner` does not;
+- the posting's metadata lines (*Reports To*, *Location*, *Travel*), the
+  "reporting to the SVP" clause, place names, and residency conditions
+  (`DFW area`).
+
+The score a resume containing the entire posting earns -- the ceiling -- rose
+from 93 to 94 on that posting, and a thin real resume rebuilt by `tailor` rose
+from 73 to 78 without a word of it changing.
+
+### Licences are gates
+
+`RN license required` is the commonest knockout question in healthcare, and a
+resume without one is screened out before a keyword is weighed. A required
+licence (nursing, therapy, CPA, PE, CDL, bar admission, FINRA series) is
+treated like a clearance or a degree minimum: unmet, it caps the score rather
+than deducting from it. `RN preferred` stays a keyword.
+
 ## Reading the score
 
 | Band | Score | Meaning |
@@ -263,7 +294,7 @@ collapses and the audit reports no bullet points, the export dropped them.
 python -m pytest tests -q
 ```
 
-260 tests cover extraction, section parsing, requirement mining, matching
+302 tests cover extraction, section parsing, requirement mining, matching
 precision, the parsing audit, scoring behaviour, document generation and the
 CLI. The tailoring tests pin the integrity guarantees hardest: no invented
 numbers, no unevidenced skills in the file, and advice to the candidate never
@@ -285,6 +316,23 @@ Module map:
 | `docx_writer.py` | Minimal stdlib OOXML writer (no dependencies) |
 | `report.py` | Terminal, Markdown, JSON, HTML renderers |
 | `cli.py` | Argument parsing and subcommands |
+
+### The browser page
+
+`web/` holds the single-file page published as an Artifact: `head.html`
+(markup and styles), `engine.js` (a hand port of this package -- same weights,
+same mining rules, same gates) and `ui.js`. Build it with
+
+```bash
+python web/build.py --preview
+```
+
+which writes `web/ats-screening-bench.html` (the page itself; it starts at
+`<title>` because the Artifact host supplies the document wrapper) and
+`web/preview.html` (wrapped, for a local browser). Keep the two engines in
+step: a change to mining, matching or scoring lands in both, and parity is
+checked by scoring the same postings and resumes through each and diffing
+every mined term, gate, component and the tailored text.
 
 ## Also here
 

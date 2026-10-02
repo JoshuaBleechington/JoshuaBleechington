@@ -20,7 +20,7 @@ from typing import Dict, List, Optional, Sequence, Tuple
 
 from .aliases import SkillLexicon, default_lexicon
 from .extract import Document
-from .jd import JobDescription, HardRequirement, degree_rank
+from .jd import LICENSES, JobDescription, HardRequirement, degree_rank
 from .match import (
     MatchResult, ResumeIndex, TermMatch, bm25, contextual_coverage, match_requirements,
 )
@@ -175,7 +175,10 @@ def _experience_score(jd: JobDescription, resume: Resume) -> Tuple[float, str]:
     if need is None:
         if have <= 0:
             return 60.0, "no minimum stated; no dated experience found in resume"
-        return 85.0, f"no minimum stated; resume evidences about {have} years"
+        # A posting that states no minimum cannot be under-met. Holding
+        # fifteen points back here capped the ceiling of every resume against
+        # such a posting at 98.5 before a single keyword was weighed.
+        return 100.0, f"no minimum stated; resume evidences about {have} years"
     if have <= 0:
         return 15.0, f"posting asks for {need:.0f}+ years; none could be parsed from dates"
     ratio = have / need
@@ -315,6 +318,15 @@ def _evaluate_gates(jd: JobDescription, resume: Resume, index: ResumeIndex) -> L
                 "clearance", hard.detail,
                 satisfied=present,
                 evidence="mentioned in resume" if present else "not mentioned in resume",
+                note=hard.context[:160],
+            ))
+        elif hard.kind == "license":
+            forms = [hard.detail] + list(LICENSES.get(hard.detail, []))
+            present = any(index.contains(f)[0] for f in forms)
+            gates.append(Gate(
+                "license", f"{hard.detail} license",
+                satisfied=present,
+                evidence="held per resume" if present else "not found on resume",
                 note=hard.context[:160],
             ))
     return gates

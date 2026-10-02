@@ -7,3 +7,5 @@ dist/
 .venv/
 venv/
 tailored-resume.docx
+web/ats-screening-bench.html
+web/preview.html

@@ -73,6 +73,75 @@ CLEARANCE_RE = re.compile(
     r"public trust|poly(?:graph)?|dod\s*8570|8140)\b", re.I
 )
 
+# Professional licences a posting can require outright. In healthcare they are
+# the commonest knockout question there is -- "RN license required" -- and a
+# resume without one is screened out before a single keyword is weighed, so a
+# score that ignored them rated an IT sales executive at 75 against a hospice
+# role he could not legally hold. Each name maps to the forms a resume writes.
+LICENSES = {
+    "registered nurse": ["rn", "r.n.", "rn license", "rn licensure", "registered nurse license",
+                         "bsn, rn", "msn, rn", "registered nurse (rn)"],
+    "licensed practical nurse": ["lpn", "lvn", "licensed vocational nurse"],
+    "nurse practitioner": ["np", "aprn", "advanced practice registered nurse", "fnp", "fnp-c"],
+    "physician assistant": ["pa-c", "physician associate"],
+    "physical therapist": ["dpt", "pt license", "licensed physical therapist"],
+    "occupational therapist": ["otr", "otr/l", "licensed occupational therapist"],
+    "respiratory therapist": ["rrt", "crt"],
+    "registered dietitian": ["rd", "rdn"],
+    "licensed clinical social worker": ["lcsw", "lmsw", "licensed social worker"],
+    "certified nursing assistant": ["cna"],
+    "pharmacist": ["pharmd", "rph", "licensed pharmacist"],
+    "physician": ["md", "do", "medical license", "licensed physician", "board certified"],
+    "certified public accountant": ["cpa", "cpa license"],
+    "professional engineer": ["pe license", "p.e.", "licensed professional engineer"],
+    "commercial driver's license": ["cdl", "class a cdl", "class b cdl", "cdl-a"],
+    "bar admission": ["admitted to the bar", "licensed attorney", "state bar", "juris doctor", "j.d."],
+    "real estate license": ["licensed realtor", "real estate salesperson license"],
+    "series 7": ["finra series 7", "series 7 license"],
+    "series 63": ["finra series 63"],
+    "insurance license": ["licensed insurance agent", "property and casualty license", "life and health license"],
+}
+
+# How a posting says a licence is required: the licence, near a word that makes
+# it a condition. "RN preferred" is a keyword; "must hold an active RN license"
+# is a gate.
+_LICENSE_NAME_RE = re.compile(
+    r"\b(registered nurse|licensed practical nurse|licensed vocational nurse|nurse practitioner|"
+    r"physician assistant|physical therapist|occupational therapist|respiratory therapist|"
+    r"registered dietitian|licensed clinical social worker|certified nursing assistant|"
+    r"pharmacist|physician|certified public accountant|professional engineer|"
+    r"commercial driver'?s? licen[sc]e|bar admission|admitted to the bar|licensed attorney|"
+    r"real estate licen[sc]e|series 7|series 63|insurance licen[sc]e|"
+    r"rn|lpn|lvn|aprn|cna|cpa|cdl|rrt|lcsw|pharmd|dpt)\b", re.I)
+_LICENSE_CONDITION_RE = re.compile(
+    r"\b(licen[sc]e[ds]?|licensure|must (?:be|hold|have|possess)|required|active|current|"
+    r"valid|unrestricted|in good standing|registered)\b", re.I)
+
+_LICENSE_ALIAS_TO_NAME = {}
+for _name, _alts in LICENSES.items():
+    _LICENSE_ALIAS_TO_NAME[_name] = _name
+    for _a in _alts:
+        _LICENSE_ALIAS_TO_NAME[_a] = _name
+
+
+def license_required(line: str) -> Optional[str]:
+    """The licence a line makes a condition of the job, or None."""
+    m = _LICENSE_NAME_RE.search(line)
+    if not m or not _LICENSE_CONDITION_RE.search(line):
+        return None
+    if NICE_MARKERS.search(line) and not re.search(r"(?<!not )\brequired\b|\bmust\b", line, re.I):
+        return None
+    found = m.group(1).lower().replace("licence", "license")
+    found = re.sub(r"'?s? licen[sc]e$", "'s license", found) if "driver" in found else found
+    for name, alts in LICENSES.items():
+        if found == name or found in alts:
+            return name
+    for name in LICENSES:
+        if found in name:
+            return name
+    return found
+
+
 # Terms that look important statistically but are pure posting boilerplate.
 BOILERPLATE = frozenset("""
 401k 401 k pto health dental vision insurance equity stock options bonus salary
@@ -95,6 +164,7 @@ class Requirement:
     required: bool = False
     preferred: bool = False
     known_skill: bool = False
+    proper: bool = False            # written as a proper term (Title Case / acronym)
     category: str = "keyword"
     contexts: List[str] = field(default_factory=list)
 
@@ -200,12 +270,56 @@ def company_tokens(text: str, lexicon: Optional[SkillLexicon] = None) -> Set[str
     return found
 
 
+_CITY_STATE_RE = re.compile(r"\b([A-Z][A-Za-z.]+(?:\s+[A-Z][A-Za-z.]+){0,2}),\s*([A-Z]{2}|[A-Z][a-z]+)\b")
+_RESIDENCY_LINE_RE = re.compile(
+    r"\b(living|reside|residing|based|located|relocat\w*|commut\w*|territor(?:y|ies))\b|\barea\b", re.I)
+_REPORTING_CLAUSE_RE = re.compile(
+    r"\breport(?:s|ing)?\s+(?:directly\s+)?(?:in\s+)?to\s+(?:the\s+)?[^,.;:()]+", re.I)
+
+
+def location_tokens(text: str) -> Set[str]:
+    """Words that name where the job is, not what it needs.
+
+    "Dallas" and "DFW" were being reported as missing keywords. A place name
+    is read from "City, ST" in the header or a Location line, and from any
+    capitalised word on a line about where the person must live.
+    """
+    found: Set[str] = set()
+    lines = text.splitlines()
+    scopes = lines[:5] + [ln for ln in lines if _METADATA_LINE_RE.match(ln)
+                          or _RESIDENCY_LINE_RE.search(ln)]
+    for raw in scopes:
+        for m in _CITY_STATE_RE.finditer(raw):
+            for word in m.group(1).split():
+                found.add(normalize(word).strip(".,"))
+        if _RESIDENCY_LINE_RE.search(raw) or _METADATA_LINE_RE.match(raw):
+            for word in re.findall(r"\b[A-Z][A-Za-z]{1,}\b", raw):
+                low = normalize(word)
+                if low in STOPWORDS or low in VAGUE_SINGLES or len(low) < 3:
+                    continue
+                if raw.strip().startswith(word):      # a sentence's first word
+                    continue
+                if word.isupper() or word.istitle():
+                    found.add(low)
+    return {t for t in found if t not in _SECTION_VOCAB}
+
+
 def _classify_heading(line: str) -> Optional[str]:
     """Map a JD heading to noise / required / preferred / responsibility."""
     h = normalize(line).strip().strip(":*#-–—• \t")
     h = re.sub(r"\s+", " ", h)
     if not h or len(h) > 70:
         return None
+    kind = _match_heading_lists(h)
+    if kind is None:
+        # "Job Responsibilities", "Key Qualifications", "Core Requirements".
+        stripped = re.sub(r"^(?:job|key|core|primary|main|position|role|your|the|our|general)\s+", "", h)
+        if stripped != h:
+            kind = _match_heading_lists(stripped)
+    return kind
+
+
+def _match_heading_lists(h: str) -> Optional[str]:
     for name in NOISE_SECTIONS:
         if h.startswith(name):
             return "noise"
@@ -282,21 +396,34 @@ def _find_hard_requirements(text: str, blocks: Sequence[Tuple[str, str, str]]) -
             line = raw.strip()
             if not line:
                 continue
-            is_preferred_line = bool(NICE_MARKERS.search(line))
-            if is_preferred_line:
+            if _METADATA_LINE_RE.match(line):
                 continue
-
+            nice = NICE_MARKERS.search(line)
             m = YEARS_RE.search(line)
+            # "10+ years of leadership experience, hospice experience strongly
+            # preferred": the preference qualifies the clause after it, not
+            # the minimum before it. Skipping the whole line lost the
+            # ten-year requirement and capped every candidate's experience
+            # score at 85%.
+            if nice and (m is None or nice.start() < m.start()):
+                continue
             if m and re.search(r"experience|background|working", line, re.I):
                 lo = float(m.group(1))
                 hard.append(HardRequirement("years", f"{m.group(0).strip()}", lo, line.strip()))
 
+            if nice:
+                continue
             if DEGREE_RE.search(line) and re.search(r"degree|diploma|bachelor|master|phd|ged", line, re.I):
                 hard.append(HardRequirement("degree", DEGREE_RE.search(line).group(0), float(degree_rank(line)), line.strip()))
 
             c = CLEARANCE_RE.search(line)
             if c:
                 hard.append(HardRequirement("clearance", c.group(0), None, line.strip()))
+
+            lic = license_required(line)
+            if lic and (kind == "required" or MUST_MARKERS.search(line)
+                        or re.search(r"\brequired\b", line, re.I)):
+                hard.append(HardRequirement("license", lic, None, line.strip()))
     return hard
 
 
@@ -317,6 +444,11 @@ def _mine_terms(
             line = strip_bullet(raw).strip() if is_bullet(raw) else raw.strip()
             if not line or len(line) < 3:
                 continue
+            if _METADATA_LINE_RE.match(line):
+                continue
+            # "Reporting to the SVP & General Manager, this leader..." names
+            # a manager, not a skill. The clause goes; the sentence stays.
+            line = _REPORTING_CLAUSE_RE.sub(" ", line)
             line_weight = base
             if MUST_MARKERS.search(line):
                 line_weight *= 1.45
@@ -332,7 +464,8 @@ def _mine_terms(
                 key = canonical(phrase)
                 if not key or key in seen_in_line:
                     continue
-                if not _is_candidate(phrase, key, lexicon):
+                proper = len(phrase.split()) > 1 and _is_proper(phrase, line)
+                if not _is_candidate(phrase, key, lexicon, proper=proper):
                     continue
                 if exclude and any(w in exclude for w in phrase.split()):
                     continue
@@ -349,11 +482,14 @@ def _mine_terms(
                         canonical_term=cid,
                         weight=0.0,
                         known_skill=known,
+                        proper=proper,
                         category=lexicon.category(resolved) if resolved else "keyword",
                     )
                     found[cid] = req
                 elif known and len(phrase) > len(req.term) and not req.known_skill:
                     req.term = phrase
+                if proper:
+                    req.proper = True
                 # Prefer the longer, more specific surface form for display.
                 if len(phrase.split()) > len(req.term.split()) and known == req.known_skill:
                     req.term = phrase
@@ -368,6 +504,14 @@ def _mine_terms(
                     req.preferred = True
                 if len(req.contexts) < 3:
                     req.contexts.append(line.strip()[:200])
+
+    # A three-word phrase the posting used once, that neither the lexicon nor
+    # the author's capitalisation vouches for, is a sentence fragment
+    # ("trusted thought partner", "execute operational strategy").
+    for cid in [c for c, r in found.items()
+                if len(r.term.split()) >= 3 and r.count < 2
+                and not r.known_skill and not r.proper]:
+        del found[cid]
 
     _suppress_subsumed(found)
 
@@ -431,7 +575,91 @@ represents identify identifies collaborate partner partners translate foster
 sponsor guide advise enable maintain leverage align shape grow pipeline
 important defining generation operating thought asset assets spanning adoption
 questions roadmaps launches workflow launch coverage areas area role roles
+job jobs multiple reflect trusted changes change decision decisions mission
+missions staff needed choice choices home value values strongly key member
+members regular regularly direct directly consistently exceptional timely
+overall across within throughout continuous ongoing trust consistency state
+region travel proactively acumen license licence licensure licensed
 """.split())
+
+# A posting's metadata lines name the reporting line, the office and the
+# schedule, not a capability. Mining them put "svp", "general manager",
+# "dallas" and "reports" among the heaviest missing keywords, and no resume
+# can be written to contain its future manager's title.
+_METADATA_LINE_RE = re.compile(
+    r"^\s*(?:job\s+)?(?:title|position|location|locations|reports?\s+to|reporting\s+to|"
+    r"department|division|travel|schedule|shift|hours|job\s+type|employment\s+type|"
+    r"salary|pay|compensation|posted|requisition|req\s*id|job\s*id|work\s+arrangement)"
+    r"\s*(?:/\s*\w+\s*)?[:\-\u2013]", re.I)
+
+# Where the person has to live is a condition of the job, not a skill the
+# resume can evidence. "DFW area" was being reported as a required keyword.
+_RESIDENCY_WORDS = frozenset("""
+area living residing reside relocate relocation relocating commute commutable
+commuting locally onsite on-site in-office in-person
+""".split())
+
+# Gerunds that have become the name of a discipline. Everything else ending
+# in -ing is a verb caught mid-sentence ("providing", "ensuring", "aligning")
+# and names nothing a resume could be asked to contain.
+_NOMINAL_GERUNDS = frozenset("""
+planning training reporting forecasting budgeting consulting auditing mentoring
+coaching staffing scheduling recruiting onboarding testing engineering marketing
+accounting purchasing sourcing licensing nursing modeling modelling pricing
+billing coding programming networking manufacturing underwriting contracting
+outsourcing benchmarking screening credentialing learning monitoring
+positioning advertising merchandising publishing counseling counselling
+fundraising prospecting selling closing messaging branding
+""".split())
+
+# Verbs a posting uses to introduce a duty. A phrase that opens on one of
+# these ("ensures agency", "drive performance", "guide agencies") is a slice
+# of a sentence; a phrase that ends on one ("care consistently reflect") is
+# the slice before the object. Neither is a keyword.
+_JD_VERBS = frozenset("""
+ensure provide drive guide deliver improve reduce strengthen support execute
+advise scale conduct implement monitor develop assess help succeed lead build
+partner work foster champion equip reinforce introduce standardize standardise
+serve align reflect maintain manage oversee coordinate collaborate communicate
+create define design establish evaluate identify influence leverage optimize
+optimise own perform plan prepare prioritize prioritise promote recommend
+represent resolve review shape translate utilize utilise track train understand
+analyze analyse achieve assist demonstrate enable engage facilitate generate
+participate contribute cultivate empower inspire motivate mentor coach
+negotiate present report respond handle operate organize organise
+""".split())
+
+def _verb_forms(bare: frozenset) -> frozenset:
+    out = set()
+    for v in bare:
+        out.add(v)
+        out.add(v + "es" if v.endswith(("s", "sh", "ch", "x", "z")) else v + "s")
+        if v.endswith("e") and not v.endswith("ee"):
+            out.add(v[:-1] + "ing")
+        else:
+            out.add(v + "ing")
+    return frozenset(out)
+
+_VERB_FORMS = _verb_forms(_JD_VERBS)
+
+# Nouns that are also verbs. "corrective action plans" ends on one and is a
+# real term, so the end-of-phrase verb rule skips these.
+_NOUN_VERB_HOMOGRAPHS = frozenset("""
+plans reports reviews supports controls designs releases updates audits
+schedules forecasts budgets changes needs contacts documents estimates
+measures offers orders places projects records requests results returns
+uses values works benefits impacts interfaces links partners pilots positions
+presents programs purchases services structures targets transfers trends
+drives leads focus
+""".split())
+
+# A phrase that trails off into a modifier is cut before its noun.
+_TRAILING_MODIFIERS = frozenset("""
+exceptional timely consistent appropriate operational strategic effective
+efficient successful high strong multiple various regular key new additional
+ongoing overall direct indirect proactive proactively broad deep full
+""".split())
+
 
 # Generic container nouns.  A phrase ending in one is a wrapper around the real
 # skill ("SIEM platforms" -> "SIEM"), and reporting both as separate gaps is
@@ -488,17 +716,56 @@ _ALLOWED_SHORT = frozenset({
 })
 
 
-def _is_candidate(phrase: str, key: str, lexicon: Optional[SkillLexicon] = None) -> bool:
-    """Filter obvious non-skills before they reach the scorer."""
+def _is_proper(phrase: str, raw_line: str) -> bool:
+    """True if the posting wrote the phrase as a proper term.
+
+    "CMS Conditions of Participation" and "Microsoft Sentinel" are written in
+    Title Case or carry an acronym; "decisions support exceptional" is not.
+    The capitalisation the author chose is the cheapest reliable signal that
+    an n-gram is a name rather than a slice of a sentence.
+    """
+    m = re.search(r"\b" + r"\W+".join(re.escape(w) for w in phrase.split()) + r"\b",
+                  raw_line, re.I)
+    if not m:
+        return False
+    # A short line written entirely in Title Case is one of the posting's own
+    # sub-headings ("Performance Management & Continuous Improvement"). The
+    # author capitalised a heading, so capitals there vouch for nothing.
+    line_words = re.findall(r"[A-Za-z][A-Za-z&.+#/-]*", raw_line)
+    if len(line_words) <= 8 and all(w[:1].isupper() for w in line_words if len(w) >= 4):
+        return False
+    words = [w for w in re.findall(r"[A-Za-z][A-Za-z&.+#/-]*", m.group(0))]
+    if not words:
+        return False
+    # The first word of a line or sentence is capitalised anyway; it is only
+    # evidence when something after it is capitalised too.
+    at_start = m.start() == 0 or raw_line[:m.start()].rstrip().endswith((".", ":", "-", "\u2022"))
+    judged = words[1:] if at_start and len(words) > 1 else words
+    judged = [w for w in judged if w.lower() not in STOPWORDS]
+    if not judged:
+        return False
+    if any(len(w) >= 2 and w.isupper() for w in judged):
+        return True
+    return all(w[:1].isupper() for w in judged)
+
+
+def _is_candidate(phrase: str, key: str, lexicon: Optional[SkillLexicon] = None,
+                  proper: bool = False) -> bool:
+    """Filter obvious non-skills before they reach the scorer.
+
+    ``proper`` says the posting wrote the phrase as a proper term, which earns
+    a long phrase the benefit of the doubt the lexicon would otherwise give.
+    """
     if not key or len(key) < 2:
         return False
     # A phrase containing a glue word is only meaningful if it is a real
     # multi-word skill ("identity and access management").  Otherwise it is a
     # fragment spanning a conjunction ("csf and iso").
-    if any(w in STOPWORDS for w in phrase.split()):
-        if lexicon is None or lexicon.resolve(phrase) is None:
-            return False
     words = phrase.split()
+    if any(w in STOPWORDS for w in words):
+        coordinated = any(w in ("and", "or") for w in words)
+        if (lexicon is None or lexicon.resolve(phrase) is None) and (coordinated or not proper):
+            return False
     if any(w in BOILERPLATE for w in words):
         return False
     if any(w in REQUIREMENT_LANGUAGE for w in words):
@@ -534,14 +801,46 @@ def _is_candidate(phrase: str, key: str, lexicon: Optional[SkillLexicon] = None)
     # Stray single letters come from possessives ("bachelor's" -> "bachelor s").
     if any(len(w) == 1 and not w.isdigit() for w in words):
         return False
+    vouched = lexicon is not None and lexicon.resolve(phrase) is not None
     # Long n-grams are almost always sentence fragments unless the lexicon
-    # vouches for them as a real multi-word skill.
-    if len(words) >= 4 and (lexicon is None or lexicon.resolve(phrase) is None):
+    # vouches for them, or the posting itself wrote them as a proper term.
+    if len(words) >= 4 and not vouched and not proper:
         return False
     if len(words) > 1 and words[-1] in CONTAINER_NOUNS:
         return False
     if len(words) == 1 and words[0] in CONTAINER_NOUNS:
         return False
+    if vouched:
+        return True
+
+    # Everything below removes slices of sentences that no resume could be
+    # asked to contain. Each class was measured against a real posting, where
+    # together they made up over a third of the keyword weight -- a ceiling
+    # that no honest resume could reach.
+    if any(w in _RESIDENCY_WORDS for w in words):
+        return False                                  # "dfw area"
+    first, last = words[0], words[-1]
+    if len(words) == 1:
+        if first.endswith("ing") and first not in _NOMINAL_GERUNDS:
+            return False                              # "providing"
+        if first in _VERB_FORMS and first not in _NOMINAL_GERUNDS:
+            return False                              # "reflect", "assess"
+        if first.endswith("ed") and len(first) > 4 and not proper:
+            return False                              # "resourced", "needed"
+        if first.endswith("ly") and len(first) > 4:
+            return False                              # "proactively"
+        return True
+    if first in _VERB_FORMS or (first.endswith("ing") and first not in _NOMINAL_GERUNDS):
+        return False                                  # "ensures agency"
+    if first in _TRAILING_MODIFIERS or (first.endswith("ly") and len(first) > 4):
+        return False                                  # "exceptional patient", "appropriately staffed"
+    if (last in _VERB_FORMS and last not in _NOUN_VERB_HOMOGRAPHS
+            and last not in _NOMINAL_GERUNDS and not last.endswith("ing")):
+        return False                                  # "care consistently reflect", "decision reflects"
+    if last.endswith("ly") or last in _TRAILING_MODIFIERS:
+        return False                                  # "travel regularly", "provide operational"
+    if last.endswith("ing") and last not in _NOMINAL_GERUNDS:
+        return False                                  # "registered nurse living"
     return True
 
 
@@ -555,11 +854,14 @@ def parse(text: str, lexicon: Optional[SkillLexicon] = None) -> JobDescription:
     # real term, and excluding it would lose a genuine keyword.
     candidates = company_tokens(text, lexicon)
     body = normalize("\n".join(t for _, kind, t in blocks if kind in ("required", "responsibility")))
+    places = {t for t in location_tokens(text)
+              if lexicon.resolve(t) is None
+              and len(re.findall(r"\b" + re.escape(t) + r"\b", body)) < 3}
     jd.company_tokens = {
         token for token in candidates
         if len(re.findall(r"\b" + re.escape(token) + r"\b", body)) < 3
     }
-    jd.requirements = list(_mine_terms(blocks, lexicon, jd.company_tokens).values())
+    jd.requirements = list(_mine_terms(blocks, lexicon, jd.company_tokens | places).values())
     jd.hard_requirements = _find_hard_requirements(text, blocks)
 
     years = [h.value for h in jd.hard_requirements if h.kind == "years" and h.value]

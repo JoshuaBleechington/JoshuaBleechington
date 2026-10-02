@@ -9,6 +9,7 @@ candidates never get told about.
 
 from __future__ import annotations
 
+import math
 import re
 from dataclasses import dataclass, field
 from datetime import date
@@ -234,7 +235,10 @@ class Resume:
 
     @property
     def years_experience(self) -> float:
-        return round(self.total_experience_months / 12.0, 1)
+        # Half-up, not Python's round(): 87 months is 7.25 years, which
+        # round() reports as 7.2 and the browser engine as 7.3. The two
+        # engines must agree to the decimal.
+        return math.floor(self.total_experience_months / 12.0 * 10 + 0.5) / 10
 
     def section(self, name: str) -> str:
         return self.sections.get(name, "")

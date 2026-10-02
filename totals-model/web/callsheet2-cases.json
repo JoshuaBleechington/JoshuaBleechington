@@ -3328,8 +3328,8 @@
       "aml": "115"
     },
     "expect": {
-      "lam_home": 82.29448819,
-      "lam_away": 80.840092,
+      "lam_home": 82.41513478,
+      "lam_away": 80.71944541,
       "projected": 163.13458019,
       "markets": [
         {
@@ -3346,13 +3346,13 @@
         },
         {
           "key": "ml",
-          "pick": "Aces ML",
-          "side": "AWAY",
-          "p": 0.447406,
+          "pick": "Lynx ML",
+          "side": "HOME",
+          "p": 0.56125568,
           "p_push": 0.0,
-          "price": 115.0,
-          "edge": -0.01771028,
-          "fair": 123.5106,
+          "price": -135.0,
+          "edge": -0.01321241,
+          "fair": -127.9232,
           "anchored": true,
           "band": ""
         }
@@ -3429,19 +3429,19 @@
       "spa": "100"
     },
     "expect": {
-      "lam_home": 75.72027651,
-      "lam_away": 78.62056845,
+      "lam_home": 76.34338712,
+      "lam_away": 77.99745784,
       "projected": 154.34084497,
       "markets": [
         {
-          "key": "ml",
-          "pick": "Sun ML",
-          "side": "AWAY",
-          "p": 0.60398016,
+          "key": "spread",
+          "pick": "Mystics +3.5",
+          "side": "HOME",
+          "p": 0.56663431,
           "p_push": 0.0,
-          "price": -140.0,
-          "edge": 0.02064683,
-          "fair": -152.5126,
+          "price": -120.0,
+          "edge": 0.02117977,
+          "fair": -130.752,
           "anchored": true,
           "band": ""
         },
@@ -3458,14 +3458,14 @@
           "band": "NO BET"
         },
         {
-          "key": "spread",
-          "pick": "Sun -3.5",
-          "side": "AWAY",
-          "p": 0.47826087,
+          "key": "ml",
+          "pick": "Mystics ML",
+          "side": "HOME",
+          "p": 0.44023633,
           "p_push": 0.0,
-          "price": 100.0,
-          "edge": -0.02173913,
-          "fair": 109.0909,
+          "price": 120.0,
+          "edge": -0.01430913,
+          "fair": 127.1507,
           "anchored": true,
           "band": ""
         }
@@ -3500,10 +3500,34 @@
       "spa": "-110"
     },
     "expect": {
-      "lam_home": 89.64728717,
-      "lam_away": 85.14728717,
+      "lam_home": 87.90080296,
+      "lam_away": 86.89377138,
       "projected": 174.79457434,
       "markets": [
+        {
+          "key": "spread",
+          "pick": "Lynx +4.5",
+          "side": "AWAY",
+          "p": 0.62458403,
+          "p_push": 0.0,
+          "price": -110.0,
+          "edge": 0.10077451,
+          "fair": -166.3712,
+          "anchored": true,
+          "band": ""
+        },
+        {
+          "key": "ml",
+          "pick": "Lynx ML",
+          "side": "AWAY",
+          "p": 0.46352845,
+          "p_push": 0.0,
+          "price": 160.0,
+          "edge": 0.07891307,
+          "fair": 115.7365,
+          "anchored": true,
+          "band": ""
+        },
         {
           "key": "total",
           "pick": "OVER 170.5",
@@ -3515,30 +3539,6 @@
           "fair": -153.6838,
           "anchored": true,
           "band": "STRONG BET"
-        },
-        {
-          "key": "ml",
-          "pick": "Sparks ML",
-          "side": "HOME",
-          "p": 0.65876353,
-          "p_push": 0.0,
-          "price": -190.0,
-          "edge": 0.00359111,
-          "fair": -193.0519,
-          "anchored": true,
-          "band": ""
-        },
-        {
-          "key": "spread",
-          "pick": "Sparks -4.5",
-          "side": "HOME",
-          "p": 0.5,
-          "p_push": 0.0,
-          "price": -110.0,
-          "edge": -0.02380952,
-          "fair": 100.0,
-          "anchored": true,
-          "band": ""
         }
       ]
     }
@@ -3569,8 +3569,8 @@
       "spa": "-105"
     },
     "expect": {
-      "lam_home": 77.06986524,
-      "lam_away": 74.78163011,
+      "lam_home": 77.08221702,
+      "lam_away": 74.76927833,
       "projected": 151.85149534,
       "markets": [
         {
@@ -3587,13 +3587,13 @@
         },
         {
           "key": "spread",
-          "pick": "Valkyries +2",
-          "side": "AWAY",
-          "p": 0.48916576,
-          "p_push": 0.03624256,
-          "price": -105.0,
-          "edge": -0.02302936,
-          "fair": 104.4297,
+          "pick": "Liberty -2",
+          "side": "HOME",
+          "p": 0.51176253,
+          "p_push": 0.03624034,
+          "price": -115.0,
+          "edge": -0.02312119,
+          "fair": -104.8184,
           "anchored": true,
           "band": ""
         },
@@ -3601,11 +3601,11 @@
           "key": "ml",
           "pick": "Liberty ML",
           "side": "HOME",
-          "p": 0.58239386,
+          "p": 0.58327042,
           "p_push": 0.0,
           "price": null,
           "edge": null,
-          "fair": -139.4601,
+          "fair": -139.9638,
           "anchored": false,
           "band": ""
         }
@@ -3637,8 +3637,8 @@
       "aml": "115"
     },
     "expect": {
-      "lam_home": 81.59084594,
-      "lam_away": 80.13644975,
+      "lam_home": 81.71149253,
+      "lam_away": 80.01580315,
       "projected": 161.72729568,
       "markets": [
         {
@@ -3655,13 +3655,13 @@
         },
         {
           "key": "ml",
-          "pick": "Sky ML",
-          "side": "AWAY",
-          "p": 0.447406,
+          "pick": "Mercury ML",
+          "side": "HOME",
+          "p": 0.56125568,
           "p_push": 0.0,
-          "price": 115.0,
-          "edge": -0.01771028,
-          "fair": 123.5106,
+          "price": -135.0,
+          "edge": -0.01321241,
+          "fair": -127.9232,
           "anchored": true,
           "band": ""
         }
@@ -3878,8 +3878,8 @@
       "spa": "-105"
     },
     "expect": {
-      "lam_home": 80.49520901,
-      "lam_away": 78.20697389,
+      "lam_home": 80.51074261,
+      "lam_away": 78.19144029,
       "projected": 158.7021829,
       "markets": [
         {
@@ -3896,13 +3896,13 @@
         },
         {
           "key": "spread",
-          "pick": "Lynx +2",
-          "side": "AWAY",
-          "p": 0.48916576,
-          "p_push": 0.03624256,
-          "price": -105.0,
-          "edge": -0.02302936,
-          "fair": 104.4297,
+          "pick": "Aces -2",
+          "side": "HOME",
+          "p": 0.51200165,
+          "p_push": 0.03623973,
+          "price": -115.0,
+          "edge": -0.02288207,
+          "fair": -104.9187,
           "anchored": true,
           "band": ""
         },
@@ -3910,11 +3910,11 @@
           "key": "ml",
           "pick": "Aces ML",
           "side": "HOME",
-          "p": 0.58239386,
+          "p": 0.58349615,
           "p_push": 0.0,
           "price": null,
           "edge": null,
-          "fair": -139.4601,
+          "fair": -140.0938,
           "anchored": false,
           "band": ""
         }
@@ -4118,8 +4118,8 @@
       "spa": "-110"
     },
     "expect": {
-      "lam_home": 81.59758581,
-      "lam_away": 77.09758581,
+      "lam_home": 81.52506541,
+      "lam_away": 77.1701062,
       "projected": 158.69517161,
       "markets": [
         {
@@ -4138,23 +4138,23 @@
           "key": "ml",
           "pick": "Lynx ML",
           "side": "HOME",
-          "p": 0.65876353,
+          "p": 0.65391259,
           "p_push": 0.0,
           "price": -190.0,
-          "edge": 0.00359111,
-          "fair": -193.0519,
+          "edge": -0.00125983,
+          "fair": -188.9443,
           "anchored": true,
           "band": ""
         },
         {
           "key": "spread",
-          "pick": "Lynx -4.5",
-          "side": "HOME",
-          "p": 0.5,
+          "pick": "Valkyries +4.5",
+          "side": "AWAY",
+          "p": 0.50526011,
           "p_push": 0.0,
           "price": -110.0,
-          "edge": -0.02380952,
-          "fair": 100.0,
+          "edge": -0.01854941,
+          "fair": -102.1264,
           "anchored": true,
           "band": ""
         }

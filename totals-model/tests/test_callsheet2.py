@@ -386,3 +386,52 @@ class TestTheBandStaysWithCallSheetOnesSide(unittest.TestCase):
         self.assertEqual(t.band, "")
         self.assertTrue(any("picked on PRICE" in n for n in t.notes))
         self.assertTrue(any(m.total.band in n for n in t.notes))
+
+
+class TestTheWnbaRatingsMargin(unittest.TestCase):
+    """Added 2 Oct 2026: the four ratings move the margin off the market."""
+
+    def test_four_average_ratings_are_home_court_and_nothing_else(self):
+        from totals.callsheet2 import WNBA_HOME_COURT, ratings_margin
+        from totals.fullgame import WNBA_LEAGUE_RATING as R
+        m, _ = ratings_margin(None, None, R, R, R, R)
+        self.assertAlmostEqual(m, WNBA_HOME_COURT, places=12)
+
+    def test_a_partial_set_is_dropped(self):
+        from totals.callsheet2 import ratings_margin
+        self.assertIsNone(ratings_margin(80, 80, 110.0, None, 100.0, 100.0))
+
+    def test_a_level_shift_rescales_the_gap_and_adds_nothing(self):
+        """The level problem the retired model documented (pace and ratings
+        off different possession counts) is a level problem: in a difference
+        a uniform shift of all four ratings rescales the gap in proportion and
+        adds nothing to it, where in the total it set the whole number."""
+        from totals.callsheet2 import WNBA_HOME_COURT, ratings_margin
+        a, _ = ratings_margin(80, 80, 100.0, 104.0, 100.0, 100.0)
+        b, _ = ratings_margin(80, 80, 110.0, 114.0, 110.0, 110.0)
+        self.assertAlmostEqual(b - WNBA_HOME_COURT, (a - WNBA_HOME_COURT) * 1.1, places=9)
+
+    def test_the_ratings_move_the_margin_toward_them_at_the_efficiency_weight(self):
+        from totals.callsheet2 import WNBA_MARGIN_WEIGHTS, forecast_matchup_wnba, ratings_margin
+        base = dict(total_line=179.5, spread=-4.5, spread_home_price=-110, spread_away_price=-110)
+        ratings = dict(away_pace=81.1, home_pace=79.6, away_off_rating=117.0, home_off_rating=114.3,
+                       away_def_rating=110.3, home_def_rating=107.2)
+        bare = forecast_matchup_wnba("Fever", "Aces", **base)
+        full = forecast_matchup_wnba("Fever", "Aces", **base, **ratings)
+        rm, _ = ratings_margin(**ratings)
+        wm, wr = WNBA_MARGIN_WEIGHTS["market"], WNBA_MARGIN_WEIGHTS["ratings"]
+        want = (wm * 4.5 + wr * rm) / (wm + wr)
+        self.assertAlmostEqual(full.lam_home - full.lam_away, want, places=6)
+        self.assertAlmostEqual(bare.lam_home - bare.lam_away, 4.5, places=6)
+        self.assertEqual(wm, 4.0)
+        self.assertEqual(wr, 1.2)
+
+    def test_the_total_is_untouched_by_the_margin(self):
+        from totals.callsheet2 import forecast_matchup_wnba
+        base = dict(total_line=179.5, spread=-4.5, spread_home_price=-110, spread_away_price=-110,
+                    away_pace=81.1, home_pace=79.6, away_off_rating=117.0, home_off_rating=114.3,
+                    away_def_rating=110.3, home_def_rating=107.2)
+        w = forecast_matchup_wnba("Fever", "Aces", **base)
+        one = forecast_wnba("Fever @ Aces", 179.5, **{k: v for k, v in base.items() if k not in ("total_line", "spread", "spread_home_price", "spread_away_price")})
+        self.assertAlmostEqual(w.total.projected, one.projected, places=12)
+        self.assertAlmostEqual(w.lam_home + w.lam_away, one.projected, places=9)

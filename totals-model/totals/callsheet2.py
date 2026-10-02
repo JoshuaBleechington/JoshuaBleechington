@@ -75,8 +75,9 @@ from typing import Any
 
 from .fullgame import (
     BANDS, DISPERSION_PHI, HOLD_REFERENCE, STARTER_INNINGS, WEIGHTS,
-    WNBA_TOTAL_SD, Forecast, _ncdf, devig, fair_total, forecast_mlb,
-    forecast_wnba, hold, implied, market_confidence, nb_pmf, nb_split, price_for,
+    WNBA_LEAGUE_PACE, WNBA_LEAGUE_RATING, WNBA_TOTAL_SD, Forecast, _ncdf, _ok,
+    devig, fair_total, forecast_mlb, forecast_wnba, hold, implied,
+    market_confidence, nb_pmf, nb_split, price_for,
 )
 
 # ===========================================================================
@@ -87,6 +88,19 @@ from .fullgame import (
 #: the retired spread model (totals/wnba.py), where it was used for the
 #: overtime estimate. Not re-fitted here.
 WNBA_MARGIN_SD = 11.0
+
+#: Points of home court on a WNBA margin, home minus away. Inherited from the
+#: retired spread model (totals/wnba.py, HOME_COURT_POINTS), total-neutral.
+WNBA_HOME_COURT = 2.5
+
+#: The margin is anchored on the market the way the total is, and the one
+#: estimate that can move it is the four efficiency ratings the total already
+#: scores -- so it carries the total's efficiency weight, not a new one. Added
+#: 2 Oct 2026 when the user asked for the WNBA book to lean on the spread and
+#: the moneyline: until then both were read off the book's own prices with no
+#: team information behind them, which is why they were shown, not picked.
+WNBA_MARGIN_WEIGHTS = {"market": WEIGHTS["WNBA"]["market"],
+                       "ratings": WEIGHTS["WNBA"]["efficiency"]}
 
 #: Share of a nine-inning game that the first five innings are. A fraction of
 #: the game, not a coefficient -- and used ONLY to size the weather deltas for
@@ -524,6 +538,38 @@ def spread_probs(margin_mean: float, home_line: float, sd: float = WNBA_MARGIN_S
     return cover, 0.0, 1.0 - cover
 
 
+def ratings_margin(
+    away_pace: float | None, home_pace: float | None,
+    away_off_rating: float | None, home_off_rating: float | None,
+    away_def_rating: float | None, home_def_rating: float | None,
+) -> tuple[float, str] | None:
+    """The margin (home minus away) the four ratings imply, plus home court.
+
+    Each offence against the defence it faces, per 100 possessions, over the
+    possessions the two paces give (the league pace when a pace is missing,
+    since pace only scales the gap). Four league-average ratings give exactly
+    the home court and nothing else. The level problem the retired model
+    documented -- pace and ratings off different possession counts -- is a
+    level problem: in a difference a uniform shift of all four ratings only
+    rescales the gap in proportion, where in the total it set the whole
+    number. That is why the margin can use the identity the total could not."""
+    four = (away_off_rating, home_off_rating, away_def_rating, home_def_rating)
+    if not all(v is not None and _ok(v, "rating") for v in four):
+        return None
+    possessions = WNBA_LEAGUE_PACE
+    if (away_pace is not None and home_pace is not None
+            and _ok(away_pace, "pace") and _ok(home_pace, "pace")):
+        possessions = away_pace * home_pace / WNBA_LEAGUE_PACE
+    home_ppp = home_off_rating * away_def_rating / WNBA_LEAGUE_RATING
+    away_ppp = away_off_rating * home_def_rating / WNBA_LEAGUE_RATING
+    gap = possessions * (home_ppp - away_ppp) / 100.0
+    margin = gap + WNBA_HOME_COURT
+    why = (f"home {home_off_rating:.1f} into {away_def_rating:.1f} is {home_ppp:.1f} per 100, "
+           f"away {away_off_rating:.1f} into {home_def_rating:.1f} is {away_ppp:.1f}; over "
+           f"{possessions:.1f} possessions that is {gap:+.1f}, plus {WNBA_HOME_COURT:g} of home court")
+    return margin, why
+
+
 def forecast_matchup_wnba(
     away: str,
     home: str,
@@ -574,9 +620,27 @@ def forecast_matchup_wnba(
         notes.append("No spread or moneyline entered, so no side markets on this card.")
         return Matchup("WNBA", away, home, markets, None, None, f, notes)
 
-    notes.append(f"Margin (home minus away) of {margin:+.1f} from the {src}, on a margin "
-                 f"SD of {WNBA_MARGIN_SD:g}. The total forecast does not move it -- pace "
-                 "and efficiency change how many points, not who scores more of them.")
+    # --- the ratings: the one estimate that can move the margin off the market --
+    rm = ratings_margin(total_inputs.get("away_pace"), total_inputs.get("home_pace"),
+                        total_inputs.get("away_off_rating"), total_inputs.get("home_off_rating"),
+                        total_inputs.get("away_def_rating"), total_inputs.get("home_def_rating"))
+    if rm is not None:
+        wm, wr = WNBA_MARGIN_WEIGHTS["market"], WNBA_MARGIN_WEIGHTS["ratings"]
+        blended = (wm * margin + wr * rm[0]) / (wm + wr)
+        notes.append(f"Margin (home minus away) of {blended:+.1f}: the market says {margin:+.1f} "
+                     f"from the {src}, at weight {wm:g}; the ratings say {rm[0]:+.1f} ({rm[1]}), at "
+                     f"weight {wr:g}, the efficiency weight the total uses for the same four "
+                     f"numbers. On a margin SD of {WNBA_MARGIN_SD:g}. The total forecast does not "
+                     "move it -- pace and efficiency change how many points, not who scores more "
+                     "of them -- and the ratings move it only by how far they disagree with "
+                     "the book.")
+        margin = blended
+    else:
+        notes.append(f"Margin (home minus away) of {margin:+.1f} from the {src}, on a margin "
+                     f"SD of {WNBA_MARGIN_SD:g}. The total forecast does not move it -- pace "
+                     "and efficiency change how many points, not who scores more of them. No "
+                     "ratings on the card, so the margin is the market's alone and the side "
+                     "markets can only ever show the vig.")
     half = f.projected / 2.0
     lam_h, lam_a = half + margin / 2.0, half - margin / 2.0
 
@@ -587,9 +651,10 @@ def forecast_matchup_wnba(
         [_side(f"{home} ML", "HOME", p_h, 0.0, home_ml),
          _side(f"{away} ML", "AWAY", 1.0 - p_h, 0.0, away_ml)],
         anchored=home_ml is not None and away_ml is not None,
-        notes=["Read off the spread through the margin distribution when a spread is in, so "
-               "an edge here is the book's moneyline disagreeing with its own spread. That "
-               "happens, and it is small."]))
+        notes=["Read off the margin: the book's spread or moneyline, moved by the four "
+               "efficiency ratings when they are on the card. With no ratings an edge here "
+               "is only the book's moneyline disagreeing with its own spread, which happens, "
+               "and is small."]))
 
     # --- spread ---------------------------------------------------------------
     if spread is not None:
@@ -599,10 +664,10 @@ def forecast_matchup_wnba(
             [_side(f"{home} {spread:+g}", "HOME", c, pu, spread_home_price),
              _side(f"{away} {-spread:+g}", "AWAY", fl, pu, spread_away_price)],
             anchored=spread_home_price is not None and spread_away_price is not None,
-            notes=["A spread with both prices in is the anchor, so this side's edge is only "
-                   "ever the vig regressed for a wide hold. It is here so the day board can "
-                   "rank it against the totals honestly, not because it can find value on "
-                   "its own."]))
+            notes=["The spread with both prices in is the anchor; the four efficiency ratings "
+                   "are the one estimate that can move the margin off it, at the total's "
+                   "efficiency weight. With no ratings this side's edge is only ever the vig "
+                   "regressed for a wide hold."]))
     return Matchup("WNBA", away, home, markets, lam_h, lam_a, f, notes)
 
 

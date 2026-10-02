@@ -738,15 +738,80 @@ def nhl_roster_goalie_ids(abbrev):
     return set(int(g["id"]) for g in (d.get("goalies") or []) if g.get("id") is not None)
 
 
+#: How much of last season a goalie carries into this one: half his shots.
+#: The sheet shrinks a save percentage toward the league by the shots behind
+#: it (stable near 1,340), so without this a goalie's first start of the year
+#: -- .739 on 23 shots, 1 Oct 2026 -- went on the sheet as his line, and his
+#: prior was the league's, not his own. A year-old season is evidence about
+#: the man; it just is not as good as this year's will be.
+GOALIE_PRIOR_SHARE = 0.5
+
+
+def nhl_goalie_prior(player_id, prev_season):
+    """Last regular season's line for one goalie, from his player page,
+    summed across clubs if he moved: (save %, shots) or None."""
+    d = nhl_api("/player/%s/landing" % player_id)
+    shots = saves = 0.0
+    for row in d.get("seasonTotals") or []:
+        if str(row.get("season")) != str(prev_season) or str(row.get("gameTypeId", 2)) != "2":
+            continue
+        if row.get("leagueAbbrev") not in (None, "NHL"):
+            continue
+        sa = row.get("shotsAgainst")
+        if sa in (None, "") or int(sa) <= 0:
+            continue
+        sa = int(sa)
+        ga = row.get("goalsAgainst")
+        if ga not in (None, ""):
+            sv = sa - int(ga)
+        elif row.get("savePctg") not in (None, ""):
+            sv = float(row["savePctg"]) * sa
+        else:
+            continue
+        shots += sa
+        saves += sv
+    if shots <= 0:
+        return None
+    return (saves / shots, int(shots))
+
+
+def nhl_blend_prior(g, prior, prev):
+    """This season's line plus half of last season's, as one line. The entry
+    keeps both halves so the printout can show them."""
+    psv, pshots = prior
+    w = int(round(pshots * GOALIE_PRIOR_SHARE))
+    now_sv, now_shots = g.get("sv"), int(g.get("shots") or 0)
+    g["this"] = {"sv": now_sv, "shots": now_shots}
+    g["prior"] = {"sv": psv, "shots": pshots, "season": prev}
+    tot = now_shots + w
+    if tot <= 0:
+        return g
+    g["sv"] = ((now_sv or 0.0) * now_shots + psv * w) / float(tot)
+    g["shots"] = tot
+    return g
+
+
 def nhl_club_goalies(abbrev, season_id=None):
-    """This season's goalies from the club page. When nobody has a shot yet
-    (a team that has not played), LAST season's page for the goalies still
-    on the roster, with the shots halved so a year-old line counts as
-    evidence but not as much as this year's will. Each entry says which."""
+    """This season's goalies from the club page, each blended with half of
+    his last season (nhl_blend_prior). When nobody has a shot yet (a team
+    that has not played), LAST season's page for the goalies still on the
+    roster, with the shots halved -- the same half, by another route. Each
+    entry says which."""
     out = _club_goalies(nhl_api("/club-stats/%s/now" % abbrev))
-    if any(g["shots"] > 0 for g in out) or not season_id:
+    if not season_id:
         return out
     prev = nhl_prev_season(season_id)
+    if any(g["shots"] > 0 for g in out):
+        for g in out:
+            if g.get("id") is None:
+                continue
+            try:
+                prior = nhl_goalie_prior(g["id"], prev)
+            except Exception:  # noqa: BLE001
+                prior = None
+            if prior:
+                nhl_blend_prior(g, prior, prev)
+        return out
     try:
         roster = nhl_roster_goalie_ids(abbrev)
     except Exception:  # noqa: BLE001
@@ -928,9 +993,12 @@ def build_nhl_game(g, date_iso, season_id, summary, log):
         # goalies
         try:
             goalies = nhl_club_goalies(ab, season_id)
-            out["goalies"][side] = [{"name": x["name"], "sv": x["sv"], "shots": x["shots"], "gs": x["gs"], "season": x.get("season")} for x in goalies]
+            out["goalies"][side] = [{"name": x["name"], "sv": x["sv"], "shots": x["shots"], "gs": x["gs"], "season": x.get("season"),
+                                     "this": x.get("this"), "prior": x.get("prior")} for x in goalies]
             if goalies and goalies[0].get("season"):
                 notes.append("%s has not played yet: the goalie lines are LAST season's (%s), shots halved." % (nick, goalies[0]["season"]))
+            elif any(x.get("prior") for x in goalies):
+                notes.append("%s goalie lines blend this season with half of last season's shots, so an early-season number is the man's own prior, not the league's." % nick)
             last_id = None
             if fin and inputs[p + "rest"] == "0":
                 try:
@@ -947,7 +1015,11 @@ def build_nhl_game(g, date_iso, season_id, summary, log):
                     notes.append("%s's likely starter %s has no shots this season; save percentage left blank." % (nick, pick["name"]))
                 notes.append("%s likely starter: %s (%s). NOT confirmed: check Daily Faceoff and tick the box." % (nick, pick["name"], why))
                 others = ", ".join("%s %s/%d" % (x["name"], "%.3f" % x["sv"] if x["sv"] is not None else "?", x["shots"]) for x in goalies if x is not pick)
-                log("  %s goalie: %s  SV %s on %s shots  [%s]%s" % (side, pick["name"], inputs[p + "gsv"] or "?", inputs[p + "gsh"] or "?", why, ("; others: " + others) if others else ""))
+                halves = ""
+                if pick.get("prior"):
+                    t, pr = pick["this"], pick["prior"]
+                    halves = " (this season %s on %d; last season %.3f on %d, at half)" % ("%.3f" % t["sv"] if t["sv"] is not None else "?", t["shots"], pr["sv"], pr["shots"])
+                log("  %s goalie: %s  SV %s on %s shots%s  [%s]%s" % (side, pick["name"], inputs[p + "gsv"] or "?", inputs[p + "gsh"] or "?", halves, why, ("; others: " + others) if others else ""))
             else:
                 notes.append("%s: %s." % (nick, why))
         except Exception as e:  # noqa: BLE001
@@ -1261,7 +1333,13 @@ def selftest():
     check("nhl teams", row["away"] == "Rangers" and row["home"] == "Bruins" and row["sport"] == "NHL")
     check("nhl team rates", i["asf"] == "31.2" and i["hsf"] == "33.4" and i["app"] == "22.1" and i["hpk"] == "78.1")
     # the Rangers are on a back to back and Igor started yesterday, so the slate names the backup
-    check("nhl goalies: likely starters with sv and shots", row["starters"] == {"away": "Jonathan Q", "home": "Jeremy S"} and i["agsv"] == "0.902" and i["agsh"] == "500" and i["hgsv"] == "0.921" and i["hgsh"] == "1900")
+    # Jonathan Q: .902 on 500 this season plus half of .910 on 1,000 last season = .906 on 1,000.
+    # Jeremy S: .921 on 1,900 plus half of .915 on 2,000 (two clubs, summed) = .919 on 2,900.
+    check("nhl goalies: likely starters, this season blended with half of last",
+          row["starters"] == {"away": "Jonathan Q", "home": "Jeremy S"} and i["agsv"] == "0.906" and i["agsh"] == "1000" and i["hgsv"] == "0.919" and i["hgsh"] == "2900")
+    check("nhl goalies: the printout shows both halves", any("this season 0.902 on 500; last season 0.910 on 1000, at half" in l for l in lines2))
+    check("nhl goalies: a goalie with no last season keeps his own line", any(x["name"] == "Igor S" and x["shots"] == 1400 and x.get("prior") is None for x in row["goalies"]["away"]))
+    check("nhl goalies: the blend is noted", any("blend this season with half of last season" in n for n in row["notes"]))
     check("nhl rest and last ten", i["arest"] == "0" and i["hrest"] == "2" and i["al10"] == "5.9" and i["hl10"] == "6.4")
     check("nhl head to head", i["h2h"] == "5.5" and i["h2hn"] == "2")
     check("nhl: the back-to-back side gets the rested goalie", any("did not start yesterday" in n for n in row["notes"]))
@@ -1426,12 +1504,19 @@ def _canned_nhl():
     sjs_now = {"goalies": []}
     sjs_last = club("SJS", [(7, "Yaroslav", "A", 0.908, 1600, 55, 54), (8, "Gone", "Guy", 0.900, 600, 20, 19)])
     sjs_roster = {"goalies": [{"id": 7}, {"id": 9}]}
+    # player pages: last season's line for the blend. Igor (1) and Joonas (4) have no page in the
+    # canned set, so they keep this season's line alone; Jeremy (3) moved mid-season and is summed.
+    def player(rows):
+        return {"seasonTotals": [{"season": s, "gameTypeId": gt, "leagueAbbrev": "NHL", "shotsAgainst": sa, "goalsAgainst": ga} for s, gt, sa, ga in rows]}
+    p2 = player([(20252026, 2, 1000, 90), (20252026, 3, 200, 10), (20242025, 2, 900, 100)])
+    p3 = player([(20252026, 2, 1200, 102), (20252026, 2, 800, 68)])
     return [
         ("/schedule/2026-10-07", sched7), ("/schedule/2026-10-06", sched6),
         ("team/summary", summary),
         ("/club-stats/SJS/now", sjs_now), ("/club-stats/SJS/20252026/2", sjs_last), ("/roster/SJS/current", sjs_roster),
         ("/club-stats/NYR/", nyr), ("/club-stats/BOS/", bos),
         ("/club-schedule-season/NYR/", nyr_season), ("/club-schedule-season/BOS/", bos_season),
+        ("/player/2/landing", p2), ("/player/3/landing", p3),
         ("/boxscore", box), ("/landing", landing),
     ]
 

@@ -290,7 +290,7 @@ const CHECKS = ["dome","playoff"];
     const text = await (async () => { document.getElementById('copy').click(); await wait(); return ''; })();
     return { card, legs, ratios, band1: total.band1, side1: total.side1, rail };
   });
-  chk(/ALL 2 HIT/.test(parlayCard.card) && /fair parlay/.test(parlayCard.card) && /worth/.test(parlayCard.card) && /2 games had no side that clears its price/.test(parlayCard.card),
+  chk(/ALL 2 HIT/.test(parlayCard.card) && /fair parlay/.test(parlayCard.card) && /worth/.test(parlayCard.card) && /1 game had no side that clears its price/.test(parlayCard.card),
       'parlay: two games with a leg that clears its price make a parlay card with the all-hit chance, fair price, value multiple and the count of games passed over', parlayCard.card.slice(0, 220));
   // Both legs on this date carry a verdict: Rays @ Yankees UNDER 6.5 (BET) and this one (BET).
   chk(/Every leg carries Call Sheet #1's BET or better\. Every leg clears its own price/.test(parlayCard.card),
@@ -723,6 +723,55 @@ const CHECKS = ["dome","playoff"];
     return { msg: document.getElementById('saveMsg').textContent, ungradedChanged: after.find(r => r.id === 2).markets.length };
   });
   chk(/left frozen/.test(rescore.msg) && /Rescored/.test(rescore.msg), 'rescore: graded rows are left frozen, ungraded ones rescored', rescore.msg);
+
+  // ---- the WNBA sides: the ratings margin, pickable sides, the cheaper-side rule ----
+  const wsides = await pg.evaluate(async () => {
+    const wait = () => new Promise(r => setTimeout(r, 60));
+    const set = (id, v) => { const el = document.getElementById(id); el.value = v; el.dispatchEvent(new Event('input', { bubbles: true })); };
+    const chipsOf = () => [...document.querySelectorAll('#markets .mk')].map(el => ({ key: el.dataset.key, chips: [...el.querySelectorAll('.cap')].map(c => c.textContent) }));
+    document.getElementById('clear').click(); document.getElementById('m-wnba').click(); await wait();
+    // Fever @ Aces, 1 Oct: the four ratings on the card, the spread shaded -105 home / -115 away
+    set('gdate', '2026-10-01'); set('away', 'Fever'); set('home', 'Aces'); set('line', '179.5'); set('op', '-140'); set('up', '105');
+    set('aml', '155'); set('hml', '-190'); set('sp', '-4.5'); set('sph', '-105'); set('spa', '-115');
+    set('apace', '81.1'); set('hpace', '79.6'); set('aort', '117.0'); set('hort', '114.3'); set('adrt', '110.3'); set('hdrt', '107.2');
+    await wait();
+    const why = document.getElementById('why').textContent;
+    const railInformed = chipsOf();
+    document.getElementById('add').click(); await wait();
+    document.getElementById('boardDate').value = '2026-10-01'; document.getElementById('boardDate').dispatchEvent(new Event('change')); await wait();
+    const bets = [...document.querySelectorAll('#bestBets .pk')].map(e => ({ pick: e.querySelector('.n2').textContent, note: [...e.querySelectorAll('.swap')].map(s => s.textContent).join(' // ') }));
+    const legs = [...document.querySelectorAll('#picks .pk:not(.parlay) .n2')].map(e => e.textContent);
+    const text = (() => { document.getElementById('copy').click(); return ''; })();
+    // grade it: Aces 94, Fever 83 -- the cheaper side (Aces -4.5) covers, the over 179.5 loses
+    const stored = JSON.parse(localStorage.getItem('callsheet2.card.v1'));
+    const w = stored.find(r => r.sport === 'WNBA' && /Fever/.test(r.matchup));
+    const inp = (k) => document.querySelector(`.grade[data-id="${w.id}"][data-k="${k}"]`);
+    const type = (el, v) => { el.value = v; el.dispatchEvent(new Event('input', { bubbles: true })); };
+    type(inp('fa'), '83'); type(inp('fh'), '94'); inp('fh').dispatchEvent(new Event('change', { bubbles: true })); await wait();
+    const tile = [...document.querySelectorAll('#calibBox .calib[data-sport="WNBA"] > div')].find(d => /Spread/.test(d.textContent));
+    const stored2 = JSON.parse(localStorage.getItem('callsheet2.card.v1')).find(r => r.id === w.id);
+    // the same game without the ratings: the sides are shown, not picked
+    document.getElementById('clear').click(); document.getElementById('m-wnba').click(); await wait();
+    set('gdate', '2026-10-01'); set('away', 'Fever'); set('home', 'Aces'); set('line', '179.5'); set('op', '-140'); set('up', '105');
+    set('aml', '155'); set('hml', '-190'); set('sp', '-4.5'); set('sph', '-105'); set('spa', '-115'); await wait();
+    const railBare = chipsOf();
+    const whyBare = document.getElementById('why').textContent;
+    document.getElementById('clear').click(); await wait();
+    return { why, railInformed, bets, legs, tile: tile ? tile.textContent : '', informed: stored2.markets.map(m => m.key + ':' + !!m.informed).join(','), railBare, whyBare };
+  });
+  chk(/the ratings say \+3\.0/.test(wsides.why) && /the market says \+4\.2/.test(wsides.why) && /Margin \(home minus away\) of \+3\.9/.test(wsides.why),
+      'wnba: the margin blends the market (+4.2 after the -105/-115 de-vig) with the ratings (+3.0, home court included) at 4.0 and 1.2', wsides.why.slice(0, 300));
+  chk(wsides.railInformed.filter(r => r.key === 'spread' || r.key === 'ml').every(r => !r.chips.some(c => /shown, not picked/.test(c))) &&
+      wsides.railInformed.filter(r => r.key === 'total').every(r => r.chips.some(c => /shown, not picked/.test(c))),
+      'wnba: with the ratings in, the spread and moneyline are pickable and the total is shown, not picked', JSON.stringify(wsides.railInformed));
+  chk(wsides.railInformed.some(r => r.key === 'spread' && r.chips.some(c => /book's cheaper side: Aces -4\.5 at -105 · 0-0 on the record/.test(c))),
+      'wnba: the spread row names the book\'s cheaper side with the running record', JSON.stringify(wsides.railInformed));
+  chk(wsides.bets.some(b => /Aces -4\.5/.test(b.pick) && /CHEAPER SIDE/.test(b.pick) && /a rule, not a probability/.test(b.note) && /Reviewed at 40 picks/.test(b.note)),
+      'wnba: the cheaper side is a straight bet in its own tier, chipped and explained', JSON.stringify(wsides.bets));
+  chk(wsides.informed === 'total:false,ml:true,spread:true', 'wnba: the stored sides carry the informed flag, the total does not', wsides.informed);
+  chk(/cheaper side 1-0/.test(wsides.tile), 'record: the spread tile keeps the cheaper side\'s own line (Aces by 11 covers -4.5)', wsides.tile.slice(0, 200));
+  chk(wsides.railBare.filter(r => r.key === 'spread' || r.key === 'ml').every(r => r.chips.some(c => /shown, not picked/.test(c))) && /No ratings on the card/.test(wsides.whyBare),
+      'wnba: without the ratings the sides are the book\'s price read back, shown, not picked', JSON.stringify(wsides.railBare));
 
   // ---- the WNBA paste ------------------------------------------------------------
   const paste = await pg.evaluate(async () => {

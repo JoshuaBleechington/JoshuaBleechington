@@ -76,7 +76,10 @@ compressed halfway toward even. An overtime win is by one and never covers
 −1.5. Both markets are **shown, not picked** from the first game, on the run
 line's record. **The first period** is the first five: its own market, its
 own anchor, the goalie gap scaled by the 30% of regulation goals a first
-period carries, a plain Poisson with no empty net and no overtime.
+period carries, a plain Poisson with no empty net and no overtime. The
+pickable markets are per sport in one table (`PICKABLE` in 2.0's tail,
+carried here): MLB the total and the first five, NHL the total and the first
+period, WNBA the spread and the moneyline.
 
 One known seam: the total's mixture uses the league overtime rate (0.23)
 while the two-team distribution ties after sixty about 16% of the time —

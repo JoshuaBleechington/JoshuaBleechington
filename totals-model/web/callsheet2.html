@@ -271,7 +271,7 @@
   <header class="top">
     <div>
       <div class="eyebrow"><span id="eyebrow">MLB · every market on the game</span>
-        <span class="build">· build <span id="build">2026-10-01</span></span></div>
+        <span class="build">· build <span id="build">2026-10-02</span></span></div>
       <h1>Call Sheet <em>2.0</em></h1>
       <p>One matchup, every market the book posts on it — the full-game total, the first five,
          the moneyline and the run line — priced off the book's own numbers and <b>ranked by edge</b>, with
@@ -586,7 +586,7 @@
     <div class="body">
       <div class="subhead">The parlay four <span class="tag">#1's BET on the total first, else the best value side — one per game, at any price, only if it clears that price</span></div>
       <div id="picks" class="picks"></div>
-      <div class="subhead">Best straight bets <span class="tag">#1's BET or better first, then the best edges — up to eight</span></div>
+      <div class="subhead">Best straight bets <span class="tag">#1's BET or better first, then the WNBA cheaper side, then the best edges — up to eight</span></div>
       <div id="bestBets" class="picks"></div>
       <div class="subhead" id="bySportHead">One sport only <span class="tag">the same two rules, MLB and WNBA apart — only on a night with both</span></div>
       <div id="bySport" class="sports"></div>
@@ -594,8 +594,8 @@
       <p class="note"><b>The parlay four</b> takes one leg per game, in two tiers. First, Call Sheet #1's verdict:
         a full-game total #1 calls <b>BET</b>, <b>STRONG BET</b> or <b>MAX BET</b>, on #1's side, when that side
         also clears its price — the one mark on the board that carries #1's corroboration gate. Second, on a game
-        with no such total: the side, of the total or the first five, with the best chance against what its price
-        needs — never the moneyline or the run line, which are shown, not picked. There is no price cap: a −200
+        with no such total: the side, of the markets that sport picks, with the best chance against what its price
+        needs — never a market that is shown, not picked. There is no price cap: a −200
         side that clears −200 is a leg like any other, and a +130 side that does not clear +130 is not. In both
         tiers only a side that clears
         its price qualifies — a parlay's return is the product of those ratios, a boost multiplies the whole
@@ -604,15 +604,19 @@
         On a thin night you get three, or two, and the card says why. <b>All four hit</b> is the product of the
         chances — a boosted payout above that multiple beats fair outright — and <b>worth N×</b> is the product
         of the ratios, the parlay's value before any boost.</p>
-      <p class="note"><b>Best straight bets</b> is the other list, up to eight, in two tiers. First, every full-game
+      <p class="note"><b>Best straight bets</b> is the other list, up to eight, in three tiers. First, every full-game
         total Call Sheet #1 calls <b>BET</b> or better, best edge first, with the green chip on it — including one
         whose price is steeper than its chance, which stays on the list with a line saying so, because the verdict
-        tier is the sheet's best record and a verdict at −125 has won before. Second, every other <b>total or first
-        five</b> with a positive edge, best edge first, marked as here on the price alone. The moneyline and the
-        run line are <b>shown, not picked</b>: derived from the book's own moneyline with nothing behind them, and
-        22-30 on the first 52 graded games against a claimed 52.5%. They stay on the rail, the table and the
-        record so the tally keeps running, and come back if the run line reads calibrated at 150 picks. Both lists
-        are graded separately in the record. Click any pick card or table row to load that matchup into the form.</p>
+        tier is the sheet's best record and a verdict at −125 has won before. Second, in the WNBA, the <b>book's
+        cheaper side</b> of the spread — a rule, not a probability: on a −105/−115 spread the book has shaded its
+        price toward the side it wants money on, and taking that side went 12-1 on the first thirteen; it carries
+        a chip, its own record line on the spread tile, and a review at 40 picks. Third, every other pickable market
+        with a positive edge, best edge first, marked as here on the price alone. <b>Which markets each sport
+        picks:</b> MLB the total and the first five; WNBA the spread and the moneyline, which carry the four ratings
+        from 2 Oct. The rest are <b>shown, not picked</b> — the MLB moneyline and run line (22-30 on the first 52
+        against a claimed 52.5%), the WNBA total (6-7 on the first 13, leaning under by construction). They stay
+        on the rail, the table and the record so the tally keeps running, and come back if the record says so.
+        Both lists are graded separately in the record. Click any pick card or table row to load that matchup into the form.</p>
       <p class="note"><b>The four at the top are the four to look at, not the four to bet.</b> Two markets
         on the same game are one bet in disguise — a run line and an under both cash on a pitchers' duel —
         so a row that shares a game with a higher one is flagged <i>corr</i>. Re-read the inputs on anything
@@ -1577,6 +1581,13 @@
   /* Each constant is inherited or a fraction of the game. See the module
      docstring in totals/callsheet2.py for what has NOT been measured. */
   var WNBA_MARGIN_SD = 11.0;      // the retired spread model's figure
+  var WNBA_HOME_COURT = 2.5;      // its home court too, total-neutral
+  /* The margin is anchored on the market the way the total is, and the one
+     estimate that can move it is the four efficiency ratings the total
+     already scores, so it carries the total's efficiency weight. Added 2 Oct
+     2026 when the user asked for the WNBA book to lean on the spread and the
+     moneyline; until then both were read off the book's own prices. */
+  var WNBA_MARGIN_WEIGHTS = { market: WNBA_WEIGHTS.market, ratings: WNBA_WEIGHTS.efficiency };
   var F5_SHARE = 5 / 9;           // innings share; sizes the weather deltas only
   var F5_INNINGS = 5.0;
   var TEAM_PHI = PHI.MLB;         // independence between the teams implies it
@@ -1805,6 +1816,27 @@
   function fmtLine(v) { return (v >= 0 ? "+" : "") + (Math.abs(v - Math.round(v)) < 1e-9 ? String(v) : v.toFixed(1)); }
 
   /* ---- WNBA --------------------------------------------------------------- */
+  /* The margin (home minus away) the four ratings imply, plus home court:
+     each offence against the defence it faces, per 100 possessions, over the
+     possessions the two paces give (the league pace when a pace is missing,
+     since pace only scales the gap). Four league-average ratings give exactly
+     the home court. The level problem the retired model documented -- pace
+     and ratings off different possession counts -- is a level problem: in a
+     difference a uniform shift of all four only rescales the gap, where in
+     the total it set the whole number. That is why the margin can use the
+     identity the total could not. */
+  function ratingsMargin() {
+    var ao = num("aort"), ho = num("hort"), ad = num("adrt"), hd = num("hdrt");
+    if (![ao, ho, ad, hd].every(function (v) { return v !== null && ok(v, "rating"); })) return null;
+    var ap = num("apace"), hp = num("hpace"), possessions = WNBA.PACE;
+    if (ap !== null && hp !== null && ok(ap, "pace") && ok(hp, "pace")) possessions = ap * hp / WNBA.PACE;
+    var hppp = ho * ad / WNBA.RATING, appp = ao * hd / WNBA.RATING;
+    var gap = possessions * (hppp - appp) / 100;
+    return { margin: gap + WNBA_HOME_COURT,
+             why: "home " + ho.toFixed(1) + " into " + ad.toFixed(1) + " is " + hppp.toFixed(1) + " per 100, away " + ao.toFixed(1) +
+                  " into " + hd.toFixed(1) + " is " + appp.toFixed(1) + "; over " + possessions.toFixed(1) + " possessions that is " +
+                  sgn(gap, 1) + ", plus " + WNBA_HOME_COURT + " of home court" };
+  }
   function forecastMatchupWnba() {
     var f = readWnba();
     var away = f.away, home = f.home, line = f.line;
@@ -1835,25 +1867,46 @@
       return { sport: "WNBA", away: away, home: home, matchup: away + " @ " + home, markets: markets,
                lamHome: null, lamAway: null, total: f, notes: notes };
     }
-    notes.push("Margin (home minus away) of <b>" + sgn(margin, 1) + "</b> from the " + src + ", on a margin SD of " +
-      WNBA_MARGIN_SD + ". The total forecast does not move it — pace and efficiency change how many points, " +
-      "not who scores more of them.");
+    var rm = ratingsMargin();
+    if (rm) {
+      var wm = WNBA_MARGIN_WEIGHTS.market, wr = WNBA_MARGIN_WEIGHTS.ratings;
+      var blended = (wm * margin + wr * rm.margin) / (wm + wr);
+      notes.push("Margin (home minus away) of <b>" + sgn(blended, 1) + "</b>: the market says " + sgn(margin, 1) + " from the " + src +
+        ", at weight " + wm + "; the ratings say <b>" + sgn(rm.margin, 1) + "</b> (" + rm.why + "), at weight " + wr +
+        ", the efficiency weight the total uses for the same four numbers. On a margin SD of " + WNBA_MARGIN_SD +
+        ". The total forecast does not move it — pace and efficiency change how many points, not who scores more of them — " +
+        "and the ratings move it only by how far they disagree with the book.");
+      margin = blended;
+    } else {
+      notes.push("Margin (home minus away) of <b>" + sgn(margin, 1) + "</b> from the " + src + ", on a margin SD of " +
+        WNBA_MARGIN_SD + ". The total forecast does not move it — pace and efficiency change how many points, " +
+        "not who scores more of them. No ratings on the card, so the margin is the market's alone and the side markets " +
+        "can only ever show the vig.");
+    }
     var half = f.projected / 2, lamH = half + margin / 2, lamA = half - margin / 2;
     var pH = 1 - ncdf((0 - margin) / WNBA_MARGIN_SD);
-    markets.push(pickOf("ml", "Moneyline",
+    /* `informed`: the four ratings were on the card, so the side carries team
+       information and may be picked. Without them the side is the book's own
+       price read back, and stays shown, not picked (see pickable). */
+    var mlm = pickOf("ml", "Moneyline",
       [sideOf(home + " ML", "HOME", pH, 0, hml), sideOf(away + " ML", "AWAY", 1 - pH, 0, aml)],
       hml !== null && aml !== null, "",
-      ["Read off the spread through the margin distribution when a spread is in, so an edge here is the " +
-       "book's moneyline disagreeing with its own spread. That happens, and it is small."]));
+      ["Read off the margin: the book's spread or moneyline, moved by the four efficiency ratings when they are on " +
+       "the card. With no ratings an edge here is only the book's moneyline disagreeing with its own spread, which " +
+       "happens, and is small."]);
+    mlm.informed = !!rm;
+    markets.push(mlm);
     if (sp !== null) {
       var pr2 = spreadProbs(margin, sp);
-      markets.push(pickOf("spread", "Spread " + home + ": " + fmtLine(sp),
+      var spm = pickOf("spread", "Spread " + home + ": " + fmtLine(sp),
         [sideOf(home + " " + fmtLine(sp), "HOME", pr2[0], pr2[1], sph),
          sideOf(away + " " + fmtLine(-sp), "AWAY", pr2[2], pr2[1], spa)],
         sph !== null && spa !== null, "",
-        ["A spread with both prices in is the anchor, so this side's edge is only ever the vig regressed " +
-         "for a wide hold. It is here so the day board can rank it against the totals honestly, not because " +
-         "it can find value on its own."]));
+        ["The spread with both prices in is the anchor; the four efficiency ratings are the one estimate that can " +
+         "move the margin off it, at the total's efficiency weight. With no ratings this side's edge is only ever the " +
+         "vig regressed for a wide hold."]);
+      spm.informed = !!rm;
+      markets.push(spm);
     }
     return { sport: "WNBA", away: away, home: home, matchup: away + " @ " + home, markets: markets,
              lamHome: lamH, lamAway: lamA, total: f, notes: notes };
@@ -1950,7 +2003,8 @@
     return ms.map(function (m) {
       return { key: m.key, label: m.label, pick: m.pick, side: m.side, p: +m.p.toFixed(5), pPush: +m.pPush.toFixed(5),
                price: m.price, edge: m.edge === null ? null : +m.edge.toFixed(5), fair: +m.fair.toFixed(1),
-               anchored: m.anchored, band: m.band, band1: m.band1, side1: m.side1, other: m.other };
+               anchored: m.anchored, band: m.band, band1: m.band1, side1: m.side1, other: m.other,
+               informed: m.informed === undefined ? undefined : !!m.informed };
     });
   }
 
@@ -2031,8 +2085,9 @@
        and nothing when no side clears its price. The leg can sit on the side
        opposite the one this list shows (the list shows the better price), so
        the mark names its pick. */
-    var leg = gameLeg(m.markets).leg;
+    var leg = gameLeg(m.markets, sport).leg;
     ranked.forEach(function (mk, i) {
+      var shade = shadeOf(mk), shadeRec = shade ? shadeRecord() : null;
       var top = i === 0 && mk.edge !== null && mk.edge > 0;
       var isLeg = leg && mk.key === leg.key;
       var res = fin ? gradeMarket(mk, fin) : null;
@@ -2044,7 +2099,8 @@
           (mk.band ? '<span class="band' + (mk.band === "NO BET" ? "" : " hot") + '">' + esc(mk.band) + '</span>' : "") +
           (!mk.anchored ? '<span class="derived">derived</span>' : "") +
           (mk.key === "total" ? railMarks : "") +
-          (!pickable(mk) ? '<span class="cap tagm" title="Derived from the book\'s own moneyline with no team information behind it. On the first 52 graded games the run line said 52.5% and did 42.3%, so it is listed and graded but never a straight bet or a parlay leg.">shown, not picked</span>' : "") +
+          (!pickable(mk, sport) ? '<span class="cap tagm" title="' + esc(notPickedWhy(sport, mk)) + '">shown, not picked</span>' : "") +
+          (shade ? '<span class="cap" style="color:var(--go);border-color:var(--go)" title="The side the book priced cheaper. The book shades its price toward the side it wants money on, so this is betting with the book against the crowd: a rule, not a probability, kept on its own record line.">book\'s cheaper side: ' + esc(shade.pick) + ' at ' + sgn(shade.price, 0) + ' · ' + recText(shadeRec) + ' on the record</span>' : "") +
           (isLeg ? '<span class="cap" style="color:var(--go);border-color:var(--go)">parlay leg: ' + esc(leg.pick) + ' ' + (leg.p * 100).toFixed(1) + '% at ' + sgn(leg.price, 0) + ' · ' + valueRatio(leg).toFixed(3) + '× its price' + (bandOf(leg) ? ' · #1 says ' + esc(bandOf(leg)) : '') + '</span>' : "") +
           (res ? '<span class="chip ' + res + '" style="margin-left:8px;vertical-align:2px">' + resText(res) + '</span>' : "") + '</div>' +
           '<div class="lab">' + esc(mk.label) + '</div></div>' +
@@ -2122,10 +2178,10 @@
      for a verdict leg, the richer-priced side. `priced` says whether anything
      pickable had a price at all, so a game whose sides are all priced above
      their chance counts as passed over, not as unpriced. */
-  function gameLeg(markets) {
+  function gameLeg(markets, sp) {
     var priced = [], clears = [];
     (markets || []).forEach(function (mk) {
-      if (!pickable(mk)) return;   // the moneyline and run line are shown, not picked
+      if (!pickable(mk, sp)) return;   // a market shown, not picked, is never a leg
       bothSides(mk).forEach(function (v) {
         if (v.price === null || v.price === undefined) return;
         priced.push(v);
@@ -2153,7 +2209,7 @@
     card.forEach(function (r) {
       if ((r.gdate || "") !== dateISO) return;
       if (sport && r.sport !== sport) return;
-      var g = gameLeg(r.markets);
+      var g = gameLeg(r.markets, r.sport);
       if (!g.leg) { if (g.priced) skipped++; return; }
       legs.push({ row: r, mk: g.leg, ratio: valueRatio(g.leg), tier: bandTier(g.leg), band: bandOf(g.leg),
                   likeliest: g.likeliest, richer: g.richer, rank: 0, corr: [] });
@@ -2187,15 +2243,78 @@
      "shown, not picked", so the tally keeps running; if the run line reads
      calibrated at 150 picks it comes back. The totals and the first five --
      the two markets the model has inputs for -- are the pickable ones:
-     62.7% and 62.5% over the same games. */
-  function pickable(mk) { return mk.key === "total" || mk.key === "f5"; }
+     62.7% and 62.5% over the same games.
+     The WNBA turned the other way on 2 Oct, at the user's call: its spread
+     and moneyline carry the four ratings from that day (see ratingsMargin),
+     its totals leaned under by construction and went 6-7 (says 54.8%, does
+     46.2%), and the user asked for the book to lean on the sides. So in the
+     WNBA the spread and the moneyline are pickable and the total is shown,
+     not picked -- still on the rail, the board and the record, so it can
+     come back the same way the run line can. The NHL entry is for Call Sheet
+     3.0, which is built from this file: the total and the first period. */
+  var PICKABLE = { MLB: ["total", "f5"], WNBA: ["spread", "ml"], NHL: ["total", "p1"] };
+  function pickable(mk, sp) {
+    if ((PICKABLE[sp] || PICKABLE.MLB).indexOf(mk.key) < 0) return false;
+    /* A WNBA side is picked only when the four ratings were on the card: a
+       row stored without them (every row before 2 Oct, or one typed with the
+       boxes empty) carries no team information on its sides and keeps the
+       chip. Rescore an ungraded row to give it the flag. */
+    return sp !== "WNBA" || !!mk.informed;
+  }
+  function notPickedWhy(sp, mk) {
+    if (sp === "WNBA" && mk.key !== "total") return "This side was stored without the four ratings, so it is the book's own price read back and carries no team information. Type the ratings (paste the stats.wnba.com table) and press Rescore, and the spread and the moneyline become pickable.";
+    if (sp === "WNBA") return "The WNBA total leaned under by construction and went 6-7 on the first 13 (says 54.8%, does 46.2%); from 2 Oct the WNBA book picks the spread and the moneyline, which carry the ratings, and the total is listed and graded but never a straight bet or a parlay leg.";
+    if (sp === "NHL") return "Derived from the book's own moneyline with no team information behind it, like the run line, which said 52.5% and did 42.3% on its first 52. Listed and graded, never a straight bet or a parlay leg, until the record says otherwise.";
+    return "Derived from the book's own moneyline with no team information behind it. On the first 52 graded games the run line said 52.5% and did 42.3%, so it is listed and graded but never a straight bet or a parlay leg.";
+  }
+  /* ---- the book's cheaper side (WNBA spread) --------------------------------
+     A RULE, not a probability. On a spread priced -105/-115 the book has
+     shaded its price toward the side it wants money on, so taking the
+     cheaper side is betting with the book against the crowd. That has a
+     mechanism and a modest literature (a point or two over a coin, long
+     run), and on this card it went 12-1 on the first thirteen WNBA spreads
+     with a shaded price (24 Sept to 1 Oct 2026); the three at -110/-110 are
+     not the rule and are not counted. It moves no number: the chip names the
+     side, the spread tile keeps its record, and it sits on the straight bets
+     as its own tier between #1's verdicts and the value picks, chipped so a
+     reader knows which tier they are looking at. Reviewed at 40 picks. */
+  var SHADE_MIN_GAP = 10;
+  function shadeOf(mk) {
+    if (!mk || mk.key !== "spread" || !mk.other) return null;
+    var a = mk.price, b = mk.other.price;
+    if (a === null || a === undefined || b === null || b === undefined || Math.abs(a - b) < SHADE_MIN_GAP) return null;
+    var sides = bothSides(mk);
+    return sides[0].price > sides[1].price ? sides[0] : sides[1];
+  }
+  function shadeRecord() {
+    var c = { w: 0, l: 0, p: 0 };
+    card.forEach(function (r) {
+      if (r.sport !== "WNBA") return;
+      (r.markets || []).forEach(function (mk) {
+        var s = shadeOf(mk); if (!s) return;
+        var res = gradeMarket(s, r.finals); if (res === null || res === "invalid") return;
+        if (res === "push") c.p++; else if (res === "win") c.w++; else c.l++;
+      });
+    });
+    return c;
+  }
+  function recText(c) { return c.w + "-" + c.l + (c.p ? "-" + c.p : ""); }
   function bestBets(dateISO, sport) {
     var all = boardRows(dateISO, false).filter(function (x) { return !sport || x.row.sport === sport; });
-    var verdict = all.filter(function (x) { return x.mk.key === "total" && bandOf(x.mk); });
-    var value = all.filter(function (x) { return pickable(x.mk) && !(x.mk.key === "total" && bandOf(x.mk)) && x.mk.edge > 0; });
+    var verdict = all.filter(function (x) { return x.mk.key === "total" && pickable(x.mk, x.row.sport) && bandOf(x.mk); });
+    var rule = [];
+    card.forEach(function (r) {
+      if ((r.gdate || "") !== dateISO || r.sport !== "WNBA" || (sport && r.sport !== sport)) return;
+      (r.markets || []).forEach(function (mk) { var s = shadeOf(mk); if (s) rule.push({ row: r, mk: s }); });
+    });
+    var value = all.filter(function (x) {
+      return pickable(x.mk, x.row.sport) && !(x.mk.key === "total" && bandOf(x.mk)) && x.mk.edge > 0 &&
+             !rule.some(function (y) { return y.row.id === x.row.id && y.mk.pick === x.mk.pick; });
+    });
     verdict.forEach(function (x) { x.tier = "verdict"; x.thin = x.mk.edge <= 0; });
+    rule.forEach(function (x) { x.tier = "rule"; x.thin = x.mk.edge === null || x.mk.edge <= 0; });
     value.forEach(function (x) { x.tier = "value"; x.thin = false; });
-    var rows = verdict.concat(value).slice(0, 8);
+    var rows = verdict.concat(rule).concat(value).slice(0, 8);
     rows.forEach(function (x, i) {
       x.rank = i + 1;
       x.corr = rows.slice(0, i).filter(function (o) { return o.row.id === x.row.id; }).map(function (o) { return o.rank; });
@@ -2206,6 +2325,12 @@
     if (x.tier === "verdict" && x.thin) {
       return '<div class="swap">#1 says <b>' + esc(bandOf(x.mk)) + '</b>, but ' + sgn(x.mk.price, 0) + ' needs ' + (implied(x.mk.price) * 100).toFixed(1) +
         '% and the sheet says ' + (x.mk.p * 100).toFixed(1) + '%. The verdict is there; the price is not. Shop it, or size it down.</div>';
+    }
+    if (x.tier === "rule") {
+      var rc = shadeRecord();
+      return '<div class="swap">The book\'s <b>cheaper side</b> — a rule, not a probability: <b>' + recText(rc) + '</b> on the record. The sheet says ' +
+        (x.mk.p * 100).toFixed(1) + '%' + (x.mk.price !== null ? ' and ' + sgn(x.mk.price, 0) + ' needs ' + (implied(x.mk.price) * 100).toFixed(1) + '%' : '') +
+        (x.thin ? '; the rule is carrying this one, not the number.' : '; the number agrees.') + ' Reviewed at 40 picks.</div>';
     }
     if (x.tier === "value") return '<div class="swap">No verdict on this market — it is here on the price alone.</div>';
     return '';
@@ -2265,7 +2390,8 @@
     var res = gradeMarket(x.mk, x.row.finals);
     return '<div class="pk ' + cls + '" data-open="' + x.row.id + '" title="Load ' + esc(x.row.matchup) + ' into the form">' +
       '<div class="n1">#' + x.rank + (x.corr && x.corr.length ? ' · same game as #' + x.corr.join(', #') : '') + '</div>' +
-      '<div class="n2">' + esc(x.mk.pick) + (bandOf(x.mk) ? ' <span class="band hot">' + esc(bandOf(x.mk)) + '</span>' : '') + '</div>' +
+      '<div class="n2">' + esc(x.mk.pick) + (bandOf(x.mk) ? ' <span class="band hot">' + esc(bandOf(x.mk)) + '</span>' : '') +
+        (x.tier === "rule" ? ' <span class="band hot" title="The side the book priced cheaper: a rule, not a probability">CHEAPER SIDE</span>' : '') + '</div>' +
       '<div class="n3">' + (x.mk.p * 100).toFixed(1) + '% · ' + (x.mk.price !== null ? sgn(x.mk.price, 0) + ' · edge ' + sgn(x.mk.edge * 100, 1) : 'no price') +
         (res ? ' · <span class="chip ' + res + '">' + resText(res) + '</span>' : '') + '</div>' +
       '<div class="n4">' + esc(x.row.matchup) + ' · ' + esc(x.mk.label) +
@@ -2318,7 +2444,7 @@
       h += '<tr class="' + (inFour ? 'pick4' : '') + '" data-open="' + x.row.id + '" title="Load ' + esc(x.row.matchup) + ' into the form">' +
         '<td><span class="rank">' + x.rank + '</span>' + (x.corr.length ? '<span class="chip corr">corr #' + x.corr.join(' #') + '</span>' : '') + '</td>' +
         '<td>' + esc(x.row.matchup) + ' <span class="gdate">' + esc(x.row.sport) + '</span></td>' +
-        '<td>' + esc(mk.label) + (!mk.anchored ? ' <span class="chip dim">derived</span>' : '') + (!pickable(mk) ? ' <span class="chip dim">not picked</span>' : '') + '</td>' +
+        '<td>' + esc(mk.label) + (!mk.anchored ? ' <span class="chip dim">derived</span>' : '') + (!pickable(mk, x.row.sport) ? ' <span class="chip dim">not picked</span>' : '') + '</td>' +
         '<td><span class="chip ' + sideClass(mk.side) + '">' + esc(mk.pick) + '</span>' + (mk.band && mk.band !== "NO BET" ? ' <span class="chip">' + esc(mk.band) + '</span>' : '') + '</td>' +
         '<td class="n">' + (mk.p * 100).toFixed(1) + '%</td>' +
         '<td class="n">' + sgn(mk.price, 0) + '</td>' +
@@ -2494,6 +2620,10 @@
         var sd = t.sides[mk.side] || (t.sides[mk.side] = { w: 0, l: 0, p: 0 });
         count(sd, res);
         if (mk.key === "total" && bandOf(mk)) { count(t.verdict || (t.verdict = { w: 0, l: 0, p: 0 }), res); }
+        if (mk.key === "spread") {
+          var sh = shadeOf(mk), shRes = sh ? gradeMarket(sh, row.finals) : null;
+          if (shRes !== null && shRes !== "invalid") count(t.shade || (t.shade = { w: 0, l: 0, p: 0 }), shRes);
+        }
         if (mk.key === "total" || mk.key === "f5") {
           var tg = marksOf(row.sport, row.inputs, row.markets);
           if (tg.profile) count(t.profile || (t.profile = { w: 0, l: 0, p: 0 }), res);
@@ -2542,6 +2672,7 @@
       var order = ["OVER", "UNDER", "HOME", "AWAY"], parts = [];
       order.forEach(function (sd) { if (s.sides[sd]) parts.push(sd.toLowerCase() + ' ' + rec(s.sides[sd])); });
       if (s.verdict) parts.push('#1 BET or better ' + rec(s.verdict));
+      if (s.shade) parts.push('cheaper side ' + rec(s.shade));
       if (s.profile) parts.push('cold-under profile ' + rec(s.profile));
       if (s.grain) parts.push('over against the grain ' + rec(s.grain));
       ["same lean", "split lean"].forEach(function (k) { if (s.lean[k]) parts.push(k + ' ' + rec(s.lean[k])); });
@@ -2693,10 +2824,10 @@
       out.push("  " + x.rank + ". " + x.row.matchup + " — " + x.mk.pick + "  " + (x.mk.p * 100).toFixed(1) + "%  " + sgn(x.mk.price, 0) +
         "  " + x.ratio.toFixed(3) + "x" + (x.band ? "  [#1: " + x.band + "]" : "") + (x.likeliest ? "  (likelier: " + x.likeliest.pick + " at " + sgn(x.likeliest.price, 0) + ")" : ""));
     });
-    out.push("BEST STRAIGHT BETS (#1's verdicts first, then by edge)");
+    out.push("BEST STRAIGHT BETS (#1's verdicts first, then the WNBA cheaper side, then by edge)");
     bestBets(dateISO).forEach(function (x) {
       out.push("  " + x.rank + ". " + x.row.matchup + " — " + x.mk.pick + "  " + (x.mk.p * 100).toFixed(1) + "%  " + sgn(x.mk.price, 0) + "  edge " + sgn(x.mk.edge * 100, 1) +
-        (x.tier === "verdict" ? "  [#1: " + bandOf(x.mk) + (x.thin ? ", price steeper than the chance" : "") + "]" : "  [value]"));
+        (x.tier === "verdict" ? "  [#1: " + bandOf(x.mk) + (x.thin ? ", price steeper than the chance" : "") + "]" : x.tier === "rule" ? "  [cheaper side, a rule: " + recText(shadeRecord()) + "]" : "  [value]"));
     });
     ["MLB", "WNBA"].forEach(function (sp) {
       var sl = parlayFour(dateISO, sp), sb = bestBets(dateISO, sp);

@@ -33,14 +33,16 @@ Two more double-click files: **Run NHL slate.bat** before the games and
 
 | On the sheet | Where it comes from |
 | --- | --- |
-| Goalies: the likely starter, save %, shots faced | The club's goalie page. On a back to back the slate names the goalie who did **not** start yesterday; otherwise the one with the most starts. **Never confirmed**: the sheet says so until you check Daily Faceoff and tick the box |
+| Goalies: the likely starter, save %, shots faced | The club's goalie page, each line blended with **half of last season's** from the player's page, so a first start of .739 on 23 shots reads as the man's own prior and not the league's. On a back to back the slate names the goalie who did **not** start yesterday; otherwise the one with the most starts. **Never confirmed**: the sheet says so until you check Daily Faceoff and tick the box |
 | Shots for per game, power play %, penalty kill % | The league's team summary report |
 | Last-10 average total, rest days, head to head | The club's season schedule |
 | Finals and the first-period score | The game page the next morning. A shootout win is a one-goal margin, as the league records it |
 
-The two goalies' lines are both printed, so if Daily Faceoff names the other
-one you can type his save % and shots over the slate's. A team that has not
-played yet gets last season's goalie lines, shots halved, with a note.
+The two goalies' lines are both printed, with both halves (this season and
+last season at half), so if Daily Faceoff names the other one you can type
+his save % and shots over the slate's. A team that has not played yet gets
+last season's goalie lines, shots halved, with a note — the same half by
+another route.
 Shots per game, special teams and the last ten wait until a team has five
 games; before that the boxes stay blank and the sheet is the market plus
 the goalies.

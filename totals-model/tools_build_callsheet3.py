@@ -23,7 +23,7 @@ import sys
 ROOT = pathlib.Path(__file__).parent / "web"
 OPEN = "  /* ===== ENGINE BLOCK."
 CLOSE = "  /* ===== END ENGINE BLOCK ===== */"
-STAMP = "2026-10-01"   # bumped by hand when 3.0's own sources change (the harness checks it)
+STAMP = "2026-10-02"   # bumped by hand when 3.0's own sources change (the harness checks it)
 
 
 def engine_block() -> str:
@@ -113,7 +113,7 @@ def tail() -> str:
     t, n = re.subn(r'([A-Za-z_.]+) === "WNBA" \? "WNBA" : "MLB"', r'sportOf(\1)', t)
     if n != 5:
         sys.exit(f"build stopped: sport normalisation matched {n} times, expected 5")
-    t = every(t, 'mk.key === "total" || mk.key === "f5"', 'mk.key === "total" || isPeriod(mk)', "period keys", 4)
+    t = every(t, 'mk.key === "total" || mk.key === "f5"', 'mk.key === "total" || isPeriod(mk)', "period keys", 3)
     t = once(t, '      if (mk.key === "f5") {\n        if (!isFinite(f5h) || !isFinite(f5a)) return null;',
              '      if (isPeriod(mk)) {\n        if (!isFinite(f5h) || !isFinite(f5a)) return null;', "grade period")
     t = once(t, 'mk.key === "f5" ? parseFloat(c.cf5)', 'isPeriod(mk) ? parseFloat(c.cf5)', "close period")

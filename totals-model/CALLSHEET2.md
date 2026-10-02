@@ -62,12 +62,39 @@ positive edge, the ones that reached the straight bets, said 60.6% and did
 calibrated (42.2% said, 42.3% done) and, read off its own price, never
 clears it. The totals and the first five, the two markets the model has
 inputs for, went 62.7% and 62.5% over the same games. So the moneyline and
-the run line (and the WNBA spread, which is the same construction) are
-**shown, not picked**: still on the rail with their chance, price and edge,
-still on the board table, still graded on the record tiles, chipped *shown,
-not picked* — but never a straight bet and never a parlay leg. The tally
-keeps running; if the run line's *does* is back within a standard error of
-its *says* at 150 picks it comes back. The margin distribution itself is not
+the run line are **shown, not picked**: still on the rail with their chance,
+price and edge, still on the board table, still graded on the record tiles,
+chipped *shown, not picked* — but never a straight bet and never a parlay
+leg. The tally keeps running; if the run line's *does* is back within a
+standard error of its *says* at 150 picks it comes back.
+
+**The WNBA turned the other way on 2 Oct**, at the user's call. Its spread
+and moneyline were the same construction as the run line — the book's own
+price read back — until that day, when the four efficiency ratings the total
+already scores were given a second job: the **ratings margin** (each offence
+into the defence it faces, per 100 possessions, over the possessions the two
+paces give, plus 2.5 of home court, inherited from the retired spread model)
+is blended with the market margin at the total's efficiency weight (1.2
+against the market's 4.0). Four league-average ratings give exactly the home
+court. So in the WNBA the **spread and the moneyline are pickable when the
+ratings are on the card** (a side stored without them keeps the chip, and
+Rescore gives an ungraded row the flag), and the **total is shown, not
+picked**: it leaned under by construction, went 6-7 on the first thirteen
+(says 54.8%, does 46.2%), and the user asked for the book to lean on the
+sides. Which markets each sport picks is one table in the code, `PICKABLE`.
+
+**The book's cheaper side** is a rule, not a probability, and the sheet says
+so everywhere it appears. On a WNBA spread priced −105/−115 the book has
+shaded its price toward the side it wants money on, so taking the cheaper
+side is betting with the book against the crowd — a mechanism with a modest
+literature (a point or two over a coin, long run) and, on this card, 12-1 on
+the first thirteen WNBA spreads with a shaded price (24 Sept to 1 Oct); the
+three at −110/−110 are not the rule and are not counted. It moves no
+number. The spread row on the rail names the side and the running record,
+the spread tile keeps its own *cheaper side* line, and it sits on the
+straight bets as its own tier between #1's verdicts and the value picks,
+chipped *CHEAPER SIDE* with a line saying whether the number agrees or the
+rule is carrying it. Reviewed at 40 picks. The margin distribution itself is not
 being refit on 52 games. `pickable()` in the page is the one switch.
 
 **Nothing per-team we hold is unpriced by the moneyline.** The book knew the
@@ -149,7 +176,13 @@ Read this before trusting a number.
 - **The tie split.** Extra innings decide a tie in the ratio the nine-inning
   result showed. Standard, approximate.
 - **The WNBA margin SD** (11.0) is inherited from the retired spread model,
-  not re-fitted.
+  not re-fitted. So is its **home court** (2.5 points). The **ratings
+  weight** on the margin (1.2) is the total's efficiency weight reused, not
+  a figure measured on margins; the ratings and the market share their
+  inputs, so the blend is at best a small correction, by design.
+- **The cheaper-side rule** has thirteen picks behind it. Its long-run
+  expectation is a point or two over a coin; 12-1 is the mechanism plus a
+  hot fortnight, and the record line exists so the two can be told apart.
 - **There is no record.** Zero graded 2.0 markets as of this writing. The day
   board exists to accumulate the record that will say whether ranking by edge
   works. On #1's 191 MLB cards, the sign of the edge did **not** predict the

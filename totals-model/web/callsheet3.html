@@ -279,7 +279,7 @@
   <header class="top">
     <div>
       <div class="eyebrow"><span id="eyebrow">MLB · every market on the game</span>
-        <span class="build">· build <span id="build">2026-10-02</span></span></div>
+        <span class="build">· build <span id="build">2026-10-04</span></span></div>
       <h1>Call Sheet <em>3.0</em></h1>
       <p>One matchup, every market the book posts on it — in baseball the full-game total, the first five,
          the moneyline and the run line; in hockey the total, the first period, the moneyline and the puck line;
@@ -1694,6 +1694,27 @@
     return [Math.max(0, 1 - under - push), push, under];
   }
   function nhlP1Split(line, mu) { return nbSplit(line, mu, NHL.P1_PHI); }
+  /* The first-period anchor with the hold regression OFF (totals/nhl.py,
+     p1_anchor). fairTotal pulls a wide-hold lean toward even because on a main
+     total a wide hold means an alternate line; a first-period market carries a
+     wide hold as a matter of course, so the regression had the sheet a point or
+     two under the book on every period and the under always the better price:
+     25 of the first 26 picks under, 10-15. Turned off 4 Oct 2026 at the user's
+     call. One price or none still goes through fairTotal. */
+  function nhlP1Anchor(line, op, up) {
+    if (op === null || up === null) return fairTotal("NHL_P1", line, op, up);
+    var o = implied(op), u = implied(up), pOver = o / (o + u);
+    var lo = Math.max(0.5, line - 4), hi = line + 4;
+    for (var i = 0; i < 80; i++) {
+      var mid = (lo + hi) / 2, sp = nhlP1Split(line, mid);
+      var live = sp[0] + sp[2], conditional = live > 0 ? sp[0] / live : 0.5;
+      if (conditional < pOver) lo = mid; else hi = mid;
+    }
+    var mu = (lo + hi) / 2;
+    return [mu, sgn(op, 0) + "/" + sgn(up, 0) + " de-vigs to " + (pOver * 100).toFixed(1) + "% over and puts fair at " + mu.toFixed(2) +
+      " against the " + line + " posted. The " + ((o + u - 1) * 100).toFixed(1) + "% hold is read straight, not regressed: a first-period market " +
+      "carries a wide hold as a matter of course, and regressing it had the sheet calling the under the better price on 25 of its first 26 periods. Off since 4 Oct 2026."];
+  }
   var splitForBase = splitFor;
   splitFor = function (sport, line, mu) {
     if (sport === "NHL") return nhlSplit(line, mu);
@@ -1888,7 +1909,7 @@
     }
     if (p1line !== null) {
       if (!ok(p1line, "nhl_period")) throw new Error("first-period total out of range");
-      var fa1 = fairTotal("NHL_P1", p1line, p1op, p1up), muP1 = fa1[0];
+      var fa1 = nhlP1Anchor(p1line, p1op, p1up), muP1 = fa1[0];
       var est1 = [[muP1, NHL_WEIGHTS.market]], p1notes = ["Anchored on the first-period market: " + fa1[1]];
       var goalies = f.estimates.filter(function (e) { return e.name === "Goalies" || e.name === "Shot rates"; })[0];
       if (goalies) {

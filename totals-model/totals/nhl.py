@@ -192,6 +192,44 @@ register_split("NHL", nhl_split)
 register_split("NHL_P1", p1_split)
 
 
+def p1_anchor(line: float, over_price: float | None, under_price: float | None
+              ) -> tuple[float, str]:
+    """The first-period market's mean, with the hold regression OFF.
+
+    `fair_total` pulls a de-vigged lean toward even when the hold is wide,
+    because on a main total a wide hold means an alternate line. A
+    first-period total carries a wide hold as a matter of course (BetMGM runs
+    about seven cents on it), so the regression read every first-period
+    market as half a lean: the sheet sat a point or two under the book on all
+    of them, the under was always the better price, and the pick went under
+    on 25 of the first 26 periods (10-15). Never a bet -- a regressed lean
+    never clears its price -- but a tile that bled for a reason that was not
+    hockey. Turned off here on 4 Oct 2026 at the user's call: both prices
+    read straight, same bisection, same split. With one price or none this
+    defers to `fair_total`, which reconstructs or assumes the pair.
+    """
+    if over_price is None or under_price is None:
+        return fair_total("NHL_P1", line, over_price, under_price)
+    p_over, _ = devig(over_price, under_price, shrink=False)
+    lo, hi = max(0.5, line - 4.0), line + 4.0
+    for _ in range(80):
+        mid = (lo + hi) / 2.0
+        o, _push, u = p1_split(line, mid)
+        live = o + u
+        conditional = o / live if live > 0 else 0.5
+        if conditional < p_over:
+            lo = mid
+        else:
+            hi = mid
+    mu = (lo + hi) / 2.0
+    return mu, (
+        f"{over_price:+.0f}/{under_price:+.0f} de-vigs to {p_over * 100:.1f}% over and puts fair "
+        f"at {mu:.2f} against the {line:g} posted. The {hold(over_price, under_price) * 100:.1f}% "
+        f"hold is read straight, not regressed: a first-period market carries a wide hold as a "
+        f"matter of course, and regressing it had the sheet calling the under the better price on "
+        f"25 of its first 26 periods. Off since 4 Oct 2026.")
+
+
 # ===========================================================================
 # The goalie, as a differential
 # ===========================================================================
@@ -535,7 +573,7 @@ def forecast_matchup_nhl(
     if p1_line is not None:
         if not _ok(p1_line, "nhl_period"):
             raise ValueError(f"first-period total {p1_line!r} is outside {PLAUSIBLE['nhl_period']}")
-        mu_p1, how = fair_total("NHL_P1", p1_line, p1_over_price, p1_under_price)
+        mu_p1, how = p1_anchor(p1_line, p1_over_price, p1_under_price)
         est: list[tuple[float, float]] = [(mu_p1, WEIGHTS["market"])]
         p1_notes = [f"Anchored on the first-period market: {how}"]
         goalies = next((e for e in f.estimates if e.name in ("Goalies", "Shot rates")), None)

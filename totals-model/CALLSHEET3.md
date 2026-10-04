@@ -76,7 +76,14 @@ compressed halfway toward even. An overtime win is by one and never covers
 −1.5. Both markets are **shown, not picked** from the first game, on the run
 line's record. **The first period** is the first five: its own market, its
 own anchor, the goalie gap scaled by the 30% of regulation goals a first
-period carries, a plain Poisson with no empty net and no overtime. The
+period carries, a plain Poisson with no empty net and no overtime. Its
+anchor reads the two prices **straight, without the wide-hold regression**
+(`p1_anchor`): a first-period market carries a seven-cent hold as a matter
+of course, and regressing it had the sheet a point or two under the book on
+every period, the under always the better price, 25 of the first 26 picks
+under (10-15). Never a bet — a regressed lean never clears its price — but
+the tile bled for a reason that was not hockey. Off since 4 Oct 2026 at the
+user's call; one price or none still goes through `fair_total`. The
 pickable markets are per sport in one table (`PICKABLE` in 2.0's tail,
 carried here): MLB the total and the first five, NHL the total and the first
 period, WNBA the spread and the moneyline.

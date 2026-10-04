@@ -248,3 +248,34 @@ class TestGrading(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class TestTheFirstPeriodAnchorIsNotRegressed(unittest.TestCase):
+    """4 Oct 2026: the first-period market's wide hold is read straight."""
+
+    def test_both_prices_reproduce_the_raw_devig(self):
+        from totals.fullgame import devig, fair_total
+        from totals.nhl import p1_anchor
+        m = forecast_matchup_nhl("A", "B", total_line=6.0, p1_line=1.5, p1_over_price=-140, p1_under_price=105)
+        p1 = next(mk for mk in m.markets if mk.key == "p1")
+        over = p1.p if p1.side == "OVER" else 1 - p1.p
+        raw, _ = devig(-140, 105, shrink=False)
+        self.assertAlmostEqual(over, raw, places=6)
+        # the regressed anchor sat under the book; this one does not
+        mu_reg, _ = fair_total("NHL_P1", 1.5, -140, 105)
+        mu_raw, how = p1_anchor(1.5, -140, 105)
+        self.assertGreater(mu_raw, mu_reg)
+        self.assertIn("read straight, not regressed", how)
+
+    def test_an_even_market_is_a_coin_flip(self):
+        from totals.nhl import p1_anchor
+        from totals.nhl import p1_split
+        mu, _ = p1_anchor(1.5, -110, -110)
+        o, _pu, u = p1_split(1.5, mu)
+        self.assertAlmostEqual(o / (o + u), 0.5, places=6)
+
+    def test_one_price_or_none_defers_to_fair_total(self):
+        from totals.fullgame import fair_total
+        from totals.nhl import p1_anchor
+        self.assertEqual(p1_anchor(1.5, -130, None), fair_total("NHL_P1", 1.5, -130, None))
+        self.assertEqual(p1_anchor(1.5, None, None), fair_total("NHL_P1", 1.5, None, None))

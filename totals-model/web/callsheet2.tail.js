@@ -754,6 +754,13 @@
              !rule.some(function (y) { return y.row.id === x.row.id && y.mk.pick === x.mk.pick; });
     });
     verdict.forEach(function (x) { x.tier = "verdict"; x.thin = x.mk.edge <= 0; });
+    /* A verdict whose price is steeper than its chance stays on the list on
+       the strength of the MLB record (12-7 on #1's bands). Hockey has no such
+       record -- its bands were 3-5 on the first 31 games, every one of them
+       a thin over on a league save percentage that read every goalie cold --
+       so a hockey verdict lists only when it also clears its price. Asked for
+       on 5 Oct: "it gives a bet signal at 53% but doesn't cover". */
+    verdict = verdict.filter(function (x) { return !(x.thin && x.row.sport === "NHL"); });
     rule.forEach(function (x) { x.tier = "rule"; x.thin = x.mk.edge === null || x.mk.edge <= 0; });
     value.forEach(function (x) { x.tier = "value"; x.thin = false; });
     var rows = verdict.concat(rule).concat(value).slice(0, 8);

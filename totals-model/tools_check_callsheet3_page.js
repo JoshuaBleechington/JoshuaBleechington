@@ -154,6 +154,30 @@ const CHECKS = ["dome","playoff","agconf","hgconf"];
   chk(/NHL/.test(flow.calib) && !/WNBA/.test(flow.calib.split('NHL')[0]), 'record: an NHL block is drawn', flow.calib.slice(0, 200));
   chk(/after one 1–1/.test(flow.final) && /Final: Rangers 2, Bruins 3/.test(flow.final), 'rail: opening a graded hockey row prints the final and the score after one', flow.final);
 
+  // ---- a hockey verdict lists only when it clears its price ------------------------
+  const thinNhl = await pg.evaluate(async () => {
+    const wait = () => new Promise(r => setTimeout(r, 60));
+    const set = (id, v) => { const el = document.getElementById(id); el.value = v; el.dispatchEvent(new Event('input', { bubbles: true })); };
+    document.getElementById('clear').click(); document.getElementById('m-nhl').click(); await wait();
+    // two cold goalies on long samples, the over priced -140: #1's band says BET (56.7%), the price needs 58.3%
+    set('gdate', '2026-10-07'); set('away', 'Flames'); set('home', 'Kraken'); set('line', '6'); set('op', '-140'); set('up', '110');
+    set('agsv', '0.890'); set('hgsv', '0.890'); set('agsh', '1800'); set('hgsh', '1800'); set('asf', '31'); set('hsf', '31'); await wait();
+    const railBand = (document.querySelector('#markets .mk[data-key="total"] .band') || {}).textContent || '';
+    const railP = (document.querySelector('#markets .mk[data-key="total"] .p') || {}).textContent || '';
+    const railEdge = (document.querySelector('#markets .mk[data-key="total"] .e') || {}).textContent || '';
+    document.getElementById('add').click(); await wait();
+    document.getElementById('boardDate').value = '2026-10-07'; document.getElementById('boardDate').dispatchEvent(new Event('change')); await wait();
+    const betsThin = [...document.querySelectorAll('#bestBets .pk')].map(e => e.querySelector('.n4').textContent.split(' · ')[0]);
+    // the same row at -120 (needs 54.5%, the sheet says 54.6%) clears its price and lists with its chip
+    set('op', '-120'); set('up', '100'); await wait(); document.getElementById('add').click(); await wait();
+    const betsClear = [...document.querySelectorAll('#bestBets .pk')].map(e => e.querySelector('.n4').textContent.split(' · ')[0] + ' ' + ((e.querySelector('.n2 .band') || {}).textContent || ''));
+    document.getElementById('clear').click(); await wait();
+    return { railBand, railP, railEdge, betsThin, betsClear };
+  });
+  chk(/BET/.test(thinNhl.railBand) && /edge -/.test(thinNhl.railEdge), 'hockey verdict: the fixture reads BET on the over with the price steeper than the chance', JSON.stringify(thinNhl));
+  chk(!thinNhl.betsThin.some(t => /Flames @ Kraken/.test(t)), 'hockey verdict: a thin hockey verdict is NOT on the straight bets (no record behind it)', JSON.stringify(thinNhl.betsThin));
+  chk(thinNhl.betsClear.some(t => /Flames @ Kraken/.test(t) && /BET/.test(t)), 'hockey verdict: the same row lists once its price clears', JSON.stringify(thinNhl.betsClear));
+
   // ---- the slate fills the goalie boxes; a 2.0 backup carries MLB only --------------
   const slate = await pg.evaluate(async () => {
     const wait = () => new Promise(r => setTimeout(r, 80));

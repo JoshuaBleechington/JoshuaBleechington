@@ -112,6 +112,19 @@ the first-period total and both prices. The slate fills the rest: goalies
 play and kill, last ten, head to head, rest days. Closes the next morning
 as on 2.0.
 
+## The board, for hockey
+
+Same two lists as 2.0, with one rule of its own. On the straight bets a
+verdict whose price is steeper than its chance stays on the list in MLB,
+on the strength of the MLB record (12-7 on #1's bands). A hockey verdict
+has no record behind it — its bands were 3-5 on the first 31 games, every
+one a thin over on a league save percentage that read every goalie cold —
+so a hockey verdict lists only when it also clears its price. Asked for on
+5 Oct 2026: "it gives a bet signal at 53% but doesn't cover". The band
+itself is unchanged (BET at 53% on the resolved probability, as in MLB), so
+the hockey record stays comparable to baseball's; what changed is that the
+band alone no longer puts a hockey row on the list.
+
 ## Grading
 
 The final score includes overtime and the shootout — a shootout win is a

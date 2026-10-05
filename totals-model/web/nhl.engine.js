@@ -152,7 +152,7 @@
     if (hr !== null && hr <= 0) b2b.push("home");
     if (b2b.length) notes.push("Back to back for the " + b2b.join(" and ") + " side. <b>SHOWN, NOT SCORED</b>: the goalie line already carries the usual consequence (the backup), and the rest effect on the total itself is unmeasured. It is on the row so the record can split on it.");
 
-    var tk = num("tick"), cs = num("cash");
+    var tk = num("ntick"), cs = num("ncash");
     if (ok(tk, "percent") && ok(cs, "percent") && Math.abs(tk - cs) >= 20) notes.push("Over holds " + tk.toFixed(0) + "% of tickets but " + cs.toFixed(0) + "% of money. Shown, not scored, for the reason the MLB book stopped scoring it: no threshold beat a coin.");
     var opened = num("opened");
     if (opened !== null && Math.abs(opened - line) > 1e-9) notes.push("The number moved " + opened + " to " + line + " (" + sgn(line - opened, 1) + "). Not scored — the current line is the anchor and the move is already inside it.");

@@ -103,7 +103,7 @@ def tail() -> str:
              '                  "arest","hrest","al5","hl5","hml","aml","sp","sph","spa"];\n'
              '  var NHL_IDS = ["away","home","line","op","up","opened","gdate","agsv","hgsv","agsh","hgsh","asf","hsf",\n'
              '                 "app","hpp","apk","hpk","al10","hl10","h2h","h2hn","arest","hrest","tick","cash",\n'
-             '                 "hml","aml","pl","plh","pla","p1line","p1op","p1up","nhlform"];\n'
+             '                 "hml","aml","pl","plh","pla","p1line","p1op","p1up","nhlform","ntick","ncash"];\n'
              '  var ALL = MLB_IDS.concat(WNBA_IDS).concat(NHL_IDS).filter(function (v, i, a) { return a.indexOf(v) === i; });\n'
              '  var CHECKS = ["dome","playoff","agconf","hgconf"];\n'
              '  function sportOf(s) { return s === "WNBA" ? "WNBA" : s === "NHL" ? "NHL" : "MLB"; }\n'

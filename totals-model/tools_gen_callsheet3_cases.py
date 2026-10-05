@@ -45,7 +45,7 @@ def build_nhl(i: dict):
         h2h_total=n(i.get("h2h")), h2h_meetings=n(i.get("h2hn")),
         away_rest_days=n(i.get("arest")), home_rest_days=n(i.get("hrest")),
         away_goalie_confirmed=bool(i.get("agconf")), home_goalie_confirmed=bool(i.get("hgconf")),
-        ticket_pct_over=n(i.get("tick")), money_pct_over=n(i.get("cash")), opened=n(i.get("opened")))
+        ticket_pct_over=n(i.get("ntick")), money_pct_over=n(i.get("ncash")), opened=n(i.get("opened")))
 
 
 FULL = dict(agsv="0.912", hgsv="0.921", agsh="1400", hgsh="1900", asf="31.2", hsf="33.4",

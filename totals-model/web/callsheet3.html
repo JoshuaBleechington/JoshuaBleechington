@@ -512,6 +512,14 @@
           <h2>Recent form <span class="tag">last five, each side — shown, not scored</span></h2>
           <div class="body">
             <div id="formPanel" class="note">No recent games on the row — load the slate and Fill form, and each side's last five come with it.</div>
+            <div class="subhead">The crowd <span class="tag">from the book's splits — shown, not scored, with its own record line</span></div>
+            <div class="grid2">
+              <div class="f"><label for="ntick">Over % tickets <span class="tag">shown</span></label><input id="ntick" type="number" step="1" min="0" max="100" inputmode="numeric" placeholder="68"></div>
+              <div class="f"><label for="ncash">Over % money <span class="tag">shown</span></label><input id="ncash" type="number" step="1" min="0" max="100" inputmode="numeric" placeholder="61"></div>
+            </div>
+            <p class="note">With 65% or more of the money on one side, the total's pick is chipped <b>with the crowd</b> or
+              <b>against the crowd</b> and the record keeps each line. In baseball no threshold beat a coin, so this moves
+              nothing; the hockey record decides whether hockey is different.</p>
             <p class="note">Score, shots for and against, and who was in net, from the box scores the slate already reads. Nothing
               here moves a number: three games of scores is noise dressed as a trend, and form measured null over a
               baseball season. It is here to catch what the season line hides — a goalie who has stopped starting, a team
@@ -1812,7 +1820,7 @@
     if (hr !== null && hr <= 0) b2b.push("home");
     if (b2b.length) notes.push("Back to back for the " + b2b.join(" and ") + " side. <b>SHOWN, NOT SCORED</b>: the goalie line already carries the usual consequence (the backup), and the rest effect on the total itself is unmeasured. It is on the row so the record can split on it.");
 
-    var tk = num("tick"), cs = num("cash");
+    var tk = num("ntick"), cs = num("ncash");
     if (ok(tk, "percent") && ok(cs, "percent") && Math.abs(tk - cs) >= 20) notes.push("Over holds " + tk.toFixed(0) + "% of tickets but " + cs.toFixed(0) + "% of money. Shown, not scored, for the reason the MLB book stopped scoring it: no threshold beat a coin.");
     var opened = num("opened");
     if (opened !== null && Math.abs(opened - line) > 1e-9) notes.push("The number moved " + opened + " to " + line + " (" + sgn(line - opened, 1) + "). Not scored — the current line is the anchor and the move is already inside it.");
@@ -2469,7 +2477,7 @@
                   "arest","hrest","al5","hl5","hml","aml","sp","sph","spa"];
   var NHL_IDS = ["away","home","line","op","up","opened","gdate","agsv","hgsv","agsh","hgsh","asf","hsf",
                  "app","hpp","apk","hpk","al10","hl10","h2h","h2hn","arest","hrest","tick","cash",
-                 "hml","aml","pl","plh","pla","p1line","p1op","p1up","nhlform"];
+                 "hml","aml","pl","plh","pla","p1line","p1op","p1up","nhlform","ntick","ncash"];
   var ALL = MLB_IDS.concat(WNBA_IDS).concat(NHL_IDS).filter(function (v, i, a) { return a.indexOf(v) === i; });
   var CHECKS = ["dome","playoff","agconf","hgconf"];
   function sportOf(s) { return s === "WNBA" ? "WNBA" : s === "NHL" ? "NHL" : "MLB"; }
@@ -3071,8 +3079,24 @@
     return against ? "over against the grain" : "";
   }
   function marksOf(sp, inputs, markets) {
-    var out = { profile: "", lean: "", grain: "" };
-    if (sp !== "MLB" || !inputs) return out;
+    var out = { profile: "", lean: "", grain: "", crowd: "" };
+    if (!inputs) return out;
+    /* the crowd (NHL): where the money is, against the sheet's pick on the
+       total. 65%+ of the money on one side is a crowd; the pick is WITH it
+       or AGAINST it. A label with its own record line, asked for on 5 Oct
+       ("add the over/under % for tickets to help the model... can we test
+       this?"): in MLB no threshold beat a coin, so it is shown, not scored,
+       and the hockey record will say whether hockey is different. */
+    if (sp === "NHL") {
+      var cash = numOf(inputs.ncash), tot = null;
+      (markets || []).forEach(function (mk) { if (mk.key === "total") tot = mk; });
+      if (tot && cash !== null && (cash >= 65 || cash <= 35)) {
+        var crowdSide = cash >= 65 ? "OVER" : "UNDER";
+        out.crowd = tot.side === crowdSide ? "with the crowd" : "against the crowd";
+      }
+      return out;
+    }
+    if (sp !== "MLB") return out;
     (markets || []).forEach(function (mk) { if (mk.key === "total") out.grain = grainOf(mk.side, inputs); });
     var line = numOf(inputs.line), mph = numOf(inputs.mph), dir = String(inputs.dir || "");
     var abp = numOf(inputs.abp), hbp = numOf(inputs.hbp), al = numOf(inputs.al10), hl = numOf(inputs.hl10);
@@ -3089,6 +3113,7 @@
     if (tg.grain) h += '<span class="' + cls + ' warn">' + esc(tg.grain) + '</span>';
     if (tg.profile) h += '<span class="' + cls + '">' + esc(tg.profile) + '</span>';
     if (tg.lean) h += '<span class="' + cls + '">' + esc(tg.lean) + '</span>';
+    if (tg.crowd) h += '<span class="' + cls + '">' + esc(tg.crowd) + '</span>';
     return h;
   }
   function renderCalib() {
@@ -3100,7 +3125,7 @@
        against away -- and the full-game total keeps the record of the rows
        that carried Call Sheet #1's verdict, because the parlay legs lean on
        it. Asked for on 25 Sept: "how many of the 17-10 went over vs under". */
-    var fresh = function (label) { return { n: 0, w: 0, l: 0, p: 0, says: 0, units: 0, label: label, sides: {}, verdict: null, profile: null, lean: {}, grain: null,
+    var fresh = function (label) { return { n: 0, w: 0, l: 0, p: 0, says: 0, units: 0, label: label, sides: {}, verdict: null, profile: null, lean: {}, grain: null, crowd: {},
                                             clv: { n: 0, beat: 0, lost: 0, even: 0, runs: 0 } }; };
     var bySport = {};
     ["MLB", "NHL", "WNBA"].forEach(function (sp) {
@@ -3125,6 +3150,7 @@
           if (tg.profile) count(t.profile || (t.profile = { w: 0, l: 0, p: 0 }), res);
           if (tg.grain && mk.key === "total") count(t.grain || (t.grain = { w: 0, l: 0, p: 0 }), res);
           if (tg.lean) count(t.lean[tg.lean] || (t.lean[tg.lean] = { w: 0, l: 0, p: 0 }), res);
+          if (tg.crowd && mk.key === "total") count(t.crowd[tg.crowd] || (t.crowd[tg.crowd] = { w: 0, l: 0, p: 0 }), res);
         }
       }
       if (res === "push") { t.p++; return; }
@@ -3173,6 +3199,7 @@
       if (s.profile) parts.push('cold-under profile ' + rec(s.profile));
       if (s.grain) parts.push('over against the grain ' + rec(s.grain));
       ["same lean", "split lean"].forEach(function (k) { if (s.lean[k]) parts.push(k + ' ' + rec(s.lean[k])); });
+      ["with the crowd", "against the crowd"].forEach(function (k) { if (s.crowd[k]) parts.push(k + ' ' + rec(s.crowd[k])); });
       if (s.clv.n) parts.push('beat the close ' + s.clv.beat + '-' + s.clv.lost + (s.clv.even ? '-' + s.clv.even : '') + ' · ' + sgn(s.clv.runs / s.clv.n, 2) + ' ' + (unit || 'runs') + ' avg');
       return '<div><p class="k">' + esc(s.label) + '</p><p class="v">' + s.w + '-' + s.l + (s.p ? '-' + s.p : '') + '</p>' +
         '<p class="s">' + (s.n ? 'says ' + says.toFixed(1) + '% · does ' + does.toFixed(1) + '% (±' + se.toFixed(1) + ') · ' + sgn(s.units, 2) + 'u' : 'pushes only') + '</p>' +

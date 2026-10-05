@@ -126,6 +126,15 @@ season line hides, and to let the record split on it later — the first
 period line is the hockey first-five, and whether a team's recent first
 periods say anything about tonight's is a question the log can answer.
 
+**The crowd** (5 Oct 2026, at the user's request: "add the over/under %
+for tickets... can we test this?") is two boxes on the hockey card, over %
+tickets and over % money, from the book's splits. With 65% or more of the
+money on one side, the total's pick is chipped *with the crowd* or
+*against the crowd* and the hockey total tile keeps each line. Shown, not
+scored: in baseball no threshold beat a coin, and a ticket/money gap of 20
+points or more is only ever a note. The hockey record decides whether
+hockey is different.
+
 ## The board, for hockey
 
 Same two lists as 2.0, with one rule of its own. On the straight bets a

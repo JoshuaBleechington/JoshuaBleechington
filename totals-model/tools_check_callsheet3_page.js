@@ -178,6 +178,30 @@ const CHECKS = ["dome","playoff","agconf","hgconf"];
   chk(!thinNhl.betsThin.some(t => /Flames @ Kraken/.test(t)), 'hockey verdict: a thin hockey verdict is NOT on the straight bets (no record behind it)', JSON.stringify(thinNhl.betsThin));
   chk(thinNhl.betsClear.some(t => /Flames @ Kraken/.test(t) && /BET/.test(t)), 'hockey verdict: the same row lists once its price clears', JSON.stringify(thinNhl.betsClear));
 
+  // ---- the crowd: a label on the hockey total with its own record line -------------
+  const crowd = await pg.evaluate(async () => {
+    const wait = () => new Promise(r => setTimeout(r, 60));
+    const set = (id, v) => { const el = document.getElementById(id); el.value = v; el.dispatchEvent(new Event('input', { bubbles: true })); };
+    document.getElementById('clear').click(); document.getElementById('m-nhl').click(); await wait();
+    // the under is the pick (-102 is the better price on an even number); 78% of the money is on the over
+    set('gdate', '2026-10-07'); set('away', 'Wild'); set('home', 'Blues'); set('line', '6'); set('op', '-118'); set('up', '-102'); set('ntick', '71'); set('ncash', '78'); await wait();
+    const pick = document.querySelector('#markets .mk[data-key="total"] .pick').childNodes[0].textContent.trim();
+    const chips = [...document.querySelectorAll('#markets .mk[data-key="total"] .cap')].map(c => c.textContent);
+    const why = document.getElementById('why').textContent;
+    document.getElementById('add').click(); await wait();
+    const stored = JSON.parse(localStorage.getItem('callsheet3.card.v1')).find(r => /Wild @ Blues/.test(r.matchup));
+    const tr = [...document.querySelectorAll('#cardTable tr')].find(x => /Wild @ Blues/.test(x.textContent));
+    const g = (k, v) => { const el = tr.querySelector(`.grade[data-k="${k}"]`); el.value = v; el.dispatchEvent(new Event('input', { bubbles: true })); el.dispatchEvent(new Event('change', { bubbles: true })); };
+    g('f5a', '1'); g('f5h', '0'); g('fa', '2'); g('fh', '1'); await wait();
+    const tile = [...document.querySelectorAll('#calibBox .calib[data-sport="NHL"] > div')].find(d => /Full-game total/.test(d.textContent));
+    document.getElementById('clear').click(); await wait();
+    return { pick, chips, why, ncash: stored.inputs.ncash, tile: tile ? tile.textContent : '' };
+  });
+  chk(/UNDER 6/.test(crowd.pick) && crowd.chips.some(c => /against the crowd/.test(c)), 'crowd: an under against 78% of the money is chipped against the crowd', JSON.stringify(crowd));
+  chk(!/Over holds 71% of tickets/.test(crowd.why), 'crowd: a 7-point ticket/money gap is below the 20-point note threshold, so the why list says nothing', crowd.why.slice(0, 200));
+  chk(crowd.ncash === '78', 'crowd: the money box is stored on the row', crowd.ncash);
+  chk(/against the crowd 1-0/.test(crowd.tile), 'record: the hockey total tile keeps the crowd line (2-1 is under 6, the pick won against the crowd)', crowd.tile.slice(0, 300));
+
   // ---- the slate fills the goalie boxes; a 2.0 backup carries MLB only --------------
   const slate = await pg.evaluate(async () => {
     const wait = () => new Promise(r => setTimeout(r, 80));

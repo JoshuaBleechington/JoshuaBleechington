@@ -2584,8 +2584,24 @@
     return against ? "over against the grain" : "";
   }
   function marksOf(sp, inputs, markets) {
-    var out = { profile: "", lean: "", grain: "" };
-    if (sp !== "MLB" || !inputs) return out;
+    var out = { profile: "", lean: "", grain: "", crowd: "" };
+    if (!inputs) return out;
+    /* the crowd (NHL): where the money is, against the sheet's pick on the
+       total. 65%+ of the money on one side is a crowd; the pick is WITH it
+       or AGAINST it. A label with its own record line, asked for on 5 Oct
+       ("add the over/under % for tickets to help the model... can we test
+       this?"): in MLB no threshold beat a coin, so it is shown, not scored,
+       and the hockey record will say whether hockey is different. */
+    if (sp === "NHL") {
+      var cash = numOf(inputs.ncash), tot = null;
+      (markets || []).forEach(function (mk) { if (mk.key === "total") tot = mk; });
+      if (tot && cash !== null && (cash >= 65 || cash <= 35)) {
+        var crowdSide = cash >= 65 ? "OVER" : "UNDER";
+        out.crowd = tot.side === crowdSide ? "with the crowd" : "against the crowd";
+      }
+      return out;
+    }
+    if (sp !== "MLB") return out;
     (markets || []).forEach(function (mk) { if (mk.key === "total") out.grain = grainOf(mk.side, inputs); });
     var line = numOf(inputs.line), mph = numOf(inputs.mph), dir = String(inputs.dir || "");
     var abp = numOf(inputs.abp), hbp = numOf(inputs.hbp), al = numOf(inputs.al10), hl = numOf(inputs.hl10);
@@ -2602,6 +2618,7 @@
     if (tg.grain) h += '<span class="' + cls + ' warn">' + esc(tg.grain) + '</span>';
     if (tg.profile) h += '<span class="' + cls + '">' + esc(tg.profile) + '</span>';
     if (tg.lean) h += '<span class="' + cls + '">' + esc(tg.lean) + '</span>';
+    if (tg.crowd) h += '<span class="' + cls + '">' + esc(tg.crowd) + '</span>';
     return h;
   }
   function renderCalib() {
@@ -2612,7 +2629,7 @@
        against away -- and the full-game total keeps the record of the rows
        that carried Call Sheet #1's verdict, because the parlay legs lean on
        it. Asked for on 25 Sept: "how many of the 17-10 went over vs under". */
-    var fresh = function (label) { return { n: 0, w: 0, l: 0, p: 0, says: 0, units: 0, label: label, sides: {}, verdict: null, profile: null, lean: {}, grain: null,
+    var fresh = function (label) { return { n: 0, w: 0, l: 0, p: 0, says: 0, units: 0, label: label, sides: {}, verdict: null, profile: null, lean: {}, grain: null, crowd: {},
                                             clv: { n: 0, beat: 0, lost: 0, even: 0, runs: 0 } }; };
     var bySport = {};
     ["MLB", "WNBA"].forEach(function (sp) {
@@ -2637,6 +2654,7 @@
           if (tg.profile) count(t.profile || (t.profile = { w: 0, l: 0, p: 0 }), res);
           if (tg.grain && mk.key === "total") count(t.grain || (t.grain = { w: 0, l: 0, p: 0 }), res);
           if (tg.lean) count(t.lean[tg.lean] || (t.lean[tg.lean] = { w: 0, l: 0, p: 0 }), res);
+          if (tg.crowd && mk.key === "total") count(t.crowd[tg.crowd] || (t.crowd[tg.crowd] = { w: 0, l: 0, p: 0 }), res);
         }
       }
       if (res === "push") { t.p++; return; }
@@ -2684,6 +2702,7 @@
       if (s.profile) parts.push('cold-under profile ' + rec(s.profile));
       if (s.grain) parts.push('over against the grain ' + rec(s.grain));
       ["same lean", "split lean"].forEach(function (k) { if (s.lean[k]) parts.push(k + ' ' + rec(s.lean[k])); });
+      ["with the crowd", "against the crowd"].forEach(function (k) { if (s.crowd[k]) parts.push(k + ' ' + rec(s.crowd[k])); });
       if (s.clv.n) parts.push('beat the close ' + s.clv.beat + '-' + s.clv.lost + (s.clv.even ? '-' + s.clv.even : '') + ' · ' + sgn(s.clv.runs / s.clv.n, 2) + ' ' + (unit || 'runs') + ' avg');
       return '<div><p class="k">' + esc(s.label) + '</p><p class="v">' + s.w + '-' + s.l + (s.p ? '-' + s.p : '') + '</p>' +
         '<p class="s">' + (s.n ? 'says ' + says.toFixed(1) + '% · does ' + does.toFixed(1) + '% (±' + se.toFixed(1) + ') · ' + sgn(s.units, 2) + 'u' : 'pushes only') + '</p>' +

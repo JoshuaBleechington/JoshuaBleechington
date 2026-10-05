@@ -3143,7 +3143,7 @@
        against away -- and the full-game total keeps the record of the rows
        that carried Call Sheet #1's verdict, because the parlay legs lean on
        it. Asked for on 25 Sept: "how many of the 17-10 went over vs under". */
-    var fresh = function (label) { return { n: 0, w: 0, l: 0, p: 0, says: 0, units: 0, label: label, sides: {}, verdict: null, profile: null, lean: {}, grain: null, crowd: {},
+    var fresh = function (label) { return { n: 0, w: 0, l: 0, p: 0, says: 0, units: 0, label: label, sides: {}, verdict: null, profile: null, lean: {}, grain: null, crowd: {}, high: null,
                                             clv: { n: 0, beat: 0, lost: 0, even: 0, runs: 0 } }; };
     var bySport = {};
     ["MLB", "NHL", "WNBA"].forEach(function (sp) {
@@ -3158,6 +3158,12 @@
       if (row) {
         var sd = t.sides[mk.side] || (t.sides[mk.side] = { w: 0, l: 0, p: 0 });
         count(sd, res);
+        /* the 54%+ line: every pick the sheet called 54% or better, whatever
+           its price. Asked for on 5 Oct ("54% or higher even without an edge
+           should be considered a bet... let's test it"): the record is the
+           test, and this line is it -- if these hit 54% they are still losing
+           bets at -140, and if they hit 60% the price was wrong, not the rule. */
+        if (mk.p >= 0.54) count(t.high || (t.high = { w: 0, l: 0, p: 0 }), res);
         if (mk.key === "total" && bandOf(mk)) { count(t.verdict || (t.verdict = { w: 0, l: 0, p: 0 }), res); }
         if (mk.key === "spread") {
           var sh = shadeOf(mk), shRes = sh ? gradeMarket(sh, row.finals) : null;
@@ -3213,6 +3219,7 @@
       var order = ["OVER", "UNDER", "HOME", "AWAY"], parts = [];
       order.forEach(function (sd) { if (s.sides[sd]) parts.push(sd.toLowerCase() + ' ' + rec(s.sides[sd])); });
       if (s.verdict) parts.push('#1 BET or better ' + rec(s.verdict));
+      if (s.high) parts.push('54%+ picks ' + rec(s.high));
       if (s.shade) parts.push('cheaper side ' + rec(s.shade));
       if (s.profile) parts.push('cold-under profile ' + rec(s.profile));
       if (s.grain) parts.push('over against the grain ' + rec(s.grain));

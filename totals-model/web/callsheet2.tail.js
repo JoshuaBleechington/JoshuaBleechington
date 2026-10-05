@@ -1418,6 +1418,9 @@
             row.inputs[k] = String(g.inputs[k]); changed = true;
           });
           if (g.inputs.dome === true && !row.inputs.dome) { row.inputs.dome = true; changed = true; }
+          /* The slate marks a postseason game at the game level; the row's
+             Playoff box is shown, not scored, so it only splits the record. */
+          if (g.playoff === true && !row.inputs.playoff) { row.inputs.playoff = true; changed = true; }
           if (changed) { var m = scoreMatchup(row.sport, row.inputs); if (m) row.markets = slimMarkets(m.markets); filled++; }
         }
       }
@@ -1470,6 +1473,7 @@
     var v = { away: g.away, home: g.home, gdate: g.gdate || todayISO() };
     SLATE_FIELDS.forEach(function (k) { if (!blank((g.inputs || {})[k])) v[k] = String(g.inputs[k]); });
     if (g.inputs && g.inputs.dome === true) v.dome = true;
+    if (g.playoff === true) v.playoff = true;
     restore(v); onEdit();
     say("<b>" + esc(g.away) + " @ " + esc(g.home) + "</b> is in the form with the slate's inputs. Type the total, the prices and the side lines, then Add to card.");
     window.scrollTo({ top: 0, behavior: "smooth" });

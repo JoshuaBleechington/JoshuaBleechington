@@ -43,11 +43,17 @@ Same architecture as baseball. The market total, de-vigged, is the anchor
 and carries the dominant weight (4.0). Everything else is a differential.
 
 **Goalies** are the starting pitcher. A save percentage is shrunk toward the
-league (.905) by the shots behind it, exactly as an ERA is shrunk by its
+league (.898) by the shots behind it, exactly as an ERA is shrunk by its
 innings, and the constant is derived the same way: goalie talent is spread
 about .008 of save percentage, a proportion's noise over n shots is
 p(1−p)/n, so a goalie's own number is worth half the league prior at about
-1,340 shots. Each goalie then faces the *other* side's shot rate. Two
+1,430 shots. The league figure was .905 a priori until 5 Oct 2026, when the
+slate's first 62 goalie lines (37,931 shots, this season blended with half
+of last) averaged .898 shots-weighted; against .905 every goalie read cold,
+every total leaned over, and #1 called BET on the over in 8 of the first 31
+games (3-5). It is measured on the card's starters, so it is the prior for
+a named starter; re-measure at the end of the month. Each goalie then faces
+the *other* side's shot rate. Two
 league-average goalies against two league-average shot rates move the
 number by exactly zero. Weight 1.6, the starters' figure. Shots alone, with
 no goalies, read as "Shot rates" through the same gap with league goalies.

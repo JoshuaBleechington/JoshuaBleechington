@@ -11,7 +11,7 @@
     ENG: 0.25,              // P(an empty-net goal in a game)
     OT: 0.23,               // P(tied after sixty)
     SHOTS: 30.0,            // per team per game
-    SV: 0.905,              // league save percentage
+    SV: 0.898,              // league save percentage: measured on the card's first 62 goalie lines (37,931 shots), 5 Oct 2026; was .905 a priori
     PP_PER_GAME: 2.8, PP_PCT: 0.21,
     TALENT_SD: 0.008,       // spread of goalie true-talent save percentage
     RESIDUAL_SD: 2.55,      // a priori; the residual-spread check measures it

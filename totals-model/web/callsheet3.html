@@ -279,7 +279,7 @@
   <header class="top">
     <div>
       <div class="eyebrow"><span id="eyebrow">MLB · every market on the game</span>
-        <span class="build">· build <span id="build">2026-10-04</span></span></div>
+        <span class="build">· build <span id="build">2026-10-05</span></span></div>
       <h1>Call Sheet <em>3.0</em></h1>
       <p>One matchup, every market the book posts on it — in baseball the full-game total, the first five,
          the moneyline and the run line; in hockey the total, the first period, the moneyline and the puck line;
@@ -508,8 +508,8 @@
           <summary><span>Filled by the slate</span> <span class="tag">goalie lines, shots, special teams, form, rest — open to check or edit</span></summary>
           <div class="body">
             <div class="grid2">
-              <div class="f"><label for="agsv">Away goalie save %</label><input id="agsv" type="number" step="0.001" inputmode="decimal" placeholder=".905"></div>
-              <div class="f"><label for="hgsv">Home goalie save %</label><input id="hgsv" type="number" step="0.001" inputmode="decimal" placeholder=".905"></div>
+              <div class="f"><label for="agsv">Away goalie save %</label><input id="agsv" type="number" step="0.001" inputmode="decimal" placeholder=".898"></div>
+              <div class="f"><label for="hgsv">Home goalie save %</label><input id="hgsv" type="number" step="0.001" inputmode="decimal" placeholder=".898"></div>
             </div>
             <div class="grid2">
               <div class="f"><label for="agsh">Away goalie shots faced</label><input id="agsh" type="number" step="1" inputmode="numeric" placeholder="both or neither"></div>
@@ -1655,7 +1655,7 @@
     ENG: 0.25,              // P(an empty-net goal in a game)
     OT: 0.23,               // P(tied after sixty)
     SHOTS: 30.0,            // per team per game
-    SV: 0.905,              // league save percentage
+    SV: 0.898,              // league save percentage: measured on the card's first 62 goalie lines (37,931 shots), 5 Oct 2026; was .905 a priori
     PP_PER_GAME: 2.8, PP_PCT: 0.21,
     TALENT_SD: 0.008,       // spread of goalie true-talent save percentage
     RESIDUAL_SD: 2.55,      // a priori; the residual-spread check measures it
@@ -3432,6 +3432,9 @@
             row.inputs[k] = String(g.inputs[k]); changed = true;
           });
           if (g.inputs.dome === true && !row.inputs.dome) { row.inputs.dome = true; changed = true; }
+          /* The slate marks a postseason game at the game level; the row's
+             Playoff box is shown, not scored, so it only splits the record. */
+          if (g.playoff === true && !row.inputs.playoff) { row.inputs.playoff = true; changed = true; }
           if (changed) { var m = scoreMatchup(row.sport, row.inputs); if (m) row.markets = slimMarkets(m.markets); filled++; }
         }
       }
@@ -3485,6 +3488,7 @@
     var v = { away: g.away, home: g.home, gdate: g.gdate || todayISO() };
     SLATE_FIELDS.forEach(function (k) { if (!blank((g.inputs || {})[k])) v[k] = String(g.inputs[k]); });
     if (g.inputs && g.inputs.dome === true) v.dome = true;
+    if (g.playoff === true) v.playoff = true;
     restore(v); onEdit();
     say("<b>" + esc(g.away) + " @ " + esc(g.home) + "</b> is in the form with the slate's inputs. Type the total, the prices and the side lines, then Add to card.");
     window.scrollTo({ top: 0, behavior: "smooth" });

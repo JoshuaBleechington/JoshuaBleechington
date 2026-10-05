@@ -83,10 +83,18 @@ OT_RATE = 0.23
 #: Regulation goals with the goalies in the net: what the goalie and shot
 #: inputs are a differential against.
 LEAGUE_REG_GOALS = LEAGUE_GOALS_PER_GAME - EMPTY_NET_RATE - OT_RATE
-#: Shots per team per game, and the league save percentage. 30 * .095 * 2 =
-#: 5.70 against 5.62 regulation goals; the gap is shots at an empty net.
+#: Shots per team per game, and the league save percentage. 30 * .102 * 2 =
+#: 6.12 against 5.62 regulation goals; the gap is shots at an empty net and
+#: the shots a cold starter does not face.
+#: The save percentage was .905 a priori until 5 Oct 2026, when the first
+#: four nights of the slate's goalie lines -- 62 of them, 37,931 shots, this
+#: season blended with half of last -- averaged .898 shots-weighted. Against
+#: .905 every goalie on the card read cold, every total leaned over, and
+#: Call Sheet #1 called BET on the over in 8 of 31 games (3-5). Measured on
+#: the card's own starters, so it is the prior for a named starter, not for
+#: the league's backups; re-measure at the end of the month.
 LEAGUE_SHOTS = 30.0
-LEAGUE_SAVE_PCT = 0.905
+LEAGUE_SAVE_PCT = 0.898
 #: Power plays per team per game, and the league conversion either side.
 LEAGUE_PP_PER_GAME = 2.8
 LEAGUE_PP_PCT = 0.21
@@ -97,9 +105,9 @@ LEAGUE_PK_PCT = 1.0 - LEAGUE_PP_PCT
 # proportion, so its measurement variance over n shots is p(1-p)/n; goalie
 # true talent is spread about .008 of save percentage. The shots at which the
 # goalie's own number is worth exactly as much as the league prior:
-#   n = p(1-p) / talent_sd^2  ~  1,340 shots, about 45 starts.
-# A backup with 300 shots keeps 18% of his number; a starter at 1,500 keeps
-# 53%. Nobody keeps 100%, which is correct.
+#   n = p(1-p) / talent_sd^2  ~  1,430 shots, about 48 starts.
+# A backup with 300 shots keeps 17% of his number; a starter at 1,500 keeps
+# 51%. Nobody keeps 100%, which is correct.
 GOALIE_TALENT_SD = 0.008
 SV_STABLE_AT = LEAGUE_SAVE_PCT * (1.0 - LEAGUE_SAVE_PCT) / GOALIE_TALENT_SD ** 2
 

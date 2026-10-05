@@ -885,6 +885,76 @@ def nhl_last_starter(game_id, abbrev):
     return None
 
 
+_BOX_CACHE = {}
+
+
+def nhl_boxscore(game_id):
+    """One box score per game per run; the two clubs in it share the call."""
+    if game_id not in _BOX_CACHE:
+        _BOX_CACHE[game_id] = nhl_api("/gamecenter/%s/boxscore" % game_id)
+    return _BOX_CACHE[game_id]
+
+
+_LANDING_CACHE = {}
+
+
+def nhl_landing(game_id):
+    if game_id not in _LANDING_CACHE:
+        _LANDING_CACHE[game_id] = nhl_api("/gamecenter/%s/landing" % game_id)
+    return _LANDING_CACHE[game_id]
+
+
+def nhl_recent_form(fin_games, abbrev, n=5):
+    """The club's last n finals, oldest first: score, shots for and against,
+    who started in net, how the game ended. Shown on the sheet, not scored:
+    three games of scores is noise dressed as a trend, and this exists to
+    catch what the season line hides (a goalie who has stopped starting, a
+    team suddenly giving up 40 shots a night). Added 5 Oct 2026."""
+    out = []
+    for g in fin_games[-n:]:
+        is_home = (g.get("homeTeam") or {}).get("abbrev") == abbrev
+        us, them = ("homeTeam", "awayTeam") if is_home else ("awayTeam", "homeTeam")
+        try:
+            box = nhl_boxscore(g.get("id")) or {}
+        except Exception:  # noqa: BLE001
+            box = {}
+        goalie = ""
+        for x in ((box.get("playerByGameStats") or {}).get(us) or {}).get("goalies") or []:
+            if x.get("starter"):
+                nm = x.get("name")
+                goalie = (nm.get("default") if isinstance(nm, dict) else nm) or ""
+        end = str((g.get("gameOutcome") or {}).get("lastPeriodType") or "REG")
+        # the first period, from the landing page's linescore: the first-five
+        # of hockey, asked for on 5 Oct ("just like the MLB setup")
+        p1f = p1a = None
+        try:
+            pa, ph = p1_from_landing(nhl_landing(g.get("id")) or {})
+            if pa is not None and ph is not None:
+                p1f, p1a = (ph, pa) if is_home else (pa, ph)
+        except Exception:  # noqa: BLE001
+            pass
+        out.append({"date": g.get("gameDate"), "opp": nhl_name(g.get(them) or {}), "home": is_home,
+                    "gf": (g.get(us) or {}).get("score"), "ga": (g.get(them) or {}).get("score"),
+                    "sf": (box.get(us) or {}).get("sog"), "sa": (box.get(them) or {}).get("sog"),
+                    "p1f": p1f, "p1a": p1a, "goalie": goalie, "end": end})
+    return out
+
+
+def nhl_form_line(form):
+    bits = []
+    for g in form:
+        res = "W" if (g["gf"] is not None and g["ga"] is not None and g["gf"] > g["ga"]) else ("OTL" if g["end"] != "REG" else "L")
+        b = "%s %s%s %s-%s" % (res, "v " if g["home"] else "@ ", g["opp"], g["gf"], g["ga"])
+        if g["sf"] is not None:
+            b += " (%s-%s)" % (g["sf"], g["sa"])
+        if g.get("p1f") is not None:
+            b += " P1 %s-%s" % (g["p1f"], g["p1a"])
+        if g["goalie"]:
+            b += " " + g["goalie"]
+        bits.append(b)
+    return ", ".join(bits) or "none yet"
+
+
 def nhl_likely_starter(goalies, rest_days, last_starter_id):
     """The slate's guess at tonight's goalie: on a back to back, the one who
     did NOT start yesterday; otherwise the one with the most starts. Never
@@ -932,8 +1002,8 @@ def build_nhl_game(g, date_iso, season_id, summary, log):
     start = str(g.get("startTimeUTC") or "")
     state = str(g.get("gameState") or "")
     inputs = {k: "" for k in ("agsv", "hgsv", "agsh", "hgsh", "asf", "hsf", "app", "hpp", "apk", "hpk",
-                              "al10", "hl10", "h2h", "h2hn", "arest", "hrest")}
-    notes, starters = [], {"away": "", "home": ""}
+                              "al10", "hl10", "h2h", "h2hn", "arest", "hrest", "nhlform")}
+    notes, starters, form = [], {"away": "", "home": ""}, {"away": [], "home": []}
     out = {"sport": "NHL", "gdate": date_iso, "away": away, "home": home, "gameId": gid, "first_puck_utc": start,
            "venue": ((g.get("venue") or {}).get("default") if isinstance(g.get("venue"), dict) else g.get("venue")) or "",
            "status": state, "starters": starters, "goalies": {"away": [], "home": []}, "inputs": inputs, "notes": notes}
@@ -981,6 +1051,8 @@ def build_nhl_game(g, date_iso, season_id, summary, log):
             if rest is not None:
                 inputs[p + "rest"] = str(max(0, rest))
             log("  %s last-10 avg total: %s (%d games); rest %s day(s)" % (side, inputs[p + "l10"] or "?", n, inputs[p + "rest"] or "?"))
+            form[side] = nhl_recent_form(fin, ab, 5)
+            log("  %s last five: %s" % (side, nhl_form_line(form[side])))
             if side == "away":
                 opp = hab
                 h2h = [x for x in fin if (x.get("awayTeam") or {}).get("abbrev") == opp or (x.get("homeTeam") or {}).get("abbrev") == opp]
@@ -1024,6 +1096,11 @@ def build_nhl_game(g, date_iso, season_id, summary, log):
                 notes.append("%s: %s." % (nick, why))
         except Exception as e:  # noqa: BLE001
             notes.append("Could not fetch %s goalies: %s" % (nick, e))
+    # the form panel: both sides' last five, as one JSON input so the sheet
+    # carries it through the form, the draft and the row like any other box
+    if form["away"] or form["home"]:
+        inputs["nhlform"] = json.dumps(form, separators=(",", ":"))
+    out["form"] = form
     for n in notes:
         log("  note: " + n)
     return out
@@ -1340,6 +1417,12 @@ def selftest():
     check("nhl goalies: the printout shows both halves", any("this season 0.902 on 500; last season 0.910 on 1000, at half" in l for l in lines2))
     check("nhl goalies: a goalie with no last season keeps his own line", any(x["name"] == "Igor S" and x["shots"] == 1400 and x.get("prior") is None for x in row["goalies"]["away"]))
     check("nhl goalies: the blend is noted", any("blend this season with half of last season" in n for n in row["notes"]))
+    fa = row["form"]["away"]
+    check("nhl form: the last five finals, oldest first, with shots and the starter",
+          len(fa) == 5 and fa[-1]["date"] == "2026-10-06" and fa[0]["date"] == "2026-09-26" and fa[-1]["sf"] == 31 and fa[-1]["sa"] == 28 and fa[-1]["goalie"] == "I. S" and fa[-1]["opp"] == "Bruins")
+    check("nhl form: rides in the inputs as JSON", json.loads(i["nhlform"])["home"][-1]["date"] == "2026-10-04")
+    check("nhl form: the first period rides along (NYR away, 1-0 after one)", fa[-1]["p1f"] == 1 and fa[-1]["p1a"] == 0)
+    check("nhl form: the printout reads it", any("last five:" in l and "I. S" in l for l in lines2))
     check("nhl rest and last ten", i["arest"] == "0" and i["hrest"] == "2" and i["al10"] == "5.9" and i["hl10"] == "6.4")
     check("nhl head to head", i["h2h"] == "5.5" and i["h2hn"] == "2")
     check("nhl: the back-to-back side gets the rested goalie", any("did not start yesterday" in n for n in row["notes"]))
@@ -1497,8 +1580,8 @@ def _canned_nhl():
     # eleven finals; the last ten average 5.9, and the two meetings with Boston (28 Sept, 6 Oct) average 5.5
     nyr_season = season("NYR", "BOS", nyr_dates, [7, 6, 6, 6, 6, 6, 6, 6, 5, 6, 6], ["2026-09-28", "2026-10-06"])
     bos_season = season("BOS", "NYR", bos_dates, [6, 6, 7, 7, 6, 6, 7, 6, 6, 7, 6], [])
-    box = {"awayTeam": {"abbrev": "NYR"}, "homeTeam": {"abbrev": "XXX"},
-           "playerByGameStats": {"awayTeam": {"goalies": [{"playerId": 1, "starter": True}, {"playerId": 2, "starter": False}]}, "homeTeam": {"goalies": []}}}
+    box = {"awayTeam": {"abbrev": "NYR", "score": 4, "sog": 31}, "homeTeam": {"abbrev": "XXX", "score": 2, "sog": 28},
+           "playerByGameStats": {"awayTeam": {"goalies": [{"playerId": 1, "name": {"default": "I. S"}, "starter": True}, {"playerId": 2, "starter": False}]}, "homeTeam": {"goalies": []}}}
     landing = {"summary": {"linescore": {"byPeriod": [{"periodDescriptor": {"number": 1}, "away": 1, "home": 0},
                                                       {"periodDescriptor": {"number": 2}, "away": 1, "home": 2}, {"periodDescriptor": {"number": 3}, "away": 0, "home": 1}]}}}
     sjs_now = {"goalies": []}

@@ -112,6 +112,20 @@ the first-period total and both prices. The slate fills the rest: goalies
 play and kill, last ten, head to head, rest days. Closes the next morning
 as on 2.0.
 
+**Recent form** (5 Oct 2026, at the user's request) is a panel on the
+hockey card, shown, not scored: each side's last five finals with the
+score, the score after one period, shots for and against, who started in
+net, and how the game ended, read from the box scores and game pages the
+slate already fetches. The slate writes both sides as one JSON input
+(`nhlform`), so it rides through the form, the draft and the row like any
+other box, and the panel adds a summary line per side with flags for 35+
+shots against a night, 25 or fewer for, and two goalies used. Nothing in it
+moves a number: three games of scores is noise dressed as a trend, and
+form measured null over a baseball season. It exists to catch what the
+season line hides, and to let the record split on it later — the first
+period line is the hockey first-five, and whether a team's recent first
+periods say anything about tonight's is a question the log can answer.
+
 ## The board, for hockey
 
 Same two lists as 2.0, with one rule of its own. On the straight bets a

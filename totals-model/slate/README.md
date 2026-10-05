@@ -36,6 +36,7 @@ Two more double-click files: **Run NHL slate.bat** before the games and
 | Goalies: the likely starter, save %, shots faced | The club's goalie page, each line blended with **half of last season's** from the player's page, so a first start of .739 on 23 shots reads as the man's own prior and not the league's. On a back to back the slate names the goalie who did **not** start yesterday; otherwise the one with the most starts. **Never confirmed**: the sheet says so until you check Daily Faceoff and tick the box |
 | Shots for per game, power play %, penalty kill % | The league's team summary report |
 | Last-10 average total, rest days, head to head | The club's season schedule |
+| Recent form: each side's last five, with the score, the score after one, shots for and against, and who started in net | The box scores and game pages of those games. Shown on the sheet's Recent form card, not scored |
 | Finals and the first-period score | The game page the next morning. A shootout win is a one-goal margin, as the league records it |
 
 The two goalies' lines are both printed, with both halves (this season and

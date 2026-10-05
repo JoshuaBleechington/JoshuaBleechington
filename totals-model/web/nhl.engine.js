@@ -227,8 +227,54 @@
     });
     el.innerHTML = parts.join(" · ") + ". Open the boxes below to change a line.";
   }
+  /* ---- recent form: shown, not scored --------------------------------------
+     The slate writes each side's last five finals (score, shots for and
+     against, the starter, how the game ended) as JSON into the hidden
+     `nhlform` box, so it rides through snapshot, restore, the draft and the
+     row like any other input. Built 5 Oct 2026 at the user's request. */
+  function nhlFormPanel() {
+    var el = $("formPanel"); if (!el) return;
+    var raw = ($("nhlform") || {}).value || "", form = null;
+    try { form = raw ? JSON.parse(raw) : null; } catch (e) { form = null; }
+    if (!form || (!(form.away || []).length && !(form.home || []).length)) {
+      el.innerHTML = "No recent games on the row — load the slate and Fill form, and each side's last five come with it.";
+      return;
+    }
+    var h = "";
+    [["away", $("away").value || "Away"], ["home", $("home").value || "Home"]].forEach(function (s) {
+      var games = form[s[0]] || [];
+      if (!games.length) { h += "<p><b>" + esc(s[1]) + "</b>: no finals yet.</p>"; return; }
+      var tot = 0, sf = 0, sa = 0, nSf = 0, w = 0, goalies = {}, p1f = 0, p1a = 0, nP1 = 0;
+      var rows = games.map(function (g) {
+        var gf = +g.gf, ga = +g.ga, res = isFinite(gf) && isFinite(ga) ? (gf > ga ? "W" : (g.end && g.end !== "REG" ? "OTL" : "L")) : "";
+        if (res === "W") w++;
+        if (isFinite(gf) && isFinite(ga)) tot += gf + ga;
+        if (g.sf !== null && g.sf !== undefined && g.sa !== null && g.sa !== undefined) { sf += +g.sf; sa += +g.sa; nSf++; }
+        if (g.goalie) goalies[g.goalie] = (goalies[g.goalie] || 0) + 1;
+        var hasP1 = g.p1f !== null && g.p1f !== undefined && g.p1a !== null && g.p1a !== undefined;
+        if (hasP1) { p1f += +g.p1f; p1a += +g.p1a; nP1++; }
+        return "<tr><td>" + esc(String(g.date || "").slice(5)) + "</td><td>" + (g.home ? "v " : "@ ") + esc(g.opp || "?") + "</td>" +
+               "<td>" + res + (g.end && g.end !== "REG" ? " (" + esc(g.end) + ")" : "") + " " + esc(g.gf) + "–" + esc(g.ga) + "</td>" +
+               "<td>" + (hasP1 ? esc(g.p1f) + "–" + esc(g.p1a) : "—") + "</td>" +
+               "<td>" + (g.sf !== null && g.sf !== undefined ? esc(g.sf) + "–" + esc(g.sa) : "—") + "</td><td>" + esc(g.goalie || "—") + "</td></tr>";
+      });
+      var names = Object.keys(goalies).sort(function (a, b) { return goalies[b] - goalies[a]; });
+      var flags = [];
+      if (nSf && sa / nSf >= 35) flags.push("giving up " + (sa / nSf).toFixed(1) + " shots a night");
+      if (nSf && sf / nSf <= 25) flags.push("only " + (sf / nSf).toFixed(1) + " shots for");
+      if (names.length > 1) flags.push("two goalies used (" + names.map(function (n) { return esc(n) + " ×" + goalies[n]; }).join(", ") + ")");
+      h += "<p><b>" + esc(s[1]) + "</b> last " + games.length + ": " + w + "-" + (games.length - w) + ", " + (games.length ? (tot / games.length).toFixed(1) : "—") +
+           " goals a game" + (nP1 ? ", first period " + ((p1f + p1a) / nP1).toFixed(1) + " (" + (p1f / nP1).toFixed(1) + " for, " + (p1a / nP1).toFixed(1) + " against)" : "") +
+           (nSf ? ", shots " + (sf / nSf).toFixed(1) + " for / " + (sa / nSf).toFixed(1) + " against" : "") +
+           (names.length ? ", in net " + names.map(function (n) { return esc(n); }).join(" and ") : "") + "." +
+           (flags.length ? " <b>" + flags.join("; ") + ".</b>" : "") + "</p>" +
+           "<table class=\"form\"><thead><tr><th>Date</th><th>Opp</th><th>Result</th><th>After one</th><th>Shots</th><th>In net</th></tr></thead><tbody>" + rows.join("") + "</tbody></table>";
+    });
+    el.innerHTML = h;
+  }
   function forecastMatchupNhl() {
     nhlGoalieSummary();
+    nhlFormPanel();
     var f = readNhl();
     var away = f.away, home = f.home, line = f.line;
     var op = num("op"), up = num("up"), hml = num("hml"), aml = num("aml");

@@ -319,6 +319,18 @@
         est1.push([muP1 + gap1, goalies.weight]);
         p1notes.push(goalies.name + ": " + sgn(gap1) + " goals over the first period, the full-game gap scaled by the " + Math.round(NHL.P1_SHARE * 100) + "% of regulation goals a first period carries. No empty net, no overtime: a period is a plain count.");
       }
+      /* first-period form from the league ledger: each club's last ten
+         first-period totals, an absolute weighted like the full game's form
+         and tagged the same way (totals/nhl.py). */
+      var a1 = num("ap1l10"), h1 = num("hp1l10");
+      if (a1 !== null && h1 !== null && ok(a1, "nhl_period") && ok(h1, "nhl_period")) {
+        var avg1 = (a1 + h1) / 2;
+        est1.push([avg1, NHL_WEIGHTS.form]);
+        p1notes.push("First-period last ten: " + a1.toFixed(2) + " and " + h1.toFixed(2) + " a game, average " + avg1.toFixed(2) +
+          ", from the league ledger. Weighted like the full game's last ten (" + NHL_WEIGHTS.form + ") and unmeasured: on the log to earn or lose it.");
+      } else if (a1 !== null || h1 !== null) {
+        p1notes.push("A first-period last ten was given for one side only; the pair is scored as a unit and has been dropped.");
+      }
       var tw1 = est1.reduce(function (a, e) { return a + e[1]; }, 0);
       var proj1 = est1.reduce(function (a, e) { return a + e[0] * e[1]; }, 0) / tw1;
       var s1 = nhlP1Split(p1line, proj1);

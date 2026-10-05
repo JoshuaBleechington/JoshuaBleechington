@@ -126,6 +126,24 @@ season line hides, and to let the record split on it later — the first
 period line is the hockey first-five, and whether a team's recent first
 periods say anything about tonight's is a question the log can answer.
 
+**The league ledger** (5 Oct 2026, at the user's request: "build the
+league ledger and have the data align to help the model... a path to a
+correct total or first period totals like MLB"). `slate.py nhl-ledger`
+keeps every regular-season final in the league — period scores, shots,
+empty-net goals, overtime or shootout — in `nhl-ledger-SEASON.json`, one
+landing page per new game, and prints the league's measured figures against
+the hockey book's a-priori constants: goals per game, overtime rate,
+empty-net rate, first-period share, first-period goals per game and its
+0/1/2+ split against the Poisson, shots per team, league save percentage,
+and the raw spread of totals. The constants change by hand when the sample
+is there (100 games), with a note, so Python and JS stay one model. The
+ledger also feeds the sheet directly: each club's **first-period last ten**
+(for plus against) goes on the slate once a club has five finals, and the
+first period scores it as an absolute at the form weight (0.8 against the
+market's 4.0), both sides or neither — the hockey counterpart of the F5
+starters, and the first non-market input the period has. Unmeasured; on
+the log to earn or lose it.
+
 **The crowd** (5 Oct 2026, at the user's request: "add the over/under %
 for tickets... can we test this?") is two boxes on the hockey card, over %
 tickets and over % money, from the book's splits. With 65% or more of the

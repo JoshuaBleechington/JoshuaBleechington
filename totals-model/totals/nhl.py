@@ -524,6 +524,8 @@ def forecast_matchup_nhl(
     p1_line: float | None = None,
     p1_over_price: float | None = None,
     p1_under_price: float | None = None,
+    away_p1_last10: float | None = None,
+    home_p1_last10: float | None = None,
     **total_inputs: Any,
 ) -> Matchup:
     notes: list[str] = []
@@ -591,6 +593,22 @@ def forecast_matchup_nhl(
             p1_notes.append(f"{goalies.name}: {gap:+.2f} goals over the first period, the full-game "
                             f"gap scaled by the {P1_SHARE:.0%} of regulation goals a first period "
                             "carries. No empty net, no overtime: a period is a plain count.")
+        # --- first-period form, from the league ledger -----------------------
+        # Each club's last ten first-period totals (for plus against), the
+        # first period's own last ten: an absolute, weighted like the full
+        # game's form and tagged the same way. Fed by the slate from
+        # nhl-ledger-<season>.json; blank until a club has MIN_TEAM_GAMES.
+        # Added 5 Oct 2026 as the hockey counterpart of the F5 starters.
+        if (away_p1_last10 is not None and home_p1_last10 is not None
+                and _ok(away_p1_last10, "nhl_period") and _ok(home_p1_last10, "nhl_period")):
+            avg1 = (away_p1_last10 + home_p1_last10) / 2.0
+            est.append((avg1, WEIGHTS["form"]))
+            p1_notes.append(f"First-period last ten: {away_p1_last10:.2f} and {home_p1_last10:.2f} a game, "
+                            f"average {avg1:.2f}, from the league ledger. Weighted like the full game's "
+                            f"last ten ({WEIGHTS['form']:g}) and unmeasured: on the log to earn or lose it.")
+        elif away_p1_last10 is not None or home_p1_last10 is not None:
+            p1_notes.append("A first-period last ten was given for one side only; the pair is scored "
+                            "as a unit and has been dropped.")
         tw = sum(wt for _, wt in est)
         proj_p1 = sum(t * wt for t, wt in est) / tw
         o, pu, u = p1_split(p1_line, proj_p1)

@@ -36,6 +36,7 @@ def build_nhl(i: dict):
         home_ml=n(i.get("hml")), away_ml=n(i.get("aml")),
         puck_line=n(i.get("pl")), pl_home_price=n(i.get("plh")), pl_away_price=n(i.get("pla")),
         p1_line=n(i.get("p1line")), p1_over_price=n(i.get("p1op")), p1_under_price=n(i.get("p1up")),
+        away_p1_last10=n(i.get("ap1l10")), home_p1_last10=n(i.get("hp1l10")),
         away_goalie_sv=n(i.get("agsv")), home_goalie_sv=n(i.get("hgsv")),
         away_goalie_shots=n(i.get("agsh")), home_goalie_shots=n(i.get("hgsh")),
         away_shots_for=n(i.get("asf")), home_shots_for=n(i.get("hsf")),
@@ -78,6 +79,9 @@ NHL_CASES = [
     {"name": "the puck line at +1.5 on a near pick-em, priced",
      "inputs": dict(away="Stars", home="Kings", line="5.5", op="-108", up="-112", hml="-105", aml="-115",
                     pl="1.5", plh="-240", pla="195", p1line="1.5", p1op="-105", p1up="-115")},
+    {"name": "first-period form from the ledger: two hot first periods pull the period over",
+     "inputs": dict(away="Avalanche", home="Senators", line="6.5", op="-110", up="-110", p1line="1.5", p1op="-130", p1up="100",
+                    ap1l10="2.30", hp1l10="2.10", **FULL)},
     {"name": "a wide moneyline hold is regressed",
      "inputs": dict(away="Lightning", home="Capitals", line="6.5", op="-110", up="-110", hml="-200", aml="150", **FULL)},
 ]

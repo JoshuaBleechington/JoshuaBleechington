@@ -279,3 +279,30 @@ class TestTheFirstPeriodAnchorIsNotRegressed(unittest.TestCase):
         from totals.nhl import p1_anchor
         self.assertEqual(p1_anchor(1.5, -130, None), fair_total("NHL_P1", 1.5, -130, None))
         self.assertEqual(p1_anchor(1.5, None, None), fair_total("NHL_P1", 1.5, None, None))
+
+
+class TestFirstPeriodForm(unittest.TestCase):
+    """5 Oct 2026: the league ledger's per-club first-period last ten."""
+
+    def test_both_sides_move_the_period_at_the_form_weight(self):
+        base = dict(total_line=6.0, p1_line=1.5, p1_over_price=-120, p1_under_price=100)
+        plain = forecast_matchup_nhl("A", "B", **base)
+        hot = forecast_matchup_nhl("A", "B", away_p1_last10=2.4, home_p1_last10=2.2, **base)
+        cold = forecast_matchup_nhl("A", "B", away_p1_last10=1.2, home_p1_last10=1.3, **base)
+        def over(m):
+            p1 = next(mk for mk in m.markets if mk.key == "p1")
+            return p1.p if p1.side == "OVER" else 1 - p1.p
+        self.assertGreater(over(hot), over(plain))
+        self.assertLess(over(cold), over(plain))
+        p1 = next(mk for mk in hot.markets if mk.key == "p1")
+        self.assertTrue(any("First-period last ten" in n and "league ledger" in n for n in p1.notes))
+        # the full-game total is untouched by a first-period input
+        self.assertAlmostEqual(hot.total.projected, plain.total.projected, places=12)
+
+    def test_one_side_is_dropped(self):
+        base = dict(total_line=6.0, p1_line=1.5, p1_over_price=-120, p1_under_price=100)
+        plain = forecast_matchup_nhl("A", "B", **base)
+        one = forecast_matchup_nhl("A", "B", away_p1_last10=2.4, **base)
+        pa = next(mk for mk in plain.markets if mk.key == "p1"); po = next(mk for mk in one.markets if mk.key == "p1")
+        self.assertAlmostEqual(pa.p, po.p, places=12)
+        self.assertTrue(any("one side only" in n for n in po.notes))

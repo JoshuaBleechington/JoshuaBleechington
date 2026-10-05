@@ -5236,6 +5236,67 @@
   },
   {
     "sport": "NHL",
+    "name": "first-period form from the ledger: two hot first periods pull the period over",
+    "inputs": {
+      "away": "Avalanche",
+      "home": "Senators",
+      "line": "6.5",
+      "op": "-110",
+      "up": "-110",
+      "p1line": "1.5",
+      "p1op": "-130",
+      "p1up": "100",
+      "ap1l10": "2.30",
+      "hp1l10": "2.10",
+      "agsv": "0.912",
+      "hgsv": "0.921",
+      "agsh": "1400",
+      "hgsh": "1900",
+      "asf": "31.2",
+      "hsf": "33.4",
+      "app": "22.1",
+      "hpp": "24.8",
+      "apk": "80.2",
+      "hpk": "78.1",
+      "al10": "5.9",
+      "hl10": "6.4",
+      "h2h": "6.3",
+      "h2hn": "3"
+    },
+    "expect": {
+      "lam_home": null,
+      "lam_away": null,
+      "projected": 6.59405204,
+      "markets": [
+        {
+          "key": "total",
+          "pick": "UNDER 6.5",
+          "side": "UNDER",
+          "p": 0.5151284,
+          "p_push": 0,
+          "price": -110.0,
+          "edge": -0.00868113,
+          "fair": -106.2402,
+          "anchored": true,
+          "band": "NO BET"
+        },
+        {
+          "key": "p1",
+          "pick": "P1 OVER 1.5",
+          "side": "OVER",
+          "p": 0.54249125,
+          "p_push": 0.0,
+          "price": -130.0,
+          "edge": -0.02272614,
+          "fair": -118.5751,
+          "anchored": true,
+          "band": ""
+        }
+      ]
+    }
+  },
+  {
+    "sport": "NHL",
     "name": "a wide moneyline hold is regressed",
     "inputs": {
       "away": "Lightning",

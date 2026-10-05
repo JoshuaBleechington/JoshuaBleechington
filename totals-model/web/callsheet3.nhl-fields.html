@@ -80,6 +80,10 @@
               <div class="f"><label for="al10">Away last-10 avg total</label><input id="al10" type="number" step="0.1" inputmode="decimal" placeholder="6.2"></div>
               <div class="f"><label for="hl10">Home last-10 avg total</label><input id="hl10" type="number" step="0.1" inputmode="decimal" placeholder="5.8"></div>
             </div>
+            <div class="grid2">
+              <div class="f"><label for="ap1l10">Away last-10 first-period total <span class="tag">ledger</span></label><input id="ap1l10" type="number" step="0.01" inputmode="decimal" placeholder="1.80"></div>
+              <div class="f"><label for="hp1l10">Home last-10 first-period total <span class="tag">ledger</span></label><input id="hp1l10" type="number" step="0.01" inputmode="decimal" placeholder="1.65"></div>
+            </div>
             <div class="grid4">
               <div class="f"><label for="h2h">H2H avg total</label><input id="h2h" type="number" step="0.1" inputmode="decimal" placeholder="6.0"></div>
               <div class="f"><label for="h2hn">Meetings</label><input id="h2hn" type="number" step="1" inputmode="numeric" placeholder="2"></div>
@@ -89,7 +93,9 @@
             <p class="note">A save percentage is shrunk toward the league by the shots behind it, so the two goalie boxes travel
               as a pair: both or neither, on each side. Shots, special teams and the last ten wait until a team has five
               games; until then the slate leaves them blank and the sheet is the market plus the goalies. Special teams and
-              form are tagged and cannot buy a band; a back to back (0 days rest) is shown, not scored.</p>
+              form are tagged and cannot buy a band; a back to back (0 days rest) is shown, not scored. The first-period
+              last ten comes from the league ledger (Run NHL ledger.bat) and moves the first period the way the full
+              game's last ten moves the total: weighted 0.8 against the market's 4, both sides or neither.</p>
           </div>
         </details>
       </div>

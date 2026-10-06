@@ -20,8 +20,9 @@ else: no packages, no account, no key.
 | Lineups | Listed when posted, and anyone who started the team's last game but is not in today's order is named in a note |
 
 It never carries a **line, a price, tickets or money**. Those come from the
-book and are typed. The **park factor** is also left blank (fill it from
-your usual source, or leave it). The **WNBA** is not covered: pace, ratings,
+book and are typed. The **park factor** fills from `parks.json`, which
+carries Statcast's 3-year figure for every park (read 6 Oct 2026; re-read
+once a season). The **WNBA** is not covered: pace, ratings,
 rest and last five still come from a stats site by hand.
 
 ## Hockey (Call Sheet 3.0)
@@ -123,11 +124,17 @@ script prints a line like
 wind: 12 mph from SW (225 deg) at a park whose CF lies at 35 deg -> out
 ```
 
-Compare the arrow on the park diagram you use (Outlier shows one) with what
-the script resolved. If they disagree, the bearing for that park is wrong:
-open `parks.json`, change `cf_bearing` (degrees clockwise from north, home
-plate toward centre field), and set `verified` to `true` so the reminder
-stops printing. Thirty parks, one check each, and it is done for good.
+There are two ways to check it, and the first needs nothing from you. When
+MLB's own stadium read is on the feed ("12 mph, Out To CF") the script
+compares it with what the forecast resolved to at the bearing on file and
+prints a **bearing check** line, agree or DISAGREE; a disagreement also goes
+on the game's notes. The stadium read is used either way, so a wrong bearing
+only ever costs you on a night the feed has no read. A park that keeps
+agreeing is verified by its own record. The second way is a satellite map:
+open the park on Google Maps with north up and read which way home plate
+points toward centre field, clockwise from north. If the bearing is wrong,
+open `parks.json`, change `cf_bearing`, and set `verified` to `true` so the
+reminder stops printing.
 
 ## When something fails
 

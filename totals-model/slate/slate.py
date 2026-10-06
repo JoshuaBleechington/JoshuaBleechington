@@ -586,6 +586,12 @@ def build_game(g, parks, date_iso, season, log):
     else:
         if how == "id":
             log("  park: matched %s by MLB venue id (the name '%s' is not in parks.json)" % (pname, venue.get("name")))
+        # the park factor: Statcast's figure, kept in parks.json (read once a season)
+        if park.get("pf") is not None:
+            inputs["pf"] = str(park["pf"])
+            log("  park factor: %s (Statcast, from parks.json)" % inputs["pf"])
+        else:
+            notes.append("%s has no park factor in parks.json: type it from Statcast." % pname)
         roof = park.get("roof") or "open"
         if roof == "fixed":
             inputs["dome"] = True
@@ -615,6 +621,18 @@ def build_game(g, parks, date_iso, season, log):
             if mlbw:
                 mph2, dir2 = mlbw
                 log("  MLB's own read: %s mph, %s%s" % (mph2, dir2 or "calm/varies", (", %s F" % mlbt) if mlbt else ""))
+                # The bearing check: when the stadium's own read and the forecast
+                # both exist, they verify the centre-field bearing on file without
+                # a park diagram. "Out" from a wind blowing toward X degrees says
+                # the bearing is near X; the file's bearing either agrees or not.
+                if w and dir2 and mph2 >= 5:
+                    toward = (w["from_deg"] + 180.0) % 360.0
+                    agree = (dir2 == d)
+                    out["bearing_check"] = {"mlb": dir2, "forecast": d, "wind_toward_deg": round(toward), "cf_bearing": park["cf_bearing"], "agree": agree}
+                    log("  bearing check: the stadium says %s, the forecast wind blows toward %d deg and the %d deg bearing on file calls that %s -> %s"
+                        % (dir2, round(toward), park["cf_bearing"], d, "agree" if agree else "DISAGREE: check %s's bearing" % pname))
+                    if not agree:
+                        notes.append("Bearing check: MLB's stadium read says %s where the forecast at the %d-degree bearing says %s. The file's bearing for %s may be wrong; the stadium read was used." % (dir2, park["cf_bearing"], d, pname))
                 if not w or dir2 != inputs["dir"]:
                     # MLB's stadium read, when present, beats a forecast grid.
                     inputs["mph"] = str(mph2)
@@ -1695,6 +1713,8 @@ def selftest():
     check("last ten", i["al10"] == "9.0" and i["hl10"] == "9.0")
     check("head to head", i["h2h"] == "9.0" and i["h2hn"] == "2")
     check("wind resolved", i["mph"] == "9" and i["dir"] == "out" and i["temp"] == "72" and i["dome"] is False)
+    check("park factor from parks.json (Petco 97)", i["pf"] == "97")
+    check("every park factor on file is a Statcast number", all(80 <= p.get("pf", 100) <= 120 for p in parks.values()) and sum(1 for p in parks.values() if "pf" in p) >= 30)
     check("lines never in a slate", not any(k in i for k in ("total", "over", "under", "aml", "hml", "rl")))
     check("lineup listed", row["lineups"]["away"][:2] == ["Away Ace", "Leadoff Man"])
     check("missing starter noted", any("not in today's lineup" in n and "Benched Guy" in n for n in row["notes"]))

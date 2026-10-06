@@ -300,6 +300,7 @@ PLAUSIBLE = {
     # percentage outside .850-.960 is a misplaced decimal, not a goalie.
     "nhl_total": (3.5, 9.5),
     "nhl_period": (0.5, 4.5),
+    "xg_rate": (1.0, 5.5),
     "save_pct": (0.850, 0.960),
     "shots": (15.0, 45.0),
     "shots_faced": (0.0, 3000.0),

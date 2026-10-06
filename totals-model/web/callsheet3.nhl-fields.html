@@ -80,6 +80,15 @@
               <div class="f"><label for="al10">Away last-10 avg total</label><input id="al10" type="number" step="0.1" inputmode="decimal" placeholder="6.2"></div>
               <div class="f"><label for="hl10">Home last-10 avg total</label><input id="hl10" type="number" step="0.1" inputmode="decimal" placeholder="5.8"></div>
             </div>
+            <div class="grid4">
+              <div class="f"><label for="axgf">Away xG for / game <span class="tag">MoneyPuck</span></label><input id="axgf" type="number" step="0.01" inputmode="decimal" placeholder="3.10"></div>
+              <div class="f"><label for="axga">Away xG against</label><input id="axga" type="number" step="0.01" inputmode="decimal" placeholder="2.90"></div>
+              <div class="f"><label for="hxgf">Home xG for / game</label><input id="hxgf" type="number" step="0.01" inputmode="decimal" placeholder="3.00"></div>
+              <div class="f"><label for="hxga">Home xG against</label><input id="hxga" type="number" step="0.01" inputmode="decimal" placeholder="3.20"></div>
+            </div>
+            <div class="grid2">
+              <div class="f"><label for="xglg">League xG per team-game <span class="tag">same table</span></label><input id="xglg" type="number" step="0.01" inputmode="decimal" placeholder="3.05"></div>
+            </div>
             <div class="grid2">
               <div class="f"><label for="ap1l10">Away last-10 first-period total <span class="tag">ledger</span></label><input id="ap1l10" type="number" step="0.01" inputmode="decimal" placeholder="1.80"></div>
               <div class="f"><label for="hp1l10">Home last-10 first-period total <span class="tag">ledger</span></label><input id="hp1l10" type="number" step="0.01" inputmode="decimal" placeholder="1.65"></div>
@@ -95,7 +104,9 @@
               games; until then the slate leaves them blank and the sheet is the market plus the goalies. Special teams and
               form are tagged and cannot buy a band; a back to back (0 days rest) is shown, not scored. The first-period
               last ten comes from the league ledger (Run NHL ledger.bat) and moves the first period the way the full
-              game's last ten moves the total: weighted 0.8 against the market's 4, both sides or neither.</p>
+              game's last ten moves the total: weighted 0.8 against the market's 4, both sides or neither. Expected
+              goals come from MoneyPuck's team file, all situations, per game, with that table's league mean beside
+              them; all four or none, weighted 1.2 and tagged.</p>
           </div>
         </details>
       </div>

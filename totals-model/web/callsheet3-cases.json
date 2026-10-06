@@ -5297,6 +5297,81 @@
   },
   {
     "sport": "NHL",
+    "name": "expected goals: two high-event clubs against the table's own league mean",
+    "inputs": {
+      "away": "Oilers",
+      "home": "Devils",
+      "line": "6.5",
+      "op": "-110",
+      "up": "-110",
+      "hml": "-130",
+      "aml": "110",
+      "axgf": "3.40",
+      "axga": "3.10",
+      "hxgf": "3.30",
+      "hxga": "2.90",
+      "xglg": "3.05",
+      "agsv": "0.912",
+      "hgsv": "0.921",
+      "agsh": "1400",
+      "hgsh": "1900",
+      "asf": "31.2",
+      "hsf": "33.4",
+      "app": "22.1",
+      "hpp": "24.8",
+      "apk": "80.2",
+      "hpk": "78.1",
+      "al10": "5.9",
+      "hl10": "6.4",
+      "h2h": "6.3",
+      "h2hn": "3"
+    },
+    "expect": {
+      "lam_home": 3.20969755,
+      "lam_away": 2.95214473,
+      "projected": 6.64184228,
+      "markets": [
+        {
+          "key": "total",
+          "pick": "UNDER 6.5",
+          "side": "UNDER",
+          "p": 0.50784174,
+          "p_push": 0,
+          "price": -110.0,
+          "edge": -0.01596778,
+          "fair": -103.1867,
+          "anchored": true,
+          "band": "NO BET"
+        },
+        {
+          "key": "ml",
+          "pick": "Oilers ML",
+          "side": "AWAY",
+          "p": 0.45742068,
+          "p_push": 0.0,
+          "price": 110.0,
+          "edge": -0.0187698,
+          "fair": 118.6171,
+          "anchored": true,
+          "band": ""
+        },
+        {
+          "key": "pl",
+          "pick": "Oilers +1.5",
+          "side": "AWAY",
+          "p": 0.62324364,
+          "p_push": 0.0,
+          "price": null,
+          "edge": null,
+          "fair": -165.4235,
+          "anchored": false,
+          "band": ""
+        }
+      ]
+    }
+  },
+  {
+    "sport": "NHL",
     "name": "a wide moneyline hold is regressed",
     "inputs": {
       "away": "Lightning",

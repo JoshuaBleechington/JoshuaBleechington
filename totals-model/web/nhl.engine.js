@@ -12,6 +12,7 @@
     OT: 0.23,               // P(tied after sixty)
     SHOTS: 30.0,            // per team per game
     SV: 0.898,              // league save percentage: measured on the card's first 62 goalie lines (37,931 shots), 5 Oct 2026; was .905 a priori
+    XG: 3.05,               // expected goals per team per game, a fallback: the slate writes the table's own mean
     PP_PER_GAME: 2.8, PP_PCT: 0.21,
     TALENT_SD: 0.008,       // spread of goalie true-talent save percentage
     RESIDUAL_SD: 2.55,      // a priori; the residual-spread check measures it
@@ -24,9 +25,9 @@
   NHL.REG_GOALS = NHL.GOALS - NHL.ENG - NHL.OT;
   NHL.SV_STABLE_AT = NHL.SV * (1.0 - NHL.SV) / (NHL.TALENT_SD * NHL.TALENT_SD);
   NHL.REG_PHI = (NHL.RESIDUAL_SD * NHL.RESIDUAL_SD - NHL.ENG * (1.0 - NHL.ENG) - NHL.OT * (1.0 - NHL.OT)) / NHL.REG_GOALS;
-  var NHL_WEIGHTS = { market: 4.0, goalies: 1.6, special: 0.8, form: 0.8, h2h: 0.5 };
+  var NHL_WEIGHTS = { market: 4.0, goalies: 1.6, xg: 1.2, special: 0.8, form: 0.8, h2h: 0.5 };
   PLAUSIBLE.nhl_total = [3.5, 9.5]; PLAUSIBLE.nhl_period = [0.5, 4.5];
-  PLAUSIBLE.save_pct = [0.850, 0.960]; PLAUSIBLE.shots = [15, 45]; PLAUSIBLE.shots_faced = [0, 3000];
+  PLAUSIBLE.save_pct = [0.850, 0.960]; PLAUSIBLE.shots = [15, 45]; PLAUSIBLE.shots_faced = [0, 3000]; PLAUSIBLE.xg_rate = [1.0, 5.5];
 
   /* ---- the goal distribution: regulation count + empty-net lump + OT goal ---- */
   function nhlRegMean(mu) { return Math.max(0.05, mu - NHL.OT - NHL.ENG); }
@@ -134,6 +135,21 @@
         " chances a side: " + sgn(sgap) + " goals. Sized a priori and tagged, so it cannot buy a band on its own.", false));
     } else if (st.some(function (v) { return v !== null; })) {
       notes.push("Special teams need all four figures — both power plays and both kills — and a partial set has been dropped rather than half-applied.");
+    }
+
+    /* expected goals (MoneyPuck, all situations): each side's offence against
+       the other's defence per game, against the league mean of the same table.
+       Tagged (totals/nhl.py); added 6 Oct 2026. */
+    var xg = [num("axgf"), num("hxgf"), num("axga"), num("hxga")];
+    if (xg.every(function (v) { return v !== null && ok(v, "xg_rate"); })) {
+      var lgIn = num("xglg"), lg = (lgIn !== null && ok(lgIn, "xg_rate")) ? lgIn : NHL.XG;
+      var xtot = (xg[0] + xg[3]) / 2 + (xg[1] + xg[2]) / 2, xgap = xtot - 2 * lg;
+      estimates.push(est("Expected goals", anchor + xgap, w.xg,
+        "Away " + xg[0].toFixed(2) + " for into " + xg[3].toFixed(2) + " against, home " + xg[1].toFixed(2) + " into " + xg[2].toFixed(2) + ": " +
+        xtot.toFixed(2) + " expected goals against a league " + (2 * lg).toFixed(2) + " (" + (lgIn !== null ? "the table's own mean" : "assumed") + "), " +
+        sgn(xgap) + " on the line. Weight " + w.xg + ", tagged: it cannot buy a band until the record says so.", false));
+    } else if (xg.some(function (v) { return v !== null; })) {
+      notes.push("Expected goals need all four figures — both sides' for and against — and a partial set has been dropped rather than half-applied.");
     }
 
     var a10 = num("al10"), h10 = num("hl10");

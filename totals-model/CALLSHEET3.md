@@ -144,6 +144,20 @@ market's 4.0), both sides or neither — the hockey counterpart of the F5
 starters, and the first non-market input the period has. Unmeasured; on
 the log to earn or lose it.
 
+**Expected goals** (6 Oct 2026, from the user's download of MoneyPuck's
+team file). Every shot attempt weighted by where it came from and how, so
+a backdoor tap-in is not a sixty-foot wrister: the best-supported team
+input in hockey analytics. The slate fetches the season's team file
+(`moneypuck.com/moneypuck/playerData/seasonSummary/<year>/regular/teams.csv`,
+or a `teams.csv` saved in the folder when the site cannot be reached), takes
+each club's `all`-situations xG for and against per game once it has five
+games, and writes the **league mean of the same table** beside them, which
+is what the sheet scores against — the WNBA pace lesson, that a league
+constant must come from the table the inputs come from (3.05 is the
+fallback). Each side's offence into the other's defence, the gap on the
+line, weight 1.2, tagged: it cannot buy a band until the record says so.
+All four figures or none.
+
 **The crowd** (5 Oct 2026, at the user's request: "add the over/under %
 for tickets... can we test this?") is two boxes on the hockey card, over %
 tickets and over % money, from the book's splits. With 65% or more of the

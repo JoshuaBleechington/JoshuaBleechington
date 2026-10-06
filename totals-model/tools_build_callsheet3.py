@@ -23,7 +23,7 @@ import sys
 ROOT = pathlib.Path(__file__).parent / "web"
 OPEN = "  /* ===== ENGINE BLOCK."
 CLOSE = "  /* ===== END ENGINE BLOCK ===== */"
-STAMP = "2026-10-05"   # bumped by hand when 3.0's own sources change (the harness checks it)
+STAMP = "2026-10-06"   # bumped by hand when 3.0's own sources change (the harness checks it)
 
 
 def engine_block() -> str:
@@ -103,7 +103,7 @@ def tail() -> str:
              '                  "arest","hrest","al5","hl5","hml","aml","sp","sph","spa"];\n'
              '  var NHL_IDS = ["away","home","line","op","up","opened","gdate","agsv","hgsv","agsh","hgsh","asf","hsf",\n'
              '                 "app","hpp","apk","hpk","al10","hl10","h2h","h2hn","arest","hrest","tick","cash",\n'
-             '                 "hml","aml","pl","plh","pla","p1line","p1op","p1up","nhlform","ntick","ncash","ap1l10","hp1l10"];\n'
+             '                 "hml","aml","pl","plh","pla","p1line","p1op","p1up","nhlform","ntick","ncash","ap1l10","hp1l10","axgf","axga","hxgf","hxga","xglg"];\n'
              '  var ALL = MLB_IDS.concat(WNBA_IDS).concat(NHL_IDS).filter(function (v, i, a) { return a.indexOf(v) === i; });\n'
              '  var CHECKS = ["dome","playoff","agconf","hgconf"];\n'
              '  function sportOf(s) { return s === "WNBA" ? "WNBA" : s === "NHL" ? "NHL" : "MLB"; }\n'
@@ -201,7 +201,7 @@ def tail() -> str:
                 '                      "apace","hpace","aort","hort","adrt","hdrt","arest","hrest","al5","hl5"];',
              '  var SLATE_FIELDS = ["aera","hera","aip","hip","al5era","hl5era","al5ip","hl5ip","arpg","hrpg","abp","hbp","al10","hl10","h2h","h2hn","pf","mph","dir","temp","tick","cash",\n'
              '                      "apace","hpace","aort","hort","adrt","hdrt","arest","hrest","al5","hl5",\n'
-             '                      "agsv","hgsv","agsh","hgsh","asf","hsf","app","hpp","apk","hpk","nhlform","ap1l10","hp1l10"];', "slate fields")
+             '                      "agsv","hgsv","agsh","hgsh","asf","hsf","app","hpp","apk","hpk","nhlform","ap1l10","hp1l10","axgf","axga","hxgf","hxga","xglg"];', "slate fields")
     t = once(t, '      if (!blank(i.aera) && !blank(i.hera)) meta.push("ERA " + esc(i.aera) + "/" + esc(i.hera));',
              '      if (!blank(i.aera) && !blank(i.hera)) meta.push("ERA " + esc(i.aera) + "/" + esc(i.hera));\n'
              '      if (!blank(i.agsv) && !blank(i.hgsv)) meta.push("SV " + esc(i.agsv) + "/" + esc(i.hgsv));', "slate meta")

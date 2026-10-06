@@ -99,6 +99,12 @@ LEAGUE_SAVE_PCT = 0.898
 LEAGUE_PP_PER_GAME = 2.8
 LEAGUE_PP_PCT = 0.21
 LEAGUE_PK_PCT = 1.0 - LEAGUE_PP_PCT
+#: Expected goals per team per game, the level MoneyPuck's xG is calibrated
+#: to (it tracks the league's scoring). A FALLBACK: the slate writes the
+#: league mean of the same table it took the clubs' figures from, and that
+#: is what the sheet uses when it is there -- the WNBA pace lesson, that a
+#: league constant must come from the table the inputs come from.
+LEAGUE_XG_PER_TEAM = 3.05
 
 # --- how much a goalie's save percentage is worth knowing -----------------
 # Same derivation as the ERA shrinkage in fullgame.py. A save percentage is a
@@ -143,7 +149,7 @@ OT_COMPRESSION = 0.5
 #: MAE of any input by a distance. The goalies take the starters' 1.6 because
 #: they are the same kind of input; special teams and form the pens' and
 #: form's. Head to head is scaled by meetings as in MLB.
-WEIGHTS = {"market": 4.0, "goalies": 1.6, "special": 0.8, "form": 0.8, "h2h": 0.5}
+WEIGHTS = {"market": 4.0, "goalies": 1.6, "xg": 1.2, "special": 0.8, "form": 0.8, "h2h": 0.5}
 H2H_FULL_WEIGHT_AT = 4
 DEFAULT_PUCK_LINE = 1.5
 _KMAX = 25
@@ -294,6 +300,11 @@ def forecast_nhl(
     home_last10_total: float | None = None,
     h2h_total: float | None = None,
     h2h_meetings: float | None = None,
+    away_xgf: float | None = None,       # expected goals for per game (MoneyPuck, all situations)
+    home_xgf: float | None = None,
+    away_xga: float | None = None,       # expected goals against per game
+    home_xga: float | None = None,
+    league_xg: float | None = None,      # the same table's league mean per team-game
     away_rest_days: float | None = None,
     home_rest_days: float | None = None,
     away_goalie_confirmed: bool = False,
@@ -379,6 +390,30 @@ def forecast_nhl(
                      "and a partial set has been dropped rather than half-applied.")
 
     # --- form and head to head, tagged as in MLB ----------------------------
+    # --- expected goals -----------------------------------------------------
+    # MoneyPuck's xG: every shot attempt weighted by where it came from and
+    # how, so a backdoor tap-in is not a sixty-foot wrister. Each side's
+    # offence against the other's defence, both per game, against the league
+    # mean of the same table; the gap goes on the line. Added 6 Oct 2026 from
+    # the user's download of the team file. Tagged: it is the best-supported
+    # team input in hockey analytics, and it still has no record here.
+    xg = [away_xgf, home_xgf, away_xga, home_xga]
+    if all(v is not None and _ok(v, "xg_rate") for v in xg):
+        lg = league_xg if (league_xg is not None and _ok(league_xg, "xg_rate")) else LEAGUE_XG_PER_TEAM
+        xtot = (away_xgf + home_xga) / 2.0 + (home_xgf + away_xga) / 2.0
+        xgap = xtot - 2.0 * lg
+        lg_how = "the table's own mean" if league_xg is not None else "assumed"
+        estimates.append(Estimate(
+            "Expected goals", anchor + xgap, w["xg"],
+            f"Away {away_xgf:.2f} for into {home_xga:.2f} against, home {home_xgf:.2f} into "
+            f"{away_xga:.2f}: {xtot:.2f} expected goals against a league {2 * lg:.2f} "
+            f"({lg_how}), {xgap:+.2f} on the line. "
+            f"Weight {w['xg']:g}, tagged: it cannot buy a band until the record says so.",
+            mechanism=False))
+    elif any(v is not None for v in xg):
+        notes.append("Expected goals need all four figures -- both sides' for and against -- and a "
+                     "partial set has been dropped rather than half-applied.")
+
     if away_last10_total is not None and home_last10_total is not None:
         avg = (away_last10_total + home_last10_total) / 2.0
         estimates.append(Estimate(

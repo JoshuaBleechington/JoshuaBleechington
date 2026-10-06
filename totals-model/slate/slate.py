@@ -28,7 +28,9 @@ come from a stats site by hand.
 """
 
 import argparse
+import csv
 import datetime as dt
+import io
 import json
 import math
 import os
@@ -78,6 +80,25 @@ def fetch_json(url, tries=3):
             _cache[url] = data
             return data
         except (OSError, ValueError) as e:  # URLError and HTTPError are OSErrors; so is a socket timeout
+            last = e
+            if i + 1 < tries:
+                time.sleep(1.5 * (i + 1))
+    raise RuntimeError("%s -> %s" % (url.split("?")[0], last))
+
+
+def fetch_text(url, tries=3):
+    """GET a text document (a CSV). Same retries and cache as fetch_json."""
+    if url in _cache:
+        return _cache[url]
+    last = None
+    for i in range(tries):
+        try:
+            req = urllib.request.Request(url, headers={"User-Agent": UA, "Accept": "text/csv,text/plain,*/*"})
+            with urllib.request.urlopen(req, timeout=40) as r:
+                data = r.read().decode("utf-8", "replace")
+            _cache[url] = data
+            return data
+        except (OSError, ValueError) as e:
             last = e
             if i + 1 < tries:
                 time.sleep(1.5 * (i + 1))
@@ -994,7 +1015,7 @@ def p1_from_landing(landing):
     return None, None
 
 
-def build_nhl_game(g, date_iso, season_id, summary, log, ledger=None):
+def build_nhl_game(g, date_iso, season_id, summary, log, ledger=None, xg=None):
     away_t, home_t = g.get("awayTeam") or {}, g.get("homeTeam") or {}
     away, home = nhl_name(away_t), nhl_name(home_t)
     aab, hab = away_t.get("abbrev") or "", home_t.get("abbrev") or ""
@@ -1002,7 +1023,8 @@ def build_nhl_game(g, date_iso, season_id, summary, log, ledger=None):
     start = str(g.get("startTimeUTC") or "")
     state = str(g.get("gameState") or "")
     inputs = {k: "" for k in ("agsv", "hgsv", "agsh", "hgsh", "asf", "hsf", "app", "hpp", "apk", "hpk",
-                              "al10", "hl10", "h2h", "h2hn", "arest", "hrest", "nhlform", "ap1l10", "hp1l10")}
+                              "al10", "hl10", "h2h", "h2hn", "arest", "hrest", "nhlform", "ap1l10", "hp1l10",
+                              "axgf", "axga", "hxgf", "hxga", "xglg")}
     notes, starters, form = [], {"away": "", "home": ""}, {"away": [], "home": []}
     out = {"sport": "NHL", "gdate": date_iso, "away": away, "home": home, "gameId": gid, "first_puck_utc": start,
            "venue": ((g.get("venue") or {}).get("default") if isinstance(g.get("venue"), dict) else g.get("venue")) or "",
@@ -1036,6 +1058,18 @@ def build_nhl_game(g, date_iso, season_id, summary, log, ledger=None):
                 notes.append("Could not read %s team rates: %s" % (nick, e))
         else:
             notes.append("%s has no row on the season summary yet (first games of the year)." % nick)
+        # expected goals, from MoneyPuck, once the club has MIN_TEAM_GAMES
+        if xg:
+            xr = xg[0].get(ab)
+            if xr and xr["gp"] >= MIN_TEAM_GAMES:
+                inputs[p + "xgf"], inputs[p + "xga"] = fmt(xr["xgf"], 2), fmt(xr["xga"], 2)
+                if xg[1] is not None:
+                    inputs["xglg"] = fmt(xg[1], 2)
+                log("  %s expected goals %s for / %s against per game (%d games)" % (side, inputs[p + "xgf"], inputs[p + "xga"], xr["gp"]))
+            elif xr:
+                notes.append("%s has %d game%s in the MoneyPuck table: expected goals left blank until %d." % (nick, xr["gp"], "" if xr["gp"] == 1 else "s", MIN_TEAM_GAMES))
+            else:
+                notes.append("%s is not in the MoneyPuck table under %s." % (nick, ab))
         # recent games, rest, head to head
         fin = []
         try:
@@ -1206,14 +1240,17 @@ def periods_from_landing(landing):
     return per, (sa, sh), (ena, enh), end
 
 
-def ledger_entry(g, landing):
+def ledger_entry(g, landing, day_date=None):
     per, shots, en, end = periods_from_landing(landing)
     at, ht = g.get("awayTeam") or {}, g.get("homeTeam") or {}
     fa, fh = at.get("score"), ht.get("score")
     if (fa is None or fh is None) and landing:
         fa = ((landing.get("awayTeam") or {}).get("score"))
         fh = ((landing.get("homeTeam") or {}).get("score"))
-    e = {"id": g.get("id"), "date": g.get("gameDate"), "away": at.get("abbrev"), "home": ht.get("abbrev"),
+    # the schedule page keeps the date on the day, not the game (checked
+    # against a saved page, 6 Oct 2026); startTimeUTC is the last resort
+    date = g.get("gameDate") or day_date or str(g.get("startTimeUTC") or "")[:10] or None
+    e = {"id": g.get("id"), "date": date, "away": at.get("abbrev"), "home": ht.get("abbrev"),
          "fa": None if fa is None else int(fa), "fh": None if fh is None else int(fh), "end": end,
          "sa": shots[0], "sh": shots[1], "ena": en[0], "enh": en[1]}
     for k, name in ((1, "p1"), (2, "p2"), (3, "p3"), ("OT", "ot")):
@@ -1246,7 +1283,7 @@ def nhl_ledger_scan(start_iso, end_iso, have_ids, log):
                 except Exception as e:  # noqa: BLE001
                     log("  game %s: no landing page (%s); scores only" % (g.get("id"), e))
                     landing = {}
-                out.append(ledger_entry(g, landing))
+                out.append(ledger_entry(g, landing, day.get("date")))
                 have_ids.add(g.get("id"))
         d += dt.timedelta(days=7)
     return out
@@ -1364,6 +1401,65 @@ def make_nhl_ledger(date_iso, out_dir, log):
     return path
 
 
+# ---- expected goals, from MoneyPuck's team file ------------------------------
+# https://moneypuck.com/data.htm -- "Team" season summary, one row per club per
+# situation. The 'all' row's xGoalsFor and xGoalsAgainst over games_played are
+# the two figures the sheet scores (totals/nhl.py, "Expected goals"), against
+# the league mean of the SAME table, which the slate writes beside them. Read
+# against the user's download of 6 Oct 2026. A teams.csv saved in the folder
+# is the fallback when the site cannot be reached.
+MONEYPUCK_TEAMS = "https://moneypuck.com/moneypuck/playerData/seasonSummary/%s/regular/teams.csv"
+
+
+def parse_moneypuck_teams(text):
+    """{club: {gp, xgf, xga, sf, gf}} per game, and the league mean xG per
+    team-game, from the 'all' rows."""
+    rows = list(csv.DictReader(io.StringIO(text)))
+    rates, gp_t, xgf_t, xga_t = {}, 0.0, 0.0, 0.0
+    for r in rows:
+        if (r.get("situation") or "").strip() != "all":
+            continue
+        try:
+            gp = float(r.get("games_played") or 0)
+            xgf, xga = float(r["xGoalsFor"]), float(r["xGoalsAgainst"])
+        except (TypeError, ValueError, KeyError):
+            continue
+        if gp <= 0:
+            continue
+        name = (r.get("name") or r.get("team") or "").strip().upper()
+        rates[name] = {"gp": int(gp), "xgf": xgf / gp, "xga": xga / gp,
+                       "sf": (float(r.get("shotsOnGoalFor") or 0) / gp), "gf": (float(r.get("goalsFor") or 0) / gp)}
+        gp_t += gp
+        xgf_t += xgf
+        xga_t += xga
+    lg = ((xgf_t + xga_t) / (2.0 * gp_t)) if gp_t > 0 else None
+    return rates, lg
+
+
+def moneypuck_teams(season_id, out_dir, log):
+    """(rates, league xG per team-game, where it came from) or (None, None, why)."""
+    year = str(season_id)[:4]
+    text, src = None, ""
+    try:
+        text = fetch_text(MONEYPUCK_TEAMS % year)
+        src = "moneypuck.com"
+    except Exception as e:  # noqa: BLE001
+        local = os.path.join(out_dir, "teams.csv")
+        if os.path.exists(local):
+            with open(local, "r", encoding="utf-8") as f:
+                text = f.read()
+            src = "teams.csv in the folder (the site could not be reached: %s)" % e
+        else:
+            return None, None, "could not fetch MoneyPuck (%s) and there is no teams.csv in the folder" % e
+    try:
+        rates, lg = parse_moneypuck_teams(text)
+    except Exception as e:  # noqa: BLE001
+        return None, None, "could not read the MoneyPuck team file (%s)" % e
+    if not rates:
+        return None, None, "the MoneyPuck team file had no 'all' rows for %s" % year
+    return rates, lg, src
+
+
 def make_nhl_slate(date_iso, out_dir, log):
     games = nhl_schedule(date_iso)
     if not games:
@@ -1376,6 +1472,11 @@ def make_nhl_slate(date_iso, out_dir, log):
         log("Could not fetch the team summary report (%s); shots and special teams will be blank." % e)
     led = load_ledger(ledger_path(out_dir, season_id))
     ledger = led["games"] if led else None
+    xg_rates, xg_lg, xg_src = moneypuck_teams(season_id, out_dir, log)
+    if xg_rates:
+        log("Expected goals: %d clubs from %s; league %.2f xG per team-game." % (len(xg_rates), xg_src, xg_lg))
+    else:
+        log("Expected goals: %s. The xG boxes stay blank." % xg_src)
     if led:
         log("League ledger: %d finals through %s." % (len(ledger), led.get("through")))
     else:
@@ -1383,7 +1484,7 @@ def make_nhl_slate(date_iso, out_dir, log):
     rows = []
     for g in games:
         try:
-            rows.append(build_nhl_game(g, date_iso, season_id, summary, log, ledger))
+            rows.append(build_nhl_game(g, date_iso, season_id, summary, log, ledger, (xg_rates, xg_lg) if xg_rates else None))
         except Exception as e:  # noqa: BLE001
             log("%s @ %s: FAILED (%s); left out of the slate" % (nhl_name(g.get("awayTeam")), nhl_name(g.get("homeTeam")), e))
         log("")
@@ -1653,6 +1754,18 @@ def selftest():
     avg1, k1 = team_p1_last10(synthetic, "NYR", "2026-10-07")
     check("ledger: a club's first-period last ten, before the date", k1 == 3 and abs(avg1 - (1 + 3 + 2) / 3.0) < 1e-9)
     check("ledger: nothing before the season", team_p1_last10(synthetic, "NYR", "2026-09-01") == (None, 0))
+    land0 = _canned_nhl_landing()
+    e0 = ledger_entry({"id": 7, "awayTeam": {"abbrev": "NYR", "score": 2}, "homeTeam": {"abbrev": "BOS", "score": 3}}, land0, "2026-10-06")
+    check("ledger: a schedule game without its own date takes the day's", e0["date"] == "2026-10-06" and e0["fa"] == 2)
+    mp_csv = ("team,season,name,team,position,situation,games_played,xGoalsFor,xGoalsAgainst,shotsOnGoalFor,goalsFor\n"
+              "BOS,2026,BOS,BOS,Team Level,all,4,11.72,11.64,99.0,9.0\n"
+              "BOS,2026,BOS,BOS,Team Level,5on5,4,8.0,8.0,70.0,6.0\n"
+              "NYR,2026,NYR,NYR,Team Level,all,6,15.0,21.0,180.0,18.0\n"
+              "SJS,2026,SJS,SJS,Team Level,all,0,0,0,0,0\n")
+    rates, lg = parse_moneypuck_teams(mp_csv)
+    check("moneypuck: the 'all' rows per game, and the table's league mean",
+          set(rates) == {"BOS", "NYR"} and abs(rates["BOS"]["xgf"] - 2.93) < 1e-9 and abs(rates["NYR"]["xga"] - 3.5) < 1e-9
+          and abs(lg - (11.72 + 11.64 + 15.0 + 21.0) / 20.0) < 1e-9)
     check("no linescore -> None", p1_from_landing({}) == (None, None))
     # one hockey game through canned payloads
     nhl_canned = _canned_nhl()
@@ -1715,6 +1828,15 @@ def selftest():
     finally:
         fetch_json = real
     check("ledger: the slate fills each side's first-period last ten (2.00 on seven games)", row3["inputs"]["ap1l10"] == "2.00" and row3["inputs"]["hp1l10"] == "2.00")
+    fetch_json = fake_nhl
+    try:
+        row4 = build_nhl_game(nhl_schedule("2026-10-07")[0], "2026-10-07", "20262027", nhl_team_summary("20262027"), lines2.append, None, (rates, lg))
+    finally:
+        fetch_json = real
+    i4 = row4["inputs"]
+    check("moneypuck: the slate fills the xG boxes for a club with five games and leaves a four-game club blank, with the league mean beside them",
+          i4["axgf"] == "2.50" and i4["axga"] == "3.50" and i4["hxgf"] == "" and i4["hxga"] == "" and i4["xglg"] == "2.97"
+          and any("expected goals left blank until 5" in n for n in row4["notes"]))
     check("ledger: without a ledger the slate says so", any("No league ledger" in n for n in row["notes"]))
 
     print()

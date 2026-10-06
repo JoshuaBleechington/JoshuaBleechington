@@ -306,3 +306,36 @@ class TestFirstPeriodForm(unittest.TestCase):
         pa = next(mk for mk in plain.markets if mk.key == "p1"); po = next(mk for mk in one.markets if mk.key == "p1")
         self.assertAlmostEqual(pa.p, po.p, places=12)
         self.assertTrue(any("one side only" in n for n in po.notes))
+
+
+class TestExpectedGoals(unittest.TestCase):
+    """6 Oct 2026: MoneyPuck's xG as a tagged estimate against the table's own league mean."""
+
+    def test_four_average_figures_move_nothing(self):
+        plain = forecast_nhl("A @ B", 6.0, over_price=-110, under_price=-110)
+        avg = forecast_nhl("A @ B", 6.0, over_price=-110, under_price=-110, away_xgf=3.05, home_xgf=3.05, away_xga=3.05, home_xga=3.05, league_xg=3.05)
+        self.assertAlmostEqual(avg.projected, plain.projected, places=12)
+
+    def test_the_gap_goes_on_the_line_at_the_xg_weight(self):
+        plain = forecast_nhl("A @ B", 6.0, over_price=-110, under_price=-110)
+        hot = forecast_nhl("A @ B", 6.0, over_price=-110, under_price=-110, away_xgf=3.4, home_xgf=3.3, away_xga=3.1, home_xga=2.9, league_xg=3.05)
+        anchor = next(e for e in hot.estimates if e.name == "Market").total
+        xg = next(e for e in hot.estimates if e.name == "Expected goals")
+        gap = (3.4 + 2.9) / 2 + (3.3 + 3.1) / 2 - 2 * 3.05
+        self.assertAlmostEqual(xg.total - anchor, gap, places=9)
+        self.assertEqual(xg.weight, WEIGHTS["xg"])
+        self.assertFalse(xg.mechanism)
+        self.assertGreater(hot.projected, plain.projected)
+        self.assertEqual(hot.band, "NO BET")   # tagged: it cannot buy a band alone
+
+    def test_a_partial_set_is_dropped(self):
+        plain = forecast_nhl("A @ B", 6.0, over_price=-110, under_price=-110)
+        part = forecast_nhl("A @ B", 6.0, over_price=-110, under_price=-110, away_xgf=3.4, home_xgf=3.3)
+        self.assertAlmostEqual(part.projected, plain.projected, places=12)
+        self.assertTrue(any("all four figures" in n for n in part.notes))
+
+    def test_the_assumed_league_level_is_used_without_the_table_mean(self):
+        from totals.nhl import LEAGUE_XG_PER_TEAM
+        a = forecast_nhl("A @ B", 6.0, away_xgf=3.4, home_xgf=3.3, away_xga=3.1, home_xga=2.9)
+        b = forecast_nhl("A @ B", 6.0, away_xgf=3.4, home_xgf=3.3, away_xga=3.1, home_xga=2.9, league_xg=LEAGUE_XG_PER_TEAM)
+        self.assertAlmostEqual(a.projected, b.projected, places=12)

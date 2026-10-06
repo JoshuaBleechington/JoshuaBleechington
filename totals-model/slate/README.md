@@ -37,6 +37,7 @@ Two more double-click files: **Run NHL slate.bat** before the games and
 | Shots for per game, power play %, penalty kill % | The league's team summary report |
 | Last-10 average total, rest days, head to head | The club's season schedule |
 | Recent form: each side's last five, with the score, the score after one, shots for and against, and who started in net | The box scores and game pages of those games. Shown on the sheet's Recent form card, not scored |
+| Expected goals for and against per game, each side, and the table's league mean | MoneyPuck's team file for the season (fetched; or a `teams.csv` you download from moneypuck.com/data.htm into this folder when the site is blocked). Blank until a club has five games |
 | First-period last ten, each side | The **league ledger** (`Run NHL ledger.bat`, or `python slate.py nhl-ledger`): every regular-season final in the league with period scores, shots, empty-net goals and overtime, in `nhl-ledger-SEASON.json` in this folder. Run it before the slate; it adds only the new finals each time, prints the league's measured figures against the sheet's assumptions, and the slate reads each club's last ten first periods from it once a club has five |
 | Finals and the first-period score | The game page the next morning. A shootout win is a one-goal margin, as the league records it |
 

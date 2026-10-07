@@ -11,16 +11,23 @@ sys.path.insert(0, __import__("os").path.dirname(__import__("os").path.abspath(_
 import tools_backtest_nhl as B
 from totals import nhl as N
 U = sys.argv[1].rstrip("/") + "/" if len(sys.argv) > 1 else "./"   # the folder above
-s = open(U+"nst_games.html", encoding="utf-8", errors="replace").read()
-rows = re.findall(r"<tr[^>]*>(.*?)</tr>", s, flags=re.S)
-hdr = [html.unescape(re.sub(r"<[^>]+>", "", h)).strip() for h in re.findall(r"<th[^>]*>(.*?)</th>", s, flags=re.S)]
-ix = {h: i for i, h in enumerate(hdr)}
+import glob
+SEASON = int(sys.argv[2]) if len(sys.argv) > 2 else 2024       # the season tested: 2024 = 2024-25
+LEDGER = sys.argv[3] if len(sys.argv) > 3 else ("ledger2425d.json" if SEASON == 2024 else "ledger2526d.json")
+CLOSES = sys.argv[4] if len(sys.argv) > 4 else ("q1.html" if SEASON == 2024 else "q2.html")
+rows, ix = [], {}
+for nf in sorted(glob.glob(U + "nst*.html")):     # every Natural Stat Trick games table in the folder
+    s = open(nf, encoding="utf-8", errors="replace").read()
+    hdr = [html.unescape(re.sub(r"<[^>]+>", "", h)).strip() for h in re.findall(r"<th[^>]*>(.*?)</th>", s, flags=re.S)]
+    if hdr: ix = {h: i for i, h in enumerate(hdr)}
+    rows += re.findall(r"<tr[^>]*>(.*?)</tr>", s, flags=re.S)
+hdr = list(ix)
 def nick(full):
     if "Utah" in full: return "Mammoth"
     return full.split()[-1] if not full.endswith("Blue Jackets") and not full.endswith("Red Wings") and not full.endswith("Maple Leafs") and not full.endswith("Golden Knights") else " ".join(full.split()[-2:])
 games = {}   # (date, home nick, away nick) -> {"away": row, "home": row}
 team_rows = collections.defaultdict(list)   # nick -> [(date, xgf, xga, gf, ga, sf, sa, hdcf, hdca, shpct, svpct)]
-for r in rows[1:]:
+for r in rows:
     c = [html.unescape(re.sub(r"<[^>]+>", "", x)).strip() for x in re.findall(r"<t[dh][^>]*>(.*?)</t[dh]>", r, flags=re.S)]
     if len(c) < len(hdr): continue
     m = re.match(r"(\d{4}-\d{2}-\d{2}) - (.+?) (\d+), (.+?) (\d+)$", c[0])
@@ -33,7 +40,7 @@ for r in rows[1:]:
                    hdcf=float(c[ix["HDCF"]]), hdca=float(c[ix["HDCA"]]), pdo=float(c[ix["PDO"]]))
     except ValueError: continue
     games.setdefault((d, hn, an), {})["home" if t == hn else "away"] = rec
-    team_rows[t].append(rec)
+    if not any(x["date"] == d for x in team_rows[t]): team_rows[t].append(rec)   # the tables overlap in Oct 2025
 for t in team_rows: team_rows[t].sort(key=lambda r: r["date"])
 print("NST games:", len(games), "teams:", len(team_rows), "dates", min(k[0] for k in games), "to", max(k[0] for k in games))
 def season_of(d): y = int(d[:4]); return y if int(d[5:7]) >= 8 else y - 1
@@ -42,16 +49,16 @@ def season_avg(t, yr):
     v = [r for r in team_rows[t] if season_of(r["date"]) == yr]
     return (B.avg([r["xgf"] for r in v]), B.avg([r["xga"] for r in v]), len(v)) if v else None
 # league xG per team-game by season
-j, led = B.load(U+"ledger2425d.json", U+"q1.html")
+j, led = B.load(U+LEDGER, U+CLOSES)
 feats = B.features(j, led, None, None)
 MIN = 5
 out = []
 for f in feats:
     d, H, A = f["date"], B.NICK.get(f["home"], f["home"]), B.NICK.get(f["away"], f["away"])
-    hb = [r for r in team_rows[H] if r["date"] < d and season_of(r["date"]) == 2024]
-    ab = [r for r in team_rows[A] if r["date"] < d and season_of(r["date"]) == 2024]
+    hb = [r for r in team_rows[H] if r["date"] < d and season_of(r["date"]) == SEASON]
+    ab = [r for r in team_rows[A] if r["date"] < d and season_of(r["date"]) == SEASON]
     # league mean to date: every team-row this season before d
-    lg_rows = [r for t in team_rows for r in team_rows[t] if r["date"] < d and season_of(r["date"]) == 2024]
+    lg_rows = [r for t in team_rows for r in team_rows[t] if r["date"] < d and season_of(r["date"]) == SEASON]
     g = dict(f)
     if len(hb) >= MIN and len(ab) >= MIN and lg_rows:
         lg = B.avg([r["xgf"] for r in lg_rows])
@@ -62,9 +69,9 @@ for f in feats:
         # last-ten xG (recent form in xG rather than goals)
         g["xg_l10"] = (B.avg([r["xgf"]+r["xga"] for r in ab[-10:]]) + B.avg([r["xgf"]+r["xga"] for r in hb[-10:]]))/2 - 2*lg
         g["n_games"] = min(len(hb), len(ab))
-    pa, ph = season_avg(A, 2023), season_avg(H, 2023)
+    pa, ph = season_avg(A, SEASON - 1), season_avg(H, SEASON - 1)
     if pa and ph:
-        lg23 = B.avg([r["xgf"] for t in team_rows for r in team_rows[t] if season_of(r["date"]) == 2023])
+        lg23 = B.avg([r["xgf"] for t in team_rows for r in team_rows[t] if season_of(r["date"]) == SEASON - 1])
         g["xg_prior"] = (pa[0] + ph[1])/2 + (ph[0] + pa[1])/2 - 2*lg23
         if "xg_now" in g:
             # the slate's blend if it blended: this season's games plus half of last season's 82
@@ -86,10 +93,10 @@ def report(key, name):
             else: l += 1
         line += f" | |x|>={t}: {w}-{l} ({100*w/max(1,w+l):.1f}%)"
     print(line)
-print("\n2024-25 against the close (1,308 games with a close):")
+print("\n%d-%02d against the close:" % (SEASON, (SEASON + 1) % 100))
 report("xg_now", "this season's xG to date (slate's input)")
 report("xg_blend", "xG blended with last season (n/(n+41))")
-report("xg_prior", "last season's xG (2023-24 full)")
+report("xg_prior", "last season's xG, full season")
 report("xg_l10", "last-ten xG total (form in xG)")
 report("hd_now", "high-danger chances to date")
 report("pdo_now", "PDO to date (luck, + = hot)")

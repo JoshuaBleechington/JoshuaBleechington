@@ -1856,8 +1856,8 @@
     }
     var hv = num("h2h"), hn = num("h2hn");
     if (hv !== null && hn) {
-      estimates.push(est("Head to head (" + hn + ")", hv, nhlH2hWeight(w.h2h, hn),
-        hn + " meetings averaging " + hv.toFixed(1) + "." + (hn < NHL.H2H_FULL_AT ? " Discounted to " + hn + "/" + NHL.H2H_FULL_AT + " of its weight on " + hn + " meeting(s)." : ""), false));
+      /* shown, not scored since 7 Oct 2026: null against 814 closing totals (totals/nhl.py) */
+      notes.push("Head to head: " + hn + " meeting(s) averaging " + hv.toFixed(1) + ". <b>SHOWN, NOT SCORED</b>: measured against 814 closing totals and null (slope 0.02).");
     }
     var b2b = [];
     var ar = num("arest"), hr = num("hrest");

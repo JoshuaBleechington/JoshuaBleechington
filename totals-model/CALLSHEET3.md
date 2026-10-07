@@ -124,20 +124,23 @@ were earned on: when it said over, did the game land over the close?
 | Season goal rates | 2,445 | −0.43 | negative | never an input; stays out |
 | Prior-season expected goals | 1,308 | +0.45 | ~3 | kept at 1.2; betting it 53.5%, one season |
 | First-period last ten (vs the period) | 2,445 | −0.003 | none | **shown, not scored** |
+| Head to head, earlier meetings this season | 814 | +0.02 | 0.08 | **shown, not scored** |
 | Back to back, the under | 696 | | | 52.6%, a label only |
 | October over, blind | 324 | | | **54.9% both seasons (54.7, 55.2); +0.25 tagged delta** |
 
 The first period's share model is dead on: 1.747 predicted from the close
 against 1.744 scored, and the 2+ rate climbs with the line as it should.
-Goalies, special teams and head to head are untested — the ledger carries
-no starters or power plays — and keep their a-priori weights.
+Goalies and special teams are untested so far — the first ledger pass
+carried no starters or power plays; `slate.py nhl-ledger --season X
+--detail` adds them and the tool tests both — and keep their a-priori
+weights.
 
 **The league constants are measured; the weights are partly measured.** The ledger
 fixed the level, the lumps, the period share and the spread on 2,624
 games. What it cannot fix without closing lines is how much each input
-should move the number off the market. Form (0.6) is measured; shots and
-the first-period form were measured out; goalies 1.6, expected goals 1.2,
-special teams 0.8 and head to head 0.5 are still a priori, and
+should move the number off the market. Form (0.6) is measured; shots, the
+first-period form and head to head were measured out; goalies 1.6,
+expected goals 1.2 and special teams 0.8 are still a priori, and
 `tools_audit_nhl.py` judges them against the record as it accumulates.
 
 ## What the user types, from BetMGM

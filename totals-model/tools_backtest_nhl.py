@@ -1,13 +1,16 @@
 """Backtest the hockey book's inputs against closing totals.
 
-    python3 tools_backtest_nhl.py LEDGER.json CLOSES.html [PRIOR_TEAMS.csv]
+    python3 tools_backtest_nhl.py LEDGER.json CLOSES.html [PRIOR_TEAMS.csv] [PRIOR_GOALIES.csv]
 
 LEDGER.json is a season's league ledger (slate.py nhl-ledger --season).
 CLOSES.html is KillerSports' saved query page (the query.html in the saved
 page's folder) for `date, team, o:team, points, o:points, total, line,
 site @ season=YYYY and site=home and playoffs=0`. PRIOR_TEAMS.csv, optional,
 is MoneyPuck's team file for the season BEFORE, for the prior-season
-expected-goals input. Prints the market's own record by month and, for
+expected-goals input; PRIOR_GOALIES.csv its goalie file for the season
+before, the prior each starter's line is blended with. The goalie, special
+teams and head-to-head tests need a ledger made with --detail (starters and
+their lines, power-play goals, penalties); without it they print nothing. Prints the market's own record by month and, for
 each input, the slope of the residual on the input and the weight it
 implies. First run 7 Oct 2026 on 2024-25 and 2025-26; CALLSHEET3.md has
 the table and what changed.
@@ -55,8 +58,34 @@ def xg_prior(path):
         out[r["name"]] = (float(r["xGoalsFor"])/gp, float(r["xGoalsAgainst"])/gp)
     lg = sum(a+b for a,b in out.values())/(2*len(out))
     return out, lg
-def features(j, led, xg=None):
-    hist = team_hist(led); rows = []
+def goalie_prior(path):
+    """playerId -> (saves, shots) from MoneyPuck's goalie file, 'all' rows."""
+    out = {}
+    for r in csv.DictReader(open(path)):
+        if r.get("situation") != "all": continue
+        try: shots = float(r["ongoal"]); goals = float(r["goals"]); pid = int(r["playerId"])
+        except (KeyError, ValueError): continue
+        if shots > 0: out[pid] = (shots - goals, shots)
+    return out
+def goalie_hist(led):
+    """playerId -> ordered (date, saves, shots) from the detail pass"""
+    h = collections.defaultdict(list)
+    for g in sorted(led, key=lambda g: (g["date"], g["id"])):
+        for k in ("a", "h"):
+            pid, sa, sv = g.get("g%s_id" % k), g.get("g%s_sa" % k), g.get("g%s_sv" % k)
+            if pid is not None and sa is not None and sv is not None: h[pid].append((g["date"], sv, sa))
+    return h
+def special_hist(led):
+    """team -> ordered (date, pp goals for, opp penalties, pp goals against, own penalties)"""
+    h = collections.defaultdict(list)
+    for g in sorted(led, key=lambda g: (g["date"], g["id"])):
+        if not g.get("detail"): continue
+        h[g["home"]].append((g["date"], g["ppgh"], g["pena"], g["ppga"], g["penh"]))
+        h[g["away"]].append((g["date"], g["ppga"], g["penh"], g["ppgh"], g["pena"]))
+    return h
+def features(j, led, xg=None, gprior=None):
+    hist = team_hist(led); ghist = goalie_hist(led); shist = special_hist(led); rows = []
+    PRIOR_SHARE = 0.5
     for g in j:
         d = g["date"]; H, A = g["home"], g["away"]
         hb, ab = before(hist, H, d), before(hist, A, d)
@@ -82,6 +111,33 @@ def features(j, led, xg=None):
             x, lg = xg
             if H in x and A in x:
                 f["xg_gap"] = (x[A][0] + x[H][1])/2 + (x[H][0] + x[A][1])/2 - 2*lg
+        # goalies: each starter's pregame line this season plus half of last season's, shrunk as the sheet does
+        if g.get("detail") and g.get("ga_id") is not None and g.get("gh_id") is not None:
+            gaps = []
+            for pid in (g["ga_id"], g["gh_id"]):
+                prev = [x for x in ghist.get(pid, []) if x[0] < d]
+                saves, shots = sum(x[1] for x in prev), sum(x[2] for x in prev)
+                if gprior and pid in gprior:
+                    saves += PRIOR_SHARE * gprior[pid][0]; shots += PRIOR_SHARE * gprior[pid][1]
+                if shots > 0:
+                    sv_used = N.shrink_sv(saves / shots, shots)
+                    gaps.append(N.goalie_gap(sv_used))
+                else:
+                    gaps.append(0.0)
+            f["goalie_gap"] = sum(gaps)
+        # special teams: each side's pregame PP% and PK% this season, through the engine's gap
+        hs, as_ = [x for x in shist.get(H, []) if x[0] < d], [x for x in shist.get(A, []) if x[0] < d]
+        if len(hs) >= 5 and len(as_) >= 5:
+            def rates(xs):
+                ppg, opp, ppga, own = (sum(x[i] for x in xs) for i in (1, 2, 3, 4))
+                return (ppg / opp if opp else N.LEAGUE_PP_PCT, 1 - (ppga / own if own else N.LEAGUE_PP_PCT))
+            hpp, hpk = rates(hs); app, apk = rates(as_)
+            f["special_gap"] = ((app - N.LEAGUE_PP_PCT) + (hpp - N.LEAGUE_PP_PCT) + (N.LEAGUE_PK_PCT - apk) + (N.LEAGUE_PK_PCT - hpk)) * N.LEAGUE_PP_PER_GAME
+        # head to head: earlier meetings this season
+        met = [x for x in hb if x[0] < d]
+        prev_meet = [gg for gg in led if gg.get("date") and gg["date"] < d and {gg["home"], gg["away"]} == {H, A} and gg.get("fa") is not None]
+        if prev_meet:
+            f["h2h"] = avg([gg["fa"] + gg["fh"] for gg in prev_meet]); f["h2hn"] = len(prev_meet)
         rows.append(f)
     return rows
 def slope(pairs):
@@ -100,11 +156,12 @@ def report(rows, label):
     for f in rows: bym[f["month"]].append(f)
     print("by month: " + "; ".join(f"{m}: {avg([f['tot'] for f in v]):.2f} v line {avg([f['line'] for f in v]):.2f}, O-U {sum(1 for f in v if f['tot']>f['line'])}-{sum(1 for f in v if f['tot']<f['line'])}" for m, v in sorted(bym.items(), key=lambda kv: (kv[0] < '07', kv[0]))))
     print(f"\n{'input (estimate - anchor)':28s} {'n':>5s} {'slope b':>8s} {'corr r':>7s} {'implied w':>9s} {'sign W-L':>10s}")
-    for key, name in (("l10", "last-10 total avg"), ("goals_gap", "season goals rates"), ("shots_gap", "season shot rates"), ("xg_gap", "prior-season xG"), ("p1l10", "P1 last ten (vs P1 of total)")):
+    for key, name in (("l10", "last-10 total avg"), ("goals_gap", "season goals rates"), ("shots_gap", "season shot rates"), ("xg_gap", "prior-season xG"),
+                      ("goalie_gap", "goalies (starters, blended)"), ("special_gap", "special teams"), ("h2h", "head to head"), ("p1l10", "P1 last ten (vs P1 of total)")):
         pairs = []
         for f in rows:
             if key not in f: continue
-            if key in ("l10",): x = f["l10"] - f["anchor"]
+            if key in ("l10", "h2h"): x = f[key] - f["anchor"]
             elif key == "p1l10": x = f["p1l10"] - N.P1_SHARE * N.reg_mean(f["anchor"]); 
             else: x = f[key]
             y = f["resid"] if key != "p1l10" else f["p1"] - N.P1_SHARE * N.reg_mean(f["anchor"])
@@ -124,4 +181,5 @@ if __name__ == "__main__":
         sys.exit(__doc__)
     j, led = load(sys.argv[1], sys.argv[2])
     xg = xg_prior(sys.argv[3]) if len(sys.argv) > 3 else None
-    report(features(j, led, xg), sys.argv[1] + (" with prior-season xG" if xg else ""))
+    gp = goalie_prior(sys.argv[4]) if len(sys.argv) > 4 else None
+    report(features(j, led, xg, gp), sys.argv[1] + (" with prior-season xG" if xg else "") + (" and goalie priors" if gp else ""))

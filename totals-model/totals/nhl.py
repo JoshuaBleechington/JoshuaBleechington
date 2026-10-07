@@ -165,7 +165,7 @@ OT_COMPRESSION = 0.5
 #: Blend weights. The market's 4.0 is the MLB figure, where it has the best
 #: MAE of any input by a distance. The goalies take the starters' 1.6 because
 #: they are the same kind of input; special teams and form the pens' and
-#: form's. Head to head is scaled by meetings as in MLB.
+#: form's. Head to head: measured null on 7 Oct 2026, shown, not scored.
 #: The weights. Market 4.0 as in baseball. Goalies 1.6 is a priori still:
 #: the backtest has no starters. Expected goals 1.2 a priori; the backtest
 #: read prior-season xG against 1,308 closing totals at a slope of 0.45
@@ -464,12 +464,12 @@ def forecast_nhl(
             "slope of 0.14, an implied weight of 0.6, which is the weight; tagged.",
             mechanism=False))
     if h2h_total is not None and h2h_meetings:
-        estimates.append(Estimate(
-            f"Head to head ({h2h_meetings:g})", h2h_total, h2h_weight(w["h2h"], h2h_meetings),
-            f"{h2h_meetings:g} meetings averaging {h2h_total:.1f}."
-            + (f" Discounted to {h2h_meetings:g}/{H2H_FULL_WEIGHT_AT} of its weight on "
-               f"{h2h_meetings:g} meeting(s)." if h2h_meetings < H2H_FULL_WEIGHT_AT else ""),
-            mechanism=False))
+        # SHOWN, NOT SCORED since 7 Oct 2026: against 814 closing totals with
+        # an earlier meeting behind them, the head-to-head lean had a slope
+        # of 0.02 (an implied weight of 0.08). Two teams' last game together
+        # says nothing about their next.
+        notes.append(f"Head to head: {h2h_meetings:g} meeting(s) averaging {h2h_total:.1f}. SHOWN, NOT "
+                     "SCORED: measured against 814 closing totals and null (slope 0.02).")
 
     # --- rest: SHOWN, NOT SCORED -------------------------------------------
     # A back-to-back changes who is in net more than it changes the score,

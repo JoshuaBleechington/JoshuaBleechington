@@ -1434,7 +1434,103 @@ def team_p1_last10(games, abbrev, before_iso, n=10):
     return sum(g["p1a"] + g["p1h"] for g in tail) / float(len(tail)), len(tail)
 
 
-def make_nhl_ledger(date_iso, out_dir, log, season=None):
+def _frac(sv):
+    """'28/31' -> (28, 31); anything else -> (None, None)."""
+    try:
+        a, b = str(sv).split("/")
+        return int(a), int(b)
+    except (ValueError, AttributeError):
+        return None, None
+
+
+def nhl_detail(entry, box, landing):
+    """The second pass over a ledger game, for the backtest of the inputs the
+    first pass could not test: who started in net and his line that night
+    (from the box score), power-play goals and penalties by side (from the
+    game page). Fills the entry in place and returns it."""
+    pbg = (box or {}).get("playerByGameStats") or {}
+    for side, key in (("awayTeam", "a"), ("homeTeam", "h")):
+        starter = None
+        for g in (pbg.get(side) or {}).get("goalies") or []:
+            if g.get("starter"):
+                starter = g
+                break
+        if starter is None:
+            # no starter flag: the goalie with the most time on ice
+            gs = [g for g in (pbg.get(side) or {}).get("goalies") or [] if g.get("toi")]
+            if gs:
+                starter = max(gs, key=lambda g: int(str(g.get("toi", "0:0")).split(":")[0]))
+        if starter is not None:
+            saves, shots = _frac(starter.get("saveShotsAgainst"))
+            nm = starter.get("name")
+            entry["g" + key + "_id"] = starter.get("playerId")
+            entry["g" + key + "_name"] = (nm.get("default") if isinstance(nm, dict) else nm) or ""
+            entry["g" + key + "_sa"] = shots
+            entry["g" + key + "_sv"] = saves
+            entry["g" + key + "_ga"] = int(starter.get("goalsAgainst") or 0) if starter.get("goalsAgainst") not in (None, "") else (shots - saves if shots is not None else None)
+    summ = (landing or {}).get("summary") or {}
+    away_ab = ((landing or {}).get("awayTeam") or {}).get("abbrev") or entry.get("away")
+    ppa = pph = 0
+    for sc in summ.get("scoring") or []:
+        for g in sc.get("goals") or []:
+            if str(g.get("strength") or "").lower() == "pp":
+                ab = g.get("teamAbbrev")
+                ab = ab.get("default") if isinstance(ab, dict) else ab
+                if ab == away_ab:
+                    ppa += 1
+                else:
+                    pph += 1
+    pena = penh = 0
+    for per in summ.get("penalties") or []:
+        for pn in per.get("penalties") or []:
+            if str(pn.get("type") or "").upper() not in ("MIN", "MAJ"):
+                continue
+            ab = pn.get("teamAbbrev")
+            ab = ab.get("default") if isinstance(ab, dict) else ab
+            if ab == away_ab:
+                pena += 1
+            else:
+                penh += 1
+    entry["ppga"], entry["ppgh"] = ppa, pph       # power-play goals FOR each side
+    entry["pena"], entry["penh"] = pena, penh     # minors and majors committed by each side
+    entry["detail"] = True
+    return entry
+
+
+def nhl_ledger_detail(led, path, log):
+    """Fetch the box score and game page for every ledger game without its
+    detail, writing the file every 100 games so a stopped run keeps what it
+    fetched. Two calls a game; a season is about 40 minutes."""
+    todo = [g for g in led["games"] if not g.get("detail") and g.get("id") is not None]
+    log("Detail pass: %d game%s to fetch (box score and game page each)..." % (len(todo), "" if len(todo) == 1 else "s"))
+    done = 0
+    for g in todo:
+        try:
+            box = nhl_boxscore(g["id"])
+        except Exception as e:  # noqa: BLE001
+            log("  game %s: no box score (%s)" % (g["id"], e))
+            box = {}
+        try:
+            landing = nhl_landing(g["id"])
+        except Exception as e:  # noqa: BLE001
+            log("  game %s: no game page (%s)" % (g["id"], e))
+            landing = {}
+        nhl_detail(g, box, landing)
+        done += 1
+        if done % 100 == 0 or done == len(todo):
+            led["generated"] = now_utc()
+            with open(path, "w", encoding="utf-8") as f:
+                json.dump(led, f, indent=1)
+            log("  %d of %d detailed; written" % (done, len(todo)))
+        # the two caches would hold a whole season's pages; keep them small
+        if len(_BOX_CACHE) > 50:
+            _BOX_CACHE.clear()
+        if len(_LANDING_CACHE) > 50:
+            _LANDING_CACHE.clear()
+    return done
+
+
+def make_nhl_ledger(date_iso, out_dir, log, season=None, detail=False):
     """This season's ledger up to date_iso, or -- with a season id such as
     20252026 -- a PAST season in full, for the backtest. A past season's
     file is complete once written and never rescanned."""
@@ -1467,6 +1563,9 @@ def make_nhl_ledger(date_iso, out_dir, log, season=None):
         json.dump(led, f, indent=1)
     log("Added %d final%s. Wrote %s." % (len(new), "" if len(new) == 1 else "s", path))
     ledger_report(led["measure"], log)
+    if detail:
+        n = nhl_ledger_detail(led, path, log)
+        log("Detail pass done: %d game%s fetched; %d of %d in the ledger carry starters and special teams." % (n, "" if n == 1 else "s", sum(1 for g in led["games"] if g.get("detail")), len(led["games"])))
     return path
 
 
@@ -1825,6 +1924,10 @@ def selftest():
     avg1, k1 = team_p1_last10(synthetic, "NYR", "2026-10-07")
     check("ledger: a club's first-period last ten, before the date", k1 == 3 and abs(avg1 - (1 + 3 + 2) / 3.0) < 1e-9)
     check("ledger: nothing before the season", team_p1_last10(synthetic, "NYR", "2026-09-01") == (None, 0))
+    det = nhl_detail({"away": "NYR", "home": "BOS"}, dict(x for x in _canned_nhl())["/boxscore"], _canned_nhl_landing())
+    check("ledger detail: starters by flag or by ice time, their lines, power-play goals and penalties",
+          det["ga_id"] == 1 and det["ga_sa"] == 28 and det["ga_sv"] == 26 and det["ga_ga"] == 2 and det["gh_id"] == 9 and det["gh_name"] == "J. S" and det["gh_sa"] == 31
+          and det["ppga"] == 1 and det["ppgh"] == 0 and det["pena"] == 1 and det["penh"] == 1 and det["detail"] is True)
     past = {"id": 2024020001, "gameDate": "2024-10-04", "periodDescriptor": {"number": 4, "periodType": "OT"},
             "awayTeam": {"abbrev": "NJD", "score": 4, "sog": 23}, "homeTeam": {"abbrev": "BUF", "score": 3, "sog": 31},
             "summary": {"scoring": [
@@ -2068,12 +2171,15 @@ def _canned_nhl():
     nyr_season = season("NYR", "BOS", nyr_dates, [7, 6, 6, 6, 6, 6, 6, 6, 5, 6, 6], ["2026-09-28", "2026-10-06"])
     bos_season = season("BOS", "NYR", bos_dates, [6, 6, 7, 7, 6, 6, 7, 6, 6, 7, 6], [])
     box = {"awayTeam": {"abbrev": "NYR", "score": 4, "sog": 31}, "homeTeam": {"abbrev": "XXX", "score": 2, "sog": 28},
-           "playerByGameStats": {"awayTeam": {"goalies": [{"playerId": 1, "name": {"default": "I. S"}, "starter": True}, {"playerId": 2, "starter": False}]}, "homeTeam": {"goalies": []}}}
+           "playerByGameStats": {"awayTeam": {"goalies": [{"playerId": 1, "name": {"default": "I. S"}, "starter": True, "saveShotsAgainst": "26/28", "goalsAgainst": 2, "toi": "59:30"}, {"playerId": 2, "starter": False}]},
+                                 "homeTeam": {"goalies": [{"playerId": 9, "name": {"default": "J. S"}, "toi": "60:00", "saveShotsAgainst": "27/31"}]}}}
     landing = {"awayTeam": {"abbrev": "NYR", "score": 2}, "homeTeam": {"abbrev": "BOS", "score": 3}, "gameOutcome": {"lastPeriodType": "REG"},
                "summary": {"linescore": {"byPeriod": [{"periodDescriptor": {"number": 1, "periodType": "REG"}, "away": 1, "home": 0},
                                                       {"periodDescriptor": {"number": 2, "periodType": "REG"}, "away": 1, "home": 2}, {"periodDescriptor": {"number": 3, "periodType": "REG"}, "away": 0, "home": 1}]},
                            "shotsByPeriod": [{"periodDescriptor": {"number": 1}, "away": 10, "home": 9}, {"periodDescriptor": {"number": 2}, "away": 8, "home": 12}, {"periodDescriptor": {"number": 3}, "away": 11, "home": 7}],
-                           "scoring": [{"periodDescriptor": {"number": 3}, "goals": [{"teamAbbrev": {"default": "BOS"}, "goalModifier": "empty-net"}]}]}}
+                           "scoring": [{"periodDescriptor": {"number": 1}, "goals": [{"teamAbbrev": {"default": "NYR"}, "goalModifier": "none", "strength": "pp"}]},
+                                       {"periodDescriptor": {"number": 3}, "goals": [{"teamAbbrev": {"default": "BOS"}, "goalModifier": "empty-net", "strength": "ev"}]}],
+                           "penalties": [{"periodDescriptor": {"number": 1}, "penalties": [{"type": "MIN", "teamAbbrev": {"default": "BOS"}}, {"type": "MIN", "teamAbbrev": {"default": "NYR"}}, {"type": "MIS", "teamAbbrev": {"default": "BOS"}}]}]}}
     sjs_now = {"goalies": []}
     sjs_last = club("SJS", [(7, "Yaroslav", "A", 0.908, 1600, 55, 54), (8, "Gone", "Guy", 0.900, 600, 20, 19)])
     sjs_roster = {"goalies": [{"id": 7}, {"id": 9}]}
@@ -2103,6 +2209,7 @@ def main(argv=None):
                          "nhl-ledger: every NHL final this season, measured against the sheet's assumptions.")
     ap.add_argument("--date", help="YYYY-MM-DD. Default: today for slate, yesterday for grade.")
     ap.add_argument("--season", help="nhl-ledger only: a past season to pull in full, e.g. 20252026 (for the backtest).")
+    ap.add_argument("--detail", action="store_true", help="nhl-ledger only: also fetch each game's box score and game page for the starters, their lines, power-play goals and penalties (two calls a game; about 40 minutes a season).")
     ap.add_argument("--out", default=".", help="folder to write into (default: where you run it)")
     ap.add_argument("--selftest", action="store_true", help="run the offline checks and exit")
     ap.add_argument("--quiet", action="store_true", help="print only the final line")
@@ -2135,7 +2242,7 @@ def main(argv=None):
         elif a.mode == "nhl-grade":
             path = make_nhl_grade(date_iso, a.out, log)
         elif a.mode == "nhl-ledger":
-            path = make_nhl_ledger(date_iso, a.out, log, a.season)
+            path = make_nhl_ledger(date_iso, a.out, log, a.season, a.detail)
         else:
             path = make_slate(date_iso, a.out, log)
     except Exception as e:  # noqa: BLE001

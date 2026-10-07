@@ -1529,7 +1529,8 @@ def nhl_right_rail(game_id):
 def _names(xs):
     out = []
     for x in xs or []:
-        nm = x.get("default") if isinstance(x, dict) else x
+        # the side panel writes an official as {"fullName": {"default": "Garrett Rank"}, "sweaterNumber": 7}
+        nm = (x.get("fullName", x.get("default")) if isinstance(x, dict) else x)
         if isinstance(nm, dict):
             nm = nm.get("default")
         if nm:
@@ -1561,7 +1562,9 @@ def nhl_ledger_refs(led, path, log):
     """Fetch the side panel for every ledger game without it, for the
     referees and scratches. One call a game; a season is about 20 minutes.
     Written every 100 games so a stopped run keeps what it fetched."""
-    todo = [g for g in led["games"] if not g.get("rail") and g.get("id") is not None]
+    # a game fetched without its referees (the first run of 7 Oct 2026 read
+    # the names at the wrong depth) is fetched again; one with them is kept
+    todo = [g for g in led["games"] if not g.get("refs") and g.get("id") is not None]
     log("Officials pass: %d game%s to fetch (one call each)..." % (len(todo), "" if len(todo) == 1 else "s"))
     done = found = 0
     for g in todo:
@@ -2023,6 +2026,11 @@ def selftest():
     rf = nhl_refs({"id": 1}, rail)
     check("ledger officials: referees, linesmen and scratch counts from the side panel",
           rf["refs"] == ["Wes McCauley", "Kelly Sutherland"] and rf["linesmen"] == ["A. Lines", "B. Lines"] and rf["scra"] == 2 and rf["scrh"] == 0 and rf["rail"] is True)
+    # the feed's real shape, from the user's saved side panel of game 2024020500
+    real_rail = {"gameInfo": {"referees": [{"fullName": {"default": "Garrett Rank"}, "sweaterNumber": 7}, {"fullName": {"default": "Francois St-Laurent"}, "sweaterNumber": 8}],
+                              "linesmen": [{"fullName": {"default": "Julien Fournier"}, "sweaterNumber": 56}], "awayTeam": {"scratches": [{"id": 1}, {"id": 2}, {"id": 3}]}, "homeTeam": {"scratches": [{"id": 4}]}}}
+    rr = nhl_refs({"id": 2024020500}, real_rail)
+    check("ledger officials: the feed's fullName shape", rr["refs"] == ["Garrett Rank", "Francois St-Laurent"] and rr["linesmen"] == ["Julien Fournier"] and rr["scra"] == 3 and rr["scrh"] == 1)
     rf2 = nhl_refs({"id": 2}, {}, {"summary": {"gameInfo": {"referees": [{"default": "Chris Rooney"}]}}})
     check("ledger officials: falls back to the game page, and an empty panel still marks the game fetched", rf2.get("refs") == ["Chris Rooney"] and nhl_refs({"id": 3}, {}).get("rail") is True and "refs" not in nhl_refs({"id": 3}, {}))
     past = {"id": 2024020001, "gameDate": "2024-10-04", "periodDescriptor": {"number": 4, "periodType": "OT"},

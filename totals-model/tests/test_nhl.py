@@ -142,17 +142,44 @@ class TestTheGateAndTheTags(unittest.TestCase):
         self.assertEqual(f.band, BANDS[-1][1])
         self.assertAlmostEqual(f.p_resolved, 0.5, places=3)
 
-    def test_special_teams_and_form_cannot_buy_a_band(self):
+    def test_form_alone_cannot_buy_a_band(self):
         f = forecast_nhl("A @ B", 5.5, -110, -110, away_pp_pct=30, home_pp_pct=30, away_pk_pct=70,
                          home_pk_pct=70, away_last10_total=8.0, home_last10_total=8.0)
         self.assertEqual(f.side, "OVER")
         self.assertEqual(f.band, BANDS[-1][1])
         self.assertTrue(any("Held at" in n for n in f.notes))
 
-    def test_special_teams_need_all_four(self):
-        f = forecast_nhl("A @ B", 6.0, -110, -110, away_pp_pct=25)
+    def test_special_teams_are_shown_not_scored(self):
+        # measured 7 Oct 2026 on the detail pass: both halves ran the wrong way, both seasons
+        bare = forecast_nhl("A @ B", 6.0, -110, -110)
+        f = forecast_nhl("A @ B", 6.0, -110, -110, away_pp_pct=30, home_pp_pct=30, away_pk_pct=70, home_pk_pct=70)
         self.assertNotIn("Special teams", [e.name for e in f.estimates])
-        self.assertTrue(any("all four" in n for n in f.notes))
+        self.assertAlmostEqual(f.projected, bare.projected, places=12)
+        self.assertTrue(any("Special teams are SHOWN, NOT SCORED" in n for n in f.notes))
+        self.assertNotIn("special", WEIGHTS)
+        g = forecast_nhl("A @ B", 6.0, -110, -110, away_pp_pct=25)
+        self.assertTrue(any("SHOWN, NOT SCORED" in n for n in g.notes))
+
+    def test_one_backup_in_net_is_a_tagged_delta_on_the_under(self):
+        from totals.nhl import BACKUP_DELTA
+        self.assertLess(BACKUP_DELTA, 0)
+        base = forecast_nhl("A @ B", 6.0, -110, -110, **LEAGUE)
+        one = forecast_nhl("A @ B", 6.0, -110, -110, away_goalie_backup=True, **LEAGUE)
+        self.assertAlmostEqual(one.projected - base.projected, BACKUP_DELTA, places=9)
+        d = next(x for x in one.deltas if x.name == "Backup in net")
+        self.assertFalse(d.mechanism)
+        self.assertEqual(one.side, "UNDER")
+        self.assertEqual(one.band, "NO BET")   # tagged: it cannot buy a band alone
+        self.assertTrue(any("Backup in net for the away side" in n for n in one.notes))
+        home = forecast_nhl("A @ B", 6.0, -110, -110, home_goalie_backup=True, **LEAGUE)
+        self.assertAlmostEqual(home.projected, one.projected, places=12)
+
+    def test_two_backups_move_nothing(self):
+        base = forecast_nhl("A @ B", 6.0, -110, -110, **LEAGUE)
+        two = forecast_nhl("A @ B", 6.0, -110, -110, away_goalie_backup=True, home_goalie_backup=True, **LEAGUE)
+        self.assertAlmostEqual(two.projected, base.projected, places=12)
+        self.assertFalse(any(x.name == "Backup in net" for x in two.deltas))
+        self.assertTrue(any("BOTH nets" in n for n in two.notes))
 
     def test_a_back_to_back_is_shown_not_scored(self):
         f = forecast_nhl("A @ B", 6.0, -110, -110, away_rest_days=0, **LEAGUE)

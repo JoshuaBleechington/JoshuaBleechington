@@ -4728,19 +4728,19 @@
       "h2hn": "3"
     },
     "expect": {
-      "lam_home": 2.9267638,
-      "lam_away": 2.49530825,
-      "projected": 6.04207205,
+      "lam_home": 2.90981295,
+      "lam_away": 2.48085624,
+      "projected": 6.01066919,
       "markets": [
         {
           "key": "pl",
           "pick": "Bruins -1.5",
           "side": "HOME",
-          "p": 0.39248596,
+          "p": 0.39176267,
           "p_push": 0.0,
           "price": 180.0,
-          "edge": 0.0353431,
-          "fair": 154.7862,
+          "edge": 0.03461982,
+          "fair": 155.2566,
           "anchored": true,
           "band": ""
         },
@@ -4748,11 +4748,11 @@
           "key": "total",
           "pick": "UNDER 6",
           "side": "UNDER",
-          "p": 0.52248654,
-          "p_push": 0.16568868,
+          "p": 0.52869805,
+          "p_push": 0.16573408,
           "price": -110.0,
-          "edge": -0.00132298,
-          "fair": -109.4182,
+          "edge": 0.00488853,
+          "fair": -112.1782,
           "anchored": true,
           "band": "NO BET"
         },
@@ -4772,11 +4772,11 @@
           "key": "ml",
           "pick": "Rangers ML",
           "side": "AWAY",
-          "p": 0.42092776,
+          "p": 0.42113742,
           "p_push": 0.0,
           "price": 130.0,
-          "edge": -0.01385485,
-          "fair": 137.5705,
+          "edge": -0.01364519,
+          "fair": 137.4522,
           "anchored": true,
           "band": ""
         }
@@ -5074,7 +5074,7 @@
   },
   {
     "sport": "NHL",
-    "name": "special teams and form only: tagged, so no band",
+    "name": "special teams shown, not scored; form only is tagged, so no band",
     "inputs": {
       "gdate": "2026-11-15",
       "away": "Devils",
@@ -5092,17 +5092,91 @@
     "expect": {
       "lam_home": null,
       "lam_away": null,
-      "projected": 5.98884406,
+      "projected": 5.87017354,
       "markets": [
         {
           "key": "total",
           "pick": "OVER 5.5",
           "side": "OVER",
-          "p": 0.55532262,
+          "p": 0.53549092,
           "p_push": 0,
           "price": -110.0,
-          "edge": 0.03151309,
-          "fair": -124.8821,
+          "edge": 0.0116814,
+          "fair": -115.281,
+          "anchored": true,
+          "band": "NO BET"
+        }
+      ]
+    }
+  },
+  {
+    "sport": "NHL",
+    "name": "backup in one net: the tagged delta on the under",
+    "inputs": {
+      "gdate": "2026-11-15",
+      "away": "Kraken",
+      "home": "Canucks",
+      "line": "6",
+      "op": "-110",
+      "up": "-110",
+      "agsv": "0.905",
+      "hgsv": "0.912",
+      "agsh": "900",
+      "hgsh": "1800",
+      "agbk": "1",
+      "hgconf": "1"
+    },
+    "expect": {
+      "lam_home": null,
+      "lam_away": null,
+      "projected": 5.92233233,
+      "markets": [
+        {
+          "key": "total",
+          "pick": "UNDER 6",
+          "side": "UNDER",
+          "p": 0.54626239,
+          "p_push": 0.16570692,
+          "price": -110.0,
+          "edge": 0.02245287,
+          "fair": -120.3917,
+          "anchored": true,
+          "band": "NO BET"
+        }
+      ]
+    }
+  },
+  {
+    "sport": "NHL",
+    "name": "backups in both nets: nothing moves",
+    "inputs": {
+      "gdate": "2026-11-15",
+      "away": "Kraken",
+      "home": "Canucks",
+      "line": "6",
+      "op": "-110",
+      "up": "-110",
+      "agsv": "0.905",
+      "hgsv": "0.912",
+      "agsh": "900",
+      "hgsh": "1800",
+      "agbk": "1",
+      "hgbk": "1"
+    },
+    "expect": {
+      "lam_home": null,
+      "lam_away": null,
+      "projected": 6.07233233,
+      "markets": [
+        {
+          "key": "total",
+          "pick": "UNDER 6",
+          "side": "UNDER",
+          "p": 0.51651943,
+          "p_push": 0.16561812,
+          "price": -110.0,
+          "edge": -0.0072901,
+          "fair": -106.8335,
           "anchored": true,
           "band": "NO BET"
         }
@@ -5276,17 +5350,17 @@
     "expect": {
       "lam_home": null,
       "lam_away": null,
-      "projected": 6.50606618,
+      "projected": 6.4690505,
       "markets": [
         {
           "key": "total",
           "pick": "UNDER 6.5",
           "side": "UNDER",
-          "p": 0.52539855,
+          "p": 0.53139976,
           "p_push": 0,
           "price": -110.0,
-          "edge": 0.00158903,
-          "fair": -110.7031,
+          "edge": 0.00759023,
+          "fair": -113.4015,
           "anchored": true,
           "band": "NO BET"
         },
@@ -5338,19 +5412,19 @@
       "h2hn": "3"
     },
     "expect": {
-      "lam_home": 3.09392416,
-      "lam_away": 2.85185982,
-      "projected": 6.56578398,
+      "lam_home": 3.08114569,
+      "lam_away": 2.84008112,
+      "projected": 6.54122681,
       "markets": [
         {
           "key": "total",
           "pick": "UNDER 6.5",
           "side": "UNDER",
-          "p": 0.51575755,
+          "p": 0.5197158,
           "p_push": 0,
           "price": -110.0,
-          "edge": -0.00805197,
-          "fair": -106.5081,
+          "edge": -0.00409373,
+          "fair": -108.2101,
           "anchored": true,
           "band": "NO BET"
         },
@@ -5358,11 +5432,11 @@
           "key": "ml",
           "pick": "Oilers ML",
           "side": "AWAY",
-          "p": 0.45758024,
+          "p": 0.4576615,
           "p_push": 0.0,
           "price": 110.0,
-          "edge": -0.01861023,
-          "fair": 118.5409,
+          "edge": -0.01852897,
+          "fair": 118.5021,
           "anchored": true,
           "band": ""
         },
@@ -5370,11 +5444,11 @@
           "key": "pl",
           "pick": "Oilers +1.5",
           "side": "AWAY",
-          "p": 0.63139345,
+          "p": 0.63181388,
           "p_push": 0.0,
           "price": null,
           "edge": null,
-          "fair": -171.292,
+          "fair": -171.6018,
           "anchored": false,
           "band": ""
         }
@@ -5473,19 +5547,19 @@
       "h2hn": "3"
     },
     "expect": {
-      "lam_home": 3.20775031,
-      "lam_away": 2.67831588,
-      "projected": 6.50606618,
+      "lam_home": 3.18757774,
+      "lam_away": 2.66147276,
+      "projected": 6.4690505,
       "markets": [
         {
           "key": "ml",
           "pick": "Lightning ML",
           "side": "AWAY",
-          "p": 0.40737698,
+          "p": 0.40764316,
           "p_push": 0.0,
           "price": 150.0,
-          "edge": 0.00737698,
-          "fair": 145.4729,
+          "edge": 0.00764316,
+          "fair": 145.3126,
           "anchored": true,
           "band": ""
         },
@@ -5493,11 +5567,11 @@
           "key": "total",
           "pick": "UNDER 6.5",
           "side": "UNDER",
-          "p": 0.52539855,
+          "p": 0.53139976,
           "p_push": 0,
           "price": -110.0,
-          "edge": 0.00158903,
-          "fair": -110.7031,
+          "edge": 0.00759023,
+          "fair": -113.4015,
           "anchored": true,
           "band": "NO BET"
         },
@@ -5505,11 +5579,11 @@
           "key": "pl",
           "pick": "Lightning +1.5",
           "side": "AWAY",
-          "p": 0.58784508,
+          "p": 0.58865851,
           "p_push": 0.0,
           "price": null,
           "edge": null,
-          "fair": -142.6272,
+          "fair": -143.107,
           "anchored": false,
           "band": ""
         }

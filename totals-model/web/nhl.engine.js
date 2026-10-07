@@ -26,8 +26,9 @@
   NHL.REG_GOALS = NHL.GOALS - NHL.ENG - NHL.OT;
   NHL.SV_STABLE_AT = NHL.SV * (1.0 - NHL.SV) / (NHL.TALENT_SD * NHL.TALENT_SD);
   NHL.REG_PHI = (NHL.RESIDUAL_SD * NHL.RESIDUAL_SD - NHL.ENG * (1.0 - NHL.ENG) - NHL.OT * (1.0 - NHL.OT)) / NHL.REG_GOALS;
-  var NHL_WEIGHTS = { market: 4.0, goalies: 1.6, xg: 1.2, special: 0.8, form: 0.6, h2h: 0.5 };   // form 0.6 measured 7 Oct 2026 (totals/nhl.py)
+  var NHL_WEIGHTS = { market: 4.0, goalies: 1.6, xg: 1.2, form: 0.6, h2h: 0.5 };   // goalies 1.6 and form 0.6 measured 7 Oct 2026; special teams out (totals/nhl.py)
   NHL.OCTOBER_DELTA = 0.25;   // the October over: 6.41 scored against a 6.07 close over two seasons, 178-146 blind; half the excess, tagged
+  NHL.BACKUP_DELTA = -0.15;   // one backup in net: 0.18 under the close on 737 games (53.7%), both seasons; sized under it, tagged
   PLAUSIBLE.nhl_total = [3.5, 9.5]; PLAUSIBLE.nhl_period = [0.5, 4.5];
   PLAUSIBLE.save_pct = [0.850, 0.960]; PLAUSIBLE.shots = [15, 45]; PLAUSIBLE.shots_faced = [0, 3000]; PLAUSIBLE.xg_rate = [1.0, 5.5];
 
@@ -136,15 +137,25 @@
     if (!checked("hgconf")) unconfirmed.push("home");
     if (haveGoalies && unconfirmed.length) notes.push("The " + unconfirmed.join(" and ") + " goalie is <b>NOT confirmed</b>. The book priced the expected starter; the one input a hockey market prices imperfectly is a late change in net. Confirm on the daily sites before betting, and re-enter the backup's line if it is the backup.");
 
+    /* a backup in net (totals/nhl.py BACKUP_DELTA): one backup, the market
+       over-bumps the total, a tagged delta on the under; two, nothing moves */
+    var backups = [];
+    if (checked("agbk")) backups.push("away");
+    if (checked("hgbk")) backups.push("home");
+    if (backups.length === 1) {
+      var bkWhy = "Backup in net for the " + backups[0] + " side. Against two seasons of closing totals a game with ONE backup starting landed 0.18 under the close (737 games, the under 53.7%): the market bumps the total for a backup and bumps it too far. " +
+        sgn(NHL.BACKUP_DELTA) + " on the line, tagged: it cannot buy a band, and the tile keeps the under's record on these games.";
+      deltas.push(delta("Backup in net", NHL.BACKUP_DELTA, bkWhy, false));
+      notes.push("<b>Backup in net</b>" + bkWhy.slice("Backup in net".length));
+    } else if (backups.length === 2) {
+      notes.push("A backup in <b>both</b> nets. Measured on 105 games with no direction (the one-backup under did not carry), so nothing moves; the record will say.");
+    }
+
+    /* special teams: SHOWN, NOT SCORED since 7 Oct 2026 (totals/nhl.py): each
+       side's power play and kill to date ran the wrong way against 2,445 closes */
     var st = [num("app"), num("hpp"), num("apk"), num("hpk")];
-    if (st.every(function (v) { return v !== null && ok(v, "percent"); })) {
-      var sgap = ((st[0] / 100 - NHL.PP_PCT) + (st[1] / 100 - NHL.PP_PCT) + (NHL.PK_PCT - st[2] / 100) + (NHL.PK_PCT - st[3] / 100)) * NHL.PP_PER_GAME;
-      estimates.push(est("Special teams", anchor + sgap, w.special,
-        "Power plays " + st[0].toFixed(1) + "% and " + st[1].toFixed(1) + "% against a league " + Math.round(NHL.PP_PCT * 100) + "%, kills " +
-        st[2].toFixed(1) + "% and " + st[3].toFixed(1) + "% against " + Math.round(NHL.PK_PCT * 100) + "%, over " + NHL.PP_PER_GAME.toFixed(1) +
-        " chances a side: " + sgn(sgap) + " goals. Sized a priori and tagged, so it cannot buy a band on its own.", false));
-    } else if (st.some(function (v) { return v !== null; })) {
-      notes.push("Special teams need all four figures — both power plays and both kills — and a partial set has been dropped rather than half-applied.");
+    if (st.some(function (v) { return v !== null; })) {
+      notes.push("Special teams are <b>SHOWN, NOT SCORED</b>: each side's power play and kill to date, against two seasons of closing totals, ran the wrong way (slopes −0.20 and −0.51; both halves negative both seasons). The market has them.");
     }
 
     /* expected goals (MoneyPuck, all situations): each side's offence against

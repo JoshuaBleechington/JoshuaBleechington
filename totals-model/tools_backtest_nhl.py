@@ -9,11 +9,14 @@ site @ season=YYYY and site=home and playoffs=0`. PRIOR_TEAMS.csv, optional,
 is MoneyPuck's team file for the season BEFORE, for the prior-season
 expected-goals input; PRIOR_GOALIES.csv its goalie file for the season
 before, the prior each starter's line is blended with. The goalie, special
-teams and head-to-head tests need a ledger made with --detail (starters and
-their lines, power-play goals, penalties); without it they print nothing. Prints the market's own record by month and, for
+teams, head-to-head and backup-in-net tests need a ledger made with
+--detail (starters and their lines, power-play goals, penalties); without
+it they print nothing. Prints the market's own record by month and, for
 each input, the slope of the residual on the input and the weight it
-implies. First run 7 Oct 2026 on 2024-25 and 2025-26; CALLSHEET3.md has
-the table and what changed.
+implies; then the record by how many backups started (a starter with under
+30% of his club's starts, ten in). First run 7 Oct 2026 on 2024-25 and
+2025-26, the detail pass the same night; CALLSHEET3.md has the table and
+what changed.
 """
 import re, html, json, collections, sys, csv, datetime as dt, math
 from totals.fullgame import fair_total
@@ -83,15 +86,32 @@ def special_hist(led):
         h[g["home"]].append((g["date"], g["ppgh"], g["pena"], g["ppga"], g["penh"]))
         h[g["away"]].append((g["date"], g["ppga"], g["penh"], g["ppgh"], g["pena"]))
     return h
+def starts_hist(led):
+    """(team, playerId) -> dates started; team -> dates played. From the detail pass."""
+    st, tg = collections.defaultdict(list), collections.defaultdict(list)
+    for g in sorted(led, key=lambda g: (g["date"], g["id"])):
+        if not g.get("detail") or g.get("ga_id") is None or g.get("gh_id") is None: continue
+        st[(g["away"], g["ga_id"])].append(g["date"]); st[(g["home"], g["gh_id"])].append(g["date"])
+        tg[g["away"]].append(g["date"]); tg[g["home"]].append(g["date"])
+    return st, tg
 def features(j, led, xg=None, gprior=None):
     hist = team_hist(led); ghist = goalie_hist(led); shist = special_hist(led); rows = []
+    sthist, tghist = starts_hist(led)
     PRIOR_SHARE = 0.5
     for g in j:
         d = g["date"]; H, A = g["home"], g["away"]
+        # backups in net: a starter with under BACKUP_SHARE of his club's starts to date, BACKUP_MIN_STARTS in
+        if g.get("detail") and g.get("ga_id") is not None and g.get("gh_id") is not None:
+            nb = 0
+            for t, pid in ((A, g["ga_id"]), (H, g["gh_id"])):
+                n = sum(1 for x in tghist[t] if x < d); s = sum(1 for x in sthist[(t, pid)] if x < d)
+                if n >= N.BACKUP_MIN_STARTS and s < N.BACKUP_SHARE * n: nb += 1
+            g = dict(g); g["backups"] = nb
         hb, ab = before(hist, H, d), before(hist, A, d)
         anchor, _ = fair_total("NHL", g["total"], -110.0, -110.0)
         tot = g["fa"] + g["fh"]
         f = {"date": d, "home": H, "away": A, "tot": tot, "line": g["total"], "anchor": anchor, "resid": tot - anchor, "month": d[5:7]}
+        if "backups" in g: f["backups"] = g["backups"]
         n = min(len(hb), len(ab)); f["n"] = n
         if n >= 5:
             f["l10"] = (avg([x[1]+x[2] for x in hb[-10:]]) + avg([x[1]+x[2] for x in ab[-10:]])) / 2.0            # last-10 total avg, both sides
@@ -171,6 +191,14 @@ def report(rows, label):
         w = 4*b/(1-b) if b is not None and b < 1 else float("nan")
         agree = sum(1 for x,y in pairs if x*y > 0); dis = sum(1 for x,y in pairs if x*y < 0)
         print(f"{name:28s} {len(pairs):5d} {b:8.3f} {r:7.3f} {w:9.2f} {agree:5d}-{dis}")
+    bk = collections.defaultdict(list)
+    for f in rows:
+        if "backups" in f: bk[f["backups"]].append(f)
+    if bk:
+        print(f"\nbackups in net (a starter under {N.BACKUP_SHARE:.0%} of his club's starts, {N.BACKUP_MIN_STARTS} in):")
+        for k in sorted(bk):
+            v = bk[k]; un = sum(1 for f in v if f["tot"] < f["line"]); ov = sum(1 for f in v if f["tot"] > f["line"])
+            print(f"  {k} backup(s): {len(v):4d} games, residual {avg([f['resid'] for f in v]):+.3f}, the under {un}-{ov} ({100*un/(un+ov) if un+ov else 0:.1f}%), mean close {avg([f['line'] for f in v]):.2f}")
     b2 = [f for f in rows if f["b2b"]]; nb = [f for f in rows if not f["b2b"]]
     print(f"\nback to back: {len(b2)} games, residual {avg([f['resid'] for f in b2]):+.3f}, under {sum(1 for f in b2 if f['tot']<f['line'])}-{sum(1 for f in b2 if f['tot']>f['line'])} | rested: residual {avg([f['resid'] for f in nb]):+.3f}, under {sum(1 for f in nb if f['tot']<f['line'])}-{sum(1 for f in nb if f['tot']>f['line'])}")
     # P1 calibration vs the total's anchor

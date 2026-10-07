@@ -48,6 +48,7 @@ def build_nhl(i: dict):
         h2h_total=n(i.get("h2h")), h2h_meetings=n(i.get("h2hn")),
         away_rest_days=n(i.get("arest")), home_rest_days=n(i.get("hrest")),
         away_goalie_confirmed=bool(i.get("agconf")), home_goalie_confirmed=bool(i.get("hgconf")),
+        away_goalie_backup=bool(i.get("agbk")), home_goalie_backup=bool(i.get("hgbk")),
         ticket_pct_over=n(i.get("ntick")), money_pct_over=n(i.get("ncash")), opened=n(i.get("opened")))
 
 
@@ -70,9 +71,15 @@ NHL_CASES = [
                     agsv="0.885", hgsv="0.915", agsh="900", hgsh="1700", asf="27.5", hsf="35.0")},
     {"name": "home dog: the default puck line flips to +1.5",
      "inputs": dict(away="Panthers", home="Blackhawks", line="6", op="-110", up="-110", hml="150", aml="-180")},
-    {"name": "special teams and form only: tagged, so no band",
+    {"name": "special teams shown, not scored; form only is tagged, so no band",
      "inputs": dict(away="Devils", home="Islanders", line="5.5", op="-110", up="-110", app="30", hpp="30", apk="70", hpk="70",
                     al10="7.5", hl10="7.0")},
+    {"name": "backup in one net: the tagged delta on the under",
+     "inputs": dict(away="Kraken", home="Canucks", line="6", op="-110", up="-110", agsv="0.905", hgsv="0.912", agsh="900", hgsh="1800",
+                    agbk="1", hgconf="1")},
+    {"name": "backups in both nets: nothing moves",
+     "inputs": dict(away="Kraken", home="Canucks", line="6", op="-110", up="-110", agsv="0.905", hgsv="0.912", agsh="900", hgsh="1800",
+                    agbk="1", hgbk="1")},
     {"name": "shots and no goalies: the shot rates read as a differential",
      "inputs": dict(away="Jets", home="Wild", line="6", op="-115", up="-105", hml="-105", aml="-115", asf="34.0", hsf="33.0")},
     # Not a dead-even card on purpose: with every market at exactly 0.5 the

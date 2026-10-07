@@ -162,21 +162,35 @@ ENG_GIVEN_TWO_GOAL_LEAD = 0.30
 #: tied game. 0.5 is a guess with the right sign.
 OT_COMPRESSION = 0.5
 
-#: Blend weights. The market's 4.0 is the MLB figure, where it has the best
-#: MAE of any input by a distance. The goalies take the starters' 1.6 because
-#: they are the same kind of input; special teams and form the pens' and
-#: form's. Head to head: measured null on 7 Oct 2026, shown, not scored.
-#: The weights. Market 4.0 as in baseball. Goalies 1.6 is a priori still:
-#: the backtest has no starters. Expected goals 1.2 a priori; the backtest
-#: read prior-season xG against 1,308 closing totals at a slope of 0.45
-#: (an implied weight near 3) but betting it was 52-53%, so it stays.
-#: Form 0.6, measured: last-ten lean against 2,445 closing totals ran at a
-#: slope of 0.14, an implied weight of 0.6. Special teams and head to head
-#: a priori, untested. Shots: REMOVED from scoring on 7 Oct 2026 -- the
-#: season shot-rate lean ran the WRONG way against the close over both
-#: seasons (slope -0.72, 49.1% betting with it). The first-period last ten:
-#: measured null (slope -0.003), shown, not scored.
-WEIGHTS = {"market": 4.0, "goalies": 1.6, "xg": 1.2, "special": 0.8, "form": 0.6, "h2h": 0.5}
+#: The weights. Market 4.0 as in baseball. Goalies 1.6: measured on 7 Oct
+#: 2026 against 1,308 closing totals of 2025-26 with the starters' lines
+#: built the way the sheet builds them (this season to date plus half of
+#: last season, shrunk): slope 0.31, an implied weight of 1.8; betting it
+#: at a quarter-goal of lean was 107-92. The 2024-25 season could not be
+#: tested the same way (no 2023-24 goalie file for the prior) and read
+#: flat, so 1.6 stays until it can. Expected goals 1.2 a priori; the
+#: backtest read prior-season xG against 1,308 closing totals at a slope
+#: of 0.45 (an implied weight near 3) but betting it was 52-53%, so it
+#: stays. Form 0.6, measured: last-ten lean against 2,445 closing totals
+#: ran at a slope of 0.14, an implied weight of 0.6. REMOVED from scoring
+#: on 7 Oct 2026, all shown, not scored: shots (season shot-rate lean ran
+#: the WRONG way, slope -0.72, 49.1% betting with it); special teams (the
+#: detail pass put each side's power play and kill to date against 2,445
+#: closes: slopes -0.20 and -0.51, the power-play half -0.06/-0.47 and the
+#: kill half -0.43/-0.54 by season -- the market has them); head to head
+#: (slope 0.02 on 814); the first-period last ten (slope -0.003).
+WEIGHTS = {"market": 4.0, "goalies": 1.6, "xg": 1.2, "form": 0.6, "h2h": 0.5}
+#: A backup in net. The detail pass named every starter over two seasons;
+#: a starter with fewer than 30% of his club's starts, ten starts in, is a
+#: backup. With ONE backup in a game the total landed 0.18 under the close
+#: (737 games, the under 396-341, 53.7%; -0.19 and -0.18 by season, at every
+#: threshold tried): the market bumps the total for a backup and bumps it
+#: too far. With a backup in BOTH nets (105 games) the sign flipped and the
+#: sample is nothing, so nothing moves. Sized under the measurement, as a
+#: tagged delta: it cannot buy a band, and the tile keeps the under's record.
+BACKUP_DELTA = -0.15
+BACKUP_SHARE = 0.30     # a starter under this share of his club's starts is a backup
+BACKUP_MIN_STARTS = 10  # ...once the club has this many starts to share
 #: October. Both backtest seasons scored 6.41 a game in October against a
 #: 6.07 closing line, the over 178-146 (54.9%) blind -- 54.7% and 55.2% by
 #: season. Fresh legs, new systems, loose special teams; the market knows
@@ -346,6 +360,8 @@ def forecast_nhl(
     home_rest_days: float | None = None,
     away_goalie_confirmed: bool = False,
     home_goalie_confirmed: bool = False,
+    away_goalie_backup: bool = False,        # the starter is his club's backup (BACKUP_SHARE)
+    home_goalie_backup: bool = False,
     ticket_pct_over: float | None = None,
     money_pct_over: float | None = None,
     opened: float | None = None,
@@ -410,26 +426,33 @@ def forecast_nhl(
                      "late change in net. Confirm on the daily sites before betting, and re-enter "
                      "the backup's line if it is the backup.")
 
-    # --- special teams ------------------------------------------------------
-    # A power play converts about a fifth of the time, each side gets under
-    # three a game. The gap is each side's conversion against the league,
-    # plus the other side's kill against the league, over the league's number
-    # of chances. A PRIORI and tagged: the market surely has it.
+    # --- a backup in net: a tagged delta on the under ------------------------
+    # See BACKUP_DELTA. One backup: the market over-bumps the total. Two: the
+    # sign flipped on 105 games, which is no sample; nothing moves.
+    backups = [s for s, b in (("away", away_goalie_backup), ("home", home_goalie_backup)) if b]
+    if len(backups) == 1:
+        bk_why = (f"Backup in net for the {backups[0]} side. Against two seasons of closing totals a "
+                  "game with ONE backup starting landed 0.18 under the close (737 games, the under "
+                  f"53.7%): the market bumps the total for a backup and bumps it too far. {BACKUP_DELTA:+.2f} "
+                  "on the line, tagged: it cannot buy a band, and the tile keeps the under's record on "
+                  "these games.")
+        deltas.append(Delta("Backup in net", BACKUP_DELTA, bk_why, mechanism=False))
+        notes.append(bk_why)
+    elif len(backups) == 2:
+        notes.append("A backup in BOTH nets. Measured on 105 games with no direction (the one-backup "
+                     "under did not carry), so nothing moves; the record will say.")
+
+    # --- special teams: SHOWN, NOT SCORED since 7 Oct 2026 -------------------
+    # The detail pass carried every power-play goal and penalty of two
+    # seasons. Each side's power play and kill to date, through the gap
+    # this block used to score, against 2,445 closing totals: slope -0.20
+    # and -0.51 by season; the power-play half -0.06/-0.47, the kill half
+    # -0.43/-0.54. The market has them. The boxes stay on the card.
     st = [away_pp_pct, home_pp_pct, away_pk_pct, home_pk_pct]
-    if all(v is not None and _ok(v, "percent") for v in st):
-        a_pp, h_pp, a_pk, h_pk = [v / 100.0 for v in st]
-        sgap = ((a_pp - LEAGUE_PP_PCT) + (h_pp - LEAGUE_PP_PCT)
-                + (LEAGUE_PK_PCT - a_pk) + (LEAGUE_PK_PCT - h_pk)) * LEAGUE_PP_PER_GAME
-        estimates.append(Estimate(
-            "Special teams", anchor + sgap, w["special"],
-            f"Power plays {away_pp_pct:.1f}% and {home_pp_pct:.1f}% against a league "
-            f"{LEAGUE_PP_PCT * 100:.0f}%, kills {away_pk_pct:.1f}% and {home_pk_pct:.1f}% against "
-            f"{LEAGUE_PK_PCT * 100:.0f}%, over {LEAGUE_PP_PER_GAME:.1f} chances a side: {sgap:+.2f} "
-            "goals. Sized a priori and tagged, so it cannot buy a band on its own.",
-            mechanism=False))
-    elif any(v is not None for v in st):
-        notes.append("Special teams need all four figures -- both power plays and both kills -- "
-                     "and a partial set has been dropped rather than half-applied.")
+    if any(v is not None for v in st):
+        notes.append("Special teams are SHOWN, NOT SCORED: each side's power play and kill to date, "
+                     "against two seasons of closing totals, ran the wrong way (slopes -0.20 and -0.51; "
+                     "both halves negative both seasons). The market has them.")
 
     # --- form and head to head, tagged as in MLB ----------------------------
     # --- expected goals -----------------------------------------------------

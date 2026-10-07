@@ -784,6 +784,24 @@ def nhl_roster_goalie_ids(abbrev):
 #: prior was the league's, not his own. A year-old season is evidence about
 #: the man; it just is not as good as this year's will be.
 GOALIE_PRIOR_SHARE = 0.5
+#: A backup in net (Call Sheet 3.0's Backup box): the named starter has
+#: under this share of his club's starts this season, once the club has
+#: BACKUP_MIN_STARTS to share. Same figures as totals/nhl.py, measured 7
+#: Oct 2026: one backup in a game, the total landed 0.18 under the close.
+BACKUP_SHARE = 0.30
+BACKUP_MIN_STARTS = 10
+
+
+def nhl_is_backup(pick, goalies):
+    """True when the likely starter is his club's backup: under BACKUP_SHARE
+    of the club's starts this season, ten starts in. Last season's lines (a
+    club that has not played) never qualify: the flag is about this season."""
+    if not pick or pick.get("season"):
+        return False
+    starts = sum(int(g.get("gs") or 0) for g in goalies if not g.get("season"))
+    if starts < BACKUP_MIN_STARTS:
+        return False
+    return int(pick.get("gs") or 0) < BACKUP_SHARE * starts
 
 
 def nhl_goalie_prior(player_id, prev_season):
@@ -1043,6 +1061,7 @@ def build_nhl_game(g, date_iso, season_id, summary, log, ledger=None, xg=None):
     inputs = {k: "" for k in ("agsv", "hgsv", "agsh", "hgsh", "asf", "hsf", "app", "hpp", "apk", "hpk",
                               "al10", "hl10", "h2h", "h2hn", "arest", "hrest", "nhlform", "ap1l10", "hp1l10",
                               "axgf", "axga", "hxgf", "hxga", "xglg")}
+    inputs["agbk"] = inputs["hgbk"] = False   # the sheet's Backup in net boxes; True when the named starter is one
     notes, starters, form = [], {"away": "", "home": ""}, {"away": [], "home": []}
     out = {"sport": "NHL", "gdate": date_iso, "away": away, "home": home, "gameId": gid, "first_puck_utc": start,
            "venue": ((g.get("venue") or {}).get("default") if isinstance(g.get("venue"), dict) else g.get("venue")) or "",
@@ -1148,6 +1167,11 @@ def build_nhl_game(g, date_iso, season_id, summary, log, ledger=None, xg=None):
                 else:
                     notes.append("%s's likely starter %s has no shots this season; save percentage left blank." % (nick, pick["name"]))
                 notes.append("%s likely starter: %s (%s). NOT confirmed: check Daily Faceoff and tick the box." % (nick, pick["name"], why))
+                if nhl_is_backup(pick, goalies):
+                    inputs[p + "gbk"] = True
+                    club_starts = sum(int(x.get("gs") or 0) for x in goalies if not x.get("season"))
+                    notes.append("%s: %s is the BACKUP (%d of the club's %d starts). The Backup box is ticked; untick it if Daily Faceoff names the starter." % (nick, pick["name"], int(pick.get("gs") or 0), club_starts))
+                    log("  %s: %s is the backup (%d of %d starts) -> Backup in net ticked" % (side, pick["name"], int(pick.get("gs") or 0), club_starts))
                 others = ", ".join("%s %s/%d" % (x["name"], "%.3f" % x["sv"] if x["sv"] is not None else "?", x["shots"]) for x in goalies if x is not pick)
                 halves = ""
                 if pick.get("prior"):
@@ -1985,6 +2009,11 @@ def selftest():
     check("nhl rest and last ten", i["arest"] == "0" and i["hrest"] == "2" and i["al10"] == "5.9" and i["hl10"] == "6.4")
     check("nhl head to head", i["h2h"] == "5.5" and i["h2hn"] == "2")
     check("nhl: the back-to-back side gets the rested goalie", any("did not start yesterday" in n for n in row["notes"]))
+    # Jonathan Q has 17 of the Rangers' 64 starts (27%): the backup. Jeremy S has 60 of 71: not.
+    check("nhl backup: the away starter is flagged, the home one is not", i["agbk"] is True and i["hgbk"] is False)
+    check("nhl backup: noted with the share", any("Jonathan Q is the BACKUP (17 of the club's 64 starts)" in n for n in row["notes"]))
+    check("nhl backup: last season's lines never qualify", not nhl_is_backup({"gs": 2, "season": "20252026"}, [{"gs": 2, "season": "20252026"}, {"gs": 60, "season": "20252026"}]))
+    check("nhl backup: under ten club starts, no flag", not nhl_is_backup({"gs": 1}, [{"gs": 1}, {"gs": 7}]))
     check("nhl: never confirmed", all("NOT confirmed" in n for n in row["notes"] if "likely starter" in n))
     check("nhl grade: final with the period score", gr2["finals"] == {"fa": "2", "fh": "3", "f5a": "1", "f5h": "0"})
     check("previous season id", nhl_prev_season("20262027") == "20252026")

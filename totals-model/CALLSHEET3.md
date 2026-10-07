@@ -55,19 +55,40 @@ games (3-5). It is measured on the card's starters, so it is the prior for
 a named starter; re-measure at the end of the month. Each goalie is read
 against the league's shot rate — the opponent's shot rate was removed on
 7 Oct 2026 (see the backtest below). A league-average goalie moves the
-number by exactly zero. Weight 1.6, the starters' figure, still a priori:
-the backtest has no starters. One goalie alone is scored against a
-league-average partner, with a note.
+number by exactly zero. Weight 1.6, measured on 7 Oct 2026: the detail
+pass named every starter of 2025-26, each line built the way the sheet
+builds it (this season to date plus half of 2024-25, shrunk), and against
+1,308 closing totals the goalie lean ran at a slope of 0.31, an implied
+weight of 1.8; at a quarter-goal of lean, betting with it was 107-92. The
+2024-25 season could not be tested the same way (no 2023-24 goalie file
+for the prior) and read flat, so 1.6 holds until it can. One goalie alone
+is scored against a league-average partner, with a note.
 
 **The one input a hockey market prices imperfectly is a late change in
 net.** The sheet says out loud when a goalie is not confirmed, and the
 slate names the likely starter; the user confirms on the daily sites.
 
-**Special teams** (both power plays, both kills, over the league's 2.8
-chances a side) are sized a priori and tagged, so they cannot buy a band.
-**Last ten** and **head to head** are tagged as in MLB. **Back to back** is
-shown, not scored: its usual consequence, the backup, already arrives
-through the goalie line, and its effect on the total has a disputed sign.
+**Special teams** (both power plays, both kills) are shown, not scored,
+since the detail pass of 7 Oct 2026: each side's power play and kill to
+date, through the gap the sheet used to score, ran the wrong way against
+2,445 closing totals (slopes −0.20 and −0.51 by season; the power-play half
+−0.06/−0.47, the kill half −0.43/−0.54). The market has them. **Last ten**
+is tagged as in MLB; **head to head** is shown, not scored. **Back to
+back** is shown, not scored: its usual consequence, the backup, already
+arrives through the goalie line, and its effect on the total has a
+disputed sign.
+
+**A backup in net** is the one flag the detail pass found. A starter with
+under 30% of his club's starts, ten starts in, is a backup; with ONE
+backup in a game the total landed 0.18 under the close (737 games, the
+under 396-341, 53.7%; −0.19 and −0.18 by season, at every threshold tried;
+the mean close in those games 6.21 against 6.02 otherwise). The market
+bumps the total for a backup and bumps it too far. One backup puts a
+tagged −0.15 on the line (sized under the measurement; it cannot buy a
+band) and the total tile keeps the under's record on these games. With a
+backup in both nets (105 games) the sign flipped on no sample, so nothing
+moves. The slate ticks the box from the club's starts; the user fixes it
+from Daily Faceoff.
 
 **The goal total is a mixture**: a regulation count (negative binomial at
 the Poisson floor, index 1.01) plus the empty-net lump (0.39 expected goals
@@ -127,21 +148,26 @@ were earned on: when it said over, did the game land over the close?
 | Head to head, earlier meetings this season | 814 | +0.02 | 0.08 | **shown, not scored** |
 | Back to back, the under | 696 | | | 52.6%, a label only |
 | October over, blind | 324 | | | **54.9% both seasons (54.7, 55.2); +0.25 tagged delta** |
+| Goalies, the starters' blended lines (2025-26, with the 2024-25 prior) | 1,308 | +0.31 | 1.8 | kept at 1.6; a quarter-goal of lean 107-92 |
+| Goalies, 2024-25 without a prior file | 1,308 | −0.16 | none | untestable as the sheet builds it; needs the 2023-24 goalie file |
+| Special teams, power play and kill to date | 2,445 | −0.20 / −0.51 | negative | **shown, not scored**; both halves negative both seasons |
+| One backup in net, the under | 737 | | | **53.7% (−0.18 under the close both seasons); −0.15 tagged delta** |
+| Backups in both nets | 105 | | | sign flipped, no sample; nothing moves |
 
 The first period's share model is dead on: 1.747 predicted from the close
 against 1.744 scored, and the 2+ rate climbs with the line as it should.
-Goalies and special teams are untested so far — the first ledger pass
-carried no starters or power plays; `slate.py nhl-ledger --season X
---detail` adds them and the tool tests both — and keep their a-priori
-weights.
+The detail pass (`slate.py nhl-ledger --season X --detail`, run by the
+user the same night: 2,624 games, every one with both starters, their
+lines, power-play goals and penalties) settled the last two scored inputs
+and found the backup flag.
 
 **The league constants are measured; the weights are partly measured.** The ledger
 fixed the level, the lumps, the period share and the spread on 2,624
 games. What it cannot fix without closing lines is how much each input
-should move the number off the market. Form (0.6) is measured; shots, the
-first-period form and head to head were measured out; goalies 1.6,
-expected goals 1.2 and special teams 0.8 are still a priori, and
-`tools_audit_nhl.py` judges them against the record as it accumulates.
+should move the number off the market. Form (0.6) and goalies (1.6, one
+season) are measured; shots, special teams, the first-period form and head
+to head were measured out; expected goals 1.2 is still a priori, and
+`tools_audit_nhl.py` judges it against the record as it accumulates.
 
 ## What the user types, from BetMGM
 

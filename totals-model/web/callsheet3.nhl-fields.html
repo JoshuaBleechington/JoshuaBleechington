@@ -25,13 +25,19 @@
             <div class="grid2">
               <label class="check"><input type="checkbox" id="agconf"> Away starter confirmed</label>
               <label class="check"><input type="checkbox" id="hgconf"> Home starter confirmed</label>
+              <label class="check"><input type="checkbox" id="agbk"> Away backup in net</label>
+              <label class="check"><input type="checkbox" id="hgbk"> Home backup in net</label>
             </div>
             <div class="links">
               <a href="https://www.dailyfaceoff.com/starting-goalies" target="_blank" rel="noopener">Daily Faceoff · starting goalies</a>
             </div>
             <p class="note">The slate names each side's <b>likely</b> starter and fills his line. A late change in net is the one
               thing a hockey market prices imperfectly, so check Daily Faceoff, tick the boxes, and if the other goalie is
-              starting, open the boxes below and type his line over the slate's (the slate's printout lists both).</p>
+              starting, open the boxes below and type his line over the slate's (the slate's printout lists both).
+              <b>Backup in net</b>: the slate ticks it when the named starter has under 30% of his club's starts, ten starts
+              in; fix it if Daily Faceoff says otherwise. With one backup in a game the total landed 0.18 under the close
+              over two seasons (737 games, the under 53.7%), so one backup puts a tagged −0.15 on the line and the record
+              tile keeps the under's record on these games. Two backups: nothing moves.</p>
             <input type="hidden" id="nhlform">
           </div>
         </section>
@@ -102,9 +108,11 @@
             <p class="note">A save percentage is shrunk toward the league by the shots behind it, so the two goalie boxes travel
               as a pair: both or neither, on each side. Shots for per game and the first-period last ten are shown,
               not scored, since the 7 Oct backtest (the shot lean ran the wrong way against two seasons of closes; the
-              period's recent past said nothing). Shots, special teams and the last ten wait until a team has five
-              games; until then the slate leaves them blank and the sheet is the market plus the goalies. Special teams and
-              form are tagged and cannot buy a band; a back to back (0 days rest) is shown, not scored. The first-period
+              period's recent past said nothing). Special teams are shown, not scored too, since the detail pass: each
+              side's power play and kill to date ran the wrong way against two seasons of closes. Shots, special teams
+              and the last ten wait until a team has five games; until then the slate leaves them blank and the sheet is
+              the market plus the goalies. Form is tagged and cannot buy a band; a back to back (0 days rest) is shown,
+              not scored. The first-period
               last ten comes from the league ledger (Run NHL ledger.bat) and moves the first period the way the full
               game's last ten moves the total: weighted 0.8 against the market's 4, both sides or neither. Expected
               goals come from MoneyPuck's team file, all situations, per game, with that table's league mean beside

@@ -1,0 +1,11 @@
+__pycache__/
+*.py[cod]
+*.egg-info/
+build/
+dist/
+.pytest_cache/
+.venv/
+venv/
+tailored-resume.docx
+web/ats-screening-bench.html
+web/preview.html

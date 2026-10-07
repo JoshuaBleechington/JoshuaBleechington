@@ -1,0 +1,838 @@
+{
+  "_comment": "canonical term -> surface forms treated as equivalent. Edit freely; keys and values are matched case-insensitively after stemming.",
+  "certifications": {
+    "cissp": [
+      "certified information systems security professional"
+    ],
+    "cisa": [
+      "certified information systems auditor"
+    ],
+    "cism": [
+      "certified information security manager"
+    ],
+    "ccsp": [
+      "certified cloud security professional"
+    ],
+    "crisc": [
+      "certified in risk and information systems control"
+    ],
+    "security+": [
+      "sec+",
+      "comptia security+",
+      "comptia security plus",
+      "security plus"
+    ],
+    "network+": [
+      "comptia network+",
+      "net+"
+    ],
+    "cysa+": [
+      "comptia cysa+",
+      "cybersecurity analyst+"
+    ],
+    "oscp": [
+      "offensive security certified professional"
+    ],
+    "ceh": [
+      "certified ethical hacker"
+    ],
+    "gcih": [
+      "giac certified incident handler"
+    ],
+    "gsec": [
+      "giac security essentials"
+    ],
+    "gcia": [
+      "giac certified intrusion analyst"
+    ],
+    "pmp": [
+      "project management professional"
+    ],
+    "az-500": [
+      "azure security engineer associate",
+      "microsoft certified azure security engineer"
+    ],
+    "sc-200": [
+      "security operations analyst associate"
+    ],
+    "aws certified security": [
+      "aws security specialty",
+      "aws certified security specialty"
+    ],
+    "cka": [
+      "certified kubernetes administrator"
+    ]
+  },
+  "security": {
+    "siem": [
+      "security information and event management",
+      "security information event management"
+    ],
+    "soar": [
+      "security orchestration automation and response",
+      "security orchestration and automation"
+    ],
+    "edr": [
+      "endpoint detection and response"
+    ],
+    "xdr": [
+      "extended detection and response"
+    ],
+    "mdr": [
+      "managed detection and response"
+    ],
+    "dlp": [
+      "data loss prevention",
+      "data leak prevention"
+    ],
+    "iam": [
+      "identity and access management",
+      "identity access management"
+    ],
+    "pam": [
+      "privileged access management",
+      "privileged account management"
+    ],
+    "sso": [
+      "single sign on",
+      "single sign-on"
+    ],
+    "mfa": [
+      "multi factor authentication",
+      "multifactor authentication",
+      "two factor authentication",
+      "2fa"
+    ],
+    "rbac": [
+      "role based access control"
+    ],
+    "zero trust": [
+      "zero trust architecture",
+      "zta",
+      "zero trust network access",
+      "ztna"
+    ],
+    "soc": [
+      "security operations center",
+      "security operations centre"
+    ],
+    "ir": [
+      "incident response",
+      "incident handling"
+    ],
+    "threat hunting": [
+      "threat hunt",
+      "proactive threat detection"
+    ],
+    "threat intelligence": [
+      "cti",
+      "cyber threat intelligence",
+      "threat intel"
+    ],
+    "vulnerability management": [
+      "vuln management",
+      "vulnerability remediation",
+      "patch management"
+    ],
+    "penetration testing": [
+      "pen testing",
+      "pentest",
+      "pentesting",
+      "ethical hacking"
+    ],
+    "mitre att&ck": [
+      "mitre attack",
+      "att&ck framework",
+      "attck"
+    ],
+    "casb": [
+      "cloud access security broker"
+    ],
+    "waf": [
+      "web application firewall"
+    ],
+    "ids/ips": [
+      "intrusion detection system",
+      "intrusion prevention system",
+      "ids",
+      "ips"
+    ],
+    "pki": [
+      "public key infrastructure"
+    ],
+    "grc": [
+      "governance risk and compliance",
+      "governance risk compliance"
+    ],
+    "tprm": [
+      "third party risk management",
+      "vendor risk management"
+    ],
+    "dfir": [
+      "digital forensics and incident response",
+      "digital forensics"
+    ],
+    "opsec": [
+      "operational security"
+    ],
+    "appsec": [
+      "application security"
+    ],
+    "devsecops": [
+      "dev sec ops",
+      "secure devops"
+    ],
+    "sast": [
+      "static application security testing",
+      "static analysis"
+    ],
+    "dast": [
+      "dynamic application security testing"
+    ],
+    "sca": [
+      "software composition analysis"
+    ],
+    "cspm": [
+      "cloud security posture management"
+    ],
+    "cnapp": [
+      "cloud native application protection platform"
+    ],
+    "sbom": [
+      "software bill of materials"
+    ],
+    "ueba": [
+      "user and entity behavior analytics",
+      "uba"
+    ]
+  },
+  "frameworks": {
+    "nist csf": [
+      "nist cybersecurity framework",
+      "cybersecurity framework"
+    ],
+    "nist 800-53": [
+      "nist sp 800-53",
+      "800-53"
+    ],
+    "nist 800-171": [
+      "nist sp 800-171",
+      "800-171"
+    ],
+    "nist ai rmf": [
+      "nist ai risk management framework",
+      "ai rmf"
+    ],
+    "iso 27001": [
+      "iso/iec 27001",
+      "iso27001"
+    ],
+    "iso 42001": [
+      "iso/iec 42001",
+      "iso42001"
+    ],
+    "soc 2": [
+      "soc2",
+      "soc ii",
+      "service organization control 2"
+    ],
+    "pci dss": [
+      "pci-dss",
+      "pci"
+    ],
+    "hipaa": [
+      "health insurance portability and accountability act"
+    ],
+    "gdpr": [
+      "general data protection regulation"
+    ],
+    "fedramp": [
+      "federal risk and authorization management program"
+    ],
+    "cmmc": [
+      "cybersecurity maturity model certification"
+    ],
+    "cis benchmarks": [
+      "cis controls",
+      "center for internet security benchmarks"
+    ],
+    "eu ai act": [
+      "european union ai act",
+      "ai act"
+    ],
+    "sox": [
+      "sarbanes oxley",
+      "sarbanes-oxley"
+    ]
+  },
+  "tools": {
+    "splunk": [
+      "splunk enterprise security",
+      "splunk es",
+      "spl"
+    ],
+    "microsoft sentinel": [
+      "azure sentinel",
+      "sentinel"
+    ],
+    "crowdstrike": [
+      "crowdstrike falcon",
+      "falcon"
+    ],
+    "defender": [
+      "microsoft defender",
+      "defender for endpoint",
+      "mde",
+      "defender for cloud"
+    ],
+    "entra id": [
+      "azure ad",
+      "azure active directory",
+      "aad",
+      "microsoft entra"
+    ],
+    "active directory": [
+      "ad ds",
+      "windows active directory"
+    ],
+    "okta": [
+      "okta workforce identity"
+    ],
+    "qualys": [
+      "qualys vmdr"
+    ],
+    "tenable": [
+      "nessus",
+      "tenable.io",
+      "tenable.sc"
+    ],
+    "rapid7": [
+      "insightvm",
+      "nexpose"
+    ],
+    "wireshark": [
+      "packet capture",
+      "pcap analysis"
+    ],
+    "burp suite": [
+      "burpsuite",
+      "burp"
+    ],
+    "metasploit": [
+      "msf"
+    ],
+    "nmap": [
+      "network mapper"
+    ],
+    "servicenow": [
+      "snow",
+      "service now"
+    ],
+    "jira": [
+      "atlassian jira"
+    ],
+    "terraform": [
+      "hashicorp terraform",
+      "iac terraform"
+    ],
+    "kubernetes": [
+      "k8s",
+      "eks",
+      "aks",
+      "gke"
+    ],
+    "docker": [
+      "containerization",
+      "containers"
+    ],
+    "ansible": [
+      "red hat ansible"
+    ],
+    "elastic": [
+      "elk stack",
+      "elasticsearch",
+      "elk"
+    ],
+    "powershell": [
+      "power shell",
+      "ps1"
+    ],
+    "kql": [
+      "kusto query language"
+    ],
+    "sql": [
+      "structured query language",
+      "t-sql",
+      "mysql",
+      "postgresql"
+    ],
+    "python": [
+      "python3"
+    ],
+    "git": [
+      "github",
+      "gitlab",
+      "version control"
+    ],
+    "ci/cd": [
+      "cicd",
+      "continuous integration",
+      "continuous delivery",
+      "continuous deployment",
+      "jenkins",
+      "github actions"
+    ],
+    "aws": [
+      "amazon web services"
+    ],
+    "azure": [
+      "microsoft azure"
+    ],
+    "gcp": [
+      "google cloud platform",
+      "google cloud"
+    ],
+    "linux": [
+      "unix",
+      "rhel",
+      "ubuntu",
+      "centos"
+    ],
+    "vmware": [
+      "vsphere",
+      "esxi"
+    ],
+    "sccm": [
+      "mecm",
+      "configuration manager",
+      "intune"
+    ]
+  },
+  "general": {
+    "stakeholder management": [
+      "stakeholder engagement"
+    ],
+    "risk assessment": [
+      "risk analysis",
+      "risk evaluation"
+    ],
+    "root cause analysis": [
+      "rca"
+    ],
+    "kpi": [
+      "key performance indicator",
+      "metrics reporting"
+    ],
+    "sla": [
+      "service level agreement"
+    ],
+    "agile": [
+      "scrum",
+      "kanban",
+      "sprint"
+    ],
+    "documentation": [
+      "technical writing",
+      "runbook",
+      "playbook",
+      "sop",
+      "standard operating procedure"
+    ],
+    "machine learning": [
+      "ml",
+      "deep learning"
+    ],
+    "artificial intelligence": [
+      "ai",
+      "genai",
+      "generative ai",
+      "llm",
+      "large language model"
+    ],
+    "data analysis": [
+      "data analytics",
+      "analytics"
+    ],
+    "project management": [
+      "program management",
+      "pmo"
+    ],
+    "business continuity": [
+      "bcp",
+      "disaster recovery",
+      "dr",
+      "bcdr"
+    ],
+    "change management": [
+      "change control"
+    ],
+    "audit": [
+      "auditing",
+      "internal audit",
+      "control testing"
+    ],
+    "policy development": [
+      "policy writing",
+      "standards development"
+    ],
+    "training": [
+      "security awareness training",
+      "user training",
+      "mentoring"
+    ]
+  },
+  "it_services": {
+    "presales": [
+      "pre-sales",
+      "pre sales",
+      "presales engagement",
+      "solution consulting",
+      "sales engineering"
+    ],
+    "solutioning": [
+      "solution design",
+      "solution development",
+      "solution architecture",
+      "solution shaping",
+      "deal shaping"
+    ],
+    "managed services": [
+      "managed service",
+      "mps",
+      "managed services provider",
+      "msp"
+    ],
+    "it outsourcing": [
+      "ito",
+      "outsourcing",
+      "infrastructure outsourcing",
+      "application outsourcing",
+      "ado"
+    ],
+    "bpo": [
+      "business process outsourcing"
+    ],
+    "tcv": [
+      "total contract value"
+    ],
+    "acv": [
+      "annual contract value"
+    ],
+    "arr": [
+      "annual recurring revenue"
+    ],
+    "mrr": [
+      "monthly recurring revenue"
+    ],
+    "rfp": [
+      "request for proposal",
+      "rfx",
+      "rfi",
+      "request for information",
+      "bid response"
+    ],
+    "bid management": [
+      "bid manager",
+      "pursuit management",
+      "deal pursuit",
+      "pursuit lead",
+      "capture management"
+    ],
+    "deal desk": [
+      "commercial constructs",
+      "pricing strategy",
+      "deal review"
+    ],
+    "statement of work": [
+      "sow",
+      "msa",
+      "master service agreement",
+      "master services agreement"
+    ],
+    "go to market": [
+      "gtm",
+      "go-to-market",
+      "route to market"
+    ],
+    "account management": [
+      "account director",
+      "client partner",
+      "account governance",
+      "account planning"
+    ],
+    "client relationship management": [
+      "client relations",
+      "customer relationship management",
+      "trusted advisor"
+    ],
+    "consultative selling": [
+      "solution selling",
+      "value selling",
+      "challenger sale"
+    ],
+    "service management": [
+      "itsm",
+      "it service management",
+      "service delivery management"
+    ],
+    "service integration": [
+      "siam",
+      "service integration and management",
+      "multi-sourcing service integration"
+    ],
+    "itil": [
+      "itil v3",
+      "itil v4",
+      "itil foundation",
+      "itil trained",
+      "itil certified"
+    ],
+    "digital transformation": [
+      "business transformation",
+      "transformation program",
+      "transformation initiatives"
+    ],
+    "change management": [
+      "organizational change management",
+      "ocm",
+      "change enablement",
+      "change adoption"
+    ],
+    "process improvement": [
+      "continuous improvement",
+      "process optimization",
+      "process reengineering",
+      "business process reengineering",
+      "bpr",
+      "process standardization"
+    ],
+    "program management": [
+      "programme management",
+      "pmo",
+      "portfolio management"
+    ],
+    "p&l": [
+      "profit and loss",
+      "p and l",
+      "pnl",
+      "budget ownership"
+    ],
+    "cxo": [
+      "c-suite",
+      "c suite",
+      "executive stakeholders",
+      "cio",
+      "cto",
+      "cfo",
+      "ciso"
+    ],
+    "stakeholder management": [
+      "stakeholder engagement"
+    ],
+    "net promoter score": [
+      "nps",
+      "customer satisfaction",
+      "csat"
+    ],
+    "service level agreement": [
+      "sla",
+      "slas",
+      "kpi",
+      "key performance indicator"
+    ],
+    "hyperscaler": [
+      "hyperscalers",
+      "cloud service provider",
+      "csp"
+    ],
+    "cloud migration": [
+      "journey to cloud",
+      "cloud adoption",
+      "lift and shift",
+      "application modernization",
+      "app modernization"
+    ],
+    "workplace services": [
+      "digital workplace",
+      "end user computing",
+      "euc",
+      "modern workplace"
+    ],
+    "oem": [
+      "original equipment manufacturer",
+      "oems",
+      "alliances",
+      "partner ecosystem",
+      "channel partners"
+    ],
+    "revenue growth": [
+      "revenue attainment",
+      "quota attainment",
+      "bookings",
+      "signings",
+      "pipeline development"
+    ],
+    "cross sell": [
+      "cross-sell",
+      "upsell",
+      "up-sell",
+      "account expansion"
+    ],
+    "delivery excellence": [
+      "service improvement plan",
+      "sip",
+      "back to green",
+      "account turnaround",
+      "remediation plan"
+    ],
+    "shared services": [
+      "center of excellence",
+      "coe",
+      "centre of excellence"
+    ],
+    "vendor management": [
+      "supplier management",
+      "third party management",
+      "procurement"
+    ],
+    "business case": [
+      "value proposition",
+      "roi",
+      "return on investment",
+      "tco",
+      "total cost of ownership"
+    ],
+    "sales enablement": [
+      "enablement",
+      "sales training",
+      "sales coaching",
+      "field enablement",
+      "seller enablement",
+      "sales readiness"
+    ],
+    "cross functional leadership": [
+      "cross-functional leadership",
+      "cross functional teams",
+      "cross-functional teams",
+      "cross functional collaboration",
+      "cross-functional",
+      "matrix leadership"
+    ],
+    "business planning": [
+      "account planning",
+      "strategic business plans",
+      "business plans",
+      "strategic planning",
+      "growth planning"
+    ],
+    "strategic partners": [
+      "partner relationships",
+      "partner ecosystem",
+      "alliance partners",
+      "technology partners",
+      "joint go to market",
+      "partner strategy"
+    ],
+    "practice leadership": [
+      "practice",
+      "practice management",
+      "capability leadership",
+      "service line leadership",
+      "practice director"
+    ],
+    "executive leadership": [
+      "executive presence",
+      "executive communication",
+      "c-suite engagement",
+      "executive stakeholder management"
+    ],
+    "operating model": [
+      "target operating model",
+      "tom",
+      "tom design",
+      "operating model design",
+      "org design"
+    ],
+    "commercial acumen": [
+      "commercial constructs",
+      "commercial management",
+      "pricing strategy",
+      "deal economics",
+      "commercial strategy"
+    ],
+    "business development": [
+      "new logo acquisition",
+      "new logo",
+      "revenue growth",
+      "bookings growth",
+      "signings growth",
+      "pipeline development"
+    ],
+    "technology consulting": [
+      "it consulting",
+      "technology advisory",
+      "advisory services",
+      "management consulting"
+    ],
+    "thought leadership": [
+      "industry forums",
+      "conference speaking",
+      "white papers",
+      "published articles"
+    ],
+    "solution reviews": [
+      "solution review",
+      "deal reviews",
+      "design reviews",
+      "architecture reviews",
+      "bid reviews"
+    ],
+    "technical resources": [
+      "solution architects",
+      "technical teams",
+      "technical staff",
+      "architects",
+      "engineering teams"
+    ],
+    "customer workshops": [
+      "client workshops",
+      "discovery workshops",
+      "design workshops"
+    ],
+    "mentoring": [
+      "coaching",
+      "mentorship",
+      "talent development",
+      "people development"
+    ]
+  },
+  "business_certs": {
+    "mba": [
+      "master of business administration"
+    ],
+    "pmp": [
+      "project management professional"
+    ],
+    "prince2": [
+      "prince 2"
+    ],
+    "six sigma": [
+      "lean six sigma",
+      "black belt",
+      "green belt"
+    ],
+    "togaf": [
+      "the open group architecture framework"
+    ],
+    "safe": [
+      "scaled agile framework",
+      "safe agilist"
+    ],
+    "aws cloud practitioner": [
+      "aws certified cloud practitioner"
+    ],
+    "azure fundamentals": [
+      "az-900"
+    ]
+  }
+}

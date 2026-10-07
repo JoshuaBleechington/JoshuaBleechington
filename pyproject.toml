@@ -1,0 +1,36 @@
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "resume-ats"
+version = "1.0.0"
+description = "Score a resume against a job description the way an applicant tracking system would."
+readme = "resume_ats/README.md"
+requires-python = ">=3.9"
+license = { text = "MIT" }
+authors = [{ name = "Joshua Bleechington" }]
+keywords = ["ats", "resume", "job-search", "applicant-tracking", "keyword-matching"]
+classifiers = [
+  "Programming Language :: Python :: 3",
+  "License :: OSI Approved :: MIT License",
+  "Topic :: Text Processing :: Linguistic",
+  "Intended Audience :: End Users/Desktop",
+]
+dependencies = []
+
+[project.optional-dependencies]
+pdf = ["pdfminer.six>=20221105"]
+dev = ["pytest>=7.0"]
+
+[project.scripts]
+resume-ats = "resume_ats.cli:main"
+
+[tool.setuptools.packages.find]
+include = ["resume_ats*"]
+
+[tool.setuptools.package-data]
+resume_ats = ["data/*.json"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

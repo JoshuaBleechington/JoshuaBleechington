@@ -195,6 +195,12 @@ def report(rows, label):
     for f in rows:
         if "backups" in f: bk[f["backups"]].append(f)
     if bk:
+        # the goalie lean split by who is in net: it works with two regular starters and not with a backup
+        for k in sorted(bk):
+            pairs = [(f["goalie_gap"], f["resid"]) for f in bk[k] if "goalie_gap" in f]
+            if len(pairs) < 3: continue
+            b, r = slope(pairs); agree = sum(1 for x,y in pairs if x*y > 0 and abs(x) >= 0.12); dis = sum(1 for x,y in pairs if x*y < 0 and abs(x) >= 0.12)
+            print(f"{'goalies, ' + str(k) + ' backup(s) in net':28s} {len(pairs):5d} {b:8.3f} {r:7.3f} {(4*b/(1-b)) if b < 1 else float('nan'):9.2f} {agree:5d}-{dis}  (sign at a tenth of a goal of lean)")
         print(f"\nbackups in net (a starter under {N.BACKUP_SHARE:.0%} of his club's starts, {N.BACKUP_MIN_STARTS} in):")
         for k in sorted(bk):
             v = bk[k]; un = sum(1 for f in v if f["tot"] < f["line"]); ov = sum(1 for f in v if f["tot"] > f["line"])

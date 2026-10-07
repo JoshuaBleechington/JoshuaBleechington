@@ -5129,17 +5129,17 @@
     "expect": {
       "lam_home": null,
       "lam_away": null,
-      "projected": 5.92233233,
+      "projected": 6.00664418,
       "markets": [
         {
           "key": "total",
           "pick": "UNDER 6",
           "side": "UNDER",
-          "p": 0.54626239,
-          "p_push": 0.16570692,
+          "p": 0.52949553,
+          "p_push": 0.16573783,
           "price": -110.0,
-          "edge": 0.02245287,
-          "fair": -120.3917,
+          "edge": 0.005686,
+          "fair": -112.5378,
           "anchored": true,
           "band": "NO BET"
         }
@@ -5166,17 +5166,17 @@
     "expect": {
       "lam_home": null,
       "lam_away": null,
-      "projected": 6.07233233,
+      "projected": 6.15664418,
       "markets": [
         {
           "key": "total",
-          "pick": "UNDER 6",
-          "side": "UNDER",
-          "p": 0.51651943,
-          "p_push": 0.16561812,
+          "pick": "OVER 6",
+          "side": "OVER",
+          "p": 0.5,
+          "p_push": 0.16528553,
           "price": -110.0,
-          "edge": -0.0072901,
-          "fair": -106.8335,
+          "edge": -0.02380952,
+          "fair": 100.0,
           "anchored": true,
           "band": "NO BET"
         }

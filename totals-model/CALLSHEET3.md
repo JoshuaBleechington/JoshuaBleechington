@@ -56,12 +56,17 @@ a named starter; re-measure at the end of the month. Each goalie is read
 against the league's shot rate — the opponent's shot rate was removed on
 7 Oct 2026 (see the backtest below). A league-average goalie moves the
 number by exactly zero. Weight 1.6, measured on 7 Oct 2026: the detail
-pass named every starter of 2025-26, each line built the way the sheet
-builds it (this season to date plus half of 2024-25, shrunk), and against
-1,308 closing totals the goalie lean ran at a slope of 0.31, an implied
-weight of 1.8; at a quarter-goal of lean, betting with it was 107-92. The
-2024-25 season could not be tested the same way (no 2023-24 goalie file
-for the prior) and read flat, so 1.6 holds until it can. One goalie alone
+pass named every starter of two seasons, each line built the way the
+sheet builds it (this season to date plus half of the season before,
+shrunk, from the user's MoneyPuck goalie files for 2023-24 and 2024-25).
+Over every game the lean was near null (slope +0.31 in 2025-26, −0.25 in
+2024-25; pooled +0.07), and the backup flag explained it. With **two
+regular starters** the lean ran the right way both seasons (+0.07 and
++0.92; pooled +0.55 on 1,744 games, 561-496 betting a tenth of a goal of
+lean, 53.1%). With **a backup in net** it ran against, both seasons,
+whichever goalie's line was asked (767 games). So goalies are scored at
+1.6 with two regular starters and **not scored with a backup in net**,
+where the backup delta carries what the backtest found. One goalie alone
 is scored against a league-average partner, with a note.
 
 **The one input a hockey market prices imperfectly is a late change in
@@ -148,8 +153,9 @@ were earned on: when it said over, did the game land over the close?
 | Head to head, earlier meetings this season | 814 | +0.02 | 0.08 | **shown, not scored** |
 | Back to back, the under | 696 | | | 52.6%, a label only |
 | October over, blind | 324 | | | **54.9% both seasons (54.7, 55.2); +0.25 tagged delta** |
-| Goalies, the starters' blended lines (2025-26, with the 2024-25 prior) | 1,308 | +0.31 | 1.8 | kept at 1.6; a quarter-goal of lean 107-92 |
-| Goalies, 2024-25 without a prior file | 1,308 | −0.16 | none | untestable as the sheet builds it; needs the 2023-24 goalie file |
+| Goalies, the starters' blended lines, every game | 2,616 | +0.31 / −0.25 (pooled +0.07) | ~0.3 | near null until split by who is in net |
+| Goalies, two regular starters | 1,744 | +0.07 / +0.92 (pooled +0.55) | ~5 | **kept at 1.6**; a tenth of a goal of lean 561-496 (53.1%) |
+| Goalies, a backup in net | 767 | −0.84 / −0.94 | negative | **not scored**; the backup delta carries it |
 | Special teams, power play and kill to date | 2,445 | −0.20 / −0.51 | negative | **shown, not scored**; both halves negative both seasons |
 | One backup in net, the under | 737 | | | **53.7% (−0.18 under the close both seasons); −0.15 tagged delta** |
 | Backups in both nets | 105 | | | sign flipped, no sample; nothing moves |

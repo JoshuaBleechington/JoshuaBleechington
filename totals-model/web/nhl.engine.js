@@ -110,7 +110,11 @@
     var aw = svWeight(ash), hw = svWeight(hsh);
     var aUsedSv = shrinkSv(asv, ash), hUsedSv = shrinkSv(hsv, hsh);
     var haveGoalies = aUsedSv !== null && hUsedSv !== null;
-    if (aUsedSv !== null || hUsedSv !== null) {
+    var anyBackup = checked("agbk") || checked("hgbk");
+    if ((aUsedSv !== null || hUsedSv !== null) && anyBackup) {
+      /* measured 7 Oct 2026 on 767 one-backup games: neither goalie's line had a direction against the close (totals/nhl.py) */
+      notes.push("Goalies are <b>NOT SCORED</b> with a backup in net: in 767 backtest games with one, neither goalie's line had a direction against the close. The backup flag carries what did.");
+    } else if (aUsedSv !== null || hUsedSv !== null) {
       var aU = aUsedSv !== null ? aUsedSv : NHL.SV, hU = hUsedSv !== null ? hUsedSv : NHL.SV;
       var aGap = goalieGap(aU), hGap = goalieGap(hU);
       if (aGap !== null && hGap !== null) {

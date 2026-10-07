@@ -231,8 +231,11 @@ const CHECKS = ["dome","playoff","agconf","hgconf","agbk","hgbk"];
   chk(backup.one.under > backup.none.under + 1 && /Backup in net for the away side/.test(backup.one.why) && !/Backup in net/.test(backup.none.why),
       'backup: ticking one Backup box moves the total toward the under and the why list says so', JSON.stringify({ none: backup.none.under, one: backup.one.under }));
   chk(backup.one.chips.some(c => /backup in net/.test(c)) && !backup.none.chips.some(c => /backup in net/.test(c)), 'backup: the total is chipped "backup in net"', JSON.stringify(backup.one.chips));
-  chk(Math.abs(backup.two.under - backup.none.under) < 0.05 && /both/.test(backup.two.why) && !backup.two.chips.some(c => /backup in net/.test(c)),
-      'backup: two backups move nothing, say so, and carry no chip', JSON.stringify({ none: backup.none.under, two: backup.two.under }));
+  // with a backup in either net the goalie lines are not scored, so two backups leave the market alone: 50.0 at -110/-110
+  chk(Math.abs(backup.two.under - 50) < 0.3 && /both/.test(backup.two.why) && /Goalies are NOT SCORED with a backup/.test(backup.two.why) && !backup.two.chips.some(c => /backup in net/.test(c)),
+      'backup: two backups carry no delta and no chip, say so, and the goalie lines are not scored', JSON.stringify({ none: backup.none.under, two: backup.two.under }));
+  chk(/Goalies are NOT SCORED with a backup/.test(backup.one.why) && !/Goalies are NOT SCORED/.test(backup.none.why),
+      'backup: one backup also takes the goalie lines out of scoring; two regular starters keep them', backup.one.why.slice(0, 200));
   chk(/Special teams are SHOWN, NOT SCORED/.test(backup.none.why) && !/Special teams.*on the line/.test(backup.none.why), 'special teams: shown, not scored, in the why list', backup.none.why.slice(0, 300));
   chk(backup.agbk === true && !backup.hgbk, 'backup: the boxes are stored on the row', JSON.stringify({ a: backup.agbk, h: backup.hgbk }));
   chk(/backup in net, the under 1-0/.test(backup.tile), 'record: the hockey total tile keeps the backup line (2-1 is under 6)', backup.tile.slice(0, 300));

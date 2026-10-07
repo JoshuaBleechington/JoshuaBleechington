@@ -163,12 +163,16 @@ ENG_GIVEN_TWO_GOAL_LEAD = 0.30
 OT_COMPRESSION = 0.5
 
 #: The weights. Market 4.0 as in baseball. Goalies 1.6: measured on 7 Oct
-#: 2026 against 1,308 closing totals of 2025-26 with the starters' lines
-#: built the way the sheet builds them (this season to date plus half of
-#: last season, shrunk): slope 0.31, an implied weight of 1.8; betting it
-#: at a quarter-goal of lean was 107-92. The 2024-25 season could not be
-#: tested the same way (no 2023-24 goalie file for the prior) and read
-#: flat, so 1.6 stays until it can. Expected goals 1.2 a priori; the
+#: 2026 against 2,616 closing totals of two seasons with the starters'
+#: lines built the way the sheet builds them (this season to date plus
+#: half of last season, shrunk). Over every game the lean was near null
+#: (+0.31 in 2025-26, -0.25 in 2024-25), and the split explained it: with
+#: two REGULAR starters the lean ran the right way both seasons (slopes
+#: +0.07 and +0.92; pooled +0.55 on 1,744 games, 53.1% betting a tenth of
+#: a goal of lean), and with a BACKUP in net it ran against (both
+#: seasons). So goalies are scored at 1.6 with two regular starters and
+#: NOT SCORED with a backup in net, where BACKUP_DELTA carries what the
+#: backtest found. Expected goals 1.2 a priori; the
 #: backtest read prior-season xG against 1,308 closing totals at a slope
 #: of 0.45 (an implied weight near 3) but betting it was 52-53%, so it
 #: stays. Form 0.6, measured: last-ten lean against 2,445 closing totals
@@ -383,7 +387,16 @@ def forecast_nhl(
     a_sv = shrink_sv(away_goalie_sv, away_goalie_shots)
     h_sv = shrink_sv(home_goalie_sv, home_goalie_shots)
     have_goalies = a_sv is not None and h_sv is not None
-    if a_sv is not None or h_sv is not None:
+    any_backup = bool(away_goalie_backup or home_goalie_backup)
+    if (a_sv is not None or h_sv is not None) and any_backup:
+        # Measured 7 Oct 2026 on 767 one-backup games: neither the backup's
+        # own line nor the regular starter's had a direction against the
+        # close (slopes -0.94 and -0.84 pooled, signs 43% and 53%). The
+        # backup delta below carries the one thing that did.
+        notes.append("Goalies are NOT SCORED with a backup in net: in 767 backtest games with one, "
+                     "neither goalie's line had a direction against the close. The backup flag "
+                     "carries what did.")
+    elif a_sv is not None or h_sv is not None:
         a_used = a_sv if a_sv is not None else LEAGUE_SAVE_PCT
         h_used = h_sv if h_sv is not None else LEAGUE_SAVE_PCT
         a_gap = goalie_gap(a_used)

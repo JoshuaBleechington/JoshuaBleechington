@@ -174,6 +174,17 @@ class TestTheGateAndTheTags(unittest.TestCase):
         home = forecast_nhl("A @ B", 6.0, -110, -110, home_goalie_backup=True, **LEAGUE)
         self.assertAlmostEqual(home.projected, one.projected, places=12)
 
+    def test_goalies_are_not_scored_with_a_backup_in_net(self):
+        from totals.nhl import BACKUP_DELTA
+        cold = dict(away_goalie_sv=0.880, home_goalie_sv=0.912, away_goalie_shots=1500, home_goalie_shots=1500)
+        scored = forecast_nhl("A @ B", 6.0, -110, -110, **cold)
+        self.assertIn("Goalies", [e.name for e in scored.estimates])
+        bare = forecast_nhl("A @ B", 6.0, -110, -110)
+        flagged = forecast_nhl("A @ B", 6.0, -110, -110, away_goalie_backup=True, **cold)
+        self.assertNotIn("Goalies", [e.name for e in flagged.estimates])
+        self.assertAlmostEqual(flagged.projected - bare.projected, BACKUP_DELTA, places=9)
+        self.assertTrue(any("Goalies are NOT SCORED with a backup in net" in n for n in flagged.notes))
+
     def test_two_backups_move_nothing(self):
         base = forecast_nhl("A @ B", 6.0, -110, -110, **LEAGUE)
         two = forecast_nhl("A @ B", 6.0, -110, -110, away_goalie_backup=True, home_goalie_backup=True, **LEAGUE)

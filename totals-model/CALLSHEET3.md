@@ -158,7 +158,10 @@ were earned on: when it said over, did the game land over the close?
 | Last-ten total average | 2,445 | +0.14 | 0.6 | kept, weight 0.8 → 0.6 |
 | Season shot rates (the shots in the goalie gap) | 2,445 | −0.72 | negative | **removed from scoring**; betting with it 49.1% |
 | Season goal rates | 2,445 | −0.43 | negative | never an input; stays out |
-| Prior-season expected goals | 1,308 | +0.45 | ~3 | kept at 1.2; betting it 53.5%, one season |
+| Prior-season expected goals, 2025-26 (MoneyPuck 2024-25) | 1,308 | +0.45 | ~3 | one season read right... |
+| Prior-season expected goals, 2024-25 (NST 2023-24) | 1,226 | −0.46 | negative | ...the other read wrong: a coin |
+| This season's expected goals to date, the slate's input (NST, 2024-25) | 1,223 | −0.31 | negative | **shown, not scored**; a half-goal of lean 19-34 |
+| High-danger chances to date / last-ten xG / PDO to date | 1,223 | −0.03 / −0.20 / null | none | never inputs; stay out |
 | First-period last ten (vs the period) | 2,445 | −0.003 | none | **shown, not scored** |
 | Head to head, earlier meetings this season | 814 | +0.02 | 0.08 | **shown, not scored** |
 | Back to back, the under | 696 | | | 52.6%, a label only |
@@ -183,9 +186,10 @@ and found the backup flag.
 fixed the level, the lumps, the period share and the spread on 2,624
 games. What it cannot fix without closing lines is how much each input
 should move the number off the market. Form (0.6) and goalies (1.6, one
-season) are measured; shots, special teams, the first-period form and head
-to head were measured out; expected goals 1.2 is still a priori, and
-`tools_audit_nhl.py` judges it against the record as it accumulates.
+season) are measured; shots, special teams, expected goals, the
+first-period form and head to head were measured out. Every weight left
+on the hockey card has a measurement behind it, and `tools_audit_nhl.py`
+keeps judging them against the record as it accumulates.
 
 ## What the user types, from BetMGM
 
@@ -235,11 +239,23 @@ input in hockey analytics. The slate fetches the season's team file
 or a `teams.csv` saved in the folder when the site cannot be reached), takes
 each club's `all`-situations xG for and against per game once it has five
 games, and writes the **league mean of the same table** beside them, which
-is what the sheet scores against — the WNBA pace lesson, that a league
+is what the sheet shows it against — the WNBA pace lesson, that a league
 constant must come from the table the inputs come from (3.05 is the
-fallback). Each side's offence into the other's defence, the gap on the
-line, weight 1.2, tagged: it cannot buy a band until the record says so.
+fallback). Each side's offence into the other's defence, the gap shown.
 All four figures or none.
+
+**Shown, not scored since 7 Oct 2026.** The user saved Natural Stat
+Trick's game table (every game of 2023-24 and 2024-25, each side's xG for
+and against, all situations), which let the input be built the way the
+slate builds it: each club's per-game xG to date, five games in, against
+the table's own league mean to date. Against 1,223 closing totals of
+2024-25 it ran the wrong way (slope −0.31; betting a half-goal of lean
+19-34), in every third of the season but the last. Last season's xG,
+which the first backtest had read at +0.45 on 2025-26, read −0.46 on
+2024-25 with the 2023-24 table: a coin across two seasons. High-danger
+chances to date were null (−0.03), last-ten xG null (−0.20), and PDO to
+date said nothing. The market has it; the weight 1.2 is gone, and the
+boxes stay on the card with the gap in the why list.
 
 **The crowd** (5 Oct 2026, at the user's request: "add the over/under %
 for tickets... can we test this?") is two boxes on the hockey card, over %

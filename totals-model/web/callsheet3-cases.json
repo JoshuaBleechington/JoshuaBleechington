@@ -5418,7 +5418,7 @@
   },
   {
     "sport": "NHL",
-    "name": "expected goals: two high-event clubs against the table's own league mean",
+    "name": "expected goals: two high-event clubs, shown against the table's own league mean, not scored",
     "inputs": {
       "gdate": "2026-11-15",
       "away": "Oilers",
@@ -5449,19 +5449,19 @@
       "h2hn": "3"
     },
     "expect": {
-      "lam_home": 3.08114569,
-      "lam_away": 2.84008112,
-      "projected": 6.54122681,
+      "lam_home": 3.04358831,
+      "lam_away": 2.80546218,
+      "projected": 6.4690505,
       "markets": [
         {
           "key": "total",
           "pick": "UNDER 6.5",
           "side": "UNDER",
-          "p": 0.5197158,
+          "p": 0.53139976,
           "p_push": 0,
           "price": -110.0,
-          "edge": -0.00409373,
-          "fair": -108.2101,
+          "edge": 0.00759023,
+          "fair": -113.4015,
           "anchored": true,
           "band": "NO BET"
         },
@@ -5469,11 +5469,11 @@
           "key": "ml",
           "pick": "Oilers ML",
           "side": "AWAY",
-          "p": 0.4576615,
+          "p": 0.45790133,
           "p_push": 0.0,
           "price": 110.0,
-          "edge": -0.01852897,
-          "fair": 118.5021,
+          "edge": -0.01828915,
+          "fair": 118.3877,
           "anchored": true,
           "band": ""
         },
@@ -5481,11 +5481,11 @@
           "key": "pl",
           "pick": "Oilers +1.5",
           "side": "AWAY",
-          "p": 0.63181388,
+          "p": 0.63306213,
           "p_push": 0.0,
           "price": null,
           "edge": null,
-          "fair": -171.6018,
+          "fair": -172.5257,
           "anchored": false,
           "band": ""
         }

@@ -591,7 +591,9 @@
               last ten comes from the league ledger (Run NHL ledger.bat) and moves the first period the way the full
               game's last ten moves the total: weighted 0.8 against the market's 4, both sides or neither. Expected
               goals come from MoneyPuck's team file, all situations, per game, with that table's league mean beside
-              them; all four or none, weighted 1.2 and tagged.</p>
+              them; all four or none, and since the 7 Oct backtest shown, not scored: built the slate's way, this
+              season's xG to date ran the wrong way against a season of closes, and last season's flipped sign
+              between seasons.</p>
           </div>
         </details>
       </div>
@@ -1724,7 +1726,7 @@
   NHL.REG_GOALS = NHL.GOALS - NHL.ENG - NHL.OT;
   NHL.SV_STABLE_AT = NHL.SV * (1.0 - NHL.SV) / (NHL.TALENT_SD * NHL.TALENT_SD);
   NHL.REG_PHI = (NHL.RESIDUAL_SD * NHL.RESIDUAL_SD - NHL.ENG * (1.0 - NHL.ENG) - NHL.OT * (1.0 - NHL.OT)) / NHL.REG_GOALS;
-  var NHL_WEIGHTS = { market: 4.0, goalies: 1.6, xg: 1.2, form: 0.6, h2h: 0.5 };   // goalies 1.6 and form 0.6 measured 7 Oct 2026; special teams out (totals/nhl.py)
+  var NHL_WEIGHTS = { market: 4.0, goalies: 1.6, form: 0.6, h2h: 0.5 };   // goalies 1.6 and form 0.6 measured 7 Oct 2026; special teams and expected goals out (totals/nhl.py)
   NHL.OCTOBER_DELTA = 0.25;   // the October over: 6.41 scored against a 6.07 close over two seasons, 178-146 blind; half the excess, tagged
   NHL.BACKUP_DELTA = -0.15;   // one backup in net: 0.18 under the close on 737 games (53.7%), both seasons; sized under it, tagged
   NHL.BACKUP_DELTA_COLD = -0.25;   // ...a COLD backup (his shrunk line costs > BACKUP_COLD_GAP goals): 0.44 under on 182 games, the under 57.5%
@@ -1868,16 +1870,15 @@
     /* expected goals (MoneyPuck, all situations): each side's offence against
        the other's defence per game, against the league mean of the same table.
        Tagged (totals/nhl.py); added 6 Oct 2026. */
+    /* SHOWN, NOT SCORED since 7 Oct 2026: this season's xG to date, built the slate's way, ran the wrong way
+       against 1,223 closes of 2024-25 (slope -0.31), and last season's flipped sign between seasons (totals/nhl.py) */
     var xg = [num("axgf"), num("hxgf"), num("axga"), num("hxga")];
     if (xg.every(function (v) { return v !== null && ok(v, "xg_rate"); })) {
       var lgIn = num("xglg"), lg = (lgIn !== null && ok(lgIn, "xg_rate")) ? lgIn : NHL.XG;
       var xtot = (xg[0] + xg[3]) / 2 + (xg[1] + xg[2]) / 2, xgap = xtot - 2 * lg;
-      estimates.push(est("Expected goals", anchor + xgap, w.xg,
-        "Away " + xg[0].toFixed(2) + " for into " + xg[3].toFixed(2) + " against, home " + xg[1].toFixed(2) + " into " + xg[2].toFixed(2) + ": " +
-        xtot.toFixed(2) + " expected goals against a league " + (2 * lg).toFixed(2) + " (" + (lgIn !== null ? "the table's own mean" : "assumed") + "), " +
-        sgn(xgap) + " on the line. Weight " + w.xg + ", tagged: it cannot buy a band until the record says so.", false));
+      notes.push("Expected goals " + xtot.toFixed(2) + " against a league " + (2 * lg).toFixed(2) + " (" + sgn(xgap) + "). <b>SHOWN, NOT SCORED</b>: built the slate's way against 1,223 closing totals, this season's xG to date ran the wrong way (slope −0.31), and last season's flipped sign between seasons. The market has it.");
     } else if (xg.some(function (v) { return v !== null; })) {
-      notes.push("Expected goals need all four figures — both sides' for and against — and a partial set has been dropped rather than half-applied.");
+      notes.push("Expected goals are shown, not scored, and a partial set (not all four figures) is not even shown.");
     }
 
     var a10 = num("al10"), h10 = num("hl10");

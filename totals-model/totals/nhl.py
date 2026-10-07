@@ -172,18 +172,18 @@ OT_COMPRESSION = 0.5
 #: a goal of lean), and with a BACKUP in net it ran against (both
 #: seasons). So goalies are scored at 1.6 with two regular starters and
 #: NOT SCORED with a backup in net, where BACKUP_DELTA carries what the
-#: backtest found. Expected goals 1.2 a priori; the
-#: backtest read prior-season xG against 1,308 closing totals at a slope
-#: of 0.45 (an implied weight near 3) but betting it was 52-53%, so it
-#: stays. Form 0.6, measured: last-ten lean against 2,445 closing totals
-#: ran at a slope of 0.14, an implied weight of 0.6. REMOVED from scoring
-#: on 7 Oct 2026, all shown, not scored: shots (season shot-rate lean ran
-#: the WRONG way, slope -0.72, 49.1% betting with it); special teams (the
-#: detail pass put each side's power play and kill to date against 2,445
-#: closes: slopes -0.20 and -0.51, the power-play half -0.06/-0.47 and the
-#: kill half -0.43/-0.54 by season -- the market has them); head to head
-#: (slope 0.02 on 814); the first-period last ten (slope -0.003).
-WEIGHTS = {"market": 4.0, "goalies": 1.6, "xg": 1.2, "form": 0.6, "h2h": 0.5}
+#: backtest found. Form 0.6, measured: last-ten lean against 2,445 closing
+#: totals ran at a slope of 0.14, an implied weight of 0.6. REMOVED from
+#: scoring on 7 Oct 2026, all shown, not scored: shots (season shot-rate
+#: lean ran the WRONG way, slope -0.72, 49.1% betting with it); special
+#: teams (the detail pass put each side's power play and kill to date
+#: against 2,445 closes: slopes -0.20 and -0.51, the power-play half
+#: -0.06/-0.47 and the kill half -0.43/-0.54 by season -- the market has
+#: them); expected goals (this season's xG to date, built the slate's way
+#: from Natural Stat Trick's game table, slope -0.31 against 1,223 closes
+#: of 2024-25, and last season's xG +0.45/-0.46 by season: a coin); head
+#: to head (slope 0.02 on 814); the first-period last ten (slope -0.003).
+WEIGHTS = {"market": 4.0, "goalies": 1.6, "form": 0.6, "h2h": 0.5}
 #: A backup in net. The detail pass named every starter over two seasons;
 #: a starter with fewer than 30% of his club's starts, ten starts in, is a
 #: backup. With ONE backup in a game the total landed 0.18 under the close
@@ -489,22 +489,25 @@ def forecast_nhl(
     # mean of the same table; the gap goes on the line. Added 6 Oct 2026 from
     # the user's download of the team file. Tagged: it is the best-supported
     # team input in hockey analytics, and it still has no record here.
+    # SHOWN, NOT SCORED since 7 Oct 2026. Natural Stat Trick's game table
+    # let the input be built the way the slate builds it -- each club's xG
+    # for and against per game to date, five games in, against the table's
+    # own league mean -- and against 1,223 closing totals of 2024-25 it ran
+    # the WRONG way (slope -0.31; betting a half-goal of lean 19-34). Last
+    # season's xG flipped sign between seasons (+0.45 in 2025-26, -0.46 in
+    # 2024-25), high-danger chances to date were null (-0.03), last-ten xG
+    # null (-0.20). The market has it. The gap is still computed and shown.
     xg = [away_xgf, home_xgf, away_xga, home_xga]
     if all(v is not None and _ok(v, "xg_rate") for v in xg):
         lg = league_xg if (league_xg is not None and _ok(league_xg, "xg_rate")) else LEAGUE_XG_PER_TEAM
         xtot = (away_xgf + home_xga) / 2.0 + (home_xgf + away_xga) / 2.0
         xgap = xtot - 2.0 * lg
-        lg_how = "the table's own mean" if league_xg is not None else "assumed"
-        estimates.append(Estimate(
-            "Expected goals", anchor + xgap, w["xg"],
-            f"Away {away_xgf:.2f} for into {home_xga:.2f} against, home {home_xgf:.2f} into "
-            f"{away_xga:.2f}: {xtot:.2f} expected goals against a league {2 * lg:.2f} "
-            f"({lg_how}), {xgap:+.2f} on the line. "
-            f"Weight {w['xg']:g}, tagged: it cannot buy a band until the record says so.",
-            mechanism=False))
+        notes.append(f"Expected goals {xtot:.2f} against a league {2 * lg:.2f} ({xgap:+.2f}). SHOWN, NOT SCORED: "
+                     "built the slate's way against 1,223 closing totals, this season's xG to date ran the "
+                     "wrong way (slope -0.31), and last season's flipped sign between seasons. The market has it.")
     elif any(v is not None for v in xg):
-        notes.append("Expected goals need all four figures -- both sides' for and against -- and a "
-                     "partial set has been dropped rather than half-applied.")
+        notes.append("Expected goals are shown, not scored, and a partial set (not all four figures) is not "
+                     "even shown.")
 
     if away_last10_total is not None and home_last10_total is not None:
         avg = (away_last10_total + home_last10_total) / 2.0

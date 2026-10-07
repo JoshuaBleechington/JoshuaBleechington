@@ -94,7 +94,7 @@ NHL_CASES = [
     {"name": "first-period form from the ledger: two hot first periods pull the period over",
      "inputs": dict(away="Avalanche", home="Senators", line="6.5", op="-110", up="-110", p1line="1.5", p1op="-130", p1up="100",
                     ap1l10="2.30", hp1l10="2.10", **FULL)},
-    {"name": "expected goals: two high-event clubs against the table's own league mean",
+    {"name": "expected goals: two high-event clubs, shown against the table's own league mean, not scored",
      "inputs": dict(away="Oilers", home="Devils", line="6.5", op="-110", up="-110", hml="-130", aml="110",
                     axgf="3.40", axga="3.10", hxgf="3.30", hxga="2.90", xglg="3.05", **FULL)},
     {"name": "October: the seasonal delta on the line, tagged",

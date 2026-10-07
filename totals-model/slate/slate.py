@@ -1236,14 +1236,45 @@ def periods_from_landing(landing):
             per[key] = (per[key][0] + a, per[key][1] + h)
         else:
             per[key] = (a, h)
+    away_ab = ((landing or {}).get("awayTeam") or {}).get("abbrev")
+    scoring = summ.get("scoring") or []
+    # A finished season's page has no linescore (checked against a saved
+    # 2024-25 page, 7 Oct 2026): the periods come from the goal list instead,
+    # one entry per period with each goal's team. A period with no goals is
+    # still listed, so three regulation periods always resolve.
+    if 1 not in per and scoring:
+        for sc in scoring:
+            d = sc.get("periodDescriptor") or {}
+            num, typ = d.get("number"), str(d.get("periodType") or "")
+            key = "SO" if typ == "SO" else ("OT" if (typ == "OT" or (num is not None and num > 3)) else num)
+            if key is None:
+                continue
+            a = h = 0
+            for g in sc.get("goals") or []:
+                ab = g.get("teamAbbrev")
+                ab = ab.get("default") if isinstance(ab, dict) else ab
+                if ab == away_ab:
+                    a += 1
+                else:
+                    h += 1
+            if key == "OT" and key in per:
+                per[key] = (per[key][0] + a, per[key][1] + h)
+            else:
+                per[key] = (a, h)
+        for k in (1, 2, 3):
+            per.setdefault(k, (0, 0))
     sa = sh = None
     sbp = summ.get("shotsByPeriod") or []
     if sbp:
         sa = sum(int(x.get("away") or 0) for x in sbp)
         sh = sum(int(x.get("home") or 0) for x in sbp)
+    else:
+        # the finished-season page keeps the game's shots on the two teams
+        ta, th = (landing or {}).get("awayTeam") or {}, (landing or {}).get("homeTeam") or {}
+        if ta.get("sog") is not None and th.get("sog") is not None:
+            sa, sh = int(ta["sog"]), int(th["sog"])
     ena = enh = 0
-    away_ab = ((landing or {}).get("awayTeam") or {}).get("abbrev")
-    for sc in summ.get("scoring") or []:
+    for sc in scoring:
         for g in sc.get("goals") or []:
             if str(g.get("goalModifier") or "").lower().startswith("empty"):
                 ab = g.get("teamAbbrev")
@@ -1254,7 +1285,9 @@ def periods_from_landing(landing):
                     enh += 1
     end = str(((landing or {}).get("gameOutcome") or {}).get("lastPeriodType") or "")
     if not end:
-        end = "SO" if "SO" in per else ("OT" if "OT" in per else "REG")
+        # the page's own last period descriptor: REG, OT or SO
+        pt = str(((landing or {}).get("periodDescriptor") or {}).get("periodType") or "")
+        end = pt if pt in ("REG", "OT", "SO") else ("SO" if "SO" in per else ("OT" if "OT" in per else "REG"))
     return per, (sa, sh), (ena, enh), end
 
 
@@ -1410,15 +1443,22 @@ def make_nhl_ledger(date_iso, out_dir, log, season=None):
         date_iso = "%s-05-05" % str(season)[4:]   # the regular season is long over by May
     path = ledger_path(out_dir, season)
     led = load_ledger(path) or {"format": LEDGER_FORMAT, "version": 1, "season": season, "games": [], "through": None}
-    have = set(g.get("id") for g in led["games"])
-    if led.get("through"):
+    # a game that came through without its periods (the first two season
+    # pulls, before the finished-season page was read right) is fetched again
+    have = set(g.get("id") for g in led["games"] if g.get("p1a") is not None)
+    redo = len(led["games"]) - len(have)
+    if redo:
+        log("%d game%s in the ledger lack period scores and will be fetched again." % (redo, "" if redo == 1 else "s"))
+    if led.get("through") and not redo:
         start = (dt.date.fromisoformat(led["through"]) - dt.timedelta(days=7)).isoformat()
     else:
         start = season_start_iso(season)
     log("Scanning the league from %s to %s (%d game%s already in the ledger); a line prints per week with games..." % (start, date_iso, len(have), "" if len(have) == 1 else "s"))
     new = nhl_ledger_scan(start, date_iso, have, log)
-    led["games"].extend(new)
-    led["games"].sort(key=lambda g: ((g.get("date") or ""), g.get("id") or 0))
+    byid = {g.get("id"): g for g in led["games"]}
+    for e in new:
+        byid[e.get("id")] = e
+    led["games"] = sorted(byid.values(), key=lambda g: ((g.get("date") or ""), g.get("id") or 0))
     led["through"] = date_iso
     led["generated"] = now_utc()
     led["measure"] = nhl_measure(led["games"])
@@ -1784,6 +1824,16 @@ def selftest():
     avg1, k1 = team_p1_last10(synthetic, "NYR", "2026-10-07")
     check("ledger: a club's first-period last ten, before the date", k1 == 3 and abs(avg1 - (1 + 3 + 2) / 3.0) < 1e-9)
     check("ledger: nothing before the season", team_p1_last10(synthetic, "NYR", "2026-09-01") == (None, 0))
+    past = {"id": 2024020001, "gameDate": "2024-10-04", "periodDescriptor": {"number": 4, "periodType": "OT"},
+            "awayTeam": {"abbrev": "NJD", "score": 4, "sog": 23}, "homeTeam": {"abbrev": "BUF", "score": 3, "sog": 31},
+            "summary": {"scoring": [
+                {"periodDescriptor": {"number": 1, "periodType": "REG"}, "goals": [{"teamAbbrev": {"default": "NJD"}, "goalModifier": "none"}, {"teamAbbrev": {"default": "NJD"}, "goalModifier": "none"}]},
+                {"periodDescriptor": {"number": 2, "periodType": "REG"}, "goals": []},
+                {"periodDescriptor": {"number": 3, "periodType": "REG"}, "goals": [{"teamAbbrev": {"default": "BUF"}, "goalModifier": "none"}, {"teamAbbrev": {"default": "BUF"}, "goalModifier": "none"}, {"teamAbbrev": {"default": "BUF"}, "goalModifier": "none"}]},
+                {"periodDescriptor": {"number": 4, "periodType": "OT"}, "goals": [{"teamAbbrev": {"default": "NJD"}, "goalModifier": "none"}]}]}}
+    pper, pshots, pen, pend = periods_from_landing(past)
+    check("ledger: a finished season's page (goal list, no linescore) gives periods, shots and the end",
+          pper == {1: (2, 0), 2: (0, 0), 3: (0, 3), "OT": (1, 0)} and pshots == (23, 31) and pen == (0, 0) and pend == "OT")
     land0 = _canned_nhl_landing()
     e0 = ledger_entry({"id": 7, "awayTeam": {"abbrev": "NYR", "score": 2}, "homeTeam": {"abbrev": "BOS", "score": 3}}, land0, "2026-10-06")
     check("ledger: a schedule game without its own date takes the day's", e0["date"] == "2026-10-06" and e0["fa"] == 2)

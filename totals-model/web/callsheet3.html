@@ -282,7 +282,7 @@
   <header class="top">
     <div>
       <div class="eyebrow"><span id="eyebrow">MLB · every market on the game</span>
-        <span class="build">· build <span id="build">2026-10-06</span></span></div>
+        <span class="build">· build <span id="build">2026-10-07</span></span></div>
       <h1>Call Sheet <em>3.0</em></h1>
       <p>One matchup, every market the book posts on it — in baseball the full-game total, the first five,
          the moneyline and the run line; in hockey the total, the first period, the moneyline and the puck line;
@@ -3124,7 +3124,7 @@
     return against ? "over against the grain" : "";
   }
   function marksOf(sp, inputs, markets) {
-    var out = { profile: "", lean: "", grain: "", crowd: "" };
+    var out = { profile: "", lean: "", grain: "", crowd: "", b2b: "" };
     if (!inputs) return out;
     /* the crowd (NHL): where the money is, against the sheet's pick on the
        total. 65%+ of the money on one side is a crowd; the pick is WITH it
@@ -3139,6 +3139,12 @@
         var crowdSide = cash >= 65 ? "OVER" : "UNDER";
         out.crowd = tot.side === crowdSide ? "with the crowd" : "against the crowd";
       }
+      /* back to back (NHL): a side on no rest. Shown, not scored; the total
+         tile keeps the UNDER's record on these games whatever the pick was,
+         because the first 12 on the card went under 8-4 (7 Oct 2026) and a
+         tired team is a mechanism with a disputed sign. The line is the test. */
+      var ar = numOf(inputs.arest), hr = numOf(inputs.hrest);
+      if ((ar !== null && ar <= 0) || (hr !== null && hr <= 0)) out.b2b = "back to back";
       return out;
     }
     if (sp !== "MLB") return out;
@@ -3159,6 +3165,7 @@
     if (tg.profile) h += '<span class="' + cls + '">' + esc(tg.profile) + '</span>';
     if (tg.lean) h += '<span class="' + cls + '">' + esc(tg.lean) + '</span>';
     if (tg.crowd) h += '<span class="' + cls + '">' + esc(tg.crowd) + '</span>';
+    if (tg.b2b) h += '<span class="' + cls + '">' + esc(tg.b2b) + '</span>';
     return h;
   }
   function renderCalib() {
@@ -3170,7 +3177,7 @@
        against away -- and the full-game total keeps the record of the rows
        that carried Call Sheet #1's verdict, because the parlay legs lean on
        it. Asked for on 25 Sept: "how many of the 17-10 went over vs under". */
-    var fresh = function (label) { return { n: 0, w: 0, l: 0, p: 0, says: 0, units: 0, label: label, sides: {}, verdict: null, profile: null, lean: {}, grain: null, crowd: {}, high: null,
+    var fresh = function (label) { return { n: 0, w: 0, l: 0, p: 0, says: 0, units: 0, label: label, sides: {}, verdict: null, profile: null, lean: {}, grain: null, crowd: {}, high: null, b2b: null,
                                             clv: { n: 0, beat: 0, lost: 0, even: 0, runs: 0 } }; };
     var bySport = {};
     ["MLB", "NHL", "WNBA"].forEach(function (sp) {
@@ -3202,6 +3209,11 @@
           if (tg.grain && mk.key === "total") count(t.grain || (t.grain = { w: 0, l: 0, p: 0 }), res);
           if (tg.lean) count(t.lean[tg.lean] || (t.lean[tg.lean] = { w: 0, l: 0, p: 0 }), res);
           if (tg.crowd && mk.key === "total") count(t.crowd[tg.crowd] || (t.crowd[tg.crowd] = { w: 0, l: 0, p: 0 }), res);
+          if (tg.b2b && mk.key === "total") {
+            var uv = bothSides(mk).filter(function (v) { return v.side === "UNDER"; })[0];
+            var ur = uv ? gradeMarket(uv, row.finals) : null;
+            if (ur !== null && ur !== "invalid") count(t.b2b || (t.b2b = { w: 0, l: 0, p: 0 }), ur);
+          }
         }
       }
       if (res === "push") { t.p++; return; }
@@ -3252,6 +3264,7 @@
       if (s.grain) parts.push('over against the grain ' + rec(s.grain));
       ["same lean", "split lean"].forEach(function (k) { if (s.lean[k]) parts.push(k + ' ' + rec(s.lean[k])); });
       ["with the crowd", "against the crowd"].forEach(function (k) { if (s.crowd[k]) parts.push(k + ' ' + rec(s.crowd[k])); });
+      if (s.b2b) parts.push('back to back, the under ' + rec(s.b2b));
       if (s.clv.n) parts.push('beat the close ' + s.clv.beat + '-' + s.clv.lost + (s.clv.even ? '-' + s.clv.even : '') + ' · ' + sgn(s.clv.runs / s.clv.n, 2) + ' ' + (unit || 'runs') + ' avg');
       return '<div><p class="k">' + esc(s.label) + '</p><p class="v">' + s.w + '-' + s.l + (s.p ? '-' + s.p : '') + '</p>' +
         '<p class="s">' + (s.n ? 'says ' + says.toFixed(1) + '% · does ' + does.toFixed(1) + '% (±' + se.toFixed(1) + ') · ' + sgn(s.units, 2) + 'u' : 'pushes only') + '</p>' +

@@ -90,10 +90,20 @@ under 396-341, 53.7%; −0.19 and −0.18 by season, at every threshold tried;
 the mean close in those games 6.21 against 6.02 otherwise). The market
 bumps the total for a backup and bumps it too far. One backup puts a
 tagged −0.15 on the line (sized under the measurement; it cannot buy a
-band) and the total tile keeps the under's record on these games. With a
-backup in both nets (105 games) the sign flipped on no sample, so nothing
-moves. The slate ticks the box from the club's starts; the user fixes it
-from Daily Faceoff.
+band) and the total tile keeps the under's record on these games. When
+the backup's own line reads **cold** (his shrunk save percentage costs
+more than 0.05 goals against a league goalie) the market over-bumped
+harder: 182 games landed 0.44 under the close, the under 100-74 (57.5%;
+−0.53 and −0.39 by season), against 0.10 under and 52.6% for a warm or
+even backup. A cold backup takes −0.25. With a backup in both nets (105
+games) the sign flipped on no sample, so nothing moves. The slate ticks
+the box from the club's starts; the user fixes it from Daily Faceoff.
+
+The same pass tested the schedule and found nothing to score: three games
+in four nights ran 0.13 under (849 games, 52.1%, both seasons, near the
+back-to-back label); a road trip's fifth game and later, divisional
+games, two-plus time zones of travel, the stretch after the All-Star
+break and April all flipped sign between seasons or sat at a coin.
 
 **The goal total is a mixture**: a regulation count (negative binomial at
 the Poisson floor, index 1.01) plus the empty-net lump (0.39 expected goals
@@ -158,6 +168,8 @@ were earned on: when it said over, did the game land over the close?
 | Goalies, a backup in net | 767 | −0.84 / −0.94 | negative | **not scored**; the backup delta carries it |
 | Special teams, power play and kill to date | 2,445 | −0.20 / −0.51 | negative | **shown, not scored**; both halves negative both seasons |
 | One backup in net, the under | 737 | | | **53.7% (−0.18 under the close both seasons); −0.15 tagged delta** |
+| ...the backup's own line cold | 182 | | | **57.5% (−0.44 under; −0.53, −0.39 by season); −0.25 tagged delta** |
+| Three in four nights, the under | 849 | | | 52.1%, −0.13; not scored |
 | Backups in both nets | 105 | | | sign flipped, no sample; nothing moves |
 
 The first period's share model is dead on: 1.747 predicted from the close

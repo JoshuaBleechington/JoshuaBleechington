@@ -5148,6 +5148,43 @@
   },
   {
     "sport": "NHL",
+    "name": "a cold backup in one net: the bigger tagged delta",
+    "inputs": {
+      "gdate": "2026-11-15",
+      "away": "Kraken",
+      "home": "Canucks",
+      "line": "6",
+      "op": "-110",
+      "up": "-110",
+      "agsv": "0.870",
+      "hgsv": "0.912",
+      "agsh": "900",
+      "hgsh": "1800",
+      "agbk": "1",
+      "hgconf": "1"
+    },
+    "expect": {
+      "lam_home": null,
+      "lam_away": null,
+      "projected": 5.90664418,
+      "markets": [
+        {
+          "key": "total",
+          "pick": "UNDER 6",
+          "side": "UNDER",
+          "p": 0.54939394,
+          "p_push": 0.1656778,
+          "price": -110.0,
+          "edge": 0.02558442,
+          "fair": -121.9233,
+          "anchored": true,
+          "band": "NO BET"
+        }
+      ]
+    }
+  },
+  {
+    "sport": "NHL",
     "name": "backups in both nets: nothing moves",
     "inputs": {
       "gdate": "2026-11-15",

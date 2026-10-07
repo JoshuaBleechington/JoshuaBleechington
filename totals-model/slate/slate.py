@@ -1521,6 +1521,69 @@ def nhl_detail(entry, box, landing):
     return entry
 
 
+def nhl_right_rail(game_id):
+    """The game page's side panel: officials, head coaches, scratches."""
+    return nhl_api("/gamecenter/%s/right-rail" % game_id)
+
+
+def _names(xs):
+    out = []
+    for x in xs or []:
+        nm = x.get("default") if isinstance(x, dict) else x
+        if isinstance(nm, dict):
+            nm = nm.get("default")
+        if nm:
+            out.append(str(nm))
+    return out
+
+
+def nhl_refs(entry, rail, landing=None):
+    """The third pass over a ledger game: the two referees and the two
+    linesmen, and how many skaters each side scratched, from the game
+    page's side panel (falling back to the game page itself). Fills the
+    entry in place; `rail` is set either way so the game is not refetched."""
+    gi = ((rail or {}).get("gameInfo") or {}) or (((landing or {}).get("summary") or {}).get("gameInfo") or {})
+    refs = _names(gi.get("referees"))
+    lines = _names(gi.get("linesmen"))
+    if refs:
+        entry["refs"] = refs
+    if lines:
+        entry["linesmen"] = lines
+    for side, key in (("awayTeam", "a"), ("homeTeam", "h")):
+        sc = (gi.get(side) or {}).get("scratches")
+        if isinstance(sc, list):
+            entry["scr" + key] = len(sc)
+    entry["rail"] = True
+    return entry
+
+
+def nhl_ledger_refs(led, path, log):
+    """Fetch the side panel for every ledger game without it, for the
+    referees and scratches. One call a game; a season is about 20 minutes.
+    Written every 100 games so a stopped run keeps what it fetched."""
+    todo = [g for g in led["games"] if not g.get("rail") and g.get("id") is not None]
+    log("Officials pass: %d game%s to fetch (one call each)..." % (len(todo), "" if len(todo) == 1 else "s"))
+    done = found = 0
+    for g in todo:
+        try:
+            rail = nhl_right_rail(g["id"])
+        except Exception as e:  # noqa: BLE001
+            log("  game %s: no side panel (%s)" % (g["id"], e))
+            rail = {}
+        nhl_refs(g, rail)
+        done += 1
+        if g.get("refs"):
+            found += 1
+        if done == 1 and not g.get("refs"):
+            log("  the first game came back without referees; the panel's keys were: %s" % ", ".join(sorted((rail or {}).keys())) or "none")
+        if done % 100 == 0 or done == len(todo):
+            led["generated"] = now_utc()
+            with open(path, "w", encoding="utf-8") as f:
+                json.dump(led, f, indent=1)
+            log("  %d of %d fetched, %d with referees; written" % (done, len(todo), found))
+    return done
+
+
 def nhl_ledger_detail(led, path, log):
     """Fetch the box score and game page for every ledger game without its
     detail, writing the file every 100 games so a stopped run keeps what it
@@ -1554,7 +1617,7 @@ def nhl_ledger_detail(led, path, log):
     return done
 
 
-def make_nhl_ledger(date_iso, out_dir, log, season=None, detail=False):
+def make_nhl_ledger(date_iso, out_dir, log, season=None, detail=False, refs=False):
     """This season's ledger up to date_iso, or -- with a season id such as
     20252026 -- a PAST season in full, for the backtest. A past season's
     file is complete once written and never rescanned."""
@@ -1590,6 +1653,9 @@ def make_nhl_ledger(date_iso, out_dir, log, season=None, detail=False):
     if detail:
         n = nhl_ledger_detail(led, path, log)
         log("Detail pass done: %d game%s fetched; %d of %d in the ledger carry starters and special teams." % (n, "" if n == 1 else "s", sum(1 for g in led["games"] if g.get("detail")), len(led["games"])))
+    if refs:
+        n = nhl_ledger_refs(led, path, log)
+        log("Officials pass done: %d game%s fetched; %d of %d in the ledger name their referees." % (n, "" if n == 1 else "s", sum(1 for g in led["games"] if g.get("refs")), len(led["games"])))
     return path
 
 
@@ -1952,6 +2018,13 @@ def selftest():
     check("ledger detail: starters by flag or by ice time, their lines, power-play goals and penalties",
           det["ga_id"] == 1 and det["ga_sa"] == 28 and det["ga_sv"] == 26 and det["ga_ga"] == 2 and det["gh_id"] == 9 and det["gh_name"] == "J. S" and det["gh_sa"] == 31
           and det["ppga"] == 1 and det["ppgh"] == 0 and det["pena"] == 1 and det["penh"] == 1 and det["detail"] is True)
+    rail = {"gameInfo": {"referees": [{"default": "Wes McCauley"}, {"default": "Kelly Sutherland"}], "linesmen": [{"default": "A. Lines"}, {"default": "B. Lines"}],
+                         "awayTeam": {"headCoach": {"default": "Coach A"}, "scratches": [{"id": 1}, {"id": 2}]}, "homeTeam": {"headCoach": {"default": "Coach B"}, "scratches": []}}}
+    rf = nhl_refs({"id": 1}, rail)
+    check("ledger officials: referees, linesmen and scratch counts from the side panel",
+          rf["refs"] == ["Wes McCauley", "Kelly Sutherland"] and rf["linesmen"] == ["A. Lines", "B. Lines"] and rf["scra"] == 2 and rf["scrh"] == 0 and rf["rail"] is True)
+    rf2 = nhl_refs({"id": 2}, {}, {"summary": {"gameInfo": {"referees": [{"default": "Chris Rooney"}]}}})
+    check("ledger officials: falls back to the game page, and an empty panel still marks the game fetched", rf2.get("refs") == ["Chris Rooney"] and nhl_refs({"id": 3}, {}).get("rail") is True and "refs" not in nhl_refs({"id": 3}, {}))
     past = {"id": 2024020001, "gameDate": "2024-10-04", "periodDescriptor": {"number": 4, "periodType": "OT"},
             "awayTeam": {"abbrev": "NJD", "score": 4, "sog": 23}, "homeTeam": {"abbrev": "BUF", "score": 3, "sog": 31},
             "summary": {"scoring": [
@@ -2239,6 +2312,7 @@ def main(argv=None):
     ap.add_argument("--date", help="YYYY-MM-DD. Default: today for slate, yesterday for grade.")
     ap.add_argument("--season", help="nhl-ledger only: a past season to pull in full, e.g. 20252026 (for the backtest).")
     ap.add_argument("--detail", action="store_true", help="nhl-ledger only: also fetch each game's box score and game page for the starters, their lines, power-play goals and penalties (two calls a game; about 40 minutes a season).")
+    ap.add_argument("--refs", action="store_true", help="nhl-ledger only: also fetch each game's side panel for the referees, linesmen and scratches (one call a game; about 20 minutes a season).")
     ap.add_argument("--out", default=".", help="folder to write into (default: where you run it)")
     ap.add_argument("--selftest", action="store_true", help="run the offline checks and exit")
     ap.add_argument("--quiet", action="store_true", help="print only the final line")
@@ -2271,7 +2345,7 @@ def main(argv=None):
         elif a.mode == "nhl-grade":
             path = make_nhl_grade(date_iso, a.out, log)
         elif a.mode == "nhl-ledger":
-            path = make_nhl_ledger(date_iso, a.out, log, a.season, a.detail)
+            path = make_nhl_ledger(date_iso, a.out, log, a.season, a.detail, a.refs)
         else:
             path = make_slate(date_iso, a.out, log)
     except Exception as e:  # noqa: BLE001

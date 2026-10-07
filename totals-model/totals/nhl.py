@@ -193,6 +193,13 @@ WEIGHTS = {"market": 4.0, "goalies": 1.6, "xg": 1.2, "form": 0.6, "h2h": 0.5}
 #: sample is nothing, so nothing moves. Sized under the measurement, as a
 #: tagged delta: it cannot buy a band, and the tile keeps the under's record.
 BACKUP_DELTA = -0.15
+#: ...and when the backup's own line reads COLD (his shrunk save percentage
+#: costs more than BACKUP_COLD_GAP goals against a league goalie) the
+#: market over-bumps harder: 182 such games landed 0.44 under the close,
+#: the under 100-74 (57.5%; -0.53 and -0.39 by season). The warm or even
+#: backup: 585 games, 0.10 under, 52.6%. Sized under both measurements.
+BACKUP_DELTA_COLD = -0.25
+BACKUP_COLD_GAP = 0.05
 BACKUP_SHARE = 0.30     # a starter under this share of his club's starts is a backup
 BACKUP_MIN_STARTS = 10  # ...once the club has this many starts to share
 #: October. Both backtest seasons scored 6.41 a game in October against a
@@ -444,12 +451,19 @@ def forecast_nhl(
     # sign flipped on 105 games, which is no sample; nothing moves.
     backups = [s for s, b in (("away", away_goalie_backup), ("home", home_goalie_backup)) if b]
     if len(backups) == 1:
+        bk_sv = a_sv if backups[0] == "away" else h_sv
+        bk_gap = goalie_gap(bk_sv) if bk_sv is not None else None
+        cold = bk_gap is not None and bk_gap > BACKUP_COLD_GAP
+        size = BACKUP_DELTA_COLD if cold else BACKUP_DELTA
         bk_why = (f"Backup in net for the {backups[0]} side. Against two seasons of closing totals a "
                   "game with ONE backup starting landed 0.18 under the close (737 games, the under "
-                  f"53.7%): the market bumps the total for a backup and bumps it too far. {BACKUP_DELTA:+.2f} "
-                  "on the line, tagged: it cannot buy a band, and the tile keeps the under's record on "
-                  "these games.")
-        deltas.append(Delta("Backup in net", BACKUP_DELTA, bk_why, mechanism=False))
+                  "53.7%): the market bumps the total for a backup and bumps it too far. "
+                  + (f"This backup reads COLD (his line costs {bk_gap:+.2f} goals against a league goalie), and a "
+                     "cold backup over-bumped harder: 182 games landed 0.44 under, the under 57.5%. "
+                     if cold else "")
+                  + f"{size:+.2f} on the line, tagged: it cannot buy a band, and the tile keeps the under's "
+                  "record on these games.")
+        deltas.append(Delta("Backup in net", size, bk_why, mechanism=False))
         notes.append(bk_why)
     elif len(backups) == 2:
         notes.append("A backup in BOTH nets. Measured on 105 games with no direction (the one-backup "

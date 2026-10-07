@@ -29,6 +29,8 @@
   var NHL_WEIGHTS = { market: 4.0, goalies: 1.6, xg: 1.2, form: 0.6, h2h: 0.5 };   // goalies 1.6 and form 0.6 measured 7 Oct 2026; special teams out (totals/nhl.py)
   NHL.OCTOBER_DELTA = 0.25;   // the October over: 6.41 scored against a 6.07 close over two seasons, 178-146 blind; half the excess, tagged
   NHL.BACKUP_DELTA = -0.15;   // one backup in net: 0.18 under the close on 737 games (53.7%), both seasons; sized under it, tagged
+  NHL.BACKUP_DELTA_COLD = -0.25;   // ...a COLD backup (his shrunk line costs > BACKUP_COLD_GAP goals): 0.44 under on 182 games, the under 57.5%
+  NHL.BACKUP_COLD_GAP = 0.05;
   PLAUSIBLE.nhl_total = [3.5, 9.5]; PLAUSIBLE.nhl_period = [0.5, 4.5];
   PLAUSIBLE.save_pct = [0.850, 0.960]; PLAUSIBLE.shots = [15, 45]; PLAUSIBLE.shots_faced = [0, 3000]; PLAUSIBLE.xg_rate = [1.0, 5.5];
 
@@ -147,9 +149,12 @@
     if (checked("agbk")) backups.push("away");
     if (checked("hgbk")) backups.push("home");
     if (backups.length === 1) {
+      var bkSv = backups[0] === "away" ? aUsedSv : hUsedSv, bkGap = bkSv !== null ? goalieGap(bkSv) : null;
+      var cold = bkGap !== null && bkGap > NHL.BACKUP_COLD_GAP, bkSize = cold ? NHL.BACKUP_DELTA_COLD : NHL.BACKUP_DELTA;
       var bkWhy = "Backup in net for the " + backups[0] + " side. Against two seasons of closing totals a game with ONE backup starting landed 0.18 under the close (737 games, the under 53.7%): the market bumps the total for a backup and bumps it too far. " +
-        sgn(NHL.BACKUP_DELTA) + " on the line, tagged: it cannot buy a band, and the tile keeps the under's record on these games.";
-      deltas.push(delta("Backup in net", NHL.BACKUP_DELTA, bkWhy, false));
+        (cold ? "This backup reads <b>COLD</b> (his line costs " + sgn(bkGap) + " goals against a league goalie), and a cold backup over-bumped harder: 182 games landed 0.44 under, the under 57.5%. " : "") +
+        sgn(bkSize) + " on the line, tagged: it cannot buy a band, and the tile keeps the under's record on these games.";
+      deltas.push(delta("Backup in net", bkSize, bkWhy, false));
       notes.push("<b>Backup in net</b>" + bkWhy.slice("Backup in net".length));
     } else if (backups.length === 2) {
       notes.push("A backup in <b>both</b> nets. Measured on 105 games with no direction (the one-backup under did not carry), so nothing moves; the record will say.");

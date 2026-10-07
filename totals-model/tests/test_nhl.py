@@ -182,8 +182,29 @@ class TestTheGateAndTheTags(unittest.TestCase):
         bare = forecast_nhl("A @ B", 6.0, -110, -110)
         flagged = forecast_nhl("A @ B", 6.0, -110, -110, away_goalie_backup=True, **cold)
         self.assertNotIn("Goalies", [e.name for e in flagged.estimates])
-        self.assertAlmostEqual(flagged.projected - bare.projected, BACKUP_DELTA, places=9)
+        # the .880 backup reads cold, so the bigger delta is the only thing on the line
+        from totals.nhl import BACKUP_DELTA_COLD
+        self.assertAlmostEqual(flagged.projected - bare.projected, BACKUP_DELTA_COLD, places=9)
+        self.assertLess(BACKUP_DELTA_COLD, BACKUP_DELTA)
         self.assertTrue(any("Goalies are NOT SCORED with a backup in net" in n for n in flagged.notes))
+
+    def test_a_cold_backup_takes_the_bigger_delta(self):
+        from totals.nhl import BACKUP_DELTA, BACKUP_DELTA_COLD
+        self.assertLess(BACKUP_DELTA_COLD, BACKUP_DELTA)
+        bare = forecast_nhl("A @ B", 6.0, -110, -110)
+        # .870 on 900 shots shrinks to about .887: a cold line, costing ~0.3 goals against a league goalie
+        cold = forecast_nhl("A @ B", 6.0, -110, -110, away_goalie_backup=True, away_goalie_sv=0.870, away_goalie_shots=900,
+                            home_goalie_sv=0.912, home_goalie_shots=1800)
+        self.assertAlmostEqual(cold.projected - bare.projected, BACKUP_DELTA_COLD, places=9)
+        self.assertTrue(any("reads COLD" in n for n in cold.notes))
+        # .905 on 900 shrinks to above the league: warm, the ordinary delta
+        warm = forecast_nhl("A @ B", 6.0, -110, -110, away_goalie_backup=True, away_goalie_sv=0.905, away_goalie_shots=900,
+                            home_goalie_sv=0.912, home_goalie_shots=1800)
+        self.assertAlmostEqual(warm.projected - bare.projected, BACKUP_DELTA, places=9)
+        self.assertFalse(any("reads COLD" in n for n in warm.notes))
+        # no line for the backup at all: the ordinary delta
+        blind = forecast_nhl("A @ B", 6.0, -110, -110, away_goalie_backup=True)
+        self.assertAlmostEqual(blind.projected - bare.projected, BACKUP_DELTA, places=9)
 
     def test_two_backups_move_nothing(self):
         base = forecast_nhl("A @ B", 6.0, -110, -110, **LEAGUE)

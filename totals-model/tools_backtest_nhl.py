@@ -205,6 +205,12 @@ def report(rows, label):
         for k in sorted(bk):
             v = bk[k]; un = sum(1 for f in v if f["tot"] < f["line"]); ov = sum(1 for f in v if f["tot"] > f["line"])
             print(f"  {k} backup(s): {len(v):4d} games, residual {avg([f['resid'] for f in v]):+.3f}, the under {un}-{ov} ({100*un/(un+ov) if un+ov else 0:.1f}%), mean close {avg([f['line'] for f in v]):.2f}")
+        # one backup, split by whether the game's goalie lean reads the backup cold (gap above BACKUP_COLD_GAP)
+        one = [f for f in bk.get(1, []) if "goalie_gap" in f]
+        for nm, v in (("cold backup", [f for f in one if f["goalie_gap"] > N.BACKUP_COLD_GAP]), ("warm or even backup", [f for f in one if f["goalie_gap"] <= N.BACKUP_COLD_GAP])):
+            if not v: continue
+            un = sum(1 for f in v if f["tot"] < f["line"]); ov = sum(1 for f in v if f["tot"] > f["line"])
+            print(f"    one backup, {nm:20s}: {len(v):4d} games, residual {avg([f['resid'] for f in v]):+.3f}, the under {un}-{ov} ({100*un/(un+ov) if un+ov else 0:.1f}%)")
     b2 = [f for f in rows if f["b2b"]]; nb = [f for f in rows if not f["b2b"]]
     print(f"\nback to back: {len(b2)} games, residual {avg([f['resid'] for f in b2]):+.3f}, under {sum(1 for f in b2 if f['tot']<f['line'])}-{sum(1 for f in b2 if f['tot']>f['line'])} | rested: residual {avg([f['resid'] for f in nb]):+.3f}, under {sum(1 for f in nb if f['tot']<f['line'])}-{sum(1 for f in nb if f['tot']>f['line'])}")
     # P1 calibration vs the total's anchor

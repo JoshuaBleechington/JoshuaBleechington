@@ -1290,6 +1290,7 @@ def nhl_ledger_scan(start_iso, end_iso, have_ids, log):
             log("  week of %s: could not fetch the schedule (%s)" % (d.isoformat(), e))
             d += dt.timedelta(days=7)
             continue
+        week_new = 0
         for day in sched.get("gameWeek") or []:
             if (day.get("date") or "") > end_iso:
                 continue
@@ -1303,6 +1304,9 @@ def nhl_ledger_scan(start_iso, end_iso, have_ids, log):
                     landing = {}
                 out.append(ledger_entry(g, landing, day.get("date")))
                 have_ids.add(g.get("id"))
+                week_new += 1
+        if week_new:
+            log("  week of %s: %d final%s added (%d so far)" % (d.isoformat(), week_new, "" if week_new == 1 else "s", len(out)))
         d += dt.timedelta(days=7)
     return out
 
@@ -1411,7 +1415,7 @@ def make_nhl_ledger(date_iso, out_dir, log, season=None):
         start = (dt.date.fromisoformat(led["through"]) - dt.timedelta(days=7)).isoformat()
     else:
         start = season_start_iso(season)
-    log("Scanning the league from %s to %s (%d game%s already in the ledger)..." % (start, date_iso, len(have), "" if len(have) == 1 else "s"))
+    log("Scanning the league from %s to %s (%d game%s already in the ledger); a line prints per week with games..." % (start, date_iso, len(have), "" if len(have) == 1 else "s"))
     new = nhl_ledger_scan(start, date_iso, have, log)
     led["games"].extend(new)
     led["games"].sort(key=lambda g: ((g.get("date") or ""), g.get("id") or 0))

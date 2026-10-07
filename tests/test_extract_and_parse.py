@@ -105,3 +105,35 @@ def test_pdf_without_a_reader_degrades_to_a_warning(text_pdf, monkeypatch):
     doc = extract(text_pdf)
     assert doc.extractor == "none"
     assert doc.warnings and "PDF text extraction failed" in doc.warnings[0]
+
+
+# -- a sentence that opens on a heading word is not a heading -----------------
+
+def test_a_bullet_that_opens_on_a_heading_word_does_not_split_the_section():
+    """"Research adversary TTPs ..." was read as a Publications heading, and
+    every role written after it fell out of the experience section."""
+    from resume_ats.resume import parse
+    resume = parse("""Dana Whitfield
+dana@example.com | 602-800-4491
+
+PROFESSIONAL EXPERIENCE
+Cloud Security Analyst | Pursue SEO Marketing Solutions | Feb 2020 - Present
+Research adversary TTPs and map them to MITRE ATT&CK
+techniques to prioritize which threats get detection rules first.
+Maintain compliance documentation across NIST 800-53 and ISO 27001.
+
+Merchant Fraud Analyst | American Express | May 2018 - Feb 2020
+Investigated merchant fraud cases end to end.
+""")
+    assert "publications" not in resume.section_order
+    assert [r.organization for r in resume.roles] == ["Pursue SEO Marketing Solutions", "American Express"]
+
+
+def test_a_heading_with_a_short_qualifier_still_matches():
+    from resume_ats.resume import _match_heading
+    assert _match_heading("Experience (continued)") == "experience"
+    assert _match_heading("Skills & Tools") == "skills"
+    assert _match_heading("WORK EXPERIENCE") == "experience"
+    assert _match_heading("Education and Training") == "education"
+    assert _match_heading("Research adversary TTPs and map them to MITRE ATT&CK") is None
+    assert _match_heading("Summary of qualifications gained over ten years in the field") is None

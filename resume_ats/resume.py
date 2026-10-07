@@ -277,13 +277,39 @@ def _match_heading(raw: str) -> Optional[str]:
     line = re.sub(r"\s+", " ", line)
     if not line or len(line) > 60:
         return None
+    raw_words = re.sub(r"\s+", " ", raw.strip().strip(":|-–—•* \t")).split()
     for alias, canon in _HEADING_LOOKUP:
-        if line == alias or line.startswith(alias + " ") or line.startswith(alias + ":"):
+        if line == alias:
             return canon
+        if line.startswith(alias + " ") or line.startswith(alias + ":"):
+            # A heading may carry a short qualifier ("Experience (continued)",
+            # "Skills & Tools"). A sentence that happens to open on an alias
+            # may not: "Research adversary TTPs and map them to MITRE ATT&CK"
+            # was read as a Publications heading, and every role after it
+            # fell out of the experience section.
+            if _heading_tail_ok(raw_words[len(alias.split()):]):
+                return canon
+            continue
         # "EXPERIENCE ————" style decorated headings
         if re.fullmatch(re.escape(alias) + r"[\s_=~.·|/-]*", line):
             return canon
     return None
+
+
+_HEADING_GLUE = frozenset({"and", "of", "the", "&", "/", "|", "-", "–", "—"})
+
+
+def _heading_tail_ok(rest: Sequence[str]) -> bool:
+    """Whether the words after a heading alias still read as a heading."""
+    if len(rest) > 3:
+        return False
+    for word in rest:
+        bare = word.strip(":;,.")
+        if not bare or bare.lower() in _HEADING_GLUE:
+            continue
+        if bare[0].isalpha() and not bare[0].isupper():
+            return False       # a lowercase word: the alias started a sentence
+    return True
 
 
 def parse_dates(text: str) -> Tuple[Optional[Tuple[int, int]], Optional[Tuple[int, int]], bool]:

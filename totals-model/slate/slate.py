@@ -1396,8 +1396,14 @@ def team_p1_last10(games, abbrev, before_iso, n=10):
     return sum(g["p1a"] + g["p1h"] for g in tail) / float(len(tail)), len(tail)
 
 
-def make_nhl_ledger(date_iso, out_dir, log):
-    season = nhl_season_id([], date_iso)
+def make_nhl_ledger(date_iso, out_dir, log, season=None):
+    """This season's ledger up to date_iso, or -- with a season id such as
+    20252026 -- a PAST season in full, for the backtest. A past season's
+    file is complete once written and never rescanned."""
+    past = season is not None and str(season) != nhl_season_id([], date_iso)
+    season = str(season) if season else nhl_season_id([], date_iso)
+    if past:
+        date_iso = "%s-05-05" % str(season)[4:]   # the regular season is long over by May
     path = ledger_path(out_dir, season)
     led = load_ledger(path) or {"format": LEDGER_FORMAT, "version": 1, "season": season, "games": [], "through": None}
     have = set(g.get("id") for g in led["games"])
@@ -2041,6 +2047,7 @@ def main(argv=None):
                     help="slate (default): today's MLB inputs. grade: MLB finals. nhl: today's NHL inputs. nhl-grade: NHL finals. "
                          "nhl-ledger: every NHL final this season, measured against the sheet's assumptions.")
     ap.add_argument("--date", help="YYYY-MM-DD. Default: today for slate, yesterday for grade.")
+    ap.add_argument("--season", help="nhl-ledger only: a past season to pull in full, e.g. 20252026 (for the backtest).")
     ap.add_argument("--out", default=".", help="folder to write into (default: where you run it)")
     ap.add_argument("--selftest", action="store_true", help="run the offline checks and exit")
     ap.add_argument("--quiet", action="store_true", help="print only the final line")
@@ -2073,7 +2080,7 @@ def main(argv=None):
         elif a.mode == "nhl-grade":
             path = make_nhl_grade(date_iso, a.out, log)
         elif a.mode == "nhl-ledger":
-            path = make_nhl_ledger(date_iso, a.out, log)
+            path = make_nhl_ledger(date_iso, a.out, log, a.season)
         else:
             path = make_slate(date_iso, a.out, log)
     except Exception as e:  # noqa: BLE001

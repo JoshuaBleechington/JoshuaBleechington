@@ -38,6 +38,7 @@ def build_nhl(i: dict):
         p1_line=n(i.get("p1line")), p1_over_price=n(i.get("p1op")), p1_under_price=n(i.get("p1up")),
         away_p1_last10=n(i.get("ap1l10")), home_p1_last10=n(i.get("hp1l10")),
         away_xgf=n(i.get("axgf")), home_xgf=n(i.get("hxgf")), away_xga=n(i.get("axga")), home_xga=n(i.get("hxga")), league_xg=n(i.get("xglg")),
+        game_month=(int(i["gdate"][5:7]) if i.get("gdate") else None),
         away_goalie_sv=n(i.get("agsv")), home_goalie_sv=n(i.get("hgsv")),
         away_goalie_shots=n(i.get("agsh")), home_goalie_shots=n(i.get("hgsh")),
         away_shots_for=n(i.get("asf")), home_shots_for=n(i.get("hsf")),
@@ -86,6 +87,10 @@ NHL_CASES = [
     {"name": "expected goals: two high-event clubs against the table's own league mean",
      "inputs": dict(away="Oilers", home="Devils", line="6.5", op="-110", up="-110", hml="-130", aml="110",
                     axgf="3.40", axga="3.10", hxgf="3.30", hxga="2.90", xglg="3.05", **FULL)},
+    {"name": "October: the seasonal delta on the line, tagged",
+     "inputs": dict(away="Wild", home="Blues", line="6", op="-110", up="-110", gdate="2026-10-20")},
+    {"name": "shots alone move nothing now: shown, not scored",
+     "inputs": dict(away="Jets", home="Wild", line="6", op="-115", up="-105", asf="36.0", hsf="34.0")},
     {"name": "a wide moneyline hold is regressed",
      "inputs": dict(away="Lightning", home="Capitals", line="6.5", op="-110", up="-110", hml="-200", aml="150", **FULL)},
 ]
@@ -95,7 +100,8 @@ def main() -> None:
     cases = [c for c in json.loads(SRC.read_text()) if c["sport"] in ("MLB", "WNBA")]
     for c in cases:
         c.pop("expect", None)
-    cases.extend({"sport": "NHL", "name": c["name"], "inputs": dict(c["inputs"])} for c in NHL_CASES)
+    # every hockey case carries a date, because October carries a delta: November unless the case says
+    cases.extend({"sport": "NHL", "name": c["name"], "inputs": dict({"gdate": "2026-11-15"}, **c["inputs"])} for c in NHL_CASES)
     from tools_gen_callsheet2_cases import build as build_mlb
     for c in cases:
         m = build_nhl(c["inputs"]) if c["sport"] == "NHL" else build_mlb(c)

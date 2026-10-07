@@ -4696,6 +4696,7 @@
     "sport": "NHL",
     "name": "the example card: full board, two goalies, everything in",
     "inputs": {
+      "gdate": "2026-11-15",
       "away": "Rangers",
       "home": "Bruins",
       "line": "6",
@@ -4727,55 +4728,55 @@
       "h2hn": "3"
     },
     "expect": {
-      "lam_home": 3.02406191,
-      "lam_away": 2.57826293,
-      "projected": 6.22232485,
+      "lam_home": 2.9338431,
+      "lam_away": 2.50134393,
+      "projected": 6.05518703,
       "markets": [
         {
           "key": "pl",
           "pick": "Bruins -1.5",
           "side": "HOME",
-          "p": 0.39654805,
+          "p": 0.39278662,
           "p_push": 0.0,
           "price": 180.0,
-          "edge": 0.03940519,
-          "fair": 152.1763,
+          "edge": 0.03564377,
+          "fair": 154.5912,
           "anchored": true,
           "band": ""
         },
         {
           "key": "total",
-          "pick": "OVER 6",
-          "side": "OVER",
-          "p": 0.51274719,
-          "p_push": 0.16489127,
+          "pick": "UNDER 6",
+          "side": "UNDER",
+          "p": 0.51989806,
+          "p_push": 0.16566131,
           "price": -110.0,
-          "edge": -0.01106234,
-          "fair": -105.2323,
+          "edge": -0.00391146,
+          "fair": -108.2891,
           "anchored": true,
           "band": "NO BET"
+        },
+        {
+          "key": "p1",
+          "pick": "P1 UNDER 1.5",
+          "side": "UNDER",
+          "p": 0.49379888,
+          "p_push": 0.0,
+          "price": 100.0,
+          "edge": -0.00620112,
+          "fair": 102.5116,
+          "anchored": true,
+          "band": ""
         },
         {
           "key": "ml",
           "pick": "Rangers ML",
           "side": "AWAY",
-          "p": 0.41973621,
+          "p": 0.42084038,
           "p_push": 0.0,
           "price": 130.0,
-          "edge": -0.0150464,
-          "fair": 138.2449,
-          "anchored": true,
-          "band": ""
-        },
-        {
-          "key": "p1",
-          "pick": "P1 OVER 1.5",
-          "side": "OVER",
-          "p": 0.52761839,
-          "p_push": 0.0,
-          "price": -120.0,
-          "edge": -0.01783615,
-          "fair": -111.6933,
+          "edge": -0.01394223,
+          "fair": 137.6198,
           "anchored": true,
           "band": ""
         }
@@ -4786,6 +4787,7 @@
     "sport": "NHL",
     "name": "nothing but the number: a coin flip on a whole-number line with a real push",
     "inputs": {
+      "gdate": "2026-11-15",
       "away": "A",
       "home": "B",
       "line": "6"
@@ -4814,6 +4816,7 @@
     "sport": "NHL",
     "name": "a half line, prices leaning over, no goalies",
     "inputs": {
+      "gdate": "2026-11-15",
       "away": "Oilers",
       "home": "Flames",
       "line": "6.5",
@@ -4870,6 +4873,7 @@
     "sport": "NHL",
     "name": "a hot goalie on a short sample is shrunk; the under still leads",
     "inputs": {
+      "gdate": "2026-11-15",
       "away": "Kraken",
       "home": "Canucks",
       "line": "5.5",
@@ -4887,43 +4891,43 @@
       "hgconf": "1"
     },
     "expect": {
-      "lam_home": 2.69642067,
-      "lam_away": 2.3701166,
-      "projected": 5.68653727,
+      "lam_home": 2.64081616,
+      "lam_away": 2.321241,
+      "projected": 5.58205716,
       "markets": [
+        {
+          "key": "total",
+          "pick": "UNDER 5.5",
+          "side": "UNDER",
+          "p": 0.51419072,
+          "p_push": 0,
+          "price": -110.0,
+          "edge": -0.00961881,
+          "fair": -105.8421,
+          "anchored": true,
+          "band": "NO BET"
+        },
         {
           "key": "ml",
           "pick": "Kraken ML",
           "side": "AWAY",
-          "p": 0.43782481,
+          "p": 0.43841545,
           "p_push": 0.0,
           "price": 120.0,
-          "edge": -0.01672064,
-          "fair": 128.4019,
+          "edge": -0.01613001,
+          "fair": 128.0942,
           "anchored": true,
           "band": ""
-        },
-        {
-          "key": "total",
-          "pick": "OVER 5.5",
-          "side": "OVER",
-          "p": 0.50405441,
-          "p_push": 0,
-          "price": -110.0,
-          "edge": -0.01975512,
-          "fair": -101.635,
-          "anchored": true,
-          "band": "NO BET"
         },
         {
           "key": "pl",
           "pick": "Kraken +1.5",
           "side": "AWAY",
-          "p": 0.62856961,
+          "p": 0.63102629,
           "p_push": 0.0,
           "price": null,
           "edge": null,
-          "fair": -169.2295,
+          "fair": -171.022,
           "anchored": false,
           "band": ""
         }
@@ -4934,6 +4938,7 @@
     "sport": "NHL",
     "name": "a cold goalie against a heavy shot team: the over, with the first period reading it",
     "inputs": {
+      "gdate": "2026-11-15",
       "away": "Sharks",
       "home": "Avalanche",
       "line": "6.5",
@@ -4955,43 +4960,19 @@
       "hsf": "35.0"
     },
     "expect": {
-      "lam_home": 3.66391339,
-      "lam_away": 2.47376524,
-      "projected": 6.75767862,
+      "lam_home": 3.54746155,
+      "lam_away": 2.39514042,
+      "projected": 6.56260198,
       "markets": [
         {
           "key": "pl",
           "pick": "Avalanche -1.5",
           "side": "HOME",
-          "p": 0.51706787,
+          "p": 0.51112152,
           "p_push": 0.0,
           "price": 105.0,
-          "edge": 0.02926299,
-          "fair": -107.0684,
-          "anchored": true,
-          "band": ""
-        },
-        {
-          "key": "total",
-          "pick": "OVER 6.5",
-          "side": "OVER",
-          "p": 0.514831,
-          "p_push": 0,
-          "price": -105.0,
-          "edge": 0.00263588,
-          "fair": -106.1137,
-          "anchored": true,
-          "band": "NO BET"
-        },
-        {
-          "key": "p1",
-          "pick": "P1 OVER 1.5",
-          "side": "OVER",
-          "p": 0.56144653,
-          "p_push": 0.0,
-          "price": -135.0,
-          "edge": -0.01302155,
-          "fair": -128.0224,
+          "edge": 0.02331664,
+          "fair": -104.5498,
           "anchored": true,
           "band": ""
         },
@@ -4999,11 +4980,35 @@
           "key": "ml",
           "pick": "Sharks ML",
           "side": "AWAY",
-          "p": 0.3031281,
+          "p": 0.30581262,
           "p_push": 0.0,
           "price": 215.0,
-          "edge": -0.01433222,
-          "fair": 229.8935,
+          "edge": -0.0116477,
+          "fair": 226.9976,
+          "anchored": true,
+          "band": ""
+        },
+        {
+          "key": "total",
+          "pick": "UNDER 6.5",
+          "side": "UNDER",
+          "p": 0.51626993,
+          "p_push": 0,
+          "price": -115.0,
+          "edge": -0.01861379,
+          "fair": -106.7269,
+          "anchored": true,
+          "band": "NO BET"
+        },
+        {
+          "key": "p1",
+          "pick": "P1 UNDER 1.5",
+          "side": "UNDER",
+          "p": 0.45635062,
+          "p_push": 0.0,
+          "price": 110.0,
+          "edge": -0.01983986,
+          "fair": 119.1298,
           "anchored": true,
           "band": ""
         }
@@ -5014,6 +5019,7 @@
     "sport": "NHL",
     "name": "home dog: the default puck line flips to +1.5",
     "inputs": {
+      "gdate": "2026-11-15",
       "away": "Panthers",
       "home": "Blackhawks",
       "line": "6",
@@ -5070,6 +5076,7 @@
     "sport": "NHL",
     "name": "special teams and form only: tagged, so no band",
     "inputs": {
+      "gdate": "2026-11-15",
       "away": "Devils",
       "home": "Islanders",
       "line": "5.5",
@@ -5085,17 +5092,17 @@
     "expect": {
       "lam_home": null,
       "lam_away": null,
-      "projected": 6.03388534,
+      "projected": 5.98884406,
       "markets": [
         {
           "key": "total",
           "pick": "OVER 5.5",
           "side": "OVER",
-          "p": 0.56274169,
+          "p": 0.55532262,
           "p_push": 0,
           "price": -110.0,
-          "edge": 0.03893216,
-          "fair": -128.6978,
+          "edge": 0.03151309,
+          "fair": -124.8821,
           "anchored": true,
           "band": "NO BET"
         }
@@ -5106,6 +5113,7 @@
     "sport": "NHL",
     "name": "shots and no goalies: the shot rates read as a differential",
     "inputs": {
+      "gdate": "2026-11-15",
       "away": "Jets",
       "home": "Wild",
       "line": "6",
@@ -5117,31 +5125,31 @@
       "hsf": "33.0"
     },
     "expect": {
-      "lam_home": 2.92204298,
-      "lam_away": 2.98513006,
-      "projected": 6.52717304,
+      "lam_home": 2.76635224,
+      "lam_away": 2.82607795,
+      "projected": 6.21243019,
       "markets": [
-        {
-          "key": "total",
-          "pick": "OVER 6",
-          "side": "OVER",
-          "p": 0.57016619,
-          "p_push": 0.16162176,
-          "price": -115.0,
-          "edge": 0.03528247,
-          "fair": -132.6481,
-          "anchored": true,
-          "band": "STRONG BET"
-        },
         {
           "key": "ml",
           "pick": "Wild ML",
           "side": "HOME",
-          "p": 0.48888672,
+          "p": 0.48916576,
           "p_push": 0.0,
           "price": -105.0,
-          "edge": -0.0233084,
-          "fair": 104.5464,
+          "edge": -0.02302936,
+          "fair": 104.4297,
+          "anchored": true,
+          "band": ""
+        },
+        {
+          "key": "total",
+          "pick": "UNDER 6",
+          "side": "UNDER",
+          "p": 0.48916576,
+          "p_push": 0.16495808,
+          "price": -105.0,
+          "edge": -0.02302936,
+          "fair": 104.4297,
           "anchored": true,
           "band": ""
         },
@@ -5149,11 +5157,11 @@
           "key": "pl",
           "pick": "Wild +1.5",
           "side": "HOME",
-          "p": 0.6585371,
+          "p": 0.66325921,
           "p_push": 0.0,
           "price": null,
           "edge": null,
-          "fair": -192.8576,
+          "fair": -196.9643,
           "anchored": false,
           "band": ""
         }
@@ -5164,6 +5172,7 @@
     "sport": "NHL",
     "name": "the puck line at +1.5 on a near pick-em, priced",
     "inputs": {
+      "gdate": "2026-11-15",
       "away": "Stars",
       "home": "Kings",
       "line": "5.5",
@@ -5238,6 +5247,7 @@
     "sport": "NHL",
     "name": "first-period form from the ledger: two hot first periods pull the period over",
     "inputs": {
+      "gdate": "2026-11-15",
       "away": "Avalanche",
       "home": "Senators",
       "line": "6.5",
@@ -5266,31 +5276,31 @@
     "expect": {
       "lam_home": null,
       "lam_away": null,
-      "projected": 6.65109831,
+      "projected": 6.49558824,
       "markets": [
-        {
-          "key": "p1",
-          "pick": "P1 OVER 1.5",
-          "side": "OVER",
-          "p": 0.55123565,
-          "p_push": 0.0,
-          "price": -130.0,
-          "edge": -0.01398174,
-          "fair": -122.8341,
-          "anchored": true,
-          "band": ""
-        },
         {
           "key": "total",
           "pick": "UNDER 6.5",
           "side": "UNDER",
-          "p": 0.50207986,
+          "p": 0.52709541,
           "p_push": 0,
           "price": -110.0,
-          "edge": -0.02172966,
-          "fair": -100.8354,
+          "edge": 0.00328589,
+          "fair": -111.4591,
           "anchored": true,
           "band": "NO BET"
+        },
+        {
+          "key": "p1",
+          "pick": "P1 UNDER 1.5",
+          "side": "UNDER",
+          "p": 0.48473336,
+          "p_push": 0.0,
+          "price": 100.0,
+          "edge": -0.01526664,
+          "fair": 106.299,
+          "anchored": true,
+          "band": ""
         }
       ]
     }
@@ -5299,6 +5309,7 @@
     "sport": "NHL",
     "name": "expected goals: two high-event clubs against the table's own league mean",
     "inputs": {
+      "gdate": "2026-11-15",
       "away": "Oilers",
       "home": "Devils",
       "line": "6.5",
@@ -5327,44 +5338,108 @@
       "h2hn": "3"
     },
     "expect": {
-      "lam_home": 3.15703581,
-      "lam_away": 2.91003371,
-      "projected": 6.68706952,
+      "lam_home": 3.08787595,
+      "lam_away": 2.84628482,
+      "projected": 6.55416077,
       "markets": [
+        {
+          "key": "total",
+          "pick": "UNDER 6.5",
+          "side": "UNDER",
+          "p": 0.51762991,
+          "p_push": 0,
+          "price": -110.0,
+          "edge": -0.00617962,
+          "fair": -107.3097,
+          "anchored": true,
+          "band": "NO BET"
+        },
         {
           "key": "ml",
           "pick": "Oilers ML",
           "side": "AWAY",
-          "p": 0.45718135,
+          "p": 0.45761868,
           "p_push": 0.0,
           "price": 110.0,
-          "edge": -0.01900912,
-          "fair": 118.7316,
+          "edge": -0.01857179,
+          "fair": 118.5225,
           "anchored": true,
           "band": ""
-        },
-        {
-          "key": "total",
-          "pick": "OVER 6.5",
-          "side": "OVER",
-          "p": 0.50365054,
-          "p_push": 0,
-          "price": -110.0,
-          "edge": -0.02015898,
-          "fair": -101.471,
-          "anchored": true,
-          "band": "NO BET"
         },
         {
           "key": "pl",
           "pick": "Oilers +1.5",
           "side": "AWAY",
-          "p": 0.62934795,
+          "p": 0.63159218,
           "p_push": 0.0,
           "price": null,
           "edge": null,
-          "fair": -169.7948,
+          "fair": -171.4383,
           "anchored": false,
+          "band": ""
+        }
+      ]
+    }
+  },
+  {
+    "sport": "NHL",
+    "name": "October: the seasonal delta on the line, tagged",
+    "inputs": {
+      "gdate": "2026-10-20",
+      "away": "Wild",
+      "home": "Blues",
+      "line": "6",
+      "op": "-110",
+      "up": "-110"
+    },
+    "expect": {
+      "lam_home": null,
+      "lam_away": null,
+      "projected": 6.40664418,
+      "markets": [
+        {
+          "key": "total",
+          "pick": "OVER 6",
+          "side": "OVER",
+          "p": 0.54784231,
+          "p_push": 0.16318526,
+          "price": -110.0,
+          "edge": 0.02403278,
+          "fair": -121.1618,
+          "anchored": true,
+          "band": "NO BET"
+        }
+      ]
+    }
+  },
+  {
+    "sport": "NHL",
+    "name": "shots alone move nothing now: shown, not scored",
+    "inputs": {
+      "gdate": "2026-11-15",
+      "away": "Jets",
+      "home": "Wild",
+      "line": "6",
+      "op": "-115",
+      "up": "-105",
+      "asf": "36.0",
+      "hsf": "34.0"
+    },
+    "expect": {
+      "lam_home": null,
+      "lam_away": null,
+      "projected": 6.21243019,
+      "markets": [
+        {
+          "key": "total",
+          "pick": "UNDER 6",
+          "side": "UNDER",
+          "p": 0.48916576,
+          "p_push": 0.16495808,
+          "price": -105.0,
+          "edge": -0.02302936,
+          "fair": 104.4297,
+          "anchored": true,
           "band": ""
         }
       ]
@@ -5374,6 +5449,7 @@
     "sport": "NHL",
     "name": "a wide moneyline hold is regressed",
     "inputs": {
+      "gdate": "2026-11-15",
       "away": "Lightning",
       "home": "Capitals",
       "line": "6.5",
@@ -5397,19 +5473,19 @@
       "h2hn": "3"
     },
     "expect": {
-      "lam_home": 3.28678898,
-      "lam_away": 2.74430933,
-      "projected": 6.65109831,
+      "lam_home": 3.20204011,
+      "lam_away": 2.67354814,
+      "projected": 6.49558824,
       "markets": [
         {
           "key": "ml",
           "pick": "Lightning ML",
           "side": "AWAY",
-          "p": 0.40634238,
+          "p": 0.40745224,
           "p_push": 0.0,
           "price": 150.0,
-          "edge": 0.00634238,
-          "fair": 146.0979,
+          "edge": 0.00745224,
+          "fair": 145.4275,
           "anchored": true,
           "band": ""
         },
@@ -5417,11 +5493,11 @@
           "key": "total",
           "pick": "UNDER 6.5",
           "side": "UNDER",
-          "p": 0.50207986,
+          "p": 0.52709541,
           "p_push": 0,
           "price": -110.0,
-          "edge": -0.02172966,
-          "fair": -100.8354,
+          "edge": 0.00328589,
+          "fair": -111.4591,
           "anchored": true,
           "band": "NO BET"
         },
@@ -5429,11 +5505,11 @@
           "key": "pl",
           "pick": "Lightning +1.5",
           "side": "AWAY",
-          "p": 0.58471146,
+          "p": 0.58807476,
           "p_push": 0.0,
           "price": null,
           "edge": null,
-          "fair": -140.7964,
+          "fair": -142.7625,
           "anchored": false,
           "band": ""
         }

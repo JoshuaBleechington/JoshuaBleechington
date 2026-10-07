@@ -97,15 +97,33 @@ class TestTheGoalie(unittest.TestCase):
         self.assertLess(few, many)
         self.assertGreater(few, LEAGUE_SAVE_PCT)
 
-    def test_the_other_sides_shots_scale_the_gap(self):
-        heavy = goalie_gap(0.880, 35.0)
-        light = goalie_gap(0.880, 25.0)
-        self.assertGreater(heavy, light)
+    def test_the_other_sides_shots_no_longer_scale_the_gap(self):
+        """7 Oct 2026: the shot-rate lean ran the wrong way against two seasons
+        of closing totals, so a goalie's gap is read at the league's shots."""
+        self.assertAlmostEqual(goalie_gap(0.880, 35.0), goalie_gap(0.880, 25.0), places=12)
+        self.assertAlmostEqual(goalie_gap(0.880), LEAGUE_SHOTS * (LEAGUE_SAVE_PCT - 0.880), places=12)
 
-    def test_shots_alone_read_as_shot_rates(self):
+    def test_shots_alone_are_shown_not_scored(self):
+        plain = forecast_nhl("A @ B", 6.0, -110, -110)
         f = forecast_nhl("A @ B", 6.0, -110, -110, away_shots_for=34, home_shots_for=33)
-        self.assertIn("Shot rates", [e.name for e in f.estimates])
-        self.assertGreater(f.projected, next(e.total for e in f.estimates if e.name == "Market"))
+        self.assertNotIn("Shot rates", [e.name for e in f.estimates])
+        self.assertAlmostEqual(f.projected, plain.projected, places=12)
+        self.assertTrue(any("SHOWN, NOT SCORED" in n and "shot-rate lean" in n for n in f.notes))
+
+    def test_one_goalie_is_scored_against_a_league_partner(self):
+        f = forecast_nhl("A @ B", 6.0, -110, -110, away_goalie_sv=0.880, away_goalie_shots=1500)
+        self.assertIn("Goalies", [e.name for e in f.estimates])
+        self.assertTrue(any("missing side is scored as a league-average goalie" in n for n in f.notes))
+
+    def test_october_carries_a_tagged_delta(self):
+        from totals.nhl import OCTOBER_DELTA
+        nov = forecast_nhl("A @ B", 6.0, -110, -110, game_month=11)
+        octo = forecast_nhl("A @ B", 6.0, -110, -110, game_month=10)
+        self.assertAlmostEqual(octo.projected - nov.projected, OCTOBER_DELTA, places=9)
+        d = next(x for x in octo.deltas if x.name == "October")
+        self.assertFalse(d.mechanism)
+        self.assertEqual(octo.band, "NO BET")   # tagged: it cannot buy a band alone
+        self.assertFalse(any(x.name == "October" for x in nov.deltas))
 
     def test_an_unconfirmed_goalie_is_said_out_loud(self):
         f = forecast_nhl("A @ B", 6.0, -110, -110, **LEAGUE)
@@ -282,30 +300,17 @@ class TestTheFirstPeriodAnchorIsNotRegressed(unittest.TestCase):
 
 
 class TestFirstPeriodForm(unittest.TestCase):
-    """5 Oct 2026: the league ledger's per-club first-period last ten."""
+    """5 Oct 2026: the ledger's per-club first-period last ten; measured null
+    against 2,445 first periods on 7 Oct and made shown, not scored."""
 
-    def test_both_sides_move_the_period_at_the_form_weight(self):
+    def test_the_first_period_last_ten_moves_nothing_and_says_so(self):
         base = dict(total_line=6.0, p1_line=1.5, p1_over_price=-120, p1_under_price=100)
         plain = forecast_matchup_nhl("A", "B", **base)
         hot = forecast_matchup_nhl("A", "B", away_p1_last10=2.4, home_p1_last10=2.2, **base)
-        cold = forecast_matchup_nhl("A", "B", away_p1_last10=1.2, home_p1_last10=1.3, **base)
-        def over(m):
-            p1 = next(mk for mk in m.markets if mk.key == "p1")
-            return p1.p if p1.side == "OVER" else 1 - p1.p
-        self.assertGreater(over(hot), over(plain))
-        self.assertLess(over(cold), over(plain))
-        p1 = next(mk for mk in hot.markets if mk.key == "p1")
-        self.assertTrue(any("First-period last ten" in n and "league ledger" in n for n in p1.notes))
-        # the full-game total is untouched by a first-period input
+        pa = next(mk for mk in plain.markets if mk.key == "p1"); ph = next(mk for mk in hot.markets if mk.key == "p1")
+        self.assertAlmostEqual(pa.p, ph.p, places=12)
+        self.assertTrue(any("First-period last ten" in n and "SHOWN, NOT SCORED" in n for n in ph.notes))
         self.assertAlmostEqual(hot.total.projected, plain.total.projected, places=12)
-
-    def test_one_side_is_dropped(self):
-        base = dict(total_line=6.0, p1_line=1.5, p1_over_price=-120, p1_under_price=100)
-        plain = forecast_matchup_nhl("A", "B", **base)
-        one = forecast_matchup_nhl("A", "B", away_p1_last10=2.4, **base)
-        pa = next(mk for mk in plain.markets if mk.key == "p1"); po = next(mk for mk in one.markets if mk.key == "p1")
-        self.assertAlmostEqual(pa.p, po.p, places=12)
-        self.assertTrue(any("one side only" in n for n in po.notes))
 
 
 class TestExpectedGoals(unittest.TestCase):

@@ -52,11 +52,12 @@ slate's first 62 goalie lines (37,931 shots, this season blended with half
 of last) averaged .898 shots-weighted; against .905 every goalie read cold,
 every total leaned over, and #1 called BET on the over in 8 of the first 31
 games (3-5). It is measured on the card's starters, so it is the prior for
-a named starter; re-measure at the end of the month. Each goalie then faces
-the *other* side's shot rate. Two
-league-average goalies against two league-average shot rates move the
-number by exactly zero. Weight 1.6, the starters' figure. Shots alone, with
-no goalies, read as "Shot rates" through the same gap with league goalies.
+a named starter; re-measure at the end of the month. Each goalie is read
+against the league's shot rate — the opponent's shot rate was removed on
+7 Oct 2026 (see the backtest below). A league-average goalie moves the
+number by exactly zero. Weight 1.6, the starters' figure, still a priori:
+the backtest has no starters. One goalie alone is scored against a
+league-average partner, with a note.
 
 **The one input a hockey market prices imperfectly is a late change in
 net.** The sheet says out loud when a goalie is not confirmed, and the
@@ -108,11 +109,35 @@ while the two-team distribution ties after sixty about 16% of the time —
 real teams protect a tie late, which no independent-count model knows. Both
 are a priori; the log will say which is nearer.
 
-**The league constants are measured; the weights are not.** The ledger
+## The backtest, 7 Oct 2026
+
+Two seasons of closing totals (KillerSports, 2,616 regular-season games
+with a close) joined to the two season ledgers. `tools_backtest_nhl.py`
+reproduces it. The market at the close went 1,242-1,257-117, residual mean
+−0.02, spread 2.31. Each input was asked the question the baseball weights
+were earned on: when it said over, did the game land over the close?
+
+| Input, against the close | Games | Slope | Implied weight | Verdict |
+| --- | --- | --- | --- | --- |
+| Last-ten total average | 2,445 | +0.14 | 0.6 | kept, weight 0.8 → 0.6 |
+| Season shot rates (the shots in the goalie gap) | 2,445 | −0.72 | negative | **removed from scoring**; betting with it 49.1% |
+| Season goal rates | 2,445 | −0.43 | negative | never an input; stays out |
+| Prior-season expected goals | 1,308 | +0.45 | ~3 | kept at 1.2; betting it 53.5%, one season |
+| First-period last ten (vs the period) | 2,445 | −0.003 | none | **shown, not scored** |
+| Back to back, the under | 696 | | | 52.6%, a label only |
+| October over, blind | 324 | | | **54.9% both seasons (54.7, 55.2); +0.25 tagged delta** |
+
+The first period's share model is dead on: 1.747 predicted from the close
+against 1.744 scored, and the 2+ rate climbs with the line as it should.
+Goalies, special teams and head to head are untested — the ledger carries
+no starters or power plays — and keep their a-priori weights.
+
+**The league constants are measured; the weights are partly measured.** The ledger
 fixed the level, the lumps, the period share and the spread on 2,624
 games. What it cannot fix without closing lines is how much each input
-should move the number off the market: goalies 1.6, expected goals 1.2,
-special teams and form 0.8, head to head 0.5 are still a priori, and
+should move the number off the market. Form (0.6) is measured; shots and
+the first-period form were measured out; goalies 1.6, expected goals 1.2,
+special teams 0.8 and head to head 0.5 are still a priori, and
 `tools_audit_nhl.py` judges them against the record as it accumulates.
 
 ## What the user types, from BetMGM

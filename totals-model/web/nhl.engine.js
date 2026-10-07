@@ -26,7 +26,8 @@
   NHL.REG_GOALS = NHL.GOALS - NHL.ENG - NHL.OT;
   NHL.SV_STABLE_AT = NHL.SV * (1.0 - NHL.SV) / (NHL.TALENT_SD * NHL.TALENT_SD);
   NHL.REG_PHI = (NHL.RESIDUAL_SD * NHL.RESIDUAL_SD - NHL.ENG * (1.0 - NHL.ENG) - NHL.OT * (1.0 - NHL.OT)) / NHL.REG_GOALS;
-  var NHL_WEIGHTS = { market: 4.0, goalies: 1.6, xg: 1.2, special: 0.8, form: 0.8, h2h: 0.5 };
+  var NHL_WEIGHTS = { market: 4.0, goalies: 1.6, xg: 1.2, special: 0.8, form: 0.6, h2h: 0.5 };   // form 0.6 measured 7 Oct 2026 (totals/nhl.py)
+  NHL.OCTOBER_DELTA = 0.25;   // the October over: 6.41 scored against a 6.07 close over two seasons, 178-146 blind; half the excess, tagged
   PLAUSIBLE.nhl_total = [3.5, 9.5]; PLAUSIBLE.nhl_period = [0.5, 4.5];
   PLAUSIBLE.save_pct = [0.850, 0.960]; PLAUSIBLE.shots = [15, 45]; PLAUSIBLE.shots_faced = [0, 3000]; PLAUSIBLE.xg_rate = [1.0, 5.5];
 
@@ -86,10 +87,12 @@
     return shots / (shots + NHL.SV_STABLE_AT);
   }
   function shrinkSv(sv, shots) { return sv === null ? null : NHL.SV + svWeight(shots) * (sv - NHL.SV); }
-  function goalieGap(svUsed, oppShots) {
+  /* a goalie over a league goalie, both facing the league's shots. The
+     opponent's shot rate was removed 7 Oct 2026: against two seasons of
+     closing totals the shot lean ran the wrong way (totals/nhl.py). */
+  function goalieGap(svUsed) {
     if (svUsed === null || !ok(svUsed, "save_pct")) return null;
-    var shots = (oppShots !== null && ok(oppShots, "shots")) ? oppShots : NHL.SHOTS;
-    return shots * (1.0 - svUsed) - NHL.SHOTS * (1.0 - NHL.SV);
+    return NHL.SHOTS * (NHL.SV - svUsed);
   }
   function nhlH2hWeight(base, n) { return base * Math.min(1, Math.max(0, n) / NHL.H2H_FULL_AT); }
 
@@ -106,21 +109,27 @@
     var aw = svWeight(ash), hw = svWeight(hsh);
     var aUsedSv = shrinkSv(asv, ash), hUsedSv = shrinkSv(hsv, hsh);
     var haveGoalies = aUsedSv !== null && hUsedSv !== null;
-    var haveShots = asf !== null && hsf !== null;
-    if (haveGoalies || haveShots) {
+    if (aUsedSv !== null || hUsedSv !== null) {
       var aU = aUsedSv !== null ? aUsedSv : NHL.SV, hU = hUsedSv !== null ? hUsedSv : NHL.SV;
-      var aGap = goalieGap(aU, hsf), hGap = goalieGap(hU, asf);
+      var aGap = goalieGap(aU), hGap = goalieGap(hU);
       if (aGap !== null && hGap !== null) {
         var gap = aGap + hGap, parts = [];
         if (aUsedSv !== null) parts.push("away " + asv.toFixed(3) + (aw < 1 ? " over " + ash.toFixed(0) + " shots is worth " + Math.round(aw * 100) + "% of itself, so it enters at " + aUsedSv.toFixed(3) : ""));
         if (hUsedSv !== null) parts.push("home " + hsv.toFixed(3) + (hw < 1 ? " over " + hsh.toFixed(0) + " shots is worth " + Math.round(hw * 100) + "% of itself, so it enters at " + hUsedSv.toFixed(3) : ""));
-        estimates.push(est(haveGoalies ? "Goalies" : "Shot rates", anchor + gap, w.goalies,
-          (parts.length ? parts.join("; ") + ". " : "") + "Each goalie against the other side's shot rate (" +
-          (asf !== null ? asf : NHL.SHOTS).toFixed(1) + " away, " + (hsf !== null ? hsf : NHL.SHOTS).toFixed(1) + " home) against a ." +
-          Math.round(NHL.SV * 1000) + " goalie facing " + NHL.SHOTS.toFixed(0) + ": " + sgn(gap) + " goals on the line. A save percentage is worth half the league prior at " +
+        estimates.push(est("Goalies", anchor + gap, w.goalies,
+          (parts.length ? parts.join("; ") + ". " : "") + "Each goalie against the league's " + NHL.SHOTS.toFixed(1) + " shots, against a ." +
+          Math.round(NHL.SV * 1000) + " goalie: " + sgn(gap) + " goals on the line. A save percentage is worth half the league prior at " +
           NHL.SV_STABLE_AT.toFixed(0) + " shots, which is why a backup's hot month cannot carry a card."));
         if ((aUsedSv !== null) !== (hUsedSv !== null)) notes.push("One goalie's save percentage is in and the other's is not; the missing side is scored as a league-average goalie. Fill in both once the starters are confirmed.");
       }
+    }
+    if (asf !== null || hsf !== null) notes.push("Shots for per game are <b>SHOWN, NOT SCORED</b>: against two seasons of closing totals the shot-rate lean ran the wrong way (49.1% betting with it). A team that shoots more shoots from everywhere, and the market knows it.");
+    var gdv = ($("gdate") || {}).value || "", gmonth = gdv.length >= 7 ? parseInt(gdv.slice(5, 7), 10) : null;
+    if (gmonth === 10) {
+      var octWhy = "October: both backtest seasons scored 6.41 a game against a 6.07 closing line, the over 178-146 blind. Half the excess, " + sgn(NHL.OCTOBER_DELTA) +
+        ", goes on the line this month. Tagged: it cannot buy a band, and the tile keeps October's record.";
+      deltas.push(delta("October", NHL.OCTOBER_DELTA, octWhy, false));
+      notes.push("<b>" + octWhy.replace("October:", "October</b>:"));
     }
     var unconfirmed = [];
     if (!checked("agconf")) unconfirmed.push("away");
@@ -156,7 +165,7 @@
     var a10 = num("al10"), h10 = num("hl10");
     if (a10 !== null && h10 !== null) {
       var avg = (a10 + h10) / 2;
-      estimates.push(est("Last 10", avg, w.form, "Last-ten combined totals average " + avg.toFixed(1) + ". Measured null in baseball and unmeasured here; weighted to move a close card, not to overturn the market.", false));
+      estimates.push(est("Last 10", avg, w.form, "Last-ten combined totals average " + avg.toFixed(1) + ". Measured against 2,445 closing totals: a slope of 0.14, an implied weight of 0.6, which is the weight; tagged.", false));
     }
     var hv = num("h2h"), hn = num("h2hn");
     if (hv !== null && hn) {
@@ -340,13 +349,9 @@
          first-period totals, an absolute weighted like the full game's form
          and tagged the same way (totals/nhl.py). */
       var a1 = num("ap1l10"), h1 = num("hp1l10");
-      if (a1 !== null && h1 !== null && ok(a1, "nhl_period") && ok(h1, "nhl_period")) {
-        var avg1 = (a1 + h1) / 2;
-        est1.push([avg1, NHL_WEIGHTS.form]);
-        p1notes.push("First-period last ten: " + a1.toFixed(2) + " and " + h1.toFixed(2) + " a game, average " + avg1.toFixed(2) +
-          ", from the league ledger. Weighted like the full game's last ten (" + NHL_WEIGHTS.form + ") and unmeasured: on the log to earn or lose it.");
-      } else if (a1 !== null || h1 !== null) {
-        p1notes.push("A first-period last ten was given for one side only; the pair is scored as a unit and has been dropped.");
+      if (a1 !== null || h1 !== null) {
+        p1notes.push("First-period last ten: " + (a1 !== null ? a1.toFixed(2) : "—") + " and " + (h1 !== null ? h1.toFixed(2) : "—") +
+          " a game, from the league ledger. <b>SHOWN, NOT SCORED</b>: measured against 2,445 first periods on 7 Oct 2026 and null (slope -0.003). A period's recent past says nothing about tonight's.");
       }
       var tw1 = est1.reduce(function (a, e) { return a + e[1]; }, 0);
       var proj1 = est1.reduce(function (a, e) { return a + e[0] * e[1]; }, 0) / tw1;

@@ -166,7 +166,23 @@ OT_COMPRESSION = 0.5
 #: MAE of any input by a distance. The goalies take the starters' 1.6 because
 #: they are the same kind of input; special teams and form the pens' and
 #: form's. Head to head is scaled by meetings as in MLB.
-WEIGHTS = {"market": 4.0, "goalies": 1.6, "xg": 1.2, "special": 0.8, "form": 0.8, "h2h": 0.5}
+#: The weights. Market 4.0 as in baseball. Goalies 1.6 is a priori still:
+#: the backtest has no starters. Expected goals 1.2 a priori; the backtest
+#: read prior-season xG against 1,308 closing totals at a slope of 0.45
+#: (an implied weight near 3) but betting it was 52-53%, so it stays.
+#: Form 0.6, measured: last-ten lean against 2,445 closing totals ran at a
+#: slope of 0.14, an implied weight of 0.6. Special teams and head to head
+#: a priori, untested. Shots: REMOVED from scoring on 7 Oct 2026 -- the
+#: season shot-rate lean ran the WRONG way against the close over both
+#: seasons (slope -0.72, 49.1% betting with it). The first-period last ten:
+#: measured null (slope -0.003), shown, not scored.
+WEIGHTS = {"market": 4.0, "goalies": 1.6, "xg": 1.2, "special": 0.8, "form": 0.6, "h2h": 0.5}
+#: October. Both backtest seasons scored 6.41 a game in October against a
+#: 6.07 closing line, the over 178-146 (54.9%) blind -- 54.7% and 55.2% by
+#: season. Fresh legs, new systems, loose special teams; the market knows
+#: the direction and not the size. Half the raw excess goes on the line as
+#: a tagged delta in October only; the tile keeps the month's record.
+OCTOBER_DELTA = 0.25
 H2H_FULL_WEIGHT_AT = 4
 DEFAULT_PUCK_LINE = 1.5
 _KMAX = 25
@@ -280,14 +296,17 @@ def shrink_sv(sv: float | None, shots_faced: float | None) -> float | None:
     return LEAGUE_SAVE_PCT + sv_weight(shots_faced) * (sv - LEAGUE_SAVE_PCT)
 
 
-def goalie_gap(sv_used: float | None, opp_shots: float | None) -> float | None:
-    """Goals this goalie allows per game against this opponent's shot rate,
-    minus what a league goalie allows against a league shot rate. Two
-    league-average inputs give exactly zero; there is a test."""
+def goalie_gap(sv_used: float | None, opp_shots: float | None = None) -> float | None:
+    """Goals this goalie allows per game over a league goalie, both facing
+    the league's shot rate. A league-average goalie gives exactly zero.
+    `opp_shots` is accepted and IGNORED since 7 Oct 2026: the backtest read
+    the shot-rate lean against 2,445 closing totals and it ran the wrong
+    way (slope -0.72 both seasons; betting with it 49.1%). A team that
+    shoots more is a team that shoots from everywhere, and the market
+    knows it. Shots stay on the card, shown, not scored."""
     if sv_used is None or not _ok(sv_used, "save_pct"):
         return None
-    shots = opp_shots if (opp_shots is not None and _ok(opp_shots, "shots")) else LEAGUE_SHOTS
-    return shots * (1.0 - sv_used) - LEAGUE_SHOTS * (1.0 - LEAGUE_SAVE_PCT)
+    return LEAGUE_SHOTS * (LEAGUE_SAVE_PCT - sv_used)
 
 
 def h2h_weight(base: float, meetings: float) -> float:
@@ -307,8 +326,9 @@ def forecast_nhl(
     home_goalie_sv: float | None = None,
     away_goalie_shots: float | None = None,
     home_goalie_shots: float | None = None,
-    away_shots_for: float | None = None,
+    away_shots_for: float | None = None,     # shown, not scored since 7 Oct 2026
     home_shots_for: float | None = None,
+    game_month: int | None = None,           # the October delta
     away_pp_pct: float | None = None,
     home_pp_pct: float | None = None,
     away_pk_pct: float | None = None,
@@ -347,13 +367,11 @@ def forecast_nhl(
     a_sv = shrink_sv(away_goalie_sv, away_goalie_shots)
     h_sv = shrink_sv(home_goalie_sv, home_goalie_shots)
     have_goalies = a_sv is not None and h_sv is not None
-    have_shots = away_shots_for is not None and home_shots_for is not None
-    if have_goalies or have_shots:
+    if a_sv is not None or h_sv is not None:
         a_used = a_sv if a_sv is not None else LEAGUE_SAVE_PCT
         h_used = h_sv if h_sv is not None else LEAGUE_SAVE_PCT
-        # the away goalie faces the home side's shots, and vice versa
-        a_gap = goalie_gap(a_used, home_shots_for)
-        h_gap = goalie_gap(h_used, away_shots_for)
+        a_gap = goalie_gap(a_used)
+        h_gap = goalie_gap(h_used)
         if a_gap is not None and h_gap is not None:
             gap = a_gap + h_gap
             parts = []
@@ -363,20 +381,27 @@ def forecast_nhl(
             if h_sv is not None:
                 parts.append(f"home {home_goalie_sv:.3f}" + (f" over {home_goalie_shots:.0f} shots is worth "
                              f"{hw:.0%} of itself, so it enters at {h_sv:.3f}" if hw < 1.0 else ""))
-            name = "Goalies" if have_goalies else "Shot rates"
             estimates.append(Estimate(
-                name, anchor + gap, w["goalies"],
+                "Goalies", anchor + gap, w["goalies"],
                 (f"{'; '.join(parts) + '. ' if parts else ''}"
-                 f"Each goalie against the other side's shot rate "
-                 f"({away_shots_for if away_shots_for is not None else LEAGUE_SHOTS:.1f} away, "
-                 f"{home_shots_for if home_shots_for is not None else LEAGUE_SHOTS:.1f} home) against a "
-                 f".{LEAGUE_SAVE_PCT * 1000:.0f} goalie facing {LEAGUE_SHOTS:.0f}: {gap:+.2f} goals on the "
-                 f"line. A save percentage is worth half the league prior at {SV_STABLE_AT:.0f} shots, "
-                 "which is why a backup's hot month cannot carry a card.")))
+                 f"Each goalie against the league's {LEAGUE_SHOTS:.1f} shots, against a "
+                 f".{LEAGUE_SAVE_PCT * 1000:.0f} goalie: {gap:+.2f} goals on the line. A save "
+                 f"percentage is worth half the league prior at {SV_STABLE_AT:.0f} shots, which is why "
+                 "a backup's hot month cannot carry a card.")))
             if (a_sv is not None) != (h_sv is not None):
                 notes.append("One goalie's save percentage is in and the other's is not; the missing "
                              "side is scored as a league-average goalie. Fill in both once the "
                              "starters are confirmed.")
+    if away_shots_for is not None or home_shots_for is not None:
+        notes.append("Shots for per game are SHOWN, NOT SCORED: against two seasons of closing totals "
+                     "the shot-rate lean ran the wrong way (49.1% betting with it). A team that shoots "
+                     "more shoots from everywhere, and the market knows it.")
+    if game_month == 10:
+        oct_why = (f"October: both backtest seasons scored 6.41 a game against a 6.07 closing line, the over "
+                   f"178-146 blind. Half the excess, {OCTOBER_DELTA:+.2f}, goes on the line this month. Tagged: "
+                   "it cannot buy a band, and the tile keeps October's record.")
+        deltas.append(Delta("October", OCTOBER_DELTA, oct_why, mechanism=False))
+        notes.append(oct_why)
     unconfirmed = [s for s, c in (("away", away_goalie_confirmed), ("home", home_goalie_confirmed))
                    if not c]
     if have_goalies and unconfirmed:
@@ -435,8 +460,8 @@ def forecast_nhl(
         avg = (away_last10_total + home_last10_total) / 2.0
         estimates.append(Estimate(
             "Last 10", avg, w["form"],
-            f"Last-ten combined totals average {avg:.1f}. Measured null in baseball and "
-            "unmeasured here; weighted to move a close card, not to overturn the market.",
+            f"Last-ten combined totals average {avg:.1f}. Measured against 2,445 closing totals: a "
+            "slope of 0.14, an implied weight of 0.6, which is the weight; tagged.",
             mechanism=False))
     if h2h_total is not None and h2h_meetings:
         estimates.append(Estimate(
@@ -651,16 +676,11 @@ def forecast_matchup_nhl(
         # game's form and tagged the same way. Fed by the slate from
         # nhl-ledger-<season>.json; blank until a club has MIN_TEAM_GAMES.
         # Added 5 Oct 2026 as the hockey counterpart of the F5 starters.
-        if (away_p1_last10 is not None and home_p1_last10 is not None
-                and _ok(away_p1_last10, "nhl_period") and _ok(home_p1_last10, "nhl_period")):
-            avg1 = (away_p1_last10 + home_p1_last10) / 2.0
-            est.append((avg1, WEIGHTS["form"]))
-            p1_notes.append(f"First-period last ten: {away_p1_last10:.2f} and {home_p1_last10:.2f} a game, "
-                            f"average {avg1:.2f}, from the league ledger. Weighted like the full game's "
-                            f"last ten ({WEIGHTS['form']:g}) and unmeasured: on the log to earn or lose it.")
-        elif away_p1_last10 is not None or home_p1_last10 is not None:
-            p1_notes.append("A first-period last ten was given for one side only; the pair is scored "
-                            "as a unit and has been dropped.")
+        if away_p1_last10 is not None or home_p1_last10 is not None:
+            p1_notes.append(f"First-period last ten: {away_p1_last10 if away_p1_last10 is not None else '—'} and "
+                            f"{home_p1_last10 if home_p1_last10 is not None else '—'} a game, from the league "
+                            "ledger. SHOWN, NOT SCORED: measured against 2,445 first periods on 7 Oct 2026 "
+                            "and null (slope -0.003). A period's recent past says nothing about tonight's.")
         tw = sum(wt for _, wt in est)
         proj_p1 = sum(t * wt for t, wt in est) / tw
         o, pu, u = p1_split(p1_line, proj_p1)

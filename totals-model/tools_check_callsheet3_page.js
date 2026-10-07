@@ -107,15 +107,15 @@ const CHECKS = ["dome","playoff","agconf","hgconf"];
     const set = (id, v) => { const el = document.getElementById(id); el.value = v; el.dispatchEvent(new Event('input', { bubbles: true })); };
     localStorage.removeItem('callsheet3.card.v1');
     document.getElementById('clear').click(); document.getElementById('m-nhl').click(); await wait();
-    document.getElementById('boardDate').value = '2026-10-07';
+    document.getElementById('boardDate').value = '2026-11-07';
     // game 1: Rangers @ Bruins, full board, the example
-    set('gdate', '2026-10-07'); document.getElementById('example').click(); await wait();
-    set('gdate', '2026-10-07'); await wait();
+    set('gdate', '2026-11-07'); document.getElementById('example').click(); await wait();
+    set('gdate', '2026-11-07'); await wait();
     const rail = [...document.querySelectorAll('#markets .mk')].map(el => ({ key: el.dataset.key, chips: [...el.querySelectorAll('.cap')].map(c => c.textContent) }));
     document.getElementById('add').click(); await wait();
     // game 2: a second hockey game, moneyline only
     document.getElementById('clear').click(); await wait();
-    set('gdate', '2026-10-07'); set('away', 'Toronto'); set('home', 'Montreal'); set('line', '6.5'); set('op', '-115'); set('up', '-105'); set('aml', '-120'); set('hml', '100');
+    set('gdate', '2026-11-07'); set('away', 'Toronto'); set('home', 'Montreal'); set('line', '6.5'); set('op', '-115'); set('up', '-105'); set('aml', '-120'); set('hml', '100');
     await wait(); document.getElementById('add').click(); await wait();
     document.getElementById('boardDate').dispatchEvent(new Event('change')); await wait();
     const card = JSON.parse(localStorage.getItem('callsheet3.card.v1'));
@@ -160,16 +160,16 @@ const CHECKS = ["dome","playoff","agconf","hgconf"];
     const wait = () => new Promise(r => setTimeout(r, 60));
     const set = (id, v) => { const el = document.getElementById(id); el.value = v; el.dispatchEvent(new Event('input', { bubbles: true })); };
     document.getElementById('clear').click(); document.getElementById('m-nhl').click(); await wait();
-    // two cool goalies on long samples, the over priced -140: #1's band says BET (57.9%), the price needs 58.3%
-    set('gdate', '2026-10-07'); set('away', 'Flames'); set('home', 'Kraken'); set('line', '6'); set('op', '-140'); set('up', '110');
-    set('agsv', '0.895'); set('hgsv', '0.895'); set('agsh', '1800'); set('hgsh', '1800'); set('asf', '31'); set('hsf', '31'); await wait();
+    // two cold goalies on long samples, the over priced -140: #1's band says BET (58.0%), the price needs 58.3%
+    set('gdate', '2026-11-07'); set('away', 'Flames'); set('home', 'Kraken'); set('line', '6'); set('op', '-140'); set('up', '110');
+    set('agsv', '0.875'); set('hgsv', '0.875'); set('agsh', '1800'); set('hgsh', '1800'); await wait();
     const railBand = (document.querySelector('#markets .mk[data-key="total"] .band') || {}).textContent || '';
     const railP = (document.querySelector('#markets .mk[data-key="total"] .p') || {}).textContent || '';
     const railEdge = (document.querySelector('#markets .mk[data-key="total"] .e') || {}).textContent || '';
     document.getElementById('add').click(); await wait();
-    document.getElementById('boardDate').value = '2026-10-07'; document.getElementById('boardDate').dispatchEvent(new Event('change')); await wait();
+    document.getElementById('boardDate').value = '2026-11-07'; document.getElementById('boardDate').dispatchEvent(new Event('change')); await wait();
     const betsThin = [...document.querySelectorAll('#bestBets .pk')].map(e => e.querySelector('.n4').textContent.split(' · ')[0]);
-    // the same row at -120 (needs 54.5%, the sheet says 55.9%) clears its price and lists with its chip
+    // the same row at -120 (needs 54.5%, the sheet says 56.1%) clears its price and lists with its chip
     set('op', '-120'); set('up', '100'); await wait(); document.getElementById('add').click(); await wait();
     const betsClear = [...document.querySelectorAll('#bestBets .pk')].map(e => e.querySelector('.n4').textContent.split(' · ')[0] + ' ' + ((e.querySelector('.n2 .band') || {}).textContent || ''));
     document.getElementById('clear').click(); await wait();
@@ -185,7 +185,7 @@ const CHECKS = ["dome","playoff","agconf","hgconf"];
     const set = (id, v) => { const el = document.getElementById(id); el.value = v; el.dispatchEvent(new Event('input', { bubbles: true })); };
     document.getElementById('clear').click(); document.getElementById('m-nhl').click(); await wait();
     // the under is the pick (-102 is the better price on an even number); 78% of the money is on the over
-    set('gdate', '2026-10-07'); set('away', 'Wild'); set('home', 'Blues'); set('line', '6'); set('op', '-118'); set('up', '-102'); set('ntick', '71'); set('ncash', '78'); await wait();
+    set('gdate', '2026-11-07'); set('away', 'Wild'); set('home', 'Blues'); set('line', '6'); set('op', '-118'); set('up', '-102'); set('ntick', '71'); set('ncash', '78'); await wait();
     const pick = document.querySelector('#markets .mk[data-key="total"] .pick').childNodes[0].textContent.trim();
     const chips = [...document.querySelectorAll('#markets .mk[data-key="total"] .cap')].map(c => c.textContent);
     const why = document.getElementById('why').textContent;
@@ -203,15 +203,32 @@ const CHECKS = ["dome","playoff","agconf","hgconf"];
   chk(crowd.ncash === '78', 'crowd: the money box is stored on the row', crowd.ncash);
   chk(/against the crowd 1-0/.test(crowd.tile), 'record: the hockey total tile keeps the crowd line (2-1 is under 6, the pick won against the crowd)', crowd.tile.slice(0, 300));
 
+  // ---- October: the seasonal delta, tagged ------------------------------------------
+  const octo = await pg.evaluate(async () => {
+    const wait = () => new Promise(r => setTimeout(r, 60));
+    const set = (id, v) => { const el = document.getElementById(id); el.value = v; el.dispatchEvent(new Event('input', { bubbles: true })); };
+    const read = () => { const el = document.querySelector('#markets .mk[data-key="total"]'); const pick = el.querySelector('.pick').childNodes[0].textContent.trim(); const p = parseFloat(el.querySelector('.p').textContent); return { pick, over: /OVER/.test(pick) ? p : 100 - p, band: (el.querySelector('.band') || {}).textContent || '', why: document.getElementById('why').textContent }; };
+    document.getElementById('clear').click(); document.getElementById('m-nhl').click(); await wait();
+    set('gdate', '2026-11-20'); set('away', 'Wild'); set('home', 'Blues'); set('line', '6'); set('op', '-110'); set('up', '-110'); await wait();
+    const nov = read();
+    set('gdate', '2026-10-20'); await wait();
+    const oct = read();
+    document.getElementById('clear').click(); await wait();
+    return { nov, oct };
+  });
+  chk(octo.oct.over > octo.nov.over + 1 && /October: both backtest seasons scored 6\.41/.test(octo.oct.why) && !/October:/.test(octo.nov.why),
+      'october: a game dated in October carries the tagged +0.25 delta and the why list says so; November does not', JSON.stringify({ nov: octo.nov.over, oct: octo.oct.over }));
+  chk(octo.oct.band === 'NO BET' || octo.oct.band === '', 'october: the delta alone cannot buy a band', octo.oct.band);
+
   // ---- the slate fills the goalie boxes; a 2.0 backup carries MLB only --------------
   const slate = await pg.evaluate(async () => {
     const wait = () => new Promise(r => setTimeout(r, 80));
-    const slateDoc = { format: 'callsheet2.slate', version: 1, date: '2026-10-07', games: [
-      { sport: 'NHL', gdate: '2026-10-07', away: 'Oilers', home: 'Flames', starters: { away: 'Skinner', home: 'Wolf' },
+    const slateDoc = { format: 'callsheet2.slate', version: 1, date: '2026-11-07', games: [
+      { sport: 'NHL', gdate: '2026-11-07', away: 'Oilers', home: 'Flames', starters: { away: 'Skinner', home: 'Wolf' },
         inputs: { agsv: '0.908', hgsv: '0.916', agsh: '1200', hgsh: '1300', asf: '30.1', hsf: '28.9', app: '25.0', hpp: '19.5', apk: '78.0', hpk: '81.2', al10: '6.4', hl10: '5.9', h2h: '6.0', h2hn: '2', arest: '0', hrest: '1', ap1l10: '1.90', hp1l10: '1.70', axgf: '3.40', axga: '3.10', hxgf: '3.30', hxga: '2.90', xglg: '3.05',
                   nhlform: JSON.stringify({ away: [{ date: '2026-10-04', opp: 'Jets', home: false, gf: 2, ga: 5, sf: 24, sa: 38, p1f: 0, p1a: 2, goalie: 'S. Skinner', end: 'REG' }, { date: '2026-10-06', opp: 'Kings', home: true, gf: 3, ga: 4, sf: 27, sa: 36, p1f: 1, p1a: 1, goalie: 'C. Pickard', end: 'OT' }], home: [{ date: '2026-10-05', opp: 'Sharks', home: true, gf: 4, ga: 1, sf: 33, sa: 22, p1f: 2, p1a: 0, goalie: 'D. Wolf', end: 'REG' }] }) },
         notes: ['Away back to back: likely the backup in net'] } ] };
-    const dt = new DataTransfer(); dt.items.add(new File([JSON.stringify(slateDoc)], 'slate-2026-10-07.json', { type: 'application/json' }));
+    const dt = new DataTransfer(); dt.items.add(new File([JSON.stringify(slateDoc)], 'slate-2026-11-07.json', { type: 'application/json' }));
     const inp = document.getElementById('slateFile'); inp.files = dt.files; inp.dispatchEvent(new Event('change', { bubbles: true })); await wait();
     const list = document.getElementById('slateList').innerText;
     document.querySelector('#slateList [data-slate]').click(); await wait();

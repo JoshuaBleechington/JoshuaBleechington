@@ -100,7 +100,9 @@
               <div class="f"><label for="hrest">Home days rest</label><input id="hrest" type="number" step="1" min="0" max="14" inputmode="numeric" placeholder="2"></div>
             </div>
             <p class="note">A save percentage is shrunk toward the league by the shots behind it, so the two goalie boxes travel
-              as a pair: both or neither, on each side. Shots, special teams and the last ten wait until a team has five
+              as a pair: both or neither, on each side. Shots for per game and the first-period last ten are shown,
+              not scored, since the 7 Oct backtest (the shot lean ran the wrong way against two seasons of closes; the
+              period's recent past said nothing). Shots, special teams and the last ten wait until a team has five
               games; until then the slate leaves them blank and the sheet is the market plus the goalies. Special teams and
               form are tagged and cannot buy a band; a back to back (0 days rest) is shown, not scored. The first-period
               last ten comes from the league ledger (Run NHL ledger.bat) and moves the first period the way the full

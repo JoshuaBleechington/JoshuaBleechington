@@ -36,7 +36,7 @@ class TestTheConstantsAreDerived(unittest.TestCase):
 
     def test_the_regulation_mean_is_the_total_less_the_two_lumps(self):
         self.assertAlmostEqual(LEAGUE_REG_GOALS, LEAGUE_GOALS_PER_GAME - EMPTY_NET_RATE - OT_RATE)
-        self.assertAlmostEqual(reg_mean(6.1), LEAGUE_REG_GOALS)
+        self.assertAlmostEqual(reg_mean(LEAGUE_GOALS_PER_GAME), LEAGUE_REG_GOALS)
 
     def test_the_regulation_index_is_derived_from_the_residual_sd(self):
         lumps = EMPTY_NET_RATE * (1 - EMPTY_NET_RATE) + OT_RATE * (1 - OT_RATE)

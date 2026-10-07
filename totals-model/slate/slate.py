@@ -1197,8 +1197,9 @@ def grade_nhl_game(g, log):
 # constants are MEASURED (nhl_measure) and each club's first-period last ten
 # is filled on the slate (team_p1_last10). Added 5 Oct 2026.
 LEDGER_FORMAT = "callsheet3.nhl-ledger"
-A_PRIORI = {"goals_per_game": 6.10, "ot_rate": 0.23, "empty_net_rate": 0.25, "p1_share": 0.30,
-            "p1_per_game": 0.30 * (6.10 - 0.25 - 0.23), "shots_per_team": 30.0, "save_pct": 0.898}
+# the engine's figures as of 7 Oct 2026, measured on the 2024-25 and 2025-26 ledgers
+A_PRIORI = {"goals_per_game": 6.17, "ot_rate": 0.23, "empty_net_rate": 0.357, "p1_share": 0.314,
+            "p1_per_game": 0.314 * (6.17 - 0.39 - 0.23), "shots_per_team": 28.1, "save_pct": 0.898}
 
 
 def ledger_path(out_dir, season_id):
@@ -1406,7 +1407,7 @@ def ledger_report(m, log):
             ("game with an empty-net goal", "empty_net_rate", "%.3f"), ("first-period share of regulation goals", "p1_share", "%.3f"),
             ("first-period goals per game", "p1_per_game", "%.2f"), ("shots per team per game", "shots_per_team", "%.1f"),
             ("league save percentage", "save_pct", "%.3f")]
-    log("  %-40s %10s %10s" % ("", "assumed", "measured"))
+    log("  %-40s %10s %10s" % ("", "engine", "measured"))
     for label, key, f in rows:
         if m.get(key) is None:
             continue

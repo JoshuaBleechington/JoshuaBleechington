@@ -68,11 +68,20 @@ chances a side) are sized a priori and tagged, so they cannot buy a band.
 shown, not scored: its usual consequence, the backup, already arrives
 through the goalie line, and its effect on the total has a disputed sign.
 
-**The goal total is a mixture**: a regulation count (negative binomial,
-index 1.09, derived from an a-priori residual spread of 2.55 less the two
-lumps) plus an empty-net goal with probability 0.25 plus the overtime goal
-with probability 0.23. The mean of the mixture is the projection exactly.
-A total of 6 pushes about 16% of the time, which is what hockey does.
+**The goal total is a mixture**: a regulation count (negative binomial at
+the Poisson floor, index 1.01) plus the empty-net lump (0.39 expected goals
+a game) plus the overtime goal with probability 0.23. The mean of the
+mixture is the projection exactly. A total of 6 pushes about 16% of the
+time, which is what hockey does. The constants were a priori until 7 Oct
+2026, when the league ledger measured them on 2,624 games (2024-25 and
+2025-26): 6.17 goals a game (October runs 6.4 both years, the highest
+month), 0.39 empty-net goals a game, 22.8% tied after sixty, 28.1 shots a
+team, a .898 league save percentage, a first-period share of 0.314 (1.74 a
+period, Poisson to the decimal), and a raw spread of totals of 2.31 —
+narrower than a Poisson, which this family cannot be, so Poisson is the
+floor and the probabilities lean a touch toward 50%, the conservative side.
+Each constant's line in `totals/nhl.py` says what it was and what it
+measured.
 
 **The moneyline and the puck line** are read off the book's own moneyline
 through a two-team regulation distribution, with the empty net on the
@@ -99,10 +108,12 @@ while the two-team distribution ties after sixty about 16% of the time —
 real teams protect a tie late, which no independent-count model knows. Both
 are a priori; the log will say which is nearer.
 
-**Every constant is a priori and says so.** Nothing is fitted, because
-there is no log yet. The log is the point; the sheet is what makes one
-possible. The residual-spread check measures the total's dispersion as
-games settle; the record measures the rest.
+**The league constants are measured; the weights are not.** The ledger
+fixed the level, the lumps, the period share and the spread on 2,624
+games. What it cannot fix without closing lines is how much each input
+should move the number off the market: goalies 1.6, expected goals 1.2,
+special teams and form 0.8, head to head 0.5 are still a priori, and
+`tools_audit_nhl.py` judges them against the record as it accumulates.
 
 ## What the user types, from BetMGM
 

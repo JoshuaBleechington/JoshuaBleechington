@@ -160,16 +160,16 @@ const CHECKS = ["dome","playoff","agconf","hgconf"];
     const wait = () => new Promise(r => setTimeout(r, 60));
     const set = (id, v) => { const el = document.getElementById(id); el.value = v; el.dispatchEvent(new Event('input', { bubbles: true })); };
     document.getElementById('clear').click(); document.getElementById('m-nhl').click(); await wait();
-    // two cold goalies on long samples, the over priced -140: #1's band says BET (56.7%), the price needs 58.3%
+    // two cool goalies on long samples, the over priced -140: #1's band says BET (57.9%), the price needs 58.3%
     set('gdate', '2026-10-07'); set('away', 'Flames'); set('home', 'Kraken'); set('line', '6'); set('op', '-140'); set('up', '110');
-    set('agsv', '0.890'); set('hgsv', '0.890'); set('agsh', '1800'); set('hgsh', '1800'); set('asf', '31'); set('hsf', '31'); await wait();
+    set('agsv', '0.895'); set('hgsv', '0.895'); set('agsh', '1800'); set('hgsh', '1800'); set('asf', '31'); set('hsf', '31'); await wait();
     const railBand = (document.querySelector('#markets .mk[data-key="total"] .band') || {}).textContent || '';
     const railP = (document.querySelector('#markets .mk[data-key="total"] .p') || {}).textContent || '';
     const railEdge = (document.querySelector('#markets .mk[data-key="total"] .e') || {}).textContent || '';
     document.getElementById('add').click(); await wait();
     document.getElementById('boardDate').value = '2026-10-07'; document.getElementById('boardDate').dispatchEvent(new Event('change')); await wait();
     const betsThin = [...document.querySelectorAll('#bestBets .pk')].map(e => e.querySelector('.n4').textContent.split(' · ')[0]);
-    // the same row at -120 (needs 54.5%, the sheet says 54.6%) clears its price and lists with its chip
+    // the same row at -120 (needs 54.5%, the sheet says 55.9%) clears its price and lists with its chip
     set('op', '-120'); set('up', '100'); await wait(); document.getElementById('add').click(); await wait();
     const betsClear = [...document.querySelectorAll('#bestBets .pk')].map(e => e.querySelector('.n4').textContent.split(' · ')[0] + ' ' + ((e.querySelector('.n2 .band') || {}).textContent || ''));
     document.getElementById('clear').click(); await wait();

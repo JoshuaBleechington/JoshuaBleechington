@@ -79,7 +79,7 @@ NHL_CASES = [
     # between the Python and the browser, which is noise, not a disagreement.
     {"name": "the puck line at +1.5 on a near pick-em, priced",
      "inputs": dict(away="Stars", home="Kings", line="5.5", op="-108", up="-112", hml="-105", aml="-115",
-                    pl="1.5", plh="-240", pla="195", p1line="1.5", p1op="-105", p1up="-115")},
+                    pl="1.5", plh="-240", pla="195", p1line="1.5", p1op="-102", p1up="-118")},
     {"name": "first-period form from the ledger: two hot first periods pull the period over",
      "inputs": dict(away="Avalanche", home="Senators", line="6.5", op="-110", up="-110", p1line="1.5", p1op="-130", p1up="100",
                     ap1l10="2.30", hp1l10="2.10", **FULL)},

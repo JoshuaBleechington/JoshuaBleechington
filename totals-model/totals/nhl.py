@@ -69,23 +69,32 @@ from .fullgame import (
 )
 
 # ===========================================================================
-# League constants -- A PRIORI, 1 Oct 2026, for the 2026-27 season
+# League constants -- MEASURED 7 Oct 2026 on the league ledger: every
+# regular-season final of 2024-25 and 2025-26, 2,624 games (slate.py
+# nhl-ledger --season). A priori from 1 Oct until then; each line says
+# what it was and what it measured.
 # ===========================================================================
 
-LEAGUE_SOURCE = "a priori for 2026-27, 1 Oct 2026; nothing here is measured yet"
+LEAGUE_SOURCE = "measured on 2,624 games, the 2024-25 and 2025-26 ledgers, 7 Oct 2026"
 
 #: Goals per game, both teams, everything included: empty-netters and the
-#: one goal that decides overtime or the shootout.
-LEAGUE_GOALS_PER_GAME = 6.10
-#: Probability a game has an empty-net goal, and that it is tied after sixty.
-EMPTY_NET_RATE = 0.25
+#: one goal that decides overtime or the shootout. Was 6.10; measured 6.08
+#: and 6.25 by season, 6.17 together. October runs 6.4 both years, the
+#: highest month, and settles to 6.0-6.1 by November.
+LEAGUE_GOALS_PER_GAME = 6.17
+#: The empty-net lump: expected empty-net goals a game. Was 0.25 as "the
+#: chance of one"; measured 0.396 and 0.382 goals a game (36% of games have
+#: at least one, some have two), so the lump carries the mean, 0.39.
+EMPTY_NET_RATE = 0.39
+#: Tied after sixty. Was 0.23; measured 0.207 and 0.248, 0.228 together
+#: (15.3% decided in overtime, 7.5% in the shootout).
 OT_RATE = 0.23
 #: Regulation goals with the goalies in the net: what the goalie and shot
 #: inputs are a differential against.
 LEAGUE_REG_GOALS = LEAGUE_GOALS_PER_GAME - EMPTY_NET_RATE - OT_RATE
-#: Shots per team per game, and the league save percentage. 30 * .102 * 2 =
-#: 6.12 against 5.62 regulation goals; the gap is shots at an empty net and
-#: the shots a cold starter does not face.
+#: Shots per team per game, and the league save percentage. Shots were 30
+#: a priori; measured 28.3 and 27.8, 28.1 together. 28.1 * .102 * 2 = 5.73
+#: against 5.55 regulation goals; the gap is the shots at an empty net.
 #: The save percentage was .905 a priori until 5 Oct 2026, when the first
 #: four nights of the slate's goalie lines -- 62 of them, 37,931 shots, this
 #: season blended with half of last -- averaged .898 shots-weighted. Against
@@ -93,7 +102,9 @@ LEAGUE_REG_GOALS = LEAGUE_GOALS_PER_GAME - EMPTY_NET_RATE - OT_RATE
 #: Call Sheet #1 called BET on the over in 8 of 31 games (3-5). Measured on
 #: the card's own starters, so it is the prior for a named starter, not for
 #: the league's backups; re-measure at the end of the month.
-LEAGUE_SHOTS = 30.0
+#: The ledger then measured the league at .901 and .896, .898 together,
+#: which is the figure already here.
+LEAGUE_SHOTS = 28.1
 LEAGUE_SAVE_PCT = 0.898
 #: Power plays per team per game, and the league conversion either side.
 LEAGUE_PP_PER_GAME = 2.8
@@ -118,19 +129,25 @@ GOALIE_TALENT_SD = 0.008
 SV_STABLE_AT = LEAGUE_SAVE_PCT * (1.0 - LEAGUE_SAVE_PCT) / GOALIE_TALENT_SD ** 2
 
 # --- dispersion ------------------------------------------------------------
-#: Spread of a final goal total around its projection, A PRIORI; the sheet's
-#: residual-spread check measures it as games settle. Of that variance the
-#: empty-net and overtime lumps carry a fixed share, and the rest is the
-#: regulation count's, which sets its index. 2.55^2 = 6.50; the two lumps
-#: carry 0.25*0.75 + 0.23*0.77 = 0.365; 6.14 / 5.62 = 1.09. Near Poisson,
-#: which is what goals are.
-RESIDUAL_SD = 2.55
+#: Spread of a final goal total around its projection. Was 2.55 a priori.
+#: The ledger measured the RAW spread of totals at 2.32 and 2.30 (variance
+#: 5.34 on a mean of 6.17): a hockey total is narrower than a Poisson, not
+#: wider, and the residual against a market can only be narrower still.
+#: The regulation count cannot be made narrower than Poisson in this
+#: family, so Poisson is the floor: 2.45^2 = 6.00 less the two lumps
+#: (0.39*0.61 + 0.23*0.77 = 0.415) is 5.59 over 5.55 regulation goals, an
+#: index of 1.01. The probabilities this gives lean a touch toward 50%,
+#: which is the conservative side. The first period, by contrast, is Poisson
+#: to the decimal: mean 1.745, variance 1.702.
+RESIDUAL_SD = 2.45
 REG_PHI = (RESIDUAL_SD ** 2
            - EMPTY_NET_RATE * (1.0 - EMPTY_NET_RATE)
            - OT_RATE * (1.0 - OT_RATE)) / LEAGUE_REG_GOALS
-#: A period is a third of the regulation game and the first is the quietest
-#: of the three. Poisson, no empty net, no overtime.
-P1_SHARE = 0.30
+#: The first period's share of the regulation goals scored with the goalies
+#: in. Was 0.30; measured 0.316 and 0.312, 0.314 together (1.74 goals a
+#: period, 0 / 1 / 2+ in 17.6 / 29.2 / 53.1% of games, where a Poisson at
+#: that mean says 2+ in 52.0%). Poisson, no empty net, no overtime.
+P1_SHARE = 0.314
 P1_PHI = 1.0
 
 # --- the empty net, on the margin -----------------------------------------

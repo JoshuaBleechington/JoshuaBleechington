@@ -4727,57 +4727,57 @@
       "h2hn": "3"
     },
     "expect": {
-      "lam_home": 3.07438002,
-      "lam_away": 2.61059982,
-      "projected": 6.16497984,
+      "lam_home": 3.02406191,
+      "lam_away": 2.57826293,
+      "projected": 6.22232485,
       "markets": [
         {
           "key": "pl",
           "pick": "Bruins -1.5",
           "side": "HOME",
-          "p": 0.40264788,
+          "p": 0.39654805,
           "p_push": 0.0,
           "price": 180.0,
-          "edge": 0.04550503,
-          "fair": 148.356,
-          "anchored": true,
-          "band": ""
-        },
-        {
-          "key": "ml",
-          "pick": "Rangers ML",
-          "side": "AWAY",
-          "p": 0.42029979,
-          "p_push": 0.0,
-          "price": 130.0,
-          "edge": -0.01448282,
-          "fair": 137.9254,
-          "anchored": true,
-          "band": ""
-        },
-        {
-          "key": "p1",
-          "pick": "P1 UNDER 1.5",
-          "side": "UNDER",
-          "p": 0.48274294,
-          "p_push": 0.0,
-          "price": 100.0,
-          "edge": -0.01725706,
-          "fair": 107.1496,
+          "edge": 0.03940519,
+          "fair": 152.1763,
           "anchored": true,
           "band": ""
         },
         {
           "key": "total",
-          "pick": "UNDER 6",
-          "side": "UNDER",
-          "p": 0.50380095,
-          "p_push": 0.15696198,
+          "pick": "OVER 6",
+          "side": "OVER",
+          "p": 0.51274719,
+          "p_push": 0.16489127,
           "price": -110.0,
-          "edge": -0.02000857,
-          "fair": -101.532,
+          "edge": -0.01106234,
+          "fair": -105.2323,
           "anchored": true,
           "band": "NO BET"
+        },
+        {
+          "key": "ml",
+          "pick": "Rangers ML",
+          "side": "AWAY",
+          "p": 0.41973621,
+          "p_push": 0.0,
+          "price": 130.0,
+          "edge": -0.0150464,
+          "fair": 138.2449,
+          "anchored": true,
+          "band": ""
+        },
+        {
+          "key": "p1",
+          "pick": "P1 OVER 1.5",
+          "side": "OVER",
+          "p": 0.52761839,
+          "p_push": 0.0,
+          "price": -120.0,
+          "edge": -0.01783615,
+          "fair": -111.6933,
+          "anchored": true,
+          "band": ""
         }
       ]
     }
@@ -4793,14 +4793,14 @@
     "expect": {
       "lam_home": null,
       "lam_away": null,
-      "projected": 6.18567098,
+      "projected": 6.15664418,
       "markets": [
         {
           "key": "total",
           "pick": "OVER 6",
           "side": "OVER",
           "p": 0.5,
-          "p_push": 0.15688462,
+          "p_push": 0.16528553,
           "price": null,
           "edge": null,
           "fair": 100.0,
@@ -4823,9 +4823,9 @@
       "aml": "-130"
     },
     "expect": {
-      "lam_home": 3.0830384,
-      "lam_away": 3.34758478,
-      "projected": 6.91062319,
+      "lam_home": 2.99990524,
+      "lam_away": 3.25042439,
+      "projected": 6.87032963,
       "markets": [
         {
           "key": "ml",
@@ -4855,11 +4855,11 @@
           "key": "pl",
           "pick": "Flames +1.5",
           "side": "HOME",
-          "p": 0.61960832,
+          "p": 0.6269337,
           "p_push": 0.0,
           "price": null,
           "edge": null,
-          "fair": -162.8869,
+          "fair": -168.0489,
           "anchored": false,
           "band": ""
         }
@@ -4887,43 +4887,43 @@
       "hgconf": "1"
     },
     "expect": {
-      "lam_home": 2.73160377,
-      "lam_away": 2.39374097,
-      "projected": 5.60534475,
+      "lam_home": 2.69642067,
+      "lam_away": 2.3701166,
+      "projected": 5.68653727,
       "markets": [
-        {
-          "key": "total",
-          "pick": "UNDER 5.5",
-          "side": "UNDER",
-          "p": 0.51448413,
-          "p_push": 0,
-          "price": -110.0,
-          "edge": -0.0093254,
-          "fair": -105.9665,
-          "anchored": true,
-          "band": "NO BET"
-        },
         {
           "key": "ml",
           "pick": "Kraken ML",
           "side": "AWAY",
-          "p": 0.43843158,
+          "p": 0.43782481,
           "p_push": 0.0,
           "price": 120.0,
-          "edge": -0.01611387,
-          "fair": 128.0858,
+          "edge": -0.01672064,
+          "fair": 128.4019,
           "anchored": true,
           "band": ""
+        },
+        {
+          "key": "total",
+          "pick": "OVER 5.5",
+          "side": "OVER",
+          "p": 0.50405441,
+          "p_push": 0,
+          "price": -110.0,
+          "edge": -0.01975512,
+          "fair": -101.635,
+          "anchored": true,
+          "band": "NO BET"
         },
         {
           "key": "pl",
           "pick": "Kraken +1.5",
           "side": "AWAY",
-          "p": 0.62280598,
+          "p": 0.62856961,
           "p_push": 0.0,
           "price": null,
           "edge": null,
-          "fair": -165.1155,
+          "fair": -169.2295,
           "anchored": false,
           "band": ""
         }
@@ -4955,31 +4955,19 @@
       "hsf": "35.0"
     },
     "expect": {
-      "lam_home": 3.71252435,
-      "lam_away": 2.48019266,
-      "projected": 6.67271701,
+      "lam_home": 3.66391339,
+      "lam_away": 2.47376524,
+      "projected": 6.75767862,
       "markets": [
         {
           "key": "pl",
           "pick": "Avalanche -1.5",
           "side": "HOME",
-          "p": 0.52192324,
+          "p": 0.51706787,
           "p_push": 0.0,
           "price": 105.0,
-          "edge": 0.03411836,
-          "fair": -109.1714,
-          "anchored": true,
-          "band": ""
-        },
-        {
-          "key": "ml",
-          "pick": "Sharks ML",
-          "side": "AWAY",
-          "p": 0.3046681,
-          "p_push": 0.0,
-          "price": 215.0,
-          "edge": -0.01279222,
-          "fair": 228.226,
+          "edge": 0.02926299,
+          "fair": -107.0684,
           "anchored": true,
           "band": ""
         },
@@ -4987,23 +4975,35 @@
           "key": "total",
           "pick": "OVER 6.5",
           "side": "OVER",
-          "p": 0.49684828,
+          "p": 0.514831,
           "p_push": 0,
           "price": -105.0,
-          "edge": -0.01534684,
-          "fair": 101.2687,
+          "edge": 0.00263588,
+          "fair": -106.1137,
           "anchored": true,
-          "band": ""
+          "band": "NO BET"
         },
         {
           "key": "p1",
           "pick": "P1 OVER 1.5",
           "side": "OVER",
-          "p": 0.55119887,
+          "p": 0.56144653,
           "p_push": 0.0,
           "price": -135.0,
-          "edge": -0.02326921,
-          "fair": -122.8158,
+          "edge": -0.01302155,
+          "fair": -128.0224,
+          "anchored": true,
+          "band": ""
+        },
+        {
+          "key": "ml",
+          "pick": "Sharks ML",
+          "side": "AWAY",
+          "p": 0.3031281,
+          "p_push": 0.0,
+          "price": 215.0,
+          "edge": -0.01433222,
+          "fair": 229.8935,
           "anchored": true,
           "band": ""
         }
@@ -5023,9 +5023,9 @@
       "aml": "-180"
     },
     "expect": {
-      "lam_home": 2.51083075,
-      "lam_away": 3.19484023,
-      "projected": 6.18567098,
+      "lam_home": 2.44457542,
+      "lam_away": 3.09206877,
+      "projected": 6.15664418,
       "markets": [
         {
           "key": "ml",
@@ -5044,7 +5044,7 @@
           "pick": "OVER 6",
           "side": "OVER",
           "p": 0.5,
-          "p_push": 0.15688462,
+          "p_push": 0.16528553,
           "price": -110.0,
           "edge": -0.02380952,
           "fair": 100.0,
@@ -5055,11 +5055,11 @@
           "key": "pl",
           "pick": "Blackhawks +1.5",
           "side": "HOME",
-          "p": 0.56340305,
+          "p": 0.57169937,
           "p_push": 0.0,
           "price": null,
           "edge": null,
-          "fair": -129.0442,
+          "fair": -133.4809,
           "anchored": false,
           "band": ""
         }
@@ -5085,17 +5085,17 @@
     "expect": {
       "lam_home": null,
       "lam_away": null,
-      "projected": 6.0592142,
+      "projected": 6.03388534,
       "markets": [
         {
           "key": "total",
           "pick": "OVER 5.5",
           "side": "OVER",
-          "p": 0.55890782,
+          "p": 0.56274169,
           "p_push": 0,
           "price": -110.0,
-          "edge": 0.0350983,
-          "fair": -126.71,
+          "edge": 0.03893216,
+          "fair": -128.6978,
           "anchored": true,
           "band": "NO BET"
         }
@@ -5117,31 +5117,31 @@
       "hsf": "33.0"
     },
     "expect": {
-      "lam_home": 2.9517916,
-      "lam_away": 3.01714371,
-      "projected": 6.44893531,
+      "lam_home": 2.92204298,
+      "lam_away": 2.98513006,
+      "projected": 6.52717304,
       "markets": [
         {
           "key": "total",
           "pick": "OVER 6",
           "side": "OVER",
-          "p": 0.54744373,
-          "p_push": 0.15504874,
+          "p": 0.57016619,
+          "p_push": 0.16162176,
           "price": -115.0,
-          "edge": 0.01256001,
-          "fair": -120.967,
+          "edge": 0.03528247,
+          "fair": -132.6481,
           "anchored": true,
-          "band": "BET"
+          "band": "STRONG BET"
         },
         {
           "key": "ml",
           "pick": "Wild ML",
           "side": "HOME",
-          "p": 0.48899049,
+          "p": 0.48888672,
           "p_push": 0.0,
           "price": -105.0,
-          "edge": -0.02320463,
-          "fair": 104.503,
+          "edge": -0.0233084,
+          "fair": 104.5464,
           "anchored": true,
           "band": ""
         },
@@ -5149,11 +5149,11 @@
           "key": "pl",
           "pick": "Wild +1.5",
           "side": "HOME",
-          "p": 0.6529426,
+          "p": 0.6585371,
           "p_push": 0.0,
           "price": null,
           "edge": null,
-          "fair": -188.1368,
+          "fair": -192.8576,
           "anchored": false,
           "band": ""
         }
@@ -5175,35 +5175,23 @@
       "plh": "-240",
       "pla": "195",
       "p1line": "1.5",
-      "p1op": "-105",
-      "p1up": "-115"
+      "p1op": "-102",
+      "p1up": "-118"
     },
     "expect": {
-      "lam_home": 2.56345651,
-      "lam_away": 2.6230724,
-      "projected": 5.66652891,
+      "lam_home": 2.48100198,
+      "lam_away": 2.53735303,
+      "projected": 5.63835501,
       "markets": [
         {
           "key": "pl",
           "pick": "Stars -1.5",
           "side": "AWAY",
-          "p": 0.33528798,
+          "p": 0.32755778,
           "p_push": 0.0,
           "price": 195.0,
-          "edge": -0.00369507,
-          "fair": 198.2511,
-          "anchored": true,
-          "band": ""
-        },
-        {
-          "key": "ml",
-          "pick": "Kings ML",
-          "side": "HOME",
-          "p": 0.48916576,
-          "p_push": 0.0,
-          "price": -105.0,
-          "edge": -0.02302936,
-          "fair": 104.4297,
+          "edge": -0.01142527,
+          "fair": 205.2896,
           "anchored": true,
           "band": ""
         },
@@ -5211,6 +5199,18 @@
           "key": "p1",
           "pick": "P1 OVER 1.5",
           "side": "OVER",
+          "p": 0.48263587,
+          "p_push": 0.0,
+          "price": -102.0,
+          "edge": -0.02231462,
+          "fair": 107.1955,
+          "anchored": true,
+          "band": ""
+        },
+        {
+          "key": "ml",
+          "pick": "Kings ML",
+          "side": "HOME",
           "p": 0.48916576,
           "p_push": 0.0,
           "price": -105.0,
@@ -5266,31 +5266,31 @@
     "expect": {
       "lam_home": null,
       "lam_away": null,
-      "projected": 6.59405204,
+      "projected": 6.65109831,
       "markets": [
-        {
-          "key": "total",
-          "pick": "UNDER 6.5",
-          "side": "UNDER",
-          "p": 0.5151284,
-          "p_push": 0,
-          "price": -110.0,
-          "edge": -0.00868113,
-          "fair": -106.2402,
-          "anchored": true,
-          "band": "NO BET"
-        },
         {
           "key": "p1",
           "pick": "P1 OVER 1.5",
           "side": "OVER",
-          "p": 0.54249125,
+          "p": 0.55123565,
           "p_push": 0.0,
           "price": -130.0,
-          "edge": -0.02272614,
-          "fair": -118.5751,
+          "edge": -0.01398174,
+          "fair": -122.8341,
           "anchored": true,
           "band": ""
+        },
+        {
+          "key": "total",
+          "pick": "UNDER 6.5",
+          "side": "UNDER",
+          "p": 0.50207986,
+          "p_push": 0,
+          "price": -110.0,
+          "edge": -0.02172966,
+          "fair": -100.8354,
+          "anchored": true,
+          "band": "NO BET"
         }
       ]
     }
@@ -5327,43 +5327,43 @@
       "h2hn": "3"
     },
     "expect": {
-      "lam_home": 3.20969755,
-      "lam_away": 2.95214473,
-      "projected": 6.64184228,
+      "lam_home": 3.15703581,
+      "lam_away": 2.91003371,
+      "projected": 6.68706952,
       "markets": [
-        {
-          "key": "total",
-          "pick": "UNDER 6.5",
-          "side": "UNDER",
-          "p": 0.50784174,
-          "p_push": 0,
-          "price": -110.0,
-          "edge": -0.01596778,
-          "fair": -103.1867,
-          "anchored": true,
-          "band": "NO BET"
-        },
         {
           "key": "ml",
           "pick": "Oilers ML",
           "side": "AWAY",
-          "p": 0.45742068,
+          "p": 0.45718135,
           "p_push": 0.0,
           "price": 110.0,
-          "edge": -0.0187698,
-          "fair": 118.6171,
+          "edge": -0.01900912,
+          "fair": 118.7316,
           "anchored": true,
           "band": ""
+        },
+        {
+          "key": "total",
+          "pick": "OVER 6.5",
+          "side": "OVER",
+          "p": 0.50365054,
+          "p_push": 0,
+          "price": -110.0,
+          "edge": -0.02015898,
+          "fair": -101.471,
+          "anchored": true,
+          "band": "NO BET"
         },
         {
           "key": "pl",
           "pick": "Oilers +1.5",
           "side": "AWAY",
-          "p": 0.62324364,
+          "p": 0.62934795,
           "p_push": 0.0,
           "price": null,
           "edge": null,
-          "fair": -165.4235,
+          "fair": -169.7948,
           "anchored": false,
           "band": ""
         }
@@ -5397,19 +5397,19 @@
       "h2hn": "3"
     },
     "expect": {
-      "lam_home": 3.33930553,
-      "lam_away": 2.77474651,
-      "projected": 6.59405204,
+      "lam_home": 3.28678898,
+      "lam_away": 2.74430933,
+      "projected": 6.65109831,
       "markets": [
         {
           "key": "ml",
           "pick": "Lightning ML",
           "side": "AWAY",
-          "p": 0.40693408,
+          "p": 0.40634238,
           "p_push": 0.0,
           "price": 150.0,
-          "edge": 0.00693408,
-          "fair": 145.74,
+          "edge": 0.00634238,
+          "fair": 146.0979,
           "anchored": true,
           "band": ""
         },
@@ -5417,11 +5417,11 @@
           "key": "total",
           "pick": "UNDER 6.5",
           "side": "UNDER",
-          "p": 0.5151284,
+          "p": 0.50207986,
           "p_push": 0,
           "price": -110.0,
-          "edge": -0.00868113,
-          "fair": -106.2402,
+          "edge": -0.02172966,
+          "fair": -100.8354,
           "anchored": true,
           "band": "NO BET"
         },
@@ -5429,11 +5429,11 @@
           "key": "pl",
           "pick": "Lightning +1.5",
           "side": "AWAY",
-          "p": 0.5787439,
+          "p": 0.58471146,
           "p_push": 0.0,
           "price": null,
           "edge": null,
-          "fair": -137.3853,
+          "fair": -140.7964,
           "anchored": false,
           "band": ""
         }

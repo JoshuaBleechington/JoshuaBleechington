@@ -1692,16 +1692,17 @@
      gets an NHL page. Everything the Python docstring says is a priori is a
      priori here too. 1 Oct 2026. ===== */
   var NHL = {
-    GOALS: 6.10,            // per game, both sides, empty-netters and the OT goal in
-    ENG: 0.25,              // P(an empty-net goal in a game)
-    OT: 0.23,               // P(tied after sixty)
-    SHOTS: 30.0,            // per team per game
+    /* measured 7 Oct 2026 on 2,624 games, the 2024-25 and 2025-26 ledgers (totals/nhl.py has each figure's story) */
+    GOALS: 6.17,            // per game, both sides, empty-netters and the OT goal in (was 6.10)
+    ENG: 0.39,              // expected empty-net goals a game, the lump's mean (was 0.25)
+    OT: 0.23,               // P(tied after sixty): measured 0.228
+    SHOTS: 28.1,            // per team per game (was 30)
     SV: 0.898,              // league save percentage: measured on the card's first 62 goalie lines (37,931 shots), 5 Oct 2026; was .905 a priori
     XG: 3.05,               // expected goals per team per game, a fallback: the slate writes the table's own mean
     PP_PER_GAME: 2.8, PP_PCT: 0.21,
     TALENT_SD: 0.008,       // spread of goalie true-talent save percentage
-    RESIDUAL_SD: 2.55,      // a priori; the residual-spread check measures it
-    P1_SHARE: 0.30, P1_PHI: 1.0,
+    RESIDUAL_SD: 2.45,      // Poisson floor: the raw spread of totals is 2.31, narrower than Poisson (was 2.55)
+    P1_SHARE: 0.314, P1_PHI: 1.0,   // first-period share of regulation goals, measured (was 0.30); Poisson to the decimal
     ENG_ONE: 0.45, ENG_TWO: 0.30,   // P(empty-net goal | leading by one / by two)
     OT_COMPRESSION: 0.5,
     H2H_FULL_AT: 4, DEFAULT_PUCK_LINE: 1.5, KMAX: 25

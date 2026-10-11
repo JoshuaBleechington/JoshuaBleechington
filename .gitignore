@@ -1,0 +1,8 @@
+# Personal track-record exports.
+#
+# These are logs of real games and real bets. This repository is a GitHub
+# profile repo (JoshuaBleechington/JoshuaBleechington), which is public by
+# default, so a save-log committed here is published. They are generated on
+# demand and delivered directly instead.
+verdict-log-*.json
+!totals-model/examples/*.json

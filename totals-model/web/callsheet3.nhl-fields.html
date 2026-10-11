@@ -1,0 +1,138 @@
+<!-- BOARD: the two NHL side markets, inserted into the board card next to the run line and first five -->
+          <div id="plFields" hidden>
+            <div class="subhead">Puck line <span class="tag">home side's number, as BetMGM prints it</span></div>
+            <div class="grid3">
+              <div class="f"><label for="pl">Home puck line</label><input id="pl" type="number" step="0.5" inputmode="decimal" placeholder="-1.5"></div>
+              <div class="f"><label for="plh">Home price</label><input id="plh" type="number" step="5" inputmode="numeric" placeholder="+180"></div>
+              <div class="f"><label for="pla">Away price</label><input id="pla" type="number" step="5" inputmode="numeric" placeholder="-220"></div>
+            </div>
+          </div>
+
+          <div id="p1Fields" hidden>
+            <div class="subhead">First period total <span class="tag">its own market, its own anchor</span></div>
+            <div class="grid3">
+              <div class="f"><label for="p1line">P1 total</label><input id="p1line" type="number" step="0.5" inputmode="decimal" placeholder="1.5"></div>
+              <div class="f"><label for="p1op">P1 over price</label><input id="p1op" type="number" step="5" inputmode="numeric" placeholder="-120"></div>
+              <div class="f"><label for="p1up">P1 under price</label><input id="p1up" type="number" step="5" inputmode="numeric" placeholder="+100"></div>
+            </div>
+          </div>
+<!-- ===== FIELDS: the NHL inputs. What you do is on top; what the slate fills is folded below it ===== -->
+      <div id="nhlFields" class="stack" hidden>
+        <section class="card">
+          <h2>Goalies <span class="tag">the one thing to confirm before you bet</span></h2>
+          <div class="body">
+            <p class="note" id="goalieSummary">No goalie lines yet — load the slate, or open the boxes below.</p>
+            <div class="grid2">
+              <div class="f"><label for="agpick">Away: who is in net</label><select id="agpick"><option value="">— load the slate —</option></select></div>
+              <div class="f"><label for="hgpick">Home: who is in net</label><select id="hgpick"><option value="">— load the slate —</option></select></div>
+            </div>
+            <div class="grid2">
+              <label class="check"><input type="checkbox" id="agconf"> Away starter confirmed</label>
+              <label class="check"><input type="checkbox" id="hgconf"> Home starter confirmed</label>
+              <label class="check"><input type="checkbox" id="agbk"> Away backup in net</label>
+              <label class="check"><input type="checkbox" id="hgbk"> Home backup in net</label>
+            </div>
+            <div class="links">
+              <a href="https://www.dailyfaceoff.com/starting-goalies" target="_blank" rel="noopener">Daily Faceoff · starting goalies</a>
+            </div>
+            <p class="note">The slate names each side's <b>likely</b> starter and fills his line, and the two lists above hold every
+              goalie on each club with the line the sheet would score. A late change in net is the one thing a hockey
+              market prices imperfectly, so check Daily Faceoff, <b>pick the goalie it names</b> (his line and the Backup box
+              follow), then tick Confirmed. The next morning's grade file carries who actually started, and the record tile
+              keeps the total's record split by whether the goalie on the card was the one who played: 42 of the first 150
+              goalie boxes were the other goalie's line.
+              <b>Backup in net</b>: set from the pick when the goalie has under 30% of his club's starts, ten starts
+              in; fix it if Daily Faceoff says otherwise. With one backup in a game the total landed 0.18 under the close
+              over two seasons (737 games, the under 53.7%), so one backup puts a tagged −0.15 on the line and the record
+              tile keeps the under's record on these games; a backup whose own line reads cold takes −0.25 (182 such games
+              landed 0.44 under, the under 57.5%). Two backups: nothing moves. With a backup in either net the
+              goalie lines are not scored: in those games neither goalie's line had a direction against the close, while
+              with two regular starters the lines ran the right way both seasons.</p>
+            <input type="hidden" id="nhlform">
+            <!-- the goalie picker's data and record: the slate's goalie lists (JSON), whose line is on each side,
+                 who actually started (from the grade file) and whether they matched (yes / no / blank) -->
+            <input type="hidden" id="ngoalies"><input type="hidden" id="agname"><input type="hidden" id="hgname">
+            <input type="hidden" id="agstart"><input type="hidden" id="hgstart"><input type="hidden" id="agok"><input type="hidden" id="hgok">
+          </div>
+        </section>
+
+        <section class="card">
+          <h2>Recent form <span class="tag">last five, each side — shown, not scored</span></h2>
+          <div class="body">
+            <div id="formPanel" class="note">No recent games on the row — load the slate and Fill form, and each side's last five come with it.</div>
+            <div class="subhead">The crowd <span class="tag">from the book's splits — shown, not scored, with its own record line</span></div>
+            <div class="grid2">
+              <div class="f"><label for="ntick">Over % tickets <span class="tag">shown</span></label><input id="ntick" type="number" step="1" min="0" max="100" inputmode="numeric" placeholder="68"></div>
+              <div class="f"><label for="ncash">Over % money <span class="tag">shown</span></label><input id="ncash" type="number" step="1" min="0" max="100" inputmode="numeric" placeholder="61"></div>
+            </div>
+            <p class="note">With 65% or more of the money on one side, the total's pick is chipped <b>with the crowd</b> or
+              <b>against the crowd</b> and the record keeps each line. In baseball no threshold beat a coin, so this moves
+              nothing; the hockey record decides whether hockey is different.</p>
+            <p class="note">Score, shots for and against, and who was in net, from the box scores the slate already reads. Nothing
+              here moves a number: three games of scores is noise dressed as a trend, and form measured null over a
+              baseball season. It is here to catch what the season line hides — a goalie who has stopped starting, a team
+              suddenly giving up 40 shots a night — and it rides on the row so the record can split on it later.</p>
+          </div>
+        </section>
+
+        <details class="card fold" id="nhlSlateBoxes">
+          <summary><span>Filled by the slate</span> <span class="tag">goalie lines, shots, special teams, form, rest — open to check or edit</span></summary>
+          <div class="body">
+            <div class="grid2">
+              <div class="f"><label for="agsv">Away goalie save %</label><input id="agsv" type="number" step="0.001" inputmode="decimal" placeholder=".898"></div>
+              <div class="f"><label for="hgsv">Home goalie save %</label><input id="hgsv" type="number" step="0.001" inputmode="decimal" placeholder=".898"></div>
+            </div>
+            <div class="grid2">
+              <div class="f"><label for="agsh">Away goalie shots faced</label><input id="agsh" type="number" step="1" inputmode="numeric" placeholder="both or neither"></div>
+              <div class="f"><label for="hgsh">Home goalie shots faced</label><input id="hgsh" type="number" step="1" inputmode="numeric" placeholder="both or neither"></div>
+            </div>
+            <div class="grid2">
+              <div class="f"><label for="asf">Away shots for / game</label><input id="asf" type="number" step="0.1" inputmode="decimal" placeholder="30.0"></div>
+              <div class="f"><label for="hsf">Home shots for / game</label><input id="hsf" type="number" step="0.1" inputmode="decimal" placeholder="30.0"></div>
+            </div>
+            <div class="grid4">
+              <div class="f"><label for="app">Away PP %</label><input id="app" type="number" step="0.1" inputmode="decimal" placeholder="21.0"></div>
+              <div class="f"><label for="hpp">Home PP %</label><input id="hpp" type="number" step="0.1" inputmode="decimal" placeholder="21.0"></div>
+              <div class="f"><label for="apk">Away PK %</label><input id="apk" type="number" step="0.1" inputmode="decimal" placeholder="79.0"></div>
+              <div class="f"><label for="hpk">Home PK %</label><input id="hpk" type="number" step="0.1" inputmode="decimal" placeholder="79.0"></div>
+            </div>
+            <div class="grid2">
+              <div class="f"><label for="al10">Away last-10 avg total</label><input id="al10" type="number" step="0.1" inputmode="decimal" placeholder="6.2"></div>
+              <div class="f"><label for="hl10">Home last-10 avg total</label><input id="hl10" type="number" step="0.1" inputmode="decimal" placeholder="5.8"></div>
+            </div>
+            <div class="grid4">
+              <div class="f"><label for="axgf">Away xG for / game <span class="tag">MoneyPuck</span></label><input id="axgf" type="number" step="0.01" inputmode="decimal" placeholder="3.10"></div>
+              <div class="f"><label for="axga">Away xG against</label><input id="axga" type="number" step="0.01" inputmode="decimal" placeholder="2.90"></div>
+              <div class="f"><label for="hxgf">Home xG for / game</label><input id="hxgf" type="number" step="0.01" inputmode="decimal" placeholder="3.00"></div>
+              <div class="f"><label for="hxga">Home xG against</label><input id="hxga" type="number" step="0.01" inputmode="decimal" placeholder="3.20"></div>
+            </div>
+            <div class="grid2">
+              <div class="f"><label for="xglg">League xG per team-game <span class="tag">same table</span></label><input id="xglg" type="number" step="0.01" inputmode="decimal" placeholder="3.05"></div>
+            </div>
+            <div class="grid2">
+              <div class="f"><label for="ap1l10">Away last-10 first-period total <span class="tag">ledger</span></label><input id="ap1l10" type="number" step="0.01" inputmode="decimal" placeholder="1.80"></div>
+              <div class="f"><label for="hp1l10">Home last-10 first-period total <span class="tag">ledger</span></label><input id="hp1l10" type="number" step="0.01" inputmode="decimal" placeholder="1.65"></div>
+            </div>
+            <div class="grid4">
+              <div class="f"><label for="h2h">H2H avg total</label><input id="h2h" type="number" step="0.1" inputmode="decimal" placeholder="6.0"></div>
+              <div class="f"><label for="h2hn">Meetings</label><input id="h2hn" type="number" step="1" inputmode="numeric" placeholder="2"></div>
+              <div class="f"><label for="arest">Away days rest</label><input id="arest" type="number" step="1" min="0" max="14" inputmode="numeric" placeholder="1"></div>
+              <div class="f"><label for="hrest">Home days rest</label><input id="hrest" type="number" step="1" min="0" max="14" inputmode="numeric" placeholder="2"></div>
+            </div>
+            <p class="note">A save percentage is shrunk toward the league by the shots behind it, so the two goalie boxes travel
+              as a pair: both or neither, on each side. Shots for per game and the first-period last ten are shown,
+              not scored, since the 7 Oct backtest (the shot lean ran the wrong way against two seasons of closes; the
+              period's recent past said nothing). Special teams are shown, not scored too, since the detail pass: each
+              side's power play and kill to date ran the wrong way against two seasons of closes. Shots, special teams
+              and the last ten wait until a team has five games; until then the slate leaves them blank and the sheet is
+              the market plus the goalies. Form is tagged and cannot buy a band; a back to back (0 days rest) is shown,
+              not scored. The first-period
+              last ten comes from the league ledger (Run NHL ledger.bat) and moves the first period the way the full
+              game's last ten moves the total: weighted 0.8 against the market's 4, both sides or neither. Expected
+              goals come from MoneyPuck's team file, all situations, per game, with that table's league mean beside
+              them; all four or none, and since the 7 Oct backtest shown, not scored: built the slate's way, this
+              season's xG to date ran the wrong way against a season of closes, and last season's flipped sign
+              between seasons.</p>
+          </div>
+        </details>
+      </div>

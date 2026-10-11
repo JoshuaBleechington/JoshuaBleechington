@@ -1,0 +1,67 @@
+{
+  "games": [
+    {
+      "away": {
+        "name": "Dodgers",
+        "runs_per_game": 5.05,
+        "own_park_factor": 1.00,
+        "starter_era": 3.05,
+        "starter_ip": 6.0,
+        "bullpen_era": 3.60
+      },
+      "home": {
+        "name": "Rockies",
+        "runs_per_game": 4.95,
+        "own_park_factor": 1.28,
+        "starter_era": 5.40,
+        "starter_ip": 5.0,
+        "bullpen_era": 5.10
+      },
+      "park_factor": 1.28,
+      "weather": { "temp_f": 84, "wind_mph_out": 5 },
+      "market": { "line": 11.5, "over_odds": -105, "under_odds": -115 }
+    },
+    {
+      "away": {
+        "name": "Mariners",
+        "runs_per_game": 3.95,
+        "own_park_factor": 0.92,
+        "starter_era": 3.30,
+        "starter_ip": 6.0,
+        "bullpen_era": 3.45
+      },
+      "home": {
+        "name": "Guardians",
+        "runs_per_game": 4.20,
+        "own_park_factor": 0.98,
+        "starter_era": 3.75,
+        "starter_ip": 5.2,
+        "bullpen_era": 2.95
+      },
+      "park_factor": 0.98,
+      "weather": { "temp_f": 66, "wind_mph_out": -8 },
+      "market": { "line": 7.5, "over_odds": -115, "under_odds": -105 }
+    },
+    {
+      "away": {
+        "name": "Yankees",
+        "runs_per_game": 4.85,
+        "own_park_factor": 1.05,
+        "starter_era": 3.40,
+        "starter_ip": 5.7,
+        "bullpen_era": 3.70
+      },
+      "home": {
+        "name": "Rays",
+        "runs_per_game": 4.10,
+        "own_park_factor": 0.95,
+        "starter_era": 4.10,
+        "starter_ip": 5.3,
+        "bullpen_era": 3.80
+      },
+      "park_factor": 0.95,
+      "weather": { "dome": true },
+      "market": { "line": 8.5, "over_odds": -110, "under_odds": -110 }
+    }
+  ]
+}

@@ -253,8 +253,8 @@ const CHECKS = ["dome","playoff","agconf","hgconf","agbk","hgbk"];
     document.getElementById('clear').click(); await wait();
     return { nov, oct };
   });
-  chk(octo.oct.over > octo.nov.over + 1 && /October: both backtest seasons scored 6\.41/.test(octo.oct.why) && !/October:/.test(octo.nov.why),
-      'october: a game dated in October carries the tagged +0.25 delta and the why list says so; November does not', JSON.stringify({ nov: octo.nov.over, oct: octo.oct.over }));
+  chk(Math.abs(octo.oct.over - octo.nov.over) < 0.05 && /October: NO seasonal delta since 11 Oct 2026/.test(octo.oct.why) && !/October/.test(octo.nov.why),
+      'october: since 11 Oct a game dated in October carries no delta, only a note; November says nothing', JSON.stringify({ nov: octo.nov.over, oct: octo.oct.over }));
   chk(octo.oct.band === 'NO BET' || octo.oct.band === '', 'october: the delta alone cannot buy a band', octo.oct.band);
 
   // ---- the slate fills the goalie boxes; a 2.0 backup carries MLB only --------------

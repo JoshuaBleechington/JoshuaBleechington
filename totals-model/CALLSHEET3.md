@@ -169,7 +169,14 @@ were earned on: when it said over, did the game land over the close?
 | First-period last ten (vs the period) | 2,445 | −0.003 | none | **shown, not scored** |
 | Head to head, earlier meetings this season | 814 | +0.02 | 0.08 | **shown, not scored** |
 | Back to back, the under | 696 | | | 52.6%, a label only |
-| October over, blind | 324 | | | **54.9% both seasons (54.7, 55.2); +0.25 tagged delta** |
+| October over, blind | 324 | | | 54.9% both seasons (54.7, 55.2); +0.25 tagged delta from 7 Oct... |
+| ...October 2026 on the card (closed 6.11, scored 6.08) | 75 | | | **retired 11 Oct**: the market carried it; blind over 33-39-3 |
+| Goalie form, last five starts against his own season | 1,764 | −0.02 | none | a cold stretch does not predict over (both cold: 44.7% / 49.1% over); not an input |
+| Starter relieved in his previous start | 241 | | | next game 47.6% over, −0.13; no bounce; not an input |
+| Rest matrix beyond back to back (both 2+ days, etc.) | 2,616 | | | signs flip between seasons; nothing beyond the back-to-back label |
+| Closing total level (5.5 / 6 / 6.5) | 2,616 | | | 5.5s run over the number on average but 50-53% over; 6.5s 46-51%; not an input |
+| Favourite size (home moneyline) | 2,616 | | | home +140 or longer: under 55.5% both seasons (277 games); watched, not scored |
+| First period by rest, backup, month, close | 2,616 | | | 2+ rate 52.5 / 53.7%; nothing beats the close's own share; the P1 market is priced to the decimal |
 | Goalies, the starters' blended lines, every game | 2,616 | +0.31 / −0.25 (pooled +0.07) | ~0.3 | near null until split by who is in net |
 | Goalies, two regular starters | 1,744 | +0.07 / +0.92 (pooled +0.55) | ~5 | **kept at 1.6**; a tenth of a goal of lean 561-496 (53.1%) |
 | Goalies, a backup in net | 767 | −0.84 / −0.94 | negative | **not scored**; the backup delta carries it |
@@ -181,6 +188,20 @@ were earned on: when it said over, did the game land over the close?
 
 The first period's share model is dead on: 1.747 predicted from the close
 against 1.744 scored, and the 2+ rate climbs with the line as it should.
+
+**In-game structure, measured 11 Oct 2026 for the live project** (not
+pregame inputs). A starter faces every shot in about 89% of games; a relief
+goalie appears in 10.6%, after the starter has allowed 3.6 on average, and
+those games score 7.6-8.0, which is selection, not a signal. The goalie
+comes out of the net late for the extra attacker, not for a bullpen: by the
+margin after two periods, a tied game scores 2.04 in the third with 0.35
+empty-net goals and goes to overtime 35-42% of the time; a one-goal game
+2.15 and 0.41; a two-goal game 2.3-2.4 and 0.48; three or more 2.0 and 0.25.
+After the first period the rest of the game averages 4.2-4.6 goals whatever
+the first period scored, so the first period's goals carry straight to the
+final: with 0 in the first the game finishes over the close 15% of the
+time, with 1 about 27-39%, with 2 about 54%, with 3+ about 80%. Home teams
+score 0.91 of the first period's 1.74 to the road side's 0.83.
 The detail pass (`slate.py nhl-ledger --season X --detail`, run by the
 user the same night: 2,624 games, every one with both starters, their
 lines, power-play goals and penalties) settled the last two scored inputs

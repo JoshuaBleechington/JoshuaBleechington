@@ -27,7 +27,7 @@
   NHL.SV_STABLE_AT = NHL.SV * (1.0 - NHL.SV) / (NHL.TALENT_SD * NHL.TALENT_SD);
   NHL.REG_PHI = (NHL.RESIDUAL_SD * NHL.RESIDUAL_SD - NHL.ENG * (1.0 - NHL.ENG) - NHL.OT * (1.0 - NHL.OT)) / NHL.REG_GOALS;
   var NHL_WEIGHTS = { market: 4.0, goalies: 1.6, form: 0.6, h2h: 0.5 };   // goalies 1.6 and form 0.6 measured 7 Oct 2026; special teams and expected goals out (totals/nhl.py)
-  NHL.OCTOBER_DELTA = 0.25;   // the October over: 6.41 scored against a 6.07 close over two seasons, 178-146 blind; half the excess, tagged
+  NHL.OCTOBER_DELTA = 0.0;    // RETIRED 11 Oct 2026: the 2026 market carried the October excess (card: 6.11 closed, 6.08 scored, blind over 33-39-3 on 75)
   NHL.BACKUP_DELTA = -0.15;   // one backup in net: 0.18 under the close on 737 games (53.7%), both seasons; sized under it, tagged
   NHL.BACKUP_DELTA_COLD = -0.25;   // ...a COLD backup (his shrunk line costs > BACKUP_COLD_GAP goals): 0.44 under on 182 games, the under 57.5%
   NHL.BACKUP_COLD_GAP = 0.05;
@@ -133,10 +133,8 @@
     if (asf !== null || hsf !== null) notes.push("Shots for per game are <b>SHOWN, NOT SCORED</b>: against two seasons of closing totals the shot-rate lean ran the wrong way (49.1% betting with it). A team that shoots more shoots from everywhere, and the market knows it.");
     var gdv = ($("gdate") || {}).value || "", gmonth = gdv.length >= 7 ? parseInt(gdv.slice(5, 7), 10) : null;
     if (gmonth === 10) {
-      var octWhy = "October: both backtest seasons scored 6.41 a game against a 6.07 closing line, the over 178-146 blind. Half the excess, " + sgn(NHL.OCTOBER_DELTA) +
-        ", goes on the line this month. Tagged: it cannot buy a band, and the tile keeps October's record.";
-      deltas.push(delta("October", NHL.OCTOBER_DELTA, octWhy, false));
-      notes.push("<b>" + octWhy.replace("October:", "October</b>:"));
+      /* retired 11 Oct 2026: the 2026 market carried the October excess (totals/nhl.py) */
+      notes.push("<b>October</b>: NO seasonal delta since 11 Oct 2026. The backtest's two Octobers ran 0.34 a game over the close; the 2026 market carries it (the card's first 75 October games closed at 6.11 and scored 6.08, the blind over 33-39-3). Shown, not scored.");
     }
     var unconfirmed = [];
     if (!checked("agconf")) unconfirmed.push("away");

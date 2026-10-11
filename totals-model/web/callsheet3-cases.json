@@ -5494,7 +5494,7 @@
   },
   {
     "sport": "NHL",
-    "name": "October: the seasonal delta on the line, tagged",
+    "name": "October: no seasonal delta since 11 Oct 2026, a note only",
     "inputs": {
       "gdate": "2026-10-20",
       "away": "Wild",
@@ -5506,17 +5506,17 @@
     "expect": {
       "lam_home": null,
       "lam_away": null,
-      "projected": 6.40664418,
+      "projected": 6.15664418,
       "markets": [
         {
           "key": "total",
           "pick": "OVER 6",
           "side": "OVER",
-          "p": 0.54784231,
-          "p_push": 0.16318526,
+          "p": 0.5,
+          "p_push": 0.16528553,
           "price": -110.0,
-          "edge": 0.02403278,
-          "fair": -121.1618,
+          "edge": -0.02380952,
+          "fair": 100.0,
           "anchored": true,
           "band": "NO BET"
         }

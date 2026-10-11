@@ -115,15 +115,15 @@ class TestTheGoalie(unittest.TestCase):
         self.assertIn("Goalies", [e.name for e in f.estimates])
         self.assertTrue(any("missing side is scored as a league-average goalie" in n for n in f.notes))
 
-    def test_october_carries_a_tagged_delta(self):
+    def test_october_carries_no_delta_since_11_oct(self):
         from totals.nhl import OCTOBER_DELTA
+        self.assertEqual(OCTOBER_DELTA, 0.0)
         nov = forecast_nhl("A @ B", 6.0, -110, -110, game_month=11)
         octo = forecast_nhl("A @ B", 6.0, -110, -110, game_month=10)
-        self.assertAlmostEqual(octo.projected - nov.projected, OCTOBER_DELTA, places=9)
-        d = next(x for x in octo.deltas if x.name == "October")
-        self.assertFalse(d.mechanism)
-        self.assertEqual(octo.band, "NO BET")   # tagged: it cannot buy a band alone
-        self.assertFalse(any(x.name == "October" for x in nov.deltas))
+        self.assertAlmostEqual(octo.projected, nov.projected, places=12)
+        self.assertFalse(any(x.name == "October" for x in octo.deltas))
+        self.assertTrue(any("October: NO seasonal delta" in n for n in octo.notes))
+        self.assertFalse(any("October" in n for n in nov.notes))
 
     def test_an_unconfirmed_goalie_is_said_out_loud(self):
         f = forecast_nhl("A @ B", 6.0, -110, -110, **LEAGUE)

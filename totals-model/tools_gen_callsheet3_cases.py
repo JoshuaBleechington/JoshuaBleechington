@@ -97,7 +97,7 @@ NHL_CASES = [
     {"name": "expected goals: two high-event clubs, shown against the table's own league mean, not scored",
      "inputs": dict(away="Oilers", home="Devils", line="6.5", op="-110", up="-110", hml="-130", aml="110",
                     axgf="3.40", axga="3.10", hxgf="3.30", hxga="2.90", xglg="3.05", **FULL)},
-    {"name": "October: the seasonal delta on the line, tagged",
+    {"name": "October: no seasonal delta since 11 Oct 2026, a note only",
      "inputs": dict(away="Wild", home="Blues", line="6", op="-110", up="-110", gdate="2026-10-20")},
     {"name": "shots alone move nothing now: shown, not scored",
      "inputs": dict(away="Jets", home="Wild", line="6", op="-115", up="-105", asf="36.0", hsf="34.0")},

@@ -202,12 +202,14 @@ BACKUP_DELTA_COLD = -0.25
 BACKUP_COLD_GAP = 0.05
 BACKUP_SHARE = 0.30     # a starter under this share of his club's starts is a backup
 BACKUP_MIN_STARTS = 10  # ...once the club has this many starts to share
-#: October. Both backtest seasons scored 6.41 a game in October against a
-#: 6.07 closing line, the over 178-146 (54.9%) blind -- 54.7% and 55.2% by
-#: season. Fresh legs, new systems, loose special teams; the market knows
-#: the direction and not the size. Half the raw excess goes on the line as
-#: a tagged delta in October only; the tile keeps the month's record.
-OCTOBER_DELTA = 0.25
+#: October: RETIRED 11 Oct 2026. Both backtest seasons scored 6.41 a game
+#: in October against a 6.07 closing line, the over 178-146 blind, and a
+#: +0.25 tagged delta went on every October line from 7 Oct. The 2026
+#: market carried it: the card's first 75 October games closed at 6.11 and
+#: scored 6.08, the blind over 33-39-3, and the delta pushed the sheet's
+#: picks over in 58 of 75 games. A seasonal excess the market has priced is
+#: not an input. October now gets a note and nothing on the line.
+OCTOBER_DELTA = 0.0
 H2H_FULL_WEIGHT_AT = 4
 DEFAULT_PUCK_LINE = 1.5
 _KMAX = 25
@@ -433,11 +435,9 @@ def forecast_nhl(
                      "the shot-rate lean ran the wrong way (49.1% betting with it). A team that shoots "
                      "more shoots from everywhere, and the market knows it.")
     if game_month == 10:
-        oct_why = (f"October: both backtest seasons scored 6.41 a game against a 6.07 closing line, the over "
-                   f"178-146 blind. Half the excess, {OCTOBER_DELTA:+.2f}, goes on the line this month. Tagged: "
-                   "it cannot buy a band, and the tile keeps October's record.")
-        deltas.append(Delta("October", OCTOBER_DELTA, oct_why, mechanism=False))
-        notes.append(oct_why)
+        notes.append("October: NO seasonal delta since 11 Oct 2026. The backtest's two Octobers ran 0.34 a game "
+                     "over the close; the 2026 market carries it (the card's first 75 October games closed at "
+                     "6.11 and scored 6.08, the blind over 33-39-3). Shown, not scored.")
     unconfirmed = [s for s, c in (("away", away_goalie_confirmed), ("home", home_goalie_confirmed))
                    if not c]
     if have_goalies and unconfirmed:

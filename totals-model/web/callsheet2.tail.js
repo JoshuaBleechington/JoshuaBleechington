@@ -253,7 +253,7 @@
         f5op !== null && f5up !== null, "", f5notes.concat(["Projected " + proj5.toFixed(2) + " against " + f5line + "."])));
     }
     return { sport: "MLB", away: away, home: home, matchup: away + " @ " + home, markets: markets,
-             lamHome: lamH, lamAway: lamA, total: f, notes: notes };
+             lamHome: lamH, lamAway: lamA, total: f, notes: notes, period: (typeof proj5 !== "undefined" ? proj5 : null) };
   }
   function fmtLine(v) { return (v >= 0 ? "+" : "") + (Math.abs(v - Math.round(v)) < 1e-9 ? String(v) : v.toFixed(1)); }
 
@@ -499,6 +499,73 @@
 
   /* ---- render: this matchup ------------------------------------------------ */
   var last = null;
+  /* ---- the forecast, betting aside (11 Oct 2026) ----------------------------
+     What the sheet expects to happen, apart from any price: the projected
+     total, each side's expected score where the sides are modelled, the
+     period projection, and the winner's chance from the moneyline market.
+     Stored on the row as `proj` when it is added (t total, h/a the sides,
+     q the period, ph the home side's chance), so the record can keep the
+     forecast's accuracy against the market's line and the favourite. Asked
+     for by the user: "a machine that can provide the best prediction
+     outcome for a matchup", with the bets set aside. */
+  function projOf(m) {
+    if (!m || !m.total) return null;
+    var r = function (v) { return v === null || v === undefined || !isFinite(v) ? null : +(+v).toFixed(3); };
+    var ml = (m.markets || []).filter(function (mk) { return mk.key === "ml"; })[0], pHome = null;
+    if (ml && ml.side === "HOME") pHome = ml.p; else if (ml && ml.side === "AWAY") pHome = 1 - ml.p;
+    return { t: r(m.total.projected), h: r(m.lamHome), a: r(m.lamAway), q: r(m.period), ph: r(pHome) };
+  }
+  function forecastText(m, sp) {
+    var pj = projOf(m); if (!pj || pj.t === null) return "";
+    var unit = sp === "WNBA" ? "points" : sp === "NHL" ? "goals" : "runs", dp = sp === "WNBA" ? 0 : 1, parts = [];
+    if (pj.h !== null && pj.a !== null) parts.push(esc(m.away) + " " + pj.a.toFixed(dp) + " – " + esc(m.home) + " " + pj.h.toFixed(dp));
+    parts.push("total " + pj.t.toFixed(dp) + " " + unit);
+    if (pj.q !== null) parts.push((sp === "NHL" ? "first period " : "first five ") + pj.q.toFixed(dp));
+    if (pj.ph !== null) { var hf = pj.ph >= 0.5; parts.push(esc(hf ? m.home : m.away) + " to win, " + Math.round((hf ? pj.ph : 1 - pj.ph) * 100) + "%"); }
+    return "<b>Forecast</b> · " + parts.join(" · ") + ". <span class=\"dim\">What the sheet expects, betting aside; the record below keeps how close it lands against the market's line and the favourite.</span>";
+  }
+  /* the forecast's record for one sport: the projected total against the final
+     and against the market's line, the winner against the favourite, the
+     period projection against its line. Rows logged before the forecast line
+     are re-scored from their inputs with today's engine and say so. */
+  function backfillProj() {
+    var changed = false;
+    card.forEach(function (r) {
+      if (r.proj || !r.inputs) return;
+      var m = scoreMatchup(r.sport, r.inputs), pj = m ? projOf(m) : null;
+      r.proj = pj || { t: null, h: null, a: null, q: null, ph: null }; r.proj.re = true; changed = true;
+    });
+    if (changed) save();
+  }
+  function forecastStats(sp) {
+    var s = { n: 0, mae: 0, mkt: 0, closer: 0, tie: 0, bias: 0, mbias: 0, nW: 0, w: 0, nF: 0, fav: 0, nQ: 0, qmae: 0, qmkt: 0, re: 0 };
+    card.forEach(function (r) {
+      if (r.sport !== sp || !r.proj || r.proj.t === null || !hasFinals(r.finals)) return;
+      var fa = parseFloat(r.finals.fa), fh = parseFloat(r.finals.fh), line = numOf(r.inputs.line);
+      if (!isFinite(fa) || !isFinite(fh) || line === null) return;
+      var tot = fa + fh, e = Math.abs(r.proj.t - tot), em = Math.abs(line - tot);
+      s.n++; s.mae += e; s.mkt += em; s.bias += r.proj.t - tot; s.mbias += line - tot;
+      if (e < em - 1e-9) s.closer++; else if (Math.abs(e - em) <= 1e-9) s.tie++;
+      if (r.proj.re) s.re++;
+      if (r.proj.h !== null && r.proj.a !== null && fh !== fa) { s.nW++; if ((r.proj.h > r.proj.a) === (fh > fa)) s.w++; }
+      var hml = numOf(r.inputs.hml), aml = numOf(r.inputs.aml);
+      if (hml !== null && aml !== null && hml !== aml && fh !== fa) { s.nF++; if ((hml < aml) === (fh > fa)) s.fav++; }
+      var qa = parseFloat(r.finals.f5a), qh = parseFloat(r.finals.f5h), qline = numOf(sp === "NHL" ? r.inputs.p1line : r.inputs.f5line);
+      if (r.proj.q !== null && isFinite(qa) && isFinite(qh) && qline !== null) { s.nQ++; s.qmae += Math.abs(r.proj.q - (qa + qh)); s.qmkt += Math.abs(qline - (qa + qh)); }
+    });
+    return s;
+  }
+  function forecastBlock(sp) {
+    var s = forecastStats(sp); if (!s.n) return "";
+    var unit = sp === "WNBA" ? "points" : sp === "NHL" ? "goals" : "runs", dp = sp === "WNBA" ? 1 : 2;
+    var t = '<b>Forecast</b> · ' + s.n + ' graded game' + (s.n === 1 ? '' : 's') + ': the projected total lands ' + (s.mae / s.n).toFixed(dp) + ' ' + unit +
+      ' from the final on average, the market\'s line ' + (s.mkt / s.n).toFixed(dp) + '; closer than the line in ' + s.closer + ', further in ' + (s.n - s.closer - s.tie) + (s.tie ? ', even in ' + s.tie : '') +
+      '; the projection runs ' + sgn(s.bias / s.n, dp) + ' against the final, the line ' + sgn(s.mbias / s.n, dp) + '.';
+    if (s.nW) t += ' Winner called ' + s.w + ' of ' + s.nW + ' (' + Math.round(100 * s.w / s.nW) + '%)' + (s.nF ? ', the favourite ' + s.fav + ' of ' + s.nF + ' (' + Math.round(100 * s.fav / s.nF) + '%)' : '') + '.';
+    if (s.nQ) t += ' ' + (sp === "NHL" ? 'First period' : 'First five') + ' projected ' + (s.qmae / s.nQ).toFixed(dp) + ' from the score, the line ' + (s.qmkt / s.nQ).toFixed(dp) + '.';
+    if (s.re) t += ' <span class="dim">' + s.re + ' row' + (s.re === 1 ? '' : 's') + ' re-scored with today\'s engine (logged before the forecast line).</span>';
+    return '<div class="verdict forecast" data-sport="' + sp + '">' + t + '</div>';
+  }
   function render() {
     var m;
     try { m = sport === "WNBA" ? forecastMatchupWnba() : forecastMatchupMlb(); }
@@ -522,6 +589,8 @@
         ' · this card went <b>' + w + '-' + l + (pu ? '-' + pu : '') + '</b>.' +
         (formLocked ? ' <b>Locked</b> — a graded row is a record. Press Clear to start a new card.' : ' Edit anything and the grading clears.') + '</div>';
     }
+    var fl = $("forecastLine");
+    if (fl) { var ft = forecastText(m, sport); fl.innerHTML = ft; fl.hidden = !ft; }
     /* The parlay leg for this game -- gameLeg(): Call Sheet #1's BET on the
        total when it clears its price, else the best value side at any price,
        and nothing when no side clears its price. The leg can sit on the side
@@ -1090,6 +1159,7 @@
     var KEYS = { MLB: [["total","Full-game total"],["f5","First five"],["ml","Moneyline"],["rl","Run line"]],
                  WNBA: [["total","Full-game total"],["ml","Moneyline"],["spread","Spread"]] };
     var box = $("calibBox");
+    backfillProj();
     /* Each tile also keeps the record BY SIDE -- over against under, home
        against away -- and the full-game total keeps the record of the rows
        that carried Call Sheet #1's verdict, because the parlay legs lean on
@@ -1202,6 +1272,7 @@
       var totalN = KEYS[sp].reduce(function (a, k) { return a + b.stats[k[0]].n; }, 0);
       var graded = card.filter(function (r) { return r.sport === sp && (r.markets || []).some(function (mk) { return gradeMarket(mk, r.finals) !== null; }); }).length;
       h += '<div class="subhead" data-sport="' + sp + '">' + sp + ' <span class="tag">' + graded + ' graded game' + (graded === 1 ? '' : 's') + ' · ' + totalN + ' graded markets</span></div>';
+      h += forecastBlock(sp);
       var unit = sp === "WNBA" ? "pts" : "runs";
       h += '<div class="calib" data-sport="' + sp + '">' + KEYS[sp].map(function (k) { return tiles(b.stats[k[0]], unit); }).join('') + tiles(b.top, unit) + tiles(b.topE, unit) + '</div>';
       h += '<div class="verdict">' + (totalN < 30
@@ -1291,13 +1362,13 @@
       return;
     }
     if (dup) {
-      dup.inputs = inputs; dup.markets = slimMarkets(last.markets); dup.away = last.away; dup.home = last.home; dup.matchup = last.matchup;
+      dup.inputs = inputs; dup.markets = slimMarkets(last.markets); dup.away = last.away; dup.home = last.home; dup.matchup = last.matchup; dup.proj = projOf(last);
       save(); renderCard(); renderBoard(); renderCalib();
       say("Updated <b>" + esc(dup.matchup) + "</b>, already on the card for " + esc(gameDate(gdate)) + ": its inputs and picks were replaced with what is in the form. One row per matchup per date, so nothing was logged twice.");
       return;
     }
     var row = { id: nextId(), sport: sport, away: last.away, home: last.home, matchup: last.matchup,
-                gdate: gdate, inputs: inputs, markets: slimMarkets(last.markets), finals: {} };
+                gdate: gdate, inputs: inputs, markets: slimMarkets(last.markets), finals: {}, proj: projOf(last) };
     card.push(row); save(); renderCard(); renderBoard(); renderCalib();
     say("Added <b>" + esc(row.matchup) + "</b> with " + row.markets.length + " market" + (row.markets.length === 1 ? "" : "s") + ". Picks are frozen as logged; enter finals to grade them.");
   }
@@ -1490,7 +1561,7 @@
           /* The slate marks a postseason game at the game level; the row's
              Playoff box is shown, not scored, so it only splits the record. */
           if (g.playoff === true && !row.inputs.playoff) { row.inputs.playoff = true; changed = true; }
-          if (changed) { var m = scoreMatchup(row.sport, row.inputs); if (m) row.markets = slimMarkets(m.markets); filled++; }
+          if (changed) { var m = scoreMatchup(row.sport, row.inputs); if (m) { row.markets = slimMarkets(m.markets); row.proj = projOf(m); } filled++; }
         }
       }
       if (hasFinals(g.finals)) {

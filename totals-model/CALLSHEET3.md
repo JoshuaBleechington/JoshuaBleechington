@@ -69,6 +69,26 @@ whichever goalie's line was asked (767 games). So goalies are scored at
 where the backup delta carries what the backtest found. One goalie alone
 is scored against a league-average partner, with a note.
 
+**The forecast, betting aside** (11 Oct 2026). The rail's top line says
+what the sheet expects to happen apart from any price: each side's
+expected score where the sides are modelled, the projected total, the
+period projection (first five, first period) and the winner's chance from
+the moneyline market. Each row stores it as `proj` (t total, h/a sides, q
+period, ph the home side's chance) when it is added, and the record block
+for each sport keeps the forecast's own scorecard: how far the projected
+total lands from the final on average against how far the market's line
+does, how often it is closer than the line, its bias and the line's, the
+winner called against the favourite, and the period projection against
+its line. Rows logged before the line are re-scored from their inputs
+with today's engine and say so. This is the honest frame for "is the
+machine accurate": the market is the best public forecast, the sheet is
+the market plus what the backtest let through, and the scorecard says
+whether that addition is worth anything as a prediction. The ranked list
+below it is a different question: it is ordered by **edge**, the gap
+between the sheet's chance and the price, so the #1 market is the best
+bet, not the likeliest outcome; the day board's toggle orders that table
+by chance to hit instead.
+
 **Whose line is on the card.** On 11 Oct 2026 the season ledger's detail
 pass (every game's actual starters) was matched against the card's first
 150 goalie boxes, each box's number rebuilt for every goalie on the club:

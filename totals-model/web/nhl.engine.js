@@ -427,7 +427,8 @@
         [sideOf("P1 OVER " + p1line, "OVER", s1[0], s1[1], p1op), sideOf("P1 UNDER " + p1line, "UNDER", s1[2], s1[1], p1up)],
         p1op !== null && p1up !== null, "", p1notes.concat(["Projected " + proj1.toFixed(2) + " against " + p1line + "."])));
     }
-    return { sport: "NHL", away: away, home: home, matchup: away + " @ " + home, markets: markets, lamHome: lamH, lamAway: lamA, total: f, notes: notes };
+    return { sport: "NHL", away: away, home: home, matchup: away + " @ " + home, markets: markets, lamHome: lamH, lamAway: lamA, total: f, notes: notes,
+             period: (typeof proj1 !== "undefined" ? proj1 : null) };
   }
 
   /* ---- the team table: an NHL page, same ordered first-hit-wins rule ------- */

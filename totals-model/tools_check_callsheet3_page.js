@@ -113,6 +113,7 @@ const CHECKS = ["dome","playoff","agconf","hgconf","agbk","hgbk"];
     set('gdate', '2026-11-07'); document.getElementById('example').click(); await wait();
     set('gdate', '2026-11-07'); await wait();
     const rail = [...document.querySelectorAll('#markets .mk')].map(el => ({ key: el.dataset.key, chips: [...el.querySelectorAll('.cap')].map(c => c.textContent) }));
+    const forecast = document.getElementById('forecastLine').textContent;
     document.getElementById('add').click(); await wait();
     // game 2: a second hockey game, moneyline only
     document.getElementById('clear').click(); await wait();
@@ -137,8 +138,14 @@ const CHECKS = ["dome","playoff","agconf","hgconf","agbk","hgbk"];
     tr().querySelector('[data-open]').click(); await wait();
     const final = (document.querySelector('#markets .final') || {}).textContent || '';
     document.getElementById('clear').click(); await wait();
-    return { rail, names, boardRows, bets, legs, label, graded, calib, nhlBlock, final, sport1: card[0].sport, keys: card[0].markets.map(m => m.key) };
+    return { rail, names, boardRows, bets, legs, label, graded, calib, nhlBlock, final, sport1: card[0].sport, keys: card[0].markets.map(m => m.key), forecast, proj: card[0].proj };
   });
+  chk(/Forecast · Rangers [0-9.]+ – Bruins [0-9.]+ · total [0-9.]+ goals · first period [0-9.]+ · (Rangers|Bruins) to win, \d+%/.test(flow.forecast),
+      'forecast: the rail says what the sheet expects — each side\'s goals, the total, the first period and the winner\'s chance', flow.forecast.slice(0, 200));
+  chk(flow.proj && typeof flow.proj.t === 'number' && typeof flow.proj.h === 'number' && typeof flow.proj.a === 'number' && typeof flow.proj.q === 'number' && typeof flow.proj.ph === 'number' && !flow.proj.re,
+      'forecast: the row stores the projection (total, sides, period, home chance) when it is added', JSON.stringify(flow.proj));
+  chk(/Forecast · 1 graded game: the projected total lands [0-9.]+ goals from the final on average, the market's line [0-9.]+;/.test(flow.calib) && /Winner called [01] of 1/.test(flow.calib) && /First period projected/.test(flow.calib),
+      'forecast: the record keeps the projection\'s accuracy against the line, the favourite and the period line', flow.calib.slice(flow.calib.indexOf('Forecast'), flow.calib.indexOf('Forecast') + 300));
   chk(flow.names.length === 2 && flow.names[0] === 'Rangers @ Bruins' && flow.names[1] === 'Maple Leafs @ Canadiens', 'card: two NHL games logged, with Toronto and Montreal canonicalised to the NHL table', JSON.stringify(flow.names));
   chk(flow.sport1 === 'NHL' && flow.keys.join(',') === 'total,ml,pl,p1', 'card: an NHL row stores total, ml, pl and p1', flow.keys.join(','));
   chk(flow.rail.filter(r => r.key === 'ml' || r.key === 'pl').every(r => r.chips.some(c => /shown, not picked/.test(c))), 'rail: the moneyline and puck line carry the shown-not-picked chip', JSON.stringify(flow.rail));

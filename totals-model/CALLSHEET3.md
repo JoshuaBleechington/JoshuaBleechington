@@ -69,6 +69,24 @@ whichever goalie's line was asked (767 games). So goalies are scored at
 where the backup delta carries what the backtest found. One goalie alone
 is scored against a league-average partner, with a note.
 
+**Whose line is on the card.** On 11 Oct 2026 the season ledger's detail
+pass (every game's actual starters) was matched against the card's first
+150 goalie boxes, each box's number rebuilt for every goalie on the club:
+101 boxes held the goalie who played, 42 held the **other** goalie's line,
+7 could not be matched, and many of the 42 had Confirmed ticked. The
+record did not hinge on it (totals went 13-20 with both lines right and
+16-19 with one wrong; the over bias was the loss), but a quarter of the
+scored input was the wrong man. So: the slate writes every goalie on each
+club into the row (`ngoalies`, with his line, starts and the club's
+starts) and the named starter's name (`agname`, `hgname`); the Goalies
+card shows **Who is in net** for each side, and a pick fills the line,
+writes the name and sets the Backup box by the rule; the morning grade
+file carries **who actually started** from the box score (`starters`),
+the row keeps him (`agstart`, `hgstart`) and whether he matched the
+carded name by last name (`agok`, `hgok`), the row's total is chipped
+"goalies right" or "goalie line wrong", and the total tile keeps both
+records. The engines do not read the names; nothing scores differently.
+
 **The one input a hockey market prices imperfectly is a late change in
 net.** The sheet says out loud when a goalie is not confirmed, and the
 slate names the likely starter; the user confirms on the daily sites.

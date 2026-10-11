@@ -1060,7 +1060,7 @@ def build_nhl_game(g, date_iso, season_id, summary, log, ledger=None, xg=None):
     state = str(g.get("gameState") or "")
     inputs = {k: "" for k in ("agsv", "hgsv", "agsh", "hgsh", "asf", "hsf", "app", "hpp", "apk", "hpk",
                               "al10", "hl10", "h2h", "h2hn", "arest", "hrest", "nhlform", "ap1l10", "hp1l10",
-                              "axgf", "axga", "hxgf", "hxga", "xglg")}
+                              "axgf", "axga", "hxgf", "hxga", "xglg", "ngoalies", "agname", "hgname")}
     inputs["agbk"] = inputs["hgbk"] = False   # the sheet's Backup in net boxes; True when the named starter is one
     notes, starters, form = [], {"away": "", "home": ""}, {"away": [], "home": []}
     out = {"sport": "NHL", "gdate": date_iso, "away": away, "home": home, "gameId": gid, "first_puck_utc": start,
@@ -1148,6 +1148,18 @@ def build_nhl_game(g, date_iso, season_id, summary, log, ledger=None, xg=None):
             goalies = nhl_club_goalies(ab, season_id)
             out["goalies"][side] = [{"name": x["name"], "sv": x["sv"], "shots": x["shots"], "gs": x["gs"], "season": x.get("season"),
                                      "this": x.get("this"), "prior": x.get("prior")} for x in goalies]
+            # the sheet's goalie picker (11 Oct 2026): every goalie on the club with
+            # the line the sheet would score, so the right starter is a click, not
+            # a retype. 42 of the first 150 goalie boxes on the card carried the
+            # other goalie's line. Compact keys: n name, sv, sh shots, gs starts,
+            # cs the club's starts this season (the backup rule's denominator),
+            # ls true when the line is last season's (a club that has not played).
+            club_starts = sum(int(x.get("gs") or 0) for x in goalies if not x.get("season"))
+            picker = [{"n": x["name"], "sv": (round(x["sv"], 3) if x["sv"] is not None else None), "sh": int(x["shots"] or 0),
+                       "gs": int(x.get("gs") or 0), "cs": club_starts, "ls": bool(x.get("season"))} for x in goalies]
+            ngo = json.loads(inputs["ngoalies"]) if inputs.get("ngoalies") else {}
+            ngo[side] = picker
+            inputs["ngoalies"] = json.dumps(ngo, separators=(",", ":"))
             if goalies and goalies[0].get("season"):
                 notes.append("%s has not played yet: the goalie lines are LAST season's (%s), shots halved." % (nick, goalies[0]["season"]))
             elif any(x.get("prior") for x in goalies):
@@ -1161,6 +1173,7 @@ def build_nhl_game(g, date_iso, season_id, summary, log, ledger=None, xg=None):
             pick, why = nhl_likely_starter(goalies, int(inputs[p + "rest"]) if inputs[p + "rest"] != "" else None, last_id)
             if pick:
                 starters[side] = pick["name"]
+                inputs[p + "gname"] = pick["name"]   # whose line is on the card; the grade run checks it against who played
                 if pick["sv"] is not None and pick["shots"] > 0:
                     inputs[p + "gsv"] = "%.3f" % pick["sv"]
                     inputs[p + "gsh"] = str(pick["shots"])
@@ -1209,8 +1222,24 @@ def grade_nhl_game(g, log):
     except Exception as e:  # noqa: BLE001
         notes.append("Could not fetch the period score: %s" % e)
     how = ((g.get("gameOutcome") or {}).get("lastPeriodType") or "").upper()
-    log("%s @ %s: final %s-%s%s, after one %s-%s" % (away, home, fin["fa"], fin["fh"], " (%s)" % how if how in ("OT", "SO") else "", fin.get("f5a", "?"), fin.get("f5h", "?")))
-    return {"sport": "NHL", "gdate": "", "away": away, "home": home, "gameId": g.get("id"), "finals": fin, "notes": notes}
+    # who actually started in net, from the box score: the sheet compares it
+    # with the goalie whose line was on the card and keeps the record of
+    # rows where they differed (11 Oct 2026: 42 of the first 150 boxes did)
+    starters = {}
+    try:
+        det = nhl_detail({}, nhl_boxscore(g.get("id")), {})
+        if det.get("ga_name"):
+            starters["away"] = det["ga_name"]
+        if det.get("gh_name"):
+            starters["home"] = det["gh_name"]
+    except Exception as e:  # noqa: BLE001
+        notes.append("Could not read the starters from the box score: %s" % e)
+    log("%s @ %s: final %s-%s%s, after one %s-%s%s" % (away, home, fin["fa"], fin["fh"], " (%s)" % how if how in ("OT", "SO") else "", fin.get("f5a", "?"), fin.get("f5h", "?"),
+                                                      ("; in net %s / %s" % (starters.get("away", "?"), starters.get("home", "?"))) if starters else ""))
+    out = {"sport": "NHL", "gdate": "", "away": away, "home": home, "gameId": g.get("id"), "finals": fin, "notes": notes}
+    if starters:
+        out["starters"] = starters
+    return out
 
 
 # ---- the league ledger -------------------------------------------------------
@@ -2079,6 +2108,11 @@ def selftest():
     check("nhl goalies: likely starters, this season blended with half of last",
           row["starters"] == {"away": "Jonathan Q", "home": "Jeremy S"} and i["agsv"] == "0.906" and i["agsh"] == "1000" and i["hgsv"] == "0.919" and i["hgsh"] == "2900")
     check("nhl goalies: the printout shows both halves", any("this season 0.902 on 500; last season 0.910 on 1000, at half" in l for l in lines2))
+    pk = json.loads(i["ngoalies"])
+    check("nhl goalies: the picker lists every goalie on each club with his line, starts and the club's starts",
+          [x["n"] for x in pk["away"]] == ["Igor S", "Jonathan Q"] and pk["away"][1]["sv"] == 0.906 and pk["away"][1]["sh"] == 1000 and pk["away"][1]["gs"] == 17 and pk["away"][0]["cs"] == 64 and pk["home"][0]["n"] == "Jeremy S" and pk["home"][0]["ls"] is False)
+    check("nhl goalies: the named starter's name rides on the row", i["agname"] == "Jonathan Q" and i["hgname"] == "Jeremy S")
+    check("nhl grade: who started in net, from the box score", gr2.get("starters") == {"away": "I. S", "home": "J. S"})
     check("nhl goalies: a goalie with no last season keeps his own line", any(x["name"] == "Igor S" and x["shots"] == 1400 and x.get("prior") is None for x in row["goalies"]["away"]))
     check("nhl goalies: the blend is noted", any("blend this season with half of last season" in n for n in row["notes"]))
     fa = row["form"]["away"]

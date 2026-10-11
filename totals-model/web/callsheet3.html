@@ -495,6 +495,10 @@
           <div class="body">
             <p class="note" id="goalieSummary">No goalie lines yet — load the slate, or open the boxes below.</p>
             <div class="grid2">
+              <div class="f"><label for="agpick">Away: who is in net</label><select id="agpick"><option value="">— load the slate —</option></select></div>
+              <div class="f"><label for="hgpick">Home: who is in net</label><select id="hgpick"><option value="">— load the slate —</option></select></div>
+            </div>
+            <div class="grid2">
               <label class="check"><input type="checkbox" id="agconf"> Away starter confirmed</label>
               <label class="check"><input type="checkbox" id="hgconf"> Home starter confirmed</label>
               <label class="check"><input type="checkbox" id="agbk"> Away backup in net</label>
@@ -503,10 +507,13 @@
             <div class="links">
               <a href="https://www.dailyfaceoff.com/starting-goalies" target="_blank" rel="noopener">Daily Faceoff · starting goalies</a>
             </div>
-            <p class="note">The slate names each side's <b>likely</b> starter and fills his line. A late change in net is the one
-              thing a hockey market prices imperfectly, so check Daily Faceoff, tick the boxes, and if the other goalie is
-              starting, open the boxes below and type his line over the slate's (the slate's printout lists both).
-              <b>Backup in net</b>: the slate ticks it when the named starter has under 30% of his club's starts, ten starts
+            <p class="note">The slate names each side's <b>likely</b> starter and fills his line, and the two lists above hold every
+              goalie on each club with the line the sheet would score. A late change in net is the one thing a hockey
+              market prices imperfectly, so check Daily Faceoff, <b>pick the goalie it names</b> (his line and the Backup box
+              follow), then tick Confirmed. The next morning's grade file carries who actually started, and the record tile
+              keeps the total's record split by whether the goalie on the card was the one who played: 42 of the first 150
+              goalie boxes were the other goalie's line.
+              <b>Backup in net</b>: set from the pick when the goalie has under 30% of his club's starts, ten starts
               in; fix it if Daily Faceoff says otherwise. With one backup in a game the total landed 0.18 under the close
               over two seasons (737 games, the under 53.7%), so one backup puts a tagged −0.15 on the line and the record
               tile keeps the under's record on these games; a backup whose own line reads cold takes −0.25 (182 such games
@@ -514,6 +521,10 @@
               goalie lines are not scored: in those games neither goalie's line had a direction against the close, while
               with two regular starters the lines ran the right way both seasons.</p>
             <input type="hidden" id="nhlform">
+            <!-- the goalie picker's data and record: the slate's goalie lists (JSON), whose line is on each side,
+                 who actually started (from the grade file) and whether they matched (yes / no / blank) -->
+            <input type="hidden" id="ngoalies"><input type="hidden" id="agname"><input type="hidden" id="hgname">
+            <input type="hidden" id="agstart"><input type="hidden" id="hgstart"><input type="hidden" id="agok"><input type="hidden" id="hgok">
           </div>
         </section>
 
@@ -1961,15 +1972,64 @@
   function nhlGoalieSummary() {
     var el = $("goalieSummary"); if (!el) return;
     var parts = [];
-    [["Away", "agsv", "agsh"], ["Home", "hgsv", "hgsh"]].forEach(function (s) {
-      var sv = num(s[1]), sh = num(s[2]);
-      if (sv === null) { parts.push("<b>" + s[0] + "</b>: no goalie line (league average)"); return; }
+    [["Away", "agsv", "agsh", "agname", "agstart", "agok"], ["Home", "hgsv", "hgsh", "hgname", "hgstart", "hgok"]].forEach(function (s) {
+      var sv = num(s[1]), sh = num(s[2]), nm = ($(s[3]) || {}).value || "", st = ($(s[4]) || {}).value || "", ok = ($(s[5]) || {}).value || "";
+      var who = nm ? " <b>" + esc(nm) + "</b>" : "";
+      if (sv === null) { parts.push("<b>" + s[0] + "</b>" + who + ": no goalie line (league average)"); return; }
       var used = shrinkSv(sv, sh), w = svWeight(sh);
-      parts.push("<b>" + s[0] + "</b> " + sv.toFixed(3) + (sh !== null ? " on " + sh.toFixed(0) + " shots" : ", shots blank") +
-                 (w < 1 ? " → scored as " + used.toFixed(3) : " → trusted in full"));
+      parts.push("<b>" + s[0] + "</b>" + who + " " + sv.toFixed(3) + (sh !== null ? " on " + sh.toFixed(0) + " shots" : ", shots blank") +
+                 (w < 1 ? " → scored as " + used.toFixed(3) : " → trusted in full") +
+                 (st ? (ok === "no" ? " — <b>" + esc(st) + " started</b>, not this line" : ok === "yes" ? " — started, as carded" : " — " + esc(st) + " started") : ""));
     });
-    el.innerHTML = parts.join(" · ") + ". Open the boxes below to change a line.";
+    el.innerHTML = parts.join(" · ") + ". Pick who is in net above, or open the boxes below to change a line.";
   }
+  /* ---- the goalie picker (11 Oct 2026) ---------------------------------------
+     The slate writes every goalie on each club into the hidden `ngoalies` box
+     with the line the sheet would score (n name, sv, sh shots, gs starts, cs
+     the club's starts, ls last season's line). Picking one fills his line,
+     writes his name on the row, and sets the Backup box by the rule (under
+     30% of the club's starts, ten starts in). 42 of the first 150 goalie boxes
+     on the card had carried the other goalie's line. */
+  function nhlGoaliePicker() {
+    var raw = ($("ngoalies") || {}).value || "", data = null;
+    try { data = raw ? JSON.parse(raw) : null; } catch (e) { data = null; }
+    [["away", "agpick", "agname", "agsv", "agsh", "agbk"], ["home", "hgpick", "hgname", "hgsv", "hgsh", "hgbk"]].forEach(function (s) {
+      var sel = $(s[1]); if (!sel) return;
+      var list = (data && data[s[0]]) || [], nameBox = $(s[2]), current = nameBox ? nameBox.value : "";
+      var key = JSON.stringify(list);
+      if (sel.getAttribute("data-key") !== key) {
+        sel.setAttribute("data-key", key);
+        var h = '<option value="">' + (list.length ? "— type the line by hand —" : "— load the slate —") + '</option>';
+        list.forEach(function (g) {
+          var line = g.sv !== null && g.sv !== undefined ? Number(g.sv).toFixed(3) + " on " + g.sh : "no line";
+          var starts = g.cs ? g.gs + " of " + g.cs + " starts" : (g.ls ? "last season's line" : "no starts yet");
+          h += '<option value="' + esc(g.n) + '">' + esc(g.n) + " — " + line + " (" + starts + ")</option>";
+        });
+        sel.innerHTML = h;
+      }
+      sel.value = list.some(function (g) { return g.n === current; }) ? current : "";
+      sel.disabled = !list.length || (typeof formLocked !== "undefined" && formLocked);
+      if (!sel.getAttribute("data-bound")) {
+        sel.setAttribute("data-bound", "1");
+        sel.addEventListener("change", function () {
+          var picked = list.filter(function (g) { return g.n === sel.value; })[0];
+          var raw2 = ($("ngoalies") || {}).value || "", d2 = null;
+          try { d2 = raw2 ? JSON.parse(raw2) : null; } catch (e) { d2 = null; }
+          picked = ((d2 && d2[s[0]]) || []).filter(function (g) { return g.n === sel.value; })[0];
+          if (nameBox) nameBox.value = picked ? picked.n : "";
+          if (picked) {
+            $(s[3]).value = picked.sv !== null && picked.sv !== undefined ? Number(picked.sv).toFixed(3) : "";
+            $(s[4]).value = picked.sh ? String(picked.sh) : "";
+            var bk = $(s[5]);
+            if (bk) bk.checked = !!(picked.cs && picked.cs >= NHL.BACKUP_MIN_STARTS && picked.gs < NHL.BACKUP_SHARE * picked.cs && !picked.ls);
+          }
+          [s[3], s[4]].forEach(function (id) { $(id).dispatchEvent(new Event("input", { bubbles: true })); });
+          if ($(s[5])) $(s[5]).dispatchEvent(new Event("change", { bubbles: true }));
+        });
+      }
+    });
+  }
+  NHL.BACKUP_SHARE = 0.30; NHL.BACKUP_MIN_STARTS = 10;   // the slate's rule (slate.py nhl_is_backup), applied again on a pick
   /* ---- recent form: shown, not scored --------------------------------------
      The slate writes each side's last five finals (score, shots for and
      against, the starter, how the game ended) as JSON into the hidden
@@ -2016,6 +2076,7 @@
     el.innerHTML = h;
   }
   function forecastMatchupNhl() {
+    nhlGoaliePicker();
     nhlGoalieSummary();
     nhlFormPanel();
     var f = readNhl();
@@ -2560,7 +2621,8 @@
                   "arest","hrest","al5","hl5","hml","aml","sp","sph","spa"];
   var NHL_IDS = ["away","home","line","op","up","opened","gdate","agsv","hgsv","agsh","hgsh","asf","hsf",
                  "app","hpp","apk","hpk","al10","hl10","h2h","h2hn","arest","hrest","tick","cash",
-                 "hml","aml","pl","plh","pla","p1line","p1op","p1up","nhlform","ntick","ncash","ap1l10","hp1l10","axgf","axga","hxgf","hxga","xglg"];
+                 "hml","aml","pl","plh","pla","p1line","p1op","p1up","nhlform","ntick","ncash","ap1l10","hp1l10","axgf","axga","hxgf","hxga","xglg",
+                 "ngoalies","agname","hgname","agstart","hgstart","agok","hgok"];
   var ALL = MLB_IDS.concat(WNBA_IDS).concat(NHL_IDS).filter(function (v, i, a) { return a.indexOf(v) === i; });
   var CHECKS = ["dome","playoff","agconf","hgconf","agbk","hgbk"];
   function sportOf(s) { return s === "WNBA" ? "WNBA" : s === "NHL" ? "NHL" : "MLB"; }
@@ -3161,8 +3223,13 @@
     if (cash !== null && cash <= 20) against++;
     return against ? "over against the grain" : "";
   }
+  /* the last word of a goalie's name, lower-cased, accents dropped: "Igor Shesterkin" and "I. Shesterkin" agree */
+  function lastName(s) {
+    var w = String(s || "").trim().split(/\s+/); if (!w.length) return "";
+    return w[w.length - 1].normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase();
+  }
   function marksOf(sp, inputs, markets) {
-    var out = { profile: "", lean: "", grain: "", crowd: "", b2b: "", backup: "" };
+    var out = { profile: "", lean: "", grain: "", crowd: "", b2b: "", backup: "", goalie: "" };
     if (!inputs) return out;
     /* the crowd (NHL): where the money is, against the sheet's pick on the
        total. 65%+ of the money on one side is a crowd; the pick is WITH it
@@ -3188,6 +3255,11 @@
          total tile keeps the UNDER's record on these games. Two backups:
          no label, nothing moves. Measured 7 Oct 2026 on two seasons. */
       if ((inputs.agbk === true) !== (inputs.hgbk === true)) out.backup = "backup in net";
+      /* the goalie on the card against the goalie who played (from the grade
+         file): both right, or a line that was the other goalie's. 11 Oct 2026. */
+      var oks = [inputs.agok, inputs.hgok].filter(function (v) { return v === "yes" || v === "no"; });
+      if (oks.length === 2 && oks[0] === "yes" && oks[1] === "yes") out.goalie = "goalies right";
+      else if (oks.indexOf("no") >= 0) out.goalie = "goalie line wrong";
       return out;
     }
     if (sp !== "MLB") return out;
@@ -3210,6 +3282,7 @@
     if (tg.crowd) h += '<span class="' + cls + '">' + esc(tg.crowd) + '</span>';
     if (tg.b2b) h += '<span class="' + cls + '">' + esc(tg.b2b) + '</span>';
     if (tg.backup) h += '<span class="' + cls + '">' + esc(tg.backup) + '</span>';
+    if (tg.goalie) h += '<span class="' + cls + (tg.goalie === "goalie line wrong" ? ' warn' : '') + '">' + esc(tg.goalie) + '</span>';
     return h;
   }
   function renderCalib() {
@@ -3221,7 +3294,7 @@
        against away -- and the full-game total keeps the record of the rows
        that carried Call Sheet #1's verdict, because the parlay legs lean on
        it. Asked for on 25 Sept: "how many of the 17-10 went over vs under". */
-    var fresh = function (label) { return { n: 0, w: 0, l: 0, p: 0, says: 0, units: 0, label: label, sides: {}, verdict: null, profile: null, lean: {}, grain: null, crowd: {}, high: null, b2b: null, backup: null,
+    var fresh = function (label) { return { n: 0, w: 0, l: 0, p: 0, says: 0, units: 0, label: label, sides: {}, verdict: null, profile: null, lean: {}, grain: null, crowd: {}, high: null, b2b: null, backup: null, goalie: {},
                                             clv: { n: 0, beat: 0, lost: 0, even: 0, runs: 0 } }; };
     var bySport = {};
     ["MLB", "NHL", "WNBA"].forEach(function (sp) {
@@ -3253,6 +3326,7 @@
           if (tg.grain && mk.key === "total") count(t.grain || (t.grain = { w: 0, l: 0, p: 0 }), res);
           if (tg.lean) count(t.lean[tg.lean] || (t.lean[tg.lean] = { w: 0, l: 0, p: 0 }), res);
           if (tg.crowd && mk.key === "total") count(t.crowd[tg.crowd] || (t.crowd[tg.crowd] = { w: 0, l: 0, p: 0 }), res);
+          if (tg.goalie && mk.key === "total") count(t.goalie[tg.goalie] || (t.goalie[tg.goalie] = { w: 0, l: 0, p: 0 }), res);
           if ((tg.b2b || tg.backup) && mk.key === "total") {
             var uv = bothSides(mk).filter(function (v) { return v.side === "UNDER"; })[0];
             var ur = uv ? gradeMarket(uv, row.finals) : null;
@@ -3313,6 +3387,7 @@
       ["with the crowd", "against the crowd"].forEach(function (k) { if (s.crowd[k]) parts.push(k + ' ' + rec(s.crowd[k])); });
       if (s.b2b) parts.push('back to back, the under ' + rec(s.b2b));
       if (s.backup) parts.push('backup in net, the under ' + rec(s.backup));
+      ["goalies right", "goalie line wrong"].forEach(function (k) { if (s.goalie[k]) parts.push(k + ' ' + rec(s.goalie[k])); });
       if (s.clv.n) parts.push('beat the close ' + s.clv.beat + '-' + s.clv.lost + (s.clv.even ? '-' + s.clv.even : '') + ' · ' + sgn(s.clv.runs / s.clv.n, 2) + ' ' + (unit || 'runs') + ' avg');
       return '<div><p class="k">' + esc(s.label) + '</p><p class="v">' + s.w + '-' + s.l + (s.p ? '-' + s.p : '') + '</p>' +
         '<p class="s">' + (s.n ? 'says ' + says.toFixed(1) + '% · does ' + does.toFixed(1) + '% (±' + se.toFixed(1) + ') · ' + sgn(s.units, 2) + 'u' : 'pushes only') + '</p>' +
@@ -3615,7 +3690,8 @@
   try { slate = JSON.parse(localStorage.getItem(SLATE_KEY) || "null"); } catch (e) { slate = null; }
   var SLATE_FIELDS = ["aera","hera","aip","hip","al5era","hl5era","al5ip","hl5ip","arpg","hrpg","abp","hbp","al10","hl10","h2h","h2hn","pf","mph","dir","temp","tick","cash",
                       "apace","hpace","aort","hort","adrt","hdrt","arest","hrest","al5","hl5",
-                      "agsv","hgsv","agsh","hgsh","asf","hsf","app","hpp","apk","hpk","nhlform","ap1l10","hp1l10","axgf","axga","hxgf","hxga","xglg"];
+                      "agsv","hgsv","agsh","hgsh","asf","hsf","app","hpp","apk","hpk","nhlform","ap1l10","hp1l10","axgf","axga","hxgf","hxga","xglg",
+                      "ngoalies","agname","hgname"];
   function blank(v) { return v === undefined || v === null || String(v).trim() === ""; }
   function sameGame(row, g) {
     var sp = sportOf(g.sport);
@@ -3654,6 +3730,19 @@
           var fin = {};
           ["fa","fh","f5a","f5h"].forEach(function (k) { if (!blank(g.finals[k])) fin[k] = String(g.finals[k]); });
           row.finals = fin; graded++;
+        }
+        /* who actually started in net (hockey): the grade file names each
+           side's starter from the box score; the row keeps him and whether
+           he is the goalie whose line was carded, so the record can split on
+           it. Last names decide: the slate writes "Igor Shesterkin", the
+           box score "I. Shesterkin". 11 Oct 2026. */
+        if (g.starters && row.inputs) {
+          [["away", "agname", "agstart", "agok"], ["home", "hgname", "hgstart", "hgok"]].forEach(function (s) {
+            var st = g.starters[s[0]]; if (blank(st)) return;
+            row.inputs[s[2]] = String(st);
+            var nm = row.inputs[s[1]];
+            row.inputs[s[3]] = blank(nm) ? "" : (lastName(nm) === lastName(st) ? "yes" : "no");
+          });
         }
       }
     });

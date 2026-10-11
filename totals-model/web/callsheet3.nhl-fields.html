@@ -23,6 +23,10 @@
           <div class="body">
             <p class="note" id="goalieSummary">No goalie lines yet — load the slate, or open the boxes below.</p>
             <div class="grid2">
+              <div class="f"><label for="agpick">Away: who is in net</label><select id="agpick"><option value="">— load the slate —</option></select></div>
+              <div class="f"><label for="hgpick">Home: who is in net</label><select id="hgpick"><option value="">— load the slate —</option></select></div>
+            </div>
+            <div class="grid2">
               <label class="check"><input type="checkbox" id="agconf"> Away starter confirmed</label>
               <label class="check"><input type="checkbox" id="hgconf"> Home starter confirmed</label>
               <label class="check"><input type="checkbox" id="agbk"> Away backup in net</label>
@@ -31,10 +35,13 @@
             <div class="links">
               <a href="https://www.dailyfaceoff.com/starting-goalies" target="_blank" rel="noopener">Daily Faceoff · starting goalies</a>
             </div>
-            <p class="note">The slate names each side's <b>likely</b> starter and fills his line. A late change in net is the one
-              thing a hockey market prices imperfectly, so check Daily Faceoff, tick the boxes, and if the other goalie is
-              starting, open the boxes below and type his line over the slate's (the slate's printout lists both).
-              <b>Backup in net</b>: the slate ticks it when the named starter has under 30% of his club's starts, ten starts
+            <p class="note">The slate names each side's <b>likely</b> starter and fills his line, and the two lists above hold every
+              goalie on each club with the line the sheet would score. A late change in net is the one thing a hockey
+              market prices imperfectly, so check Daily Faceoff, <b>pick the goalie it names</b> (his line and the Backup box
+              follow), then tick Confirmed. The next morning's grade file carries who actually started, and the record tile
+              keeps the total's record split by whether the goalie on the card was the one who played: 42 of the first 150
+              goalie boxes were the other goalie's line.
+              <b>Backup in net</b>: set from the pick when the goalie has under 30% of his club's starts, ten starts
               in; fix it if Daily Faceoff says otherwise. With one backup in a game the total landed 0.18 under the close
               over two seasons (737 games, the under 53.7%), so one backup puts a tagged −0.15 on the line and the record
               tile keeps the under's record on these games; a backup whose own line reads cold takes −0.25 (182 such games
@@ -42,6 +49,10 @@
               goalie lines are not scored: in those games neither goalie's line had a direction against the close, while
               with two regular starters the lines ran the right way both seasons.</p>
             <input type="hidden" id="nhlform">
+            <!-- the goalie picker's data and record: the slate's goalie lists (JSON), whose line is on each side,
+                 who actually started (from the grade file) and whether they matched (yes / no / blank) -->
+            <input type="hidden" id="ngoalies"><input type="hidden" id="agname"><input type="hidden" id="hgname">
+            <input type="hidden" id="agstart"><input type="hidden" id="hgstart"><input type="hidden" id="agok"><input type="hidden" id="hgok">
           </div>
         </section>
 

@@ -24,7 +24,8 @@ const IDS = ["away","home","line","op","up","opened","gdate","aera","hera","aip"
              "hml","aml","rl","rlh","rla","f5line","f5op","f5up","al5era","hl5era","al5ip","hl5ip",
              "apace","hpace","aort","hort","adrt","hdrt","arest","hrest","al5","hl5","sp","sph","spa",
              "agsv","hgsv","agsh","hgsh","asf","hsf","app","hpp","apk","hpk","pl","plh","pla","p1line","p1op","p1up",
-             "ntick","ncash","ap1l10","hp1l10","axgf","axga","hxgf","hxga","xglg","nhlform"];
+             "ntick","ncash","ap1l10","hp1l10","axgf","axga","hxgf","hxga","xglg","nhlform",
+             "ngoalies","agname","hgname","agstart","hgstart","agok","hgok"];
 const CHECKS = ["dome","playoff","agconf","hgconf","agbk","hgbk"];
 
 (async () => {
@@ -263,6 +264,9 @@ const CHECKS = ["dome","playoff","agconf","hgconf","agbk","hgbk"];
     const slateDoc = { format: 'callsheet2.slate', version: 1, date: '2026-11-07', games: [
       { sport: 'NHL', gdate: '2026-11-07', away: 'Oilers', home: 'Flames', starters: { away: 'Skinner', home: 'Wolf' },
         inputs: { agsv: '0.908', hgsv: '0.916', agsh: '1200', hgsh: '1300', asf: '30.1', hsf: '28.9', app: '25.0', hpp: '19.5', apk: '78.0', hpk: '81.2', al10: '6.4', hl10: '5.9', h2h: '6.0', h2hn: '2', arest: '0', hrest: '1', ap1l10: '1.90', hp1l10: '1.70', axgf: '3.40', axga: '3.10', hxgf: '3.30', hxga: '2.90', xglg: '3.05', agbk: true, hgbk: false,
+                  agname: 'Stuart Skinner', hgname: 'Dustin Wolf',
+                  ngoalies: JSON.stringify({ away: [{ n: 'Stuart Skinner', sv: 0.908, sh: 1200, gs: 10, cs: 12, ls: false }, { n: 'Calvin Pickard', sv: 0.897, sh: 450, gs: 2, cs: 12, ls: false }],
+                                            home: [{ n: 'Dustin Wolf', sv: 0.916, sh: 1300, gs: 11, cs: 12, ls: false }, { n: 'Devin Cooley', sv: 0.902, sh: 300, gs: 1, cs: 12, ls: false }] }),
                   nhlform: JSON.stringify({ away: [{ date: '2026-10-04', opp: 'Jets', home: false, gf: 2, ga: 5, sf: 24, sa: 38, p1f: 0, p1a: 2, goalie: 'S. Skinner', end: 'REG' }, { date: '2026-10-06', opp: 'Kings', home: true, gf: 3, ga: 4, sf: 27, sa: 36, p1f: 1, p1a: 1, goalie: 'C. Pickard', end: 'OT' }], home: [{ date: '2026-10-05', opp: 'Sharks', home: true, gf: 4, ga: 1, sf: 33, sa: 22, p1f: 2, p1a: 0, goalie: 'D. Wolf', end: 'REG' }] }) },
         notes: ['Away back to back: likely the backup in net'] } ] };
     const dt = new DataTransfer(); dt.items.add(new File([JSON.stringify(slateDoc)], 'slate-2026-11-07.json', { type: 'application/json' }));
@@ -299,6 +303,47 @@ const CHECKS = ["dome","playoff","agconf","hgconf","agbk","hgbk"];
       'slate: Fill form switches to NHL and fills the goalie, shot, special-teams and rest boxes, never the line', JSON.stringify(slate.form));
   chk(slate.form.ap1l10 === '1.90' && slate.form.hp1l10 === '1.70', 'slate: the first-period last ten fills from the ledger fields', JSON.stringify({ a: slate.form.ap1l10, h: slate.form.hp1l10 }));
   chk(slate.form.agbk === true && slate.form.hgbk === false, 'slate: the Backup in net box is ticked from the slate for the away side only', JSON.stringify({ a: slate.form.agbk, h: slate.form.hgbk }));
+
+  // ---- the goalie picker: the slate's lists, a pick fills the line and the backup box, the grade file checks it ----
+  const picker = await pg.evaluate(async () => {
+    const wait = () => new Promise(r => setTimeout(r, 80));
+    const set = (id, v) => { const el = document.getElementById(id); el.value = v; el.dispatchEvent(new Event('input', { bubbles: true })); };
+    localStorage.removeItem('callsheet3.card.v1');
+    document.getElementById('slateClear').click(); document.getElementById('clear').click(); await wait();
+    const slateDoc = { format: 'callsheet2.slate', version: 1, date: '2026-11-08', games: [
+      { sport: 'NHL', gdate: '2026-11-08', away: 'Oilers', home: 'Flames', starters: { away: 'Stuart Skinner', home: 'Dustin Wolf' },
+        inputs: { agsv: '0.908', hgsv: '0.916', agsh: '1200', hgsh: '1300', arest: '1', hrest: '1', agname: 'Stuart Skinner', hgname: 'Dustin Wolf',
+                  ngoalies: JSON.stringify({ away: [{ n: 'Stuart Skinner', sv: 0.908, sh: 1200, gs: 10, cs: 12, ls: false }, { n: 'Calvin Pickard', sv: 0.897, sh: 450, gs: 2, cs: 12, ls: false }],
+                                            home: [{ n: 'Dustin Wolf', sv: 0.916, sh: 1300, gs: 11, cs: 12, ls: false }, { n: 'Devin Cooley', sv: 0.902, sh: 300, gs: 1, cs: 12, ls: false }] }) }, notes: [] } ] };
+    const dt = new DataTransfer(); dt.items.add(new File([JSON.stringify(slateDoc)], 'slate-2026-11-08.json', { type: 'application/json' }));
+    const inp = document.getElementById('slateFile'); inp.files = dt.files; inp.dispatchEvent(new Event('change', { bubbles: true })); await wait();
+    document.querySelector('#slateList [data-slate]').click(); await wait();
+    set('line', '6'); set('op', '-110'); set('up', '-110'); await wait();
+    const sel = document.getElementById('agpick'), hsel = document.getElementById('hgpick');
+    const before = { options: [...sel.options].map(o => o.textContent), value: sel.value, hvalue: hsel.value, summary: document.getElementById('goalieSummary').textContent };
+    sel.value = 'Calvin Pickard'; sel.dispatchEvent(new Event('change', { bubbles: true })); await wait();
+    const after = { agsv: document.getElementById('agsv').value, agsh: document.getElementById('agsh').value, agname: document.getElementById('agname').value, agbk: document.getElementById('agbk').checked, hgbk: document.getElementById('hgbk').checked, summary: document.getElementById('goalieSummary').textContent };
+    document.getElementById('add').click(); await wait();
+    // the grade file: Skinner started after all, Wolf as carded
+    const gradeDoc = { format: 'callsheet2.slate', version: 1, date: '2026-11-08', games: [ { sport: 'NHL', gdate: '2026-11-08', away: 'Oilers', home: 'Flames', finals: { fa: '2', fh: '1', f5a: '1', f5h: '0' }, starters: { away: 'S. Skinner', home: 'D. Wolf' }, notes: [] } ] };
+    const dt2 = new DataTransfer(); dt2.items.add(new File([JSON.stringify(gradeDoc)], 'nhl-grade-2026-11-08.json', { type: 'application/json' }));
+    inp.files = dt2.files; inp.dispatchEvent(new Event('change', { bubbles: true })); await wait();
+    const row = JSON.parse(localStorage.getItem('callsheet3.card.v1')).find(r => /Oilers @ Flames/.test(r.matchup));
+    const tr = [...document.querySelectorAll('#cardTable tr')].find(x => /Oilers @ Flames/.test(x.textContent));
+    const tile = [...document.querySelectorAll('#calibBox .calib[data-sport="NHL"] > div')].find(d => /Full-game total/.test(d.textContent));
+    tr.querySelector('[data-open]').click(); await wait();
+    const opened = document.getElementById('goalieSummary').textContent;
+    document.getElementById('slateClear').click(); document.getElementById('clear').click(); await wait();
+    return { before, after, agok: row.inputs.agok, hgok: row.inputs.hgok, agstart: row.inputs.agstart, rowText: tr.textContent, tile: tile ? tile.textContent : '', opened };
+  });
+  chk(picker.before.options.length === 3 && /Calvin Pickard — 0\.897 on 450 \(2 of 12 starts\)/.test(picker.before.options[2]) && picker.before.value === 'Stuart Skinner' && picker.before.hvalue === 'Dustin Wolf',
+      'picker: each side lists the club\'s goalies with his line and starts, and the slate\'s named starter is selected', JSON.stringify(picker.before.options));
+  chk(/Away Stuart Skinner 0\.908 on 1200/.test(picker.before.summary), 'picker: the summary names whose line is on the card', picker.before.summary.slice(0, 160));
+  chk(picker.after.agsv === '0.897' && picker.after.agsh === '450' && picker.after.agname === 'Calvin Pickard' && picker.after.agbk === true && picker.after.hgbk === false,
+      'picker: picking the other goalie fills his line, writes his name, and ticks Backup by the rule (2 of 12 starts)', JSON.stringify(picker.after));
+  chk(picker.agok === 'no' && picker.hgok === 'yes' && picker.agstart === 'S. Skinner', 'grade: the grade file\'s starters are matched by last name against the carded names', JSON.stringify({ a: picker.agok, h: picker.hgok, st: picker.agstart }));
+  chk(/goalie line wrong/.test(picker.rowText) && /goalie line wrong [01]-[01]/.test(picker.tile), 'record: the row is chipped and the total tile keeps the goalie-line record', picker.tile.slice(0, 300));
+  chk(/S\. Skinner started, not this line/.test(picker.opened), 'picker: the opened row says who started instead', picker.opened.slice(0, 200));
   chk(slate.form.axgf === '3.40' && slate.form.hxga === '2.90' && slate.form.xglg === '3.05', 'slate: the expected-goals boxes and the table\'s league mean fill', JSON.stringify({ a: slate.form.axgf, h: slate.form.hxga, lg: slate.form.xglg }));
   chk(/Expected goals/.test(slate.form.why) || slate.form.why === '', 'slate: with a line typed the why list would name expected goals (no line yet here)', slate.form.why.slice(0, 120));
   chk(/First-period last ten: 1\.90 and 1\.70 a game, average 1\.80, from the league ledger/.test(slate.form.p1why) || slate.form.p1why === '',

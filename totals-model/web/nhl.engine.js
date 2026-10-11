@@ -261,15 +261,64 @@
   function nhlGoalieSummary() {
     var el = $("goalieSummary"); if (!el) return;
     var parts = [];
-    [["Away", "agsv", "agsh"], ["Home", "hgsv", "hgsh"]].forEach(function (s) {
-      var sv = num(s[1]), sh = num(s[2]);
-      if (sv === null) { parts.push("<b>" + s[0] + "</b>: no goalie line (league average)"); return; }
+    [["Away", "agsv", "agsh", "agname", "agstart", "agok"], ["Home", "hgsv", "hgsh", "hgname", "hgstart", "hgok"]].forEach(function (s) {
+      var sv = num(s[1]), sh = num(s[2]), nm = ($(s[3]) || {}).value || "", st = ($(s[4]) || {}).value || "", ok = ($(s[5]) || {}).value || "";
+      var who = nm ? " <b>" + esc(nm) + "</b>" : "";
+      if (sv === null) { parts.push("<b>" + s[0] + "</b>" + who + ": no goalie line (league average)"); return; }
       var used = shrinkSv(sv, sh), w = svWeight(sh);
-      parts.push("<b>" + s[0] + "</b> " + sv.toFixed(3) + (sh !== null ? " on " + sh.toFixed(0) + " shots" : ", shots blank") +
-                 (w < 1 ? " → scored as " + used.toFixed(3) : " → trusted in full"));
+      parts.push("<b>" + s[0] + "</b>" + who + " " + sv.toFixed(3) + (sh !== null ? " on " + sh.toFixed(0) + " shots" : ", shots blank") +
+                 (w < 1 ? " → scored as " + used.toFixed(3) : " → trusted in full") +
+                 (st ? (ok === "no" ? " — <b>" + esc(st) + " started</b>, not this line" : ok === "yes" ? " — started, as carded" : " — " + esc(st) + " started") : ""));
     });
-    el.innerHTML = parts.join(" · ") + ". Open the boxes below to change a line.";
+    el.innerHTML = parts.join(" · ") + ". Pick who is in net above, or open the boxes below to change a line.";
   }
+  /* ---- the goalie picker (11 Oct 2026) ---------------------------------------
+     The slate writes every goalie on each club into the hidden `ngoalies` box
+     with the line the sheet would score (n name, sv, sh shots, gs starts, cs
+     the club's starts, ls last season's line). Picking one fills his line,
+     writes his name on the row, and sets the Backup box by the rule (under
+     30% of the club's starts, ten starts in). 42 of the first 150 goalie boxes
+     on the card had carried the other goalie's line. */
+  function nhlGoaliePicker() {
+    var raw = ($("ngoalies") || {}).value || "", data = null;
+    try { data = raw ? JSON.parse(raw) : null; } catch (e) { data = null; }
+    [["away", "agpick", "agname", "agsv", "agsh", "agbk"], ["home", "hgpick", "hgname", "hgsv", "hgsh", "hgbk"]].forEach(function (s) {
+      var sel = $(s[1]); if (!sel) return;
+      var list = (data && data[s[0]]) || [], nameBox = $(s[2]), current = nameBox ? nameBox.value : "";
+      var key = JSON.stringify(list);
+      if (sel.getAttribute("data-key") !== key) {
+        sel.setAttribute("data-key", key);
+        var h = '<option value="">' + (list.length ? "— type the line by hand —" : "— load the slate —") + '</option>';
+        list.forEach(function (g) {
+          var line = g.sv !== null && g.sv !== undefined ? Number(g.sv).toFixed(3) + " on " + g.sh : "no line";
+          var starts = g.cs ? g.gs + " of " + g.cs + " starts" : (g.ls ? "last season's line" : "no starts yet");
+          h += '<option value="' + esc(g.n) + '">' + esc(g.n) + " — " + line + " (" + starts + ")</option>";
+        });
+        sel.innerHTML = h;
+      }
+      sel.value = list.some(function (g) { return g.n === current; }) ? current : "";
+      sel.disabled = !list.length || (typeof formLocked !== "undefined" && formLocked);
+      if (!sel.getAttribute("data-bound")) {
+        sel.setAttribute("data-bound", "1");
+        sel.addEventListener("change", function () {
+          var picked = list.filter(function (g) { return g.n === sel.value; })[0];
+          var raw2 = ($("ngoalies") || {}).value || "", d2 = null;
+          try { d2 = raw2 ? JSON.parse(raw2) : null; } catch (e) { d2 = null; }
+          picked = ((d2 && d2[s[0]]) || []).filter(function (g) { return g.n === sel.value; })[0];
+          if (nameBox) nameBox.value = picked ? picked.n : "";
+          if (picked) {
+            $(s[3]).value = picked.sv !== null && picked.sv !== undefined ? Number(picked.sv).toFixed(3) : "";
+            $(s[4]).value = picked.sh ? String(picked.sh) : "";
+            var bk = $(s[5]);
+            if (bk) bk.checked = !!(picked.cs && picked.cs >= NHL.BACKUP_MIN_STARTS && picked.gs < NHL.BACKUP_SHARE * picked.cs && !picked.ls);
+          }
+          [s[3], s[4]].forEach(function (id) { $(id).dispatchEvent(new Event("input", { bubbles: true })); });
+          if ($(s[5])) $(s[5]).dispatchEvent(new Event("change", { bubbles: true }));
+        });
+      }
+    });
+  }
+  NHL.BACKUP_SHARE = 0.30; NHL.BACKUP_MIN_STARTS = 10;   // the slate's rule (slate.py nhl_is_backup), applied again on a pick
   /* ---- recent form: shown, not scored --------------------------------------
      The slate writes each side's last five finals (score, shots for and
      against, the starter, how the game ended) as JSON into the hidden
@@ -316,6 +365,7 @@
     el.innerHTML = h;
   }
   function forecastMatchupNhl() {
+    nhlGoaliePicker();
     nhlGoalieSummary();
     nhlFormPanel();
     var f = readNhl();

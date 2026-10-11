@@ -1024,8 +1024,13 @@
     if (cash !== null && cash <= 20) against++;
     return against ? "over against the grain" : "";
   }
+  /* the last word of a goalie's name, lower-cased, accents dropped: "Igor Shesterkin" and "I. Shesterkin" agree */
+  function lastName(s) {
+    var w = String(s || "").trim().split(/\s+/); if (!w.length) return "";
+    return w[w.length - 1].normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase();
+  }
   function marksOf(sp, inputs, markets) {
-    var out = { profile: "", lean: "", grain: "", crowd: "", b2b: "", backup: "" };
+    var out = { profile: "", lean: "", grain: "", crowd: "", b2b: "", backup: "", goalie: "" };
     if (!inputs) return out;
     /* the crowd (NHL): where the money is, against the sheet's pick on the
        total. 65%+ of the money on one side is a crowd; the pick is WITH it
@@ -1051,6 +1056,11 @@
          total tile keeps the UNDER's record on these games. Two backups:
          no label, nothing moves. Measured 7 Oct 2026 on two seasons. */
       if ((inputs.agbk === true) !== (inputs.hgbk === true)) out.backup = "backup in net";
+      /* the goalie on the card against the goalie who played (from the grade
+         file): both right, or a line that was the other goalie's. 11 Oct 2026. */
+      var oks = [inputs.agok, inputs.hgok].filter(function (v) { return v === "yes" || v === "no"; });
+      if (oks.length === 2 && oks[0] === "yes" && oks[1] === "yes") out.goalie = "goalies right";
+      else if (oks.indexOf("no") >= 0) out.goalie = "goalie line wrong";
       return out;
     }
     if (sp !== "MLB") return out;
@@ -1073,6 +1083,7 @@
     if (tg.crowd) h += '<span class="' + cls + '">' + esc(tg.crowd) + '</span>';
     if (tg.b2b) h += '<span class="' + cls + '">' + esc(tg.b2b) + '</span>';
     if (tg.backup) h += '<span class="' + cls + '">' + esc(tg.backup) + '</span>';
+    if (tg.goalie) h += '<span class="' + cls + (tg.goalie === "goalie line wrong" ? ' warn' : '') + '">' + esc(tg.goalie) + '</span>';
     return h;
   }
   function renderCalib() {
@@ -1083,7 +1094,7 @@
        against away -- and the full-game total keeps the record of the rows
        that carried Call Sheet #1's verdict, because the parlay legs lean on
        it. Asked for on 25 Sept: "how many of the 17-10 went over vs under". */
-    var fresh = function (label) { return { n: 0, w: 0, l: 0, p: 0, says: 0, units: 0, label: label, sides: {}, verdict: null, profile: null, lean: {}, grain: null, crowd: {}, high: null, b2b: null, backup: null,
+    var fresh = function (label) { return { n: 0, w: 0, l: 0, p: 0, says: 0, units: 0, label: label, sides: {}, verdict: null, profile: null, lean: {}, grain: null, crowd: {}, high: null, b2b: null, backup: null, goalie: {},
                                             clv: { n: 0, beat: 0, lost: 0, even: 0, runs: 0 } }; };
     var bySport = {};
     ["MLB", "WNBA"].forEach(function (sp) {
@@ -1115,6 +1126,7 @@
           if (tg.grain && mk.key === "total") count(t.grain || (t.grain = { w: 0, l: 0, p: 0 }), res);
           if (tg.lean) count(t.lean[tg.lean] || (t.lean[tg.lean] = { w: 0, l: 0, p: 0 }), res);
           if (tg.crowd && mk.key === "total") count(t.crowd[tg.crowd] || (t.crowd[tg.crowd] = { w: 0, l: 0, p: 0 }), res);
+          if (tg.goalie && mk.key === "total") count(t.goalie[tg.goalie] || (t.goalie[tg.goalie] = { w: 0, l: 0, p: 0 }), res);
           if ((tg.b2b || tg.backup) && mk.key === "total") {
             var uv = bothSides(mk).filter(function (v) { return v.side === "UNDER"; })[0];
             var ur = uv ? gradeMarket(uv, row.finals) : null;
@@ -1174,6 +1186,7 @@
       ["with the crowd", "against the crowd"].forEach(function (k) { if (s.crowd[k]) parts.push(k + ' ' + rec(s.crowd[k])); });
       if (s.b2b) parts.push('back to back, the under ' + rec(s.b2b));
       if (s.backup) parts.push('backup in net, the under ' + rec(s.backup));
+      ["goalies right", "goalie line wrong"].forEach(function (k) { if (s.goalie[k]) parts.push(k + ' ' + rec(s.goalie[k])); });
       if (s.clv.n) parts.push('beat the close ' + s.clv.beat + '-' + s.clv.lost + (s.clv.even ? '-' + s.clv.even : '') + ' · ' + sgn(s.clv.runs / s.clv.n, 2) + ' ' + (unit || 'runs') + ' avg');
       return '<div><p class="k">' + esc(s.label) + '</p><p class="v">' + s.w + '-' + s.l + (s.p ? '-' + s.p : '') + '</p>' +
         '<p class="s">' + (s.n ? 'says ' + says.toFixed(1) + '% · does ' + does.toFixed(1) + '% (±' + se.toFixed(1) + ') · ' + sgn(s.units, 2) + 'u' : 'pushes only') + '</p>' +
@@ -1486,6 +1499,19 @@
           var fin = {};
           ["fa","fh","f5a","f5h"].forEach(function (k) { if (!blank(g.finals[k])) fin[k] = String(g.finals[k]); });
           row.finals = fin; graded++;
+        }
+        /* who actually started in net (hockey): the grade file names each
+           side's starter from the box score; the row keeps him and whether
+           he is the goalie whose line was carded, so the record can split on
+           it. Last names decide: the slate writes "Igor Shesterkin", the
+           box score "I. Shesterkin". 11 Oct 2026. */
+        if (g.starters && row.inputs) {
+          [["away", "agname", "agstart", "agok"], ["home", "hgname", "hgstart", "hgok"]].forEach(function (s) {
+            var st = g.starters[s[0]]; if (blank(st)) return;
+            row.inputs[s[2]] = String(st);
+            var nm = row.inputs[s[1]];
+            row.inputs[s[3]] = blank(nm) ? "" : (lastName(nm) === lastName(st) ? "yes" : "no");
+          });
         }
       }
     });

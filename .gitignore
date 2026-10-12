@@ -6,3 +6,6 @@
 # demand and delivered directly instead.
 verdict-log-*.json
 !totals-model/examples/*.json
+
+# The Odds API key, read by slate.py from a file beside itself. Never commit it.
+odds_key.txt

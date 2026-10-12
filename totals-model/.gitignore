@@ -13,3 +13,11 @@ package-lock.json
 # The slate script writes its daily files next to itself when run there.
 slate/slate-*.json
 slate/grade-*.json
+slate/nhl-slate-*.json
+slate/nhl-grade-*.json
+slate/odds-*.json
+slate/odds-log.json
+
+# The Odds API key. This repository is public, so the key must never land in
+# it: the script reads it from this file beside itself, and nowhere else.
+odds_key.txt

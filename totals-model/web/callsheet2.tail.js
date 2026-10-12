@@ -426,7 +426,7 @@
                     recent form can be tested against the record rather than assumed */
                  "al5era","hl5era","al5ip","hl5ip",
                  /* the shop: every book's price on each side, JSON from the odds file (12 Oct 2026) */
-                 "odds"];
+                 "odds","sharp"];
   var WNBA_IDS = ["away","home","line","op","up","opened","gdate","apace","hpace","aort","hort","adrt","hdrt",
                   "arest","hrest","al5","hl5","hml","aml","sp","sph","spa"];
   var ALL = MLB_IDS.concat(WNBA_IDS).filter(function (v, i, a) { return a.indexOf(v) === i; });
@@ -622,6 +622,7 @@
           (!pickable(mk, sport) ? '<span class="cap tagm" title="' + esc(notPickedWhy(sport, mk)) + '">shown, not picked</span>' : "") +
           (shade ? '<span class="cap" style="color:var(--go);border-color:var(--go)" title="The side the book priced cheaper. The book shades its price toward the side it wants money on, so this is betting with the book against the crowd: a rule, not a probability, kept on its own record line.">book\'s cheaper side: ' + esc(shade.pick) + ' at ' + sgn(shade.price, 0) + ' · ' + recText(shadeRec) + ' on the record</span>' : "") +
           (function () { var best = bestPriceOf(mk, txt("odds")); if (!best || mk.price === null || implied(best.price) >= implied(mk.price) - 1e-9) return ""; return '<span class="cap" style="color:var(--go);border-color:var(--go)" title="The best price on this side at the same number across the books in the odds file, and the edge there">best ' + sgn(best.price, 0) + ' at ' + esc(bookName(best.book)) + ' · edge there ' + sgn((mk.p - implied(best.price)) * 100, 1) + '</span>'; })() +
+          shopChips(mk, m) +
           (isLeg ? '<span class="cap" style="color:var(--go);border-color:var(--go)">parlay leg: ' + esc(leg.pick) + ' ' + (leg.p * 100).toFixed(1) + '% at ' + sgn(leg.price, 0) + ' · ' + valueRatio(leg).toFixed(3) + '× its price' + (bandOf(leg) ? ' · #1 says ' + esc(bandOf(leg)) : '') + '</span>' : "") +
           (res ? '<span class="chip ' + res + '" style="margin-left:8px;vertical-align:2px">' + resText(res) + '</span>' : "") + '</div>' +
           '<div class="lab">' + esc(mk.label) + '</div></div>' +
@@ -640,7 +641,7 @@
               '<i class="h" style="width:' + (100 - ha).toFixed(1) + '%">' + m.lamHome.toFixed(sport === "WNBA" ? 1 : 2) + ' ' + esc(m.home) + '</i></div>';
     }
     box.innerHTML = html;
-    why.innerHTML = m.notes.concat(m.total.notes).concat(lastFiveNote()).map(function (n) { return "<li>" + n + "</li>"; }).join("");
+    why.innerHTML = m.notes.concat(m.total.notes).concat(lastFiveNote()).concat(shopNotes(m)).map(function (n) { return "<li>" + n + "</li>"; }).join("");
   }
   /* The last five starts ride along on the row and the rail but touch no
      number. The line names them so a reader knows they were seen. */
@@ -741,7 +742,7 @@
      ml: {HOME, AWAY}, spread: {HOME, AWAY}, period: {OVER, UNDER}}. The rail
      names the best price on the listed side at the same number, and the edge
      there, so a -135 that is -118 somewhere else is seen before the bet. */
-  var BOOK_NAMES = { fanatics: "Fanatics", betmgm: "BetMGM", draftkings: "DraftKings", fanduel: "FanDuel", caesars: "Caesars", espnbet: "ESPN BET", betrivers: "BetRivers", bovada: "Bovada", williamhill_us: "Caesars", pointsbetus: "PointsBet" };
+  var BOOK_NAMES = { fanatics: "Fanatics", betmgm: "BetMGM", draftkings: "DraftKings", fanduel: "FanDuel", caesars: "Caesars", espnbet: "ESPN BET", betrivers: "BetRivers", bovada: "Bovada", williamhill_us: "Caesars", pointsbetus: "PointsBet", pinnacle: "Pinnacle" };
   function bookName(k) { return BOOK_NAMES[k] || String(k || ""); }
   function shopKey(mk) {
     if (mk.key === "total") return "total";
@@ -762,6 +763,91 @@
       if (!best || implied(price) < implied(best.price)) best = { book: x[0], price: price };
     });
     return best;
+  }
+  /* The rest of the odds file (13 Oct 2026, "make sure we aren't leaving
+     anything on the table"): the SHARP book's number beside the carded one
+     (the hidden `sharp` box: {book, line, op, up, hml, aml}), the ALTERNATE
+     totals priced by the sheet's own projection (splitFor() on the row's
+     projected total, so the under at 6.5 and the over at 5.5 are seen with
+     their edge while the Line box stays on the book's main number), and the
+     book's SPLIT of the total between the sides (team totals). All three are
+     shown, not scored: the row still ranks the main number; the chips say
+     where the same lean is priced better or worse. */
+  function shopOf(raw) { if (!raw) return null; try { return JSON.parse(raw); } catch (e) { return null; } }
+  function sharpOf(raw) { var s = shopOf(raw); return s && s.line !== undefined && s.line !== null && isFinite(+s.line) ? s : null; }
+  function altLines(m, raw) {
+    var shop = shopOf(raw), f = m && m.total;
+    if (!shop || !shop.alt || !f || f.projected === undefined || f.line === undefined || f.line === null) return [];
+    var main = +f.line, out = {};
+    ["OVER", "UNDER"].forEach(function (side) {
+      (shop.alt[side] || []).concat((shop.total || {})[side] || []).forEach(function (x) {
+        var price = +x[1], point = x[2] === null || x[2] === undefined ? null : +x[2];
+        if (!isFinite(price) || point === null || !isFinite(point) || Math.abs(point - main) < 1e-9) return;   // the main number is the row itself
+        var k = side + "@" + point, cur = out[k];
+        if (!cur || implied(price) < implied(cur.price)) out[k] = { side: side, point: point, price: price, book: x[0] };
+      });
+    });
+    return Object.keys(out).map(function (k) {
+      var a = out[k], sp = splitFor(sport, a.point, f.projected), live = sp[0] + sp[2];
+      a.p = live > 0 ? (a.side === "OVER" ? sp[0] : sp[2]) / live : 0.5;
+      a.edge = a.p - implied(a.price); a.dist = Math.abs(a.point - main);
+      return a;
+    }).sort(function (x, y) { return x.dist - y.dist || x.point - y.point; });
+  }
+  function splitOf(raw) {
+    var shop = shopOf(raw), t = shop && shop.team; if (!t) return null;
+    var pick = function (side) {
+      var list = (t[side] || {}).OVER || []; if (!list.length) return null;
+      var x = list.filter(function (y) { return y[0] === shop.book; })[0] || list[0];
+      return { book: x[0], price: +x[1], point: +x[2] };
+    };
+    var a = pick("AWAY"), h = pick("HOME");
+    return a || h ? { away: a, home: h } : null;
+  }
+  function shopChips(mk, m) {
+    if (mk.key !== "total" || !m || !m.total) return "";
+    var out = "", line = lineOf(mk), sh = sharpOf(txt("sharp"));
+    if (sh) {
+      var off = line !== null && Math.abs(+sh.line - line) > 1e-9;
+      out += '<span class="cap' + (off ? '' : ' tagm') + '"' + (off ? ' style="color:var(--go);border-color:var(--go)"' : '') +
+        ' title="Pinnacle, the sharp book, read beside the carded line. Shown, not scored: the odds log keeps the gap nightly and it is measured before it can move a number.">' +
+        (off ? 'sharp line ' + esc(String(sh.line)) + ' (' + sgn(+sh.op, 0) + '/' + sgn(+sh.up, 0) + '), here ' + esc(String(line))
+             : 'Pinnacle agrees at ' + esc(String(sh.line)) + ' (' + sgn(+sh.op, 0) + '/' + sgn(+sh.up, 0) + ')') + '</span>';
+    }
+    altLines(m, txt("odds")).filter(function (a) { return a.side === mk.side; }).slice(0, 2).forEach(function (a) {
+      out += '<span class="cap' + (a.edge > 0 ? '' : ' tagm') + '"' + (a.edge > 0 ? ' style="color:var(--go);border-color:var(--go)"' : '') +
+        ' title="An alternate number at the book, priced by the sheet\'s own projection of ' + m.total.projected.toFixed(2) + '. Shown, not picked: the row ranks the main number; this says where the same lean is priced better or worse.">alt ' +
+        esc(a.side) + ' ' + esc(String(a.point)) + ' ' + sgn(a.price, 0) + ' at ' + esc(bookName(a.book)) + ' · sheet ' + (a.p * 100).toFixed(1) + '% · edge ' + sgn(a.edge * 100, 1) + '</span>';
+    });
+    var sp = splitOf(txt("odds"));
+    if (sp) {
+      var part = function (nm, x) { return x ? esc(nm) + ' ' + esc(String(x.point)) + ' (o ' + sgn(x.price, 0) + ')' : esc(nm) + ' —'; };
+      out += '<span class="cap tagm" title="The book\'s own total for each side (team totals), shown, not scored. The sheet\'s own split is the bar under the list.">book\'s split: ' + part(m.away, sp.away) + ' · ' + part(m.home, sp.home) + '</span>';
+    }
+    return out;
+  }
+  function shopNotes(m) {
+    if (!m || !m.total || m.total.line === undefined || m.total.line === null) return [];
+    var notes = [], line = +m.total.line, sh = sharpOf(txt("sharp"));
+    if (sh) {
+      var off = Math.abs(+sh.line - line) > 1e-9;
+      notes.push("<b>Pinnacle, the sharp book:</b> " + esc(String(sh.line)) + " (" + sgn(+sh.op, 0) + "/" + sgn(+sh.up, 0) + ")" +
+        (sh.hml !== undefined && sh.aml !== undefined ? ", moneyline " + sgn(+sh.aml, 0) + "/" + sgn(+sh.hml, 0) : "") +
+        (off ? ", <b>" + (+sh.line > line ? "above" : "below") + " the carded " + line + "</b>" : ", the same number as the card") +
+        ". Shown, not scored: the odds log keeps the gap nightly and it is measured before it can move a number.");
+    }
+    var alts = altLines(m, txt("odds")), side = m.total.side, mine = alts.filter(function (a) { return a.side === side; });
+    if (mine.length) {
+      notes.push("<b>Alternates on the " + esc(String(side).toLowerCase()) + ", priced by the sheet's projection of " + m.total.projected.toFixed(2) + ", shown, not picked:</b> " +
+        mine.map(function (a) { return esc(String(a.point)) + " at " + sgn(a.price, 0) + " (" + esc(bookName(a.book)) + ") " + (a.p * 100).toFixed(1) + "%, edge " + sgn(a.edge * 100, 1); }).join("; ") +
+        ". The Line box stays on the book's main number; an alternate is shopped here, not typed there.");
+    }
+    var sp = splitOf(txt("odds"));
+    if (sp) {
+      var part = function (nm, x) { return x ? esc(nm) + " " + x.point + " (over " + sgn(x.price, 0) + ")" : esc(nm) + " —"; };
+      notes.push("<b>The book's split, shown, not scored:</b> " + part(m.away, sp.away) + ", " + part(m.home, sp.home) + ".");
+    }
+    return notes;
   }
   /* why the sheet likes this one most: the row re-scored from its inputs, each
      scored input's lean against the market's own fair number, and every delta
@@ -1649,7 +1735,7 @@
                       "apace","hpace","aort","hort","adrt","hdrt","arest","hrest","al5","hl5",
                       /* the odds file (12 Oct 2026): the book's lines and prices, the opener, and
                          every book's price for the shop -- blank boxes fill, typed ones stay */
-                      "line","op","up","opened","hml","aml","rl","rlh","rla","f5line","f5op","f5up","odds"];
+                      "line","op","up","opened","hml","aml","rl","rlh","rla","f5line","f5op","f5up","odds","sharp"];
   function blank(v) { return v === undefined || v === null || String(v).trim() === ""; }
   function sameGame(row, g) {
     var sp = g.sport === "WNBA" ? "WNBA" : "MLB";

@@ -256,15 +256,20 @@ const CHECKS = ["dome","playoff","agconf","hgconf","agbk","hgbk"];
     document.getElementById('slateClear').click(); document.getElementById('clear').click(); await wait();
     const game = { sport: 'NHL', gdate: '2026-11-09', away: 'Kraken', home: 'Canucks' };   // its own matchup: the row stays on the card for later tests
     await load({ format: 'callsheet2.slate', version: 1, date: '2026-11-09', games: [ Object.assign({}, game, { starters: { away: 'Stuart Skinner', home: 'Dustin Wolf' }, inputs: { agsv: '0.908', hgsv: '0.916', agsh: '1200', hgsh: '1300', agname: 'Stuart Skinner', hgname: 'Dustin Wolf' }, notes: ['from the slate'] }) ] }, 'nhl-slate-2026-11-09.json');
-    const shop = JSON.stringify({ total: { OVER: [['fanatics', -110, 6], ['draftkings', -102, 6], ['betmgm', -105, 6.5]], UNDER: [['fanatics', -110, 6], ['betmgm', -118, 6]] }, ml: { HOME: [['fanatics', 110, null], ['caesars', 118, null]], AWAY: [['fanatics', -130, null]] } });
-    await load({ format: 'callsheet2.slate', version: 1, date: '2026-11-09', games: [ Object.assign({}, game, { inputs: { line: '6', op: '-110', up: '-110', opened: '6.5', hml: '110', aml: '-130', pl: '1.5', plh: '-180', pla: '150', p1line: '1.5', p1op: '-125', p1up: '105', odds: shop }, notes: ['from the odds file'] }) ] }, 'odds-2026-11-09.json');
+    const shop = JSON.stringify({ book: 'fanatics', total: { OVER: [['fanatics', -110, 6], ['draftkings', -102, 6], ['betmgm', -105, 6.5]], UNDER: [['fanatics', -110, 6], ['betmgm', -118, 6]] }, ml: { HOME: [['fanatics', 110, null], ['caesars', 118, null]], AWAY: [['fanatics', -130, null]] },
+      alt: { OVER: [['fanatics', -150, 5.5], ['fanatics', 125, 6.5]], UNDER: [['fanatics', 125, 5.5], ['fanatics', -150, 6.5]] },
+      team: { AWAY: { OVER: [['fanatics', -115, 2.5]] }, HOME: { OVER: [['betmgm', -110, 3.5], ['fanatics', -105, 3.5]], UNDER: [['fanatics', -115, 3.5]] } } });
+    const sharp = JSON.stringify({ book: 'pinnacle', line: 6.5, op: -105, up: -115, hml: 105, aml: -125 });
+    await load({ format: 'callsheet2.slate', version: 1, date: '2026-11-09', games: [ Object.assign({}, game, { inputs: { line: '6', op: '-110', up: '-110', opened: '6.5', hml: '110', aml: '-130', pl: '1.5', plh: '-180', pla: '150', p1line: '1.5', p1op: '-125', p1up: '105', odds: shop, sharp: sharp }, notes: ['from the odds file'] }) ] }, 'odds-2026-11-09.json');
     const pending = [...document.querySelectorAll('#slateList [data-slate]')].length;
     document.querySelector('#slateList [data-slate]').click(); await wait();
     const v = id => document.getElementById(id).value;
-    const form = { agsv: v('agsv'), line: v('line'), op: v('op'), opened: v('opened'), hml: v('hml'), pl: v('pl'), p1line: v('p1line'), odds: v('odds').length > 10 };
+    const form = { agsv: v('agsv'), line: v('line'), op: v('op'), opened: v('opened'), hml: v('hml'), pl: v('pl'), p1line: v('p1line'), odds: v('odds').length > 10, sharp: v('sharp').length > 10 };
     const chips = [...document.querySelectorAll('#markets .mk[data-key="total"] .cap')].map(c => c.textContent);
     const listed = document.querySelector('#markets .mk[data-key="total"] .pick').childNodes[0].textContent.trim();
+    const why = document.getElementById('why').textContent;
     document.getElementById('add').click(); await wait();
+    const stored = JSON.parse(localStorage.getItem('callsheet3.card.v1')).find(r => /Kraken @ Canucks/.test(r.matchup) && r.gdate === '2026-11-09');
     // a later odds file with a moved number: the carded line stays
     await load({ format: 'callsheet2.slate', version: 1, date: '2026-11-09', games: [ Object.assign({}, game, { inputs: { line: '6.5', op: '-115', up: '-105' } }) ] }, 'odds-2026-11-09.json');
     // the backup test left its own Kraken @ Canucks row (12 Nov) on the in-memory card, so find this one by its date
@@ -275,8 +280,14 @@ const CHECKS = ["dome","playoff","agconf","hgconf","agbk","hgbk"];
     await wait();
     const row2 = JSON.parse(localStorage.getItem('callsheet3.card.v1')).find(mine);
     document.getElementById('slateClear').click(); document.getElementById('clear').click(); await wait();
-    return { pending, form, chips, listed, line1: row1.inputs.line, close: row2.close, agok: row2.inputs.agok };
+    return { pending, form, chips, listed, why, kept: { odds: (stored.inputs.odds || '').length > 10, sharp: (stored.inputs.sharp || '').length > 10 }, line1: row1.inputs.line, close: row2.close, agok: row2.inputs.agok };
   });
+  chk(oddsT.form.sharp && oddsT.kept.odds && oddsT.kept.sharp, 'odds: the sharp box fills from the file, and the shop and the sharp line are stored on the hockey row', JSON.stringify({ form: oddsT.form.sharp, kept: oddsT.kept }));
+  chk(oddsT.chips.some(c => c === 'sharp line 6.5 (-105/-115), here 6'), 'odds: Pinnacle\'s number is chipped beside the carded line when it differs', JSON.stringify(oddsT.chips));
+  chk(oddsT.chips.filter(c => /^alt (OVER|UNDER) (5\.5|6\.5) [+-]\d+ at Fanatics · sheet \d+\.\d% · edge [+-]\d+\.\d$/.test(c)).length === 2, 'odds: the two nearest alternates on the listed side are priced by the sheet\'s projection, best price per number', JSON.stringify(oddsT.chips));
+  chk(oddsT.chips.some(c => c === "book's split: Kraken 2.5 (o -115) · Canucks 3.5 (o -105)"), 'odds: the book\'s split rides as a chip, the carded book\'s number first', JSON.stringify(oddsT.chips));
+  chk(/Pinnacle, the sharp book: 6\.5 \(-105\/-115\), moneyline -125\/\+105, above the carded 6/.test(oddsT.why) && /Alternates on the (over|under), priced by the sheet's projection of \d\.\d\d, shown, not picked: (5\.5|6\.5) at/.test(oddsT.why) && /The book's split, shown, not scored: Kraken 2\.5 \(over -115\), Canucks 3\.5 \(over -105\)\./.test(oddsT.why),
+      'odds: the why list names the sharp line, the alternates and the split as shown, not scored', oddsT.why.slice(-700));
   chk(oddsT.pending === 1 && oddsT.form.agsv === '0.908' && oddsT.form.line === '6' && oddsT.form.op === '-110' && oddsT.form.opened === '6.5' && oddsT.form.hml === '110' && oddsT.form.pl === '1.5' && oddsT.form.p1line === '1.5' && oddsT.form.odds,
       'odds: the odds file merges into the slate\'s pending game, and Fill form carries the goalies, the lines, the prices, the opener and the shop', JSON.stringify(oddsT.form));
   chk(/OVER/.test(oddsT.listed) ? oddsT.chips.some(c => /^best -102 at DraftKings · edge there [+-][0-9.]+$/.test(c)) : !oddsT.chips.some(c => /^best /.test(c)),

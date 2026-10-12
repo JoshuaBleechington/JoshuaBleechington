@@ -141,6 +141,30 @@ the **best price** on the listed side at the same number across the books
 and the edge there. Nothing scores differently; the line box is still the
 book's main market, typed by a script instead of a hand.
 
+**The rest of the subscription** (13 Oct 2026, "make sure we aren't
+leaving anything on the table"). Four more things the feed carries, all
+shown and none scored. **The sharp line**: Pinnacle rides in the book list
+and is never carded; its total and prices sit in the hidden `sharp` box,
+the rail chips the gap in green when its number differs from the card, and
+the odds log keeps the gap every night so it can be measured before it
+moves anything. **The alternates**: every number the books post on the
+total, with the best price at each, priced by the sheet's own projection
+(`splitFor` on the row's projected total); the rail shows the two nearest
+numbers on the listed side with the sheet's chance there and the edge, so
+the under at 6.5 is seen with its price while the Line box stays on the
+book's 5.5 (the thing the user did by hand on Senators at Devils, 12 Oct,
+and got an alternate-line band for). The row still ranks the main number.
+**The book's split**: each side's own total at the carded book, beside the
+sheet's own split bar. **The credits**: the run prints what it cost and what
+is left, from the response headers, against the 20,000 a month plan. The
+**history mode** (`slate.py odds-history --season`) pulls a past season's
+totals at noon and 7:30 pm Eastern, every book, ten credits a snapshot,
+about 3,700 a season, asking first and keeping 3,000 for the nights;
+`tools_backtest_nhl_odds.py` joins the file to the season ledger and
+measures the opener against the close, the move's direction against the
+final, and Pinnacle's gap and lean against the final. Not run yet: the
+user pulls the file and the table goes here.
+
 **Whose line is on the card.** On 11 Oct 2026 the season ledger's detail
 pass (every game's actual starters) was matched against the card's first
 150 goalie boxes, each box's number rebuilt for every goalie on the club:

@@ -60,20 +60,37 @@ the goalies.
 `python slate.py odds`, or **Run odds.bat**, after the slate. It needs a key
 from <https://the-odds-api.com> in `odds_key.txt` beside `slate.py` (one
 line, nothing else), or in the `ODDS_API_KEY` environment variable. One call
-a sport for the main markets and one call a game for the period market, so
-a night of twelve hockey games and two baseball games is about sixteen
-requests.
+a sport for the main markets (three credits) and one call a game for the
+period total, the alternate totals and the team totals (a credit a market
+the books price), so a night of twelve hockey games and two baseball games
+is about fifty credits a run. The last line printed is the credits the run
+used and what is left this month.
 
 | On the sheet | Where it comes from |
 | --- | --- |
 | The main total and both prices, both moneylines, the run or puck line and its prices, the period total (first five, first period) and its prices | The first book in `--books` that prices the game (default order: Fanatics, BetMGM, DraftKings, FanDuel, Caesars, ESPN BET, BetRivers, Bovada). Blank boxes fill; anything you typed stays |
 | **Opened** | The first number this script saw for the game, kept in `odds-log.json`. Run the odds early in the day and again before the games and the opener is the morning number |
 | The best price on each side, on the rail | Every book's price on every side rides on the row (the hidden `odds` box); the rail names the best price at the same number and the edge there |
+| **The sharp line**, on the rail and in the why list | Pinnacle's total and prices, beside the carded line (the hidden `sharp` box). Pinnacle is read, never carded. When its number differs from the card the chip says so in green. Shown, not scored: the odds log keeps the gap nightly and it is measured before it can move a number |
+| **The alternates**, on the rail and in the why list | Every number the books post on the total, priced by the sheet's own projection: the two nearest numbers on the listed side show with the best price, the sheet's chance there and the edge. Shown, not picked: the row still ranks the main number, and the Line box stays on it |
+| **The book's split**, on the rail | Each side's own total at the carded book (team totals), shown, not scored, beside the sheet's own split bar |
 | **Close** | The morning grade run attaches the last number the odds run saw before the game to each final, and the sheet's CLOSE box fills if it is blank, so "beat the close" grades itself |
 
 The sheet's own number never moves: the line boxes are the book's main
 market, exactly as before, just typed by the script. Shop alternates on the
 sheet, not in the Line box.
+
+**The history mode**, for the backtest. `python slate.py odds-history
+--season 20252026`, or **Run odds history.bat**, pulls a past season's
+hockey totals at two moments a day (noon and 7:30 pm Eastern) from every
+book in the list, into `odds-history-NHL-SEASON.json`. The dates come from
+the season ledger when it is in the folder, so no off day is spent on. Ten
+credits a snapshot: a season is about 3,700. It prints the cost and asks
+before it spends, stops when 3,000 credits are left for the nightly runs,
+and carries on where it stopped when run again (the month resets on the
+1st). `tools_backtest_nhl_odds.py` reads the file beside the ledger and
+measures the opener, the move to the close and Pinnacle's gap against the
+finals; what it finds goes in CALLSHEET3.md before anything scores.
 
 ## Setup, once
 

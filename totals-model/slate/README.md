@@ -55,6 +55,26 @@ Shots per game, special teams and the last ten wait until a team has five
 games; before that the boxes stay blank and the sheet is the market plus
 the goalies.
 
+## The odds feed (The Odds API)
+
+`python slate.py odds`, or **Run odds.bat**, after the slate. It needs a key
+from <https://the-odds-api.com> in `odds_key.txt` beside `slate.py` (one
+line, nothing else), or in the `ODDS_API_KEY` environment variable. One call
+a sport for the main markets and one call a game for the period market, so
+a night of twelve hockey games and two baseball games is about sixteen
+requests.
+
+| On the sheet | Where it comes from |
+| --- | --- |
+| The main total and both prices, both moneylines, the run or puck line and its prices, the period total (first five, first period) and its prices | The first book in `--books` that prices the game (default order: Fanatics, BetMGM, DraftKings, FanDuel, Caesars, ESPN BET, BetRivers, Bovada). Blank boxes fill; anything you typed stays |
+| **Opened** | The first number this script saw for the game, kept in `odds-log.json`. Run the odds early in the day and again before the games and the opener is the morning number |
+| The best price on each side, on the rail | Every book's price on every side rides on the row (the hidden `odds` box); the rail names the best price at the same number and the edge there |
+| **Close** | The morning grade run attaches the last number the odds run saw before the game to each final, and the sheet's CLOSE box fills if it is blank, so "beat the close" grades itself |
+
+The sheet's own number never moves: the line boxes are the book's main
+market, exactly as before, just typed by the script. Shop alternates on the
+sheet, not in the Line box.
+
 ## Setup, once
 
 **Mac.** Open Terminal and type `python3 --version`. If it prints a version,

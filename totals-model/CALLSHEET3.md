@@ -124,6 +124,23 @@ between the sheet's chance and the price, so the #1 market is the best
 bet, not the likeliest outcome; the day board's toggle orders that table
 by chance to hit instead.
 
+**The odds feed** (12 Oct 2026, The Odds API, at the user's request). The
+sheet's rule that the slate never carries a line or a price is retired:
+`slate.py odds` writes `odds-DATE.json` with, for every game of the day,
+the main total and both prices, both moneylines, the run or puck line and
+its prices and the period total and its prices, from the first of the
+user's books that prices it (Fanatics, then BetMGM, then the shops), plus
+every book's price on every side as JSON in the hidden `odds` box. The
+loader fills blank boxes and never a typed one; a second file for the same
+game merges into the pending entry instead of replacing it, so the slate's
+goalies and the odds file's lines meet on one Fill form. The **opener** is
+the first number the script saw for the game (`odds-log.json`), the
+**close** the last, attached by the grade run and filled into the CLOSE
+box if blank, so the "beat the close" line grades itself. The rail names
+the **best price** on the listed side at the same number across the books
+and the edge there. Nothing scores differently; the line box is still the
+book's main market, typed by a script instead of a hand.
+
 **Whose line is on the card.** On 11 Oct 2026 the season ledger's detail
 pass (every game's actual starters) was matched against the card's first
 150 goalie boxes, each box's number rebuilt for every goalie on the club:

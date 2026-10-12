@@ -447,6 +447,8 @@
               <div class="f"><label for="temp">Temp °F</label><input id="temp" type="number" step="1" inputmode="numeric" placeholder="72"></div>
               <div class="f"><label for="tick">Over % tickets <span class="tag">shown</span></label><input id="tick" type="number" step="1" min="0" max="100" inputmode="numeric" placeholder="72"></div>
               <div class="f"><label for="cash">Over % money <span class="tag">shown</span></label><input id="cash" type="number" step="1" min="0" max="100" inputmode="numeric" placeholder="59"></div>
+              <!-- the shop: every book's price on each side, JSON written by the odds file; the rail reads it -->
+              <input type="hidden" id="odds">
             </div>
             <label class="check"><input type="checkbox" id="dome"> Roof shut — wind and temp both drop out</label>
             <div class="links">

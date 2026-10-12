@@ -198,12 +198,11 @@ def tail() -> str:
              '        if (!moved && d.draft && d.draft.inputs) {', "restore")
     t = once(t, 'say("Loaded <b>" + card.length + "</b> matchups from " + esc(f.name) + ".");',
              'if (!moved) say("Loaded <b>" + card.length + "</b> matchups from " + esc(f.name) + ".");', "restore message")
-    t = once(t, '  var SLATE_FIELDS = ["aera","hera","aip","hip","al5era","hl5era","al5ip","hl5ip","arpg","hrpg","abp","hbp","al10","hl10","h2h","h2hn","pf","mph","dir","temp","tick","cash",\n'
-                '                      "apace","hpace","aort","hort","adrt","hdrt","arest","hrest","al5","hl5"];',
-             '  var SLATE_FIELDS = ["aera","hera","aip","hip","al5era","hl5era","al5ip","hl5ip","arpg","hrpg","abp","hbp","al10","hl10","h2h","h2hn","pf","mph","dir","temp","tick","cash",\n'
-             '                      "apace","hpace","aort","hort","adrt","hdrt","arest","hrest","al5","hl5",\n'
+    t = once(t, '                      "line","op","up","opened","hml","aml","rl","rlh","rla","f5line","f5op","f5up","odds"];',
+             '                      "line","op","up","opened","hml","aml","rl","rlh","rla","f5line","f5op","f5up","odds",\n'
              '                      "agsv","hgsv","agsh","hgsh","asf","hsf","app","hpp","apk","hpk","nhlform","ap1l10","hp1l10","axgf","axga","hxgf","hxga","xglg",\n'
-             '                      "ngoalies","agname","hgname"];', "slate fields")
+             '                      "ngoalies","agname","hgname",\n'
+             '                      "pl","plh","pla","p1line","p1op","p1up"];', "slate fields")
     # the slate's backup-in-net flags are booleans, carried like the roof: into a
     # row's inputs when the card already has the game, into the form otherwise
     t = once(t, '          if (g.inputs.dome === true && !row.inputs.dome) { row.inputs.dome = true; changed = true; }',

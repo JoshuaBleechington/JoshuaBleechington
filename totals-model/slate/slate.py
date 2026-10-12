@@ -1795,6 +1795,9 @@ def make_nhl_grade(date_iso, out_dir, log):
             r = grade_nhl_game(g, log)
             if r:
                 r["gdate"] = date_iso
+                c = odds_close_for(odds_log_path(out_dir), "NHL", date_iso, r["away"], r["home"])
+                if c:
+                    r["close"] = c     # the last number the odds run saw before the game
                 rows.append(r)
         except Exception as e:  # noqa: BLE001
             log("a game failed to grade: %s" % e)
@@ -1804,6 +1807,235 @@ def make_nhl_grade(date_iso, out_dir, log):
     with open(path, "w", encoding="utf-8") as f:
         json.dump(doc, f, indent=1)
     log("Wrote %s with %d final%s. Load it into Call Sheet 3.0 the same way; graded rows are never touched." % (path, len(rows), "" if len(rows) == 1 else "s"))
+    return path
+
+
+# ---- the odds feed: The Odds API --------------------------------------------
+# https://the-odds-api.com -- a paid key, read from odds_key.txt beside this
+# script (one line) or the ODDS_API_KEY environment variable. One call a
+# sport for the main markets (total, moneyline, spread) across the books the
+# user shops, one call a game for the period market (first five, first
+# period, first half). Fills the LINE boxes the sheet never filled before
+# (12 Oct 2026, at the user's request): the main total and its prices, the
+# moneyline, the run or puck line, the period total and its prices; the
+# OPENER as the first number this script saw for the game (odds-log.json);
+# every book's price on each side for the sheet's best-price chip; and, on
+# the grade run, the CLOSE as the last number it saw before the game.
+ODDS_API = "https://api.the-odds-api.com/v4"
+ODDS_SPORTS = {"MLB": "baseball_mlb", "NHL": "icehockey_nhl", "NBA": "basketball_nba"}
+ODDS_PERIOD = {"MLB": "totals_1st_5_innings", "NHL": "totals_p1", "NBA": "totals_h1"}
+ODDS_PERIOD_KEYS = {"MLB": ("f5line", "f5op", "f5up"), "NHL": ("p1line", "p1op", "p1up"), "NBA": ("h1line", "h1op", "h1up")}
+ODDS_SPREAD_KEYS = {"MLB": ("rl", "rlh", "rla"), "NHL": ("pl", "plh", "pla"), "NBA": ("sp", "sph", "spa")}
+ODDS_BOOKS = ["fanatics", "betmgm", "draftkings", "fanduel", "caesars", "espnbet", "betrivers", "bovada"]
+ODDS_LOG = "odds-log.json"
+ODDS_TWO_WORD = {"Blue Jackets", "Red Wings", "Maple Leafs", "Golden Knights", "Red Sox", "White Sox", "Blue Jays", "Trail Blazers"}
+
+
+def odds_key(out_dir="."):
+    k = os.environ.get("ODDS_API_KEY", "").strip()
+    if k:
+        return k
+    for folder in (out_dir, HERE):
+        p = os.path.join(folder, "odds_key.txt")
+        if os.path.exists(p):
+            with open(p, encoding="utf-8") as f:
+                k = f.read().strip()
+            if k:
+                return k
+    raise RuntimeError("no Odds API key: put it in odds_key.txt beside slate.py (one line) or set ODDS_API_KEY")
+
+
+def odds_nick(full):
+    """'Florida Panthers' -> 'Panthers'; two-word nicknames kept whole; Utah's club -> Mammoth."""
+    s = str(full or "").strip()
+    if s.startswith("Utah"):
+        return "Mammoth"
+    words = s.split()
+    if len(words) >= 2 and " ".join(words[-2:]) in ODDS_TWO_WORD:
+        return " ".join(words[-2:])
+    return words[-1] if words else s
+
+
+def us_game_date(iso_utc):
+    """The US game date of a UTC start time: Eastern time, daylight saving by the US rule."""
+    t = dt.datetime.strptime(str(iso_utc)[:19], "%Y-%m-%dT%H:%M:%S")
+    y = t.year
+    mar = dt.date(y, 3, 8)
+    mar += dt.timedelta(days=(6 - mar.weekday()) % 7)        # the second Sunday of March
+    nov = dt.date(y, 11, 1)
+    nov += dt.timedelta(days=(6 - nov.weekday()) % 7)        # the first Sunday of November
+    summer = dt.datetime.combine(mar, dt.time(7)) <= t < dt.datetime.combine(nov, dt.time(6))   # 2am local, in UTC
+    return (t - dt.timedelta(hours=4 if summer else 5)).date().isoformat()
+
+
+def fetch_odds(sport, key, books):
+    q = urllib.parse.urlencode({"apiKey": key, "markets": "h2h,spreads,totals", "oddsFormat": "american",
+                                "dateFormat": "iso", "bookmakers": ",".join(books)})
+    return fetch_json("%s/sports/%s/odds/?%s" % (ODDS_API, ODDS_SPORTS[sport], q))
+
+
+def fetch_odds_period(sport, event_id, key, books):
+    q = urllib.parse.urlencode({"apiKey": key, "markets": ODDS_PERIOD[sport], "oddsFormat": "american",
+                                "dateFormat": "iso", "bookmakers": ",".join(books)})
+    return fetch_json("%s/sports/%s/events/%s/odds?%s" % (ODDS_API, ODDS_SPORTS[sport], event_id, q))
+
+
+def odds_markets(ev):
+    """{book: {market key: {outcome name: (price, point)}}} for one event document."""
+    out = {}
+    for bk in (ev or {}).get("bookmakers") or []:
+        mk = {}
+        for m in bk.get("markets") or []:
+            oc = {}
+            for o in m.get("outcomes") or []:
+                try:
+                    oc[str(o.get("name"))] = (int(round(float(o.get("price")))),
+                                              float(o["point"]) if o.get("point") is not None else None)
+                except (TypeError, ValueError):
+                    continue
+            mk[m.get("key")] = oc
+        out[bk.get("key")] = mk
+    return out
+
+
+def odds_game(ev, sport, books, period=None):
+    """One event -> the sheet's line boxes from the first of the user's books that
+    prices it, plus every book's price on each side (the shop) as JSON."""
+    full_home, full_away = ev.get("home_team"), ev.get("away_team")
+    g = {"sport": sport, "gdate": us_game_date(ev.get("commence_time") or "1970-01-01T00:00:00Z"),
+         "away": odds_nick(full_away), "home": odds_nick(full_home), "eventId": ev.get("id"),
+         "first_utc": ev.get("commence_time"), "book": "", "inputs": {}, "notes": []}
+    seen = odds_markets(ev)
+    per = odds_markets(period) if period else {}
+    book = next((b for b in books if b in seen and "totals" in seen[b]), None) or next((b for b in books if b in seen), None)
+    if not book:
+        g["notes"].append("No book in the list has priced this game yet.")
+        return g
+    g["book"] = book
+    i, mk = g["inputs"], seen[book]
+    t = mk.get("totals") or {}
+    if "Over" in t and "Under" in t and t["Over"][1] is not None:
+        i["line"] = fmt(t["Over"][1], 1)
+        i["op"], i["up"] = str(t["Over"][0]), str(t["Under"][0])
+    h2h = mk.get("h2h") or {}
+    if full_home in h2h and full_away in h2h:
+        i["hml"], i["aml"] = str(h2h[full_home][0]), str(h2h[full_away][0])
+    sp = mk.get("spreads") or {}
+    if full_home in sp and full_away in sp and sp[full_home][1] is not None:
+        k0, k1, k2 = ODDS_SPREAD_KEYS[sport]
+        i[k0], i[k1], i[k2] = fmt(sp[full_home][1], 1), str(sp[full_home][0]), str(sp[full_away][0])
+    pkey = ODDS_PERIOD[sport]
+    pm = (per.get(book) or {}).get(pkey) or next((per[b][pkey] for b in books if b in per and pkey in per[b]), None)
+    if pm and "Over" in pm and "Under" in pm and pm["Over"][1] is not None:
+        k0, k1, k2 = ODDS_PERIOD_KEYS[sport]
+        i[k0], i[k1], i[k2] = fmt(pm["Over"][1], 1), str(pm["Over"][0]), str(pm["Under"][0])
+    shop = {}
+    for b, mks in seen.items():
+        tt = mks.get("totals") or {}
+        for side in ("Over", "Under"):
+            if side in tt and tt[side][1] is not None:
+                shop.setdefault("total", {}).setdefault(side.upper(), []).append([b, tt[side][0], tt[side][1]])
+        hh = mks.get("h2h") or {}
+        for side, nm in (("HOME", full_home), ("AWAY", full_away)):
+            if nm in hh:
+                shop.setdefault("ml", {}).setdefault(side, []).append([b, hh[nm][0], None])
+        ss = mks.get("spreads") or {}
+        for side, nm in (("HOME", full_home), ("AWAY", full_away)):
+            if nm in ss and ss[nm][1] is not None:
+                shop.setdefault("spread", {}).setdefault(side, []).append([b, ss[nm][0], ss[nm][1]])
+    for b, mks in per.items():
+        pp = mks.get(pkey) or {}
+        for side in ("Over", "Under"):
+            if side in pp and pp[side][1] is not None:
+                shop.setdefault("period", {}).setdefault(side.upper(), []).append([b, pp[side][0], pp[side][1]])
+    if shop:
+        i["odds"] = json.dumps(shop, separators=(",", ":"))
+    return g
+
+
+def odds_log_path(out_dir):
+    return os.path.join(out_dir, ODDS_LOG)
+
+
+def odds_log_key(sport, date_iso, away, home):
+    return "%s|%s|%s @ %s" % (sport, date_iso, away, home)
+
+
+def odds_log_update(path, g, now):
+    """The first numbers this script saw for a game are kept as the OPENER; the
+    latest are kept as the CLOSE candidate. Returns the game's entry."""
+    try:
+        with open(path, encoding="utf-8") as f:
+            log = json.load(f)
+    except (OSError, ValueError):
+        log = {}
+    k = odds_log_key(g["sport"], g["gdate"], g["away"], g["home"])
+    snap = {k2: g["inputs"].get(k2) for k2 in ("line", "op", "up", "hml", "aml", "p1line", "f5line", "h1line") if g["inputs"].get(k2)}
+    snap["at"], snap["book"] = now, g["book"]
+    e = log.get(k) or {}
+    if snap.get("line"):
+        if not e.get("first"):
+            e["first"] = snap
+        e["last"] = snap
+    log[k] = e
+    with open(path, "w", encoding="utf-8") as f:
+        json.dump(log, f, indent=1)
+    return e
+
+
+def odds_close_for(path, sport, date_iso, away, home):
+    """The close the grade run attaches: the last total (and period total) this script saw."""
+    try:
+        with open(path, encoding="utf-8") as f:
+            log = json.load(f)
+    except (OSError, ValueError):
+        return None
+    last = (log.get(odds_log_key(sport, date_iso, away, home)) or {}).get("last") or {}
+    if not last.get("line"):
+        return None
+    c = {"ctot": last["line"]}
+    per = last.get("p1line") or last.get("f5line") or last.get("h1line")
+    if per:
+        c["cf5"] = per
+    return c
+
+
+def make_odds(date_iso, out_dir, log, books=None, sports=("MLB", "NHL")):
+    key = odds_key(out_dir)
+    books = [b.strip().lower() for b in (books or ",".join(ODDS_BOOKS)).split(",") if b.strip()]
+    rows, now = [], now_utc()
+    for sport in sports:
+        try:
+            evs = fetch_odds(sport, key, books)
+        except Exception as e:  # noqa: BLE001
+            log("%s: the odds feed failed (%s)" % (sport, e))
+            continue
+        todays = [ev for ev in evs if us_game_date(ev.get("commence_time") or "1970-01-01T00:00:00Z") == date_iso]
+        log("%s: %d game%s on the feed for %s (%d listed in all)" % (sport, len(todays), "" if len(todays) == 1 else "s", date_iso, len(evs)))
+        for ev in todays:
+            per = None
+            try:
+                per = fetch_odds_period(sport, ev.get("id"), key, books)
+            except Exception as e:  # noqa: BLE001
+                log("  %s @ %s: no period market on the feed (%s)" % (odds_nick(ev.get("away_team")), odds_nick(ev.get("home_team")), e))
+            g = odds_game(ev, sport, books, per)
+            e = odds_log_update(odds_log_path(out_dir), g, now)
+            opener = (e.get("first") or {}).get("line")
+            if opener and not g["inputs"].get("opened"):
+                g["inputs"]["opened"] = opener
+            i = g["inputs"]
+            k0, k1, k2 = ODDS_PERIOD_KEYS[sport]
+            s0, s1, s2 = ODDS_SPREAD_KEYS[sport]
+            log("  %s @ %s  [%s]  total %s (%s/%s) opened %s · ML %s/%s · %s %s (%s/%s) · period %s (%s/%s)" % (
+                g["away"], g["home"], g["book"] or "no book", i.get("line", "-"), i.get("op", "-"), i.get("up", "-"), i.get("opened", "-"),
+                i.get("aml", "-"), i.get("hml", "-"), s0, i.get(s0, "-"), i.get(s1, "-"), i.get(s2, "-"), i.get(k0, "-"), i.get(k1, "-"), i.get(k2, "-")))
+            rows.append(g)
+    doc = {"format": FORMAT, "version": VERSION, "date": date_iso, "generated": now,
+           "source": "slate.py odds: The Odds API (%s)" % ", ".join(books), "games": rows}
+    path = os.path.join(out_dir, "odds-%s.json" % date_iso)
+    with open(path, "w", encoding="utf-8") as f:
+        json.dump(doc, f, indent=1)
+    log("Wrote %s with %d game%s. Load it into the sheet with the slate: blank line boxes fill, anything typed stays, and the best price on each side shows on the rail." % (path, len(rows), "" if len(rows) == 1 else "s"))
     return path
 
 
@@ -1840,6 +2072,9 @@ def make_grade(date_iso, out_dir, log):
         try:
             r = grade_game(g, log)
             if r:
+                c = odds_close_for(odds_log_path(out_dir), "MLB", date_iso, r["away"], r["home"])
+                if c:
+                    r["close"] = c     # the last number the odds run saw before the game
                 rows.append(r)
         except Exception as e:  # noqa: BLE001
             log("a game failed to grade: %s" % e)
@@ -2132,6 +2367,31 @@ def selftest():
     check("nhl: never confirmed", all("NOT confirmed" in n for n in row["notes"] if "likely starter" in n))
     check("nhl grade: final with the period score", gr2["finals"] == {"fa": "2", "fh": "3", "f5a": "1", "f5h": "0"})
     check("previous season id", nhl_prev_season("20262027") == "20252026")
+    # the odds feed, offline: one event document in The Odds API's shape
+    ev = {"id": "abc", "commence_time": "2026-10-13T00:10:00Z", "home_team": "Milwaukee Brewers", "away_team": "Los Angeles Dodgers",
+          "bookmakers": [{"key": "fanatics", "markets": [
+                              {"key": "totals", "outcomes": [{"name": "Over", "price": 100, "point": 7.0}, {"name": "Under", "price": -120, "point": 7.0}]},
+                              {"key": "h2h", "outcomes": [{"name": "Milwaukee Brewers", "price": 110}, {"name": "Los Angeles Dodgers", "price": -130}]},
+                              {"key": "spreads", "outcomes": [{"name": "Milwaukee Brewers", "price": -165, "point": 1.5}, {"name": "Los Angeles Dodgers", "price": 135, "point": -1.5}]}]},
+                         {"key": "draftkings", "markets": [
+                              {"key": "totals", "outcomes": [{"name": "Over", "price": -105, "point": 7.0}, {"name": "Under", "price": -115, "point": 7.0}]}]}]}
+    per = {"id": "abc", "bookmakers": [{"key": "fanatics", "markets": [{"key": "totals_1st_5_innings", "outcomes": [{"name": "Over", "price": -110, "point": 3.5}, {"name": "Under", "price": -120, "point": 3.5}]}]}]}
+    og = odds_game(ev, "MLB", ["fanatics", "betmgm", "draftkings"], per)
+    oi = og["inputs"]
+    check("odds: the game date is the US date of a UTC start", og["gdate"] == "2026-10-12" and us_game_date("2026-12-01T01:00:00Z") == "2026-11-30" and us_game_date("2026-10-12T23:30:00Z") == "2026-10-12")
+    check("odds: nicknames the sheet uses", og["away"] == "Dodgers" and og["home"] == "Brewers" and odds_nick("Columbus Blue Jackets") == "Blue Jackets" and odds_nick("Utah Mammoth") == "Mammoth" and odds_nick("Boston Red Sox") == "Red Sox" and odds_nick("Portland Trail Blazers") == "Trail Blazers")
+    check("odds: the carded book's total, prices, moneyline and run line", og["book"] == "fanatics" and oi["line"] == "7.0" and oi["op"] == "100" and oi["up"] == "-120" and oi["hml"] == "110" and oi["aml"] == "-130" and oi["rl"] == "1.5" and oi["rlh"] == "-165" and oi["rla"] == "135")
+    check("odds: the period market", oi["f5line"] == "3.5" and oi["f5op"] == "-110" and oi["f5up"] == "-120")
+    shop = json.loads(oi["odds"])
+    check("odds: every book's price on each side for the shop", [x[0] for x in shop["total"]["UNDER"]] == ["fanatics", "draftkings"] and shop["total"]["UNDER"][1][1] == -115 and shop["period"]["OVER"][0][1] == -110 and shop["ml"]["HOME"][0][1] == 110)
+    import tempfile
+    tmp = os.path.join(tempfile.mkdtemp(), "odds-log.json")
+    e1 = odds_log_update(tmp, og, "2026-10-12T15:00:00Z")
+    og2 = json.loads(json.dumps(og)); og2["inputs"]["line"] = "6.5"; og2["inputs"]["up"] = "105"
+    e2 = odds_log_update(tmp, og2, "2026-10-12T22:00:00Z")
+    check("odds log: the first number seen is the opener, the latest the close candidate", e1["first"]["line"] == "7.0" and e2["first"]["line"] == "7.0" and e2["last"]["line"] == "6.5" and e2["last"]["at"] == "2026-10-12T22:00:00Z")
+    check("odds log: the grade run reads the close", odds_close_for(tmp, "MLB", "2026-10-12", "Dodgers", "Brewers") == {"ctot": "6.5", "cf5": "3.5"} and odds_close_for(tmp, "NHL", "2026-10-12", "Dodgers", "Brewers") is None)
+    check("odds: a game no book has priced carries a note and no line", odds_game({"id": "x", "commence_time": "2026-10-13T00:00:00Z", "home_team": "A B", "away_team": "C D", "bookmakers": []}, "NHL", ["fanatics"])["notes"] == ["No book in the list has priced this game yet."])
     fetch_json = fake_nhl
     try:
         sjs = nhl_club_goalies("SJS", "20262027")
@@ -2348,9 +2608,12 @@ def _canned_nhl():
 
 def main(argv=None):
     ap = argparse.ArgumentParser(description="Write the day's slate (or yesterday's finals) for Call Sheet 2.0.")
-    ap.add_argument("mode", nargs="?", choices=["slate", "grade", "nhl", "nhl-grade", "nhl-ledger"], default="slate",
+    ap.add_argument("mode", nargs="?", choices=["slate", "grade", "nhl", "nhl-grade", "nhl-ledger", "odds"], default="slate",
                     help="slate (default): today's MLB inputs. grade: MLB finals. nhl: today's NHL inputs. nhl-grade: NHL finals. "
-                         "nhl-ledger: every NHL final this season, measured against the sheet's assumptions.")
+                         "nhl-ledger: every NHL final this season, measured against the sheet's assumptions. "
+                         "odds: today's lines, prices, openers and every book's price from The Odds API (needs odds_key.txt).")
+    ap.add_argument("--books", help="odds only: the books to read, first one carded, e.g. fanatics,betmgm,draftkings (default: %s)" % ",".join(ODDS_BOOKS))
+    ap.add_argument("--sports", help="odds only: which sports, e.g. NHL,MLB (default: MLB,NHL)")
     ap.add_argument("--date", help="YYYY-MM-DD. Default: today for slate, yesterday for grade.")
     ap.add_argument("--season", help="nhl-ledger only: a past season to pull in full, e.g. 20252026 (for the backtest).")
     ap.add_argument("--detail", action="store_true", help="nhl-ledger only: also fetch each game's box score and game page for the starters, their lines, power-play goals and penalties (two calls a game; about 40 minutes a season).")
@@ -2372,7 +2635,7 @@ def main(argv=None):
             print("--date must look like 2026-09-28")
             return 2
     else:
-        date_iso = (today if a.mode in ("slate", "nhl", "nhl-ledger") else today - dt.timedelta(days=1)).isoformat()
+        date_iso = (today if a.mode in ("slate", "nhl", "nhl-ledger", "odds") else today - dt.timedelta(days=1)).isoformat()
     lines = []
 
     def log(s):
@@ -2388,6 +2651,9 @@ def main(argv=None):
             path = make_nhl_grade(date_iso, a.out, log)
         elif a.mode == "nhl-ledger":
             path = make_nhl_ledger(date_iso, a.out, log, a.season, a.detail, a.refs)
+        elif a.mode == "odds":
+            sports = tuple(s.strip().upper() for s in a.sports.split(",") if s.strip()) if a.sports else ("MLB", "NHL")
+            path = make_odds(date_iso, a.out, log, a.books, sports)
         else:
             path = make_slate(date_iso, a.out, log)
     except Exception as e:  # noqa: BLE001

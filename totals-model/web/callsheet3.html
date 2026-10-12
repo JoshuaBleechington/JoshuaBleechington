@@ -479,6 +479,8 @@
               <div class="f"><label for="temp">Temp °F</label><input id="temp" type="number" step="1" inputmode="numeric" placeholder="72"></div>
               <div class="f"><label for="tick">Over % tickets <span class="tag">shown</span></label><input id="tick" type="number" step="1" min="0" max="100" inputmode="numeric" placeholder="72"></div>
               <div class="f"><label for="cash">Over % money <span class="tag">shown</span></label><input id="cash" type="number" step="1" min="0" max="100" inputmode="numeric" placeholder="59"></div>
+              <!-- the shop: every book's price on each side, JSON written by the odds file; the rail reads it -->
+              <input type="hidden" id="odds">
             </div>
             <label class="check"><input type="checkbox" id="dome"> Roof shut — wind and temp both drop out</label>
             <div class="links">
@@ -2648,7 +2650,9 @@
                  "hml","aml","rl","rlh","rla","f5line","f5op","f5up",
                  /* shown, not scored: the last five starts, recorded since 28 Sept so
                     recent form can be tested against the record rather than assumed */
-                 "al5era","hl5era","al5ip","hl5ip"];
+                 "al5era","hl5era","al5ip","hl5ip",
+                 /* the shop: every book's price on each side, JSON from the odds file (12 Oct 2026) */
+                 "odds"];
   var WNBA_IDS = ["away","home","line","op","up","opened","gdate","apace","hpace","aort","hort","adrt","hdrt",
                   "arest","hrest","al5","hl5","hml","aml","sp","sph","spa"];
   var NHL_IDS = ["away","home","line","op","up","opened","gdate","agsv","hgsv","agsh","hgsh","asf","hsf",
@@ -2850,6 +2854,7 @@
           (mk.key === "total" && callView ? '<span class="cap" style="color:var(--go);border-color:var(--go)" title="11-18 Oct: every hockey total gets a side, over or under, at the user\'s request">the call: ' + esc(callView.pick) + ' ' + (callView.p * 100).toFixed(1) + '%</span>' : "") +
           (!pickable(mk, sport) ? '<span class="cap tagm" title="' + esc(notPickedWhy(sport, mk)) + '">shown, not picked</span>' : "") +
           (shade ? '<span class="cap" style="color:var(--go);border-color:var(--go)" title="The side the book priced cheaper. The book shades its price toward the side it wants money on, so this is betting with the book against the crowd: a rule, not a probability, kept on its own record line.">book\'s cheaper side: ' + esc(shade.pick) + ' at ' + sgn(shade.price, 0) + ' · ' + recText(shadeRec) + ' on the record</span>' : "") +
+          (function () { var best = bestPriceOf(mk, txt("odds")); if (!best || mk.price === null || implied(best.price) >= implied(mk.price) - 1e-9) return ""; return '<span class="cap" style="color:var(--go);border-color:var(--go)" title="The best price on this side at the same number across the books in the odds file, and the edge there">best ' + sgn(best.price, 0) + ' at ' + esc(bookName(best.book)) + ' · edge there ' + sgn((mk.p - implied(best.price)) * 100, 1) + '</span>'; })() +
           (isLeg ? '<span class="cap" style="color:var(--go);border-color:var(--go)">parlay leg: ' + esc(leg.pick) + ' ' + (leg.p * 100).toFixed(1) + '% at ' + sgn(leg.price, 0) + ' · ' + valueRatio(leg).toFixed(3) + '× its price' + (bandOf(leg) ? ' · #1 says ' + esc(bandOf(leg)) : '') + '</span>' : "") +
           (res ? '<span class="chip ' + res + '" style="margin-left:8px;vertical-align:2px">' + resText(res) + '</span>' : "") + '</div>' +
           '<div class="lab">' + esc(mk.label) + '</div></div>' +
@@ -2962,6 +2967,34 @@
     if (!row || row.sport !== "NHL" || !mk || mk.key !== "total" || NHL_TOTAL_ONLY.indexOf(row.gdate || "") < 0) return null;
     var vs = bothSides(mk).slice().sort(function (a, b) { return b.p - a.p; });
     return vs.length ? vs[0] : null;
+  }
+  /* ---- the shop (12 Oct 2026) ------------------------------------------------
+     The odds file writes every book's price on each side into the hidden
+     `odds` box as JSON: {total: {OVER: [[book, price, point], ...], UNDER: ...},
+     ml: {HOME, AWAY}, spread: {HOME, AWAY}, period: {OVER, UNDER}}. The rail
+     names the best price on the listed side at the same number, and the edge
+     there, so a -135 that is -118 somewhere else is seen before the bet. */
+  var BOOK_NAMES = { fanatics: "Fanatics", betmgm: "BetMGM", draftkings: "DraftKings", fanduel: "FanDuel", caesars: "Caesars", espnbet: "ESPN BET", betrivers: "BetRivers", bovada: "Bovada", williamhill_us: "Caesars", pointsbetus: "PointsBet" };
+  function bookName(k) { return BOOK_NAMES[k] || String(k || ""); }
+  function shopKey(mk) {
+    if (mk.key === "total") return "total";
+    if (mk.key === "ml") return "ml";
+    if (mk.key === "spread" || mk.key === "pl" || mk.key === "rl") return "spread";
+    if (mk.key === "f5" || mk.key === "p1" || mk.key === "h1") return "period";
+    return null;
+  }
+  function bestPriceOf(mk, raw) {
+    var sk = shopKey(mk); if (!sk || !raw) return null;
+    var shop = null; try { shop = JSON.parse(raw); } catch (e) { return null; }
+    var list = shop && shop[sk] && shop[sk][mk.side]; if (!list || !list.length) return null;
+    var line = mk.key === "ml" ? null : Math.abs(lineOf(mk)), best = null;
+    list.forEach(function (x) {
+      var price = +x[1], point = x[2] === null || x[2] === undefined ? null : Math.abs(+x[2]);
+      if (!isFinite(price)) return;
+      if (line !== null && point !== null && Math.abs(point - line) > 1e-9) return;   // the same number only
+      if (!best || implied(price) < implied(best.price)) best = { book: x[0], price: price };
+    });
+    return best;
   }
   /* why the sheet likes this one most: the row re-scored from its inputs, each
      scored input's lean against the market's own fair number, and every delta
@@ -3876,8 +3909,12 @@
   try { slate = JSON.parse(localStorage.getItem(SLATE_KEY) || "null"); } catch (e) { slate = null; }
   var SLATE_FIELDS = ["aera","hera","aip","hip","al5era","hl5era","al5ip","hl5ip","arpg","hrpg","abp","hbp","al10","hl10","h2h","h2hn","pf","mph","dir","temp","tick","cash",
                       "apace","hpace","aort","hort","adrt","hdrt","arest","hrest","al5","hl5",
+                      /* the odds file (12 Oct 2026): the book's lines and prices, the opener, and
+                         every book's price for the shop -- blank boxes fill, typed ones stay */
+                      "line","op","up","opened","hml","aml","rl","rlh","rla","f5line","f5op","f5up","odds",
                       "agsv","hgsv","agsh","hgsh","asf","hsf","app","hpp","apk","hpk","nhlform","ap1l10","hp1l10","axgf","axga","hxgf","hxga","xglg",
-                      "ngoalies","agname","hgname"];
+                      "ngoalies","agname","hgname",
+                      "pl","plh","pla","p1line","p1op","p1up"];
   function blank(v) { return v === undefined || v === null || String(v).trim() === ""; }
   function sameGame(row, g) {
     var sp = sportOf(g.sport);
@@ -3922,6 +3959,12 @@
            he is the goalie whose line was carded, so the record can split on
            it. Last names decide: the slate writes "Igor Shesterkin", the
            box score "I. Shesterkin". 11 Oct 2026. */
+        /* the close (12 Oct 2026): the grade run attaches the last number the
+           odds run saw before the game; the CLOSE box fills if it is blank */
+        if (g.close) {
+          row.close = row.close || {};
+          ["ctot", "cf5"].forEach(function (k) { if (!blank(g.close[k]) && blank(row.close[k])) row.close[k] = String(g.close[k]); });
+        }
         if (g.starters && row.inputs) {
           [["away", "agname", "agstart", "agok"], ["home", "hgname", "hgstart", "hgok"]].forEach(function (s) {
             var st = g.starters[s[0]]; if (blank(st)) return;
@@ -3935,6 +3978,20 @@
     /* The pending list carries over: a finals file has no inputs and must not
        empty it, and a fresh slate replaces only the games it names. */
     var incoming = d.games.filter(function (g) { return !!g.inputs; });
+    /* a second file for the same game (the odds file after the slate, or the
+       slate after the odds) MERGES into the pending entry: the new file's
+       blank boxes fill from what was already there, so nothing one feed
+       wrote is lost to the other. 12 Oct 2026. */
+    var prior = ((slate && slate.games) || []);
+    incoming.forEach(function (g) {
+      prior.forEach(function (k) {
+        var ksp = k.sport === "WNBA" ? "WNBA" : (k.sport === "NHL" ? "NHL" : "MLB");
+        if ((k.gdate || "") !== (g.gdate || "") || !sameGame({ gdate: k.gdate, sport: ksp, away: k.away, home: k.home }, g)) return;
+        Object.keys(k.inputs || {}).forEach(function (key) { if (blank(g.inputs[key]) && !blank(k.inputs[key])) g.inputs[key] = k.inputs[key]; });
+        ["starters", "goalies", "form"].forEach(function (f) { if (g[f] === undefined && k[f] !== undefined) g[f] = k[f]; });
+        if (k.notes && k.notes.length) g.notes = (g.notes || []).concat(k.notes.filter(function (n) { return (g.notes || []).indexOf(n) < 0; }));
+      });
+    });
     var kept = ((slate && slate.games) || []).filter(function (k) {
       return !incoming.some(function (g) { return (k.gdate || "") === (g.gdate || "") && sameGame({ gdate: k.gdate, sport: sportOf(k.sport), away: k.away, home: k.home }, g); });
     });

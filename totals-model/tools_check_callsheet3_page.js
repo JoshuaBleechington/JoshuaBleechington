@@ -248,6 +248,42 @@ const CHECKS = ["dome","playoff","agconf","hgconf","agbk","hgbk"];
   chk(backup.agbk === true && !backup.hgbk, 'backup: the boxes are stored on the row', JSON.stringify({ a: backup.agbk, h: backup.hgbk }));
   chk(/backup in net, the under 1-0/.test(backup.tile), 'record: the hockey total tile keeps the backup line (2-1 is under 6)', backup.tile.slice(0, 300));
 
+  // ---- the odds file: lines fill, merge with the slate, the best price, the close ------
+  const oddsT = await pg.evaluate(async () => {
+    const wait = () => new Promise(r => setTimeout(r, 80));
+    const load = async (doc, name) => { const dt = new DataTransfer(); dt.items.add(new File([JSON.stringify(doc)], name, { type: 'application/json' })); const inp = document.getElementById('slateFile'); inp.files = dt.files; inp.dispatchEvent(new Event('change', { bubbles: true })); await wait(); };
+    localStorage.removeItem('callsheet3.card.v1');
+    document.getElementById('slateClear').click(); document.getElementById('clear').click(); await wait();
+    const game = { sport: 'NHL', gdate: '2026-11-09', away: 'Kraken', home: 'Canucks' };   // its own matchup: the row stays on the card for later tests
+    await load({ format: 'callsheet2.slate', version: 1, date: '2026-11-09', games: [ Object.assign({}, game, { starters: { away: 'Stuart Skinner', home: 'Dustin Wolf' }, inputs: { agsv: '0.908', hgsv: '0.916', agsh: '1200', hgsh: '1300', agname: 'Stuart Skinner', hgname: 'Dustin Wolf' }, notes: ['from the slate'] }) ] }, 'nhl-slate-2026-11-09.json');
+    const shop = JSON.stringify({ total: { OVER: [['fanatics', -110, 6], ['draftkings', -102, 6], ['betmgm', -105, 6.5]], UNDER: [['fanatics', -110, 6], ['betmgm', -118, 6]] }, ml: { HOME: [['fanatics', 110, null], ['caesars', 118, null]], AWAY: [['fanatics', -130, null]] } });
+    await load({ format: 'callsheet2.slate', version: 1, date: '2026-11-09', games: [ Object.assign({}, game, { inputs: { line: '6', op: '-110', up: '-110', opened: '6.5', hml: '110', aml: '-130', pl: '1.5', plh: '-180', pla: '150', p1line: '1.5', p1op: '-125', p1up: '105', odds: shop }, notes: ['from the odds file'] }) ] }, 'odds-2026-11-09.json');
+    const pending = [...document.querySelectorAll('#slateList [data-slate]')].length;
+    document.querySelector('#slateList [data-slate]').click(); await wait();
+    const v = id => document.getElementById(id).value;
+    const form = { agsv: v('agsv'), line: v('line'), op: v('op'), opened: v('opened'), hml: v('hml'), pl: v('pl'), p1line: v('p1line'), odds: v('odds').length > 10 };
+    const chips = [...document.querySelectorAll('#markets .mk[data-key="total"] .cap')].map(c => c.textContent);
+    const listed = document.querySelector('#markets .mk[data-key="total"] .pick').childNodes[0].textContent.trim();
+    document.getElementById('add').click(); await wait();
+    // a later odds file with a moved number: the carded line stays
+    await load({ format: 'callsheet2.slate', version: 1, date: '2026-11-09', games: [ Object.assign({}, game, { inputs: { line: '6.5', op: '-115', up: '-105' } }) ] }, 'odds-2026-11-09.json');
+    // the backup test left its own Kraken @ Canucks row (12 Nov) on the in-memory card, so find this one by its date
+    const mine = r => /Kraken @ Canucks/.test(r.matchup) && r.gdate === '2026-11-09';
+    const row1 = JSON.parse(localStorage.getItem('callsheet3.card.v1')).find(mine);
+    // the grade file with the close attached
+    await load({ format: 'callsheet2.slate', version: 1, date: '2026-11-09', games: [ Object.assign({}, game, { finals: { fa: '2', fh: '1', f5a: '1', f5h: '0' }, close: { ctot: '6.5', cf5: '1.5' }, starters: { away: 'S. Skinner', home: 'D. Wolf' } }) ] }, 'nhl-grade-2026-11-09.json');
+    await wait();
+    const row2 = JSON.parse(localStorage.getItem('callsheet3.card.v1')).find(mine);
+    document.getElementById('slateClear').click(); document.getElementById('clear').click(); await wait();
+    return { pending, form, chips, listed, line1: row1.inputs.line, close: row2.close, agok: row2.inputs.agok };
+  });
+  chk(oddsT.pending === 1 && oddsT.form.agsv === '0.908' && oddsT.form.line === '6' && oddsT.form.op === '-110' && oddsT.form.opened === '6.5' && oddsT.form.hml === '110' && oddsT.form.pl === '1.5' && oddsT.form.p1line === '1.5' && oddsT.form.odds,
+      'odds: the odds file merges into the slate\'s pending game, and Fill form carries the goalies, the lines, the prices, the opener and the shop', JSON.stringify(oddsT.form));
+  chk(/OVER/.test(oddsT.listed) ? oddsT.chips.some(c => /^best -102 at DraftKings · edge there [+-][0-9.]+$/.test(c)) : !oddsT.chips.some(c => /^best /.test(c)),
+      'odds: the rail names the best price on the listed side at the same number only (-102 at 6 counts, -105 at 6.5 does not; the under has no better price)', JSON.stringify({ listed: oddsT.listed, chips: oddsT.chips }));
+  chk(oddsT.line1 === '6', 'odds: a later odds file never moves a line already on the row', oddsT.line1);
+  chk(oddsT.close && oddsT.close.ctot === '6.5' && oddsT.close.cf5 === '1.5' && oddsT.agok === 'yes', 'odds: the grade file\'s close fills the CLOSE box, beside the starter check', JSON.stringify({ close: oddsT.close, agok: oddsT.agok }));
+
   // ---- 12-13 Oct: the hockey book picks the full-game total only ---------------------
   const twoDays = await pg.evaluate(async () => {
     const wait = () => new Promise(r => setTimeout(r, 60));

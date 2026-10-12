@@ -189,6 +189,10 @@
   .edge.pos { color: var(--edge); } .edge.neg { color: var(--bad); }
   .picks { display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: 9px; }
   .pk { border: 1px solid var(--edge); background: var(--edge-wash); border-radius: 9px; padding: 11px 13px; display: grid; gap: 4px; }
+  /* the one the sheet likes most tonight (hockey totals, 11-18 Oct): its own colour, and a why */
+  .pk.fav { border: 2px solid var(--go); box-shadow: inset 0 0 0 1px var(--go); background: var(--go-wash, rgba(63, 179, 119, 0.12)); }
+  .band.favb { background: var(--go); color: #fff; border-color: var(--go); }
+  .pk.fav .why { border-left: 3px solid var(--go); padding-left: 8px; }
   .sports { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 14px; }
   .sportcol { border: 1px solid var(--rule); border-radius: 10px; padding: 12px 13px; background: var(--surface-2); display: grid; gap: 8px; align-content: start; }
   .sportcol .subhead { margin: 0; }

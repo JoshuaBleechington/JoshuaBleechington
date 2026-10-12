@@ -84,7 +84,14 @@ says. It is named on the total's row ("the call"), listed in the straight
 bets under its own CALL tier after the verdicts with a note saying whether
 the price agrees, and the total tile keeps the calls' own record line
 ("the call, 11-18 Oct"). A call whose price is steeper than its chance is a
-call, not a bet, and the note says so.
+call, not a bet, and the note says so. **The one it likes most**: among
+the night's hockey totals (verdicts and calls) the strongest lean, highest
+chance then edge, gets its own colour on the straight-bets card, a "★
+LIKES MOST" label, and a why (`callWhy`) built by re-scoring the row from
+its inputs: the market's own fair number against the line and which side
+is juiced, each scored input's lean against it with its weight, every
+delta on the line, and whether the price agrees. Asked for 12 Oct: "the
+one it really likes, have it put a colour and why".
 
 **The forecast, betting aside** (11 Oct 2026). The rail's top line says
 what the sheet expects to happen apart from any price: each side's

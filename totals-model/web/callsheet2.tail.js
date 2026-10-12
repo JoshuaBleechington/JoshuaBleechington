@@ -728,6 +728,25 @@
     var vs = bothSides(mk).slice().sort(function (a, b) { return b.p - a.p; });
     return vs.length ? vs[0] : null;
   }
+  /* why the sheet likes this one most: the row re-scored from its inputs, each
+     scored input's lean against the market's own fair number, and every delta
+     on the line, in one sentence a reader can argue with. */
+  function callWhy(x) {
+    var m = scoreMatchup(x.row.sport, x.row.inputs); if (!m || !m.total) return "";
+    var f = m.total, line = numOf(x.row.inputs.line), mkt = (f.estimates || []).filter(function (e) { return e.name === "Market"; })[0];
+    if (!mkt || line === null) return "";
+    var parts = ["the market's own fair number is " + mkt.total.toFixed(2) + " against the " + line + " line" +
+      (mkt.total > line + 0.05 ? " (the over is the juiced side)" : mkt.total < line - 0.05 ? " (the under is the juiced side)" : "")];
+    (f.estimates || []).forEach(function (e) {
+      if (e.name === "Market" || e.scored === false) return;
+      parts.push(e.name.toLowerCase() + " " + sgn(e.total - mkt.total, 2) + " at weight " + e.weight + (e.mechanism === false ? " (tagged)" : ""));
+    });
+    (f.deltas || []).forEach(function (d) { parts.push(d.name.toLowerCase() + " " + sgn(d.runs, 2) + " on the line" + (d.mechanism === false ? " (tagged)" : "")); });
+    var side = x.mk.side === "OVER" ? "over" : "under";
+    return '<div class="swap why"><b>Why the sheet likes this one most tonight</b>: projected ' + f.projected.toFixed(2) + ' against ' + line + ', so the ' + side + ' at ' +
+      (x.mk.p * 100).toFixed(1) + '%, the strongest lean among tonight\'s hockey totals. Behind it: ' + parts.join("; ") + '.' +
+      (x.mk.price !== null ? (x.mk.edge > 0 ? ' The price agrees.' : ' The price asks more than that chance, so this is the sheet\'s pick, not a bet.') : '') + '</div>';
+  }
   function parlayFour(dateISO, sport) {
     var legs = [], skipped = 0;
     card.forEach(function (r) {
@@ -870,6 +889,15 @@
     rule.forEach(function (x) { x.tier = "rule"; x.thin = x.mk.edge === null || x.mk.edge <= 0; });
     value.forEach(function (x) { x.tier = "value"; x.thin = false; });
     var rows = verdict.concat(call).concat(rule).concat(value).slice(0, Math.max(8, verdict.length + call.length));
+    /* the one it likes most tonight: among the hockey totals in the window
+       (verdicts and calls), the strongest lean -- highest chance, then edge.
+       Its card gets a colour and a why (callWhy). Asked for 12 Oct. */
+    var fav = null;
+    rows.forEach(function (x) {
+      if (x.row.sport !== "NHL" || x.mk.key !== "total" || !(x.tier === "verdict" || x.tier === "call") || !callOf(x.row, x.mk)) return;
+      if (!fav || x.mk.p > fav.mk.p + 1e-9 || (Math.abs(x.mk.p - fav.mk.p) <= 1e-9 && (x.mk.edge || 0) > (fav.mk.edge || 0))) fav = x;
+    });
+    if (fav) fav.fav = true;
     rows.forEach(function (x, i) {
       x.rank = i + 1;
       x.corr = rows.slice(0, i).filter(function (o) { return o.row.id === x.row.id; }).map(function (o) { return o.rank; });
@@ -948,15 +976,16 @@
   }
   function pickCard(x, cls, extra) {
     var res = gradeMarket(x.mk, x.row.finals);
-    return '<div class="pk ' + cls + '" data-open="' + x.row.id + '" title="Load ' + esc(x.row.matchup) + ' into the form">' +
-      '<div class="n1">#' + x.rank + (x.corr && x.corr.length ? ' · same game as #' + x.corr.join(', #') : '') + '</div>' +
+    return '<div class="pk ' + cls + (x.fav ? ' fav' : '') + '" data-open="' + x.row.id + '" title="Load ' + esc(x.row.matchup) + ' into the form">' +
+      '<div class="n1">#' + x.rank + (x.corr && x.corr.length ? ' · same game as #' + x.corr.join(', #') : '') + (x.fav ? ' · <b>the one it likes most tonight</b>' : '') + '</div>' +
       '<div class="n2">' + esc(x.mk.pick) + (bandOf(x.mk) ? ' <span class="band hot">' + esc(bandOf(x.mk)) + '</span>' : '') +
+        (x.fav ? ' <span class="band favb" title="The strongest lean among tonight\'s hockey totals">★ LIKES MOST</span>' : '') +
         (x.tier === "rule" ? ' <span class="band hot" title="The side the book priced cheaper: a rule, not a probability">CHEAPER SIDE</span>' : '') +
         (x.tier === "call" ? ' <span class="band hot" title="11-18 Oct: every hockey total gets a side, over or under, at the user\'s request">CALL</span>' : '') + '</div>' +
       '<div class="n3">' + (x.mk.p * 100).toFixed(1) + '% · ' + (x.mk.price !== null ? sgn(x.mk.price, 0) + ' · edge ' + sgn(x.mk.edge * 100, 1) : 'no price') +
         (res ? ' · <span class="chip ' + res + '">' + resText(res) + '</span>' : '') + '</div>' +
       '<div class="n4">' + esc(x.row.matchup) + ' · ' + esc(x.mk.label) +
-        (x.mk.key === "total" && marksOf(x.row.sport, x.row.inputs, x.row.markets).grain ? ' <span class="tagm warn">over against the grain</span>' : '') + '</div>' + (extra || '') + '</div>';
+        (x.mk.key === "total" && marksOf(x.row.sport, x.row.inputs, x.row.markets).grain ? ' <span class="tagm warn">over against the grain</span>' : '') + '</div>' + (extra || '') + (x.fav ? callWhy(x) : '') + '</div>';
   }
   function renderBoard() {
     var dateISO = $("boardDate").value || todayISO(), byProb = !$("byEdge").checked;
@@ -1456,7 +1485,7 @@
     });
     out.push("BEST STRAIGHT BETS (#1's verdicts first, then the WNBA cheaper side, then by edge)");
     bestBets(dateISO).forEach(function (x) {
-      out.push("  " + x.rank + ". " + x.row.matchup + " — " + x.mk.pick + "  " + (x.mk.p * 100).toFixed(1) + "%  " + sgn(x.mk.price, 0) + "  edge " + sgn(x.mk.edge * 100, 1) +
+      out.push("  " + x.rank + ". " + (x.fav ? "★ " : "") + x.row.matchup + " — " + x.mk.pick + "  " + (x.mk.p * 100).toFixed(1) + "%  " + sgn(x.mk.price, 0) + "  edge " + sgn(x.mk.edge * 100, 1) + (x.fav ? "  [the one it likes most tonight]" : "") +
         (x.tier === "verdict" ? "  [#1: " + bandOf(x.mk) + (x.thin ? ", price steeper than the chance" : "") + "]" : x.tier === "call" ? "  [the call, " + NHL_TOTAL_ONLY_LABEL + ": the likelier side" + (x.thin ? ", price steeper than the chance" : "") + "]" : x.tier === "rule" ? "  [cheaper side, a rule: " + recText(shadeRecord()) + "]" : "  [value]"));
     });
     ["MLB", "WNBA"].forEach(function (sp) {

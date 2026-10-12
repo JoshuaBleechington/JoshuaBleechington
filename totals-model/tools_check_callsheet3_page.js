@@ -264,6 +264,7 @@ const CHECKS = ["dome","playoff","agconf","hgconf","agbk","hgbk"];
     const boardP1 = [...document.querySelectorAll('#board tbody tr')].map(tr => tr.querySelectorAll('td')[2].textContent).find(t => /First period/.test(t)) || '';
     const legs = [...document.querySelectorAll('#picks .pk:not(.parlay) .n4')].map(e => e.textContent).join(' | ');
     const bets = [...document.querySelectorAll('#bestBets .pk')].map(e => e.textContent);
+    const fav = [...document.querySelectorAll('#bestBets .pk.fav')].map(e => e.textContent.replace(/\s+/g, ' '));
     // grade it 2-1: the call's own record line appears on the total tile
     const tr = [...document.querySelectorAll('#cardTable tr')].find(x => /Kings @ Sharks/.test(x.textContent));
     const g = (k, v) => { const el = tr.querySelector(`.grade[data-k="${k}"]`); el.value = v; el.dispatchEvent(new Event('input', { bubbles: true })); el.dispatchEvent(new Event('change', { bubbles: true })); };
@@ -274,8 +275,10 @@ const CHECKS = ["dome","playoff","agconf","hgconf","agbk","hgbk"];
     set('gdate', '2026-10-20'); set('away', 'Wild'); set('home', 'Blues'); set('line', '6'); set('op', '-110'); set('up', '-110'); set('p1line', '1.5'); set('p1op', '-105'); set('p1up', '-115'); await wait();
     const d14 = read();
     document.getElementById('clear').click(); await wait();
-    return { d12, boardP1, legs, d14, callChip, band12, bets, tileText };
+    return { d12, boardP1, legs, d14, callChip, band12, bets, tileText, fav };
   });
+  chk(twoDays.fav.length === 1 && /Kings @ Sharks/.test(twoDays.fav[0]) && /LIKES MOST/.test(twoDays.fav[0]) && /Why the sheet likes this one most tonight: projected [0-9.]+ against 6/.test(twoDays.fav[0]) && /the market's own fair number is [0-9.]+ against the 6 line/.test(twoDays.fav[0]),
+      'the one it likes most: exactly one hockey call carries the colour, the label and a why built from the row\'s own inputs', (twoDays.fav[0] || '').slice(0, 300));
   chk(/the call: (OVER|UNDER) 6 [0-9.]+%/.test(twoDays.callChip) && (twoDays.band12 === 'NO BET' || twoDays.band12 === ''),
       'the call: on 12 Oct a coin-flip hockey total still names a side on the rail', JSON.stringify({ chip: twoDays.callChip, band: twoDays.band12 }));
   chk(twoDays.bets.some(t => /Kings @ Sharks/.test(t) && /CALL/.test(t) && /The call/.test(t)), 'the call: the straight bets list it under its own CALL label with the note', JSON.stringify(twoDays.bets).slice(0, 300));

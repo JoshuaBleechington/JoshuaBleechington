@@ -226,7 +226,8 @@ class TestTheGateAndTheTags(unittest.TestCase):
 
 class TestTheMarkets(unittest.TestCase):
     def test_the_moneyline_reproduces_the_book_when_nothing_moves_the_total(self):
-        m = forecast_matchup_nhl("Rangers", "Bruins", **BOARD, **LEAGUE)
+        # without the period prices: since 12 Oct the period market is a second read of the total
+        m = forecast_matchup_nhl("Rangers", "Bruins", **{**BOARD, "p1_over_price": None, "p1_under_price": None}, **LEAGUE)
         p_mkt, _ = devig(-150, 130)
         ml = next(mk for mk in m.markets if mk.key == "ml")
         p_home = ml.p if ml.side == "HOME" else 1.0 - ml.p
@@ -279,7 +280,7 @@ class TestTheMarkets(unittest.TestCase):
 
     def test_the_total_is_the_forecasts_total(self):
         m = forecast_matchup_nhl("Rangers", "Bruins", **BOARD, **LEAGUE)
-        one = forecast_nhl("Rangers @ Bruins", 6.0, -110, -110, **LEAGUE)
+        one = forecast_nhl("Rangers @ Bruins", 6.0, -110, -110, p1_line=1.5, p1_over_price=-120, p1_under_price=100, **LEAGUE)
         t = next(mk for mk in m.markets if mk.key == "total")
         self.assertAlmostEqual(t.p, one.p_resolved, places=12)
         self.assertEqual(t.band, one.band)
@@ -325,6 +326,33 @@ class TestGrading(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class TestTheFirstPeriodMarketAsASecondRead(unittest.TestCase):
+    """12 Oct 2026: the period line's de-vigged mean over the period share, plus the lumps, as a
+    tagged estimate of the full game, at the user's request; untested, so it can never buy a band."""
+
+    def test_the_estimate_is_the_period_mean_scaled_up(self):
+        from totals.nhl import p1_anchor, P1_SHARE, EMPTY_NET_RATE, OT_RATE, WEIGHTS
+        f = forecast_nhl("A @ B", 6.0, -110, -110, p1_line=1.5, p1_over_price=-155, p1_under_price=115)
+        e = next(x for x in f.estimates if x.name == "First-period market")
+        mu1, _ = p1_anchor(1.5, -155, 115)
+        self.assertAlmostEqual(e.total, mu1 / P1_SHARE + EMPTY_NET_RATE + OT_RATE, places=9)
+        self.assertEqual(e.weight, WEIGHTS["p1mkt"])
+        self.assertFalse(e.mechanism)
+        self.assertGreater(e.total, 6.0)          # over juiced to -155 on 1.5 reads as a higher-scoring game
+        self.assertEqual(f.band, "NO BET")        # tagged: cannot buy a band alone
+
+    def test_it_needs_both_prices(self):
+        f = forecast_nhl("A @ B", 6.0, -110, -110, p1_line=1.5, p1_over_price=-155)
+        self.assertNotIn("First-period market", [e.name for e in f.estimates])
+        g = forecast_nhl("A @ B", 6.0, -110, -110)
+        self.assertNotIn("First-period market", [e.name for e in g.estimates])
+
+    def test_the_matchup_wrapper_forwards_the_period_market(self):
+        m = forecast_matchup_nhl("Rangers", "Bruins", total_line=6.0, over_price=-110, under_price=-110,
+                                 p1_line=1.5, p1_over_price=-155, p1_under_price=115)
+        self.assertIn("First-period market", [e.name for e in m.total.estimates])
 
 
 class TestTheFirstPeriodAnchorIsNotRegressed(unittest.TestCase):

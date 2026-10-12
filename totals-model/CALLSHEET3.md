@@ -91,7 +91,18 @@ LIKES MOST" label, and a why (`callWhy`) built by re-scoring the row from
 its inputs: the market's own fair number against the line and which side
 is juiced, each scored input's lean against it with its weight, every
 delta on the line, and whether the price agrees. Asked for 12 Oct: "the
-one it really likes, have it put a colour and why".
+one it really likes, have it put a colour and why". Later the same day,
+for the week: a hockey matchup's ranked list is the **full-game total
+alone**, over or under (the other three markets stay scored, on the row
+and on the board); **every** call carries the why, not only the
+favourite; the **last five** from the form panel are read against
+tonight's line as a trend in the why list (shown, not scored; the last
+ten carries the scored form); and the other markets feed the total's call
+through the **first-period market read as a second estimate of the game**
+(`p1mkt`, weight 0.5, tagged, both engines): the period line's de-vigged
+mean over the measured 31.4% share, plus the empty-net and overtime lumps,
+is what the period price implies for sixty minutes. A big road favourite
+(home +140 or longer) gets the watched note (unders 55.5% on 277 games).
 
 **The forecast, betting aside** (11 Oct 2026). The rail's top line says
 what the sheet expects to happen apart from any price: each side's

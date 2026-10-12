@@ -26,7 +26,7 @@
   NHL.REG_GOALS = NHL.GOALS - NHL.ENG - NHL.OT;
   NHL.SV_STABLE_AT = NHL.SV * (1.0 - NHL.SV) / (NHL.TALENT_SD * NHL.TALENT_SD);
   NHL.REG_PHI = (NHL.RESIDUAL_SD * NHL.RESIDUAL_SD - NHL.ENG * (1.0 - NHL.ENG) - NHL.OT * (1.0 - NHL.OT)) / NHL.REG_GOALS;
-  var NHL_WEIGHTS = { market: 4.0, goalies: 1.6, form: 0.6, h2h: 0.5 };   // goalies 1.6 and form 0.6 measured 7 Oct 2026; special teams and expected goals out (totals/nhl.py)
+  var NHL_WEIGHTS = { market: 4.0, goalies: 1.6, form: 0.6, h2h: 0.5, p1mkt: 0.5 };   // goalies 1.6 and form 0.6 measured 7 Oct 2026; special teams and expected goals out; p1mkt a priori, tagged (totals/nhl.py)
   NHL.OCTOBER_DELTA = 0.0;    // RETIRED 11 Oct 2026: the 2026 market carried the October excess (card: 6.11 closed, 6.08 scored, blind over 33-39-3 on 75)
   NHL.BACKUP_DELTA = -0.15;   // one backup in net: 0.18 under the close on 737 games (53.7%), both seasons; sized under it, tagged
   NHL.BACKUP_DELTA_COLD = -0.25;   // ...a COLD backup (his shrunk line costs > BACKUP_COLD_GAP goals): 0.44 under on 182 games, the under 57.5%
@@ -195,6 +195,31 @@
     if (hr !== null && hr <= 0) b2b.push("home");
     if (b2b.length) notes.push("Back to back for the " + b2b.join(" and ") + " side. <b>SHOWN, NOT SCORED</b>: the goalie line already carries the usual consequence (the backup), and the rest effect on the total itself is unmeasured. It is on the row so the record can split on it.");
 
+    /* the first-period market as a second read of the game (12 Oct 2026, totals/nhl.py):
+       its de-vigged mean over the measured period share, plus the empty net and
+       overtime, is what the period price implies for sixty minutes; weight 0.5, tagged */
+    var p1l = num("p1line"), p1o = num("p1op"), p1u = num("p1up");
+    if (p1l !== null && p1o !== null && p1u !== null && ok(p1l, "nhl_period")) {
+      var a1 = nhlP1Anchor(p1l, p1o, p1u), implied1 = a1[0] / NHL.P1_SHARE + NHL.ENG + NHL.OT;
+      var why1 = "The period line: " + a1[1] + " Over the first period's " + Math.round(NHL.P1_SHARE * 100) + "% share of regulation goals, plus the empty net and overtime, that is " +
+        implied1.toFixed(2) + " for sixty minutes against the market's " + anchor.toFixed(2) + ". Weight " + w.p1mkt + ", tagged: a second market's read of the same game, untested against any history.";
+      estimates.push(est("First-period market", implied1, w.p1mkt, why1, false));
+      notes.push("<b>First-period market</b> as a second read of the game: " + why1);
+    }
+    /* the last five from the form panel, read against tonight's line: shown, not
+       scored -- the last ten carries the scored form; this names the trend */
+    var rawForm = txt("nhlform"), form5 = null;   // txt() reads the row being re-scored, not the form on screen
+    try { form5 = rawForm ? JSON.parse(rawForm) : null; } catch (e) { form5 = null; }
+    if (form5) {
+      var trend = [];
+      [["away", teamName("away", "NHL") || "Away"], ["home", teamName("home", "NHL") || "Home"]].forEach(function (s) {
+        var gs = (form5[s[0]] || []).filter(function (g) { return isFinite(+g.gf) && isFinite(+g.ga); });
+        if (!gs.length) return;
+        var tots = gs.map(function (g) { return +g.gf + +g.ga; }), over = tots.filter(function (t) { return t > line; }).length, avg = tots.reduce(function (a, b) { return a + b; }, 0) / tots.length;
+        trend.push(esc(s[1]) + " games averaged " + avg.toFixed(1) + " (" + over + " of " + gs.length + " over tonight's " + line + ")");
+      });
+      if (trend.length) notes.push("Last five: " + trend.join("; ") + ". Shown, not scored; the last ten carries the scored form.");
+    }
     var tk = num("ntick"), cs = num("ncash");
     if (ok(tk, "percent") && ok(cs, "percent") && Math.abs(tk - cs) >= 20) notes.push("Over holds " + tk.toFixed(0) + "% of tickets but " + cs.toFixed(0) + "% of money. Shown, not scored, for the reason the MLB book stopped scoring it: no threshold beat a coin.");
     var opened = num("opened");
@@ -377,6 +402,7 @@
     markets.push(totalMarket(f, line, op, up, 2));
     var anchor = f.estimates.filter(function (e) { return e.name === "Market"; })[0].total;
     var lamH = null, lamA = null;
+    if (hml !== null && aml !== null && hml >= 140) notes.push("A big road favourite (the home side +140 or longer): two seasons of closing totals ran under 55.5% in these games (277 of them). Watched, not scored.");
     if (hml !== null && aml !== null) {
       var dv = devig(hml, aml), pHomeMkt = dv[0];
       var mlHold = implied(hml) + implied(aml) - 1;

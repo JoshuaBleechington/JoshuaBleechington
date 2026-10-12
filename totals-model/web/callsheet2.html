@@ -2163,6 +2163,10 @@
     var leg = gameLeg(m.markets, sport).leg;
     /* the call (12-13 Oct): the hockey total's likelier side, named on the total's row whatever the band says */
     var callView = sport === "NHL" ? callOf({ sport: "NHL", gdate: ($("gdate") || {}).value || "" }, m.markets.filter(function (k) { return k.key === "total"; })[0]) : null;
+    /* 11-18 Oct, at the user's request: a hockey matchup's list is the full-game
+       total alone, over or under; the other three markets stay scored and on the
+       row, and come back to the list on 19 Oct. */
+    if (callView) { ranked = ranked.filter(function (mk) { return mk.key === "total"; }); $("rankTag").textContent = "the total only, " + NHL_TOTAL_ONLY_LABEL; }
     ranked.forEach(function (mk, i) {
       var shade = shadeOf(mk), shadeRec = shade ? shadeRecord() : null;
       var top = i === 0 && mk.edge !== null && mk.edge > 0;
@@ -2307,8 +2311,10 @@
     });
     (f.deltas || []).forEach(function (d) { parts.push(d.name.toLowerCase() + " " + sgn(d.runs, 2) + " on the line" + (d.mechanism === false ? " (tagged)" : "")); });
     var side = x.mk.side === "OVER" ? "over" : "under";
-    return '<div class="swap why"><b>Why the sheet likes this one most tonight</b>: projected ' + f.projected.toFixed(2) + ' against ' + line + ', so the ' + side + ' at ' +
-      (x.mk.p * 100).toFixed(1) + '%, the strongest lean among tonight\'s hockey totals. Behind it: ' + parts.join("; ") + '.' +
+    var trend = (f.notes || []).filter(function (n) { return /^Last five:/.test(String(n)); })[0] || "";
+    return '<div class="swap why"><b>' + (x.fav ? "Why the sheet likes this one most tonight" : "Why this side") + '</b>: projected ' + f.projected.toFixed(2) + ' against ' + line + ', so the ' + side + ' at ' +
+      (x.mk.p * 100).toFixed(1) + '%' + (x.fav ? ', the strongest lean among tonight\'s hockey totals' : '') + '. Behind it: ' + parts.join("; ") + '.' +
+      (trend ? ' ' + trend.replace(/\.?\s*Shown, not scored.*$/, '.') : '') +
       (x.mk.price !== null ? (x.mk.edge > 0 ? ' The price agrees.' : ' The price asks more than that chance, so this is the sheet\'s pick, not a bet.') : '') + '</div>';
   }
   function parlayFour(dateISO, sport) {
@@ -2549,7 +2555,7 @@
       '<div class="n3">' + (x.mk.p * 100).toFixed(1) + '% · ' + (x.mk.price !== null ? sgn(x.mk.price, 0) + ' · edge ' + sgn(x.mk.edge * 100, 1) : 'no price') +
         (res ? ' · <span class="chip ' + res + '">' + resText(res) + '</span>' : '') + '</div>' +
       '<div class="n4">' + esc(x.row.matchup) + ' · ' + esc(x.mk.label) +
-        (x.mk.key === "total" && marksOf(x.row.sport, x.row.inputs, x.row.markets).grain ? ' <span class="tagm warn">over against the grain</span>' : '') + '</div>' + (extra || '') + (x.fav ? callWhy(x) : '') + '</div>';
+        (x.mk.key === "total" && marksOf(x.row.sport, x.row.inputs, x.row.markets).grain ? ' <span class="tagm warn">over against the grain</span>' : '') + '</div>' + (extra || '') + (callOf(x.row, x.mk) ? callWhy(x) : '') + '</div>';
   }
   function renderBoard() {
     var dateISO = $("boardDate").value || todayISO(), byProb = !$("byEdge").checked;

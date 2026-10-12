@@ -183,7 +183,14 @@ OT_COMPRESSION = 0.5
 #: from Natural Stat Trick's game table, slope -0.31 against 1,223 closes
 #: of 2024-25, and last season's xG +0.45/-0.46 by season: a coin); head
 #: to head (slope 0.02 on 814); the first-period last ten (slope -0.003).
-WEIGHTS = {"market": 4.0, "goalies": 1.6, "form": 0.6, "h2h": 0.5}
+WEIGHTS = {"market": 4.0, "goalies": 1.6, "form": 0.6, "h2h": 0.5, "p1mkt": 0.5}
+#: The first-period market read as a second estimate of the full game (12 Oct
+#: 2026, at the user's request: "use the weights of the other markets to help
+#: with the final determination" of the total). The period line's de-vigged
+#: mean over the measured first-period share, plus the empty-net and overtime
+#: lumps, is what the book's period price implies for sixty minutes. A priori
+#: 0.5 and TAGGED: there is no history of period closes to test it on, so it
+#: can move a call and never buy a band. It only ever shows with both prices.
 #: A backup in net. The detail pass named every starter over two seasons;
 #: a starter with fewer than 30% of his club's starts, ten starts in, is a
 #: backup. With ONE backup in a game the total landed 0.18 under the close
@@ -375,6 +382,9 @@ def forecast_nhl(
     home_goalie_confirmed: bool = False,
     away_goalie_backup: bool = False,        # the starter is his club's backup (BACKUP_SHARE)
     home_goalie_backup: bool = False,
+    p1_line: float | None = None,            # the first-period market, read as a second estimate of the game
+    p1_over_price: float | None = None,
+    p1_under_price: float | None = None,
     ticket_pct_over: float | None = None,
     money_pct_over: float | None = None,
     opened: float | None = None,
@@ -524,6 +534,18 @@ def forecast_nhl(
         notes.append(f"Head to head: {h2h_meetings:g} meeting(s) averaging {h2h_total:.1f}. SHOWN, NOT "
                      "SCORED: measured against 814 closing totals and null (slope 0.02).")
 
+    # --- the first-period market as a second read of the game (12 Oct 2026) --
+    p1 = [p1_line, p1_over_price, p1_under_price]
+    if all(v is not None for v in p1) and _ok(p1_line, "nhl_period"):
+        mu1, how1 = p1_anchor(p1_line, p1_over_price, p1_under_price)
+        implied_total = mu1 / P1_SHARE + EMPTY_NET_RATE + OT_RATE
+        why1 = (f"The period line: {how1} Over the first period's {P1_SHARE:.0%} share of regulation "
+                f"goals, plus the empty net and overtime, that is {implied_total:.2f} for sixty minutes "
+                f"against the market's {anchor:.2f}. Weight {w['p1mkt']:g}, tagged: a second market's "
+                "read of the same game, untested against any history.")
+        estimates.append(Estimate("First-period market", implied_total, w["p1mkt"], why1, mechanism=False))
+        notes.append("First-period market as a second read of the game: " + why1)
+
     # --- rest: SHOWN, NOT SCORED -------------------------------------------
     # A back-to-back changes who is in net more than it changes the score,
     # and the goalie input already carries that. Its own effect on the total
@@ -659,7 +681,8 @@ def forecast_matchup_nhl(
     **total_inputs: Any,
 ) -> Matchup:
     notes: list[str] = []
-    f = forecast_nhl(f"{away} @ {home}", total_line, over_price, under_price, **total_inputs)
+    f = forecast_nhl(f"{away} @ {home}", total_line, over_price, under_price,
+                     p1_line=p1_line, p1_over_price=p1_over_price, p1_under_price=p1_under_price, **total_inputs)
     markets: list[Market] = [_total_market(f, total_line, over_price, under_price, 2)]
 
     anchor = next(e.total for e in f.estimates if e.name == "Market")
@@ -682,6 +705,9 @@ def forecast_matchup_nhl(
             notes.append(f"A {ml_hold * 100:.1f}% moneyline hold is wide for a main line; only "
                          f"{market_confidence(ml_hold) * 100:.0f}% of the de-vigged lean is kept.")
 
+        if home_ml >= 140:
+            notes.append("A big road favourite (the home side +140 or longer): two seasons of closing totals ran "
+                         "under 55.5% in these games (277 of them). Watched, not scored.")
         p_h = p_home_wins(lam_h, lam_a)
         markets.append(_pick(
             "ml", "Moneyline",

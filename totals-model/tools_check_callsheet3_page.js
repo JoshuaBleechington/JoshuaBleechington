@@ -254,21 +254,35 @@ const CHECKS = ["dome","playoff","agconf","hgconf","agbk","hgbk"];
     const set = (id, v) => { const el = document.getElementById(id); el.value = v; el.dispatchEvent(new Event('input', { bubbles: true })); };
     const read = () => { const p1 = document.querySelector('#markets .mk[data-key="p1"]'); return { chips: [...p1.querySelectorAll('.cap')].map(c => c.textContent), title: (p1.querySelector('.cap[title]') || {}).title || '' }; };
     document.getElementById('clear').click(); document.getElementById('m-nhl').click(); await wait();
-    set('gdate', '2026-10-12'); set('away', 'Wild'); set('home', 'Blues'); set('line', '6'); set('op', '-110'); set('up', '-110'); set('p1line', '1.5'); set('p1op', '-105'); set('p1up', '-115'); await wait();
+    set('gdate', '2026-10-12'); set('away', 'Kings'); set('home', 'Sharks'); set('line', '6'); set('op', '-110'); set('up', '-110'); set('p1line', '1.5'); set('p1op', '-105'); set('p1up', '-115'); await wait();
     const d12 = read();
+    const totalRow = document.querySelector('#markets .mk[data-key="total"]');
+    const callChip = [...totalRow.querySelectorAll('.cap')].map(c => c.textContent).find(c => /the call/.test(c)) || '';
+    const band12 = (totalRow.querySelector('.band') || {}).textContent || '';
     document.getElementById('add').click(); await wait();
     document.getElementById('boardDate').value = '2026-10-12'; document.getElementById('boardDate').dispatchEvent(new Event('change')); await wait();
     const boardP1 = [...document.querySelectorAll('#board tbody tr')].map(tr => tr.querySelectorAll('td')[2].textContent).find(t => /First period/.test(t)) || '';
     const legs = [...document.querySelectorAll('#picks .pk:not(.parlay) .n4')].map(e => e.textContent).join(' | ');
+    const bets = [...document.querySelectorAll('#bestBets .pk')].map(e => e.textContent);
+    // grade it 2-1: the call's own record line appears on the total tile
+    const tr = [...document.querySelectorAll('#cardTable tr')].find(x => /Kings @ Sharks/.test(x.textContent));
+    const g = (k, v) => { const el = tr.querySelector(`.grade[data-k="${k}"]`); el.value = v; el.dispatchEvent(new Event('input', { bubbles: true })); el.dispatchEvent(new Event('change', { bubbles: true })); };
+    g('f5a', '0'); g('f5h', '1'); g('fa', '2'); g('fh', '1'); await wait();
+    const tile = [...document.querySelectorAll('#calibBox .calib[data-sport="NHL"] > div')].find(d => /Full-game total/.test(d.textContent));
+    const tileText = tile ? tile.textContent : '';
     document.getElementById('clear').click(); await wait();
-    set('gdate', '2026-10-14'); set('away', 'Wild'); set('home', 'Blues'); set('line', '6'); set('op', '-110'); set('up', '-110'); set('p1line', '1.5'); set('p1op', '-105'); set('p1up', '-115'); await wait();
+    set('gdate', '2026-10-20'); set('away', 'Wild'); set('home', 'Blues'); set('line', '6'); set('op', '-110'); set('up', '-110'); set('p1line', '1.5'); set('p1op', '-105'); set('p1up', '-115'); await wait();
     const d14 = read();
     document.getElementById('clear').click(); await wait();
-    return { d12, boardP1, legs, d14 };
+    return { d12, boardP1, legs, d14, callChip, band12, bets, tileText };
   });
-  chk(twoDays.d12.chips.some(c => /shown, not picked/.test(c)) && /12 and 13 Oct/.test(twoDays.d12.title), 'two days: on 12 Oct the first period is shown, not picked, and the chip says why', JSON.stringify(twoDays.d12));
+  chk(/the call: (OVER|UNDER) 6 [0-9.]+%/.test(twoDays.callChip) && (twoDays.band12 === 'NO BET' || twoDays.band12 === ''),
+      'the call: on 12 Oct a coin-flip hockey total still names a side on the rail', JSON.stringify({ chip: twoDays.callChip, band: twoDays.band12 }));
+  chk(twoDays.bets.some(t => /Kings @ Sharks/.test(t) && /CALL/.test(t) && /The call/.test(t)), 'the call: the straight bets list it under its own CALL label with the note', JSON.stringify(twoDays.bets).slice(0, 300));
+  chk(/the call, 11-18 Oct [01]-[01]/.test(twoDays.tileText), 'the call: the total tile keeps the calls\' own record', twoDays.tileText.slice(0, 300));
+  chk(twoDays.d12.chips.some(c => /shown, not picked/.test(c)) && /11 to 18 Oct/.test(twoDays.d12.title), 'the week: on 12 Oct the first period is shown, not picked, and the chip says why', JSON.stringify(twoDays.d12));
   chk(/not picked/.test(twoDays.boardP1) && !/First period/.test(twoDays.legs), 'two days: the board marks the first period not picked and no first-period leg is offered', JSON.stringify({ board: twoDays.boardP1, legs: twoDays.legs }));
-  chk(!twoDays.d14.chips.some(c => /shown, not picked/.test(c)), 'two days: on 14 Oct the first period picks as before', JSON.stringify(twoDays.d14));
+  chk(!twoDays.d14.chips.some(c => /shown, not picked/.test(c)), 'the week: on 20 Oct the first period picks as before', JSON.stringify(twoDays.d14));
 
   // ---- October: the seasonal delta, tagged ------------------------------------------
   const octo = await pg.evaluate(async () => {

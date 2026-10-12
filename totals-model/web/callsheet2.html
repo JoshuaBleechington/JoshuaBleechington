@@ -2157,6 +2157,8 @@
        opposite the one this list shows (the list shows the better price), so
        the mark names its pick. */
     var leg = gameLeg(m.markets, sport).leg;
+    /* the call (12-13 Oct): the hockey total's likelier side, named on the total's row whatever the band says */
+    var callView = sport === "NHL" ? callOf({ sport: "NHL", gdate: ($("gdate") || {}).value || "" }, m.markets.filter(function (k) { return k.key === "total"; })[0]) : null;
     ranked.forEach(function (mk, i) {
       var shade = shadeOf(mk), shadeRec = shade ? shadeRecord() : null;
       var top = i === 0 && mk.edge !== null && mk.edge > 0;
@@ -2170,6 +2172,7 @@
           (mk.band ? '<span class="band' + (mk.band === "NO BET" ? "" : " hot") + '">' + esc(mk.band) + '</span>' : "") +
           (!mk.anchored ? '<span class="derived">derived</span>' : "") +
           (mk.key === "total" ? railMarks : "") +
+          (mk.key === "total" && callView ? '<span class="cap" style="color:var(--go);border-color:var(--go)" title="11-18 Oct: every hockey total gets a side, over or under, at the user\'s request">the call: ' + esc(callView.pick) + ' ' + (callView.p * 100).toFixed(1) + '%</span>' : "") +
           (!pickable(mk, sport) ? '<span class="cap tagm" title="' + esc(notPickedWhy(sport, mk)) + '">shown, not picked</span>' : "") +
           (shade ? '<span class="cap" style="color:var(--go);border-color:var(--go)" title="The side the book priced cheaper. The book shades its price toward the side it wants money on, so this is betting with the book against the crowd: a rule, not a probability, kept on its own record line.">book\'s cheaper side: ' + esc(shade.pick) + ' at ' + sgn(shade.price, 0) + ' · ' + recText(shadeRec) + ' on the record</span>' : "") +
           (isLeg ? '<span class="cap" style="color:var(--go);border-color:var(--go)">parlay leg: ' + esc(leg.pick) + ' ' + (leg.p * 100).toFixed(1) + '% at ' + sgn(leg.price, 0) + ' · ' + valueRatio(leg).toFixed(3) + '× its price' + (bandOf(leg) ? ' · #1 says ' + esc(bandOf(leg)) : '') + '</span>' : "") +
@@ -2275,6 +2278,16 @@
                   fair: priceFor(o.p), anchored: mk.anchored, band: "", band1: mk.band1, side1: mk.side1, notes: mk.notes,
                   other: { pick: mk.pick, p: mk.p, price: mk.price, edge: mk.edge } }];
   }
+  /* THE CALL (12-13 Oct 2026, at the user's request): on those two days every
+     hockey total gets a side, over or under, no NO BET -- the side the sheet
+     thinks likelier, whatever the price says. A view of that side, or null
+     when the row is not a hockey total in the window. It lists in the
+     straight bets as its own tier and the total tile keeps its record. */
+  function callOf(row, mk) {
+    if (!row || row.sport !== "NHL" || !mk || mk.key !== "total" || NHL_TOTAL_ONLY.indexOf(row.gdate || "") < 0) return null;
+    var vs = bothSides(mk).slice().sort(function (a, b) { return b.p - a.p; });
+    return vs.length ? vs[0] : null;
+  }
   function parlayFour(dateISO, sport) {
     var legs = [], skipped = 0;
     card.forEach(function (r) {
@@ -2324,11 +2337,14 @@
      come back the same way the run line can. The NHL entry is for Call Sheet
      3.0, which is built from this file: the total and the first period. */
   var PICKABLE = { MLB: ["total", "f5"], WNBA: ["spread", "ml"], NHL: ["total", "p1"] };
-  /* 12 Oct 2026, at the user's request, for two days: the hockey book picks the
-     FULL-GAME TOTAL only. For games dated 12 and 13 Oct the first period is
-     listed and graded, never a straight bet or a parlay leg; nothing else on
-     the hockey card changes, and games dated 14 Oct onward pick as before. */
-  var NHL_TOTAL_ONLY = ["2026-10-12", "2026-10-13"];
+  /* 12 Oct 2026, at the user's request, for a week with last night as the
+     first test: the hockey book picks the FULL-GAME TOTAL only, and every
+     hockey total gets a side (callOf). For games dated 11 to 18 Oct the first
+     period is listed and graded, never a straight bet or a parlay leg;
+     nothing else on the hockey card changes, and games dated 19 Oct onward
+     pick as before. */
+  var NHL_TOTAL_ONLY = ["2026-10-11", "2026-10-12", "2026-10-13", "2026-10-14", "2026-10-15", "2026-10-16", "2026-10-17", "2026-10-18"];
+  var NHL_TOTAL_ONLY_LABEL = "11-18 Oct";
   function pickable(mk, sp, gdate) {
     if ((PICKABLE[sp] || PICKABLE.MLB).indexOf(mk.key) < 0) return false;
     if (sp === "NHL" && mk.key === "p1") {
@@ -2344,7 +2360,7 @@
   function notPickedWhy(sp, mk) {
     if (sp === "WNBA" && mk.key !== "total") return "This side was stored without the four ratings, so it is the book's own price read back and carries no team information. Type the ratings (paste the stats.wnba.com table) and press Rescore, and the spread and the moneyline become pickable.";
     if (sp === "WNBA") return "The WNBA total leaned under by construction and went 6-7 on the first 13 (says 54.8%, does 46.2%); from 2 Oct the WNBA book picks the spread and the moneyline, which carry the ratings, and the total is listed and graded but never a straight bet or a parlay leg.";
-    if (sp === "NHL" && mk.key === "p1") return "For games on 12 and 13 Oct the hockey book picks the full-game total only, at the user's request. The first period is listed and graded, never a straight bet or a parlay leg, on those two days.";
+    if (sp === "NHL" && mk.key === "p1") return "For games from 11 to 18 Oct the hockey book picks the full-game total only, at the user's request. The first period is listed and graded, never a straight bet or a parlay leg, that week.";
     if (sp === "NHL") return "Derived from the book's own moneyline with no team information behind it, like the run line, which said 52.5% and did 42.3% on its first 52. Listed and graded, never a straight bet or a parlay leg, until the record says otherwise.";
     return "Derived from the book's own moneyline with no team information behind it. On the first 52 graded games the run line said 52.5% and did 42.3%, so it is listed and graded but never a straight bet or a parlay leg.";
   }
@@ -2388,11 +2404,21 @@
       if ((r.gdate || "") !== dateISO || r.sport !== "WNBA" || (sport && r.sport !== sport)) return;
       (r.markets || []).forEach(function (mk) { var s = shadeOf(mk); if (s) rule.push({ row: r, mk: s }); });
     });
+    /* the call: every hockey total in the two-day window that is not already
+       a verdict, on the sheet's likelier side, whatever the price */
+    var call = [];
+    card.forEach(function (r) {
+      if ((r.gdate || "") !== dateISO || r.sport !== "NHL" || (sport && r.sport !== sport)) return;
+      var tot = (r.markets || []).filter(function (mk) { return mk.key === "total"; })[0], cv = callOf(r, tot);
+      if (cv && !verdict.some(function (y) { return y.row.id === r.id; })) call.push({ row: r, mk: cv });
+    });
     var value = all.filter(function (x) {
       return pickable(x.mk, x.row.sport, x.row.gdate) && !(x.mk.key === "total" && bandOf(x.mk)) && x.mk.edge > 0 &&
+             !callOf(x.row, x.mk) &&
              !rule.some(function (y) { return y.row.id === x.row.id && y.mk.pick === x.mk.pick; });
     });
     verdict.forEach(function (x) { x.tier = "verdict"; x.thin = x.mk.edge <= 0; });
+    call.forEach(function (x) { x.tier = "call"; x.thin = x.mk.edge === null || x.mk.edge <= 0; });
     /* A verdict whose price is steeper than its chance stays on the list on
        the strength of the MLB record (12-7 on #1's bands). Hockey has no such
        record -- its bands were 3-5 on the first 31 games, every one of them
@@ -2402,7 +2428,7 @@
     verdict = verdict.filter(function (x) { return !(x.thin && x.row.sport === "NHL"); });
     rule.forEach(function (x) { x.tier = "rule"; x.thin = x.mk.edge === null || x.mk.edge <= 0; });
     value.forEach(function (x) { x.tier = "value"; x.thin = false; });
-    var rows = verdict.concat(rule).concat(value).slice(0, 8);
+    var rows = verdict.concat(call).concat(rule).concat(value).slice(0, Math.max(8, verdict.length + call.length));
     rows.forEach(function (x, i) {
       x.rank = i + 1;
       x.corr = rows.slice(0, i).filter(function (o) { return o.row.id === x.row.id; }).map(function (o) { return o.rank; });
@@ -2419,6 +2445,11 @@
       return '<div class="swap">The book\'s <b>cheaper side</b> — a rule, not a probability: <b>' + recText(rc) + '</b> on the record. The sheet says ' +
         (x.mk.p * 100).toFixed(1) + '%' + (x.mk.price !== null ? ' and ' + sgn(x.mk.price, 0) + ' needs ' + (implied(x.mk.price) * 100).toFixed(1) + '%' : '') +
         (x.thin ? '; the rule is carrying this one, not the number.' : '; the number agrees.') + ' Reviewed at 40 picks.</div>';
+    }
+    if (x.tier === "call") {
+      return '<div class="swap"><b>The call</b> — from 11 to 18 Oct every hockey total gets a side, at your request: this is the side the sheet thinks likelier, ' +
+        (x.mk.p * 100).toFixed(1) + '%' + (x.mk.price !== null ? ', and ' + sgn(x.mk.price, 0) + ' needs ' + (implied(x.mk.price) * 100).toFixed(1) + '%' + (x.thin ? ': the price is steeper than the chance, so this is a call, not a bet.' : ': the price agrees.') : '.') +
+        ' The total tile keeps the calls\' own record.</div>';
     }
     if (x.tier === "value") return '<div class="swap">No verdict on this market — it is here on the price alone.</div>';
     return '';
@@ -2479,7 +2510,8 @@
     return '<div class="pk ' + cls + '" data-open="' + x.row.id + '" title="Load ' + esc(x.row.matchup) + ' into the form">' +
       '<div class="n1">#' + x.rank + (x.corr && x.corr.length ? ' · same game as #' + x.corr.join(', #') : '') + '</div>' +
       '<div class="n2">' + esc(x.mk.pick) + (bandOf(x.mk) ? ' <span class="band hot">' + esc(bandOf(x.mk)) + '</span>' : '') +
-        (x.tier === "rule" ? ' <span class="band hot" title="The side the book priced cheaper: a rule, not a probability">CHEAPER SIDE</span>' : '') + '</div>' +
+        (x.tier === "rule" ? ' <span class="band hot" title="The side the book priced cheaper: a rule, not a probability">CHEAPER SIDE</span>' : '') +
+        (x.tier === "call" ? ' <span class="band hot" title="11-18 Oct: every hockey total gets a side, over or under, at the user\'s request">CALL</span>' : '') + '</div>' +
       '<div class="n3">' + (x.mk.p * 100).toFixed(1) + '% · ' + (x.mk.price !== null ? sgn(x.mk.price, 0) + ' · edge ' + sgn(x.mk.edge * 100, 1) : 'no price') +
         (res ? ' · <span class="chip ' + res + '">' + resText(res) + '</span>' : '') + '</div>' +
       '<div class="n4">' + esc(x.row.matchup) + ' · ' + esc(x.mk.label) +
@@ -2734,7 +2766,7 @@
        against away -- and the full-game total keeps the record of the rows
        that carried Call Sheet #1's verdict, because the parlay legs lean on
        it. Asked for on 25 Sept: "how many of the 17-10 went over vs under". */
-    var fresh = function (label) { return { n: 0, w: 0, l: 0, p: 0, says: 0, units: 0, label: label, sides: {}, verdict: null, profile: null, lean: {}, grain: null, crowd: {}, high: null, b2b: null, backup: null, goalie: {},
+    var fresh = function (label) { return { n: 0, w: 0, l: 0, p: 0, says: 0, units: 0, label: label, sides: {}, verdict: null, profile: null, lean: {}, grain: null, crowd: {}, high: null, b2b: null, backup: null, goalie: {}, call: null,
                                             clv: { n: 0, beat: 0, lost: 0, even: 0, runs: 0 } }; };
     var bySport = {};
     ["MLB", "WNBA"].forEach(function (sp) {
@@ -2767,6 +2799,10 @@
           if (tg.lean) count(t.lean[tg.lean] || (t.lean[tg.lean] = { w: 0, l: 0, p: 0 }), res);
           if (tg.crowd && mk.key === "total") count(t.crowd[tg.crowd] || (t.crowd[tg.crowd] = { w: 0, l: 0, p: 0 }), res);
           if (tg.goalie && mk.key === "total") count(t.goalie[tg.goalie] || (t.goalie[tg.goalie] = { w: 0, l: 0, p: 0 }), res);
+          if (mk.key === "total") {
+            var cv = callOf(row, mk), cr = cv ? gradeMarket(cv, row.finals) : null;
+            if (cr !== null && cr !== "invalid") count(t.call || (t.call = { w: 0, l: 0, p: 0 }), cr);
+          }
           if ((tg.b2b || tg.backup) && mk.key === "total") {
             var uv = bothSides(mk).filter(function (v) { return v.side === "UNDER"; })[0];
             var ur = uv ? gradeMarket(uv, row.finals) : null;
@@ -2827,6 +2863,7 @@
       if (s.b2b) parts.push('back to back, the under ' + rec(s.b2b));
       if (s.backup) parts.push('backup in net, the under ' + rec(s.backup));
       ["goalies right", "goalie line wrong"].forEach(function (k) { if (s.goalie[k]) parts.push(k + ' ' + rec(s.goalie[k])); });
+      if (s.call) parts.push('the call, ' + NHL_TOTAL_ONLY_LABEL + ' ' + rec(s.call));
       if (s.clv.n) parts.push('beat the close ' + s.clv.beat + '-' + s.clv.lost + (s.clv.even ? '-' + s.clv.even : '') + ' · ' + sgn(s.clv.runs / s.clv.n, 2) + ' ' + (unit || 'runs') + ' avg');
       return '<div><p class="k">' + esc(s.label) + '</p><p class="v">' + s.w + '-' + s.l + (s.p ? '-' + s.p : '') + '</p>' +
         '<p class="s">' + (s.n ? 'says ' + says.toFixed(1) + '% · does ' + does.toFixed(1) + '% (±' + se.toFixed(1) + ') · ' + sgn(s.units, 2) + 'u' : 'pushes only') + '</p>' +
@@ -2979,7 +3016,7 @@
     out.push("BEST STRAIGHT BETS (#1's verdicts first, then the WNBA cheaper side, then by edge)");
     bestBets(dateISO).forEach(function (x) {
       out.push("  " + x.rank + ". " + x.row.matchup + " — " + x.mk.pick + "  " + (x.mk.p * 100).toFixed(1) + "%  " + sgn(x.mk.price, 0) + "  edge " + sgn(x.mk.edge * 100, 1) +
-        (x.tier === "verdict" ? "  [#1: " + bandOf(x.mk) + (x.thin ? ", price steeper than the chance" : "") + "]" : x.tier === "rule" ? "  [cheaper side, a rule: " + recText(shadeRecord()) + "]" : "  [value]"));
+        (x.tier === "verdict" ? "  [#1: " + bandOf(x.mk) + (x.thin ? ", price steeper than the chance" : "") + "]" : x.tier === "call" ? "  [the call, " + NHL_TOTAL_ONLY_LABEL + ": the likelier side" + (x.thin ? ", price steeper than the chance" : "") + "]" : x.tier === "rule" ? "  [cheaper side, a rule: " + recText(shadeRecord()) + "]" : "  [value]"));
     });
     ["MLB", "WNBA"].forEach(function (sp) {
       var sl = parlayFour(dateISO, sp), sb = bestBets(dateISO, sp);

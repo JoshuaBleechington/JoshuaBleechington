@@ -69,15 +69,22 @@ whichever goalie's line was asked (767 games). So goalies are scored at
 where the backup delta carries what the backtest found. One goalie alone
 is scored against a league-average partner, with a note.
 
-**12 and 13 Oct 2026: the full-game total only.** At the user's request,
-for two days, the hockey book picks nothing but the full-game total. For
-games dated 12 and 13 Oct the first period is listed and graded, never a
+**11 to 18 Oct 2026: the full-game total only, and every total gets a
+side.** At the user's request, for a week with the night before as the
+first test, the hockey book picks nothing but the full-game total. For
+games dated 11 to 18 Oct the first period is listed and graded, never a
 straight bet or a parlay leg (`NHL_TOTAL_ONLY` in the card script); the
 moneyline and puck line were already shown, not picked. Nothing scored
 changes: the period engine still runs and shows its number, and games
-dated 14 Oct onward pick as before. The two days are a clean read of the
-total on its own after the October delta was retired and the goalie
-picker went in.
+dated 19 Oct onward pick as before. The week is a clean read of the total
+on its own after the October delta was retired and the goalie picker went
+in. And that week **every hockey total gets a side**, over or under, no NO
+BET (`callOf`): the side the sheet thinks likelier, whatever the price
+says. It is named on the total's row ("the call"), listed in the straight
+bets under its own CALL tier after the verdicts with a note saying whether
+the price agrees, and the total tile keeps the calls' own record line
+("the call, 11-18 Oct"). A call whose price is steeper than its chance is a
+call, not a bet, and the note says so.
 
 **The forecast, betting aside** (11 Oct 2026). The rail's top line says
 what the sheet expects to happen apart from any price: each side's

@@ -325,6 +325,7 @@ const CHECKS = ["dome","playoff","agconf","hgconf","agbk","hgbk"];
     g('f5a', '0'); g('f5h', '1'); g('fa', '2'); g('fh', '1'); await wait();
     const tile = [...document.querySelectorAll('#calibBox .calib[data-sport="NHL"] > div')].find(d => /Full-game total/.test(d.textContent));
     const tileText = tile ? tile.textContent : '';
+    const favText = (document.querySelector('#calibBox .favs[data-sport="NHL"]') || {}).textContent || '';
     document.getElementById('clear').click(); await wait();
     set('gdate', '2026-10-20'); set('away', 'Wild'); set('home', 'Blues'); set('line', '6'); set('op', '-110'); set('up', '-110'); set('p1line', '1.5'); set('p1op', '-105'); set('p1up', '-115'); await wait();
     const d14 = read();
@@ -333,7 +334,7 @@ const CHECKS = ["dome","playoff","agconf","hgconf","agbk","hgbk"];
       return { has: !!c, none: !!(c && c.classList.contains('none')), key: c ? c.dataset.key || '' : '', lab: c ? c.querySelector('.lab').textContent : '', why: c ? c.querySelector('.why').textContent : '',
                tag: document.getElementById('rankTag').textContent, others: !!o, open: o ? o.open : null, rows: [...document.querySelectorAll('#markets .mk')].map(e => e.dataset.key) }; })();
     document.getElementById('clear').click(); await wait();
-    return { d12, boardP1, legs, d14, callChip, band12, bets, tileText, fav, railKeys, rankTag, totalWhy, why: whyText, pick20 };
+    return { d12, boardP1, legs, d14, callChip, band12, bets, tileText, favText, fav, railKeys, rankTag, totalWhy, why: whyText, pick20 };
   });
   chk(twoDays.railKeys.join(',') === 'total' && /the total only, 11-12 Oct/.test(twoDays.rankTag), 'the week: a hockey matchup\'s list is the full-game total alone, and the tag says so', JSON.stringify({ keys: twoDays.railKeys, tag: twoDays.rankTag }));
   chk(/First-period market/.test(twoDays.why) && /for sixty minutes against the market/.test(twoDays.why), 'the week: the first-period market is read as a second estimate of the game, tagged, in the why list', twoDays.why.slice(twoDays.why.indexOf('First-period market'), twoDays.why.indexOf('First-period market') + 200));
@@ -346,11 +347,14 @@ const CHECKS = ["dome","playoff","agconf","hgconf","agbk","hgbk"];
       'the call: on 12 Oct a coin-flip hockey total still names a side on the rail', JSON.stringify({ chip: twoDays.callChip, band: twoDays.band12 }));
   chk(twoDays.bets.some(t => /Kings @ Sharks/.test(t) && /CALL/.test(t) && /The call/.test(t)), 'the call: the straight bets list it under its own CALL label with the note', JSON.stringify(twoDays.bets).slice(0, 300));
   chk(/the call, 11-12 Oct [01]-[01]/.test(twoDays.tileText), 'the call: the total tile keeps the calls\' own record', twoDays.tileText.slice(0, 300));
+  // Kings -130 on the road won 2-1: the favourite by price table counts it in the -149 to -120 row (won, dog +1.5 covered), beside the two-season baseline
+  chk(/The favourite, by price/.test(twoDays.favText) && /−149 to −120\s*[1-9]\d*\s*\d+\.\d%\s*\d+\.\d%\s*\d+\.\d%\s*\d+\.\d%\s*[+-]\d+\.\d%/.test(twoDays.favText) && /two seasons at the close\s*828\s*54\.0%\s*57\.1%\s*68\.6%\s*31\.4%\s*-5\.5%/.test(twoDays.favText),
+      'the favourite by price: the record section tables the favourite\'s record, the dog +1.5 and the return by price, with the two-season baseline in grey', twoDays.favText.slice(0, 600));
   chk(twoDays.d12.chips.some(c => /shown, not picked/.test(c)) && /11 and 12 Oct/.test(twoDays.d12.title), 'the week: on 12 Oct the first period is shown, not picked, and the chip says why', JSON.stringify(twoDays.d12));
   chk(/not picked/.test(twoDays.boardP1) && !/First period/.test(twoDays.legs), 'two days: the board marks the first period not picked and no first-period leg is offered', JSON.stringify({ board: twoDays.boardP1, legs: twoDays.legs }));
   chk(!twoDays.d14.chips.some(c => /shown, not picked/.test(c)), 'the week: on 20 Oct the first period picks as before', JSON.stringify(twoDays.d14));
   chk(twoDays.pick20.has && twoDays.pick20.others && twoDays.pick20.rows.indexOf('total') >= 0 && twoDays.pick20.rows.indexOf('p1') >= 0 &&
-      (twoDays.pick20.none ? (/No pick yet|coin flip/.test(twoDays.pick20.why) && twoDays.pick20.open === true && twoDays.pick20.tag === 'no pick yet')
+      (twoDays.pick20.none ? (/book/.test(twoDays.pick20.why) && twoDays.pick20.open === true && twoDays.pick20.tag === 'no pick yet')
                             : (/^The pick · an? (OVER|UNDER) game/.test(twoDays.pick20.lab) && /^Why: Projected/.test(twoDays.pick20.why) && twoDays.pick20.open === false && /the pick, then the rest by edge/.test(twoDays.pick20.tag))),
       'the pick: on 20 Oct a hockey matchup shows the pick block (or says nothing separates the sides) with the markets folded under it', JSON.stringify(twoDays.pick20).slice(0, 400));
 
@@ -358,25 +362,32 @@ const CHECKS = ["dome","playoff","agconf","hgconf","agbk","hgbk"];
   const pickT = await pg.evaluate(async () => {
     const wait = () => new Promise(r => setTimeout(r, 60));
     const set = (id, v) => { const el = document.getElementById(id); el.value = v; el.dispatchEvent(new Event('input', { bubbles: true })); };
-    const read = () => { const c = document.querySelector('#markets .pickcard'), o = document.querySelector('#markets details.others');
+    const read = () => { const c = document.querySelector('#markets .pickcard'), o = document.querySelector('#markets details.others'), ml = document.querySelector('#markets .mk[data-key="ml"]');
       return { has: !!c, none: !!(c && c.classList.contains('none')), key: c ? c.dataset.key || '' : '', side: c ? c.dataset.side || '' : '', pick: c ? c.querySelector('.pick').textContent : '',
                lab: c ? c.querySelector('.lab').textContent : '', p: c && c.querySelector('.p') ? parseFloat(c.querySelector('.p').textContent) : null, why: c ? c.querySelector('.why').textContent : '',
-               open: o ? o.open : null, summary: o ? o.querySelector('summary').textContent : '', rows: [...document.querySelectorAll('#markets .mk')].map(e => e.dataset.key) }; };
+               open: o ? o.open : null, summary: o ? o.querySelector('summary').textContent : '', rows: [...document.querySelectorAll('#markets .mk')].map(e => e.dataset.key),
+               mlP: ml ? parseFloat(ml.querySelector('.p').textContent) : null, mlChips: ml ? [...ml.querySelectorAll('.cap')].map(x => x.textContent) : [] }; };
     document.getElementById('clear').click(); document.getElementById('m-mlb').click(); await wait();
-    set('gdate', '2026-10-20'); set('away', 'Rays'); set('home', 'Yankees'); set('line', '8.5'); set('op', '-110'); set('up', '-110');
+    set('gdate', '2026-10-20'); set('away', 'Rays'); set('home', 'Yankees'); set('line', '8.5'); set('op', '-110'); set('up', '-110'); await wait();
+    const bare = read();
     set('aera', '2.10'); set('hera', '2.30'); set('aip', '180'); set('hip', '175'); set('abp', '2.90'); set('hbp', '3.00'); await wait();
     const totalPick = read();
     set('aml', '210'); set('hml', '-250'); await wait();
     const mlPick = read();
     document.getElementById('clear').click(); await wait();
-    return { totalPick, mlPick };
+    return { bare, totalPick, mlPick };
   });
+  chk(pickT.bare.has && pickT.bare.none && /^No pick yet$/.test(pickT.bare.pick) && /Nothing on the card moves a number off the book's/.test(pickT.bare.why) && pickT.bare.open === true,
+      'the pick: a line and two prices alone give no pick, because nothing on the card moves a number off the book\'s', JSON.stringify(pickT.bare).slice(0, 400));
   chk(pickT.totalPick.has && !pickT.totalPick.none && pickT.totalPick.key === 'total' && pickT.totalPick.side === 'UNDER' && /^The pick · an UNDER game$/.test(pickT.totalPick.lab) &&
-      /^Why: Projected [0-9.]+ runs against the 8\.5 line, so the under at [0-9.]+%\. Behind it: the market's own fair number/.test(pickT.totalPick.why) && pickT.totalPick.open === false && /other markets/.test(pickT.totalPick.summary) && pickT.totalPick.rows.indexOf('total') >= 0,
-      'the pick: two aces against an 8.5 make it an UNDER game, the why built from the total\'s lean, the other markets folded under it', JSON.stringify(pickT.totalPick).slice(0, 500));
-  chk(pickT.mlPick.key === 'ml' && pickT.mlPick.side === 'HOME' && /^The pick · a MONEYLINE game$/.test(pickT.mlPick.lab) && pickT.mlPick.p > 60 && /Yankees to win at [0-9.]+%/.test(pickT.mlPick.why) &&
-      /book's own number read back/.test(pickT.mlPick.why) && /At -250 it needs 71\.4%/.test(pickT.mlPick.why),
-      'the pick: a -250 favourite outranks the under by chance alone, is a MONEYLINE game, and the why says the sides are the book\'s own number', JSON.stringify(pickT.mlPick).slice(0, 500));
+      /^Why: Projected [0-9.]+ runs against the 8\.5 line, so the under at [0-9.]+%\. Behind it: the market's own fair number/.test(pickT.totalPick.why) &&
+      /The book's own number makes it 50\.0%; the sheet's inputs move it to [0-9.]+%, a [0-9.]+-point lean toward the under\./.test(pickT.totalPick.why) &&
+      pickT.totalPick.open === false && /other markets/.test(pickT.totalPick.summary) && pickT.totalPick.rows.indexOf('total') >= 0,
+      'the pick: two aces against an 8.5 make it an UNDER game; the why carries the total\'s lean and the book\'s number against the sheet\'s; the other markets fold under it', JSON.stringify(pickT.totalPick).slice(0, 600));
+  // the moneyline row lists its better-priced side, which on -250/+210 is the dog, so its chance reads under 40 rather than over 60
+  chk(pickT.mlPick.key === 'total' && pickT.mlPick.side === 'UNDER' && pickT.mlPick.mlP !== null && (pickT.mlPick.mlP > 60 || pickT.mlPick.mlP < 40) && pickT.mlPick.mlChips.some(c => /shown, not picked/.test(c)) && pickT.mlPick.rows.indexOf('ml') >= 0,
+      'the pick: a -250 favourite does NOT take the pick from the under, because the sheet has no information on the sides; the moneyline row sits folded, shown not picked',
+      JSON.stringify({ key: pickT.mlPick.key, side: pickT.mlPick.side, mlP: pickT.mlPick.mlP, mlChips: pickT.mlPick.mlChips, rows: pickT.mlPick.rows }));
 
   // ---- October: the seasonal delta, tagged ------------------------------------------
   const octo = await pg.evaluate(async () => {

@@ -169,6 +169,12 @@
   .pickcard .band.hot { background: var(--go); color: #fff; border-color: var(--go); }
   details.others > summary { cursor: pointer; font-size: 11px; color: var(--muted); font-weight: 600; letter-spacing: .04em; text-transform: uppercase; padding: 6px 0 8px; list-style: none; }
   details.others > summary::-webkit-details-marker { display: none; }
+  /* the favourite, by price (12 Oct 2026): a small table in the record section */
+  .verdict.favs table.favt { width: 100%; border-collapse: collapse; margin-top: 8px; font: 600 11px/1.4 var(--mono); }
+  .favt th, .favt td { text-align: right; padding: 3px 6px; border-bottom: 1px solid var(--rule-firm); white-space: nowrap; }
+  .favt th { font: 700 9.5px/1 var(--sans); letter-spacing: .06em; text-transform: uppercase; color: var(--muted); }
+  .favt th:first-child, .favt td:first-child { text-align: left; }
+  .favt tr.base td { color: var(--muted); font-weight: 500; }
   details.others > summary::before { content: "▸ "; } details.others[open] > summary::before { content: "▾ "; }
   .mklist { display: flex; flex-direction: column; gap: 8px; }
   .split { display: flex; height: 26px; border-radius: 6px; overflow: hidden; border: 1px solid var(--rule); margin: 6px 14px 8px 60px; }
@@ -581,9 +587,12 @@
         <div class="body">
           <p class="note" id="forecastLine" hidden></p>
           <div id="markets" class="mklist"></div>
-          <p class="note"><b>The pick is the likeliest side on the board, any market.</b> Chance to hit is the only
-            key, the label names the kind of game it is (over, under, run or puck line, moneyline, upset), and the
-            why is the sheet's reasoning in one paragraph. The other markets fold under it, ranked by edge: each row
+          <p class="note"><b>The pick is the likeliest side among the markets the sheet's own inputs inform,</b> and only
+            where those inputs move its chance off the book's number by a point or more toward that side. A side the
+            sheet has no information on (the moneyline and the run or puck line in baseball and hockey) is never the
+            pick, however likely it looks: that would be the book's number read back. The label names the kind of
+            game it is (over, under, first five or first period, spread, moneyline, upset) and the why gives the book's
+            number, the sheet's, the lean, and the reasoning. The other markets fold under it, ranked by edge: each row
             shows how likely that side is to hit and, in gold or red, how far above or below the price's break-even that is. A 62%
             favourite at −185 is a 62% chance and a losing bet; a 53% under at −110 is the better bet on the same
             game. The green mark is this game's parlay leg — Call Sheet #1's BET on the total when that side clears
@@ -2223,7 +2232,7 @@
     });
     /* THE PICK above, the rest folded under it (12 Oct 2026, at the user's
        request). In the hockey window the call row is the list, as before. */
-    var pk = callView ? null : thePick(m.markets, sport);
+    var pk = callView ? null : thePick(m.markets, sport, ($("gdate") || {}).value || "");
     if (pk) {
       if (pk.none) $("rankTag").textContent = "no pick yet";
       html += pickBlock(pk, m, sport) +
@@ -2485,15 +2494,39 @@
      the approach is measured, not assumed. The other markets stay scored and
      graded, folded under the pick. Below PICK_MIN nothing separates the
      sides and the block says so instead of naming a coin flip. */
-  var PICK_MIN = 0.505;
-  function thePick(markets, sp) {
-    var views = rankMarkets(markets || [], true);
+  /* Later the same night, at the user's word ("I don't want it to pick solely
+     because it looks the best ... we have plenty of data ... make sure this
+     is the focus"): the pick is the likeliest side AMONG THE MARKETS THE
+     SHEET'S INPUTS INFORM (pickable: the total and the period in baseball
+     and hockey, the sides in the WNBA when the ratings are on the card), and
+     only where those inputs MOVE THE CHANCE OFF THE BOOK'S OWN NUMBER by a
+     point or more toward that side. A side the sheet has no information on
+     is never the pick, however likely it looks: that would be the book's
+     number read back, and the hockey sides were measured that night to be
+     exactly that. When nothing on the card moves a number, the block says
+     so. The why states the book's number, the sheet's, and the lean. */
+  var PICK_MIN = 0.505, PICK_INFO = 0.01;
+  function marketChance(mk) {   // the book's own de-vigged chance of the listed side; 0.5 without both prices
+    var a = mk.price, b = mk.other ? mk.other.price : null;
+    if (a === null || a === undefined || b === null || b === undefined) return 0.5;
+    var ia = implied(a), ib = implied(b);
+    return ia + ib > 0 ? ia / (ia + ib) : 0.5;
+  }
+  function thePick(markets, sp, gdate) {
+    var views = rankMarkets((markets || []).filter(function (mk) { return pickable(mk, sp, gdate); }), true);
     if (!views.length) return null;
-    var best = views[0];
-    views.slice(1).forEach(function (v) {
-      if (Math.abs(v.p - best.p) <= 0.01 && (v.edge === null ? -9 : v.edge) > (best.edge === null ? -9 : best.edge) + 1e-9) best = v;
-    });
-    return best.p >= PICK_MIN ? { mk: best, type: gameType(best) } : { none: true, mk: best };
+    views.forEach(function (v) { v.pMkt = marketChance(v); v.lean = v.p - v.pMkt; });
+    var cands = views.filter(function (v) { return v.p >= PICK_MIN && v.lean >= PICK_INFO; });
+    if (!cands.length) {
+      var top = views[0], moved = views.filter(function (v) { return Math.abs(v.lean) >= PICK_INFO; });
+      var msg = !moved.length
+        ? "Nothing on the card moves a number off the book's: on every market the sheet informs, its chance is the book's own (" + esc(top.pick) + " " + (top.p * 100).toFixed(1) + "% here). Type the inputs and a side will show."
+        : "The sheet's inputs lean against the side the book favours without reaching the other side: " + esc(top.pick) + " is " + (top.p * 100).toFixed(1) + "% on the sheet against " + (top.pMkt * 100).toFixed(1) + "% at the book. Nothing here to take.";
+      return { none: true, mk: top, msg: msg };
+    }
+    var best = cands[0];
+    cands.slice(1).forEach(function (v) { if (Math.abs(v.p - best.p) <= 0.01 && v.lean > best.lean + 1e-9) best = v; });
+    return { mk: best, type: gameType(best) };
   }
   function gameType(mk) {
     var k = mk.key;
@@ -2511,6 +2544,11 @@
     var price = mk.price !== null && mk.price !== undefined
       ? ' At ' + sgn(mk.price, 0) + ' it needs ' + (mk.breakeven * 100).toFixed(1) + '%: ' + (mk.edge > 0 ? 'the price agrees.' : 'the price asks more than that chance, so this is the likeliest side, not a value bet.')
       : ' No price typed.';
+    /* the information behind the pick: the book's own chance, the sheet's, and the lean between them */
+    if (mk.pMkt !== undefined && mk.lean !== undefined) {
+      var toward = mk.key === "ml" ? esc(mk.side === "HOME" ? m.home : m.away) : (mk.side === "OVER" || mk.side === "UNDER") ? 'the ' + String(mk.side).toLowerCase() : esc(mk.pick);
+      price = ' The book\'s own number makes it ' + (mk.pMkt * 100).toFixed(1) + '%; the sheet\'s inputs move it to ' + (mk.p * 100).toFixed(1) + '%, a ' + (mk.lean * 100).toFixed(1) + '-point lean toward ' + toward + '.' + price;
+    }
     if (mk.key === "total") {
       var f = m.total, lean = totalLean(f, f.line);
       s = 'Projected ' + f.projected.toFixed(dp) + ' ' + unit + ' against the ' + f.line + ' line, so the ' + String(mk.side).toLowerCase() + ' at ' + (mk.p * 100).toFixed(1) + '%' +
@@ -2533,7 +2571,7 @@
   function pickBlock(pk, m, sp) {
     var mk = pk.mk;
     if (pk.none) return '<div class="pickcard none"><div class="lab">The pick</div><div class="pick">No pick yet</div>' +
-      '<div class="why">Nothing on the card separates the sides: the likeliest side on the board is ' + esc(mk.pick) + ' at ' + (mk.p * 100).toFixed(1) + '%, a coin flip. Type the inputs and a side will show.</div></div>';
+      '<div class="why">' + (pk.msg || ('Nothing on the card separates the sides: ' + esc(mk.pick) + ' at ' + (mk.p * 100).toFixed(1) + '% is a coin flip. Type the inputs and a side will show.')) + '</div></div>';
     return '<div class="pickcard" data-key="' + esc(mk.key) + '" data-side="' + esc(mk.side) + '">' +
       '<div class="lab">The pick · ' + esc(pk.type) + '</div>' +
       '<div class="head"><div class="pick ' + sideClass(mk.side) + '">' + esc(mk.pick) + (mk.band ? '<span class="band' + (mk.band === "NO BET" ? "" : " hot") + '">' + esc(mk.band) + '</span>' : '') + '</div>' +
@@ -3022,6 +3060,50 @@
     if (tg.goalie) h += '<span class="' + cls + (tg.goalie === "goalie line wrong" ? ' warn' : '') + '">' + esc(tg.goalie) + '</span>';
     return h;
   }
+  /* ---- the favourite, by price (12 Oct 2026) ----------------------------------
+     Asked for the night the hockey sides were measured ("I like how you put
+     this together. Can we track this on the model near the 'is it working'
+     section"): every graded row with both moneyline prices typed, bucketed
+     by the favourite's price: how often the favourite won against what its
+     price implied, how often the dog covered +1.5 and the favourite -1.5,
+     and the favourite's moneyline return. The two-season baseline at the
+     close (tools_backtest_nhl_sides.py, 2,616 games) sits in grey beside the
+     hockey block. Nothing here moves a number; it is the base rate the pick
+     is read against. */
+  var FAV_BUCKETS = [[-100000, -200, "−200 or more"], [-199, -150, "−199 to −150"], [-149, -120, "−149 to −120"], [-119, -101, "−119 to −101"]];
+  var FAV_BASE_NHL = { "−200 or more": [566, 68.2, 71.5, 55.5, 44.5, -4.8], "−199 to −150": [859, 58.2, 62.6, 62.9, 37.1, -7.1],
+                       "−149 to −120": [828, 54.0, 57.1, 68.6, 31.4, -5.5], "−119 to −101": [281, 50.2, 52.2, 70.5, 29.5, -4.0] };
+  function favBlock(sp) {
+    var b = {};
+    card.forEach(function (r) {
+      if (r.sport !== sp || !r.finals) return;
+      var fh = parseFloat(r.finals.fh), fa = parseFloat(r.finals.fa);
+      if (!isFinite(fh) || !isFinite(fa)) return;
+      var hml = numOf((r.inputs || {}).hml), aml = numOf((r.inputs || {}).aml);
+      if (hml === null || aml === null || hml === aml) return;
+      var favHome = hml < aml, favp = favHome ? hml : aml, margin = favHome ? fh - fa : fa - fh;
+      var bk = FAV_BUCKETS.filter(function (x) { return favp >= x[0] && favp <= x[1]; })[0];
+      if (!bk) return;
+      var s = b[bk[2]] || (b[bk[2]] = { n: 0, w: 0, imp: 0, dog: 0, fav15: 0, units: 0 });
+      s.n++; s.imp += implied(favp);
+      if (margin > 0) { s.w++; s.units += payout(favp); } else s.units -= 1;
+      if (margin <= 1) s.dog++;
+      if (margin >= 2) s.fav15++;
+    });
+    if (!Object.keys(b).length && sp !== "NHL") return "";
+    var h = '<div class="verdict favs" data-sport="' + sp + '"><b>The favourite, by price.</b> The favourite\'s record against what its price implied, the dog +1.5 and the favourite −1.5, and the favourite\'s moneyline return, over this card\'s graded games with both prices typed' +
+      (sp === "NHL" ? '; in grey, two seasons at the close (2,616 games, measured 12 Oct 2026)' : '') + '. The base rate the pick is read against; nothing here moves a number.' +
+      '<table class="favt"><tr><th>favourite\'s price</th><th>n</th><th>fav won</th><th>implied</th><th>dog +1.5</th><th>fav −1.5</th><th>fav ML</th></tr>';
+    FAV_BUCKETS.forEach(function (x) {
+      var s = b[x[2]], base = sp === "NHL" ? FAV_BASE_NHL[x[2]] : null;
+      if (!s && !base) return;
+      h += '<tr><td>' + x[2] + '</td>' + (s
+        ? '<td>' + s.n + '</td><td>' + (100 * s.w / s.n).toFixed(1) + '%</td><td>' + (100 * s.imp / s.n).toFixed(1) + '%</td><td>' + (100 * s.dog / s.n).toFixed(1) + '%</td><td>' + (100 * s.fav15 / s.n).toFixed(1) + '%</td><td>' + sgn(100 * s.units / s.n, 1) + '%</td>'
+        : '<td>0</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td>') + '</tr>';
+      if (base) h += '<tr class="base"><td>two seasons at the close</td><td>' + base[0] + '</td><td>' + base[1].toFixed(1) + '%</td><td>' + base[2].toFixed(1) + '%</td><td>' + base[3].toFixed(1) + '%</td><td>' + base[4].toFixed(1) + '%</td><td>' + sgn(base[5], 1) + '%</td></tr>';
+    });
+    return h + '</table></div>';
+  }
   function renderCalib() {
     var KEYS = { MLB: [["total","Full-game total"],["f5","First five"],["ml","Moneyline"],["rl","Run line"]],
                  WNBA: [["total","Full-game total"],["ml","Moneyline"],["spread","Spread"]] };
@@ -3095,7 +3177,7 @@
          approach is read against the whole book. The hockey window's rows
          were calls, not picks, and stay out. */
       if (!(r.sport === "NHL" && NHL_TOTAL_ONLY.indexOf(r.gdate || "") >= 0)) {
-        var pk = thePick(r.markets, r.sport), pres = pk && !pk.none ? gradeMarket(pk.mk, r.finals) : null;
+        var pk = thePick(r.markets, r.sport, r.gdate), pres = pk && !pk.none ? gradeMarket(pk.mk, r.finals) : null;
         if (pres !== null && pres !== "invalid") { b.any = true; tally(b.pick, pk.mk, pres, null, r); }
       }
       if (r.gdate) dates[r.gdate] = true;
@@ -3153,6 +3235,7 @@
       var graded = card.filter(function (r) { return r.sport === sp && (r.markets || []).some(function (mk) { return gradeMarket(mk, r.finals) !== null; }); }).length;
       h += '<div class="subhead" data-sport="' + sp + '">' + sp + ' <span class="tag">' + graded + ' graded game' + (graded === 1 ? '' : 's') + ' · ' + totalN + ' graded markets</span></div>';
       h += forecastBlock(sp);
+      h += favBlock(sp);
       var unit = sp === "WNBA" ? "pts" : "runs";
       h += '<div class="calib" data-sport="' + sp + '">' + tiles(b.pick, unit) + KEYS[sp].map(function (k) { return tiles(b.stats[k[0]], unit); }).join('') + tiles(b.top, unit) + tiles(b.topE, unit) + '</div>';
       h += '<div class="verdict">' + (totalN < 30

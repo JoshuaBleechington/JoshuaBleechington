@@ -169,6 +169,12 @@
   .pickcard .band.hot { background: var(--go); color: #fff; border-color: var(--go); }
   details.others > summary { cursor: pointer; font-size: 11px; color: var(--muted); font-weight: 600; letter-spacing: .04em; text-transform: uppercase; padding: 6px 0 8px; list-style: none; }
   details.others > summary::-webkit-details-marker { display: none; }
+  /* the favourite, by price (12 Oct 2026): a small table in the record section */
+  .verdict.favs table.favt { width: 100%; border-collapse: collapse; margin-top: 8px; font: 600 11px/1.4 var(--mono); }
+  .favt th, .favt td { text-align: right; padding: 3px 6px; border-bottom: 1px solid var(--rule-firm); white-space: nowrap; }
+  .favt th { font: 700 9.5px/1 var(--sans); letter-spacing: .06em; text-transform: uppercase; color: var(--muted); }
+  .favt th:first-child, .favt td:first-child { text-align: left; }
+  .favt tr.base td { color: var(--muted); font-weight: 500; }
   details.others > summary::before { content: "▸ "; } details.others[open] > summary::before { content: "▾ "; }
   .mklist { display: flex; flex-direction: column; gap: 8px; }
   .split { display: flex; height: 26px; border-radius: 6px; overflow: hidden; border: 1px solid var(--rule); margin: 6px 14px 8px 60px; }
@@ -581,9 +587,12 @@
         <div class="body">
           <p class="note" id="forecastLine" hidden></p>
           <div id="markets" class="mklist"></div>
-          <p class="note"><b>The pick is the likeliest side on the board, any market.</b> Chance to hit is the only
-            key, the label names the kind of game it is (over, under, run or puck line, moneyline, upset), and the
-            why is the sheet's reasoning in one paragraph. The other markets fold under it, ranked by edge: each row
+          <p class="note"><b>The pick is the likeliest side among the markets the sheet's own inputs inform,</b> and only
+            where those inputs move its chance off the book's number by a point or more toward that side. A side the
+            sheet has no information on (the moneyline and the run or puck line in baseball and hockey) is never the
+            pick, however likely it looks: that would be the book's number read back. The label names the kind of
+            game it is (over, under, first five or first period, spread, moneyline, upset) and the why gives the book's
+            number, the sheet's, the lean, and the reasoning. The other markets fold under it, ranked by edge: each row
             shows how likely that side is to hit and, in gold or red, how far above or below the price's break-even that is. A 62%
             favourite at −185 is a 62% chance and a losing bet; a 53% under at −110 is the better bet on the same
             game. The green mark is this game's parlay leg — Call Sheet #1's BET on the total when that side clears

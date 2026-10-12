@@ -94,6 +94,28 @@ and in baseball and hockey those are the market's own numbers; the record
 tile keeps **The pick** as its own line per sport, over every row on the
 card, so the approach reads against the whole book from day one.
 
+Later that night, after the sides measure below, the user drew the line:
+"I don't want it to pick solely because it looks the best. We have plenty
+of data ... make sure this is the focus, no cap." So **the pick is the
+likeliest side among the markets the sheet's inputs inform** (`pickable`:
+the total and the period in baseball and hockey, the sides in the WNBA
+with the ratings on the card), **and only where those inputs move its
+chance off the book's own number by a point or more toward that side**
+(`PICK_INFO`; the book's number is the two prices de-vigged). A side the
+sheet has no information on is never the pick, however likely it looks.
+With a line and two prices alone the block says nothing on the card moves
+a number; when the inputs lean against the side the book favours without
+reaching the other side it says that too. The why now opens with the
+book's number, the sheet's, and the lean between them, so "this is the pick
+because of xyz" is a sentence with three numbers in it. **The favourite,
+by price**: the same night the user asked for the backtest's favourite
+table on the sheet ("near the 'is it working' section that I love"), so
+the record section carries it per sport over the card's graded games with
+both moneyline prices typed, favourite won against implied, the dog +1.5,
+the favourite −1.5, the favourite's return, with the two-season close
+baseline in grey beside the hockey block. Nothing in it moves a number; it
+is the base rate the pick is read against.
+
 **The hockey sides, measured** (12 Oct 2026, `tools_backtest_nhl_sides.py`,
 run the night the pick went in, at the user's word: "run the hockey sides
 backtest on the ledgers"). Two seasons, 2,616 games, each with the actual

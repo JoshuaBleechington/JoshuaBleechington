@@ -153,6 +153,23 @@
   .mkdetail { font-size: 12px; color: var(--ink-2); line-height: 1.5; padding: 0 14px 4px 60px; }
   .mkdetail b { color: var(--ink); }
   .mkdetail .other { color: var(--muted); }
+  /* THE PICK (12 Oct 2026): one side per matchup, the likeliest on the board, with its kind of game and its why */
+  .pickcard { border: 2px solid var(--go); border-radius: 10px; padding: 12px 14px; margin-bottom: 10px; background: var(--edge-wash); }
+  .pickcard.none { border-color: var(--rule-firm); background: transparent; }
+  .pickcard .lab { font-size: 11px; color: var(--go); font-weight: 800; letter-spacing: .08em; text-transform: uppercase; }
+  .pickcard.none .lab { color: var(--muted); }
+  .pickcard .head { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; margin: 4px 0 6px; }
+  .pickcard .pick { font: 800 20px/1.15 var(--sans); letter-spacing: -.01em; }
+  .pickcard .pick.over { color: var(--over); } .pickcard .pick.under { color: var(--under); }
+  .pickcard .pick.home { color: var(--home); } .pickcard .pick.away { color: var(--away); }
+  .pickcard .p { font: 800 26px/1 var(--mono); }
+  .pickcard .why { font-size: 12.5px; color: var(--ink-2); line-height: 1.5; }
+  .pickcard .why b { color: var(--ink); }
+  .pickcard .band { display: inline-block; font: 700 9.5px/1 var(--sans); letter-spacing: .08em; text-transform: uppercase; margin-left: 8px; vertical-align: middle; padding: 4px 6px; border-radius: 4px; border: 1px solid var(--rule-firm); }
+  .pickcard .band.hot { background: var(--go); color: #fff; border-color: var(--go); }
+  details.others > summary { cursor: pointer; font-size: 11px; color: var(--muted); font-weight: 600; letter-spacing: .04em; text-transform: uppercase; padding: 6px 0 8px; list-style: none; }
+  details.others > summary::-webkit-details-marker { display: none; }
+  details.others > summary::before { content: "▸ "; } details.others[open] > summary::before { content: "▾ "; }
   .mklist { display: flex; flex-direction: column; gap: 8px; }
   .split { display: flex; height: 26px; border-radius: 6px; overflow: hidden; border: 1px solid var(--rule); margin: 6px 14px 8px 60px; }
   .split i { font-style: normal; display: flex; align-items: center; font: 700 10.5px/1 var(--sans); letter-spacing: .05em; color: #fff; white-space: nowrap; overflow: hidden; }
@@ -560,12 +577,14 @@
 
     <div class="rail">
       <section class="card">
-        <h2>This matchup, ranked <span class="tag" id="rankTag">by edge</span></h2>
+        <h2>This matchup <span class="tag" id="rankTag">the pick, then the rest by edge</span></h2>
         <div class="body">
           <p class="note" id="forecastLine" hidden></p>
           <div id="markets" class="mklist"></div>
-          <p class="note"><b>Probability is the big number; edge is the order.</b> Each row shows how likely
-            the pick is to hit and, in gold or red, how far above or below the price's break-even that is. A 62%
+          <p class="note"><b>The pick is the likeliest side on the board, any market.</b> Chance to hit is the only
+            key, the label names the kind of game it is (over, under, run or puck line, moneyline, upset), and the
+            why is the sheet's reasoning in one paragraph. The other markets fold under it, ranked by edge: each row
+            shows how likely that side is to hit and, in gold or red, how far above or below the price's break-even that is. A 62%
             favourite at −185 is a 62% chance and a losing bet; a 53% under at −110 is the better bet on the same
             game. The green mark is this game's parlay leg — Call Sheet #1's BET on the total when that side clears
             its price, otherwise the side with the best chance against its price. Two grey chips on the

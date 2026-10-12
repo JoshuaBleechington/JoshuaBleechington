@@ -69,21 +69,49 @@ whichever goalie's line was asked (767 games). So goalies are scored at
 where the backup delta carries what the backtest found. One goalie alone
 is scored against a league-average partner, with a note.
 
-**11 to 18 Oct 2026: the full-game total only, and every total gets a
+**The pick** (12 Oct 2026, at the user's request). "This matchup, ranked"
+is replaced by one side per matchup: **the likeliest side of any market on
+the board**, chance to hit the only key (a tie inside a point breaks toward
+the better price), with the kind of game it is (an OVER game, an UNDER
+game, first five or first period; a RUN LINE or PUCK LINE game; a
+MONEYLINE game; an UPSET game when the pick is a plus-money winner) and a
+why in one paragraph: for a total, the projection against the line and the
+lean behind it (`totalLean`, the same list the call's why used); for a
+period, the projection and the period's own notes; for a side, the sheet's
+split and, in baseball and hockey, the plain statement that **the sides
+carry no team information on this sheet**, so the number is the book's own
+read back. The user asked for it in those words after a Dodgers-Brewers
+card ranked a 56% first-five under above a 63.5% run line by edge: "I
+don't like how it's so focused on the edge instead of the possible outcome
+... pick the best, most likely ... this is the pick because of xyz and this
+is an overs, unders, spread, moneyline or upset type of game ... no need to
+show the other options." So the other markets fold under the pick, still
+scored, graded and on the board, a click away. Below 50.5% the block says
+nothing separates the sides rather than naming a coin flip. The consequence
+is stated plainly and measured, not assumed: by chance alone the run line
+at +1.5 and the big favourite's moneyline will be the pick most nights,
+and in baseball and hockey those are the market's own numbers; the record
+tile keeps **The pick** as its own line per sport, over every row on the
+card, so the approach reads against the whole book from day one.
+
+**11 and 12 Oct 2026: the full-game total only, and every total gets a
 side.** At the user's request, for a week with the night before as the
-first test, the hockey book picks nothing but the full-game total. For
-games dated 11 to 18 Oct the first period is listed and graded, never a
-straight bet or a parlay leg (`NHL_TOTAL_ONLY` in the card script); the
-moneyline and puck line were already shown, not picked. Nothing scored
-changes: the period engine still runs and shows its number, and games
-dated 19 Oct onward pick as before. The week is a clean read of the total
+first test, the hockey book picked nothing but the full-game total. Cut
+short the same day the odds feed went in ("scratch the week trial ... go
+back to the other markets"): the window is the two days whose calls were
+already made, so those rows keep grading as calls. For games dated 11 and
+12 Oct the first period is listed and graded, never a straight bet or a
+parlay leg (`NHL_TOTAL_ONLY` in the card script); the moneyline and puck
+line were already shown, not picked. Nothing scored changes: the period
+engine still runs and shows its number, and games dated 13 Oct onward show
+the pick like every other sport. The two days are a clean read of the total
 on its own after the October delta was retired and the goalie picker went
 in. And that week **every hockey total gets a side**, over or under, no NO
 BET (`callOf`): the side the sheet thinks likelier, whatever the price
 says. It is named on the total's row ("the call"), listed in the straight
 bets under its own CALL tier after the verdicts with a note saying whether
 the price agrees, and the total tile keeps the calls' own record line
-("the call, 11-18 Oct"). A call whose price is steeper than its chance is a
+("the call, 11-12 Oct"). A call whose price is steeper than its chance is a
 call, not a bet, and the note says so. **The one it likes most**: among
 the night's hockey totals (verdicts and calls) the strongest lean, highest
 chance then edge, gets its own colour on the straight-bets card, a "★

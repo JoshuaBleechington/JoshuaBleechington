@@ -578,8 +578,8 @@
     /* The rail ranks by EDGE, always: the toggle on the day board orders the
        table, not this list. Probability stays the big number on every row. */
     var byProb = false;
-    $("rankTag").textContent = "by edge";
-    var ranked = rankMarkets(m.markets, false), html = "";
+    $("rankTag").textContent = "the pick, then the rest by edge";
+    var ranked = rankMarkets(m.markets, false), html = "", rows = "";
     var railMarks = markChips(marksOf(sport, snapshot(), m.markets), "cap tagm");
     var gradedRow = openedFinals(), fin = gradedRow ? gradedRow.finals : null;
     if (gradedRow) {
@@ -599,11 +599,11 @@
        opposite the one this list shows (the list shows the better price), so
        the mark names its pick. */
     var leg = gameLeg(m.markets, sport).leg;
-    /* the call (12-13 Oct): the hockey total's likelier side, named on the total's row whatever the band says */
+    /* the call (11-12 Oct): the hockey total's likelier side, named on the total's row whatever the band says */
     var callView = sport === "NHL" ? callOf({ sport: "NHL", gdate: ($("gdate") || {}).value || "" }, m.markets.filter(function (k) { return k.key === "total"; })[0]) : null;
-    /* 11-18 Oct, at the user's request: a hockey matchup's list is the full-game
+    /* 11-12 Oct, at the user's request: a hockey matchup's list is the full-game
        total alone, over or under; the other three markets stay scored and on the
-       row, and come back to the list on 19 Oct. */
+       row. From 13 Oct the hockey rail shows the pick like every other sport. */
     if (callView) { ranked = ranked.filter(function (mk) { return mk.key === "total"; }); $("rankTag").textContent = "the total only, " + NHL_TOTAL_ONLY_LABEL; }
     ranked.forEach(function (mk, i) {
       var shade = shadeOf(mk), shadeRec = shade ? shadeRecord() : null;
@@ -611,14 +611,14 @@
       var isLeg = leg && mk.key === leg.key;
       var res = fin ? gradeMarket(mk, fin) : null;
       var eCls = mk.edge === null ? "" : (mk.edge > 0 ? "pos" : "neg");
-      html += '<div class="mk' + (top ? " top" : "") + (isLeg ? " alt" : "") + (mk.edge !== null && mk.edge <= 0 ? " neg" : "") +
+      rows += '<div class="mk' + (top ? " top" : "") + (isLeg ? " alt" : "") + (mk.edge !== null && mk.edge <= 0 ? " neg" : "") +
         (res ? " " + res : "") + '" data-key="' + mk.key + '"' + (res ? ' data-result="' + res + '"' : '') + '>' +
         '<div class="rk">' + (i + 1) + '</div>' +
         '<div><div class="pick ' + sideClass(mk.side) + '">' + esc(mk.pick) +
           (mk.band ? '<span class="band' + (mk.band === "NO BET" ? "" : " hot") + '">' + esc(mk.band) + '</span>' : "") +
           (!mk.anchored ? '<span class="derived">derived</span>' : "") +
           (mk.key === "total" ? railMarks : "") +
-          (mk.key === "total" && callView ? '<span class="cap" style="color:var(--go);border-color:var(--go)" title="11-18 Oct: every hockey total gets a side, over or under, at the user\'s request">the call: ' + esc(callView.pick) + ' ' + (callView.p * 100).toFixed(1) + '%</span>' : "") +
+          (mk.key === "total" && callView ? '<span class="cap" style="color:var(--go);border-color:var(--go)" title="11-12 Oct: every hockey total got a side, over or under, at the user\'s request">the call: ' + esc(callView.pick) + ' ' + (callView.p * 100).toFixed(1) + '%</span>' : "") +
           (!pickable(mk, sport) ? '<span class="cap tagm" title="' + esc(notPickedWhy(sport, mk)) + '">shown, not picked</span>' : "") +
           (shade ? '<span class="cap" style="color:var(--go);border-color:var(--go)" title="The side the book priced cheaper. The book shades its price toward the side it wants money on, so this is betting with the book against the crowd: a rule, not a probability, kept on its own record line.">book\'s cheaper side: ' + esc(shade.pick) + ' at ' + sgn(shade.price, 0) + ' · ' + recText(shadeRec) + ' on the record</span>' : "") +
           (function () { var best = bestPriceOf(mk, txt("odds")); if (!best || mk.price === null || implied(best.price) >= implied(mk.price) - 1e-9) return ""; return '<span class="cap" style="color:var(--go);border-color:var(--go)" title="The best price on this side at the same number across the books in the odds file, and the edge there">best ' + sgn(best.price, 0) + ' at ' + esc(bookName(best.book)) + ' · edge there ' + sgn((mk.p - implied(best.price)) * 100, 1) + '</span>'; })() +
@@ -635,6 +635,14 @@
           (mk.other.edge !== null ? ' at ' + sgn(mk.other.price, 0) + ', edge ' + sgn(mk.other.edge * 100, 1) : '') + '.</span> ' +
           mk.notes.map(function (n) { return n; }).join(" ") + '</div>';
     });
+    /* THE PICK above, the rest folded under it (12 Oct 2026, at the user's
+       request). In the hockey window the call row is the list, as before. */
+    var pk = callView ? null : thePick(m.markets, sport);
+    if (pk) {
+      if (pk.none) $("rankTag").textContent = "no pick yet";
+      html += pickBlock(pk, m, sport) +
+        '<details class="others"' + (pk.none ? ' open' : '') + '><summary>' + (pk.none ? 'the markets, by edge' : 'the other markets, listed and graded, by edge') + '</summary>' + rows + '</details>';
+    } else html += rows;
     if (m.lamHome !== null) {
       var t = m.lamHome + m.lamAway, ha = m.lamAway / t * 100;
       html += '<div class="split"><i class="a" style="width:' + ha.toFixed(1) + '%">' + esc(m.away) + ' ' + m.lamAway.toFixed(sport === "WNBA" ? 1 : 2) + '</i>' +
@@ -852,10 +860,13 @@
   /* why the sheet likes this one most: the row re-scored from its inputs, each
      scored input's lean against the market's own fair number, and every delta
      on the line, in one sentence a reader can argue with. */
-  function callWhy(x) {
-    var m = scoreMatchup(x.row.sport, x.row.inputs); if (!m || !m.total) return "";
-    var f = m.total, line = numOf(x.row.inputs.line), mkt = (f.estimates || []).filter(function (e) { return e.name === "Market"; })[0];
-    if (!mkt || line === null) return "";
+  /* the lean of the full-game total as a list a reader can argue with: the
+     market's own fair number against the line, each scored estimate's lean at
+     its weight, every delta, and the trend note. Shared by the call's why and
+     the pick's why. */
+  function totalLean(f, line) {
+    var mkt = (f.estimates || []).filter(function (e) { return e.name === "Market"; })[0];
+    if (!mkt || line === null || line === undefined) return null;
     var parts = ["the market's own fair number is " + mkt.total.toFixed(2) + " against the " + line + " line" +
       (mkt.total > line + 0.05 ? " (the over is the juiced side)" : mkt.total < line - 0.05 ? " (the under is the juiced side)" : "")];
     (f.estimates || []).forEach(function (e) {
@@ -863,12 +874,85 @@
       parts.push(e.name.toLowerCase() + " " + sgn(e.total - mkt.total, 2) + " at weight " + e.weight + (e.mechanism === false ? " (tagged)" : ""));
     });
     (f.deltas || []).forEach(function (d) { parts.push(d.name.toLowerCase() + " " + sgn(d.runs, 2) + " on the line" + (d.mechanism === false ? " (tagged)" : "")); });
-    var side = x.mk.side === "OVER" ? "over" : "under";
     var trend = (f.notes || []).filter(function (n) { return /^Last five:/.test(String(n)); })[0] || "";
+    return { parts: parts, trend: trend ? String(trend).replace(/\.?\s*Shown, not scored.*$/, '.') : "" };
+  }
+  function callWhy(x) {
+    var m = scoreMatchup(x.row.sport, x.row.inputs); if (!m || !m.total) return "";
+    var f = m.total, line = numOf(x.row.inputs.line), lean = totalLean(f, line);
+    if (!lean) return "";
+    var side = x.mk.side === "OVER" ? "over" : "under";
     return '<div class="swap why"><b>' + (x.fav ? "Why the sheet likes this one most tonight" : "Why this side") + '</b>: projected ' + f.projected.toFixed(2) + ' against ' + line + ', so the ' + side + ' at ' +
-      (x.mk.p * 100).toFixed(1) + '%' + (x.fav ? ', the strongest lean among tonight\'s hockey totals' : '') + '. Behind it: ' + parts.join("; ") + '.' +
-      (trend ? ' ' + trend.replace(/\.?\s*Shown, not scored.*$/, '.') : '') +
+      (x.mk.p * 100).toFixed(1) + '%' + (x.fav ? ', the strongest lean among tonight\'s hockey totals' : '') + '. Behind it: ' + lean.parts.join("; ") + '.' +
+      (lean.trend ? ' ' + lean.trend : '') +
       (x.mk.price !== null ? (x.mk.edge > 0 ? ' The price agrees.' : ' The price asks more than that chance, so this is the sheet\'s pick, not a bet.') : '') + '</div>';
+  }
+  /* THE PICK (12 Oct 2026, at the user's request: "pick the best, most likely
+     ... this is the pick because of xyz and this is an overs, unders, spread,
+     moneyline or upset type of game"). One side per matchup: the LIKELIEST
+     side of any market on the board, the chance to hit the only key, a tie
+     inside a point breaking toward the better price. Not the edge: a 63% run
+     line at -130 outranks a 56% under at -110 here, and the user knows that a
+     side the sheet has no team information on (the moneyline and the run or
+     puck line in baseball and hockey) is the book's own number read back --
+     the why says so when it is. The record tile keeps the pick's own line so
+     the approach is measured, not assumed. The other markets stay scored and
+     graded, folded under the pick. Below PICK_MIN nothing separates the
+     sides and the block says so instead of naming a coin flip. */
+  var PICK_MIN = 0.505;
+  function thePick(markets, sp) {
+    var views = rankMarkets(markets || [], true);
+    if (!views.length) return null;
+    var best = views[0];
+    views.slice(1).forEach(function (v) {
+      if (Math.abs(v.p - best.p) <= 0.01 && (v.edge === null ? -9 : v.edge) > (best.edge === null ? -9 : best.edge) + 1e-9) best = v;
+    });
+    return best.p >= PICK_MIN ? { mk: best, type: gameType(best) } : { none: true, mk: best };
+  }
+  function gameType(mk) {
+    var k = mk.key;
+    if (k === "total" || k === "f5" || k === "p1" || k === "h1") {
+      return (mk.side === "OVER" ? "an OVER" : "an UNDER") + " game" + (k === "f5" ? ", first five" : k === "p1" ? ", first period" : k === "h1" ? ", first half" : "");
+    }
+    if (k === "ml") return (mk.price !== null && mk.price !== undefined && mk.price > 0) ? "an UPSET game" : "a MONEYLINE game";
+    if (k === "rl") return "a RUN LINE game";
+    if (k === "pl") return "a PUCK LINE game";
+    return "a SPREAD game";
+  }
+  function periodName(k) { return k === "f5" ? "first five" : k === "p1" ? "first period" : "first half"; }
+  function pickWhy(pk, m, sp) {
+    var mk = pk.mk, dp = sp === "WNBA" ? 1 : 2, unit = sp === "WNBA" ? "points" : sp === "NHL" ? "goals" : "runs", s;
+    var price = mk.price !== null && mk.price !== undefined
+      ? ' At ' + sgn(mk.price, 0) + ' it needs ' + (mk.breakeven * 100).toFixed(1) + '%: ' + (mk.edge > 0 ? 'the price agrees.' : 'the price asks more than that chance, so this is the likeliest side, not a value bet.')
+      : ' No price typed.';
+    if (mk.key === "total") {
+      var f = m.total, lean = totalLean(f, f.line);
+      s = 'Projected ' + f.projected.toFixed(dp) + ' ' + unit + ' against the ' + f.line + ' line, so the ' + String(mk.side).toLowerCase() + ' at ' + (mk.p * 100).toFixed(1) + '%' +
+          (lean ? '. Behind it: ' + lean.parts.join('; ') + '.' + (lean.trend ? ' ' + lean.trend : '') : '.');
+    } else if (mk.key === "f5" || mk.key === "p1" || mk.key === "h1") {
+      s = 'Projected ' + periodName(mk.key) + (m.period !== undefined && m.period !== null && isFinite(+m.period) ? ' ' + (+m.period).toFixed(dp) + ' ' + unit : '') + ' against the ' + lineOf(mk) + ' line, so the ' +
+          String(mk.side).toLowerCase() + ' at ' + (mk.p * 100).toFixed(1) + '%. ' + (mk.notes || []).join(' ');
+    } else {
+      var home = mk.side === "HOME", team = home ? m.home : m.away;
+      var split = (m.lamHome !== null && m.lamHome !== undefined && m.lamAway !== null && m.lamAway !== undefined) ? m.lamHome - m.lamAway : null;
+      s = esc(mk.key === "ml" ? team + ' to win' : mk.pick) + ' at ' + (mk.p * 100).toFixed(1) + '%' +
+          (split !== null ? ': the sheet\'s split projects ' + esc(split >= 0 ? m.home : m.away) + ' by ' + Math.abs(split).toFixed(dp) + ' ' + unit + ' (' + esc(m.away) + ' ' + m.lamAway.toFixed(dp) + ', ' + esc(m.home) + ' ' + m.lamHome.toFixed(dp) + ')' : '') + '.' +
+          (sp === "WNBA" && mk.informed ? ' The four ratings move the margin off the book\'s number.'
+            : ' The sides carry no team information on this sheet in ' + (sp === "NHL" ? 'hockey (the goalies and the form score the total, not the margin)' : sp === "MLB" ? 'baseball (the pitchers and the pens score the total, not the margin)' : 'this game') +
+              ': this is the book\'s own number read back, and it is the likeliest thing on the board.') +
+          ' ' + (mk.notes || []).join(' ');
+    }
+    return s + price;
+  }
+  function pickBlock(pk, m, sp) {
+    var mk = pk.mk;
+    if (pk.none) return '<div class="pickcard none"><div class="lab">The pick</div><div class="pick">No pick yet</div>' +
+      '<div class="why">Nothing on the card separates the sides: the likeliest side on the board is ' + esc(mk.pick) + ' at ' + (mk.p * 100).toFixed(1) + '%, a coin flip. Type the inputs and a side will show.</div></div>';
+    return '<div class="pickcard" data-key="' + esc(mk.key) + '" data-side="' + esc(mk.side) + '">' +
+      '<div class="lab">The pick · ' + esc(pk.type) + '</div>' +
+      '<div class="head"><div class="pick ' + sideClass(mk.side) + '">' + esc(mk.pick) + (mk.band ? '<span class="band' + (mk.band === "NO BET" ? "" : " hot") + '">' + esc(mk.band) + '</span>' : '') + '</div>' +
+      '<div class="p">' + (mk.p * 100).toFixed(1) + '%</div></div>' +
+      '<div class="why"><b>Why</b>: ' + pickWhy(pk, m, sp) + '</div></div>';
   }
   function parlayFour(dateISO, sport) {
     var legs = [], skipped = 0;
@@ -921,12 +1005,14 @@
   var PICKABLE = { MLB: ["total", "f5"], WNBA: ["spread", "ml"], NHL: ["total", "p1"] };
   /* 12 Oct 2026, at the user's request, for a week with last night as the
      first test: the hockey book picks the FULL-GAME TOTAL only, and every
-     hockey total gets a side (callOf). For games dated 11 to 18 Oct the first
-     period is listed and graded, never a straight bet or a parlay leg;
-     nothing else on the hockey card changes, and games dated 19 Oct onward
-     pick as before. */
-  var NHL_TOTAL_ONLY = ["2026-10-11", "2026-10-12", "2026-10-13", "2026-10-14", "2026-10-15", "2026-10-16", "2026-10-17", "2026-10-18"];
-  var NHL_TOTAL_ONLY_LABEL = "11-18 Oct";
+     hockey total gets a side (callOf). Cut short the same day, once the odds
+     feed was in ("scratch the week trial"): the window is the two days whose
+     calls were already made, 11 and 12 Oct, so those rows keep grading as
+     calls and the tile keeps their record; from 13 Oct the hockey rail shows
+     THE PICK (thePick) like every other sport, and the first period picks
+     as before. */
+  var NHL_TOTAL_ONLY = ["2026-10-11", "2026-10-12"];
+  var NHL_TOTAL_ONLY_LABEL = "11-12 Oct";
   function pickable(mk, sp, gdate) {
     if ((PICKABLE[sp] || PICKABLE.MLB).indexOf(mk.key) < 0) return false;
     if (sp === "NHL" && mk.key === "p1") {
@@ -942,7 +1028,7 @@
   function notPickedWhy(sp, mk) {
     if (sp === "WNBA" && mk.key !== "total") return "This side was stored without the four ratings, so it is the book's own price read back and carries no team information. Type the ratings (paste the stats.wnba.com table) and press Rescore, and the spread and the moneyline become pickable.";
     if (sp === "WNBA") return "The WNBA total leaned under by construction and went 6-7 on the first 13 (says 54.8%, does 46.2%); from 2 Oct the WNBA book picks the spread and the moneyline, which carry the ratings, and the total is listed and graded but never a straight bet or a parlay leg.";
-    if (sp === "NHL" && mk.key === "p1") return "For games from 11 to 18 Oct the hockey book picks the full-game total only, at the user's request. The first period is listed and graded, never a straight bet or a parlay leg, that week.";
+    if (sp === "NHL" && mk.key === "p1") return "For games on 11 and 12 Oct the hockey book picked the full-game total only, at the user's request (a week's trial, cut short once the odds feed was in). The first period is listed and graded, never a straight bet or a parlay leg, on those two days.";
     if (sp === "NHL") return "Derived from the book's own moneyline with no team information behind it, like the run line, which said 52.5% and did 42.3% on its first 52. Listed and graded, never a straight bet or a parlay leg, until the record says otherwise.";
     return "Derived from the book's own moneyline with no team information behind it. On the first 52 graded games the run line said 52.5% and did 42.3%, so it is listed and graded but never a straight bet or a parlay leg.";
   }
@@ -1039,7 +1125,7 @@
         (x.thin ? '; the rule is carrying this one, not the number.' : '; the number agrees.') + ' Reviewed at 40 picks.</div>';
     }
     if (x.tier === "call") {
-      return '<div class="swap"><b>The call</b> — from 11 to 18 Oct every hockey total gets a side, at your request: this is the side the sheet thinks likelier, ' +
+      return '<div class="swap"><b>The call</b> — on 11 and 12 Oct every hockey total got a side, at your request: this is the side the sheet thinks likelier, ' +
         (x.mk.p * 100).toFixed(1) + '%' + (x.mk.price !== null ? ', and ' + sgn(x.mk.price, 0) + ' needs ' + (implied(x.mk.price) * 100).toFixed(1) + '%' + (x.thin ? ': the price is steeper than the chance, so this is a call, not a bet.' : ': the price agrees.') : '.') +
         ' The total tile keeps the calls\' own record.</div>';
     }
@@ -1104,7 +1190,7 @@
       '<div class="n2">' + esc(x.mk.pick) + (bandOf(x.mk) ? ' <span class="band hot">' + esc(bandOf(x.mk)) + '</span>' : '') +
         (x.fav ? ' <span class="band favb" title="The strongest lean among tonight\'s hockey totals">★ LIKES MOST</span>' : '') +
         (x.tier === "rule" ? ' <span class="band hot" title="The side the book priced cheaper: a rule, not a probability">CHEAPER SIDE</span>' : '') +
-        (x.tier === "call" ? ' <span class="band hot" title="11-18 Oct: every hockey total gets a side, over or under, at the user\'s request">CALL</span>' : '') + '</div>' +
+        (x.tier === "call" ? ' <span class="band hot" title="11-12 Oct: every hockey total got a side, over or under, at the user\'s request">CALL</span>' : '') + '</div>' +
       '<div class="n3">' + (x.mk.p * 100).toFixed(1) + '% · ' + (x.mk.price !== null ? sgn(x.mk.price, 0) + ' · edge ' + sgn(x.mk.edge * 100, 1) : 'no price') +
         (res ? ' · <span class="chip ' + res + '">' + resText(res) + '</span>' : '') + '</div>' +
       '<div class="n4">' + esc(x.row.matchup) + ' · ' + esc(x.mk.label) +
@@ -1363,7 +1449,7 @@
                                             clv: { n: 0, beat: 0, lost: 0, even: 0, runs: 0 } }; };
     var bySport = {};
     ["MLB", "WNBA"].forEach(function (sp) {
-      var b = { stats: {}, top: fresh("The parlay four"), topE: fresh("Best straight bets"), any: false };
+      var b = { stats: {}, pick: fresh("The pick"), top: fresh("The parlay four"), topE: fresh("Best straight bets"), any: false };
       KEYS[sp].forEach(function (k) { b.stats[k[0]] = fresh(k[1]); });
       bySport[sp] = b;
     });
@@ -1418,6 +1504,14 @@
         var st = b.stats[mk.key]; if (!st) return;
         b.any = true; tally(st, mk, res, r);
       });
+      /* the pick's own record (12 Oct 2026): the likeliest side of any market
+         on the row, graded like the rest, every row on the card so the
+         approach is read against the whole book. The hockey window's rows
+         were calls, not picks, and stay out. */
+      if (!(r.sport === "NHL" && NHL_TOTAL_ONLY.indexOf(r.gdate || "") >= 0)) {
+        var pk = thePick(r.markets, r.sport), pres = pk && !pk.none ? gradeMarket(pk.mk, r.finals) : null;
+        if (pres !== null && pres !== "invalid") { b.any = true; tally(b.pick, pk.mk, pres, null, r); }
+      }
       if (r.gdate) dates[r.gdate] = true;
     });
     Object.keys(dates).forEach(function (d) {
@@ -1474,7 +1568,7 @@
       h += '<div class="subhead" data-sport="' + sp + '">' + sp + ' <span class="tag">' + graded + ' graded game' + (graded === 1 ? '' : 's') + ' · ' + totalN + ' graded markets</span></div>';
       h += forecastBlock(sp);
       var unit = sp === "WNBA" ? "pts" : "runs";
-      h += '<div class="calib" data-sport="' + sp + '">' + KEYS[sp].map(function (k) { return tiles(b.stats[k[0]], unit); }).join('') + tiles(b.top, unit) + tiles(b.topE, unit) + '</div>';
+      h += '<div class="calib" data-sport="' + sp + '">' + tiles(b.pick, unit) + KEYS[sp].map(function (k) { return tiles(b.stats[k[0]], unit); }).join('') + tiles(b.top, unit) + tiles(b.topE, unit) + '</div>';
       h += '<div class="verdict">' + (totalN < 30
         ? '<b>' + totalN + ' graded ' + sp + ' markets.</b> Nothing here can be read yet — one standard error on a hit rate is ' +
           (totalN ? (100 / Math.sqrt(totalN) / 2).toFixed(0) : '—') + ' points at this size. ' +

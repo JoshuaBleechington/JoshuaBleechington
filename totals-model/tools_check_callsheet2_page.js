@@ -254,7 +254,7 @@ const CHECKS = ["dome","playoff"];
     const tag = document.getElementById('rankTag').textContent;
     return { rows, parlay, parlayNote, tag, checked: document.getElementById('byEdge').checked };
   });
-  chk(!dflt.checked && dflt.tag === 'by edge', 'default: the rail ranks by edge; the table by chance unless edge is ticked', dflt.tag);
+  chk(!dflt.checked && /^(the pick, then the rest by edge|no pick yet|the total only)/.test(dflt.tag), 'default: the rail shows the pick, then the rest by edge; the table by chance unless edge is ticked', dflt.tag);
   chk(dflt.rows.every((p, i) => i === 0 || p <= dflt.rows[i - 1] + 1e-9), 'default: board ordered by chance, best first', dflt.rows.join(' > '));
   chk(/Only one leg clears its price/.test(dflt.parlayNote),
       'parlay: the bare WNBA row (market only, under at -155 needing 60.8%) has no leg that clears its price, so the board says one leg is not a parlay', dflt.parlayNote.slice(0, 160));

@@ -3192,7 +3192,7 @@
       s = esc(mk.key === "ml" ? team + ' to win' : mk.pick) + ' at ' + (mk.p * 100).toFixed(1) + '%' +
           (split !== null ? ': the sheet\'s split projects ' + esc(split >= 0 ? m.home : m.away) + ' by ' + Math.abs(split).toFixed(dp) + ' ' + unit + ' (' + esc(m.away) + ' ' + m.lamAway.toFixed(dp) + ', ' + esc(m.home) + ' ' + m.lamHome.toFixed(dp) + ')' : '') + '.' +
           (sp === "WNBA" && mk.informed ? ' The four ratings move the margin off the book\'s number.'
-            : ' The sides carry no team information on this sheet in ' + (sp === "NHL" ? 'hockey (the goalies and the form score the total, not the margin)' : sp === "MLB" ? 'baseball (the pitchers and the pens score the total, not the margin)' : 'this game') +
+            : ' The sides carry no team information on this sheet in ' + (sp === "NHL" ? 'hockey (measured 12 Oct 2026 on two seasons: goals, shots, expected goals, form and the goalies added nothing to the moneyline, and the favourite lost four to seven cents on the dollar at the close)' : sp === "MLB" ? 'baseball (the pitchers and the pens score the total, not the margin)' : 'this game') +
               ': this is the book\'s own number read back, and it is the likeliest thing on the board.') +
           ' ' + (mk.notes || []).join(' ');
     }

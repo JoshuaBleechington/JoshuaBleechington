@@ -94,6 +94,55 @@ and in baseball and hockey those are the market's own numbers; the record
 tile keeps **The pick** as its own line per sport, over every row on the
 card, so the approach reads against the whole book from day one.
 
+**The hockey sides, measured** (12 Oct 2026, `tools_backtest_nhl_sides.py`,
+run the night the pick went in, at the user's word: "run the hockey sides
+backtest on the ledgers"). Two seasons, 2,616 games, each with the actual
+starters and the closing home moneyline (KillerSports; one price kept, a
+4.5% hold assumed and the market then calibrated by a logistic fit on
+2024-25: slope 0.966, intercept +0.12, a priced market). Every input the
+sheet holds, signed home minus away, was read against the market two ways:
+the slope of (home won − market chance) on the input, and a logistic model
+of market plus input fitted on 2024-25 and scored on 2025-26 out of sample.
+
+| input (home − away) | residual t | coef/SD beside the market (t) | out-of-sample log-loss vs the market | bets at 3+ points, 2025-26 |
+| --- | --- | --- | --- | --- |
+| goal difference to date | −0.9 | −0.07 (−0.8) | +0.0017 | 9-10, −2.9u |
+| shot difference to date | +0.1 | +0.01 (+0.1) | +0.0015 | none |
+| expected-goal difference to date (NST) | −0.5 | −0.09 (−1.0) | +0.0026 | 25-20, −0.5u |
+| expected-goal difference, last season | −1.6 | −0.11 (−1.2) | +0.0009 | 50-53, −11.7u |
+| last-ten goal difference | −1.4 | −0.14 (−1.9) | +0.0034 | 179-196, −35.4u |
+| the goalies (starters, blended, shrunk) | 0.0 | +0.08 (+1.2) | +0.0016 | 82-70, +2.8u |
+| rest days (capped at 3) | +2.3 | +0.12 (+2.1) | −0.0003 | 158-153, −3.1u |
+| back to back, the other side tired | +1.8 | +0.11 (+1.8) | +0.0002 | 159-122, −0.6u |
+| a backup in the other net | +2.2 | +0.09 (+1.6) | −0.0011 | 195-166, +14.1u |
+| all together (shots out) | | market's own slope stays 1.25 | +0.0046 | 366-318, +20.3u on 684 (±26u) |
+
+Reading: **nothing the sheet holds picks a winner better than the
+moneyline.** Team quality to date, expected goals this season and last,
+and recent form all carry a negative sign beside the price, which is the
+market slightly over-rating the strong and the hot side, and none of them
+lowers the out-of-sample log-loss. The goalies, the one input that moves
+the total, do nothing to the side. Rest, a tired opponent and a backup in
+the other net are the only inputs with a lean in the right direction, each
+about two standard errors on the residual and none of them money except
+the backup line (+3.9% a bet on 361, one standard error), which joins the
+watched list and scores nothing. The all-inputs model's +20 units come on
+684 bets with a standard error near 26 and a worse log-loss: noise with a
+dog tilt. So the pick's why says, in hockey, that the sides are the book's
+own number read back, and now says it as a measured fact.
+
+The base rates the pick leans on, both seasons: home ice 54.2% won against
+53.5% priced. By the favourite's price, the favourite won / the dog +1.5
+covered / the favourite's moneyline returned: −200 or more 68.2% / 55.5%
+/ −4.8% a bet; −199 to −150 58.2% / 62.9% / −7.1%; −149 to −120 54.0% /
+68.6% / −5.5%; −119 to −101 50.2% / 70.5% / −4.0%. Every dog at the close
+returned −2.7% a bet. **The likeliest side of a hockey moneyline lost four
+to seven cents on the dollar at the closing price over two seasons**: it
+hit, as a favourite does, and the price was more than that. The pick tile
+will show whether tonight's board is any different; the puck line's price
+is not in the KillerSports pull, so the +1.5 dog's return waits on the odds
+history.
+
 **11 and 12 Oct 2026: the full-game total only, and every total gets a
 side.** At the user's request, for a week with the night before as the
 first test, the hockey book picked nothing but the full-game total. Cut

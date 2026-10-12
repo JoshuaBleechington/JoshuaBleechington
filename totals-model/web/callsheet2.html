@@ -2404,21 +2404,12 @@
       if ((r.gdate || "") !== dateISO || r.sport !== "WNBA" || (sport && r.sport !== sport)) return;
       (r.markets || []).forEach(function (mk) { var s = shadeOf(mk); if (s) rule.push({ row: r, mk: s }); });
     });
-    /* the call: every hockey total in the two-day window that is not already
-       a verdict, on the sheet's likelier side, whatever the price */
-    var call = [];
-    card.forEach(function (r) {
-      if ((r.gdate || "") !== dateISO || r.sport !== "NHL" || (sport && r.sport !== sport)) return;
-      var tot = (r.markets || []).filter(function (mk) { return mk.key === "total"; })[0], cv = callOf(r, tot);
-      if (cv && !verdict.some(function (y) { return y.row.id === r.id; })) call.push({ row: r, mk: cv });
-    });
     var value = all.filter(function (x) {
       return pickable(x.mk, x.row.sport, x.row.gdate) && !(x.mk.key === "total" && bandOf(x.mk)) && x.mk.edge > 0 &&
              !callOf(x.row, x.mk) &&
              !rule.some(function (y) { return y.row.id === x.row.id && y.mk.pick === x.mk.pick; });
     });
     verdict.forEach(function (x) { x.tier = "verdict"; x.thin = x.mk.edge <= 0; });
-    call.forEach(function (x) { x.tier = "call"; x.thin = x.mk.edge === null || x.mk.edge <= 0; });
     /* A verdict whose price is steeper than its chance stays on the list on
        the strength of the MLB record (12-7 on #1's bands). Hockey has no such
        record -- its bands were 3-5 on the first 31 games, every one of them
@@ -2426,6 +2417,16 @@
        so a hockey verdict lists only when it also clears its price. Asked for
        on 5 Oct: "it gives a bet signal at 53% but doesn't cover". */
     verdict = verdict.filter(function (x) { return !(x.thin && x.row.sport === "NHL"); });
+    /* the call: every hockey total in the window that is not a LISTED verdict
+       (a hockey verdict dropped for its price becomes a call), on the sheet's
+       likelier side, whatever the price */
+    var call = [];
+    card.forEach(function (r) {
+      if ((r.gdate || "") !== dateISO || r.sport !== "NHL" || (sport && r.sport !== sport)) return;
+      var tot = (r.markets || []).filter(function (mk) { return mk.key === "total"; })[0], cv = callOf(r, tot);
+      if (cv && !verdict.some(function (y) { return y.row.id === r.id; })) call.push({ row: r, mk: cv });
+    });
+    call.forEach(function (x) { x.tier = "call"; x.thin = x.mk.edge === null || x.mk.edge <= 0; });
     rule.forEach(function (x) { x.tier = "rule"; x.thin = x.mk.edge === null || x.mk.edge <= 0; });
     value.forEach(function (x) { x.tier = "value"; x.thin = false; });
     var rows = verdict.concat(call).concat(rule).concat(value).slice(0, Math.max(8, verdict.length + call.length));

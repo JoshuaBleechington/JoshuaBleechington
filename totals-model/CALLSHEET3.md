@@ -250,6 +250,35 @@ slate fills each club's conceded and scored per game from the ledger
 clubs that trail late, conceding 0.55 and 0.50 and scoring 0.25 and 0.30,
 net +0.50, +0.20 on the line toward the over.
 
+**Travel spots, measured null; the backup rule's anatomy found** (13 Oct
+2026, `tools_backtest_nhl_travel.py`, at the user's word: "run the travel
+spots test too"). From the schedule alone, 2,577 games with both clubs'
+spots: the away club crossing two or more time zones since its last game
+(282 games, residual −0.05, west and east split 72-58 and 68-73 over), two
+or more zones off its own clock (851, −0.05), 1,500 miles flown (237,
+−0.10), the fourth game or more of a road trip (408, −0.07; the home side
+won 58.1% against 54.4% priced, a point and a half of standard error), the
+first game home after three on the road (417, −0.11), the away club's third
+game in four nights (576, −0.05), both rested two days (234, −0.21, t −1.4),
+and every continuous measure (miles, zones, trip length) under one and a
+half standard errors on the total and on the sides. Null, all of it. One
+line stood out, the HOME club's third game in four nights (446, −0.28, t
+−2.6, the over 43.6%), and the split explained it: with a day off it is
+−0.13 and the second season +0.06; on a back to back it is −0.52 (t −2.9).
+And the home back to back itself is the backup goalie: the home club on a
+back to back with a regular starter in net ran −0.06 (139 games, the under
+51.1%), with a backup in either net −0.53 (115, the under 65.2%, t −2.5).
+The backup rule's whole edge sits there: a backup with the home club on a
+back to back 65.2% under on 115, a backup with the away club on one 52.7%
+on 154, a backup with nobody tired 51.4% on 498. Cut finer it is 61 games
+for the home club's own backup (50.0% in 2024-25 on 26, 73.5% in 2025-26
+on 35; a cold one 16-3), which is too few and too split to re-size the
+rule on. So the rule stays as scored (−0.15 one backup, −0.25 cold), and
+the total tile keeps a new watched line, **"home back to back with a
+backup, the under"**, so the cell builds its own record before it can
+size anything. The pooled rule is where the two seasons agree; this is
+where the mechanism probably lives.
+
 **The hockey sides, measured** (12 Oct 2026, `tools_backtest_nhl_sides.py`,
 run the night the pick went in, at the user's word: "run the hockey sides
 backtest on the ledgers"). Two seasons, 2,616 games, each with the actual

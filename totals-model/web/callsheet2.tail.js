@@ -1584,6 +1584,11 @@
             if (ur !== null && ur !== "invalid") {
               if (tg.b2b) count(t.b2b || (t.b2b = { w: 0, l: 0, p: 0 }), ur);
               if (tg.backup) count(t.backup || (t.backup = { w: 0, l: 0, p: 0 }), ur);
+              /* the HOME club on a back to back with a backup in net (13 Oct 2026): the cell the
+                 backup rule's edge sits in on two seasons (the under 65.2% on 115, split 50% and
+                 73.5% by season), watched on its own line before it can size anything */
+              var hr = numOf((row.inputs || {}).hrest);
+              if (tg.backup && hr !== null && hr <= 0) count(t.hb2bBackup || (t.hb2bBackup = { w: 0, l: 0, p: 0 }), ur);
             }
           }
         }
@@ -1645,6 +1650,7 @@
       ["with the crowd", "against the crowd"].forEach(function (k) { if (s.crowd[k]) parts.push(k + ' ' + rec(s.crowd[k])); });
       if (s.b2b) parts.push('back to back, the under ' + rec(s.b2b));
       if (s.backup) parts.push('backup in net, the under ' + rec(s.backup));
+      if (s.hb2bBackup) parts.push('home back to back with a backup, the under ' + rec(s.hb2bBackup));
       ["goalies right", "goalie line wrong"].forEach(function (k) { if (s.goalie[k]) parts.push(k + ' ' + rec(s.goalie[k])); });
       if (s.call) parts.push('the call, ' + NHL_TOTAL_ONLY_LABEL + ' ' + rec(s.call));
       if (s.sharpShade) parts.push("Pinnacle's shade, 3+ points " + rec(s.sharpShade));

@@ -65,7 +65,7 @@ from typing import Any
 from .callsheet2 import Market, Matchup, _pick, _side, _total_market, team_pmf
 from .fullgame import (
     BANDS, HOLD_REFERENCE, Delta, Estimate, Forecast, PLAUSIBLE, _assemble, _ok,
-    devig, fair_total, hold, market_confidence, nb_pmf, nb_split, register_split,
+    devig, fair_total, hold, implied, market_confidence, nb_pmf, nb_split, register_split,
 )
 
 # ===========================================================================
@@ -149,6 +149,14 @@ REG_PHI = (RESIDUAL_SD ** 2
 #: that mean says 2+ in 52.0%). Poisson, no empty net, no overtime.
 P1_SHARE = 0.314
 P1_PHI = 1.0
+#: An alternate first-period number, flagged (13 Oct 2026). The odds run
+#: took one book's alternate (2.5 at +240/-325) as the period line on all
+#: sixteen games of a card when the carded book posted no period total, and
+#: the sheet priced the period row against it. The two prices of a main
+#: period line sit within 15 points of implied chance of each other on 1,000
+#: carded periods (-155/+115 is the widest); an alternate sits 40 or more
+#: apart. Above this gap the why list says the line reads as an alternate.
+P1_ALT_GAP = 0.25
 
 # --- the empty net, on the margin -----------------------------------------
 #: P(the leading side scores into the empty net | it leads by one at the end
@@ -679,6 +687,14 @@ def forecast_nhl(
                 "read of the same game, untested against any history.")
         estimates.append(Estimate("First-period market", implied_total, w["p1mkt"], why1, mechanism=False))
         notes.append("First-period market as a second read of the game: " + why1)
+        gap1 = abs(implied(p1_over_price) - implied(p1_under_price))
+        if gap1 >= P1_ALT_GAP:
+            notes.append(f"The first-period line {p1_line:g} at {p1_over_price:+g}/{p1_under_price:+g} reads as an "
+                         f"ALTERNATE number: its two prices sit {gap1 * 100:.0f} points of implied chance apart, "
+                         f"where a main period line sits within 15. The main first-period total is the number most "
+                         "books post near even. Retype that line and its prices, or ignore the first-period row: "
+                         "the sixty-minute read above stands, but the period row is priced against a number the "
+                         "market does not treat as its main line.")
 
     # --- rest: SHOWN, NOT SCORED -------------------------------------------
     # A back-to-back changes who is in net more than it changes the score,

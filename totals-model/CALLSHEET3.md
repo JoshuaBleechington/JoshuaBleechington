@@ -503,6 +503,23 @@ even backup. A cold backup takes −0.25. With a backup in both nets (105
 games) the sign flipped on no sample, so nothing moves. The slate ticks
 the box from the club's starts; the user fixes it from Daily Faceoff.
 
+**Two corrections the 13 Oct 2026 card asked for.** The user's card that
+night carried ten Backup ticks on sixteen games, three of them on the
+club's starter (the rule needs ten starts, the clubs sat at five to seven,
+so every tick was by hand), and the odds run had written one book's
+alternate first-period number (2.5 at +240/−325) onto all sixteen rows
+because the carded book posted no period total. So (1) the why list now
+calls out a Backup tick on a goalie who holds half or more of his club's
+starts, with the instruction to untick it unless Daily Faceoff names
+someone else; (2) a period line whose two prices sit 25 or more points of
+implied chance apart (`P1_ALT_GAP`; a main period line sits within 15 on
+1,000 carded periods, an alternate at 40 or more) is named an alternate
+number in the why list, with the sixty-minute read of it left standing;
+and (3) the odds run takes the period line most books post both sides of
+(`odds_main_line`), priced at the carded book when it posts that number
+and at the first listed book that does otherwise, with a note naming the
+book.
+
 The same pass tested the schedule and found nothing to score: three games
 in four nights ran 0.13 under (849 games, 52.1%, both seasons, near the
 back-to-back label); a road trip's fifth game and later, divisional

@@ -2003,6 +2003,41 @@ def odds_rows(ev, market):
     return out
 
 
+def _imp(price):
+    price = float(price)
+    return 100.0 / (price + 100.0) if price > 0 else -price / (-price + 100.0)
+
+
+def odds_main_line(rows, books):
+    """The MAIN number of a market from every book's postings (odds_rows): the
+    point most books post both sides of, ties to the most evenly priced, and
+    that point's prices at the first of `books` that posts it. A guard against
+    a book listing an alternate as its line: on 13 Oct 2026 BetMGM's
+    first-period total came through as 2.5 at +240/-325 while five books had
+    1.5, the carded book had no period line, and the sheet's first period was
+    the alternate on all sixteen games. Returns (point, over, under, book)."""
+    by = {}
+    for b, name, _desc, price, point in rows:
+        if point is None or name not in ("Over", "Under"):
+            continue
+        by.setdefault(point, {}).setdefault(b, {})[name] = price
+    cands = []
+    for point, bb in by.items():
+        full = {b: v for b, v in bb.items() if "Over" in v and "Under" in v}
+        if full:
+            even = min(abs(_imp(v["Over"]) - _imp(v["Under"])) for v in full.values())
+            cands.append((-len(full), even, point, full))
+    if not cands:
+        return None
+    cands.sort(key=lambda c: (c[0], c[1], c[2]))
+    _n, _even, point, full = cands[0]
+    for b in books:
+        if b in full:
+            return (point, full[b]["Over"], full[b]["Under"], b)
+    b = sorted(full)[0]
+    return (point, full[b]["Over"], full[b]["Under"], b)
+
+
 def odds_markets(ev):
     """{book: {market key: {outcome name: (price, point)}}} for one event document."""
     out = {}
@@ -2031,7 +2066,6 @@ def odds_game(ev, sport, books, extra=None):
          "away": odds_nick(full_away), "home": odds_nick(full_home), "eventId": ev.get("id"),
          "first_utc": ev.get("commence_time"), "book": "", "inputs": {}, "notes": []}
     seen = odds_markets(ev)
-    per = odds_markets(extra) if extra else {}
     retail = [b for b in books if b != ODDS_SHARP] or list(books)
     book = (next((b for b in retail if b in seen and "totals" in seen[b]), None) or next((b for b in retail if b in seen), None)
             or next((b for b in books if b in seen), None))
@@ -2065,11 +2099,16 @@ def odds_game(ev, sport, books, extra=None):
             if sharp.get("line") is not None and i.get("line") and abs(sharp["line"] - float(i["line"])) > 1e-9:
                 g["notes"].append("Pinnacle has the total at %s (%s/%s) against the carded %s: the sharp line sits %s. Shown, not scored." % (
                     fmt(sharp["line"], 1), sharp["op"], sharp["up"], i["line"], "higher" if sharp["line"] > float(i["line"]) else "lower"))
+    # the period total: the number most books post, at the carded book when it posts it,
+    # else the first retail book that does (13 Oct 2026: never one book's alternate again)
     pkey = ODDS_PERIOD[sport]
-    pm = (per.get(book) or {}).get(pkey) or next((per[b][pkey] for b in retail if b in per and pkey in per[b]), None)
-    if pm and "Over" in pm and "Under" in pm and pm["Over"][1] is not None:
+    prow = odds_rows(extra, pkey)
+    pm = odds_main_line(prow, [book] + retail)
+    if pm:
         k0, k1, k2 = ODDS_PERIOD_KEYS[sport]
-        i[k0], i[k1], i[k2] = fmt(pm["Over"][1], 1), str(pm["Over"][0]), str(pm["Under"][0])
+        i[k0], i[k1], i[k2] = fmt(pm[0], 1), str(pm[1]), str(pm[2])
+        if pm[3] != book:
+            g["notes"].append("The period line is %s's, the number most books post (%s at %s/%s); the carded book posts no period line." % (pm[3], fmt(pm[0], 1), pm[1], pm[2]))
     shop = {}
     for b, mks in seen.items():
         tt = mks.get("totals") or {}
@@ -2084,11 +2123,9 @@ def odds_game(ev, sport, books, extra=None):
         for side, nm in (("HOME", full_home), ("AWAY", full_away)):
             if nm in ss and ss[nm][1] is not None:
                 shop.setdefault("spread", {}).setdefault(side, []).append([b, ss[nm][0], ss[nm][1]])
-    for b, mks in per.items():
-        pp = mks.get(pkey) or {}
-        for side in ("Over", "Under"):
-            if side in pp and pp[side][1] is not None:
-                shop.setdefault("period", {}).setdefault(side.upper(), []).append([b, pp[side][0], pp[side][1]])
+    for b, name, _desc, price, point in prow:    # every book's period postings, every number, for the shop
+        if name in ("Over", "Under") and point is not None:
+            shop.setdefault("period", {}).setdefault(name.upper(), []).append([b, price, point])
     # every number the books post on the total, with its price, and each side's own total
     for b, name, _desc, price, point in odds_rows(extra, "alternate_totals"):
         if name in ("Over", "Under") and point is not None:
@@ -2706,6 +2743,10 @@ def selftest():
     check("odds: the alternate totals ride in the shop with their prices", [x[2] for x in shop3["alt"]["UNDER"]] == [6.5, 7.5] and shop3["alt"]["OVER"][1][1] == 130)
     check("odds: the team totals ride as each side's own number", shop3["team"]["HOME"]["OVER"][0] == ["fanatics", -115, 3.5] and shop3["team"]["AWAY"]["OVER"][0][2] == 4.5 and "UNDER" not in shop3["team"]["AWAY"])
     check("odds: the period total still fills beside them", og3["inputs"]["f5line"] == "3.5")
+    check("odds: the main period line is the number most books post, not one book's alternate, at the first book in the list that posts it",
+          odds_main_line([("betmgm", "Over", "", 240, 2.5), ("betmgm", "Under", "", -325, 2.5), ("draftkings", "Over", "", -130, 1.5), ("draftkings", "Under", "", 100, 1.5),
+                          ("pinnacle", "Over", "", -122, 1.5), ("pinnacle", "Under", "", 104, 1.5)], ["fanatics", "betmgm", "draftkings"]) == (1.5, -130, 100, "draftkings")
+          and odds_main_line([("betmgm", "Over", "", 240, 2.5)], ["betmgm"]) is None and odds_main_line([], ["fanatics"]) is None)
     e3 = odds_log_update(tmp, og3, "2026-10-12T23:00:00Z")
     check("odds log: the sharp book's number rides in the log", e3["last"]["sharp"] == {"line": "7.5", "op": "-108", "up": "-112"} and e3["first"]["line"] == "7.0")
     _last_headers.clear()

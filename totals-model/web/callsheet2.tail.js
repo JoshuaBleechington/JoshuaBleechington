@@ -820,10 +820,18 @@
   }
   function splitOf(raw) {
     var shop = shopOf(raw), t = shop && shop.team; if (!t) return null;
+    /* the books post different team-total numbers (13 Oct 2026: Fanatics 3.5 at +135, FanDuel
+       2.5 at -172, BetMGM 3.0 at -118 on one side of one game); the main one is the most
+       evenly priced pair, the carded book on a tie, a lone over as the last resort */
     var pick = function (side) {
-      var list = (t[side] || {}).OVER || []; if (!list.length) return null;
-      var x = list.filter(function (y) { return y[0] === shop.book; })[0] || list[0];
-      return { book: x[0], price: +x[1], point: +x[2] };
+      var over = (t[side] || {}).OVER || [], under = (t[side] || {}).UNDER || []; if (!over.length) return null;
+      var best = null;
+      over.forEach(function (o) {
+        var u = under.filter(function (x) { return x[0] === o[0] && Math.abs(+x[2] - +o[2]) < 1e-9; })[0];
+        var cand = { book: o[0], price: +o[1], point: +o[2], gap: u ? Math.abs(implied(+o[1]) - implied(+u[1])) : 1, carded: o[0] === shop.book ? 0 : 1 };
+        if (!best || cand.gap < best.gap - 1e-9 || (Math.abs(cand.gap - best.gap) <= 1e-9 && cand.carded < best.carded)) best = cand;
+      });
+      return best;
     };
     var a = pick("AWAY"), h = pick("HOME");
     return a || h ? { away: a, home: h } : null;

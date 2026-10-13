@@ -412,6 +412,32 @@ const CHECKS = ["dome","playoff","agconf","hgconf","agbk","hgbk"];
       'october: since 11 Oct a game dated in October carries no delta, only a note; November says nothing', JSON.stringify({ nov: octo.nov.over, oct: octo.oct.over }));
   chk(octo.oct.band === 'NO BET' || octo.oct.band === '', 'october: the delta alone cannot buy a band', octo.oct.band);
 
+  // ---- 13 Oct 2026: the why list flags an alternate period number and a Backup tick over a starter ----
+  const flags = await pg.evaluate(async () => {
+    const wait = () => new Promise(r => setTimeout(r, 60));
+    const set = (id, v) => { const el = document.getElementById(id); el.value = v; el.dispatchEvent(new Event('input', { bubbles: true })); };
+    document.getElementById('clear').click(); document.getElementById('m-nhl').click(); await wait();
+    set('gdate', '2026-10-21'); set('away', 'Wild'); set('home', 'Blues'); set('line', '6'); set('op', '-110'); set('up', '-110');
+    set('p1line', '2.5'); set('p1op', '240'); set('p1up', '-325'); await wait();
+    const alt = document.getElementById('why').textContent;
+    set('p1line', '1.5'); set('p1op', '-155'); set('p1up', '115'); await wait();
+    const main = document.getElementById('why').textContent;
+    set('ngoalies', JSON.stringify({ away: [{ n: 'Jesper Wallstedt', sv: 0.912, sh: 180, gs: 6, cs: 6, ls: false }], home: [{ n: 'Jordan Binnington', sv: 0.901, sh: 170, gs: 5, cs: 6, ls: false }] }));
+    set('agname', 'Jesper Wallstedt'); set('hgname', 'Jordan Binnington');
+    document.getElementById('agbk').checked = true; document.getElementById('agbk').dispatchEvent(new Event('change', { bubbles: true })); await wait();
+    const tick = document.getElementById('why').textContent;
+    document.getElementById('agbk').checked = false; document.getElementById('agbk').dispatchEvent(new Event('change', { bubbles: true })); await wait();
+    const untick = document.getElementById('why').textContent;
+    document.getElementById('clear').click(); await wait();
+    return { alt, main, tick, untick };
+  });
+  chk(/The first-period line 2\.5 at \+240\/-325 reads as an ALTERNATE number: its two prices sit 47 points of implied chance apart/.test(flags.alt) && /First-period market/.test(flags.alt),
+      'flags: a period line priced +240/-325 is named an alternate number in the why list, and the sixty-minute read still stands', flags.alt.slice(flags.alt.indexOf('ALTERNATE') - 60, flags.alt.indexOf('ALTERNATE') + 120));
+  chk(!/ALTERNATE/.test(flags.main), 'flags: the widest main period line carded, -155/+115, draws no alternate flag', '');
+  chk(/Backup in net is ticked for Jesper Wallstedt, who has 6 of the club's 6 starts/.test(flags.tick) && /Untick it unless Daily Faceoff names a different starter/.test(flags.tick),
+      'flags: a Backup tick over the goalie with every start is called out, with the untick instruction', flags.tick.slice(flags.tick.indexOf('Backup in net is ticked') - 20, flags.tick.indexOf('Backup in net is ticked') + 200));
+  chk(!/Backup in net is ticked/.test(flags.untick), 'flags: unticked, the call-out goes', '');
+
   // ---- the slate fills the goalie boxes; a 2.0 backup carries MLB only --------------
   const slate = await pg.evaluate(async () => {
     const wait = () => new Promise(r => setTimeout(r, 80));

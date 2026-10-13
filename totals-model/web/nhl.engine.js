@@ -18,6 +18,7 @@
     TALENT_SD: 0.008,       // spread of goalie true-talent save percentage
     RESIDUAL_SD: 2.45,      // Poisson floor: the raw spread of totals is 2.31, narrower than Poisson (was 2.55)
     P1_SHARE: 0.314, P1_PHI: 1.0,   // first-period share of regulation goals, measured (was 0.30); Poisson to the decimal
+    P1_ALT_GAP: 0.25,               // a period line whose two prices sit this far apart in implied chance reads as an alternate number (13 Oct 2026; totals/nhl.py)
     ENG_ONE: 0.49, ENG_TWO: 0.70,   // P(empty-net goal | leading by one / by two): measured 13 Oct 2026 on 877 and 509 regulation wins (were 0.45 / 0.30 a priori; totals/nhl.py)
     OT_COMPRESSION: 0.5,
     H2H_FULL_AT: 4, DEFAULT_PUCK_LINE: 1.5, KMAX: 25
@@ -181,6 +182,19 @@
     } else if (backups.length === 2) {
       notes.push("A backup in <b>both</b> nets. Measured on 105 games with no direction (the one-backup under did not carry), so nothing moves; the record will say.");
     }
+    /* a Backup tick on a goalie who has most of his club's starts (13 Oct 2026: ten of
+       sixteen rows ticked by hand, three of them on starters, and four of the night's
+       seven picks stood on those ticks). The slate's goalie list says who the backup is. */
+    var gl = null;
+    try { gl = JSON.parse(txt("ngoalies") || "null"); } catch (e) { gl = null; }
+    [["away", "agname", "agbk"], ["home", "hgname", "hgbk"]].forEach(function (s) {
+      if (!checked(s[2]) || !gl) return;
+      var nm = txt(s[1]), g = ((gl[s[0]] || []).filter(function (x) { return x.n === nm; })[0]);
+      if (g && g.cs >= 3 && g.gs >= 0.5 * g.cs) {
+        notes.push("<b>Backup in net is ticked for " + esc(nm) + "</b>, who has " + g.gs + " of the club's " + g.cs + " starts. The box means the club's BACKUP goalie: ticked, the goalie lines are not scored and a tagged " +
+          sgn(NHL.BACKUP_DELTA) + " (" + sgn(NHL.BACKUP_DELTA_COLD) + " cold) goes on the under. Untick it unless Daily Faceoff names a different starter, and then pick that goalie in the list instead.");
+      }
+    });
 
     /* season scoring rates, FADED (13 Oct 2026, totals/nhl.py SCORING_FADE): each
        club's goals for and against per game to date against the ledger's league
@@ -274,6 +288,12 @@
         implied1.toFixed(2) + " for sixty minutes against the market's " + anchor.toFixed(2) + ". Weight " + w.p1mkt + ", tagged: a second market's read of the same game, untested against any history.";
       estimates.push(est("First-period market", implied1, w.p1mkt, why1, false));
       notes.push("<b>First-period market</b> as a second read of the game: " + why1);
+      var gap1 = Math.abs(implied(p1o) - implied(p1u));
+      if (gap1 >= NHL.P1_ALT_GAP) {
+        notes.push("The first-period line " + p1l + " at " + sgn(p1o, 0) + "/" + sgn(p1u, 0) + " reads as an <b>ALTERNATE</b> number: its two prices sit " + Math.round(gap1 * 100) +
+          " points of implied chance apart, where a main period line sits within 15. The main first-period total is the number most books post near even. " +
+          "Retype that line and its prices, or ignore the first-period row: the sixty-minute read above stands, but the period row is priced against a number the market does not treat as its main line.");
+      }
     }
     /* the last five from the form panel, read against tonight's line: shown, not
        scored -- the last ten carries the scored form; this names the trend */

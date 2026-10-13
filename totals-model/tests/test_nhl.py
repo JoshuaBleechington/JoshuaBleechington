@@ -471,17 +471,22 @@ class TestTheFirstPeriodMarketAsASecondRead(unittest.TestCase):
                                  p1_line=1.5, p1_over_price=-155, p1_under_price=115)
         self.assertIn("First-period market", [e.name for e in m.total.estimates])
 
-    def test_an_alternate_period_number_is_flagged_in_the_notes(self):
-        # 13 Oct 2026: the odds run carded one book's 2.5 at +240/-325 as the period line on a whole card
+    def test_an_alternate_period_number_is_flagged_and_not_read(self):
+        # 13 Oct 2026: the odds run carded one book's 2.5 at +240/-325 as the period line on a whole
+        # card; the de-vigged read off an alternate sat a quarter of a goal high, so it is left out
+        base = forecast_nhl("A @ B", 6.0, -110, -110)
         f = forecast_nhl("A @ B", 6.0, -110, -110, p1_line=2.5, p1_over_price=240, p1_under_price=-325)
         flag = [n for n in f.notes if "reads as an ALTERNATE number" in n]
         self.assertEqual(len(flag), 1)
         self.assertIn("2.5 at +240/-325", flag[0])
         self.assertIn("47 points of implied chance apart", flag[0])
-        self.assertIn("First-period market", [e.name for e in f.estimates])   # the sixty-minute read still stands
-        # the widest main period line carded, -155/+115, is 14 points apart: no flag
+        self.assertIn("NOT READ", flag[0])
+        self.assertNotIn("First-period market", [e.name for e in f.estimates])
+        self.assertAlmostEqual(f.projected, base.projected, places=9)    # the projection is untouched
+        # the widest main period line carded, -155/+115, is 14 points apart: read as before, no flag
         g = forecast_nhl("A @ B", 6.0, -110, -110, p1_line=1.5, p1_over_price=-155, p1_under_price=115)
         self.assertFalse([n for n in g.notes if "ALTERNATE" in n])
+        self.assertIn("First-period market", [e.name for e in g.estimates])
 
 
 class TestTheFirstPeriodAnchorIsNotRegressed(unittest.TestCase):

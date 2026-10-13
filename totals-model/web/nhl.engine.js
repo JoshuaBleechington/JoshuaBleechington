@@ -283,16 +283,20 @@
        overtime, is what the period price implies for sixty minutes; weight 0.5, tagged */
     var p1l = num("p1line"), p1o = num("p1op"), p1u = num("p1up");
     if (p1l !== null && p1o !== null && p1u !== null && ok(p1l, "nhl_period")) {
-      var a1 = nhlP1Anchor(p1l, p1o, p1u), implied1 = a1[0] / NHL.P1_SHARE + NHL.ENG + NHL.OT;
-      var why1 = "The period line: " + a1[1] + " Over the first period's " + Math.round(NHL.P1_SHARE * 100) + "% share of regulation goals, plus the empty net and overtime, that is " +
-        implied1.toFixed(2) + " for sixty minutes against the market's " + anchor.toFixed(2) + ". Weight " + w.p1mkt + ", tagged: a second market's read of the same game, untested against any history.";
-      estimates.push(est("First-period market", implied1, w.p1mkt, why1, false));
-      notes.push("<b>First-period market</b> as a second read of the game: " + why1);
       var gap1 = Math.abs(implied(p1o) - implied(p1u));
       if (gap1 >= NHL.P1_ALT_GAP) {
+        /* an alternate number is not read at all (13 Oct 2026): the de-vigged read off one sat
+           +0.24 above the full-game anchor on 16 games against +0.08 off a main line on 81 */
         notes.push("The first-period line " + p1l + " at " + sgn(p1o, 0) + "/" + sgn(p1u, 0) + " reads as an <b>ALTERNATE</b> number: its two prices sit " + Math.round(gap1 * 100) +
           " points of implied chance apart, where a main period line sits within 15. The main first-period total is the number most books post near even. " +
-          "Retype that line and its prices, or ignore the first-period row: the sixty-minute read above stands, but the period row is priced against a number the market does not treat as its main line.");
+          "<b>NOT READ</b>: a de-vigged alternate reads the game a quarter of a goal high (measured on the card, 13 Oct 2026), so the first-period market is left out of the projection " +
+          "and the period row is priced against a number the market does not treat as its main line. Retype the main line and its prices, or ignore the first-period row.");
+      } else {
+        var a1 = nhlP1Anchor(p1l, p1o, p1u), implied1 = a1[0] / NHL.P1_SHARE + NHL.ENG + NHL.OT;
+        var why1 = "The period line: " + a1[1] + " Over the first period's " + Math.round(NHL.P1_SHARE * 100) + "% share of regulation goals, plus the empty net and overtime, that is " +
+          implied1.toFixed(2) + " for sixty minutes against the market's " + anchor.toFixed(2) + ". Weight " + w.p1mkt + ", tagged: a second market's read of the same game, untested against any history.";
+        estimates.push(est("First-period market", implied1, w.p1mkt, why1, false));
+        notes.push("<b>First-period market</b> as a second read of the game: " + why1);
       }
     }
     /* the last five from the form panel, read against tonight's line: shown, not

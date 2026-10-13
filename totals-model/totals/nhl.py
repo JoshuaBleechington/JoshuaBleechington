@@ -679,22 +679,30 @@ def forecast_nhl(
     # --- the first-period market as a second read of the game (12 Oct 2026) --
     p1 = [p1_line, p1_over_price, p1_under_price]
     if all(v is not None for v in p1) and _ok(p1_line, "nhl_period"):
-        mu1, how1 = p1_anchor(p1_line, p1_over_price, p1_under_price)
-        implied_total = mu1 / P1_SHARE + EMPTY_NET_RATE + OT_RATE
-        why1 = (f"The period line: {how1} Over the first period's {P1_SHARE:.0%} share of regulation "
-                f"goals, plus the empty net and overtime, that is {implied_total:.2f} for sixty minutes "
-                f"against the market's {anchor:.2f}. Weight {w['p1mkt']:g}, tagged: a second market's "
-                "read of the same game, untested against any history.")
-        estimates.append(Estimate("First-period market", implied_total, w["p1mkt"], why1, mechanism=False))
-        notes.append("First-period market as a second read of the game: " + why1)
         gap1 = abs(implied(p1_over_price) - implied(p1_under_price))
         if gap1 >= P1_ALT_GAP:
+            # An alternate number is not read at all (13 Oct 2026): a
+            # proportional de-vig of a +220/-300 pair leaves too much chance
+            # on the long side, the period mean comes out high and the scaling
+            # triples it. On the card the read off an alternate sat +0.24
+            # above the full-game anchor (16 games) against +0.08 off a main
+            # line (81 games). The flag stays; the estimate goes.
             notes.append(f"The first-period line {p1_line:g} at {p1_over_price:+g}/{p1_under_price:+g} reads as an "
                          f"ALTERNATE number: its two prices sit {gap1 * 100:.0f} points of implied chance apart, "
                          f"where a main period line sits within 15. The main first-period total is the number most "
-                         "books post near even. Retype that line and its prices, or ignore the first-period row: "
-                         "the sixty-minute read above stands, but the period row is priced against a number the "
-                         "market does not treat as its main line.")
+                         "books post near even. NOT READ: a de-vigged alternate reads the game a quarter of a goal "
+                         "high (measured on the card, 13 Oct 2026), so the first-period market is left out of the "
+                         "projection and the period row is priced against a number the market does not treat as "
+                         "its main line. Retype the main line and its prices, or ignore the first-period row.")
+        else:
+            mu1, how1 = p1_anchor(p1_line, p1_over_price, p1_under_price)
+            implied_total = mu1 / P1_SHARE + EMPTY_NET_RATE + OT_RATE
+            why1 = (f"The period line: {how1} Over the first period's {P1_SHARE:.0%} share of regulation "
+                    f"goals, plus the empty net and overtime, that is {implied_total:.2f} for sixty minutes "
+                    f"against the market's {anchor:.2f}. Weight {w['p1mkt']:g}, tagged: a second market's "
+                    "read of the same game, untested against any history.")
+            estimates.append(Estimate("First-period market", implied_total, w["p1mkt"], why1, mechanism=False))
+            notes.append("First-period market as a second read of the game: " + why1)
 
     # --- rest: SHOWN, NOT SCORED -------------------------------------------
     # A back-to-back changes who is in net more than it changes the score,

@@ -431,9 +431,9 @@ const CHECKS = ["dome","playoff","agconf","hgconf","agbk","hgbk"];
     document.getElementById('clear').click(); await wait();
     return { alt, main, tick, untick };
   });
-  chk(/The first-period line 2\.5 at \+240\/-325 reads as an ALTERNATE number: its two prices sit 47 points of implied chance apart/.test(flags.alt) && /First-period market/.test(flags.alt),
-      'flags: a period line priced +240/-325 is named an alternate number in the why list, and the sixty-minute read still stands', flags.alt.slice(flags.alt.indexOf('ALTERNATE') - 60, flags.alt.indexOf('ALTERNATE') + 120));
-  chk(!/ALTERNATE/.test(flags.main), 'flags: the widest main period line carded, -155/+115, draws no alternate flag', '');
+  chk(/The first-period line 2\.5 at \+240\/-325 reads as an ALTERNATE number: its two prices sit 47 points of implied chance apart/.test(flags.alt) && /NOT READ/.test(flags.alt) && !/First-period market as a second read/.test(flags.alt),
+      'flags: a period line priced +240/-325 is named an alternate number in the why list and is not read into the projection', flags.alt.slice(flags.alt.indexOf('ALTERNATE') - 60, flags.alt.indexOf('ALTERNATE') + 120));
+  chk(!/ALTERNATE/.test(flags.main) && /First-period market as a second read/.test(flags.main), 'flags: the widest main period line carded, -155/+115, draws no alternate flag and is read as before', '');
   chk(/Backup in net is ticked for Jesper Wallstedt, who has 6 of the club's 6 starts/.test(flags.tick) && /Untick it unless Daily Faceoff names a different starter/.test(flags.tick),
       'flags: a Backup tick over the goalie with every start is called out, with the untick instruction', flags.tick.slice(flags.tick.indexOf('Backup in net is ticked') - 20, flags.tick.indexOf('Backup in net is ticked') + 200));
   chk(!/Backup in net is ticked/.test(flags.untick), 'flags: unticked, the call-out goes', '');

@@ -514,7 +514,11 @@ starts, with the instruction to untick it unless Daily Faceoff names
 someone else; (2) a period line whose two prices sit 25 or more points of
 implied chance apart (`P1_ALT_GAP`; a main period line sits within 15 on
 1,000 carded periods, an alternate at 40 or more) is named an alternate
-number in the why list, with the sixty-minute read of it left standing;
+number in the why list and is NOT read into the projection: a proportional
+de-vig of a +220/−300 pair leaves too much chance on the long side, and on
+the card the sixty-minute read off an alternate sat +0.24 above the
+full-game anchor (16 games) against +0.08 off a main line (81 games, where
+the read's lean has predicted nothing yet, 18-23 over when it sat high);
 and (3) the odds run takes the period line most books post both sides of
 (`odds_main_line`), priced at the carded book when it posts that number
 and at the first listed book that does otherwise, with a note naming the

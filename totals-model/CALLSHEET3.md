@@ -250,6 +250,34 @@ slate fills each club's conceded and scored per game from the ledger
 clubs that trail late, conceding 0.55 and 0.50 and scoring 0.25 and 0.30,
 net +0.50, +0.20 on the line toward the over.
 
+**The sides, calibrated: the moneyline was right, the puck line was not**
+(13 Oct 2026, at the user's word: "I care more about the accuracy of the
+matchup predictions"). The favourite-by-price table says favourites won
+three to four points less than their price implied; the sheet never used
+the vigged price. Against the de-vigged chance, two seasons fit a
+calibration curve of slope 1.07 (se 0.16) and intercept zero: at −150 the
+sheet says 57.4% and favourites at −150 won 56.6%; at −200, 63.8% against
+63.5%; at −250, 68.4% against 68.4%. Calibrating on one season makes the
+other season's log-loss worse (0.6828 against 0.6816). **The sheet's
+moneyline chance is the historical rate**, and nothing on the sheet
+improves it. The dog +1.5 was another matter: the sheet said 61.0% at −150
+where 65.8% covered, 55.1% at −200 where 60.0% did, 50.7% at −250 where
+60.6% did. The margin model had too few one-goal games for two measurable
+reasons: two independent counts tie 16-18% of the time at these means and
+hockey ties 22.7% (flat across the favourite's price), and a two-goal lead
+took an empty-netter 69.9% of the time in 509 regulation wins against the
+engine's a-priori 0.30 (a one-goal lead 48.6% in 877 against 0.45). Both
+are now measured: `final_margin_dist` scales its tie mass to OT_RATE the
+way the total's parity fix does, and ENG_GIVEN_TWO_GOAL_LEAD is 0.70. The
+shares of one-, two- and three-plus-goal finals go from 35 / 30 / 35% to
+38 / 21 / 41% against 41 / 20 / 39% measured, and the dog +1.5 reads 68.0%
+at −115 (68.7% covered), 62.9% at −150 (65.8%), 57.6% at −200 (60.0%),
+and matches the pooled −200-or-more bucket (55.5%). Two to three points
+short in the middle prices remain, on a thousand games each, for another
+night (the regulation margin's dispersion is the next thing to measure).
+The moneyline does not move: it is anchored on the market's own chance
+through `solve_split`. Pinned in `TestTheMarginShape`.
+
 **Travel spots, measured null; the backup rule's anatomy found** (13 Oct
 2026, `tools_backtest_nhl_travel.py`, at the user's word: "run the travel
 spots test too"). From the schedule alone, 2,577 games with both clubs'

@@ -217,6 +217,42 @@ class TestEmptyNetHabits(unittest.TestCase):
         self.assertGreater(big.p_over, 0.55)
 
 
+class TestTheMarginShape(unittest.TestCase):
+    """13 Oct 2026: the margin distribution ties at the measured rate and the
+    empty-net conversions are the measured ones, so the share of one-, two-
+    and three-plus-goal finals lands on two seasons of ledgers (41%, 20%,
+    39%) and the dog +1.5 is no longer under-called."""
+
+    def test_one_two_and_three_plus_goal_finals_land_on_the_ledgers(self):
+        d = final_margin_dist(3.1, 2.7)
+        one = sum(v for k, v in d.items() if abs(k) == 1)
+        two = sum(v for k, v in d.items() if abs(k) == 2)
+        self.assertAlmostEqual(sum(d.values()), 1.0, places=9)
+        self.assertTrue(0.36 <= one <= 0.43, one)
+        self.assertTrue(0.18 <= two <= 0.24, two)
+
+    def test_the_tie_rate_is_the_measured_one(self):
+        # the tie mass is split into the +1 and -1 margins by the overtime share; the decided
+        # mass is everything the regulation count left, scaled to fill 1 - OT_RATE
+        import totals.nhl as nhl
+        reg = nhl.reg_margin_dist(3.1, 2.7)
+        self.assertLess(reg[0], OT_RATE, "two independent counts tie less often than hockey does")
+        d = final_margin_dist(3.1, 2.7)
+        decided = sum(v for k, v in d.items() if abs(k) >= 2)
+        self.assertLess(decided, 1.0 - OT_RATE)
+
+    def test_the_dog_plus_one_and_a_half_at_a_minus_150_favourite(self):
+        lh, la = solve_split(reg_mean(6.0), 0.574)
+        cover, push, fail = puck_line_probs(lh, la, -1.5)
+        self.assertEqual(push, 0.0)
+        self.assertTrue(0.60 <= fail <= 0.67, fail)      # history 65.8% on 1,095 games within 20 cents
+
+    def test_the_empty_net_rates_are_the_measured_ones(self):
+        self.assertAlmostEqual(ENG_GIVEN_ONE_GOAL_LEAD, 0.49)
+        import totals.nhl as nhl
+        self.assertAlmostEqual(nhl.ENG_GIVEN_TWO_GOAL_LEAD, 0.70)
+
+
 class TestTheGateAndTheTags(unittest.TestCase):
     def test_nothing_entered_is_a_coin_flip(self):
         f = forecast_nhl("A @ B", 6.0)

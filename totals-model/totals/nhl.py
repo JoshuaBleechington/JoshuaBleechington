@@ -152,11 +152,18 @@ P1_PHI = 1.0
 
 # --- the empty net, on the margin -----------------------------------------
 #: P(the leading side scores into the empty net | it leads by one at the end
-#: of regulation play), and by two. The pull happens in close games, so the
-#: one-goal case carries most of it. Together with how often regulation ends
-#: one or two goals apart these reproduce EMPTY_NET_RATE roughly, not exactly.
-ENG_GIVEN_ONE_GOAL_LEAD = 0.45
-ENG_GIVEN_TWO_GOAL_LEAD = 0.30
+#: of regulation play), and by two. Were 0.45 and 0.30 a priori ("the pull
+#: happens in close games"). MEASURED 13 Oct 2026 on two seasons of ledger
+#: empty-netters: a regulation win that stood at one goal before the empty
+#: net took an empty-netter in 48.6% of 877 games; one that stood at two,
+#: in 69.9% of 509 -- a two-goal lead is pulled against just as hard, and
+#: more often has the time to score. The old 0.30 left the engine with far
+#: too many two-goal finals (30% against 20% measured) and too few three-
+#: goal ones, which is half of why the dog +1.5 was under-called at every
+#: price (the sheet said 55% at -200 where 60% covered; 51% at -250 where
+#: 61% did). The other half is the tie rate, scaled in final_margin_dist.
+ENG_GIVEN_ONE_GOAL_LEAD = 0.49
+ENG_GIVEN_TWO_GOAL_LEAD = 0.70
 #: Overtime and the shootout are nearer a coin flip than regulation. The
 #: regulation win share is pulled this far toward even before it decides a
 #: tied game. 0.5 is a guess with the right sign.
@@ -728,9 +735,26 @@ def ot_home_share(dist: dict[int, float]) -> float:
 def final_margin_dist(lam_home: float, lam_away: float, phi: float = REG_PHI) -> dict[int, float]:
     """P(final margin = d): regulation, then the empty net for a side leading
     by one or two, then the overtime goal for a tie. Every final margin is
-    nonzero, which is what a hockey game is."""
+    nonzero, which is what a hockey game is.
+
+    THE TIE RATE IS SCALED (13 Oct 2026). Two independent counts tie after
+    sixty 16-18% of the time at these means; hockey ties 22.7% (measured on
+    2,616 games, flat across the favourite's price: 20-26% by bucket), because
+    the trailing side pushes. The same scaling the total's parity fix applies
+    (total_pmf) is applied here: the tie mass is set to OT_RATE and the
+    decided mass scaled to fill the rest, so the margin distribution and the
+    goal distribution tie at the same rate. Before it, final margins of
+    exactly one came out 32-35% where 39-42% happen; with it and the measured
+    empty-net rates, about 40%, 22% and 38% for one, two and three-plus
+    against 41%, 20% and 39% measured. The moneyline is anchored on the
+    market's own chance through solve_split and does not move; the puck line
+    does, toward the dog +1.5, which history said it should.
+    """
     reg = reg_margin_dist(lam_home, lam_away, phi)
     ot = ot_home_share(reg)
+    tie_raw = reg.get(0, 0.0)
+    c_tie = OT_RATE / tie_raw if 0.0 < tie_raw < 1.0 else 1.0
+    c_dec = (1.0 - OT_RATE) / (1.0 - tie_raw) if 0.0 < tie_raw < 1.0 else 1.0
     out: dict[int, float] = {}
 
     def add(d: int, v: float) -> None:
@@ -738,9 +762,12 @@ def final_margin_dist(lam_home: float, lam_away: float, phi: float = REG_PHI) ->
 
     for d, v in reg.items():
         if d == 0:
+            v *= c_tie
             add(1, v * ot)
             add(-1, v * (1.0 - ot))
-        elif abs(d) == 1:
+            continue
+        v *= c_dec
+        if abs(d) == 1:
             add(d + (1 if d > 0 else -1), v * ENG_GIVEN_ONE_GOAL_LEAD)
             add(d, v * (1.0 - ENG_GIVEN_ONE_GOAL_LEAD))
         elif abs(d) == 2:

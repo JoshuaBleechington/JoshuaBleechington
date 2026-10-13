@@ -1792,7 +1792,7 @@
     TALENT_SD: 0.008,       // spread of goalie true-talent save percentage
     RESIDUAL_SD: 2.45,      // Poisson floor: the raw spread of totals is 2.31, narrower than Poisson (was 2.55)
     P1_SHARE: 0.314, P1_PHI: 1.0,   // first-period share of regulation goals, measured (was 0.30); Poisson to the decimal
-    ENG_ONE: 0.45, ENG_TWO: 0.30,   // P(empty-net goal | leading by one / by two)
+    ENG_ONE: 0.49, ENG_TWO: 0.70,   // P(empty-net goal | leading by one / by two): measured 13 Oct 2026 on 877 and 509 regulation wins (were 0.45 / 0.30 a priori; totals/nhl.py)
     OT_COMPRESSION: 0.5,
     H2H_FULL_AT: 4, DEFAULT_PUCK_LINE: 1.5, KMAX: 25
   };
@@ -2088,13 +2088,21 @@
     var share = (win + lose) > 0 ? win / (win + lose) : 0.5;
     return 0.5 + NHL.OT_COMPRESSION * (share - 0.5);
   }
+  /* THE TIE RATE IS SCALED (13 Oct 2026, totals/nhl.py final_margin_dist): two
+     independent counts tie 16-18% at these means; hockey ties 22.7%. The tie
+     mass is set to NHL.OT and the decided mass scaled to fill the rest, the
+     same scaling the total's parity fix applies, so the margin and the goal
+     distributions tie at one rate. The moneyline stays anchored on the market
+     through nhlSolveSplit; the puck line moves toward the dog +1.5. */
   function nhlFinalMarginDist(lh, la) {
     var reg = nhlRegMarginDist(lh, la), ot = nhlOtHomeShare(reg), out = {};
+    var tieRaw = reg[0] || 0, cTie = (tieRaw > 0 && tieRaw < 1) ? NHL.OT / tieRaw : 1, cDec = (tieRaw > 0 && tieRaw < 1) ? (1 - NHL.OT) / (1 - tieRaw) : 1;
     var add = function (d, v) { out[d] = (out[d] || 0) + v; };
     Object.keys(reg).forEach(function (k) {
       var d = +k, v = reg[k];
-      if (d === 0) { add(1, v * ot); add(-1, v * (1 - ot)); }
-      else if (Math.abs(d) === 1) { add(d + (d > 0 ? 1 : -1), v * NHL.ENG_ONE); add(d, v * (1 - NHL.ENG_ONE)); }
+      if (d === 0) { v *= cTie; add(1, v * ot); add(-1, v * (1 - ot)); return; }
+      v *= cDec;
+      if (Math.abs(d) === 1) { add(d + (d > 0 ? 1 : -1), v * NHL.ENG_ONE); add(d, v * (1 - NHL.ENG_ONE)); }
       else if (Math.abs(d) === 2) { add(d + (d > 0 ? 1 : -1), v * NHL.ENG_TWO); add(d, v * (1 - NHL.ENG_TWO)); }
       else add(d, v);
     });

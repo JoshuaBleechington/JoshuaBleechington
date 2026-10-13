@@ -36,16 +36,36 @@
 
   /* ---- the goal distribution: regulation count + empty-net lump + OT goal ---- */
   function nhlRegMean(mu) { return Math.max(0.05, mu - NHL.OT - NHL.ENG); }
+  /* PARITY IN (13 Oct 2026, totals/nhl.py total_pmf): a game tied after sixty
+     has an even regulation total and ends with exactly one more goal, so
+     overtime lands on the odd numbers, and the empty-net goal is added only
+     to the games that were not tied. Against 2,616 finals the old mixture
+     put 16.3% on six goals where 10.9% landed and 15.8% on five where 22.6%
+     did; the sharp-line pull found it through phantom edges at the number
+     next to Pinnacle's. The tie share of an even count is the even split of
+     a coin (1, 1/2, 3/8, 5/16 ...), scaled on the counts above zero so the
+     tie rate is NHL.OT exactly. The mean stays mu exactly. */
+  function nhlTieShare(t) {
+    if (t % 2) return 0;
+    var share = 1;
+    for (var i = 1; i <= t / 2; i++) share *= (2 * i - 1) / (2 * i);
+    return share;
+  }
   function nhlTotalPmf(mu, kmax) {
     kmax = kmax || 40;
     var mr = nhlRegMean(mu), pEng = NHL.ENG / (1.0 - NHL.OT);
     var reg = [], s = 0, k;
     for (k = 0; k <= kmax; k++) { var v = nbPmf(k, mr, NHL.REG_PHI); reg.push(v); s += v; }
     if (s > 0) reg = reg.map(function (v) { return v / s; });
+    var raw = reg.map(function (v, t) { return v * nhlTieShare(t); }), above = 0;
+    for (k = 2; k <= kmax; k++) above += raw[k];
+    var c = above > 0 ? Math.max(0, (NHL.OT - raw[0]) / above) : 0;
+    var tie = reg.map(function (v, t) { return t === 0 ? raw[0] : Math.min(v, raw[t] * c); });
+    var notie = reg.map(function (v, t) { return v - tie[t]; });
     var out = [];
     for (k = 0; k <= kmax; k++) {
-      var prev = k >= 1 ? reg[k - 1] : 0;
-      out.push(NHL.OT * prev + (1.0 - NHL.OT) * ((1.0 - pEng) * reg[k] + pEng * prev));
+      var tiePrev = k >= 1 ? tie[k - 1] : 0, notiePrev = k >= 1 ? notie[k - 1] : 0;
+      out.push(tiePrev + (1.0 - pEng) * notie[k] + pEng * notiePrev);
     }
     return out;
   }

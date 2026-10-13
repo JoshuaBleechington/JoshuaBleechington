@@ -259,7 +259,7 @@ const CHECKS = ["dome","playoff","agconf","hgconf","agbk","hgbk"];
     const shop = JSON.stringify({ book: 'fanatics', total: { OVER: [['fanatics', -110, 6], ['draftkings', -102, 6], ['betmgm', -105, 6.5]], UNDER: [['fanatics', -110, 6], ['betmgm', -118, 6]] }, ml: { HOME: [['fanatics', 110, null], ['caesars', 118, null]], AWAY: [['fanatics', -130, null]] },
       alt: { OVER: [['fanatics', -150, 5.5], ['fanatics', 125, 6.5]], UNDER: [['fanatics', 125, 5.5], ['fanatics', -150, 6.5]] },
       team: { AWAY: { OVER: [['fanatics', -115, 2.5]] }, HOME: { OVER: [['betmgm', -110, 3.5], ['fanatics', -105, 3.5]], UNDER: [['fanatics', -115, 3.5]] } } });
-    const sharp = JSON.stringify({ book: 'pinnacle', line: 6.5, op: -105, up: -115, hml: 105, aml: -125 });
+    const sharp = JSON.stringify({ book: 'pinnacle', line: 6.5, op: -125, up: 105, hml: 105, aml: -125 });   // a 30-cent shade on the over
     await load({ format: 'callsheet2.slate', version: 1, date: '2026-11-09', games: [ Object.assign({}, game, { inputs: { line: '6', op: '-110', up: '-110', opened: '6.5', hml: '110', aml: '-130', pl: '1.5', plh: '-180', pla: '150', p1line: '1.5', p1op: '-125', p1up: '105', odds: shop, sharp: sharp }, notes: ['from the odds file'] }) ] }, 'odds-2026-11-09.json');
     const pending = [...document.querySelectorAll('#slateList [data-slate]')].length;
     document.querySelector('#slateList [data-slate]').click(); await wait();
@@ -279,14 +279,18 @@ const CHECKS = ["dome","playoff","agconf","hgconf","agbk","hgbk"];
     await load({ format: 'callsheet2.slate', version: 1, date: '2026-11-09', games: [ Object.assign({}, game, { finals: { fa: '2', fh: '1', f5a: '1', f5h: '0' }, close: { ctot: '6.5', cf5: '1.5' }, starters: { away: 'S. Skinner', home: 'D. Wolf' } }) ] }, 'nhl-grade-2026-11-09.json');
     await wait();
     const row2 = JSON.parse(localStorage.getItem('callsheet3.card.v1')).find(mine);
+    // graded 2-1 (three goals under the carded 6): Pinnacle's 30-cent shade on the over lost, on its own record line
+    const tileO = [...document.querySelectorAll('#calibBox .calib[data-sport="NHL"] > div')].find(d => /Full-game total/.test(d.textContent));
+    const tileOText = tileO ? tileO.textContent : '';
     document.getElementById('slateClear').click(); document.getElementById('clear').click(); await wait();
-    return { pending, form, chips, listed, why, kept: { odds: (stored.inputs.odds || '').length > 10, sharp: (stored.inputs.sharp || '').length > 10 }, line1: row1.inputs.line, close: row2.close, agok: row2.inputs.agok };
+    return { pending, form, chips, listed, why, kept: { odds: (stored.inputs.odds || '').length > 10, sharp: (stored.inputs.sharp || '').length > 10 }, line1: row1.inputs.line, close: row2.close, agok: row2.inputs.agok, tile: tileOText };
   });
   chk(oddsT.form.sharp && oddsT.kept.odds && oddsT.kept.sharp, 'odds: the sharp box fills from the file, and the shop and the sharp line are stored on the hockey row', JSON.stringify({ form: oddsT.form.sharp, kept: oddsT.kept }));
-  chk(oddsT.chips.some(c => c === 'sharp line 6.5 (-105/-115), here 6'), 'odds: Pinnacle\'s number is chipped beside the carded line when it differs', JSON.stringify(oddsT.chips));
+  chk(oddsT.chips.some(c => c === 'sharp line 6.5 (-125/+105), here 6') && oddsT.chips.some(c => c === 'Pinnacle shades OVER by 6.8 points'),
+      'odds: Pinnacle\'s number is chipped beside the carded line when it differs, and its 3+ point shade names the side (-125/+105 is 6.8 points)', JSON.stringify(oddsT.chips));
   chk(oddsT.chips.filter(c => /^alt (OVER|UNDER) (5\.5|6\.5) [+-]\d+ at Fanatics · sheet \d+\.\d% · edge [+-]\d+\.\d$/.test(c)).length === 2, 'odds: the two nearest alternates on the listed side are priced by the sheet\'s projection, best price per number', JSON.stringify(oddsT.chips));
   chk(oddsT.chips.some(c => c === "book's split: Kraken 2.5 (o -115) · Canucks 3.5 (o -105)"), 'odds: the book\'s split rides as a chip, the carded book\'s number first', JSON.stringify(oddsT.chips));
-  chk(/Pinnacle, the sharp book: 6\.5 \(-105\/-115\), moneyline -125\/\+105, above the carded 6/.test(oddsT.why) && /Alternates on the (over|under), priced by the sheet's projection of \d\.\d\d, shown, not picked: (5\.5|6\.5) at/.test(oddsT.why) && /The book's split, shown, not scored: Kraken 2\.5 \(over -115\), Canucks 3\.5 \(over -105\)\./.test(oddsT.why),
+  chk(/Pinnacle, the sharp book: 6\.5 \(-125\/\+105\), moneyline -125\/\+105, above the carded 6/.test(oddsT.why) && /It shades the over by 6\.8 points: on the 2025-26 history that side went 56\.3%/.test(oddsT.why) && /Alternates on the (over|under), priced by the sheet's projection of \d\.\d\d, shown, not picked: (5\.5|6\.5) at/.test(oddsT.why) && /The book's split, shown, not scored: Kraken 2\.5 \(over -115\), Canucks 3\.5 \(over -105\)\./.test(oddsT.why),
       'odds: the why list names the sharp line, the alternates and the split as shown, not scored', oddsT.why.slice(-700));
   chk(oddsT.pending === 1 && oddsT.form.agsv === '0.908' && oddsT.form.line === '6' && oddsT.form.op === '-110' && oddsT.form.opened === '6.5' && oddsT.form.hml === '110' && oddsT.form.pl === '1.5' && oddsT.form.p1line === '1.5' && oddsT.form.odds,
       'odds: the odds file merges into the slate\'s pending game, and Fill form carries the goalies, the lines, the prices, the opener and the shop', JSON.stringify(oddsT.form));
@@ -294,6 +298,7 @@ const CHECKS = ["dome","playoff","agconf","hgconf","agbk","hgbk"];
       'odds: the rail names the best price on the listed side at the same number only (-102 at 6 counts, -105 at 6.5 does not; the under has no better price)', JSON.stringify({ listed: oddsT.listed, chips: oddsT.chips }));
   chk(oddsT.line1 === '6', 'odds: a later odds file never moves a line already on the row', oddsT.line1);
   chk(oddsT.close && oddsT.close.ctot === '6.5' && oddsT.close.cf5 === '1.5' && oddsT.agok === 'yes', 'odds: the grade file\'s close fills the CLOSE box, beside the starter check', JSON.stringify({ close: oddsT.close, agok: oddsT.agok }));
+  chk(/Pinnacle's shade, 3\+ points 0-1/.test(oddsT.tile), 'odds: the total tile keeps Pinnacle\'s shade on its own record line (the over lost at 2-1)', oddsT.tile.slice(0, 400));
 
   // ---- 12-13 Oct: the hockey book picks the full-game total only ---------------------
   const twoDays = await pg.evaluate(async () => {

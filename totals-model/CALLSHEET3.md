@@ -116,6 +116,76 @@ the favourite −1.5, the favourite's return, with the two-season close
 baseline in grey beside the hockey block. Nothing in it moves a number; it
 is the base rate the pick is read against.
 
+**The odds history, measured** (13 Oct 2026, the night the 2025-26 pull
+came in: 334 snapshots at noon and 7:30 pm Eastern, 1,319 games, every
+retail book and Pinnacle; `tools_backtest_nhl_odds.py` and
+`tools_backtest_nhl_sharp.py`, joined to the season ledger and the
+KillerSports closes). Five findings, in the order they mattered.
+
+1. **The move is information, and only before it happens.** The line
+   moved half a goal or more in 271 of 1,275 games. Where it rose, the over
+   at the opener's number went 100-68-1 (59.5%) and at the close 82-87
+   (48.5%); where it fell, the under at the opener went 60-42 (58.8%) and
+   at the close 48-54. The close prices the move away. Nothing on the sheet
+   says which way a line will move: the goalie lean agreed with 73 moves
+   and disagreed with 51, and betting it at the opener went 314-292 at an
+   assumed −110 (−1.1% a bet); the last ten 46-42, nothing; a backup in net
+   moved the line UP 52 times to 20 down, so the backup rule's edge is
+   against the bumped close, not the opener, which is where it was measured.
+
+2. **The engine's distribution ignored parity, and the pull caught it.**
+   Priced off Pinnacle's mean, a retail number half a goal from Pinnacle's
+   looked two points cheap 193 times and went 79-107. The cause: a game
+   tied after sixty has an even regulation total and ends with exactly one
+   more goal, so overtime lands on the odd numbers. Against 2,616 finals the
+   old mixture put 16.3% on six goals where 10.9% landed, 15.8% on five
+   where 22.6% did, 14.3% on seven where 19.8% did, and 16.5% on a push at a
+   whole-number line where 11.4% pushed. `total_pmf` (and `nhlTotalPmf`)
+   now put the tie share on the even regulation counts, the even split of a
+   coin scaled to the measured tie rate, and the empty-net goal on the games
+   that were not tied: log-likelihood per game −2.247 to −2.186, pushes at
+   whole lines 13.2% against 11.4%, and those phantom edges go to ten bets.
+   The alternates chips were inheriting the old step; they are right now.
+   Every main-line probability at a half-goal line is anchored by the prices
+   and barely moves; a whole-number line's push and both sides do.
+
+3. **Pinnacle's shade is the one signal in the pull.** The shade is the
+   gap between Pinnacle's two prices in POINTS of implied chance (−125/+105
+   is 6.8 points; cents mislead across even, and a first cut in cents put
+   every pair with a plus price in the wide bucket). The side Pinnacle
+   prices shorter, taken at the best retail price at the same number, went
+   650-534-59 (54.9%, +2.5% a bet) over 1,243 closes: flat under two points
+   (52.6% on 368), 55.9% at 2-4 points (+4.4% on 435), 54.4% at 4-6, 62.0%
+   at 6+ (80 games), and 372-289-32 (56.3%, +3.8% a bet) over the 693 with
+   a shade of three points or more; at the opener a shade of 2+ went 54.9%
+   on 172 and the rest nothing. Pinnacle's shaded side beat its own
+   de-vigged chance by about three points in every bucket, which the retail
+   book's own shade did not (its 55%+ bucket did 52%: the public's money,
+   not information). So the sheet now chips **"Pinnacle shades OVER by 6.8
+   points"** on the total when the sharp box's prices sit three points
+   apart, says so in the why list with the measure, and keeps the side's
+   record on the total tile ("Pinnacle's shade, 3+ points"): a rule with a
+   record line, not a weight, until the record here agrees. Its mean is not the point: Pinnacle's mean and the
+   carded book's differ by 0.06 on average and blending them adds nothing
+   to the log-loss at any weight. An amplifier on the market's lean
+   (p' = σ(k·logit p)) was tried and is noise: a few ten-thousandths of
+   log-loss, non-monotone, and losing money at every k.
+
+4. **The best price** at the carded book's number beat the carded price on
+   1,506 of 2,624 sides, by 0.6 points of implied chance on average and 1.05
+   when it did. The shop chip is worth about a point a bet.
+
+5. **The sheet's inputs against Pinnacle's own mean** read as they did
+   against the KillerSports close: the goalies +0.32 a goal of lean (t 0.8,
+   implied weight 1.9, beside 1.6 scored), the last ten +0.08, head to head
+   nothing, and **season scoring rates −0.51 (t −2.5)**, the same sign and
+   size as 2024-25 against the close (−0.42, t −2.1): the market over-moves
+   with a club's goals-for and goals-against rates, by about half a goal of
+   final per goal of rate lean, two seasons running. The sheet carries no
+   season scoring-rate boxes, so this is a candidate input to build, with a
+   negative sign, and the first one in a week that two seasons agree on.
+   Pinnacle's mean error against the final was 1.835; the close's 1.841.
+
 **The hockey sides, measured** (12 Oct 2026, `tools_backtest_nhl_sides.py`,
 run the night the pick went in, at the user's word: "run the hockey sides
 backtest on the ledgers"). Two seasons, 2,616 games, each with the actual

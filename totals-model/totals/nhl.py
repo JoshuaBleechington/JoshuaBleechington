@@ -234,23 +234,54 @@ def reg_mean(total_mean: float) -> float:
     return max(0.05, total_mean - OT_RATE - EMPTY_NET_RATE)
 
 
-def total_pmf(mu: float, kmax: int = 40) -> list[float]:
-    """P(final total = k) for a TOTAL mean of `mu`, as the mixture.
+def tie_share(t: int) -> float:
+    """P(the two sides split a regulation total of t evenly) with each goal a
+    coin flip: C(t, t/2) / 2^t for even t, zero for odd. 1, 1/2, 3/8, 5/16 ..."""
+    if t % 2:
+        return 0.0
+    share = 1.0
+    for i in range(1, t // 2 + 1):
+        share *= (2 * i - 1) / (2.0 * i)
+    return share
 
-    With probability OT_RATE the game is tied after sixty and exactly one
-    more goal is scored; otherwise an empty-net goal is added with the
-    probability that makes the unconditional rate EMPTY_NET_RATE. The mean
-    of the mixture is `mu` exactly; there is a test at twelve decimals.
+
+def total_pmf(mu: float, kmax: int = 40) -> list[float]:
+    """P(final total = k) for a TOTAL mean of `mu`, as the mixture, PARITY IN.
+
+    A game tied after sixty has an EVEN regulation total and ends with exactly
+    one more goal, so overtime and the shootout land on the ODD numbers; the
+    empty-net goal is added only to the games that were not tied. Before 13
+    Oct 2026 the overtime goal was spread over every regulation count alike,
+    and against 2,616 finals the model put 16.3% on six goals where 10.9%
+    landed there, 15.8% on five where 22.6% did (the parity swing is about
+    ten points at every count), and 16.5% on a push at a whole-number line
+    where 11.4% pushed. The sharp-line pull found it: priced off the old
+    distribution, a retail number half a goal from Pinnacle's looked two
+    points cheap 193 times and went 79-107. With parity in, the log-likelihood
+    per game improves from -2.247 to -2.186 and those "edges" vanish.
+
+    The tie share of each even regulation count is the even split of a coin
+    (tie_share), scaled so the tie rate over the distribution is OT_RATE
+    exactly (hockey ties more than a coin says: the trailing side pushes);
+    the scale is solved on the counts above zero, since a scoreless sixty is
+    a tie whatever the scale. The mean of the mixture is `mu` exactly; there
+    is a test at twelve decimals.
     """
     mr = reg_mean(mu)
     p_eng = EMPTY_NET_RATE / (1.0 - OT_RATE)
     reg = [nb_pmf(k, mr, REG_PHI) for k in range(kmax + 1)]
     s = sum(reg)
     reg = [v / s for v in reg] if s > 0 else reg
+    raw = [reg[t] * tie_share(t) for t in range(kmax + 1)]
+    above = sum(raw[2:])
+    c = max(0.0, (OT_RATE - raw[0]) / above) if above > 0 else 0.0
+    tie = [raw[0]] + [min(reg[t], raw[t] * c) for t in range(1, kmax + 1)]
+    notie = [reg[t] - tie[t] for t in range(kmax + 1)]
     out = []
     for k in range(kmax + 1):
-        prev = reg[k - 1] if k >= 1 else 0.0
-        out.append(OT_RATE * prev + (1.0 - OT_RATE) * ((1.0 - p_eng) * reg[k] + p_eng * prev))
+        tie_prev = tie[k - 1] if k >= 1 else 0.0
+        notie_prev = notie[k - 1] if k >= 1 else 0.0
+        out.append(tie_prev + (1.0 - p_eng) * notie[k] + p_eng * notie_prev)
     return out
 
 

@@ -309,7 +309,7 @@
   <header class="top">
     <div>
       <div class="eyebrow"><span id="eyebrow">MLB · every market on the game</span>
-        <span class="build">· build <span id="build">2026-10-12</span></span></div>
+        <span class="build">· build <span id="build">2026-10-13</span></span></div>
       <h1>Call Sheet <em>3.0</em></h1>
       <p>One matchup, every market the book posts on it — in baseball the full-game total, the first five,
          the moneyline and the run line; in hockey the total, the first period, the moneyline and the puck line;
@@ -1783,16 +1783,36 @@
 
   /* ---- the goal distribution: regulation count + empty-net lump + OT goal ---- */
   function nhlRegMean(mu) { return Math.max(0.05, mu - NHL.OT - NHL.ENG); }
+  /* PARITY IN (13 Oct 2026, totals/nhl.py total_pmf): a game tied after sixty
+     has an even regulation total and ends with exactly one more goal, so
+     overtime lands on the odd numbers, and the empty-net goal is added only
+     to the games that were not tied. Against 2,616 finals the old mixture
+     put 16.3% on six goals where 10.9% landed and 15.8% on five where 22.6%
+     did; the sharp-line pull found it through phantom edges at the number
+     next to Pinnacle's. The tie share of an even count is the even split of
+     a coin (1, 1/2, 3/8, 5/16 ...), scaled on the counts above zero so the
+     tie rate is NHL.OT exactly. The mean stays mu exactly. */
+  function nhlTieShare(t) {
+    if (t % 2) return 0;
+    var share = 1;
+    for (var i = 1; i <= t / 2; i++) share *= (2 * i - 1) / (2 * i);
+    return share;
+  }
   function nhlTotalPmf(mu, kmax) {
     kmax = kmax || 40;
     var mr = nhlRegMean(mu), pEng = NHL.ENG / (1.0 - NHL.OT);
     var reg = [], s = 0, k;
     for (k = 0; k <= kmax; k++) { var v = nbPmf(k, mr, NHL.REG_PHI); reg.push(v); s += v; }
     if (s > 0) reg = reg.map(function (v) { return v / s; });
+    var raw = reg.map(function (v, t) { return v * nhlTieShare(t); }), above = 0;
+    for (k = 2; k <= kmax; k++) above += raw[k];
+    var c = above > 0 ? Math.max(0, (NHL.OT - raw[0]) / above) : 0;
+    var tie = reg.map(function (v, t) { return t === 0 ? raw[0] : Math.min(v, raw[t] * c); });
+    var notie = reg.map(function (v, t) { return v - tie[t]; });
     var out = [];
     for (k = 0; k <= kmax; k++) {
-      var prev = k >= 1 ? reg[k - 1] : 0;
-      out.push(NHL.OT * prev + (1.0 - NHL.OT) * ((1.0 - pEng) * reg[k] + pEng * prev));
+      var tiePrev = k >= 1 ? tie[k - 1] : 0, notiePrev = k >= 1 ? notie[k - 1] : 0;
+      out.push(tiePrev + (1.0 - pEng) * notie[k] + pEng * notiePrev);
     }
     return out;
   }
@@ -3046,6 +3066,22 @@
      where the same lean is priced better or worse. */
   function shopOf(raw) { if (!raw) return null; try { return JSON.parse(raw); } catch (e) { return null; } }
   function sharpOf(raw) { var s = shopOf(raw); return s && s.line !== undefined && s.line !== null && isFinite(+s.line) ? s : null; }
+  /* Pinnacle's SHADE (13 Oct 2026, measured on the 2025-26 history pull):
+     the side the sharp book prices shorter, by the gap between its two
+     prices in POINTS of implied chance (-125/+105 is 6.8 points; cents
+     mislead across even). At the best retail price at the same number that
+     side went 650-534-59 (54.9%, +2.5% a bet) over 1,243 closes, flat under
+     two points, and 372-289-32 (56.3%, +3.8% a bet) over the 693 with a
+     shade of three points or more; at the opener a shade of 2+ went 54.9%
+     on 172. A rule with its own record line, like the WNBA's cheaper side:
+     it moves no number until the record here says what the history said. */
+  var SHARP_SHADE_PTS = 3;
+  function sharpShadeOf(raw) {
+    var s = sharpOf(raw); if (!s || s.op === undefined || s.up === undefined || !isFinite(+s.op) || !isFinite(+s.up)) return null;
+    var pts = 100 * Math.abs(implied(+s.op) - implied(+s.up));
+    if (pts < SHARP_SHADE_PTS) return null;
+    return { side: +s.op < +s.up ? "OVER" : "UNDER", pts: pts };
+  }
   function altLines(m, raw) {
     var shop = shopOf(raw), f = m && m.total;
     if (!shop || !shop.alt || !f || f.projected === undefined || f.line === undefined || f.line === null) return [];
@@ -3084,6 +3120,8 @@
         ' title="Pinnacle, the sharp book, read beside the carded line. Shown, not scored: the odds log keeps the gap nightly and it is measured before it can move a number.">' +
         (off ? 'sharp line ' + esc(String(sh.line)) + ' (' + sgn(+sh.op, 0) + '/' + sgn(+sh.up, 0) + '), here ' + esc(String(line))
              : 'Pinnacle agrees at ' + esc(String(sh.line)) + ' (' + sgn(+sh.op, 0) + '/' + sgn(+sh.up, 0) + ')') + '</span>';
+      var ss = sharpShadeOf(txt("sharp"));
+      if (ss) out += '<span class="cap" style="color:var(--go);border-color:var(--go)" title="The side Pinnacle prices shorter, by three points of implied chance or more. Measured on the 2025-26 history: at the best retail price at the same number it went 56.3% (+3.8% a bet) over 693 closes, and 54.9% at the opener. A rule with its own record line on the total tile; it moves no number.">Pinnacle shades ' + esc(ss.side) + ' by ' + ss.pts.toFixed(1) + ' points</span>';
     }
     altLines(m, txt("odds")).filter(function (a) { return a.side === mk.side; }).slice(0, 2).forEach(function (a) {
       out += '<span class="cap' + (a.edge > 0 ? '' : ' tagm') + '"' + (a.edge > 0 ? ' style="color:var(--go);border-color:var(--go)"' : '') +
@@ -3105,7 +3143,8 @@
       notes.push("<b>Pinnacle, the sharp book:</b> " + esc(String(sh.line)) + " (" + sgn(+sh.op, 0) + "/" + sgn(+sh.up, 0) + ")" +
         (sh.hml !== undefined && sh.aml !== undefined ? ", moneyline " + sgn(+sh.aml, 0) + "/" + sgn(+sh.hml, 0) : "") +
         (off ? ", <b>" + (+sh.line > line ? "above" : "below") + " the carded " + line + "</b>" : ", the same number as the card") +
-        ". Shown, not scored: the odds log keeps the gap nightly and it is measured before it can move a number.");
+        ". Shown, not scored: the odds log keeps the gap nightly and it is measured before it can move a number." +
+        (function () { var ss = sharpShadeOf(txt("sharp")); return ss ? " <b>It shades the " + ss.side.toLowerCase() + " by " + ss.pts.toFixed(1) + " points</b>: on the 2025-26 history that side went 56.3% at the best retail price over 693 closes with a shade of three points or more (+3.8% a bet), and 54.9% at the opener. A rule with its own record line on the total tile, not a weight." : ""; })());
     }
     var alts = altLines(m, txt("odds")), side = m.total.side, mine = alts.filter(function (a) { return a.side === side; });
     if (mine.length) {
@@ -3818,6 +3857,10 @@
           if (mk.key === "total") {
             var cv = callOf(row, mk), cr = cv ? gradeMarket(cv, row.finals) : null;
             if (cr !== null && cr !== "invalid") count(t.call || (t.call = { w: 0, l: 0, p: 0 }), cr);
+            /* Pinnacle's shade (13 Oct 2026): the side the sharp book prices shorter by 20+ cents, on its own line */
+            var ss = sharpShadeOf((row.inputs || {}).sharp), sv = ss ? bothSides(mk).filter(function (v) { return v.side === ss.side; })[0] : null;
+            var sr = sv ? gradeMarket(sv, row.finals) : null;
+            if (sr !== null && sr !== "invalid") count(t.sharpShade || (t.sharpShade = { w: 0, l: 0, p: 0 }), sr);
           }
           if ((tg.b2b || tg.backup) && mk.key === "total") {
             var uv = bothSides(mk).filter(function (v) { return v.side === "UNDER"; })[0];
@@ -3889,6 +3932,7 @@
       if (s.backup) parts.push('backup in net, the under ' + rec(s.backup));
       ["goalies right", "goalie line wrong"].forEach(function (k) { if (s.goalie[k]) parts.push(k + ' ' + rec(s.goalie[k])); });
       if (s.call) parts.push('the call, ' + NHL_TOTAL_ONLY_LABEL + ' ' + rec(s.call));
+      if (s.sharpShade) parts.push("Pinnacle's shade, 3+ points " + rec(s.sharpShade));
       if (s.clv.n) parts.push('beat the close ' + s.clv.beat + '-' + s.clv.lost + (s.clv.even ? '-' + s.clv.even : '') + ' · ' + sgn(s.clv.runs / s.clv.n, 2) + ' ' + (unit || 'runs') + ' avg');
       return '<div><p class="k">' + esc(s.label) + '</p><p class="v">' + s.w + '-' + s.l + (s.p ? '-' + s.p : '') + '</p>' +
         '<p class="s">' + (s.n ? 'says ' + says.toFixed(1) + '% · does ' + does.toFixed(1) + '% (±' + se.toFixed(1) + ') · ' + sgn(s.units, 2) + 'u' : 'pushes only') + '</p>' +

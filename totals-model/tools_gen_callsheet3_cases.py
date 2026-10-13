@@ -49,7 +49,9 @@ def build_nhl(i: dict):
         away_rest_days=n(i.get("arest")), home_rest_days=n(i.get("hrest")),
         away_goalie_confirmed=bool(i.get("agconf")), home_goalie_confirmed=bool(i.get("hgconf")),
         away_goalie_backup=bool(i.get("agbk")), home_goalie_backup=bool(i.get("hgbk")),
-        ticket_pct_over=n(i.get("ntick")), money_pct_over=n(i.get("ncash")), opened=n(i.get("opened")))
+        ticket_pct_over=n(i.get("ntick")), money_pct_over=n(i.get("ncash")), opened=n(i.get("opened")),
+        away_gf=n(i.get("agf")), away_ga=n(i.get("aga")), home_gf=n(i.get("hgf")), home_ga=n(i.get("hga")),
+        league_gpg=n(i.get("lgg")), away_games=n(i.get("angp")), home_games=n(i.get("hngp")))
 
 
 FULL = dict(agsv="0.912", hgsv="0.921", agsh="1400", hgsh="1900", asf="31.2", hsf="33.4",
@@ -103,6 +105,12 @@ NHL_CASES = [
      "inputs": dict(away="Jets", home="Wild", line="6", op="-115", up="-105", asf="36.0", hsf="34.0")},
     {"name": "a wide moneyline hold is regressed",
      "inputs": dict(away="Lightning", home="Capitals", line="6.5", op="-110", up="-110", hml="-200", aml="150", **FULL)},
+    {"name": "season scoring rates, faded: two high-scoring clubs pull the line DOWN",
+     "inputs": dict(away="Oilers", home="Devils", line="6.5", op="-110", up="-110", hml="-130", aml="110",
+                    agf="3.60", aga="3.20", hgf="3.40", hga="3.10", lgg="6.10", angp="12", hngp="11", **FULL)},
+    {"name": "scoring rates on four games: shown, not scored until five",
+     "inputs": dict(away="Kraken", home="Canucks", line="6", op="-110", up="-110",
+                    agf="3.60", aga="3.20", hgf="3.40", hga="3.10", lgg="6.10", angp="4", hngp="11")},
 ]
 
 

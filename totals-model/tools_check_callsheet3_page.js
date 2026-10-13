@@ -25,7 +25,8 @@ const IDS = ["away","home","line","op","up","opened","gdate","aera","hera","aip"
              "apace","hpace","aort","hort","adrt","hdrt","arest","hrest","al5","hl5","sp","sph","spa",
              "agsv","hgsv","agsh","hgsh","asf","hsf","app","hpp","apk","hpk","pl","plh","pla","p1line","p1op","p1up",
              "ntick","ncash","ap1l10","hp1l10","axgf","axga","hxgf","hxga","xglg","nhlform",
-             "ngoalies","agname","hgname","agstart","hgstart","agok","hgok"];
+             "ngoalies","agname","hgname","agstart","hgstart","agok","hgok",
+             "agf","aga","hgf","hga","lgg","angp","hngp"];
 const CHECKS = ["dome","playoff","agconf","hgconf","agbk","hgbk"];
 
 (async () => {

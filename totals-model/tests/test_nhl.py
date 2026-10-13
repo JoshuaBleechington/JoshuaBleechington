@@ -16,7 +16,7 @@ from totals.fullgame import BANDS, devig, implied, split_for
 from totals.nhl import (
     EMPTY_NET_RATE, ENG_GIVEN_ONE_GOAL_LEAD, GOALIE_TALENT_SD, LEAGUE_GOALS_PER_GAME,
     LEAGUE_REG_GOALS, LEAGUE_SAVE_PCT, LEAGUE_SHOTS, OT_RATE, P1_SHARE, REG_PHI,
-    RESIDUAL_SD, SV_STABLE_AT, WEIGHTS, final_margin_dist, forecast_matchup_nhl,
+    RESIDUAL_SD, SCORING_FADE, SCORING_MIN_GAMES, SV_STABLE_AT, WEIGHTS, final_margin_dist, forecast_matchup_nhl,
     forecast_nhl, goalie_gap, grade, nhl_split, p_home_wins, puck_line_probs,
     reg_mean, shrink_sv, solve_split, sv_weight, total_pmf,
 )
@@ -134,6 +134,50 @@ class TestTheGoalie(unittest.TestCase):
     def test_an_implausible_save_percentage_is_dropped(self):
         f = forecast_nhl("A @ B", 6.0, -110, -110, **{**LEAGUE, "home_goalie_sv": 9.3})
         self.assertNotIn("Goalies", [e.name for e in f.estimates])
+
+
+class TestScoringRatesFaded(unittest.TestCase):
+    """13 Oct 2026: each club's goals for and against per game, the two
+    offences against the two defences, against the league's goals a game.
+    The market over-moves with them two seasons running, so the lean goes on
+    the line with the opposite sign, at SCORING_FADE a goal."""
+    RATES = dict(away_gf=3.6, away_ga=3.2, home_gf=3.4, home_ga=3.1, league_gpg=6.1, away_games=12, home_games=11)
+    PROJ = (3.6 + 3.1) / 2.0 + (3.4 + 3.2) / 2.0     # 6.65: the two offences against the two defences
+
+    def test_two_high_scoring_clubs_pull_the_total_down(self):
+        base = forecast_nhl("A @ B", 6.5, -110, -110)
+        f = forecast_nhl("A @ B", 6.5, -110, -110, **self.RATES)
+        d = [x for x in f.deltas if x.name == "Scoring rates, faded"]
+        self.assertEqual(len(d), 1)
+        self.assertAlmostEqual(d[0].runs, SCORING_FADE * (self.PROJ - 6.1), places=9)
+        self.assertLess(d[0].runs, 0.0)
+        self.assertLess(f.projected, base.projected)
+        self.assertTrue(d[0].mechanism, "measured on two seasons with a mechanism: not tagged")
+        self.assertTrue(any("over-moves with them" in n for n in f.notes))
+
+    def test_low_scoring_clubs_push_the_total_up(self):
+        f = forecast_nhl("A @ B", 6.5, -110, -110, **{**self.RATES, "away_gf": 2.6, "home_gf": 2.5})
+        d = [x for x in f.deltas if x.name == "Scoring rates, faded"][0]
+        self.assertGreater(d.runs, 0.0)
+
+    def test_under_five_games_is_shown_not_scored(self):
+        f = forecast_nhl("A @ B", 6.5, -110, -110, **{**self.RATES, "away_games": SCORING_MIN_GAMES - 1})
+        self.assertFalse([x for x in f.deltas if x.name.startswith("Scoring")])
+        self.assertTrue(any("shown, not scored until then" in n for n in f.notes))
+
+    def test_the_league_mean_falls_back_to_the_constant(self):
+        f = forecast_nhl("A @ B", 6.5, -110, -110, **{**self.RATES, "league_gpg": None})
+        d = [x for x in f.deltas if x.name == "Scoring rates, faded"][0]
+        self.assertAlmostEqual(d.runs, SCORING_FADE * (self.PROJ - LEAGUE_GOALS_PER_GAME), places=9)
+
+    def test_a_partial_set_scores_nothing_and_says_so(self):
+        f = forecast_nhl("A @ B", 6.5, -110, -110, away_gf=3.6, away_ga=3.2)
+        self.assertFalse([x for x in f.deltas if x.name.startswith("Scoring")])
+        self.assertTrue(any("partial" in n for n in f.notes))
+
+    def test_the_matchup_wrapper_carries_it(self):
+        m = forecast_matchup_nhl("A", "B", **BOARD, **self.RATES)
+        self.assertTrue([x for x in m.total.deltas if x.name == "Scoring rates, faded"])
 
 
 class TestTheGateAndTheTags(unittest.TestCase):

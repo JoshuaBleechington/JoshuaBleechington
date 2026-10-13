@@ -31,6 +31,8 @@
   NHL.BACKUP_DELTA = -0.15;   // one backup in net: 0.18 under the close on 737 games (53.7%), both seasons; sized under it, tagged
   NHL.BACKUP_DELTA_COLD = -0.25;   // ...a COLD backup (his shrunk line costs > BACKUP_COLD_GAP goals): 0.44 under on 182 games, the under 57.5%
   NHL.BACKUP_COLD_GAP = 0.05;
+  NHL.SCORING_FADE = -0.35;   // season scoring rates, FADED (13 Oct 2026): the market over-moves with them, -0.42 and -0.49 a goal of lean two seasons running (totals/nhl.py)
+  NHL.SCORING_MIN_GAMES = 5;
   PLAUSIBLE.nhl_total = [3.5, 9.5]; PLAUSIBLE.nhl_period = [0.5, 4.5];
   PLAUSIBLE.save_pct = [0.850, 0.960]; PLAUSIBLE.shots = [15, 45]; PLAUSIBLE.shots_faced = [0, 3000]; PLAUSIBLE.xg_rate = [1.0, 5.5];
 
@@ -176,6 +178,30 @@
       notes.push("<b>Backup in net</b>" + bkWhy.slice("Backup in net".length));
     } else if (backups.length === 2) {
       notes.push("A backup in <b>both</b> nets. Measured on 105 games with no direction (the one-backup under did not carry), so nothing moves; the record will say.");
+    }
+
+    /* season scoring rates, FADED (13 Oct 2026, totals/nhl.py SCORING_FADE): each
+       club's goals for and against per game to date against the ledger's league
+       goals a game; the market over-moves with them two seasons running, so the
+       lean goes on the line with the opposite sign. All four or nothing; five
+       games a side. */
+    var rates = [num("agf"), num("aga"), num("hgf"), num("hga")];
+    if (rates.every(function (v) { return v !== null && ok(v, "xg_rate"); })) {
+      var few = [], agp = num("angp"), hgp = num("hngp");
+      if (agp !== null && agp < NHL.SCORING_MIN_GAMES) few.push("away");
+      if (hgp !== null && hgp < NHL.SCORING_MIN_GAMES) few.push("home");
+      var lggIn = num("lgg"), lgg = (lggIn !== null && ok(lggIn, "nhl_total")) ? lggIn : NHL.GOALS;
+      var rtot = (rates[0] + rates[3]) / 2 + (rates[2] + rates[1]) / 2, rgap = rtot - lgg;
+      if (few.length) {
+        notes.push("Scoring rates: " + rtot.toFixed(2) + " against the league's " + lgg.toFixed(2) + " (" + sgn(rgap) + "), on under " + NHL.SCORING_MIN_GAMES + " games for the " + few.join(" and ") + " side: shown, not scored until then.");
+      } else {
+        var rsize = NHL.SCORING_FADE * rgap;
+        var rwhy = "Scoring rates: the clubs' goals for and against to date project " + rtot.toFixed(2) + " against the league's " + lgg.toFixed(2) + " (" + sgn(rgap) + "). The market over-moves with them: against two seasons of closing totals the final ran 0.42 and 0.49 of a goal the OTHER way per goal of lean (t −2.1 and −2.4), and the same against Pinnacle's number. Faded at " + sgn(NHL.SCORING_FADE) + " a goal: " + sgn(rsize) + " on the line.";
+        deltas.push(delta("Scoring rates, faded", rsize, rwhy, true));
+        notes.push("<b>Scoring rates, faded</b>" + rwhy.slice("Scoring rates".length));
+      }
+    } else if (rates.some(function (v) { return v !== null; })) {
+      notes.push("Scoring rates need all four figures (each side's goals for and against per game); a partial set scores nothing.");
     }
 
     /* special teams: SHOWN, NOT SCORED since 7 Oct 2026 (totals/nhl.py): each

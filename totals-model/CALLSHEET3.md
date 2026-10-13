@@ -186,6 +186,26 @@ KillerSports closes). Five findings, in the order they mattered.
    negative sign, and the first one in a week that two seasons agree on.
    Pinnacle's mean error against the final was 1.835; the close's 1.841.
 
+**Season scoring rates, faded** (13 Oct 2026, built the same night at the
+user's word: "build the scoring rates input"). The slate now writes each
+club's goals for and against per game over its finals this season, the
+games behind them, and the ledger's league goals a game to date (twenty
+finals in; the sheet's constant 6.17 otherwise) into seven new boxes
+(`agf aga hgf hga lgg angp hngp`). Both engines read them as the two
+offences against the two defences, a projected total against the league's,
+and put the lean on the line with the OPPOSITE sign at `SCORING_FADE`,
+−0.35 a goal: the measured slopes were −0.42 and −0.49 against the close
+and −0.51 against Pinnacle, shrunk a fifth for a number read out of
+sample. All four rates or nothing; five games a side, like every rate on
+the sheet; scored, not tagged, because two seasons agreed and the
+mechanism is plain (the public follows scoring reputations and the book
+shades to it). Typical size: two clubs averaging 3.5 for and 3.2 against
+project 6.7 against a league 6.17, a lean of +0.53, so −0.19 on the line
+toward the under. Tested in `tests/test_nhl.py`, two engine cases, and the
+slate's selftest (the Rangers' fake season reads 4.00 for, 2.00 against
+over eleven finals). The first input the pick can lean on that was found
+by the odds feed rather than by the ledger alone.
+
 **The hockey sides, measured** (12 Oct 2026, `tools_backtest_nhl_sides.py`,
 run the night the pick went in, at the user's word: "run the hockey sides
 backtest on the ledgers"). Two seasons, 2,616 games, each with the actual

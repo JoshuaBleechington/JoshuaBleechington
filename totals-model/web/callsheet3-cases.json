@@ -5626,5 +5626,121 @@
         }
       ]
     }
+  },
+  {
+    "sport": "NHL",
+    "name": "season scoring rates, faded: two high-scoring clubs pull the line DOWN",
+    "inputs": {
+      "gdate": "2026-11-15",
+      "away": "Oilers",
+      "home": "Devils",
+      "line": "6.5",
+      "op": "-110",
+      "up": "-110",
+      "hml": "-130",
+      "aml": "110",
+      "agf": "3.60",
+      "aga": "3.20",
+      "hgf": "3.40",
+      "hga": "3.10",
+      "lgg": "6.10",
+      "angp": "12",
+      "hngp": "11",
+      "agsv": "0.912",
+      "hgsv": "0.921",
+      "agsh": "1400",
+      "hgsh": "1900",
+      "asf": "31.2",
+      "hsf": "33.4",
+      "app": "22.1",
+      "hpp": "24.8",
+      "apk": "80.2",
+      "hpk": "78.1",
+      "al10": "5.9",
+      "hl10": "6.4",
+      "h2h": "6.3",
+      "h2hn": "3"
+    },
+    "expect": {
+      "lam_home": 2.89775339,
+      "lam_away": 2.66935716,
+      "projected": 6.18711054,
+      "markets": [
+        {
+          "key": "total",
+          "pick": "UNDER 6.5",
+          "side": "UNDER",
+          "p": 0.56310218,
+          "p_push": 0,
+          "price": -110.0,
+          "edge": 0.03929265,
+          "fair": -128.8865,
+          "anchored": true,
+          "band": "BET"
+        },
+        {
+          "key": "ml",
+          "pick": "Oilers ML",
+          "side": "AWAY",
+          "p": 0.45853637,
+          "p_push": 0.0,
+          "price": 110.0,
+          "edge": -0.0176541,
+          "fair": 118.0852,
+          "anchored": true,
+          "band": ""
+        },
+        {
+          "key": "pl",
+          "pick": "Oilers +1.5",
+          "side": "AWAY",
+          "p": 0.63785663,
+          "p_push": 0.0,
+          "price": null,
+          "edge": null,
+          "fair": -176.1337,
+          "anchored": false,
+          "band": ""
+        }
+      ]
+    }
+  },
+  {
+    "sport": "NHL",
+    "name": "scoring rates on four games: shown, not scored until five",
+    "inputs": {
+      "gdate": "2026-11-15",
+      "away": "Kraken",
+      "home": "Canucks",
+      "line": "6",
+      "op": "-110",
+      "up": "-110",
+      "agf": "3.60",
+      "aga": "3.20",
+      "hgf": "3.40",
+      "hga": "3.10",
+      "lgg": "6.10",
+      "angp": "4",
+      "hngp": "11"
+    },
+    "expect": {
+      "lam_home": null,
+      "lam_away": null,
+      "projected": 6.17159321,
+      "markets": [
+        {
+          "key": "total",
+          "pick": "OVER 6",
+          "side": "OVER",
+          "p": 0.5,
+          "p_push": 0.13145712,
+          "price": -110.0,
+          "edge": -0.02380952,
+          "fair": 100.0,
+          "anchored": true,
+          "band": "NO BET"
+        }
+      ]
+    }
   }
 ]

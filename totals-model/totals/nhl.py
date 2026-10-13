@@ -209,6 +209,20 @@ BACKUP_DELTA_COLD = -0.25
 BACKUP_COLD_GAP = 0.05
 BACKUP_SHARE = 0.30     # a starter under this share of his club's starts is a backup
 BACKUP_MIN_STARTS = 10  # ...once the club has this many starts to share
+#: Season scoring rates, FADED (13 Oct 2026, at the user's word: "build the
+#: scoring rates input"). Each club's goals for and against per game to
+#: date, the two offences against the two defences, against the league's
+#: goals a game to date from the ledger: the market OVER-MOVES with them.
+#: The residual of the final on that lean ran -0.42 a goal in 2024-25
+#: against the KillerSports close (t -2.1, 1,223 games) and -0.49 in
+#: 2025-26 (t -2.4), and -0.51 against Pinnacle's own mean at the close
+#: (t -2.5): the first input in a week that two seasons agree on, with a
+#: mechanism (the public follows scoring reputations and the book shades to
+#: it). Scored as a delta of SCORING_FADE times the lean, shrunk a fifth
+#: from the measured slope for a number read out of sample; five games a
+#: side before it counts, like every rate on the sheet.
+SCORING_FADE = -0.35
+SCORING_MIN_GAMES = 5
 #: October: RETIRED 11 Oct 2026. Both backtest seasons scored 6.41 a game
 #: in October against a 6.07 closing line, the over 178-146 blind, and a
 #: +0.25 tagged delta went on every October line from 7 Oct. The 2026
@@ -419,6 +433,13 @@ def forecast_nhl(
     ticket_pct_over: float | None = None,
     money_pct_over: float | None = None,
     opened: float | None = None,
+    away_gf: float | None = None,            # season scoring rates, faded (SCORING_FADE)
+    away_ga: float | None = None,
+    home_gf: float | None = None,
+    home_ga: float | None = None,
+    league_gpg: float | None = None,         # the ledger's league goals a game to date
+    away_games: float | None = None,         # games behind each club's rates
+    home_games: float | None = None,
 ) -> Forecast:
     if not _ok(line, "nhl_total"):
         raise ValueError(f"total {line!r} is outside {PLAUSIBLE['nhl_total']}")
@@ -509,6 +530,33 @@ def forecast_nhl(
     elif len(backups) == 2:
         notes.append("A backup in BOTH nets. Measured on 105 games with no direction (the one-backup "
                      "under did not carry), so nothing moves; the record will say.")
+
+    # --- season scoring rates, FADED (13 Oct 2026) ---------------------------
+    # See SCORING_FADE: the market over-moves with a club's goals for and
+    # against rates, two seasons running, so the lean goes on the line with
+    # the opposite sign. All four rates or nothing; five games a side.
+    rates = [away_gf, away_ga, home_gf, home_ga]
+    if all(v is not None and _ok(v, "xg_rate") for v in rates):
+        few = [s for s, n_ in (("away", away_games), ("home", home_games))
+               if n_ is not None and n_ < SCORING_MIN_GAMES]
+        lgg = league_gpg if (league_gpg is not None and _ok(league_gpg, "nhl_total")) else LEAGUE_GOALS_PER_GAME
+        rtot = (away_gf + home_ga) / 2.0 + (home_gf + away_ga) / 2.0
+        rgap = rtot - lgg
+        if few:
+            notes.append(f"Scoring rates: {rtot:.2f} against the league's {lgg:.2f} ({rgap:+.2f}), on under "
+                         f"{SCORING_MIN_GAMES} games for the {' and '.join(few)} side: shown, not scored until then.")
+        else:
+            size = SCORING_FADE * rgap
+            why = (f"Scoring rates: the clubs' goals for and against to date project {rtot:.2f} against the "
+                   f"league's {lgg:.2f} ({rgap:+.2f}). The market over-moves with them: against two seasons of "
+                   "closing totals the final ran 0.42 and 0.49 of a goal the OTHER way per goal of lean (t -2.1 "
+                   f"and -2.4), and the same against Pinnacle's number. Faded at {SCORING_FADE:+.2f} a goal: "
+                   f"{size:+.2f} on the line.")
+            deltas.append(Delta("Scoring rates, faded", size, why, mechanism=True))
+            notes.append(why)
+    elif any(v is not None for v in rates):
+        notes.append("Scoring rates need all four figures (each side's goals for and against per game); a partial "
+                     "set scores nothing.")
 
     # --- special teams: SHOWN, NOT SCORED since 7 Oct 2026 -------------------
     # The detail pass carried every power-play goal and penalty of two

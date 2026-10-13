@@ -31,8 +31,10 @@
   NHL.BACKUP_DELTA = -0.15;   // one backup in net: 0.18 under the close on 737 games (53.7%), both seasons; sized under it, tagged
   NHL.BACKUP_DELTA_COLD = -0.25;   // ...a COLD backup (his shrunk line costs > BACKUP_COLD_GAP goals): 0.44 under on 182 games, the under 57.5%
   NHL.BACKUP_COLD_GAP = 0.05;
-  NHL.SCORING_FADE = -0.35;   // season scoring rates, FADED (13 Oct 2026): the market over-moves with them, -0.42 and -0.49 a goal of lean two seasons running (totals/nhl.py)
+  NHL.SCORING_FADE = -0.25;   // season scoring rates, FADED, tagged (13 Oct 2026): the market over-moves with them, -0.29 and -0.33 a goal of lean two seasons running, -0.38 against Pinnacle, pooled t -2.0 (totals/nhl.py)
   NHL.SCORING_MIN_GAMES = 5;
+  NHL.EN_PULL = 0.40;         // empty-net habits, tagged (13 Oct 2026): both clubs' net empty-netters a game, conceded minus scored, +1.03 and +0.56 a goal of lean, pooled t 2.9; half the slope (totals/nhl.py)
+  NHL.EN_MIN_GAMES = 10;
   PLAUSIBLE.nhl_total = [3.5, 9.5]; PLAUSIBLE.nhl_period = [0.5, 4.5];
   PLAUSIBLE.save_pct = [0.850, 0.960]; PLAUSIBLE.shots = [15, 45]; PLAUSIBLE.shots_faced = [0, 3000]; PLAUSIBLE.xg_rate = [1.0, 5.5];
 
@@ -196,12 +198,33 @@
         notes.push("Scoring rates: " + rtot.toFixed(2) + " against the league's " + lgg.toFixed(2) + " (" + sgn(rgap) + "), on under " + NHL.SCORING_MIN_GAMES + " games for the " + few.join(" and ") + " side: shown, not scored until then.");
       } else {
         var rsize = NHL.SCORING_FADE * rgap;
-        var rwhy = "Scoring rates: the clubs' goals for and against to date project " + rtot.toFixed(2) + " against the league's " + lgg.toFixed(2) + " (" + sgn(rgap) + "). The market over-moves with them: against two seasons of closing totals the final ran 0.42 and 0.49 of a goal the OTHER way per goal of lean (t −2.1 and −2.4), and the same against Pinnacle's number. Faded at " + sgn(NHL.SCORING_FADE) + " a goal: " + sgn(rsize) + " on the line.";
-        deltas.push(delta("Scoring rates, faded", rsize, rwhy, true));
+        var rwhy = "Scoring rates: the clubs' goals for and against to date project " + rtot.toFixed(2) + " against the league's " + lgg.toFixed(2) + " (" + sgn(rgap) + "). The market over-moves with them: against two seasons of closing totals the final ran 0.29 and 0.33 of a goal the OTHER way per goal of lean (t −1.5 and −1.6, pooled −2.0), and 0.38 against Pinnacle's number. Faded at " + sgn(NHL.SCORING_FADE) + " a goal: " + sgn(rsize) + " on the line, tagged: it cannot buy a band on its own.";
+        deltas.push(delta("Scoring rates, faded", rsize, rwhy, false));
         notes.push("<b>Scoring rates, faded</b>" + rwhy.slice("Scoring rates".length));
       }
     } else if (rates.some(function (v) { return v !== null; })) {
       notes.push("Scoring rates need all four figures (each side's goals for and against per game); a partial set scores nothing.");
+    }
+
+    /* empty-net habits, tagged (13 Oct 2026, totals/nhl.py EN_PULL): both clubs' net
+       empty-net goals a game to date, conceded minus scored -- trailing late minus
+       leading late. All four or nothing; ten games a side. */
+    var en = [num("aenc"), num("aens"), num("henc"), num("hens")];
+    if (en.every(function (v) { return v !== null && v >= 0 && v <= 2; })) {
+      var fewEn = [], agpE = num("angp"), hgpE = num("hngp");
+      if (agpE !== null && agpE < NHL.EN_MIN_GAMES) fewEn.push("away");
+      if (hgpE !== null && hgpE < NHL.EN_MIN_GAMES) fewEn.push("home");
+      var conceded = en[0] + en[2], scoredEn = en[1] + en[3], netEn = conceded - scoredEn;
+      if (fewEn.length) {
+        notes.push("Empty-net habits: a net " + sgn(netEn) + " a game (conceded minus scored, both clubs), on under " + NHL.EN_MIN_GAMES + " games for the " + fewEn.join(" and ") + " side: shown, not scored until then.");
+      } else {
+        var esize = NHL.EN_PULL * netEn;
+        var ewhy = "Empty-net habits: between them the two clubs concede " + conceded.toFixed(2) + " empty-net goals a game and score " + scoredEn.toFixed(2) + ", a net of " + sgn(netEn) + ". A club that trails late pulls the goalie and concedes, and the market does not price the habit: against two seasons of closing totals the final ran 1.03 and 0.56 of a goal per goal of net lean (t 2.7 and 1.4, pooled 2.9). At " + sgn(NHL.EN_PULL) + " a goal, half the pooled slope: " + sgn(esize) + " on the line, tagged: it cannot buy a band on its own.";
+        deltas.push(delta("Empty-net habits", esize, ewhy, false));
+        notes.push("<b>Empty-net habits</b>" + ewhy.slice("Empty-net habits".length));
+      }
+    } else if (en.some(function (v) { return v !== null; })) {
+      notes.push("Empty-net habits need all four figures (each side's empty-net goals conceded and scored per game); a partial set scores nothing.");
     }
 
     /* special teams: SHOWN, NOT SCORED since 7 Oct 2026 (totals/nhl.py): each

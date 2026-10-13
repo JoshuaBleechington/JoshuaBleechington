@@ -202,25 +202,53 @@ Nothing goes on the sheet. The one thing the split confirmed: a club on a
 back to back with a DIFFERENT goalie (658 games) ran −0.14 on the close,
 the over 47.4%, which is the backup-in-net rule already carried.
 
-**Season scoring rates, faded** (13 Oct 2026, built the same night at the
-user's word: "build the scoring rates input"). The slate now writes each
-club's goals for and against per game over its finals this season, the
-games behind them, and the ledger's league goals a game to date (twenty
-finals in; the sheet's constant 6.17 otherwise) into seven new boxes
-(`agf aga hgf hga lgg angp hngp`). Both engines read them as the two
-offences against the two defences, a projected total against the league's,
-and put the lean on the line with the OPPOSITE sign at `SCORING_FADE`,
-−0.35 a goal: the measured slopes were −0.42 and −0.49 against the close
-and −0.51 against Pinnacle, shrunk a fifth for a number read out of
-sample. All four rates or nothing; five games a side, like every rate on
-the sheet; scored, not tagged, because two seasons agreed and the
-mechanism is plain (the public follows scoring reputations and the book
-shades to it). Typical size: two clubs averaging 3.5 for and 3.2 against
-project 6.7 against a league 6.17, a lean of +0.53, so −0.19 on the line
-toward the under. Tested in `tests/test_nhl.py`, two engine cases, and the
-slate's selftest (the Rangers' fake season reads 4.00 for, 2.00 against
-over eleven finals). The first input the pick can lean on that was found
-by the odds feed rather than by the ledger alone.
+**Season scoring rates, faded and tagged** (13 Oct 2026, built the same
+night at the user's word: "build the scoring rates input"). The slate now
+writes each club's goals for and against per game over its finals this
+season and the games behind them into six new boxes (`agf aga hgf hga angp
+hngp`; a seventh, `lgg`, is a league override left blank). Both engines
+read them as the two offences against the two defences, a projected total
+against the league's fixed 6.17, and put the lean on the line with the
+OPPOSITE sign at `SCORING_FADE`, −0.25 a goal, tagged. **The measure was
+corrected the same night.** The figures quoted when it was built (−0.42,
+−0.49, −0.51) were residuals on the OLD distribution's anchor; the parity
+fix moved the anchor +0.12 at a 5.5 line and −0.10 at a 6.5, and every
+slope on the sheet had to be re-read. Under the current engine the lean
+runs −0.29 a goal in 2024-25 (t −1.5), −0.33 in 2025-26 (t −1.6), −0.38
+against Pinnacle's own mean (t −1.8), −0.29 pooled (t −2.0); against the
+ledger's running league mean instead of the constant it is weaker (−0.21,
+−0.27), so the constant is the reference and the slate leaves the league
+box blank; by games played it shows no structure (no shrink earns its
+place). Same sign two seasons and against the sharp line, a plain
+mechanism, and not strong enough alone: scored at the pooled slope less a
+shrink, tagged, so it moves the forecast and cannot buy a band by itself.
+The same re-read left the goalies and the backup rule standing (two
+regular starters +0.26 and +1.04 a goal of lean; one backup 0.19 and 0.16
+under the close, the under 55.3% and 52.1%; a cold backup 0.51 and 0.33
+under). Typical size: two clubs averaging 3.5 for and 3.2 against project
+6.7 against 6.17, a lean of +0.53, so −0.13 on the line toward the under.
+Tested in `tests/test_nhl.py`, two engine cases, and the slate's selftest
+(the Rangers' fake season reads 4.00 for, 2.00 against over eleven finals).
+
+**Empty-net habits, tagged** (13 Oct 2026, `tools_backtest_nhl_en.py`, at
+the user's word: "run the empty-net habits test too"). Three measures
+from two seasons of ledger empty-netters. The PULL HABIT, a club's share
+of close regulation losses in which it conceded an empty-netter, does not
+persist within a season (r +0.11 and −0.08 between halves of 32 clubs) and
+moved nothing (slope −0.33 on the total, t −0.7). The per-game RATES do:
+both clubs' empty-netters conceded per game ran +0.91 and +1.05 a goal of
+final per goal of lean (t 1.5, 1.6), scored per game −1.34 and −0.47, and
+the NET, conceded minus scored (trailing late minus leading late), +1.03
+(t 2.7) and +0.56 (t 1.4), +0.81 pooled (t 2.9), independent of the
+scoring-rates lean (r 0.02 between them; in a two-variable fit the net
+keeps +0.81 at t 2.9). Mechanism: a club that trails late pulls the
+goalie and concedes, and the market prices the trailing, not the pulling.
+One strong season and one weak one: tagged, at half the pooled slope,
+`EN_PULL` +0.40 a goal, ten games a side, all four figures or nothing. The
+slate fills each club's conceded and scored per game from the ledger
+(`aenc aens henc hens`); the games-played boxes gate it. Typical size: two
+clubs that trail late, conceding 0.55 and 0.50 and scoring 0.25 and 0.30,
+net +0.50, +0.20 on the line toward the over.
 
 **The hockey sides, measured** (12 Oct 2026, `tools_backtest_nhl_sides.py`,
 run the night the pick went in, at the user's word: "run the hockey sides

@@ -5662,31 +5662,31 @@
       "h2hn": "3"
     },
     "expect": {
-      "lam_home": 2.89775339,
-      "lam_away": 2.66935716,
-      "projected": 6.18711054,
+      "lam_home": 2.9263816,
+      "lam_away": 2.69572894,
+      "projected": 6.24211054,
       "markets": [
         {
           "key": "total",
           "pick": "UNDER 6.5",
           "side": "UNDER",
-          "p": 0.56310218,
+          "p": 0.55381046,
           "p_push": 0,
           "price": -110.0,
-          "edge": 0.03929265,
-          "fair": -128.8865,
+          "edge": 0.03000094,
+          "fair": -124.12,
           "anchored": true,
-          "band": "BET"
+          "band": "NO BET"
         },
         {
           "key": "ml",
           "pick": "Oilers ML",
           "side": "AWAY",
-          "p": 0.45853637,
+          "p": 0.45834749,
           "p_push": 0.0,
           "price": 110.0,
-          "edge": -0.0176541,
-          "fair": 118.0852,
+          "edge": -0.01784298,
+          "fair": 118.1751,
           "anchored": true,
           "band": ""
         },
@@ -5694,11 +5694,11 @@
           "key": "pl",
           "pick": "Oilers +1.5",
           "side": "AWAY",
-          "p": 0.63785663,
+          "p": 0.63684242,
           "p_push": 0.0,
           "price": null,
           "edge": null,
-          "fair": -176.1337,
+          "fair": -175.3626,
           "anchored": false,
           "band": ""
         }
@@ -5739,6 +5739,83 @@
           "fair": 100.0,
           "anchored": true,
           "band": "NO BET"
+        }
+      ]
+    }
+  },
+  {
+    "sport": "NHL",
+    "name": "empty-net habits: two clubs that trail late push the line UP, tagged",
+    "inputs": {
+      "gdate": "2026-11-15",
+      "away": "Sabres",
+      "home": "Ducks",
+      "line": "6",
+      "op": "-110",
+      "up": "-110",
+      "hml": "-115",
+      "aml": "-105",
+      "aenc": "0.55",
+      "aens": "0.25",
+      "henc": "0.50",
+      "hens": "0.30",
+      "angp": "20",
+      "hngp": "18",
+      "agsv": "0.912",
+      "hgsv": "0.921",
+      "agsh": "1400",
+      "hgsh": "1900",
+      "asf": "31.2",
+      "hsf": "33.4",
+      "app": "22.1",
+      "hpp": "24.8",
+      "apk": "80.2",
+      "hpk": "78.1",
+      "al10": "5.9",
+      "hl10": "6.4",
+      "h2h": "6.3",
+      "h2hn": "3"
+    },
+    "expect": {
+      "lam_home": 2.83211325,
+      "lam_away": 2.77205828,
+      "projected": 6.22417154,
+      "markets": [
+        {
+          "key": "total",
+          "pick": "OVER 6",
+          "side": "OVER",
+          "p": 0.50997928,
+          "p_push": 0.1310195,
+          "price": -110.0,
+          "edge": -0.01383025,
+          "fair": -104.073,
+          "anchored": true,
+          "band": "NO BET"
+        },
+        {
+          "key": "ml",
+          "pick": "Sabres ML",
+          "side": "AWAY",
+          "p": 0.48911828,
+          "p_push": 0.0,
+          "price": -105.0,
+          "edge": -0.02307684,
+          "fair": 104.4495,
+          "anchored": true,
+          "band": ""
+        },
+        {
+          "key": "pl",
+          "pick": "Sabres +1.5",
+          "side": "AWAY",
+          "p": 0.66304597,
+          "p_push": 0.0,
+          "price": null,
+          "edge": null,
+          "fair": -196.7764,
+          "anchored": false,
+          "band": ""
         }
       ]
     }

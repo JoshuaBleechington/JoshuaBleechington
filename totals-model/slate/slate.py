@@ -42,6 +42,7 @@ import urllib.request
 
 FORMAT = "callsheet2.slate"
 VERSION = 1
+EN_MIN_GAMES = 10     # empty-net habits wait for ten finals a club (totals/nhl.py EN_MIN_GAMES)
 HERE = os.path.dirname(os.path.abspath(__file__))
 STATS = "https://statsapi.mlb.com/api/v1"
 METEO = "https://api.open-meteo.com/v1/forecast"
@@ -959,6 +960,27 @@ def nhl_league_gpg(ledger_games, date_iso, min_games=20):
     return sum(tots) / float(len(tots)) if len(tots) >= min_games else None
 
 
+def nhl_en_rates(ledger_games, abbrev, date_iso):
+    """The club's empty-net goals conceded and scored per game to date, from
+    the league ledger, and the games behind them: (conceded, scored, n). The
+    sheet reads both clubs' net (conceded minus scored) as a tagged lean on
+    the total (13 Oct 2026): a club that trails late pulls the goalie."""
+    conceded = scored = n = 0
+    for g in ledger_games or []:
+        if g.get("ena") is None or g.get("enh") is None or (g.get("date") or "") >= date_iso:
+            continue
+        if g.get("home") == abbrev:
+            conceded += g["ena"]
+            scored += g["enh"]
+        elif g.get("away") == abbrev:
+            conceded += g["enh"]
+            scored += g["ena"]
+        else:
+            continue
+        n += 1
+    return (conceded / float(n), scored / float(n), n) if n else (None, None, 0)
+
+
 def nhl_last_starter(game_id, abbrev):
     """Who started the team's last game, from its boxscore."""
     box = nhl_api("/gamecenter/%s/boxscore" % game_id)
@@ -1089,7 +1111,7 @@ def build_nhl_game(g, date_iso, season_id, summary, log, ledger=None, xg=None):
     inputs = {k: "" for k in ("agsv", "hgsv", "agsh", "hgsh", "asf", "hsf", "app", "hpp", "apk", "hpk",
                               "al10", "hl10", "h2h", "h2hn", "arest", "hrest", "nhlform", "ap1l10", "hp1l10",
                               "axgf", "axga", "hxgf", "hxga", "xglg", "ngoalies", "agname", "hgname",
-                              "agf", "aga", "hgf", "hga", "lgg", "angp", "hngp")}
+                              "agf", "aga", "hgf", "hga", "lgg", "angp", "hngp", "aenc", "aens", "henc", "hens")}
     inputs["agbk"] = inputs["hgbk"] = False   # the sheet's Backup in net boxes; True when the named starter is one
     notes, starters, form = [], {"away": "", "home": ""}, {"away": [], "home": []}
     out = {"sport": "NHL", "gdate": date_iso, "away": away, "home": home, "gameId": gid, "first_puck_utc": start,
@@ -1160,13 +1182,7 @@ def build_nhl_game(g, date_iso, season_id, summary, log, ledger=None, xg=None):
                 log("  %s scoring rates: %s for, %s against per game (%d games)" % (side, inputs[p + "gf"], inputs[p + "ga"], ng))
             else:
                 notes.append("%s has %d final%s this season: the scoring rates are left blank until %d." % (nick, ng, "" if ng == 1 else "s", MIN_TEAM_GAMES))
-            if side == "away":
-                lgg = nhl_league_gpg(ledger, date_iso) if ledger is not None else None
-                if lgg is not None:
-                    inputs["lgg"] = fmt(lgg, 2)
-                    log("  league goals a game to date: %s" % inputs["lgg"])
-                elif ledger is not None:
-                    notes.append("The league ledger has under 20 finals this season: the league goals-a-game box is left blank and the sheet uses its constant.")
+            # the league box stays blank: the sheet's fixed 6.17 measured stronger than the season's running mean
             form[side] = nhl_recent_form(fin, ab, 5)
             log("  %s last five: %s" % (side, nhl_form_line(form[side])))
             # the first-period last ten, from the league ledger
@@ -1177,6 +1193,13 @@ def build_nhl_game(g, date_iso, season_id, summary, log, ledger=None, xg=None):
                     log("  %s first-period last ten: %s over %d game%s" % (side, inputs[p + "p1l10"], k1, "" if k1 == 1 else "s"))
                 else:
                     notes.append("%s has %d final%s in the league ledger: the first-period last ten is left blank until %d." % (nick, k1, "" if k1 == 1 else "s", MIN_TEAM_GAMES))
+                # empty-net habits, tagged on the sheet (13 Oct 2026): conceded and scored per game, ten games in
+                enc, ens, ken = nhl_en_rates(ledger, ab, date_iso)
+                if enc is not None and ken >= EN_MIN_GAMES:
+                    inputs[p + "enc"], inputs[p + "ens"] = fmt(enc, 2), fmt(ens, 2)
+                    log("  %s empty-netters: %s conceded, %s scored per game (%d games)" % (side, inputs[p + "enc"], inputs[p + "ens"], ken))
+                else:
+                    notes.append("%s has %d final%s in the league ledger: the empty-net habits are left blank until %d." % (nick, ken, "" if ken == 1 else "s", EN_MIN_GAMES))
             elif side == "away":
                 notes.append("No league ledger in this folder: run the NHL ledger first and the first-period last ten fills.")
             if side == "away":
@@ -2626,6 +2649,10 @@ def selftest():
           i["agf"] == "4.00" and i["aga"] == "2.00" and i["hgf"] == "4.36" and i["hga"] == "2.00" and i["angp"] == "11" and i["hngp"] == "11" and i["lgg"] == "")
     check("nhl scoring rates: the league's goals a game from the ledger, twenty finals in",
           nhl_league_gpg([{"fa": 2, "fh": 3, "date": "2026-10-01"}] * 25, "2026-10-07") == 5.0 and nhl_league_gpg([{"fa": 2, "fh": 3, "date": "2026-10-01"}] * 5, "2026-10-07") is None)
+    # empty-net habits from the ledger: the Rangers, away in every game, conceded the home side's empty-netter each night
+    en_led = [{"home": "BOS", "away": "NYR", "ena": 0, "enh": 1, "date": "2026-10-01"}] * 12 + [{"home": "BOS", "away": "NYR", "ena": 1, "enh": 0, "date": "2026-10-09"}]
+    check("nhl empty-net habits: conceded and scored per game to date, games after the date left out",
+          nhl_en_rates(en_led, "NYR", "2026-10-07") == (1.0, 0.0, 12) and nhl_en_rates(en_led, "BOS", "2026-10-07") == (0.0, 1.0, 12) and nhl_en_rates(en_led, "SJS", "2026-10-07") == (None, None, 0))
     check("nhl head to head", i["h2h"] == "5.5" and i["h2hn"] == "2")
     check("nhl: the back-to-back side gets the rested goalie", any("did not start yesterday" in n for n in row["notes"]))
     # Jonathan Q has 17 of the Rangers' 64 starts (27%): the backup. Jeremy S has 60 of 71: not.
@@ -2719,6 +2746,7 @@ def selftest():
     finally:
         fetch_json = real
     check("ledger: the slate fills each side's first-period last ten (2.00 on seven games)", row3["inputs"]["ap1l10"] == "2.00" and row3["inputs"]["hp1l10"] == "2.00")
+    check("nhl empty-net habits: the slate leaves them blank under ten finals", row3["inputs"]["aenc"] == "" and any("empty-net habits are left blank until 10" in n for n in row3["notes"]))
     fetch_json = fake_nhl
     try:
         row4 = build_nhl_game(nhl_schedule("2026-10-07")[0], "2026-10-07", "20262027", nhl_team_summary("20262027"), lines2.append, None, (rates, lg))

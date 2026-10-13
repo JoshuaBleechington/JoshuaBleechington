@@ -56,7 +56,7 @@ def run(folder, log=print):
             d, y = g["date"], yesterday(g["date"])
             anchor, _ = fair_total("NHL", g["total"], -110.0, -110.0)
             tot = g["fa"] + g["fh"]
-            r = {"season": led_f[6:10], "date": d, "line": g["total"], "anchor": anchor, "tot": tot, "resid": tot - anchor,
+            r = {"season": "2024" if "2425" in led_f else "2025", "date": d, "line": g["total"], "anchor": anchor, "tot": tot, "resid": tot - anchor,
                  "p1": g["p1a"] + g["p1h"], "margin": g["fh"] - g["fa"], "hml": g.get("hml")}
             for side, team, pid in (("a", g["away"], g["ga_id"]), ("h", g["home"], g["gh_id"])):
                 r[side + "_tired"] = y in starts[pid]

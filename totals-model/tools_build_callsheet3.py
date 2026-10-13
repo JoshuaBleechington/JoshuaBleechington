@@ -105,7 +105,7 @@ def tail() -> str:
              '                 "app","hpp","apk","hpk","al10","hl10","h2h","h2hn","arest","hrest","tick","cash",\n'
              '                 "hml","aml","pl","plh","pla","p1line","p1op","p1up","nhlform","ntick","ncash","ap1l10","hp1l10","axgf","axga","hxgf","hxga","xglg",\n'
              '                 "ngoalies","agname","hgname","agstart","hgstart","agok","hgok",\n'
-             '                 "odds","sharp","agf","aga","hgf","hga","lgg","angp","hngp"];\n'
+             '                 "odds","sharp","agf","aga","hgf","hga","lgg","angp","hngp","aenc","aens","henc","hens"];\n'
              '  var ALL = MLB_IDS.concat(WNBA_IDS).concat(NHL_IDS).filter(function (v, i, a) { return a.indexOf(v) === i; });\n'
              '  var CHECKS = ["dome","playoff","agconf","hgconf","agbk","hgbk"];\n'
              '  function sportOf(s) { return s === "WNBA" ? "WNBA" : s === "NHL" ? "NHL" : "MLB"; }\n'
@@ -204,7 +204,7 @@ def tail() -> str:
              '                      "agsv","hgsv","agsh","hgsh","asf","hsf","app","hpp","apk","hpk","nhlform","ap1l10","hp1l10","axgf","axga","hxgf","hxga","xglg",\n'
              '                      "ngoalies","agname","hgname",\n'
              '                      "pl","plh","pla","p1line","p1op","p1up",\n'
-             '                      "agf","aga","hgf","hga","lgg","angp","hngp"];', "slate fields")
+             '                      "agf","aga","hgf","hga","lgg","angp","hngp","aenc","aens","henc","hens"];', "slate fields")
     # the slate's backup-in-net flags are booleans, carried like the roof: into a
     # row's inputs when the card already has the game, into the form otherwise
     t = once(t, '          if (g.inputs.dome === true && !row.inputs.dome) { row.inputs.dome = true; changed = true; }',

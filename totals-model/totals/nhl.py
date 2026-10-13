@@ -209,20 +209,36 @@ BACKUP_DELTA_COLD = -0.25
 BACKUP_COLD_GAP = 0.05
 BACKUP_SHARE = 0.30     # a starter under this share of his club's starts is a backup
 BACKUP_MIN_STARTS = 10  # ...once the club has this many starts to share
-#: Season scoring rates, FADED (13 Oct 2026, at the user's word: "build the
-#: scoring rates input"). Each club's goals for and against per game to
-#: date, the two offences against the two defences, against the league's
-#: goals a game to date from the ledger: the market OVER-MOVES with them.
-#: The residual of the final on that lean ran -0.42 a goal in 2024-25
-#: against the KillerSports close (t -2.1, 1,223 games) and -0.49 in
-#: 2025-26 (t -2.4), and -0.51 against Pinnacle's own mean at the close
-#: (t -2.5): the first input in a week that two seasons agree on, with a
-#: mechanism (the public follows scoring reputations and the book shades to
-#: it). Scored as a delta of SCORING_FADE times the lean, shrunk a fifth
-#: from the measured slope for a number read out of sample; five games a
-#: side before it counts, like every rate on the sheet.
-SCORING_FADE = -0.35
+#: Season scoring rates, FADED and TAGGED (13 Oct 2026, at the user's word:
+#: "build the scoring rates input"). Each club's goals for and against per
+#: game to date, the two offences against the two defences, against the
+#: league's LEAGUE_GOALS_PER_GAME (the fixed constant measured stronger
+#: than the ledger's to-date mean): the market OVER-MOVES with them. Under
+#: the parity distribution the residual of the final on that lean ran
+#: -0.29 a goal in 2024-25 against the KillerSports close (t -1.5, 1,223
+#: games), -0.33 in 2025-26 (t -1.6), -0.38 against Pinnacle's own mean at
+#: the close (t -1.8), and -0.29 pooled (t -2.0): the same sign two seasons
+#: running and against the sharp line, with a mechanism (the public follows
+#: scoring reputations and the book shades to it), and not strong enough
+#: on its own to buy a band. A delta of SCORING_FADE times the lean, the
+#: pooled slope shrunk for a number read out of sample, TAGGED; five games
+#: a side before it counts, like every rate on the sheet. The first figures
+#: quoted the night it was built (-0.42, -0.49, -0.51) were read against
+#: the old distribution's anchor; this is the current measure.
+SCORING_FADE = -0.25
 SCORING_MIN_GAMES = 5
+#: Empty-net habits, TAGGED (13 Oct 2026, the same night: "run the
+#: empty-net habits test too"). A club that trails late pulls the goalie
+#: and concedes empty-net goals; a club that leads late scores them. Both
+#: clubs' NET empty-net goals a game to date (conceded minus scored, ten
+#: games in) against two seasons of closes: +1.03 a goal of final per goal
+#: of lean in 2024-25 (t 2.7) and +0.56 in 2025-26 (t 1.4), +0.81 pooled
+#: (t 2.9), independent of the scoring rates (r 0.02 between the leans).
+#: The pull HABIT itself (empty-netters conceded per close loss) does not
+#: persist within a season (r +0.11 and -0.08 between halves) and measured
+#: nothing; the net rate does. Half the pooled slope, tagged.
+EN_PULL = 0.40
+EN_MIN_GAMES = 10
 #: October: RETIRED 11 Oct 2026. Both backtest seasons scored 6.41 a game
 #: in October against a 6.07 closing line, the over 178-146 blind, and a
 #: +0.25 tagged delta went on every October line from 7 Oct. The 2026
@@ -437,9 +453,13 @@ def forecast_nhl(
     away_ga: float | None = None,
     home_gf: float | None = None,
     home_ga: float | None = None,
-    league_gpg: float | None = None,         # the ledger's league goals a game to date
+    league_gpg: float | None = None,         # a league goals-a-game override; blank is LEAGUE_GOALS_PER_GAME
     away_games: float | None = None,         # games behind each club's rates
     home_games: float | None = None,
+    away_en_conceded: float | None = None,   # empty-net habits, tagged (EN_PULL)
+    away_en_scored: float | None = None,
+    home_en_conceded: float | None = None,
+    home_en_scored: float | None = None,
 ) -> Forecast:
     if not _ok(line, "nhl_total"):
         raise ValueError(f"total {line!r} is outside {PLAUSIBLE['nhl_total']}")
@@ -549,14 +569,42 @@ def forecast_nhl(
             size = SCORING_FADE * rgap
             why = (f"Scoring rates: the clubs' goals for and against to date project {rtot:.2f} against the "
                    f"league's {lgg:.2f} ({rgap:+.2f}). The market over-moves with them: against two seasons of "
-                   "closing totals the final ran 0.42 and 0.49 of a goal the OTHER way per goal of lean (t -2.1 "
-                   f"and -2.4), and the same against Pinnacle's number. Faded at {SCORING_FADE:+.2f} a goal: "
-                   f"{size:+.2f} on the line.")
-            deltas.append(Delta("Scoring rates, faded", size, why, mechanism=True))
+                   "closing totals the final ran 0.29 and 0.33 of a goal the OTHER way per goal of lean (t -1.5 "
+                   f"and -1.6, pooled -2.0), and 0.38 against Pinnacle's number. Faded at {SCORING_FADE:+.2f} a goal: "
+                   f"{size:+.2f} on the line, tagged: it cannot buy a band on its own.")
+            deltas.append(Delta("Scoring rates, faded", size, why, mechanism=False))
             notes.append(why)
     elif any(v is not None for v in rates):
         notes.append("Scoring rates need all four figures (each side's goals for and against per game); a partial "
                      "set scores nothing.")
+
+    # --- empty-net habits, tagged (13 Oct 2026) -------------------------------
+    # See EN_PULL. Both clubs' net empty-net goals a game to date, conceded
+    # minus scored: trailing late minus leading late. All four or nothing;
+    # ten games a side.
+    en = [away_en_conceded, away_en_scored, home_en_conceded, home_en_scored]
+    if all(v is not None and 0.0 <= v <= 2.0 for v in en):
+        few_en = [s for s, n_ in (("away", away_games), ("home", home_games))
+                  if n_ is not None and n_ < EN_MIN_GAMES]
+        conceded = away_en_conceded + home_en_conceded
+        scored = away_en_scored + home_en_scored
+        net = conceded - scored
+        if few_en:
+            notes.append(f"Empty-net habits: a net {net:+.2f} a game (conceded minus scored, both clubs), on under "
+                         f"{EN_MIN_GAMES} games for the {' and '.join(few_en)} side: shown, not scored until then.")
+        else:
+            size_en = EN_PULL * net
+            why_en = (f"Empty-net habits: between them the two clubs concede {conceded:.2f} empty-net goals a game "
+                      f"and score {scored:.2f}, a net of {net:+.2f}. A club that trails late pulls the goalie and "
+                      "concedes, and the market does not price the habit: against two seasons of closing totals "
+                      "the final ran 1.03 and 0.56 of a goal per goal of net lean (t 2.7 and 1.4, pooled 2.9). "
+                      f"At {EN_PULL:+.2f} a goal, half the pooled slope: {size_en:+.2f} on the line, tagged: it "
+                      "cannot buy a band on its own.")
+            deltas.append(Delta("Empty-net habits", size_en, why_en, mechanism=False))
+            notes.append(why_en)
+    elif any(v is not None for v in en):
+        notes.append("Empty-net habits need all four figures (each side's empty-net goals conceded and scored per "
+                     "game); a partial set scores nothing.")
 
     # --- special teams: SHOWN, NOT SCORED since 7 Oct 2026 -------------------
     # The detail pass carried every power-play goal and penalty of two

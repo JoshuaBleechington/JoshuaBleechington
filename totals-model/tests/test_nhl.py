@@ -16,7 +16,7 @@ from totals.fullgame import BANDS, devig, implied, split_for
 from totals.nhl import (
     EMPTY_NET_RATE, ENG_GIVEN_ONE_GOAL_LEAD, GOALIE_TALENT_SD, LEAGUE_GOALS_PER_GAME,
     LEAGUE_REG_GOALS, LEAGUE_SAVE_PCT, LEAGUE_SHOTS, OT_RATE, P1_SHARE, REG_PHI,
-    RESIDUAL_SD, SCORING_FADE, SCORING_MIN_GAMES, SV_STABLE_AT, WEIGHTS, final_margin_dist, forecast_matchup_nhl,
+    EN_MIN_GAMES, EN_PULL, RESIDUAL_SD, SCORING_FADE, SCORING_MIN_GAMES, SV_STABLE_AT, WEIGHTS, final_margin_dist, forecast_matchup_nhl,
     forecast_nhl, goalie_gap, grade, nhl_split, p_home_wins, puck_line_probs,
     reg_mean, shrink_sv, solve_split, sv_weight, total_pmf,
 )
@@ -152,8 +152,8 @@ class TestScoringRatesFaded(unittest.TestCase):
         self.assertAlmostEqual(d[0].runs, SCORING_FADE * (self.PROJ - 6.1), places=9)
         self.assertLess(d[0].runs, 0.0)
         self.assertLess(f.projected, base.projected)
-        self.assertTrue(d[0].mechanism, "measured on two seasons with a mechanism: not tagged")
-        self.assertTrue(any("over-moves with them" in n for n in f.notes))
+        self.assertFalse(d[0].mechanism, "same sign two seasons at a pooled t of 2: it moves the forecast and is tagged, so it cannot buy a band alone")
+        self.assertTrue(any("over-moves with them" in n and "tagged" in n for n in f.notes))
 
     def test_low_scoring_clubs_push_the_total_up(self):
         f = forecast_nhl("A @ B", 6.5, -110, -110, **{**self.RATES, "away_gf": 2.6, "home_gf": 2.5})
@@ -178,6 +178,43 @@ class TestScoringRatesFaded(unittest.TestCase):
     def test_the_matchup_wrapper_carries_it(self):
         m = forecast_matchup_nhl("A", "B", **BOARD, **self.RATES)
         self.assertTrue([x for x in m.total.deltas if x.name == "Scoring rates, faded"])
+
+
+class TestEmptyNetHabits(unittest.TestCase):
+    """13 Oct 2026: both clubs' net empty-net goals a game to date, conceded
+    minus scored, trailing late minus leading late. Tagged at EN_PULL a goal."""
+    EN = dict(away_en_conceded=0.55, away_en_scored=0.25, home_en_conceded=0.50, home_en_scored=0.30, away_games=20, home_games=18)
+    NET = (0.55 + 0.50) - (0.25 + 0.30)     # +0.50
+
+    def test_two_clubs_that_trail_late_push_the_total_up_tagged(self):
+        base = forecast_nhl("A @ B", 6.0, -110, -110)
+        f = forecast_nhl("A @ B", 6.0, -110, -110, **self.EN)
+        d = [x for x in f.deltas if x.name == "Empty-net habits"]
+        self.assertEqual(len(d), 1)
+        self.assertAlmostEqual(d[0].runs, EN_PULL * self.NET, places=9)
+        self.assertGreater(f.projected, base.projected)
+        self.assertFalse(d[0].mechanism)
+        self.assertTrue(any("does not price the habit" in n and "tagged" in n for n in f.notes))
+
+    def test_clubs_that_lead_late_pull_it_down(self):
+        f = forecast_nhl("A @ B", 6.0, -110, -110, **{**self.EN, "away_en_scored": 0.70, "home_en_scored": 0.65})
+        d = [x for x in f.deltas if x.name == "Empty-net habits"][0]
+        self.assertLess(d.runs, 0.0)
+
+    def test_under_ten_games_is_shown_not_scored(self):
+        f = forecast_nhl("A @ B", 6.0, -110, -110, **{**self.EN, "home_games": EN_MIN_GAMES - 1})
+        self.assertFalse([x for x in f.deltas if x.name == "Empty-net habits"])
+        self.assertTrue(any("Empty-net habits" in n and "shown, not scored until then" in n for n in f.notes))
+
+    def test_a_partial_set_scores_nothing(self):
+        f = forecast_nhl("A @ B", 6.0, -110, -110, away_en_conceded=0.5, home_en_scored=0.3)
+        self.assertFalse([x for x in f.deltas if x.name == "Empty-net habits"])
+        self.assertTrue(any("Empty-net habits need all four" in n for n in f.notes))
+
+    def test_it_cannot_buy_a_band_alone(self):
+        big = forecast_nhl("A @ B", 6.0, -110, -110, **{**self.EN, "away_en_conceded": 1.2, "home_en_conceded": 1.1, "away_en_scored": 0.1, "home_en_scored": 0.1})
+        self.assertEqual(big.band, "NO BET")
+        self.assertGreater(big.p_over, 0.55)
 
 
 class TestTheGateAndTheTags(unittest.TestCase):

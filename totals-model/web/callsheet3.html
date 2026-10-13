@@ -618,9 +618,15 @@
               <div class="f"><label for="hga">Home goals against</label><input id="hga" type="number" step="0.01" inputmode="decimal" placeholder="3.05"></div>
             </div>
             <div class="grid4">
-              <div class="f"><label for="lgg">League goals / game <span class="tag">ledger</span></label><input id="lgg" type="number" step="0.01" inputmode="decimal" placeholder="6.17"></div>
+              <div class="f"><label for="lgg">League goals / game <span class="tag">blank = 6.17</span></label><input id="lgg" type="number" step="0.01" inputmode="decimal" placeholder="6.17"></div>
               <div class="f"><label for="angp">Away games played</label><input id="angp" type="number" step="1" inputmode="numeric" placeholder="12"></div>
               <div class="f"><label for="hngp">Home games played</label><input id="hngp" type="number" step="1" inputmode="numeric" placeholder="11"></div>
+            </div>
+            <div class="grid4">
+              <div class="f"><label for="aenc">Away empty-netters conceded / game <span class="tag">ledger, tagged</span></label><input id="aenc" type="number" step="0.01" inputmode="decimal" placeholder="0.40"></div>
+              <div class="f"><label for="aens">Away empty-netters scored / game</label><input id="aens" type="number" step="0.01" inputmode="decimal" placeholder="0.35"></div>
+              <div class="f"><label for="henc">Home empty-netters conceded / game</label><input id="henc" type="number" step="0.01" inputmode="decimal" placeholder="0.30"></div>
+              <div class="f"><label for="hens">Home empty-netters scored / game</label><input id="hens" type="number" step="0.01" inputmode="decimal" placeholder="0.45"></div>
             </div>
             <div class="grid2">
               <div class="f"><label for="ap1l10">Away last-10 first-period total <span class="tag">ledger</span></label><input id="ap1l10" type="number" step="0.01" inputmode="decimal" placeholder="1.80"></div>
@@ -646,11 +652,16 @@
               them; all four or none, and since the 7 Oct backtest shown, not scored: built the slate's way, this
               season's xG to date ran the wrong way against a season of closes, and last season's flipped sign
               between seasons. <b>Season scoring rates</b> (each club's goals for and against per game, from its
-              finals, with the ledger's league goals a game beside them) are <b>scored, faded</b>: the two offences
-              against the two defences project a total, and the market over-moves with it two seasons running
-              (the final ran 0.42 and 0.49 of a goal the other way per goal of lean, and the same against
-              Pinnacle's number), so the lean goes on the line at −0.35 a goal. All four or nothing, five games a
-              side; the slate fills them with the games-played count.</p>
+              finals) are <b>faded, tagged</b>: the two offences against the two defences project a total against
+              the league's 6.17, and the market over-moves with it two seasons running (the final ran 0.29 and
+              0.33 of a goal the other way per goal of lean, 0.38 against Pinnacle's number, pooled t −2.0), so
+              the lean goes on the line at −0.25 a goal; tagged, so it cannot buy a band on its own. All four or
+              nothing, five games a side; the slate fills them with the games-played count. Leave the league box
+              blank: the fixed 6.17 measured stronger than the season's running mean. <b>Empty-net habits</b> (each
+              club's empty-netters conceded and scored per game, from the ledger) are <b>tagged</b> too: a club that
+              trails late pulls the goalie and concedes, the market does not price the habit, and both clubs' net
+              (conceded minus scored) ran 1.03 and 0.56 of a goal of final per goal of lean (pooled t 2.9), so it
+              goes on the line at +0.40 a goal, half the slope. All four or nothing, ten games a side.</p>
           </div>
         </details>
       </div>
@@ -1794,8 +1805,10 @@
   NHL.BACKUP_DELTA = -0.15;   // one backup in net: 0.18 under the close on 737 games (53.7%), both seasons; sized under it, tagged
   NHL.BACKUP_DELTA_COLD = -0.25;   // ...a COLD backup (his shrunk line costs > BACKUP_COLD_GAP goals): 0.44 under on 182 games, the under 57.5%
   NHL.BACKUP_COLD_GAP = 0.05;
-  NHL.SCORING_FADE = -0.35;   // season scoring rates, FADED (13 Oct 2026): the market over-moves with them, -0.42 and -0.49 a goal of lean two seasons running (totals/nhl.py)
+  NHL.SCORING_FADE = -0.25;   // season scoring rates, FADED, tagged (13 Oct 2026): the market over-moves with them, -0.29 and -0.33 a goal of lean two seasons running, -0.38 against Pinnacle, pooled t -2.0 (totals/nhl.py)
   NHL.SCORING_MIN_GAMES = 5;
+  NHL.EN_PULL = 0.40;         // empty-net habits, tagged (13 Oct 2026): both clubs' net empty-netters a game, conceded minus scored, +1.03 and +0.56 a goal of lean, pooled t 2.9; half the slope (totals/nhl.py)
+  NHL.EN_MIN_GAMES = 10;
   PLAUSIBLE.nhl_total = [3.5, 9.5]; PLAUSIBLE.nhl_period = [0.5, 4.5];
   PLAUSIBLE.save_pct = [0.850, 0.960]; PLAUSIBLE.shots = [15, 45]; PLAUSIBLE.shots_faced = [0, 3000]; PLAUSIBLE.xg_rate = [1.0, 5.5];
 
@@ -1959,12 +1972,33 @@
         notes.push("Scoring rates: " + rtot.toFixed(2) + " against the league's " + lgg.toFixed(2) + " (" + sgn(rgap) + "), on under " + NHL.SCORING_MIN_GAMES + " games for the " + few.join(" and ") + " side: shown, not scored until then.");
       } else {
         var rsize = NHL.SCORING_FADE * rgap;
-        var rwhy = "Scoring rates: the clubs' goals for and against to date project " + rtot.toFixed(2) + " against the league's " + lgg.toFixed(2) + " (" + sgn(rgap) + "). The market over-moves with them: against two seasons of closing totals the final ran 0.42 and 0.49 of a goal the OTHER way per goal of lean (t −2.1 and −2.4), and the same against Pinnacle's number. Faded at " + sgn(NHL.SCORING_FADE) + " a goal: " + sgn(rsize) + " on the line.";
-        deltas.push(delta("Scoring rates, faded", rsize, rwhy, true));
+        var rwhy = "Scoring rates: the clubs' goals for and against to date project " + rtot.toFixed(2) + " against the league's " + lgg.toFixed(2) + " (" + sgn(rgap) + "). The market over-moves with them: against two seasons of closing totals the final ran 0.29 and 0.33 of a goal the OTHER way per goal of lean (t −1.5 and −1.6, pooled −2.0), and 0.38 against Pinnacle's number. Faded at " + sgn(NHL.SCORING_FADE) + " a goal: " + sgn(rsize) + " on the line, tagged: it cannot buy a band on its own.";
+        deltas.push(delta("Scoring rates, faded", rsize, rwhy, false));
         notes.push("<b>Scoring rates, faded</b>" + rwhy.slice("Scoring rates".length));
       }
     } else if (rates.some(function (v) { return v !== null; })) {
       notes.push("Scoring rates need all four figures (each side's goals for and against per game); a partial set scores nothing.");
+    }
+
+    /* empty-net habits, tagged (13 Oct 2026, totals/nhl.py EN_PULL): both clubs' net
+       empty-net goals a game to date, conceded minus scored -- trailing late minus
+       leading late. All four or nothing; ten games a side. */
+    var en = [num("aenc"), num("aens"), num("henc"), num("hens")];
+    if (en.every(function (v) { return v !== null && v >= 0 && v <= 2; })) {
+      var fewEn = [], agpE = num("angp"), hgpE = num("hngp");
+      if (agpE !== null && agpE < NHL.EN_MIN_GAMES) fewEn.push("away");
+      if (hgpE !== null && hgpE < NHL.EN_MIN_GAMES) fewEn.push("home");
+      var conceded = en[0] + en[2], scoredEn = en[1] + en[3], netEn = conceded - scoredEn;
+      if (fewEn.length) {
+        notes.push("Empty-net habits: a net " + sgn(netEn) + " a game (conceded minus scored, both clubs), on under " + NHL.EN_MIN_GAMES + " games for the " + fewEn.join(" and ") + " side: shown, not scored until then.");
+      } else {
+        var esize = NHL.EN_PULL * netEn;
+        var ewhy = "Empty-net habits: between them the two clubs concede " + conceded.toFixed(2) + " empty-net goals a game and score " + scoredEn.toFixed(2) + ", a net of " + sgn(netEn) + ". A club that trails late pulls the goalie and concedes, and the market does not price the habit: against two seasons of closing totals the final ran 1.03 and 0.56 of a goal per goal of net lean (t 2.7 and 1.4, pooled 2.9). At " + sgn(NHL.EN_PULL) + " a goal, half the pooled slope: " + sgn(esize) + " on the line, tagged: it cannot buy a band on its own.";
+        deltas.push(delta("Empty-net habits", esize, ewhy, false));
+        notes.push("<b>Empty-net habits</b>" + ewhy.slice("Empty-net habits".length));
+      }
+    } else if (en.some(function (v) { return v !== null; })) {
+      notes.push("Empty-net habits need all four figures (each side's empty-net goals conceded and scored per game); a partial set scores nothing.");
     }
 
     /* special teams: SHOWN, NOT SCORED since 7 Oct 2026 (totals/nhl.py): each
@@ -2750,7 +2784,7 @@
                  "app","hpp","apk","hpk","al10","hl10","h2h","h2hn","arest","hrest","tick","cash",
                  "hml","aml","pl","plh","pla","p1line","p1op","p1up","nhlform","ntick","ncash","ap1l10","hp1l10","axgf","axga","hxgf","hxga","xglg",
                  "ngoalies","agname","hgname","agstart","hgstart","agok","hgok",
-                 "odds","sharp","agf","aga","hgf","hga","lgg","angp","hngp"];
+                 "odds","sharp","agf","aga","hgf","hga","lgg","angp","hngp","aenc","aens","henc","hens"];
   var ALL = MLB_IDS.concat(WNBA_IDS).concat(NHL_IDS).filter(function (v, i, a) { return a.indexOf(v) === i; });
   var CHECKS = ["dome","playoff","agconf","hgconf","agbk","hgbk"];
   function sportOf(s) { return s === "WNBA" ? "WNBA" : s === "NHL" ? "NHL" : "MLB"; }
@@ -4285,7 +4319,7 @@
                       "agsv","hgsv","agsh","hgsh","asf","hsf","app","hpp","apk","hpk","nhlform","ap1l10","hp1l10","axgf","axga","hxgf","hxga","xglg",
                       "ngoalies","agname","hgname",
                       "pl","plh","pla","p1line","p1op","p1up",
-                      "agf","aga","hgf","hga","lgg","angp","hngp"];
+                      "agf","aga","hgf","hga","lgg","angp","hngp","aenc","aens","henc","hens"];
   function blank(v) { return v === undefined || v === null || String(v).trim() === ""; }
   function sameGame(row, g) {
     var sp = sportOf(g.sport);

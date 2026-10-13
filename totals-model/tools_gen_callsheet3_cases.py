@@ -51,7 +51,8 @@ def build_nhl(i: dict):
         away_goalie_backup=bool(i.get("agbk")), home_goalie_backup=bool(i.get("hgbk")),
         ticket_pct_over=n(i.get("ntick")), money_pct_over=n(i.get("ncash")), opened=n(i.get("opened")),
         away_gf=n(i.get("agf")), away_ga=n(i.get("aga")), home_gf=n(i.get("hgf")), home_ga=n(i.get("hga")),
-        league_gpg=n(i.get("lgg")), away_games=n(i.get("angp")), home_games=n(i.get("hngp")))
+        league_gpg=n(i.get("lgg")), away_games=n(i.get("angp")), home_games=n(i.get("hngp")),
+        away_en_conceded=n(i.get("aenc")), away_en_scored=n(i.get("aens")), home_en_conceded=n(i.get("henc")), home_en_scored=n(i.get("hens")))
 
 
 FULL = dict(agsv="0.912", hgsv="0.921", agsh="1400", hgsh="1900", asf="31.2", hsf="33.4",
@@ -111,6 +112,9 @@ NHL_CASES = [
     {"name": "scoring rates on four games: shown, not scored until five",
      "inputs": dict(away="Kraken", home="Canucks", line="6", op="-110", up="-110",
                     agf="3.60", aga="3.20", hgf="3.40", hga="3.10", lgg="6.10", angp="4", hngp="11")},
+    {"name": "empty-net habits: two clubs that trail late push the line UP, tagged",
+     "inputs": dict(away="Sabres", home="Ducks", line="6", op="-110", up="-110", hml="-115", aml="-105",
+                    aenc="0.55", aens="0.25", henc="0.50", hens="0.30", angp="20", hngp="18", **FULL)},
 ]
 
 

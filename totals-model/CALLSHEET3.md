@@ -186,6 +186,22 @@ KillerSports closes). Five findings, in the order they mattered.
    negative sign, and the first one in a week that two seasons agree on.
    Pinnacle's mean error against the final was 1.835; the close's 1.841.
 
+**The goalie on consecutive nights, measured null and rare** (13 Oct 2026,
+`tools_backtest_nhl_goalie_b2b.py`, at the user's word). Two seasons of
+starters: a goalie started the day after starting in **63 of 2,616 games
+(2.4%)**, never both goalies in one game; a club on a back to back sent a
+different goalie out 658 times and the same one 63. The clubs already
+manage it. In those 63 the tired goalie's save percentage sat 0.003 ABOVE
+the everyone-else baseline against his own season rate (t 0.8 either way;
+the baseline itself carries a leave-one-out bias of −.009 from the
+shots-to-save-percentage correlation, so groups are read against each
+other, not against zero); the total ran −0.13 on a close the market had
+already raised to 6.13 against 6.02 elsewhere (t −0.4), the over 29-30-4;
+the sides, 40 and 23 games, noise; the first period +0.13 on 63, noise.
+Nothing goes on the sheet. The one thing the split confirmed: a club on a
+back to back with a DIFFERENT goalie (658 games) ran −0.14 on the close,
+the over 47.4%, which is the backup-in-net rule already carried.
+
 **Season scoring rates, faded** (13 Oct 2026, built the same night at the
 user's word: "build the scoring rates input"). The slate now writes each
 club's goals for and against per game over its finals this season, the

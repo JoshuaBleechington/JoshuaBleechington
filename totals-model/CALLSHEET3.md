@@ -547,6 +547,27 @@ anchor's side): a tenth of a goal of lean went 549-537 at the close, −38
 units; three tenths 143-120 on 263 games, +10. The goalie line is a weight
 in the blend at 1.6, not a bet on its own, which is how it is scored.
 
+**Time-decayed form, measured 14 Oct 2026** (at the user's word: "run the
+time-decayed form test too"; `tools_backtest_nhl_form.py`). The pro
+models weight every game by how long ago it was, a half-life in games or
+days, where the sheet takes a flat average of each club's last ten totals
+at weight 0.6. On 2,445 games with five or more played by both clubs:
+flat windows of 5, 10, 15, 20 and the season, exponential decays with
+half-lives of 3, 5, 10, 20 and 40 games and of 7, 14, 30 and 60 days.
+Every variant's slope on the close's residual sits between +0.06 and
++0.17 with a t of about one; the flat ten reads +0.06 (t 0.6) under the
+parity anchor. The longer windows read +0.3 in 2024-25 and zero in
+2025-26; the short ones read nothing both seasons. The flat ten and a
+five-game decay correlate at 0.89 and split the same information between
+them. With twenty-one variants tried, the best bet record (a fourteen-day
+half-life, +20 units at a quarter of a goal) is what one of twenty-one
+coins looks like. No decay beats the flat ten; the input stays as it is.
+The same run measured RESIDUAL form, each club's totals against its own
+closes, flat and decayed, which is the form a market-aware model would
+use and the product the trend platforms sell: null to negative at every
+window (season to date −0.20, −0.41 in 2025-26). A club that has been
+going over its number does not keep going over it.
+
 The same pass tested the schedule and found nothing to score: three games
 in four nights ran 0.13 under (849 games, 52.1%, both seasons, near the
 back-to-back label); a road trip's fifth game and later, divisional
@@ -635,6 +656,8 @@ were earned on: when it said over, did the game land over the close?
 | Backups in both nets | 105 | | | sign flipped, no sample; nothing moves |
 | Goals saved above expected as the goalie prior (MoneyPuck, last season), two regular starters | 1,683 | +0.07 / +1.06 (pooled +0.52, t 1.6) | | **not an input**: the raw prior measured +0.24 / +1.08 (pooled +0.72, t 2.3) on the same games; raw and GSAx together, raw +0.89 (t 1.7), GSAx −0.22; the two priors agree at r 0.80 |
 | ...the sheet's goalie lean bet AT THE LINE, two regular starters | 1,683 | | | a tenth of a goal 549-537 (50.6%), −38u; three tenths 143-120 (54.4%, 263 games), +10u: a weight in the blend, not a bet |
+| Time-decayed form (half-lives of 3 to 40 games and 7 to 60 days) against the flat last ten | 2,445 | +0.08 to +0.17, every t about 1 | 0.3 to 0.8 | **nothing beats the flat ten beyond noise** (flat ten +0.06, t 0.6 under the parity anchor); the longer windows read +0.3 in 2024-25 and zero in 2025-26 |
+| Residual form: each club's totals against its own closes, flat and decayed | 2,444 | −0.01 to −0.20 (season to date −0.11 / −0.41) | negative | a club's recent over/under record against the market does NOT persist; the trend platforms' product, and it reads the wrong way |
 
 The first period's share model is dead on: 1.747 predicted from the close
 against 1.744 scored, and the 2+ rate climbs with the line as it should.

@@ -557,6 +557,33 @@ const CHECKS = ["dome","playoff","agconf","hgconf","agbk","hgbk"];
   });
   chk(teams.dlNhlHasBruins && !teams.dlNhlHasAstros && teams.dlNhlLen === 32 && teams.dlHasAstros, 'teams: the NHL datalist holds the 32 clubs and the MLB one its 30', JSON.stringify(teams));
 
+  // ---- 14 Oct 2026: colour in the record section, the favourite table and the forecast line ----
+  const colour = await pg.evaluate(async () => {
+    const wait = () => new Promise(r => setTimeout(r, 80));
+    // twelve graded hockey games with a -250 home favourite: it won eleven by two or more, lost one
+    const rows = [];
+    for (let i = 0; i < 12; i++) {
+      const win = i < 11;
+      rows.push({ id: 9001 + i, sport: 'NHL', away: 'Sharks', home: 'Bruins', matchup: 'Sharks @ Bruins', gdate: '2026-09-' + String(5 + i).padStart(2, '0'),
+                  inputs: { away: 'Sharks', home: 'Bruins', gdate: '2026-09-' + String(5 + i).padStart(2, '0'), line: '6', op: '-110', up: '-110', hml: '-250', aml: '200', p1line: '1.5' },
+                  proj: { t: 6.1, h: 0.7, a: 0.3, q: 1.7, re: false }, markets: [], finals: win ? { fa: '1', fh: '4', f5a: '0', f5h: '2' } : { fa: '3', fh: '2', f5a: '1', f5h: '1' } });
+    }
+    const doc = { format: 'callsheet2.backup', version: 1, card: rows };
+    const dt = new DataTransfer(); dt.items.add(new File([JSON.stringify(doc)], 'callsheet3-2026-09-17.json', { type: 'application/json' }));
+    const inp = document.getElementById('restoreFile'); inp.files = dt.files; inp.dispatchEvent(new Event('change', { bubbles: true })); await wait();
+    const tr = [...document.querySelectorAll('#calibBox .favs[data-sport="NHL"] tr')].find(t => /−200 or more/.test(t.textContent));
+    const cells = tr ? [...tr.querySelectorAll('td')].map(td => (td.className || '-') + ':' + td.textContent) : [];
+    const small = [...document.querySelectorAll('#calibBox .favs[data-sport="NHL"] tr')].filter(t => /−149 to −120/.test(t.textContent)).map(t => [...t.querySelectorAll('td.up, td.down')].length);
+    const fc = document.querySelector('#calibBox .forecast[data-sport="NHL"]');
+    const legend = (document.querySelector('#calibBox .favs[data-sport="NHL"]') || {}).textContent || '';
+    return { cells, small, forecastSpans: fc ? fc.querySelectorAll('span.up, span.down').length : -1, forecastText: fc ? fc.textContent : '', legend };
+  });
+  chk(colour.cells.length === 7 && /^up:9[0-9]\.\d%$/.test(colour.cells[2]) && /^ref:/.test(colour.cells[3]) && /^down:8\.3%$/.test(colour.cells[4]) && /^up:91\.7%$/.test(colour.cells[5]) && /^up:\+/.test(colour.cells[6]),
+      'colour: on twelve games the favourite row goes green where it beats the implied chance and the two-season rate, red where it trails, green on a positive return', JSON.stringify(colour.cells));
+  chk(colour.small.every(n => n === 0), 'colour: a bucket under ten games stays uncoloured', JSON.stringify(colour.small));
+  chk(colour.forecastSpans >= 1 && /projected total lands/.test(colour.forecastText), 'colour: the forecast line tones the sheet\'s figures against the market\'s', colour.forecastText.slice(0, 200));
+  chk(/Green beats its reference by 2 points or more, red trails it/.test(colour.legend) && /Colour after 10 games/.test(colour.legend), 'colour: the table says what the colours mean', colour.legend.slice(0, 400));
+
   // ---- the build stamp ------------------------------------------------------------
   const stamp = await pg.evaluate(() => (document.getElementById('build') || {}).textContent);
   const git = (cmd) => execSync(cmd, { cwd: __dirname, encoding: 'utf8' }).trim();

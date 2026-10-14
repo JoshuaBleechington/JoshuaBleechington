@@ -560,11 +560,17 @@
   function forecastBlock(sp) {
     var s = forecastStats(sp); if (!s.n) return "";
     var unit = sp === "WNBA" ? "points" : sp === "NHL" ? "goals" : "runs", dp = sp === "WNBA" ? 1 : 2;
-    var t = '<b>Forecast</b> · ' + s.n + ' graded game' + (s.n === 1 ? '' : 's') + ': the projected total lands ' + (s.mae / s.n).toFixed(dp) + ' ' + unit +
-      ' from the final on average, the market\'s line ' + (s.mkt / s.n).toFixed(dp) + '; closer than the line in ' + s.closer + ', further in ' + (s.n - s.closer - s.tie) + (s.tie ? ', even in ' + s.tie : '') +
+    /* colour for recognition (14 Oct 2026): the sheet's figure goes green when it beats the market's, red when it trails it */
+    var tone = function (good, bad, text) { return good ? '<span class="up">' + text + '</span>' : bad ? '<span class="down">' + text + '</span>' : text; };
+    var further = s.n - s.closer - s.tie;
+    var t = '<b>Forecast</b> · ' + s.n + ' graded game' + (s.n === 1 ? '' : 's') + ': the projected total lands ' + tone(s.mae < s.mkt - 1e-9, s.mae > s.mkt + 1e-9, (s.mae / s.n).toFixed(dp) + ' ' + unit) +
+      ' from the final on average, the market\'s line ' + (s.mkt / s.n).toFixed(dp) + '; closer than the line in ' + tone(s.closer > further, s.closer < further, String(s.closer)) + ', further in ' + further + (s.tie ? ', even in ' + s.tie : '') +
       '; the projection runs ' + sgn(s.bias / s.n, dp) + ' against the final, the line ' + sgn(s.mbias / s.n, dp) + '.';
-    if (s.nW) t += ' Winner called ' + s.w + ' of ' + s.nW + ' (' + Math.round(100 * s.w / s.nW) + '%)' + (s.nF ? ', the favourite ' + s.fav + ' of ' + s.nF + ' (' + Math.round(100 * s.fav / s.nF) + '%)' : '') + '.';
-    if (s.nQ) t += ' ' + (sp === "NHL" ? 'First period' : 'First five') + ' projected ' + (s.qmae / s.nQ).toFixed(dp) + ' from the score, the line ' + (s.qmkt / s.nQ).toFixed(dp) + '.';
+    if (s.nW) {
+      var wr = s.w / s.nW, fr = s.nF ? s.fav / s.nF : null;
+      t += ' Winner called ' + tone(fr !== null && wr > fr + 1e-9, fr !== null && wr < fr - 1e-9, s.w + ' of ' + s.nW + ' (' + Math.round(100 * wr) + '%)') + (s.nF ? ', the favourite ' + s.fav + ' of ' + s.nF + ' (' + Math.round(100 * fr) + '%)' : '') + '.';
+    }
+    if (s.nQ) t += ' ' + (sp === "NHL" ? 'First period' : 'First five') + ' projected ' + tone(s.qmae < s.qmkt - 1e-9, s.qmae > s.qmkt + 1e-9, (s.qmae / s.nQ).toFixed(dp)) + ' from the score, the line ' + (s.qmkt / s.nQ).toFixed(dp) + '.';
     if (s.re) t += ' <span class="dim">' + s.re + ' row' + (s.re === 1 ? '' : 's') + ' re-scored with today\'s engine (logged before the forecast line).</span>';
     return '<div class="verdict forecast" data-sport="' + sp + '">' + t + '</div>';
   }
@@ -1505,6 +1511,7 @@
   var FAV_BUCKETS = [[-100000, -200, "−200 or more"], [-199, -150, "−199 to −150"], [-149, -120, "−149 to −120"], [-119, -101, "−119 to −101"]];
   var FAV_BASE_NHL = { "−200 or more": [566, 68.2, 71.5, 55.5, 44.5, -4.8], "−199 to −150": [859, 58.2, 62.6, 62.9, 37.1, -7.1],
                        "−149 to −120": [828, 54.0, 57.1, 68.6, 31.4, -5.5], "−119 to −101": [281, 50.2, 52.2, 70.5, 29.5, -4.0] };
+  var FAV_COLOR_MIN = 10, FAV_COLOR_PTS = 2;   // colour needs ten games and two points of daylight from the reference (14 Oct 2026)
   function favBlock(sp) {
     var b = {};
     card.forEach(function (r) {
@@ -1524,13 +1531,20 @@
     });
     if (!Object.keys(b).length && sp !== "NHL") return "";
     var h = '<div class="verdict favs" data-sport="' + sp + '"><b>The favourite, by price.</b> The favourite\'s record against what its price implied, the dog +1.5 and the favourite −1.5, and the favourite\'s moneyline return, over this card\'s graded games with both prices typed' +
-      (sp === "NHL" ? '; in grey, two seasons at the close (2,616 games, measured 12 Oct 2026)' : '') + '. The base rate the pick is read against; nothing here moves a number.' +
+      (sp === "NHL" ? '; in grey, two seasons at the close (2,616 games, measured 12 Oct 2026)' : '') + '. The base rate the pick is read against; nothing here moves a number. ' +
+      '<span class="dim">Green beats its reference by ' + FAV_COLOR_PTS + ' points or more, red trails it: the implied chance for the favourite, ' + (sp === "NHL" ? 'the two-season rate for the spreads, ' : '') + 'zero for the return. Colour after ' + FAV_COLOR_MIN + ' games.</span>' +
       '<table class="favt"><tr><th>favourite\'s price</th><th>n</th><th>fav won</th><th>implied</th><th>dog +1.5</th><th>fav −1.5</th><th>fav ML</th></tr>';
+    var cell = function (pct, ref, n, text) {
+      var cls = (ref === null || n < FAV_COLOR_MIN) ? '' : pct >= ref + FAV_COLOR_PTS ? ' class="up"' : pct <= ref - FAV_COLOR_PTS ? ' class="down"' : '';
+      return '<td' + cls + '>' + text + '</td>';
+    };
     FAV_BUCKETS.forEach(function (x) {
       var s = b[x[2]], base = sp === "NHL" ? FAV_BASE_NHL[x[2]] : null;
       if (!s && !base) return;
+      var won = s ? 100 * s.w / s.n : 0, imp = s ? 100 * s.imp / s.n : 0, dog = s ? 100 * s.dog / s.n : 0, f15 = s ? 100 * s.fav15 / s.n : 0, ret = s ? 100 * s.units / s.n : 0;
       h += '<tr><td>' + x[2] + '</td>' + (s
-        ? '<td>' + s.n + '</td><td>' + (100 * s.w / s.n).toFixed(1) + '%</td><td>' + (100 * s.imp / s.n).toFixed(1) + '%</td><td>' + (100 * s.dog / s.n).toFixed(1) + '%</td><td>' + (100 * s.fav15 / s.n).toFixed(1) + '%</td><td>' + sgn(100 * s.units / s.n, 1) + '%</td>'
+        ? '<td>' + s.n + '</td>' + cell(won, imp, s.n, won.toFixed(1) + '%') + '<td class="ref">' + imp.toFixed(1) + '%</td>' +
+          cell(dog, base ? base[3] : null, s.n, dog.toFixed(1) + '%') + cell(f15, base ? base[4] : null, s.n, f15.toFixed(1) + '%') + cell(ret, 0, s.n, sgn(ret, 1) + '%')
         : '<td>0</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td>') + '</tr>';
       if (base) h += '<tr class="base"><td>two seasons at the close</td><td>' + base[0] + '</td><td>' + base[1].toFixed(1) + '%</td><td>' + base[2].toFixed(1) + '%</td><td>' + base[3].toFixed(1) + '%</td><td>' + base[4].toFixed(1) + '%</td><td>' + sgn(base[5], 1) + '%</td></tr>';
     });

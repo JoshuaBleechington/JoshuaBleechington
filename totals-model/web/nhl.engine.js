@@ -490,10 +490,33 @@
     });
     el.innerHTML = h;
   }
+  /* ---- the context card (14 Oct 2026, at the user's word: "little bits of info like
+     Bruins have the 4th worst defense in the league"). The slate writes each club's
+     league ranks as JSON into the hidden `nhlctx` box, each line with a status
+     (scored / faded / shown / label) and the tag that says what the sheet did with
+     the fact. Rendered, never read by the engine. */
+  var CTX_BADGE = { scored: "scored", faded: "faded", shown: "shown", label: "label" };
+  function nhlCtxPanel() {
+    var el = $("ctxPanel"); if (!el) return;
+    var raw = ($("nhlctx") || {}).value || "", ctx = null;
+    try { ctx = raw ? JSON.parse(raw) : null; } catch (e) { ctx = null; }
+    if (!ctx || !ctx.length) {
+      el.innerHTML = "No context on the row — load the slate and Fill form, and the lines come with it.";
+      return;
+    }
+    var order = { scored: 0, faded: 1, shown: 2, label: 3 };
+    var items = ctx.slice().sort(function (a, b) { return (order[a.s] || 0) - (order[b.s] || 0); });
+    el.innerHTML = '<ul class="ctx">' + items.map(function (c) {
+      var s = CTX_BADGE[c.s] ? c.s : "shown";
+      return '<li class="ctx-' + s + '"><span class="cbadge">' + CTX_BADGE[s] + '</span> <span class="ctext">' + esc(c.t || "") + '</span>' +
+             (c.tag ? ' <span class="ctag">' + esc(c.tag) + '</span>' : '') + '</li>';
+    }).join("") + '</ul>';
+  }
   function forecastMatchupNhl() {
     nhlGoaliePicker();
     nhlGoalieSummary();
     nhlFormPanel();
+    nhlCtxPanel();
     var f = readNhl();
     var away = f.away, home = f.home, line = f.line;
     var op = num("op"), up = num("up"), hml = num("hml"), aml = num("aml");

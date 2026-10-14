@@ -103,7 +103,7 @@ def tail() -> str:
              '                  "arest","hrest","al5","hl5","hml","aml","sp","sph","spa"];\n'
              '  var NHL_IDS = ["away","home","line","op","up","opened","gdate","agsv","hgsv","agsh","hgsh","asf","hsf",\n'
              '                 "app","hpp","apk","hpk","al10","hl10","h2h","h2hn","arest","hrest","tick","cash",\n'
-             '                 "hml","aml","pl","plh","pla","p1line","p1op","p1up","nhlform","ntick","ncash","ap1l10","hp1l10","axgf","axga","hxgf","hxga","xglg",\n'
+             '                 "hml","aml","pl","plh","pla","p1line","p1op","p1up","nhlform","nhlctx","ntick","ncash","ap1l10","hp1l10","axgf","axga","hxgf","hxga","xglg",\n'
              '                 "ngoalies","agname","hgname","agstart","hgstart","agok","hgok",\n'
              '                 "odds","sharp","agf","aga","hgf","hga","lgg","angp","hngp","aenc","aens","henc","hens"];\n'
              '  var ALL = MLB_IDS.concat(WNBA_IDS).concat(NHL_IDS).filter(function (v, i, a) { return a.indexOf(v) === i; });\n'
@@ -201,7 +201,7 @@ def tail() -> str:
              'if (!moved) say("Loaded <b>" + card.length + "</b> matchups from " + esc(f.name) + ".");', "restore message")
     t = once(t, '                      "line","op","up","opened","hml","aml","rl","rlh","rla","f5line","f5op","f5up","odds","sharp"];',
              '                      "line","op","up","opened","hml","aml","rl","rlh","rla","f5line","f5op","f5up","odds","sharp",\n'
-             '                      "agsv","hgsv","agsh","hgsh","asf","hsf","app","hpp","apk","hpk","nhlform","ap1l10","hp1l10","axgf","axga","hxgf","hxga","xglg",\n'
+             '                      "agsv","hgsv","agsh","hgsh","asf","hsf","app","hpp","apk","hpk","nhlform","nhlctx","ap1l10","hp1l10","axgf","axga","hxgf","hxga","xglg",\n'
              '                      "ngoalies","agname","hgname",\n'
              '                      "pl","plh","pla","p1line","p1op","p1up",\n'
              '                      "agf","aga","hgf","hga","lgg","angp","hngp","aenc","aens","henc","hens"];', "slate fields")

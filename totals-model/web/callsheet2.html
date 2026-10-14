@@ -183,6 +183,15 @@
   .favt td.ref { color: var(--muted); }
   .verdict.forecast .up { color: var(--go); font-weight: 700; }
   .verdict.forecast .down { color: var(--bad); font-weight: 700; }
+  /* the context card (14 Oct 2026): a club's league ranks, each with the tag that says what the sheet did with it */
+  ul.ctx { list-style: none; margin: 0; padding: 0; }
+  ul.ctx li { padding: 6px 0; border-bottom: 1px solid var(--rule); font-size: 12.5px; line-height: 1.5; color: var(--ink); }
+  ul.ctx li:last-child { border-bottom: 0; }
+  ul.ctx .cbadge { display: inline-block; min-width: 52px; text-align: center; margin-right: 6px; padding: 1px 6px; border-radius: 3px; font: 700 9.5px/1.6 var(--sans); letter-spacing: .06em; text-transform: uppercase; vertical-align: 1px; }
+  ul.ctx .ctag { display: block; margin: 1px 0 0 58px; font-size: 11px; color: var(--muted); }
+  ul.ctx li.ctx-scored .cbadge { color: var(--go); background: var(--go-wash); }
+  ul.ctx li.ctx-faded .cbadge { color: var(--edge); background: var(--edge-wash); }
+  ul.ctx li.ctx-shown .cbadge, ul.ctx li.ctx-label .cbadge { color: var(--muted); background: var(--surface-2); }
   details.others > summary::before { content: "▸ "; } details.others[open] > summary::before { content: "▾ "; }
   .mklist { display: flex; flex-direction: column; gap: 8px; }
   .split { display: flex; height: 26px; border-radius: 6px; overflow: hidden; border: 1px solid var(--rule); margin: 6px 14px 8px 60px; }

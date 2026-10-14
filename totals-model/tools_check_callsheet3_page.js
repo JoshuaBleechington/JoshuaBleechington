@@ -447,7 +447,12 @@ const CHECKS = ["dome","playoff","agconf","hgconf","agbk","hgbk"];
                   agname: 'Stuart Skinner', hgname: 'Dustin Wolf',
                   ngoalies: JSON.stringify({ away: [{ n: 'Stuart Skinner', sv: 0.908, sh: 1200, gs: 10, cs: 12, ls: false }, { n: 'Calvin Pickard', sv: 0.897, sh: 450, gs: 2, cs: 12, ls: false }],
                                             home: [{ n: 'Dustin Wolf', sv: 0.916, sh: 1300, gs: 11, cs: 12, ls: false }, { n: 'Devin Cooley', sv: 0.902, sh: 300, gs: 1, cs: 12, ls: false }] }),
-                  nhlform: JSON.stringify({ away: [{ date: '2026-10-04', opp: 'Jets', home: false, gf: 2, ga: 5, sf: 24, sa: 38, p1f: 0, p1a: 2, goalie: 'S. Skinner', end: 'REG' }, { date: '2026-10-06', opp: 'Kings', home: true, gf: 3, ga: 4, sf: 27, sa: 36, p1f: 1, p1a: 1, goalie: 'C. Pickard', end: 'OT' }], home: [{ date: '2026-10-05', opp: 'Sharks', home: true, gf: 4, ga: 1, sf: 33, sa: 22, p1f: 2, p1a: 0, goalie: 'D. Wolf', end: 'REG' }] }) },
+                  nhlform: JSON.stringify({ away: [{ date: '2026-10-04', opp: 'Jets', home: false, gf: 2, ga: 5, sf: 24, sa: 38, p1f: 0, p1a: 2, goalie: 'S. Skinner', end: 'REG' }, { date: '2026-10-06', opp: 'Kings', home: true, gf: 3, ga: 4, sf: 27, sa: 36, p1f: 1, p1a: 1, goalie: 'C. Pickard', end: 'OT' }], home: [{ date: '2026-10-05', opp: 'Sharks', home: true, gf: 4, ga: 1, sf: 33, sa: 22, p1f: 2, p1a: 0, goalie: 'D. Wolf', end: 'REG' }] }),
+                  nhlctx: JSON.stringify([
+                    { side: 'home', k: 'rates', s: 'faded', t: 'Flames allow 3.90 a game, 4th most in the league (12 games).', tag: 'scored, faded: the market over-moves with scoring reputations, so the lean goes on the line at −0.25 a goal, tagged' },
+                    { side: 'away', k: 'goalie_backup', s: 'scored', t: 'Stuart Skinner .908 on 1200 shots, 22nd of 40 goalies with 100+ shots.', tag: 'the backup rule: a tagged −0.15 on the line, −0.25 if his line reads cold; the line itself is not scored' },
+                    { side: 'home', k: 'special', s: 'shown', t: 'Flames kill at 81.2%, 6th best in the league.', tag: 'shown, not scored: special teams measured the wrong way against the close' },
+                    { side: 'away', k: 'rest', s: 'label', t: 'Oilers on a back to back.', tag: 'a label: the goalie line carries a back to back' }]) },
         notes: ['Away back to back: likely the backup in net'] } ] };
     const dt = new DataTransfer(); dt.items.add(new File([JSON.stringify(slateDoc)], 'slate-2026-11-07.json', { type: 'application/json' }));
     const inp = document.getElementById('slateFile'); inp.files = dt.files; inp.dispatchEvent(new Event('change', { bubbles: true })); await wait();
@@ -458,7 +463,11 @@ const CHECKS = ["dome","playoff","agconf","hgconf","agbk","hgbk"];
                    agbk: document.getElementById('agbk').checked, hgbk: document.getElementById('hgbk').checked,
                    panel: document.getElementById('formPanel').innerText, ap1l10: v('ap1l10'), hp1l10: v('hp1l10'), axgf: v('axgf'), hxga: v('hxga'), xglg: v('xglg'),
                    why: document.getElementById('why').textContent,
-                   p1why: [...document.querySelectorAll('#markets .mk[data-key="p1"] .mkdetail')].map(e => e.textContent).join(' ') };
+                   p1why: [...document.querySelectorAll('#markets .mk[data-key="p1"] .mkdetail')].map(e => e.textContent).join(' '),
+                   ctx: [...document.querySelectorAll('#ctxPanel ul.ctx li')].map(li => li.className + '|' + li.querySelector('.cbadge').textContent + '|' + li.querySelector('.ctext').textContent + '|' + (li.querySelector('.ctag') || {}).textContent),
+                   ctxStored: v('nhlctx').length > 10 };
+    document.getElementById('clear').click(); await wait();
+    const ctxCleared = document.getElementById('ctxPanel').textContent;
     document.getElementById('slateClear').click(); document.getElementById('clear').click(); await wait();
     // a 2.0 backup with an MLB row and a WNBA row: both join the card, and loading it twice adds nothing
     const before = JSON.parse(localStorage.getItem('callsheet3.card.v1') || '[]');
@@ -475,8 +484,12 @@ const CHECKS = ["dome","playoff","agconf","hgconf","agbk","hgbk"];
     const msg2 = document.getElementById('saveMsg').textContent;
     const wnbaBtn = document.getElementById('m-wnba');
     return { list, form, before: before.length, card: card.map(r => r.sport + ':' + r.matchup), ids: card.map(r => r.id), msg,
-             again: again.length, msg2, wnbaHidden: wnbaBtn.hidden, wnbaOffset: wnbaBtn.offsetParent !== null };
+             again: again.length, msg2, wnbaHidden: wnbaBtn.hidden, wnbaOffset: wnbaBtn.offsetParent !== null, ctxCleared };
   });
+  chk(slate.form.ctx.length === 4 && slate.form.ctx[0] === 'ctx-scored|scored|Stuart Skinner .908 on 1200 shots, 22nd of 40 goalies with 100+ shots.|the backup rule: a tagged −0.15 on the line, −0.25 if his line reads cold; the line itself is not scored'
+      && slate.form.ctx[1].startsWith('ctx-faded|faded|Flames allow 3.90 a game, 4th most in the league (12 games).|scored, faded') && slate.form.ctx[2].startsWith('ctx-shown|shown|Flames kill at 81.2%') && slate.form.ctx[3].startsWith('ctx-label|label|Oilers on a back to back.') && slate.form.ctxStored,
+      'context: the card lists the slate\'s lines scored first, each with its badge and the tag that says what the sheet did with it, and the JSON rides in the form', JSON.stringify(slate.form.ctx));
+  chk(/No context on the row/.test(slate.ctxCleared), 'context: Clear empties the card', slate.ctxCleared.slice(0, 80));
   chk(/Oilers @ Flames/.test(slate.list) && /SV 0\.908\/0\.916/.test(slate.list) && /Skinner v Wolf/.test(slate.list) && /likely the backup/.test(slate.list),
       'slate: a hockey game lists with its goalies, save percentages and note', slate.list.slice(0, 200));
   chk(slate.form.pressed === 'true' && slate.form.away === 'Oilers' && slate.form.agsv === '0.908' && slate.form.hgsh === '1300' && slate.form.asf === '30.1' && slate.form.apk === '78.0' && slate.form.arest === '0' && slate.form.line === '',

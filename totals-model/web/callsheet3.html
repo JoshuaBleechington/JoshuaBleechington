@@ -183,6 +183,15 @@
   .favt td.ref { color: var(--muted); }
   .verdict.forecast .up { color: var(--go); font-weight: 700; }
   .verdict.forecast .down { color: var(--bad); font-weight: 700; }
+  /* the context card (14 Oct 2026): a club's league ranks, each with the tag that says what the sheet did with it */
+  ul.ctx { list-style: none; margin: 0; padding: 0; }
+  ul.ctx li { padding: 6px 0; border-bottom: 1px solid var(--rule); font-size: 12.5px; line-height: 1.5; color: var(--ink); }
+  ul.ctx li:last-child { border-bottom: 0; }
+  ul.ctx .cbadge { display: inline-block; min-width: 52px; text-align: center; margin-right: 6px; padding: 1px 6px; border-radius: 3px; font: 700 9.5px/1.6 var(--sans); letter-spacing: .06em; text-transform: uppercase; vertical-align: 1px; }
+  ul.ctx .ctag { display: block; margin: 1px 0 0 58px; font-size: 11px; color: var(--muted); }
+  ul.ctx li.ctx-scored .cbadge { color: var(--go); background: var(--go-wash); }
+  ul.ctx li.ctx-faded .cbadge { color: var(--edge); background: var(--edge-wash); }
+  ul.ctx li.ctx-shown .cbadge, ul.ctx li.ctx-label .cbadge { color: var(--muted); background: var(--surface-2); }
   details.others > summary::before { content: "▸ "; } details.others[open] > summary::before { content: "▾ "; }
   .mklist { display: flex; flex-direction: column; gap: 8px; }
   .split { display: flex; height: 26px; border-radius: 6px; overflow: hidden; border: 1px solid var(--rule); margin: 6px 14px 8px 60px; }
@@ -558,11 +567,25 @@
               landed 0.44 under, the under 57.5%). Two backups: nothing moves. With a backup in either net the
               goalie lines are not scored: in those games neither goalie's line had a direction against the close, while
               with two regular starters the lines ran the right way both seasons.</p>
-            <input type="hidden" id="nhlform">
+            <input type="hidden" id="nhlform"><input type="hidden" id="nhlctx">
             <!-- the goalie picker's data and record: the slate's goalie lists (JSON), whose line is on each side,
                  who actually started (from the grade file) and whether they matched (yes / no / blank) -->
             <input type="hidden" id="ngoalies"><input type="hidden" id="agname"><input type="hidden" id="hgname">
             <input type="hidden" id="agstart"><input type="hidden" id="hgstart"><input type="hidden" id="agok"><input type="hidden" id="hgok">
+          </div>
+        </section>
+
+        <section class="card">
+          <h2>Context <span class="tag">where each club stands in the league, and what the sheet did with it</span></h2>
+          <div class="body">
+            <div id="ctxPanel" class="note">No context on the row — load the slate and Fill form, and the lines come with it.</div>
+            <p class="note">Each line is a club's rank against the other 31 on a number the slate already holds: scoring
+              rates, the last ten, empty-net habits, shots, special teams, expected goals, and the named goalie among the
+              goalies with 100 shots or more. A club shows up when it sits in the top or bottom eight of the league; the
+              goalie always. <b>The tag is the point.</b> "4th worst defence" is what the public bets and the book shades
+              to, so each line says what the sheet already did with the fact: <b>scored</b> at its measured weight,
+              <b>faded</b> because the market over-moves with it, <b>shown</b> because it measured null or the wrong way
+              against the close, or a <b>label</b>. Nothing here moves a number on its own.</p>
           </div>
         </section>
 
@@ -2272,10 +2295,33 @@
     });
     el.innerHTML = h;
   }
+  /* ---- the context card (14 Oct 2026, at the user's word: "little bits of info like
+     Bruins have the 4th worst defense in the league"). The slate writes each club's
+     league ranks as JSON into the hidden `nhlctx` box, each line with a status
+     (scored / faded / shown / label) and the tag that says what the sheet did with
+     the fact. Rendered, never read by the engine. */
+  var CTX_BADGE = { scored: "scored", faded: "faded", shown: "shown", label: "label" };
+  function nhlCtxPanel() {
+    var el = $("ctxPanel"); if (!el) return;
+    var raw = ($("nhlctx") || {}).value || "", ctx = null;
+    try { ctx = raw ? JSON.parse(raw) : null; } catch (e) { ctx = null; }
+    if (!ctx || !ctx.length) {
+      el.innerHTML = "No context on the row — load the slate and Fill form, and the lines come with it.";
+      return;
+    }
+    var order = { scored: 0, faded: 1, shown: 2, label: 3 };
+    var items = ctx.slice().sort(function (a, b) { return (order[a.s] || 0) - (order[b.s] || 0); });
+    el.innerHTML = '<ul class="ctx">' + items.map(function (c) {
+      var s = CTX_BADGE[c.s] ? c.s : "shown";
+      return '<li class="ctx-' + s + '"><span class="cbadge">' + CTX_BADGE[s] + '</span> <span class="ctext">' + esc(c.t || "") + '</span>' +
+             (c.tag ? ' <span class="ctag">' + esc(c.tag) + '</span>' : '') + '</li>';
+    }).join("") + '</ul>';
+  }
   function forecastMatchupNhl() {
     nhlGoaliePicker();
     nhlGoalieSummary();
     nhlFormPanel();
+    nhlCtxPanel();
     var f = readNhl();
     var away = f.away, home = f.home, line = f.line;
     var op = num("op"), up = num("up"), hml = num("hml"), aml = num("aml");
@@ -2822,7 +2868,7 @@
                   "arest","hrest","al5","hl5","hml","aml","sp","sph","spa"];
   var NHL_IDS = ["away","home","line","op","up","opened","gdate","agsv","hgsv","agsh","hgsh","asf","hsf",
                  "app","hpp","apk","hpk","al10","hl10","h2h","h2hn","arest","hrest","tick","cash",
-                 "hml","aml","pl","plh","pla","p1line","p1op","p1up","nhlform","ntick","ncash","ap1l10","hp1l10","axgf","axga","hxgf","hxga","xglg",
+                 "hml","aml","pl","plh","pla","p1line","p1op","p1up","nhlform","nhlctx","ntick","ncash","ap1l10","hp1l10","axgf","axga","hxgf","hxga","xglg",
                  "ngoalies","agname","hgname","agstart","hgstart","agok","hgok",
                  "odds","sharp","agf","aga","hgf","hga","lgg","angp","hngp","aenc","aens","henc","hens"];
   var ALL = MLB_IDS.concat(WNBA_IDS).concat(NHL_IDS).filter(function (v, i, a) { return a.indexOf(v) === i; });
@@ -4384,7 +4430,7 @@
                       /* the odds file (12 Oct 2026): the book's lines and prices, the opener, and
                          every book's price for the shop -- blank boxes fill, typed ones stay */
                       "line","op","up","opened","hml","aml","rl","rlh","rla","f5line","f5op","f5up","odds","sharp",
-                      "agsv","hgsv","agsh","hgsh","asf","hsf","app","hpp","apk","hpk","nhlform","ap1l10","hp1l10","axgf","axga","hxgf","hxga","xglg",
+                      "agsv","hgsv","agsh","hgsh","asf","hsf","app","hpp","apk","hpk","nhlform","nhlctx","ap1l10","hp1l10","axgf","axga","hxgf","hxga","xglg",
                       "ngoalies","agname","hgname",
                       "pl","plh","pla","p1line","p1op","p1up",
                       "agf","aga","hgf","hga","lgg","angp","hngp","aenc","aens","henc","hens"];

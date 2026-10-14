@@ -524,6 +524,28 @@ and (3) the odds run takes the period line most books post both sides of
 and at the first listed book that does otherwise, with a note naming the
 book.
 
+**The context card** (14 Oct 2026, at the user's word: "little bits of
+info like Bruins have the 4th worst defense in the league... with the
+tag, it tells you what the sheet already did with the fact"). The slate
+ranks each club against the other 31 on the numbers it already holds,
+from one table each: scoring rates, the last ten and empty-net habits
+from the league ledger (`nhl_ledger_tables`), shots and special teams
+from the team summary, expected goals from MoneyPuck's table, and the
+named goalie among the goalies with 100 shots or more from the league's
+goalie report (`nhl_goalie_summary`, one call). A club gets a line when
+it sits in the top or bottom eight of the league (`CTX_NOTABLE`, with
+`CTX_MIN_CLUBS` 16 ranked before anything shows); the goalie always; a
+back to back as a label. Each line carries a status and a tag
+(`CTX_TAGS`): **scored** at its weight (the goalie line at 1.6, the last
+ten at 0.6, the empty-net habit at +0.40), **faded** (scoring rates: the
+market over-moves with them), **shown** (expected goals, special teams,
+shot rates: null or the wrong way against the close), or a **label**.
+The lines ride in the hidden `nhlctx` box as JSON like the form panel,
+and the sheet's Context card renders them scored first with a badge and
+the tag under each. The engine never reads them: "4th worst defence" is
+what the public bets and the book shades to, and the card's job is to
+say so beside the fact.
+
 **Goals saved above expected, measured 14 Oct 2026** (at the user's word:
 "run the GSAx goalie test tonight"; `tools_backtest_nhl_gsax.py`). The
 platforms rate a goalie by goals saved above EXPECTED, crediting the shots

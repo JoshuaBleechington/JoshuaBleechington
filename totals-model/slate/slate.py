@@ -960,6 +960,180 @@ def nhl_league_gpg(ledger_games, date_iso, min_games=20):
     return sum(tots) / float(len(tots)) if len(tots) >= min_games else None
 
 
+def nhl_ledger_tables(ledger_games, date_iso):
+    """Every club's season to date from the league ledger, before a date:
+    {abbrev: {gf, ga, n, l10, enc, ens}} with goals for and against per game,
+    the last-ten average total and empty-netters conceded and scored per
+    game. The context card ranks a club against the other 31 from this one
+    table (14 Oct 2026)."""
+    per = {}
+    for g in sorted(ledger_games or [], key=lambda g: (g.get("date") or "", g.get("id") or 0)):
+        if g.get("fa") is None or g.get("fh") is None or (g.get("date") or "") >= date_iso:
+            continue
+        tot = g["fa"] + g["fh"]
+        for ab, us, them, enc, ens in ((g.get("home"), g["fh"], g["fa"], g.get("ena"), g.get("enh")),
+                                        (g.get("away"), g["fa"], g["fh"], g.get("enh"), g.get("ena"))):
+            if not ab:
+                continue
+            d = per.setdefault(ab, {"gf": 0, "ga": 0, "n": 0, "tots": [], "enc": 0, "ens": 0, "en_n": 0})
+            d["gf"] += us
+            d["ga"] += them
+            d["n"] += 1
+            d["tots"].append(tot)
+            if enc is not None and ens is not None:
+                d["enc"] += enc
+                d["ens"] += ens
+                d["en_n"] += 1
+    out = {}
+    for ab, d in per.items():
+        n = d["n"]
+        out[ab] = {"gf": d["gf"] / float(n), "ga": d["ga"] / float(n), "n": n,
+                   "l10": sum(d["tots"][-10:]) / float(len(d["tots"][-10:])),
+                   "enc": (d["enc"] / float(d["en_n"])) if d["en_n"] else None,
+                   "ens": (d["ens"] / float(d["en_n"])) if d["en_n"] else None, "en_n": d["en_n"]}
+    return out
+
+
+def nhl_goalie_summary(season_id):
+    """Every goalie's season line from the stats REST goalie report, keyed by
+    player id: {name, team, sv, shots, gs}. One call for the league; the
+    context card ranks the named starter among the goalies with CTX_GOALIE_SHOTS."""
+    q = urllib.parse.urlencode({"cayenneExp": "seasonId=%s and gameTypeId=2" % season_id, "limit": -1})
+    d = fetch_json(NHL_STATS + "/goalie/summary?" + q)
+    out = {}
+    for r in d.get("data") or []:
+        pid = r.get("playerId")
+        if pid is None or r.get("savePct") in (None, "") or not r.get("shotsAgainst"):
+            continue
+        try:
+            out[int(pid)] = {"name": r.get("goalieFullName") or r.get("lastName") or str(pid), "team": r.get("teamAbbrevs") or "",
+                             "sv": float(r["savePct"]), "shots": int(r["shotsAgainst"]), "gs": int(r.get("gamesStarted") or 0)}
+        except (TypeError, ValueError):
+            continue
+    return out
+
+
+# ---- the context card (14 Oct 2026, at the user's word: "little bits of info like
+# Bruins have the 4th worst defense in the league") -------------------------
+# Each line is a club's rank against the other 31 on a number the slate
+# already holds, with a TAG that says what the sheet did with the fact:
+# scored (at its weight), faded (the market over-moves with it), shown (it
+# measured null or the wrong way against the close) or a label. The tag is
+# the point: "4th worst defence" is what the public bets and the book
+# shades to, and the card says so next to it. Lines appear when a club sits
+# in the top or bottom CTX_NOTABLE of the league; the named goalie always.
+CTX_NOTABLE = 8
+CTX_MIN_CLUBS = 16
+CTX_GOALIE_SHOTS = 100
+CTX_TAGS = {
+    "rates": ("faded", "scored, faded: the market over-moves with scoring reputations, so the lean goes on the line at −0.25 a goal, tagged"),
+    "goalie": ("scored", "scored: the goalie line at weight 1.6, shrunk by his shots"),
+    "goalie_backup": ("scored", "the backup rule: a tagged −0.15 on the line, −0.25 if his line reads cold; the line itself is not scored"),
+    "form": ("scored", "scored: the last ten at weight 0.6"),
+    "en": ("scored", "scored, tagged: both clubs' net empty-netters at +0.40 a goal"),
+    "xg": ("shown", "shown, not scored: expected goals measured null against the close"),
+    "special": ("shown", "shown, not scored: special teams measured the wrong way against the close"),
+    "shots": ("shown", "shown, not scored: shot rates measured the wrong way against the close"),
+    "rest": ("label", "a label: the goalie line carries a back to back"),
+}
+
+
+def ordinal(k):
+    k = int(k)
+    suf = "th" if 10 <= k % 100 <= 20 else {1: "st", 2: "nd", 3: "rd"}.get(k % 10, "th")
+    return "%d%s" % (k, suf)
+
+
+def ctx_rank(value, values, high_first=True):
+    """(rank, n) of a value among values, 1 = the highest (or lowest)."""
+    vals = [v for v in values if v is not None]
+    if value is None or not vals:
+        return None, 0
+    ahead = sum(1 for v in vals if ((v > value) if high_first else (v < value)))
+    return ahead + 1, len(vals)
+
+
+def ctx_phrase(rank, n, hi_word, lo_word):
+    """'4th most' from the top, '4th fewest' from the bottom."""
+    if rank <= n / 2.0:
+        return "%s %s" % (ordinal(rank), hi_word)
+    return "%s %s" % (ordinal(n - rank + 1), lo_word)
+
+
+def ctx_notable(rank, n):
+    return n >= CTX_MIN_CLUBS and (rank <= CTX_NOTABLE or rank > n - CTX_NOTABLE)
+
+
+def ctx_line(kind, side, text):
+    s, tag = CTX_TAGS[kind]
+    return {"side": side, "k": kind, "s": s, "t": text, "tag": tag}
+
+
+def nhl_context(sides, summary, xg, tables, gsum):
+    """The context lines for one game. `sides` is a list of two dicts with
+    nick, ab, side, row (the team summary row), pick (the goalie, with id),
+    backup (bool) and rest; `summary` every club's summary row, `xg` the
+    MoneyPuck table, `tables` nhl_ledger_tables, `gsum` nhl_goalie_summary."""
+    out = []
+    rows = list((summary or {}).values())
+    xrates = (xg[0] if xg else None) or {}
+    xall = [r for r in xrates.values() if r.get("gp", 0) >= MIN_TEAM_GAMES]
+    tall = [t for t in (tables or {}).values() if t["n"] >= MIN_TEAM_GAMES]
+    goalies = [g for g in (gsum or {}).values() if g["shots"] >= CTX_GOALIE_SHOTS]
+    for s in sides:
+        nick, side = s["nick"], s["side"]
+        t = (tables or {}).get(s["ab"])
+        if t and t["n"] >= MIN_TEAM_GAMES:
+            r, n = ctx_rank(t["gf"], [x["gf"] for x in tall])
+            if r and ctx_notable(r, n):
+                out.append(ctx_line("rates", side, "%s score %.2f a game, %s in the league (%d games)." % (nick, t["gf"], ctx_phrase(r, n, "most", "fewest"), t["n"])))
+            r, n = ctx_rank(t["ga"], [x["ga"] for x in tall])
+            if r and ctx_notable(r, n):
+                out.append(ctx_line("rates", side, "%s allow %.2f a game, %s in the league (%d games)." % (nick, t["ga"], ctx_phrase(r, n, "most", "fewest"), t["n"])))
+            r, n = ctx_rank(t["l10"], [x["l10"] for x in tall])
+            if r and ctx_notable(r, n):
+                out.append(ctx_line("form", side, "%s games have averaged %.1f goals over the last ten, %s in the league." % (nick, t["l10"], ctx_phrase(r, n, "highest", "lowest"))))
+            if t["enc"] is not None and t["en_n"] >= EN_MIN_GAMES:
+                eall = [x for x in tall if x["enc"] is not None and x["en_n"] >= EN_MIN_GAMES]
+                r, n = ctx_rank(t["enc"], [x["enc"] for x in eall])
+                if r and ctx_notable(r, n) and r <= n / 2.0:
+                    out.append(ctx_line("en", side, "%s concede %.2f empty-netters a game, %s in the league: they trail late." % (nick, t["enc"], ctx_phrase(r, n, "most", "fewest"))))
+                r, n = ctx_rank(t["ens"], [x["ens"] for x in eall])
+                if r and ctx_notable(r, n) and r <= n / 2.0:
+                    out.append(ctx_line("en", side, "%s score %.2f empty-netters a game, %s in the league: they lead late." % (nick, t["ens"], ctx_phrase(r, n, "most", "fewest"))))
+        row = s.get("row")
+        if row and int(row.get("gamesPlayed") or 0) >= MIN_TEAM_GAMES:
+            full = [x for x in rows if int(x.get("gamesPlayed") or 0) >= MIN_TEAM_GAMES]
+            for key, kind, verb, hi, lo, scale in (("shotsForPerGame", "shots", "take %.1f shots a game", "most", "fewest", 1.0),
+                                                   ("powerPlayPct", "special", "power play at %.1f%%", "best", "worst", 100.0),
+                                                   ("penaltyKillPct", "special", "kill at %.1f%%", "best", "worst", 100.0)):
+                try:
+                    v = float(row[key]) if row.get(key) is not None else None
+                    vals = [float(x[key]) for x in full if x.get(key) is not None]
+                except (TypeError, ValueError):
+                    continue
+                r, n = ctx_rank(v, vals)
+                if r and ctx_notable(r, n):
+                    out.append(ctx_line(kind, side, ("%s " + verb + ", %s in the league.") % (nick, v * scale, ctx_phrase(r, n, hi, lo))))
+        xr = xrates.get(s["ab"])
+        if xr and xr.get("gp", 0) >= MIN_TEAM_GAMES:
+            r, n = ctx_rank(xr["xgf"], [x["xgf"] for x in xall])
+            if r and ctx_notable(r, n):
+                out.append(ctx_line("xg", side, "%s create %.2f expected goals a game, %s in the league." % (nick, xr["xgf"], ctx_phrase(r, n, "most", "fewest"))))
+            r, n = ctx_rank(xr["xga"], [x["xga"] for x in xall])
+            if r and ctx_notable(r, n):
+                out.append(ctx_line("xg", side, "%s give up %.2f expected goals a game, %s in the league." % (nick, xr["xga"], ctx_phrase(r, n, "most", "fewest"))))
+        pick = s.get("pick")
+        g = (gsum or {}).get((pick or {}).get("id")) if pick else None
+        if g and g["shots"] >= CTX_GOALIE_SHOTS and goalies:
+            r, n = ctx_rank(g["sv"], [x["sv"] for x in goalies])
+            out.append(ctx_line("goalie_backup" if s.get("backup") else "goalie", side,
+                                "%s .%03d on %d shots, %s of %d goalies with %d+ shots." % (g["name"], round(g["sv"] * 1000), g["shots"], ordinal(r), n, CTX_GOALIE_SHOTS)))
+        if s.get("rest") == "0":
+            out.append(ctx_line("rest", side, "%s on a back to back." % nick))
+    return out
+
+
 def nhl_en_rates(ledger_games, abbrev, date_iso):
     """The club's empty-net goals conceded and scored per game to date, from
     the league ledger, and the games behind them: (conceded, scored, n). The
@@ -1101,7 +1275,7 @@ def p1_from_landing(landing):
     return None, None
 
 
-def build_nhl_game(g, date_iso, season_id, summary, log, ledger=None, xg=None):
+def build_nhl_game(g, date_iso, season_id, summary, log, ledger=None, xg=None, goalie_summary=None, tables=None):
     away_t, home_t = g.get("awayTeam") or {}, g.get("homeTeam") or {}
     away, home = nhl_name(away_t), nhl_name(home_t)
     aab, hab = away_t.get("abbrev") or "", home_t.get("abbrev") or ""
@@ -1109,11 +1283,12 @@ def build_nhl_game(g, date_iso, season_id, summary, log, ledger=None, xg=None):
     start = str(g.get("startTimeUTC") or "")
     state = str(g.get("gameState") or "")
     inputs = {k: "" for k in ("agsv", "hgsv", "agsh", "hgsh", "asf", "hsf", "app", "hpp", "apk", "hpk",
-                              "al10", "hl10", "h2h", "h2hn", "arest", "hrest", "nhlform", "ap1l10", "hp1l10",
+                              "al10", "hl10", "h2h", "h2hn", "arest", "hrest", "nhlform", "nhlctx", "ap1l10", "hp1l10",
                               "axgf", "axga", "hxgf", "hxga", "xglg", "ngoalies", "agname", "hgname",
                               "agf", "aga", "hgf", "hga", "lgg", "angp", "hngp", "aenc", "aens", "henc", "hens")}
     inputs["agbk"] = inputs["hgbk"] = False   # the sheet's Backup in net boxes; True when the named starter is one
     notes, starters, form = [], {"away": "", "home": ""}, {"away": [], "home": []}
+    ctx_sides = []   # what the context card needs from each side (nhl_context)
     out = {"sport": "NHL", "gdate": date_iso, "away": away, "home": home, "gameId": gid, "first_puck_utc": start,
            "venue": ((g.get("venue") or {}).get("default") if isinstance(g.get("venue"), dict) else g.get("venue")) or "",
            "status": state, "starters": starters, "goalies": {"away": [], "home": []}, "inputs": inputs, "notes": notes}
@@ -1124,6 +1299,8 @@ def build_nhl_game(g, date_iso, season_id, summary, log, ledger=None, xg=None):
         nick = away if side == "away" else home
         # team rates from the summary report
         row = summary.get(int(t.get("id") or -1)) if summary else None
+        cs = {"nick": nick, "ab": ab, "side": side, "row": row, "pick": None, "backup": False, "rest": None}
+        ctx_sides.append(cs)
         if row:
             try:
                 gp = int(row.get("gamesPlayed") or 0)
@@ -1172,6 +1349,7 @@ def build_nhl_game(g, date_iso, season_id, summary, log, ledger=None, xg=None):
             rest = nhl_rest_days(fin, date_iso)
             if rest is not None:
                 inputs[p + "rest"] = str(max(0, rest))
+                cs["rest"] = inputs[p + "rest"]
             log("  %s last-10 avg total: %s (%d games); rest %s day(s)" % (side, inputs[p + "l10"] or "?", n, inputs[p + "rest"] or "?"))
             # season scoring rates, faded on the sheet (13 Oct 2026): goals for and
             # against per game over the club's finals, with the games behind them
@@ -1240,6 +1418,7 @@ def build_nhl_game(g, date_iso, season_id, summary, log, ledger=None, xg=None):
                     log("  %s: could not read yesterday's starter (%s)" % (side, e))
             pick, why = nhl_likely_starter(goalies, int(inputs[p + "rest"]) if inputs[p + "rest"] != "" else None, last_id)
             if pick:
+                cs["pick"] = pick
                 starters[side] = pick["name"]
                 inputs[p + "gname"] = pick["name"]   # whose line is on the card; the grade run checks it against who played
                 if pick["sv"] is not None and pick["shots"] > 0:
@@ -1250,6 +1429,7 @@ def build_nhl_game(g, date_iso, season_id, summary, log, ledger=None, xg=None):
                 notes.append("%s likely starter: %s (%s). NOT confirmed: check Daily Faceoff and tick the box." % (nick, pick["name"], why))
                 if nhl_is_backup(pick, goalies):
                     inputs[p + "gbk"] = True
+                    cs["backup"] = True
                     club_starts = sum(int(x.get("gs") or 0) for x in goalies if not x.get("season"))
                     notes.append("%s: %s is the BACKUP (%d of the club's %d starts). The Backup box is ticked; untick it if Daily Faceoff names the starter." % (nick, pick["name"], int(pick.get("gs") or 0), club_starts))
                     log("  %s: %s is the backup (%d of %d starts) -> Backup in net ticked" % (side, pick["name"], int(pick.get("gs") or 0), club_starts))
@@ -1268,6 +1448,18 @@ def build_nhl_game(g, date_iso, season_id, summary, log, ledger=None, xg=None):
     if form["away"] or form["home"]:
         inputs["nhlform"] = json.dumps(form, separators=(",", ":"))
     out["form"] = form
+    # the context card: each club's rank in the league on the numbers above, with the
+    # tag that says what the sheet did with each (nhl_context); one JSON input
+    try:
+        ctx = nhl_context(ctx_sides, summary, xg, tables, goalie_summary)
+    except Exception as e:  # noqa: BLE001
+        ctx = []
+        notes.append("Could not build the context lines: %s" % e)
+    if ctx:
+        inputs["nhlctx"] = json.dumps(ctx, separators=(",", ":"))
+        for c in ctx:
+            log("  context: %s  [%s]" % (c["t"], c["s"]))
+    out["context"] = ctx
     for n in notes:
         log("  note: " + n)
     return out
@@ -1839,10 +2031,17 @@ def make_nhl_slate(date_iso, out_dir, log):
         log("League ledger: %d finals through %s." % (len(ledger), led.get("through")))
     else:
         log("No league ledger in %s: run 'python slate.py nhl-ledger' (Run NHL ledger.bat) and the first-period form fills." % out_dir)
+    tables = nhl_ledger_tables(ledger, date_iso) if ledger else {}
+    gsum = {}
+    try:
+        gsum = nhl_goalie_summary(season_id)
+        log("Goalie report: %d goalies, %d with %d+ shots (the context card ranks the named starter among them)." % (len(gsum), sum(1 for x in gsum.values() if x["shots"] >= CTX_GOALIE_SHOTS), CTX_GOALIE_SHOTS))
+    except Exception as e:  # noqa: BLE001
+        log("Could not fetch the goalie report (%s); the context card has no goalie line." % e)
     rows = []
     for g in games:
         try:
-            rows.append(build_nhl_game(g, date_iso, season_id, summary, log, ledger, (xg_rates, xg_lg) if xg_rates else None))
+            rows.append(build_nhl_game(g, date_iso, season_id, summary, log, ledger, (xg_rates, xg_lg) if xg_rates else None, gsum, tables))
         except Exception as e:  # noqa: BLE001
             log("%s @ %s: FAILED (%s); left out of the slate" % (nhl_name(g.get("awayTeam")), nhl_name(g.get("homeTeam")), e))
         log("")
@@ -2654,11 +2853,46 @@ def selftest():
     fetch_json = fake_nhl
     try:
         lines2 = []
-        row = build_nhl_game(nhl_schedule("2026-10-07")[0], "2026-10-07", "20262027", nhl_team_summary("20262027"), lines2.append)
+        gsum = nhl_goalie_summary("20262027")
+        row = build_nhl_game(nhl_schedule("2026-10-07")[0], "2026-10-07", "20262027", nhl_team_summary("20262027"), lines2.append, goalie_summary=gsum)
         gr2 = grade_nhl_game(nhl_schedule("2026-10-06")[0], lines2.append)
     finally:
         fetch_json = real
     i = row["inputs"]
+    # the context card (14 Oct 2026): the named goalies ranked among the goalies with 100+ shots
+    # (Thin Line's 40 shots do not count), the back-to-back label, and the tag on each line
+    check("goalie report: every goalie's line by id", gsum[3]["sv"] == 0.921 and gsum[3]["shots"] == 1900 and gsum[2]["name"] == "Jonathan Q")
+    ctx = json.loads(i["nhlctx"])
+    check("context: the named starters are ranked among the goalies with 100+ shots",
+          any(c["t"] == "Jeremy S .921 on 1900 shots, 1st of 4 goalies with 100+ shots." and c["side"] == "home" and c["s"] == "scored" and c["k"] == "goalie" for c in ctx)
+          and any(c["t"] == "Jonathan Q .902 on 500 shots, 3rd of 4 goalies with 100+ shots." and c["k"] == "goalie_backup" and "backup rule" in c["tag"] for c in ctx))
+    check("context: the back to back is a label", any(c["t"] == "Rangers on a back to back." and c["s"] == "label" for c in ctx))
+    check("context: two clubs on the summary is no league to rank in", not any(c["k"] in ("shots", "special") for c in ctx))
+    check("context: the printout reads it", any("context: Rangers on a back to back." in l for l in lines2))
+    # the ranks, on a synthetic league of twenty clubs: the Bruins allow the most, the Rangers the fewest
+    tabs = {"C%02d" % k: {"gf": 2.5 + 0.05 * k, "ga": 2.5 + 0.05 * k, "n": 8, "l10": 5.0 + 0.1 * k, "enc": 0.3, "ens": 0.3, "en_n": 12} for k in range(18)}
+    tabs["BOS"] = {"gf": 2.95, "ga": 4.1, "n": 8, "l10": 7.4, "enc": 0.75, "ens": 0.2, "en_n": 12}   # 2.95 scored is 9th of 20: the middle
+    tabs["NYR"] = {"gf": 2.1, "ga": 2.2, "n": 8, "l10": 5.1, "enc": 0.3, "ens": 0.3, "en_n": 12}
+    sides = [{"nick": "Rangers", "ab": "NYR", "side": "away", "row": None, "pick": None, "backup": False, "rest": "1"},
+             {"nick": "Bruins", "ab": "BOS", "side": "home", "row": None, "pick": None, "backup": False, "rest": "1"}]
+    cx = nhl_context(sides, {}, None, tabs, {})
+    texts = [c["t"] for c in cx]
+    check("context: ranks from the ledger table, most and fewest, with the faded tag on scoring rates",
+          "Bruins allow 4.10 a game, 1st most in the league (8 games)." in texts and "Rangers allow 2.20 a game, 1st fewest in the league (8 games)." in texts
+          and "Rangers score 2.10 a game, 1st fewest in the league (8 games)." in texts
+          and all(c["s"] == "faded" and "over-moves" in c["tag"] for c in cx if c["k"] == "rates"))
+    check("context: the last ten and the empty-net habit, scored", "Bruins games have averaged 7.4 goals over the last ten, 1st highest in the league." in texts
+          and "Bruins concede 0.75 empty-netters a game, 1st most in the league: they trail late." in texts and all(c["s"] == "scored" for c in cx if c["k"] in ("form", "en")))
+    check("context: a club in the middle of the league says nothing", not any("Bruins score" in t for t in texts))
+    check("context: ordinals and phrases", ordinal(1) == "1st" and ordinal(2) == "2nd" and ordinal(3) == "3rd" and ordinal(4) == "4th" and ordinal(11) == "11th" and ordinal(12) == "12th" and ordinal(13) == "13th" and ordinal(22) == "22nd"
+          and ctx_phrase(4, 32, "most", "fewest") == "4th most" and ctx_phrase(29, 32, "most", "fewest") == "4th fewest" and ctx_rank(3.0, [1.0, 2.0, 3.0, 4.0]) == (2, 4) and ctx_rank(3.0, [1.0, 2.0, 3.0, 4.0], False) == (3, 4))
+    check("context: fewer than sixteen clubs ranks nothing; the top and bottom eight of 32 are notable",
+          not ctx_notable(1, 10) and ctx_notable(1, 16) and ctx_notable(8, 32) and not ctx_notable(9, 32) and not ctx_notable(24, 32) and ctx_notable(25, 32))
+    led_t = nhl_ledger_tables([{"date": "2026-10-01", "home": "BOS", "away": "NYR", "fa": 2, "fh": 5, "ena": 0, "enh": 1, "id": 1},
+                               {"date": "2026-10-03", "home": "NYR", "away": "BOS", "fa": 1, "fh": 3, "ena": 0, "enh": 0, "id": 2},
+                               {"date": "2026-10-09", "home": "NYR", "away": "BOS", "fa": 9, "fh": 9, "ena": 0, "enh": 0, "id": 3}], "2026-10-07")
+    check("context: the ledger table, per club before the date", led_t["BOS"]["gf"] == 3.0 and led_t["BOS"]["ga"] == 2.5 and led_t["BOS"]["n"] == 2 and led_t["NYR"]["l10"] == 5.5
+          and led_t["BOS"]["ens"] == 0.5 and led_t["NYR"]["enc"] == 0.5 and led_t["NYR"]["en_n"] == 2)
     check("nhl teams", row["away"] == "Rangers" and row["home"] == "Bruins" and row["sport"] == "NHL")
     check("nhl team rates", i["asf"] == "31.2" and i["hsf"] == "33.4" and i["app"] == "22.1" and i["hpk"] == "78.1")
     # the Rangers are on a back to back and Igor started yesterday, so the slate names the backup
@@ -2965,9 +3199,15 @@ def _canned_nhl():
         return {"seasonTotals": [{"season": s, "gameTypeId": gt, "leagueAbbrev": "NHL", "shotsAgainst": sa, "goalsAgainst": ga} for s, gt, sa, ga in rows]}
     p2 = player([(20252026, 2, 1000, 90), (20252026, 3, 200, 10), (20242025, 2, 900, 100)])
     p3 = player([(20252026, 2, 1200, 102), (20252026, 2, 800, 68)])
+    gsummary = {"data": [
+        {"playerId": 1, "goalieFullName": "Igor S", "teamAbbrevs": "NYR", "savePct": 0.912, "shotsAgainst": 1400, "gamesStarted": 47},
+        {"playerId": 2, "goalieFullName": "Jonathan Q", "teamAbbrevs": "NYR", "savePct": 0.902, "shotsAgainst": 500, "gamesStarted": 17},
+        {"playerId": 3, "goalieFullName": "Jeremy S", "teamAbbrevs": "BOS", "savePct": 0.921, "shotsAgainst": 1900, "gamesStarted": 60},
+        {"playerId": 4, "goalieFullName": "Joonas K", "teamAbbrevs": "BOS", "savePct": 0.898, "shotsAgainst": 300, "gamesStarted": 11},
+        {"playerId": 5, "goalieFullName": "Thin Line", "teamAbbrevs": "SJS", "savePct": 0.950, "shotsAgainst": 40, "gamesStarted": 1}]}
     return [
         ("/schedule/2026-10-07", sched7), ("/schedule/2026-10-06", sched6),
-        ("team/summary", summary),
+        ("team/summary", summary), ("goalie/summary", gsummary),
         ("/club-stats/SJS/now", sjs_now), ("/club-stats/SJS/20252026/2", sjs_last), ("/roster/SJS/current", sjs_roster),
         ("/club-stats/NYR/", nyr), ("/club-stats/BOS/", bos),
         ("/club-schedule-season/NYR/", nyr_season), ("/club-schedule-season/BOS/", bos_season),

@@ -524,6 +524,29 @@ and (3) the odds run takes the period line most books post both sides of
 and at the first listed book that does otherwise, with a note naming the
 book.
 
+**Goals saved above expected, measured 14 Oct 2026** (at the user's word:
+"run the GSAx goalie test tonight"; `tools_backtest_nhl_gsax.py`). The
+platforms rate a goalie by goals saved above EXPECTED, crediting the shots
+he faced for how hard they were; the sheet blends half of last season's
+raw save percentage into each starter's line to date. MoneyPuck's goalie
+files for 2023-24 and 2024-25 (xGoals, goals, shots, all situations) were
+joined to the two ledgers by player id, 1,683 games with two regular
+starters and both goalies in the prior file. The GSAx prior is the weaker
+one: last season's raw line alone had a slope of +0.72 on the close's
+residual (t 2.3), last season's GSAx +0.52 (t 1.6), and with both in one
+regression the raw line carries it (+0.89, t 1.7) and GSAx goes negative
+(−0.22). Swapping GSAx into the sheet's blend took the slope from +0.71 to
++0.61. The two priors agree at r 0.80 and differ by a tenth of a goal on
+an average night. Both read right in 2025-26 (+1.06 and +1.08) and both
+read nothing in 2024-25 (+0.07 and +0.24). Shot quality does not improve
+the goalie prior against a market that already prices the goalie; the
+raw line stays. The same run put the sheet's goalie lean to the honest
+test, bet AT THE LINE rather than signed against the anchor (which had
+counted the 82 games that landed on the number, all of them on the
+anchor's side): a tenth of a goal of lean went 549-537 at the close, −38
+units; three tenths 143-120 on 263 games, +10. The goalie line is a weight
+in the blend at 1.6, not a bet on its own, which is how it is scored.
+
 The same pass tested the schedule and found nothing to score: three games
 in four nights ran 0.13 under (849 games, 52.1%, both seasons, near the
 back-to-back label); a road trip's fifth game and later, divisional
@@ -610,6 +633,8 @@ were earned on: when it said over, did the game land over the close?
 | ...the backup's own line cold | 182 | | | **57.5% (−0.44 under; −0.53, −0.39 by season); −0.25 tagged delta** |
 | Three in four nights, the under | 849 | | | 52.1%, −0.13; not scored |
 | Backups in both nets | 105 | | | sign flipped, no sample; nothing moves |
+| Goals saved above expected as the goalie prior (MoneyPuck, last season), two regular starters | 1,683 | +0.07 / +1.06 (pooled +0.52, t 1.6) | | **not an input**: the raw prior measured +0.24 / +1.08 (pooled +0.72, t 2.3) on the same games; raw and GSAx together, raw +0.89 (t 1.7), GSAx −0.22; the two priors agree at r 0.80 |
+| ...the sheet's goalie lean bet AT THE LINE, two regular starters | 1,683 | | | a tenth of a goal 549-537 (50.6%), −38u; three tenths 143-120 (54.4%, 263 games), +10u: a weight in the blend, not a bet |
 
 The first period's share model is dead on: 1.747 predicted from the close
 against 1.744 scored, and the 2+ rate climbs with the line as it should.

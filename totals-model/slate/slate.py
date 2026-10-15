@@ -2122,7 +2122,10 @@ def nba_entry_from_cdn(g, box):
     e = {"id": g["id"], "date": g["date"], "away": at.get("teamTricode") or g.get("away"), "home": ht.get("teamTricode") or g.get("home"),
          "fa": int(at["score"]) if at.get("score") is not None else g.get("fa"), "fh": int(ht["score"]) if ht.get("score") is not None else g.get("fh"),
          "qa": qa, "qh": qh, "ota": ota, "oth": oth, "end": "OT" if ota or oth else "REG",
-         "sa": la, "sh": lh, "pa": pa, "ph": ph, "oa": oa, "oh": oh, "detail": True}
+         "sa": la, "sh": lh, "pa": pa, "ph": ph, "oa": oa, "oh": oh, "detail": True,
+         # tip-off (UTC) for the rest, travel and time-zone tests; the crew for the referee test
+         "t": game.get("gameTimeUTC") or None,
+         "off": [o.get("name") or ("%s %s" % (o.get("firstName") or "", o.get("familyName") or "")).strip() for o in (game.get("officials") or []) if isinstance(o, dict)]}
     e["pace"] = nba_pace(la, lh)
     return e
 
@@ -2168,9 +2171,10 @@ def nba_entry_from_stats(g, trad, summary):
         elif r.get("TEAM_ABBREVIATION") == sides["homeTeam"][0]:
             qh, oth = q, o
     a, h = sides["awayTeam"], sides["homeTeam"]
+    offs = [("%s %s" % (r.get("FIRST_NAME") or "", r.get("LAST_NAME") or "")).strip() for r in nba_result_set(summary, "Officials")]
     e = {"id": g["id"], "date": g["date"], "away": a[0] or g.get("away"), "home": h[0] or g.get("home"), "fa": g.get("fa"), "fh": g.get("fh"),
          "qa": qa or [], "qh": qh or [], "ota": ota or [], "oth": oth or [], "end": "OT" if (ota or oth) else "REG",
-         "sa": a[1], "sh": h[1], "pa": a[2], "ph": h[2], "oa": a[3], "oh": h[3], "detail": True}
+         "sa": a[1], "sh": h[1], "pa": a[2], "ph": h[2], "oa": a[3], "oh": h[3], "detail": True, "t": None, "off": [o for o in offs if o]}
     e["pace"] = nba_pace(a[1], h[1])
     return e
 
@@ -3376,6 +3380,8 @@ def selftest():
           e2["qa"] == [20, 30, 25, 28] and e2["qh"] == [30, 28, 20, 25] and e2["ota"] == [5] and e2["oth"] == [10] and e2["end"] == "OT" and e2["pa"][0] == [301, "Anthony E", 1, 38.5, 30, 4]
           and e2["oa"] == [[302, "Sat Out", "DNP - Injury/Illness"]] and e2["pace"] is not None and e2["detail"] is True and any("trying the stats site" in l for l in lines3))
     check("nba schedule (CDN): this season's finals only, dates normalised", sch == [{"id": "0022600003", "date": "2026-10-22", "away": "GSW", "home": "LAL", "fa": 110, "fh": 115}])
+    check("nba box: tip-off and the crew ride along for the rest, travel and referee tests",
+          e1["t"] == "2024-10-22T23:30:00Z" and e1["off"] == ["Scott Foster", "Tony Brothers"] and e2["off"] == ["Marc Davis"] and e2["t"] is None)
     m3 = nba_measure([e1, e2])
     check("nba measure: points, home margin, overtime, the first half's share, pace", m3["games"] == 2 and m3["points_per_game"] == (241 + 211) / 2.0 and m3["home_margin"] == (23 + 5) / 2.0 and m3["ot_rate"] == 0.5
           and abs(m3["first_half_share"] - (28 + 25 + 35 + 31 + 20 + 30 + 30 + 28) / float(241 + 206)) < 1e-9 and m3["pace"] is not None)
@@ -3561,7 +3567,8 @@ def _canned_nba():
         if reason:
             p["notPlayingReason"] = reason
         return p
-    box1 = {"game": {"gameId": "0022400001", "gameStatus": 3,
+    box1 = {"game": {"gameId": "0022400001", "gameStatus": 3, "gameTimeUTC": "2024-10-22T23:30:00Z",
+                     "officials": [{"personId": 1, "name": "Scott Foster", "assignment": "OFFICIAL1"}, {"personId": 2, "name": "Tony Brothers", "assignment": "OFFICIAL2"}],
                      "awayTeam": {"teamTricode": "NYK", "score": 109, "periods": [{"period": k, "periodType": "REGULAR", "score": s} for k, s in enumerate([28, 25, 30, 26], 1)],
                                   "statistics": {"fieldGoalsAttempted": 90, "freeThrowsAttempted": 25, "reboundsOffensive": 10, "turnovers": 12, "minutes": "PT240M00.00S"},
                                   "players": [player(201, "Jalen B", True, "PT34M12.00S", 25, -12), player(202, "Bench Guy", False, "PT12M00.00S", 4, -3),
@@ -3578,7 +3585,8 @@ def _canned_nba():
                                                   "players": [{"personId": 401, "firstName": "LeBron", "familyName": "J", "position": "F", "comment": "", "statistics": {"minutes": "40:00", "points": 28, "plusMinusPoints": 6}}]}}}
     lh = ["GAME_ID", "TEAM_ID", "TEAM_ABBREVIATION", "PTS_QTR1", "PTS_QTR2", "PTS_QTR3", "PTS_QTR4", "PTS_OT1", "PTS_OT2", "PTS"]
     summ2 = {"resultSets": [{"name": "GameSummary", "headers": ["GAME_ID"], "rowSet": [["0022400002"]]},
-                            {"name": "LineScore", "headers": lh, "rowSet": [["0022400002", 1610612750, "MIN", 20, 30, 25, 28, 5, 0, 108], ["0022400002", 1610612747, "LAL", 30, 28, 20, 25, 10, 0, 113]]}]}
+                            {"name": "LineScore", "headers": lh, "rowSet": [["0022400002", 1610612750, "MIN", 20, 30, 25, 28, 5, 0, 108], ["0022400002", 1610612747, "LAL", 30, 28, 20, 25, 10, 0, 113]]},
+                            {"name": "Officials", "headers": ["OFFICIAL_ID", "FIRST_NAME", "LAST_NAME", "JERSEY_NUM"], "rowSet": [[3, "Marc", "Davis", "8"]]}]}
     sched = {"leagueSchedule": {"seasonYear": "2026-27", "gameDates": [
         {"gameDate": "10/22/2026 00:00:00", "games": [
             {"gameId": "0022600003", "gameStatus": 3, "gameDateEst": "2026-10-22T00:00:00Z", "awayTeam": {"teamTricode": "GSW", "score": 110}, "homeTeam": {"teamTricode": "LAL", "score": 115}},

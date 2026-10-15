@@ -56,32 +56,60 @@ Shots per game, special teams and the last ten wait until a team has five
 games; before that the boxes stay blank and the sheet is the market plus
 the goalies.
 
-## Basketball: the NBA ledger (the first step of the NBA book, 15 Oct 2026)
+## Basketball (The Super Model, 15 Oct 2026)
 
-**Run NBA ledger.bat**, or `python slate.py nba-ledger --season 2024-25`. It
-writes `nba-ledger-SEASON.json`: every regular-season final of the season
-with the quarter scores, overtime, each team's box line and the game's pace
-(possessions per 48 minutes), every player who dressed with his minutes,
-points and plus-minus and whether he started, and every player who sat with
-the reason the feed gave (inactive, injury, coach's decision). Blank at the
-prompt means this season up to today; for the backtest run it for
-**2024-25** and **2025-26**, about ten minutes each. A past season is read
-from ESPN's open site API: the scoreboard a week a call for the games, the
-summary page per game for the quarters, the box lines, every player's
-minutes and who sat, and the crew (the league's own CDN keeps box scores
-for the running season only, and its stats site will not answer a script;
-both stay as fallbacks). This season reads the league's CDN schedule and
-box scores, ESPN when the CDN has nothing. The file is written every 100
-games, so a run can be stopped and started again and picks up where it
-was. The build container cannot reach any of these feeds, so the first run
-on your machine is the live test: if it stops or writes an empty file,
-send the printout. Beside the two ledgers the backtest needs KillerSports'
-closing lines for the same seasons, saved as pages like the hockey ones:
+Three double-click files, in this order on a game day:
+
+1. **Run NBA ledger.bat**, blank at the prompt: adds this season's new
+   finals to `nba-ledger-202627.json`. Every rating on the slate comes
+   from this file, so it goes first. Nothing to add is fine.
+2. **Run NBA slate.bat**, or `python slate.py nba`: writes
+   `nba-slate-DATE.json` with every game on the league's scoreboard that
+   has not been played. In The Super Model: **Saving → Load slate**, pick
+   it, press **Fill form** on each game.
+3. **Run odds.bat**: the NBA is in the default sports now, so the total,
+   its prices, the first-half total, the spread and the moneylines fill
+   from the carded book. Run it early for the opener and again before tip
+   for the close.
+4. **An hour before tip**, run the slate again and load the newer file: the
+   injury page changes through the day, and the who-is-out list on each
+   matchup is the one thing the close does not fully carry. Tick a doubtful
+   player out on the card if he is ruled out late.
+5. **Grade NBA yesterday.bat** the next morning, or `python slate.py
+   nba-grade`: `nba-grade-DATE.json` with each final, the half-time score
+   and the close the odds run last saw. Load it the same way.
+
+| On the sheet | Where it comes from |
+| --- | --- |
+| Offensive and defensive rating, pace, games played, each side; the league's rating and pace | The ledger, this season only: points per 100 possessions scored and allowed (possessions = FGA − OREB + TOV + 0.44 FTA), possessions per 48 minutes, every final before the slate's date. Blank until a club has **five** games (the sheet's fade waits for ten); the league line fills at twenty finals. Last season's numbers are never used for a club: the rosters moved too much |
+| Rest days, each side | The ledger: days since the club's last final, 0 on a back to back. A label on the sheet |
+| **Who is out**: each side's injury report with the status, the reason, and the man's minutes, points and plus-minus a game | ESPN's league injury page, every club. Each man is keyed by his **player id**, so his line comes from his own games: this season's once he has three, otherwise last season's from `nba-ledger-202526.json` with his old club named when he has moved (a traded or signed player is never read against the wrong team). A rookie with no line is listed with his status alone. The sheet's card sums the regulars' minutes (20+ a game) that are OUT, and a tick counts a doubtful man out. **Shown, not scored**: announced absences are in the close |
+| **Context** lines, with the tag | The ledger's tables, each club against the league once sixteen clubs have five games: offensive and defensive rating (faded under fifty games, shown after), pace, points for and against, the last ten, free-throw rate, a lopsided home or road record; the stage of the season (scored, tagged); the two watched clubs (a label); a back to back (a label); the regulars out (shown). Each line says what the sheet did with the fact. Rendered on the matchup's Context card, never read by the engine |
+| The stage of the season | The date on the row against the 2026-27 calendar in `slate.py` (the deadline 4 Feb, the last two weeks from 29 Mar; a priori until the league publishes). The engine reads the date itself; the slate's line only says so |
+| A preseason game | Flagged in the notes. Thin lines and the wrong rotations; the record keeps it apart if you log it |
+| Finals and the half-time score | The scoreboard's line scores the next morning, or the game summary when the scoreboard has none |
+
+The ledger, in full: `python slate.py nba-ledger --season 2024-25` writes
+`nba-ledger-SEASON.json`, every regular-season final of the season with the
+quarter scores, overtime, each team's box line and the game's pace, every
+player who dressed with his minutes, points and plus-minus and whether he
+started, and every player who sat with the reason the feed gave. A past
+season is read from ESPN's open site API, the scoreboard a day a call and
+the summary page a game (the league's own CDN keeps box scores for the
+running season only, and its stats site will not answer a script; both stay
+as fallbacks; this season reads the CDN first). The file is written every
+100 games, so a run can be stopped and started again. Beside the two
+ledgers the backtest needs KillerSports' closing lines for the same seasons,
+saved as pages like the hockey ones (`tools_backtest_nba.py`, NBA.md):
 
 ```
 date, team, o:team, points, o:points, line, total, site, rest @ season=2024 and site=home and playoffs=0
 date, team, o:team, points, o:points, line, total, site, rest @ season=2025 and site=home and playoffs=0
 ```
+
+The build container cannot reach ESPN, so the first slate run on your
+machine is the live test: if a game is missing, the injury list is empty or
+a rating looks wrong, send the printout and the file.
 
 ## The odds feed (The Odds API)
 

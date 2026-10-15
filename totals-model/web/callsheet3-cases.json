@@ -6235,6 +6235,138 @@
   },
   {
     "sport": "NBA",
+    "name": "the early-season side watch: the ratings' margin twelve points off the spread in the first thirty games, a note and nothing moved",
+    "inputs": {
+      "gdate": "2026-12-10",
+      "away": "Hornets",
+      "home": "Bucks",
+      "line": "229.5",
+      "op": "-110",
+      "up": "-110",
+      "sp": "-3.5",
+      "sph": "-110",
+      "spa": "-110",
+      "naort": "110.0",
+      "nadrt": "118.0",
+      "nhort": "118.0",
+      "nhdrt": "110.0",
+      "napace": "100.0",
+      "nhpace": "100.0",
+      "nagp": "15",
+      "nhgp": "16"
+    },
+    "expect": {
+      "lam_home": 116.44107143,
+      "lam_away": 112.94107143,
+      "projected": 229.38214286,
+      "markets": [
+        {
+          "key": "total",
+          "pick": "UNDER 229.5",
+          "side": "UNDER",
+          "p": 0.5026121,
+          "p_push": 0.0,
+          "price": -110.0,
+          "edge": -0.02119742,
+          "fair": -101.0503,
+          "anchored": true,
+          "band": "NO BET"
+        },
+        {
+          "key": "spread",
+          "pick": "Bucks -3.5",
+          "side": "HOME",
+          "p": 0.5,
+          "p_push": 0.0,
+          "price": -110.0,
+          "edge": -0.02380952,
+          "fair": 100.0,
+          "anchored": true,
+          "band": ""
+        },
+        {
+          "key": "ml",
+          "pick": "Bucks ML",
+          "side": "HOME",
+          "p": 0.61026125,
+          "p_push": 0.0,
+          "price": null,
+          "edge": null,
+          "fair": -156.5821,
+          "anchored": false,
+          "band": ""
+        }
+      ]
+    }
+  },
+  {
+    "sport": "NBA",
+    "name": "the same gap at thirty-five games: no watch",
+    "inputs": {
+      "gdate": "2026-12-10",
+      "away": "Hornets",
+      "home": "Bucks",
+      "line": "229.5",
+      "op": "-110",
+      "up": "-110",
+      "sp": "-3.5",
+      "sph": "-110",
+      "spa": "-110",
+      "naort": "110.0",
+      "nadrt": "118.0",
+      "nhort": "118.0",
+      "nhdrt": "110.0",
+      "napace": "100.0",
+      "nhpace": "100.0",
+      "nagp": "35",
+      "nhgp": "36"
+    },
+    "expect": {
+      "lam_home": 116.4125,
+      "lam_away": 112.9125,
+      "projected": 229.325,
+      "markets": [
+        {
+          "key": "total",
+          "pick": "UNDER 229.5",
+          "side": "UNDER",
+          "p": 0.50387854,
+          "p_push": 0.0,
+          "price": -110.0,
+          "edge": -0.01993098,
+          "fair": -101.5635,
+          "anchored": true,
+          "band": "NO BET"
+        },
+        {
+          "key": "spread",
+          "pick": "Bucks -3.5",
+          "side": "HOME",
+          "p": 0.5,
+          "p_push": 0.0,
+          "price": -110.0,
+          "edge": -0.02380952,
+          "fair": 100.0,
+          "anchored": true,
+          "band": ""
+        },
+        {
+          "key": "ml",
+          "pick": "Bucks ML",
+          "side": "HOME",
+          "p": 0.61026125,
+          "p_push": 0.0,
+          "price": null,
+          "edge": null,
+          "fair": -156.5821,
+          "anchored": false,
+          "band": ""
+        }
+      ]
+    }
+  },
+  {
+    "sport": "NBA",
     "name": "the moneyline alone gives the margin",
     "inputs": {
       "gdate": "2026-12-10",

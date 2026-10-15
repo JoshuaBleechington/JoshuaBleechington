@@ -237,6 +237,24 @@ const CHECKS = ["dome","playoff","agconf","hgconf","agbk","hgbk"];
   chk(nba.nbaBlock.length >= 4 && nba.nbaBlock.some(t => /First half/.test(t)) && nba.nbaBlock.some(t => /Spread/.test(t)) && /First half projected/.test(nba.calib), 'nba: the record has an NBA block with first-half and spread tiles and the half in the forecast line', JSON.stringify(nba.nbaBlock));
   chk(/at the half 46–54/.test(nba.final) && /Final: Raptors 101, Celtics 115/.test(nba.final) && /Jaylen Brown/.test(nba.reopened), 'nba: reopening the graded row prints the final with the half-time score and the who-is-out list', nba.final + ' | ' + nba.reopened.slice(0, 80));
 
+  // ---- the NBA early-season side watch: a note on the why list, nothing moved -------
+  const earlySide = await pg.evaluate(async () => {
+    const wait = () => new Promise(r => setTimeout(r, 60));
+    const set = (id, v) => { const el = document.getElementById(id); el.value = v; el.dispatchEvent(new Event('input', { bubbles: true })); };
+    document.getElementById('clear').click(); document.getElementById('m-nba').click(); await wait();
+    set('gdate', '2026-11-05'); set('away', 'Hornets'); set('home', 'Bucks'); set('line', '229.5'); set('op', '-110'); set('up', '-110'); set('sp', '-3.5'); set('sph', '-110'); set('spa', '-110');
+    set('naort', '110'); set('nadrt', '118'); set('nhort', '118'); set('nhdrt', '110'); set('napace', '100'); set('nhpace', '100'); set('nagp', '15'); set('nhgp', '16'); await wait();
+    const read = () => { const el = document.querySelector('#markets .mk[data-key="spread"]'); return { pick: el.querySelector('.pick').childNodes[0].textContent.trim(), p: parseFloat(el.querySelector('.p').textContent), why: document.getElementById('why').textContent }; };
+    const early = read();
+    set('nagp', '35'); set('nhgp', '36'); await wait();
+    const later = read();
+    document.getElementById('clear').click(); await wait();
+    return { early, later };
+  });
+  chk(/Early-season side watch: the ratings' margin projects \+16\.0 against the market's \+3\.5, 12\.5 points toward the Bucks\. WATCHED, NOT SCORED: in a club's first 30 games the ratings' side at 4\+ points of lean went 148-124/.test(earlySide.early.why)
+      && Math.abs(earlySide.early.p - 50) < 0.6, 'nba early side: at fifteen games the why names the ratings\' side as a watch and the spread stays the book\'s 50%', JSON.stringify({ p: earlySide.early.p, why: (earlySide.early.why.match(/Early-season[^.]*\./) || ['none'])[0] }));
+  chk(!/Early-season side watch/.test(earlySide.later.why) && Math.abs(earlySide.later.p - earlySide.early.p) < 0.01, 'nba early side: at thirty-five games the watch is gone and nothing else changed', (earlySide.later.why.match(/Early-season[^.]*\./) || ['none'])[0]);
+
   // ---- a hockey verdict lists only when it clears its price ------------------------
   const thinNhl = await pg.evaluate(async () => {
     const wait = () => new Promise(r => setTimeout(r, 60));

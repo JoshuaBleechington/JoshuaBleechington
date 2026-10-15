@@ -101,6 +101,16 @@ LAST_TWO_WEEKS_DELTA = 2.0
 SEASON_DATES = {"deadline": "2027-02-04", "last_two_weeks": "2027-03-29", "end": "2027-04-11"}
 #: Two clubs the close has run under both seasons, home and away. A LABEL.
 WATCHED_CLUBS = {"Nuggets": "+5.1 and +4.3 a game over the close", "Jazz": "+3.0 and +5.7 a game over the close"}
+#: The WNBA card's spread pattern tried on the NBA (15 Oct 2026): the ratings'
+#: side of the spread LOSES over two seasons at every lean (669-716 at 2+
+#: points, 394-394 at 4+, 212-196 at 6+; the blend the WNBA card scores,
+#: ratings 1.2 against the market's 4.0, 351-344 at a point of lean), except
+#: in a club's first thirty games, where the ratings' side at 4+ points went
+#: 148-124 (54.4%; slope +0.156 a point, t 1.5), then 135-143 from thirty to
+#: sixty and 113-125 after. One season's worth of a weak early signal: a
+#: WATCH on the card, not scored, measured on the record from opening night.
+EARLY_SIDE_GAMES = 30
+EARLY_SIDE_LEAN = 4.0
 #: A regular is a player at this many minutes a game; the who-is-out list is
 #: shown, not scored (announced absences are in the close; the live card
 #: measures the late ones).
@@ -180,10 +190,10 @@ def nba_fair_total(sport: str, line: float, over_price: float | None, under_pric
 # The total
 # ===========================================================================
 
-def ratings_projection(away_ort, home_ort, away_drt, home_drt, away_pace, home_pace,
-                       league_rating: float | None = None, league_pace: float | None = None) -> tuple[float, str] | None:
-    """The pace x efficiency total: each offence into the defence it faces, per
-    100 possessions, over the mean of the two paces. The backtest's input."""
+def _ratings_sides(away_ort, home_ort, away_drt, home_drt, away_pace, home_pace,
+                   league_rating: float | None = None, league_pace: float | None = None) -> tuple[float, float, float, float] | None:
+    """Each offence into the defence it faces, per 100 possessions, over the
+    mean of the two paces: (away points, home points, pace, league rating)."""
     four = (away_ort, home_ort, away_drt, home_drt)
     if not all(v is not None and _ok(v, "nba_rating") for v in four):
         return None
@@ -193,9 +203,28 @@ def ratings_projection(away_ort, home_ort, away_drt, home_drt, away_pace, home_p
     pace = sum(paces) / len(paces) if len(paces) == 2 else lp
     exp_a = pace / 100.0 * (away_ort + home_drt - lg)
     exp_h = pace / 100.0 * (home_ort + away_drt - lg)
+    return exp_a, exp_h, pace, lg
+
+
+def ratings_projection(away_ort, home_ort, away_drt, home_drt, away_pace, home_pace,
+                       league_rating: float | None = None, league_pace: float | None = None) -> tuple[float, str] | None:
+    """The pace x efficiency total: each offence into the defence it faces, per
+    100 possessions, over the mean of the two paces. The backtest's input."""
+    s = _ratings_sides(away_ort, home_ort, away_drt, home_drt, away_pace, home_pace, league_rating, league_pace)
+    if s is None:
+        return None
+    exp_a, exp_h, pace, lg = s
     why = (f"away {away_ort:.1f} into {home_drt:.1f} and home {home_ort:.1f} into {away_drt:.1f}, each less the league's "
            f"{lg:.1f}, over {pace:.1f} possessions: {exp_a:.1f} and {exp_h:.1f}, {exp_a + exp_h:.1f} together")
     return exp_a + exp_h, why
+
+
+def ratings_margin(away_ort, home_ort, away_drt, home_drt, away_pace, home_pace,
+                   league_rating: float | None = None, league_pace: float | None = None) -> float | None:
+    """The same projection as a margin, home minus away: the spread's own
+    projection, priced against two seasons of closes (slope -0.01). A watch."""
+    s = _ratings_sides(away_ort, home_ort, away_drt, home_drt, away_pace, home_pace, league_rating, league_pace)
+    return None if s is None else s[1] - s[0]
 
 
 def stage_of(game_date: str | None) -> tuple[float, str] | None:
@@ -391,6 +420,18 @@ def forecast_matchup_nba(
     if spread is not None and spread <= -10:
         notes.append("A home favourite of ten or more: against two seasons of closes these covered by +0.84 a game (426 games, +1.28 and "
                      "+0.42 by season, t 1.3). Watched, not scored.")
+    # --- the WNBA card's pattern, early in the season: a watch, not scored ----
+    rm = ratings_margin(total_inputs.get("away_ort"), total_inputs.get("home_ort"), total_inputs.get("away_drt"), total_inputs.get("home_drt"),
+                        total_inputs.get("away_pace"), total_inputs.get("home_pace"), total_inputs.get("league_rating"), total_inputs.get("league_pace"))
+    ag, hg = total_inputs.get("away_games"), total_inputs.get("home_games")
+    n_side = min(ag, hg) if ag is not None and hg is not None else None
+    if rm is not None and n_side is not None and RATINGS_MIN_GAMES <= n_side < EARLY_SIDE_GAMES and abs(rm - margin) >= EARLY_SIDE_LEAN:
+        toward = home if rm > margin else away
+        notes.append(f"Early-season side watch: the ratings' margin projects {rm:+.1f} against the market's {margin:+.1f}, {abs(rm - margin):.1f} points "
+                     f"toward the {toward}. WATCHED, NOT SCORED: in a club's first {EARLY_SIDE_GAMES} games the ratings' side at {EARLY_SIDE_LEAN:g}+ points "
+                     "of lean went 148-124 (54.4%; slope +0.156 a point, t 1.5) against two seasons of closes, then 135-143 from thirty to sixty games and "
+                     "113-125 after, 394-394 over the whole. The WNBA card's spread scores the ratings at 1.2 against the market's 4.0 and is 7-0 informed on "
+                     "seven games; on the NBA that blend went 351-344 at a point of lean. The record section keeps this watch from opening night.")
     p_h = 1.0 - _ncdf((0.0 - margin) / MARGIN_SD)
     markets.append(_pick(
         "ml", "Moneyline",

@@ -18,6 +18,7 @@
     DEADLINE_DELTA: 1.0, LAST_TWO_WEEKS_DELTA: 2.0,              // the stage of the season, tagged: +1.36 after the deadline (t 2.3), +2.25 in the last fortnight (t 1.8)
     SEASON: { deadline: "2027-02-04", last_two_weeks: "2027-03-29", end: "2027-04-11" },   // A PRIORI for 2026-27 until the league publishes
     REGULAR_MPG: 20,
+    EARLY_SIDE_GAMES: 30, EARLY_SIDE_LEAN: 4,   // the WNBA card's pattern on the NBA: the ratings' side at 4+ points of lean 148-124 in a club's first thirty games, 50/50 after; a watch
     FAIR_SPAN: 30
   };
   NBA.RATING = Math.round(NBA.POINTS / 2 / NBA.PACE * 100 * 10) / 10;   // 112.7 points per 100 possessions
@@ -69,16 +70,27 @@
          ": a basketball total is symmetric, so the mean sits on the number.");
     return [mu, why];
   }
-  function nbaRatingsProjection(ao, ho, ad, hd, ap, hp, lgr, lgp) {
+  function nbaRatingsSides(ao, ho, ad, hd, ap, hp, lgr, lgp) {
     var four = [ao, ho, ad, hd];
     for (var i = 0; i < 4; i++) if (four[i] === null || !ok(four[i], "nba_rating")) return null;
     var lg = (lgr !== null && ok(lgr, "nba_rating")) ? lgr : NBA.RATING;
     var lp = (lgp !== null && ok(lgp, "nba_pace")) ? lgp : NBA.PACE;
     var paces = [ap, hp].filter(function (p) { return p !== null && ok(p, "nba_pace"); });
     var pace = paces.length === 2 ? (paces[0] + paces[1]) / 2 : lp;
-    var ea = pace / 100 * (ao + hd - lg), eh = pace / 100 * (ho + ad - lg);
+    return [pace / 100 * (ao + hd - lg), pace / 100 * (ho + ad - lg), pace, lg];
+  }
+  function nbaRatingsProjection(ao, ho, ad, hd, ap, hp, lgr, lgp) {
+    var s = nbaRatingsSides(ao, ho, ad, hd, ap, hp, lgr, lgp);
+    if (!s) return null;
+    var ea = s[0], eh = s[1], pace = s[2], lg = s[3];
     return [ea + eh, "away " + ao.toFixed(1) + " into " + hd.toFixed(1) + " and home " + ho.toFixed(1) + " into " + ad.toFixed(1) + ", each less the league's " + lg.toFixed(1) +
       ", over " + pace.toFixed(1) + " possessions: " + ea.toFixed(1) + " and " + eh.toFixed(1) + ", " + (ea + eh).toFixed(1) + " together"];
+  }
+  /* the same projection as a margin, home minus away: the spread's own projection,
+     priced against two seasons of closes (slope -0.01); an early-season watch only */
+  function nbaRatingsMargin(ao, ho, ad, hd, ap, hp, lgr, lgp) {
+    var s = nbaRatingsSides(ao, ho, ad, hd, ap, hp, lgr, lgp);
+    return s ? s[1] - s[0] : null;
   }
   function nbaStageOf(gdate) {
     var d = String(gdate || "").slice(0, 10);
@@ -230,6 +242,14 @@
       var halfT = f.projected / 2;
       lamH = halfT + margin / 2; lamA = halfT - margin / 2;
       if (spIn !== null && spIn <= -10) notes.push("A home favourite of ten or more: against two seasons of closes these covered by +0.84 a game (426 games, +1.28 and +0.42 by season, t 1.3). Watched, not scored.");
+      /* the WNBA card's pattern, early in the season: a watch, not scored (totals/nba.py EARLY_SIDE_*) */
+      var rm = nbaRatingsMargin(num("naort"), num("nhort"), num("nadrt"), num("nhdrt"), num("napace"), num("nhpace"), num("nlrtg"), num("nlpace"));
+      var agS = num("nagp"), hgS = num("nhgp"), nSide = (agS !== null && hgS !== null) ? Math.min(agS, hgS) : null;
+      if (rm !== null && nSide !== null && nSide >= NBA.MIN_GAMES && nSide < NBA.EARLY_SIDE_GAMES && Math.abs(rm - margin) >= NBA.EARLY_SIDE_LEAN) {
+        notes.push("<b>Early-season side watch</b>: the ratings' margin projects " + sgn(rm, 1) + " against the market's " + sgn(margin, 1) + ", " + Math.abs(rm - margin).toFixed(1) + " points toward the " +
+          esc(rm > margin ? home : away) + ". <b>WATCHED, NOT SCORED</b>: in a club's first " + NBA.EARLY_SIDE_GAMES + " games the ratings' side at " + NBA.EARLY_SIDE_LEAN + "+ points of lean went 148-124 (54.4%; slope +0.156 a point, t 1.5) against two seasons of closes, " +
+          "then 135-143 from thirty to sixty games and 113-125 after, 394-394 over the whole. The WNBA card's spread scores the ratings at 1.2 against the market's 4.0 and is 7-0 informed on seven games; on the NBA that blend went 351-344 at a point of lean. The record section keeps this watch from opening night.");
+      }
       var pH = 1 - ncdf((0 - margin) / NBA.MARGIN_SD);
       markets.push(pickOf("ml", "Moneyline",
         [sideOf(home + " ML", "HOME", pH, 0, hml), sideOf(away + " ML", "AWAY", 1 - pH, 0, aml)],

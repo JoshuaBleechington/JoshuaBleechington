@@ -160,6 +160,24 @@ class TestTheMatchup(unittest.TestCase):
         with self.assertRaises(ValueError):
             forecast_matchup_nba("A", "B", total_line=228.5, h1_line=228.5)
 
+    def test_the_early_season_side_watch(self):
+        # the ratings make the Bucks 16 better over 100 possessions; the spread says 3.5
+        kw = dict(total_line=229.5, over_price=-110, under_price=-110, spread=-3.5, spread_home_price=-110, spread_away_price=-110,
+                  away_ort=110.0, away_drt=118.0, home_ort=118.0, home_drt=110.0, away_pace=100.0, home_pace=100.0)
+        early = forecast_matchup_nba("Hornets", "Bucks", away_games=15, home_games=16, **kw)
+        note = [n for n in early.notes if n.startswith("Early-season side watch")]
+        self.assertEqual(len(note), 1)
+        self.assertIn("toward the Bucks", note[0])
+        self.assertIn("WATCHED, NOT SCORED", note[0])
+        sp = next(m for m in early.markets if m.key == "spread")
+        self.assertAlmostEqual(sp.p, 0.5, places=2)   # a watch moves nothing
+        later = forecast_matchup_nba("Hornets", "Bucks", away_games=35, home_games=36, **kw)
+        self.assertFalse(any(n.startswith("Early-season side watch") for n in later.notes))
+        nine = forecast_matchup_nba("Hornets", "Bucks", away_games=9, home_games=16, **kw)
+        self.assertFalse(any(n.startswith("Early-season side watch") for n in nine.notes))
+        close = forecast_matchup_nba("Hornets", "Bucks", away_games=15, home_games=16, **dict(kw, away_ort=114.0, home_ort=114.0, away_drt=114.0, home_drt=114.0))
+        self.assertFalse(any(n.startswith("Early-season side watch") for n in close.notes))   # even ratings: 3.5 points of lean, under four
+
 
 class TestGrading(unittest.TestCase):
     def setUp(self):

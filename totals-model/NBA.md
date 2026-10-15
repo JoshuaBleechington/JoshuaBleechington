@@ -104,7 +104,9 @@ slate with every player's status, minutes, points and plus-minus a game, the
 regulars' minutes summed, and a tick on a doubtful player that counts him out
 (the tick rides in the row). **Context** is the hockey card's shape: each
 club's league ranks with the tag that says what the sheet did with the fact.
-The slate fills both (next).
+The slate fills both (below). **The early-season side watch** (below, the
+WNBA pattern) is a note on the sides' why list in a club's first thirty games
+when the ratings' margin sits four or more points off the market's.
 
 **Four games of 2025-26 through the engine** (`scratchpad/nba/examples.py`,
 the 2025-26 calendar, the ratings to date from the ledger, the closes from
@@ -115,6 +117,79 @@ Raptors @ Celtics 5 Apr, the last two weeks +2.0, OVER 54.4% held at NO BET,
 lost. The sides read 50.0% at the spread's own number and 58 to 80% on the
 moneyline, the book's chances, and went 3-1 and 3-1 as the book said they
 would about.
+
+## The slate, 15 Oct 2026
+
+`slate.py nba` (Run NBA slate.bat) and `slate.py nba-grade` (Grade NBA
+yesterday.bat), beside the ledger and the odds run (`slate/README.md` has the
+order of a game day). The slate reads the day's scoreboard from ESPN's site
+API, fills each club's ratings, pace and games from this season's ledger (five
+games to fill, nothing from last season: the rosters moved), rest from the
+ledger's dates, and writes two JSON boxes the matchup's cards render:
+
+- **Who is out**, from the league's injury page, every listed man keyed by his
+  player id. His line is his own: this season's after three games, last
+  season's before that with his old club named when he has moved. So a
+  traded or signed player is never read against the wrong team, a rookie
+  shows with his status alone, and the card's sum of regulars' minutes
+  counts only the men marked OUT plus the ones you tick.
+- **Context**, the hockey card's shape: each club's rank in the league on the
+  ratings (faded under fifty games, shown after), pace, points, the last
+  ten, free-throw rate, a lopsided home or road record, with the stage of
+  the season (scored, tagged), the watched clubs, a back to back and the
+  regulars out, each line carrying the tag that says what the sheet did
+  with the fact.
+
+The grade run writes each final with the half-time score and the close the
+odds run last saw. Everything is checked offline in the script's selftest
+against canned feeds: sixteen clubs' tables, a traded man's line by id, a
+two-game club left blank, a preseason flag, the two watched clubs, and a
+morning's finals with the half from the line scores or the summary.
+
+## The WNBA card's spread pattern, tried on the NBA, 15 Oct 2026
+
+The WNBA card scores the ratings' margin at 1.2 against the market's 4.0 and
+its spread stands 7-0 informed, 15-1 with the uninformed rows, on the record
+(the moneyline 7-0). Twenty-three rows. The same thing on the NBA, the pace x
+efficiency margin projection to date against the spread, over the two
+ledger seasons:
+
+| The ratings' side of the spread | Record | At −110 |
+| --- | --- | --- |
+| 2+ points off the spread | 669-716 (48.3%) | −107.8u |
+| 3+ points | 521-536 (49.3%) | −62.4u |
+| 4+ points | 394-394 (50.0%) | −35.8u |
+| 6+ points | 212-196 (52.0%) | −3.3u |
+| the WNBA blend (4.0 market, 1.2 ratings), a point of lean | 351-344 (50.5%) | −24.9u |
+| the blend, 2+ points | 79-68 (53.7%) | +3.8u |
+| the blend, 3+ points | 22-10 (68.8%) | +10.0u |
+
+By the stage of the season, the ratings' side at 4+ points of lean: **10-29
+games in, 148-124 (54.4%; slope +0.156 a point, t 1.5)**; 30-59 games
+135-143 (slope −0.057); 60+ games 113-125 (slope −0.144). The home side's
+residual by the gap's sign: −1.3 when the ratings sat 6+ under the spread,
+−1.1 at +3 to +6 over it, nothing in between; the signs do not hold by
+season.
+
+**The verdict.** The WNBA's edge is a thin market on twelve clubs, where the
+public number lags the ratings; the NBA's spread has the ratings priced
+(slope −0.01 on 2,142 games) and the ratings' side loses at every lean over
+two seasons. The blend's 22-10 at three points of lean is thirty-two games,
+the kind of count the WNBA record is made of, and not a scoring input. The
+one thing with a sign both seasons is the first month: a club's first thirty
+games, where the ratings' side at four or more points of lean covered 54.4%.
+So the engine carries an **early-season side watch**: when the lesser side
+has ten to twenty-nine games and the ratings' margin sits four or more
+points off the market's, the why list names the ratings' side and the
+record; nothing moves, the spread stays the book's own number. The record
+section measures it from opening night, and it scores only if a season of
+the card says what the backtest's first month said.
+
+**The rosters.** Every team number on the slate is this season's only; last
+season's ratings are not a prior, because the summer moved the rosters
+(`RATINGS_MIN_GAMES` is the wait, the fade is the read). Players carry their
+own lines by id across clubs, so the who-is-out card reads a traded man
+against his own minutes, not his new team's.
 
 **What the record says the basketball book is.** The spread is priced against
 everything the box score holds, and the moneyline follows the spread. The total

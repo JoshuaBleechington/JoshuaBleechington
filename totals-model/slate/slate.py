@@ -2888,13 +2888,15 @@ NBA_INPUT_IDS = ("naort", "nhort", "nadrt", "nhdrt", "napace", "nhpace", "nagp",
 
 # ---- the crew: the day's assignments and each referee's line from the ledger ----
 # The league posts the crews about 9 am Eastern on official.nba.com; the page
-# reads a JSON feed by date (the shape below is the one the open-source
-# wrappers read; UNVERIFIED from the build container, which cannot reach the
-# site, so the first run on the user's machine is the test). Shown on the
-# Context card, never scored: against two seasons of closes crews predict the
-# night's free throws (slope 0.60, t 7.3) and the total does not follow them
-# (t -1.0), NBA.md. When the feed fails the Crew box on the sheet takes the
-# names by hand and the card composes the same line.
+# reads a JSON feed by date (read against the user's download of 15 Oct 2026
+# and live the same day: nba.Table.rows, one row a game, the tricodes in
+# home_team_abbr / away_team_abbr and the game code, the officials as
+# official1..3 with a usually-null fourth; the G League and the WNBA ride
+# beside it). Shown on the Context card, never scored: against two seasons
+# of closes crews predict the night's free throws (slope 0.60, t 7.3) and the
+# total does not follow them (t -1.0), NBA.md. When the feed is not up the
+# Crew box on the sheet takes the names by hand and the card composes the
+# same line.
 NBA_OFFICIALS_URL = "https://official.nba.com/wp-json/api/v1/get-game-officials?date=%s"
 NBA_OFFICIALS_HEADERS = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36",
                          "Referer": "https://official.nba.com/referee-assignments/", "Accept": "application/json, text/plain, */*"}
@@ -2930,13 +2932,14 @@ def nba_officials(date_iso):
             v = low.get(k)
             if v and str(v).strip() and str(v).strip() not in names:
                 names.append(str(v).strip())
-        away = espn_tricode(low.get("away_team") or low.get("away_team_abbreviation") or low.get("visitor_team") or "") or nba_nick_tricode(low.get("away_team_name") or low.get("away") or "")
-        home = espn_tricode(low.get("home_team") or low.get("home_team_abbreviation") or "") or nba_nick_tricode(low.get("home_team_name") or low.get("home") or "")
+        # the feed (the user's download of 15 Oct 2026): home_team_abbr / away_team_abbr are the league's tricodes, home_team / away_team the cities
+        away = str(low.get("away_team_abbr") or low.get("away_team_abbreviation") or "").strip().upper()
+        home = str(low.get("home_team_abbr") or low.get("home_team_abbreviation") or "").strip().upper()
         code = str(low.get("game_code") or "")
-        if (not away or not home) and "/" in code and len(code.split("/")[-1]) == 6:
-            away, home = code.split("/")[-1][:3], code.split("/")[-1][3:]
-        if away and home and names:
-            out[(away.upper(), home.upper())] = names
+        if (len(away) != 3 or len(home) != 3) and "/" in code and len(code.split("/")[-1]) == 6:
+            away, home = code.split("/")[-1][:3].upper(), code.split("/")[-1][3:].upper()
+        if len(away) == 3 and len(home) == 3 and names:
+            out[(espn_tricode(away), espn_tricode(home))] = names
     return out
 
 
@@ -3102,9 +3105,11 @@ def make_nba_slate(date_iso, out_dir, log):
         log("Injury report: %d clubs, %d players listed." % (len(injuries), sum(len(v) for v in injuries.values())))
     except Exception as e:  # noqa: BLE001
         log("Could not read the injury report (%s)." % e)
-    refs = nba_referee_tables((led["games"] if led else []) + (prior["games"] if prior else []))
+    prior2 = load_nba_ledger(nba_ledger_path(out_dir, nba_prev_season(nba_prev_season(season))))   # two seasons back, for the referees' lines only
+    refs = nba_referee_tables((led["games"] if led else []) + (prior["games"] if prior else []) + (prior2["games"] if prior2 else []))
     if refs:
-        log("Referees: %d officials' lines over %d ledger games (league %.1f free throws and %.1f points a game)." % (len(refs["r"]), refs["lg"][0], refs["lg"][1], refs["lg"][2]))
+        log("Referees: %d officials' lines over %d ledger games%s (league %.1f free throws and %.1f points a game)." % (
+            len(refs["r"]), refs["lg"][0], " across three seasons" if prior2 and prior else (" across two seasons" if prior else ""), refs["lg"][1], refs["lg"][2]))
     officials = None
     try:
         officials = nba_officials(date_iso)
@@ -4704,11 +4709,16 @@ def _canned_nba_slate():
             {"status": "Day-To-Day", "athlete": {"id": "9001", "displayName": "Knicks Star"}, "details": {"type": "Illness"}},
             {"status": "Out", "athlete": {"displayName": "No Id Man"}, "details": {"type": "Rest"}}]},
         {"displayName": "Nowhere Club", "injuries": [{"status": "Out", "athlete": {"id": "1", "displayName": "Nobody"}, "details": {}}]}]}
-    # the league's assignments feed (the wrappers' shape, unverified from the container): one row a game, the clubs as tricodes or in the game code
+    # the league's assignments feed as the user's download of 15 Oct 2026 has it: one row a game, the clubs as cities with the
+    # tricodes beside them and in the game code, a fourth official slot usually null, the replay centre in a second table
     offs = {"nba": {"Table": {"rows": [
-        {"game_id": "0022600003", "game_code": "20261021/BOSNYK", "home_team": "NYK", "away_team": "BOS", "official1": "Scott Foster", "official2": "Tony Brothers", "official3": "Marc Davis", "alternate": "Not Working"},
-        {"game_id": "0022600004", "game_code": "20261021/PORLAL", "official1": "Zach Zarba", "official2": "Eric Dalen", "official3": "Jason Goldenberg"}]}},
-            "gleague": {"Table": {"rows": [{"game_code": "20261021/ABCDEF", "official1": "G League Ref"}]}}, "wnba": {"Table": {"rows": []}}}
+        {"game_id": "0022600003", "game_date": "10/21/2026", "season": "22026", "game_code": "20261021/BOSNYK", "home_team_id": 1610612752, "home_team": "New York", "home_team_abbr": "NYK",
+         "away_team_id": 1610612738, "away_team": "Boston", "away_team_abbr": "BOS", "official1": "Scott Foster", "official1_code": 1, "official2": "Tony Brothers", "official2_code": 2,
+         "official3": "Marc Davis", "official3_code": 3, "official4": None, "official4_code": None},
+        {"game_id": "0022600004", "game_date": "10/21/2026", "game_code": "20261021/PORLAL", "home_team": "Los Angeles", "away_team": "Portland",
+         "official1": "Zach Zarba", "official2": "Eric Dalen", "official3": "Jason Goldenberg", "official4": None}]},
+                    "Table1": {"rows": [{"game_date": "10/21/2026", "official_code": 1151, "replaycenter_official": "Sean Corbin"}]}},
+            "gl": {"Table": {"rows": [{"game_code": "20261021/ABCDEF", "home_team_abbr": "DEF", "away_team_abbr": "ABC", "official1": "G League Ref"}]}}, "wnba": {"Table": {"rows": []}}}
     return [("scoreboard?dates=20261021&", sb21), ("scoreboard?dates=20261022&", sb22), ("summary?event=4019000104", sum104), ("/injuries", inj),
             ("get-game-officials?date=2026-10-21", offs)], now, prior
 

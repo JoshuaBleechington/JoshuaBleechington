@@ -139,10 +139,12 @@ ledger's dates, and writes two JSON boxes the matchup's cards render:
   stale, and the card's sum of regulars' minutes counts only the men marked
   OUT plus the ones you tick.
 - **The crew** (15 Oct 2026, the user: "I think that will be helpful at some
-  point"): the slate reads the league's assignments feed by date and writes
-  the three names into the Crew box, and a referee table from both ledgers
-  into the row (each official's games, free throws and points a game, and
-  the league's). The Context card composes the last line from the two, so a
+  point"): the slate reads the league's assignments feed by date (the user
+  opened the domain and sent the day's file the same evening; the parser is
+  checked against that shape and ran live) and writes the three names into
+  the Crew box, and a referee table from up to three seasons of ledgers into
+  the row (each official's games, free throws and points a game, and the
+  league's). The Context card composes the last line from the two, so a
   crew typed by hand from official.nba.com gets the same line; a surname
   alone matches when it is unique. Shown, not scored, for the reason in the
   backtest table above: crews predict the night's free throws (t 7.3), the

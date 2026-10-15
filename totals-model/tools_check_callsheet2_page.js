@@ -238,7 +238,7 @@ const CHECKS = ["dome","playoff"];
       'by sport: the two columns together cover at least the combined parlay four', `${mlbCol.legs.length}+${wnbaCol.legs.length} vs ${bySport.combinedLegs.length}`);
   chk(mlbCol.legs.length >= 2 ? /ALL \d HIT/.test(mlbCol.parlay) : mlbCol.parlay === '', 'by sport: a column with two or more legs prices them as a parlay; fewer gets no parlay card', mlbCol.parlay.slice(0, 80));
   chk(split.mlb && split.wnba, 'calib: once a WNBA game is graded there are two blocks', split.heads.join(' | '));
-  chk(split.heads.length === 2 && /^MLB/.test(split.heads[0]) && /^WNBA/.test(split.heads[1]), 'calib: the blocks are headed MLB then WNBA, with their counts', split.heads.join(' | '));
+  chk(split.heads.length === 3 && /^MLB/.test(split.heads[0]) && /^WNBA/.test(split.heads[1]) && /^The board's likeliest/.test(split.heads[2]), 'calib: the blocks are headed MLB then WNBA, with their counts, then the board\'s likeliest (15 Oct 2026)', split.heads.join(' | '));
   chk(split.mlbHasF5 && !split.mlbHasSpread && split.wnbaHasSpread && !split.wnbaHasF5,
       'calib: each block carries only its own markets (F5 and run line are MLB, spread is WNBA)', `MLB f5=${split.mlbHasF5} spread=${split.mlbHasSpread}; WNBA spread=${split.wnbaHasSpread} f5=${split.wnbaHasF5}`);
   chk(/Full-game total\s*0-1/.test(split.wnba), 'calib: the WNBA total (UNDER 162.5) graded a loss from a 70-78 final', split.wnba.slice(0, 120));

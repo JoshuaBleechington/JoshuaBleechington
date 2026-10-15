@@ -1820,6 +1820,36 @@
         : '<b>' + totalN + ' graded ' + sp + ' markets.</b> Compare each market\'s <i>does</i> against its <i>says</i> before believing either; ' +
           'and compare each four against the blind rate of everything logged, not against 50%. The parlay four and the straight bets will differ most nights; the units column is the referee.') + '</div>';
     });
+    /* the board's likeliest side and the two-leg parlays, across every date (15 Oct 2026,
+       the user: "add the two-leg parlays to the grade log too"). Graded the way the board
+       builds them, from the rows as logged, so the record is of what the board showed at
+       the prices it showed; a pair is open until both its games have finals. */
+    var lkStat = fresh("Likeliest at any price"), tlStat = fresh("Two-leg parlays"), openLegs = 0, openPairs = 0, dates = {};
+    card.forEach(function (r) { if (r.gdate) dates[r.gdate] = true; });
+    Object.keys(dates).forEach(function (d) {
+      likeliestLegs(d).forEach(function (x) {
+        var res = gradeMarket(x.mk, x.row.finals);
+        if (res === null || res === undefined || res === "invalid") { openLegs++; return; }
+        if (res === "push") { lkStat.p++; return; }
+        lkStat.n++; lkStat.says += x.mk.p; lkStat.units += res === "win" ? decimalOf(x.mk.price) - 1 : -1; count(lkStat, res);
+        count(lkStat.sides[x.mk.side] || (lkStat.sides[x.mk.side] = { w: 0, l: 0, p: 0 }), res);
+      });
+      twoLegParlays(d, TWO_LEG_MAX).forEach(function (x) {
+        var res = parlayResult(x.legs);
+        if (res === null) { openPairs++; return; }
+        if (res === "push") { tlStat.p++; return; }
+        tlStat.n++; tlStat.says += x.p; tlStat.units += res === "win" ? x.dec - 1 : -1; count(tlStat, res);
+      });
+    });
+    if (lkStat.n || lkStat.p || tlStat.n || tlStat.p || openLegs || openPairs) {
+      var tileOrOpen = function (s, open, what) {
+        return (s.n || s.p) ? tiles(s, "") : '<div><p class="k">' + esc(s.label) + '</p><p class="v">0-0</p><p class="s">' + (open ? open + ' ' + what + (open === 1 ? '' : 's') + ' still open' : 'nothing graded yet') + '</p></div>';
+      };
+      h += '<div class="subhead" data-sport="BOARD">The board\'s likeliest <span class="tag">the likeliest side in each game at any price, and the two-leg parlays built from them, as the board showed them, every sport together</span></div>';
+      h += '<div class="calib" data-sport="BOARD">' + tileOrOpen(lkStat, openLegs, "leg") + tileOrOpen(tlStat, openPairs, "pair") + '</div>';
+      h += '<div class="verdict">Both are the book\'s prices read back, not the sheet\'s picks, so the referee is the units column against what the prices needed. A pair of favourites pays the book\'s margin twice: expect the pairs\' <i>does</i> to sit under their <i>says</i> and the units to run negative unless the legs are genuinely mispriced. ' +
+           (openPairs || openLegs ? (openLegs ? openLegs + ' leg' + (openLegs === 1 ? '' : 's') : '') + (openLegs && openPairs ? ' and ' : '') + (openPairs ? openPairs + ' pair' + (openPairs === 1 ? '' : 's') : '') + ' still waiting on a final.' : '') + '</div>';
+    }
     box.innerHTML = h;
   }
 

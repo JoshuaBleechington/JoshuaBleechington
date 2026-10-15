@@ -141,12 +141,13 @@ const CHECKS = ["dome","playoff","agconf","hgconf","agbk","hgbk"];
     g('f5a', '1'); g('f5h', '1'); g('fa', '2'); g('fh', '3'); await wait();
     const graded = [...tr().querySelectorAll('.rowmk .m')].map(e => ({ pick: e.querySelector('.chip').textContent, res: (e.querySelector('.chip.win,.chip.loss,.chip.push') || {}).textContent || '' }));
     const calib = document.getElementById('calibBox').innerText;
+    const boardTiles = [...document.querySelectorAll('#calibBox .calib[data-sport="BOARD"] > div')].map(d => d.querySelector('.k').textContent + ' ' + d.querySelector('.v').textContent + ' | ' + d.querySelector('.s').textContent);
     const nhlBlock = [...document.querySelectorAll('#calibBox .calib[data-sport="NHL"] > div')].map(d => d.querySelector('.k').textContent + ' ' + d.querySelector('.v').textContent + ' ' + d.querySelector('.s').textContent);
     // open the graded row: the rail says "after one"
     tr().querySelector('[data-open]').click(); await wait();
     const final = (document.querySelector('#markets .final') || {}).textContent || '';
     document.getElementById('clear').click(); await wait();
-    return { rail, names, boardRows, bets, legs, likeliest, twoLegs, label, graded, calib, nhlBlock, final, sport1: card[0].sport, keys: card[0].markets.map(m => m.key), forecast, proj: card[0].proj };
+    return { rail, names, boardRows, bets, legs, likeliest, twoLegs, label, graded, calib, boardTiles, nhlBlock, final, sport1: card[0].sport, keys: card[0].markets.map(m => m.key), forecast, proj: card[0].proj };
   });
   chk(/Forecast · Rangers [0-9.]+ – Bruins [0-9.]+ · total [0-9.]+ goals · first period [0-9.]+ · (Rangers|Bruins) to win, \d+%/.test(flow.forecast),
       'forecast: the rail says what the sheet expects — each side\'s goals, the total, the first period and the winner\'s chance', flow.forecast.slice(0, 200));
@@ -173,6 +174,8 @@ const CHECKS = ["dome","playoff","agconf","hgconf","agbk","hgbk"];
       'board: the likeliest side in each game at any price, likeliest first, with what its price needs', JSON.stringify(flow.likeliest));
   chk(flow.twoLegs.length === 1 && /^PARLAY #1 · the (price agrees|book's price, not an edge)$/.test(flow.twoLegs[0].n1) && /^both land \d\d?\.\d% · pays [-+]\d+ \(\d\.\d\d×\) needs \d\d\.\d%$/.test(flow.twoLegs[0].n3) && / \+ /.test(flow.twoLegs[0].n2),
       'board: two priced games make one two-leg parlay, with the chance both land, the parlay price and what it needs', JSON.stringify(flow.twoLegs));
+  chk(flow.boardTiles.length === 2 && /^Likeliest at any price 1-0 \| says \d\d\.\d% · does 100\.0%/.test(flow.boardTiles[0]) && /^Two-leg parlays 0-0 \| 1 pair still open$/.test(flow.boardTiles[1]),
+      'record: the board\'s likeliest side and the two-leg parlays keep their own tiles; one graded game grades the leg and leaves the pair open', JSON.stringify(flow.boardTiles));
   chk(/NHL/.test(flow.calib) && !/WNBA/.test(flow.calib.split('NHL')[0]), 'record: an NHL block is drawn', flow.calib.slice(0, 200));
   chk(/after one 1–1/.test(flow.final) && /Final: Rangers 2, Bruins 3/.test(flow.final), 'rail: opening a graded hockey row prints the final and the score after one', flow.final);
 

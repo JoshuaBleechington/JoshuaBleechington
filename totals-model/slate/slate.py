@@ -2540,7 +2540,7 @@ def make_nba_ledger(date_iso, out_dir, log, season=None):
     except Exception as e:  # noqa: BLE001
         log("Could not read ESPN's scoreboard (%s)." % e)
         games = None
-    if not past and not games:
+    if not past and games is None:   # ESPN did not answer at all; an empty answer is the truth before opening night
         try:
             games = nba_games_from_schedule(date_iso)
             source = "cdn"

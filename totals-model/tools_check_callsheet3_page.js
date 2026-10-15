@@ -131,6 +131,8 @@ const CHECKS = ["dome","playoff","agconf","hgconf","agbk","hgbk"];
     const boardRows = [...document.querySelectorAll('#board tbody tr')].map(tr => ({ market: tr.querySelectorAll('td')[2].textContent, notPicked: !!tr.querySelector('.chip.dim') && /not picked/.test(tr.querySelectorAll('td')[2].textContent) }));
     const bets = [...document.querySelectorAll('#bestBets .pk .n4')].map(e => e.textContent);
     const legs = [...document.querySelectorAll('#picks .pk:not(.parlay) .n4')].map(e => e.textContent);
+    const likeliest = [...document.querySelectorAll('#likeliest .pk')].map(e => ({ n1: e.querySelector('.n1').textContent, pick: e.querySelector('.n2').textContent, n3: e.querySelector('.n3').textContent, n4: e.querySelector('.n4').textContent, agrees: e.classList.contains('agrees') }));
+    const twoLegs = [...document.querySelectorAll('#twoLegs .pk')].map(e => ({ n1: e.querySelector('.n1').textContent, n2: (e.querySelector('.n2') || {}).textContent || '', n3: e.querySelector('.n3').textContent }));
     // grade game 1: Bruins 3, Rangers 2 (a shootout), first period 1-1
     const tr = () => [...document.querySelectorAll('#cardTable tr')].find(t => /Rangers @ Bruins/.test(t.textContent));
     const label = tr().querySelector('.finals .l').textContent + '|' + [...tr().querySelectorAll('.finals .l')].map(e => e.textContent).join(',');
@@ -144,7 +146,7 @@ const CHECKS = ["dome","playoff","agconf","hgconf","agbk","hgbk"];
     tr().querySelector('[data-open]').click(); await wait();
     const final = (document.querySelector('#markets .final') || {}).textContent || '';
     document.getElementById('clear').click(); await wait();
-    return { rail, names, boardRows, bets, legs, label, graded, calib, nhlBlock, final, sport1: card[0].sport, keys: card[0].markets.map(m => m.key), forecast, proj: card[0].proj };
+    return { rail, names, boardRows, bets, legs, likeliest, twoLegs, label, graded, calib, nhlBlock, final, sport1: card[0].sport, keys: card[0].markets.map(m => m.key), forecast, proj: card[0].proj };
   });
   chk(/Forecast · Rangers [0-9.]+ – Bruins [0-9.]+ · total [0-9.]+ goals · first period [0-9.]+ · (Rangers|Bruins) to win, \d+%/.test(flow.forecast),
       'forecast: the rail says what the sheet expects — each side\'s goals, the total, the first period and the winner\'s chance', flow.forecast.slice(0, 200));
@@ -166,6 +168,11 @@ const CHECKS = ["dome","playoff","agconf","hgconf","agbk","hgbk"];
   const totRes = flow.graded.find(x => /^(OVER|UNDER) 6$/.test(x.pick));
   chk(totRes && totRes.res === 'loss' || (totRes && /UNDER/.test(totRes.pick) && totRes.res === 'win'), 'grade: 3-2 is five goals, under the 6', JSON.stringify(totRes));
   chk(flow.nhlBlock.length >= 4 && flow.nhlBlock.some(t => /First period/.test(t)) && flow.nhlBlock.some(t => /Puck line/.test(t)), 'record: the NHL block has first period and puck line tiles', JSON.stringify(flow.nhlBlock));
+  chk(flow.likeliest.length === 2 && flow.likeliest.every(x => /^#\d · the (price agrees|book's price, not an edge)$/.test(x.n1) && /^\d\d\.\d% · [-+]\d+ needs \d\d\.\d%$/.test(x.n3))
+      && parseFloat(flow.likeliest[0].n3) >= parseFloat(flow.likeliest[1].n3) && flow.likeliest.some(x => /Rangers @ Bruins/.test(x.n4)) && flow.likeliest.some(x => /Toronto|Maple Leafs/.test(x.n4) && /Moneyline/.test(x.n4)),
+      'board: the likeliest side in each game at any price, likeliest first, with what its price needs', JSON.stringify(flow.likeliest));
+  chk(flow.twoLegs.length === 1 && /^PARLAY #1 · the (price agrees|book's price, not an edge)$/.test(flow.twoLegs[0].n1) && /^both land \d\d?\.\d% · pays [-+]\d+ \(\d\.\d\d×\) needs \d\d\.\d%$/.test(flow.twoLegs[0].n3) && / \+ /.test(flow.twoLegs[0].n2),
+      'board: two priced games make one two-leg parlay, with the chance both land, the parlay price and what it needs', JSON.stringify(flow.twoLegs));
   chk(/NHL/.test(flow.calib) && !/WNBA/.test(flow.calib.split('NHL')[0]), 'record: an NHL block is drawn', flow.calib.slice(0, 200));
   chk(/after one 1–1/.test(flow.final) && /Final: Rangers 2, Bruins 3/.test(flow.final), 'rail: opening a graded hockey row prints the final and the score after one', flow.final);
 

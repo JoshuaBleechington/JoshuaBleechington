@@ -264,6 +264,11 @@
                    padding: 3px 5px; border: 1px solid var(--rule-firm); border-radius: 4px; color: var(--ink-2); margin: 4px 4px 0 0; }
   .mk .cap.tagm.warn, .openbtn .tagm.warn, .pk .tagm.warn { color: var(--warn); border-color: var(--warn); }
   .pk.thin { border-style: dashed; }
+  .pk.likely { border: 1px dashed var(--ink-2); background: transparent; }
+  .pk.likely .n1 { color: var(--ink-2); }
+  .pk.likely.agrees { border: 1px solid var(--go); background: var(--go-wash); }
+  .pk.likely.agrees .n1 { color: var(--go); }
+  .pk.two .amp { color: var(--muted); font-weight: 400; margin: 0 4px; }
   /* the slate panel */
   .slate .sg { display: flex; justify-content: space-between; align-items: center; gap: 10px; padding: 10px 12px;
                border: 1px solid var(--rule); border-radius: 8px; margin-bottom: 8px; }
@@ -653,6 +658,10 @@
       <div id="picks" class="picks"></div>
       <div class="subhead">Best straight bets <span class="tag">#1's BET or better first, then the WNBA cheaper side, then the best edges — up to eight</span></div>
       <div id="bestBets" class="picks"></div>
+      <div class="subhead">Likeliest at any price <span class="tag">the most likely outcome in each game, whichever market it sits in, with what its price needs — one a game, likeliest first; not the sheet's pick</span></div>
+      <div id="likeliest" class="picks"></div>
+      <div class="subhead">Two-leg parlays <span class="tag">up to six pairs from the likeliest legs, different games, ranked by the chance both land — the parlay's price and what it needs beside each</span></div>
+      <div id="twoLegs" class="picks"></div>
       <div class="subhead" id="bySportHead">One sport only <span class="tag">the same two rules, MLB and WNBA apart — only on a night with both</span></div>
       <div id="bySport" class="sports"></div>
       <div class="scroll"><div id="board"></div></div>

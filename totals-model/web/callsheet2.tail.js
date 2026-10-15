@@ -1026,8 +1026,8 @@
   function likeliestOf(markets) {
     var best = null, bestUnpriced = null;
     (markets || []).forEach(function (mk) {
-      [{ pick: mk.pick, p: mk.p, price: mk.price, key: mk.key, side: mk.side, onOther: false },
-       mk.other ? { pick: mk.other.pick, p: mk.other.p, price: mk.other.price, key: mk.key, side: FLIP[mk.side] || mk.side, onOther: true } : null].forEach(function (c) {
+      [{ pick: mk.pick, p: mk.p, price: mk.price, key: mk.key, side: mk.side, label: mk.label, edge: mk.edge, onOther: false },
+       mk.other ? { pick: mk.other.pick, p: mk.other.p, price: mk.other.price, key: mk.key, side: FLIP[mk.side] || mk.side, label: mk.label, edge: mk.other.edge, onOther: true } : null].forEach(function (c) {
         if (!c || c.p === null || c.p === undefined) return;
         if (c.price !== null && c.price !== undefined) { if (!best || c.p > best.p + 1e-9) best = c; }
         else if (!bestUnpriced || c.p > bestUnpriced.p + 1e-9) bestUnpriced = c;
@@ -1301,6 +1301,62 @@
       '<div class="n4">' + esc(x.row.matchup) + ' · ' + esc(x.mk.label) +
         (x.mk.key === "total" && marksOf(x.row.sport, x.row.inputs, x.row.markets).grain ? ' <span class="tagm warn">over against the grain</span>' : '') + '</div>' + (extra || '') + (callOf(x.row, x.mk) ? callWhy(x) : '') + '</div>';
   }
+  /* ---- the likeliest side in each game at any price, and the two-leg parlays built
+     from them (15 Oct 2026, the user: "put the likeliest card on the board too and
+     give me up to six two-leg bets"). One leg a game, likeliest first; the pairs
+     take different games and rank by the chance both land, with the parlay's price
+     and what that price needs beside each. The price agreeing or not is said on
+     every card; nothing here is the sheet's pick. ---- */
+  function likeliestLegs(dateISO, sport) {
+    var legs = [];
+    card.forEach(function (r) {
+      if ((r.gdate || "") !== dateISO) return;
+      if (sport && r.sport !== sport) return;
+      var best = likeliestOf(r.markets);
+      if (!best || best.price === null || best.price === undefined) return;
+      legs.push({ row: r, mk: best, need: implied(best.price), rank: 0 });
+    });
+    legs.sort(function (a, b) { return (b.mk.p - a.mk.p) || (a.need - b.need); });
+    legs.forEach(function (x, i) { x.rank = i + 1; });
+    return legs;
+  }
+  function decimalOf(price) { return price > 0 ? 1 + price / 100 : 1 + 100 / Math.abs(price); }
+  function americanOf(dec) { return dec >= 2 ? Math.round((dec - 1) * 100) : -Math.round(100 / (dec - 1)); }
+  var TWO_LEG_MAX = 6, TWO_LEG_POOL = 8;
+  function twoLegParlays(dateISO, max) {
+    var legs = likeliestLegs(dateISO).slice(0, TWO_LEG_POOL), out = [];
+    for (var i = 0; i < legs.length; i++) {
+      for (var j = i + 1; j < legs.length; j++) {
+        var a = legs[i], b = legs[j], dec = decimalOf(a.mk.price) * decimalOf(b.mk.price);
+        out.push({ legs: [a, b], p: a.mk.p * b.mk.p, dec: dec, price: americanOf(dec), need: 1 / dec });
+      }
+    }
+    out.sort(function (x, y) { return (y.p - x.p) || (x.need - y.need); });
+    return out.slice(0, max || TWO_LEG_MAX);
+  }
+  function parlayResult(legs) {
+    var rs = legs.map(function (x) { return gradeMarket(x.mk, x.row.finals); });
+    if (rs.some(function (r) { return r === null || r === undefined; })) return null;
+    if (rs.some(function (r) { return r === "loss" || r === "invalid"; })) return "loss";
+    if (rs.every(function (r) { return r === "push"; })) return "push";
+    return "win";
+  }
+  function likelyPick(x) {
+    var res = gradeMarket(x.mk, x.row.finals), ok = x.mk.p >= x.need;
+    return '<div class="pk likely' + (ok ? ' agrees' : '') + '" data-open="' + x.row.id + '" title="Load ' + esc(x.row.matchup) + ' into the form">' +
+      '<div class="n1">#' + x.rank + (ok ? ' · the price agrees' : ' · the book\'s price, not an edge') + '</div>' +
+      '<div class="n2">' + esc(x.mk.pick) + '</div>' +
+      '<div class="n3">' + (x.mk.p * 100).toFixed(1) + '% · ' + sgn(x.mk.price, 0) + ' needs ' + (x.need * 100).toFixed(1) + '%' + (res ? ' · <span class="chip ' + res + '">' + resText(res) + '</span>' : '') + '</div>' +
+      '<div class="n4">' + esc(x.row.matchup) + ' · ' + esc(x.mk.label || x.mk.key) + '</div></div>';
+  }
+  function twoLegCard(x, i) {
+    var a = x.legs[0], b = x.legs[1], ok = x.p >= x.need, res = parlayResult(x.legs);
+    return '<div class="pk likely two' + (ok ? ' agrees' : '') + '">' +
+      '<div class="n1">PARLAY #' + (i + 1) + (ok ? ' · the price agrees' : ' · the book\'s price, not an edge') + '</div>' +
+      '<div class="n2">' + esc(a.mk.pick) + ' <span class="amp">+</span> ' + esc(b.mk.pick) + '</div>' +
+      '<div class="n3">both land ' + (x.p * 100).toFixed(1) + '% · pays ' + sgn(x.price, 0) + ' (' + x.dec.toFixed(2) + '×) needs ' + (x.need * 100).toFixed(1) + '%' + (res ? ' · <span class="chip ' + res + '">' + res + '</span>' : '') + '</div>' +
+      '<div class="n4">' + esc(a.row.matchup) + ' (' + (a.mk.p * 100).toFixed(1) + '% at ' + sgn(a.mk.price, 0) + ') · ' + esc(b.row.matchup) + ' (' + (b.mk.p * 100).toFixed(1) + '% at ' + sgn(b.mk.price, 0) + ')</div></div>';
+  }
   function renderBoard() {
     var dateISO = $("boardDate").value || todayISO(), byProb = !$("byEdge").checked;
     var rows = boardRows(dateISO, byProb);
@@ -1317,6 +1373,24 @@
     bets.forEach(function (x) { bh += pickCard(x, "straight" + (x.thin ? " thin" : ""), betNote(x)); });
     if (!bets.length && rows.length) bh = '<div class="empty">No market on this date is priced below its chance. The book has every side covered tonight.</div>';
     $("bestBets").innerHTML = bh;
+
+    // --- the likeliest side in each game, and the two-leg parlays from them ---
+    if ($("likeliest")) {
+      var lk = likeliestLegs(dateISO), lh = "";
+      lk.forEach(function (x) { lh += likelyPick(x); });
+      if (!lk.length && rows.length) lh = '<div class="empty">No priced side on this date.</div>';
+      $("likeliest").innerHTML = lh;
+      var tl = twoLegParlays(dateISO, TWO_LEG_MAX), th = "";
+      tl.forEach(function (x, i) { th += twoLegCard(x, i); });
+      if (!tl.length) th = '<div class="empty">' + (lk.length === 1 ? 'One priced game on the card: a two-leg parlay needs two.' : 'Add two or more games with prices and the pairs land here.') + '</div>';
+      else if (lk.length > 2) {
+        var seen = {}; tl.forEach(function (x) { x.legs.forEach(function (l) { seen[l.row.matchup] = (seen[l.row.matchup] || 0) + 1; }); });
+        var most = Object.keys(seen).sort(function (p, q) { return seen[q] - seen[p]; })[0];
+        th += '<div class="pk likely two" style="grid-column:1/-1;border-style:dotted"><div class="n1">READ THIS FIRST</div><div class="n3">' + tl.length + ' pairs from the ' + Math.min(lk.length, TWO_LEG_POOL) + ' likeliest legs, ranked by the chance both land' +
+          (seen[most] > 1 ? '; ' + esc(most) + ' is in ' + seen[most] + ' of them, so a loss there takes ' + seen[most] + ' tickets' : '') + '. "The price agrees" means the pair\'s chance clears what the parlay pays; most pairs of the book\'s own favourites do not, and that is the book\'s margin twice over.</div></div>';
+      }
+      $("twoLegs").innerHTML = th;
+    }
 
     // --- by sport: the same two rules, one sport at a time ---
     /* Only when the date has BOTH sports. With one, the columns repeat the
@@ -1869,6 +1943,14 @@
       out.push("  " + x.rank + ". " + x.row.matchup + " — " + x.mk.pick + "  " + (x.mk.p * 100).toFixed(1) + "%  " + sgn(x.mk.price, 0) +
         "  " + x.ratio.toFixed(3) + "x" + (x.band ? "  [#1: " + x.band + "]" : "") + (x.likeliest ? "  (likelier: " + x.likeliest.pick + " at " + sgn(x.likeliest.price, 0) + ")" : ""));
     });
+    out.push("LIKELIEST AT ANY PRICE (one a game)");
+    likeliestLegs(dateISO).forEach(function (x) {
+      out.push("  " + x.rank + ". " + x.row.matchup + " — " + x.mk.pick + "  " + (x.mk.p * 100).toFixed(1) + "%  " + sgn(x.mk.price, 0) + " needs " + (x.need * 100).toFixed(1) + "%" + (x.mk.p >= x.need ? "  [the price agrees]" : "  [the book's price]"));
+    });
+    out.push("TWO-LEG PARLAYS (up to " + TWO_LEG_MAX + ", from the likeliest legs, by the chance both land)");
+    twoLegParlays(dateISO, TWO_LEG_MAX).forEach(function (x, i) {
+      out.push("  " + (i + 1) + ". " + x.legs[0].mk.pick + " (" + x.legs[0].row.matchup + ") + " + x.legs[1].mk.pick + " (" + x.legs[1].row.matchup + ")  both " + (x.p * 100).toFixed(1) + "%  pays " + sgn(x.price, 0) + " needs " + (x.need * 100).toFixed(1) + "%" + (x.p >= x.need ? "  [the price agrees]" : "  [the book's price]"));
+    });
     out.push("BEST STRAIGHT BETS (#1's verdicts first, then the WNBA cheaper side, then by edge)");
     bestBets(dateISO).forEach(function (x) {
       out.push("  " + x.rank + ". " + (x.fav ? "★ " : "") + x.row.matchup + " — " + x.mk.pick + "  " + (x.mk.p * 100).toFixed(1) + "%  " + sgn(x.mk.price, 0) + "  edge " + sgn(x.mk.edge * 100, 1) + (x.fav ? "  [the one it likes most tonight]" : "") +
@@ -1896,6 +1978,7 @@
   $("byEdge").addEventListener("change", function () { renderBoard(); });
   $("picks").addEventListener("click", function (e) { var t = e.target.closest("[data-open]"); if (t) openRow(t.dataset.open); });
   $("bestBets").addEventListener("click", function (e) { var t = e.target.closest("[data-open]"); if (t) openRow(t.dataset.open); });
+  if ($("likeliest")) $("likeliest").addEventListener("click", function (e) { var t = e.target.closest("[data-open]"); if (t) openRow(t.dataset.open); });
   $("bySport").addEventListener("click", function (e) { var t = e.target.closest("[data-open]"); if (t) openRow(t.dataset.open); });
   $("board").addEventListener("click", function (e) { var t = e.target.closest("tr[data-open]"); if (t) openRow(t.dataset.open); });
   $("boardDate").addEventListener("change", renderBoard);

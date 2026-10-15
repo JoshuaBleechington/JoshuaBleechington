@@ -30,6 +30,7 @@ come from a stats site by hand.
 import argparse
 import csv
 import datetime as dt
+import gzip
 import io
 import json
 import math
@@ -70,20 +71,26 @@ _cache = {}
 _last_headers = {}   # the headers of the last document fetched (The Odds API counts credits in them)
 
 
-def fetch_json(url, tries=3, headers=None):
+def fetch_json(url, tries=3, headers=None, timeout=25, cache=True):
     """GET a JSON document. Retries twice on a network error, caches by URL.
-    `headers` replaces the default pair (the NBA stats site wants a browser's)."""
+    `headers` replaces the default pair (the NBA stats site wants a browser's
+    and answers gzipped); `cache=False` for the thousand box scores of a
+    ledger pull, which would otherwise sit in memory for the whole run."""
     if url in _cache:
         return _cache[url]
     last = None
     for i in range(tries):
         try:
             req = urllib.request.Request(url, headers=headers or {"User-Agent": UA, "Accept": "application/json"})
-            with urllib.request.urlopen(req, timeout=25) as r:
-                data = json.loads(r.read().decode("utf-8"))
+            with urllib.request.urlopen(req, timeout=timeout) as r:
+                raw = r.read()
+                if (r.headers.get("Content-Encoding") or "").lower() == "gzip":
+                    raw = gzip.decompress(raw)
+                data = json.loads(raw.decode("utf-8"))
                 _last_headers.clear()
                 _last_headers.update({k.lower(): v for k, v in r.headers.items()})
-            _cache[url] = data
+            if cache:
+                _cache[url] = data
             return data
         except (OSError, ValueError) as e:  # URLError and HTTPError are OSErrors; so is a socket timeout
             last = e
@@ -1979,11 +1986,21 @@ NBA_CDN = "https://cdn.nba.com/static/json"
 NBA_STATS = "https://stats.nba.com/stats"
 NBA_STATS_HEADERS = {
     "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36",
-    "Accept": "application/json, text/plain, */*", "Accept-Language": "en-US,en;q=0.9",
-    "Referer": "https://www.nba.com/", "Origin": "https://www.nba.com",
+    "Accept": "application/json, text/plain, */*", "Accept-Language": "en-US,en;q=0.9", "Accept-Encoding": "gzip",
+    "Referer": "https://www.nba.com/", "Origin": "https://www.nba.com", "Host": "stats.nba.com", "Connection": "keep-alive",
     "x-nba-stats-origin": "stats", "x-nba-stats-token": "true",
 }
+NBA_STATS_TIMEOUT = 60   # the stats site answers a season's log slowly or not at all; one try, then the CDN
+NBA_CDN_TIMEOUT = 20
 NBA_PACE_FT = 0.44   # free-throw possessions: the standard estimate, FGA - OREB + TOV + 0.44 FTA
+# Regular-season game ids are sequential: 002 + the season's two digits + 00001
+# upward, 1,230 a season (30 clubs, 82 games). When the stats site will not
+# answer, the ledger walks the ids on the CDN directly and stops after
+# NBA_ID_GAP misses past NBA_ID_FLOOR; a postponed game leaves a hole, a
+# rescheduled one takes a later id.
+NBA_ID_FLOOR = 1230
+NBA_ID_GAP = 15
+NBA_ID_LIMIT = 1320
 
 
 def nba_season_id(date_iso):
@@ -2009,9 +2026,59 @@ def nba_ledger_path(out_dir, season):
     return os.path.join(out_dir, "nba-ledger-%s.json" % season.replace("-", ""))
 
 
-def nba_stats_json(path, params):
+def nba_stats_json(path, params, tries=1):
     url = NBA_STATS + path + "?" + urllib.parse.urlencode(params)
-    return fetch_json(url, headers=NBA_STATS_HEADERS)
+    return fetch_json(url, tries=tries, headers=NBA_STATS_HEADERS, timeout=NBA_STATS_TIMEOUT)
+
+
+def nba_box_url(gid):
+    return NBA_CDN + "/liveData/boxscore/boxscore_%s.json" % gid
+
+
+def nba_box_date(game):
+    """The game's US date from the CDN box score: gameEt carries the Eastern
+    clock; failing that, the UTC time less five hours."""
+    et = str(game.get("gameEt") or "")
+    if re.match(r"\d{4}-\d{2}-\d{2}", et):
+        return et[:10]
+    utc = str(game.get("gameTimeUTC") or "")
+    m = re.match(r"(\d{4}-\d{2}-\d{2})T(\d{2}):(\d{2})", utc)
+    if m:
+        d = dt.datetime(int(m.group(1)[:4]), int(m.group(1)[5:7]), int(m.group(1)[8:10]), int(m.group(2)), int(m.group(3))) - dt.timedelta(hours=5)
+        return d.date().isoformat()
+    return None
+
+
+def nba_scan_ids(season, have, log, on_entry):
+    """Walk a season's regular-season game ids on the CDN, building an entry
+    from each box score found (no stats site at all). Calls on_entry(entry)
+    for each; skips ids in `have`. Returns (fetched, misses)."""
+    yy = season[2:4]
+    fetched = misses = 0
+    streak = 0
+    for k in range(1, NBA_ID_LIMIT + 1):
+        gid = "002%s%05d" % (yy, k)
+        if gid in have:
+            streak = 0
+            continue
+        try:
+            box = fetch_json(nba_box_url(gid), tries=1, timeout=NBA_CDN_TIMEOUT, cache=False)
+            game = box.get("game") or {}
+            if not game.get("homeTeam"):
+                raise ValueError("no game in the document")
+        except Exception:  # noqa: BLE001
+            misses += 1
+            streak += 1
+            if k > NBA_ID_FLOOR and streak >= NBA_ID_GAP:
+                break
+            continue
+        streak = 0
+        if int(game.get("gameStatus") or 0) != 3:
+            continue   # not final yet (this season)
+        g = {"id": gid, "date": nba_box_date(game), "away": None, "home": None, "fa": None, "fh": None}
+        on_entry(nba_entry_from_cdn(g, box))
+        fetched += 1
+    return fetched, misses
 
 
 def nba_result_set(doc, name=None):
@@ -2183,7 +2250,7 @@ def nba_game_entry(g, log):
     """The CDN box score first; the stats site's two documents when the CDN
     has none; scores only when neither can be read."""
     try:
-        box = fetch_json(NBA_CDN + "/liveData/boxscore/boxscore_%s.json" % g["id"])
+        box = fetch_json(nba_box_url(g["id"]), timeout=NBA_CDN_TIMEOUT, cache=False)
         if (box.get("game") or {}).get("homeTeam"):
             return nba_entry_from_cdn(g, box)
     except Exception as e:  # noqa: BLE001
@@ -2264,20 +2331,6 @@ def make_nba_ledger(date_iso, out_dir, log, season=None):
     led = led or {"format": NBA_LEDGER_FORMAT, "version": 1, "season": season, "games": [], "through": None}
     have = {g.get("id") for g in led["games"] if g.get("detail")}
     log("NBA %s: %d game%s already in the ledger with detail." % (season, len(have), "" if len(have) == 1 else "s"))
-    games = []
-    try:
-        games = nba_games_from_log(season)
-        log("League game log: %d regular-season games listed." % len(games))
-    except Exception as e:  # noqa: BLE001
-        log("Could not read the league game log (%s)." % e)
-        if not past:
-            try:
-                games = nba_games_from_schedule(date_iso)
-                log("CDN schedule: %d finals listed up to %s." % (len(games), date_iso))
-            except Exception as e2:  # noqa: BLE001
-                log("Could not read the CDN schedule either (%s)." % e2)
-    todo = [g for g in sorted(games, key=lambda g: (g["date"], g["id"])) if g["id"] not in have and (past or g["date"] <= date_iso)]
-    log("%d game%s to fetch; a line prints every %d, and the file is written every %d so a run can be stopped and resumed." % (len(todo), "" if len(todo) == 1 else "s", NBA_LEDGER_FLUSH, NBA_LEDGER_FLUSH))
     byid = {g.get("id"): g for g in led["games"]}
 
     def flush():
@@ -2287,16 +2340,41 @@ def make_nba_ledger(date_iso, out_dir, log, season=None):
         led["measure"] = nba_measure(led["games"])
         with open(path, "w", encoding="utf-8") as f:
             json.dump(led, f, separators=(",", ":"))
-    done = 0
-    for g in todo:
-        e = nba_game_entry(g, log)
+    # the list of games: the CDN schedule for this season (one small file), the
+    # stats site's game log for a past one (one call, slow, often refused);
+    # with neither, the ids are walked on the CDN directly
+    games = None
+    if not past:
+        try:
+            games = nba_games_from_schedule(date_iso)
+            log("CDN schedule: %d finals listed up to %s." % (len(games), date_iso))
+        except Exception as e:  # noqa: BLE001
+            log("Could not read the CDN schedule (%s)." % e)
+    if games is None:
+        try:
+            games = nba_games_from_log(season)
+            log("League game log: %d regular-season games listed." % len(games))
+        except Exception as e:  # noqa: BLE001
+            log("The stats site did not answer for the game log (%s): walking the season's game ids on the CDN instead." % e)
+    done = [0]
+
+    def took(e):
         byid[e["id"]] = e
-        done += 1
-        if done % NBA_LEDGER_FLUSH == 0:
+        done[0] += 1
+        if done[0] % NBA_LEDGER_FLUSH == 0:
             flush()
-            log("  %d of %d fetched (%s); written." % (done, len(todo), g["date"]))
+            log("  %d fetched (%s); written." % (done[0], e.get("date")))
+    if games is None:
+        log("Walking ids 002%s00001 upward; a line prints every %d, and the file is written every %d so a run can be stopped and resumed." % (season[2:4], NBA_LEDGER_FLUSH, NBA_LEDGER_FLUSH))
+        fetched, misses = nba_scan_ids(season, have, log, took)
+        log("Walked the ids: %d box score%s read, %d id%s with none." % (fetched, "" if fetched == 1 else "s", misses, "" if misses == 1 else "s"))
+    else:
+        todo = [g for g in sorted(games, key=lambda g: (g["date"], g["id"])) if g["id"] not in have and (past or g["date"] <= date_iso)]
+        log("%d game%s to fetch; a line prints every %d, and the file is written every %d so a run can be stopped and resumed." % (len(todo), "" if len(todo) == 1 else "s", NBA_LEDGER_FLUSH, NBA_LEDGER_FLUSH))
+        for g in todo:
+            took(nba_game_entry(g, log))
     flush()
-    log("Added %d game%s. Wrote %s." % (done, "" if done == 1 else "s", path))
+    log("Added %d game%s. Wrote %s." % (done[0], "" if done[0] == 1 else "s", path))
     nba_ledger_report(led["measure"], log)
     return path
 
@@ -3355,11 +3433,13 @@ def selftest():
     check("nba: pace from the two box lines", nba_pace({"fga": 90, "fta": 25, "oreb": 10, "tov": 12, "min": 240.0}, {"fga": 86, "fta": 20, "oreb": 8, "tov": 14, "min": 240.0}) == 101.9
           and nba_pace({"fga": 90, "fta": 25, "oreb": 10, "tov": 12, "min": 265.0}, {"fga": 86, "fta": 20, "oreb": 8, "tov": 14, "min": 265.0}) == round(101.9 * 48 / 53.0, 1))
     nba_canned = _canned_nba()
-    def fake_nba(url, tries=3, headers=None):
+    def fake_nba(url, tries=3, headers=None, timeout=25, cache=True):
         for key, payload in nba_canned:
             if key in url:
                 return payload
         raise RuntimeError("no canned payload for " + url)
+    check("nba: the US date from the box score's Eastern clock, or UTC less five hours",
+          nba_box_date({"gameEt": "2024-10-22T19:30:00Z"}) == "2024-10-22" and nba_box_date({"gameTimeUTC": "2024-10-23T02:30:00Z"}) == "2024-10-22" and nba_box_date({}) is None)
     fetch_json = fake_nba
     try:
         gl = nba_games_from_log("2024-25")
@@ -3398,6 +3478,25 @@ def selftest():
     check("nba ledger: a past season's file, with detail, the measure and the through date; a second run fetches nothing",
           led3["format"] == NBA_LEDGER_FORMAT and led3["season"] == "2024-25" and len(led3["games"]) == 2 and led3["through"] == "2025-06-30" and led3["measure"]["games"] == 2
           and os.path.basename(p3) == "nba-ledger-202425.json" and p4 == p3 and any("0 games to fetch" in l for l in lines4))
+    # the stats site refusing the game log: the ids are walked on the CDN; only the first game has a box there
+    canned_no_log = [x for x in nba_canned if x[0] != "leaguegamelog"]
+    def fake_nba_nolog(url, tries=3, headers=None, timeout=25, cache=True):
+        for key, payload in canned_no_log:
+            if key in url:
+                return payload
+        raise RuntimeError("no canned payload for " + url)
+    fetch_json = fake_nba_nolog
+    try:
+        tmp4 = tempfile.mkdtemp()
+        lines5 = []
+        p5 = make_nba_ledger("2026-10-15", tmp4, lines5.append, "2024-25")
+        with open(p5, "r", encoding="utf-8") as f:
+            led5 = json.load(f)
+    finally:
+        fetch_json = real
+    check("nba ledger: without the stats site the ids are walked on the CDN, the date read from the box, and the walk stops after the gap",
+          any("walking the season's game ids" in l for l in lines5) and len(led5["games"]) == 1 and led5["games"][0]["id"] == "0022400001" and led5["games"][0]["date"] == "2024-10-22"
+          and led5["games"][0]["away"] == "NYK" and led5["games"][0]["fa"] == 109 and any("1 box score read" in l for l in lines5))
     fetch_json = fake_nhl
     try:
         sjs = nhl_club_goalies("SJS", "20262027")
@@ -3567,7 +3666,7 @@ def _canned_nba():
         if reason:
             p["notPlayingReason"] = reason
         return p
-    box1 = {"game": {"gameId": "0022400001", "gameStatus": 3, "gameTimeUTC": "2024-10-22T23:30:00Z",
+    box1 = {"game": {"gameId": "0022400001", "gameStatus": 3, "gameTimeUTC": "2024-10-22T23:30:00Z", "gameEt": "2024-10-22T19:30:00Z",
                      "officials": [{"personId": 1, "name": "Scott Foster", "assignment": "OFFICIAL1"}, {"personId": 2, "name": "Tony Brothers", "assignment": "OFFICIAL2"}],
                      "awayTeam": {"teamTricode": "NYK", "score": 109, "periods": [{"period": k, "periodType": "REGULAR", "score": s} for k, s in enumerate([28, 25, 30, 26], 1)],
                                   "statistics": {"fieldGoalsAttempted": 90, "freeThrowsAttempted": 25, "reboundsOffensive": 10, "turnovers": 12, "minutes": "PT240M00.00S"},

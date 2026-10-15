@@ -281,7 +281,8 @@
       list.forEach(function (p) {
         var isOut = /^out/i.test(String(p.st || "")), id = String(p.id || p.n);
         var box = isOut ? "out" : '<input type="checkbox" data-q="' + esc(id) + '"' + (ticked.indexOf(id) >= 0 ? " checked" : "") + ' title="Tick when he is ruled out">';
-        var note = esc(p.note || "") + (p.ret ? (p.note ? "; " : "") + "back " + esc(p.ret) + (p.past ? " (before this game: likely stale)" : "") : "") + (p.src === "last season" ? '<span class="dim"> (last season\'s line)</span>' : "");
+        var ret = p.ret && /^\d{4}-\d{2}-\d{2}$/.test(String(p.ret)) ? MONTHS[+String(p.ret).slice(5, 7) - 1] + " " + (+String(p.ret).slice(8, 10)) : (p.ret || "");
+        var note = esc(p.note || "") + (ret ? (p.note ? "; " : "") + "back " + esc(ret) + (p.past ? " (before this game: likely stale)" : "") : "") + (p.src === "last season" ? '<span class="dim"> (last season\'s line)</span>' : "");
         h += "<tr" + (isOut || ticked.indexOf(id) >= 0 ? ' class="out"' : "") + "><td>" + esc(p.n || "?") + (p.c ? '<div class="dim">' + esc(p.c) + "</div>" : "") + "</td><td>" + esc(p.st || "") + "</td><td>" + (p.mpg !== undefined && p.mpg !== null ? (+p.mpg).toFixed(1) : "—") +
              "</td><td>" + (p.ppg !== undefined && p.ppg !== null ? (+p.ppg).toFixed(1) : "—") + "</td><td>" + (p.pm !== undefined && p.pm !== null ? sgn(+p.pm, 1) : "—") + "</td><td>" + note + "</td><td>" + box + "</td></tr>";
       });

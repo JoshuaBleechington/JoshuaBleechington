@@ -16,6 +16,7 @@ fullgame.html) + NHL BLOCK + tail.
 from __future__ import annotations
 
 import datetime as dt
+import json
 import pathlib
 import re
 import sys
@@ -80,6 +81,9 @@ def head() -> str:
              "  table.form th, table.form td { text-align: left; padding: 3px 6px; border-bottom: 1px solid var(--rule); white-space: nowrap; }\n"
              "  table.form th { font-size: 10px; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); font-weight: 600; }\n"
              "  table.form td .dim { white-space: normal; max-width: 360px; font: 11px/1.4 var(--sans); color: var(--muted); }\n"
+             "  #nbaOutPanel table.form td { white-space: normal; vertical-align: top; }\n"
+             "  #nbaOutPanel table.form td:first-child { min-width: 150px; }\n"
+             "  #nbaOutPanel table.form td:nth-child(6) { min-width: 120px; }\n"
              "  @media (prefers-reduced-motion: reduce) { * { transition: none !important; animation: none !important; } }\n</style>", "fold css")
     h = once(h, "<p>One matchup, every market the book posts on it — the full-game total, the first five,\n         the moneyline and the run line — priced off",
              "<p>One matchup, every market the book posts on it — in baseball the full-game total, the first five,\n         the moneyline and the run line; in hockey the total, the first period, the moneyline and the puck line;\n         in the NBA the total, the first half, the moneyline and the spread; in the WNBA the total, the moneyline and the spread — priced off", "header copy")
@@ -198,10 +202,7 @@ def tail() -> str:
              '        aml: "130", hml: "-150", pl: "-1.5", plh: "180", pla: "-220", p1line: "1.5", p1op: "-120", p1up: "100",\n'
              '        agsv: "0.912", hgsv: "0.921", agsh: "1400", hgsh: "1900", asf: "31.2", hsf: "33.4",\n'
              '        app: "22.1", hpp: "24.8", apk: "80.2", hpk: "78.1", al10: "5.9", hl10: "6.4", h2h: "6.3", h2hn: "3", arest: "0", hrest: "2" });\n'
-             '    } else if (sport === "NBA") {\n'
-             '      restore({ away: "Knicks", home: "Celtics", line: "228.5", op: "-110", up: "-110", gdate: $("gdate").value,\n'
-             '        aml: "205", hml: "-250", sp: "-6.5", sph: "-110", spa: "-110", h1line: "114.5", h1op: "-110", h1up: "-110",\n'
-             '        naort: "116.0", nadrt: "113.5", nhort: "118.2", nhdrt: "109.8", napace: "99.8", nhpace: "97.9", nagp: "20", nhgp: "21", narest: "0", nhrest: "2" });\n'
+             '    } else if (sport === "NBA") {\n' + nba_example_js() +
              '    } else {\n      restore({ away: "Sun", home: "Mystics"', "example")
     t = every(t, '"callsheet2.card.v1"', '"callsheet3.card.v1"', "card key", 1)
     t = every(t, '"callsheet2.draft.v1"', '"callsheet3.draft.v1"', "draft key", 1)
@@ -253,6 +254,47 @@ def tail() -> str:
              '      if (!blank(i.aera) && !blank(i.hera)) meta.push("ERA " + esc(i.aera) + "/" + esc(i.hera));\n'
              '      if (!blank(i.agsv) && !blank(i.hgsv)) meta.push("SV " + esc(i.agsv) + "/" + esc(i.hgsv));', "slate meta")
     return t
+
+
+# The NBA example: a game-day row as the slate and the odds run would leave it
+# three weeks into the season. 76ers @ Knicks on opening night 2026-27 with
+# DraftKings' real numbers off ESPN's scoreboard (15 Oct 2026, with the
+# openers), ratings at fifteen and sixteen games (the fade live, the ratings'
+# margin five points off the spread for the early-season side watch), the
+# Knicks on a back to back, the who-is-out list in the slate's shape (the page's
+# comment and return date, a traded man on last season's line) and the context
+# lines with their tags.
+NBA_EXAMPLE_OUT = {
+    "away": [
+        {"id": "3059318", "n": "Joel Embiid", "st": "Out", "note": "Knee", "c": "Embiid (knee) has been ruled out for Tuesday's game against the Knicks.", "ret": "2026-11-18", "pos": "C",
+         "mpg": 31.5, "ppg": 26.9, "pm": 4.1, "src": "this season", "g": 12},
+        {"id": "4351851", "n": "Anfernee Simons", "st": "Questionable", "note": "Hamstring; with Bulls last season", "c": "Simons (hamstring) is listed as questionable for Tuesday's game in New York.", "ret": "2026-11-10", "pos": "G",
+         "mpg": 24.9, "ppg": 14.3, "pm": 1.8, "src": "last season", "g": 55},
+        {"id": "4870562", "n": "Dominick Barlow", "st": "Day-To-Day", "note": "Back", "c": "Barlow (back) was unable to practice Monday.", "ret": "2026-11-12", "pos": "F",
+         "mpg": 11.8, "ppg": 4.2, "pm": -0.6, "src": "this season", "g": 9}],
+    "home": [
+        {"id": "4066648", "n": "Mitchell Robinson", "st": "Out", "note": "Ankle", "c": "Robinson (ankle) will miss Tuesday's game against the 76ers.", "ret": "2026-11-20", "pos": "C",
+         "mpg": 22.4, "ppg": 5.6, "pm": 3.1, "src": "this season", "g": 10},
+        {"id": "4065804", "n": "Josh Hart", "st": "Questionable", "note": "Knee", "c": "Hart (knee) is questionable for Tuesday's game, Ian Begley of SNY reports.", "ret": "2026-11-10", "pos": "G",
+         "mpg": 33.1, "ppg": 13.4, "pm": 5.2, "src": "this season", "g": 16}]}
+NBA_EXAMPLE_CTX = [
+    {"side": "home", "k": "ratings_faded", "s": "faded", "t": "Knicks score 118.0 per 100 possessions, 3rd best in the league (16 games).", "tag": "faded: the market over-moves with early-season ratings, so the projection's lean goes on the line at −0.25 a point until fifty games, tagged"},
+    {"side": "home", "k": "ratings_faded", "s": "faded", "t": "Knicks allow 109.0 per 100 possessions, 4th best in the league (16 games).", "tag": "faded: the market over-moves with early-season ratings, so the projection's lean goes on the line at −0.25 a point until fifty games, tagged"},
+    {"side": "away", "k": "ratings_faded", "s": "faded", "t": "76ers allow 115.0 per 100 possessions, 6th worst in the league (15 games).", "tag": "faded: the market over-moves with early-season ratings, so the projection's lean goes on the line at −0.25 a point until fifty games, tagged"},
+    {"side": "home", "k": "pace", "s": "shown", "t": "Knicks play at 98.0 possessions a game, 5th slowest in the league.", "tag": "shown, not scored: pace alone measured null against the close; it feeds the projection"},
+    {"side": "home", "k": "record", "s": "shown", "t": "Knicks are 7-1 at home.", "tag": "shown, not scored: the spread is priced against the box score"},
+    {"side": "game", "k": "move", "s": "shown", "t": "DraftKings: the total opened 229.5 and sits 231.5, up 2; Knicks opened -3.5 and sit -5.5.", "tag": "shown, not scored: the current line is the anchor and the move is already inside it"},
+    {"side": "home", "k": "rest", "s": "label", "t": "Knicks on a back to back.", "tag": "a label: rest measured inside the number against two seasons of closes"},
+    {"side": "away", "k": "out", "s": "shown", "t": "76ers without Joel Embiid: 32 minutes a game of regulars.", "tag": "shown, not scored: announced absences are in the close; the card measures the late ones"},
+    {"side": "home", "k": "out", "s": "shown", "t": "Knicks without Mitchell Robinson: 22 minutes a game of regulars.", "tag": "shown, not scored: announced absences are in the close; the card measures the late ones"}]
+
+
+def nba_example_js() -> str:
+    return ('      restore({ away: "76ers", home: "Knicks", line: "231.5", op: "-110", up: "-110", opened: "229.5", gdate: $("gdate").value,\n'
+            '        aml: "164", hml: "-198", sp: "-5.5", sph: "-108", spa: "-112", h1line: "115.5", h1op: "-110", h1up: "-110",\n'
+            '        naort: "113.5", nadrt: "115.0", nhort: "118.0", nhdrt: "109.0", napace: "99.5", nhpace: "98.0", nagp: "15", nhgp: "16", nlrtg: "113.0", nlpace: "100.5", narest: "1", nhrest: "0",\n'
+            '        nbaout: ' + json.dumps(json.dumps(NBA_EXAMPLE_OUT, separators=(",", ":"))) + ',\n'
+            '        nbactx: ' + json.dumps(json.dumps(NBA_EXAMPLE_CTX, separators=(",", ":"))) + ' });\n')
 
 
 def build() -> str:

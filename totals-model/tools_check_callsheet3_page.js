@@ -255,6 +255,28 @@ const CHECKS = ["dome","playoff","agconf","hgconf","agbk","hgbk"];
       && Math.abs(earlySide.early.p - 50) < 0.6, 'nba early side: at fifteen games the why names the ratings\' side as a watch and the spread stays the book\'s 50%', JSON.stringify({ p: earlySide.early.p, why: (earlySide.early.why.match(/Early-season[^.]*\./) || ['none'])[0] }));
   chk(!/Early-season side watch/.test(earlySide.later.why) && Math.abs(earlySide.later.p - earlySide.early.p) < 0.01, 'nba early side: at thirty-five games the watch is gone and nothing else changed', (earlySide.later.why.match(/Early-season[^.]*\./) || ['none'])[0]);
 
+  // ---- the NBA example: a game-day row with every card filled -----------------------
+  const nbaEx = await pg.evaluate(async () => {
+    const wait = () => new Promise(r => setTimeout(r, 60));
+    document.getElementById('clear').click(); document.getElementById('m-nba').click(); await wait();
+    document.getElementById('gdate').value = '2026-11-10';
+    document.getElementById('example').click(); await wait();
+    const out = document.getElementById('nbaOutPanel').innerText;
+    const ctx = [...document.querySelectorAll('#nbaCtxPanel ul.ctx li')].map(li => li.querySelector('.cbadge').textContent);
+    const why = document.getElementById('why').textContent;
+    const rail = [...document.querySelectorAll('#markets .mk')].map(el => el.dataset.key + ':' + el.querySelector('.pick').childNodes[0].textContent.trim());
+    const pick = (document.querySelector('#markets .pickcard .lab') || {}).textContent || '';
+    const opened = document.getElementById('opened').value;
+    document.getElementById('clear').click(); await wait();
+    return { out, ctx, why, rail, pick, opened };
+  });
+  chk(/76ers: 3 listed, 32 minutes a game of regulars out/.test(nbaEx.out) && /Knicks: 2 listed, 22 minutes a game/.test(nbaEx.out) && /Embiid \(knee\) has been ruled out/.test(nbaEx.out) && /back Nov 10/.test(nbaEx.out) && /last season's line/.test(nbaEx.out),
+      'nba example: the who-is-out card lists both sides with the comments, the return dates and the traded man\'s last-season line', nbaEx.out.slice(0, 300));
+  chk(nbaEx.ctx.length === 9 && nbaEx.ctx.slice(0, 3).every(b => b === 'faded') && nbaEx.ctx.indexOf('label') > nbaEx.ctx.indexOf('shown'), 'nba example: nine context lines, faded first, labels last', JSON.stringify(nbaEx.ctx));
+  chk(/Ratings, faded/.test(nbaEx.why) && /Early-season side watch/.test(nbaEx.why) && /Back to back for the home side/.test(nbaEx.why) && /Regulars out, minutes a game: away 32, home 22/.test(nbaEx.why) && /The number moved 229\.5 to 231\.5/.test(nbaEx.why),
+      'nba example: the why list carries the fade, the side watch, the back to back, the regulars out and the move off the opener', nbaEx.why.slice(0, 400));
+  chk(nbaEx.rail.length === 4 && nbaEx.opened === '229.5' && /an? (OVER|UNDER) game|No pick/.test(nbaEx.pick), 'nba example: all four markets on the rail, the opener in its box, a pick card', JSON.stringify({ rail: nbaEx.rail, pick: nbaEx.pick, opened: nbaEx.opened }));
+
   // ---- a hockey verdict lists only when it clears its price ------------------------
   const thinNhl = await pg.evaluate(async () => {
     const wait = () => new Promise(r => setTimeout(r, 60));

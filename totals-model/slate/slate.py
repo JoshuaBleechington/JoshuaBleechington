@@ -2075,14 +2075,20 @@ def nba_us_date(iso):
     return d.date().isoformat()
 
 
-def nba_games_from_espn(season, through_iso=None, log=None):
-    """Every regular-season final of a season from ESPN's scoreboard, a week
+def nba_games_from_espn(season, through_iso=None, log=None, since_iso=None):
+    """Every regular-season final of a season from ESPN's scoreboard, a day
     a call: {id, date, away, home, an, hn, fa, fh} with ESPN's event id, NBA
-    tricodes and the nicknames KillerSports uses."""
+    tricodes and the nicknames KillerSports uses. `since_iso` starts the walk
+    there (the daily run picks up from the ledger's last date)."""
     y = int(season[:4])
     start, end = dt.date(y, 10, 1), dt.date(y + 1, 6, 30)
     if through_iso:
         end = min(end, dt.date.fromisoformat(through_iso))
+    if since_iso:
+        try:
+            start = max(start, dt.date.fromisoformat(since_iso))
+        except ValueError:
+            pass
     out, d, failed = {}, start, []
     # one day a call: ESPN answers 400 to a date range (seen 15 Oct 2026)
     while d <= end:
@@ -2513,28 +2519,34 @@ def make_nba_ledger(date_iso, out_dir, log, season=None):
         if done[0] % NBA_LEDGER_FLUSH == 0:
             flush()
             log("  %d fetched (%s); written." % (done[0], e.get("date")))
-    # the games and their detail. A PAST season: ESPN's open API, the scoreboard
-    # a week a call and the summary page per game (the league's CDN keeps box
-    # scores for the running season only, and its stats site will not answer a
-    # script). THIS season: the league's CDN schedule and box scores, ESPN when
-    # the CDN has nothing. The stats site's game log and the id walk stay as
-    # the last resorts.
+    # the games and their detail: ESPN's open API first for every season, the
+    # scoreboard a day a call and the summary page per game (the user's machine
+    # and the build container both read it; the league's CDN answered 403 on
+    # his first run of the season, 15 Oct 2026, and its stats site will not
+    # answer a script). The daily run walks the scoreboard from two days
+    # before the ledger's last game. THIS season falls back to the CDN
+    # schedule and box scores when ESPN lists nothing; a PAST season to the
+    # stats site's game log and then the id walk.
     games, source = None, ""
-    if not past:
+    since = None
+    if not past and led["games"]:
+        last = max((g.get("date") or "") for g in led["games"])
+        if last:
+            since = (dt.date.fromisoformat(last) - dt.timedelta(days=2)).isoformat()
+    try:
+        games = nba_games_from_espn(season, None if past else date_iso, log, since_iso=since)
+        source = "espn"
+        log("ESPN scoreboard: %d regular-season finals listed%s." % (len(games), (" from %s" % since) if since else ""))
+    except Exception as e:  # noqa: BLE001
+        log("Could not read ESPN's scoreboard (%s)." % e)
+        games = None
+    if not past and not games:
         try:
             games = nba_games_from_schedule(date_iso)
             source = "cdn"
             log("CDN schedule: %d finals listed up to %s." % (len(games), date_iso))
         except Exception as e:  # noqa: BLE001
-            log("Could not read the CDN schedule (%s)." % e)
-    if games is None or (not past and not games):
-        try:
-            games = nba_games_from_espn(season, None if past else date_iso, log)
-            source = "espn"
-            log("ESPN scoreboard: %d regular-season finals listed." % len(games))
-        except Exception as e:  # noqa: BLE001
-            log("Could not read ESPN's scoreboard (%s)." % e)
-            games = None
+            log("Could not read the CDN schedule either (%s)." % e)
     if (games is None or not games) and past:
         try:
             games = nba_games_from_log(season)

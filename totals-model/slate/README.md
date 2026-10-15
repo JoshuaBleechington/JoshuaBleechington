@@ -56,6 +56,30 @@ Shots per game, special teams and the last ten wait until a team has five
 games; before that the boxes stay blank and the sheet is the market plus
 the goalies.
 
+## Basketball: the NBA ledger (the first step of the NBA book, 15 Oct 2026)
+
+**Run NBA ledger.bat**, or `python slate.py nba-ledger --season 2024-25`. It
+writes `nba-ledger-SEASON.json`: every regular-season final of the season
+with the quarter scores, overtime, each team's box line and the game's pace
+(possessions per 48 minutes), every player who dressed with his minutes,
+points and plus-minus and whether he started, and every player who sat with
+the reason the feed gave (inactive, injury, coach's decision). Blank at the
+prompt means this season up to today; for the backtest run it for
+**2024-25** and **2025-26**, about ten minutes each. Games are listed from
+the league's game log (stats.nba.com, one call a season) and each game's
+detail from the CDN box score (one call a game), with the stats site's two
+documents as the fallback when a game's box score is not on the CDN. The
+file is written every 100 games, so a run can be stopped and started again
+and picks up where it was. The build container cannot reach the NBA's
+feeds, so the first run on your machine is the live test: if it stops,
+send the printout. Beside the two ledgers the backtest needs KillerSports'
+closing lines for the same seasons, saved as pages like the hockey ones:
+
+```
+date, team, o:team, points, o:points, line, total, site, rest @ season=2024 and site=home and playoffs=0
+date, team, o:team, points, o:points, line, total, site, rest @ season=2025 and site=home and playoffs=0
+```
+
 ## The odds feed (The Odds API)
 
 `python slate.py odds`, or **Run odds.bat**, after the slate. It needs a key

@@ -9,3 +9,4 @@ verdict-log-*.json
 
 # The Odds API key, read by slate.py from a file beside itself. Never commit it.
 odds_key.txt
+totals-model/slate/nba-ledger-*.json

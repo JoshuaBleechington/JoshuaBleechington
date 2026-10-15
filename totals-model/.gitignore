@@ -21,3 +21,4 @@ slate/odds-log.json
 # The Odds API key. This repository is public, so the key must never land in
 # it: the script reads it from this file beside itself, and nowhere else.
 odds_key.txt
+slate/nba-ledger-*.json

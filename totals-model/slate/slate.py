@@ -34,6 +34,7 @@ import io
 import json
 import math
 import os
+import re
 import sys
 import time
 import urllib.error
@@ -69,14 +70,15 @@ _cache = {}
 _last_headers = {}   # the headers of the last document fetched (The Odds API counts credits in them)
 
 
-def fetch_json(url, tries=3):
-    """GET a JSON document. Retries twice on a network error, caches by URL."""
+def fetch_json(url, tries=3, headers=None):
+    """GET a JSON document. Retries twice on a network error, caches by URL.
+    `headers` replaces the default pair (the NBA stats site wants a browser's)."""
     if url in _cache:
         return _cache[url]
     last = None
     for i in range(tries):
         try:
-            req = urllib.request.Request(url, headers={"User-Agent": UA, "Accept": "application/json"})
+            req = urllib.request.Request(url, headers=headers or {"User-Agent": UA, "Accept": "application/json"})
             with urllib.request.urlopen(req, timeout=25) as r:
                 data = json.loads(r.read().decode("utf-8"))
                 _last_headers.clear()
@@ -1951,6 +1953,350 @@ def make_nhl_ledger(date_iso, out_dir, log, season=None, detail=False, refs=Fals
     return path
 
 
+# ---- the NBA ledger ----------------------------------------------------------
+# Every regular-season final of a season from the league's public feeds, with
+# quarter scores, the two teams' box lines (for pace), and every player who
+# dressed with his minutes, plus who sat and why. The basketball book is
+# built the hockey way (15 Oct 2026, at the user's word on 8 Oct: "I want
+# everything you mentioned"): the ledger first, the backtest against the
+# KillerSports closes second, the engine third with only what the backtest
+# supports. The feeds cannot be reached from the build container, so the
+# shapes below are the feed's documented ones, checked offline (--selftest)
+# and proven on the user's own machine on the first run.
+#
+#   python slate.py nba-ledger --season 2024-25     (a past season in full)
+#   python slate.py nba-ledger                      (this season, up to today)
+#
+# Games are listed from stats.nba.com's league game log (one call a season,
+# two rows a game) or, for the current season when that fails, the CDN's
+# schedule file. Each game's detail comes from the CDN's live-data box score
+# (one call a game); when a game's box score is not on the CDN the stats site's
+# traditional box score and summary are read instead (two calls). The file is
+# written every NBA_LEDGER_FLUSH games so a run can be stopped and resumed.
+NBA_LEDGER_FORMAT = "callsheet3.nba-ledger"
+NBA_LEDGER_FLUSH = 100
+NBA_CDN = "https://cdn.nba.com/static/json"
+NBA_STATS = "https://stats.nba.com/stats"
+NBA_STATS_HEADERS = {
+    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36",
+    "Accept": "application/json, text/plain, */*", "Accept-Language": "en-US,en;q=0.9",
+    "Referer": "https://www.nba.com/", "Origin": "https://www.nba.com",
+    "x-nba-stats-origin": "stats", "x-nba-stats-token": "true",
+}
+NBA_PACE_FT = 0.44   # free-throw possessions: the standard estimate, FGA - OREB + TOV + 0.44 FTA
+
+
+def nba_season_id(date_iso):
+    """'2024-25' for any date in that season: October to June."""
+    d = dt.date.fromisoformat(date_iso)
+    y = d.year if d.month >= 8 else d.year - 1
+    return "%d-%02d" % (y, (y + 1) % 100)
+
+
+def nba_norm_season(season):
+    """'2024-25', '2024', '202425' or '20242025' -> '2024-25'."""
+    s = str(season).strip()
+    if re.fullmatch(r"\d{4}-\d{2}", s):
+        return s
+    if re.fullmatch(r"\d{4}", s):
+        return "%s-%02d" % (s, (int(s) + 1) % 100)
+    if re.fullmatch(r"\d{8}", s) or re.fullmatch(r"\d{6}", s):
+        return "%s-%s" % (s[:4], s[-2:])
+    raise ValueError("a season looks like 2024-25")
+
+
+def nba_ledger_path(out_dir, season):
+    return os.path.join(out_dir, "nba-ledger-%s.json" % season.replace("-", ""))
+
+
+def nba_stats_json(path, params):
+    url = NBA_STATS + path + "?" + urllib.parse.urlencode(params)
+    return fetch_json(url, headers=NBA_STATS_HEADERS)
+
+
+def nba_result_set(doc, name=None):
+    """stats.nba.com documents carry tables as headers + rowSet; this returns
+    a list of dicts for the named (or first) table."""
+    sets = (doc or {}).get("resultSets") or ([doc["resultSet"]] if (doc or {}).get("resultSet") else [])
+    for rs in sets:
+        if name is None or rs.get("name") == name:
+            heads = rs.get("headers") or []
+            return [dict(zip(heads, row)) for row in rs.get("rowSet") or []]
+    return []
+
+
+def nba_minutes(s):
+    """'PT34M12.00S', '34:12', '34' or '' -> minutes as a float."""
+    if s in (None, ""):
+        return 0.0
+    s = str(s)
+    m = re.fullmatch(r"PT(?:(\d+)M)?(?:([\d.]+)S)?", s)
+    if m:
+        return float(m.group(1) or 0) + float(m.group(2) or 0) / 60.0
+    if ":" in s:
+        a, b = s.split(":", 1)
+        try:
+            return float(a) + float(b) / 60.0
+        except ValueError:
+            return 0.0
+    try:
+        return float(s)
+    except ValueError:
+        return 0.0
+
+
+def nba_games_from_log(season):
+    """Every regular-season game of a season from the league game log, one
+    entry per game: {id, date, away, home, fa, fh}. Two rows a game in the
+    log (one per team); the MATCHUP column says who was home."""
+    rows = nba_result_set(nba_stats_json("/leaguegamelog", {"Counter": 0, "DateFrom": "", "DateTo": "", "Direction": "ASC", "LeagueID": "00",
+                                                             "PlayerOrTeam": "T", "Season": season, "SeasonType": "Regular Season", "Sorter": "DATE"}),
+                          "LeagueGameLog")
+    games = {}
+    for r in rows:
+        gid = str(r.get("GAME_ID") or "")
+        if not gid.startswith("002"):
+            continue
+        g = games.setdefault(gid, {"id": gid, "date": str(r.get("GAME_DATE") or "")[:10], "away": None, "home": None, "fa": None, "fh": None})
+        ab, pts, m = r.get("TEAM_ABBREVIATION"), r.get("PTS"), str(r.get("MATCHUP") or "")
+        if " @ " in m:
+            g["away"], g["fa"] = ab, (int(pts) if pts is not None else None)
+        else:
+            g["home"], g["fh"] = ab, (int(pts) if pts is not None else None)
+    return [g for g in games.values() if g["away"] and g["home"]]
+
+
+def nba_games_from_schedule(season_iso_through):
+    """This season's finals from the CDN schedule file (the current season
+    only): {id, date, away, home, fa, fh} for games marked final up to a date."""
+    doc = fetch_json(NBA_CDN + "/staticData/scheduleLeagueV2.json")
+    out = []
+    for day in ((doc.get("leagueSchedule") or {}).get("gameDates") or []):
+        for g in day.get("games") or []:
+            gid = str(g.get("gameId") or "")
+            if not gid.startswith("002") or int(g.get("gameStatus") or 0) != 3:
+                continue
+            date = str(g.get("gameDateEst") or day.get("gameDate") or "")[:10]
+            if "/" in date:   # the schedule writes 10/22/2024 00:00:00 on the day; the game carries ISO
+                mth, dy, yr = date.split("/")[:3]
+                date = "%s-%s-%s" % (yr[:4], mth.zfill(2), dy.zfill(2))
+            if date > season_iso_through:
+                continue
+            at, ht = g.get("awayTeam") or {}, g.get("homeTeam") or {}
+            out.append({"id": gid, "date": date, "away": at.get("teamTricode"), "home": ht.get("teamTricode"),
+                        "fa": int(at["score"]) if at.get("score") is not None else None, "fh": int(ht["score"]) if ht.get("score") is not None else None})
+    return out
+
+
+def _nba_team_from_cdn(t):
+    """One side of the CDN box score: quarters, the team line, the players."""
+    reg, ot = [], []
+    for p in t.get("periods") or []:
+        (ot if str(p.get("periodType") or "").upper().startswith("OT") or int(p.get("period") or 0) > 4 else reg).append(int(p.get("score") or 0))
+    st = t.get("statistics") or {}
+    line = {"fga": int(st.get("fieldGoalsAttempted") or 0), "fta": int(st.get("freeThrowsAttempted") or 0),
+            "oreb": int(st.get("reboundsOffensive") or 0), "tov": int(st.get("turnovers") or st.get("turnoversTotal") or 0),
+            "min": nba_minutes(st.get("minutes")) or 240.0}
+    played, out = [], []
+    for p in t.get("players") or []:
+        s = p.get("statistics") or {}
+        mins = nba_minutes(s.get("minutes"))
+        name = p.get("name") or ("%s %s" % (p.get("firstName") or "", p.get("familyName") or "")).strip()
+        status = str(p.get("status") or "").upper()
+        if status == "INACTIVE" or (status != "ACTIVE" and mins == 0 and p.get("notPlayingReason")):
+            out.append([p.get("personId"), name, str(p.get("notPlayingReason") or p.get("notPlayingDescription") or "inactive")])
+        elif mins > 0:
+            played.append([p.get("personId"), name, 1 if str(p.get("starter") or "0") == "1" else 0, round(mins, 1),
+                           int(s.get("points") or 0), int(s.get("plusMinusPoints") or 0)])
+        else:
+            out.append([p.get("personId"), name, str(p.get("notPlayingReason") or "DNP")])
+    return reg, ot, line, played, out
+
+
+def nba_entry_from_cdn(g, box):
+    """A ledger entry from the CDN live-data box score."""
+    game = (box or {}).get("game") or {}
+    at, ht = game.get("awayTeam") or {}, game.get("homeTeam") or {}
+    qa, ota, la, pa, oa = _nba_team_from_cdn(at)
+    qh, oth, lh, ph, oh = _nba_team_from_cdn(ht)
+    e = {"id": g["id"], "date": g["date"], "away": at.get("teamTricode") or g.get("away"), "home": ht.get("teamTricode") or g.get("home"),
+         "fa": int(at["score"]) if at.get("score") is not None else g.get("fa"), "fh": int(ht["score"]) if ht.get("score") is not None else g.get("fh"),
+         "qa": qa, "qh": qh, "ota": ota, "oth": oth, "end": "OT" if ota or oth else "REG",
+         "sa": la, "sh": lh, "pa": pa, "ph": ph, "oa": oa, "oh": oh, "detail": True}
+    e["pace"] = nba_pace(la, lh)
+    return e
+
+
+def nba_pace(la, lh):
+    """Possessions per 48 minutes, the average of the two teams' estimates."""
+    if not la or not lh:
+        return None
+    pa = la["fga"] - la["oreb"] + la["tov"] + NBA_PACE_FT * la["fta"]
+    ph = lh["fga"] - lh["oreb"] + lh["tov"] + NBA_PACE_FT * lh["fta"]
+    mins = ((la.get("min") or 240.0) + (lh.get("min") or 240.0)) / 2.0 / 5.0   # team minutes are five men's
+    if mins <= 0:
+        return None
+    return round((pa + ph) / 2.0 * 48.0 / mins, 1)
+
+
+def nba_entry_from_stats(g, trad, summary):
+    """A ledger entry from the stats site's traditional box score (players,
+    team lines) and summary (the line score by quarter)."""
+    bs = (trad or {}).get("boxScoreTraditional") or {}
+    sides = {}
+    for key in ("awayTeam", "homeTeam"):
+        t = bs.get(key) or {}
+        st = t.get("statistics") or {}
+        line = {"fga": int(st.get("fieldGoalsAttempted") or 0), "fta": int(st.get("freeThrowsAttempted") or 0),
+                "oreb": int(st.get("reboundsOffensive") or 0), "tov": int(st.get("turnovers") or 0), "min": nba_minutes(st.get("minutes")) or 240.0}
+        played, out = [], []
+        for p in t.get("players") or []:
+            s = p.get("statistics") or {}
+            mins = nba_minutes(s.get("minutes"))
+            name = p.get("name") or ("%s %s" % (p.get("firstName") or "", p.get("familyName") or "")).strip()
+            if mins > 0:
+                played.append([p.get("personId"), name, 1 if (p.get("position") or "") else 0, round(mins, 1), int(s.get("points") or 0), int(s.get("plusMinusPoints") or 0)])
+            else:
+                out.append([p.get("personId"), name, str(p.get("comment") or "DNP")])
+        sides[key] = (t.get("teamTricode"), line, played, out)
+    qa = qh = ota = oth = None
+    for r in nba_result_set(summary, "LineScore"):
+        q = [int(r.get("PTS_QTR%d" % k) or 0) for k in (1, 2, 3, 4)]
+        o = [int(r.get("PTS_OT%d" % k) or 0) for k in range(1, 11) if r.get("PTS_OT%d" % k)]
+        if r.get("TEAM_ABBREVIATION") == sides["awayTeam"][0]:
+            qa, ota = q, o
+        elif r.get("TEAM_ABBREVIATION") == sides["homeTeam"][0]:
+            qh, oth = q, o
+    a, h = sides["awayTeam"], sides["homeTeam"]
+    e = {"id": g["id"], "date": g["date"], "away": a[0] or g.get("away"), "home": h[0] or g.get("home"), "fa": g.get("fa"), "fh": g.get("fh"),
+         "qa": qa or [], "qh": qh or [], "ota": ota or [], "oth": oth or [], "end": "OT" if (ota or oth) else "REG",
+         "sa": a[1], "sh": h[1], "pa": a[2], "ph": h[2], "oa": a[3], "oh": h[3], "detail": True}
+    e["pace"] = nba_pace(a[1], h[1])
+    return e
+
+
+def nba_game_entry(g, log):
+    """The CDN box score first; the stats site's two documents when the CDN
+    has none; scores only when neither can be read."""
+    try:
+        box = fetch_json(NBA_CDN + "/liveData/boxscore/boxscore_%s.json" % g["id"])
+        if (box.get("game") or {}).get("homeTeam"):
+            return nba_entry_from_cdn(g, box)
+    except Exception as e:  # noqa: BLE001
+        log("  game %s: no CDN box score (%s); trying the stats site" % (g["id"], e))
+    try:
+        trad = nba_stats_json("/boxscoretraditionalv3", {"GameID": g["id"], "LeagueID": "00", "endPeriod": 0, "endRange": 0, "rangeType": 0, "startPeriod": 0, "startRange": 0})
+        summ = nba_stats_json("/boxscoresummaryv2", {"GameID": g["id"]})
+        return nba_entry_from_stats(g, trad, summ)
+    except Exception as e:  # noqa: BLE001
+        log("  game %s: no box score anywhere (%s); scores only" % (g["id"], e))
+    return {"id": g["id"], "date": g["date"], "away": g.get("away"), "home": g.get("home"), "fa": g.get("fa"), "fh": g.get("fh"), "detail": False}
+
+
+def nba_measure(games):
+    """The basketball book's constants as the ledger measures them: points a
+    game, the spread of the total and the margin, home court, overtime, the
+    first half's share, pace. The engine's a-priori figures are set against
+    these once two seasons are in."""
+    fin = [g for g in games if g.get("fa") is not None and g.get("fh") is not None]
+    n = len(fin)
+    m = {"games": n}
+    if not n:
+        return m
+    tots = [g["fa"] + g["fh"] for g in fin]
+    margins = [g["fh"] - g["fa"] for g in fin]
+    m["points_per_game"] = _mean(tots)
+    m["total_sd"] = _sd(tots)
+    m["home_margin"] = _mean(margins)
+    m["margin_sd"] = _sd(margins)
+    m["home_win_pct"] = sum(1 for x in margins if x > 0) / float(n)
+    m["ot_rate"] = sum(1 for g in fin if g.get("end") == "OT") / float(n)
+    withq = [g for g in fin if len(g.get("qa") or []) == 4 and len(g.get("qh") or []) == 4]
+    if withq:
+        reg = [sum(g["qa"]) + sum(g["qh"]) for g in withq]
+        half = [g["qa"][0] + g["qa"][1] + g["qh"][0] + g["qh"][1] for g in withq]
+        m["first_half_share"] = sum(half) / float(sum(reg)) if sum(reg) else None
+        m["first_half_points"] = _mean(half)
+        m["first_half_sd"] = _sd(half)
+        m["quarter_shares"] = [sum(g["qa"][k] + g["qh"][k] for g in withq) / float(sum(reg)) for k in range(4)]
+    paced = [g["pace"] for g in fin if g.get("pace")]
+    if paced:
+        m["pace"] = _mean(paced)
+        m["pace_sd"] = _sd(paced)
+    return m
+
+
+def nba_ledger_report(m, log):
+    n = m.get("games", 0)
+    log("NBA ledger: %d regular-season final%s." % (n, "" if n == 1 else "s"))
+    if not n:
+        return
+    for label, key, f in (("points per game, both teams", "points_per_game", "%.1f"), ("spread of the total (raw)", "total_sd", "%.1f"),
+                          ("home margin", "home_margin", "%+.2f"), ("spread of the margin (raw)", "margin_sd", "%.1f"),
+                          ("home wins", "home_win_pct", "%.3f"), ("overtime", "ot_rate", "%.3f"),
+                          ("first-half share of regulation points", "first_half_share", "%.3f"), ("first-half points", "first_half_points", "%.1f"),
+                          ("pace, possessions per 48", "pace", "%.1f")):
+        if m.get(key) is not None:
+            log("  %-42s %8s" % (label, f % m[key]))
+    if m.get("quarter_shares"):
+        log("  quarters' share of regulation points: " + " / ".join("%.3f" % x for x in m["quarter_shares"]))
+    if n < 200:
+        log("  Under 200 games: read these as noise until the sample is there.")
+
+
+def make_nba_ledger(date_iso, out_dir, log, season=None):
+    """A season's NBA ledger: this season up to date_iso, or a past season
+    in full with --season. Resumable: written every NBA_LEDGER_FLUSH games."""
+    current = nba_season_id(date_iso)
+    season = nba_norm_season(season) if season else current
+    past = season != current
+    path = nba_ledger_path(out_dir, season)
+    led = None
+    if os.path.exists(path):
+        with open(path, "r", encoding="utf-8") as f:
+            led = json.load(f)
+        if led.get("format") != NBA_LEDGER_FORMAT:
+            led = None
+    led = led or {"format": NBA_LEDGER_FORMAT, "version": 1, "season": season, "games": [], "through": None}
+    have = {g.get("id") for g in led["games"] if g.get("detail")}
+    log("NBA %s: %d game%s already in the ledger with detail." % (season, len(have), "" if len(have) == 1 else "s"))
+    games = []
+    try:
+        games = nba_games_from_log(season)
+        log("League game log: %d regular-season games listed." % len(games))
+    except Exception as e:  # noqa: BLE001
+        log("Could not read the league game log (%s)." % e)
+        if not past:
+            try:
+                games = nba_games_from_schedule(date_iso)
+                log("CDN schedule: %d finals listed up to %s." % (len(games), date_iso))
+            except Exception as e2:  # noqa: BLE001
+                log("Could not read the CDN schedule either (%s)." % e2)
+    todo = [g for g in sorted(games, key=lambda g: (g["date"], g["id"])) if g["id"] not in have and (past or g["date"] <= date_iso)]
+    log("%d game%s to fetch; a line prints every %d, and the file is written every %d so a run can be stopped and resumed." % (len(todo), "" if len(todo) == 1 else "s", NBA_LEDGER_FLUSH, NBA_LEDGER_FLUSH))
+    byid = {g.get("id"): g for g in led["games"]}
+
+    def flush():
+        led["games"] = sorted(byid.values(), key=lambda g: ((g.get("date") or ""), g.get("id") or ""))
+        led["through"] = date_iso if not past else "%d-06-30" % (int(season[:4]) + 1)
+        led["generated"] = now_utc()
+        led["measure"] = nba_measure(led["games"])
+        with open(path, "w", encoding="utf-8") as f:
+            json.dump(led, f, separators=(",", ":"))
+    done = 0
+    for g in todo:
+        e = nba_game_entry(g, log)
+        byid[e["id"]] = e
+        done += 1
+        if done % NBA_LEDGER_FLUSH == 0:
+            flush()
+            log("  %d of %d fetched (%s); written." % (done, len(todo), g["date"]))
+    flush()
+    log("Added %d game%s. Wrote %s." % (done, "" if done == 1 else "s", path))
+    nba_ledger_report(led["measure"], log)
+    return path
+
+
 # ---- expected goals, from MoneyPuck's team file ------------------------------
 # https://moneypuck.com/data.htm -- "Team" season summary, one row per club per
 # situation. The 'all' row's xGoalsFor and xGoalsAgainst over games_played are
@@ -2997,6 +3343,55 @@ def selftest():
           and hg["snaps"][ts]["pinnacle"] == [6.5, -105, -115, -130, 110] and hist["pulled"]["2025-10-08 16:00"]["games"] == 1)
     check("odds history: the dates come from the calendar without a ledger, or from the range", odds_history_dates("NHL", "20252026", tempfile.mkdtemp())[0] == "2025-10-01"
           and odds_history_dates("NHL", "x", ".", "2025-10-08", "2025-10-10") == ["2025-10-08", "2025-10-09", "2025-10-10"])
+    # the NBA ledger (15 Oct 2026), offline: the feed's shapes, canned
+    check("nba: the season from a date", nba_season_id("2026-10-15") == "2026-27" and nba_season_id("2027-04-10") == "2026-27" and nba_season_id("2027-07-01") == "2026-27" and nba_season_id("2027-08-15") == "2027-28")
+    check("nba: season spellings", nba_norm_season("2024-25") == "2024-25" and nba_norm_season("2024") == "2024-25" and nba_norm_season("20242025") == "2024-25" and nba_norm_season("202425") == "2024-25")
+    check("nba: minutes in the feed's shapes", abs(nba_minutes("PT34M12.00S") - 34.2) < 1e-9 and abs(nba_minutes("34:30") - 34.5) < 1e-9 and nba_minutes("") == 0.0 and nba_minutes(None) == 0.0 and nba_minutes("PT00M00.00S") == 0.0 and abs(nba_minutes("PT240M") - 240.0) < 1e-9)
+    # (90 - 10 + 12 + 0.44 x 25 = 103.0) and (86 - 8 + 14 + 0.44 x 20 = 100.8): 101.9 a side over 48 minutes
+    check("nba: pace from the two box lines", nba_pace({"fga": 90, "fta": 25, "oreb": 10, "tov": 12, "min": 240.0}, {"fga": 86, "fta": 20, "oreb": 8, "tov": 14, "min": 240.0}) == 101.9
+          and nba_pace({"fga": 90, "fta": 25, "oreb": 10, "tov": 12, "min": 265.0}, {"fga": 86, "fta": 20, "oreb": 8, "tov": 14, "min": 265.0}) == round(101.9 * 48 / 53.0, 1))
+    nba_canned = _canned_nba()
+    def fake_nba(url, tries=3, headers=None):
+        for key, payload in nba_canned:
+            if key in url:
+                return payload
+        raise RuntimeError("no canned payload for " + url)
+    fetch_json = fake_nba
+    try:
+        gl = nba_games_from_log("2024-25")
+        lines3 = []
+        e1 = nba_game_entry(gl[0], lines3.append)       # the CDN box score
+        e2 = nba_game_entry(gl[1], lines3.append)       # not on the CDN: the stats site's two documents
+        sch = nba_games_from_schedule("2026-10-25")
+    finally:
+        fetch_json = real
+    check("nba log: one entry a game from two rows, home and away by the matchup", len(gl) == 2 and gl[0] == {"id": "0022400001", "date": "2024-10-22", "away": "NYK", "home": "BOS", "fa": 109, "fh": 132}
+          and gl[1]["home"] == "LAL" and gl[1]["away"] == "MIN" and gl[1]["fa"] == 103)
+    check("nba box (CDN): quarters, overtime, the end, the team lines and pace",
+          e1["qa"] == [28, 25, 30, 26] and e1["qh"] == [35, 31, 33, 33] and e1["ota"] == [] and e1["end"] == "REG" and e1["sa"]["fga"] == 90 and e1["sh"]["tov"] == 14 and e1["pace"] == 101.9 and e1["detail"] is True)
+    check("nba box (CDN): every man who played with his minutes, starters flagged; the inactive and the DNPs listed with the reason",
+          e1["pa"][0] == [201, "Jalen B", 1, 34.2, 25, -12] and e1["pa"][1][2] == 0 and len(e1["pa"]) == 2 and e1["oa"] == [[203, "Hurt Guy", "Injury/Illness - Left Knee"], [204, "Benched Guy", "DNP - Coach's Decision"]]
+          and e1["ph"][0][1] == "Jayson T" and e1["oh"] == [])
+    check("nba box (stats site): quarters from the summary's line score, starters by position, the DNP comment",
+          e2["qa"] == [20, 30, 25, 28] and e2["qh"] == [30, 28, 20, 25] and e2["ota"] == [5] and e2["oth"] == [10] and e2["end"] == "OT" and e2["pa"][0] == [301, "Anthony E", 1, 38.5, 30, 4]
+          and e2["oa"] == [[302, "Sat Out", "DNP - Injury/Illness"]] and e2["pace"] is not None and e2["detail"] is True and any("trying the stats site" in l for l in lines3))
+    check("nba schedule (CDN): this season's finals only, dates normalised", sch == [{"id": "0022600003", "date": "2026-10-22", "away": "GSW", "home": "LAL", "fa": 110, "fh": 115}])
+    m3 = nba_measure([e1, e2])
+    check("nba measure: points, home margin, overtime, the first half's share, pace", m3["games"] == 2 and m3["points_per_game"] == (241 + 211) / 2.0 and m3["home_margin"] == (23 + 5) / 2.0 and m3["ot_rate"] == 0.5
+          and abs(m3["first_half_share"] - (28 + 25 + 35 + 31 + 20 + 30 + 30 + 28) / float(241 + 206)) < 1e-9 and m3["pace"] is not None)
+    tmp3 = tempfile.mkdtemp()
+    fetch_json = fake_nba
+    try:
+        lines4 = []
+        p3 = make_nba_ledger("2026-10-15", tmp3, lines4.append, "2024-25")
+        with open(p3, "r", encoding="utf-8") as f:
+            led3 = json.load(f)
+        p4 = make_nba_ledger("2026-10-15", tmp3, lines4.append, "2024-25")   # again: nothing to fetch
+    finally:
+        fetch_json = real
+    check("nba ledger: a past season's file, with detail, the measure and the through date; a second run fetches nothing",
+          led3["format"] == NBA_LEDGER_FORMAT and led3["season"] == "2024-25" and len(led3["games"]) == 2 and led3["through"] == "2025-06-30" and led3["measure"]["games"] == 2
+          and os.path.basename(p3) == "nba-ledger-202425.json" and p4 == p3 and any("0 games to fetch" in l for l in lines4))
     fetch_json = fake_nhl
     try:
         sjs = nhl_club_goalies("SJS", "20262027")
@@ -3148,6 +3543,51 @@ def _canned():
     ]
 
 
+def _canned_nba():
+    """Two games of 2024-25 in the feeds' shapes: the league game log (two rows
+    a game), a CDN box score for the first, the stats site's traditional box
+    score and summary for the second, and this season's CDN schedule."""
+    heads = ["SEASON_ID", "TEAM_ID", "TEAM_ABBREVIATION", "TEAM_NAME", "GAME_ID", "GAME_DATE", "MATCHUP", "WL", "MIN", "PTS", "PLUS_MINUS"]
+    log = {"resultSets": [{"name": "LeagueGameLog", "headers": heads, "rowSet": [
+        ["22024", 1610612752, "NYK", "New York Knicks", "0022400001", "2024-10-22", "NYK @ BOS", "L", 240, 109, -23],
+        ["22024", 1610612738, "BOS", "Boston Celtics", "0022400001", "2024-10-22", "BOS vs. NYK", "W", 240, 132, 23],
+        ["22024", 1610612750, "MIN", "Minnesota Timberwolves", "0022400002", "2024-10-22", "MIN @ LAL", "L", 265, 103, -5],
+        ["22024", 1610612747, "LAL", "Los Angeles Lakers", "0022400002", "2024-10-22", "LAL vs. MIN", "W", 265, 108, 5],
+        ["22024", 1610612747, "LAL", "Los Angeles Lakers", "0012400002", "2024-10-10", "LAL vs. PHX", "W", 240, 100, 1]]}]}   # preseason: ignored
+
+    def player(pid, name, starter, mins, pts, pm, status="ACTIVE", reason=None):
+        p = {"personId": pid, "name": name, "starter": "1" if starter else "0", "status": status,
+             "statistics": {"minutes": mins, "points": pts, "plusMinusPoints": pm}}
+        if reason:
+            p["notPlayingReason"] = reason
+        return p
+    box1 = {"game": {"gameId": "0022400001", "gameStatus": 3,
+                     "awayTeam": {"teamTricode": "NYK", "score": 109, "periods": [{"period": k, "periodType": "REGULAR", "score": s} for k, s in enumerate([28, 25, 30, 26], 1)],
+                                  "statistics": {"fieldGoalsAttempted": 90, "freeThrowsAttempted": 25, "reboundsOffensive": 10, "turnovers": 12, "minutes": "PT240M00.00S"},
+                                  "players": [player(201, "Jalen B", True, "PT34M12.00S", 25, -12), player(202, "Bench Guy", False, "PT12M00.00S", 4, -3),
+                                              player(203, "Hurt Guy", False, "PT00M00.00S", 0, 0, "INACTIVE", "Injury/Illness - Left Knee"),
+                                              player(204, "Benched Guy", False, "", 0, 0, "ACTIVE", "DNP - Coach's Decision")]},
+                     "homeTeam": {"teamTricode": "BOS", "score": 132, "periods": [{"period": k, "periodType": "REGULAR", "score": s} for k, s in enumerate([35, 31, 33, 33], 1)],
+                                  "statistics": {"fieldGoalsAttempted": 86, "freeThrowsAttempted": 20, "reboundsOffensive": 8, "turnovers": 14, "minutes": "PT240M00.00S"},
+                                  "players": [player(101, "Jayson T", True, "PT36M30.00S", 37, 20)]}}}
+    trad2 = {"boxScoreTraditional": {"gameId": "0022400002",
+                                     "awayTeam": {"teamTricode": "MIN", "statistics": {"fieldGoalsAttempted": 95, "freeThrowsAttempted": 22, "reboundsOffensive": 11, "turnovers": 13, "minutes": "265:00"},
+                                                  "players": [{"personId": 301, "firstName": "Anthony", "familyName": "E", "position": "G", "comment": "", "statistics": {"minutes": "38:30", "points": 30, "plusMinusPoints": 4}},
+                                                              {"personId": 302, "firstName": "Sat", "familyName": "Out", "position": "", "comment": "DNP - Injury/Illness", "statistics": {"minutes": "", "points": 0, "plusMinusPoints": 0}}]},
+                                     "homeTeam": {"teamTricode": "LAL", "statistics": {"fieldGoalsAttempted": 92, "freeThrowsAttempted": 30, "reboundsOffensive": 9, "turnovers": 10, "minutes": "265:00"},
+                                                  "players": [{"personId": 401, "firstName": "LeBron", "familyName": "J", "position": "F", "comment": "", "statistics": {"minutes": "40:00", "points": 28, "plusMinusPoints": 6}}]}}}
+    lh = ["GAME_ID", "TEAM_ID", "TEAM_ABBREVIATION", "PTS_QTR1", "PTS_QTR2", "PTS_QTR3", "PTS_QTR4", "PTS_OT1", "PTS_OT2", "PTS"]
+    summ2 = {"resultSets": [{"name": "GameSummary", "headers": ["GAME_ID"], "rowSet": [["0022400002"]]},
+                            {"name": "LineScore", "headers": lh, "rowSet": [["0022400002", 1610612750, "MIN", 20, 30, 25, 28, 5, 0, 108], ["0022400002", 1610612747, "LAL", 30, 28, 20, 25, 10, 0, 113]]}]}
+    sched = {"leagueSchedule": {"seasonYear": "2026-27", "gameDates": [
+        {"gameDate": "10/22/2026 00:00:00", "games": [
+            {"gameId": "0022600003", "gameStatus": 3, "gameDateEst": "2026-10-22T00:00:00Z", "awayTeam": {"teamTricode": "GSW", "score": 110}, "homeTeam": {"teamTricode": "LAL", "score": 115}},
+            {"gameId": "0022600004", "gameStatus": 1, "gameDateEst": "2026-10-22T00:00:00Z", "awayTeam": {"teamTricode": "BOS", "score": 0}, "homeTeam": {"teamTricode": "NYK", "score": 0}}]},
+        {"gameDate": "10/28/2026 00:00:00", "games": [
+            {"gameId": "0022600050", "gameStatus": 3, "gameDateEst": "2026-10-28T00:00:00Z", "awayTeam": {"teamTricode": "MIA", "score": 99}, "homeTeam": {"teamTricode": "CHI", "score": 101}}]}]}}
+    return [("leaguegamelog", log), ("boxscore_0022400001.json", box1), ("boxscoretraditionalv3", trad2), ("boxscoresummaryv2", summ2), ("scheduleLeagueV2", sched)]
+
+
 def _canned_nhl_landing():
     return dict(x for x in _canned_nhl())["/landing"]
 
@@ -3220,15 +3660,16 @@ def _canned_nhl():
 
 def main(argv=None):
     ap = argparse.ArgumentParser(description="Write the day's slate (or yesterday's finals) for Call Sheet 2.0.")
-    ap.add_argument("mode", nargs="?", choices=["slate", "grade", "nhl", "nhl-grade", "nhl-ledger", "odds", "odds-history"], default="slate",
+    ap.add_argument("mode", nargs="?", choices=["slate", "grade", "nhl", "nhl-grade", "nhl-ledger", "nba-ledger", "odds", "odds-history"], default="slate",
                     help="slate (default): today's MLB inputs. grade: MLB finals. nhl: today's NHL inputs. nhl-grade: NHL finals. "
                          "nhl-ledger: every NHL final this season, measured against the sheet's assumptions. "
+                         "nba-ledger: every NBA final of a season with quarters, pace and every player's minutes (--season 2024-25 for a past season). "
                          "odds: today's lines, prices, openers, the sharp line, the alternates and every book's price from The Odds API (needs odds_key.txt). "
                          "odds-history: a past season's lines at two moments a day, for the backtest's openers (paid plans; asks before it spends).")
     ap.add_argument("--books", help="odds only: the books to read, first one carded, pinnacle never carded, e.g. fanatics,betmgm,draftkings,pinnacle (default: %s)" % ",".join(ODDS_BOOKS))
     ap.add_argument("--sports", help="odds only: which sports, e.g. NHL,MLB (default: MLB,NHL; odds-history: NHL)")
     ap.add_argument("--date", help="YYYY-MM-DD. Default: today for slate, yesterday for grade.")
-    ap.add_argument("--season", help="nhl-ledger and odds-history: a past season to pull in full, e.g. 20252026 (for the backtest).")
+    ap.add_argument("--season", help="nhl-ledger, nba-ledger and odds-history: a past season to pull in full, e.g. 20252026 or 2024-25 (for the backtest).")
     ap.add_argument("--from", dest="start", help="odds-history: the first date to pull, YYYY-MM-DD (with --to; else the season's dates).")
     ap.add_argument("--to", dest="end", help="odds-history: the last date to pull, YYYY-MM-DD.")
     ap.add_argument("--times", help="odds-history: the UTC snapshot times a day, e.g. 16:00,23:30 (default); +02:30 means the next day's 02:30.")
@@ -3254,7 +3695,7 @@ def main(argv=None):
             print("--date must look like 2026-09-28")
             return 2
     else:
-        date_iso = (today if a.mode in ("slate", "nhl", "nhl-ledger", "odds") else today - dt.timedelta(days=1)).isoformat()
+        date_iso = (today if a.mode in ("slate", "nhl", "nhl-ledger", "nba-ledger", "odds") else today - dt.timedelta(days=1)).isoformat()
     lines = []
 
     def log(s):
@@ -3270,6 +3711,8 @@ def main(argv=None):
             path = make_nhl_grade(date_iso, a.out, log)
         elif a.mode == "nhl-ledger":
             path = make_nhl_ledger(date_iso, a.out, log, a.season, a.detail, a.refs)
+        elif a.mode == "nba-ledger":
+            path = make_nba_ledger(date_iso, a.out, log, a.season)
         elif a.mode == "odds":
             sports = tuple(s.strip().upper() for s in a.sports.split(",") if s.strip()) if a.sports else ("MLB", "NHL")
             path = make_odds(date_iso, a.out, log, a.books, sports)

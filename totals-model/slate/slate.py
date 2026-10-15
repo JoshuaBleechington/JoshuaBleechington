@@ -2049,6 +2049,167 @@ def nba_box_date(game):
     return None
 
 
+# ESPN's open site API: no headers, no key, every season back to the 2000s,
+# the regular season marked on each event. The league's own CDN keeps box
+# scores for the running season only (the 2024-25 walk found none, 15 Oct
+# 2026) and the stats site will not answer a script, so a PAST season is
+# read here: the scoreboard a week at a time for the games, the summary
+# page per game for quarters, the box lines, every player's minutes and
+# who sat, the crew.
+ESPN_NBA = "https://site.api.espn.com/apis/site/v2/sports/basketball/nba"
+ESPN_TRICODE = {"GS": "GSW", "NY": "NYK", "NO": "NOP", "SA": "SAS", "UTAH": "UTA", "WSH": "WAS", "PHX": "PHX", "BKN": "BKN"}
+
+
+def espn_tricode(ab):
+    ab = str(ab or "").upper()
+    return ESPN_TRICODE.get(ab, ab)
+
+
+def nba_us_date(iso):
+    """A US date from an ESPN or NBA UTC stamp: five hours back, so a late
+    West Coast tip stays on its own night (the date KillerSports uses)."""
+    m = re.match(r"(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})", str(iso or ""))
+    if not m:
+        return None
+    d = dt.datetime(int(m.group(1)), int(m.group(2)), int(m.group(3)), int(m.group(4)), int(m.group(5))) - dt.timedelta(hours=5)
+    return d.date().isoformat()
+
+
+def nba_games_from_espn(season, through_iso=None, log=None):
+    """Every regular-season final of a season from ESPN's scoreboard, a week
+    a call: {id, date, away, home, an, hn, fa, fh} with ESPN's event id, NBA
+    tricodes and the nicknames KillerSports uses."""
+    y = int(season[:4])
+    start, end = dt.date(y, 10, 1), dt.date(y + 1, 6, 30)
+    if through_iso:
+        end = min(end, dt.date.fromisoformat(through_iso))
+    out, d = {}, start
+    while d <= end:
+        e = min(d + dt.timedelta(days=6), end)
+        try:
+            doc = fetch_json(ESPN_NBA + "/scoreboard?dates=%s-%s&limit=200" % (d.strftime("%Y%m%d"), e.strftime("%Y%m%d")), cache=False)
+        except Exception as ex:  # noqa: BLE001
+            if log:
+                log("  week of %s: no scoreboard (%s)" % (d.isoformat(), ex))
+            d = e + dt.timedelta(days=1)
+            continue
+        for ev in doc.get("events") or []:
+            if int(((ev.get("season") or {}).get("type") or 0)) != 2:
+                continue   # preseason, play-in, playoffs
+            comp = ((ev.get("competitions") or [{}])[0]) or {}
+            st = ((comp.get("status") or {}).get("type") or {})
+            if not st.get("completed"):
+                continue
+            g = {"id": str(ev.get("id")), "date": nba_us_date(comp.get("date") or ev.get("date")), "t": comp.get("date") or ev.get("date"),
+                 "away": None, "home": None, "an": None, "hn": None, "fa": None, "fh": None}
+            for c in comp.get("competitors") or []:
+                t = c.get("team") or {}
+                side = "home" if c.get("homeAway") == "home" else "away"
+                g[side] = espn_tricode(t.get("abbreviation"))
+                g[("hn" if side == "home" else "an")] = t.get("name") or t.get("shortDisplayName")
+                try:
+                    g["fh" if side == "home" else "fa"] = int(c.get("score")) if c.get("score") not in (None, "") else None
+                except (TypeError, ValueError):
+                    pass
+            if g["away"] and g["home"]:
+                out[g["id"]] = g
+        d = e + dt.timedelta(days=1)
+    return sorted(out.values(), key=lambda g: (g["date"] or "", g["id"]))
+
+
+def _espn_stat(stats, *names):
+    for s in stats or []:
+        if s.get("name") in names:
+            v = str(s.get("displayValue") or s.get("value") or "")
+            return v
+    return ""
+
+
+def _espn_attempts(v):
+    """'40-88' -> 88; '12' -> 12."""
+    try:
+        return int(float(v.split("-")[-1])) if v else 0
+    except ValueError:
+        return 0
+
+
+def nba_entry_from_espn(g, summ):
+    """A ledger entry from ESPN's game summary: quarters from the header's
+    line scores, the box lines from the team statistics, every player from
+    the box with his minutes, points and plus-minus, the DNPs and the
+    injury list as who sat, the officials."""
+    box = (summ or {}).get("boxscore") or {}
+    hdr = ((((summ or {}).get("header") or {}).get("competitions") or [{}])[0]) or {}
+    sides = {"away": {}, "home": {}}
+    for c in hdr.get("competitors") or []:
+        side = "home" if c.get("homeAway") == "home" else "away"
+        ls = []
+        for q in c.get("linescores") or []:
+            try:
+                ls.append(int(float(q.get("displayValue") if q.get("displayValue") not in (None, "") else q.get("value") or 0)))
+            except (TypeError, ValueError):
+                ls.append(0)
+        sides[side]["q"], sides[side]["ot"] = ls[:4], ls[4:]
+        sides[side]["ab"] = espn_tricode((c.get("team") or {}).get("abbreviation"))
+        try:
+            sides[side]["score"] = int(c.get("score")) if c.get("score") not in (None, "") else None
+        except (TypeError, ValueError):
+            sides[side]["score"] = None
+    for t in box.get("teams") or []:
+        side = "home" if t.get("homeAway") == "home" else "away"
+        st = t.get("statistics") or []
+        sides[side]["line"] = {"fga": _espn_attempts(_espn_stat(st, "fieldGoalsMade-fieldGoalsAttempted", "fieldGoalsAttempted")),
+                               "fta": _espn_attempts(_espn_stat(st, "freeThrowsMade-freeThrowsAttempted", "freeThrowsAttempted")),
+                               "oreb": _espn_attempts(_espn_stat(st, "offensiveRebounds")), "tov": _espn_attempts(_espn_stat(st, "turnovers", "totalTurnovers")),
+                               "min": 240.0}
+        sides[side]["ab"] = sides[side].get("ab") or espn_tricode((t.get("team") or {}).get("abbreviation"))
+    for p in box.get("players") or []:
+        ab = espn_tricode((p.get("team") or {}).get("abbreviation"))
+        side = "home" if ab == sides["home"].get("ab") else "away"
+        played, out = sides[side].setdefault("pa", []), sides[side].setdefault("oa", [])
+        for grp in p.get("statistics") or []:
+            names = [str(x) for x in (grp.get("names") or grp.get("labels") or [])]
+            iM = names.index("MIN") if "MIN" in names else None
+            iPM = names.index("+/-") if "+/-" in names else None
+            iP = names.index("PTS") if "PTS" in names else None
+            for a in grp.get("athletes") or []:
+                ath = a.get("athlete") or {}
+                pid, name = ath.get("id"), ath.get("displayName") or ath.get("shortName") or str(ath.get("id"))
+                stats = a.get("stats") or []
+                mins = nba_minutes(stats[iM]) if iM is not None and iM < len(stats) else 0.0
+                if a.get("didNotPlay") or mins <= 0:
+                    out.append([pid, name, str(a.get("reason") or "DNP")])
+                    continue
+                def _i(k):
+                    try:
+                        return int(float(str(stats[k]).replace("+", ""))) if k is not None and k < len(stats) else 0
+                    except ValueError:
+                        return 0
+                played.append([pid, name, 1 if a.get("starter") else 0, round(mins, 1), _i(iP), _i(iPM)])
+    # the injury list on the page: who was out before the game, with the status
+    for team in (summ or {}).get("injuries") or []:
+        ab = espn_tricode((team.get("team") or {}).get("abbreviation"))
+        side = "home" if ab == sides["home"].get("ab") else "away"
+        out = sides[side].setdefault("oa", [])
+        seen = {x[0] for x in out}
+        for inj in team.get("injuries") or []:
+            ath = inj.get("athlete") or {}
+            if ath.get("id") in seen:
+                continue
+            det = inj.get("details") or {}
+            out.append([ath.get("id"), ath.get("displayName") or str(ath.get("id")), "%s - %s" % (inj.get("status") or "Out", det.get("type") or det.get("detail") or "injury")])
+    offs = [o.get("displayName") or o.get("fullName") for o in (((summ or {}).get("gameInfo") or {}).get("officials") or []) if isinstance(o, dict)]
+    a, h = sides["away"], sides["home"]
+    e = {"id": g["id"], "date": g.get("date"), "away": a.get("ab") or g.get("away"), "home": h.get("ab") or g.get("home"), "an": g.get("an"), "hn": g.get("hn"),
+         "fa": a.get("score") if a.get("score") is not None else g.get("fa"), "fh": h.get("score") if h.get("score") is not None else g.get("fh"),
+         "qa": a.get("q") or [], "qh": h.get("q") or [], "ota": a.get("ot") or [], "oth": h.get("ot") or [],
+         "sa": a.get("line"), "sh": h.get("line"), "pa": a.get("pa") or [], "ph": h.get("pa") or [], "oa": a.get("oa") or [], "oh": h.get("oa") or [],
+         "t": g.get("t"), "off": [o for o in offs if o], "detail": bool(a.get("line") and h.get("line"))}
+    e["end"] = "OT" if (e["ota"] or e["oth"]) else "REG"
+    e["pace"] = nba_pace(a.get("line"), h.get("line")) if e["detail"] else None
+    return e
+
+
 def nba_scan_ids(season, have, log, on_entry):
     """Walk a season's regular-season game ids on the CDN, building an entry
     from each box score found (no stats site at all). Calls on_entry(entry)
@@ -2340,22 +2501,6 @@ def make_nba_ledger(date_iso, out_dir, log, season=None):
         led["measure"] = nba_measure(led["games"])
         with open(path, "w", encoding="utf-8") as f:
             json.dump(led, f, separators=(",", ":"))
-    # the list of games: the CDN schedule for this season (one small file), the
-    # stats site's game log for a past one (one call, slow, often refused);
-    # with neither, the ids are walked on the CDN directly
-    games = None
-    if not past:
-        try:
-            games = nba_games_from_schedule(date_iso)
-            log("CDN schedule: %d finals listed up to %s." % (len(games), date_iso))
-        except Exception as e:  # noqa: BLE001
-            log("Could not read the CDN schedule (%s)." % e)
-    if games is None:
-        try:
-            games = nba_games_from_log(season)
-            log("League game log: %d regular-season games listed." % len(games))
-        except Exception as e:  # noqa: BLE001
-            log("The stats site did not answer for the game log (%s): walking the season's game ids on the CDN instead." % e)
     done = [0]
 
     def took(e):
@@ -2364,15 +2509,55 @@ def make_nba_ledger(date_iso, out_dir, log, season=None):
         if done[0] % NBA_LEDGER_FLUSH == 0:
             flush()
             log("  %d fetched (%s); written." % (done[0], e.get("date")))
-    if games is None:
+    # the games and their detail. A PAST season: ESPN's open API, the scoreboard
+    # a week a call and the summary page per game (the league's CDN keeps box
+    # scores for the running season only, and its stats site will not answer a
+    # script). THIS season: the league's CDN schedule and box scores, ESPN when
+    # the CDN has nothing. The stats site's game log and the id walk stay as
+    # the last resorts.
+    games, source = None, ""
+    if not past:
+        try:
+            games = nba_games_from_schedule(date_iso)
+            source = "cdn"
+            log("CDN schedule: %d finals listed up to %s." % (len(games), date_iso))
+        except Exception as e:  # noqa: BLE001
+            log("Could not read the CDN schedule (%s)." % e)
+    if games is None or (not past and not games):
+        try:
+            games = nba_games_from_espn(season, None if past else date_iso, log)
+            source = "espn"
+            log("ESPN scoreboard: %d regular-season finals listed." % len(games))
+        except Exception as e:  # noqa: BLE001
+            log("Could not read ESPN's scoreboard (%s)." % e)
+            games = None
+    if (games is None or not games) and past:
+        try:
+            games = nba_games_from_log(season)
+            source = "stats"
+            log("League game log: %d regular-season games listed." % len(games))
+        except Exception as e:  # noqa: BLE001
+            games = None
+            log("The stats site did not answer for the game log (%s): walking the season's game ids on the CDN instead." % e)
+    if games is None and past:
         log("Walking ids 002%s00001 upward; a line prints every %d, and the file is written every %d so a run can be stopped and resumed." % (season[2:4], NBA_LEDGER_FLUSH, NBA_LEDGER_FLUSH))
         fetched, misses = nba_scan_ids(season, have, log, took)
         log("Walked the ids: %d box score%s read, %d id%s with none." % (fetched, "" if fetched == 1 else "s", misses, "" if misses == 1 else "s"))
+    elif games is None:
+        log("No games listed for %s yet." % season)
     else:
-        todo = [g for g in sorted(games, key=lambda g: (g["date"], g["id"])) if g["id"] not in have and (past or g["date"] <= date_iso)]
+        todo = [g for g in sorted(games, key=lambda g: (g["date"] or "", g["id"])) if g["id"] not in have and (past or (g["date"] or "") <= date_iso)]
         log("%d game%s to fetch; a line prints every %d, and the file is written every %d so a run can be stopped and resumed." % (len(todo), "" if len(todo) == 1 else "s", NBA_LEDGER_FLUSH, NBA_LEDGER_FLUSH))
         for g in todo:
-            took(nba_game_entry(g, log))
+            if source == "espn":
+                try:
+                    took(nba_entry_from_espn(g, fetch_json(ESPN_NBA + "/summary?event=%s" % g["id"], timeout=NBA_CDN_TIMEOUT, cache=False)))
+                except Exception as e:  # noqa: BLE001
+                    log("  game %s (%s, %s @ %s): no summary (%s); scores only" % (g["id"], g.get("date"), g.get("away"), g.get("home"), e))
+                    took({"id": g["id"], "date": g.get("date"), "away": g.get("away"), "home": g.get("home"), "an": g.get("an"), "hn": g.get("hn"),
+                          "fa": g.get("fa"), "fh": g.get("fh"), "t": g.get("t"), "detail": False})
+            else:
+                took(nba_game_entry(g, log))
     flush()
     log("Added %d game%s. Wrote %s." % (done[0], "" if done[0] == 1 else "s", path))
     nba_ledger_report(led["measure"], log)
@@ -3466,7 +3651,14 @@ def selftest():
     check("nba measure: points, home margin, overtime, the first half's share, pace", m3["games"] == 2 and m3["points_per_game"] == (241 + 211) / 2.0 and m3["home_margin"] == (23 + 5) / 2.0 and m3["ot_rate"] == 0.5
           and abs(m3["first_half_share"] - (28 + 25 + 35 + 31 + 20 + 30 + 30 + 28) / float(241 + 206)) < 1e-9 and m3["pace"] is not None)
     tmp3 = tempfile.mkdtemp()
-    fetch_json = fake_nba
+    # the stats site's game log as the source (ESPN's scoreboard not answering): the CDN box for one game, the stats documents for the other
+    canned_no_espn = [x for x in nba_canned if not x[0].startswith("scoreboard?")]
+    def fake_nba_noespn(url, tries=3, headers=None, timeout=25, cache=True):
+        for key, payload in canned_no_espn:
+            if key in url:
+                return payload
+        raise RuntimeError("no canned payload for " + url)
+    fetch_json = fake_nba_noespn
     try:
         lines4 = []
         p3 = make_nba_ledger("2026-10-15", tmp3, lines4.append, "2024-25")
@@ -3475,11 +3667,11 @@ def selftest():
         p4 = make_nba_ledger("2026-10-15", tmp3, lines4.append, "2024-25")   # again: nothing to fetch
     finally:
         fetch_json = real
-    check("nba ledger: a past season's file, with detail, the measure and the through date; a second run fetches nothing",
+    check("nba ledger (stats log): a past season's file, with detail, the measure and the through date; a second run fetches nothing",
           led3["format"] == NBA_LEDGER_FORMAT and led3["season"] == "2024-25" and len(led3["games"]) == 2 and led3["through"] == "2025-06-30" and led3["measure"]["games"] == 2
-          and os.path.basename(p3) == "nba-ledger-202425.json" and p4 == p3 and any("0 games to fetch" in l for l in lines4))
-    # the stats site refusing the game log: the ids are walked on the CDN; only the first game has a box there
-    canned_no_log = [x for x in nba_canned if x[0] != "leaguegamelog"]
+          and os.path.basename(p3) == "nba-ledger-202425.json" and p4 == p3 and any("0 games to fetch" in l for l in lines4) and any("League game log: 2" in l for l in lines4))
+    # neither ESPN nor the stats site: the ids are walked on the CDN; only the first game has a box there
+    canned_no_log = [x for x in nba_canned if x[0] not in ("leaguegamelog", "scoreboard?dates=20241022-")]
     def fake_nba_nolog(url, tries=3, headers=None, timeout=25, cache=True):
         for key, payload in canned_no_log:
             if key in url:
@@ -3494,9 +3686,31 @@ def selftest():
             led5 = json.load(f)
     finally:
         fetch_json = real
-    check("nba ledger: without the stats site the ids are walked on the CDN, the date read from the box, and the walk stops after the gap",
+    check("nba ledger: with neither ESPN nor the stats site the ids are walked on the CDN, the date read from the box, and the walk stops after the gap",
           any("walking the season's game ids" in l for l in lines5) and len(led5["games"]) == 1 and led5["games"][0]["id"] == "0022400001" and led5["games"][0]["date"] == "2024-10-22"
           and led5["games"][0]["away"] == "NYK" and led5["games"][0]["fa"] == 109 and any("1 box score read" in l for l in lines5))
+    # ESPN, the way a past season is read now (15 Oct 2026, after the CDN walk found no 2024-25 box scores)
+    check("nba espn: tricodes and the US date", espn_tricode("GS") == "GSW" and espn_tricode("ny") == "NYK" and espn_tricode("BOS") == "BOS" and nba_us_date("2024-10-23T02:30Z") == "2024-10-22" and nba_us_date("2024-10-22T23:30Z") == "2024-10-22")
+    fetch_json = fake_nba
+    try:
+        eg = nba_games_from_espn("2024-25", "2024-10-28")
+        es = nba_entry_from_espn(eg[0], fetch_json(ESPN_NBA + "/summary?event=401704001"))
+        tmp5 = tempfile.mkdtemp()
+        lines6 = []
+        p6 = make_nba_ledger("2026-10-15", tmp5, lines6.append, "2024-25")
+        with open(p6, "r", encoding="utf-8") as f:
+            led6 = json.load(f)
+    finally:
+        fetch_json = real
+    check("nba espn: the scoreboard lists regular-season finals only, with nicknames", len(eg) == 1 and eg[0]["id"] == "401704001" and eg[0]["date"] == "2024-10-22" and eg[0]["away"] == "NYK" and eg[0]["home"] == "BOS"
+          and eg[0]["an"] == "Knicks" and eg[0]["hn"] == "Celtics" and eg[0]["fa"] == 109 and eg[0]["fh"] == 132)
+    check("nba espn: quarters from the line scores, the box lines and pace", es["qa"] == [28, 25, 30, 26] and es["qh"] == [35, 31, 33, 33] and es["ota"] == [] and es["end"] == "REG"
+          and es["sa"] == {"fga": 90, "fta": 25, "oreb": 10, "tov": 12, "min": 240.0} and es["sh"]["tov"] == 14 and es["pace"] == 101.9 and es["detail"] is True)
+    check("nba espn: every man who played with his minutes, starters flagged; the DNPs and the injury list as who sat; the crew",
+          es["pa"] == [["3934672", "Jalen Brunson", 1, 34.0, 25, -12], ["1", "Bench Guy", 0, 12.0, 4, -3]] and es["oa"] == [["2", "Benched Guy", "COACH'S DECISION"], ["3", "Hurt Guy", "Out - Knee"]]
+          and es["ph"] == [["4065648", "Jayson Tatum", 1, 36.0, 37, 20]] and es["oh"] == [] and es["off"] == ["Scott Foster", "Tony Brothers"] and es["t"] == "2024-10-22T23:30Z")
+    check("nba ledger: a past season reads from ESPN first", any("ESPN scoreboard: 1 regular-season finals listed" in l for l in lines6) and len(led6["games"]) == 1 and led6["games"][0]["id"] == "401704001"
+          and led6["games"][0]["hn"] == "Celtics" and led6["games"][0]["detail"] is True and led6["measure"]["games"] == 1)
     fetch_json = fake_nhl
     try:
         sjs = nhl_club_goalies("SJS", "20262027")
@@ -3692,7 +3906,33 @@ def _canned_nba():
             {"gameId": "0022600004", "gameStatus": 1, "gameDateEst": "2026-10-22T00:00:00Z", "awayTeam": {"teamTricode": "BOS", "score": 0}, "homeTeam": {"teamTricode": "NYK", "score": 0}}]},
         {"gameDate": "10/28/2026 00:00:00", "games": [
             {"gameId": "0022600050", "gameStatus": 3, "gameDateEst": "2026-10-28T00:00:00Z", "awayTeam": {"teamTricode": "MIA", "score": 99}, "homeTeam": {"teamTricode": "CHI", "score": 101}}]}]}}
-    return [("leaguegamelog", log), ("boxscore_0022400001.json", box1), ("boxscoretraditionalv3", trad2), ("boxscoresummaryv2", summ2), ("scheduleLeagueV2", sched)]
+    # ESPN: one week of the scoreboard with a regular-season final, a preseason game and a game not yet played; its summary
+    def comp(ab, name, home, score, ls):
+        return {"homeAway": "home" if home else "away", "team": {"abbreviation": ab, "name": name, "displayName": name}, "score": score,
+                "linescores": [{"displayValue": str(x), "value": float(x)} for x in ls]}
+    espn_sb = {"events": [
+        {"id": "401704001", "date": "2024-10-22T23:30Z", "season": {"year": 2025, "type": 2},
+         "competitions": [{"id": "401704001", "date": "2024-10-22T23:30Z", "status": {"type": {"completed": True, "name": "STATUS_FINAL"}},
+                           "competitors": [comp("BOS", "Celtics", True, "132", [35, 31, 33, 33]), comp("NY", "Knicks", False, "109", [28, 25, 30, 26])]}]},
+        {"id": "401700001", "date": "2024-10-10T23:00Z", "season": {"year": 2025, "type": 1},
+         "competitions": [{"id": "401700001", "date": "2024-10-10T23:00Z", "status": {"type": {"completed": True}}, "competitors": [comp("LAL", "Lakers", True, "100", []), comp("PHX", "Suns", False, "99", [])]}]},
+        {"id": "401704002", "date": "2024-10-23T02:30Z", "season": {"year": 2025, "type": 2},
+         "competitions": [{"id": "401704002", "date": "2024-10-23T02:30Z", "status": {"type": {"completed": False}}, "competitors": [comp("LAL", "Lakers", True, "0", []), comp("MIN", "Timberwolves", False, "0", [])]}]}]}
+    espn_sum = {"header": {"competitions": [{"date": "2024-10-22T23:30Z", "competitors": [comp("BOS", "Celtics", True, "132", [35, 31, 33, 33]), comp("NY", "Knicks", False, "109", [28, 25, 30, 26])]}]},
+                "boxscore": {"teams": [{"homeAway": "away", "team": {"abbreviation": "NY"}, "statistics": [{"name": "fieldGoalsMade-fieldGoalsAttempted", "displayValue": "40-90"}, {"name": "freeThrowsMade-freeThrowsAttempted", "displayValue": "20-25"},
+                                                                                                          {"name": "offensiveRebounds", "displayValue": "10"}, {"name": "turnovers", "displayValue": "12"}]},
+                                       {"homeAway": "home", "team": {"abbreviation": "BOS"}, "statistics": [{"name": "fieldGoalsMade-fieldGoalsAttempted", "displayValue": "48-86"}, {"name": "freeThrowsMade-freeThrowsAttempted", "displayValue": "16-20"},
+                                                                                                          {"name": "offensiveRebounds", "displayValue": "8"}, {"name": "totalTurnovers", "displayValue": "14"}]}],
+                             "players": [{"team": {"abbreviation": "NY"}, "statistics": [{"names": ["MIN", "FG", "3PT", "FT", "OREB", "DREB", "REB", "AST", "STL", "BLK", "TO", "PF", "+/-", "PTS"],
+                                                                                           "athletes": [{"athlete": {"id": "3934672", "displayName": "Jalen Brunson"}, "starter": True, "didNotPlay": False, "stats": ["34", "9-18", "2-5", "5-5", "0", "3", "3", "8", "1", "0", "2", "2", "-12", "25"]},
+                                                                                                        {"athlete": {"id": "1", "displayName": "Bench Guy"}, "starter": False, "didNotPlay": False, "stats": ["12", "2-4", "0-1", "0-0", "1", "1", "2", "0", "0", "0", "0", "1", "-3", "4"]},
+                                                                                                        {"athlete": {"id": "2", "displayName": "Benched Guy"}, "starter": False, "didNotPlay": True, "reason": "COACH'S DECISION", "stats": []}]}]},
+                                         {"team": {"abbreviation": "BOS"}, "statistics": [{"names": ["MIN", "FG", "3PT", "FT", "OREB", "DREB", "REB", "AST", "STL", "BLK", "TO", "PF", "+/-", "PTS"],
+                                                                                            "athletes": [{"athlete": {"id": "4065648", "displayName": "Jayson Tatum"}, "starter": True, "didNotPlay": False, "stats": ["36", "14-18", "8-14", "1-1", "0", "4", "4", "10", "1", "0", "1", "2", "+20", "37"]}]}]}]},
+                "injuries": [{"team": {"abbreviation": "NY"}, "injuries": [{"status": "Out", "athlete": {"id": "3", "displayName": "Hurt Guy"}, "details": {"type": "Knee"}}]}, {"team": {"abbreviation": "BOS"}, "injuries": []}],
+                "gameInfo": {"officials": [{"displayName": "Scott Foster"}, {"displayName": "Tony Brothers"}]}}
+    return [("leaguegamelog", log), ("boxscore_0022400001.json", box1), ("boxscoretraditionalv3", trad2), ("boxscoresummaryv2", summ2), ("scheduleLeagueV2", sched),
+            ("scoreboard?dates=20241022-", espn_sb), ("summary?event=401704001", espn_sum)]
 
 
 def _canned_nhl_landing():

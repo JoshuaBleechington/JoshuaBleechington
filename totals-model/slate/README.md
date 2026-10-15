@@ -65,13 +65,16 @@ with the quarter scores, overtime, each team's box line and the game's pace
 points and plus-minus and whether he started, and every player who sat with
 the reason the feed gave (inactive, injury, coach's decision). Blank at the
 prompt means this season up to today; for the backtest run it for
-**2024-25** and **2025-26**, about ten minutes each. Games are listed from
-the league's game log (stats.nba.com, one call a season) and each game's
-detail from the CDN box score (one call a game), with the stats site's two
-documents as the fallback when a game's box score is not on the CDN. The
-file is written every 100 games, so a run can be stopped and started again
-and picks up where it was. The build container cannot reach the NBA's
-feeds, so the first run on your machine is the live test: if it stops,
+**2024-25** and **2025-26**, about ten minutes each. A past season is read
+from ESPN's open site API: the scoreboard a week a call for the games, the
+summary page per game for the quarters, the box lines, every player's
+minutes and who sat, and the crew (the league's own CDN keeps box scores
+for the running season only, and its stats site will not answer a script;
+both stay as fallbacks). This season reads the league's CDN schedule and
+box scores, ESPN when the CDN has nothing. The file is written every 100
+games, so a run can be stopped and started again and picks up where it
+was. The build container cannot reach any of these feeds, so the first run
+on your machine is the live test: if it stops or writes an empty file,
 send the printout. Beside the two ledgers the backtest needs KillerSports'
 closing lines for the same seasons, saved as pages like the hockey ones:
 

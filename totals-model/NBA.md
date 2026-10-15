@@ -66,6 +66,56 @@ every spread (95% observed at −15 or more against 91%; 10% at +10 or more
 against 15%: big home dogs win less than the model says), 13.7 overstates the
 dog.
 
+## The engine, 15 Oct 2026
+
+`totals/nba.py` and `web/nba.engine.js` (the port, replayed through The Super
+Model against the package on every change: 13 basketball cases in
+`web/callsheet3-cases.json`, `tests/test_nba.py` for the package). The NBA is
+the page's fourth button; the inputs are in `web/callsheet3.nba-fields.html`
+and the wiring in `tools_build_callsheet3.py`.
+
+**The total** anchors on the book's two prices through a discretised normal at
+sd 18.0 (`nba_fair_total`, the engine's solve with a thirty-point bracket) at
+weight 4.0, and moves off it by two tagged deltas and nothing else:
+
+- **Ratings, faded.** The pace × efficiency projection (each offence into the
+  defence it faces, less the league's 112.7 per 100, over the two paces' mean)
+  minus the anchor, shrunk by n/(n+20) games, times −0.25, under fifty games a
+  side; ten games a side to score; shown after fifty. Four league-average
+  ratings on the league's own number move nothing.
+- **Stage of the season.** +1.0 after the trade deadline, +2.0 from the last
+  two weeks, from the date on the row against `SEASON_DATES` (the 2026-27
+  calendar, a priori until the league publishes it).
+
+Both tagged, so neither can buy a band; a card carrying only them is held at NO
+BET with the note saying so. **Labels**: the Nuggets and the Jazz (watched), a
+back to back (rest measured inside the number), the regulars' minutes out
+(shown: announced absences are in the close).
+
+**The first half** anchors on its own market at sd 11.9 and takes the full
+game's lean at the 0.5036 share. **The spread** is the book's number with its
+prices de-vigged through a normal margin at sd 12.5; **the moneyline** reads
+off the same margin. Nothing moves either, and both are shown, never picked.
+The pick is the likeliest side of the total and the half where the sheet's
+inputs move the chance a point or more off the book's own.
+
+**Who is out** is a card on the matchup: each side's injury report from the
+slate with every player's status, minutes, points and plus-minus a game, the
+regulars' minutes summed, and a tick on a doubtful player that counts him out
+(the tick rides in the row). **Context** is the hockey card's shape: each
+club's league ranks with the tag that says what the sheet did with the fact.
+The slate fills both (next).
+
+**Four games of 2025-26 through the engine** (`scratchpad/nba/examples.py`,
+the 2025-26 calendar, the ratings to date from the ledger, the closes from
+KillerSports, the sides at −110): Bucks @ Hornets 12 Nov, ratings faded −1.2,
+UNDER 52.7%, won; Nuggets @ Kings 11 Dec, the Nuggets label, UNDER 50.9%,
+lost; Cavaliers @ Hornets 20 Feb, after the deadline +1.0, OVER 52.2%, won;
+Raptors @ Celtics 5 Apr, the last two weeks +2.0, OVER 54.4% held at NO BET,
+lost. The sides read 50.0% at the spread's own number and 58 to 80% on the
+moneyline, the book's chances, and went 3-1 and 3-1 as the book said they
+would about.
+
 **What the record says the basketball book is.** The spread is priced against
 everything the box score holds, and the moneyline follows the spread. The total
 carries three things the close does not: it over-moves with early-season

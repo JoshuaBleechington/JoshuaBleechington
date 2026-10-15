@@ -53,14 +53,19 @@ def head() -> str:
     board, fields = frag.split("<!-- ===== FIELDS:")[0], "<!-- ===== FIELDS:" + frag.split("<!-- ===== FIELDS:")[1]
     board = board.split("-->\n", 1)[1]
     fields = fields.split("-->\n", 1)[1]
+    nfrag = (ROOT / "callsheet3.nba-fields.html").read_text()
+    nboard, nfields = nfrag.split("<!-- ===== FIELDS:")[0], "<!-- ===== FIELDS:" + nfrag.split("<!-- ===== FIELDS:")[1]
+    nboard = nboard.split("-->\n", 1)[1]
+    nfields = nfields.split("-->\n", 1)[1]
     # "The Super Model": the user's name for the page, 15 Oct 2026, on the eve of the basketball book
     h = once(h, "<title>Call Sheet 2.0</title>", "<title>The Super Model</title>", "title")
     h = once(h, "<h1>Call Sheet <em>2.0</em></h1>", "<h1>The <em>Super</em> Model</h1>", "h1")
     h = once(h, '<button type="button" id="m-mlb" aria-pressed="true">MLB</button>\n      <button type="button" id="m-wnba" aria-pressed="false">WNBA</button>',
              '<button type="button" id="m-mlb" aria-pressed="true">MLB</button>\n      <button type="button" id="m-nhl" aria-pressed="false">NHL</button>\n'
+             '      <button type="button" id="m-nba" aria-pressed="false">NBA</button>\n'
              '      <button type="button" id="m-wnba" aria-pressed="false">WNBA</button>', "sport buttons")
-    h = once(h, '          <div id="spFields" hidden>', board + '          <div id="spFields" hidden>', "board sections")
-    h = once(h, '      <div id="wnbaFields" class="stack" hidden>', fields + '      <div id="wnbaFields" class="stack" hidden>', "NHL fields")
+    h = once(h, '          <div id="spFields" hidden>', board + nboard + '          <div id="spFields" hidden>', "board sections")
+    h = once(h, '      <div id="wnbaFields" class="stack" hidden>', fields + nfields + '      <div id="wnbaFields" class="stack" hidden>', "NHL and NBA fields")
     h = re.sub(r'<span id="build">\d{4}-\d{2}-\d{2}</span>', f'<span id="build">{STAMP}</span>', h, count=1)
     h = once(h, "  @media (prefers-reduced-motion: reduce) { * { transition: none !important; animation: none !important; } }\n</style>",
              "  /* the folded card: what the slate fills, out of the way until it is wanted */\n"
@@ -76,7 +81,7 @@ def head() -> str:
              "  table.form th { font-size: 10px; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); font-weight: 600; }\n"
              "  @media (prefers-reduced-motion: reduce) { * { transition: none !important; animation: none !important; } }\n</style>", "fold css")
     h = once(h, "<p>One matchup, every market the book posts on it — the full-game total, the first five,\n         the moneyline and the run line — priced off",
-             "<p>One matchup, every market the book posts on it — in baseball the full-game total, the first five,\n         the moneyline and the run line; in hockey the total, the first period, the moneyline and the puck line;\n         in basketball the total, the moneyline and the spread — priced off", "header copy")
+             "<p>One matchup, every market the book posts on it — in baseball the full-game total, the first five,\n         the moneyline and the run line; in hockey the total, the first period, the moneyline and the puck line;\n         in the NBA the total, the first half, the moneyline and the spread; in the WNBA the total, the moneyline and the spread — priced off", "header copy")
     h = once(h, "Call Sheet #1 is untouched; its total is this sheet's total to the last digit.</p>",
              "Call Sheet #1 is untouched; its MLB total is this sheet's total to the last digit. The hockey book is new on 1 Oct 2026 and every constant in it is a priori; the record decides.</p>", "header tail")
     h = once(h, "<b>Separate from Call Sheet #1.</b> This page keeps its own card in this browser\n            and its own backup format. Nothing here reads or writes #1's log.",
@@ -90,6 +95,7 @@ def head() -> str:
     h = once(h, '<a href="https://app.outlier.bet/MLB/games" target="_blank" rel="noopener">Outlier · games</a>',
              '<a href="https://app.outlier.bet/MLB/games" target="_blank" rel="noopener">Outlier · MLB</a>\n'
              '            <a href="https://app.outlier.bet/NHL/games" target="_blank" rel="noopener">Outlier · NHL</a>\n'
+             '            <a href="https://app.outlier.bet/NBA/games" target="_blank" rel="noopener">Outlier · NBA</a>\n'
              '            <a href="https://sports.betmgm.com/en/sports/hockey-12" target="_blank" rel="noopener">BetMGM · NHL</a>', "board links")
     return h
 
@@ -107,15 +113,17 @@ def tail() -> str:
              '                 "hml","aml","pl","plh","pla","p1line","p1op","p1up","nhlform","nhlctx","ntick","ncash","ap1l10","hp1l10","axgf","axga","hxgf","hxga","xglg",\n'
              '                 "ngoalies","agname","hgname","agstart","hgstart","agok","hgok",\n'
              '                 "odds","sharp","agf","aga","hgf","hga","lgg","angp","hngp","aenc","aens","henc","hens"];\n'
-             '  var ALL = MLB_IDS.concat(WNBA_IDS).concat(NHL_IDS).filter(function (v, i, a) { return a.indexOf(v) === i; });\n'
+             '  var NBA_IDS = ["away","home","line","op","up","opened","gdate","hml","aml","sp","sph","spa","h1line","h1op","h1up",\n'
+             '                 "naort","nhort","nadrt","nhdrt","napace","nhpace","nagp","nhgp","nlrtg","nlpace","narest","nhrest","nbaout","nbaq","nbactx","odds","sharp"];\n'
+             '  var ALL = MLB_IDS.concat(WNBA_IDS).concat(NHL_IDS).concat(NBA_IDS).filter(function (v, i, a) { return a.indexOf(v) === i; });\n'
              '  var CHECKS = ["dome","playoff","agconf","hgconf","agbk","hgbk"];\n'
-             '  function sportOf(s) { return s === "WNBA" ? "WNBA" : s === "NHL" ? "NHL" : "MLB"; }\n'
-             '  /* the period market: the first five in baseball, the first period in hockey */\n'
-             '  function isPeriod(mk) { return mk.key === "f5" || mk.key === "p1"; }', "ids")
+             '  function sportOf(s) { return s === "WNBA" ? "WNBA" : s === "NHL" ? "NHL" : s === "NBA" ? "NBA" : "MLB"; }\n'
+             '  /* the period market: the first five in baseball, the first period in hockey, the first half in the NBA */\n'
+             '  function isPeriod(mk) { return mk.key === "f5" || mk.key === "p1" || mk.key === "h1"; }', "ids")
     t = every(t, 'sp === "WNBA" ? forecastMatchupWnba() : forecastMatchupMlb()',
-              'sp === "NHL" ? forecastMatchupNhl() : sp === "WNBA" ? forecastMatchupWnba() : forecastMatchupMlb()', "dispatch (stored)", 1)
+              'sp === "NHL" ? forecastMatchupNhl() : sp === "NBA" ? forecastMatchupNba() : sp === "WNBA" ? forecastMatchupWnba() : forecastMatchupMlb()', "dispatch (stored)", 1)
     t = every(t, 'sport === "WNBA" ? forecastMatchupWnba() : forecastMatchupMlb()',
-              'sport === "NHL" ? forecastMatchupNhl() : sport === "WNBA" ? forecastMatchupWnba() : forecastMatchupMlb()', "dispatch (live)", 1)
+              'sport === "NHL" ? forecastMatchupNhl() : sport === "NBA" ? forecastMatchupNba() : sport === "WNBA" ? forecastMatchupWnba() : forecastMatchupMlb()', "dispatch (live)", 1)
     t, n = re.subn(r'([A-Za-z_.]+) === "WNBA" \? "WNBA" : "MLB"', r'sportOf(\1)', t)
     if n != 5:
         sys.exit(f"build stopped: sport normalisation matched {n} times, expected 5")
@@ -127,22 +135,41 @@ def tail() -> str:
     t = once(t, 'function resText(res) { return res === "invalid" ? "F5 > final — recheck" : res; }',
              'function resText(res) { return res === "invalid" ? "period > final — recheck" : res; }', "invalid text")
     t = once(t, "? ' · after five ' + esc(fin.f5a) + '–' + esc(fin.f5h) : '';",
-             "? (sport === \"NHL\" ? ' · after one ' : ' · after five ') + esc(fin.f5a) + '–' + esc(fin.f5h) : '';", "after five")
+             "? (sport === \"NHL\" ? ' · after one ' : sport === \"NBA\" ? ' · at the half ' : ' · after five ') + esc(fin.f5a) + '–' + esc(fin.f5h) : '';", "after five")
     t = once(t, "(r.sport === \"MLB\" ? '<input class=\"grade close\" data-id=\"' + r.id + '\" data-k=\"cf5\" value=\"' + esc(cl.cf5 || \"\") + '\" placeholder=\"F5\"",
-             "(r.sport !== \"WNBA\" ? '<input class=\"grade close\" data-id=\"' + r.id + '\" data-k=\"cf5\" value=\"' + esc(cl.cf5 || \"\") + '\" placeholder=\"' + (r.sport === \"NHL\" ? \"P1\" : \"F5\") + '\"", "close box")
+             "(r.sport !== \"WNBA\" ? '<input class=\"grade close\" data-id=\"' + r.id + '\" data-k=\"cf5\" value=\"' + esc(cl.cf5 || \"\") + '\" placeholder=\"' + (r.sport === \"NHL\" ? \"P1\" : r.sport === \"NBA\" ? \"1H\" : \"F5\") + '\"", "close box")
     t = once(t, "      var f5 = r.sport === \"MLB\"\n        ? '<span class=\"finals\"><span class=\"l\">F5</span>",
-             "      var f5 = r.sport !== \"WNBA\"\n        ? '<span class=\"finals\"><span class=\"l\">' + (r.sport === \"NHL\" ? \"P1\" : \"F5\") + '</span>", "period finals")
+             "      var f5 = r.sport !== \"WNBA\"\n        ? '<span class=\"finals\"><span class=\"l\">' + (r.sport === \"NHL\" ? \"P1\" : r.sport === \"NBA\" ? \"1H\" : \"F5\") + '</span>", "period finals")
     t = once(t, 'WNBA: [["total","Full-game total"],["ml","Moneyline"],["spread","Spread"]] };',
              'NHL: [["total","Full-game total"],["p1","First period"],["ml","Moneyline"],["pl","Puck line"]],\n'
+             '                 NBA: [["total","Full-game total"],["h1","First half"],["ml","Moneyline"],["spread","Spread"]],\n'
              '                 WNBA: [["total","Full-game total"],["ml","Moneyline"],["spread","Spread"]] };', "calib keys")
-    t = every(t, '["MLB", "WNBA"]', '["MLB", "NHL", "WNBA"]', "sport loops", 4)
-    t = once(t, 'if (!bySport.MLB.any && !bySport.WNBA.any)', 'if (!bySport.MLB.any && !bySport.NHL.any && !bySport.WNBA.any)', "any graded")
+    t = every(t, '["MLB", "WNBA"]', '["MLB", "NHL", "NBA", "WNBA"]', "sport loops", 4)
+    t = once(t, 'if (!bySport.MLB.any && !bySport.WNBA.any)', 'if (!bySport.MLB.any && !bySport.NHL.any && !bySport.NBA.any && !bySport.WNBA.any)', "any graded")
     t = once(t, '                       WNBA: "Nothing graded yet. Type the final on the card and the three markets grade themselves." };',
              '                       NHL: "Nothing graded yet. Type the final and the first-period score on the card and the four markets grade themselves; a shootout win grades as a one-goal margin.",\n'
+             '                       NBA: "Nothing graded yet. Type the final and the half-time score on the card and the four markets grade themselves.",\n'
              '                       WNBA: "Nothing graded yet. Type the final on the card and the three markets grade themselves. The WNBA log on 2.0 comes over with Load a backup." };', "empty notes")
-    t = once(t, 'var unit = sp === "WNBA" ? "pts" : "runs";', 'var unit = sp === "WNBA" ? "pts" : sp === "NHL" ? "goals" : "runs";', "unit")
+    t = once(t, 'var unit = sp === "WNBA" ? "pts" : "runs";', 'var unit = (sp === "WNBA" || sp === "NBA") ? "pts" : sp === "NHL" ? "goals" : "runs";', "unit")
     t = once(t, ": 'With seven games in the season book",
-             ": sp === \"NHL\" ? 'The puck line and the moneyline are shown, not picked, from the first game: every constant in the hockey book is a priori, and the record decides which earns a weight. The total and the first period are the pickable markets.' : 'With seven games in the season book", "calib verdict")
+             ": sp === \"NHL\" ? 'The puck line and the moneyline are shown, not picked, from the first game: every constant in the hockey book is a priori, and the record decides which earns a weight. The total and the first period are the pickable markets.' : "
+             "sp === \"NBA\" ? 'The spread and the moneyline are shown, not picked: measured priced against everything in the box score over two seasons of closes. The total and the first half are the pickable markets; the ratings fade and the stage deltas are tagged, and the record decides what they earn.' : 'With seven games in the season book", "calib verdict")
+    # units and decimals: the NBA is a points sport like the WNBA (one decimal on a total, none on a forecast line)
+    t = every(t, 'sp === "WNBA" ? "points"', '(sp === "WNBA" || sp === "NBA") ? "points"', "points unit", 3)
+    t = every(t, 'sp === "WNBA" ? 1 : 2', '(sp === "WNBA" || sp === "NBA") ? 1 : 2', "decimals (sp)", 2)
+    t = every(t, 'sp === "WNBA" ? 0 : 1', '(sp === "WNBA" || sp === "NBA") ? 0 : 1', "decimals (forecast line)", 1)
+    t = every(t, 'sport === "WNBA" ? 1 : 2', '(sport === "WNBA" || sport === "NBA") ? 1 : 2', "decimals (split)", 2)
+    t = once(t, 'sp === "NHL" ? r.inputs.p1line : r.inputs.f5line', 'sp === "NHL" ? r.inputs.p1line : sp === "NBA" ? r.inputs.h1line : r.inputs.f5line', "forecast period line")
+    t = once(t, '(sp === "NHL" ? "first period " : "first five ")', '(sp === "NHL" ? "first period " : sp === "NBA" ? "first half " : "first five ")', "forecast line period")
+    t = once(t, "(sp === \"NHL\" ? 'First period' : 'First five')", "(sp === \"NHL\" ? 'First period' : sp === \"NBA\" ? 'First half' : 'First five')", "record period")
+    t = once(t, 'NHL: ["total", "p1"] };', 'NHL: ["total", "p1"], NBA: ["total", "h1"] };', "pickable")
+    t = once(t, "sp === \"MLB\" ? 'baseball (the pitchers and the pens score the total, not the margin)' : 'this game'",
+             "sp === \"MLB\" ? 'baseball (the pitchers and the pens score the total, not the margin)' : sp === \"NBA\" ? 'the NBA (measured 15 Oct 2026 on two seasons of closes: the pace and efficiency margin projection read 0.00 against the spread, and rest, travel, time zones and announced absences sat inside the number)' : 'this game'", "pick why sides")
+    t = once(t, 'if (sp === "NHL") return "Derived from the book',
+             'if (sp === "NBA") return "The spread and the moneyline are the book\'s own number through a normal margin at 12.5 points: measured priced against everything in the box score over two seasons of closes (15 Oct 2026). Listed and graded, never a straight bet or a parlay leg, until the record says otherwise.";\n'
+             '    if (sp === "NHL") return "Derived from the book', "not picked why")
+    t = once(t, 'if (!Object.keys(b).length && sp !== "NHL") return "";', 'if (sp === "NBA") return "";   // the +1.5 columns are hockey\'s; the NBA favourite reads on the spread\n    if (!Object.keys(b).length && sp !== "NHL") return "";', "favourite table")
+    t = once(t, 'k.sport === "WNBA" ? "WNBA" : (k.sport === "NHL" ? "NHL" : "MLB")', 'sportOf(k.sport)', "slate sport key")
     t = once(t, '    $("m-wnba").setAttribute("aria-pressed", s === "WNBA" ? "true" : "false");\n'
                 '    $("mlbFields").hidden = s !== "MLB"; $("wnbaFields").hidden = s !== "WNBA";\n'
                 '    $("rlFields").hidden = s !== "MLB"; $("f5Fields").hidden = s !== "MLB"; $("spFields").hidden = s !== "WNBA";\n'
@@ -151,23 +178,29 @@ def tail() -> str:
                 '    $("line").placeholder = s === "WNBA" ? "165.5" : "8.5";',
              '    $("m-wnba").setAttribute("aria-pressed", s === "WNBA" ? "true" : "false");\n'
              '    $("m-nhl").setAttribute("aria-pressed", s === "NHL" ? "true" : "false");\n'
-             '    $("mlbFields").hidden = s !== "MLB"; $("wnbaFields").hidden = s !== "WNBA"; $("nhlFields").hidden = s !== "NHL";\n'
-             '    $("rlFields").hidden = s !== "MLB"; $("f5Fields").hidden = s !== "MLB"; $("spFields").hidden = s !== "WNBA";\n'
-             '    $("plFields").hidden = s !== "NHL"; $("p1Fields").hidden = s !== "NHL";\n'
+             '    $("m-nba").setAttribute("aria-pressed", s === "NBA" ? "true" : "false");\n'
+             '    $("mlbFields").hidden = s !== "MLB"; $("wnbaFields").hidden = s !== "WNBA"; $("nhlFields").hidden = s !== "NHL"; $("nbaFields").hidden = s !== "NBA";\n'
+             '    $("rlFields").hidden = s !== "MLB"; $("f5Fields").hidden = s !== "MLB"; $("spFields").hidden = s !== "WNBA" && s !== "NBA";\n'
+             '    $("plFields").hidden = s !== "NHL"; $("p1Fields").hidden = s !== "NHL"; $("h1Fields").hidden = s !== "NBA";\n'
              '    $("eyebrow").textContent = s + " · every market on the game";\n'
-             '    $("lineLabel").textContent = s === "WNBA" ? "Total (points)" : s === "NHL" ? "Total (goals)" : "Total (runs)";\n'
-             '    $("line").placeholder = s === "WNBA" ? "165.5" : s === "NHL" ? "6" : "8.5";\n'
-             '    $("opened").placeholder = s === "WNBA" ? "165.5" : s === "NHL" ? "6" : "8.5";', "setSport")
-    t = once(t, '["paste", "pasteFill", "add", "example", "m-mlb", "m-wnba"]', '["paste", "pasteFill", "add", "example", "m-mlb", "m-nhl", "m-wnba"]', "lock list")
+             '    $("lineLabel").textContent = (s === "WNBA" || s === "NBA") ? "Total (points)" : s === "NHL" ? "Total (goals)" : "Total (runs)";\n'
+             '    $("line").placeholder = s === "WNBA" ? "165.5" : s === "NBA" ? "228.5" : s === "NHL" ? "6" : "8.5";\n'
+             '    $("opened").placeholder = s === "WNBA" ? "165.5" : s === "NBA" ? "228.5" : s === "NHL" ? "6" : "8.5";', "setSport")
+    t = once(t, '["paste", "pasteFill", "add", "example", "m-mlb", "m-wnba"]', '["paste", "pasteFill", "add", "example", "m-mlb", "m-nhl", "m-nba", "m-wnba"]', "lock list")
     t = once(t, '  $("m-wnba").addEventListener("click", function () { setSport("WNBA"); });',
              '  $("m-wnba").addEventListener("click", function () { setSport("WNBA"); });\n'
-             '  $("m-nhl").addEventListener("click", function () { setSport("NHL"); });', "nhl button")
+             '  $("m-nhl").addEventListener("click", function () { setSport("NHL"); });\n'
+             '  $("m-nba").addEventListener("click", function () { setSport("NBA"); });', "nhl and nba buttons")
     t = once(t, '    } else {\n      restore({ away: "Sun", home: "Mystics"',
              '    } else if (sport === "NHL") {\n'
              '      restore({ away: "Rangers", home: "Bruins", line: "6", op: "-110", up: "-110", gdate: $("gdate").value,\n'
              '        aml: "130", hml: "-150", pl: "-1.5", plh: "180", pla: "-220", p1line: "1.5", p1op: "-120", p1up: "100",\n'
              '        agsv: "0.912", hgsv: "0.921", agsh: "1400", hgsh: "1900", asf: "31.2", hsf: "33.4",\n'
              '        app: "22.1", hpp: "24.8", apk: "80.2", hpk: "78.1", al10: "5.9", hl10: "6.4", h2h: "6.3", h2hn: "3", arest: "0", hrest: "2" });\n'
+             '    } else if (sport === "NBA") {\n'
+             '      restore({ away: "Knicks", home: "Celtics", line: "228.5", op: "-110", up: "-110", gdate: $("gdate").value,\n'
+             '        aml: "205", hml: "-250", sp: "-6.5", sph: "-110", spa: "-110", h1line: "114.5", h1op: "-110", h1up: "-110",\n'
+             '        naort: "116.0", nadrt: "113.5", nhort: "118.2", nhdrt: "109.8", napace: "99.8", nhpace: "97.9", nagp: "20", nhgp: "21", narest: "0", nhrest: "2" });\n'
              '    } else {\n      restore({ away: "Sun", home: "Mystics"', "example")
     t = every(t, '"callsheet2.card.v1"', '"callsheet3.card.v1"', "card key", 1)
     t = every(t, '"callsheet2.draft.v1"', '"callsheet3.draft.v1"', "draft key", 1)
@@ -205,7 +238,8 @@ def tail() -> str:
              '                      "agsv","hgsv","agsh","hgsh","asf","hsf","app","hpp","apk","hpk","nhlform","nhlctx","ap1l10","hp1l10","axgf","axga","hxgf","hxga","xglg",\n'
              '                      "ngoalies","agname","hgname",\n'
              '                      "pl","plh","pla","p1line","p1op","p1up",\n'
-             '                      "agf","aga","hgf","hga","lgg","angp","hngp","aenc","aens","henc","hens"];', "slate fields")
+             '                      "agf","aga","hgf","hga","lgg","angp","hngp","aenc","aens","henc","hens",\n'
+             '                      "sp","sph","spa","h1line","h1op","h1up","naort","nhort","nadrt","nhdrt","napace","nhpace","nagp","nhgp","nlrtg","nlpace","narest","nhrest","nbaout","nbactx"];', "slate fields")
     # the slate's backup-in-net flags are booleans, carried like the roof: into a
     # row's inputs when the card already has the game, into the form otherwise
     t = once(t, '          if (g.inputs.dome === true && !row.inputs.dome) { row.inputs.dome = true; changed = true; }',
@@ -221,7 +255,7 @@ def tail() -> str:
 
 
 def build() -> str:
-    return head() + engine_block() + (ROOT / "nhl.engine.js").read_text() + tail()
+    return head() + engine_block() + (ROOT / "nhl.engine.js").read_text() + (ROOT / "nba.engine.js").read_text() + tail()
 
 
 if __name__ == "__main__":

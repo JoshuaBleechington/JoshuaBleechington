@@ -330,7 +330,7 @@
       <h1>The <em>Super</em> Model</h1>
       <p>One matchup, every market the book posts on it — in baseball the full-game total, the first five,
          the moneyline and the run line; in hockey the total, the first period, the moneyline and the puck line;
-         in basketball the total, the moneyline and the spread — priced off the book's own numbers and <b>ranked by edge</b>, with
+         in the NBA the total, the first half, the moneyline and the spread; in the WNBA the total, the moneyline and the spread — priced off the book's own numbers and <b>ranked by edge</b>, with
          the chance to hit as the big number on every row. Then a day board with the parlay four, the best
          straight bets, and tonight's whole card in one order.
          Call Sheet #1 is untouched; its MLB total is this sheet's total to the last digit. The hockey book is new on 1 Oct 2026 and every constant in it is a priori; the record decides.</p>
@@ -338,6 +338,7 @@
     <div class="modes" role="group" aria-label="Sport">
       <button type="button" id="m-mlb" aria-pressed="true">MLB</button>
       <button type="button" id="m-nhl" aria-pressed="false">NHL</button>
+      <button type="button" id="m-nba" aria-pressed="false">NBA</button>
       <button type="button" id="m-wnba" aria-pressed="false">WNBA</button>
     </div>
   </header>
@@ -406,6 +407,14 @@
               <div class="f"><label for="p1up">P1 under price</label><input id="p1up" type="number" step="5" inputmode="numeric" placeholder="+100"></div>
             </div>
           </div>
+          <div id="h1Fields" hidden>
+            <div class="subhead">First half total <span class="tag">its own market, its own anchor</span></div>
+            <div class="grid3">
+              <div class="f"><label for="h1line">1H total</label><input id="h1line" type="number" step="0.5" inputmode="decimal" placeholder="114.5"></div>
+              <div class="f"><label for="h1op">1H over price</label><input id="h1op" type="number" step="5" inputmode="numeric" placeholder="-110"></div>
+              <div class="f"><label for="h1up">1H under price</label><input id="h1up" type="number" step="5" inputmode="numeric" placeholder="-110"></div>
+            </div>
+          </div>
           <div id="spFields" hidden>
             <div class="subhead">Spread <span class="tag">home side's number, as the book prints it</span></div>
             <div class="grid3">
@@ -418,6 +427,7 @@
           <div class="links">
             <a href="https://app.outlier.bet/MLB/games" target="_blank" rel="noopener">Outlier · MLB</a>
             <a href="https://app.outlier.bet/NHL/games" target="_blank" rel="noopener">Outlier · NHL</a>
+            <a href="https://app.outlier.bet/NBA/games" target="_blank" rel="noopener">Outlier · NBA</a>
             <a href="https://sports.betmgm.com/en/sports/hockey-12" target="_blank" rel="noopener">BetMGM · NHL</a>
             <a href="https://www.covers.com/sport/baseball/mlb/odds" target="_blank" rel="noopener">Covers · ML, run line, total</a>
             <a href="https://www.vegasinsider.com/mlb/odds/las-vegas/" target="_blank" rel="noopener">Vegas Insider</a>
@@ -693,6 +703,75 @@
               trails late pulls the goalie and concedes, the market does not price the habit, and both clubs' net
               (conceded minus scored) ran 1.03 and 0.56 of a goal of final per goal of lean (pooled t 2.9), so it
               goes on the line at +0.40 a goal, half the slope. All four or nothing, ten games a side.</p>
+          </div>
+        </details>
+      </div>
+      <div id="nbaFields" class="stack" hidden>
+        <section class="card">
+          <h2>Who is out <span class="tag">the one input the market learns late</span></h2>
+          <div class="body">
+            <div id="nbaOutPanel" class="note">No list on the row — load the slate and Fill form, and each side's injury report comes with it.</div>
+            <p class="note">Each side's injury report, from the slate: every player listed with his status and his minutes, points and
+              plus-minus a game this season. A player marked <b>Out</b> counts; tick the box on a doubtful one when he is ruled out.
+              The regulars' minutes (20 a game or more) are summed and shown in the why list. <b>Shown, not scored</b>: against two
+              seasons of closes the announced absences were already in the number (the total's slope on missing minutes 0.00; the
+              side's +0.29, t 1.2). What the close cannot carry is the late scratch, and that is what the record measures from
+              opening night: the sheet logs the list as it stood when the row was added, so the two can be split.</p>
+            <div class="links">
+              <a href="https://official.nba.com/nba-injury-report-2026-27-season/" target="_blank" rel="noopener">NBA · official injury report</a>
+              <a href="https://www.espn.com/nba/injuries" target="_blank" rel="noopener">ESPN · injuries</a>
+            </div>
+            <input type="hidden" id="nbaout"><input type="hidden" id="nbaq"><input type="hidden" id="nbactx">
+          </div>
+        </section>
+
+        <section class="card">
+          <h2>Context <span class="tag">where each club stands in the league, and what the sheet did with it</span></h2>
+          <div class="body">
+            <div id="nbaCtxPanel" class="note">No context on the row — load the slate and Fill form, and the lines come with it.</div>
+            <p class="note">Each line is a club's rank against the other 29 on a number the slate already holds: offensive and
+              defensive rating, pace, points scored and allowed, the last ten, free-throw rate, three-point rate, home and road
+              records, the regulars out. A club shows up when it sits in the top or bottom six of the league; the stage of the
+              season and the two watched clubs always. <b>The tag is the point.</b> "3rd worst defence" is what the public bets
+              and the book moves to, so each line says what the sheet already did with the fact: <b>faded</b> because the market
+              over-moves with early-season ratings, <b>scored</b> when a stage delta is on the line, <b>shown</b> because it measured
+              inside the number against two seasons of closes, or a <b>label</b>. Nothing here moves a number on its own.</p>
+          </div>
+        </section>
+
+        <details class="card fold" id="nbaSlateBoxes">
+          <summary><span>Filled by the slate</span> <span class="tag">ratings, pace, games played, rest — open to check or edit</span></summary>
+          <div class="body">
+            <div class="grid4">
+              <div class="f"><label for="naort">Away offensive rating <span class="tag">per 100, to date</span></label><input id="naort" type="number" step="0.1" inputmode="decimal" placeholder="113.5"></div>
+              <div class="f"><label for="nadrt">Away defensive rating</label><input id="nadrt" type="number" step="0.1" inputmode="decimal" placeholder="112.0"></div>
+              <div class="f"><label for="nhort">Home offensive rating</label><input id="nhort" type="number" step="0.1" inputmode="decimal" placeholder="114.0"></div>
+              <div class="f"><label for="nhdrt">Home defensive rating</label><input id="nhdrt" type="number" step="0.1" inputmode="decimal" placeholder="111.5"></div>
+            </div>
+            <div class="grid4">
+              <div class="f"><label for="napace">Away pace <span class="tag">possessions / 48</span></label><input id="napace" type="number" step="0.1" inputmode="decimal" placeholder="101.5"></div>
+              <div class="f"><label for="nhpace">Home pace</label><input id="nhpace" type="number" step="0.1" inputmode="decimal" placeholder="101.5"></div>
+              <div class="f"><label for="nagp">Away games played</label><input id="nagp" type="number" step="1" inputmode="numeric" placeholder="12"></div>
+              <div class="f"><label for="nhgp">Home games played</label><input id="nhgp" type="number" step="1" inputmode="numeric" placeholder="11"></div>
+            </div>
+            <div class="grid4">
+              <div class="f"><label for="nlrtg">League rating <span class="tag">blank = 112.7</span></label><input id="nlrtg" type="number" step="0.1" inputmode="decimal" placeholder="112.7"></div>
+              <div class="f"><label for="nlpace">League pace <span class="tag">blank = 101.5</span></label><input id="nlpace" type="number" step="0.1" inputmode="decimal" placeholder="101.5"></div>
+              <div class="f"><label for="narest">Away days rest</label><input id="narest" type="number" step="1" min="0" max="14" inputmode="numeric" placeholder="1"></div>
+              <div class="f"><label for="nhrest">Home days rest</label><input id="nhrest" type="number" step="1" min="0" max="14" inputmode="numeric" placeholder="2"></div>
+            </div>
+            <p class="note">The four ratings are each club's points scored and allowed per 100 possessions this season, from the
+              league ledger, with the pace beside them; the projection is each offence into the defence it faces over the two paces'
+              mean. <b>Faded, tagged</b>: against two seasons of closes the market over-moved with early-season ratings (the final ran
+              0.22 a point the other way per point of lean under fifty games a side, t −2.6, both seasons; nothing after fifty), so
+              the lean, shrunk by games played, goes on the line at −0.25 a point until fifty games and is shown after. The four
+              travel together, ten games a side. <b>Rest</b> is a label: back to backs, the second night on the road, three in four and
+              time zones all flipped sign between seasons. The stage of the season moves the total on its own from the date on the
+              row: +1.0 after the trade deadline, +2.0 in the last two weeks, both tagged (933 and 224 games, both seasons the same
+              way). Two clubs, the Nuggets and the Jazz, ran over the close both seasons home and away: a label on the row, not a
+              number, since a club's own over/under record does not carry within a season. The spread and the moneyline are the
+              book's own numbers through a normal margin at 12.5 points: measured priced against everything in the box score, so
+              they are shown and graded, never the pick. The total and the first half are the pickable markets.</p>
           </div>
         </details>
       </div>
@@ -2435,6 +2514,330 @@
     return TEAM_PATTERNS.NHL.map(function (p) { return p[0]; }).sort();
   };
   /* ===== END NHL BLOCK ===== */
+  /* ===== NBA BLOCK. Ported from totals/nba.py; web/callsheet3-cases.json is
+     replayed through this page against the package on every change. It sits
+     after Call Sheet #1's engine block and the NHL block and changes nothing
+     inside them: the point distribution is registered by reassigning splitFor
+     again, the plausibility windows are added to PLAUSIBLE, and the team table
+     gets an NBA page. Built 15 Oct 2026 from two seasons of the user's ledger
+     against KillerSports' closes (NBA.md): the sides are priced and shown,
+     the total carries a faded ratings lean and two stage deltas, both tagged,
+     and the first half anchors on its own market. ===== */
+  var NBA = {
+    /* measured 15 Oct 2026 on 2,449 closes, the 2024-25 and 2025-26 ledgers (totals/nba.py has each figure's story) */
+    POINTS: 228.8,          // a game, both teams, at the close
+    TOTAL_SD: 18.0,         // the total's residual on the close, flat across levels
+    MARGIN_SD: 12.5,        // a normal margin at 12.5 fits the spread's home win rate (13.7 raw overstates the dog)
+    HALF_SHARE: 0.5036, HALF_SD: 11.9,   // the first half's share of regulation points, the same at every level; the half's spread on half the close
+    HOME_COURT: 1.7, OT: 0.047, PACE: 101.5,
+    FADE: -0.25, SHRINK_K: 20, FADE_UNTIL: 50, MIN_GAMES: 10,   // the ratings projection, faded and tagged: -0.22 a point of lean under 50 games (t -2.6), null after
+    DEADLINE_DELTA: 1.0, LAST_TWO_WEEKS_DELTA: 2.0,              // the stage of the season, tagged: +1.36 after the deadline (t 2.3), +2.25 in the last fortnight (t 1.8)
+    SEASON: { deadline: "2027-02-04", last_two_weeks: "2027-03-29", end: "2027-04-11" },   // A PRIORI for 2026-27 until the league publishes
+    REGULAR_MPG: 20,
+    FAIR_SPAN: 30
+  };
+  NBA.RATING = Math.round(NBA.POINTS / 2 / NBA.PACE * 100 * 10) / 10;   // 112.7 points per 100 possessions
+  var NBA_WEIGHTS = { market: 4.0, h1mkt: 4.0 };
+  var NBA_WATCHED = { "Nuggets": "+5.1 and +4.3 a game over the close", "Jazz": "+3.0 and +5.7 a game over the close" };
+  PLAUSIBLE.nba_total = [170, 300]; PLAUSIBLE.nba_half = [80, 150]; PLAUSIBLE.nba_pace = [85, 120]; PLAUSIBLE.nba_rating = [90, 135];
+
+  function nbaSplit(line, mu) { return normalSplit(line, mu, NBA.TOTAL_SD); }
+  function nbaHalfSplit(line, mu) { return normalSplit(line, mu, NBA.HALF_SD); }
+  var splitForBaseNba = splitFor;
+  splitFor = function (sport, line, mu) {
+    if (sport === "NBA") return nbaSplit(line, mu);
+    if (sport === "NBA_H1") return nbaHalfSplit(line, mu);
+    return splitForBaseNba(sport, line, mu);
+  };
+  /* fairTotal with a basketball-sized bracket (totals/nba.py nba_fair_total): the
+     engine block's solve brackets four runs, which a total that moves 18 points a
+     sigma can leave. The same de-vig, reconstruction and confidence cut. */
+  function nbaFairTotal(sport, line, op, up) {
+    var quoted = op !== null && up !== null;
+    var rebuilt = quoted ? null : completePair(op, up);
+    if (rebuilt) { op = rebuilt[0]; up = rebuilt[1]; quoted = true; }
+    if (!quoted) { op = -110; up = -110; }
+    var o = implied(op), u = implied(up), s = o + u;
+    var bookHold = s - 1;
+    var conf = marketConfidence(rebuilt ? HOLD_90TH : bookHold);
+    var rawOver = o / s;
+    var pOver = 0.5 + (rawOver - 0.5) * conf;
+    var lo = Math.max(0.5, line - NBA.FAIR_SPAN), hi = line + NBA.FAIR_SPAN;
+    for (var i = 0; i < 80; i++) {
+      var mid = (lo + hi) / 2, sp = splitFor(sport, line, mid);
+      var live = sp[0] + sp[2];
+      var conditional = live > 0 ? sp[0] / live : 0.5;
+      if (conditional < pOver) lo = mid; else hi = mid;
+    }
+    var mu = (lo + hi) / 2;
+    var tail = conf < 1
+      ? " That is a " + (bookHold * 100).toFixed(1) + "% hold where a main line runs " + (HOLD_REFERENCE * 100).toFixed(0) +
+        "%: most likely an ALTERNATE line. The read has been pulled back from " + (rawOver * 100).toFixed(1) + "% toward even and only " + (conf * 100).toFixed(0) + "% of it is kept."
+      : "";
+    var why = rebuilt
+      ? ("Only one price was given, so the other side was reconstructed at the " + (TYPICAL_HOLD * 100).toFixed(1) + "% hold this book typically charges, giving " + sgn(op, 0) + "/" + sgn(up, 0) +
+         ". That de-vigs to " + (pOver * 100).toFixed(1) + "% over and puts fair at " + mu.toFixed(1) + " rather than the " + line + " posted; the confidence is cut against the " +
+         (HOLD_90TH * 100).toFixed(1) + "% 90th-percentile hold, so only " + (marketConfidence(HOLD_90TH) * 100).toFixed(0) + "% of the " + (rawOver * 100).toFixed(1) + "% read is kept.")
+      : quoted
+      ? (sgn(op, 0) + "/" + sgn(up, 0) + " de-vigs to " + (pOver * 100).toFixed(1) + "% over (" + (bookHold * 100).toFixed(2) + "% hold), which is the market saying fair is " +
+         mu.toFixed(1) + " rather than the " + line + " it posted." + tail)
+      : ("No prices given, so an evenly-priced market is assumed. A line of " + line + " splitting 50/50 implies a mean of " + mu.toFixed(1) +
+         ": a basketball total is symmetric, so the mean sits on the number.");
+    return [mu, why];
+  }
+  function nbaRatingsProjection(ao, ho, ad, hd, ap, hp, lgr, lgp) {
+    var four = [ao, ho, ad, hd];
+    for (var i = 0; i < 4; i++) if (four[i] === null || !ok(four[i], "nba_rating")) return null;
+    var lg = (lgr !== null && ok(lgr, "nba_rating")) ? lgr : NBA.RATING;
+    var lp = (lgp !== null && ok(lgp, "nba_pace")) ? lgp : NBA.PACE;
+    var paces = [ap, hp].filter(function (p) { return p !== null && ok(p, "nba_pace"); });
+    var pace = paces.length === 2 ? (paces[0] + paces[1]) / 2 : lp;
+    var ea = pace / 100 * (ao + hd - lg), eh = pace / 100 * (ho + ad - lg);
+    return [ea + eh, "away " + ao.toFixed(1) + " into " + hd.toFixed(1) + " and home " + ho.toFixed(1) + " into " + ad.toFixed(1) + ", each less the league's " + lg.toFixed(1) +
+      ", over " + pace.toFixed(1) + " possessions: " + ea.toFixed(1) + " and " + eh.toFixed(1) + ", " + (ea + eh).toFixed(1) + " together"];
+  }
+  function nbaStageOf(gdate) {
+    var d = String(gdate || "").slice(0, 10);
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(d)) return null;
+    var s = NBA.SEASON;
+    if (d > s.end) return null;
+    if (d >= s.last_two_weeks) return [NBA.LAST_TWO_WEEKS_DELTA, "the last two weeks of the season"];
+    if (d > s.deadline) return [NBA.DEADLINE_DELTA, "after the trade deadline"];
+    return null;
+  }
+  /* the who-is-out list the slate writes (JSON in the hidden nbaout box): each side's
+     players out or in doubt with his minutes, points and plus-minus a game to date; a
+     questionable player counts as out when his box is ticked (the ids in nbaq) */
+  function nbaOutList() {
+    var raw = txt("nbaout") || "", d = null;
+    try { d = raw ? JSON.parse(raw) : null; } catch (e) { d = null; }
+    return d && typeof d === "object" ? d : { away: [], home: [] };
+  }
+  function nbaTicked() {
+    return String(txt("nbaq") || "").split(",").filter(function (x) { return x; });
+  }
+  function nbaOutMinutes(side) {
+    var list = nbaOutList()[side] || [], ticked = nbaTicked(), sum = 0;
+    list.forEach(function (p) {
+      var out = /^out/i.test(String(p.st || "")) || ticked.indexOf(String(p.id)) >= 0;
+      if (out && +p.mpg >= NBA.REGULAR_MPG) sum += +p.mpg;
+    });
+    return sum;
+  }
+  function readNba() {
+    var line = num("line");
+    if (!ok(line, "nba_total")) return null;
+    var w = NBA_WEIGHTS, notes = [];
+    var fa = nbaFairTotal("NBA", line, num("op"), num("up")), anchor = fa[0];
+    var estimates = [est("Market", anchor, w.market, fa[1])], deltas = [];
+    var away = canonTeam($("away").value, "NBA") || "Away", home = canonTeam($("home").value, "NBA") || "Home";
+    var ao = num("naort"), ho = num("nhort"), ad = num("nadrt"), hd = num("nhdrt"), ap = num("napace"), hp = num("nhpace");
+    var ag = num("nagp"), hg = num("nhgp"), lgr = num("nlrtg"), lgp = num("nlpace");
+    var rp = nbaRatingsProjection(ao, ho, ad, hd, ap, hp, lgr, lgp);
+    if (rp) {
+      var n = (ag !== null && hg !== null) ? Math.min(ag, hg) : null, lean = rp[0] - anchor;
+      if (n === null || n < NBA.MIN_GAMES) {
+        notes.push("Ratings projection " + rp[0].toFixed(1) + " (" + rp[1] + "), " + sgn(lean, 1) + " on the market's " + anchor.toFixed(1) + ". <b>SHOWN, NOT SCORED</b>: the fade needs " +
+          NBA.MIN_GAMES + " games a side" + (n === null ? "" : " and the lesser side has " + n) + ".");
+      } else if (n >= NBA.FADE_UNTIL) {
+        notes.push("Ratings projection " + rp[0].toFixed(1) + " (" + rp[1] + "), " + sgn(lean, 1) + " on the market's " + anchor.toFixed(1) + ". <b>SHOWN, NOT SCORED</b>: past " +
+          NBA.FADE_UNTIL + " games a side the market has the ratings priced (slope +0.003 on 944 games).");
+      } else {
+        var shrunk = lean * n / (n + NBA.SHRINK_K), size = NBA.FADE * shrunk;
+        var fadeWhy = "Pace x efficiency projects " + rp[0].toFixed(1) + " (" + rp[1] + "), " + sgn(lean, 1) + " on the market's " + anchor.toFixed(1) + "; shrunk by " + n + "/(" + n + "+" + NBA.SHRINK_K +
+          ") games to " + sgn(shrunk, 1) + ". The market OVER-MOVES with early-season ratings: against two seasons of closes the final ran 0.22 a point the OTHER way per point of lean under " +
+          NBA.FADE_UNTIL + " games (t -2.6, both seasons), nothing after. So " + sgn(NBA.FADE, 2) + " a point goes on the line, " + sgn(size, 2) + "; tagged, it cannot buy a band.";
+        deltas.push(delta("Ratings, faded", size, fadeWhy, false));
+        notes.push("<b>Ratings, faded</b>: " + fadeWhy);
+      }
+    } else if (ao !== null || ho !== null || ad !== null || hd !== null) {
+      notes.push("The four ratings travel together, each offence into the defence it faces; a partial set is dropped.");
+    }
+    var st = nbaStageOf(($("gdate") || {}).value);
+    if (st) {
+      var stWhy = st[1].charAt(0).toUpperCase() + st[1].slice(1) + ": against two seasons of closes the total ran " +
+        (st[0] === NBA.LAST_TWO_WEEKS_DELTA ? "+2.25 a game in the last two weeks (224 games, +1.40 and +3.10 by season; April alone +3.2)" : "+1.36 a game after the deadline (933 games, +1.17 and +1.56 by season)") +
+        ". Tanking, bench minutes and no defence; the market under-prices it. " + sgn(st[0], 1) + " on the line, tagged.";
+      deltas.push(delta("Stage of the season", st[0], stWhy, false));
+      notes.push("<b>Stage of the season</b>, " + stWhy);
+    }
+    [away, home].forEach(function (nm) {
+      if (NBA_WATCHED[nm]) notes.push("<b>" + esc(nm) + "</b> games ran " + NBA_WATCHED[nm] + " both seasons, home and away. <b>WATCHED, NOT SCORED</b>: a club's own over/under residual does not persist within a season (slope -0.05 on 2,137 games).");
+    });
+    var ar = num("narest"), hr = num("nhrest"), b2b = [];
+    if (ar !== null && ar <= 0) b2b.push("away");
+    if (hr !== null && hr <= 0) b2b.push("home");
+    if (b2b.length) notes.push("Back to back for the " + b2b.join(" and ") + " side. <b>A LABEL</b>: rest, the second night on the road, three in four and the time zones all flipped sign between seasons against two seasons of closes. The market prices rest.");
+    var outA = nbaOutMinutes("away"), outH = nbaOutMinutes("home"), outBits = [];
+    if (outA > 0) outBits.push("away " + outA.toFixed(0));
+    if (outH > 0) outBits.push("home " + outH.toFixed(0));
+    if (outBits.length) notes.push("Regulars out, minutes a game: " + outBits.join(", ") + ". <b>SHOWN, NOT SCORED</b>: announced absences are in the close (slope -0.01 on the total, +0.29 on the side, t 1.2); games with 40+ minutes of regulars out ran +0.87 over the close (t 1.8). The card measures the late ones from opening night.");
+    var f = assemble("NBA", away, home, line, estimates, deltas, notes);
+    f.away = away; f.home = home; f.line = line;
+    return f;
+  }
+  function nbaMarginFromSpread(spread, ph, pa) {
+    if (ph !== null && pa !== null) {
+      var pc = devig(ph, pa)[0], lo = -40, hi = 40;
+      for (var i = 0; i < 60; i++) {
+        var mid = (lo + hi) / 2, sp = spreadProbs(mid, spread, NBA.MARGIN_SD), live = sp[0] + sp[2];
+        if ((live > 0 ? sp[0] / live : 0.5) < pc) lo = mid; else hi = mid;
+      }
+      var m = (lo + hi) / 2;
+      return [m, "spread " + fmtLine(spread) + " at " + sgn(ph, 0) + "/" + sgn(pa, 0) + ", which de-vigs to " + (pc * 100).toFixed(1) + "% home and moves fair to " + sgn(m, 1)];
+    }
+    return [-spread, "spread " + fmtLine(spread) + " taken as the mean margin (no prices)"];
+  }
+  /* the context card: the slate's league ranks for the two clubs, each with the tag that
+     says what the sheet did with the fact (the hockey card's shape, nhlCtxPanel) */
+  function nbaCtxPanel() {
+    var el = $("nbaCtxPanel"); if (!el) return;
+    var raw = ($("nbactx") || {}).value || "", ctx = null;
+    try { ctx = raw ? JSON.parse(raw) : null; } catch (e) { ctx = null; }
+    if (!ctx || !ctx.length) {
+      el.innerHTML = "No context on the row — load the slate and Fill form, and the lines come with it.";
+      return;
+    }
+    var order = { scored: 0, faded: 1, shown: 2, label: 3 };
+    var items = ctx.slice().sort(function (a, b) { return (order[a.s] || 0) - (order[b.s] || 0); });
+    el.innerHTML = '<ul class="ctx">' + items.map(function (c) {
+      var s = order[c.s] !== undefined ? c.s : "shown";
+      return '<li class="ctx-' + s + '"><span class="cbadge">' + s + '</span> <span class="ctext">' + esc(c.t || "") + '</span>' +
+             (c.tag ? ' <span class="ctag">' + esc(c.tag) + '</span>' : '') + '</li>';
+    }).join("") + '</ul>';
+  }
+  function forecastMatchupNba() {
+    nbaOutPanel();
+    nbaCtxPanel();
+    var f = readNba();
+    var away = f.away, home = f.home, line = f.line;
+    var op = num("op"), up = num("up"), hml = num("hml"), aml = num("aml");
+    var spIn = num("sp"), sph = num("sph"), spa = num("spa");
+    var h1line = num("h1line"), h1op = num("h1op"), h1up = num("h1up");
+    var notes = [], markets = [];
+    markets.push(totalMarket(f, line, op, up, 1));
+    var anchor = f.estimates.filter(function (e) { return e.name === "Market"; })[0].total;
+    var projH1 = null;
+    if (h1line !== null) {
+      if (!ok(h1line, "nba_half")) throw new Error("first-half total out of range");
+      var fh = nbaFairTotal("NBA_H1", h1line, h1op, h1up), lean1 = (f.projected - anchor) * NBA.HALF_SHARE;
+      projH1 = fh[0] + lean1;
+      var s1 = nbaHalfSplit(h1line, projH1);
+      markets.push(pickOf("h1", "First half total " + h1line,
+        [sideOf("1H OVER " + h1line, "OVER", s1[0], s1[1], h1op), sideOf("1H UNDER " + h1line, "UNDER", s1[2], s1[1], h1up)],
+        h1op !== null && h1up !== null, "",
+        ["Anchored on the first-half market: " + fh[1],
+         "The full game's lean, " + sgn(f.projected - anchor, 1) + " on its anchor, comes over at the half's " + (NBA.HALF_SHARE * 100).toFixed(1) + "% share: " + sgn(lean1, 1) +
+         ". The share holds at every total level (0.5037 under 220, 0.5003 at 240 and up); the half spreads " + NBA.HALF_SD + " points on its number.",
+         "Projected " + projH1.toFixed(1) + " against " + h1line + "."]));
+    }
+    var margin = null, src = "";
+    if (spIn !== null) { var ms = nbaMarginFromSpread(spIn, sph, spa); margin = ms[0]; src = ms[1]; }
+    else if (hml !== null && aml !== null) {
+      var pHm = devig(hml, aml)[0];
+      margin = -NBA.MARGIN_SD * invNcdf(1 - pHm);
+      src = "moneyline " + sgn(hml, 0) + "/" + sgn(aml, 0) + ", " + (pHm * 100).toFixed(1) + "% home";
+    }
+    var lamH = null, lamA = null;
+    if (margin === null) {
+      notes.push("No spread or moneyline entered, so no side markets on this card.");
+    } else {
+      notes.push("Margin (home minus away) of <b>" + sgn(margin, 1) + "</b> from the " + src + ", on a margin SD of " + NBA.MARGIN_SD + ". Nothing on this sheet moves it: against two seasons of closes the pace x efficiency margin projection read 0.00 on the spread, and rest, travel, time zones and announced absences all sat inside the number. The sides are the book's own number read back, shown and graded, never the pick.");
+      var halfT = f.projected / 2;
+      lamH = halfT + margin / 2; lamA = halfT - margin / 2;
+      if (spIn !== null && spIn <= -10) notes.push("A home favourite of ten or more: against two seasons of closes these covered by +0.84 a game (426 games, +1.28 and +0.42 by season, t 1.3). Watched, not scored.");
+      var pH = 1 - ncdf((0 - margin) / NBA.MARGIN_SD);
+      markets.push(pickOf("ml", "Moneyline",
+        [sideOf(home + " ML", "HOME", pH, 0, hml), sideOf(away + " ML", "AWAY", 1 - pH, 0, aml)],
+        hml !== null && aml !== null, "",
+        ["Read off the margin through a normal at " + NBA.MARGIN_SD + ", which fits the spread's home win rate within a few points at every bucket (big home dogs win a little less than it says). An edge here is only the book's moneyline disagreeing with its own spread."]));
+      if (spIn !== null) {
+        var pr = spreadProbs(margin, spIn, NBA.MARGIN_SD);
+        markets.push(pickOf("spread", "Spread " + home + ": " + fmtLine(spIn),
+          [sideOf(home + " " + fmtLine(spIn), "HOME", pr[0], pr[1], sph), sideOf(away + " " + fmtLine(-spIn), "AWAY", pr[2], pr[1], spa)],
+          sph !== null && spa !== null, "",
+          ["The spread with both prices in is the anchor and nothing moves it off: the sides are priced. Shown and graded, never the pick."]));
+      }
+    }
+    return { sport: "NBA", away: away, home: home, matchup: away + " @ " + home, markets: markets, lamHome: lamH, lamAway: lamA, total: f, notes: notes, period: projH1 };
+  }
+  /* ---- the who-is-out panel: each side's list, the regulars' minutes summed, a tick for the doubtful ---- */
+  function nbaOutPanel() {
+    var el = $("nbaOutPanel"); if (!el) return;
+    var d = nbaOutList(), ticked = nbaTicked(), h = "";
+    var any = (d.away || []).length || (d.home || []).length;
+    if (!any) { el.innerHTML = "No list on the row — load the slate and Fill form, and each side's injury report comes with it."; return; }
+    [["away", canonTeam($("away").value, "NBA") || "Away"], ["home", canonTeam($("home").value, "NBA") || "Home"]].forEach(function (s) {
+      var list = d[s[0]] || [], mins = nbaOutMinutes(s[0]);
+      h += "<p><b>" + esc(s[1]) + "</b>: " + (list.length ? list.length + " listed, <b>" + mins.toFixed(0) + " minutes a game</b> of regulars out." : "nobody listed.") + "</p>";
+      if (!list.length) return;
+      h += '<table class="form"><thead><tr><th>Player</th><th>Status</th><th>Min</th><th>Pts</th><th>+/-</th><th>Note</th><th>Out?</th></tr></thead><tbody>';
+      list.forEach(function (p) {
+        var isOut = /^out/i.test(String(p.st || "")), id = String(p.id || p.n);
+        var box = isOut ? "out" : '<input type="checkbox" data-q="' + esc(id) + '"' + (ticked.indexOf(id) >= 0 ? " checked" : "") + ' title="Tick when he is ruled out">';
+        h += "<tr" + (isOut || ticked.indexOf(id) >= 0 ? ' class="out"' : "") + "><td>" + esc(p.n || "?") + "</td><td>" + esc(p.st || "") + "</td><td>" + (p.mpg !== undefined && p.mpg !== null ? (+p.mpg).toFixed(1) : "—") +
+             "</td><td>" + (p.ppg !== undefined && p.ppg !== null ? (+p.ppg).toFixed(1) : "—") + "</td><td>" + (p.pm !== undefined && p.pm !== null ? sgn(+p.pm, 1) : "—") + "</td><td>" + esc(p.note || "") + "</td><td>" + box + "</td></tr>";
+      });
+      h += "</tbody></table>";
+    });
+    el.innerHTML = h;
+  }
+  document.addEventListener("change", function (e) {
+    var t = e.target;
+    if (!t || !t.getAttribute || !t.getAttribute("data-q") || !$("nbaq")) return;
+    var id = t.getAttribute("data-q"), ticked = nbaTicked().filter(function (x) { return x !== id; });
+    if (t.checked) ticked.push(id);
+    $("nbaq").value = ticked.join(",");
+    $("nbaq").dispatchEvent(new Event("input", { bubbles: true }));
+  });
+
+  /* ---- the team table: an NBA page, same ordered first-hit-wins rule ------- */
+  TEAM_PATTERNS.NBA = [
+    ["Trail Blazers", /trail|blazer|portland|\bpor\b/],
+    ["76ers",         /76|sixers|philadelphia|\bphi\b/],
+    ["Timberwolves",  /timberwol|\bwolves\b|minnesota|\bmin\b/],
+    ["Hawks",         /hawk|atlanta|\batl\b/],
+    ["Celtics",       /celtic|boston|\bbos\b/],
+    ["Nets",          /\bnets?\b|brooklyn|\bbkn\b/],
+    ["Hornets",       /hornet|charlotte|\bcha\b/],
+    ["Bulls",         /\bbulls?\b|chicago|\bchi\b/],
+    ["Cavaliers",     /cavalier|\bcavs\b|cleveland|\bcle\b/],
+    ["Mavericks",     /maverick|\bmavs\b|dallas|\bdal\b/],
+    ["Nuggets",       /nugget|denver|\bden\b/],
+    ["Pistons",       /piston|detroit|\bdet\b/],
+    ["Warriors",      /warrior|golden state|\bgsw\b|\bgs\b/],
+    ["Rockets",       /rocket|houston|\bhou\b/],
+    ["Pacers",        /pacer|indiana|\bind\b/],
+    ["Clippers",      /clipper|\blac\b/],
+    ["Lakers",        /laker|\blal\b/],
+    ["Grizzlies",     /grizzl|memphis|\bmem\b/],
+    ["Heat",          /\bheat\b|miami|\bmia\b/],
+    ["Bucks",         /\bbucks?\b|milwaukee|\bmil\b/],
+    ["Pelicans",      /pelican|\bpels\b|new orleans|\bnop\b|\bno\b/],
+    ["Knicks",        /knick|\bnyk\b|\bny\b/],
+    ["Thunder",       /thunder|oklahoma|\bokc\b/],
+    ["Magic",         /magic|orlando|\borl\b/],
+    ["Suns",          /\bsuns?\b|phoenix|\bphx\b/],
+    ["Kings",         /\bkings?\b|sacramento|\bsac\b/],
+    ["Spurs",         /spur|san antonio|\bsas\b|\bsa\b/],
+    ["Raptors",       /raptor|toronto|\btor\b/],
+    ["Jazz",          /\bjazz\b|\butah\b|\buta\b/],
+    ["Wizards",       /wizard|washington|\bwas\b|\bwsh\b/]
+  ];
+  var canonTeamBaseNba = canonTeam, teamsForBaseNba = teamsFor;
+  canonTeam = function (sRaw, sport) {
+    if (sport !== "NBA") return canonTeamBaseNba(sRaw, sport);
+    var s = String(sRaw === undefined || sRaw === null ? "" : sRaw).trim();
+    if (!s) return "";
+    var low = s.toLowerCase(), list = TEAM_PATTERNS.NBA;
+    for (var i = 0; i < list.length; i++) if (list[i][1].test(low)) return list[i][0];
+    return s;
+  };
+  teamsFor = function (sport) {
+    if (sport !== "NBA") return teamsForBaseNba(sport);
+    return TEAM_PATTERNS.NBA.map(function (p) { return p[0]; }).sort();
+  };
+  /* ===== END NBA BLOCK ===== */
 
   /* ====================================================================
      Call Sheet 2.0 -- ported from totals/callsheet2.py. Everything above
@@ -2871,11 +3274,13 @@
                  "hml","aml","pl","plh","pla","p1line","p1op","p1up","nhlform","nhlctx","ntick","ncash","ap1l10","hp1l10","axgf","axga","hxgf","hxga","xglg",
                  "ngoalies","agname","hgname","agstart","hgstart","agok","hgok",
                  "odds","sharp","agf","aga","hgf","hga","lgg","angp","hngp","aenc","aens","henc","hens"];
-  var ALL = MLB_IDS.concat(WNBA_IDS).concat(NHL_IDS).filter(function (v, i, a) { return a.indexOf(v) === i; });
+  var NBA_IDS = ["away","home","line","op","up","opened","gdate","hml","aml","sp","sph","spa","h1line","h1op","h1up",
+                 "naort","nhort","nadrt","nhdrt","napace","nhpace","nagp","nhgp","nlrtg","nlpace","narest","nhrest","nbaout","nbaq","nbactx","odds","sharp"];
+  var ALL = MLB_IDS.concat(WNBA_IDS).concat(NHL_IDS).concat(NBA_IDS).filter(function (v, i, a) { return a.indexOf(v) === i; });
   var CHECKS = ["dome","playoff","agconf","hgconf","agbk","hgbk"];
-  function sportOf(s) { return s === "WNBA" ? "WNBA" : s === "NHL" ? "NHL" : "MLB"; }
-  /* the period market: the first five in baseball, the first period in hockey */
-  function isPeriod(mk) { return mk.key === "f5" || mk.key === "p1"; }
+  function sportOf(s) { return s === "WNBA" ? "WNBA" : s === "NHL" ? "NHL" : s === "NBA" ? "NBA" : "MLB"; }
+  /* the period market: the first five in baseball, the first period in hockey, the first half in the NBA */
+  function isPeriod(mk) { return mk.key === "f5" || mk.key === "p1" || mk.key === "h1"; }
   function snapshot() {
     var s = {};
     ALL.forEach(function (id) { s[id] = $(id).value; });
@@ -2884,7 +3289,7 @@
   }
   function scoreMatchup(sp, inputs) {
     var prev = SRC; SRC = inputs || null;
-    try { return sp === "NHL" ? forecastMatchupNhl() : sp === "WNBA" ? forecastMatchupWnba() : forecastMatchupMlb(); }
+    try { return sp === "NHL" ? forecastMatchupNhl() : sp === "NBA" ? forecastMatchupNba() : sp === "WNBA" ? forecastMatchupWnba() : forecastMatchupMlb(); }
     catch (e) { return null; }
     finally { SRC = prev; }
   }
@@ -2964,10 +3369,10 @@
   }
   function forecastText(m, sp) {
     var pj = projOf(m); if (!pj || pj.t === null) return "";
-    var unit = sp === "WNBA" ? "points" : sp === "NHL" ? "goals" : "runs", dp = sp === "WNBA" ? 0 : 1, parts = [];
+    var unit = (sp === "WNBA" || sp === "NBA") ? "points" : sp === "NHL" ? "goals" : "runs", dp = (sp === "WNBA" || sp === "NBA") ? 0 : 1, parts = [];
     if (pj.h !== null && pj.a !== null) parts.push(esc(m.away) + " " + pj.a.toFixed(dp) + " – " + esc(m.home) + " " + pj.h.toFixed(dp));
     parts.push("total " + pj.t.toFixed(dp) + " " + unit);
-    if (pj.q !== null) parts.push((sp === "NHL" ? "first period " : "first five ") + pj.q.toFixed(dp));
+    if (pj.q !== null) parts.push((sp === "NHL" ? "first period " : sp === "NBA" ? "first half " : "first five ") + pj.q.toFixed(dp));
     if (pj.ph !== null) { var hf = pj.ph >= 0.5; parts.push(esc(hf ? m.home : m.away) + " to win, " + Math.round((hf ? pj.ph : 1 - pj.ph) * 100) + "%"); }
     return "<b>Forecast</b> · " + parts.join(" · ") + ". <span class=\"dim\">What the sheet expects, betting aside; the record below keeps how close it lands against the market's line and the favourite.</span>";
   }
@@ -2997,14 +3402,14 @@
       if (r.proj.h !== null && r.proj.a !== null && fh !== fa) { s.nW++; if ((r.proj.h > r.proj.a) === (fh > fa)) s.w++; }
       var hml = numOf(r.inputs.hml), aml = numOf(r.inputs.aml);
       if (hml !== null && aml !== null && hml !== aml && fh !== fa) { s.nF++; if ((hml < aml) === (fh > fa)) s.fav++; }
-      var qa = parseFloat(r.finals.f5a), qh = parseFloat(r.finals.f5h), qline = numOf(sp === "NHL" ? r.inputs.p1line : r.inputs.f5line);
+      var qa = parseFloat(r.finals.f5a), qh = parseFloat(r.finals.f5h), qline = numOf(sp === "NHL" ? r.inputs.p1line : sp === "NBA" ? r.inputs.h1line : r.inputs.f5line);
       if (r.proj.q !== null && isFinite(qa) && isFinite(qh) && qline !== null) { s.nQ++; s.qmae += Math.abs(r.proj.q - (qa + qh)); s.qmkt += Math.abs(qline - (qa + qh)); }
     });
     return s;
   }
   function forecastBlock(sp) {
     var s = forecastStats(sp); if (!s.n) return "";
-    var unit = sp === "WNBA" ? "points" : sp === "NHL" ? "goals" : "runs", dp = sp === "WNBA" ? 1 : 2;
+    var unit = (sp === "WNBA" || sp === "NBA") ? "points" : sp === "NHL" ? "goals" : "runs", dp = (sp === "WNBA" || sp === "NBA") ? 1 : 2;
     /* colour for recognition (14 Oct 2026): the sheet's figure goes green when it beats the market's, red when it trails it */
     var tone = function (good, bad, text) { return good ? '<span class="up">' + text + '</span>' : bad ? '<span class="down">' + text + '</span>' : text; };
     var further = s.n - s.closer - s.tie;
@@ -3015,13 +3420,13 @@
       var wr = s.w / s.nW, fr = s.nF ? s.fav / s.nF : null;
       t += ' Winner called ' + tone(fr !== null && wr > fr + 1e-9, fr !== null && wr < fr - 1e-9, s.w + ' of ' + s.nW + ' (' + Math.round(100 * wr) + '%)') + (s.nF ? ', the favourite ' + s.fav + ' of ' + s.nF + ' (' + Math.round(100 * fr) + '%)' : '') + '.';
     }
-    if (s.nQ) t += ' ' + (sp === "NHL" ? 'First period' : 'First five') + ' projected ' + tone(s.qmae < s.qmkt - 1e-9, s.qmae > s.qmkt + 1e-9, (s.qmae / s.nQ).toFixed(dp)) + ' from the score, the line ' + (s.qmkt / s.nQ).toFixed(dp) + '.';
+    if (s.nQ) t += ' ' + (sp === "NHL" ? 'First period' : sp === "NBA" ? 'First half' : 'First five') + ' projected ' + tone(s.qmae < s.qmkt - 1e-9, s.qmae > s.qmkt + 1e-9, (s.qmae / s.nQ).toFixed(dp)) + ' from the score, the line ' + (s.qmkt / s.nQ).toFixed(dp) + '.';
     if (s.re) t += ' <span class="dim">' + s.re + ' row' + (s.re === 1 ? '' : 's') + ' re-scored with today\'s engine (logged before the forecast line).</span>';
     return '<div class="verdict forecast" data-sport="' + sp + '">' + t + '</div>';
   }
   function render() {
     var m;
-    try { m = sport === "NHL" ? forecastMatchupNhl() : sport === "WNBA" ? forecastMatchupWnba() : forecastMatchupMlb(); }
+    try { m = sport === "NHL" ? forecastMatchupNhl() : sport === "NBA" ? forecastMatchupNba() : sport === "WNBA" ? forecastMatchupWnba() : forecastMatchupMlb(); }
     catch (e) { m = null; }
     last = m;
     var box = $("markets"), why = $("why");
@@ -3037,7 +3442,7 @@
       var w = 0, l = 0, pu = 0;
       ranked.forEach(function (mk) { var r = gradeMarket(mk, fin); if (r === "win") w++; else if (r === "loss") l++; else if (r === "push") pu++; });
       var f5 = (fin.f5a !== undefined && fin.f5a !== "" && fin.f5h !== undefined && fin.f5h !== "")
-        ? (sport === "NHL" ? ' · after one ' : ' · after five ') + esc(fin.f5a) + '–' + esc(fin.f5h) : '';
+        ? (sport === "NHL" ? ' · after one ' : sport === "NBA" ? ' · at the half ' : ' · after five ') + esc(fin.f5a) + '–' + esc(fin.f5h) : '';
       html += '<div class="final"><b>Final: ' + esc(m.away) + ' ' + esc(fin.fa || "?") + ', ' + esc(m.home) + ' ' + esc(fin.fh || "?") + '</b>' + f5 +
         ' · this card went <b>' + w + '-' + l + (pu ? '-' + pu : '') + '</b>.' +
         (formLocked ? ' <b>Locked</b> — a graded row is a record. Press Clear to start a new card.' : ' Edit anything and the grading clears.') + '</div>';
@@ -3096,8 +3501,8 @@
     } else html += rows;
     if (m.lamHome !== null) {
       var t = m.lamHome + m.lamAway, ha = m.lamAway / t * 100;
-      html += '<div class="split"><i class="a" style="width:' + ha.toFixed(1) + '%">' + esc(m.away) + ' ' + m.lamAway.toFixed(sport === "WNBA" ? 1 : 2) + '</i>' +
-              '<i class="h" style="width:' + (100 - ha).toFixed(1) + '%">' + m.lamHome.toFixed(sport === "WNBA" ? 1 : 2) + ' ' + esc(m.home) + '</i></div>';
+      html += '<div class="split"><i class="a" style="width:' + ha.toFixed(1) + '%">' + esc(m.away) + ' ' + m.lamAway.toFixed((sport === "WNBA" || sport === "NBA") ? 1 : 2) + '</i>' +
+              '<i class="h" style="width:' + (100 - ha).toFixed(1) + '%">' + m.lamHome.toFixed((sport === "WNBA" || sport === "NBA") ? 1 : 2) + ' ' + esc(m.home) + '</i></div>';
     }
     box.innerHTML = html;
     why.innerHTML = m.notes.concat(m.total.notes).concat(lastFiveNote()).concat(shopNotes(m)).map(function (n) { return "<li>" + n + "</li>"; }).join("");
@@ -3423,7 +3828,7 @@
   }
   function periodName(k) { return k === "f5" ? "first five" : k === "p1" ? "first period" : "first half"; }
   function pickWhy(pk, m, sp) {
-    var mk = pk.mk, dp = sp === "WNBA" ? 1 : 2, unit = sp === "WNBA" ? "points" : sp === "NHL" ? "goals" : "runs", s;
+    var mk = pk.mk, dp = (sp === "WNBA" || sp === "NBA") ? 1 : 2, unit = (sp === "WNBA" || sp === "NBA") ? "points" : sp === "NHL" ? "goals" : "runs", s;
     var price = mk.price !== null && mk.price !== undefined
       ? ' At ' + sgn(mk.price, 0) + ' it needs ' + (mk.breakeven * 100).toFixed(1) + '%: ' + (mk.edge > 0 ? 'the price agrees.' : 'the price asks more than that chance, so this is the likeliest side, not a value bet.')
       : ' No price typed.';
@@ -3445,7 +3850,7 @@
       s = esc(mk.key === "ml" ? team + ' to win' : mk.pick) + ' at ' + (mk.p * 100).toFixed(1) + '%' +
           (split !== null ? ': the sheet\'s split projects ' + esc(split >= 0 ? m.home : m.away) + ' by ' + Math.abs(split).toFixed(dp) + ' ' + unit + ' (' + esc(m.away) + ' ' + m.lamAway.toFixed(dp) + ', ' + esc(m.home) + ' ' + m.lamHome.toFixed(dp) + ')' : '') + '.' +
           (sp === "WNBA" && mk.informed ? ' The four ratings move the margin off the book\'s number.'
-            : ' The sides carry no team information on this sheet in ' + (sp === "NHL" ? 'hockey (measured 12 Oct 2026 on two seasons: goals, shots, expected goals, form and the goalies added nothing to the moneyline, and the favourite lost four to seven cents on the dollar at the close)' : sp === "MLB" ? 'baseball (the pitchers and the pens score the total, not the margin)' : 'this game') +
+            : ' The sides carry no team information on this sheet in ' + (sp === "NHL" ? 'hockey (measured 12 Oct 2026 on two seasons: goals, shots, expected goals, form and the goalies added nothing to the moneyline, and the favourite lost four to seven cents on the dollar at the close)' : sp === "MLB" ? 'baseball (the pitchers and the pens score the total, not the margin)' : sp === "NBA" ? 'the NBA (measured 15 Oct 2026 on two seasons of closes: the pace and efficiency margin projection read 0.00 against the spread, and rest, travel, time zones and announced absences sat inside the number)' : 'this game') +
               ': this is the book\'s own number read back, and it is the likeliest thing on the board.') +
           ' ' + (mk.notes || []).join(' ');
     }
@@ -3509,7 +3914,7 @@
      not picked -- still on the rail, the board and the record, so it can
      come back the same way the run line can. The NHL entry is for Call Sheet
      3.0, which is built from this file: the total and the first period. */
-  var PICKABLE = { MLB: ["total", "f5"], WNBA: ["spread", "ml"], NHL: ["total", "p1"] };
+  var PICKABLE = { MLB: ["total", "f5"], WNBA: ["spread", "ml"], NHL: ["total", "p1"], NBA: ["total", "h1"] };
   /* 12 Oct 2026, at the user's request, for a week with last night as the
      first test: the hockey book picks the FULL-GAME TOTAL only, and every
      hockey total gets a side (callOf). Cut short the same day, once the odds
@@ -3536,6 +3941,7 @@
     if (sp === "WNBA" && mk.key !== "total") return "This side was stored without the four ratings, so it is the book's own price read back and carries no team information. Type the ratings (paste the stats.wnba.com table) and press Rescore, and the spread and the moneyline become pickable.";
     if (sp === "WNBA") return "The WNBA total leaned under by construction and went 6-7 on the first 13 (says 54.8%, does 46.2%); from 2 Oct the WNBA book picks the spread and the moneyline, which carry the ratings, and the total is listed and graded but never a straight bet or a parlay leg.";
     if (sp === "NHL" && mk.key === "p1") return "For games on 11 and 12 Oct the hockey book picked the full-game total only, at the user's request (a week's trial, cut short once the odds feed was in). The first period is listed and graded, never a straight bet or a parlay leg, on those two days.";
+    if (sp === "NBA") return "The spread and the moneyline are the book's own number through a normal margin at 12.5 points: measured priced against everything in the box score over two seasons of closes (15 Oct 2026). Listed and graded, never a straight bet or a parlay leg, until the record says otherwise.";
     if (sp === "NHL") return "Derived from the book's own moneyline with no team information behind it, like the run line, which said 52.5% and did 42.3% on its first 52. Listed and graded, never a straight bet or a parlay leg, until the record says otherwise.";
     return "Derived from the book's own moneyline with no team information behind it. On the first 52 graded games the run line said 52.5% and did 42.3%, so it is listed and graded but never a straight bet or a parlay leg.";
   }
@@ -3724,7 +4130,7 @@
     /* Only when the date has BOTH sports. With one, the columns repeat the
        two lists above word for word, which read as duplicates (29 Sept). */
     var sh = "";
-    var sportsOn = ["MLB", "NHL", "WNBA"].filter(function (sp) { return card.some(function (r) { return (r.gdate || "") === dateISO && r.sport === sp; }); });
+    var sportsOn = ["MLB", "NHL", "NBA", "WNBA"].filter(function (sp) { return card.some(function (r) { return (r.gdate || "") === dateISO && r.sport === sp; }); });
     $("bySportHead").hidden = sportsOn.length < 2;
     (sportsOn.length < 2 ? [] : sportsOn).forEach(function (sp) {
       var games = card.filter(function (r) { return (r.gdate || "") === dateISO && r.sport === sp; }).length;
@@ -3779,7 +4185,7 @@
   function setFormLock(on) {
     formLocked = !!on;
     ALL.concat(CHECKS).forEach(function (id) { $(id).disabled = formLocked; });
-    ["paste", "pasteFill", "add", "example", "m-mlb", "m-nhl", "m-wnba"].forEach(function (id) { $(id).disabled = formLocked; });
+    ["paste", "pasteFill", "add", "example", "m-mlb", "m-nhl", "m-nba", "m-wnba"].forEach(function (id) { $(id).disabled = formLocked; });
     $("lockNote").hidden = !formLocked;
   }
   function openedFinals() {
@@ -3820,9 +4226,9 @@
       /* The close is never read-only: it is typed the morning after, often
          after the finals have already locked the row. */
       var close = '<span class="finals"><span class="l">CLOSE</span><input class="grade close" data-id="' + r.id + '" data-k="ctot" value="' + esc(cl.ctot || "") + '" placeholder="' + (r.sport === "WNBA" ? "tot" : "tot") + '" inputmode="decimal" title="The full-game total the market closed at">' +
-        (r.sport !== "WNBA" ? '<input class="grade close" data-id="' + r.id + '" data-k="cf5" value="' + esc(cl.cf5 || "") + '" placeholder="' + (r.sport === "NHL" ? "P1" : "F5") + '" inputmode="decimal" title="The first-five total the market closed at">' : '') + '</span>';
+        (r.sport !== "WNBA" ? '<input class="grade close" data-id="' + r.id + '" data-k="cf5" value="' + esc(cl.cf5 || "") + '" placeholder="' + (r.sport === "NHL" ? "P1" : r.sport === "NBA" ? "1H" : "F5") + '" inputmode="decimal" title="The first-five total the market closed at">' : '') + '</span>';
       var f5 = r.sport !== "WNBA"
-        ? '<span class="finals"><span class="l">' + (r.sport === "NHL" ? "P1" : "F5") + '</span><input class="grade" data-id="' + r.id + '" data-k="f5a" value="' + esc(fin.f5a || "") + '" placeholder="A" inputmode="numeric"' + ro + '>' +
+        ? '<span class="finals"><span class="l">' + (r.sport === "NHL" ? "P1" : r.sport === "NBA" ? "1H" : "F5") + '</span><input class="grade" data-id="' + r.id + '" data-k="f5a" value="' + esc(fin.f5a || "") + '" placeholder="A" inputmode="numeric"' + ro + '>' +
           '<input class="grade" data-id="' + r.id + '" data-k="f5h" value="' + esc(fin.f5h || "") + '" placeholder="H" inputmode="numeric"' + ro + '></span>' : '';
       h += '<tr><td><span class="gdate' + (r.gdate === today ? ' today' : '') + '">' + esc(gameDate(r.gdate)) + '</span></td>' +
         '<td><button type="button" class="openbtn" data-open="' + r.id + '" title="Load into the form"><b>' + esc(r.matchup) + '</b><br><span class="gdate">' + esc(r.sport) + '</span>' +
@@ -3974,6 +4380,7 @@
       if (margin <= 1) s.dog++;
       if (margin >= 2) s.fav15++;
     });
+    if (sp === "NBA") return "";   // the +1.5 columns are hockey's; the NBA favourite reads on the spread
     if (!Object.keys(b).length && sp !== "NHL") return "";
     var h = '<div class="verdict favs" data-sport="' + sp + '"><b>The favourite, by price.</b> The favourite\'s record against what its price implied, the dog +1.5 and the favourite −1.5, and the favourite\'s moneyline return, over this card\'s graded games with both prices typed' +
       (sp === "NHL" ? '; in grey, two seasons at the close (2,616 games, measured 12 Oct 2026)' : '') + '. The base rate the pick is read against; nothing here moves a number. ' +
@@ -3998,6 +4405,7 @@
   function renderCalib() {
     var KEYS = { MLB: [["total","Full-game total"],["f5","First five"],["ml","Moneyline"],["rl","Run line"]],
                  NHL: [["total","Full-game total"],["p1","First period"],["ml","Moneyline"],["pl","Puck line"]],
+                 NBA: [["total","Full-game total"],["h1","First half"],["ml","Moneyline"],["spread","Spread"]],
                  WNBA: [["total","Full-game total"],["ml","Moneyline"],["spread","Spread"]] };
     var box = $("calibBox");
     backfillProj();
@@ -4008,7 +4416,7 @@
     var fresh = function (label) { return { n: 0, w: 0, l: 0, p: 0, says: 0, units: 0, label: label, sides: {}, verdict: null, profile: null, lean: {}, grain: null, crowd: {}, high: null, b2b: null, backup: null, goalie: {}, call: null,
                                             clv: { n: 0, beat: 0, lost: 0, even: 0, runs: 0 } }; };
     var bySport = {};
-    ["MLB", "NHL", "WNBA"].forEach(function (sp) {
+    ["MLB", "NHL", "NBA", "WNBA"].forEach(function (sp) {
       var b = { stats: {}, pick: fresh("The pick"), top: fresh("The parlay four"), topE: fresh("Best straight bets"), any: false };
       KEYS[sp].forEach(function (k) { b.stats[k[0]] = fresh(k[1]); });
       bySport[sp] = b;
@@ -4098,9 +4506,10 @@
        invisible until their first graded game). */
     var EMPTY_NOTE = { MLB: "Nothing graded yet. Type the final and the first-five score on the card and the four markets grade themselves.",
                        NHL: "Nothing graded yet. Type the final and the first-period score on the card and the four markets grade themselves; a shootout win grades as a one-goal margin.",
+                       NBA: "Nothing graded yet. Type the final and the half-time score on the card and the four markets grade themselves.",
                        WNBA: "Nothing graded yet. Type the final on the card and the three markets grade themselves. The WNBA log on 2.0 comes over with Load a backup." };
     var h = '';
-    if (!bySport.MLB.any && !bySport.NHL.any && !bySport.WNBA.any) {
+    if (!bySport.MLB.any && !bySport.NHL.any && !bySport.NBA.any && !bySport.WNBA.any) {
       h += '<p class="note">Enter finals on the card — away and home runs, and the first-five runs for MLB — and every market grades itself, one block per sport.</p>';
     }
     var tiles = function (s, unit) {
@@ -4128,7 +4537,7 @@
         '<p class="s">' + (s.n ? 'says ' + says.toFixed(1) + '% · does ' + does.toFixed(1) + '% (±' + se.toFixed(1) + ') · ' + sgn(s.units, 2) + 'u' : 'pushes only') + '</p>' +
         (parts.length ? '<p class="s sides">' + esc(parts.join(' · ')) + '</p>' : '') + '</div>';
     };
-    ["MLB", "NHL", "WNBA"].forEach(function (sp) {
+    ["MLB", "NHL", "NBA", "WNBA"].forEach(function (sp) {
       var b = bySport[sp];
       if (!b.any) {
         h += '<div class="subhead" data-sport="' + sp + '">' + sp + ' <span class="tag">nothing graded yet</span></div>' +
@@ -4140,13 +4549,13 @@
       h += '<div class="subhead" data-sport="' + sp + '">' + sp + ' <span class="tag">' + graded + ' graded game' + (graded === 1 ? '' : 's') + ' · ' + totalN + ' graded markets</span></div>';
       h += forecastBlock(sp);
       h += favBlock(sp);
-      var unit = sp === "WNBA" ? "pts" : sp === "NHL" ? "goals" : "runs";
+      var unit = (sp === "WNBA" || sp === "NBA") ? "pts" : sp === "NHL" ? "goals" : "runs";
       h += '<div class="calib" data-sport="' + sp + '">' + tiles(b.pick, unit) + KEYS[sp].map(function (k) { return tiles(b.stats[k[0]], unit); }).join('') + tiles(b.top, unit) + tiles(b.topE, unit) + '</div>';
       h += '<div class="verdict">' + (totalN < 30
         ? '<b>' + totalN + ' graded ' + sp + ' markets.</b> Nothing here can be read yet — one standard error on a hit rate is ' +
           (totalN ? (100 / Math.sqrt(totalN) / 2).toFixed(0) : '—') + ' points at this size. ' +
           (sp === "MLB" ? 'The run line and the moneyline are shown, not picked, since 27 Sept: watch whether the run line\'s <i>does</i> climbs back toward its <i>says</i>; it comes back at 150 picks if it does. The two fours are the reason the sheet exists.'
-                        : sp === "NHL" ? 'The puck line and the moneyline are shown, not picked, from the first game: every constant in the hockey book is a priori, and the record decides which earns a weight. The total and the first period are the pickable markets.' : 'With seven games in the season book and this sheet newer than that, the WNBA block will read as noise for weeks; it is here so the two sports never get pooled.')
+                        : sp === "NHL" ? 'The puck line and the moneyline are shown, not picked, from the first game: every constant in the hockey book is a priori, and the record decides which earns a weight. The total and the first period are the pickable markets.' : sp === "NBA" ? 'The spread and the moneyline are shown, not picked: measured priced against everything in the box score over two seasons of closes. The total and the first half are the pickable markets; the ratings fade and the stage deltas are tagged, and the record decides what they earn.' : 'With seven games in the season book and this sheet newer than that, the WNBA block will read as noise for weeks; it is here so the two sports never get pooled.')
         : '<b>' + totalN + ' graded ' + sp + ' markets.</b> Compare each market\'s <i>does</i> against its <i>says</i> before believing either; ' +
           'and compare each four against the blind rate of everything logged, not against 50%. The parlay four and the straight bets will differ most nights; the units column is the referee.') + '</div>';
     });
@@ -4205,13 +4614,14 @@
     $("m-mlb").setAttribute("aria-pressed", s === "MLB" ? "true" : "false");
     $("m-wnba").setAttribute("aria-pressed", s === "WNBA" ? "true" : "false");
     $("m-nhl").setAttribute("aria-pressed", s === "NHL" ? "true" : "false");
-    $("mlbFields").hidden = s !== "MLB"; $("wnbaFields").hidden = s !== "WNBA"; $("nhlFields").hidden = s !== "NHL";
-    $("rlFields").hidden = s !== "MLB"; $("f5Fields").hidden = s !== "MLB"; $("spFields").hidden = s !== "WNBA";
-    $("plFields").hidden = s !== "NHL"; $("p1Fields").hidden = s !== "NHL";
+    $("m-nba").setAttribute("aria-pressed", s === "NBA" ? "true" : "false");
+    $("mlbFields").hidden = s !== "MLB"; $("wnbaFields").hidden = s !== "WNBA"; $("nhlFields").hidden = s !== "NHL"; $("nbaFields").hidden = s !== "NBA";
+    $("rlFields").hidden = s !== "MLB"; $("f5Fields").hidden = s !== "MLB"; $("spFields").hidden = s !== "WNBA" && s !== "NBA";
+    $("plFields").hidden = s !== "NHL"; $("p1Fields").hidden = s !== "NHL"; $("h1Fields").hidden = s !== "NBA";
     $("eyebrow").textContent = s + " · every market on the game";
-    $("lineLabel").textContent = s === "WNBA" ? "Total (points)" : s === "NHL" ? "Total (goals)" : "Total (runs)";
-    $("line").placeholder = s === "WNBA" ? "165.5" : s === "NHL" ? "6" : "8.5";
-    $("opened").placeholder = s === "WNBA" ? "165.5" : s === "NHL" ? "6" : "8.5";
+    $("lineLabel").textContent = (s === "WNBA" || s === "NBA") ? "Total (points)" : s === "NHL" ? "Total (goals)" : "Total (runs)";
+    $("line").placeholder = s === "WNBA" ? "165.5" : s === "NBA" ? "228.5" : s === "NHL" ? "6" : "8.5";
+    $("opened").placeholder = s === "WNBA" ? "165.5" : s === "NBA" ? "228.5" : s === "NHL" ? "6" : "8.5";
     var dl = $("teamList"); dl.innerHTML = teamsFor(s).map(function (t) { return '<option value="' + esc(t) + '">'; }).join("");
     if (!quiet) onEdit();
   }
@@ -4261,6 +4671,10 @@
         aml: "130", hml: "-150", pl: "-1.5", plh: "180", pla: "-220", p1line: "1.5", p1op: "-120", p1up: "100",
         agsv: "0.912", hgsv: "0.921", agsh: "1400", hgsh: "1900", asf: "31.2", hsf: "33.4",
         app: "22.1", hpp: "24.8", apk: "80.2", hpk: "78.1", al10: "5.9", hl10: "6.4", h2h: "6.3", h2hn: "3", arest: "0", hrest: "2" });
+    } else if (sport === "NBA") {
+      restore({ away: "Knicks", home: "Celtics", line: "228.5", op: "-110", up: "-110", gdate: $("gdate").value,
+        aml: "205", hml: "-250", sp: "-6.5", sph: "-110", spa: "-110", h1line: "114.5", h1op: "-110", h1up: "-110",
+        naort: "116.0", nadrt: "113.5", nhort: "118.2", nhdrt: "109.8", napace: "99.8", nhpace: "97.9", nagp: "20", nhgp: "21", narest: "0", nhrest: "2" });
     } else {
       restore({ away: "Sun", home: "Mystics", line: "162.5", op: "118", up: "-155", gdate: $("gdate").value,
         aml: "160", hml: "-190", sp: "-4.5", sph: "-110", spa: "-110",
@@ -4286,7 +4700,7 @@
       out.push("  " + x.rank + ". " + (x.fav ? "★ " : "") + x.row.matchup + " — " + x.mk.pick + "  " + (x.mk.p * 100).toFixed(1) + "%  " + sgn(x.mk.price, 0) + "  edge " + sgn(x.mk.edge * 100, 1) + (x.fav ? "  [the one it likes most tonight]" : "") +
         (x.tier === "verdict" ? "  [#1: " + bandOf(x.mk) + (x.thin ? ", price steeper than the chance" : "") + "]" : x.tier === "call" ? "  [the call, " + NHL_TOTAL_ONLY_LABEL + ": the likelier side" + (x.thin ? ", price steeper than the chance" : "") + "]" : x.tier === "rule" ? "  [cheaper side, a rule: " + recText(shadeRecord()) + "]" : "  [value]"));
     });
-    ["MLB", "NHL", "WNBA"].forEach(function (sp) {
+    ["MLB", "NHL", "NBA", "WNBA"].forEach(function (sp) {
       var sl = parlayFour(dateISO, sp), sb = bestBets(dateISO, sp);
       if (!sl.length && !sb.length) return;
       out.push(sp + " ONLY");
@@ -4304,6 +4718,7 @@
   $("m-mlb").addEventListener("click", function () { setSport("MLB"); });
   $("m-wnba").addEventListener("click", function () { setSport("WNBA"); });
   $("m-nhl").addEventListener("click", function () { setSport("NHL"); });
+  $("m-nba").addEventListener("click", function () { setSport("NBA"); });
   ALL.forEach(function (id) { $(id).addEventListener("input", onEdit); $(id).addEventListener("change", onEdit); });
   CHECKS.forEach(function (id) { $(id).addEventListener("change", onEdit); });
   $("byEdge").addEventListener("change", function () { renderBoard(); });
@@ -4433,7 +4848,8 @@
                       "agsv","hgsv","agsh","hgsh","asf","hsf","app","hpp","apk","hpk","nhlform","nhlctx","ap1l10","hp1l10","axgf","axga","hxgf","hxga","xglg",
                       "ngoalies","agname","hgname",
                       "pl","plh","pla","p1line","p1op","p1up",
-                      "agf","aga","hgf","hga","lgg","angp","hngp","aenc","aens","henc","hens"];
+                      "agf","aga","hgf","hga","lgg","angp","hngp","aenc","aens","henc","hens",
+                      "sp","sph","spa","h1line","h1op","h1up","naort","nhort","nadrt","nhdrt","napace","nhpace","nagp","nhgp","nlrtg","nlpace","narest","nhrest","nbaout","nbactx"];
   function blank(v) { return v === undefined || v === null || String(v).trim() === ""; }
   function sameGame(row, g) {
     var sp = sportOf(g.sport);
@@ -4504,7 +4920,7 @@
     var prior = ((slate && slate.games) || []);
     incoming.forEach(function (g) {
       prior.forEach(function (k) {
-        var ksp = k.sport === "WNBA" ? "WNBA" : (k.sport === "NHL" ? "NHL" : "MLB");
+        var ksp = sportOf(k.sport);
         if ((k.gdate || "") !== (g.gdate || "") || !sameGame({ gdate: k.gdate, sport: ksp, away: k.away, home: k.home }, g)) return;
         Object.keys(k.inputs || {}).forEach(function (key) { if (blank(g.inputs[key]) && !blank(k.inputs[key])) g.inputs[key] = k.inputs[key]; });
         ["starters", "goalies", "form"].forEach(function (f) { if (g[f] === undefined && k[f] !== undefined) g[f] = k[f]; });

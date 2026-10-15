@@ -13,6 +13,7 @@ from __future__ import annotations
 import json
 import pathlib
 
+from totals import nba as NB
 from totals import nhl as N
 
 HERE = pathlib.Path(__file__).parent
@@ -53,6 +54,70 @@ def build_nhl(i: dict):
         away_gf=n(i.get("agf")), away_ga=n(i.get("aga")), home_gf=n(i.get("hgf")), home_ga=n(i.get("hga")),
         league_gpg=n(i.get("lgg")), away_games=n(i.get("angp")), home_games=n(i.get("hngp")),
         away_en_conceded=n(i.get("aenc")), away_en_scored=n(i.get("aens")), home_en_conceded=n(i.get("henc")), home_en_scored=n(i.get("hens")))
+
+
+def build_nba(i: dict):
+    away, home = i.get("away") or "Away", i.get("home") or "Home"
+    out = {"away": 0.0, "home": 0.0}
+    try:
+        lst = json.loads(i["nbaout"]) if i.get("nbaout") else {}
+        ticked = set(x for x in str(i.get("nbaq") or "").split(",") if x)
+        for side in ("away", "home"):
+            for p in lst.get(side) or []:
+                is_out = str(p.get("st", "")).lower().startswith("out") or str(p.get("id", p.get("n"))) in ticked
+                if is_out and float(p.get("mpg") or 0) >= NB.REGULAR_MPG:
+                    out[side] += float(p["mpg"])
+    except (TypeError, ValueError):
+        pass
+    return NB.forecast_matchup_nba(
+        away, home, total_line=float(i["line"]), over_price=n(i.get("op")), under_price=n(i.get("up")),
+        home_ml=n(i.get("hml")), away_ml=n(i.get("aml")),
+        spread=n(i.get("sp")), spread_home_price=n(i.get("sph")), spread_away_price=n(i.get("spa")),
+        h1_line=n(i.get("h1line")), h1_over_price=n(i.get("h1op")), h1_under_price=n(i.get("h1up")),
+        away_ort=n(i.get("naort")), home_ort=n(i.get("nhort")), away_drt=n(i.get("nadrt")), home_drt=n(i.get("nhdrt")),
+        away_pace=n(i.get("napace")), home_pace=n(i.get("nhpace")), away_games=n(i.get("nagp")), home_games=n(i.get("nhgp")),
+        league_rating=n(i.get("nlrtg")), league_pace=n(i.get("nlpace")),
+        away_rest_days=n(i.get("narest")), home_rest_days=n(i.get("nhrest")),
+        away_out_minutes=out["away"] or None, home_out_minutes=out["home"] or None,
+        game_date=i.get("gdate"))
+
+
+NBA_FULL = dict(naort="116.0", nadrt="113.5", nhort="118.2", nhdrt="109.8", napace="99.8", nhpace="97.9", nagp="20", nhgp="21")
+NBA_CASES = [
+    {"name": "the example card: total, half, spread and moneyline, the ratings faded",
+     "inputs": dict(away="Knicks", home="Celtics", line="228.5", op="-110", up="-110", hml="-250", aml="205", sp="-6.5", sph="-110", spa="-110",
+                    h1line="114.5", h1op="-110", h1up="-110", narest="0", nhrest="2", **NBA_FULL)},
+    {"name": "nothing but the number: a coin flip on a whole-number line with a real push",
+     "inputs": dict(away="A", home="B", line="228")},
+    {"name": "a half line, prices leaning over, no ratings",
+     "inputs": dict(away="Lakers", home="Warriors", line="232.5", op="-125", up="105", hml="120", aml="-140")},
+    {"name": "two high-rated offences pull the line DOWN: the fade, tagged, no band",
+     "inputs": dict(away="Pacers", home="Hawks", line="235.5", op="-110", up="-110", naort="121.0", nadrt="116.0", nhort="120.0", nhdrt="117.0",
+                    napace="104.0", nhpace="103.0", nagp="15", nhgp="14")},
+    {"name": "the same ratings past fifty games: shown, not scored",
+     "inputs": dict(away="Pacers", home="Hawks", line="235.5", op="-110", up="-110", naort="121.0", nadrt="116.0", nhort="120.0", nhdrt="117.0",
+                    napace="104.0", nhpace="103.0", nagp="55", nhgp="52")},
+    {"name": "the same ratings on nine games: shown until ten",
+     "inputs": dict(away="Pacers", home="Hawks", line="235.5", op="-110", up="-110", naort="121.0", nadrt="116.0", nhort="120.0", nhdrt="117.0",
+                    napace="104.0", nhpace="103.0", nagp="9", nhgp="12")},
+    {"name": "after the trade deadline: +1.0 on the line, tagged",
+     "inputs": dict(away="Bulls", home="Heat", line="222.5", op="-110", up="-110", gdate="2027-03-01")},
+    {"name": "the last two weeks: +2.0 on the line, tagged, with the half carrying its share",
+     "inputs": dict(away="Bulls", home="Heat", line="222.5", op="-110", up="-110", gdate="2027-04-06", h1line="111.5", h1op="-115", h1up="-105")},
+    {"name": "a priced spread moves fair off the number; the home favourite of ten is watched",
+     "inputs": dict(away="Wizards", home="Thunder", line="226.5", op="-110", up="-110", sp="-14.5", sph="-120", spa="100", hml="-1000", aml="650")},
+    {"name": "the moneyline alone gives the margin",
+     "inputs": dict(away="Spurs", home="Rockets", line="224.5", op="-105", up="-115", hml="-180", aml="150")},
+    {"name": "who is out: the regulars' minutes shown, not scored; the Nuggets watched",
+     "inputs": dict(away="Nuggets", home="Jazz", line="236.5", op="-110", up="-110", nagp="12", nhgp="12",
+                    nbaout=json.dumps({"away": [{"id": "1", "n": "Nikola Jokic", "st": "Out", "mpg": 36.2, "ppg": 28.1, "pm": 9.4, "note": "rest"},
+                                                {"id": "2", "n": "Bench Guy", "st": "Out", "mpg": 8.0, "ppg": 2.0, "pm": -1.0}],
+                                       "home": [{"id": "3", "n": "Lauri Markkanen", "st": "Questionable", "mpg": 33.0, "ppg": 24.0, "pm": 1.0}]}), nbaq="3")},
+    {"name": "a wide hold on the total is regressed as an alternate",
+     "inputs": dict(away="Magic", home="Pistons", line="214.5", op="-150", up="120", hml="-105", aml="-115")},
+    {"name": "one price only: the other side is rebuilt",
+     "inputs": dict(away="Kings", home="Suns", line="230.5", op="-120")},
+]
 
 
 FULL = dict(agsv="0.912", hgsv="0.921", agsh="1400", hgsh="1900", asf="31.2", hsf="33.4",
@@ -124,9 +189,11 @@ def main() -> None:
         c.pop("expect", None)
     # every hockey case carries a date, because October carries a delta: November unless the case says
     cases.extend({"sport": "NHL", "name": c["name"], "inputs": dict({"gdate": "2026-11-15"}, **c["inputs"])} for c in NHL_CASES)
+    # every basketball case carries a date, because the stage of the season carries a delta: December unless the case says
+    cases.extend({"sport": "NBA", "name": c["name"], "inputs": dict({"gdate": "2026-12-10"}, **c["inputs"])} for c in NBA_CASES)
     from tools_gen_callsheet2_cases import build as build_mlb
     for c in cases:
-        m = build_nhl(c["inputs"]) if c["sport"] == "NHL" else build_mlb(c)
+        m = build_nhl(c["inputs"]) if c["sport"] == "NHL" else build_nba(c["inputs"]) if c["sport"] == "NBA" else build_mlb(c)
         c["expect"] = {
             "lam_home": None if m.lam_home is None else round(m.lam_home, 8),
             "lam_away": None if m.lam_away is None else round(m.lam_away, 8),
@@ -139,8 +206,8 @@ def main() -> None:
             } for mk in m.ranked()],
         }
     OUT.write_text(json.dumps(cases, indent=2) + "\n")
-    by = {sp: sum(1 for c in cases if c["sport"] == sp) for sp in ("MLB", "NHL", "WNBA")}
-    print(f"{len(cases)} cases written ({by['MLB']} MLB, {by['NHL']} NHL, {by['WNBA']} WNBA)")
+    by = {sp: sum(1 for c in cases if c["sport"] == sp) for sp in ("MLB", "NHL", "NBA", "WNBA")}
+    print(f"{len(cases)} cases written ({by['MLB']} MLB, {by['NHL']} NHL, {by['NBA']} NBA, {by['WNBA']} WNBA)")
 
 
 if __name__ == "__main__":

@@ -5819,5 +5819,573 @@
         }
       ]
     }
+  },
+  {
+    "sport": "NBA",
+    "name": "the example card: total, half, spread and moneyline, the ratings faded",
+    "inputs": {
+      "gdate": "2026-12-10",
+      "away": "Knicks",
+      "home": "Celtics",
+      "line": "228.5",
+      "op": "-110",
+      "up": "-110",
+      "hml": "-250",
+      "aml": "205",
+      "sp": "-6.5",
+      "sph": "-110",
+      "spa": "-110",
+      "h1line": "114.5",
+      "h1op": "-110",
+      "h1up": "-110",
+      "narest": "0",
+      "nhrest": "2",
+      "naort": "116.0",
+      "nadrt": "113.5",
+      "nhort": "118.2",
+      "nhdrt": "109.8",
+      "napace": "99.8",
+      "nhpace": "97.9",
+      "nagp": "20",
+      "nhgp": "21"
+    },
+    "expect": {
+      "lam_home": 117.44182188,
+      "lam_away": 110.94182188,
+      "projected": 228.38364375,
+      "markets": [
+        {
+          "key": "ml",
+          "pick": "Celtics ML",
+          "side": "HOME",
+          "p": 0.69846821,
+          "p_push": 0.0,
+          "price": -250.0,
+          "edge": -0.0158175,
+          "fair": -231.64,
+          "anchored": true,
+          "band": ""
+        },
+        {
+          "key": "total",
+          "pick": "UNDER 228.5",
+          "side": "UNDER",
+          "p": 0.50257884,
+          "p_push": 0.0,
+          "price": -110.0,
+          "edge": -0.02123068,
+          "fair": -101.0369,
+          "anchored": true,
+          "band": "NO BET"
+        },
+        {
+          "key": "h1",
+          "pick": "1H UNDER 114.5",
+          "side": "UNDER",
+          "p": 0.50196443,
+          "p_push": 0.0,
+          "price": -110.0,
+          "edge": -0.02184509,
+          "fair": -100.7889,
+          "anchored": true,
+          "band": ""
+        },
+        {
+          "key": "spread",
+          "pick": "Celtics -6.5",
+          "side": "HOME",
+          "p": 0.5,
+          "p_push": 0.0,
+          "price": -110.0,
+          "edge": -0.02380952,
+          "fair": 100.0,
+          "anchored": true,
+          "band": ""
+        }
+      ]
+    }
+  },
+  {
+    "sport": "NBA",
+    "name": "nothing but the number: a coin flip on a whole-number line with a real push",
+    "inputs": {
+      "gdate": "2026-12-10",
+      "away": "A",
+      "home": "B",
+      "line": "228"
+    },
+    "expect": {
+      "lam_home": null,
+      "lam_away": null,
+      "projected": 228.0,
+      "markets": [
+        {
+          "key": "total",
+          "pick": "OVER 228",
+          "side": "OVER",
+          "p": 0.5,
+          "p_push": 0.02216061,
+          "price": null,
+          "edge": null,
+          "fair": 100.0,
+          "anchored": true,
+          "band": "NO BET"
+        }
+      ]
+    }
+  },
+  {
+    "sport": "NBA",
+    "name": "a half line, prices leaning over, no ratings",
+    "inputs": {
+      "gdate": "2026-12-10",
+      "away": "Lakers",
+      "home": "Warriors",
+      "line": "232.5",
+      "op": "-125",
+      "up": "105",
+      "hml": "120",
+      "aml": "-140"
+    },
+    "expect": {
+      "lam_home": 116.00731039,
+      "lam_away": 117.95922311,
+      "projected": 233.9665335,
+      "markets": [
+        {
+          "key": "ml",
+          "pick": "Warriors ML",
+          "side": "HOME",
+          "p": 0.4379562,
+          "p_push": 0.0,
+          "price": 120.0,
+          "edge": -0.01658925,
+          "fair": 128.3333,
+          "anchored": true,
+          "band": ""
+        },
+        {
+          "key": "total",
+          "pick": "UNDER 232.5",
+          "side": "UNDER",
+          "p": 0.46753247,
+          "p_push": 0.0,
+          "price": 105.0,
+          "edge": -0.02027241,
+          "fair": 113.8889,
+          "anchored": true,
+          "band": ""
+        }
+      ]
+    }
+  },
+  {
+    "sport": "NBA",
+    "name": "two high-rated offences pull the line DOWN: the fade, tagged, no band",
+    "inputs": {
+      "gdate": "2026-12-10",
+      "away": "Pacers",
+      "home": "Hawks",
+      "line": "235.5",
+      "op": "-110",
+      "up": "-110",
+      "naort": "121.0",
+      "nadrt": "116.0",
+      "nhort": "120.0",
+      "nhdrt": "117.0",
+      "napace": "104.0",
+      "nhpace": "103.0",
+      "nagp": "15",
+      "nhgp": "14"
+    },
+    "expect": {
+      "lam_home": null,
+      "lam_away": null,
+      "projected": 233.25577941,
+      "markets": [
+        {
+          "key": "total",
+          "pick": "UNDER 235.5",
+          "side": "UNDER",
+          "p": 0.54961113,
+          "p_push": 0.0,
+          "price": -110.0,
+          "edge": 0.0258016,
+          "fair": -122.0304,
+          "anchored": true,
+          "band": "NO BET"
+        }
+      ]
+    }
+  },
+  {
+    "sport": "NBA",
+    "name": "the same ratings past fifty games: shown, not scored",
+    "inputs": {
+      "gdate": "2026-12-10",
+      "away": "Pacers",
+      "home": "Hawks",
+      "line": "235.5",
+      "op": "-110",
+      "up": "-110",
+      "naort": "121.0",
+      "nadrt": "116.0",
+      "nhort": "120.0",
+      "nhdrt": "117.0",
+      "napace": "104.0",
+      "nhpace": "103.0",
+      "nagp": "55",
+      "nhgp": "52"
+    },
+    "expect": {
+      "lam_home": null,
+      "lam_away": null,
+      "projected": 235.5,
+      "markets": [
+        {
+          "key": "total",
+          "pick": "OVER 235.5",
+          "side": "OVER",
+          "p": 0.5,
+          "p_push": 0.0,
+          "price": -110.0,
+          "edge": -0.02380952,
+          "fair": 100.0,
+          "anchored": true,
+          "band": "NO BET"
+        }
+      ]
+    }
+  },
+  {
+    "sport": "NBA",
+    "name": "the same ratings on nine games: shown until ten",
+    "inputs": {
+      "gdate": "2026-12-10",
+      "away": "Pacers",
+      "home": "Hawks",
+      "line": "235.5",
+      "op": "-110",
+      "up": "-110",
+      "naort": "121.0",
+      "nadrt": "116.0",
+      "nhort": "120.0",
+      "nhdrt": "117.0",
+      "napace": "104.0",
+      "nhpace": "103.0",
+      "nagp": "9",
+      "nhgp": "12"
+    },
+    "expect": {
+      "lam_home": null,
+      "lam_away": null,
+      "projected": 235.5,
+      "markets": [
+        {
+          "key": "total",
+          "pick": "OVER 235.5",
+          "side": "OVER",
+          "p": 0.5,
+          "p_push": 0.0,
+          "price": -110.0,
+          "edge": -0.02380952,
+          "fair": 100.0,
+          "anchored": true,
+          "band": "NO BET"
+        }
+      ]
+    }
+  },
+  {
+    "sport": "NBA",
+    "name": "after the trade deadline: +1.0 on the line, tagged",
+    "inputs": {
+      "gdate": "2027-03-01",
+      "away": "Bulls",
+      "home": "Heat",
+      "line": "222.5",
+      "op": "-110",
+      "up": "-110"
+    },
+    "expect": {
+      "lam_home": null,
+      "lam_away": null,
+      "projected": 223.5,
+      "markets": [
+        {
+          "key": "total",
+          "pick": "OVER 222.5",
+          "side": "OVER",
+          "p": 0.52215206,
+          "p_push": 0.0,
+          "price": -110.0,
+          "edge": -0.00165746,
+          "fair": -109.2716,
+          "anchored": true,
+          "band": "NO BET"
+        }
+      ]
+    }
+  },
+  {
+    "sport": "NBA",
+    "name": "the last two weeks: +2.0 on the line, tagged, with the half carrying its share",
+    "inputs": {
+      "gdate": "2027-04-06",
+      "away": "Bulls",
+      "home": "Heat",
+      "line": "222.5",
+      "op": "-110",
+      "up": "-110",
+      "h1line": "111.5",
+      "h1op": "-115",
+      "h1up": "-105"
+    },
+    "expect": {
+      "lam_home": null,
+      "lam_away": null,
+      "projected": 224.5,
+      "markets": [
+        {
+          "key": "total",
+          "pick": "OVER 222.5",
+          "side": "OVER",
+          "p": 0.54423588,
+          "p_push": 0.0,
+          "price": -110.0,
+          "edge": 0.02042636,
+          "fair": -119.4117,
+          "anchored": true,
+          "band": "NO BET"
+        },
+        {
+          "key": "h1",
+          "pick": "1H OVER 111.5",
+          "side": "OVER",
+          "p": 0.54450877,
+          "p_push": 0.0,
+          "price": -115.0,
+          "edge": 0.00962505,
+          "fair": -119.5432,
+          "anchored": true,
+          "band": ""
+        }
+      ]
+    }
+  },
+  {
+    "sport": "NBA",
+    "name": "a priced spread moves fair off the number; the home favourite of ten is watched",
+    "inputs": {
+      "gdate": "2026-12-10",
+      "away": "Wizards",
+      "home": "Thunder",
+      "line": "226.5",
+      "op": "-110",
+      "up": "-110",
+      "sp": "-14.5",
+      "sph": "-120",
+      "spa": "100",
+      "hml": "-1000",
+      "aml": "650"
+    },
+    "expect": {
+      "lam_home": 120.84074322,
+      "lam_away": 105.65925678,
+      "projected": 226.5,
+      "markets": [
+        {
+          "key": "ml",
+          "pick": "Wizards ML",
+          "side": "AWAY",
+          "p": 0.11227482,
+          "p_push": 0.0,
+          "price": 650.0,
+          "edge": -0.02105852,
+          "fair": 790.6717,
+          "anchored": true,
+          "band": ""
+        },
+        {
+          "key": "spread",
+          "pick": "Wizards +14.5",
+          "side": "AWAY",
+          "p": 0.47826087,
+          "p_push": 0.0,
+          "price": 100.0,
+          "edge": -0.02173913,
+          "fair": 109.0909,
+          "anchored": true,
+          "band": ""
+        },
+        {
+          "key": "total",
+          "pick": "OVER 226.5",
+          "side": "OVER",
+          "p": 0.5,
+          "p_push": 0.0,
+          "price": -110.0,
+          "edge": -0.02380952,
+          "fair": 100.0,
+          "anchored": true,
+          "band": "NO BET"
+        }
+      ]
+    }
+  },
+  {
+    "sport": "NBA",
+    "name": "the moneyline alone gives the margin",
+    "inputs": {
+      "gdate": "2026-12-10",
+      "away": "Spurs",
+      "home": "Rockets",
+      "line": "224.5",
+      "op": "-105",
+      "up": "-115",
+      "hml": "-180",
+      "aml": "150"
+    },
+    "expect": {
+      "lam_home": 113.85642734,
+      "lam_away": 110.15467931,
+      "projected": 224.01110665,
+      "markets": [
+        {
+          "key": "ml",
+          "pick": "Spurs ML",
+          "side": "AWAY",
+          "p": 0.38356164,
+          "p_push": 0.0,
+          "price": 150.0,
+          "edge": -0.01643836,
+          "fair": 160.7143,
+          "anchored": true,
+          "band": ""
+        },
+        {
+          "key": "total",
+          "pick": "OVER 224.5",
+          "side": "OVER",
+          "p": 0.48916576,
+          "p_push": 0.0,
+          "price": -105.0,
+          "edge": -0.02302936,
+          "fair": 104.4297,
+          "anchored": true,
+          "band": ""
+        }
+      ]
+    }
+  },
+  {
+    "sport": "NBA",
+    "name": "who is out: the regulars' minutes shown, not scored; the Nuggets watched",
+    "inputs": {
+      "gdate": "2026-12-10",
+      "away": "Nuggets",
+      "home": "Jazz",
+      "line": "236.5",
+      "op": "-110",
+      "up": "-110",
+      "nagp": "12",
+      "nhgp": "12",
+      "nbaout": "{\"away\": [{\"id\": \"1\", \"n\": \"Nikola Jokic\", \"st\": \"Out\", \"mpg\": 36.2, \"ppg\": 28.1, \"pm\": 9.4, \"note\": \"rest\"}, {\"id\": \"2\", \"n\": \"Bench Guy\", \"st\": \"Out\", \"mpg\": 8.0, \"ppg\": 2.0, \"pm\": -1.0}], \"home\": [{\"id\": \"3\", \"n\": \"Lauri Markkanen\", \"st\": \"Questionable\", \"mpg\": 33.0, \"ppg\": 24.0, \"pm\": 1.0}]}",
+      "nbaq": "3"
+    },
+    "expect": {
+      "lam_home": null,
+      "lam_away": null,
+      "projected": 236.5,
+      "markets": [
+        {
+          "key": "total",
+          "pick": "OVER 236.5",
+          "side": "OVER",
+          "p": 0.5,
+          "p_push": 0.0,
+          "price": -110.0,
+          "edge": -0.02380952,
+          "fair": 100.0,
+          "anchored": true,
+          "band": "NO BET"
+        }
+      ]
+    }
+  },
+  {
+    "sport": "NBA",
+    "name": "a wide hold on the total is regressed as an alternate",
+    "inputs": {
+      "gdate": "2026-12-10",
+      "away": "Magic",
+      "home": "Pistons",
+      "line": "214.5",
+      "op": "-150",
+      "up": "120",
+      "hml": "-105",
+      "aml": "-115"
+    },
+    "expect": {
+      "lam_home": 108.51245231,
+      "lam_away": 108.85196158,
+      "projected": 217.3644139,
+      "markets": [
+        {
+          "key": "total",
+          "pick": "UNDER 214.5",
+          "side": "UNDER",
+          "p": 0.43678161,
+          "p_push": 0.0,
+          "price": 120.0,
+          "edge": -0.01776385,
+          "fair": 128.9474,
+          "anchored": true,
+          "band": ""
+        },
+        {
+          "key": "ml",
+          "pick": "Pistons ML",
+          "side": "HOME",
+          "p": 0.48916576,
+          "p_push": 0.0,
+          "price": -105.0,
+          "edge": -0.02302936,
+          "fair": 104.4297,
+          "anchored": true,
+          "band": ""
+        }
+      ]
+    }
+  },
+  {
+    "sport": "NBA",
+    "name": "one price only: the other side is rebuilt",
+    "inputs": {
+      "gdate": "2026-12-10",
+      "away": "Kings",
+      "home": "Suns",
+      "line": "230.5",
+      "op": "-120"
+    },
+    "expect": {
+      "lam_home": null,
+      "lam_away": null,
+      "projected": 231.19584011,
+      "markets": [
+        {
+          "key": "total",
+          "pick": "OVER 230.5",
+          "side": "OVER",
+          "p": 0.51541838,
+          "p_push": 0.0,
+          "price": -120.0,
+          "edge": -0.03003616,
+          "fair": -106.3636,
+          "anchored": true,
+          "band": "NO BET"
+        }
+      ]
+    }
   }
 ]

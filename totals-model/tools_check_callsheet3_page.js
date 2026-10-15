@@ -26,7 +26,8 @@ const IDS = ["away","home","line","op","up","opened","gdate","aera","hera","aip"
              "agsv","hgsv","agsh","hgsh","asf","hsf","app","hpp","apk","hpk","pl","plh","pla","p1line","p1op","p1up",
              "ntick","ncash","ap1l10","hp1l10","axgf","axga","hxgf","hxga","xglg","nhlform",
              "ngoalies","agname","hgname","agstart","hgstart","agok","hgok",
-             "agf","aga","hgf","hga","lgg","angp","hngp","aenc","aens","henc","hens"];
+             "agf","aga","hgf","hga","lgg","angp","hngp","aenc","aens","henc","hens",
+             "h1line","h1op","h1up","naort","nhort","nadrt","nhdrt","napace","nhpace","nagp","nhgp","nlrtg","nlpace","narest","nhrest","nbaout","nbaq","nbactx"];
 const CHECKS = ["dome","playoff","agconf","hgconf","agbk","hgbk"];
 
 (async () => {
@@ -62,10 +63,14 @@ const CHECKS = ["dome","playoff","agconf","hgconf","agbk","hgbk"];
   chk(nb && nb === src, 'engine: the NHL block is web/nhl.engine.js verbatim and follows the engine block', `${nb ? nb.length : 'missing'} vs ${src.length}`);
   const html = fs.readFileSync(path.join(__dirname, 'web/callsheet3.html'), 'utf8');
   chk(html.indexOf('END ENGINE BLOCK') < html.indexOf('NHL BLOCK.'), 'engine: the NHL block comes after the engine block', '');
+  const nbb = block('callsheet3.html', '  /* ===== NBA BLOCK.', '  /* ===== END NBA BLOCK ===== */');
+  const nsrc = fs.readFileSync(path.join(__dirname, 'web/nba.engine.js'), 'utf8').replace(/\n$/, '');
+  chk(nbb && nbb === nsrc, 'engine: the NBA block is web/nba.engine.js verbatim and follows the NHL block', `${nbb ? nbb.length : 'missing'} vs ${nsrc.length}`);
+  chk(html.indexOf('END NHL BLOCK') < html.indexOf('NBA BLOCK.'), 'engine: the NBA block comes after the NHL block', '');
 
   // ---- fixtures ---------------------------------------------------------------
   const fill = async (sport, inputs) => pg.evaluate(async ([sport, inputs, ids, checks]) => {
-    document.getElementById(sport === 'WNBA' ? 'm-wnba' : sport === 'NHL' ? 'm-nhl' : 'm-mlb').click();
+    document.getElementById(sport === 'WNBA' ? 'm-wnba' : sport === 'NHL' ? 'm-nhl' : sport === 'NBA' ? 'm-nba' : 'm-mlb').click();
     document.getElementById('byEdge').checked = true;
     ids.forEach(id => { document.getElementById(id).value = ''; });
     checks.forEach(id => { document.getElementById(id).checked = false; });
@@ -163,6 +168,74 @@ const CHECKS = ["dome","playoff","agconf","hgconf","agbk","hgbk"];
   chk(flow.nhlBlock.length >= 4 && flow.nhlBlock.some(t => /First period/.test(t)) && flow.nhlBlock.some(t => /Puck line/.test(t)), 'record: the NHL block has first period and puck line tiles', JSON.stringify(flow.nhlBlock));
   chk(/NHL/.test(flow.calib) && !/WNBA/.test(flow.calib.split('NHL')[0]), 'record: an NHL block is drawn', flow.calib.slice(0, 200));
   chk(/after one 1–1/.test(flow.final) && /Final: Rangers 2, Bruins 3/.test(flow.final), 'rail: opening a graded hockey row prints the final and the score after one', flow.final);
+
+  // ---- the basketball card (15 Oct 2026): add, pick, who is out, grade with the half, record ----
+  const nba = await pg.evaluate(async () => {
+    const wait = () => new Promise(r => setTimeout(r, 60));
+    const set = (id, v) => { const el = document.getElementById(id); el.value = v; el.dispatchEvent(new Event('input', { bubbles: true })); };
+    localStorage.removeItem('callsheet3.card.v1');
+    document.getElementById('clear').click(); document.getElementById('m-nba').click(); await wait();
+    document.getElementById('boardDate').value = '2027-04-06';
+    // the last two weeks: the stage delta puts +2 on the line, the half carries its share, the ratings fade is past fifty games
+    set('gdate', '2027-04-06'); set('away', 'Raptors'); set('home', 'Boston'); set('line', '221.5'); set('op', '-110'); set('up', '-110');
+    set('sp', '-9.5'); set('sph', '-110'); set('spa', '-110'); set('hml', '-450'); set('aml', '340'); set('h1line', '111.5'); set('h1op', '-110'); set('h1up', '-110');
+    set('naort', '113.6'); set('nadrt', '111.2'); set('nhort', '117.7'); set('nhdrt', '110.5'); set('napace', '100.8'); set('nhpace', '97.4'); set('nagp', '77'); set('nhgp', '77');
+    set('nbaout', JSON.stringify({ away: [{ id: '1', n: 'Scottie Barnes', st: 'Out', mpg: 34.5, ppg: 20.1, pm: 2.2, note: 'knee' }, { id: '2', n: 'Deep Bench', st: 'Out', mpg: 6.0, ppg: 1.5, pm: -0.5 }],
+                                   home: [{ id: '3', n: 'Jaylen Brown', st: 'Questionable', mpg: 33.8, ppg: 24.2, pm: 4.0, note: 'ankle' }] }));
+    set('nbactx', JSON.stringify([{ side: 'home', k: 'drt', s: 'faded', t: 'Celtics allow 110.5 per 100, 3rd best in the league (77 games).', tag: 'faded: the market over-moves with early-season ratings; past fifty games shown' },
+                                  { side: 'away', k: 'pace', s: 'shown', t: 'Raptors play at 100.8 possessions, 8th slowest.', tag: 'shown: pace alone measured null against the close' }]));
+    await wait();
+    const ctxLines = [...document.querySelectorAll('#nbaCtxPanel ul.ctx li')].map(li => li.className + '|' + li.querySelector('.cbadge').textContent + '|' + li.querySelector('.ctext').textContent);
+    const visible = { nba: !document.getElementById('nbaFields').hidden, h1: !document.getElementById('h1Fields').hidden, sp: !document.getElementById('spFields').hidden, nhl: !document.getElementById('nhlFields').hidden, pressed: document.getElementById('m-nba').getAttribute('aria-pressed'), label: document.getElementById('lineLabel').textContent };
+    const rail = [...document.querySelectorAll('#markets .mk')].map(el => ({ key: el.dataset.key, pick: el.querySelector('.pick').childNodes[0].textContent.trim(), p: parseFloat(el.querySelector('.p').textContent), chips: [...el.querySelectorAll('.cap')].map(c => c.textContent) }));
+    const pick = (() => { const c = document.querySelector('#markets .pickcard'); return c ? { key: c.dataset.key || '', side: c.dataset.side || '', lab: c.querySelector('.lab').textContent, why: c.querySelector('.why').textContent, none: c.classList.contains('none') } : null; })();
+    const why = document.getElementById('why').textContent;
+    const panel0 = document.getElementById('nbaOutPanel').innerText;
+    // tick Brown out: the home minutes go from none to 33.8
+    const box = document.querySelector('#nbaOutPanel input[data-q="3"]'); box.checked = true; box.dispatchEvent(new Event('change', { bubbles: true })); await wait();
+    const panel1 = document.getElementById('nbaOutPanel').innerText, q = document.getElementById('nbaq').value, why1 = document.getElementById('why').textContent;
+    const forecast = document.getElementById('forecastLine').textContent;
+    document.getElementById('add').click(); await wait();
+    document.getElementById('boardDate').dispatchEvent(new Event('change')); await wait();
+    const card = JSON.parse(localStorage.getItem('callsheet3.card.v1')).filter(r => r.sport === 'NBA');
+    const boardRows = [...document.querySelectorAll('#board tbody tr')].map(tr => ({ market: tr.querySelectorAll('td')[2].textContent, notPicked: !!tr.querySelector('.chip.dim') && /not picked/.test(tr.querySelectorAll('td')[2].textContent) }));
+    const bets = [...document.querySelectorAll('#bestBets .pk .n4')].map(e => e.textContent);
+    // grade: Celtics 115, Raptors 101; 54-46 at the half
+    const tr = () => [...document.querySelectorAll('#cardTable tr')].find(t => /Raptors @ Celtics/.test(t.textContent));
+    const label = [...tr().querySelectorAll('.finals .l')].map(e => e.textContent).join(',');
+    const g = (k, v) => { const el = tr().querySelector(`.grade[data-k="${k}"]`); el.value = v; el.dispatchEvent(new Event('input', { bubbles: true })); el.dispatchEvent(new Event('change', { bubbles: true })); };
+    g('f5a', '46'); g('f5h', '54'); g('fa', '101'); g('fh', '115'); await wait();
+    const graded = [...tr().querySelectorAll('.rowmk .m')].map(e => ({ pick: e.querySelector('.chip').textContent, res: (e.querySelector('.chip.win,.chip.loss,.chip.push') || {}).textContent || '' }));
+    const calib = document.getElementById('calibBox').innerText;
+    const nbaBlock = [...document.querySelectorAll('#calibBox .calib[data-sport="NBA"] > div')].map(d => d.querySelector('.k').textContent + ' ' + d.querySelector('.v').textContent + ' ' + d.querySelector('.s').textContent);
+    tr().querySelector('[data-open]').click(); await wait();
+    const final = (document.querySelector('#markets .final') || {}).textContent || '';
+    const reopened = document.getElementById('nbaOutPanel').innerText;
+    document.getElementById('clear').click(); await wait();
+    return { visible, rail, pick, why, panel0, panel1, q, why1, forecast, card: card.map(r => r.sport + ':' + r.matchup), keys: card[0].markets.map(m => m.key), boardRows, bets, label, graded, calib, nbaBlock, final, reopened, proj: card[0].proj, ctxLines, ctxStored: (card[0].inputs.nbactx || '').length > 10 };
+  });
+  chk(nba.ctxLines.length === 2 && nba.ctxLines[0].startsWith('ctx-faded|faded|Celtics allow 110.5 per 100, 3rd best') && nba.ctxLines[1].startsWith('ctx-shown|shown|Raptors play at 100.8') && nba.ctxStored,
+      'nba: the context card lists the slate\'s lines with their badges, faded before shown, and the JSON rides in the row', JSON.stringify(nba.ctxLines));
+  chk(nba.visible.nba && nba.visible.h1 && nba.visible.sp && !nba.visible.nhl && nba.visible.pressed === 'true' && nba.visible.label === 'Total (points)', 'nba: the fourth button shows the NBA fields, the half and the spread, and hides hockey', JSON.stringify(nba.visible));
+  chk(nba.card.length === 1 && nba.card[0] === 'NBA:Raptors @ Celtics' && nba.keys.join(',') === 'total,h1,ml,spread', 'nba: the row stores total, half, moneyline and spread, Boston canonicalised to the NBA table', JSON.stringify({ card: nba.card, keys: nba.keys }));
+  const tot = nba.rail.find(r => r.key === 'total');
+  chk(tot && /OVER 221\.5/.test(tot.pick) && tot.p > 53 && tot.p < 56, 'nba: the last two weeks put +2 on the line and the over reads about 54%', JSON.stringify(tot));
+  chk(nba.pick && !nba.pick.none && nba.pick.key === 'total' && nba.pick.side === 'OVER' && /an OVER game/.test(nba.pick.lab) && /The book's own number makes it 50\.0%; the sheet's inputs move it to 5[3-5]\.\d%/.test(nba.pick.why),
+      'nba: the pick is the total, named an OVER game, with the book\'s number and the sheet\'s in the why', JSON.stringify(nba.pick));
+  chk(nba.rail.filter(r => r.key === 'ml' || r.key === 'spread').every(r => r.chips.some(c => /shown, not picked/.test(c))) && nba.boardRows.filter(r => /Moneyline|Spread/.test(r.market)).every(r => r.notPicked) && !nba.bets.some(t => /Moneyline|Spread/.test(t)),
+      'nba: the moneyline and the spread are shown, not picked, on the rail and the board, and never reach the straight bets', JSON.stringify({ rail: nba.rail.map(r => r.key + ':' + r.chips.join('|')), board: nba.boardRows, bets: nba.bets }));
+  chk(/past 50 games a side the market has the ratings priced/.test(nba.why) && /last two weeks of the season/.test(nba.why), 'nba: the why list says the ratings are shown past fifty games and names the stage',
+      (nba.why.match(/[^.]*past 50 games[^.]*\./) || ['no ratings note'])[0] + ' | ' + (nba.why.match(/[^.]*last two weeks[^.]*\./) || ['no stage note'])[0]);
+  chk(/Raptors: 2 listed, 35 minutes a game of regulars out/.test(nba.panel0) && /Celtics: 1 listed, 0 minutes a game/.test(nba.panel0) && /Regulars out, minutes a game: away 35\./.test(nba.why) && !/home 34/.test(nba.why),
+      'nba: who is out lists each side, sums the regulars\' minutes (a six-minute man does not count) and the why carries it', nba.panel0.slice(0, 200) + ' | ' + (nba.why.match(/Regulars out[^.]*\./) || [''])[0]);
+  chk(nba.q === '3' && /Celtics: 1 listed, 34 minutes a game/.test(nba.panel1) && /away 35, home 34/.test(nba.why1), 'nba: ticking a doubtful player out adds his minutes and the tick rides in the row', JSON.stringify({ q: nba.q, panel: nba.panel1.slice(0, 160) }));
+  chk(/Forecast · Raptors [0-9.]+ – Celtics [0-9.]+ · total [0-9.]+ points · first half [0-9.]+ · Celtics to win, \d+%/.test(nba.forecast), 'nba: the forecast line reads in points with the half and the winner', nba.forecast.slice(0, 200));
+  chk(/1H/.test(nba.label) && nba.graded.length === 4 && nba.graded.every(x => x.res), 'nba: the score boxes are labelled 1H and all four markets grade from a final and a half', JSON.stringify({ label: nba.label, graded: nba.graded }));
+  const nbaTot = nba.graded.find(x => /^(OVER|UNDER) 221\.5$/.test(x.pick)), nbaH1 = nba.graded.find(x => /1H (OVER|UNDER) 111\.5/.test(x.pick)), nbaSp = nba.graded.find(x => /-9\.5|\+9\.5/.test(x.pick));
+  chk(nbaTot && nbaTot.res === (/OVER/.test(nbaTot.pick) ? 'loss' : 'win') && nbaH1 && nbaH1.res === (/OVER/.test(nbaH1.pick) ? 'loss' : 'win') && nbaSp && nbaSp.res === (/Celtics/.test(nbaSp.pick) ? 'win' : 'loss'),
+      'nba: 216 is under 221.5, 100 at the half is under 111.5, and Boston by 14 covers -9.5', JSON.stringify([nbaTot, nbaH1, nbaSp]));
+  chk(nba.nbaBlock.length >= 4 && nba.nbaBlock.some(t => /First half/.test(t)) && nba.nbaBlock.some(t => /Spread/.test(t)) && /First half projected/.test(nba.calib), 'nba: the record has an NBA block with first-half and spread tiles and the half in the forecast line', JSON.stringify(nba.nbaBlock));
+  chk(/at the half 46–54/.test(nba.final) && /Final: Raptors 101, Celtics 115/.test(nba.final) && /Jaylen Brown/.test(nba.reopened), 'nba: reopening the graded row prints the final with the half-time score and the who-is-out list', nba.final + ' | ' + nba.reopened.slice(0, 80));
 
   // ---- a hockey verdict lists only when it clears its price ------------------------
   const thinNhl = await pg.evaluate(async () => {

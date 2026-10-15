@@ -5936,7 +5936,7 @@
   },
   {
     "sport": "NBA",
-    "name": "a half line, prices leaning over, no ratings",
+    "name": "a half line, prices leaning over, no ratings; the number moved three from the opener, a note",
     "inputs": {
       "gdate": "2026-12-10",
       "away": "Lakers",
@@ -5945,7 +5945,8 @@
       "op": "-125",
       "up": "105",
       "hml": "120",
-      "aml": "-140"
+      "aml": "-140",
+      "opened": "229.5"
     },
     "expect": {
       "lam_home": 116.00731039,

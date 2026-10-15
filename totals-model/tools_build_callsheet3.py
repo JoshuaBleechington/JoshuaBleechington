@@ -79,6 +79,7 @@ def head() -> str:
              "  table.form { width: 100%; border-collapse: collapse; margin: 6px 0 12px; font-size: 12px; font-family: var(--mono); }\n"
              "  table.form th, table.form td { text-align: left; padding: 3px 6px; border-bottom: 1px solid var(--rule); white-space: nowrap; }\n"
              "  table.form th { font-size: 10px; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); font-weight: 600; }\n"
+             "  table.form td .dim { white-space: normal; max-width: 360px; font: 11px/1.4 var(--sans); color: var(--muted); }\n"
              "  @media (prefers-reduced-motion: reduce) { * { transition: none !important; animation: none !important; } }\n</style>", "fold css")
     h = once(h, "<p>One matchup, every market the book posts on it — the full-game total, the first five,\n         the moneyline and the run line — priced off",
              "<p>One matchup, every market the book posts on it — in baseball the full-game total, the first five,\n         the moneyline and the run line; in hockey the total, the first period, the moneyline and the puck line;\n         in the NBA the total, the first half, the moneyline and the spread; in the WNBA the total, the moneyline and the spread — priced off", "header copy")

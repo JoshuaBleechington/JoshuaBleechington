@@ -168,6 +168,8 @@
     if (outA > 0) outBits.push("away " + outA.toFixed(0));
     if (outH > 0) outBits.push("home " + outH.toFixed(0));
     if (outBits.length) notes.push("Regulars out, minutes a game: " + outBits.join(", ") + ". <b>SHOWN, NOT SCORED</b>: announced absences are in the close (slope -0.01 on the total, +0.29 on the side, t 1.2); games with 40+ minutes of regulars out ran +0.87 over the close (t 1.8). The card measures the late ones from opening night.");
+    var opened = num("opened");
+    if (opened !== null && Math.abs(opened - line) > 1e-9) notes.push("The number moved " + opened + " to " + line + " (" + sgn(line - opened, 1) + "). Not scored — the current line is the anchor and the move is already inside it.");
     var f = assemble("NBA", away, home, line, estimates, deltas, notes);
     f.away = away; f.home = home; f.line = line;
     return f;
@@ -279,8 +281,9 @@
       list.forEach(function (p) {
         var isOut = /^out/i.test(String(p.st || "")), id = String(p.id || p.n);
         var box = isOut ? "out" : '<input type="checkbox" data-q="' + esc(id) + '"' + (ticked.indexOf(id) >= 0 ? " checked" : "") + ' title="Tick when he is ruled out">';
-        h += "<tr" + (isOut || ticked.indexOf(id) >= 0 ? ' class="out"' : "") + "><td>" + esc(p.n || "?") + "</td><td>" + esc(p.st || "") + "</td><td>" + (p.mpg !== undefined && p.mpg !== null ? (+p.mpg).toFixed(1) : "—") +
-             "</td><td>" + (p.ppg !== undefined && p.ppg !== null ? (+p.ppg).toFixed(1) : "—") + "</td><td>" + (p.pm !== undefined && p.pm !== null ? sgn(+p.pm, 1) : "—") + "</td><td>" + esc(p.note || "") + "</td><td>" + box + "</td></tr>";
+        var note = esc(p.note || "") + (p.ret ? (p.note ? "; " : "") + "back " + esc(p.ret) + (p.past ? " (before this game: likely stale)" : "") : "") + (p.src === "last season" ? '<span class="dim"> (last season\'s line)</span>' : "");
+        h += "<tr" + (isOut || ticked.indexOf(id) >= 0 ? ' class="out"' : "") + "><td>" + esc(p.n || "?") + (p.c ? '<div class="dim">' + esc(p.c) + "</div>" : "") + "</td><td>" + esc(p.st || "") + "</td><td>" + (p.mpg !== undefined && p.mpg !== null ? (+p.mpg).toFixed(1) : "—") +
+             "</td><td>" + (p.ppg !== undefined && p.ppg !== null ? (+p.ppg).toFixed(1) : "—") + "</td><td>" + (p.pm !== undefined && p.pm !== null ? sgn(+p.pm, 1) : "—") + "</td><td>" + note + "</td><td>" + box + "</td></tr>";
       });
       h += "</tbody></table>";
     });

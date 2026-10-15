@@ -260,6 +260,7 @@ def forecast_nba(
     away_out_minutes: float | None = None, home_out_minutes: float | None = None,
     away: str | None = None, home: str | None = None,
     game_date: str | None = None,
+    opened: float | None = None,
 ) -> Forecast:
     if not _ok(line, "nba_total"):
         raise ValueError(f"total {line!r} is outside {PLAUSIBLE['nba_total']}")
@@ -323,6 +324,9 @@ def forecast_nba(
         notes.append("Regulars out, minutes a game: " + ", ".join(out_bits) + ". SHOWN, NOT SCORED: announced absences are in the "
                      "close (slope -0.01 on the total, +0.29 on the side, t 1.2); games with 40+ minutes of regulars out ran +0.87 "
                      "over the close (t 1.8). The card measures the late ones from opening night.")
+    if opened is not None and abs(opened - line) > 1e-9:
+        notes.append(f"The number moved {opened:g} to {line:g} ({line - opened:+.1f}). Not scored -- the current line is the anchor "
+                     "and the move is already inside it.")
     return _assemble("NBA", matchup, line, estimates, deltas, notes)
 
 

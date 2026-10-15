@@ -128,11 +128,21 @@ games to fill, nothing from last season: the rosters moved), rest from the
 ledger's dates, and writes two JSON boxes the matchup's cards render:
 
 - **Who is out**, from the league's injury page, every listed man keyed by his
-  player id. His line is his own: this season's after three games, last
-  season's before that with his old club named when he has moved. So a
-  traded or signed player is never read against the wrong team, a rookie
-  shows with his status alone, and the card's sum of regulars' minutes
-  counts only the men marked OUT plus the ones you tick.
+  player id (the page carries no id field, only the player-card link; found
+  on the user's download of 15 Oct 2026, when every line came back blank).
+  His line is his own: this season's after three games, last season's before
+  that with his old club named when he has moved. So a traded or signed
+  player is never read against the wrong team (the first live run listed
+  Jaylen Brown and LeBron James under the 76ers with the Celtics' and the
+  Lakers' lines), a rookie shows with his status alone, the page's comment
+  and return date ride along, a return date before the game is flagged as
+  stale, and the card's sum of regulars' minutes counts only the men marked
+  OUT plus the ones you tick.
+- **The scoreboard's book**: ESPN carries DraftKings' total, spread and
+  moneylines with their openers. They go in the row's notes, the opening
+  total fills the Opened box (the engine notes the move, not scored), and a
+  move of a point or more is a Context line. The carded lines stay the odds
+  run's, one book for the record.
 - **Context**, the hockey card's shape: each club's rank in the league on the
   ratings (faded under fifty games, shown after), pace, points, the last
   ten, free-throw rate, a lopsided home or road record, with the stage of

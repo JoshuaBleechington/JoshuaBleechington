@@ -2602,6 +2602,7 @@ NBA_CTX_TAGS = {
     "watched": ("label", "watched, not scored: a club the close has run under two seasons running, home and away"),
     "rest": ("label", "a label: rest measured inside the number against two seasons of closes"),
     "out": ("shown", "shown, not scored: announced absences are in the close; the card measures the late ones"),
+    "move": ("shown", "shown, not scored: the current line is the anchor and the move is already inside it"),
 }
 
 
@@ -2639,7 +2640,7 @@ def nba_day_games(date_iso):
         g = {"id": str(ev.get("id")), "date": nba_us_date(comp.get("date") or ev.get("date")) or date_iso, "t": comp.get("date") or ev.get("date"),
              "type": int(((ev.get("season") or {}).get("type") or 0)), "final": bool(st.get("completed")), "state": str(st.get("description") or st.get("name") or ""),
              "away": None, "home": None, "an": None, "hn": None, "fa": None, "fh": None, "ha": None, "hh": None,
-             "venue": ((comp.get("venue") or {}).get("fullName")) or ""}
+             "venue": ((comp.get("venue") or {}).get("fullName")) or "", "odds": nba_espn_odds(comp)}
         for c in comp.get("competitors") or []:
             t = c.get("team") or {}
             side = "home" if c.get("homeAway") == "home" else "away"
@@ -2704,21 +2705,77 @@ def nba_player_tables(ledger_games):
             for pid, d in per.items() if d["g"]}
 
 
+def espn_athlete_id(ath):
+    """The player's ESPN id: the injury page's athlete carries none as a field
+    (the user's page of 15 Oct 2026), only in his player-card link and his
+    headshot; the box scores key him by the same number."""
+    pid = str((ath or {}).get("id") or "")
+    if pid:
+        return pid
+    for l in (ath or {}).get("links") or []:
+        m = re.search(r"/id/(\d+)", str(l.get("href") or ""))
+        if m:
+            return m.group(1)
+    m = re.search(r"/(\d+)\.png", str(((ath or {}).get("headshot") or {}).get("href") or ""))
+    return m.group(1) if m else ""
+
+
 def nba_injuries():
-    """ESPN's injury page: {tricode: [{id, n, st, note, pos}]} for every club listed."""
+    """ESPN's injury page: {tricode: [{id, n, st, note, pos, c, ret}]} for every
+    club listed. The club is the athlete's own on his entry, else the page's
+    heading; the id is read off his links when the page gives none."""
     doc = espn_json("/injuries")
     out = {}
     for team in doc.get("injuries") or []:
         t = team.get("team") or {}
-        ab = espn_tricode(t.get("abbreviation") or team.get("abbreviation") or "") or nba_nick_tricode(t.get("displayName") or team.get("displayName") or team.get("name"))
-        if not ab:
-            continue
+        ab_team = espn_tricode(t.get("abbreviation") or team.get("abbreviation") or "") or nba_nick_tricode(t.get("displayName") or team.get("displayName") or team.get("name"))
         for inj in team.get("injuries") or []:
             ath = inj.get("athlete") or {}
             det = inj.get("details") or {}
-            out.setdefault(ab, []).append({"id": str(ath.get("id") or ""), "n": ath.get("displayName") or ath.get("shortName") or "?", "st": str(inj.get("status") or det.get("fantasyStatus", {}).get("description", "") if isinstance(det.get("fantasyStatus"), dict) else inj.get("status") or ""),
-                                           "note": str(det.get("type") or det.get("detail") or inj.get("shortComment") or "")[:60], "pos": str(((ath.get("position") or {}).get("abbreviation")) or "")})
+            ab = espn_tricode(((ath.get("team") or {}).get("abbreviation")) or "") or ab_team
+            if not ab:
+                continue
+            fs = det.get("fantasyStatus") if isinstance(det.get("fantasyStatus"), dict) else {}
+            name = ath.get("displayName") or ath.get("shortName") or "?"
+            e = {"id": espn_athlete_id(ath) or name, "n": name, "st": str(inj.get("status") or fs.get("description") or ""),
+                 "note": str(det.get("type") or det.get("detail") or "")[:60], "pos": str(((ath.get("position") or {}).get("abbreviation")) or "")}
+            if inj.get("shortComment"):
+                e["c"] = str(inj["shortComment"])[:200]
+            if det.get("returnDate"):
+                e["ret"] = str(det["returnDate"])[:10]
+            out.setdefault(ab, []).append(e)
     return out
+
+
+def _odds_num(s):
+    """'o221.5' / 'u221.5' / '-1.5' / '+105' / 'EVEN' -> a number, or None."""
+    t = str(s if s is not None else "").strip().lower().lstrip("ou")
+    if t in ("even", "ev", "pk", "pick"):
+        return 0.0 if t in ("pk", "pick") else 100.0
+    try:
+        return float(t.replace("+", ""))
+    except ValueError:
+        return None
+
+
+def nba_espn_odds(comp):
+    """DraftKings' numbers on ESPN's scoreboard, when the event carries them:
+    the total with its prices, the home spread with its prices, the two
+    moneylines, and the OPENING total and spread. Shown on the row and the
+    opener filled; the carded lines still come from the odds run."""
+    for o in comp.get("odds") or []:
+        tot, ps, ml = o.get("total") or {}, o.get("pointSpread") or {}, o.get("moneyline") or {}
+        c = lambda d, k: ((d.get(k) or {}).get("close") or {})   # noqa: E731
+        op_ = lambda d, k: ((d.get(k) or {}).get("open") or {})  # noqa: E731
+        d = {"book": (o.get("provider") or {}).get("name") or "the book", "total": _odds_num(o.get("overUnder")) if o.get("overUnder") is not None else _odds_num(c(tot, "over").get("line")),
+             "op": _odds_num(c(tot, "over").get("odds")), "up": _odds_num(c(tot, "under").get("odds")),
+             "sp": _odds_num(o.get("spread")) if o.get("spread") is not None else _odds_num(c(ps, "home").get("line")),
+             "sph": _odds_num(c(ps, "home").get("odds")), "spa": _odds_num(c(ps, "away").get("odds")),
+             "hml": _odds_num(c(ml, "home").get("odds")), "aml": _odds_num(c(ml, "away").get("odds")),
+             "o_total": _odds_num(op_(tot, "over").get("line")), "o_sp": _odds_num(op_(ps, "home").get("line"))}
+        if d["total"] is not None or d["sp"] is not None:
+            return d
+    return None
 
 
 def nba_out_list(ab, injuries, players, prior_players):
@@ -2735,6 +2792,9 @@ def nba_out_list(ab, injuries, players, prior_players):
         elif p:
             src, where = p, "this season"
         e = {"id": inj["id"], "n": inj["n"], "st": inj["st"], "note": inj["note"]}
+        for k in ("c", "ret", "pos"):
+            if inj.get(k):
+                e[k] = inj[k]
         if src:
             e.update({"mpg": round(src["mpg"], 1), "ppg": round(src["ppg"], 1), "pm": round(src["pm"], 1), "src": where, "g": src["g"]})
             if where == "last season" and src.get("team") and src["team"] != ab:
@@ -2824,7 +2884,25 @@ def ctx_line_nba(kind, side, text):
     return {"side": side, "k": kind, "s": s, "t": text, "tag": tag}
 
 
-NBA_INPUT_IDS = ("naort", "nhort", "nadrt", "nhdrt", "napace", "nhpace", "nagp", "nhgp", "nlrtg", "nlpace", "narest", "nhrest", "nbaout", "nbactx")
+NBA_INPUT_IDS = ("naort", "nhort", "nadrt", "nhdrt", "napace", "nhpace", "nagp", "nhgp", "nlrtg", "nlpace", "narest", "nhrest", "nbaout", "nbactx", "opened")
+
+
+def nba_odds_note(o, away, home):
+    """One line on the row for the scoreboard's book: the numbers at the run and
+    where they opened."""
+    def price(p):
+        return "%+.0f" % p if p is not None else "?"
+    bits = []
+    if o.get("total") is not None:
+        bits.append("total %s (%s/%s)%s" % (fmt(o["total"], 1), price(o.get("op")), price(o.get("up")), (", opened %s" % fmt(o["o_total"], 1)) if o.get("o_total") is not None and abs(o["o_total"] - o["total"]) > 1e-9 else ""))
+    if o.get("sp") is not None:
+        fav = home if o["sp"] <= 0 else away
+        ln = o["sp"] if o["sp"] <= 0 else -o["sp"]
+        bits.append("%s %s (%s/%s)%s" % (fav, ("%+g" % ln) if ln else "pick", price(o.get("sph")), price(o.get("spa")),
+                                        (", opened %+g" % (o["o_sp"] if o["sp"] <= 0 else -o["o_sp"])) if o.get("o_sp") is not None and abs(o["o_sp"] - o["sp"]) > 1e-9 else ""))
+    if o.get("hml") is not None and o.get("aml") is not None:
+        bits.append("moneyline %s %s / %s %s" % (home, price(o["hml"]), away, price(o["aml"])))
+    return "%s on ESPN's scoreboard at the slate run: %s. Shown for the opener and as a check on the carded book; the lines come from the odds run." % (o.get("book") or "The book", "; ".join(bits))
 
 
 def build_nba_game(g, date_iso, tables, league, players, prior_players, injuries, log, have_ledger=True):
@@ -2854,6 +2932,9 @@ def build_nba_game(g, date_iso, tables, league, players, prior_players, injuries
             inputs["n%srest" % p] = str(max(0, rest))
             cs["rest"] = max(0, rest)
         cs["out"] = nba_out_list(ab, injuries, players, prior_players)
+        for e in cs["out"]:
+            if e.get("ret") and e["ret"] < date_iso:
+                e["past"] = True   # the page's return date is before this game: the listing is likely stale
         if cs["out"]:
             regs = [e for e in cs["out"] if str(e.get("st", "")).lower().startswith("out") and (e.get("mpg") or 0) >= NBA_REGULAR_MPG]
             log("  %s injury report: %d listed%s" % (side, len(cs["out"]), ("; OUT regulars: " + ", ".join("%s %.0f min" % (e["n"], e["mpg"]) for e in regs)) if regs else ""))
@@ -2869,6 +2950,18 @@ def build_nba_game(g, date_iso, tables, league, players, prior_players, injuries
     except Exception as e:  # noqa: BLE001
         ctx = []
         notes.append("Could not build the context lines: %s" % e)
+    o = g.get("odds")
+    if o:
+        notes.append(nba_odds_note(o, away, home))
+        if o.get("o_total") is not None:
+            inputs["opened"] = fmt(o["o_total"], 1)
+        moves = []
+        if o.get("o_total") is not None and o.get("total") is not None and abs(o["total"] - o["o_total"]) >= 1.0:
+            moves.append("the total opened %s and sits %s, %s %g" % (fmt(o["o_total"], 1), fmt(o["total"], 1), "down" if o["total"] < o["o_total"] else "up", abs(o["total"] - o["o_total"])))
+        if o.get("o_sp") is not None and o.get("sp") is not None and abs(o["sp"] - o["o_sp"]) >= 1.0:
+            moves.append("%s opened %+g and sit %+g" % (home, o["o_sp"], o["sp"]))
+        if moves:
+            ctx.append(ctx_line_nba("move", "game", "%s: %s." % (o.get("book") or "The book", "; ".join(moves))))
     if ctx:
         inputs["nbactx"] = json.dumps(ctx, separators=(",", ":"))
         for c in ctx:
@@ -4172,7 +4265,16 @@ def selftest():
     check("nba slate: the who-is-out list keys each man by his id, so a traded player carries LAST season's line with his old club named, a regular this season's, a rookie none",
           len(out7["away"]) == 3 and len(moved) == 1 and moved[0]["st"] == "Out" and moved[0]["mpg"] == 30.0 and moved[0]["src"] == "last season" and moved[0]["note"] == "Hamstring; with Lakers last season"
           and star[0]["st"] == "Questionable" and star[0]["mpg"] == 34.0 and star[0]["src"] == "this season" and star[0]["g"] == 6 and "mpg" not in rookie[0]
-          and out7["away"][0]["id"] == "9000" and len(out7["home"]) == 1 and out7["home"][0]["n"] == "Knicks Star" and out7["home"][0]["st"] == "Day-To-Day")
+          and out7["away"][0]["id"] == "9000" and len(out7["home"]) == 2 and out7["home"][0]["n"] == "Knicks Star" and out7["home"][0]["st"] == "Day-To-Day")
+    check("nba slate: the id is read off the player-card link or the headshot when the page gives none, the name stands in when there is neither, and the page's comment and return date ride along",
+          moved[0]["c"] == "Man (hamstring) is out for Wednesday's game against the Knicks." and moved[0]["ret"] == "2026-10-28" and "past" not in moved[0] and "c" not in star[0]
+          and rookie[0]["ret"] == "2026-10-19" and rookie[0]["past"] is True
+          and [e["id"] for e in out7["home"]] == ["9001", "No Id Man"] and any("Injury report: 2 clubs, 5 players listed" in l for l in lines7)
+          and espn_athlete_id({"links": [{"href": "https://www.espn.com/nba/player/_/id/4585618/keshon-gilbert"}]}) == "4585618" and espn_athlete_id({}) == "")
+    check("nba slate: the scoreboard's book rides as a note with the opener, fills the Opened box, and a move of a point or more is a context line",
+          bn["inputs"]["opened"] == "224.5" and any(n == "Draft Kings on ESPN's scoreboard at the slate run: total 221.5 (-115/-105), opened 224.5; Knicks -1.5 (-108/-112), opened -2.5; moneyline Knicks -115 / Celtics -105. Shown for the opener and as a check on the carded book; the lines come from the odds run." for n in bn["notes"])
+          and any(c["k"] == "move" and c["s"] == "shown" and c["t"] == "Draft Kings: the total opened 224.5 and sits 221.5, down 3; Knicks opened -2.5 and sit -1.5." for c in (json.loads(bn["inputs"]["nbactx"]) if bn["inputs"].get("nbactx") else []))
+          and _odds_num("o221.5") == 221.5 and _odds_num("u221.5") == 221.5 and _odds_num("+105") == 105.0 and _odds_num("-1.5") == -1.5 and _odds_num("EVEN") == 100.0 and _odds_num(None) is None and _odds_num("x") is None)
     ctx7 = json.loads(bn["inputs"]["nbactx"]) if bn["inputs"].get("nbactx") else []
     kinds7 = [(c["k"], c["side"], c["s"]) for c in ctx7]
     check("nba slate: the context lines carry the tag (Boston's offence faded, pace shown, the back to back a label, the regular out shown)",
@@ -4182,13 +4284,14 @@ def selftest():
           and all("faded" in c["tag"] for c in ctx7 if c["k"] == "ratings_faded"))
     pl = rows7.get("Trail Blazers @ Lakers") or {"inputs": {}, "notes": []}
     dj = rows7.get("Nuggets @ Jazz") or {"inputs": {}, "notes": []}
-    check("nba slate: a club with two games keeps its ratings blank with a note; its games and rest still fill, the other side's ratings too",
+    check("nba slate: a club with two games keeps its ratings blank with a note; its games and rest still fill, the other side's ratings too; no book on the event, no opener and no note",
           pl["inputs"]["naort"] == "" and pl["inputs"]["nagp"] == "2" and pl["inputs"]["narest"] == "1" and pl["inputs"]["nhort"] != "" and pl["inputs"]["nhgp"] == "5"
-          and any(n.startswith("Trail Blazers has 2 games this season: the ratings are left blank until 5") for n in pl["notes"]))
+          and any(n.startswith("Trail Blazers has 2 games this season: the ratings are left blank until 5") for n in pl["notes"])
+          and pl["inputs"]["opened"] == "" and not any("scoreboard" in n for n in pl["notes"]))
     check("nba slate: a preseason game is flagged, and the two watched clubs are named on the row and in the context",
           any(n.startswith("PRESEASON") for n in dj["notes"]) and any(n.startswith("Nuggets: a club the close has run under") for n in dj["notes"]) and any(n.startswith("Jazz: a club") for n in dj["notes"])
           and sum(1 for c in (json.loads(dj["inputs"]["nbactx"]) if dj["inputs"].get("nbactx") else []) if c["k"] == "watched") == 2)
-    check("nba slate: the printout names the ledger, the injury report and each game", any("Ledger 2026-27: 43 games" in l for l in lines7) and any("Injury report: 2 clubs, 4 players listed" in l for l in lines7)
+    check("nba slate: the printout names the ledger, the injury report and each game", any("Ledger 2026-27: 43 games" in l for l in lines7) and any("Injury report: 2 clubs, 5 players listed" in l for l in lines7)
           and any(l.startswith("Celtics @ Knicks  (Madison Square Garden") for l in lines7) and any("Wrote" in l and "3 games" in l for l in lines7))
     check("nba slate: without a ledger or the injury page the row says so and the boxes stay blank", bare["inputs"]["naort"] == "" and bare["inputs"]["nagp"] == "0" and bare["inputs"]["nbaout"] == '{"away":[],"home":[]}'
           and any("injury report could not be read" in n for n in bare["notes"]) and not any("no game in the ledger" in n for n in bare["notes"]))
@@ -4457,12 +4560,19 @@ def _canned_nba_slate():
         return {"homeAway": "home" if home else "away", "team": {"abbreviation": ab, "name": name, "displayName": name}, "score": score,
                 "linescores": [{"displayValue": str(x), "value": float(x)} for x in ls]}
 
-    def ev(gid, date, away, home, done, stype=2, venue="The Arena"):
+    def ev(gid, date, away, home, done, stype=2, venue="The Arena", odds=None):
         st = {"type": {"completed": done, "description": "Final" if done else "Scheduled", "name": "STATUS_FINAL" if done else "STATUS_SCHEDULED"}}
-        return {"id": gid, "date": date, "season": {"year": 2027, "type": stype},
-                "competitions": [{"id": gid, "date": date, "status": st, "venue": {"fullName": venue}, "competitors": [home, away]}]}
+        c = {"id": gid, "date": date, "status": st, "venue": {"fullName": venue}, "competitors": [home, away]}
+        if odds:
+            c["odds"] = odds
+        return {"id": gid, "date": date, "season": {"year": 2027, "type": stype}, "competitions": [c]}
+    # the book on the scoreboard (the user's page of 15 Oct 2026): the lines at the run and where they opened
+    dk = [{"provider": {"id": "100", "name": "Draft Kings"}, "details": "NY -1.5", "overUnder": 221.5, "spread": -1.5,
+           "moneyline": {"home": {"close": {"odds": "-115"}, "open": {"odds": "-125"}}, "away": {"close": {"odds": "-105"}, "open": {"odds": "+105"}}},
+           "pointSpread": {"home": {"close": {"line": "-1.5", "odds": "-108"}, "open": {"line": "-2.5", "odds": "-105"}}, "away": {"close": {"line": "+1.5", "odds": "-112"}, "open": {"line": "+2.5", "odds": "-115"}}},
+           "total": {"over": {"close": {"line": "o221.5", "odds": "-115"}, "open": {"line": "o224.5", "odds": "-115"}}, "under": {"close": {"line": "u221.5", "odds": "-105"}, "open": {"line": "u224.5", "odds": "-105"}}}}]
     sb21 = {"events": [ev("4019000090", "2026-10-21T17:00Z", comp("MIA", "Heat", False, "101", [25, 26, 25, 25]), comp("CHI", "Bulls", True, "99", [24, 25, 25, 25]), True),
-                       ev("4019000101", "2026-10-22T00:00Z", comp("BOS", "Celtics", False, "0", []), comp("NY", "Knicks", True, "0", []), False, venue="Madison Square Garden"),
+                       ev("4019000101", "2026-10-22T00:00Z", comp("BOS", "Celtics", False, "0", []), comp("NY", "Knicks", True, "0", []), False, venue="Madison Square Garden", odds=dk),
                        ev("4019000102", "2026-10-22T02:30Z", comp("POR", "Trail Blazers", False, "0", []), comp("LAL", "Lakers", True, "0", []), False),
                        ev("4019000103", "2026-10-22T01:00Z", comp("DEN", "Nuggets", False, "0", []), comp("UTAH", "Jazz", True, "0", []), False, stype=1)]}
     sb22 = {"events": [ev("4019000101", "2026-10-22T00:00Z", comp("BOS", "Celtics", False, "110", [28, 27, 30, 25]), comp("NY", "Knicks", True, "105", [25, 30, 22, 28]), True),
@@ -4470,13 +4580,19 @@ def _canned_nba_slate():
                        ev("4019000105", "2026-10-23T00:00Z", comp("DAL", "Mavericks", False, "0", []), comp("PHX", "Suns", True, "0", []), False)]}
     sum104 = {"header": {"competitions": [{"date": "2026-10-22T02:00Z", "competitors": [comp("LAL", "Lakers", True, "118", [29, 29, 30, 30]), comp("GS", "Warriors", False, "120", [30, 28, 32, 30])]}]},
               "boxscore": {"teams": [], "players": []}, "injuries": [], "gameInfo": {"officials": []}}
+    # the injury page as the user's download of 15 Oct 2026 has it: no id on the athlete, only in his links and headshot; his club on his entry
     inj = {"injuries": [
         {"id": "2", "displayName": "Boston Celtics", "injuries": [
-            {"status": "Out", "athlete": {"id": "7777", "displayName": "Moved Man", "position": {"abbreviation": "F"}}, "details": {"type": "Hamstring"}},
-            {"status": "Questionable", "athlete": {"id": "9000", "displayName": "Celtics Star", "position": {"abbreviation": "G"}}, "details": {"type": "Ankle"}},
-            {"status": "Out", "athlete": {"id": "8888", "displayName": "Rookie Kid"}, "details": {"type": "Knee"}}]},
+            {"status": "Out", "shortComment": "Man (hamstring) is out for Wednesday's game against the Knicks.",
+             "athlete": {"displayName": "Moved Man", "shortName": "M. Man", "links": [{"rel": ["playercard"], "href": "https://www.espn.com/nba/player/_/id/7777/moved-man"}],
+                         "headshot": {"href": "https://a.espncdn.com/i/headshots/nba/players/full/7777.png"}, "position": {"abbreviation": "F"}, "team": {"abbreviation": "BOS", "displayName": "Boston Celtics"}},
+             "details": {"fantasyStatus": {"description": "OUT"}, "type": "Hamstring", "location": "Leg", "detail": "Strain", "returnDate": "2026-10-28"}},
+            {"status": "Questionable", "athlete": {"displayName": "Celtics Star", "headshot": {"href": "https://a.espncdn.com/i/headshots/nba/players/full/9000.png"}, "position": {"abbreviation": "G"}, "team": {"abbreviation": "BOS"}},
+             "details": {"type": "Ankle"}},
+            {"status": "Out", "athlete": {"id": "8888", "displayName": "Rookie Kid"}, "details": {"type": "Knee", "returnDate": "2026-10-19"}}]},
         {"team": {"abbreviation": "NY", "displayName": "New York Knicks"}, "injuries": [
-            {"status": "Day-To-Day", "athlete": {"id": "9001", "displayName": "Knicks Star"}, "details": {"type": "Illness"}}]},
+            {"status": "Day-To-Day", "athlete": {"id": "9001", "displayName": "Knicks Star"}, "details": {"type": "Illness"}},
+            {"status": "Out", "athlete": {"displayName": "No Id Man"}, "details": {"type": "Rest"}}]},
         {"displayName": "Nowhere Club", "injuries": [{"status": "Out", "athlete": {"id": "1", "displayName": "Nobody"}, "details": {}}]}]}
     return [("scoreboard?dates=20261021&", sb21), ("scoreboard?dates=20261022&", sb22), ("summary?event=4019000104", sum104), ("/injuries", inj)], now, prior
 

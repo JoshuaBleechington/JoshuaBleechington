@@ -79,7 +79,7 @@ def build_nba(i: dict):
         league_rating=n(i.get("nlrtg")), league_pace=n(i.get("nlpace")),
         away_rest_days=n(i.get("narest")), home_rest_days=n(i.get("nhrest")),
         away_out_minutes=out["away"] or None, home_out_minutes=out["home"] or None,
-        game_date=i.get("gdate"))
+        game_date=i.get("gdate"), opened=n(i.get("opened")))
 
 
 NBA_FULL = dict(naort="116.0", nadrt="113.5", nhort="118.2", nhdrt="109.8", napace="99.8", nhpace="97.9", nagp="20", nhgp="21")
@@ -89,8 +89,8 @@ NBA_CASES = [
                     h1line="114.5", h1op="-110", h1up="-110", narest="0", nhrest="2", **NBA_FULL)},
     {"name": "nothing but the number: a coin flip on a whole-number line with a real push",
      "inputs": dict(away="A", home="B", line="228")},
-    {"name": "a half line, prices leaning over, no ratings",
-     "inputs": dict(away="Lakers", home="Warriors", line="232.5", op="-125", up="105", hml="120", aml="-140")},
+    {"name": "a half line, prices leaning over, no ratings; the number moved three from the opener, a note",
+     "inputs": dict(away="Lakers", home="Warriors", line="232.5", op="-125", up="105", hml="120", aml="-140", opened="229.5")},
     {"name": "two high-rated offences pull the line DOWN: the fade, tagged, no band",
      "inputs": dict(away="Pacers", home="Hawks", line="235.5", op="-110", up="-110", naort="121.0", nadrt="116.0", nhort="120.0", nhdrt="117.0",
                     napace="104.0", nhpace="103.0", nagp="15", nhgp="14")},

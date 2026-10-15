@@ -2083,14 +2083,16 @@ def nba_games_from_espn(season, through_iso=None, log=None):
     start, end = dt.date(y, 10, 1), dt.date(y + 1, 6, 30)
     if through_iso:
         end = min(end, dt.date.fromisoformat(through_iso))
-    out, d = {}, start
+    out, d, failed = {}, start, []
+    # one day a call: ESPN answers 400 to a date range (seen 15 Oct 2026)
     while d <= end:
-        e = min(d + dt.timedelta(days=6), end)
+        e = d
         try:
-            doc = fetch_json(ESPN_NBA + "/scoreboard?dates=%s-%s&limit=200" % (d.strftime("%Y%m%d"), e.strftime("%Y%m%d")), cache=False)
+            doc = fetch_json(ESPN_NBA + "/scoreboard?dates=%s&limit=100" % d.strftime("%Y%m%d"), cache=False)
         except Exception as ex:  # noqa: BLE001
-            if log:
-                log("  week of %s: no scoreboard (%s)" % (d.isoformat(), ex))
+            failed.append(d.isoformat())
+            if log and len(failed) <= 3:
+                log("  %s: no scoreboard (%s)" % (d.isoformat(), ex))
             d = e + dt.timedelta(days=1)
             continue
         for ev in doc.get("events") or []:
@@ -2114,6 +2116,8 @@ def nba_games_from_espn(season, through_iso=None, log=None):
             if g["away"] and g["home"]:
                 out[g["id"]] = g
         d = e + dt.timedelta(days=1)
+    if failed and log:
+        log("  %d day%s with no scoreboard answer (first %s, last %s)." % (len(failed), "" if len(failed) == 1 else "s", failed[0], failed[-1]))
     return sorted(out.values(), key=lambda g: (g["date"] or "", g["id"]))
 
 
@@ -3671,7 +3675,7 @@ def selftest():
           led3["format"] == NBA_LEDGER_FORMAT and led3["season"] == "2024-25" and len(led3["games"]) == 2 and led3["through"] == "2025-06-30" and led3["measure"]["games"] == 2
           and os.path.basename(p3) == "nba-ledger-202425.json" and p4 == p3 and any("0 games to fetch" in l for l in lines4) and any("League game log: 2" in l for l in lines4))
     # neither ESPN nor the stats site: the ids are walked on the CDN; only the first game has a box there
-    canned_no_log = [x for x in nba_canned if x[0] not in ("leaguegamelog", "scoreboard?dates=20241022-")]
+    canned_no_log = [x for x in nba_canned if x[0] not in ("leaguegamelog", "scoreboard?dates=20241022&")]
     def fake_nba_nolog(url, tries=3, headers=None, timeout=25, cache=True):
         for key, payload in canned_no_log:
             if key in url:
@@ -3932,7 +3936,7 @@ def _canned_nba():
                 "injuries": [{"team": {"abbreviation": "NY"}, "injuries": [{"status": "Out", "athlete": {"id": "3", "displayName": "Hurt Guy"}, "details": {"type": "Knee"}}]}, {"team": {"abbreviation": "BOS"}, "injuries": []}],
                 "gameInfo": {"officials": [{"displayName": "Scott Foster"}, {"displayName": "Tony Brothers"}]}}
     return [("leaguegamelog", log), ("boxscore_0022400001.json", box1), ("boxscoretraditionalv3", trad2), ("boxscoresummaryv2", summ2), ("scheduleLeagueV2", sched),
-            ("scoreboard?dates=20241022-", espn_sb), ("summary?event=401704001", espn_sum)]
+            ("scoreboard?dates=20241022&", espn_sb), ("summary?event=401704001", espn_sum)]
 
 
 def _canned_nhl_landing():

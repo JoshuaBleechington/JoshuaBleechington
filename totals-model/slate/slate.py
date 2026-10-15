@@ -2884,7 +2884,89 @@ def ctx_line_nba(kind, side, text):
     return {"side": side, "k": kind, "s": s, "t": text, "tag": tag}
 
 
-NBA_INPUT_IDS = ("naort", "nhort", "nadrt", "nhdrt", "napace", "nhpace", "nagp", "nhgp", "nlrtg", "nlpace", "narest", "nhrest", "nbaout", "nbactx", "opened")
+NBA_INPUT_IDS = ("naort", "nhort", "nadrt", "nhdrt", "napace", "nhpace", "nagp", "nhgp", "nlrtg", "nlpace", "narest", "nhrest", "nbaout", "nbactx", "opened", "ncrew", "nbarefs")
+
+# ---- the crew: the day's assignments and each referee's line from the ledger ----
+# The league posts the crews about 9 am Eastern on official.nba.com; the page
+# reads a JSON feed by date (the shape below is the one the open-source
+# wrappers read; UNVERIFIED from the build container, which cannot reach the
+# site, so the first run on the user's machine is the test). Shown on the
+# Context card, never scored: against two seasons of closes crews predict the
+# night's free throws (slope 0.60, t 7.3) and the total does not follow them
+# (t -1.0), NBA.md. When the feed fails the Crew box on the sheet takes the
+# names by hand and the card composes the same line.
+NBA_OFFICIALS_URL = "https://official.nba.com/wp-json/api/v1/get-game-officials?date=%s"
+NBA_OFFICIALS_HEADERS = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36",
+                         "Referer": "https://official.nba.com/referee-assignments/", "Accept": "application/json, text/plain, */*"}
+
+
+def _official_rows(doc):
+    """Every dict in the feed that names a first official, wherever it sits."""
+    out = []
+    def walk(x):
+        if isinstance(x, dict):
+            if any(k in x for k in ("official1", "OFFICIAL1", "crew_chief", "referee1")):
+                out.append(x)
+            else:
+                for v in x.values():
+                    walk(v)
+        elif isinstance(x, list):
+            for v in x:
+                walk(v)
+    walk(doc)
+    return out
+
+
+def nba_officials(date_iso):
+    """{(away tricode, home tricode): [names]} for a date from the league's feed."""
+    doc = fetch_json(NBA_OFFICIALS_URL % date_iso, headers=NBA_OFFICIALS_HEADERS, timeout=NBA_CDN_TIMEOUT, cache=False)
+    if isinstance(doc, dict) and isinstance(doc.get("nba"), (dict, list)):
+        doc = doc["nba"]   # the feed carries the G League and the WNBA beside the NBA
+    out = {}
+    for r in _official_rows(doc):
+        low = {str(k).lower(): v for k, v in r.items()}
+        names = []
+        for k in ("official1", "official2", "official3", "crew_chief", "referee1", "referee2", "referee3", "umpire1", "umpire2"):
+            v = low.get(k)
+            if v and str(v).strip() and str(v).strip() not in names:
+                names.append(str(v).strip())
+        away = espn_tricode(low.get("away_team") or low.get("away_team_abbreviation") or low.get("visitor_team") or "") or nba_nick_tricode(low.get("away_team_name") or low.get("away") or "")
+        home = espn_tricode(low.get("home_team") or low.get("home_team_abbreviation") or "") or nba_nick_tricode(low.get("home_team_name") or low.get("home") or "")
+        code = str(low.get("game_code") or "")
+        if (not away or not home) and "/" in code and len(code.split("/")[-1]) == 6:
+            away, home = code.split("/")[-1][:3], code.split("/")[-1][3:]
+        if away and home and names:
+            out[(away.upper(), home.upper())] = names
+    return out
+
+
+def nba_referee_tables(ledger_games):
+    """Each official's games, free throws and points a game over the ledgers,
+    and the league's over the same games: {"lg": [g, fta, pts], "r": {name: [g, fta, pts]}}."""
+    per, lg = {}, [0, 0, 0]
+    for g in ledger_games or []:
+        if not g.get("off") or not g.get("sa") or not g.get("sh") or g.get("fa") is None or g.get("fh") is None:
+            continue
+        fta, pts = (g["sa"].get("fta") or 0) + (g["sh"].get("fta") or 0), g["fa"] + g["fh"]
+        lg[0] += 1; lg[1] += fta; lg[2] += pts
+        for name in g["off"]:
+            d = per.setdefault(str(name), [0, 0, 0])
+            d[0] += 1; d[1] += fta; d[2] += pts
+    if not lg[0]:
+        return None
+    return {"lg": [lg[0], round(lg[1] / float(lg[0]), 1), round(lg[2] / float(lg[0]), 1)],
+            "r": {n: [d[0], round(d[1] / float(d[0]), 1), round(d[2] / float(d[0]), 1)] for n, d in per.items()}}
+
+
+def nba_crew_summary(names, refs):
+    """One printable line for the log: each named official's line, the league's beside."""
+    if not refs:
+        return ", ".join(names)
+    bits = []
+    for n in names:
+        d = refs["r"].get(n)
+        bits.append("%s %s" % (n, ("%.1f FTA / %.1f pts over %d" % (d[1], d[2], d[0])) if d else "no games in the ledger"))
+    return "; ".join(bits) + " (league %.1f / %.1f)" % (refs["lg"][1], refs["lg"][2])
 
 
 def nba_odds_note(o, away, home):
@@ -2905,7 +2987,7 @@ def nba_odds_note(o, away, home):
     return "%s on ESPN's scoreboard at the slate run: %s. Shown for the opener and as a check on the carded book; the lines come from the odds run." % (o.get("book") or "The book", "; ".join(bits))
 
 
-def build_nba_game(g, date_iso, tables, league, players, prior_players, injuries, log, have_ledger=True):
+def build_nba_game(g, date_iso, tables, league, players, prior_players, injuries, log, have_ledger=True, officials=None, refs=None):
     away, home = g.get("an") or NBA_NICK.get(g["away"], g["away"]), g.get("hn") or NBA_NICK.get(g["home"], g["home"])
     inputs = {k: "" for k in NBA_INPUT_IDS}
     notes = []
@@ -2968,6 +3050,14 @@ def build_nba_game(g, date_iso, tables, league, players, prior_players, injuries
             log("  context: %s  [%s]" % (c["t"], c["s"]))
     if not injuries:
         notes.append("The injury report could not be read; the who-is-out list is empty. Check the league's report before betting.")
+    if refs:
+        inputs["nbarefs"] = json.dumps(refs, separators=(",", ":"))
+    crew = (officials or {}).get((g["away"], g["home"]))
+    if crew:
+        inputs["ncrew"] = ", ".join(crew)
+        log("  crew: " + nba_crew_summary(crew, refs))
+    elif officials is not None:
+        notes.append("No crew on the league's feed for this game yet (posted about 9 am Eastern): type the names in the Crew box when they are up.")
     for n in notes:
         log("  note: " + n)
     return out
@@ -3012,10 +3102,19 @@ def make_nba_slate(date_iso, out_dir, log):
         log("Injury report: %d clubs, %d players listed." % (len(injuries), sum(len(v) for v in injuries.values())))
     except Exception as e:  # noqa: BLE001
         log("Could not read the injury report (%s)." % e)
+    refs = nba_referee_tables((led["games"] if led else []) + (prior["games"] if prior else []))
+    if refs:
+        log("Referees: %d officials' lines over %d ledger games (league %.1f free throws and %.1f points a game)." % (len(refs["r"]), refs["lg"][0], refs["lg"][1], refs["lg"][2]))
+    officials = None
+    try:
+        officials = nba_officials(date_iso)
+        log("Crews: %d game%s on the league's assignments feed." % (len(officials), "" if len(officials) == 1 else "s"))
+    except Exception as e:  # noqa: BLE001
+        log("Could not read the league's referee assignments (%s): type the crews in the Crew box from official.nba.com/referee-assignments." % e)
     rows = []
     for g in games:
         try:
-            rows.append(build_nba_game(g, date_iso, tables, league, players, prior_players, injuries, log, have_ledger=bool(led)))
+            rows.append(build_nba_game(g, date_iso, tables, league, players, prior_players, injuries, log, have_ledger=bool(led), officials=officials, refs=refs))
         except Exception as e:  # noqa: BLE001
             log("%s @ %s: FAILED (%s); left out of the slate" % (g.get("an"), g.get("hn"), e))
         log("")
@@ -4291,6 +4390,15 @@ def selftest():
     check("nba slate: a preseason game is flagged, and the two watched clubs are named on the row and in the context",
           any(n.startswith("PRESEASON") for n in dj["notes"]) and any(n.startswith("Nuggets: a club the close has run under") for n in dj["notes"]) and any(n.startswith("Jazz: a club") for n in dj["notes"])
           and sum(1 for c in (json.loads(dj["inputs"]["nbactx"]) if dj["inputs"].get("nbactx") else []) if c["k"] == "watched") == 2)
+    refs7 = json.loads(bn["inputs"]["nbarefs"]) if bn["inputs"].get("nbarefs") else None
+    foster_games = [g for g in led_now if g.get("off") and "Scott Foster" in g["off"]]
+    check("nba slate: the referee table from the ledgers rides in the row (each official's games, free throws and points a game, the league's beside), and the crew fills from the league's feed by tricode or game code",
+          refs7 is not None and refs7["lg"][0] == 40 and refs7["lg"][1] == 40.0 and set(refs7["r"]) == {"Scott Foster", "Tony Brothers", "Marc Davis", "Zach Zarba", "Eric Dalen", "Jason Goldenberg"}
+          and refs7["r"]["Scott Foster"][0] == len(foster_games) and refs7["r"]["Scott Foster"][2] == round(sum(g["fa"] + g["fh"] for g in foster_games) / float(len(foster_games)), 1)
+          and bn["inputs"]["ncrew"] == "Scott Foster, Tony Brothers, Marc Davis" and pl["inputs"]["ncrew"] == "Zach Zarba, Eric Dalen, Jason Goldenberg" and dj["inputs"]["ncrew"] == ""
+          and any(n.startswith("No crew on the league's feed for this game yet") for n in dj["notes"]) and not any("No crew" in n for n in bn["notes"])
+          and any("Crews: 2 games on the league's assignments feed" in l for l in lines7) and any(l.startswith("  crew: Scott Foster 40.0 FTA / ") for l in lines7)
+          and bare["inputs"]["ncrew"] == "" and not any("No crew" in n for n in bare["notes"]))
     check("nba slate: the printout names the ledger, the injury report and each game", any("Ledger 2026-27: 43 games" in l for l in lines7) and any("Injury report: 2 clubs, 5 players listed" in l for l in lines7)
           and any(l.startswith("Celtics @ Knicks  (Madison Square Garden") for l in lines7) and any("Wrote" in l and "3 games" in l for l in lines7))
     check("nba slate: without a ledger or the injury page the row says so and the boxes stay blank", bare["inputs"]["naort"] == "" and bare["inputs"]["nagp"] == "0" and bare["inputs"]["nbaout"] == '{"away":[],"home":[]}'
@@ -4544,12 +4652,14 @@ def _canned_nba_slate():
                 "qa": [fa // 4] * 4, "qh": [fh // 4] * 4, "ota": [], "oth": [], "end": "REG", "sa": box(fga_a), "sh": box(fga_h), "pace": None,
                 "pa": pa, "ph": ph, "oa": [], "oh": [], "t": date + "T23:30Z", "off": [], "detail": True}
     now, k = [], 0
+    crews = [["Scott Foster", "Tony Brothers", "Marc Davis"], ["Zach Zarba", "Eric Dalen", "Jason Goldenberg"]]
     for r, d in enumerate(["2026-10-13", "2026-10-14", "2026-10-15", "2026-10-16", "2026-10-17"]):
         for i in range(0, 16, 2):
             away, home = clubs[(i + r) % 16], clubs[(i + 1 + r) % 16]
             k += 1
             # a club scores 100 plus its strength (Boston 15 ... San Antonio 0) whoever it plays; its possessions rise down the list
             now.append(entry("40190%04d" % k, d, away, home, 115 - clubs.index(away), 115 - clubs.index(home), roster(away), roster(home), 85 + clubs.index(away), 85 + clubs.index(home)))
+            now[-1]["off"] = crews[k % 2]
     now.append(entry("4019000098", "2026-10-18", "POR", "SAS", 98, 100, roster("POR"), roster("SAS"), 90, 100))
     now.append(entry("4019000099", "2026-10-19", "POR", "SAS", 97, 100, roster("POR"), roster("SAS"), 90, 100))
     # the sixth game, a back to back for both, with the traded man in Boston's rotation for the first time
@@ -4594,7 +4704,13 @@ def _canned_nba_slate():
             {"status": "Day-To-Day", "athlete": {"id": "9001", "displayName": "Knicks Star"}, "details": {"type": "Illness"}},
             {"status": "Out", "athlete": {"displayName": "No Id Man"}, "details": {"type": "Rest"}}]},
         {"displayName": "Nowhere Club", "injuries": [{"status": "Out", "athlete": {"id": "1", "displayName": "Nobody"}, "details": {}}]}]}
-    return [("scoreboard?dates=20261021&", sb21), ("scoreboard?dates=20261022&", sb22), ("summary?event=4019000104", sum104), ("/injuries", inj)], now, prior
+    # the league's assignments feed (the wrappers' shape, unverified from the container): one row a game, the clubs as tricodes or in the game code
+    offs = {"nba": {"Table": {"rows": [
+        {"game_id": "0022600003", "game_code": "20261021/BOSNYK", "home_team": "NYK", "away_team": "BOS", "official1": "Scott Foster", "official2": "Tony Brothers", "official3": "Marc Davis", "alternate": "Not Working"},
+        {"game_id": "0022600004", "game_code": "20261021/PORLAL", "official1": "Zach Zarba", "official2": "Eric Dalen", "official3": "Jason Goldenberg"}]}},
+            "gleague": {"Table": {"rows": [{"game_code": "20261021/ABCDEF", "official1": "G League Ref"}]}}, "wnba": {"Table": {"rows": []}}}
+    return [("scoreboard?dates=20261021&", sb21), ("scoreboard?dates=20261022&", sb22), ("summary?event=4019000104", sum104), ("/injuries", inj),
+            ("get-game-officials?date=2026-10-21", offs)], now, prior
 
 
 def _canned_nhl_landing():

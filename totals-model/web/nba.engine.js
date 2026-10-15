@@ -188,16 +188,37 @@
   }
   /* the context card: the slate's league ranks for the two clubs, each with the tag that
      says what the sheet did with the fact (the hockey card's shape, nhlCtxPanel) */
+  /* the crew line: the names in the Crew box (the slate's, or typed from the league's page)
+     against the referee table the slate writes from the ledger (nbarefs: each official's
+     games, free throws and points a game, and the league's). Shown, not scored: NBA.md */
+  var NBA_CREW_TAG = "shown, not scored: crews predict the night's free throws (slope 0.60, t 7.3 on two seasons) and the total does not follow them (t −1.0 against the close)";
+  function nbaCrewLine() {
+    var names = String(($("ncrew") || {}).value || "").split(/[,;]+/).map(function (s) { return s.trim(); }).filter(function (s) { return s; });
+    if (!names.length) return null;
+    var raw = ($("nbarefs") || {}).value || "", refs = null;
+    try { refs = raw ? JSON.parse(raw) : null; } catch (e) { refs = null; }
+    var table = refs && refs.r ? refs.r : {}, keys = Object.keys(table);
+    var find = function (n) {
+      if (table[n]) return table[n];
+      var low = n.toLowerCase(), hit = keys.filter(function (k) { return k.toLowerCase() === low; });
+      if (!hit.length) { var last = low.split(" ").pop(); hit = keys.filter(function (k) { return k.toLowerCase().split(" ").pop() === last; }); }
+      return hit.length === 1 ? table[hit[0]] : null;
+    };
+    var bits = names.map(function (n) { var d = find(n); return n + (d ? " " + (+d[1]).toFixed(1) + " free throws and " + (+d[2]).toFixed(1) + " points a game (" + d[0] + " games)" : " (no games in the ledger)"); });
+    return { side: "game", k: "crew", s: "shown", t: "Crew: " + bits.join("; ") + (refs && refs.lg ? "; the league " + (+refs.lg[1]).toFixed(1) + " and " + (+refs.lg[2]).toFixed(1) + "." : "."), tag: NBA_CREW_TAG };
+  }
   function nbaCtxPanel() {
     var el = $("nbaCtxPanel"); if (!el) return;
     var raw = ($("nbactx") || {}).value || "", ctx = null;
     try { ctx = raw ? JSON.parse(raw) : null; } catch (e) { ctx = null; }
-    if (!ctx || !ctx.length) {
+    var items = (ctx || []).slice(), crew = nbaCrewLine();
+    if (crew) items.push(crew);
+    if (!items.length) {
       el.innerHTML = "No context on the row — load the slate and Fill form, and the lines come with it.";
       return;
     }
     var order = { scored: 0, faded: 1, shown: 2, label: 3 };
-    var items = ctx.slice().sort(function (a, b) { return (order[a.s] || 0) - (order[b.s] || 0); });
+    items.sort(function (a, b) { return (order[a.s] || 0) - (order[b.s] || 0); });
     el.innerHTML = '<ul class="ctx">' + items.map(function (c) {
       var s = order[c.s] !== undefined ? c.s : "shown";
       return '<li class="ctx-' + s + '"><span class="cbadge">' + s + '</span> <span class="ctext">' + esc(c.t || "") + '</span>' +

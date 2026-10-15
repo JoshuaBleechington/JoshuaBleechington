@@ -733,13 +733,23 @@
           <h2>Context <span class="tag">where each club stands in the league, and what the sheet did with it</span></h2>
           <div class="body">
             <div id="nbaCtxPanel" class="note">No context on the row — load the slate and Fill form, and the lines come with it.</div>
+            <div>
+              <div class="f"><label for="ncrew">Crew <span class="tag">the referees, comma-separated; the slate fills it when the league has posted the assignments</span></label><input id="ncrew" type="text" placeholder="Scott Foster, Tony Brothers, Marc Davis" autocomplete="off"></div>
+            </div>
             <p class="note">Each line is a club's rank against the other 29 on a number the slate already holds: offensive and
               defensive rating, pace, points scored and allowed, the last ten, free-throw rate, three-point rate, home and road
               records, the regulars out. A club shows up when it sits in the top or bottom six of the league; the stage of the
               season and the two watched clubs always. <b>The tag is the point.</b> "3rd worst defence" is what the public bets
               and the book moves to, so each line says what the sheet already did with the fact: <b>faded</b> because the market
               over-moves with early-season ratings, <b>scored</b> when a stage delta is on the line, <b>shown</b> because it measured
-              inside the number against two seasons of closes, or a <b>label</b>. Nothing here moves a number on its own.</p>
+              inside the number against two seasons of closes, or a <b>label</b>. Nothing here moves a number on its own.
+              <b>The crew</b> is the last line: each referee's free throws and points a game over the ledger seasons against the
+              league's. The league posts the crews about 9 am Eastern; the slate fills the box from its feed, or you type the names
+              from the link below. Shown, not scored: crews predict the night's free throws (t 7.3) and the total does not follow.</p>
+            <div class="links">
+              <a href="https://official.nba.com/referee-assignments/" target="_blank" rel="noopener">NBA · referee assignments</a>
+            </div>
+            <input type="hidden" id="nbarefs">
           </div>
         </section>
 
@@ -2708,16 +2718,37 @@
   }
   /* the context card: the slate's league ranks for the two clubs, each with the tag that
      says what the sheet did with the fact (the hockey card's shape, nhlCtxPanel) */
+  /* the crew line: the names in the Crew box (the slate's, or typed from the league's page)
+     against the referee table the slate writes from the ledger (nbarefs: each official's
+     games, free throws and points a game, and the league's). Shown, not scored: NBA.md */
+  var NBA_CREW_TAG = "shown, not scored: crews predict the night's free throws (slope 0.60, t 7.3 on two seasons) and the total does not follow them (t −1.0 against the close)";
+  function nbaCrewLine() {
+    var names = String(($("ncrew") || {}).value || "").split(/[,;]+/).map(function (s) { return s.trim(); }).filter(function (s) { return s; });
+    if (!names.length) return null;
+    var raw = ($("nbarefs") || {}).value || "", refs = null;
+    try { refs = raw ? JSON.parse(raw) : null; } catch (e) { refs = null; }
+    var table = refs && refs.r ? refs.r : {}, keys = Object.keys(table);
+    var find = function (n) {
+      if (table[n]) return table[n];
+      var low = n.toLowerCase(), hit = keys.filter(function (k) { return k.toLowerCase() === low; });
+      if (!hit.length) { var last = low.split(" ").pop(); hit = keys.filter(function (k) { return k.toLowerCase().split(" ").pop() === last; }); }
+      return hit.length === 1 ? table[hit[0]] : null;
+    };
+    var bits = names.map(function (n) { var d = find(n); return n + (d ? " " + (+d[1]).toFixed(1) + " free throws and " + (+d[2]).toFixed(1) + " points a game (" + d[0] + " games)" : " (no games in the ledger)"); });
+    return { side: "game", k: "crew", s: "shown", t: "Crew: " + bits.join("; ") + (refs && refs.lg ? "; the league " + (+refs.lg[1]).toFixed(1) + " and " + (+refs.lg[2]).toFixed(1) + "." : "."), tag: NBA_CREW_TAG };
+  }
   function nbaCtxPanel() {
     var el = $("nbaCtxPanel"); if (!el) return;
     var raw = ($("nbactx") || {}).value || "", ctx = null;
     try { ctx = raw ? JSON.parse(raw) : null; } catch (e) { ctx = null; }
-    if (!ctx || !ctx.length) {
+    var items = (ctx || []).slice(), crew = nbaCrewLine();
+    if (crew) items.push(crew);
+    if (!items.length) {
       el.innerHTML = "No context on the row — load the slate and Fill form, and the lines come with it.";
       return;
     }
     var order = { scored: 0, faded: 1, shown: 2, label: 3 };
-    var items = ctx.slice().sort(function (a, b) { return (order[a.s] || 0) - (order[b.s] || 0); });
+    items.sort(function (a, b) { return (order[a.s] || 0) - (order[b.s] || 0); });
     el.innerHTML = '<ul class="ctx">' + items.map(function (c) {
       var s = order[c.s] !== undefined ? c.s : "shown";
       return '<li class="ctx-' + s + '"><span class="cbadge">' + s + '</span> <span class="ctext">' + esc(c.t || "") + '</span>' +
@@ -3303,7 +3334,7 @@
                  "ngoalies","agname","hgname","agstart","hgstart","agok","hgok",
                  "odds","sharp","agf","aga","hgf","hga","lgg","angp","hngp","aenc","aens","henc","hens"];
   var NBA_IDS = ["away","home","line","op","up","opened","gdate","hml","aml","sp","sph","spa","h1line","h1op","h1up",
-                 "naort","nhort","nadrt","nhdrt","napace","nhpace","nagp","nhgp","nlrtg","nlpace","narest","nhrest","nbaout","nbaq","nbactx","odds","sharp"];
+                 "naort","nhort","nadrt","nhdrt","napace","nhpace","nagp","nhgp","nlrtg","nlpace","narest","nhrest","nbaout","nbaq","nbactx","ncrew","nbarefs","odds","sharp"];
   var ALL = MLB_IDS.concat(WNBA_IDS).concat(NHL_IDS).concat(NBA_IDS).filter(function (v, i, a) { return a.indexOf(v) === i; });
   var CHECKS = ["dome","playoff","agconf","hgconf","agbk","hgbk"];
   function sportOf(s) { return s === "WNBA" ? "WNBA" : s === "NHL" ? "NHL" : s === "NBA" ? "NBA" : "MLB"; }
@@ -4704,7 +4735,8 @@
         aml: "164", hml: "-198", sp: "-5.5", sph: "-108", spa: "-112", h1line: "115.5", h1op: "-110", h1up: "-110",
         naort: "113.5", nadrt: "115.0", nhort: "118.0", nhdrt: "109.0", napace: "99.5", nhpace: "98.0", nagp: "15", nhgp: "16", nlrtg: "113.0", nlpace: "100.5", narest: "1", nhrest: "0",
         nbaout: "{\"away\":[{\"id\":\"3059318\",\"n\":\"Joel Embiid\",\"st\":\"Out\",\"note\":\"Knee\",\"c\":\"Embiid (knee) has been ruled out for Tuesday's game against the Knicks.\",\"ret\":\"2026-11-18\",\"pos\":\"C\",\"mpg\":31.5,\"ppg\":26.9,\"pm\":4.1,\"src\":\"this season\",\"g\":12},{\"id\":\"4351851\",\"n\":\"Anfernee Simons\",\"st\":\"Questionable\",\"note\":\"Hamstring; with Bulls last season\",\"c\":\"Simons (hamstring) is listed as questionable for Tuesday's game in New York.\",\"ret\":\"2026-11-10\",\"pos\":\"G\",\"mpg\":24.9,\"ppg\":14.3,\"pm\":1.8,\"src\":\"last season\",\"g\":55},{\"id\":\"4870562\",\"n\":\"Dominick Barlow\",\"st\":\"Day-To-Day\",\"note\":\"Back\",\"c\":\"Barlow (back) was unable to practice Monday.\",\"ret\":\"2026-11-12\",\"pos\":\"F\",\"mpg\":11.8,\"ppg\":4.2,\"pm\":-0.6,\"src\":\"this season\",\"g\":9}],\"home\":[{\"id\":\"4066648\",\"n\":\"Mitchell Robinson\",\"st\":\"Out\",\"note\":\"Ankle\",\"c\":\"Robinson (ankle) will miss Tuesday's game against the 76ers.\",\"ret\":\"2026-11-20\",\"pos\":\"C\",\"mpg\":22.4,\"ppg\":5.6,\"pm\":3.1,\"src\":\"this season\",\"g\":10},{\"id\":\"4065804\",\"n\":\"Josh Hart\",\"st\":\"Questionable\",\"note\":\"Knee\",\"c\":\"Hart (knee) is questionable for Tuesday's game, Ian Begley of SNY reports.\",\"ret\":\"2026-11-10\",\"pos\":\"G\",\"mpg\":33.1,\"ppg\":13.4,\"pm\":5.2,\"src\":\"this season\",\"g\":16}]}",
-        nbactx: "[{\"side\":\"home\",\"k\":\"ratings_faded\",\"s\":\"faded\",\"t\":\"Knicks score 118.0 per 100 possessions, 3rd best in the league (16 games).\",\"tag\":\"faded: the market over-moves with early-season ratings, so the projection's lean goes on the line at \\u22120.25 a point until fifty games, tagged\"},{\"side\":\"home\",\"k\":\"ratings_faded\",\"s\":\"faded\",\"t\":\"Knicks allow 109.0 per 100 possessions, 4th best in the league (16 games).\",\"tag\":\"faded: the market over-moves with early-season ratings, so the projection's lean goes on the line at \\u22120.25 a point until fifty games, tagged\"},{\"side\":\"away\",\"k\":\"ratings_faded\",\"s\":\"faded\",\"t\":\"76ers allow 115.0 per 100 possessions, 6th worst in the league (15 games).\",\"tag\":\"faded: the market over-moves with early-season ratings, so the projection's lean goes on the line at \\u22120.25 a point until fifty games, tagged\"},{\"side\":\"home\",\"k\":\"pace\",\"s\":\"shown\",\"t\":\"Knicks play at 98.0 possessions a game, 5th slowest in the league.\",\"tag\":\"shown, not scored: pace alone measured null against the close; it feeds the projection\"},{\"side\":\"home\",\"k\":\"record\",\"s\":\"shown\",\"t\":\"Knicks are 7-1 at home.\",\"tag\":\"shown, not scored: the spread is priced against the box score\"},{\"side\":\"game\",\"k\":\"move\",\"s\":\"shown\",\"t\":\"DraftKings: the total opened 229.5 and sits 231.5, up 2; Knicks opened -3.5 and sit -5.5.\",\"tag\":\"shown, not scored: the current line is the anchor and the move is already inside it\"},{\"side\":\"home\",\"k\":\"rest\",\"s\":\"label\",\"t\":\"Knicks on a back to back.\",\"tag\":\"a label: rest measured inside the number against two seasons of closes\"},{\"side\":\"away\",\"k\":\"out\",\"s\":\"shown\",\"t\":\"76ers without Joel Embiid: 32 minutes a game of regulars.\",\"tag\":\"shown, not scored: announced absences are in the close; the card measures the late ones\"},{\"side\":\"home\",\"k\":\"out\",\"s\":\"shown\",\"t\":\"Knicks without Mitchell Robinson: 22 minutes a game of regulars.\",\"tag\":\"shown, not scored: announced absences are in the close; the card measures the late ones\"}]" });
+        nbactx: "[{\"side\":\"home\",\"k\":\"ratings_faded\",\"s\":\"faded\",\"t\":\"Knicks score 118.0 per 100 possessions, 3rd best in the league (16 games).\",\"tag\":\"faded: the market over-moves with early-season ratings, so the projection's lean goes on the line at \\u22120.25 a point until fifty games, tagged\"},{\"side\":\"home\",\"k\":\"ratings_faded\",\"s\":\"faded\",\"t\":\"Knicks allow 109.0 per 100 possessions, 4th best in the league (16 games).\",\"tag\":\"faded: the market over-moves with early-season ratings, so the projection's lean goes on the line at \\u22120.25 a point until fifty games, tagged\"},{\"side\":\"away\",\"k\":\"ratings_faded\",\"s\":\"faded\",\"t\":\"76ers allow 115.0 per 100 possessions, 6th worst in the league (15 games).\",\"tag\":\"faded: the market over-moves with early-season ratings, so the projection's lean goes on the line at \\u22120.25 a point until fifty games, tagged\"},{\"side\":\"home\",\"k\":\"pace\",\"s\":\"shown\",\"t\":\"Knicks play at 98.0 possessions a game, 5th slowest in the league.\",\"tag\":\"shown, not scored: pace alone measured null against the close; it feeds the projection\"},{\"side\":\"home\",\"k\":\"record\",\"s\":\"shown\",\"t\":\"Knicks are 7-1 at home.\",\"tag\":\"shown, not scored: the spread is priced against the box score\"},{\"side\":\"game\",\"k\":\"move\",\"s\":\"shown\",\"t\":\"DraftKings: the total opened 229.5 and sits 231.5, up 2; Knicks opened -3.5 and sit -5.5.\",\"tag\":\"shown, not scored: the current line is the anchor and the move is already inside it\"},{\"side\":\"home\",\"k\":\"rest\",\"s\":\"label\",\"t\":\"Knicks on a back to back.\",\"tag\":\"a label: rest measured inside the number against two seasons of closes\"},{\"side\":\"away\",\"k\":\"out\",\"s\":\"shown\",\"t\":\"76ers without Joel Embiid: 32 minutes a game of regulars.\",\"tag\":\"shown, not scored: announced absences are in the close; the card measures the late ones\"},{\"side\":\"home\",\"k\":\"out\",\"s\":\"shown\",\"t\":\"Knicks without Mitchell Robinson: 22 minutes a game of regulars.\",\"tag\":\"shown, not scored: announced absences are in the close; the card measures the late ones\"}]",
+        ncrew: "Scott Foster, Tony Brothers, Marc Davis", nbarefs: "{\"lg\":[2462,44.0,228.8],\"r\":{\"Scott Foster\":[118,46.2,229.1],\"Tony Brothers\":[95,43.1,226.0],\"Marc Davis\":[102,44.8,230.3],\"Zach Zarba\":[110,42.9,227.4]}}" });
     } else {
       restore({ away: "Sun", home: "Mystics", line: "162.5", op: "118", up: "-155", gdate: $("gdate").value,
         aml: "160", hml: "-190", sp: "-4.5", sph: "-110", spa: "-110",
@@ -4879,7 +4911,7 @@
                       "ngoalies","agname","hgname",
                       "pl","plh","pla","p1line","p1op","p1up",
                       "agf","aga","hgf","hga","lgg","angp","hngp","aenc","aens","henc","hens",
-                      "sp","sph","spa","h1line","h1op","h1up","naort","nhort","nadrt","nhdrt","napace","nhpace","nagp","nhgp","nlrtg","nlpace","narest","nhrest","nbaout","nbactx"];
+                      "sp","sph","spa","h1line","h1op","h1up","naort","nhort","nadrt","nhdrt","napace","nhpace","nagp","nhgp","nlrtg","nlpace","narest","nhrest","nbaout","nbactx","ncrew","nbarefs"];
   function blank(v) { return v === undefined || v === null || String(v).trim() === ""; }
   function sameGame(row, g) {
     var sp = sportOf(g.sport);

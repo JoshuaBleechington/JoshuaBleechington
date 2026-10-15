@@ -138,6 +138,17 @@ ledger's dates, and writes two JSON boxes the matchup's cards render:
   and return date ride along, a return date before the game is flagged as
   stale, and the card's sum of regulars' minutes counts only the men marked
   OUT plus the ones you tick.
+- **The crew** (15 Oct 2026, the user: "I think that will be helpful at some
+  point"): the slate reads the league's assignments feed by date and writes
+  the three names into the Crew box, and a referee table from both ledgers
+  into the row (each official's games, free throws and points a game, and
+  the league's). The Context card composes the last line from the two, so a
+  crew typed by hand from official.nba.com gets the same line; a surname
+  alone matches when it is unique. Shown, not scored, for the reason in the
+  backtest table above: crews predict the night's free throws (t 7.3), the
+  total does not follow them (t −1.0), and a crew's own over/under residual
+  to date measured null (+0.17, t 1.0). The ledger keeps the crew on every
+  game, so the test re-runs as the record grows.
 - **The scoreboard's book**: ESPN carries DraftKings' total, spread and
   moneylines with their openers. They go in the row's notes, the opening
   total fills the Opened box (the engine notes the move, not scored), and a

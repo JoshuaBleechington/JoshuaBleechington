@@ -27,7 +27,7 @@ const IDS = ["away","home","line","op","up","opened","gdate","aera","hera","aip"
              "ntick","ncash","ap1l10","hp1l10","axgf","axga","hxgf","hxga","xglg","nhlform",
              "ngoalies","agname","hgname","agstart","hgstart","agok","hgok",
              "agf","aga","hgf","hga","lgg","angp","hngp","aenc","aens","henc","hens",
-             "h1line","h1op","h1up","naort","nhort","nadrt","nhdrt","napace","nhpace","nagp","nhgp","nlrtg","nlpace","narest","nhrest","nbaout","nbaq","nbactx"];
+             "h1line","h1op","h1up","naort","nhort","nadrt","nhdrt","napace","nhpace","nagp","nhgp","nlrtg","nlpace","narest","nhrest","nbaout","nbaq","nbactx","ncrew","nbarefs"];
 const CHECKS = ["dome","playoff","agconf","hgconf","agbk","hgbk"];
 
 (async () => {
@@ -267,12 +267,26 @@ const CHECKS = ["dome","playoff","agconf","hgconf","agbk","hgbk"];
     const rail = [...document.querySelectorAll('#markets .mk')].map(el => el.dataset.key + ':' + el.querySelector('.pick').childNodes[0].textContent.trim());
     const pick = (document.querySelector('#markets .pickcard .lab') || {}).textContent || '';
     const opened = document.getElementById('opened').value;
+    const crewText = () => ([...document.querySelectorAll('#nbaCtxPanel ul.ctx li')].map(li => li.querySelector('.ctext').textContent).find(t => /^Crew:/.test(t)) || '');
+    const crew0 = crewText();
+    // the crew typed by hand: a surname alone matches when it is unique in the table, an unknown name says so
+    const el = document.getElementById('ncrew'); el.value = 'Zarba; Nobody Here'; el.dispatchEvent(new Event('input', { bubbles: true })); await wait();
+    const crew1 = crewText();
+    el.value = ''; el.dispatchEvent(new Event('input', { bubbles: true })); await wait();
+    const crew2 = crewText(), ctxNoCrew = document.querySelectorAll('#nbaCtxPanel ul.ctx li').length;
+    document.getElementById('add').click(); await wait();
+    const stored = JSON.parse(localStorage.getItem('callsheet3.card.v1')).find(r => /76ers @ Knicks/.test(r.matchup));
     document.getElementById('clear').click(); await wait();
-    return { out, ctx, why, rail, pick, opened };
+    return { out, ctx, why, rail, pick, opened, crew0, crew1, crew2, ctxNoCrew, storedRefs: (stored.inputs.nbarefs || '').length > 10, storedCrew: stored.inputs.ncrew };
   });
+  chk(nbaEx.crew0 === 'Crew: Scott Foster 46.2 free throws and 229.1 points a game (118 games); Tony Brothers 43.1 free throws and 226.0 points a game (95 games); Marc Davis 44.8 free throws and 230.3 points a game (102 games); the league 44.0 and 228.8.',
+      'nba crew: the context card ends with the crew line, each referee\'s free throws and points a game against the league\'s', nbaEx.crew0);
+  chk(nbaEx.crew1 === 'Crew: Zarba 42.9 free throws and 227.4 points a game (110 games); Nobody Here (no games in the ledger); the league 44.0 and 228.8.' && nbaEx.crew2 === '' && nbaEx.ctxNoCrew === 9,
+      'nba crew: a typed surname matches the table, an unknown name says so, and an empty box drops the line', JSON.stringify({ crew1: nbaEx.crew1, crew2: nbaEx.crew2, n: nbaEx.ctxNoCrew }));
+  chk(nbaEx.storedRefs && nbaEx.storedCrew === '', 'nba crew: the referee table rides in the row and the crew box is stored as typed', JSON.stringify({ refs: nbaEx.storedRefs, crew: nbaEx.storedCrew }));
   chk(/76ers: 3 listed, 32 minutes a game of regulars out/.test(nbaEx.out) && /Knicks: 2 listed, 22 minutes a game/.test(nbaEx.out) && /Embiid \(knee\) has been ruled out/.test(nbaEx.out) && /back Nov 10/.test(nbaEx.out) && /last season's line/.test(nbaEx.out),
       'nba example: the who-is-out card lists both sides with the comments, the return dates and the traded man\'s last-season line', nbaEx.out.slice(0, 300));
-  chk(nbaEx.ctx.length === 9 && nbaEx.ctx.slice(0, 3).every(b => b === 'faded') && nbaEx.ctx.indexOf('label') > nbaEx.ctx.indexOf('shown'), 'nba example: nine context lines, faded first, labels last', JSON.stringify(nbaEx.ctx));
+  chk(nbaEx.ctx.length === 10 && nbaEx.ctx.slice(0, 3).every(b => b === 'faded') && nbaEx.ctx.indexOf('label') > nbaEx.ctx.indexOf('shown'), 'nba example: ten context lines with the crew, faded first, labels last', JSON.stringify(nbaEx.ctx));
   chk(/Ratings, faded/.test(nbaEx.why) && /Early-season side watch/.test(nbaEx.why) && /Back to back for the home side/.test(nbaEx.why) && /Regulars out, minutes a game: away 32, home 22/.test(nbaEx.why) && /The number moved 229\.5 to 231\.5/.test(nbaEx.why),
       'nba example: the why list carries the fade, the side watch, the back to back, the regulars out and the move off the opener', nbaEx.why.slice(0, 400));
   chk(nbaEx.rail.length === 4 && nbaEx.opened === '229.5' && /an? (OVER|UNDER) game|No pick/.test(nbaEx.pick), 'nba example: all four markets on the rail, the opener in its box, a pick card', JSON.stringify({ rail: nbaEx.rail, pick: nbaEx.pick, opened: nbaEx.opened }));

@@ -119,7 +119,7 @@ def tail() -> str:
              '                 "ngoalies","agname","hgname","agstart","hgstart","agok","hgok",\n'
              '                 "odds","sharp","agf","aga","hgf","hga","lgg","angp","hngp","aenc","aens","henc","hens"];\n'
              '  var NBA_IDS = ["away","home","line","op","up","opened","gdate","hml","aml","sp","sph","spa","h1line","h1op","h1up",\n'
-             '                 "naort","nhort","nadrt","nhdrt","napace","nhpace","nagp","nhgp","nlrtg","nlpace","narest","nhrest","nbaout","nbaq","nbactx","odds","sharp"];\n'
+             '                 "naort","nhort","nadrt","nhdrt","napace","nhpace","nagp","nhgp","nlrtg","nlpace","narest","nhrest","nbaout","nbaq","nbactx","ncrew","nbarefs","odds","sharp"];\n'
              '  var ALL = MLB_IDS.concat(WNBA_IDS).concat(NHL_IDS).concat(NBA_IDS).filter(function (v, i, a) { return a.indexOf(v) === i; });\n'
              '  var CHECKS = ["dome","playoff","agconf","hgconf","agbk","hgbk"];\n'
              '  function sportOf(s) { return s === "WNBA" ? "WNBA" : s === "NHL" ? "NHL" : s === "NBA" ? "NBA" : "MLB"; }\n'
@@ -241,7 +241,7 @@ def tail() -> str:
              '                      "ngoalies","agname","hgname",\n'
              '                      "pl","plh","pla","p1line","p1op","p1up",\n'
              '                      "agf","aga","hgf","hga","lgg","angp","hngp","aenc","aens","henc","hens",\n'
-             '                      "sp","sph","spa","h1line","h1op","h1up","naort","nhort","nadrt","nhdrt","napace","nhpace","nagp","nhgp","nlrtg","nlpace","narest","nhrest","nbaout","nbactx"];', "slate fields")
+             '                      "sp","sph","spa","h1line","h1op","h1up","naort","nhort","nadrt","nhdrt","napace","nhpace","nagp","nhgp","nlrtg","nlpace","narest","nhrest","nbaout","nbactx","ncrew","nbarefs"];', "slate fields")
     # the slate's backup-in-net flags are booleans, carried like the roof: into a
     # row's inputs when the card already has the game, into the form otherwise
     t = once(t, '          if (g.inputs.dome === true && !row.inputs.dome) { row.inputs.dome = true; changed = true; }',
@@ -287,6 +287,8 @@ NBA_EXAMPLE_CTX = [
     {"side": "home", "k": "rest", "s": "label", "t": "Knicks on a back to back.", "tag": "a label: rest measured inside the number against two seasons of closes"},
     {"side": "away", "k": "out", "s": "shown", "t": "76ers without Joel Embiid: 32 minutes a game of regulars.", "tag": "shown, not scored: announced absences are in the close; the card measures the late ones"},
     {"side": "home", "k": "out", "s": "shown", "t": "Knicks without Mitchell Robinson: 22 minutes a game of regulars.", "tag": "shown, not scored: announced absences are in the close; the card measures the late ones"}]
+# the referee table the slate writes from the ledger: each official's games, free throws and points a game, and the league's
+NBA_EXAMPLE_REFS = {"lg": [2462, 44.0, 228.8], "r": {"Scott Foster": [118, 46.2, 229.1], "Tony Brothers": [95, 43.1, 226.0], "Marc Davis": [102, 44.8, 230.3], "Zach Zarba": [110, 42.9, 227.4]}}
 
 
 def nba_example_js() -> str:
@@ -294,7 +296,8 @@ def nba_example_js() -> str:
             '        aml: "164", hml: "-198", sp: "-5.5", sph: "-108", spa: "-112", h1line: "115.5", h1op: "-110", h1up: "-110",\n'
             '        naort: "113.5", nadrt: "115.0", nhort: "118.0", nhdrt: "109.0", napace: "99.5", nhpace: "98.0", nagp: "15", nhgp: "16", nlrtg: "113.0", nlpace: "100.5", narest: "1", nhrest: "0",\n'
             '        nbaout: ' + json.dumps(json.dumps(NBA_EXAMPLE_OUT, separators=(",", ":"))) + ',\n'
-            '        nbactx: ' + json.dumps(json.dumps(NBA_EXAMPLE_CTX, separators=(",", ":"))) + ' });\n')
+            '        nbactx: ' + json.dumps(json.dumps(NBA_EXAMPLE_CTX, separators=(",", ":"))) + ',\n'
+            '        ncrew: "Scott Foster, Tony Brothers, Marc Davis", nbarefs: ' + json.dumps(json.dumps(NBA_EXAMPLE_REFS, separators=(",", ":"))) + ' });\n')
 
 
 def build() -> str:

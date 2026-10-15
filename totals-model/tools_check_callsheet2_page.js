@@ -593,7 +593,7 @@ const CHECKS = ["dome","playoff"];
     return { rail, capBox, capWords, loadedFromCard, wanted, loadedFromRow, wantedRow };
   });
   chk(!capFlow.capBox && !capFlow.capWords, 'cap: there is no leg-cap box and no cap wording left on the page', `box=${capFlow.capBox} words=${capFlow.capWords}`);
-  chk(!capFlow.rail.some(m => m.caps.some(c => /likeliest|beyond/.test(c))), 'cap: the rail no longer carries a likeliest-beyond-the-cap chip', JSON.stringify(capFlow.rail));
+  chk(!capFlow.rail.some(m => m.caps.some(c => /beyond the cap|likeliest beyond/.test(c))), 'cap: the rail no longer carries a likeliest-beyond-the-cap chip (the likeliest-at-any-price chip of 15 Oct is a different thing)', JSON.stringify(capFlow.rail));
   chk(!capFlow.rail.some(m => m.alt), 'cap: no leg is marked on a game where nothing pickable clears its price', JSON.stringify(capFlow.rail));
   chk(capFlow.loadedFromCard === capFlow.wanted, 'click: a pick card loads its matchup into the form', `${capFlow.loadedFromCard} vs ${capFlow.wanted}`);
   chk(capFlow.loadedFromRow === capFlow.wantedRow, 'click: a board row loads its matchup into the form', `${capFlow.loadedFromRow} vs ${capFlow.wantedRow}`);

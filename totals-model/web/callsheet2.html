@@ -154,6 +154,9 @@
   .mkdetail { font-size: 12px; color: var(--ink-2); line-height: 1.5; padding: 0 14px 4px 60px; }
   .mkdetail b { color: var(--ink); }
   .mkdetail .other { color: var(--muted); }
+  .mk.likely { outline: 2px dashed var(--ink-2); outline-offset: -2px; }
+  .mk .cap.likely { color: var(--ink); border-color: var(--ink-2); border-style: dashed; font-weight: 700; }
+  .mkdetail .other.likely { color: var(--ink); font-weight: 700; }
   /* THE PICK (12 Oct 2026): one side per matchup, the likeliest on the board, with its kind of game and its why */
   .pickcard { border: 2px solid var(--go); border-radius: 10px; padding: 12px 14px; margin-bottom: 10px; background: var(--edge-wash); }
   .pickcard.none { border-color: var(--rule-firm); background: transparent; }
@@ -167,7 +170,14 @@
   .pickcard .why { font-size: 12.5px; color: var(--ink-2); line-height: 1.5; }
   .pickcard .why b { color: var(--ink); }
   .pickcard .also { font-size: 12px; color: var(--muted); line-height: 1.5; margin-top: 7px; padding-top: 6px; border-top: 1px dashed var(--rule); }
-  .pickcard .also b { color: var(--ink-2); }
+  .likelycard { border: 2px dashed var(--ink-2); border-radius: 10px; padding: 10px 14px; margin-bottom: 10px; }
+  .likelycard .lab { font-size: 11px; color: var(--ink-2); font-weight: 800; letter-spacing: .08em; text-transform: uppercase; }
+  .likelycard .head { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; margin: 4px 0 6px; }
+  .likelycard .pick { font: 800 18px/1.15 var(--sans); letter-spacing: -.01em; }
+  .likelycard .pick.over { color: var(--over); } .likelycard .pick.under { color: var(--under); }
+  .likelycard .pick.home { color: var(--home); } .likelycard .pick.away { color: var(--away); }
+  .likelycard .p { font: 800 22px/1 var(--mono); color: var(--ink-2); }
+  .likelycard .why { font-size: 12.5px; color: var(--ink-2); line-height: 1.5; }
   .pickcard .band { display: inline-block; font: 700 9.5px/1 var(--sans); letter-spacing: .08em; text-transform: uppercase; margin-left: 8px; vertical-align: middle; padding: 4px 6px; border-radius: 4px; border: 1px solid var(--rule-firm); }
   .pickcard .band.hot { background: var(--go); color: #fff; border-color: var(--go); }
   details.others > summary { cursor: pointer; font-size: 11px; color: var(--muted); font-weight: 600; letter-spacing: .04em; text-transform: uppercase; padding: 6px 0 8px; list-style: none; }
@@ -2225,18 +2235,29 @@
        total alone, over or under; the other three markets stay scored and on the
        row. From 13 Oct the hockey rail shows the pick like every other sport. */
     if (callView) { ranked = ranked.filter(function (mk) { return mk.key === "total"; }); $("rankTag").textContent = "the total only, " + NHL_TOTAL_ONLY_LABEL; }
+    /* the likeliest side on the whole card at any price (15 Oct 2026): its market row is
+       outlined and chipped, and the chip or the "Other side" line says whether the price
+       clears, so a likely side at a steep price reads as the book's price and not an edge */
+    var likely = likeliestOf(m.markets);
+    var likelyChip = function (c) {
+      var need = c.price !== null && c.price !== undefined ? implied(c.price) : null;
+      return '<span class="cap likely" title="The most likely outcome in this game, whichever market it sits in, with what its price needs">likeliest at any price' + (c.onOther ? ': ' + esc(c.pick) + ' ' + (c.p * 100).toFixed(1) + '%' : '') +
+        (need === null ? '' : ' · ' + sgn(c.price, 0) + ' needs ' + (need * 100).toFixed(1) + '%' + (c.p >= need ? ', the price agrees' : ', the book\'s price')) + '</span>';
+    };
     ranked.forEach(function (mk, i) {
       var shade = shadeOf(mk), shadeRec = shade ? shadeRecord() : null;
       var top = i === 0 && mk.edge !== null && mk.edge > 0;
       var isLeg = leg && mk.key === leg.key;
+      var isLikely = likely && mk.key === likely.key;
       var res = fin ? gradeMarket(mk, fin) : null;
       var eCls = mk.edge === null ? "" : (mk.edge > 0 ? "pos" : "neg");
-      rows += '<div class="mk' + (top ? " top" : "") + (isLeg ? " alt" : "") + (mk.edge !== null && mk.edge <= 0 ? " neg" : "") +
+      rows += '<div class="mk' + (top ? " top" : "") + (isLeg ? " alt" : "") + (isLikely ? " likely" : "") + (mk.edge !== null && mk.edge <= 0 ? " neg" : "") +
         (res ? " " + res : "") + '" data-key="' + mk.key + '"' + (res ? ' data-result="' + res + '"' : '') + '>' +
         '<div class="rk">' + (i + 1) + '</div>' +
         '<div><div class="pick ' + sideClass(mk.side) + '">' + esc(mk.pick) +
           (mk.band ? '<span class="band' + (mk.band === "NO BET" ? "" : " hot") + '">' + esc(mk.band) + '</span>' : "") +
           (!mk.anchored ? '<span class="derived">derived</span>' : "") +
+          (isLikely ? likelyChip(likely) : "") +
           (mk.key === "total" ? railMarks : "") +
           (mk.key === "total" && callView ? '<span class="cap" style="color:var(--go);border-color:var(--go)" title="11-12 Oct: every hockey total got a side, over or under, at the user\'s request">the call: ' + esc(callView.pick) + ' ' + (callView.p * 100).toFixed(1) + '%</span>' : "") +
           (!pickable(mk, sport) ? '<span class="cap tagm" title="' + esc(notPickedWhy(sport, mk)) + '">shown, not picked</span>' : "") +
@@ -2251,8 +2272,8 @@
             "edge " + sgn(mk.edge * 100, 1) + " · " + sgn(mk.price, 0) + " needs " + (mk.breakeven * 100).toFixed(1) + "%") + '</div>' +
           '<div class="e">fair ' + sgn(mk.fair, 0) + (mk.pPush > 0.005 ? ' · push ' + (mk.pPush * 100).toFixed(1) + '%' : '') + '</div></div>' +
         '</div>' +
-        '<div class="mkdetail"><span class="other">Other side: ' + esc(mk.other.pick) + ' ' + (mk.other.p * 100).toFixed(1) + '%' +
-          (mk.other.edge !== null ? ' at ' + sgn(mk.other.price, 0) + ', edge ' + sgn(mk.other.edge * 100, 1) : '') + '.</span> ' +
+        '<div class="mkdetail"><span class="other' + (isLikely && likely.onOther ? ' likely' : '') + '">Other side: ' + esc(mk.other.pick) + ' ' + (mk.other.p * 100).toFixed(1) + '%' +
+          (mk.other.edge !== null ? ' at ' + sgn(mk.other.price, 0) + ', edge ' + sgn(mk.other.edge * 100, 1) : '') + (isLikely && likely.onOther ? ': the likeliest outcome in this game' : '') + '.</span> ' +
           mk.notes.map(function (n) { return n; }).join(" ") + '</div>';
     });
     /* THE PICK above, the rest folded under it (12 Oct 2026, at the user's
@@ -2626,35 +2647,41 @@
      that needs 61% reads as the book's price and not an edge. Both sides of every
      priced market are in the running; the pick is still the likeliest side the sheet
      has moved a point off the book. */
-  function likeliestLine(markets, pk) {
+  function likeliestOf(markets) {
     var best = null, bestUnpriced = null;
     (markets || []).forEach(function (mk) {
-      [{ pick: mk.pick, p: mk.p, price: mk.price }, mk.other ? { pick: mk.other.pick, p: mk.other.p, price: mk.other.price } : null].forEach(function (c) {
+      [{ pick: mk.pick, p: mk.p, price: mk.price, key: mk.key, side: mk.side, onOther: false },
+       mk.other ? { pick: mk.other.pick, p: mk.other.p, price: mk.other.price, key: mk.key, side: FLIP[mk.side] || mk.side, onOther: true } : null].forEach(function (c) {
         if (!c || c.p === null || c.p === undefined) return;
         if (c.price !== null && c.price !== undefined) { if (!best || c.p > best.p + 1e-9) best = c; }
         else if (!bestUnpriced || c.p > bestUnpriced.p + 1e-9) bestUnpriced = c;
       });
     });
-    best = best || bestUnpriced;   // a side with a price first: the line is about the price
-    if (!best) return "";
-    var isPick = pk && !pk.none && pk.mk && pk.mk.pick === best.pick;
-    var priced = best.price !== null && best.price !== undefined;
-    var need = priced ? implied(best.price) : null;
-    var verdict = !priced ? "no price typed" : (best.p >= need ? "the price agrees" : "the book's price, not an edge");
-    return '<b>Likeliest on the card at any price</b>: ' + esc(best.pick) + ' at ' + (best.p * 100).toFixed(1) + '%' +
-      (priced ? ', ' + sgn(best.price, 0) + ' needs ' + (need * 100).toFixed(1) + '%' : '') + ': ' + verdict + (isPick ? ', and it is the pick.' : '.') +
-      (!isPick && priced && best.p < need ? ' A high chance at a steep price is the book knowing it, and you paying for it.' : '');
+    return best || bestUnpriced;   // a side with a price first: the line is about the price
+  }
+  function likelyIsPick(likely, pk) { return !!(likely && pk && !pk.none && pk.mk && pk.mk.pick === likely.pick); }
+  /* the card under the pick, when the likeliest side is some other side: its chance, its
+     price and what the price needs, in the pick card's shape so it cannot be missed */
+  function likelyBlock(likely, pk) {
+    if (!likely || likelyIsPick(likely, pk)) return "";
+    var priced = likely.price !== null && likely.price !== undefined, need = priced ? implied(likely.price) : null;
+    var why = !priced ? 'No price typed, so nothing to weigh it against.'
+      : likely.p >= need ? sgn(likely.price, 0) + ' needs ' + (need * 100).toFixed(1) + '%: the price agrees. It is not the pick because the sheet has not moved it a point off the book\'s own number; it is the book\'s read, and a fair one.'
+      : sgn(likely.price, 0) + ' needs ' + (need * 100).toFixed(1) + '%: the book\'s price, not an edge. A high chance at a steep price is the book knowing it, and you paying for it.';
+    return '<div class="likelycard"><div class="lab">Likeliest at any price · not the pick</div>' +
+      '<div class="head"><div class="pick ' + sideClass(likely.side || "") + '">' + esc(likely.pick) + '</div><div class="p">' + (likely.p * 100).toFixed(1) + '%</div></div>' +
+      '<div class="why">' + why + '</div></div>';
   }
   function pickBlock(pk, m, sp) {
-    var mk = pk.mk, also = likeliestLine(m && m.markets, pk);
-    var alsoHtml = also ? '<div class="also">' + also + '</div>' : '';
+    var mk = pk.mk, likely = likeliestOf(m && m.markets);
+    var alsoHtml = likelyIsPick(likely, pk) ? '<div class="also">Also the likeliest side on the card at any price.</div>' : '';
     if (pk.none) return '<div class="pickcard none"><div class="lab">The pick</div><div class="pick">No pick yet</div>' +
-      '<div class="why">' + (pk.msg || ('Nothing on the card separates the sides: ' + esc(mk.pick) + ' at ' + (mk.p * 100).toFixed(1) + '% is a coin flip. Type the inputs and a side will show.')) + '</div>' + alsoHtml + '</div>';
+      '<div class="why">' + (pk.msg || ('Nothing on the card separates the sides: ' + esc(mk.pick) + ' at ' + (mk.p * 100).toFixed(1) + '% is a coin flip. Type the inputs and a side will show.')) + '</div></div>' + likelyBlock(likely, pk);
     return '<div class="pickcard" data-key="' + esc(mk.key) + '" data-side="' + esc(mk.side) + '">' +
       '<div class="lab">The pick · ' + esc(pk.type) + '</div>' +
       '<div class="head"><div class="pick ' + sideClass(mk.side) + '">' + esc(mk.pick) + (mk.band ? '<span class="band' + (mk.band === "NO BET" ? "" : " hot") + '">' + esc(mk.band) + '</span>' : '') + '</div>' +
       '<div class="p">' + (mk.p * 100).toFixed(1) + '%</div></div>' +
-      '<div class="why"><b>Why</b>: ' + pickWhy(pk, m, sp) + '</div>' + alsoHtml + '</div>';
+      '<div class="why"><b>Why</b>: ' + pickWhy(pk, m, sp) + '</div>' + alsoHtml + '</div>' + likelyBlock(likely, pk);
   }
   function parlayFour(dateISO, sport) {
     var legs = [], skipped = 0;

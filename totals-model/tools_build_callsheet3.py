@@ -23,7 +23,7 @@ import sys
 ROOT = pathlib.Path(__file__).parent / "web"
 OPEN = "  /* ===== ENGINE BLOCK."
 CLOSE = "  /* ===== END ENGINE BLOCK ===== */"
-STAMP = "2026-10-14"   # bumped by hand when 3.0's own sources change (the harness checks it)
+STAMP = "2026-10-15"   # bumped by hand when 3.0's own sources change (the harness checks it)
 
 
 def engine_block() -> str:
@@ -53,8 +53,9 @@ def head() -> str:
     board, fields = frag.split("<!-- ===== FIELDS:")[0], "<!-- ===== FIELDS:" + frag.split("<!-- ===== FIELDS:")[1]
     board = board.split("-->\n", 1)[1]
     fields = fields.split("-->\n", 1)[1]
-    h = once(h, "<title>Call Sheet 2.0</title>", "<title>Call Sheet 3.0</title>", "title")
-    h = once(h, "<h1>Call Sheet <em>2.0</em></h1>", "<h1>Call Sheet <em>3.0</em></h1>", "h1")
+    # "The Super Model": the user's name for the page, 15 Oct 2026, on the eve of the basketball book
+    h = once(h, "<title>Call Sheet 2.0</title>", "<title>The Super Model</title>", "title")
+    h = once(h, "<h1>Call Sheet <em>2.0</em></h1>", "<h1>The <em>Super</em> Model</h1>", "h1")
     h = once(h, '<button type="button" id="m-mlb" aria-pressed="true">MLB</button>\n      <button type="button" id="m-wnba" aria-pressed="false">WNBA</button>',
              '<button type="button" id="m-mlb" aria-pressed="true">MLB</button>\n      <button type="button" id="m-nhl" aria-pressed="false">NHL</button>\n'
              '      <button type="button" id="m-wnba" aria-pressed="false">WNBA</button>', "sport buttons")

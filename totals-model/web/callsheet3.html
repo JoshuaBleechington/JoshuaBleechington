@@ -166,6 +166,8 @@
   .pickcard .p { font: 800 26px/1 var(--mono); }
   .pickcard .why { font-size: 12.5px; color: var(--ink-2); line-height: 1.5; }
   .pickcard .why b { color: var(--ink); }
+  .pickcard .also { font-size: 12px; color: var(--muted); line-height: 1.5; margin-top: 7px; padding-top: 6px; border-top: 1px dashed var(--rule); }
+  .pickcard .also b { color: var(--ink-2); }
   .pickcard .band { display: inline-block; font: 700 9.5px/1 var(--sans); letter-spacing: .08em; text-transform: uppercase; margin-left: 8px; vertical-align: middle; padding: 4px 6px; border-radius: 4px; border: 1px solid var(--rule-firm); }
   .pickcard .band.hot { background: var(--go); color: #fff; border-color: var(--go); }
   details.others > summary { cursor: pointer; font-size: 11px; color: var(--muted); font-weight: 600; letter-spacing: .04em; text-transform: uppercase; padding: 6px 0 8px; list-style: none; }
@@ -3915,15 +3917,41 @@
     }
     return s + price;
   }
+  /* the likeliest side on the whole card at ANY price (15 Oct 2026, the user: "if the
+     model thinks another market is likelier, that is the type of bet I want it to
+     recommend"): named under the pick with its break-even, so a 57% side at a price
+     that needs 61% reads as the book's price and not an edge. Both sides of every
+     priced market are in the running; the pick is still the likeliest side the sheet
+     has moved a point off the book. */
+  function likeliestLine(markets, pk) {
+    var best = null, bestUnpriced = null;
+    (markets || []).forEach(function (mk) {
+      [{ pick: mk.pick, p: mk.p, price: mk.price }, mk.other ? { pick: mk.other.pick, p: mk.other.p, price: mk.other.price } : null].forEach(function (c) {
+        if (!c || c.p === null || c.p === undefined) return;
+        if (c.price !== null && c.price !== undefined) { if (!best || c.p > best.p + 1e-9) best = c; }
+        else if (!bestUnpriced || c.p > bestUnpriced.p + 1e-9) bestUnpriced = c;
+      });
+    });
+    best = best || bestUnpriced;   // a side with a price first: the line is about the price
+    if (!best) return "";
+    var isPick = pk && !pk.none && pk.mk && pk.mk.pick === best.pick;
+    var priced = best.price !== null && best.price !== undefined;
+    var need = priced ? implied(best.price) : null;
+    var verdict = !priced ? "no price typed" : (best.p >= need ? "the price agrees" : "the book's price, not an edge");
+    return '<b>Likeliest on the card at any price</b>: ' + esc(best.pick) + ' at ' + (best.p * 100).toFixed(1) + '%' +
+      (priced ? ', ' + sgn(best.price, 0) + ' needs ' + (need * 100).toFixed(1) + '%' : '') + ': ' + verdict + (isPick ? ', and it is the pick.' : '.') +
+      (!isPick && priced && best.p < need ? ' A high chance at a steep price is the book knowing it, and you paying for it.' : '');
+  }
   function pickBlock(pk, m, sp) {
-    var mk = pk.mk;
+    var mk = pk.mk, also = likeliestLine(m && m.markets, pk);
+    var alsoHtml = also ? '<div class="also">' + also + '</div>' : '';
     if (pk.none) return '<div class="pickcard none"><div class="lab">The pick</div><div class="pick">No pick yet</div>' +
-      '<div class="why">' + (pk.msg || ('Nothing on the card separates the sides: ' + esc(mk.pick) + ' at ' + (mk.p * 100).toFixed(1) + '% is a coin flip. Type the inputs and a side will show.')) + '</div></div>';
+      '<div class="why">' + (pk.msg || ('Nothing on the card separates the sides: ' + esc(mk.pick) + ' at ' + (mk.p * 100).toFixed(1) + '% is a coin flip. Type the inputs and a side will show.')) + '</div>' + alsoHtml + '</div>';
     return '<div class="pickcard" data-key="' + esc(mk.key) + '" data-side="' + esc(mk.side) + '">' +
       '<div class="lab">The pick · ' + esc(pk.type) + '</div>' +
       '<div class="head"><div class="pick ' + sideClass(mk.side) + '">' + esc(mk.pick) + (mk.band ? '<span class="band' + (mk.band === "NO BET" ? "" : " hot") + '">' + esc(mk.band) + '</span>' : '') + '</div>' +
       '<div class="p">' + (mk.p * 100).toFixed(1) + '%</div></div>' +
-      '<div class="why"><b>Why</b>: ' + pickWhy(pk, m, sp) + '</div></div>';
+      '<div class="why"><b>Why</b>: ' + pickWhy(pk, m, sp) + '</div>' + alsoHtml + '</div>';
   }
   function parlayFour(dateISO, sport) {
     var legs = [], skipped = 0;

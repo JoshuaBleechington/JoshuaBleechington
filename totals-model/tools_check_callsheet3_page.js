@@ -244,7 +244,7 @@ const CHECKS = ["dome","playoff","agconf","hgconf","agbk","hgbk"];
     document.getElementById('clear').click(); document.getElementById('m-nba').click(); await wait();
     set('gdate', '2026-11-05'); set('away', 'Hornets'); set('home', 'Bucks'); set('line', '229.5'); set('op', '-110'); set('up', '-110'); set('sp', '-3.5'); set('sph', '-110'); set('spa', '-110');
     set('naort', '110'); set('nadrt', '118'); set('nhort', '118'); set('nhdrt', '110'); set('napace', '100'); set('nhpace', '100'); set('nagp', '15'); set('nhgp', '16'); await wait();
-    const read = () => { const el = document.querySelector('#markets .mk[data-key="spread"]'); return { pick: el.querySelector('.pick').childNodes[0].textContent.trim(), p: parseFloat(el.querySelector('.p').textContent), why: document.getElementById('why').textContent }; };
+    const read = () => { const el = document.querySelector('#markets .mk[data-key="spread"]'); return { pick: el.querySelector('.pick').childNodes[0].textContent.trim(), p: parseFloat(el.querySelector('.p').textContent), why: document.getElementById('why').textContent, also: (document.querySelector('#markets .pickcard .also') || {}).textContent || '' }; };
     const early = read();
     set('nagp', '35'); set('nhgp', '36'); await wait();
     const later = read();
@@ -254,6 +254,8 @@ const CHECKS = ["dome","playoff","agconf","hgconf","agbk","hgbk"];
   chk(/Early-season side watch: the ratings' margin projects \+16\.0 against the market's \+3\.5, 12\.5 points toward the Bucks\. WATCHED, NOT SCORED: in a club's first 30 games the ratings' side at 4\+ points of lean went 148-124/.test(earlySide.early.why)
       && Math.abs(earlySide.early.p - 50) < 0.6, 'nba early side: at fifteen games the why names the ratings\' side as a watch and the spread stays the book\'s 50%', JSON.stringify({ p: earlySide.early.p, why: (earlySide.early.why.match(/Early-season[^.]*\./) || ['none'])[0] }));
   chk(!/Early-season side watch/.test(earlySide.later.why) && Math.abs(earlySide.later.p - earlySide.early.p) < 0.01, 'nba early side: at thirty-five games the watch is gone and nothing else changed', (earlySide.later.why.match(/Early-season[^.]*\./) || ['none'])[0]);
+  chk(/^Likeliest on the card at any price: (OVER|UNDER) 229\.5 at 5\d\.\d%, -110 needs 52\.4%: the book's price, not an edge\. A high chance at a steep price is the book knowing it, and you paying for it\.$/.test(earlySide.early.also),
+      'pick card: a likelier side under its break-even is named as the book\'s price, not an edge (the unpriced moneyline is passed over)', earlySide.early.also);
 
   // ---- the NBA example: a game-day row with every card filled -----------------------
   const nbaEx = await pg.evaluate(async () => {
@@ -266,6 +268,7 @@ const CHECKS = ["dome","playoff","agconf","hgconf","agbk","hgbk"];
     const why = document.getElementById('why').textContent;
     const rail = [...document.querySelectorAll('#markets .mk')].map(el => el.dataset.key + ':' + el.querySelector('.pick').childNodes[0].textContent.trim());
     const pick = (document.querySelector('#markets .pickcard .lab') || {}).textContent || '';
+    const also = (document.querySelector('#markets .pickcard .also') || {}).textContent || '';
     const opened = document.getElementById('opened').value;
     const crewText = () => ([...document.querySelectorAll('#nbaCtxPanel ul.ctx li')].map(li => li.querySelector('.ctext').textContent).find(t => /^Crew:/.test(t)) || '');
     const crew0 = crewText();
@@ -277,8 +280,10 @@ const CHECKS = ["dome","playoff","agconf","hgconf","agbk","hgbk"];
     document.getElementById('add').click(); await wait();
     const stored = JSON.parse(localStorage.getItem('callsheet3.card.v1')).find(r => /76ers @ Knicks/.test(r.matchup));
     document.getElementById('clear').click(); await wait();
-    return { out, ctx, why, rail, pick, opened, crew0, crew1, crew2, ctxNoCrew, storedRefs: (stored.inputs.nbarefs || '').length > 10, storedCrew: stored.inputs.ncrew };
+    return { out, ctx, why, rail, pick, also, opened, crew0, crew1, crew2, ctxNoCrew, storedRefs: (stored.inputs.nbarefs || '').length > 10, storedCrew: stored.inputs.ncrew };
   });
+  chk(/^Likeliest on the card at any price: Knicks ML at 66\.6%, -198 needs 66\.4%: the price agrees\.$/.test(nbaEx.also),
+      'pick card: the likeliest side on the whole card at any price is named under the pick with its break-even', nbaEx.also);
   chk(nbaEx.crew0 === 'Crew: Scott Foster 46.2 free throws and 229.1 points a game (118 games); Tony Brothers 43.1 free throws and 226.0 points a game (95 games); Marc Davis 44.8 free throws and 230.3 points a game (102 games); the league 44.0 and 228.8.',
       'nba crew: the context card ends with the crew line, each referee\'s free throws and points a game against the league\'s', nbaEx.crew0);
   chk(nbaEx.crew1 === 'Crew: Zarba 42.9 free throws and 227.4 points a game (110 games); Nobody Here (no games in the ledger); the league 44.0 and 228.8.' && nbaEx.crew2 === '' && nbaEx.ctxNoCrew === 9,

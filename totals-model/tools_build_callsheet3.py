@@ -158,7 +158,7 @@ def tail() -> str:
     t = once(t, 'var unit = sp === "WNBA" ? "pts" : "runs";', 'var unit = (sp === "WNBA" || sp === "NBA") ? "pts" : sp === "NHL" ? "goals" : "runs";', "unit")
     t = once(t, ": 'With seven games in the season book",
              ": sp === \"NHL\" ? 'The puck line and the moneyline are shown, not picked, from the first game: every constant in the hockey book is a priori, and the record decides which earns a weight. The total and the first period are the pickable markets.' : "
-             "sp === \"NBA\" ? 'The spread and the moneyline are shown, not picked: measured priced against everything in the box score over two seasons of closes. The total and the first half are the pickable markets; the ratings fade and the stage deltas are tagged, and the record decides what they earn.' : 'With seven games in the season book", "calib verdict")
+             "sp === \"NBA\" ? 'The spread and the moneyline are shown, not picked: measured priced against everything in the box score over two seasons of closes, with one exception, the short dog (a dog the book makes 40% or better, +5.6 points on 626 games, both seasons), which lifts the dog and makes its moneyline pickable on its own record line. The total and the first half are the pickable markets; the ratings fade and the stage deltas are tagged, and the record decides what they earn.' : 'With seven games in the season book", "calib verdict")
     # units and decimals: the NBA is a points sport like the WNBA (one decimal on a total, none on a forecast line)
     t = every(t, 'sp === "WNBA" ? "points"', '(sp === "WNBA" || sp === "NBA") ? "points"', "points unit", 3)
     t = every(t, 'sp === "WNBA" ? 1 : 2', '(sp === "WNBA" || sp === "NBA") ? 1 : 2', "decimals (sp)", 2)
@@ -167,7 +167,7 @@ def tail() -> str:
     t = once(t, 'sp === "NHL" ? r.inputs.p1line : r.inputs.f5line', 'sp === "NHL" ? r.inputs.p1line : sp === "NBA" ? r.inputs.h1line : r.inputs.f5line', "forecast period line")
     t = once(t, '(sp === "NHL" ? "first period " : "first five ")', '(sp === "NHL" ? "first period " : sp === "NBA" ? "first half " : "first five ")', "forecast line period")
     t = once(t, "(sp === \"NHL\" ? 'First period' : 'First five')", "(sp === \"NHL\" ? 'First period' : sp === \"NBA\" ? 'First half' : 'First five')", "record period")
-    t = once(t, 'NHL: ["total", "p1", "ml"] };', 'NHL: ["total", "p1", "ml"], NBA: ["total", "h1"] };', "pickable")
+    t = once(t, 'NHL: ["total", "p1", "ml"] };', 'NHL: ["total", "p1", "ml"], NBA: ["total", "h1", "ml"] };', "pickable")
     t = once(t, "sp === \"MLB\" ? 'baseball (the pitchers and the pens score the total, not the margin)' : 'this game'",
              "sp === \"MLB\" ? 'baseball (the pitchers and the pens score the total, not the margin)' : sp === \"NBA\" ? 'the NBA (measured 15 Oct 2026 on two seasons of closes: the pace and efficiency margin projection read 0.00 against the spread, and rest, travel, time zones and announced absences sat inside the number)' : 'this game'", "pick why sides")
     t = once(t, 'if (sp === "NHL") return "Derived from the book',

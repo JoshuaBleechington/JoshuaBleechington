@@ -160,6 +160,25 @@ class TestTheMatchup(unittest.TestCase):
         with self.assertRaises(ValueError):
             forecast_matchup_nba("A", "B", total_line=228.5, h1_line=228.5)
 
+    def test_the_short_dog_is_lifted_and_a_long_one_is_not(self):
+        from totals.nba import SHORT_DOG_LIFT
+        # -120/+100 de-vigs the dog to 47.8%: a short dog, lifted
+        m = forecast_matchup_nba("Hornets", "Bucks", total_line=229.5, over_price=-110, under_price=-110, home_ml=-120, away_ml=100)
+        ml = next(x for x in m.markets if x.key == "ml")
+        away = ml.p if ml.side == "AWAY" else ml.other_side["p"]
+        base = forecast_matchup_nba("Hornets", "Bucks", total_line=229.5, over_price=-110, under_price=-110, spread=-1.5)   # the same margin, no prices: no book chance, no lift
+        self.assertTrue(any(n.startswith("UPSET SIGNAL, the short dog") for n in ml.notes))
+        self.assertTrue(any(n.startswith("Upset watch, Hornets at +100: Hornets a short dog at 48% (scored, +4 points)") for n in m.notes))
+        # -250/+205 de-vigs the dog to 30%: not short, nothing moves, the watch stays quiet
+        long = forecast_matchup_nba("Hornets", "Bucks", total_line=229.5, over_price=-110, under_price=-110, home_ml=-250, away_ml=205)
+        mll = next(x for x in long.markets if x.key == "ml")
+        self.assertFalse(any("short dog" in n for n in mll.notes))
+        self.assertFalse(any(n.startswith("Upset watch") for n in long.notes))
+        # the lift is the constant on the dog: without it the moneyline round-trips to the book's own de-vigged chance
+        from totals.fullgame import devig
+        self.assertAlmostEqual(away - (1.0 - devig(-120, 100)[0]), SHORT_DOG_LIFT, places=4)
+        self.assertEqual(len(base.markets), 3)   # total, ml, spread: the spread alone still gives sides
+
     def test_the_upset_watch_names_the_signals_and_moves_nothing(self):
         base = dict(total_line=229.5, over_price=-110, under_price=-110, spread=-11.5, spread_home_price=-110, spread_away_price=-110, home_ml=-600, away_ml=420)
         quiet = forecast_matchup_nba("Hornets", "Bucks", **base)

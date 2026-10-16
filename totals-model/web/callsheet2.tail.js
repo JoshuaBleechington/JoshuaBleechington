@@ -1130,6 +1130,8 @@
     /* the hockey moneyline is pickable only on the upset signal (16 Oct 2026): the
        dog's backup in net, which the engine marks `informed` on the row */
     if (sp === "NHL" && mk.key === "ml") return !!mk.informed;
+    /* the NBA moneyline likewise, on the short dog (16 Oct 2026): a dog the book makes 40%+ */
+    if (sp === "NBA" && mk.key === "ml") return !!mk.informed;
     /* A WNBA side is picked only when the four ratings were on the card: a
        row stored without them (every row before 2 Oct, or one typed with the
        boxes empty) carries no team information on its sides and keeps the
@@ -1141,6 +1143,7 @@
     if (sp === "WNBA") return "The WNBA total leaned under by construction and went 6-7 on the first 13 (says 54.8%, does 46.2%); from 2 Oct the WNBA book picks the spread and the moneyline, which carry the ratings, and the total is listed and graded but never a straight bet or a parlay leg.";
     if (sp === "NHL" && mk.key === "p1") return "For games on 11 and 12 Oct the hockey book picked the full-game total only, at the user's request (a week's trial, cut short once the odds feed was in). The first period is listed and graded, never a straight bet or a parlay leg, on those two days.";
     if (sp === "NHL" && mk.key === "ml") return "The book's own moneyline read back, with no team information behind it: listed and graded, never a straight bet or a parlay leg, except on the one measured upset signal, the dog starting its backup goalie (+7.4 points on 327 games, both seasons), when the dog's side becomes pickable on its own record line.";
+    if (sp === "NBA" && mk.key === "ml") return "The book's own moneyline read back through the margin, priced against everything in the box score: listed and graded, never a straight bet or a parlay leg, except on the one measured upset signal, a dog the book makes 40% or better (+5.6 points on 626 games, both seasons, +9.8% a bet), when the dog's side becomes pickable on its own record line.";
     if (sp === "NHL") return "Derived from the book's own moneyline with no team information behind it, like the run line, which said 52.5% and did 42.3% on its first 52. Listed and graded, never a straight bet or a parlay leg, until the record says otherwise.";
     return "Derived from the book's own moneyline with no team information behind it. On the first 52 graded games the run line said 52.5% and did 42.3%, so it is listed and graded but never a straight bet or a parlay leg.";
   }
@@ -1383,6 +1386,9 @@
         ["away", "home"].forEach(function (s) { (lst[s] || []).forEach(function (p) { if ((/^out/i.test(String(p.st || "")) || ticked.indexOf(String(p.id)) >= 0) && +p.mpg >= 20) out[s] += +p.mpg; }); });
       } catch (e) { }
       var favOut = dogHome ? out.away : out.home, sp = n("sp");
+      /* the short dog, scored (16 Oct 2026): the book's own de-vigged chance of the dog, from the two prices */
+      var ia = implied(dog.price), ib = implied(listedDog ? ml.other.price : ml.price), pDogBook = ia + ib > 0 ? ia / (ia + ib) : 0;
+      if (pDogBook >= 0.40) { sig.push("a short dog at " + (pDogBook * 100).toFixed(0) + "% (scored, +4 points)" + (favOut >= 20 ? "; favourite missing " + favOut.toFixed(0) + " minutes, where it ran +7.3" : "")); scored = true; }
       if (favOut >= 40) sig.push("favourite missing " + favOut.toFixed(0) + " minutes of regulars (+2.1 points, watched)");
       if (sp !== null && Math.abs(sp) >= 10 && favRest !== null && favRest <= 0) sig.push("favourite of ten or more on a back to back (+3.9 points, watched)");
     } else if (r.sport === "MLB") {
@@ -1775,11 +1781,12 @@
           var sh = shadeOf(mk), shRes = sh ? gradeMarket(sh, row.finals) : null;
           if (shRes !== null && shRes !== "invalid") count(t.shade || (t.shade = { w: 0, l: 0, p: 0 }), shRes);
         }
-        /* the hockey upset signal (16 Oct 2026): the dog's record on the rows where its backup lifted it */
-        if (mk.key === "ml" && row.sport === "NHL" && mk.informed) {
+        /* the upset signals (16 Oct 2026): the dog's record on the rows where it was lifted, hockey's backup and the NBA's short dog */
+        if (mk.key === "ml" && (row.sport === "NHL" || row.sport === "NBA") && mk.informed) {
           var dogListed = mk.price !== null && mk.price !== undefined ? mk.price > 0 : (mk.other && mk.other.p > mk.p);
           var dres = dogListed ? res : (res === "win" ? "loss" : res === "loss" ? "win" : res);
-          count(t.upset || (t.upset = { w: 0, l: 0, p: 0 }), dres);
+          if (row.sport === "NHL") count(t.upset || (t.upset = { w: 0, l: 0, p: 0 }), dres);
+          else count(t.shortDog || (t.shortDog = { w: 0, l: 0, p: 0 }), dres);
         }
         if (mk.key === "total" || mk.key === "f5") {
           var tg = marksOf(row.sport, row.inputs, row.markets);
@@ -1873,6 +1880,7 @@
       if (s.call) parts.push('the call, ' + NHL_TOTAL_ONLY_LABEL + ' ' + rec(s.call));
       if (s.sharpShade) parts.push("Pinnacle's shade, 3+ points " + rec(s.sharpShade));
       if (s.upset) parts.push("the dog with a backup in net " + rec(s.upset));
+      if (s.shortDog) parts.push("the short dog " + rec(s.shortDog));
       if (s.clv.n) parts.push('beat the close ' + s.clv.beat + '-' + s.clv.lost + (s.clv.even ? '-' + s.clv.even : '') + ' · ' + sgn(s.clv.runs / s.clv.n, 2) + ' ' + (unit || 'runs') + ' avg');
       return '<div><p class="k">' + esc(s.label) + '</p><p class="v">' + s.w + '-' + s.l + (s.p ? '-' + s.p : '') + '</p>' +
         '<p class="s">' + (s.n ? 'says ' + says.toFixed(1) + '% · does ' + does.toFixed(1) + '% (±' + se.toFixed(1) + ') · ' + sgn(s.units, 2) + 'u' : 'pushes only') + '</p>' +

@@ -6150,11 +6150,11 @@
           "key": "ml",
           "pick": "Warriors ML",
           "side": "HOME",
-          "p": 0.4379562,
+          "p": 0.4779562,
           "p_push": 0.0,
           "price": 120.0,
-          "edge": -0.01658925,
-          "fair": 128.3333,
+          "edge": 0.02341075,
+          "fair": 109.2242,
           "anchored": true,
           "band": ""
         },
@@ -6658,6 +6658,18 @@
       "projected": 217.3644139,
       "markets": [
         {
+          "key": "ml",
+          "pick": "Pistons ML",
+          "side": "HOME",
+          "p": 0.52916576,
+          "p_push": 0.0,
+          "price": -105.0,
+          "edge": 0.01697064,
+          "fair": -112.389,
+          "anchored": true,
+          "band": ""
+        },
+        {
           "key": "total",
           "pick": "UNDER 214.5",
           "side": "UNDER",
@@ -6668,18 +6680,111 @@
           "fair": 128.9474,
           "anchored": true,
           "band": ""
-        },
+        }
+      ]
+    }
+  },
+  {
+    "sport": "NBA",
+    "name": "the short dog: -120/+100 makes the dog 47.8%, lifted four points on the moneyline, tagged, the side pickable",
+    "inputs": {
+      "gdate": "2026-12-10",
+      "away": "Hornets",
+      "home": "Bucks",
+      "line": "229.5",
+      "op": "-110",
+      "up": "-110",
+      "sp": "-1.5",
+      "sph": "-110",
+      "spa": "-110",
+      "hml": "-120",
+      "aml": "100"
+    },
+    "expect": {
+      "lam_home": 115.5,
+      "lam_away": 114.0,
+      "projected": 229.5,
+      "markets": [
         {
           "key": "ml",
-          "pick": "Pistons ML",
-          "side": "HOME",
-          "p": 0.48916576,
+          "pick": "Hornets ML",
+          "side": "AWAY",
+          "p": 0.49224157,
           "p_push": 0.0,
-          "price": -105.0,
-          "edge": -0.02302936,
-          "fair": 104.4297,
+          "price": 100.0,
+          "edge": -0.00775843,
+          "fair": 103.1523,
           "anchored": true,
           "band": ""
+        },
+        {
+          "key": "total",
+          "pick": "OVER 229.5",
+          "side": "OVER",
+          "p": 0.5,
+          "p_push": 0.0,
+          "price": -110.0,
+          "edge": -0.02380952,
+          "fair": 100.0,
+          "anchored": true,
+          "band": "NO BET"
+        },
+        {
+          "key": "spread",
+          "pick": "Bucks -1.5",
+          "side": "HOME",
+          "p": 0.5,
+          "p_push": 0.0,
+          "price": -110.0,
+          "edge": -0.02380952,
+          "fair": 100.0,
+          "anchored": true,
+          "band": ""
+        }
+      ]
+    }
+  },
+  {
+    "sport": "NBA",
+    "name": "a dog at 36% is not short: the moneyline stays the book's number",
+    "inputs": {
+      "gdate": "2026-12-10",
+      "away": "Hornets",
+      "home": "Bucks",
+      "line": "229.5",
+      "op": "-110",
+      "up": "-110",
+      "hml": "-198",
+      "aml": "164"
+    },
+    "expect": {
+      "lam_home": 116.93872477,
+      "lam_away": 112.56127523,
+      "projected": 229.5,
+      "markets": [
+        {
+          "key": "ml",
+          "pick": "Hornets ML",
+          "side": "AWAY",
+          "p": 0.36309582,
+          "p_push": 0.0,
+          "price": 164.0,
+          "edge": -0.01569206,
+          "fair": 175.4094,
+          "anchored": true,
+          "band": ""
+        },
+        {
+          "key": "total",
+          "pick": "OVER 229.5",
+          "side": "OVER",
+          "p": 0.5,
+          "p_push": 0.0,
+          "price": -110.0,
+          "edge": -0.02380952,
+          "fair": 100.0,
+          "anchored": true,
+          "band": "NO BET"
         }
       ]
     }

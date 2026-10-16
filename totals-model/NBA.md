@@ -228,42 +228,61 @@ season's ratings are not a prior, because the summer moved the rosters
 own lines by id across clubs, so the who-is-out card reads a traded man
 against his own minutes, not his new team's.
 
-## The upset watch, 16 Oct 2026
+## The upset watch, and the short dog, 16 Oct 2026
 
-The user: "look for potential upsets too." The dog's outright wins against
-the spread's own model (a normal margin at sd 12.5, the engine's) on 2,448
-games, by signal (`scratchpad/nba/dig4.py`); the spread stands in for the
-moneyline because KillerSports carries no NBA prices:
+The user: "look for potential upsets too." First against the spread's own
+model (a normal margin at sd 12.5) on 2,448 games, because KillerSports
+carries no NBA prices; then, the same evening, against two seasons of real
+closing moneylines the user pulled from The Odds API (`slate.py odds-history
+--sports NBA`, one snapshot a game day at 6:30 pm Eastern, 2,403 games joined;
+`scratchpad/nba/dig6.py`). The dog's outright wins against the moneyline's
+own de-vigged chance, by signal, with the dog's return at the best retail
+price:
 
-| Signal | Games | Dog wins vs the model | By season |
-| --- | --- | --- | --- |
-| The favourite missing 40+ minutes of regulars | 926 | 291 vs 271.2, +2.1 points (z 1.5) | −0.2 / +3.4 |
-| A favourite of ten or more on a back to back | 86 | 17 vs 13.6, +3.9 (z 1.0) | +0.4 / +7.2 |
-| The favourite on a back to back, the dog rested 2+ | 55 | +6.7 (z 1.1) | +0.3 / +15.5 |
-| The ratings like the dog by 4+, first thirty games | 89 | 39 vs 30.1, +10.0 (z 2.0) | +0.4 / +25.5 |
-| The ratings like the dog by 4+, after thirty games | 378 | −0.1 (z −0.1) | −0.9 / +0.6 |
-| The favourite on the road | 1,012 | +0.9 (z 0.6) | +0.2 / +1.6 |
-| After the trade deadline | 933 | 238 vs 260.7, **−2.4 (z −1.7)** | −2.0 / −2.9 |
-| The last two weeks | 224 | 46 vs 57.0, **−4.9 (z −1.8)** | −3.7 / −6.1 |
-| A big favourite (10+) | 617 | −1.2 (z −0.9) | −3.8 / +1.2 |
+| Signal | Games | Dog wins vs priced | By season | Dog ML, best price |
+| --- | --- | --- | --- | --- |
+| **A short dog: the book makes the dog 40% or better** | 626 | 315 vs 280, **+5.6 points (z 2.8)** | **+5.6 / +5.6** | **+61.6u (+9.8% a bet)** |
+| ...of which the favourite missing 20+ minutes of regulars | 460 | +7.3 (z 3.2) | +7.4 / +7.3 | +62.1u |
+| ...of which the favourite at full strength | 166 | +0.8 (z 0.2) | +1.3 / +0.1 | −0.5u |
+| A big favourite (dog under 25%) on a back to back | 113 | +4.5 (z 1.3) | +4.4 / +4.6 | +28.4u |
+| The favourite on a back to back, the dog rested 2+ | 58 | +9.8 (z 1.6) | +2.8 / +19.8 | +23.6u |
+| The favourite missing 40+ minutes of regulars | 905 | +2.2 (z 1.5) | +0.3 / +3.2 | −4.1u |
+| The ratings like the dog by 4+, first thirty games | 87 | +10.4 (z 2.1) | +0.9 / +26.0 | +24.4u |
+| The favourite on a back to back | 388 | +2.4 (z 1.0) | +7.3 / −3.1 | +36.0u |
+| The favourite on the road | 979 | +1.0 (z 0.7) | +1.3 / +0.8 | −32.0u |
+| A big favourite (dog under 25%) | 792 | −1.1 (z −0.8) | −0.3 / −1.9 | −109.1u |
+| After the trade deadline | 900 | −2.0 (z −1.4) | −0.7 / −3.4 | −171.0u |
+| The last two weeks | 207 | −3.8 (z −1.3) | −2.1 / −5.3 | −56.5u |
 
-Nothing clears noise with the same sign both seasons. The one two-sigma line,
-the ratings liking the dog early, is one season's (+0.4 then +25.5), the
-same early-season watch the spread carries. The clearest thing in the table
-runs the other way: after the deadline and in the last two weeks the dogs
-win LESS than priced, because the favourites run through the tankers. So the
-NBA card carries an **Upset watch** note naming the signals present (the
-favourite's regulars out, a big favourite on a back to back, the early
-ratings gap, the late-season caution) and scores none of them; the board's
-Upset watch lists the dogs with a signal; the record decides.
+The moneyline as a whole is nearly calibrated (upsets 31.7% against 30.7%
+priced) and a dog costs the vig (−3.0% a bet over everything). The excess
+sits in one place: **the short dog**. Dogs at 40 to 45% won 47.6%, dogs at
+45 to 50% won 52.7%, the two seasons identical (+5.6 and +5.6 points,
++31.1u and +30.5u), home and road the same (+5.6 / +5.6), early and late
+season the same, before and after the deadline the same. Below 40% nothing
+(30-40%: −0.3), and long dogs lose heavily (under 10%: 2 of 79). The
+mechanism reads from the split: the edge lives where the favourite is
+missing regulars (+7.3 on 460 games) and vanishes when the favourite is at
+full strength (+0.8 on 166): the public backs the name, and the market
+under-moves for the name's absences. It is the NBA's version of the
+hockey backup finding, with the same shape: the market over-rates the
+publicised side.
 
-**What would settle it.** Real closing moneylines for the two seasons, which
-KillerSports cannot give. `slate.py odds-history --sports NBA --season
-2024-25` (Run NBA odds history.bat, 16 Oct 2026) pulls them from The Odds
-API's history, one snapshot a game day at 6:30 pm Eastern on the ledger's
-dates, the moneyline alone, about 1,650 credits a season, into
-`odds-history-NBA-SEASON.json`. With both seasons in, the upset table above
-is re-run at the price each dog paid rather than at the spread's model.
+**On the sheet.** `SHORT_DOG_MIN` 0.40 and `SHORT_DOG_LIFT` +0.04 (two-thirds
+of the measurement): when the book's two prices de-vig the dog to 40% or
+better, the dog's win chance takes +4 points, tagged, the moneyline becomes
+pickable on that row, the Upset watch card and the moneyline chip say so
+in green, and the record keeps "the short dog" as its own line on the ML
+tile. The rest of the table is watched: named on the card, not scored. The
+one two-sigma line among the watched, the ratings liking the dog early, is
+one season's (+0.9 then +26.0). The late-season caution stands: after the
+deadline the dogs win less than priced.
+
+**A note on timing.** Where the closing spread (from KillerSports) implied a
+better dog than the 6:30 pm moneyline by four points or more, the dog won
+50.7% against 33.4% priced on 134 games. That is the line moving toward the
+dog after the snapshot, on news, and it is not a bet at the snapshot price;
+it is the reason the slate runs again an hour before tip.
 
 **What the record says the basketball book is.** The spread is priced against
 everything the box score holds, and the moneyline follows the spread. The total

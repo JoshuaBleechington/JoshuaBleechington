@@ -290,6 +290,35 @@ const CHECKS = ["dome","playoff","agconf","hgconf","agbk","hgbk"];
       && upset.before.card && /watched, not scored/.test(upset.before.card.lab) && !/scored/.test(upset.before.card.cls) && upset.before.chips.some(c => /^upset watch: Rangers ML/.test(c)),
       'upset: the matchup rail carries an upset card under the pick, green when the signal is scored, and a chip on the moneyline row', JSON.stringify({ after: upset.after.card, before: upset.before.card }));
 
+  // ---- the NBA short dog (16 Oct 2026): a dog the book makes 40%+ is lifted four points, pickable, on the upset card ----
+  const shortDog = await pg.evaluate(async () => {
+    const wait = () => new Promise(r => setTimeout(r, 60));
+    const set = (id, v) => { const el = document.getElementById(id); el.value = v; el.dispatchEvent(new Event('input', { bubbles: true })); };
+    document.getElementById('clear').click(); document.getElementById('m-nba').click(); await wait();
+    document.getElementById('boardDate').value = '2026-11-21';
+    set('gdate', '2026-11-21'); set('away', 'Hornets'); set('home', 'Bucks'); set('line', '229.5'); set('op', '-110'); set('up', '-110'); set('hml', '-120'); set('aml', '100'); await wait();
+    const read = () => { const el = document.querySelector('#markets .mk[data-key="ml"]'); const pick = el.querySelector('.pick').childNodes[0].textContent.trim(); const p = parseFloat(el.querySelector('.p').textContent);
+      const uc = document.querySelector('#markets .upsetcard');
+      return { pick, p, away: /Hornets/.test(pick) ? p : 100 - p, chips: [...el.querySelectorAll('.cap')].map(c => c.textContent), why: document.getElementById('why').textContent,
+               card: uc ? { cls: uc.className, lab: uc.querySelector('.lab').textContent, pick: uc.querySelector('.pick').textContent, p: uc.querySelector('.p').textContent } : null }; };
+    const short = read();
+    document.getElementById('add').click(); await wait();
+    document.getElementById('boardDate').dispatchEvent(new Event('change')); await wait();
+    const ups = [...document.querySelectorAll('#upsets .pk')].map(e => ({ cls: e.className, n2: e.querySelector('.n2').textContent, n4: e.querySelector('.n4').textContent }));
+    const bets = [...document.querySelectorAll('#bestBets .pk .n2')].map(e => e.textContent);
+    set('hml', '-198'); set('aml', '164'); await wait();
+    const long = read();
+    document.getElementById('clear').click(); await wait();
+    return { short, ups, bets, long };
+  });
+  chk(Math.abs(shortDog.short.away - 51.8) < 0.3 && !shortDog.short.chips.some(c => /shown, not picked/.test(c)) && shortDog.short.chips.some(c => c === 'upset signal: Hornets ML 51.8%')
+      && shortDog.short.card && /scored/.test(shortDog.short.card.cls) && shortDog.short.card.pick === 'Hornets ML' && /Upset watch, Hornets at \+100: Hornets a short dog at 48% \(scored, \+4 points\)/.test(shortDog.short.why),
+      'nba short dog: -120/+100 lifts the dog to 51.8%, pickable, with the green upset card and the chip', JSON.stringify({ away: shortDog.short.away, chips: shortDog.short.chips, card: shortDog.short.card }));
+  chk(shortDog.ups.some(u => /scored/.test(u.cls) && u.n2 === 'Hornets ML' && /a short dog at 48% \(scored, \+4 points\)/.test(u.n4)) && shortDog.bets.some(t => /^Hornets ML/.test(t)),
+      'nba short dog: the board\'s upset watch and the straight bets carry the dog', JSON.stringify({ ups: shortDog.ups, bets: shortDog.bets }));
+  chk(Math.abs(shortDog.long.away - 36.3) < 0.3 && shortDog.long.chips.some(c => /shown, not picked/.test(c)) && !shortDog.long.card && !/short dog/.test(shortDog.long.why),
+      'nba short dog: a dog at 36% is the book\'s number, not pickable, no card', JSON.stringify({ away: shortDog.long.away, chips: shortDog.long.chips }));
+
   // ---- the NBA early-season side watch: a note on the why list, nothing moved -------
   const earlySide = await pg.evaluate(async () => {
     const wait = () => new Promise(r => setTimeout(r, 60));

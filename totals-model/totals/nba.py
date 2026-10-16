@@ -123,6 +123,21 @@ EARLY_SIDE_LEAN = 4.0
 #: the card, none scored; the record decides.
 UPSET_FAV_OUT_MIN = 40.0
 UPSET_BIG_FAV = 10.0
+#: THE SHORT DOG (16 Oct 2026, the user's two seasons of closing moneylines from
+#: The Odds API, 2,403 games joined to the ledgers; scratchpad/nba/dig6.py). A
+#: dog the moneyline makes 40% or better won 315 of 626 (50.3%) against 44.7%
+#: priced: +5.6 points, z 2.8, +5.6 and +5.6 by season, +9.8% a bet at the
+#: best retail price (+31.1u and +30.5u by season). Home and road the same
+#: (+5.6 / +5.6), early and late season the same, before and after the
+#: deadline the same. Below 40% nothing (30-40%: -0.3), and big dogs lose
+#: heavily (under 10%: 2 of 79). The effect lives where the favourite is
+#: missing 20+ minutes of regulars (+7.3, z 3.2, 460 games; +0.8 on the 166
+#: at full strength): the public backs the name and the market under-moves
+#: for its absences. Scored at two-thirds of the measurement on the dog's win
+#: chance, tagged; the moneyline becomes pickable on that row and the record
+#: keeps the short dog's own line.
+SHORT_DOG_MIN = 0.40
+SHORT_DOG_LIFT = 0.04
 #: A regular is a player at this many minutes a game; the who-is-out list is
 #: shown, not scored (announced absences are in the close; the live card
 #: measures the late ones).
@@ -448,14 +463,32 @@ def forecast_matchup_nba(
                      "of lean went 148-124 (54.4%; slope +0.156 a point, t 1.5) against two seasons of closes, then 135-143 from thirty to sixty games and "
                      "113-125 after, 394-394 over the whole. The WNBA card's spread scores the ratings at 1.2 against the market's 4.0 and is 7-0 informed on "
                      "seven games; on the NBA that blend went 351-344 at a point of lean. The record section keeps this watch from opening night.")
-    # --- the upset watch: named, not scored ------------------------------------
-    fav_home = margin >= 0
+    # --- the short dog: SCORED, tagged; the rest of the upset watch named ------
+    p_h = 1.0 - _ncdf((0.0 - margin) / MARGIN_SD)
+    if home_ml is not None and away_ml is not None:
+        p_home_book, _ = devig(home_ml, away_ml)
+    else:
+        p_home_book = p_h
+    fav_home = p_home_book >= 0.5
     dog, fav = (away, home) if fav_home else (home, away)
+    p_dog_book = (1.0 - p_home_book) if fav_home else p_home_book
     a_out, h_out = total_inputs.get("away_out_minutes") or 0.0, total_inputs.get("home_out_minutes") or 0.0
     fav_out = h_out if fav_home else a_out
     a_rest, h_rest = total_inputs.get("away_rest_days"), total_inputs.get("home_rest_days")
     fav_rest, dog_rest = (h_rest, a_rest) if fav_home else (a_rest, h_rest)
     watch = []
+    ml_notes = [f"Read off the margin through a normal at {MARGIN_SD:g}, which fits the spread's home win rate within a few points at "
+                "every bucket (big home dogs win a little less than it says). An edge here is only the book's moneyline disagreeing "
+                "with its own spread."]
+    short_dog = p_dog_book >= SHORT_DOG_MIN
+    if short_dog:
+        p_h = p_h - SHORT_DOG_LIFT if fav_home else p_h + SHORT_DOG_LIFT
+        ml_notes.append(f"UPSET SIGNAL, the short dog: the book makes {dog} {p_dog_book * 100:.1f}% and the market under-prices a dog this short. Against two "
+                        f"seasons of closing moneylines dogs at 40% or better won 315 of 626 against 280 priced (+5.6 points, z 2.8, +5.6 and +5.6 by "
+                        f"season; +9.8% a bet at the best retail price). {SHORT_DOG_LIFT * 100:+.0f} points to {dog}, tagged: this side is pickable on the "
+                        "record's own line.")
+        watch.append(f"{dog} a short dog at {p_dog_book * 100:.0f}% (scored, {SHORT_DOG_LIFT * 100:+.0f} points)" +
+                     (f"; {fav} missing {fav_out:.0f} minutes of regulars, where the short dog ran +7.3 (460 games) against +0.8 at full strength" if fav_out >= 20 else ""))
     if fav_out >= UPSET_FAV_OUT_MIN:
         watch.append(f"{fav} missing {fav_out:.0f} minutes a game of regulars: dogs won +2.1 points more than priced on 926 such games (z 1.5; -0.2 and +3.4 by season)")
     if abs(margin) >= UPSET_BIG_FAV and fav_rest is not None and fav_rest <= 0:
@@ -467,15 +500,13 @@ def forecast_matchup_nba(
         watch.append(f"{st_now[1]}: FEWER upsets, dogs won {'4.9' if st_now[0] == LAST_TWO_WEEKS_DELTA else '2.4'} points less than priced (z -1.8); the favourites run through the tankers")
     if watch:
         notes.append(f"Upset watch, {dog}" + (f" at {away_ml if fav_home else home_ml:+.0f}" if (away_ml is not None and home_ml is not None) else "") + ": " + "; ".join(watch) +
-                     ". WATCHED, NOT SCORED: none of these clears noise with the same sign both seasons; the record decides.")
-    p_h = 1.0 - _ncdf((0.0 - margin) / MARGIN_SD)
+                     (". The scored signal is the short dog; the rest are watched on the record." if short_dog
+                      else ". WATCHED, NOT SCORED: none of these clears noise with the same sign both seasons; the record decides."))
     markets.append(_pick(
         "ml", "Moneyline",
         [_side(f"{home} ML", "HOME", p_h, 0.0, home_ml), _side(f"{away} ML", "AWAY", 1.0 - p_h, 0.0, away_ml)],
         anchored=home_ml is not None and away_ml is not None,
-        notes=[f"Read off the margin through a normal at {MARGIN_SD:g}, which fits the spread's home win rate within a few points at "
-               "every bucket (big home dogs win a little less than it says). An edge here is only the book's moneyline disagreeing "
-               "with its own spread."]))
+        notes=ml_notes))
     if spread is not None:
         c, pu, fl = spread_probs(margin, spread, MARGIN_SD)
         markets.append(_pick(

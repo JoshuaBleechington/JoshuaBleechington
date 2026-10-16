@@ -19,6 +19,7 @@
     SEASON: { deadline: "2027-02-04", last_two_weeks: "2027-03-29", end: "2027-04-11" },   // A PRIORI for 2026-27 until the league publishes
     REGULAR_MPG: 20,
     EARLY_SIDE_GAMES: 30, EARLY_SIDE_LEAN: 4,   // the WNBA card's pattern on the NBA: the ratings' side at 4+ points of lean 148-124 in a club's first thirty games, 50/50 after; a watch
+    SHORT_DOG_MIN: 0.40, SHORT_DOG_LIFT: 0.04,   // the short dog (16 Oct 2026, two seasons of closing moneylines): a dog the book makes 40%+ won +5.6 points more than priced (z 2.8, +5.6 both seasons, +9.8% a bet); two-thirds of it, tagged, the moneyline pickable
     FAIR_SPAN: 30
   };
   NBA.RATING = Math.round(NBA.POINTS / 2 / NBA.PACE * 100 * 10) / 10;   // 112.7 points per 100 possessions
@@ -279,21 +280,33 @@
           esc(rm > margin ? home : away) + ". <b>WATCHED, NOT SCORED</b>: in a club's first " + NBA.EARLY_SIDE_GAMES + " games the ratings' side at " + NBA.EARLY_SIDE_LEAN + "+ points of lean went 148-124 (54.4%; slope +0.156 a point, t 1.5) against two seasons of closes, " +
           "then 135-143 from thirty to sixty games and 113-125 after, 394-394 over the whole. The WNBA card's spread scores the ratings at 1.2 against the market's 4.0 and is 7-0 informed on seven games; on the NBA that blend went 351-344 at a point of lean. The record section keeps this watch from opening night.");
       }
-      /* the upset watch (totals/nba.py UPSET_*): named, not scored; none cleared noise both seasons */
-      var favHomeU = margin >= 0, dogU = favHomeU ? away : home, favU = favHomeU ? home : away;
+      /* the short dog, SCORED and tagged (totals/nba.py SHORT_DOG_*); the rest of the upset watch named, not scored */
+      var pH = 1 - ncdf((0 - margin) / NBA.MARGIN_SD);
+      var pHomeBook = (hml !== null && aml !== null) ? devig(hml, aml)[0] : pH;
+      var favHomeU = pHomeBook >= 0.5, dogU = favHomeU ? away : home, favU = favHomeU ? home : away, pDogBook = favHomeU ? 1 - pHomeBook : pHomeBook;
       var favOutU = favHomeU ? nbaOutMinutes("home") : nbaOutMinutes("away"), arU = num("narest"), hrU = num("nhrest"), favRestU = favHomeU ? hrU : arU, watchU = [];
+      var mlNotesN = ["Read off the margin through a normal at " + NBA.MARGIN_SD + ", which fits the spread's home win rate within a few points at every bucket (big home dogs win a little less than it says). An edge here is only the book's moneyline disagreeing with its own spread."];
+      var shortDog = pDogBook >= NBA.SHORT_DOG_MIN;
+      if (shortDog) {
+        pH = favHomeU ? pH - NBA.SHORT_DOG_LIFT : pH + NBA.SHORT_DOG_LIFT;
+        mlNotesN.push("<b>UPSET SIGNAL, the short dog</b>: the book makes " + esc(dogU) + " " + (pDogBook * 100).toFixed(1) + "% and the market under-prices a dog this short. Against two seasons of closing moneylines dogs at 40% or better won 315 of 626 against 280 priced (+5.6 points, z 2.8, +5.6 and +5.6 by season; +9.8% a bet at the best retail price). " +
+          sgn(NBA.SHORT_DOG_LIFT * 100, 0) + " points to " + esc(dogU) + ", tagged: this side is pickable on the record's own line.");
+        watchU.push(esc(dogU) + " a short dog at " + (pDogBook * 100).toFixed(0) + "% (scored, " + sgn(NBA.SHORT_DOG_LIFT * 100, 0) + " points)" +
+          (favOutU >= 20 ? "; " + esc(favU) + " missing " + favOutU.toFixed(0) + " minutes of regulars, where the short dog ran +7.3 (460 games) against +0.8 at full strength" : ""));
+      }
       if (favOutU >= 40) watchU.push(esc(favU) + " missing " + favOutU.toFixed(0) + " minutes a game of regulars: dogs won +2.1 points more than priced on 926 such games (z 1.5; -0.2 and +3.4 by season)");
       if (Math.abs(margin) >= 10 && favRestU !== null && favRestU <= 0) watchU.push(esc(favU) + " a favourite of ten or more on a back to back: dogs won +3.9 points more than priced on 86 games (z 1.0; +0.4 and +7.2)");
       if (rm !== null && nSide !== null && nSide >= NBA.MIN_GAMES && nSide < NBA.EARLY_SIDE_GAMES && (favHomeU ? (margin - rm) : (rm - margin)) >= NBA.EARLY_SIDE_LEAN)
         watchU.push("the ratings like " + esc(dogU) + " by " + Math.abs(rm - margin).toFixed(1) + " points more than the market in the first thirty games: dogs won +10.0 points more than priced on 89 games (z 2.0, but +0.4 and +25.5 by season: one season's)");
       var stU = nbaStageOf(($("gdate") || {}).value);
       if (stU) watchU.push(stU[1] + ": FEWER upsets, dogs won " + (stU[0] === NBA.LAST_TWO_WEEKS_DELTA ? "4.9" : "2.4") + " points less than priced (z -1.8); the favourites run through the tankers");
-      if (watchU.length) notes.push("<b>Upset watch</b>, " + esc(dogU) + ((hml !== null && aml !== null) ? " at " + sgn(favHomeU ? aml : hml, 0) : "") + ": " + watchU.join("; ") + ". <b>WATCHED, NOT SCORED</b>: none of these clears noise with the same sign both seasons; the record decides.");
-      var pH = 1 - ncdf((0 - margin) / NBA.MARGIN_SD);
-      markets.push(pickOf("ml", "Moneyline",
+      if (watchU.length) notes.push("<b>Upset watch</b>, " + esc(dogU) + ((hml !== null && aml !== null) ? " at " + sgn(favHomeU ? aml : hml, 0) : "") + ": " + watchU.join("; ") +
+        (shortDog ? ". The scored signal is the short dog; the rest are watched on the record." : ". <b>WATCHED, NOT SCORED</b>: none of these clears noise with the same sign both seasons; the record decides."));
+      var mlmN = pickOf("ml", "Moneyline",
         [sideOf(home + " ML", "HOME", pH, 0, hml), sideOf(away + " ML", "AWAY", 1 - pH, 0, aml)],
-        hml !== null && aml !== null, "",
-        ["Read off the margin through a normal at " + NBA.MARGIN_SD + ", which fits the spread's home win rate within a few points at every bucket (big home dogs win a little less than it says). An edge here is only the book's moneyline disagreeing with its own spread."]));
+        hml !== null && aml !== null, "", mlNotesN);
+      mlmN.informed = shortDog;
+      markets.push(mlmN);
       if (spIn !== null) {
         var pr = spreadProbs(margin, spIn, NBA.MARGIN_SD);
         markets.push(pickOf("spread", "Spread " + home + ": " + fmtLine(spIn),

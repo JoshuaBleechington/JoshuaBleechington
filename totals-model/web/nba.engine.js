@@ -191,7 +191,7 @@
   /* the crew line: the names in the Crew box (the slate's, or typed from the league's page)
      against the referee table the slate writes from the ledger (nbarefs: each official's
      games, free throws and points a game, and the league's). Shown, not scored: NBA.md */
-  var NBA_CREW_TAG = "shown, not scored: crews predict the night's free throws (slope 0.60, t 7.3 on two seasons) and the total does not follow them (t −1.0 against the close)";
+  var NBA_CREW_TAG = "shown, not scored: crews predict the night's free throws (slope 0.60, t 7.3 on two seasons) and the total does not follow them (t −1.0 against the close); a referee's over/under record is a watch until this season repeats it";
   function nbaCrewLine() {
     var names = String(($("ncrew") || {}).value || "").split(/[,;]+/).map(function (s) { return s.trim(); }).filter(function (s) { return s; });
     if (!names.length) return null;
@@ -204,7 +204,13 @@
       if (!hit.length) { var last = low.split(" ").pop(); hit = keys.filter(function (k) { return k.toLowerCase().split(" ").pop() === last; }); }
       return hit.length === 1 ? table[hit[0]] : null;
     };
-    var bits = names.map(function (n) { var d = find(n); return n + (d ? " " + (+d[1]).toFixed(1) + " free throws and " + (+d[2]).toFixed(1) + " points a game (" + d[0] + " games)" : " (no games in the ledger)"); });
+    var bits = names.map(function (n) {
+      var d = find(n);
+      if (!d) return n + " (no games in the ledger)";
+      var ou = (d.length > 4 && (+d[3] || +d[4])) ? ", over the close " + d[3] + "-" + d[4] + " the last two seasons" : "";
+      if (d.length > 6 && (+d[5] || +d[6])) ou += (ou ? " and " : ", over the close ") + d[5] + "-" + d[6] + " this season";
+      return n + " " + (+d[1]).toFixed(1) + " free throws and " + (+d[2]).toFixed(1) + " points a game (" + d[0] + " games)" + ou;
+    });
     return { side: "game", k: "crew", s: "shown", t: "Crew: " + bits.join("; ") + (refs && refs.lg ? "; the league " + (+refs.lg[1]).toFixed(1) + " and " + (+refs.lg[2]).toFixed(1) + "." : "."), tag: NBA_CREW_TAG };
   }
   function nbaCtxPanel() {

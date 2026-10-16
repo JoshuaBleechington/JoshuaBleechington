@@ -24,7 +24,7 @@ import sys
 ROOT = pathlib.Path(__file__).parent / "web"
 OPEN = "  /* ===== ENGINE BLOCK."
 CLOSE = "  /* ===== END ENGINE BLOCK ===== */"
-STAMP = "2026-10-15"   # bumped by hand when 3.0's own sources change (the harness checks it)
+STAMP = "2026-10-16"   # bumped by hand when 3.0's own sources change (the harness checks it)
 
 
 def engine_block() -> str:
@@ -288,7 +288,7 @@ NBA_EXAMPLE_CTX = [
     {"side": "away", "k": "out", "s": "shown", "t": "76ers without Joel Embiid: 32 minutes a game of regulars.", "tag": "shown, not scored: announced absences are in the close; the card measures the late ones"},
     {"side": "home", "k": "out", "s": "shown", "t": "Knicks without Mitchell Robinson: 22 minutes a game of regulars.", "tag": "shown, not scored: announced absences are in the close; the card measures the late ones"}]
 # the referee table the slate writes from the ledger: each official's games, free throws and points a game, and the league's
-NBA_EXAMPLE_REFS = {"lg": [2462, 44.0, 228.8], "r": {"Scott Foster": [118, 46.2, 229.1], "Tony Brothers": [95, 43.1, 226.0], "Marc Davis": [102, 44.8, 230.3], "Zach Zarba": [110, 42.9, 227.4]}}
+NBA_EXAMPLE_REFS = {"lg": [2462, 44.0, 228.8], "r": {"Scott Foster": [118, 46.2, 229.1, 66, 41, 4, 2], "Tony Brothers": [95, 43.1, 226.0, 56, 54, 3, 3], "Marc Davis": [102, 44.8, 230.3, 71, 51, 0, 0], "Zach Zarba": [110, 42.9, 227.4, 58, 60, 2, 5]}}
 
 
 def nba_example_js() -> str:

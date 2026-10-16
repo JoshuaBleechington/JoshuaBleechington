@@ -2914,6 +2914,47 @@ NBA_OFFICIALS_HEADERS = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64
                          "Referer": "https://official.nba.com/referee-assignments/", "Accept": "application/json, text/plain, */*"}
 
 
+# Each referee's games against the closing total over the backtest's two seasons,
+# 2024-25 and 2025-26: the ledgers joined to KillerSports' closes, generated 15 Oct
+# 2026 by tools_nba_ref_table.py (86 officials over 2442 joined games with a crew; [games, over, under, push] against the closing total). SHOWN on the
+# Context card beside each official's free throws and points; not scored: the
+# crew's own over/under residual to date measured +0.17 (t 1.0) against the
+# close. With 86 officials a few sit two sigma from even by chance alone, so a
+# tilt here is a watch until this season's record (from the odds log, beside
+# it) says the same thing out of sample.
+NBA_REF_OU = {
+    "Aaron Smith": [38, 20, 18, 0], "Agon Abazi": [4, 1, 3, 0], "Andy Nagy": [126, 76, 50, 0],
+    "Ashley Moyer-Gleich": [50, 26, 24, 0], "Ben Taylor": [80, 43, 36, 1], "Bill Kennedy": [77, 39, 38, 0],
+    "Biniam Maru": [40, 21, 19, 0], "Brandon Adair": [80, 32, 48, 0], "Brandon Schwab": [103, 51, 51, 1],
+    "Brent Barnaky": [122, 60, 62, 0], "Brent Haskill": [13, 6, 6, 1], "Brett Nansel": [69, 35, 33, 1],
+    "Brian Forte": [117, 48, 69, 0], "CJ Washington": [103, 63, 39, 1], "Che Flores": [78, 46, 31, 1],
+    "Chelisa Painter": [3, 0, 3, 0], "Courtney Kirkland": [120, 63, 57, 0], "Curtis Blair": [116, 47, 68, 1],
+    "Danielle Scott": [92, 49, 43, 0], "Dannica Baroody": [38, 17, 21, 0], "David Guthrie": [48, 18, 29, 1],
+    "Dedric Taylor": [75, 33, 42, 0], "Derek Richardson": [40, 19, 21, 0], "Derrick Collins": [81, 39, 42, 0],
+    "Ed Malloy": [100, 44, 56, 0], "Eric Dalen": [107, 49, 58, 0], "Eric Lewis": [14, 10, 4, 0],
+    "Evan Scott": [100, 51, 49, 0], "Gediminas Petraitis": [130, 61, 68, 1], "Gina Catanzariti": [3, 2, 1, 0],
+    "Intae Hwang": [57, 27, 30, 0], "J.B. DeRosa": [101, 53, 47, 1], "J.D. Ralls": [37, 21, 15, 1],
+    "J.T. Orr": [99, 44, 54, 1], "JD Ralls": [43, 15, 28, 0], "Jacyn Goble": [133, 68, 65, 0],
+    "James Capers": [89, 56, 33, 0], "James Williams": [127, 60, 66, 1], "Jason Goldenberg": [116, 66, 50, 0],
+    "Jenna Reneau": [44, 18, 26, 0], "Jenna Schroeder": [102, 45, 55, 2], "John Butler": [121, 57, 64, 0],
+    "John Conley": [79, 44, 35, 0], "John Goble": [116, 63, 53, 0], "Jonathan Sterling": [92, 48, 44, 0],
+    "Josh Tiven": [128, 67, 61, 0], "Justin Van Duyne": [129, 60, 68, 1], "Karl Lane": [113, 62, 49, 2],
+    "Kevin Cutler": [123, 55, 67, 1], "Kevin Scott": [119, 56, 63, 0], "Klajdi Mulla": [3, 2, 1, 0],
+    "Leon Wood": [40, 22, 18, 0], "Marat Kogut": [118, 61, 57, 0], "Marc Davis": [122, 71, 51, 0],
+    "Marcy Williams": [2, 1, 1, 0], "Mark Lindsay": [125, 64, 61, 0], "Matt Boland": [36, 19, 17, 0],
+    "Matt Kallio": [82, 47, 35, 0], "Matt Myers": [101, 56, 45, 0], "Michael Smith": [77, 39, 38, 0],
+    "Mitchell Ervin": [127, 67, 59, 1], "Mousa Dagher": [113, 57, 55, 1], "Natalie Sago": [127, 57, 68, 2],
+    "Nate Cearley": [8, 4, 4, 0], "Nate Green": [113, 58, 54, 1], "Nick Buchert": [127, 68, 59, 0],
+    "Pat Fraher": [127, 71, 56, 0], "Pat O'Connell": [48, 20, 28, 0], "Phenizee Ransom": [119, 63, 54, 2],
+    "Ray Acosta": [132, 66, 65, 1], "Robert Hussey": [93, 48, 45, 0], "Rodney Mott": [91, 43, 48, 0],
+    "Scott Foster": [109, 66, 41, 2], "Scott Twardoski": [106, 54, 52, 0], "Sean Corbin": [120, 58, 62, 0],
+    "Sean Wright": [105, 57, 48, 0], "Sha'Rae Mitchell": [76, 41, 35, 0], "Simone Jelks": [87, 50, 37, 0],
+    "Suyash Mehta": [92, 49, 43, 0], "Tom Washington": [41, 15, 25, 1], "Tony Brothers": [112, 56, 54, 2],
+    "Tre Maddox": [99, 62, 37, 0], "Tyler Ford": [124, 68, 56, 0], "Tyler Mirkovich": [4, 1, 3, 0],
+    "Tyler Ricks": [67, 33, 33, 1], "Zach Zarba": [118, 58, 60, 0],
+}
+
+
 def _official_rows(doc):
     """Every dict in the feed that names a first official, wherever it sits."""
     out = []
@@ -2955,9 +2996,40 @@ def nba_officials(date_iso):
     return out
 
 
-def nba_referee_tables(ledger_games):
-    """Each official's games, free throws and points a game over the ledgers,
-    and the league's over the same games: {"lg": [g, fta, pts], "r": {name: [g, fta, pts]}}."""
+def nba_season_ref_ou(this_season, odds_log):
+    """{name: [over, under]} for this season: each ledger game with a crew graded
+    against the close the odds run last saw (odds-log.json, by date and nicknames)."""
+    out = {}
+    if not this_season or not odds_log:
+        return out
+    try:
+        with open(odds_log, encoding="utf-8") as f:
+            logd = json.load(f)
+    except (OSError, ValueError):
+        return out
+    for g in this_season:
+        if not g.get("off") or g.get("fa") is None or g.get("fh") is None:
+            continue
+        an, hn = g.get("an") or NBA_NICK.get(g.get("away"), g.get("away")), g.get("hn") or NBA_NICK.get(g.get("home"), g.get("home"))
+        last = (logd.get(odds_log_key("NBA", g.get("date") or "", an, hn)) or {}).get("last") or {}
+        try:
+            close = float(last.get("line"))
+        except (TypeError, ValueError):
+            continue
+        tot = g["fa"] + g["fh"]
+        if abs(tot - close) < 1e-9:
+            continue
+        for name in g["off"]:
+            d = out.setdefault(str(name), [0, 0])
+            d[0 if tot > close else 1] += 1
+    return out
+
+
+def nba_referee_tables(ledger_games, this_season=None, odds_log=None):
+    """Each official's games, free throws and points a game over the ledgers, the
+    league's over the same games, and his record against the close: the past two
+    seasons' from NBA_REF_OU, this season's from the odds log.
+    {"lg": [g, fta, pts], "r": {name: [g, fta, pts, over2, under2, over1, under1]}}."""
     per, lg = {}, [0, 0, 0]
     for g in ledger_games or []:
         if not g.get("off") or not g.get("sa") or not g.get("sh") or g.get("fa") is None or g.get("fh") is None:
@@ -2969,8 +3041,12 @@ def nba_referee_tables(ledger_games):
             d[0] += 1; d[1] += fta; d[2] += pts
     if not lg[0]:
         return None
-    return {"lg": [lg[0], round(lg[1] / float(lg[0]), 1), round(lg[2] / float(lg[0]), 1)],
-            "r": {n: [d[0], round(d[1] / float(d[0]), 1), round(d[2] / float(d[0]), 1)] for n, d in per.items()}}
+    now = nba_season_ref_ou(this_season, odds_log)
+    out = {}
+    for n, d in per.items():
+        past, cur = NBA_REF_OU.get(n) or [0, 0, 0, 0], now.get(n) or [0, 0]
+        out[n] = [d[0], round(d[1] / float(d[0]), 1), round(d[2] / float(d[0]), 1), past[1], past[2], cur[0], cur[1]]
+    return {"lg": [lg[0], round(lg[1] / float(lg[0]), 1), round(lg[2] / float(lg[0]), 1)], "r": out}
 
 
 def nba_crew_summary(names, refs):
@@ -2980,7 +3056,12 @@ def nba_crew_summary(names, refs):
     bits = []
     for n in names:
         d = refs["r"].get(n)
-        bits.append("%s %s" % (n, ("%.1f FTA / %.1f pts over %d" % (d[1], d[2], d[0])) if d else "no games in the ledger"))
+        if not d:
+            bits.append("%s no games in the ledger" % n)
+            continue
+        ou = (", over the close %d-%d the last two seasons" % (d[3], d[4])) if len(d) > 4 and (d[3] or d[4]) else ""
+        ou += (", %d-%d this season" % (d[5], d[6])) if len(d) > 6 and (d[5] or d[6]) else ""
+        bits.append("%s %.1f FTA / %.1f pts over %d%s" % (n, d[1], d[2], d[0], ou))
     return "; ".join(bits) + " (league %.1f / %.1f)" % (refs["lg"][1], refs["lg"][2])
 
 
@@ -3118,7 +3199,7 @@ def make_nba_slate(date_iso, out_dir, log):
     except Exception as e:  # noqa: BLE001
         log("Could not read the injury report (%s)." % e)
     prior2 = load_nba_ledger(nba_ledger_path(out_dir, nba_prev_season(nba_prev_season(season))))   # two seasons back, for the referees' lines only
-    refs = nba_referee_tables((led["games"] if led else []) + (prior["games"] if prior else []) + (prior2["games"] if prior2 else []))
+    refs = nba_referee_tables((led["games"] if led else []) + (prior["games"] if prior else []) + (prior2["games"] if prior2 else []), led["games"] if led else [], odds_log_path(out_dir))
     if refs:
         log("Referees: %d officials' lines over %d ledger games%s (league %.1f free throws and %.1f points a game)." % (
             len(refs["r"]), refs["lg"][0], " across three seasons" if prior2 and prior else (" across two seasons" if prior else ""), refs["lg"][1], refs["lg"][2]))
@@ -3131,7 +3212,7 @@ def make_nba_slate(date_iso, out_dir, log):
     rows = []
     for g in games:
         try:
-            rows.append(build_nba_game(g, date_iso, tables, league, players, prior_players, injuries, log, have_ledger=bool(led), officials=officials, refs=refs))
+            rows.append(build_nba_game(g, date_iso, tables, league, players, prior_players, injuries, log, have_ledger=bool(led and led.get("games")), officials=officials, refs=refs))
         except Exception as e:  # noqa: BLE001
             log("%s @ %s: FAILED (%s); left out of the slate" % (g.get("an"), g.get("hn"), e))
         log("")
@@ -4342,7 +4423,9 @@ def selftest():
         with open(nba_ledger_path(tmp7, season), "w", encoding="utf-8") as f:
             json.dump({"format": NBA_LEDGER_FORMAT, "season": season, "through": games[-1]["date"], "games": games}, f)
     with open(odds_log_path(tmp7), "w", encoding="utf-8") as f:
-        json.dump({odds_log_key("NBA", "2026-10-22", "Celtics", "Knicks"): {"first": {"line": "223.0"}, "last": {"line": "221.5", "op": "-110", "up": "-110", "h1line": "110.5", "at": "2026-10-21T23:00:00Z", "book": "fanatics"}}}, f)
+        json.dump({odds_log_key("NBA", "2026-10-22", "Celtics", "Knicks"): {"first": {"line": "223.0"}, "last": {"line": "221.5", "op": "-110", "up": "-110", "h1line": "110.5", "at": "2026-10-21T23:00:00Z", "book": "fanatics"}},
+                   # closes for two of the synthetic finals: Celtics @ Knicks 115-114 (over 225.5, Zarba's crew), Lakers @ Warriors 113-112 (under 230, Foster's crew)
+                   odds_log_key("NBA", "2026-10-13", "Celtics", "Knicks"): {"last": {"line": "225.5"}}, odds_log_key("NBA", "2026-10-13", "Lakers", "Warriors"): {"last": {"line": "230"}}}, f)
     fetch_json = fake_nba_slate
     try:
         day = nba_day_games("2026-10-21")
@@ -4412,6 +4495,9 @@ def selftest():
     check("nba slate: the referee table from the ledgers rides in the row (each official's games, free throws and points a game, the league's beside), and the crew fills from the league's feed by tricode or game code",
           refs7 is not None and refs7["lg"][0] == 40 and refs7["lg"][1] == 40.0 and set(refs7["r"]) == {"Scott Foster", "Tony Brothers", "Marc Davis", "Zach Zarba", "Eric Dalen", "Jason Goldenberg"}
           and refs7["r"]["Scott Foster"][0] == len(foster_games) and refs7["r"]["Scott Foster"][2] == round(sum(g["fa"] + g["fh"] for g in foster_games) / float(len(foster_games)), 1)
+          and refs7["r"]["Scott Foster"][3:] == [66, 41, 0, 1] and refs7["r"]["Zach Zarba"][3:] == [58, 60, 1, 0] and refs7["r"]["Tony Brothers"][5:] == [0, 1]
+          and any("Scott Foster 40.0 FTA / " in l and "over the close 66-41 the last two seasons, 0-1 this season" in l for l in lines7)
+          and nba_season_ref_ou(led_now, "/nonexistent/odds-log.json") == {} and NBA_REF_OU["Scott Foster"] == [109, 66, 41, 2]
           and bn["inputs"]["ncrew"] == "Scott Foster, Tony Brothers, Marc Davis" and pl["inputs"]["ncrew"] == "Zach Zarba, Eric Dalen, Jason Goldenberg" and dj["inputs"]["ncrew"] == ""
           and any(n.startswith("No crew on the league's feed for this game yet") for n in dj["notes"]) and not any("No crew" in n for n in bn["notes"])
           and any("Crews: 2 games on the league's assignments feed" in l for l in lines7) and any(l.startswith("  crew: Scott Foster 40.0 FTA / ") for l in lines7)

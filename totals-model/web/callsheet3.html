@@ -347,7 +347,7 @@
   <header class="top">
     <div>
       <div class="eyebrow"><span id="eyebrow">MLB · every market on the game</span>
-        <span class="build">· build <span id="build">2026-10-15</span></span></div>
+        <span class="build">· build <span id="build">2026-10-16</span></span></div>
       <h1>The <em>Super</em> Model</h1>
       <p>One matchup, every market the book posts on it — in baseball the full-game total, the first five,
          the moneyline and the run line; in hockey the total, the first period, the moneyline and the puck line;
@@ -2742,7 +2742,7 @@
   /* the crew line: the names in the Crew box (the slate's, or typed from the league's page)
      against the referee table the slate writes from the ledger (nbarefs: each official's
      games, free throws and points a game, and the league's). Shown, not scored: NBA.md */
-  var NBA_CREW_TAG = "shown, not scored: crews predict the night's free throws (slope 0.60, t 7.3 on two seasons) and the total does not follow them (t −1.0 against the close)";
+  var NBA_CREW_TAG = "shown, not scored: crews predict the night's free throws (slope 0.60, t 7.3 on two seasons) and the total does not follow them (t −1.0 against the close); a referee's over/under record is a watch until this season repeats it";
   function nbaCrewLine() {
     var names = String(($("ncrew") || {}).value || "").split(/[,;]+/).map(function (s) { return s.trim(); }).filter(function (s) { return s; });
     if (!names.length) return null;
@@ -2755,7 +2755,13 @@
       if (!hit.length) { var last = low.split(" ").pop(); hit = keys.filter(function (k) { return k.toLowerCase().split(" ").pop() === last; }); }
       return hit.length === 1 ? table[hit[0]] : null;
     };
-    var bits = names.map(function (n) { var d = find(n); return n + (d ? " " + (+d[1]).toFixed(1) + " free throws and " + (+d[2]).toFixed(1) + " points a game (" + d[0] + " games)" : " (no games in the ledger)"); });
+    var bits = names.map(function (n) {
+      var d = find(n);
+      if (!d) return n + " (no games in the ledger)";
+      var ou = (d.length > 4 && (+d[3] || +d[4])) ? ", over the close " + d[3] + "-" + d[4] + " the last two seasons" : "";
+      if (d.length > 6 && (+d[5] || +d[6])) ou += (ou ? " and " : ", over the close ") + d[5] + "-" + d[6] + " this season";
+      return n + " " + (+d[1]).toFixed(1) + " free throws and " + (+d[2]).toFixed(1) + " points a game (" + d[0] + " games)" + ou;
+    });
     return { side: "game", k: "crew", s: "shown", t: "Crew: " + bits.join("; ") + (refs && refs.lg ? "; the league " + (+refs.lg[1]).toFixed(1) + " and " + (+refs.lg[2]).toFixed(1) + "." : "."), tag: NBA_CREW_TAG };
   }
   function nbaCtxPanel() {
@@ -4904,7 +4910,7 @@
         naort: "113.5", nadrt: "115.0", nhort: "118.0", nhdrt: "109.0", napace: "99.5", nhpace: "98.0", nagp: "15", nhgp: "16", nlrtg: "113.0", nlpace: "100.5", narest: "1", nhrest: "0",
         nbaout: "{\"away\":[{\"id\":\"3059318\",\"n\":\"Joel Embiid\",\"st\":\"Out\",\"note\":\"Knee\",\"c\":\"Embiid (knee) has been ruled out for Tuesday's game against the Knicks.\",\"ret\":\"2026-11-18\",\"pos\":\"C\",\"mpg\":31.5,\"ppg\":26.9,\"pm\":4.1,\"src\":\"this season\",\"g\":12},{\"id\":\"4351851\",\"n\":\"Anfernee Simons\",\"st\":\"Questionable\",\"note\":\"Hamstring; with Bulls last season\",\"c\":\"Simons (hamstring) is listed as questionable for Tuesday's game in New York.\",\"ret\":\"2026-11-10\",\"pos\":\"G\",\"mpg\":24.9,\"ppg\":14.3,\"pm\":1.8,\"src\":\"last season\",\"g\":55},{\"id\":\"4870562\",\"n\":\"Dominick Barlow\",\"st\":\"Day-To-Day\",\"note\":\"Back\",\"c\":\"Barlow (back) was unable to practice Monday.\",\"ret\":\"2026-11-12\",\"pos\":\"F\",\"mpg\":11.8,\"ppg\":4.2,\"pm\":-0.6,\"src\":\"this season\",\"g\":9}],\"home\":[{\"id\":\"4066648\",\"n\":\"Mitchell Robinson\",\"st\":\"Out\",\"note\":\"Ankle\",\"c\":\"Robinson (ankle) will miss Tuesday's game against the 76ers.\",\"ret\":\"2026-11-20\",\"pos\":\"C\",\"mpg\":22.4,\"ppg\":5.6,\"pm\":3.1,\"src\":\"this season\",\"g\":10},{\"id\":\"4065804\",\"n\":\"Josh Hart\",\"st\":\"Questionable\",\"note\":\"Knee\",\"c\":\"Hart (knee) is questionable for Tuesday's game, Ian Begley of SNY reports.\",\"ret\":\"2026-11-10\",\"pos\":\"G\",\"mpg\":33.1,\"ppg\":13.4,\"pm\":5.2,\"src\":\"this season\",\"g\":16}]}",
         nbactx: "[{\"side\":\"home\",\"k\":\"ratings_faded\",\"s\":\"faded\",\"t\":\"Knicks score 118.0 per 100 possessions, 3rd best in the league (16 games).\",\"tag\":\"faded: the market over-moves with early-season ratings, so the projection's lean goes on the line at \\u22120.25 a point until fifty games, tagged\"},{\"side\":\"home\",\"k\":\"ratings_faded\",\"s\":\"faded\",\"t\":\"Knicks allow 109.0 per 100 possessions, 4th best in the league (16 games).\",\"tag\":\"faded: the market over-moves with early-season ratings, so the projection's lean goes on the line at \\u22120.25 a point until fifty games, tagged\"},{\"side\":\"away\",\"k\":\"ratings_faded\",\"s\":\"faded\",\"t\":\"76ers allow 115.0 per 100 possessions, 6th worst in the league (15 games).\",\"tag\":\"faded: the market over-moves with early-season ratings, so the projection's lean goes on the line at \\u22120.25 a point until fifty games, tagged\"},{\"side\":\"home\",\"k\":\"pace\",\"s\":\"shown\",\"t\":\"Knicks play at 98.0 possessions a game, 5th slowest in the league.\",\"tag\":\"shown, not scored: pace alone measured null against the close; it feeds the projection\"},{\"side\":\"home\",\"k\":\"record\",\"s\":\"shown\",\"t\":\"Knicks are 7-1 at home.\",\"tag\":\"shown, not scored: the spread is priced against the box score\"},{\"side\":\"game\",\"k\":\"move\",\"s\":\"shown\",\"t\":\"DraftKings: the total opened 229.5 and sits 231.5, up 2; Knicks opened -3.5 and sit -5.5.\",\"tag\":\"shown, not scored: the current line is the anchor and the move is already inside it\"},{\"side\":\"home\",\"k\":\"rest\",\"s\":\"label\",\"t\":\"Knicks on a back to back.\",\"tag\":\"a label: rest measured inside the number against two seasons of closes\"},{\"side\":\"away\",\"k\":\"out\",\"s\":\"shown\",\"t\":\"76ers without Joel Embiid: 32 minutes a game of regulars.\",\"tag\":\"shown, not scored: announced absences are in the close; the card measures the late ones\"},{\"side\":\"home\",\"k\":\"out\",\"s\":\"shown\",\"t\":\"Knicks without Mitchell Robinson: 22 minutes a game of regulars.\",\"tag\":\"shown, not scored: announced absences are in the close; the card measures the late ones\"}]",
-        ncrew: "Scott Foster, Tony Brothers, Marc Davis", nbarefs: "{\"lg\":[2462,44.0,228.8],\"r\":{\"Scott Foster\":[118,46.2,229.1],\"Tony Brothers\":[95,43.1,226.0],\"Marc Davis\":[102,44.8,230.3],\"Zach Zarba\":[110,42.9,227.4]}}" });
+        ncrew: "Scott Foster, Tony Brothers, Marc Davis", nbarefs: "{\"lg\":[2462,44.0,228.8],\"r\":{\"Scott Foster\":[118,46.2,229.1,66,41,4,2],\"Tony Brothers\":[95,43.1,226.0,56,54,3,3],\"Marc Davis\":[102,44.8,230.3,71,51,0,0],\"Zach Zarba\":[110,42.9,227.4,58,60,2,5]}}" });
     } else {
       restore({ away: "Sun", home: "Mystics", line: "162.5", op: "118", up: "-155", gdate: $("gdate").value,
         aml: "160", hml: "-190", sp: "-4.5", sph: "-110", spa: "-110",

@@ -151,6 +151,20 @@ ledger's dates, and writes two JSON boxes the matchup's cards render:
   total does not follow them (t −1.0), and a crew's own over/under residual
   to date measured null (+0.17, t 1.0). The ledger keeps the crew on every
   game, so the test re-runs as the record grows.
+- **Each referee against the close** (16 Oct 2026, the user: "I like these
+  ideas"): the two backtest seasons' over/under record per official ships
+  inside the slate (`NBA_REF_OU`, 86 officials over 2,442 joined games,
+  `tools_nba_ref_table.py`), and this season's is graded from the odds log
+  as the ledger and the odds runs fill, so the crew line reads "Scott
+  Foster … over the close 66-41 the last two seasons and 4-2 this season".
+  The spread of the past table is wide: Foster 66-41 and Tre Maddox 62-37
+  over, Brian Forte 48-69 and Curtis Blair 47-68 under. With 86 officials
+  a handful sit two sigma from even by chance, and the within-season
+  residual test above says the tilt did not carry as a predictor. So it
+  is a watch with a clean out-of-sample test built in: the past table is
+  frozen now, this season's record sits beside it, and if the officials
+  who tilted over keep tilting over, the crew becomes an input at the
+  season's end, scored at what the record says.
 - **The scoreboard's book**: ESPN carries DraftKings' total, spread and
   moneylines with their openers. They go in the row's notes, the opening
   total fills the Opened box (the engine notes the move, not scored), and a

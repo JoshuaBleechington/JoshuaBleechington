@@ -141,7 +141,12 @@ sheet, not in the Line box.
 **The history mode**, for the backtest. `python slate.py odds-history
 --season 20252026`, or **Run odds history.bat**, pulls a past season's
 hockey totals at two moments a day (noon and 7:30 pm Eastern) from every
-book in the list, into `odds-history-NHL-SEASON.json`. The dates come from
+book in the list, into `odds-history-NHL-SEASON.json`. **Run NBA odds
+history.bat** (`--sports NBA --season 2024-25`) pulls a past NBA season's
+closing moneylines instead, one snapshot a game day at 6:30 pm Eastern on
+the ledger's dates, into `odds-history-NBA-SEASON.json`, about 1,650
+credits a season: the dog's price for the upset test (NBA.md), which
+KillerSports cannot give. The dates come from
 the season ledger when it is in the folder, so no off day is spent on. Ten
 credits a snapshot: a season is about 3,700. It prints the cost and asks
 before it spends, stops when 3,000 credits are left for the nightly runs,

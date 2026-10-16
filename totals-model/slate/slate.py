@@ -3420,6 +3420,8 @@ ODDS_SHARP = "pinnacle"                               # read beside the carded l
 ODDS_LOG = "odds-log.json"
 ODDS_HISTORY_FORMAT = "callsheet.odds-history"
 ODDS_HISTORY_TIMES = ("16:00", "23:30")              # UTC: noon Eastern (the opener) and 7:30 pm Eastern (the close for the main slate)
+ODDS_HISTORY_TIMES_NBA = ("22:30",)                  # UTC: one snapshot at 6:30 pm Eastern (5:30 in winter), before the 7 pm tips; the moneylines for the upset test (16 Oct 2026)
+ODDS_HISTORY_MARKETS = {"NBA": "h2h"}                # the NBA pull wants the moneyline alone: KillerSports already gave the spreads and totals at the close
 ODDS_HISTORY_KEEP = 3000                             # credits a history pull leaves untouched for the nightly runs
 ODDS_HISTORY_COST = 10                               # credits a market a snapshot, by the API's price list
 ODDS_TWO_WORD = {"Blue Jackets", "Red Wings", "Maple Leafs", "Golden Knights", "Red Sox", "White Sox", "Blue Jays", "Trail Blazers"}
@@ -3781,11 +3783,14 @@ def odds_history_dates(sport, season, out_dir, start=None, end=None):
     """The game dates to pull: a date range when given; else the season ledger's
     own dates (NHL, no off days wasted); else the season's calendar."""
     if not (start and end):
+        led = None
         if sport == "NHL":
             led = load_ledger(ledger_path(out_dir, str(season)))
-            dates = sorted(set(g.get("date") for g in ((led or {}).get("games") or []) if g.get("date")))
-            if dates:
-                return dates
+        elif sport == "NBA":
+            led = load_nba_ledger(nba_ledger_path(out_dir, nba_norm_season(str(season))))   # the game days only: no off day, no All-Star weekend
+        dates = sorted(set(g.get("date") for g in ((led or {}).get("games") or []) if g.get("date")))
+        if dates:
+            return dates
         y0 = int(str(season)[:4])
         y1 = int(str(season)[4:8]) if len(str(season)) >= 8 else y0 + 1
         start, end = {"NHL": ("%d-10-01" % y0, "%d-04-20" % y1), "MLB": ("%d-03-25" % y0, "%d-10-01" % y0)}.get(sport, ("%d-10-20" % y0, "%d-04-15" % y1))
@@ -3819,16 +3824,20 @@ def odds_history_add(doc, sport, snap_doc, label):
     return got, ts
 
 
-def make_odds_history(out_dir, log, books=None, sports=("NHL",), season=None, start=None, end=None, times=None, markets="totals", yes=False, keep=ODDS_HISTORY_KEEP):
+def make_odds_history(out_dir, log, books=None, sports=("NHL",), season=None, start=None, end=None, times=None, markets=None, yes=False, keep=ODDS_HISTORY_KEEP):
     if not season and not (start and end):
-        raise RuntimeError("odds-history needs --season (e.g. 20252026) or --from and --to")
+        raise RuntimeError("odds-history needs --season (e.g. 20252026, or 2024-25 for the NBA) or --from and --to")
     key = odds_key(out_dir)
     books = odds_books_list(books)
-    times = [t.strip() for t in (times or ",".join(ODDS_HISTORY_TIMES)).split(",") if t.strip()]
-    season = str(season) if season else "%s-%s" % (start, end)
-    nmk = len([m for m in markets.split(",") if m.strip()])
+    season_arg = str(season) if season else "%s-%s" % (start, end)
     paths = []
     for sport in sports:
+        # the defaults by sport: hockey two snapshots a day on the totals (the openers test), the NBA one snapshot on the moneyline (the upset test)
+        sp_times = [t.strip() for t in (times or ",".join(ODDS_HISTORY_TIMES_NBA if sport == "NBA" else ODDS_HISTORY_TIMES)).split(",") if t.strip()]
+        sp_markets = markets or ODDS_HISTORY_MARKETS.get(sport, "totals")
+        nmk = len([m for m in sp_markets.split(",") if m.strip()])
+        season = nba_norm_season(season_arg) if (sport == "NBA" and season) else season_arg
+        times, markets = sp_times, sp_markets   # the file records what was pulled
         dates = odds_history_dates(sport, season, out_dir, start, end)
         path = odds_history_path(out_dir, sport, season)
         try:
@@ -3866,9 +3875,11 @@ def make_odds_history(out_dir, log, books=None, sports=("NHL",), season=None, st
             if left is not None and left < keep:
                 log("Stopped with %s credits left, to keep %d for the nightly runs. The month resets on the 1st; run again then and it carries on where it stopped." % (left, keep))
                 break
-        log("Wrote %s: %d game%s, %d snapshot%s. Run tools_backtest_nhl_odds.py on it beside the season ledger." % (
-            path, len(doc["games"]), "" if len(doc["games"]) == 1 else "s", len(doc["pulled"]), "" if len(doc["pulled"]) == 1 else "s"))
+        log("Wrote %s: %d game%s, %d snapshot%s. %s" % (
+            path, len(doc["games"]), "" if len(doc["games"]) == 1 else "s", len(doc["pulled"]), "" if len(doc["pulled"]) == 1 else "s",
+            "Send it to Claude with the season ledger: the upset test reads the dog's price from it." if sport == "NBA" else "Run tools_backtest_nhl_odds.py on it beside the season ledger."))
         paths.append(path)
+        times, markets = None if not times else ",".join(times), None   # the next sport takes its own defaults unless the user gave them
     return paths[-1] if paths else out_dir
 
 
@@ -4305,6 +4316,21 @@ def selftest():
     hg = hist["games"]["NHL|2025-10-08|Rangers @ Bruins"]
     check("odds history: a snapshot folds in per game, per book", got == 1 and ts == "2025-10-08T15:55:00Z" and hg["snaps"][ts]["fanatics"] == [6.0, -110, -110]
           and hg["snaps"][ts]["pinnacle"] == [6.5, -105, -115, -130, 110] and hist["pulled"]["2025-10-08 16:00"]["games"] == 1)
+    hist_nba = {"pulled": {}, "games": {}}
+    got_n, ts_n = odds_history_add(hist_nba, "NBA", {"timestamp": "2024-10-22T22:30:00Z", "data": [{"commence_time": "2024-10-22T23:30:00Z", "home_team": "Boston Celtics", "away_team": "New York Knicks", "bookmakers": [
+        {"key": "fanatics", "markets": [{"key": "h2h", "outcomes": [{"name": "Boston Celtics", "price": -320}, {"name": "New York Knicks", "price": 255}]}]},
+        {"key": "pinnacle", "markets": [{"key": "h2h", "outcomes": [{"name": "Boston Celtics", "price": -300}, {"name": "New York Knicks", "price": 265}]}]}]}]}, "2024-10-22 22:30")
+    hgn = hist_nba["games"].get("NBA|2024-10-22|Knicks @ Celtics") or {"snaps": {}}
+    check("odds history (NBA): a moneyline-only snapshot folds in with the totals blank and the two prices, keyed like the ledger", got_n == 1 and hgn["snaps"].get(ts_n, {}).get("fanatics") == [None, None, None, -320, 255]
+          and hgn["snaps"][ts_n]["pinnacle"] == [None, None, None, -300, 265] and hgn["away"] == "Knicks" and hgn["home"] == "Celtics")
+    tmp_h = tempfile.mkdtemp()
+    with open(nba_ledger_path(tmp_h, "2026-27"), "w", encoding="utf-8") as f:
+        json.dump({"format": NBA_LEDGER_FORMAT, "season": "2026-27", "games": [{"id": str(k), "date": "2026-10-%02d" % d} for k, d in enumerate([13, 13, 14, 15, 16, 17, 18, 19, 20])]}, f)
+    nba_hist_dates = odds_history_dates("NBA", "2026-27", tmp_h)
+    check("odds history (NBA): the dates come from the NBA ledger's game days (the season spelt either way), the calendar without one",
+          nba_hist_dates[0] == "2026-10-13" and nba_hist_dates[-1] == "2026-10-20" and len(nba_hist_dates) == 8 and odds_history_dates("NBA", "202627", tmp_h) == nba_hist_dates
+          and odds_history_dates("NBA", "2024-25", tempfile.mkdtemp())[0] == "2024-10-20" and odds_history_dates("NBA", "2024-25", tempfile.mkdtemp())[-1] == "2025-04-15"
+          and odds_history_path(tempfile.mkdtemp(), "NBA", "2024-25").endswith("odds-history-NBA-2024-25.json"))
     check("odds history: the dates come from the calendar without a ledger, or from the range", odds_history_dates("NHL", "20252026", tempfile.mkdtemp())[0] == "2025-10-01"
           and odds_history_dates("NHL", "x", ".", "2025-10-08", "2025-10-10") == ["2025-10-08", "2025-10-09", "2025-10-10"])
     # the NBA ledger (15 Oct 2026), offline: the feed's shapes, canned
@@ -4906,8 +4932,8 @@ def main(argv=None):
     ap.add_argument("--season", help="nhl-ledger, nba-ledger and odds-history: a past season to pull in full, e.g. 20252026 or 2024-25 (for the backtest).")
     ap.add_argument("--from", dest="start", help="odds-history: the first date to pull, YYYY-MM-DD (with --to; else the season's dates).")
     ap.add_argument("--to", dest="end", help="odds-history: the last date to pull, YYYY-MM-DD.")
-    ap.add_argument("--times", help="odds-history: the UTC snapshot times a day, e.g. 16:00,23:30 (default); +02:30 means the next day's 02:30.")
-    ap.add_argument("--markets", help="odds-history: the markets to pull, e.g. totals or totals,h2h (default totals; each is 10 credits a snapshot).")
+    ap.add_argument("--times", help="odds-history: the UTC snapshot times a day, e.g. 16:00,23:30 (the hockey default; the NBA's is 22:30 alone); +02:30 means the next day's 02:30.")
+    ap.add_argument("--markets", help="odds-history: the markets to pull, e.g. totals or totals,h2h (default totals; the NBA's default h2h; each is 10 credits a snapshot).")
     ap.add_argument("--yes", action="store_true", help="odds-history: pull without asking first.")
     ap.add_argument("--keep", type=int, default=ODDS_HISTORY_KEEP, help="odds-history: stop when this many credits are left for the nightly runs (default %d)." % ODDS_HISTORY_KEEP)
     ap.add_argument("--detail", action="store_true", help="nhl-ledger only: also fetch each game's box score and game page for the starters, their lines, power-play goals and penalties (two calls a game; about 40 minutes a season).")
@@ -4956,7 +4982,7 @@ def main(argv=None):
             path = make_odds(date_iso, a.out, log, a.books, sports)
         elif a.mode == "odds-history":
             sports = tuple(s.strip().upper() for s in a.sports.split(",") if s.strip()) if a.sports else ("NHL",)
-            path = make_odds_history(a.out, log, a.books, sports, a.season, a.start, a.end, a.times, a.markets or "totals", a.yes, a.keep)
+            path = make_odds_history(a.out, log, a.books, sports, a.season, a.start, a.end, a.times, a.markets, a.yes, a.keep)
         else:
             path = make_slate(date_iso, a.out, log)
     except Exception as e:  # noqa: BLE001

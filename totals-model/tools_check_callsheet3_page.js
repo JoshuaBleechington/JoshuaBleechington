@@ -258,7 +258,9 @@ const CHECKS = ["dome","playoff","agconf","hgconf","agbk","hgbk"];
     set('gdate', '2026-11-20'); set('away', 'Rangers'); set('home', 'Bruins'); set('line', '6'); set('op', '-110'); set('up', '-110'); set('hml', '-150'); set('aml', '130');
     set('agsv', '0.905'); set('hgsv', '0.915'); set('agsh', '900'); set('hgsh', '1800'); set('arest', '0'); set('hrest', '2'); await wait();
     const read = () => { const el = document.querySelector('#markets .mk[data-key="ml"]'); const pick = el.querySelector('.pick').childNodes[0].textContent.trim(); const p = parseFloat(el.querySelector('.p').textContent);
-      return { pick, p, away: /Rangers/.test(pick) ? p : 100 - p, chips: [...el.querySelectorAll('.cap')].map(c => c.textContent), why: document.getElementById('why').textContent }; };
+      const uc = document.querySelector('#markets .upsetcard');
+      return { pick, p, away: /Rangers/.test(pick) ? p : 100 - p, chips: [...el.querySelectorAll('.cap')].map(c => c.textContent), why: document.getElementById('why').textContent,
+               card: uc ? { cls: uc.className, lab: uc.querySelector('.lab').textContent, pick: uc.querySelector('.pick').textContent, p: uc.querySelector('.p').textContent, why: uc.querySelector('.why').textContent } : null }; };
     const before = read();
     tick('agbk', true); await wait();
     const after = read();
@@ -282,6 +284,11 @@ const CHECKS = ["dome","playoff","agconf","hgconf","agbk","hgbk"];
       'upset: the board\'s upset watch carries the dog with its signals and the dog reaches the straight bets when its price agrees', JSON.stringify({ ups: upset.ups, bets: upset.bets }));
   chk(Math.abs(upset.favBk.away - upset.before.away) < 0.15 && upset.favBk.chips.some(c => /shown, not picked/.test(c)) && /NOT an upset signal/.test(upset.favBk.why),
       'upset: the favourite\'s backup moves nothing and the why says it is not an upset signal', JSON.stringify({ fav: upset.favBk.away, base: upset.before.away }));
+  chk(upset.after.card && /scored/.test(upset.after.card.cls) && upset.after.card.lab === 'Upset watch · a scored signal' && upset.after.card.pick === 'Rangers ML' && upset.after.card.p === '47.1%'
+      && /^\+130 needs 43\.5%: the price agrees\. Signals: backup in the dog's net \(scored, \+5 points\); dog on a back to back \(\+5\.7 points, watched\)\./.test(upset.after.card.why)
+      && upset.after.chips.some(c => c === 'upset signal: Rangers ML 47.1%')
+      && upset.before.card && /watched, not scored/.test(upset.before.card.lab) && !/scored/.test(upset.before.card.cls) && upset.before.chips.some(c => /^upset watch: Rangers ML/.test(c)),
+      'upset: the matchup rail carries an upset card under the pick, green when the signal is scored, and a chip on the moneyline row', JSON.stringify({ after: upset.after.card, before: upset.before.card }));
 
   // ---- the NBA early-season side watch: a note on the why list, nothing moved -------
   const earlySide = await pg.evaluate(async () => {

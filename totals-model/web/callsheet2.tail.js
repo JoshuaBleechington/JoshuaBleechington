@@ -615,6 +615,8 @@
        outlined and chipped, and the chip or the "Other side" line says whether the price
        clears, so a likely side at a steep price reads as the book's price and not an edge */
     var likely = likeliestOf(m.markets);
+    var upsetView = null;
+    try { upsetView = upsetSignals({ sport: sport, inputs: snapshot(), markets: m.markets, finals: fin || {}, matchup: m.matchup, id: 0 }); } catch (e) { upsetView = null; }
     var likelyChip = function (c) {
       var need = c.price !== null && c.price !== undefined ? implied(c.price) : null;
       return '<span class="cap likely" title="The most likely outcome in this game, whichever market it sits in, with what its price needs">likeliest at any price' + (c.onOther ? ': ' + esc(c.pick) + ' ' + (c.p * 100).toFixed(1) + '%' : '') +
@@ -634,6 +636,7 @@
           (mk.band ? '<span class="band' + (mk.band === "NO BET" ? "" : " hot") + '">' + esc(mk.band) + '</span>' : "") +
           (!mk.anchored ? '<span class="derived">derived</span>' : "") +
           (isLikely ? likelyChip(likely) : "") +
+          (mk.key === "ml" && upsetView ? '<span class="cap upsetcap' + (upsetView.scored ? ' scored' : '') + '" title="' + esc(upsetView.sig.join('; ')) + '">' + (upsetView.scored ? 'upset signal: ' : 'upset watch: ') + esc(upsetView.dog.pick) + ' ' + (upsetView.dog.p * 100).toFixed(1) + '%</span>' : "") +
           (mk.key === "total" ? railMarks : "") +
           (mk.key === "total" && callView ? '<span class="cap" style="color:var(--go);border-color:var(--go)" title="11-12 Oct: every hockey total got a side, over or under, at the user\'s request">the call: ' + esc(callView.pick) + ' ' + (callView.p * 100).toFixed(1) + '%</span>' : "") +
           (!pickable(mk, sport) ? '<span class="cap tagm" title="' + esc(notPickedWhy(sport, mk)) + '">shown, not picked</span>' : "") +
@@ -657,9 +660,9 @@
     var pk = callView ? null : thePick(m.markets, sport, ($("gdate") || {}).value || "");
     if (pk) {
       if (pk.none) $("rankTag").textContent = "no pick yet";
-      html += pickBlock(pk, m, sport) +
+      html += pickBlock(pk, m, sport) + (upsetView ? upsetBlock(upsetView) : '') +
         '<details class="others"' + (pk.none ? ' open' : '') + '><summary>' + (pk.none ? 'the markets, by edge' : 'the other markets, listed and graded, by edge') + '</summary>' + rows + '</details>';
-    } else html += rows;
+    } else html += (upsetView ? upsetBlock(upsetView) : '') + rows;
     if (m.lamHome !== null) {
       var t = m.lamHome + m.lamAway, ha = m.lamAway / t * 100;
       html += '<div class="split"><i class="a" style="width:' + ha.toFixed(1) + '%">' + esc(m.away) + ' ' + m.lamAway.toFixed(sport === "WNBA" ? 1 : 2) + '</i>' +
@@ -1401,6 +1404,16 @@
       '<div class="n2">' + esc(x.dog.pick) + '</div>' +
       '<div class="n3">' + (x.dog.p * 100).toFixed(1) + '% · ' + sgn(x.dog.price, 0) + ' needs ' + (x.need * 100).toFixed(1) + '%' + (res ? ' · <span class="chip ' + res + '">' + resText(res) + '</span>' : '') + '</div>' +
       '<div class="n4">' + esc(x.row.matchup) + ' · ' + esc(x.sig.join('; ')) + '</div></div>';
+  }
+  /* the upset card on the matchup rail (16 Oct 2026, the user: "highlight the upset data in
+     the matchup as well"): the same signals the board lists, under the pick card */
+  function upsetBlock(x) {
+    var ok = x.dog.p >= x.need;
+    return '<div class="upsetcard' + (x.scored ? ' scored' : '') + '"><div class="lab">Upset watch · ' + (x.scored ? 'a scored signal' : 'watched, not scored') + '</div>' +
+      '<div class="head"><div class="pick ' + sideClass(x.dog.side || "") + '">' + esc(x.dog.pick) + '</div><div class="p">' + (x.dog.p * 100).toFixed(1) + '%</div></div>' +
+      '<div class="why">' + sgn(x.dog.price, 0) + ' needs ' + (x.need * 100).toFixed(1) + '%: ' + (ok ? 'the price agrees.' : 'the book\'s price, not an edge.') + ' <b>Signals</b>: ' + esc(x.sig.join('; ')) + '.' +
+      (x.scored ? ' The dog\'s own backup is the one signal that cleared two seasons (the dog won +7.4 points more than priced on 327 games, +39 units at the close): scored at +5 points, tagged, and this side is pickable on its own record line.'
+                : ' Nothing here moves the dog\'s chance; the record decides.') + '</div></div>';
   }
   function twoLegCard(x, i) {
     var a = x.legs[0], b = x.legs[1], ok = x.p >= x.need, res = parlayResult(x.legs);

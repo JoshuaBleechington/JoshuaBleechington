@@ -258,10 +258,12 @@ ratings gap, the late-season caution) and scores none of them; the board's
 Upset watch lists the dogs with a signal; the record decides.
 
 **What would settle it.** Real closing moneylines for the two seasons, which
-KillerSports cannot give. The Odds API's history (`slate.py odds-history`)
-can pull them a day at a time for the price of about 3,300 credits a season,
-and with them the dog's record is measured at the price it paid rather than
-at the spread's model.
+KillerSports cannot give. `slate.py odds-history --sports NBA --season
+2024-25` (Run NBA odds history.bat, 16 Oct 2026) pulls them from The Odds
+API's history, one snapshot a game day at 6:30 pm Eastern on the ledger's
+dates, the moneyline alone, about 1,650 credits a season, into
+`odds-history-NBA-SEASON.json`. With both seasons in, the upset table above
+is re-run at the price each dog paid rather than at the spread's model.
 
 **What the record says the basketball book is.** The spread is priced against
 everything the box score holds, and the moneyline follows the spread. The total

@@ -323,6 +323,35 @@ class TestTheGateAndTheTags(unittest.TestCase):
         blind = forecast_nhl("A @ B", 6.0, -110, -110, away_goalie_backup=True)
         self.assertAlmostEqual(blind.projected - bare.projected, BACKUP_DELTA, places=9)
 
+    def test_the_dogs_backup_is_the_upset_signal(self):
+        from totals.nhl import DOG_BACKUP_LIFT
+        base = forecast_matchup_nhl("Rangers", "Bruins", **BOARD, **LEAGUE)            # -150 home: the Bruins favoured, the Rangers the dog
+        dog_bk = forecast_matchup_nhl("Rangers", "Bruins", away_goalie_backup=True, **BOARD, **LEAGUE)
+        ml0, ml1 = (next(m for m in base.markets if m.key == "ml"), next(m for m in dog_bk.markets if m.key == "ml"))
+        away0 = ml0.p if ml0.side == "AWAY" else ml0.other_side["p"]
+        away1 = ml1.p if ml1.side == "AWAY" else ml1.other_side["p"]
+        self.assertAlmostEqual(away1 - away0, DOG_BACKUP_LIFT, places=2)   # the backup's total delta moves the split by a hair as well
+        self.assertTrue(any(n.startswith("UPSET SIGNAL: Rangers start a backup") for n in ml1.notes))
+        watch = [n for n in dog_bk.notes if n.startswith("Upset watch, Rangers at +130")]
+        self.assertEqual(len(watch), 1)
+        self.assertIn("start a backup (scored, +5 points)", watch[0])
+        # the favourite's backup is not an upset signal, and two backups move nothing
+        fav_bk = forecast_matchup_nhl("Rangers", "Bruins", home_goalie_backup=True, **BOARD, **LEAGUE)
+        mlf = next(m for m in fav_bk.markets if m.key == "ml")
+        self.assertLess(abs((mlf.p if mlf.side == "AWAY" else mlf.other_side["p"]) - away0), 0.003)   # only the total's hair, no lift
+        self.assertTrue(any("NOT an upset signal" in n for n in fav_bk.notes))
+        both = forecast_matchup_nhl("Rangers", "Bruins", away_goalie_backup=True, home_goalie_backup=True, **BOARD, **LEAGUE)
+        mlb = next(m for m in both.markets if m.key == "ml")
+        self.assertLess(abs((mlb.p if mlb.side == "AWAY" else mlb.other_side["p"]) - away0), 0.003)
+        # the watched signals are named and move nothing: the dog on a back to back, the favourite on the road
+        b2b = forecast_matchup_nhl("Rangers", "Bruins", away_rest_days=0, **BOARD, **LEAGUE)
+        self.assertTrue(any("Rangers on a back to back: dogs won +5.7 points" in n for n in b2b.notes))
+        mlr = next(m for m in b2b.markets if m.key == "ml")
+        self.assertAlmostEqual((mlr.p if mlr.side == "AWAY" else mlr.other_side["p"]), away0, places=6)
+        road = forecast_matchup_nhl("Rangers", "Bruins", **{**BOARD, "home_ml": 130, "away_ml": -150}, **LEAGUE)
+        self.assertTrue(any("Rangers favoured on the road: dogs won +2.6 points" in n for n in road.notes))
+        self.assertFalse(any(n.startswith("Upset watch") for n in base.notes))
+
     def test_two_backups_move_nothing(self):
         base = forecast_nhl("A @ B", 6.0, -110, -110, **LEAGUE)
         two = forecast_nhl("A @ B", 6.0, -110, -110, away_goalie_backup=True, home_goalie_backup=True, **LEAGUE)

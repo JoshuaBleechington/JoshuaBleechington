@@ -160,6 +160,21 @@ class TestTheMatchup(unittest.TestCase):
         with self.assertRaises(ValueError):
             forecast_matchup_nba("A", "B", total_line=228.5, h1_line=228.5)
 
+    def test_the_upset_watch_names_the_signals_and_moves_nothing(self):
+        base = dict(total_line=229.5, over_price=-110, under_price=-110, spread=-11.5, spread_home_price=-110, spread_away_price=-110, home_ml=-600, away_ml=420)
+        quiet = forecast_matchup_nba("Hornets", "Bucks", **base)
+        self.assertFalse(any(n.startswith("Upset watch") for n in quiet.notes))
+        loud = forecast_matchup_nba("Hornets", "Bucks", home_out_minutes=48.0, home_rest_days=0, away_rest_days=2, **base)
+        note = [n for n in loud.notes if n.startswith("Upset watch, Hornets at +420")]
+        self.assertEqual(len(note), 1)
+        self.assertIn("Bucks missing 48 minutes a game of regulars", note[0])
+        self.assertIn("a favourite of ten or more on a back to back", note[0])
+        self.assertIn("WATCHED, NOT SCORED", note[0])
+        ml_q, ml_l = (next(m for m in quiet.markets if m.key == "ml"), next(m for m in loud.markets if m.key == "ml"))
+        self.assertAlmostEqual(ml_q.p, ml_l.p, places=9)   # named, not scored
+        late = forecast_matchup_nba("Hornets", "Bucks", game_date="2027-04-06", **base)
+        self.assertTrue(any("FEWER upsets" in n for n in late.notes))
+
     def test_the_early_season_side_watch(self):
         # the ratings make the Bucks 16 better over 100 possessions; the spread says 3.5
         kw = dict(total_line=229.5, over_price=-110, under_price=-110, spread=-3.5, spread_home_price=-110, spread_away_price=-110,

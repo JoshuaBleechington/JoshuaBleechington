@@ -167,7 +167,7 @@ def tail() -> str:
     t = once(t, 'sp === "NHL" ? r.inputs.p1line : r.inputs.f5line', 'sp === "NHL" ? r.inputs.p1line : sp === "NBA" ? r.inputs.h1line : r.inputs.f5line', "forecast period line")
     t = once(t, '(sp === "NHL" ? "first period " : "first five ")', '(sp === "NHL" ? "first period " : sp === "NBA" ? "first half " : "first five ")', "forecast line period")
     t = once(t, "(sp === \"NHL\" ? 'First period' : 'First five')", "(sp === \"NHL\" ? 'First period' : sp === \"NBA\" ? 'First half' : 'First five')", "record period")
-    t = once(t, 'NHL: ["total", "p1"] };', 'NHL: ["total", "p1"], NBA: ["total", "h1"] };', "pickable")
+    t = once(t, 'NHL: ["total", "p1", "ml"] };', 'NHL: ["total", "p1", "ml"], NBA: ["total", "h1"] };', "pickable")
     t = once(t, "sp === \"MLB\" ? 'baseball (the pitchers and the pens score the total, not the margin)' : 'this game'",
              "sp === \"MLB\" ? 'baseball (the pitchers and the pens score the total, not the margin)' : sp === \"NBA\" ? 'the NBA (measured 15 Oct 2026 on two seasons of closes: the pace and efficiency margin projection read 0.00 against the spread, and rest, travel, time zones and announced absences sat inside the number)' : 'this game'", "pick why sides")
     t = once(t, 'if (sp === "NHL") return "Derived from the book',

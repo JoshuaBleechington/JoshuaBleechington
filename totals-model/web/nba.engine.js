@@ -279,6 +279,16 @@
           esc(rm > margin ? home : away) + ". <b>WATCHED, NOT SCORED</b>: in a club's first " + NBA.EARLY_SIDE_GAMES + " games the ratings' side at " + NBA.EARLY_SIDE_LEAN + "+ points of lean went 148-124 (54.4%; slope +0.156 a point, t 1.5) against two seasons of closes, " +
           "then 135-143 from thirty to sixty games and 113-125 after, 394-394 over the whole. The WNBA card's spread scores the ratings at 1.2 against the market's 4.0 and is 7-0 informed on seven games; on the NBA that blend went 351-344 at a point of lean. The record section keeps this watch from opening night.");
       }
+      /* the upset watch (totals/nba.py UPSET_*): named, not scored; none cleared noise both seasons */
+      var favHomeU = margin >= 0, dogU = favHomeU ? away : home, favU = favHomeU ? home : away;
+      var favOutU = favHomeU ? nbaOutMinutes("home") : nbaOutMinutes("away"), arU = num("narest"), hrU = num("nhrest"), favRestU = favHomeU ? hrU : arU, watchU = [];
+      if (favOutU >= 40) watchU.push(esc(favU) + " missing " + favOutU.toFixed(0) + " minutes a game of regulars: dogs won +2.1 points more than priced on 926 such games (z 1.5; -0.2 and +3.4 by season)");
+      if (Math.abs(margin) >= 10 && favRestU !== null && favRestU <= 0) watchU.push(esc(favU) + " a favourite of ten or more on a back to back: dogs won +3.9 points more than priced on 86 games (z 1.0; +0.4 and +7.2)");
+      if (rm !== null && nSide !== null && nSide >= NBA.MIN_GAMES && nSide < NBA.EARLY_SIDE_GAMES && (favHomeU ? (margin - rm) : (rm - margin)) >= NBA.EARLY_SIDE_LEAN)
+        watchU.push("the ratings like " + esc(dogU) + " by " + Math.abs(rm - margin).toFixed(1) + " points more than the market in the first thirty games: dogs won +10.0 points more than priced on 89 games (z 2.0, but +0.4 and +25.5 by season: one season's)");
+      var stU = nbaStageOf(($("gdate") || {}).value);
+      if (stU) watchU.push(stU[1] + ": FEWER upsets, dogs won " + (stU[0] === NBA.LAST_TWO_WEEKS_DELTA ? "4.9" : "2.4") + " points less than priced (z -1.8); the favourites run through the tankers");
+      if (watchU.length) notes.push("<b>Upset watch</b>, " + esc(dogU) + ((hml !== null && aml !== null) ? " at " + sgn(favHomeU ? aml : hml, 0) : "") + ": " + watchU.join("; ") + ". <b>WATCHED, NOT SCORED</b>: none of these clears noise with the same sign both seasons; the record decides.");
       var pH = 1 - ncdf((0 - margin) / NBA.MARGIN_SD);
       markets.push(pickOf("ml", "Moneyline",
         [sideOf(home + " ML", "HOME", pH, 0, hml), sideOf(away + " ML", "AWAY", 1 - pH, 0, aml)],

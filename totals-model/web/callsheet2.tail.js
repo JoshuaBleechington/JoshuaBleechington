@@ -171,7 +171,7 @@
              edge: o.edge === undefined ? null : o.edge, fair: priceFor(o.p), anchored: mk.anchored,
              band: (mk.side1 && side === mk.side1) ? (mk.band1 || "") : "",
              band1: mk.band1, side1: mk.side1, notes: mk.notes,
-             other: { pick: mk.pick, p: mk.p, price: mk.price, edge: mk.edge }, flipped: true };
+             other: { pick: mk.pick, p: mk.p, price: mk.price, edge: mk.edge }, flipped: true, informed: mk.informed };
   }
   function viewOf(mk, byProb) { return byProb ? likelier(mk) : mk; }
 
@@ -1107,7 +1107,7 @@
      not picked -- still on the rail, the board and the record, so it can
      come back the same way the run line can. The NHL entry is for Call Sheet
      3.0, which is built from this file: the total and the first period. */
-  var PICKABLE = { MLB: ["total", "f5"], WNBA: ["spread", "ml"], NHL: ["total", "p1"] };
+  var PICKABLE = { MLB: ["total", "f5"], WNBA: ["spread", "ml"], NHL: ["total", "p1", "ml"] };
   /* 12 Oct 2026, at the user's request, for a week with last night as the
      first test: the hockey book picks the FULL-GAME TOTAL only, and every
      hockey total gets a side (callOf). Cut short the same day, once the odds
@@ -1124,6 +1124,9 @@
       var d = gdate || (($("gdate") || {}).value) || todayISO();
       if (NHL_TOTAL_ONLY.indexOf(d) >= 0) return false;
     }
+    /* the hockey moneyline is pickable only on the upset signal (16 Oct 2026): the
+       dog's backup in net, which the engine marks `informed` on the row */
+    if (sp === "NHL" && mk.key === "ml") return !!mk.informed;
     /* A WNBA side is picked only when the four ratings were on the card: a
        row stored without them (every row before 2 Oct, or one typed with the
        boxes empty) carries no team information on its sides and keeps the
@@ -1134,6 +1137,7 @@
     if (sp === "WNBA" && mk.key !== "total") return "This side was stored without the four ratings, so it is the book's own price read back and carries no team information. Type the ratings (paste the stats.wnba.com table) and press Rescore, and the spread and the moneyline become pickable.";
     if (sp === "WNBA") return "The WNBA total leaned under by construction and went 6-7 on the first 13 (says 54.8%, does 46.2%); from 2 Oct the WNBA book picks the spread and the moneyline, which carry the ratings, and the total is listed and graded but never a straight bet or a parlay leg.";
     if (sp === "NHL" && mk.key === "p1") return "For games on 11 and 12 Oct the hockey book picked the full-game total only, at the user's request (a week's trial, cut short once the odds feed was in). The first period is listed and graded, never a straight bet or a parlay leg, on those two days.";
+    if (sp === "NHL" && mk.key === "ml") return "The book's own moneyline read back, with no team information behind it: listed and graded, never a straight bet or a parlay leg, except on the one measured upset signal, the dog starting its backup goalie (+7.4 points on 327 games, both seasons), when the dog's side becomes pickable on its own record line.";
     if (sp === "NHL") return "Derived from the book's own moneyline with no team information behind it, like the run line, which said 52.5% and did 42.3% on its first 52. Listed and graded, never a straight bet or a parlay leg, until the record says otherwise.";
     return "Derived from the book's own moneyline with no team information behind it. On the first 52 graded games the run line said 52.5% and did 42.3%, so it is listed and graded but never a straight bet or a parlay leg.";
   }
@@ -1349,6 +1353,55 @@
       '<div class="n3">' + (x.mk.p * 100).toFixed(1) + '% · ' + sgn(x.mk.price, 0) + ' needs ' + (x.need * 100).toFixed(1) + '%' + (res ? ' · <span class="chip ' + res + '">' + resText(res) + '</span>' : '') + '</div>' +
       '<div class="n4">' + esc(x.row.matchup) + ' · ' + esc(x.mk.label || x.mk.key) + '</div></div>';
   }
+  /* ---- the upset watch on the board (16 Oct 2026, the user: "look for potential upsets
+     too"): every game on the date where the dog carries a measured signal against the
+     favourite, from the row's inputs. Hockey: the dog's backup in net (scored, the only
+     one that cleared two seasons), the dog on a back to back and the favourite on the
+     road (watched). NBA: the favourite missing 40+ minutes of regulars, a favourite of
+     ten or more on a back to back (watched, neither clears noise). Each card names the
+     dog, its price, the sheet's chance of the dog and the signals. ---- */
+  function upsetSignals(r) {
+    var i = r.inputs || {}, mks = r.markets || [], ml = mks.filter(function (m) { return m.key === "ml"; })[0];
+    if (!ml || ml.price === null || ml.price === undefined || !ml.other || ml.other.price === null || ml.other.price === undefined) return null;
+    var listedDog = ml.price > 0 || (ml.price === ml.other.price && ml.p < ml.other.p);
+    var dog = { pick: listedDog ? ml.pick : ml.other.pick, p: listedDog ? ml.p : ml.other.p, price: listedDog ? ml.price : ml.other.price, side: listedDog ? ml.side : (FLIP[ml.side] || ml.side) };
+    var dogHome = dog.side === "HOME", sig = [], scored = false;
+    var n = function (k) { var v = parseFloat(i[k]); return isFinite(v) ? v : null; };
+    var dogRest = n(dogHome ? "hrest" : "arest"), favRest = n(dogHome ? "arest" : "hrest");
+    if (r.sport === "NHL") {
+      var dogBk = !!i[dogHome ? "hgbk" : "agbk"], favBk = !!i[dogHome ? "agbk" : "hgbk"];
+      if (dogBk && !favBk) { sig.push("backup in the dog's net (scored, +5 points)"); scored = true; }
+      if (dogRest !== null && dogRest <= 0) sig.push("dog on a back to back (+5.7 points, watched)");
+      if (dogHome) sig.push("favourite on the road (+2.6 points, watched)");
+    } else if (r.sport === "NBA") {
+      var out = { away: 0, home: 0 };
+      try {
+        var lst = i.nbaout ? JSON.parse(i.nbaout) : {}, ticked = String(i.nbaq || "").split(",").filter(function (x) { return x; });
+        ["away", "home"].forEach(function (s) { (lst[s] || []).forEach(function (p) { if ((/^out/i.test(String(p.st || "")) || ticked.indexOf(String(p.id)) >= 0) && +p.mpg >= 20) out[s] += +p.mpg; }); });
+      } catch (e) { }
+      var favOut = dogHome ? out.away : out.home, sp = n("sp");
+      if (favOut >= 40) sig.push("favourite missing " + favOut.toFixed(0) + " minutes of regulars (+2.1 points, watched)");
+      if (sp !== null && Math.abs(sp) >= 10 && favRest !== null && favRest <= 0) sig.push("favourite of ten or more on a back to back (+3.9 points, watched)");
+    } else if (r.sport === "MLB") {
+      return null;
+    }
+    if (!sig.length) return null;
+    return { row: r, dog: dog, need: implied(dog.price), sig: sig, scored: scored };
+  }
+  function upsetWatch(dateISO) {
+    var out = [];
+    card.forEach(function (r) { if ((r.gdate || "") !== dateISO) return; var u = upsetSignals(r); if (u) out.push(u); });
+    out.sort(function (a, b) { return (b.scored - a.scored) || (b.sig.length - a.sig.length) || (b.dog.p - a.dog.p); });
+    return out;
+  }
+  function upsetCard(x) {
+    var res = gradeMarket({ key: "ml", side: x.dog.side, pick: x.dog.pick, price: x.dog.price }, x.row.finals), ok = x.dog.p >= x.need;
+    return '<div class="pk upset' + (x.scored ? ' scored' : '') + '" data-open="' + x.row.id + '" title="Load ' + esc(x.row.matchup) + ' into the form">' +
+      '<div class="n1">UPSET WATCH · ' + (x.scored ? 'a scored signal' : 'watched') + (ok ? ' · the price agrees' : ' · the book\'s price') + '</div>' +
+      '<div class="n2">' + esc(x.dog.pick) + '</div>' +
+      '<div class="n3">' + (x.dog.p * 100).toFixed(1) + '% · ' + sgn(x.dog.price, 0) + ' needs ' + (x.need * 100).toFixed(1) + '%' + (res ? ' · <span class="chip ' + res + '">' + resText(res) + '</span>' : '') + '</div>' +
+      '<div class="n4">' + esc(x.row.matchup) + ' · ' + esc(x.sig.join('; ')) + '</div></div>';
+  }
   function twoLegCard(x, i) {
     var a = x.legs[0], b = x.legs[1], ok = x.p >= x.need, res = parlayResult(x.legs);
     return '<div class="pk likely two' + (ok ? ' agrees' : '') + '">' +
@@ -1390,6 +1443,13 @@
           (seen[most] > 1 ? '; ' + esc(most) + ' is in ' + seen[most] + ' of them, so a loss there takes ' + seen[most] + ' tickets' : '') + '. "The price agrees" means the pair\'s chance clears what the parlay pays; most pairs of the book\'s own favourites do not, and that is the book\'s margin twice over.</div></div>';
       }
       $("twoLegs").innerHTML = th;
+    }
+    // --- the upset watch ---
+    if ($("upsets")) {
+      var ups = upsetWatch(dateISO), uh = "";
+      ups.forEach(function (x) { uh += upsetCard(x); });
+      if (!ups.length) uh = '<div class="empty">' + (rows.length ? 'No dog on this date carries a measured signal against its favourite.' : 'Add the matchups and any dog with a signal lands here.') + '</div>';
+      $("upsets").innerHTML = uh;
     }
 
     // --- by sport: the same two rules, one sport at a time ---
@@ -1702,6 +1762,12 @@
           var sh = shadeOf(mk), shRes = sh ? gradeMarket(sh, row.finals) : null;
           if (shRes !== null && shRes !== "invalid") count(t.shade || (t.shade = { w: 0, l: 0, p: 0 }), shRes);
         }
+        /* the hockey upset signal (16 Oct 2026): the dog's record on the rows where its backup lifted it */
+        if (mk.key === "ml" && row.sport === "NHL" && mk.informed) {
+          var dogListed = mk.price !== null && mk.price !== undefined ? mk.price > 0 : (mk.other && mk.other.p > mk.p);
+          var dres = dogListed ? res : (res === "win" ? "loss" : res === "loss" ? "win" : res);
+          count(t.upset || (t.upset = { w: 0, l: 0, p: 0 }), dres);
+        }
         if (mk.key === "total" || mk.key === "f5") {
           var tg = marksOf(row.sport, row.inputs, row.markets);
           if (tg.profile) count(t.profile || (t.profile = { w: 0, l: 0, p: 0 }), res);
@@ -1793,6 +1859,7 @@
       ["goalies right", "goalie line wrong"].forEach(function (k) { if (s.goalie[k]) parts.push(k + ' ' + rec(s.goalie[k])); });
       if (s.call) parts.push('the call, ' + NHL_TOTAL_ONLY_LABEL + ' ' + rec(s.call));
       if (s.sharpShade) parts.push("Pinnacle's shade, 3+ points " + rec(s.sharpShade));
+      if (s.upset) parts.push("the dog with a backup in net " + rec(s.upset));
       if (s.clv.n) parts.push('beat the close ' + s.clv.beat + '-' + s.clv.lost + (s.clv.even ? '-' + s.clv.even : '') + ' · ' + sgn(s.clv.runs / s.clv.n, 2) + ' ' + (unit || 'runs') + ' avg');
       return '<div><p class="k">' + esc(s.label) + '</p><p class="v">' + s.w + '-' + s.l + (s.p ? '-' + s.p : '') + '</p>' +
         '<p class="s">' + (s.n ? 'says ' + says.toFixed(1) + '% · does ' + does.toFixed(1) + '% (±' + se.toFixed(1) + ') · ' + sgn(s.units, 2) + 'u' : 'pushes only') + '</p>' +
@@ -1981,6 +2048,10 @@
     twoLegParlays(dateISO, TWO_LEG_MAX).forEach(function (x, i) {
       out.push("  " + (i + 1) + ". " + x.legs[0].mk.pick + " (" + x.legs[0].row.matchup + ") + " + x.legs[1].mk.pick + " (" + x.legs[1].row.matchup + ")  both " + (x.p * 100).toFixed(1) + "%  pays " + sgn(x.price, 0) + " needs " + (x.need * 100).toFixed(1) + "%" + (x.p >= x.need ? "  [the price agrees]" : "  [the book's price]"));
     });
+    out.push("UPSET WATCH (dogs with a measured signal; the dog's backup in net is scored, the rest watched)");
+    upsetWatch(dateISO).forEach(function (x, i) {
+      out.push("  " + (i + 1) + ". " + x.row.matchup + " — " + x.dog.pick + "  " + (x.dog.p * 100).toFixed(1) + "%  " + sgn(x.dog.price, 0) + " needs " + (x.need * 100).toFixed(1) + "%  [" + x.sig.join("; ") + "]");
+    });
     out.push("BEST STRAIGHT BETS (#1's verdicts first, then the WNBA cheaper side, then by edge)");
     bestBets(dateISO).forEach(function (x) {
       out.push("  " + x.rank + ". " + (x.fav ? "★ " : "") + x.row.matchup + " — " + x.mk.pick + "  " + (x.mk.p * 100).toFixed(1) + "%  " + sgn(x.mk.price, 0) + "  edge " + sgn(x.mk.edge * 100, 1) + (x.fav ? "  [the one it likes most tonight]" : "") +
@@ -2009,6 +2080,7 @@
   $("picks").addEventListener("click", function (e) { var t = e.target.closest("[data-open]"); if (t) openRow(t.dataset.open); });
   $("bestBets").addEventListener("click", function (e) { var t = e.target.closest("[data-open]"); if (t) openRow(t.dataset.open); });
   if ($("likeliest")) $("likeliest").addEventListener("click", function (e) { var t = e.target.closest("[data-open]"); if (t) openRow(t.dataset.open); });
+  if ($("upsets")) $("upsets").addEventListener("click", function (e) { var t = e.target.closest("[data-open]"); if (t) openRow(t.dataset.open); });
   $("bySport").addEventListener("click", function (e) { var t = e.target.closest("[data-open]"); if (t) openRow(t.dataset.open); });
   $("board").addEventListener("click", function (e) { var t = e.target.closest("tr[data-open]"); if (t) openRow(t.dataset.open); });
   $("boardDate").addEventListener("change", renderBoard);

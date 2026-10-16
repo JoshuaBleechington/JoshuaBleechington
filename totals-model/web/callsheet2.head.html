@@ -269,6 +269,10 @@
   .pk.likely.agrees { border: 1px solid var(--go); background: var(--go-wash); }
   .pk.likely.agrees .n1 { color: var(--go); }
   .pk.two .amp { color: var(--muted); font-weight: 400; margin: 0 4px; }
+  .pk.upset { border: 1px dashed var(--away); background: transparent; }
+  .pk.upset .n1 { color: var(--away); }
+  .pk.upset.scored { border: 1px solid var(--go); background: var(--go-wash); }
+  .pk.upset.scored .n1 { color: var(--go); }
   /* the slate panel */
   .slate .sg { display: flex; justify-content: space-between; align-items: center; gap: 10px; padding: 10px 12px;
                border: 1px solid var(--rule); border-radius: 8px; margin-bottom: 8px; }
@@ -332,7 +336,7 @@
   <header class="top">
     <div>
       <div class="eyebrow"><span id="eyebrow">MLB · every market on the game</span>
-        <span class="build">· build <span id="build">2026-10-15</span></span></div>
+        <span class="build">· build <span id="build">2026-10-16</span></span></div>
       <h1>Call Sheet <em>2.0</em></h1>
       <p>One matchup, every market the book posts on it — the full-game total, the first five,
          the moneyline and the run line — priced off the book's own numbers and <b>ranked by edge</b>, with
@@ -662,6 +666,8 @@
       <div id="likeliest" class="picks"></div>
       <div class="subhead">Two-leg parlays <span class="tag">up to six pairs from the likeliest legs, different games, ranked by the chance both land — the parlay's price and what it needs beside each</span></div>
       <div id="twoLegs" class="picks"></div>
+      <div class="subhead">Upset watch <span class="tag">every dog on the date with a measured signal against its favourite — the dog's backup in net is scored (hockey, +5 points), the rest are watched; the dog's price and the sheet's chance beside each</span></div>
+      <div id="upsets" class="picks"></div>
       <div class="subhead" id="bySportHead">One sport only <span class="tag">the same two rules, MLB and WNBA apart — only on a night with both</span></div>
       <div id="bySport" class="sports"></div>
       <div class="scroll"><div id="board"></div></div>

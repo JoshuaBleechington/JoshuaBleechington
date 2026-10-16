@@ -809,3 +809,43 @@ card already had), and a period that exceeds the final is `invalid`. The
 record keeps an NHL block in goals with tiles for the total, the first
 period, the moneyline and the puck line, plus the two fours and beat the
 close.
+
+## The upset signal, 16 Oct 2026
+
+The user: "I want the model to also look for potential upsets too between
+matchups based on certain trends or patterns." The question was put to the
+sides backtest's rows (`tools_backtest_nhl_sides.py`, 2,616 games over two
+seasons with a closing moneyline): when did the dog win outright more often
+than the market priced, and on what signal? The dog's wins against the
+market's expectation, by signal (`scratchpad/nba/dig5.py`):
+
+| Signal | Games | Dog wins vs priced | By season | Dog ML at the close |
+| --- | --- | --- | --- | --- |
+| **The dog's goalie a backup** | 327 | 158 vs 134.0, **+7.4 points (z 2.7)** | +6.3 / +8.3 | **+39.3u** |
+| The dog on a back to back | 173 | 83 vs 73.1, +5.7 (z 1.5) | +5.1 / +6.6 | +18.1u |
+| The favourite on the road | 931 | 414 vs 390.2, +2.6 (z 1.6) | +2.8 / +2.3 | +11.2u |
+| The dog's xG difference better by 0.3+ | 252 | +4.1 (z 1.3) | −7.1 / +12.7 | +8.1u |
+| The favourite's goalie a backup | 440 | 168 vs 173.9, −1.3 (z −0.6) | −2.6 / 0.0 | −41.8u |
+| The favourite on a back to back | 390 | 138 vs 149.7, −3.0 (z −1.2) | −7.2 / +0.8 | −54.4u |
+| The favourite rested 3+ days more | 196 | −4.6 (z −1.3) | −6.3 / −2.7 | −31.7u |
+| Two or more against the favourite | 489 | +0.3 (z 0.2) | −3.8 / +4.2 | −24.4u |
+
+The pattern is the one the total showed: the market moves for the
+publicised disadvantage and moves too far. A backup in the DOG's net is
+priced as if the dog cannot win, and the dog wins 7 points more often than
+that, both seasons, +39 units at the closing price. A backup in the
+favourite's net, or a favourite on tired legs, has the opposite shape: the
+market over-bumps the dog and the dog wins less than priced. Stacking the
+signals adds nothing.
+
+**On the sheet.** The dog's backup is scored: `DOG_BACKUP_LIFT` puts +5
+points (two-thirds of the measurement) on the dog's win chance, tagged, and
+the moneyline becomes pickable on that row, so the dog reaches the straight
+bets and the parlay legs when its price agrees. The ML tile on the record
+keeps the dog's line on those rows ("the dog with a backup in net W-L"). The
+dog on a back to back and the favourite on the road are named on the card's
+**Upset watch** note and on the board's **Upset watch** section, not scored.
+The favourite's backup and the favourite's back to back are named as NOT
+upset signals, so the Backup tick is read the right way round: it is the
+dog's tick that matters. The NBA has its own watch with nothing scored
+(NBA.md).

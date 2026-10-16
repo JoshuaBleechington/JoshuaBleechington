@@ -247,6 +247,42 @@ const CHECKS = ["dome","playoff","agconf","hgconf","agbk","hgbk"];
   chk(nba.nbaBlock.length >= 4 && nba.nbaBlock.some(t => /First half/.test(t)) && nba.nbaBlock.some(t => /Spread/.test(t)) && /First half projected/.test(nba.calib), 'nba: the record has an NBA block with first-half and spread tiles and the half in the forecast line', JSON.stringify(nba.nbaBlock));
   chk(/at the half 46–54/.test(nba.final) && /Final: Raptors 101, Celtics 115/.test(nba.final) && /Jaylen Brown/.test(nba.reopened), 'nba: reopening the graded row prints the final with the half-time score and the who-is-out list', nba.final + ' | ' + nba.reopened.slice(0, 80));
 
+  // ---- the hockey upset signal (16 Oct 2026): the dog's backup lifts the dog, the moneyline becomes pickable, the board's upset watch lists it ----
+  const upset = await pg.evaluate(async () => {
+    const wait = () => new Promise(r => setTimeout(r, 60));
+    const set = (id, v) => { const el = document.getElementById(id); el.value = v; el.dispatchEvent(new Event('input', { bubbles: true })); };
+    const tick = (id, on) => { const el = document.getElementById(id); el.checked = on; el.dispatchEvent(new Event('change', { bubbles: true })); };
+    localStorage.removeItem('callsheet3.card.v1');
+    document.getElementById('clear').click(); document.getElementById('m-nhl').click(); await wait();
+    document.getElementById('boardDate').value = '2026-11-20';
+    set('gdate', '2026-11-20'); set('away', 'Rangers'); set('home', 'Bruins'); set('line', '6'); set('op', '-110'); set('up', '-110'); set('hml', '-150'); set('aml', '130');
+    set('agsv', '0.905'); set('hgsv', '0.915'); set('agsh', '900'); set('hgsh', '1800'); set('arest', '0'); set('hrest', '2'); await wait();
+    const read = () => { const el = document.querySelector('#markets .mk[data-key="ml"]'); const pick = el.querySelector('.pick').childNodes[0].textContent.trim(); const p = parseFloat(el.querySelector('.p').textContent);
+      return { pick, p, away: /Rangers/.test(pick) ? p : 100 - p, chips: [...el.querySelectorAll('.cap')].map(c => c.textContent), why: document.getElementById('why').textContent }; };
+    const before = read();
+    tick('agbk', true); await wait();
+    const after = read();
+    document.getElementById('add').click(); await wait();
+    document.getElementById('boardDate').dispatchEvent(new Event('change')); await wait();
+    const ups = [...document.querySelectorAll('#upsets .pk')].map(e => ({ cls: e.className, n1: e.querySelector('.n1').textContent, n2: e.querySelector('.n2').textContent, n3: e.querySelector('.n3').textContent, n4: e.querySelector('.n4').textContent }));
+    const bets = [...document.querySelectorAll('#bestBets .pk .n2')].map(e => e.textContent);
+    const stored = JSON.parse(localStorage.getItem('callsheet3.card.v1')).find(r => /Rangers @ Bruins/.test(r.matchup) && r.gdate === '2026-11-20').markets.find(m => m.key === 'ml');
+    // the favourite's backup instead: no lift, not pickable
+    tick('agbk', false); tick('hgbk', true); await wait();
+    const favBk = read();
+    document.getElementById('clear').click(); await wait();
+    return { before, after, ups, bets, informed: stored.informed, favBk };
+  });
+  chk(Math.abs(upset.after.away - upset.before.away - 5) < 0.15 && !upset.after.chips.some(c => /shown, not picked/.test(c)) && upset.before.chips.some(c => /shown, not picked/.test(c)) && upset.informed === true,
+      'upset: the dog\'s backup lifts the dog five points on the moneyline, which becomes pickable and stores the flag', JSON.stringify({ before: upset.before.away, after: upset.after.away, chips: upset.after.chips, informed: upset.informed }));
+  chk(/Upset watch, Rangers at \+130: Rangers start a backup \(scored, \+5 points\); Rangers on a back to back: dogs won \+5\.7 points/.test(upset.after.why) && /UPSET SIGNAL: Rangers start a backup/.test(upset.after.why) === false,
+      'upset: the why list names the watch with the scored signal first and the back to back after it', (upset.after.why.match(/Upset watch[^.]*\./) || ['none'])[0]);
+  chk(upset.ups.length === 1 && /scored/.test(upset.ups[0].cls) && /^UPSET WATCH · a scored signal · the price agrees$/.test(upset.ups[0].n1) && upset.ups[0].n2 === 'Rangers ML' && /backup in the dog's net \(scored, \+5 points\); dog on a back to back/.test(upset.ups[0].n4)
+      && upset.bets.some(t => /^Rangers ML/.test(t)),
+      'upset: the board\'s upset watch carries the dog with its signals and the dog reaches the straight bets when its price agrees', JSON.stringify({ ups: upset.ups, bets: upset.bets }));
+  chk(Math.abs(upset.favBk.away - upset.before.away) < 0.15 && upset.favBk.chips.some(c => /shown, not picked/.test(c)) && /NOT an upset signal/.test(upset.favBk.why),
+      'upset: the favourite\'s backup moves nothing and the why says it is not an upset signal', JSON.stringify({ fav: upset.favBk.away, base: upset.before.away }));
+
   // ---- the NBA early-season side watch: a note on the why list, nothing moved -------
   const earlySide = await pg.evaluate(async () => {
     const wait = () => new Promise(r => setTimeout(r, 60));

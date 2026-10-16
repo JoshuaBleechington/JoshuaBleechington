@@ -228,6 +228,41 @@ season's ratings are not a prior, because the summer moved the rosters
 own lines by id across clubs, so the who-is-out card reads a traded man
 against his own minutes, not his new team's.
 
+## The upset watch, 16 Oct 2026
+
+The user: "look for potential upsets too." The dog's outright wins against
+the spread's own model (a normal margin at sd 12.5, the engine's) on 2,448
+games, by signal (`scratchpad/nba/dig4.py`); the spread stands in for the
+moneyline because KillerSports carries no NBA prices:
+
+| Signal | Games | Dog wins vs the model | By season |
+| --- | --- | --- | --- |
+| The favourite missing 40+ minutes of regulars | 926 | 291 vs 271.2, +2.1 points (z 1.5) | −0.2 / +3.4 |
+| A favourite of ten or more on a back to back | 86 | 17 vs 13.6, +3.9 (z 1.0) | +0.4 / +7.2 |
+| The favourite on a back to back, the dog rested 2+ | 55 | +6.7 (z 1.1) | +0.3 / +15.5 |
+| The ratings like the dog by 4+, first thirty games | 89 | 39 vs 30.1, +10.0 (z 2.0) | +0.4 / +25.5 |
+| The ratings like the dog by 4+, after thirty games | 378 | −0.1 (z −0.1) | −0.9 / +0.6 |
+| The favourite on the road | 1,012 | +0.9 (z 0.6) | +0.2 / +1.6 |
+| After the trade deadline | 933 | 238 vs 260.7, **−2.4 (z −1.7)** | −2.0 / −2.9 |
+| The last two weeks | 224 | 46 vs 57.0, **−4.9 (z −1.8)** | −3.7 / −6.1 |
+| A big favourite (10+) | 617 | −1.2 (z −0.9) | −3.8 / +1.2 |
+
+Nothing clears noise with the same sign both seasons. The one two-sigma line,
+the ratings liking the dog early, is one season's (+0.4 then +25.5), the
+same early-season watch the spread carries. The clearest thing in the table
+runs the other way: after the deadline and in the last two weeks the dogs
+win LESS than priced, because the favourites run through the tankers. So the
+NBA card carries an **Upset watch** note naming the signals present (the
+favourite's regulars out, a big favourite on a back to back, the early
+ratings gap, the late-season caution) and scores none of them; the board's
+Upset watch lists the dogs with a signal; the record decides.
+
+**What would settle it.** Real closing moneylines for the two seasons, which
+KillerSports cannot give. The Odds API's history (`slate.py odds-history`)
+can pull them a day at a time for the price of about 3,300 credits a season,
+and with them the dog's record is measured at the price it paid rather than
+at the spread's model.
+
 **What the record says the basketball book is.** The spread is priced against
 everything the box score holds, and the moneyline follows the spread. The total
 carries three things the close does not: it over-moves with early-season

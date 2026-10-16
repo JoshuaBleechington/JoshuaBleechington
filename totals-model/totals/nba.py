@@ -111,6 +111,18 @@ WATCHED_CLUBS = {"Nuggets": "+5.1 and +4.3 a game over the close", "Jazz": "+3.0
 #: WATCH on the card, not scored, measured on the record from opening night.
 EARLY_SIDE_GAMES = 30
 EARLY_SIDE_LEAN = 4.0
+#: THE UPSET WATCH (16 Oct 2026, the user: "look for potential upsets too"): the
+#: dog's outright wins against the spread's own model (a normal margin at 12.5)
+#: on 2,448 games, by signal. Nothing clears noise with the same sign both
+#: seasons: the favourite missing 40+ minutes of regulars +2.1 points (z 1.5;
+#: -0.2 and +3.4), a favourite of ten or more on a back to back +3.9 (z 1.0,
+#: 86 games), the ratings liking the dog by 4+ in a club's first thirty games
+#: +10.0 (z 2.0, but +0.4 and +25.5 by season: one season's). The other way:
+#: after the deadline dogs won 2.4 points LESS than priced and in the last two
+#: weeks 4.9 less (z -1.8): the favourites run through the tankers. Named on
+#: the card, none scored; the record decides.
+UPSET_FAV_OUT_MIN = 40.0
+UPSET_BIG_FAV = 10.0
 #: A regular is a player at this many minutes a game; the who-is-out list is
 #: shown, not scored (announced absences are in the close; the live card
 #: measures the late ones).
@@ -436,6 +448,26 @@ def forecast_matchup_nba(
                      "of lean went 148-124 (54.4%; slope +0.156 a point, t 1.5) against two seasons of closes, then 135-143 from thirty to sixty games and "
                      "113-125 after, 394-394 over the whole. The WNBA card's spread scores the ratings at 1.2 against the market's 4.0 and is 7-0 informed on "
                      "seven games; on the NBA that blend went 351-344 at a point of lean. The record section keeps this watch from opening night.")
+    # --- the upset watch: named, not scored ------------------------------------
+    fav_home = margin >= 0
+    dog, fav = (away, home) if fav_home else (home, away)
+    a_out, h_out = total_inputs.get("away_out_minutes") or 0.0, total_inputs.get("home_out_minutes") or 0.0
+    fav_out = h_out if fav_home else a_out
+    a_rest, h_rest = total_inputs.get("away_rest_days"), total_inputs.get("home_rest_days")
+    fav_rest, dog_rest = (h_rest, a_rest) if fav_home else (a_rest, h_rest)
+    watch = []
+    if fav_out >= UPSET_FAV_OUT_MIN:
+        watch.append(f"{fav} missing {fav_out:.0f} minutes a game of regulars: dogs won +2.1 points more than priced on 926 such games (z 1.5; -0.2 and +3.4 by season)")
+    if abs(margin) >= UPSET_BIG_FAV and fav_rest is not None and fav_rest <= 0:
+        watch.append(f"{fav} a favourite of ten or more on a back to back: dogs won +3.9 points more than priced on 86 games (z 1.0; +0.4 and +7.2)")
+    if rm is not None and n_side is not None and RATINGS_MIN_GAMES <= n_side < EARLY_SIDE_GAMES and ((rm - margin) >= EARLY_SIDE_LEAN if not fav_home else (margin - rm) >= EARLY_SIDE_LEAN):
+        watch.append(f"the ratings like {dog} by {abs(rm - margin):.1f} points more than the market in the first thirty games: dogs won +10.0 points more than priced on 89 games (z 2.0, but +0.4 and +25.5 by season: one season's)")
+    st_now = stage_of(total_inputs.get("game_date"))
+    if st_now is not None:
+        watch.append(f"{st_now[1]}: FEWER upsets, dogs won {'4.9' if st_now[0] == LAST_TWO_WEEKS_DELTA else '2.4'} points less than priced (z -1.8); the favourites run through the tankers")
+    if watch:
+        notes.append(f"Upset watch, {dog}" + (f" at {away_ml if fav_home else home_ml:+.0f}" if (away_ml is not None and home_ml is not None) else "") + ": " + "; ".join(watch) +
+                     ". WATCHED, NOT SCORED: none of these clears noise with the same sign both seasons; the record decides.")
     p_h = 1.0 - _ncdf((0.0 - margin) / MARGIN_SD)
     markets.append(_pick(
         "ml", "Moneyline",

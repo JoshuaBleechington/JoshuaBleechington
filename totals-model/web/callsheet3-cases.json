@@ -5222,6 +5222,199 @@
   },
   {
     "sport": "NHL",
+    "name": "the upset signal: the DOG's backup lifts the dog five points on the moneyline, tagged; the dog on a back to back watched",
+    "inputs": {
+      "gdate": "2026-11-15",
+      "away": "Rangers",
+      "home": "Bruins",
+      "line": "6",
+      "op": "-110",
+      "up": "-110",
+      "hml": "-150",
+      "aml": "130",
+      "agsv": "0.905",
+      "hgsv": "0.915",
+      "agsh": "900",
+      "hgsh": "1800",
+      "agbk": "1",
+      "hgconf": "1",
+      "arest": "0",
+      "hrest": "2"
+    },
+    "expect": {
+      "lam_home": 2.92278407,
+      "lam_away": 2.47880914,
+      "projected": 6.02159321,
+      "markets": [
+        {
+          "key": "ml",
+          "pick": "Rangers ML",
+          "side": "AWAY",
+          "p": 0.47104953,
+          "p_push": 0.0,
+          "price": 130.0,
+          "edge": 0.03626692,
+          "fair": 112.2919,
+          "anchored": true,
+          "band": ""
+        },
+        {
+          "key": "total",
+          "pick": "UNDER 6",
+          "side": "UNDER",
+          "p": 0.52883332,
+          "p_push": 0.13236959,
+          "price": -110.0,
+          "edge": 0.0050238,
+          "fair": -112.2391,
+          "anchored": true,
+          "band": "NO BET"
+        },
+        {
+          "key": "pl",
+          "pick": "Rangers +1.5",
+          "side": "AWAY",
+          "p": 0.62664773,
+          "p_push": 0.0,
+          "price": null,
+          "edge": null,
+          "fair": -167.8436,
+          "anchored": false,
+          "band": ""
+        }
+      ]
+    }
+  },
+  {
+    "sport": "NHL",
+    "name": "the favourite's backup: not an upset signal, the moneyline is the book's number",
+    "inputs": {
+      "gdate": "2026-11-15",
+      "away": "Rangers",
+      "home": "Bruins",
+      "line": "6",
+      "op": "-110",
+      "up": "-110",
+      "hml": "-150",
+      "aml": "130",
+      "agsv": "0.905",
+      "hgsv": "0.915",
+      "agsh": "900",
+      "hgsh": "1800",
+      "hgbk": "1",
+      "agconf": "1"
+    },
+    "expect": {
+      "lam_home": 2.92278407,
+      "lam_away": 2.47880914,
+      "projected": 6.02159321,
+      "markets": [
+        {
+          "key": "total",
+          "pick": "UNDER 6",
+          "side": "UNDER",
+          "p": 0.52883332,
+          "p_push": 0.13236959,
+          "price": -110.0,
+          "edge": 0.0050238,
+          "fair": -112.2391,
+          "anchored": true,
+          "band": "NO BET"
+        },
+        {
+          "key": "ml",
+          "pick": "Rangers ML",
+          "side": "AWAY",
+          "p": 0.42104953,
+          "p_push": 0.0,
+          "price": 130.0,
+          "edge": -0.01373308,
+          "fair": 137.5017,
+          "anchored": true,
+          "band": ""
+        },
+        {
+          "key": "pl",
+          "pick": "Rangers +1.5",
+          "side": "AWAY",
+          "p": 0.62664773,
+          "p_push": 0.0,
+          "price": null,
+          "edge": null,
+          "fair": -167.8436,
+          "anchored": false,
+          "band": ""
+        }
+      ]
+    }
+  },
+  {
+    "sport": "NHL",
+    "name": "the favourite on the road with the dog's backup: the lift and two watched signals",
+    "inputs": {
+      "gdate": "2026-11-15",
+      "away": "Bruins",
+      "home": "Rangers",
+      "line": "6",
+      "op": "-110",
+      "up": "-110",
+      "hml": "130",
+      "aml": "-150",
+      "agsv": "0.915",
+      "hgsv": "0.905",
+      "agsh": "1800",
+      "hgsh": "900",
+      "hgbk": "1",
+      "agconf": "1",
+      "hrest": "0",
+      "arest": "1"
+    },
+    "expect": {
+      "lam_home": 2.47880914,
+      "lam_away": 2.92278407,
+      "projected": 6.02159321,
+      "markets": [
+        {
+          "key": "ml",
+          "pick": "Rangers ML",
+          "side": "HOME",
+          "p": 0.47104953,
+          "p_push": 0.0,
+          "price": 130.0,
+          "edge": 0.03626692,
+          "fair": 112.2919,
+          "anchored": true,
+          "band": ""
+        },
+        {
+          "key": "total",
+          "pick": "UNDER 6",
+          "side": "UNDER",
+          "p": 0.52883332,
+          "p_push": 0.13236959,
+          "price": -110.0,
+          "edge": 0.0050238,
+          "fair": -112.2391,
+          "anchored": true,
+          "band": "NO BET"
+        },
+        {
+          "key": "pl",
+          "pick": "Rangers +1.5",
+          "side": "HOME",
+          "p": 0.62664773,
+          "p_push": 0.0,
+          "price": null,
+          "edge": null,
+          "fair": -167.8436,
+          "anchored": false,
+          "band": ""
+        }
+      ]
+    }
+  },
+  {
+    "sport": "NHL",
     "name": "shots and no goalies: the shot rates read as a differential",
     "inputs": {
       "gdate": "2026-11-15",
@@ -6485,6 +6678,69 @@
           "price": -105.0,
           "edge": -0.02302936,
           "fair": 104.4297,
+          "anchored": true,
+          "band": ""
+        }
+      ]
+    }
+  },
+  {
+    "sport": "NBA",
+    "name": "the upset watch: a big favourite on a back to back missing 48 minutes of regulars, named and not scored",
+    "inputs": {
+      "gdate": "2026-12-10",
+      "away": "Hornets",
+      "home": "Bucks",
+      "line": "229.5",
+      "op": "-110",
+      "up": "-110",
+      "sp": "-11.5",
+      "sph": "-110",
+      "spa": "-110",
+      "hml": "-600",
+      "aml": "420",
+      "nhrest": "0",
+      "narest": "2",
+      "nbaout": "{\"home\": [{\"id\": \"11\", \"n\": \"Giannis Antetokounmpo\", \"st\": \"Out\", \"mpg\": 34.0, \"ppg\": 30.0, \"pm\": 8.0, \"note\": \"knee\"}, {\"id\": \"12\", \"n\": \"Damian Lillard\", \"st\": \"Out\", \"mpg\": 14.0, \"ppg\": 6.0, \"pm\": 1.0}], \"away\": []}"
+    },
+    "expect": {
+      "lam_home": 120.5,
+      "lam_away": 109.0,
+      "projected": 229.5,
+      "markets": [
+        {
+          "key": "ml",
+          "pick": "Hornets ML",
+          "side": "AWAY",
+          "p": 0.17878638,
+          "p_push": 0.0,
+          "price": 420.0,
+          "edge": -0.01352131,
+          "fair": 459.3267,
+          "anchored": true,
+          "band": ""
+        },
+        {
+          "key": "total",
+          "pick": "OVER 229.5",
+          "side": "OVER",
+          "p": 0.5,
+          "p_push": 0.0,
+          "price": -110.0,
+          "edge": -0.02380952,
+          "fair": 100.0,
+          "anchored": true,
+          "band": "NO BET"
+        },
+        {
+          "key": "spread",
+          "pick": "Bucks -11.5",
+          "side": "HOME",
+          "p": 0.5,
+          "p_push": 0.0,
+          "price": -110.0,
+          "edge": -0.02380952,
+          "fair": 100.0,
           "anchored": true,
           "band": ""
         }

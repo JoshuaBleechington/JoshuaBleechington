@@ -222,6 +222,24 @@ BACKUP_DELTA = -0.15
 #: backup: 585 games, 0.10 under, 52.6%. Sized under both measurements.
 BACKUP_DELTA_COLD = -0.25
 BACKUP_COLD_GAP = 0.05
+#: THE UPSET SIGNAL (16 Oct 2026, the user: "look for potential upsets too").
+#: On the sides backtest's rows, 2,616 games over two seasons with a closing
+#: moneyline, the dog's wins against what the market priced, by signal. When
+#: the DOG started its backup goalie the dog won 158 of 327 against 134.0
+#: priced: +7.4 points, z 2.7, +6.3 and +8.3 by season, the dog's moneyline
+#: +39 units at the close. The market bumps the favourite's price for a dog's
+#: backup and bumps it too far, the over-reaction the total showed. The
+#: favourite's own backup moved nothing (-1.3 points, z -0.6, 440 games), and
+#: a favourite on a back to back ran the OTHER way (-3.0, z -1.2: the market
+#: over-bumps the dog for the favourite's tired legs). Scored at two-thirds
+#: of the measurement on the dog's win chance, tagged; the moneyline becomes
+#: pickable on that row and the record keeps the dog's line.
+DOG_BACKUP_LIFT = 0.05
+#: WATCHED, not scored: a dog on a back to back +5.7 points (z 1.5, +5.1 and
+#: +6.6 by season, 173 games) and the favourite on the road +2.6 (z 1.6,
+#: +2.8 and +2.3, 931 games). Named on the card; the record decides.
+UPSET_WATCH = {"dog_b2b": "+5.7 points on 173 games (z 1.5; +5.1 and +6.6 by season)",
+               "fav_road": "+2.6 points on 931 games (z 1.6; +2.8 and +2.3 by season)"}
 BACKUP_SHARE = 0.30     # a starter under this share of his club's starts is a backup
 BACKUP_MIN_STARTS = 10  # ...once the club has this many starts to share
 #: Season scoring rates, FADED and TAGGED (13 Oct 2026, at the user's word:
@@ -887,14 +905,45 @@ def forecast_matchup_nhl(
             notes.append("A big road favourite (the home side +140 or longer): two seasons of closing totals ran "
                          "under 55.5% in these games (277 of them). Watched, not scored.")
         p_h = p_home_wins(lam_h, lam_a)
+        # --- the upset signal: the DOG's backup in net lifts the dog, tagged --------
+        fav_home = p_home_mkt >= 0.5
+        dog, fav = (away, home) if fav_home else (home, away)
+        a_bk, h_bk = bool(total_inputs.get("away_goalie_backup")), bool(total_inputs.get("home_goalie_backup"))
+        dog_bk, fav_bk = (a_bk, h_bk) if fav_home else (h_bk, a_bk)
+        ml_notes = ["Priced off the book's own moneyline, overtime and the shootout included. "
+                    "The only thing that can move it is the total forecast changing how often "
+                    "the game is tied after sixty, and that is a small thing."]
+        lifted = dog_bk and not fav_bk
+        if lifted:
+            p_h = p_h - DOG_BACKUP_LIFT if fav_home else p_h + DOG_BACKUP_LIFT
+            ml_notes.append(f"UPSET SIGNAL: {dog} start a backup and the market has moved the price for it too far. Against two seasons of closing "
+                            f"moneylines the dog with a backup in net won 158 of 327 against 134 priced (+7.4 points, z 2.7, +6.3 and +8.3 by "
+                            f"season; the dog's moneyline +39 units). {DOG_BACKUP_LIFT * 100:+.0f} points to {dog}, tagged: this side is pickable "
+                            "on the record's own line.")
+        # --- the upset watch: named, not scored ------------------------------------
+        a_rest, h_rest = total_inputs.get("away_rest_days"), total_inputs.get("home_rest_days")
+        dog_rest = a_rest if fav_home else h_rest
+        watch = []
+        if lifted:
+            watch.append(f"{dog} start a backup (scored, {DOG_BACKUP_LIFT * 100:+.0f} points)")
+        if dog_rest is not None and dog_rest <= 0:
+            watch.append(f"{dog} on a back to back: dogs won {UPSET_WATCH['dog_b2b']}")
+        if not fav_home:
+            watch.append(f"{fav} favoured on the road: dogs won {UPSET_WATCH['fav_road']}")
+        if fav_bk and not dog_bk:
+            watch.append(f"{fav} start a backup: NOT an upset signal, the dog won 1.3 points LESS than priced (440 games); the market over-bumps the dog")
+        fav_rest = h_rest if fav_home else a_rest
+        if fav_rest is not None and fav_rest <= 0 and not (dog_rest is not None and dog_rest <= 0):
+            watch.append(f"{fav} on a back to back: NOT an upset signal, the dog won 3.0 points less than priced (390 games); the market over-bumps the dog")
+        if watch:
+            notes.append(f"Upset watch, {dog} at {away_ml if fav_home else home_ml:+.0f}: " + "; ".join(watch) + ". "
+                         + ("The scored signal is the dog's own backup; the rest are watched on the record." if lifted else "Watched, not scored: nothing here moves the dog's chance."))
         markets.append(_pick(
             "ml", "Moneyline",
             [_side(f"{home} ML", "HOME", p_h, 0.0, home_ml),
              _side(f"{away} ML", "AWAY", 1.0 - p_h, 0.0, away_ml)],
             anchored=True,
-            notes=["Priced off the book's own moneyline, overtime and the shootout included. "
-                   "The only thing that can move it is the total forecast changing how often "
-                   "the game is tied after sixty, and that is a small thing."]))
+            notes=ml_notes))
 
         pl = DEFAULT_PUCK_LINE if puck_line is None else puck_line
         home_line = puck_line if puck_line is not None else (-abs(pl) if p_home_mkt >= 0.5 else abs(pl))

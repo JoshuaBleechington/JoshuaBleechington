@@ -31,6 +31,8 @@
   NHL.OCTOBER_DELTA = 0.0;    // RETIRED 11 Oct 2026: the 2026 market carried the October excess (card: 6.11 closed, 6.08 scored, blind over 33-39-3 on 75)
   NHL.BACKUP_DELTA = -0.15;   // one backup in net: 0.18 under the close on 737 games (53.7%), both seasons; sized under it, tagged
   NHL.BACKUP_DELTA_COLD = -0.25;   // ...a COLD backup (his shrunk line costs > BACKUP_COLD_GAP goals): 0.44 under on 182 games, the under 57.5%
+  NHL.DOG_BACKUP_LIFT = 0.05;   // the upset signal (16 Oct 2026, totals/nhl.py): the DOG with a backup in net won +7.4 points more than priced on 327 games (z 2.7, +6.3 and +8.3 by season, the dog's moneyline +39u); two-thirds of it on the dog's win chance, tagged, the moneyline pickable
+  var NHL_UPSET_WATCH = { dog_b2b: "+5.7 points on 173 games (z 1.5; +5.1 and +6.6 by season)", fav_road: "+2.6 points on 931 games (z 1.6; +2.8 and +2.3 by season)" };
   NHL.BACKUP_COLD_GAP = 0.05;
   NHL.SCORING_FADE = -0.25;   // season scoring rates, FADED, tagged (13 Oct 2026): the market over-moves with them, -0.29 and -0.33 a goal of lean two seasons running, -0.38 against Pinnacle, pooled t -2.0 (totals/nhl.py)
   NHL.SCORING_MIN_GAMES = 5;
@@ -538,9 +540,27 @@
         split[0].toFixed(2) + " " + home + "</b>; the total forecast moves both by ×" + scale.toFixed(3) + ". The moneyline already knows the goalies, so nothing per-team moves this split — the split IS the market.");
       if (mlHold > HOLD_REFERENCE) notes.push("A " + (mlHold * 100).toFixed(1) + "% moneyline hold is wide for a main line; only " + (marketConfidence(mlHold) * 100).toFixed(0) + "% of the de-vigged lean is kept.");
       var pH = nhlPHomeWins(lamH, lamA);
-      markets.push(pickOf("ml", "Moneyline",
+      /* the upset signal (totals/nhl.py DOG_BACKUP_LIFT): the DOG's backup in net lifts the dog, tagged; the watch names the rest */
+      var favHome = pHomeMkt >= 0.5, dog = favHome ? away : home, fav = favHome ? home : away;
+      var aBk = checked("agbk"), hBk = checked("hgbk"), dogBk = favHome ? aBk : hBk, favBk = favHome ? hBk : aBk, lifted = !!(dogBk && !favBk);
+      var mlNotes = ["Priced off the book's own moneyline, overtime and the shootout included. The only thing that can move it is the total forecast changing how often the game is tied after sixty, and that is a small thing."];
+      if (lifted) {
+        pH = favHome ? pH - NHL.DOG_BACKUP_LIFT : pH + NHL.DOG_BACKUP_LIFT;
+        mlNotes.push("<b>UPSET SIGNAL</b>: " + esc(dog) + " start a backup and the market has moved the price for it too far. Against two seasons of closing moneylines the dog with a backup in net won 158 of 327 against 134 priced (+7.4 points, z 2.7, +6.3 and +8.3 by season; the dog's moneyline +39 units). " +
+          sgn(NHL.DOG_BACKUP_LIFT * 100, 0) + " points to " + esc(dog) + ", tagged: this side is pickable on the record's own line.");
+      }
+      var aRest = num("arest"), hRest = num("hrest"), dogRest = favHome ? aRest : hRest, favRest = favHome ? hRest : aRest, watch = [];
+      if (lifted) watch.push(esc(dog) + " start a backup (scored, " + sgn(NHL.DOG_BACKUP_LIFT * 100, 0) + " points)");
+      if (dogRest !== null && dogRest <= 0) watch.push(esc(dog) + " on a back to back: dogs won " + NHL_UPSET_WATCH.dog_b2b);
+      if (!favHome) watch.push(esc(fav) + " favoured on the road: dogs won " + NHL_UPSET_WATCH.fav_road);
+      if (favBk && !dogBk) watch.push(esc(fav) + " start a backup: NOT an upset signal, the dog won 1.3 points LESS than priced (440 games); the market over-bumps the dog");
+      if (favRest !== null && favRest <= 0 && !(dogRest !== null && dogRest <= 0)) watch.push(esc(fav) + " on a back to back: NOT an upset signal, the dog won 3.0 points less than priced (390 games); the market over-bumps the dog");
+      if (watch.length) notes.push("<b>Upset watch</b>, " + esc(dog) + " at " + sgn(favHome ? aml : hml, 0) + ": " + watch.join("; ") + ". " + (lifted ? "The scored signal is the dog's own backup; the rest are watched on the record." : "Watched, not scored: nothing here moves the dog's chance."));
+      var mlm = pickOf("ml", "Moneyline",
         [sideOf(home + " ML", "HOME", pH, 0, hml), sideOf(away + " ML", "AWAY", 1 - pH, 0, aml)],
-        true, "", ["Priced off the book's own moneyline, overtime and the shootout included. The only thing that can move it is the total forecast changing how often the game is tied after sixty, and that is a small thing."]));
+        true, "", mlNotes);
+      mlm.informed = lifted;
+      markets.push(mlm);
       var homeLine = plIn !== null ? plIn : (pHomeMkt >= 0.5 ? -NHL.DEFAULT_PUCK_LINE : NHL.DEFAULT_PUCK_LINE);
       var pr = puckLineProbs(lamH, lamA, homeLine);
       markets.push(pickOf("pl", "Puck line " + home + ": " + fmtLine(homeLine),

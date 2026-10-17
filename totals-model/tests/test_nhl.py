@@ -1,0 +1,592 @@
+"""NHL: the total and the markets, built a week before the season.
+
+Organised around the module docstring's claims. Nothing is fitted, so the
+tests are about structure: the constants are derived from the stated facts,
+league-average inputs move nothing, the mixture means what it says, the
+derivative markets reproduce the market they were anchored on, and the
+grader reads a hockey score the way the league does.
+"""
+
+from __future__ import annotations
+
+import math
+import unittest
+
+from totals.fullgame import BANDS, devig, implied, split_for
+from totals.nhl import (
+    EMPTY_NET_RATE, ENG_GIVEN_ONE_GOAL_LEAD, GOALIE_TALENT_SD, LEAGUE_GOALS_PER_GAME,
+    LEAGUE_REG_GOALS, LEAGUE_SAVE_PCT, LEAGUE_SHOTS, OT_RATE, P1_SHARE, REG_PHI,
+    EN_MIN_GAMES, EN_PULL, RESIDUAL_SD, SCORING_FADE, SCORING_MIN_GAMES, SV_STABLE_AT, WEIGHTS, final_margin_dist, forecast_matchup_nhl,
+    forecast_nhl, goalie_gap, grade, nhl_split, p_home_wins, puck_line_probs,
+    reg_mean, shrink_sv, solve_split, sv_weight, total_pmf,
+)
+
+LEAGUE = dict(away_goalie_sv=LEAGUE_SAVE_PCT, home_goalie_sv=LEAGUE_SAVE_PCT,
+              away_goalie_shots=1500, home_goalie_shots=1500,
+              away_shots_for=LEAGUE_SHOTS, home_shots_for=LEAGUE_SHOTS)
+BOARD = dict(total_line=6.0, over_price=-110, under_price=-110, home_ml=-150, away_ml=130,
+             puck_line=-1.5, pl_home_price=180, pl_away_price=-220,
+             p1_line=1.5, p1_over_price=-120, p1_under_price=100)
+
+
+class TestTheConstantsAreDerived(unittest.TestCase):
+    def test_the_shrinkage_shots_fall_out_of_two_facts(self):
+        self.assertAlmostEqual(SV_STABLE_AT, LEAGUE_SAVE_PCT * (1 - LEAGUE_SAVE_PCT) / GOALIE_TALENT_SD ** 2)
+        self.assertTrue(1200 < SV_STABLE_AT < 1500)
+
+    def test_the_regulation_mean_is_the_total_less_the_two_lumps(self):
+        self.assertAlmostEqual(LEAGUE_REG_GOALS, LEAGUE_GOALS_PER_GAME - EMPTY_NET_RATE - OT_RATE)
+        self.assertAlmostEqual(reg_mean(LEAGUE_GOALS_PER_GAME), LEAGUE_REG_GOALS)
+
+    def test_the_regulation_index_is_derived_from_the_residual_sd(self):
+        lumps = EMPTY_NET_RATE * (1 - EMPTY_NET_RATE) + OT_RATE * (1 - OT_RATE)
+        self.assertAlmostEqual(REG_PHI, (RESIDUAL_SD ** 2 - lumps) / LEAGUE_REG_GOALS)
+        self.assertTrue(1.0 < REG_PHI < 1.2, "goals are near Poisson")
+
+    def test_the_market_weight_is_the_mlb_figure(self):
+        self.assertEqual(WEIGHTS["market"], 4.0)
+        self.assertEqual(WEIGHTS["goalies"], 1.6)
+
+
+class TestTheMixture(unittest.TestCase):
+    def test_it_sums_to_one_and_means_what_it_says(self):
+        for mu in (4.5, 5.5, 6.1, 7.0):
+            pm = total_pmf(mu)
+            self.assertAlmostEqual(sum(pm), 1.0, places=9)
+            self.assertAlmostEqual(sum(k * v for k, v in enumerate(pm)), mu, places=9)
+
+    def test_it_is_registered_as_the_nhl_split(self):
+        self.assertEqual(split_for("NHL", 6.0, 6.1), nhl_split(6.0, 6.1))
+
+    def test_a_whole_number_line_pushes(self):
+        o, p, u = nhl_split(6.0, 6.1)
+        self.assertTrue(0.10 < p < 0.20)
+        self.assertAlmostEqual(o + p + u, 1.0, places=9)
+        o2, p2, u2 = nhl_split(5.5, 6.1)
+        self.assertEqual(p2, 0.0)
+
+    def test_the_empty_net_lump_lifts_the_over_on_the_half_above_regulation(self):
+        """The same mean as a plain count, but with mass pushed one goal up:
+        P(total >= 6) is higher than a plain NB of the same mean says."""
+        from totals.fullgame import nb_split
+        o_mix, _, _ = nhl_split(5.5, 6.1)
+        o_nb, _, _ = nb_split(5.5, 6.1, REG_PHI)
+        self.assertNotAlmostEqual(o_mix, o_nb, places=3)
+
+
+class TestTheGoalie(unittest.TestCase):
+    def test_league_average_inputs_move_nothing(self):
+        self.assertAlmostEqual(goalie_gap(LEAGUE_SAVE_PCT, LEAGUE_SHOTS), 0.0, places=12)
+        f = forecast_nhl("A @ B", 6.0, -110, -110, **LEAGUE)
+        anchor = next(e.total for e in f.estimates if e.name == "Market")
+        self.assertAlmostEqual(f.projected, anchor, places=12)
+
+    def test_a_hot_goalie_lowers_the_total_and_a_cold_one_raises_it(self):
+        hot = forecast_nhl("A @ B", 6.0, -110, -110, **{**LEAGUE, "home_goalie_sv": 0.930})
+        cold = forecast_nhl("A @ B", 6.0, -110, -110, **{**LEAGUE, "home_goalie_sv": 0.880})
+        base = forecast_nhl("A @ B", 6.0, -110, -110, **LEAGUE)
+        self.assertLess(hot.projected, base.projected)
+        self.assertGreater(cold.projected, base.projected)
+
+    def test_shrinkage_by_shots(self):
+        self.assertEqual(sv_weight(None), 1.0)
+        self.assertAlmostEqual(sv_weight(SV_STABLE_AT), 0.5)
+        self.assertLess(sv_weight(300), sv_weight(1500))
+        few = shrink_sv(0.930, 300)
+        many = shrink_sv(0.930, 1500)
+        self.assertLess(few, many)
+        self.assertGreater(few, LEAGUE_SAVE_PCT)
+
+    def test_the_other_sides_shots_no_longer_scale_the_gap(self):
+        """7 Oct 2026: the shot-rate lean ran the wrong way against two seasons
+        of closing totals, so a goalie's gap is read at the league's shots."""
+        self.assertAlmostEqual(goalie_gap(0.880, 35.0), goalie_gap(0.880, 25.0), places=12)
+        self.assertAlmostEqual(goalie_gap(0.880), LEAGUE_SHOTS * (LEAGUE_SAVE_PCT - 0.880), places=12)
+
+    def test_shots_alone_are_shown_not_scored(self):
+        plain = forecast_nhl("A @ B", 6.0, -110, -110)
+        f = forecast_nhl("A @ B", 6.0, -110, -110, away_shots_for=34, home_shots_for=33)
+        self.assertNotIn("Shot rates", [e.name for e in f.estimates])
+        self.assertAlmostEqual(f.projected, plain.projected, places=12)
+        self.assertTrue(any("SHOWN, NOT SCORED" in n and "shot-rate lean" in n for n in f.notes))
+
+    def test_one_goalie_is_scored_against_a_league_partner(self):
+        f = forecast_nhl("A @ B", 6.0, -110, -110, away_goalie_sv=0.880, away_goalie_shots=1500)
+        self.assertIn("Goalies", [e.name for e in f.estimates])
+        self.assertTrue(any("missing side is scored as a league-average goalie" in n for n in f.notes))
+
+    def test_october_carries_no_delta_since_11_oct(self):
+        from totals.nhl import OCTOBER_DELTA
+        self.assertEqual(OCTOBER_DELTA, 0.0)
+        nov = forecast_nhl("A @ B", 6.0, -110, -110, game_month=11)
+        octo = forecast_nhl("A @ B", 6.0, -110, -110, game_month=10)
+        self.assertAlmostEqual(octo.projected, nov.projected, places=12)
+        self.assertFalse(any(x.name == "October" for x in octo.deltas))
+        self.assertTrue(any("October: NO seasonal delta" in n for n in octo.notes))
+        self.assertFalse(any("October" in n for n in nov.notes))
+
+    def test_an_unconfirmed_goalie_is_said_out_loud(self):
+        f = forecast_nhl("A @ B", 6.0, -110, -110, **LEAGUE)
+        self.assertTrue(any("NOT confirmed" in n for n in f.notes))
+        g = forecast_nhl("A @ B", 6.0, -110, -110, away_goalie_confirmed=True, home_goalie_confirmed=True, **LEAGUE)
+        self.assertFalse(any("NOT confirmed" in n for n in g.notes))
+
+    def test_an_implausible_save_percentage_is_dropped(self):
+        f = forecast_nhl("A @ B", 6.0, -110, -110, **{**LEAGUE, "home_goalie_sv": 9.3})
+        self.assertNotIn("Goalies", [e.name for e in f.estimates])
+
+
+class TestScoringRatesFaded(unittest.TestCase):
+    """13 Oct 2026: each club's goals for and against per game, the two
+    offences against the two defences, against the league's goals a game.
+    The market over-moves with them two seasons running, so the lean goes on
+    the line with the opposite sign, at SCORING_FADE a goal."""
+    RATES = dict(away_gf=3.6, away_ga=3.2, home_gf=3.4, home_ga=3.1, league_gpg=6.1, away_games=12, home_games=11)
+    PROJ = (3.6 + 3.1) / 2.0 + (3.4 + 3.2) / 2.0     # 6.65: the two offences against the two defences
+
+    def test_two_high_scoring_clubs_pull_the_total_down(self):
+        base = forecast_nhl("A @ B", 6.5, -110, -110)
+        f = forecast_nhl("A @ B", 6.5, -110, -110, **self.RATES)
+        d = [x for x in f.deltas if x.name == "Scoring rates, faded"]
+        self.assertEqual(len(d), 1)
+        self.assertAlmostEqual(d[0].runs, SCORING_FADE * (self.PROJ - 6.1), places=9)
+        self.assertLess(d[0].runs, 0.0)
+        self.assertLess(f.projected, base.projected)
+        self.assertFalse(d[0].mechanism, "same sign two seasons at a pooled t of 2: it moves the forecast and is tagged, so it cannot buy a band alone")
+        self.assertTrue(any("over-moves with them" in n and "tagged" in n for n in f.notes))
+
+    def test_low_scoring_clubs_push_the_total_up(self):
+        f = forecast_nhl("A @ B", 6.5, -110, -110, **{**self.RATES, "away_gf": 2.6, "home_gf": 2.5})
+        d = [x for x in f.deltas if x.name == "Scoring rates, faded"][0]
+        self.assertGreater(d.runs, 0.0)
+
+    def test_under_five_games_is_shown_not_scored(self):
+        f = forecast_nhl("A @ B", 6.5, -110, -110, **{**self.RATES, "away_games": SCORING_MIN_GAMES - 1})
+        self.assertFalse([x for x in f.deltas if x.name.startswith("Scoring")])
+        self.assertTrue(any("shown, not scored until then" in n for n in f.notes))
+
+    def test_the_league_mean_falls_back_to_the_constant(self):
+        f = forecast_nhl("A @ B", 6.5, -110, -110, **{**self.RATES, "league_gpg": None})
+        d = [x for x in f.deltas if x.name == "Scoring rates, faded"][0]
+        self.assertAlmostEqual(d.runs, SCORING_FADE * (self.PROJ - LEAGUE_GOALS_PER_GAME), places=9)
+
+    def test_a_partial_set_scores_nothing_and_says_so(self):
+        f = forecast_nhl("A @ B", 6.5, -110, -110, away_gf=3.6, away_ga=3.2)
+        self.assertFalse([x for x in f.deltas if x.name.startswith("Scoring")])
+        self.assertTrue(any("partial" in n for n in f.notes))
+
+    def test_the_matchup_wrapper_carries_it(self):
+        m = forecast_matchup_nhl("A", "B", **BOARD, **self.RATES)
+        self.assertTrue([x for x in m.total.deltas if x.name == "Scoring rates, faded"])
+
+
+class TestEmptyNetHabits(unittest.TestCase):
+    """13 Oct 2026: both clubs' net empty-net goals a game to date, conceded
+    minus scored, trailing late minus leading late. Tagged at EN_PULL a goal."""
+    EN = dict(away_en_conceded=0.55, away_en_scored=0.25, home_en_conceded=0.50, home_en_scored=0.30, away_games=20, home_games=18)
+    NET = (0.55 + 0.50) - (0.25 + 0.30)     # +0.50
+
+    def test_two_clubs_that_trail_late_push_the_total_up_tagged(self):
+        base = forecast_nhl("A @ B", 6.0, -110, -110)
+        f = forecast_nhl("A @ B", 6.0, -110, -110, **self.EN)
+        d = [x for x in f.deltas if x.name == "Empty-net habits"]
+        self.assertEqual(len(d), 1)
+        self.assertAlmostEqual(d[0].runs, EN_PULL * self.NET, places=9)
+        self.assertGreater(f.projected, base.projected)
+        self.assertFalse(d[0].mechanism)
+        self.assertTrue(any("does not price the habit" in n and "tagged" in n for n in f.notes))
+
+    def test_clubs_that_lead_late_pull_it_down(self):
+        f = forecast_nhl("A @ B", 6.0, -110, -110, **{**self.EN, "away_en_scored": 0.70, "home_en_scored": 0.65})
+        d = [x for x in f.deltas if x.name == "Empty-net habits"][0]
+        self.assertLess(d.runs, 0.0)
+
+    def test_under_ten_games_is_shown_not_scored(self):
+        f = forecast_nhl("A @ B", 6.0, -110, -110, **{**self.EN, "home_games": EN_MIN_GAMES - 1})
+        self.assertFalse([x for x in f.deltas if x.name == "Empty-net habits"])
+        self.assertTrue(any("Empty-net habits" in n and "shown, not scored until then" in n for n in f.notes))
+
+    def test_a_partial_set_scores_nothing(self):
+        f = forecast_nhl("A @ B", 6.0, -110, -110, away_en_conceded=0.5, home_en_scored=0.3)
+        self.assertFalse([x for x in f.deltas if x.name == "Empty-net habits"])
+        self.assertTrue(any("Empty-net habits need all four" in n for n in f.notes))
+
+    def test_it_cannot_buy_a_band_alone(self):
+        big = forecast_nhl("A @ B", 6.0, -110, -110, **{**self.EN, "away_en_conceded": 1.2, "home_en_conceded": 1.1, "away_en_scored": 0.1, "home_en_scored": 0.1})
+        self.assertEqual(big.band, "NO BET")
+        self.assertGreater(big.p_over, 0.55)
+
+
+class TestTheMarginShape(unittest.TestCase):
+    """13 Oct 2026: the margin distribution ties at the measured rate and the
+    empty-net conversions are the measured ones, so the share of one-, two-
+    and three-plus-goal finals lands on two seasons of ledgers (41%, 20%,
+    39%) and the dog +1.5 is no longer under-called."""
+
+    def test_one_two_and_three_plus_goal_finals_land_on_the_ledgers(self):
+        d = final_margin_dist(3.1, 2.7)
+        one = sum(v for k, v in d.items() if abs(k) == 1)
+        two = sum(v for k, v in d.items() if abs(k) == 2)
+        self.assertAlmostEqual(sum(d.values()), 1.0, places=9)
+        self.assertTrue(0.36 <= one <= 0.43, one)
+        self.assertTrue(0.18 <= two <= 0.24, two)
+
+    def test_the_tie_rate_is_the_measured_one(self):
+        # the tie mass is split into the +1 and -1 margins by the overtime share; the decided
+        # mass is everything the regulation count left, scaled to fill 1 - OT_RATE
+        import totals.nhl as nhl
+        reg = nhl.reg_margin_dist(3.1, 2.7)
+        self.assertLess(reg[0], OT_RATE, "two independent counts tie less often than hockey does")
+        d = final_margin_dist(3.1, 2.7)
+        decided = sum(v for k, v in d.items() if abs(k) >= 2)
+        self.assertLess(decided, 1.0 - OT_RATE)
+
+    def test_the_dog_plus_one_and_a_half_at_a_minus_150_favourite(self):
+        lh, la = solve_split(reg_mean(6.0), 0.574)
+        cover, push, fail = puck_line_probs(lh, la, -1.5)
+        self.assertEqual(push, 0.0)
+        self.assertTrue(0.60 <= fail <= 0.67, fail)      # history 65.8% on 1,095 games within 20 cents
+
+    def test_the_empty_net_rates_are_the_measured_ones(self):
+        self.assertAlmostEqual(ENG_GIVEN_ONE_GOAL_LEAD, 0.49)
+        import totals.nhl as nhl
+        self.assertAlmostEqual(nhl.ENG_GIVEN_TWO_GOAL_LEAD, 0.70)
+
+
+class TestTheGateAndTheTags(unittest.TestCase):
+    def test_nothing_entered_is_a_coin_flip(self):
+        f = forecast_nhl("A @ B", 6.0)
+        self.assertEqual(f.band, BANDS[-1][1])
+        self.assertAlmostEqual(f.p_resolved, 0.5, places=3)
+
+    def test_form_alone_cannot_buy_a_band(self):
+        f = forecast_nhl("A @ B", 5.5, -110, -110, away_pp_pct=30, home_pp_pct=30, away_pk_pct=70,
+                         home_pk_pct=70, away_last10_total=8.0, home_last10_total=8.0)
+        self.assertEqual(f.side, "OVER")
+        self.assertEqual(f.band, BANDS[-1][1])
+        self.assertTrue(any("Held at" in n for n in f.notes))
+
+    def test_special_teams_are_shown_not_scored(self):
+        # measured 7 Oct 2026 on the detail pass: both halves ran the wrong way, both seasons
+        bare = forecast_nhl("A @ B", 6.0, -110, -110)
+        f = forecast_nhl("A @ B", 6.0, -110, -110, away_pp_pct=30, home_pp_pct=30, away_pk_pct=70, home_pk_pct=70)
+        self.assertNotIn("Special teams", [e.name for e in f.estimates])
+        self.assertAlmostEqual(f.projected, bare.projected, places=12)
+        self.assertTrue(any("Special teams are SHOWN, NOT SCORED" in n for n in f.notes))
+        self.assertNotIn("special", WEIGHTS)
+        g = forecast_nhl("A @ B", 6.0, -110, -110, away_pp_pct=25)
+        self.assertTrue(any("SHOWN, NOT SCORED" in n for n in g.notes))
+
+    def test_one_backup_in_net_is_a_tagged_delta_on_the_under(self):
+        from totals.nhl import BACKUP_DELTA
+        self.assertLess(BACKUP_DELTA, 0)
+        base = forecast_nhl("A @ B", 6.0, -110, -110, **LEAGUE)
+        one = forecast_nhl("A @ B", 6.0, -110, -110, away_goalie_backup=True, **LEAGUE)
+        self.assertAlmostEqual(one.projected - base.projected, BACKUP_DELTA, places=9)
+        d = next(x for x in one.deltas if x.name == "Backup in net")
+        self.assertFalse(d.mechanism)
+        self.assertEqual(one.side, "UNDER")
+        self.assertEqual(one.band, "NO BET")   # tagged: it cannot buy a band alone
+        self.assertTrue(any("Backup in net for the away side" in n for n in one.notes))
+        home = forecast_nhl("A @ B", 6.0, -110, -110, home_goalie_backup=True, **LEAGUE)
+        self.assertAlmostEqual(home.projected, one.projected, places=12)
+
+    def test_goalies_are_not_scored_with_a_backup_in_net(self):
+        from totals.nhl import BACKUP_DELTA
+        cold = dict(away_goalie_sv=0.880, home_goalie_sv=0.912, away_goalie_shots=1500, home_goalie_shots=1500)
+        scored = forecast_nhl("A @ B", 6.0, -110, -110, **cold)
+        self.assertIn("Goalies", [e.name for e in scored.estimates])
+        bare = forecast_nhl("A @ B", 6.0, -110, -110)
+        flagged = forecast_nhl("A @ B", 6.0, -110, -110, away_goalie_backup=True, **cold)
+        self.assertNotIn("Goalies", [e.name for e in flagged.estimates])
+        # the .880 backup reads cold, so the bigger delta is the only thing on the line
+        from totals.nhl import BACKUP_DELTA_COLD
+        self.assertAlmostEqual(flagged.projected - bare.projected, BACKUP_DELTA_COLD, places=9)
+        self.assertLess(BACKUP_DELTA_COLD, BACKUP_DELTA)
+        self.assertTrue(any("Goalies are NOT SCORED with a backup in net" in n for n in flagged.notes))
+
+    def test_a_cold_backup_takes_the_bigger_delta(self):
+        from totals.nhl import BACKUP_DELTA, BACKUP_DELTA_COLD
+        self.assertLess(BACKUP_DELTA_COLD, BACKUP_DELTA)
+        bare = forecast_nhl("A @ B", 6.0, -110, -110)
+        # .870 on 900 shots shrinks to about .887: a cold line, costing ~0.3 goals against a league goalie
+        cold = forecast_nhl("A @ B", 6.0, -110, -110, away_goalie_backup=True, away_goalie_sv=0.870, away_goalie_shots=900,
+                            home_goalie_sv=0.912, home_goalie_shots=1800)
+        self.assertAlmostEqual(cold.projected - bare.projected, BACKUP_DELTA_COLD, places=9)
+        self.assertTrue(any("reads COLD" in n for n in cold.notes))
+        # .905 on 900 shrinks to above the league: warm, the ordinary delta
+        warm = forecast_nhl("A @ B", 6.0, -110, -110, away_goalie_backup=True, away_goalie_sv=0.905, away_goalie_shots=900,
+                            home_goalie_sv=0.912, home_goalie_shots=1800)
+        self.assertAlmostEqual(warm.projected - bare.projected, BACKUP_DELTA, places=9)
+        self.assertFalse(any("reads COLD" in n for n in warm.notes))
+        # no line for the backup at all: the ordinary delta
+        blind = forecast_nhl("A @ B", 6.0, -110, -110, away_goalie_backup=True)
+        self.assertAlmostEqual(blind.projected - bare.projected, BACKUP_DELTA, places=9)
+
+    def test_the_dogs_backup_is_the_upset_signal(self):
+        from totals.nhl import DOG_BACKUP_LIFT
+        base = forecast_matchup_nhl("Rangers", "Bruins", **BOARD, **LEAGUE)            # -150 home: the Bruins favoured, the Rangers the dog
+        dog_bk = forecast_matchup_nhl("Rangers", "Bruins", away_goalie_backup=True, **BOARD, **LEAGUE)
+        ml0, ml1 = (next(m for m in base.markets if m.key == "ml"), next(m for m in dog_bk.markets if m.key == "ml"))
+        away0 = ml0.p if ml0.side == "AWAY" else ml0.other_side["p"]
+        away1 = ml1.p if ml1.side == "AWAY" else ml1.other_side["p"]
+        self.assertAlmostEqual(away1 - away0, DOG_BACKUP_LIFT, places=2)   # the backup's total delta moves the split by a hair as well
+        self.assertTrue(any(n.startswith("UPSET SIGNAL: Rangers start a backup") for n in ml1.notes))
+        watch = [n for n in dog_bk.notes if n.startswith("Upset watch, Rangers at +130")]
+        self.assertEqual(len(watch), 1)
+        self.assertIn("start a backup (scored, +5 points)", watch[0])
+        # the favourite's backup is not an upset signal, and two backups move nothing
+        fav_bk = forecast_matchup_nhl("Rangers", "Bruins", home_goalie_backup=True, **BOARD, **LEAGUE)
+        mlf = next(m for m in fav_bk.markets if m.key == "ml")
+        self.assertLess(abs((mlf.p if mlf.side == "AWAY" else mlf.other_side["p"]) - away0), 0.003)   # only the total's hair, no lift
+        self.assertTrue(any("NOT an upset signal" in n for n in fav_bk.notes))
+        both = forecast_matchup_nhl("Rangers", "Bruins", away_goalie_backup=True, home_goalie_backup=True, **BOARD, **LEAGUE)
+        mlb = next(m for m in both.markets if m.key == "ml")
+        self.assertLess(abs((mlb.p if mlb.side == "AWAY" else mlb.other_side["p"]) - away0), 0.003)
+        # the watched signals are named and move nothing: the dog on a back to back, the favourite on the road
+        b2b = forecast_matchup_nhl("Rangers", "Bruins", away_rest_days=0, **BOARD, **LEAGUE)
+        self.assertTrue(any("Rangers on a back to back: dogs won +5.7 points" in n for n in b2b.notes))
+        mlr = next(m for m in b2b.markets if m.key == "ml")
+        self.assertAlmostEqual((mlr.p if mlr.side == "AWAY" else mlr.other_side["p"]), away0, places=6)
+        road = forecast_matchup_nhl("Rangers", "Bruins", **{**BOARD, "home_ml": 130, "away_ml": -150}, **LEAGUE)
+        self.assertTrue(any("Rangers favoured on the road: dogs won +2.6 points" in n for n in road.notes))
+        self.assertFalse(any(n.startswith("Upset watch") for n in base.notes))
+
+    def test_two_backups_move_nothing(self):
+        base = forecast_nhl("A @ B", 6.0, -110, -110, **LEAGUE)
+        two = forecast_nhl("A @ B", 6.0, -110, -110, away_goalie_backup=True, home_goalie_backup=True, **LEAGUE)
+        self.assertAlmostEqual(two.projected, base.projected, places=12)
+        self.assertFalse(any(x.name == "Backup in net" for x in two.deltas))
+        self.assertTrue(any("BOTH nets" in n for n in two.notes))
+
+    def test_a_back_to_back_is_shown_not_scored(self):
+        f = forecast_nhl("A @ B", 6.0, -110, -110, away_rest_days=0, **LEAGUE)
+        g = forecast_nhl("A @ B", 6.0, -110, -110, away_rest_days=2, **LEAGUE)
+        self.assertAlmostEqual(f.projected, g.projected, places=12)
+        self.assertTrue(any("Back to back" in n for n in f.notes))
+
+    def test_a_typo_total_is_refused(self):
+        with self.assertRaises(ValueError):
+            forecast_nhl("A @ B", 60.0)
+
+
+class TestTheMarkets(unittest.TestCase):
+    def test_the_moneyline_reproduces_the_book_when_nothing_moves_the_total(self):
+        # without the period prices: since 12 Oct the period market is a second read of the total
+        m = forecast_matchup_nhl("Rangers", "Bruins", **{**BOARD, "p1_over_price": None, "p1_under_price": None}, **LEAGUE)
+        p_mkt, _ = devig(-150, 130)
+        ml = next(mk for mk in m.markets if mk.key == "ml")
+        p_home = ml.p if ml.side == "HOME" else 1.0 - ml.p
+        self.assertAlmostEqual(p_home, p_mkt, places=6)
+
+    def test_the_puck_line_sides_sum_to_one_with_no_push_at_a_half(self):
+        pl = puck_line_probs(3.2, 2.5, -1.5)
+        self.assertAlmostEqual(sum(pl), 1.0, places=9)
+        self.assertEqual(pl[1], 0.0)
+
+    def test_every_final_margin_is_nonzero(self):
+        d = final_margin_dist(3.0, 2.8)
+        self.assertNotIn(0, d)
+        self.assertAlmostEqual(sum(d.values()), 1.0, places=9)
+
+    def test_the_favourite_covers_less_often_than_it_wins(self):
+        self.assertLess(puck_line_probs(3.2, 2.5, -1.5)[0], p_home_wins(3.2, 2.5))
+
+    def test_the_empty_net_lifts_the_favourites_cover(self):
+        import totals.nhl as nhl
+        with_eng = puck_line_probs(3.2, 2.5, -1.5)[0]
+        saved = nhl.ENG_GIVEN_ONE_GOAL_LEAD
+        try:
+            nhl.ENG_GIVEN_ONE_GOAL_LEAD = 0.0
+            without = puck_line_probs(3.2, 2.5, -1.5)[0]
+        finally:
+            nhl.ENG_GIVEN_ONE_GOAL_LEAD = saved
+        self.assertGreater(with_eng, without)
+        self.assertEqual(ENG_GIVEN_ONE_GOAL_LEAD, saved)
+
+    def test_solve_split_is_exact(self):
+        lh, la = solve_split(5.6, 0.58)
+        self.assertAlmostEqual(lh + la, 5.6, places=9)
+        self.assertAlmostEqual(p_home_wins(lh, la), 0.58, places=6)
+
+    def test_the_first_period_is_anchored_on_its_own_market(self):
+        m = forecast_matchup_nhl("Rangers", "Bruins", **{**BOARD, "p1_over_price": -110, "p1_under_price": -110}, **LEAGUE)
+        p1 = next(mk for mk in m.markets if mk.key == "p1")
+        self.assertAlmostEqual(p1.p, 0.5, places=3)
+
+    def test_the_first_period_reads_the_goalie_gap_scaled(self):
+        hot = forecast_matchup_nhl("Rangers", "Bruins", **BOARD, **{**LEAGUE, "home_goalie_sv": 0.935})
+        base = forecast_matchup_nhl("Rangers", "Bruins", **BOARD, **LEAGUE)
+        p1h = next(mk for mk in hot.markets if mk.key == "p1")
+        p1b = next(mk for mk in base.markets if mk.key == "p1")
+        under_h = p1h.p if p1h.side == "UNDER" else 1 - p1h.p
+        under_b = p1b.p if p1b.side == "UNDER" else 1 - p1b.p
+        self.assertGreater(under_h, under_b)
+        self.assertTrue(any(f"{P1_SHARE:.0%}" in n for n in p1h.notes))
+
+    def test_the_total_is_the_forecasts_total(self):
+        m = forecast_matchup_nhl("Rangers", "Bruins", **BOARD, **LEAGUE)
+        one = forecast_nhl("Rangers @ Bruins", 6.0, -110, -110, p1_line=1.5, p1_over_price=-120, p1_under_price=100, **LEAGUE)
+        t = next(mk for mk in m.markets if mk.key == "total")
+        self.assertAlmostEqual(t.p, one.p_resolved, places=12)
+        self.assertEqual(t.band, one.band)
+
+    def test_no_moneyline_means_no_sides(self):
+        m = forecast_matchup_nhl("Rangers", "Bruins", total_line=6.0, p1_line=1.5)
+        self.assertEqual({mk.key for mk in m.markets}, {"total", "p1"})
+        self.assertIsNone(m.lam_home)
+
+    def test_a_typo_period_total_is_refused(self):
+        with self.assertRaises(ValueError):
+            forecast_matchup_nhl("A", "B", total_line=6.0, p1_line=15)
+
+
+class TestGrading(unittest.TestCase):
+    def setUp(self):
+        self.m = forecast_matchup_nhl("Rangers", "Bruins", **BOARD, **LEAGUE)
+        self.by = {mk.key: mk for mk in self.m.markets}
+
+    def test_total_and_push(self):
+        t = self.by["total"]
+        self.assertEqual(grade(t, home_goals=3, away_goals=3), "push")
+        res = grade(t, home_goals=4, away_goals=3)
+        self.assertEqual(res, "win" if t.side == "OVER" else "loss")
+
+    def test_a_shootout_is_a_one_goal_margin(self):
+        ml, pl = self.by["ml"], self.by["pl"]
+        self.assertEqual(grade(ml, home_goals=3, away_goals=2), "win" if ml.side == "HOME" else "loss")
+        # home -1.5 cannot cover a one-goal win; the away +1.5 side does
+        self.assertEqual(grade(pl, home_goals=3, away_goals=2), "win" if pl.side == "AWAY" else "loss")
+        self.assertEqual(grade(pl, home_goals=4, away_goals=2), "win" if pl.side == "HOME" else "loss")
+
+    def test_the_first_period_grades_and_refuses_the_impossible(self):
+        p1 = self.by["p1"]
+        self.assertIsNone(grade(p1, home_goals=3, away_goals=2))
+        self.assertEqual(grade(p1, home_goals=3, away_goals=2, p1_home=4, p1_away=0), "invalid")
+        res = grade(p1, home_goals=3, away_goals=2, p1_home=1, p1_away=1)
+        self.assertEqual(res, "win" if p1.side == "OVER" else "loss")
+
+    def test_ungradeable_without_a_score(self):
+        self.assertIsNone(grade(self.by["ml"], home_goals=None, away_goals=None))
+
+
+if __name__ == "__main__":
+    unittest.main()
+
+
+class TestTheFirstPeriodMarketAsASecondRead(unittest.TestCase):
+    """12 Oct 2026: the period line's de-vigged mean over the period share, plus the lumps, as a
+    tagged estimate of the full game, at the user's request; untested, so it can never buy a band."""
+
+    def test_the_estimate_is_the_period_mean_scaled_up(self):
+        from totals.nhl import p1_anchor, P1_SHARE, EMPTY_NET_RATE, OT_RATE, WEIGHTS
+        f = forecast_nhl("A @ B", 6.0, -110, -110, p1_line=1.5, p1_over_price=-155, p1_under_price=115)
+        e = next(x for x in f.estimates if x.name == "First-period market")
+        mu1, _ = p1_anchor(1.5, -155, 115)
+        self.assertAlmostEqual(e.total, mu1 / P1_SHARE + EMPTY_NET_RATE + OT_RATE, places=9)
+        self.assertEqual(e.weight, WEIGHTS["p1mkt"])
+        self.assertFalse(e.mechanism)
+        self.assertGreater(e.total, 6.0)          # over juiced to -155 on 1.5 reads as a higher-scoring game
+        self.assertEqual(f.band, "NO BET")        # tagged: cannot buy a band alone
+
+    def test_it_needs_both_prices(self):
+        f = forecast_nhl("A @ B", 6.0, -110, -110, p1_line=1.5, p1_over_price=-155)
+        self.assertNotIn("First-period market", [e.name for e in f.estimates])
+        g = forecast_nhl("A @ B", 6.0, -110, -110)
+        self.assertNotIn("First-period market", [e.name for e in g.estimates])
+
+    def test_the_matchup_wrapper_forwards_the_period_market(self):
+        m = forecast_matchup_nhl("Rangers", "Bruins", total_line=6.0, over_price=-110, under_price=-110,
+                                 p1_line=1.5, p1_over_price=-155, p1_under_price=115)
+        self.assertIn("First-period market", [e.name for e in m.total.estimates])
+
+    def test_an_alternate_period_number_is_flagged_and_not_read(self):
+        # 13 Oct 2026: the odds run carded one book's 2.5 at +240/-325 as the period line on a whole
+        # card; the de-vigged read off an alternate sat a quarter of a goal high, so it is left out
+        base = forecast_nhl("A @ B", 6.0, -110, -110)
+        f = forecast_nhl("A @ B", 6.0, -110, -110, p1_line=2.5, p1_over_price=240, p1_under_price=-325)
+        flag = [n for n in f.notes if "reads as an ALTERNATE number" in n]
+        self.assertEqual(len(flag), 1)
+        self.assertIn("2.5 at +240/-325", flag[0])
+        self.assertIn("47 points of implied chance apart", flag[0])
+        self.assertIn("NOT READ", flag[0])
+        self.assertNotIn("First-period market", [e.name for e in f.estimates])
+        self.assertAlmostEqual(f.projected, base.projected, places=9)    # the projection is untouched
+        # the widest main period line carded, -155/+115, is 14 points apart: read as before, no flag
+        g = forecast_nhl("A @ B", 6.0, -110, -110, p1_line=1.5, p1_over_price=-155, p1_under_price=115)
+        self.assertFalse([n for n in g.notes if "ALTERNATE" in n])
+        self.assertIn("First-period market", [e.name for e in g.estimates])
+
+
+class TestTheFirstPeriodAnchorIsNotRegressed(unittest.TestCase):
+    """4 Oct 2026: the first-period market's wide hold is read straight."""
+
+    def test_both_prices_reproduce_the_raw_devig(self):
+        from totals.fullgame import devig, fair_total
+        from totals.nhl import p1_anchor
+        m = forecast_matchup_nhl("A", "B", total_line=6.0, p1_line=1.5, p1_over_price=-140, p1_under_price=105)
+        p1 = next(mk for mk in m.markets if mk.key == "p1")
+        over = p1.p if p1.side == "OVER" else 1 - p1.p
+        raw, _ = devig(-140, 105, shrink=False)
+        self.assertAlmostEqual(over, raw, places=6)
+        # the regressed anchor sat under the book; this one does not
+        mu_reg, _ = fair_total("NHL_P1", 1.5, -140, 105)
+        mu_raw, how = p1_anchor(1.5, -140, 105)
+        self.assertGreater(mu_raw, mu_reg)
+        self.assertIn("read straight, not regressed", how)
+
+    def test_an_even_market_is_a_coin_flip(self):
+        from totals.nhl import p1_anchor
+        from totals.nhl import p1_split
+        mu, _ = p1_anchor(1.5, -110, -110)
+        o, _pu, u = p1_split(1.5, mu)
+        self.assertAlmostEqual(o / (o + u), 0.5, places=6)
+
+    def test_one_price_or_none_defers_to_fair_total(self):
+        from totals.fullgame import fair_total
+        from totals.nhl import p1_anchor
+        self.assertEqual(p1_anchor(1.5, -130, None), fair_total("NHL_P1", 1.5, -130, None))
+        self.assertEqual(p1_anchor(1.5, None, None), fair_total("NHL_P1", 1.5, None, None))
+
+
+class TestFirstPeriodForm(unittest.TestCase):
+    """5 Oct 2026: the ledger's per-club first-period last ten; measured null
+    against 2,445 first periods on 7 Oct and made shown, not scored."""
+
+    def test_the_first_period_last_ten_moves_nothing_and_says_so(self):
+        base = dict(total_line=6.0, p1_line=1.5, p1_over_price=-120, p1_under_price=100)
+        plain = forecast_matchup_nhl("A", "B", **base)
+        hot = forecast_matchup_nhl("A", "B", away_p1_last10=2.4, home_p1_last10=2.2, **base)
+        pa = next(mk for mk in plain.markets if mk.key == "p1"); ph = next(mk for mk in hot.markets if mk.key == "p1")
+        self.assertAlmostEqual(pa.p, ph.p, places=12)
+        self.assertTrue(any("First-period last ten" in n and "SHOWN, NOT SCORED" in n for n in ph.notes))
+        self.assertAlmostEqual(hot.total.projected, plain.total.projected, places=12)
+
+
+class TestExpectedGoals(unittest.TestCase):
+    """6 Oct 2026: MoneyPuck's xG as a tagged estimate; 7 Oct 2026: shown, not scored, after the
+    Natural Stat Trick game table let this season's xG to date be tested against the close."""
+
+    def test_expected_goals_are_shown_not_scored(self):
+        plain = forecast_nhl("A @ B", 6.0, over_price=-110, under_price=-110)
+        hot = forecast_nhl("A @ B", 6.0, over_price=-110, under_price=-110, away_xgf=3.4, home_xgf=3.3, away_xga=3.1, home_xga=2.9, league_xg=3.05)
+        self.assertNotIn("Expected goals", [e.name for e in hot.estimates])
+        self.assertNotIn("xg", WEIGHTS)
+        self.assertAlmostEqual(hot.projected, plain.projected, places=12)
+        note = next(n for n in hot.notes if n.startswith("Expected goals"))
+        self.assertIn("SHOWN, NOT SCORED", note)
+        self.assertIn("6.35 against a league 6.10 (+0.25)", note)   # the gap is still computed and shown
+
+    def test_a_partial_set_is_not_shown(self):
+        plain = forecast_nhl("A @ B", 6.0, over_price=-110, under_price=-110)
+        part = forecast_nhl("A @ B", 6.0, over_price=-110, under_price=-110, away_xgf=3.4, home_xgf=3.3)
+        self.assertAlmostEqual(part.projected, plain.projected, places=12)
+        self.assertTrue(any("partial set" in n for n in part.notes))
+        self.assertFalse(any("against a league" in n for n in part.notes))
+
+    def test_the_assumed_league_level_is_used_without_the_table_mean(self):
+        from totals.nhl import LEAGUE_XG_PER_TEAM
+        a = forecast_nhl("A @ B", 6.0, away_xgf=3.4, home_xgf=3.3, away_xga=3.1, home_xga=2.9)
+        b = forecast_nhl("A @ B", 6.0, away_xgf=3.4, home_xgf=3.3, away_xga=3.1, home_xga=2.9, league_xg=LEAGUE_XG_PER_TEAM)
+        na = next(n for n in a.notes if n.startswith("Expected goals")); nb = next(n for n in b.notes if n.startswith("Expected goals"))
+        self.assertEqual(na, nb)

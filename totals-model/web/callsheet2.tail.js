@@ -373,7 +373,12 @@
     var v = m ? +m[1] : 0;
     return mk.side === "HOME" ? v : -v;
   }
+  /* a VOID row (17 Oct 2026, the user: "the MLB was postponed, put void on the chart"):
+     the flag rides in the row's finals, so every grade reads null, the record and the
+     board leave the row out, and the card shows it greyed with VOID on it */
+  function isVoid(r) { return !!(r && r.finals && r.finals.void); }
   function gradeMarket(mk, fin) {
+    if (fin && fin.void) return null;
     var fh = fin ? parseFloat(fin.fh) : NaN, fa = fin ? parseFloat(fin.fa) : NaN;
     var f5h = fin ? parseFloat(fin.f5h) : NaN, f5a = fin ? parseFloat(fin.f5a) : NaN;
     var line = lineOf(mk), total;
@@ -1065,7 +1070,7 @@
   function parlayFour(dateISO, sport) {
     var legs = [], skipped = 0;
     card.forEach(function (r) {
-      if ((r.gdate || "") !== dateISO) return;
+      if ((r.gdate || "") !== dateISO || isVoid(r)) return;
       if (sport && r.sport !== sport) return;
       var g = gameLeg(r.markets, r.sport, r.gdate);
       if (!g.leg) { if (g.priced) skipped++; return; }
@@ -1184,7 +1189,7 @@
     var verdict = all.filter(function (x) { return x.mk.key === "total" && pickable(x.mk, x.row.sport, x.row.gdate) && bandOf(x.mk); });
     var rule = [];
     card.forEach(function (r) {
-      if ((r.gdate || "") !== dateISO || r.sport !== "WNBA" || (sport && r.sport !== sport)) return;
+      if ((r.gdate || "") !== dateISO || r.sport !== "WNBA" || (sport && r.sport !== sport) || isVoid(r)) return;
       (r.markets || []).forEach(function (mk) { var s = shadeOf(mk); if (s) rule.push({ row: r, mk: s }); });
     });
     var value = all.filter(function (x) {
@@ -1205,7 +1210,7 @@
        likelier side, whatever the price */
     var call = [];
     card.forEach(function (r) {
-      if ((r.gdate || "") !== dateISO || r.sport !== "NHL" || (sport && r.sport !== sport)) return;
+      if ((r.gdate || "") !== dateISO || r.sport !== "NHL" || (sport && r.sport !== sport) || isVoid(r)) return;
       var tot = (r.markets || []).filter(function (mk) { return mk.key === "total"; })[0], cv = callOf(r, tot);
       if (cv && !verdict.some(function (y) { return y.row.id === r.id; })) call.push({ row: r, mk: cv });
     });
@@ -1250,7 +1255,7 @@
   function boardRows(dateISO, byProb) {
     var rows = [];
     card.forEach(function (r) {
-      if ((r.gdate || "") !== dateISO) return;
+      if ((r.gdate || "") !== dateISO || isVoid(r)) return;
       (r.markets || []).forEach(function (mk0) {
         var mk = viewOf(mk0, byProb);
         if (mk.edge === null || mk.edge === undefined) return;
@@ -1320,7 +1325,7 @@
   function likeliestLegs(dateISO, sport) {
     var legs = [];
     card.forEach(function (r) {
-      if ((r.gdate || "") !== dateISO) return;
+      if ((r.gdate || "") !== dateISO || isVoid(r)) return;
       if (sport && r.sport !== sport) return;
       var best = likeliestOf(r.markets);
       if (!best || best.price === null || best.price === undefined) return;
@@ -1399,7 +1404,7 @@
   }
   function upsetWatch(dateISO) {
     var out = [];
-    card.forEach(function (r) { if ((r.gdate || "") !== dateISO) return; var u = upsetSignals(r); if (u) out.push(u); });
+    card.forEach(function (r) { if ((r.gdate || "") !== dateISO || isVoid(r)) return; var u = upsetSignals(r); if (u) out.push(u); });
     out.sort(function (a, b) { return (b.scored - a.scored) || (b.sig.length - a.sig.length) || (b.dog.p - a.dog.p); });
     return out;
   }
@@ -1548,6 +1553,7 @@
      the lock is stored -- the finals are the lock. */
   function rowLocked(r) {
     var fin = r.finals || {};
+    if (fin.void) return false;
     return fin.fa !== undefined && fin.fa !== "" && fin.fh !== undefined && fin.fh !== "" && !unlocked[r.id];
   }
   var unlocked = {};
@@ -1575,17 +1581,23 @@
       var f5 = r.sport === "MLB"
         ? '<span class="finals"><span class="l">F5</span><input class="grade" data-id="' + r.id + '" data-k="f5a" value="' + esc(fin.f5a || "") + '" placeholder="A" inputmode="numeric"' + ro + '>' +
           '<input class="grade" data-id="' + r.id + '" data-k="f5h" value="' + esc(fin.f5h || "") + '" placeholder="H" inputmode="numeric"' + ro + '></span>' : '';
-      h += '<tr><td><span class="gdate' + (r.gdate === today ? ' today' : '') + '">' + esc(gameDate(r.gdate)) + '</span></td>' +
+      var vd = isVoid(r);
+      h += '<tr' + (vd ? ' class="void"' : '') + '><td><span class="gdate' + (r.gdate === today ? ' today' : '') + '">' + esc(gameDate(r.gdate)) + '</span></td>' +
         '<td><button type="button" class="openbtn" data-open="' + r.id + '" title="Load into the form"><b>' + esc(r.matchup) + '</b><br><span class="gdate">' + esc(r.sport) + '</span>' +
           markChips(marksOf(r.sport, r.inputs, r.markets), "tagm") + '</button></td>' +
         '<td><div class="rowmk">' + mks + '</div></td>' +
-        '<td' + (lk ? ' class="locked"' : '') + '><span class="finals"><span class="l">FINAL</span><input class="grade" data-id="' + r.id + '" data-k="fa" value="' + esc(fin.fa || "") + '" placeholder="A" inputmode="numeric"' + ro + '>' +
-          '<input class="grade" data-id="' + r.id + '" data-k="fh" value="' + esc(fin.fh || "") + '" placeholder="H" inputmode="numeric"' + ro + '></span> ' + f5 +
-          (lk ? ' <span class="lock" title="Graded and locked">&#128274;</span>' : '') + '<br>' + close + '</td>' +
-        '<td>' + (lk
-          ? '<button type="button" class="x unlock" data-unlock="' + r.id + '" title="Unlock to correct the score">unlock</button>'
-          : (unlocked[r.id] ? '<button type="button" class="x unlock" data-relock="' + r.id + '" title="Lock again">lock</button>' : '') +
-            '<button type="button" class="x" data-del="' + r.id + '" title="Remove">×</button>') + '</td></tr>';
+        (vd
+          ? '<td class="voided"><span class="finals"><span class="l">VOID</span><span class="voidtag" title="Postponed or no action: nothing on this row is graded or counted">no action · postponed</span></span><br>' + close + '</td>'
+          : '<td' + (lk ? ' class="locked"' : '') + '><span class="finals"><span class="l">FINAL</span><input class="grade" data-id="' + r.id + '" data-k="fa" value="' + esc(fin.fa || "") + '" placeholder="A" inputmode="numeric"' + ro + '>' +
+            '<input class="grade" data-id="' + r.id + '" data-k="fh" value="' + esc(fin.fh || "") + '" placeholder="H" inputmode="numeric"' + ro + '></span> ' + f5 +
+            (lk ? ' <span class="lock" title="Graded and locked">&#128274;</span>' : '') + '<br>' + close + '</td>') +
+        '<td>' + (vd
+          ? '<button type="button" class="x unlock" data-unvoid="' + r.id + '" title="Take the void off: the finals come back as typed">undo void</button>'
+          : (lk
+            ? '<button type="button" class="x unlock" data-unlock="' + r.id + '" title="Unlock to correct the score">unlock</button>'
+            : (unlocked[r.id] ? '<button type="button" class="x unlock" data-relock="' + r.id + '" title="Lock again">lock</button>' : '') +
+              '<button type="button" class="x" data-del="' + r.id + '" title="Remove">×</button>') +
+            '<button type="button" class="x voidbtn" data-void="' + r.id + '" title="Postponed or no action: mark the row void. It stays on the card, greyed, and counts nowhere.">void</button>') + '</td></tr>';
     });
     $("cardTable").innerHTML = h + '</tbody></table>';
   }
@@ -2147,6 +2159,14 @@
       if (victim && rowLocked(victim)) return;
       card = card.filter(function (r) { return String(r.id) !== b.dataset.del; });
       save(); renderCard(); renderBoard(); renderCalib();
+    } else if (b.dataset.void || b.dataset.unvoid) {
+      var vrow = card.filter(function (r) { return String(r.id) === (b.dataset.void || b.dataset.unvoid); })[0];
+      if (!vrow) return;
+      vrow.finals = vrow.finals || {};
+      if (b.dataset.void) { vrow.finals.void = true; delete unlocked[vrow.id]; } else { delete vrow.finals.void; }
+      save(); renderCard(); renderBoard(); renderCalib();
+      if (opened && opened.id === vrow.id) { opened.row = vrow; render(); }
+      say(b.dataset.void ? "<b>" + esc(vrow.matchup) + "</b> is void: postponed or no action. It stays on the card, greyed, and counts nowhere; undo void brings the finals back." : "<b>" + esc(vrow.matchup) + "</b> is live again.");
     } else if (b.dataset.open) {
       openRow(b.dataset.open);
     }

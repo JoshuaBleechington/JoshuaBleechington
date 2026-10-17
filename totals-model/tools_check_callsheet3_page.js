@@ -247,6 +247,38 @@ const CHECKS = ["dome","playoff","agconf","hgconf","agbk","hgbk"];
   chk(nba.nbaBlock.length >= 4 && nba.nbaBlock.some(t => /First half/.test(t)) && nba.nbaBlock.some(t => /Spread/.test(t)) && /First half projected/.test(nba.calib), 'nba: the record has an NBA block with first-half and spread tiles and the half in the forecast line', JSON.stringify(nba.nbaBlock));
   chk(/at the half 46–54/.test(nba.final) && /Final: Raptors 101, Celtics 115/.test(nba.final) && /Jaylen Brown/.test(nba.reopened), 'nba: reopening the graded row prints the final with the half-time score and the who-is-out list', nba.final + ' | ' + nba.reopened.slice(0, 80));
 
+  // ---- a void row (17 Oct 2026): postponed, counts nowhere, undo brings it back --------
+  const voided = await pg.evaluate(async () => {
+    const wait = () => new Promise(r => setTimeout(r, 60));
+    const set = (id, v) => { const el = document.getElementById(id); el.value = v; el.dispatchEvent(new Event('input', { bubbles: true })); };
+    document.getElementById('clear').click(); document.getElementById('m-mlb').click(); await wait();
+    document.getElementById('boardDate').value = '2026-11-30';
+    set('gdate', '2026-11-30'); set('away', 'Brewers'); set('home', 'Dodgers'); set('line', '8'); set('op', '-105'); set('up', '-115'); set('hml', '-150'); set('aml', '125'); await wait();
+    document.getElementById('add').click(); await wait();
+    const tr = () => [...document.querySelectorAll('#cardTable tr')].find(t => /Brewers @ Dodgers/.test(t.textContent) && /Nov 30/.test(t.textContent));
+    const g = (k, v) => { const el = tr().querySelector(`.grade[data-k="${k}"]`); el.value = v; el.dispatchEvent(new Event('input', { bubbles: true })); el.dispatchEvent(new Event('change', { bubbles: true })); };
+    g('f5a', '4'); g('f5h', '4'); g('fa', '6'); g('fh', '4'); await wait();
+    const mlbHead = () => (document.querySelector('#calibBox .subhead[data-sport="MLB"]') || {}).textContent || '';
+    const gradedBefore = mlbHead();
+    const chipsBefore = [...tr().querySelectorAll('.rowmk .chip.win, .rowmk .chip.loss, .rowmk .chip.push')].length;
+    document.getElementById('boardDate').dispatchEvent(new Event('change')); await wait();
+    const boardBefore = document.querySelectorAll('#board tbody tr').length;
+    tr().querySelector('[data-void]').click(); await wait();
+    const rowCls = tr().className, tag = (tr().querySelector('.voidtag') || {}).textContent || '', chipsAfter = [...tr().querySelectorAll('.rowmk .chip.win, .rowmk .chip.loss, .rowmk .chip.push')].length;
+    const gradedAfter = mlbHead(), boardAfter = document.querySelectorAll('#board tbody tr').length;
+    const stored = JSON.parse(localStorage.getItem('callsheet3.card.v1')).find(r => /Brewers @ Dodgers/.test(r.matchup) && r.gdate === '2026-11-30').finals;
+    const hasUndo = !!tr().querySelector('[data-unvoid]'), hasInputs = !!tr().querySelector('.grade[data-k="fa"]');
+    tr().querySelector('[data-unvoid]').click(); await wait();
+    const chipsBack = [...tr().querySelectorAll('.rowmk .chip.win, .rowmk .chip.loss, .rowmk .chip.push')].length, gradedBack = mlbHead(), faBack = tr().querySelector('.grade[data-k="fa"]').value;
+    document.getElementById('clear').click(); await wait();
+    return { gradedBefore, gradedAfter, gradedBack, chipsBefore, chipsAfter, chipsBack, boardBefore, boardAfter, rowCls, tag, stored, hasUndo, hasInputs, faBack };
+  });
+  const gradedN = s => { const m = s.match(/(\d+) graded game/); return m ? +m[1] : (/nothing graded/.test(s) ? 0 : -1); };
+  chk(voided.chipsBefore > 0 && voided.chipsAfter === 0 && voided.rowCls === 'void' && voided.tag === 'no action · postponed' && voided.stored.void === true && voided.stored.fa === '6' && voided.hasUndo && !voided.hasInputs,
+      'void: the row goes grey with VOID on it, its grades vanish, the finals stay stored and an undo button replaces the score boxes', JSON.stringify({ before: voided.chipsBefore, after: voided.chipsAfter, cls: voided.rowCls, tag: voided.tag, stored: voided.stored }));
+  chk(gradedN(voided.gradedBefore) - gradedN(voided.gradedAfter) === 1 && voided.boardBefore > voided.boardAfter && gradedN(voided.gradedBack) === gradedN(voided.gradedBefore) && voided.chipsBack === voided.chipsBefore && voided.faBack === '6',
+      'void: the record and the board leave the row out, and undo void brings the grades and the typed finals back', JSON.stringify({ gradedBefore: voided.gradedBefore, gradedAfter: voided.gradedAfter, gradedBack: voided.gradedBack, board: [voided.boardBefore, voided.boardAfter], chipsBack: voided.chipsBack }));
+
   // ---- the hockey upset signal (16 Oct 2026): the dog's backup lifts the dog, the moneyline becomes pickable, the board's upset watch lists it ----
   const upset = await pg.evaluate(async () => {
     const wait = () => new Promise(r => setTimeout(r, 60));

@@ -303,6 +303,10 @@
            background: var(--surface-2); border: 1px solid var(--rule); }
   .final b { color: var(--ink); }
   td.locked .grade { background: var(--surface-2); color: var(--ink-2); border-style: dashed; }
+  tr.void td { opacity: .55; }
+  tr.void td.voided, tr.void td:last-child { opacity: 1; }
+  .voidtag { display: inline-block; font: 700 10px/1 var(--sans); letter-spacing: .06em; text-transform: uppercase; color: var(--bad); border: 1px dashed var(--bad); padding: 5px 7px; border-radius: 4px; }
+  .x.voidbtn { color: var(--muted); }
   .lock { font-size: 13px; vertical-align: 1px; margin-left: 4px; }
   .x.unlock { font: 700 10px/1 var(--sans); letter-spacing: .06em; text-transform: uppercase; }
   .f input:disabled, .f select:disabled, .f textarea:disabled { background: var(--surface-2); color: var(--ink-2); border-style: dashed; cursor: not-allowed; }
@@ -348,7 +352,7 @@
   <header class="top">
     <div>
       <div class="eyebrow"><span id="eyebrow">MLB · every market on the game</span>
-        <span class="build">· build <span id="build">2026-10-16</span></span></div>
+        <span class="build">· build <span id="build">2026-10-17</span></span></div>
       <h1>Call Sheet <em>2.0</em></h1>
       <p>One matchup, every market the book posts on it — the full-game total, the first five,
          the moneyline and the run line — priced off the book's own numbers and <b>ranked by edge</b>, with

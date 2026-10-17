@@ -24,7 +24,7 @@ import sys
 ROOT = pathlib.Path(__file__).parent / "web"
 OPEN = "  /* ===== ENGINE BLOCK."
 CLOSE = "  /* ===== END ENGINE BLOCK ===== */"
-STAMP = "2026-10-16"   # bumped by hand when 3.0's own sources change (the harness checks it)
+STAMP = "2026-10-17"   # bumped by hand when 3.0's own sources change (the harness checks it)
 
 
 def engine_block() -> str:
@@ -208,11 +208,12 @@ def tail() -> str:
     t = every(t, '"callsheet2.draft.v1"', '"callsheet3.draft.v1"', "draft key", 1)
     t = every(t, '"callsheet2.slate.v1"', '"callsheet3.slate.v1"', "slate key", 1)
     t = once(t, 'format: "callsheet2.backup"', 'format: "callsheet3.backup"', "backup format")
-    t = once(t, 'name = "callsheet2-" + todayISO() + ".json"', 'name = "callsheet3-" + todayISO() + ".json"', "backup name")
+    t = once(t, 'name = "callsheet2-" + todayISO() + ".json"', 'name = "the-super-model-" + todayISO() + ".json"', "backup name")   # 17 Oct 2026, the user: "can it say The Super Model"
+    t = once(t, 'var out = ["Call Sheet 2.0 — " + gameDate(dateISO)];', 'var out = ["The Super Model — " + gameDate(dateISO)];', "board text header")
     t = once(t, '        if (d.format !== "callsheet2.backup" || !Array.isArray(d.card)) throw new Error("not a Call Sheet 2.0 backup");\n'
                 '        card = d.card; save(); renderCard(); renderBoard(); renderCalib();\n'
                 '        if (d.draft && d.draft.inputs) {',
-             '        if ((d.format !== "callsheet3.backup" && d.format !== "callsheet2.backup") || !Array.isArray(d.card)) throw new Error("not a Call Sheet 3.0 or 2.0 backup");\n'
+             '        if ((d.format !== "callsheet3.backup" && d.format !== "callsheet2.backup") || !Array.isArray(d.card)) throw new Error("not a Super Model or Call Sheet backup");\n'
              '        /* A 3.0 backup is a restore: it replaces the card. A 2.0 backup is a\n'
              '           move: its rows join the card, baseball and basketball alike, and a\n'
              '           matchup already here (same sport, teams and date) is left as it\n'

@@ -163,16 +163,14 @@ const CHECKS = ["dome","playoff"];
       flow.bests.join('|') + ' vs ' + flow.rows.filter(r => r.edge > 0 && r.pick !== 'UNDER 6.5').map(r => r.pick).join('|'));
   chk(flow.rows.some(r => /Rays \+1\.5/.test(r.pick) && r.edge > 0) && !flow.bests.some(p => /Rays \+1\.5/.test(p)),
       'board: a run line with a positive edge is on the table but not among the straight bets', flow.bests.join('|'));
-  // The parlay legs: one per game, only where a side clears its price (no price cap since 1 Oct).
-  // Game 1 (Rays @ Yankees) has several; game 2 (Rockies @ Dodgers, -110/-110 and a -300 ML) has none.
-  chk(flow.picks.length === 1 && flow.picks[0] === 'UNDER 6.5',
-      'parlay: only the game with a leg that clears its price contributes one, and it is #1\'s BET on the total', flow.picks.join('|'));
-  chk(flow.pickBands.length === 1 && flow.pickBands[0] === 'BET',
-      'parlay: the leg card carries Call Sheet #1\'s band chip', flow.pickBands.join('|'));
-  // The likelier side is read among the PICKABLE sides only: Rays +1.5 (62.8%) is on the game but shown, not picked.
-  chk(flow.swaps.length === 2 && /Call Sheet #1 says BET on this total and it clears its price/.test(flow.swaps[0]) &&
-      /Likelier on this game: F5 UNDER 3\.5/.test(flow.swaps[1]) && /better value/.test(flow.swaps[1]) && !/Rays \+1\.5/.test(flow.swaps.join('|')),
-      'parlay: the card says the leg is #1\'s verdict and names the likelier pickable side it passed on, never the run line', flow.swaps.join('|'));
+  // The parlay legs from 19 Oct 2026: the likeliest priced side on each game, at any price (the user: "the likelier
+  // instead of the edge"). Game 2's -300 Dodgers moneyline is its likeliest side; game 1's is Rays +1.5 at 62.8%.
+  chk(flow.picks.length === 2 && /Dodgers ML/.test(flow.picks[0]) && /Rays \+1\.5/.test(flow.picks[1]),
+      'parlay: one leg a game, the likeliest side on each, likeliest first', flow.picks.join('|'));
+  chk(flow.pickBands.every(b => b === ''), 'parlay: neither likeliest side carries #1\'s band (the band belongs to the total)', flow.pickBands.join('|'));
+  chk(flow.swaps.some(s => /The likeliest side on this game\. [-−]300 needs 75\.0%: the book's price, not an edge/.test(s)) &&
+      flow.swaps.some(s => /The value on this game was UNDER 6\.5 .* the better price, the less likely result/.test(s)),
+      'parlay: each card says the leg is the likeliest side and whether its price agrees, and names the value leg it replaced', flow.swaps.join('|'));
   chk(!flow.rows[0].corr && flow.rows.slice(1).some(r => r.corr), 'board: the first row is never flagged; a later same-game row is',
       flow.rows.map(r => r.corr).join(','));
   chk(flow.rows.some(r => /Dodgers|Rockies/.test(r.pick) && r.edge < 0) && !flow.bests.some(p => /ML/.test(p) && /Dodgers/.test(p)),
@@ -256,8 +254,8 @@ const CHECKS = ["dome","playoff"];
   });
   chk(!dflt.checked && /^(the pick, then the rest by edge|no pick yet|the total only)/.test(dflt.tag), 'default: the rail shows the pick, then the rest by edge; the table by chance unless edge is ticked', dflt.tag);
   chk(dflt.rows.every((p, i) => i === 0 || p <= dflt.rows[i - 1] + 1e-9), 'default: board ordered by chance, best first', dflt.rows.join(' > '));
-  chk(/Only one leg clears its price/.test(dflt.parlayNote),
-      'parlay: the bare WNBA row (market only, under at -155 needing 60.8%) has no leg that clears its price, so the board says one leg is not a parlay', dflt.parlayNote.slice(0, 160));
+  chk(/ALL [2-4] HIT/.test(dflt.parlay) && dflt.parlayNote === '',
+      'parlay: the bare WNBA row (market only, under at -155) now contributes its likeliest side like any other game, so the date makes a parlay card', (dflt.parlay || dflt.parlayNote).slice(0, 160));
 
   // ---- a real parlay card: add a game whose best leg clears its price -------------
   const parlayCard = await pg.evaluate(async () => {
@@ -290,23 +288,23 @@ const CHECKS = ["dome","playoff"];
     const text = await (async () => { document.getElementById('copy').click(); await wait(); return ''; })();
     return { card, legs, ratios, band1: total.band1, side1: total.side1, rail };
   });
-  chk(/ALL 2 HIT/.test(parlayCard.card) && /fair parlay/.test(parlayCard.card) && /worth/.test(parlayCard.card) && /1 game had no side that clears its price/.test(parlayCard.card),
-      'parlay: two games with a leg that clears its price make a parlay card with the all-hit chance, fair price, value multiple and the count of games passed over', parlayCard.card.slice(0, 220));
-  // Both legs on this date carry a verdict: Rays @ Yankees UNDER 6.5 (BET) and this one (BET).
-  chk(/Every leg carries Call Sheet #1's BET or better\. Every leg clears its own price/.test(parlayCard.card),
-      'parlay: the card counts the legs that carry #1\'s verdict', parlayCard.card.slice(0, 300));
-  chk(parlayCard.legs.every(l => /edge \+/.test(l.n3)), 'parlay: every leg on the card has a positive edge', parlayCard.legs.map(l => l.pick + ' ' + l.n3).join(' || '));
+  // From 19 Oct 2026 the four are the likeliest side on each game at any price: four games on this date, so four legs,
+  // the -300 Dodgers moneyline among them, and the card counts the legs whose price agrees rather than the verdicts.
+  chk(/ALL 4 HIT/.test(parlayCard.card) && /pays [+-−]\d+ \([\d.]+×\) needs [\d.]+%/.test(parlayCard.card) && /worth/.test(parlayCard.card) && /The likeliest side on each game\. 3 of the 4 legs clear their price; the rest are the book's price, not an edge/.test(parlayCard.card),
+      'parlay: four games make a four-leg card with the all-hit chance, the book\'s multiplied price and what it needs, the value multiple, and the count of legs whose price agrees', parlayCard.card.slice(0, 300));
+  chk(parlayCard.legs.length === 4 && parlayCard.legs.some(l => /Dodgers ML/.test(l.pick) && /edge [-−]/.test(l.n3)),
+      'parlay: a leg can carry a negative edge now, because it is there as the likelier result, not the better price', parlayCard.legs.map(l => l.pick + ' ' + l.n3).join(' || '));
   const gLeg = parlayCard.legs.find(l => /Guardians/.test(l.game)) || {};
   chk(parlayCard.band1 === 'BET' && parlayCard.side1 === 'UNDER' && parlayCard.ratios['F5 UNDER 3.5'] > parlayCard.ratios['UNDER 6.5'] && parlayCard.ratios['UNDER 6.5'] > 1,
       'fixture: the under is #1\'s BET, it clears -135, and the first-five under at -110 out-values it',
       JSON.stringify({ band1: parlayCard.band1, side1: parlayCard.side1, ratios: parlayCard.ratios }));
   chk(gLeg.pick === 'UNDER 6.5' && gLeg.band === 'BET',
-      'parlay: #1\'s verdict is the leg even though a side with no verdict has the richer price on the same game', JSON.stringify(gLeg));
-  chk(/Call Sheet #1 says BET on this total and it clears its price — F5 UNDER 3.5 .* is the richer price on this game but carries no verdict/.test(gLeg.note || ''),
-      'parlay: the card names the richer-priced side it passed over', gLeg.note);
-  const legRatio = l => { const m = /^([\d.]+)% · ([+-]\d+)/.exec(l.n3); const p = +m[1] / 100, pr = +m[2]; return p / (pr < 0 ? -pr / (-pr + 100) : 100 / (pr + 100)); };
-  chk(parlayCard.legs.length === 2 && parlayCard.legs.every(l => l.band) && legRatio(parlayCard.legs[0]) >= legRatio(parlayCard.legs[1]),
-      'parlay: two verdict legs rank by value, the richer first', parlayCard.legs.map(l => l.game.slice(0, 18) + ' ' + l.pick + (l.band ? ' [' + l.band + ']' : '') + ' ' + legRatio(l).toFixed(3)).join(' | '));
+      'parlay: the likeliest side on the Guardians game is the under, which is also #1\'s verdict, and the card keeps the band chip', JSON.stringify(gLeg));
+  chk(/The likeliest side on this game\. [-−]135 needs 57\.4%: the price agrees\. Call Sheet #1 says BET\./.test(gLeg.note || ''),
+      'parlay: the card says the leg is the likeliest side, that its price agrees, and that #1 calls it a BET', gLeg.note);
+  const legP = l => +(/^([\d.]+)%/.exec(l.n3) || [0, 0])[1];
+  chk(parlayCard.legs.every((l, i) => i === 0 || legP(l) <= legP(parlayCard.legs[i - 1]) + 1e-9),
+      'parlay: the legs rank by chance, likeliest first', parlayCard.legs.map(l => l.game.slice(0, 18) + ' ' + l.pick + ' ' + legP(l) + '%').join(' | '));
   chk(parlayCard.rail.some(t => /parlay leg: UNDER 6.5 .* · #1 says BET/.test(t)), 'rail: the green mark names the verdict leg and #1\'s call', parlayCard.rail.join(' | '));
 
   // ---- a verdict the price does not clear still makes the straight bets -----------

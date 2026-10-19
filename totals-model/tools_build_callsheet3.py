@@ -159,7 +159,7 @@ def tail() -> str:
     t = once(t, "      var f5 = r.sport === \"MLB\"\n        ? '<span class=\"finals\"><span class=\"l\">F5</span>",
              "      var f5 = r.sport !== \"WNBA\"\n        ? '<span class=\"finals\"><span class=\"l\">' + (r.sport === \"NHL\" ? \"P1\" : r.sport === \"NBA\" ? \"1H\" : \"F5\") + '</span>", "period finals")
     t = once(t, 'WNBA: [["total","Full-game total"],["ml","Moneyline"],["spread","Spread"]] };',
-             'NHL: [["total","Full-game total"],["p1","First period"],["ml","Moneyline"],["pl","Puck line"]],\n'
+             'NHL: [["total","Full-game total"],["p1","First period"],["ml","Moneyline"],["pl","Puck line"],["alt","Alternate totals"]],\n'
              '                 NBA: [["total","Full-game total"],["h1","First half"],["ml","Moneyline"],["spread","Spread"]],\n'
              '                 WNBA: [["total","Full-game total"],["ml","Moneyline"],["spread","Spread"]] };', "calib keys")
     t = every(t, '["MLB", "WNBA"]', '["MLB", "NHL", "NBA", "WNBA"]', "sport loops", 4)

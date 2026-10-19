@@ -849,3 +849,32 @@ The favourite's backup and the favourite's back to back are named as NOT
 upset signals, so the Backup tick is read the right way round: it is the
 dog's tick that matters. The NBA has its own watch with nothing scored
 (NBA.md).
+
+## The alternate totals with a verdict, and the likelier parlay four, 19 Oct 2026
+
+The user, testing by typing an alternate number into the Line box: "for the
+NHL model add the strong bets, max bets to the cards as well... the Sharks vs
+Maple Leafs shows max bet over the 5.5 total." Then: "do the same thing for
+the parlay four as well, with the likelier on this game showing the likelier
+instead of the edge."
+
+**The alternate total.** The hockey engine now prices every alternate number
+the odds file carries on the sheet's side with the same projection split, and
+the one that reads STRONG BET or MAX BET with an edge becomes a market of its
+own, `alt`: on the rail as a row and as a card under the pick, on the board in
+its own section and in the table, and graded as the full game at its own
+number on its own record tile, "Alternate totals". It is never the pick and
+never a value leg. The band is the chance, as on the main number, and the
+card says what that means: at −215 the book already asks for 68%, so a MAX
+BET at 72% is four points of edge, and the edge is the figure to read. The
+Line box stays on the main number.
+
+**The parlay four.** From today each game's leg is the likeliest priced side
+on the game at any price, the alternate included, ranked by chance; the card
+says whether the price agrees and names the value side it passed over. Up to
+today the four were the best value legs with #1's verdicts first, and under
+that rule they went 17-14-2 in MLB and 13-16 in the NHL. The tile is now "The
+parlay four, likelier legs" and grades the four as the board builds them. The
+honest expectation, from the likeliest-at-any-price record (160-83, −3.9u)
+and the two-leg parlays (57-82, −27.6u): four favourites at the book's
+prices will hit often and pay less than they should. The record decides.

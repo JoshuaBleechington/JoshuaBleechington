@@ -92,7 +92,8 @@ const CHECKS = ["dome","playoff","agconf","hgconf","agbk","hgbk"];
   }, [sport, inputs, IDS, CHECKS]);
 
   for (const c of CASES) {
-    const got = await fill(c.sport, c.inputs);
+    // the alternate total (19 Oct 2026) is a page-only market built from the odds file; the Python engine has no such row
+    const got = (await fill(c.sport, c.inputs)).filter(m => m.key !== 'alt');
     const w = c.expect, tag = `${c.sport} · ${c.name}`;
     chk(got.length === w.markets.length, `${tag}: ${w.markets.length} markets`, `page drew ${got.length}`);
     chk(got.map(m => m.key).join('>') === w.markets.map(m => m.key).join('>'),
@@ -160,7 +161,9 @@ const CHECKS = ["dome","playoff","agconf","hgconf","agbk","hgbk"];
   chk(flow.rail.filter(r => r.key === 'ml' || r.key === 'pl').every(r => r.chips.some(c => /shown, not picked/.test(c))), 'rail: the moneyline and puck line carry the shown-not-picked chip', JSON.stringify(flow.rail));
   chk(flow.boardRows.filter(r => /Moneyline|Puck line/.test(r.market)).every(r => r.notPicked) && flow.boardRows.filter(r => /total|period/i.test(r.market)).every(r => !r.notPicked),
       'board: moneyline and puck line are marked not picked; the total and first period are not', JSON.stringify(flow.boardRows));
-  chk(!flow.bets.some(t => /Moneyline|Puck line/.test(t)) && !flow.legs.some(t => /Moneyline|Puck line/.test(t)), 'picks: no puck line or moneyline reaches the straight bets or the parlay legs', JSON.stringify({ bets: flow.bets, legs: flow.legs }));
+  chk(!flow.bets.some(t => /Moneyline|Puck line/.test(t)), 'picks: no puck line or moneyline reaches the straight bets', JSON.stringify({ bets: flow.bets }));
+  // the parlay four from 19 Oct 2026: the likeliest side on each game at any price, so a moneyline or a puck line can be a leg
+  chk(flow.legs.length === 2 && flow.legs.every(t => /Rangers @ Bruins|Maple Leafs @ Canadiens/.test(t)), 'picks: the parlay four takes the likeliest side on each of the two games, whatever market it sits in', JSON.stringify({ legs: flow.legs }));
   chk(/P1/.test(flow.label), 'card: the period score boxes are labelled P1 on a hockey row', flow.label);
   const byPick = Object.fromEntries(flow.graded.map(x => [x.pick, x.res]));
   chk(flow.graded.length === 4 && flow.graded.every(x => x.res), 'grade: all four hockey markets grade from a final and a first period', JSON.stringify(flow.graded));
@@ -611,7 +614,7 @@ const CHECKS = ["dome","playoff","agconf","hgconf","agbk","hgbk"];
   chk(/The favourite, by price/.test(twoDays.favText) && /−149 to −120\s*[1-9]\d*\s*\d+\.\d%\s*\d+\.\d%\s*\d+\.\d%\s*\d+\.\d%\s*[+-]\d+\.\d%/.test(twoDays.favText) && /two seasons at the close\s*828\s*54\.0%\s*57\.1%\s*68\.6%\s*31\.4%\s*-5\.5%/.test(twoDays.favText),
       'the favourite by price: the record section tables the favourite\'s record, the dog +1.5 and the return by price, with the two-season baseline in grey', twoDays.favText.slice(0, 600));
   chk(twoDays.d12.chips.some(c => /shown, not picked/.test(c)) && /11 and 12 Oct/.test(twoDays.d12.title), 'the week: on 12 Oct the first period is shown, not picked, and the chip says why', JSON.stringify(twoDays.d12));
-  chk(/not picked/.test(twoDays.boardP1) && !/First period/.test(twoDays.legs), 'two days: the board marks the first period not picked and no first-period leg is offered', JSON.stringify({ board: twoDays.boardP1, legs: twoDays.legs }));
+  chk(/not picked/.test(twoDays.boardP1), 'two days: the board marks the first period not picked', JSON.stringify({ board: twoDays.boardP1 }));
   chk(!twoDays.d14.chips.some(c => /shown, not picked/.test(c)), 'the week: on 20 Oct the first period picks as before', JSON.stringify(twoDays.d14));
   chk(twoDays.pick20.has && twoDays.pick20.others && twoDays.pick20.rows.indexOf('total') >= 0 && twoDays.pick20.rows.indexOf('p1') >= 0 &&
       (twoDays.pick20.none ? (/book/.test(twoDays.pick20.why) && twoDays.pick20.open === true && twoDays.pick20.tag === 'no pick yet')
@@ -938,6 +941,65 @@ const CHECKS = ["dome","playoff","agconf","hgconf","agbk","hgbk"];
       && propsEx.whys.some(w => /Knicks allow 0\.97x the league's points per minute to guards \(this season 0\.95 over 16 games, last season 0\.99\): x0\.978 at 0\.75 weight, measured/.test(w)) && propsEx.whys.some(w => /HashtagBasketball: 76ers allow/.test(w)),
       'props example: the why lines are the slate\'s own, the regulars-out rule, the defence factor, the website\'s rank and the listed-out man', JSON.stringify(propsEx.whys.slice(0, 2)).slice(0, 600));
   chk(propsEx.saved === null && propsEx.tileSame && propsEx.after === propsEx.before, 'props example: nothing is saved or graded, and a sport button puts it away', JSON.stringify({ saved: propsEx.saved, same: propsEx.tileSame, before: propsEx.before, after: propsEx.after }));
+
+  // ---- 19 Oct 2026: the alternate total with a verdict -- a market of its own on the rail, the board and the record;
+  //      and the parlay four takes the likeliest side on each game, the alternate included ----
+  const altT = await pg.evaluate(async () => {
+    const wait = () => new Promise(r => setTimeout(r, 80));
+    const set = (id, v) => { const el = document.getElementById(id); el.value = v; el.dispatchEvent(new Event('input', { bubbles: true })); };
+    localStorage.removeItem('callsheet3.card.v1');
+    document.getElementById('clear').click(); document.getElementById('m-nhl').click(); await wait();
+    set('gdate', '2026-11-09'); document.getElementById('example').click(); await wait();
+    set('gdate', '2026-11-09');
+    // the odds file's shop: the main 6 at -110/-110 and the alternates. The example projects 6.04, so the sheet's side is the
+    // under; the under 7 at -150 (needs 60.0%, the sheet 70.9%) reads MAX BET with an edge, the under 6.5 at -120 STRONG BET
+    // with less, the under 5.5 at +150 no band: the best edge with a verdict is the leg
+    set('odds', JSON.stringify({ total: { OVER: [['fanatics', -110, 6]], UNDER: [['fanatics', -110, 6]] },
+                                 alt: { OVER: [['fanatics', 115, 7], ['fanatics', -105, 6.5], ['fanatics', -180, 5.5]], UNDER: [['fanatics', -150, 7], ['fanatics', -120, 6.5], ['fanatics', 150, 5.5]] },
+                                 book: 'fanatics' })); await wait();
+    const side = (document.querySelector('#markets .mk[data-key="total"] .pick') || {}).childNodes;
+    const totalSide = side && side.length ? side[0].textContent.trim() : '';
+    const altRow = document.querySelector('#markets .mk[data-key="alt"]');
+    const alt = altRow ? { pick: altRow.querySelector('.pick').childNodes[0].textContent.trim(), band: (altRow.querySelector('.band') || {}).textContent || '', p: parseFloat(altRow.querySelector('.p').textContent),
+                           chips: [...altRow.querySelectorAll('.cap')].map(c => c.textContent), edge: altRow.querySelector('.e').textContent,
+                           detail: (altRow.nextElementSibling && altRow.nextElementSibling.classList.contains('mkdetail')) ? altRow.nextElementSibling.textContent : '' } : null;
+    const altCard = (document.querySelector('#markets .altcard') || {}).textContent || '';
+    const pickKey = (document.querySelector('#markets .pickcard') || {}).getAttribute ? document.querySelector('#markets .pickcard').getAttribute('data-key') : '';
+    document.getElementById('add').click(); await wait();
+    document.getElementById('boardDate').value = '2026-11-09'; document.getElementById('boardDate').dispatchEvent(new Event('change')); await wait();
+    const stored = JSON.parse(localStorage.getItem('callsheet3.card.v1'))[0];
+    const altMk = stored.markets.find(m => m.key === 'alt');
+    const board = [...document.querySelectorAll('#altBets .pk')].map(e => e.innerText.replace(/\s+/g, ' ').trim());
+    const headHidden = document.getElementById('altBetsHead').hidden;
+    const legs = [...document.querySelectorAll('#picks .pk:not(.parlay)')].map(e => ({ pick: e.querySelector('.n2').childNodes[0].textContent.trim(), n1: e.querySelector('.n1').textContent, swaps: [...e.querySelectorAll('.swap')].map(s => s.textContent) }));
+    const parlay = (document.querySelector('#picks .pk.parlay') || {}).textContent || '';
+    const tableAlt = [...document.querySelectorAll('#board tbody tr')].map(tr => tr.querySelectorAll('td')[2].textContent).filter(t => /Alternate/.test(t));
+    // grade: a 3-2 game -- the under 7 wins
+    const tr = () => [...document.querySelectorAll('#cardTable tr')].find(t => /Rangers @ Bruins/.test(t.textContent));
+    const g = (k, v) => { const el = tr().querySelector(`.grade[data-k="${k}"]`); el.value = v; el.dispatchEvent(new Event('input', { bubbles: true })); el.dispatchEvent(new Event('change', { bubbles: true })); };
+    g('fa', '2'); g('fh', '3'); await wait();
+    const after = JSON.parse(localStorage.getItem('callsheet3.card.v1'))[0];
+    const tile = [...document.querySelectorAll('#calibBox .calib[data-sport="NHL"] > div')].map(d => d.innerText.replace(/\s+/g, ' ').trim()).find(t => /Alternate totals/i.test(t)) || '';
+    const boardAfter = [...document.querySelectorAll('#altBets .pk')].map(e => e.innerText.replace(/\s+/g, ' ').trim());
+    const text = (() => { return ''; })();
+    localStorage.removeItem('callsheet3.card.v1');
+    document.getElementById('clear').click(); await wait();
+    return { totalSide, alt, altCard, pickKey, altMk: altMk ? { pick: altMk.pick, band: altMk.band, point: altMk.point, book: altMk.book, price: altMk.price } : null, board, headHidden, legs, parlay, tableAlt, tile, boardAfter, keys: stored.markets.map(m => m.key) };
+  });
+  chk(altT.totalSide === 'UNDER 6' && altT.alt && altT.alt.pick === 'UNDER 7' && altT.alt.band === 'MAX BET' && altT.alt.p > 70 && /edge \+1[01]\./.test(altT.alt.edge) && altT.alt.chips.some(c => /shown, not picked/.test(c)),
+      'alternates: the under 7 at -150 lists as its own market with the MAX BET band and a ten-point edge, shown not picked; the under 6.5 with the smaller edge and the bandless under 5.5 do not', JSON.stringify(altT.alt));
+  chk(/An alternate number at Fanatics, priced by the same projection of 6\.04 split at 7: UNDER 7 70\.9% against [-−]150, which needs 60\.0%/.test(altT.alt ? altT.alt.detail : '') && /The band is the chance, as on the main number/.test(altT.alt ? altT.alt.detail : ''),
+      'alternates: the row\'s note names the book, the projection, the number and the reading of the band', (altT.alt ? altT.alt.detail : '').slice(0, 260));
+  chk(/Alternate total · MAX BET · not the pick/.test(altT.altCard) && /UNDER 7/.test(altT.altCard) && /[-−]150 at Fanatics needs 60\.0%: edge \+1[01]\./.test(altT.altCard) && altT.pickKey === 'total',
+      'alternates: a card under the pick carries the band, the price and what it needs, and the pick stays on the main number', altT.altCard.slice(0, 200) + ' | pick ' + altT.pickKey);
+  chk(altT.altMk && altT.altMk.point === 7 && altT.altMk.book === 'fanatics' && altT.altMk.price === -150 && altT.altMk.band === 'MAX BET' && altT.keys.indexOf('alt') >= 0,
+      'alternates: the row stores the alternate as a market with its number, book and band', JSON.stringify(altT.altMk) + ' ' + altT.keys.join(','));
+  chk(!altT.headHidden && altT.board.length === 1 && /#1 · MAX BET · the price agrees/.test(altT.board[0]) && /UNDER 7/.test(altT.board[0]) && /Rangers @ Bruins · Alternate total 7 at Fanatics/.test(altT.board[0]) && altT.tableAlt.length === 1,
+      'alternates: the board section shows the alternate with its band, and the table lists it', JSON.stringify(altT.board) + ' ' + JSON.stringify(altT.tableAlt));
+  chk(altT.legs.length === 1 && altT.legs[0].pick === 'UNDER 7' && altT.legs[0].swaps.some(s => /The likeliest side on this game, an alternate number\. [-−]150 needs 60\.0%: the price agrees\. Call Sheet #1 says MAX BET\./.test(s)) && altT.legs[0].swaps.some(s => /The value on this game was UNDER 6 /.test(s)),
+      'the parlay four: the alternate under 7 is the likeliest side on the game and becomes its leg, the card saying so and naming the value side', JSON.stringify(altT.legs));
+  chk(altT.boardAfter.length === 1 && /\bwin\b/i.test(altT.boardAfter[0]), 'alternates: a 3-2 final grades the under 7 a win on the board card', JSON.stringify({ board: altT.boardAfter }));
+  chk(/Alternate totals 1-0/i.test(altT.tile), 'alternates: the record keeps its own tile', altT.tile.slice(0, 160));
 
   // ---- the build stamp ------------------------------------------------------------
   const stamp = await pg.evaluate(() => (document.getElementById('build') || {}).textContent);

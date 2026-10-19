@@ -367,7 +367,7 @@
   /* ---- grading ---------------------------------------------------------- */
   function lineOf(mk) {
     var m;
-    if (mk.key === "total" || mk.key === "f5") { m = /([0-9]+(?:\.[0-9]+)?)\s*$/.exec(mk.pick); return m ? +m[1] : 0; }
+    if (mk.key === "total" || mk.key === "f5" || mk.key === "alt") { m = /([0-9]+(?:\.[0-9]+)?)\s*$/.exec(mk.pick); return m ? +m[1] : 0; }
     if (mk.key === "ml") return 0;
     m = /([+-][0-9]+(?:\.[0-9]+)?)\s*$/.exec(mk.pick);
     var v = m ? +m[1] : 0;
@@ -382,7 +382,7 @@
     var fh = fin ? parseFloat(fin.fh) : NaN, fa = fin ? parseFloat(fin.fa) : NaN;
     var f5h = fin ? parseFloat(fin.f5h) : NaN, f5a = fin ? parseFloat(fin.f5a) : NaN;
     var line = lineOf(mk), total;
-    if (mk.key === "total" || mk.key === "f5") {
+    if (mk.key === "total" || mk.key === "f5" || mk.key === "alt") {   // an alternate total grades as the full game at its own number
       if (mk.key === "f5") {
         if (!isFinite(f5h) || !isFinite(f5a)) return null;
         /* A side's runs after five cannot exceed its final. Five rows on the
@@ -453,7 +453,8 @@
       return { key: m.key, label: m.label, pick: m.pick, side: m.side, p: +m.p.toFixed(5), pPush: +m.pPush.toFixed(5),
                price: m.price, edge: m.edge === null ? null : +m.edge.toFixed(5), fair: +m.fair.toFixed(1),
                anchored: m.anchored, band: m.band, band1: m.band1, side1: m.side1, other: m.other,
-               informed: m.informed === undefined ? undefined : !!m.informed };
+               informed: m.informed === undefined ? undefined : !!m.informed,
+               point: m.point, book: m.book };   // the alternate total's number and book (19 Oct 2026); undefined on every other market
     });
   }
 
@@ -665,9 +666,9 @@
     var pk = callView ? null : thePick(m.markets, sport, ($("gdate") || {}).value || "");
     if (pk) {
       if (pk.none) $("rankTag").textContent = "no pick yet";
-      html += pickBlock(pk, m, sport) + (upsetView ? upsetBlock(upsetView) : '') +
+      html += pickBlock(pk, m, sport) + (upsetView ? upsetBlock(upsetView) : '') + altBlock(m.markets, fin) +
         '<details class="others"' + (pk.none ? ' open' : '') + '><summary>' + (pk.none ? 'the markets, by edge' : 'the other markets, listed and graded, by edge') + '</summary>' + rows + '</details>';
-    } else html += (upsetView ? upsetBlock(upsetView) : '') + rows;
+    } else html += (upsetView ? upsetBlock(upsetView) : '') + altBlock(m.markets, fin) + rows;
     if (m.lamHome !== null) {
       var t = m.lamHome + m.lamAway, ha = m.lamAway / t * 100;
       html += '<div class="split"><i class="a" style="width:' + ha.toFixed(1) + '%">' + esc(m.away) + ' ' + m.lamAway.toFixed(sport === "WNBA" ? 1 : 2) + '</i>' +
@@ -717,7 +718,7 @@
      #1's side. Rows logged before band1/side1 were stored carry the band on
      the stored pick alone, and bothSides() gives the flipped side no band. */
   function bandOf(v) {
-    if (v.key !== "total") return "";
+    if (v.key !== "total" && v.key !== "alt") return "";   // an alternate total carries its own band (19 Oct 2026); the verdict tier still reads the main number alone
     var b = v.side1 ? (v.side === v.side1 ? (v.band1 || "") : "") : (v.band || "");
     return b === "NO BET" ? "" : b;   // NO BET is the absence of a verdict, not one
   }
@@ -1031,11 +1032,12 @@
      that needs 61% reads as the book's price and not an edge. Both sides of every
      priced market are in the running; the pick is still the likeliest side the sheet
      has moved a point off the book. */
-  function likeliestOf(markets) {
+  function likeliestOf(markets, withAlt) {
     var best = null, bestUnpriced = null;
     (markets || []).forEach(function (mk) {
-      [{ pick: mk.pick, p: mk.p, price: mk.price, key: mk.key, side: mk.side, label: mk.label, edge: mk.edge, onOther: false },
-       mk.other ? { pick: mk.other.pick, p: mk.other.p, price: mk.other.price, key: mk.key, side: FLIP[mk.side] || mk.side, label: mk.label, edge: mk.other.edge, onOther: true } : null].forEach(function (c) {
+      if (mk.key === "alt" && !withAlt) return;   // an alternate total is the main number moved, not another outcome; it has its own card, and the parlay four takes it
+      [{ pick: mk.pick, p: mk.p, price: mk.price, key: mk.key, side: mk.side, label: mk.label, edge: mk.edge, onOther: false, mk: mk },
+       mk.other ? { pick: mk.other.pick, p: mk.other.p, price: mk.other.price, key: mk.key, side: FLIP[mk.side] || mk.side, label: mk.label, edge: mk.other.edge, onOther: true, mk: mk } : null].forEach(function (c) {
         if (!c || c.p === null || c.p === undefined) return;
         if (c.price !== null && c.price !== undefined) { if (!best || c.p > best.p + 1e-9) best = c; }
         else if (!bestUnpriced || c.p > bestUnpriced.p + 1e-9) bestUnpriced = c;
@@ -1056,6 +1058,19 @@
       '<div class="head"><div class="pick ' + sideClass(likely.side || "") + '">' + esc(likely.pick) + '</div><div class="p">' + (likely.p * 100).toFixed(1) + '%</div></div>' +
       '<div class="why">' + why + '</div></div>';
   }
+  /* the alternate total with a verdict (19 Oct 2026, the user: "add the strong bets, max
+     bets to the cards"): a card under the pick in the pick card's shape, with the band,
+     the price and what it needs, and the edge, which is the figure to read */
+  function altBlock(markets, fin) {
+    var a = (markets || []).filter(function (mk) { return mk.key === "alt"; })[0];
+    if (!a) return "";
+    var res = fin ? gradeMarket(a, fin) : null, need = a.breakeven !== null && a.breakeven !== undefined ? a.breakeven : implied(a.price);
+    return '<div class="likelycard altcard" data-key="alt"><div class="lab">Alternate total · ' + esc(a.band) + ' · not the pick</div>' +
+      '<div class="head"><div class="pick ' + sideClass(a.side) + '">' + esc(a.pick) + '</div><div class="p">' + (a.p * 100).toFixed(1) + '%</div></div>' +
+      '<div class="why">' + sgn(a.price, 0) + (a.book ? ' at ' + esc(bookName(a.book)) : '') + ' needs ' + (need * 100).toFixed(1) + '%: edge ' + sgn(a.edge * 100, 1) +
+      '. The band is the chance, as on the main number; the price already asks for ' + (need * 100).toFixed(0) + '% of it, so the edge is the figure to read. Graded on its own record line; never the pick, never a leg.' +
+      (res ? ' <span class="chip ' + res + '">' + resText(res) + '</span>' : '') + '</div></div>';
+  }
   function pickBlock(pk, m, sp) {
     var mk = pk.mk, likely = likeliestOf(m && m.markets);
     var alsoHtml = likelyIsPick(likely, pk) ? '<div class="also">Also the likeliest side on the card at any price.</div>' : '';
@@ -1067,17 +1082,27 @@
       '<div class="p">' + (mk.p * 100).toFixed(1) + '%</div></div>' +
       '<div class="why"><b>Why</b>: ' + pickWhy(pk, m, sp) + '</div>' + alsoHtml + '</div>' + likelyBlock(likely, pk);
   }
+  /* THE PARLAY FOUR, from 19 Oct 2026: the LIKELIER side on each game, the alternate
+     totals included (the user: "do the same thing for the parlay four as well, with
+     the likelier on this game showing the likelier instead of the edge"). Up to 19 Oct
+     the four were the best VALUE legs with #1's verdicts first, and under that rule
+     they went 17-14-2 in MLB and 13-16 in the NHL. From here each game's leg is its
+     likeliest priced side, ranked by chance; the card says whether the price agrees,
+     and where the value leg was a different side it is named. The record tile grades
+     the four the board shows. */
   function parlayFour(dateISO, sport) {
     var legs = [], skipped = 0;
     card.forEach(function (r) {
       if ((r.gdate || "") !== dateISO || isVoid(r)) return;
       if (sport && r.sport !== sport) return;
+      var best = likeliestOf(r.markets, true);
+      if (!best || best.price === null || best.price === undefined) { if ((r.markets || []).some(function (mk) { return mk.price !== null && mk.price !== undefined; })) skipped++; return; }
+      var mk = best.onOther ? likelier(best.mk) : best.mk;
       var g = gameLeg(r.markets, r.sport, r.gdate);
-      if (!g.leg) { if (g.priced) skipped++; return; }
-      legs.push({ row: r, mk: g.leg, ratio: valueRatio(g.leg), tier: bandTier(g.leg), band: bandOf(g.leg),
-                  likeliest: g.likeliest, richer: g.richer, rank: 0, corr: [] });
+      legs.push({ row: r, mk: mk, ratio: valueRatio(mk), tier: bandTier(mk), band: bandOf(mk), need: implied(mk.price),
+                  value: g.leg && g.leg.pick !== mk.pick ? g.leg : null, likeliest: null, richer: null, rank: 0, corr: [] });
     });
-    legs.sort(function (a, b) { return ((b.tier > 0) - (a.tier > 0)) || (b.ratio - a.ratio) || (b.mk.p - a.mk.p); });
+    legs.sort(function (a, b) { return (b.mk.p - a.mk.p) || (b.ratio - a.ratio); });
     legs.forEach(function (l, i) { l.rank = i + 1; });
     var out = legs.slice(0, 4);
     out.skipped = skipped;
@@ -1144,6 +1169,7 @@
     return sp !== "WNBA" || !!mk.informed;
   }
   function notPickedWhy(sp, mk) {
+    if (mk.key === "alt") return "An alternate number of the total, priced by the same projection and listed when it reads STRONG BET or MAX BET with an edge: shown here and on the board, graded on its own record line, never the pick and never a parlay leg. The band is the chance; at a heavy price the book already asks for most of it, so read the edge.";
     if (sp === "WNBA" && mk.key !== "total") return "This side was stored without the four ratings, so it is the book's own price read back and carries no team information. Type the ratings (paste the stats.wnba.com table) and press Rescore, and the spread and the moneyline become pickable.";
     if (sp === "WNBA") return "The WNBA total leaned under by construction and went 6-7 on the first 13 (says 54.8%, does 46.2%); from 2 Oct the WNBA book picks the spread and the moneyline, which carry the ratings, and the total is listed and graded but never a straight bet or a parlay leg.";
     if (sp === "NHL" && mk.key === "p1") return "For games on 11 and 12 Oct the hockey book picked the full-game total only, at the user's request (a week's trial, cut short once the odds feed was in). The first period is listed and graded, never a straight bet or a parlay leg, on those two days.";
@@ -1274,13 +1300,15 @@
   }
   function legNote(x) {
     var s = '';
-    if (x.band) {
-      s += '<div class="swap">Call Sheet #1 says <b>' + esc(x.band) + '</b> on this total and it clears its price' +
-        (x.richer ? ' — ' + esc(x.richer.pick) + ' ' + (x.richer.p * 100).toFixed(1) + '% at ' + sgn(x.richer.price, 0) + ' (' + valueRatio(x.richer).toFixed(3) + '×) is the richer price on this game but carries no verdict' : '') + '.</div>';
+    var need = x.need !== undefined ? x.need : (x.mk.price !== null && x.mk.price !== undefined ? implied(x.mk.price) : null);
+    if (need !== null) {
+      s += '<div class="swap">The likeliest side on this game' + (x.mk.key === "alt" ? ', an alternate number' : '') + '. ' + sgn(x.mk.price, 0) + ' needs ' + (need * 100).toFixed(1) + '%: ' +
+        (x.mk.p >= need ? 'the price agrees.' : 'the book\'s price, not an edge; it is here because it is the likelier result, as asked.') +
+        (x.band ? ' Call Sheet #1 says <b>' + esc(x.band) + '</b>.' : '') + '</div>';
     }
-    if (x.likeliest) {
-      s += '<div class="swap">Likelier on this game: ' + esc(x.likeliest.pick) + ' ' + (x.likeliest.p * 100).toFixed(1) + '% at ' + sgn(x.likeliest.price, 0) +
-        ' — but it needs ' + (implied(x.likeliest.price) * 100).toFixed(1) + '%, so this leg is the better value.</div>';
+    if (x.value) {
+      s += '<div class="swap">The value on this game was ' + esc(x.value.pick) + ' ' + (x.value.p * 100).toFixed(1) + '% at ' + sgn(x.value.price, 0) +
+        ' (edge ' + sgn(x.value.edge * 100, 1) + '): the better price, the less likely result.</div>';
     }
     return s;
   }
@@ -1289,18 +1317,21 @@
       var pAll = legs.reduce(function (a, x) { return a * x.mk.p; }, 1);
       var rAll = legs.reduce(function (a, x) { return a * x.ratio; }, 1);
       var pushes = legs.filter(function (x) { return x.mk.pPush > 0.005; }).length;
-      var verdicts = legs.filter(function (x) { return x.tier > 0; }).length;
+      var agrees = legs.filter(function (x) { return x.mk.price !== null && x.mk.p >= implied(x.mk.price); }).length;
+      var alts = legs.filter(function (x) { return x.mk.key === "alt"; }).length;
+      var dec = legs.reduce(function (a, x) { return a * decimalOf(x.mk.price); }, 1);
       return '<div class="pk parlay" style="' + (wide ? 'grid-column:1/-1;' : '') + 'border-style:dashed"><div class="n1">ALL ' + legs.length + ' HIT</div>' +
-        '<div class="n2">' + (pAll * 100).toFixed(1) + '% · fair parlay ' + sgn(priceFor(pAll), 0) + ' (' + (1 / pAll).toFixed(2) + '×) · worth <b>' + rAll.toFixed(2) + '×</b> what the prices say</div>' +
-        '<div class="n4">' + (verdicts === legs.length ? 'Every leg' : verdicts === 0 ? 'No leg' : verdicts + ' of the ' + legs.length + ' legs') + (verdicts >= 2 && verdicts < legs.length ? ' carry' : ' carries') + ' Call Sheet #1\'s BET or better' +
-        (verdicts < legs.length ? (verdicts ? '; the rest are' : '; these are') + ' the best value side on their game' : '') +
-        '. Every leg clears its own price, so the parlay is worth more than the book\'s multiplied odds before any boost' +
-        (legs.skipped ? '; ' + legs.skipped + ' game' + (legs.skipped === 1 ? '' : 's') + ' had no side that clears its price' : '') +
+        '<div class="n2">' + (pAll * 100).toFixed(1) + '% · pays ' + sgn(americanOf(dec), 0) + ' (' + dec.toFixed(2) + '×) needs ' + (100 / dec).toFixed(1) + '% · fair ' + sgn(priceFor(pAll), 0) + ' · worth <b>' + rAll.toFixed(2) + '×</b> what the prices say</div>' +
+        '<div class="n4">The likeliest side on each game' + (alts ? ', ' + alts + ' of them an alternate number' : '') + '. ' +
+        (agrees === legs.length ? 'Every leg clears its own price, so the parlay is worth more than the book\'s multiplied odds before any boost' :
+         agrees === 0 ? 'No leg clears its price: these are the book\'s favourites at the book\'s prices, here because they are the likelier results, as asked' :
+         agrees + ' of the ' + legs.length + ' legs clear their price; the rest are the book\'s price, not an edge') +
+        (legs.skipped ? '; ' + legs.skipped + ' game' + (legs.skipped === 1 ? '' : 's') + ' had no priced side' : '') +
         (pushes ? '; ' + pushes + ' can push, which most apps void to a smaller parlay' : '') +
         '. A boosted payout above ' + (1 / pAll).toFixed(2) + '× beats fair outright.</div></div>';
     }
-    if (!legs.length && nRows) return '<div class="empty">No leg on this date clears its price. Nothing to parlay tonight.</div>';
-    if (legs.length === 1) return '<div class="empty">Only one leg clears its price — not a parlay; it is under best straight bets if the edge is there.</div>';
+    if (!legs.length && nRows) return '<div class="empty">No priced side on this date. Nothing to parlay tonight.</div>';
+    if (legs.length === 1) return '<div class="empty">One priced game on the card — not a parlay; its likeliest side is above.</div>';
     return '';
   }
   function pickCard(x, cls, extra) {
@@ -1426,6 +1457,23 @@
       (x.scored ? ' The dog\'s own backup is the one signal that cleared two seasons (the dog won +7.4 points more than priced on 327 games, +39 units at the close): scored at +5 points, tagged, and this side is pickable on its own record line.'
                 : ' Nothing here moves the dog\'s chance; the record decides.') + '</div></div>';
   }
+  /* the alternate totals with a verdict on a date (19 Oct 2026): one a hockey game, best edge first */
+  function altBets(dateISO) {
+    var out = [];
+    card.forEach(function (r) {
+      if ((r.gdate || "") !== dateISO || isVoid(r)) return;
+      (r.markets || []).forEach(function (mk) { if (mk.key === "alt") out.push({ row: r, mk: mk }); });
+    });
+    out.sort(function (a, b) { return (b.mk.edge - a.mk.edge) || (b.mk.p - a.mk.p); });
+    return out;
+  }
+  function altCard(x, i) {
+    var mk = x.mk, res = gradeMarket(mk, x.row.finals), need = implied(mk.price);
+    return '<div class="pk likely alt' + (res ? ' ' + res : '') + '" data-open="' + x.row.id + '" title="Load ' + esc(x.row.matchup) + ' into the form"><div class="n1">#' + (i + 1) + ' · ' + esc(mk.band) + ' · the price ' + (mk.p >= need ? 'agrees' : 'asks more') + '</div>' +
+      '<div class="n2">' + esc(mk.pick) + '</div>' +
+      '<div class="n3">' + (mk.p * 100).toFixed(1) + '% · ' + sgn(mk.price, 0) + ' needs ' + (need * 100).toFixed(1) + '% · edge ' + sgn(mk.edge * 100, 1) + (res ? ' · <span class="chip ' + res + '">' + resText(res) + '</span>' : '') + '</div>' +
+      '<div class="n4">' + esc(x.row.matchup) + ' · ' + esc(mk.label) + (mk.book ? ' at ' + esc(bookName(mk.book)) : '') + '</div></div>';
+  }
   function twoLegCard(x, i) {
     var a = x.legs[0], b = x.legs[1], ok = x.p >= x.need, res = parlayResult(x.legs);
     return '<div class="pk likely two' + (ok ? ' agrees' : '') + '">' +
@@ -1474,6 +1522,13 @@
       ups.forEach(function (x) { uh += upsetCard(x); });
       if (!ups.length) uh = '<div class="empty">' + (rows.length ? 'No dog on this date carries a measured signal against its favourite.' : 'Add the matchups and any dog with a signal lands here.') + '</div>';
       $("upsets").innerHTML = uh;
+    }
+    // --- the alternate totals with a verdict (19 Oct 2026): hockey only, so the section shows when there is one ---
+    if ($("altBets")) {
+      var ab = altBets(dateISO), ah = "";
+      ab.forEach(function (x, i) { ah += altCard(x, i); });
+      $("altBetsHead").hidden = !ab.length; $("altBets").hidden = !ab.length;
+      $("altBets").innerHTML = ah;
     }
 
     // --- by sport: the same two rules, one sport at a time ---
@@ -1771,7 +1826,7 @@
                                             clv: { n: 0, beat: 0, lost: 0, even: 0, runs: 0 } }; };
     var bySport = {};
     ["MLB", "WNBA"].forEach(function (sp) {
-      var b = { stats: {}, pick: fresh("The pick"), top: fresh("The parlay four"), topE: fresh("Best straight bets"), any: false };
+      var b = { stats: {}, pick: fresh("The pick"), top: fresh("The parlay four, likelier legs"), topE: fresh("Best straight bets"), any: false };
       KEYS[sp].forEach(function (k) { b.stats[k[0]] = fresh(k[1]); });
       bySport[sp] = b;
     });
@@ -2068,10 +2123,10 @@
   function boardAsText() {
     var dateISO = $("boardDate").value || todayISO(), rows = boardRows(dateISO, !$("byEdge").checked);
     var out = ["Call Sheet 2.0 — " + gameDate(dateISO)];
-    out.push("THE PARLAY FOUR (one leg per game, any price it clears)");
+    out.push("THE PARLAY FOUR (the likeliest side on each game at any price, alternates included; from 19 Oct 2026)");
     parlayFour(dateISO).forEach(function (x) {
-      out.push("  " + x.rank + ". " + x.row.matchup + " — " + x.mk.pick + "  " + (x.mk.p * 100).toFixed(1) + "%  " + sgn(x.mk.price, 0) +
-        "  " + x.ratio.toFixed(3) + "x" + (x.band ? "  [#1: " + x.band + "]" : "") + (x.likeliest ? "  (likelier: " + x.likeliest.pick + " at " + sgn(x.likeliest.price, 0) + ")" : ""));
+      out.push("  " + x.rank + ". " + x.row.matchup + " — " + x.mk.pick + "  " + (x.mk.p * 100).toFixed(1) + "%  " + sgn(x.mk.price, 0) + " needs " + (x.need * 100).toFixed(1) + "%" +
+        (x.mk.p >= x.need ? "  [the price agrees]" : "  [the book's price]") + (x.band ? "  [#1: " + x.band + "]" : "") + (x.value ? "  (the value was " + x.value.pick + " at " + sgn(x.value.price, 0) + ")" : ""));
     });
     out.push("LIKELIEST AT ANY PRICE (one a game)");
     likeliestLegs(dateISO).forEach(function (x) {
@@ -2085,6 +2140,13 @@
     upsetWatch(dateISO).forEach(function (x, i) {
       out.push("  " + (i + 1) + ". " + x.row.matchup + " — " + x.dog.pick + "  " + (x.dog.p * 100).toFixed(1) + "%  " + sgn(x.dog.price, 0) + " needs " + (x.need * 100).toFixed(1) + "%  [" + x.sig.join("; ") + "]");
     });
+    var alts = altBets(dateISO);
+    if (alts.length) {
+      out.push("ALTERNATE TOTALS WITH A VERDICT (hockey: STRONG BET or MAX BET on an alternate number with an edge; the band is the chance, read the edge)");
+      alts.forEach(function (x, i) {
+        out.push("  " + (i + 1) + ". " + x.row.matchup + " — " + x.mk.pick + "  " + (x.mk.p * 100).toFixed(1) + "%  " + sgn(x.mk.price, 0) + " needs " + (implied(x.mk.price) * 100).toFixed(1) + "%  edge " + sgn(x.mk.edge * 100, 1) + "  [" + x.mk.band + (x.mk.book ? ", " + bookName(x.mk.book) : "") + "]");
+      });
+    }
     out.push("BEST STRAIGHT BETS (#1's verdicts first, then the WNBA cheaper side, then by edge)");
     bestBets(dateISO).forEach(function (x) {
       out.push("  " + x.rank + ". " + (x.fav ? "★ " : "") + x.row.matchup + " — " + x.mk.pick + "  " + (x.mk.p * 100).toFixed(1) + "%  " + sgn(x.mk.price, 0) + "  edge " + sgn(x.mk.edge * 100, 1) + (x.fav ? "  [the one it likes most tonight]" : "") +
@@ -2114,6 +2176,7 @@
   $("bestBets").addEventListener("click", function (e) { var t = e.target.closest("[data-open]"); if (t) openRow(t.dataset.open); });
   if ($("likeliest")) $("likeliest").addEventListener("click", function (e) { var t = e.target.closest("[data-open]"); if (t) openRow(t.dataset.open); });
   if ($("upsets")) $("upsets").addEventListener("click", function (e) { var t = e.target.closest("[data-open]"); if (t) openRow(t.dataset.open); });
+  if ($("altBets")) $("altBets").addEventListener("click", function (e) { var t = e.target.closest("[data-open]"); if (t) openRow(t.dataset.open); });
   $("bySport").addEventListener("click", function (e) { var t = e.target.closest("[data-open]"); if (t) openRow(t.dataset.open); });
   $("board").addEventListener("click", function (e) { var t = e.target.closest("tr[data-open]"); if (t) openRow(t.dataset.open); });
   $("boardDate").addEventListener("change", renderBoard);

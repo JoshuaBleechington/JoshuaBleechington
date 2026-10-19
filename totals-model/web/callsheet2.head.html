@@ -171,6 +171,7 @@
   .pickcard .why b { color: var(--ink); }
   .pickcard .also { font-size: 12px; color: var(--muted); line-height: 1.5; margin-top: 7px; padding-top: 6px; border-top: 1px dashed var(--rule); }
   .likelycard { border: 2px dashed var(--ink-2); border-radius: 10px; padding: 10px 14px; margin-bottom: 10px; }
+  .likelycard.altcard { border-color: var(--go); border-style: solid; }
   .likelycard .lab { font-size: 11px; color: var(--ink-2); font-weight: 800; letter-spacing: .08em; text-transform: uppercase; }
   .likelycard .head { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; margin: 4px 0 6px; }
   .likelycard .pick { font: 800 18px/1.15 var(--sans); letter-spacing: -.01em; }
@@ -674,7 +675,7 @@
         <span class="tag" id="boardCount"></span>
       </span></h2>
     <div class="body">
-      <div class="subhead">The parlay four <span class="tag">#1's BET on the total first, else the best value side — one per game, at any price, only if it clears that price</span></div>
+      <div class="subhead">The parlay four <span class="tag">the likeliest side on each game at any price, alternate totals included — one a game, likeliest first; each card says whether its price agrees and names the value side it passed over</span></div>
       <div id="picks" class="picks"></div>
       <div class="subhead">Best straight bets <span class="tag">#1's BET or better first, then the WNBA cheaper side, then the best edges — up to eight</span></div>
       <div id="bestBets" class="picks"></div>
@@ -684,22 +685,21 @@
       <div id="twoLegs" class="picks"></div>
       <div class="subhead">Upset watch <span class="tag">every dog on the date with a measured signal against its favourite — the dog's backup in net is scored (hockey, +5 points), the rest are watched; the dog's price and the sheet's chance beside each</span></div>
       <div id="upsets" class="picks"></div>
+      <div class="subhead" id="altBetsHead" hidden>Alternate totals with a verdict <span class="tag">hockey: the alternate number on the sheet's side that reads STRONG BET or MAX BET with an edge, one a game — the band is the chance and the price already asks for most of it, so read the edge; graded on its own record line, never the pick or a leg</span></div>
+      <div id="altBets" class="picks" hidden></div>
       <div class="subhead" id="bySportHead">One sport only <span class="tag">the same two rules, MLB and WNBA apart — only on a night with both</span></div>
       <div id="bySport" class="sports"></div>
       <div class="scroll"><div id="board"></div></div>
-      <p class="note"><b>The parlay four</b> takes one leg per game, in two tiers. First, Call Sheet #1's verdict:
-        a full-game total #1 calls <b>BET</b>, <b>STRONG BET</b> or <b>MAX BET</b>, on #1's side, when that side
-        also clears its price — the one mark on the board that carries #1's corroboration gate. Second, on a game
-        with no such total: the side, of the markets that sport picks, with the best chance against what its price
-        needs — never a market that is shown, not picked. There is no price cap: a −200
-        side that clears −200 is a leg like any other, and a +130 side that does not clear +130 is not. In both
-        tiers only a side that clears
-        its price qualifies — a parlay's return is the product of those ratios, a boost multiplies the whole
-        thing, and a leg priced above its chance drags it down however often it hits, so a 55% over at −120
-        beats a 61% dog at −155. Verdict legs rank first, then by value; the card names what each leg passed on.
-        On a thin night you get three, or two, and the card says why. <b>All four hit</b> is the product of the
-        chances — a boosted payout above that multiple beats fair outright — and <b>worth N×</b> is the product
-        of the ratios, the parlay's value before any boost.</p>
+      <p class="note"><b>The parlay four</b>, from 19 Oct 2026, takes the <b>likeliest side on each game</b> at any price,
+        whichever market it sits in and the alternate totals included — one leg a game, likeliest first, up to four.
+        Each card says whether the price agrees (the chance clears what the price needs) or is the book's price, and
+        names the value side it passed over, which is often the less likely result at the better number. Before 19 Oct
+        the four were the best value legs with #1's verdicts first, and under that rule they went 17-14-2 in MLB and
+        13-16 in the NHL; the record tile grades the four as the board now builds them. <b>All four hit</b> is the
+        product of the chances, <b>pays</b> is the book's multiplied price and what it needs, and <b>worth N×</b> is
+        the product of the ratios, the parlay's value before any boost: with four favourites it will usually sit
+        under 1, because the book's margin is in every leg. A boosted payout above the fair multiple beats fair
+        outright.</p>
       <p class="note"><b>Best straight bets</b> is the other list, up to eight, in three tiers. First, every full-game
         total Call Sheet #1 calls <b>BET</b> or better, best edge first, with the green chip on it — including one
         whose price is steeper than its chance, which stays on the list with a line saying so, because the verdict

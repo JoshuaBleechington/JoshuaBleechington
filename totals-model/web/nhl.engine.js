@@ -514,6 +514,33 @@
              (c.tag ? ' <span class="ctag">' + esc(c.tag) + '</span>' : '') + '</li>';
     }).join("") + '</ul>';
   }
+  function altBandFor(p) { for (var i = 0; i < BANDS.length; i++) if (p >= BANDS[i][0]) return BANDS[i][1]; return NOBET; }
+  function nhlAltMarket(f) {
+    if (!f || f.side === undefined || f.projected === undefined || f.projected === null) return null;
+    var alts;
+    try { alts = altLines({ total: f }, txt("odds")); } catch (e) { return null; }
+    if (!alts || !alts.length) return null;
+    var best = null;
+    alts.forEach(function (a) {
+      if (a.side !== f.side || a.edge === null || a.edge === undefined || a.edge <= 0) return;
+      if ((TIERS[altBandFor(a.p)] || 0) < 2) return;   // STRONG BET or MAX BET only
+      if (!best || a.edge > best.edge + 1e-9) best = a;
+    });
+    if (!best) return null;
+    var opp = alts.filter(function (a) { return a.side !== best.side && Math.abs(a.point - best.point) < 1e-9; })[0];
+    var sp = splitFor("NHL", best.point, f.projected);
+    var mine = sideOf(best.side + " " + best.point, best.side, best.side === "OVER" ? sp[0] : sp[2], sp[1], best.price);
+    var theirs = sideOf(FLIP[best.side] + " " + best.point, FLIP[best.side], best.side === "OVER" ? sp[2] : sp[0], sp[1], opp ? opp.price : null);
+    var band = altBandFor(mine.p);
+    return { key: "alt", label: "Alternate total " + best.point, pick: mine.pick, side: mine.side, p: mine.p, pPush: mine.pPush, price: mine.price,
+             breakeven: mine.breakeven, edge: mine.edge, ev: mine.ev, fair: priceFor(mine.p), anchored: true, band: band, band1: band, side1: mine.side,
+             point: best.point, book: best.book,
+             notes: ["An alternate number at " + bookName(best.book) + ", priced by the same projection of " + f.projected.toFixed(2) + " split at " + best.point + ": " +
+                     mine.pick + " " + (mine.p * 100).toFixed(1) + "% against " + sgn(best.price, 0) + ", which needs " + (mine.breakeven * 100).toFixed(1) + "%. " +
+                     "<b>The band is the chance, as on the main number; at this price the book already asks for most of it, so the edge is the figure to read.</b> " +
+                     "Shown here, on the board and on its own record line; never the pick, never a parlay leg. The Line box stays on the main number."],
+             other: { pick: theirs.pick, p: theirs.p, price: theirs.price, edge: theirs.edge } };
+  }
   function forecastMatchupNhl() {
     nhlGoaliePicker();
     nhlGoalieSummary();
@@ -526,6 +553,15 @@
     var p1line = num("p1line"), p1op = num("p1op"), p1up = num("p1up");
     var notes = [], markets = [];
     markets.push(totalMarket(f, line, op, up, 2));
+    /* the alternate totals (19 Oct 2026, the user: "add the strong bets, max bets to the
+       cards"): every alternate number the books post on the sheet's side, priced by the
+       same projection split; the one that reads STRONG BET or MAX BET with an edge
+       becomes a market of its own, "alt" -- on the rail, the board and its own record
+       line, never the pick and never a leg. The band is the chance, as on the main
+       number; at a heavy price the book already asks for most of it, so the edge is the
+       figure to read, and the record decides. */
+    var altM = nhlAltMarket(f);
+    if (altM) markets.push(altM);
     var anchor = f.estimates.filter(function (e) { return e.name === "Market"; })[0].total;
     var lamH = null, lamA = null;
     if (hml !== null && aml !== null && hml >= 140) notes.push("A big road favourite (the home side +140 or longer): two seasons of closing totals ran under 55.5% in these games (277 of them). Watched, not scored.");

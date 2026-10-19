@@ -853,6 +853,62 @@ const CHECKS = ["dome","playoff","agconf","hgconf","agbk","hgbk"];
   chk(colour.forecastSpans >= 1 && /projected total lands/.test(colour.forecastText), 'colour: the forecast line tones the sheet\'s figures against the market\'s', colour.forecastText.slice(0, 200));
   chk(/Green beats its reference by 2 points or more, red trails it/.test(colour.legend) && /Colour after 10 games/.test(colour.legend), 'colour: the table says what the colours mean', colour.legend.slice(0, 400));
 
+  // ---- 19 Oct 2026: the Props tab -- a props file lists, a grade file grades, the record tile and the backup carry it ----
+  const propsT = await pg.evaluate(async () => {
+    const wait = () => new Promise(r => setTimeout(r, 80));
+    localStorage.removeItem('callsheet3.props.v1');
+    const propsDoc = { format: 'callsheet3.props', version: 1, date: '2026-10-21', games: [
+      { gid: '401909834', away: 'Hawks', home: 'Magic', aab: 'ATL', hab: 'ORL', spread: -4.5, total: 229.5, pace: 99.8, props: [
+        { pid: '3037789', name: 'Trae Young', team: 'ATL', opp: 'ORL', home: false, pos: 'PG', mk: 'pts', line: 24.5, op: -110, up: -110, book: 'fanatics', books: { fanatics: [24.5, -110, -110], draftkings: [25.5, -115, -105] },
+          proj: 27.2, sd: 9.4, pm: 0.612, pb: 0.5, p: 0.5604, push: 0, side: 'OVER', chance: 0.5604, price: -110, need: 0.5238, edge: 0.0366, band: 'BET', mins: 35.1, rate36: 27.9,
+          why: ['27.9 points per 36 this season (3 games, 104 minutes)', '35.1 minutes projected'], log: [['2026-10-15', 'MIA', 0, 34.0, 26]] },
+        { pid: '4066261', name: 'Jalen Suggs', team: 'ORL', opp: 'ATL', home: true, pos: 'SG', mk: 'ast', line: 4.5, op: -120, up: -100, book: 'fanatics', books: { fanatics: [4.5, -120, -100] },
+          why: ['no history to project from (under 60 minutes with the stat in the ledgers)'], log: [] },
+        { pid: '4397020', name: 'Paolo Banchero', team: 'ORL', opp: 'ATL', home: true, pos: 'PF', mk: 'reb', line: 7.5, op: -105, up: -115, book: 'fanatics', books: { fanatics: [7.5, -105, -115] },
+          proj: 7.1, sd: 3.5, pm: 0.45, pb: 0.4773, p: 0.468, push: 0, side: 'UNDER', chance: 0.532, price: -115, need: 0.5349, edge: -0.0029, band: 'no edge', mins: 33.0, rate36: 7.7, why: ['7.7 rebounds per 36'], log: [] } ] } ] };
+    const load = async (doc, fname) => { const dt = new DataTransfer(); dt.items.add(new File([JSON.stringify(doc)], fname, { type: 'application/json' })); const inp = document.getElementById('slateFile'); inp.files = dt.files; inp.dispatchEvent(new Event('change', { bubbles: true })); await wait(); };
+    await load(propsDoc, 'nba-props-2026-10-21.json');
+    const viewOn = !document.getElementById('propsView').hidden, colsOff = document.querySelector('.cols').hidden, pressed = document.getElementById('m-props').getAttribute('aria-pressed');
+    const best = [...document.querySelectorAll('#propsBest .pk')].map(e => e.innerText.replace(/\s+/g, ' ').trim());
+    const rowsOn = document.querySelectorAll('#propsTable tr[data-prop]').length;
+    document.getElementById('propsAll').checked = true; document.getElementById('propsAll').dispatchEvent(new Event('change', { bubbles: true })); await wait();
+    const rowsAll = document.querySelectorAll('#propsTable tr[data-prop]').length;
+    const count = document.getElementById('propsCount').textContent, msg = document.getElementById('propsMsg').textContent;
+    document.querySelector('#propsTable tr[data-prop]').click(); await wait();
+    const whyOpen = [...document.querySelectorAll('#propsTable tr.why')].filter(t => !t.hidden).map(t => t.innerText.replace(/\s+/g, ' ').trim());
+    const tileBefore = !!document.querySelector('#calibBox .calib[data-sport="PROPS"]');
+    const gradeDoc = { format: 'callsheet2.slate', version: 1, date: '2026-10-21', games: [
+      { sport: 'NBA', gdate: '2026-10-21', away: 'Hawks', home: 'Magic', gameId: '401909834', finals: { fa: '118', fh: '112', f5a: '60', f5h: '55' }, notes: [],
+        box: { '3037789': ['Trae Young', 36.2, 28, 3, 11, 4], '4397020': ['Paolo Banchero', 34.0, 22, 9, 4, 1] } } ] };
+    await load(gradeDoc, 'nba-grade-2026-10-21.json');
+    const after = JSON.parse(localStorage.getItem('callsheet3.props.v1'));
+    const tile = document.querySelector('#calibBox .calib[data-sport="PROPS"]');
+    const tileText = tile ? tile.innerText.replace(/\s+/g, ' ').trim() : '';
+    const slateMsg = document.getElementById('saveMsg').textContent;
+    const bk = { format: 'callsheet3.backup', version: 1, card: [], props: [after[0]] };
+    const dt2 = new DataTransfer(); dt2.items.add(new File([JSON.stringify(bk)], 'the-super-model-2026-10-22.json', { type: 'application/json' }));
+    const inp2 = document.getElementById('restoreFile'); inp2.files = dt2.files; inp2.dispatchEvent(new Event('change', { bubbles: true })); await wait();
+    const restored = JSON.parse(localStorage.getItem('callsheet3.props.v1'));
+    document.getElementById('m-nba').click(); await wait();
+    const viewOff = document.getElementById('propsView').hidden, colsBack = !document.querySelector('.cols').hidden, nbaPressed = document.getElementById('m-nba').getAttribute('aria-pressed');
+    localStorage.removeItem('callsheet3.props.v1');
+    return { viewOn, colsOff, pressed, best, rowsOn, rowsAll, count, msg, whyOpen, tileBefore, after: after.map(r => [r.name, r.mk, r.result, r.actual]), tileText, slateMsg, restored: restored.length, viewOff, colsBack, nbaPressed };
+  });
+  chk(propsT.viewOn && propsT.colsOff && propsT.pressed === 'true', 'props: loading a props file through Load slate opens the Props tab in place of the matchup columns', JSON.stringify({ on: propsT.viewOn, cols: propsT.colsOff, pressed: propsT.pressed }));
+  chk(propsT.best.length === 1 && /#1 · BET/.test(propsT.best[0]) && /Trae Young OVER 24\.5 points/.test(propsT.best[0]) && /56\.0% · [-−]110 needs 52\.4% · edge \+3\.7/.test(propsT.best[0]) && /projected 27\.2 \(±9\.4\)/.test(propsT.best[0]),
+      'props: the best list carries the one prop that clears its price, with its band, chance, price, need, edge and projection', JSON.stringify(propsT.best));
+  chk(propsT.rowsOn === 2 && propsT.rowsAll === 3 && /3 props on .*21/.test(propsT.count) && /3.* new/.test(propsT.msg),
+      'props: the table lists the projected props, every prop with the box ticked, and the count names the date', JSON.stringify({ on: propsT.rowsOn, all: propsT.rowsAll, count: propsT.count, msg: propsT.msg }));
+  chk(propsT.whyOpen.length === 1 && /27\.9 points per 36/.test(propsT.whyOpen[0]) && /last games: 10-15 @ MIA 34m 26/.test(propsT.whyOpen[0]) && /books: fanatics 24\.5 \([-−]110\/[-−]110\) · draftkings 25\.5/.test(propsT.whyOpen[0]),
+      'props: a click opens the why with the reasons, the last games and every book\'s line', JSON.stringify(propsT.whyOpen));
+  chk(!propsT.tileBefore, 'props: no record tile before anything is graded', '');
+  chk(propsT.after[0][2] === 'win' && propsT.after[0][3] === 28 && propsT.after[2][2] === 'loss' && propsT.after[2][3] === 9 && propsT.after[1][2] === 'void',
+      'props: the grade file\'s box grades each prop by its side (28 over 24.5 wins; 9 rebounds beat the under 7.5), and a player with no box line is void', JSON.stringify(propsT.after));
+  chk(/Every prop with a side 1-1 says 54\.6% · does 50\.0%/i.test(propsT.tileText) && /BET 1-0 \+0\.9u/.test(propsT.tileText) && /no edge 0-1 [-−]1\.0u/.test(propsT.tileText) && /over 1-0 · under 0-1/.test(propsT.tileText) && /points 1-0/i.test(propsT.tileText) && /rebounds 0-1/i.test(propsT.tileText) && /assists 0-0 pushes only · 1 void/i.test(propsT.tileText),
+      'props: the record tile keeps the props by band, side and market, the void counted apart', propsT.tileText.slice(0, 500));
+  chk(/3 props graded on the Props tab/.test(propsT.slateMsg), 'props: the slate message says how many props the grade file graded', propsT.slateMsg.slice(-160));
+  chk(propsT.restored === 1 && propsT.viewOff && propsT.colsBack && propsT.nbaPressed === 'true', 'props: a backup\'s props restore, and a sport button brings the matchup columns back', JSON.stringify({ restored: propsT.restored, off: propsT.viewOff, cols: propsT.colsBack, nba: propsT.nbaPressed }));
+
   // ---- the build stamp ------------------------------------------------------------
   const stamp = await pg.evaluate(() => (document.getElementById('build') || {}).textContent);
   const git = (cmd) => execSync(cmd, { cwd: __dirname, encoding: 'utf8' }).trim();

@@ -79,13 +79,21 @@ Three double-click files, in this order on a game day:
    its prices, the first-half total, the spread and the moneylines fill
    from the carded book. Run it early for the opener and again before tip
    for the close.
-4. **An hour before tip**, run the slate again and load the newer file: the
+4. **Run NBA props.bat**, or `python slate.py nba-props` (19 Oct 2026):
+   writes `nba-props-DATE.json`, every player prop the books post on the
+   day's games with the slate's projection beside each, about five credits
+   a game. In The Super Model: **NBA PROPS → Load props**. Run it after the
+   ledger (the game logs) and late enough that the books have posted the
+   props, usually by the early afternoon.
+5. **An hour before tip**, run the slate again and load the newer file: the
    injury page changes through the day, and the who-is-out list on each
    matchup is the one thing the close does not fully carry. Tick a doubtful
-   player out on the card if he is ruled out late.
-5. **Grade NBA yesterday.bat** the next morning, or `python slate.py
-   nba-grade`: `nba-grade-DATE.json` with each final, the half-time score
-   and the close the odds run last saw. Load it the same way.
+   player out on the card if he is ruled out late. The props run reads the
+   same page, so a late scratch means running it again too.
+6. **Grade NBA yesterday.bat** the next morning, or `python slate.py
+   nba-grade`: `nba-grade-DATE.json` with each final, the half-time score,
+   the close the odds run last saw, and every player's box line. Load it
+   the same way: it grades the card and the Props tab together.
 
 | On the sheet | Where it comes from |
 | --- | --- |
@@ -99,11 +107,44 @@ Three double-click files, in this order on a game day:
 | A preseason game | Flagged in the notes. Thin lines and the wrong rotations; the record keeps it apart if you log it |
 | Finals and the half-time score | The scoreboard's line scores the next morning, or the game summary when the scoreboard has none |
 
+### The player props (19 Oct 2026)
+
+`python slate.py nba-props` writes `nba-props-DATE.json` for The Super
+Model's **NBA PROPS** tab. The lines come from The Odds API, one call a game
+for the five markets (points, rebounds, assists, threes, points + rebounds +
+assists), the carded book the first in the odds run's list that posts both
+prices on one number, every book's line kept beside it. Each player is
+placed on his club by ESPN's team roster, then by the ledgers; the game's
+spread, total and pace ride along. Beside each line, the slate's own
+projection, built from the ledgers' box lines and measured on 2025-26
+(`tools_backtest_nba_props.py`):
+
+| Step | What | Measured |
+| --- | --- | --- |
+| Rate × minutes | His per-minute rate this season, last season's as a prior at half its minutes (1,000 at most), times the minutes of his last five games; before he has played this season, last season's whole-season mean (not its last five: April's minutes are rest) | Unbiased on every market; points +0.10 over 14,370 player-games |
+| Regulars out | For every 30 minutes a game of teammates listed Out or Doubtful on ESPN who play 24 or more: +1.42 minutes, +0.56 points per 36, +0.09 assists per 36; rebounds and threes get nothing | t 36, t 11, t 6; rebounds t 0.6 and threes t 1.8, null |
+| Pace | The matchup's pace (the two clubs' mean, this season at five games, else last season's) against the league's, in full | Mechanical |
+| Defence v position | The ledger's own table: what each defence allowed per minute to guards, forwards and centres (ESPN's three positions) against the league, this season shrunk toward last season's by its games (twenty games to even). Carried at 0.75 for points, rebounds and assists, 0.4 for threes | A defence's lean over the first half of 2025-26 carried into the second at 0.77, 0.74, 0.73, 0.41 (t 8, 8, 7, 4) |
+| HashtagBasketball's rank | The website's defence-v-position table, the club's rank of 150 against the five positions that fold into his | Shown, never scored |
+| Home and road | His own per-36 at home and on the road, this season with last behind it | Shown, never scored: a player's own split over the first half of 2025-26 predicted the second half's at r 0.08 |
+| The chance | A normal around the projection, one sigma k × √projection (k 1.85 points, 1.2 rebounds, 1.15 assists, 1.1 threes, 1.9 combined), blended with the book's own chance at 4 to 2 on the logit scale | The normal held 69% within one sigma on every market; the blend's weights are a priori |
+
+A prop is the slate's call as made: the page does not rescore it, the BET
+band (three points of edge and 55%) and LEAN (any edge) are a priori, and
+the Props record tile is the test. Props cannot be backtested against lines
+(ten credits a market a game on the history endpoint). A player listed Out
+or Doubtful gets no projection; a name the rosters and ledgers cannot place
+is listed under the game as unmatched.
+
 The ledger, in full: `python slate.py nba-ledger --season 2024-25` writes
 `nba-ledger-SEASON.json`, every regular-season final of the season with the
 quarter scores, overtime, each team's box line and the game's pace, every
-player who dressed with his minutes, points and plus-minus and whether he
-started, and every player who sat with the reason the feed gave. A past
+player who dressed with his full box line (minutes, points, plus-minus,
+rebounds, assists, threes, field-goal and free-throw attempts and makes,
+turnovers, steals, blocks, his position; the six-item line before 19 Oct
+2026 is refilled from the summaries the next time the ledger runs for that
+season, about fifteen minutes for a past one), whether he started, and
+every player who sat with the reason the feed gave. A past
 season is read from ESPN's open site API, the scoreboard a day a call and
 the summary page a game (the league's own CDN keeps box scores for the
 running season only, and its stats site will not answer a script; both stay
@@ -117,9 +158,12 @@ date, team, o:team, points, o:points, line, total, site, rest @ season=2024 and 
 date, team, o:team, points, o:points, line, total, site, rest @ season=2025 and site=home and playoffs=0
 ```
 
-The build container cannot reach ESPN, so the first slate run on your
-machine is the live test: if a game is missing, the injury list is empty or
-a rating looks wrong, send the printout and the file.
+The build container reaches ESPN, HashtagBasketball and the league's
+feeds, so the slate, the ledger and the props pipeline were run live from
+it; The Odds API answers only from your machine, so the first props run
+there is the live test of the lines. If a game is missing, the injury list
+is empty, a rating looks wrong or a prop is unmatched, send the printout
+and the file.
 
 ## The odds feed (The Odds API)
 

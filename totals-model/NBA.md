@@ -293,3 +293,39 @@ two seasons (a label). Rest, travel, crews and announced absences are in the
 number. The input the backtest cannot see is timing: a late scratch moves the
 line after the close used here was set, and that is the nightly card's job,
 measured from opening night on the record section.
+
+## The player props, 19 Oct 2026
+
+The user: "set up another tab for player props... find the ideal scenario
+for player props". The ledger now keeps every player's full box line
+(rebounds, assists, threes, attempts, makes, turnovers, steals, blocks and
+ESPN's position beside the minutes, points and plus-minus it had), and a
+ledger from before refills itself the next time it runs. `python slate.py
+nba-props` writes one file a day for The Super Model's NBA PROPS tab: every
+prop The Odds API posts on the day's games, with the slate's projection
+beside each. Everything in the projection was measured first on the 2025-26
+ledger (`tools_backtest_nba_props.py`, 1,235 games, 26,628 player lines):
+
+| Question | Answer |
+| --- | --- |
+| Is rate × minutes unbiased? | Yes on every market: points +0.10 over 14,370 player-games, the rest within 0.05 |
+| How wide is the miss? | One sigma k × √projection, k 1.86 points, 1.21 rebounds, 1.16 assists, 1.10 threes, 1.92 combined; a normal held 69% within one sigma on each |
+| Do missing regulars lift a player? | Pooled over 21,076 player-games: every 30 minutes a game of teammates missing who play 24+ adds 1.42 minutes (t 36), 0.56 points per 36 (t 11), 0.09 assists per 36 (t 6); rebounds (t 0.6) and threes (t 1.8) nothing |
+| Does a player's home/road split persist? | No: first half of the season against the second, r 0.08 over 152 players. Shown, never scored |
+| Does a defence's lean by position persist? | Yes: a defence's first-half lean (per minute to guards, forwards, centres against the league) carried into the second half at 0.77 for points (t 8), 0.74 rebounds, 0.73 assists, 0.41 threes. Those are the weights; the table is the ledger's own, this season shrunk toward last season's |
+
+The chance of the over is read from that normal and blended with the book's
+own chance at 4 to 2 on the logit scale, a priori; the BET band (three
+points of edge at 55%) and LEAN are a priori; the Props record tile on the
+page is the test, since props cannot be backtested against lines (ten
+credits a market a game on the history endpoint). The pipeline ran live
+from the build container on opening night's three games with canned lines
+(The Odds API answers only from the user's machine): rosters from ESPN's
+team pages, 95 players on the injury page, 396 defence factors from last
+season's ledger, HashtagBasketball's 150 rows shown beside them.
+
+Two things the run taught. ESPN lists a man as G, F or C, so the defence
+table is by those three and the website's five positions fold into them.
+And a player's last five games of last season are April's minutes (Cade
+Cunningham's averaged 23.6), so before he has played this season the
+projection uses last season's whole-season mean instead.

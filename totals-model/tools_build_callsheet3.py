@@ -58,6 +58,7 @@ def head() -> str:
     nboard, nfields = nfrag.split("<!-- ===== FIELDS:")[0], "<!-- ===== FIELDS:" + nfrag.split("<!-- ===== FIELDS:")[1]
     nboard = nboard.split("-->\n", 1)[1]
     nfields = nfields.split("-->\n", 1)[1]
+    pfrag = (ROOT / "callsheet3.props.html").read_text().split("-->\n", 1)[1]   # the Props tab (19 Oct 2026)
     # "The Super Model": the user's name for the page, 15 Oct 2026, on the eve of the basketball book
     h = once(h, "<title>Call Sheet 2.0</title>", "<title>The Super Model</title>", "title")
     h = once(h, "<h1>Call Sheet <em>2.0</em></h1>", "<h1>The <em>Super</em> Model</h1>", "h1")
@@ -66,6 +67,10 @@ def head() -> str:
              '      <button type="button" id="m-nba" aria-pressed="false">NBA</button>\n'
              '      <button type="button" id="m-wnba" aria-pressed="false">WNBA</button>', "sport buttons")
     h = once(h, '          <div id="spFields" hidden>', board + nboard + '          <div id="spFields" hidden>', "board sections")
+    # the Props tab (19 Oct 2026): a fifth button, and the section that stands in for the matchup columns
+    h = once(h, '      <button type="button" id="m-wnba" aria-pressed="false">WNBA</button>',
+             '      <button type="button" id="m-wnba" aria-pressed="false">WNBA</button>\n      <button type="button" id="m-props" aria-pressed="false">NBA PROPS</button>', "props button")
+    h = once(h, '  <section class="card" style="margin-top:20px">\n    <h2>Day board', pfrag + '  <section class="card" style="margin-top:20px">\n    <h2>Day board', "props section")
     h = once(h, '      <div id="wnbaFields" class="stack" hidden>', fields + nfields + '      <div id="wnbaFields" class="stack" hidden>', "NHL and NBA fields")
     h = re.sub(r'<span id="build">\d{4}-\d{2}-\d{2}</span>', f'<span id="build">{STAMP}</span>', h, count=1)
     h = once(h, "  @media (prefers-reduced-motion: reduce) { * { transition: none !important; animation: none !important; } }\n</style>",
@@ -84,6 +89,13 @@ def head() -> str:
              "  #nbaOutPanel table.form td { white-space: normal; vertical-align: top; }\n"
              "  #nbaOutPanel table.form td:first-child { min-width: 150px; }\n"
              "  #nbaOutPanel table.form td:nth-child(6) { min-width: 120px; }\n"
+             "  /* the Props tab (19 Oct 2026) */\n"
+             "  table.props td.pos { color: var(--go); font-weight: 700; } table.props td.neg { color: var(--muted); }\n"
+             "  table.props tr[data-prop] { cursor: pointer; } table.props tr.win td:first-child { border-left: 3px solid var(--go); }\n"
+             "  table.props tr.loss td:first-child { border-left: 3px solid var(--bad); } table.props tr.void td, table.props tr.push td { color: var(--muted); }\n"
+             "  table.props tr.why td { white-space: normal; background: var(--surface-2, var(--surface)); }\n"
+             "  table.props tr.why ul { margin: 4px 0; padding-left: 18px; font: 11.5px/1.5 var(--sans); color: var(--ink-2); }\n"
+             "  #propsView .picks .pk.scored { border-color: var(--go); }\n"
              "  @media (prefers-reduced-motion: reduce) { * { transition: none !important; animation: none !important; } }\n</style>", "fold css")
     h = once(h, "<p>One matchup, every market the book posts on it — the full-game total, the first five,\n         the moneyline and the run line — priced off",
              "<p>One matchup, every market the book posts on it — in baseball the full-game total, the first five,\n         the moneyline and the run line; in hockey the total, the first period, the moneyline and the puck line;\n         in the NBA the total, the first half, the moneyline and the spread; in the WNBA the total, the moneyline and the spread — priced off", "header copy")
@@ -257,6 +269,27 @@ def tail() -> str:
     t = once(t, '      if (!blank(i.aera) && !blank(i.hera)) meta.push("ERA " + esc(i.aera) + "/" + esc(i.hera));',
              '      if (!blank(i.aera) && !blank(i.hera)) meta.push("ERA " + esc(i.aera) + "/" + esc(i.hera));\n'
              '      if (!blank(i.agsv) && !blank(i.hgsv)) meta.push("SV " + esc(i.agsv) + "/" + esc(i.hgsv));', "slate meta")
+    # the Props tab (19 Oct 2026): the backup carries the props and a restore brings them back; the slate
+    # loader takes a props file too and grades the props from a grade file's box lines; the record block
+    # ends with the props tile; a sport button leaves the tab
+    t = once(t, '                            card: card, draft: { sport: sport, inputs: snapshot() } }, null, 2);',
+             '                            card: card, props: props, draft: { sport: sport, inputs: snapshot() } }, null, 2);', "backup props")
+    t = once(t, '        } else card = d.card;\n        save(); renderCard(); renderBoard(); renderCalib();',
+             '        } else card = d.card;\n'
+             '        if (!moved && Array.isArray(d.props)) { props = d.props; saveProps(); renderProps(); }\n'
+             '        save(); renderCard(); renderBoard(); renderCalib();', "restore props")
+    t = once(t, '    saveSlate(); save(); renderCard(); renderBoard(); renderCalib();\n    say("Slate "',
+             '    saveSlate(); save(); renderCard(); renderBoard(); renderCalib();\n'
+             '    var propsGraded = gradeProps(d); if (propsGraded) renderCalib();\n'
+             '    say("Slate "', "grade props")
+    t = once(t, '". Typed values were not overwritten; lines and prices are never in a slate.");',
+             '". Typed values were not overwritten; lines and prices are never in a slate." + (propsGraded ? " <b>" + propsGraded + "</b> prop" + (propsGraded === 1 ? "" : "s") + " graded on the Props tab." : ""));', "grade props message")
+    t = once(t, '      try { applySlate(JSON.parse(rd.result), f.name); }',
+             '      try { var sd = JSON.parse(rd.result); if (sd && sd.format === "callsheet3.props") applyProps(sd, f.name); else applySlate(sd, f.name); }', "props file")
+    t = once(t, '    box.innerHTML = h;\n  }\n\n\n  /* ---- the WNBA paste', '    h += propsRecordHtml();\n    box.innerHTML = h;\n  }\n\n\n  /* ---- the WNBA paste', "props record")
+    t = once(t, '    $("opened").placeholder = s === "WNBA" ? "165.5" : s === "NBA" ? "228.5" : s === "NHL" ? "6" : "8.5";',
+             '    $("opened").placeholder = s === "WNBA" ? "165.5" : s === "NBA" ? "228.5" : s === "NHL" ? "6" : "8.5";\n'
+             '    if (propsView) showProps(false);', "props off on a sport")
     return t
 
 
@@ -305,7 +338,7 @@ def nba_example_js() -> str:
 
 
 def build() -> str:
-    return head() + engine_block() + (ROOT / "nhl.engine.js").read_text() + (ROOT / "nba.engine.js").read_text() + tail()
+    return head() + engine_block() + (ROOT / "nhl.engine.js").read_text() + (ROOT / "nba.engine.js").read_text() + (ROOT / "props.engine.js").read_text() + tail()
 
 
 if __name__ == "__main__":

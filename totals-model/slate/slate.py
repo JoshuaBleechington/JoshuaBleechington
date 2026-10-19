@@ -2196,6 +2196,30 @@ NBA_PACE_FT = 0.44   # free-throw possessions: the standard estimate, FGA - OREB
 NBA_ID_FLOOR = 1230
 NBA_ID_GAP = 15
 NBA_ID_LIMIT = 1320
+# A player's line in a ledger game, as a list (the file is 2 MB a season and
+# keys would double it). The first six are the 15 Oct 2026 entry (id, name,
+# starter, minutes, points, plus-minus); the rest were added 19 Oct 2026 for
+# the player props: rebounds, assists, threes made, field-goal and free-throw
+# attempts, turnovers, steals, blocks, field goals and free throws made, the
+# position ESPN lists. An older entry is six long; nba_player_dict reads
+# either and the ledger run refills the short ones from the summaries.
+NBA_PLAYER_KEYS = ("id", "n", "st", "min", "pts", "pm", "reb", "ast", "tpm", "fga", "fta", "tov", "stl", "blk", "fgm", "ftm", "pos")
+
+
+def nba_player_line(pid, name, starter, mins, pts, pm, reb=0, ast=0, tpm=0, fga=0, fta=0, tov=0, stl=0, blk=0, fgm=0, ftm=0, pos=""):
+    return [pid, name, int(starter or 0), round(float(mins or 0), 1), int(pts or 0), int(pm or 0),
+            int(reb or 0), int(ast or 0), int(tpm or 0), int(fga or 0), int(fta or 0), int(tov or 0), int(stl or 0), int(blk or 0), int(fgm or 0), int(ftm or 0), str(pos or "")]
+
+
+def nba_player_dict(entry):
+    """A ledger player entry as a dict; a six-long entry (before 19 Oct 2026)
+    reads with `full` False and the box stats None."""
+    d = dict(zip(NBA_PLAYER_KEYS, entry))
+    d["full"] = len(entry) >= 16
+    for k in NBA_PLAYER_KEYS[6:]:
+        d.setdefault(k, None)
+    d["id"] = str(d.get("id") or "")
+    return d
 
 
 def nba_season_id(date_iso):
@@ -2374,9 +2398,8 @@ def nba_entry_from_espn(g, summ):
         played, out = sides[side].setdefault("pa", []), sides[side].setdefault("oa", [])
         for grp in p.get("statistics") or []:
             names = [str(x) for x in (grp.get("names") or grp.get("labels") or [])]
-            iM = names.index("MIN") if "MIN" in names else None
-            iPM = names.index("+/-") if "+/-" in names else None
-            iP = names.index("PTS") if "PTS" in names else None
+            ix = {k: (names.index(k) if k in names else None) for k in ("MIN", "+/-", "PTS", "REB", "AST", "3PT", "FG", "FT", "TO", "STL", "BLK")}
+            iM = ix["MIN"]
             for a in grp.get("athletes") or []:
                 ath = a.get("athlete") or {}
                 pid, name = ath.get("id"), ath.get("displayName") or ath.get("shortName") or str(ath.get("id"))
@@ -2390,7 +2413,20 @@ def nba_entry_from_espn(g, summ):
                         return int(float(str(stats[k]).replace("+", ""))) if k is not None and k < len(stats) else 0
                     except ValueError:
                         return 0
-                played.append([pid, name, 1 if a.get("starter") else 0, round(mins, 1), _i(iP), _i(iPM)])
+                def _made_att(k):
+                    """'9-18' -> (9, 18)."""
+                    v = str(stats[k]) if k is not None and k < len(stats) else ""
+                    try:
+                        made, att = v.split("-", 1)
+                        return int(float(made)), int(float(att))
+                    except ValueError:
+                        return 0, 0
+                fgm, fga = _made_att(ix["FG"])
+                ftm, fta = _made_att(ix["FT"])
+                tpm, _tpa = _made_att(ix["3PT"])
+                pos = str(((ath.get("position") or {}).get("abbreviation") if isinstance(ath.get("position"), dict) else ath.get("position")) or "")
+                played.append(nba_player_line(pid, name, 1 if a.get("starter") else 0, mins, _i(ix["PTS"]), _i(ix["+/-"]),
+                                              _i(ix["REB"]), _i(ix["AST"]), tpm, fga, fta, _i(ix["TO"]), _i(ix["STL"]), _i(ix["BLK"]), fgm, ftm, pos))
     # the injury list on the page: who was out before the game, with the status
     for team in (summ or {}).get("injuries") or []:
         ab = espn_tricode((team.get("team") or {}).get("abbreviation"))
@@ -2539,8 +2575,10 @@ def _nba_team_from_cdn(t):
         if status == "INACTIVE" or (status != "ACTIVE" and mins == 0 and p.get("notPlayingReason")):
             out.append([p.get("personId"), name, str(p.get("notPlayingReason") or p.get("notPlayingDescription") or "inactive")])
         elif mins > 0:
-            played.append([p.get("personId"), name, 1 if str(p.get("starter") or "0") == "1" else 0, round(mins, 1),
-                           int(s.get("points") or 0), int(s.get("plusMinusPoints") or 0)])
+            played.append(nba_player_line(p.get("personId"), name, 1 if str(p.get("starter") or "0") == "1" else 0, mins,
+                                          s.get("points"), s.get("plusMinusPoints"), s.get("reboundsTotal"), s.get("assists"), s.get("threePointersMade"),
+                                          s.get("fieldGoalsAttempted"), s.get("freeThrowsAttempted"), s.get("turnovers"), s.get("steals"), s.get("blocks"),
+                                          s.get("fieldGoalsMade"), s.get("freeThrowsMade"), p.get("position")))
         else:
             out.append([p.get("personId"), name, str(p.get("notPlayingReason") or "DNP")])
     return reg, ot, line, played, out
@@ -2591,7 +2629,9 @@ def nba_entry_from_stats(g, trad, summary):
             mins = nba_minutes(s.get("minutes"))
             name = p.get("name") or ("%s %s" % (p.get("firstName") or "", p.get("familyName") or "")).strip()
             if mins > 0:
-                played.append([p.get("personId"), name, 1 if (p.get("position") or "") else 0, round(mins, 1), int(s.get("points") or 0), int(s.get("plusMinusPoints") or 0)])
+                played.append(nba_player_line(p.get("personId"), name, 1 if (p.get("position") or "") else 0, mins, s.get("points"), s.get("plusMinusPoints"),
+                                              s.get("reboundsTotal"), s.get("assists"), s.get("threePointersMade"), s.get("fieldGoalsAttempted"), s.get("freeThrowsAttempted"),
+                                              s.get("turnovers"), s.get("steals"), s.get("blocks"), s.get("fieldGoalsMade"), s.get("freeThrowsMade"), p.get("position")))
             else:
                 out.append([p.get("personId"), name, str(p.get("comment") or "DNP")])
         sides[key] = (t.get("teamTricode"), line, played, out)
@@ -2769,6 +2809,24 @@ def make_nba_ledger(date_iso, out_dir, log, season=None):
                           "fa": g.get("fa"), "fh": g.get("fh"), "t": g.get("t"), "detail": False})
             else:
                 took(nba_game_entry(g, log))
+    # the box lines (19 Oct 2026): a game whose player entries predate them is
+    # read again from its ESPN summary, so an older ledger fills in place;
+    # written every NBA_LEDGER_FLUSH like the rest, so this too can be resumed
+    short = [g for g in byid.values() if g.get("detail") and any(len(p) < 16 for p in (g.get("pa") or []) + (g.get("ph") or []))]
+    if short and source == "espn":
+        log("%d game%s in the ledger carry the old six-item player lines: reading their summaries again for the box stats (rebounds, assists, threes, the rest)." % (len(short), "" if len(short) == 1 else "s"))
+        filled = 0
+        for g in sorted(short, key=lambda g: (g.get("date") or "", g.get("id") or "")):
+            try:
+                e = nba_entry_from_espn(g, fetch_json(ESPN_NBA + "/summary?event=%s" % g["id"], timeout=NBA_CDN_TIMEOUT, cache=False))
+            except Exception as e:  # noqa: BLE001
+                log("  game %s (%s): no summary (%s); its lines stay short" % (g["id"], g.get("date"), e))
+                continue
+            took(e)
+            filled += 1
+        log("Filled the box lines on %d game%s." % (filled, "" if filled == 1 else "s"))
+    elif short:
+        log("%d game%s carry the old six-item player lines and this ledger did not come from ESPN; they stay as they are." % (len(short), "" if len(short) == 1 else "s"))
     flush()
     log("Added %d game%s. Wrote %s." % (done[0], "" if done[0] == 1 else "s", path))
     nba_ledger_report(led["measure"], log)
@@ -3430,19 +3488,24 @@ def make_nba_grade(date_iso, out_dir, log):
         fin = {"fa": str(g["fa"]), "fh": str(g["fh"])}
         notes = []
         ha, hh = g.get("ha"), g.get("hh")
-        if ha is None or hh is None:
-            try:
-                summ = espn_json("/summary?event=%s" % g["id"])
-                e = nba_entry_from_espn({"id": g["id"], "date": date_iso}, summ)
-                if len(e.get("qa") or []) >= 2 and len(e.get("qh") or []) >= 2:
-                    ha, hh = e["qa"][0] + e["qa"][1], e["qh"][0] + e["qh"][1]
-            except Exception as ex:  # noqa: BLE001
-                notes.append("Could not read the half-time score: %s" % ex)
+        # the summary page: the half-time score when the scoreboard has none, and
+        # every player's box line for the Props tab (19 Oct 2026), by ESPN id
+        box = None
+        try:
+            summ = espn_json("/summary?event=%s" % g["id"])
+            e = nba_entry_from_espn({"id": g["id"], "date": date_iso}, summ)
+            if (ha is None or hh is None) and len(e.get("qa") or []) >= 2 and len(e.get("qh") or []) >= 2:
+                ha, hh = e["qa"][0] + e["qa"][1], e["qh"][0] + e["qh"][1]
+            box = nba_props_box(e)
+        except Exception as ex:  # noqa: BLE001
+            notes.append("Could not read the summary page (%s): no half-time score from it, and no box lines for the props." % ex)
         if ha is not None and hh is not None:
             fin["f5a"], fin["f5h"] = str(ha), str(hh)
         else:
             notes.append("No half-time score on the feed; type it by hand.")
         row = {"sport": "NBA", "gdate": date_iso, "away": away, "home": home, "gameId": g["id"], "finals": fin, "notes": notes}
+        if box:
+            row["box"] = box
         c = odds_close_for(odds_log_path(out_dir), "NBA", date_iso, away, home)
         if c:
             row["close"] = c
@@ -3452,7 +3515,666 @@ def make_nba_grade(date_iso, out_dir, log):
     path = os.path.join(out_dir, "nba-grade-%s.json" % date_iso)
     with open(path, "w", encoding="utf-8") as f:
         json.dump(doc, f, indent=1)
-    log("Wrote %s with %d final%s. Load it into The Super Model the same way." % (path, len(rows), "" if len(rows) == 1 else "s"))
+    log("Wrote %s with %d final%s. Load it into The Super Model the same way; it grades the card and the Props tab together." % (path, len(rows), "" if len(rows) == 1 else "s"))
+    return path
+
+
+# ---- NBA player props (19 Oct 2026) ------------------------------------------
+# The user: "set up another tab for player props... find the ideal scenario
+# for player props". One file a day for The Super Model's Props tab: every
+# player prop The Odds API lists on the day's games (points, rebounds,
+# assists, threes, points + rebounds + assists), each with the book's line and
+# prices, and beside it the slate's own projection from the ledgers' box lines:
+#   rate x minutes      his per-minute rate this season, last season's as a
+#                       prior at half its minutes (PROPS_PRIOR_CAP of them at
+#                       most), times the minutes of his last PROPS_LAST_N games
+#   regulars out        pooled over 2025-26 (26,628 player lines): every 30
+#                       minutes a game of teammates missing who play 24+ adds
+#                       1.42 minutes (t 36), 0.56 points per 36 (t 11) and
+#                       0.09 assists per 36 (t 6); rebounds and threes moved
+#                       nothing (t 0.6, 1.8), so they get no rate lift. SCORED
+#   pace                the matchup's pace against the league's, in full
+#   defence v position  the LEDGER's own table: what each defence allowed per
+#                       minute to guards, forwards and centres against the
+#                       league, this season shrunk toward last season's. A
+#                       defence's lean over the first half of 2025-26 carried
+#                       into its second half at 0.77 (points, t 8), 0.74
+#                       (rebounds), 0.73 (assists) and 0.41 (threes), and
+#                       those are the weights. HashtagBasketball's table is
+#                       read beside it and SHOWN as a rank, never scored
+#   home / road         SHOWN, not scored: a player's own split over the first
+#                       half of 2025-26 predicted the second half's at r 0.08
+# A projection built this way is unbiased (points +0.10 over 14,370 player-
+# games; rebounds, assists and threes within 0.05) and misses by k x sqrt
+# (projection) one sigma, k measured per market (PROPS_SD_K), a normal that
+# held 69% within one sigma on every market. That normal gives the chance of
+# the over; it is blended with the book's own chance at PROPS_ANCHOR to
+# PROPS_MODEL_W, as the rest of the sheet anchors on the market, and the
+# Props record tile says whether any of it earns its keep. Props cannot be
+# backtested against lines (ten credits a market a game on the history
+# endpoint), so the tile is the test. All measured 19 Oct 2026 on the 2025-26
+# ledger with the box lines (tools_backtest_nba_props.py).
+PROPS_FORMAT = "callsheet3.props"
+PROPS_MARKETS = (("pts", "player_points", "points"), ("reb", "player_rebounds", "rebounds"), ("ast", "player_assists", "assists"),
+                 ("tpm", "player_threes", "threes"), ("pra", "player_points_rebounds_assists", "points + rebounds + assists"))
+PROPS_SD_K = {"pts": 1.85, "reb": 1.2, "ast": 1.15, "tpm": 1.1, "pra": 1.9}      # one sigma = k x sqrt(projection), measured per market
+PROPS_OUT_MIN_PER30 = 1.42                                                    # minutes added per 30 mpg of regulars out (t 36)
+PROPS_OUT_RATE_PER30 = {"pts": 0.56, "reb": 0.0, "ast": 0.09, "tpm": 0.0, "pra": 0.66}   # per 36, per 30 mpg out (points t 11, assists t 6; the rest null)
+PROPS_PRIOR_CAP = 1000.0
+PROPS_PRIOR_SHARE = 0.5
+PROPS_LAST_N = 5
+PROPS_MIN_MINUTES = 60.0
+PROPS_REGULAR_MPG = 24.0
+PROPS_PLAYER_MIN_GAMES = 3
+PROPS_ANCHOR = 4.0
+PROPS_MODEL_W = 2.0
+PROPS_DVP_WEIGHT = {"pts": 0.75, "reb": 0.75, "ast": 0.75, "tpm": 0.4, "pra": 0.75}   # how much of a defence's lean to carry (measured, first half to second)
+PROPS_DVP_SHRINK = 20                                                         # games of this season before its table outweighs last season's
+PROPS_BET_EDGE = 0.03
+PROPS_BET_CHANCE = 0.55
+PROPS_OUT_STATUSES = ("out", "doubtful")
+HASHTAG_DVP = "https://hashtagbasketball.com/nba-defense-vs-position"
+HASHTAG_CODES = {"GS": "GSW", "NY": "NYK", "NO": "NOP", "SA": "SAS", "WSH": "WAS", "PHO": "PHX", "UTAH": "UTA"}
+# ESPN's box scores and rosters list a man as G, F or C (26,628 lines of 2025-26: G 12,970, F 9,644, C 3,982, a
+# handful finer), so the ledger's defence table is by those three; the website's five fold into them
+POS3 = {"G": "G", "PG": "G", "SG": "G", "F": "F", "SF": "F", "PF": "F", "C": "C", "G-F": "F", "F-G": "G", "F-C": "F", "C-F": "C", "GF": "F", "FC": "F"}
+POS_WORD = {"G": "guards", "F": "forwards", "C": "centres"}
+HTB_POS = {"G": ("PG", "SG"), "F": ("SF", "PF"), "C": ("C",)}
+
+
+def _phi(z):
+    return 0.5 * (1.0 + math.erf(z / math.sqrt(2.0)))
+
+
+def props_implied(price):
+    """An American price as the chance it needs."""
+    p = float(price)
+    return 100.0 / (p + 100.0) if p > 0 else -p / (-p + 100.0)
+
+
+def props_devig(over, under):
+    """The book's own chance of the over, the margin taken out."""
+    a, b = props_implied(over), props_implied(under)
+    return a / (a + b) if a + b > 0 else 0.5
+
+
+def props_over(mu, sd, line):
+    """(chance of the over, chance of a push) for a normal projection against a
+    line: a .5 line cannot push; a whole line pushes on the number itself."""
+    if sd <= 0:
+        return (1.0 if mu > line else 0.0), 0.0
+    if abs(line - round(line)) < 1e-9:
+        hi, lo = _phi((line + 0.5 - mu) / sd), _phi((line - 0.5 - mu) / sd)
+        return 1.0 - hi, hi - lo
+    return 1.0 - _phi((line - mu) / sd), 0.0
+
+
+def props_blend(pb, pm):
+    """The book's chance and the model's, blended on the logit scale at the
+    anchor's weight against the model's: the market stays the spine."""
+    def lg(p):
+        p = min(max(p, 1e-4), 1 - 1e-4)
+        return math.log(p / (1 - p))
+    z = (PROPS_ANCHOR * lg(pb) + PROPS_MODEL_W * lg(pm)) / (PROPS_ANCHOR + PROPS_MODEL_W)
+    return 1.0 / (1.0 + math.exp(-z))
+
+
+def props_name_key(name):
+    """'Luka Dončić' / 'Jaren Jackson Jr.' / 'P.J. Washington' -> a key the three
+    sites' spellings share: ascii, lower, no punctuation, no suffix."""
+    s = unicodedata.normalize("NFKD", str(name or "")).encode("ascii", "ignore").decode("ascii").lower()
+    s = re.sub(r"[.'`’]", "", s)
+    parts = [p for p in re.split(r"[^a-z0-9]+", s) if p and p not in ("jr", "sr", "ii", "iii", "iv", "v")]
+    return " ".join(parts)
+
+
+def props_stat(g, mk):
+    """The market's number from one game log, or None when the log predates the box lines."""
+    if mk == "pts":
+        return g.get("pts")
+    if not g.get("full"):
+        return None
+    if mk == "pra":
+        return (g.get("pts") or 0) + (g.get("reb") or 0) + (g.get("ast") or 0)
+    return g.get(mk)
+
+
+def nba_player_logs(ledger_games):
+    """Every player's game log from a ledger, by ESPN id: {pid: {n, team, pos,
+    g: [{d, opp, home, min, st, pts, reb, ast, tpm, full}, ...]}}, oldest first;
+    team and position are the last the ledger saw him with."""
+    per = {}
+    for g in sorted(ledger_games or [], key=lambda g: (g.get("date") or "", g.get("id") or "")):
+        for key, ab, opp, home in (("pa", g.get("away"), g.get("home"), False), ("ph", g.get("home"), g.get("away"), True)):
+            for p in g.get(key) or []:
+                d = nba_player_dict(p)
+                e = per.setdefault(d["id"], {"n": d["n"], "team": ab, "pos": "", "g": []})
+                e["n"], e["team"] = d["n"], ab
+                if d.get("pos"):
+                    e["pos"] = d["pos"]
+                e["g"].append({"d": g.get("date"), "opp": opp, "home": home, "min": float(d["min"] or 0), "st": int(d["st"] or 0),
+                               "pts": d["pts"], "reb": d["reb"], "ast": d["ast"], "tpm": d["tpm"], "full": d["full"]})
+    return per
+
+
+def props_rate(logs_this, logs_last, mk):
+    """The player's per-minute rate on a market: this season's total over its
+    minutes, with last season's rate as a prior weighted at half of last
+    season's minutes (PROPS_PRIOR_CAP of them at most). None under
+    PROPS_MIN_MINUTES of evidence."""
+    def sums(logs):
+        s = m = 0.0
+        n = 0
+        for g in logs or []:
+            v = props_stat(g, mk)
+            if v is None or g["min"] <= 0:
+                continue
+            s += v
+            m += g["min"]
+            n += 1
+        return s, m, n
+    s1, m1, n1 = sums(logs_this)
+    s2, m2, n2 = sums(logs_last)
+    prior = (s2 / m2) if m2 > 0 else None
+    w = min(m2, PROPS_PRIOR_CAP) * PROPS_PRIOR_SHARE if prior is not None else 0.0
+    denom = m1 + w
+    if denom < PROPS_MIN_MINUTES:
+        return None
+    return {"rate": (s1 + (prior * w if prior is not None else 0.0)) / denom, "this": (s1 / m1) if m1 > 0 else None, "m_this": m1, "n_this": n1,
+            "prior": prior, "m_last": m2, "n_last": n2, "w": w}
+
+
+def props_minutes(logs_this, logs_last):
+    """Minutes to project: the mean of the last PROPS_LAST_N games played this
+    season, with the season mean and the starts among them beside it. Before
+    he has played this season, LAST season's mean over every game he played
+    (not its last five: April's minutes are rest and garbage time; Cade
+    Cunningham's last five of 2025-26 averaged 23.6)."""
+    this = [g for g in (logs_this or []) if g["min"] > 0]
+    if this:
+        recent = this[-PROPS_LAST_N:]
+        return {"proj": sum(g["min"] for g in recent) / len(recent), "n": len(recent), "season": sum(g["min"] for g in this) / len(this),
+                "starts": sum(1 for g in recent if g["st"]), "last_season": False}
+    last = [g for g in (logs_last or []) if g["min"] > 0]
+    if not last:
+        return None
+    return {"proj": sum(g["min"] for g in last) / len(last), "n": len(last), "season": None, "starts": sum(1 for g in last if g["st"]), "last_season": True}
+
+
+def props_split(logs_this, logs_last, mk):
+    """Per-36 at home and on the road, this season with last season behind it: shown, never scored."""
+    out = {}
+    for side in (True, False):
+        s = m = 0.0
+        for g in (logs_this or []) + (logs_last or []):
+            v = props_stat(g, mk)
+            if v is None or g["min"] <= 0 or g["home"] != side:
+                continue
+            s += v
+            m += g["min"]
+        out["home" if side else "road"] = (s / m * 36.0, m) if m > 0 else None
+    return out
+
+
+def parse_hashtag_dvp(text):
+    """HashtagBasketball's defence-v-position page -> {(pos, tricode): {"pts":
+    (allowed a game, rank), "reb": ..., "ast": ..., "tpm": ...}} from the one
+    table that lists every position; the rank runs 1 (fewest allowed) to 150."""
+    best = []
+    for tb in re.findall(r"<table[^>]*>(.*?)</table>", text, re.S):
+        rows = re.findall(r"<tr[^>]*>(.*?)</tr>", tb, re.S)
+        if len(rows) > len(best):
+            best = rows
+    out, cols = {}, None
+    for r in best:
+        cells = [html.unescape(re.sub(r"\s+", " ", re.sub(r"<[^>]+>", " ", c))).strip() for c in re.findall(r"<t[dh][^>]*>(.*?)</t[dh]>", r, re.S)]
+        if not cells:
+            continue
+        if cells[0].lower().startswith("sort") or cells[0].lower() == "position":
+            cols = [c.replace("Sort:", "").strip().upper() for c in cells]
+            continue
+        if cols is None or len(cells) != len(cols) or "TEAM" not in cols:
+            continue
+        team = cells[cols.index("TEAM")].split()
+        if not team:
+            continue
+        code = team[0].upper()
+        ab = espn_tricode(HASHTAG_CODES.get(code, code))
+        e = {}
+        for key, col in (("pts", "PTS"), ("reb", "REB"), ("ast", "AST"), ("tpm", "3PM")):
+            if col not in cols:
+                continue
+            parts = cells[cols.index(col)].split()
+            try:
+                e[key] = (float(parts[0]), int(parts[1]) if len(parts) > 1 else None)
+            except (ValueError, IndexError):
+                continue
+        if e:
+            out[(cells[0].upper(), ab)] = e
+    return out
+
+
+def props_dvp_means(dvp):
+    """The league's mean allowed per position per stat, from the table itself."""
+    acc = {}
+    for (pos, _ab), e in dvp.items():
+        for k, (v, _r) in e.items():
+            a = acc.setdefault((pos, k), [0.0, 0])
+            a[0] += v
+            a[1] += 1
+    return {k: a[0] / a[1] for k, a in acc.items() if a[1]}
+
+
+def nba_dvp_table(ledger_games, date_iso=None):
+    """The ledger's own defence-v-position table: {(defence, pos3, mk): (factor,
+    games)}, what each defence allowed per minute to guards, forwards and
+    centres against the league's per-minute to that position, over its games
+    before date_iso (every game when None). A factor of 1.08 is eight percent
+    more than the league allowed."""
+    acc, lg, gcount = {}, {}, {}
+    for g in ledger_games or []:
+        if not g.get("detail") or (date_iso and (g.get("date") or "") >= date_iso):
+            continue
+        for key, opp in (("pa", g.get("home")), ("ph", g.get("away"))):
+            if not opp:
+                continue
+            gcount[opp] = gcount.get(opp, 0) + 1
+            for p in g.get(key) or []:
+                d = nba_player_dict(p)
+                ps = POS3.get(str(d.get("pos") or "").upper())
+                if not ps or not d["full"] or (d["min"] or 0) <= 0:
+                    continue
+                for mk in ("pts", "reb", "ast", "tpm"):
+                    v = d.get(mk) or 0
+                    a = acc.setdefault((opp, ps, mk), [0.0, 0.0])
+                    a[0] += v
+                    a[1] += d["min"]
+                    l = lg.setdefault((ps, mk), [0.0, 0.0])
+                    l[0] += v
+                    l[1] += d["min"]
+    out = {}
+    for (opp, ps, mk), (s, m) in acc.items():
+        l = lg[(ps, mk)]
+        if m > 0 and l[1] > 0 and l[0] > 0:
+            out[(opp, ps, mk)] = ((s / m) / (l[0] / l[1]), gcount.get(opp, 0))
+    return out
+
+
+def props_dvp_blend(this, last):
+    """This season's factor shrunk toward last season's by the games behind it:
+    {f, f_this, n_this, f_last, n_last} or None. `this` and `last` are (factor,
+    games) or None."""
+    if not this and not last:
+        return None
+    if this and last:
+        n = this[1]
+        f = (n * this[0] + PROPS_DVP_SHRINK * last[0]) / float(n + PROPS_DVP_SHRINK)
+    else:
+        f = (this or last)[0]
+    return {"f": f, "f_this": this[0] if this else None, "n_this": this[1] if this else 0, "f_last": last[0] if last else None, "n_last": last[1] if last else 0}
+
+
+def htb_line(dvp, opp_nick, opp, pos3, mk):
+    """HashtagBasketball's rank for a defence against the website's positions that fold into pos3, shown beside the ledger's table."""
+    parts = []
+    label = dict((m, lab) for m, _a, lab in PROPS_MARKETS).get(mk, mk)
+    for ps in HTB_POS.get(pos3, ()):
+        e = (dvp or {}).get((ps, opp))
+        if e and mk in e:
+            v, rank = e[mk]
+            parts.append("%.1f %s a game to %ss%s" % (v, label, ps, (" (%s of 150, 1 the fewest)" % ordinal(rank)) if rank else ""))
+    return ("HashtagBasketball: %s allow %s; shown, not scored" % (opp_nick, ", ".join(parts))) if parts else None
+
+
+def fetch_odds_events(sport, key):
+    """The sport's upcoming events (a free call): id, commence_time, the two clubs' full names."""
+    q = urllib.parse.urlencode({"apiKey": key, "dateFormat": "iso"})
+    return fetch_json("%s/sports/%s/events?%s" % (ODDS_API, ODDS_SPORTS[sport], q))
+
+
+def odds_event_props(doc, books):
+    """Every player prop in one event document: [{name, mk, line, op, up, book,
+    books: {book: [line, over, under]}}], the carded line the first book in
+    `books` that posts both prices on one number (a book's first number is
+    its main line; the alternates follow it in the list and are left)."""
+    keymap = {api: mk for mk, api, _ in PROPS_MARKETS}
+    by = {}
+    for bm in (doc or {}).get("bookmakers") or []:
+        bk = bm.get("key")
+        for m in bm.get("markets") or []:
+            mk = keymap.get(m.get("key"))
+            if not mk:
+                continue
+            for o in m.get("outcomes") or []:
+                name = str(o.get("description") or "").strip()
+                side = str(o.get("name") or "").strip().lower()
+                if side not in ("over", "under") or not name or o.get("point") is None:
+                    continue
+                slot = by.setdefault((name, mk), {}).setdefault(bk, [None, None, None])
+                try:
+                    pt = float(o["point"])
+                except (TypeError, ValueError):
+                    continue
+                if slot[0] is None:
+                    slot[0] = pt
+                if abs(pt - slot[0]) > 1e-9:
+                    continue
+                try:
+                    slot[1 if side == "over" else 2] = int(float(o.get("price")))
+                except (TypeError, ValueError):
+                    continue
+    out = []
+    for (name, mk), bks in by.items():
+        posted = [(bk, v) for bk, v in bks.items() if v[0] is not None and v[1] is not None and v[2] is not None]
+        if not posted:
+            continue
+        carded = None
+        for bk in books:
+            for b, v in posted:
+                if b == bk:
+                    carded = (b, v)
+                    break
+            if carded:
+                break
+        if carded is None:
+            carded = posted[0]
+        out.append({"name": name, "mk": mk, "line": carded[1][0], "op": carded[1][1], "up": carded[1][2], "book": carded[0],
+                    "books": {b: v for b, v in posted}})
+    out.sort(key=lambda x: (x["name"], x["mk"]))
+    return out
+
+
+def props_match_player(name, clubs, logs_this, logs_last, rosters=None):
+    """The ESPN id a prop's name refers to, looked for on the two clubs first:
+    the day's rosters when the game page lists them, then the ledgers' players
+    whose last club is one of the two, then anyone with the name. Returns
+    (pid, team, how) or (None, None, why)."""
+    key = props_name_key(name)
+    if not key:
+        return None, None, "no name"
+    for ab in clubs:
+        for pid, nm in ((rosters or {}).get(ab) or {}).items():
+            if props_name_key(nm) == key:
+                return str(pid), ab, "roster"
+    for logs in (logs_this, logs_last):
+        for pid, e in (logs or {}).items():
+            if e.get("team") in clubs and props_name_key(e.get("n")) == key:
+                return pid, e["team"], "ledger"
+    sur = key.split()[-1]
+    ini = key[0]
+    for logs in (logs_this, logs_last):
+        hits = [(pid, e) for pid, e in (logs or {}).items() if e.get("team") in clubs and props_name_key(e.get("n")).split()[-1:] == [sur] and props_name_key(e.get("n"))[:1] == ini]
+        if len(hits) == 1:
+            return hits[0][0], hits[0][1]["team"], "surname"
+    for logs in (logs_this, logs_last):
+        hits = [(pid, e) for pid, e in (logs or {}).items() if props_name_key(e.get("n")) == key]
+        if len(hits) == 1:
+            return hits[0][0], None, "name only, club unknown"
+    return None, None, "not in the ledgers"
+
+
+def props_out_minutes(ab, injuries, logs_this, logs_last):
+    """The minutes a game of the club's listed-out players (Out or Doubtful on
+    ESPN), each at his own mpg this season after PROPS_PLAYER_MIN_GAMES games,
+    else last season's: (total mpg of those at PROPS_REGULAR_MPG or more,
+    [(name, mpg, status)], [(name, status)] of the questionable)."""
+    regular, listed, maybe = 0.0, [], []
+    for inj in (injuries or {}).get(ab) or []:
+        st = str(inj.get("st") or "")
+        pid = str(inj.get("id") or "")
+        e1, e2 = (logs_this or {}).get(pid), (logs_last or {}).get(pid)
+        mpg = None
+        if e1 and len(e1["g"]) >= PROPS_PLAYER_MIN_GAMES:
+            mpg = sum(g["min"] for g in e1["g"]) / len(e1["g"])
+        elif e2 and e2["g"]:
+            mpg = sum(g["min"] for g in e2["g"]) / len(e2["g"])
+        elif e1 and e1["g"]:
+            mpg = sum(g["min"] for g in e1["g"]) / len(e1["g"])
+        if st.lower() in PROPS_OUT_STATUSES:
+            listed.append((inj.get("n"), mpg, st))
+            if mpg is not None and mpg >= PROPS_REGULAR_MPG:
+                regular += mpg
+        elif st:
+            maybe.append((inj.get("n"), st))
+    return regular, listed, maybe
+
+
+def props_project(prop, logs_this, logs_last, ctx):
+    """One prop's projection: {proj, sd, pm, pb, p, push, side, chance, price,
+    need, edge, band, why[]} or None with the reason. ctx carries out_mpg and
+    out_names for his club, pace and league_pace, dvp as (allowed, rank, league
+    mean) for his position against tonight's defence, home, and his own status."""
+    mk, line = prop["mk"], float(prop["line"])
+    label = dict((m, lab) for m, _a, lab in PROPS_MARKETS)[mk]
+    why = []
+    if ctx.get("self_out"):
+        return None, ["listed %s on ESPN: no projection, the book will void or pull the line" % ctx["self_out"]]
+    r = props_rate(logs_this, logs_last, mk)
+    m = props_minutes(logs_this, logs_last)
+    if not r or not m:
+        return None, ["no history to project from (under %d minutes with the stat in the ledgers)" % int(PROPS_MIN_MINUTES)]
+    rate36 = r["rate"] * 36.0
+    if r["this"] is not None and r["prior"] is not None:
+        why.append("%.1f %s per 36 this season (%d games, %d minutes), blended with last season's %.1f (%d of %d minutes, at half): %.1f per 36" % (
+            r["this"] * 36, label, r["n_this"], int(r["m_this"]), r["prior"] * 36, int(round(r["w"] / PROPS_PRIOR_SHARE)), int(r["m_last"]), rate36))
+    elif r["this"] is not None:
+        why.append("%.1f %s per 36 this season (%d games, %d minutes); no last season to blend" % (rate36, label, r["n_this"], int(r["m_this"])))
+    else:
+        why.append("%.1f %s per 36 LAST season (%d games, %d minutes): nothing this season yet" % (rate36, label, r["n_last"], int(r["m_last"])))
+    mins = m["proj"]
+    if m["last_season"]:
+        why.append("%.1f minutes projected: last season's mean over %d game%s (nothing this season yet), %d of them starts" % (mins, m["n"], "" if m["n"] == 1 else "s", m["starts"]))
+    else:
+        why.append("%.1f minutes projected: his last %d game%s%s, %d of them starts" % (
+            mins, m["n"], "" if m["n"] == 1 else "s", (" (season %.1f)" % m["season"]) if m["season"] else "", m["starts"]))
+    out_mpg = float(ctx.get("out_mpg") or 0.0)
+    rate = r["rate"]
+    if out_mpg > 0:
+        dmin = PROPS_OUT_MIN_PER30 * out_mpg / 30.0
+        drate = PROPS_OUT_RATE_PER30[mk] / 36.0 * out_mpg / 30.0
+        mins += dmin
+        rate += drate
+        why.append("%s out (%.0f minutes a game between them): +%.1f minutes and +%.2f %s per 36, the pooled rule, scored" % (
+            ", ".join(n for n, _mpg, _st in (ctx.get("out_names") or [])[:4]) or "regulars", out_mpg, dmin, drate * 36, label))
+    for nm, st in (ctx.get("maybe") or [])[:3]:
+        why.append("%s is %s: not counted as out" % (nm, st))
+    f_pace = 1.0
+    if ctx.get("pace") and ctx.get("league_pace"):
+        f_pace = float(ctx["pace"]) / float(ctx["league_pace"])
+        why.append("pace %.1f against the league's %.1f: x%.3f" % (ctx["pace"], ctx["league_pace"], f_pace))
+    f_dvp = 1.0
+    dv = ctx.get("dvp")
+    if dv and dv.get("f"):
+        wgt = PROPS_DVP_WEIGHT[mk]
+        f_dvp = 1.0 + wgt * (dv["f"] - 1.0)
+        detail = []
+        if dv.get("f_this") is not None:
+            detail.append("this season %.2f over %d game%s" % (dv["f_this"], dv["n_this"], "" if dv["n_this"] == 1 else "s"))
+        if dv.get("f_last") is not None:
+            detail.append("last season %.2f" % dv["f_last"])
+        why.append("%s allow %.2fx the league's %s per minute to %s (%s): x%.3f at %.2f weight, measured" % (
+            ctx.get("opp_nick") or "they", dv["f"], "points" if mk == "pra" else label, POS_WORD.get(ctx.get("pos"), "that position"), ", ".join(detail), f_dvp, wgt))
+    if ctx.get("htb"):
+        why.append(ctx["htb"])
+    sp = props_split(logs_this, logs_last, mk)
+    if sp.get("home") and sp.get("road"):
+        why.append("home %.1f / road %.1f per 36 over %d minutes: shown, not scored (a player's own split did not persist from one half of 2025-26 to the other, r 0.08)%s" % (
+            sp["home"][0], sp["road"][0], int(sp["home"][1] + sp["road"][1]), "; tonight at home" if ctx.get("home") else "; tonight on the road"))
+    mu = rate * mins * f_pace * f_dvp
+    sd = PROPS_SD_K[mk] * math.sqrt(max(mu, 1.0))
+    pm, push = props_over(mu, sd, line)
+    pm_c = pm / (1.0 - push) if push < 1.0 else 0.5
+    pb = props_devig(prop["op"], prop["up"])
+    p = props_blend(pb, pm_c)
+    side = "OVER" if p >= 0.5 else "UNDER"
+    chance = p if side == "OVER" else 1.0 - p
+    price = prop["op"] if side == "OVER" else prop["up"]
+    need = props_implied(price)
+    edge = chance - need
+    band = "BET" if (edge >= PROPS_BET_EDGE and chance >= PROPS_BET_CHANCE) else ("LEAN" if edge > 0 else "no edge")
+    why.append("projected %.1f against %s %.1f, one sigma %.1f: the over %.1f%% by the projection, %.1f%% by the book's prices; blended %.1f%% at %.0f to %.0f" % (
+        mu, label, line, sd, pm * 100, pb * 100, p * 100, PROPS_ANCHOR, PROPS_MODEL_W))
+    return {"proj": round(mu, 2), "sd": round(sd, 2), "pm": round(pm, 4), "pb": round(pb, 4), "p": round(p, 4), "push": round(push, 4),
+            "side": side, "chance": round(chance, 4), "price": price, "need": round(need, 4), "edge": round(edge, 4), "band": band,
+            "mins": round(mins, 1), "rate36": round(rate * 36.0, 2), "why": why}, why
+
+
+def nba_props_box(entry):
+    """A graded game's box for the Props tab, by ESPN id: [name, minutes, points, rebounds, assists, threes]."""
+    box = {}
+    for key in ("pa", "ph"):
+        for p in entry.get(key) or []:
+            d = nba_player_dict(p)
+            if d["id"]:
+                box[d["id"]] = [d["n"], d["min"], d["pts"], d["reb"], d["ast"], d["tpm"]]
+    return box
+
+
+ESPN_TEAM_CODE = {v: k for k, v in ESPN_TRICODE.items()}   # the league's tricode -> ESPN's own (GSW -> GS)
+
+
+def espn_team_roster(ab):
+    """A club's roster from ESPN's team page, {espn id: (name, position)}:
+    the authority on who is on which club today, since the game page lists
+    nobody before tip-off (seen 19 Oct 2026) and the ledger's last club is a
+    summer trade behind."""
+    doc = espn_json("/teams/%s/roster" % ESPN_TEAM_CODE.get(ab, ab))
+    out = {}
+    for a in (doc or {}).get("athletes") or []:
+        if a.get("id"):
+            out[str(a["id"])] = (a.get("displayName") or a.get("fullName") or str(a["id"]), str(((a.get("position") or {}).get("abbreviation")) or ""))
+    return out
+
+
+def make_nba_props(date_iso, out_dir, log):
+    """The day's player props with the slate's projection beside each, for The
+    Super Model's Props tab: nba-props-DATE.json. The lines come from The Odds
+    API (a credit a market a game), the history from the ledgers, who is out
+    from ESPN, the defence table from HashtagBasketball."""
+    key = odds_key(out_dir)
+    season = nba_season_id(date_iso)
+    led = load_nba_ledger(nba_ledger_path(out_dir, season))
+    prior = load_nba_ledger(nba_ledger_path(out_dir, nba_prev_season(season)))
+    logs_this = nba_player_logs(led["games"] if led else [])
+    logs_last = nba_player_logs(prior["games"] if prior else [])
+    full_this = sum(1 for e in logs_this.values() for g in e["g"] if g["full"])
+    full_last = sum(1 for e in logs_last.values() for g in e["g"] if g["full"])
+    log("Ledgers: %s %d games (%d player lines with the box stats), %s %d games (%d with)." % (
+        season, len(led["games"]) if led else 0, full_this, nba_prev_season(season), len(prior["games"]) if prior else 0, full_last))
+    if prior and not full_last:
+        log("  Last season's ledger has no box stats yet: run the NBA ledger for %s once (Run NBA ledger.bat) and rebounds, assists and threes get a history." % nba_prev_season(season))
+    tables, league = nba_team_tables(led["games"] if led else [], date_iso)
+    ptables, pleague = nba_team_tables(prior["games"] if prior else [], "9999-12-31")
+    league_pace = (league or {}).get("pace") or (pleague or {}).get("pace")
+
+    def club_pace(ab):
+        t = tables.get(ab)
+        if t and t["n"] >= NBA_MIN_TEAM_GAMES:
+            return t["pace"]
+        t = ptables.get(ab)
+        return t["pace"] if t else None
+    injuries = {}
+    try:
+        injuries = nba_injuries()
+        log("Injury report: %d clubs, %d players listed." % (len(injuries), sum(len(v) for v in injuries.values())))
+    except Exception as e:  # noqa: BLE001
+        log("Could not read the injury report (%s): nobody counted as out." % e)
+    dvp_this = nba_dvp_table(led["games"] if led else [], date_iso)
+    dvp_last = nba_dvp_table(prior["games"] if prior else [])
+    log("Defence v position from the ledgers: %d defence-position-market factors this season, %d last season (guards, forwards, centres)." % (len(dvp_this), len(dvp_last)))
+    htb = {}
+    try:
+        htb = parse_hashtag_dvp(fetch_text(HASHTAG_DVP))
+        log("HashtagBasketball's table: %d position-club rows, shown beside the ledger's factor." % len(htb))
+    except Exception as e:  # noqa: BLE001
+        log("Could not read HashtagBasketball's table (%s): the ledger's factor stands alone." % e)
+    day = {}
+    try:
+        for g in nba_day_games(date_iso):
+            day[(g["away"], g["home"])] = g
+        log("ESPN scoreboard: %d game%s on %s." % (len(day), "" if len(day) == 1 else "s", date_iso))
+    except Exception as e:  # noqa: BLE001
+        log("Could not read ESPN's scoreboard (%s): no rosters, spreads or totals beside the props." % e)
+    events = [ev for ev in fetch_odds_events("NBA", key) if us_game_date(ev.get("commence_time") or "") == date_iso]
+    log("The Odds API lists %d event%s on %s." % (len(events), "" if len(events) == 1 else "s", date_iso))
+    markets = ",".join(api for _mk, api, _lab in PROPS_MARKETS)
+    games, credits_used, roster_cache = [], 0, {}
+    for ev in events:
+        aab, hab = nba_nick_tricode(ev.get("away_team")), nba_nick_tricode(ev.get("home_team"))
+        away, home = NBA_NICK.get(aab, ev.get("away_team")), NBA_NICK.get(hab, ev.get("home_team"))
+        if not aab or not hab:
+            log("%s @ %s: could not place the clubs; skipped" % (ev.get("away_team"), ev.get("home_team")))
+            continue
+        try:
+            doc = fetch_odds_event("NBA", ev["id"], key, ODDS_BOOKS, markets=markets)
+        except Exception as e:  # noqa: BLE001
+            log("%s @ %s: no props from the API (%s)" % (away, home, e))
+            continue
+        used, left = odds_credits()
+        credits_used += used or 0
+        props = odds_event_props(doc, ODDS_BOOKS)
+        g = day.get((aab, hab)) or {}
+        rosters, roster_pos = {}, {}
+        for ab in (aab, hab):
+            try:
+                if ab not in roster_cache:
+                    roster_cache[ab] = espn_team_roster(ab)
+                rosters[ab] = {pid: nm for pid, (nm, _pos) in roster_cache[ab].items()}
+                roster_pos.update({pid: pos for pid, (_nm, pos) in roster_cache[ab].items()})
+            except Exception as e:  # noqa: BLE001
+                log("  %s: no roster from ESPN's team page (%s); the ledgers place its players" % (NBA_NICK.get(ab, ab), e))
+        pace_a, pace_h = club_pace(aab), club_pace(hab)
+        pace = (pace_a + pace_h) / 2.0 if pace_a and pace_h else (pace_a or pace_h)
+        out = {}
+        for ab in (aab, hab):
+            out[ab] = props_out_minutes(ab, injuries, logs_this, logs_last)
+        odds = g.get("odds") or {}
+        row = {"gid": g.get("id"), "away": away, "home": home, "aab": aab, "hab": hab, "tip": g.get("t") or ev.get("commence_time"),
+               "spread": odds.get("sp"), "total": odds.get("total"), "pace": round(pace, 1) if pace else None, "league_pace": round(league_pace, 1) if league_pace else None,
+               "out": {ab: [[n, round(mpg, 1) if mpg is not None else None, st] for n, mpg, st in out[ab][1]] for ab in (aab, hab)},
+               "props": [], "unmatched": []}
+        log("%s @ %s: %d props%s%s" % (away, home, len(props), (" · pace %.1f" % pace) if pace else "",
+                                       "".join(" · %s out: %s" % (NBA_NICK.get(ab, ab), ", ".join("%s (%s)" % (n, ("%.0f mpg" % mpg) if mpg is not None else "no line") for n, mpg, _s in out[ab][1])) for ab in (aab, hab) if out[ab][1])))
+        for pr in props:
+            pid, team, how = props_match_player(pr["name"], (aab, hab), logs_this, logs_last, rosters)
+            if not pid or not team:
+                row["unmatched"].append([pr["name"], pr["mk"], pr["line"], how])
+                continue
+            opp = hab if team == aab else aab
+            e1, e2 = logs_this.get(pid) or {}, logs_last.get(pid) or {}
+            pos = POS3.get(str(e1.get("pos") or e2.get("pos") or roster_pos.get(pid) or "").upper(), "")
+            self_out = ""
+            for n, mpg, st in out[team][1]:
+                if props_name_key(n) == props_name_key(pr["name"]):
+                    self_out = st
+            dmk = "pts" if pr["mk"] == "pra" else pr["mk"]
+            dv = props_dvp_blend(dvp_this.get((opp, pos, dmk)), dvp_last.get((opp, pos, dmk))) if pos else None
+            ctx = {"out_mpg": out[team][0], "out_names": [(n, mpg, st) for n, mpg, st in out[team][1] if mpg is not None and mpg >= PROPS_REGULAR_MPG],
+                   "maybe": out[team][2], "pace": pace, "league_pace": league_pace, "home": team == hab, "pos": pos, "opp_nick": NBA_NICK.get(opp, opp),
+                   "dvp": dv, "htb": htb_line(htb, NBA_NICK.get(opp, opp), opp, pos, dmk) if pos else None, "self_out": self_out}
+            proj, why = props_project(pr, e1.get("g"), e2.get("g"), ctx)
+            recent = [[g_["d"], g_["opp"], 1 if g_["home"] else 0, g_["min"], props_stat(g_, pr["mk"])] for g_ in (e1.get("g") or e2.get("g") or [])[-10:]]
+            item = {"pid": pid, "name": e1.get("n") or e2.get("n") or pr["name"], "team": team, "opp": opp, "home": team == hab, "pos": pos,
+                    "mk": pr["mk"], "line": pr["line"], "op": pr["op"], "up": pr["up"], "book": pr["book"], "books": pr["books"], "log": recent, "why": why}
+            if proj:
+                item.update(proj)
+            row["props"].append(item)
+        row["props"].sort(key=lambda x: (-(x.get("edge") if x.get("edge") is not None else -9), x["name"], x["mk"]))
+        projected = sum(1 for x in row["props"] if x.get("p") is not None)
+        log("  %d placed and projected, %d placed without a projection, %d not placed%s" % (
+            projected, len(row["props"]) - projected, len(row["unmatched"]), (" (credits: %s used, %s left)" % (used, left)) if used is not None else ""))
+        for x in row["props"][:3]:
+            if x.get("p") is not None:
+                log("    %s %s %s %s at %+d: %.1f%% (needs %.1f%%) %s · proj %.1f" % (x["name"], x["side"], x["line"], dict((m, lab) for m, _a, lab in PROPS_MARKETS)[x["mk"]], x["price"], x["chance"] * 100, x["need"] * 100, x["band"], x["proj"]))
+        games.append(row)
+    doc = {"format": PROPS_FORMAT, "version": 1, "date": date_iso, "generated": now_utc(), "source": "slate.py nba-props: The Odds API, the ledgers, ESPN, HashtagBasketball",
+           "credits": credits_used, "games": games,
+           "method": {"anchor": PROPS_ANCHOR, "model": PROPS_MODEL_W, "sd_k": PROPS_SD_K, "out_min_per30": PROPS_OUT_MIN_PER30, "out_rate_per30": PROPS_OUT_RATE_PER30, "dvp_weight": PROPS_DVP_WEIGHT, "dvp_shrink": PROPS_DVP_SHRINK}}
+    path = os.path.join(out_dir, "nba-props-%s.json" % date_iso)
+    with open(path, "w", encoding="utf-8") as f:
+        json.dump(doc, f, indent=1)
+    n = sum(len(g["props"]) for g in games)
+    log("Wrote %s: %d props on %d game%s, %d credits. Open The Super Model -> NBA PROPS -> Load props." % (path, n, len(games), "" if len(games) == 1 else "s", credits_used))
     return path
 
 
@@ -4497,6 +5219,85 @@ def selftest():
           row4["inputs"]["agname"] == "Jonathan Q" and row4["inputs"]["agconf"] is False
           and any("RotoWire names Call Up in net for the Rangers (confirmed), who is not on the club's goalie page" in n for n in row4["notes"]))
     check("lineups: the boxes start False on every row, so the sheet reads a boolean either way", i["agconf"] is False and i["hgconf"] is False)
+    # the player props (19 Oct 2026): the lines in The Odds API's shape, the defence table, the logs, the projection
+    ev_doc = {"id": "e1", "bookmakers": [
+        {"key": "draftkings", "markets": [{"key": "player_points", "outcomes": [{"name": "Over", "description": "Luka Dončić", "price": -115, "point": 31.5}, {"name": "Under", "description": "Luka Dončić", "price": -105, "point": 31.5}]}]},
+        {"key": "fanatics", "markets": [
+            {"key": "player_points", "outcomes": [{"name": "Over", "description": "Luka Dončić", "price": -110, "point": 30.5}, {"name": "Under", "description": "Luka Dončić", "price": -110, "point": 30.5},
+                                                  {"name": "Over", "description": "Luka Dončić", "price": 150, "point": 35.5}, {"name": "Under", "description": "Luka Dončić", "price": -190, "point": 35.5},
+                                                  {"name": "Over", "description": "Bench Guy", "price": -110, "point": 8.5}]},
+            {"key": "player_rebounds", "outcomes": []},
+            {"key": "player_first_basket", "outcomes": [{"name": "Luka Dončić", "price": 600}]}]},
+        {"key": "fanduel", "markets": [{"key": "player_rebounds", "outcomes": [{"name": "Over", "description": "Luka Dončić", "price": -120, "point": 8.5}, {"name": "Under", "description": "Luka Dončić", "price": 100, "point": 8.5}]}]}]}
+    pp = odds_event_props(ev_doc, ODDS_BOOKS)
+    check("props: the carded book's main line first, the alternates left, a one-sided line left, the other markets ignored",
+          [(x["name"], x["mk"], x["line"], x["op"], x["up"], x["book"]) for x in pp] == [("Luka Dončić", "pts", 30.5, -110, -110, "fanatics"), ("Luka Dončić", "reb", 8.5, -120, 100, "fanduel")]
+          and pp[0]["books"]["draftkings"] == [31.5, -115, -105] and "fanatics" not in pp[1]["books"])
+    dvp_html = ('<table id="GridView2"><tr><th>Sort: Position</th><th>Sort: Team</th><th>Sort: PTS</th><th>Sort: REB</th></tr><tr><td>PG</td><td>OKC &nbsp;&nbsp; 3</td><td>21.6 &nbsp;&nbsp; 28</td><td>6.3 &nbsp;&nbsp; 27</td></tr></table>'
+                '<table id="GridView1"><tr><th>Sort: Position</th><th>Sort: Team</th><th>Sort: PTS</th><th>Sort: FG%</th><th>Sort: 3PM</th><th>Sort: REB</th><th>Sort: AST</th></tr>'
+                '<tr><td>PG</td><td><a>NY</a> &nbsp;&nbsp; 6</td><td>21.9 &nbsp;&nbsp; 34</td><td>42.8 &nbsp;&nbsp; 7</td><td>3.0 &nbsp;&nbsp; 104</td><td>5.6 &nbsp;&nbsp; 4</td><td>8.4 &nbsp;&nbsp; 135</td></tr>'
+                '<tr><td>PG</td><td>GS &nbsp;&nbsp; 150</td><td>26.1 &nbsp;&nbsp; 149</td><td>47.0 &nbsp;&nbsp; 83</td><td>3.9 &nbsp;&nbsp; 150</td><td>6.5 &nbsp;&nbsp; 35</td><td>8.6 &nbsp;&nbsp; 139</td></tr>'
+                '<tr><td>C</td><td>GS &nbsp;&nbsp; 10</td><td>24.0 &nbsp;&nbsp; 50</td><td>50.0 &nbsp;&nbsp; 90</td><td>0.5 &nbsp;&nbsp; 10</td><td>12.0 &nbsp;&nbsp; 100</td><td>3.0 &nbsp;&nbsp; 20</td></tr></table>')
+    dv = parse_hashtag_dvp(dvp_html)
+    means = props_dvp_means(dv)
+    check("props: the defence table from the one table with every position, the site's codes mapped to the league's, value and rank, the league mean per position",
+          dv[("PG", "NYK")]["pts"] == (21.9, 34) and dv[("PG", "GSW")]["tpm"] == (3.9, 150) and dv[("C", "GSW")]["reb"] == (12.0, 100) and ("PG", "OKC") not in dv
+          and abs(means[("PG", "pts")] - 24.0) < 1e-9 and means[("C", "ast")] == 3.0)
+
+    def pline(pid, name, st, mins, pts, reb, ast, tpm, pos="PG"):
+        return nba_player_line(pid, name, st, mins, pts, 0, reb, ast, tpm, 20, 8, 3, 1, 0, 10, 7, pos)
+    this_games = [{"id": "g%d" % k, "date": "2026-10-%02d" % (10 + k), "away": "DAL", "home": "LAL", "detail": True,
+                   "pa": [pline("11", "Luka Doncic", 1, m_, p_, r_, a_, t_), pline("22", "Kyrie Irving", 1, 30.0, 20, 4, 5, 2)], "ph": [pline("44", "LeBron James", 1, 35.0, 25, 7, 8, 2, "SF")]}
+                  for k, (m_, p_, r_, a_, t_) in enumerate([(36.0, 30, 8, 9, 4), (34.0, 28, 7, 8, 3), (38.0, 35, 9, 10, 5)])]
+    last_games = [{"id": "h%d" % k, "date": "2026-01-%02d" % (10 + k), "away": "LAL", "home": "DAL", "detail": True, "ph": [pline("11", "Luka Doncic", 1, 35.0, 30, 8, 8, 4)], "pa": [pline("44", "LeBron James", 1, 35.0, 25, 7, 8, 2, "SF")]} for k in range(2)]
+    lt, ll = nba_player_logs(this_games), nba_player_logs(last_games)
+    check("props: the game logs by id, oldest first, with the club, the position and the stats",
+          lt["11"]["team"] == "DAL" and lt["11"]["pos"] == "PG" and len(lt["11"]["g"]) == 3 and lt["11"]["g"][-1]["pts"] == 35 and lt["11"]["g"][0]["home"] is False and ll["11"]["g"][0]["home"] is True and lt["44"]["pos"] == "SF")
+    pr_ = props_rate(lt["11"]["g"], ll["11"]["g"], "pts")
+    check("props: the rate blends this season with last season's at half its minutes", abs(pr_["rate"] * 36 - 30.965) < 0.01 and pr_["m_this"] == 108 and pr_["w"] == 35 and abs(pr_["prior"] * 36 - 30.857) < 0.01
+          and props_rate([], [], "pts") is None and props_rate(lt["11"]["g"], ll["11"]["g"], "pra")["n_this"] == 3)
+    pm_ = props_minutes(lt["11"]["g"], ll["11"]["g"])
+    check("props: the minutes are the last five games' mean this season, else last season's whole-season mean",
+          pm_["proj"] == 36.0 and pm_["n"] == 3 and pm_["starts"] == 3 and pm_["last_season"] is False and pm_["season"] == 36.0
+          and props_minutes([], ll["11"]["g"]) == {"proj": 35.0, "n": 2, "season": None, "starts": 2, "last_season": True} and props_minutes([], []) is None)
+    check("props: the chance of the over from a normal, a whole line pushing on the number", abs(props_over(34.134, 10.5165, 30.5)[0] - 0.6352) < 0.001 and props_over(34.134, 10.5165, 30.5)[1] == 0
+          and abs(sum(props_over(30.0, 5.0, 30)) - (1 - _phi(-0.1))) < 1e-9 and props_over(20.0, 0.0, 19.5) == (1.0, 0.0))
+    check("props: the blend leans on the market", abs(props_blend(0.5, 0.6352) - 0.5461) < 0.001 and props_blend(0.5, 0.5) == 0.5 and abs(props_devig(-110, -110) - 0.5) < 1e-9 and abs(props_implied(150) - 0.4) < 1e-9)
+    inj_ = {"DAL": [{"id": "22", "n": "Kyrie Irving", "st": "Out", "note": "knee"}, {"id": "33", "n": "Some Body", "st": "Questionable", "note": "ankle"}]}
+    out_mpg, listed, maybe = props_out_minutes("DAL", inj_, lt, ll)
+    check("props: the regulars out, at their own minutes, the questionable listed apart", out_mpg == 30.0 and listed == [("Kyrie Irving", 30.0, "Out")] and maybe == [("Some Body", "Questionable")])
+    prop_ = {"name": "Luka Dončić", "mk": "pts", "line": 30.5, "op": -110, "up": -110, "book": "fanatics", "books": {}}
+    tbl = nba_dvp_table(this_games)
+    check("props: the ledger's defence table, per defence, position and market, with the games behind it; one defence of guards is the league itself",
+          tbl[("LAL", "G", "pts")] == (1.0, 3) and tbl[("DAL", "F", "reb")] == (1.0, 3) and ("DAL", "G", "pts") not in tbl and nba_dvp_table(this_games, "2026-10-11")[("LAL", "G", "ast")][1] == 1)
+    check("props: this season's factor shrinks toward last season's by the games behind it",
+          abs(props_dvp_blend((1.10, 10), (1.00, 82))["f"] - 1.0333333) < 1e-6 and props_dvp_blend((1.10, 10), None)["f"] == 1.10 and props_dvp_blend(None, (0.95, 82)) == {"f": 0.95, "f_this": None, "n_this": 0, "f_last": 0.95, "n_last": 82}
+          and props_dvp_blend(None, None) is None)
+    check("props: the website's rank shown beside the ledger's factor, the five positions folded into three",
+          htb_line(dv, "Knicks", "NYK", "G", "pts") == "HashtagBasketball: Knicks allow 21.9 points a game to PGs (34th of 150, 1 the fewest); shown, not scored"
+          and htb_line(dv, "Warriors", "GSW", "C", "reb") == "HashtagBasketball: Warriors allow 12.0 rebounds a game to Cs (100th of 150, 1 the fewest); shown, not scored" and htb_line(dv, "Knicks", "NYK", "F", "pts") is None)
+    ctx_ = {"out_mpg": 30.0, "out_names": [("Kyrie Irving", 30.0, "Out")], "maybe": [("Some Body", "Questionable")], "pace": 100.0, "league_pace": 98.0, "home": False, "pos": "G", "opp_nick": "Lakers",
+            "dvp": {"f": 25.0 / 24.0, "f_this": 25.0 / 24.0, "n_this": 10, "f_last": None, "n_last": 0}, "htb": "HashtagBasketball: Lakers allow 25.0 points a game to PGs (120th of 150, 1 the fewest); shown, not scored", "self_out": ""}
+    proj_, why_ = props_project(prop_, lt["11"]["g"], ll["11"]["g"], ctx_)
+    check("props: the projection is rate x minutes, the regulars out, pace and the defence, against the line",
+          abs(proj_["proj"] - 34.48) < 0.05 and abs(proj_["sd"] - 10.86) < 0.02 and proj_["side"] == "OVER" and abs(proj_["p"] - 0.549) < 0.002 and proj_["band"] == "LEAN"
+          and abs(proj_["edge"] - 0.025) < 0.002 and proj_["price"] == -110 and abs(proj_["mins"] - 37.4) < 0.05)
+    check("props: the why says each step",
+          any(w.startswith("31.0 points per 36 this season (3 games, 108 minutes), blended with last season's 30.9 (70 of 70 minutes, at half): 31.0 per 36") for w in why_)
+          and any(w.startswith("36.0 minutes projected: his last 3 games (season 36.0), 3 of them starts") for w in why_)
+          and any(w == "Kyrie Irving out (30 minutes a game between them): +1.4 minutes and +0.56 points per 36, the pooled rule, scored" for w in why_)
+          and any(w == "Some Body is Questionable: not counted as out" for w in why_) and any(w == "pace 100.0 against the league's 98.0: x1.020" for w in why_)
+          and any(w == "Lakers allow 1.04x the league's points per minute to guards (this season 1.04 over 10 games): x1.031 at 0.75 weight, measured" for w in why_)
+          and any(w == ctx_["htb"] for w in why_)
+          and any(w.startswith("home 30.9 / road 31.0 per 36 over 178 minutes: shown, not scored") and w.endswith("; tonight on the road") for w in why_)
+          and any(w.startswith("projected 34.5 against points 30.5, one sigma 10.9: the over 64.3% by the projection, 50.0% by the book's prices; blended 54.9% at 4 to 2") for w in why_))
+    check("props: a listed-out player gets no projection, and no history is said", props_project(prop_, lt["11"]["g"], ll["11"]["g"], dict(ctx_, self_out="Out"))[0] is None
+          and props_project(prop_, [], [], ctx_)[1] == ["no history to project from (under 60 minutes with the stat in the ledgers)"])
+    check("props: a prop's name finds the player on one of the two clubs, by roster, by ledger, by surname, else says so",
+          props_match_player("Luka Dončić", ("DAL", "LAL"), lt, ll) == ("11", "DAL", "ledger") and props_match_player("L. Doncic", ("DAL", "LAL"), lt, ll) == ("11", "DAL", "surname")
+          and props_match_player("Luka Doncic", ("BOS", "MIA"), {}, {}, {"MIA": {"77": "Luka Doncic"}}) == ("77", "MIA", "roster") and props_match_player("Nobody Here", ("DAL", "LAL"), lt, ll) == (None, None, "not in the ledgers")
+          and props_match_player("Luka Doncic", ("BOS", "MIA"), lt, ll) == ("11", None, "name only, club unknown") and props_name_key("Jaren Jackson Jr.") == "jaren jackson" and props_name_key("P.J. Washington") == "pj washington")
+    check("props: the box for the grade file, by id", nba_props_box(this_games[0]) == {"11": ["Luka Doncic", 36.0, 30, 8, 9, 4], "22": ["Kyrie Irving", 30.0, 20, 4, 5, 2], "44": ["LeBron James", 35.0, 25, 7, 8, 2]})
     check("nhl grade: final with the period score", gr2["finals"] == {"fa": "2", "fh": "3", "f5a": "1", "f5h": "0"})
     check("previous season id", nhl_prev_season("20262027") == "20252026")
     # the odds feed, offline: one event document in The Odds API's shape
@@ -4606,10 +5407,14 @@ def selftest():
     check("nba box (CDN): quarters, overtime, the end, the team lines and pace",
           e1["qa"] == [28, 25, 30, 26] and e1["qh"] == [35, 31, 33, 33] and e1["ota"] == [] and e1["end"] == "REG" and e1["sa"]["fga"] == 90 and e1["sh"]["tov"] == 14 and e1["pace"] == 101.9 and e1["detail"] is True)
     check("nba box (CDN): every man who played with his minutes, starters flagged; the inactive and the DNPs listed with the reason",
-          e1["pa"][0] == [201, "Jalen B", 1, 34.2, 25, -12] and e1["pa"][1][2] == 0 and len(e1["pa"]) == 2 and e1["oa"] == [[203, "Hurt Guy", "Injury/Illness - Left Knee"], [204, "Benched Guy", "DNP - Coach's Decision"]]
+          e1["pa"][0][:6] == [201, "Jalen B", 1, 34.2, 25, -12] and e1["pa"][1][2] == 0 and len(e1["pa"]) == 2 and e1["oa"] == [[203, "Hurt Guy", "Injury/Illness - Left Knee"], [204, "Benched Guy", "DNP - Coach's Decision"]]
           and e1["ph"][0][1] == "Jayson T" and e1["oh"] == [])
+    check("nba box: the player line carries the box stats (19 Oct 2026) and reads as a dict either length",
+          len(e1["pa"][0]) == 17 and nba_player_dict(e1["pa"][0])["full"] is True and nba_player_dict(e1["pa"][0])["reb"] == 0
+          and nba_player_dict([201, "Jalen B", 1, 34.2, 25, -12]) == {"id": "201", "n": "Jalen B", "st": 1, "min": 34.2, "pts": 25, "pm": -12, "reb": None, "ast": None, "tpm": None, "fga": None, "fta": None, "tov": None, "stl": None, "blk": None, "fgm": None, "ftm": None, "pos": None, "full": False}
+          and nba_player_line("9", "X", True, 31.26, "20", None, reb="7", pos="PG") == ["9", "X", 1, 31.3, 20, 0, 7, 0, 0, 0, 0, 0, 0, 0, 0, 0, "PG"])
     check("nba box (stats site): quarters from the summary's line score, starters by position, the DNP comment",
-          e2["qa"] == [20, 30, 25, 28] and e2["qh"] == [30, 28, 20, 25] and e2["ota"] == [5] and e2["oth"] == [10] and e2["end"] == "OT" and e2["pa"][0] == [301, "Anthony E", 1, 38.5, 30, 4]
+          e2["qa"] == [20, 30, 25, 28] and e2["qh"] == [30, 28, 20, 25] and e2["ota"] == [5] and e2["oth"] == [10] and e2["end"] == "OT" and e2["pa"][0][:6] == [301, "Anthony E", 1, 38.5, 30, 4] and len(e2["pa"][0]) == 17
           and e2["oa"] == [[302, "Sat Out", "DNP - Injury/Illness"]] and e2["pace"] is not None and e2["detail"] is True and any("trying the stats site" in l for l in lines3))
     check("nba schedule (CDN): this season's finals only, dates normalised", sch == [{"id": "0022600003", "date": "2026-10-22", "away": "GSW", "home": "LAL", "fa": 110, "fh": 115}])
     check("nba box: tip-off and the crew ride along for the rest, travel and referee tests",
@@ -4674,8 +5479,9 @@ def selftest():
     check("nba espn: quarters from the line scores, the box lines and pace", es["qa"] == [28, 25, 30, 26] and es["qh"] == [35, 31, 33, 33] and es["ota"] == [] and es["end"] == "REG"
           and es["sa"] == {"fga": 90, "fta": 25, "oreb": 10, "tov": 12, "min": 240.0} and es["sh"]["tov"] == 14 and es["pace"] == 101.9 and es["detail"] is True)
     check("nba espn: every man who played with his minutes, starters flagged; the DNPs and the injury list as who sat; the crew",
-          es["pa"] == [["3934672", "Jalen Brunson", 1, 34.0, 25, -12], ["1", "Bench Guy", 0, 12.0, 4, -3]] and es["oa"] == [["2", "Benched Guy", "COACH'S DECISION"], ["3", "Hurt Guy", "Out - Knee"]]
-          and es["ph"] == [["4065648", "Jayson Tatum", 1, 36.0, 37, 20]] and es["oh"] == [] and es["off"] == ["Scott Foster", "Tony Brothers"] and es["t"] == "2024-10-22T23:30Z")
+          es["pa"] == [["3934672", "Jalen Brunson", 1, 34.0, 25, -12, 3, 8, 2, 18, 5, 2, 1, 0, 9, 5, "PG"], ["1", "Bench Guy", 0, 12.0, 4, -3, 2, 0, 0, 4, 0, 0, 0, 0, 2, 0, ""]]
+          and es["oa"] == [["2", "Benched Guy", "COACH'S DECISION"], ["3", "Hurt Guy", "Out - Knee"]]
+          and es["ph"] == [["4065648", "Jayson Tatum", 1, 36.0, 37, 20, 4, 10, 8, 18, 1, 1, 1, 0, 14, 1, ""]] and es["oh"] == [] and es["off"] == ["Scott Foster", "Tony Brothers"] and es["t"] == "2024-10-22T23:30Z")
     check("nba ledger: a past season reads from ESPN first", any("ESPN scoreboard: 1 regular-season finals listed" in l for l in lines6) and len(led6["games"]) == 1 and led6["games"][0]["id"] == "401704001"
           and led6["games"][0]["hn"] == "Celtics" and led6["games"][0]["detail"] is True and led6["measure"]["games"] == 1)
     # the NBA slate and the morning grade (15 Oct 2026), offline: the scoreboard, the injury page and two small ledgers
@@ -4994,7 +5800,7 @@ def _canned_nba():
                                        {"homeAway": "home", "team": {"abbreviation": "BOS"}, "statistics": [{"name": "fieldGoalsMade-fieldGoalsAttempted", "displayValue": "48-86"}, {"name": "freeThrowsMade-freeThrowsAttempted", "displayValue": "16-20"},
                                                                                                           {"name": "offensiveRebounds", "displayValue": "8"}, {"name": "totalTurnovers", "displayValue": "14"}]}],
                              "players": [{"team": {"abbreviation": "NY"}, "statistics": [{"names": ["MIN", "FG", "3PT", "FT", "OREB", "DREB", "REB", "AST", "STL", "BLK", "TO", "PF", "+/-", "PTS"],
-                                                                                           "athletes": [{"athlete": {"id": "3934672", "displayName": "Jalen Brunson"}, "starter": True, "didNotPlay": False, "stats": ["34", "9-18", "2-5", "5-5", "0", "3", "3", "8", "1", "0", "2", "2", "-12", "25"]},
+                                                                                           "athletes": [{"athlete": {"id": "3934672", "displayName": "Jalen Brunson", "position": {"abbreviation": "PG"}}, "starter": True, "didNotPlay": False, "stats": ["34", "9-18", "2-5", "5-5", "0", "3", "3", "8", "1", "0", "2", "2", "-12", "25"]},
                                                                                                         {"athlete": {"id": "1", "displayName": "Bench Guy"}, "starter": False, "didNotPlay": False, "stats": ["12", "2-4", "0-1", "0-0", "1", "1", "2", "0", "0", "0", "0", "1", "-3", "4"]},
                                                                                                         {"athlete": {"id": "2", "displayName": "Benched Guy"}, "starter": False, "didNotPlay": True, "reason": "COACH'S DECISION", "stats": []}]}]},
                                          {"team": {"abbreviation": "BOS"}, "statistics": [{"names": ["MIN", "FG", "3PT", "FT", "OREB", "DREB", "REB", "AST", "STL", "BLK", "TO", "PF", "+/-", "PTS"],
@@ -5209,7 +6015,7 @@ def _canned_cbs():
 
 def main(argv=None):
     ap = argparse.ArgumentParser(description="Write the day's slate (or yesterday's finals) for Call Sheet 2.0.")
-    ap.add_argument("mode", nargs="?", choices=["slate", "grade", "nhl", "nhl-grade", "nhl-ledger", "nba", "nba-grade", "nba-ledger", "odds", "odds-history"], default="slate",
+    ap.add_argument("mode", nargs="?", choices=["slate", "grade", "nhl", "nhl-grade", "nhl-ledger", "nba", "nba-grade", "nba-ledger", "nba-props", "odds", "odds-history"], default="slate",
                     help="slate (default): today's MLB inputs. grade: MLB finals. nhl: today's NHL inputs. nhl-grade: NHL finals. "
                          "nhl-ledger: every NHL final this season, measured against the sheet's assumptions. "
                          "nba: today's NBA inputs (ratings, pace, rest, who is out, the context lines). nba-grade: NBA finals with the half-time score. "
@@ -5267,6 +6073,8 @@ def main(argv=None):
             path = make_nba_slate(date_iso, a.out, log)
         elif a.mode == "nba-grade":
             path = make_nba_grade(date_iso, a.out, log)
+        elif a.mode == "nba-props":
+            path = make_nba_props(date_iso, a.out, log)
         elif a.mode == "odds":
             sports = tuple(s.strip().upper() for s in a.sports.split(",") if s.strip()) if a.sports else ("MLB", "NHL", "NBA")
             path = make_odds(date_iso, a.out, log, a.books, sports)

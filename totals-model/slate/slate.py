@@ -4097,6 +4097,8 @@ def make_nba_props(date_iso, out_dir, log):
         log("Could not read ESPN's scoreboard (%s): no rosters, spreads or totals beside the props." % e)
     events = [ev for ev in fetch_odds_events("NBA", key) if us_game_date(ev.get("commence_time") or "") == date_iso]
     log("The Odds API lists %d event%s on %s." % (len(events), "" if len(events) == 1 else "s", date_iso))
+    if not events:
+        log("Nothing to project for %s. The run is for today unless told otherwise: python slate.py nba-props --date 2026-10-21 (or add --date to the bat file's click)." % date_iso)
     markets = ",".join(api for _mk, api, _lab in PROPS_MARKETS)
     games, credits_used, roster_cache = [], 0, {}
     for ev in events:
@@ -5298,6 +5300,9 @@ def selftest():
           and props_match_player("Luka Doncic", ("BOS", "MIA"), {}, {}, {"MIA": {"77": "Luka Doncic"}}) == ("77", "MIA", "roster") and props_match_player("Nobody Here", ("DAL", "LAL"), lt, ll) == (None, None, "not in the ledgers")
           and props_match_player("Luka Doncic", ("BOS", "MIA"), lt, ll) == ("11", None, "name only, club unknown") and props_name_key("Jaren Jackson Jr.") == "jaren jackson" and props_name_key("P.J. Washington") == "pj washington")
     check("props: the box for the grade file, by id", nba_props_box(this_games[0]) == {"11": ["Luka Doncic", 36.0, 30, 8, 9, 4], "22": ["Kyrie Irving", 30.0, 20, 4, 5, 2], "44": ["LeBron James", 35.0, 25, 7, 8, 2]})
+    check("the date: every slate, the ledgers, the odds and the props run for today; the grades for yesterday",
+          all(default_date(m, dt.date(2026, 10, 19)) == "2026-10-19" for m in ("slate", "nhl", "nhl-ledger", "nba", "nba-ledger", "nba-props", "odds"))
+          and all(default_date(m, dt.date(2026, 10, 19)) == "2026-10-18" for m in ("grade", "nhl-grade", "nba-grade")))
     check("nhl grade: final with the period score", gr2["finals"] == {"fa": "2", "fh": "3", "f5a": "1", "f5h": "0"})
     check("previous season id", nhl_prev_season("20262027") == "20252026")
     # the odds feed, offline: one event document in The Odds API's shape
@@ -6012,6 +6017,15 @@ def _canned_cbs():
 
 
 # ---- main ------------------------------------------------------------------
+# The slates run for today, the grades for yesterday. The props run was left
+# off this list on 19 Oct 2026 and the user's first run wrote an empty file
+# for the 18th; the list is a name now, and the self-test reads it.
+TODAY_MODES = ("slate", "nhl", "nhl-ledger", "nba", "nba-ledger", "nba-props", "odds")
+
+
+def default_date(mode, today):
+    return (today if mode in TODAY_MODES else today - dt.timedelta(days=1)).isoformat()
+
 
 def main(argv=None):
     ap = argparse.ArgumentParser(description="Write the day's slate (or yesterday's finals) for Call Sheet 2.0.")
@@ -6051,7 +6065,7 @@ def main(argv=None):
             print("--date must look like 2026-09-28")
             return 2
     else:
-        date_iso = (today if a.mode in ("slate", "nhl", "nhl-ledger", "nba", "nba-ledger", "odds") else today - dt.timedelta(days=1)).isoformat()
+        date_iso = default_date(a.mode, today)
     lines = []
 
     def log(s):

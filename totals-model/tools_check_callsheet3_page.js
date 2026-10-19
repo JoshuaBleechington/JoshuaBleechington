@@ -908,6 +908,36 @@ const CHECKS = ["dome","playoff","agconf","hgconf","agbk","hgbk"];
       'props: the record tile keeps the props by band, side and market, the void counted apart', propsT.tileText.slice(0, 500));
   chk(/3 props graded on the Props tab/.test(propsT.slateMsg), 'props: the slate message says how many props the grade file graded', propsT.slateMsg.slice(-160));
   chk(propsT.restored === 1 && propsT.viewOff && propsT.colsBack && propsT.nbaPressed === 'true', 'props: a backup\'s props restore, and a sport button brings the matchup columns back', JSON.stringify({ restored: propsT.restored, off: propsT.viewOff, cols: propsT.colsBack, nba: propsT.nbaPressed }));
+  // the Example button: one game's props computed at build time through the slate's projection, previewed and never saved
+  const propsEx = await pg.evaluate(async () => {
+    const wait = () => new Promise(r => setTimeout(r, 80));
+    localStorage.removeItem('callsheet3.props.v1');
+    document.getElementById('m-props').click(); await wait();
+    const before = document.getElementById('propsCount').textContent, tileBefore = !!document.querySelector('#calibBox .calib[data-sport="PROPS"]');
+    document.getElementById('propsAll').checked = false; document.getElementById('propsAll').dispatchEvent(new Event('change', { bubbles: true })); await wait();
+    document.getElementById('propsExample').click(); await wait();
+    const on = !document.getElementById('propsView').hidden, count = document.getElementById('propsCount').textContent, msg = document.getElementById('propsMsg').textContent;
+    const best = [...document.querySelectorAll('#propsBest .pk')].map(e => e.innerText.replace(/\s+/g, ' ').trim());
+    const rows = document.querySelectorAll('#propsTable tr[data-prop]').length;
+    document.getElementById('propsAll').checked = true; document.getElementById('propsAll').dispatchEvent(new Event('change', { bubbles: true })); await wait();
+    const rowsAll = document.querySelectorAll('#propsTable tr[data-prop]').length;
+    const whys = [...document.querySelectorAll('#propsTable tr.why')].map(t => t.innerText.replace(/\s+/g, ' ').trim());
+    const saved = localStorage.getItem('callsheet3.props.v1');
+    const tileAfter = !!document.querySelector('#calibBox .calib[data-sport="PROPS"]');
+    document.getElementById('m-nba').click(); await wait();
+    document.getElementById('m-props').click(); await wait();
+    const after = document.getElementById('propsCount').textContent;
+    document.getElementById('m-nba').click(); await wait();
+    return { on, count, msg, best, rows, rowsAll, whys, saved, tileSame: tileBefore === tileAfter, before, after };
+  });
+  chk(propsEx.on && /^EXAMPLE · 8 props on/.test(propsEx.count) && /An example/.test(propsEx.msg) && propsEx.rows === 7 && propsEx.rowsAll === 8,
+      'props example: eight props on 76ers @ Knicks, seven projected (Embiid is out), the count says EXAMPLE', JSON.stringify({ count: propsEx.count, rows: propsEx.rows, all: propsEx.rowsAll }));
+  chk(propsEx.best.length >= 2 && /#1 · (BET|LEAN)/.test(propsEx.best[0]) && propsEx.best.some(b => /Tyrese Maxey OVER 25\.5 points/.test(b)),
+      'props example: the best list ranks the props by edge, Maxey over with Embiid out among them', JSON.stringify(propsEx.best.slice(0, 3)));
+  chk(propsEx.whys.some(w => /Joel Embiid out \(31 minutes a game between them\): \+1\.5 minutes and \+0\.58 points per 36, the pooled rule, scored/.test(w)) && propsEx.whys.some(w => /listed Out on ESPN: no projection/.test(w))
+      && propsEx.whys.some(w => /Knicks allow 0\.97x the league's points per minute to guards \(this season 0\.95 over 16 games, last season 0\.99\): x0\.978 at 0\.75 weight, measured/.test(w)) && propsEx.whys.some(w => /HashtagBasketball: 76ers allow/.test(w)),
+      'props example: the why lines are the slate\'s own, the regulars-out rule, the defence factor, the website\'s rank and the listed-out man', JSON.stringify(propsEx.whys.slice(0, 2)).slice(0, 600));
+  chk(propsEx.saved === null && propsEx.tileSame && propsEx.after === propsEx.before, 'props example: nothing is saved or graded, and a sport button puts it away', JSON.stringify({ saved: propsEx.saved, same: propsEx.tileSame, before: propsEx.before, after: propsEx.after }));
 
   // ---- the build stamp ------------------------------------------------------------
   const stamp = await pg.evaluate(() => (document.getElementById('build') || {}).textContent);

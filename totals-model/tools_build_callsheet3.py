@@ -337,8 +337,76 @@ def nba_example_js() -> str:
             '        ncrew: "Scott Foster, Tony Brothers, Marc Davis", nbarefs: ' + json.dumps(json.dumps(NBA_EXAMPLE_REFS, separators=(",", ":"))) + ' });\n')
 
 
+def props_example_games() -> list:
+    """One game's props for the Props tab's Example button (19 Oct 2026, the
+    user: "put an example on the NBA props model like you did for the NBA"),
+    computed through the slate's own projection on made-up but plausible game
+    logs, so the example reads exactly as a real file does: 76ers @ Knicks, the
+    NBA example's game, Embiid out, eight props across the five markets."""
+    import random
+    sys.path.insert(0, str(pathlib.Path(__file__).parent / "slate"))
+    import slate  # noqa: E402
+    rng = random.Random(19)
+    opps = ["BOS", "MIA", "CHI", "TOR", "CLE", "ATL", "ORL", "DET", "BKN", "MIL", "IND", "WAS"]
+
+    def logs(n, start, mins, per36, home_first, starts=True):
+        out = []
+        for k in range(n):
+            m = max(8.0, min(44.0, rng.gauss(mins, 3.5)))
+            g = {"d": (start + dt.timedelta(days=2 * k + rng.randint(0, 1))).isoformat(), "opp": rng.choice(opps), "home": (k + (0 if home_first else 1)) % 2 == 0,
+                 "min": round(m, 1), "st": 1 if starts else 0, "full": True}
+            for mk, r36 in per36.items():
+                mu = r36 * m / 36.0
+                g[mk] = max(0, int(round(rng.gauss(mu, slate.PROPS_SD_K[mk] * (mu ** 0.5) if mu > 0 else 0.5))))
+            out.append(g)
+        return out
+    this_start, last_start = dt.date(2026, 10, 21), dt.date(2025, 11, 1)
+    players = {
+        "Jalen Brunson": ("NYK", "G", logs(15, this_start, 34.8, {"pts": 28.9, "reb": 3.2, "ast": 7.4, "tpm": 2.6}, True), logs(60, last_start, 35.0, {"pts": 27.1, "reb": 3.0, "ast": 7.0, "tpm": 2.4}, False)),
+        "Karl-Anthony Towns": ("NYK", "C", logs(16, this_start, 33.5, {"pts": 24.5, "reb": 13.0, "ast": 3.3, "tpm": 1.9}, True), logs(62, last_start, 34.0, {"pts": 25.6, "reb": 13.2, "ast": 3.3, "tpm": 2.0}, False)),
+        "Mikal Bridges": ("NYK", "F", logs(16, this_start, 36.0, {"pts": 18.0, "reb": 3.4, "ast": 3.7, "tpm": 2.0}, True), logs(64, last_start, 36.5, {"pts": 17.6, "reb": 3.2, "ast": 3.6, "tpm": 1.9}, False)),
+        "OG Anunoby": ("NYK", "F", logs(14, this_start, 34.0, {"pts": 17.5, "reb": 4.9, "ast": 2.0, "tpm": 2.3}, True), logs(55, last_start, 35.0, {"pts": 16.9, "reb": 4.8, "ast": 2.2, "tpm": 2.2}, False)),
+        "Tyrese Maxey": ("PHI", "G", logs(15, this_start, 36.5, {"pts": 27.0, "reb": 3.3, "ast": 6.1, "tpm": 3.0}, False), logs(52, last_start, 37.0, {"pts": 26.5, "reb": 3.3, "ast": 6.0, "tpm": 2.9}, True)),
+        "Paul George": ("PHI", "F", logs(12, this_start, 33.0, {"pts": 17.0, "reb": 5.9, "ast": 4.2, "tpm": 2.4}, False), logs(41, last_start, 32.0, {"pts": 17.2, "reb": 5.8, "ast": 4.3, "tpm": 2.3}, True)),
+        "Kelly Oubre Jr.": ("PHI", "F", logs(15, this_start, 31.0, {"pts": 16.9, "reb": 6.4, "ast": 1.5, "tpm": 1.4}, False), logs(60, last_start, 31.5, {"pts": 16.4, "reb": 6.2, "ast": 1.6, "tpm": 1.5}, True)),
+        "Joel Embiid": ("PHI", "C", logs(9, this_start, 31.2, {"pts": 27.5, "reb": 9.5, "ast": 3.8, "tpm": 1.2}, False), logs(19, last_start, 30.5, {"pts": 23.8, "reb": 8.2, "ast": 4.5, "tpm": 1.1}, True)),
+    }
+    lines = [("Jalen Brunson", "pts", 27.5, -110, -110), ("Karl-Anthony Towns", "reb", 11.5, -115, -105), ("Mikal Bridges", "pra", 24.5, -110, -110), ("OG Anunoby", "ast", 2.5, 100, -120),
+             ("Tyrese Maxey", "pts", 25.5, -110, -110), ("Paul George", "tpm", 2.5, -120, 100), ("Kelly Oubre Jr.", "pts", 14.5, -105, -115), ("Joel Embiid", "reb", 9.5, -110, -110)]
+    dvp = {"NYK": {"G": {"f": 0.97, "f_this": 0.95, "n_this": 16, "f_last": 0.99, "n_last": 82}, "F": {"f": 1.02, "f_this": 1.03, "n_this": 16, "f_last": 1.01, "n_last": 82}, "C": {"f": 1.05, "f_this": 1.07, "n_this": 16, "f_last": 1.03, "n_last": 82}},
+           "PHI": {"G": {"f": 1.06, "f_this": 1.08, "n_this": 15, "f_last": 1.02, "n_last": 82}, "F": {"f": 1.01, "f_this": 1.00, "n_this": 15, "f_last": 1.02, "n_last": 82}, "C": {"f": 0.93, "f_this": 0.90, "n_this": 15, "f_last": 0.96, "n_last": 82}}}
+    htb = {("PHI", "G", "pts"): "HashtagBasketball: 76ers allow 24.0 points a game to PGs (116th of 150, 1 the fewest), 22.6 points a game to SGs (61st of 150, 1 the fewest); shown, not scored",
+           ("PHI", "C", "reb"): "HashtagBasketball: 76ers allow 11.9 rebounds a game to Cs (40th of 150, 1 the fewest); shown, not scored",
+           ("PHI", "F", "pts"): "HashtagBasketball: 76ers allow 21.4 points a game to SFs (24th of 150, 1 the fewest), 22.9 points a game to PFs (88th of 150, 1 the fewest); shown, not scored",
+           ("PHI", "F", "ast"): "HashtagBasketball: 76ers allow 3.9 assists a game to SFs (70th of 150, 1 the fewest), 3.1 assists a game to PFs (45th of 150, 1 the fewest); shown, not scored",
+           ("NYK", "G", "pts"): "HashtagBasketball: Knicks allow 21.9 points a game to PGs (34th of 150, 1 the fewest), 22.1 points a game to SGs (42nd of 150, 1 the fewest); shown, not scored",
+           ("NYK", "F", "tpm"): "HashtagBasketball: Knicks allow 2.9 threes a game to SFs (87th of 150, 1 the fewest), 2.2 threes a game to PFs (61st of 150, 1 the fewest); shown, not scored",
+           ("NYK", "F", "pts"): "HashtagBasketball: Knicks allow 22.1 points a game to SFs (43rd of 150, 1 the fewest), 21.6 points a game to PFs (38th of 150, 1 the fewest); shown, not scored",
+           ("NYK", "C", "reb"): "HashtagBasketball: Knicks allow 13.4 rebounds a game to Cs (125th of 150, 1 the fewest); shown, not scored"}
+    out = {"PHI": (31.2, [("Joel Embiid", 31.2, "Out")], [("Andre Drummond", "Questionable")]), "NYK": (0.0, [], [("Josh Hart", "Day-To-Day")])}
+    props = []
+    for k, (name, mk, line, op, up) in enumerate(lines):
+        team, pos, this, last = players[name]
+        opp = "NYK" if team == "PHI" else "PHI"
+        dmk = "pts" if mk == "pra" else mk
+        pr = {"name": name, "mk": mk, "line": line, "op": op, "up": up, "book": "fanatics"}
+        ctx = {"out_mpg": out[team][0], "out_names": out[team][1], "maybe": out[team][2], "pace": 99.5, "league_pace": 100.5, "home": team == "NYK", "pos": pos,
+               "opp_nick": slate.NBA_NICK[opp], "dvp": dvp[opp][pos], "htb": htb.get((opp, pos, dmk)), "self_out": "Out" if name == "Joel Embiid" else ""}
+        proj, why = slate.props_project(pr, this, last, ctx)
+        item = {"pid": "x%d" % (k + 1), "name": name, "team": team, "opp": opp, "home": team == "NYK", "pos": pos, "mk": mk, "line": line, "op": op, "up": up, "book": "fanatics",
+                "books": {"fanatics": [line, op, up], "draftkings": [line + (0.5 if k % 3 == 0 else 0.0), op - 5, up + 5], "fanduel": [line, op + 2, up - 2]},
+                "log": [[g["d"], g["opp"], 1 if g["home"] else 0, g["min"], slate.props_stat(g, mk)] for g in (this or last)[-10:]], "why": why}
+        if proj:
+            item.update(proj)
+        props.append(item)
+    props.sort(key=lambda x: (-(x.get("edge") if x.get("edge") is not None else -9), x["name"], x["mk"]))
+    return [{"gid": "example", "away": "76ers", "home": "Knicks", "aab": "PHI", "hab": "NYK", "tip": None, "spread": -5.5, "total": 231.5, "pace": 99.5, "league_pace": 100.5,
+             "out": {"PHI": [["Joel Embiid", 31.2, "Out"]], "NYK": []}, "props": props, "unmatched": []}]
+
+
 def build() -> str:
-    return head() + engine_block() + (ROOT / "nhl.engine.js").read_text() + (ROOT / "nba.engine.js").read_text() + (ROOT / "props.engine.js").read_text() + tail()
+    props_js = once((ROOT / "props.engine.js").read_text(), "/*PROPS_EXAMPLE*/[]", json.dumps(props_example_games(), separators=(",", ":")), "props example")
+    return head() + engine_block() + (ROOT / "nhl.engine.js").read_text() + (ROOT / "nba.engine.js").read_text() + props_js + tail()
 
 
 if __name__ == "__main__":

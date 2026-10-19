@@ -12,15 +12,43 @@
   var props = [];
   try { props = JSON.parse(localStorage.getItem(PROPS_KEY) || "[]"); if (!Array.isArray(props)) props = []; } catch (e) { props = []; }
   var propsView = false;
+  /* the example (19 Oct 2026, the user: "put an example on the NBA props model
+     like you did for the NBA"): one game's props computed at build time through
+     the slate's own projection, previewed in the tab and never saved -- a real
+     file, Clear this date or a sport button puts it away */
+  var PROPS_EXAMPLE_GAMES = /*PROPS_EXAMPLE*/[];
+  var propsPreview = null;
+  function propsSource() { return propsPreview || props; }
   function saveProps() { try { localStorage.setItem(PROPS_KEY, JSON.stringify(props)); } catch (e) {} }
   function propsSay(msg) { var el = $("propsMsg"); if (!el) return; el.hidden = false; el.innerHTML = msg; }
   function propKey(r) { return (r.gdate || "") + "|" + r.pid + "|" + r.mk; }
-  function propsDates() { var d = {}; props.forEach(function (r) { if (r.gdate) d[r.gdate] = true; }); return Object.keys(d).sort(); }
+  function propsDates() { var d = {}; propsSource().forEach(function (r) { if (r.gdate) d[r.gdate] = true; }); return Object.keys(d).sort(); }
+  /* one row per player per market from a props file's games */
+  function propsRowsFrom(d) {
+    var rows = [];
+    (d.games || []).forEach(function (g) {
+      (g.props || []).forEach(function (x) {
+        rows.push({ id: 0, gdate: d.date || "", game: g.away + " @ " + g.home, away: g.away, home: g.home, aab: g.aab, hab: g.hab, spread: g.spread, total: g.total, pace: g.pace,
+                    pid: String(x.pid), name: x.name, team: x.team, opp: x.opp, athome: !!x.home, pos: x.pos || "", mk: x.mk, line: x.line, op: x.op, up: x.up, book: x.book, books: x.books || {},
+                    proj: x.proj, sd: x.sd, pm: x.pm, pb: x.pb, p: x.p, push: x.push, side: x.side, chance: x.chance, price: x.price, need: x.need, edge: x.edge, band: x.band,
+                    mins: x.mins, rate36: x.rate36, why: x.why || [], log: x.log || [], actual: null, result: null });
+      });
+    });
+    return rows;
+  }
+  function propsExample() {
+    var doc = { format: "callsheet3.props", date: todayISO(), games: PROPS_EXAMPLE_GAMES };
+    propsPreview = propsRowsFrom(doc).map(function (r, i) { r.id = 90001 + i; return r; });
+    if ($("propsDate")) $("propsDate").value = doc.date;
+    showProps(true);
+    propsSay("<b>An example</b>, one game's props as a real file lists them, with the projection built the slate's way. Nothing here is saved or graded: load a real props file, press Clear this date or a sport button, and it goes.");
+  }
   function propsCanon(s) { return String(s || "").toLowerCase().replace(/[^a-z0-9]+/g, " ").trim(); }
   function propHas(r) { return r.p !== null && r.p !== undefined; }
   /* the tab: the matchup columns go, the props section comes, the sport buttons read unpressed */
   function showProps(on) {
     propsView = !!on;
+    if (!propsView) propsPreview = null;
     var cols = document.querySelector(".cols"); if (cols) cols.hidden = propsView;
     var v = $("propsView"); if (v) v.hidden = !propsView;
     var b = $("m-props"); if (b) b.setAttribute("aria-pressed", propsView ? "true" : "false");
@@ -34,16 +62,11 @@
     if (!d || d.format !== "callsheet3.props" || !Array.isArray(d.games)) throw new Error("not a Super Model props file");
     var added = 0, replaced = 0, kept = 0, nextP = props.reduce(function (m, r) { return Math.max(m, r.id || 0); }, 0) + 1;
     var have = {}; props.forEach(function (r, i) { have[propKey(r)] = i; });
-    d.games.forEach(function (g) {
-      (g.props || []).forEach(function (x) {
-        var row = { id: 0, gdate: d.date || "", game: g.away + " @ " + g.home, away: g.away, home: g.home, aab: g.aab, hab: g.hab, spread: g.spread, total: g.total, pace: g.pace,
-                    pid: String(x.pid), name: x.name, team: x.team, opp: x.opp, athome: !!x.home, pos: x.pos || "", mk: x.mk, line: x.line, op: x.op, up: x.up, book: x.book, books: x.books || {},
-                    proj: x.proj, sd: x.sd, pm: x.pm, pb: x.pb, p: x.p, push: x.push, side: x.side, chance: x.chance, price: x.price, need: x.need, edge: x.edge, band: x.band,
-                    mins: x.mins, rate36: x.rate36, why: x.why || [], log: x.log || [], actual: null, result: null };
-        var k = propKey(row), i = have[k];
-        if (i !== undefined) { if (props[i].result) { kept++; return; } row.id = props[i].id; props[i] = row; replaced++; }
-        else { row.id = nextP++; have[k] = props.length; props.push(row); added++; }
-      });
+    propsPreview = null;
+    propsRowsFrom(d).forEach(function (row) {
+      var k = propKey(row), i = have[k];
+      if (i !== undefined) { if (props[i].result) { kept++; return; } row.id = props[i].id; props[i] = row; replaced++; }
+      else { row.id = nextP++; have[k] = props.length; props.push(row); added++; }
     });
     saveProps();
     if ($("propsDate") && d.date) $("propsDate").value = d.date;
@@ -119,9 +142,9 @@
     var dates = propsDates(), sel = $("propsDate");
     if (!sel.value || dates.indexOf(sel.value) < 0) sel.value = dates.length ? dates[dates.length - 1] : "";
     var date = sel.value;
-    var rows = props.filter(function (r) { return (r.gdate || "") === date; });
-    $("propsCount").textContent = rows.length ? rows.length + " props on " + gameDate(date) + " · " + dates.length + " date" + (dates.length === 1 ? "" : "s") + " kept"
-                                              : (props.length ? "no props on this date" : "no props loaded");
+    var rows = propsSource().filter(function (r) { return (r.gdate || "") === date; });
+    $("propsCount").textContent = (propsPreview ? "EXAMPLE · " : "") + (rows.length ? rows.length + " props on " + gameDate(date) + " · " + dates.length + " date" + (dates.length === 1 ? "" : "s") + " kept"
+                                              : (propsSource().length ? "no props on this date" : "no props loaded"));
     var resChip = function (r) {
       if (!r.result) return '';
       var cls = r.result === "win" ? "win" : r.result === "loss" ? "loss" : "push";
@@ -168,7 +191,9 @@
     $("loadProps").addEventListener("click", function () { $("slateFile").click(); });
     $("propsDate").addEventListener("change", renderProps);
     $("propsAll").addEventListener("change", renderProps);
+    $("propsExample").addEventListener("click", propsExample);
     $("propsClear").addEventListener("click", function () {
+      if (propsPreview) { propsPreview = null; renderProps(); propsSay("The example is gone. Load a real props file when you have one."); return; }
       var date = $("propsDate").value, before = props.length;
       props = props.filter(function (r) { return (r.gdate || "") !== date || r.result; });
       saveProps(); renderProps(); renderCalib();

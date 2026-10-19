@@ -1435,12 +1435,12 @@ def build_nhl_game(g, date_iso, season_id, summary, log, ledger=None, xg=None, g
                     inputs[p + "gsh"] = str(pick["shots"])
                 else:
                     notes.append("%s's likely starter %s has no shots this season; save percentage left blank." % (nick, pick["name"]))
-                notes.append("%s likely starter: %s (%s). NOT confirmed: check Daily Faceoff and tick the box." % (nick, pick["name"], why))
+                notes.append("%s likely starter: %s (%s). NOT confirmed: check RotoWire or CBS and tick the box." % (nick, pick["name"], why))
                 if nhl_is_backup(pick, goalies):
                     inputs[p + "gbk"] = True
                     cs["backup"] = True
                     club_starts = sum(int(x.get("gs") or 0) for x in goalies if not x.get("season"))
-                    notes.append("%s: %s is the BACKUP (%d of the club's %d starts). The Backup box is ticked; untick it if Daily Faceoff names the starter." % (nick, pick["name"], int(pick.get("gs") or 0), club_starts))
+                    notes.append("%s: %s is the BACKUP (%d of the club's %d starts). The Backup box is ticked; untick it if RotoWire or CBS names the starter." % (nick, pick["name"], int(pick.get("gs") or 0), club_starts))
                     log("  %s: %s is the backup (%d of %d starts) -> Backup in net ticked" % (side, pick["name"], int(pick.get("gs") or 0), club_starts))
                 others = ", ".join("%s %s/%d" % (x["name"], "%.3f" % x["sv"] if x["sv"] is not None else "?", x["shots"]) for x in goalies if x is not pick)
                 halves = ""

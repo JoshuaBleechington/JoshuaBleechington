@@ -367,7 +367,7 @@
   <header class="top">
     <div>
       <div class="eyebrow"><span id="eyebrow">MLB · every market on the game</span>
-        <span class="build">· build <span id="build">2026-10-17</span></span></div>
+        <span class="build">· build <span id="build">2026-10-19</span></span></div>
       <h1>The <em>Super</em> Model</h1>
       <p>One matchup, every market the book posts on it — in baseball the full-game total, the first five,
          the moneyline and the run line; in hockey the total, the first period, the moneyline and the puck line;
@@ -466,9 +466,6 @@
           </div>
 
           <div class="links">
-            <a href="https://app.outlier.bet/MLB/games" target="_blank" rel="noopener">Outlier · MLB</a>
-            <a href="https://app.outlier.bet/NHL/games" target="_blank" rel="noopener">Outlier · NHL</a>
-            <a href="https://app.outlier.bet/NBA/games" target="_blank" rel="noopener">Outlier · NBA</a>
             <a href="https://sports.betmgm.com/en/sports/hockey-12" target="_blank" rel="noopener">BetMGM · NHL</a>
             <a href="https://www.covers.com/sport/baseball/mlb/odds" target="_blank" rel="noopener">Covers · ML, run line, total</a>
             <a href="https://www.vegasinsider.com/mlb/odds/las-vegas/" target="_blank" rel="noopener">Vegas Insider</a>
@@ -513,7 +510,6 @@
               <div class="f"><label for="hrpg">Home runs/game</label><input id="hrpg" type="number" step="0.01" inputmode="decimal" placeholder="4.52"></div>
             </div>
             <div class="links">
-              <a href="https://app.outlier.bet/MLB/games" target="_blank" rel="noopener">Outlier · matchup panel</a>
               <a href="https://www.rotowire.com/baseball/daily-lineups.php" target="_blank" rel="noopener">RotoWire · lineups</a>
               <a href="https://www.teamrankings.com/mlb/stat/runs-per-game" target="_blank" rel="noopener">TeamRankings · runs/game</a>
               <a href="https://www.baseball-reference.com/leagues/majors/2026.shtml" target="_blank" rel="noopener">Baseball-Reference · 2026 season</a>
@@ -551,7 +547,6 @@
               <div class="f"><label for="h2hn">Meetings</label><input id="h2hn" type="number" step="1" inputmode="numeric" placeholder="4"></div>
             </div>
             <div class="links">
-              <a href="https://app.outlier.bet/MLB/games" target="_blank" rel="noopener">Outlier · L10 / H2H</a>
               <a href="https://www.covers.com/sport/baseball/mlb/matchups" target="_blank" rel="noopener">Covers · matchups</a>
             </div>
           </div>
@@ -603,16 +598,19 @@
               <label class="check"><input type="checkbox" id="hgbk"> Home backup in net</label>
             </div>
             <div class="links">
+              <a href="https://www.rotowire.com/hockey/nhl-lineups.php" target="_blank" rel="noopener">RotoWire · NHL lineups and goalies</a>
+              <a href="https://www.cbssports.com/fantasy/hockey/depth-chart/G/" target="_blank" rel="noopener">CBS · goalie depth charts</a>
               <a href="https://www.dailyfaceoff.com/starting-goalies" target="_blank" rel="noopener">Daily Faceoff · starting goalies</a>
             </div>
             <p class="note">The slate names each side's <b>likely</b> starter and fills his line, and the two lists above hold every
               goalie on each club with the line the sheet would score. A late change in net is the one thing a hockey
-              market prices imperfectly, so check Daily Faceoff, <b>pick the goalie it names</b> (his line and the Backup box
-              follow), then tick Confirmed. The next morning's grade file carries who actually started, and the record tile
+              market prices imperfectly, so check RotoWire's lineups (the goalie is marked confirmed or expected) or
+              CBS's goalie depth chart, <b>pick the goalie they name</b> (his line and the Backup box follow), then tick
+              Confirmed — only on a confirmed start, not an expected one. The next morning's grade file carries who actually started, and the record tile
               keeps the total's record split by whether the goalie on the card was the one who played: 42 of the first 150
               goalie boxes were the other goalie's line.
               <b>Backup in net</b>: set from the pick when the goalie has under 30% of his club's starts, ten starts
-              in; fix it if Daily Faceoff says otherwise. With one backup in a game the total landed 0.18 under the close
+              in; fix it if RotoWire or CBS says otherwise. With one backup in a game the total landed 0.18 under the close
               over two seasons (737 games, the under 53.7%), so one backup puts a tagged −0.15 on the line and the record
               tile keeps the under's record on these games; a backup whose own line reads cold takes −0.25 (182 such games
               landed 0.44 under, the under 57.5%). Two backups: nothing moves. With a backup in either net the
@@ -2135,7 +2133,7 @@
       var nm = txt(s[1]), g = ((gl[s[0]] || []).filter(function (x) { return x.n === nm; })[0]);
       if (g && g.cs >= 3 && g.gs >= 0.5 * g.cs) {
         notes.push("<b>Backup in net is ticked for " + esc(nm) + "</b>, who has " + g.gs + " of the club's " + g.cs + " starts. The box means the club's BACKUP goalie: ticked, the goalie lines are not scored and a tagged " +
-          sgn(NHL.BACKUP_DELTA) + " (" + sgn(NHL.BACKUP_DELTA_COLD) + " cold) goes on the under. Untick it unless Daily Faceoff names a different starter, and then pick that goalie in the list instead.");
+          sgn(NHL.BACKUP_DELTA) + " (" + sgn(NHL.BACKUP_DELTA_COLD) + " cold) goes on the under. Untick it unless RotoWire or CBS names a different starter, and then pick that goalie in the list instead.");
       }
     });
 

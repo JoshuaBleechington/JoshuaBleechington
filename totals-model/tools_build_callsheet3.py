@@ -24,7 +24,7 @@ import sys
 ROOT = pathlib.Path(__file__).parent / "web"
 OPEN = "  /* ===== ENGINE BLOCK."
 CLOSE = "  /* ===== END ENGINE BLOCK ===== */"
-STAMP = "2026-10-17"   # bumped by hand when 3.0's own sources change (the harness checks it)
+STAMP = "2026-10-19"   # bumped by hand when 3.0's own sources change (the harness checks it)
 
 
 def engine_block() -> str:
@@ -96,12 +96,13 @@ def head() -> str:
     h = once(h, "its own line in the record below, so it can earn one.</p>",
              "its own line in the record below, so it can earn one. The three labels are baseball's; the hockey book "
              "starts with none and earns its own from the record.</p>", "rail note")
-    # NHL links on the board card
+    # Links on the board card: Outlier is off the Super Model (19 Oct 2026), BetMGM's hockey board takes its place
     h = once(h, '<a href="https://app.outlier.bet/MLB/games" target="_blank" rel="noopener">Outlier · games</a>',
-             '<a href="https://app.outlier.bet/MLB/games" target="_blank" rel="noopener">Outlier · MLB</a>\n'
-             '            <a href="https://app.outlier.bet/NHL/games" target="_blank" rel="noopener">Outlier · NHL</a>\n'
-             '            <a href="https://app.outlier.bet/NBA/games" target="_blank" rel="noopener">Outlier · NBA</a>\n'
-             '            <a href="https://sports.betmgm.com/en/sports/hockey-12" target="_blank" rel="noopener">BetMGM · NHL</a>', "board links")
+             '<a href="https://sports.betmgm.com/en/sports/hockey-12" target="_blank" rel="noopener">BetMGM · NHL</a>', "board links")
+    h = once(h, '              <a href="https://app.outlier.bet/MLB/games" target="_blank" rel="noopener">Outlier · matchup panel</a>\n',
+             '', "outlier matchup link")
+    h = once(h, '              <a href="https://app.outlier.bet/MLB/games" target="_blank" rel="noopener">Outlier · L10 / H2H</a>\n',
+             '', "outlier l10 link")
     return h
 
 

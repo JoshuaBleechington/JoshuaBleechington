@@ -194,7 +194,7 @@
       var nm = txt(s[1]), g = ((gl[s[0]] || []).filter(function (x) { return x.n === nm; })[0]);
       if (g && g.cs >= 3 && g.gs >= 0.5 * g.cs) {
         notes.push("<b>Backup in net is ticked for " + esc(nm) + "</b>, who has " + g.gs + " of the club's " + g.cs + " starts. The box means the club's BACKUP goalie: ticked, the goalie lines are not scored and a tagged " +
-          sgn(NHL.BACKUP_DELTA) + " (" + sgn(NHL.BACKUP_DELTA_COLD) + " cold) goes on the under. Untick it unless Daily Faceoff names a different starter, and then pick that goalie in the list instead.");
+          sgn(NHL.BACKUP_DELTA) + " (" + sgn(NHL.BACKUP_DELTA_COLD) + " cold) goes on the under. Untick it unless RotoWire or CBS names a different starter, and then pick that goalie in the list instead.");
       }
     });
 

@@ -5,6 +5,6 @@ python slate.py nhl %*
 echo.
 echo ---------------------------------------------------------------
 echo Done. In Call Sheet 3.0: Saving, Load slate, pick the nhl-slate file.
-echo Then confirm each goalie on Daily Faceoff and tick the box.
+echo Then confirm each goalie on RotoWire or CBS and tick the box.
 echo ---------------------------------------------------------------
 pause

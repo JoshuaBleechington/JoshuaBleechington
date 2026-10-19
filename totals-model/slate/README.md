@@ -34,9 +34,9 @@ Two more double-click files: **Run NHL slate.bat** before the games and
 
 | On the sheet | Where it comes from |
 | --- | --- |
-| Goalies: the likely starter, save %, shots faced | The club's goalie page, each line blended with **half of last season's** from the player's page, so a first start of .739 on 23 shots reads as the man's own prior and not the league's. On a back to back the slate names the goalie who did **not** start yesterday; otherwise the one with the most starts. **Never confirmed**: the sheet says so until you check Daily Faceoff and tick the box |
-| Backup in net | Ticked when the named starter has under 30% of his club's starts, ten starts in. One backup in a game and the total landed 0.18 under the close over two seasons, so the sheet puts a tagged −0.15 on the line and keeps the under's record. Untick it if Daily Faceoff names the starter |
-| The goalie picker: every goalie on each club, with his line, starts and the club's starts | The club page, written into the sheet's hidden `ngoalies` box with the named starter's name. On the sheet, **Who is in net** lists them; picking the goalie Daily Faceoff names fills his line and sets the Backup box. The morning grade run adds **who actually started** from the box score, and the sheet keeps the total's record split by whether the carded goalie played (11 Oct 2026: 42 of the first 150 boxes had the other goalie's line) |
+| Goalies: the likely starter, save %, shots faced | The club's goalie page, each line blended with **half of last season's** from the player's page, so a first start of .739 on 23 shots reads as the man's own prior and not the league's. On a back to back the slate names the goalie who did **not** start yesterday; otherwise the one with the most starts. **Never confirmed**: the sheet says so until you check RotoWire's NHL lineups or CBS's goalie depth chart and tick the box |
+| Backup in net | Ticked when the named starter has under 30% of his club's starts, ten starts in. One backup in a game and the total landed 0.18 under the close over two seasons, so the sheet puts a tagged −0.15 on the line and keeps the under's record. Untick it if RotoWire or CBS names the starter |
+| The goalie picker: every goalie on each club, with his line, starts and the club's starts | The club page, written into the sheet's hidden `ngoalies` box with the named starter's name. On the sheet, **Who is in net** lists them; picking the goalie RotoWire or CBS names fills his line and sets the Backup box. The morning grade run adds **who actually started** from the box score, and the sheet keeps the total's record split by whether the carded goalie played (11 Oct 2026: 42 of the first 150 boxes had the other goalie's line) |
 | Shots for per game, power play %, penalty kill % | The league's team summary report |
 | Last-10 average total, rest days, head to head | The club's season schedule |
 | Recent form: each side's last five, with the score, the score after one, shots for and against, and who started in net | The box scores and game pages of those games. Shown on the sheet's Recent form card, not scored |
@@ -48,7 +48,7 @@ Two more double-click files: **Run NHL slate.bat** before the games and
 | Finals and the first-period score | The game page the next morning. A shootout win is a one-goal margin, as the league records it |
 
 The two goalies' lines are both printed, with both halves (this season and
-last season at half), so if Daily Faceoff names the other one you can type
+last season at half), so if RotoWire or CBS names the other one you can type
 his save % and shots over the slate's. A team that has not played yet gets
 last season's goalie lines, shots halved, with a note — the same half by
 another route.

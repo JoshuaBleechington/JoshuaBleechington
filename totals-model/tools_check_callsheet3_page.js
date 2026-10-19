@@ -697,7 +697,7 @@ const CHECKS = ["dome","playoff","agconf","hgconf","agbk","hgbk"];
     const wait = () => new Promise(r => setTimeout(r, 80));
     const slateDoc = { format: 'callsheet2.slate', version: 1, date: '2026-11-07', games: [
       { sport: 'NHL', gdate: '2026-11-07', away: 'Oilers', home: 'Flames', starters: { away: 'Skinner', home: 'Wolf' },
-        inputs: { agsv: '0.908', hgsv: '0.916', agsh: '1200', hgsh: '1300', asf: '30.1', hsf: '28.9', app: '25.0', hpp: '19.5', apk: '78.0', hpk: '81.2', al10: '6.4', hl10: '5.9', h2h: '6.0', h2hn: '2', arest: '0', hrest: '1', ap1l10: '1.90', hp1l10: '1.70', axgf: '3.40', axga: '3.10', hxgf: '3.30', hxga: '2.90', xglg: '3.05', agbk: true, hgbk: false,
+        inputs: { agsv: '0.908', hgsv: '0.916', agsh: '1200', hgsh: '1300', asf: '30.1', hsf: '28.9', app: '25.0', hpp: '19.5', apk: '78.0', hpk: '81.2', al10: '6.4', hl10: '5.9', h2h: '6.0', h2hn: '2', arest: '0', hrest: '1', ap1l10: '1.90', hp1l10: '1.70', axgf: '3.40', axga: '3.10', hxgf: '3.30', hxga: '2.90', xglg: '3.05', agbk: true, hgbk: false, agconf: false, hgconf: true,
                   agname: 'Stuart Skinner', hgname: 'Dustin Wolf',
                   ngoalies: JSON.stringify({ away: [{ n: 'Stuart Skinner', sv: 0.908, sh: 1200, gs: 10, cs: 12, ls: false }, { n: 'Calvin Pickard', sv: 0.897, sh: 450, gs: 2, cs: 12, ls: false }],
                                             home: [{ n: 'Dustin Wolf', sv: 0.916, sh: 1300, gs: 11, cs: 12, ls: false }, { n: 'Devin Cooley', sv: 0.902, sh: 300, gs: 1, cs: 12, ls: false }] }),
@@ -715,6 +715,7 @@ const CHECKS = ["dome","playoff","agconf","hgconf","agbk","hgbk"];
     const v = id => document.getElementById(id).value;
     const form = { away: v('away'), home: v('home'), agsv: v('agsv'), hgsh: v('hgsh'), asf: v('asf'), apk: v('apk'), arest: v('arest'), line: v('line'), pressed: document.getElementById('m-nhl').getAttribute('aria-pressed'),
                    agbk: document.getElementById('agbk').checked, hgbk: document.getElementById('hgbk').checked,
+                   agconf: document.getElementById('agconf').checked, hgconf: document.getElementById('hgconf').checked,
                    panel: document.getElementById('formPanel').innerText, ap1l10: v('ap1l10'), hp1l10: v('hp1l10'), axgf: v('axgf'), hxga: v('hxga'), xglg: v('xglg'),
                    why: document.getElementById('why').textContent,
                    p1why: [...document.querySelectorAll('#markets .mk[data-key="p1"] .mkdetail')].map(e => e.textContent).join(' '),
@@ -750,6 +751,7 @@ const CHECKS = ["dome","playoff","agconf","hgconf","agbk","hgbk"];
       'slate: Fill form switches to NHL and fills the goalie, shot, special-teams and rest boxes, never the line', JSON.stringify(slate.form));
   chk(slate.form.ap1l10 === '1.90' && slate.form.hp1l10 === '1.70', 'slate: the first-period last ten fills from the ledger fields', JSON.stringify({ a: slate.form.ap1l10, h: slate.form.hp1l10 }));
   chk(slate.form.agbk === true && slate.form.hgbk === false, 'slate: the Backup in net box is ticked from the slate for the away side only', JSON.stringify({ a: slate.form.agbk, h: slate.form.hgbk }));
+  chk(slate.form.agconf === false && slate.form.hgconf === true, 'slate: the Confirmed box is ticked from the slate when RotoWire marks the start confirmed (the home side here), never otherwise', JSON.stringify({ a: slate.form.agconf, h: slate.form.hgconf }));
 
   // ---- the goalie picker: the slate's lists, a pick fills the line and the backup box, the grade file checks it ----
   const picker = await pg.evaluate(async () => {

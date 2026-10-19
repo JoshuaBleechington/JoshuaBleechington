@@ -32,10 +32,18 @@ Two more double-click files: **Run NHL slate.bat** before the games and
 `python3 slate.py nhl-grade`. They write `nhl-slate-DATE.json` and
 `nhl-grade-DATE.json`, which load into Call Sheet 3.0 the same way.
 
+The slate reads **RotoWire's NHL lineups** and **CBS's goalie depth chart**
+for the goalies (19 Oct 2026). RotoWire marks most starts *Expected* in the
+morning and *Confirmed* after the morning skate, so run the slate in the
+afternoon when you can, or run it twice: a game already on the card takes
+the Confirmed tick from the second run but keeps the goalie it has, so if
+RotoWire has changed its mind by then, pick the new goalie in the sheet's
+**Who is in net** list by hand.
+
 | On the sheet | Where it comes from |
 | --- | --- |
-| Goalies: the likely starter, save %, shots faced | The club's goalie page, each line blended with **half of last season's** from the player's page, so a first start of .739 on 23 shots reads as the man's own prior and not the league's. On a back to back the slate names the goalie who did **not** start yesterday; otherwise the one with the most starts. **Never confirmed**: the sheet says so until you check RotoWire's NHL lineups or CBS's goalie depth chart and tick the box |
-| Backup in net | Ticked when the named starter has under 30% of his club's starts, ten starts in. One backup in a game and the total landed 0.18 under the close over two seasons, so the sheet puts a tagged −0.15 on the line and keeps the under's record. Untick it if RotoWire or CBS names the starter |
+| Goalies: the likely starter, save %, shots faced | The club's goalie page, each line blended with **half of last season's** from the player's page, so a first start of .739 on 23 shots reads as the man's own prior and not the league's. On a back to back the slate names the goalie who did **not** start yesterday; otherwise the one with the most starts. Then **RotoWire's NHL lineups page** (19 Oct 2026; today's page, or tomorrow's, the only two it shows) names tonight's goalie for each club and the slate takes him over the guess, his line with him: a start RotoWire marks **Confirmed** ticks the sheet's Confirmed box, one marked **Expected** is said to be expected and left for you to tick when it turns green. A goalie RotoWire names who is not on the club's page (a call-up) is noted and the guess stands. **CBS's goalie depth chart** adds its news blurb on the named goalie and names any goalie of the club on its reserve list with the injury. Either page can fail alone; the slate still writes and says what it could not read |
+| Backup in net | Ticked when the named starter has under 30% of his club's starts, ten starts in. One backup in a game and the total landed 0.18 under the close over two seasons, so the sheet puts a tagged −0.15 on the line and keeps the under's record. Before the club has ten starts, the starts rule cannot speak, so **CBS's depth chart** decides: the box is ticked when CBS lists the named goalie as the club's backup, and the note says so. Ten starts in, the starts rule decides and a disagreement with CBS is only noted. Untick the box if you know better |
 | The goalie picker: every goalie on each club, with his line, starts and the club's starts | The club page, written into the sheet's hidden `ngoalies` box with the named starter's name. On the sheet, **Who is in net** lists them; picking the goalie RotoWire or CBS names fills his line and sets the Backup box. The morning grade run adds **who actually started** from the box score, and the sheet keeps the total's record split by whether the carded goalie played (11 Oct 2026: 42 of the first 150 boxes had the other goalie's line) |
 | Shots for per game, power play %, penalty kill % | The league's team summary report |
 | Last-10 average total, rest days, head to head | The club's season schedule |

@@ -5,6 +5,7 @@ python slate.py nhl %*
 echo.
 echo ---------------------------------------------------------------
 echo Done. In Call Sheet 3.0: Saving, Load slate, pick the nhl-slate file.
-echo Then confirm each goalie on RotoWire or CBS and tick the box.
+echo The slate reads RotoWire's lineups and CBS's goalie depth chart: a confirmed start is ticked already.
+echo Check the ones it calls EXPECTED on RotoWire before you bet, and tick the box when they turn green.
 echo ---------------------------------------------------------------
 pause

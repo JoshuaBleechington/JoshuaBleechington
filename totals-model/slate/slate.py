@@ -31,6 +31,7 @@ import argparse
 import csv
 import datetime as dt
 import gzip
+import html
 import io
 import json
 import math
@@ -38,6 +39,7 @@ import os
 import re
 import sys
 import time
+import unicodedata
 import urllib.error
 import urllib.parse
 import urllib.request
@@ -817,6 +819,165 @@ def nhl_is_backup(pick, goalies):
     return int(pick.get("gs") or 0) < BACKUP_SHARE * starts
 
 
+# ---- the goalie lineups: RotoWire and CBS (19 Oct 2026) ---------------------
+# The slate's likely starter is a guess from the club's starts. RotoWire's
+# lineup page names tonight's goalie for each club and marks him CONFIRMED
+# (green) or EXPECTED (yellow); CBS's goalie depth chart lists each club's
+# starter, backup and reserves with its news blurbs. On 17 Oct 2026 the user
+# ticked Confirmed on 21 goalies and 6 of them did not play, so the slate now
+# reads both: a goalie RotoWire names replaces the guess (his line follows), a
+# confirmed start ticks the sheet's Confirmed box, an expected one is said to
+# be expected, and the Backup box follows CBS's depth chart until the club has
+# the ten starts the starts rule needs. RotoWire shows today and tomorrow only
+# (?date=tomorrow; a date in the query is ignored), so any other day gets no
+# lineups and says so. Either page may fail alone; the slate still writes.
+ROTOWIRE_NHL = "https://www.rotowire.com/hockey/nhl-lineups.php"
+CBS_NHL_GOALIES = "https://www.cbssports.com/fantasy/hockey/depth-chart/G/"
+CBS_NHL_CODES = {"CLB": "CBJ", "MON": "MTL", "NJ": "NJD", "TB": "TBL", "WAS": "WSH", "LA": "LAK", "LV": "VGK", "SJ": "SJS"}
+
+
+def _name_key(name):
+    """'A. Vasilevskiy' / 'Andrei Vasilevskiy' -> ('a', 'vasilevskiy'): the first
+    initial (blank when the name is one word) and the surname, accents and
+    punctuation dropped, so the three sites' spellings meet."""
+    s = unicodedata.normalize("NFKD", str(name or "")).encode("ascii", "ignore").decode("ascii").lower()
+    parts = [p for p in re.split(r"[^a-z]+", s) if p]
+    if not parts:
+        return ("", "")
+    return (parts[0][0] if len(parts) > 1 else "", parts[-1])
+
+
+def nhl_goalie_match(name, goalies):
+    """The club-page goalie a lineup name refers to: the same surname, and the
+    same first initial when two goalies share one. None when nobody matches."""
+    ini, sur = _name_key(name)
+    if not sur:
+        return None
+    found = [g for g in goalies if _name_key(g.get("name"))[1] == sur]
+    if len(found) > 1 and ini:
+        found = [g for g in found if _name_key(g.get("name"))[0] == ini]
+    return found[0] if len(found) == 1 else None
+
+
+def nhl_backup_source(pick, goalies, cb):
+    """Why the Backup box is ticked: 'starts' by the starts rule (nhl_is_backup),
+    'cbs' when the club has under BACKUP_MIN_STARTS and CBS's depth chart lists
+    the named goalie as the backup, else None. The starts rule is the measured
+    one; CBS only speaks in the weeks before it can."""
+    if nhl_is_backup(pick, goalies):
+        return "starts"
+    if not pick or pick.get("season") or not cb:
+        return None
+    starts = sum(int(g.get("gs") or 0) for g in goalies if not g.get("season"))
+    if starts >= BACKUP_MIN_STARTS:
+        return None
+    sur = _name_key(cb.get("backup"))[1]
+    return "cbs" if sur and sur == _name_key(pick.get("name"))[1] else None
+
+
+def _rw_date_iso(line):
+    """'October 19, 2026' -> '2026-10-19', or None."""
+    try:
+        return dt.datetime.strptime(str(line or "").strip(), "%B %d, %Y").date().isoformat()
+    except ValueError:
+        return None
+
+
+def parse_rotowire_goalies(text):
+    """RotoWire's NHL lineups page -> (the page's date line, {nickname: {name,
+    status, opp, home}}). Each game is a `lineup is-nhl` box: two `lineup__mteam`
+    names, and two `lineup__list`s whose `lineup__player-highlight` is the
+    goalie, with a status row under his name whose class says confirmed or
+    expected (the word beside the dot is kept when the class is something new)."""
+    m = re.search(r"Starting NHL lineups for ([A-Za-z]+ \d{1,2}, \d{4})", text)
+    page_date = m.group(1) if m else ""
+    out = {}
+    for box in text.split('<div class="lineup is-nhl">')[1:]:
+        names = {}
+        for side, nm in re.findall(r'lineup__mteam is-(visit|home)[^"]*">\s*([^<]+?)\s*<', box):
+            names[side] = re.sub(r"\s+", " ", nm).strip()
+        if len(names) != 2:
+            continue
+        for side in ("visit", "home"):
+            lst = re.search(r'<ul class="lineup__list is-%s">(.*?)</ul>' % side, box, re.S)
+            li = re.search(r'<li class="lineup__player-highlight">(.*?)</li>', lst.group(1), re.S) if lst else None
+            nm = re.search(r'highlight-name">\s*<a[^>]*>([^<]+)</a>', li.group(1)) if li else None
+            if not nm:
+                continue
+            st = re.search(r'align-center is-([a-z]+)"', li.group(1))
+            word = re.search(r"</div>\s*([A-Za-z][A-Za-z ]*?)\s*</div>\s*$", li.group(1).strip())
+            status = st.group(1) if st else (word.group(1).strip().lower() if word else "")
+            out[names[side]] = {"name": re.sub(r"\s+", " ", nm.group(1)).strip(), "status": status,
+                                "opp": names["home" if side == "visit" else "visit"], "home": side == "home"}
+    return page_date, out
+
+
+def parse_cbs_goalies(text):
+    """CBS's goalie depth chart -> {tricode: {starter, backup, reserves, news}}:
+    one table row a club (CBS's own codes mapped to the league's), the long
+    name of each goalie in the Starter, Backup and Reserves cells, and the
+    tooltip beside a name (an injury, or the day's blurb) under `news` by name."""
+    out = {}
+    cell_names = re.compile(r'CellPlayerName--long">\s*<span[^>]*>\s*<a [^>]*>([^<]+)</a>')
+    tips = re.compile(r'CellPlayerName--long">\s*<span[^>]*>\s*<a [^>]*>([^<]+)</a>\s*<span class="CellPlayerName-icon[^"]*">.*?Tablebase-tooltipInner">\s*(.*?)\s*</div>', re.S)
+    for row in re.findall(r'<tr class="TableBase-bodyTr">(.*?)</tr>', text, re.S):
+        cells = re.findall(r'<td class="TableBase-bodyTd[^"]*">(.*?)</td>', row, re.S)
+        if len(cells) < 3:
+            continue
+        m = re.search(r"/nhl/teams/([A-Z]+)/", cells[0])
+        if not m:
+            continue
+        ab = CBS_NHL_CODES.get(m.group(1), m.group(1))
+        news = {}
+        for c in cells[1:]:
+            for nm, tip in tips.findall(c):
+                news[nm.strip()] = re.sub(r"\s+", " ", html.unescape(tip)).strip()
+        out[ab] = {"starter": (cell_names.findall(cells[1]) or [""])[0].strip(),
+                   "backup": (cell_names.findall(cells[2]) or [""])[0].strip(),
+                   "reserves": [x.strip() for x in cell_names.findall(cells[3])] if len(cells) > 3 else [],
+                   "news": news}
+    return out
+
+
+def nhl_lineups(date_iso, log):
+    """Tonight's goalies from RotoWire (today's page, or tomorrow's) and the
+    depth chart from CBS: {"rw": {nickname: ...}, "rw_date": the page's date
+    line, "cbs": {tricode: ...}}, with whatever came back. A page that fails,
+    or a RotoWire page for another day, leaves its part empty and is logged."""
+    out = {"rw": {}, "rw_date": "", "cbs": {}}
+    today = dt.date.today()
+    try:
+        want = dt.date.fromisoformat(date_iso)
+    except ValueError:
+        want = None
+    url = None
+    if want == today:
+        url = ROTOWIRE_NHL
+    elif want == today + dt.timedelta(days=1):
+        url = ROTOWIRE_NHL + "?date=tomorrow"
+    else:
+        log("RotoWire lineups: the page shows today and tomorrow only, and %s is neither; the goalies are the slate's guess." % date_iso)
+    if url:
+        try:
+            page_date, rw = parse_rotowire_goalies(fetch_text(url))
+            shown = _rw_date_iso(page_date)
+            if shown and shown != date_iso:
+                log("RotoWire lineups: the page is for %s, not %s; not used." % (page_date, date_iso))
+            elif not rw:
+                log("RotoWire lineups: no goalies on the page yet (%s)." % (page_date or "no date on it"))
+            else:
+                out["rw"], out["rw_date"] = rw, page_date
+                log("RotoWire lineups for %s: %d goalies named, %d confirmed." % (page_date or date_iso, len(rw), sum(1 for v in rw.values() if v["status"] == "confirmed")))
+        except Exception as e:  # noqa: BLE001
+            log("RotoWire lineups: not read (%s); the goalies are the slate's guess." % e)
+    try:
+        out["cbs"] = parse_cbs_goalies(fetch_text(CBS_NHL_GOALIES))
+        log("CBS goalie depth chart: %d clubs." % len(out["cbs"]))
+    except Exception as e:  # noqa: BLE001
+        log("CBS goalie depth chart: not read (%s)." % e)
+    return out
+
+
 def nhl_goalie_prior(player_id, prev_season):
     """Last regular season's line for one goalie, from his player page,
     summed across clubs if he moved: (save %, shots) or None."""
@@ -1284,7 +1445,7 @@ def p1_from_landing(landing):
     return None, None
 
 
-def build_nhl_game(g, date_iso, season_id, summary, log, ledger=None, xg=None, goalie_summary=None, tables=None):
+def build_nhl_game(g, date_iso, season_id, summary, log, ledger=None, xg=None, goalie_summary=None, tables=None, lineups=None):
     away_t, home_t = g.get("awayTeam") or {}, g.get("homeTeam") or {}
     away, home = nhl_name(away_t), nhl_name(home_t)
     aab, hab = away_t.get("abbrev") or "", home_t.get("abbrev") or ""
@@ -1296,6 +1457,8 @@ def build_nhl_game(g, date_iso, season_id, summary, log, ledger=None, xg=None, g
                               "axgf", "axga", "hxgf", "hxga", "xglg", "ngoalies", "agname", "hgname",
                               "agf", "aga", "hgf", "hga", "lgg", "angp", "hngp", "aenc", "aens", "henc", "hens")}
     inputs["agbk"] = inputs["hgbk"] = False   # the sheet's Backup in net boxes; True when the named starter is one
+    inputs["agconf"] = inputs["hgconf"] = False   # the sheet's Confirmed boxes; True when RotoWire marks the start confirmed
+    lineups = lineups or {}
     notes, starters, form = [], {"away": "", "home": ""}, {"away": [], "home": []}
     ctx_sides = []   # what the context card needs from each side (nhl_context)
     out = {"sport": "NHL", "gdate": date_iso, "away": away, "home": home, "gameId": gid, "first_puck_utc": start,
@@ -1426,6 +1589,17 @@ def build_nhl_game(g, date_iso, season_id, summary, log, ledger=None, xg=None, g
                 except Exception as e:  # noqa: BLE001
                     log("  %s: could not read yesterday's starter (%s)" % (side, e))
             pick, why = nhl_likely_starter(goalies, int(inputs[p + "rest"]) if inputs[p + "rest"] != "" else None, last_id)
+            # the lineups (19 Oct 2026): the goalie RotoWire names replaces the guess,
+            # with his status; CBS's depth chart speaks on the backup and carries the news
+            rw = (lineups.get("rw") or {}).get(nick)
+            rw_status = ""
+            if rw:
+                named = nhl_goalie_match(rw["name"], goalies)
+                if named is not None:
+                    pick, why, rw_status = named, "RotoWire: %s" % rw["status"], rw["status"]
+                else:
+                    notes.append("RotoWire names %s in net for the %s (%s), who is not on the club's goalie page; the slate's guess stands. Pick him by hand if he is a call-up." % (rw["name"], nick, rw["status"] or "no status"))
+            cb = (lineups.get("cbs") or {}).get(ab)
             if pick:
                 cs["pick"] = pick
                 starters[side] = pick["name"]
@@ -1435,13 +1609,34 @@ def build_nhl_game(g, date_iso, season_id, summary, log, ledger=None, xg=None, g
                     inputs[p + "gsh"] = str(pick["shots"])
                 else:
                     notes.append("%s's likely starter %s has no shots this season; save percentage left blank." % (nick, pick["name"]))
-                notes.append("%s likely starter: %s (%s). NOT confirmed: check RotoWire or CBS and tick the box." % (nick, pick["name"], why))
-                if nhl_is_backup(pick, goalies):
+                if rw_status == "confirmed":
+                    inputs[p + "gconf"] = True
+                    notes.append("%s starter: %s, CONFIRMED on RotoWire. The Confirmed box is ticked." % (nick, pick["name"]))
+                elif rw_status:
+                    notes.append("%s likely starter: %s, %s on RotoWire, not yet confirmed: tick the box when it turns green." % (nick, pick["name"], rw_status.upper()))
+                else:
+                    notes.append("%s likely starter: %s (%s). NOT confirmed: check RotoWire or CBS and tick the box." % (nick, pick["name"], why))
+                club_starts = sum(int(x.get("gs") or 0) for x in goalies if not x.get("season"))
+                bsrc = nhl_backup_source(pick, goalies, cb)
+                if bsrc:
                     inputs[p + "gbk"] = True
                     cs["backup"] = True
-                    club_starts = sum(int(x.get("gs") or 0) for x in goalies if not x.get("season"))
-                    notes.append("%s: %s is the BACKUP (%d of the club's %d starts). The Backup box is ticked; untick it if RotoWire or CBS names the starter." % (nick, pick["name"], int(pick.get("gs") or 0), club_starts))
-                    log("  %s: %s is the backup (%d of %d starts) -> Backup in net ticked" % (side, pick["name"], int(pick.get("gs") or 0), club_starts))
+                    if bsrc == "cbs":
+                        notes.append("%s: %s is the BACKUP on CBS's depth chart (the club has %d start%s, under the %d the starts rule needs). The Backup box is ticked." % (nick, pick["name"], club_starts, "" if club_starts == 1 else "s", BACKUP_MIN_STARTS))
+                        log("  %s: %s is the backup on CBS's depth chart (%d club starts) -> Backup in net ticked" % (side, pick["name"], club_starts))
+                    else:
+                        notes.append("%s: %s is the BACKUP (%d of the club's %d starts). The Backup box is ticked%s" % (nick, pick["name"], int(pick.get("gs") or 0), club_starts, "." if rw_status else "; untick it if RotoWire or CBS names the starter."))
+                        log("  %s: %s is the backup (%d of %d starts) -> Backup in net ticked" % (side, pick["name"], int(pick.get("gs") or 0), club_starts))
+                elif cb and _name_key(cb.get("backup"))[1] and _name_key(cb.get("backup"))[1] == _name_key(pick["name"])[1]:
+                    notes.append("CBS's depth chart lists %s as the %s backup; by starts he is not (%d of the club's %d), so the Backup box is left alone." % (pick["name"], nick, int(pick.get("gs") or 0), club_starts))
+                if cb:
+                    blurb = next((v for k, v in (cb.get("news") or {}).items() if _name_key(k)[1] == _name_key(pick["name"])[1]), None)
+                    if blurb:
+                        notes.append("CBS on %s: %s" % (pick["name"], blurb))
+                    for nm in cb.get("reserves") or []:
+                        tip = (cb.get("news") or {}).get(nm)
+                        if tip and nhl_goalie_match(nm, goalies) is not None:
+                            notes.append("%s: %s is on CBS's reserve list (%s)." % (nick, nm, tip))
                 others = ", ".join("%s %s/%d" % (x["name"], "%.3f" % x["sv"] if x["sv"] is not None else "?", x["shots"]) for x in goalies if x is not pick)
                 halves = ""
                 if pick.get("prior"):
@@ -3348,10 +3543,11 @@ def make_nhl_slate(date_iso, out_dir, log):
         log("Goalie report: %d goalies, %d with %d+ shots (the context card ranks the named starter among them)." % (len(gsum), sum(1 for x in gsum.values() if x["shots"] >= CTX_GOALIE_SHOTS), CTX_GOALIE_SHOTS))
     except Exception as e:  # noqa: BLE001
         log("Could not fetch the goalie report (%s); the context card has no goalie line." % e)
+    lineups = nhl_lineups(date_iso, log) if games else {}
     rows = []
     for g in games:
         try:
-            rows.append(build_nhl_game(g, date_iso, season_id, summary, log, ledger, (xg_rates, xg_lg) if xg_rates else None, gsum, tables))
+            rows.append(build_nhl_game(g, date_iso, season_id, summary, log, ledger, (xg_rates, xg_lg) if xg_rates else None, gsum, tables, lineups))
         except Exception as e:  # noqa: BLE001
             log("%s @ %s: FAILED (%s); left out of the slate" % (nhl_name(g.get("awayTeam")), nhl_name(g.get("homeTeam")), e))
         log("")
@@ -4253,6 +4449,54 @@ def selftest():
     check("nhl backup: last season's lines never qualify", not nhl_is_backup({"gs": 2, "season": "20252026"}, [{"gs": 2, "season": "20252026"}, {"gs": 60, "season": "20252026"}]))
     check("nhl backup: under ten club starts, no flag", not nhl_is_backup({"gs": 1}, [{"gs": 1}, {"gs": 7}]))
     check("nhl: never confirmed", all("NOT confirmed" in n for n in row["notes"] if "likely starter" in n))
+    # the goalie lineups (19 Oct 2026): RotoWire names the goalie and his status, CBS the depth chart and the news
+    rw_date, rw = parse_rotowire_goalies(_canned_rotowire())
+    check("rotowire: the page's date, each club's goalie with his status and opponent, the tools box skipped",
+          rw_date == "October 7, 2026" and rw["Rangers"] == {"name": "I. S", "status": "confirmed", "opp": "Bruins", "home": False}
+          and rw["Bruins"]["name"] == "Jeremy S" and rw["Bruins"]["status"] == "expected" and rw["Bruins"]["home"] is True and len(rw) == 2)
+    check("rotowire: the date line to ISO", _rw_date_iso("October 7, 2026") == "2026-10-07" and _rw_date_iso("") is None)
+    cbs = parse_cbs_goalies(_canned_cbs())
+    check("cbs: starter, backup, reserves and the tooltip by name, CBS's codes mapped to the league's",
+          cbs["NYR"]["starter"] == "Igor S" and cbs["NYR"]["backup"] == "Jonathan Q" and cbs["NYR"]["reserves"] == [] and cbs["CBJ"]["starter"] == "Jet G"
+          and cbs["NYR"]["news"]["Igor S"] == "Rangers' Igor S: First goalie off Wednesday" and cbs["BOS"]["reserves"] == ["Joonas K"]
+          and cbs["BOS"]["news"]["Joonas K"] == "Lower Body: IR. Expected to be out until at least Oct 20" and set(cbs) == {"NYR", "BOS", "CBJ"})
+    check("goalie names: an initial and a surname meet the club page's full name, accents and hyphens aside",
+          nhl_goalie_match("A. Vasilevskiy", [{"name": "Andrei Vasilevskiy"}, {"name": "Dennis Hildeby"}])["name"] == "Andrei Vasilevskiy"
+          and nhl_goalie_match("Ukko-Pekka Luukkonen", [{"name": "Ukko-Pekka Luukkonen"}])["name"] == "Ukko-Pekka Luukkonen"
+          and nhl_goalie_match("J. Smith", [{"name": "Alex Smith"}, {"name": "Jo Smith"}])["name"] == "Jo Smith"
+          and nhl_goalie_match("Nobody", [{"name": "Igor S"}]) is None and _name_key("Jesper Wallstedt") == ("j", "wallstedt") and _name_key("Montembeault") == ("", "montembeault"))
+    check("backup source: the starts rule first, CBS's depth chart under ten club starts, nothing otherwise",
+          nhl_backup_source({"name": "Jonathan Q", "gs": 17}, [{"name": "Igor S", "gs": 47}, {"name": "Jonathan Q", "gs": 17}], None) == "starts"
+          and nhl_backup_source({"name": "Jonathan Q", "gs": 1}, [{"name": "Igor S", "gs": 5}, {"name": "Jonathan Q", "gs": 1}], {"backup": "Jonathan Q"}) == "cbs"
+          and nhl_backup_source({"name": "Igor S", "gs": 5}, [{"name": "Igor S", "gs": 5}, {"name": "Jonathan Q", "gs": 1}], {"backup": "Jonathan Q"}) is None
+          and nhl_backup_source({"name": "Jonathan Q", "gs": 1}, [{"name": "Igor S", "gs": 5}, {"name": "Jonathan Q", "gs": 1}], None) is None
+          and nhl_backup_source({"name": "Jonathan Q", "gs": 3}, [{"name": "Igor S", "gs": 20}, {"name": "Jonathan Q", "gs": 3}], {"backup": "Igor S"}) == "starts")
+    fetch_json = fake_nhl
+    try:
+        lines3 = []
+        row3 = build_nhl_game(nhl_schedule("2026-10-07")[0], "2026-10-07", "20262027", nhl_team_summary("20262027"), lines3.append, goalie_summary=gsum, lineups={"rw": rw, "cbs": cbs})
+    finally:
+        fetch_json = real
+    i3 = row3["inputs"]
+    check("lineups: RotoWire's confirmed goalie replaces the slate's back-to-back guess, his line follows and the Confirmed box is ticked",
+          i3["agname"] == "Igor S" and i3["agsv"] == "0.912" and i3["agsh"] == "1400" and i3["agconf"] is True and i3["agbk"] is False and row3["starters"]["away"] == "Igor S"
+          and any("Rangers starter: Igor S, CONFIRMED on RotoWire. The Confirmed box is ticked." in n for n in row3["notes"]))
+    check("lineups: an expected start is said to be expected and its box stays unticked",
+          i3["hgname"] == "Jeremy S" and i3["hgconf"] is False and any("Bruins likely starter: Jeremy S, EXPECTED on RotoWire, not yet confirmed" in n for n in row3["notes"]))
+    check("lineups: CBS's blurb on the named goalie and the injured reserve ride in the notes",
+          any(n == "CBS on Igor S: Rangers' Igor S: First goalie off Wednesday" for n in row3["notes"])
+          and any("Bruins: Joonas K is on CBS's reserve list (Lower Body: IR. Expected to be out until at least Oct 20)." in n for n in row3["notes"]))
+    check("lineups: the printout names the source", any("[RotoWire: confirmed]" in l for l in lines3) and any("[RotoWire: expected]" in l for l in lines3))
+    fetch_json = fake_nhl
+    try:
+        row4 = build_nhl_game(nhl_schedule("2026-10-07")[0], "2026-10-07", "20262027", nhl_team_summary("20262027"), lambda s: None, goalie_summary=gsum,
+                              lineups={"rw": {"Rangers": {"name": "Call Up", "status": "confirmed", "opp": "Bruins", "home": False}}, "cbs": {}})
+    finally:
+        fetch_json = real
+    check("lineups: a goalie RotoWire names who is not on the club page leaves the guess and says so",
+          row4["inputs"]["agname"] == "Jonathan Q" and row4["inputs"]["agconf"] is False
+          and any("RotoWire names Call Up in net for the Rangers (confirmed), who is not on the club's goalie page" in n for n in row4["notes"]))
+    check("lineups: the boxes start False on every row, so the sheet reads a boolean either way", i["agconf"] is False and i["hgconf"] is False)
     check("nhl grade: final with the period score", gr2["finals"] == {"fa": "2", "fh": "3", "f5a": "1", "f5h": "0"})
     check("previous season id", nhl_prev_season("20262027") == "20252026")
     # the odds feed, offline: one event document in The Odds API's shape
@@ -4913,6 +5157,52 @@ def _canned_nhl():
         ("/player/2/landing", p2), ("/player/3/landing", p3),
         ("/boxscore", box), ("/landing", landing),
     ]
+
+
+def _canned_rotowire():
+    """RotoWire's lineup page, cut to the markup the parser reads (19 Oct 2026):
+    the date line, one game box with both clubs, each list's highlighted goalie
+    with his status row, and the tools box that carries no game."""
+    def goalie(side, href, name, cls, dot, word):
+        return ('<ul class="lineup__list is-%s">\n<li class="lineup__player-highlight">\n<div class="lineup__player-highlight-name">\n'
+                '<a href="%s">%s</a>\n</div>\n<div class="flex-row align-center %s" style="padding:3px 0 2px;font-size:11px;">\n'
+                '<div class="dot is-medium %s" style="margin-right:5px;"></div>%s\n</div>\n</li>\n'
+                '<li class="lineup__title">POWER PLAY #1</li>\n<li class="lineup__player"><div class="lineup__pos">C</div><a title="Some Guy" href="/hockey/player/some-guy-1">S. Guy</a></li>\n</ul>'
+                % (side, href, name, cls, dot, word))
+    return ('<div class="page-title__secondary">Starting NHL lineups for October 7, 2026<div class="lineup__partner-top"><b>Like a lineup?</b></div></div>\n'
+            '<div class="lineups">\n<div class="lineup is-nhl">\n<div class="lineup__meta flex-row"><div class="lineup__time">7:00 PM ET</div></div>\n'
+            '<div class="lineup__box"><div class="lineup__top"><div class="lineup__teams">'
+            '<a href="/hockey/nhl-depth-charts/rangers-depth-chart-nyr" class="lineup__team is-visit"><div class="lineup__abbr">NYR</div></a>'
+            '<a href="/hockey/nhl-depth-charts/bruins-depth-chart-bos" class="lineup__team is-home"><div class="lineup__abbr">BOS</div></a></div></div>\n'
+            '<div class="lineup__matchup">\n<a href="/hockey/nhl-depth-charts/rangers-depth-chart-nyr" class="lineup__mteam is-visit white">\n'
+            '    Rangers                                        <span class="lineup__wl">(6-3-1)</span>\n</a>\n'
+            '<a href="/hockey/nhl-depth-charts/bruins-depth-chart-bos" class="lineup__mteam is-home white">\n'
+            '    Bruins                                        <span class="lineup__wl">(5-4-0)</span>\n</a>\n</div>\n<div class="lineup__main">\n'
+            + goalie("visit", "/hockey/player/igor-s-1", "I. S", "is-confirmed", "is-green", "Confirmed")
+            + goalie("home", "/hockey/player/jeremy-s-3", "Jeremy S", "is-expected", "is-yellow", "Expected")
+            + '</div><div class="lineup__bottom"></div></div></div>\n'
+            '<div class="lineup is-nhl is-tools"><div class="lineup__tool-name">Lineup optimizer</div></div>\n</div>')
+
+
+def _canned_cbs():
+    """CBS's goalie depth chart, cut to the markup the parser reads: one table
+    row a club with CBS's code, the short and long name of each goalie, a news
+    tooltip on a starter and an injury tooltip on a reserve."""
+    def player(short, long_, pid, tip=None):
+        icon = ('<span class="CellPlayerName-icon icon-moon-injury"><div class="Tablebase-tooltip Tablebase-tooltip--playerIcons ">'
+                '<div class="Tablebase-tooltipInner">\n                    %s\n                </div></div></span>' % tip) if tip else ""
+        return ('<span class="CellPlayerName--short"><span class=""><a href="/nhl/players/%d/x/fantasy/" class="">%s</a>%s</span></span>'
+                '<span class="CellPlayerName--long"><span class=""><a href="/nhl/players/%d/x/fantasy/" class="">%s</a>%s</span></span>' % (pid, short, icon, pid, long_, icon))
+    def row(code, slug, starter, backup, reserves):
+        cells = ['<span class="CellLogoNameLockup"><div class="TeamLogoNameLockup-name"><span class="TeamName"><a href="/nhl/teams/%s/%s/" class="">%s</a></span></div></span>' % (code, slug, code),
+                 starter, backup, ('<div class="CellPlayerNames">' + "".join('<div class="CellPlayerNames-name">%s</div>' % r for r in reserves) + "</div>") if reserves else "\n                                        —                 "]
+        return '<tr class="TableBase-bodyTr">' + "".join('<td class="TableBase-bodyTd \n                ">%s</td>' % c for c in cells) + "</tr>"
+    return ('<table class="TableBase-table"><thead><tr class="TableBase-headTr"><th class="TableBase-headTh">Team</th><th class="TableBase-headTh">Starter</th>'
+            '<th class="TableBase-headTh">Backup</th><th class="TableBase-headTh">Reserves</th></tr></thead><tbody>'
+            + row("NYR", "new-york-rangers", player("I. S", "Igor S", 1, "Rangers&#x27; Igor S: First goalie off Wednesday"), player("J. Q", "Jonathan Q", 2), [])
+            + row("BOS", "boston-bruins", player("J. S", "Jeremy S", 3), player("N. Body", "No Body", 99), [player("J. K", "Joonas K", 4, "Lower Body: IR. Expected to be out until at least Oct 20")])
+            + row("CLB", "columbus-blue-jackets", player("J. G", "Jet G", 5), player("C. T", "Cam T", 6), [])
+            + "</tbody></table>")
 
 
 # ---- main ------------------------------------------------------------------

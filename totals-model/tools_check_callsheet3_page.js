@@ -879,7 +879,7 @@ const CHECKS = ["dome","playoff","agconf","hgconf","agbk","hgbk"];
       { gid: '401909834', away: 'Hawks', home: 'Magic', aab: 'ATL', hab: 'ORL', spread: -4.5, total: 229.5, pace: 99.8, props: [
         { pid: '3037789', name: 'Trae Young', team: 'ATL', opp: 'ORL', home: false, pos: 'PG', mk: 'pts', line: 24.5, op: -110, up: -110, book: 'fanatics', books: { fanatics: [24.5, -110, -110], draftkings: [25.5, -115, -105] },
           proj: 27.2, sd: 9.4, pm: 0.612, pb: 0.5, p: 0.5604, push: 0, side: 'OVER', chance: 0.5604, price: -110, need: 0.5238, edge: 0.0366, band: 'BET', mins: 35.1, rate36: 27.9,
-          why: ['27.9 points per 36 this season (3 games, 104 minutes)', '35.1 minutes projected'], log: [['2026-10-15', 'MIA', 0, 34.0, 26]] },
+          why: ['27.9 points per 36 this season (3 games, 104 minutes)', '35.1 minutes projected'], log: [['2026-10-15', 'MIA', 0, 34.0, 26], ['2026-10-17', 'CHI', 1, 31.0, 22], ['2026-10-19', 'BOS', 0, 12.5, null]] },
         { pid: '4066261', name: 'Jalen Suggs', team: 'ORL', opp: 'ATL', home: true, pos: 'SG', mk: 'ast', line: 4.5, op: -120, up: -100, book: 'fanatics', books: { fanatics: [4.5, -120, -100] },
           why: ['no history to project from (under 60 minutes with the stat in the ledgers)'], log: [] },
         { pid: '4397020', name: 'Paolo Banchero', team: 'ORL', opp: 'ATL', home: true, pos: 'PF', mk: 'reb', line: 7.5, op: -105, up: -115, book: 'fanatics', books: { fanatics: [7.5, -105, -115] },
@@ -894,6 +894,7 @@ const CHECKS = ["dome","playoff","agconf","hgconf","agbk","hgbk"];
     const count = document.getElementById('propsCount').textContent, msg = document.getElementById('propsMsg').textContent;
     document.querySelector('#propsTable tr[data-prop]').click(); await wait();
     const whyOpen = [...document.querySelectorAll('#propsTable tr.why')].filter(t => !t.hidden).map(t => t.innerText.replace(/\s+/g, ' ').trim());
+    const logMarks = [...document.querySelectorAll('#propsTable tr.why b.lg')].map(b => b.className + '|' + b.textContent);
     const tileBefore = !!document.querySelector('#calibBox .calib[data-sport="PROPS"]');
     const gradeDoc = { format: 'callsheet2.slate', version: 1, date: '2026-10-21', games: [
       { sport: 'NBA', gdate: '2026-10-21', away: 'Hawks', home: 'Magic', gameId: '401909834', finals: { fa: '118', fh: '112', f5a: '60', f5h: '55' }, notes: [],
@@ -910,8 +911,10 @@ const CHECKS = ["dome","playoff","agconf","hgconf","agbk","hgbk"];
     document.getElementById('m-nba').click(); await wait();
     const viewOff = document.getElementById('propsView').hidden, colsBack = !document.querySelector('.cols').hidden, nbaPressed = document.getElementById('m-nba').getAttribute('aria-pressed');
     localStorage.removeItem('callsheet3.props.v1');
-    return { viewOn, colsOff, pressed, best, rowsOn, rowsAll, count, msg, whyOpen, tileBefore, after: after.map(r => [r.name, r.mk, r.result, r.actual]), tileText, slateMsg, restored: restored.length, viewOff, colsBack, nbaPressed };
+    return { viewOn, colsOff, pressed, best, rowsOn, rowsAll, count, msg, whyOpen, logMarks, tileBefore, after: after.map(r => [r.name, r.mk, r.result, r.actual]), tileText, slateMsg, restored: restored.length, viewOff, colsBack, nbaPressed };
   });
+  chk(propsT.logMarks.join(',') === 'lg over|26,lg under|22,lg|?' && /10-17 v CHI 31m 22 · 10-19 @ BOS 12.5m \? \(1 of 2 over 24\.5\)/.test(propsT.whyOpen[0]),
+      'props: the last games mark each stat, green over the prop\'s line and red under it, a missing one plain, and tally how many cleared the number', JSON.stringify({ marks: propsT.logMarks, why: propsT.whyOpen }));
   chk(propsT.viewOn && propsT.colsOff && propsT.pressed === 'true', 'props: loading a props file through Load slate opens the Props tab in place of the matchup columns', JSON.stringify({ on: propsT.viewOn, cols: propsT.colsOff, pressed: propsT.pressed }));
   chk(propsT.best.length === 1 && /#1 · BET/.test(propsT.best[0]) && /Trae Young OVER 24\.5 points/.test(propsT.best[0]) && /56\.0% · [-−]110 needs 52\.4% · edge \+3\.7/.test(propsT.best[0]) && /projected 27\.2 \(±9\.4\)/.test(propsT.best[0]),
       'props: the best list carries the one prop that clears its price, with its band, chance, price, need, edge and projection', JSON.stringify(propsT.best));

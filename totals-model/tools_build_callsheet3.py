@@ -102,6 +102,9 @@ def head() -> str:
              "  table.props tr.loss td:first-child { border-left: 3px solid var(--bad); } table.props tr.void td, table.props tr.push td { color: var(--muted); }\n"
              "  table.props tr.why td { white-space: normal; background: var(--surface-2, var(--surface)); }\n"
              "  table.props tr.why ul { margin: 4px 0; padding-left: 18px; font: 11.5px/1.5 var(--sans); color: var(--ink-2); }\n"
+             "  table.props tr.why b.lg { display: inline-block; min-width: 18px; text-align: center; padding: 0 5px; border-radius: 3px; font: 700 11.5px/1.5 var(--mono); background: var(--surface-2); color: var(--ink); }\n"
+             "  table.props tr.why b.lg.over { background: var(--go-wash); color: var(--go); } table.props tr.why b.lg.under { background: var(--bad-wash); color: var(--bad); }\n"
+             "  table.props tr.why b.lg.push { background: var(--edge-wash); color: var(--edge); }\n"
              "  #propsView .picks .pk.scored { border-color: var(--go); }\n"
              "  @media (prefers-reduced-motion: reduce) { * { transition: none !important; animation: none !important; } }\n</style>", "fold css")
     h = once(h, "<p>One matchup, every market the book posts on it — the full-game total, the first five,\n         the moneyline and the run line — priced off",

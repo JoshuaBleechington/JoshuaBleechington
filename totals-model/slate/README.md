@@ -136,7 +136,9 @@ projection, built from the ledgers' box lines and measured on 2025-26
 
 A prop is the slate's call as made: the page does not rescore it, the BET
 band (three points of edge and 55%) and LEAN (any edge) are a priori, and
-the Props record tile is the test. Props cannot be backtested against lines
+the Props record tile is the test. A click on a prop opens its why list with
+the last games: each game's stat is marked, green over the prop's line, red
+under it, with a tally of how many cleared the number (20 Oct 2026). Props cannot be backtested against lines
 (ten credits a market a game on the history endpoint). A player listed Out
 or Doubtful gets no projection; a name the rosters and ledgers cannot place
 is listed under the game as unmatched.

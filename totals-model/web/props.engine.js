@@ -150,6 +150,20 @@
       var cls = r.result === "win" ? "win" : r.result === "loss" ? "loss" : "push";
       return ' <span class="chip ' + cls + '">' + esc(r.result === "void" ? "VOID · did not play" : r.result.toUpperCase()) + (r.actual !== null && r.actual !== undefined ? " · " + r.actual : "") + '</span>';
     };
+    /* the last games (20 Oct 2026, the user: "highlight their scored numbers so it's easy to see"):
+       the stat of each game in its own mark, green over the prop's line, red under it, grey on it,
+       and a tally at the end of how many of them cleared the number */
+    function propsLogGame(g, line) {
+      var v = (g[4] === null || g[4] === undefined || g[4] === "") ? null : +g[4];
+      var cls = v === null || line === null || line === undefined || isNaN(+line) ? "" : (v > +line ? " over" : v < +line ? " under" : " push");
+      return esc(String(g[0] || "").slice(5) + " " + (g[2] ? "v " : "@ ") + g[1] + " " + g[3] + "m ") + '<b class="lg' + cls + '">' + (v === null ? "?" : esc(String(g[4]))) + '</b>';
+    }
+    function propsLogTally(r) {
+      var vals = (r.log || []).map(function (g) { return g[4]; }).filter(function (v) { return v !== null && v !== undefined && v !== "" && !isNaN(+v); });
+      if (!vals.length || r.line === null || r.line === undefined || isNaN(+r.line)) return "";
+      var over = vals.filter(function (v) { return +v > +r.line; }).length, push = vals.filter(function (v) { return +v === +r.line; }).length;
+      return ' <span class="dim">(' + over + " of " + vals.length + " over " + r.line + (push ? ", " + push + " on it" : "") + ")</span>";
+    }
     var picks = rows.filter(function (r) { return propHas(r) && r.edge > 0; }).sort(function (a, b) { return b.edge - a.edge; });
     $("propsBest").innerHTML = picks.length ? picks.slice(0, 12).map(function (r, i) {
       return '<div class="pk' + (r.band === "BET" ? ' scored' : '') + '" data-prop="' + r.id + '"><div class="n1">#' + (i + 1) + ' · ' + esc(r.band) + '</div>' +
@@ -169,7 +183,7 @@
                     : '<td colspan="7" class="dim">' + esc((r.why && r.why[0]) || 'no projection') + '</td>') +
         '<td>' + (r.result ? esc(r.result) + (r.actual !== null && r.actual !== undefined ? ' · ' + r.actual : '') : '') + '</td></tr>';
       h += '<tr class="why" data-why="' + r.id + '" hidden><td colspan="12"><ul>' + (r.why || []).map(function (w) { return '<li>' + esc(w) + '</li>'; }).join('') +
-        (r.log && r.log.length ? '<li>last games: ' + esc(r.log.map(function (g) { return String(g[0] || "").slice(5) + " " + (g[2] ? "v " : "@ ") + g[1] + " " + g[3] + "m " + (g[4] === null || g[4] === undefined ? "?" : g[4]); }).join(" · ")) + '</li>' : '') +
+        (r.log && r.log.length ? '<li>last games: ' + r.log.map(function (g) { return propsLogGame(g, r.line); }).join(" · ") + propsLogTally(r) + '</li>' : '') +
         (r.books && Object.keys(r.books).length > 1 ? '<li>books: ' + esc(Object.keys(r.books).map(function (b) { return b + " " + r.books[b][0] + " (" + sgn(r.books[b][1], 0) + "/" + sgn(r.books[b][2], 0) + ")"; }).join(" · ")) + '</li>' : '') +
         '</ul></td></tr>';
     });

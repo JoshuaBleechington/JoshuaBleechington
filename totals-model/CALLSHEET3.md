@@ -895,3 +895,11 @@ lineup as it stood when the row was added, and the NBA example carries one
 (the 76ers expected without Embiid, the Knicks confirmed without Robinson).
 Shown, not scored: `nba.engine.js` renders the box in `nbaLineupPanel` and
 reads nothing from it. The page's build stamp is 2026-10-20.
+
+The same day, on the Props tab (the user: "for last games for the players,
+could you highlight their scored numbers so it's easy to see?"): the why
+list's last-games line marks each game's stat in its own box, green when it
+beat the prop's line, red when it fell short, grey on the number, a missing
+one plain, and ends with a tally, "7 of 10 over 24.5" (`props.engine.js`,
+`propsLogGame` and `propsLogTally`). The line is the prop's own, so the
+marks read the same way whichever side the sheet took.

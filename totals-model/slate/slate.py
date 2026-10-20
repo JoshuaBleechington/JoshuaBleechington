@@ -978,6 +978,109 @@ def nhl_lineups(date_iso, log):
     return out
 
 
+# ---- NBA starting lineups (20 Oct 2026) ---------------------------------------
+# RotoWire's NBA lineups page names each club's starting five with the position,
+# expected or confirmed, and under it the men who may not play with their
+# status (the user, 20 Oct 2026: "show the starting lineup for that matchup
+# next to the who's out section"). The slate writes it into the row and the
+# matchup's card shows it beside the who-is-out list; nothing is scored on it.
+# Today's page and tomorrow's only, like the hockey page; tomorrow's carries
+# today's date in its subtitle before the lineups are posted, so only today's
+# page is checked against its date.
+ROTOWIRE_NBA = "https://www.rotowire.com/basketball/nba-lineups.php"
+RW_NBA_CODES = {"PHO": "PHX", "NOR": "NOP", "BRK": "BKN", "GS": "GSW", "NY": "NYK", "SA": "SAS", "UTAH": "UTA", "WSH": "WAS"}   # RotoWire's codes where they differ from the league's
+
+
+def parse_rotowire_nba(text):
+    """RotoWire's NBA lineups page -> (the page's date line, {nickname: {status,
+    five: [[position, name], ...], maybe: [[position, name, status], ...],
+    abbr, opp, home}}). Each game is a `lineup is-nba` box (the tools boxes
+    carry no club and are skipped): two `lineup__mteam` names and codes, and
+    two `lineup__list`s whose first row's class says expected or confirmed,
+    whose players before the MAY NOT PLAY title are the five, each with his
+    position and his full name in the link's title (the link text is often
+    'M. Robinson'), and whose players after it carry a status (Out, Ques,
+    GTD...). A row hidden as `is-ofs` (out for the season) is left out."""
+    m = re.search(r"Starting (?:[A-Z]+ )?lineups for ([A-Za-z]+ \d{1,2}, \d{4})", text)
+    page_date = m.group(1) if m else ""
+    out = {}
+    player = re.compile(r'<li class="lineup__player([^"]*)"[^>]*>(.*?)</li>', re.S)
+
+    def entry(inner):
+        nm = re.search(r'<a title="([^"]+)"', inner)
+        if not nm:
+            return None
+        pos = re.search(r'lineup__pos"[^>]*>\s*([^<]*?)\s*<', inner)
+        inj = re.search(r'lineup__inj">\s*([^<]*?)\s*<', inner)
+        return [pos.group(1).strip() if pos else "", re.sub(r"\s+", " ", html.unescape(nm.group(1))).strip(), (inj.group(1).strip() if inj else "")]
+
+    for box in text.split('<div class="lineup is-nba')[1:]:
+        names, codes = {}, {}
+        for side, nm in re.findall(r'lineup__mteam is-(visit|home)[^"]*">\s*([^<]+?)\s*<', box):
+            names[side] = re.sub(r"\s+", " ", html.unescape(nm)).strip()
+        for side, ab in re.findall(r'lineup__team is-(visit|home)[^>]*>.*?lineup__abbr[^>]*>\s*([^<]+?)\s*<', box, re.S):
+            codes[side] = ab.strip().upper()
+        if len(names) != 2:
+            continue
+        for side in ("visit", "home"):
+            lst = re.search(r'<ul class="lineup__list is-%s">(.*?)</ul>' % side, box, re.S)
+            if not lst:
+                continue
+            st = re.search(r'lineup__status is-([a-z]+)', lst.group(1))
+            head, _, tail = lst.group(1).partition("MAY NOT PLAY")
+            five = [e[:2] for e in (entry(inner) for cls, inner in player.findall(head)) if e]
+            maybe = [e for e in (entry(inner) for cls, inner in player.findall(tail) if "is-ofs" not in cls) if e]
+            out[names[side]] = {"status": st.group(1) if st else "", "five": five, "maybe": maybe, "abbr": codes.get(side, ""),
+                                "opp": names["home" if side == "visit" else "visit"], "home": side == "home"}
+    return page_date, out
+
+
+def nba_lineup_for(lineups, nick, ab):
+    """The RotoWire entry for a club: by the nickname the scoreboard gives, else
+    by the tricode (RotoWire's own codes mapped). None when the page has none."""
+    rw = (lineups or {}).get("rw") or {}
+    if nick in rw:
+        return rw[nick]
+    for v in rw.values():
+        code = str(v.get("abbr") or "").upper()
+        if code and RW_NBA_CODES.get(code, code) == ab:
+            return v
+    return None
+
+
+def nba_lineups(date_iso, log):
+    """Tonight's starting fives from RotoWire (today's page, or tomorrow's):
+    {"rw": {nickname: ...}, "rw_date": the page's date line}. A page that
+    fails, today's page showing another day, or a page with no lineups yet
+    leaves it empty and is logged; the card then says there is no lineup."""
+    out = {"rw": {}, "rw_date": ""}
+    today = dt.date.today()
+    try:
+        want = dt.date.fromisoformat(date_iso)
+    except ValueError:
+        want = None
+    if want == today:
+        url = ROTOWIRE_NBA
+    elif want == today + dt.timedelta(days=1):
+        url = ROTOWIRE_NBA + "?date=tomorrow"
+    else:
+        log("RotoWire NBA lineups: the page shows today and tomorrow only, and %s is neither; no starting fives on the slate." % date_iso)
+        return out
+    try:
+        page_date, rw = parse_rotowire_nba(fetch_text(url))
+        shown = _rw_date_iso(page_date)
+        if want == today and shown and shown != date_iso:
+            log("RotoWire NBA lineups: the page is for %s, not %s; not used." % (page_date, date_iso))
+        elif not rw:
+            log("RotoWire NBA lineups: no lineups on the page yet%s." % ((" (%s)" % page_date) if want == today and page_date else ""))
+        else:
+            out["rw"], out["rw_date"] = rw, (page_date if want == today else date_iso)
+            log("RotoWire NBA lineups for %s: %d clubs' starting fives, %d confirmed." % (out["rw_date"], len(rw), sum(1 for v in rw.values() if v["status"] == "confirmed")))
+    except Exception as e:  # noqa: BLE001
+        log("RotoWire NBA lineups: not read (%s); no starting fives on the slate." % e)
+    return out
+
+
 def nhl_goalie_prior(player_id, prev_season):
     """Last regular season's line for one goalie, from his player page,
     summed across clubs if he moved: (save %, shots) or None."""
@@ -3149,7 +3252,7 @@ def ctx_line_nba(kind, side, text):
     return {"side": side, "k": kind, "s": s, "t": text, "tag": tag}
 
 
-NBA_INPUT_IDS = ("naort", "nhort", "nadrt", "nhdrt", "napace", "nhpace", "nagp", "nhgp", "nlrtg", "nlpace", "narest", "nhrest", "nbaout", "nbactx", "opened", "ncrew", "nbarefs")
+NBA_INPUT_IDS = ("naort", "nhort", "nadrt", "nhdrt", "napace", "nhpace", "nagp", "nhgp", "nlrtg", "nlpace", "narest", "nhrest", "nbaout", "nbactx", "opened", "ncrew", "nbarefs", "nbalineup")
 
 # ---- the crew: the day's assignments and each referee's line from the ledger ----
 # The league posts the crews about 9 am Eastern on official.nba.com; the page
@@ -3336,7 +3439,7 @@ def nba_odds_note(o, away, home):
     return "%s on ESPN's scoreboard at the slate run: %s. Shown for the opener and as a check on the carded book; the lines come from the odds run." % (o.get("book") or "The book", "; ".join(bits))
 
 
-def build_nba_game(g, date_iso, tables, league, players, prior_players, injuries, log, have_ledger=True, officials=None, refs=None):
+def build_nba_game(g, date_iso, tables, league, players, prior_players, injuries, log, have_ledger=True, officials=None, refs=None, lineups=None):
     away, home = g.get("an") or NBA_NICK.get(g["away"], g["away"]), g.get("hn") or NBA_NICK.get(g["home"], g["home"])
     inputs = {k: "" for k in NBA_INPUT_IDS}
     notes = []
@@ -3373,6 +3476,20 @@ def build_nba_game(g, date_iso, tables, league, players, prior_players, injuries
     if league:
         inputs["nlrtg"], inputs["nlpace"] = fmt(league["ortg"], 1), fmt(league["pace"], 1)
     inputs["nbaout"] = json.dumps({"away": sides[0]["out"], "home": sides[1]["out"]}, separators=(",", ":"))
+    # the starting fives (20 Oct 2026): RotoWire's expected or confirmed lineup for each
+    # club with the men who may not play under it, shown beside the who-is-out list, never scored
+    lu = {"away": None, "home": None}
+    for s in sides:
+        rw = nba_lineup_for(lineups, s["nick"], s["ab"])
+        if rw:
+            lu[s["side"]] = {"status": rw.get("status") or "", "five": rw.get("five") or [], "maybe": rw.get("maybe") or []}
+            log("  %s starting five, RotoWire (%s): %s%s" % (s["side"], (rw.get("status") or "no status").upper(), ", ".join("%s %s" % (p, n) for p, n in lu[s["side"]]["five"]) or "none named",
+                ("; may not play: " + ", ".join("%s (%s)" % (n, st or "?") for _, n, st in lu[s["side"]]["maybe"])) if lu[s["side"]]["maybe"] else ""))
+        elif (lineups or {}).get("rw"):
+            notes.append("No starting five on RotoWire for the %s yet." % s["nick"])
+    if lu["away"] or lu["home"]:
+        lu["src"] = "RotoWire"
+        inputs["nbalineup"] = json.dumps(lu, separators=(",", ":"))
     for s in sides:
         if s["ab"] in NBA_WATCHED:
             notes.append("%s: a club the close has run under both seasons, home and away. Watched on the sheet, not scored." % s["nick"])
@@ -3462,10 +3579,11 @@ def make_nba_slate(date_iso, out_dir, log):
         log("Crews: %d game%s on the league's assignments feed." % (len(officials), "" if len(officials) == 1 else "s"))
     except Exception as e:  # noqa: BLE001
         log("Could not read the league's referee assignments (%s): type the crews in the Crew box from official.nba.com/referee-assignments." % e)
+    lineups = nba_lineups(date_iso, log) if games else {}
     rows = []
     for g in games:
         try:
-            rows.append(build_nba_game(g, date_iso, tables, league, players, prior_players, injuries, log, have_ledger=bool(led and led.get("games")), officials=officials, refs=refs))
+            rows.append(build_nba_game(g, date_iso, tables, league, players, prior_players, injuries, log, have_ledger=bool(led and led.get("games")), officials=officials, refs=refs, lineups=lineups))
         except Exception as e:  # noqa: BLE001
             log("%s @ %s: FAILED (%s); left out of the slate" % (g.get("an"), g.get("hn"), e))
         log("")
@@ -5508,6 +5626,10 @@ def selftest():
                    # closes for two of the synthetic finals: Celtics @ Knicks 115-114 (over 225.5, Zarba's crew), Lakers @ Warriors 113-112 (under 230, Foster's crew)
                    odds_log_key("NBA", "2026-10-13", "Celtics", "Knicks"): {"last": {"line": "225.5"}}, odds_log_key("NBA", "2026-10-13", "Lakers", "Warriors"): {"last": {"line": "230"}}}, f)
     fetch_json = fake_nba_slate
+    # RotoWire's NBA page sits in fetch_text's cache for the run, so the slate reads the canned
+    # lineups on the two days it would fetch (the 20th and 21st) and nothing goes out on any day
+    _cache[ROTOWIRE_NBA] = _canned_rotowire_nba("October 21, 2026")
+    _cache[ROTOWIRE_NBA + "?date=tomorrow"] = _canned_rotowire_nba("October 20, 2026")
     try:
         day = nba_day_games("2026-10-21")
         tabs7, lg7 = nba_team_tables(led_now, "2026-10-21")
@@ -5523,6 +5645,8 @@ def selftest():
         bare = build_nba_game(day[1], "2026-10-21", {}, None, {}, {}, {}, lines9.append, have_ledger=False)
     finally:
         fetch_json = real
+        _cache.pop(ROTOWIRE_NBA, None)
+        _cache.pop(ROTOWIRE_NBA + "?date=tomorrow", None)
     check("nba slate: the scoreboard for a day, finals and scheduled games alike, on the US date with the half-time score",
           len(day) == 4 and day[0]["final"] is True and day[0]["ha"] == 51 and day[0]["hh"] == 49 and day[0]["fa"] == 101 and day[0]["date"] == "2026-10-21"
           and day[1]["final"] is False and day[1]["state"] == "Scheduled" and day[1]["away"] == "BOS" and day[1]["home"] == "NYK" and day[1]["hn"] == "Knicks" and day[1]["venue"] == "Madison Square Garden"
@@ -5587,6 +5711,50 @@ def selftest():
           and any(l.startswith("Celtics @ Knicks  (Madison Square Garden") for l in lines7) and any("Wrote" in l and "3 games" in l for l in lines7))
     check("nba slate: without a ledger or the injury page the row says so and the boxes stay blank", bare["inputs"]["naort"] == "" and bare["inputs"]["nagp"] == "0" and bare["inputs"]["nbaout"] == '{"away":[],"home":[]}'
           and any("injury report could not be read" in n for n in bare["notes"]) and not any("no game in the ledger" in n for n in bare["notes"]))
+    # the starting fives (20 Oct 2026): RotoWire's page parsed, found by club, carried on the row, and read only on the two days the page shows
+    rwd, rwn = parse_rotowire_nba(_canned_rotowire_nba("October 21, 2026"))
+    check("rotowire nba: the page's date, each club's five with the position and the full name, the status, the may-not-play men with theirs; the hidden out-for-season row and the tools box skipped",
+          rwd == "October 21, 2026" and set(rwn) == {"Celtics", "Knicks"} and rwn["Celtics"]["status"] == "expected" and rwn["Knicks"]["status"] == "confirmed"
+          and rwn["Celtics"]["five"] == [["PG", "Derrick White"], ["SG", "Jaylen Brown"], ["SF", "Jayson Tatum"], ["PF", "Moved Man"], ["C", "Mitchell Robinson"]]
+          and rwn["Celtics"]["maybe"] == [["G", "Celtics Star", "Ques"], ["C", "Devin Carter", "Out"]] and rwn["Knicks"]["maybe"] == [] and [p for p, n in rwn["Knicks"]["five"]] == ["PG", "SG", "SF", "PF", "C"]
+          and rwn["Celtics"]["abbr"] == "BOS" and rwn["Knicks"]["abbr"] == "NYK" and rwn["Celtics"]["opp"] == "Knicks" and rwn["Celtics"]["home"] is False and rwn["Knicks"]["home"] is True)
+    check("rotowire nba: a club is found by its nickname, else by its code with RotoWire's own mapped, else not at all",
+          nba_lineup_for({"rw": rwn}, "Celtics", "BOS") is rwn["Celtics"] and nba_lineup_for({"rw": rwn}, "New York", "NYK") is rwn["Knicks"]
+          and nba_lineup_for({"rw": {"Suns": {"abbr": "PHO"}}}, "Phoenix", "PHX") == {"abbr": "PHO"} and nba_lineup_for({"rw": rwn}, "Lakers", "LAL") is None and nba_lineup_for(None, "Celtics", "BOS") is None)
+    lines10 = []
+    with_five = build_nba_game(day[1], "2026-10-21", {}, None, {}, {}, {}, lines10.append, have_ledger=False, lineups={"rw": rwn, "rw_date": rwd})
+    lu10 = json.loads(with_five["inputs"]["nbalineup"]) if with_five["inputs"].get("nbalineup") else {}
+    check("nba slate: the fives ride in the row with the status and the may-not-play men, the printout names them, and a row without the page has an empty box and no note",
+          lu10.get("src") == "RotoWire" and lu10["away"]["status"] == "expected" and lu10["away"]["five"][0] == ["PG", "Derrick White"] and lu10["away"]["maybe"][1] == ["C", "Devin Carter", "Out"]
+          and lu10["home"]["status"] == "confirmed" and lu10["home"]["five"][4] == ["C", "Karl-Anthony Towns"] and lu10["home"]["maybe"] == []
+          and any(l == "  away starting five, RotoWire (EXPECTED): PG Derrick White, SG Jaylen Brown, SF Jayson Tatum, PF Moved Man, C Mitchell Robinson; may not play: Celtics Star (Ques), Devin Carter (Out)" for l in lines10)
+          and any(l == "  home starting five, RotoWire (CONFIRMED): PG Jalen Brunson, SG Mikal Bridges, SF Josh Hart, PF OG Anunoby, C Karl-Anthony Towns" for l in lines10)
+          and bare["inputs"]["nbalineup"] == "" and not any("No starting five" in n for n in bare["notes"]))
+    one_side = build_nba_game(day[1], "2026-10-21", {}, None, {}, {}, {}, (lambda s: None), have_ledger=False, lineups={"rw": {"Celtics": rwn["Celtics"]}, "rw_date": rwd})
+    check("nba slate: a club RotoWire has not posted is noted and its side is null; the slate's own run carried the fives on the two days it reads the page",
+          json.loads(one_side["inputs"]["nbalineup"])["home"] is None and json.loads(one_side["inputs"]["nbalineup"])["away"]["status"] == "expected"
+          and any(n == "No starting five on RotoWire for the Knicks yet." for n in one_side["notes"])
+          and (bn["inputs"].get("nbalineup", "") != "") == ((dt.date(2026, 10, 21) - dt.date.today()).days in (0, 1)))
+    today10 = dt.date.today()
+    todays_line = "%s %d, %d" % (today10.strftime("%B"), today10.day, today10.year)
+    _cache[ROTOWIRE_NBA] = _canned_rotowire_nba(todays_line)
+    _cache[ROTOWIRE_NBA + "?date=tomorrow"] = _canned_rotowire_nba(todays_line)   # tomorrow's page carries today's date in its subtitle before the lineups are posted
+    try:
+        lines11, lines12, lines13 = [], [], []
+        lu_today = nba_lineups(today10.isoformat(), lines11.append)
+        lu_tmrw = nba_lineups((today10 + dt.timedelta(days=1)).isoformat(), lines12.append)
+        lu_far = nba_lineups("2030-01-01", lines13.append)
+        _cache[ROTOWIRE_NBA] = _canned_rotowire_nba("January 1, 2030")
+        lines14 = []
+        lu_stale = nba_lineups(today10.isoformat(), lines14.append)
+    finally:
+        _cache.pop(ROTOWIRE_NBA, None)
+        _cache.pop(ROTOWIRE_NBA + "?date=tomorrow", None)
+    check("nba lineups: today's page is read and checked against its date line, tomorrow's is read on its own say-so, another day's page is refused, any other day is not fetched",
+          set(lu_today["rw"]) == {"Celtics", "Knicks"} and lu_today["rw_date"] == todays_line and any(l == "RotoWire NBA lineups for %s: 2 clubs' starting fives, 1 confirmed." % todays_line for l in lines11)
+          and set(lu_tmrw["rw"]) == {"Celtics", "Knicks"} and lu_tmrw["rw_date"] == (today10 + dt.timedelta(days=1)).isoformat()
+          and lu_far["rw"] == {} and any("today and tomorrow only" in l for l in lines13)
+          and lu_stale["rw"] == {} and any(l == "RotoWire NBA lineups: the page is for January 1, 2030, not %s; not used." % today10.isoformat() for l in lines14))
     g8 = {"%s @ %s" % (g["away"], g["home"]): g for g in gr8["games"]}
     check("nba grade: the finals with the half-time score from the line scores, or from the summary when the scoreboard has none; the close attached; a game not played skipped",
           len(gr8["games"]) == 2 and g8["Celtics @ Knicks"]["finals"] == {"fa": "110", "fh": "105", "f5a": "55", "f5h": "55"} and g8["Celtics @ Knicks"]["close"] == {"ctot": "221.5", "cf5": "110.5"}
@@ -6014,6 +6182,33 @@ def _canned_cbs():
             + row("BOS", "boston-bruins", player("J. S", "Jeremy S", 3), player("N. Body", "No Body", 99), [player("J. K", "Joonas K", 4, "Lower Body: IR. Expected to be out until at least Oct 20")])
             + row("CLB", "columbus-blue-jackets", player("J. G", "Jet G", 5), player("C. T", "Cam T", 6), [])
             + "</tbody></table>")
+
+
+def _canned_rotowire_nba(date_line):
+    """RotoWire's NBA lineups page, cut to the markup the parser reads (20 Oct
+    2026): the date line, one game box with both clubs' codes and names, each
+    list's status row, five starters with the position and the full name in
+    the link's title, the MAY NOT PLAY title with the men under it (one hidden
+    as out for the season), and the tools box that carries no game."""
+    def li(pos, name, short, cls="is-pct-play-100", inj=None, style=""):
+        return ('<li class="lineup__player %s" title="x">\n<div class="lineup__pos" %s>%s</div>\n<a title="%s" href="/basketball/player/x-1">%s</a>\n%s</li>\n'
+                % (cls, style, pos, name, short, ('<span class="lineup__inj">%s</span>' % inj) if inj else ""))
+    visit = ('<ul class="lineup__list is-visit">\n<li class="lineup__status is-expected">\n<div class="dot is-medium is-yellow"></div>Expected Lineup\n</li>\n'
+             + li("PG", "Derrick White", "D. White") + li("SG", "Jaylen Brown", "J. Brown") + li("SF", "Jayson Tatum", "J. Tatum") + li("PF", "Moved Man", "M. Man") + li("C", "Mitchell Robinson", "M. Robinson")
+             + '<li><button class="see-proj-minutes" data-team="BOS">Projected Minutes</button></li>\n<li class="lineup__title is-middle">MAY NOT PLAY</li>\n'
+             + li("G", "Celtics Star", "C. Star", "is-pct-play-50 has-injury-status", "Ques", 'style="width:15px;"') + li("C", "Devin Carter", "D. Carter", "is-pct-play-0 has-injury-status", "Out")
+             + li("G", "Season Over", "S. Over", "is-pct-play-0 has-injury-status hide is-ofs", "OFS") + "</ul>\n")
+    home = ('<ul class="lineup__list is-home">\n<li class="lineup__status is-confirmed">\n<div class="dot is-medium is-green"></div>Confirmed Lineup\n</li>\n'
+            + li("PG", "Jalen Brunson", "J. Brunson") + li("SG", "Mikal Bridges", "M. Bridges") + li("SF", "Josh Hart", "J. Hart") + li("PF", "OG Anunoby", "O. Anunoby") + li("C", "Karl-Anthony Towns", "K. Towns")
+            + "</ul>\n")
+    top = ('<h1>NBA Daily Starting Lineups</h1>\n<div class="page-title__secondary">Starting lineups for %s</div>\n<div class="lineups">\n' % date_line)
+    return (top + '<div class="lineup is-nba" data-lnum="1">\n<div class="lineup__meta flex-row"><div class="lineup__time">7:00 PM ET</div></div>\n'
+            '<div class="lineup__box"><div class="lineup__top"><div class="lineup__teams">'
+            '<a href="/basketball/nba-depth-charts/celtics-depth-chart-bos" class="lineup__team is-visit">\n<img class="lineup__logo" src="x" alt="BOS">\n<div class="lineup__abbr">BOS</div>\n</a>'
+            '<a href="/basketball/nba-depth-charts/knicks-depth-chart-nyk" class="lineup__team is-home">\n<img class="lineup__logo" src="x" alt="NYK">\n<div class="lineup__abbr">NYK</div>\n</a></div></div>\n'
+            '<div class="lineup__matchup">\n<a href="/basketball/nba-depth-charts/celtics-depth-chart-bos" class="lineup__mteam is-visit white">\n    Celtics   <span class="lineup__wl">(0-0)</span>\n</a>\n'
+            '<a href="/basketball/nba-depth-charts/knicks-depth-chart-nyk" class="lineup__mteam is-home white">\n    Knicks   <span class="lineup__wl">(0-0)</span>\n</a>\n</div>\n<div class="lineup__main">\n'
+            + visit + home + '</div></div></div>\n<div class="lineup is-nba is-tools is-picks"><div class="lineup__box">Tools</div></div>\n</div>')
 
 
 # ---- main ------------------------------------------------------------------

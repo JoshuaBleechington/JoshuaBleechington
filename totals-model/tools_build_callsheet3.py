@@ -24,7 +24,7 @@ import sys
 ROOT = pathlib.Path(__file__).parent / "web"
 OPEN = "  /* ===== ENGINE BLOCK."
 CLOSE = "  /* ===== END ENGINE BLOCK ===== */"
-STAMP = "2026-10-19"   # bumped by hand when 3.0's own sources change (the harness checks it)
+STAMP = "2026-10-20"   # bumped by hand when 3.0's own sources change (the harness checks it)
 
 
 def engine_block() -> str:
@@ -89,6 +89,13 @@ def head() -> str:
              "  #nbaOutPanel table.form td { white-space: normal; vertical-align: top; }\n"
              "  #nbaOutPanel table.form td:first-child { min-width: 150px; }\n"
              "  #nbaOutPanel table.form td:nth-child(6) { min-width: 120px; }\n"
+             "  /* the starting five beside the who-is-out list (20 Oct 2026) */\n"
+             "  #nbaLineupPanel .fives { margin: 6px 0 2px; } #nbaLineupPanel .five p { margin: 4px 0; }\n"
+             "  #nbaLineupPanel table.form { margin: 2px 0 6px; } #nbaLineupPanel table.form td.pos { color: var(--muted); font-size: 10.5px; letter-spacing: .08em; width: 34px; }\n"
+             "  #nbaLineupPanel .lbadge { display: inline-block; margin-left: 6px; padding: 1px 6px; border-radius: 3px; font: 700 9.5px/1.6 var(--sans); letter-spacing: .06em; text-transform: uppercase; vertical-align: 1px; }\n"
+             "  #nbaLineupPanel .lbadge.conf { color: var(--go); background: var(--go-wash); } #nbaLineupPanel .lbadge.exp { color: var(--edge); background: var(--edge-wash); }\n"
+             "  #nbaLineupPanel .lbadge.none { color: var(--muted); background: var(--surface-2); }\n"
+             "  @media (max-width: 640px) { #nbaLineupPanel .fives { grid-template-columns: 1fr; } }\n"
              "  /* the Props tab (19 Oct 2026) */\n"
              "  table.props td.pos { color: var(--go); font-weight: 700; } table.props td.neg { color: var(--muted); }\n"
              "  table.props tr[data-prop] { cursor: pointer; } table.props tr.win td:first-child { border-left: 3px solid var(--go); }\n"
@@ -132,7 +139,7 @@ def tail() -> str:
              '                 "ngoalies","agname","hgname","agstart","hgstart","agok","hgok",\n'
              '                 "odds","sharp","agf","aga","hgf","hga","lgg","angp","hngp","aenc","aens","henc","hens"];\n'
              '  var NBA_IDS = ["away","home","line","op","up","opened","gdate","hml","aml","sp","sph","spa","h1line","h1op","h1up",\n'
-             '                 "naort","nhort","nadrt","nhdrt","napace","nhpace","nagp","nhgp","nlrtg","nlpace","narest","nhrest","nbaout","nbaq","nbactx","ncrew","nbarefs","odds","sharp"];\n'
+             '                 "naort","nhort","nadrt","nhdrt","napace","nhpace","nagp","nhgp","nlrtg","nlpace","narest","nhrest","nbaout","nbaq","nbactx","ncrew","nbarefs","nbalineup","odds","sharp"];\n'
              '  var ALL = MLB_IDS.concat(WNBA_IDS).concat(NHL_IDS).concat(NBA_IDS).filter(function (v, i, a) { return a.indexOf(v) === i; });\n'
              '  var CHECKS = ["dome","playoff","agconf","hgconf","agbk","hgbk"];\n'
              '  function sportOf(s) { return s === "WNBA" ? "WNBA" : s === "NHL" ? "NHL" : s === "NBA" ? "NBA" : "MLB"; }\n'
@@ -255,7 +262,7 @@ def tail() -> str:
              '                      "ngoalies","agname","hgname",\n'
              '                      "pl","plh","pla","p1line","p1op","p1up",\n'
              '                      "agf","aga","hgf","hga","lgg","angp","hngp","aenc","aens","henc","hens",\n'
-             '                      "sp","sph","spa","h1line","h1op","h1up","naort","nhort","nadrt","nhdrt","napace","nhpace","nagp","nhgp","nlrtg","nlpace","narest","nhrest","nbaout","nbactx","ncrew","nbarefs"];', "slate fields")
+             '                      "sp","sph","spa","h1line","h1op","h1up","naort","nhort","nadrt","nhdrt","napace","nhpace","nagp","nhgp","nlrtg","nlpace","narest","nhrest","nbaout","nbactx","ncrew","nbarefs","nbalineup"];', "slate fields")
     # the slate's backup-in-net flags are booleans, carried like the roof: into a
     # row's inputs when the card already has the game, into the form otherwise.
     # The Confirmed boxes travel the same way (19 Oct 2026): the slate ticks one
@@ -324,8 +331,16 @@ NBA_EXAMPLE_CTX = [
     {"side": "home", "k": "rest", "s": "label", "t": "Knicks on a back to back.", "tag": "a label: rest measured inside the number against two seasons of closes"},
     {"side": "away", "k": "out", "s": "shown", "t": "76ers without Joel Embiid: 32 minutes a game of regulars.", "tag": "shown, not scored: announced absences are in the close; the card measures the late ones"},
     {"side": "home", "k": "out", "s": "shown", "t": "Knicks without Mitchell Robinson: 22 minutes a game of regulars.", "tag": "shown, not scored: announced absences are in the close; the card measures the late ones"}]
+# the starting fives as the slate writes them from RotoWire (20 Oct 2026): the 76ers' expected
+# without Embiid, the Knicks' confirmed without Robinson, the may-not-play men under each
+NBA_EXAMPLE_LINEUP = {
+    "away": {"status": "expected", "five": [["PG", "Tyrese Maxey"], ["SG", "VJ Edgecombe"], ["SF", "Paul George"], ["PF", "Kelly Oubre Jr."], ["C", "Adem Bona"]],
+             "maybe": [["G", "Anfernee Simons", "Ques"], ["F", "Dominick Barlow", "GTD"], ["C", "Joel Embiid", "Out"]]},
+    "home": {"status": "confirmed", "five": [["PG", "Jalen Brunson"], ["SG", "Mikal Bridges"], ["SF", "Josh Hart"], ["PF", "OG Anunoby"], ["C", "Karl-Anthony Towns"]],
+             "maybe": [["C", "Mitchell Robinson", "Out"]]},
+    "src": "RotoWire"}
 # the referee table the slate writes from the ledger: each official's games, free throws and points a game, and the league's
-NBA_EXAMPLE_REFS = {"lg": [2462, 44.0, 228.8], "r": {"Scott Foster": [118, 46.2, 229.1, 66, 41, 4, 2], "Tony Brothers": [95, 43.1, 226.0, 56, 54, 3, 3], "Marc Davis": [102, 44.8, 230.3, 71, 51, 0, 0], "Zach Zarba": [110, 42.9, 227.4, 58, 60, 2, 5]}}
+NBA_EXAMPLE_REFS ={"lg": [2462, 44.0, 228.8], "r": {"Scott Foster": [118, 46.2, 229.1, 66, 41, 4, 2], "Tony Brothers": [95, 43.1, 226.0, 56, 54, 3, 3], "Marc Davis": [102, 44.8, 230.3, 71, 51, 0, 0], "Zach Zarba": [110, 42.9, 227.4, 58, 60, 2, 5]}}
 
 
 def nba_example_js() -> str:
@@ -334,6 +349,7 @@ def nba_example_js() -> str:
             '        naort: "113.5", nadrt: "115.0", nhort: "118.0", nhdrt: "109.0", napace: "99.5", nhpace: "98.0", nagp: "15", nhgp: "16", nlrtg: "113.0", nlpace: "100.5", narest: "1", nhrest: "0",\n'
             '        nbaout: ' + json.dumps(json.dumps(NBA_EXAMPLE_OUT, separators=(",", ":"))) + ',\n'
             '        nbactx: ' + json.dumps(json.dumps(NBA_EXAMPLE_CTX, separators=(",", ":"))) + ',\n'
+            '        nbalineup: ' + json.dumps(json.dumps(NBA_EXAMPLE_LINEUP, separators=(",", ":"))) + ',\n'
             '        ncrew: "Scott Foster, Tony Brothers, Marc Davis", nbarefs: ' + json.dumps(json.dumps(NBA_EXAMPLE_REFS, separators=(",", ":"))) + ' });\n')
 
 

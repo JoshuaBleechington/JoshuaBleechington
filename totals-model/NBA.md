@@ -138,6 +138,21 @@ ledger's dates, and writes two JSON boxes the matchup's cards render:
   and return date ride along, a return date before the game is flagged as
   stale, and the card's sum of regulars' minutes counts only the men marked
   OUT plus the ones you tick.
+- **The starting five** (20 Oct 2026, the user: "show the starting lineup
+  for that matchup as well, maybe next to the who's out section"): the slate
+  reads RotoWire's NBA lineups page, today's or tomorrow's, and writes each
+  club's five with the position and the full name, the lineup's status
+  (expected or confirmed) and the MAY NOT PLAY men with theirs into the
+  row's `nbalineup` box. The Who is out card renders it under the injury
+  list, two columns, a badge for the status, and says when RotoWire has not
+  posted a side. The parser is checked against the page's shape and ran on
+  the day's real page (six clubs, five starters each, the hidden
+  out-for-season rows dropped). Shown, not scored: the engine does not read
+  the box, and a lineup is a name on the card, not a number on the line.
+  The NHL goalie pull of 19 Oct reads the same site; the same today-or-
+  tomorrow rule and the same date check apply, except that tomorrow's NBA
+  page carries today's date in its subtitle before the lineups post, so
+  only today's page is checked against its date.
 - **The crew** (15 Oct 2026, the user: "I think that will be helpful at some
   point"): the slate reads the league's assignments feed by date (the user
   opened the domain and sent the day's file the same evening; the parser is

@@ -878,3 +878,20 @@ parlay four, likelier legs" and grades the four as the board builds them. The
 honest expectation, from the likeliest-at-any-price record (160-83, −3.9u)
 and the two-leg parlays (57-82, −27.6u): four favourites at the book's
 prices will hit often and pay less than they should. The record decides.
+
+## The starting five on the NBA card, 20 Oct 2026
+
+The user: "Would it be possible for the NBA model to show the starting
+lineup for that matchup as well, maybe next to the who's out section?"
+
+The slate's NBA run now reads RotoWire's NBA lineups page beside the injury
+page (`slate.py`: `parse_rotowire_nba`, `nba_lineups`, the row's `nbalineup`
+box) and the Who is out card renders it under the injury list: a **Starting
+five** block, two columns, each side's five with the position, a badge that
+says **expected** or **confirmed**, and the may-not-play men with their
+status under it. A side RotoWire has not posted says so. The box rides in
+the row with the rest of the slate's fields, so a reopened row shows the
+lineup as it stood when the row was added, and the NBA example carries one
+(the 76ers expected without Embiid, the Knicks confirmed without Robinson).
+Shown, not scored: `nba.engine.js` renders the box in `nbaLineupPanel` and
+reads nothing from it. The page's build stamp is 2026-10-20.

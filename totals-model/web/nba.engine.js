@@ -234,6 +234,7 @@
   }
   function forecastMatchupNba() {
     nbaOutPanel();
+    nbaLineupPanel();
     nbaCtxPanel();
     var f = readNba();
     var away = f.away, home = f.home, line = f.line;
@@ -338,6 +339,35 @@
       });
       h += "</tbody></table>";
     });
+    el.innerHTML = h;
+  }
+  /* ---- the starting five (20 Oct 2026): RotoWire's expected or confirmed lineup for each
+     club, written by the slate into the hidden nbalineup box with the men who may not play
+     under it. Shown beside the who-is-out list, never scored; the engine does not read it ---- */
+  function nbaLineup() {
+    var raw = ($("nbalineup") || {}).value || "", d = null;
+    try { d = raw ? JSON.parse(raw) : null; } catch (e) { d = null; }
+    return d && typeof d === "object" ? d : {};
+  }
+  function nbaLineupPanel() {
+    var el = $("nbaLineupPanel"); if (!el) return;
+    var d = nbaLineup();
+    if (!d.away && !d.home) { el.innerHTML = "No lineup on the row — load the slate and Fill form, and RotoWire's starting five for each side comes with it (today's and tomorrow's games only)."; return; }
+    var h = '<div class="grid2 fives">';
+    [["away", canonTeam($("away").value, "NBA") || "Away"], ["home", canonTeam($("home").value, "NBA") || "Home"]].forEach(function (s) {
+      var L = d[s[0]];
+      h += '<div class="five" data-side="' + s[0] + '">';
+      if (!L) { h += "<p><b>" + esc(s[1]) + "</b> <span class=\"lbadge none\">no lineup</span> <span class=\"dim\">RotoWire has not posted this side yet.</span></p></div>"; return; }
+      var st = String(L.status || "").toLowerCase(), word = st === "confirmed" ? "confirmed" : st === "expected" ? "expected" : (st || "lineup");
+      h += "<p><b>" + esc(s[1]) + "</b> <span class=\"lbadge " + (st === "confirmed" ? "conf" : "exp") + "\">" + esc(word) + "</span></p>";
+      h += '<table class="form"><tbody>' + (L.five || []).map(function (p) {
+        return "<tr><td class=\"pos\">" + esc(p[0] || "") + "</td><td>" + esc(p[1] || "") + "</td></tr>";
+      }).join("") + "</tbody></table>";
+      if ((L.maybe || []).length) h += '<p class="dim">May not play: ' + L.maybe.map(function (p) { return (p[0] ? esc(p[0]) + " " : "") + esc(p[1] || "") + (p[2] ? " (" + esc(p[2]) + ")" : ""); }).join("; ") + ".</p>";
+      h += "</div>";
+    });
+    h += "</div>";
+    if (d.src) h += '<p class="dim">Source: ' + esc(d.src) + ", as the slate read it. Expected is the morning's lineup; confirmed is the club's.</p>";
     el.innerHTML = h;
   }
   document.addEventListener("change", function (e) {

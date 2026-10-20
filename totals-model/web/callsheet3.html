@@ -360,6 +360,13 @@
   #nbaOutPanel table.form td { white-space: normal; vertical-align: top; }
   #nbaOutPanel table.form td:first-child { min-width: 150px; }
   #nbaOutPanel table.form td:nth-child(6) { min-width: 120px; }
+  /* the starting five beside the who-is-out list (20 Oct 2026) */
+  #nbaLineupPanel .fives { margin: 6px 0 2px; } #nbaLineupPanel .five p { margin: 4px 0; }
+  #nbaLineupPanel table.form { margin: 2px 0 6px; } #nbaLineupPanel table.form td.pos { color: var(--muted); font-size: 10.5px; letter-spacing: .08em; width: 34px; }
+  #nbaLineupPanel .lbadge { display: inline-block; margin-left: 6px; padding: 1px 6px; border-radius: 3px; font: 700 9.5px/1.6 var(--sans); letter-spacing: .06em; text-transform: uppercase; vertical-align: 1px; }
+  #nbaLineupPanel .lbadge.conf { color: var(--go); background: var(--go-wash); } #nbaLineupPanel .lbadge.exp { color: var(--edge); background: var(--edge-wash); }
+  #nbaLineupPanel .lbadge.none { color: var(--muted); background: var(--surface-2); }
+  @media (max-width: 640px) { #nbaLineupPanel .fives { grid-template-columns: 1fr; } }
   /* the Props tab (19 Oct 2026) */
   table.props td.pos { color: var(--go); font-weight: 700; } table.props td.neg { color: var(--muted); }
   table.props tr[data-prop] { cursor: pointer; } table.props tr.win td:first-child { border-left: 3px solid var(--go); }
@@ -375,7 +382,7 @@
   <header class="top">
     <div>
       <div class="eyebrow"><span id="eyebrow">MLB · every market on the game</span>
-        <span class="build">· build <span id="build">2026-10-19</span></span></div>
+        <span class="build">· build <span id="build">2026-10-20</span></span></div>
       <h1>The <em>Super</em> Model</h1>
       <p>One matchup, every market the book posts on it — in baseball the full-game total, the first five,
          the moneyline and the run line; in hockey the total, the first period, the moneyline and the puck line;
@@ -759,17 +766,23 @@
           <h2>Who is out <span class="tag">the one input the market learns late</span></h2>
           <div class="body">
             <div id="nbaOutPanel" class="note">No list on the row — load the slate and Fill form, and each side's injury report comes with it.</div>
+            <div class="subhead">Starting five <span class="tag">RotoWire's lineup for each side, expected or confirmed · shown, not scored</span></div>
+            <div id="nbaLineupPanel" class="note">No lineup on the row — load the slate and Fill form, and RotoWire's starting five for each side comes with it (today's and tomorrow's games only).</div>
             <p class="note">Each side's injury report, from the slate: every player listed with his status and his minutes, points and
               plus-minus a game this season. A player marked <b>Out</b> counts; tick the box on a doubtful one when he is ruled out.
               The regulars' minutes (20 a game or more) are summed and shown in the why list. <b>Shown, not scored</b>: against two
               seasons of closes the announced absences were already in the number (the total's slope on missing minutes 0.00; the
               side's +0.29, t 1.2). What the close cannot carry is the late scratch, and that is what the record measures from
-              opening night: the sheet logs the list as it stood when the row was added, so the two can be split.</p>
+              opening night: the sheet logs the list as it stood when the row was added, so the two can be split.
+              <b>The starting five</b> is RotoWire's: <b>expected</b> in the morning, <b>confirmed</b> once the club says so, with the men
+              who may not play under it. The slate reads today's page and tomorrow's, the two RotoWire shows; run it again late and the
+              newer lineup rides on the newer file. Shown, not scored: a lineup is a name on the card, not a number on the line.</p>
             <div class="links">
               <a href="https://official.nba.com/nba-injury-report-2026-27-season/" target="_blank" rel="noopener">NBA · official injury report</a>
               <a href="https://www.espn.com/nba/injuries" target="_blank" rel="noopener">ESPN · injuries</a>
+              <a href="https://www.rotowire.com/basketball/nba-lineups.php" target="_blank" rel="noopener">RotoWire · NBA lineups</a>
             </div>
-            <input type="hidden" id="nbaout"><input type="hidden" id="nbaq"><input type="hidden" id="nbactx">
+            <input type="hidden" id="nbaout"><input type="hidden" id="nbaq"><input type="hidden" id="nbactx"><input type="hidden" id="nbalineup">
           </div>
         </section>
 
@@ -2908,6 +2921,7 @@
   }
   function forecastMatchupNba() {
     nbaOutPanel();
+    nbaLineupPanel();
     nbaCtxPanel();
     var f = readNba();
     var away = f.away, home = f.home, line = f.line;
@@ -3012,6 +3026,35 @@
       });
       h += "</tbody></table>";
     });
+    el.innerHTML = h;
+  }
+  /* ---- the starting five (20 Oct 2026): RotoWire's expected or confirmed lineup for each
+     club, written by the slate into the hidden nbalineup box with the men who may not play
+     under it. Shown beside the who-is-out list, never scored; the engine does not read it ---- */
+  function nbaLineup() {
+    var raw = ($("nbalineup") || {}).value || "", d = null;
+    try { d = raw ? JSON.parse(raw) : null; } catch (e) { d = null; }
+    return d && typeof d === "object" ? d : {};
+  }
+  function nbaLineupPanel() {
+    var el = $("nbaLineupPanel"); if (!el) return;
+    var d = nbaLineup();
+    if (!d.away && !d.home) { el.innerHTML = "No lineup on the row — load the slate and Fill form, and RotoWire's starting five for each side comes with it (today's and tomorrow's games only)."; return; }
+    var h = '<div class="grid2 fives">';
+    [["away", canonTeam($("away").value, "NBA") || "Away"], ["home", canonTeam($("home").value, "NBA") || "Home"]].forEach(function (s) {
+      var L = d[s[0]];
+      h += '<div class="five" data-side="' + s[0] + '">';
+      if (!L) { h += "<p><b>" + esc(s[1]) + "</b> <span class=\"lbadge none\">no lineup</span> <span class=\"dim\">RotoWire has not posted this side yet.</span></p></div>"; return; }
+      var st = String(L.status || "").toLowerCase(), word = st === "confirmed" ? "confirmed" : st === "expected" ? "expected" : (st || "lineup");
+      h += "<p><b>" + esc(s[1]) + "</b> <span class=\"lbadge " + (st === "confirmed" ? "conf" : "exp") + "\">" + esc(word) + "</span></p>";
+      h += '<table class="form"><tbody>' + (L.five || []).map(function (p) {
+        return "<tr><td class=\"pos\">" + esc(p[0] || "") + "</td><td>" + esc(p[1] || "") + "</td></tr>";
+      }).join("") + "</tbody></table>";
+      if ((L.maybe || []).length) h += '<p class="dim">May not play: ' + L.maybe.map(function (p) { return (p[0] ? esc(p[0]) + " " : "") + esc(p[1] || "") + (p[2] ? " (" + esc(p[2]) + ")" : ""); }).join("; ") + ".</p>";
+      h += "</div>";
+    });
+    h += "</div>";
+    if (d.src) h += '<p class="dim">Source: ' + esc(d.src) + ", as the slate read it. Expected is the morning's lineup; confirmed is the club's.</p>";
     el.innerHTML = h;
   }
   document.addEventListener("change", function (e) {
@@ -3727,7 +3770,7 @@
                  "ngoalies","agname","hgname","agstart","hgstart","agok","hgok",
                  "odds","sharp","agf","aga","hgf","hga","lgg","angp","hngp","aenc","aens","henc","hens"];
   var NBA_IDS = ["away","home","line","op","up","opened","gdate","hml","aml","sp","sph","spa","h1line","h1op","h1up",
-                 "naort","nhort","nadrt","nhdrt","napace","nhpace","nagp","nhgp","nlrtg","nlpace","narest","nhrest","nbaout","nbaq","nbactx","ncrew","nbarefs","odds","sharp"];
+                 "naort","nhort","nadrt","nhdrt","napace","nhpace","nagp","nhgp","nlrtg","nlpace","narest","nhrest","nbaout","nbaq","nbactx","ncrew","nbarefs","nbalineup","odds","sharp"];
   var ALL = MLB_IDS.concat(WNBA_IDS).concat(NHL_IDS).concat(NBA_IDS).filter(function (v, i, a) { return a.indexOf(v) === i; });
   var CHECKS = ["dome","playoff","agconf","hgconf","agbk","hgbk"];
   function sportOf(s) { return s === "WNBA" ? "WNBA" : s === "NHL" ? "NHL" : s === "NBA" ? "NBA" : "MLB"; }
@@ -5428,6 +5471,7 @@
         naort: "113.5", nadrt: "115.0", nhort: "118.0", nhdrt: "109.0", napace: "99.5", nhpace: "98.0", nagp: "15", nhgp: "16", nlrtg: "113.0", nlpace: "100.5", narest: "1", nhrest: "0",
         nbaout: "{\"away\":[{\"id\":\"3059318\",\"n\":\"Joel Embiid\",\"st\":\"Out\",\"note\":\"Knee\",\"c\":\"Embiid (knee) has been ruled out for Tuesday's game against the Knicks.\",\"ret\":\"2026-11-18\",\"pos\":\"C\",\"mpg\":31.5,\"ppg\":26.9,\"pm\":4.1,\"src\":\"this season\",\"g\":12},{\"id\":\"4351851\",\"n\":\"Anfernee Simons\",\"st\":\"Questionable\",\"note\":\"Hamstring; with Bulls last season\",\"c\":\"Simons (hamstring) is listed as questionable for Tuesday's game in New York.\",\"ret\":\"2026-11-10\",\"pos\":\"G\",\"mpg\":24.9,\"ppg\":14.3,\"pm\":1.8,\"src\":\"last season\",\"g\":55},{\"id\":\"4870562\",\"n\":\"Dominick Barlow\",\"st\":\"Day-To-Day\",\"note\":\"Back\",\"c\":\"Barlow (back) was unable to practice Monday.\",\"ret\":\"2026-11-12\",\"pos\":\"F\",\"mpg\":11.8,\"ppg\":4.2,\"pm\":-0.6,\"src\":\"this season\",\"g\":9}],\"home\":[{\"id\":\"4066648\",\"n\":\"Mitchell Robinson\",\"st\":\"Out\",\"note\":\"Ankle\",\"c\":\"Robinson (ankle) will miss Tuesday's game against the 76ers.\",\"ret\":\"2026-11-20\",\"pos\":\"C\",\"mpg\":22.4,\"ppg\":5.6,\"pm\":3.1,\"src\":\"this season\",\"g\":10},{\"id\":\"4065804\",\"n\":\"Josh Hart\",\"st\":\"Questionable\",\"note\":\"Knee\",\"c\":\"Hart (knee) is questionable for Tuesday's game, Ian Begley of SNY reports.\",\"ret\":\"2026-11-10\",\"pos\":\"G\",\"mpg\":33.1,\"ppg\":13.4,\"pm\":5.2,\"src\":\"this season\",\"g\":16}]}",
         nbactx: "[{\"side\":\"home\",\"k\":\"ratings_faded\",\"s\":\"faded\",\"t\":\"Knicks score 118.0 per 100 possessions, 3rd best in the league (16 games).\",\"tag\":\"faded: the market over-moves with early-season ratings, so the projection's lean goes on the line at \\u22120.25 a point until fifty games, tagged\"},{\"side\":\"home\",\"k\":\"ratings_faded\",\"s\":\"faded\",\"t\":\"Knicks allow 109.0 per 100 possessions, 4th best in the league (16 games).\",\"tag\":\"faded: the market over-moves with early-season ratings, so the projection's lean goes on the line at \\u22120.25 a point until fifty games, tagged\"},{\"side\":\"away\",\"k\":\"ratings_faded\",\"s\":\"faded\",\"t\":\"76ers allow 115.0 per 100 possessions, 6th worst in the league (15 games).\",\"tag\":\"faded: the market over-moves with early-season ratings, so the projection's lean goes on the line at \\u22120.25 a point until fifty games, tagged\"},{\"side\":\"home\",\"k\":\"pace\",\"s\":\"shown\",\"t\":\"Knicks play at 98.0 possessions a game, 5th slowest in the league.\",\"tag\":\"shown, not scored: pace alone measured null against the close; it feeds the projection\"},{\"side\":\"home\",\"k\":\"record\",\"s\":\"shown\",\"t\":\"Knicks are 7-1 at home.\",\"tag\":\"shown, not scored: the spread is priced against the box score\"},{\"side\":\"game\",\"k\":\"move\",\"s\":\"shown\",\"t\":\"DraftKings: the total opened 229.5 and sits 231.5, up 2; Knicks opened -3.5 and sit -5.5.\",\"tag\":\"shown, not scored: the current line is the anchor and the move is already inside it\"},{\"side\":\"home\",\"k\":\"rest\",\"s\":\"label\",\"t\":\"Knicks on a back to back.\",\"tag\":\"a label: rest measured inside the number against two seasons of closes\"},{\"side\":\"away\",\"k\":\"out\",\"s\":\"shown\",\"t\":\"76ers without Joel Embiid: 32 minutes a game of regulars.\",\"tag\":\"shown, not scored: announced absences are in the close; the card measures the late ones\"},{\"side\":\"home\",\"k\":\"out\",\"s\":\"shown\",\"t\":\"Knicks without Mitchell Robinson: 22 minutes a game of regulars.\",\"tag\":\"shown, not scored: announced absences are in the close; the card measures the late ones\"}]",
+        nbalineup: "{\"away\":{\"status\":\"expected\",\"five\":[[\"PG\",\"Tyrese Maxey\"],[\"SG\",\"VJ Edgecombe\"],[\"SF\",\"Paul George\"],[\"PF\",\"Kelly Oubre Jr.\"],[\"C\",\"Adem Bona\"]],\"maybe\":[[\"G\",\"Anfernee Simons\",\"Ques\"],[\"F\",\"Dominick Barlow\",\"GTD\"],[\"C\",\"Joel Embiid\",\"Out\"]]},\"home\":{\"status\":\"confirmed\",\"five\":[[\"PG\",\"Jalen Brunson\"],[\"SG\",\"Mikal Bridges\"],[\"SF\",\"Josh Hart\"],[\"PF\",\"OG Anunoby\"],[\"C\",\"Karl-Anthony Towns\"]],\"maybe\":[[\"C\",\"Mitchell Robinson\",\"Out\"]]},\"src\":\"RotoWire\"}",
         ncrew: "Scott Foster, Tony Brothers, Marc Davis", nbarefs: "{\"lg\":[2462,44.0,228.8],\"r\":{\"Scott Foster\":[118,46.2,229.1,66,41,4,2],\"Tony Brothers\":[95,43.1,226.0,56,54,3,3],\"Marc Davis\":[102,44.8,230.3,71,51,0,0],\"Zach Zarba\":[110,42.9,227.4,58,60,2,5]}}" });
     } else {
       restore({ away: "Sun", home: "Mystics", line: "162.5", op: "118", up: "-155", gdate: $("gdate").value,
@@ -5634,7 +5678,7 @@
                       "ngoalies","agname","hgname",
                       "pl","plh","pla","p1line","p1op","p1up",
                       "agf","aga","hgf","hga","lgg","angp","hngp","aenc","aens","henc","hens",
-                      "sp","sph","spa","h1line","h1op","h1up","naort","nhort","nadrt","nhdrt","napace","nhpace","nagp","nhgp","nlrtg","nlpace","narest","nhrest","nbaout","nbactx","ncrew","nbarefs"];
+                      "sp","sph","spa","h1line","h1op","h1up","naort","nhort","nadrt","nhdrt","napace","nhpace","nagp","nhgp","nlrtg","nlpace","narest","nhrest","nbaout","nbactx","ncrew","nbarefs","nbalineup"];
   function blank(v) { return v === undefined || v === null || String(v).trim() === ""; }
   function sameGame(row, g) {
     var sp = sportOf(g.sport);

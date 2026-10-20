@@ -1053,7 +1053,7 @@ def nba_lineups(date_iso, log):
     {"rw": {nickname: ...}, "rw_date": the page's date line}. A page that
     fails, today's page showing another day, or a page with no lineups yet
     leaves it empty and is logged; the card then says there is no lineup."""
-    out = {"rw": {}, "rw_date": ""}
+    out = {"rw": {}, "rw_date": "", "why": ""}   # why: the reason there are none, carried onto each row as a note
     today = dt.date.today()
     try:
         want = dt.date.fromisoformat(date_iso)
@@ -1064,20 +1064,24 @@ def nba_lineups(date_iso, log):
     elif want == today + dt.timedelta(days=1):
         url = ROTOWIRE_NBA + "?date=tomorrow"
     else:
-        log("RotoWire NBA lineups: the page shows today and tomorrow only, and %s is neither; no starting fives on the slate." % date_iso)
+        out["why"] = "RotoWire's page shows today and tomorrow only, and %s is neither" % date_iso
+        log("RotoWire NBA lineups: %s; no starting fives on the slate." % out["why"])
         return out
     try:
         page_date, rw = parse_rotowire_nba(fetch_text(url))
         shown = _rw_date_iso(page_date)
         if want == today and shown and shown != date_iso:
-            log("RotoWire NBA lineups: the page is for %s, not %s; not used." % (page_date, date_iso))
+            out["why"] = "RotoWire's page is for %s, not %s" % (page_date, date_iso)
+            log("RotoWire NBA lineups: %s; not used." % out["why"])
         elif not rw:
-            log("RotoWire NBA lineups: no lineups on the page yet%s." % ((" (%s)" % page_date) if want == today and page_date else ""))
+            out["why"] = "no lineups on RotoWire's page yet%s" % ((" (%s)" % page_date) if want == today and page_date else "")
+            log("RotoWire NBA lineups: %s." % out["why"])
         else:
             out["rw"], out["rw_date"] = rw, (page_date if want == today else date_iso)
             log("RotoWire NBA lineups for %s: %d clubs' starting fives, %d confirmed." % (out["rw_date"], len(rw), sum(1 for v in rw.values() if v["status"] == "confirmed")))
     except Exception as e:  # noqa: BLE001
-        log("RotoWire NBA lineups: not read (%s); no starting fives on the slate." % e)
+        out["why"] = "RotoWire's page was not read (%s)" % e
+        log("RotoWire NBA lineups: %s; no starting fives on the slate." % out["why"])
     return out
 
 
@@ -3490,6 +3494,8 @@ def build_nba_game(g, date_iso, tables, league, players, prior_players, injuries
     if lu["away"] or lu["home"]:
         lu["src"] = "RotoWire"
         inputs["nbalineup"] = json.dumps(lu, separators=(",", ":"))
+    elif (lineups or {}).get("why"):
+        notes.append("No starting fives on the row: %s. The card's Starting five block stays empty; run the slate again later." % lineups["why"])
     for s in sides:
         if s["ab"] in NBA_WATCHED:
             notes.append("%s: a club the close has run under both seasons, home and away. Watched on the sheet, not scored." % s["nick"])
@@ -5751,10 +5757,13 @@ def selftest():
         _cache.pop(ROTOWIRE_NBA, None)
         _cache.pop(ROTOWIRE_NBA + "?date=tomorrow", None)
     check("nba lineups: today's page is read and checked against its date line, tomorrow's is read on its own say-so, another day's page is refused, any other day is not fetched",
-          set(lu_today["rw"]) == {"Celtics", "Knicks"} and lu_today["rw_date"] == todays_line and any(l == "RotoWire NBA lineups for %s: 2 clubs' starting fives, 1 confirmed." % todays_line for l in lines11)
+          set(lu_today["rw"]) == {"Celtics", "Knicks"} and lu_today["rw_date"] == todays_line and lu_today["why"] == "" and any(l == "RotoWire NBA lineups for %s: 2 clubs' starting fives, 1 confirmed." % todays_line for l in lines11)
           and set(lu_tmrw["rw"]) == {"Celtics", "Knicks"} and lu_tmrw["rw_date"] == (today10 + dt.timedelta(days=1)).isoformat()
-          and lu_far["rw"] == {} and any("today and tomorrow only" in l for l in lines13)
-          and lu_stale["rw"] == {} and any(l == "RotoWire NBA lineups: the page is for January 1, 2030, not %s; not used." % today10.isoformat() for l in lines14))
+          and lu_far["rw"] == {} and lu_far["why"] == "RotoWire's page shows today and tomorrow only, and 2030-01-01 is neither" and any("today and tomorrow only" in l for l in lines13)
+          and lu_stale["rw"] == {} and any(l == "RotoWire NBA lineups: RotoWire's page is for January 1, 2030, not %s; not used." % today10.isoformat() for l in lines14))
+    no_five = build_nba_game(day[1], "2026-10-21", {}, None, {}, {}, {}, (lambda s: None), have_ledger=False, lineups=lu_far)
+    check("nba slate: when the page gave nothing the row says why, so the reason shows on the sheet's slate list and not only in the window",
+          no_five["inputs"]["nbalineup"] == "" and any(n == "No starting fives on the row: RotoWire's page shows today and tomorrow only, and 2030-01-01 is neither. The card's Starting five block stays empty; run the slate again later." for n in no_five["notes"]))
     g8 = {"%s @ %s" % (g["away"], g["home"]): g for g in gr8["games"]}
     check("nba grade: the finals with the half-time score from the line scores, or from the summary when the scoreboard has none; the close attached; a game not played skipped",
           len(gr8["games"]) == 2 and g8["Celtics @ Knicks"]["finals"] == {"fa": "110", "fh": "105", "f5a": "55", "f5h": "55"} and g8["Celtics @ Knicks"]["close"] == {"ctot": "221.5", "cf5": "110.5"}

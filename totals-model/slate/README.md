@@ -138,7 +138,14 @@ A prop is the slate's call as made: the page does not rescore it, the BET
 band (three points of edge and 55%) and LEAN (any edge) are a priori, and
 the Props record tile is the test. A click on a prop opens its why list with
 the last games: each game's stat is marked, green over the prop's line, red
-under it, with a tally of how many cleared the number (20 Oct 2026). Props cannot be backtested against lines
+under it, with a tally of how many cleared the number (20 Oct 2026). A click
+on a best-prop card opens the prop on its own panel (21 Oct 2026): the
+numbers as tiles, **what moves it** (each factor's push on the projection in
+the stat's units, written by the slate as `parts` beside the why: the
+regulars out, pace, the defence, last season's prior and the minutes trend,
+ranked with a bar, green toward the pick and red away from it, the biggest
+named on the card too), the why with the two biggest levers in bold, the
+last games as a table and every book's line. Props cannot be backtested against lines
 (ten credits a market a game on the history endpoint). A player listed Out
 or Doubtful gets no projection; a name the rosters and ledgers cannot place
 is listed under the game as unmatched.

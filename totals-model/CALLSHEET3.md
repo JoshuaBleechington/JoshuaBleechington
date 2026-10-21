@@ -917,3 +917,35 @@ during a row's re-score (`if (!SRC)`), and the page relabels any such row by
 side from its own clubs once on load (the build tool's "relabel" patch). The
 harness re-scores a basketball row with a hockey game in the form and reloads
 a mislabelled one.
+
+## The prop's own panel, and what moves it, 21 Oct 2026
+
+The user: "leave the best bet cards the way they are but when I click one,
+could you have it open a page or something with the details of the prop
+instead of in the list below... it's a little difficult to read the prop
+details." Then: "highlight the areas of the prop bet that are helping with
+the prediction the most."
+
+**The panel.** A best-prop card opens the prop over the page
+(`#propDetail`, `props.engine.js`: `propsDetailHtml`, `openPropDetail`): the
+band, the player with his position and club, the pick in large type with
+the result chip when graded, the game and the book's line; six tiles
+(chance with the model's and the book's over, price and what it needs, edge,
+projection with one sigma, minutes, per 36); the why as a list; the last
+games as a table with the marks and the tally; every book's line with the
+carded one flagged. Escape, Close, a click outside or a sport button puts it
+away; a table row still folds its why open in place.
+
+**What moves it.** The slate's `props_project` now writes `base` (his own
+rate at his own minutes) and `parts` beside the why: each factor's push on
+the projection in the stat's units, the others held, pointing at its why
+line. The regulars out, pace and the defence sum from the base to the
+projection exactly; last season's prior and the minutes trend (his last
+five against the season) say what sits inside the base. The panel ranks
+them with a bar, green when the push is toward the pick's side and red when
+it is away, names the biggest lever, bolds the two biggest levers' why
+lines, and the card carries the top two in a fifth line. On the example,
+Maxey over 25.5 with Embiid out: the regulars out +1.8 is the lever, the
+Knicks' defence −0.7 and the pace −0.3 lean against, the prior +0.4 and the
+minutes trend −0.4 sit inside the start. A props file from before the 21st
+has no parts, so its panel shows the why without the ranking.

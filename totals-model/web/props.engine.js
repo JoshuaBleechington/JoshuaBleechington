@@ -31,7 +31,7 @@
         rows.push({ id: 0, gdate: d.date || "", game: g.away + " @ " + g.home, away: g.away, home: g.home, aab: g.aab, hab: g.hab, spread: g.spread, total: g.total, pace: g.pace,
                     pid: String(x.pid), name: x.name, team: x.team, opp: x.opp, athome: !!x.home, pos: x.pos || "", mk: x.mk, line: x.line, op: x.op, up: x.up, book: x.book, books: x.books || {},
                     proj: x.proj, sd: x.sd, pm: x.pm, pb: x.pb, p: x.p, push: x.push, side: x.side, chance: x.chance, price: x.price, need: x.need, edge: x.edge, band: x.band,
-                    mins: x.mins, rate36: x.rate36, why: x.why || [], log: x.log || [], actual: null, result: null });
+                    mins: x.mins, rate36: x.rate36, base: x.base, parts: x.parts || [], why: x.why || [], log: x.log || [], actual: null, result: null });
       });
     });
     return rows;
@@ -48,7 +48,7 @@
   /* the tab: the matchup columns go, the props section comes, the sport buttons read unpressed */
   function showProps(on) {
     propsView = !!on;
-    if (!propsView) propsPreview = null;
+    if (!propsView) { propsPreview = null; closePropDetail(); }
     var cols = document.querySelector(".cols"); if (cols) cols.hidden = propsView;
     var v = $("propsView"); if (v) v.hidden = !propsView;
     var b = $("m-props"); if (b) b.setAttribute("aria-pressed", propsView ? "true" : "false");
@@ -137,6 +137,111 @@
     h += '<div class="verdict">The props are a priori: the pooled rules behind them were measured on last season\'s box scores, the blend\'s weights were not. Read the BET band against the rest and <i>does</i> against <i>says</i>; under 100 graded props nothing here is a reading.</div>';
     return h;
   }
+  function propResChip(r) {
+    if (!r.result) return '';
+    var cls = r.result === "win" ? "win" : r.result === "loss" ? "loss" : "push";
+    return ' <span class="chip ' + cls + '">' + esc(r.result === "void" ? "VOID · did not play" : r.result.toUpperCase()) + (r.actual !== null && r.actual !== undefined ? " · " + r.actual : "") + '</span>';
+  }
+  /* the last games (20 Oct 2026, the user: "highlight their scored numbers so it's easy to see"):
+     the stat of each game in its own mark, green over the prop's line, red under it, grey on it,
+     and a tally at the end of how many of them cleared the number */
+  function propsLogMark(v, line) {
+    var val = (v === null || v === undefined || v === "") ? null : +v;
+    var cls = val === null || line === null || line === undefined || isNaN(+line) ? "" : (val > +line ? " over" : val < +line ? " under" : " push");
+    return '<b class="lg' + cls + '">' + (val === null ? "?" : esc(String(v))) + '</b>';
+  }
+  function propsLogGame(g, line) {
+    return esc(String(g[0] || "").slice(5) + " " + (g[2] ? "v " : "@ ") + g[1] + " " + g[3] + "m ") + propsLogMark(g[4], line);
+  }
+  function propsLogTally(r) {
+    var vals = (r.log || []).map(function (g) { return g[4]; }).filter(function (v) { return v !== null && v !== undefined && v !== "" && !isNaN(+v); });
+    if (!vals.length || r.line === null || r.line === undefined || isNaN(+r.line)) return "";
+    var over = vals.filter(function (v) { return +v > +r.line; }).length, push = vals.filter(function (v) { return +v === +r.line; }).length;
+    return ' <span class="dim">(' + over + " of " + vals.length + " over " + r.line + (push ? ", " + push + " on it" : "") + ")</span>";
+  }
+  /* ---- the detail panel (21 Oct 2026, the user: "when I click one, could you have it open a
+     page or something with the details of the prop instead of in the list below"): a best-prop
+     card opens the prop on its own panel over the page, the numbers as tiles, the why as a
+     list, the last games as a table with the marks, every book's line; a table row still folds
+     its why open below it. Escape, the Close button or a click outside puts it away ---- */
+  function propById(id) {
+    var s = propsSource();
+    for (var i = 0; i < s.length; i++) if (String(s[i].id) === String(id)) return s[i];
+    return null;
+  }
+  /* what moves it (21 Oct 2026, the user: "highlight the areas of the prop bet that are helping
+     with the prediction the most"): the slate writes each factor's push on the projection in the
+     stat's units (parts: regulars out, pace, the defence, last season's prior, the minutes
+     trend), each pointing at its why line. Ranked by size, largest first; a push toward the
+     pick's side helps, away from it hurts */
+  function propsLevers(r) {
+    return (r.parts || []).filter(function (p) { return p && isFinite(+p.eff); }).slice().sort(function (a, b) { return Math.abs(b.eff) - Math.abs(a.eff); });
+  }
+  function propsLeverHelps(r, eff) { return r.side === "UNDER" ? eff < 0 : eff > 0; }
+  function propsLeversLine(r) {
+    var lv = propsLevers(r).slice(0, 2);
+    return lv.length ? lv.map(function (p) { return esc(p.t) + " " + sgn(+p.eff, 1); }).join(" · ") : "";
+  }
+  function propsDetailHtml(r) {
+    var has = propHas(r), lab = PROPS_LABEL[r.mk] || r.mk;
+    var tile = function (k, v, s, cls) { return '<div class="pd-tile' + (cls ? ' ' + cls : '') + '"><div class="k">' + esc(k) + '</div><div class="v">' + v + '</div>' + (s ? '<div class="s">' + s + '</div>' : '') + '</div>'; };
+    var h = '<div class="pd-band">' + esc(has ? r.band : "no projection") + '</div>';
+    h += '<h3>' + esc(r.name) + (r.pos ? ' <span class="tag">' + esc(r.pos) + '</span>' : '') + (r.team ? ' <span class="tag">' + esc(r.team) + '</span>' : '') + '</h3>';
+    h += '<div class="pd-pick">' + (has ? esc(r.side) + ' ' : '') + esc(String(r.line)) + ' ' + esc(lab) + propResChip(r) + '</div>';
+    h += '<div class="pd-sub">' + esc(r.game) + ' · ' + esc(gameDate(r.gdate)) + (r.opp ? ' · ' + (r.athome ? 'at home against ' : 'on the road at ') + esc(r.opp) : '') +
+         ' · ' + esc(r.book || "the book") + ' ' + esc(String(r.line)) + ' (' + sgn(r.op, 0) + '/' + sgn(r.up, 0) + ')</div>';
+    if (has) {
+      h += '<div class="pd-tiles">' +
+        tile("Chance", (r.chance * 100).toFixed(1) + "%", "blended: the over is " + (r.pm * 100).toFixed(1) + "% by the model, " + (r.pb * 100).toFixed(1) + "% by the book") +
+        tile("Price", sgn(r.price, 0), "needs " + (r.need * 100).toFixed(1) + "%") +
+        tile("Edge", sgn(r.edge * 100, 1), "points of chance over the price", r.edge > 0 ? "good" : "bad") +
+        tile("Projection", esc(String(r.proj)), "± " + esc(String(r.sd)) + " one sigma") +
+        tile("Minutes", esc(String(r.mins)), "projected") +
+        tile("Per 36", esc(String(r.rate36)), esc(lab) + " per 36 minutes") +
+        '</div>';
+    } else {
+      h += '<p class="note">' + esc((r.why && r.why[0]) || "No projection on this prop.") + '</p>';
+    }
+    var levers = has ? propsLevers(r) : [], top = levers.slice(0, 2).map(function (p) { return +p.i; });
+    if (levers.length && r.base !== undefined && r.base !== null) {
+      var maxE = Math.max.apply(null, levers.map(function (p) { return Math.abs(+p.eff); }).concat([0.01])), gap = r.proj - r.line;
+      h += '<h4>What moves it</h4><p class="pd-base">Starts from <b>' + esc(String(r.base)) + '</b>, his ' + esc(String(r.rate36)) + ' per 36 at his minutes; the regulars out, pace and the defence take it to <b>' + esc(String(r.proj)) +
+           '</b>, ' + sgn(gap, 1) + ' against the line. Green pushes toward the ' + esc(r.side || "pick") + ', red away from it. The prior and the minutes trend say what sits inside the start.</p>';
+      h += '<div class="pd-levers">' + levers.map(function (p, i) {
+        var helps = propsLeverHelps(r, +p.eff), w = Math.max(3, Math.round(Math.abs(+p.eff) / maxE * 100));
+        return '<div class="lever' + (helps ? ' helps' : ' hurts') + (i === 0 ? ' top' : '') + '"><div class="lt">' + esc(p.t) + (i === 0 ? ' <span class="tag">biggest lever</span>' : '') + '</div>' +
+               '<div class="lb"><span style="width:' + w + '%"></span></div><div class="lv">' + sgn(+p.eff, 1) + '</div></div>';
+      }).join("") + '</div>';
+    }
+    if (r.why && r.why.length) h += '<h4>Why</h4><ul class="pd-why">' + r.why.map(function (w, i) { return '<li' + (top.indexOf(i) >= 0 ? ' class="lever-line"' : '') + '>' + esc(w) + '</li>'; }).join("") + '</ul>';
+    if (r.log && r.log.length) {
+      h += '<h4>Last games' + propsLogTally(r) + '</h4><table class="form pd-log"><thead><tr><th>Date</th><th>Opp</th><th>Min</th><th>' + esc(lab) + '</th></tr></thead><tbody>' +
+        r.log.map(function (g) {
+          return '<tr><td>' + esc(String(g[0] || "").slice(5)) + '</td><td>' + esc((g[2] ? "v " : "@ ") + (g[1] || "")) + '</td><td>' + esc(String(g[3] === null || g[3] === undefined ? "" : g[3])) + '</td><td>' + propsLogMark(g[4], r.line) + '</td></tr>';
+        }).join("") + '</tbody></table>';
+    }
+    var bks = Object.keys(r.books || {});
+    if (bks.length) {
+      h += '<h4>Every book</h4><table class="form pd-books"><thead><tr><th>Book</th><th>Line</th><th>Over</th><th>Under</th></tr></thead><tbody>' + bks.map(function (b) {
+        var x = r.books[b] || [];
+        return '<tr' + (b === r.book ? ' class="carded"' : '') + '><td>' + esc(b) + (b === r.book ? ' <span class="tag">carded</span>' : '') + '</td><td>' + esc(String(x[0])) + '</td><td>' + (x[1] === null || x[1] === undefined ? "" : sgn(+x[1], 0)) + '</td><td>' + (x[2] === null || x[2] === undefined ? "" : sgn(+x[2], 0)) + '</td></tr>';
+      }).join("") + '</tbody></table>';
+    }
+    h += '<p class="note">A prop is the slate\'s call as made at the price posted; the page does not rescore it, and the Props record tile is the test.</p>';
+    return h;
+  }
+  function openPropDetail(id) {
+    var r = propById(id), dlg = $("propDetail"); if (!r || !dlg) return;
+    $("propDetailBody").innerHTML = propsDetailHtml(r);
+    dlg.hidden = false; dlg.scrollTop = 0;
+    document.body.classList.add("noscroll");
+    if ($("propDetailClose")) $("propDetailClose").focus();
+  }
+  function closePropDetail() {
+    var dlg = $("propDetail"); if (!dlg) return;
+    dlg.hidden = true;
+    document.body.classList.remove("noscroll");
+  }
   function renderProps() {
     var v = $("propsView"); if (!v) return;
     var dates = propsDates(), sel = $("propsDate");
@@ -145,31 +250,14 @@
     var rows = propsSource().filter(function (r) { return (r.gdate || "") === date; });
     $("propsCount").textContent = (propsPreview ? "EXAMPLE · " : "") + (rows.length ? rows.length + " props on " + gameDate(date) + " · " + dates.length + " date" + (dates.length === 1 ? "" : "s") + " kept"
                                               : (propsSource().length ? "no props on this date" : "no props loaded"));
-    var resChip = function (r) {
-      if (!r.result) return '';
-      var cls = r.result === "win" ? "win" : r.result === "loss" ? "loss" : "push";
-      return ' <span class="chip ' + cls + '">' + esc(r.result === "void" ? "VOID · did not play" : r.result.toUpperCase()) + (r.actual !== null && r.actual !== undefined ? " · " + r.actual : "") + '</span>';
-    };
-    /* the last games (20 Oct 2026, the user: "highlight their scored numbers so it's easy to see"):
-       the stat of each game in its own mark, green over the prop's line, red under it, grey on it,
-       and a tally at the end of how many of them cleared the number */
-    function propsLogGame(g, line) {
-      var v = (g[4] === null || g[4] === undefined || g[4] === "") ? null : +g[4];
-      var cls = v === null || line === null || line === undefined || isNaN(+line) ? "" : (v > +line ? " over" : v < +line ? " under" : " push");
-      return esc(String(g[0] || "").slice(5) + " " + (g[2] ? "v " : "@ ") + g[1] + " " + g[3] + "m ") + '<b class="lg' + cls + '">' + (v === null ? "?" : esc(String(g[4]))) + '</b>';
-    }
-    function propsLogTally(r) {
-      var vals = (r.log || []).map(function (g) { return g[4]; }).filter(function (v) { return v !== null && v !== undefined && v !== "" && !isNaN(+v); });
-      if (!vals.length || r.line === null || r.line === undefined || isNaN(+r.line)) return "";
-      var over = vals.filter(function (v) { return +v > +r.line; }).length, push = vals.filter(function (v) { return +v === +r.line; }).length;
-      return ' <span class="dim">(' + over + " of " + vals.length + " over " + r.line + (push ? ", " + push + " on it" : "") + ")</span>";
-    }
+    var resChip = propResChip;
     var picks = rows.filter(function (r) { return propHas(r) && r.edge > 0; }).sort(function (a, b) { return b.edge - a.edge; });
     $("propsBest").innerHTML = picks.length ? picks.slice(0, 12).map(function (r, i) {
       return '<div class="pk' + (r.band === "BET" ? ' scored' : '') + '" data-prop="' + r.id + '"><div class="n1">#' + (i + 1) + ' · ' + esc(r.band) + '</div>' +
         '<div class="n2">' + esc(r.name) + ' ' + esc(r.side) + ' ' + r.line + ' ' + esc(PROPS_LABEL[r.mk] || r.mk) + '</div>' +
         '<div class="n3">' + (r.chance * 100).toFixed(1) + '% · ' + sgn(r.price, 0) + ' needs ' + (r.need * 100).toFixed(1) + '% · edge ' + sgn(r.edge * 100, 1) + resChip(r) + '</div>' +
-        '<div class="n4">' + esc(r.game) + ' · projected ' + r.proj + ' (±' + r.sd + ') · ' + esc(r.book) + '</div></div>';
+        '<div class="n4">' + esc(r.game) + ' · projected ' + r.proj + ' (±' + r.sd + ') · ' + esc(r.book) + '</div>' +
+        (propsLeversLine(r) ? '<div class="n5">Moves it: ' + propsLeversLine(r) + '</div>' : '') + '</div>';
     }).join("") : '<div class="empty">' + (rows.length ? 'No prop on this date clears its price.' : 'Load a props file: Run NBA props.bat writes nba-props-DATE.json.') + '</div>';
     var list = ($("propsAll").checked ? rows : rows.filter(propHas)).slice().sort(function (a, b) {
       return (a.game < b.game ? -1 : a.game > b.game ? 1 : 0) || ((propHas(b) ? b.edge : -9) - (propHas(a) ? a.edge : -9));
@@ -224,6 +312,11 @@
       if (w) { w.hidden = !w.hidden; if (!w.hidden && w.scrollIntoView) w.scrollIntoView({ block: "nearest" }); }
     };
     $("propsTable").addEventListener("click", toggleWhy);
-    $("propsBest").addEventListener("click", toggleWhy);
+    $("propsBest").addEventListener("click", function (e) { var t = e.target.closest("[data-prop]"); if (t) openPropDetail(t.getAttribute("data-prop")); });
+    if ($("propDetail")) {
+      $("propDetailClose").addEventListener("click", closePropDetail);
+      $("propDetail").addEventListener("click", function (e) { if (e.target === $("propDetail")) closePropDetail(); });
+      document.addEventListener("keydown", function (e) { if (e.key === "Escape" && !$("propDetail").hidden) closePropDetail(); });
+    }
   }
   /* ===== END PROPS BLOCK ===== */

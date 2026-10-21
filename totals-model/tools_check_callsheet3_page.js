@@ -960,6 +960,38 @@ const CHECKS = ["dome","playoff","agconf","hgconf","agbk","hgbk"];
       'props example: the why lines are the slate\'s own, the regulars-out rule, the defence factor, the website\'s rank and the listed-out man', JSON.stringify(propsEx.whys.slice(0, 2)).slice(0, 600));
   chk(propsEx.saved === null && propsEx.tileSame && propsEx.after === propsEx.before, 'props example: nothing is saved or graded, and a sport button puts it away', JSON.stringify({ saved: propsEx.saved, same: propsEx.tileSame, before: propsEx.before, after: propsEx.after }));
 
+  // ---- the prop's own panel (21 Oct 2026): a best-prop card opens it, a table row still folds its why, Escape or Close puts it away
+  const propsDlg = await pg.evaluate(async () => {
+    const wait = () => new Promise(r => setTimeout(r, 60));
+    document.getElementById('m-props').click(); await wait();
+    document.getElementById('propsExample').click(); await wait();
+    const dlg = document.getElementById('propDetail'), hidden0 = dlg.hidden;
+    const card = [...document.querySelectorAll('#propsBest .pk')].find(e => /Tyrese Maxey/.test(e.textContent)), id = card.getAttribute('data-prop');
+    card.click(); await wait();
+    const open = !dlg.hidden, text = document.getElementById('propDetailBody').innerText.replace(/\s+/g, ' ').trim();
+    const tiles = [...dlg.querySelectorAll('.pd-tile .k')].map(e => e.textContent);
+    const marks = dlg.querySelectorAll('.pd-log b.lg').length, books = dlg.querySelectorAll('.pd-books tbody tr').length, carded = (dlg.querySelector('.pd-books tr.carded td') || {}).textContent || '';
+    const whyRowOpen = !!document.querySelector('#propsTable tr.why[data-why="' + id + '"]:not([hidden])'), noscroll = document.body.classList.contains('noscroll');
+    const levers = [...dlg.querySelectorAll('.pd-levers .lever')].map(e => e.className + '|' + e.querySelector('.lt').textContent.trim() + '|' + e.querySelector('.lv').textContent);
+    const base = (dlg.querySelector('.pd-base') || {}).textContent || '', boldWhy = [...dlg.querySelectorAll('ul.pd-why li.lever-line')].map(e => e.textContent.slice(0, 40));
+    const cardLever = (card.querySelector('.n5') || {}).textContent || '';
+    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })); await wait();
+    const closedEsc = dlg.hidden && !document.body.classList.contains('noscroll');
+    card.click(); await wait(); document.getElementById('propDetailClose').click(); await wait();
+    const closedBtn = dlg.hidden;
+    card.click(); await wait(); document.getElementById('m-nba').click(); await wait();
+    const closedSport = dlg.hidden;
+    return { hidden0, open, text: text.slice(0, 1500), tiles, marks, books, carded, whyRowOpen, noscroll, closedEsc, closedBtn, closedSport, levers, base, boldWhy, cardLever };
+  });
+  chk(propsDlg.levers.length === 5 && /^lever helps top\|Regulars out biggest lever\|\+1\.[5-9]$/.test(propsDlg.levers[0]) && propsDlg.levers.some(l => /^lever hurts\|Defence v position\|[-−]0\./.test(l)) && propsDlg.levers.some(l => /^lever hurts\|Pace\|[-−]0\./.test(l))
+      && /^Starts from 28\.\d+, his 28\.\d+ per 36 at his minutes; the regulars out, pace and the defence take it to 29\.34, \+3\.8 against the line\./.test(propsDlg.base)
+      && propsDlg.boldWhy.length === 2 && propsDlg.boldWhy.some(w => /^Joel Embiid out/.test(w)) && /^Moves it: Regulars out \+1\.[5-9] · /.test(propsDlg.cardLever),
+      'props detail: what moves it ranks each factor\'s push on the projection with a bar, the regulars out the biggest lever on Maxey with Embiid out, the defence and the pace against; the two biggest bold their why lines and the card names them', JSON.stringify({ levers: propsDlg.levers, base: propsDlg.base, bold: propsDlg.boldWhy, card: propsDlg.cardLever }));
+  chk(propsDlg.hidden0 && propsDlg.open && propsDlg.noscroll && /^LEAN Tyrese Maxey G PHI OVER 25\.5 points 76ers @ Knicks/.test(propsDlg.text) && /on the road at NYK/.test(propsDlg.text) && /Why /i.test(propsDlg.text)
+      && propsDlg.tiles.join(',') === 'Chance,Price,Edge,Projection,Minutes,Per 36' && propsDlg.marks === 10 && propsDlg.books === 3 && /fanatics/.test(propsDlg.carded) && !propsDlg.whyRowOpen,
+      'props detail: a best-prop card opens the prop on its own panel with the tiles, the why, the marked last games and every book, and leaves the table row folded', JSON.stringify(propsDlg));
+  chk(propsDlg.closedEsc && propsDlg.closedBtn && propsDlg.closedSport, 'props detail: Escape, the Close button and a sport button each put the panel away', JSON.stringify({ esc: propsDlg.closedEsc, btn: propsDlg.closedBtn, sport: propsDlg.closedSport }));
+
   // ---- 19 Oct 2026: the alternate total with a verdict -- a market of its own on the rail, the board and the record;
   //      and the parlay four takes the likeliest side on each game, the alternate included ----
   const altT = await pg.evaluate(async () => {

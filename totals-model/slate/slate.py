@@ -4086,6 +4086,8 @@ def props_project(prop, logs_this, logs_last, ctx):
     else:
         why.append("%.1f %s per 36 LAST season (%d games, %d minutes): nothing this season yet" % (rate36, label, r["n_last"], int(r["m_last"])))
     mins = m["proj"]
+    mins0, rate0 = mins, r["rate"]   # his own rate at his own minutes: the projection's base before the scored adjustments (21 Oct 2026)
+    i_mins = len(why)
     if m["last_season"]:
         why.append("%.1f minutes projected: last season's mean over %d game%s (nothing this season yet), %d of them starts" % (mins, m["n"], "" if m["n"] == 1 else "s", m["starts"]))
     else:
@@ -4093,6 +4095,7 @@ def props_project(prop, logs_this, logs_last, ctx):
             mins, m["n"], "" if m["n"] == 1 else "s", (" (season %.1f)" % m["season"]) if m["season"] else "", m["starts"]))
     out_mpg = float(ctx.get("out_mpg") or 0.0)
     rate = r["rate"]
+    i_out = len(why)
     if out_mpg > 0:
         dmin = PROPS_OUT_MIN_PER30 * out_mpg / 30.0
         drate = PROPS_OUT_RATE_PER30[mk] / 36.0 * out_mpg / 30.0
@@ -4103,10 +4106,12 @@ def props_project(prop, logs_this, logs_last, ctx):
     for nm, st in (ctx.get("maybe") or [])[:3]:
         why.append("%s is %s: not counted as out" % (nm, st))
     f_pace = 1.0
+    i_pace = len(why)
     if ctx.get("pace") and ctx.get("league_pace"):
         f_pace = float(ctx["pace"]) / float(ctx["league_pace"])
         why.append("pace %.1f against the league's %.1f: x%.3f" % (ctx["pace"], ctx["league_pace"], f_pace))
     f_dvp = 1.0
+    i_dvp = len(why)
     dv = ctx.get("dvp")
     if dv and dv.get("f"):
         wgt = PROPS_DVP_WEIGHT[mk]
@@ -4138,9 +4143,26 @@ def props_project(prop, logs_this, logs_last, ctx):
     band = "BET" if (edge >= PROPS_BET_EDGE and chance >= PROPS_BET_CHANCE) else ("LEAN" if edge > 0 else "no edge")
     why.append("projected %.1f against %s %.1f, one sigma %.1f: the over %.1f%% by the projection, %.1f%% by the book's prices; blended %.1f%% at %.0f to %.0f" % (
         mu, label, line, sd, pm * 100, pb * 100, p * 100, PROPS_ANCHOR, PROPS_MODEL_W))
+    # what moves it (21 Oct 2026, the user: "highlight the areas of the prop bet that are
+    # helping with the prediction the most"): each factor's push on the projection in the
+    # stat's units, the others held, each pointing at its why line. The base is his own
+    # rate at his own minutes; the regulars out, pace and the defence sum from it to the
+    # projection exactly; the prior's pull and the minutes trend say what sits inside the
+    # base. The page ranks them and marks the biggest.
+    parts = []
+    if r["this"] is not None and r["prior"] is not None:
+        parts.append({"k": "prior", "t": "Last season's prior on his rate", "eff": round((rate0 - r["this"]) * mins0, 2), "i": 0})
+    if m["season"] and not m["last_season"]:
+        parts.append({"k": "minutes", "t": "Minutes, his last %d against the season" % m["n"], "eff": round((mins0 - m["season"]) * rate0, 2), "i": i_mins})
+    if out_mpg > 0:
+        parts.append({"k": "out", "t": "Regulars out", "eff": round(rate * mins - rate0 * mins0, 2), "i": i_out})
+    if abs(f_pace - 1.0) > 1e-9:
+        parts.append({"k": "pace", "t": "Pace", "eff": round((f_pace - 1.0) * rate * mins, 2), "i": i_pace})
+    if abs(f_dvp - 1.0) > 1e-9:
+        parts.append({"k": "dvp", "t": "Defence v position", "eff": round((f_dvp - 1.0) * rate * mins * f_pace, 2), "i": i_dvp})
     return {"proj": round(mu, 2), "sd": round(sd, 2), "pm": round(pm, 4), "pb": round(pb, 4), "p": round(p, 4), "push": round(push, 4),
             "side": side, "chance": round(chance, 4), "price": price, "need": round(need, 4), "edge": round(edge, 4), "band": band,
-            "mins": round(mins, 1), "rate36": round(rate * 36.0, 2), "why": why}, why
+            "mins": round(mins, 1), "rate36": round(rate * 36.0, 2), "base": round(rate0 * mins0, 2), "parts": parts, "why": why}, why
 
 
 def nba_props_box(entry):
@@ -5408,6 +5430,12 @@ def selftest():
     check("props: the projection is rate x minutes, the regulars out, pace and the defence, against the line",
           abs(proj_["proj"] - 34.48) < 0.05 and abs(proj_["sd"] - 10.86) < 0.02 and proj_["side"] == "OVER" and abs(proj_["p"] - 0.549) < 0.002 and proj_["band"] == "LEAN"
           and abs(proj_["edge"] - 0.025) < 0.002 and proj_["price"] == -110 and abs(proj_["mins"] - 37.4) < 0.05)
+    parts_ = dict((p["k"], p) for p in proj_["parts"])
+    check("props: what moves it: the base is his rate at his minutes, the regulars out, pace and the defence sum from it to the projection, the prior and the minutes trend say what sits inside it, each pointing at its why line",
+          set(parts_) == {"prior", "minutes", "out", "pace", "dvp"} and abs(proj_["base"] + parts_["out"]["eff"] + parts_["pace"]["eff"] + parts_["dvp"]["eff"] - proj_["proj"]) < 0.03
+          and parts_["out"]["eff"] > 1.5 and parts_["pace"]["eff"] > 0 and parts_["dvp"]["eff"] > 0 and abs(parts_["minutes"]["eff"]) < 0.01 and parts_["prior"]["i"] == 0
+          and why_[parts_["out"]["i"]].startswith("Kyrie Irving out") and why_[parts_["pace"]["i"]].startswith("pace 100.0") and why_[parts_["dvp"]["i"]].startswith("Lakers allow")
+          and why_[parts_["minutes"]["i"]].startswith("36.0 minutes projected"))
     check("props: the why says each step",
           any(w.startswith("31.0 points per 36 this season (3 games, 108 minutes), blended with last season's 30.9 (70 of 70 minutes, at half): 31.0 per 36") for w in why_)
           and any(w.startswith("36.0 minutes projected: his last 3 games (season 36.0), 3 of them starts") for w in why_)

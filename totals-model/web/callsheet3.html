@@ -373,9 +373,39 @@
   table.props tr.loss td:first-child { border-left: 3px solid var(--bad); } table.props tr.void td, table.props tr.push td { color: var(--muted); }
   table.props tr.why td { white-space: normal; background: var(--surface-2, var(--surface)); }
   table.props tr.why ul { margin: 4px 0; padding-left: 18px; font: 11.5px/1.5 var(--sans); color: var(--ink-2); }
-  table.props tr.why b.lg { display: inline-block; min-width: 18px; text-align: center; padding: 0 5px; border-radius: 3px; font: 700 11.5px/1.5 var(--mono); background: var(--surface-2); color: var(--ink); }
-  table.props tr.why b.lg.over { background: var(--go-wash); color: var(--go); } table.props tr.why b.lg.under { background: var(--bad-wash); color: var(--bad); }
-  table.props tr.why b.lg.push { background: var(--edge-wash); color: var(--edge); }
+  #propsView b.lg, .pdlg b.lg { display: inline-block; min-width: 18px; text-align: center; padding: 0 5px; border-radius: 3px; font: 700 11.5px/1.5 var(--mono); background: var(--surface-2); color: var(--ink); }
+  #propsView b.lg.over, .pdlg b.lg.over { background: var(--go-wash); color: var(--go); } #propsView b.lg.under, .pdlg b.lg.under { background: var(--bad-wash); color: var(--bad); }
+  #propsView b.lg.push, .pdlg b.lg.push { background: var(--edge-wash); color: var(--edge); }
+  /* the prop's own panel (21 Oct 2026) */
+  body.noscroll { overflow: hidden; }
+  .pdlg { position: fixed; inset: 0; z-index: 60; background: rgba(8, 12, 11, 0.58); display: flex; align-items: flex-start; justify-content: center; padding: 28px 16px; overflow-y: auto; }
+  .pdlg[hidden] { display: none; }
+  .pdlg-box { position: relative; width: min(780px, 100%); background: var(--surface); color: var(--ink); border: 1px solid var(--rule); border-radius: 12px; padding: 20px 22px 22px; box-shadow: 0 24px 70px rgba(0, 0, 0, 0.4); }
+  .pdlg-close { position: absolute; top: 12px; right: 12px; }
+  .pdlg .pd-band { font: 900 11px/1 var(--sans); letter-spacing: .1em; text-transform: uppercase; color: var(--edge); }
+  .pdlg h3 { margin: 8px 70px 2px 0; font: 800 23px/1.15 var(--sans); } .pdlg h3 .tag { vertical-align: middle; }
+  .pdlg .pd-pick { font: 700 17px/1.3 var(--sans); margin: 2px 0; } .pdlg .pd-pick .chip { vertical-align: middle; margin-left: 6px; }
+  .pdlg .pd-sub { color: var(--muted); font-size: 12.5px; line-height: 1.5; margin: 0 0 6px; }
+  .pdlg .pd-tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(118px, 1fr)); gap: 8px; margin: 12px 0 6px; }
+  .pdlg .pd-tile { border: 1px solid var(--rule); border-radius: 8px; padding: 8px 10px; background: var(--surface-2); }
+  .pdlg .pd-tile .k { font: 600 10px/1.4 var(--sans); letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
+  .pdlg .pd-tile .v { font: 700 19px/1.25 var(--mono); } .pdlg .pd-tile .s { font: 11px/1.4 var(--sans); color: var(--muted); }
+  .pdlg .pd-tile.good .v { color: var(--go); } .pdlg .pd-tile.bad .v { color: var(--bad); }
+  .pdlg h4 { margin: 16px 0 6px; font: 700 11px/1.4 var(--sans); letter-spacing: .1em; text-transform: uppercase; color: var(--ink-2); } .pdlg h4 .dim { text-transform: none; letter-spacing: 0; font-weight: 500; }
+  .pdlg ul.pd-why { margin: 0; padding-left: 18px; font: 13px/1.55 var(--sans); color: var(--ink); } .pdlg ul.pd-why li { margin: 4px 0; }
+  .pdlg table.form { margin: 4px 0 4px; } .pdlg table.form td, .pdlg table.form th { white-space: normal; } .pdlg table.form tr.carded td { font-weight: 700; }
+  .pdlg .note { margin: 14px 0 0; }
+  .pdlg .pd-base { font: 12.5px/1.5 var(--sans); color: var(--ink-2); margin: 0 0 8px; }
+  .pdlg .pd-levers { display: grid; gap: 6px; }
+  .pdlg .lever { display: grid; grid-template-columns: minmax(150px, 1.2fr) 2fr 56px; gap: 10px; align-items: center; font: 12.5px/1.4 var(--sans); }
+  .pdlg .lever .lb { height: 10px; background: var(--surface-2); border-radius: 5px; overflow: hidden; } .pdlg .lever .lb span { display: block; height: 100%; border-radius: 5px; background: var(--muted); }
+  .pdlg .lever.helps .lb span { background: var(--go); } .pdlg .lever.hurts .lb span { background: var(--bad); }
+  .pdlg .lever .lv { font: 700 13px/1 var(--mono); text-align: right; } .pdlg .lever.helps .lv { color: var(--go); } .pdlg .lever.hurts .lv { color: var(--bad); }
+  .pdlg .lever.top .lt { font-weight: 700; }
+  .pdlg ul.pd-why li.lever-line { font-weight: 600; } .pdlg ul.pd-why li.lever-line::marker { color: var(--edge); }
+  .pk .n5 { font-size: 11px; color: var(--ink-2); }
+  @media (max-width: 640px) { .pdlg .lever { grid-template-columns: 1fr 1fr 50px; } }
+  @media (max-width: 640px) { .pdlg { padding: 10px 8px; } .pdlg-box { padding: 16px 14px 18px; } .pdlg h3 { font-size: 20px; } }
   #propsView .picks .pk.scored { border-color: var(--go); }
   @media (prefers-reduced-motion: reduce) { * { transition: none !important; animation: none !important; } }
 </style>
@@ -1008,12 +1038,19 @@
         box line, so <b>Load slate</b> on it grades these rows with the card. A prop is the slate's call as made: the
         page does not rescore it, and the record tile below is the test. Props cannot be backtested against lines (ten
         credits a market a game on the history endpoint), so the tile earns everything from day one.</p>
-      <div class="subhead">Best props <span class="tag">every prop whose blended chance clears its price, best edge first — BET at 3 points of edge and 55% or better, LEAN below that; a priori bands, the record decides</span></div>
+      <div class="subhead">Best props <span class="tag">every prop whose blended chance clears its price, best edge first — BET at 3 points of edge and 55% or better, LEAN below that; a priori bands, the record decides. Click a card for the prop's own panel</span></div>
       <div id="propsBest" class="picks"></div>
-      <div class="subhead">Every prop on the date <span class="tag">by game, then by edge — click a row or a card for the why, the last games and every book's line</span></div>
+      <div class="subhead">Every prop on the date <span class="tag">by game, then by edge — click a row for the why, the last games and every book's line</span></div>
       <div class="scroll"><div id="propsTable"></div></div>
     </div>
   </section>
+  <!-- the prop's own panel (21 Oct 2026): a best-prop card opens here; Escape, Close or a click outside puts it away -->
+  <div id="propDetail" class="pdlg" hidden role="dialog" aria-modal="true" aria-label="The prop in full">
+    <div class="pdlg-box">
+      <button type="button" class="btn pdlg-close" id="propDetailClose">Close</button>
+      <div id="propDetailBody"></div>
+    </div>
+  </div>
   <section class="card" style="margin-top:20px">
     <h2>Day board
       <span class="row" style="gap:8px">
@@ -3135,7 +3172,7 @@
      like you did for the NBA"): one game's props computed at build time through
      the slate's own projection, previewed in the tab and never saved -- a real
      file, Clear this date or a sport button puts it away */
-  var PROPS_EXAMPLE_GAMES = [{"gid":"example","away":"76ers","home":"Knicks","aab":"PHI","hab":"NYK","tip":null,"spread":-5.5,"total":231.5,"pace":99.5,"league_pace":100.5,"out":{"PHI":[["Joel Embiid",31.2,"Out"]],"NYK":[]},"props":[{"pid":"x5","name":"Tyrese Maxey","team":"PHI","opp":"NYK","home":false,"pos":"G","mk":"pts","line":25.5,"op":-110,"up":-110,"book":"fanatics","books":{"fanatics":[25.5,-110,-110],"draftkings":[25.5,-115,-105],"fanduel":[25.5,-108,-112]},"log":[["2026-10-31","TOR",1,36.0,34],["2026-11-02","WAS",0,40.2,34],["2026-11-05","ATL",1,36.9,31],["2026-11-07","DET",0,31.3,35],["2026-11-08","MIL",1,38.1,26],["2026-11-10","MIL",0,37.1,33],["2026-11-13","DET",1,37.9,21],["2026-11-14","ATL",0,39.1,31],["2026-11-16","BOS",1,36.2,34],["2026-11-18","BOS",0,32.6,13]],"why":["27.7 points per 36 this season (15 games, 556 minutes), blended with last season's 28.5 (1000 of 1909 minutes, at half): 28.1 per 36","36.6 minutes projected: his last 5 games (season 37.1), 5 of them starts","Joel Embiid out (31 minutes a game between them): +1.5 minutes and +0.58 points per 36, the pooled rule, scored","Andre Drummond is Questionable: not counted as out","pace 99.5 against the league's 100.5: x0.990","Knicks allow 0.97x the league's points per minute to guards (this season 0.95 over 16 games, last season 0.99): x0.978 at 0.75 weight, measured","HashtagBasketball: Knicks allow 21.9 points a game to PGs (34th of 150, 1 the fewest), 22.1 points a game to SGs (42nd of 150, 1 the fewest); shown, not scored","home 29.9 / road 26.9 per 36 over 2465 minutes: shown, not scored (a player's own split did not persist from one half of 2025-26 to the other, r 0.08); tonight on the road","projected 29.3 against points 25.5, one sigma 10.0: the over 64.9% by the projection, 50.0% by the book's prices; blended 55.1% at 4 to 2"],"proj":29.34,"sd":10.02,"pm":0.6492,"pb":0.5,"p":0.5511,"push":0.0,"side":"OVER","chance":0.5511,"price":-110,"need":0.5238,"edge":0.0273,"band":"LEAN","mins":38.1,"rate36":28.68},{"pid":"x4","name":"OG Anunoby","team":"NYK","opp":"PHI","home":true,"pos":"F","mk":"ast","line":2.5,"op":100,"up":-120,"book":"fanatics","books":{"fanatics":[2.5,100,-120],"draftkings":[3.0,95,-115],"fanduel":[2.5,102,-122]},"log":[["2026-10-29","ATL",1,37.4,2],["2026-10-31","ATL",0,37.1,1],["2026-11-02","CLE",1,35.7,3],["2026-11-05","ATL",0,33.6,0],["2026-11-06","TOR",1,37.1,0],["2026-11-08","DET",0,34.6,1],["2026-11-11","ATL",1,33.4,2],["2026-11-12","TOR",0,36.2,3],["2026-11-15","ATL",1,31.1,0],["2026-11-17","DET",0,37.2,4]],"why":["1.6 assists per 36 this season (14 games, 480 minutes), blended with last season's 2.4 (1000 of 1949 minutes, at half): 2.1 per 36","34.5 minutes projected: his last 5 games (season 34.3), 5 of them starts","Josh Hart is Day-To-Day: not counted as out","pace 99.5 against the league's 100.5: x0.990","76ers allow 1.01x the league's assists per minute to forwards (this season 1.00 over 15 games, last season 1.02): x1.008 at 0.75 weight, measured","HashtagBasketball: 76ers allow 3.9 assists a game to SFs (70th of 150, 1 the fewest), 3.1 assists a game to PFs (45th of 150, 1 the fewest); shown, not scored","home 2.0 / road 2.6 per 36 over 2430 minutes: shown, not scored (a player's own split did not persist from one half of 2025-26 to the other, r 0.08); tonight at home","projected 2.0 against assists 2.5, one sigma 1.6: the over 36.9% by the projection, 47.8% by the book's prices; blended 44.1% at 4 to 2"],"proj":1.96,"sd":1.61,"pm":0.3687,"pb":0.4783,"p":0.441,"push":0.0,"side":"UNDER","chance":0.559,"price":-120,"need":0.5455,"edge":0.0136,"band":"LEAN","mins":34.5,"rate36":2.05},{"pid":"x6","name":"Paul George","team":"PHI","opp":"NYK","home":false,"pos":"F","mk":"tpm","line":2.5,"op":-120,"up":100,"book":"fanatics","books":{"fanatics":[2.5,-120,100],"draftkings":[2.5,-125,105],"fanduel":[2.5,-118,98]},"log":[["2026-10-26","DET",0,35.1,3],["2026-10-28","DET",1,38.0,3],["2026-10-30","MIA",0,31.7,3],["2026-10-31","MIA",1,23.1,3],["2026-11-02","CHI",0,38.3,0],["2026-11-05","MIA",1,35.8,3],["2026-11-06","BOS",0,31.6,2],["2026-11-08","IND",1,34.1,1],["2026-11-10","ORL",0,30.0,0],["2026-11-12","MIL",1,38.5,2]],"why":["2.0 threes per 36 this season (12 games, 405 minutes), blended with last season's 2.4 (1000 of 1338 minutes, at half): 2.3 per 36","34.0 minutes projected: his last 5 games (season 33.8), 5 of them starts","Joel Embiid out (31 minutes a game between them): +1.5 minutes and +0.00 threes per 36, the pooled rule, scored","Andre Drummond is Questionable: not counted as out","pace 99.5 against the league's 100.5: x0.990","Knicks allow 1.02x the league's threes per minute to forwards (this season 1.03 over 16 games, last season 1.01): x1.008 at 0.40 weight, measured","HashtagBasketball: Knicks allow 2.9 threes a game to SFs (87th of 150, 1 the fewest), 2.2 threes a game to PFs (61st of 150, 1 the fewest); shown, not scored","home 2.3 / road 2.4 per 36 over 1743 minutes: shown, not scored (a player's own split did not persist from one half of 2025-26 to the other, r 0.08); tonight on the road","projected 2.2 against threes 2.5, one sigma 1.6: the over 43.1% by the projection, 52.2% by the book's prices; blended 49.1% at 4 to 2"],"proj":2.21,"sd":1.64,"pm":0.4308,"pb":0.5217,"p":0.4913,"push":0.0,"side":"UNDER","chance":0.5087,"price":100,"need":0.5,"edge":0.0087,"band":"LEAN","mins":35.5,"rate36":2.25},{"pid":"x2","name":"Karl-Anthony Towns","team":"NYK","opp":"PHI","home":true,"pos":"C","mk":"reb","line":11.5,"op":-115,"up":-105,"book":"fanatics","books":{"fanatics":[11.5,-115,-105],"draftkings":[11.5,-120,-100],"fanduel":[11.5,-113,-107]},"log":[["2026-11-03","TOR",1,33.2,13],["2026-11-05","BOS",0,36.5,12],["2026-11-06","MIL",1,33.0,12],["2026-11-08","IND",0,33.8,8],["2026-11-11","CHI",1,35.4,18],["2026-11-13","CLE",0,34.8,4],["2026-11-14","DET",1,29.1,11],["2026-11-17","ORL",0,34.3,19],["2026-11-18","BOS",1,33.6,18],["2026-11-21","ATL",0,30.3,10]],"why":["12.6 rebounds per 36 this season (16 games, 537 minutes), blended with last season's 12.9 (1000 of 2071 minutes, at half): 12.7 per 36","32.4 minutes projected: his last 5 games (season 33.6), 5 of them starts","Josh Hart is Day-To-Day: not counted as out","pace 99.5 against the league's 100.5: x0.990","76ers allow 0.93x the league's rebounds per minute to centres (this season 0.90 over 15 games, last season 0.96): x0.948 at 0.75 weight, measured","HashtagBasketball: 76ers allow 11.9 rebounds a game to Cs (40th of 150, 1 the fewest); shown, not scored","home 12.9 / road 12.8 per 36 over 2608 minutes: shown, not scored (a player's own split did not persist from one half of 2025-26 to the other, r 0.08); tonight at home","projected 10.8 against rebounds 11.5, one sigma 3.9: the over 42.7% by the projection, 51.1% by the book's prices; blended 48.3% at 4 to 2"],"proj":10.77,"sd":3.94,"pm":0.4266,"pb":0.5108,"p":0.4826,"push":0.0,"side":"UNDER","chance":0.5174,"price":-105,"need":0.5122,"edge":0.0052,"band":"LEAN","mins":32.4,"rate36":12.75},{"pid":"x1","name":"Jalen Brunson","team":"NYK","opp":"PHI","home":true,"pos":"G","mk":"pts","line":27.5,"op":-110,"up":-110,"book":"fanatics","books":{"fanatics":[27.5,-110,-110],"draftkings":[28.0,-115,-105],"fanduel":[27.5,-108,-112]},"log":[["2026-10-31","BKN",0,26.4,18],["2026-11-03","BOS",1,37.5,39],["2026-11-05","ATL",0,32.4,15],["2026-11-07","MIA",1,38.1,37],["2026-11-09","ORL",0,33.2,25],["2026-11-11","IND",1,34.9,24],["2026-11-13","IND",0,35.7,35],["2026-11-15","MIA",1,37.4,38],["2026-11-17","IND",0,34.7,33],["2026-11-18","MIL",1,33.6,40]],"why":["30.7 points per 36 this season (15 games, 510 minutes), blended with last season's 26.9 (1000 of 2094 minutes, at half): 28.8 per 36","35.3 minutes projected: his last 5 games (season 34.1), 5 of them starts","Josh Hart is Day-To-Day: not counted as out","pace 99.5 against the league's 100.5: x0.990","76ers allow 1.06x the league's points per minute to guards (this season 1.08 over 15 games, last season 1.02): x1.045 at 0.75 weight, measured","HashtagBasketball: 76ers allow 24.0 points a game to PGs (116th of 150, 1 the fewest), 22.6 points a game to SGs (61st of 150, 1 the fewest); shown, not scored","home 29.0 / road 26.2 per 36 over 2605 minutes: shown, not scored (a player's own split did not persist from one half of 2025-26 to the other, r 0.08); tonight at home","projected 29.2 against points 27.5, one sigma 10.0: the over 56.6% by the projection, 50.0% by the book's prices; blended 52.2% at 4 to 2"],"proj":29.16,"sd":9.99,"pm":0.5659,"pb":0.5,"p":0.5221,"push":0.0,"side":"OVER","chance":0.5221,"price":-110,"need":0.5238,"edge":-0.0017,"band":"no edge","mins":35.3,"rate36":28.77},{"pid":"x7","name":"Kelly Oubre Jr.","team":"PHI","opp":"NYK","home":false,"pos":"F","mk":"pts","line":14.5,"op":-105,"up":-115,"book":"fanatics","books":{"fanatics":[14.5,-105,-115],"draftkings":[15.0,-110,-110],"fanduel":[14.5,-103,-117]},"log":[["2026-11-01","MIA",1,32.7,9],["2026-11-03","ORL",0,35.0,23],["2026-11-04","ORL",1,30.0,0],["2026-11-07","MIL",0,27.7,15],["2026-11-09","IND",1,33.5,6],["2026-11-10","CLE",0,35.8,10],["2026-11-12","MIA",1,30.4,2],["2026-11-14","DET",0,31.4,9],["2026-11-17","IND",1,26.7,16],["2026-11-18","MIA",0,30.8,14]],"why":["13.1 points per 36 this season (15 games, 452 minutes), blended with last season's 16.7 (1000 of 1880 minutes, at half): 15.0 per 36","31.0 minutes projected: his last 5 games (season 30.2), 5 of them starts","Joel Embiid out (31 minutes a game between them): +1.5 minutes and +0.58 points per 36, the pooled rule, scored","Andre Drummond is Questionable: not counted as out","pace 99.5 against the league's 100.5: x0.990","Knicks allow 1.02x the league's points per minute to forwards (this season 1.03 over 16 games, last season 1.01): x1.015 at 0.75 weight, measured","HashtagBasketball: Knicks allow 22.1 points a game to SFs (43rd of 150, 1 the fewest), 21.6 points a game to PFs (38th of 150, 1 the fewest); shown, not scored","home 14.5 / road 17.5 per 36 over 2332 minutes: shown, not scored (a player's own split did not persist from one half of 2025-26 to the other, r 0.08); tonight on the road","projected 14.1 against points 14.5, one sigma 7.0: the over 48.0% by the projection, 48.9% by the book's prices; blended 48.6% at 4 to 2"],"proj":14.15,"sd":6.96,"pm":0.4799,"pb":0.4892,"p":0.4861,"push":0.0,"side":"UNDER","chance":0.5139,"price":-115,"need":0.5349,"edge":-0.021,"band":"no edge","mins":32.5,"rate36":15.6},{"pid":"x3","name":"Mikal Bridges","team":"NYK","opp":"PHI","home":true,"pos":"F","mk":"pra","line":24.5,"op":-110,"up":-110,"book":"fanatics","books":{"fanatics":[24.5,-110,-110],"draftkings":[24.5,-115,-105],"fanduel":[24.5,-108,-112]},"log":[["2026-11-03","BOS",1,37.6,39],["2026-11-04","CLE",0,37.0,28],["2026-11-07","IND",1,31.5,22],["2026-11-09","IND",0,40.8,26],["2026-11-11","WAS",1,37.3,11],["2026-11-13","WAS",0,38.6,41],["2026-11-14","IND",1,38.9,21],["2026-11-16","MIL",0,38.4,21],["2026-11-18","TOR",1,36.8,15],["2026-11-21","WAS",0,38.8,23]],"why":["22.8 points + rebounds + assists per 36 this season (16 games, 605 minutes), blended with last season's 23.5 (1000 of 2346 minutes, at half): 23.1 per 36","38.3 minutes projected: his last 5 games (season 37.8), 5 of them starts","Josh Hart is Day-To-Day: not counted as out","pace 99.5 against the league's 100.5: x0.990","76ers allow 1.01x the league's points per minute to forwards (this season 1.00 over 15 games, last season 1.02): x1.008 at 0.75 weight, measured","HashtagBasketball: 76ers allow 21.4 points a game to SFs (24th of 150, 1 the fewest), 22.9 points a game to PFs (88th of 150, 1 the fewest); shown, not scored","home 24.6 / road 22.2 per 36 over 2951 minutes: shown, not scored (a player's own split did not persist from one half of 2025-26 to the other, r 0.08); tonight at home","projected 24.5 against points + rebounds + assists 24.5, one sigma 9.4: the over 50.1% by the projection, 50.0% by the book's prices; blended 50.0% at 4 to 2"],"proj":24.52,"sd":9.41,"pm":0.501,"pb":0.5,"p":0.5003,"push":0.0,"side":"OVER","chance":0.5003,"price":-110,"need":0.5238,"edge":-0.0235,"band":"no edge","mins":38.3,"rate36":23.11},{"pid":"x8","name":"Joel Embiid","team":"PHI","opp":"NYK","home":false,"pos":"C","mk":"reb","line":9.5,"op":-110,"up":-110,"book":"fanatics","books":{"fanatics":[9.5,-110,-110],"draftkings":[9.5,-115,-105],"fanduel":[9.5,-108,-112]},"log":[["2026-10-22","WAS",0,24.4,7],["2026-10-23","ATL",1,33.9,9],["2026-10-26","MIL",0,34.2,9],["2026-10-28","CHI",1,34.2,7],["2026-10-30","BOS",0,30.4,8],["2026-10-31","TOR",1,35.9,15],["2026-11-03","IND",0,38.3,10],["2026-11-04","ATL",1,30.7,10],["2026-11-07","MIA",0,29.8,8]],"why":["listed Out on ESPN: no projection, the book will void or pull the line"]}],"unmatched":[]}];
+  var PROPS_EXAMPLE_GAMES = [{"gid":"example","away":"76ers","home":"Knicks","aab":"PHI","hab":"NYK","tip":null,"spread":-5.5,"total":231.5,"pace":99.5,"league_pace":100.5,"out":{"PHI":[["Joel Embiid",31.2,"Out"]],"NYK":[]},"props":[{"pid":"x5","name":"Tyrese Maxey","team":"PHI","opp":"NYK","home":false,"pos":"G","mk":"pts","line":25.5,"op":-110,"up":-110,"book":"fanatics","books":{"fanatics":[25.5,-110,-110],"draftkings":[25.5,-115,-105],"fanduel":[25.5,-108,-112]},"log":[["2026-10-31","TOR",1,36.0,34],["2026-11-02","WAS",0,40.2,34],["2026-11-05","ATL",1,36.9,31],["2026-11-07","DET",0,31.3,35],["2026-11-08","MIL",1,38.1,26],["2026-11-10","MIL",0,37.1,33],["2026-11-13","DET",1,37.9,21],["2026-11-14","ATL",0,39.1,31],["2026-11-16","BOS",1,36.2,34],["2026-11-18","BOS",0,32.6,13]],"why":["27.7 points per 36 this season (15 games, 556 minutes), blended with last season's 28.5 (1000 of 1909 minutes, at half): 28.1 per 36","36.6 minutes projected: his last 5 games (season 37.1), 5 of them starts","Joel Embiid out (31 minutes a game between them): +1.5 minutes and +0.58 points per 36, the pooled rule, scored","Andre Drummond is Questionable: not counted as out","pace 99.5 against the league's 100.5: x0.990","Knicks allow 0.97x the league's points per minute to guards (this season 0.95 over 16 games, last season 0.99): x0.978 at 0.75 weight, measured","HashtagBasketball: Knicks allow 21.9 points a game to PGs (34th of 150, 1 the fewest), 22.1 points a game to SGs (42nd of 150, 1 the fewest); shown, not scored","home 29.9 / road 26.9 per 36 over 2465 minutes: shown, not scored (a player's own split did not persist from one half of 2025-26 to the other, r 0.08); tonight on the road","projected 29.3 against points 25.5, one sigma 10.0: the over 64.9% by the projection, 50.0% by the book's prices; blended 55.1% at 4 to 2"],"proj":29.34,"sd":10.02,"pm":0.6492,"pb":0.5,"p":0.5511,"push":0.0,"side":"OVER","chance":0.5511,"price":-110,"need":0.5238,"edge":0.0273,"band":"LEAN","mins":38.1,"rate36":28.68,"base":28.55,"parts":[{"k":"prior","t":"Last season's prior on his rate","eff":0.39,"i":0},{"k":"minutes","t":"Minutes, his last 5 against the season","eff":-0.38,"i":1},{"k":"out","t":"Regulars out","eff":1.77,"i":2},{"k":"pace","t":"Pace","eff":-0.3,"i":4},{"k":"dvp","t":"Defence v position","eff":-0.68,"i":5}]},{"pid":"x4","name":"OG Anunoby","team":"NYK","opp":"PHI","home":true,"pos":"F","mk":"ast","line":2.5,"op":100,"up":-120,"book":"fanatics","books":{"fanatics":[2.5,100,-120],"draftkings":[3.0,95,-115],"fanduel":[2.5,102,-122]},"log":[["2026-10-29","ATL",1,37.4,2],["2026-10-31","ATL",0,37.1,1],["2026-11-02","CLE",1,35.7,3],["2026-11-05","ATL",0,33.6,0],["2026-11-06","TOR",1,37.1,0],["2026-11-08","DET",0,34.6,1],["2026-11-11","ATL",1,33.4,2],["2026-11-12","TOR",0,36.2,3],["2026-11-15","ATL",1,31.1,0],["2026-11-17","DET",0,37.2,4]],"why":["1.6 assists per 36 this season (14 games, 480 minutes), blended with last season's 2.4 (1000 of 1949 minutes, at half): 2.1 per 36","34.5 minutes projected: his last 5 games (season 34.3), 5 of them starts","Josh Hart is Day-To-Day: not counted as out","pace 99.5 against the league's 100.5: x0.990","76ers allow 1.01x the league's assists per minute to forwards (this season 1.00 over 15 games, last season 1.02): x1.008 at 0.75 weight, measured","HashtagBasketball: 76ers allow 3.9 assists a game to SFs (70th of 150, 1 the fewest), 3.1 assists a game to PFs (45th of 150, 1 the fewest); shown, not scored","home 2.0 / road 2.6 per 36 over 2430 minutes: shown, not scored (a player's own split did not persist from one half of 2025-26 to the other, r 0.08); tonight at home","projected 2.0 against assists 2.5, one sigma 1.6: the over 36.9% by the projection, 47.8% by the book's prices; blended 44.1% at 4 to 2"],"proj":1.96,"sd":1.61,"pm":0.3687,"pb":0.4783,"p":0.441,"push":0.0,"side":"UNDER","chance":0.559,"price":-120,"need":0.5455,"edge":0.0136,"band":"LEAN","mins":34.5,"rate36":2.05,"base":1.97,"parts":[{"k":"prior","t":"Last season's prior on his rate","eff":0.39,"i":0},{"k":"minutes","t":"Minutes, his last 5 against the season","eff":0.01,"i":1},{"k":"pace","t":"Pace","eff":-0.02,"i":3},{"k":"dvp","t":"Defence v position","eff":0.01,"i":4}]},{"pid":"x6","name":"Paul George","team":"PHI","opp":"NYK","home":false,"pos":"F","mk":"tpm","line":2.5,"op":-120,"up":100,"book":"fanatics","books":{"fanatics":[2.5,-120,100],"draftkings":[2.5,-125,105],"fanduel":[2.5,-118,98]},"log":[["2026-10-26","DET",0,35.1,3],["2026-10-28","DET",1,38.0,3],["2026-10-30","MIA",0,31.7,3],["2026-10-31","MIA",1,23.1,3],["2026-11-02","CHI",0,38.3,0],["2026-11-05","MIA",1,35.8,3],["2026-11-06","BOS",0,31.6,2],["2026-11-08","IND",1,34.1,1],["2026-11-10","ORL",0,30.0,0],["2026-11-12","MIL",1,38.5,2]],"why":["2.0 threes per 36 this season (12 games, 405 minutes), blended with last season's 2.4 (1000 of 1338 minutes, at half): 2.3 per 36","34.0 minutes projected: his last 5 games (season 33.8), 5 of them starts","Joel Embiid out (31 minutes a game between them): +1.5 minutes and +0.00 threes per 36, the pooled rule, scored","Andre Drummond is Questionable: not counted as out","pace 99.5 against the league's 100.5: x0.990","Knicks allow 1.02x the league's threes per minute to forwards (this season 1.03 over 16 games, last season 1.01): x1.008 at 0.40 weight, measured","HashtagBasketball: Knicks allow 2.9 threes a game to SFs (87th of 150, 1 the fewest), 2.2 threes a game to PFs (61st of 150, 1 the fewest); shown, not scored","home 2.3 / road 2.4 per 36 over 1743 minutes: shown, not scored (a player's own split did not persist from one half of 2025-26 to the other, r 0.08); tonight on the road","projected 2.2 against threes 2.5, one sigma 1.6: the over 43.1% by the projection, 52.2% by the book's prices; blended 49.1% at 4 to 2"],"proj":2.21,"sd":1.64,"pm":0.4308,"pb":0.5217,"p":0.4913,"push":0.0,"side":"UNDER","chance":0.5087,"price":100,"need":0.5,"edge":0.0087,"band":"LEAN","mins":35.5,"rate36":2.25,"base":2.13,"parts":[{"k":"prior","t":"Last season's prior on his rate","eff":0.2,"i":0},{"k":"minutes","t":"Minutes, his last 5 against the season","eff":0.01,"i":1},{"k":"out","t":"Regulars out","eff":0.09,"i":2},{"k":"pace","t":"Pace","eff":-0.02,"i":4},{"k":"dvp","t":"Defence v position","eff":0.02,"i":5}]},{"pid":"x2","name":"Karl-Anthony Towns","team":"NYK","opp":"PHI","home":true,"pos":"C","mk":"reb","line":11.5,"op":-115,"up":-105,"book":"fanatics","books":{"fanatics":[11.5,-115,-105],"draftkings":[11.5,-120,-100],"fanduel":[11.5,-113,-107]},"log":[["2026-11-03","TOR",1,33.2,13],["2026-11-05","BOS",0,36.5,12],["2026-11-06","MIL",1,33.0,12],["2026-11-08","IND",0,33.8,8],["2026-11-11","CHI",1,35.4,18],["2026-11-13","CLE",0,34.8,4],["2026-11-14","DET",1,29.1,11],["2026-11-17","ORL",0,34.3,19],["2026-11-18","BOS",1,33.6,18],["2026-11-21","ATL",0,30.3,10]],"why":["12.6 rebounds per 36 this season (16 games, 537 minutes), blended with last season's 12.9 (1000 of 2071 minutes, at half): 12.7 per 36","32.4 minutes projected: his last 5 games (season 33.6), 5 of them starts","Josh Hart is Day-To-Day: not counted as out","pace 99.5 against the league's 100.5: x0.990","76ers allow 0.93x the league's rebounds per minute to centres (this season 0.90 over 15 games, last season 0.96): x0.948 at 0.75 weight, measured","HashtagBasketball: 76ers allow 11.9 rebounds a game to Cs (40th of 150, 1 the fewest); shown, not scored","home 12.9 / road 12.8 per 36 over 2608 minutes: shown, not scored (a player's own split did not persist from one half of 2025-26 to the other, r 0.08); tonight at home","projected 10.8 against rebounds 11.5, one sigma 3.9: the over 42.7% by the projection, 51.1% by the book's prices; blended 48.3% at 4 to 2"],"proj":10.77,"sd":3.94,"pm":0.4266,"pb":0.5108,"p":0.4826,"push":0.0,"side":"UNDER","chance":0.5174,"price":-105,"need":0.5122,"edge":0.0052,"band":"LEAN","mins":32.4,"rate36":12.75,"base":11.48,"parts":[{"k":"prior","t":"Last season's prior on his rate","eff":0.14,"i":0},{"k":"minutes","t":"Minutes, his last 5 against the season","eff":-0.41,"i":1},{"k":"pace","t":"Pace","eff":-0.11,"i":3},{"k":"dvp","t":"Defence v position","eff":-0.6,"i":4}]},{"pid":"x1","name":"Jalen Brunson","team":"NYK","opp":"PHI","home":true,"pos":"G","mk":"pts","line":27.5,"op":-110,"up":-110,"book":"fanatics","books":{"fanatics":[27.5,-110,-110],"draftkings":[28.0,-115,-105],"fanduel":[27.5,-108,-112]},"log":[["2026-10-31","BKN",0,26.4,18],["2026-11-03","BOS",1,37.5,39],["2026-11-05","ATL",0,32.4,15],["2026-11-07","MIA",1,38.1,37],["2026-11-09","ORL",0,33.2,25],["2026-11-11","IND",1,34.9,24],["2026-11-13","IND",0,35.7,35],["2026-11-15","MIA",1,37.4,38],["2026-11-17","IND",0,34.7,33],["2026-11-18","MIL",1,33.6,40]],"why":["30.7 points per 36 this season (15 games, 510 minutes), blended with last season's 26.9 (1000 of 2094 minutes, at half): 28.8 per 36","35.3 minutes projected: his last 5 games (season 34.1), 5 of them starts","Josh Hart is Day-To-Day: not counted as out","pace 99.5 against the league's 100.5: x0.990","76ers allow 1.06x the league's points per minute to guards (this season 1.08 over 15 games, last season 1.02): x1.045 at 0.75 weight, measured","HashtagBasketball: 76ers allow 24.0 points a game to PGs (116th of 150, 1 the fewest), 22.6 points a game to SGs (61st of 150, 1 the fewest); shown, not scored","home 29.0 / road 26.2 per 36 over 2605 minutes: shown, not scored (a player's own split did not persist from one half of 2025-26 to the other, r 0.08); tonight at home","projected 29.2 against points 27.5, one sigma 10.0: the over 56.6% by the projection, 50.0% by the book's prices; blended 52.2% at 4 to 2"],"proj":29.16,"sd":9.99,"pm":0.5659,"pb":0.5,"p":0.5221,"push":0.0,"side":"OVER","chance":0.5221,"price":-110,"need":0.5238,"edge":-0.0017,"band":"no edge","mins":35.3,"rate36":28.77,"base":28.18,"parts":[{"k":"prior","t":"Last season's prior on his rate","eff":-1.84,"i":0},{"k":"minutes","t":"Minutes, his last 5 against the season","eff":0.96,"i":1},{"k":"pace","t":"Pace","eff":-0.28,"i":3},{"k":"dvp","t":"Defence v position","eff":1.26,"i":4}]},{"pid":"x7","name":"Kelly Oubre Jr.","team":"PHI","opp":"NYK","home":false,"pos":"F","mk":"pts","line":14.5,"op":-105,"up":-115,"book":"fanatics","books":{"fanatics":[14.5,-105,-115],"draftkings":[15.0,-110,-110],"fanduel":[14.5,-103,-117]},"log":[["2026-11-01","MIA",1,32.7,9],["2026-11-03","ORL",0,35.0,23],["2026-11-04","ORL",1,30.0,0],["2026-11-07","MIL",0,27.7,15],["2026-11-09","IND",1,33.5,6],["2026-11-10","CLE",0,35.8,10],["2026-11-12","MIA",1,30.4,2],["2026-11-14","DET",0,31.4,9],["2026-11-17","IND",1,26.7,16],["2026-11-18","MIA",0,30.8,14]],"why":["13.1 points per 36 this season (15 games, 452 minutes), blended with last season's 16.7 (1000 of 1880 minutes, at half): 15.0 per 36","31.0 minutes projected: his last 5 games (season 30.2), 5 of them starts","Joel Embiid out (31 minutes a game between them): +1.5 minutes and +0.58 points per 36, the pooled rule, scored","Andre Drummond is Questionable: not counted as out","pace 99.5 against the league's 100.5: x0.990","Knicks allow 1.02x the league's points per minute to forwards (this season 1.03 over 16 games, last season 1.01): x1.015 at 0.75 weight, measured","HashtagBasketball: Knicks allow 22.1 points a game to SFs (43rd of 150, 1 the fewest), 21.6 points a game to PFs (38th of 150, 1 the fewest); shown, not scored","home 14.5 / road 17.5 per 36 over 2332 minutes: shown, not scored (a player's own split did not persist from one half of 2025-26 to the other, r 0.08); tonight on the road","projected 14.1 against points 14.5, one sigma 7.0: the over 48.0% by the projection, 48.9% by the book's prices; blended 48.6% at 4 to 2"],"proj":14.15,"sd":6.96,"pm":0.4799,"pb":0.4892,"p":0.4861,"push":0.0,"side":"UNDER","chance":0.5139,"price":-115,"need":0.5349,"edge":-0.021,"band":"no edge","mins":32.5,"rate36":15.6,"base":12.94,"parts":[{"k":"prior","t":"Last season's prior on his rate","eff":1.64,"i":0},{"k":"minutes","t":"Minutes, his last 5 against the season","eff":0.34,"i":1},{"k":"out","t":"Regulars out","eff":1.14,"i":2},{"k":"pace","t":"Pace","eff":-0.14,"i":4},{"k":"dvp","t":"Defence v position","eff":0.21,"i":5}]},{"pid":"x3","name":"Mikal Bridges","team":"NYK","opp":"PHI","home":true,"pos":"F","mk":"pra","line":24.5,"op":-110,"up":-110,"book":"fanatics","books":{"fanatics":[24.5,-110,-110],"draftkings":[24.5,-115,-105],"fanduel":[24.5,-108,-112]},"log":[["2026-11-03","BOS",1,37.6,39],["2026-11-04","CLE",0,37.0,28],["2026-11-07","IND",1,31.5,22],["2026-11-09","IND",0,40.8,26],["2026-11-11","WAS",1,37.3,11],["2026-11-13","WAS",0,38.6,41],["2026-11-14","IND",1,38.9,21],["2026-11-16","MIL",0,38.4,21],["2026-11-18","TOR",1,36.8,15],["2026-11-21","WAS",0,38.8,23]],"why":["22.8 points + rebounds + assists per 36 this season (16 games, 605 minutes), blended with last season's 23.5 (1000 of 2346 minutes, at half): 23.1 per 36","38.3 minutes projected: his last 5 games (season 37.8), 5 of them starts","Josh Hart is Day-To-Day: not counted as out","pace 99.5 against the league's 100.5: x0.990","76ers allow 1.01x the league's points per minute to forwards (this season 1.00 over 15 games, last season 1.02): x1.008 at 0.75 weight, measured","HashtagBasketball: 76ers allow 21.4 points a game to SFs (24th of 150, 1 the fewest), 22.9 points a game to PFs (88th of 150, 1 the fewest); shown, not scored","home 24.6 / road 22.2 per 36 over 2951 minutes: shown, not scored (a player's own split did not persist from one half of 2025-26 to the other, r 0.08); tonight at home","projected 24.5 against points + rebounds + assists 24.5, one sigma 9.4: the over 50.1% by the projection, 50.0% by the book's prices; blended 50.0% at 4 to 2"],"proj":24.52,"sd":9.41,"pm":0.501,"pb":0.5,"p":0.5003,"push":0.0,"side":"OVER","chance":0.5003,"price":-110,"need":0.5238,"edge":-0.0235,"band":"no edge","mins":38.3,"rate36":23.11,"base":24.58,"parts":[{"k":"prior","t":"Last season's prior on his rate","eff":0.35,"i":0},{"k":"minutes","t":"Minutes, his last 5 against the season","eff":0.3,"i":1},{"k":"pace","t":"Pace","eff":-0.24,"i":3},{"k":"dvp","t":"Defence v position","eff":0.18,"i":4}]},{"pid":"x8","name":"Joel Embiid","team":"PHI","opp":"NYK","home":false,"pos":"C","mk":"reb","line":9.5,"op":-110,"up":-110,"book":"fanatics","books":{"fanatics":[9.5,-110,-110],"draftkings":[9.5,-115,-105],"fanduel":[9.5,-108,-112]},"log":[["2026-10-22","WAS",0,24.4,7],["2026-10-23","ATL",1,33.9,9],["2026-10-26","MIL",0,34.2,9],["2026-10-28","CHI",1,34.2,7],["2026-10-30","BOS",0,30.4,8],["2026-10-31","TOR",1,35.9,15],["2026-11-03","IND",0,38.3,10],["2026-11-04","ATL",1,30.7,10],["2026-11-07","MIA",0,29.8,8]],"why":["listed Out on ESPN: no projection, the book will void or pull the line"]}],"unmatched":[]}];
   var propsPreview = null;
   function propsSource() { return propsPreview || props; }
   function saveProps() { try { localStorage.setItem(PROPS_KEY, JSON.stringify(props)); } catch (e) {} }
@@ -3150,7 +3187,7 @@
         rows.push({ id: 0, gdate: d.date || "", game: g.away + " @ " + g.home, away: g.away, home: g.home, aab: g.aab, hab: g.hab, spread: g.spread, total: g.total, pace: g.pace,
                     pid: String(x.pid), name: x.name, team: x.team, opp: x.opp, athome: !!x.home, pos: x.pos || "", mk: x.mk, line: x.line, op: x.op, up: x.up, book: x.book, books: x.books || {},
                     proj: x.proj, sd: x.sd, pm: x.pm, pb: x.pb, p: x.p, push: x.push, side: x.side, chance: x.chance, price: x.price, need: x.need, edge: x.edge, band: x.band,
-                    mins: x.mins, rate36: x.rate36, why: x.why || [], log: x.log || [], actual: null, result: null });
+                    mins: x.mins, rate36: x.rate36, base: x.base, parts: x.parts || [], why: x.why || [], log: x.log || [], actual: null, result: null });
       });
     });
     return rows;
@@ -3167,7 +3204,7 @@
   /* the tab: the matchup columns go, the props section comes, the sport buttons read unpressed */
   function showProps(on) {
     propsView = !!on;
-    if (!propsView) propsPreview = null;
+    if (!propsView) { propsPreview = null; closePropDetail(); }
     var cols = document.querySelector(".cols"); if (cols) cols.hidden = propsView;
     var v = $("propsView"); if (v) v.hidden = !propsView;
     var b = $("m-props"); if (b) b.setAttribute("aria-pressed", propsView ? "true" : "false");
@@ -3256,6 +3293,111 @@
     h += '<div class="verdict">The props are a priori: the pooled rules behind them were measured on last season\'s box scores, the blend\'s weights were not. Read the BET band against the rest and <i>does</i> against <i>says</i>; under 100 graded props nothing here is a reading.</div>';
     return h;
   }
+  function propResChip(r) {
+    if (!r.result) return '';
+    var cls = r.result === "win" ? "win" : r.result === "loss" ? "loss" : "push";
+    return ' <span class="chip ' + cls + '">' + esc(r.result === "void" ? "VOID · did not play" : r.result.toUpperCase()) + (r.actual !== null && r.actual !== undefined ? " · " + r.actual : "") + '</span>';
+  }
+  /* the last games (20 Oct 2026, the user: "highlight their scored numbers so it's easy to see"):
+     the stat of each game in its own mark, green over the prop's line, red under it, grey on it,
+     and a tally at the end of how many of them cleared the number */
+  function propsLogMark(v, line) {
+    var val = (v === null || v === undefined || v === "") ? null : +v;
+    var cls = val === null || line === null || line === undefined || isNaN(+line) ? "" : (val > +line ? " over" : val < +line ? " under" : " push");
+    return '<b class="lg' + cls + '">' + (val === null ? "?" : esc(String(v))) + '</b>';
+  }
+  function propsLogGame(g, line) {
+    return esc(String(g[0] || "").slice(5) + " " + (g[2] ? "v " : "@ ") + g[1] + " " + g[3] + "m ") + propsLogMark(g[4], line);
+  }
+  function propsLogTally(r) {
+    var vals = (r.log || []).map(function (g) { return g[4]; }).filter(function (v) { return v !== null && v !== undefined && v !== "" && !isNaN(+v); });
+    if (!vals.length || r.line === null || r.line === undefined || isNaN(+r.line)) return "";
+    var over = vals.filter(function (v) { return +v > +r.line; }).length, push = vals.filter(function (v) { return +v === +r.line; }).length;
+    return ' <span class="dim">(' + over + " of " + vals.length + " over " + r.line + (push ? ", " + push + " on it" : "") + ")</span>";
+  }
+  /* ---- the detail panel (21 Oct 2026, the user: "when I click one, could you have it open a
+     page or something with the details of the prop instead of in the list below"): a best-prop
+     card opens the prop on its own panel over the page, the numbers as tiles, the why as a
+     list, the last games as a table with the marks, every book's line; a table row still folds
+     its why open below it. Escape, the Close button or a click outside puts it away ---- */
+  function propById(id) {
+    var s = propsSource();
+    for (var i = 0; i < s.length; i++) if (String(s[i].id) === String(id)) return s[i];
+    return null;
+  }
+  /* what moves it (21 Oct 2026, the user: "highlight the areas of the prop bet that are helping
+     with the prediction the most"): the slate writes each factor's push on the projection in the
+     stat's units (parts: regulars out, pace, the defence, last season's prior, the minutes
+     trend), each pointing at its why line. Ranked by size, largest first; a push toward the
+     pick's side helps, away from it hurts */
+  function propsLevers(r) {
+    return (r.parts || []).filter(function (p) { return p && isFinite(+p.eff); }).slice().sort(function (a, b) { return Math.abs(b.eff) - Math.abs(a.eff); });
+  }
+  function propsLeverHelps(r, eff) { return r.side === "UNDER" ? eff < 0 : eff > 0; }
+  function propsLeversLine(r) {
+    var lv = propsLevers(r).slice(0, 2);
+    return lv.length ? lv.map(function (p) { return esc(p.t) + " " + sgn(+p.eff, 1); }).join(" · ") : "";
+  }
+  function propsDetailHtml(r) {
+    var has = propHas(r), lab = PROPS_LABEL[r.mk] || r.mk;
+    var tile = function (k, v, s, cls) { return '<div class="pd-tile' + (cls ? ' ' + cls : '') + '"><div class="k">' + esc(k) + '</div><div class="v">' + v + '</div>' + (s ? '<div class="s">' + s + '</div>' : '') + '</div>'; };
+    var h = '<div class="pd-band">' + esc(has ? r.band : "no projection") + '</div>';
+    h += '<h3>' + esc(r.name) + (r.pos ? ' <span class="tag">' + esc(r.pos) + '</span>' : '') + (r.team ? ' <span class="tag">' + esc(r.team) + '</span>' : '') + '</h3>';
+    h += '<div class="pd-pick">' + (has ? esc(r.side) + ' ' : '') + esc(String(r.line)) + ' ' + esc(lab) + propResChip(r) + '</div>';
+    h += '<div class="pd-sub">' + esc(r.game) + ' · ' + esc(gameDate(r.gdate)) + (r.opp ? ' · ' + (r.athome ? 'at home against ' : 'on the road at ') + esc(r.opp) : '') +
+         ' · ' + esc(r.book || "the book") + ' ' + esc(String(r.line)) + ' (' + sgn(r.op, 0) + '/' + sgn(r.up, 0) + ')</div>';
+    if (has) {
+      h += '<div class="pd-tiles">' +
+        tile("Chance", (r.chance * 100).toFixed(1) + "%", "blended: the over is " + (r.pm * 100).toFixed(1) + "% by the model, " + (r.pb * 100).toFixed(1) + "% by the book") +
+        tile("Price", sgn(r.price, 0), "needs " + (r.need * 100).toFixed(1) + "%") +
+        tile("Edge", sgn(r.edge * 100, 1), "points of chance over the price", r.edge > 0 ? "good" : "bad") +
+        tile("Projection", esc(String(r.proj)), "± " + esc(String(r.sd)) + " one sigma") +
+        tile("Minutes", esc(String(r.mins)), "projected") +
+        tile("Per 36", esc(String(r.rate36)), esc(lab) + " per 36 minutes") +
+        '</div>';
+    } else {
+      h += '<p class="note">' + esc((r.why && r.why[0]) || "No projection on this prop.") + '</p>';
+    }
+    var levers = has ? propsLevers(r) : [], top = levers.slice(0, 2).map(function (p) { return +p.i; });
+    if (levers.length && r.base !== undefined && r.base !== null) {
+      var maxE = Math.max.apply(null, levers.map(function (p) { return Math.abs(+p.eff); }).concat([0.01])), gap = r.proj - r.line;
+      h += '<h4>What moves it</h4><p class="pd-base">Starts from <b>' + esc(String(r.base)) + '</b>, his ' + esc(String(r.rate36)) + ' per 36 at his minutes; the regulars out, pace and the defence take it to <b>' + esc(String(r.proj)) +
+           '</b>, ' + sgn(gap, 1) + ' against the line. Green pushes toward the ' + esc(r.side || "pick") + ', red away from it. The prior and the minutes trend say what sits inside the start.</p>';
+      h += '<div class="pd-levers">' + levers.map(function (p, i) {
+        var helps = propsLeverHelps(r, +p.eff), w = Math.max(3, Math.round(Math.abs(+p.eff) / maxE * 100));
+        return '<div class="lever' + (helps ? ' helps' : ' hurts') + (i === 0 ? ' top' : '') + '"><div class="lt">' + esc(p.t) + (i === 0 ? ' <span class="tag">biggest lever</span>' : '') + '</div>' +
+               '<div class="lb"><span style="width:' + w + '%"></span></div><div class="lv">' + sgn(+p.eff, 1) + '</div></div>';
+      }).join("") + '</div>';
+    }
+    if (r.why && r.why.length) h += '<h4>Why</h4><ul class="pd-why">' + r.why.map(function (w, i) { return '<li' + (top.indexOf(i) >= 0 ? ' class="lever-line"' : '') + '>' + esc(w) + '</li>'; }).join("") + '</ul>';
+    if (r.log && r.log.length) {
+      h += '<h4>Last games' + propsLogTally(r) + '</h4><table class="form pd-log"><thead><tr><th>Date</th><th>Opp</th><th>Min</th><th>' + esc(lab) + '</th></tr></thead><tbody>' +
+        r.log.map(function (g) {
+          return '<tr><td>' + esc(String(g[0] || "").slice(5)) + '</td><td>' + esc((g[2] ? "v " : "@ ") + (g[1] || "")) + '</td><td>' + esc(String(g[3] === null || g[3] === undefined ? "" : g[3])) + '</td><td>' + propsLogMark(g[4], r.line) + '</td></tr>';
+        }).join("") + '</tbody></table>';
+    }
+    var bks = Object.keys(r.books || {});
+    if (bks.length) {
+      h += '<h4>Every book</h4><table class="form pd-books"><thead><tr><th>Book</th><th>Line</th><th>Over</th><th>Under</th></tr></thead><tbody>' + bks.map(function (b) {
+        var x = r.books[b] || [];
+        return '<tr' + (b === r.book ? ' class="carded"' : '') + '><td>' + esc(b) + (b === r.book ? ' <span class="tag">carded</span>' : '') + '</td><td>' + esc(String(x[0])) + '</td><td>' + (x[1] === null || x[1] === undefined ? "" : sgn(+x[1], 0)) + '</td><td>' + (x[2] === null || x[2] === undefined ? "" : sgn(+x[2], 0)) + '</td></tr>';
+      }).join("") + '</tbody></table>';
+    }
+    h += '<p class="note">A prop is the slate\'s call as made at the price posted; the page does not rescore it, and the Props record tile is the test.</p>';
+    return h;
+  }
+  function openPropDetail(id) {
+    var r = propById(id), dlg = $("propDetail"); if (!r || !dlg) return;
+    $("propDetailBody").innerHTML = propsDetailHtml(r);
+    dlg.hidden = false; dlg.scrollTop = 0;
+    document.body.classList.add("noscroll");
+    if ($("propDetailClose")) $("propDetailClose").focus();
+  }
+  function closePropDetail() {
+    var dlg = $("propDetail"); if (!dlg) return;
+    dlg.hidden = true;
+    document.body.classList.remove("noscroll");
+  }
   function renderProps() {
     var v = $("propsView"); if (!v) return;
     var dates = propsDates(), sel = $("propsDate");
@@ -3264,31 +3406,14 @@
     var rows = propsSource().filter(function (r) { return (r.gdate || "") === date; });
     $("propsCount").textContent = (propsPreview ? "EXAMPLE · " : "") + (rows.length ? rows.length + " props on " + gameDate(date) + " · " + dates.length + " date" + (dates.length === 1 ? "" : "s") + " kept"
                                               : (propsSource().length ? "no props on this date" : "no props loaded"));
-    var resChip = function (r) {
-      if (!r.result) return '';
-      var cls = r.result === "win" ? "win" : r.result === "loss" ? "loss" : "push";
-      return ' <span class="chip ' + cls + '">' + esc(r.result === "void" ? "VOID · did not play" : r.result.toUpperCase()) + (r.actual !== null && r.actual !== undefined ? " · " + r.actual : "") + '</span>';
-    };
-    /* the last games (20 Oct 2026, the user: "highlight their scored numbers so it's easy to see"):
-       the stat of each game in its own mark, green over the prop's line, red under it, grey on it,
-       and a tally at the end of how many of them cleared the number */
-    function propsLogGame(g, line) {
-      var v = (g[4] === null || g[4] === undefined || g[4] === "") ? null : +g[4];
-      var cls = v === null || line === null || line === undefined || isNaN(+line) ? "" : (v > +line ? " over" : v < +line ? " under" : " push");
-      return esc(String(g[0] || "").slice(5) + " " + (g[2] ? "v " : "@ ") + g[1] + " " + g[3] + "m ") + '<b class="lg' + cls + '">' + (v === null ? "?" : esc(String(g[4]))) + '</b>';
-    }
-    function propsLogTally(r) {
-      var vals = (r.log || []).map(function (g) { return g[4]; }).filter(function (v) { return v !== null && v !== undefined && v !== "" && !isNaN(+v); });
-      if (!vals.length || r.line === null || r.line === undefined || isNaN(+r.line)) return "";
-      var over = vals.filter(function (v) { return +v > +r.line; }).length, push = vals.filter(function (v) { return +v === +r.line; }).length;
-      return ' <span class="dim">(' + over + " of " + vals.length + " over " + r.line + (push ? ", " + push + " on it" : "") + ")</span>";
-    }
+    var resChip = propResChip;
     var picks = rows.filter(function (r) { return propHas(r) && r.edge > 0; }).sort(function (a, b) { return b.edge - a.edge; });
     $("propsBest").innerHTML = picks.length ? picks.slice(0, 12).map(function (r, i) {
       return '<div class="pk' + (r.band === "BET" ? ' scored' : '') + '" data-prop="' + r.id + '"><div class="n1">#' + (i + 1) + ' · ' + esc(r.band) + '</div>' +
         '<div class="n2">' + esc(r.name) + ' ' + esc(r.side) + ' ' + r.line + ' ' + esc(PROPS_LABEL[r.mk] || r.mk) + '</div>' +
         '<div class="n3">' + (r.chance * 100).toFixed(1) + '% · ' + sgn(r.price, 0) + ' needs ' + (r.need * 100).toFixed(1) + '% · edge ' + sgn(r.edge * 100, 1) + resChip(r) + '</div>' +
-        '<div class="n4">' + esc(r.game) + ' · projected ' + r.proj + ' (±' + r.sd + ') · ' + esc(r.book) + '</div></div>';
+        '<div class="n4">' + esc(r.game) + ' · projected ' + r.proj + ' (±' + r.sd + ') · ' + esc(r.book) + '</div>' +
+        (propsLeversLine(r) ? '<div class="n5">Moves it: ' + propsLeversLine(r) + '</div>' : '') + '</div>';
     }).join("") : '<div class="empty">' + (rows.length ? 'No prop on this date clears its price.' : 'Load a props file: Run NBA props.bat writes nba-props-DATE.json.') + '</div>';
     var list = ($("propsAll").checked ? rows : rows.filter(propHas)).slice().sort(function (a, b) {
       return (a.game < b.game ? -1 : a.game > b.game ? 1 : 0) || ((propHas(b) ? b.edge : -9) - (propHas(a) ? a.edge : -9));
@@ -3343,7 +3468,12 @@
       if (w) { w.hidden = !w.hidden; if (!w.hidden && w.scrollIntoView) w.scrollIntoView({ block: "nearest" }); }
     };
     $("propsTable").addEventListener("click", toggleWhy);
-    $("propsBest").addEventListener("click", toggleWhy);
+    $("propsBest").addEventListener("click", function (e) { var t = e.target.closest("[data-prop]"); if (t) openPropDetail(t.getAttribute("data-prop")); });
+    if ($("propDetail")) {
+      $("propDetailClose").addEventListener("click", closePropDetail);
+      $("propDetail").addEventListener("click", function (e) { if (e.target === $("propDetail")) closePropDetail(); });
+      document.addEventListener("keydown", function (e) { if (e.key === "Escape" && !$("propDetail").hidden) closePropDetail(); });
+    }
   }
   /* ===== END PROPS BLOCK ===== */
 

@@ -127,7 +127,10 @@
     var w = NBA_WEIGHTS, notes = [];
     var fa = nbaFairTotal("NBA", line, num("op"), num("up")), anchor = fa[0];
     var estimates = [est("Market", anchor, w.market, fa[1])], deltas = [];
-    var away = canonTeam($("away").value, "NBA") || "Away", home = canonTeam($("home").value, "NBA") || "Home";
+    /* the clubs through txt(), not the form: a card row re-scored while another game sat in
+       the form (a slate or odds file merged into the card) took that game's names onto its
+       moneyline and spread until 21 Oct 2026 (the user's backup: "Islanders ML" on Celtics @ Pistons) */
+    var away = canonTeam(txt("away"), "NBA") || "Away", home = canonTeam(txt("home"), "NBA") || "Home";
     var ao = num("naort"), ho = num("nhort"), ad = num("nadrt"), hd = num("nhdrt"), ap = num("napace"), hp = num("nhpace");
     var ag = num("nagp"), hg = num("nhgp"), lgr = num("nlrtg"), lgp = num("nlpace");
     var rp = nbaRatingsProjection(ao, ho, ad, hd, ap, hp, lgr, lgp);
@@ -233,9 +236,7 @@
     }).join("") + '</ul>';
   }
   function forecastMatchupNba() {
-    nbaOutPanel();
-    nbaLineupPanel();
-    nbaCtxPanel();
+    if (!SRC) { nbaOutPanel(); nbaLineupPanel(); nbaCtxPanel(); }   // the form's panels: not while a card row is being re-scored
     var f = readNba();
     var away = f.away, home = f.home, line = f.line;
     var op = num("op"), up = num("up"), hml = num("hml"), aml = num("aml");

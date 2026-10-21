@@ -24,7 +24,7 @@ import sys
 ROOT = pathlib.Path(__file__).parent / "web"
 OPEN = "  /* ===== ENGINE BLOCK."
 CLOSE = "  /* ===== END ENGINE BLOCK ===== */"
-STAMP = "2026-10-20"   # bumped by hand when 3.0's own sources change (the harness checks it)
+STAMP = "2026-10-21"   # bumped by hand when 3.0's own sources change (the harness checks it)
 
 
 def engine_block() -> str:
@@ -148,6 +148,40 @@ def tail() -> str:
              '  function sportOf(s) { return s === "WNBA" ? "WNBA" : s === "NHL" ? "NHL" : s === "NBA" ? "NBA" : "MLB"; }\n'
              '  /* the period market: the first five in baseball, the first period in hockey, the first half in the NBA */\n'
              '  function isPeriod(mk) { return mk.key === "f5" || mk.key === "p1" || mk.key === "h1"; }', "ids")
+    t = once(t, '    if (keep.length !== card.length) { card = keep; try { localStorage.setItem(KEY, JSON.stringify(card)); } catch (e) {} }\n'
+                '  })();\n'
+                '  function save() {',
+             '    if (keep.length !== card.length) { card = keep; try { localStorage.setItem(KEY, JSON.stringify(card)); } catch (e) {} }\n'
+             '  })();\n'
+             '  /* An NBA row re-scored while another game sat in the form (a slate or odds file merged\n'
+             '     into the card) carried that game\'s names on its moneyline and spread until 21 Oct 2026\n'
+             '     (the user\'s backup: "Islanders ML" on Celtics @ Pistons); the sides and the grades were\n'
+             '     right. Relabel such rows by side from the row\'s own clubs, once, on load. */\n'
+             '  (function () {\n'
+             '    var fixed = 0;\n'
+             '    card.forEach(function (r) {\n'
+             '      if (r.sport !== "NBA" || !r.markets) return;\n'
+             '      var away = String(r.away || ""), home = String(r.home || ""), sp = parseFloat((r.inputs || {}).sp);\n'
+             '      r.markets.forEach(function (m) {\n'
+             '        if (m.key !== "ml" && m.key !== "spread") return;\n'
+             '        var pick = String(m.pick || "");\n'
+             '        if ((away && pick.indexOf(away) === 0) || (home && pick.indexOf(home) === 0)) return;\n'
+             '        var mine = m.side === "HOME" ? home : away, theirs = m.side === "HOME" ? away : home;\n'
+             '        if (!mine || !theirs) return;\n'
+             '        if (m.key === "ml") {\n'
+             '          m.pick = mine + " ML"; if (m.other) m.other.pick = theirs + " ML";\n'
+             '        } else {\n'
+             '          if (!isFinite(sp)) return;\n'
+             '          var mineLine = m.side === "HOME" ? sp : -sp;\n'
+             '          m.pick = mine + " " + fmtLine(mineLine); m.label = "Spread " + home + ": " + fmtLine(sp);\n'
+             '          if (m.other) m.other.pick = theirs + " " + fmtLine(-mineLine);\n'
+             '        }\n'
+             '        fixed++;\n'
+             '      });\n'
+             '    });\n'
+             '    if (fixed) { try { localStorage.setItem(KEY, JSON.stringify(card)); } catch (e) {} }\n'
+             '  })();\n'
+             '  function save() {', "relabel")
     t = every(t, 'sp === "WNBA" ? forecastMatchupWnba() : forecastMatchupMlb()',
               'sp === "NHL" ? forecastMatchupNhl() : sp === "NBA" ? forecastMatchupNba() : sp === "WNBA" ? forecastMatchupWnba() : forecastMatchupMlb()', "dispatch (stored)", 1)
     t = every(t, 'sport === "WNBA" ? forecastMatchupWnba() : forecastMatchupMlb()',

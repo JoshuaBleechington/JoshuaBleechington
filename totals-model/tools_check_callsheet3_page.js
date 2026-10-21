@@ -1019,6 +1019,42 @@ const CHECKS = ["dome","playoff","agconf","hgconf","agbk","hgbk"];
   chk(altT.boardAfter.length === 1 && /\bwin\b/i.test(altT.boardAfter[0]), 'alternates: a 3-2 final grades the under 7 a win on the board card', JSON.stringify({ board: altT.boardAfter }));
   chk(/Alternate totals 1-0/i.test(altT.tile), 'alternates: the record keeps its own tile', altT.tile.slice(0, 160));
 
+  // ---- an NBA row re-scored while another game sits in the form keeps its own clubs' names (21 Oct 2026) ----
+  const relabel = await pg.evaluate(async () => {
+    const wait = () => new Promise(r => setTimeout(r, 60));
+    const set = (id, v) => { const el = document.getElementById(id); el.value = v; el.dispatchEvent(new Event('input', { bubbles: true })); };
+    localStorage.removeItem('callsheet3.card.v1');
+    document.getElementById('clear').click(); document.getElementById('m-nba').click(); await wait();
+    set('gdate', '2026-10-20'); set('away', 'Celtics'); set('home', 'Pistons'); set('line', '213'); set('op', '-215'); set('up', '170');
+    set('sp', '1.5'); set('sph', '-110'); set('spa', '-110'); set('hml', '100'); set('aml', '-120'); await wait();
+    document.getElementById('add').click(); await wait();
+    // a hockey game in the form while a slate merges into the basketball row on the card
+    document.getElementById('clear').click(); document.getElementById('m-nhl').click(); await wait();
+    set('gdate', '2026-10-20'); set('away', 'Ducks'); set('home', 'Islanders'); set('line', '6'); set('op', '-110'); set('up', '-110'); await wait();
+    const doc = { format: 'callsheet2.slate', version: 1, date: '2026-10-20', games: [{ sport: 'NBA', gdate: '2026-10-20', away: 'Celtics', home: 'Pistons', inputs: { narest: '1', nhrest: '2' }, notes: [] }] };
+    const dt = new DataTransfer(); dt.items.add(new File([JSON.stringify(doc)], 'nba-slate-2026-10-20.json', { type: 'application/json' }));
+    const inp = document.getElementById('slateFile'); inp.files = dt.files; inp.dispatchEvent(new Event('change', { bubbles: true })); await wait();
+    const row = JSON.parse(localStorage.getItem('callsheet3.card.v1')).find(r => /Celtics @ Pistons/.test(r.matchup));
+    const sides = row.markets.filter(m => m.key === 'ml' || m.key === 'spread').map(m => ({ key: m.key, side: m.side, pick: m.pick, other: (m.other || {}).pick, label: m.label }));
+    // a row the old page wrote: the hockey names on the moneyline and the spread, to be relabelled on load
+    const broken = JSON.parse(localStorage.getItem('callsheet3.card.v1'));
+    broken.forEach(r => r.markets.forEach(m => { if (m.key === 'ml') { m.pick = 'Islanders ML'; m.other.pick = 'Ducks ML'; } if (m.key === 'spread') { m.pick = 'Islanders +1.5'; m.label = 'Spread Islanders: +1.5'; m.other.pick = 'Ducks -1.5'; } }));
+    localStorage.setItem('callsheet3.card.v1', JSON.stringify(broken));
+    return { merged: row.inputs.narest === '1' && row.inputs.nhrest === '2', sides, formAway: document.getElementById('away').value };
+  });
+  await pg.reload(); await pg.waitForTimeout(300);
+  const relabelled = await pg.evaluate(() => {
+    const row = JSON.parse(localStorage.getItem('callsheet3.card.v1')).find(r => /Celtics @ Pistons/.test(r.matchup));
+    const out = row.markets.filter(m => m.key === 'ml' || m.key === 'spread').map(m => ({ key: m.key, side: m.side, pick: m.pick, other: (m.other || {}).pick, label: m.label }));
+    localStorage.removeItem('callsheet3.card.v1');
+    return out;
+  });
+  const ownClubs = (s) => s.length === 2 && s.every(m => (m.side === 'HOME' ? /^Pistons /.test(m.pick) && /^Celtics /.test(m.other) : /^Celtics /.test(m.pick) && /^Pistons /.test(m.other)))
+    && s.find(m => m.key === 'spread').label === 'Spread Pistons: +1.5' && /^(Pistons \+1\.5|Celtics -1\.5)$/.test(s.find(m => m.key === 'spread').pick) && /^(Pistons|Celtics) ML$/.test(s.find(m => m.key === 'ml').pick);
+  chk(relabel.merged && relabel.formAway === 'Ducks' && ownClubs(relabel.sides),
+      'nba: a card row re-scored by a slate while a hockey game sits in the form keeps its own clubs on the moneyline and the spread', JSON.stringify(relabel));
+  chk(ownClubs(relabelled), 'nba: a row the old page mislabelled with the form\'s clubs is relabelled by side from its own clubs on load', JSON.stringify(relabelled));
+
   // ---- the build stamp ------------------------------------------------------------
   const stamp = await pg.evaluate(() => (document.getElementById('build') || {}).textContent);
   const git = (cmd) => execSync(cmd, { cwd: __dirname, encoding: 'utf8' }).trim();

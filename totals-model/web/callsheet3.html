@@ -385,7 +385,7 @@
   <header class="top">
     <div>
       <div class="eyebrow"><span id="eyebrow">MLB · every market on the game</span>
-        <span class="build">· build <span id="build">2026-10-20</span></span></div>
+        <span class="build">· build <span id="build">2026-10-21</span></span></div>
       <h1>The <em>Super</em> Model</h1>
       <p>One matchup, every market the book posts on it — in baseball the full-game total, the first five,
          the moneyline and the run line; in hockey the total, the first period, the moneyline and the puck line;
@@ -2817,7 +2817,10 @@
     var w = NBA_WEIGHTS, notes = [];
     var fa = nbaFairTotal("NBA", line, num("op"), num("up")), anchor = fa[0];
     var estimates = [est("Market", anchor, w.market, fa[1])], deltas = [];
-    var away = canonTeam($("away").value, "NBA") || "Away", home = canonTeam($("home").value, "NBA") || "Home";
+    /* the clubs through txt(), not the form: a card row re-scored while another game sat in
+       the form (a slate or odds file merged into the card) took that game's names onto its
+       moneyline and spread until 21 Oct 2026 (the user's backup: "Islanders ML" on Celtics @ Pistons) */
+    var away = canonTeam(txt("away"), "NBA") || "Away", home = canonTeam(txt("home"), "NBA") || "Home";
     var ao = num("naort"), ho = num("nhort"), ad = num("nadrt"), hd = num("nhdrt"), ap = num("napace"), hp = num("nhpace");
     var ag = num("nagp"), hg = num("nhgp"), lgr = num("nlrtg"), lgp = num("nlpace");
     var rp = nbaRatingsProjection(ao, ho, ad, hd, ap, hp, lgr, lgp);
@@ -2923,9 +2926,7 @@
     }).join("") + '</ul>';
   }
   function forecastMatchupNba() {
-    nbaOutPanel();
-    nbaLineupPanel();
-    nbaCtxPanel();
+    if (!SRC) { nbaOutPanel(); nbaLineupPanel(); nbaCtxPanel(); }   // the form's panels: not while a card row is being re-scored
     var f = readNba();
     var away = f.away, home = f.home, line = f.line;
     var op = num("op"), up = num("up"), hml = num("hml"), aml = num("aml");
@@ -3828,6 +3829,34 @@
       if (!twin) { seen.push(r); keep.push(r); }
     });
     if (keep.length !== card.length) { card = keep; try { localStorage.setItem(KEY, JSON.stringify(card)); } catch (e) {} }
+  })();
+  /* An NBA row re-scored while another game sat in the form (a slate or odds file merged
+     into the card) carried that game's names on its moneyline and spread until 21 Oct 2026
+     (the user's backup: "Islanders ML" on Celtics @ Pistons); the sides and the grades were
+     right. Relabel such rows by side from the row's own clubs, once, on load. */
+  (function () {
+    var fixed = 0;
+    card.forEach(function (r) {
+      if (r.sport !== "NBA" || !r.markets) return;
+      var away = String(r.away || ""), home = String(r.home || ""), sp = parseFloat((r.inputs || {}).sp);
+      r.markets.forEach(function (m) {
+        if (m.key !== "ml" && m.key !== "spread") return;
+        var pick = String(m.pick || "");
+        if ((away && pick.indexOf(away) === 0) || (home && pick.indexOf(home) === 0)) return;
+        var mine = m.side === "HOME" ? home : away, theirs = m.side === "HOME" ? away : home;
+        if (!mine || !theirs) return;
+        if (m.key === "ml") {
+          m.pick = mine + " ML"; if (m.other) m.other.pick = theirs + " ML";
+        } else {
+          if (!isFinite(sp)) return;
+          var mineLine = m.side === "HOME" ? sp : -sp;
+          m.pick = mine + " " + fmtLine(mineLine); m.label = "Spread " + home + ": " + fmtLine(sp);
+          if (m.other) m.other.pick = theirs + " " + fmtLine(-mineLine);
+        }
+        fixed++;
+      });
+    });
+    if (fixed) { try { localStorage.setItem(KEY, JSON.stringify(card)); } catch (e) {} }
   })();
   function save() {
     try { localStorage.setItem(KEY, JSON.stringify(card)); }

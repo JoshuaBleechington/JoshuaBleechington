@@ -903,3 +903,17 @@ beat the prop's line, red when it fell short, grey on the number, a missing
 one plain, and ends with a tally, "7 of 10 over 24.5" (`props.engine.js`,
 `propsLogGame` and `propsLogTally`). The line is the prop's own, so the
 marks read the same way whichever side the sheet took.
+
+**The form's clubs on a card row, 21 Oct 2026.** The user's backup of the
+21st had "Islanders ML" and "Islanders +1.5" on Celtics @ Pistons, and
+"Celtics ML" on Thunder @ Spurs. The NBA engine's `readNba` took the two
+clubs from the form (`$("away").value`) rather than through `txt()`, so when
+a slate or odds file merged into a card row and the row was re-scored
+(`scoreMatchup`, which points `txt()` at the row's inputs) the moneyline and
+the spread were named after whatever game sat in the form at the time. The
+sides (HOME, AWAY) and so the grades were right; only the labels were wrong.
+Fixed at the source (`txt("away")`), the form's panels no longer redraw
+during a row's re-score (`if (!SRC)`), and the page relabels any such row by
+side from its own clubs once on load (the build tool's "relabel" patch). The
+harness re-scores a basketball row with a hockey game in the form and reloads
+a mislabelled one.

@@ -243,8 +243,8 @@ const CHECKS = ["dome","playoff","agconf","hgconf","agbk","hgbk"];
              lineup0, lineup1, lineupBadges, lineupStored: card[0].inputs.nbalineup || '', lineupReopened, form0, form1, formChips, formStored: (card[0].inputs.nbaform || '').indexOf('Hornets') > 0 };
   });
   chk(/^No recent games on the row/.test(nba.form0) && /^Raptors last 3: 1-2, over 1-1, covered 1-1, 107\.0 for and 107\.3 against, the half 53\.0–53\.3 \(over 1-1\)\./.test(nba.form1)
-      && /Celtics: no finals in the ledger yet\./.test(nba.form1) && /03-30 @ Knicks L 104–112 51–58 U 110\.5 UNDER 216 v 221\.5 \+6\.5 NO/.test(nba.form1)
-      && /04-01 v Hornets W 118–109 \(OT\) 60–52 O 111\.5 OVER 227 v 224 -7\.5 COVERED/.test(nba.form1) && /04-03 @ Heat L 99–101 48–50 200 no close —/.test(nba.form1)
+      && /Celtics: no finals in the ledger yet\./.test(nba.form1) && /03-30 @ Knicks L 104–112 51–58 U 110\.5 UNDER 216\/221\.5 \+6\.5 NO/.test(nba.form1)
+      && /04-01 v Hornets W 118–109 \(OT\) 60–52 O 111\.5 OVER 227\/224 -7\.5 COVERED/.test(nba.form1) && /04-03 @ Heat L 99–101 48–50 200 no close —/.test(nba.form1)
       && nba.formChips.join('|') === 'loss:L,under:U 110.5,under:UNDER,loss:NO|win:W,over:O 111.5,over:OVER,win:COVERED|loss:L' && nba.formStored,
       'nba: the recent form card lists each side\'s last five with the half, the total and the spread against the close in colour, a game without a close shows its score alone, and the JSON rides in the row',
       JSON.stringify({ form1: nba.form1.slice(0, 400), chips: nba.formChips }));

@@ -468,8 +468,8 @@
         var ctot = g.ctot !== null && g.ctot !== undefined ? +g.ctot : fb.ctot, ch1 = g.ch1 !== null && g.ch1 !== undefined ? +g.ch1 : fb.ch1, csp = g.csp !== null && g.csp !== undefined ? +g.csp : fb.csp;
         var total = hasScore ? us + them : null, totCell = "—", h1Cell = "—", spCell = "—";
         if (total !== null && ctot !== null && ctot !== undefined) {
-          if (total > ctot) { ov++; totCell = chip("over", "OVER") + " " + total + " v " + ctot; }
-          else if (total < ctot) { un++; totCell = chip("under", "UNDER") + " " + total + " v " + ctot; }
+          if (total > ctot) { ov++; totCell = chip("over", "OVER") + " " + total + "/" + ctot; }
+          else if (total < ctot) { un++; totCell = chip("under", "UNDER") + " " + total + "/" + ctot; }
           else totCell = chip("push", "PUSH") + " " + total;
         } else if (total !== null) totCell = total + ' <span class="dim">no close</span>';
         if (hasH1) {
@@ -489,7 +489,7 @@
       var n = games.length;
       h += "<p><b>" + esc(s[1]) + "</b> last " + n + ": <b>" + w + "-" + (n - w) + "</b>" + (ov + un ? ", over " + ov + "-" + un : "") + (cov + ncov ? ", covered " + cov + "-" + ncov : "") +
            (n ? ", " + (pf / n).toFixed(1) + " for and " + (pa / n).toFixed(1) + " against" : "") + (nH1 ? ", the half " + (h1f / nH1).toFixed(1) + "–" + (h1a / nH1).toFixed(1) + (h1o + h1u ? " (over " + h1o + "-" + h1u + ")" : "") : "") + ".</p>" +
-           '<table class="form nbaform"><thead><tr><th>Date</th><th>Opp</th><th>Result</th><th>Half</th><th>Total</th><th>Spread</th></tr></thead><tbody>' + rows.join("") + "</tbody></table>";
+           '<div class="scroll"><table class="form nbaform"><thead><tr><th>Date</th><th>Opp</th><th>Result</th><th>Half</th><th>Total</th><th>Spread</th></tr></thead><tbody>' + rows.join("") + "</tbody></table></div>";
     });
     el.innerHTML = h;
   }

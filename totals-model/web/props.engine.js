@@ -104,15 +104,30 @@
     if (n) { saveProps(); renderProps(); }
     return n;
   }
-  /* the record tile: every graded prop with a side, by market, by band, by side; says is the blended chance */
-  function propsRecordHtml() {
+  /* the record: every graded prop with a side, by market, by band, by side; says is the blended chance.
+     propsRecordHtml() is the block on the card's "Is it working" section; propsRecordHtml(true) is the
+     fuller one on the Props tab itself (22 Oct 2026, the user: "a section at the top similar to the
+     'is this working' on the other models"): the bands as tiles, the edge the sheet claimed, the centre
+     the chance was read around (the mean to 21 Oct, the median from 22 Oct), night by night, and
+     says against does by the chance claimed */
+  var PROPS_EDGE_BUCKETS = ["10+ points of edge", "6 to 10 points", "3 to 6 points", "under 3 points", "no edge"];
+  var PROPS_CHANCE_BUCKETS = ["50 to 55%", "55 to 60%", "60 to 65%", "65% and up"];
+  function propsEdgeBucket(r) { var e = (r.edge || 0) * 100; return e >= 10 ? PROPS_EDGE_BUCKETS[0] : e >= 6 ? PROPS_EDGE_BUCKETS[1] : e >= 3 ? PROPS_EDGE_BUCKETS[2] : e > 0 ? PROPS_EDGE_BUCKETS[3] : PROPS_EDGE_BUCKETS[4]; }
+  function propsChanceBucket(r) { var c = (r.chance || 0) * 100; return c < 55 ? PROPS_CHANCE_BUCKETS[0] : c < 60 ? PROPS_CHANCE_BUCKETS[1] : c < 65 ? PROPS_CHANCE_BUCKETS[2] : PROPS_CHANCE_BUCKETS[3]; }
+  function propsCentre(r) { return (r.why || []).some(function (w) { return /around the median/.test(String(w)); }) ? "median" : "mean"; }
+  function propsRecordHtml(full) {
     var graded = props.filter(function (r) { return r.result && r.result !== "graded"; });
     if (!graded.length) return "";
     var mk = function () { return { n: 0, w: 0, l: 0, p: 0, v: 0, says: 0, units: 0 }; };
-    var all = mk(), byMk = {}, byBand = {}, bySide = {};
+    var all = mk(), byMk = {}, byBand = {}, bySide = {}, byEdge = {}, byChance = {}, byDate = {}, byDateBet = {}, byCentre = {};
     var dec = function (price) { return price > 0 ? 1 + price / 100 : 1 + 100 / (-price); };
     graded.forEach(function (r) {
-      [all, byMk[r.mk] || (byMk[r.mk] = mk()), byBand[r.band] || (byBand[r.band] = mk()), bySide[r.side] || (bySide[r.side] = mk())].forEach(function (s) {
+      var d = r.gdate || "?";
+      var sinks = [all, byMk[r.mk] || (byMk[r.mk] = mk()), byBand[r.band] || (byBand[r.band] = mk()), bySide[r.side] || (bySide[r.side] = mk()),
+                   byEdge[propsEdgeBucket(r)] || (byEdge[propsEdgeBucket(r)] = mk()), byChance[propsChanceBucket(r)] || (byChance[propsChanceBucket(r)] = mk()),
+                   byDate[d] || (byDate[d] = mk()), byCentre[propsCentre(r)] || (byCentre[propsCentre(r)] = mk())];
+      if (r.band === "BET") sinks.push(byDateBet[d] || (byDateBet[d] = mk()));
+      sinks.forEach(function (s) {
         if (r.result === "void") { s.v++; return; }
         if (r.result === "push") { s.p++; return; }
         s.n++; s.says += r.chance;
@@ -120,23 +135,59 @@
       });
     });
     var rec = function (s) { return s.w + "-" + s.l + (s.p ? "-" + s.p : ""); };
+    var says = function (s) { return s.n ? (s.says / s.n * 100).toFixed(1) + "%" : "—"; };
+    var does = function (s) { return s.n ? (s.w / s.n * 100).toFixed(1) + "%" : "—"; };
     var line = function (s) {
       if (!s.n) return "pushes only";
-      return "says " + (s.says / s.n * 100).toFixed(1) + "% · does " + (s.w / s.n * 100).toFixed(1) + "% (±" + (100 / Math.sqrt(s.n) / 2).toFixed(1) + ") · " + sgn(s.units, 2) + "u";
+      return "says " + says(s) + " · does " + does(s) + " (±" + (100 / Math.sqrt(s.n) / 2).toFixed(1) + ") · " + sgn(s.units, 2) + "u";
     };
+    /* the tab's tiles carry colour (22 Oct 2026, the user: "jazz that up with some colors"): the record
+       green when the units are up and red when down, does marked against says the same way */
     var tile = function (label, s, parts) {
-      return '<div><p class="k">' + esc(label) + '</p><p class="v">' + rec(s) + '</p><p class="s">' + line(s) + (s.v ? ' · ' + s.v + ' void' : '') + '</p>' +
+      var cls = full && s.n ? (s.units > 0 ? ' class="good"' : s.units < 0 ? ' class="bad"' : '') : '';
+      var body = line(s);
+      if (full && s.n) body = "says " + says(s) + ' · does <span class="does ' + (s.w / s.n >= s.says / s.n ? 'up' : 'down') + '">' + does(s) + '</span> (±' + (100 / Math.sqrt(s.n) / 2).toFixed(1) + ') · <span class="units">' + sgn(s.units, 2) + 'u</span>';
+      return '<div' + cls + '><p class="k">' + esc(label) + '</p><p class="v">' + rec(s) + '</p><p class="s">' + body + (s.v ? ' · ' + s.v + ' void' : '') + '</p>' +
         (parts && parts.length ? '<p class="s sides">' + esc(parts.join(" · ")) + '</p>' : '') + '</div>';
     };
     var parts = [];
     ["OVER", "UNDER"].forEach(function (sd) { if (bySide[sd]) parts.push(sd.toLowerCase() + " " + rec(bySide[sd])); });
     ["BET", "LEAN", "no edge"].forEach(function (b) { if (byBand[b]) parts.push(b + " " + rec(byBand[b]) + (byBand[b].n ? " " + sgn(byBand[b].units, 1) + "u" : "")); });
-    var h = '<div class="subhead" data-sport="PROPS">NBA player props <span class="tag">' + graded.length + ' graded · the slate\'s call as made, at the price posted · says is the blended chance</span></div>';
-    h += '<div class="calib" data-sport="PROPS">' + tile("Every prop with a side", all, parts);
-    ["pts", "reb", "ast", "tpm", "pra"].forEach(function (k) { if (byMk[k]) h += tile(PROPS_LABEL[k], byMk[k], []); });
-    h += '</div>';
-    h += '<div class="verdict">The props are a priori: the pooled rules behind them were measured on last season\'s box scores, the blend\'s weights were not. Read the BET band against the rest and <i>does</i> against <i>says</i>; under 100 graded props nothing here is a reading.</div>';
-    return h;
+    var markets = ["pts", "reb", "ast", "tpm", "pra"].map(function (k) { return byMk[k] ? tile(PROPS_LABEL[k], byMk[k], []) : ""; }).join("");
+    var verdict = 'The props are a priori: the pooled rules behind them were measured on last season\'s box scores, the blend\'s weights were not. Read the BET band against the rest and <i>does</i> against <i>says</i>; under 100 graded props nothing here is a reading.';
+    if (!full) {
+      var h = '<div class="subhead" data-sport="PROPS">NBA player props <span class="tag">' + graded.length + ' graded · the slate\'s call as made, at the price posted · says is the blended chance</span></div>';
+      h += '<div class="calib" data-sport="PROPS">' + tile("Every prop with a side", all, parts) + markets + '</div>';
+      h += '<div class="verdict">' + verdict + '</div>';
+      return h;
+    }
+    var dates = Object.keys(byDate).sort();
+    var h2 = '<div class="calib" data-sport="PROPS-TAB">' + tile("Every prop with a side", all, parts.slice(0, 2));
+    ["BET", "LEAN", "no edge"].forEach(function (b) { if (byBand[b]) h2 += tile(b === "no edge" ? "No edge: the book's own side" : b + " band", byBand[b], []); });
+    h2 += '</div>';
+    h2 += '<div class="subhead">By market</div><div class="calib" data-sport="PROPS-MK">' + markets + '</div>';
+    h2 += '<div class="subhead">By the edge the sheet claimed <span class="tag">the chance less what the price needs</span></div><div class="calib" data-sport="PROPS-EDGE">' +
+          PROPS_EDGE_BUCKETS.map(function (b) { return byEdge[b] ? tile(b, byEdge[b], []) : ""; }).join("") + '</div>';
+    h2 += '<div class="subhead">By the centre the chance was read around <span class="tag">the mean to 21 Oct 2026, the median from the 22nd: a box-score stat skews right</span></div><div class="calib" data-sport="PROPS-CENTRE">' +
+          (byCentre.mean ? tile("Called at the mean, to 21 Oct", byCentre.mean, []) : "") + (byCentre.median ? tile("Called at the median, from 22 Oct", byCentre.median, []) : "") + '</div>';
+    h2 += '<div class="subhead">Night by night <span class="tag">' + dates.length + ' night' + (dates.length === 1 ? '' : 's') + ' graded</span></div>' +
+          '<table class="form" id="propsNights"><thead><tr><th>Night</th><th>Record</th><th>Says</th><th>Does</th><th>Units</th><th>BET band</th></tr></thead><tbody>' +
+          dates.slice().reverse().map(function (d) {
+            var s = byDate[d], b = byDateBet[d];
+            var up = s.n && s.w / s.n >= s.says / s.n;
+            return '<tr><td>' + esc(gameDate(d)) + '</td><td class="' + (s.units >= 0 ? 'pos' : 'neg') + '">' + rec(s) + (s.v ? ' <span class="dim">' + s.v + ' void</span>' : '') + '</td><td>' + says(s) + '</td><td class="' + (up ? 'pos' : 'neg') + '">' + does(s) + '</td><td class="' + (s.units >= 0 ? 'pos' : 'neg') + '">' + sgn(s.units, 1) + 'u</td>' +
+                   '<td class="' + (b ? (b.units >= 0 ? 'pos' : 'neg') : '') + '">' + (b ? rec(b) + ' ' + sgn(b.units, 1) + 'u' : '—') + '</td></tr>';
+          }).join("") + '</tbody></table>';
+    h2 += '<div class="subhead">Says against does, by the chance claimed <span class="tag">a calibrated sheet reads the same in both columns</span></div>' +
+          '<table class="form" id="propsLadder"><thead><tr><th>Chance claimed</th><th>Props</th><th>Says</th><th>Does</th><th>±</th><th>Units</th></tr></thead><tbody>' +
+          PROPS_CHANCE_BUCKETS.map(function (b) {
+            var s = byChance[b]; if (!s || !s.n) return "";
+            var up = s.w / s.n >= s.says / s.n;
+            return '<tr><td>' + esc(b) + '</td><td>' + s.n + '</td><td>' + says(s) + '</td><td class="' + (up ? 'pos' : 'neg') + '">' + does(s) + '</td><td>' + (100 / Math.sqrt(s.n) / 2).toFixed(1) + '</td><td class="' + (s.units >= 0 ? 'pos' : 'neg') + '">' + sgn(s.units, 1) + 'u</td></tr>';
+          }).join("") + '</tbody></table>';
+    h2 += '<div class="verdict">' + verdict + ' The first two nights (829 props) were called at the mean and read 423-406, the sheet saying 55.7% and doing 51.0%; ' +
+          're-scored at the median they read 452-377 with the say-so within a point of the done. The median tile is the one to read from here, on its own, once it has a hundred props.</div>';
+    return h2;
   }
   function propResChip(r) {
     if (!r.result) return '';
@@ -262,7 +313,8 @@
     if (!sel.value || dates.indexOf(sel.value) < 0) sel.value = dates.length ? dates[dates.length - 1] : "";
     var date = sel.value;
     var rows = propsSource().filter(function (r) { return (r.gdate || "") === date; });
-    $("propsCount").textContent = (propsPreview ? "EXAMPLE · " : "") + (rows.length ? rows.length + " props on " + gameDate(date) + " · " + dates.length + " date" + (dates.length === 1 ? "" : "s") + " kept"
+    if ($("propsCalib")) $("propsCalib").innerHTML = propsRecordHtml(true) || '<div class="verdict">Nothing graded yet. The morning\'s grade file (Grade NBA yesterday.bat, then Load slate) grades every prop with a side against the box score, and the record builds here: by band, by market, by the edge claimed, night by night, and says against does.</div>';
+    $("propsCount").textContent =(propsPreview ? "EXAMPLE · " : "") + (rows.length ? rows.length + " props on " + gameDate(date) + " · " + dates.length + " date" + (dates.length === 1 ? "" : "s") + " kept"
                                               : (propsSource().length ? "no props on this date" : "no props loaded"));
     var resChip = propResChip;
     var picks = rows.filter(function (r) { return propHas(r) && r.edge > 0; }).sort(function (a, b) { return b.edge - a.edge; });

@@ -991,3 +991,17 @@ nights' 829 props with the shift, their own lines and prices: 452-377
 against 423-406 as shipped, the BET band 44-47 against 51-57, the sheet's
 say-so 55.5% against 54.5% done where it had said 55.7% and done 51.0%. The
 overs in the BET band fall from 88 of 108 to 62 of 91.
+
+**The tab's own Is it working block**, the same day (the user: "a section at
+the top similar to the 'is this working' on the other models... jazz that
+up with some colors"). `propsRecordHtml(true)` renders at the top of the
+Props tab: every prop with a side, then the BET band, the LEAN band and the
+no-edge side as their own tiles; by market; by the edge the sheet claimed
+(ten points and up, six to ten, three to six, under three, none); by the
+centre the chance was read around (the mean to 21 Oct, the median from the
+22nd, told apart by the why line, so the fix gets its own record from day
+one); night by night as a table with the BET band beside; and says against
+does by the chance claimed. In colour: a tile's record and units green when
+the units are up and red when down, with a bar on its left edge, and does
+marked green or red against says in the tiles and the tables. The card's
+own block below the record stays as it was.

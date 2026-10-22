@@ -886,6 +886,7 @@ const CHECKS = ["dome","playoff","agconf","hgconf","agbk","hgbk"];
           proj: 7.1, sd: 3.5, pm: 0.45, pb: 0.4773, p: 0.468, push: 0, side: 'UNDER', chance: 0.532, price: -115, need: 0.5349, edge: -0.0029, band: 'no edge', mins: 33.0, rate36: 7.7, why: ['7.7 rebounds per 36'], log: [] } ] } ] };
     const load = async (doc, fname) => { const dt = new DataTransfer(); dt.items.add(new File([JSON.stringify(doc)], fname, { type: 'application/json' })); const inp = document.getElementById('slateFile'); inp.files = dt.files; inp.dispatchEvent(new Event('change', { bubbles: true })); await wait(); };
     await load(propsDoc, 'nba-props-2026-10-21.json');
+    const tabEmpty0 = document.getElementById('propsCalib').innerText.replace(/\s+/g, ' ').trim();
     const viewOn = !document.getElementById('propsView').hidden, colsOff = document.querySelector('.cols').hidden, pressed = document.getElementById('m-props').getAttribute('aria-pressed');
     const best = [...document.querySelectorAll('#propsBest .pk')].map(e => e.innerText.replace(/\s+/g, ' ').trim());
     const rowsOn = document.querySelectorAll('#propsTable tr[data-prop]').length;
@@ -904,6 +905,10 @@ const CHECKS = ["dome","playoff","agconf","hgconf","agbk","hgbk"];
     const after = JSON.parse(localStorage.getItem('callsheet3.props.v1'));
     const tile = document.querySelector('#calibBox .calib[data-sport="PROPS"]');
     const tileText = tile ? tile.innerText.replace(/\s+/g, ' ').trim() : '';
+    const tabCalib = document.getElementById('propsCalib').innerText.replace(/\s+/g, ' ').trim();
+    const tabBlocks = ['PROPS-TAB', 'PROPS-MK', 'PROPS-EDGE', 'PROPS-CENTRE'].map(k => { const b = document.querySelector('#propsCalib .calib[data-sport="' + k + '"]'); return k + ':' + (b ? [...b.querySelectorAll(':scope > div .k')].map(e => e.textContent).join('|') : 'none'); });
+    const nights = [...document.querySelectorAll('#propsNights tbody tr')].map(tr => tr.innerText.replace(/\s+/g, ' ').trim());
+    const ladder = [...document.querySelectorAll('#propsLadder tbody tr')].map(tr => tr.innerText.replace(/\s+/g, ' ').trim());
     const slateMsg = document.getElementById('saveMsg').textContent;
     const bk = { format: 'callsheet3.backup', version: 1, card: [], props: [after[0]] };
     const dt2 = new DataTransfer(); dt2.items.add(new File([JSON.stringify(bk)], 'the-super-model-2026-10-22.json', { type: 'application/json' }));
@@ -912,8 +917,15 @@ const CHECKS = ["dome","playoff","agconf","hgconf","agbk","hgbk"];
     document.getElementById('m-nba').click(); await wait();
     const viewOff = document.getElementById('propsView').hidden, colsBack = !document.querySelector('.cols').hidden, nbaPressed = document.getElementById('m-nba').getAttribute('aria-pressed');
     localStorage.removeItem('callsheet3.props.v1');
-    return { viewOn, colsOff, pressed, best, rowsOn, rowsAll, count, msg, whyOpen, logMarks, tileBefore, after: after.map(r => [r.name, r.mk, r.result, r.actual]), tileText, slateMsg, restored: restored.length, viewOff, colsBack, nbaPressed };
+    return { viewOn, colsOff, pressed, best, rowsOn, rowsAll, count, msg, whyOpen, logMarks, tileBefore, after: after.map(r => [r.name, r.mk, r.result, r.actual]), tileText, slateMsg, restored: restored.length, viewOff, colsBack, nbaPressed,
+             tabCalib, tabBlocks, nights, ladder, tabEmpty0 };
   });
+  chk(/Nothing graded yet/.test(propsT.tabEmpty0) && /^Every prop with a side 1-1 says 54\.6% · does 50\.0%/i.test(propsT.tabCalib) && /BET band 1-0 says 56\.0% · does 100\.0%/i.test(propsT.tabCalib)
+      && propsT.tabBlocks[0] === 'PROPS-TAB:Every prop with a side|BET band|No edge: the book\'s own side' && propsT.tabBlocks[1] === 'PROPS-MK:points|rebounds|assists' && propsT.tabBlocks[2] === 'PROPS-EDGE:3 to 6 points|no edge'
+      && propsT.tabBlocks[3] === 'PROPS-CENTRE:Called at the mean, to 21 Oct' && propsT.nights.length === 1 && /^Oct 21 1-1 1 void 54\.6% 50\.0% [-−]0\.1u 1-0 \+0\.9u$/.test(propsT.nights[0])
+      && propsT.ladder.length === 2 && /^50 to 55% 1 53\.2% 0\.0% 50\.0 [-−]1\.0u$/.test(propsT.ladder[0]) && /^55 to 60% 1 56\.0% 100\.0% 50\.0 \+0\.9u$/.test(propsT.ladder[1]) && /Called at the median/.test(propsT.tabCalib) === false,
+      'props: the tab\'s own Is it working block: the bands as tiles, by market, by the edge claimed, the centre the chance was read around, night by night and says against does by the chance claimed; empty until something grades',
+      JSON.stringify({ blocks: propsT.tabBlocks, nights: propsT.nights, ladder: propsT.ladder, head: propsT.tabCalib.slice(0, 160), empty: propsT.tabEmpty0.slice(0, 60) }));
   chk(propsT.logMarks.join(',') === 'lg over|26,lg under|22,lg|?' && /Last games \(1 of 2 over 24\.5\)/i.test(propsT.whyOpen[0]) && /10-19 @ BOS 12\.5 \?/.test(propsT.whyOpen[0]),
       'props: the last games mark each stat, green over the prop\'s line and red under it, a missing one plain, and tally how many cleared the number', JSON.stringify({ marks: propsT.logMarks, why: propsT.whyOpen }));
   chk(propsT.viewOn && propsT.colsOff && propsT.pressed === 'true', 'props: loading a props file through Load slate opens the Props tab in place of the matchup columns', JSON.stringify({ on: propsT.viewOn, cols: propsT.colsOff, pressed: propsT.pressed }));

@@ -137,7 +137,11 @@ projection, built from the ledgers' box lines and measured on 2025-26
 
 A prop is the slate's call as made: the page does not rescore it, the BET
 band (three points of edge and 55%) and LEAN (any edge) are a priori, and
-the Props record tile is the test. A click on a best-prop card or on a row
+the Props record tile is the test. The tab's own **Is it working** block
+(22 Oct 2026) reads the record by band, by market, by the edge claimed, by
+the centre the chance was read around (the mean to 21 Oct, the median from
+the 22nd), night by night, and says against does by the chance claimed, in
+colour. A click on a best-prop card or on a row
 of the Every-prop table opens the prop on its own panel (21 and 22 Oct
 2026; Previous / Next or the arrow keys walk the table from there): the
 numbers as tiles, **what moves it** (each factor's push on the projection in

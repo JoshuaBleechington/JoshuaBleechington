@@ -12,6 +12,7 @@
   var props = [];
   try { props = JSON.parse(localStorage.getItem(PROPS_KEY) || "[]"); if (!Array.isArray(props)) props = []; } catch (e) { props = []; }
   var propsView = false;
+  var propsOrder = [], propDetailId = null;   // the Every-prop table's order, and the prop the panel shows (22 Oct 2026)
   /* the example (19 Oct 2026, the user: "put an example on the NBA props model
      like you did for the NBA"): one game's props computed at build time through
      the slate's own projection, previewed in the tab and never saved -- a real
@@ -150,9 +151,6 @@
     var cls = val === null || line === null || line === undefined || isNaN(+line) ? "" : (val > +line ? " over" : val < +line ? " under" : " push");
     return '<b class="lg' + cls + '">' + (val === null ? "?" : esc(String(v))) + '</b>';
   }
-  function propsLogGame(g, line) {
-    return esc(String(g[0] || "").slice(5) + " " + (g[2] ? "v " : "@ ") + g[1] + " " + g[3] + "m ") + propsLogMark(g[4], line);
-  }
   function propsLogTally(r) {
     var vals = (r.log || []).map(function (g) { return g[4]; }).filter(function (v) { return v !== null && v !== undefined && v !== "" && !isNaN(+v); });
     if (!vals.length || r.line === null || r.line === undefined || isNaN(+r.line)) return "";
@@ -230,16 +228,32 @@
     h += '<p class="note">A prop is the slate\'s call as made at the price posted; the page does not rescore it, and the Props record tile is the test.</p>';
     return h;
   }
+  /* a best-prop card or a row of the Every-prop table opens the panel (22 Oct 2026, the user:
+     "the same for the entries on the list so they are easy to review"); Previous / Next and the
+     arrow keys walk the table's order from there */
   function openPropDetail(id) {
     var r = propById(id), dlg = $("propDetail"); if (!r || !dlg) return;
+    propDetailId = String(id);
     $("propDetailBody").innerHTML = propsDetailHtml(r);
+    var i = propsOrder.indexOf(propDetailId), nav = $("propDetailNav");
+    if (nav) {
+      nav.hidden = i < 0 || propsOrder.length < 2;
+      $("propDetailPos").textContent = i >= 0 ? (i + 1) + " of " + propsOrder.length : "";
+      $("propDetailPrev").disabled = i <= 0;
+      $("propDetailNext").disabled = i < 0 || i >= propsOrder.length - 1;
+    }
     dlg.hidden = false; dlg.scrollTop = 0;
     document.body.classList.add("noscroll");
     if ($("propDetailClose")) $("propDetailClose").focus();
   }
+  function stepPropDetail(d) {
+    var i = propsOrder.indexOf(propDetailId); if (i < 0) return;
+    var j = i + d; if (j < 0 || j >= propsOrder.length) return;
+    openPropDetail(propsOrder[j]);
+  }
   function closePropDetail() {
     var dlg = $("propDetail"); if (!dlg) return;
-    dlg.hidden = true;
+    dlg.hidden = true; propDetailId = null;
     document.body.classList.remove("noscroll");
   }
   function renderProps() {
@@ -270,12 +284,9 @@
                       '<td class="' + (r.edge > 0 ? 'pos' : 'neg') + '">' + sgn(r.edge * 100, 1) + '</td><td>' + r.proj + '</td><td>' + esc(r.band) + '</td>'
                     : '<td colspan="7" class="dim">' + esc((r.why && r.why[0]) || 'no projection') + '</td>') +
         '<td>' + (r.result ? esc(r.result) + (r.actual !== null && r.actual !== undefined ? ' · ' + r.actual : '') : '') + '</td></tr>';
-      h += '<tr class="why" data-why="' + r.id + '" hidden><td colspan="12"><ul>' + (r.why || []).map(function (w) { return '<li>' + esc(w) + '</li>'; }).join('') +
-        (r.log && r.log.length ? '<li>last games: ' + r.log.map(function (g) { return propsLogGame(g, r.line); }).join(" · ") + propsLogTally(r) + '</li>' : '') +
-        (r.books && Object.keys(r.books).length > 1 ? '<li>books: ' + esc(Object.keys(r.books).map(function (b) { return b + " " + r.books[b][0] + " (" + sgn(r.books[b][1], 0) + "/" + sgn(r.books[b][2], 0) + ")"; }).join(" · ")) + '</li>' : '') +
-        '</ul></td></tr>';
     });
     h += '</tbody></table>';
+    propsOrder = list.map(function (r) { return String(r.id); });   // the panel's Previous / Next walk the table's order
     $("propsTable").innerHTML = rows.length ? h : '';
   }
   function propsAsText() {
@@ -306,17 +317,21 @@
       if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(text).then(function () { propsSay("Copied the props as text."); }, function () { propsSay("The clipboard is blocked here; the text is below.<pre>" + esc(text) + "</pre>"); });
       else propsSay("<pre>" + esc(text) + "</pre>");
     });
-    var toggleWhy = function (e) {
-      var t = e.target.closest("[data-prop]"); if (!t) return;
-      var w = document.querySelector('#propsTable tr[data-why="' + t.getAttribute("data-prop") + '"]');
-      if (w) { w.hidden = !w.hidden; if (!w.hidden && w.scrollIntoView) w.scrollIntoView({ block: "nearest" }); }
-    };
-    $("propsTable").addEventListener("click", toggleWhy);
-    $("propsBest").addEventListener("click", function (e) { var t = e.target.closest("[data-prop]"); if (t) openPropDetail(t.getAttribute("data-prop")); });
+    var openFrom = function (e) { var t = e.target.closest("[data-prop]"); if (t) openPropDetail(t.getAttribute("data-prop")); };
+    $("propsTable").addEventListener("click", openFrom);
+    $("propsBest").addEventListener("click", openFrom);
     if ($("propDetail")) {
       $("propDetailClose").addEventListener("click", closePropDetail);
+      $("propDetailPrev").addEventListener("click", function () { stepPropDetail(-1); });
+      $("propDetailNext").addEventListener("click", function () { stepPropDetail(1); });
       $("propDetail").addEventListener("click", function (e) { if (e.target === $("propDetail")) closePropDetail(); });
-      document.addEventListener("keydown", function (e) { if (e.key === "Escape" && !$("propDetail").hidden) closePropDetail(); });
+      document.addEventListener("keydown", function (e) {
+        if ($("propDetail").hidden) return;
+        var tag = e.target && e.target.tagName ? e.target.tagName.toLowerCase() : "";
+        if (e.key === "Escape") closePropDetail();
+        else if (e.key === "ArrowLeft" && tag !== "input" && tag !== "textarea") stepPropDetail(-1);
+        else if (e.key === "ArrowRight" && tag !== "input" && tag !== "textarea") stepPropDetail(1);
+      });
     }
   }
   /* ===== END PROPS BLOCK ===== */

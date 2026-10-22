@@ -24,7 +24,7 @@ import sys
 ROOT = pathlib.Path(__file__).parent / "web"
 OPEN = "  /* ===== ENGINE BLOCK."
 CLOSE = "  /* ===== END ENGINE BLOCK ===== */"
-STAMP = "2026-10-21"   # bumped by hand when 3.0's own sources change (the harness checks it)
+STAMP = "2026-10-22"   # bumped by hand when 3.0's own sources change (the harness checks it)
 
 
 def engine_block() -> str:
@@ -100,8 +100,6 @@ def head() -> str:
              "  table.props td.pos { color: var(--go); font-weight: 700; } table.props td.neg { color: var(--muted); }\n"
              "  table.props tr[data-prop] { cursor: pointer; } table.props tr.win td:first-child { border-left: 3px solid var(--go); }\n"
              "  table.props tr.loss td:first-child { border-left: 3px solid var(--bad); } table.props tr.void td, table.props tr.push td { color: var(--muted); }\n"
-             "  table.props tr.why td { white-space: normal; background: var(--surface-2, var(--surface)); }\n"
-             "  table.props tr.why ul { margin: 4px 0; padding-left: 18px; font: 11.5px/1.5 var(--sans); color: var(--ink-2); }\n"
              "  #propsView b.lg, .pdlg b.lg { display: inline-block; min-width: 18px; text-align: center; padding: 0 5px; border-radius: 3px; font: 700 11.5px/1.5 var(--mono); background: var(--surface-2); color: var(--ink); }\n"
              "  #propsView b.lg.over, .pdlg b.lg.over { background: var(--go-wash); color: var(--go); } #propsView b.lg.under, .pdlg b.lg.under { background: var(--bad-wash); color: var(--bad); }\n"
              "  #propsView b.lg.push, .pdlg b.lg.push { background: var(--edge-wash); color: var(--edge); }\n"
@@ -110,9 +108,11 @@ def head() -> str:
              "  .pdlg { position: fixed; inset: 0; z-index: 60; background: rgba(8, 12, 11, 0.58); display: flex; align-items: flex-start; justify-content: center; padding: 28px 16px; overflow-y: auto; }\n"
              "  .pdlg[hidden] { display: none; }\n"
              "  .pdlg-box { position: relative; width: min(780px, 100%); background: var(--surface); color: var(--ink); border: 1px solid var(--rule); border-radius: 12px; padding: 20px 22px 22px; box-shadow: 0 24px 70px rgba(0, 0, 0, 0.4); }\n"
-             "  .pdlg-close { position: absolute; top: 12px; right: 12px; }\n"
+             "  .pdlg-top { display: flex; justify-content: space-between; align-items: center; gap: 8px; margin: -4px 0 10px; }\n"
+             "  .pdlg-nav { display: flex; align-items: center; gap: 8px; } .pdlg-nav[hidden] { display: none; } .pdlg-nav .btn[disabled] { opacity: .45; cursor: default; }\n"
+             "  .pdlg-close { margin-left: auto; }\n"
              "  .pdlg .pd-band { font: 900 11px/1 var(--sans); letter-spacing: .1em; text-transform: uppercase; color: var(--edge); }\n"
-             "  .pdlg h3 { margin: 8px 70px 2px 0; font: 800 23px/1.15 var(--sans); } .pdlg h3 .tag { vertical-align: middle; }\n"
+             "  .pdlg h3 { margin: 4px 0 2px; font: 800 23px/1.15 var(--sans); } .pdlg h3 .tag { vertical-align: middle; }\n"
              "  .pdlg .pd-pick { font: 700 17px/1.3 var(--sans); margin: 2px 0; } .pdlg .pd-pick .chip { vertical-align: middle; margin-left: 6px; }\n"
              "  .pdlg .pd-sub { color: var(--muted); font-size: 12.5px; line-height: 1.5; margin: 0 0 6px; }\n"
              "  .pdlg .pd-tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(118px, 1fr)); gap: 8px; margin: 12px 0 6px; }\n"

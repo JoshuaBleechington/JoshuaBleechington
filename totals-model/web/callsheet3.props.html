@@ -34,14 +34,21 @@
         credits a market a game on the history endpoint), so the tile earns everything from day one.</p>
       <div class="subhead">Best props <span class="tag">every prop whose blended chance clears its price, best edge first — BET at 3 points of edge and 55% or better, LEAN below that; a priori bands, the record decides. Click a card for the prop's own panel</span></div>
       <div id="propsBest" class="picks"></div>
-      <div class="subhead">Every prop on the date <span class="tag">by game, then by edge — click a row for the why, the last games and every book's line</span></div>
+      <div class="subhead">Every prop on the date <span class="tag">by game, then by edge — click a row for the prop's own panel, then Previous and Next (or the arrow keys) walk the list</span></div>
       <div class="scroll"><div id="propsTable"></div></div>
     </div>
   </section>
-  <!-- the prop's own panel (21 Oct 2026): a best-prop card opens here; Escape, Close or a click outside puts it away -->
+  <!-- the prop's own panel (21 Oct 2026): a best-prop card or a table row opens here; Previous / Next walk the table (22 Oct); Escape, Close or a click outside puts it away -->
   <div id="propDetail" class="pdlg" hidden role="dialog" aria-modal="true" aria-label="The prop in full">
     <div class="pdlg-box">
-      <button type="button" class="btn pdlg-close" id="propDetailClose">Close</button>
+      <div class="pdlg-top">
+        <div class="pdlg-nav" id="propDetailNav" hidden>
+          <button type="button" class="btn" id="propDetailPrev">&lsaquo; Previous</button>
+          <span class="tag" id="propDetailPos"></span>
+          <button type="button" class="btn" id="propDetailNext">Next &rsaquo;</button>
+        </div>
+        <button type="button" class="btn pdlg-close" id="propDetailClose">Close</button>
+      </div>
       <div id="propDetailBody"></div>
     </div>
   </div>

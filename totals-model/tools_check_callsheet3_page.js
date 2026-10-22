@@ -893,8 +893,9 @@ const CHECKS = ["dome","playoff","agconf","hgconf","agbk","hgbk"];
     const rowsAll = document.querySelectorAll('#propsTable tr[data-prop]').length;
     const count = document.getElementById('propsCount').textContent, msg = document.getElementById('propsMsg').textContent;
     document.querySelector('#propsTable tr[data-prop]').click(); await wait();
-    const whyOpen = [...document.querySelectorAll('#propsTable tr.why')].filter(t => !t.hidden).map(t => t.innerText.replace(/\s+/g, ' ').trim());
-    const logMarks = [...document.querySelectorAll('#propsTable tr.why b.lg')].map(b => b.className + '|' + b.textContent);
+    const whyOpen = document.getElementById('propDetail').hidden ? [] : [document.getElementById('propDetailBody').innerText.replace(/\s+/g, ' ').trim()];
+    const logMarks = [...document.querySelectorAll('#propDetail .pd-log b.lg')].map(b => b.className + '|' + b.textContent);
+    document.getElementById('propDetailClose').click(); await wait();
     const tileBefore = !!document.querySelector('#calibBox .calib[data-sport="PROPS"]');
     const gradeDoc = { format: 'callsheet2.slate', version: 1, date: '2026-10-21', games: [
       { sport: 'NBA', gdate: '2026-10-21', away: 'Hawks', home: 'Magic', gameId: '401909834', finals: { fa: '118', fh: '112', f5a: '60', f5h: '55' }, notes: [],
@@ -913,15 +914,15 @@ const CHECKS = ["dome","playoff","agconf","hgconf","agbk","hgbk"];
     localStorage.removeItem('callsheet3.props.v1');
     return { viewOn, colsOff, pressed, best, rowsOn, rowsAll, count, msg, whyOpen, logMarks, tileBefore, after: after.map(r => [r.name, r.mk, r.result, r.actual]), tileText, slateMsg, restored: restored.length, viewOff, colsBack, nbaPressed };
   });
-  chk(propsT.logMarks.join(',') === 'lg over|26,lg under|22,lg|?' && /10-17 v CHI 31m 22 · 10-19 @ BOS 12.5m \? \(1 of 2 over 24\.5\)/.test(propsT.whyOpen[0]),
+  chk(propsT.logMarks.join(',') === 'lg over|26,lg under|22,lg|?' && /Last games \(1 of 2 over 24\.5\)/i.test(propsT.whyOpen[0]) && /10-19 @ BOS 12\.5 \?/.test(propsT.whyOpen[0]),
       'props: the last games mark each stat, green over the prop\'s line and red under it, a missing one plain, and tally how many cleared the number', JSON.stringify({ marks: propsT.logMarks, why: propsT.whyOpen }));
   chk(propsT.viewOn && propsT.colsOff && propsT.pressed === 'true', 'props: loading a props file through Load slate opens the Props tab in place of the matchup columns', JSON.stringify({ on: propsT.viewOn, cols: propsT.colsOff, pressed: propsT.pressed }));
   chk(propsT.best.length === 1 && /#1 · BET/.test(propsT.best[0]) && /Trae Young OVER 24\.5 points/.test(propsT.best[0]) && /56\.0% · [-−]110 needs 52\.4% · edge \+3\.7/.test(propsT.best[0]) && /projected 27\.2 \(±9\.4\)/.test(propsT.best[0]),
       'props: the best list carries the one prop that clears its price, with its band, chance, price, need, edge and projection', JSON.stringify(propsT.best));
   chk(propsT.rowsOn === 2 && propsT.rowsAll === 3 && /3 props on .*21/.test(propsT.count) && /3.* new/.test(propsT.msg),
       'props: the table lists the projected props, every prop with the box ticked, and the count names the date', JSON.stringify({ on: propsT.rowsOn, all: propsT.rowsAll, count: propsT.count, msg: propsT.msg }));
-  chk(propsT.whyOpen.length === 1 && /27\.9 points per 36/.test(propsT.whyOpen[0]) && /last games: 10-15 @ MIA 34m 26/.test(propsT.whyOpen[0]) && /books: fanatics 24\.5 \([-−]110\/[-−]110\) · draftkings 25\.5/.test(propsT.whyOpen[0]),
-      'props: a click opens the why with the reasons, the last games and every book\'s line', JSON.stringify(propsT.whyOpen));
+  chk(propsT.whyOpen.length === 1 && /27\.9 points per 36/.test(propsT.whyOpen[0]) && /10-15 @ MIA 34 26/.test(propsT.whyOpen[0]) && /fanatics carded 24\.5 [-−]110 [-−]110 draftkings 25\.5 [-−]115 [-−]105/.test(propsT.whyOpen[0]),
+      'props: a click on a table row opens the prop\'s panel with the reasons, the last games and every book\'s line', JSON.stringify(propsT.whyOpen));
   chk(!propsT.tileBefore, 'props: no record tile before anything is graded', '');
   chk(propsT.after[0][2] === 'win' && propsT.after[0][3] === 28 && propsT.after[2][2] === 'loss' && propsT.after[2][3] === 9 && propsT.after[1][2] === 'void',
       'props: the grade file\'s box grades each prop by its side (28 over 24.5 wins; 9 rebounds beat the under 7.5), and a player with no box line is void', JSON.stringify(propsT.after));
@@ -942,7 +943,12 @@ const CHECKS = ["dome","playoff","agconf","hgconf","agbk","hgbk"];
     const rows = document.querySelectorAll('#propsTable tr[data-prop]').length;
     document.getElementById('propsAll').checked = true; document.getElementById('propsAll').dispatchEvent(new Event('change', { bubbles: true })); await wait();
     const rowsAll = document.querySelectorAll('#propsTable tr[data-prop]').length;
-    const whys = [...document.querySelectorAll('#propsTable tr.why')].map(t => t.innerText.replace(/\s+/g, ' ').trim());
+    const whys = [];
+    for (const tr of [...document.querySelectorAll('#propsTable tr[data-prop]')]) {
+      tr.click(); await wait();
+      whys.push(document.getElementById('propDetailBody').innerText.replace(/\s+/g, ' ').trim());
+      document.getElementById('propDetailClose').click(); await wait();
+    }
     const saved = localStorage.getItem('callsheet3.props.v1');
     const tileAfter = !!document.querySelector('#calibBox .calib[data-sport="PROPS"]');
     document.getElementById('m-nba').click(); await wait();
@@ -971,7 +977,7 @@ const CHECKS = ["dome","playoff","agconf","hgconf","agbk","hgbk"];
     const open = !dlg.hidden, text = document.getElementById('propDetailBody').innerText.replace(/\s+/g, ' ').trim();
     const tiles = [...dlg.querySelectorAll('.pd-tile .k')].map(e => e.textContent);
     const marks = dlg.querySelectorAll('.pd-log b.lg').length, books = dlg.querySelectorAll('.pd-books tbody tr').length, carded = (dlg.querySelector('.pd-books tr.carded td') || {}).textContent || '';
-    const whyRowOpen = !!document.querySelector('#propsTable tr.why[data-why="' + id + '"]:not([hidden])'), noscroll = document.body.classList.contains('noscroll');
+    const fromCardPos = document.getElementById('propDetailPos').textContent, noscroll = document.body.classList.contains('noscroll');
     const levers = [...dlg.querySelectorAll('.pd-levers .lever')].map(e => e.className + '|' + e.querySelector('.lt').textContent.trim() + '|' + e.querySelector('.lv').textContent);
     const base = (dlg.querySelector('.pd-base') || {}).textContent || '', boldWhy = [...dlg.querySelectorAll('ul.pd-why li.lever-line')].map(e => e.textContent.slice(0, 40));
     const cardLever = (card.querySelector('.n5') || {}).textContent || '';
@@ -981,15 +987,37 @@ const CHECKS = ["dome","playoff","agconf","hgconf","agbk","hgbk"];
     const closedBtn = dlg.hidden;
     card.click(); await wait(); document.getElementById('m-nba').click(); await wait();
     const closedSport = dlg.hidden;
-    return { hidden0, open, text: text.slice(0, 1500), tiles, marks, books, carded, whyRowOpen, noscroll, closedEsc, closedBtn, closedSport, levers, base, boldWhy, cardLever };
+    // a row of the Every-prop table opens the same panel, and Previous / Next and the arrow keys walk the table's order
+    document.getElementById('m-props').click(); await wait();
+    document.getElementById('propsExample').click(); await wait();   // the sport button put the example away
+    const trs =[...document.querySelectorAll('#propsTable tr[data-prop]')], rowNames = trs.slice(0, 3).map(t => t.querySelectorAll('td')[1].textContent.trim());
+    const h3 = () => ((document.querySelector('#propDetailBody h3') || {}).textContent || '').trim();
+    trs[0].click(); await wait();
+    const rowOpen = !dlg.hidden, name0 = h3(), pos0 = document.getElementById('propDetailPos').textContent, prevOff0 = document.getElementById('propDetailPrev').disabled, navShown = !document.getElementById('propDetailNav').hidden;
+    document.getElementById('propDetailNext').click(); await wait();
+    const name1 = h3(), pos1 = document.getElementById('propDetailPos').textContent, prevOff1 = document.getElementById('propDetailPrev').disabled;
+    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowRight', bubbles: true })); await wait();
+    const name2 = h3();
+    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowLeft', bubbles: true })); await wait();
+    const name1b = h3();
+    trs[trs.length - 1].click(); await wait();
+    const nextOffLast = document.getElementById('propDetailNext').disabled, posLast = document.getElementById('propDetailPos').textContent;
+    document.getElementById('propDetailClose').click(); await wait(); document.getElementById('m-nba').click(); await wait();
+    return { hidden0, open, text: text.slice(0, 1500), tiles, marks, books, carded, fromCardPos, noscroll, closedEsc, closedBtn, closedSport, levers, base, boldWhy, cardLever,
+             n: trs.length, rowNames, rowOpen, name0, pos0, prevOff0, navShown, name1, pos1, prevOff1, name2, name1b, nextOffLast, posLast };
   });
+  chk(propsDlg.rowOpen && propsDlg.navShown && propsDlg.name0.indexOf(propsDlg.rowNames[0]) === 0 && propsDlg.pos0 === '1 of ' + propsDlg.n && propsDlg.prevOff0
+      && propsDlg.name1.indexOf(propsDlg.rowNames[1]) === 0 && propsDlg.pos1 === '2 of ' + propsDlg.n && !propsDlg.prevOff1 && propsDlg.name2.indexOf(propsDlg.rowNames[2]) === 0 && propsDlg.name1b === propsDlg.name1
+      && propsDlg.nextOffLast && propsDlg.posLast === propsDlg.n + ' of ' + propsDlg.n && /^\d+ of \d+$/.test(propsDlg.fromCardPos),
+      'props detail: a row of the Every-prop table opens the same panel, Next and the arrow keys walk the table\'s order with the position shown, Previous is off on the first and Next on the last, and a card opened from the best list knows its place too',
+      JSON.stringify({ n: propsDlg.n, rows: propsDlg.rowNames, name0: propsDlg.name0, pos0: propsDlg.pos0, name1: propsDlg.name1, pos1: propsDlg.pos1, name2: propsDlg.name2, back: propsDlg.name1b, last: propsDlg.posLast, card: propsDlg.fromCardPos }));
   chk(propsDlg.levers.length === 5 && /^lever helps top\|Regulars out biggest lever\|\+1\.[5-9]$/.test(propsDlg.levers[0]) && propsDlg.levers.some(l => /^lever hurts\|Defence v position\|[-−]0\./.test(l)) && propsDlg.levers.some(l => /^lever hurts\|Pace\|[-−]0\./.test(l))
       && /^Starts from 28\.\d+, his 28\.\d+ per 36 at his minutes; the regulars out, pace and the defence take it to 29\.34, \+3\.8 against the line\./.test(propsDlg.base)
       && propsDlg.boldWhy.length === 2 && propsDlg.boldWhy.some(w => /^Joel Embiid out/.test(w)) && /^Moves it: Regulars out \+1\.[5-9] · /.test(propsDlg.cardLever),
       'props detail: what moves it ranks each factor\'s push on the projection with a bar, the regulars out the biggest lever on Maxey with Embiid out, the defence and the pace against; the two biggest bold their why lines and the card names them', JSON.stringify({ levers: propsDlg.levers, base: propsDlg.base, bold: propsDlg.boldWhy, card: propsDlg.cardLever }));
   chk(propsDlg.hidden0 && propsDlg.open && propsDlg.noscroll && /^LEAN Tyrese Maxey G PHI OVER 25\.5 points 76ers @ Knicks/.test(propsDlg.text) && /on the road at NYK/.test(propsDlg.text) && /Why /i.test(propsDlg.text)
-      && propsDlg.tiles.join(',') === 'Chance,Price,Edge,Projection,Minutes,Per 36' && propsDlg.marks === 10 && propsDlg.books === 3 && /fanatics/.test(propsDlg.carded) && !propsDlg.whyRowOpen,
-      'props detail: a best-prop card opens the prop on its own panel with the tiles, the why, the marked last games and every book, and leaves the table row folded', JSON.stringify(propsDlg));
+      && propsDlg.tiles.join(',') === 'Chance,Price,Edge,Projection,Minutes,Per 36' && propsDlg.marks === 10 && propsDlg.books === 3 && /fanatics/.test(propsDlg.carded),
+      'props detail: a best-prop card opens the prop on its own panel with the tiles, the why, the marked last games and every book', JSON.stringify(propsDlg).slice(0, 1500));
   chk(propsDlg.closedEsc && propsDlg.closedBtn && propsDlg.closedSport, 'props detail: Escape, the Close button and a sport button each put the panel away', JSON.stringify({ esc: propsDlg.closedEsc, btn: propsDlg.closedBtn, sport: propsDlg.closedSport }));
 
   // ---- 19 Oct 2026: the alternate total with a verdict -- a market of its own on the rail, the board and the record;

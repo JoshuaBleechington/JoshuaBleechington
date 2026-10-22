@@ -934,7 +934,12 @@ the result chip when graded, the game and the book's line; six tiles
 projection with one sigma, minutes, per 36); the why as a list; the last
 games as a table with the marks and the tally; every book's line with the
 carded one flagged. Escape, Close, a click outside or a sport button puts it
-away; a table row still folds its why open in place.
+away. On the 22nd (the user: "the same for the entries on the list so they
+are easy to review as well") a row of the Every-prop table opens the same
+panel, the inline why row under the table is gone, and **Previous / Next**
+(or the arrow keys) walk the table's order from whichever prop is open, the
+position shown as "3 of 42"; a panel opened from a best-prop card knows its
+place in the table too.
 
 **What moves it.** The slate's `props_project` now writes `base` (his own
 rate at his own minutes) and `parts` beside the why: each factor's push on

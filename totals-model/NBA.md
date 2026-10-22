@@ -153,6 +153,22 @@ ledger's dates, and writes two JSON boxes the matchup's cards render:
   tomorrow rule and the same date check apply, except that tomorrow's NBA
   page carries today's date in its subtitle before the lineups post, so
   only today's page is checked against its date.
+- **Recent form** (22 Oct 2026, the user: "add in the last 5 games for the
+  teams like you do for NHL, with the scores like first half, total and
+  spread covered or no, and with a little color"): the slate writes each
+  side's last five finals from the ledger into the row's `nbaform` box with
+  the half-time score (the first two quarters) and the close the odds run
+  last saw for the game from `odds-log.json`: the total, the first-half
+  total, and the home spread, which the odds log keeps from the 22nd (the
+  side lines `sp`, `pl` and `rl` ride in the log's snapshots now). The
+  Recent form card, under Who is out, lists each game with a W or L chip
+  and the score, the half with its over or under against the half's close,
+  the total with its over or under against the close, and the spread from
+  the side's view with covered or not, and sums the five above the table. A
+  past game the odds run never saw borrows the close from the sheet's own
+  card row when the game is on it, else shows its score alone. Shown, not
+  scored: the within-season over/under run measured null (slope −0.05 on
+  2,137 games).
 - **The crew** (15 Oct 2026, the user: "I think that will be helpful at some
   point"): the slate reads the league's assignments feed by date (the user
   opened the domain and sent the day's file the same evening; the parser is

@@ -3256,7 +3256,7 @@ def ctx_line_nba(kind, side, text):
     return {"side": side, "k": kind, "s": s, "t": text, "tag": tag}
 
 
-NBA_INPUT_IDS = ("naort", "nhort", "nadrt", "nhdrt", "napace", "nhpace", "nagp", "nhgp", "nlrtg", "nlpace", "narest", "nhrest", "nbaout", "nbactx", "opened", "ncrew", "nbarefs", "nbalineup")
+NBA_INPUT_IDS = ("naort", "nhort", "nadrt", "nhdrt", "napace", "nhpace", "nagp", "nhgp", "nlrtg", "nlpace", "narest", "nhrest", "nbaout", "nbactx", "opened", "ncrew", "nbarefs", "nbalineup", "nbaform")
 
 # ---- the crew: the day's assignments and each referee's line from the ledger ----
 # The league posts the crews about 9 am Eastern on official.nba.com; the page
@@ -3385,6 +3385,38 @@ def nba_season_ref_ou(this_season, odds_log):
     return out
 
 
+def _log_num(v):
+    try:
+        return float(v)
+    except (TypeError, ValueError):
+        return None
+
+
+def nba_recent_form(games, ab, date_iso, logd, n=5):
+    """The club's last n finals before the date, oldest first, from the ledger:
+    the score, the half-time score (the first two quarters), and the close the
+    odds run last saw for the game in odds-log.json (the total, the first-half
+    total and the home spread), so the sheet can show the result against each.
+    Shown, not scored (22 Oct 2026, the user: "the last 5 games for the teams
+    like you do for NHL, with the first half, total and spread covered or no")."""
+    mine = [g for g in (games or []) if g.get("fa") is not None and g.get("fh") is not None and (g.get("date") or "") < date_iso and ab in (g.get("away"), g.get("home"))]
+    mine.sort(key=lambda g: (g.get("date") or "", str(g.get("id"))))
+    out = []
+    for g in mine[-n:]:
+        home = g.get("home") == ab
+        them = g.get("away") if home else g.get("home")
+        qa, qh = g.get("qa") or [], g.get("qh") or []
+        h1a = sum(qa[:2]) if len(qa) >= 2 else None
+        h1h = sum(qh[:2]) if len(qh) >= 2 else None
+        an, hn = g.get("an") or NBA_NICK.get(g.get("away"), g.get("away")), g.get("hn") or NBA_NICK.get(g.get("home"), g.get("home"))
+        last = ((logd or {}).get(odds_log_key("NBA", g.get("date") or "", an, hn)) or {}).get("last") or {}
+        out.append({"date": g.get("date"), "opp": NBA_NICK.get(them, them), "home": home,
+                    "pf": g["fh"] if home else g["fa"], "pa": g["fa"] if home else g["fh"],
+                    "h1f": h1h if home else h1a, "h1a": h1a if home else h1h, "end": g.get("end") or "REG",
+                    "ctot": _log_num(last.get("line")), "ch1": _log_num(last.get("h1line")), "csp": _log_num(last.get("sp"))})
+    return out
+
+
 def nba_referee_tables(ledger_games, this_season=None, odds_log=None):
     """Each official's games, free throws and points a game over the ledgers, the
     league's over the same games, and his record against the close: the past two
@@ -3443,7 +3475,7 @@ def nba_odds_note(o, away, home):
     return "%s on ESPN's scoreboard at the slate run: %s. Shown for the opener and as a check on the carded book; the lines come from the odds run." % (o.get("book") or "The book", "; ".join(bits))
 
 
-def build_nba_game(g, date_iso, tables, league, players, prior_players, injuries, log, have_ledger=True, officials=None, refs=None, lineups=None):
+def build_nba_game(g, date_iso, tables, league, players, prior_players, injuries, log, have_ledger=True, officials=None, refs=None, lineups=None, form=None):
     away, home = g.get("an") or NBA_NICK.get(g["away"], g["away"]), g.get("hn") or NBA_NICK.get(g["home"], g["home"])
     inputs = {k: "" for k in NBA_INPUT_IDS}
     notes = []
@@ -3496,6 +3528,18 @@ def build_nba_game(g, date_iso, tables, league, players, prior_players, injuries
         inputs["nbalineup"] = json.dumps(lu, separators=(",", ":"))
     elif (lineups or {}).get("why"):
         notes.append("No starting fives on the row: %s. The card's Starting five block stays empty; run the slate again later." % lineups["why"])
+    # recent form (22 Oct 2026): each side's last five from the ledger with the close the odds run saw; shown, not scored
+    if form and (form.get("away") or form.get("home")):
+        inputs["nbaform"] = json.dumps(form, separators=(",", ":"))
+        for side in ("away", "home"):
+            fs = form.get(side) or []
+            if not fs:
+                continue
+            w = sum(1 for x in fs if x["pf"] > x["pa"])
+            ov = sum(1 for x in fs if x["ctot"] is not None and x["pf"] + x["pa"] > x["ctot"])
+            un = sum(1 for x in fs if x["ctot"] is not None and x["pf"] + x["pa"] < x["ctot"])
+            log("  %s last %d: %d-%d%s, %.1f for and %.1f against" % (side, len(fs), w, len(fs) - w, (", over %d-%d against the close" % (ov, un)) if ov + un else "",
+                                                                   sum(x["pf"] for x in fs) / float(len(fs)), sum(x["pa"] for x in fs) / float(len(fs))))
     for s in sides:
         if s["ab"] in NBA_WATCHED:
             notes.append("%s: a club the close has run under both seasons, home and away. Watched on the sheet, not scored." % s["nick"])
@@ -3586,10 +3630,16 @@ def make_nba_slate(date_iso, out_dir, log):
     except Exception as e:  # noqa: BLE001
         log("Could not read the league's referee assignments (%s): type the crews in the Crew box from official.nba.com/referee-assignments." % e)
     lineups = nba_lineups(date_iso, log) if games else {}
+    try:
+        with open(odds_log_path(out_dir), encoding="utf-8") as f:
+            logd = json.load(f)
+    except (OSError, ValueError):
+        logd = {}
     rows = []
     for g in games:
         try:
-            rows.append(build_nba_game(g, date_iso, tables, league, players, prior_players, injuries, log, have_ledger=bool(led and led.get("games")), officials=officials, refs=refs, lineups=lineups))
+            form = {"away": nba_recent_form(led["games"], g["away"], date_iso, logd), "home": nba_recent_form(led["games"], g["home"], date_iso, logd)} if led else None
+            rows.append(build_nba_game(g, date_iso, tables, league, players, prior_players, injuries, log, have_ledger=bool(led and led.get("games")), officials=officials, refs=refs, lineups=lineups, form=form))
         except Exception as e:  # noqa: BLE001
             log("%s @ %s: FAILED (%s); left out of the slate" % (g.get("an"), g.get("hn"), e))
         log("")
@@ -4745,7 +4795,8 @@ def odds_log_update(path, g, now):
     except (OSError, ValueError):
         log = {}
     k = odds_log_key(g["sport"], g["gdate"], g["away"], g["home"])
-    snap = {k2: g["inputs"].get(k2) for k2 in ("line", "op", "up", "hml", "aml", "p1line", "f5line", "h1line") if g["inputs"].get(k2)}
+    # the side lines ride in the log from 22 Oct 2026 (sp, pl, rl with their prices), so the basketball form card can read the spread against the close
+    snap = {k2: g["inputs"].get(k2) for k2 in ("line", "op", "up", "hml", "aml", "p1line", "f5line", "h1line", "sp", "sph", "spa", "pl", "plh", "pla", "rl", "rlh", "rla") if g["inputs"].get(k2)}
     snap["at"], snap["book"] = now, g["book"]
     if g["inputs"].get("sharp"):
         try:
@@ -5669,8 +5720,10 @@ def selftest():
             json.dump({"format": NBA_LEDGER_FORMAT, "season": season, "through": games[-1]["date"], "games": games}, f)
     with open(odds_log_path(tmp7), "w", encoding="utf-8") as f:
         json.dump({odds_log_key("NBA", "2026-10-22", "Celtics", "Knicks"): {"first": {"line": "223.0"}, "last": {"line": "221.5", "op": "-110", "up": "-110", "h1line": "110.5", "at": "2026-10-21T23:00:00Z", "book": "fanatics"}},
-                   # closes for two of the synthetic finals: Celtics @ Knicks 115-114 (over 225.5, Zarba's crew), Lakers @ Warriors 113-112 (under 230, Foster's crew)
-                   odds_log_key("NBA", "2026-10-13", "Celtics", "Knicks"): {"last": {"line": "225.5"}}, odds_log_key("NBA", "2026-10-13", "Lakers", "Warriors"): {"last": {"line": "230"}}}, f)
+                   # closes for two of the synthetic finals: Celtics @ Knicks 115-114 (over 225.5, Zarba's crew), Lakers @ Warriors 113-112 (under 230, Foster's crew),
+                   # and one with the half and the spread for the form card: Celtics @ Knicks on the 17th, 229 under 230, the Knicks -2.5
+                   odds_log_key("NBA", "2026-10-13", "Celtics", "Knicks"): {"last": {"line": "225.5"}}, odds_log_key("NBA", "2026-10-13", "Lakers", "Warriors"): {"last": {"line": "230"}},
+                   odds_log_key("NBA", "2026-10-17", "Celtics", "Knicks"): {"last": {"line": "230", "h1line": "115", "sp": "-2.5"}}}, f)
     fetch_json = fake_nba_slate
     # RotoWire's NBA page sits in fetch_text's cache for the run, so the slate reads the canned
     # lineups on the two days it would fetch (the 20th and 21st) and nothing goes out on any day
@@ -5746,7 +5799,7 @@ def selftest():
     check("nba slate: the referee table from the ledgers rides in the row (each official's games, free throws and points a game, the league's beside), and the crew fills from the league's feed by tricode or game code",
           refs7 is not None and refs7["lg"][0] == 40 and refs7["lg"][1] == 40.0 and set(refs7["r"]) == {"Scott Foster", "Tony Brothers", "Marc Davis", "Zach Zarba", "Eric Dalen", "Jason Goldenberg"}
           and refs7["r"]["Scott Foster"][0] == len(foster_games) and refs7["r"]["Scott Foster"][2] == round(sum(g["fa"] + g["fh"] for g in foster_games) / float(len(foster_games)), 1)
-          and refs7["r"]["Scott Foster"][3:] == [66, 41, 0, 1] and refs7["r"]["Zach Zarba"][3:] == [58, 60, 1, 0] and refs7["r"]["Tony Brothers"][5:] == [0, 1]
+          and refs7["r"]["Scott Foster"][3:] == [66, 41, 0, 1] and refs7["r"]["Zach Zarba"][3:] == [58, 60, 1, 1] and refs7["r"]["Tony Brothers"][5:] == [0, 1]
           and any("Scott Foster 40.0 FTA / " in l and "over the close 66-41 the last two seasons, 0-1 this season" in l for l in lines7)
           and nba_season_ref_ou(led_now, "/nonexistent/odds-log.json") == {} and NBA_REF_OU["Scott Foster"] == [109, 66, 41, 2]
           and bn["inputs"]["ncrew"] == "Scott Foster, Tony Brothers, Marc Davis" and pl["inputs"]["ncrew"] == "Zach Zarba, Eric Dalen, Jason Goldenberg" and dj["inputs"]["ncrew"] == ""
@@ -5781,6 +5834,20 @@ def selftest():
           json.loads(one_side["inputs"]["nbalineup"])["home"] is None and json.loads(one_side["inputs"]["nbalineup"])["away"]["status"] == "expected"
           and any(n == "No starting five on RotoWire for the Knicks yet." for n in one_side["notes"])
           and (bn["inputs"].get("nbalineup", "") != "") == ((dt.date(2026, 10, 21) - dt.date.today()).days in (0, 1)))
+    # recent form (22 Oct 2026): the last five from the ledger with the close the odds run saw
+    with open(odds_log_path(tmp7), encoding="utf-8") as f:
+        logd7 = json.load(f)
+    f5 = nba_recent_form(led_now, "BOS", "2026-10-21", logd7)
+    check("nba form: the club's last five before the date, oldest first, with the half from the quarters and the close the odds run saw where it saw one",
+          [x["date"] for x in f5] == ["2026-10-14", "2026-10-15", "2026-10-16", "2026-10-17", "2026-10-20"]
+          and f5[-1] == {"date": "2026-10-20", "opp": "Knicks", "home": False, "pf": 115, "pa": 114, "h1f": 56, "h1a": 56, "end": "REG", "ctot": None, "ch1": None, "csp": None}
+          and f5[0]["home"] is True and f5[0]["opp"] == "Spurs" and f5[0]["pf"] == 115 and f5[0]["pa"] == 100
+          and f5[3] == {"date": "2026-10-17", "opp": "Knicks", "home": False, "pf": 115, "pa": 114, "h1f": 56, "h1a": 56, "end": "REG", "ctot": 230.0, "ch1": 115.0, "csp": -2.5}
+          and [x["pf"] for x in nba_recent_form(led_now, "POR", "2026-10-21", logd7)] == [98, 97] and nba_recent_form(led_now, "XXX", "2026-10-21", logd7) == [] and nba_recent_form(led_now, "BOS", "2026-10-13", logd7) == [])
+    form7 = json.loads(bn["inputs"]["nbaform"]) if bn["inputs"].get("nbaform") else {}
+    check("nba slate: the form rides in the row for both sides and the printout sums it; a row without a ledger has none",
+          len(form7.get("away") or []) == 5 and len(form7.get("home") or []) == 5 and form7["home"][-1]["opp"] == "Celtics" and form7["home"][-1]["pf"] == 114
+          and any(l == "  away last 5: 5-0, over 0-1 against the close, 115.0 for and 108.4 against" for l in lines7) and bare["inputs"]["nbaform"] == "")
     today10 = dt.date.today()
     todays_line = "%s %d, %d" % (today10.strftime("%B"), today10.day, today10.year)
     _cache[ROTOWIRE_NBA] = _canned_rotowire_nba(todays_line)

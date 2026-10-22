@@ -27,7 +27,7 @@ const IDS = ["away","home","line","op","up","opened","gdate","aera","hera","aip"
              "ntick","ncash","ap1l10","hp1l10","axgf","axga","hxgf","hxga","xglg","nhlform",
              "ngoalies","agname","hgname","agstart","hgstart","agok","hgok",
              "agf","aga","hgf","hga","lgg","angp","hngp","aenc","aens","henc","hens",
-             "h1line","h1op","h1up","naort","nhort","nadrt","nhdrt","napace","nhpace","nagp","nhgp","nlrtg","nlpace","narest","nhrest","nbaout","nbaq","nbactx","ncrew","nbarefs","nbalineup"];
+             "h1line","h1op","h1up","naort","nhort","nadrt","nhdrt","napace","nhpace","nagp","nhgp","nlrtg","nlpace","narest","nhrest","nbaout","nbaq","nbactx","ncrew","nbarefs","nbalineup","nbaform"];
 const CHECKS = ["dome","playoff","agconf","hgconf","agbk","hgbk"];
 
 (async () => {
@@ -203,6 +203,15 @@ const CHECKS = ["dome","playoff","agconf","hgconf","agbk","hgbk"];
     set('nbalineup', JSON.stringify({ away: { status: 'expected', five: [['PG', 'Immanuel Quickley'], ['SG', 'RJ Barrett'], ['SF', 'Brandon Ingram'], ['PF', 'Jonathan Mogbo'], ['C', 'Jakob Poeltl']], maybe: [['F', 'Scottie Barnes', 'Out']] }, home: null, src: 'RotoWire' }));
     await wait();
     const lineup1 = document.getElementById('nbaLineupPanel').innerText, lineupBadges = [...document.querySelectorAll('#nbaLineupPanel .lbadge')].map(b => b.className + '|' + b.textContent);
+    // recent form: the away side's three games with a close, one without; the home side empty
+    const form0 = document.getElementById('nbaFormPanel').innerText;
+    set('nbaform', JSON.stringify({ away: [
+      { date: '2027-03-30', opp: 'Knicks', home: false, pf: 104, pa: 112, h1f: 51, h1a: 58, end: 'REG', ctot: 221.5, ch1: 110.5, csp: -6.5 },
+      { date: '2027-04-01', opp: 'Hornets', home: true, pf: 118, pa: 109, h1f: 60, h1a: 52, end: 'OT', ctot: 224.0, ch1: 111.5, csp: -7.5 },
+      { date: '2027-04-03', opp: 'Heat', home: false, pf: 99, pa: 101, h1f: 48, h1a: 50, end: 'REG', ctot: null, ch1: null, csp: null }], home: [] }));
+    await wait();
+    const form1 = document.getElementById('nbaFormPanel').innerText.replace(/\s+/g, ' ').trim();
+    const formChips = [...document.querySelectorAll('#nbaFormPanel tbody tr')].map(tr => [...tr.querySelectorAll('.chip')].map(c => c.className.replace('chip ', '') + ':' + c.textContent).join(','));
     const ctxLines =[...document.querySelectorAll('#nbaCtxPanel ul.ctx li')].map(li => li.className + '|' + li.querySelector('.cbadge').textContent + '|' + li.querySelector('.ctext').textContent);
     const visible = { nba: !document.getElementById('nbaFields').hidden, h1: !document.getElementById('h1Fields').hidden, sp: !document.getElementById('spFields').hidden, nhl: !document.getElementById('nhlFields').hidden, pressed: document.getElementById('m-nba').getAttribute('aria-pressed'), label: document.getElementById('lineLabel').textContent };
     const rail = [...document.querySelectorAll('#markets .mk')].map(el => ({ key: el.dataset.key, pick: el.querySelector('.pick').childNodes[0].textContent.trim(), p: parseFloat(el.querySelector('.p').textContent), chips: [...el.querySelectorAll('.cap')].map(c => c.textContent) }));
@@ -231,8 +240,14 @@ const CHECKS = ["dome","playoff","agconf","hgconf","agbk","hgbk"];
     const reopened = document.getElementById('nbaOutPanel').innerText, lineupReopened = document.getElementById('nbaLineupPanel').innerText;
     document.getElementById('clear').click(); await wait();
     return { visible, rail, pick, why, panel0, panel1, q, why1, forecast, card: card.map(r => r.sport + ':' + r.matchup), keys: card[0].markets.map(m => m.key), boardRows, bets, label, graded, calib, nbaBlock, final, reopened, proj: card[0].proj, ctxLines, ctxStored: (card[0].inputs.nbactx || '').length > 10,
-             lineup0, lineup1, lineupBadges, lineupStored: card[0].inputs.nbalineup || '', lineupReopened };
+             lineup0, lineup1, lineupBadges, lineupStored: card[0].inputs.nbalineup || '', lineupReopened, form0, form1, formChips, formStored: (card[0].inputs.nbaform || '').indexOf('Hornets') > 0 };
   });
+  chk(/^No recent games on the row/.test(nba.form0) && /^Raptors last 3: 1-2, over 1-1, covered 1-1, 107\.0 for and 107\.3 against, the half 53\.0–53\.3 \(over 1-1\)\./.test(nba.form1)
+      && /Celtics: no finals in the ledger yet\./.test(nba.form1) && /03-30 @ Knicks L 104–112 51–58 U 110\.5 UNDER 216 v 221\.5 \+6\.5 NO/.test(nba.form1)
+      && /04-01 v Hornets W 118–109 \(OT\) 60–52 O 111\.5 OVER 227 v 224 -7\.5 COVERED/.test(nba.form1) && /04-03 @ Heat L 99–101 48–50 200 no close —/.test(nba.form1)
+      && nba.formChips.join('|') === 'loss:L,under:U 110.5,under:UNDER,loss:NO|win:W,over:O 111.5,over:OVER,win:COVERED|loss:L' && nba.formStored,
+      'nba: the recent form card lists each side\'s last five with the half, the total and the spread against the close in colour, a game without a close shows its score alone, and the JSON rides in the row',
+      JSON.stringify({ form1: nba.form1.slice(0, 400), chips: nba.formChips }));
   chk(/^No lineup on the row/.test(nba.lineup0) && /Raptors\s+expected/i.test(nba.lineup1) && /PG\s+Immanuel Quickley/.test(nba.lineup1) && /C\s+Jakob Poeltl/.test(nba.lineup1) && /May not play: F Scottie Barnes \(Out\)\./.test(nba.lineup1)
       && /Celtics\s+no lineup/i.test(nba.lineup1) && /RotoWire has not posted this side yet/.test(nba.lineup1) && /Source: RotoWire/.test(nba.lineup1)
       && nba.lineupBadges.join(',') === 'lbadge exp|expected,lbadge none|no lineup' && nba.lineupStored.indexOf('Immanuel Quickley') > 0 && /PG\s+Immanuel Quickley/.test(nba.lineupReopened),

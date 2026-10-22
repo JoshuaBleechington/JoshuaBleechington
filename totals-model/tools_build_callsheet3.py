@@ -96,6 +96,9 @@ def head() -> str:
              "  #nbaLineupPanel .lbadge.conf { color: var(--go); background: var(--go-wash); } #nbaLineupPanel .lbadge.exp { color: var(--edge); background: var(--edge-wash); }\n"
              "  #nbaLineupPanel .lbadge.none { color: var(--muted); background: var(--surface-2); }\n"
              "  @media (max-width: 640px) { #nbaLineupPanel .fives { grid-template-columns: 1fr; } }\n"
+             "  /* recent form, basketball (22 Oct 2026): the chips carry the colour */\n"
+             "  #nbaFormPanel table.form td { vertical-align: middle; } #nbaFormPanel .chip { padding: 2px 6px; margin-right: 2px; }\n"
+             "  #nbaFormPanel .chip.push { background: var(--surface-2); color: var(--ink-2); }\n"
              "  /* the Props tab (19 Oct 2026) */\n"
              "  table.props td.pos { color: var(--go); font-weight: 700; } table.props td.neg { color: var(--muted); }\n"
              "  table.props tr[data-prop] { cursor: pointer; } table.props tr.win td:first-child { border-left: 3px solid var(--go); }\n"
@@ -178,7 +181,7 @@ def tail() -> str:
              '                 "ngoalies","agname","hgname","agstart","hgstart","agok","hgok",\n'
              '                 "odds","sharp","agf","aga","hgf","hga","lgg","angp","hngp","aenc","aens","henc","hens"];\n'
              '  var NBA_IDS = ["away","home","line","op","up","opened","gdate","hml","aml","sp","sph","spa","h1line","h1op","h1up",\n'
-             '                 "naort","nhort","nadrt","nhdrt","napace","nhpace","nagp","nhgp","nlrtg","nlpace","narest","nhrest","nbaout","nbaq","nbactx","ncrew","nbarefs","nbalineup","odds","sharp"];\n'
+             '                 "naort","nhort","nadrt","nhdrt","napace","nhpace","nagp","nhgp","nlrtg","nlpace","narest","nhrest","nbaout","nbaq","nbactx","ncrew","nbarefs","nbalineup","nbaform","odds","sharp"];\n'
              '  var ALL = MLB_IDS.concat(WNBA_IDS).concat(NHL_IDS).concat(NBA_IDS).filter(function (v, i, a) { return a.indexOf(v) === i; });\n'
              '  var CHECKS = ["dome","playoff","agconf","hgconf","agbk","hgbk"];\n'
              '  function sportOf(s) { return s === "WNBA" ? "WNBA" : s === "NHL" ? "NHL" : s === "NBA" ? "NBA" : "MLB"; }\n'
@@ -337,7 +340,7 @@ def tail() -> str:
              '                      "ngoalies","agname","hgname",\n'
              '                      "pl","plh","pla","p1line","p1op","p1up",\n'
              '                      "agf","aga","hgf","hga","lgg","angp","hngp","aenc","aens","henc","hens",\n'
-             '                      "sp","sph","spa","h1line","h1op","h1up","naort","nhort","nadrt","nhdrt","napace","nhpace","nagp","nhgp","nlrtg","nlpace","narest","nhrest","nbaout","nbactx","ncrew","nbarefs","nbalineup"];', "slate fields")
+             '                      "sp","sph","spa","h1line","h1op","h1up","naort","nhort","nadrt","nhdrt","napace","nhpace","nagp","nhgp","nlrtg","nlpace","narest","nhrest","nbaout","nbactx","ncrew","nbarefs","nbalineup","nbaform"];', "slate fields")
     # the slate's backup-in-net flags are booleans, carried like the roof: into a
     # row's inputs when the card already has the game, into the form otherwise.
     # The Confirmed boxes travel the same way (19 Oct 2026): the slate ticks one
@@ -418,6 +421,21 @@ NBA_EXAMPLE_LINEUP = {
 NBA_EXAMPLE_REFS ={"lg": [2462, 44.0, 228.8], "r": {"Scott Foster": [118, 46.2, 229.1, 66, 41, 4, 2], "Tony Brothers": [95, 43.1, 226.0, 56, 54, 3, 3], "Marc Davis": [102, 44.8, 230.3, 71, 51, 0, 0], "Zach Zarba": [110, 42.9, 227.4, 58, 60, 2, 5]}}
 
 
+# each side's last five as the slate writes them (22 Oct 2026): the score, the half, and the close the odds run saw
+# (the total, the first-half total, the home spread); one game without a close
+NBA_EXAMPLE_FORM = {
+    "away": [{"date": "2026-10-30", "opp": "Celtics", "home": False, "pf": 104, "pa": 112, "h1f": 51, "h1a": 58, "end": "REG", "ctot": 221.5, "ch1": 110.5, "csp": -6.5},
+             {"date": "2026-11-01", "opp": "Hornets", "home": True, "pf": 118, "pa": 109, "h1f": 60, "h1a": 52, "end": "REG", "ctot": 224.0, "ch1": 112.0, "csp": -7.5},
+             {"date": "2026-11-03", "opp": "Bulls", "home": True, "pf": 112, "pa": 115, "h1f": 55, "h1a": 57, "end": "OT", "ctot": 226.5, "ch1": 113.0, "csp": -4.0},
+             {"date": "2026-11-05", "opp": "Heat", "home": False, "pf": 99, "pa": 101, "h1f": 48, "h1a": 50, "end": "REG", "ctot": None, "ch1": None, "csp": None},
+             {"date": "2026-11-08", "opp": "Magic", "home": True, "pf": 121, "pa": 108, "h1f": 63, "h1a": 49, "end": "REG", "ctot": 219.5, "ch1": 109.5, "csp": -3.5}],
+    "home": [{"date": "2026-10-31", "opp": "Nets", "home": True, "pf": 124, "pa": 106, "h1f": 64, "h1a": 50, "end": "REG", "ctot": 228.5, "ch1": 114.5, "csp": -9.5},
+             {"date": "2026-11-02", "opp": "Bucks", "home": False, "pf": 110, "pa": 117, "h1f": 52, "h1a": 61, "end": "REG", "ctot": 230.0, "ch1": 115.0, "csp": -2.5},
+             {"date": "2026-11-04", "opp": "Pacers", "home": True, "pf": 131, "pa": 120, "h1f": 68, "h1a": 59, "end": "REG", "ctot": 235.5, "ch1": 118.0, "csp": -5.5},
+             {"date": "2026-11-06", "opp": "Cavaliers", "home": False, "pf": 103, "pa": 98, "h1f": 49, "h1a": 47, "end": "REG", "ctot": 222.0, "ch1": 111.5, "csp": 3.0},
+             {"date": "2026-11-09", "opp": "Raptors", "home": True, "pf": 115, "pa": 100, "h1f": 57, "h1a": 46, "end": "REG", "ctot": 225.0, "ch1": 112.5, "csp": -8.0}]}
+
+
 def nba_example_js() -> str:
     return ('      restore({ away: "76ers", home: "Knicks", line: "231.5", op: "-110", up: "-110", opened: "229.5", gdate: $("gdate").value,\n'
             '        aml: "164", hml: "-198", sp: "-5.5", sph: "-108", spa: "-112", h1line: "115.5", h1op: "-110", h1up: "-110",\n'
@@ -425,6 +443,7 @@ def nba_example_js() -> str:
             '        nbaout: ' + json.dumps(json.dumps(NBA_EXAMPLE_OUT, separators=(",", ":"))) + ',\n'
             '        nbactx: ' + json.dumps(json.dumps(NBA_EXAMPLE_CTX, separators=(",", ":"))) + ',\n'
             '        nbalineup: ' + json.dumps(json.dumps(NBA_EXAMPLE_LINEUP, separators=(",", ":"))) + ',\n'
+            '        nbaform: ' + json.dumps(json.dumps(NBA_EXAMPLE_FORM, separators=(",", ":"))) + ',\n'
             '        ncrew: "Scott Foster, Tony Brothers, Marc Davis", nbarefs: ' + json.dumps(json.dumps(NBA_EXAMPLE_REFS, separators=(",", ":"))) + ' });\n')
 
 

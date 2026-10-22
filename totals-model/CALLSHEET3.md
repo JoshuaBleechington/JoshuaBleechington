@@ -1022,3 +1022,19 @@ over the close a game, and a flat bet on the lean's side at −110. Rows
 count once they carry a crew, finals and a close; the verdict names the
 graded games missing either. Shown, never scored: the decision stays the
 season's end, and the harness grades an over crew and a no-lean crew.
+
+## Recent form on the NBA card, 22 Oct 2026
+
+The user: "add in the last 5 games for the teams like you do for NHL, with
+the scores like first half, total and spread covered or no, and with a
+little color." A Recent form card under Who is out (`nbaFormPanel` in
+`nba.engine.js`, the hidden `nbaform` box the slate fills): each side's
+last five with a W or L chip and the score, the half with an over or under
+chip against the half's close, the total with its chip against the close,
+and the spread from the side's view with COVERED or NO, the five summed
+above the table. The closes come from the odds log by date and nicknames;
+the spread rides in the log from today (the odds run's snapshots now keep
+`sp`, `pl` and `rl` with their prices), and a past game without one borrows
+the close from the sheet's own card row when the game is on it
+(`nbaCardCloseFor`). A game with no close shows its score alone. The NBA
+example carries five a side. Shown, not scored.

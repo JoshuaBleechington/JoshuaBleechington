@@ -367,6 +367,9 @@
   #nbaLineupPanel .lbadge.conf { color: var(--go); background: var(--go-wash); } #nbaLineupPanel .lbadge.exp { color: var(--edge); background: var(--edge-wash); }
   #nbaLineupPanel .lbadge.none { color: var(--muted); background: var(--surface-2); }
   @media (max-width: 640px) { #nbaLineupPanel .fives { grid-template-columns: 1fr; } }
+  /* recent form, basketball (22 Oct 2026): the chips carry the colour */
+  #nbaFormPanel table.form td { vertical-align: middle; } #nbaFormPanel .chip { padding: 2px 6px; margin-right: 2px; }
+  #nbaFormPanel .chip.push { background: var(--surface-2); color: var(--ink-2); }
   /* the Props tab (19 Oct 2026) */
   table.props td.pos { color: var(--go); font-weight: 700; } table.props td.neg { color: var(--muted); }
   table.props tr[data-prop] { cursor: pointer; } table.props tr.win td:first-child { border-left: 3px solid var(--go); }
@@ -822,6 +825,20 @@
               <a href="https://www.rotowire.com/basketball/nba-lineups.php" target="_blank" rel="noopener">RotoWire · NBA lineups</a>
             </div>
             <input type="hidden" id="nbaout"><input type="hidden" id="nbaq"><input type="hidden" id="nbactx"><input type="hidden" id="nbalineup">
+          </div>
+        </section>
+
+        <section class="card">
+          <h2>Recent form <span class="tag">last five, each side — the score, the half, the total and the spread against the close · shown, not scored</span></h2>
+          <div class="body">
+            <div id="nbaFormPanel" class="note">No recent games on the row — load the slate and Fill form, and each side's last five come with it.</div>
+            <p class="note">Each side's last five finals from the ledger, with the half-time score, and against each one the close the
+              odds run last saw: the total (over or under), the first-half total, and the spread (covered or not, from this
+              side's view). A game the odds run never saw shows its score alone; a game on this card borrows the card's
+              close. <b>Shown, not scored</b>: five games of scores is noise dressed as a trend, and a club's own over/under
+              run measured null within a season against two seasons of closes (slope −0.05 on 2,137 games). It is here to
+              catch what the season line hides: a club suddenly scoring 130, a half that keeps coming in under.</p>
+            <input type="hidden" id="nbaform">
           </div>
         </section>
 
@@ -2981,7 +2998,7 @@
     }).join("") + '</ul>';
   }
   function forecastMatchupNba() {
-    if (!SRC) { nbaOutPanel(); nbaLineupPanel(); nbaCtxPanel(); }   // the form's panels: not while a card row is being re-scored
+    if (!SRC) { nbaOutPanel(); nbaLineupPanel(); nbaFormPanel(); nbaCtxPanel(); }   // the form's panels: not while a card row is being re-scored
     var f = readNba();
     var away = f.away, home = f.home, line = f.line;
     var op = num("op"), up = num("up"), hml = num("hml"), aml = num("aml");
@@ -3171,6 +3188,73 @@
     if (sport !== "NBA") return teamsForBaseNba(sport);
     return TEAM_PATTERNS.NBA.map(function (p) { return p[0]; }).sort();
   };
+  /* ---- recent form (22 Oct 2026, the user: "add in the last 5 games for the teams like you do for
+     NHL, with the scores like first half, total and spread covered or no, and with a little color"):
+     the slate writes each side's last five finals from the ledger into the hidden nbaform box with
+     the half-time score and the close the odds run last saw (the total, the first-half total, the
+     home spread). A game the odds run never saw borrows the close from this card's own row when the
+     game is on it. Shown, never scored ---- */
+  function nbaForm() {
+    var raw = ($("nbaform") || {}).value || "", d = null;
+    try { d = raw ? JSON.parse(raw) : null; } catch (e) { d = null; }
+    return d && typeof d === "object" ? d : {};
+  }
+  function nbaCardCloseFor(date, awayNick, homeNick) {
+    var hit = card.filter(function (r) {
+      return r.sport === "NBA" && (r.gdate || "") === date && canonTeam(r.away, "NBA") === canonTeam(awayNick, "NBA") && canonTeam(r.home, "NBA") === canonTeam(homeNick, "NBA");
+    })[0];
+    if (!hit) return {};
+    var i = hit.inputs || {}, c = hit.close || {};
+    var num = function (v) { var x = parseFloat(v); return isFinite(x) ? x : null; };
+    return { ctot: num(c.ctot) !== null ? num(c.ctot) : num(i.line), ch1: num(c.cf5) !== null ? num(c.cf5) : num(i.h1line), csp: num(i.sp) };
+  }
+  function nbaFormPanel() {
+    var el = $("nbaFormPanel"); if (!el) return;
+    var d = nbaForm();
+    if (!(d.away || []).length && !(d.home || []).length) { el.innerHTML = "No recent games on the row — load the slate and Fill form, and each side's last five come with it."; return; }
+    var chip = function (cls, text) { return '<span class="chip ' + cls + '">' + esc(text) + '</span>'; };
+    var h = "";
+    [["away", canonTeam($("away").value, "NBA") || "Away"], ["home", canonTeam($("home").value, "NBA") || "Home"]].forEach(function (s) {
+      var games = d[s[0]] || [];
+      if (!games.length) { h += "<p><b>" + esc(s[1]) + "</b>: no finals in the ledger yet.</p>"; return; }
+      var w = 0, ov = 0, un = 0, cov = 0, ncov = 0, pf = 0, pa = 0, h1f = 0, h1a = 0, nH1 = 0, h1o = 0, h1u = 0;
+      var rows = games.map(function (g) {
+        var us = +g.pf, them = +g.pa, hasScore = isFinite(us) && isFinite(them);
+        var won = hasScore && us > them;
+        if (won) w++;
+        if (hasScore) { pf += us; pa += them; }
+        var hasH1 = g.h1f !== null && g.h1f !== undefined && g.h1a !== null && g.h1a !== undefined;
+        if (hasH1) { h1f += +g.h1f; h1a += +g.h1a; nH1++; }
+        var awayNick = g.home ? s[1] : g.opp, homeNick = g.home ? g.opp : s[1];
+        var fb = (g.ctot === null || g.ctot === undefined || g.csp === null || g.csp === undefined || g.ch1 === null || g.ch1 === undefined) ? nbaCardCloseFor(g.date, awayNick, homeNick) : {};
+        var ctot = g.ctot !== null && g.ctot !== undefined ? +g.ctot : fb.ctot, ch1 = g.ch1 !== null && g.ch1 !== undefined ? +g.ch1 : fb.ch1, csp = g.csp !== null && g.csp !== undefined ? +g.csp : fb.csp;
+        var total = hasScore ? us + them : null, totCell = "—", h1Cell = "—", spCell = "—";
+        if (total !== null && ctot !== null && ctot !== undefined) {
+          if (total > ctot) { ov++; totCell = chip("over", "OVER") + " " + total + " v " + ctot; }
+          else if (total < ctot) { un++; totCell = chip("under", "UNDER") + " " + total + " v " + ctot; }
+          else totCell = chip("push", "PUSH") + " " + total;
+        } else if (total !== null) totCell = total + ' <span class="dim">no close</span>';
+        if (hasH1) {
+          var h1t = (+g.h1f) + (+g.h1a);
+          h1Cell = esc(g.h1f) + "–" + esc(g.h1a);
+          if (ch1 !== null && ch1 !== undefined) { if (h1t > ch1) { h1o++; h1Cell += " " + chip("over", "O " + ch1); } else if (h1t < ch1) { h1u++; h1Cell += " " + chip("under", "U " + ch1); } else h1Cell += " " + chip("push", "push"); }
+        }
+        if (hasScore && csp !== null && csp !== undefined) {
+          var ours = g.home ? csp : -csp, margin = us - them + ours;   // the home spread turned to this side's view, then the result against it
+          spCell = (ours >= 0 ? "+" : "") + ours + " " + (margin > 0 ? chip("win", "COVERED") : margin < 0 ? chip("loss", "NO") : chip("push", "PUSH"));
+          if (margin > 0) cov++; else if (margin < 0) ncov++;
+        }
+        return "<tr><td>" + esc(String(g.date || "").slice(5)) + "</td><td>" + (g.home ? "v " : "@ ") + esc(g.opp || "?") + "</td>" +
+               "<td>" + (hasScore ? chip(won ? "win" : "loss", won ? "W" : "L") + " " + us + "–" + them + (g.end && g.end !== "REG" ? " (" + esc(g.end) + ")" : "") : "—") + "</td>" +
+               "<td>" + h1Cell + "</td><td>" + totCell + "</td><td>" + spCell + "</td></tr>";
+      });
+      var n = games.length;
+      h += "<p><b>" + esc(s[1]) + "</b> last " + n + ": <b>" + w + "-" + (n - w) + "</b>" + (ov + un ? ", over " + ov + "-" + un : "") + (cov + ncov ? ", covered " + cov + "-" + ncov : "") +
+           (n ? ", " + (pf / n).toFixed(1) + " for and " + (pa / n).toFixed(1) + " against" : "") + (nH1 ? ", the half " + (h1f / nH1).toFixed(1) + "–" + (h1a / nH1).toFixed(1) + (h1o + h1u ? " (over " + h1o + "-" + h1u + ")" : "") : "") + ".</p>" +
+           '<table class="form nbaform"><thead><tr><th>Date</th><th>Opp</th><th>Result</th><th>Half</th><th>Total</th><th>Spread</th></tr></thead><tbody>' + rows.join("") + "</tbody></table>";
+    });
+    el.innerHTML = h;
+  }
   /* ---- the referees as a watch (22 Oct 2026, the user: "add the tile so I can see it build... I want
      to see what impact the refs have on the game, even if small"). The frozen two-season table the
      slate writes into the row's nbarefs box gives each official's over/under record against the
@@ -4064,7 +4148,7 @@
                  "ngoalies","agname","hgname","agstart","hgstart","agok","hgok",
                  "odds","sharp","agf","aga","hgf","hga","lgg","angp","hngp","aenc","aens","henc","hens"];
   var NBA_IDS = ["away","home","line","op","up","opened","gdate","hml","aml","sp","sph","spa","h1line","h1op","h1up",
-                 "naort","nhort","nadrt","nhdrt","napace","nhpace","nagp","nhgp","nlrtg","nlpace","narest","nhrest","nbaout","nbaq","nbactx","ncrew","nbarefs","nbalineup","odds","sharp"];
+                 "naort","nhort","nadrt","nhdrt","napace","nhpace","nagp","nhgp","nlrtg","nlpace","narest","nhrest","nbaout","nbaq","nbactx","ncrew","nbarefs","nbalineup","nbaform","odds","sharp"];
   var ALL = MLB_IDS.concat(WNBA_IDS).concat(NHL_IDS).concat(NBA_IDS).filter(function (v, i, a) { return a.indexOf(v) === i; });
   var CHECKS = ["dome","playoff","agconf","hgconf","agbk","hgbk"];
   function sportOf(s) { return s === "WNBA" ? "WNBA" : s === "NHL" ? "NHL" : s === "NBA" ? "NBA" : "MLB"; }
@@ -5795,6 +5879,7 @@
         nbaout: "{\"away\":[{\"id\":\"3059318\",\"n\":\"Joel Embiid\",\"st\":\"Out\",\"note\":\"Knee\",\"c\":\"Embiid (knee) has been ruled out for Tuesday's game against the Knicks.\",\"ret\":\"2026-11-18\",\"pos\":\"C\",\"mpg\":31.5,\"ppg\":26.9,\"pm\":4.1,\"src\":\"this season\",\"g\":12},{\"id\":\"4351851\",\"n\":\"Anfernee Simons\",\"st\":\"Questionable\",\"note\":\"Hamstring; with Bulls last season\",\"c\":\"Simons (hamstring) is listed as questionable for Tuesday's game in New York.\",\"ret\":\"2026-11-10\",\"pos\":\"G\",\"mpg\":24.9,\"ppg\":14.3,\"pm\":1.8,\"src\":\"last season\",\"g\":55},{\"id\":\"4870562\",\"n\":\"Dominick Barlow\",\"st\":\"Day-To-Day\",\"note\":\"Back\",\"c\":\"Barlow (back) was unable to practice Monday.\",\"ret\":\"2026-11-12\",\"pos\":\"F\",\"mpg\":11.8,\"ppg\":4.2,\"pm\":-0.6,\"src\":\"this season\",\"g\":9}],\"home\":[{\"id\":\"4066648\",\"n\":\"Mitchell Robinson\",\"st\":\"Out\",\"note\":\"Ankle\",\"c\":\"Robinson (ankle) will miss Tuesday's game against the 76ers.\",\"ret\":\"2026-11-20\",\"pos\":\"C\",\"mpg\":22.4,\"ppg\":5.6,\"pm\":3.1,\"src\":\"this season\",\"g\":10},{\"id\":\"4065804\",\"n\":\"Josh Hart\",\"st\":\"Questionable\",\"note\":\"Knee\",\"c\":\"Hart (knee) is questionable for Tuesday's game, Ian Begley of SNY reports.\",\"ret\":\"2026-11-10\",\"pos\":\"G\",\"mpg\":33.1,\"ppg\":13.4,\"pm\":5.2,\"src\":\"this season\",\"g\":16}]}",
         nbactx: "[{\"side\":\"home\",\"k\":\"ratings_faded\",\"s\":\"faded\",\"t\":\"Knicks score 118.0 per 100 possessions, 3rd best in the league (16 games).\",\"tag\":\"faded: the market over-moves with early-season ratings, so the projection's lean goes on the line at \\u22120.25 a point until fifty games, tagged\"},{\"side\":\"home\",\"k\":\"ratings_faded\",\"s\":\"faded\",\"t\":\"Knicks allow 109.0 per 100 possessions, 4th best in the league (16 games).\",\"tag\":\"faded: the market over-moves with early-season ratings, so the projection's lean goes on the line at \\u22120.25 a point until fifty games, tagged\"},{\"side\":\"away\",\"k\":\"ratings_faded\",\"s\":\"faded\",\"t\":\"76ers allow 115.0 per 100 possessions, 6th worst in the league (15 games).\",\"tag\":\"faded: the market over-moves with early-season ratings, so the projection's lean goes on the line at \\u22120.25 a point until fifty games, tagged\"},{\"side\":\"home\",\"k\":\"pace\",\"s\":\"shown\",\"t\":\"Knicks play at 98.0 possessions a game, 5th slowest in the league.\",\"tag\":\"shown, not scored: pace alone measured null against the close; it feeds the projection\"},{\"side\":\"home\",\"k\":\"record\",\"s\":\"shown\",\"t\":\"Knicks are 7-1 at home.\",\"tag\":\"shown, not scored: the spread is priced against the box score\"},{\"side\":\"game\",\"k\":\"move\",\"s\":\"shown\",\"t\":\"DraftKings: the total opened 229.5 and sits 231.5, up 2; Knicks opened -3.5 and sit -5.5.\",\"tag\":\"shown, not scored: the current line is the anchor and the move is already inside it\"},{\"side\":\"home\",\"k\":\"rest\",\"s\":\"label\",\"t\":\"Knicks on a back to back.\",\"tag\":\"a label: rest measured inside the number against two seasons of closes\"},{\"side\":\"away\",\"k\":\"out\",\"s\":\"shown\",\"t\":\"76ers without Joel Embiid: 32 minutes a game of regulars.\",\"tag\":\"shown, not scored: announced absences are in the close; the card measures the late ones\"},{\"side\":\"home\",\"k\":\"out\",\"s\":\"shown\",\"t\":\"Knicks without Mitchell Robinson: 22 minutes a game of regulars.\",\"tag\":\"shown, not scored: announced absences are in the close; the card measures the late ones\"}]",
         nbalineup: "{\"away\":{\"status\":\"expected\",\"five\":[[\"PG\",\"Tyrese Maxey\"],[\"SG\",\"VJ Edgecombe\"],[\"SF\",\"Paul George\"],[\"PF\",\"Kelly Oubre Jr.\"],[\"C\",\"Adem Bona\"]],\"maybe\":[[\"G\",\"Anfernee Simons\",\"Ques\"],[\"F\",\"Dominick Barlow\",\"GTD\"],[\"C\",\"Joel Embiid\",\"Out\"]]},\"home\":{\"status\":\"confirmed\",\"five\":[[\"PG\",\"Jalen Brunson\"],[\"SG\",\"Mikal Bridges\"],[\"SF\",\"Josh Hart\"],[\"PF\",\"OG Anunoby\"],[\"C\",\"Karl-Anthony Towns\"]],\"maybe\":[[\"C\",\"Mitchell Robinson\",\"Out\"]]},\"src\":\"RotoWire\"}",
+        nbaform: "{\"away\":[{\"date\":\"2026-10-30\",\"opp\":\"Celtics\",\"home\":false,\"pf\":104,\"pa\":112,\"h1f\":51,\"h1a\":58,\"end\":\"REG\",\"ctot\":221.5,\"ch1\":110.5,\"csp\":-6.5},{\"date\":\"2026-11-01\",\"opp\":\"Hornets\",\"home\":true,\"pf\":118,\"pa\":109,\"h1f\":60,\"h1a\":52,\"end\":\"REG\",\"ctot\":224.0,\"ch1\":112.0,\"csp\":-7.5},{\"date\":\"2026-11-03\",\"opp\":\"Bulls\",\"home\":true,\"pf\":112,\"pa\":115,\"h1f\":55,\"h1a\":57,\"end\":\"OT\",\"ctot\":226.5,\"ch1\":113.0,\"csp\":-4.0},{\"date\":\"2026-11-05\",\"opp\":\"Heat\",\"home\":false,\"pf\":99,\"pa\":101,\"h1f\":48,\"h1a\":50,\"end\":\"REG\",\"ctot\":null,\"ch1\":null,\"csp\":null},{\"date\":\"2026-11-08\",\"opp\":\"Magic\",\"home\":true,\"pf\":121,\"pa\":108,\"h1f\":63,\"h1a\":49,\"end\":\"REG\",\"ctot\":219.5,\"ch1\":109.5,\"csp\":-3.5}],\"home\":[{\"date\":\"2026-10-31\",\"opp\":\"Nets\",\"home\":true,\"pf\":124,\"pa\":106,\"h1f\":64,\"h1a\":50,\"end\":\"REG\",\"ctot\":228.5,\"ch1\":114.5,\"csp\":-9.5},{\"date\":\"2026-11-02\",\"opp\":\"Bucks\",\"home\":false,\"pf\":110,\"pa\":117,\"h1f\":52,\"h1a\":61,\"end\":\"REG\",\"ctot\":230.0,\"ch1\":115.0,\"csp\":-2.5},{\"date\":\"2026-11-04\",\"opp\":\"Pacers\",\"home\":true,\"pf\":131,\"pa\":120,\"h1f\":68,\"h1a\":59,\"end\":\"REG\",\"ctot\":235.5,\"ch1\":118.0,\"csp\":-5.5},{\"date\":\"2026-11-06\",\"opp\":\"Cavaliers\",\"home\":false,\"pf\":103,\"pa\":98,\"h1f\":49,\"h1a\":47,\"end\":\"REG\",\"ctot\":222.0,\"ch1\":111.5,\"csp\":3.0},{\"date\":\"2026-11-09\",\"opp\":\"Raptors\",\"home\":true,\"pf\":115,\"pa\":100,\"h1f\":57,\"h1a\":46,\"end\":\"REG\",\"ctot\":225.0,\"ch1\":112.5,\"csp\":-8.0}]}",
         ncrew: "Scott Foster, Tony Brothers, Marc Davis", nbarefs: "{\"lg\":[2462,44.0,228.8],\"r\":{\"Scott Foster\":[118,46.2,229.1,66,41,4,2],\"Tony Brothers\":[95,43.1,226.0,56,54,3,3],\"Marc Davis\":[102,44.8,230.3,71,51,0,0],\"Zach Zarba\":[110,42.9,227.4,58,60,2,5]}}" });
     } else {
       restore({ away: "Sun", home: "Mystics", line: "162.5", op: "118", up: "-155", gdate: $("gdate").value,
@@ -6001,7 +6086,7 @@
                       "ngoalies","agname","hgname",
                       "pl","plh","pla","p1line","p1op","p1up",
                       "agf","aga","hgf","hga","lgg","angp","hngp","aenc","aens","henc","hens",
-                      "sp","sph","spa","h1line","h1op","h1up","naort","nhort","nadrt","nhdrt","napace","nhpace","nagp","nhgp","nlrtg","nlpace","narest","nhrest","nbaout","nbactx","ncrew","nbarefs","nbalineup"];
+                      "sp","sph","spa","h1line","h1op","h1up","naort","nhort","nadrt","nhdrt","napace","nhpace","nagp","nhgp","nlrtg","nlpace","narest","nhrest","nbaout","nbactx","ncrew","nbarefs","nbalineup","nbaform"];
   function blank(v) { return v === undefined || v === null || String(v).trim() === ""; }
   function sameGame(row, g) {
     var sp = sportOf(g.sport);

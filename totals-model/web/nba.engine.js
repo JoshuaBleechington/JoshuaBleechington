@@ -236,7 +236,7 @@
     }).join("") + '</ul>';
   }
   function forecastMatchupNba() {
-    if (!SRC) { nbaOutPanel(); nbaLineupPanel(); nbaCtxPanel(); }   // the form's panels: not while a card row is being re-scored
+    if (!SRC) { nbaOutPanel(); nbaLineupPanel(); nbaFormPanel(); nbaCtxPanel(); }   // the form's panels: not while a card row is being re-scored
     var f = readNba();
     var away = f.away, home = f.home, line = f.line;
     var op = num("op"), up = num("up"), hml = num("hml"), aml = num("aml");
@@ -426,6 +426,73 @@
     if (sport !== "NBA") return teamsForBaseNba(sport);
     return TEAM_PATTERNS.NBA.map(function (p) { return p[0]; }).sort();
   };
+  /* ---- recent form (22 Oct 2026, the user: "add in the last 5 games for the teams like you do for
+     NHL, with the scores like first half, total and spread covered or no, and with a little color"):
+     the slate writes each side's last five finals from the ledger into the hidden nbaform box with
+     the half-time score and the close the odds run last saw (the total, the first-half total, the
+     home spread). A game the odds run never saw borrows the close from this card's own row when the
+     game is on it. Shown, never scored ---- */
+  function nbaForm() {
+    var raw = ($("nbaform") || {}).value || "", d = null;
+    try { d = raw ? JSON.parse(raw) : null; } catch (e) { d = null; }
+    return d && typeof d === "object" ? d : {};
+  }
+  function nbaCardCloseFor(date, awayNick, homeNick) {
+    var hit = card.filter(function (r) {
+      return r.sport === "NBA" && (r.gdate || "") === date && canonTeam(r.away, "NBA") === canonTeam(awayNick, "NBA") && canonTeam(r.home, "NBA") === canonTeam(homeNick, "NBA");
+    })[0];
+    if (!hit) return {};
+    var i = hit.inputs || {}, c = hit.close || {};
+    var num = function (v) { var x = parseFloat(v); return isFinite(x) ? x : null; };
+    return { ctot: num(c.ctot) !== null ? num(c.ctot) : num(i.line), ch1: num(c.cf5) !== null ? num(c.cf5) : num(i.h1line), csp: num(i.sp) };
+  }
+  function nbaFormPanel() {
+    var el = $("nbaFormPanel"); if (!el) return;
+    var d = nbaForm();
+    if (!(d.away || []).length && !(d.home || []).length) { el.innerHTML = "No recent games on the row — load the slate and Fill form, and each side's last five come with it."; return; }
+    var chip = function (cls, text) { return '<span class="chip ' + cls + '">' + esc(text) + '</span>'; };
+    var h = "";
+    [["away", canonTeam($("away").value, "NBA") || "Away"], ["home", canonTeam($("home").value, "NBA") || "Home"]].forEach(function (s) {
+      var games = d[s[0]] || [];
+      if (!games.length) { h += "<p><b>" + esc(s[1]) + "</b>: no finals in the ledger yet.</p>"; return; }
+      var w = 0, ov = 0, un = 0, cov = 0, ncov = 0, pf = 0, pa = 0, h1f = 0, h1a = 0, nH1 = 0, h1o = 0, h1u = 0;
+      var rows = games.map(function (g) {
+        var us = +g.pf, them = +g.pa, hasScore = isFinite(us) && isFinite(them);
+        var won = hasScore && us > them;
+        if (won) w++;
+        if (hasScore) { pf += us; pa += them; }
+        var hasH1 = g.h1f !== null && g.h1f !== undefined && g.h1a !== null && g.h1a !== undefined;
+        if (hasH1) { h1f += +g.h1f; h1a += +g.h1a; nH1++; }
+        var awayNick = g.home ? s[1] : g.opp, homeNick = g.home ? g.opp : s[1];
+        var fb = (g.ctot === null || g.ctot === undefined || g.csp === null || g.csp === undefined || g.ch1 === null || g.ch1 === undefined) ? nbaCardCloseFor(g.date, awayNick, homeNick) : {};
+        var ctot = g.ctot !== null && g.ctot !== undefined ? +g.ctot : fb.ctot, ch1 = g.ch1 !== null && g.ch1 !== undefined ? +g.ch1 : fb.ch1, csp = g.csp !== null && g.csp !== undefined ? +g.csp : fb.csp;
+        var total = hasScore ? us + them : null, totCell = "—", h1Cell = "—", spCell = "—";
+        if (total !== null && ctot !== null && ctot !== undefined) {
+          if (total > ctot) { ov++; totCell = chip("over", "OVER") + " " + total + " v " + ctot; }
+          else if (total < ctot) { un++; totCell = chip("under", "UNDER") + " " + total + " v " + ctot; }
+          else totCell = chip("push", "PUSH") + " " + total;
+        } else if (total !== null) totCell = total + ' <span class="dim">no close</span>';
+        if (hasH1) {
+          var h1t = (+g.h1f) + (+g.h1a);
+          h1Cell = esc(g.h1f) + "–" + esc(g.h1a);
+          if (ch1 !== null && ch1 !== undefined) { if (h1t > ch1) { h1o++; h1Cell += " " + chip("over", "O " + ch1); } else if (h1t < ch1) { h1u++; h1Cell += " " + chip("under", "U " + ch1); } else h1Cell += " " + chip("push", "push"); }
+        }
+        if (hasScore && csp !== null && csp !== undefined) {
+          var ours = g.home ? csp : -csp, margin = us - them + ours;   // the home spread turned to this side's view, then the result against it
+          spCell = (ours >= 0 ? "+" : "") + ours + " " + (margin > 0 ? chip("win", "COVERED") : margin < 0 ? chip("loss", "NO") : chip("push", "PUSH"));
+          if (margin > 0) cov++; else if (margin < 0) ncov++;
+        }
+        return "<tr><td>" + esc(String(g.date || "").slice(5)) + "</td><td>" + (g.home ? "v " : "@ ") + esc(g.opp || "?") + "</td>" +
+               "<td>" + (hasScore ? chip(won ? "win" : "loss", won ? "W" : "L") + " " + us + "–" + them + (g.end && g.end !== "REG" ? " (" + esc(g.end) + ")" : "") : "—") + "</td>" +
+               "<td>" + h1Cell + "</td><td>" + totCell + "</td><td>" + spCell + "</td></tr>";
+      });
+      var n = games.length;
+      h += "<p><b>" + esc(s[1]) + "</b> last " + n + ": <b>" + w + "-" + (n - w) + "</b>" + (ov + un ? ", over " + ov + "-" + un : "") + (cov + ncov ? ", covered " + cov + "-" + ncov : "") +
+           (n ? ", " + (pf / n).toFixed(1) + " for and " + (pa / n).toFixed(1) + " against" : "") + (nH1 ? ", the half " + (h1f / nH1).toFixed(1) + "–" + (h1a / nH1).toFixed(1) + (h1o + h1u ? " (over " + h1o + "-" + h1u + ")" : "") : "") + ".</p>" +
+           '<table class="form nbaform"><thead><tr><th>Date</th><th>Opp</th><th>Result</th><th>Half</th><th>Total</th><th>Spread</th></tr></thead><tbody>' + rows.join("") + "</tbody></table>";
+    });
+    el.innerHTML = h;
+  }
   /* ---- the referees as a watch (22 Oct 2026, the user: "add the tile so I can see it build... I want
      to see what impact the refs have on the game, even if small"). The frozen two-season table the
      slate writes into the row's nbarefs box gives each official's over/under record against the

@@ -1005,3 +1005,20 @@ does by the chance claimed. In colour: a tile's record and units green when
 the units are up and red when down, with a bar on its left edge, and does
 marked green or red against says in the tiles and the tables. The card's
 own block below the record stays as it was.
+
+## The referees as a watch, 22 Oct 2026
+
+The user, asked when the referee data would be scored: "add the tile so I
+can see it build. I want to see what impact the refs have on the game,
+even if small but can be measured." Under the NBA record, three tiles by
+the crew's lean in the frozen two-season table (`nbaRefsWatchHtml` in
+`nba.engine.js`, patched into `renderCalib` after the NBA verdict): crews
+leaning over, crews with no lean, crews leaning under. An official leans
+at 1.5 sigma over or under the close across 2024-25 and 2025-26 (the z of
+his record in the row's referee table), a crew by the sum of its three.
+Each tile: the season's over-under count against the close, the past
+table's pooled over rate for those crews against this season's, the points
+over the close a game, and a flat bet on the lean's side at −110. Rows
+count once they carry a crew, finals and a close; the verdict names the
+graded games missing either. Shown, never scored: the decision stays the
+season's end, and the harness grades an over crew and a no-lean crew.

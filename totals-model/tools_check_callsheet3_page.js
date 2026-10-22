@@ -1127,6 +1127,38 @@ const CHECKS = ["dome","playoff","agconf","hgconf","agbk","hgbk"];
       'nba: a card row re-scored by a slate while a hockey game sits in the form keeps its own clubs on the moneyline and the spread', JSON.stringify(relabel));
   chk(ownClubs(relabelled), 'nba: a row the old page mislabelled with the form\'s clubs is relabelled by side from its own clubs on load', JSON.stringify(relabelled));
 
+  // ---- the referees as a watch (22 Oct 2026): graded totals against the close by the crew's lean in the frozen table ----
+  const refsW = await pg.evaluate(async () => {
+    const wait = () => new Promise(r => setTimeout(r, 60));
+    const set = (id, v) => { const el = document.getElementById(id); el.value = v; el.dispatchEvent(new Event('input', { bubbles: true })); };
+    localStorage.removeItem('callsheet3.card.v1');
+    document.getElementById('clear').click(); document.getElementById('m-nba').click(); await wait();
+    const empty = (document.querySelector('#calibBox .calib[data-sport="REFS"]') || {}).innerText || '';
+    // the NBA example: Foster, Brothers and Davis, a crew leaning over (z 2.4 + 0.2 + 1.8); the game lands 238 against a 231.5 close
+    document.getElementById('gdate').value = '2026-11-10'; document.getElementById('example').click(); await wait();
+    document.getElementById('add').click(); await wait();
+    // a second row with Zarba alone, no lean (58-60): lands 205 against a 220 close
+    document.getElementById('clear').click(); document.getElementById('m-nba').click(); await wait();
+    set('gdate', '2026-11-10'); set('away', 'Raptors'); set('home', 'Celtics'); set('line', '221.5'); set('op', '-110'); set('up', '-110');
+    set('ncrew', 'Zach Zarba'); set('nbarefs', JSON.stringify({ lg: [2462, 44.0, 228.8], r: { 'Zach Zarba': [110, 42.9, 227.4, 58, 60, 2, 5] } })); await wait();
+    document.getElementById('add').click(); await wait();
+    const rowOf = (re) => [...document.querySelectorAll('#cardTable tr')].find(t => re.test(t.textContent));
+    const g = (tr, k, v) => { const el = tr.querySelector(`.grade[data-k="${k}"]`); el.value = v; el.dispatchEvent(new Event('input', { bubbles: true })); el.dispatchEvent(new Event('change', { bubbles: true })); };
+    g(rowOf(/76ers @ Knicks/), 'fa', '118'); g(rowOf(/76ers @ Knicks/), 'fh', '120'); g(rowOf(/76ers @ Knicks/), 'ctot', '231.5'); await wait();
+    const afterOne = [...document.querySelectorAll('#calibBox .calib[data-sport="REFS"] > div')].map(d => d.querySelector('.k').textContent + '|' + d.querySelector('.v').textContent + '|' + d.querySelector('.s').textContent + '|' + ((d.querySelector('.sides') || {}).textContent || ''));
+    g(rowOf(/Raptors @ Celtics/), 'fa', '100'); g(rowOf(/Raptors @ Celtics/), 'fh', '105'); g(rowOf(/Raptors @ Celtics/), 'ctot', '220'); await wait();
+    const tiles = [...document.querySelectorAll('#calibBox .calib[data-sport="REFS"] > div')].map(d => d.querySelector('.k').textContent + '|' + d.querySelector('.v').textContent + '|' + d.querySelector('.s').textContent + '|' + ((d.querySelector('.sides') || {}).textContent || ''));
+    const verdict = (document.querySelector('#calibBox .subhead[data-sport="REFS"] + .calib + .verdict') || {}).textContent || '';
+    localStorage.removeItem('callsheet3.card.v1'); document.getElementById('clear').click(); await wait();
+    return { empty: empty.replace(/\s+/g, ' ').slice(0, 120), afterOne, tiles, verdict: verdict.slice(0, 200) };
+  });
+  chk(refsW.empty === '' && refsW.afterOne.length === 3 && /^Crews leaning over in the past table\|over 1-0\|the past table says 56\.9% over · this season 100\.0% over \(±50\.0\)\|\+6\.5 pts against the close a game on 1 · flat on the over \+0\.91u$/.test(refsW.afterOne[0])
+      && /^Crews with no lean\|0-0\|nothing graded/.test(refsW.afterOne[1]),
+      'refs watch: the block sits under the NBA record once it has a graded game, the tiles empty until one carries a crew and a close; the example\'s crew leans over and its 238 against 231.5 counts as an over for the over crews, flat on the over', JSON.stringify({ empty: refsW.empty, tiles: refsW.afterOne }));
+  chk(/^Crews with no lean\|over 0-1\|the past table says 49\.2% over · this season 0\.0% over \(±50\.0\)\|[-−]15\.0 pts against the close a game on 1 · no side to take$/.test(refsW.tiles[1]) && /^Crews leaning under in the past table\|0-0\|/.test(refsW.tiles[2])
+      && /An official 1\.5 sigma or more/.test(refsW.verdict),
+      'refs watch: Zarba alone has no lean, so his 205 against 220 lands in the middle tile with no side taken, and the under tile waits', JSON.stringify({ tiles: refsW.tiles, verdict: refsW.verdict.slice(0, 80) }));
+
   // ---- the build stamp ------------------------------------------------------------
   const stamp = await pg.evaluate(() => (document.getElementById('build') || {}).textContent);
   const git = (cmd) => execSync(cmd, { cwd: __dirname, encoding: 'utf8' }).trim();

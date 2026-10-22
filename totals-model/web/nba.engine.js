@@ -426,4 +426,65 @@
     if (sport !== "NBA") return teamsForBaseNba(sport);
     return TEAM_PATTERNS.NBA.map(function (p) { return p[0]; }).sort();
   };
+  /* ---- the referees as a watch (22 Oct 2026, the user: "add the tile so I can see it build... I want
+     to see what impact the refs have on the game, even if small"). The frozen two-season table the
+     slate writes into the row's nbarefs box gives each official's over/under record against the
+     close; an official 1.5 sigma or more over or under across those seasons leans, the crew's lean is
+     the sum of its three, and this block keeps the season's graded totals against the close by the
+     crew's lean, with the points over the close a game. Shown, never scored: the decision is the
+     season's end, and the test is whether the past table's lean carries ---- */
+  var NBA_REF_Z = 1.5;
+  function nbaRefZ(rec) { var w = +rec[3] || 0, l = +rec[4] || 0; return (w + l) ? (w - l) / Math.sqrt(w + l) : 0; }
+  function nbaCrewLean(row) {
+    var names = String((row.inputs || {}).ncrew || "").split(/[,;]+/).map(function (s) { return s.trim(); }).filter(function (s) { return s; });
+    if (!names.length) return null;
+    var refs = null;
+    try { refs = row.inputs.nbarefs ? JSON.parse(row.inputs.nbarefs) : null; } catch (e) { refs = null; }
+    var table = refs && refs.r ? refs.r : {}, keys = Object.keys(table), z = 0, found = 0, pastW = 0, pastL = 0;
+    names.forEach(function (n) {
+      var d = table[n];
+      if (!d) {
+        var low = n.toLowerCase(), hit = keys.filter(function (k) { return k.toLowerCase() === low; });
+        if (!hit.length) { var last = low.split(" ").pop(); hit = keys.filter(function (k) { return k.toLowerCase().split(" ").pop() === last; }); }
+        d = hit.length === 1 ? table[hit[0]] : null;
+      }
+      if (!d || d.length < 5) return;
+      found++; z += nbaRefZ(d); pastW += +d[3] || 0; pastL += +d[4] || 0;
+    });
+    if (!found) return null;
+    return { z: z, lean: z >= NBA_REF_Z ? "over" : z <= -NBA_REF_Z ? "under" : "even", pastW: pastW, pastL: pastL, found: found };
+  }
+  function nbaRefsWatchHtml() {
+    var mk = function (label, side) { return { label: label, side: side, n: 0, o: 0, u: 0, p: 0, says: 0, pts: 0, units: 0 }; };
+    var g = { over: mk("Crews leaning over in the past table", "over"), even: mk("Crews with no lean", null), under: mk("Crews leaning under in the past table", "under") };
+    var noCrew = 0, noClose = 0;
+    card.forEach(function (r) {
+      if (r.sport !== "NBA" || !r.finals || blank(r.finals.fa) || blank(r.finals.fh)) return;
+      var lean = nbaCrewLean(r);
+      if (!lean) { noCrew++; return; }
+      var c = parseFloat((r.close || {}).ctot);
+      if (!isFinite(c)) { noClose++; return; }
+      var total = (+r.finals.fa) + (+r.finals.fh), s = g[lean.lean];
+      if (total === c) { s.p++; return; }
+      s.n++; s.says += lean.pastW / (lean.pastW + lean.pastL); s.pts += total - c;
+      if (total > c) s.o++; else s.u++;
+      if (s.side) s.units += ((s.side === "over") === (total > c)) ? 100 / 110 : -1;
+    });
+    var any = g.over.n + g.even.n + g.under.n + g.over.p + g.even.p + g.under.p;
+    var tile = function (s) {
+      if (!s.n) return '<div><p class="k">' + esc(s.label) + '</p><p class="v">0-0</p><p class="s">' + (s.p ? s.p + ' push' + (s.p === 1 ? '' : 'es') + ' only' : 'nothing graded with a crew and a close yet') + '</p></div>';
+      var says = s.says / s.n * 100, does = s.o / s.n * 100, se = 100 / Math.sqrt(s.n) / 2;
+      return '<div><p class="k">' + esc(s.label) + '</p><p class="v">over ' + s.o + '-' + s.u + (s.p ? '-' + s.p : '') + '</p>' +
+        '<p class="s">the past table says ' + says.toFixed(1) + '% over · this season ' + does.toFixed(1) + '% over (±' + se.toFixed(1) + ')</p>' +
+        '<p class="s sides">' + sgn(s.pts / s.n, 1) + ' pts against the close a game on ' + s.n + (s.side ? ' · flat on the ' + s.side + ' ' + sgn(s.units, 2) + 'u' : ' · no side to take') + '</p></div>';
+    };
+    var h = '<div class="subhead" data-sport="REFS">The referees, as a watch <span class="tag">this season\'s graded totals against the close, by the crew\'s lean in the frozen two-season table · shown, never scored</span></div>';
+    h += '<div class="calib" data-sport="REFS">' + tile(g.over) + tile(g.even) + tile(g.under) + '</div>';
+    h += '<div class="verdict">An official 1.5 sigma or more over or under the close across 2024-25 and 2025-26 leans (eight officials over, 450-286 pooled; seven under, 175-270), and a crew leans by the sum of its three. ' +
+         'The test is whether the past lean carries: if the over crews keep running over and the under crews under, the crew becomes an input at the season\'s end, scored at what this block says. Two seasons of closes said crews predict free throws (t 7.3) and the total does not follow (t −1.0), so expect both tiles to drift toward the league\'s rate. ' +
+         'One standard error at twenty games is eleven points; read nothing under a hundred a tile.' +
+         (any ? '' : ' Nothing graded yet with a crew in the Crew box and a close on the card.') +
+         (noCrew ? ' ' + noCrew + ' graded game' + (noCrew === 1 ? '' : 's') + ' without a crew.' : '') + (noClose ? ' ' + noClose + ' without a close.' : '') + '</div>';
+    return h;
+  }
   /* ===== END NBA BLOCK ===== */

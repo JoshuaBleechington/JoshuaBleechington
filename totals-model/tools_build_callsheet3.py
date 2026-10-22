@@ -218,6 +218,8 @@ def tail() -> str:
              '    if (fixed) { try { localStorage.setItem(KEY, JSON.stringify(card)); } catch (e) {} }\n'
              '  })();\n'
              '  function save() {', "relabel")
+    t = once(t, "the units column is the referee.') + '</div>';\n    });",
+             "the units column is the referee.') + '</div>';\n      if (sp === \"NBA\") h += nbaRefsWatchHtml();   // the referees as a watch (22 Oct 2026)\n    });", "refs watch")
     t = every(t, 'sp === "WNBA" ? forecastMatchupWnba() : forecastMatchupMlb()',
               'sp === "NHL" ? forecastMatchupNhl() : sp === "NBA" ? forecastMatchupNba() : sp === "WNBA" ? forecastMatchupWnba() : forecastMatchupMlb()', "dispatch (stored)", 1)
     t = every(t, 'sport === "WNBA" ? forecastMatchupWnba() : forecastMatchupMlb()',

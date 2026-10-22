@@ -180,6 +180,19 @@ ledger's dates, and writes two JSON boxes the matchup's cards render:
   frozen now, this season's record sits beside it, and if the officials
   who tilted over keep tilting over, the crew becomes an input at the
   season's end, scored at what the record says.
+- **The referees as a watch, on the record** (22 Oct 2026, the user: "add
+  the tile so I can see it build... I want to see what impact the refs
+  have on the game, even if small"): a block under the NBA record keeps
+  this season's graded totals against the close by the crew's lean in the
+  frozen table. An official 1.5 sigma or more over or under across the two
+  seasons leans (eight over, 450-286 pooled; seven under, 175-270), a crew
+  leans by the sum of its three, and each tile shows the over-under count
+  against the close, what the past table says for those crews against what
+  this season does, the points over the close a game, and a flat bet on the
+  lean's side at −110. Shown, never scored (`nba.engine.js`
+  `nbaRefsWatchHtml`, from the rows' Crew box and referee table, the finals
+  and the close the grade file attaches). The decision stays the season's
+  end; one standard error at twenty games is eleven points.
 - **The scoreboard's book**: ESPN carries DraftKings' total, spread and
   moneylines with their openers. They go in the row's notes, the opening
   total fills the Opened box (the engine notes the move, not scored), and a

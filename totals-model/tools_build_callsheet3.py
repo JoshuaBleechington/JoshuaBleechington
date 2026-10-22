@@ -118,6 +118,8 @@ def head() -> str:
              "  #nbaFormPanel table.form { margin: 4px 0 10px; font-size: 11.5px; } #nbaFormPanel table.form th, #nbaFormPanel table.form td { padding: 3px 5px; }\n"
              "  #nbaFormPanel .chip.push { background: var(--surface-2); color: var(--ink-2); }\n"
              "  /* the Props tab (19 Oct 2026) */\n"
+             "  #propsView .propsctl { align-items: center; margin: 2px 0 8px; } #propsView .propsctl select, #propsView .propsctl input { padding: 6px 8px; font-size: 13px; }\n"
+             "  table.props th.sortable { cursor: pointer; user-select: none; } table.props th.sortable:hover { color: var(--ink); } table.props th.sortable.on { color: var(--ink); border-bottom-color: var(--ink-2); }\n"
              "  table.props td.pos { color: var(--go); font-weight: 700; } table.props td.neg { color: var(--muted); }\n"
              "  table.props tr[data-prop] { cursor: pointer; } table.props tr.win td:first-child { border-left: 3px solid var(--go); }\n"
              "  table.props tr.loss td:first-child { border-left: 3px solid var(--bad); } table.props tr.void td, table.props tr.push td { color: var(--muted); }\n"

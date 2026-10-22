@@ -13,6 +13,51 @@
   try { props = JSON.parse(localStorage.getItem(PROPS_KEY) || "[]"); if (!Array.isArray(props)) props = []; } catch (e) { props = []; }
   var propsView = false;
   var propsOrder = [], propDetailId = null;   // the Every-prop table's order, and the prop the panel shows (22 Oct 2026)
+  /* the table's view (22 Oct 2026, the user: "is there a way for me to rearrange the rows? all the rebound props, or
+     the points for a player, by chance percentage and band"): a sort column with its direction, and filters by market,
+     band, side and a name. Kept in this browser only; Reset view puts the table back to by game, then by edge */
+  var PROPS_VIEW_KEY = "callsheet3.props.view.v1";
+  var PROPS_VIEW_DEFAULT = { sort: "default", dir: -1, mk: "", band: "", side: "", q: "" };
+  var propsTableView = Object.assign({}, PROPS_VIEW_DEFAULT);
+  try { var pv0 = JSON.parse(localStorage.getItem(PROPS_VIEW_KEY) || "null"); if (pv0 && typeof pv0 === "object") propsTableView = Object.assign({}, PROPS_VIEW_DEFAULT, pv0); } catch (e) {}
+  function savePropsTableView() { try { localStorage.setItem(PROPS_VIEW_KEY, JSON.stringify(propsTableView)); } catch (e) {} }
+  var PROPS_BAND_RANK = { "BET": 0, "LEAN": 1, "no edge": 2 };
+  var PROPS_SORT_COLS = [["game", "Game"], ["name", "Player"], ["mk", "Market"], ["line", "Line"], ["side", "Pick"], ["chance", "Chance"], ["price", "Price"], ["need", "Needs"], ["edge", "Edge"], ["proj", "Proj"], ["band", "Band"], ["result", "Result"]];
+  function propsSortValue(r, key) {
+    var has = propHas(r);
+    switch (key) {
+      case "game": return r.game || "";
+      case "name": return r.name || "";
+      case "mk": return PROPS_LABEL[r.mk] || r.mk || "";
+      case "line": return +r.line;
+      case "side": return has ? (r.side || "") : "~";
+      case "chance": return has ? +r.chance : -1;
+      case "price": return has ? +r.price : -99999;
+      case "need": return has ? +r.need : -1;
+      case "edge": return has ? +r.edge : -9;
+      case "proj": return has ? +r.proj : -1;
+      case "band": return has ? (PROPS_BAND_RANK[r.band] !== undefined ? PROPS_BAND_RANK[r.band] : 3) : 4;
+      case "result": return r.result || "~";
+    }
+    return 0;
+  }
+  function propsTableRows(rows) {
+    var v = propsTableView, q = String(v.q || "").trim().toLowerCase();
+    var list = rows.filter(function (r) {
+      if (v.mk && r.mk !== v.mk) return false;
+      if (v.band && (!propHas(r) || r.band !== v.band)) return false;
+      if (v.side && (!propHas(r) || r.side !== v.side)) return false;
+      if (q && String(r.name || "").toLowerCase().indexOf(q) < 0 && String(r.game || "").toLowerCase().indexOf(q) < 0) return false;
+      return true;
+    });
+    var byDefault = function (a, b) { return (a.game < b.game ? -1 : a.game > b.game ? 1 : 0) || ((propHas(b) ? b.edge : -9) - (propHas(a) ? a.edge : -9)) || String(a.name).localeCompare(String(b.name)); };
+    if (v.sort === "default") return list.sort(byDefault);
+    return list.sort(function (a, b) {
+      var x = propsSortValue(a, v.sort), y = propsSortValue(b, v.sort), c = typeof x === "string" ? x.localeCompare(y) : (x - y);
+      if (v.sort === "band") c = -c;   // the band's rank runs BET first; a "descending" band sort still reads BET at the top
+      return (c * v.dir) || byDefault(a, b);
+    });
+  }
   /* the example (19 Oct 2026, the user: "put an example on the NBA props model
      like you did for the NBA"): one game's props computed at build time through
      the slate's own projection, previewed in the tab and never saved -- a real
@@ -325,10 +370,13 @@
         '<div class="n4">' + esc(r.game) + ' · projected ' + r.proj + ' (±' + r.sd + ') · ' + esc(r.book) + '</div>' +
         (propsLeversLine(r) ? '<div class="n5">Moves it: ' + propsLeversLine(r) + '</div>' : '') + '</div>';
     }).join("") : '<div class="empty">' + (rows.length ? 'No prop on this date clears its price.' : 'Load a props file: Run NBA props.bat writes nba-props-DATE.json.') + '</div>';
-    var list = ($("propsAll").checked ? rows : rows.filter(propHas)).slice().sort(function (a, b) {
-      return (a.game < b.game ? -1 : a.game > b.game ? 1 : 0) || ((propHas(b) ? b.edge : -9) - (propHas(a) ? a.edge : -9));
-    });
-    var h = '<table class="form props"><thead><tr><th>Game</th><th>Player</th><th>Market</th><th>Line</th><th>Pick</th><th>Chance</th><th>Price</th><th>Needs</th><th>Edge</th><th>Proj</th><th>Band</th><th>Result</th></tr></thead><tbody>';
+    var pool = ($("propsAll").checked ? rows : rows.filter(propHas)).slice(), list = propsTableRows(pool);
+    ["propsMk", "propsBand", "propsSide", "propsQ"].forEach(function (id) { var el = $(id); if (el) { var k = { propsMk: "mk", propsBand: "band", propsSide: "side", propsQ: "q" }[id]; if (el.value !== propsTableView[k]) el.value = propsTableView[k]; } });
+    if ($("propsShown")) $("propsShown").textContent = rows.length ? (list.length === pool.length ? pool.length + " shown" : list.length + " of " + pool.length + " shown") + (propsTableView.sort !== "default" ? " · sorted by " + (PROPS_SORT_COLS.filter(function (c) { return c[0] === propsTableView.sort; })[0] || ["", propsTableView.sort])[1].toLowerCase() + (propsTableView.dir < 0 ? " ▾" : " ▴") : "") : "";
+    var h = '<table class="form props"><thead><tr>' + PROPS_SORT_COLS.map(function (c) {
+      var on = propsTableView.sort === c[0];
+      return '<th data-sort="' + c[0] + '" class="sortable' + (on ? ' on' : '') + '" title="Sort by ' + c[1].toLowerCase() + '">' + c[1] + (on ? (propsTableView.dir < 0 ? ' ▾' : ' ▴') : '') + '</th>';
+    }).join('') + '</tr></thead><tbody>';
     list.forEach(function (r) {
       h += '<tr data-prop="' + r.id + '" class="' + (r.result || '') + '"><td>' + esc(r.game) + '</td><td>' + esc(r.name) + (r.pos ? ' <span class="tag">' + esc(r.pos) + '</span>' : '') + '</td>' +
         '<td>' + esc(PROPS_LABEL[r.mk] || r.mk) + '</td><td>' + r.line + ' (' + sgn(r.op, 0) + '/' + sgn(r.up, 0) + ')</td>' +
@@ -370,7 +418,21 @@
       else propsSay("<pre>" + esc(text) + "</pre>");
     });
     var openFrom = function (e) { var t = e.target.closest("[data-prop]"); if (t) openPropDetail(t.getAttribute("data-prop")); };
-    $("propsTable").addEventListener("click", openFrom);
+    $("propsTable").addEventListener("click", function (e) {
+      var th = e.target.closest("th[data-sort]");
+      if (th) {
+        var k = th.getAttribute("data-sort");
+        if (propsTableView.sort === k) { if (propsTableView.dir < 0) propsTableView.dir = 1; else { propsTableView.sort = "default"; propsTableView.dir = -1; } }
+        else { propsTableView.sort = k; propsTableView.dir = (k === "game" || k === "name" || k === "mk" || k === "side" || k === "result" || k === "band") ? 1 : -1; }
+        savePropsTableView(); renderProps(); return;
+      }
+      openFrom(e);
+    });
+    [["propsMk", "mk"], ["propsBand", "band"], ["propsSide", "side"], ["propsQ", "q"]].forEach(function (p) {
+      var el = $(p[0]); if (!el) return;
+      el.addEventListener(p[0] === "propsQ" ? "input" : "change", function () { propsTableView[p[1]] = el.value; savePropsTableView(); renderProps(); });
+    });
+    if ($("propsReset")) $("propsReset").addEventListener("click", function () { propsTableView = Object.assign({}, PROPS_VIEW_DEFAULT); try { localStorage.removeItem(PROPS_VIEW_KEY); } catch (e) {} renderProps(); });
     $("propsBest").addEventListener("click", openFrom);
     if ($("propDetail")) {
       $("propDetailClose").addEventListener("click", closePropDetail);

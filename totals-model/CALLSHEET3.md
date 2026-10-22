@@ -1048,6 +1048,20 @@ their points a game against the league's by history (the total did not
 follow, t −1.0), and the past table's pooled over rate with these three as
 a soft lean. Never scored; the referee watch on the record is the test.
 
+## The Every-prop table's view, 22 Oct 2026
+
+The user: "is there a way for me to rearrange the rows? For example, all
+the rebound props, or the points for a player, by chance percentage and
+band." Every column header sorts (`propsTableRows`, `propsSortValue`): a
+first click sorts numbers high to low and words A to Z, a second flips it,
+a third goes back to the default, by game then by edge; the header shows
+the arrow and the count line says what the sort is. Above the table, filters
+by market, band, side and a player's or game's name, with the count as "12
+of 111 shown". The view is kept in this browser (`callsheet3.props.view.v1`)
+until Reset view clears it; the panel's Previous and Next walk the table as
+shown. The harness filters the example to the rebounds, sorts it by chance
+both ways, narrows it to Maxey's LEANs and resets.
+
 ## The sport buttons, 22 Oct 2026
 
 The user: "rearrange the models to have Player props 1st, NBA 2nd and then

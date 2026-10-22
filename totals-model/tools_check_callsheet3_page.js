@@ -989,14 +989,34 @@ const CHECKS = ["dome","playoff","agconf","hgconf","agbk","hgbk"];
       whys.push(document.getElementById('propDetailBody').innerText.replace(/\s+/g, ' ').trim());
       document.getElementById('propDetailClose').click(); await wait();
     }
+    // the table's view: a market filter, a column sort, a band filter and a name, then Reset
+    const cells = (i) => [...document.querySelectorAll('#propsTable tbody tr[data-prop]')].map(tr => tr.querySelectorAll('td')[i].textContent.trim());
+    const sel = (id, v) => { const el = document.getElementById(id); el.value = v; el.dispatchEvent(new Event(id === 'propsQ' ? 'input' : 'change', { bubbles: true })); };
+    sel('propsMk', 'reb'); await wait();
+    const view1 = { markets: cells(2), shown: document.getElementById('propsShown').textContent };
+    sel('propsMk', ''); document.querySelector('#propsTable th[data-sort="chance"]').click(); await wait();
+    const view2 = { chances: cells(5), head: document.querySelector('#propsTable th[data-sort="chance"]').textContent, shown: document.getElementById('propsShown').textContent, order: JSON.parse(localStorage.getItem('callsheet3.props.view.v1') || '{}') };
+    document.querySelector('#propsTable th[data-sort="chance"]').click(); await wait();
+    const view3 = { chances: cells(5) };
+    sel('propsBand', 'LEAN'); sel('propsQ', 'maxey'); await wait();
+    const view4 = { names: cells(1), bands: cells(10), shown: document.getElementById('propsShown').textContent };
+    document.getElementById('propsReset').click(); await wait();
+    const view5 = { rows: document.querySelectorAll('#propsTable tbody tr[data-prop]').length, shown: document.getElementById('propsShown').textContent, stored: localStorage.getItem('callsheet3.props.view.v1'), mk: document.getElementById('propsMk').value, q: document.getElementById('propsQ').value };
     const saved = localStorage.getItem('callsheet3.props.v1');
     const tileAfter = !!document.querySelector('#calibBox .calib[data-sport="PROPS"]');
     document.getElementById('m-nba').click(); await wait();
     document.getElementById('m-props').click(); await wait();
     const after = document.getElementById('propsCount').textContent;
     document.getElementById('m-nba').click(); await wait();
-    return { on, count, msg, best, rows, rowsAll, whys, saved, tileSame: tileBefore === tileAfter, before, after };
+    return { on, count, msg, best, rows, rowsAll, whys, saved, tileSame: tileBefore === tileAfter, before, after, view1, view2, view3, view4, view5 };
   });
+  const pct = (s) => parseFloat(String(s).replace('%', ''));
+  chk(propsEx.view1.markets.length >= 1 && propsEx.view1.markets.every(m => m === 'rebounds') && /of 8 shown$/.test(propsEx.view1.shown)
+      && propsEx.view2.chances.length === 8 && propsEx.view2.chances.slice(0, 7).every((c, i) => isNaN(pct(c)) ? false : pct(c) >= (isNaN(pct(propsEx.view2.chances[i + 1])) ? -1 : pct(propsEx.view2.chances[i + 1]))) && /Chance ▾/.test(propsEx.view2.head) && /sorted by chance ▾/.test(propsEx.view2.shown) && propsEx.view2.order.sort === 'chance'
+      && propsEx.view3.chances.filter(c => !isNaN(pct(c))).every((c, i, a) => i === 0 || pct(c) >= pct(a[i - 1]))
+      && propsEx.view4.names.every(n => /Maxey/.test(n)) && propsEx.view4.bands.every(b => b === 'LEAN') && propsEx.view4.names.length >= 1
+      && propsEx.view5.rows === 8 && propsEx.view5.shown === '8 shown' && propsEx.view5.stored === null && propsEx.view5.mk === '' && propsEx.view5.q === '',
+      'props table: the market filter keeps the rebounds, a click on Chance sorts it high to low and again low to high, the band and name filters narrow it, and Reset view puts it back', JSON.stringify({ v1: propsEx.view1, v2: { head: propsEx.view2.head, shown: propsEx.view2.shown, chances: propsEx.view2.chances }, v3: propsEx.view3, v4: propsEx.view4, v5: propsEx.view5 }));
   chk(propsEx.on && /^EXAMPLE · 8 props on/.test(propsEx.count) && /An example/.test(propsEx.msg) && propsEx.rows === 7 && propsEx.rowsAll === 8,
       'props example: eight props on 76ers @ Knicks, seven projected (Embiid is out), the count says EXAMPLE', JSON.stringify({ count: propsEx.count, rows: propsEx.rows, all: propsEx.rowsAll }));
   chk(propsEx.best.length >= 2 && /#1 · (BET|LEAN)/.test(propsEx.best[0]) && propsEx.best.some(b => /Tyrese Maxey OVER 25\.5 points/.test(b)),

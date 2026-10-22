@@ -48,26 +48,36 @@
         </section>
 
         <section class="card">
-          <h2>Context <span class="tag">where each club stands in the league, and what the sheet did with it</span></h2>
+          <h2>Referee stats <span class="tag">the crew against the close — shown, not scored, with its own watch on the record</span></h2>
           <div class="body">
-            <div id="nbaCtxPanel" class="note">No context on the row — load the slate and Fill form, and the lines come with it.</div>
+            <div id="nbaCrewPanel" class="note">No crew on the row — load the slate and Fill form once the league has posted the assignments (about 9 am Eastern), or type the names below.</div>
             <div>
               <div class="f"><label for="ncrew">Crew <span class="tag">the referees, comma-separated; the slate fills it when the league has posted the assignments</span></label><input id="ncrew" type="text" placeholder="Scott Foster, Tony Brothers, Marc Davis" autocomplete="off"></div>
             </div>
+            <p class="note">Each referee's free throws and points a game over the ledger seasons against the league's, and his record against
+              the closing total: the last two seasons, frozen, and this one as it builds. An official 1.5 sigma or more over or under
+              across the two seasons <b>leans</b>, and the crew leans by the sum of its three: the badge and the colour say so. <b>Shown,
+              not scored</b>: crews predict the night's free throws (t 7.3) and the total does not follow them (t −1.0), so a lean is a
+              watch, and the record's referee block keeps the season's totals against the close by the crew's lean. The league posts
+              the crews about 9 am Eastern; the slate fills the box from its feed, or you type the names from the link below.</p>
+            <div class="links">
+              <a href="https://official.nba.com/referee-assignments/" target="_blank" rel="noopener">NBA · referee assignments</a>
+            </div>
+            <input type="hidden" id="nbarefs">
+          </div>
+        </section>
+
+        <section class="card">
+          <h2>Context <span class="tag">where each club stands in the league, and what the sheet did with it</span></h2>
+          <div class="body">
+            <div id="nbaCtxPanel" class="note">No context on the row — load the slate and Fill form, and the lines come with it.</div>
             <p class="note">Each line is a club's rank against the other 29 on a number the slate already holds: offensive and
               defensive rating, pace, points scored and allowed, the last ten, free-throw rate, three-point rate, home and road
               records, the regulars out. A club shows up when it sits in the top or bottom six of the league; the stage of the
               season and the two watched clubs always. <b>The tag is the point.</b> "3rd worst defence" is what the public bets
               and the book moves to, so each line says what the sheet already did with the fact: <b>faded</b> because the market
               over-moves with early-season ratings, <b>scored</b> when a stage delta is on the line, <b>shown</b> because it measured
-              inside the number against two seasons of closes, or a <b>label</b>. Nothing here moves a number on its own.
-              <b>The crew</b> is the last line: each referee's free throws and points a game over the ledger seasons against the
-              league's. The league posts the crews about 9 am Eastern; the slate fills the box from its feed, or you type the names
-              from the link below. Shown, not scored: crews predict the night's free throws (t 7.3) and the total does not follow.</p>
-            <div class="links">
-              <a href="https://official.nba.com/referee-assignments/" target="_blank" rel="noopener">NBA · referee assignments</a>
-            </div>
-            <input type="hidden" id="nbarefs">
+              inside the number against two seasons of closes, or a <b>label</b>. Nothing here moves a number on its own.</p>
           </div>
         </section>
 

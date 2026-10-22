@@ -221,39 +221,52 @@
     var el = $("nbaCtxPanel"); if (!el) return;
     var raw = ($("nbactx") || {}).value || "", ctx = null;
     try { ctx = raw ? JSON.parse(raw) : null; } catch (e) { ctx = null; }
-    var items = (ctx || []).slice(), crew = nbaCrewLine();
-    if (crew) items.push(crew);
+    var items = (ctx || []).slice();
     if (!items.length) {
       el.innerHTML = "No context on the row — load the slate and Fill form, and the lines come with it.";
       return;
     }
     var order = { scored: 0, faded: 1, shown: 2, label: 3 };
     items.sort(function (a, b) { return (order[a.s] || 0) - (order[b.s] || 0); });
-    /* the crew first and highlighted (22 Oct 2026, the user: "have the ref section on the matchup be highlighted, and if
-       those particular refs are a signal or alert"): the crew's lean in the frozen table as a badge on the line, each
-       official as a chip with his past record and his own lean; the sentence itself is unchanged */
-    var crewI = -1;
-    items.forEach(function (c, i) { if (c.k === "crew" && crewI < 0) crewI = i; });
-    if (crewI > 0) items.unshift(items.splice(crewI, 1)[0]);
-    var refsRaw = ($("nbarefs") || {}).value || "", refsD = null;
-    try { refsD = refsRaw ? JSON.parse(refsRaw) : null; } catch (e) { refsD = null; }
     el.innerHTML = '<ul class="ctx">' + items.map(function (c) {
       var s = order[c.s] !== undefined ? c.s : "shown";
-      if (c.k === "crew") {
-        var det = nbaCrewDetails(nbaCrewNames(($("ncrew") || {}).value), refsD), lean = det && det.found ? det.lean : "even";
-        var alert = lean === "even" ? '<span class="crewalert even">' + (det && det.found ? 'Crew even' : 'Crew unread') + '</span>' : '<span class="crewalert ' + lean + '">Crew leans ' + lean.toUpperCase() + ' · z ' + sgn(det.z, 1) + '</span>';
-        var chips = det ? det.officials.map(function (o) {
-          return '<span class="refchip ' + o.lean + '">' + esc(o.name) + (o.d ? ' <b>' + o.pastW + '-' + o.pastL + '</b>' + (o.lean !== "even" ? ' ' + o.lean.toUpperCase() + ' LEAN' : '') + (o.thisW + o.thisL ? ' · ' + o.thisW + '-' + o.thisL + ' this season' : '') : ' <span class="dim">no games</span>') + '</span>';
-        }).join("") : "";
-        return '<li class="ctx-' + s + ' ctx-crew lean-' + lean + '"><span class="cbadge">' + s + '</span> ' + alert + ' <span class="ctext">' + esc(c.t || "") + '</span>' +
-               '<span class="crewchips">' + chips + '</span>' + (c.tag ? ' <span class="ctag">' + esc(c.tag) + '</span>' : '') + '</li>';
-      }
       return '<li class="ctx-' + s + '"><span class="cbadge">' + s + '</span> <span class="ctext">' + esc(c.t || "") + '</span>' +
              (c.tag ? ' <span class="ctag">' + esc(c.tag) + '</span>' : '') + '</li>';
     }).join("") + '</ul>';
   }
+  /* the Referee stats card (22 Oct 2026, the user: "change the name from context to Referee stats... make sure that's set
+     up for all NBA games"): the crew line on its own card, highlighted in the crew's lean with a badge, each official a
+     chip with his past record, his own lean and this season; the sentence is nbaCrewLine's, unchanged */
+  function nbaCrewPanel() {
+    var el = $("nbaCrewPanel"); if (!el) return;
+    var crew = nbaCrewLine();
+    if (!crew) { el.innerHTML = "No crew on the row — load the slate and Fill form once the league has posted the assignments (about 9 am Eastern), or type the names below."; return; }
+    var refsRaw = ($("nbarefs") || {}).value || "", refsD = null;
+    try { refsD = refsRaw ? JSON.parse(refsRaw) : null; } catch (e) { refsD = null; }
+    var det = nbaCrewDetails(nbaCrewNames(($("ncrew") || {}).value), refsD), lean = det && det.found ? det.lean : "even";
+    var alert = lean === "even" ? '<span class="crewalert even">' + (det && det.found ? 'Crew even' : 'Crew unread') + '</span>' : '<span class="crewalert ' + lean + '">Crew leans ' + lean.toUpperCase() + ' · z ' + sgn(det.z, 1) + '</span>';
+    var chips = det ? det.officials.map(function (o) {
+      return '<span class="refchip ' + o.lean + '">' + esc(o.name) + (o.d ? ' <b>' + o.pastW + '-' + o.pastL + '</b>' + (o.lean !== "even" ? ' ' + o.lean.toUpperCase() + ' LEAN' : '') + (o.thisW + o.thisL ? ' · ' + o.thisW + '-' + o.thisL + ' this season' : '') : ' <span class="dim">no games</span>') + '</span>';
+    }).join("") : "";
+    /* the crew call (22 Oct 2026, the user: "maybe a little prediction too"): what the numbers say for tonight, with the
+       honest weights: free throws against the league (the one thing a crew predicts, t 7.3), points a game by their history
+       (the total did not follow, t -1.0), and the past table's over rate with these three as a soft lean. Never scored */
+    var call = "";
+    if (det && det.found) {
+      var known = det.officials.filter(function (o) { return o.d; }), lg = refsD && refsD.lg ? refsD.lg : null;
+      var fta = known.reduce(function (a, o) { return a + (+o.d[1] || 0); }, 0) / known.length, pts = known.reduce(function (a, o) { return a + (+o.d[2] || 0); }, 0) / known.length;
+      var past = det.pastW + det.pastL, rate = past ? det.pastW / past : 0.5;
+      var leanTxt = lean === "over" ? "a soft lean to the OVER" : lean === "under" ? "a soft lean to the UNDER" : "no lean";
+      call = '<div class="crewcall"><b>Crew call for tonight:</b> ' +
+             (lg ? 'free throws ' + sgn(fta - (+lg[1]), 1) + ' against the league\'s ' + (+lg[1]).toFixed(1) + ' (the one thing a crew predicts, t 7.3); points ' + sgn(pts - (+lg[2]), 1) + ' a game by their history' : 'free throws ' + fta.toFixed(1) + ' and points ' + pts.toFixed(1) + ' a game by their history') +
+             (past ? '; the past table\'s over rate with these ' + known.length + ' is <b>' + (rate * 100).toFixed(1) + '%</b> on ' + past + ' games, ' + leanTxt : '') +
+             '. <span class="dim">Shown, not scored: the total did not follow the crew over two seasons of closes; the referee watch on the record is the test.</span></div>';
+    }
+    el.innerHTML = '<div class="crewblock lean-' + lean + '"><span class="cbadge">shown</span> ' + alert + ' <span class="ctext">' + esc(crew.t || "") + '</span>' +
+                   '<span class="crewchips">' + chips + '</span>' + call + (crew.tag ? ' <span class="ctag">' + esc(crew.tag) + '</span>' : '') + '</div>';
+  }
   function forecastMatchupNba() {
-    if (!SRC) { nbaOutPanel(); nbaLineupPanel(); nbaFormPanel(); nbaCtxPanel(); }   // the form's panels: not while a card row is being re-scored
+    if (!SRC) { nbaOutPanel(); nbaLineupPanel(); nbaFormPanel(); nbaCrewPanel(); nbaCtxPanel(); }   // the form's panels: not while a card row is being re-scored
     var f = readNba();
     var away = f.away, home = f.home, line = f.line;
     var op = num("op"), up = num("up"), hml = num("hml"), aml = num("aml");
@@ -604,7 +617,7 @@
     }
     h += '<div class="verdict">An official 1.5 sigma or more over or under the close across 2024-25 and 2025-26 <b>leans</b> (eight officials over, 450-286 pooled; seven under, 175-270), and a crew leans by the sum of its three. ' +
          'The test is whether the past lean carries: if the over crews keep running over and the under crews under, the crew becomes an input at the season\'s end, scored at what this block says. Two seasons of closes said crews predict free throws (t 7.3) and the total does not follow (t −1.0), so expect both leans to drift toward the league\'s rate. ' +
-         'One standard error at twenty games is eleven points; read nothing under a hundred a line. On the matchup, the crew line in the Context card carries the same lean as its badge.' +
+         'One standard error at twenty games is eleven points; read nothing under a hundred a line. On the matchup, the Referee stats card carries the same lean as its badge.' +
          (any ? '' : ' Nothing graded yet with a crew in the Crew box and a close on the card.') +
          (noCrew ? ' ' + noCrew + ' graded game' + (noCrew === 1 ? '' : 's') + ' without a crew.' : '') + (noClose ? ' ' + noClose + ' without a close.' : '') + '</div>';
     return h;

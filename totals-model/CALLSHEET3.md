@@ -1031,11 +1031,22 @@ the past table says, this season's over rate in the over or under colour,
 the standard error, points against the close, a flat bet on the lean), and
 one by official for everyone who has worked a graded game on the card, the
 leaning ones first, with his past record and z, this season's record, over
-rate and points. On the matchup the crew line moves to the top of the
-Context card, highlighted in the lean's colour with a badge ("Crew leans
-OVER · z +4.4", or "Crew even"), and each official is a chip with his past
-record, his own lean and this season's record (`nbaCrewDetails`,
+rate and points. On the matchup the crew gets its own card, **Referee
+stats**, above Context (the user, later the same evening: "change the name
+from context to Referee stats... make sure that's set up for all NBA games
+moving forward"): the crew line highlighted in the lean's colour with a
+badge ("Crew leans OVER · z +4.4", or "Crew even"), each official a chip
+with his past record, his own lean and this season's record, the Crew box
+and the league's link under it (`nbaCrewPanel`, `nbaCrewDetails`,
 `nbaRefLookup`; the sentence itself is unchanged so the record's text is).
+The Context card keeps the clubs' ranks alone. Every NBA row with a crew in
+its box renders the card; a crew of three officials inside 1.5 sigma reads
+"Crew even" in grey, which is the usual case. Under the chips, a **crew
+call for tonight** (the user: "maybe a little prediction too"): the crew's
+free throws against the league's (the one thing a crew predicts, t 7.3),
+their points a game against the league's by history (the total did not
+follow, t −1.0), and the past table's pooled over rate with these three as
+a soft lean. Never scored; the referee watch on the record is the test.
 
 ## The sport buttons, 22 Oct 2026
 

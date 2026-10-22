@@ -3682,6 +3682,12 @@ PROPS_FORMAT = "callsheet3.props"
 PROPS_MARKETS = (("pts", "player_points", "points"), ("reb", "player_rebounds", "rebounds"), ("ast", "player_assists", "assists"),
                  ("tpm", "player_threes", "threes"), ("pra", "player_points_rebounds_assists", "points + rebounds + assists"))
 PROPS_SD_K = {"pts": 1.85, "reb": 1.2, "ast": 1.15, "tpm": 1.1, "pra": 1.9}      # one sigma = k x sqrt(projection), measured per market
+# the centre (22 Oct 2026): the mean sits above the median on a right-skewed stat, so the chance is read
+# around the mean shifted down by this fraction of a sigma (tools_backtest_nba_props_median.py: 2025-26
+# all five markets, 2024-25 points; a shift fitted on a season's first half put the second half's over
+# rate at 50 +/- 3 on every market). PROPS_MEDIAN_OVER is the over rate at the mean, for the why line.
+PROPS_MEDIAN_SHIFT = {"pts": 0.08, "reb": 0.11, "ast": 0.14, "tpm": 0.23, "pra": 0.05}
+PROPS_MEDIAN_OVER = {"pts": 0.47, "reb": 0.46, "ast": 0.45, "tpm": 0.41, "pra": 0.48}
 PROPS_OUT_MIN_PER30 = 1.42                                                    # minutes added per 30 mpg of regulars out (t 36)
 PROPS_OUT_RATE_PER30 = {"pts": 0.56, "reb": 0.0, "ast": 0.09, "tpm": 0.0, "pra": 0.66}   # per 36, per 30 mpg out (points t 11, assists t 6; the rest null)
 PROPS_PRIOR_CAP = 1000.0
@@ -4131,7 +4137,12 @@ def props_project(prop, logs_this, logs_last, ctx):
             sp["home"][0], sp["road"][0], int(sp["home"][1] + sp["road"][1]), "; tonight at home" if ctx.get("home") else "; tonight on the road"))
     mu = rate * mins * f_pace * f_dvp
     sd = PROPS_SD_K[mk] * math.sqrt(max(mu, 1.0))
-    pm, push = props_over(mu, sd, line)
+    # the centre (22 Oct 2026): a box-score stat skews right, so the mean sits above the median and a
+    # normal centred on the mean says 50% for a number the man clears 46% of the time (41% on threes);
+    # the books post the median. The chance is read around the median, the mean shifted down by the
+    # measured fraction of a sigma (tools_backtest_nba_props_median.py, both seasons)
+    centre = mu - PROPS_MEDIAN_SHIFT[mk] * sd
+    pm, push = props_over(centre, sd, line)
     pm_c = pm / (1.0 - push) if push < 1.0 else 0.5
     pb = props_devig(prop["op"], prop["up"])
     p = props_blend(pb, pm_c)
@@ -4141,8 +4152,8 @@ def props_project(prop, logs_this, logs_last, ctx):
     need = props_implied(price)
     edge = chance - need
     band = "BET" if (edge >= PROPS_BET_EDGE and chance >= PROPS_BET_CHANCE) else ("LEAN" if edge > 0 else "no edge")
-    why.append("projected %.1f against %s %.1f, one sigma %.1f: the over %.1f%% by the projection, %.1f%% by the book's prices; blended %.1f%% at %.0f to %.0f" % (
-        mu, label, line, sd, pm * 100, pb * 100, p * 100, PROPS_ANCHOR, PROPS_MODEL_W))
+    why.append("projected %.1f against %s %.1f, one sigma %.1f, the chance read around the median %.1f (the stat skews right: at the mean the over lands %.0f%% of the time): the over %.1f%% by the projection, %.1f%% by the book's prices; blended %.1f%% at %.0f to %.0f" % (
+        mu, label, line, sd, centre, PROPS_MEDIAN_OVER[mk] * 100, pm * 100, pb * 100, p * 100, PROPS_ANCHOR, PROPS_MODEL_W))
     # what moves it (21 Oct 2026, the user: "highlight the areas of the prop bet that are
     # helping with the prediction the most"): each factor's push on the projection in the
     # stat's units, the others held, each pointing at its why line. The base is his own
@@ -5427,9 +5438,10 @@ def selftest():
     ctx_ = {"out_mpg": 30.0, "out_names": [("Kyrie Irving", 30.0, "Out")], "maybe": [("Some Body", "Questionable")], "pace": 100.0, "league_pace": 98.0, "home": False, "pos": "G", "opp_nick": "Lakers",
             "dvp": {"f": 25.0 / 24.0, "f_this": 25.0 / 24.0, "n_this": 10, "f_last": None, "n_last": 0}, "htb": "HashtagBasketball: Lakers allow 25.0 points a game to PGs (120th of 150, 1 the fewest); shown, not scored", "self_out": ""}
     proj_, why_ = props_project(prop_, lt["11"]["g"], ll["11"]["g"], ctx_)
-    check("props: the projection is rate x minutes, the regulars out, pace and the defence, against the line",
-          abs(proj_["proj"] - 34.48) < 0.05 and abs(proj_["sd"] - 10.86) < 0.02 and proj_["side"] == "OVER" and abs(proj_["p"] - 0.549) < 0.002 and proj_["band"] == "LEAN"
-          and abs(proj_["edge"] - 0.025) < 0.002 and proj_["price"] == -110 and abs(proj_["mins"] - 37.4) < 0.05)
+    check("props: the projection is rate x minutes, the regulars out, pace and the defence, against the line; the chance read around the median (the mean less 0.08 sigmas on points)",
+          abs(proj_["proj"] - 34.48) < 0.05 and abs(proj_["sd"] - 10.86) < 0.02 and proj_["side"] == "OVER" and abs(proj_["p"] - 0.538) < 0.002 and proj_["band"] == "LEAN"
+          and abs(proj_["edge"] - 0.0144) < 0.002 and proj_["price"] == -110 and abs(proj_["mins"] - 37.4) < 0.05 and abs(proj_["pm"] - 0.6128) < 0.002
+          and abs(props_over(34.48 - 0.08 * 10.86, 10.86, 30.5)[0] - proj_["pm"]) < 0.001)
     parts_ = dict((p["k"], p) for p in proj_["parts"])
     check("props: what moves it: the base is his rate at his minutes, the regulars out, pace and the defence sum from it to the projection, the prior and the minutes trend say what sits inside it, each pointing at its why line",
           set(parts_) == {"prior", "minutes", "out", "pace", "dvp"} and abs(proj_["base"] + parts_["out"]["eff"] + parts_["pace"]["eff"] + parts_["dvp"]["eff"] - proj_["proj"]) < 0.03
@@ -5444,7 +5456,7 @@ def selftest():
           and any(w == "Lakers allow 1.04x the league's points per minute to guards (this season 1.04 over 10 games): x1.031 at 0.75 weight, measured" for w in why_)
           and any(w == ctx_["htb"] for w in why_)
           and any(w.startswith("home 30.9 / road 31.0 per 36 over 178 minutes: shown, not scored") and w.endswith("; tonight on the road") for w in why_)
-          and any(w.startswith("projected 34.5 against points 30.5, one sigma 10.9: the over 64.3% by the projection, 50.0% by the book's prices; blended 54.9% at 4 to 2") for w in why_))
+          and any(w == "projected 34.5 against points 30.5, one sigma 10.9, the chance read around the median 33.6 (the stat skews right: at the mean the over lands 47% of the time): the over 61.3% by the projection, 50.0% by the book's prices; blended 53.8% at 4 to 2" for w in why_))
     check("props: a listed-out player gets no projection, and no history is said", props_project(prop_, lt["11"]["g"], ll["11"]["g"], dict(ctx_, self_out="Out"))[0] is None
           and props_project(prop_, [], [], ctx_)[1] == ["no history to project from (under 60 minutes with the stat in the ledgers)"])
     check("props: a prop's name finds the player on one of the two clubs, by roster, by ledger, by surname, else says so",

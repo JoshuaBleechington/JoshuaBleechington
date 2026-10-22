@@ -954,3 +954,40 @@ Maxey over 25.5 with Embiid out: the regulars out +1.8 is the lever, the
 Knicks' defence −0.7 and the pace −0.3 lean against, the prior +0.4 and the
 minutes trend −0.4 sit inside the start. A props file from before the 21st
 has no parts, so its panel shows the why without the ranking.
+
+## The blowout test, and the props' centre, 22 Oct 2026
+
+The second night of props (21 Oct) went 321-326 with the BET band 38-53:
+seven of eleven games were decided by fifteen or more and the overs went
+105-162 in them against 87-65 in the close games. The user: "go ahead and
+build the blowout test and let's see if it matters."
+
+**It does not matter as an input.** `tools_backtest_nba_blowout.py` joins a
+season's ledger to the closing moneylines (the expected margin through the
+engine's 12.5-point normal). Regulars do lose minutes with the expected
+margin, 0.08 a point over two seasons (t −9; 1.4 minutes at twelve or more,
+the favourite's regulars 1.9), and the bench gains 0.09, in both halves of
+both seasons. But the stat projection's miss is flat across the expected
+margin, the over rate 46-47% in every bucket of both seasons, and shading
+the minutes by the fitted slope made the second half worse (points at 12+:
++0.17 to +0.82). The blowouts hurt after the fact, regulars −2.1 minutes
+and −0.8 points in games decided by 15+, but the spread does not say which
+games those will be: the 12+ bucket blows out 53% of the time against 31%
+for a pick-em, and on the 21st two of the seven blowouts were favoured by
+nine or more. Measured, not an input.
+
+**What the test found instead.** The over rate at the projection's own
+mean was 46-47% in every bucket, so the problem was never the blowout: a
+box-score stat skews right, the mean sits above the median, and a normal
+centred on the mean says 50% for a number the man clears 46% of the time,
+41% on threes. The books post the median. `tools_backtest_nba_props_median.py`
+measures the shift of the centre that puts the over rate at 50%: 0.08
+sigmas on points (0.09 and 0.07 by season), 0.11 rebounds, 0.14 assists,
+0.23 threes, 0.05 combined; a shift fitted on the first half of 2025-26 put
+the second half's over rate at 50 ± 3 on every market. The slate now reads
+the chance around the median (`PROPS_MEDIAN_SHIFT`; the projection shown is
+still the mean, the why line names the median). Re-scoring the first two
+nights' 829 props with the shift, their own lines and prices: 452-377
+against 423-406 as shipped, the BET band 44-47 against 51-57, the sheet's
+say-so 55.5% against 54.5% done where it had said 55.7% and done 51.0%. The
+overs in the BET band fall from 88 of 108 to 62 of 91.

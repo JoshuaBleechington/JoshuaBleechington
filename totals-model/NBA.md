@@ -344,3 +344,23 @@ table is by those three and the website's five positions fold into them.
 And a player's last five games of last season are April's minutes (Cade
 Cunningham's averaged 23.6), so before he has played this season the
 projection uses last season's whole-season mean instead.
+
+**The blowout, and the centre (22 Oct 2026).** The second night went
+321-326 with seven of eleven games decided by fifteen or more, the overs
+105-162 in those games. `tools_backtest_nba_blowout.py` asked both seasons'
+ledgers, joined to the closing moneylines, whether the market's expected
+margin predicts the shortfall in a regular's minutes and so the projection's
+miss. The minutes, yes: 0.08 a point over two seasons (t −9), 1.4 minutes at
+twelve or more, the favourite's regulars most, the bench the other way. The
+miss, no: the projection's bias and over rate were flat across the expected
+margin in both seasons, and shading the minutes by the slope made the second
+half worse. The blowouts that hurt were not in the spreads. Measured, not an
+input. What the test found instead is that the over rate at the projection's
+own mean is 46-47% everywhere, 41% on threes: a box-score stat skews right,
+the mean sits above the median, and the books post the median.
+`tools_backtest_nba_props_median.py` measures the shift that centres the
+chance, 0.08 sigmas on points, 0.11 rebounds, 0.14 assists, 0.23 threes and
+0.05 combined, holding from the first half of 2025-26 to the second and on
+2024-25's points; the slate reads the chance around that median now, and
+re-scoring the first two nights' 829 props with it reads 452-377 against
+423-406 as shipped, the say-so within a point of the done.

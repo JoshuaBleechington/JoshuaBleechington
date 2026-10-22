@@ -1023,6 +1023,20 @@ count once they carry a crew, finals and a close; the verdict names the
 graded games missing either. Shown, never scored: the decision stays the
 season's end, and the harness grades an over crew and a no-lean crew.
 
+Reworked the same evening (the user: "add some color to the refs section...
+a little more organized... have the ref section on the matchup be
+highlighted, and if those particular refs are a signal or alert"). The
+block is two tables now: one by the crew's lean (games, over-under, what
+the past table says, this season's over rate in the over or under colour,
+the standard error, points against the close, a flat bet on the lean), and
+one by official for everyone who has worked a graded game on the card, the
+leaning ones first, with his past record and z, this season's record, over
+rate and points. On the matchup the crew line moves to the top of the
+Context card, highlighted in the lean's colour with a badge ("Crew leans
+OVER · z +4.4", or "Crew even"), and each official is a chip with his past
+record, his own lean and this season's record (`nbaCrewDetails`,
+`nbaRefLookup`; the sentence itself is unchanged so the record's text is).
+
 ## Recent form on the NBA card, 22 Oct 2026
 
 The user: "add in the last 5 games for the teams like you do for NHL, with

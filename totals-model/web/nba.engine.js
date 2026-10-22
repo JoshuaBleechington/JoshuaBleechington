@@ -229,8 +229,25 @@
     }
     var order = { scored: 0, faded: 1, shown: 2, label: 3 };
     items.sort(function (a, b) { return (order[a.s] || 0) - (order[b.s] || 0); });
+    /* the crew first and highlighted (22 Oct 2026, the user: "have the ref section on the matchup be highlighted, and if
+       those particular refs are a signal or alert"): the crew's lean in the frozen table as a badge on the line, each
+       official as a chip with his past record and his own lean; the sentence itself is unchanged */
+    var crewI = -1;
+    items.forEach(function (c, i) { if (c.k === "crew" && crewI < 0) crewI = i; });
+    if (crewI > 0) items.unshift(items.splice(crewI, 1)[0]);
+    var refsRaw = ($("nbarefs") || {}).value || "", refsD = null;
+    try { refsD = refsRaw ? JSON.parse(refsRaw) : null; } catch (e) { refsD = null; }
     el.innerHTML = '<ul class="ctx">' + items.map(function (c) {
       var s = order[c.s] !== undefined ? c.s : "shown";
+      if (c.k === "crew") {
+        var det = nbaCrewDetails(nbaCrewNames(($("ncrew") || {}).value), refsD), lean = det && det.found ? det.lean : "even";
+        var alert = lean === "even" ? '<span class="crewalert even">' + (det && det.found ? 'Crew even' : 'Crew unread') + '</span>' : '<span class="crewalert ' + lean + '">Crew leans ' + lean.toUpperCase() + ' · z ' + sgn(det.z, 1) + '</span>';
+        var chips = det ? det.officials.map(function (o) {
+          return '<span class="refchip ' + o.lean + '">' + esc(o.name) + (o.d ? ' <b>' + o.pastW + '-' + o.pastL + '</b>' + (o.lean !== "even" ? ' ' + o.lean.toUpperCase() + ' LEAN' : '') + (o.thisW + o.thisL ? ' · ' + o.thisW + '-' + o.thisL + ' this season' : '') : ' <span class="dim">no games</span>') + '</span>';
+        }).join("") : "";
+        return '<li class="ctx-' + s + ' ctx-crew lean-' + lean + '"><span class="cbadge">' + s + '</span> ' + alert + ' <span class="ctext">' + esc(c.t || "") + '</span>' +
+               '<span class="crewchips">' + chips + '</span>' + (c.tag ? ' <span class="ctag">' + esc(c.tag) + '</span>' : '') + '</li>';
+      }
       return '<li class="ctx-' + s + '"><span class="cbadge">' + s + '</span> <span class="ctext">' + esc(c.t || "") + '</span>' +
              (c.tag ? ' <span class="ctag">' + esc(c.tag) + '</span>' : '') + '</li>';
     }).join("") + '</ul>';
@@ -502,54 +519,92 @@
      season's end, and the test is whether the past table's lean carries ---- */
   var NBA_REF_Z = 1.5;
   function nbaRefZ(rec) { var w = +rec[3] || 0, l = +rec[4] || 0; return (w + l) ? (w - l) / Math.sqrt(w + l) : 0; }
+  function nbaRefLean(z) { return z >= NBA_REF_Z ? "over" : z <= -NBA_REF_Z ? "under" : "even"; }
+  function nbaRefLookup(table, n) {
+    if (table[n]) return table[n];
+    var keys = Object.keys(table), low = n.toLowerCase(), hit = keys.filter(function (k) { return k.toLowerCase() === low; });
+    if (!hit.length) { var last = low.split(" ").pop(); hit = keys.filter(function (k) { return k.toLowerCase().split(" ").pop() === last; }); }
+    return hit.length === 1 ? table[hit[0]] : null;
+  }
+  function nbaCrewNames(s) { return String(s || "").split(/[,;]+/).map(function (x) { return x.trim(); }).filter(function (x) { return x; }); }
+  /* the crew read against the frozen table: each official's past record, its z and lean, this season's record, and the crew's own lean (the sum of the z's) */
+  function nbaCrewDetails(names, refs) {
+    if (!names.length) return null;
+    var table = refs && refs.r ? refs.r : {}, z = 0, found = 0, pastW = 0, pastL = 0, officials = [];
+    names.forEach(function (n) {
+      var d = nbaRefLookup(table, n);
+      var o = { name: n, d: d && d.length >= 5 ? d : null, z: 0, lean: "even", pastW: 0, pastL: 0, thisW: 0, thisL: 0 };
+      if (o.d) {
+        o.z = nbaRefZ(o.d); o.lean = nbaRefLean(o.z); o.pastW = +o.d[3] || 0; o.pastL = +o.d[4] || 0; o.thisW = +o.d[5] || 0; o.thisL = +o.d[6] || 0;
+        found++; z += o.z; pastW += o.pastW; pastL += o.pastL;
+      }
+      officials.push(o);
+    });
+    return { officials: officials, z: z, lean: found ? nbaRefLean(z) : "even", pastW: pastW, pastL: pastL, found: found };
+  }
   function nbaCrewLean(row) {
-    var names = String((row.inputs || {}).ncrew || "").split(/[,;]+/).map(function (s) { return s.trim(); }).filter(function (s) { return s; });
+    var names = nbaCrewNames((row.inputs || {}).ncrew);
     if (!names.length) return null;
     var refs = null;
     try { refs = row.inputs.nbarefs ? JSON.parse(row.inputs.nbarefs) : null; } catch (e) { refs = null; }
-    var table = refs && refs.r ? refs.r : {}, keys = Object.keys(table), z = 0, found = 0, pastW = 0, pastL = 0;
-    names.forEach(function (n) {
-      var d = table[n];
-      if (!d) {
-        var low = n.toLowerCase(), hit = keys.filter(function (k) { return k.toLowerCase() === low; });
-        if (!hit.length) { var last = low.split(" ").pop(); hit = keys.filter(function (k) { return k.toLowerCase().split(" ").pop() === last; }); }
-        d = hit.length === 1 ? table[hit[0]] : null;
-      }
-      if (!d || d.length < 5) return;
-      found++; z += nbaRefZ(d); pastW += +d[3] || 0; pastL += +d[4] || 0;
-    });
-    if (!found) return null;
-    return { z: z, lean: z >= NBA_REF_Z ? "over" : z <= -NBA_REF_Z ? "under" : "even", pastW: pastW, pastL: pastL, found: found };
+    var det = nbaCrewDetails(names, refs);
+    return det && det.found ? det : null;
   }
+  /* the block on the record (reworked 22 Oct 2026, the user: "add some color... a little more organized"): one table by the
+     crew's lean, one by official for everyone who has worked a graded game, the colours on the season's rate and the points */
   function nbaRefsWatchHtml() {
-    var mk = function (label, side) { return { label: label, side: side, n: 0, o: 0, u: 0, p: 0, says: 0, pts: 0, units: 0 }; };
-    var g = { over: mk("Crews leaning over in the past table", "over"), even: mk("Crews with no lean", null), under: mk("Crews leaning under in the past table", "under") };
-    var noCrew = 0, noClose = 0;
+    var mk = function (lean) { return { lean: lean, n: 0, o: 0, u: 0, p: 0, says: 0, pts: 0, units: 0 }; };
+    var g = { over: mk("over"), even: mk("even"), under: mk("under") }, byRef = {}, noCrew = 0, noClose = 0;
+    var tally = function (s, res, diff, says) {
+      if (res === "push") { s.p++; return; }
+      s.n++; s.pts += diff; s.says += says;
+      if (res === "over") s.o++; else s.u++;
+    };
     card.forEach(function (r) {
       if (r.sport !== "NBA" || !r.finals || blank(r.finals.fa) || blank(r.finals.fh)) return;
-      var lean = nbaCrewLean(r);
-      if (!lean) { noCrew++; return; }
+      var cl = nbaCrewLean(r);
+      if (!cl) { noCrew++; return; }
       var c = parseFloat((r.close || {}).ctot);
       if (!isFinite(c)) { noClose++; return; }
-      var total = (+r.finals.fa) + (+r.finals.fh), s = g[lean.lean];
-      if (total === c) { s.p++; return; }
-      s.n++; s.says += lean.pastW / (lean.pastW + lean.pastL); s.pts += total - c;
-      if (total > c) s.o++; else s.u++;
-      if (s.side) s.units += ((s.side === "over") === (total > c)) ? 100 / 110 : -1;
+      var total = (+r.finals.fa) + (+r.finals.fh), res = total > c ? "over" : total < c ? "under" : "push", says = cl.pastW + cl.pastL ? cl.pastW / (cl.pastW + cl.pastL) : 0.5;
+      var s = g[cl.lean];
+      tally(s, res, total - c, says);
+      if (res !== "push" && cl.lean !== "even") s.units += ((cl.lean === "over") === (res === "over")) ? 100 / 110 : -1;
+      cl.officials.forEach(function (o) {
+        if (!o.d) return;
+        var sr = byRef[o.name] || (byRef[o.name] = { name: o.name, lean: o.lean, z: o.z, pastW: o.pastW, pastL: o.pastL, n: 0, o: 0, u: 0, p: 0, pts: 0, says: 0, units: 0 });
+        tally(sr, res, total - c, o.pastW + o.pastL ? o.pastW / (o.pastW + o.pastL) : 0.5);
+      });
     });
     var any = g.over.n + g.even.n + g.under.n + g.over.p + g.even.p + g.under.p;
-    var tile = function (s) {
-      if (!s.n) return '<div><p class="k">' + esc(s.label) + '</p><p class="v">0-0</p><p class="s">' + (s.p ? s.p + ' push' + (s.p === 1 ? '' : 'es') + ' only' : 'nothing graded with a crew and a close yet') + '</p></div>';
-      var says = s.says / s.n * 100, does = s.o / s.n * 100, se = 100 / Math.sqrt(s.n) / 2;
-      return '<div><p class="k">' + esc(s.label) + '</p><p class="v">over ' + s.o + '-' + s.u + (s.p ? '-' + s.p : '') + '</p>' +
-        '<p class="s">the past table says ' + says.toFixed(1) + '% over · this season ' + does.toFixed(1) + '% over (±' + se.toFixed(1) + ')</p>' +
-        '<p class="s sides">' + sgn(s.pts / s.n, 1) + ' pts against the close a game on ' + s.n + (s.side ? ' · flat on the ' + s.side + ' ' + sgn(s.units, 2) + 'u' : ' · no side to take') + '</p></div>';
-    };
+    var chip = function (lean) { return lean === "over" ? '<span class="chip over">OVER LEAN</span>' : lean === "under" ? '<span class="chip under">UNDER LEAN</span>' : '<span class="chip push">EVEN</span>'; };
+    var pct = function (x) { return (x * 100).toFixed(1) + "%"; };
+    var rateCell = function (s) { var r = s.o / s.n; return '<td class="' + (r > 0.5 ? "over" : r < 0.5 ? "under" : "") + '">' + pct(r) + '</td>'; };
+    var ptsCell = function (s) { var v = s.pts / s.n; return '<td class="' + (v > 0 ? "over" : v < 0 ? "under" : "") + '">' + sgn(v, 1) + '</td>'; };
+    var unitsCell = function (s, lean) { return lean === "even" ? '<td class="dim">no side</td>' : '<td class="' + (s.units > 0 ? "pos" : s.units < 0 ? "neg" : "") + '">' + sgn(s.units, 2) + 'u</td>'; };
     var h = '<div class="subhead" data-sport="REFS">The referees, as a watch <span class="tag">this season\'s graded totals against the close, by the crew\'s lean in the frozen two-season table · shown, never scored</span></div>';
-    h += '<div class="calib" data-sport="REFS">' + tile(g.over) + tile(g.even) + tile(g.under) + '</div>';
-    h += '<div class="verdict">An official 1.5 sigma or more over or under the close across 2024-25 and 2025-26 leans (eight officials over, 450-286 pooled; seven under, 175-270), and a crew leans by the sum of its three. ' +
-         'The test is whether the past lean carries: if the over crews keep running over and the under crews under, the crew becomes an input at the season\'s end, scored at what this block says. Two seasons of closes said crews predict free throws (t 7.3) and the total does not follow (t −1.0), so expect both tiles to drift toward the league\'s rate. ' +
-         'One standard error at twenty games is eleven points; read nothing under a hundred a tile.' +
+    h += '<table class="form refs" id="refsLean"><thead><tr><th>Crew lean</th><th>Games</th><th>Over–under</th><th>Past says over</th><th>This season over</th><th>±</th><th>Pts v close</th><th>Flat on the lean</th></tr></thead><tbody>';
+    ["over", "even", "under"].forEach(function (lean) {
+      var s = g[lean];
+      if (!s.n) { h += '<tr><td>' + chip(lean) + '</td><td>0</td><td class="dim" colspan="6">' + (s.p ? s.p + ' push' + (s.p === 1 ? '' : 'es') + ' only' : 'nothing graded with a crew and a close yet') + '</td></tr>'; return; }
+      h += '<tr><td>' + chip(lean) + '</td><td>' + s.n + '</td><td>' + s.o + '-' + s.u + (s.p ? '-' + s.p : '') + '</td><td>' + pct(s.says / s.n) + '</td>' + rateCell(s) + '<td class="dim">' + (100 / Math.sqrt(s.n) / 2).toFixed(1) + '</td>' + ptsCell(s) + unitsCell(s, lean) + '</tr>';
+    });
+    h += '</tbody></table>';
+    var refs = Object.keys(byRef).map(function (k) { return byRef[k]; }).sort(function (a, b) { return Math.abs(b.z) - Math.abs(a.z) || a.name.localeCompare(b.name); });
+    var refTable = function (id, list) {
+      return '<table class="form refs" id="' + id + '"><thead><tr><th>Official</th><th>Lean</th><th>Past two seasons</th><th>This season</th><th>Over rate</th><th>Pts v close</th></tr></thead><tbody>' + list.map(function (s) {
+        return '<tr><td>' + esc(s.name) + '</td><td>' + chip(s.lean) + '</td><td>' + s.pastW + '-' + s.pastL + ' <span class="dim">z ' + sgn(s.z, 1) + '</span></td><td>' + s.o + '-' + s.u + (s.p ? '-' + s.p : '') + '</td>' + (s.n ? rateCell(s) : '<td>—</td>') + (s.n ? ptsCell(s) : '<td>—</td>') + '</tr>';
+      }).join("") + '</tbody></table>';
+    };
+    var leaning = refs.filter(function (s) { return s.lean !== "even"; }), even = refs.filter(function (s) { return s.lean === "even"; });
+    if (refs.length) {
+      h += '<div class="subhead">The leaning officials <span class="tag">the ones the past table flags, who have worked a graded game on the card</span></div>';
+      h += leaning.length ? refTable("refsRefs", leaning) : '<div class="verdict">None of the leaning officials has worked a graded game on the card yet.</div>';
+      if (even.length) h += '<details class="fold refsfold"><summary><span>Officials with no lean</span> <span class="tag">' + even.length + ' within 1.5 sigma of even in the past table, by the size of the tilt</span></summary><div class="body">' + refTable("refsEven", even) + '</div></details>';
+    }
+    h += '<div class="verdict">An official 1.5 sigma or more over or under the close across 2024-25 and 2025-26 <b>leans</b> (eight officials over, 450-286 pooled; seven under, 175-270), and a crew leans by the sum of its three. ' +
+         'The test is whether the past lean carries: if the over crews keep running over and the under crews under, the crew becomes an input at the season\'s end, scored at what this block says. Two seasons of closes said crews predict free throws (t 7.3) and the total does not follow (t −1.0), so expect both leans to drift toward the league\'s rate. ' +
+         'One standard error at twenty games is eleven points; read nothing under a hundred a line. On the matchup, the crew line in the Context card carries the same lean as its badge.' +
          (any ? '' : ' Nothing graded yet with a crew in the Crew box and a close on the card.') +
          (noCrew ? ' ' + noCrew + ' graded game' + (noCrew === 1 ? '' : 's') + ' without a crew.' : '') + (noClose ? ' ' + noClose + ' without a close.' : '') + '</div>';
     return h;

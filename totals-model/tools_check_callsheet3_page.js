@@ -426,6 +426,9 @@ const CHECKS = ["dome","playoff","agconf","hgconf","agbk","hgbk"];
     const opened = document.getElementById('opened').value;
     const crewText = () => ([...document.querySelectorAll('#nbaCtxPanel ul.ctx li')].map(li => li.querySelector('.ctext').textContent).find(t => /^Crew:/.test(t)) || '');
     const crew0 = crewText();
+    const crewLi = document.querySelector('#nbaCtxPanel ul.ctx li.ctx-crew');
+    const crewBlock = { first: document.querySelector('#nbaCtxPanel ul.ctx li').classList.contains('ctx-crew'), cls: crewLi ? crewLi.className : '', alert: ((crewLi && crewLi.querySelector('.crewalert')) || {}).textContent || '',
+                        chips: crewLi ? [...crewLi.querySelectorAll('.refchip')].map(e => e.className + '|' + e.textContent.replace(/\s+/g, ' ').trim()) : [] };
     // the crew typed by hand: a surname alone matches when it is unique in the table, an unknown name says so
     const el = document.getElementById('ncrew'); el.value = 'Zarba; Nobody Here'; el.dispatchEvent(new Event('input', { bubbles: true })); await wait();
     const crew1 = crewText();
@@ -434,8 +437,11 @@ const CHECKS = ["dome","playoff","agconf","hgconf","agbk","hgbk"];
     document.getElementById('add').click(); await wait();
     const stored = JSON.parse(localStorage.getItem('callsheet3.card.v1')).find(r => /76ers @ Knicks/.test(r.matchup));
     document.getElementById('clear').click(); await wait();
-    return { out, lineup, ctx, why, rail, pick, also, likelyCard, likelyRow, opened, crew0, crew1, crew2, ctxNoCrew, storedRefs: (stored.inputs.nbarefs || '').length > 10, storedCrew: stored.inputs.ncrew, storedLineup: (stored.inputs.nbalineup || '').indexOf('Tyrese Maxey') > 0 };
+    return { out, lineup, ctx, why, rail, pick, also, likelyCard, likelyRow, opened, crew0, crew1, crew2, ctxNoCrew, storedRefs: (stored.inputs.nbarefs || '').length > 10, storedCrew: stored.inputs.ncrew, storedLineup: (stored.inputs.nbalineup || '').indexOf('Tyrese Maxey') > 0, crewBlock };
   });
+  chk(nbaEx.crewBlock.first && /ctx-crew lean-over/.test(nbaEx.crewBlock.cls) && nbaEx.crewBlock.alert === 'Crew leans OVER · z +4.4'
+      && nbaEx.crewBlock.chips.join(' || ') === 'refchip over|Scott Foster 66-41 OVER LEAN · 4-2 this season || refchip even|Tony Brothers 56-54 · 3-3 this season || refchip over|Marc Davis 71-51 OVER LEAN',
+      'nba crew: the crew line sits first on the Context card, highlighted with the crew\'s lean as its badge, each official a chip with his past record, his lean and this season', JSON.stringify(nbaEx.crewBlock));
   chk(/76ers\s+expected/i.test(nbaEx.lineup) && /Knicks\s+confirmed/i.test(nbaEx.lineup) && /PG\s+Tyrese Maxey/.test(nbaEx.lineup) && /C\s+Karl-Anthony Towns/.test(nbaEx.lineup)
       && /Joel Embiid \(Out\)/.test(nbaEx.lineup) && /Mitchell Robinson \(Out\)/.test(nbaEx.lineup) && nbaEx.storedLineup,
       'nba example: both starting fives on the card, the 76ers expected and the Knicks confirmed, Embiid and Robinson under may-not-play, and the lineup stored with the row', nbaEx.lineup);
@@ -451,7 +457,7 @@ const CHECKS = ["dome","playoff","agconf","hgconf","agbk","hgbk"];
   chk(nbaEx.storedRefs && nbaEx.storedCrew === '', 'nba crew: the referee table rides in the row and the crew box is stored as typed', JSON.stringify({ refs: nbaEx.storedRefs, crew: nbaEx.storedCrew }));
   chk(/76ers: 3 listed, 32 minutes a game of regulars out/.test(nbaEx.out) && /Knicks: 2 listed, 22 minutes a game/.test(nbaEx.out) && /Embiid \(knee\) has been ruled out/.test(nbaEx.out) && /back Nov 10/.test(nbaEx.out) && /last season's line/.test(nbaEx.out),
       'nba example: the who-is-out card lists both sides with the comments, the return dates and the traded man\'s last-season line', nbaEx.out.slice(0, 300));
-  chk(nbaEx.ctx.length === 10 && nbaEx.ctx.slice(0, 3).every(b => b === 'faded') && nbaEx.ctx.indexOf('label') > nbaEx.ctx.indexOf('shown'), 'nba example: ten context lines with the crew, faded first, labels last', JSON.stringify(nbaEx.ctx));
+  chk(nbaEx.ctx.length === 10 && nbaEx.ctx[0] === 'shown' && nbaEx.ctx.slice(1, 4).every(b => b === 'faded') && nbaEx.ctx.indexOf('label') > nbaEx.ctx.indexOf('shown'), 'nba example: ten context lines, the crew first, then faded, labels last', JSON.stringify(nbaEx.ctx));
   chk(/Ratings, faded/.test(nbaEx.why) && /Early-season side watch/.test(nbaEx.why) && /Back to back for the home side/.test(nbaEx.why) && /Regulars out, minutes a game: away 32, home 22/.test(nbaEx.why) && /The number moved 229\.5 to 231\.5/.test(nbaEx.why),
       'nba example: the why list carries the fade, the side watch, the back to back, the regulars out and the move off the opener', nbaEx.why.slice(0, 400));
   chk(nbaEx.rail.length === 4 && nbaEx.opened === '229.5' && /an? (OVER|UNDER) game|No pick/.test(nbaEx.pick), 'nba example: all four markets on the rail, the opener in its box, a pick card', JSON.stringify({ rail: nbaEx.rail, pick: nbaEx.pick, opened: nbaEx.opened }));
@@ -1165,19 +1171,20 @@ const CHECKS = ["dome","playoff","agconf","hgconf","agbk","hgbk"];
     const rowOf = (re) => [...document.querySelectorAll('#cardTable tr')].find(t => re.test(t.textContent));
     const g = (tr, k, v) => { const el = tr.querySelector(`.grade[data-k="${k}"]`); el.value = v; el.dispatchEvent(new Event('input', { bubbles: true })); el.dispatchEvent(new Event('change', { bubbles: true })); };
     g(rowOf(/76ers @ Knicks/), 'fa', '118'); g(rowOf(/76ers @ Knicks/), 'fh', '120'); g(rowOf(/76ers @ Knicks/), 'ctot', '231.5'); await wait();
-    const afterOne = [...document.querySelectorAll('#calibBox .calib[data-sport="REFS"] > div')].map(d => d.querySelector('.k').textContent + '|' + d.querySelector('.v').textContent + '|' + d.querySelector('.s').textContent + '|' + ((d.querySelector('.sides') || {}).textContent || ''));
+    const rowsOf = (id) => [...document.querySelectorAll('#' + id + ' tbody tr')].map(tr => [...tr.querySelectorAll('td')].map(td => td.className + ':' + td.textContent.trim()).join('|'));
+    const afterOne = rowsOf('refsLean'), refsOne = rowsOf('refsRefs').concat(rowsOf('refsEven'));
     g(rowOf(/Raptors @ Celtics/), 'fa', '100'); g(rowOf(/Raptors @ Celtics/), 'fh', '105'); g(rowOf(/Raptors @ Celtics/), 'ctot', '220'); await wait();
-    const tiles = [...document.querySelectorAll('#calibBox .calib[data-sport="REFS"] > div')].map(d => d.querySelector('.k').textContent + '|' + d.querySelector('.v').textContent + '|' + d.querySelector('.s').textContent + '|' + ((d.querySelector('.sides') || {}).textContent || ''));
-    const verdict = (document.querySelector('#calibBox .subhead[data-sport="REFS"] + .calib + .verdict') || {}).textContent || '';
+    const leanRows = rowsOf('refsLean'), refRows = rowsOf('refsRefs').concat(rowsOf('refsEven')), evenFolded = !!document.querySelector('#calibBox details.refsfold #refsEven');
+    const verdict = (document.querySelector('#refsLean ~ .verdict') || {}).textContent || '';
     localStorage.removeItem('callsheet3.card.v1'); document.getElementById('clear').click(); await wait();
-    return { empty: empty.replace(/\s+/g, ' ').slice(0, 120), afterOne, tiles, verdict: verdict.slice(0, 200) };
+    return { empty: empty.replace(/\s+/g, ' ').slice(0, 120), afterOne, refsOne, leanRows, refRows, evenFolded, verdict: verdict.slice(0, 200) };
   });
-  chk(refsW.empty === '' && refsW.afterOne.length === 3 && /^Crews leaning over in the past table\|over 1-0\|the past table says 56\.9% over · this season 100\.0% over \(±50\.0\)\|\+6\.5 pts against the close a game on 1 · flat on the over \+0\.91u$/.test(refsW.afterOne[0])
-      && /^Crews with no lean\|0-0\|nothing graded/.test(refsW.afterOne[1]),
-      'refs watch: the block sits under the NBA record once it has a graded game, the tiles empty until one carries a crew and a close; the example\'s crew leans over and its 238 against 231.5 counts as an over for the over crews, flat on the over', JSON.stringify({ empty: refsW.empty, tiles: refsW.afterOne }));
-  chk(/^Crews with no lean\|over 0-1\|the past table says 49\.2% over · this season 0\.0% over \(±50\.0\)\|[-−]15\.0 pts against the close a game on 1 · no side to take$/.test(refsW.tiles[1]) && /^Crews leaning under in the past table\|0-0\|/.test(refsW.tiles[2])
-      && /An official 1\.5 sigma or more/.test(refsW.verdict),
-      'refs watch: Zarba alone has no lean, so his 205 against 220 lands in the middle tile with no side taken, and the under tile waits', JSON.stringify({ tiles: refsW.tiles, verdict: refsW.verdict.slice(0, 80) }));
+  chk(refsW.empty === '' && refsW.afterOne.length === 3 && /^:OVER LEAN\|:1\|:1-0\|:56\.9%\|over:100\.0%\|dim:50\.0\|over:\+6\.5\|pos:\+0\.91u$/.test(refsW.afterOne[0]) && /^:EVEN\|:0\|dim:nothing graded/.test(refsW.afterOne[1])
+      && refsW.refsOne.length === 3 && /^:Scott Foster\|:OVER LEAN\|:66-41 z \+2\.4\|:1-0\|over:100\.0%\|over:\+6\.5$/.test(refsW.refsOne[0]) && /^:Marc Davis\|:OVER LEAN\|:71-51 z \+1\.8\|:1-0\|/.test(refsW.refsOne[1]) && /^:Tony Brothers\|:EVEN\|:56-54 z \+0\.2\|:1-0\|/.test(refsW.refsOne[2]),
+      'refs watch: one table by the crew\'s lean and one by official, in colour; the example\'s crew leans over and its 238 against 231.5 counts as an over, Foster and Davis the leaning officials, Brothers even', JSON.stringify({ empty: refsW.empty, lean: refsW.afterOne, refs: refsW.refsOne }));
+  chk(/^:EVEN\|:1\|:0-1\|:49\.2%\|under:0\.0%\|dim:50\.0\|under:[-−]15\.0\|dim:no side$/.test(refsW.leanRows[1]) && /^:UNDER LEAN\|:0\|dim:nothing graded/.test(refsW.leanRows[2])
+      && refsW.refRows.length === 4 && /^:Zach Zarba\|:EVEN\|:58-60 z [-−]0\.2\|:0-1\|under:0\.0%\|under:[-−]15\.0$/.test(refsW.refRows[3]) && refsW.evenFolded && /An official 1\.5 sigma or more/.test(refsW.verdict),
+      'refs watch: Zarba alone has no lean, so his 205 against 220 lands on the even line with no side taken, and he joins the folded no-lean officials last', JSON.stringify({ lean: refsW.leanRows, refs: refsW.refRows, folded: refsW.evenFolded, verdict: refsW.verdict.slice(0, 80) }));
 
   // ---- the build stamp ------------------------------------------------------------
   const stamp = await pg.evaluate(() => (document.getElementById('build') || {}).textContent);

@@ -1037,6 +1037,13 @@ OVER · z +4.4", or "Crew even"), and each official is a chip with his past
 record, his own lean and this season's record (`nbaCrewDetails`,
 `nbaRefLookup`; the sentence itself is unchanged so the record's text is).
 
+## The sport buttons, 22 Oct 2026
+
+The user: "rearrange the models to have Player props 1st, NBA 2nd and then
+the rest." The buttons read NBA PROPS, NBA, MLB, NHL, WNBA now (the build
+tool's "sport buttons" patch). The page still opens on MLB by default and
+the MLB button still starts pressed; only the order changed.
+
 ## Recent form on the NBA card, 22 Oct 2026
 
 The user: "add in the last 5 games for the teams like you do for NHL, with

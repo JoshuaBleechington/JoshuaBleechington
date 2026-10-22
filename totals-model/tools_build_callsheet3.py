@@ -62,14 +62,15 @@ def head() -> str:
     # "The Super Model": the user's name for the page, 15 Oct 2026, on the eve of the basketball book
     h = once(h, "<title>Call Sheet 2.0</title>", "<title>The Super Model</title>", "title")
     h = once(h, "<h1>Call Sheet <em>2.0</em></h1>", "<h1>The <em>Super</em> Model</h1>", "h1")
+    # the sport buttons (22 Oct 2026, the user: "Player props 1st, NBA 2nd and then the rest"): the props tab leads, then the
+    # NBA card, then the others in their old order; the MLB button still starts pressed, since MLB is the page's default sport
     h = once(h, '<button type="button" id="m-mlb" aria-pressed="true">MLB</button>\n      <button type="button" id="m-wnba" aria-pressed="false">WNBA</button>',
-             '<button type="button" id="m-mlb" aria-pressed="true">MLB</button>\n      <button type="button" id="m-nhl" aria-pressed="false">NHL</button>\n'
+             '<button type="button" id="m-props" aria-pressed="false">NBA PROPS</button>\n'
              '      <button type="button" id="m-nba" aria-pressed="false">NBA</button>\n'
+             '      <button type="button" id="m-mlb" aria-pressed="true">MLB</button>\n      <button type="button" id="m-nhl" aria-pressed="false">NHL</button>\n'
              '      <button type="button" id="m-wnba" aria-pressed="false">WNBA</button>', "sport buttons")
     h = once(h, '          <div id="spFields" hidden>', board + nboard + '          <div id="spFields" hidden>', "board sections")
     # the Props tab (19 Oct 2026): a fifth button, and the section that stands in for the matchup columns
-    h = once(h, '      <button type="button" id="m-wnba" aria-pressed="false">WNBA</button>',
-             '      <button type="button" id="m-wnba" aria-pressed="false">WNBA</button>\n      <button type="button" id="m-props" aria-pressed="false">NBA PROPS</button>', "props button")
     h = once(h, '  <section class="card" style="margin-top:20px">\n    <h2>Day board', pfrag + '  <section class="card" style="margin-top:20px">\n    <h2>Day board', "props section")
     h = once(h, '      <div id="wnbaFields" class="stack" hidden>', fields + nfields + '      <div id="wnbaFields" class="stack" hidden>', "NHL and NBA fields")
     h = re.sub(r'<span id="build">\d{4}-\d{2}-\d{2}</span>', f'<span id="build">{STAMP}</span>', h, count=1)

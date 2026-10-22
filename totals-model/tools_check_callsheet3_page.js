@@ -208,7 +208,9 @@ const CHECKS = ["dome","playoff","agconf","hgconf","agbk","hgbk"];
     set('nbaform', JSON.stringify({ away: [
       { date: '2027-03-30', opp: 'Knicks', home: false, pf: 104, pa: 112, h1f: 51, h1a: 58, end: 'REG', ctot: 221.5, ch1: 110.5, csp: -6.5 },
       { date: '2027-04-01', opp: 'Hornets', home: true, pf: 118, pa: 109, h1f: 60, h1a: 52, end: 'OT', ctot: 224.0, ch1: 111.5, csp: -7.5 },
-      { date: '2027-04-03', opp: 'Heat', home: false, pf: 99, pa: 101, h1f: 48, h1a: 50, end: 'REG', ctot: null, ch1: null, csp: null }], home: [] }));
+      { date: '2027-04-03', opp: 'Heat', home: false, pf: 99, pa: 101, h1f: 48, h1a: 50, end: 'REG', ctot: null, ch1: null, csp: null },
+      // this very game, without a close: once the row is on the card and graded, the panel borrows the card's line, half and spread
+      { date: '2027-04-06', opp: 'Celtics', home: false, pf: 101, pa: 115, h1f: 46, h1a: 54, end: 'REG', ctot: null, ch1: null, csp: null }], home: [] }));
     await wait();
     const form1 = document.getElementById('nbaFormPanel').innerText.replace(/\s+/g, ' ').trim();
     const formChips = [...document.querySelectorAll('#nbaFormPanel tbody tr')].map(tr => [...tr.querySelectorAll('.chip')].map(c => c.className.replace('chip ', '') + ':' + c.textContent).join(','));
@@ -238,14 +240,17 @@ const CHECKS = ["dome","playoff","agconf","hgconf","agbk","hgbk"];
     tr().querySelector('[data-open]').click(); await wait();
     const final = (document.querySelector('#markets .final') || {}).textContent || '';
     const reopened = document.getElementById('nbaOutPanel').innerText, lineupReopened = document.getElementById('nbaLineupPanel').innerText;
+    const formReopened = document.getElementById('nbaFormPanel').innerText.replace(/\s+/g, ' ').trim();
     document.getElementById('clear').click(); await wait();
     return { visible, rail, pick, why, panel0, panel1, q, why1, forecast, card: card.map(r => r.sport + ':' + r.matchup), keys: card[0].markets.map(m => m.key), boardRows, bets, label, graded, calib, nbaBlock, final, reopened, proj: card[0].proj, ctxLines, ctxStored: (card[0].inputs.nbactx || '').length > 10,
-             lineup0, lineup1, lineupBadges, lineupStored: card[0].inputs.nbalineup || '', lineupReopened, form0, form1, formChips, formStored: (card[0].inputs.nbaform || '').indexOf('Hornets') > 0 };
+             lineup0, lineup1, lineupBadges, lineupStored: card[0].inputs.nbalineup || '', lineupReopened, form0, form1, formChips, formStored: (card[0].inputs.nbaform || '').indexOf('Hornets') > 0, formReopened };
   });
-  chk(/^No recent games on the row/.test(nba.form0) && /^Raptors last 3: 1-2, over 1-1, covered 1-1, 107\.0 for and 107\.3 against, the half 53\.0–53\.3 \(over 1-1\)\./.test(nba.form1)
+  chk(/04-06 @ Celtics L 101–115 46–54 U 111\.5 UNDER 216\/221\.5 \+9\.5 NO/.test(nba.formReopened) && /^Raptors last 4: 1-3, over 1-2, covered 1-2/.test(nba.formReopened) && /04-06 @ Celtics L 101–115 46–54 216 no close —/.test(nba.form1),
+      'nba: a form game without a close borrows the card\'s own line, half and spread once the game is on the card, read from the right side', JSON.stringify({ before: nba.form1.slice(-120), after: nba.formReopened.slice(0, 420) }));
+  chk(/^No recent games on the row/.test(nba.form0) && /^Raptors last 4: 1-3, over 1-1, covered 1-1, 105\.5 for and 109\.3 against, the half 51\.3–53\.5 \(over 1-1\)\./.test(nba.form1)
       && /Celtics: no finals in the ledger yet\./.test(nba.form1) && /03-30 @ Knicks L 104–112 51–58 U 110\.5 UNDER 216\/221\.5 \+6\.5 NO/.test(nba.form1)
       && /04-01 v Hornets W 118–109 \(OT\) 60–52 O 111\.5 OVER 227\/224 -7\.5 COVERED/.test(nba.form1) && /04-03 @ Heat L 99–101 48–50 200 no close —/.test(nba.form1)
-      && nba.formChips.join('|') === 'loss:L,under:U 110.5,under:UNDER,loss:NO|win:W,over:O 111.5,over:OVER,win:COVERED|loss:L' && nba.formStored,
+      && nba.formChips.join('|') === 'loss:L,under:U 110.5,under:UNDER,loss:NO|win:W,over:O 111.5,over:OVER,win:COVERED|loss:L|loss:L' && nba.formStored,
       'nba: the recent form card lists each side\'s last five with the half, the total and the spread against the close in colour, a game without a close shows its score alone, and the JSON rides in the row',
       JSON.stringify({ form1: nba.form1.slice(0, 400), chips: nba.formChips }));
   chk(/^No lineup on the row/.test(nba.lineup0) && /Raptors\s+expected/i.test(nba.lineup1) && /PG\s+Immanuel Quickley/.test(nba.lineup1) && /C\s+Jakob Poeltl/.test(nba.lineup1) && /May not play: F Scottie Barnes \(Out\)\./.test(nba.lineup1)

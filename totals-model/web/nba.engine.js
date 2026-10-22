@@ -463,7 +463,7 @@
         if (hasScore) { pf += us; pa += them; }
         var hasH1 = g.h1f !== null && g.h1f !== undefined && g.h1a !== null && g.h1a !== undefined;
         if (hasH1) { h1f += +g.h1f; h1a += +g.h1a; nH1++; }
-        var awayNick = g.home ? s[1] : g.opp, homeNick = g.home ? g.opp : s[1];
+        var awayNick = g.home ? g.opp : s[1], homeNick = g.home ? s[1] : g.opp;   // this side at home: the opponent was the visitor
         var fb = (g.ctot === null || g.ctot === undefined || g.csp === null || g.csp === undefined || g.ch1 === null || g.ch1 === undefined) ? nbaCardCloseFor(g.date, awayNick, homeNick) : {};
         var ctot = g.ctot !== null && g.ctot !== undefined ? +g.ctot : fb.ctot, ch1 = g.ch1 !== null && g.ch1 !== undefined ? +g.ch1 : fb.ch1, csp = g.csp !== null && g.csp !== undefined ? +g.csp : fb.csp;
         var total = hasScore ? us + them : null, totCell = "—", h1Cell = "—", spCell = "—";

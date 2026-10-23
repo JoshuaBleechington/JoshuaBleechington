@@ -4268,6 +4268,14 @@ def make_nba_props(date_iso, out_dir, log):
     full_last = sum(1 for e in logs_last.values() for g in e["g"] if g["full"])
     log("Ledgers: %s %d games (%d player lines with the box stats), %s %d games (%d with)." % (
         season, len(led["games"]) if led else 0, full_this, nba_prev_season(season), len(prior["games"]) if prior else 0, full_last))
+    ledgers = {"folder": os.path.abspath(out_dir), "this": {"season": season, "games": len(led["games"]) if led else 0, "lines": full_this},
+               "last": {"season": nba_prev_season(season), "games": len(prior["games"]) if prior else 0, "lines": full_last}}
+    if not led and not prior:
+        log("  NO LEDGER FOUND in %s: every prop will read 'no history to project from'. The props run reads nba-ledger-%s.json and nba-ledger-%s.json from the folder it is started in; run it from the slate folder (Run NBA props.bat there), with the ledgers beside it." % (
+            ledgers["folder"], season.replace("-", ""), nba_prev_season(season).replace("-", "")))
+    elif not prior:
+        log("  LAST SEASON'S LEDGER NOT FOUND: nba-ledger-%s.json is not in %s. With a game or two this season nobody has the %d minutes a projection needs, so every prop will read 'no history'. Put the file back beside slate.py and run this again." % (
+            nba_prev_season(season).replace("-", ""), ledgers["folder"], int(PROPS_MIN_MINUTES)))
     if prior and not full_last:
         log("  Last season's ledger has no box stats yet: run the NBA ledger for %s once (Run NBA ledger.bat) and rebounds, assists and threes get a history." % nba_prev_season(season))
     tables, league = nba_team_tables(led["games"] if led else [], date_iso)
@@ -4377,7 +4385,7 @@ def make_nba_props(date_iso, out_dir, log):
                 log("    %s %s %s %s at %+d: %.1f%% (needs %.1f%%) %s · proj %.1f" % (x["name"], x["side"], x["line"], dict((m, lab) for m, _a, lab in PROPS_MARKETS)[x["mk"]], x["price"], x["chance"] * 100, x["need"] * 100, x["band"], x["proj"]))
         games.append(row)
     doc = {"format": PROPS_FORMAT, "version": 1, "date": date_iso, "generated": now_utc(), "source": "slate.py nba-props: The Odds API, the ledgers, ESPN, HashtagBasketball",
-           "credits": credits_used, "games": games,
+           "credits": credits_used, "games": games, "ledgers": ledgers,   # what the run read (23 Oct 2026): the page says so when nothing projects
            "method": {"anchor": PROPS_ANCHOR, "model": PROPS_MODEL_W, "sd_k": PROPS_SD_K, "out_min_per30": PROPS_OUT_MIN_PER30, "out_rate_per30": PROPS_OUT_RATE_PER30, "dvp_weight": PROPS_DVP_WEIGHT, "dvp_shrink": PROPS_DVP_SHRINK}}
     path = os.path.join(out_dir, "nba-props-%s.json" % date_iso)
     with open(path, "w", encoding="utf-8") as f:

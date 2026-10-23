@@ -913,6 +913,11 @@ const CHECKS = ["dome","playoff","agconf","hgconf","agbk","hgbk"];
         { pid: '4397020', name: 'Paolo Banchero', team: 'ORL', opp: 'ATL', home: true, pos: 'PF', mk: 'reb', line: 7.5, op: -105, up: -115, book: 'fanatics', books: { fanatics: [7.5, -105, -115] },
           proj: 7.1, sd: 3.5, pm: 0.45, pb: 0.4773, p: 0.468, push: 0, side: 'UNDER', chance: 0.532, price: -115, need: 0.5349, edge: -0.0029, band: 'no edge', mins: 33.0, rate36: 7.7, why: ['7.7 rebounds per 36'], log: [] } ] } ] };
     const load = async (doc, fname) => { const dt = new DataTransfer(); dt.items.add(new File([JSON.stringify(doc)], fname, { type: 'application/json' })); const inp = document.getElementById('slateFile'); inp.files = dt.files; inp.dispatchEvent(new Event('change', { bubbles: true })); await wait(); };
+    // a file that projects nothing says why: the run read no ledger
+    await load({ format: 'callsheet3.props', version: 1, date: '2026-10-23', ledgers: { folder: 'C:\\Users\\J\\Downloads', this: { season: '2026-27', games: 0, lines: 0 }, last: { season: '2025-26', games: 0, lines: 0 } },
+                 games: [{ gid: 'z', away: 'Bulls', home: 'Bucks', aab: 'CHI', hab: 'MIL', props: [{ pid: '1', name: 'Josh Giddey', team: 'CHI', opp: 'MIL', home: false, pos: 'G', mk: 'pts', line: 12.5, op: -135, up: 100, book: 'fanatics', books: {}, why: ['no history to project from (under 60 minutes with the stat in the ledgers)'], log: [] }] }] }, 'nba-props-2026-10-23.json');
+    const noneMsg = document.getElementById('propsMsg').innerText.replace(/\s+/g, ' ');
+    document.getElementById('propsClear').click(); await wait();
     await load(propsDoc, 'nba-props-2026-10-21.json');
     const tabEmpty0 = document.getElementById('propsCalib').innerText.replace(/\s+/g, ' ').trim();
     const viewOn = !document.getElementById('propsView').hidden, colsOff = document.querySelector('.cols').hidden, pressed = document.getElementById('m-props').getAttribute('aria-pressed');
@@ -946,8 +951,10 @@ const CHECKS = ["dome","playoff","agconf","hgconf","agbk","hgbk"];
     const viewOff = document.getElementById('propsView').hidden, colsBack = !document.querySelector('.cols').hidden, nbaPressed = document.getElementById('m-nba').getAttribute('aria-pressed');
     localStorage.removeItem('callsheet3.props.v1');
     return { viewOn, colsOff, pressed, best, rowsOn, rowsAll, count, msg, whyOpen, logMarks, tileBefore, after: after.map(r => [r.name, r.mk, r.result, r.actual]), tileText, slateMsg, restored: restored.length, viewOff, colsBack, nbaPressed,
-             tabCalib, tabBlocks, nights, ladder, tabEmpty0 };
+             tabCalib, tabBlocks, nights, ladder, tabEmpty0, noneMsg };
   });
+  chk(/None of the 1 props has a projection\. The run read 0 games of 2026-27 and 0 of 2025-26 in C:\\Users\\J\\Downloads\. Last season's ledger, nba-ledger-202526\.json, was not read\. With a game or two this season nobody has the sixty minutes a projection needs, so every prop reads no history\. Put that file back in the slate folder beside slate\.py, with this season's ledger beside it, run the props again/.test(propsT.noneMsg),
+      'props: a file that projects nothing says last season\'s ledger was not read, names the folder the run saw, and says what to put back', propsT.noneMsg.slice(0, 500));
   chk(/Nothing graded yet/.test(propsT.tabEmpty0) && /^Every prop with a side 1-1 says 54\.6% · does 50\.0%/i.test(propsT.tabCalib) && /BET band 1-0 says 56\.0% · does 100\.0%/i.test(propsT.tabCalib)
       && propsT.tabBlocks[0] === 'PROPS-TAB:Every prop with a side|BET band|No edge: the book\'s own side' && propsT.tabBlocks[1] === 'PROPS-MK:points|rebounds|assists' && propsT.tabBlocks[2] === 'PROPS-EDGE:3 to 6 points|no edge'
       && propsT.tabBlocks[3] === 'PROPS-CENTRE:Called at the mean, to 21 Oct' && propsT.nights.length === 1 && /^Oct 21 1-1 1 void 54\.6% 50\.0% [-−]0\.1u 1-0 \+0\.9u$/.test(propsT.nights[0])

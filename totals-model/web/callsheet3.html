@@ -3545,8 +3545,21 @@
     saveProps();
     if ($("propsDate") && d.date) $("propsDate").value = d.date;
     showProps(true); renderCalib();
+    /* a file that projects nothing (23 Oct 2026, the user's file of the 23rd: 712 props, every one "no history"):
+       the run read no ledger, and the file says so from today; the message names the cause instead of leaving the cards empty */
+    var incoming = propsRowsFrom(d), none = incoming.length && !incoming.some(propHas), lg = d.ledgers || null, warn = "";
+    if (none) {
+      var lastSeason = (lg && lg.last && lg.last.season) || "2025-26", lastFile = "nba-ledger-" + lastSeason.replace("-", "") + ".json";
+      warn = " <b>None of the " + incoming.length + " props has a projection.</b>" +
+             (lg ? " The run read " + (lg.this ? lg.this.games : 0) + " games of " + esc((lg.this || {}).season || "this season") + " and " + (lg.last ? lg.last.games : 0) + " of " + esc(lastSeason) +
+                   (lg.folder ? " in " + esc(lg.folder) : "") + "." : "") +
+             (!lg || (lg.last || {}).games === 0
+               ? " <b>Last season's ledger, " + esc(lastFile) + ", was not read.</b> With a game or two this season nobody has the sixty minutes a projection needs, so every prop reads no history. Put that file back in the slate folder beside slate.py" +
+                 ((lg && (lg.this || {}).games === 0) ? ", with this season's ledger beside it" : "") + ", run the props again from that folder, and load the new file; it replaces these."
+               : "");
+    }
     propsSay("Props " + (name ? "<b>" + esc(name) + "</b> " : "") + "loaded: <b>" + added + "</b> new, " + replaced + " replaced, " + kept + " graded and left as " +
-             (kept === 1 ? "it was" : "they were") + ". A prop is the slate's call as made; the page does not rescore it.");
+             (kept === 1 ? "it was" : "they were") + ". A prop is the slate's call as made; the page does not rescore it." + warn);
     return { added: added, replaced: replaced, kept: kept };
   }
   /* the grade: the nba-grade file carries each game's box by ESPN id,

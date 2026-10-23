@@ -86,14 +86,20 @@ Three double-click files, in this order on a game day:
    a game. In The Super Model: **NBA PROPS → Load props**. Run it after the
    ledger (the game logs) and late enough that the books have posted the
    props, usually by the early afternoon.
-5. **An hour before tip**, run the slate again and load the newer file: the
-   injury page changes through the day, and the who-is-out list on each
-   matchup is the one thing the close does not fully carry. Tick a doubtful
-   player out on the card if he is ruled out late. The props run reads the
-   same page, so a late scratch means running it again too. The starting
-   fives come from RotoWire on the same run (20 Oct 2026), *expected* in
-   the morning and *confirmed* once the clubs post, so the late run is the
-   one with the confirmed lineups.
+5. **An hour before tip**, run the slate, the odds and the props again and
+   load each. What a second load does to a game already on the card (23 Oct
+   2026): it fills boxes that were blank (the crew the league posted after
+   the morning run, a line the odds had not listed), **replaces the starting
+   five** with the newer one (expected to confirmed, a scratch), ticks a
+   confirmed goalie, and replaces ungraded props; it never overwrites a
+   filled box, so the line, the prices and the who-is-out list stay as they
+   stood when the row was added, and the record is of the row as logged.
+   Tick a doubtful player out on the card if he is ruled out late. The
+   **close** for the record does not come from the page at all: every odds
+   run writes what it saw to `odds-log.json`, the last run before tip is the
+   close, and the morning grade attaches it. So the one thing that must
+   happen on a game day is an odds run after the day's games are listed; a
+   day without one grades with no close.
 6. **Grade NBA yesterday.bat** the next morning, or `python slate.py
    nba-grade`: `nba-grade-DATE.json` with each final, the half-time score,
    the close the odds run last saw, and every player's box line. Load it

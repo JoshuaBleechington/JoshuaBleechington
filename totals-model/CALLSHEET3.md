@@ -1048,6 +1048,21 @@ their points a game against the league's by history (the total did not
 follow, t −1.0), and the past table's pooled over rate with these three as
 a soft lean. Never scored; the referee watch on the record is the test.
 
+## A later slate refreshes the starting five, 23 Oct 2026
+
+The loader fills blanks and never overwrites a filled box, so a slate
+loaded an hour before tip could not bring the confirmed lineup onto a row
+carded in the morning. The starting five is display only and changes
+through the day, so from today a newer slate's `nbalineup` replaces the
+row's (the build tool's "lineup refresh" patch beside the goalie-confirm
+rule); every other box keeps the rule, and the record stays of the row as
+logged. The user's question of the 23rd, "run the slate and the props before
+the games again and then add them, then run the odds?", is answered in
+`slate/README.md` step 5: the close comes from the odds log, not the page,
+so the one thing a game day needs is an odds run after the games are
+listed. The harness loads two slates onto a carded row and reads the five
+from the second and the rest days from the first.
+
 ## The Every-prop table's view, 22 Oct 2026
 
 The user: "is there a way for me to rearrange the rows? For example, all

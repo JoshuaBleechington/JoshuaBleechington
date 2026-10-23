@@ -6284,6 +6284,7 @@
           });
           if (g.inputs.dome === true && !row.inputs.dome) { row.inputs.dome = true; changed = true; }
           ["agbk", "hgbk", "agconf", "hgconf"].forEach(function (k) { if (g.inputs[k] === true && !row.inputs[k]) { row.inputs[k] = true; changed = true; } });
+          ["nbalineup"].forEach(function (k) { if (!blank(g.inputs[k]) && String(g.inputs[k]) !== String(row.inputs[k] || "")) { row.inputs[k] = String(g.inputs[k]); changed = true; } });   // the starting five follows the newest slate (23 Oct 2026)
           /* The slate marks a postseason game at the game level; the row's
              Playoff box is shown, not scored, so it only splits the record. */
           if (g.playoff === true && !row.inputs.playoff) { row.inputs.playoff = true; changed = true; }

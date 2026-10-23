@@ -368,6 +368,12 @@ def tail() -> str:
     t = once(t, '          if (g.inputs.dome === true && !row.inputs.dome) { row.inputs.dome = true; changed = true; }',
              '          if (g.inputs.dome === true && !row.inputs.dome) { row.inputs.dome = true; changed = true; }\n'
              '          ["agbk", "hgbk", "agconf", "hgconf"].forEach(function (k) { if (g.inputs[k] === true && !row.inputs[k]) { row.inputs[k] = true; changed = true; } });', "slate backup flags into rows")
+    # a later slate refreshes the starting five on a row already carded (23 Oct 2026): the lineup is display only and
+    # changes through the day (expected to confirmed, a scratch), so the newer file's box replaces the older one; every
+    # other box keeps the loader's rule, blanks fill and typed values stay, so the record is of the row as logged
+    t = once(t, '          ["agbk", "hgbk", "agconf", "hgconf"].forEach(function (k) { if (g.inputs[k] === true && !row.inputs[k]) { row.inputs[k] = true; changed = true; } });',
+             '          ["agbk", "hgbk", "agconf", "hgconf"].forEach(function (k) { if (g.inputs[k] === true && !row.inputs[k]) { row.inputs[k] = true; changed = true; } });\n'
+             '          ["nbalineup"].forEach(function (k) { if (!blank(g.inputs[k]) && String(g.inputs[k]) !== String(row.inputs[k] || "")) { row.inputs[k] = String(g.inputs[k]); changed = true; } });   // the starting five follows the newest slate (23 Oct 2026)', "lineup refresh")
     t = once(t, '    if (g.inputs && g.inputs.dome === true) v.dome = true;',
              '    if (g.inputs && g.inputs.dome === true) v.dome = true;\n'
              '    ["agbk", "hgbk", "agconf", "hgconf"].forEach(function (k) { if (g.inputs && g.inputs[k] === true) v[k] = true; });', "slate backup flags into the form")

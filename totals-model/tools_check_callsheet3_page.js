@@ -1156,12 +1156,22 @@ const CHECKS = ["dome","playoff","agconf","hgconf","agbk","hgbk"];
     const inp = document.getElementById('slateFile'); inp.files = dt.files; inp.dispatchEvent(new Event('change', { bubbles: true })); await wait();
     const row = JSON.parse(localStorage.getItem('callsheet3.card.v1')).find(r => /Celtics @ Pistons/.test(r.matchup));
     const sides = row.markets.filter(m => m.key === 'ml' || m.key === 'spread').map(m => ({ key: m.key, side: m.side, pick: m.pick, other: (m.other || {}).pick, label: m.label }));
+    // a later slate refreshes the starting five on the carded row but leaves a filled box (the rest days) as logged
+    const loadDoc = async (games, fname) => { const dt2 = new DataTransfer(); dt2.items.add(new File([JSON.stringify({ format: 'callsheet2.slate', version: 1, date: '2026-10-20', games })], fname, { type: 'application/json' })); inp.files = dt2.files; inp.dispatchEvent(new Event('change', { bubbles: true })); await wait(); };
+    const lineupDoc = (status, rest) => [{ sport: 'NBA', gdate: '2026-10-20', away: 'Celtics', home: 'Pistons', notes: [], inputs: { narest: rest, nbalineup: JSON.stringify({ away: { status, five: [['PG', 'Derrick White']], maybe: [] }, home: null, src: 'RotoWire' }) } }];
+    await loadDoc(lineupDoc('expected', '2'), 'nba-slate-a.json');
+    const lu1 = JSON.parse(localStorage.getItem('callsheet3.card.v1')).find(r => /Celtics @ Pistons/.test(r.matchup)).inputs;
+    await loadDoc(lineupDoc('confirmed', '9'), 'nba-slate-b.json');
+    const lu2 = JSON.parse(localStorage.getItem('callsheet3.card.v1')).find(r => /Celtics @ Pistons/.test(r.matchup)).inputs;
+    const refresh = { lu1: /expected/.test(lu1.nbalineup || ''), rest1: lu1.narest, lu2: /confirmed/.test(lu2.nbalineup || ''), rest2: lu2.narest };
     // a row the old page wrote: the hockey names on the moneyline and the spread, to be relabelled on load
     const broken = JSON.parse(localStorage.getItem('callsheet3.card.v1'));
     broken.forEach(r => r.markets.forEach(m => { if (m.key === 'ml') { m.pick = 'Islanders ML'; m.other.pick = 'Ducks ML'; } if (m.key === 'spread') { m.pick = 'Islanders +1.5'; m.label = 'Spread Islanders: +1.5'; m.other.pick = 'Ducks -1.5'; } }));
     localStorage.setItem('callsheet3.card.v1', JSON.stringify(broken));
-    return { merged: row.inputs.narest === '1' && row.inputs.nhrest === '2', sides, formAway: document.getElementById('away').value };
+    return { merged: row.inputs.narest === '1' && row.inputs.nhrest === '2', sides, formAway: document.getElementById('away').value, refresh };
   });
+  chk(relabel.refresh.lu1 && relabel.refresh.rest1 === '1' && relabel.refresh.lu2 && relabel.refresh.rest2 === '1',
+      'slate reload: a later slate replaces the starting five on a carded row (expected to confirmed) and leaves the filled boxes as logged', JSON.stringify(relabel.refresh));
   await pg.reload(); await pg.waitForTimeout(300);
   const relabelled = await pg.evaluate(() => {
     const row = JSON.parse(localStorage.getItem('callsheet3.card.v1')).find(r => /Celtics @ Pistons/.test(r.matchup));

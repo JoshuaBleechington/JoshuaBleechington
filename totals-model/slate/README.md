@@ -99,7 +99,11 @@ Three double-click files, in this order on a game day:
    run writes what it saw to `odds-log.json`, the last run before tip is the
    close, and the morning grade attaches it. So the one thing that must
    happen on a game day is an odds run after the day's games are listed; a
-   day without one grades with no close.
+   day without one grades with no close. A game that has already tipped is
+   **left alone** by the odds and props runs (23 Oct 2026): its lines are
+   in play, so the log keeps the last pre-tip snapshot as the close and the
+   props called before tip stand; on a night with an early game, running
+   for the late games is safe.
 6. **Grade NBA yesterday.bat** the next morning, or `python slate.py
    nba-grade`: `nba-grade-DATE.json` with each final, the half-time score,
    the close the odds run last saw, and every player's box line. Load it

@@ -918,6 +918,12 @@ const CHECKS = ["dome","playoff","agconf","hgconf","agbk","hgbk"];
                  games: [{ gid: 'z', away: 'Bulls', home: 'Bucks', aab: 'CHI', hab: 'MIL', props: [{ pid: '1', name: 'Josh Giddey', team: 'CHI', opp: 'MIL', home: false, pos: 'G', mk: 'pts', line: 12.5, op: -135, up: 100, book: 'fanatics', books: {}, why: ['no history to project from (under 60 minutes with the stat in the ledgers)'], log: [] }] }] }, 'nba-props-2026-10-23.json');
     const noneMsg = document.getElementById('propsMsg').innerText.replace(/\s+/g, ' ');
     document.getElementById('propsClear').click(); await wait();
+    // a file written after a game tipped leaves that game's props out
+    await load({ format: 'callsheet3.props', version: 1, date: '2026-10-23', generated: '2026-10-24T01:10:00Z', games: [
+      { gid: 'a', away: 'Bulls', home: 'Bucks', aab: 'CHI', hab: 'MIL', tip: '2026-10-24T00:00Z', props: [{ pid: '1', name: 'Josh Giddey', team: 'CHI', opp: 'MIL', home: false, pos: 'G', mk: 'pts', line: 12.5, op: -135, up: 100, book: 'fanatics', books: {}, proj: 14.1, sd: 6.9, pm: 0.58, pb: 0.5, p: 0.53, push: 0, side: 'OVER', chance: 0.53, price: -135, need: 0.574, edge: -0.044, band: 'no edge', mins: 30, rate36: 16.9, why: ['x'], log: [] }] },
+      { gid: 'b', away: 'Knicks', home: 'Celtics', aab: 'NYK', hab: 'BOS', tip: '2026-10-24T02:30Z', props: [{ pid: '2', name: 'Paul George', team: 'BOS', opp: 'NYK', home: true, pos: 'F', mk: 'pts', line: 17.5, op: -110, up: -110, book: 'fanatics', books: {}, proj: 19.0, sd: 8.1, pm: 0.57, pb: 0.5, p: 0.524, push: 0, side: 'OVER', chance: 0.524, price: -110, need: 0.524, edge: 0.0, band: 'no edge', mins: 32, rate36: 21.4, why: ['x'], log: [] }] }] }, 'nba-props-2026-10-23.json');
+    const inPlay = { msg: document.getElementById('propsMsg').innerText.replace(/\s+/g, ' '), names: JSON.parse(localStorage.getItem('callsheet3.props.v1')).map(r => r.name) };
+    document.getElementById('propsClear').click(); await wait();
     await load(propsDoc, 'nba-props-2026-10-21.json');
     const tabEmpty0 = document.getElementById('propsCalib').innerText.replace(/\s+/g, ' ').trim();
     const viewOn = !document.getElementById('propsView').hidden, colsOff = document.querySelector('.cols').hidden, pressed = document.getElementById('m-props').getAttribute('aria-pressed');
@@ -951,8 +957,10 @@ const CHECKS = ["dome","playoff","agconf","hgconf","agbk","hgbk"];
     const viewOff = document.getElementById('propsView').hidden, colsBack = !document.querySelector('.cols').hidden, nbaPressed = document.getElementById('m-nba').getAttribute('aria-pressed');
     localStorage.removeItem('callsheet3.props.v1');
     return { viewOn, colsOff, pressed, best, rowsOn, rowsAll, count, msg, whyOpen, logMarks, tileBefore, after: after.map(r => [r.name, r.mk, r.result, r.actual]), tileText, slateMsg, restored: restored.length, viewOff, colsBack, nbaPressed,
-             tabCalib, tabBlocks, nights, ladder, tabEmpty0, noneMsg };
+             tabCalib, tabBlocks, nights, ladder, tabEmpty0, noneMsg, inPlay };
   });
+  chk(/loaded: 1 new, 0 replaced, 0 graded and left as they were, 1 on 1 game already under way left out \(in-play lines; the calls made before tip stand\)/.test(propsT.inPlay.msg) && propsT.inPlay.names.join(',') === 'Paul George',
+      'props: a file written after a game tipped leaves that game\'s props out and says so, and keeps the games still to come', JSON.stringify(propsT.inPlay));
   chk(/None of the 1 props has a projection\. The run read 0 games of 2026-27 and 0 of 2025-26 in C:\\Users\\J\\Downloads\. Last season's ledger, nba-ledger-202526\.json, was not read\. With a game or two this season nobody has the sixty minutes a projection needs, so every prop reads no history\. Put that file back in the slate folder beside slate\.py, with this season's ledger beside it, run the props again/.test(propsT.noneMsg),
       'props: a file that projects nothing says last season\'s ledger was not read, names the folder the run saw, and says what to put back', propsT.noneMsg.slice(0, 500));
   chk(/Nothing graded yet/.test(propsT.tabEmpty0) && /^Every prop with a side 1-1 says 54\.6% · does 50\.0%/i.test(propsT.tabCalib) && /BET band 1-0 says 56\.0% · does 100\.0%/i.test(propsT.tabCalib)

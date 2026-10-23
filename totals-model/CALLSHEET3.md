@@ -1048,6 +1048,23 @@ their points a game against the league's by history (the total did not
 follow, t −1.0), and the past table's pooled over rate with these three as
 a soft lean. Never scored; the referee watch on the record is the test.
 
+## A game under way is left alone, 23 Oct 2026
+
+The user, with the Bulls at the Bucks in the second half: "the Bulls game
+keeps showing props when I run it for the other games... would that be a
+reason when I pulled the odds and slate it shows them again?" It was, and
+it mattered: The Odds API lists a game in play with in-play lines, so a
+late odds run overwrote the log's close with a live number and a late
+props run replaced the pre-tip calls with live ones. `odds_started` now
+skips any event whose start is at or before the run (the odds run does
+not even spend the credit), the log keeps the last pre-tip snapshot as the
+close, and the props run says which games it skipped. The page guards a
+file from an older run the same way: a game whose tip is at or before the
+file's `generated` stamp has its props left out, and the message says how
+many. The slate itself still lists a game in play (ESPN marks it not
+final), which is harmless: the loader only fills blanks and refreshes the
+five.
+
 ## A later slate refreshes the starting five, 23 Oct 2026
 
 The loader fills blanks and never overwrites a filled box, so a slate

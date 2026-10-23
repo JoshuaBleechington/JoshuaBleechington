@@ -4312,6 +4312,11 @@ def make_nba_props(date_iso, out_dir, log):
         log("Could not read ESPN's scoreboard (%s): no rosters, spreads or totals beside the props." % e)
     events = [ev for ev in fetch_odds_events("NBA", key) if us_game_date(ev.get("commence_time") or "") == date_iso]
     log("The Odds API lists %d event%s on %s." % (len(events), "" if len(events) == 1 else "s", date_iso))
+    started = [ev for ev in events if odds_started(ev, now_utc())]
+    for ev in started:
+        log("%s @ %s: started %s UTC, skipped; its props are in-play lines now, and the calls made before tip stand on the sheet" % (
+            ev.get("away_team"), ev.get("home_team"), str(ev.get("commence_time") or "")[11:16]))
+    events = [ev for ev in events if ev not in started]
     if not events:
         log("Nothing to project for %s. The run is for today unless told otherwise: python slate.py nba-props --date 2026-10-21 (or add --date to the bat file's click)." % date_iso)
     markets = ",".join(api for _mk, api, _lab in PROPS_MARKETS)
@@ -4587,6 +4592,20 @@ def odds_nick(full):
     return words[-1] if words else s
 
 
+def odds_started(ev, now_iso):
+    """True when the event's start is at or before now (23 Oct 2026): a game in
+    play carries in-play lines, and the odds and props runs leave it alone so
+    the log's last pre-tip snapshot stays the close and the morning's props
+    stand. The user, with the Bulls at the Bucks in the second half: "the
+    Bulls game keeps showing when I run it for the other games"."""
+    try:
+        start = dt.datetime.strptime(str(ev.get("commence_time") or "")[:19], "%Y-%m-%dT%H:%M:%S")
+        now = dt.datetime.strptime(str(now_iso)[:19], "%Y-%m-%dT%H:%M:%S")
+    except ValueError:
+        return False
+    return start <= now
+
+
 def us_game_date(iso_utc):
     """The US game date of a UTC start time: Eastern time, daylight saving by the US rule."""
     t = dt.datetime.strptime(str(iso_utc)[:19], "%Y-%m-%dT%H:%M:%S")
@@ -4860,6 +4879,10 @@ def make_odds(date_iso, out_dir, log, books=None, sports=("MLB", "NHL", "NBA")):
         todays = [ev for ev in evs if us_game_date(ev.get("commence_time") or "1970-01-01T00:00:00Z") == date_iso]
         log("%s: %d game%s on the feed for %s (%d listed in all)" % (sport, len(todays), "" if len(todays) == 1 else "s", date_iso, len(evs)))
         for ev in todays:
+            if odds_started(ev, now):
+                log("  %s @ %s: started %s UTC, skipped; its lines are in play now, so the log keeps the last run before tip as the close" % (
+                    odds_nick(ev.get("away_team")), odds_nick(ev.get("home_team")), str(ev.get("commence_time") or "")[11:16]))
+                continue
             extra = None
             try:
                 extra = fetch_odds_event(sport, ev.get("id"), key, books)
@@ -5553,6 +5576,9 @@ def selftest():
     check("odds log: the first number seen is the opener, the latest the close candidate", e1["first"]["line"] == "7.0" and e2["first"]["line"] == "7.0" and e2["last"]["line"] == "6.5" and e2["last"]["at"] == "2026-10-12T22:00:00Z")
     check("odds log: the grade run reads the close", odds_close_for(tmp, "MLB", "2026-10-12", "Dodgers", "Brewers") == {"ctot": "6.5", "cf5": "3.5"} and odds_close_for(tmp, "NHL", "2026-10-12", "Dodgers", "Brewers") is None)
     check("odds: a game no book has priced carries a note and no line", odds_game({"id": "x", "commence_time": "2026-10-13T00:00:00Z", "home_team": "A B", "away_team": "C D", "bookmakers": []}, "NHL", ["fanatics"])["notes"] == ["No book in the list has priced this game yet."])
+    check("odds: a game that has tipped is left alone by the odds and props runs, one that has not is taken, a missing time is taken",
+          odds_started({"commence_time": "2026-10-23T20:00:00Z"}, "2026-10-23T20:25:00Z") is True and odds_started({"commence_time": "2026-10-23T20:00:00Z"}, "2026-10-23T20:00:00Z") is True
+          and odds_started({"commence_time": "2026-10-23T23:30:00Z"}, "2026-10-23T20:25:00Z") is False and odds_started({}, "2026-10-23T20:25:00Z") is False)
     # the rest of the subscription (13 Oct 2026): the sharp book, the alternates, the team totals, the credits, the history
     ev2 = json.loads(json.dumps(ev))
     ev2["bookmakers"].insert(0, {"key": "pinnacle", "markets": [

@@ -3534,10 +3534,16 @@
   /* the file: one row per player per market per date; a row already graded is a record and stays */
   function applyProps(d, name) {
     if (!d || d.format !== "callsheet3.props" || !Array.isArray(d.games)) throw new Error("not a Super Model props file");
-    var added = 0, replaced = 0, kept = 0, nextP = props.reduce(function (m, r) { return Math.max(m, r.id || 0); }, 0) + 1;
+    var added = 0, replaced = 0, kept = 0, inPlay = 0, nextP = props.reduce(function (m, r) { return Math.max(m, r.id || 0); }, 0) + 1;
     var have = {}; props.forEach(function (r, i) { have[propKey(r)] = i; });
     propsPreview = null;
+    /* a game that had tipped when the file was written carries in-play lines (23 Oct 2026, the Bulls at the Bucks in the
+       second half): its props are left out, so the calls made before tip stand. The run skips such games from today;
+       this guards a file from an older run */
+    var gen = String(d.generated || ""), startedGames = {};
+    (d.games || []).forEach(function (g) { if (g.tip && gen && String(g.tip).slice(0, 19) <= gen.slice(0, 19)) startedGames[g.away + " @ " + g.home] = true; });
     propsRowsFrom(d).forEach(function (row) {
+      if (startedGames[row.game]) { inPlay++; return; }
       var k = propKey(row), i = have[k];
       if (i !== undefined) { if (props[i].result) { kept++; return; } row.id = props[i].id; props[i] = row; replaced++; }
       else { row.id = nextP++; have[k] = props.length; props.push(row); added++; }
@@ -3559,7 +3565,8 @@
                : "");
     }
     propsSay("Props " + (name ? "<b>" + esc(name) + "</b> " : "") + "loaded: <b>" + added + "</b> new, " + replaced + " replaced, " + kept + " graded and left as " +
-             (kept === 1 ? "it was" : "they were") + ". A prop is the slate's call as made; the page does not rescore it." + warn);
+             (kept === 1 ? "it was" : "they were") + (inPlay ? ", <b>" + inPlay + "</b> on " + Object.keys(startedGames).length + " game" + (Object.keys(startedGames).length === 1 ? "" : "s") + " already under way left out (in-play lines; the calls made before tip stand)" : "") +
+             ". A prop is the slate's call as made; the page does not rescore it." + warn);
     return { added: added, replaced: replaced, kept: kept };
   }
   /* the grade: the nba-grade file carries each game's box by ESPN id,

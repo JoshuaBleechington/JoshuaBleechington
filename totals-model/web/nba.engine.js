@@ -578,6 +578,7 @@
       var cl = nbaCrewLean(r);
       if (!cl) { noCrew++; return; }
       var c = parseFloat((r.close || {}).ctot);
+      if (!isFinite(c)) c = parseFloat((r.inputs || {}).line);   // no close attached: the row's own line, the last the odds run filled (23 Oct 2026)
       if (!isFinite(c)) { noClose++; return; }
       var total = (+r.finals.fa) + (+r.finals.fh), res = total > c ? "over" : total < c ? "under" : "push", says = cl.pastW + cl.pastL ? cl.pastW / (cl.pastW + cl.pastL) : 0.5;
       var s = g[cl.lean];
@@ -619,7 +620,7 @@
          'The test is whether the past lean carries: if the over crews keep running over and the under crews under, the crew becomes an input at the season\'s end, scored at what this block says. Two seasons of closes said crews predict free throws (t 7.3) and the total does not follow (t −1.0), so expect both leans to drift toward the league\'s rate. ' +
          'One standard error at twenty games is eleven points; read nothing under a hundred a line. On the matchup, the Referee stats card carries the same lean as its badge.' +
          (any ? '' : ' Nothing graded yet with a crew in the Crew box and a close on the card.') +
-         (noCrew ? ' ' + noCrew + ' graded game' + (noCrew === 1 ? '' : 's') + ' without a crew.' : '') + (noClose ? ' ' + noClose + ' without a close.' : '') + '</div>';
+         (noCrew ? ' ' + noCrew + ' graded game' + (noCrew === 1 ? '' : 's') + ' without a crew.' : '') + (noClose ? ' ' + noClose + ' without a close or a line.' : '') + '</div>';
     return h;
   }
   /* ===== END NBA BLOCK ===== */

@@ -3680,10 +3680,13 @@ def make_nba_grade(date_iso, out_dir, log):
         row = {"sport": "NBA", "gdate": date_iso, "away": away, "home": home, "gameId": g["id"], "finals": fin, "notes": notes}
         if box:
             row["box"] = box
-        c = odds_close_for(odds_log_path(out_dir), "NBA", date_iso, away, home)
+        c = odds_close_for(odds_log_path(out_dir), "NBA", date_iso, away, home, tip=g.get("t"), notes=notes)
         if c:
             row["close"] = c
         log("%s @ %s: final %s-%s, at the half %s-%s%s" % (away, home, fin["fa"], fin["fh"], fin.get("f5a", "?"), fin.get("f5h", "?"), (" · close %s" % c["ctot"]) if c else ""))
+        for n in notes:
+            if "after tip" in n:
+                log("  " + n)
         rows.append(row)
     doc = {"format": FORMAT, "version": VERSION, "date": date_iso, "generated": now_utc(), "source": "slate.py nba-grade: ESPN's site API", "games": rows}
     path = os.path.join(out_dir, "nba-grade-%s.json" % date_iso)
@@ -4512,7 +4515,7 @@ def make_nhl_grade(date_iso, out_dir, log):
             r = grade_nhl_game(g, log)
             if r:
                 r["gdate"] = date_iso
-                c = odds_close_for(odds_log_path(out_dir), "NHL", date_iso, r["away"], r["home"])
+                c = odds_close_for(odds_log_path(out_dir), "NHL", date_iso, r["away"], r["home"], tip=g.get("startTimeUTC"), notes=r.setdefault("notes", []))
                 if c:
                     r["close"] = c     # the last number the odds run saw before the game
                 rows.append(r)
@@ -4825,6 +4828,8 @@ def odds_log_update(path, g, now):
     # the side lines ride in the log from 22 Oct 2026 (sp, pl, rl with their prices), so the basketball form card can read the spread against the close
     snap = {k2: g["inputs"].get(k2) for k2 in ("line", "op", "up", "hml", "aml", "p1line", "f5line", "h1line", "sp", "sph", "spa", "pl", "plh", "pla", "rl", "rlh", "rla") if g["inputs"].get(k2)}
     snap["at"], snap["book"] = now, g["book"]
+    if g.get("first_utc"):
+        snap["tip"] = g["first_utc"]     # so the grade can tell a pre-tip snapshot from an in-play one (24 Oct 2026)
     if g["inputs"].get("sharp"):
         try:
             sh = json.loads(g["inputs"]["sharp"])
@@ -4843,20 +4848,45 @@ def odds_log_update(path, g, now):
     return e
 
 
-def odds_close_for(path, sport, date_iso, away, home):
-    """The close the grade run attaches: the last total (and period total) this script saw."""
+def odds_close_pick(e, tip=None):
+    """(close, note) from a game's odds-log entry. The last snapshot is the
+    close, unless it was taken at or after tip: that is an in-play line (a run
+    from before 23 Oct 2026 could still take one; the Bulls at the Bucks graded
+    with a 257.5 close against a 257 final), so the opener stands in when it
+    came before tip, and nothing does otherwise. The tip rides in the snapshot
+    from 24 Oct 2026; the grade passes the schedule's for older entries."""
+    last, first = e.get("last") or {}, e.get("first") or {}
+    tip = str(last.get("tip") or tip or "")[:16]
+    note = None
+    if tip and last.get("at") and str(last["at"])[:16] >= tip:
+        if first.get("line") and str(first.get("at") or "")[:16] < tip:
+            note = ("The odds run's last snapshot (%s at %s UTC) came after tip, an in-play line; the opener %s at %s UTC stands as the close."
+                    % (last.get("line"), str(last["at"])[11:16], first["line"], str(first["at"])[11:16]))
+            last = first
+        else:
+            return None, ("The odds run's only snapshot (%s at %s UTC) came after tip, an in-play line; no close. Type it by hand if you know it."
+                          % (last.get("line"), str(last["at"])[11:16]))
+    if not last.get("line"):
+        return None, None
+    c = {"ctot": last["line"]}
+    per = last.get("p1line") or last.get("f5line") or last.get("h1line")
+    if per:
+        c["cf5"] = per
+    return c, note
+
+
+def odds_close_for(path, sport, date_iso, away, home, tip=None, notes=None):
+    """The close the grade run attaches: the last total (and period total) this
+    script saw before tip. A note about a snapshot taken in play goes on
+    `notes` when a list is passed."""
     try:
         with open(path, encoding="utf-8") as f:
             log = json.load(f)
     except (OSError, ValueError):
         return None
-    last = (log.get(odds_log_key(sport, date_iso, away, home)) or {}).get("last") or {}
-    if not last.get("line"):
-        return None
-    c = {"ctot": last["line"]}
-    per = last.get("p1line") or last.get("f5line") or last.get("h1line")
-    if per:
-        c["cf5"] = per
+    c, note = odds_close_pick(log.get(odds_log_key(sport, date_iso, away, home)) or {}, tip)
+    if note and notes is not None:
+        notes.append(note)
     return c
 
 
@@ -5075,7 +5105,7 @@ def make_grade(date_iso, out_dir, log):
         try:
             r = grade_game(g, log)
             if r:
-                c = odds_close_for(odds_log_path(out_dir), "MLB", date_iso, r["away"], r["home"])
+                c = odds_close_for(odds_log_path(out_dir), "MLB", date_iso, r["away"], r["home"], tip=g.get("gameDate"), notes=r.setdefault("notes", []))
                 if c:
                     r["close"] = c     # the last number the odds run saw before the game
                 rows.append(r)
@@ -5575,6 +5605,22 @@ def selftest():
     e2 = odds_log_update(tmp, og2, "2026-10-12T22:00:00Z")
     check("odds log: the first number seen is the opener, the latest the close candidate", e1["first"]["line"] == "7.0" and e2["first"]["line"] == "7.0" and e2["last"]["line"] == "6.5" and e2["last"]["at"] == "2026-10-12T22:00:00Z")
     check("odds log: the grade run reads the close", odds_close_for(tmp, "MLB", "2026-10-12", "Dodgers", "Brewers") == {"ctot": "6.5", "cf5": "3.5"} and odds_close_for(tmp, "NHL", "2026-10-12", "Dodgers", "Brewers") is None)
+    check("odds log: each snapshot carries the tip", e2["last"]["tip"] == "2026-10-13T00:10:00Z" and e2["first"]["tip"] == "2026-10-13T00:10:00Z")
+    # a snapshot taken in play (24 Oct 2026): the opener stands in when it came before tip, nothing when it did not
+    inplay = {"first": {"line": "239.5", "h1line": "115.5", "at": "2026-10-23T15:43:47Z"}, "last": {"line": "257.5", "at": "2026-10-23T22:35:10Z"}}
+    pick, why = odds_close_pick(inplay, "2026-10-23T20:10Z")
+    check("odds log: a last snapshot taken after tip is passed over for the opener, with a note",
+          pick == {"ctot": "239.5", "cf5": "115.5"} and why == "The odds run's last snapshot (257.5 at 22:35 UTC) came after tip, an in-play line; the opener 239.5 at 15:43 UTC stands as the close.")
+    check("odds log: the tip in the snapshot wins over the one passed, and a pre-tip last snapshot is the close with no note",
+          odds_close_pick({"first": inplay["first"], "last": dict(inplay["last"], tip="2026-10-23T23:10:00Z")}, "2026-10-23T20:10Z") == ({"ctot": "257.5"}, None))
+    check("odds log: an entry whose only snapshot came after tip gives no close and says so",
+          odds_close_pick({"first": inplay["last"], "last": inplay["last"]}, "2026-10-23T20:10Z") == (None, "The odds run's only snapshot (257.5 at 22:35 UTC) came after tip, an in-play line; no close. Type it by hand if you know it."))
+    notes_x, notes_y = [], []
+    check("odds log: a tip passed by the grade does not override the one in the snapshot", odds_close_for(tmp, "MLB", "2026-10-12", "Dodgers", "Brewers", tip="2026-10-12T21:00:00Z", notes=notes_x) == {"ctot": "6.5", "cf5": "3.5"} and notes_x == [])
+    tmp2 = os.path.join(os.path.dirname(tmp), "odds-log-old.json")
+    with open(tmp2, "w", encoding="utf-8") as f:
+        json.dump({odds_log_key("NBA", "2026-10-23", "Bulls", "Bucks"): inplay}, f)     # an entry written before the tip rode in the snapshot
+    check("odds log: the grade run gets the note on its row for an older entry", odds_close_for(tmp2, "NBA", "2026-10-23", "Bulls", "Bucks", tip="2026-10-23T20:10Z", notes=notes_y) == {"ctot": "239.5", "cf5": "115.5"} and len(notes_y) == 1 and "opener 239.5 at 15:43 UTC" in notes_y[0])
     check("odds: a game no book has priced carries a note and no line", odds_game({"id": "x", "commence_time": "2026-10-13T00:00:00Z", "home_team": "A B", "away_team": "C D", "bookmakers": []}, "NHL", ["fanatics"])["notes"] == ["No book in the list has priced this game yet."])
     check("odds: a game that has tipped is left alone by the odds and props runs, one that has not is taken, a missing time is taken",
           odds_started({"commence_time": "2026-10-23T20:00:00Z"}, "2026-10-23T20:25:00Z") is True and odds_started({"commence_time": "2026-10-23T20:00:00Z"}, "2026-10-23T20:00:00Z") is True

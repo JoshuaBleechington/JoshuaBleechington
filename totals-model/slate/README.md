@@ -103,7 +103,10 @@ Three double-click files, in this order on a game day:
    **left alone** by the odds and props runs (23 Oct 2026): its lines are
    in play, so the log keeps the last pre-tip snapshot as the close and the
    props called before tip stand; on a night with an early game, running
-   for the late games is safe.
+   for the late games is safe. The grade also checks (24 Oct 2026): a
+   snapshot taken at or after tip is an in-play line and is passed over for
+   the opener, with a note on the row saying so; the Bulls at the Bucks on
+   23 Oct had graded with a 257.5 close against a 257 final that way.
 6. **Grade NBA yesterday.bat** the next morning, or `python slate.py
    nba-grade`: `nba-grade-DATE.json` with each final, the half-time score,
    the close the odds run last saw, and every player's box line. Load it

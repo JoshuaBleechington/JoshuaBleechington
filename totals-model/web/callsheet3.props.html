@@ -1,0 +1,70 @@
+  <!-- ===== PROPS: NBA player props (19 Oct 2026). Shown in place of the matchup columns when NBA PROPS is pressed ===== -->
+  <section class="card" id="propsView" hidden>
+    <h2>NBA player props
+      <span class="row" style="gap:8px">
+        <label class="f" style="flex-direction:row;align-items:center;gap:6px"><span class="tag">date</span><input id="propsDate" type="date" style="padding:6px 8px;font-size:13px"></label>
+        <label class="check" style="font-size:12px"><input type="checkbox" id="propsAll"> Every prop, not only the projected</label>
+        <span class="tag" id="propsCount"></span>
+      </span></h2>
+    <div class="body">
+      <div class="row">
+        <button type="button" class="btn solid" id="loadProps">Load props</button>
+        <button type="button" class="btn" id="propsText">Copy props as text</button>
+        <button type="button" class="btn" id="propsClear">Clear this date</button>
+        <button type="button" class="btn" id="propsExample">Example</button>
+      </div>
+      <p class="note" id="propsMsg" hidden></p>
+      <div class="subhead">Is it working <span class="tag">every graded prop, every night, at the price posted · says is the blended chance, does is what landed</span></div>
+      <div id="propsCalib"></div>
+      <p class="note"><b>Run NBA props.bat</b> writes <code>nba-props-DATE.json</code>: every player prop the books post on the
+        day's games (points, rebounds, assists, threes, points + rebounds + assists), the carded book's line and prices,
+        and beside each the slate's own projection. <b>Rate × minutes</b>: his per-minute rate this season with last
+        season's as a prior at half its minutes, times the minutes of his last five games. <b>Regulars out</b>, scored:
+        every 30 minutes a game of teammates missing who play 24 or more adds 1.42 minutes (t 36), 0.56 points per 36
+        (t 11) and 0.09 assists (t 6); rebounds and threes did not move, so they get no lift. <b>Pace</b>, the
+        matchup's against the league's, in full. <b>Defence v position</b> from the ledger's own table, what each
+        defence allowed per minute to guards, forwards and centres against the league: a defence's lean over the first
+        half of 2025-26 carried into its second half at 0.77 for points, 0.74 rebounds, 0.73 assists and 0.41 threes,
+        and those are the weights; HashtagBasketball's rank is shown beside it, never scored. <b>Home and road</b> is
+        shown and never scored: a player's own split over the first half of 2025-26 predicted the second half's at
+        r 0.08. A projection built this way is unbiased on every market over 2025-26 and misses by k × √projection, one
+        sigma, k measured per market (1.85 points, 1.2 rebounds, 1.15 assists, 1.1 threes, 1.9 combined), a normal that
+        held 69% within one sigma, read around the <b>median</b> (the mean shifted down a measured fraction of a sigma:
+        a box-score stat skews right, and at the mean the over lands 46% of the time, 41% on threes, while the books post
+        the median); that chance is blended with the book's own at 4 to 2, the market the spine as everywhere on this
+        page. The blowout was measured and is not an input: the market's expected margin predicts a regular's minutes
+        but not the projection's miss, in both seasons. The next morning's grade file carries every player's
+        box line, so <b>Load slate</b> on it grades these rows with the card. A prop is the slate's call as made: the
+        page does not rescore it, and the record tile below is the test. Props cannot be backtested against lines (ten
+        credits a market a game on the history endpoint), so the tile earns everything from day one.</p>
+      <div class="subhead">Best props <span class="tag">every prop whose blended chance clears its price, best edge first — BET at 3 points of edge and 55% or better, LEAN below that; a priori bands, the record decides. Click a card for the prop's own panel</span></div>
+      <div id="propsBest" class="picks"></div>
+      <div class="subhead">Every prop on the date <span class="tag">by game, then by edge — click a column to sort it, filter by market, band, side or player; click a row for the prop's own panel, then Previous and Next (or the arrow keys) walk the list as shown</span></div>
+      <div class="row propsctl">
+        <label class="f" style="flex-direction:row;align-items:center;gap:6px"><span class="tag">market</span>
+          <select id="propsMk"><option value="">all</option><option value="pts">points</option><option value="reb">rebounds</option><option value="ast">assists</option><option value="tpm">threes</option><option value="pra">pts + reb + ast</option></select></label>
+        <label class="f" style="flex-direction:row;align-items:center;gap:6px"><span class="tag">band</span>
+          <select id="propsBand"><option value="">all</option><option value="BET">BET</option><option value="LEAN">LEAN</option><option value="no edge">no edge</option></select></label>
+        <label class="f" style="flex-direction:row;align-items:center;gap:6px"><span class="tag">side</span>
+          <select id="propsSide"><option value="">all</option><option value="OVER">over</option><option value="UNDER">under</option></select></label>
+        <label class="f" style="flex-direction:row;align-items:center;gap:6px"><span class="tag">player or game</span><input id="propsQ" type="text" placeholder="Maxey" autocomplete="off" style="width:150px"></label>
+        <span class="tag" id="propsShown"></span>
+        <button type="button" class="btn" id="propsReset">Reset view</button>
+      </div>
+      <div class="scroll"><div id="propsTable"></div></div>
+    </div>
+  </section>
+  <!-- the prop's own panel (21 Oct 2026): a best-prop card or a table row opens here; Previous / Next walk the table (22 Oct); Escape, Close or a click outside puts it away -->
+  <div id="propDetail" class="pdlg" hidden role="dialog" aria-modal="true" aria-label="The prop in full">
+    <div class="pdlg-box">
+      <div class="pdlg-top">
+        <div class="pdlg-nav" id="propDetailNav" hidden>
+          <button type="button" class="btn" id="propDetailPrev">&lsaquo; Previous</button>
+          <span class="tag" id="propDetailPos"></span>
+          <button type="button" class="btn" id="propDetailNext">Next &rsaquo;</button>
+        </div>
+        <button type="button" class="btn pdlg-close" id="propDetailClose">Close</button>
+      </div>
+      <div id="propDetailBody"></div>
+    </div>
+  </div>

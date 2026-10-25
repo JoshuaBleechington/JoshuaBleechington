@@ -40,7 +40,7 @@ VERSION = 1
 LEAGUE = {
     "ortg": 114.5,        # points per 100 possessions
     "pace": 99.0,         # possessions a team per 48 minutes
-    "pace_sd": 3.0,       # a game's pace around its expectation (the first replay: 4.2 made the total's spread 20.6 against the market's 18.2)
+    "pace_sd": 2.0,       # a game's pace around its expectation (the replays: 4.2 made the total's spread 20.6 and 3.0 19.8, against the market's 18.2)
     "tov": 0.135,         # turnovers per possession
     "trip": 0.105,        # trips to the line per possession (two shots each)
     "ft": 0.782,          # free-throw percentage
@@ -63,8 +63,13 @@ LEAGUE = {
     "ot_poss": 10.5,      # possessions a side in overtime
 }
 
-# ---- the shrink each market's raw probability gets (the backtest sets these; 1.0 until it has) ----
-SHRINK = {"total": 1.0, "h1": 1.0, "spread": 1.0, "ml": 1.0, "team": 1.0, "quarter": 1.0}
+# ---- the shrink each market's raw probability gets: "worth" = 0.5 + (p - 0.5) * shrink ----
+# tools_backtest_nba_sim.py, 2025-26 at 400 runs a game with the tendencies file, the sim's own view against the closing total
+# and spread: the slope of does on says was +0.04 for the total (t 0.2; a 70%+ call landed 52.0%), +0.02 for the spread (t 0.1;
+# a 70%+ call 44.4%), +0.97 for the moneyline (t 7.1; a 70%+ call 79.9% at says 77.4%). The close already carries the ratings,
+# so a total or spread call is worth a coin whatever it says; the win chance is nearly true. The first half, the team totals and
+# the quarters have no lines in the history yet, so they stay at 1.0 as unmeasured, and the page's record is where they get measured.
+SHRINK = {"total": 0.05, "h1": 1.0, "spread": 0.0, "ml": 0.97, "team": 1.0, "quarter": 1.0}
 BANDS = [(0.70, "STRONG"), (0.65, "BET"), (0.60, "LEAN")]
 
 
@@ -258,6 +263,21 @@ def _endgame(setup, rng, clock, pa_q, ph_q, sa, sh, ta, th):
     quick = setup["_quick"]
     while clock > 0:
         margin = sh - sa
+        if clock <= 24.0 and abs(margin) <= 3:
+            # the last possession (the replay: the sim found overtime 2.9% of the time against the ledger's 4.4%, because a level
+            # game kept trading possessions): level, one side holds for the last shot; down one to three, the trailer takes one try
+            if margin == 0:
+                trailer_home = rng.random() < 0.5
+                tq = th if trailer_home else ta
+            else:
+                trailer_home = margin < 0
+                tq = quick[1] if trailer_home else quick[0]
+            pts = _draw(tq, rng.random())
+            if trailer_home:
+                ph_q += pts; sh += pts
+            else:
+                pa_q += pts; sa += pts
+            break
         if margin == 0 or abs(margin) > lg["foul_reach"]:
             # play it out: one possession each at the game's pace
             secs = 14.0
@@ -429,7 +449,7 @@ def _market(kind, line, p_first, push, first, second):
     p = p_first / live
     side, prob = (first, p) if p >= 0.5 else (second, 1.0 - p)
     cal = shrink(prob, kind)
-    return {"line": line, "side": side, "p_raw": round(prob, 4), "p": round(cal, 4), "push": round(push or 0.0, 4), "band": band(cal), "first": first}
+    return {"line": line, "side": side, "p_raw": round(prob, 4), "p": round(cal, 4), "push": round(push or 0.0, 4), "band": band(prob), "first": first}   # the band is the sim's own chance; "p" is what it is worth
 
 
 # ---- club profiles from the ledger -------------------------------------------------

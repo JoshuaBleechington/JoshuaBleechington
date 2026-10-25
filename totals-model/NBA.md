@@ -338,6 +338,99 @@ number. The input the backtest cannot see is timing: a late scratch moves the
 line after the close used here was set, and that is the nightly card's job,
 measured from opening night on the record section.
 
+## The simulation, 25 Oct 2026
+
+The user: "run the matchup 500 to 10,000 times to best determine how the
+game will likely end, with confidence levels, tied into the model as a
+scored metric; player fouls early, coaches' tendencies, substitution
+patterns, second-half patterns, late-game behaviour, pace, fatigue, refs,
+travel." `slate/nbasim.py` is the engine, pure Python, 5,000 games in a
+second. A game, each run:
+
+- **Possessions** from the two clubs' paces relative to the league, drawn
+  with a spread of 2.0 and split across the quarters by the measured
+  shares; the fourth runs 3% faster in a blowout.
+- **A possession** is a turnover, a trip to the line (two shots at the
+  club's percentage) or a shot, a three or a two at the club's shares and
+  percentages, a miss rebounded by the offence at its rate for another try.
+  The make rates are scaled so the expected points equal the target: the
+  club's offensive rating against the opponent's defensive rating, league-
+  relative, shifted for home court (half the ledger's 1.73 a side), a back
+  to back (−1.0 per 100, a priori), the regulars out (his points a game
+  times 0.15 plus his minutes times 0.03 per 100, three fifths on his
+  club's offence and two fifths on its defence, a priori) and the crew's
+  whistle (its free throws a game against the league's, scaling the trips).
+- **Who is on the floor**: the starters' share of each quarter's minutes
+  (the club's own from the play-by-play when it has ten games, else the
+  league's) and a gap of 4.0 per 100 between an all-starter lineup and an
+  all-bench one move the target by the quarter; a margin of 16 at the start
+  of the fourth empties both benches.
+- **The end of a close game**: inside the last thirty seconds the trailer
+  within nine fouls, the leader shoots two, the trailer takes quick threes;
+  inside the last twenty-four seconds level, one side holds for the last
+  shot, and down one to three the trailer takes one try. Overtime when
+  level.
+
+Two views. The **sim's own view** is that game from the ledger's ratings
+(this season blended with last by n/(n+15)). The **market-anchored view**
+is the same game with each side's base nudged until its mean total and
+margin equal the scoreboard book's total and spread, so what is left is
+the shape: the halves, the quarters, the team totals. The slate writes
+both on the row as histograms (`nbasim`), and the page reads the chance of
+any line off them.
+
+**The play-by-play**, `python slate.py nba-pbp`, one ESPN call a game:
+2,483 games over 2024-25, 2025-26 and this season, every substitution with
+the man in and out, every foul by type, timeouts, shots with the attempt's
+value, free throws, rebounds, turnovers, the clock and the score at each.
+`tools_nba_tendencies.py` measures from it (`slate/nba-tend.json`):
+
+| What | Measured |
+| --- | --- |
+| Possessions by quarter | 0.258 / 0.252 / 0.251 / 0.240 of the game |
+| Starters' share of the minutes by quarter | 0.69 / 0.60 / 0.67 / 0.53; in the fourth by the margin at its start: 0.62 inside five, 0.60 at six to ten, 0.55 at eleven to fifteen, 0.48 at sixteen to twenty, 0.29 past twenty |
+| The fourth by the margin at its start | 22.3 possessions and 1.217 a possession inside five; 23.3 and 1.187 past twenty |
+| Points in the last minute | 6.3 with the margin within nine, 3.5 out of reach, 4.3 level: the fouling end is worth about 2.8 points |
+| Foul trouble | a regular picks up two fouls in the first quarter in 10.3% of his games and plays 28.9 minutes in them against 29.9: a minute, not a lever |
+| Timeouts a club by quarter | 1.1 / 1.2 / 1.2 / 1.9; the first substitution after 5:29 |
+| The shot mix | 42.0% of attempts from three at 35.8%, twos at 54.8%, free throws at 78.1%, a trip on 10.5% of possessions, a turnover on 13.7% |
+
+**The replay** (`tools_backtest_nba_sim.py`, 2025-26, 1,145 games with a
+club profile of five games or more, 400 runs a game, the profiles built
+from the games before each date with 2024-25 as the prior, against
+KillerSports' closing total and spread):
+
+| The sim's own view against the close | Result |
+| --- | --- |
+| The total: final − close +0.24 (sd 18.2); final − sim −0.19 (sd 19.1); the sim's total sits 5.7 from the close | the close is the better number |
+| Slope of the close's residual on the sim's lean | **+0.002 (t 0.0)**: the sim's total carries nothing the close does not |
+| Total calls by band, says → does | 60-65: 62.5 → 48.7 (112-118); 65-70: 67.2 → 53.5 (68-59); 70+: 74.6 → 52.0 (52-48) |
+| Spread calls by band | 60-65: 62.2 → 46.2; 65-70: 67.1 → 52.7; 70+: 74.5 → 44.4; slope +0.02 (t 0.1) |
+| Moneyline, says → does | 55-60: 57.3 → 57.5; 60-65: 62.3 → 64.2; 65-70: 67.5 → 74.6; 70+: 77.4 → 79.9; **slope +0.97 (t 7.1)**, Brier 0.209 against a coin's 0.250 |
+| The shape | quarter shares 0.257 / 0.250 / 0.255 / 0.238 against the ledger's 0.255 / 0.250 / 0.255 / 0.240; first half 116.7 against 116.1; the sim's own spread of the total 19.1 against the market's residual 18.2; overtime 3.3% against 4.4% |
+
+So the honest reading, the same one the earlier backtests gave: the market
+prices the ratings, and a simulation built on the ratings cannot out-call
+the close on the total or the spread whatever confidence it prints; its
+win probabilities are nearly true, which says the engine's variance is
+right. That sets the shrink each market's chance gets before it is shown
+as "worth" (`nbasim.SHRINK`: total 0.05, spread 0.0, moneyline 0.97) and
+the use: the sim is a distribution tool. Its value is in what the close
+does not carry, the first half, the quarters and the team totals, and
+those cannot be measured until their lines are in the log. The odds log
+has carried the first-half close since 17 Oct; the historical first-half
+lines for 2025-26 would cost about 12,000 credits on the event endpoint
+(ten a game a market), which is the one spend decision left. The page's
+record keeps says against does for every call at LEAN or better from the
+first night, by view, market and band, so the question answers itself as
+the season goes.
+
+What is still a priori and marked so: the cost of an absence, the bench
+gap, the back-to-back penalty. What the play-by-play could add next: each
+player's on/off per 100 from the stints (the absence cost measured instead
+of assumed), each club's late-game pace and timeout habits, and a rotation
+model for the props' minutes.
+
 ## The player props, 19 Oct 2026
 
 The user: "set up another tab for player props... find the ideal scenario

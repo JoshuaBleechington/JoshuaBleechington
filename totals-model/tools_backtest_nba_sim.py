@@ -53,7 +53,7 @@ def bucket(p):
     return "70+" if c >= 0.70 else "65-70" if c >= 0.65 else "60-65" if c >= 0.60 else "55-60" if c >= 0.55 else "50-55"
 
 
-def run(folder, runs=1000, seasons=("2024-25", "2025-26"), seed=1, min_games=5):
+def run(folder, runs=1000, seasons=("2024-25", "2025-26"), seed=1, min_games=5, tend=None):
     files = {"2024-25": ("led2425.json", "78766447-query.html", None), "2025-26": ("led2526.json", "a6af4eb0-query.html", "led2425.json")}
     rows = []
     for season in seasons:
@@ -65,7 +65,7 @@ def run(folder, runs=1000, seasons=("2024-25", "2025-26"), seed=1, min_games=5):
         cache_date, prof = None, None
         for i, g in enumerate(joined):
             if g["date"] != cache_date:
-                prof = nbasim.profiles_from_ledger(led, g["date"], prior_games=prior)
+                prof = nbasim.profiles_from_ledger(led, g["date"], prior_games=prior, tend=tend)
                 cache_date = g["date"]
             a, h = prof["teams"].get(g["away"]), prof["teams"].get(g["home"])
             if not a or not h or min(a["n"], h["n"]) < min_games:
@@ -153,7 +153,7 @@ def main(argv):
         print(__doc__)
         return 2
     folder = argv[0]
-    runs, seed, seasons = 1000, 1, ("2024-25", "2025-26")
+    runs, seed, seasons, tend = 1000, 1, ("2024-25", "2025-26"), None
     i = 1
     while i < len(argv):
         if argv[i] == "--runs":
@@ -162,9 +162,11 @@ def main(argv):
             seed = int(argv[i + 1]); i += 2
         elif argv[i] == "--season":
             seasons = (argv[i + 1],); i += 2
+        elif argv[i] == "--tend":
+            tend = json.load(open(argv[i + 1])); i += 2
         else:
             i += 1
-    rows = run(folder, runs=runs, seasons=seasons, seed=seed)
+    rows = run(folder, runs=runs, seasons=seasons, seed=seed, tend=tend)
     out = os.path.join(folder, "sim-backtest.json")
     with open(out, "w") as f:
         json.dump(rows, f)

@@ -1048,6 +1048,38 @@ their points a game against the league's by history (the total did not
 follow, t −1.0), and the past table's pooled over rate with these three as
 a soft lean. Never scored; the referee watch on the record is the test.
 
+## The Simulation card, 25 Oct 2026
+
+The user: "a simulation model for the super model... run the matchup 500
+to 10,000 times to best determine how the game will likely end, tied in as
+a scored metric, with confidence levels." The engine is `slate/nbasim.py`
+(NBA.md, "The simulation"); the slate run plays each game NBA_SIM_RUNS
+times, twice, and the row carries the results as histograms in the hidden
+`nbasim` box: the total, the halves, the quarters, the margin and the team
+totals, for the sim's own view and for the market-anchored one, plus the
+anchor, the profiles, the shrink and the bands.
+
+The card reads the chance of any line off the histograms, so nothing is
+re-run in the page and the calls follow the line on the row as it is
+typed. `nbaSimPanel` draws the head line (the runs, each side's mean, the
+median total with its middle half, the margin, the home win chance,
+overtime, the anchor), a table of every market with the own view's chance
+and the anchored one for the row's line, each a chip with its side and
+its band (LEAN 60, BET 65, STRONG 70) and the "worth" beside it (the chance
+shrunk by what the replay found), then the medians by quarter and half,
+the team totals and the fourth's share, and the two profiles.
+
+`nbaSimRecordHtml` is the record: every graded NBA row's calls at LEAN or
+better, from the stored histograms against the lines the row carried,
+graded off the finals (the half from f5a and f5h, the spread and the
+moneyline from the margin), tallied by view, market and band with says,
+does and units at the row's own prices. It sits under the NBA verdict and
+the referee watch in Is it working, and it is what the user asked for: a
+scored metric from the first night, honest about what 70% means. The
+example row carries a seeded block built by nbasim at build time
+(`nba_example_sim`), so the Example button shows the card and the harness
+can check it.
+
 ## The graded night joins the last games, 25 Oct 2026
 
 The user, on a graded prop from the 24th whose panel listed the 21st and

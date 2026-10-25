@@ -90,15 +90,20 @@ Three double-click files, in this order on a game day:
    day's games with the slate's projection beside each, about five credits
    a game. In The Super Model: **NBA PROPS → Load props**. Run it late
    enough that the books have posted the props, usually by the early
-   afternoon; it brings the game logs up to date itself first.
+   afternoon; it brings the game logs up to date itself first, and plays
+   each game **10,000 times** (the slate's own simulation, from the same
+   profiles and the injury report as it stands) and attaches the runs to
+   every prop, read on the prop's panel (26 Oct 2026).
 5. **An hour before tip**, run the slate, the odds and the props again and
    load each. What a second load does to a game already on the card (23 Oct
    2026): it fills boxes that were blank (the crew the league posted after
    the morning run, a line the odds had not listed), **replaces the starting
-   five** with the newer one (expected to confirmed, a scratch), ticks a
-   confirmed goalie, and replaces ungraded props; it never overwrites a
-   filled box, so the line, the prices and the who-is-out list stay as they
-   stood when the row was added, and the record is of the row as logged.
+   five, the who-is-out list and the simulation** with the newer ones
+   (expected to confirmed, a scratch, the runs from the later injury
+   report; 26 Oct 2026), ticks a confirmed goalie, and replaces ungraded
+   props; it never overwrites any other filled box, so the line, the prices
+   and the ratings stay as they stood when the row was added, and the
+   record is of the row as logged.
    Tick a doubtful player out on the card if he is ruled out late. The
    **close** for the record does not come from the page at all: every odds
    run writes what it saw to `odds-log.json`, the last run before tip is the
@@ -149,6 +154,7 @@ projection, built from the ledgers' box lines and measured on 2025-26
 | Regulars out | For every 30 minutes a game of teammates listed Out or Doubtful on ESPN who play 24 or more: +1.42 minutes, +0.56 points per 36, +0.09 assists per 36; rebounds and threes get nothing | t 36, t 11, t 6; rebounds t 0.6 and threes t 1.8, null |
 | Pace | The game's possessions (the two clubs' paces less the league's, this season at five games, else last season's) against the club's **own** pace, in full: his rate per 36 is earned at his club's pace already. Before 25 Oct 2026 it was the two clubs' mean against the league's; the new form misses less on every market | Mechanical; measured 25 Oct 2026 (points 6.589 against 6.592) |
 | The matchup, from the simulation | The club's expected points per possession in the simulation's own view (its offence into the opponent's defence, league-relative, home court, a back to back) against its own rating, to the half power on points, assists, threes and PRA; none on rebounds. The market's implied team points carried nothing beyond pace | `tools_backtest_nba_props_sim.py`, 2025-26, 17,700 player-games, beyond the pace and defence levers: the miss followed it (points t 5.2, PRA 6.2, assists 4.8, threes 3.2, rebounds 1.6) and half weight cut it; full weight overshot with the defence lever in |
+| The game's runs (26 Oct 2026) | Each game played 10,000 times by `nbasim.py` from the same profiles, with the listed-out regulars' cost taken off their club as the slate's sim does (`props_out_sim_list`, `nba_props_game_sim`); on every prop, his club's median points with the middle half against its points a game by the ratings alone, the ratio applied in full to his rate at his minutes (the sim's own read), the blowout chance (fifteen or more either way), overtime and the game's possessions. A run nearer tip carries the later injury report, and a second load replaces the ungraded prop | **Shown, not scored**: the scored part is the matchup lever above, at the weight that measured; the full-weight read overshot, and trimming minutes for a rout made the projection worse out of sample |
 | Defence v position | The ledger's own table: what each defence allowed per minute to guards, forwards and centres (ESPN's three positions) against the league, this season shrunk toward last season's by its games (twenty games to even). Carried at 0.75 for points, rebounds and assists, 0.4 for threes | A defence's lean over the first half of 2025-26 carried into the second at 0.77, 0.74, 0.73, 0.41 (t 8, 8, 7, 4) |
 | HashtagBasketball's rank | The website's defence-v-position table, the club's rank of 150 against the five positions that fold into his | Shown, never scored |
 | Home and road | His own per-36 at home and on the road, this season with last behind it | Shown, never scored: a player's own split over the first half of 2025-26 predicted the second half's at r 0.08 |

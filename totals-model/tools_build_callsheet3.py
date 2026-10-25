@@ -128,12 +128,22 @@ def head() -> str:
              "  #propsView b.lg.push, .pdlg b.lg.push { background: var(--edge-wash); color: var(--edge); }\n"
              "  .pdlg .pd-log tr.this td { font-weight: 700; border-top: 2px solid color-mix(in srgb, var(--ink) 35%, transparent); } .pdlg .pd-log tr.this .tag { margin-left: 4px; }\n"
              "  /* the simulation card and its record (25 Oct 2026) */\n"
-             "  #nbaSimPanel .simhead { margin-bottom: 8px; line-height: 1.5; } #nbaSimPanel .simtab td, #nbaSimPanel .simtab th { white-space: nowrap; }\n"
-             "  .simchip { display: inline-block; padding: 1px 7px; border-radius: 4px; font: 600 12px/1.6 var(--mono); background: var(--surface-2); color: var(--ink); }\n"
+             "  #nbaSimPanel .simtiles { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; margin: 2px 0 8px; }\n"
+             "  @media (max-width: 720px) { #nbaSimPanel .simtiles { grid-template-columns: repeat(2, minmax(0, 1fr)); } }\n"
+             "  #nbaSimPanel .simtile { border: 1px solid var(--rule); border-radius: 8px; padding: 8px 10px; background: var(--surface-2); min-width: 0; }\n"
+             "  #nbaSimPanel .simtile .k { font: 600 10px/1.4 var(--sans); letter-spacing: .08em; text-transform: uppercase; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }\n"
+             "  #nbaSimPanel .simtile .v { font: 700 18px/1.25 var(--mono); color: var(--ink); } #nbaSimPanel .simtile .s { font: 11px/1.4 var(--sans); color: var(--muted); }\n"
+             "  #nbaSimPanel .simmeta { font: 12px/1.5 var(--sans); color: var(--ink-2); margin: 0 0 6px; }\n"
+             "  #nbaSimPanel table.simtab { table-layout: fixed; margin: 4px 0 10px; } #nbaSimPanel .simtab th:first-child, #nbaSimPanel .simtab td:first-child { width: 40%; }\n"
+             "  #nbaSimPanel .simtab td, #nbaSimPanel .simtab th { white-space: normal; vertical-align: top; padding: 6px 6px; }\n"
+             "  #nbaSimPanel .mkname { font: 700 12.5px/1.4 var(--sans); color: var(--ink); } #nbaSimPanel .mkline { font: 12px/1.5 var(--mono); } #nbaSimPanel .mkline .dim { font: 11px/1.4 var(--sans); }\n"
+             "  .simchip { display: inline-block; padding: 1px 7px; border-radius: 4px; font: 600 12px/1.6 var(--mono); background: var(--surface-2); color: var(--ink); white-space: nowrap; }\n"
              "  .simchip.simlean { background: var(--edge-wash); color: var(--edge); } .simchip.simbet { background: var(--go-wash); color: var(--go); } .simchip.simstrong { background: var(--go); color: #fff; }\n"
-             "  #nbaSimPanel .simq, #nbaSimPanel .simprof { margin-top: 8px; font-size: 12.5px; line-height: 1.5; }\n"
+             "  #nbaSimPanel .simsub { font: 11px/1.4 var(--sans); color: var(--muted); margin-top: 2px; }\n"
+             "  #nbaSimPanel table.simq { margin: 2px 0 8px; } #nbaSimPanel table.simq th, #nbaSimPanel table.simq td { text-align: center; padding: 3px 4px; } #nbaSimPanel table.simq th:first-child, #nbaSimPanel table.simq td:first-child { text-align: left; white-space: normal; font-family: var(--sans); }\n"
+             "  #nbaSimPanel .simprof { margin-top: 4px; font-size: 11.5px; line-height: 1.5; }\n"
              "  .simrec { margin-top: 10px; } .simrec .simrecview { font-weight: 700; margin: 8px 0 4px; } .simrec .simrectab td.good { color: var(--go); } .simrec .simrectab td.bad { color: var(--bad); }\n"
-             "  #nbaSimPanel .ttgap { margin-top: 3px; font-size: 12px; } .simchip.gaprule { font-size: 11.5px; }\n"
+             "  #nbaSimPanel .ttgap { margin-top: 3px; font: 11.5px/1.5 var(--sans); } .simchip.gaprule { font-size: 11px; }\n"
              "  /* the Props tab's own Is it working block, in colour (22 Oct 2026) */\n"
              "  #propsCalib .calib > div.good { box-shadow: inset 3px 0 0 var(--go); } #propsCalib .calib > div.bad { box-shadow: inset 3px 0 0 var(--bad); }\n"
              "  #propsCalib .calib > div.good .v, #propsCalib .calib > div.good .units { color: var(--go); } #propsCalib .calib > div.bad .v, #propsCalib .calib > div.bad .units { color: var(--bad); }\n"
@@ -157,6 +167,7 @@ def head() -> str:
              "  .pdlg .pd-tile .k { font: 600 10px/1.4 var(--sans); letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }\n"
              "  .pdlg .pd-tile .v { font: 700 19px/1.25 var(--mono); } .pdlg .pd-tile .s { font: 11px/1.4 var(--sans); color: var(--muted); }\n"
              "  .pdlg .pd-tile.good .v { color: var(--go); } .pdlg .pd-tile.bad .v { color: var(--bad); }\n"
+             "  .pdlg .pd-simtiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(128px, 1fr)); gap: 8px; margin: 4px 0 8px; } .pdlg .pd-simtiles .pd-tile .v { font-size: 17px; }\n"
              "  .pdlg h4 { margin: 16px 0 6px; font: 700 11px/1.4 var(--sans); letter-spacing: .1em; text-transform: uppercase; color: var(--ink-2); } .pdlg h4 .dim { text-transform: none; letter-spacing: 0; font-weight: 500; }\n"
              "  .pdlg ul.pd-why { margin: 0; padding-left: 18px; font: 13px/1.55 var(--sans); color: var(--ink); } .pdlg ul.pd-why li { margin: 4px 0; }\n"
              "  .pdlg table.form { margin: 4px 0 4px; } .pdlg table.form td, .pdlg table.form th { white-space: normal; } .pdlg table.form tr.carded td { font-weight: 700; }\n"
@@ -381,7 +392,7 @@ def tail() -> str:
     # other box keeps the loader's rule, blanks fill and typed values stay, so the record is of the row as logged
     t = once(t, '          ["agbk", "hgbk", "agconf", "hgconf"].forEach(function (k) { if (g.inputs[k] === true && !row.inputs[k]) { row.inputs[k] = true; changed = true; } });',
              '          ["agbk", "hgbk", "agconf", "hgconf"].forEach(function (k) { if (g.inputs[k] === true && !row.inputs[k]) { row.inputs[k] = true; changed = true; } });\n'
-             '          ["nbalineup"].forEach(function (k) { if (!blank(g.inputs[k]) && String(g.inputs[k]) !== String(row.inputs[k] || "")) { row.inputs[k] = String(g.inputs[k]); changed = true; } });   // the starting five follows the newest slate (23 Oct 2026)', "lineup refresh")
+             '          ["nbalineup", "nbaout", "nbasim"].forEach(function (k) { if (!blank(g.inputs[k]) && String(g.inputs[k]) !== String(row.inputs[k] || "")) { row.inputs[k] = String(g.inputs[k]); changed = true; } });   // the starting five follows the newest slate (23 Oct 2026); so do the injury report and the simulation run from it (26 Oct 2026), shown and recorded, never scored by the engine', "lineup refresh")
     t = once(t, '    if (g.inputs && g.inputs.dome === true) v.dome = true;',
              '    if (g.inputs && g.inputs.dome === true) v.dome = true;\n'
              '    ["agbk", "hgbk", "agconf", "hgconf"].forEach(function (k) { if (g.inputs && g.inputs[k] === true) v[k] = true; });', "slate backup flags into the form")
@@ -548,13 +559,26 @@ def props_example_games() -> list:
            ("NYK", "F", "pts"): "HashtagBasketball: Knicks allow 22.1 points a game to SFs (43rd of 150, 1 the fewest), 21.6 points a game to PFs (38th of 150, 1 the fewest); shown, not scored",
            ("NYK", "C", "reb"): "HashtagBasketball: Knicks allow 13.4 rebounds a game to Cs (125th of 150, 1 the fewest); shown, not scored"}
     out = {"PHI": (31.2, [("Joel Embiid", 31.2, "Out")], [("Andre Drummond", "Questionable")]), "NYK": (0.0, [], [("Josh Hart", "Day-To-Day")])}
+    # the simulation on the props (26 Oct 2026): the NBA example's two profiles, the game played by nbasim at build
+    # time (seeded) and read for each prop, and the matchup lever from the same profiles, as a real file carries them
+    import nbasim  # noqa: E402
+    prof = {"league": dict(nbasim.LEAGUE), "last": {},
+            "teams": {"PHI": {"ab": "PHI", "ortg": 113.5, "drtg": 115.0, "pace": 99.5, "tov": 0.135, "trip": 0.10, "ft": 0.79, "a3": 0.41, "p3": 0.36, "p2": 0.55, "oreb": 0.27, "n": 15},
+                      "NYK": {"ab": "NYK", "ortg": 118.0, "drtg": 109.0, "pace": 98.0, "tov": 0.125, "trip": 0.11, "ft": 0.80, "a3": 0.44, "p3": 0.37, "p2": 0.56, "oreb": 0.29, "n": 16}}}
+    gs = slate.nba_props_game_sim(prof, "PHI", "NYK", "2026-10-26", 3000, seed=7, out={"away": [{"n": "Joel Embiid", "st": "Out", "mpg": 31.2, "ppg": 27.5}], "home": []})
+
+    def club_match(team, opp, home_side):
+        o, d = dict(prof["teams"][team]), prof["teams"][opp]
+        ppp = nbasim._target(o, d, prof["league"], home_side)
+        return {"f": round(ppp * 100.0 / o["ortg"], 4), "ortg": o["ortg"], "drtg": d["drtg"], "lg": round(prof["league"]["ortg"], 1), "home": bool(home_side), "b2b": False, "n": o["n"]}
     props = []
     for k, (name, mk, line, op, up) in enumerate(lines):
         team, pos, this, last = players[name]
         opp = "NYK" if team == "PHI" else "PHI"
         dmk = "pts" if mk == "pra" else mk
         pr = {"name": name, "mk": mk, "line": line, "op": op, "up": up, "book": "fanatics"}
-        ctx = {"out_mpg": out[team][0], "out_names": out[team][1], "maybe": out[team][2], "pace": 99.5, "league_pace": 100.5, "home": team == "NYK", "pos": pos,
+        ctx = {"out_mpg": out[team][0], "out_names": out[team][1], "maybe": out[team][2], "pace": 98.75, "league_pace": 100.5, "home": team == "NYK", "pos": pos,
+               "pace_team": prof["teams"][team]["pace"], "pace_opp": prof["teams"][opp]["pace"], "match": club_match(team, opp, team == "NYK"),
                "opp_nick": slate.NBA_NICK[opp], "dvp": dvp[opp][pos], "htb": htb.get((opp, pos, dmk)), "self_out": "Out" if name == "Joel Embiid" else ""}
         proj, why = slate.props_project(pr, this, last, ctx)
         item = {"pid": "x%d" % (k + 1), "name": name, "team": team, "opp": opp, "home": team == "NYK", "pos": pos, "mk": mk, "line": line, "op": op, "up": up, "book": "fanatics",
@@ -562,10 +586,11 @@ def props_example_games() -> list:
                 "log": [[g["d"], g["opp"], 1 if g["home"] else 0, g["min"], slate.props_stat(g, mk)] for g in (this or last)[-10:]], "why": why}
         if proj:
             item.update(proj)
+            item["sim"] = slate.nba_prop_sim_read(gs, team == "NYK", proj)
         props.append(item)
     props.sort(key=lambda x: (-(x.get("edge") if x.get("edge") is not None else -9), x["name"], x["mk"]))
-    return [{"gid": "example", "away": "76ers", "home": "Knicks", "aab": "PHI", "hab": "NYK", "tip": None, "spread": -5.5, "total": 231.5, "pace": 99.5, "league_pace": 100.5,
-             "out": {"PHI": [["Joel Embiid", 31.2, "Out"]], "NYK": []}, "props": props, "unmatched": []}]
+    return [{"gid": "example", "away": "76ers", "home": "Knicks", "aab": "PHI", "hab": "NYK", "tip": None, "spread": -5.5, "total": 231.5, "pace": 98.75, "league_pace": 100.5,
+             "out": {"PHI": [["Joel Embiid", 31.2, "Out"]], "NYK": []}, "sim": gs, "props": props, "unmatched": []}]
 
 
 def build() -> str:

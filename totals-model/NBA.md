@@ -491,6 +491,23 @@ the league double-counted the club's own pace, which a player's rate per
 36 already carries; the game's possessions against the club's own pace
 misses less on every market and is the form now.
 
+**The runs on every prop, 26 Oct 2026.** The user: "confirm the simulation
+is being run for the props as well, and attach the results to the player
+props when I select them to see what the simulation did in regards to how
+it was scored." The props run now plays each game the same 10,000 times as
+the slate (`nba_props_game_sim`, `--runs`), from the same profiles, with
+the listed-out regulars' cost taken off their club exactly as the slate's
+sim does, and writes on the game row and on every prop what the runs said:
+his club's median points with the middle half against its points a game by
+the ratings alone, the ratio applied in full to his rate at his minutes
+(the sim's own read of his number), the blowout chance, overtime and the
+possessions. The prop's panel shows it under What moves it, with the
+matchup lever marked as the one part the score takes, at the half weight
+that measured; the full-weight read and the blowout stay shown, not
+scored, for the reasons above and in the blowout row of slate/README.md. A
+run nearer tip carries the later injury report, and a second load of the
+props replaces an ungraded prop with the newer run.
+
 What is still a priori and marked so: the cost of an absence, the bench
 gap, the back-to-back penalty. What the play-by-play could add next: each
 player's on/off per 100 from the stints (the absence cost measured instead

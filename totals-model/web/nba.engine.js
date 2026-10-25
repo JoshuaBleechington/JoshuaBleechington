@@ -645,33 +645,53 @@
     var calls = { own: {}, mkt: {} };
     nbaSimCalls(sim, lines, "own").forEach(function (c) { calls.own[c.key] = c; });
     if (mkt) nbaSimCalls(sim, lines, "mkt").forEach(function (c) { calls.mkt[c.key] = c; });
+    /* the layout (26 Oct 2026, the user: "off centred and a tiny bit hard to read"): four tiles for the game, one line
+       of context, a three-column table that fits the card (the market and its line in the first column, a chip with its
+       band and worth under it in each view's column), the medians as a small table, the profiles last */
     var fmt1 = function (x) { return x === null || x === undefined ? "?" : (+x).toFixed(1); };
     var mA = nbaSimMean(own.away), mH = nbaSimMean(own.home), mg = nbaSimMean(own.margin);
-    var h = '<div class="simhead"><b>' + String(sim.runs).replace(/\B(?=(\d{3})+(?!\d))/g, ",") + ' games.</b> The sim\'s own view: ' +
-            esc(away) + ' <b>' + fmt1(mA) + '</b>, ' + esc(home) + ' <b>' + fmt1(mH) + '</b>; total <b>' + nbaSimQ(own.total, 0.5) + '</b> (middle half ' + nbaSimQ(own.total, 0.25) + '–' + nbaSimQ(own.total, 0.75) + '), ' +
-            esc(mg >= 0 ? home : away) + ' by <b>' + Math.abs(mg).toFixed(1) + '</b>, ' + esc(home) + ' wins <b>' + (100 * (nbaSimOver(own.margin, 0) || {}).over).toFixed(0) + '%</b>, overtime ' + (100 * (own.ot || 0)).toFixed(1) + '%.' +
-            (sim.anchor ? ' Anchored to ' + esc(sim.anchor.book) + '\'s ' + esc(String(sim.anchor.total)) + (sim.anchor.sp !== null && sim.anchor.sp !== undefined ? ' / ' + (sim.anchor.sp > 0 ? '+' : '') + esc(String(sim.anchor.sp)) : '') + ' for the derivative markets.' : ' No book on the scoreboard at the run: no anchored view.') + '</div>';
-    h += '<table class="form simtab"><thead><tr><th>Market</th><th>Line</th><th>The sim\'s own view</th><th>Anchored to the market</th></tr></thead><tbody>';
+    var tile = function (k, v, s, cls) { return '<div class="simtile' + (cls ? ' ' + cls : '') + '"><div class="k">' + k + '</div><div class="v">' + v + '</div>' + (s ? '<div class="s">' + s + '</div>' : '') + '</div>'; };
+    var h = '<div class="simtiles">' +
+            tile("Total", nbaSimQ(own.total, 0.5), 'middle half ' + nbaSimQ(own.total, 0.25) + '–' + nbaSimQ(own.total, 0.75)) +
+            tile("Margin", esc(mg >= 0 ? home : away) + ' by ' + Math.abs(mg).toFixed(1), esc(away) + ' ' + fmt1(mA) + ' · ' + esc(home) + ' ' + fmt1(mH)) +
+            tile(esc(home) + " wins", (100 * (nbaSimOver(own.margin, 0) || {}).over).toFixed(0) + '%', 'the one chance the replay found true') +
+            tile("Overtime", (100 * (own.ot || 0)).toFixed(1) + '%', '') + '</div>';
+    h += '<div class="simmeta"><b>' + String(sim.runs).replace(/\B(?=(\d{3})+(?!\d))/g, ",") + ' games</b>, the sim\'s own view. ' +
+         (sim.anchor ? 'Anchored to ' + esc(sim.anchor.book) + '\'s ' + esc(String(sim.anchor.total)) + (sim.anchor.sp !== null && sim.anchor.sp !== undefined ? ' / ' + (sim.anchor.sp > 0 ? '+' : '') + esc(String(sim.anchor.sp)) : '') + ' for the market view.' : 'No book on the scoreboard at the run: no market view.') + '</div>';
+    var cell = function (c) {
+      if (!c) return '<span class="dim">—</span>';
+      var cls = c.band === "no call" ? "simno" : c.band === "LEAN" ? "simlean" : c.band === "BET" ? "simbet" : "simstrong";
+      return '<span class="simchip ' + cls + '"><b>' + esc(c.side) + '</b> ' + (100 * c.p).toFixed(0) + '%</span>' +
+             '<div class="simsub">' + (c.band !== "no call" ? esc(c.band) + ' · ' : '') + 'worth ' + (100 * c.worth).toFixed(0) + '%</div>';
+    };
+    h += '<table class="form simtab"><thead><tr><th>Market</th><th>The sim\'s own view</th><th>Anchored to the market</th></tr></thead><tbody>';
     [["total", "Total", lines.total], ["h1", "First half", lines.h1], ["spread", "Spread (home)", lines.sp], ["ml", "Moneyline", null],
      ["away_total", esc(away) + " team total", lines.away_tt ? lines.away_tt.line : null], ["home_total", esc(home) + " team total", lines.home_tt ? lines.home_tt.line : null]].forEach(function (m) {
-      var lineTxt = m[2] === null || m[2] === undefined ? (m[0] === "ml" ? "" : '<span class="dim">no line on the row' + (/_total$/.test(m[0]) ? ' (the odds run brings it)' : '') + '</span>') : esc(String(m[2]));
-      if (/_total$/.test(m[0]) && m[2] !== null && m[2] !== undefined) {
-        var tt = m[0] === "away_total" ? lines.away_tt : lines.home_tt;
-        lineTxt += ' <span class="dim">' + esc(tt.book) + ' ' + (tt.op > 0 ? '+' : '') + tt.op + '/' + (tt.up > 0 ? '+' : '') + tt.up + '</span>';
-        if (tt.rule) {
-          lineTxt += '<div class="ttgap">implied <b>' + tt.rule.implied + '</b>, gap <b>' + (tt.rule.gap > 0 ? '+' : '') + tt.rule.gap + '</b>' +
-                     (tt.rule.call ? ' · <span class="simchip simbet gaprule"><b>' + tt.rule.call + '</b> by the gap rule</span>' : ' · <span class="dim">inside a point, no call</span>') + '</div>';
+      var first = '<div class="mkname">' + m[1] + '</div>';
+      if (m[2] === null || m[2] === undefined) {
+        if (m[0] !== "ml") first += '<div class="mkline dim">no line on the row' + (/_total$/.test(m[0]) ? ' (the odds run brings it)' : '') + '</div>';
+      } else {
+        first += '<div class="mkline">' + esc(String(m[2]));
+        if (/_total$/.test(m[0])) {
+          var tt = m[0] === "away_total" ? lines.away_tt : lines.home_tt;
+          first += ' <span class="dim">' + esc(tt.book) + ' ' + (tt.op > 0 ? '+' : '') + tt.op + '/' + (tt.up > 0 ? '+' : '') + tt.up + '</span></div>';
+          if (tt.rule) {
+            first += '<div class="ttgap">implied <b>' + tt.rule.implied + '</b>, gap <b>' + (tt.rule.gap > 0 ? '+' : '') + tt.rule.gap + '</b> · ' +
+                     (tt.rule.call ? '<span class="simchip simbet gaprule"><b>' + tt.rule.call + '</b> by the gap rule</span>' : '<span class="dim">inside a point, no call</span>') + '</div>';
+          }
+        } else {
+          first += '</div>';
         }
       }
-      h += '<tr><td>' + m[1] + '</td><td>' + lineTxt + '</td><td>' + nbaSimChip(calls.own[m[0]]) + '</td><td>' + (m[0] === "ml" ? '<span class="dim">the own view\'s</span>' : nbaSimChip(calls.mkt[m[0]])) + '</td></tr>';
+      h += '<tr><td>' + first + '</td><td>' + cell(calls.own[m[0]]) + '</td><td>' + (m[0] === "ml" ? '<span class="dim">the own view\'s</span>' : cell(calls.mkt[m[0]])) + '</td></tr>';
     });
     h += '</tbody></table>';
-    var V = mkt || own, tag = mkt ? "anchored" : "own view";
-    var qs = (V.q || []).map(function (q, i) { return 'Q' + (i + 1) + ' <b>' + nbaSimQ(q, 0.5) + '</b>'; }).join(' · ');
+    var V = mkt || own, tag = mkt ? "anchored to the market" : "the own view";
     var tot = nbaSimQ(V.total, 0.5);
-    h += '<div class="simq">Medians, ' + tag + ': ' + qs + ' · first half <b>' + nbaSimQ(V.h1, 0.5) + '</b> · second half <b>' + nbaSimQ(V.h2, 0.5) + '</b>' +
-         (tot ? ' · the fourth ' + (100 * nbaSimQ(V.q[3], 0.5) / tot).toFixed(1) + '% of the game' : '') +
-         ' · team totals ' + esc(away) + ' <b>' + nbaSimQ(V.away, 0.5) + '</b>, ' + esc(home) + ' <b>' + nbaSimQ(V.home, 0.5) + '</b></div>';
+    h += '<table class="form simq"><thead><tr><th>Medians, ' + tag + '</th><th>Q1</th><th>Q2</th><th>Q3</th><th>Q4</th><th>1H</th><th>2H</th><th>' + esc(away) + '</th><th>' + esc(home) + '</th></tr></thead><tbody><tr><td class="dim">' +
+         (tot ? 'the fourth ' + (100 * nbaSimQ(V.q[3], 0.5) / tot).toFixed(1) + '% of the game' : '') + '</td>' +
+         (V.q || []).map(function (q) { return '<td>' + nbaSimQ(q, 0.5) + '</td>'; }).join('') +
+         '<td>' + nbaSimQ(V.h1, 0.5) + '</td><td>' + nbaSimQ(V.h2, 0.5) + '</td><td>' + nbaSimQ(V.away, 0.5) + '</td><td>' + nbaSimQ(V.home, 0.5) + '</td></tr></tbody></table>';
     var pa = sim.prof && sim.prof.away, ph = sim.prof && sim.prof.home;
     if (pa && ph) {
       h += '<div class="simprof dim">Profiles: ' + esc(away) + ' ' + pa.ortg + ' / ' + pa.drtg + ' per 100, pace ' + pa.pace + (pa.b2b ? ', back to back' : '') + (pa.out ? ', out ' + pa.out + ' per 100' : '') +

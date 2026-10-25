@@ -77,7 +77,7 @@
         rows.push({ id: 0, gdate: d.date || "", game: g.away + " @ " + g.home, away: g.away, home: g.home, aab: g.aab, hab: g.hab, spread: g.spread, total: g.total, pace: g.pace,
                     pid: String(x.pid), name: x.name, team: x.team, opp: x.opp, athome: !!x.home, pos: x.pos || "", mk: x.mk, line: x.line, op: x.op, up: x.up, book: x.book, books: x.books || {},
                     proj: x.proj, sd: x.sd, pm: x.pm, pb: x.pb, p: x.p, push: x.push, side: x.side, chance: x.chance, price: x.price, need: x.need, edge: x.edge, band: x.band,
-                    mins: x.mins, rate36: x.rate36, base: x.base, parts: x.parts || [], why: x.why || [], log: x.log || [], actual: null, result: null });
+                    mins: x.mins, rate36: x.rate36, base: x.base, parts: x.parts || [], why: x.why || [], log: x.log || [], sim: x.sim || null, actual: null, result: null });
       });
     });
     return rows;
@@ -316,6 +316,45 @@
     var lv = propsLevers(r).slice(0, 2);
     return lv.length ? lv.map(function (p) { return esc(p.t) + " " + sgn(+p.eff, 1); }).join(" · ") : "";
   }
+  /* the simulation on the prop (26 Oct 2026, the user: "confirm the simulation is being run for the props as
+     well, and attach the results to the player props when I select them to see what the simulation did in
+     regards to how it was scored"): the props run plays each game the same 10,000 times as the slate, from
+     the same profiles, and the file carries on every prop his club's points in those runs with the middle
+     half, against the club's points a game by its ratings alone, the blowout and overtime chances and the
+     game's possessions. What the SCORE takes from the simulation is the matchup lever (the club's efficiency
+     into tonight's defence, from the same profiles, at the half weight that measured; none on rebounds), so
+     that lever is the tile in colour; the sim's full-weight read of his number is beside the projection and
+     the rest is shown, not scored */
+  function propsSimHtml(r, tile) {
+    var s = r.sim, lab = PROPS_LABEL[r.mk] || r.mk, club = r.team || "his club";
+    var match = (r.parts || []).filter(function (p) { return p && p.k === "match" && isFinite(+p.eff); })[0] || null;
+    var h = '<div class="pd-sim"><h4>Simulation' + (s ? ' <span class="dim">· ' + esc(r.game) + ' played ' + esc(Number(s.runs).toLocaleString()) + ' times</span>' : '') + '</h4>';
+    if (!s) {
+      h += '<p class="note">This file\'s run carried no simulation on the props' + (match ? ', though the matchup lever (' + sgn(+match.eff, 1) + ') came from its profiles' : '') +
+           '. A props run with the current slate.py plays the game 10,000 times and attaches it here.</p></div>';
+      return h;
+    }
+    var pc = function (v) { return (v * 100).toFixed(v * 100 >= 10 ? 0 : 1) + "%"; };
+    var vsProj = s.read !== null && s.read !== undefined ? sgn(s.read - r.proj, 1) + " against the model's " + esc(String(r.proj)) : "no read";
+    var mEff = match ? sgn(+match.eff, 1) : "0.0";
+    var mSub = r.mk === "reb" ? "scored at no weight on rebounds (measured)" : match ? "the scored part, at half weight" + (propsLeverHelps(r, +match.eff) ? ", toward the " + esc(r.side) : ", against the " + esc(r.side)) : "no lever on this prop";
+    h += '<div class="pd-simtiles">' +
+      tile(esc(club) + " points", esc(String(s.team_pts)), "middle half " + esc(String(s.team_lo)) + "–" + esc(String(s.team_hi)) + (s.team_ppg ? " · " + esc(String(s.team_ppg)) + " a game by the ratings" : "")) +
+      tile("Sim's read", s.read === null || s.read === undefined ? "–" : esc(String(s.read)), "his per 36 at his minutes × " + (s.ratio ? esc(s.ratio.toFixed(2)) : "–") + "; " + vsProj) +
+      tile("Matchup lever", mEff, mSub, match && r.mk !== "reb" ? (propsLeverHelps(r, +match.eff) ? "good" : "bad") : "") +
+      tile("Blowout", pc(s.blowout), "15 or more either way; shown, not scored") +
+      tile("Overtime", pc(s.ot), "chance of extra minutes") +
+      tile("Possessions", esc(String(s.poss)), "the game's pace in the runs") +
+      '</div>';
+    h += '<p class="pd-base">The slate played the game ' + esc(Number(s.runs).toLocaleString()) + ' times from the two clubs\' profiles (ratings, pace, shot mix, rest) and the injury report as it stood at the run' +
+         (s.out ? ' (' + esc(club) + '\'s regulars out took ' + esc(Math.abs(+s.out).toFixed(1)) + ' per 100 off its offence)' : '') + '; a later run carries the later report. It puts ' + esc(club) + ' at <b>' + esc(String(s.team_pts)) +
+         '</b> points, the middle half ' + esc(String(s.team_lo)) + ' to ' + esc(String(s.team_hi)) + (s.team_ppg ? ', against ' + esc(String(s.team_ppg)) + ' a game by the ratings alone' : '') +
+         (s.ratio ? ', so the matchup is worth ×' + esc(s.ratio.toFixed(2)) + ' on the club\'s scoring' : '') + '. ' +
+         (s.read !== null && s.read !== undefined ? 'Applied in full to his ' + esc(String(r.rate36)) + ' per 36 at ' + esc(String(r.mins)) + ' minutes, that reads <b>' + esc(String(s.read)) + '</b> ' + esc(lab) + ' against the model\'s ' + esc(String(r.proj)) + '. ' : '') +
+         'What the score takes from the simulation is the <b>matchup lever</b>, ' + (r.mk === "reb" ? 'none on rebounds, where it measured nothing' : mEff + ' here, at half weight, the weight that measured against 2025-26\'s box scores (full weight counted the defence twice)') +
+         '. The blowout chance (' + pc(s.blowout) + ') and overtime (' + pc(s.ot) + ') are shown, not scored: his minutes come from his own last games, and trimming them for a rout made the projection worse out of sample.</p></div>';
+    return h;
+  }
   function propsDetailHtml(r) {
     var has = propHas(r), lab = PROPS_LABEL[r.mk] || r.mk;
     var tile = function (k, v, s, cls) { return '<div class="pd-tile' + (cls ? ' ' + cls : '') + '"><div class="k">' + esc(k) + '</div><div class="v">' + v + '</div>' + (s ? '<div class="s">' + s + '</div>' : '') + '</div>'; };
@@ -339,7 +378,8 @@
     var levers = has ? propsLevers(r) : [], top = levers.slice(0, 2).map(function (p) { return +p.i; });
     if (levers.length && r.base !== undefined && r.base !== null) {
       var maxE = Math.max.apply(null, levers.map(function (p) { return Math.abs(+p.eff); }).concat([0.01])), gap = r.proj - r.line;
-      h += '<h4>What moves it</h4><p class="pd-base">Starts from <b>' + esc(String(r.base)) + '</b>, his ' + esc(String(r.rate36)) + ' per 36 at his minutes; the regulars out, pace and the defence take it to <b>' + esc(String(r.proj)) +
+      var hasMatch = levers.some(function (p) { return p.k === "match"; });
+      h += '<h4>What moves it</h4><p class="pd-base">Starts from <b>' + esc(String(r.base)) + '</b>, his ' + esc(String(r.rate36)) + ' per 36 at his minutes; the regulars out, pace' + (hasMatch ? ', the matchup' : '') + ' and the defence take it to <b>' + esc(String(r.proj)) +
            '</b>, ' + sgn(gap, 1) + ' against the line. Green pushes toward the ' + esc(r.side || "pick") + ', red away from it. The prior and the minutes trend say what sits inside the start.</p>';
       h += '<div class="pd-levers">' + levers.map(function (p, i) {
         var helps = propsLeverHelps(r, +p.eff), w = Math.max(3, Math.round(Math.abs(+p.eff) / maxE * 100));
@@ -347,6 +387,7 @@
                '<div class="lb"><span style="width:' + w + '%"></span></div><div class="lv">' + sgn(+p.eff, 1) + '</div></div>';
       }).join("") + '</div>';
     }
+    if (has) h += propsSimHtml(r, tile);
     if (r.why && r.why.length) h += '<h4>Why</h4><ul class="pd-why">' + r.why.map(function (w, i) { return '<li' + (top.indexOf(i) >= 0 ? ' class="lever-line"' : '') + '>' + esc(w) + '</li>'; }).join("") + '</ul>';
     /* the game the prop was on joins the list once it is graded (25 Oct 2026, the user: "they only show the last
        date of 10/23 and not 10/24 for the props that were on yesterday"): the last games are the history the

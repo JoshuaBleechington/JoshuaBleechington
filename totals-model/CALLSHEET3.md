@@ -1226,3 +1226,36 @@ the spread rides in the log from today (the odds run's snapshots now keep
 the close from the sheet's own card row when the game is on it
 (`nbaCardCloseFor`). A game with no close shows its score alone. The NBA
 example carries five a side. Shown, not scored.
+
+## The simulation on the prop, 26 Oct 2026
+
+The user: "for the player props, I want to confirm the simulation is being
+run for those as well, and I want the results attached to the player props
+when I select them to see what the simulation did in regards to how it was
+scored for the player prop for that player." The props run plays each game
+the same 10,000 times as the slate (NBA.md, "The runs on every prop") and
+the file carries a `sim` block on the game row and on every projected prop.
+The prop's panel renders it as a **Simulation** section under What moves
+it (`propsSimHtml`): six tiles, his club's points in the runs with the
+middle half against its points a game by the ratings alone, the sim's
+full-weight read of his number against the model's projection, the
+**matchup lever** in colour as the one part the score takes (green toward
+the pick, red against; none on rebounds), the blowout chance, overtime and
+the game's possessions, then a paragraph that says in words what was
+scored and what is shown. A prop from a file made before the runs says so
+and asks for a props run with the current slate.py. The Example's props
+carry a seeded run and the matchup lever, so the panel shows the section
+and the harness checks it.
+
+**A later slate on a carded game** (the user: "will the simulation update
+when I re-run the games closer to start and determine the final starting
+lineups?"). A game already on the card used to keep its first run's
+`nbasim` and who-is-out boxes, as it keeps every filled box; now the
+injury report (`nbaout`) and the simulation (`nbasim`) follow the newest
+slate the way the starting five does, so the Simulation card and its
+record carry the run nearest tip. Neither is read by the engine, so the
+row's picks do not move; the line, the prices, the ratings and the rest
+days stay as logged. The simulation reads ESPN's injury report (Out and
+Doubtful), not RotoWire's five: a man benched but active is not an
+absence to it. Props reload the same way they always did: an ungraded prop
+is replaced by the newer file, its `sim` with it.

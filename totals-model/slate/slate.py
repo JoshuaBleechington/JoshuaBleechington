@@ -3464,6 +3464,57 @@ def nba_sim_ft_factor(crew, refs):
     return max(0.85, min(1.15, (sum(rates) / len(rates)) / refs["lg"][1]))
 
 
+def nba_props_game_sim(prof, aab, hab, date_iso, runs, seed=None, out=None):
+    """The simulation's own view of a game for the props run (26 Oct 2026, the
+    user: "confirm the simulation is being run for the props as well, and
+    attach the results to each prop"): each club's points with its middle
+    half against its points a game by the ratings, the blowout chance, the
+    pace, overtime. The scored part is the matchup lever in props_project;
+    this is what the panel shows beside it. `out` is {"away": [...], "home":
+    [...]} of listed-out men ({st, mpg, ppg}), the slate's absence cost taken
+    off each club, so a run nearer tip carries the final injury report."""
+    if not nbasim or not prof:
+        return None
+    adj_a, adj_h = nba_sim_out_adj((out or {}).get("away")), nba_sim_out_adj((out or {}).get("home"))
+    setup = nbasim.setup_from_profiles(prof, aab, hab, date_iso, out_adj={"away": adj_a[0], "home": adj_h[0]})
+    if not setup:
+        return None
+    setup["away"]["out_dadj"], setup["home"]["out_dadj"] = adj_a[1], adj_h[1]
+    if seed is None:
+        seed = sum(ord(c) for c in (date_iso + aab + hab)) % 100000
+    own = nbasim.simulate(setup, n=runs, seed=seed)
+    H = nbasim.histograms(own)
+    mh = H["margin"]
+    n = float(sum(mh["c"]))
+    blowout = sum(c for i, c in enumerate(mh["c"]) if abs(mh["lo"] + i) >= 15) / n
+    home_win = sum(c for i, c in enumerate(mh["c"]) if mh["lo"] + i > 0) / n
+
+    def side(key, ab):
+        h, t = H[key], prof["teams"].get(ab) or {}
+        tot = float(sum(h["c"]))
+        mean = sum((h["lo"] + i) * c for i, c in enumerate(h["c"])) / tot
+        return {"median": nbasim.hist_quantile(h, 0.5), "p25": nbasim.hist_quantile(h, 0.25), "p75": nbasim.hist_quantile(h, 0.75), "mean": round(mean, 1),
+                "ppg": round(t["ortg"] * t["pace"] / 100.0, 1) if t.get("ortg") and t.get("pace") else None}
+    return {"runs": runs, "away": side("away", aab), "home": side("home", hab), "total": nbasim.hist_quantile(H["total"], 0.5),
+            "margin": round(sum((mh["lo"] + i) * c for i, c in enumerate(mh["c"])) / n, 1), "home_win": round(home_win, 3), "ot": H["ot"],
+            "blowout": round(blowout, 3), "poss": round(nbasim._pace_game(setup["away"], setup["home"], setup["league"]), 1),
+            "out": {"away": round(adj_a[0], 2), "home": round(adj_h[0], 2)}}
+
+
+def nba_prop_sim_read(gs, home_side, proj):
+    """What the game's simulation says for one prop: the club's points against
+    its ratings' points a game, and his rate at his minutes scaled by that
+    ratio in full (shown, not scored; the matchup lever carries it at half
+    weight on the markets that measured)."""
+    if not gs or not proj:
+        return None
+    s = gs["home" if home_side else "away"]
+    ratio = (s["median"] / s["ppg"]) if s.get("ppg") else None
+    read = round(proj["rate36"] / 36.0 * proj["mins"] * ratio, 1) if ratio else None
+    return {"runs": gs["runs"], "team_pts": s["median"], "team_lo": s["p25"], "team_hi": s["p75"], "team_ppg": s["ppg"], "ratio": round(ratio, 3) if ratio else None,
+            "read": read, "blowout": gs["blowout"], "ot": gs["ot"], "poss": gs["poss"], "home_win": gs["home_win"], "out": (gs.get("out") or {}).get("home" if home_side else "away", 0.0)}
+
+
 def nba_sim_block(g, sides, prof, refs, crew, runs, log):
     """The row's nbasim block: both views' histograms, the anchor, the profiles."""
     if not nbasim or not prof:
@@ -4402,14 +4453,7 @@ def props_out_minutes(ab, injuries, logs_this, logs_last):
     for inj in (injuries or {}).get(ab) or []:
         st = str(inj.get("st") or "")
         pid = str(inj.get("id") or "")
-        e1, e2 = (logs_this or {}).get(pid), (logs_last or {}).get(pid)
-        mpg = None
-        if e1 and len(e1["g"]) >= PROPS_PLAYER_MIN_GAMES:
-            mpg = sum(g["min"] for g in e1["g"]) / len(e1["g"])
-        elif e2 and e2["g"]:
-            mpg = sum(g["min"] for g in e2["g"]) / len(e2["g"])
-        elif e1 and e1["g"]:
-            mpg = sum(g["min"] for g in e1["g"]) / len(e1["g"])
+        mpg = props_player_avg((logs_this or {}).get(pid), (logs_last or {}).get(pid), "min")
         if st.lower() in PROPS_OUT_STATUSES:
             listed.append((inj.get("n"), mpg, st))
             if mpg is not None and mpg >= PROPS_REGULAR_MPG:
@@ -4417,6 +4461,31 @@ def props_out_minutes(ab, injuries, logs_this, logs_last):
         elif st:
             maybe.append((inj.get("n"), st))
     return regular, listed, maybe
+
+
+def props_player_avg(e1, e2, key):
+    """A player's average of a box stat a game: this season's after
+    PROPS_PLAYER_MIN_GAMES games, else last season's, else this season's few."""
+    for e in ((e1 if e1 and len(e1["g"]) >= PROPS_PLAYER_MIN_GAMES else None), e2, e1):
+        if e and e["g"]:
+            return sum(float(g.get(key) or 0) for g in e["g"]) / len(e["g"])
+    return None
+
+
+def props_out_sim_list(ab, injuries, logs_this, logs_last):
+    """The club's listed-out men for the game's simulation (26 Oct 2026, the user:
+    "will the simulation update when I re-run closer to start?"): each with his
+    status, minutes and points a game, the shape nba_sim_out_adj reads, so the
+    props run's game takes the same absence cost off the club as the slate's."""
+    out = []
+    for inj in (injuries or {}).get(ab) or []:
+        st = str(inj.get("st") or "")
+        if st.lower() not in PROPS_OUT_STATUSES:
+            continue
+        pid = str(inj.get("id") or "")
+        e1, e2 = (logs_this or {}).get(pid), (logs_last or {}).get(pid)
+        out.append({"n": inj.get("n"), "st": st, "mpg": props_player_avg(e1, e2, "min") or 0.0, "ppg": props_player_avg(e1, e2, "pts") or 0.0})
+    return out
 
 
 def props_project(prop, logs_this, logs_last, ctx):
@@ -4568,7 +4637,7 @@ def espn_team_roster(ab):
     return out
 
 
-def make_nba_props(date_iso, out_dir, log, topup=False):
+def make_nba_props(date_iso, out_dir, log, topup=False, sim_runs=NBA_SIM_RUNS):
     """The day's player props with the slate's projection beside each, for The
     Super Model's Props tab: nba-props-DATE.json. The lines come from The Odds
     API (a credit a market a game), the history from the ledgers, who is out
@@ -4610,7 +4679,8 @@ def make_nba_props(date_iso, out_dir, log, topup=False):
     if nbasim and (led or prior):
         try:
             sim_prof = nbasim.profiles_from_ledger(led["games"] if led else [], date_iso, prior_games=prior["games"] if prior else None, tend=nba_load_tend(out_dir))
-            log("Simulation profiles: %d clubs; the matchup lever at %.1f weight on points, assists, threes and PRA, none on rebounds (measured)." % (len(sim_prof["teams"]), PROPS_MATCH_ALPHA["pts"]))
+            log("Simulation: %d clubs profiled; the matchup lever at %.1f weight on points, assists, threes and PRA, none on rebounds (measured); %s." % (
+                len(sim_prof["teams"]), PROPS_MATCH_ALPHA["pts"], ("each game played {:,} times, the runs attached to every prop".format(sim_runs)) if sim_runs else "the runs turned off (--runs 0)"))
         except Exception as e:  # noqa: BLE001
             log("Simulation profiles could not be built (%s): no matchup lever today." % e)
 
@@ -4697,6 +4767,20 @@ def make_nba_props(date_iso, out_dir, log, topup=False):
                "props": [], "unmatched": []}
         log("%s @ %s: %d props%s%s" % (away, home, len(props), (" · pace %.1f" % pace) if pace else "",
                                        "".join(" · %s out: %s" % (NBA_NICK.get(ab, ab), ", ".join("%s (%s)" % (n, ("%.0f mpg" % mpg) if mpg is not None else "no line") for n, mpg, _s in out[ab][1])) for ab in (aab, hab) if out[ab][1])))
+        # the game's simulation (26 Oct 2026): run once a game, attached to the row and, read for each prop, to the prop
+        gs = None
+        if sim_prof and sim_runs:
+            try:
+                gs = nba_props_game_sim(sim_prof, aab, hab, date_iso, sim_runs,
+                                        out={"away": props_out_sim_list(aab, injuries, logs_this, logs_last), "home": props_out_sim_list(hab, injuries, logs_this, logs_last)})
+            except Exception as e:  # noqa: BLE001
+                log("  the simulation failed for this game (%s); the props carry the matchup lever alone" % e)
+        if gs:
+            row["sim"] = gs
+            log("  sim, %s runs: %s %d (%d–%d) against %s a game by the ratings, %s %d (%d–%d) against %s; blowout of 15+ %.0f%%, overtime %.1f%%, %s possessions%s" % (
+                "{:,}".format(gs["runs"]), away, gs["away"]["median"], gs["away"]["p25"], gs["away"]["p75"], gs["away"]["ppg"], home, gs["home"]["median"], gs["home"]["p25"], gs["home"]["p75"], gs["home"]["ppg"],
+                100 * gs["blowout"], 100 * gs["ot"], gs["poss"],
+                "".join("; %s's regulars out: %+.1f per 100 on the offence" % (NBA_NICK.get(ab, ab), gs["out"][s]) for ab, s in ((aab, "away"), (hab, "home")) if gs["out"][s])))
         for pr in props:
             pid, team, how = props_match_player(pr["name"], (aab, hab), logs_this, logs_last, rosters)
             if not pid or not team:
@@ -4721,6 +4805,8 @@ def make_nba_props(date_iso, out_dir, log, topup=False):
                     "mk": pr["mk"], "line": pr["line"], "op": pr["op"], "up": pr["up"], "book": pr["book"], "books": pr["books"], "log": recent, "why": why}
             if proj:
                 item.update(proj)
+                if gs:
+                    item["sim"] = nba_prop_sim_read(gs, team == hab, proj)
             row["props"].append(item)
         row["props"].sort(key=lambda x: (-(x.get("edge") if x.get("edge") is not None else -9), x["name"], x["mk"]))
         projected = sum(1 for x in row["props"] if x.get("p") is not None)
@@ -6089,6 +6175,24 @@ def selftest():
           and abs(proj_m["base"] + sum(parts_m[k]["eff"] for k in ("out", "pace", "dvp", "match")) - proj_m["proj"]) < 0.03 and parts_m["pace"]["eff"] < 0 and parts_m["match"]["eff"] > 0
           and why_m[parts_m["pace"]["i"]] == "the game's pace 102.0 (their 103.0, Lakers's 99.0, the league's 100.0) against their own: x0.990"
           and why_m[parts_m["match"]["i"]] == "the matchup, from the simulation's profiles: 116.0 per 100 into Lakers's 118.0 defence (league 114.0, on the road, on a back to back): x1.020 on the efficiency, at 0.5 weight, measured")
+    # the game's simulation for the props (26 Oct 2026): run once a game, read for each prop
+    if nbasim:
+        prof_x = {"league": dict(nbasim.LEAGUE), "last": {},
+                  "teams": {"BOS": {"ab": "BOS", "ortg": 118.0, "drtg": 110.5, "pace": 100.5, "tov": 0.125, "trip": 0.10, "ft": 0.81, "a3": 0.48, "p3": 0.37, "p2": 0.56, "oreb": 0.24, "n": 12},
+                            "NYK": {"ab": "NYK", "ortg": 115.5, "drtg": 112.0, "pace": 99.0, "tov": 0.13, "trip": 0.11, "ft": 0.78, "a3": 0.40, "p3": 0.36, "p2": 0.55, "oreb": 0.30, "n": 12}}}
+        gs_x = nba_props_game_sim(prof_x, "BOS", "NYK", "2026-10-26", 400, seed=3)
+        rd_x = nba_prop_sim_read(gs_x, True, proj_m)
+        check("props sim: the game's runs give each club's points with its middle half against its ratings' points a game, the blowout chance, the pace and overtime, and a prop's full-weight read from them",
+              gs_x["runs"] == 400 and 100 < gs_x["away"]["median"] < 130 and gs_x["away"]["p25"] < gs_x["away"]["median"] < gs_x["away"]["p75"] and abs(gs_x["home"]["ppg"] - 114.3) < 0.1
+              and 0.1 < gs_x["blowout"] < 0.6 and 0 <= gs_x["ot"] < 0.1 and abs(gs_x["poss"] - 100.5) < 0.01 and 0.2 < gs_x["home_win"] < 0.8 and gs_x["out"] == {"away": 0.0, "home": 0.0}
+              and rd_x["team_pts"] == gs_x["home"]["median"] and abs(rd_x["read"] - proj_m["rate36"] / 36.0 * proj_m["mins"] * rd_x["ratio"]) < 0.06 and rd_x["blowout"] == gs_x["blowout"] and rd_x["out"] == 0.0
+              and nba_prop_sim_read(None, True, proj_m) is None)
+        # the listed-out men go into the game's runs (26 Oct 2026): a regular Out costs his club, the same cost as the slate's sim, so a later run carries the final report
+        out_x = props_out_sim_list("DAL", inj_, lt, ll)
+        gs_o = nba_props_game_sim(prof_x, "BOS", "NYK", "2026-10-26", 400, seed=3, out={"home": [{"st": "Out", "mpg": 34.0, "ppg": 25.0}], "away": [{"st": "Questionable", "mpg": 30.0, "ppg": 20.0}]})
+        check("props sim: the listed-out men, at their minutes and points a game, take the slate's absence cost off the club in the runs; a questionable man costs nothing",
+              out_x == [{"n": "Kyrie Irving", "st": "Out", "mpg": 30.0, "ppg": 20.0}] and gs_o["out"] == {"away": 0.0, "home": round(-0.6 * (0.15 * 25.0 + 0.03 * 34.0), 2)}
+              and gs_o["home"]["median"] < gs_x["home"]["median"] and nba_prop_sim_read(gs_o, True, proj_m)["out"] == gs_o["out"]["home"])
     prop_reb = dict(prop_); prop_reb["mk"] = "reb"; prop_reb["line"] = 6.5
     proj_r, _why_r = props_project(prop_reb, lt["11"]["g"], ll["11"]["g"], ctx_m)
     check("props: rebounds take no matchup lever (measured null)", proj_r is None or "match" not in dict((p["k"], p) for p in proj_r["parts"]))
@@ -6377,7 +6481,7 @@ def selftest():
         try:
             make_nba_slate("2026-10-21", tmp7, lines10.append, topup=True)
             make_nba_ledger = lambda d, o, lg, season=None: (_ for _ in ()).throw(RuntimeError("ESPN down"))
-            p11 = make_nba_props.__defaults__   # the props default: no top-up unless asked, so the selftest's other calls stay offline
+            p11 = make_nba_props.__defaults__   # the props defaults: no top-up unless asked (the selftest's other calls stay offline), the same runs a game as the slate
             nba_ledger_topup("2026-10-21", tmp7, lines10.append)
         finally:
             make_nba_ledger = real_led
@@ -6410,7 +6514,7 @@ def selftest():
           pb["n"] == 3 and pb["plays"][0] == [1, 469.0, "S", 0, ["11", "12"], 6, 16, 0] and pb["plays"][1] == [1, 450.0, "X", 1, ["21"], 6, 16, 3] and pb["plays"][2][2] == "E" and pb["plays"][2][3] == -1 and pb["ot"] == 0)
     check("nba top-up: the slate run brings this season's ledger up to date first, and a failure is logged while the run goes on",
           calls == [("2026-10-21", tmp7, None)] and lines10[0] == "Bringing this season's ledger up to date first:" and lines10[1] == "  stub ran"
-          and any(l == "  Could not bring the ledger up to date (ESPN down); the run goes on with the ledger as it is." for l in lines10) and p11 == (False,))
+          and any(l == "  Could not bring the ledger up to date (ESPN down); the run goes on with the ledger as it is." for l in lines10) and p11 == (False, NBA_SIM_RUNS) and NBA_SIM_RUNS == 10000)
     check("nba slate: the scoreboard for a day, finals and scheduled games alike, on the US date with the half-time score",
           len(day) == 4 and day[0]["final"] is True and day[0]["ha"] == 51 and day[0]["hh"] == 49 and day[0]["fa"] == 101 and day[0]["date"] == "2026-10-21"
           and day[1]["final"] is False and day[1]["state"] == "Scheduled" and day[1]["away"] == "BOS" and day[1]["home"] == "NYK" and day[1]["hn"] == "Knicks" and day[1]["venue"] == "Madison Square Garden"
@@ -7026,7 +7130,7 @@ def main(argv=None):
     ap.add_argument("--detail", action="store_true", help="nhl-ledger only: also fetch each game's box score and game page for the starters, their lines, power-play goals and penalties (two calls a game; about 40 minutes a season).")
     ap.add_argument("--refs", action="store_true", help="nhl-ledger only: also fetch each game's side panel for the referees, linesmen and scratches (one call a game; about 20 minutes a season).")
     ap.add_argument("--no-ledger", action="store_true", help="nba and nba-props: do not bring this season's ledger up to date first (they do by default, 25 Oct 2026).")
-    ap.add_argument("--runs", type=int, default=NBA_SIM_RUNS, help="nba: how many times the simulation plays each game (default %d; 0 turns it off)." % NBA_SIM_RUNS)
+    ap.add_argument("--runs", type=int, default=NBA_SIM_RUNS, help="nba and nba-props: how many times the simulation plays each game (default %d; 0 turns it off)." % NBA_SIM_RUNS)
     ap.add_argument("--out", default=".", help="folder to write into (default: where you run it)")
     ap.add_argument("--selftest", action="store_true", help="run the offline checks and exit")
     ap.add_argument("--quiet", action="store_true", help="print only the final line")
@@ -7069,7 +7173,7 @@ def main(argv=None):
         elif a.mode == "nba-grade":
             path = make_nba_grade(date_iso, a.out, log)
         elif a.mode == "nba-props":
-            path = make_nba_props(date_iso, a.out, log, topup=not a.no_ledger)
+            path = make_nba_props(date_iso, a.out, log, topup=not a.no_ledger, sim_runs=max(0, a.runs))
         elif a.mode == "odds":
             sports = tuple(s.strip().upper() for s in a.sports.split(",") if s.strip()) if a.sports else ("MLB", "NHL", "NBA")
             path = make_odds(date_iso, a.out, log, a.books, sports)

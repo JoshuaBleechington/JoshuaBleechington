@@ -1078,7 +1078,10 @@ const CHECKS = ["dome","playoff","agconf","hgconf","agbk","hgbk"];
     const card = [...document.querySelectorAll('#propsBest .pk')].find(e => /Tyrese Maxey/.test(e.textContent)), id = card.getAttribute('data-prop');
     card.click(); await wait();
     const open = !dlg.hidden, text = document.getElementById('propDetailBody').innerText.replace(/\s+/g, ' ').trim();
-    const tiles = [...dlg.querySelectorAll('.pd-tile .k')].map(e => e.textContent);
+    const tiles = [...dlg.querySelectorAll('.pd-tiles .pd-tile .k')].map(e => e.textContent);
+    // the simulation on the prop (26 Oct 2026): six tiles of its own under What moves it, and the paragraph that says what was scored
+    const simTiles = [...dlg.querySelectorAll('.pd-simtiles .pd-tile')].map(e => e.querySelector('.k').textContent + '=' + e.querySelector('.v').textContent + '|' + ((e.querySelector('.s') || {}).textContent || '') + '|' + e.className);
+    const simText = ((dlg.querySelector('.pd-sim') || {}).innerText || '').replace(/\s+/g, ' ').trim(), simBeforeWhy = (() => { const s = dlg.querySelector('.pd-sim'); let n = s && s.nextElementSibling; return !!(n && /^H4$/i.test(n.tagName) && /^Why/.test(n.textContent)); })();
     const marks = dlg.querySelectorAll('.pd-log b.lg').length, books = dlg.querySelectorAll('.pd-books tbody tr').length, carded = (dlg.querySelector('.pd-books tr.carded td') || {}).textContent || '';
     const fromCardPos = document.getElementById('propDetailPos').textContent, noscroll = document.body.classList.contains('noscroll');
     const levers = [...dlg.querySelectorAll('.pd-levers .lever')].map(e => e.className + '|' + e.querySelector('.lt').textContent.trim() + '|' + e.querySelector('.lv').textContent);
@@ -1106,18 +1109,26 @@ const CHECKS = ["dome","playoff","agconf","hgconf","agbk","hgbk"];
     trs[trs.length - 1].click(); await wait();
     const nextOffLast = document.getElementById('propDetailNext').disabled, posLast = document.getElementById('propDetailPos').textContent;
     document.getElementById('propDetailClose').click(); await wait(); document.getElementById('m-nba').click(); await wait();
-    return { hidden0, open, text: text.slice(0, 1500), tiles, marks, books, carded, fromCardPos, noscroll, closedEsc, closedBtn, closedSport, levers, base, boldWhy, cardLever,
+    return { hidden0, open, text: text.slice(0, 3200), tiles, simTiles, simText, simBeforeWhy, marks, books, carded, fromCardPos, noscroll, closedEsc, closedBtn, closedSport, levers, base, boldWhy, cardLever,
              n: trs.length, rowNames, rowOpen, name0, pos0, prevOff0, navShown, name1, pos1, prevOff1, name2, name1b, nextOffLast, posLast };
   });
+  chk(propsDlg.simTiles.length === 6 && /^PHI points=1[01]\d\|middle half \d+–\d+ · 112\.9 a game by the ratings\|/.test(propsDlg.simTiles[0]) && /^Sim's read=2\d\.\d\|his per 36 at his minutes × 0\.\d\d; [-−+]\d\.\d against the model's 28\.07\|/.test(propsDlg.simTiles[1])
+      && /^Matchup lever=[-−]0\.8\|the scored part, at half weight, against the OVER\|pd-tile bad$/.test(propsDlg.simTiles[2]) && /^Blowout=\d+%\|15 or more either way; shown, not scored\|/.test(propsDlg.simTiles[3])
+      && /^Overtime=\d\.\d%\|/.test(propsDlg.simTiles[4]) && /^Possessions=9\d\.\d\|the game's pace in the runs\|/.test(propsDlg.simTiles[5])
+      && /^SIMULATION · 76ers @ Knicks played 3,000 times /.test(propsDlg.simText) && /What the score takes from the simulation is the matchup lever, [-−]0\.8 here, at half weight/.test(propsDlg.simText)
+      && /The blowout chance \(\d+%\) and overtime \(\d\.\d%\) are shown, not scored/.test(propsDlg.simText) && propsDlg.simBeforeWhy,
+      'props detail: the Simulation section carries the game\'s runs on the prop: his club\'s points with the middle half against the ratings\' number, the sim\'s full-weight read against the projection, the matchup lever as the scored part in colour, the blowout, overtime and the possessions, shown not scored, before the why',
+      JSON.stringify({ tiles: propsDlg.simTiles, text: propsDlg.simText.slice(0, 700), beforeWhy: propsDlg.simBeforeWhy }));
   chk(propsDlg.rowOpen && propsDlg.navShown && propsDlg.name0.indexOf(propsDlg.rowNames[0]) === 0 && propsDlg.pos0 === '1 of ' + propsDlg.n && propsDlg.prevOff0
       && propsDlg.name1.indexOf(propsDlg.rowNames[1]) === 0 && propsDlg.pos1 === '2 of ' + propsDlg.n && !propsDlg.prevOff1 && propsDlg.name2.indexOf(propsDlg.rowNames[2]) === 0 && propsDlg.name1b === propsDlg.name1
       && propsDlg.nextOffLast && propsDlg.posLast === propsDlg.n + ' of ' + propsDlg.n && /^\d+ of \d+$/.test(propsDlg.fromCardPos),
       'props detail: a row of the Every-prop table opens the same panel, Next and the arrow keys walk the table\'s order with the position shown, Previous is off on the first and Next on the last, and a card opened from the best list knows its place too',
       JSON.stringify({ n: propsDlg.n, rows: propsDlg.rowNames, name0: propsDlg.name0, pos0: propsDlg.pos0, name1: propsDlg.name1, pos1: propsDlg.pos1, name2: propsDlg.name2, back: propsDlg.name1b, last: propsDlg.posLast, card: propsDlg.fromCardPos }));
-  chk(propsDlg.levers.length === 5 && /^lever helps top\|Regulars out biggest lever\|\+1\.[5-9]$/.test(propsDlg.levers[0]) && propsDlg.levers.some(l => /^lever hurts\|Defence v position\|[-−]0\./.test(l)) && propsDlg.levers.some(l => /^lever hurts\|Pace\|[-−]0\./.test(l))
-      && /^Starts from 28\.\d+, his 28\.\d+ per 36 at his minutes; the regulars out, pace and the defence take it to 29\.34, \+3\.8 against the line\./.test(propsDlg.base)
-      && propsDlg.boldWhy.length === 2 && propsDlg.boldWhy.some(w => /^Joel Embiid out/.test(w)) && /^Moves it: Regulars out \+1\.[5-9] · /.test(propsDlg.cardLever),
-      'props detail: what moves it ranks each factor\'s push on the projection with a bar, the regulars out the biggest lever on Maxey with Embiid out, the defence and the pace against; the two biggest bold their why lines and the card names them', JSON.stringify({ levers: propsDlg.levers, base: propsDlg.base, bold: propsDlg.boldWhy, card: propsDlg.cardLever }));
+  chk(propsDlg.levers.length === 6 && /^lever helps top\|Regulars out biggest lever\|\+1\.[5-9]$/.test(propsDlg.levers[0]) && propsDlg.levers.some(l => /^lever hurts\|Defence v position\|[-−]0\./.test(l)) && propsDlg.levers.some(l => /^lever hurts\|Pace\|[-−]0\./.test(l))
+      && propsDlg.levers.some(l => /^lever hurts\|The matchup, from the simulation\|[-−]0\.[5-9]$/.test(l))
+      && /^Starts from 28\.\d+, his 28\.\d+ per 36 at his minutes; the regulars out, pace, the matchup and the defence take it to 28\.07, \+2\.6 against the line\./.test(propsDlg.base)
+      && propsDlg.boldWhy.length === 2 && propsDlg.boldWhy.some(w => /^Joel Embiid out/.test(w)) && propsDlg.boldWhy.some(w => /^the matchup, from the simulation's profi/.test(w)) && /^Moves it: Regulars out \+1\.[5-9] · The matchup, from the simulation [-−]0\.[5-9]$/.test(propsDlg.cardLever),
+      'props detail: what moves it ranks each factor\'s push on the projection with a bar, the regulars out the biggest lever on Maxey with Embiid out, the matchup from the simulation, the pace and the defence against; the two biggest bold their why lines and the card names them', JSON.stringify({ levers: propsDlg.levers, base: propsDlg.base, bold: propsDlg.boldWhy, card: propsDlg.cardLever }));
   chk(propsDlg.hidden0 && propsDlg.open && propsDlg.noscroll && /^LEAN Tyrese Maxey G PHI OVER 25\.5 points 76ers @ Knicks/.test(propsDlg.text) && /on the road at NYK/.test(propsDlg.text) && /Why /i.test(propsDlg.text)
       && propsDlg.tiles.join(',') === 'Chance,Price,Edge,Projection,Minutes,Per 36' && propsDlg.marks === 10 && propsDlg.books === 3 && /fanatics/.test(propsDlg.carded),
       'props detail: a best-prop card opens the prop on its own panel with the tiles, the why, the marked last games and every book', JSON.stringify(propsDlg).slice(0, 1500));
@@ -1201,20 +1212,23 @@ const CHECKS = ["dome","playoff","agconf","hgconf","agbk","hgbk"];
     const sides = row.markets.filter(m => m.key === 'ml' || m.key === 'spread').map(m => ({ key: m.key, side: m.side, pick: m.pick, other: (m.other || {}).pick, label: m.label }));
     // a later slate refreshes the starting five on the carded row but leaves a filled box (the rest days) as logged
     const loadDoc = async (games, fname) => { const dt2 = new DataTransfer(); dt2.items.add(new File([JSON.stringify({ format: 'callsheet2.slate', version: 1, date: '2026-10-20', games })], fname, { type: 'application/json' })); inp.files = dt2.files; inp.dispatchEvent(new Event('change', { bubbles: true })); await wait(); };
-    const lineupDoc = (status, rest) => [{ sport: 'NBA', gdate: '2026-10-20', away: 'Celtics', home: 'Pistons', notes: [], inputs: { narest: rest, nbalineup: JSON.stringify({ away: { status, five: [['PG', 'Derrick White']], maybe: [] }, home: null, src: 'RotoWire' }) } }];
+    // the injury report and the simulation follow too (26 Oct 2026, the user: "will the simulation update when I re-run closer to start?")
+    const lineupDoc = (status, rest) => [{ sport: 'NBA', gdate: '2026-10-20', away: 'Celtics', home: 'Pistons', notes: [], inputs: { narest: rest, nbalineup: JSON.stringify({ away: { status, five: [['PG', 'Derrick White']], maybe: [] }, home: null, src: 'RotoWire' }),
+      nbaout: JSON.stringify({ away: [{ n: 'Jayson Tatum', st: status === 'expected' ? 'Questionable' : 'Out' }], home: [] }), nbasim: JSON.stringify({ v: 1, runs: status === 'expected' ? 100 : 200 }) } }];
     await loadDoc(lineupDoc('expected', '2'), 'nba-slate-a.json');
     const lu1 = JSON.parse(smStore.getItem('callsheet3.card.v1')).find(r => /Celtics @ Pistons/.test(r.matchup)).inputs;
     await loadDoc(lineupDoc('confirmed', '9'), 'nba-slate-b.json');
     const lu2 = JSON.parse(smStore.getItem('callsheet3.card.v1')).find(r => /Celtics @ Pistons/.test(r.matchup)).inputs;
-    const refresh = { lu1: /expected/.test(lu1.nbalineup || ''), rest1: lu1.narest, lu2: /confirmed/.test(lu2.nbalineup || ''), rest2: lu2.narest };
+    const refresh = { lu1: /expected/.test(lu1.nbalineup || ''), rest1: lu1.narest, lu2: /confirmed/.test(lu2.nbalineup || ''), rest2: lu2.narest,
+                      out1: /Questionable/.test(lu1.nbaout || ''), out2: /"Out"/.test(lu2.nbaout || ''), sim1: /"runs":100/.test(lu1.nbasim || ''), sim2: /"runs":200/.test(lu2.nbasim || '') };
     // a row the old page wrote: the hockey names on the moneyline and the spread, to be relabelled on load
     const broken = JSON.parse(smStore.getItem('callsheet3.card.v1'));
     broken.forEach(r => r.markets.forEach(m => { if (m.key === 'ml') { m.pick = 'Islanders ML'; m.other.pick = 'Ducks ML'; } if (m.key === 'spread') { m.pick = 'Islanders +1.5'; m.label = 'Spread Islanders: +1.5'; m.other.pick = 'Ducks -1.5'; } }));
     await smStore.setItem('callsheet3.card.v1', JSON.stringify(broken));
     return { merged: row.inputs.narest === '1' && row.inputs.nhrest === '2', sides, formAway: document.getElementById('away').value, refresh };
   });
-  chk(relabel.refresh.lu1 && relabel.refresh.rest1 === '1' && relabel.refresh.lu2 && relabel.refresh.rest2 === '1',
-      'slate reload: a later slate replaces the starting five on a carded row (expected to confirmed) and leaves the filled boxes as logged', JSON.stringify(relabel.refresh));
+  chk(relabel.refresh.lu1 && relabel.refresh.rest1 === '1' && relabel.refresh.lu2 && relabel.refresh.rest2 === '1' && relabel.refresh.out1 && relabel.refresh.out2 && relabel.refresh.sim1 && relabel.refresh.sim2,
+      'slate reload: a later slate replaces the starting five, the injury report and the simulation on a carded row (expected to confirmed, questionable to out, the newer runs) and leaves the filled boxes as logged', JSON.stringify(relabel.refresh));
   await pg.reload(); await pg.waitForTimeout(300); await pg.evaluate(() => smStore.ready);
   const relabelled = await pg.evaluate(async () => {
     const row = JSON.parse(smStore.getItem('callsheet3.card.v1')).find(r => /Celtics @ Pistons/.test(r.matchup));
@@ -1270,6 +1284,9 @@ const CHECKS = ["dome","playoff","agconf","hgconf","agbk","hgbk"];
     document.getElementById('gdate').value = '2026-11-10';
     document.getElementById('example').click(); await wait();
     const panel = document.getElementById('nbaSimPanel').innerText.replace(/\s+/g, ' ').trim();
+    const tiles = [...document.querySelectorAll('#nbaSimPanel .simtile')].map(t => t.querySelector('.k').textContent + '=' + t.querySelector('.v').textContent);
+    const meta = (document.querySelector('#nbaSimPanel .simmeta') || {}).innerText || '';
+    const medians = (document.querySelector('#nbaSimPanel table.simq') || {}).innerText || '';
     const rows = [...document.querySelectorAll('#nbaSimPanel .simtab tbody tr')].map(tr => tr.innerText.replace(/\s+/g, ' ').trim());
     const chips = [...document.querySelectorAll('#nbaSimPanel .simchip')].map(e => e.className + '|' + e.textContent.replace(/\s+/g, ' ').trim());
     const set = (id, v) => { const el = document.getElementById(id); el.value = v; el.dispatchEvent(new Event('input', { bubbles: true })); };
@@ -1278,7 +1295,7 @@ const CHECKS = ["dome","playoff","agconf","hgconf","agbk","hgbk"];
     set('line', '231.5'); await wait();
     document.getElementById('add').click(); await wait();
     const stored = JSON.parse(smStore.getItem('callsheet3.card.v1')).find(r => /76ers @ Knicks/.test(r.matchup));
-    return { panel: panel.slice(0, 420), rows, chips, moved, hasSim: !!(stored && stored.inputs.nbasim && stored.inputs.nbasim.length > 1000) };
+    return { panel: panel.slice(0, 420), tiles, meta: meta.replace(/\s+/g, ' ').trim(), medians: medians.replace(/\s+/g, ' ').trim(), rows, chips, moved, hasSim: !!(stored && stored.inputs.nbasim && stored.inputs.nbasim.length > 1000) };
   });
   // graded, with the book's team totals on the row's odds JSON (26 Oct 2026): the record takes them too
   await pg.evaluate(async () => { const c = JSON.parse(smStore.getItem('callsheet3.card.v1')); c.forEach(r => { if (/76ers @ Knicks/.test(r.matchup)) { r.finals = { fa: '112', fh: '121', f5a: '55', f5h: '60' };
@@ -1300,7 +1317,9 @@ const CHECKS = ["dome","playoff","agconf","hgconf","agbk","hgbk"];
     return rows.slice(4);
   });
   await pg.evaluate(async () => { await smStore.removeItem('callsheet3.card.v1'); }); await pg.reload(); await pg.waitForTimeout(300); await pg.evaluate(() => smStore.ready);
-  chk(/^3,000 games\. The sim's own view: 76ers \d+\.\d, Knicks \d+\.\d; total \d+ \(middle half \d+–\d+\), Knicks by \d+\.\d, Knicks wins \d+%, overtime \d\.\d%\. Anchored to DraftKings's 231\.5 \/ -5\.5 for the derivative markets\./.test(simT.panel)
+  chk(simT.tiles.length === 4 && /^Total=\d+$/.test(simT.tiles[0]) && /^Margin=Knicks by \d+\.\d$/.test(simT.tiles[1]) && /^Knicks wins=\d+%$/.test(simT.tiles[2]) && /^Overtime=\d\.\d%$/.test(simT.tiles[3])
+      && /^3,000 games, the sim's own view\. Anchored to DraftKings's 231\.5 \/ -5\.5 for the market view\.$/.test(simT.meta)
+      && /^Medians, anchored to the market Q1 Q2 Q3 Q4 1H 2H 76ers Knicks the fourth \d+\.\d% of the game( \d+){8}$/i.test(simT.medians)
       && simT.rows.length === 6 && /^Total 231\.5 (OVER|UNDER) \d+%/.test(simT.rows[0]) && /^First half 115\.5 (OVER|UNDER) \d+%/.test(simT.rows[1]) && /^Spread \(home\) -5\.5 (HOME|AWAY) \d+%/.test(simT.rows[2]) && /^Moneyline (HOME|AWAY) \d+%.*the own view's$/.test(simT.rows[3])
       && /^76ers team total no line on the row \(the odds run brings it\) — —$/.test(simT.rows[4]) && /^Knicks team total no line on the row/.test(simT.rows[5])
       && simT.chips.length === 7 && simT.chips.every(c => /^simchip sim(no|lean|bet|strong)\|(OVER|UNDER|HOME|AWAY) \d+%$/.test(c)) && simT.moved !== simT.rows[0] && /UNDER [89]\d%/.test(simT.moved) && simT.hasSim,

@@ -7011,7 +7011,13 @@ var qrcode = function() {
     };
     return next();
   }
-  function phoneUrlFor(enc) { return new URL("m.html", location.href).href + "#" + enc; }
+  /* the sheet's address: beside this page when the page is a file or a folder; under it when the page is served at a bare id */
+  function phoneSheetUrl() {
+    var u = new URL(location.href); u.hash = ""; u.search = "";
+    if (/\/$/.test(u.pathname) || /\/[^\/]*\.[A-Za-z0-9]+$/.test(u.pathname)) return new URL("m.html", u.href).href;
+    return u.href.replace(/\/?$/, "/") + "m.html";
+  }
+  function phoneUrlFor(enc) { return phoneSheetUrl() + "#" + enc; }
   function showPhone() {
     var dlg = $("phoneDlg"), body = $("phoneBody"); if (!dlg || !body) return;
     var dateISO = $("boardDate").value || todayISO();

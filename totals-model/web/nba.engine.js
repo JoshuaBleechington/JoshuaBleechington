@@ -579,9 +579,42 @@
     add("h1", "h1", "First half", lines.h1, nbaSimOver(H.h1, lines.h1), "OVER", "UNDER");
     if (lines.sp !== null && lines.sp !== undefined && lines.sp !== "" && !isNaN(+lines.sp)) add("spread", "spread", "Spread", +lines.sp, nbaSimOver(H.margin, -(+lines.sp)), "HOME", "AWAY");
     if (view === "own") add("ml", "ml", "Moneyline", null, nbaSimOver(H.margin, 0), "HOME", "AWAY");
+    if (lines.away_tt) add("away_total", "team", "Away team total", lines.away_tt.line, nbaSimOver(H.away, lines.away_tt.line), "OVER", "UNDER");
+    if (lines.home_tt) add("home_total", "team", "Home team total", lines.home_tt.line, nbaSimOver(H.home, lines.home_tt.line), "OVER", "UNDER");
     return out;
   }
-  function nbaSimLinesFromForm() { return { total: num("line"), h1: num("h1line"), sp: num("sp") }; }
+  /* the team totals (26 Oct 2026): the book's main line on each side from the row's odds JSON (the carded book first, the
+     point whose two prices sit closest together; the shop also lists the alternates). The replay of 588 games of 2025-26
+     found the book's team-total line sitting off the number the game's total and spread imply, and the anchored sim's call
+     landing 60.7% at home and 53.9% away, so these two get their own rows and their own record */
+  function nbaTeamTotalLine(oddsRaw, side) {
+    var o = null;
+    try { o = oddsRaw ? JSON.parse(oddsRaw) : null; } catch (e) { o = null; }
+    var t = o && o.team && o.team[side];
+    if (!t) return null;
+    var pick = function (bk) {
+      var byPt = {};
+      (t.OVER || []).forEach(function (x) { if (x[0] === bk && x[2] !== null && x[2] !== undefined) (byPt[x[2]] = byPt[x[2]] || {}).over = x[1]; });
+      (t.UNDER || []).forEach(function (x) { if (x[0] === bk && x[2] !== null && x[2] !== undefined) (byPt[x[2]] = byPt[x[2]] || {}).under = x[1]; });
+      var best = null;
+      Object.keys(byPt).forEach(function (pt) {
+        var e = byPt[pt];
+        if (e.over === undefined || e.under === undefined) return;
+        var gap = Math.abs((+e.over) - (+e.under));
+        if (!best || gap < best.gap) best = { line: +pt, op: +e.over, up: +e.under, gap: gap, book: bk };
+      });
+      return best;
+    };
+    var books = [o.book].concat((t.OVER || []).map(function (x) { return x[0]; })).filter(function (b, i, a) { return b && a.indexOf(b) === i; });
+    for (var i = 0; i < books.length; i++) { var b = pick(books[i]); if (b) return b; }
+    return null;
+  }
+  function nbaSimLinesFrom(inputs) {
+    var oddsRaw = inputs.odds || "";
+    return { total: blank(inputs.line) ? null : +inputs.line, h1: blank(inputs.h1line) ? null : +inputs.h1line, sp: blank(inputs.sp) ? null : +inputs.sp,
+             away_tt: nbaTeamTotalLine(oddsRaw, "AWAY"), home_tt: nbaTeamTotalLine(oddsRaw, "HOME") };
+  }
+  function nbaSimLinesFromForm() { return nbaSimLinesFrom({ line: $("line").value, h1line: $("h1line").value, sp: $("sp").value, odds: ($("odds") || {}).value || "" }); }
   function nbaSimChip(c) {
     if (!c) return '<span class="dim">—</span>';
     var cls = c.band === "no call" ? "simno" : c.band === "LEAN" ? "simlean" : c.band === "BET" ? "simbet" : "simstrong";
@@ -605,8 +638,10 @@
             esc(mg >= 0 ? home : away) + ' by <b>' + Math.abs(mg).toFixed(1) + '</b>, ' + esc(home) + ' wins <b>' + (100 * (nbaSimOver(own.margin, 0) || {}).over).toFixed(0) + '%</b>, overtime ' + (100 * (own.ot || 0)).toFixed(1) + '%.' +
             (sim.anchor ? ' Anchored to ' + esc(sim.anchor.book) + '\'s ' + esc(String(sim.anchor.total)) + (sim.anchor.sp !== null && sim.anchor.sp !== undefined ? ' / ' + (sim.anchor.sp > 0 ? '+' : '') + esc(String(sim.anchor.sp)) : '') + ' for the derivative markets.' : ' No book on the scoreboard at the run: no anchored view.') + '</div>';
     h += '<table class="form simtab"><thead><tr><th>Market</th><th>Line</th><th>The sim\'s own view</th><th>Anchored to the market</th></tr></thead><tbody>';
-    [["total", "Total", lines.total], ["h1", "First half", lines.h1], ["spread", "Spread (home)", lines.sp], ["ml", "Moneyline", null]].forEach(function (m) {
-      var lineTxt = m[2] === null || m[2] === undefined ? (m[0] === "ml" ? "" : '<span class="dim">no line on the row</span>') : esc(String(m[2]));
+    [["total", "Total", lines.total], ["h1", "First half", lines.h1], ["spread", "Spread (home)", lines.sp], ["ml", "Moneyline", null],
+     ["away_total", esc(away) + " team total", lines.away_tt ? lines.away_tt.line : null], ["home_total", esc(home) + " team total", lines.home_tt ? lines.home_tt.line : null]].forEach(function (m) {
+      var lineTxt = m[2] === null || m[2] === undefined ? (m[0] === "ml" ? "" : '<span class="dim">no line on the row' + (/_total$/.test(m[0]) ? ' (the odds run brings it)' : '') + '</span>') : esc(String(m[2]));
+      if (/_total$/.test(m[0]) && m[2] !== null && m[2] !== undefined) { var tt = m[0] === "away_total" ? lines.away_tt : lines.home_tt; lineTxt += ' <span class="dim">' + esc(tt.book) + ' ' + (tt.op > 0 ? '+' : '') + tt.op + '/' + (tt.up > 0 ? '+' : '') + tt.up + '</span>'; }
       h += '<tr><td>' + m[1] + '</td><td>' + lineTxt + '</td><td>' + nbaSimChip(calls.own[m[0]]) + '</td><td>' + (m[0] === "ml" ? '<span class="dim">the own view\'s</span>' : nbaSimChip(calls.mkt[m[0]])) + '</td></tr>';
     });
     h += '</tbody></table>';
@@ -634,7 +669,7 @@
       var sim = null; try { sim = JSON.parse(r.inputs.nbasim); } catch (e) { sim = null; }
       if (!sim || !sim.own) return;
       var fin = r.finals || {}, fa = +fin.fa, fh = +fin.fh, half = (fin.f5a !== undefined && fin.f5a !== "" && fin.f5h !== undefined && fin.f5h !== "") ? (+fin.f5a + +fin.f5h) : null;
-      var lines = { total: blank(r.inputs.line) ? null : +r.inputs.line, h1: blank(r.inputs.h1line) ? null : +r.inputs.h1line, sp: blank(r.inputs.sp) ? null : +r.inputs.sp };
+      var lines = nbaSimLinesFrom(r.inputs);
       ["own", "mkt"].forEach(function (view) {
         nbaSimCalls(sim, lines, view).forEach(function (c) {
           if (c.band === "no call") return;
@@ -643,6 +678,11 @@
           else if (c.key === "h1") { if (half === null || half === c.line) return; won = (half > c.line) === (c.side === "OVER"); price = c.side === "OVER" ? r.inputs.h1op : r.inputs.h1up; }
           else if (c.key === "spread") { var m = fh - fa + c.line; if (m === 0) return; won = (m > 0) === (c.side === "HOME"); price = c.side === "HOME" ? r.inputs.sph : r.inputs.spa; }
           else if (c.key === "ml") { if (fa === fh) return; won = (fh > fa) === (c.side === "HOME"); price = c.side === "HOME" ? r.inputs.hml : r.inputs.aml; }
+          else if (c.key === "away_total" || c.key === "home_total") {
+            var pts = c.key === "away_total" ? fa : fh, tt = c.key === "away_total" ? lines.away_tt : lines.home_tt;
+            if (pts === c.line) return;
+            won = (pts > c.line) === (c.side === "OVER"); price = c.side === "OVER" ? tt.op : tt.up;
+          }
           if (won === null) return;
           var k = view + "|" + c.key + "|" + c.band;
           var d = T[k] || (T[k] = { view: view, key: c.key, band: c.band, n: 0, w: 0, says: 0, units: 0 });
@@ -651,7 +691,8 @@
       });
     });
     if (!n) return '';
-    var order = { total: 0, h1: 1, spread: 2, ml: 3 }, bandOrder = { STRONG: 0, BET: 1, LEAN: 2 }, label = { total: "Total", h1: "First half", spread: "Spread", ml: "Moneyline" };
+    var order = { total: 0, h1: 1, spread: 2, ml: 3, away_total: 4, home_total: 5 }, bandOrder = { STRONG: 0, BET: 1, LEAN: 2 },
+        label = { total: "Total", h1: "First half", spread: "Spread", ml: "Moneyline", away_total: "Away team total", home_total: "Home team total" };
     var h = '<div class="simrec"><div class="calibhead">SIMULATION · says against does, every call at LEAN or better</div>';
     ["own", "mkt"].forEach(function (view) {
       var ks = Object.keys(T).filter(function (k) { return T[k].view === view; }).sort(function (a, b) { return (order[T[a].key] - order[T[b].key]) || (bandOrder[T[a].band] - bandOrder[T[b].band]); });
@@ -663,7 +704,7 @@
       });
       h += '</tbody></table>';
     });
-    h += '<div class="note dim">A call is the sim\'s side at LEAN (60%) or better on the line the row carried; "says" is the sim\'s own chance, "does" the share that landed. The 2025-26 replay: the own view\'s total and spread calls land at 50% whatever they say (the close already carries the ratings), its win chances within 3 points of true; the anchored view is the one to watch on the first half.</div></div>';
+    h += '<div class="note dim">A call is the sim\'s side at LEAN (60%) or better on the line the row carried; "says" is the sim\'s own chance, "does" the share that landed. The replays: the own view\'s total and spread calls land at 50% whatever they say (the close already carries the ratings), its win chances within 3 points of true; the first half is a coin from either view over two seasons; the anchored team totals landed 60.7% at home and 53.9% away over 588 games of 2025-26, the one place the book\'s line sat off the game\'s own number, and this record is where that gets its second season.</div></div>';
     return h;
   }
 

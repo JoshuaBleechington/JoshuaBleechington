@@ -124,7 +124,8 @@ def run(folder, runs=1000, seasons=("2024-25", "2025-26"), seed=1, min_games=5, 
                     line = period_line(mk, market, "home" if key == "tt_home" else "away" if key == "tt_away" else None)
                     if not line:
                         continue
-                    hist = (Ho if key == "h1_own" else H)[hk]
+                    src = Ho if key == "h1_own" else H
+                    hist = src["q"][0] if hk == "q1" else src["q"][2] if hk == "q3" else src[hk]
                     p_over, push = nbasim.hist_over(hist, line[0])
                     if p_over is None:
                         continue

@@ -425,6 +425,45 @@ record keeps says against does for every call at LEAN or better from the
 first night, by view, market and band, so the question answers itself as
 the season goes.
 
+**The period lines, 26 Oct 2026.** The user moved to the 100,000-credit
+plan and pulled them (`slate.py odds-periods`): 2025-26 from 21 Oct to 24
+Jan, 675 games with the first-half, first-quarter and third-quarter
+totals and both team totals at the close, fifteen minutes before tip;
+2024-25 from 20 Oct to 9 Jan, 554 games with the first half. The replay
+(`--periods`), the market-anchored game against each line at the line's
+own price, 588 and 473 games joined:
+
+| Market, anchored | 2025-26 | 2024-25 | Reading |
+| --- | --- | --- | --- |
+| First half | slope +0.08 (t 0.2); 60-65: 113-96, +5.9u; 70+: 4-4 | slope −0.30 (t −0.6); 60-65: 72-72, −6.1u | a coin; the books split the halves as well as the game |
+| First half, the own view | slope +0.71 (t 2.6); 70+: 53-35, +12.5u | slope +0.18 (t 0.5); 70+: 21-23, −4.0u | the 2025-26 band did not come back: a coin |
+| First quarter | slope +0.50 (t 1.0); 60-65: 75-51, +16.0u on 126; Brier 0.248 | no lines yet | a watch, one season |
+| Third quarter | slope +0.74 (t 1.4); 60-65: 71-64, −2.9u; Brier 0.256 | no lines yet | nothing; "third-quarter unders" is not in the lines |
+| **Home team total** | slope +0.65 (t 1.2); 50-55: 176-128; 55-60: 133-79; 60-65: 45-23; **357-231 (60.7%), +93u** on 588 | no lines yet | the one inefficiency so far |
+| Away team total | slope +0.62 (t 1.0); 55-60: 111-92; 60-65: 31-21; 317-271 (53.9%), +18.5u | no lines yet | the same, weaker |
+
+Why the team totals: the book's team-total line sits off the number the
+game's own total and spread imply, (total ∓ spread) / 2, and the anchored
+game is built on that number. When the home line sat a point or more
+**above** the implied, the under landed 64.9% of the time (211 games); a
+point or more below, the over landed 63.5% (167); within a point, 52.9%.
+The away side 59.4% and 55.8%. The book posts a team total the market has
+not reconciled with its own spread and total, and the sim reads the gap.
+One season, and the 2024-25 team totals are the next pull; the page's
+record keeps the calls from tonight either way. The shrink on the team
+totals is 0.65 for now, the first quarter 0.5, the first half 0.1
+(`nbasim.SHRINK`).
+
+**The full-game lines history** (`tools_nba_odds_history.py`, every book's
+total, spread and moneyline at noon and 6:30 pm Eastern, both seasons,
+Pinnacle among them): Pinnacle's closing total less the US books' mean
+predicts nothing of the final's residual (slope −1.12, t −0.8; −0.23,
+t −0.2), the total's move from the opener to the close predicts nothing
+(t 0.3; t 0.6; 221-220 and 181-149 with a two-point move), and the spread
+shade leans the same faint way both seasons (t 1.9; t 1.2, on a shade
+whose spread is a third of a point). The Pinnacle chip stays shown, not
+scored.
+
 **Does the simulation help the props?** The user asked; it does, a
 little, and in a measurable way (`tools_backtest_nba_props_sim.py`,
 2025-26, 17,700 player-games with eight prior games and fifteen projected

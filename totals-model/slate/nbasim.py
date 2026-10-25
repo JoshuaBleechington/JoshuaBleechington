@@ -67,9 +67,15 @@ LEAGUE = {
 # tools_backtest_nba_sim.py, 2025-26 at 400 runs a game with the tendencies file, the sim's own view against the closing total
 # and spread: the slope of does on says was +0.04 for the total (t 0.2; a 70%+ call landed 52.0%), +0.02 for the spread (t 0.1;
 # a 70%+ call 44.4%), +0.97 for the moneyline (t 7.1; a 70%+ call 79.9% at says 77.4%). The close already carries the ratings,
-# so a total or spread call is worth a coin whatever it says; the win chance is nearly true. The first half, the team totals and
-# the quarters have no lines in the history yet, so they stay at 1.0 as unmeasured, and the page's record is where they get measured.
-SHRINK = {"total": 0.05, "h1": 1.0, "spread": 0.0, "ml": 0.97, "team": 1.0, "quarter": 1.0}
+# so a total or spread call is worth a coin whatever it says; the win chance is nearly true.
+# The period lines (26 Oct 2026, the user's pull: 588 games of 2025-26 with the first half, the quarters and the team totals at
+# the close; 473 of 2024-25 with the first half): the FIRST HALF is a coin from either view (anchored +0.08 then -0.30, the own
+# view +0.71 then +0.18; the 2025-26 own-view 70%+ band's 53-35 did not come back in 2024-25's 21-23); the FIRST QUARTER,
+# anchored, +0.50 (t 1.0, one season, +16u at 60-65 on 126 games); the TEAM TOTALS, anchored, +0.65 and +0.62 (t 1.2 and 1.0),
+# with the calls landing 60.7% at home and 53.9% away over 588 games, because the book's team-total line sits off the number
+# the game's total and spread imply: a line a point or more above the implied went under 64.9% of the time (home) and 59.4%
+# (away), a point or more below went over 63.5% and 55.8%. One season; the 2024-25 team totals are the next pull.
+SHRINK = {"total": 0.05, "h1": 0.1, "spread": 0.0, "ml": 0.97, "team": 0.65, "quarter": 0.5}
 BANDS = [(0.70, "STRONG"), (0.65, "BET"), (0.60, "LEAN")]
 
 

@@ -1280,17 +1280,22 @@ const CHECKS = ["dome","playoff","agconf","hgconf","agbk","hgbk"];
     const stored = JSON.parse(smStore.getItem('callsheet3.card.v1')).find(r => /76ers @ Knicks/.test(r.matchup));
     return { panel: panel.slice(0, 420), rows, chips, moved, hasSim: !!(stored && stored.inputs.nbasim && stored.inputs.nbasim.length > 1000) };
   });
-  await pg.evaluate(async () => { const c = JSON.parse(smStore.getItem('callsheet3.card.v1')); c.forEach(r => { if (/76ers @ Knicks/.test(r.matchup)) r.finals = { fa: '112', fh: '121', f5a: '55', f5h: '60' }; }); await smStore.setItem('callsheet3.card.v1', JSON.stringify(c)); });
+  // graded, with the book's team totals on the row's odds JSON (26 Oct 2026): the record takes them too
+  await pg.evaluate(async () => { const c = JSON.parse(smStore.getItem('callsheet3.card.v1')); c.forEach(r => { if (/76ers @ Knicks/.test(r.matchup)) { r.finals = { fa: '112', fh: '121', f5a: '55', f5h: '60' };
+    r.inputs.odds = JSON.stringify({ total: {}, ml: {}, spread: {}, book: 'fanatics', team: { AWAY: { OVER: [['fanatics', -110, 113.5], ['fanatics', 140, 117.5], ['draftkings', -112, 113.5]], UNDER: [['fanatics', -110, 113.5], ['fanatics', -170, 117.5], ['draftkings', -108, 113.5]] },
+                                                                                                    HOME: { OVER: [['fanatics', -115, 118.5]], UNDER: [['fanatics', -105, 118.5]] } } }); } }); await smStore.setItem('callsheet3.card.v1', JSON.stringify(c)); });
   await pg.reload(); await pg.waitForTimeout(300); await pg.evaluate(() => smStore.ready);
   const simRec = await pg.evaluate(() => { const rec = document.querySelector('#calibBox .simrec'); return { has: !!rec, text: rec ? rec.innerText.replace(/\s+/g, ' ').trim().slice(0, 300) : '', rows: rec ? [...rec.querySelectorAll('.simrectab tbody tr')].map(tr => tr.innerText.replace(/\s+/g, ' ').trim()) : [] }; });
   await pg.evaluate(async () => { await smStore.removeItem('callsheet3.card.v1'); }); await pg.reload(); await pg.waitForTimeout(300); await pg.evaluate(() => smStore.ready);
   chk(/^3,000 games\. The sim's own view: 76ers \d+\.\d, Knicks \d+\.\d; total \d+ \(middle half \d+–\d+\), Knicks by \d+\.\d, Knicks wins \d+%, overtime \d\.\d%\. Anchored to DraftKings's 231\.5 \/ -5\.5 for the derivative markets\./.test(simT.panel)
-      && simT.rows.length === 4 && /^Total 231\.5 (OVER|UNDER) \d+%/.test(simT.rows[0]) && /^First half 115\.5 (OVER|UNDER) \d+%/.test(simT.rows[1]) && /^Spread \(home\) -5\.5 (HOME|AWAY) \d+%/.test(simT.rows[2]) && /^Moneyline (HOME|AWAY) \d+%.*the own view's$/.test(simT.rows[3])
+      && simT.rows.length === 6 && /^Total 231\.5 (OVER|UNDER) \d+%/.test(simT.rows[0]) && /^First half 115\.5 (OVER|UNDER) \d+%/.test(simT.rows[1]) && /^Spread \(home\) -5\.5 (HOME|AWAY) \d+%/.test(simT.rows[2]) && /^Moneyline (HOME|AWAY) \d+%.*the own view's$/.test(simT.rows[3])
+      && /^76ers team total no line on the row \(the odds run brings it\) — —$/.test(simT.rows[4]) && /^Knicks team total no line on the row/.test(simT.rows[5])
       && simT.chips.length === 7 && simT.chips.every(c => /^simchip sim(no|lean|bet|strong)\|(OVER|UNDER|HOME|AWAY) \d+%$/.test(c)) && simT.moved !== simT.rows[0] && /UNDER [89]\d%/.test(simT.moved) && simT.hasSim,
       'nba sim: the Simulation card reads the example\'s runs, lists every market with the own and the anchored chance for the line on the row, follows the line when it is typed, and the block rides with the row', JSON.stringify({ panel: simT.panel, rows: simT.rows, moved: simT.moved, chips: simT.chips.length, has: simT.hasSim }));
   chk(simRec.has && /^SIMULATION · says against does, every call at LEAN or better The sim's own view/.test(simRec.text) && simRec.rows.length >= 1
-      && simRec.rows.every(r => /^(Total|First half|Spread|Moneyline) (STRONG|BET|LEAN) [01]-[01] \d+\.\d% (0|100)\.0% [+-]\d+\.\du$/.test(r)),
-      'nba sim: once the row grades, the record block keeps the sim\'s calls at LEAN or better, says against does by view, market and band', JSON.stringify(simRec));
+      && simRec.rows.every(r => /^(Total|First half|Spread|Moneyline|Away team total|Home team total) (STRONG|BET|LEAN) [01]-[01] \d+\.\d% (0|100)\.0% [+-]\d+\.\du$/.test(r))
+      && simRec.rows.some(r => /^(Away|Home) team total/.test(r)),
+      'nba sim: once the row grades, the record block keeps the sim\'s calls at LEAN or better, says against does by view, market and band, the book\'s team totals among them', JSON.stringify(simRec));
 
   // ---- the store (25 Oct 2026): the card, the props and the slate live in IndexedDB, past localStorage's 10 MB ----
   await fill(CASES[0].sport, CASES[0].inputs);

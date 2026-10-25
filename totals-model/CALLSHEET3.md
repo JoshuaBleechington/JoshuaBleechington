@@ -1060,6 +1060,14 @@ grade file's box line (kept on the row as `amin` from today; older graded
 props show a dash) and the stat marked against the line like the rest,
 or DNP for a void. The tally in the heading stays the history's.
 
+The user: "could the older graded props get their minutes filled in
+too?" Loading a night's grade file again now fills the minutes in on
+props already graded that have none, from the same box lines, and leaves
+every result and actual as it was; the message says how many. The grade
+files for the 20th to the 24th were rebuilt from ESPN in the container
+and sent to him for that (they carry no close, which does not matter: a
+grade file fills only blank closes, and those rows have theirs).
+
 ## A run without last season says so, 25 Oct 2026
 
 The user's props file of the 24th: 403 props, 140 with a side and 135 of

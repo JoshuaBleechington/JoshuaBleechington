@@ -160,25 +160,33 @@
     if (r.mk === "pra") v = (b[2] === null || b[2] === undefined || b[3] === null || b[3] === undefined || b[4] === null || b[4] === undefined) ? null : b[2] + b[3] + b[4];
     return (v === null || v === undefined) ? undefined : v;
   }
+  var propsMinsFilled = 0;   // graded props whose minutes a second load of the night's grade file filled in (25 Oct 2026)
   function gradeProps(d) {
     if (!d || !Array.isArray(d.games)) return 0;
-    var n = 0;
+    var n = 0, filled = 0;
     d.games.forEach(function (g) {
       if (!g.box) return;
       props.forEach(function (r) {
-        if (r.result || (r.gdate || "") !== (g.gdate || d.date || "")) return;
+        if ((r.gdate || "") !== (g.gdate || d.date || "")) return;
         if (propsCanon(r.away) !== propsCanon(g.away) || propsCanon(r.home) !== propsCanon(g.home)) return;
+        var bl = g.box[r.pid] || [], mins = bl[1] === null || bl[1] === undefined ? null : bl[1];   // his minutes that night, for the panel's last-games row
+        if (r.result) {
+          /* graded already: the result stands, and only the minutes fill in when the row has none (25 Oct 2026, the user:
+             "could the older graded props get their minutes filled in too?"): load the night's grade file again */
+          if ((r.amin === null || r.amin === undefined) && mins !== null) { r.amin = mins; filled++; }
+          return;
+        }
         var v = propActual(r, g.box);
         if (v === undefined) return;
-        var bl = g.box[r.pid] || [];
-        r.amin = bl[1] === null || bl[1] === undefined ? null : bl[1];   // his minutes that night, for the panel's last-games row (25 Oct 2026)
+        r.amin = mins;
         if (v === null) { r.result = "void"; r.actual = null; n++; return; }
         r.actual = v;
         r.result = !r.side ? "graded" : (v === r.line ? "push" : ((v > r.line) === (r.side === "OVER") ? "win" : "loss"));
         n++;
       });
     });
-    if (n) { saveProps(); renderProps(); }
+    propsMinsFilled = filled;
+    if (n || filled) { saveProps(); renderProps(); }
     return n;
   }
   /* the record: every graded prop with a side, by market, by band, by side; says is the blended chance.

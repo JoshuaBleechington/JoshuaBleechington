@@ -395,7 +395,8 @@ def tail() -> str:
              '    var propsGraded = gradeProps(d); if (propsGraded) renderCalib();\n'
              '    say("Slate "', "grade props")
     t = once(t, '". Typed values were not overwritten; lines and prices are never in a slate.");',
-             '". Typed values were not overwritten; lines and prices are never in a slate." + (propsGraded ? " <b>" + propsGraded + "</b> prop" + (propsGraded === 1 ? "" : "s") + " graded on the Props tab." : ""));', "grade props message")
+             '". Typed values were not overwritten; lines and prices are never in a slate." + (propsGraded ? " <b>" + propsGraded + "</b> prop" + (propsGraded === 1 ? "" : "s") + " graded on the Props tab." : "")'
+             ' + (propsMinsFilled ? " Minutes filled in on <b>" + propsMinsFilled + "</b> graded prop" + (propsMinsFilled === 1 ? "" : "s") + " from the box lines." : ""));', "grade props message")
     t = once(t, '      try { applySlate(JSON.parse(rd.result), f.name); }',
              '      try { var sd = JSON.parse(rd.result); if (sd && sd.format === "callsheet3.props") applyProps(sd, f.name); else applySlate(sd, f.name); }', "props file")
     t = once(t, '    box.innerHTML = h;\n  }\n\n\n  /* ---- the WNBA paste', '    h += propsRecordHtml();\n    box.innerHTML = h;\n  }\n\n\n  /* ---- the WNBA paste', "props record")

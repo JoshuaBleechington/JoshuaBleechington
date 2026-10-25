@@ -966,12 +966,23 @@ const CHECKS = ["dome","playoff","agconf","hgconf","agbk","hgbk"];
     const dt2 = new DataTransfer(); dt2.items.add(new File([JSON.stringify(bk)], 'the-super-model-2026-10-22.json', { type: 'application/json' }));
     const inp2 = document.getElementById('restoreFile'); inp2.files = dt2.files; inp2.dispatchEvent(new Event('change', { bubbles: true })); await wait();
     const restored = JSON.parse(smStore.getItem('callsheet3.props.v1'));
+    // older graded props get their minutes from a second load of the night's grade file, results untouched (25 Oct 2026)
+    const bk3 = { format: 'callsheet3.backup', version: 1, card: [], props: after.map(r => { const c = Object.assign({}, r); delete c.amin; return c; }) };
+    const dt3 = new DataTransfer(); dt3.items.add(new File([JSON.stringify(bk3)], 'the-super-model-2026-10-22.json', { type: 'application/json' }));
+    inp2.files = dt3.files; inp2.dispatchEvent(new Event('change', { bubbles: true })); await wait();
+    const stripped = JSON.parse(smStore.getItem('callsheet3.props.v1')).every(r => r.amin === undefined);
+    await load(gradeDoc, 'nba-grade-2026-10-21.json');
+    const refilled = JSON.parse(smStore.getItem('callsheet3.props.v1'));
+    const refill = { stripped, same: refilled.length === after.length && refilled.every((r, i) => r.result === after[i].result && r.actual === after[i].actual),
+                     mins: refilled.map(r => r.amin), was: after.map(r => r.amin), msg: document.getElementById('saveMsg').innerText.replace(/\s+/g, ' ') };
     document.getElementById('m-nba').click(); await wait();
     const viewOff = document.getElementById('propsView').hidden, colsBack = !document.querySelector('.cols').hidden, nbaPressed = document.getElementById('m-nba').getAttribute('aria-pressed');
     await smStore.removeItem('callsheet3.props.v1');
     return { viewOn, colsOff, pressed, best, rowsOn, rowsAll, count, msg, whyOpen, logMarks, tileBefore, after: after.map(r => [r.name, r.mk, r.result, r.actual]), tileText, slateMsg, restored: restored.length, viewOff, colsBack, nbaPressed,
-             tabCalib, tabBlocks, nights, ladder, tabEmpty0, noneMsg, thinMsg, inPlay, thisRow, thisMark, logRows };
+             tabCalib, tabBlocks, nights, ladder, tabEmpty0, noneMsg, thinMsg, inPlay, thisRow, thisMark, logRows, refill };
   });
+  chk(propsT.refill.stripped && propsT.refill.same && JSON.stringify(propsT.refill.mins) === JSON.stringify(propsT.refill.was) && propsT.refill.mins.some(m => typeof m === 'number') && /Minutes filled in on \d+ graded props? from the box lines\./.test(propsT.refill.msg),
+      'props: a second load of a night\'s grade file fills the minutes in on props graded before they were kept, leaves every result as it was, and says how many', JSON.stringify(propsT.refill));
   chk(/^10-21 @ [A-Z]+ this game 36\.2 28$/.test(propsT.thisRow) && /lg over/.test(propsT.thisMark) && propsT.logRows === 4,
       'props: a graded prop\'s last games end with the game itself, his minutes from the box line and the stat marked against the line', JSON.stringify({ row: propsT.thisRow, mark: propsT.thisMark, rows: propsT.logRows }));
   chk(/loaded: 2 new.*Last season's ledger, nba-ledger-202526\.json, was not read by this run: 1 of the 1 projections rest on this season's two or three games a player, and 1 prop has no history at all\. Put the file back beside slate\.py, run the props again before tip, and load the new file; it replaces these\./.test(propsT.thinMsg),

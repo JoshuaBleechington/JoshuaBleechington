@@ -2,8 +2,8 @@
 rem Double-click to build tonight's NBA slate for The Super Model: each club's
 rem ratings, pace and games to date from the ledger, rest, the injury report
 rem as the who-is-out list, RotoWire's starting fives, and the context lines.
-rem Run "Run NBA ledger" first (blank season) so the ratings are current.
-rem Lines come from "Run odds".
+rem It brings this season's ledger up to date first, so the ratings and the
+rem last-five cards are current. Lines come from "Run odds".
 cd /d "%~dp0"
 python slate.py nba %*
 echo.

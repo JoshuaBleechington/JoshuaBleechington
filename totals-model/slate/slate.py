@@ -3592,7 +3592,25 @@ def load_nba_ledger(path):
     return d if d.get("format") == NBA_LEDGER_FORMAT and isinstance(d.get("games"), list) else None
 
 
-def make_nba_slate(date_iso, out_dir, log):
+def nba_ledger_topup(date_iso, out_dir, log):
+    """This season's ledger brought up to date before a slate or props run
+    (25 Oct 2026, the user: "the props' last games show 10/23 and not 10/24
+    for the players who were on yesterday"; the props had run before the
+    ledger bat). The daily walk is a scoreboard call a day from two days
+    before the ledger's last game and a summary a game, seconds for a night's
+    finals, so neither run depends on the ledger having been run first. A
+    failure is logged and the run goes on with what the file holds."""
+    log("Bringing this season's ledger up to date first:")
+    try:
+        make_nba_ledger(date_iso, out_dir, log)
+    except Exception as e:  # noqa: BLE001
+        log("  Could not bring the ledger up to date (%s); the run goes on with the ledger as it is." % e)
+    log("")
+
+
+def make_nba_slate(date_iso, out_dir, log, topup=False):
+    if topup:
+        nba_ledger_topup(date_iso, out_dir, log)
     games = [g for g in nba_day_games(date_iso) if not g["final"]]
     if not games:
         log("No NBA games on the feed for %s." % date_iso)
@@ -4256,12 +4274,14 @@ def espn_team_roster(ab):
     return out
 
 
-def make_nba_props(date_iso, out_dir, log):
+def make_nba_props(date_iso, out_dir, log, topup=False):
     """The day's player props with the slate's projection beside each, for The
     Super Model's Props tab: nba-props-DATE.json. The lines come from The Odds
     API (a credit a market a game), the history from the ledgers, who is out
     from ESPN, the defence table from HashtagBasketball."""
     key = odds_key(out_dir)
+    if topup:
+        nba_ledger_topup(date_iso, out_dir, log)
     season = nba_season_id(date_iso)
     led = load_nba_ledger(nba_ledger_path(out_dir, season))
     prior = load_nba_ledger(nba_ledger_path(out_dir, nba_prev_season(season)))
@@ -5226,7 +5246,7 @@ def selftest():
     check("lineup diff", missing_from_lineup({1, 2}, [1, 2, 3], {3: "Third Man"}) == ["Third Man"])
 
     print("one game through canned payloads")
-    global fetch_json
+    global fetch_json, make_nba_ledger
     real = fetch_json
     canned = _canned()
 
@@ -5822,10 +5842,23 @@ def selftest():
             gr8 = json.load(f)
         lines9 = []
         bare = build_nba_game(day[1], "2026-10-21", {}, None, {}, {}, {}, lines9.append, have_ledger=False)
+        # the top-up (25 Oct 2026): the slate and props runs bring the ledger up to date first, and a failure is logged, not fatal
+        real_led, calls, lines10 = make_nba_ledger, [], []
+        make_nba_ledger = lambda d, o, lg, season=None: calls.append((d, o, season)) or lg("  stub ran")
+        try:
+            make_nba_slate("2026-10-21", tmp7, lines10.append, topup=True)
+            make_nba_ledger = lambda d, o, lg, season=None: (_ for _ in ()).throw(RuntimeError("ESPN down"))
+            p11 = make_nba_props.__defaults__   # the props default: no top-up unless asked, so the selftest's other calls stay offline
+            nba_ledger_topup("2026-10-21", tmp7, lines10.append)
+        finally:
+            make_nba_ledger = real_led
     finally:
         fetch_json = real
         _cache.pop(ROTOWIRE_NBA, None)
         _cache.pop(ROTOWIRE_NBA + "?date=tomorrow", None)
+    check("nba top-up: the slate run brings this season's ledger up to date first, and a failure is logged while the run goes on",
+          calls == [("2026-10-21", tmp7, None)] and lines10[0] == "Bringing this season's ledger up to date first:" and lines10[1] == "  stub ran"
+          and any(l == "  Could not bring the ledger up to date (ESPN down); the run goes on with the ledger as it is." for l in lines10) and p11 == (False,))
     check("nba slate: the scoreboard for a day, finals and scheduled games alike, on the US date with the half-time score",
           len(day) == 4 and day[0]["final"] is True and day[0]["ha"] == 51 and day[0]["hh"] == 49 and day[0]["fa"] == 101 and day[0]["date"] == "2026-10-21"
           and day[1]["final"] is False and day[1]["state"] == "Scheduled" and day[1]["away"] == "BOS" and day[1]["home"] == "NYK" and day[1]["hn"] == "Knicks" and day[1]["venue"] == "Madison Square Garden"
@@ -6439,6 +6472,7 @@ def main(argv=None):
     ap.add_argument("--keep", type=int, default=ODDS_HISTORY_KEEP, help="odds-history: stop when this many credits are left for the nightly runs (default %d)." % ODDS_HISTORY_KEEP)
     ap.add_argument("--detail", action="store_true", help="nhl-ledger only: also fetch each game's box score and game page for the starters, their lines, power-play goals and penalties (two calls a game; about 40 minutes a season).")
     ap.add_argument("--refs", action="store_true", help="nhl-ledger only: also fetch each game's side panel for the referees, linesmen and scratches (one call a game; about 20 minutes a season).")
+    ap.add_argument("--no-ledger", action="store_true", help="nba and nba-props: do not bring this season's ledger up to date first (they do by default, 25 Oct 2026).")
     ap.add_argument("--out", default=".", help="folder to write into (default: where you run it)")
     ap.add_argument("--selftest", action="store_true", help="run the offline checks and exit")
     ap.add_argument("--quiet", action="store_true", help="print only the final line")
@@ -6475,11 +6509,11 @@ def main(argv=None):
         elif a.mode == "nba-ledger":
             path = make_nba_ledger(date_iso, a.out, log, a.season)
         elif a.mode == "nba":
-            path = make_nba_slate(date_iso, a.out, log)
+            path = make_nba_slate(date_iso, a.out, log, topup=not a.no_ledger)
         elif a.mode == "nba-grade":
             path = make_nba_grade(date_iso, a.out, log)
         elif a.mode == "nba-props":
-            path = make_nba_props(date_iso, a.out, log)
+            path = make_nba_props(date_iso, a.out, log, topup=not a.no_ledger)
         elif a.mode == "odds":
             sports = tuple(s.strip().upper() for s in a.sports.split(",") if s.strip()) if a.sports else ("MLB", "NHL", "NBA")
             path = make_odds(date_iso, a.out, log, a.books, sports)

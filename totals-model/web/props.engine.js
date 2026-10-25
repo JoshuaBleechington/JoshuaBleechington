@@ -136,6 +136,16 @@
                  ((lg && (lg.this || {}).games === 0) ? ", with this season's ledger beside it" : "") + ", run the props again from that folder, and load the new file; it replaces these."
                : "");
     }
+    /* a file whose projections rest on this season alone (25 Oct 2026, the user's file of the 24th: 140 projected, 135 of them
+       "no last season to blend", 263 with no side at all): the run read no last-season ledger, and nothing had said so */
+    var withSide = incoming.filter(propHas), noHist = incoming.length - withSide.length,
+        thin = withSide.filter(function (r) { return (r.why || []).some(function (w) { return /no last season to blend/.test(String(w)); }); }).length;
+    if (!none && withSide.length && ((lg && lg.last && !lg.last.games) || (!lg && thin > withSide.length / 2))) {
+      var lastSeason2 = (lg && lg.last && lg.last.season) || "2025-26";
+      warn += " <b>Last season's ledger, nba-ledger-" + esc(lastSeason2.replace("-", "")) + ".json, was not read by this run:</b> " + thin + " of the " + withSide.length +
+              " projections rest on this season's two or three games a player, and " + noHist + (noHist === 1 ? " prop has" : " props have") +
+              " no history at all. Put the file back beside slate.py, run the props again before tip, and load the new file; it replaces these.";
+    }
     propsSay("Props " + (name ? "<b>" + esc(name) + "</b> " : "") + "loaded: <b>" + added + "</b> new, " + replaced + " replaced, " + kept + " graded and left as " +
              (kept === 1 ? "it was" : "they were") + (inPlay ? ", <b>" + inPlay + "</b> on " + Object.keys(startedGames).length + " game" + (Object.keys(startedGames).length === 1 ? "" : "s") + " already under way left out (in-play lines; the calls made before tip stand)" : "") +
              ". A prop is the slate's call as made; the page does not rescore it." + warn);

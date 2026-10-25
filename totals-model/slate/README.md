@@ -69,9 +69,13 @@ the goalies.
 
 Three double-click files, in this order on a game day:
 
-1. **Run NBA ledger.bat**, blank at the prompt: adds this season's new
-   finals to `nba-ledger-202627.json`. Every rating on the slate comes
-   from this file, so it goes first. Nothing to add is fine.
+1. **Run NBA ledger.bat** is no longer a daily step (25 Oct 2026): the
+   slate and props runs bring this season's `nba-ledger-202627.json` up to
+   date themselves before they read it, a scoreboard call and a summary a
+   game, seconds for a night's finals (`--no-ledger` skips it). The bat
+   stays for the first run of a past season (`2025-26` at the prompt), which
+   the props need for last season's history, and for a rebuild. Every
+   rating on the slate and every player's last games come from this file.
 2. **Run NBA slate.bat**, or `python slate.py nba`: writes
    `nba-slate-DATE.json` with every game on the league's scoreboard that
    has not been played. In The Super Model: **Saving → Load slate**, pick
@@ -83,9 +87,9 @@ Three double-click files, in this order on a game day:
 4. **Run NBA props.bat**, or `python slate.py nba-props` (19 Oct 2026):
    writes `nba-props-DATE.json`, every player prop the books post on the
    day's games with the slate's projection beside each, about five credits
-   a game. In The Super Model: **NBA PROPS → Load props**. Run it after the
-   ledger (the game logs) and late enough that the books have posted the
-   props, usually by the early afternoon.
+   a game. In The Super Model: **NBA PROPS → Load props**. Run it late
+   enough that the books have posted the props, usually by the early
+   afternoon; it brings the game logs up to date itself first.
 5. **An hour before tip**, run the slate, the odds and the props again and
    load each. What a second load does to a game already on the card (23 Oct
    2026): it fills boxes that were blank (the crew the league posted after

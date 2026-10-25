@@ -2,9 +2,10 @@
 rem Double-click to build tonight's NBA player props for The Super Model's
 rem Props tab: every prop the books post on the day's games (points, rebounds,
 rem assists, threes, points + rebounds + assists) with the slate's own
-rem projection beside each. Run "Run NBA ledger" first (blank season) so the
-rem game logs are current; the first time, run it for last season too, so the
-rem rebounds, assists and threes have a history. About five credits a game.
+rem projection beside each. It brings this season's ledger (the game logs)
+rem up to date first; the first time, run "Run NBA ledger" for last season
+rem too, so the rebounds, assists and threes have a history. About five
+rem credits a game.
 cd /d "%~dp0"
 python slate.py nba-props %*
 echo.

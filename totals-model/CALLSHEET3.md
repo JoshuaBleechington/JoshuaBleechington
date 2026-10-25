@@ -1048,6 +1048,21 @@ their points a game against the league's by history (the total did not
 follow, t −1.0), and the past table's pooled over rate with these three as
 a soft lean. Never scored; the referee watch on the record is the test.
 
+## A run without last season says so, 25 Oct 2026
+
+The user's props file of the 24th: 403 props, 140 with a side and 135 of
+those "no last season to blend", 263 with no side at all. The run had
+read no 2025-26 ledger (the file's date in his OneDrive folder is the
+next morning), and because a few dozen players already had sixty minutes
+this season, enough projected that nothing looked wrong. The 23rd and the
+25th blended normally. The load message now says when a file's run read
+no last-season ledger: by the file's own `ledgers` block when it has one
+(last season with zero games), or, for an older file, when more than half
+the projections carry "no last season to blend". It counts the thin
+projections and the props with no history, names the file and says to
+run the props again before tip. A rookie's "no last season" is normal and
+does not trip it; the test is the run, not the player.
+
 ## The page's memory moves to IndexedDB, 25 Oct 2026
 
 The user's 10/25 backup: 298 card rows (1.9 million characters) and 2,171

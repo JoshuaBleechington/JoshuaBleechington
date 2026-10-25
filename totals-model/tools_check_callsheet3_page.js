@@ -919,6 +919,13 @@ const CHECKS = ["dome","playoff","agconf","hgconf","agbk","hgbk"];
                  games: [{ gid: 'z', away: 'Bulls', home: 'Bucks', aab: 'CHI', hab: 'MIL', props: [{ pid: '1', name: 'Josh Giddey', team: 'CHI', opp: 'MIL', home: false, pos: 'G', mk: 'pts', line: 12.5, op: -135, up: 100, book: 'fanatics', books: {}, why: ['no history to project from (under 60 minutes with the stat in the ledgers)'], log: [] }] }] }, 'nba-props-2026-10-23.json');
     const noneMsg = document.getElementById('propsMsg').innerText.replace(/\s+/g, ' ');
     document.getElementById('propsClear').click(); await wait();
+    // a file whose projections rest on this season alone says last season's ledger was not read (25 Oct 2026)
+    await load({ format: 'callsheet3.props', version: 1, date: '2026-10-24', ledgers: { folder: 'C:\\Users\\J\\slate', this: { season: '2026-27', games: 16, lines: 400 }, last: { season: '2025-26', games: 0, lines: 0 } },
+                 games: [{ gid: 'y', away: 'Heat', home: 'Hornets', aab: 'MIA', hab: 'CHA', props: [
+                   { pid: '1', name: 'Bam Adebayo', team: 'MIA', opp: 'CHA', home: false, pos: 'C', mk: 'reb', line: 9.5, op: -105, up: -125, book: 'betmgm', books: {}, proj: 10.8, sd: 3.6, pm: 0.6, pb: 0.5, p: 0.57, push: 0, side: 'OVER', chance: 0.57, price: -105, need: 0.512, edge: 0.058, band: 'LEAN', mins: 31, rate36: 12.5, why: ['12.5 rebounds per 36 this season (2 games, 63 minutes); no last season to blend'], log: [] },
+                   { pid: '2', name: 'Naz Reid', team: 'CHA', opp: 'MIA', home: true, pos: 'F', mk: 'pts', line: 14.5, op: -110, up: -110, book: 'betmgm', books: {}, why: ['no history to project from (under 60 minutes with the stat in the ledgers)'], log: [] }] }] }, 'nba-props-2026-10-24.json');
+    const thinMsg = document.getElementById('propsMsg').innerText.replace(/\s+/g, ' ');
+    document.getElementById('propsClear').click(); await wait();
     // a file written after a game tipped leaves that game's props out
     await load({ format: 'callsheet3.props', version: 1, date: '2026-10-23', generated: '2026-10-24T01:10:00Z', games: [
       { gid: 'a', away: 'Bulls', home: 'Bucks', aab: 'CHI', hab: 'MIL', tip: '2026-10-24T00:00Z', props: [{ pid: '1', name: 'Josh Giddey', team: 'CHI', opp: 'MIL', home: false, pos: 'G', mk: 'pts', line: 12.5, op: -135, up: 100, book: 'fanatics', books: {}, proj: 14.1, sd: 6.9, pm: 0.58, pb: 0.5, p: 0.53, push: 0, side: 'OVER', chance: 0.53, price: -135, need: 0.574, edge: -0.044, band: 'no edge', mins: 30, rate36: 16.9, why: ['x'], log: [] }] },
@@ -958,8 +965,10 @@ const CHECKS = ["dome","playoff","agconf","hgconf","agbk","hgbk"];
     const viewOff = document.getElementById('propsView').hidden, colsBack = !document.querySelector('.cols').hidden, nbaPressed = document.getElementById('m-nba').getAttribute('aria-pressed');
     await smStore.removeItem('callsheet3.props.v1');
     return { viewOn, colsOff, pressed, best, rowsOn, rowsAll, count, msg, whyOpen, logMarks, tileBefore, after: after.map(r => [r.name, r.mk, r.result, r.actual]), tileText, slateMsg, restored: restored.length, viewOff, colsBack, nbaPressed,
-             tabCalib, tabBlocks, nights, ladder, tabEmpty0, noneMsg, inPlay };
+             tabCalib, tabBlocks, nights, ladder, tabEmpty0, noneMsg, thinMsg, inPlay };
   });
+  chk(/loaded: 2 new.*Last season's ledger, nba-ledger-202526\.json, was not read by this run: 1 of the 1 projections rest on this season's two or three games a player, and 1 prop has no history at all\. Put the file back beside slate\.py, run the props again before tip, and load the new file; it replaces these\./.test(propsT.thinMsg),
+      'props: a file whose projections rest on this season alone says last season\'s ledger was not read and what to do', propsT.thinMsg.slice(0, 500));
   chk(/loaded: 1 new, 0 replaced, 0 graded and left as they were, 1 on 1 game already under way left out \(in-play lines; the calls made before tip stand\)/.test(propsT.inPlay.msg) && propsT.inPlay.names.join(',') === 'Paul George',
       'props: a file written after a game tipped leaves that game\'s props out and says so, and keeps the games still to come', JSON.stringify(propsT.inPlay));
   chk(/None of the 1 props has a projection\. The run read 0 games of 2026-27 and 0 of 2025-26 in C:\\Users\\J\\Downloads\. Last season's ledger, nba-ledger-202526\.json, was not read\. With a game or two this season nobody has the sixty minutes a projection needs, so every prop reads no history\. Put that file back in the slate folder beside slate\.py, with this season's ledger beside it, run the props again/.test(propsT.noneMsg),

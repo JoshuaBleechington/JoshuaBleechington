@@ -75,7 +75,12 @@ LEAGUE = {
 # with the calls landing 60.7% at home and 53.9% away over 588 games, because the book's team-total line sits off the number
 # the game's total and spread imply: a line a point or more above the implied went under 64.9% of the time (home) and 59.4%
 # (away), a point or more below went over 63.5% and 55.8%. One season; the 2024-25 team totals are the next pull.
-SHRINK = {"total": 0.05, "h1": 0.1, "spread": 0.0, "ml": 0.97, "team": 0.65, "quarter": 0.5}
+# The second season (26 Oct 2026, 554 games of 2024-25 with the team totals and the first quarter) came back the same way on
+# the team totals: the anchored home calls 279-194 (59.0%, +94.6u at the lines' prices; slope of does on says +2.74, t 3.5), a
+# home line a point or more above the implied under 62.1% of the time, a point or more below over 68.1% (t -5.1 on the gap);
+# the away side positive but noisy (247-226; the slope -0.67, t -0.9). The first quarter did not come back (+0.12, t 0.2): a
+# watch. The team totals are a measured market, their shrink 1.0, and the page scores the gap rule itself beside the sim's chance.
+SHRINK = {"total": 0.05, "h1": 0.1, "spread": 0.0, "ml": 0.97, "team": 1.0, "quarter": 0.1}
 BANDS = [(0.70, "STRONG"), (0.65, "BET"), (0.60, "LEAN")]
 
 

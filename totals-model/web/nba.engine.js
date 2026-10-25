@@ -609,10 +609,24 @@
     for (var i = 0; i < books.length; i++) { var b = pick(books[i]); if (b) return b; }
     return null;
   }
+  /* the gap rule (26 Oct 2026): the book's team total against the number the game's own total and spread imply, (total -/+
+     spread) / 2. Two seasons of closes: a home line a point or more ABOVE the implied went under 62.1% and 63.2% of the time
+     (169 and 247 games), a point or more BELOW went over 68.1% and 63.1% (94 and 195); the away side 55.4% / 56.8% and
+     57.1% / 56.5%; the slope of the over's chance on the gap -0.080 and -0.057 a point at home (t -5.1, -5.7), -0.036 and
+     -0.030 away (t -2.4, -2.8). Scored: a gap of a point or more is a call, and the record keeps it from the first night */
+  var NBA_TT_GAP = 1.0;
+  function nbaTeamTotalGap(tt, total, sp, side) {
+    if (!tt || total === null || total === undefined || sp === null || sp === undefined || isNaN(+total) || isNaN(+sp)) return null;
+    var implied = side === "HOME" ? (+total - +sp) / 2.0 : (+total + +sp) / 2.0, gap = tt.line - implied;
+    return { implied: Math.round(implied * 10) / 10, gap: Math.round(gap * 10) / 10, call: gap >= NBA_TT_GAP ? "UNDER" : gap <= -NBA_TT_GAP ? "OVER" : null };
+  }
   function nbaSimLinesFrom(inputs) {
     var oddsRaw = inputs.odds || "";
-    return { total: blank(inputs.line) ? null : +inputs.line, h1: blank(inputs.h1line) ? null : +inputs.h1line, sp: blank(inputs.sp) ? null : +inputs.sp,
-             away_tt: nbaTeamTotalLine(oddsRaw, "AWAY"), home_tt: nbaTeamTotalLine(oddsRaw, "HOME") };
+    var total = blank(inputs.line) ? null : +inputs.line, sp = blank(inputs.sp) ? null : +inputs.sp;
+    var out = { total: total, h1: blank(inputs.h1line) ? null : +inputs.h1line, sp: sp, away_tt: nbaTeamTotalLine(oddsRaw, "AWAY"), home_tt: nbaTeamTotalLine(oddsRaw, "HOME") };
+    if (out.away_tt) out.away_tt.rule = nbaTeamTotalGap(out.away_tt, total, sp, "AWAY");
+    if (out.home_tt) out.home_tt.rule = nbaTeamTotalGap(out.home_tt, total, sp, "HOME");
+    return out;
   }
   function nbaSimLinesFromForm() { return nbaSimLinesFrom({ line: $("line").value, h1line: $("h1line").value, sp: $("sp").value, odds: ($("odds") || {}).value || "" }); }
   function nbaSimChip(c) {
@@ -641,7 +655,14 @@
     [["total", "Total", lines.total], ["h1", "First half", lines.h1], ["spread", "Spread (home)", lines.sp], ["ml", "Moneyline", null],
      ["away_total", esc(away) + " team total", lines.away_tt ? lines.away_tt.line : null], ["home_total", esc(home) + " team total", lines.home_tt ? lines.home_tt.line : null]].forEach(function (m) {
       var lineTxt = m[2] === null || m[2] === undefined ? (m[0] === "ml" ? "" : '<span class="dim">no line on the row' + (/_total$/.test(m[0]) ? ' (the odds run brings it)' : '') + '</span>') : esc(String(m[2]));
-      if (/_total$/.test(m[0]) && m[2] !== null && m[2] !== undefined) { var tt = m[0] === "away_total" ? lines.away_tt : lines.home_tt; lineTxt += ' <span class="dim">' + esc(tt.book) + ' ' + (tt.op > 0 ? '+' : '') + tt.op + '/' + (tt.up > 0 ? '+' : '') + tt.up + '</span>'; }
+      if (/_total$/.test(m[0]) && m[2] !== null && m[2] !== undefined) {
+        var tt = m[0] === "away_total" ? lines.away_tt : lines.home_tt;
+        lineTxt += ' <span class="dim">' + esc(tt.book) + ' ' + (tt.op > 0 ? '+' : '') + tt.op + '/' + (tt.up > 0 ? '+' : '') + tt.up + '</span>';
+        if (tt.rule) {
+          lineTxt += '<div class="ttgap">implied <b>' + tt.rule.implied + '</b>, gap <b>' + (tt.rule.gap > 0 ? '+' : '') + tt.rule.gap + '</b>' +
+                     (tt.rule.call ? ' · <span class="simchip simbet gaprule"><b>' + tt.rule.call + '</b> by the gap rule</span>' : ' · <span class="dim">inside a point, no call</span>') + '</div>';
+        }
+      }
       h += '<tr><td>' + m[1] + '</td><td>' + lineTxt + '</td><td>' + nbaSimChip(calls.own[m[0]]) + '</td><td>' + (m[0] === "ml" ? '<span class="dim">the own view\'s</span>' : nbaSimChip(calls.mkt[m[0]])) + '</td></tr>';
     });
     h += '</tbody></table>';
@@ -664,12 +685,19 @@
   function nbaSimRecordHtml() {
     var rows = card.filter(function (r) { return r.sport === "NBA" && rowGraded(r) && r.inputs && r.inputs.nbasim; });
     if (!rows.length) return '';
-    var T = {}, n = 0;
+    var T = {}, n = 0, G = { HOME: { n: 0, w: 0, units: 0 }, AWAY: { n: 0, w: 0, units: 0 } }, gn = 0;
     rows.forEach(function (r) {
       var sim = null; try { sim = JSON.parse(r.inputs.nbasim); } catch (e) { sim = null; }
       if (!sim || !sim.own) return;
       var fin = r.finals || {}, fa = +fin.fa, fh = +fin.fh, half = (fin.f5a !== undefined && fin.f5a !== "" && fin.f5h !== undefined && fin.f5h !== "") ? (+fin.f5a + +fin.f5h) : null;
       var lines = nbaSimLinesFrom(r.inputs);
+      // the gap rule's own tally
+      [["AWAY", lines.away_tt, fa], ["HOME", lines.home_tt, fh]].forEach(function (x) {
+        var tt = x[1];
+        if (!tt || !tt.rule || !tt.rule.call || x[2] === tt.line) return;
+        var won = (x[2] > tt.line) === (tt.rule.call === "OVER"), d = G[x[0]];
+        d.n++; d.w += won ? 1 : 0; d.units += nbaSimUnits(tt.rule.call === "OVER" ? tt.op : tt.up, won); gn++;
+      });
       ["own", "mkt"].forEach(function (view) {
         nbaSimCalls(sim, lines, view).forEach(function (c) {
           if (c.band === "no call") return;
@@ -690,7 +718,7 @@
         });
       });
     });
-    if (!n) return '';
+    if (!n && !gn) return '';
     var order = { total: 0, h1: 1, spread: 2, ml: 3, away_total: 4, home_total: 5 }, bandOrder = { STRONG: 0, BET: 1, LEAN: 2 },
         label = { total: "Total", h1: "First half", spread: "Spread", ml: "Moneyline", away_total: "Away team total", home_total: "Home team total" };
     var h = '<div class="simrec"><div class="calibhead">SIMULATION · says against does, every call at LEAN or better</div>';
@@ -704,7 +732,17 @@
       });
       h += '</tbody></table>';
     });
-    h += '<div class="note dim">A call is the sim\'s side at LEAN (60%) or better on the line the row carried; "says" is the sim\'s own chance, "does" the share that landed. The replays: the own view\'s total and spread calls land at 50% whatever they say (the close already carries the ratings), its win chances within 3 points of true; the first half is a coin from either view over two seasons; the anchored team totals landed 60.7% at home and 53.9% away over 588 games of 2025-26, the one place the book\'s line sat off the game\'s own number, and this record is where that gets its second season.</div></div>';
+    if (gn) {
+      h += '<div class="simrecview">The team-total gap rule <span class="tag">the book\'s line a point or more off the number the game\'s total and spread imply · scored, two seasons</span></div><table class="form simrectab gaptab"><thead><tr><th>Side</th><th>Record</th><th>Does</th><th>Units</th><th>Two seasons said</th></tr></thead><tbody>';
+      [["HOME", "62% under above the number, 66% over below (169 and 247, 94 and 195 games)"], ["AWAY", "56% under above, 57% over below"]].forEach(function (x) {
+        var d = G[x[0]];
+        if (!d.n) return;
+        var cls = d.units > 0 ? "good" : d.units < 0 ? "bad" : "";
+        h += '<tr><td>' + (x[0] === "HOME" ? "Home team total" : "Away team total") + '</td><td>' + d.w + '-' + (d.n - d.w) + '</td><td class="' + cls + '">' + (100 * d.w / d.n).toFixed(1) + '%</td><td class="' + cls + '">' + (d.units >= 0 ? '+' : '') + d.units.toFixed(1) + 'u</td><td class="dim">' + x[1] + '</td></tr>';
+      });
+      h += '</tbody></table>';
+    }
+    h += '<div class="note dim">A call is the sim\'s side at LEAN (60%) or better on the line the row carried; "says" is the sim\'s own chance, "does" the share that landed. The replays: the own view\'s total and spread calls land at 50% whatever they say (the close already carries the ratings), its win chances within 3 points of true; the first half is a coin from either view over two seasons. The team totals are the one inefficiency: the book\'s line sits off the number the game\'s own total and spread imply, the gap rule reads it (a point or more, scored over two seasons), and the anchored sim\'s calls carry the same lean with the shape on top.</div></div>';
     return h;
   }
 

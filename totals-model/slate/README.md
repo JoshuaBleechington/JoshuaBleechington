@@ -235,15 +235,16 @@ resumable, each stopping at 3,000 credits left:
 | **Run NBA period lines.bat** | `python slate.py odds-periods --season 2025-26`: the first-half, first-quarter and third-quarter totals and the team totals at the close (fifteen minutes before each tip; `--minutes`) for every game of the season from the historical event endpoint, into `odds-periods-NBA-SEASON.json`. A credit a game day to list the games, ten a market a game. The US books only: Pinnacle sits in another region and would double the bill. Type `totals_h1` at the markets prompt for the first half alone | 2025-26, four markets: about 49,000. 2024-25, the first half alone: about 12,300 |
 | **Run NBA lines history.bat** | `python slate.py odds-history --sports NBA --season 2025-26 --markets totals,spreads,h2h --times 16:00,22:30`: every book's total, spread and moneyline at noon and 6:30 pm Eastern for every game day, into the same `odds-history-NBA-SEASON.json` the moneyline pull wrote (it adds the opener snapshot and the markets; the spread now rides after the moneylines). Pinnacle included, for the sharp line | about 10,000 a season |
 
-The first pulls (26 Oct 2026) ran to late January of each season and
-measured (NBA.md, "The period lines"): the first half is a coin from either
-view over two seasons, the first quarter a watch, and the **team totals**
-the one inefficiency, the anchored sim's calls landing 60.7% at home over
-588 games. The next pull is the one that confirms or kills it: **Run NBA
-period lines.bat** for 2024-25 with `team_totals,totals_q1` at the markets
-prompt (it prices the 555 games already listed for the two markets and
-lists the rest of the season, about 25,000), then 2025-26 with the same
-two markets for the rest of its season (about 11,000).
+The pulls (26 Oct 2026) ran to late January of each season and measured
+(NBA.md, "The period lines"): the first half is a coin from either view
+over two seasons, the quarters a watch at best, and the **team totals** the
+one inefficiency, two seasons the same way. The book's team-total line
+sits off the number the game's own total and spread imply; a home line a
+point or more above it went under 62% and 63% of the time, a point or more
+below went over 68% and 63%. The Simulation card shows the implied number
+and the gap under each team total and calls the side by the gap rule; the
+record keeps the rule's tally. The odds run brings the team totals, so
+the rule is live on every game the odds run has seen.
 
 ## The odds feed (The Odds API)
 

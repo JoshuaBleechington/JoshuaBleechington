@@ -1283,9 +1283,22 @@ const CHECKS = ["dome","playoff","agconf","hgconf","agbk","hgbk"];
   // graded, with the book's team totals on the row's odds JSON (26 Oct 2026): the record takes them too
   await pg.evaluate(async () => { const c = JSON.parse(smStore.getItem('callsheet3.card.v1')); c.forEach(r => { if (/76ers @ Knicks/.test(r.matchup)) { r.finals = { fa: '112', fh: '121', f5a: '55', f5h: '60' };
     r.inputs.odds = JSON.stringify({ total: {}, ml: {}, spread: {}, book: 'fanatics', team: { AWAY: { OVER: [['fanatics', -110, 113.5], ['fanatics', 140, 117.5], ['draftkings', -112, 113.5]], UNDER: [['fanatics', -110, 113.5], ['fanatics', -170, 117.5], ['draftkings', -108, 113.5]] },
-                                                                                                    HOME: { OVER: [['fanatics', -115, 118.5]], UNDER: [['fanatics', -105, 118.5]] } } }); } }); await smStore.setItem('callsheet3.card.v1', JSON.stringify(c)); });
+                                                                                                    HOME: { OVER: [['fanatics', -115, 120.5]], UNDER: [['fanatics', -105, 120.5]] } } }); } }); await smStore.setItem('callsheet3.card.v1', JSON.stringify(c)); });
   await pg.reload(); await pg.waitForTimeout(300); await pg.evaluate(() => smStore.ready);
-  const simRec = await pg.evaluate(() => { const rec = document.querySelector('#calibBox .simrec'); return { has: !!rec, text: rec ? rec.innerText.replace(/\s+/g, ' ').trim().slice(0, 300) : '', rows: rec ? [...rec.querySelectorAll('.simrectab tbody tr')].map(tr => tr.innerText.replace(/\s+/g, ' ').trim()) : [] }; });
+  const simRec = await pg.evaluate(() => { const rec = document.querySelector('#calibBox .simrec'); return { has: !!rec, text: rec ? rec.innerText.replace(/\s+/g, ' ').trim().slice(0, 300) : '', rows: rec ? [...rec.querySelectorAll('.simrectab:not(.gaptab) tbody tr')].map(tr => tr.innerText.replace(/\s+/g, ' ').trim()) : [],
+    gap: rec ? [...rec.querySelectorAll('.gaptab tbody tr')].map(tr => tr.innerText.replace(/\s+/g, ' ').trim()) : [] }; });
+  // the gap rule on the card: the Knicks' 120.5 sits 2 above the implied (231.5 + 5.5) / 2 = 118.5, so UNDER by the rule; the 76ers' 113.5 sits half a point over 113, no call
+  const gapCard = await pg.evaluate(async () => {
+    const wait = () => new Promise(r => setTimeout(r, 80));
+    document.getElementById('m-nba').click(); await wait();
+    const row = JSON.parse(smStore.getItem('callsheet3.card.v1')).find(r => /76ers @ Knicks/.test(r.matchup));
+    const btn = document.querySelector('#card tr[data-id="' + row.id + '"] button.fill, #card [data-id="' + row.id + '"] .fill, button[data-fill="' + row.id + '"]');
+    if (btn) { btn.click(); await wait(); }
+    else { document.getElementById('odds').value = row.inputs.odds; document.getElementById('line').value = '231.5'; document.getElementById('sp').value = '-5.5'; document.getElementById('nbasim').value = row.inputs.nbasim; document.getElementById('away').value = '76ers'; document.getElementById('home').value = 'Knicks'; document.getElementById('line').dispatchEvent(new Event('input', { bubbles: true })); await wait(); }
+    const rows = [...document.querySelectorAll('#nbaSimPanel .simtab tbody tr')].map(tr => tr.innerText.replace(/\s+/g, ' ').trim());
+    document.getElementById('clear').click(); await wait();
+    return rows.slice(4);
+  });
   await pg.evaluate(async () => { await smStore.removeItem('callsheet3.card.v1'); }); await pg.reload(); await pg.waitForTimeout(300); await pg.evaluate(() => smStore.ready);
   chk(/^3,000 games\. The sim's own view: 76ers \d+\.\d, Knicks \d+\.\d; total \d+ \(middle half \d+–\d+\), Knicks by \d+\.\d, Knicks wins \d+%, overtime \d\.\d%\. Anchored to DraftKings's 231\.5 \/ -5\.5 for the derivative markets\./.test(simT.panel)
       && simT.rows.length === 6 && /^Total 231\.5 (OVER|UNDER) \d+%/.test(simT.rows[0]) && /^First half 115\.5 (OVER|UNDER) \d+%/.test(simT.rows[1]) && /^Spread \(home\) -5\.5 (HOME|AWAY) \d+%/.test(simT.rows[2]) && /^Moneyline (HOME|AWAY) \d+%.*the own view's$/.test(simT.rows[3])
@@ -1294,8 +1307,11 @@ const CHECKS = ["dome","playoff","agconf","hgconf","agbk","hgbk"];
       'nba sim: the Simulation card reads the example\'s runs, lists every market with the own and the anchored chance for the line on the row, follows the line when it is typed, and the block rides with the row', JSON.stringify({ panel: simT.panel, rows: simT.rows, moved: simT.moved, chips: simT.chips.length, has: simT.hasSim }));
   chk(simRec.has && /^SIMULATION · says against does, every call at LEAN or better The sim's own view/.test(simRec.text) && simRec.rows.length >= 1
       && simRec.rows.every(r => /^(Total|First half|Spread|Moneyline|Away team total|Home team total) (STRONG|BET|LEAN) [01]-[01] \d+\.\d% (0|100)\.0% [+-]\d+\.\du$/.test(r))
-      && simRec.rows.some(r => /^(Away|Home) team total/.test(r)),
-      'nba sim: once the row grades, the record block keeps the sim\'s calls at LEAN or better, says against does by view, market and band, the book\'s team totals among them', JSON.stringify(simRec));
+      && simRec.rows.some(r => /^(Away|Home) team total/.test(r))
+      && simRec.gap.length === 1 && /^Home team total 0-1 0\.0% -1\.0u 62% under above the number/.test(simRec.gap[0]),
+      'nba sim: once the row grades, the record block keeps the sim\'s calls at LEAN or better, says against does by view, market and band, the book\'s team totals among them, and the gap rule\'s own tally (the Knicks\' 120.5 two above the implied 118.5, under called, 121 scored: a loss)', JSON.stringify(simRec));
+  chk(gapCard.length === 2 && /^76ers team total 113\.5 fanatics -110\/-110 implied 113, gap \+0\.5 · inside a point, no call/.test(gapCard[0]) && /^Knicks team total 120\.5 fanatics -115\/-105 implied 118\.5, gap \+2 · UNDER by the gap rule/.test(gapCard[1]),
+      'nba sim: the Simulation card shows each team total\'s implied number and gap, and the gap rule\'s call when it is a point or more', JSON.stringify(gapCard));
 
   // ---- the store (25 Oct 2026): the card, the props and the slate live in IndexedDB, past localStorage's 10 MB ----
   await fill(CASES[0].sport, CASES[0].inputs);

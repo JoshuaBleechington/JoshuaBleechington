@@ -1048,6 +1048,23 @@ their points a game against the league's by history (the total did not
 follow, t −1.0), and the past table's pooled over rate with these three as
 a soft lean. Never scored; the referee watch on the record is the test.
 
+## The team totals and the gap rule, 26 Oct 2026
+
+The user's period-line pulls measured the simulation's derivative calls
+(NBA.md, "The period lines"): the first half a coin, the quarters a watch
+at best, and the team totals the one inefficiency, over two seasons. The
+Simulation card's table gained two rows, the away and the home team total,
+with the book's main line from the row's odds JSON (`nbaTeamTotalLine`:
+the carded book first, the point whose two prices sit closest together),
+the chance from each view, and under the line the number the game's own
+total and spread imply with the gap (`nbaTeamTotalGap`). A gap of a point
+or more is a call by the **gap rule**, chipped on the row; inside a point,
+no call. The record block grades the sim's team-total calls like the
+others and keeps the gap rule's own tally by side, with what two seasons
+said beside it. The rule needs the team totals on the row, which the odds
+run brings (`team` in the odds JSON), so a game added by hand shows "no
+line on the row".
+
 ## The Simulation card, 25 Oct 2026
 
 The user: "a simulation model for the super model... run the matchup 500

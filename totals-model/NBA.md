@@ -437,22 +437,30 @@ own price, 588 and 473 games joined:
 | --- | --- | --- | --- |
 | First half | slope +0.08 (t 0.2); 60-65: 113-96, +5.9u; 70+: 4-4 | slope −0.30 (t −0.6); 60-65: 72-72, −6.1u | a coin; the books split the halves as well as the game |
 | First half, the own view | slope +0.71 (t 2.6); 70+: 53-35, +12.5u | slope +0.18 (t 0.5); 70+: 21-23, −4.0u | the 2025-26 band did not come back: a coin |
-| First quarter | slope +0.50 (t 1.0); 60-65: 75-51, +16.0u on 126; Brier 0.248 | no lines yet | a watch, one season |
-| Third quarter | slope +0.74 (t 1.4); 60-65: 71-64, −2.9u; Brier 0.256 | no lines yet | nothing; "third-quarter unders" is not in the lines |
-| **Home team total** | slope +0.65 (t 1.2); 50-55: 176-128; 55-60: 133-79; 60-65: 45-23; **357-231 (60.7%), +93u** on 588 | no lines yet | the one inefficiency so far |
-| Away team total | slope +0.62 (t 1.0); 55-60: 111-92; 60-65: 31-21; 317-271 (53.9%), +18.5u | no lines yet | the same, weaker |
+| First quarter | slope +0.50 (t 1.0); 60-65: 75-51, +16.0u on 126; Brier 0.248 | slope +0.12 (t 0.2); 60-65: 47-32, 55-60: 70-85 | did not come back: a watch |
+| Third quarter | slope +0.74 (t 1.4); 60-65: 71-64, −2.9u; Brier 0.256 | no lines | nothing; "third-quarter unders" is not in the lines |
+| **Home team total** | slope +0.65 (t 1.2); 50-55: 176-128; 55-60: 133-79; 60-65: 45-23; **357-231 (60.7%), +93u** on 588 | **slope +2.74 (t 3.5)**; 50-55: 166-141; 55-60: 95-50; 60-65: 18-3; **279-194 (59.0%), +94.6u** on 473 | the inefficiency, two seasons |
+| Away team total | slope +0.62 (t 1.0); 55-60: 111-92; 60-65: 31-21; 317-271 (53.9%), +18.5u | slope −0.67 (t −0.9); 247-226, +25u | positive both seasons, noisy |
 
 Why the team totals: the book's team-total line sits off the number the
 game's own total and spread imply, (total ∓ spread) / 2, and the anchored
-game is built on that number. When the home line sat a point or more
-**above** the implied, the under landed 64.9% of the time (211 games); a
-point or more below, the over landed 63.5% (167); within a point, 52.9%.
-The away side 59.4% and 55.8%. The book posts a team total the market has
-not reconciled with its own spread and total, and the sim reads the gap.
-One season, and the 2024-25 team totals are the next pull; the page's
-record keeps the calls from tonight either way. The shrink on the team
-totals is 0.65 for now, the first quarter 0.5, the first half 0.1
-(`nbasim.SHRINK`).
+game is built on that number. **The gap rule**, measured straight off the
+lines and the finals without the sim (the second pull, 26 Oct 2026):
+
+| Line less the implied | 2025-26 home | 2024-25 home | 2025-26 away | 2024-25 away |
+| --- | --- | --- | --- | --- |
+| a point or more above: the UNDER lands | 63.2% (247 games, +54.8u at the lines' prices) | 62.1% (169, +46.8u) | 56.8% (229, +18.9u) | 55.4% (112, +15.6u) |
+| within a point: the under lands | 52.2% (226) | 51.4% (288) | 50.0% (246) | 51.1% (278) |
+| a point or more below: the OVER lands | 63.1% (195, +40.2u) | 68.1% (94, +42.9u) | 56.5% (193, +17.3u) | 57.1% (161, +30.4u) |
+| slope of the over's chance on the gap, a point | −0.057 (t −5.7) | −0.080 (t −5.1) | −0.030 (t −2.8) | −0.036 (t −2.4) |
+
+The book posts a team total the market has not reconciled with its own
+spread and total. Two seasons, the same way, t above five at home: this
+one is **scored**. The Simulation card shows each team total's implied
+number and gap and calls the side by the gap rule when the gap is a point
+or more; the record keeps the rule's own tally by side, and the anchored
+sim's calls beside it (`nbasim.SHRINK`: team 1.0, the first half 0.1, the
+first quarter 0.1).
 
 **The full-game lines history** (`tools_nba_odds_history.py`, every book's
 total, spread and moneyline at noon and 6:30 pm Eastern, both seasons,

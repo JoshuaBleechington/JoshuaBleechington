@@ -344,8 +344,8 @@ The user: "run the matchup 500 to 10,000 times to best determine how the
 game will likely end, with confidence levels, tied into the model as a
 scored metric; player fouls early, coaches' tendencies, substitution
 patterns, second-half patterns, late-game behaviour, pace, fatigue, refs,
-travel." `slate/nbasim.py` is the engine, pure Python, 5,000 games in a
-second. A game, each run:
+travel." `slate/nbasim.py` is the engine, pure Python, 10,000 games in about
+two seconds (the user: "make sure the simulation runs 10k times"). A game, each run:
 
 - **Possessions** from the two clubs' paces relative to the league, drawn
   with a spread of 2.0 and split across the quarters by the measured

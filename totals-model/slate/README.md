@@ -78,7 +78,7 @@ Three double-click files, in this order on a game day:
    rating on the slate and every player's last games come from this file.
 2. **Run NBA slate.bat**, or `python slate.py nba`: writes
    `nba-slate-DATE.json` with every game on the league's scoreboard that
-   has not been played, each simulated 5,000 times (the section below).
+   has not been played, each simulated 10,000 times (the section below).
    In The Super Model: **Saving → Load slate**, pick it, press **Fill form**
    on each game.
 3. **Run odds.bat**: the NBA is in the default sports now, so the total,
@@ -206,13 +206,13 @@ and the file.
 
 ### The simulation (25 Oct 2026)
 
-The NBA slate run plays each game possession by possession, 5,000 times,
+The NBA slate run plays each game possession by possession, 10,000 times,
 and writes the results on the row for The Super Model's Simulation card.
 It needs two files beside `slate.py`: **`nbasim.py`** (the engine, pure
 Python) and **`nba-tend.json`** (the tendencies: each club's shot mix and
 rotations, measured from three seasons of play-by-play; without it the
 league's figures stand in and the run says so). `--runs 10000` plays more,
-`--runs 0` turns it off; 5,000 runs take about a second a game. The engine
+`--runs 0` turns it off; 10,000 runs take about two seconds a game. The engine
 and what it found are in NBA.md, "The simulation". Two more modes feed it,
 neither a daily step:
 
@@ -220,7 +220,25 @@ neither a daily step:
 | --- | --- |
 | The play-by-play, a season at a time | `python slate.py nba-pbp --season 2025-26` (blank season: this season up to today): every game's plays from ESPN, one call a game, compact, in `nba-pbp-SEASON.json`, about twenty minutes a season, written every 100 games so it can be stopped and resumed. The three seasons were pulled in the build container 25 Oct 2026 |
 | The tendencies file | `python tools_nba_tendencies.py nba-pbp-202425.json nba-ledger-202425.json nba-pbp-202526.json nba-ledger-202526.json nba-pbp-202627.json nba-ledger-202627.json --out nba-tend.json`: possessions and points by quarter, the fourth by the margin at its start, the points in the last minute by the margin then, the shot mix, the starters' share of each quarter for the league and each club, timeouts, each player's fouls and how often two in the first quarter. Rebuilt once a month or so as this season's play-by-play grows |
-| The replay against the closes | `python tools_backtest_nba_sim.py FOLDER --runs 400 --season 2025-26 --tend nba-tend.json`: the folder with the two ledgers and the KillerSports pages, as `tools_backtest_nba.py` reads them. Prints the sim's total and margin against the close, the quarter shares and the first half against the ledger, and says against does by band for the total, the spread and the moneyline, with the shrink each market earns |
+| The replay against the closes | `python tools_backtest_nba_sim.py FOLDER --runs 400 --season 2025-26 --tend nba-tend.json [--periods odds-periods-NBA-2025-26.json]`: the folder with the two ledgers and the KillerSports pages, as `tools_backtest_nba.py` reads them. Prints the sim's total and margin against the close, the quarter shares and the first half against the ledger, and says against does by band for the total, the spread and the moneyline, with the shrink each market earns; with the period lines, the same for the first half, the first and third quarters and the team totals, at the lines' own prices |
+
+**The period lines, and the spend (25 Oct 2026).** The sim's first-half,
+quarter and team-total calls can only be measured against the lines the
+books posted, and those are not in any file yet. The user moved to the
+100,000-credit plan for it. The Odds API answers only from his machine, so
+two bats do the pulling, each printing the cost and asking first, each
+resumable, each stopping at 3,000 credits left:
+
+| Bat | What it pulls | Credits |
+| --- | --- | --- |
+| **Run NBA period lines.bat** | `python slate.py odds-periods --season 2025-26`: the first-half, first-quarter and third-quarter totals and the team totals at the close (fifteen minutes before each tip; `--minutes`) for every game of the season from the historical event endpoint, into `odds-periods-NBA-SEASON.json`. A credit a game day to list the games, ten a market a game. The US books only: Pinnacle sits in another region and would double the bill. Type `totals_h1` at the markets prompt for the first half alone | 2025-26, four markets: about 49,000. 2024-25, the first half alone: about 12,300 |
+| **Run NBA lines history.bat** | `python slate.py odds-history --sports NBA --season 2025-26 --markets totals,spreads,h2h --times 16:00,22:30`: every book's total, spread and moneyline at noon and 6:30 pm Eastern for every game day, into the same `odds-history-NBA-SEASON.json` the moneyline pull wrote (it adds the opener snapshot and the markets; the spread now rides after the moneylines). Pinnacle included, for the sharp line | about 10,000 a season |
+
+The order on the 100,000: period lines 2025-26 (49k), period lines 2024-25
+first half (12k), lines history both seasons (20k); about 19,000 stays for
+the nightly runs until the month resets. Send the files back and the
+replay sets the shrink on the first half, the quarters and the team totals
+the way it did on the total, the spread and the moneyline.
 
 ## The odds feed (The Odds API)
 

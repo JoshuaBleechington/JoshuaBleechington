@@ -3427,7 +3427,7 @@ try:
     import nbasim
 except ImportError:   # the file is not beside slate.py: the slate runs without the sim
     nbasim = None
-NBA_SIM_RUNS = 5000
+NBA_SIM_RUNS = 10000       # the user, 25 Oct 2026: "make sure the simulation runs 10k times per matchup"; about two seconds a game
 NBA_SIM_OUT_PPG = 0.15      # an OUT regular's cost, points per 100 possessions: his points a game times this...
 NBA_SIM_OUT_MPG = 0.03      # ...plus his minutes a game times this; three fifths on the club's offence, two fifths on its defence (a priori)
 NBA_TEND_FILE = "nba-tend.json"
@@ -5272,9 +5272,177 @@ def odds_history_dates(sport, season, out_dir, start=None, end=None):
     return [(a + dt.timedelta(days=n)).isoformat() for n in range((b - a).days + 1)]
 
 
+# ---- the period lines' history (25 Oct 2026): the first half, the quarters and the team totals at the close ----
+# The historical event endpoint prices one game's extra markets as they stood at a moment: ten credits a market a game (a
+# region counts once; Pinnacle sits in another region and would double it, so the US books alone by default). A season of
+# four markets is about 49,000 credits, which the 100,000-credit plan carries; the run prints the cost and asks first.
+ODDS_PERIODS_FORMAT = "callsheet.odds-periods"
+ODDS_PERIODS_MARKETS = "totals_h1,totals_q1,totals_q3,team_totals"
+ODDS_PERIODS_BOOKS = ["fanatics", "betmgm", "draftkings", "fanduel", "caesars", "espnbet", "betrivers"]
+ODDS_PERIODS_MINUTES = 15          # the snapshot this many minutes before tip: the close
+ODDS_PERIODS_EVENTS_AT = "18:00"   # UTC, the hour the day's events are listed at (2 pm Eastern: every game of the night is up)
+ODDS_PERIODS_FLUSH = 20
+
+
+def odds_periods_path(out_dir, sport, season):
+    return os.path.join(out_dir, "odds-periods-%s-%s.json" % (sport, season))
+
+
+def fetch_odds_history_events(sport, key, at_iso):
+    """The events listed at a past moment (a credit): id, commence_time, the clubs."""
+    q = urllib.parse.urlencode({"apiKey": key, "dateFormat": "iso", "date": at_iso})
+    return fetch_json("%s/historical/sports/%s/events?%s" % (ODDS_API, ODDS_SPORTS[sport], q), cache=False)
+
+
+def fetch_odds_history_event(sport, key, books, event_id, at_iso, markets):
+    """One past game's extra markets as they stood at at_iso (ten credits a market)."""
+    q = urllib.parse.urlencode({"apiKey": key, "markets": markets, "oddsFormat": "american", "dateFormat": "iso",
+                                "bookmakers": ",".join(books), "date": at_iso})
+    return fetch_json("%s/historical/sports/%s/events/%s/odds?%s" % (ODDS_API, ODDS_SPORTS[sport], event_id, q), cache=False)
+
+
+def odds_periods_parse(ev):
+    """{market: {book: [line, over, under]}} for the period totals, and for the
+    team totals {book: {"home": [line, over, under], "away": [...]}}."""
+    out = {}
+    full_home, full_away = ev.get("home_team"), ev.get("away_team")
+    for bk in (ev or {}).get("bookmakers") or []:
+        b = bk.get("key")
+        for m in bk.get("markets") or []:
+            mk = m.get("key")
+            if mk == "team_totals":
+                sides = {}
+                for o in m.get("outcomes") or []:
+                    side = "home" if o.get("description") == full_home else ("away" if o.get("description") == full_away else None)
+                    if not side or o.get("point") is None:
+                        continue
+                    row = sides.setdefault(side, [float(o["point"]), None, None])
+                    try:
+                        row[1 if o.get("name") == "Over" else 2] = int(round(float(o.get("price"))))
+                    except (TypeError, ValueError):
+                        pass
+                if sides:
+                    out.setdefault(mk, {})[b] = sides
+            else:
+                row = [None, None, None]
+                for o in m.get("outcomes") or []:
+                    if o.get("point") is None:
+                        continue
+                    row[0] = float(o["point"])
+                    try:
+                        row[1 if o.get("name") == "Over" else 2] = int(round(float(o.get("price"))))
+                    except (TypeError, ValueError):
+                        pass
+                if row[0] is not None and (row[1] is not None or row[2] is not None):
+                    out.setdefault(mk, {})[b] = row
+    return out
+
+
+def make_odds_periods(out_dir, log, season, markets=None, books=None, minutes=ODDS_PERIODS_MINUTES, yes=False, keep=ODDS_HISTORY_KEEP, sport="NBA"):
+    """odds-periods-NBA-SEASON.json: the period lines at the close for every game of
+    a season, from the historical event endpoint. Resumable; the file is written
+    every ODDS_PERIODS_FLUSH games and the run stops at `keep` credits."""
+    key = odds_key(out_dir)
+    season = nba_norm_season(str(season))
+    markets = ",".join(m.strip() for m in (markets or ODDS_PERIODS_MARKETS).split(",") if m.strip())
+    mks = markets.split(",")
+    books = odds_books_list(books) if books else list(ODDS_PERIODS_BOOKS)
+    dates = odds_history_dates(sport, season, out_dir)
+    path = odds_periods_path(out_dir, sport, season)
+    try:
+        with open(path, encoding="utf-8") as f:
+            doc = json.load(f)
+    except (OSError, ValueError):
+        doc = {"format": ODDS_PERIODS_FORMAT, "version": 1, "sport": sport, "season": season, "books": books, "markets": mks, "minutes_before_tip": minutes, "pulled": {}, "games": {}}
+    for m in mks:
+        if m not in doc["markets"]:
+            doc["markets"].append(m)
+    have = {k: g for k, g in doc["games"].items()}
+    need_days = [d for d in dates if d not in doc["pulled"]]
+    todo_games = [k for k, g in have.items() if any(m not in (g.get("mk") or {}) for m in mks)]
+    est = len(need_days) * 1 + (len(todo_games) + 12 * len(need_days)) * ODDS_HISTORY_COST * len(mks)
+    log("%s %s: %d game date%s, %d day%s still to list (a credit each) and about %d games to price at %d credits a market (%s): about %s credits in all." % (
+        sport, season, len(dates), "" if len(dates) == 1 else "s", len(need_days), "" if len(need_days) == 1 else "s", len(todo_games) + 12 * len(need_days), ODDS_HISTORY_COST, markets, "{:,}".format(est)))
+    if not need_days and not todo_games:
+        log("Nothing to pull: %s is complete for %s." % (path, markets))
+        return path
+    if not yes:
+        try:
+            ans = input("Pull them? Type y to go on: ")
+        except EOFError:
+            ans = ""
+        if ans.strip().lower() not in ("y", "yes"):
+            log("Stopped before pulling anything.")
+            return path
+
+    def flush():
+        with open(path, "w", encoding="utf-8") as f:
+            json.dump(doc, f, indent=1)
+    stopped = False
+    n_priced = 0
+    for d in dates:
+        if d not in doc["pulled"]:
+            at = odds_history_at(d, ODDS_PERIODS_EVENTS_AT)
+            try:
+                evs = fetch_odds_history_events(sport, key, at)
+            except Exception as e:  # noqa: BLE001
+                log("  %s: the events list failed (%s). Stopped; what is pulled is kept, run again to go on." % (d, e))
+                stopped = True
+                break
+            data = evs.get("data") if isinstance(evs, dict) else evs
+            n_day = 0
+            for ev in data or []:
+                start = ev.get("commence_time") or ""
+                if not start or us_game_date(start) != d:
+                    continue
+                k = odds_log_key(sport, d, odds_nick(ev.get("away_team")), odds_nick(ev.get("home_team")))
+                doc["games"].setdefault(k, {"sport": sport, "gdate": d, "away": odds_nick(ev.get("away_team")), "home": odds_nick(ev.get("home_team")), "id": ev.get("id"), "start": start, "mk": {}})
+                n_day += 1
+            doc["pulled"][d] = {"events": n_day, "at": (evs.get("timestamp") if isinstance(evs, dict) else None) or at}
+            used, left = odds_credits()
+            if left is not None and left < keep:
+                log("Stopped with %s credits left, to keep %d for the nightly runs. Run again after the 1st and it carries on." % (left, keep))
+                stopped = True
+                break
+        # price this day's games that still lack a market
+        for k, g in list(doc["games"].items()):
+            if g.get("gdate") != d or not g.get("id") or all(m in (g.get("mk") or {}) for m in mks):
+                continue
+            try:
+                tip = dt.datetime.strptime(str(g["start"])[:19], "%Y-%m-%dT%H:%M:%S")
+                at = (tip - dt.timedelta(minutes=minutes)).strftime("%Y-%m-%dT%H:%M:%SZ")
+                doc_ev = fetch_odds_history_event(sport, key, books, g["id"], at, markets)
+            except Exception as e:  # noqa: BLE001
+                log("  %s: the event call failed (%s). Stopped; what is pulled is kept, run again to go on." % (k, e))
+                stopped = True
+                break
+            ev = doc_ev.get("data") if isinstance(doc_ev, dict) and "data" in doc_ev else doc_ev
+            parsed = odds_periods_parse(ev or {})
+            g["at"] = (doc_ev.get("timestamp") if isinstance(doc_ev, dict) else None) or at
+            for m in mks:
+                g["mk"][m] = parsed.get(m) or {}
+            n_priced += 1
+            used, left = odds_credits()
+            if n_priced % ODDS_PERIODS_FLUSH == 0:
+                flush()
+                log("  %s: %d games priced so far · %s credits the last call · %s left" % (d, n_priced, used if used is not None else "?", left if left is not None else "?"))
+            if left is not None and left < keep:
+                log("Stopped with %s credits left, to keep %d for the nightly runs. Run again after the 1st and it carries on." % (left, keep))
+                stopped = True
+                break
+        if stopped:
+            break
+    flush()
+    priced = sum(1 for g in doc["games"].values() if all(m in (g.get("mk") or {}) for m in mks))
+    with_h1 = sum(1 for g in doc["games"].values() if (g.get("mk") or {}).get("totals_h1"))
+    log("Wrote %s: %d games listed, %d priced for %s, %d with a first-half total. %s" % (
+        path, len(doc["games"]), priced, markets, with_h1, "Send it to Claude: the simulation's first-half, quarter and team-total calls are measured against it." if not stopped else "Run again to go on where it stopped."))
+    return path
+
+
 def odds_history_add(doc, sport, snap_doc, label):
     """Fold one historical snapshot into the history file: per game, per book,
-    [total, over price, under price(, home ML, away ML)] under the snapshot's stamp."""
+    [total, over price, under price(, home ML, away ML(, home spread, its price, the away price))] under the snapshot's stamp."""
     ts = snap_doc.get("timestamp") or label
     got = 0
     for ev in snap_doc.get("data") or []:
@@ -5289,6 +5457,12 @@ def odds_history_add(doc, sport, snap_doc, label):
             hh = mks.get("h2h") or {}
             if full_home in hh and full_away in hh:
                 row = (row or [None, None, None]) + [hh[full_home][0], hh[full_away][0]]
+            sp = mks.get("spreads") or {}
+            if full_home in sp and full_away in sp and sp[full_home][1] is not None:   # the spread rides from 25 Oct 2026: the home number and both prices
+                row = (row or [None, None, None])
+                if len(row) == 3:
+                    row = row + [None, None]
+                row = row + [sp[full_home][1], sp[full_home][0], sp[full_away][0]]
             if row:
                 snap[b] = row
         if snap:
@@ -5961,6 +6135,23 @@ def selftest():
           nba_hist_dates[0] == "2026-10-13" and nba_hist_dates[-1] == "2026-10-20" and len(nba_hist_dates) == 8 and odds_history_dates("NBA", "202627", tmp_h) == nba_hist_dates
           and odds_history_dates("NBA", "2024-25", tempfile.mkdtemp())[0] == "2024-10-20" and odds_history_dates("NBA", "2024-25", tempfile.mkdtemp())[-1] == "2025-04-15"
           and odds_history_path(tempfile.mkdtemp(), "NBA", "2024-25").endswith("odds-history-NBA-2024-25.json"))
+    # the spread rides in the history from 25 Oct 2026, after the moneylines
+    hist_sp = {"pulled": {}, "games": {}}
+    odds_history_add(hist_sp, "NBA", {"timestamp": "2026-10-22T22:30:00Z", "data": [{"commence_time": "2026-10-22T23:30:00Z", "home_team": "Boston Celtics", "away_team": "New York Knicks", "bookmakers": [
+        {"key": "fanatics", "markets": [{"key": "totals", "outcomes": [{"name": "Over", "price": -110, "point": 221.5}, {"name": "Under", "price": -110, "point": 221.5}]},
+                                        {"key": "spreads", "outcomes": [{"name": "Boston Celtics", "price": -108, "point": -2.5}, {"name": "New York Knicks", "price": -112, "point": 2.5}]}]}]}]}, "2026-10-22 22:30")
+    check("odds history: the spread rides after the moneylines, with the moneylines blank when the call had none",
+          hist_sp["games"]["NBA|2026-10-22|Knicks @ Celtics"]["snaps"]["2026-10-22T22:30:00Z"]["fanatics"] == [221.5, -110, -110, None, None, -2.5, -108, -112])
+    # the period lines' history (25 Oct 2026): one event document parsed
+    pp = odds_periods_parse({"home_team": "Boston Celtics", "away_team": "New York Knicks", "bookmakers": [
+        {"key": "fanatics", "markets": [{"key": "totals_h1", "outcomes": [{"name": "Over", "price": -110, "point": 112.5}, {"name": "Under", "price": -110, "point": 112.5}]},
+                                        {"key": "totals_q1", "outcomes": [{"name": "Over", "price": -115, "point": 56.5}, {"name": "Under", "price": -105, "point": 56.5}]},
+                                        {"key": "team_totals", "outcomes": [{"name": "Over", "description": "Boston Celtics", "price": -110, "point": 114.5}, {"name": "Under", "description": "Boston Celtics", "price": -110, "point": 114.5},
+                                                                             {"name": "Over", "description": "New York Knicks", "price": -105, "point": 107.5}, {"name": "Under", "description": "New York Knicks", "price": -115, "point": 107.5}]}]},
+        {"key": "draftkings", "markets": [{"key": "totals_h1", "outcomes": [{"name": "Over", "price": -112, "point": 113.0}, {"name": "Under", "price": -108, "point": 113.0}]}]}]})
+    check("odds periods: the first half and the quarter per book, the team totals by side",
+          pp["totals_h1"] == {"fanatics": [112.5, -110, -110], "draftkings": [113.0, -112, -108]} and pp["totals_q1"] == {"fanatics": [56.5, -115, -105]}
+          and pp["team_totals"] == {"fanatics": {"home": [114.5, -110, -110], "away": [107.5, -105, -115]}} and odds_periods_path(".", "NBA", "2025-26") == os.path.join(".", "odds-periods-NBA-2025-26.json"))
     check("odds history: the dates come from the calendar without a ledger, or from the range", odds_history_dates("NHL", "20252026", tempfile.mkdtemp())[0] == "2025-10-01"
           and odds_history_dates("NHL", "x", ".", "2025-10-08", "2025-10-10") == ["2025-10-08", "2025-10-09", "2025-10-10"])
     # the NBA ledger (15 Oct 2026), offline: the feed's shapes, canned
@@ -6741,7 +6932,7 @@ def default_date(mode, today):
 
 def main(argv=None):
     ap = argparse.ArgumentParser(description="Write the day's slate (or yesterday's finals) for Call Sheet 2.0.")
-    ap.add_argument("mode", nargs="?", choices=["slate", "grade", "nhl", "nhl-grade", "nhl-ledger", "nba", "nba-grade", "nba-ledger", "nba-pbp", "nba-props", "odds", "odds-history"], default="slate",
+    ap.add_argument("mode", nargs="?", choices=["slate", "grade", "nhl", "nhl-grade", "nhl-ledger", "nba", "nba-grade", "nba-ledger", "nba-pbp", "nba-props", "odds", "odds-history", "odds-periods"], default="slate",
                     help="slate (default): today's MLB inputs. grade: MLB finals. nhl: today's NHL inputs. nhl-grade: NHL finals. "
                          "nhl-ledger: every NHL final this season, measured against the sheet's assumptions. "
                          "nba: today's NBA inputs (ratings, pace, rest, who is out, the context lines). nba-grade: NBA finals with the half-time score. "
@@ -6756,7 +6947,8 @@ def main(argv=None):
     ap.add_argument("--to", dest="end", help="odds-history: the last date to pull, YYYY-MM-DD.")
     ap.add_argument("--times", help="odds-history: the UTC snapshot times a day, e.g. 16:00,23:30 (the hockey default; the NBA's is 22:30 alone); +02:30 means the next day's 02:30.")
     ap.add_argument("--markets", help="odds-history: the markets to pull, e.g. totals or totals,h2h (default totals; the NBA's default h2h; each is 10 credits a snapshot).")
-    ap.add_argument("--yes", action="store_true", help="odds-history: pull without asking first.")
+    ap.add_argument("--yes", action="store_true", help="odds-history and odds-periods: pull without asking first.")
+    ap.add_argument("--minutes", type=int, default=ODDS_PERIODS_MINUTES, help="odds-periods: the snapshot this many minutes before tip (default %d, the close)." % ODDS_PERIODS_MINUTES)
     ap.add_argument("--keep", type=int, default=ODDS_HISTORY_KEEP, help="odds-history: stop when this many credits are left for the nightly runs (default %d)." % ODDS_HISTORY_KEEP)
     ap.add_argument("--detail", action="store_true", help="nhl-ledger only: also fetch each game's box score and game page for the starters, their lines, power-play goals and penalties (two calls a game; about 40 minutes a season).")
     ap.add_argument("--refs", action="store_true", help="nhl-ledger only: also fetch each game's side panel for the referees, linesmen and scratches (one call a game; about 20 minutes a season).")
@@ -6811,6 +7003,10 @@ def main(argv=None):
         elif a.mode == "odds-history":
             sports = tuple(s.strip().upper() for s in a.sports.split(",") if s.strip()) if a.sports else ("NHL",)
             path = make_odds_history(a.out, log, a.books, sports, a.season, a.start, a.end, a.times, a.markets, a.yes, a.keep)
+        elif a.mode == "odds-periods":
+            if not a.season:
+                raise RuntimeError("odds-periods needs --season (e.g. 2025-26)")
+            path = make_odds_periods(a.out, log, a.season, a.markets if a.markets and "," in a.markets or (a.markets or "").startswith(("totals_", "team_", "spreads_")) else None, a.books, a.minutes, a.yes, a.keep)
         else:
             path = make_slate(date_iso, a.out, log)
     except Exception as e:  # noqa: BLE001

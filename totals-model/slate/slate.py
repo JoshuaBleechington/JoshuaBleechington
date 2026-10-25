@@ -3309,6 +3309,75 @@ def nba_espn_odds(comp):
     return None
 
 
+def nba_injuries_rotowire(injuries, lineups, lookups, log):
+    """ESPN's injury report brought together with RotoWire's lineups page (26 Oct
+    2026, the user: "can it be replaced with RotoWire, or together?"): together.
+    ESPN is the broad list; RotoWire's page is the fresher one near tip, each
+    club's five with the men who may not play under it. A man RotoWire marks
+    Out or Doubtful joins his club's list when ESPN has him absent or milder;
+    a man ESPN has Out or Doubtful but RotoWire shows in a CONFIRMED five is
+    counted in, his status 'Starting per RotoWire'; an expected five only adds
+    a note, since it is RotoWire's projection. `lookups` are player tables by
+    id (each entry with a name `n`, and `team` when known) that give a RotoWire
+    name its ESPN id. Returns the merged report and the notes made."""
+    rw = (lineups or {}).get("rw") or {}
+    merged = {ab: [dict(e) for e in lst] for ab, lst in (injuries or {}).items()}
+    if not rw:
+        return merged, []
+
+    def find_id(name, ab):
+        key = props_name_key(name)
+        for same_club in (True, False):
+            for tbl in lookups or []:
+                for pid, e in (tbl or {}).items():
+                    if props_name_key(e.get("n")) == key and (not same_club or e.get("team") == ab):
+                        return pid
+        return None
+    notes = []
+    for nick, v in rw.items():
+        code = str(v.get("abbr") or "").upper()
+        ab = nba_nick_tricode(nick) or RW_NBA_CODES.get(code, code)
+        if not ab:
+            continue
+        lst = merged.setdefault(ab, [])
+        by_key = {props_name_key(e["n"]): e for e in lst}
+        club = NBA_NICK.get(ab, ab)
+        for pos, name, st in v.get("maybe") or []:
+            s = str(st or "").strip().lower()
+            if not (s.startswith("out") or s.startswith("dou")):
+                continue
+            new_st = "Out" if s.startswith("out") else "Doubtful"
+            e = by_key.get(props_name_key(name))
+            if e is None:
+                pid = find_id(name, ab)
+                e = {"id": pid or name, "n": name, "st": new_st, "note": "per RotoWire", "pos": pos, "src": "rotowire"}
+                lst.append(e)
+                by_key[props_name_key(name)] = e
+                notes.append("%s (%s) %s per RotoWire, not on ESPN's report" % (name, club, new_st.lower()))
+            elif str(e.get("st") or "").lower() not in PROPS_OUT_STATUSES:
+                notes.append("%s (%s) %s per RotoWire, %s on ESPN's report: counted out" % (name, club, new_st.lower(), e.get("st") or "listed"))
+                e["note"] = ((e.get("note") + "; ") if e.get("note") else "") + "ESPN had him " + str(e.get("st") or "listed").lower() + ", RotoWire " + new_st.lower()
+                e["st"] = new_st
+        five = set(props_name_key(n) for _p, n in v.get("five") or [])
+        for e in lst:
+            if props_name_key(e["n"]) not in five or str(e.get("st") or "").lower() not in PROPS_OUT_STATUSES:
+                continue
+            if v.get("status") == "confirmed":
+                notes.append("%s (%s) %s on ESPN's report but in RotoWire's confirmed five: counted in" % (e["n"], club, e["st"]))
+                e["note"] = ((e.get("note") + "; ") if e.get("note") else "") + "ESPN had him " + str(e["st"]).lower()
+                e["st"] = "Starting per RotoWire"
+            else:
+                notes.append("%s (%s) %s on ESPN's report, in RotoWire's expected five: counted out until the five is confirmed" % (e["n"], club, e["st"]))
+                e["note"] = ((e.get("note") + "; ") if e.get("note") else "") + "RotoWire expects him to start"
+    if notes:
+        log("RotoWire's lineups page against ESPN's report: %d change%s." % (len(notes), "" if len(notes) == 1 else "s"))
+        for n in notes:
+            log("  " + n)
+    else:
+        log("RotoWire's lineups page agrees with ESPN's report: nothing to change.")
+    return merged, notes
+
+
 def nba_out_list(ab, injuries, players, prior_players):
     """The who-is-out list for one club: each listed player with his status and his
     own line, this season's after NBA_PLAYER_MIN_GAMES games, last season's before."""
@@ -3969,6 +4038,8 @@ def make_nba_slate(date_iso, out_dir, log, topup=False, sim_runs=NBA_SIM_RUNS):
     except Exception as e:  # noqa: BLE001
         log("Could not read the league's referee assignments (%s): type the crews in the Crew box from official.nba.com/referee-assignments." % e)
     lineups = nba_lineups(date_iso, log) if games else {}
+    if (lineups or {}).get("rw"):   # the two reports together (26 Oct 2026): RotoWire's outs and confirmed starters into ESPN's list
+        injuries, _rw_notes = nba_injuries_rotowire(injuries, lineups, [players, prior_players], log)
     try:
         with open(odds_log_path(out_dir), encoding="utf-8") as f:
             logd = json.load(f)
@@ -4704,6 +4775,10 @@ def make_nba_props(date_iso, out_dir, log, topup=False, sim_runs=NBA_SIM_RUNS):
         log("Injury report: %d clubs, %d players listed." % (len(injuries), sum(len(v) for v in injuries.values())))
     except Exception as e:  # noqa: BLE001
         log("Could not read the injury report (%s): nobody counted as out." % e)
+    # RotoWire's lineups page too (26 Oct 2026): its outs join the report and a confirmed starter ESPN still has Out is counted in
+    lineups = nba_lineups(date_iso, log)
+    if (lineups or {}).get("rw"):
+        injuries, _rw_notes = nba_injuries_rotowire(injuries, lineups, [logs_this, logs_last], log)
     dvp_this = nba_dvp_table(led["games"] if led else [], date_iso)
     dvp_last = nba_dvp_table(prior["games"] if prior else [])
     log("Defence v position from the ledgers: %d defence-position-market factors this season, %d last season (guards, forwards, centres)." % (len(dvp_this), len(dvp_last)))
@@ -6142,6 +6217,20 @@ def selftest():
     inj_ = {"DAL": [{"id": "22", "n": "Kyrie Irving", "st": "Out", "note": "knee"}, {"id": "33", "n": "Some Body", "st": "Questionable", "note": "ankle"}]}
     out_mpg, listed, maybe = props_out_minutes("DAL", inj_, lt, ll)
     check("props: the regulars out, at their own minutes, the questionable listed apart", out_mpg == 30.0 and listed == [("Kyrie Irving", 30.0, "Out")] and maybe == [("Some Body", "Questionable")])
+    # the two reports together (26 Oct 2026): RotoWire's outs join ESPN's, a confirmed starter ESPN has Out is counted in, an expected one only noted
+    _pd, rw_ = parse_rotowire_nba(_canned_rotowire_nba("October 21, 2026"))
+    inj_rw = {"BOS": [{"id": "44", "n": "Jayson Tatum", "st": "Out", "note": "knee"}, {"id": "55", "n": "Celtics Star", "st": "Day-To-Day", "note": ""}],
+              "NYK": [{"id": "66", "n": "Jalen Brunson", "st": "Out", "note": "ankle"}, {"id": "67", "n": "Josh Hart", "st": "Questionable", "note": "wrist"}]}
+    rw_lines = []
+    merged, rw_notes = nba_injuries_rotowire(inj_rw, {"rw": rw_}, [{"77": {"n": "Devin Carter", "team": "BOS"}}], rw_lines.append)
+    bos, nyk = {e["n"]: e for e in merged["BOS"]}, {e["n"]: e for e in merged["NYK"]}
+    check("injuries: RotoWire's Out joins the report with his ESPN id, a man in an expected five stays out with a note, a man in a confirmed five is counted in, the milder statuses stand, and ESPN's own list is left as it was",
+          bos["Devin Carter"]["st"] == "Out" and bos["Devin Carter"]["id"] == "77" and bos["Devin Carter"]["src"] == "rotowire"
+          and bos["Jayson Tatum"]["st"] == "Out" and bos["Jayson Tatum"]["note"] == "knee; RotoWire expects him to start" and bos["Celtics Star"]["st"] == "Day-To-Day"
+          and nyk["Jalen Brunson"]["st"] == "Starting per RotoWire" and nyk["Jalen Brunson"]["note"] == "ankle; ESPN had him out" and nyk["Josh Hart"]["st"] == "Questionable"
+          and inj_rw["NYK"][0]["st"] == "Out" and len(rw_notes) == 3 and rw_lines[0] == "RotoWire's lineups page against ESPN's report: 3 changes."
+          and props_out_minutes("NYK", merged, {}, {"66": {"g": [{"min": 35.0}]}}) == (0.0, [], [("Jalen Brunson", "Starting per RotoWire"), ("Josh Hart", "Questionable")])
+          and nba_injuries_rotowire(inj_rw, {"rw": {}}, [], rw_lines.append)[0] == inj_rw)
     prop_ = {"name": "Luka Dončić", "mk": "pts", "line": 30.5, "op": -110, "up": -110, "book": "fanatics", "books": {}}
     tbl = nba_dvp_table(this_games)
     check("props: the ledger's defence table, per defence, position and market, with the games behind it; one defence of guards is the league itself",

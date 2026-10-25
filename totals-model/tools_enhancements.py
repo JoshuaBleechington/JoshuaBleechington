@@ -43,6 +43,7 @@ TOP = [
     ("cs2", "Call Sheet 2.0: every market on a matchup ranked by edge, the parlay four, the board"),
     ("close-guard", "An in-play line was being graded as the close; the grade now passes over a snapshot taken after tip"),
     ("median-line", "The posted line is a median, not a mean: the first correction that made the chance honest"),
+    ("take", "The bets you actually place, marked on the page and graded on their own line: the record of you, not only of the sheet"),
 ]
 
 # (key, date, area, title, what it did, tier)
@@ -219,6 +220,10 @@ ENTRIES = [
      "A home team total a point or more above the implied number goes under 63% and 62% of the time, a point below over 63% and 68%, two seasons; on the Simulation card and in the record.", "edge"),
     ("sim-props", "2026-10-25", "NBA props", "The Simulation card restyled; the props run plays each game 10,000 times and attaches the runs to every prop; a later slate refreshes the injury report and the sim",
      "The prop's panel shows the club's points in the runs, the sim's read of his number, the matchup lever as the scored part, the blowout and overtime chances.", "show"),
+    ("take", "2026-10-25", "Page", "The bets you take: a Take button on every market, pick card and prop; Taking tonight on the board; What you took in the record",
+     "A click marks the bet as shown, with its side and price; the marked bets list at the top of the day board and the Props tab with a copy button, ride through reloads and rescores, and grade on their own tiles at one unit each. A graded row cannot be marked after the fact.", "guard"),
+    ("take-sim", "2026-10-25", "NBA", "The simulation's calls can be taken too",
+     "A Take button under every chip on the Simulation card and beside the gap rule's call, live once the game is on the card; the mark keeps the call as shown (line, price, chance, worth, band) and grades on a Simulation calls tile.", "guard"),
 ]
 
 COLORS = {"edge": "#b4232c", "guard": "#c2700a", "show": "#1f5fa8", "fix": "#6b7280"}
@@ -271,10 +276,10 @@ def build() -> str:
     out = ['<!doctype html><html><head><meta charset="utf-8"><title>The Super Model: the enhancements to date</title><style>' + css + '</style></head><body>']
     out.append('<h1>The Super Model: the enhancements to date</h1>')
     out.append('<p class="sub">Every change to the model and the page from the first totals model on 4 August 2026 through 25 October 2026, dated by the commit that shipped it. '
-               'The colour says what kind of change it was; the twelve in the box are the ones that matter most to what is bet tonight.</p>')
+               'The colour says what kind of change it was; the ones in the box are the ones that matter most to what is bet tonight.</p>')
     out.append('<div class="legend">' + "".join(
         '<div class="leg"><div class="sw" style="background:%s"></div><div><b>%s</b>%s · %d</div></div>' % (COLORS[t], TIERS[t][0], TIERS[t][1], counts[t]) for t in TIERS) + '</div>')
-    out.append('<h2>The twelve that matter most</h2>')
+    out.append('<h2>The %s that matter most</h2>' % ["", "one", "two", "three", "four", "five", "six", "seven", "eight", "nine", "ten", "eleven", "twelve", "thirteen", "fourteen", "fifteen"][len(TOP)])
     out.append('<ol class="top">' + "".join(
         '<li style="border-color:%s;background:%s;color:%s"><div><b>%s</b><span>%s</span></div></li>' % (COLORS[by_key[k][5]], SOFT[by_key[k][5]], COLORS[by_key[k][5]], esc(by_key[k][3]), esc(why))
         for k, why in TOP) + '</ol>')
@@ -288,7 +293,7 @@ def build() -> str:
         top = any(k == key for k, _ in TOP)
         out.append('<div class="ent" style="border-color:%s;background:%s"><div class="d">%s</div><div class="a">%s</div><div><div class="tags"><span class="tag" style="background:%s">%s</span>%s</div><div class="t">%s</div><div class="w">%s</div></div></div>' % (
             COLORS[tier], SOFT[tier] if top else "#fff", esc(d[5:].replace("-", "/")), esc(area), COLORS[tier], esc(TIERS[tier][0]),
-            '<span class="tag" style="background:#1a1d23">top 12</span>' if top else "", esc(title), esc(what)))
+            '<span class="tag" style="background:#1a1d23">top %d</span>' % len(TOP) if top else "", esc(title), esc(what)))
     out.append('<h2>Measured and kept off the score</h2>')
     out.append('<p class="count">What the tests found carried nothing against the closes, and so stays shown beside the call rather than inside it. Each one is a line on the card that says so.</p>')
     out.append('<ul class="null">' + "".join('<li>%s</li>' % esc(x) for x in [

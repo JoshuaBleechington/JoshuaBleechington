@@ -2940,6 +2940,165 @@ def make_nba_ledger(date_iso, out_dir, log, season=None):
     return path
 
 
+# ---- the NBA play-by-play (25 Oct 2026, for the simulation) --------------------
+# ESPN's game page carries every play with the period, the clock, the type, the
+# team, the players and the score: substitutions with the man in and the man
+# out, every foul by type, timeouts, free throws, shots, rebounds, turnovers.
+# One call a game, kept compact: a play is [period, seconds left, code, side
+# (0 away, 1 home, -1 neither), [player ids], away score, home score, points].
+# The simulation's tendencies (rotations, foul trouble, timeouts, the end of a
+# game) are measured from this file, never from the box score alone.
+NBA_PBP_FORMAT = "callsheet3.nba-pbp"
+NBA_PBP_CODES = {"S": "substitution (in, out)", "PF": "personal foul", "SF": "shooting foul", "OF": "offensive foul", "LF": "loose-ball foul",
+                 "TF": "technical foul", "FF": "flagrant foul", "TK": "take foul", "XF": "other foul", "T": "team timeout", "TX": "official timeout",
+                 "FT": "free throw (points 1 when made)", "M": "field goal made (points 2 or 3)", "X": "field goal missed", "OR": "offensive rebound",
+                 "DR": "defensive rebound", "TV": "turnover", "E": "end of period", "J": "jump ball", "R": "replay or challenge", "V": "violation or ejection", "O": "other"}
+
+
+def nba_pbp_code(ptype, scoring, points):
+    t = str(ptype or "").lower()
+    if "substitution" in t:
+        return "S"
+    if "timeout" in t:
+        return "TX" if "official" in t else "T"
+    if "free throw" in t:
+        return "FT"
+    if "charge" in t and "foul" not in t:
+        return "OF"   # ESPN's "Offensive Charge"
+    if "foul" in t:
+        if "shooting" in t:
+            return "SF"
+        if "offensive" in t or "charge" in t:
+            return "OF"
+        if "loose" in t:
+            return "LF"
+        if "technical" in t:
+            return "TF"
+        if "flagrant" in t:
+            return "FF"
+        if "take" in t or "transition" in t or "clear path" in t:
+            return "TK"
+        if "personal" in t:
+            return "PF"
+        return "XF"
+    if "rebound" in t:
+        return "OR" if "offensive" in t else "DR"
+    if "turnover" in t or "traveling" in t or "out of bounds" in t or "bad pass" in t or "lost ball" in t:
+        return "TV"
+    if "end " in t or t.startswith("end") or "end of" in t:
+        return "E"
+    if "jump ball" in t or "jumpball" in t:
+        return "J"
+    if "replay" in t or "challenge" in t or "review" in t:
+        return "R"
+    if "violation" in t or "ejection" in t or "kicked" in t or "delay" in t:
+        return "V"
+    if scoring or (points or 0) > 0:
+        return "M"
+    if "shot" in t or "jumper" in t or "layup" in t or "dunk" in t or "hook" in t or "tip" in t or "fadeaway" in t or "floater" in t or "jump" in t or "finger roll" in t:
+        return "X"
+    return "O"
+
+
+def nba_clock_seconds(disp):
+    """'7:49' -> 469.0; '0:02.3' -> 2.3; blank -> None."""
+    s = str(disp or "").strip()
+    m = re.match(r"^(\d+):(\d+(?:\.\d+)?)$", s)
+    if m:
+        return int(m.group(1)) * 60 + float(m.group(2))
+    try:
+        return float(s)
+    except ValueError:
+        return None
+
+
+def nba_pbp_compact(g, summ):
+    """A game's plays, compact, from its ESPN summary; `g` carries the id, the
+    date and the tricodes from the scoreboard walk."""
+    teams = {}
+    for t in ((summ or {}).get("boxscore") or {}).get("teams") or []:
+        tm = t.get("team") or {}
+        teams[str(tm.get("id"))] = "home" if t.get("homeAway") == "home" else "away"
+    hdr = ((((summ or {}).get("header") or {}).get("competitions") or [{}])[0]) or {}
+    for c in hdr.get("competitors") or []:
+        tm = c.get("team") or {}
+        teams.setdefault(str(tm.get("id")), "home" if c.get("homeAway") == "home" else "away")
+    plays, kinds = [], {}
+    for p in (summ or {}).get("plays") or []:
+        ptype = ((p.get("type") or {}).get("text")) or ""
+        pts = int(p.get("scoreValue") or 0)
+        code = nba_pbp_code(ptype, bool(p.get("scoringPlay")), pts)
+        text = str(p.get("text") or "").lower()
+        if code == "X":
+            # a miss carries the attempt's value, so the three-point share is in the file: ESPN's pointsAttempted, else the text
+            try:
+                pts = int(p.get("pointsAttempted") or 0)
+            except (TypeError, ValueError):
+                pts = 0
+            if pts not in (2, 3):
+                pts = 3 if ("three point" in text or "3-pt" in text or "3pt" in text) else 2
+        elif code == "M" and pts <= 0:
+            pts = 3 if ("three point" in text or "3-pt" in text) else 2
+        kinds[ptype] = kinds.get(ptype, 0) + 1
+        side = teams.get(str((p.get("team") or {}).get("id")), None)
+        pids = [str((a.get("athlete") or {}).get("id")) for a in (p.get("participants") or []) if (a.get("athlete") or {}).get("id")]
+        try:
+            aw, hm = int(p.get("awayScore") or 0), int(p.get("homeScore") or 0)
+        except (TypeError, ValueError):
+            aw, hm = 0, 0
+        plays.append([int(((p.get("period") or {}).get("number")) or 0), nba_clock_seconds((p.get("clock") or {}).get("displayValue")), code,
+                      1 if side == "home" else (0 if side == "away" else -1), pids, aw, hm, pts if code in ("M", "FT", "X") else 0])
+    ot = max([pl[0] for pl in plays] + [4]) - 4
+    return {"id": g["id"], "date": g.get("date"), "away": g.get("away"), "home": g.get("home"), "fa": g.get("fa"), "fh": g.get("fh"), "ot": ot, "n": len(plays), "plays": plays, "kinds": kinds}
+
+
+def make_nba_pbp(date_iso, out_dir, log, season=None):
+    """nba-pbp-SEASON.json: every regular-season game's plays from ESPN, one
+    call a game, written every NBA_LEDGER_FLUSH so a run can be stopped and
+    resumed. This season up to date_iso, or a past season with --season."""
+    current = nba_season_id(date_iso)
+    season = nba_norm_season(season) if season else current
+    past = season != current
+    path = os.path.join(out_dir, "nba-pbp-%s.json" % season.replace("-", ""))
+    doc = None
+    if os.path.exists(path):
+        with open(path, "r", encoding="utf-8") as f:
+            doc = json.load(f)
+        if doc.get("format") != NBA_PBP_FORMAT:
+            doc = None
+    doc = doc or {"format": NBA_PBP_FORMAT, "version": 1, "season": season, "codes": NBA_PBP_CODES, "games": []}
+    byid = {g["id"]: g for g in doc["games"]}
+    log("NBA play-by-play %s: %d game%s already in the file." % (season, len(byid), "" if len(byid) == 1 else "s"))
+    games = nba_games_from_espn(season, None if past else date_iso, log)
+    todo = [g for g in games if g["id"] not in byid]
+    log("%d final%s listed, %d to fetch; the file is written every %d." % (len(games), "" if len(games) == 1 else "s", len(todo), NBA_LEDGER_FLUSH))
+
+    def flush():
+        doc["games"] = sorted(byid.values(), key=lambda g: ((g.get("date") or ""), g.get("id") or ""))
+        doc["through"] = date_iso if not past else "%d-06-30" % (int(season[:4]) + 1)
+        doc["generated"] = now_utc()
+        with open(path, "w", encoding="utf-8") as f:
+            json.dump(doc, f, separators=(",", ":"))
+    done, empty = 0, 0
+    for g in todo:
+        try:
+            summ = fetch_json(ESPN_NBA + "/summary?event=%s" % g["id"], timeout=NBA_CDN_TIMEOUT, cache=False)
+            e = nba_pbp_compact(g, summ)
+        except Exception as ex:  # noqa: BLE001
+            log("  game %s (%s, %s @ %s): no summary (%s)" % (g["id"], g.get("date"), g.get("away"), g.get("home"), ex))
+            continue
+        if not e["n"]:
+            empty += 1
+        byid[g["id"]] = e
+        done += 1
+        if done % NBA_LEDGER_FLUSH == 0:
+            flush()
+            log("  %d fetched (%s); written." % (done, g.get("date")))
+    flush()
+    log("Added %d game%s (%d with no plays). Wrote %s with %d games." % (done, "" if done == 1 else "s", empty, path, len(byid)))
+    return path
+
+
 # ---- the NBA slate ------------------------------------------------------------
 # Today's games with the boxes the basketball book scores or shows (totals/nba.py):
 # each club's ratings, pace and games to date from the running ledger, the
@@ -3256,7 +3415,81 @@ def ctx_line_nba(kind, side, text):
     return {"side": side, "k": kind, "s": s, "t": text, "tag": tag}
 
 
-NBA_INPUT_IDS = ("naort", "nhort", "nadrt", "nhdrt", "napace", "nhpace", "nagp", "nhgp", "nlrtg", "nlpace", "narest", "nhrest", "nbaout", "nbactx", "opened", "ncrew", "nbarefs", "nbalineup", "nbaform")
+NBA_INPUT_IDS = ("naort", "nhort", "nadrt", "nhdrt", "napace", "nhpace", "nagp", "nhgp", "nlrtg", "nlpace", "narest", "nhrest", "nbaout", "nbactx", "opened", "ncrew", "nbarefs", "nbalineup", "nbaform", "nbasim")
+
+# ---- the simulation (25 Oct 2026): nbasim.py beside this file ------------------
+# The slate run plays each game NBA_SIM_RUNS times, twice: the sim's own view
+# (the ledger's ratings, pace and shot mix, who is out, rest, the crew) and the
+# market-anchored view (the same game centred on the scoreboard book's total
+# and spread, for the derivative markets). The row carries the distributions
+# as histograms, so the page reads the chance of any line without re-running.
+try:
+    import nbasim
+except ImportError:   # the file is not beside slate.py: the slate runs without the sim
+    nbasim = None
+NBA_SIM_RUNS = 5000
+NBA_SIM_OUT_PPG = 0.15      # an OUT regular's cost, points per 100 possessions: his points a game times this...
+NBA_SIM_OUT_MPG = 0.03      # ...plus his minutes a game times this; three fifths on the club's offence, two fifths on its defence (a priori)
+NBA_TEND_FILE = "nba-tend.json"
+
+
+def nba_sim_out_adj(out_list):
+    """(offence, defence) adjustments per 100 possessions from a club's who-is-out list."""
+    cost = 0.0
+    for e in out_list or []:
+        if str(e.get("st", "")).lower().startswith("out") and (e.get("mpg") or 0) >= NBA_REGULAR_MPG:
+            cost += NBA_SIM_OUT_PPG * (e.get("ppg") or 0) + NBA_SIM_OUT_MPG * (e.get("mpg") or 0)
+    return -0.6 * cost, 0.4 * cost
+
+
+def nba_sim_ft_factor(crew, refs):
+    """The crew's free throws a game against the league's, 1.0 without a crew."""
+    if not crew or not refs or not refs.get("lg") or not refs["lg"][1]:
+        return 1.0
+    rates = [refs["r"][n][1] for n in crew if refs["r"].get(n) and refs["r"][n][0] >= 20]
+    if not rates:
+        return 1.0
+    return max(0.85, min(1.15, (sum(rates) / len(rates)) / refs["lg"][1]))
+
+
+def nba_sim_block(g, sides, prof, refs, crew, runs, log):
+    """The row's nbasim block: both views' histograms, the anchor, the profiles."""
+    if not nbasim or not prof:
+        return None
+    adj_a, adj_h = nba_sim_out_adj(sides[0]["out"]), nba_sim_out_adj(sides[1]["out"])
+    out_adj = {"away": adj_a[0], "home": adj_h[0]}
+    ftf = nba_sim_ft_factor(crew, refs)
+    setup = nbasim.setup_from_profiles(prof, g["away"], g["home"], g.get("date") or "", ft_factor=ftf, out_adj=out_adj)
+    if not setup:
+        return None
+    setup["away"]["out_dadj"], setup["home"]["out_dadj"] = adj_a[1], adj_h[1]
+    seed = int(str(g.get("id") or "0")[-6:] or 0)
+    own = nbasim.simulate(setup, n=runs, seed=seed)
+    block = {"v": nbasim.VERSION, "runs": runs, "own": nbasim.histograms(own), "mkt": None, "anchor": None, "ft_factor": round(ftf, 3),
+             "shrink": nbasim.SHRINK, "bands": nbasim.BANDS,
+             "prof": {s: {"ortg": round(setup[s]["ortg"], 1), "drtg": round(setup[s]["drtg"], 1), "pace": round(setup[s]["pace"], 1), "n": setup[s].get("n", 0),
+                          "b2b": bool(setup[s].get("b2b")), "out": round(out_adj[s], 2), "a3": round(setup[s]["a3"], 3)} for s in ("away", "home")}}
+    o = g.get("odds") or {}
+    if o.get("total") is not None:
+        setup2 = nbasim.setup_from_profiles(prof, g["away"], g["home"], g.get("date") or "", ft_factor=ftf, out_adj=out_adj)
+        setup2["away"]["out_dadj"], setup2["home"]["out_dadj"] = adj_a[1], adj_h[1]
+        mkt = nbasim.simulate_anchored(setup2, o["total"], o.get("sp"), n=runs, seed=seed + 1)
+        block["mkt"] = nbasim.histograms(mkt)
+        block["anchor"] = {"total": o["total"], "sp": o.get("sp"), "book": o.get("book") or "the book"}
+    sm = nbasim.summarize(own, {"total": o.get("total"), "spread": o.get("sp")} if o else {})
+    t, m = sm["total"], sm["margin"]
+    line = "  sim, %s runs: total %.1f (middle half %g-%g), %s by %.1f, home win %.0f%%, overtime %.1f%%" % (
+        "{:,}".format(runs), t["mean"], t["p25"], t["p75"], (sides[1]["nick"] if m["mean"] >= 0 else sides[0]["nick"]), abs(m["mean"]), 100 * sm["home_win"], 100 * sm["ot"])
+    if o.get("total") is not None and sm["markets"].get("total"):
+        mt = sm["markets"]["total"]
+        line += "; at %s's %g the sim's own view says %s %.0f%% (%s)" % (block["anchor"]["book"], o["total"], mt["side"], 100 * mt["p_raw"], mt["band"])
+    log(line)
+    if block["mkt"]:
+        h1, q4, tot = block["mkt"]["h1"], block["mkt"]["q"][3], block["mkt"]["total"]
+        log("  sim, anchored to %g / %s: first half median %s (middle half %s-%s), fourth quarter median %s of %s" % (
+            o["total"], ("%+g" % o["sp"]) if o.get("sp") is not None else "no spread", nbasim.hist_quantile(h1, 0.5), nbasim.hist_quantile(h1, 0.25), nbasim.hist_quantile(h1, 0.75),
+            nbasim.hist_quantile(q4, 0.5), nbasim.hist_quantile(tot, 0.5)))
+    return block
 
 # ---- the crew: the day's assignments and each referee's line from the ledger ----
 # The league posts the crews about 9 am Eastern on official.nba.com; the page
@@ -3475,7 +3708,7 @@ def nba_odds_note(o, away, home):
     return "%s on ESPN's scoreboard at the slate run: %s. Shown for the opener and as a check on the carded book; the lines come from the odds run." % (o.get("book") or "The book", "; ".join(bits))
 
 
-def build_nba_game(g, date_iso, tables, league, players, prior_players, injuries, log, have_ledger=True, officials=None, refs=None, lineups=None, form=None):
+def build_nba_game(g, date_iso, tables, league, players, prior_players, injuries, log, have_ledger=True, officials=None, refs=None, lineups=None, form=None, sim=None):
     away, home = g.get("an") or NBA_NICK.get(g["away"], g["away"]), g.get("hn") or NBA_NICK.get(g["home"], g["home"])
     inputs = {k: "" for k in NBA_INPUT_IDS}
     notes = []
@@ -3574,6 +3807,18 @@ def build_nba_game(g, date_iso, tables, league, players, prior_players, injuries
         log("  crew: " + nba_crew_summary(crew, refs))
     elif officials is not None:
         notes.append("No crew on the league's feed for this game yet (posted about 9 am Eastern): type the names in the Crew box when they are up.")
+    # the simulation (25 Oct 2026): both views on the row as histograms
+    if sim and sim.get("prof"):
+        try:
+            g2 = dict(g)
+            g2["date"] = date_iso
+            block = nba_sim_block(g2, sides, sim["prof"], refs, crew, sim.get("runs") or NBA_SIM_RUNS, log)
+            if block:
+                inputs["nbasim"] = json.dumps(block, separators=(",", ":"))
+            else:
+                notes.append("No simulation: a club has no profile in the ledgers yet.")
+        except Exception as e:  # noqa: BLE001
+            notes.append("The simulation failed for this game: %s" % e)
     for n in notes:
         log("  note: " + n)
     return out
@@ -3608,7 +3853,7 @@ def nba_ledger_topup(date_iso, out_dir, log):
     log("")
 
 
-def make_nba_slate(date_iso, out_dir, log, topup=False):
+def make_nba_slate(date_iso, out_dir, log, topup=False, sim_runs=NBA_SIM_RUNS):
     if topup:
         nba_ledger_topup(date_iso, out_dir, log)
     games = [g for g in nba_day_games(date_iso) if not g["final"]]
@@ -3641,6 +3886,26 @@ def make_nba_slate(date_iso, out_dir, log, topup=False):
     if refs:
         log("Referees: %d officials' lines over %d ledger games%s (league %.1f free throws and %.1f points a game)." % (
             len(refs["r"]), refs["lg"][0], " across three seasons" if prior2 and prior else (" across two seasons" if prior else ""), refs["lg"][1], refs["lg"][2]))
+    # the simulation's profiles (25 Oct 2026): every club before today, this season blended with last, the play-by-play's shot mix and rotations
+    sim = None
+    if sim_runs and nbasim and (led or prior):
+        tend = None
+        tp = os.path.join(out_dir, NBA_TEND_FILE)
+        if os.path.exists(tp):
+            try:
+                with open(tp, "r", encoding="utf-8") as f:
+                    tend = json.load(f)
+            except (OSError, ValueError):
+                tend = None
+        try:
+            prof = nbasim.profiles_from_ledger(led["games"] if led else [], date_iso, prior_games=prior["games"] if prior else None, tend=tend)
+            sim = {"prof": prof, "runs": sim_runs}
+            log("Simulation: %d clubs profiled (%s), %s runs a game, %s." % (len(prof["teams"]), "this season blended with last" if prior else "this season only",
+                                                                           "{:,}".format(sim_runs), ("the play-by-play's shot mix and rotations from %s" % NBA_TEND_FILE) if tend else "the league's shot mix (no %s in the folder)" % NBA_TEND_FILE))
+        except Exception as e:  # noqa: BLE001
+            log("Simulation: could not build the profiles (%s); the rows carry no sim." % e)
+    elif sim_runs and not nbasim:
+        log("Simulation: nbasim.py is not beside slate.py; the rows carry no sim.")
     officials = None
     try:
         officials = nba_officials(date_iso)
@@ -3657,7 +3922,7 @@ def make_nba_slate(date_iso, out_dir, log, topup=False):
     for g in games:
         try:
             form = {"away": nba_recent_form(led["games"], g["away"], date_iso, logd), "home": nba_recent_form(led["games"], g["home"], date_iso, logd)} if led else None
-            rows.append(build_nba_game(g, date_iso, tables, league, players, prior_players, injuries, log, have_ledger=bool(led and led.get("games")), officials=officials, refs=refs, lineups=lineups, form=form))
+            rows.append(build_nba_game(g, date_iso, tables, league, players, prior_players, injuries, log, have_ledger=bool(led and led.get("games")), officials=officials, refs=refs, lineups=lineups, form=form, sim=sim))
         except Exception as e:  # noqa: BLE001
             log("%s @ %s: FAILED (%s); left out of the slate" % (g.get("an"), g.get("hn"), e))
         log("")
@@ -5833,7 +6098,7 @@ def selftest():
         day = nba_day_games("2026-10-21")
         tabs7, lg7 = nba_team_tables(led_now, "2026-10-21")
         lines7 = []
-        p7 = make_nba_slate("2026-10-21", tmp7, lines7.append)
+        p7 = make_nba_slate("2026-10-21", tmp7, lines7.append, sim_runs=300)
         with open(p7, "r", encoding="utf-8") as f:
             sl7 = json.load(f)
         lines8 = []
@@ -5856,6 +6121,29 @@ def selftest():
         fetch_json = real
         _cache.pop(ROTOWIRE_NBA, None)
         _cache.pop(ROTOWIRE_NBA + "?date=tomorrow", None)
+    # the simulation on the row (25 Oct 2026): both views as histograms, the anchor from the scoreboard's book, the calls off the runs
+    sim_rows = [g for g in sl7["games"] if g["inputs"].get("nbasim")]
+    sb = json.loads(sim_rows[0]["inputs"]["nbasim"]) if sim_rows else {}
+    check("nba sim: every slate row carries a sim block with the own view's histograms, the runs and the profiles",
+          nbasim is not None and len(sim_rows) == len(sl7["games"]) and sb.get("runs") == 300 and sb.get("own", {}).get("total", {}).get("c") and sum(sb["own"]["total"]["c"]) == 300
+          and set(sb["own"].keys()) >= {"total", "h1", "h2", "q", "margin", "away", "home", "ot"} and len(sb["own"]["q"]) == 4 and sb["prof"]["home"]["ortg"] > 90)
+    check("nba sim: the slate log names the runs and the sim's own total",
+          any(l.startswith("  sim, 300 runs: total ") and "home win" in l for l in lines7) and any(l.startswith("Simulation: ") and "runs a game" in l for l in lines7))
+    check("nba sim: an OUT regular costs his club on both ends, a listed doubtful man nothing, and the crew's whistle scales inside its bounds",
+          nba_sim_out_adj([{"st": "Out", "mpg": 34.0, "ppg": 25.0}, {"st": "Questionable", "mpg": 30.0, "ppg": 20.0}, {"st": "Out", "mpg": 12.0, "ppg": 4.0}]) == (-0.6 * (0.15 * 25.0 + 0.03 * 34.0), 0.4 * (0.15 * 25.0 + 0.03 * 34.0))
+          and nba_sim_ft_factor(["A", "B"], {"r": {"A": [50, 48.0, 230.0], "B": [40, 44.0, 228.0]}, "lg": [1000, 44.0, 228.8]}) == (46.0 / 44.0) and nba_sim_ft_factor(["A"], {"r": {"A": [50, 80.0, 230.0]}, "lg": [1000, 44.0, 228.8]}) == 1.15
+          and nba_sim_ft_factor(None, {"r": {}, "lg": [1000, 44.0, 228.8]}) == 1.0)
+    check("nba play-by-play: the play codes", [nba_pbp_code(t, s, p) for t, s, p in (("Substitution", False, 0), ("Shooting Foul", False, 0), ("Offensive Charge", False, 0), ("Full Timeout", False, 0), ("Official Timeout", False, 0),
+                                                                                       ("Free Throw - 1 of 2", True, 1), ("Jump Shot", True, 3), ("Jump Shot", False, 0), ("Defensive Rebound", False, 0), ("Bad Pass\nTurnover", False, 0),
+                                                                                       ("End Period", False, 0), ("Ref-Initiated Review (Overturned)", False, 0), ("Traveling", False, 0))]
+          == ["S", "SF", "OF", "T", "TX", "FT", "M", "X", "DR", "TV", "E", "R", "TV"] and nba_clock_seconds("7:49") == 469.0 and nba_clock_seconds("0:02.3") == 2.3 and nba_clock_seconds("") is None)
+    pb = nba_pbp_compact({"id": "1", "date": "2026-10-23", "away": "CHI", "home": "MIL", "fa": 132, "fh": 125},
+                         {"boxscore": {"teams": [{"team": {"id": "4"}, "homeAway": "away"}, {"team": {"id": "15"}, "homeAway": "home"}]},
+                          "plays": [{"period": {"number": 1}, "clock": {"displayValue": "7:49"}, "type": {"text": "Substitution"}, "team": {"id": "4"}, "participants": [{"athlete": {"id": "11"}}, {"athlete": {"id": "12"}}], "awayScore": 6, "homeScore": 16},
+                                    {"period": {"number": 1}, "clock": {"displayValue": "7:30"}, "type": {"text": "Jump Shot"}, "team": {"id": "15"}, "scoringPlay": False, "pointsAttempted": 3, "text": "X misses 26-foot three point jumper", "participants": [{"athlete": {"id": "21"}}], "awayScore": 6, "homeScore": 16},
+                                    {"period": {"number": 4}, "clock": {"displayValue": "0:00.0"}, "type": {"text": "End Game"}, "awayScore": 132, "homeScore": 125}]})
+    check("nba play-by-play: a compact game keeps the period, the clock, the code, the side, the players, the score and a miss's attempt value",
+          pb["n"] == 3 and pb["plays"][0] == [1, 469.0, "S", 0, ["11", "12"], 6, 16, 0] and pb["plays"][1] == [1, 450.0, "X", 1, ["21"], 6, 16, 3] and pb["plays"][2][2] == "E" and pb["plays"][2][3] == -1 and pb["ot"] == 0)
     check("nba top-up: the slate run brings this season's ledger up to date first, and a failure is logged while the run goes on",
           calls == [("2026-10-21", tmp7, None)] and lines10[0] == "Bringing this season's ledger up to date first:" and lines10[1] == "  stub ran"
           and any(l == "  Could not bring the ledger up to date (ESPN down); the run goes on with the ledger as it is." for l in lines10) and p11 == (False,))
@@ -6453,7 +6741,7 @@ def default_date(mode, today):
 
 def main(argv=None):
     ap = argparse.ArgumentParser(description="Write the day's slate (or yesterday's finals) for Call Sheet 2.0.")
-    ap.add_argument("mode", nargs="?", choices=["slate", "grade", "nhl", "nhl-grade", "nhl-ledger", "nba", "nba-grade", "nba-ledger", "nba-props", "odds", "odds-history"], default="slate",
+    ap.add_argument("mode", nargs="?", choices=["slate", "grade", "nhl", "nhl-grade", "nhl-ledger", "nba", "nba-grade", "nba-ledger", "nba-pbp", "nba-props", "odds", "odds-history"], default="slate",
                     help="slate (default): today's MLB inputs. grade: MLB finals. nhl: today's NHL inputs. nhl-grade: NHL finals. "
                          "nhl-ledger: every NHL final this season, measured against the sheet's assumptions. "
                          "nba: today's NBA inputs (ratings, pace, rest, who is out, the context lines). nba-grade: NBA finals with the half-time score. "
@@ -6473,6 +6761,7 @@ def main(argv=None):
     ap.add_argument("--detail", action="store_true", help="nhl-ledger only: also fetch each game's box score and game page for the starters, their lines, power-play goals and penalties (two calls a game; about 40 minutes a season).")
     ap.add_argument("--refs", action="store_true", help="nhl-ledger only: also fetch each game's side panel for the referees, linesmen and scratches (one call a game; about 20 minutes a season).")
     ap.add_argument("--no-ledger", action="store_true", help="nba and nba-props: do not bring this season's ledger up to date first (they do by default, 25 Oct 2026).")
+    ap.add_argument("--runs", type=int, default=NBA_SIM_RUNS, help="nba: how many times the simulation plays each game (default %d; 0 turns it off)." % NBA_SIM_RUNS)
     ap.add_argument("--out", default=".", help="folder to write into (default: where you run it)")
     ap.add_argument("--selftest", action="store_true", help="run the offline checks and exit")
     ap.add_argument("--quiet", action="store_true", help="print only the final line")
@@ -6508,8 +6797,10 @@ def main(argv=None):
             path = make_nhl_ledger(date_iso, a.out, log, a.season, a.detail, a.refs)
         elif a.mode == "nba-ledger":
             path = make_nba_ledger(date_iso, a.out, log, a.season)
+        elif a.mode == "nba-pbp":
+            path = make_nba_pbp(date_iso, a.out, log, a.season)
         elif a.mode == "nba":
-            path = make_nba_slate(date_iso, a.out, log, topup=not a.no_ledger)
+            path = make_nba_slate(date_iso, a.out, log, topup=not a.no_ledger, sim_runs=max(0, a.runs))
         elif a.mode == "nba-grade":
             path = make_nba_grade(date_iso, a.out, log)
         elif a.mode == "nba-props":

@@ -27,7 +27,7 @@ const IDS = ["away","home","line","op","up","opened","gdate","aera","hera","aip"
              "ntick","ncash","ap1l10","hp1l10","axgf","axga","hxgf","hxga","xglg","nhlform",
              "ngoalies","agname","hgname","agstart","hgstart","agok","hgok",
              "agf","aga","hgf","hga","lgg","angp","hngp","aenc","aens","henc","hens",
-             "h1line","h1op","h1up","naort","nhort","nadrt","nhdrt","napace","nhpace","nagp","nhgp","nlrtg","nlpace","narest","nhrest","nbaout","nbaq","nbactx","ncrew","nbarefs","nbalineup","nbaform"];
+             "h1line","h1op","h1up","naort","nhort","nadrt","nhdrt","napace","nhpace","nagp","nhgp","nlrtg","nlpace","narest","nhrest","nbaout","nbaq","nbactx","ncrew","nbarefs","nbalineup","nbaform","nbasim"];
 const CHECKS = ["dome","playoff","agconf","hgconf","agbk","hgbk"];
 
 (async () => {
@@ -1262,6 +1262,36 @@ const CHECKS = ["dome","playoff","agconf","hgconf","agbk","hgbk"];
       'refs watch: Zarba alone has no lean, so his 205 against 220 lands on the even line with no side taken, and he joins the folded no-lean officials last', JSON.stringify({ lean: refsW.leanRows, refs: refsW.refRows, folded: refsW.evenFolded, verdict: refsW.verdict.slice(0, 80) }));
 
   // ---- the build stamp ------------------------------------------------------------
+  // ---- the simulation (25 Oct 2026): the card on the example, the block stored with the row, the record once graded ----
+  await pg.evaluate(async () => { await smStore.removeItem('callsheet3.card.v1'); }); await pg.reload(); await pg.waitForTimeout(300); await pg.evaluate(() => smStore.ready);
+  const simT = await pg.evaluate(async () => {
+    const wait = () => new Promise(r => setTimeout(r, 80));
+    document.getElementById('clear').click(); document.getElementById('m-nba').click(); await wait();
+    document.getElementById('gdate').value = '2026-11-10';
+    document.getElementById('example').click(); await wait();
+    const panel = document.getElementById('nbaSimPanel').innerText.replace(/\s+/g, ' ').trim();
+    const rows = [...document.querySelectorAll('#nbaSimPanel .simtab tbody tr')].map(tr => tr.innerText.replace(/\s+/g, ' ').trim());
+    const chips = [...document.querySelectorAll('#nbaSimPanel .simchip')].map(e => e.className + '|' + e.textContent.replace(/\s+/g, ' ').trim());
+    const set = (id, v) => { const el = document.getElementById(id); el.value = v; el.dispatchEvent(new Event('input', { bubbles: true })); };
+    set('line', '245.5'); await wait();
+    const moved = document.querySelector('#nbaSimPanel .simtab tbody tr').innerText.replace(/\s+/g, ' ').trim();
+    set('line', '231.5'); await wait();
+    document.getElementById('add').click(); await wait();
+    const stored = JSON.parse(smStore.getItem('callsheet3.card.v1')).find(r => /76ers @ Knicks/.test(r.matchup));
+    return { panel: panel.slice(0, 420), rows, chips, moved, hasSim: !!(stored && stored.inputs.nbasim && stored.inputs.nbasim.length > 1000) };
+  });
+  await pg.evaluate(async () => { const c = JSON.parse(smStore.getItem('callsheet3.card.v1')); c.forEach(r => { if (/76ers @ Knicks/.test(r.matchup)) r.finals = { fa: '112', fh: '121', f5a: '55', f5h: '60' }; }); await smStore.setItem('callsheet3.card.v1', JSON.stringify(c)); });
+  await pg.reload(); await pg.waitForTimeout(300); await pg.evaluate(() => smStore.ready);
+  const simRec = await pg.evaluate(() => { const rec = document.querySelector('#calibBox .simrec'); return { has: !!rec, text: rec ? rec.innerText.replace(/\s+/g, ' ').trim().slice(0, 300) : '', rows: rec ? [...rec.querySelectorAll('.simrectab tbody tr')].map(tr => tr.innerText.replace(/\s+/g, ' ').trim()) : [] }; });
+  await pg.evaluate(async () => { await smStore.removeItem('callsheet3.card.v1'); }); await pg.reload(); await pg.waitForTimeout(300); await pg.evaluate(() => smStore.ready);
+  chk(/^3,000 games\. The sim's own view: 76ers \d+\.\d, Knicks \d+\.\d; total \d+ \(middle half \d+–\d+\), Knicks by \d+\.\d, Knicks wins \d+%, overtime \d\.\d%\. Anchored to DraftKings's 231\.5 \/ -5\.5 for the derivative markets\./.test(simT.panel)
+      && simT.rows.length === 4 && /^Total 231\.5 (OVER|UNDER) \d+%/.test(simT.rows[0]) && /^First half 115\.5 (OVER|UNDER) \d+%/.test(simT.rows[1]) && /^Spread \(home\) -5\.5 (HOME|AWAY) \d+%/.test(simT.rows[2]) && /^Moneyline (HOME|AWAY) \d+%.*the own view's$/.test(simT.rows[3])
+      && simT.chips.length === 7 && simT.chips.every(c => /^simchip sim(no|lean|bet|strong)\|(OVER|UNDER|HOME|AWAY) \d+%$/.test(c)) && simT.moved !== simT.rows[0] && /UNDER [89]\d%/.test(simT.moved) && simT.hasSim,
+      'nba sim: the Simulation card reads the example\'s runs, lists every market with the own and the anchored chance for the line on the row, follows the line when it is typed, and the block rides with the row', JSON.stringify({ panel: simT.panel, rows: simT.rows, moved: simT.moved, chips: simT.chips.length, has: simT.hasSim }));
+  chk(simRec.has && /^SIMULATION · says against does, every call at LEAN or better The sim's own view/.test(simRec.text) && simRec.rows.length >= 1
+      && simRec.rows.every(r => /^(Total|First half|Spread|Moneyline) (STRONG|BET|LEAN) [01]-[01] \d+\.\d% (0|100)\.0% [+-]\d+\.\du$/.test(r)),
+      'nba sim: once the row grades, the record block keeps the sim\'s calls at LEAN or better, says against does by view, market and band', JSON.stringify(simRec));
+
   // ---- the store (25 Oct 2026): the card, the props and the slate live in IndexedDB, past localStorage's 10 MB ----
   await fill(CASES[0].sport, CASES[0].inputs);
   const store1 = await pg.evaluate(async () => {

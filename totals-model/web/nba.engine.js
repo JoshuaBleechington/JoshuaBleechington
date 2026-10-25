@@ -266,7 +266,7 @@
                    '<span class="crewchips">' + chips + '</span>' + call + (crew.tag ? ' <span class="ctag">' + esc(crew.tag) + '</span>' : '') + '</div>';
   }
   function forecastMatchupNba() {
-    if (!SRC) { nbaOutPanel(); nbaLineupPanel(); nbaFormPanel(); nbaCrewPanel(); nbaCtxPanel(); }   // the form's panels: not while a card row is being re-scored
+    if (!SRC) { nbaOutPanel(); nbaLineupPanel(); nbaFormPanel(); nbaSimPanel(); nbaCrewPanel(); nbaCtxPanel(); }   // the form's panels: not while a card row is being re-scored
     var f = readNba();
     var away = f.away, home = f.home, line = f.line;
     var op = num("op"), up = num("up"), hml = num("hml"), aml = num("aml");
@@ -530,6 +530,143 @@
      the sum of its three, and this block keeps the season's graded totals against the close by the
      crew's lean, with the points over the close a game. Shown, never scored: the decision is the
      season's end, and the test is whether the past table's lean carries ---- */
+  /* ---- the simulation (25 Oct 2026): the slate plays each game NBA_SIM_RUNS times, twice, and the row carries the
+     distributions as histograms. The sim's OWN view: the ledger's ratings, pace and shot mix, who is out, rest, the crew.
+     The MARKET-ANCHORED view: the same game centred on the scoreboard book's total and spread, for the derivative
+     markets (the first half, the quarters, the team totals). The page reads the chance of any line off the histograms,
+     so the calls follow the lines on the row, and the record keeps says against does by band from the first night. */
+  function nbaSim() {
+    var raw = ($("nbasim") || {}).value || "", d = null;
+    try { d = raw ? JSON.parse(raw) : null; } catch (e) { d = null; }
+    return d && d.own ? d : null;
+  }
+  function nbaSimOver(h, line) {
+    if (!h || line === null || line === undefined || line === "" || isNaN(+line)) return null;
+    var n = 0, over = 0, push = 0, L = +line;
+    h.c.forEach(function (c, i) { n += c; var v = h.lo + i; if (v > L) over += c; else if (v === L) push += c; });
+    if (!n) return null;
+    var live = n - push;
+    return { over: live ? over / live : 0.5, push: push / n, n: n };
+  }
+  function nbaSimQ(h, p) {
+    if (!h) return null;
+    var n = h.c.reduce(function (a, b) { return a + b; }, 0), acc = 0;
+    for (var i = 0; i < h.c.length; i++) { acc += h.c[i]; if (acc >= p * n) return h.lo + i; }
+    return h.lo + h.c.length - 1;
+  }
+  function nbaSimMean(h) {
+    if (!h) return null;
+    var n = 0, s = 0;
+    h.c.forEach(function (c, i) { n += c; s += c * (h.lo + i); });
+    return n ? s / n : null;
+  }
+  function nbaSimBand(p, bands) {
+    var c = Math.max(p, 1 - p), b = bands || [[0.7, "STRONG"], [0.65, "BET"], [0.6, "LEAN"]];
+    for (var i = 0; i < b.length; i++) if (c >= b[i][0]) return b[i][1];
+    return "no call";
+  }
+  function nbaSimWorth(p, kind, shrink) { var k = (shrink || {})[kind]; if (k === undefined || k === null) k = 1; return 0.5 + (p - 0.5) * k; }
+  /* every call the row's lines allow, from one view's histograms: {key, view, label, line, side, p, worth, band, push} */
+  function nbaSimCalls(sim, lines, view) {
+    var H = sim[view]; if (!H) return [];
+    var out = [], bands = sim.bands, shrink = sim.shrink || {};
+    var add = function (key, kind, label, line, r, first, second) {
+      if (!r) return;
+      var p = r.over, side = p >= 0.5 ? first : second, prob = p >= 0.5 ? p : 1 - p;
+      out.push({ key: key, view: view, label: label, line: line, side: side, p: prob, worth: nbaSimWorth(prob, kind, shrink), band: nbaSimBand(prob, bands), push: r.push });
+    };
+    add("total", "total", "Total", lines.total, nbaSimOver(H.total, lines.total), "OVER", "UNDER");
+    add("h1", "h1", "First half", lines.h1, nbaSimOver(H.h1, lines.h1), "OVER", "UNDER");
+    if (lines.sp !== null && lines.sp !== undefined && lines.sp !== "" && !isNaN(+lines.sp)) add("spread", "spread", "Spread", +lines.sp, nbaSimOver(H.margin, -(+lines.sp)), "HOME", "AWAY");
+    if (view === "own") add("ml", "ml", "Moneyline", null, nbaSimOver(H.margin, 0), "HOME", "AWAY");
+    return out;
+  }
+  function nbaSimLinesFromForm() { return { total: num("line"), h1: num("h1line"), sp: num("sp") }; }
+  function nbaSimChip(c) {
+    if (!c) return '<span class="dim">—</span>';
+    var cls = c.band === "no call" ? "simno" : c.band === "LEAN" ? "simlean" : c.band === "BET" ? "simbet" : "simstrong";
+    return '<span class="simchip ' + cls + '"><b>' + esc(c.side) + '</b> ' + (100 * c.p).toFixed(0) + '%</span>' +
+           (c.band !== "no call" ? ' <span class="tag">' + esc(c.band) + '</span>' : '') +
+           ' <span class="dim">worth ' + (100 * c.worth).toFixed(0) + '%</span>';
+  }
+  function nbaSimPanel() {
+    var el = $("nbaSimPanel"); if (!el) return;
+    var sim = nbaSim();
+    if (!sim) { el.innerHTML = "No simulation on the row — load the slate and Fill form, and the game's runs come with it."; return; }
+    var f = readNba(), away = f.away || "Away", home = f.home || "Home";
+    var lines = nbaSimLinesFromForm(), own = sim.own, mkt = sim.mkt;
+    var calls = { own: {}, mkt: {} };
+    nbaSimCalls(sim, lines, "own").forEach(function (c) { calls.own[c.key] = c; });
+    if (mkt) nbaSimCalls(sim, lines, "mkt").forEach(function (c) { calls.mkt[c.key] = c; });
+    var fmt1 = function (x) { return x === null || x === undefined ? "?" : (+x).toFixed(1); };
+    var mA = nbaSimMean(own.away), mH = nbaSimMean(own.home), mg = nbaSimMean(own.margin);
+    var h = '<div class="simhead"><b>' + String(sim.runs).replace(/\B(?=(\d{3})+(?!\d))/g, ",") + ' games.</b> The sim\'s own view: ' +
+            esc(away) + ' <b>' + fmt1(mA) + '</b>, ' + esc(home) + ' <b>' + fmt1(mH) + '</b>; total <b>' + nbaSimQ(own.total, 0.5) + '</b> (middle half ' + nbaSimQ(own.total, 0.25) + '–' + nbaSimQ(own.total, 0.75) + '), ' +
+            esc(mg >= 0 ? home : away) + ' by <b>' + Math.abs(mg).toFixed(1) + '</b>, ' + esc(home) + ' wins <b>' + (100 * (nbaSimOver(own.margin, 0) || {}).over).toFixed(0) + '%</b>, overtime ' + (100 * (own.ot || 0)).toFixed(1) + '%.' +
+            (sim.anchor ? ' Anchored to ' + esc(sim.anchor.book) + '\'s ' + esc(String(sim.anchor.total)) + (sim.anchor.sp !== null && sim.anchor.sp !== undefined ? ' / ' + (sim.anchor.sp > 0 ? '+' : '') + esc(String(sim.anchor.sp)) : '') + ' for the derivative markets.' : ' No book on the scoreboard at the run: no anchored view.') + '</div>';
+    h += '<table class="form simtab"><thead><tr><th>Market</th><th>Line</th><th>The sim\'s own view</th><th>Anchored to the market</th></tr></thead><tbody>';
+    [["total", "Total", lines.total], ["h1", "First half", lines.h1], ["spread", "Spread (home)", lines.sp], ["ml", "Moneyline", null]].forEach(function (m) {
+      var lineTxt = m[2] === null || m[2] === undefined ? (m[0] === "ml" ? "" : '<span class="dim">no line on the row</span>') : esc(String(m[2]));
+      h += '<tr><td>' + m[1] + '</td><td>' + lineTxt + '</td><td>' + nbaSimChip(calls.own[m[0]]) + '</td><td>' + (m[0] === "ml" ? '<span class="dim">the own view\'s</span>' : nbaSimChip(calls.mkt[m[0]])) + '</td></tr>';
+    });
+    h += '</tbody></table>';
+    var V = mkt || own, tag = mkt ? "anchored" : "own view";
+    var qs = (V.q || []).map(function (q, i) { return 'Q' + (i + 1) + ' <b>' + nbaSimQ(q, 0.5) + '</b>'; }).join(' · ');
+    var tot = nbaSimQ(V.total, 0.5);
+    h += '<div class="simq">Medians, ' + tag + ': ' + qs + ' · first half <b>' + nbaSimQ(V.h1, 0.5) + '</b> · second half <b>' + nbaSimQ(V.h2, 0.5) + '</b>' +
+         (tot ? ' · the fourth ' + (100 * nbaSimQ(V.q[3], 0.5) / tot).toFixed(1) + '% of the game' : '') +
+         ' · team totals ' + esc(away) + ' <b>' + nbaSimQ(V.away, 0.5) + '</b>, ' + esc(home) + ' <b>' + nbaSimQ(V.home, 0.5) + '</b></div>';
+    var pa = sim.prof && sim.prof.away, ph = sim.prof && sim.prof.home;
+    if (pa && ph) {
+      h += '<div class="simprof dim">Profiles: ' + esc(away) + ' ' + pa.ortg + ' / ' + pa.drtg + ' per 100, pace ' + pa.pace + (pa.b2b ? ', back to back' : '') + (pa.out ? ', out ' + pa.out + ' per 100' : '') +
+           ' · ' + esc(home) + ' ' + ph.ortg + ' / ' + ph.drtg + ', pace ' + ph.pace + (ph.b2b ? ', back to back' : '') + (ph.out ? ', out ' + ph.out + ' per 100' : '') +
+           (sim.ft_factor && Math.abs(sim.ft_factor - 1) >= 0.02 ? ' · the crew\'s whistle x' + sim.ft_factor : '') + '</div>';
+    }
+    el.innerHTML = h;
+  }
+  /* the record: every graded NBA row's sim calls at LEAN or better, says against does by view, market and band */
+  function nbaSimUnits(price, win) { var p = +price; if (!p || isNaN(p)) p = -110; return win ? (p > 0 ? p / 100 : 100 / -p) : -1; }
+  function nbaSimRecordHtml() {
+    var rows = card.filter(function (r) { return r.sport === "NBA" && rowGraded(r) && r.inputs && r.inputs.nbasim; });
+    if (!rows.length) return '';
+    var T = {}, n = 0;
+    rows.forEach(function (r) {
+      var sim = null; try { sim = JSON.parse(r.inputs.nbasim); } catch (e) { sim = null; }
+      if (!sim || !sim.own) return;
+      var fin = r.finals || {}, fa = +fin.fa, fh = +fin.fh, half = (fin.f5a !== undefined && fin.f5a !== "" && fin.f5h !== undefined && fin.f5h !== "") ? (+fin.f5a + +fin.f5h) : null;
+      var lines = { total: blank(r.inputs.line) ? null : +r.inputs.line, h1: blank(r.inputs.h1line) ? null : +r.inputs.h1line, sp: blank(r.inputs.sp) ? null : +r.inputs.sp };
+      ["own", "mkt"].forEach(function (view) {
+        nbaSimCalls(sim, lines, view).forEach(function (c) {
+          if (c.band === "no call") return;
+          var won = null, price = -110;
+          if (c.key === "total") { if (fa + fh === c.line) return; won = (fa + fh > c.line) === (c.side === "OVER"); price = c.side === "OVER" ? r.inputs.op : r.inputs.up; }
+          else if (c.key === "h1") { if (half === null || half === c.line) return; won = (half > c.line) === (c.side === "OVER"); price = c.side === "OVER" ? r.inputs.h1op : r.inputs.h1up; }
+          else if (c.key === "spread") { var m = fh - fa + c.line; if (m === 0) return; won = (m > 0) === (c.side === "HOME"); price = c.side === "HOME" ? r.inputs.sph : r.inputs.spa; }
+          else if (c.key === "ml") { if (fa === fh) return; won = (fh > fa) === (c.side === "HOME"); price = c.side === "HOME" ? r.inputs.hml : r.inputs.aml; }
+          if (won === null) return;
+          var k = view + "|" + c.key + "|" + c.band;
+          var d = T[k] || (T[k] = { view: view, key: c.key, band: c.band, n: 0, w: 0, says: 0, units: 0 });
+          d.n++; d.w += won ? 1 : 0; d.says += c.p; d.units += nbaSimUnits(price, won); n++;
+        });
+      });
+    });
+    if (!n) return '';
+    var order = { total: 0, h1: 1, spread: 2, ml: 3 }, bandOrder = { STRONG: 0, BET: 1, LEAN: 2 }, label = { total: "Total", h1: "First half", spread: "Spread", ml: "Moneyline" };
+    var h = '<div class="simrec"><div class="calibhead">SIMULATION · says against does, every call at LEAN or better</div>';
+    ["own", "mkt"].forEach(function (view) {
+      var ks = Object.keys(T).filter(function (k) { return T[k].view === view; }).sort(function (a, b) { return (order[T[a].key] - order[T[b].key]) || (bandOrder[T[a].band] - bandOrder[T[b].band]); });
+      if (!ks.length) return;
+      h += '<div class="simrecview">' + (view === "own" ? "The sim's own view" : "Anchored to the market") + '</div><table class="form simrectab"><thead><tr><th>Market</th><th>Band</th><th>Record</th><th>Says</th><th>Does</th><th>Units</th></tr></thead><tbody>';
+      ks.forEach(function (k) {
+        var d = T[k], does = d.w / d.n, says = d.says / d.n, cls = d.units > 0 ? "good" : d.units < 0 ? "bad" : "";
+        h += '<tr><td>' + label[d.key] + '</td><td>' + esc(d.band) + '</td><td>' + d.w + '-' + (d.n - d.w) + '</td><td>' + (100 * says).toFixed(1) + '%</td><td class="' + cls + '">' + (100 * does).toFixed(1) + '%</td><td class="' + cls + '">' + (d.units >= 0 ? '+' : '') + d.units.toFixed(1) + 'u</td></tr>';
+      });
+      h += '</tbody></table>';
+    });
+    h += '<div class="note dim">A call is the sim\'s side at LEAN (60%) or better on the line the row carried; "says" is the sim\'s own chance, "does" the share that landed. The 2025-26 replay: the own view\'s total and spread calls land at 50% whatever they say (the close already carries the ratings), its win chances within 3 points of true; the anchored view is the one to watch on the first half.</div></div>';
+    return h;
+  }
+
   var NBA_REF_Z = 1.5;
   function nbaRefZ(rec) { var w = +rec[3] || 0, l = +rec[4] || 0; return (w + l) ? (w - l) / Math.sqrt(w + l) : 0; }
   function nbaRefLean(z) { return z >= NBA_REF_Z ? "over" : z <= -NBA_REF_Z ? "under" : "even"; }

@@ -127,6 +127,12 @@ def head() -> str:
              "  #propsView b.lg.over, .pdlg b.lg.over { background: var(--go-wash); color: var(--go); } #propsView b.lg.under, .pdlg b.lg.under { background: var(--bad-wash); color: var(--bad); }\n"
              "  #propsView b.lg.push, .pdlg b.lg.push { background: var(--edge-wash); color: var(--edge); }\n"
              "  .pdlg .pd-log tr.this td { font-weight: 700; border-top: 2px solid color-mix(in srgb, var(--ink) 35%, transparent); } .pdlg .pd-log tr.this .tag { margin-left: 4px; }\n"
+             "  /* the simulation card and its record (25 Oct 2026) */\n"
+             "  #nbaSimPanel .simhead { margin-bottom: 8px; line-height: 1.5; } #nbaSimPanel .simtab td, #nbaSimPanel .simtab th { white-space: nowrap; }\n"
+             "  .simchip { display: inline-block; padding: 1px 7px; border-radius: 4px; font: 600 12px/1.6 var(--mono); background: var(--surface-2); color: var(--ink); }\n"
+             "  .simchip.simlean { background: var(--edge-wash); color: var(--edge); } .simchip.simbet { background: var(--go-wash); color: var(--go); } .simchip.simstrong { background: var(--go); color: #fff; }\n"
+             "  #nbaSimPanel .simq, #nbaSimPanel .simprof { margin-top: 8px; font-size: 12.5px; line-height: 1.5; }\n"
+             "  .simrec { margin-top: 10px; } .simrec .simrecview { font-weight: 700; margin: 8px 0 4px; } .simrec .simrectab td.good { color: var(--go); } .simrec .simrectab td.bad { color: var(--bad); }\n"
              "  /* the Props tab's own Is it working block, in colour (22 Oct 2026) */\n"
              "  #propsCalib .calib > div.good { box-shadow: inset 3px 0 0 var(--go); } #propsCalib .calib > div.bad { box-shadow: inset 3px 0 0 var(--bad); }\n"
              "  #propsCalib .calib > div.good .v, #propsCalib .calib > div.good .units { color: var(--go); } #propsCalib .calib > div.bad .v, #propsCalib .calib > div.bad .units { color: var(--bad); }\n"
@@ -202,7 +208,7 @@ def tail() -> str:
              '                 "ngoalies","agname","hgname","agstart","hgstart","agok","hgok",\n'
              '                 "odds","sharp","agf","aga","hgf","hga","lgg","angp","hngp","aenc","aens","henc","hens"];\n'
              '  var NBA_IDS = ["away","home","line","op","up","opened","gdate","hml","aml","sp","sph","spa","h1line","h1op","h1up",\n'
-             '                 "naort","nhort","nadrt","nhdrt","napace","nhpace","nagp","nhgp","nlrtg","nlpace","narest","nhrest","nbaout","nbaq","nbactx","ncrew","nbarefs","nbalineup","nbaform","odds","sharp"];\n'
+             '                 "naort","nhort","nadrt","nhdrt","napace","nhpace","nagp","nhgp","nlrtg","nlpace","narest","nhrest","nbaout","nbaq","nbactx","ncrew","nbarefs","nbalineup","nbaform","nbasim","odds","sharp"];\n'
              '  var ALL = MLB_IDS.concat(WNBA_IDS).concat(NHL_IDS).concat(NBA_IDS).filter(function (v, i, a) { return a.indexOf(v) === i; });\n'
              '  var CHECKS = ["dome","playoff","agconf","hgconf","agbk","hgbk"];\n'
              '  function sportOf(s) { return s === "WNBA" ? "WNBA" : s === "NHL" ? "NHL" : s === "NBA" ? "NBA" : "MLB"; }\n'
@@ -243,7 +249,7 @@ def tail() -> str:
              '  })();\n'
              '  function save() {', "relabel")
     t = once(t, "the units column is the referee.') + '</div>';\n    });",
-             "the units column is the referee.') + '</div>';\n      if (sp === \"NBA\") h += nbaRefsWatchHtml();   // the referees as a watch (22 Oct 2026)\n    });", "refs watch")
+             "the units column is the referee.') + '</div>';\n      if (sp === \"NBA\") h += nbaRefsWatchHtml();   // the referees as a watch (22 Oct 2026)\n      if (sp === \"NBA\") h += nbaSimRecordHtml();   // the simulation's calls, says against does (25 Oct 2026)\n    });", "refs watch")
     t = every(t, 'sp === "WNBA" ? forecastMatchupWnba() : forecastMatchupMlb()',
               'sp === "NHL" ? forecastMatchupNhl() : sp === "NBA" ? forecastMatchupNba() : sp === "WNBA" ? forecastMatchupWnba() : forecastMatchupMlb()', "dispatch (stored)", 1)
     t = every(t, 'sport === "WNBA" ? forecastMatchupWnba() : forecastMatchupMlb()',
@@ -361,7 +367,7 @@ def tail() -> str:
              '                      "ngoalies","agname","hgname",\n'
              '                      "pl","plh","pla","p1line","p1op","p1up",\n'
              '                      "agf","aga","hgf","hga","lgg","angp","hngp","aenc","aens","henc","hens",\n'
-             '                      "sp","sph","spa","h1line","h1op","h1up","naort","nhort","nadrt","nhdrt","napace","nhpace","nagp","nhgp","nlrtg","nlpace","narest","nhrest","nbaout","nbactx","ncrew","nbarefs","nbalineup","nbaform"];', "slate fields")
+             '                      "sp","sph","spa","h1line","h1op","h1up","naort","nhort","nadrt","nhdrt","napace","nhpace","nagp","nhgp","nlrtg","nlpace","narest","nhrest","nbaout","nbactx","ncrew","nbarefs","nbalineup","nbaform","nbasim"];', "slate fields")
     # the slate's backup-in-net flags are booleans, carried like the roof: into a
     # row's inputs when the card already has the game, into the form otherwise.
     # The Confirmed boxes travel the same way (19 Oct 2026): the slate ticks one
@@ -464,6 +470,24 @@ NBA_EXAMPLE_FORM = {
              {"date": "2026-11-09", "opp": "Raptors", "home": True, "pf": 115, "pa": 100, "h1f": 57, "h1a": 46, "end": "REG", "ctot": 225.0, "ch1": 112.5, "csp": -8.0}]}
 
 
+def nba_example_sim() -> dict:
+    """The example row's simulation block, built by nbasim itself (seeded, so the page's example never changes between builds)."""
+    sys.path.insert(0, str(pathlib.Path(__file__).parent / "slate"))
+    import nbasim  # noqa: E402  (slate/nbasim.py)
+    def setup():
+        lg = dict(nbasim.LEAGUE)
+        away = {"ab": "PHI", "ortg": 113.5, "drtg": 115.0, "pace": 99.5, "tov": 0.135, "trip": 0.10, "ft": 0.79, "a3": 0.41, "p3": 0.36, "p2": 0.55, "oreb": 0.27, "b2b": False, "out_adj": -2.1, "out_dadj": 1.4, "n": 15}
+        home = {"ab": "NYK", "ortg": 118.0, "drtg": 109.0, "pace": 98.0, "tov": 0.125, "trip": 0.11, "ft": 0.80, "a3": 0.44, "p3": 0.37, "p2": 0.56, "oreb": 0.29, "b2b": True, "out_adj": -1.0, "out_dadj": 0.7, "n": 16}
+        return {"league": lg, "away": away, "home": home, "ft_factor": 1.03}
+    s = setup()
+    own = nbasim.simulate(s, n=3000, seed=5)
+    mkt = nbasim.simulate_anchored(setup(), 231.5, -5.5, n=3000, seed=6)
+    return {"v": nbasim.VERSION, "runs": 3000, "own": nbasim.histograms(own), "mkt": nbasim.histograms(mkt), "anchor": {"total": 231.5, "sp": -5.5, "book": "DraftKings"},
+            "ft_factor": 1.03, "shrink": nbasim.SHRINK, "bands": nbasim.BANDS,
+            "prof": {"away": {"ortg": 113.5, "drtg": 115.0, "pace": 99.5, "n": 15, "b2b": False, "out": -2.1, "a3": 0.41},
+                     "home": {"ortg": 118.0, "drtg": 109.0, "pace": 98.0, "n": 16, "b2b": True, "out": -1.0, "a3": 0.44}}}
+
+
 def nba_example_js() -> str:
     return ('      restore({ away: "76ers", home: "Knicks", line: "231.5", op: "-110", up: "-110", opened: "229.5", gdate: $("gdate").value,\n'
             '        aml: "164", hml: "-198", sp: "-5.5", sph: "-108", spa: "-112", h1line: "115.5", h1op: "-110", h1up: "-110",\n'
@@ -472,6 +496,7 @@ def nba_example_js() -> str:
             '        nbactx: ' + json.dumps(json.dumps(NBA_EXAMPLE_CTX, separators=(",", ":"))) + ',\n'
             '        nbalineup: ' + json.dumps(json.dumps(NBA_EXAMPLE_LINEUP, separators=(",", ":"))) + ',\n'
             '        nbaform: ' + json.dumps(json.dumps(NBA_EXAMPLE_FORM, separators=(",", ":"))) + ',\n'
+            '        nbasim: ' + json.dumps(json.dumps(nba_example_sim(), separators=(",", ":"))) + ',\n'
             '        ncrew: "Scott Foster, Tony Brothers, Marc Davis", nbarefs: ' + json.dumps(json.dumps(NBA_EXAMPLE_REFS, separators=(",", ":"))) + ' });\n')
 
 

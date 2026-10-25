@@ -1420,6 +1420,45 @@ const CHECKS = ["dome","playoff","agconf","hgconf","agbk","hgbk"];
       && simTakeT.took.some(t => new RegExp('^Simulation calls taken ' + (simTakeT.t3.side === 'UNDER' ? '1-0' : '0-1') + ' says \\d\\d\\.\\d% · does (100|0)\\.0%', 'i').test(t)),
       'sim take: once the game grades the call shows its result off the final on its card, the button becomes a TAKEN chip, and What you took keeps it on the Simulation calls tile', JSON.stringify({ t3: simTakeT.t3, list3: simTakeT.list3, took: simTakeT.took }));
 
+  // ---- 26 Oct 2026: the levers' tally -- a Levers column counting the factors toward the pick and against, sortable, a filter for the
+  //      props where every lever leans the pick's way, the tag on the card and the panel's heading ----
+  const leverT = await pg.evaluate(async () => {
+    const wait = () => new Promise(r => setTimeout(r, 90));
+    document.getElementById('propsReset').click(); await wait();
+    document.getElementById('m-props').click(); await wait(); document.getElementById('propsExample').click(); await wait();
+    const card = () => [...document.querySelectorAll('#propsBest .pk')].find(e => /Tyrese Maxey/.test(e.textContent)), id = card().getAttribute('data-prop');
+    const cell = (tr) => (tr.querySelector('td.agree') || {}).textContent || '';
+    const head = document.querySelector('#propsTable th[data-sort="agree"]').textContent;
+    const maxey = document.querySelector('#propsTable tr[data-prop="' + id + '"]'), maxeyCell = cell(maxey), maxeyCls = maxey.querySelector('td.agree').className, maxeyTitle = maxey.querySelector('td.agree').title;
+    const tag = (card().querySelector('.n1 .tag') || {}).textContent || '', tagTitle = (card().querySelector('.n1 .tag') || {}).title || '';
+    const all = [...document.querySelectorAll('#propsTable tbody tr[data-prop]')].map(cell);
+    // sort by the levers: the top row has the most toward less against
+    document.querySelector('#propsTable th[data-sort="agree"]').click(); await wait();
+    const sorted = [...document.querySelectorAll('#propsTable tbody tr[data-prop]')].map(cell), headOn = document.querySelector('#propsTable th[data-sort="agree"]').textContent;
+    const score = (s) => { const m = /^(\d+)▲ (\d+)▼$/.exec(s); return m ? (+m[1] - +m[2]) + (+m[1]) / 10 : -50; };
+    // the filters
+    const sel = (v) => { const el = document.getElementById('propsAgree'); el.value = v; el.dispatchEvent(new Event('change', { bubbles: true })); };
+    sel('all'); await wait();
+    const onlyAll = [...document.querySelectorAll('#propsTable tbody tr[data-prop]')].map(cell), shownAll = document.getElementById('propsShown').textContent;
+    sel('most'); await wait();
+    const onlyMost = [...document.querySelectorAll('#propsTable tbody tr[data-prop]')].map(cell);
+    const stored = JSON.parse(localStorage.getItem('callsheet3.props.view.v1') || '{}');
+    document.getElementById('propsReset').click(); await wait();
+    const after = { rows: document.querySelectorAll('#propsTable tbody tr[data-prop]').length, agree: document.getElementById('propsAgree').value };
+    // the panel's heading carries the words
+    card().click(); await wait();
+    const h4 = ([...document.querySelectorAll('#propDetail h4')].find(h => /What moves it/.test(h.textContent)) || {}).textContent || '';
+    document.getElementById('propDetailClose').click(); await wait(); document.getElementById('m-nba').click(); await wait();
+    return { head, maxeyCell, maxeyCls, maxeyTitle, tag, tagTitle, all, sorted, headOn, scores: sorted.map(score), onlyAll, shownAll, onlyMost, stored, after, h4 };
+  });
+  chk(leverT.head === 'Levers' && leverT.maxeyCell === '2▲ 4▼' && /\bneg\b/.test(leverT.maxeyCls) && leverT.maxeyTitle === '2 of 6 levers toward the OVER, 4 against' && leverT.tag === 'levers 2▲ 4▼' && leverT.tagTitle === leverT.maxeyTitle
+      && leverT.all.length === 7 && leverT.all.every(s => /^\d+▲ \d+▼$/.test(s)) && /^What moves it · 2 of 6 levers toward the OVER, 4 against$/.test(leverT.h4.replace(/\s+/g, ' ').trim()),
+      'levers: the Every-prop table counts each prop\'s levers toward the pick and against, Maxey 2 up 4 down in red, the best card carries the tally as a tag and the panel\'s heading says it in words', JSON.stringify(leverT).slice(0, 900));
+  chk(/Levers ▾/.test(leverT.headOn) && leverT.scores.every((s, i, a) => i === 0 || s <= a[i - 1]) && leverT.scores[0] > leverT.scores[leverT.scores.length - 1]
+      && leverT.onlyAll.every(s => /^\d+▲ 0▼$/.test(s)) && leverT.onlyAll.length < leverT.all.length && /^\d+ of 7 shown/.test(leverT.shownAll)
+      && leverT.onlyMost.length >= leverT.onlyAll.length && leverT.onlyMost.every(s => { const m = /^(\d+)▲ (\d+)▼$/.exec(s); return m && +m[1] > +m[2]; }) && leverT.stored.agree === 'most' && leverT.after.rows === 7 && leverT.after.agree === '',
+      'levers: the column sorts with the most agreement first, the filter keeps the props where every lever leans the pick\'s way or more do than not, the view is remembered and Reset view clears it', JSON.stringify({ head: leverT.headOn, scores: leverT.scores, all: leverT.onlyAll, most: leverT.onlyMost, shown: leverT.shownAll, stored: leverT.stored, after: leverT.after }));
+
   // ---- the build stamp ------------------------------------------------------------
   // ---- the simulation (25 Oct 2026): the card on the example, the block stored with the row, the record once graded ----
   await pg.evaluate(async () => { await smStore.removeItem('callsheet3.card.v1'); }); await pg.reload(); await pg.waitForTimeout(300); await pg.evaluate(() => smStore.ready);

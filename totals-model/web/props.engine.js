@@ -17,15 +17,29 @@
      the points for a player, by chance percentage and band"): a sort column with its direction, and filters by market,
      band, side and a name. Kept in this browser only; Reset view puts the table back to by game, then by edge */
   var PROPS_VIEW_KEY = "callsheet3.props.view.v1";
-  var PROPS_VIEW_DEFAULT = { sort: "default", dir: -1, mk: "", band: "", side: "", q: "" };
+  var PROPS_VIEW_DEFAULT = { sort: "default", dir: -1, mk: "", band: "", side: "", q: "", agree: "" };
   var propsTableView = Object.assign({}, PROPS_VIEW_DEFAULT);
   try { var pv0 = JSON.parse(localStorage.getItem(PROPS_VIEW_KEY) || "null"); if (pv0 && typeof pv0 === "object") propsTableView = Object.assign({}, PROPS_VIEW_DEFAULT, pv0); } catch (e) {}
   function savePropsTableView() { try { localStorage.setItem(PROPS_VIEW_KEY, JSON.stringify(propsTableView)); } catch (e) {} }
   var PROPS_BAND_RANK = { "BET": 0, "LEAN": 1, "no edge": 2 };
-  var PROPS_SORT_COLS = [["game", "Game"], ["name", "Player"], ["mk", "Market"], ["line", "Line"], ["side", "Pick"], ["chance", "Chance"], ["price", "Price"], ["need", "Needs"], ["edge", "Edge"], ["proj", "Proj"], ["band", "Band"], ["result", "Result"]];
+  var PROPS_SORT_COLS = [["game", "Game"], ["name", "Player"], ["mk", "Market"], ["line", "Line"], ["side", "Pick"], ["chance", "Chance"], ["price", "Price"], ["need", "Needs"], ["edge", "Edge"], ["proj", "Proj"], ["band", "Band"], ["result", "Result"], ["agree", "Levers"]];
+  /* the levers' tally (26 Oct 2026, the user: "find props like this one, where What moves it shows multiple green bars
+     pointing toward the pick"): how many of the factors push toward the pick's side and how many against, a push under
+     0.05 in the stat's units counting as neither. A column to sort by, a filter, a tag on the card and the panel's heading */
+  function propsLeverTally(r) {
+    var toward = 0, against = 0;
+    if (propHas(r)) (r.parts || []).forEach(function (p) {
+      if (!p || !isFinite(+p.eff) || Math.abs(+p.eff) < 0.05) return;
+      if (propsLeverHelps(r, +p.eff)) toward++; else against++;
+    });
+    var n = toward + against;
+    return { toward: toward, against: against, n: n, all: n >= 2 && against === 0, most: toward > against,
+             text: n ? toward + "▲ " + against + "▼" : "", words: n ? toward + " of " + n + " lever" + (n === 1 ? "" : "s") + " toward the " + (r.side || "pick") + (against ? ", " + against + " against" : "") : "" };
+  }
   function propsSortValue(r, key) {
     var has = propHas(r);
     switch (key) {
+      case "agree": return has ? (function (t) { return t.n ? (t.toward - t.against) + t.toward / 10 : -50; })(propsLeverTally(r)) : -99;
       case "game": return r.game || "";
       case "name": return r.name || "";
       case "mk": return PROPS_LABEL[r.mk] || r.mk || "";
@@ -47,6 +61,7 @@
       if (v.mk && r.mk !== v.mk) return false;
       if (v.band && (!propHas(r) || r.band !== v.band)) return false;
       if (v.side && (!propHas(r) || r.side !== v.side)) return false;
+      if (v.agree) { var t = propsLeverTally(r); if (!propHas(r) || (v.agree === "all" ? !t.all : !t.most)) return false; }
       if (q && String(r.name || "").toLowerCase().indexOf(q) < 0 && String(r.game || "").toLowerCase().indexOf(q) < 0) return false;
       return true;
     });
@@ -407,8 +422,8 @@
     var levers = has ? propsLevers(r) : [], top = levers.slice(0, 2).map(function (p) { return +p.i; });
     if (levers.length && r.base !== undefined && r.base !== null) {
       var maxE = Math.max.apply(null, levers.map(function (p) { return Math.abs(+p.eff); }).concat([0.01])), gap = r.proj - r.line;
-      var hasMatch = levers.some(function (p) { return p.k === "match"; });
-      h += '<h4>What moves it</h4><p class="pd-base">Starts from <b>' + esc(String(r.base)) + '</b>, his ' + esc(String(r.rate36)) + ' per 36 at his minutes; the regulars out, pace' + (hasMatch ? ', the matchup' : '') + ' and the defence take it to <b>' + esc(String(r.proj)) +
+      var hasMatch = levers.some(function (p) { return p.k === "match"; }), tally = propsLeverTally(r);
+      h += '<h4>What moves it' + (tally.n ? ' <span class="dim">· ' + esc(tally.words) + '</span>' : '') + '</h4><p class="pd-base">Starts from <b>' + esc(String(r.base)) + '</b>, his ' + esc(String(r.rate36)) + ' per 36 at his minutes; the regulars out, pace' + (hasMatch ? ', the matchup' : '') + ' and the defence take it to <b>' + esc(String(r.proj)) +
            '</b>, ' + sgn(gap, 1) + ' against the line. Green pushes toward the ' + esc(r.side || "pick") + ', red away from it. The prior and the minutes trend say what sits inside the start.</p>';
       h += '<div class="pd-levers">' + levers.map(function (p, i) {
         var helps = propsLeverHelps(r, +p.eff), w = Math.max(3, Math.round(Math.abs(+p.eff) / maxE * 100));
@@ -482,7 +497,8 @@
     var resChip = propResChip;
     var picks = rows.filter(function (r) { return propHas(r) && r.edge > 0; }).sort(function (a, b) { return b.edge - a.edge; });
     $("propsBest").innerHTML = picks.length ? picks.slice(0, 12).map(function (r, i) {
-      return '<div class="pk' + (r.band === "BET" ? ' scored' : '') + '" data-prop="' + r.id + '"><div class="n1">#' + (i + 1) + ' · ' + esc(r.band) + '</div>' +
+      var tl = propsLeverTally(r);
+      return '<div class="pk' + (r.band === "BET" ? ' scored' : '') + '" data-prop="' + r.id + '"><div class="n1">#' + (i + 1) + ' · ' + esc(r.band) + (tl.n ? ' <span class="tag' + (tl.all ? ' agree' : '') + '" title="' + esc(tl.words) + '">levers ' + tl.text + '</span>' : '') + '</div>' +
         '<div class="n2">' + esc(r.name) + ' ' + esc(r.side) + ' ' + r.line + ' ' + esc(PROPS_LABEL[r.mk] || r.mk) + '</div>' +
         '<div class="n3">' + (r.chance * 100).toFixed(1) + '% · ' + sgn(r.price, 0) + ' needs ' + (r.need * 100).toFixed(1) + '% · edge ' + sgn(r.edge * 100, 1) + resChip(r) + '</div>' +
         '<div class="n4">' + esc(r.game) + ' · projected ' + r.proj + ' (±' + r.sd + ') · ' + esc(r.book) + '</div>' +
@@ -496,7 +512,7 @@
       $("propsTakingCount").textContent = taken.length ? taken.length + " marked" : "";
     }
     var pool = ($("propsAll").checked ? rows : rows.filter(propHas)).slice(), list = propsTableRows(pool);
-    ["propsMk", "propsBand", "propsSide", "propsQ"].forEach(function (id) { var el = $(id); if (el) { var k = { propsMk: "mk", propsBand: "band", propsSide: "side", propsQ: "q" }[id]; if (el.value !== propsTableView[k]) el.value = propsTableView[k]; } });
+    ["propsMk", "propsBand", "propsSide", "propsQ", "propsAgree"].forEach(function (id) { var el = $(id); if (el) { var k = { propsMk: "mk", propsBand: "band", propsSide: "side", propsQ: "q", propsAgree: "agree" }[id]; if (el.value !== propsTableView[k]) el.value = propsTableView[k]; } });
     if ($("propsShown")) $("propsShown").textContent = rows.length ? (list.length === pool.length ? pool.length + " shown" : list.length + " of " + pool.length + " shown") + (propsTableView.sort !== "default" ? " · sorted by " + (PROPS_SORT_COLS.filter(function (c) { return c[0] === propsTableView.sort; })[0] || ["", propsTableView.sort])[1].toLowerCase() + (propsTableView.dir < 0 ? " ▾" : " ▴") : "") : "";
     var h = '<table class="form props"><thead><tr>' + PROPS_SORT_COLS.map(function (c) {
       var on = propsTableView.sort === c[0];
@@ -508,7 +524,9 @@
         (propHas(r) ? '<td>' + esc(r.side) + '</td><td>' + (r.chance * 100).toFixed(1) + '%</td><td>' + sgn(r.price, 0) + '</td><td>' + (r.need * 100).toFixed(1) + '%</td>' +
                       '<td class="' + (r.edge > 0 ? 'pos' : 'neg') + '">' + sgn(r.edge * 100, 1) + '</td><td>' + r.proj + '</td><td>' + esc(r.band) + '</td>'
                     : '<td colspan="7" class="dim">' + esc((r.why && r.why[0]) || 'no projection') + '</td>') +
-        '<td>' + (r.result ? esc(r.result) + (r.actual !== null && r.actual !== undefined ? ' · ' + r.actual : '') : '') + '</td><td class="take">' + propTakeBtn(r) + '</td></tr>';
+        '<td>' + (r.result ? esc(r.result) + (r.actual !== null && r.actual !== undefined ? ' · ' + r.actual : '') : '') + '</td>' +
+        (function (t) { return '<td class="agree' + (t.n ? (t.all ? ' pos' : t.against > t.toward ? ' neg' : '') : '') + '" title="' + esc(t.words) + '">' + t.text + '</td>'; })(propsLeverTally(r)) +
+        '<td class="take">' + propTakeBtn(r) + '</td></tr>';
     });
     h += '</tbody></table>';
     propsOrder = list.map(function (r) { return String(r.id); });   // the panel's Previous / Next walk the table's order
@@ -553,7 +571,7 @@
       }
       openFrom(e);
     });
-    [["propsMk", "mk"], ["propsBand", "band"], ["propsSide", "side"], ["propsQ", "q"]].forEach(function (p) {
+    [["propsMk", "mk"], ["propsBand", "band"], ["propsSide", "side"], ["propsQ", "q"], ["propsAgree", "agree"]].forEach(function (p) {
       var el = $(p[0]); if (!el) return;
       el.addEventListener(p[0] === "propsQ" ? "input" : "change", function () { propsTableView[p[1]] = el.value; savePropsTableView(); renderProps(); });
     });

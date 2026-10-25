@@ -186,6 +186,7 @@ def head() -> str:
              "  .takebtn:hover { border-color: var(--ink); color: var(--ink); } .takebtn.on { background: var(--go); border-color: var(--go); color: #fff; } .takebtn.big { font-size: 12px; padding: 7px 14px; }\n"
              "  .pk .n6 { margin-top: 8px; } .pdlg .pd-take { margin: 6px 0 2px; } table.props td.take, #board td:last-child { white-space: nowrap; }\n"
              "  .takebtn.off { opacity: .45; cursor: not-allowed; } .simtab .simtake { margin-top: 5px; } .ttgap .takebtn { margin-left: 4px; vertical-align: middle; }\n"
+             "  table.props td.agree { font-family: var(--mono); white-space: nowrap; } .pk .tag.agree { background: var(--go); color: #fff; }\n"
              "  .pk.taking, tr.taking { box-shadow: inset 4px 0 0 var(--go); } .pk.taking.sum { border-style: dashed; } .chip.taken { background: var(--go); color: #fff; }\n"
              "  #calibBox .calib[data-sport=\"TAKEN\"] > div.good { box-shadow: inset 3px 0 0 var(--go); } #calibBox .calib[data-sport=\"TAKEN\"] > div.bad { box-shadow: inset 3px 0 0 var(--bad); }\n"
              "  @media (max-width: 640px) { .pdlg .lever { grid-template-columns: 1fr 1fr 50px; } }\n"

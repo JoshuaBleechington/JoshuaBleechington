@@ -1316,3 +1316,20 @@ tonight lists a simulation call as "TAKING · NBA · SIMULATION" with the
 view it came from; the copy text names it; What you took grades it on
 its own tile, "Simulation calls taken", the way the sim record grades (the
 half from the half-time score, team totals from each side's final).
+
+## The levers' tally, 26 Oct 2026
+
+The user, with a Ziaire Williams over on the screen whose What moves it
+showed every bar green: "if I wanted to find props like this one, with
+multiple green bars pointing toward the implied result." `propsLeverTally`
+counts a prop's factors pushing toward the pick's side and against it (a
+push under 0.05 in the stat's units counts as neither), and the count is
+put where it can be found: a **Levers** column in the Every-prop table
+(▲ toward, ▼ against; green when every lever leans the pick's way, red
+when more lean against), sortable like the rest with the most agreement
+first; a **levers** filter beside the others, "every lever toward the
+pick" or "more toward than against", remembered with the view and
+cleared by Reset view; a tag on each best card; and the words on the
+panel's What moves it heading. The tally is shown, not scored: it says how
+many of the measured pushes agree, not how big they are, and the chance
+beside it already carries their sizes.

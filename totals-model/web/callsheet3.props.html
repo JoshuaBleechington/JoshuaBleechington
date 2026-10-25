@@ -41,7 +41,7 @@
       <div id="propsTaking" class="picks" hidden></div>
       <div class="subhead">Best props <span class="tag">every prop whose blended chance clears its price, best edge first — BET at 3 points of edge and 55% or better, LEAN below that; a priori bands, the record decides. Click a card for the prop's own panel</span></div>
       <div id="propsBest" class="picks"></div>
-      <div class="subhead">Every prop on the date <span class="tag">by game, then by edge — click a column to sort it, filter by market, band, side or player; click a row for the prop's own panel, then Previous and Next (or the arrow keys) walk the list as shown</span></div>
+      <div class="subhead">Every prop on the date <span class="tag">by game, then by edge — click a column to sort it, filter by market, band, side, the levers or player; the Levers column counts the factors pushing toward the pick ▲ and against it ▼; click a row for the prop's own panel, then Previous and Next (or the arrow keys) walk the list as shown</span></div>
       <div class="row propsctl">
         <label class="f" style="flex-direction:row;align-items:center;gap:6px"><span class="tag">market</span>
           <select id="propsMk"><option value="">all</option><option value="pts">points</option><option value="reb">rebounds</option><option value="ast">assists</option><option value="tpm">threes</option><option value="pra">pts + reb + ast</option></select></label>
@@ -49,6 +49,8 @@
           <select id="propsBand"><option value="">all</option><option value="BET">BET</option><option value="LEAN">LEAN</option><option value="no edge">no edge</option></select></label>
         <label class="f" style="flex-direction:row;align-items:center;gap:6px"><span class="tag">side</span>
           <select id="propsSide"><option value="">all</option><option value="OVER">over</option><option value="UNDER">under</option></select></label>
+        <label class="f" style="flex-direction:row;align-items:center;gap:6px"><span class="tag">levers</span>
+          <select id="propsAgree"><option value="">all</option><option value="all">every lever toward the pick</option><option value="most">more toward than against</option></select></label>
         <label class="f" style="flex-direction:row;align-items:center;gap:6px"><span class="tag">player or game</span><input id="propsQ" type="text" placeholder="Maxey" autocomplete="off" style="width:150px"></label>
         <span class="tag" id="propsShown"></span>
         <button type="button" class="btn" id="propsReset">Reset view</button>

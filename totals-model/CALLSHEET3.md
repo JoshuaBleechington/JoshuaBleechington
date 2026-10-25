@@ -1048,6 +1048,18 @@ their points a game against the league's by history (the total did not
 follow, t −1.0), and the past table's pooled over rate with these three as
 a soft lean. Never scored; the referee watch on the record is the test.
 
+## The graded night joins the last games, 25 Oct 2026
+
+The user, on a graded prop from the 24th whose panel listed the 21st and
+the 23rd: "they only show the last date of 10/23 and not 10/24 for the
+props that were on yesterday." The last games are the history the call
+was made from, as the props file carried them, and the page never
+rewrites a call; so the graded night goes under them instead, as its own
+row: the date, the opponent with a "this game" tag, his minutes from the
+grade file's box line (kept on the row as `amin` from today; older graded
+props show a dash) and the stat marked against the line like the rest,
+or DNP for a void. The tally in the heading stays the history's.
+
 ## A run without last season says so, 25 Oct 2026
 
 The user's props file of the 24th: 403 props, 140 with a side and 135 of

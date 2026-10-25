@@ -950,6 +950,11 @@ const CHECKS = ["dome","playoff","agconf","hgconf","agbk","hgbk"];
         box: { '3037789': ['Trae Young', 36.2, 28, 3, 11, 4], '4397020': ['Paolo Banchero', 34.0, 22, 9, 4, 1] } } ] };
     await load(gradeDoc, 'nba-grade-2026-10-21.json');
     const after = JSON.parse(smStore.getItem('callsheet3.props.v1'));
+    // the graded night joins the panel's last games, with his minutes from the box line (25 Oct 2026)
+    document.querySelector('#propsTable tr[data-prop]').click(); await wait();
+    const thisRow = (document.querySelector('#propDetail .pd-log tr.this') || { innerText: '' }).innerText.replace(/\s+/g, ' ').trim(), thisMark = (document.querySelector('#propDetail .pd-log tr.this b.lg') || { className: '' }).className;
+    const logRows = document.querySelectorAll('#propDetail .pd-log tbody tr').length;
+    document.getElementById('propDetailClose').click(); await wait();
     const tile = document.querySelector('#calibBox .calib[data-sport="PROPS"]');
     const tileText = tile ? tile.innerText.replace(/\s+/g, ' ').trim() : '';
     const tabCalib = document.getElementById('propsCalib').innerText.replace(/\s+/g, ' ').trim();
@@ -965,8 +970,10 @@ const CHECKS = ["dome","playoff","agconf","hgconf","agbk","hgbk"];
     const viewOff = document.getElementById('propsView').hidden, colsBack = !document.querySelector('.cols').hidden, nbaPressed = document.getElementById('m-nba').getAttribute('aria-pressed');
     await smStore.removeItem('callsheet3.props.v1');
     return { viewOn, colsOff, pressed, best, rowsOn, rowsAll, count, msg, whyOpen, logMarks, tileBefore, after: after.map(r => [r.name, r.mk, r.result, r.actual]), tileText, slateMsg, restored: restored.length, viewOff, colsBack, nbaPressed,
-             tabCalib, tabBlocks, nights, ladder, tabEmpty0, noneMsg, thinMsg, inPlay };
+             tabCalib, tabBlocks, nights, ladder, tabEmpty0, noneMsg, thinMsg, inPlay, thisRow, thisMark, logRows };
   });
+  chk(/^10-21 @ [A-Z]+ this game 36\.2 28$/.test(propsT.thisRow) && /lg over/.test(propsT.thisMark) && propsT.logRows === 4,
+      'props: a graded prop\'s last games end with the game itself, his minutes from the box line and the stat marked against the line', JSON.stringify({ row: propsT.thisRow, mark: propsT.thisMark, rows: propsT.logRows }));
   chk(/loaded: 2 new.*Last season's ledger, nba-ledger-202526\.json, was not read by this run: 1 of the 1 projections rest on this season's two or three games a player, and 1 prop has no history at all\. Put the file back beside slate\.py, run the props again before tip, and load the new file; it replaces these\./.test(propsT.thinMsg),
       'props: a file whose projections rest on this season alone says last season\'s ledger was not read and what to do', propsT.thinMsg.slice(0, 500));
   chk(/loaded: 1 new, 0 replaced, 0 graded and left as they were, 1 on 1 game already under way left out \(in-play lines; the calls made before tip stand\)/.test(propsT.inPlay.msg) && propsT.inPlay.names.join(',') === 'Paul George',

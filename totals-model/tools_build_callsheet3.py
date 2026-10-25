@@ -126,6 +126,7 @@ def head() -> str:
              "  #propsView b.lg, .pdlg b.lg { display: inline-block; min-width: 18px; text-align: center; padding: 0 5px; border-radius: 3px; font: 700 11.5px/1.5 var(--mono); background: var(--surface-2); color: var(--ink); }\n"
              "  #propsView b.lg.over, .pdlg b.lg.over { background: var(--go-wash); color: var(--go); } #propsView b.lg.under, .pdlg b.lg.under { background: var(--bad-wash); color: var(--bad); }\n"
              "  #propsView b.lg.push, .pdlg b.lg.push { background: var(--edge-wash); color: var(--edge); }\n"
+             "  .pdlg .pd-log tr.this td { font-weight: 700; border-top: 2px solid color-mix(in srgb, var(--ink) 35%, transparent); } .pdlg .pd-log tr.this .tag { margin-left: 4px; }\n"
              "  /* the Props tab's own Is it working block, in colour (22 Oct 2026) */\n"
              "  #propsCalib .calib > div.good { box-shadow: inset 3px 0 0 var(--go); } #propsCalib .calib > div.bad { box-shadow: inset 3px 0 0 var(--bad); }\n"
              "  #propsCalib .calib > div.good .v, #propsCalib .calib > div.good .units { color: var(--go); } #propsCalib .calib > div.bad .v, #propsCalib .calib > div.bad .units { color: var(--bad); }\n"

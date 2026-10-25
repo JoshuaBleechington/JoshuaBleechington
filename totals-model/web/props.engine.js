@@ -170,6 +170,8 @@
         if (propsCanon(r.away) !== propsCanon(g.away) || propsCanon(r.home) !== propsCanon(g.home)) return;
         var v = propActual(r, g.box);
         if (v === undefined) return;
+        var bl = g.box[r.pid] || [];
+        r.amin = bl[1] === null || bl[1] === undefined ? null : bl[1];   // his minutes that night, for the panel's last-games row (25 Oct 2026)
         if (v === null) { r.result = "void"; r.actual = null; n++; return; }
         r.actual = v;
         r.result = !r.side ? "graded" : (v === r.line ? "push" : ((v > r.line) === (r.side === "OVER") ? "win" : "loss"));
@@ -338,11 +340,19 @@
       }).join("") + '</div>';
     }
     if (r.why && r.why.length) h += '<h4>Why</h4><ul class="pd-why">' + r.why.map(function (w, i) { return '<li' + (top.indexOf(i) >= 0 ? ' class="lever-line"' : '') + '>' + esc(w) + '</li>'; }).join("") + '</ul>';
-    if (r.log && r.log.length) {
+    /* the game the prop was on joins the list once it is graded (25 Oct 2026, the user: "they only show the last
+       date of 10/23 and not 10/24 for the props that were on yesterday"): the last games are the history the
+       call was made from, as the file carried them, and the graded night goes under them with his minutes from
+       the box line and the stat marked like the rest; a prop graded before the minutes were kept shows a dash */
+    var played = !!(r.result && r.result !== "graded");
+    if ((r.log && r.log.length) || played) {
       h += '<h4>Last games' + propsLogTally(r) + '</h4><table class="form pd-log"><thead><tr><th>Date</th><th>Opp</th><th>Min</th><th>' + esc(lab) + '</th></tr></thead><tbody>' +
-        r.log.map(function (g) {
+        (r.log || []).map(function (g) {
           return '<tr><td>' + esc(String(g[0] || "").slice(5)) + '</td><td>' + esc((g[2] ? "v " : "@ ") + (g[1] || "")) + '</td><td>' + esc(String(g[3] === null || g[3] === undefined ? "" : g[3])) + '</td><td>' + propsLogMark(g[4], r.line) + '</td></tr>';
-        }).join("") + '</tbody></table>';
+        }).join("") +
+        (played ? '<tr class="this"><td>' + esc(String(r.gdate || "").slice(5)) + '</td><td>' + esc((r.athome ? "v " : "@ ") + (r.opp || "")) + ' <span class="tag">this game</span></td><td>' +
+                  esc(r.amin === null || r.amin === undefined ? "–" : String(r.amin)) + '</td><td>' + (r.result === "void" ? '<b class="lg">DNP</b>' : propsLogMark(r.actual, r.line)) + '</td></tr>' : '') +
+        '</tbody></table>';
     }
     var bks = Object.keys(r.books || {});
     if (bks.length) {

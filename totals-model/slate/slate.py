@@ -5414,9 +5414,15 @@ def make_odds_periods(out_dir, log, season, markets=None, books=None, minutes=OD
     have = {k: g for k, g in doc["games"].items()}
     need_days = [d for d in dates if d not in doc["pulled"]]
     todo_games = [k for k, g in have.items() if any(m not in (g.get("mk") or {}) for m in mks)]
-    est = len(need_days) * 1 + (len(todo_games) + 12 * len(need_days)) * ODDS_HISTORY_COST * len(mks)
+    # the games still to list, counted off the ledger's own dates (the first run said 12 a day and 79,846 credits; a season is about 1,230 games)
+    led = load_nba_ledger(nba_ledger_path(out_dir, season)) if sport == "NBA" else None
+    per_day = {}
+    for g in (led or {}).get("games") or []:
+        per_day[g.get("date")] = per_day.get(g.get("date"), 0) + 1
+    unlisted = sum(per_day.get(d, 7) for d in need_days)
+    est = len(need_days) * 1 + (len(todo_games) + unlisted) * ODDS_HISTORY_COST * len(mks)
     log("%s %s: %d game date%s, %d day%s still to list (a credit each) and about %d games to price at %d credits a market (%s): about %s credits in all." % (
-        sport, season, len(dates), "" if len(dates) == 1 else "s", len(need_days), "" if len(need_days) == 1 else "s", len(todo_games) + 12 * len(need_days), ODDS_HISTORY_COST, markets, "{:,}".format(est)))
+        sport, season, len(dates), "" if len(dates) == 1 else "s", len(need_days), "" if len(need_days) == 1 else "s", len(todo_games) + unlisted, ODDS_HISTORY_COST, markets, "{:,}".format(est)))
     if not need_days and not todo_games:
         log("Nothing to pull: %s is complete for %s." % (path, markets))
         return path

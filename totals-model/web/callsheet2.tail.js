@@ -450,11 +450,13 @@
   }
   function slimMarkets(ms) {
     return ms.map(function (m) {
-      return { key: m.key, label: m.label, pick: m.pick, side: m.side, p: +m.p.toFixed(5), pPush: +m.pPush.toFixed(5),
-               price: m.price, edge: m.edge === null ? null : +m.edge.toFixed(5), fair: +m.fair.toFixed(1),
-               anchored: m.anchored, band: m.band, band1: m.band1, side1: m.side1, other: m.other,
-               informed: m.informed === undefined ? undefined : !!m.informed,
-               point: m.point, book: m.book };   // the alternate total's number and book (19 Oct 2026); undefined on every other market
+      var o = { key: m.key, label: m.label, pick: m.pick, side: m.side, p: +m.p.toFixed(5), pPush: +m.pPush.toFixed(5),
+                price: m.price, edge: m.edge === null ? null : +m.edge.toFixed(5), fair: +m.fair.toFixed(1),
+                anchored: m.anchored, band: m.band, band1: m.band1, side1: m.side1, other: m.other,
+                informed: m.informed === undefined ? undefined : !!m.informed,
+                point: m.point, book: m.book };   // the alternate total's number and book (19 Oct 2026); undefined on every other market
+      if (m.take) o.take = m.take;   // the bet marked as taken rides with its market (26 Oct 2026)
+      return o;
     });
   }
 
@@ -1345,7 +1347,8 @@
       '<div class="n3">' + (x.mk.p * 100).toFixed(1) + '% · ' + (x.mk.price !== null ? sgn(x.mk.price, 0) + ' · edge ' + sgn(x.mk.edge * 100, 1) : 'no price') +
         (res ? ' · <span class="chip ' + res + '">' + resText(res) + '</span>' : '') + '</div>' +
       '<div class="n4">' + esc(x.row.matchup) + ' · ' + esc(x.mk.label) +
-        (x.mk.key === "total" && marksOf(x.row.sport, x.row.inputs, x.row.markets).grain ? ' <span class="tagm warn">over against the grain</span>' : '') + '</div>' + (extra || '') + (callOf(x.row, x.mk) ? callWhy(x) : '') + '</div>';
+        (x.mk.key === "total" && marksOf(x.row.sport, x.row.inputs, x.row.markets).grain ? ' <span class="tagm warn">over against the grain</span>' : '') + '</div>' + (extra || '') + (callOf(x.row, x.mk) ? callWhy(x) : '') +
+      '<div class="n6">' + takeBtn(x.row, x.mk) + '</div></div>';
   }
   /* ---- the likeliest side in each game at any price, and the two-leg parlays built
      from them (15 Oct 2026, the user: "put the likeliest card on the board too and
@@ -1393,7 +1396,8 @@
       '<div class="n1">#' + x.rank + (ok ? ' · the price agrees' : ' · the book\'s price, not an edge') + '</div>' +
       '<div class="n2">' + esc(x.mk.pick) + '</div>' +
       '<div class="n3">' + (x.mk.p * 100).toFixed(1) + '% · ' + sgn(x.mk.price, 0) + ' needs ' + (x.need * 100).toFixed(1) + '%' + (res ? ' · <span class="chip ' + res + '">' + resText(res) + '</span>' : '') + '</div>' +
-      '<div class="n4">' + esc(x.row.matchup) + ' · ' + esc(x.mk.label || x.mk.key) + '</div></div>';
+      '<div class="n4">' + esc(x.row.matchup) + ' · ' + esc(x.mk.label || x.mk.key) + '</div>' +
+      '<div class="n6">' + takeBtn(x.row, x.mk) + '</div></div>';
   }
   /* ---- the upset watch on the board (16 Oct 2026, the user: "look for potential upsets
      too"): every game on the date where the dog carries a measured signal against the
@@ -1472,7 +1476,8 @@
     return '<div class="pk likely alt' + (res ? ' ' + res : '') + '" data-open="' + x.row.id + '" title="Load ' + esc(x.row.matchup) + ' into the form"><div class="n1">#' + (i + 1) + ' · ' + esc(mk.band) + ' · the price ' + (mk.p >= need ? 'agrees' : 'asks more') + '</div>' +
       '<div class="n2">' + esc(mk.pick) + '</div>' +
       '<div class="n3">' + (mk.p * 100).toFixed(1) + '% · ' + sgn(mk.price, 0) + ' needs ' + (need * 100).toFixed(1) + '% · edge ' + sgn(mk.edge * 100, 1) + (res ? ' · <span class="chip ' + res + '">' + resText(res) + '</span>' : '') + '</div>' +
-      '<div class="n4">' + esc(x.row.matchup) + ' · ' + esc(mk.label) + (mk.book ? ' at ' + esc(bookName(mk.book)) : '') + '</div></div>';
+      '<div class="n4">' + esc(x.row.matchup) + ' · ' + esc(mk.label) + (mk.book ? ' at ' + esc(bookName(mk.book)) : '') + '</div>' +
+      '<div class="n6">' + takeBtn(x.row, mk) + '</div></div>';
   }
   function twoLegCard(x, i) {
     var a = x.legs[0], b = x.legs[1], ok = x.p >= x.need, res = parlayResult(x.legs);
@@ -1486,6 +1491,7 @@
     var dateISO = $("boardDate").value || todayISO(), byProb = !$("byEdge").checked;
     var rows = boardRows(dateISO, byProb);
     $("boardCount").textContent = rows.length ? rows.length + " priced markets on " + gameDate(dateISO) : "nothing logged for " + gameDate(dateISO);
+    renderTaking(dateISO);   // the bets marked as taken on the date (26 Oct 2026)
 
     // --- the parlay four ---
     var legs = parlayFour(dateISO), ph = "";
@@ -1554,11 +1560,11 @@
     $("bySport").innerHTML = sh;
 
     if (!rows.length) { $("board").innerHTML = '<div class="empty">Add today\'s matchups to the card and every priced market lands here, best edge first.</div>'; return; }
-    var h = '<table><thead><tr><th>#</th><th>Matchup</th><th>Market</th><th>Pick</th><th>Chance</th><th>Price</th><th>Needs</th><th>Edge</th><th>Fair</th><th>Result</th></tr></thead><tbody>';
+    var h = '<table><thead><tr><th>#</th><th>Matchup</th><th>Market</th><th>Pick</th><th>Chance</th><th>Price</th><th>Needs</th><th>Edge</th><th>Fair</th><th>Result</th><th>Take</th></tr></thead><tbody>';
     rows.forEach(function (x) {
       var mk = x.mk, res = gradeMarket(mk, x.row.finals);
       var inFour = (byProb ? legs : bets).some(function (y) { return y.row.id === x.row.id && y.mk.pick === mk.pick; });
-      h += '<tr class="' + (inFour ? 'pick4' : '') + '" data-open="' + x.row.id + '" title="Load ' + esc(x.row.matchup) + ' into the form">' +
+      h += '<tr class="' + (inFour ? 'pick4' : '') + (isTaken(x.row, mk) ? ' taking' : '') + '" data-open="' + x.row.id + '" title="Load ' + esc(x.row.matchup) + ' into the form">' +
         '<td><span class="rank">' + x.rank + '</span>' + (x.corr.length ? '<span class="chip corr">corr #' + x.corr.join(' #') + '</span>' : '') + '</td>' +
         '<td>' + esc(x.row.matchup) + ' <span class="gdate">' + esc(x.row.sport) + '</span></td>' +
         '<td>' + esc(mk.label) + (!mk.anchored ? ' <span class="chip dim">derived</span>' : '') + (!pickable(mk, x.row.sport, x.row.gdate) ? ' <span class="chip dim">not picked</span>' : '') + '</td>' +
@@ -1568,7 +1574,8 @@
         '<td class="n">' + (implied(mk.price) * 100).toFixed(1) + '%</td>' +
         '<td class="n"><span class="edge ' + (mk.edge > 0 ? 'pos' : 'neg') + '">' + sgn(mk.edge * 100, 1) + '</span></td>' +
         '<td class="n">' + sgn(mk.fair, 0) + '</td>' +
-        '<td>' + (res ? '<span class="chip ' + res + '">' + resText(res) + '</span>' : '<span class="gdate">—</span>') + '</td></tr>';
+        '<td>' + (res ? '<span class="chip ' + res + '">' + resText(res) + '</span>' : '<span class="gdate">—</span>') + '</td>' +
+        '<td>' + takeBtn(x.row, mk) + '</td></tr>';
     });
     $("board").innerHTML = h + '</tbody></table>';
   }
@@ -1975,6 +1982,7 @@
         : '<b>' + totalN + ' graded ' + sp + ' markets.</b> Compare each market\'s <i>does</i> against its <i>says</i> before believing either; ' +
           'and compare each four against the blind rate of everything logged, not against 50%. The parlay four and the straight bets will differ most nights; the units column is the referee.') + '</div>';
     });
+    h += takenRecordHtml();   // what you took (26 Oct 2026): the marked bets, graded at the price shown when marked
     /* the board's likeliest side and the two-leg parlays, across every date (15 Oct 2026,
        the user: "add the two-leg parlays to the grade log too"). Graded the way the board
        builds them, from the rows as logged, so the record is of what the board showed at
@@ -2084,7 +2092,7 @@
       return;
     }
     if (dup) {
-      dup.inputs = inputs; dup.markets = slimMarkets(last.markets); dup.away = last.away; dup.home = last.home; dup.matchup = last.matchup; dup.proj = projOf(last);
+      dup.inputs = inputs; dup.markets = carryTakes(dup.markets, slimMarkets(last.markets)); dup.away = last.away; dup.home = last.home; dup.matchup = last.matchup; dup.proj = projOf(last);
       save(); renderCard(); renderBoard(); renderCalib();
       say("Updated <b>" + esc(dup.matchup) + "</b>, already on the card for " + esc(gameDate(gdate)) + ": its inputs and picks were replaced with what is in the form. One row per matchup per date, so nothing was logged twice.");
       return;
@@ -2316,7 +2324,7 @@
           /* The slate marks a postseason game at the game level; the row's
              Playoff box is shown, not scored, so it only splits the record. */
           if (g.playoff === true && !row.inputs.playoff) { row.inputs.playoff = true; changed = true; }
-          if (changed) { var m = scoreMatchup(row.sport, row.inputs); if (m) { row.markets = slimMarkets(m.markets); row.proj = projOf(m); } filled++; }
+          if (changed) { var m = scoreMatchup(row.sport, row.inputs); if (m) { row.markets = carryTakes(row.markets, slimMarkets(m.markets)); row.proj = projOf(m); } filled++; }
         }
       }
       if (hasFinals(g.finals)) {
@@ -2426,7 +2434,7 @@
       var graded = (r.markets || []).some(function (mk) { return gradeMarket(mk, r.finals) !== null; });
       if (graded) { kept++; return; }
       var m = scoreMatchup(r.sport, r.inputs); if (!m) return;
-      r.markets = slimMarkets(m.markets); n++;
+      r.markets = carryTakes(r.markets, slimMarkets(m.markets)); n++;
     });
     save(); renderCard(); renderBoard(); renderCalib();
     say("Rescored <b>" + n + "</b> ungraded matchup" + (n === 1 ? "" : "s") + " through the model as it stands today." +

@@ -117,7 +117,7 @@
     propsRowsFrom(d).forEach(function (row) {
       if (startedGames[row.game]) { inPlay++; return; }
       var k = propKey(row), i = have[k];
-      if (i !== undefined) { if (props[i].result) { kept++; return; } row.id = props[i].id; props[i] = row; replaced++; }
+      if (i !== undefined) { if (props[i].result) { kept++; return; } row.id = props[i].id; if (props[i].take) row.take = true; props[i] = row; replaced++; }   // the take mark rides through a reload (26 Oct 2026)
       else { row.id = nextP++; have[k] = props.length; props.push(row); added++; }
     });
     saveProps();
@@ -204,7 +204,7 @@
     var graded = props.filter(function (r) { return r.result && r.result !== "graded"; });
     if (!graded.length) return "";
     var mk = function () { return { n: 0, w: 0, l: 0, p: 0, v: 0, says: 0, units: 0 }; };
-    var all = mk(), byMk = {}, byBand = {}, bySide = {}, byEdge = {}, byChance = {}, byDate = {}, byDateBet = {}, byCentre = {};
+    var all = mk(), byMk = {}, byBand = {}, bySide = {}, byEdge = {}, byChance = {}, byDate = {}, byDateBet = {}, byCentre = {}, byTake = mk();
     var dec = function (price) { return price > 0 ? 1 + price / 100 : 1 + 100 / (-price); };
     graded.forEach(function (r) {
       var d = r.gdate || "?";
@@ -212,6 +212,7 @@
                    byEdge[propsEdgeBucket(r)] || (byEdge[propsEdgeBucket(r)] = mk()), byChance[propsChanceBucket(r)] || (byChance[propsChanceBucket(r)] = mk()),
                    byDate[d] || (byDate[d] = mk()), byCentre[propsCentre(r)] || (byCentre[propsCentre(r)] = mk())];
       if (r.band === "BET") sinks.push(byDateBet[d] || (byDateBet[d] = mk()));
+      if (r.take) sinks.push(byTake);   // the props marked as taken (26 Oct 2026)
       sinks.forEach(function (s) {
         if (r.result === "void") { s.v++; return; }
         if (r.result === "push") { s.p++; return; }
@@ -238,6 +239,7 @@
     var parts = [];
     ["OVER", "UNDER"].forEach(function (sd) { if (bySide[sd]) parts.push(sd.toLowerCase() + " " + rec(bySide[sd])); });
     ["BET", "LEAN", "no edge"].forEach(function (b) { if (byBand[b]) parts.push(b + " " + rec(byBand[b]) + (byBand[b].n ? " " + sgn(byBand[b].units, 1) + "u" : "")); });
+    if (byTake.n || byTake.p) parts.push("taken " + rec(byTake) + (byTake.n ? " " + sgn(byTake.units, 1) + "u" : ""));
     var markets = ["pts", "reb", "ast", "tpm", "pra"].map(function (k) { return byMk[k] ? tile(PROPS_LABEL[k], byMk[k], []) : ""; }).join("");
     var verdict = 'The props are a priori: the pooled rules behind them were measured on last season\'s box scores, the blend\'s weights were not. Read the BET band against the rest and <i>does</i> against <i>says</i>; under 100 graded props nothing here is a reading.';
     if (!full) {
@@ -249,6 +251,7 @@
     var dates = Object.keys(byDate).sort();
     var h2 = '<div class="calib" data-sport="PROPS-TAB">' + tile("Every prop with a side", all, parts.slice(0, 2));
     ["BET", "LEAN", "no edge"].forEach(function (b) { if (byBand[b]) h2 += tile(b === "no edge" ? "No edge: the book's own side" : b + " band", byBand[b], []); });
+    if (byTake.n || byTake.p) h2 += tile("Taken: the props you marked", byTake, []);
     h2 += '</div>';
     h2 += '<div class="subhead">By market</div><div class="calib" data-sport="PROPS-MK">' + markets + '</div>';
     h2 += '<div class="subhead">By the edge the sheet claimed <span class="tag">the chance less what the price needs</span></div><div class="calib" data-sport="PROPS-EDGE">' +
@@ -278,6 +281,31 @@
     if (!r.result) return '';
     var cls = r.result === "win" ? "win" : r.result === "loss" ? "loss" : "push";
     return ' <span class="chip ' + cls + '">' + esc(r.result === "void" ? "VOID · did not play" : r.result.toUpperCase()) + (r.actual !== null && r.actual !== undefined ? " · " + r.actual : "") + '</span>';
+  }
+  /* the props you take (26 Oct 2026, the user: "a select or picked option for the props or bets I take, that way I
+     can see on the page the ones I will place"): a Take button on every projected prop, on the best cards, the table
+     and the panel; the mark is a flag on the row, kept with the props, carried through a reload of the night's file,
+     listed under Taking on this tab and under Taking tonight on the day board, and graded on its own line in the
+     record. A graded prop cannot be marked after the fact. Nothing here changes a chance or a band */
+  function propTakeBtn(r, big) {
+    if (!propHas(r)) return "";
+    if (r.result) return r.take ? ' <span class="chip taken">TAKEN</span>' : "";
+    return '<button type="button" class="takebtn' + (r.take ? ' on' : '') + (big ? ' big' : '') + '" data-ptake="' + r.id + '" title="' +
+           (r.take ? 'Marked as a bet you are placing: click to unmark it' : 'Mark this prop as a bet you are placing') + '">' + (r.take ? '&#10003; Taking' : (big ? 'Take this prop' : 'Take')) + '</button>';
+  }
+  function propTakeCard(r) {
+    return '<div class="pk taking" data-prop="' + r.id + '"><div class="n1">TAKING · NBA PROP · ' + esc(r.band) + '</div>' +
+      '<div class="n2">' + esc(r.name) + ' ' + esc(r.side) + ' ' + r.line + ' ' + esc(PROPS_LABEL[r.mk] || r.mk) + '</div>' +
+      '<div class="n3">' + (r.chance * 100).toFixed(1) + '% · ' + sgn(r.price, 0) + ' needs ' + (r.need * 100).toFixed(1) + '%' + propResChip(r) + '</div>' +
+      '<div class="n4">' + esc(r.game) + ' · ' + esc(r.book) + ' · projected ' + r.proj + '</div><div class="n6">' + propTakeBtn(r) + '</div></div>';
+  }
+  function togglePropTake(id) {
+    var r = propById(id); if (!r || !propHas(r)) return;
+    if (r.result) { propsSay("<b>" + esc(r.name) + "</b> is graded: a prop is marked before the game, not after."); return; }
+    r.take = !r.take;
+    if (!propsPreview) saveProps();
+    renderProps(); renderCalib(); if (typeof renderBoard === "function") renderBoard();
+    if ($("propDetail") && !$("propDetail").hidden && propDetailId === String(id)) $("propDetailBody").innerHTML = propsDetailHtml(r);
   }
   /* the last games (20 Oct 2026, the user: "highlight their scored numbers so it's easy to see"):
      the stat of each game in its own mark, green over the prop's line, red under it, grey on it,
@@ -363,6 +391,7 @@
     h += '<div class="pd-pick">' + (has ? esc(r.side) + ' ' : '') + esc(String(r.line)) + ' ' + esc(lab) + propResChip(r) + '</div>';
     h += '<div class="pd-sub">' + esc(r.game) + ' · ' + esc(gameDate(r.gdate)) + (r.opp ? ' · ' + (r.athome ? 'at home against ' : 'on the road at ') + esc(r.opp) : '') +
          ' · ' + esc(r.book || "the book") + ' ' + esc(String(r.line)) + ' (' + sgn(r.op, 0) + '/' + sgn(r.up, 0) + ')</div>';
+    if (has && (propTakeBtn(r, true) || "").length) h += '<div class="pd-take">' + propTakeBtn(r, true) + '</div>';
     if (has) {
       h += '<div class="pd-tiles">' +
         tile("Chance", (r.chance * 100).toFixed(1) + "%", "blended: the over is " + (r.pm * 100).toFixed(1) + "% by the model, " + (r.pb * 100).toFixed(1) + "% by the book") +
@@ -457,22 +486,29 @@
         '<div class="n2">' + esc(r.name) + ' ' + esc(r.side) + ' ' + r.line + ' ' + esc(PROPS_LABEL[r.mk] || r.mk) + '</div>' +
         '<div class="n3">' + (r.chance * 100).toFixed(1) + '% · ' + sgn(r.price, 0) + ' needs ' + (r.need * 100).toFixed(1) + '% · edge ' + sgn(r.edge * 100, 1) + resChip(r) + '</div>' +
         '<div class="n4">' + esc(r.game) + ' · projected ' + r.proj + ' (±' + r.sd + ') · ' + esc(r.book) + '</div>' +
-        (propsLeversLine(r) ? '<div class="n5">Moves it: ' + propsLeversLine(r) + '</div>' : '') + '</div>';
+        (propsLeversLine(r) ? '<div class="n5">Moves it: ' + propsLeversLine(r) + '</div>' : '') + '<div class="n6">' + propTakeBtn(r) + '</div></div>';
     }).join("") : '<div class="empty">' + (rows.length ? 'No prop on this date clears its price.' : 'Load a props file: Run NBA props.bat writes nba-props-DATE.json.') + '</div>';
+    /* the props marked as taken on the date (26 Oct 2026), above the best list */
+    var taken = rows.filter(function (r) { return r.take && propHas(r); });
+    if ($("propsTaking")) {
+      $("propsTakingHead").hidden = !taken.length; $("propsTaking").hidden = !taken.length;
+      $("propsTaking").innerHTML = taken.map(propTakeCard).join("");
+      $("propsTakingCount").textContent = taken.length ? taken.length + " marked" : "";
+    }
     var pool = ($("propsAll").checked ? rows : rows.filter(propHas)).slice(), list = propsTableRows(pool);
     ["propsMk", "propsBand", "propsSide", "propsQ"].forEach(function (id) { var el = $(id); if (el) { var k = { propsMk: "mk", propsBand: "band", propsSide: "side", propsQ: "q" }[id]; if (el.value !== propsTableView[k]) el.value = propsTableView[k]; } });
     if ($("propsShown")) $("propsShown").textContent = rows.length ? (list.length === pool.length ? pool.length + " shown" : list.length + " of " + pool.length + " shown") + (propsTableView.sort !== "default" ? " · sorted by " + (PROPS_SORT_COLS.filter(function (c) { return c[0] === propsTableView.sort; })[0] || ["", propsTableView.sort])[1].toLowerCase() + (propsTableView.dir < 0 ? " ▾" : " ▴") : "") : "";
     var h = '<table class="form props"><thead><tr>' + PROPS_SORT_COLS.map(function (c) {
       var on = propsTableView.sort === c[0];
       return '<th data-sort="' + c[0] + '" class="sortable' + (on ? ' on' : '') + '" title="Sort by ' + c[1].toLowerCase() + '">' + c[1] + (on ? (propsTableView.dir < 0 ? ' ▾' : ' ▴') : '') + '</th>';
-    }).join('') + '</tr></thead><tbody>';
+    }).join('') + '<th>Take</th></tr></thead><tbody>';
     list.forEach(function (r) {
-      h += '<tr data-prop="' + r.id + '" class="' + (r.result || '') + '"><td>' + esc(r.game) + '</td><td>' + esc(r.name) + (r.pos ? ' <span class="tag">' + esc(r.pos) + '</span>' : '') + '</td>' +
+      h += '<tr data-prop="' + r.id + '" class="' + (r.result || '') + (r.take ? ' taking' : '') + '"><td>' + esc(r.game) + '</td><td>' + esc(r.name) + (r.pos ? ' <span class="tag">' + esc(r.pos) + '</span>' : '') + '</td>' +
         '<td>' + esc(PROPS_LABEL[r.mk] || r.mk) + '</td><td>' + r.line + ' (' + sgn(r.op, 0) + '/' + sgn(r.up, 0) + ')</td>' +
         (propHas(r) ? '<td>' + esc(r.side) + '</td><td>' + (r.chance * 100).toFixed(1) + '%</td><td>' + sgn(r.price, 0) + '</td><td>' + (r.need * 100).toFixed(1) + '%</td>' +
                       '<td class="' + (r.edge > 0 ? 'pos' : 'neg') + '">' + sgn(r.edge * 100, 1) + '</td><td>' + r.proj + '</td><td>' + esc(r.band) + '</td>'
                     : '<td colspan="7" class="dim">' + esc((r.why && r.why[0]) || 'no projection') + '</td>') +
-        '<td>' + (r.result ? esc(r.result) + (r.actual !== null && r.actual !== undefined ? ' · ' + r.actual : '') : '') + '</td></tr>';
+        '<td>' + (r.result ? esc(r.result) + (r.actual !== null && r.actual !== undefined ? ' · ' + r.actual : '') : '') + '</td><td class="take">' + propTakeBtn(r) + '</td></tr>';
     });
     h += '</tbody></table>';
     propsOrder = list.map(function (r) { return String(r.id); });   // the panel's Previous / Next walk the table's order
@@ -483,7 +519,7 @@
     var rows = props.filter(function (r) { return (r.gdate || "") === date && propHas(r); }).sort(function (a, b) { return b.edge - a.edge; });
     var out = ["The Super Model — NBA props — " + gameDate(date)];
     rows.forEach(function (r, i) {
-      out.push((i + 1) + ". " + r.name + " " + r.side + " " + r.line + " " + (PROPS_LABEL[r.mk] || r.mk) + " " + sgn(r.price, 0) + " · " + (r.chance * 100).toFixed(1) + "% needs " +
+      out.push((i + 1) + ". " + (r.take ? "TAKING · " : "") + r.name + " " + r.side + " " + r.line + " " + (PROPS_LABEL[r.mk] || r.mk) + " " + sgn(r.price, 0) + " · " + (r.chance * 100).toFixed(1) + "% needs " +
                (r.need * 100).toFixed(1) + "% · " + r.band + " · " + r.game + " · proj " + r.proj + (r.result ? " · " + r.result.toUpperCase() + (r.actual !== null && r.actual !== undefined ? " " + r.actual : "") : ""));
     });
     return out.join("\n");
@@ -523,6 +559,10 @@
     });
     if ($("propsReset")) $("propsReset").addEventListener("click", function () { propsTableView = Object.assign({}, PROPS_VIEW_DEFAULT); try { localStorage.removeItem(PROPS_VIEW_KEY); } catch (e) {} renderProps(); });
     $("propsBest").addEventListener("click", openFrom);
+    if ($("propsTaking")) {
+      $("propsTaking").addEventListener("click", openFrom);
+      $("propsTakingText").addEventListener("click", function () { copyText(takingAsText($("propsDate").value), propsSay, "the props you are taking"); });
+    }
     if ($("propDetail")) {
       $("propDetailClose").addEventListener("click", closePropDetail);
       $("propDetailPrev").addEventListener("click", function () { stepPropDetail(-1); });

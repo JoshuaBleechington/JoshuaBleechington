@@ -181,6 +181,12 @@ def head() -> str:
              "  .pdlg .lever.top .lt { font-weight: 700; }\n"
              "  .pdlg ul.pd-why li.lever-line { font-weight: 600; } .pdlg ul.pd-why li.lever-line::marker { color: var(--edge); }\n"
              "  .pk .n5 { font-size: 11px; color: var(--ink-2); }\n"
+             "  /* the bets you take (26 Oct 2026): a Take button on every priced market and prop, the marked ones listed and lit */\n"
+             "  .takebtn { font: 700 10.5px/1 var(--sans); letter-spacing: .06em; text-transform: uppercase; padding: 5px 10px; border-radius: 999px; border: 1.5px solid var(--rule); background: transparent; color: var(--ink-2); cursor: pointer; }\n"
+             "  .takebtn:hover { border-color: var(--ink); color: var(--ink); } .takebtn.on { background: var(--go); border-color: var(--go); color: #fff; } .takebtn.big { font-size: 12px; padding: 7px 14px; }\n"
+             "  .pk .n6 { margin-top: 8px; } .pdlg .pd-take { margin: 6px 0 2px; } table.props td.take, #board td:last-child { white-space: nowrap; }\n"
+             "  .pk.taking, tr.taking { box-shadow: inset 4px 0 0 var(--go); } .pk.taking.sum { border-style: dashed; } .chip.taken { background: var(--go); color: #fff; }\n"
+             "  #calibBox .calib[data-sport=\"TAKEN\"] > div.good { box-shadow: inset 3px 0 0 var(--go); } #calibBox .calib[data-sport=\"TAKEN\"] > div.bad { box-shadow: inset 3px 0 0 var(--bad); }\n"
              "  @media (max-width: 640px) { .pdlg .lever { grid-template-columns: 1fr 1fr 50px; } }\n"
              "  @media (max-width: 640px) { .pdlg { padding: 10px 8px; } .pdlg-box { padding: 16px 14px 18px; } .pdlg h3 { font-size: 20px; } }\n"
              "  #propsView .picks .pk.scored { border-color: var(--go); }\n"
@@ -595,7 +601,7 @@ def props_example_games() -> list:
 
 def build() -> str:
     props_js = once((ROOT / "props.engine.js").read_text(), "/*PROPS_EXAMPLE*/[]", json.dumps(props_example_games(), separators=(",", ":")), "props example")
-    html = head() + engine_block() + (ROOT / "nhl.engine.js").read_text() + (ROOT / "nba.engine.js").read_text() + props_js + tail()
+    html = head() + engine_block() + (ROOT / "nhl.engine.js").read_text() + (ROOT / "nba.engine.js").read_text() + props_js + (ROOT / "take.engine.js").read_text() + tail()
     # the store (25 Oct 2026): the card, the props and the slate outgrew localStorage's 10 MB, so every storage call goes
     # through smStore (web/store.js), which keeps those three in IndexedDB behind a cache filled before the page's code
     # runs; the page's one closure waits for that cache. The shim itself keeps its own localStorage calls, so it goes in after

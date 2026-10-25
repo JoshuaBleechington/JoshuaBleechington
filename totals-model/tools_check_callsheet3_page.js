@@ -1275,6 +1275,100 @@ const CHECKS = ["dome","playoff","agconf","hgconf","agbk","hgbk"];
       && refsW.refRows.length === 4 && /^:Zach Zarba\|:EVEN\|:58-60 z [-−]0\.2\|:0-1\|under:0\.0%\|under:[-−]15\.0$/.test(refsW.refRows[3]) && refsW.evenFolded && /An official 1\.5 sigma or more/.test(refsW.verdict),
       'refs watch: Zarba alone has no lean, so his 205 against 220 lands on the even line with no side taken, and he joins the folded no-lean officials last', JSON.stringify({ lean: refsW.leanRows, refs: refsW.refRows, folded: refsW.evenFolded, verdict: refsW.verdict.slice(0, 80) }));
 
+  // ---- 26 Oct 2026: the bets you take -- a Take button on the board, the pick cards and the props; Taking tonight lists them;
+  //      the mark rides through a rescore and a reload, a graded row cannot be marked, and What you took grades them ----
+  const takeT = await pg.evaluate(async () => {
+    const wait = () => new Promise(r => setTimeout(r, 90));
+    const set = (id, v) => { const el = document.getElementById(id); el.value = v; el.dispatchEvent(new Event('input', { bubbles: true })); };
+    await smStore.removeItem('callsheet3.card.v1'); await smStore.removeItem('callsheet3.props.v1');
+    document.getElementById('clear').click(); document.getElementById('m-nhl').click(); await wait();
+    set('gdate', '2026-11-12'); document.getElementById('example').click(); await wait(); set('gdate', '2026-11-12');
+    document.getElementById('add').click(); await wait();
+    document.getElementById('boardDate').value = '2026-11-12'; document.getElementById('boardDate').dispatchEvent(new Event('change')); await wait();
+    const head0 = document.getElementById('takingHead').hidden, btns0 = document.querySelectorAll('#board tbody tr .takebtn').length, rows0 = document.querySelectorAll('#board tbody tr').length;
+    const tr0 = document.querySelector('#board tbody tr'), pick0 = tr0.querySelectorAll('td')[3].querySelector('.chip').textContent.trim();
+    set('line', '5.5'); await wait();   // the form now differs from the row: a row click would put the row's 6 back
+    tr0.querySelector('.takebtn').click(); await wait();
+    const lineAfter = document.getElementById('line').value;
+    const mine = () => JSON.parse(smStore.getItem('callsheet3.card.v1')).filter(r => /Rangers @ Bruins/.test(r.matchup) && r.gdate === '2026-11-12');   // rows from earlier checks sit on the card too
+    const stored1 = mine()[0];
+    const takes1 = stored1.markets.filter(m => m.take).map(m => m.key + ':' + m.take.side + ':' + m.take.pick + ':' + m.take.price + ':' + (m.take.p > 0 && m.take.p < 1));
+    const tr1 = document.querySelector('#board tbody tr'), on1 = tr1.classList.contains('taking') && /Taking/.test(tr1.querySelector('.takebtn').textContent);
+    const list1 = [...document.querySelectorAll('#taking .pk')].map(e => e.innerText.replace(/\s+/g, ' ').trim());
+    const head1 = document.getElementById('takingHead').hidden, count1 = document.getElementById('takingCount').textContent;
+    const cardOn = [...document.querySelectorAll('#picks .pk .takebtn.on, #bestBets .pk .takebtn.on, #likeliest .pk .takebtn.on')].length;
+    // a rescore rebuilds every ungraded row's markets: the mark moves over
+    document.getElementById('rescore').click(); await wait();
+    const takes2 = mine()[0].markets.filter(m => m.take).map(m => m.key + ':' + m.take.side);
+    // the same game added again from the form replaces its markets: the mark moves over
+    set('line', '6'); await wait(); document.getElementById('add').click(); await wait();
+    const takes3 = mine()[0].markets.filter(m => m.take).map(m => m.key + ':' + m.take.side), nRows = mine().length;
+    // the copy button speaks, with or without a clipboard
+    document.getElementById('takingText').click(); await new Promise(r => setTimeout(r, 250));
+    const said = document.getElementById('saveMsg').textContent;
+    // grade the game 2-3: the mark grades on its card, the button becomes a TAKEN chip, and What you took keeps the line
+    const trc = () => [...document.querySelectorAll('#cardTable tr')].find(t => /Rangers @ Bruins/.test(t.textContent));
+    const g = (k, v) => { const el = trc().querySelector(`.grade[data-k="${k}"]`); el.value = v; el.dispatchEvent(new Event('input', { bubbles: true })); el.dispatchEvent(new Event('change', { bubbles: true })); };
+    g('fa', '2'); g('fh', '3'); await wait();
+    const list3 = [...document.querySelectorAll('#taking .pk')].map(e => e.innerText.replace(/\s+/g, ' ').trim());
+    const res3 = (document.querySelector('#taking .pk .chip.win, #taking .pk .chip.loss, #taking .pk .chip.push') || {}).textContent || '';
+    const boardRes = (document.querySelector('#board tbody tr.taking td:nth-child(10) .chip') || {}).textContent || '';
+    const chip3 = (document.querySelector('#board tbody tr.taking .chip.taken') || {}).textContent || '', btn3 = document.querySelectorAll('#board tbody tr.taking .takebtn').length;
+    const took = [...document.querySelectorAll('#calibBox .calib[data-sport="TAKEN"] > div')].map(d => d.innerText.replace(/\s+/g, ' ').trim());
+    // a graded row refuses a new mark
+    const other = [...document.querySelectorAll('#board tbody tr')].find(t => !t.classList.contains('taking')), otherBtns = other ? other.querySelectorAll('.takebtn').length : -1;
+    return { head0, btns0, rows0, pick0, lineAfter, takes1, on1, list1, head1, count1, cardOn, takes2, takes3, nRows, said, list3, res3, boardRes, chip3, btn3, took, otherBtns };
+  });
+  chk(takeT.head0 && takeT.btns0 === takeT.rows0 && takeT.rows0 > 0 && takeT.lineAfter === '5.5' && takeT.takes1.length === 1 && new RegExp('^(total|p1|ml|pl):(OVER|UNDER|HOME|AWAY):' + takeT.pick0.replace(/[.+\-]/g, '\\$&') + ':[-−]?\\d+:true$').test(takeT.takes1[0])
+      && takeT.on1 && !takeT.head1 && takeT.count1 === '1 marked' && takeT.list1.length === 2 && /^TAKING · NHL · marked /.test(takeT.list1[0]) && takeT.list1[0].indexOf(takeT.pick0) > 0 && /Rangers @ Bruins/.test(takeT.list1[0]) && /Taking$/i.test(takeT.list1[0])
+      && /^TONIGHT 1 bet marked none graded yet · one unit each 1 on the card, 0 props$/.test(takeT.list1[1]) && takeT.cardOn >= 1,
+      'take: a Take button on every priced row of the board marks the pick as shown without opening the row; the row lights, the same market\'s card lights, and Taking tonight lists it with a summary card', JSON.stringify(takeT).slice(0, 1200));
+  chk(takeT.takes2.length === 1 && takeT.takes2[0] === takeT.takes1[0].split(':').slice(0, 2).join(':') && takeT.takes3.length === 1 && takeT.takes3[0] === takeT.takes2[0] && takeT.nRows === 1 && /Copied the bets you are taking|the text is below/.test(takeT.said),
+      'take: the mark rides through a rescore and through the same game added again, and the copy button speaks', JSON.stringify({ t2: takeT.takes2, t3: takeT.takes3, rows: takeT.nRows, said: takeT.said.slice(0, 80) }));
+  chk(takeT.list3.length === 2 && /(WIN|LOSS|PUSH|win|loss|push)/.test(takeT.res3) && takeT.res3.toLowerCase() === takeT.boardRes.toLowerCase() && takeT.chip3 === 'TAKEN' && takeT.btn3 === 0 && takeT.otherBtns === 0
+      && takeT.took.length === 1 && new RegExp('^Game bets taken ' + (takeT.res3.toLowerCase() === 'win' ? '1-0' : takeT.res3.toLowerCase() === 'loss' ? '0-1' : '0-0-1') + ' ', 'i').test(takeT.took[0]) && /says \d+\.\d% · does \d+\.\d% \(±\d+\.\d\) · [-−+]\d\.\d\du$/.test(takeT.took[0])
+      && new RegExp('graded ' + (takeT.res3.toLowerCase() === 'win' ? '1-0' : takeT.res3.toLowerCase() === 'loss' ? '0-1' : '0-0-1') + ' · ').test(takeT.list3[1]),
+      'take: once the game grades the marked bet shows its result on its card and the board, the button becomes a TAKEN chip, no mark can be added to the graded row, and What you took keeps the record at the price marked', JSON.stringify({ list3: takeT.list3, res: takeT.res3, board: takeT.boardRes, chip: takeT.chip3, took: takeT.took, other: takeT.otherBtns }));
+  await pg.reload(); await pg.waitForTimeout(300); await pg.evaluate(() => smStore.ready);
+  const takeR = await pg.evaluate(async () => {
+    const wait = () => new Promise(r => setTimeout(r, 90));
+    document.getElementById('boardDate').value = '2026-11-12'; document.getElementById('boardDate').dispatchEvent(new Event('change')); await wait();
+    const list = [...document.querySelectorAll('#taking .pk')].map(e => e.innerText.replace(/\s+/g, ' ').trim()), hidden = document.getElementById('takingHead').hidden;
+    // the props: the example's best card, the table row and the panel each carry the button; Taking lists the mark; the board's Taking tonight lists it on the props' date
+    document.getElementById('m-props').click(); await wait(); document.getElementById('propsExample').click(); await wait();
+    const card = () => [...document.querySelectorAll('#propsBest .pk')].find(e => /Tyrese Maxey/.test(e.textContent)), id = card().getAttribute('data-prop');   // re-found after every re-render
+    const pHead0 = document.getElementById('propsTakingHead').hidden, pBtns = document.querySelectorAll('#propsTable tr[data-prop] .takebtn').length, pRows = document.querySelectorAll('#propsTable tr[data-prop]').length;
+    card().querySelector('.takebtn').click(); await wait();
+    const dlgOpen = !document.getElementById('propDetail').hidden;
+    const pList = [...document.querySelectorAll('#propsTaking .pk')].map(e => e.innerText.replace(/\s+/g, ' ').trim());
+    const rowTaking = !!document.querySelector('#propsTable tr[data-prop="' + id + '"].taking'), cardOn = card().querySelector('.takebtn').classList.contains('on');
+    const pCount = document.getElementById('propsTakingCount').textContent, pHead1 = document.getElementById('propsTakingHead').hidden;
+    card().click(); await wait();
+    const panelBtn = (document.querySelector('#propDetail .pd-take .takebtn') || {}).textContent || '', panelOn = !!document.querySelector('#propDetail .pd-take .takebtn.on');
+    document.querySelector('#propDetail .pd-take .takebtn').click(); await wait();   // unmark from the panel
+    const panelOff = !document.querySelector('#propDetail .pd-take .takebtn.on') && !!document.querySelector('#propDetail .pd-take .takebtn'), pList2 = document.querySelectorAll('#propsTaking .pk').length, pHead2 = document.getElementById('propsTakingHead').hidden;
+    document.getElementById('propDetailClose').click(); await wait();
+    card().querySelector('.takebtn').click(); await wait();   // mark it again from the card
+    document.getElementById('propsTakingText').click(); await new Promise(r => setTimeout(r, 250));
+    const pSaid = document.getElementById('propsMsg').textContent;
+    const today = document.getElementById('propsDate').value;
+    document.getElementById('m-nba').click(); await wait();   // the example is put away by a sport button, and its mark with it
+    document.getElementById('m-props').click(); await wait();
+    const gone = document.querySelectorAll('#propsTaking .pk').length + (document.getElementById('propsTakingHead').hidden ? 0 : 100);
+    document.getElementById('m-nba').click(); await wait();
+    document.getElementById('boardDate').value = today; document.getElementById('boardDate').dispatchEvent(new Event('change')); await wait();
+    const boardProps = [...document.querySelectorAll('#taking .pk')].map(e => e.innerText.replace(/\s+/g, ' ').trim()).filter(t => /NBA PROP/.test(t)).length;
+    await smStore.removeItem('callsheet3.card.v1'); await smStore.removeItem('callsheet3.props.v1');
+    document.getElementById('clear').click(); await wait();
+    return { list, hidden, pHead0, pBtns, pRows, dlgOpen, pList, rowTaking, cardOn, pCount, pHead1, panelBtn, panelOn, panelOff, pList2, pHead2, pSaid, gone, boardProps };
+  });
+  chk(!takeR.hidden && takeR.list.length === 2 && /^TAKING · NHL/.test(takeR.list[0]), 'take: the mark survives a reload of the page', JSON.stringify({ hidden: takeR.hidden, list: takeR.list }));
+  chk(takeR.pHead0 && takeR.pBtns === 7 && takeR.pRows === 7 && !takeR.dlgOpen && takeR.pList.length === 1 && /^TAKING · NBA PROP · LEAN Tyrese Maxey OVER 25\.5 points 52\.4% · [-−]110 needs 52\.4% 76ers @ Knicks · fanatics · projected 28\.07 .*Taking$/i.test(takeR.pList[0])
+      && takeR.rowTaking && takeR.cardOn && takeR.pCount === '1 marked' && !takeR.pHead1 && takeR.panelOn && /Taking/.test(takeR.panelBtn) && takeR.panelOff && takeR.pList2 === 0 && takeR.pHead2
+      && /Copied the props you are taking|the text is below/.test(takeR.pSaid) && takeR.gone === 0 && takeR.boardProps === 0,
+      'take: a prop\'s Take button on the best card marks it without opening the panel; the row lights, Taking lists it with a count, the panel\'s own button shows it on and unmarks it, the copy button speaks, and the example\'s mark goes with the example',
+      JSON.stringify(takeR).slice(0, 1200));
+
   // ---- the build stamp ------------------------------------------------------------
   // ---- the simulation (25 Oct 2026): the card on the example, the block stored with the row, the record once graded ----
   await pg.evaluate(async () => { await smStore.removeItem('callsheet3.card.v1'); }); await pg.reload(); await pg.waitForTimeout(300); await pg.evaluate(() => smStore.ready);

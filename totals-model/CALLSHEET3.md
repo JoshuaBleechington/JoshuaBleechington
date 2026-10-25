@@ -1259,3 +1259,43 @@ days stay as logged. The simulation reads ESPN's injury report (Out and
 Doubtful), not RotoWire's five: a man benched but active is not an
 absence to it. Props reload the same way they always did: an ungraded prop
 is replaced by the newer file, its `sim` with it.
+
+## The bets you take, 26 Oct 2026
+
+The user: "add a select or picked option for the props or bets I take,
+that way I can see on the page the ones I will place." And: "don't break
+anything." So the mark is extra state that nothing scores or grades from.
+
+A **Take** button sits on every priced market row of the day board, on
+every pick card (the parlay four, the straight bets, the likeliest side,
+the alternate totals) and on every projected prop (the best cards, the
+Every-prop table's last column, the prop's own panel). Clicking it marks
+the bet and lights the row or card green; clicking again unmarks it. The
+button is caught before the row or card underneath opens anything
+(`web/take.engine.js`, a capture-phase click handler).
+
+On a card row the mark is the market's `take`: the side, the pick, the
+price and the chance **as shown when it was marked**, because the board
+can show either side of a market (the likelier side or the value side)
+and the mark has to say which one was taken. On a prop it is a flag. Both
+are kept with the card and the props in IndexedDB; the market's mark rides
+through a rescore, a second Add of the same game and a slate that fills a
+blank box (`carryTakes`, by market and, for an alternate, by its number),
+and a prop's mark rides through a reload of the night's props file.
+
+**Taking tonight** sits at the top of the day board, above the parlay
+four: one card per marked bet on the board's date (the pick, the chance,
+the price and what it needs, the matchup, the result once the game
+grades) and the marked props for the same date, with a summary card
+(how many, graded W-L-P, units at one unit each) and a copy button. The
+Props tab has its own **Taking** section above the best props, with a
+count and a copy button; Copy props as text prefixes a marked prop with
+TAKING.
+
+**What you took** is a block in Is it working: every marked bet that has
+graded, game bets and props on two tiles, says against does and units at
+the price shown when the bet was marked. The props record also carries a
+"taken" line and a tile. A graded row or prop cannot be marked after the
+fact (the button becomes a TAKEN chip once the game grades, and a mark on
+a graded row is refused with a note), so the taken record is of bets
+marked before the game.

@@ -58,6 +58,25 @@
     return out;
   }
   function propsTakenOn(dateISO) { return (typeof propsSource === "function" ? propsSource() : []).filter(function (r) { return (r.gdate || "") === dateISO && r.take && propHas(r); }); }
+  /* the simulation's calls taken on NBA rows (26 Oct 2026): the mark lives on the row as row.simTakes */
+  function simTakesOn(dateISO) {
+    var out = [];
+    card.forEach(function (r) {
+      if ((r.gdate || "") !== dateISO || isVoid(r) || r.sport !== "NBA") return;
+      (r.simTakes || []).forEach(function (t) { out.push({ row: r, t: t }); });
+    });
+    return out;
+  }
+  function simTakeCard(x) {
+    var t = x.t, res = nbaSimTakeRes(t, x.row), price = t.price === null || t.price === undefined ? -110 : t.price;
+    return '<div class="pk taking sim" data-open="' + x.row.id + '" title="Load ' + esc(x.row.matchup) + ' into the form">' +
+      '<div class="n1">TAKING · NBA · SIMULATION' + (t.at ? ' · marked ' + esc(takeWhen(t.at)) : '') + '</div>' +
+      '<div class="n2">' + esc(t.pick) + '</div>' +
+      '<div class="n3">' + (t.p === null || t.p === undefined ? esc(t.band) : (100 * t.p).toFixed(0) + '% by the sim · worth ' + (100 * t.worth).toFixed(0) + '% · ' + esc(t.band)) +
+        ' · ' + (t.price === null || t.price === undefined ? 'no price on the row (−110 assumed)' : sgn(t.price, 0) + ' needs ' + (implied(price) * 100).toFixed(1) + '%') + (res ? ' · <span class="chip ' + res + '">' + esc(res) + '</span>' : '') + '</div>' +
+      '<div class="n4">' + esc(x.row.matchup) + ' · ' + esc(nbaSimTakeViewLabel(t.view)) + '</div>' +
+      '<div class="n6">' + nbaSimTakeBtn(x.row, t.view, t.key, t.side) + '</div></div>';
+  }
   function propTakeRes(r) { return !r.result || r.result === "graded" || r.result === "void" ? null : r.result; }
   function takeTally(s, res, price) {
     if (res === null || res === undefined || res === "invalid") return;
@@ -76,15 +95,16 @@
   }
   function renderTaking(dateISO) {
     var box = $("taking"); if (!box) return;
-    var bets = takesOn(dateISO), ps = propsTakenOn(dateISO), n = bets.length + ps.length;
+    var bets = takesOn(dateISO), sims = simTakesOn(dateISO), ps = propsTakenOn(dateISO), n = bets.length + sims.length + ps.length;
     $("takingHead").hidden = !n; box.hidden = !n;
     if (!n) { box.innerHTML = ""; $("takingCount").textContent = ""; return; }
     var s = { n: 0, w: 0, l: 0, p: 0, units: 0 }, h = "";
     bets.forEach(function (x) { takeTally(s, gradeMarket(x.mk, x.row.finals), x.mk.price); h += takeCard(x); });
+    sims.forEach(function (x) { takeTally(s, nbaSimTakeRes(x.t, x.row), x.t.price === null || x.t.price === undefined ? -110 : x.t.price); h += simTakeCard(x); });
     ps.forEach(function (r) { takeTally(s, propTakeRes(r), r.price); h += propTakeCard(r); });
     h += '<div class="pk taking sum"><div class="n1">TONIGHT</div><div class="n2">' + n + ' bet' + (n === 1 ? '' : 's') + ' marked</div>' +
          '<div class="n3">' + (s.n || s.p ? 'graded ' + s.w + '-' + s.l + (s.p ? '-' + s.p : '') + ' · ' + sgn(s.units, 2) + 'u at one unit each' : 'none graded yet · one unit each') + '</div>' +
-         '<div class="n4">' + bets.length + ' on the card, ' + ps.length + ' prop' + (ps.length === 1 ? '' : 's') + '</div></div>';
+         '<div class="n4">' + bets.length + ' on the card, ' + sims.length + ' from the simulation, ' + ps.length + ' prop' + (ps.length === 1 ? '' : 's') + '</div></div>';
     box.innerHTML = h;
     $("takingCount").textContent = n + " marked";
   }
@@ -93,6 +113,10 @@
     takesOn(dateISO).forEach(function (x) {
       var res = gradeMarket(x.mk, x.row.finals);
       out.push((++k) + ". " + x.mk.pick + " " + sgn(x.mk.price, 0) + " · " + (x.mk.p * 100).toFixed(1) + "% needs " + (implied(x.mk.price) * 100).toFixed(1) + "% · " + x.row.matchup + " · " + (x.mk.label || x.mk.key) + (res ? " · " + String(res).toUpperCase() : ""));
+    });
+    simTakesOn(dateISO).forEach(function (x) {
+      var t = x.t, res = nbaSimTakeRes(t, x.row);
+      out.push((++k) + ". " + t.pick + " " + (t.price === null || t.price === undefined ? "(no price)" : sgn(t.price, 0)) + " · the simulation, " + nbaSimTakeViewLabel(t.view) + (t.p === null ? "" : ": " + (100 * t.p).toFixed(0) + "%, worth " + (100 * t.worth).toFixed(0) + "%") + " · " + t.band + " · " + x.row.matchup + (res ? " · " + String(res).toUpperCase() : ""));
     });
     propsTakenOn(dateISO).forEach(function (r) {
       out.push((++k) + ". " + r.name + " " + r.side + " " + r.line + " " + (PROPS_LABEL[r.mk] || r.mk) + " " + sgn(r.price, 0) + " · " + (r.chance * 100).toFixed(1) + "% needs " + (r.need * 100).toFixed(1) + "% · " + r.game + (r.result ? " · " + r.result.toUpperCase() : ""));
@@ -106,7 +130,7 @@
   }
   /* the record: every marked bet that has graded, at the price shown when it was marked */
   function takenRecordHtml() {
-    var mk = function () { return { n: 0, w: 0, l: 0, p: 0, says: 0, units: 0 }; }, bets = mk(), pr = mk();
+    var mk = function () { return { n: 0, w: 0, l: 0, p: 0, says: 0, units: 0 }; }, bets = mk(), sims = mk(), pr = mk();
     card.forEach(function (r) {
       if (isVoid(r)) return;
       (r.markets || []).forEach(function (m) {
@@ -115,12 +139,16 @@
         if (res === null || res === "invalid") return;
         takeTally(bets, res, v.price); if (res !== "push") bets.says += v.p;
       });
+      if (r.sport === "NBA") (r.simTakes || []).forEach(function (t) {
+        var res = nbaSimTakeRes(t, r); if (!res) return;
+        takeTally(sims, res, t.price === null || t.price === undefined ? -110 : t.price); if (res !== "push") sims.says += (t.p === null || t.p === undefined ? 0.5 : t.p);
+      });
     });
     (typeof props === "undefined" ? [] : props).forEach(function (r) {
       var res = propTakeRes(r); if (!r.take || !res) return;
       takeTally(pr, res, r.price); if (res !== "push") pr.says += r.chance;
     });
-    if (!bets.n && !bets.p && !pr.n && !pr.p) return "";
+    if (!bets.n && !bets.p && !sims.n && !sims.p && !pr.n && !pr.p) return "";
     var tile = function (label, s) {
       if (!s.n && !s.p) return "";
       var says = s.n ? s.says / s.n * 100 : 0, does = s.n ? s.w / s.n * 100 : 0;
@@ -128,14 +156,18 @@
              '<p class="s">' + (s.n ? 'says ' + says.toFixed(1) + '% · does ' + does.toFixed(1) + '% (±' + (100 / Math.sqrt(s.n) / 2).toFixed(1) + ') · ' + sgn(s.units, 2) + 'u' : 'pushes only') + '</p></div>';
     };
     return '<div class="subhead" data-sport="TAKEN">What you took <span class="tag">every bet marked Taking before its game, graded at the price shown when it was marked · one unit each · says is the sheet\'s chance</span></div>' +
-           '<div class="calib" data-sport="TAKEN">' + tile("Game bets taken", bets) + tile("Props taken", pr) + '</div>';
+           '<div class="calib" data-sport="TAKEN">' + tile("Game bets taken", bets) + tile("Simulation calls taken", sims) + tile("Props taken", pr) + '</div>';
   }
   /* the buttons: caught before the card or the row underneath opens anything */
   document.addEventListener("click", function (e) {
-    var t = e.target && e.target.closest ? e.target.closest("[data-take],[data-ptake]") : null; if (!t) return;
+    var t = e.target && e.target.closest ? e.target.closest("[data-take],[data-ptake],[data-stake]") : null; if (!t) return;
     e.stopPropagation(); e.preventDefault();
-    if (t.hasAttribute("data-take")) toggleTake(t.getAttribute("data-take")); else togglePropTake(t.getAttribute("data-ptake"));
+    if (t.hasAttribute("data-take")) toggleTake(t.getAttribute("data-take"));
+    else if (t.hasAttribute("data-stake")) toggleSimTake(t.getAttribute("data-stake"));
+    else togglePropTake(t.getAttribute("data-ptake"));
   }, true);
+  /* Add puts the game on the card, and the Simulation card's greyed buttons come alive once the row exists: redraw it after the add */
+  if ($("add") && $("nbaSimPanel")) $("add").addEventListener("click", function () { setTimeout(function () { if (sport === "NBA") nbaSimPanel(); }, 0); });
   if ($("taking")) {
     $("taking").addEventListener("click", function (e) {
       var t = e.target.closest("[data-open]"); if (t) { openRow(t.dataset.open); return; }

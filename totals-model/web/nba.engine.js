@@ -658,11 +658,13 @@
             tile("Overtime", (100 * (own.ot || 0)).toFixed(1) + '%', '') + '</div>';
     h += '<div class="simmeta"><b>' + String(sim.runs).replace(/\B(?=(\d{3})+(?!\d))/g, ",") + ' games</b>, the sim\'s own view. ' +
          (sim.anchor ? 'Anchored to ' + esc(sim.anchor.book) + '\'s ' + esc(String(sim.anchor.total)) + (sim.anchor.sp !== null && sim.anchor.sp !== undefined ? ' / ' + (sim.anchor.sp > 0 ? '+' : '') + esc(String(sim.anchor.sp)) : '') + ' for the market view.' : 'No book on the scoreboard at the run: no market view.') + '</div>';
+    var takeRow = nbaSimTakeRow(f);   // the card row this game is on, if any: a sim call is taken on the row (26 Oct 2026)
     var cell = function (c) {
       if (!c) return '<span class="dim">—</span>';
       var cls = c.band === "no call" ? "simno" : c.band === "LEAN" ? "simlean" : c.band === "BET" ? "simbet" : "simstrong";
       return '<span class="simchip ' + cls + '"><b>' + esc(c.side) + '</b> ' + (100 * c.p).toFixed(0) + '%</span>' +
-             '<div class="simsub">' + (c.band !== "no call" ? esc(c.band) + ' · ' : '') + 'worth ' + (100 * c.worth).toFixed(0) + '%</div>';
+             '<div class="simsub">' + (c.band !== "no call" ? esc(c.band) + ' · ' : '') + 'worth ' + (100 * c.worth).toFixed(0) + '%</div>' +
+             '<div class="simtake">' + nbaSimTakeBtn(takeRow, c.view, c.key, c.side) + '</div>';
     };
     h += '<table class="form simtab"><thead><tr><th>Market</th><th>The sim\'s own view</th><th>Anchored to the market</th></tr></thead><tbody>';
     [["total", "Total", lines.total], ["h1", "First half", lines.h1], ["spread", "Spread (home)", lines.sp], ["ml", "Moneyline", null],
@@ -677,7 +679,7 @@
           first += ' <span class="dim">' + esc(tt.book) + ' ' + (tt.op > 0 ? '+' : '') + tt.op + '/' + (tt.up > 0 ? '+' : '') + tt.up + '</span></div>';
           if (tt.rule) {
             first += '<div class="ttgap">implied <b>' + tt.rule.implied + '</b>, gap <b>' + (tt.rule.gap > 0 ? '+' : '') + tt.rule.gap + '</b> · ' +
-                     (tt.rule.call ? '<span class="simchip simbet gaprule"><b>' + tt.rule.call + '</b> by the gap rule</span>' : '<span class="dim">inside a point, no call</span>') + '</div>';
+                     (tt.rule.call ? '<span class="simchip simbet gaprule"><b>' + tt.rule.call + '</b> by the gap rule</span> ' + nbaSimTakeBtn(takeRow, "gap", m[0], tt.rule.call) : '<span class="dim">inside a point, no call</span>') + '</div>';
           }
         } else {
           first += '</div>';
@@ -700,6 +702,81 @@
     }
     el.innerHTML = h;
   }
+  /* the simulation's calls you take (26 Oct 2026, the user: "lets say I decide to go with the Thunder team total under
+     119.5 at 72%, I would like to be able to select from this field too for tracking purposes and to show on the take for
+     the home screen"): a Take button under every chip on the Simulation card and beside the gap rule's call. The mark
+     lives on the card row (row.simTakes), one per view, market and side, and keeps the call as shown when it was
+     marked: the line, the book's price on that side, the sim's chance, its worth and its band, with the pick in words.
+     The game has to be on the card first, since the row is where the mark and the finals live. Listed under Taking
+     tonight with the rest, graded off the row's finals the way the sim record grades (the half from the half-time
+     score), on its own tile in What you took. Nothing here changes a call or a band. */
+  function nbaSimTakeRow(f) {
+    var away = (f && f.away) || $("away").value, home = (f && f.home) || $("home").value, gdate = $("gdate").value;
+    if (!away || !home) return null;
+    return card.filter(function (r) { return r.sport === "NBA" && sameGame(r, { sport: "NBA", gdate: gdate, away: away, home: home }); })[0] || null;
+  }
+  function nbaSimTakeId(view, key, side) { return view + "|" + key + "|" + side; }
+  function nbaSimTakeOf(row, view, key, side) {
+    var id = nbaSimTakeId(view, key, side);
+    return ((row && row.simTakes) || []).filter(function (t) { return t.id === id; })[0] || null;
+  }
+  function nbaSimTakeBtn(row, view, key, side) {
+    if (!row) return '<button type="button" class="takebtn off" disabled title="Add the game to the card first (Add, or Fill form from the slate and Add); the mark lives on the card row">Take</button>';
+    var t = nbaSimTakeOf(row, view, key, side);
+    if (isVoid(row) || rowGraded(row)) return t ? '<span class="chip taken">TAKEN</span>' : '';
+    return '<button type="button" class="takebtn' + (t ? ' on' : '') + '" data-stake="' + row.id + '|' + view + '|' + key + '|' + side + '" title="' +
+           (t ? 'Marked as a bet you are placing: click to unmark it' : 'Mark this call as a bet you are placing') + '">' + (t ? '&#10003; Taking' : 'Take') + '</button>';
+  }
+  /* the book's price on the call's side, from the form's boxes (the total, the half, the spread and the moneyline) or the team total's own line */
+  function nbaSimPriceOf(key, side, lines, inp) {
+    var v = key === "total" ? (side === "OVER" ? inp.op : inp.up) : key === "h1" ? (side === "OVER" ? inp.h1op : inp.h1up) : key === "spread" ? (side === "HOME" ? inp.sph : inp.spa)
+          : key === "ml" ? (side === "HOME" ? inp.hml : inp.aml) : (function () { var tt = key === "away_total" ? lines.away_tt : lines.home_tt; return tt ? (side === "OVER" ? tt.op : tt.up) : null; })();
+    return v === null || v === undefined || v === "" || isNaN(+v) ? null : +v;
+  }
+  function nbaSimPickText(key, side, line, away, home) {
+    if (key === "total") return "Total " + side + " " + line;
+    if (key === "h1") return "First half " + side + " " + line;
+    if (key === "spread") return (side === "HOME" ? home + " " + fmtLine(+line) : away + " " + fmtLine(-(+line)));
+    if (key === "ml") return (side === "HOME" ? home : away) + " ML";
+    return (key === "away_total" ? away : home) + " team total " + side + " " + line;
+  }
+  function toggleSimTake(spec) {
+    var p = String(spec).split("|"), row = card.filter(function (r) { return String(r.id) === p[0]; })[0]; if (!row) return;
+    var view = p[1], key = p[2], side = p[3], id = nbaSimTakeId(view, key, side);
+    if (rowGraded(row) || isVoid(row)) { say("<b>" + esc(row.matchup) + "</b> is graded: a bet is marked before the game, not after."); return; }
+    var done = function () { save(); render(); renderCard(); renderBoard(); renderCalib(); };
+    if (nbaSimTakeOf(row, view, key, side)) {   // marked already: unmark it
+      row.simTakes = row.simTakes.filter(function (t) { return t.id !== id; });
+      done(); return;
+    }
+    // mark it as the card shows it now: the call from the form's own runs and lines
+    var sim = nbaSim(), lines = nbaSimLinesFromForm(), f = readNba();
+    var tt = key === "away_total" ? lines.away_tt : key === "home_total" ? lines.home_tt : null, c = null;
+    if (view === "gap") { if (tt && tt.rule && tt.rule.call === side) c = { line: tt.line, p: null, worth: null, band: "gap rule" }; }
+    else if (sim) c = nbaSimCalls(sim, lines, view).filter(function (x) { return x.key === key && x.side === side; })[0] || null;
+    if (!c) { say("That call is not on the card as shown now; put the line back and take it again."); return; }
+    var inp = { op: $("op").value, up: $("up").value, h1op: $("h1op").value, h1up: $("h1up").value, sph: $("sph").value, spa: $("spa").value, hml: $("hml").value, aml: $("aml").value };
+    row.simTakes = (row.simTakes || []).concat([{ id: id, view: view, key: key, side: side, line: c.line, price: nbaSimPriceOf(key, side, lines, inp),
+                                                  p: c.p === null ? null : +(+c.p).toFixed(4), worth: c.worth === null ? null : +(+c.worth).toFixed(4), band: c.band,
+                                                  pick: nbaSimPickText(key, side, c.line, f.away || row.away, f.home || row.home), at: new Date().toISOString() }]);
+    done();
+  }
+  /* a taken call's result off the row's finals, the sim record's reading: the half from the half-time score */
+  function nbaSimTakeRes(t, row) {
+    var fin = (row && row.finals) || {};
+    if (fin.void) return null;
+    var fa = parseFloat(fin.fa), fh = parseFloat(fin.fh);
+    if (!isFinite(fa) || !isFinite(fh)) return null;
+    var cmp = function (v, line, over) { if (v === line) return "push"; return ((v > line) === over) ? "win" : "loss"; };
+    if (t.key === "total") return cmp(fa + fh, +t.line, t.side === "OVER");
+    if (t.key === "h1") { var f5a = parseFloat(fin.f5a), f5h = parseFloat(fin.f5h); if (!isFinite(f5a) || !isFinite(f5h)) return null; return cmp(f5a + f5h, +t.line, t.side === "OVER"); }
+    if (t.key === "spread") { var m = fh - fa + +t.line; if (m === 0) return "push"; return ((m > 0) === (t.side === "HOME")) ? "win" : "loss"; }
+    if (t.key === "ml") { if (fa === fh) return "push"; return ((fh > fa) === (t.side === "HOME")) ? "win" : "loss"; }
+    if (t.key === "away_total") return cmp(fa, +t.line, t.side === "OVER");
+    if (t.key === "home_total") return cmp(fh, +t.line, t.side === "OVER");
+    return null;
+  }
+  function nbaSimTakeViewLabel(view) { return view === "own" ? "the sim's own view" : view === "mkt" ? "anchored to the market" : "the gap rule"; }
   /* the record: every graded NBA row's sim calls at LEAN or better, says against does by view, market and band */
   function nbaSimUnits(price, win) { var p = +price; if (!p || isNaN(p)) p = -110; return win ? (p > 0 ? p / 100 : 100 / -p) : -1; }
   function nbaSimRecordHtml() {

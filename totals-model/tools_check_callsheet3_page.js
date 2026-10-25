@@ -1321,7 +1321,7 @@ const CHECKS = ["dome","playoff","agconf","hgconf","agbk","hgbk"];
   });
   chk(takeT.head0 && takeT.btns0 === takeT.rows0 && takeT.rows0 > 0 && takeT.lineAfter === '5.5' && takeT.takes1.length === 1 && new RegExp('^(total|p1|ml|pl):(OVER|UNDER|HOME|AWAY):' + takeT.pick0.replace(/[.+\-]/g, '\\$&') + ':[-−]?\\d+:true$').test(takeT.takes1[0])
       && takeT.on1 && !takeT.head1 && takeT.count1 === '1 marked' && takeT.list1.length === 2 && /^TAKING · NHL · marked /.test(takeT.list1[0]) && takeT.list1[0].indexOf(takeT.pick0) > 0 && /Rangers @ Bruins/.test(takeT.list1[0]) && /Taking$/i.test(takeT.list1[0])
-      && /^TONIGHT 1 bet marked none graded yet · one unit each 1 on the card, 0 props$/.test(takeT.list1[1]) && takeT.cardOn >= 1,
+      && /^TONIGHT 1 bet marked none graded yet · one unit each 1 on the card, 0 from the simulation, 0 props$/.test(takeT.list1[1]) && takeT.cardOn >= 1,
       'take: a Take button on every priced row of the board marks the pick as shown without opening the row; the row lights, the same market\'s card lights, and Taking tonight lists it with a summary card', JSON.stringify(takeT).slice(0, 1200));
   chk(takeT.takes2.length === 1 && takeT.takes2[0] === takeT.takes1[0].split(':').slice(0, 2).join(':') && takeT.takes3.length === 1 && takeT.takes3[0] === takeT.takes2[0] && takeT.nRows === 1 && /Copied the bets you are taking|the text is below/.test(takeT.said),
       'take: the mark rides through a rescore and through the same game added again, and the copy button speaks', JSON.stringify({ t2: takeT.takes2, t3: takeT.takes3, rows: takeT.nRows, said: takeT.said.slice(0, 80) }));
@@ -1368,6 +1368,57 @@ const CHECKS = ["dome","playoff","agconf","hgconf","agbk","hgbk"];
       && /Copied the props you are taking|the text is below/.test(takeR.pSaid) && takeR.gone === 0 && takeR.boardProps === 0,
       'take: a prop\'s Take button on the best card marks it without opening the panel; the row lights, Taking lists it with a count, the panel\'s own button shows it on and unmarks it, the copy button speaks, and the example\'s mark goes with the example',
       JSON.stringify(takeR).slice(0, 1200));
+
+  // ---- 26 Oct 2026: the simulation's calls can be taken too -- a Take button under every chip on the NBA Simulation card, greyed until the
+  //      game is on the card; the mark lives on the row, lists under Taking tonight as a simulation call, rides through a rescore and grades on its own tile ----
+  const simTakeT = await pg.evaluate(async () => {
+    const wait = () => new Promise(r => setTimeout(r, 90));
+    const set = (id, v) => { const el = document.getElementById(id); el.value = v; el.dispatchEvent(new Event('input', { bubbles: true })); };
+    await smStore.removeItem('callsheet3.card.v1');
+    document.getElementById('clear').click(); document.getElementById('m-nba').click(); await wait();
+    set('gdate', '2026-11-13'); document.getElementById('example').click(); await wait(); set('gdate', '2026-11-13'); await wait();
+    const off0 = document.querySelectorAll('#nbaSimPanel .takebtn.off[disabled]').length, on0 = document.querySelectorAll('#nbaSimPanel .takebtn[data-stake]').length;
+    const hint = (document.querySelector('#nbaSimPanel .takebtn.off') || {}).title || '';
+    document.getElementById('add').click(); await wait();
+    document.getElementById('boardDate').value = '2026-11-13'; document.getElementById('boardDate').dispatchEvent(new Event('change')); await wait();
+    const live = document.querySelectorAll('#nbaSimPanel .takebtn[data-stake]').length, off1 = document.querySelectorAll('#nbaSimPanel .takebtn.off').length;
+    const mine = () => JSON.parse(smStore.getItem('callsheet3.card.v1')).filter(r => /76ers @ Knicks/.test(r.matchup) && r.gdate === '2026-11-13');
+    const mlBtn = document.querySelector('#nbaSimPanel .takebtn[data-stake*="|own|ml|"]'), mlSpec = mlBtn.getAttribute('data-stake');
+    mlBtn.click(); await wait();
+    const t1 = (mine()[0].simTakes || [])[0] || null;
+    const btnOn = !!document.querySelector('#nbaSimPanel .takebtn.on[data-stake="' + mlSpec + '"]');
+    const list1 = [...document.querySelectorAll('#taking .pk')].map(e => e.innerText.replace(/\s+/g, ' ').trim());
+    // a second mark, the total's own-view call, then the first unmarked from the Taking card
+    const totBtn = document.querySelector('#nbaSimPanel .takebtn[data-stake*="|own|total|"]'); totBtn.click(); await wait();
+    const n2 = (mine()[0].simTakes || []).length, count2 = document.getElementById('takingCount').textContent;
+    document.querySelector('#taking .pk.sim .takebtn.on').click(); await wait();
+    const after = (mine()[0].simTakes || []).map(t => t.id), list2 = document.querySelectorAll('#taking .pk.sim').length;
+    // a rescore keeps the mark; the copy names the simulation
+    document.getElementById('rescore').click(); await wait();
+    const after3 = (mine()[0].simTakes || []).map(t => t.id);
+    document.getElementById('takingText').click(); await new Promise(r => setTimeout(r, 250));
+    const said = document.getElementById('saveMsg').textContent;
+    // grade: 231 points, the Knicks by ten -- the total's call grades off the final
+    const trc = () => [...document.querySelectorAll('#cardTable tr')].find(t => /76ers @ Knicks/.test(t.textContent));
+    const g = (k, v) => { const el = trc().querySelector(`.grade[data-k="${k}"]`); el.value = v; el.dispatchEvent(new Event('input', { bubbles: true })); el.dispatchEvent(new Event('change', { bubbles: true })); };
+    g('fa', '110'); g('fh', '120'); await wait();
+    const t3 = (mine()[0].simTakes || [])[0], list3 = [...document.querySelectorAll('#taking .pk.sim')].map(e => e.innerText.replace(/\s+/g, ' ').trim());
+    const took = [...document.querySelectorAll('#calibBox .calib[data-sport="TAKEN"] > div')].map(d => d.innerText.replace(/\s+/g, ' ').trim());
+    await smStore.removeItem('callsheet3.card.v1'); document.getElementById('clear').click(); await wait();
+    return { off0, on0, hint, live, off1, mlSpec, t1, btnOn, list1, n2, count2, after, list2, after3, said, t3, list3, took };
+  });
+  chk(simTakeT.off0 >= 7 && simTakeT.on0 === 0 && /Add the game to the card first/.test(simTakeT.hint) && simTakeT.live === simTakeT.off0 && simTakeT.off1 === 0
+      && simTakeT.t1 && simTakeT.t1.view === 'own' && simTakeT.t1.key === 'ml' && /^(HOME|AWAY)$/.test(simTakeT.t1.side) && simTakeT.t1.pick === (simTakeT.t1.side === 'HOME' ? 'Knicks ML' : '76ers ML')
+      && simTakeT.t1.price === (simTakeT.t1.side === 'HOME' ? -198 : 164) && simTakeT.t1.p > 0.5 && simTakeT.t1.p < 1 && simTakeT.t1.worth > 0.5 && /^(LEAN|BET|STRONG)$/.test(simTakeT.t1.band) && simTakeT.t1.line === null && simTakeT.btnOn
+      && simTakeT.list1.length === 2 && /^TAKING · NBA · SIMULATION · marked /.test(simTakeT.list1[0]) && /Knicks ML \d\d% by the sim · worth \d\d% · (LEAN|BET|STRONG) · [-−]198 needs 66\.4% 76ers @ Knicks · the sim's own view/.test(simTakeT.list1[0])
+      && /1 bet marked none graded yet · one unit each 0 on the card, 1 from the simulation, 0 props$/.test(simTakeT.list1[1]),
+      'sim take: the Simulation card\'s buttons are greyed with a hint until the game is on the card, then a click marks the call on the row as shown (the pick in words, the row\'s price, the sim\'s chance, worth and band) and Taking tonight lists it as a simulation call', JSON.stringify(simTakeT).slice(0, 1400));
+  chk(simTakeT.n2 === 2 && simTakeT.count2 === '2 marked' && simTakeT.after.length === 1 && /^own\|total\|(OVER|UNDER)$/.test(simTakeT.after[0]) && simTakeT.list2 === 1 && simTakeT.after3.join() === simTakeT.after.join()
+      && /Copied the bets you are taking|the text is below/.test(simTakeT.said),
+      'sim take: a second call marks beside the first, the Taking card\'s own button unmarks one, a rescore keeps the mark, and the copy speaks', JSON.stringify({ n2: simTakeT.n2, count: simTakeT.count2, after: simTakeT.after, list2: simTakeT.list2, after3: simTakeT.after3, said: simTakeT.said.slice(0, 60) }));
+  chk(simTakeT.t3 && simTakeT.t3.key === 'total' && simTakeT.t3.line === 231.5 && simTakeT.list3.length === 1 && new RegExp(' · ' + (simTakeT.t3.side === 'UNDER' ? 'win' : 'loss') + ' 76ers @ Knicks', 'i').test(simTakeT.list3[0]) && /TAKEN$/.test(simTakeT.list3[0])
+      && simTakeT.took.some(t => new RegExp('^Simulation calls taken ' + (simTakeT.t3.side === 'UNDER' ? '1-0' : '0-1') + ' says \\d\\d\\.\\d% · does (100|0)\\.0%', 'i').test(t)),
+      'sim take: once the game grades the call shows its result off the final on its card, the button becomes a TAKEN chip, and What you took keeps it on the Simulation calls tile', JSON.stringify({ t3: simTakeT.t3, list3: simTakeT.list3, took: simTakeT.took }));
 
   // ---- the build stamp ------------------------------------------------------------
   // ---- the simulation (25 Oct 2026): the card on the example, the block stored with the row, the record once graded ----

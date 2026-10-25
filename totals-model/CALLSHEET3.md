@@ -1299,3 +1299,20 @@ the price shown when the bet was marked. The props record also carries a
 fact (the button becomes a TAKEN chip once the game grades, and a mark on
 a graded row is refused with a note), so the taken record is of bets
 marked before the game.
+
+**The simulation's calls** (the user, with the Simulation card on the
+screen: "let's say I decide to go with the Thunder team total under 119.5
+at 72%; I would like to be able to select from this field too, for
+tracking purposes, and to show on the take for the home screen"). A Take
+button sits under every chip on the NBA Simulation card, both views, and
+beside the gap rule's call. The mark lives on the card row as
+`simTakes`, one per view, market and side, and keeps the call as the card
+showed it when marked: the line, the book's price on that side (from the
+row's boxes, or the team total's own line), the sim's chance, its worth,
+its band and the pick in words (`toggleSimTake`, nba.engine.js). The game
+has to be on the card first, since the row is where the mark and the
+finals live: until it is, the button is greyed with that hint. Taking
+tonight lists a simulation call as "TAKING · NBA · SIMULATION" with the
+view it came from; the copy text names it; What you took grades it on
+its own tile, "Simulation calls taken", the way the sim record grades (the
+half from the half-time score, team totals from each side's final).

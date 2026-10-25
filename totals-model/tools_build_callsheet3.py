@@ -185,6 +185,7 @@ def head() -> str:
              "  .takebtn { font: 700 10.5px/1 var(--sans); letter-spacing: .06em; text-transform: uppercase; padding: 5px 10px; border-radius: 999px; border: 1.5px solid var(--rule); background: transparent; color: var(--ink-2); cursor: pointer; }\n"
              "  .takebtn:hover { border-color: var(--ink); color: var(--ink); } .takebtn.on { background: var(--go); border-color: var(--go); color: #fff; } .takebtn.big { font-size: 12px; padding: 7px 14px; }\n"
              "  .pk .n6 { margin-top: 8px; } .pdlg .pd-take { margin: 6px 0 2px; } table.props td.take, #board td:last-child { white-space: nowrap; }\n"
+             "  .takebtn.off { opacity: .45; cursor: not-allowed; } .simtab .simtake { margin-top: 5px; } .ttgap .takebtn { margin-left: 4px; vertical-align: middle; }\n"
              "  .pk.taking, tr.taking { box-shadow: inset 4px 0 0 var(--go); } .pk.taking.sum { border-style: dashed; } .chip.taken { background: var(--go); color: #fff; }\n"
              "  #calibBox .calib[data-sport=\"TAKEN\"] > div.good { box-shadow: inset 3px 0 0 var(--go); } #calibBox .calib[data-sport=\"TAKEN\"] > div.bad { box-shadow: inset 3px 0 0 var(--bad); }\n"
              "  @media (max-width: 640px) { .pdlg .lever { grid-template-columns: 1fr 1fr 50px; } }\n"

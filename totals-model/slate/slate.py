@@ -3433,6 +3433,18 @@ NBA_SIM_OUT_MPG = 0.03      # ...plus his minutes a game times this; three fifth
 NBA_TEND_FILE = "nba-tend.json"
 
 
+def nba_load_tend(out_dir):
+    """nba-tend.json beside slate.py, or None."""
+    tp = os.path.join(out_dir, NBA_TEND_FILE)
+    if not os.path.exists(tp):
+        return None
+    try:
+        with open(tp, "r", encoding="utf-8") as f:
+            return json.load(f)
+    except (OSError, ValueError):
+        return None
+
+
 def nba_sim_out_adj(out_list):
     """(offence, defence) adjustments per 100 possessions from a club's who-is-out list."""
     cost = 0.0
@@ -3889,14 +3901,7 @@ def make_nba_slate(date_iso, out_dir, log, topup=False, sim_runs=NBA_SIM_RUNS):
     # the simulation's profiles (25 Oct 2026): every club before today, this season blended with last, the play-by-play's shot mix and rotations
     sim = None
     if sim_runs and nbasim and (led or prior):
-        tend = None
-        tp = os.path.join(out_dir, NBA_TEND_FILE)
-        if os.path.exists(tp):
-            try:
-                with open(tp, "r", encoding="utf-8") as f:
-                    tend = json.load(f)
-            except (OSError, ValueError):
-                tend = None
+        tend = nba_load_tend(out_dir)
         try:
             prof = nbasim.profiles_from_ledger(led["games"] if led else [], date_iso, prior_games=prior["games"] if prior else None, tend=tend)
             sim = {"prof": prof, "runs": sim_runs}
@@ -4035,6 +4040,15 @@ PROPS_PLAYER_MIN_GAMES = 3
 PROPS_ANCHOR = 4.0
 PROPS_MODEL_W = 2.0
 PROPS_DVP_WEIGHT = {"pts": 0.75, "reb": 0.75, "ast": 0.75, "tpm": 0.4, "pra": 0.75}   # how much of a defence's lean to carry (measured, first half to second)
+# the matchup lever (25 Oct 2026, the user: "see if the simulation enhances the props"): the club's expected points per
+# possession in the simulation's own view (its offence into the opponent's defence, league-relative, home court, a back to
+# back) against its own rating, to a power. tools_backtest_nba_props_sim.py on 2025-26, 17,700 player-games, beyond the
+# pace and the defence-by-position levers: the miss still followed it (points t 5.2, assists 4.8, threes 3.2, PRA 6.2,
+# rebounds 1.6) and half weight cut the miss (points 6.583 to 6.579, PRA 8.192 to 8.186); full weight overshot with the
+# defence lever in. The market's implied team points carried nothing beyond pace (t 0.8). The pace lever's form changed the
+# same day: the game's possessions against the club's OWN pace, not the two clubs' mean against the league (6.589 against
+# 6.592 on points, better on every market), since a player's rate per 36 is earned at his club's pace already.
+PROPS_MATCH_ALPHA = {"pts": 0.5, "reb": 0.0, "ast": 0.5, "tpm": 0.5, "pra": 0.5}
 PROPS_DVP_SHRINK = 20                                                         # games of this season before its table outweighs last season's
 PROPS_BET_EDGE = 0.03
 PROPS_BET_CHANCE = 0.55
@@ -4449,9 +4463,22 @@ def props_project(prop, logs_this, logs_last, ctx):
         why.append("%s is %s: not counted as out" % (nm, st))
     f_pace = 1.0
     i_pace = len(why)
-    if ctx.get("pace") and ctx.get("league_pace"):
+    if ctx.get("pace_team") and ctx.get("pace_opp") and ctx.get("league_pace"):
+        # the game's possessions against the club's own (25 Oct 2026): his rate per 36 is earned at his club's pace
+        game_pace = float(ctx["pace_team"]) + float(ctx["pace_opp"]) - float(ctx["league_pace"])
+        f_pace = max(0.8, min(1.25, game_pace / float(ctx["pace_team"])))
+        why.append("the game's pace %.1f (their %.1f, %s's %.1f, the league's %.1f) against their own: x%.3f" % (
+            game_pace, ctx["pace_team"], ctx.get("opp_nick") or "the opponent", ctx["pace_opp"], ctx["league_pace"], f_pace))
+    elif ctx.get("pace") and ctx.get("league_pace"):
         f_pace = float(ctx["pace"]) / float(ctx["league_pace"])
         why.append("pace %.1f against the league's %.1f: x%.3f" % (ctx["pace"], ctx["league_pace"], f_pace))
+    f_match = 1.0
+    i_match = len(why)
+    mt = ctx.get("match")
+    if mt and mt.get("f") and PROPS_MATCH_ALPHA.get(mk):
+        f_match = float(mt["f"]) ** PROPS_MATCH_ALPHA[mk]
+        why.append("the matchup, from the simulation's profiles: %.1f per 100 into %s's %.1f defence (league %.1f%s%s): x%.3f on the efficiency, at %.1f weight, measured" % (
+            mt["ortg"], ctx.get("opp_nick") or "the opponent", mt["drtg"], mt["lg"], ", at home" if mt.get("home") else ", on the road", ", on a back to back" if mt.get("b2b") else "", f_match, PROPS_MATCH_ALPHA[mk]))
     f_dvp = 1.0
     i_dvp = len(why)
     dv = ctx.get("dvp")
@@ -4471,7 +4498,7 @@ def props_project(prop, logs_this, logs_last, ctx):
     if sp.get("home") and sp.get("road"):
         why.append("home %.1f / road %.1f per 36 over %d minutes: shown, not scored (a player's own split did not persist from one half of 2025-26 to the other, r 0.08)%s" % (
             sp["home"][0], sp["road"][0], int(sp["home"][1] + sp["road"][1]), "; tonight at home" if ctx.get("home") else "; tonight on the road"))
-    mu = rate * mins * f_pace * f_dvp
+    mu = rate * mins * f_pace * f_dvp * f_match
     sd = PROPS_SD_K[mk] * math.sqrt(max(mu, 1.0))
     # the centre (22 Oct 2026): a box-score stat skews right, so the mean sits above the median and a
     # normal centred on the mean says 50% for a number the man clears 46% of the time (41% on threes);
@@ -4507,6 +4534,8 @@ def props_project(prop, logs_this, logs_last, ctx):
         parts.append({"k": "pace", "t": "Pace", "eff": round((f_pace - 1.0) * rate * mins, 2), "i": i_pace})
     if abs(f_dvp - 1.0) > 1e-9:
         parts.append({"k": "dvp", "t": "Defence v position", "eff": round((f_dvp - 1.0) * rate * mins * f_pace, 2), "i": i_dvp})
+    if abs(f_match - 1.0) > 1e-9:
+        parts.append({"k": "match", "t": "The matchup, from the simulation", "eff": round((f_match - 1.0) * rate * mins * f_pace * f_dvp, 2), "i": i_match})
     return {"proj": round(mu, 2), "sd": round(sd, 2), "pm": round(pm, 4), "pb": round(pb, 4), "p": round(p, 4), "push": round(push, 4),
             "side": side, "chance": round(chance, 4), "price": price, "need": round(need, 4), "edge": round(edge, 4), "band": band,
             "mins": round(mins, 1), "rate36": round(rate * 36.0, 2), "base": round(rate0 * mins0, 2), "parts": parts, "why": why}, why
@@ -4576,6 +4605,29 @@ def make_nba_props(date_iso, out_dir, log, topup=False):
             return t["pace"]
         t = ptables.get(ab)
         return t["pace"] if t else None
+    # the simulation's profiles (25 Oct 2026): the matchup lever and the pace lever's base, this season blended with last
+    sim_prof = None
+    if nbasim and (led or prior):
+        try:
+            sim_prof = nbasim.profiles_from_ledger(led["games"] if led else [], date_iso, prior_games=prior["games"] if prior else None, tend=nba_load_tend(out_dir))
+            log("Simulation profiles: %d clubs; the matchup lever at %.1f weight on points, assists, threes and PRA, none on rebounds (measured)." % (len(sim_prof["teams"]), PROPS_MATCH_ALPHA["pts"]))
+        except Exception as e:  # noqa: BLE001
+            log("Simulation profiles could not be built (%s): no matchup lever today." % e)
+
+    def club_match(team, opp, home_side):
+        """ctx['match'] for a club: its expected points per possession in the game against its own rating."""
+        if not sim_prof:
+            return None
+        off, dfn = sim_prof["teams"].get(team), sim_prof["teams"].get(opp)
+        if not off or not dfn or not off.get("ortg"):
+            return None
+        o = dict(off)
+        o.update(nbasim.rest_flags(sim_prof["last"], team, date_iso))
+        o["out_adj"] = 0.0
+        d = dict(dfn)
+        d["out_dadj"] = 0.0
+        ppp = nbasim._target(o, d, sim_prof["league"], home_side)
+        return {"f": round(ppp * 100.0 / off["ortg"], 4), "ortg": round(off["ortg"], 1), "drtg": round(dfn["drtg"], 1), "lg": round(sim_prof["league"]["ortg"], 1), "home": bool(home_side), "b2b": bool(o.get("b2b")), "n": off.get("n", 0)}
     injuries = {}
     try:
         injuries = nba_injuries()
@@ -4661,6 +4713,7 @@ def make_nba_props(date_iso, out_dir, log, topup=False):
             dv = props_dvp_blend(dvp_this.get((opp, pos, dmk)), dvp_last.get((opp, pos, dmk))) if pos else None
             ctx = {"out_mpg": out[team][0], "out_names": [(n, mpg, st) for n, mpg, st in out[team][1] if mpg is not None and mpg >= PROPS_REGULAR_MPG],
                    "maybe": out[team][2], "pace": pace, "league_pace": league_pace, "home": team == hab, "pos": pos, "opp_nick": NBA_NICK.get(opp, opp),
+                   "pace_team": pace_h if team == hab else pace_a, "pace_opp": pace_a if team == hab else pace_h, "match": club_match(team, opp, team == hab),
                    "dvp": dv, "htb": htb_line(htb, NBA_NICK.get(opp, opp), opp, pos, dmk) if pos else None, "self_out": self_out}
             proj, why = props_project(pr, e1.get("g"), e2.get("g"), ctx)
             recent = [[g_["d"], g_["opp"], 1 if g_["home"] else 0, g_["min"], props_stat(g_, pr["mk"])] for g_ in (e1.get("g") or e2.get("g") or [])[-10:]]
@@ -4679,7 +4732,8 @@ def make_nba_props(date_iso, out_dir, log, topup=False):
         games.append(row)
     doc = {"format": PROPS_FORMAT, "version": 1, "date": date_iso, "generated": now_utc(), "source": "slate.py nba-props: The Odds API, the ledgers, ESPN, HashtagBasketball",
            "credits": credits_used, "games": games, "ledgers": ledgers,   # what the run read (23 Oct 2026): the page says so when nothing projects
-           "method": {"anchor": PROPS_ANCHOR, "model": PROPS_MODEL_W, "sd_k": PROPS_SD_K, "out_min_per30": PROPS_OUT_MIN_PER30, "out_rate_per30": PROPS_OUT_RATE_PER30, "dvp_weight": PROPS_DVP_WEIGHT, "dvp_shrink": PROPS_DVP_SHRINK}}
+           "method": {"anchor": PROPS_ANCHOR, "model": PROPS_MODEL_W, "sd_k": PROPS_SD_K, "out_min_per30": PROPS_OUT_MIN_PER30, "out_rate_per30": PROPS_OUT_RATE_PER30, "dvp_weight": PROPS_DVP_WEIGHT, "dvp_shrink": PROPS_DVP_SHRINK,
+                      "match_alpha": PROPS_MATCH_ALPHA, "pace": "the game's possessions against the club's own"}}
     path = os.path.join(out_dir, "nba-props-%s.json" % date_iso)
     with open(path, "w", encoding="utf-8") as f:
         json.dump(doc, f, indent=1)
@@ -6019,6 +6073,19 @@ def selftest():
           and parts_["out"]["eff"] > 1.5 and parts_["pace"]["eff"] > 0 and parts_["dvp"]["eff"] > 0 and abs(parts_["minutes"]["eff"]) < 0.01 and parts_["prior"]["i"] == 0
           and why_[parts_["out"]["i"]].startswith("Kyrie Irving out") and why_[parts_["pace"]["i"]].startswith("pace 100.0") and why_[parts_["dvp"]["i"]].startswith("Lakers allow")
           and why_[parts_["minutes"]["i"]].startswith("36.0 minutes projected"))
+    # the pace lever's new form and the matchup lever (25 Oct 2026)
+    ctx_m = dict(ctx_)
+    ctx_m.update({"pace_team": 103.0, "pace_opp": 99.0, "league_pace": 100.0, "match": {"f": 1.04, "ortg": 116.0, "drtg": 118.0, "lg": 114.0, "home": False, "b2b": True, "n": 12}})
+    proj_m, why_m = props_project(prop_, lt["11"]["g"], ll["11"]["g"], ctx_m)
+    parts_m = dict((p["k"], p) for p in proj_m["parts"])
+    check("props: the pace lever is the game's possessions against the club's own, the matchup lever the sim's efficiency to the half, each a part that sums to the projection with its why line",
+          abs(proj_m["proj"] - proj_["proj"] / 1.0204 * (102.0 / 103.0) * (1.04 ** 0.5)) < 0.05 and set(parts_m) == {"prior", "minutes", "out", "pace", "dvp", "match"}
+          and abs(proj_m["base"] + sum(parts_m[k]["eff"] for k in ("out", "pace", "dvp", "match")) - proj_m["proj"]) < 0.03 and parts_m["pace"]["eff"] < 0 and parts_m["match"]["eff"] > 0
+          and why_m[parts_m["pace"]["i"]] == "the game's pace 102.0 (their 103.0, Lakers's 99.0, the league's 100.0) against their own: x0.990"
+          and why_m[parts_m["match"]["i"]] == "the matchup, from the simulation's profiles: 116.0 per 100 into Lakers's 118.0 defence (league 114.0, on the road, on a back to back): x1.020 on the efficiency, at 0.5 weight, measured")
+    prop_reb = dict(prop_); prop_reb["mk"] = "reb"; prop_reb["line"] = 6.5
+    proj_r, _why_r = props_project(prop_reb, lt["11"]["g"], ll["11"]["g"], ctx_m)
+    check("props: rebounds take no matchup lever (measured null)", proj_r is None or "match" not in dict((p["k"], p) for p in proj_r["parts"]))
     check("props: the why says each step",
           any(w.startswith("31.0 points per 36 this season (3 games, 108 minutes), blended with last season's 30.9 (70 of 70 minutes, at half): 31.0 per 36") for w in why_)
           and any(w.startswith("36.0 minutes projected: his last 3 games (season 36.0), 3 of them starts") for w in why_)

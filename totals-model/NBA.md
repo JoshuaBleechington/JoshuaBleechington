@@ -425,6 +425,25 @@ record keeps says against does for every call at LEAN or better from the
 first night, by view, market and band, so the question answers itself as
 the season goes.
 
+**Does the simulation help the props?** The user asked; it does, a
+little, and in a measurable way (`tools_backtest_nba_props_sim.py`,
+2025-26, 17,700 player-games with eight prior games and fifteen projected
+minutes). The club's expected points in the sim's own view, against its
+points a game to date, explained the projection's miss on every market
+(points t 10.6, PRA 13.4, assists 10.5, rebounds 6.3), where the market's
+implied team points managed t 4.1 and nothing beyond the pace lever
+(t 0.8). Beyond the pace and the defence-by-position levers the props
+already carry, the sim's remainder, its efficiency part, still held
+(points t 5.2, PRA 6.2, assists 4.8, threes 3.2, rebounds 1.6), and at half
+weight it cut the miss (points 6.583 to 6.579, PRA 8.192 to 8.186); at
+full weight it overshot, the defence counted twice. So the props carry a
+**matchup lever** from the sim's profiles at the half power on points,
+assists, threes and PRA, none on rebounds (`PROPS_MATCH_ALPHA`). The same
+test showed the pace lever's form was wrong: the two clubs' mean against
+the league double-counted the club's own pace, which a player's rate per
+36 already carries; the game's possessions against the club's own pace
+misses less on every market and is the form now.
+
 What is still a priori and marked so: the cost of an absence, the bench
 gap, the back-to-back penalty. What the play-by-play could add next: each
 player's on/off per 100 from the stints (the absence cost measured instead

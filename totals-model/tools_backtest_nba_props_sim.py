@@ -61,9 +61,29 @@ def main(argv):
     ppg = team_points_to_date(games)
     hist = defaultdict(list)
     rows = []
+    # the defence by position to date, as the props run carries it: allowed per minute to a position against the league's,
+    # this season before the date, shrunk toward even by games (twenty to even), at the slate's weights
+    POS3 = {"PG": "G", "SG": "G", "G": "G", "SF": "F", "PF": "F", "F": "F", "C": "C"}
+    DVP_W = {"pts": 0.75, "reb": 0.75, "ast": 0.75, "tpm": 0.4, "pra": 0.75}
+    allowed = defaultdict(lambda: defaultdict(lambda: [0.0, 0.0, 0]))   # (opp, pos) -> mk -> [stat, minutes, games]
+    league_pm = defaultdict(lambda: defaultdict(lambda: [0.0, 0.0]))     # pos -> mk -> [stat, minutes]
     for g in games:
         k = ks.get((g["date"], g["hn"], g["an"]))
         s = sim.get((g["date"], g["away"], g["home"]))
+        dvp_now = {}
+        for key, ab, opp in (("pa", g["away"], g["home"]), ("ph", g["home"], g["away"])):
+            for p in g.get(key) or []:
+                ps = POS3.get(p[16]) if len(p) > 16 else None
+                if not ps:
+                    continue
+                f = {}
+                for mk in ("pts", "reb", "ast", "tpm", "pra"):
+                    a, lgp = allowed[(opp, ps)][mk], league_pm[ps][mk]
+                    if a[1] > 0 and lgp[1] > 0 and lgp[0] > 0:
+                        raw = (a[0] / a[1]) / (lgp[0] / lgp[1])
+                        n = a[2]
+                        f[mk] = 1.0 + DVP_W[mk] * ((1.0 + (raw - 1.0) * n / (n + 20.0)) - 1.0)
+                dvp_now[str(p[0])] = f
         for key, ab, opp in (("pa", g["away"], g["home"]), ("ph", g["home"], g["away"])):
             implied = None
             if k and k["total"] is not None and k["spread"] is not None:
@@ -74,9 +94,10 @@ def main(argv):
             td, to = ppg.get((g["date"], ab)), ppg.get((g["date"], opp))
             base = td[0] if td else None
             # the pace lever the props run already carries: the game's expected possessions against the club's own
-            pace_ratio = None
+            pace_ratio, pace_old = None, None
             if td and to and td[1] and td[2]:
                 pace_ratio = max(0.8, min(1.25, (td[1] + to[1] - td[2]) / td[1]))
+                pace_old = max(0.8, min(1.25, ((td[1] + to[1]) / 2.0) / td[2]))   # the form the props run carried before 25 Oct 2026: the two clubs' mean against the league's
             for p in g.get(key) or []:
                 pid, mins = str(p[0]), float(p[3])
                 h = hist[pid]
@@ -84,13 +105,30 @@ def main(argv):
                     m_this = sum(x[0] for x in h)
                     pm = sum(x[0] for x in h[-5:]) / 5.0
                     if pm >= MIN_MINUTES and m_this > 0:
-                        row = {"pm": pm, "implied": implied, "own": own, "base": base, "pace": pace_ratio, "act": {}, "mu": {}}
-                        for mk in ("pts", "reb", "ast", "pra"):
+                        row = {"pm": pm, "implied": implied, "own": own, "base": base, "pace": pace_ratio, "pace_old": pace_old, "dvp": dvp_now.get(pid) or {}, "act": {}, "mu": {}}
+                        for mk in ("pts", "reb", "ast", "tpm", "pra"):
                             rate = sum(x[1][mk] for x in h) / m_this
                             row["mu"][mk] = rate * pm
                             row["act"][mk] = val(p, mk)
                         rows.append(row)
-                h.append((mins, {mk: val(p, mk) for mk in ("pts", "reb", "ast", "pra")}))
+                h.append((mins, {mk: val(p, mk) for mk in ("pts", "reb", "ast", "tpm", "pra")}))
+        # the game joins the defence tables after it is played
+        for key, ab, opp in (("pa", g["away"], g["home"]), ("ph", g["home"], g["away"])):
+            seen = set()
+            for p in g.get(key) or []:
+                ps = POS3.get(p[16]) if len(p) > 16 else None
+                if not ps or float(p[3]) <= 0:
+                    continue
+                for mk in ("pts", "reb", "ast", "tpm", "pra"):
+                    a = allowed[(opp, ps)][mk]
+                    a[0] += val(p, mk)
+                    a[1] += float(p[3])
+                    if (ps, mk) not in seen:
+                        a[2] += 1
+                        seen.add((ps, mk))
+                    lgp = league_pm[ps][mk]
+                    lgp[0] += val(p, mk)
+                    lgp[1] += float(p[3])
     print("%d player-games with a projection; %d with the market's implied points, %d with the sim's own" % (
         len(rows), sum(1 for r in rows if r["implied"]), sum(1 for r in rows if r["own"])))
     for lever in ("market", "sim"):
@@ -115,19 +153,31 @@ def main(argv):
             line += " | miss on log ratio: slope %+.2f (t %.1f)" % (o[0], o[1]) if o else ""
             print(line)
         # beyond the pace lever: the base scaled by the game's expected possessions, and the lever's remainder (its efficiency part)
-        print("  beyond the pace lever the props already carry:")
-        for mk in ("pts", "reb", "ast", "pra"):
-            floor = 6 if mk in ("pts", "pra") else 1.0
-            sel = [r for r in rs if r["mu"][mk] >= floor and r["pace"]]
+        print("  beyond the pace lever AND the defence-by-position lever the props already carry (pace = the game's possessions against the club's own):")
+        for mk in ("pts", "reb", "ast", "tpm", "pra"):
+            floor = 6 if mk in ("pts", "pra") else (0.8 if mk == "tpm" else 1.0)
+            sel = [r for r in rs if r["mu"][mk] >= floor and r["pace"] and r["dvp"].get(mk)]
+            if not sel:
+                continue
             xs = [math.log(r[key] / r["base"] / r["pace"]) for r in sel]
             out = "  %-4s n %6d " % (mk, len(sel))
             for alpha in (0.0, 0.5, 1.0):
-                errs = [(r["act"][mk] - r["mu"][mk] * r["pace"] * (r[key] / r["base"] / r["pace"]) ** alpha) for r in sel]
-                out += " | pace x rest^%.1f rmse %.3f" % (alpha, math.sqrt(sum(e * e for e in errs) / len(errs)))
-            ys = [(r["act"][mk] - r["mu"][mk] * r["pace"]) / math.sqrt(r["mu"][mk]) for r in sel]
+                errs = [(r["act"][mk] - r["mu"][mk] * r["pace"] * r["dvp"][mk] * (r[key] / r["base"] / r["pace"]) ** alpha) for r in sel]
+                out += " | pace x dvp x rest^%.1f rmse %.3f" % (alpha, math.sqrt(sum(e * e for e in errs) / len(errs)))
+            ys = [(r["act"][mk] - r["mu"][mk] * r["pace"] * r["dvp"][mk]) / math.sqrt(r["mu"][mk]) for r in sel]
             o = ols(xs, ys)
-            out += " | miss after pace on the rest: slope %+.2f (t %.1f)" % (o[0], o[1]) if o else ""
+            out += " | miss after pace and dvp on the rest: slope %+.2f (t %.1f)" % (o[0], o[1]) if o else ""
             print(out)
+    print()
+    print("== the pace lever's form: the two clubs' mean against the league (as carried) or the game's possessions against the club's own ==")
+    for mk in ("pts", "reb", "ast", "tpm", "pra"):
+        floor = 6 if mk in ("pts", "pra") else (0.8 if mk == "tpm" else 1.0)
+        sel = [r for r in rows if r["mu"][mk] >= floor and r["pace"] and r["pace_old"]]
+        e0 = [(r["act"][mk] - r["mu"][mk]) for r in sel]
+        e1 = [(r["act"][mk] - r["mu"][mk] * r["pace_old"]) for r in sel]
+        e2 = [(r["act"][mk] - r["mu"][mk] * r["pace"]) for r in sel]
+        rm = lambda es: math.sqrt(sum(e * e for e in es) / len(es))  # noqa: E731
+        print("  %-4s n %6d  no pace rmse %.3f | mean-vs-league rmse %.3f | game-vs-own rmse %.3f" % (mk, len(sel), rm(e0), rm(e1), rm(e2)))
     return 0
 
 

@@ -1459,6 +1459,58 @@ const CHECKS = ["dome","playoff","agconf","hgconf","agbk","hgbk"];
       && leverT.onlyMost.length >= leverT.onlyAll.length && leverT.onlyMost.every(s => { const m = /^(\d+)▲ (\d+)▼$/.exec(s); return m && +m[1] > +m[2]; }) && leverT.stored.agree === 'most' && leverT.after.rows === 7 && leverT.after.agree === '',
       'levers: the column sorts with the most agreement first, the filter keeps the props where every lever leans the pick\'s way or more do than not, the view is remembered and Reset view clears it', JSON.stringify({ head: leverT.headOn, scores: leverT.scores, all: leverT.onlyAll, most: leverT.onlyMost, shown: leverT.shownAll, stored: leverT.stored, after: leverT.after }));
 
+  // ---- 26 Oct 2026: tonight on your phone -- the Phone QR button makes a code carrying the night's picks; an independent decoder (jsQR,
+  //      tools_vendor) reads it back off the drawn modules; the phone sheet m.html renders it, view only ----
+  const phoneT = await pg.evaluate(async () => {
+    const wait = (ms) => new Promise(r => setTimeout(r, ms || 100));
+    const set = (id, v) => { const el = document.getElementById(id); el.value = v; el.dispatchEvent(new Event('input', { bubbles: true })); };
+    await smStore.removeItem('callsheet3.card.v1'); await smStore.removeItem('callsheet3.props.v1');
+    document.getElementById('clear').click(); document.getElementById('m-nba').click(); await wait();
+    set('gdate', '2026-11-14'); document.getElementById('example').click(); await wait(); set('gdate', '2026-11-14'); await wait();
+    document.getElementById('add').click(); await wait();
+    document.getElementById('boardDate').value = '2026-11-14'; document.getElementById('boardDate').dispatchEvent(new Event('change')); await wait();
+    document.querySelector('#nbaSimPanel .takebtn[data-stake*="|own|total|"]').click(); await wait();
+    document.querySelector('#board tbody tr .takebtn').click(); await wait();
+    const hidden0 = document.getElementById('phoneDlg').hidden;
+    document.getElementById('phone').click(); await wait(700);
+    const open = !document.getElementById('phoneDlg').hidden, link = (document.querySelector('#phoneBody a') || {}).href || '';
+    const note = (document.querySelector('#phoneBody .note') || {}).innerText || '', dim = (document.querySelector('#phoneBody .note.dim') || {}).innerText || '';
+    const d = (document.querySelector('#phoneBody svg path') || { getAttribute: () => '' }).getAttribute('d') || '';
+    const pts = [...d.matchAll(/M(-?\d+(?:\.\d+)?),(-?\d+(?:\.\d+)?)[hl]/g)].map(m => [Math.round(((+m[1]) - 6) / 4), Math.round(((+m[2]) - 6) / 4)]);
+    const n = pts.length ? Math.max(...pts.map(p => p[0])) + 1 : 0, mods = [];
+    for (let r = 0; r < n; r++) { const row = []; for (let c = 0; c < n; c++) row.push(0); mods.push(row); }
+    pts.forEach(p => { mods[p[1]][p[0]] = 1; });
+    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })); await wait();
+    const closed = document.getElementById('phoneDlg').hidden && !document.body.classList.contains('noscroll');
+    return { hidden0, open, link, note: note.replace(/\s+/g, ' ').trim(), dim, n, mods, closed };
+  });
+  let decoded = null;
+  try {
+    const jsQR = require('./tools_vendor/jsQR.js');
+    const scale = 4, q = 4, size = (phoneT.n + 2 * q) * scale, data = new Uint8ClampedArray(size * size * 4);
+    for (let y = 0; y < size; y++) for (let x = 0; x < size; x++) {
+      const r = Math.floor(y / scale) - q, c = Math.floor(x / scale) - q, dark = r >= 0 && c >= 0 && r < phoneT.n && c < phoneT.n && phoneT.mods[r][c];
+      const v = dark ? 0 : 255, i = (y * size + x) * 4; data[i] = v; data[i + 1] = v; data[i + 2] = v; data[i + 3] = 255;
+    }
+    const res = jsQR(data, size, size); decoded = res ? res.data : null;
+  } catch (e) { decoded = 'decoder error: ' + e.message; }
+  chk(phoneT.hidden0 && phoneT.open && /\/m\.html#z[A-Za-z0-9_-]+$/.test(phoneT.link) && phoneT.n >= 57 && phoneT.n % 4 === 1 && decoded === phoneT.link
+      && /^Point your phone's camera at the code and open the link\. It shows \d+ lines: the bets you are taking, the parlay four, the best straight bets, the likeliest sides, the best props and the simulation's calls, view only\./.test(phoneT.note)
+      && /nothing is uploaded/.test(phoneT.note) && /signed in to claude\.ai/.test(phoneT.note) && new RegExp(phoneT.n + ' modules a side').test(phoneT.dim) && phoneT.closed,
+      'phone: the Phone QR button draws a code whose link carries the night\'s picks deflated into the hash of m.html, an independent decoder reads the very link back off the drawn modules, the note says what is in it and how it works, and Escape closes it',
+      JSON.stringify({ hidden0: phoneT.hidden0, open: phoneT.open, link: phoneT.link.slice(0, 90), n: phoneT.n, decoded: decoded === phoneT.link ? 'matches' : String(decoded).slice(0, 80), note: phoneT.note.slice(0, 160), dim: phoneT.dim, closed: phoneT.closed }));
+  // the phone sheet renders the code, view only
+  const sheetErrs = [];
+  const sheetCtx = await pg.context().browser().newContext({ viewport: { width: 390, height: 844 } }), sheet = await sheetCtx.newPage();
+  sheet.on('pageerror', e => sheetErrs.push(e.message));
+  await sheet.goto(phoneT.link); await sheet.waitForTimeout(600);
+  const sheetT = await sheet.evaluate(() => ({ text: document.body.innerText.replace(/\s+/g, ' ').trim(), cards: document.querySelectorAll('.pk').length, takes: document.querySelectorAll('.pk.take').length, inputs: document.querySelectorAll('input, button, select, textarea').length, wide: document.documentElement.scrollWidth <= 390 }));
+  await sheetCtx.close();
+  chk(sheetErrs.length === 0 && /^The Super Model Sat, Nov 14 · made \d{1,2}:\d\d [AP]M · view only TAKING TONIGHT 2 TAKING · NBA Knicks ML 66\.6% · [-−]198 needs 66\.4% 76ers @ Knicks · Moneyline TAKING · NBA · SIMULATION STRONG Total UNDER 231\.5 7\d\.\d% · worth 5\d% · [-−]110 needs 52\.4% 76ers @ Knicks · the simulation, the sim's own view THE PARLAY FOUR 1 /.test(sheetT.text)
+      && /LIKELIEST AT ANY PRICE 1 /.test(sheetT.text) && /THE SIMULATION'S CALLS, BET OR BETTER \d /.test(sheetT.text) && /View only: the card lives in the desktop browser\./.test(sheetT.text) && sheetT.takes === 2 && sheetT.cards >= 6 && sheetT.inputs === 0 && sheetT.wide,
+      'phone sheet: m.html unpacks the code on a phone-width screen with no script errors and lists the bets marked Taking first, then the parlay four, the likeliest sides and the simulation\'s calls, with nothing to type into and no sideways scroll', JSON.stringify({ errs: sheetErrs, text: sheetT.text.slice(0, 500), cards: sheetT.cards, takes: sheetT.takes, inputs: sheetT.inputs, wide: sheetT.wide }));
+  await pg.evaluate(async () => { await smStore.removeItem('callsheet3.card.v1'); await smStore.removeItem('callsheet3.props.v1'); document.getElementById('clear').click(); });
+
   // ---- the build stamp ------------------------------------------------------------
   // ---- the simulation (25 Oct 2026): the card on the example, the block stored with the row, the record once graded ----
   await pg.evaluate(async () => { await smStore.removeItem('callsheet3.card.v1'); }); await pg.reload(); await pg.waitForTimeout(300); await pg.evaluate(() => smStore.ready);

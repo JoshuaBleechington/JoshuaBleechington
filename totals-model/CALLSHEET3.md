@@ -1333,3 +1333,27 @@ cleared by Reset view; a tag on each best card; and the words on the
 panel's What moves it heading. The tally is shown, not scored: it says how
 many of the measured pushes agree, not how big they are, and the chance
 beside it already carries their sizes.
+
+## Tonight on your phone, 26 Oct 2026
+
+The user: "a QR code or something I can scan with my phone camera that has
+the model picks that I can view on my mobile, even if view only." The
+picks live in this browser's storage, so the phone has to be handed them.
+The **Phone QR** button on the day board makes a code that carries the
+night's picks themselves: `phonePayload` gathers, for the board's date,
+the bets marked Taking (card, simulation and props), the parlay four, the
+best straight bets, the likeliest sides, the best twelve props and the
+NBA simulation's calls at BET or better with the gap rule's; `phoneEncode`
+deflates the JSON and base64url's it into the hash of a link to `m.html`,
+a small read-only sheet published beside the page; the QR encoder is
+Kazuhiko Arase's qrcode-generator 1.4.4 (MIT, vendored in `web/vendor`,
+no network). A code holds about 2,900 characters, so `phoneFit` trims from
+the least important end when a night runs long (the likeliest list, then
+the simulation's calls, then the props) and the sheet says what stayed
+off. Nothing is uploaded and nothing is stored: the code is the data, made
+fresh on each press; the page is private, so the phone opens the link
+signed in to claude.ai. `web/m.html` decodes the hash (DecompressionStream
+on the phone; a browser without it is told) and renders the sections as
+cards with the result chips, in the page's light and dark looks. The
+harness makes a code on the example board, decodes it with an independent
+decoder (jsQR) off the rendered modules, and renders the sheet.

@@ -1,0 +1,87 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="dark light">
+<title>Tonight on your phone</title>
+<style>
+  :root { --bg: #ffffff; --surface: #f4f5f7; --ink: #15181e; --ink-2: #434a56; --muted: #6b7280; --rule: #d9dde3; --go: #1f8a4c; --bad: #b4232c; --edge: #8a5a00; --mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace; --sans: -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; }
+  @media (prefers-color-scheme: dark) { :root { --bg: #111317; --surface: #1b1e24; --ink: #eceef2; --ink-2: #c3c8d1; --muted: #8b93a1; --rule: #2b3039; --go: #3fbf78; --bad: #ef6b6b; --edge: #e2b351; } }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--ink); font: 15px/1.45 var(--sans); padding: 16px 16px 40px; }
+  h1 { font-size: 20px; margin: 0 0 2px; letter-spacing: -.01em; } h1 em { font-style: normal; color: var(--go); }
+  .sub { color: var(--muted); font-size: 12.5px; margin: 0 0 14px; }
+  h2 { font: 700 11px/1.4 var(--sans); letter-spacing: .12em; text-transform: uppercase; color: var(--ink-2); margin: 18px 0 8px; padding-bottom: 4px; border-bottom: 1px solid var(--rule); }
+  .pk { background: var(--surface); border: 1px solid var(--rule); border-radius: 10px; padding: 10px 12px; margin: 0 0 8px; }
+  .pk.take { box-shadow: inset 4px 0 0 var(--go); }
+  .n1 { font: 700 10.5px/1.4 var(--sans); letter-spacing: .08em; text-transform: uppercase; color: var(--edge); }
+  .n2 { font: 700 17px/1.25 var(--sans); margin: 2px 0; }
+  .n3 { font: 13px/1.4 var(--mono); color: var(--ink-2); } .n4 { font-size: 12px; color: var(--muted); margin-top: 2px; }
+  .chip { display: inline-block; font: 700 10.5px/1 var(--sans); letter-spacing: .06em; text-transform: uppercase; padding: 3px 7px; border-radius: 999px; background: var(--rule); color: var(--ink); vertical-align: middle; margin-left: 4px; }
+  .chip.win { background: var(--go); color: #fff; } .chip.loss { background: var(--bad); color: #fff; } .chip.band { background: transparent; border: 1px solid var(--rule); color: var(--ink-2); }
+  .empty { color: var(--muted); font-size: 13px; }
+  .foot { margin-top: 22px; font-size: 12px; color: var(--muted); border-top: 1px solid var(--rule); padding-top: 8px; }
+  .err { background: var(--surface); border: 1px solid var(--rule); border-radius: 10px; padding: 14px; }
+</style>
+</head>
+<body>
+<h1>The <em>Super</em> Model</h1>
+<p class="sub" id="sub">tonight, view only</p>
+<div id="body"><p class="empty">Scan the code from the day board's Phone QR button; the picks are inside the code itself.</p></div>
+<p class="foot" id="foot" hidden>View only: the card lives in the desktop browser. Scan again after a new run for a fresh sheet. The chance is the sheet's; the band is a priori and the record decides.</p>
+<script>
+(function () {
+  "use strict";
+  function esc(s) { return String(s === undefined || s === null ? "" : s).replace(/[&<>"]/g, function (c) { return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]; }); }
+  function sgn(v, d) { v = +v; return (v >= 0 ? "+" : "") + v.toFixed(d === undefined ? 0 : d); }
+  function implied(price) { price = +price; return price > 0 ? 100 / (price + 100) : -price / (-price + 100); }
+  function b64url(s) { s = String(s).replace(/-/g, "+").replace(/_/g, "/"); while (s.length % 4) s += "="; var bin = atob(s), out = new Uint8Array(bin.length); for (var i = 0; i < bin.length; i++) out[i] = bin.charCodeAt(i); return out; }
+  function decode(hash) {
+    var kind = hash.charAt(0), bytes = b64url(hash.slice(1));
+    if (kind === "z") {
+      if (typeof DecompressionStream === "undefined") return Promise.reject(new Error("this browser cannot unpack the code; try another browser on the phone"));
+      var ds = new DecompressionStream("deflate-raw"), w = ds.writable.getWriter();
+      w.write(bytes); w.close();
+      return new Response(ds.readable).arrayBuffer().then(function (buf) { return JSON.parse(new TextDecoder().decode(new Uint8Array(buf))); });
+    }
+    return Promise.resolve(JSON.parse(new TextDecoder().decode(bytes)));
+  }
+  function gameDate(iso) { try { var d = new Date(iso + "T12:00:00"); return d.toLocaleDateString([], { weekday: "short", month: "short", day: "numeric" }); } catch (e) { return iso; } }
+  function line3(x) {
+    var parts = [];
+    if (x.c !== undefined) parts.push(x.c.toFixed(1) + "%" + (x.w !== undefined ? " · worth " + x.w.toFixed(0) + "%" : ""));
+    if (x.pr !== undefined && x.pr !== null) parts.push(sgn(x.pr) + " needs " + (implied(x.pr) * 100).toFixed(1) + "%");
+    if (x.e !== undefined) parts.push("edge " + sgn(x.e, 1));
+    if (x.pj !== undefined) parts.push("proj " + x.pj);
+    if (x.g2 !== undefined) parts.push("gap " + sgn(x.g2, 1));
+    if (x.ok) parts.push("the price agrees");
+    return parts.join(" · ");
+  }
+  function card(x, cls, n1) {
+    return '<div class="pk' + (cls ? ' ' + cls : '') + '"><div class="n1">' + esc(n1) + (x.b ? ' <span class="chip band">' + esc(x.b) + '</span>' : '') + '</div>' +
+      '<div class="n2">' + esc(x.p) + (x.r ? ' <span class="chip ' + esc(x.r) + '">' + esc(x.r) + '</span>' : '') + '</div>' +
+      '<div class="n3">' + esc(line3(x)) + '</div><div class="n4">' + esc(x.g) + (x.m ? ' · ' + esc(x.m) : '') + (x.v ? ' · ' + esc(x.v) : '') + '</div></div>';
+  }
+  function section(title, items, fn) { if (!items || !items.length) return ''; return '<h2>' + esc(title) + ' <span class="chip">' + items.length + '</span></h2>' + items.map(fn).join(''); }
+  function render(P) {
+    document.getElementById("sub").textContent = gameDate(P.d) + " · made " + new Date(P.at).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" }) + " · view only";
+    var h = '';
+    h += section("Taking tonight", P.take, function (x, i) { return card(x, "take", "TAKING · " + (x.k === "prop" ? "NBA PROP" : x.k === "sim" ? "NBA · SIMULATION" : x.s)); });
+    h += section("The parlay four", P.four, function (x, i) { return card(x, "", "#" + (i + 1) + " · " + x.s); });
+    h += section("Best straight bets", P.bets, function (x, i) { return card(x, "", "#" + (i + 1) + " · " + x.s); });
+    h += section("Likeliest at any price", P.likely, function (x, i) { return card(x, "", "#" + (i + 1) + " · " + x.s); });
+    h += section("Best props", P.props, function (x, i) { return card(x, "", "#" + (i + 1) + " · NBA PROP"); });
+    h += section("The simulation's calls, BET or better", P.sim, function (x, i) { return card(x, "", "NBA · " + x.v.toUpperCase()); });
+    if (!h) h = '<p class="empty">Nothing on the board for this date.</p>';
+    if (P.cut) h += '<p class="empty">The night ran long for one code: ' + esc(P.cut) + ' stayed off it.</p>';
+    document.getElementById("body").innerHTML = h;
+    document.getElementById("foot").hidden = false;
+  }
+  var hash = (location.hash || "").slice(1);
+  if (hash) decode(hash).then(render).catch(function (e) { document.getElementById("body").innerHTML = '<div class="err">The code could not be read: ' + esc(e && e.message || e) + '. Make a fresh one from the day board.</div>'; });
+  window.addEventListener("hashchange", function () { var hh = (location.hash || "").slice(1); if (hh) decode(hh).then(render).catch(function () {}); });
+})();
+</script>
+</body>
+</html>

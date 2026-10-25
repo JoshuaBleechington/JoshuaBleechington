@@ -187,6 +187,8 @@ def head() -> str:
              "  .pk .n6 { margin-top: 8px; } .pdlg .pd-take { margin: 6px 0 2px; } table.props td.take, #board td:last-child { white-space: nowrap; }\n"
              "  .takebtn.off { opacity: .45; cursor: not-allowed; } .simtab .simtake { margin-top: 5px; } .ttgap .takebtn { margin-left: 4px; vertical-align: middle; }\n"
              "  table.props td.agree { font-family: var(--mono); white-space: nowrap; } .pk .tag.agree { background: var(--go); color: #fff; }\n"
+             "  .pdlg.phone .pdlg-box { max-width: 640px; } .pdlg.phone h3 { margin: 4px 0 10px; font: 800 20px/1.2 var(--sans); } .pdlg.phone h3 .tag { vertical-align: middle; }\n"
+             "  .qrbox { background: #fff; padding: 10px; border-radius: 10px; width: min(100%, 520px); margin: 0 auto 10px; } .qrbox svg { display: block; width: 100%; height: auto; }\n"
              "  .pk.taking, tr.taking { box-shadow: inset 4px 0 0 var(--go); } .pk.taking.sum { border-style: dashed; } .chip.taken { background: var(--go); color: #fff; }\n"
              "  #calibBox .calib[data-sport=\"TAKEN\"] > div.good { box-shadow: inset 3px 0 0 var(--go); } #calibBox .calib[data-sport=\"TAKEN\"] > div.bad { box-shadow: inset 3px 0 0 var(--bad); }\n"
              "  @media (max-width: 640px) { .pdlg .lever { grid-template-columns: 1fr 1fr 50px; } }\n"
@@ -603,7 +605,9 @@ def props_example_games() -> list:
 
 def build() -> str:
     props_js = once((ROOT / "props.engine.js").read_text(), "/*PROPS_EXAMPLE*/[]", json.dumps(props_example_games(), separators=(",", ":")), "props example")
-    html = head() + engine_block() + (ROOT / "nhl.engine.js").read_text() + (ROOT / "nba.engine.js").read_text() + props_js + (ROOT / "take.engine.js").read_text() + tail()
+    # the phone sheet (26 Oct 2026): the QR encoder (Kazuhiko Arase's qrcode-generator 1.4.4, MIT, vendored) and the phone block
+    html = head() + engine_block() + (ROOT / "nhl.engine.js").read_text() + (ROOT / "nba.engine.js").read_text() + props_js + (ROOT / "take.engine.js").read_text() + \
+        (ROOT / "vendor" / "qrcode.js").read_text() + (ROOT / "phone.engine.js").read_text() + tail()
     # the store (25 Oct 2026): the card, the props and the slate outgrew localStorage's 10 MB, so every storage call goes
     # through smStore (web/store.js), which keeps those three in IndexedDB behind a cache filled before the page's code
     # runs; the page's one closure waits for that cache. The shim itself keeps its own localStorage calls, so it goes in after

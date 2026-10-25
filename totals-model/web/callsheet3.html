@@ -443,7 +443,7 @@
   <header class="top">
     <div>
       <div class="eyebrow"><span id="eyebrow">MLB · every market on the game</span>
-        <span class="build">· build <span id="build">2026-10-23</span></span></div>
+        <span class="build">· build <span id="build">2026-10-25</span></span></div>
       <h1>The <em>Super</em> Model</h1>
       <p>One matchup, every market the book posts on it — in baseball the full-game total, the first five,
          the moneyline and the run line; in hockey the total, the first period, the moneyline and the puck line;
@@ -1199,6 +1199,89 @@
   </section>
 </div>
 <script>
+/* ===== STORE: the page's memory, in this browser's database (25 Oct 2026) =====
+   The user's 10/25 backup held 298 card rows and 2,171 props: 11.5 MB as the
+   browser counts it, and localStorage stops at 10 MB in Chrome (5 MB in Safari).
+   The props save had been failing quietly for a day, and the morning the page
+   "showed nothing from 10/24 and would not change the date" was that wall. The
+   card, the props and the slate now live in IndexedDB, which holds hundreds of
+   megabytes; the draft and the table view stay in localStorage. The page reads
+   through a cache filled before its own code runs, so every read stays
+   synchronous; a write updates the cache and goes to the database behind it.
+   Whatever the old keys still hold in localStorage moves over on the first load
+   and is cleared from there. No IndexedDB (an old private window): localStorage
+   carries on as before. */
+var smStore = (function () {
+  var DB = "callsheet3", OS = "kv", BIG = ["callsheet3.card.v1", "callsheet3.props.v1", "callsheet3.slate.v1"];
+  var cache = {}, db = null, why = "";
+  function tx(mode, fn) {
+    return new Promise(function (res, rej) {
+      if (!db) return res();
+      var t;
+      try { t = db.transaction(OS, mode); } catch (e) { return rej(e); }
+      t.oncomplete = function () { res(); };
+      t.onerror = t.onabort = function () { rej(t.error || new Error("the write did not finish")); };
+      fn(t.objectStore(OS));
+    });
+  }
+  function fail(e) {
+    why = String((e && e.message) || e || "storage failed");
+    var el = document.getElementById("saveState");
+    if (el) el.textContent = "this browser is not storing anything: " + why;
+  }
+  var ready = new Promise(function (res) {
+    var rq;
+    try { rq = indexedDB.open(DB, 1); } catch (e) { why = String(e); return res(); }
+    rq.onupgradeneeded = function () { rq.result.createObjectStore(OS); };
+    rq.onerror = rq.onblocked = function () { why = String(rq.error || "blocked"); res(); };
+    rq.onsuccess = function () {
+      db = rq.result;
+      db.onversionchange = function () { db.close(); db = null; };
+      var c;
+      try { c = db.transaction(OS, "readonly").objectStore(OS).openCursor(); } catch (e) { why = String(e); db = null; return res(); }
+      c.onsuccess = function () { var cur = c.result; if (cur) { cache[cur.key] = cur.value; cur.continue(); } else res(); };
+      c.onerror = function () { why = String(c.error); db = null; res(); };
+    };
+  }).then(function () {
+    if (!db) return;
+    /* the move from localStorage, once: what the database already holds is newer, so it wins */
+    var moved = [];
+    BIG.forEach(function (k) {
+      var v = null;
+      try { v = localStorage.getItem(k); } catch (e) {}
+      if (v === null) return;
+      if (cache[k] === undefined) { cache[k] = v; moved.push(k); }
+      try { localStorage.removeItem(k); } catch (e) {}
+    });
+    if (moved.length) return tx("readwrite", function (s) { moved.forEach(function (k) { s.put(cache[k], k); }); }).catch(fail);
+  }).then(function () {
+    try { if (navigator.storage && navigator.storage.persist) navigator.storage.persist(); } catch (e) {}
+  });
+  function big(k) { return !!db && BIG.indexOf(k) >= 0; }
+  return {
+    ready: ready,
+    backend: function () { return db ? "indexeddb" : "localstorage"; },
+    why: function () { return why; },
+    getItem: function (k) { if (big(k)) return cache[k] === undefined ? null : cache[k]; return localStorage.getItem(k); },
+    setItem: function (k, v) {
+      v = String(v);
+      if (big(k)) { cache[k] = v; return tx("readwrite", function (s) { s.put(v, k); }).catch(fail); }
+      localStorage.setItem(k, v);
+      return Promise.resolve();
+    },
+    removeItem: function (k) {
+      if (big(k)) { delete cache[k]; return tx("readwrite", function (s) { s.delete(k); }).catch(fail); }
+      localStorage.removeItem(k);
+      return Promise.resolve();
+    },
+    clear: function () {
+      cache = {};
+      try { localStorage.clear(); } catch (e) {}
+      return tx("readwrite", function (s) { s.clear(); }).catch(fail);
+    }
+  };
+})();
+smStore.ready.then(function () {
 (function () {
   "use strict";
   var $ = function (id) { return document.getElementById(id); };
@@ -3438,7 +3521,7 @@
   var PROPS_KEY = "callsheet3.props.v1";
   var PROPS_LABEL = { pts: "points", reb: "rebounds", ast: "assists", tpm: "threes", pra: "pts + reb + ast" };
   var props = [];
-  try { props = JSON.parse(localStorage.getItem(PROPS_KEY) || "[]"); if (!Array.isArray(props)) props = []; } catch (e) { props = []; }
+  try { props = JSON.parse(smStore.getItem(PROPS_KEY) || "[]"); if (!Array.isArray(props)) props = []; } catch (e) { props = []; }
   var propsView = false;
   var propsOrder = [], propDetailId = null;   // the Every-prop table's order, and the prop the panel shows (22 Oct 2026)
   /* the table's view (22 Oct 2026, the user: "is there a way for me to rearrange the rows? all the rebound props, or
@@ -3447,8 +3530,8 @@
   var PROPS_VIEW_KEY = "callsheet3.props.view.v1";
   var PROPS_VIEW_DEFAULT = { sort: "default", dir: -1, mk: "", band: "", side: "", q: "" };
   var propsTableView = Object.assign({}, PROPS_VIEW_DEFAULT);
-  try { var pv0 = JSON.parse(localStorage.getItem(PROPS_VIEW_KEY) || "null"); if (pv0 && typeof pv0 === "object") propsTableView = Object.assign({}, PROPS_VIEW_DEFAULT, pv0); } catch (e) {}
-  function savePropsTableView() { try { localStorage.setItem(PROPS_VIEW_KEY, JSON.stringify(propsTableView)); } catch (e) {} }
+  try { var pv0 = JSON.parse(smStore.getItem(PROPS_VIEW_KEY) || "null"); if (pv0 && typeof pv0 === "object") propsTableView = Object.assign({}, PROPS_VIEW_DEFAULT, pv0); } catch (e) {}
+  function savePropsTableView() { try { smStore.setItem(PROPS_VIEW_KEY, JSON.stringify(propsTableView)); } catch (e) {} }
   var PROPS_BAND_RANK = { "BET": 0, "LEAN": 1, "no edge": 2 };
   var PROPS_SORT_COLS = [["game", "Game"], ["name", "Player"], ["mk", "Market"], ["line", "Line"], ["side", "Pick"], ["chance", "Chance"], ["price", "Price"], ["need", "Needs"], ["edge", "Edge"], ["proj", "Proj"], ["band", "Band"], ["result", "Result"]];
   function propsSortValue(r, key) {
@@ -3493,7 +3576,7 @@
   var PROPS_EXAMPLE_GAMES = [{"gid":"example","away":"76ers","home":"Knicks","aab":"PHI","hab":"NYK","tip":null,"spread":-5.5,"total":231.5,"pace":99.5,"league_pace":100.5,"out":{"PHI":[["Joel Embiid",31.2,"Out"]],"NYK":[]},"props":[{"pid":"x6","name":"Paul George","team":"PHI","opp":"NYK","home":false,"pos":"F","mk":"tpm","line":2.5,"op":-120,"up":100,"book":"fanatics","books":{"fanatics":[2.5,-120,100],"draftkings":[2.5,-125,105],"fanduel":[2.5,-118,98]},"log":[["2026-10-26","DET",0,35.1,3],["2026-10-28","DET",1,38.0,3],["2026-10-30","MIA",0,31.7,3],["2026-10-31","MIA",1,23.1,3],["2026-11-02","CHI",0,38.3,0],["2026-11-05","MIA",1,35.8,3],["2026-11-06","BOS",0,31.6,2],["2026-11-08","IND",1,34.1,1],["2026-11-10","ORL",0,30.0,0],["2026-11-12","MIL",1,38.5,2]],"why":["2.0 threes per 36 this season (12 games, 405 minutes), blended with last season's 2.4 (1000 of 1338 minutes, at half): 2.3 per 36","34.0 minutes projected: his last 5 games (season 33.8), 5 of them starts","Joel Embiid out (31 minutes a game between them): +1.5 minutes and +0.00 threes per 36, the pooled rule, scored","Andre Drummond is Questionable: not counted as out","pace 99.5 against the league's 100.5: x0.990","Knicks allow 1.02x the league's threes per minute to forwards (this season 1.03 over 16 games, last season 1.01): x1.008 at 0.40 weight, measured","HashtagBasketball: Knicks allow 2.9 threes a game to SFs (87th of 150, 1 the fewest), 2.2 threes a game to PFs (61st of 150, 1 the fewest); shown, not scored","home 2.3 / road 2.4 per 36 over 1743 minutes: shown, not scored (a player's own split did not persist from one half of 2025-26 to the other, r 0.08); tonight on the road","projected 2.2 against threes 2.5, one sigma 1.6, the chance read around the median 1.8 (the stat skews right: at the mean the over lands 41% of the time): the over 34.3% by the projection, 52.2% by the book's prices; blended 46.0% at 4 to 2"],"proj":2.21,"sd":1.64,"pm":0.343,"pb":0.5217,"p":0.4604,"push":0.0,"side":"UNDER","chance":0.5396,"price":100,"need":0.5,"edge":0.0396,"band":"LEAN","mins":35.5,"rate36":2.25,"base":2.13,"parts":[{"k":"prior","t":"Last season's prior on his rate","eff":0.2,"i":0},{"k":"minutes","t":"Minutes, his last 5 against the season","eff":0.01,"i":1},{"k":"out","t":"Regulars out","eff":0.09,"i":2},{"k":"pace","t":"Pace","eff":-0.02,"i":4},{"k":"dvp","t":"Defence v position","eff":0.02,"i":5}]},{"pid":"x4","name":"OG Anunoby","team":"NYK","opp":"PHI","home":true,"pos":"F","mk":"ast","line":2.5,"op":100,"up":-120,"book":"fanatics","books":{"fanatics":[2.5,100,-120],"draftkings":[3.0,95,-115],"fanduel":[2.5,102,-122]},"log":[["2026-10-29","ATL",1,37.4,2],["2026-10-31","ATL",0,37.1,1],["2026-11-02","CLE",1,35.7,3],["2026-11-05","ATL",0,33.6,0],["2026-11-06","TOR",1,37.1,0],["2026-11-08","DET",0,34.6,1],["2026-11-11","ATL",1,33.4,2],["2026-11-12","TOR",0,36.2,3],["2026-11-15","ATL",1,31.1,0],["2026-11-17","DET",0,37.2,4]],"why":["1.6 assists per 36 this season (14 games, 480 minutes), blended with last season's 2.4 (1000 of 1949 minutes, at half): 2.1 per 36","34.5 minutes projected: his last 5 games (season 34.3), 5 of them starts","Josh Hart is Day-To-Day: not counted as out","pace 99.5 against the league's 100.5: x0.990","76ers allow 1.01x the league's assists per minute to forwards (this season 1.00 over 15 games, last season 1.02): x1.008 at 0.75 weight, measured","HashtagBasketball: 76ers allow 3.9 assists a game to SFs (70th of 150, 1 the fewest), 3.1 assists a game to PFs (45th of 150, 1 the fewest); shown, not scored","home 2.0 / road 2.6 per 36 over 2430 minutes: shown, not scored (a player's own split did not persist from one half of 2025-26 to the other, r 0.08); tonight at home","projected 2.0 against assists 2.5, one sigma 1.6, the chance read around the median 1.7 (the stat skews right: at the mean the over lands 45% of the time): the over 31.7% by the projection, 47.8% by the book's prices; blended 42.2% at 4 to 2"],"proj":1.96,"sd":1.61,"pm":0.3173,"pb":0.4783,"p":0.4223,"push":0.0,"side":"UNDER","chance":0.5777,"price":-120,"need":0.5455,"edge":0.0323,"band":"BET","mins":34.5,"rate36":2.05,"base":1.97,"parts":[{"k":"prior","t":"Last season's prior on his rate","eff":0.39,"i":0},{"k":"minutes","t":"Minutes, his last 5 against the season","eff":0.01,"i":1},{"k":"pace","t":"Pace","eff":-0.02,"i":3},{"k":"dvp","t":"Defence v position","eff":0.01,"i":4}]},{"pid":"x2","name":"Karl-Anthony Towns","team":"NYK","opp":"PHI","home":true,"pos":"C","mk":"reb","line":11.5,"op":-115,"up":-105,"book":"fanatics","books":{"fanatics":[11.5,-115,-105],"draftkings":[11.5,-120,-100],"fanduel":[11.5,-113,-107]},"log":[["2026-11-03","TOR",1,33.2,13],["2026-11-05","BOS",0,36.5,12],["2026-11-06","MIL",1,33.0,12],["2026-11-08","IND",0,33.8,8],["2026-11-11","CHI",1,35.4,18],["2026-11-13","CLE",0,34.8,4],["2026-11-14","DET",1,29.1,11],["2026-11-17","ORL",0,34.3,19],["2026-11-18","BOS",1,33.6,18],["2026-11-21","ATL",0,30.3,10]],"why":["12.6 rebounds per 36 this season (16 games, 537 minutes), blended with last season's 12.9 (1000 of 2071 minutes, at half): 12.7 per 36","32.4 minutes projected: his last 5 games (season 33.6), 5 of them starts","Josh Hart is Day-To-Day: not counted as out","pace 99.5 against the league's 100.5: x0.990","76ers allow 0.93x the league's rebounds per minute to centres (this season 0.90 over 15 games, last season 0.96): x0.948 at 0.75 weight, measured","HashtagBasketball: 76ers allow 11.9 rebounds a game to Cs (40th of 150, 1 the fewest); shown, not scored","home 12.9 / road 12.8 per 36 over 2608 minutes: shown, not scored (a player's own split did not persist from one half of 2025-26 to the other, r 0.08); tonight at home","projected 10.8 against rebounds 11.5, one sigma 3.9, the chance read around the median 10.3 (the stat skews right: at the mean the over lands 46% of the time): the over 38.4% by the projection, 51.1% by the book's prices; blended 46.8% at 4 to 2"],"proj":10.77,"sd":3.94,"pm":0.384,"pb":0.5108,"p":0.4679,"push":0.0,"side":"UNDER","chance":0.5321,"price":-105,"need":0.5122,"edge":0.0199,"band":"LEAN","mins":32.4,"rate36":12.75,"base":11.48,"parts":[{"k":"prior","t":"Last season's prior on his rate","eff":0.14,"i":0},{"k":"minutes","t":"Minutes, his last 5 against the season","eff":-0.41,"i":1},{"k":"pace","t":"Pace","eff":-0.11,"i":3},{"k":"dvp","t":"Defence v position","eff":-0.6,"i":4}]},{"pid":"x5","name":"Tyrese Maxey","team":"PHI","opp":"NYK","home":false,"pos":"G","mk":"pts","line":25.5,"op":-110,"up":-110,"book":"fanatics","books":{"fanatics":[25.5,-110,-110],"draftkings":[25.5,-115,-105],"fanduel":[25.5,-108,-112]},"log":[["2026-10-31","TOR",1,36.0,34],["2026-11-02","WAS",0,40.2,34],["2026-11-05","ATL",1,36.9,31],["2026-11-07","DET",0,31.3,35],["2026-11-08","MIL",1,38.1,26],["2026-11-10","MIL",0,37.1,33],["2026-11-13","DET",1,37.9,21],["2026-11-14","ATL",0,39.1,31],["2026-11-16","BOS",1,36.2,34],["2026-11-18","BOS",0,32.6,13]],"why":["27.7 points per 36 this season (15 games, 556 minutes), blended with last season's 28.5 (1000 of 1909 minutes, at half): 28.1 per 36","36.6 minutes projected: his last 5 games (season 37.1), 5 of them starts","Joel Embiid out (31 minutes a game between them): +1.5 minutes and +0.58 points per 36, the pooled rule, scored","Andre Drummond is Questionable: not counted as out","pace 99.5 against the league's 100.5: x0.990","Knicks allow 0.97x the league's points per minute to guards (this season 0.95 over 16 games, last season 0.99): x0.978 at 0.75 weight, measured","HashtagBasketball: Knicks allow 21.9 points a game to PGs (34th of 150, 1 the fewest), 22.1 points a game to SGs (42nd of 150, 1 the fewest); shown, not scored","home 29.9 / road 26.9 per 36 over 2465 minutes: shown, not scored (a player's own split did not persist from one half of 2025-26 to the other, r 0.08); tonight on the road","projected 29.3 against points 25.5, one sigma 10.0, the chance read around the median 28.5 (the stat skews right: at the mean the over lands 47% of the time): the over 61.9% by the projection, 50.0% by the book's prices; blended 54.0% at 4 to 2"],"proj":29.34,"sd":10.02,"pm":0.6191,"pb":0.5,"p":0.5404,"push":0.0,"side":"OVER","chance":0.5404,"price":-110,"need":0.5238,"edge":0.0166,"band":"LEAN","mins":38.1,"rate36":28.68,"base":28.55,"parts":[{"k":"prior","t":"Last season's prior on his rate","eff":0.39,"i":0},{"k":"minutes","t":"Minutes, his last 5 against the season","eff":-0.38,"i":1},{"k":"out","t":"Regulars out","eff":1.77,"i":2},{"k":"pace","t":"Pace","eff":-0.3,"i":4},{"k":"dvp","t":"Defence v position","eff":-0.68,"i":5}]},{"pid":"x7","name":"Kelly Oubre Jr.","team":"PHI","opp":"NYK","home":false,"pos":"F","mk":"pts","line":14.5,"op":-105,"up":-115,"book":"fanatics","books":{"fanatics":[14.5,-105,-115],"draftkings":[15.0,-110,-110],"fanduel":[14.5,-103,-117]},"log":[["2026-11-01","MIA",1,32.7,9],["2026-11-03","ORL",0,35.0,23],["2026-11-04","ORL",1,30.0,0],["2026-11-07","MIL",0,27.7,15],["2026-11-09","IND",1,33.5,6],["2026-11-10","CLE",0,35.8,10],["2026-11-12","MIA",1,30.4,2],["2026-11-14","DET",0,31.4,9],["2026-11-17","IND",1,26.7,16],["2026-11-18","MIA",0,30.8,14]],"why":["13.1 points per 36 this season (15 games, 452 minutes), blended with last season's 16.7 (1000 of 1880 minutes, at half): 15.0 per 36","31.0 minutes projected: his last 5 games (season 30.2), 5 of them starts","Joel Embiid out (31 minutes a game between them): +1.5 minutes and +0.58 points per 36, the pooled rule, scored","Andre Drummond is Questionable: not counted as out","pace 99.5 against the league's 100.5: x0.990","Knicks allow 1.02x the league's points per minute to forwards (this season 1.03 over 16 games, last season 1.01): x1.015 at 0.75 weight, measured","HashtagBasketball: Knicks allow 22.1 points a game to SFs (43rd of 150, 1 the fewest), 21.6 points a game to PFs (38th of 150, 1 the fewest); shown, not scored","home 14.5 / road 17.5 per 36 over 2332 minutes: shown, not scored (a player's own split did not persist from one half of 2025-26 to the other, r 0.08); tonight on the road","projected 14.1 against points 14.5, one sigma 7.0, the chance read around the median 13.6 (the stat skews right: at the mean the over lands 47% of the time): the over 44.8% by the projection, 48.9% by the book's prices; blended 47.5% at 4 to 2"],"proj":14.15,"sd":6.96,"pm":0.4481,"pb":0.4892,"p":0.4754,"push":0.0,"side":"UNDER","chance":0.5246,"price":-115,"need":0.5349,"edge":-0.0103,"band":"no edge","mins":32.5,"rate36":15.6,"base":12.94,"parts":[{"k":"prior","t":"Last season's prior on his rate","eff":1.64,"i":0},{"k":"minutes","t":"Minutes, his last 5 against the season","eff":0.34,"i":1},{"k":"out","t":"Regulars out","eff":1.14,"i":2},{"k":"pace","t":"Pace","eff":-0.14,"i":4},{"k":"dvp","t":"Defence v position","eff":0.21,"i":5}]},{"pid":"x1","name":"Jalen Brunson","team":"NYK","opp":"PHI","home":true,"pos":"G","mk":"pts","line":27.5,"op":-110,"up":-110,"book":"fanatics","books":{"fanatics":[27.5,-110,-110],"draftkings":[28.0,-115,-105],"fanduel":[27.5,-108,-112]},"log":[["2026-10-31","BKN",0,26.4,18],["2026-11-03","BOS",1,37.5,39],["2026-11-05","ATL",0,32.4,15],["2026-11-07","MIA",1,38.1,37],["2026-11-09","ORL",0,33.2,25],["2026-11-11","IND",1,34.9,24],["2026-11-13","IND",0,35.7,35],["2026-11-15","MIA",1,37.4,38],["2026-11-17","IND",0,34.7,33],["2026-11-18","MIL",1,33.6,40]],"why":["30.7 points per 36 this season (15 games, 510 minutes), blended with last season's 26.9 (1000 of 2094 minutes, at half): 28.8 per 36","35.3 minutes projected: his last 5 games (season 34.1), 5 of them starts","Josh Hart is Day-To-Day: not counted as out","pace 99.5 against the league's 100.5: x0.990","76ers allow 1.06x the league's points per minute to guards (this season 1.08 over 15 games, last season 1.02): x1.045 at 0.75 weight, measured","HashtagBasketball: 76ers allow 24.0 points a game to PGs (116th of 150, 1 the fewest), 22.6 points a game to SGs (61st of 150, 1 the fewest); shown, not scored","home 29.0 / road 26.2 per 36 over 2605 minutes: shown, not scored (a player's own split did not persist from one half of 2025-26 to the other, r 0.08); tonight at home","projected 29.2 against points 27.5, one sigma 10.0, the chance read around the median 28.4 (the stat skews right: at the mean the over lands 47% of the time): the over 53.4% by the projection, 50.0% by the book's prices; blended 51.1% at 4 to 2"],"proj":29.16,"sd":9.99,"pm":0.5343,"pb":0.5,"p":0.5114,"push":0.0,"side":"OVER","chance":0.5114,"price":-110,"need":0.5238,"edge":-0.0124,"band":"no edge","mins":35.3,"rate36":28.77,"base":28.18,"parts":[{"k":"prior","t":"Last season's prior on his rate","eff":-1.84,"i":0},{"k":"minutes","t":"Minutes, his last 5 against the season","eff":0.96,"i":1},{"k":"pace","t":"Pace","eff":-0.28,"i":3},{"k":"dvp","t":"Defence v position","eff":1.26,"i":4}]},{"pid":"x3","name":"Mikal Bridges","team":"NYK","opp":"PHI","home":true,"pos":"F","mk":"pra","line":24.5,"op":-110,"up":-110,"book":"fanatics","books":{"fanatics":[24.5,-110,-110],"draftkings":[24.5,-115,-105],"fanduel":[24.5,-108,-112]},"log":[["2026-11-03","BOS",1,37.6,39],["2026-11-04","CLE",0,37.0,28],["2026-11-07","IND",1,31.5,22],["2026-11-09","IND",0,40.8,26],["2026-11-11","WAS",1,37.3,11],["2026-11-13","WAS",0,38.6,41],["2026-11-14","IND",1,38.9,21],["2026-11-16","MIL",0,38.4,21],["2026-11-18","TOR",1,36.8,15],["2026-11-21","WAS",0,38.8,23]],"why":["22.8 points + rebounds + assists per 36 this season (16 games, 605 minutes), blended with last season's 23.5 (1000 of 2346 minutes, at half): 23.1 per 36","38.3 minutes projected: his last 5 games (season 37.8), 5 of them starts","Josh Hart is Day-To-Day: not counted as out","pace 99.5 against the league's 100.5: x0.990","76ers allow 1.01x the league's points per minute to forwards (this season 1.00 over 15 games, last season 1.02): x1.008 at 0.75 weight, measured","HashtagBasketball: 76ers allow 21.4 points a game to SFs (24th of 150, 1 the fewest), 22.9 points a game to PFs (88th of 150, 1 the fewest); shown, not scored","home 24.6 / road 22.2 per 36 over 2951 minutes: shown, not scored (a player's own split did not persist from one half of 2025-26 to the other, r 0.08); tonight at home","projected 24.5 against points + rebounds + assists 24.5, one sigma 9.4, the chance read around the median 24.1 (the stat skews right: at the mean the over lands 48% of the time): the over 48.1% by the projection, 50.0% by the book's prices; blended 49.4% at 4 to 2"],"proj":24.52,"sd":9.41,"pm":0.481,"pb":0.5,"p":0.4937,"push":0.0,"side":"UNDER","chance":0.5063,"price":-110,"need":0.5238,"edge":-0.0175,"band":"no edge","mins":38.3,"rate36":23.11,"base":24.58,"parts":[{"k":"prior","t":"Last season's prior on his rate","eff":0.35,"i":0},{"k":"minutes","t":"Minutes, his last 5 against the season","eff":0.3,"i":1},{"k":"pace","t":"Pace","eff":-0.24,"i":3},{"k":"dvp","t":"Defence v position","eff":0.18,"i":4}]},{"pid":"x8","name":"Joel Embiid","team":"PHI","opp":"NYK","home":false,"pos":"C","mk":"reb","line":9.5,"op":-110,"up":-110,"book":"fanatics","books":{"fanatics":[9.5,-110,-110],"draftkings":[9.5,-115,-105],"fanduel":[9.5,-108,-112]},"log":[["2026-10-22","WAS",0,24.4,7],["2026-10-23","ATL",1,33.9,9],["2026-10-26","MIL",0,34.2,9],["2026-10-28","CHI",1,34.2,7],["2026-10-30","BOS",0,30.4,8],["2026-10-31","TOR",1,35.9,15],["2026-11-03","IND",0,38.3,10],["2026-11-04","ATL",1,30.7,10],["2026-11-07","MIA",0,29.8,8]],"why":["listed Out on ESPN: no projection, the book will void or pull the line"]}],"unmatched":[]}];
   var propsPreview = null;
   function propsSource() { return propsPreview || props; }
-  function saveProps() { try { localStorage.setItem(PROPS_KEY, JSON.stringify(props)); } catch (e) {} }
+  function saveProps() { try { smStore.setItem(PROPS_KEY, JSON.stringify(props)); } catch (e) {} }
   function propsSay(msg) { var el = $("propsMsg"); if (!el) return; el.hidden = false; el.innerHTML = msg; }
   function propKey(r) { return (r.gdate || "") + "|" + r.pid + "|" + r.mk; }
   function propsDates() { var d = {}; propsSource().forEach(function (r) { if (r.gdate) d[r.gdate] = true; }); return Object.keys(d).sort(); }
@@ -3880,7 +3963,7 @@
       var el = $(p[0]); if (!el) return;
       el.addEventListener(p[0] === "propsQ" ? "input" : "change", function () { propsTableView[p[1]] = el.value; savePropsTableView(); renderProps(); });
     });
-    if ($("propsReset")) $("propsReset").addEventListener("click", function () { propsTableView = Object.assign({}, PROPS_VIEW_DEFAULT); try { localStorage.removeItem(PROPS_VIEW_KEY); } catch (e) {} renderProps(); });
+    if ($("propsReset")) $("propsReset").addEventListener("click", function () { propsTableView = Object.assign({}, PROPS_VIEW_DEFAULT); try { smStore.removeItem(PROPS_VIEW_KEY); } catch (e) {} renderProps(); });
     $("propsBest").addEventListener("click", openFrom);
     if ($("propDetail")) {
       $("propDetailClose").addEventListener("click", closePropDetail);
@@ -4369,7 +4452,7 @@
 
   var KEY = "callsheet3.card.v1", DRAFT_KEY = "callsheet3.draft.v1";
   var card = [];
-  try { card = JSON.parse(localStorage.getItem(KEY) || "[]"); } catch (e) { card = []; }
+  try { card = JSON.parse(smStore.getItem(KEY) || "[]"); } catch (e) { card = []; }
   /* A card written before 29 Sept could hold the same ungraded game twice with
      identical inputs (Add pressed twice). Drop the later copy once, on load. */
   (function () {
@@ -4379,7 +4462,7 @@
                                                                    JSON.stringify(s.inputs) === JSON.stringify(r.inputs); });
       if (!twin) { seen.push(r); keep.push(r); }
     });
-    if (keep.length !== card.length) { card = keep; try { localStorage.setItem(KEY, JSON.stringify(card)); } catch (e) {} }
+    if (keep.length !== card.length) { card = keep; try { smStore.setItem(KEY, JSON.stringify(card)); } catch (e) {} }
   })();
   /* An NBA row re-scored while another game sat in the form (a slate or odds file merged
      into the card) carried that game's names on its moneyline and spread until 21 Oct 2026
@@ -4407,19 +4490,19 @@
         fixed++;
       });
     });
-    if (fixed) { try { localStorage.setItem(KEY, JSON.stringify(card)); } catch (e) {} }
+    if (fixed) { try { smStore.setItem(KEY, JSON.stringify(card)); } catch (e) {} }
   })();
   function save() {
-    try { localStorage.setItem(KEY, JSON.stringify(card)); }
+    try { smStore.setItem(KEY, JSON.stringify(card)); }
     catch (e) { $("saveState").textContent = "this browser is not storing anything"; }
   }
   function saveDraft() {
-    try { localStorage.setItem(DRAFT_KEY, JSON.stringify({ sport: sport, inputs: snapshot() })); $("saveState").textContent = "draft saved"; }
+    try { smStore.setItem(DRAFT_KEY, JSON.stringify({ sport: sport, inputs: snapshot() })); $("saveState").textContent = "draft saved"; }
     catch (e) { $("saveState").textContent = "this browser is not storing anything"; }
   }
   function loadDraft() {
     var d = null;
-    try { d = JSON.parse(localStorage.getItem(DRAFT_KEY) || "null"); } catch (e) { d = null; }
+    try { d = JSON.parse(smStore.getItem(DRAFT_KEY) || "null"); } catch (e) { d = null; }
     if (!d || !d.inputs) return false;
     setSport(sportOf(d.sport), true);
     restore(d.inputs);
@@ -6267,7 +6350,7 @@
      and prices filled. Lines and prices are never in a slate. 28 Sept 2026. */
   var SLATE_KEY = "callsheet3.slate.v1";
   var slate = null;
-  try { slate = JSON.parse(localStorage.getItem(SLATE_KEY) || "null"); } catch (e) { slate = null; }
+  try { slate = JSON.parse(smStore.getItem(SLATE_KEY) || "null"); } catch (e) { slate = null; }
   var SLATE_FIELDS = ["aera","hera","aip","hip","al5era","hl5era","al5ip","hl5ip","arpg","hrpg","abp","hbp","al10","hl10","h2h","h2hn","pf","mph","dir","temp","tick","cash",
                       "apace","hpace","aort","hort","adrt","hdrt","arest","hrest","al5","hl5",
                       /* the odds file (12 Oct 2026): the book's lines and prices, the opener, and
@@ -6286,7 +6369,7 @@
   }
   function rowGraded(r) { return (r.markets || []).some(function (mk) { return gradeMarket(mk, r.finals) !== null; }); }
   function hasFinals(fin) { return !!fin && !blank(fin.fa) && !blank(fin.fh); }
-  function saveSlate() { try { if (slate) localStorage.setItem(SLATE_KEY, JSON.stringify(slate)); else localStorage.removeItem(SLATE_KEY); } catch (e) {} }
+  function saveSlate() { try { if (slate) smStore.setItem(SLATE_KEY, JSON.stringify(slate)); else smStore.removeItem(SLATE_KEY); } catch (e) {} }
   function applySlate(d, name) {
     if (!d || d.format !== "callsheet2.slate" || !Array.isArray(d.games)) throw new Error("not a Call Sheet 2.0 slate");
     var filled = 0, graded = 0, frozen = 0, pending = 0;
@@ -6440,4 +6523,5 @@
   else if ($("gdate").value === "") $("gdate").value = todayISO();
   render(); renderCard(); renderBoard(); renderCalib();
 })();
+});
 </script>

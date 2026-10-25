@@ -41,7 +41,8 @@ const CHECKS = ["dome","playoff","agconf","hgconf","agbk","hgbk"];
   });
   await pg.goto('file://' + path.join(__dirname, 'web/callsheet3.html'));
   await pg.waitForTimeout(300);
-  await pg.evaluate(() => { localStorage.clear(); });
+  // the page's memory is the store (25 Oct 2026): IndexedDB behind a cache, localStorage for the small keys
+  await pg.evaluate(() => smStore.ready.then(() => smStore.clear()));
   await pg.reload();
   await pg.waitForTimeout(300);
 
@@ -113,7 +114,7 @@ const CHECKS = ["dome","playoff","agconf","hgconf","agbk","hgbk"];
   const flow = await pg.evaluate(async () => {
     const wait = () => new Promise(r => setTimeout(r, 60));
     const set = (id, v) => { const el = document.getElementById(id); el.value = v; el.dispatchEvent(new Event('input', { bubbles: true })); };
-    localStorage.removeItem('callsheet3.card.v1');
+    await smStore.removeItem('callsheet3.card.v1');
     document.getElementById('clear').click(); document.getElementById('m-nhl').click(); await wait();
     document.getElementById('boardDate').value = '2026-11-07';
     // game 1: Rangers @ Bruins, full board, the example
@@ -127,7 +128,7 @@ const CHECKS = ["dome","playoff","agconf","hgconf","agbk","hgbk"];
     set('gdate', '2026-11-07'); set('away', 'Toronto'); set('home', 'Montreal'); set('line', '6.5'); set('op', '-115'); set('up', '-105'); set('aml', '-120'); set('hml', '100');
     await wait(); document.getElementById('add').click(); await wait();
     document.getElementById('boardDate').dispatchEvent(new Event('change')); await wait();
-    const card = JSON.parse(localStorage.getItem('callsheet3.card.v1'));
+    const card = JSON.parse(smStore.getItem('callsheet3.card.v1'));
     const names = card.map(r => r.matchup);
     const boardRows = [...document.querySelectorAll('#board tbody tr')].map(tr => ({ market: tr.querySelectorAll('td')[2].textContent, notPicked: !!tr.querySelector('.chip.dim') && /not picked/.test(tr.querySelectorAll('td')[2].textContent) }));
     const bets = [...document.querySelectorAll('#bestBets .pk .n4')].map(e => e.textContent);
@@ -186,7 +187,7 @@ const CHECKS = ["dome","playoff","agconf","hgconf","agbk","hgbk"];
   const nba = await pg.evaluate(async () => {
     const wait = () => new Promise(r => setTimeout(r, 60));
     const set = (id, v) => { const el = document.getElementById(id); el.value = v; el.dispatchEvent(new Event('input', { bubbles: true })); };
-    localStorage.removeItem('callsheet3.card.v1');
+    await smStore.removeItem('callsheet3.card.v1');
     document.getElementById('clear').click(); document.getElementById('m-nba').click(); await wait();
     document.getElementById('boardDate').value = '2027-04-06';
     // the last two weeks: the stage delta puts +2 on the line, the half carries its share, the ratings fade is past fifty games
@@ -226,7 +227,7 @@ const CHECKS = ["dome","playoff","agconf","hgconf","agbk","hgbk"];
     const forecast = document.getElementById('forecastLine').textContent;
     document.getElementById('add').click(); await wait();
     document.getElementById('boardDate').dispatchEvent(new Event('change')); await wait();
-    const card = JSON.parse(localStorage.getItem('callsheet3.card.v1')).filter(r => r.sport === 'NBA');
+    const card = JSON.parse(smStore.getItem('callsheet3.card.v1')).filter(r => r.sport === 'NBA');
     const boardRows = [...document.querySelectorAll('#board tbody tr')].map(tr => ({ market: tr.querySelectorAll('td')[2].textContent, notPicked: !!tr.querySelector('.chip.dim') && /not picked/.test(tr.querySelectorAll('td')[2].textContent) }));
     const bets = [...document.querySelectorAll('#bestBets .pk .n4')].map(e => e.textContent);
     // grade: Celtics 115, Raptors 101; 54-46 at the half
@@ -300,7 +301,7 @@ const CHECKS = ["dome","playoff","agconf","hgconf","agbk","hgbk"];
     tr().querySelector('[data-void]').click(); await wait();
     const rowCls = tr().className, tag = (tr().querySelector('.voidtag') || {}).textContent || '', chipsAfter = [...tr().querySelectorAll('.rowmk .chip.win, .rowmk .chip.loss, .rowmk .chip.push')].length;
     const gradedAfter = mlbHead(), boardAfter = document.querySelectorAll('#board tbody tr').length;
-    const stored = JSON.parse(localStorage.getItem('callsheet3.card.v1')).find(r => /Brewers @ Dodgers/.test(r.matchup) && r.gdate === '2026-11-30').finals;
+    const stored = JSON.parse(smStore.getItem('callsheet3.card.v1')).find(r => /Brewers @ Dodgers/.test(r.matchup) && r.gdate === '2026-11-30').finals;
     const hasUndo = !!tr().querySelector('[data-unvoid]'), hasInputs = !!tr().querySelector('.grade[data-k="fa"]');
     tr().querySelector('[data-unvoid]').click(); await wait();
     const chipsBack = [...tr().querySelectorAll('.rowmk .chip.win, .rowmk .chip.loss, .rowmk .chip.push')].length, gradedBack = mlbHead(), faBack = tr().querySelector('.grade[data-k="fa"]').value;
@@ -318,7 +319,7 @@ const CHECKS = ["dome","playoff","agconf","hgconf","agbk","hgbk"];
     const wait = () => new Promise(r => setTimeout(r, 60));
     const set = (id, v) => { const el = document.getElementById(id); el.value = v; el.dispatchEvent(new Event('input', { bubbles: true })); };
     const tick = (id, on) => { const el = document.getElementById(id); el.checked = on; el.dispatchEvent(new Event('change', { bubbles: true })); };
-    localStorage.removeItem('callsheet3.card.v1');
+    await smStore.removeItem('callsheet3.card.v1');
     document.getElementById('clear').click(); document.getElementById('m-nhl').click(); await wait();
     document.getElementById('boardDate').value = '2026-11-20';
     set('gdate', '2026-11-20'); set('away', 'Rangers'); set('home', 'Bruins'); set('line', '6'); set('op', '-110'); set('up', '-110'); set('hml', '-150'); set('aml', '130');
@@ -334,7 +335,7 @@ const CHECKS = ["dome","playoff","agconf","hgconf","agbk","hgbk"];
     document.getElementById('boardDate').dispatchEvent(new Event('change')); await wait();
     const ups = [...document.querySelectorAll('#upsets .pk')].map(e => ({ cls: e.className, n1: e.querySelector('.n1').textContent, n2: e.querySelector('.n2').textContent, n3: e.querySelector('.n3').textContent, n4: e.querySelector('.n4').textContent }));
     const bets = [...document.querySelectorAll('#bestBets .pk .n2')].map(e => e.textContent);
-    const stored = JSON.parse(localStorage.getItem('callsheet3.card.v1')).find(r => /Rangers @ Bruins/.test(r.matchup) && r.gdate === '2026-11-20').markets.find(m => m.key === 'ml');
+    const stored = JSON.parse(smStore.getItem('callsheet3.card.v1')).find(r => /Rangers @ Bruins/.test(r.matchup) && r.gdate === '2026-11-20').markets.find(m => m.key === 'ml');
     // the favourite's backup instead: no lift, not pickable
     tick('agbk', false); tick('hgbk', true); await wait();
     const favBk = read();
@@ -436,7 +437,7 @@ const CHECKS = ["dome","playoff","agconf","hgconf","agbk","hgbk"];
     el.value = ''; el.dispatchEvent(new Event('input', { bubbles: true })); await wait();
     const crew2 = crewText(), ctxNoCrew = document.querySelectorAll('#nbaCtxPanel ul.ctx li').length;
     document.getElementById('add').click(); await wait();
-    const stored = JSON.parse(localStorage.getItem('callsheet3.card.v1')).find(r => /76ers @ Knicks/.test(r.matchup));
+    const stored = JSON.parse(smStore.getItem('callsheet3.card.v1')).find(r => /76ers @ Knicks/.test(r.matchup));
     document.getElementById('clear').click(); await wait();
     return { out, lineup, ctx, why, rail, pick, also, likelyCard, likelyRow, opened, crew0, crew1, crew2, ctxNoCrew, storedRefs: (stored.inputs.nbarefs || '').length > 10, storedCrew: stored.inputs.ncrew, storedLineup: (stored.inputs.nbalineup || '').indexOf('Tyrese Maxey') > 0, crewBlock };
   });
@@ -499,7 +500,7 @@ const CHECKS = ["dome","playoff","agconf","hgconf","agbk","hgbk"];
     const chips = [...document.querySelectorAll('#markets .mk[data-key="total"] .cap')].map(c => c.textContent);
     const why = document.getElementById('why').textContent;
     document.getElementById('add').click(); await wait();
-    const stored = JSON.parse(localStorage.getItem('callsheet3.card.v1')).find(r => /Wild @ Blues/.test(r.matchup));
+    const stored = JSON.parse(smStore.getItem('callsheet3.card.v1')).find(r => /Wild @ Blues/.test(r.matchup));
     const tr = [...document.querySelectorAll('#cardTable tr')].find(x => /Wild @ Blues/.test(x.textContent));
     const g = (k, v) => { const el = tr.querySelector(`.grade[data-k="${k}"]`); el.value = v; el.dispatchEvent(new Event('input', { bubbles: true })); el.dispatchEvent(new Event('change', { bubbles: true })); };
     g('f5a', '1'); g('f5h', '0'); g('fa', '2'); g('fh', '1'); await wait();
@@ -528,7 +529,7 @@ const CHECKS = ["dome","playoff","agconf","hgconf","agbk","hgbk"];
     const two = read();
     tick('hgbk', false); await wait();
     document.getElementById('add').click(); await wait();
-    const stored = JSON.parse(localStorage.getItem('callsheet3.card.v1')).find(r => /Kraken @ Canucks/.test(r.matchup));
+    const stored = JSON.parse(smStore.getItem('callsheet3.card.v1')).find(r => /Kraken @ Canucks/.test(r.matchup));
     const tr = [...document.querySelectorAll('#cardTable tr')].find(x => /Kraken @ Canucks/.test(x.textContent));
     const g = (k, v) => { const el = tr.querySelector(`.grade[data-k="${k}"]`); el.value = v; el.dispatchEvent(new Event('input', { bubbles: true })); el.dispatchEvent(new Event('change', { bubbles: true })); };
     g('f5a', '0'); g('f5h', '1'); g('fa', '2'); g('fh', '1'); await wait();
@@ -553,7 +554,7 @@ const CHECKS = ["dome","playoff","agconf","hgconf","agbk","hgbk"];
   const oddsT = await pg.evaluate(async () => {
     const wait = () => new Promise(r => setTimeout(r, 80));
     const load = async (doc, name) => { const dt = new DataTransfer(); dt.items.add(new File([JSON.stringify(doc)], name, { type: 'application/json' })); const inp = document.getElementById('slateFile'); inp.files = dt.files; inp.dispatchEvent(new Event('change', { bubbles: true })); await wait(); };
-    localStorage.removeItem('callsheet3.card.v1');
+    await smStore.removeItem('callsheet3.card.v1');
     document.getElementById('slateClear').click(); document.getElementById('clear').click(); await wait();
     const game = { sport: 'NHL', gdate: '2026-11-09', away: 'Kraken', home: 'Canucks' };   // its own matchup: the row stays on the card for later tests
     await load({ format: 'callsheet2.slate', version: 1, date: '2026-11-09', games: [ Object.assign({}, game, { starters: { away: 'Stuart Skinner', home: 'Dustin Wolf' }, inputs: { agsv: '0.908', hgsv: '0.916', agsh: '1200', hgsh: '1300', agname: 'Stuart Skinner', hgname: 'Dustin Wolf' }, notes: ['from the slate'] }) ] }, 'nhl-slate-2026-11-09.json');
@@ -570,16 +571,16 @@ const CHECKS = ["dome","playoff","agconf","hgconf","agbk","hgbk"];
     const listed = document.querySelector('#markets .mk[data-key="total"] .pick').childNodes[0].textContent.trim();
     const why = document.getElementById('why').textContent;
     document.getElementById('add').click(); await wait();
-    const stored = JSON.parse(localStorage.getItem('callsheet3.card.v1')).find(r => /Kraken @ Canucks/.test(r.matchup) && r.gdate === '2026-11-09');
+    const stored = JSON.parse(smStore.getItem('callsheet3.card.v1')).find(r => /Kraken @ Canucks/.test(r.matchup) && r.gdate === '2026-11-09');
     // a later odds file with a moved number: the carded line stays
     await load({ format: 'callsheet2.slate', version: 1, date: '2026-11-09', games: [ Object.assign({}, game, { inputs: { line: '6.5', op: '-115', up: '-105' } }) ] }, 'odds-2026-11-09.json');
     // the backup test left its own Kraken @ Canucks row (12 Nov) on the in-memory card, so find this one by its date
     const mine = r => /Kraken @ Canucks/.test(r.matchup) && r.gdate === '2026-11-09';
-    const row1 = JSON.parse(localStorage.getItem('callsheet3.card.v1')).find(mine);
+    const row1 = JSON.parse(smStore.getItem('callsheet3.card.v1')).find(mine);
     // the grade file with the close attached
     await load({ format: 'callsheet2.slate', version: 1, date: '2026-11-09', games: [ Object.assign({}, game, { finals: { fa: '2', fh: '1', f5a: '1', f5h: '0' }, close: { ctot: '6.5', cf5: '1.5' }, starters: { away: 'S. Skinner', home: 'D. Wolf' } }) ] }, 'nhl-grade-2026-11-09.json');
     await wait();
-    const row2 = JSON.parse(localStorage.getItem('callsheet3.card.v1')).find(mine);
+    const row2 = JSON.parse(smStore.getItem('callsheet3.card.v1')).find(mine);
     // graded 2-1 (three goals under the carded 6): Pinnacle's 30-cent shade on the over lost, on its own record line
     const tileO = [...document.querySelectorAll('#calibBox .calib[data-sport="NHL"] > div')].find(d => /Full-game total/.test(d.textContent));
     const tileOText = tileO ? tileO.textContent : '';
@@ -771,17 +772,17 @@ const CHECKS = ["dome","playoff","agconf","hgconf","agbk","hgbk"];
     const ctxCleared = document.getElementById('ctxPanel').textContent;
     document.getElementById('slateClear').click(); document.getElementById('clear').click(); await wait();
     // a 2.0 backup with an MLB row and a WNBA row: both join the card, and loading it twice adds nothing
-    const before = JSON.parse(localStorage.getItem('callsheet3.card.v1') || '[]');
+    const before = JSON.parse(smStore.getItem('callsheet3.card.v1') || '[]');
     const b2 = { format: 'callsheet2.backup', version: 1, card: [
       { id: 1, sport: 'MLB', away: 'Rays', home: 'Yankees', matchup: 'Rays @ Yankees', gdate: '2026-09-22', inputs: { away: 'Rays', home: 'Yankees', line: '6.5', op: '-110', up: '-110', gdate: '2026-09-22' }, markets: [{ key: 'total', label: 'Full-game total 6.5', pick: 'UNDER 6.5', side: 'UNDER', p: 0.52, pPush: 0, price: -110, edge: -0.004, fair: -108, anchored: true, band: 'NO BET', other: { pick: 'OVER 6.5', p: 0.48, price: -110, edge: -0.044 } }], finals: { fa: '2', fh: '3' } },
       { id: 2, sport: 'WNBA', away: 'Sun', home: 'Mystics', matchup: 'Sun @ Mystics', gdate: '2026-09-22', inputs: { away: 'Sun', home: 'Mystics', line: '162.5', gdate: '2026-09-22' }, markets: [], finals: {} } ] };
     const dt2 = new DataTransfer(); dt2.items.add(new File([JSON.stringify(b2)], 'callsheet2-2026-09-30.json', { type: 'application/json' }));
     const inp2 = document.getElementById('restoreFile'); inp2.files = dt2.files; inp2.dispatchEvent(new Event('change', { bubbles: true })); await wait();
-    const card = JSON.parse(localStorage.getItem('callsheet3.card.v1'));
+    const card = JSON.parse(smStore.getItem('callsheet3.card.v1'));
     const msg = document.getElementById('saveMsg').textContent;
     const dt3 = new DataTransfer(); dt3.items.add(new File([JSON.stringify(b2)], 'callsheet2-2026-09-30.json', { type: 'application/json' }));
     inp2.files = dt3.files; inp2.dispatchEvent(new Event('change', { bubbles: true })); await wait();
-    const again = JSON.parse(localStorage.getItem('callsheet3.card.v1'));
+    const again = JSON.parse(smStore.getItem('callsheet3.card.v1'));
     const msg2 = document.getElementById('saveMsg').textContent;
     const wnbaBtn = document.getElementById('m-wnba');
     return { list, form, before: before.length, card: card.map(r => r.sport + ':' + r.matchup), ids: card.map(r => r.id), msg,
@@ -803,7 +804,7 @@ const CHECKS = ["dome","playoff","agconf","hgconf","agbk","hgbk"];
   const picker = await pg.evaluate(async () => {
     const wait = () => new Promise(r => setTimeout(r, 80));
     const set = (id, v) => { const el = document.getElementById(id); el.value = v; el.dispatchEvent(new Event('input', { bubbles: true })); };
-    localStorage.removeItem('callsheet3.card.v1');
+    await smStore.removeItem('callsheet3.card.v1');
     document.getElementById('slateClear').click(); document.getElementById('clear').click(); await wait();
     const slateDoc = { format: 'callsheet2.slate', version: 1, date: '2026-11-08', games: [
       { sport: 'NHL', gdate: '2026-11-08', away: 'Oilers', home: 'Flames', starters: { away: 'Stuart Skinner', home: 'Dustin Wolf' },
@@ -823,7 +824,7 @@ const CHECKS = ["dome","playoff","agconf","hgconf","agbk","hgbk"];
     const gradeDoc = { format: 'callsheet2.slate', version: 1, date: '2026-11-08', games: [ { sport: 'NHL', gdate: '2026-11-08', away: 'Oilers', home: 'Flames', finals: { fa: '2', fh: '1', f5a: '1', f5h: '0' }, starters: { away: 'S. Skinner', home: 'D. Wolf' }, notes: [] } ] };
     const dt2 = new DataTransfer(); dt2.items.add(new File([JSON.stringify(gradeDoc)], 'nhl-grade-2026-11-08.json', { type: 'application/json' }));
     inp.files = dt2.files; inp.dispatchEvent(new Event('change', { bubbles: true })); await wait();
-    const row = JSON.parse(localStorage.getItem('callsheet3.card.v1')).find(r => /Oilers @ Flames/.test(r.matchup));
+    const row = JSON.parse(smStore.getItem('callsheet3.card.v1')).find(r => /Oilers @ Flames/.test(r.matchup));
     const tr = [...document.querySelectorAll('#cardTable tr')].find(x => /Oilers @ Flames/.test(x.textContent));
     const tile = [...document.querySelectorAll('#calibBox .calib[data-sport="NHL"] > div')].find(d => /Full-game total/.test(d.textContent));
     tr.querySelector('[data-open]').click(); await wait();
@@ -902,7 +903,7 @@ const CHECKS = ["dome","playoff","agconf","hgconf","agbk","hgbk"];
   // ---- 19 Oct 2026: the Props tab -- a props file lists, a grade file grades, the record tile and the backup carry it ----
   const propsT = await pg.evaluate(async () => {
     const wait = () => new Promise(r => setTimeout(r, 80));
-    localStorage.removeItem('callsheet3.props.v1');
+    await smStore.removeItem('callsheet3.props.v1');
     const propsDoc = { format: 'callsheet3.props', version: 1, date: '2026-10-21', games: [
       { gid: '401909834', away: 'Hawks', home: 'Magic', aab: 'ATL', hab: 'ORL', spread: -4.5, total: 229.5, pace: 99.8, props: [
         { pid: '3037789', name: 'Trae Young', team: 'ATL', opp: 'ORL', home: false, pos: 'PG', mk: 'pts', line: 24.5, op: -110, up: -110, book: 'fanatics', books: { fanatics: [24.5, -110, -110], draftkings: [25.5, -115, -105] },
@@ -922,7 +923,7 @@ const CHECKS = ["dome","playoff","agconf","hgconf","agbk","hgbk"];
     await load({ format: 'callsheet3.props', version: 1, date: '2026-10-23', generated: '2026-10-24T01:10:00Z', games: [
       { gid: 'a', away: 'Bulls', home: 'Bucks', aab: 'CHI', hab: 'MIL', tip: '2026-10-24T00:00Z', props: [{ pid: '1', name: 'Josh Giddey', team: 'CHI', opp: 'MIL', home: false, pos: 'G', mk: 'pts', line: 12.5, op: -135, up: 100, book: 'fanatics', books: {}, proj: 14.1, sd: 6.9, pm: 0.58, pb: 0.5, p: 0.53, push: 0, side: 'OVER', chance: 0.53, price: -135, need: 0.574, edge: -0.044, band: 'no edge', mins: 30, rate36: 16.9, why: ['x'], log: [] }] },
       { gid: 'b', away: 'Knicks', home: 'Celtics', aab: 'NYK', hab: 'BOS', tip: '2026-10-24T02:30Z', props: [{ pid: '2', name: 'Paul George', team: 'BOS', opp: 'NYK', home: true, pos: 'F', mk: 'pts', line: 17.5, op: -110, up: -110, book: 'fanatics', books: {}, proj: 19.0, sd: 8.1, pm: 0.57, pb: 0.5, p: 0.524, push: 0, side: 'OVER', chance: 0.524, price: -110, need: 0.524, edge: 0.0, band: 'no edge', mins: 32, rate36: 21.4, why: ['x'], log: [] }] }] }, 'nba-props-2026-10-23.json');
-    const inPlay = { msg: document.getElementById('propsMsg').innerText.replace(/\s+/g, ' '), names: JSON.parse(localStorage.getItem('callsheet3.props.v1')).map(r => r.name) };
+    const inPlay = { msg: document.getElementById('propsMsg').innerText.replace(/\s+/g, ' '), names: JSON.parse(smStore.getItem('callsheet3.props.v1')).map(r => r.name) };
     document.getElementById('propsClear').click(); await wait();
     await load(propsDoc, 'nba-props-2026-10-21.json');
     const tabEmpty0 = document.getElementById('propsCalib').innerText.replace(/\s+/g, ' ').trim();
@@ -941,7 +942,7 @@ const CHECKS = ["dome","playoff","agconf","hgconf","agbk","hgbk"];
       { sport: 'NBA', gdate: '2026-10-21', away: 'Hawks', home: 'Magic', gameId: '401909834', finals: { fa: '118', fh: '112', f5a: '60', f5h: '55' }, notes: [],
         box: { '3037789': ['Trae Young', 36.2, 28, 3, 11, 4], '4397020': ['Paolo Banchero', 34.0, 22, 9, 4, 1] } } ] };
     await load(gradeDoc, 'nba-grade-2026-10-21.json');
-    const after = JSON.parse(localStorage.getItem('callsheet3.props.v1'));
+    const after = JSON.parse(smStore.getItem('callsheet3.props.v1'));
     const tile = document.querySelector('#calibBox .calib[data-sport="PROPS"]');
     const tileText = tile ? tile.innerText.replace(/\s+/g, ' ').trim() : '';
     const tabCalib = document.getElementById('propsCalib').innerText.replace(/\s+/g, ' ').trim();
@@ -952,10 +953,10 @@ const CHECKS = ["dome","playoff","agconf","hgconf","agbk","hgbk"];
     const bk = { format: 'callsheet3.backup', version: 1, card: [], props: [after[0]] };
     const dt2 = new DataTransfer(); dt2.items.add(new File([JSON.stringify(bk)], 'the-super-model-2026-10-22.json', { type: 'application/json' }));
     const inp2 = document.getElementById('restoreFile'); inp2.files = dt2.files; inp2.dispatchEvent(new Event('change', { bubbles: true })); await wait();
-    const restored = JSON.parse(localStorage.getItem('callsheet3.props.v1'));
+    const restored = JSON.parse(smStore.getItem('callsheet3.props.v1'));
     document.getElementById('m-nba').click(); await wait();
     const viewOff = document.getElementById('propsView').hidden, colsBack = !document.querySelector('.cols').hidden, nbaPressed = document.getElementById('m-nba').getAttribute('aria-pressed');
-    localStorage.removeItem('callsheet3.props.v1');
+    await smStore.removeItem('callsheet3.props.v1');
     return { viewOn, colsOff, pressed, best, rowsOn, rowsAll, count, msg, whyOpen, logMarks, tileBefore, after: after.map(r => [r.name, r.mk, r.result, r.actual]), tileText, slateMsg, restored: restored.length, viewOff, colsBack, nbaPressed,
              tabCalib, tabBlocks, nights, ladder, tabEmpty0, noneMsg, inPlay };
   });
@@ -988,7 +989,7 @@ const CHECKS = ["dome","playoff","agconf","hgconf","agbk","hgbk"];
   // the Example button: one game's props computed at build time through the slate's projection, previewed and never saved
   const propsEx = await pg.evaluate(async () => {
     const wait = () => new Promise(r => setTimeout(r, 80));
-    localStorage.removeItem('callsheet3.props.v1');
+    await smStore.removeItem('callsheet3.props.v1');
     document.getElementById('m-props').click(); await wait();
     const before = document.getElementById('propsCount').textContent, tileBefore = !!document.querySelector('#calibBox .calib[data-sport="PROPS"]');
     document.getElementById('propsAll').checked = false; document.getElementById('propsAll').dispatchEvent(new Event('change', { bubbles: true })); await wait();
@@ -1017,7 +1018,7 @@ const CHECKS = ["dome","playoff","agconf","hgconf","agbk","hgbk"];
     const view4 = { names: cells(1), bands: cells(10), shown: document.getElementById('propsShown').textContent };
     document.getElementById('propsReset').click(); await wait();
     const view5 = { rows: document.querySelectorAll('#propsTable tbody tr[data-prop]').length, shown: document.getElementById('propsShown').textContent, stored: localStorage.getItem('callsheet3.props.view.v1'), mk: document.getElementById('propsMk').value, q: document.getElementById('propsQ').value };
-    const saved = localStorage.getItem('callsheet3.props.v1');
+    const saved = smStore.getItem('callsheet3.props.v1');
     const tileAfter = !!document.querySelector('#calibBox .calib[data-sport="PROPS"]');
     document.getElementById('m-nba').click(); await wait();
     document.getElementById('m-props').click(); await wait();
@@ -1100,7 +1101,7 @@ const CHECKS = ["dome","playoff","agconf","hgconf","agbk","hgbk"];
   const altT = await pg.evaluate(async () => {
     const wait = () => new Promise(r => setTimeout(r, 80));
     const set = (id, v) => { const el = document.getElementById(id); el.value = v; el.dispatchEvent(new Event('input', { bubbles: true })); };
-    localStorage.removeItem('callsheet3.card.v1');
+    await smStore.removeItem('callsheet3.card.v1');
     document.getElementById('clear').click(); document.getElementById('m-nhl').click(); await wait();
     set('gdate', '2026-11-09'); document.getElementById('example').click(); await wait();
     set('gdate', '2026-11-09');
@@ -1120,7 +1121,7 @@ const CHECKS = ["dome","playoff","agconf","hgconf","agbk","hgbk"];
     const pickKey = (document.querySelector('#markets .pickcard') || {}).getAttribute ? document.querySelector('#markets .pickcard').getAttribute('data-key') : '';
     document.getElementById('add').click(); await wait();
     document.getElementById('boardDate').value = '2026-11-09'; document.getElementById('boardDate').dispatchEvent(new Event('change')); await wait();
-    const stored = JSON.parse(localStorage.getItem('callsheet3.card.v1'))[0];
+    const stored = JSON.parse(smStore.getItem('callsheet3.card.v1'))[0];
     const altMk = stored.markets.find(m => m.key === 'alt');
     const board = [...document.querySelectorAll('#altBets .pk')].map(e => e.innerText.replace(/\s+/g, ' ').trim());
     const headHidden = document.getElementById('altBetsHead').hidden;
@@ -1131,11 +1132,11 @@ const CHECKS = ["dome","playoff","agconf","hgconf","agbk","hgbk"];
     const tr = () => [...document.querySelectorAll('#cardTable tr')].find(t => /Rangers @ Bruins/.test(t.textContent));
     const g = (k, v) => { const el = tr().querySelector(`.grade[data-k="${k}"]`); el.value = v; el.dispatchEvent(new Event('input', { bubbles: true })); el.dispatchEvent(new Event('change', { bubbles: true })); };
     g('fa', '2'); g('fh', '3'); await wait();
-    const after = JSON.parse(localStorage.getItem('callsheet3.card.v1'))[0];
+    const after = JSON.parse(smStore.getItem('callsheet3.card.v1'))[0];
     const tile = [...document.querySelectorAll('#calibBox .calib[data-sport="NHL"] > div')].map(d => d.innerText.replace(/\s+/g, ' ').trim()).find(t => /Alternate totals/i.test(t)) || '';
     const boardAfter = [...document.querySelectorAll('#altBets .pk')].map(e => e.innerText.replace(/\s+/g, ' ').trim());
     const text = (() => { return ''; })();
-    localStorage.removeItem('callsheet3.card.v1');
+    await smStore.removeItem('callsheet3.card.v1');
     document.getElementById('clear').click(); await wait();
     return { totalSide, alt, altCard, pickKey, altMk: altMk ? { pick: altMk.pick, band: altMk.band, point: altMk.point, book: altMk.book, price: altMk.price } : null, board, headHidden, legs, parlay, tableAlt, tile, boardAfter, keys: stored.markets.map(m => m.key) };
   });
@@ -1158,7 +1159,7 @@ const CHECKS = ["dome","playoff","agconf","hgconf","agbk","hgbk"];
   const relabel = await pg.evaluate(async () => {
     const wait = () => new Promise(r => setTimeout(r, 60));
     const set = (id, v) => { const el = document.getElementById(id); el.value = v; el.dispatchEvent(new Event('input', { bubbles: true })); };
-    localStorage.removeItem('callsheet3.card.v1');
+    await smStore.removeItem('callsheet3.card.v1');
     document.getElementById('clear').click(); document.getElementById('m-nba').click(); await wait();
     set('gdate', '2026-10-20'); set('away', 'Celtics'); set('home', 'Pistons'); set('line', '213'); set('op', '-215'); set('up', '170');
     set('sp', '1.5'); set('sph', '-110'); set('spa', '-110'); set('hml', '100'); set('aml', '-120'); await wait();
@@ -1169,29 +1170,29 @@ const CHECKS = ["dome","playoff","agconf","hgconf","agbk","hgbk"];
     const doc = { format: 'callsheet2.slate', version: 1, date: '2026-10-20', games: [{ sport: 'NBA', gdate: '2026-10-20', away: 'Celtics', home: 'Pistons', inputs: { narest: '1', nhrest: '2' }, notes: [] }] };
     const dt = new DataTransfer(); dt.items.add(new File([JSON.stringify(doc)], 'nba-slate-2026-10-20.json', { type: 'application/json' }));
     const inp = document.getElementById('slateFile'); inp.files = dt.files; inp.dispatchEvent(new Event('change', { bubbles: true })); await wait();
-    const row = JSON.parse(localStorage.getItem('callsheet3.card.v1')).find(r => /Celtics @ Pistons/.test(r.matchup));
+    const row = JSON.parse(smStore.getItem('callsheet3.card.v1')).find(r => /Celtics @ Pistons/.test(r.matchup));
     const sides = row.markets.filter(m => m.key === 'ml' || m.key === 'spread').map(m => ({ key: m.key, side: m.side, pick: m.pick, other: (m.other || {}).pick, label: m.label }));
     // a later slate refreshes the starting five on the carded row but leaves a filled box (the rest days) as logged
     const loadDoc = async (games, fname) => { const dt2 = new DataTransfer(); dt2.items.add(new File([JSON.stringify({ format: 'callsheet2.slate', version: 1, date: '2026-10-20', games })], fname, { type: 'application/json' })); inp.files = dt2.files; inp.dispatchEvent(new Event('change', { bubbles: true })); await wait(); };
     const lineupDoc = (status, rest) => [{ sport: 'NBA', gdate: '2026-10-20', away: 'Celtics', home: 'Pistons', notes: [], inputs: { narest: rest, nbalineup: JSON.stringify({ away: { status, five: [['PG', 'Derrick White']], maybe: [] }, home: null, src: 'RotoWire' }) } }];
     await loadDoc(lineupDoc('expected', '2'), 'nba-slate-a.json');
-    const lu1 = JSON.parse(localStorage.getItem('callsheet3.card.v1')).find(r => /Celtics @ Pistons/.test(r.matchup)).inputs;
+    const lu1 = JSON.parse(smStore.getItem('callsheet3.card.v1')).find(r => /Celtics @ Pistons/.test(r.matchup)).inputs;
     await loadDoc(lineupDoc('confirmed', '9'), 'nba-slate-b.json');
-    const lu2 = JSON.parse(localStorage.getItem('callsheet3.card.v1')).find(r => /Celtics @ Pistons/.test(r.matchup)).inputs;
+    const lu2 = JSON.parse(smStore.getItem('callsheet3.card.v1')).find(r => /Celtics @ Pistons/.test(r.matchup)).inputs;
     const refresh = { lu1: /expected/.test(lu1.nbalineup || ''), rest1: lu1.narest, lu2: /confirmed/.test(lu2.nbalineup || ''), rest2: lu2.narest };
     // a row the old page wrote: the hockey names on the moneyline and the spread, to be relabelled on load
-    const broken = JSON.parse(localStorage.getItem('callsheet3.card.v1'));
+    const broken = JSON.parse(smStore.getItem('callsheet3.card.v1'));
     broken.forEach(r => r.markets.forEach(m => { if (m.key === 'ml') { m.pick = 'Islanders ML'; m.other.pick = 'Ducks ML'; } if (m.key === 'spread') { m.pick = 'Islanders +1.5'; m.label = 'Spread Islanders: +1.5'; m.other.pick = 'Ducks -1.5'; } }));
-    localStorage.setItem('callsheet3.card.v1', JSON.stringify(broken));
+    await smStore.setItem('callsheet3.card.v1', JSON.stringify(broken));
     return { merged: row.inputs.narest === '1' && row.inputs.nhrest === '2', sides, formAway: document.getElementById('away').value, refresh };
   });
   chk(relabel.refresh.lu1 && relabel.refresh.rest1 === '1' && relabel.refresh.lu2 && relabel.refresh.rest2 === '1',
       'slate reload: a later slate replaces the starting five on a carded row (expected to confirmed) and leaves the filled boxes as logged', JSON.stringify(relabel.refresh));
-  await pg.reload(); await pg.waitForTimeout(300);
-  const relabelled = await pg.evaluate(() => {
-    const row = JSON.parse(localStorage.getItem('callsheet3.card.v1')).find(r => /Celtics @ Pistons/.test(r.matchup));
+  await pg.reload(); await pg.waitForTimeout(300); await pg.evaluate(() => smStore.ready);
+  const relabelled = await pg.evaluate(async () => {
+    const row = JSON.parse(smStore.getItem('callsheet3.card.v1')).find(r => /Celtics @ Pistons/.test(r.matchup));
     const out = row.markets.filter(m => m.key === 'ml' || m.key === 'spread').map(m => ({ key: m.key, side: m.side, pick: m.pick, other: (m.other || {}).pick, label: m.label }));
-    localStorage.removeItem('callsheet3.card.v1');
+    await smStore.removeItem('callsheet3.card.v1');
     return out;
   });
   const ownClubs = (s) => s.length === 2 && s.every(m => (m.side === 'HOME' ? /^Pistons /.test(m.pick) && /^Celtics /.test(m.other) : /^Celtics /.test(m.pick) && /^Pistons /.test(m.other)))
@@ -1204,7 +1205,7 @@ const CHECKS = ["dome","playoff","agconf","hgconf","agbk","hgbk"];
   const refsW = await pg.evaluate(async () => {
     const wait = () => new Promise(r => setTimeout(r, 60));
     const set = (id, v) => { const el = document.getElementById(id); el.value = v; el.dispatchEvent(new Event('input', { bubbles: true })); };
-    localStorage.removeItem('callsheet3.card.v1');
+    await smStore.removeItem('callsheet3.card.v1');
     document.getElementById('clear').click(); document.getElementById('m-nba').click(); await wait();
     const empty = (document.querySelector('#calibBox .calib[data-sport="REFS"]') || {}).innerText || '';
     // the NBA example: Foster, Brothers and Davis, a crew leaning over (z 2.4 + 0.2 + 1.8); the game lands 238 against a 231.5 close
@@ -1223,7 +1224,7 @@ const CHECKS = ["dome","playoff","agconf","hgconf","agbk","hgbk"];
     g(rowOf(/Raptors @ Celtics/), 'fa', '100'); g(rowOf(/Raptors @ Celtics/), 'fh', '105'); g(rowOf(/Raptors @ Celtics/), 'ctot', '220'); await wait();
     const leanRows = rowsOf('refsLean'), refRows = rowsOf('refsRefs').concat(rowsOf('refsEven')), evenFolded = !!document.querySelector('#calibBox details.refsfold #refsEven');
     const verdict = (document.querySelector('#refsLean ~ .verdict') || {}).textContent || '';
-    localStorage.removeItem('callsheet3.card.v1'); document.getElementById('clear').click(); await wait();
+    await smStore.removeItem('callsheet3.card.v1'); document.getElementById('clear').click(); await wait();
     return { empty: empty.replace(/\s+/g, ' ').slice(0, 120), afterOne, refsOne, leanRows, refRows, evenFolded, verdict: verdict.slice(0, 200) };
   });
   chk(refsW.empty === '' && refsW.afterOne.length === 3 && /^:OVER LEAN\|:1\|:1-0\|:56\.9%\|over:100\.0%\|dim:50\.0\|over:\+6\.5\|pos:\+0\.91u$/.test(refsW.afterOne[0]) && /^:EVEN\|:0\|dim:nothing graded/.test(refsW.afterOne[1])
@@ -1234,6 +1235,34 @@ const CHECKS = ["dome","playoff","agconf","hgconf","agbk","hgbk"];
       'refs watch: Zarba alone has no lean, so his 205 against 220 lands on the even line with no side taken, and he joins the folded no-lean officials last', JSON.stringify({ lean: refsW.leanRows, refs: refsW.refRows, folded: refsW.evenFolded, verdict: refsW.verdict.slice(0, 80) }));
 
   // ---- the build stamp ------------------------------------------------------------
+  // ---- the store (25 Oct 2026): the card, the props and the slate live in IndexedDB, past localStorage's 10 MB ----
+  await fill(CASES[0].sport, CASES[0].inputs);
+  const store1 = await pg.evaluate(async () => {
+    await smStore.ready;
+    const before = { backend: smStore.backend(), why: smStore.why(), keys: Object.keys(localStorage) };
+    document.getElementById('add').click(); await new Promise(r => setTimeout(r, 80));
+    const row = smStore.getItem('callsheet3.card.v1');
+    // a props list far past the localStorage limit saves through the store
+    const big = JSON.stringify(Array.from({ length: 3000 }, (_, i) => ({ id: i + 1, gdate: '2026-10-24', game: 'Heat @ Hornets', away: 'Heat', home: 'Hornets', aab: 'MIA', hab: 'CHA', pid: String(i), name: 'Player ' + i, team: 'MIA', opp: 'CHA', pos: 'G', mk: 'pts', line: 20.5, op: -110, up: -110, book: 'fanatics', books: {}, proj: 22.1, sd: 7, pm: 0.58, pb: 0.5, p: 0.55, push: 0, side: 'OVER', chance: 0.55, price: -110, need: 0.524, edge: 0.026, band: 'LEAN', mins: 30, rate36: 26, why: ['x'.repeat(1800)], log: [] })));
+    await smStore.setItem('callsheet3.props.v1', big);
+    // the move: the card goes back to where the old page kept it, and the database forgets it
+    await smStore.removeItem('callsheet3.card.v1');
+    localStorage.setItem('callsheet3.card.v1', row);
+    const inLocal = window.localStorage.getItem('callsheet3.props.v1');   // the browser's own store, on purpose: the key must not be there
+    return { before, backend: smStore.backend(), why: smStore.why(), rows: JSON.parse(row).length, bigLen: big.length, propsInLocal: inLocal === null ? null : inLocal.length, keys: Object.keys(localStorage) };
+  });
+  await pg.reload(); await pg.waitForTimeout(300);
+  const store2 = await pg.evaluate(async () => {
+    await smStore.ready;
+    const p = smStore.getItem('callsheet3.props.v1'), c = JSON.parse(smStore.getItem('callsheet3.card.v1') || '[]');
+    const lc = window.localStorage.getItem('callsheet3.card.v1'), lp = window.localStorage.getItem('callsheet3.props.v1');   // the browser's own store, on purpose
+    return { pLen: p ? p.length : 0, cardRows: c.length, localCard: lc === null ? null : lc.length, localProps: lp === null ? null : lp.length, keys: Object.keys(localStorage), saveState: document.getElementById('saveState').textContent };
+  });
+  chk(store1.backend === 'indexeddb' && store1.rows >= 1 && store1.propsInLocal === null, 'store: the page keeps the card and the props in IndexedDB, not localStorage', JSON.stringify(store1));
+  chk(store2.pLen === store1.bigLen && store2.localProps === null, 'store: a props list far past the localStorage limit saves and comes back after a reload', JSON.stringify({ pLen: store2.pLen, bigLen: store1.bigLen }));
+  chk(store2.cardRows === store1.rows && store2.localCard === null && !/not storing/.test(store2.saveState), 'store: a card the old page left in localStorage moves to the database on load and leaves localStorage', JSON.stringify(store2));
+  await pg.evaluate(() => smStore.clear()); await pg.reload(); await pg.waitForTimeout(300);
+
   const stamp = await pg.evaluate(() => (document.getElementById('build') || {}).textContent);
   const git = (cmd) => execSync(cmd, { cwd: __dirname, encoding: 'utf8' }).trim();
   let want, why;

@@ -24,7 +24,7 @@ import sys
 ROOT = pathlib.Path(__file__).parent / "web"
 OPEN = "  /* ===== ENGINE BLOCK."
 CLOSE = "  /* ===== END ENGINE BLOCK ===== */"
-STAMP = "2026-10-23"   # bumped by hand when 3.0's own sources change (the harness checks it)
+STAMP = "2026-10-25"   # bumped by hand when 3.0's own sources change (the harness checks it)
 
 
 def engine_block() -> str:
@@ -542,7 +542,16 @@ def props_example_games() -> list:
 
 def build() -> str:
     props_js = once((ROOT / "props.engine.js").read_text(), "/*PROPS_EXAMPLE*/[]", json.dumps(props_example_games(), separators=(",", ":")), "props example")
-    return head() + engine_block() + (ROOT / "nhl.engine.js").read_text() + (ROOT / "nba.engine.js").read_text() + props_js + tail()
+    html = head() + engine_block() + (ROOT / "nhl.engine.js").read_text() + (ROOT / "nba.engine.js").read_text() + props_js + tail()
+    # the store (25 Oct 2026): the card, the props and the slate outgrew localStorage's 10 MB, so every storage call goes
+    # through smStore (web/store.js), which keeps those three in IndexedDB behind a cache filled before the page's code
+    # runs; the page's one closure waits for that cache. The shim itself keeps its own localStorage calls, so it goes in after
+    html = every(html, "localStorage.", "smStore.", "storage shim", 14)
+    html = once(html, '<script>\n(function () {\n  "use strict";\n',
+                '<script>\n' + (ROOT / "store.js").read_text() + 'smStore.ready.then(function () {\n(function () {\n  "use strict";\n', "store start")
+    html = once(html, '  render(); renderCard(); renderBoard(); renderCalib();\n})();\n</script>',
+                '  render(); renderCard(); renderBoard(); renderCalib();\n})();\n});\n</script>', "store end")
+    return html
 
 
 if __name__ == "__main__":

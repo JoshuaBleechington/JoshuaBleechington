@@ -1048,6 +1048,32 @@ their points a game against the league's by history (the total did not
 follow, t −1.0), and the past table's pooled over rate with these three as
 a soft lean. Never scored; the referee watch on the record is the test.
 
+## The page's memory moves to IndexedDB, 25 Oct 2026
+
+The user's 10/25 backup: 298 card rows (1.9 million characters) and 2,171
+props (3.8 million). Browsers count localStorage in two-byte characters and
+stop at 10 MB in Chrome, 5 MB in Safari; the page was at 11.5 MB. The
+props save, wrapped in a try/catch, had been failing quietly for about a
+day, and the morning the page "showed nothing from 10/24 and would not
+change the date" was that wall (he found his way back; the backup he sent
+is the in-memory state, not what the browser had kept). A season of props
+at 400 to 750 a night was never going to fit, so the storage moved rather
+than the data shrinking.
+
+`web/store.js` is `smStore`: the card, the props and the slate live in
+IndexedDB, which holds hundreds of megabytes, behind a cache filled before
+the page's own code runs, so every read stays synchronous and the page's
+code changed only in name (the build turns its 14 `localStorage.` calls
+into `smStore.` and wraps the page's one closure in `smStore.ready.then`).
+A write updates the cache and goes to the database behind it; a failure
+shows on the Saving tag instead of vanishing. The draft and the table
+view stay in localStorage. On the first load, whatever the old keys hold
+in localStorage moves over and is cleared from there, which also frees
+the quota the small keys share. A browser without IndexedDB keeps using
+localStorage as before. The harness goes through the store too, and
+checks the move, a 6 MB props list through a reload, and that nothing is
+left in localStorage.
+
 ## A game under way is left alone, 23 Oct 2026
 
 The user, with the Bulls at the Bucks in the second half: "the Bulls game

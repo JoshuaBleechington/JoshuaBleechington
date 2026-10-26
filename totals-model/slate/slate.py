@@ -4402,10 +4402,11 @@ def props_game_factors(g, logs, mk, league_pace=None, logs_last=None):
     norm = gs if len(gs) >= 5 else gs + [x for x in (logs_last or []) if (x.get("min") or 0) > 0][-30:]
     mins = float(g["min"])
     root, stood, plain, tail = [], [], [], []
+    lift = mk in ("pts", "pra", "ast")   # the pooled rule: a regular out lifts his teammates' minutes, points and assists; rebounds and threes measured nothing
     for name, mpg in (g.get("back") or [])[:2]:
-        root.append("%s back (%s mpg)" % (name, ("%.0f" % mpg)))
+        root.append("%s back (%s mpg%s)" % (name, ("%.0f" % mpg), ", the lift gone" if lift else ""))
     for name, mpg in (g.get("out") or [])[:2]:
-        root.append("%s out (%s mpg)" % (name, ("%.0f" % mpg)))
+        root.append("%s out (%s mpg%s)" % (name, ("%.0f" % mpg), ", a lift for him" if lift else ""))
     blow = g.get("mg") is not None and abs(int(g["mg"])) >= PROPS_WHAT_BLOWOUT
     if blow:
         root.append("%s by %d, a blowout" % ("won" if g["mg"] > 0 else "lost", abs(int(g["mg"]))))
@@ -6463,9 +6464,9 @@ def selftest():
                    "pa": pa, "ph": [nba_player_line("44", "LeBron James", 1, 35.0, 25, 0, 7, 8, 2, 18, 6, 3, 1, 1, 9, 5, "SF")]})
     lw = nba_player_logs(wg)["11"]["g"]
     check("props: the line behind one of his last games: the regulars back or out and the blowout first, then what stood out by its size, then the plain box and the margin, five at most, and a game with nothing to compare against still reads its box",
-          props_game_factors(lw[-1], lw, "pts", 100.0) == ["Kyrie Irving back (30 mpg)", "lost by 21, a blowout", "9 shots, 10 under his usual at those minutes", "2 of 8 from the floor, cold (his season 49%)", "31 min, 4 under his usual 35"]
-          and props_game_factors(lw[-2], lw, "pts", 100.0) == ["Kyrie Irving out (30 mpg)", "36 min (his usual 35)", "24 shots (his usual 22 at those minutes)", "10 of 20 from the floor", "won by 5"]
-          and props_game_factors(lw[-1], lw[-2:], "pts") == ["Kyrie Irving back (30 mpg)", "lost by 21, a blowout", "31 min", "9 shots", "2 of 8 from the floor"]
+          props_game_factors(lw[-1], lw, "pts", 100.0) == ["Kyrie Irving back (30 mpg, the lift gone)", "lost by 21, a blowout", "9 shots, 10 under his usual at those minutes", "2 of 8 from the floor, cold (his season 49%)", "31 min, 4 under his usual 35"]
+          and props_game_factors(lw[-2], lw, "pts", 100.0) == ["Kyrie Irving out (30 mpg, a lift for him)", "36 min (his usual 35)", "24 shots (his usual 22 at those minutes)", "10 of 20 from the floor", "won by 5"]
+          and props_game_factors(lw[-1], lw[-2:], "pts") == ["Kyrie Irving back (30 mpg, the lift gone)", "lost by 21, a blowout", "31 min", "9 shots", "2 of 8 from the floor"]
           and props_game_factors(lw[-1], lw, "reb", 100.0) == ["Kyrie Irving back (30 mpg)", "lost by 21, a blowout", "31 min, 4 under his usual 35", "a slow game, 93 possessions against their usual 99"]
           and lw[-1]["mg"] == -21 and lw[-1]["pace"] == 93.0 and lw[-1]["out"] == [] and lw[-1]["back"] == [["Kyrie Irving", 30.0]] and lw[-2]["out"] == [["Kyrie Irving", 30.0]] and lw[0].get("out") is None)
     # early in a season (26 Oct 2026): last season's minutes name the regulars, and the game's own injury list names who sat
@@ -6476,7 +6477,7 @@ def selftest():
     le = nba_player_logs(early, prior_logs=prior_e)["11"]["g"]
     check("props: early in the season last season's minutes name the regulars and the game's own injury list says who sat, so a line reads from the first week",
           nba_prior_mpg(prior_e) == {("DAL", "22"): ("Kyrie Irving", 31.0)} and le[1]["out"] == [["Kyrie Irving", 31.0]] and le[2]["back"] == [["Kyrie Irving", 31.0]] and le[0].get("out") is None
-          and props_game_factors(le[1], le, "pts", 100.0, prior_e["22"]["g"])[0] == "Kyrie Irving out (31 mpg)" and nba_player_logs(early)["11"]["g"][1].get("out") is None)
+          and props_game_factors(le[1], le, "pts", 100.0, prior_e["22"]["g"])[0] == "Kyrie Irving out (31 mpg, a lift for him)" and nba_player_logs(early)["11"]["g"][1].get("out") is None)
     pr_ = props_rate(lt["11"]["g"], ll["11"]["g"], "pts")
     check("props: the rate blends this season with last season's at half its minutes", abs(pr_["rate"] * 36 - 30.965) < 0.01 and pr_["m_this"] == 108 and pr_["w"] == 35 and abs(pr_["prior"] * 36 - 30.857) < 0.01
           and props_rate([], [], "pts") is None and props_rate(lt["11"]["g"], ll["11"]["g"], "pra")["n_this"] == 3)

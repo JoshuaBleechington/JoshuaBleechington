@@ -1535,9 +1535,12 @@ want all the last games to have that info." The box has most of the answer,
 and the slate writes it beside every game now (`props_game_factors`, the
 sixth element of each `log` entry), five items at most, in this order:
 
-- **The night's causes.** A regular of his club back or out that night; a
-  blowout of fifteen or more; a start when he usually comes off the bench,
-  or the bench when he usually starts.
+- **The night's causes.** A regular of his club back or out that night,
+  with the measured direction on the markets the pooled rule moves ("out
+  (26 mpg, a lift for him)", "back (26 mpg, the lift gone)"; nothing on
+  rebounds and threes, where the rule measured null), after the user read a
+  green "back" as a help; a blowout of fifteen or more; a start when he
+  usually comes off the bench, or the bench when he usually starts.
 - **What stood out**, ranked by its size in the stat's units: his minutes
   three or more off his usual (or 12% of it), his shots (FGA + 0.44 FTA)
   two or more off his usual at those minutes (or a quarter of it), his

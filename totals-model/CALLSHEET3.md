@@ -960,11 +960,13 @@ user, on a panel whose two bold lines were a regular out (+0.49 per 36,
 toward the over) and the pace (×0.954, against it): "are those the two
 biggest reasons for the potential over?" They were the two biggest by size
 in either direction, which read wrong. Now the two biggest levers toward
-the pick's side are bold, the biggest against it carries a red tag ("the
-biggest against the OVER") and a red marker, a push under 0.05 in the
-stat's units counts as neither, and the Why heading says so. The bars above
-are unchanged, and the card's fifth line still names the top two by size
-with their signs.
+the pick's side are bold and green, each with a green tag ("the biggest for
+the OVER", "the second biggest for the OVER"; then "colour the ones that
+are the biggest for the over too, like green"), the biggest against it
+carries a red tag ("the biggest against the OVER") and a red marker, a push
+under 0.05 in the stat's units counts as neither, and the Why heading says
+so. The bars above are unchanged, and the card's fifth line still names
+the top two by size with their signs.
 
 ## The blowout test, and the props' centre, 22 Oct 2026
 

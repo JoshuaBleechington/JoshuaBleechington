@@ -531,9 +531,10 @@
       }).join("") + '</div>';
     }
     if (has) h += propsSimHtml(r, tile);
-    if (r.why && r.why.length) h += '<h4>Why' + (felt.length ? ' <span class="dim">· ' + (top.length ? 'the biggest reason' + (top.length > 1 ? 's' : '') + ' for the ' + esc(r.side || "pick") + ' in bold' : 'no lever toward the ' + esc(r.side || "pick")) + (against.length ? (top.length ? ', ' : '; ') + 'the biggest against it tagged' : '') + '</span>' : '') + '</h4><ul class="pd-why">' + r.why.map(function (w, i) {
-      var cls = top.indexOf(i) >= 0 ? ' class="lever-line"' : against.indexOf(i) >= 0 ? ' class="lever-against"' : '';
-      return '<li' + cls + '>' + esc(w) + (against.indexOf(i) >= 0 ? ' <span class="tag hurts">the biggest against the ' + esc(r.side || "pick") + '</span>' : '') + '</li>';
+    if (r.why && r.why.length) h += '<h4>Why' + (felt.length ? ' <span class="dim">· ' + (top.length ? 'the biggest reason' + (top.length > 1 ? 's' : '') + ' for the ' + esc(r.side || "pick") + ' in green' : 'no lever toward the ' + esc(r.side || "pick")) + (against.length ? (top.length ? ', ' : '; ') + 'the biggest against it in red' : '') + '</span>' : '') + '</h4><ul class="pd-why">' + r.why.map(function (w, i) {
+      var rank = top.indexOf(i), cls = rank >= 0 ? ' class="lever-line"' : against.indexOf(i) >= 0 ? ' class="lever-against"' : '';
+      return '<li' + cls + '>' + esc(w) + (rank >= 0 ? ' <span class="tag helps">the ' + (rank === 0 ? '' : 'second ') + 'biggest for the ' + esc(r.side || "pick") + '</span>' : '') +
+             (against.indexOf(i) >= 0 ? ' <span class="tag hurts">the biggest against the ' + esc(r.side || "pick") + '</span>' : '') + '</li>';
     }).join("") + '</ul>';
     /* the game the prop was on joins the list once it is graded (25 Oct 2026, the user: "they only show the last
        date of 10/23 and not 10/24 for the props that were on yesterday"): the last games are the history the

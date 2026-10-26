@@ -178,7 +178,7 @@ the stat's units, written by the slate as `parts` beside the why: the
 regulars out, pace, the defence, last season's prior and the minutes trend,
 ranked with a bar, green toward the pick and red away from it, the biggest
 named on the card too), the why with the two biggest levers toward the
-pick in bold and the biggest against it tagged (26 Oct 2026), the
+pick in bold green and the biggest against it tagged red (26 Oct 2026), the
 last games as a table (each game's stat marked, green over the prop's line
 and red under it, with a tally of how many cleared the number) and every
 book's line. Props cannot be backtested against lines

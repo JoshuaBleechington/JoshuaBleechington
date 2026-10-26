@@ -74,7 +74,8 @@ def units_at(price, win):
 
 
 DERIV = (("h1_mkt", "FIRST HALF, anchored", "h1"), ("h1_own", "FIRST HALF, own view", "h1"), ("q1", "FIRST QUARTER, anchored", "q1"), ("q3", "THIRD QUARTER, anchored", "q3"),
-         ("tt_home", "HOME TEAM TOTAL, anchored", "home"), ("tt_away", "AWAY TEAM TOTAL, anchored", "away"))
+         ("tt_home", "HOME TEAM TOTAL, anchored", "home"), ("tt_away", "AWAY TEAM TOTAL, anchored", "away"),
+         ("tt_home_own", "HOME TEAM TOTAL, own view", "home"), ("tt_away_own", "AWAY TEAM TOTAL, own view", "away"))   # the own view's team totals (26 Oct 2026): the card calls them too
 
 
 def bucket(p):
@@ -120,11 +121,11 @@ def run(folder, runs=1000, seasons=("2024-25", "2025-26"), seed=1, min_games=5, 
                 qa, qh = g["qa"], g["qh"]
                 outcomes = {"h1": qa[0] + qa[1] + qh[0] + qh[1], "q1": qa[0] + qh[0], "q3": qa[2] + qh[2], "home": g["fh"], "away": g["fa"]}
                 for key, _label, hk in DERIV:
-                    market = {"h1_mkt": "totals_h1", "h1_own": "totals_h1", "q1": "totals_q1", "q3": "totals_q3", "tt_home": "team_totals", "tt_away": "team_totals"}[key]
-                    line = period_line(mk, market, "home" if key == "tt_home" else "away" if key == "tt_away" else None)
+                    market = {"h1_mkt": "totals_h1", "h1_own": "totals_h1", "q1": "totals_q1", "q3": "totals_q3", "tt_home": "team_totals", "tt_away": "team_totals", "tt_home_own": "team_totals", "tt_away_own": "team_totals"}[key]
+                    line = period_line(mk, market, "home" if key.startswith("tt_home") else "away" if key.startswith("tt_away") else None)
                     if not line:
                         continue
-                    src = Ho if key == "h1_own" else H
+                    src = Ho if key in ("h1_own", "tt_home_own", "tt_away_own") else H
                     hist = src["q"][0] if hk == "q1" else src["q"][2] if hk == "q3" else src[hk]
                     p_over, push = nbasim.hist_over(hist, line[0])
                     if p_over is None:

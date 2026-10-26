@@ -4268,13 +4268,54 @@ def props_stat(g, mk):
     return g.get(mk)
 
 
+def nba_club_regulars(ledger_games):
+    """Per club and game, which of the club's regulars sat and which came back
+    (26 Oct 2026, for the panel's last games): a regular plays PROPS_REGULAR_MPG
+    minutes a game over five games or more with the club, counted only between
+    his first and last game with it, so a man traded in is not "out" before he
+    arrived. {(club, game id): {"out": [[name, mpg], ...], "back": [...]}}"""
+    mins, order = {}, {}
+    games = sorted(ledger_games or [], key=lambda g: (g.get("date") or "", g.get("id") or ""))
+    for g in games:
+        for key, ab in (("pa", g.get("away")), ("ph", g.get("home"))):
+            played = set()
+            for p in g.get(key) or []:
+                d = nba_player_dict(p)
+                m = float(d["min"] or 0)
+                if m <= 0:
+                    continue
+                played.add(d["id"])
+                s = mins.setdefault((ab, d["id"]), [0.0, 0, d["n"], g.get("date"), g.get("date")])
+                s[0] += m; s[1] += 1; s[4] = g.get("date")
+            order.setdefault(ab, []).append((g.get("date"), g.get("id"), played))
+    regs = {}
+    for (ab, pid), (s, n, name, first, last) in mins.items():
+        if n >= 5 and s / n >= PROPS_REGULAR_MPG:
+            regs.setdefault(ab, {})[pid] = (name, round(s / n, 1), first, last)
+    out = {}
+    for ab, gl in order.items():
+        r, prev = regs.get(ab, {}), set()
+        for date, gid, played in gl:
+            absent = set(pid for pid, (_n, _m, first, last) in r.items() if first <= date <= last and pid not in played)
+            back = [pid for pid in prev if pid in played]
+            out[(ab, gid)] = {"out": sorted([[r[p][0], r[p][1]] for p in absent], key=lambda x: -x[1]), "back": sorted([[r[p][0], r[p][1]] for p in back], key=lambda x: -x[1])}
+            prev = absent
+    return out
+
+
 def nba_player_logs(ledger_games):
     """Every player's game log from a ledger, by ESPN id: {pid: {n, team, pos,
     g: [{d, opp, home, min, st, pts, reb, ast, tpm, full}, ...]}}, oldest first;
-    team and position are the last the ledger saw him with."""
+    team and position are the last the ledger saw him with. A full box line
+    adds his shots and makes, the club's final margin, overtime, the game's
+    pace and the club's regulars out or back that night (26 Oct 2026)."""
     per = {}
+    regs = nba_club_regulars(ledger_games)
     for g in sorted(ledger_games or [], key=lambda g: (g.get("date") or "", g.get("id") or "")):
         for key, ab, opp, home in (("pa", g.get("away"), g.get("home"), False), ("ph", g.get("home"), g.get("away"), True)):
+            fa, fh = g.get("fa"), g.get("fh")
+            mg = None if fa is None or fh is None else (int(fh) - int(fa) if home else int(fa) - int(fh))
+            club = regs.get((ab, g.get("id"))) or {}
             for p in g.get(key) or []:
                 d = nba_player_dict(p)
                 e = per.setdefault(d["id"], {"n": d["n"], "team": ab, "pos": "", "g": []})
@@ -4283,6 +4324,16 @@ def nba_player_logs(ledger_games):
                     e["pos"] = d["pos"]
                 entry = {"d": g.get("date"), "opp": opp, "home": home, "min": float(d["min"] or 0), "st": int(d["st"] or 0),
                          "pts": d["pts"], "reb": d["reb"], "ast": d["ast"], "tpm": d["tpm"], "full": d["full"]}
+                if d["full"]:
+                    entry.update({"fga": d["fga"], "fgm": d["fgm"], "fta": d["fta"], "ftm": d["ftm"], "tov": d["tov"]})
+                if mg is not None:
+                    entry["mg"] = mg
+                entry["ot"] = bool(g.get("ota") or g.get("oth")) or (str(g.get("end") or "REG") != "REG")
+                if g.get("pace"):
+                    entry["pace"] = g["pace"]
+                if club.get("out") or club.get("back"):
+                    entry["out"] = [x for x in club.get("out") or [] if x[0] != d["n"]]
+                    entry["back"] = [x for x in club.get("back") or [] if x[0] != d["n"]]
                 # his usage (26 Oct 2026): his shots, trips and turnovers against the club's possessions while he was on the floor
                 tl = g.get("sa" if key == "pa" else "sh") or {}
                 tpos = (tl.get("fga") or 0) + NBA_PACE_FT * (tl.get("fta") or 0) + (tl.get("tov") or 0)
@@ -4292,6 +4343,71 @@ def nba_player_logs(ledger_games):
                     entry["tu"] = round(tpos * entry["min"] / (tm / 5.0), 2)
                 e["g"].append(entry)
     return per
+
+
+# what the box says about one of his last games (26 Oct 2026, the user, on P.J. Washington's panel: "on the last games, the ones
+# that didn't cover, is there a way to put next to those losses what may have been the factor?"): his minutes, shots and shooting
+# against his season's, the final margin, the pace, overtime, the club's regulars out or back, his role. Worded, the biggest
+# first, three at most; shown beside the game on the panel, never scored
+PROPS_WHAT_MIN = 4.0        # minutes off his usual before the line says so
+PROPS_WHAT_SHOTS = 3.0      # shots (FGA + 0.44 FTA) off his usual at those minutes
+PROPS_WHAT_FG = 0.12        # field-goal share off his season's, on five attempts or more
+PROPS_WHAT_BLOWOUT = 15     # a final margin of this or more either way
+PROPS_WHAT_PACE = 5.0       # possessions off the league's
+PROPS_WHAT_MAX = 4
+
+
+def props_game_factors(g, logs, mk, league_pace=None):
+    """The factors behind one game's line, worded and ordered: the night's
+    causes first (regulars back or out, a blowout, his role), then the measured
+    ones (minutes, shots, shooting) by their size in the stat's units, then
+    overtime and the pace. [] when the log has nothing to compare against."""
+    gs = [x for x in (logs or []) if (x.get("min") or 0) > 0]
+    if not g or g.get("min") is None or len(gs) < 3:
+        return []
+    mins = float(g["min"])
+    m_avg = sum(x["min"] for x in gs) / len(gs)
+    tot_min = sum(x["min"] for x in gs)
+    vals = [(props_stat(x, mk), x["min"]) for x in gs]
+    rate = sum(v for v, _m in vals if v is not None) / sum(m for v, m in vals if v is not None) if any(v is not None for v, _m in vals) else 0.0
+    measured, context = [], []
+    d_min = mins - m_avg
+    if abs(d_min) >= PROPS_WHAT_MIN:
+        measured.append((abs(d_min) * rate, "%d min, %d %s his usual %d" % (round(mins), round(abs(d_min)), "under" if d_min < 0 else "over", round(m_avg))))
+    full = [x for x in gs if x.get("full") and x.get("fga") is not None]
+    if mk in ("pts", "pra", "tpm") and g.get("full") and g.get("fga") is not None and len(full) >= 3:
+        shots36 = sum((x["fga"] or 0) + NBA_PACE_FT * (x["fta"] or 0) for x in full) / sum(x["min"] for x in full) * 36.0
+        shots = (g["fga"] or 0) + NBA_PACE_FT * (g["fta"] or 0)
+        d_sh = shots - shots36 * mins / 36.0
+        pps = sum((x["pts"] or 0) for x in full) / max(1.0, sum((x["fga"] or 0) + NBA_PACE_FT * (x["fta"] or 0) for x in full))   # his points a shot
+        if abs(d_sh) >= PROPS_WHAT_SHOTS:
+            measured.append((abs(d_sh) * (pps if mk != "tpm" else 0.4), "%d shots, %d %s his usual at those minutes" % (round(shots), round(abs(d_sh)), "under" if d_sh < 0 else "over")))
+        if mk != "tpm" and (g["fga"] or 0) >= 5:
+            fg_season = sum((x["fgm"] or 0) for x in full) / max(1.0, sum((x["fga"] or 0) for x in full))
+            fg = (g["fgm"] or 0) / float(g["fga"])
+            if abs(fg - fg_season) >= PROPS_WHAT_FG:
+                measured.append((abs(fg - fg_season) * (g["fga"] or 0) * 2.0, "%d of %d from the floor, %s (his season %d%%)" % (g["fgm"] or 0, g["fga"], "cold" if fg < fg_season else "hot", round(100 * fg_season))))
+    measured.sort(key=lambda x: -x[0])
+    for name, mpg in (g.get("back") or [])[:2]:
+        context.append("%s back (%s mpg)" % (name, ("%.0f" % mpg)))
+    for name, mpg in (g.get("out") or [])[:2]:
+        context.append("%s out (%s mpg)" % (name, ("%.0f" % mpg)))
+    if g.get("mg") is not None and abs(int(g["mg"])) >= PROPS_WHAT_BLOWOUT:
+        context.append("%s by %d, a blowout" % ("won" if g["mg"] > 0 else "lost", abs(int(g["mg"]))))
+    starts = sum(1 for x in gs if x.get("st")) / float(len(gs))
+    if not g.get("st") and starts >= 0.7:
+        context.append("off the bench")
+    elif g.get("st") and starts <= 0.3:
+        context.append("a start")
+    if g.get("ot"):
+        context.append("overtime")
+    paces = [float(x["pace"]) for x in gs if x.get("pace")]
+    base_pace = sum(paces) / len(paces) if len(paces) >= 5 else (float(league_pace) if league_pace else None)   # his club's own games, else the league's
+    if g.get("pace") and base_pace and abs(float(g["pace"]) - base_pace) >= PROPS_WHAT_PACE:
+        context.append("a %s game, %d possessions against their usual %d" % ("slow" if float(g["pace"]) < base_pace else "fast", round(float(g["pace"])), round(base_pace)))
+    root = [c for c in context if " back (" in c or " out (" in c or "a blowout" in c or c in ("off the bench", "a start")]
+    tail = [c for c in context if c not in root]
+    return (root + [t for _s, t in measured] + tail)[:PROPS_WHAT_MAX]
 
 
 def props_role(name, ab, lineups, logs_this, logs_last):
@@ -4954,7 +5070,8 @@ def make_nba_props(date_iso, out_dir, log, topup=False, sim_runs=NBA_SIM_RUNS):
                    "usage": (usage_[0] if usage_ else None), "usage_src": (usage_[1] if usage_ else None), "starter": starter_, "start_src": start_src,
                    "dvp": dv, "htb": htb_line(htb, NBA_NICK.get(opp, opp), opp, pos, dmk) if pos else None, "self_out": self_out}
             proj, why = props_project(pr, e1.get("g"), e2.get("g"), ctx)
-            recent = [[g_["d"], g_["opp"], 1 if g_["home"] else 0, g_["min"], props_stat(g_, pr["mk"])] for g_ in (e1.get("g") or e2.get("g") or [])[-10:]]
+            season_logs = e1.get("g") or e2.get("g") or []
+            recent = [[g_["d"], g_["opp"], 1 if g_["home"] else 0, g_["min"], props_stat(g_, pr["mk"]), props_game_factors(g_, season_logs, pr["mk"], league_pace)] for g_ in season_logs[-10:]]
             item = {"pid": pid, "name": e1.get("n") or e2.get("n") or pr["name"], "team": team, "opp": opp, "home": team == hab, "pos": pos,
                     "mk": pr["mk"], "line": pr["line"], "op": pr["op"], "up": pr["up"], "book": pr["book"], "books": pr["books"], "log": recent, "why": why}
             if proj:
@@ -6283,6 +6400,20 @@ def selftest():
     lt, ll = nba_player_logs(this_games), nba_player_logs(last_games)
     check("props: the game logs by id, oldest first, with the club, the position and the stats",
           lt["11"]["team"] == "DAL" and lt["11"]["pos"] == "PG" and len(lt["11"]["g"]) == 3 and lt["11"]["g"][-1]["pts"] == 35 and lt["11"]["g"][0]["home"] is False and ll["11"]["g"][0]["home"] is True and lt["44"]["pos"] == "SF")
+    # what the box says about one of his last games (26 Oct 2026): a regular back, a blowout, his shots and shooting against his season's
+    wg = []
+    for k in range(9):
+        pa = [nba_player_line("11", "Luka Doncic", 1, 31.0 if k == 8 else 36.0, 10 if k == 8 else 30, 0, 8, 9, 4, 8 if k == 8 else 20, 2 if k == 8 else 8, 3, 1, 0, 2 if k == 8 else 10, 2 if k == 8 else 7, "PG")]
+        if k != 7:
+            pa.append(nba_player_line("22", "Kyrie Irving", 1, 30.0, 20, 0, 4, 5, 2, 15, 4, 2, 1, 0, 7, 3, "SG"))
+        wg.append({"id": "w%d" % k, "date": "2026-11-%02d" % (1 + k), "away": "DAL", "home": "LAL", "fa": 100 if k == 8 else 115, "fh": 121 if k == 8 else 110, "pace": 93.0 if k == 8 else 100.0, "detail": True,
+                   "pa": pa, "ph": [nba_player_line("44", "LeBron James", 1, 35.0, 25, 0, 7, 8, 2, 18, 6, 3, 1, 1, 9, 5, "SF")]})
+    lw = nba_player_logs(wg)["11"]["g"]
+    check("props: what the box says about one of his last games: the regulars back or out and the blowout first, then his shots and shooting against his season's, four at most, nothing under three games",
+          props_game_factors(lw[-1], lw, "pts", 100.0) == ["Kyrie Irving back (30 mpg)", "lost by 21, a blowout", "9 shots, 10 under his usual at those minutes", "2 of 8 from the floor, cold (his season 49%)"]
+          and props_game_factors(lw[-2], lw, "pts", 100.0) == ["Kyrie Irving out (30 mpg)"] and props_game_factors(lw[-1], lw[-2:], "pts") == []
+          and props_game_factors(lw[-1], lw, "reb", 100.0) == ["Kyrie Irving back (30 mpg)", "lost by 21, a blowout", "31 min, 4 under his usual 35", "a slow game, 93 possessions against their usual 99"]
+          and lw[-1]["mg"] == -21 and lw[-1]["pace"] == 93.0 and lw[-1]["out"] == [] and lw[-1]["back"] == [["Kyrie Irving", 30.0]] and lw[-2]["out"] == [["Kyrie Irving", 30.0]] and lw[0].get("out") is None)
     pr_ = props_rate(lt["11"]["g"], ll["11"]["g"], "pts")
     check("props: the rate blends this season with last season's at half its minutes", abs(pr_["rate"] * 36 - 30.965) < 0.01 and pr_["m_this"] == 108 and pr_["w"] == 35 and abs(pr_["prior"] * 36 - 30.857) < 0.01
           and props_rate([], [], "pts") is None and props_rate(lt["11"]["g"], ll["11"]["g"], "pra")["n_this"] == 3)

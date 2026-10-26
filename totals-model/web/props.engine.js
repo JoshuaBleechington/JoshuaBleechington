@@ -700,12 +700,30 @@
        the box line and the stat marked like the rest; a prop graded before the minutes were kept shows a dash */
     var played = !!(r.result && r.result !== "graded");
     if ((r.log && r.log.length) || played) {
-      h += '<h4>Last games' + propsLogTally(r) + '</h4><table class="form pd-log"><thead><tr><th>Date</th><th>Opp</th><th>Min</th><th>' + esc(lab) + '</th></tr></thead><tbody>' +
+      /* what happened (26 Oct 2026, the user, on P.J. Washington's panel: "on the last games, the ones that didn't cover, is there a
+         way to put next to those losses what may have been the factor?"): the slate writes beside each game what the box says,
+         the night's causes first (a regular back or out, a blowout, his role), then his minutes, shots and shooting against his
+         season's, then overtime and the pace; the first is bold, red under the line and green over it. A file from before carries
+         none, and the column stays away. The graded night's own line gets his minutes against the games above it */
+      var what = (r.log || []).some(function (g) { return g[5] && g[5].length; });
+      var whatCell = function (f, v) {
+        if (!f || !f.length) return '<td class="pd-what"></td>';
+        var side = v === null || v === undefined || r.line === null || r.line === undefined || isNaN(+r.line) ? "" : (+v > +r.line ? " over" : +v < +r.line ? " under" : "");
+        return '<td class="pd-what"><b class="' + side.trim() + '">' + esc(f[0]) + '</b>' + (f.length > 1 ? ' · ' + f.slice(1).map(esc).join(' · ') : '') + '</td>';
+      };
+      var thisWhat = function () {
+        var mins = (r.log || []).map(function (g) { return +g[3]; }).filter(function (m) { return isFinite(m) && m > 0; });
+        if (r.result === "void") return ["did not play"];
+        if (!mins.length || r.amin === null || r.amin === undefined) return [];
+        var avg = mins.reduce(function (a, b) { return a + b; }, 0) / mins.length, d = +r.amin - avg;
+        return Math.abs(d) >= 4 ? [Math.round(+r.amin) + " min, " + Math.round(Math.abs(d)) + (d < 0 ? " under" : " over") + " his usual " + Math.round(avg)] : [];
+      };
+      h += '<h4>Last games' + propsLogTally(r) + (what ? ' <span class="dim">· what the box says happened, the biggest factor first</span>' : '') + '</h4><table class="form pd-log"><thead><tr><th>Date</th><th>Opp</th><th>Min</th><th>' + esc(lab) + '</th>' + (what ? '<th>What happened</th>' : '') + '</tr></thead><tbody>' +
         (r.log || []).map(function (g) {
-          return '<tr><td>' + esc(String(g[0] || "").slice(5)) + '</td><td>' + esc((g[2] ? "v " : "@ ") + (g[1] || "")) + '</td><td>' + esc(String(g[3] === null || g[3] === undefined ? "" : g[3])) + '</td><td>' + propsLogMark(g[4], r.line) + '</td></tr>';
+          return '<tr><td>' + esc(String(g[0] || "").slice(5)) + '</td><td>' + esc((g[2] ? "v " : "@ ") + (g[1] || "")) + '</td><td>' + esc(String(g[3] === null || g[3] === undefined ? "" : g[3])) + '</td><td>' + propsLogMark(g[4], r.line) + '</td>' + (what ? whatCell(g[5], g[4]) : '') + '</tr>';
         }).join("") +
         (played ? '<tr class="this"><td>' + esc(String(r.gdate || "").slice(5)) + '</td><td>' + esc((r.athome ? "v " : "@ ") + (r.opp || "")) + ' <span class="tag">this game</span></td><td>' +
-                  esc(r.amin === null || r.amin === undefined ? "–" : String(r.amin)) + '</td><td>' + (r.result === "void" ? '<b class="lg">DNP</b>' : propsLogMark(r.actual, r.line)) + '</td></tr>' : '') +
+                  esc(r.amin === null || r.amin === undefined ? "–" : String(r.amin)) + '</td><td>' + (r.result === "void" ? '<b class="lg">DNP</b>' : propsLogMark(r.actual, r.line)) + '</td>' + (what ? whatCell(thisWhat(), r.actual) : '') + '</tr>' : '') +
         '</tbody></table>';
     }
     var bks = Object.keys(r.books || {});

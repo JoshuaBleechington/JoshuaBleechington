@@ -1004,8 +1004,8 @@ const CHECKS = ["dome","playoff","agconf","hgconf","agbk","hgbk"];
       'props: the best list carries the one prop that clears its price, with its band, chance, price, need, edge and projection', JSON.stringify(propsT.best));
   chk(propsT.rowsOn === 2 && propsT.rowsAll === 3 && /3 props on .*21/.test(propsT.count) && /3.* new/.test(propsT.msg),
       'props: the table lists the projected props, every prop with the box ticked, and the count names the date', JSON.stringify({ on: propsT.rowsOn, all: propsT.rowsAll, count: propsT.count, msg: propsT.msg }));
-  chk(propsT.whyOpen.length === 1 && /27\.9 points per 36/.test(propsT.whyOpen[0]) && /10-15 @ MIA 34 26/.test(propsT.whyOpen[0]) && /fanatics carded 24\.5 [-−]110 [-−]110 draftkings 25\.5 [-−]115 [-−]105/.test(propsT.whyOpen[0]),
-      'props: a click on a table row opens the prop\'s panel with the reasons, the last games and every book\'s line', JSON.stringify(propsT.whyOpen));
+  chk(propsT.whyOpen.length === 1 && /27\.9 points per 36/.test(propsT.whyOpen[0]) && /10-15 @ MIA 34 26/.test(propsT.whyOpen[0]) && /fanatics carded 24\.5 [-−]110 [-−]110 draftkings 25\.5 [-−]115 [-−]105/.test(propsT.whyOpen[0]) && !/what happened/i.test(propsT.whyOpen[0]),
+      'props: a click on a table row opens the prop\'s panel with the reasons, the last games and every book\'s line; a file from before the what-happened column carries none and the column stays away', JSON.stringify(propsT.whyOpen));
   chk(!propsT.tileBefore, 'props: no record tile before anything is graded', '');
   chk(propsT.after[0][2] === 'win' && propsT.after[0][3] === 28 && propsT.after[2][2] === 'loss' && propsT.after[2][3] === 9 && propsT.after[1][2] === 'void',
       'props: the grade file\'s box grades each prop by its side (28 over 24.5 wins; 9 rebounds beat the under 7.5), and a player with no box line is void', JSON.stringify(propsT.after));
@@ -1534,6 +1534,33 @@ const CHECKS = ["dome","playoff","agconf","hgconf","agbk","hgbk"];
       && simPropsT.sorted.length === 7 && simPropsT.sorted[0].name === simBig.name && simPropsT.sorted[0].mk === simBig.mk && simPropsT.sorted.every((r, i, a) => i === 0 || simGap(r) <= simGap(a[i - 1])) && /sorted by sim ▾/.test(simPropsT.shown)
       && simPropsT.after.sim === '' && simPropsT.after.n === 7 && !/sorted/.test(simPropsT.after.shown),
       'props: every best card ends with the sim\'s read against the line in green or red, the simulation filter keeps the props the sim\'s read sides with (or against), the Sim column sorts by the gap toward the pick, and Reset view clears both', JSON.stringify({ best: simPropsT.best.map(b => b.slice(0, 140)), yes: simPropsT.yes, no: simPropsT.no, sorted: simPropsT.sorted.map(r => r.name + ' ' + r.side + ' ' + r.line + ' ' + r.sim), shown: simPropsT.shown, after: simPropsT.after }));
+
+  // ---- 26 Oct 2026: what happened on each of his last games -- the slate writes beside each game what the box says (a regular back or out,
+  //      a blowout, his role, then his minutes, shots and shooting against his season's, then overtime and the pace); the panel's Last games table
+  //      shows it as a column, the first factor bold, red under the line and green over it ----
+  const whatT = await pg.evaluate(async () => {
+    const wait = () => new Promise(r => setTimeout(r, 90));
+    document.getElementById('propsReset').click(); await wait();
+    document.getElementById('m-props').click(); await wait(); document.getElementById('propsExample').click(); await wait();
+    [...document.querySelectorAll('#propsBest .pk')].find(e => /Tyrese Maxey/.test(e.textContent)).click(); await wait();
+    const dlg = document.getElementById('propDetail');
+    const head = [...dlg.querySelectorAll('.pd-log thead th')].map(t => t.textContent), h4 = ([...dlg.querySelectorAll('h4')].find(h => /^Last games/i.test(h.textContent)) || {}).innerText.replace(/\s+/g, ' ').trim();
+    const rows = [...dlg.querySelectorAll('.pd-log tbody tr')].map(tr => { const tds = tr.querySelectorAll('td'), b = tr.querySelector('td.pd-what b'); return { stat: tds[3].textContent.trim(), mark: tds[3].querySelector('b.lg').className, what: tds[4] ? tds[4].textContent.trim() : null, first: b ? b.textContent : '', cls: b ? b.className : '' }; });
+    document.getElementById('propDetailClose').click(); await wait();
+    // a prop with another market reads its own factors: rebounds take no shots or shooting
+    [...document.querySelectorAll('#propsBest .pk')].find(e => /Karl-Anthony Towns/.test(e.textContent)).click(); await wait();
+    const rebWhat = [...dlg.querySelectorAll('.pd-log tbody tr td.pd-what')].map(td => td.textContent.trim()).filter(t => t);
+    document.getElementById('propDetailClose').click(); await wait();
+    document.getElementById('m-nba').click(); await wait();
+    return { head, h4, rows, rebWhat };
+  });
+  const whatRe = /^((.+ (back|out) \(\d+ mpg\))|((won|lost) by \d+, a blowout)|(off the bench)|(a start)|(\d+ min, \d+ (under|over) his usual \d+)|(\d+ shots, \d+ (under|over) his usual at those minutes)|(\d+ of \d+ from the floor, (cold|hot) \(his season \d+%\))|(overtime)|(a (slow|fast) game, \d+ possessions against their usual \d+))$/;
+  chk(whatT.head.join('|') === 'Date|Opp|Min|points|What happened' && /^LAST GAMES \(\d+ of 10 over 25\.5\) · what the box says happened, the biggest factor first$/i.test(whatT.h4) && whatT.rows.length === 10
+      && whatT.rows.filter(r => r.what).length >= 6 && whatT.rows.every(r => r.what === '' || r.what.split(' · ').every(p => whatRe.test(p)))
+      && whatT.rows.every(r => !r.first || (r.first === r.what.split(' · ')[0] && r.cls === (/over/.test(r.mark) ? 'over' : /under/.test(r.mark) ? 'under' : '')))
+      && whatT.rows.some(r => /(back|out) \(\d+ mpg\)/.test(r.first)) && whatT.rows.some(r => /a blowout/.test(r.what)) && whatT.rows.some(r => /shots, \d+ (under|over) his usual/.test(r.what))
+      && whatT.rebWhat.length >= 4 && whatT.rebWhat.every(t => !/shots|from the floor/.test(t)),
+      'props: the panel\'s last games carry what the box says happened on each, the night\'s causes first (a regular back or out, a blowout) then his minutes, shots and shooting against his season\'s, the first factor bold in the colour of the game\'s mark; a rebounds prop reads no shots or shooting', JSON.stringify(whatT).slice(0, 1800));
 
   // ---- 26 Oct 2026: the pair's own panel -- a same-game pair card opens like a prop: the ticket's numbers, how the chance is made, each leg with a way
   //      into its own panel, Previous / Next across the night's tickets; Take marks the pair on both legs, lists it under Taking and grades it under What you took ----

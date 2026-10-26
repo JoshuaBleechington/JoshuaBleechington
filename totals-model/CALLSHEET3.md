@@ -1524,3 +1524,28 @@ ticket cannot be marked after the fact. Found by the harness while
 checking this: a slate load graded the props after the board had been
 drawn, so Taking tonight showed the props' and the pairs' results only on
 the next render; the board is drawn again once the props grade.
+
+## What happened on each of his last games, 26 Oct 2026
+
+The user, on P.J. Washington's panel with three of his last games marked
+red: "on the last games, the ones that didn't cover, is there a way to put
+next to those losses what may have been the factor that led to the loss?"
+The box has most of the answer, and the slate writes it beside each game
+now (`props_game_factors`, the sixth element of each `log` entry): the
+night's causes first, a regular of his club back or out that night (a man
+on 24 minutes a game over five games or more, counted only between his
+first and last game with the club, from `nba_club_regulars`), a blowout of
+fifteen or more, a start when he usually comes off the bench or the bench
+when he usually starts; then the measured parts, ranked by their size in
+the stat's units, his minutes four or more off his usual, his shots (FGA +
+0.44 FTA) three or more off his usual at those minutes, his shooting twelve
+points of field-goal share off his season's on five attempts or more; then
+overtime and a game five possessions or more off his club's own pace. Four
+at most, nothing under three games to compare against; a rebounds or
+assists prop reads no shots or shooting. The panel's **Last games** table
+carries it as a **What happened** column, the first factor bold in the
+colour of the game's mark, red under the line and green over it, and the
+graded night's own row gets his minutes against the games above it. A file
+from before carries none and the column stays away. The game logs now keep
+his shots and makes, the club's final margin, overtime, the game's pace and
+the club's regulars out or back, for this. Shown, never scored.

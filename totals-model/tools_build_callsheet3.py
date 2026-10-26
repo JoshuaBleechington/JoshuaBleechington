@@ -192,6 +192,8 @@ def head() -> str:
              "  table.props td.simc { font-family: var(--mono); white-space: nowrap; } .pk .n5.simline.pos { color: var(--go); } .pk .n5.simline.neg { color: var(--bad); }\n"
              "  .pk.simg .n2 { font-family: var(--mono); } .pk.simg .n2 .dim { font-weight: 500; font-size: 13px; } .pk.simg.dim { opacity: .7; } .pk.simg .n5 b { color: var(--ink); }\n"
              "  .pk.pair.agrees { border-color: var(--go); } .pk.pair.win { box-shadow: inset 4px 0 0 var(--go); } .pk.pair.loss { box-shadow: inset 4px 0 0 var(--bad); } .pdlg h3 .tag.role { background: var(--ink-2); color: var(--bg, #fff); }\n"
+             "  /* what happened on each of his last games (26 Oct 2026): the first factor bold, red under the line and green over it */\n"
+             "  .pdlg .pd-log td:not(.pd-what) { white-space: nowrap; } .pdlg .pd-log td.pd-what { font-size: 11.5px; color: var(--ink-2); white-space: normal; min-width: 220px; } .pdlg .pd-log td.pd-what b { font-weight: 600; } .pdlg .pd-log td.pd-what b.under { color: var(--bad); } .pdlg .pd-log td.pd-what b.over { color: var(--go); }\n"
              "  /* the pair's own panel (26 Oct 2026): the ticket opens like a prop, each leg in a box of its own with a way to its panel */\n"
              "  .pk[data-pair] { cursor: pointer; } .pk[data-pair]:hover { border-color: var(--ink); } .pdlg h3 .amp { color: var(--muted); font-weight: 500; }\n"
              "  .pdlg .pd-leg { border: 1px solid var(--rule); border-radius: 8px; padding: 6px 12px 10px; margin: 10px 0; } .pdlg .pd-leg h4 { margin: 6px 0 2px; } .pdlg .pd-leg .pd-tiles { margin: 8px 0 6px; }\n"
@@ -552,6 +554,12 @@ def props_example_games() -> list:
             for mk, r36 in per36.items():
                 mu = r36 * m / 36.0
                 g[mk] = max(0, int(round(rng.gauss(mu, slate.PROPS_SD_K[mk] * (mu ** 0.5) if mu > 0 else 0.5))))
+            # the box behind the line (26 Oct 2026, the panel's what-happened column): his shots and makes, the margin, the pace
+            pts = g.get("pts", 0)
+            fga = max(1, int(round(pts / 1.15 * rng.uniform(0.85, 1.15))))
+            fta = max(0, int(round(pts * 0.22 * rng.uniform(0.5, 1.5))))
+            g.update({"fga": fga, "fgm": max(0, min(fga, int(round(fga * rng.uniform(0.36, 0.56))))), "fta": fta, "ftm": max(0, int(round(fta * 0.8))), "tov": rng.randint(0, 4),
+                      "mg": int(round(rng.gauss(0, 13))), "pace": round(rng.gauss(100.5, 4.0), 1), "ot": rng.random() < 0.06})
             out.append(g)
         return out
     this_start, last_start = dt.date(2026, 10, 21), dt.date(2025, 11, 1)
@@ -565,6 +573,14 @@ def props_example_games() -> list:
         "Kelly Oubre Jr.": ("PHI", "F", logs(15, this_start, 31.0, {"pts": 16.9, "reb": 6.4, "ast": 1.5, "tpm": 1.4}, False), logs(60, last_start, 31.5, {"pts": 16.4, "reb": 6.2, "ast": 1.6, "tpm": 1.5}, True)),
         "Joel Embiid": ("PHI", "C", logs(9, this_start, 31.2, {"pts": 27.5, "reb": 9.5, "ast": 3.8, "tpm": 1.2}, False), logs(19, last_start, 30.5, {"pts": 23.8, "reb": 8.2, "ast": 4.5, "tpm": 1.1}, True)),
     }
+    # a regular out or back on some nights, as the ledger would say (26 Oct 2026)
+    for name, (team, _pos, this, _last) in players.items():
+        mate = ("Paul George" if name == "Joel Embiid" else "Joel Embiid") if team == "PHI" else "Josh Hart"
+        for k, g in enumerate(this):
+            if k % 5 == 3:
+                g["out"], g["back"] = [[mate, 31.2]], []
+            elif k % 5 == 4:
+                g["out"], g["back"] = [], [[mate, 31.2]]
     lines = [("Jalen Brunson", "pts", 27.5, -110, -110), ("Karl-Anthony Towns", "reb", 11.5, -115, -105), ("Mikal Bridges", "pra", 24.5, -110, -110), ("OG Anunoby", "ast", 2.5, 100, -120),
              ("Tyrese Maxey", "pts", 25.5, -110, -110), ("Paul George", "tpm", 2.5, -120, 100), ("Kelly Oubre Jr.", "pts", 14.5, -105, -115), ("Joel Embiid", "reb", 9.5, -110, -110)]
     dvp = {"NYK": {"G": {"f": 0.97, "f_this": 0.95, "n_this": 16, "f_last": 0.99, "n_last": 82}, "F": {"f": 1.02, "f_this": 1.03, "n_this": 16, "f_last": 1.01, "n_last": 82}, "C": {"f": 1.05, "f_this": 1.07, "n_this": 16, "f_last": 1.03, "n_last": 82}},
@@ -605,7 +621,7 @@ def props_example_games() -> list:
         proj, why = slate.props_project(pr, this, last, ctx)
         item = {"pid": "x%d" % (k + 1), "name": name, "team": team, "opp": opp, "home": team == "NYK", "pos": pos, "mk": mk, "line": line, "op": op, "up": up, "book": "fanatics",
                 "books": {"fanatics": [line, op, up], "draftkings": [line + (0.5 if k % 3 == 0 else 0.0), op - 5, up + 5], "fanduel": [line, op + 2, up - 2]},
-                "log": [[g["d"], g["opp"], 1 if g["home"] else 0, g["min"], slate.props_stat(g, mk)] for g in (this or last)[-10:]], "why": why}
+                "log": [[g["d"], g["opp"], 1 if g["home"] else 0, g["min"], slate.props_stat(g, mk), slate.props_game_factors(g, this or last, mk, 100.5)] for g in (this or last)[-10:]], "why": why}
         if proj:
             item.update(proj)
             item["sim"] = slate.nba_prop_sim_read(gs, team == "NYK", proj)

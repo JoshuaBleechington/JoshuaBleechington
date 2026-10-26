@@ -179,7 +179,7 @@ regulars out, pace, the defence, last season's prior and the minutes trend,
 ranked with a bar, green toward the pick and red away from it, the biggest
 named on the card too), the why with the two biggest levers toward the
 pick in bold green and the biggest against it tagged red (26 Oct 2026), the
-last games as a table (each game's stat marked, green over the prop's line
+last games as a table (each game's stat marked, green over the prop's line, and from 26 Oct 2026 what the box says happened on each, a regular back or out, a blowout, his minutes, shots and shooting against his season's, the biggest first
 and red under it, with a tally of how many cleared the number) and every
 book's line. Props cannot be backtested against lines
 (ten credits a market a game on the history endpoint). A player listed Out

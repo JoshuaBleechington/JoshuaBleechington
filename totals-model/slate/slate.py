@@ -4452,7 +4452,7 @@ def props_game_factors(g, logs, mk, league_pace=None, logs_last=None):
             if mk != "tpm":
                 plain.append("%d of %d from the floor" % (g["fgm"] or 0, g["fga"] or 0))
     stood.sort(key=lambda x: -x[0])
-    if g.get("mg") is not None and not blow:
+    if g.get("mg") is not None and not blow and int(g["mg"]) != 0:
         plain.append("%s by %d" % ("won" if g["mg"] > 0 else "lost", abs(int(g["mg"]))))
     if g.get("ot"):
         tail.append("overtime")

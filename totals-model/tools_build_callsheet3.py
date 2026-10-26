@@ -560,7 +560,7 @@ def props_example_games() -> list:
             fga = max(1, int(round(pts / 1.15 * rng2.uniform(0.85, 1.15))))
             fta = max(0, int(round(pts * 0.22 * rng2.uniform(0.5, 1.5))))
             g.update({"fga": fga, "fgm": max(0, min(fga, int(round(fga * rng2.uniform(0.36, 0.56))))), "fta": fta, "ftm": max(0, int(round(fta * 0.8))), "tov": rng2.randint(0, 4),
-                      "mg": int(round(rng2.gauss(0, 13))), "pace": round(rng2.gauss(100.5, 4.0), 1), "ot": rng2.random() < 0.06})
+                      "mg": int(round(rng2.gauss(0, 13))) or 1, "pace": round(rng2.gauss(100.5, 4.0), 1), "ot": rng2.random() < 0.06})
             out.append(g)
         return out
     this_start, last_start = dt.date(2026, 10, 21), dt.date(2025, 11, 1)

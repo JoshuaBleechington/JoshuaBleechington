@@ -44,6 +44,7 @@ TOP = [
     ("close-guard", "An in-play line was being graded as the close; the grade now passes over a snapshot taken after tip"),
     ("median-line", "The posted line is a median, not a mean: the first correction that made the chance honest"),
     ("take", "The bets you actually place, marked on the page and graded on their own line: the record of you, not only of the sheet"),
+    ("tt-own", "The card's confidence now means what the replay found, not what the sim says: a 71% worth a coin reads as a coin"),
 ]
 
 # (key, date, area, title, what it did, tier)
@@ -224,6 +225,18 @@ ENTRIES = [
      "A click marks the bet as shown, with its side and price; the marked bets list at the top of the day board and the Props tab with a copy button, ride through reloads and rescores, and grade on their own tiles at one unit each. A graded row cannot be marked after the fact.", "guard"),
     ("take-sim", "2026-10-25", "NBA", "The simulation's calls can be taken too",
      "A Take button under every chip on the Simulation card and beside the gap rule's call, live once the game is on the card; the mark keeps the call as shown (line, price, chance, worth, band) and grades on a Simulation calls tile.", "guard"),
+    ("runs", "2026-10-25", "NBA", "10,000 runs measured as the right count",
+     "Twenty seeds a game at 1,000 to 50,000 runs against a 400,000-run reference: at 10,000 a chance wanders half a point, inside what the chip shows; 50,000 buys a decimal the page never prints at five times the time. A call within a point of a band edge flips at every count.", "guard"),
+    ("rotowire", "2026-10-25", "Slate", "The injury report together with RotoWire's lineups page",
+     "A man RotoWire marks Out joins ESPN's list with his id from the ledgers; a man ESPN has Out but RotoWire shows in a confirmed five is counted in. Runs in the slate and the props; on its first live night it found two men out that ESPN's report did not.", "guard"),
+    ("levers", "2026-10-25", "NBA props", "The levers' tally: a Levers column, a filter for the props whose levers all lean the pick's way, the tag and the heading",
+     "How many of What moves it's factors push toward the pick and how many against, sortable, filterable, on the card and the panel. Shown, not scored: it counts the pushes, the chance carries their sizes.", "show"),
+    ("phone", "2026-10-25", "Page", "Tonight on your phone: a QR code that carries the night's picks to a read-only phone sheet",
+     "The code holds the picks themselves, compressed into the link; nothing is uploaded. The bets marked Taking, the parlay four, the best bets, the likeliest sides, the best props and the simulation's calls, trimmed from the least important end on a long night. The harness decodes the drawn code with an independent reader.", "show"),
+    ("lineup-test", "2026-10-26", "NBA", "The lineups test: five-man stints from the play-by-play, player impact ratings, and the club model kept",
+     "2,481 games cut into stints (five a side in 99.99%, minutes within 0.26 of the box); adjusted plus-minus per player, refit weekly; the players matched the club model on margins, were worse in the first month, and nothing added to the close. A continuity-weighted prior gained one percent. The model stays.", "guard"),
+    ("tt-own", "2026-10-26", "NBA", "The own view's team totals measured null on both seasons; the Simulation card's band now comes from the worth",
+     "After a 71% own-view team total read STRONG and lost by seventeen: its 65-70% calls had landed 47% in both seasons, the anchored home total's 66-68%. The worth now splits by view and side, and every chip's band reads off its worth, so the card says which calls the replay backs.", "guard"),
 ]
 
 COLORS = {"edge": "#b4232c", "guard": "#c2700a", "show": "#1f5fa8", "fix": "#6b7280"}
@@ -275,7 +288,7 @@ def build() -> str:
 """
     out = ['<!doctype html><html><head><meta charset="utf-8"><title>The Super Model: the enhancements to date</title><style>' + css + '</style></head><body>']
     out.append('<h1>The Super Model: the enhancements to date</h1>')
-    out.append('<p class="sub">Every change to the model and the page from the first totals model on 4 August 2026 through 25 October 2026, dated by the commit that shipped it. '
+    out.append('<p class="sub">Every change to the model and the page from the first totals model on 4 August 2026 through 26 October 2026, dated by the commit that shipped it. '
                'The colour says what kind of change it was; the ones in the box are the ones that matter most to what is bet tonight.</p>')
     out.append('<div class="legend">' + "".join(
         '<div class="leg"><div class="sw" style="background:%s"></div><div><b>%s</b>%s · %d</div></div>' % (COLORS[t], TIERS[t][0], TIERS[t][1], counts[t]) for t in TIERS) + '</div>')

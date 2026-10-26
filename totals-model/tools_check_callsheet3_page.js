@@ -1086,6 +1086,7 @@ const CHECKS = ["dome","playoff","agconf","hgconf","agbk","hgbk"];
     const fromCardPos = document.getElementById('propDetailPos').textContent, noscroll = document.body.classList.contains('noscroll');
     const levers = [...dlg.querySelectorAll('.pd-levers .lever')].map(e => e.className + '|' + e.querySelector('.lt').textContent.trim() + '|' + e.querySelector('.lv').textContent);
     const base = (dlg.querySelector('.pd-base') || {}).textContent || '', boldWhy = [...dlg.querySelectorAll('ul.pd-why li.lever-line')].map(e => e.textContent.slice(0, 40));
+    const againstWhy = [...dlg.querySelectorAll('ul.pd-why li.lever-against')].map(e => e.textContent.replace(/\s+/g, ' ').trim()), whyHead = ((dlg.querySelector('h4 + ul.pd-why') || {}).previousElementSibling || {}).textContent || '';
     const cardLever = (card.querySelector('.n5') || {}).textContent || '';
     document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })); await wait();
     const closedEsc = dlg.hidden && !document.body.classList.contains('noscroll');
@@ -1109,7 +1110,7 @@ const CHECKS = ["dome","playoff","agconf","hgconf","agbk","hgbk"];
     trs[trs.length - 1].click(); await wait();
     const nextOffLast = document.getElementById('propDetailNext').disabled, posLast = document.getElementById('propDetailPos').textContent;
     document.getElementById('propDetailClose').click(); await wait(); document.getElementById('m-nba').click(); await wait();
-    return { hidden0, open, text: text.slice(0, 3200), tiles, simTiles, simText, simBeforeWhy, marks, books, carded, fromCardPos, noscroll, closedEsc, closedBtn, closedSport, levers, base, boldWhy, cardLever,
+    return { hidden0, open, text: text.slice(0, 3200), tiles, simTiles, simText, simBeforeWhy, marks, books, carded, fromCardPos, noscroll, closedEsc, closedBtn, closedSport, levers, base, boldWhy, againstWhy, whyHead, cardLever,
              n: trs.length, rowNames, rowOpen, name0, pos0, prevOff0, navShown, name1, pos1, prevOff1, name2, name1b, nextOffLast, posLast };
   });
   chk(propsDlg.simTiles.length === 6 && /^PHI points=1[01]\d\|middle half \d+–\d+ · 112\.9 a game by the ratings\|/.test(propsDlg.simTiles[0]) && /^Sim's read=2\d\.\d\|his per 36 at his minutes × 0\.\d\d; [-−+]\d\.\d against the model's 28\.07\|/.test(propsDlg.simTiles[1])
@@ -1127,8 +1128,11 @@ const CHECKS = ["dome","playoff","agconf","hgconf","agbk","hgbk"];
   chk(propsDlg.levers.length === 6 && /^lever helps top\|Regulars out biggest lever\|\+1\.[5-9]$/.test(propsDlg.levers[0]) && propsDlg.levers.some(l => /^lever hurts\|Defence v position\|[-−]0\./.test(l)) && propsDlg.levers.some(l => /^lever hurts\|Pace\|[-−]0\./.test(l))
       && propsDlg.levers.some(l => /^lever hurts\|The matchup, from the simulation\|[-−]0\.[5-9]$/.test(l))
       && /^Starts from 28\.\d+, his 28\.\d+ per 36 at his minutes; the regulars out, pace, the matchup and the defence take it to 28\.07, \+2\.6 against the line\./.test(propsDlg.base)
-      && propsDlg.boldWhy.length === 2 && propsDlg.boldWhy.some(w => /^Joel Embiid out/.test(w)) && propsDlg.boldWhy.some(w => /^the matchup, from the simulation's profi/.test(w)) && /^Moves it: Regulars out \+1\.[5-9] · The matchup, from the simulation [-−]0\.[5-9]$/.test(propsDlg.cardLever),
-      'props detail: what moves it ranks each factor\'s push on the projection with a bar, the regulars out the biggest lever on Maxey with Embiid out, the matchup from the simulation, the pace and the defence against; the two biggest bold their why lines and the card names them', JSON.stringify({ levers: propsDlg.levers, base: propsDlg.base, bold: propsDlg.boldWhy, card: propsDlg.cardLever }));
+      && propsDlg.boldWhy.length === 2 && propsDlg.boldWhy.some(w => /^Joel Embiid out/.test(w)) && propsDlg.boldWhy.some(w => /^27\.7 points per 36 this season/.test(w)) && !propsDlg.boldWhy.some(w => /^the matchup|^the game's pace/.test(w))
+      && propsDlg.againstWhy.length === 1 && /^(the matchup, from the simulation's profiles|the game's pace)/.test(propsDlg.againstWhy[0]) && /the biggest against the OVER$/.test(propsDlg.againstWhy[0])
+      && /the biggest reasons for the OVER in bold, the biggest against it tagged/.test(propsDlg.whyHead)
+      && /^Moves it: Regulars out \+1\.[5-9] · The matchup, from the simulation [-−]0\.[5-9]$/.test(propsDlg.cardLever),
+      'props detail: what moves it ranks each factor\'s push on the projection with a bar, the regulars out the biggest lever on Maxey with Embiid out, the matchup from the simulation, the pace and the defence against; the two biggest toward the OVER (Embiid out, the prior) bold their why lines, the biggest against it (the matchup) is tagged, and the card names the top two by size', JSON.stringify({ levers: propsDlg.levers, base: propsDlg.base, bold: propsDlg.boldWhy, against: propsDlg.againstWhy, head: propsDlg.whyHead, card: propsDlg.cardLever }));
   chk(propsDlg.hidden0 && propsDlg.open && propsDlg.noscroll && /^LEAN Tyrese Maxey G PHI( starter)? OVER 25\.5 points 76ers @ Knicks/.test(propsDlg.text) && /on the road at NYK/.test(propsDlg.text) && /Why /i.test(propsDlg.text)
       && propsDlg.tiles.join(',') === 'Chance,Price,Edge,Projection,Minutes,Per 36,Usage' && propsDlg.marks === 10 && propsDlg.books === 3 && /fanatics/.test(propsDlg.carded),
       'props detail: a best-prop card opens the prop on its own panel with the tiles, the why, the marked last games and every book', JSON.stringify(propsDlg).slice(0, 1500));

@@ -955,6 +955,17 @@ Knicks' defence −0.7 and the pace −0.3 lean against, the prior +0.4 and the
 minutes trend −0.4 sit inside the start. A props file from before the 21st
 has no parts, so its panel shows the why without the ranking.
 
+**The Why's bold lines are the reasons for the pick (26 Oct 2026).** The
+user, on a panel whose two bold lines were a regular out (+0.49 per 36,
+toward the over) and the pace (×0.954, against it): "are those the two
+biggest reasons for the potential over?" They were the two biggest by size
+in either direction, which read wrong. Now the two biggest levers toward
+the pick's side are bold, the biggest against it carries a red tag ("the
+biggest against the OVER") and a red marker, a push under 0.05 in the
+stat's units counts as neither, and the Why heading says so. The bars above
+are unchanged, and the card's fifth line still names the top two by size
+with their signs.
+
 ## The blowout test, and the props' centre, 22 Oct 2026
 
 The second night of props (21 Oct) went 321-326 with the BET band 38-53:

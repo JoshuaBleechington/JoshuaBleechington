@@ -512,7 +512,13 @@
     } else {
       h += '<p class="note">' + esc((r.why && r.why[0]) || "No projection on this prop.") + '</p>';
     }
-    var levers = has ? propsLevers(r) : [], top = levers.slice(0, 2).map(function (p) { return +p.i; });
+    var levers = has ? propsLevers(r) : [];
+    /* the Why's marked lines (26 Oct 2026, the user: "are those the two biggest reasons for the pick?"; they had been the two
+       biggest by size in either direction, so a pace lever against the over read as a reason for it): the two biggest levers
+       toward the pick's side are bold, the biggest against it is tagged, a push under 0.05 in the stat's units counting as neither */
+    var felt = levers.filter(function (p) { return Math.abs(+p.eff) >= 0.05; });
+    var top = felt.filter(function (p) { return propsLeverHelps(r, +p.eff); }).slice(0, 2).map(function (p) { return +p.i; });
+    var against = felt.filter(function (p) { return !propsLeverHelps(r, +p.eff); }).slice(0, 1).map(function (p) { return +p.i; });
     if (levers.length && r.base !== undefined && r.base !== null) {
       var maxE = Math.max.apply(null, levers.map(function (p) { return Math.abs(+p.eff); }).concat([0.01])), gap = r.proj - r.line;
       var hasMatch = levers.some(function (p) { return p.k === "match"; }), tally = propsLeverTally(r);
@@ -525,7 +531,10 @@
       }).join("") + '</div>';
     }
     if (has) h += propsSimHtml(r, tile);
-    if (r.why && r.why.length) h += '<h4>Why</h4><ul class="pd-why">' + r.why.map(function (w, i) { return '<li' + (top.indexOf(i) >= 0 ? ' class="lever-line"' : '') + '>' + esc(w) + '</li>'; }).join("") + '</ul>';
+    if (r.why && r.why.length) h += '<h4>Why' + (felt.length ? ' <span class="dim">· ' + (top.length ? 'the biggest reason' + (top.length > 1 ? 's' : '') + ' for the ' + esc(r.side || "pick") + ' in bold' : 'no lever toward the ' + esc(r.side || "pick")) + (against.length ? (top.length ? ', ' : '; ') + 'the biggest against it tagged' : '') + '</span>' : '') + '</h4><ul class="pd-why">' + r.why.map(function (w, i) {
+      var cls = top.indexOf(i) >= 0 ? ' class="lever-line"' : against.indexOf(i) >= 0 ? ' class="lever-against"' : '';
+      return '<li' + cls + '>' + esc(w) + (against.indexOf(i) >= 0 ? ' <span class="tag hurts">the biggest against the ' + esc(r.side || "pick") + '</span>' : '') + '</li>';
+    }).join("") + '</ul>';
     /* the game the prop was on joins the list once it is graded (25 Oct 2026, the user: "they only show the last
        date of 10/23 and not 10/24 for the props that were on yesterday"): the last games are the history the
        call was made from, as the file carried them, and the graded night goes under them with his minutes from

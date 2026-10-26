@@ -243,6 +243,8 @@ ENTRIES = [
      "The user's alternate-line read (Sengun 10+ points, 5+ rebounds, 3+ assists at 95%). Measured: the model's 95% floor cleared 97.5% of nights, posted as a book's whole number 98%, and one man's three floors together 96.5% against 85.7% if independent, his minutes carrying all three. Shown on the panel, not priced: the books' alternate lines would be a second market a game on the feed.", "show"),
     ("props-pairs", "2026-10-26", "Props", "Same-game pairs: two props from one game as a ticket, the chance both land measured, graded on their own tile",
      "The user saw the night's quick winners were two-leg same-game parlays. The likeliest four legs a game at 52% or better, every pair a ticket: two players' props land almost as independence says (23.7% and 25.2% against 25%), a man's own two markets together more often (28 to 29%, his points with his threes 38%), so the product carries a measured factor, capped at the lesser leg; the parlay price, what it needs, whether the price agrees; graded from the first night and carried on the phone sheet.", "show"),
+    ("why-bold", "2026-10-26", "Props", "The Why's bold lines are the two biggest reasons for the pick; the biggest against it is tagged",
+     "They had been the two biggest levers by size in either direction, so a pace lever against the over read as a reason for it. Now the two biggest toward the pick's side are bold, the biggest against it carries a red tag, a push under 0.05 counts as neither, and the heading says so.", "show"),
 ]
 
 COLORS = {"edge": "#b4232c", "guard": "#c2700a", "show": "#1f5fa8", "fix": "#6b7280"}

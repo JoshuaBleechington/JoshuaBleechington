@@ -191,6 +191,7 @@ def head() -> str:
              "  .takebtn.off { opacity: .45; cursor: not-allowed; } .simtab .simtake { margin-top: 5px; } .ttgap .takebtn { margin-left: 4px; vertical-align: middle; }\n"
              "  table.props td.agree { font-family: var(--mono); white-space: nowrap; } .pk .tag.agree { background: var(--go); color: #fff; }\n"
              "  /* the simulation's stats on the Props page (26 Oct 2026): a card a game, the Sim column, the best cards' last line */\n"
+             "  table.props td.usgc { font-family: var(--mono); white-space: nowrap; } table.props td.usgc .tag { font-size: 9px; padding: 1px 4px; margin-left: 2px; vertical-align: middle; }\n"
              "  table.props td.simc { font-family: var(--mono); white-space: nowrap; } .pk .n5.simline.pos { color: var(--go); } .pk .n5.simline.neg { color: var(--bad); }\n"
              "  .pk.simg .n2 { font-family: var(--mono); } .pk.simg .n2 .dim { font-weight: 500; font-size: 13px; } .pk.simg.dim { opacity: .7; } .pk.simg .n5 b { color: var(--ink); }\n"
              "  .pk.pair.agrees { border-color: var(--go); } .pk.pair.win { box-shadow: inset 4px 0 0 var(--go); } .pk.pair.loss { box-shadow: inset 4px 0 0 var(--bad); } .pdlg h3 .tag.role { background: var(--ink-2); color: var(--bg, #fff); }\n"

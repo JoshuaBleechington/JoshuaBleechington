@@ -1410,6 +1410,8 @@ either way, a role player's wider, and the why says so. A **usage** filter
 in the Every-prop table (24% and up, 18 to 24%, under 18%) finds the ones
 he asked for.
 
+**The Usage column** (later the same day, the user: "on Every prop on the date, a section for usage rate too?"): his share with S for a starter or B off the bench, green at 24% and up, sortable highest first, beside Levers and Sim.
+
 **The role.** The Williams and Thybulle pattern is a real one: a starter's
 miss runs about one sigma at every usage, a bench man's 1.15 to 1.25 at low
 usage, because the starter's minutes are the steady part. The role comes

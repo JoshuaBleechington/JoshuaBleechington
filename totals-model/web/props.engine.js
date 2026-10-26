@@ -242,7 +242,7 @@
   try { var pv0 = JSON.parse(localStorage.getItem(PROPS_VIEW_KEY) || "null"); if (pv0 && typeof pv0 === "object") propsTableView = Object.assign({}, PROPS_VIEW_DEFAULT, pv0); } catch (e) {}
   function savePropsTableView() { try { localStorage.setItem(PROPS_VIEW_KEY, JSON.stringify(propsTableView)); } catch (e) {} }
   var PROPS_BAND_RANK = { "BET": 0, "LEAN": 1, "no edge": 2 };
-  var PROPS_SORT_COLS = [["game", "Game"], ["name", "Player"], ["mk", "Market"], ["line", "Line"], ["side", "Pick"], ["chance", "Chance"], ["price", "Price"], ["need", "Needs"], ["edge", "Edge"], ["proj", "Proj"], ["band", "Band"], ["result", "Result"], ["agree", "Levers"], ["sim", "Sim"]];
+  var PROPS_SORT_COLS = [["game", "Game"], ["name", "Player"], ["mk", "Market"], ["line", "Line"], ["side", "Pick"], ["chance", "Chance"], ["price", "Price"], ["need", "Needs"], ["edge", "Edge"], ["proj", "Proj"], ["band", "Band"], ["result", "Result"], ["agree", "Levers"], ["sim", "Sim"], ["usage", "Usage"]];
   /* the levers' tally (26 Oct 2026, the user: "find props like this one, where What moves it shows multiple green bars
      pointing toward the pick"): how many of the factors push toward the pick's side and how many against, a push under
      0.05 in the stat's units counting as neither. A column to sort by, a filter, a tag on the card and the panel's heading */
@@ -261,6 +261,7 @@
     switch (key) {
       case "agree": return has ? (function (t) { return t.n ? (t.toward - t.against) + t.toward / 10 : -50; })(propsLeverTally(r)) : -99;
       case "sim": return has ? (function (g) { return g === null ? -99 : g; })(propSimGap(r)) : -999;
+      case "usage": return r.usg === null || r.usg === undefined ? -1 : +r.usg;
       case "game": return r.game || "";
       case "name": return r.name || "";
       case "mk": return PROPS_LABEL[r.mk] || r.mk || "";
@@ -815,6 +816,7 @@
         '<td>' + (r.result ? esc(r.result) + (r.actual !== null && r.actual !== undefined ? ' · ' + r.actual : '') : '') + '</td>' +
         (function (t) { return '<td class="agree' + (t.n ? (t.all ? ' pos' : t.against > t.toward ? ' neg' : '') : '') + '" title="' + esc(t.words) + '">' + t.text + '</td>'; })(propsLeverTally(r)) +
         (function (v, ag) { return '<td class="simc' + (ag === true ? ' pos' : ag === false ? ' neg' : '') + '" title="' + (v === null ? 'no simulation on this prop' : 'the simulation\'s own read of the stat, his per 36 at his minutes scaled by his club\'s runs; ' + (ag === true ? 'on the ' + esc(r.side) + '\'s side of the line' : ag === false ? 'against the ' + esc(r.side) : 'on the line') + ' (shown, not scored)') + '">' + (v === null ? '' : v) + '</td>'; })(propSimRead(r), propSimAgrees(r)) +
+        (function (u) { return '<td class="usgc' + (u === "hi" ? ' pos' : '') + '" title="' + (r.usg === null || r.usg === undefined ? 'no usage on this prop' : 'his share of his club\'s possessions while on the floor' + (r.starter === true ? '; a starter' : r.starter === false ? '; off the bench' : '') + (r.sdf && r.sdf !== 1 ? '; the miss read at ' + r.sdf + ' sigmas (measured)' : '')) + '">' + (r.usg === null || r.usg === undefined ? '' : esc(String(r.usg)) + '%' + (r.starter === true ? ' <span class="tag">S</span>' : r.starter === false ? ' <span class="tag">B</span>' : '')) + '</td>'; })(propUsageBucket(r)) +
         '<td class="take">' + propTakeBtn(r) + '</td></tr>';
     });
     h += '</tbody></table>';

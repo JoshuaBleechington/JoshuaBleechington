@@ -1482,6 +1482,12 @@ const CHECKS = ["dome","playoff","agconf","hgconf","agbk","hgbk"];
     // the filters: usage 24% and up, then the role
     const sel = (id, v) => { const el = document.getElementById(id); el.value = v; el.dispatchEvent(new Event('change', { bubbles: true })); };
     const names = () => [...document.querySelectorAll('#propsTable tbody tr[data-prop]')].map(tr => tr.querySelectorAll('td')[1].textContent.trim());
+    const heads = [...document.querySelectorAll('#propsTable thead th')].map(t => t.textContent.trim()), tds0 = [...document.querySelector('#propsTable tbody tr[data-prop]').querySelectorAll('td')];
+    const aligned = heads.length === tds0.length && tds0[heads.indexOf('Sim')].classList.contains('simc') && tds0[heads.indexOf('Usage')].classList.contains('usgc') && tds0[heads.indexOf('Levers')].classList.contains('agree') && tds0[heads.indexOf('Take')].classList.contains('take');
+    const usgCells = [...document.querySelectorAll('#propsTable tbody tr[data-prop]')].map(tr => tr.querySelectorAll('td')[1].textContent.trim().split(' ')[0] + ':' + tr.querySelector('td.usgc').textContent.trim() + ':' + tr.querySelector('td.usgc').className);
+    document.querySelector('#propsTable th[data-sort="usage"]').click(); await wait();
+    const usgSorted = [...document.querySelectorAll('#propsTable tbody tr[data-prop] td.usgc')].map(td => parseFloat(td.textContent)), usgShown = document.getElementById('propsShown').textContent;
+    document.getElementById('propsReset').click(); await wait();
     sel('propsUsage', 'hi'); await wait(); const hi = names();
     sel('propsUsage', ''); sel('propsRole', 'bench'); await wait(); const bench = names();
     document.getElementById('propsReset').click(); await wait();
@@ -1489,16 +1495,18 @@ const CHECKS = ["dome","playoff","agconf","hgconf","agbk","hgbk"];
     // the pairs
     const pairs = [...document.querySelectorAll('#propsPairs .pk.pair')].map(e => ({ text: e.innerText.replace(/\s+/g, ' ').trim(), agrees: e.classList.contains('agrees') }));
     document.getElementById('m-nba').click(); await wait();
-    return { h3, role, usage, floors, why, hi, bench, after, pairs };
+    return { h3, role, usage, floors, why, hi, bench, after, pairs, usgCells, usgSorted, usgShown, aligned };
   });
   chk(/^Tyrese Maxey G PHI starter$/.test(usageT.h3) && usageT.role === "RotoWire's expected five" && /^Usage=29%\|of his club's possessions while on; a starter, the miss read at 0\.91 sigmas \(measured\)$/.test(usageT.usage)
       && /^95% of nights: 1\d\+ · 90%: 1\d\+ · 80%: (19|2\d)\+ points\. Measured on 2025-26: the 95% floors cleared 97\.5% of nights/.test(usageT.floors)
       && /^usage 29\.0% of his club's possessions \(this season\), a starter \(RotoWire's expected five\): a high-usage starting man's miss runs 0\.91 sigmas, measured, so the chance is read narrower$/.test(usageT.why),
       'props: the panel carries his role as a tag, his usage as a tile with the sigma factor, the floors he clears 95, 90 and 80% of nights with the measured record behind them, and the why line', JSON.stringify({ h3: usageT.h3, role: usageT.role, usage: usageT.usage, floors: usageT.floors.slice(0, 200), why: usageT.why }));
-  chk(usageT.hi.length === 3 && usageT.hi.every(n => /Jalen Brunson|Karl-Anthony Towns|Tyrese Maxey/.test(n)) && usageT.bench.length === 1 && /Kelly Oubre/.test(usageT.bench[0]) && usageT.after.n === 7 && usageT.after.usage === '' && usageT.after.role === ''
+  chk(usageT.aligned && usageT.usgCells.length === 7 && usageT.usgCells.some(c => /^Tyrese:29% S:usgc pos$/.test(c)) && usageT.usgCells.some(c => /^Kelly:19% B:usgc$/.test(c)) && usageT.usgCells.every(c => /:\d+(\.\d)?% [SB]:usgc( pos)?$/.test(c))
+      && usageT.usgSorted.length === 7 && usageT.usgSorted.every((u, i, a) => i === 0 || u <= a[i - 1]) && /sorted by usage ▾/.test(usageT.usgShown)
+      && usageT.hi.length === 3 && usageT.hi.every(n => /Jalen Brunson|Karl-Anthony Towns|Tyrese Maxey/.test(n)) && usageT.bench.length === 1 && /Kelly Oubre/.test(usageT.bench[0]) && usageT.after.n === 7 && usageT.after.usage === '' && usageT.after.role === ''
       && usageT.pairs.length >= 3 && usageT.pairs.every(p => /^PAIR #\d · 76ers @ Knicks · the price (agrees|asks more) .+ \+ .+ both land \d\d\.\d% · pays [-−+]\d+ \(\d\.\d\d×\) needs \d\d\.\d% .+ · (two players|two overs on one club|one man, two markets|one man, his points with his threes), measured ×(0\.95|1\.00|1\.15|1\.50) TAKE$/.test(p.text))
       && usageT.pairs.map(p => parseFloat(/both land (\d\d\.\d)%/.exec(p.text)[1])).every((c, i, a) => i === 0 || c <= a[i - 1]),
-      'props: the usage and role filters keep the right men and Reset view clears them, and the same-game pairs list the date\'s tickets likeliest first with the parlay\'s price, what it needs and the measured kind of pair', JSON.stringify({ hi: usageT.hi, bench: usageT.bench, after: usageT.after, pairs: usageT.pairs.map(p => p.text.slice(0, 160)) }));
+      'props: every header of the Every-prop table sits over its own cell; the Usage column carries his share with S or B for his role, green at 24% and up, and sorts highest first; the usage and role filters keep the right men and Reset view clears them, and the same-game pairs list the date\'s tickets likeliest first with the parlay\'s price, what it needs and the measured kind of pair', JSON.stringify({ aligned: usageT.aligned, cells: usageT.usgCells, sorted: usageT.usgSorted, shown: usageT.usgShown, hi: usageT.hi, bench: usageT.bench, after: usageT.after, pairs: usageT.pairs.map(p => p.text.slice(0, 160)) }));
 
   // ---- 26 Oct 2026: the simulation's stats on the Props page -- a card a game above the picks, the Sim column with its filter and sort, the best cards' last line ----
   const simPropsT = await pg.evaluate(async () => {
@@ -1525,7 +1533,7 @@ const CHECKS = ["dome","playoff","agconf","hgconf","agbk","hgbk"];
   const simGap = r => r.sim === null || r.sim === '' ? null : (r.side === 'UNDER' ? r.line - parseFloat(r.sim) : parseFloat(r.sim) - r.line);
   const simMaxey = simPropsT.rows.find(r => /^Tyrese Maxey/.test(r.name)), simBig = simPropsT.rows.slice().sort((a, b) => simGap(b) - simGap(a))[0];
   chk(simPropsT.strip.length === 1 && /^pk simg\|76ers @ Knicks · played 3,000 times PHI \d{2,3} · NYK \d{2,3} total \d{3} (NYK|PHI) by \d+\.\d · home win \d+(\.\d)?% · total \d{3}( · the book's [\d.]+ \([-−+][\d.]+\))? PHI middle half \d+–\d+ against [\d.]+ a game by the ratings · NYK \d+–\d+ against [\d.]+ blowout of 15 or more \d+(\.\d)?% · overtime \d+(\.\d)?% · [\d.]+ possessions · PHI's regulars out [-−][\d.]+ per 100 on the offence · the sim's read on the pick's side for \d of [67] props$/.test(simPropsT.strip[0])
-      && simPropsT.head.slice(-3).join('|') === 'Levers|Sim|Take' && simPropsT.rows.length === 7 && simPropsT.rows.every(r => /^\d+(\.\d)?$/.test(r.sim) && /^simc( pos| neg)?$/.test(r.cls) && (simGap(r) > 0) === /pos/.test(r.cls) && (simGap(r) < 0) === /neg/.test(r.cls) && /the simulation's own read of the stat/.test(r.title))
+      && simPropsT.head.slice(-4).join('|') === 'Levers|Sim|Usage|Take' && simPropsT.rows.length === 7 && simPropsT.rows.every(r => /^\d+(\.\d)?$/.test(r.sim) && /^simc( pos| neg)?$/.test(r.cls) && (simGap(r) > 0) === /pos/.test(r.cls) && (simGap(r) < 0) === /neg/.test(r.cls) && /the simulation's own read of the stat/.test(r.title))
       && simMaxey && simMaxey.side === 'OVER' && simMaxey.line === 25.5 && /^2\d\.\d$/.test(simMaxey.sim) && simMaxey.cls === 'simc ' + (parseFloat(simMaxey.sim) > 25.5 ? 'pos' : 'neg'),
       'props: the simulation\'s strip shows the example game played 3,000 times with both clubs\' points and middle halves against the ratings, the total, the margin, the blowout, overtime, the pace and the 76ers\' regulars out, and the Sim column carries the sim\'s own read on every projected prop, green on the pick\'s side of the line', JSON.stringify({ strip: simPropsT.strip, head: simPropsT.head.slice(-4), rows: simPropsT.rows.map(r => r.name + ' ' + r.side + ' ' + r.line + ' sim ' + r.sim + ' ' + r.cls) }));
   chk(simPropsT.best.length >= 4 && simPropsT.best.every(b => /→n5 simline( pos| neg)?\|Sim reads \d+(\.\d)? v the \d+\.5 line, (on the (OVER|UNDER)'s side|against the (OVER|UNDER)|on the line) · (PHI|NYK) \d{2,3} \(\d+–\d+\) · blowout \d+(\.\d)?%$/.test(b))

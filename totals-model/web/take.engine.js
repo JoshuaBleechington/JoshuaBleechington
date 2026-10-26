@@ -78,6 +78,14 @@
       '<div class="n6">' + nbaSimTakeBtn(x.row, t.view, t.key, t.side) + '</div></div>';
   }
   function propTakeRes(r) { return !r.result || r.result === "graded" || r.result === "void" ? null : r.result; }
+  /* a same-game pair you take (26 Oct 2026): rebuilt from its two legs, graded as the Same-game pairs tile grades every ticket */
+  function pairTakeTally(s, t) {
+    var res = propsPairRes(t); if (!res) return;
+    if (res === "push") { s.p++; return; }
+    s.n++; if (s.says !== undefined) s.says += t.chance;
+    if (res === "win") { s.w++; s.units += propsPairUnits(t, res); } else { s.l++; s.units -= 1; }
+  }
+  function pairTakesList(dateISO) { return typeof pairTakesOn === "function" ? pairTakesOn(dateISO) : []; }
   function takeTally(s, res, price) {
     if (res === null || res === undefined || res === "invalid") return;
     if (res === "push") { s.p++; return; }
@@ -95,16 +103,17 @@
   }
   function renderTaking(dateISO) {
     var box = $("taking"); if (!box) return;
-    var bets = takesOn(dateISO), sims = simTakesOn(dateISO), ps = propsTakenOn(dateISO), n = bets.length + sims.length + ps.length;
+    var bets = takesOn(dateISO), sims = simTakesOn(dateISO), ps = propsTakenOn(dateISO), prs = pairTakesList(dateISO), n = bets.length + sims.length + ps.length + prs.length;
     $("takingHead").hidden = !n; box.hidden = !n;
     if (!n) { box.innerHTML = ""; $("takingCount").textContent = ""; return; }
     var s = { n: 0, w: 0, l: 0, p: 0, units: 0 }, h = "";
     bets.forEach(function (x) { takeTally(s, gradeMarket(x.mk, x.row.finals), x.mk.price); h += takeCard(x); });
     sims.forEach(function (x) { takeTally(s, nbaSimTakeRes(x.t, x.row), x.t.price === null || x.t.price === undefined ? -110 : x.t.price); h += simTakeCard(x); });
     ps.forEach(function (r) { takeTally(s, propTakeRes(r), r.price); h += propTakeCard(r); });
+    prs.forEach(function (t, i) { pairTakeTally(s, t); h += propsPairCard(t, i, true); });
     h += '<div class="pk taking sum"><div class="n1">TONIGHT</div><div class="n2">' + n + ' bet' + (n === 1 ? '' : 's') + ' marked</div>' +
          '<div class="n3">' + (s.n || s.p ? 'graded ' + s.w + '-' + s.l + (s.p ? '-' + s.p : '') + ' · ' + sgn(s.units, 2) + 'u at one unit each' : 'none graded yet · one unit each') + '</div>' +
-         '<div class="n4">' + bets.length + ' on the card, ' + sims.length + ' from the simulation, ' + ps.length + ' prop' + (ps.length === 1 ? '' : 's') + '</div></div>';
+         '<div class="n4">' + bets.length + ' on the card, ' + sims.length + ' from the simulation, ' + ps.length + ' prop' + (ps.length === 1 ? '' : 's') + (prs.length ? ', ' + prs.length + ' same-game pair' + (prs.length === 1 ? '' : 's') : '') + '</div></div>';
     box.innerHTML = h;
     $("takingCount").textContent = n + " marked";
   }
@@ -120,6 +129,10 @@
     });
     propsTakenOn(dateISO).forEach(function (r) {
       out.push((++k) + ". " + r.name + " " + r.side + " " + r.line + " " + (PROPS_LABEL[r.mk] || r.mk) + " " + sgn(r.price, 0) + " · " + (r.chance * 100).toFixed(1) + "% needs " + (r.need * 100).toFixed(1) + "% · " + r.game + (r.result ? " · " + r.result.toUpperCase() : ""));
+    });
+    pairTakesList(dateISO).forEach(function (t) {
+      var res = propsPairRes(t);
+      out.push((++k) + ". SAME-GAME PAIR " + t.legs.map(function (r) { return r.name + " " + r.side + " " + r.line + " " + (PROPS_LABEL[r.mk] || r.mk); }).join(" + ") + " " + sgn(t.price, 0) + " · both land " + (t.chance * 100).toFixed(1) + "% needs " + (t.need * 100).toFixed(1) + "% · " + t.game + (res ? " · " + res.toUpperCase() : ""));
     });
     return out.join("\n");
   }
@@ -148,7 +161,9 @@
       var res = propTakeRes(r); if (!r.take || !res) return;
       takeTally(pr, res, r.price); if (res !== "push") pr.says += r.chance;
     });
-    if (!bets.n && !bets.p && !sims.n && !sims.p && !pr.n && !pr.p) return "";
+    var prs = mk();
+    if (typeof pairTakesAll === "function") pairTakesAll().forEach(function (t) { pairTakeTally(prs, t); });
+    if (!bets.n && !bets.p && !sims.n && !sims.p && !pr.n && !pr.p && !prs.n && !prs.p) return "";
     var tile = function (label, s) {
       if (!s.n && !s.p) return "";
       var says = s.n ? s.says / s.n * 100 : 0, does = s.n ? s.w / s.n * 100 : 0;
@@ -156,14 +171,15 @@
              '<p class="s">' + (s.n ? 'says ' + says.toFixed(1) + '% · does ' + does.toFixed(1) + '% (±' + (100 / Math.sqrt(s.n) / 2).toFixed(1) + ') · ' + sgn(s.units, 2) + 'u' : 'pushes only') + '</p></div>';
     };
     return '<div class="subhead" data-sport="TAKEN">What you took <span class="tag">every bet marked Taking before its game, graded at the price shown when it was marked · one unit each · says is the sheet\'s chance</span></div>' +
-           '<div class="calib" data-sport="TAKEN">' + tile("Game bets taken", bets) + tile("Simulation calls taken", sims) + tile("Props taken", pr) + '</div>';
+           '<div class="calib" data-sport="TAKEN">' + tile("Game bets taken", bets) + tile("Simulation calls taken", sims) + tile("Props taken", pr) + tile("Same-game pairs taken", prs) + '</div>';
   }
   /* the buttons: caught before the card or the row underneath opens anything */
   document.addEventListener("click", function (e) {
-    var t = e.target && e.target.closest ? e.target.closest("[data-take],[data-ptake],[data-stake]") : null; if (!t) return;
+    var t = e.target && e.target.closest ? e.target.closest("[data-take],[data-ptake],[data-stake],[data-ttake]") : null; if (!t) return;
     e.stopPropagation(); e.preventDefault();
     if (t.hasAttribute("data-take")) toggleTake(t.getAttribute("data-take"));
     else if (t.hasAttribute("data-stake")) toggleSimTake(t.getAttribute("data-stake"));
+    else if (t.hasAttribute("data-ttake")) togglePairTake(t.getAttribute("data-ttake"));
     else togglePropTake(t.getAttribute("data-ptake"));
   }, true);
   /* Add puts the game on the card, and the Simulation card's greyed buttons come alive once the row exists: redraw it after the add */
@@ -171,6 +187,7 @@
   if ($("taking")) {
     $("taking").addEventListener("click", function (e) {
       var t = e.target.closest("[data-open]"); if (t) { openRow(t.dataset.open); return; }
+      var pr = e.target.closest("[data-pair]"); if (pr) { openPairDetail(pr.getAttribute("data-pair")); return; }
       var q = e.target.closest("[data-prop]"); if (q) openPropDetail(q.getAttribute("data-prop"));
     });
     $("takingText").addEventListener("click", function () { copyText(takingAsText($("boardDate").value || todayISO()), say, "the bets you are taking"); });

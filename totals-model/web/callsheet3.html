@@ -462,6 +462,10 @@
   table.props td.simc { font-family: var(--mono); white-space: nowrap; } .pk .n5.simline.pos { color: var(--go); } .pk .n5.simline.neg { color: var(--bad); }
   .pk.simg .n2 { font-family: var(--mono); } .pk.simg .n2 .dim { font-weight: 500; font-size: 13px; } .pk.simg.dim { opacity: .7; } .pk.simg .n5 b { color: var(--ink); }
   .pk.pair.agrees { border-color: var(--go); } .pk.pair.win { box-shadow: inset 4px 0 0 var(--go); } .pk.pair.loss { box-shadow: inset 4px 0 0 var(--bad); } .pdlg h3 .tag.role { background: var(--ink-2); color: var(--bg, #fff); }
+  /* the pair's own panel (26 Oct 2026): the ticket opens like a prop, each leg in a box of its own with a way to its panel */
+  .pk[data-pair] { cursor: pointer; } .pk[data-pair]:hover { border-color: var(--ink); } .pdlg h3 .amp { color: var(--muted); font-weight: 500; }
+  .pdlg .pd-leg { border: 1px solid var(--rule); border-radius: 8px; padding: 6px 12px 10px; margin: 10px 0; } .pdlg .pd-leg h4 { margin: 6px 0 2px; } .pdlg .pd-leg .pd-tiles { margin: 8px 0 6px; }
+  .pdlg .pd-leg .pd-base .pos { color: var(--go); } .pdlg .pd-leg .pd-base .neg { color: var(--bad); } .pdlg .pd-leg .row { gap: 8px; align-items: center; }
   .pdlg.phone .pdlg-box { max-width: 640px; } .pdlg.phone h3 { margin: 4px 0 10px; font: 800 20px/1.2 var(--sans); } .pdlg.phone h3 .tag { vertical-align: middle; }
   .qrbox { background: #fff; padding: 10px; border-radius: 10px; width: min(100%, 520px); margin: 0 auto 10px; } .qrbox svg { display: block; width: 100%; height: auto; }
   .pk.taking, tr.taking { box-shadow: inset 4px 0 0 var(--go); } .pk.taking.sum { border-style: dashed; } .chip.taken { background: var(--go); color: #fff; }
@@ -1147,11 +1151,11 @@
         box line, so <b>Load slate</b> on it grades these rows with the card. A prop is the slate's call as made: the
         page does not rescore it, and the record tile below is the test. Props cannot be backtested against lines (ten
         credits a market a game on the history endpoint), so the tile earns everything from day one.</p>
-      <div class="subhead" id="propsTakingHead" hidden>Taking <span class="tag" id="propsTakingCount"></span> <span class="tag">the props you marked with Take: the bets you are placing, listed here and on the day board, graded on their own line in Is it working</span> <button type="button" class="btn" id="propsTakingText" style="margin-left:8px;padding:4px 10px;font-size:11px">Copy as text</button></div>
+      <div class="subhead" id="propsTakingHead" hidden>Taking <span class="tag" id="propsTakingCount"></span> <span class="tag">the props and the same-game pairs you marked with Take: the bets you are placing, listed here and on the day board, graded on their own lines in Is it working</span> <button type="button" class="btn" id="propsTakingText" style="margin-left:8px;padding:4px 10px;font-size:11px">Copy as text</button></div>
       <div id="propsTaking" class="picks" hidden></div>
       <div class="subhead">The simulation on the games <span class="tag">each game played 10,000 times at the props run: the clubs' points with the middle half against the ratings' points a game, the total against the book's, the margin, the blowout and overtime chances, the pace and the regulars out; the sim's own read of each prop is the Sim column below and the last line of the best cards. Shown, not scored: the scored part is the matchup lever, at half weight</span></div>
       <div id="propsSim" class="picks"></div>
-      <div class="subhead">Same-game pairs <span class="tag">two props from one game at 52% or better, the likeliest four a game paired, the likeliest tickets first: the chance both land (measured: two players' props land almost independently, a man's own two markets together more often), the parlay's price from the two legs and what it needs; graded on their own line</span></div>
+      <div class="subhead">Same-game pairs <span class="tag">two props from one game at 52% or better, the likeliest four a game paired, the likeliest tickets first: the chance both land (measured: two players' props land almost independently, a man's own two markets together more often), the parlay's price from the two legs and what it needs; graded on their own line. Click a ticket for its own panel, Take to mark it as a ticket you are placing</span></div>
       <div id="propsPairs" class="picks"></div>
       <div class="subhead">Best props <span class="tag">every prop whose blended chance clears its price, best edge first — BET at 3 points of edge and 55% or better, LEAN below that; a priori bands, the record decides. Click a card for the prop's own panel</span></div>
       <div id="propsBest" class="picks"></div>
@@ -3911,6 +3915,7 @@ smStore.ready.then(function () {
   try { props = JSON.parse(smStore.getItem(PROPS_KEY) || "[]"); if (!Array.isArray(props)) props = []; } catch (e) { props = []; }
   var propsView = false;
   var propsOrder = [], propDetailId = null;   // the Every-prop table's order, and the prop the panel shows (22 Oct 2026)
+  var pairsOrder = [], propDetailKind = "prop";   // the night's tickets in order, and whether the panel shows a prop or a pair (26 Oct 2026)
   /* the table's view (22 Oct 2026, the user: "is there a way for me to rearrange the rows? all the rebound props, or
      the points for a player, by chance percentage and band"): a sort column with its direction, and filters by market,
      band, side and a name. Kept in this browser only; Reset view puts the table back to by game, then by edge */
@@ -3986,6 +3991,15 @@ smStore.ready.then(function () {
      it stood, and the record grades them the same way */
   var PROPS_PAIR_FACTOR = { same_club_overs: 0.95, cross: 1.0, same_man: 1.15, same_man_pts_tpm: 1.5 };
   var PROPS_PAIR_MIN = 0.52, PROPS_PAIR_LEGS = 4, PROPS_PAIR_MAX = 8;
+  function propsPairTicket(a, b) {
+    if (!a || !b || !propHas(a) || !propHas(b) || String(a.id) === String(b.id)) return null;
+    if (b.chance > a.chance) { var s = a; a = b; b = s; }   // the likelier leg first
+    var kind;
+    if (String(a.pid) === String(b.pid)) { if (a.mk === b.mk) return null; kind = ((a.mk === "pts" && b.mk === "tpm") || (a.mk === "tpm" && b.mk === "pts")) ? "same_man_pts_tpm" : "same_man"; }
+    else kind = (a.team === b.team && a.side === "OVER" && b.side === "OVER") ? "same_club_overs" : "cross";
+    var f = PROPS_PAIR_FACTOR[kind], chance = Math.min(a.chance, b.chance, a.chance * b.chance * f), dec = decimalOf(a.price) * decimalOf(b.price);
+    return { id: a.id + "|" + b.id, game: a.game, legs: [a, b], kind: kind, f: f, chance: chance, dec: dec, price: americanOf(dec), need: 1 / dec };
+  }
   function propsPairs(dateISO, rowsIn) {
     var rows = (rowsIn || propsSource()).filter(function (r) { return (r.gdate || "") === dateISO && propHas(r) && r.chance >= PROPS_PAIR_MIN && r.result !== "void"; });
     var byGame = {};
@@ -3994,17 +4008,46 @@ smStore.ready.then(function () {
     Object.keys(byGame).forEach(function (game) {
       var legs = byGame[game].slice().sort(function (a, b) { return b.chance - a.chance; }).slice(0, PROPS_PAIR_LEGS);
       for (var i = 0; i < legs.length; i++) for (var j = i + 1; j < legs.length; j++) {
-        var a = legs[i], b = legs[j], kind, f;
-        if (String(a.pid) === String(b.pid)) { if (a.mk === b.mk) continue; kind = ((a.mk === "pts" && b.mk === "tpm") || (a.mk === "tpm" && b.mk === "pts")) ? "same_man_pts_tpm" : "same_man"; }
-        else kind = (a.team === b.team && a.side === "OVER" && b.side === "OVER") ? "same_club_overs" : "cross";
-        f = PROPS_PAIR_FACTOR[kind];
-        var chance = Math.min(a.chance, b.chance, a.chance * b.chance * f), dec = decimalOf(a.price) * decimalOf(b.price);
-        out.push({ game: game, legs: [a, b], kind: kind, f: f, chance: chance, dec: dec, price: americanOf(dec), need: 1 / dec });
+        var t = propsPairTicket(legs[i], legs[j]); if (t) out.push(t);
       }
     });
     out.sort(function (x, y) { return (y.chance - x.chance) || (x.need - y.need); });
     return out.slice(0, PROPS_PAIR_MAX);
   }
+  /* a pair you take (26 Oct 2026, the user: "when I click on the same-game pairs they don't open to show any details; I'd like
+     something similar to how the props are for the singles"): the mark lives on both legs as the other leg's key (`pairs`),
+     so it rides through a reload like a prop's own mark, and the ticket is rebuilt from the two rows as the night stood */
+  function propsPairTaken(t) { return ((t.legs[0].pairs || []).indexOf(propKey(t.legs[1])) >= 0); }
+  function propsPairTakeBtn(t, big) {
+    var a = t.legs[0], b = t.legs[1], on = propsPairTaken(t);
+    if (a.result || b.result) return on ? ' <span class="chip taken">TAKEN</span>' : "";
+    return '<button type="button" class="takebtn' + (on ? ' on' : '') + (big ? ' big' : '') + '" data-ttake="' + a.id + '|' + b.id + '" title="' +
+           (on ? 'Marked as a ticket you are placing: click to unmark it' : 'Mark this pair as a ticket you are placing') + '">' + (on ? '&#10003; Taking' : (big ? 'Take this pair' : 'Take')) + '</button>';
+  }
+  function togglePairTake(spec) {
+    var p = String(spec).split("|"), a = propById(p[0]), b = propById(p[1]); if (!a || !b || !propHas(a) || !propHas(b)) return;
+    if (a.result || b.result) { propsSay("<b>" + esc(a.name) + " + " + esc(b.name) + "</b> is graded: a ticket is marked before the game, not after."); return; }
+    var ka = propKey(a), kb = propKey(b), on = (a.pairs || []).indexOf(kb) >= 0;
+    var drop = function (r, k) { r.pairs = (r.pairs || []).filter(function (x) { return x !== k; }); if (!r.pairs.length) delete r.pairs; };
+    var add = function (r, k) { if ((r.pairs || []).indexOf(k) < 0) r.pairs = (r.pairs || []).concat([k]); };
+    if (on) { drop(a, kb); drop(b, ka); } else { add(a, kb); add(b, ka); }
+    if (!propsPreview) saveProps();
+    renderProps(); renderCalib(); if (typeof renderBoard === "function") renderBoard();
+    refreshPropDetail();
+  }
+  function pairTakesOn(dateISO) {
+    var rows = propsSource().filter(function (r) { return (r.gdate || "") === dateISO; }), byKey = {}, seen = {}, out = [];
+    rows.forEach(function (r) { byKey[propKey(r)] = r; });
+    rows.forEach(function (a) {
+      (a.pairs || []).forEach(function (k) {
+        var b = byKey[k], t = b ? propsPairTicket(a, b) : null; if (!t || seen[t.id]) return;
+        seen[t.id] = true; out.push(t);
+      });
+    });
+    out.sort(function (x, y) { return (y.chance - x.chance) || (x.need - y.need); });
+    return out;
+  }
+  function pairTakesAll() { var out = []; propsDates().forEach(function (d) { out = out.concat(pairTakesOn(d)); }); return out; }
   function propsPairRes(t) {
     var rs = t.legs.map(function (r) { return r.result; });
     if (rs.some(function (r) { return !r || r === "graded"; })) return null;
@@ -4020,14 +4063,82 @@ smStore.ready.then(function () {
     t.legs.forEach(function (r) { if (r.result === "win") dec *= decimalOf(r.price); });   // a pushed leg drops out of the ticket
     return dec - 1;
   }
-  function propsPairCard(t, i) {
-    var res = propsPairRes(t), ok = t.chance >= t.need, a = t.legs[0], b = t.legs[1];
-    var leg = function (r) { return esc(r.name) + ' ' + esc(r.side) + ' ' + r.line + ' ' + esc(PROPS_LABEL[r.mk] || r.mk); };
-    var kind = t.kind === "same_club_overs" ? "two overs on one club" : t.kind === "cross" ? "two players" : t.kind === "same_man_pts_tpm" ? "one man, his points with his threes" : "one man, two markets";
-    return '<div class="pk pair' + (ok ? ' agrees' : '') + (res ? ' ' + res : '') + '"><div class="n1">PAIR #' + (i + 1) + ' · ' + esc(t.game) + ' · ' + (ok ? 'the price agrees' : 'the price asks more') + '</div>' +
+  function propsPairKindWords(kind) { return kind === "same_club_overs" ? "two overs on one club" : kind === "cross" ? "two players" : kind === "same_man_pts_tpm" ? "one man, his points with his threes" : "one man, two markets"; }
+  function propsPairLeg(r) { return esc(r.name) + ' ' + esc(r.side) + ' ' + r.line + ' ' + esc(PROPS_LABEL[r.mk] || r.mk); }
+  function propsPairCard(t, i, asTaking) {
+    var res = propsPairRes(t), ok = t.chance >= t.need, a = t.legs[0], b = t.legs[1], on = propsPairTaken(t), leg = propsPairLeg;
+    return '<div class="pk pair' + (ok ? ' agrees' : '') + (res ? ' ' + res : '') + (on ? ' taking' : '') + '" data-pair="' + esc(t.id) + '"><div class="n1">' + (asTaking ? 'TAKING · SAME-GAME PAIR' : 'PAIR #' + (i + 1)) + ' · ' + esc(t.game) + ' · ' + (ok ? 'the price agrees' : 'the price asks more') + '</div>' +
       '<div class="n2">' + leg(a) + ' <span class="amp">+</span> ' + leg(b) + (res ? ' <span class="chip ' + res + '">' + esc(res.toUpperCase()) + '</span>' : '') + '</div>' +
       '<div class="n3">both land ' + (t.chance * 100).toFixed(1) + '% · pays ' + sgn(t.price, 0) + ' (' + t.dec.toFixed(2) + '×) needs ' + (t.need * 100).toFixed(1) + '%</div>' +
-      '<div class="n4">' + esc(a.name) + ' ' + (a.chance * 100).toFixed(1) + '% at ' + sgn(a.price, 0) + ' · ' + esc(b.name) + ' ' + (b.chance * 100).toFixed(1) + '% at ' + sgn(b.price, 0) + ' · ' + esc(kind) + ', measured ×' + t.f.toFixed(2) + '</div></div>';
+      '<div class="n4">' + esc(a.name) + ' ' + (a.chance * 100).toFixed(1) + '% at ' + sgn(a.price, 0) + ' · ' + esc(b.name) + ' ' + (b.chance * 100).toFixed(1) + '% at ' + sgn(b.price, 0) + ' · ' + esc(propsPairKindWords(t.kind)) + ', measured ×' + t.f.toFixed(2) + '</div>' +
+      '<div class="n6">' + propsPairTakeBtn(t) + '</div></div>';
+  }
+  /* the pair's own panel (26 Oct 2026): the ticket's numbers as tiles, how the chance is made from the two legs and the
+     measured factor, then each leg's numbers with a button to its own panel. Previous / Next walk the night's tickets */
+  function propsPairMeasured(kind) {
+    return kind === "cross" ? "Two players' props in one game landed almost as independence says on 2025-26 (both over the median 25.2% of pairs on opposite clubs and 23.7% on one club, against 25.0%), so the product carries ×1.00"
+         : kind === "same_club_overs" ? "Two overs on one club landed together a shade less often than independence says on 2025-26 (23.7% of pairs against 25.0%), so the product carries ×0.95"
+         : kind === "same_man_pts_tpm" ? "One man's points and threes land together far more often than independence says on 2025-26 (38.2% of pairs against 25%): the threes are points, so the product carries ×1.5"
+         : "One man's two markets land together more often than independence says on 2025-26 (28 to 29% of pairs against 25%), his minutes carrying both, so the product carries ×1.15";
+  }
+  function propsPairDetailHtml(t) {
+    var a = t.legs[0], b = t.legs[1], res = propsPairRes(t), ok = t.chance >= t.need, leg = propsPairLeg, pc = function (v) { return (v * 100).toFixed(1) + "%"; };
+    var tile = function (k, v, s, cls) { return '<div class="pd-tile' + (cls ? ' ' + cls : '') + '"><div class="k">' + esc(k) + '</div><div class="v">' + v + '</div>' + (s ? '<div class="s">' + s + '</div>' : '') + '</div>'; };
+    var h = '<div class="pd-band">Same-game pair · ' + (ok ? 'the price agrees' : 'the price asks more') + '</div>';
+    h += '<h3>' + leg(a) + ' <span class="amp">+</span> ' + leg(b) + '</h3>';
+    h += '<div class="pd-pick">both land ' + pc(t.chance) + ' · pays ' + sgn(t.price, 0) + ' (' + t.dec.toFixed(2) + '×) needs ' + pc(t.need) + (res ? ' <span class="chip ' + res + '">' + esc(res.toUpperCase()) + '</span>' : '') + '</div>';
+    h += '<div class="pd-sub">' + esc(t.game) + ' · ' + esc(gameDate(a.gdate)) + ' · ' + esc(propsPairKindWords(t.kind)) + ', measured ×' + t.f.toFixed(2) + ' · ' + esc(a.book || "the book") + (b.book && b.book !== a.book ? ' and ' + esc(b.book) : '') + '</div>';
+    if ((propsPairTakeBtn(t, true) || "").length) h += '<div class="pd-take">' + propsPairTakeBtn(t, true) + '</div>';
+    h += '<div class="pd-tiles">' +
+      tile("Both land", pc(t.chance), "the two chances multiplied, × " + t.f.toFixed(2) + " measured, capped at the lesser leg") +
+      tile("Parlay price", sgn(t.price, 0), t.dec.toFixed(2) + "× the stake · needs " + pc(t.need)) +
+      tile("Edge", sgn((t.chance - t.need) * 100, 1), "points of chance over the parlay price", ok ? "good" : "bad") +
+      tile("Leg 1", pc(a.chance), leg(a) + " at " + sgn(a.price, 0) + " · " + esc(a.band)) +
+      tile("Leg 2", pc(b.chance), leg(b) + " at " + sgn(b.price, 0) + " · " + esc(b.band)) +
+      '</div>';
+    var raw = a.chance * b.chance * t.f, capped = t.chance < raw - 1e-9;
+    h += '<h4>How the chance is made</h4><p class="pd-base">' + leg(a) + ' lands <b>' + pc(a.chance) + '</b> by the sheet and ' + leg(b) + ' <b>' + pc(b.chance) + '</b>, each the blended chance on its own panel. ' +
+         propsPairMeasured(t.kind) + ': ' + pc(a.chance) + ' × ' + pc(b.chance) + ' × ' + t.f.toFixed(2) + ' = <b>' + pc(raw) + '</b>' + (capped ? ', capped at the lesser leg\'s ' + pc(t.chance) : '') +
+         '. The ticket pays the two prices multiplied, ' + decimalOf(a.price).toFixed(2) + ' × ' + decimalOf(b.price).toFixed(2) + ' = ' + t.dec.toFixed(2) + '×, ' + sgn(t.price, 0) + ', which needs ' + pc(t.need) + ': ' +
+         (ok ? 'the price agrees by ' + ((t.chance - t.need) * 100).toFixed(1) + ' points' : 'the price asks ' + ((t.need - t.chance) * 100).toFixed(1) + ' points more than the sheet gives') +
+         '. A pushed leg drops out of the ticket as the books do it; a lost leg loses it.</p>';
+    [a, b].forEach(function (r, i) {
+      var lv = propsLeversLine(r), sl = propSimLine(r), tally = propsLeverTally(r), tl = propsLogTally(r), ag = propSimAgrees(r);
+      h += '<div class="pd-leg"><h4>Leg ' + (i + 1) + ' <span class="dim">· ' + leg(r) + (r.pos ? ' · ' + esc(r.pos) : '') + (r.team ? ' ' + esc(r.team) : '') + (r.starter === true ? ' · starter' : r.starter === false ? ' · bench' : '') + '</span></h4>';
+      h += '<div class="pd-tiles">' +
+        tile("Chance", pc(r.chance), "the over " + pc(r.pm) + " by the model, " + pc(r.pb) + " by the book") +
+        tile("Price", sgn(r.price, 0), "needs " + pc(r.need)) +
+        tile("Edge", sgn(r.edge * 100, 1), esc(r.band), r.edge > 0 ? "good" : "bad") +
+        tile("Projection", esc(String(r.proj)), "± " + esc(String(r.sd)) + " one sigma · line " + esc(String(r.line))) +
+        tile("Minutes", esc(String(r.mins)), esc(String(r.rate36)) + " per 36") +
+        (r.usg !== null && r.usg !== undefined ? tile("Usage", esc(String(r.usg)) + "%", "of his club's possessions") : "") +
+        '</div>';
+      h += '<p class="pd-base">' + (lv ? 'Moves it: ' + lv + (tally.n ? ' (' + esc(tally.words) + ')' : '') + '. ' : '') + (sl ? '<span class="' + (ag === true ? 'pos' : ag === false ? 'neg' : '') + '">' + sl + '</span>. ' : '') + (tl ? 'Last games' + tl + '.' : '') + '</p>';
+      h += '<div class="row"><button type="button" class="btn" data-prop="' + r.id + '">Open this prop</button> ' + propTakeBtn(r) + '</div></div>';
+    });
+    h += '<p class="note">Two of the slate\'s calls as made, priced as one ticket at the two legs\' prices multiplied; the Same-game pairs tile in Is it working is the test, and a pair you mark grades under What you took.</p>';
+    return h;
+  }
+  function openPairDetail(spec) {
+    var p = String(spec).split("|"), a = propById(p[0]), b = propById(p[1]), dlg = $("propDetail"); if (!a || !b || !dlg) return;
+    var t = propsPairTicket(a, b); if (!t) return;
+    propDetailId = String(t.id); propDetailKind = "pair";
+    $("propDetailBody").innerHTML = propsPairDetailHtml(t);
+    var i = pairsOrder.indexOf(propDetailId), nav = $("propDetailNav");
+    if (nav) {
+      nav.hidden = i < 0 || pairsOrder.length < 2;
+      $("propDetailPos").textContent = i >= 0 ? (i + 1) + " of " + pairsOrder.length + " pairs" : "";
+      $("propDetailPrev").disabled = i <= 0;
+      $("propDetailNext").disabled = i < 0 || i >= pairsOrder.length - 1;
+    }
+    dlg.hidden = false; dlg.scrollTop = 0;
+    document.body.classList.add("noscroll");
+    if ($("propDetailClose")) $("propDetailClose").focus();
+  }
+  function refreshPropDetail() {
+    var dlg = $("propDetail"); if (!dlg || dlg.hidden || !propDetailId) return;
+    if (propDetailKind === "pair") { var p = propDetailId.split("|"), a = propById(p[0]), b = propById(p[1]), t = a && b ? propsPairTicket(a, b) : null; if (t) $("propDetailBody").innerHTML = propsPairDetailHtml(t); }
+    else { var r = propById(propDetailId); if (r) $("propDetailBody").innerHTML = propsDetailHtml(r); }
   }
   var propsTableView = Object.assign({}, PROPS_VIEW_DEFAULT);
   try { var pv0 = JSON.parse(smStore.getItem(PROPS_VIEW_KEY) || "null"); if (pv0 && typeof pv0 === "object") propsTableView = Object.assign({}, PROPS_VIEW_DEFAULT, pv0); } catch (e) {}
@@ -4148,7 +4259,7 @@ smStore.ready.then(function () {
     propsRowsFrom(d).forEach(function (row) {
       if (startedGames[row.game]) { inPlay++; return; }
       var k = propKey(row), i = have[k];
-      if (i !== undefined) { if (props[i].result) { kept++; return; } row.id = props[i].id; if (props[i].take) row.take = true; props[i] = row; replaced++; }   // the take mark rides through a reload (26 Oct 2026)
+      if (i !== undefined) { if (props[i].result) { kept++; return; } row.id = props[i].id; if (props[i].take) row.take = true; if (props[i].pairs) row.pairs = props[i].pairs; props[i] = row; replaced++; }   // the take and pair marks ride through a reload (26 Oct 2026)
       else { row.id = nextP++; have[k] = props.length; props.push(row); added++; }
     });
     saveProps();
@@ -4237,16 +4348,15 @@ smStore.ready.then(function () {
     var mk = function () { return { n: 0, w: 0, l: 0, p: 0, v: 0, says: 0, units: 0 }; };
     var all = mk(), byMk = {}, byBand = {}, bySide = {}, byEdge = {}, byChance = {}, byDate = {}, byDateBet = {}, byCentre = {}, byTake = mk();
     /* the same-game pairs' record (26 Oct 2026): each graded date's tickets as the night built them, a ticket won when both legs did */
-    var byPair = mk(), pairDates = {};
+    var byPair = mk(), byPairTake = mk(), pairDates = {};
     graded.forEach(function (r) { if (r.gdate) pairDates[r.gdate] = true; });
-    Object.keys(pairDates).forEach(function (d) {
-      propsPairs(d, props).forEach(function (t) {
-        var res = propsPairRes(t); if (!res) return;
-        if (res === "push") { byPair.p++; return; }
-        byPair.n++; byPair.says += t.chance;
-        if (res === "win") { byPair.w++; byPair.units += propsPairUnits(t, res); } else { byPair.l++; byPair.units -= 1; }
-      });
-    });
+    var pairSink = function (s) { return function (t) {
+      var res = propsPairRes(t); if (!res) return;
+      if (res === "push") { s.p++; return; }
+      s.n++; s.says += t.chance;
+      if (res === "win") { s.w++; s.units += propsPairUnits(t, res); } else { s.l++; s.units -= 1; }
+    }; };
+    Object.keys(pairDates).forEach(function (d) { propsPairs(d, props).forEach(pairSink(byPair)); pairTakesOn(d).forEach(pairSink(byPairTake)); });
     var dec = function (price) { return price > 0 ? 1 + price / 100 : 1 + 100 / (-price); };
     graded.forEach(function (r) {
       var d = r.gdate || "?";
@@ -4283,6 +4393,7 @@ smStore.ready.then(function () {
     ["BET", "LEAN", "no edge"].forEach(function (b) { if (byBand[b]) parts.push(b + " " + rec(byBand[b]) + (byBand[b].n ? " " + sgn(byBand[b].units, 1) + "u" : "")); });
     if (byTake.n || byTake.p) parts.push("taken " + rec(byTake) + (byTake.n ? " " + sgn(byTake.units, 1) + "u" : ""));
     if (byPair.n || byPair.p) parts.push("same-game pairs " + rec(byPair) + (byPair.n ? " " + sgn(byPair.units, 1) + "u" : ""));
+    if (byPairTake.n || byPairTake.p) parts.push("pairs taken " + rec(byPairTake) + (byPairTake.n ? " " + sgn(byPairTake.units, 1) + "u" : ""));
     var markets = ["pts", "reb", "ast", "tpm", "pra"].map(function (k) { return byMk[k] ? tile(PROPS_LABEL[k], byMk[k], []) : ""; }).join("");
     var verdict = 'The props are a priori: the pooled rules behind them were measured on last season\'s box scores, the blend\'s weights were not. Read the BET band against the rest and <i>does</i> against <i>says</i>; under 100 graded props nothing here is a reading.';
     if (!full) {
@@ -4349,7 +4460,7 @@ smStore.ready.then(function () {
     r.take = !r.take;
     if (!propsPreview) saveProps();
     renderProps(); renderCalib(); if (typeof renderBoard === "function") renderBoard();
-    if ($("propDetail") && !$("propDetail").hidden && propDetailId === String(id)) $("propDetailBody").innerHTML = propsDetailHtml(r);
+    refreshPropDetail();
   }
   /* the last games (20 Oct 2026, the user: "highlight their scored numbers so it's easy to see"):
      the stat of each game in its own mark, green over the prop's line, red under it, grey on it,
@@ -4514,7 +4625,7 @@ smStore.ready.then(function () {
      arrow keys walk the table's order from there */
   function openPropDetail(id) {
     var r = propById(id), dlg = $("propDetail"); if (!r || !dlg) return;
-    propDetailId = String(id);
+    propDetailId = String(id); propDetailKind = "prop";
     $("propDetailBody").innerHTML = propsDetailHtml(r);
     var i = propsOrder.indexOf(propDetailId), nav = $("propDetailNav");
     if (nav) {
@@ -4528,13 +4639,13 @@ smStore.ready.then(function () {
     if ($("propDetailClose")) $("propDetailClose").focus();
   }
   function stepPropDetail(d) {
-    var i = propsOrder.indexOf(propDetailId); if (i < 0) return;
-    var j = i + d; if (j < 0 || j >= propsOrder.length) return;
-    openPropDetail(propsOrder[j]);
+    var order = propDetailKind === "pair" ? pairsOrder : propsOrder, i = order.indexOf(propDetailId); if (i < 0) return;
+    var j = i + d; if (j < 0 || j >= order.length) return;
+    if (propDetailKind === "pair") openPairDetail(order[j]); else openPropDetail(order[j]);
   }
   function closePropDetail() {
     var dlg = $("propDetail"); if (!dlg) return;
-    dlg.hidden = true; propDetailId = null;
+    dlg.hidden = true; propDetailId = null; propDetailKind = "prop";
     document.body.classList.remove("noscroll");
   }
   function renderProps() {
@@ -4560,18 +4671,19 @@ smStore.ready.then(function () {
     /* the simulation's strip (26 Oct 2026): one card a game */
     if ($("propsSim")) $("propsSim").innerHTML = rows.length ? propsSimStripHtml(rows) : '<div class="empty">Load a props file and each game\'s simulation lands here.</div>';
     /* the props marked as taken on the date (26 Oct 2026), above the best list */
-    var taken = rows.filter(function (r) { return r.take && propHas(r); });
+    var taken = rows.filter(function (r) { return r.take && propHas(r); }), takenPairs = pairTakesOn(date), nTaken = taken.length + takenPairs.length;
     if ($("propsTaking")) {
-      $("propsTakingHead").hidden = !taken.length; $("propsTaking").hidden = !taken.length;
-      $("propsTaking").innerHTML = taken.map(propTakeCard).join("");
-      $("propsTakingCount").textContent = taken.length ? taken.length + " marked" : "";
+      $("propsTakingHead").hidden = !nTaken; $("propsTaking").hidden = !nTaken;
+      $("propsTaking").innerHTML = takenPairs.map(function (t, i) { return propsPairCard(t, i, true); }).join("") + taken.map(propTakeCard).join("");
+      $("propsTakingCount").textContent = nTaken ? nTaken + " marked" : "";
     }
     var pool = ($("propsAll").checked ? rows : rows.filter(propHas)).slice(), list = propsTableRows(pool);
     ["propsMk", "propsBand", "propsSide", "propsQ", "propsAgree", "propsUsage", "propsRole", "propsSimSel"].forEach(function (id) { var el = $(id); if (el) { var k = { propsMk: "mk", propsBand: "band", propsSide: "side", propsQ: "q", propsAgree: "agree", propsUsage: "usage", propsRole: "role", propsSimSel: "sim" }[id]; if (el.value !== propsTableView[k]) el.value = propsTableView[k]; } });
     /* the same-game pairs (26 Oct 2026), the likeliest tickets first */
     if ($("propsPairs")) {
       var pairs = propsPairs(date, rows);
-      $("propsPairs").innerHTML = pairs.length ? pairs.map(propsPairCard).join("") : '<div class="empty">' + (rows.length ? 'No game on this date has two props at 52% or better.' : 'Load a props file and the pairs land here.') + '</div>';
+      pairsOrder = pairs.map(function (t) { return String(t.id); });   // the panel's Previous / Next walk the night's tickets
+      $("propsPairs").innerHTML = pairs.length ? pairs.map(function (t, i) { return propsPairCard(t, i); }).join("") : '<div class="empty">' + (rows.length ? 'No game on this date has two props at 52% or better.' : 'Load a props file and the pairs land here.') + '</div>';
     }
     if ($("propsShown")) $("propsShown").textContent = rows.length ? (list.length === pool.length ? pool.length + " shown" : list.length + " of " + pool.length + " shown") + (propsTableView.sort !== "default" ? " · sorted by " + (PROPS_SORT_COLS.filter(function (c) { return c[0] === propsTableView.sort; })[0] || ["", propsTableView.sort])[1].toLowerCase() + (propsTableView.dir < 0 ? " ▾" : " ▴") : "") : "";
     var h = '<table class="form props"><thead><tr>' + PROPS_SORT_COLS.map(function (c) {
@@ -4638,8 +4750,10 @@ smStore.ready.then(function () {
     });
     if ($("propsReset")) $("propsReset").addEventListener("click", function () { propsTableView = Object.assign({}, PROPS_VIEW_DEFAULT); try { smStore.removeItem(PROPS_VIEW_KEY); } catch (e) {} renderProps(); });
     $("propsBest").addEventListener("click", openFrom);
+    var openPairFrom = function (e) { var t = e.target.closest("[data-pair]"); if (t) { openPairDetail(t.getAttribute("data-pair")); return true; } return false; };
+    if ($("propsPairs")) $("propsPairs").addEventListener("click", openPairFrom);
     if ($("propsTaking")) {
-      $("propsTaking").addEventListener("click", openFrom);
+      $("propsTaking").addEventListener("click", function (e) { if (!openPairFrom(e)) openFrom(e); });
       $("propsTakingText").addEventListener("click", function () { copyText(takingAsText($("propsDate").value), propsSay, "the props you are taking"); });
     }
     if ($("propDetail")) {
@@ -4647,6 +4761,7 @@ smStore.ready.then(function () {
       $("propDetailPrev").addEventListener("click", function () { stepPropDetail(-1); });
       $("propDetailNext").addEventListener("click", function () { stepPropDetail(1); });
       $("propDetail").addEventListener("click", function (e) { if (e.target === $("propDetail")) closePropDetail(); });
+      $("propDetailBody").addEventListener("click", function (e) { if (propDetailKind !== "pair") return; var t = e.target.closest("[data-prop]"); if (t) openPropDetail(t.getAttribute("data-prop")); });   // a leg's own panel from the pair's
       document.addEventListener("keydown", function (e) {
         if ($("propDetail").hidden) return;
         var tag = e.target && e.target.tagName ? e.target.tagName.toLowerCase() : "";
@@ -4737,6 +4852,14 @@ smStore.ready.then(function () {
       '<div class="n6">' + nbaSimTakeBtn(x.row, t.view, t.key, t.side) + '</div></div>';
   }
   function propTakeRes(r) { return !r.result || r.result === "graded" || r.result === "void" ? null : r.result; }
+  /* a same-game pair you take (26 Oct 2026): rebuilt from its two legs, graded as the Same-game pairs tile grades every ticket */
+  function pairTakeTally(s, t) {
+    var res = propsPairRes(t); if (!res) return;
+    if (res === "push") { s.p++; return; }
+    s.n++; if (s.says !== undefined) s.says += t.chance;
+    if (res === "win") { s.w++; s.units += propsPairUnits(t, res); } else { s.l++; s.units -= 1; }
+  }
+  function pairTakesList(dateISO) { return typeof pairTakesOn === "function" ? pairTakesOn(dateISO) : []; }
   function takeTally(s, res, price) {
     if (res === null || res === undefined || res === "invalid") return;
     if (res === "push") { s.p++; return; }
@@ -4754,16 +4877,17 @@ smStore.ready.then(function () {
   }
   function renderTaking(dateISO) {
     var box = $("taking"); if (!box) return;
-    var bets = takesOn(dateISO), sims = simTakesOn(dateISO), ps = propsTakenOn(dateISO), n = bets.length + sims.length + ps.length;
+    var bets = takesOn(dateISO), sims = simTakesOn(dateISO), ps = propsTakenOn(dateISO), prs = pairTakesList(dateISO), n = bets.length + sims.length + ps.length + prs.length;
     $("takingHead").hidden = !n; box.hidden = !n;
     if (!n) { box.innerHTML = ""; $("takingCount").textContent = ""; return; }
     var s = { n: 0, w: 0, l: 0, p: 0, units: 0 }, h = "";
     bets.forEach(function (x) { takeTally(s, gradeMarket(x.mk, x.row.finals), x.mk.price); h += takeCard(x); });
     sims.forEach(function (x) { takeTally(s, nbaSimTakeRes(x.t, x.row), x.t.price === null || x.t.price === undefined ? -110 : x.t.price); h += simTakeCard(x); });
     ps.forEach(function (r) { takeTally(s, propTakeRes(r), r.price); h += propTakeCard(r); });
+    prs.forEach(function (t, i) { pairTakeTally(s, t); h += propsPairCard(t, i, true); });
     h += '<div class="pk taking sum"><div class="n1">TONIGHT</div><div class="n2">' + n + ' bet' + (n === 1 ? '' : 's') + ' marked</div>' +
          '<div class="n3">' + (s.n || s.p ? 'graded ' + s.w + '-' + s.l + (s.p ? '-' + s.p : '') + ' · ' + sgn(s.units, 2) + 'u at one unit each' : 'none graded yet · one unit each') + '</div>' +
-         '<div class="n4">' + bets.length + ' on the card, ' + sims.length + ' from the simulation, ' + ps.length + ' prop' + (ps.length === 1 ? '' : 's') + '</div></div>';
+         '<div class="n4">' + bets.length + ' on the card, ' + sims.length + ' from the simulation, ' + ps.length + ' prop' + (ps.length === 1 ? '' : 's') + (prs.length ? ', ' + prs.length + ' same-game pair' + (prs.length === 1 ? '' : 's') : '') + '</div></div>';
     box.innerHTML = h;
     $("takingCount").textContent = n + " marked";
   }
@@ -4779,6 +4903,10 @@ smStore.ready.then(function () {
     });
     propsTakenOn(dateISO).forEach(function (r) {
       out.push((++k) + ". " + r.name + " " + r.side + " " + r.line + " " + (PROPS_LABEL[r.mk] || r.mk) + " " + sgn(r.price, 0) + " · " + (r.chance * 100).toFixed(1) + "% needs " + (r.need * 100).toFixed(1) + "% · " + r.game + (r.result ? " · " + r.result.toUpperCase() : ""));
+    });
+    pairTakesList(dateISO).forEach(function (t) {
+      var res = propsPairRes(t);
+      out.push((++k) + ". SAME-GAME PAIR " + t.legs.map(function (r) { return r.name + " " + r.side + " " + r.line + " " + (PROPS_LABEL[r.mk] || r.mk); }).join(" + ") + " " + sgn(t.price, 0) + " · both land " + (t.chance * 100).toFixed(1) + "% needs " + (t.need * 100).toFixed(1) + "% · " + t.game + (res ? " · " + res.toUpperCase() : ""));
     });
     return out.join("\n");
   }
@@ -4807,7 +4935,9 @@ smStore.ready.then(function () {
       var res = propTakeRes(r); if (!r.take || !res) return;
       takeTally(pr, res, r.price); if (res !== "push") pr.says += r.chance;
     });
-    if (!bets.n && !bets.p && !sims.n && !sims.p && !pr.n && !pr.p) return "";
+    var prs = mk();
+    if (typeof pairTakesAll === "function") pairTakesAll().forEach(function (t) { pairTakeTally(prs, t); });
+    if (!bets.n && !bets.p && !sims.n && !sims.p && !pr.n && !pr.p && !prs.n && !prs.p) return "";
     var tile = function (label, s) {
       if (!s.n && !s.p) return "";
       var says = s.n ? s.says / s.n * 100 : 0, does = s.n ? s.w / s.n * 100 : 0;
@@ -4815,14 +4945,15 @@ smStore.ready.then(function () {
              '<p class="s">' + (s.n ? 'says ' + says.toFixed(1) + '% · does ' + does.toFixed(1) + '% (±' + (100 / Math.sqrt(s.n) / 2).toFixed(1) + ') · ' + sgn(s.units, 2) + 'u' : 'pushes only') + '</p></div>';
     };
     return '<div class="subhead" data-sport="TAKEN">What you took <span class="tag">every bet marked Taking before its game, graded at the price shown when it was marked · one unit each · says is the sheet\'s chance</span></div>' +
-           '<div class="calib" data-sport="TAKEN">' + tile("Game bets taken", bets) + tile("Simulation calls taken", sims) + tile("Props taken", pr) + '</div>';
+           '<div class="calib" data-sport="TAKEN">' + tile("Game bets taken", bets) + tile("Simulation calls taken", sims) + tile("Props taken", pr) + tile("Same-game pairs taken", prs) + '</div>';
   }
   /* the buttons: caught before the card or the row underneath opens anything */
   document.addEventListener("click", function (e) {
-    var t = e.target && e.target.closest ? e.target.closest("[data-take],[data-ptake],[data-stake]") : null; if (!t) return;
+    var t = e.target && e.target.closest ? e.target.closest("[data-take],[data-ptake],[data-stake],[data-ttake]") : null; if (!t) return;
     e.stopPropagation(); e.preventDefault();
     if (t.hasAttribute("data-take")) toggleTake(t.getAttribute("data-take"));
     else if (t.hasAttribute("data-stake")) toggleSimTake(t.getAttribute("data-stake"));
+    else if (t.hasAttribute("data-ttake")) togglePairTake(t.getAttribute("data-ttake"));
     else togglePropTake(t.getAttribute("data-ptake"));
   }, true);
   /* Add puts the game on the card, and the Simulation card's greyed buttons come alive once the row exists: redraw it after the add */
@@ -4830,6 +4961,7 @@ smStore.ready.then(function () {
   if ($("taking")) {
     $("taking").addEventListener("click", function (e) {
       var t = e.target.closest("[data-open]"); if (t) { openRow(t.dataset.open); return; }
+      var pr = e.target.closest("[data-pair]"); if (pr) { openPairDetail(pr.getAttribute("data-pair")); return; }
       var q = e.target.closest("[data-prop]"); if (q) openPropDetail(q.getAttribute("data-prop"));
     });
     $("takingText").addEventListener("click", function () { copyText(takingAsText($("boardDate").value || todayISO()), say, "the bets you are taking"); });
@@ -7151,6 +7283,7 @@ var qrcode = function() {
     takesOn(dateISO).forEach(function (x) { P.take.push({ k: "card", s: x.row.sport, g: x.row.matchup, p: x.mk.pick, m: x.mk.label || x.mk.key, c: phoneChance(x.mk.p), pr: x.mk.price, r: res(x.mk, x.row) }); });
     simTakesOn(dateISO).forEach(function (x) { P.take.push({ k: "sim", s: "NBA", g: x.row.matchup, p: x.t.pick, m: "the simulation, " + nbaSimTakeViewLabel(x.t.view), c: phoneChance(x.t.p), w: phoneChance(x.t.worth), b: x.t.band === "no call" ? undefined : x.t.band, pr: x.t.price === null ? undefined : x.t.price, r: nbaSimTakeRes(x.t, x.row) || undefined }); });
     propsTakenOn(dateISO).forEach(function (r) { P.take.push({ k: "prop", s: "NBA", g: r.game, p: r.name + " " + r.side + " " + r.line + " " + (PROPS_LABEL[r.mk] || r.mk), m: "prop", c: phoneChance(r.chance), pr: r.price, b: r.band, r: propTakeRes(r) || undefined }); });
+    if (typeof pairTakesOn === "function") pairTakesOn(dateISO).forEach(function (t) { P.take.push({ k: "pair", s: "NBA", g: t.game, p: t.legs.map(function (r) { return r.name + " " + r.side + " " + r.line + " " + (PROPS_LABEL[r.mk] || r.mk); }).join(" + "), m: "same-game pair at the parlay price", c: phoneChance(t.chance), pr: t.price, r: propsPairRes(t) || undefined }); });
     parlayFour(dateISO).forEach(function (x) { P.four.push({ g: x.row.matchup, s: x.row.sport, p: x.mk.pick, m: x.mk.label, c: phoneChance(x.mk.p), pr: x.mk.price === null ? undefined : x.mk.price, b: bandOf(x.mk) || undefined, r: res(x.mk, x.row) }); });
     bestBets(dateISO).forEach(function (x) { P.bets.push({ g: x.row.matchup, s: x.row.sport, p: x.mk.pick, m: x.mk.label, c: phoneChance(x.mk.p), pr: x.mk.price, e: x.mk.edge === null || x.mk.edge === undefined ? undefined : Math.round(x.mk.edge * 1000) / 10, b: bandOf(x.mk) || undefined, r: res(x.mk, x.row) }); });
     if (keep.likely !== false) likeliestLegs(dateISO).forEach(function (x) { P.likely.push({ g: x.row.matchup, s: x.row.sport, p: x.mk.pick, c: phoneChance(x.mk.p), pr: x.mk.price, ok: x.mk.p >= x.need ? 1 : undefined, r: res(x.mk, x.row) }); });

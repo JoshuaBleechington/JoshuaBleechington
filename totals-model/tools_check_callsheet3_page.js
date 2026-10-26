@@ -1496,7 +1496,7 @@ const CHECKS = ["dome","playoff","agconf","hgconf","agbk","hgbk"];
       && /^usage 29\.0% of his club's possessions \(this season\), a starter \(RotoWire's expected five\): a high-usage starting man's miss runs 0\.91 sigmas, measured, so the chance is read narrower$/.test(usageT.why),
       'props: the panel carries his role as a tag, his usage as a tile with the sigma factor, the floors he clears 95, 90 and 80% of nights with the measured record behind them, and the why line', JSON.stringify({ h3: usageT.h3, role: usageT.role, usage: usageT.usage, floors: usageT.floors.slice(0, 200), why: usageT.why }));
   chk(usageT.hi.length === 3 && usageT.hi.every(n => /Jalen Brunson|Karl-Anthony Towns|Tyrese Maxey/.test(n)) && usageT.bench.length === 1 && /Kelly Oubre/.test(usageT.bench[0]) && usageT.after.n === 7 && usageT.after.usage === '' && usageT.after.role === ''
-      && usageT.pairs.length >= 3 && usageT.pairs.every(p => /^PAIR #\d · 76ers @ Knicks · the price (agrees|asks more) .+ \+ .+ both land \d\d\.\d% · pays [-−+]\d+ \(\d\.\d\d×\) needs \d\d\.\d% .+ · (two players|two overs on one club|one man, two markets|one man, his points with his threes), measured ×(0\.95|1\.00|1\.15|1\.50)$/.test(p.text))
+      && usageT.pairs.length >= 3 && usageT.pairs.every(p => /^PAIR #\d · 76ers @ Knicks · the price (agrees|asks more) .+ \+ .+ both land \d\d\.\d% · pays [-−+]\d+ \(\d\.\d\d×\) needs \d\d\.\d% .+ · (two players|two overs on one club|one man, two markets|one man, his points with his threes), measured ×(0\.95|1\.00|1\.15|1\.50) Take$/.test(p.text))
       && usageT.pairs.map(p => parseFloat(/both land (\d\d\.\d)%/.exec(p.text)[1])).every((c, i, a) => i === 0 || c <= a[i - 1]),
       'props: the usage and role filters keep the right men and Reset view clears them, and the same-game pairs list the date\'s tickets likeliest first with the parlay\'s price, what it needs and the measured kind of pair', JSON.stringify({ hi: usageT.hi, bench: usageT.bench, after: usageT.after, pairs: usageT.pairs.map(p => p.text.slice(0, 160)) }));
 
@@ -1534,6 +1534,91 @@ const CHECKS = ["dome","playoff","agconf","hgconf","agbk","hgbk"];
       && simPropsT.sorted.length === 7 && simPropsT.sorted[0].name === simBig.name && simPropsT.sorted[0].mk === simBig.mk && simPropsT.sorted.every((r, i, a) => i === 0 || simGap(r) <= simGap(a[i - 1])) && /sorted by sim ▾/.test(simPropsT.shown)
       && simPropsT.after.sim === '' && simPropsT.after.n === 7 && !/sorted/.test(simPropsT.after.shown),
       'props: every best card ends with the sim\'s read against the line in green or red, the simulation filter keeps the props the sim\'s read sides with (or against), the Sim column sorts by the gap toward the pick, and Reset view clears both', JSON.stringify({ best: simPropsT.best.map(b => b.slice(0, 140)), yes: simPropsT.yes, no: simPropsT.no, sorted: simPropsT.sorted.map(r => r.name + ' ' + r.side + ' ' + r.line + ' ' + r.sim), shown: simPropsT.shown, after: simPropsT.after }));
+
+  // ---- 26 Oct 2026: the pair's own panel -- a same-game pair card opens like a prop: the ticket's numbers, how the chance is made, each leg with a way
+  //      into its own panel, Previous / Next across the night's tickets; Take marks the pair on both legs, lists it under Taking and grades it under What you took ----
+  const pairT = await pg.evaluate(async () => {
+    const wait = () => new Promise(r => setTimeout(r, 90));
+    document.getElementById('propsReset').click(); await wait();
+    document.getElementById('m-props').click(); await wait(); document.getElementById('propsExample').click(); await wait();
+    const o = {}, dlg = document.getElementById('propDetail'), txt = e => (e ? e.innerText : '').replace(/\s+/g, ' ').trim();
+    const cards = [...document.querySelectorAll('#propsPairs .pk.pair')]; o.nCards = cards.length; o.attrs = cards.map(c => c.getAttribute('data-pair'));
+    cards[0].click(); await wait();
+    o.open = !dlg.hidden; o.band = txt(dlg.querySelector('.pd-band')); o.h3 = txt(dlg.querySelector('h3')); o.pick = txt(dlg.querySelector('.pd-pick')); o.sub = txt(dlg.querySelector('.pd-sub'));
+    o.tiles = [...dlg.querySelectorAll('#propDetailBody > .pd-tiles .pd-tile')].map(e => e.querySelector('.k').textContent + '=' + e.querySelector('.v').textContent);
+    o.how = txt(([...dlg.querySelectorAll('h4')].find(h => /^How the chance/.test(h.textContent)) || {}).nextElementSibling);
+    o.legs = [...dlg.querySelectorAll('.pd-leg')].map(e => txt(e.querySelector('h4')) + ' || ' + [...e.querySelectorAll('.pd-tile .k')].map(k => k.textContent).join(',') + ' || ' + txt(e.querySelector('.pd-base')) + ' || ' + txt(e.querySelector('button[data-prop]')) + ' | ' + !!e.querySelector('.takebtn[data-ptake]'));
+    o.nav = { hidden: document.getElementById('propDetailNav').hidden, pos: document.getElementById('propDetailPos').textContent, prevOff: document.getElementById('propDetailPrev').disabled, nextOff: document.getElementById('propDetailNext').disabled };
+    o.bigBtn = txt(dlg.querySelector('.pd-take .takebtn[data-ttake]'));
+    document.getElementById('propDetailNext').click(); await wait();
+    o.h3next = txt(dlg.querySelector('h3')); o.posNext = document.getElementById('propDetailPos').textContent;
+    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowLeft', bubbles: true })); await wait();
+    o.h3back = txt(dlg.querySelector('h3'));
+    dlg.querySelector('.pd-take .takebtn[data-ttake]').click(); await wait();   // take the pair from its panel
+    o.takeOn = !!dlg.querySelector('.pd-take .takebtn.on[data-ttake]'); o.cardTaking = document.querySelectorAll('#propsPairs .pk.pair.taking').length; o.cardBtnOn = document.querySelectorAll('#propsPairs .pk.pair .takebtn.on[data-ttake]').length;
+    o.takingList = [...document.querySelectorAll('#propsTaking .pk')].map(txt); o.takingCount = document.getElementById('propsTakingCount').textContent; o.takingHead = document.getElementById('propsTakingHead').hidden;
+    o.stored = JSON.stringify(((window.__props_preview_peek = null), null));
+    dlg.querySelector('.pd-leg button[data-prop]').click(); await wait();   // the first leg's own panel from the pair's
+    o.legPanel = txt(dlg.querySelector('h3')) + ' | ' + txt(dlg.querySelector('.pd-band')) + ' | ' + document.getElementById('propDetailPos').textContent;
+    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })); await wait();
+    o.closed = dlg.hidden && !document.body.classList.contains('noscroll');
+    document.querySelector('#propsTaking .pk.pair').click(); await wait();   // the Taking card opens the pair's panel too
+    o.fromTaking = txt(dlg.querySelector('.pd-band')) + ' | ' + txt(dlg.querySelector('h3'));
+    document.getElementById('propDetailClose').click(); await wait();
+    document.querySelector('#propsPairs .pk.pair .takebtn.on[data-ttake]').click(); await wait();   // unmark from the card's button, without opening it
+    o.unmarked = { dlg: dlg.hidden, taking: document.querySelectorAll('#propsPairs .pk.pair.taking').length, list: document.querySelectorAll('#propsTaking .pk').length, head: document.getElementById('propsTakingHead').hidden };
+    const today = document.getElementById('propsDate').value;
+    // a real file: a pair marked before the game lists on the board, rides through the file loaded again, grades under What you took and in the tab's record
+    const load = async (doc, fname) => { const dt = new DataTransfer(); dt.items.add(new File([JSON.stringify(doc)], fname, { type: 'application/json' })); const inp = document.getElementById('slateFile'); inp.files = dt.files; inp.dispatchEvent(new Event('change', { bubbles: true })); await wait(); };
+    const pdoc = { format: 'callsheet3.props', version: 1, date: '2026-10-27', games: [
+      { gid: '401909900', away: 'Hawks', home: 'Magic', aab: 'ATL', hab: 'ORL', spread: -4.5, total: 229.5, pace: 99.8, props: [
+        { pid: '3037789', name: 'Trae Young', team: 'ATL', opp: 'ORL', home: false, pos: 'G', mk: 'pts', line: 24.5, op: -110, up: -110, book: 'fanatics', books: { fanatics: [24.5, -110, -110] }, proj: 27.2, sd: 9.4, pm: 0.63, pb: 0.5, p: 0.6, push: 0, side: 'OVER', chance: 0.6, price: -110, need: 0.5238, edge: 0.0762, band: 'BET', mins: 35.1, rate36: 27.9, why: ['27.9 points per 36'], log: [] },
+        { pid: '4397020', name: 'Paolo Banchero', team: 'ORL', opp: 'ATL', home: true, pos: 'F', mk: 'reb', line: 7.5, op: -105, up: -115, book: 'fanatics', books: { fanatics: [7.5, -105, -115] }, proj: 8.9, sd: 3.5, pm: 0.6, pb: 0.5, p: 0.56, push: 0, side: 'OVER', chance: 0.56, price: -105, need: 0.512, edge: 0.048, band: 'LEAN', mins: 33.0, rate36: 9.7, why: ['9.7 rebounds per 36'], log: [] } ] } ] };
+    await smStore.removeItem('callsheet3.props.v1'); document.getElementById('m-nba').click(); await wait();
+    await load(pdoc, 'nba-props-2026-10-27.json');
+    o.filePairs = [...document.querySelectorAll('#propsPairs .pk.pair')].map(txt);
+    document.querySelector('#propsPairs .pk.pair .takebtn[data-ttake]').click(); await wait();
+    const stored1 = JSON.parse(smStore.getItem('callsheet3.props.v1'));
+    o.storedPairs = stored1.map(r => r.name + ':' + JSON.stringify(r.pairs || null));
+    document.getElementById('m-nba').click(); await wait();
+    document.getElementById('boardDate').value = '2026-10-27'; document.getElementById('boardDate').dispatchEvent(new Event('change')); await wait();
+    o.board = [...document.querySelectorAll('#taking .pk')].map(txt);
+    document.getElementById('takingText').click(); await new Promise(r => setTimeout(r, 250));
+    o.said = document.getElementById('saveMsg').innerText.replace(/\s+/g, ' ').trim();
+    await load(pdoc, 'nba-props-2026-10-27.json');   // the same file again: the mark rides through
+    const stored2 = JSON.parse(smStore.getItem('callsheet3.props.v1'));
+    o.storedPairs2 = stored2.map(r => r.name + ':' + JSON.stringify(r.pairs || null));
+    o.tabTaking = [...document.querySelectorAll('#propsTaking .pk')].map(txt);
+    await load({ format: 'callsheet2.slate', version: 1, date: '2026-10-27', games: [{ sport: 'NBA', gdate: '2026-10-27', away: 'Hawks', home: 'Magic', gameId: '401909900', finals: { fa: '118', fh: '112', f5a: '60', f5h: '55' }, notes: [],
+      box: { '3037789': ['Trae Young', 36.2, 28, 3, 11, 4], '4397020': ['Paolo Banchero', 34.0, 22, 9, 4, 1] } }] }, 'nba-grade-2026-10-27.json');
+    o.gradedCards = [...document.querySelectorAll('#propsPairs .pk.pair')].map(e => e.className + ' | ' + txt(e));
+    o.tabParts = txt(document.querySelector('#propsCalib .calib[data-sport="PROPS-TAB"] .sides'));
+    const taken = document.querySelector('#calibBox .calib[data-sport="TAKEN"]');
+    o.took = taken ? [...taken.querySelectorAll(':scope > div')].map(txt) : [];
+    document.getElementById('m-nba').click(); await wait();
+    o.boardGraded = [...document.querySelectorAll('#taking .pk')].map(txt);
+    await smStore.removeItem('callsheet3.props.v1'); document.getElementById('clear').click(); await wait();
+    return o;
+  });
+  chk(pairT.nCards >= 3 && pairT.attrs.every(a => /^\d+\|\d+$/.test(a)) && pairT.open && pairT.band === 'Same-game pair · the price agrees' && /^.+ (OVER|UNDER) \d+\.5 \w+ \+ .+ (OVER|UNDER) \d+\.5 \w+$/.test(pairT.h3)
+      && /^both land \d\d\.\d% · pays \+\d+ \(\d\.\d\d×\) needs \d\d\.\d%$/.test(pairT.pick) && /^76ers @ Knicks · \w{3} \d{1,2} · (two players|two overs on one club|one man, two markets|one man, his points with his threes), measured ×\d\.\d\d · fanatics$/.test(pairT.sub)
+      && pairT.tiles.length === 5 && /^Both land=\d\d\.\d%$/.test(pairT.tiles[0]) && /^Parlay price=\+\d+$/.test(pairT.tiles[1]) && /^Edge=\+\d\.\d$/.test(pairT.tiles[2]) && /^Leg 1=\d\d\.\d%$/.test(pairT.tiles[3]) && /^Leg 2=\d\d\.\d%$/.test(pairT.tiles[4])
+      && /lands \d\d\.\d% by the sheet and .+ \d\d\.\d%, each the blended chance on its own panel\. .+ so the product carries ×\d\.\d\d: \d\d\.\d% × \d\d\.\d% × \d\.\d\d = \d\d\.\d%.*\. The ticket pays the two prices multiplied, \d\.\d\d × \d\.\d\d = \d\.\d\d×, \+\d+, which needs \d\d\.\d%: the price agrees by \d+\.\d points\. A pushed leg drops out/.test(pairT.how)
+      && pairT.legs.length === 2 && pairT.legs.every(l => /^LEG [12] · .+ (OVER|UNDER) \d+\.5 \w+ · [A-Z] (PHI|NYK) · (starter|bench) \|\| Chance,Price,Edge,Projection,Minutes,Usage \|\| Moves it: .+ \|\| Open this prop \| true$/.test(l))
+      && !pairT.nav.hidden && /^1 of \d pairs$/.test(pairT.nav.pos) && pairT.nav.prevOff && !pairT.nav.nextOff && pairT.bigBtn === 'Take this pair' && pairT.h3next !== pairT.h3 && /^2 of \d pairs$/.test(pairT.posNext) && pairT.h3back === pairT.h3
+      && /^.+ \| (LEAN|BET|no edge) \| \d of 7$/.test(pairT.legPanel) && pairT.closed && pairT.fromTaking === 'Same-game pair · the price agrees | ' + pairT.h3,
+      'pairs: a same-game pair card opens its own panel with the ticket\'s band, both legs, the chance, the parlay price and what it needs, five tiles, the arithmetic of the chance with the measured factor, each leg\'s numbers with a button to its own panel, and Previous / Next across the night\'s tickets', JSON.stringify(pairT).slice(0, 1500));
+  chk(pairT.takeOn && pairT.cardTaking === 1 && pairT.cardBtnOn === 1 && pairT.takingList.length === 1 && /^TAKING · SAME-GAME PAIR · 76ers @ Knicks · the price agrees .+ \+ .+ both land \d\d\.\d% · pays \+\d+ .+Taking$/i.test(pairT.takingList[0]) && pairT.takingCount === '1 marked' && !pairT.takingHead
+      && pairT.unmarked.dlg && pairT.unmarked.taking === 0 && pairT.unmarked.list === 0 && pairT.unmarked.head
+      && pairT.filePairs.length === 1 && /^PAIR #1 · Hawks @ Magic · the price agrees Trae Young OVER 24\.5 points \+ Paolo Banchero OVER 7\.5 rebounds both land 33\.6% · pays \+27\d \(3\.7\d×\) needs 26\.\d% .+two players, measured ×1\.00 Take$/.test(pairT.filePairs[0])
+      && pairT.storedPairs.join(';') === 'Trae Young:["2026-10-27|4397020|reb"];Paolo Banchero:["2026-10-27|3037789|pts"]' && pairT.storedPairs2.join(';') === pairT.storedPairs.join(';')
+      && pairT.board.length === 2 && /^TAKING · SAME-GAME PAIR · Hawks @ Magic · the price agrees Trae Young OVER 24\.5 points \+ Paolo Banchero OVER 7\.5 rebounds both land 33\.6%/.test(pairT.board[0]) && /^TONIGHT 1 bet marked none graded yet · one unit each 0 on the card, 0 from the simulation, 0 props, 1 same-game pair$/.test(pairT.board[1])
+      && /Copied the bets you are taking|the text is below/.test(pairT.said) && (!/the text is below/.test(pairT.said) || /1\. SAME-GAME PAIR Trae Young OVER 24\.5 points \+ Paolo Banchero OVER 7\.5 rebounds \+27\d · both land 33\.6% needs 26\.\d% · Hawks @ Magic/.test(pairT.said))
+      && pairT.tabTaking.length === 1 && /^TAKING · SAME-GAME PAIR/.test(pairT.tabTaking[0])
+      && pairT.gradedCards.length === 1 && /^pk pair agrees win taking \| PAIR #1 .+ WIN .+ TAKEN$/.test(pairT.gradedCards[0]) && /same-game pairs 1-0 \+2\.7u · pairs taken 1-0 \+2\.7u/.test(pairT.tabParts)
+      && pairT.took.length === 1 && /^Same-game pairs taken 1-0 says 33\.6% · does 100\.0% \(±50\.0\) · \+2\.7\du$/.test(pairT.took[0]) && pairT.boardGraded.length === 2 && /WIN/.test(pairT.boardGraded[0]) && /graded 1-0 · \+2\.7\du at one unit each/.test(pairT.boardGraded[1]),
+      'pairs: Take on the pair\'s panel marks the ticket on both legs (the card lights, its button is on, Taking lists it with a count, the card\'s button unmarks it without opening); on a real file the mark lists on the board\'s Taking tonight with the summary, copies as text, rides through the file loaded again, and once the night grades the ticket shows WIN with a TAKEN chip, the tab\'s record says pairs taken 1-0 and What you took carries a Same-game pairs taken tile at the parlay price',
+      JSON.stringify({ takeOn: pairT.takeOn, cardTaking: pairT.cardTaking, cardBtnOn: pairT.cardBtnOn, takingList: pairT.takingList, count: pairT.takingCount, unmarked: pairT.unmarked, filePairs: pairT.filePairs, stored: pairT.storedPairs, stored2: pairT.storedPairs2, board: pairT.board, said: pairT.said.slice(0, 200), tabTaking: pairT.tabTaking, graded: pairT.gradedCards, parts: pairT.tabParts, took: pairT.took, boardGraded: pairT.boardGraded }).slice(0, 2500));
 
   // ---- 26 Oct 2026: tonight on your phone -- the Phone QR button makes a code carrying the night's picks; an independent decoder (jsQR,
   //      tools_vendor) reads it back off the drawn modules; the phone sheet m.html renders it, view only ----

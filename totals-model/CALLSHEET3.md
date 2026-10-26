@@ -1487,3 +1487,37 @@ shows it three ways:
 
 Shown, not scored, as before: the scored part of the simulation is the
 matchup lever at half weight, the weight that measured.
+
+## The pair's own panel, and the pairs you take, 26 Oct 2026
+
+The user: "when I click on the same-game pairs they don't open to show
+any details; I'd like something similar to how the props are for the
+singles." A ticket card opens the same panel the props use
+(`propsPairDetailHtml`, `openPairDetail`): the band ("Same-game pair · the
+price agrees"), both legs in the title, the chance both land with the
+parlay price and what it needs, five tiles (both land, the parlay price,
+the edge over it, each leg's chance at its price and band), then **How the
+chance is made**: each leg's blended chance, the measured sentence for the
+pair's kind (two players almost independent, two overs on one club ×0.95,
+one man's two markets ×1.15, his points with his threes ×1.5), the product
+written out and the cap at the lesser leg when it bites, the two decimal
+prices multiplied into the ticket's price and what that needs, and by how
+many points the price agrees or asks more. Under it each leg in a box of
+its own: its chance, price, edge and band, projection and line, minutes,
+usage, the Moves it line with the levers' tally, the sim's read in green or
+red, the last-games tally, a button to the leg's own panel and the leg's
+own Take. Previous / Next and the arrow keys walk the night's tickets
+(`pairsOrder`), and a leg's panel opened from a pair walks the table as
+before.
+
+**A pair you take.** Take this pair on the panel, or Take on the card,
+marks the ticket on both legs as the other leg's key (`pairs`), so it rides
+through the file loaded again like a prop's own mark and the ticket is
+rebuilt from the two rows as the night stood (`propsPairTicket`,
+`pairTakesOn`). The marked tickets list under Taking on the tab and under
+Taking tonight on the board (counted in the summary as same-game pairs),
+copy as text, go on the phone sheet, and grade as the Same-game pairs tile
+grades every ticket: a pushed leg drops out, a lost leg loses it. The tab's
+record says "pairs taken" beside "same-game pairs", and What you took
+carries a **Same-game pairs taken** tile at the parlay price. A graded
+ticket cannot be marked after the fact.

@@ -68,7 +68,7 @@
   function render(P) {
     document.getElementById("sub").textContent = gameDate(P.d) + " · made " + new Date(P.at).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" }) + " · view only";
     var h = '';
-    h += section("Taking tonight", P.take, function (x, i) { return card(x, "take", "TAKING · " + (x.k === "prop" ? "NBA PROP" : x.k === "sim" ? "NBA · SIMULATION" : x.s)); });
+    h += section("Taking tonight", P.take, function (x, i) { return card(x, "take", "TAKING · " + (x.k === "prop" ? "NBA PROP" : x.k === "sim" ? "NBA · SIMULATION" : x.k === "pair" ? "NBA · SAME-GAME PAIR" : x.s)); });
     h += section("The parlay four", P.four, function (x, i) { return card(x, "", "#" + (i + 1) + " · " + x.s); });
     h += section("Best straight bets", P.bets, function (x, i) { return card(x, "", "#" + (i + 1) + " · " + x.s); });
     h += section("Likeliest at any price", P.likely, function (x, i) { return card(x, "", "#" + (i + 1) + " · " + x.s); });

@@ -543,6 +543,7 @@ def props_example_games() -> list:
     sys.path.insert(0, str(pathlib.Path(__file__).parent / "slate"))
     import slate  # noqa: E402
     rng = random.Random(19)
+    rng2 = random.Random(23)   # the box behind each line (26 Oct 2026) draws from its own stream, so the example's stats stay as they were
     opps = ["BOS", "MIA", "CHI", "TOR", "CLE", "ATL", "ORL", "DET", "BKN", "MIL", "IND", "WAS"]
 
     def logs(n, start, mins, per36, home_first, starts=True):
@@ -556,10 +557,10 @@ def props_example_games() -> list:
                 g[mk] = max(0, int(round(rng.gauss(mu, slate.PROPS_SD_K[mk] * (mu ** 0.5) if mu > 0 else 0.5))))
             # the box behind the line (26 Oct 2026, the panel's what-happened column): his shots and makes, the margin, the pace
             pts = g.get("pts", 0)
-            fga = max(1, int(round(pts / 1.15 * rng.uniform(0.85, 1.15))))
-            fta = max(0, int(round(pts * 0.22 * rng.uniform(0.5, 1.5))))
-            g.update({"fga": fga, "fgm": max(0, min(fga, int(round(fga * rng.uniform(0.36, 0.56))))), "fta": fta, "ftm": max(0, int(round(fta * 0.8))), "tov": rng.randint(0, 4),
-                      "mg": int(round(rng.gauss(0, 13))), "pace": round(rng.gauss(100.5, 4.0), 1), "ot": rng.random() < 0.06})
+            fga = max(1, int(round(pts / 1.15 * rng2.uniform(0.85, 1.15))))
+            fta = max(0, int(round(pts * 0.22 * rng2.uniform(0.5, 1.5))))
+            g.update({"fga": fga, "fgm": max(0, min(fga, int(round(fga * rng2.uniform(0.36, 0.56))))), "fta": fta, "ftm": max(0, int(round(fta * 0.8))), "tov": rng2.randint(0, 4),
+                      "mg": int(round(rng2.gauss(0, 13))), "pace": round(rng2.gauss(100.5, 4.0), 1), "ot": rng2.random() < 0.06})
             out.append(g)
         return out
     this_start, last_start = dt.date(2026, 10, 21), dt.date(2025, 11, 1)

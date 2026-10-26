@@ -508,6 +508,42 @@ scored, for the reasons above and in the blowout row of slate/README.md. A
 run nearer tip carries the later injury report, and a second load of the
 props replaces an ungraded prop with the newer run.
 
+**The lineups test, 26 Oct 2026.** The user, after the Pacers scored 136
+on a profile that was 90% last season's Pacers: "could the simulation
+test the starting lineups? we have the individual players' info." Three
+steps, all on the public data already in hand. (1) `tools_nba_stints.py`
+cuts the play-by-play into five-man stints: the box's starters, the
+substitutions ([entering, leaving]), and the men a period's plays name
+before their own sub-in as that period's starters; 2,481 games, 32 stints
+a game, five a side in 99.99% of them, the points adding to the final in
+99.6% of games, a man's stint minutes within 0.26 of his box minutes.
+(2) `tools_nba_lineups.py` fits adjusted plus-minus from the stints (a
+ridge regression of each stint's points per 100 possessions on the ten on
+the floor, an offence and a defence number a man, last season's stints at
+half weight, the ridge strength chosen on a held-out slice: 4,000, and
+the held-out stint error 62.99 against 63.17 for the league mean alone,
+which is how little ten men explain of one stint), refit weekly through
+2025-26, and predicts every game three ways: the club model the sim uses,
+the players at the minutes they actually played (a perfect rotation call),
+and the players at the rotation projected from the club's last three games.
+Against 1,182 finals: margin error 14.78 for the club model, 14.61 and
+14.63 for the players; totals a wash once the stint possession count's
+bias is taken out; in the first month, where rosters are newest, the club
+model was better (12.83 against 13.43 and 13.35); and nothing added to the
+close (every t under 1.5). Knowing the exact minutes played did not beat
+the projected rotation, so the rotation is not the limiting factor; the
+player numbers themselves are the noise. (3) `tools_nba_prior_test.py`
+weights last season's prior by roster continuity, the share of last
+season's minutes played by men who have dressed this season: first-month
+margin error 13.41 at the fixed weight against 13.29 scaled, a one
+percent gain, within noise, and the totals no better. So the club model
+stays as it is, and the lesson of the Pacers stands as a lesson, not a
+fix: in October a club that changed a lot is where the own view is most
+wrong, in either direction, and the market already knows it. What the
+stints make possible later, if wanted: absence scenarios run at slate
+time (the game with and without each questionable regular), and the props'
+minutes from a rotation model rather than his last five.
+
 What is still a priori and marked so: the cost of an absence, the bench
 gap, the back-to-back penalty. What the play-by-play could add next: each
 player's on/off per 100 from the stints (the absence cost measured instead

@@ -9841,7 +9841,7 @@ var qrcode = function() {
     });
     slate = { name: name || (slate && slate.name) || "", date: d.date || (slate && slate.date) || "", generated: d.generated || "", games: kept.concat(incoming) };
     saveSlate(); save(); renderCard(); renderBoard(); renderCalib();
-    var propsGraded = gradeProps(d); if (propsGraded) renderCalib();
+    var propsGraded = gradeProps(d); if (propsGraded) { renderCalib(); renderBoard(); }   // the board's Taking tonight carries the props' and the pairs' results (26 Oct 2026)
     say("Slate " + (name ? "<b>" + esc(name) + "</b> " : "") + "loaded: <b>" + filled + "</b> row" + (filled === 1 ? "" : "s") + " filled in, <b>" + graded + "</b> graded, " +
         "<b>" + pending + "</b> not yet on the card" + (frozen ? ", " + frozen + " graded row" + (frozen === 1 ? "" : "s") + " left exactly as logged" : "") +
         ". Typed values were not overwritten; lines and prices are never in a slate." + (propsGraded ? " <b>" + propsGraded + "</b> prop" + (propsGraded === 1 ? "" : "s") + " graded on the Props tab." : "") + (propsMinsFilled ? " Minutes filled in on <b>" + propsMinsFilled + "</b> graded prop" + (propsMinsFilled === 1 ? "" : "s") + " from the box lines." : ""));

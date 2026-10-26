@@ -1520,4 +1520,7 @@ copy as text, go on the phone sheet, and grade as the Same-game pairs tile
 grades every ticket: a pushed leg drops out, a lost leg loses it. The tab's
 record says "pairs taken" beside "same-game pairs", and What you took
 carries a **Same-game pairs taken** tile at the parlay price. A graded
-ticket cannot be marked after the fact.
+ticket cannot be marked after the fact. Found by the harness while
+checking this: a slate load graded the props after the board had been
+drawn, so Taking tonight showed the props' and the pairs' results only on
+the next render; the board is drawn again once the props grade.

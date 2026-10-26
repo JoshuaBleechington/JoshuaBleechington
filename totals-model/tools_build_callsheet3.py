@@ -429,7 +429,7 @@ def tail() -> str:
              '        save(); renderCard(); renderBoard(); renderCalib();', "restore props")
     t = once(t, '    saveSlate(); save(); renderCard(); renderBoard(); renderCalib();\n    say("Slate "',
              '    saveSlate(); save(); renderCard(); renderBoard(); renderCalib();\n'
-             '    var propsGraded = gradeProps(d); if (propsGraded) renderCalib();\n'
+             '    var propsGraded = gradeProps(d); if (propsGraded) { renderCalib(); renderBoard(); }   // the board\'s Taking tonight carries the props\' and the pairs\' results (26 Oct 2026)\n'
              '    say("Slate "', "grade props")
     t = once(t, '". Typed values were not overwritten; lines and prices are never in a slate.");',
              '". Typed values were not overwritten; lines and prices are never in a slate." + (propsGraded ? " <b>" + propsGraded + "</b> prop" + (propsGraded === 1 ? "" : "s") + " graded on the Props tab." : "")'

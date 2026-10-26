@@ -657,3 +657,21 @@ a player's line is the league's home edge, about 0.3 points per 36: the
 points projection's miss runs +0.03 sigmas at home (t 2.9) and −0.01 on
 the road, the over rate 50.9% against 49.0%, and that edge is the club's
 home court, which the matchup lever carries already. Nothing to add.
+
+**Does a specific teammate's presence help a man? (26 Oct 2026).** The
+user, reading three Ty Jerome games: "when Cedric Coward was out Ty didn't
+cover, when he's in he did; I imagine Coward may have helped his stats."
+`tools_nba_pair_with_without.py` asked 2025-26 for every player and regular
+teammate (24 minutes a game, ten games or more) with eight or more games
+each way, inside the teammate's window with the club: 1,030 pairs. A man
+scores 0.64 points per 36 LESS with the teammate on the floor than without
+(median −0.71, PRA −0.73), and in only 39.5% of pairs does he score more
+with him: the pooled regulars-out rule, seen pair by pair. The spread of the
+pair splits (sd 2.74 points per 36) is barely wider than shuffling the
+with/without labels gives (2.53), and a pair's own split over the first
+half of the season predicts the second half's at r 0.09 (280 pairs). So
+"this teammate helps him" is noise almost everywhere, and the biggest
+splits either way come from the smallest samples. Jerome's three games
+with Memphis cannot say anything, and his one miss was 35 against 35.5 on
+his usual shots. The panel's line keeps the pooled direction in words,
+"out (26 mpg, a lift for him)" and "back (26 mpg, the lift gone)".

@@ -565,22 +565,27 @@
     for (var i = 0; i < b.length; i++) if (c >= b[i][0]) return b[i][1];
     return "no call";
   }
-  function nbaSimWorth(p, kind, shrink) { var k = (shrink || {})[kind]; if (k === undefined || k === null) k = 1; return 0.5 + (p - 0.5) * k; }
+  /* the worth (26 Oct 2026): the team totals' shrink depends on the view and the side (nbasim.SHRINK); a row stored before
+     the split lacks the new keys, so the measured defaults stand in. The band is read off the WORTH, not the raw chance,
+     so a 71% that is worth 56% reads as no call and a 57% worth 61% reads LEAN: the replay's answer, not the sim's say-so */
+  var NBA_SIM_SHRINK_DEFAULT = { team: 1.5, team_away: 0.3, team_own: 0.3 };
+  function nbaSimWorth(p, kind, shrink) { var k = (shrink || {})[kind]; if (k === undefined || k === null) k = NBA_SIM_SHRINK_DEFAULT[kind]; if (k === undefined || k === null) k = 1; return Math.max(0, Math.min(1, 0.5 + (p - 0.5) * k)); }
+  function nbaSimTeamKind(view, key) { return view === "own" ? "team_own" : key === "away_total" ? "team_away" : "team"; }
   /* every call the row's lines allow, from one view's histograms: {key, view, label, line, side, p, worth, band, push} */
   function nbaSimCalls(sim, lines, view) {
     var H = sim[view]; if (!H) return [];
     var out = [], bands = sim.bands, shrink = sim.shrink || {};
     var add = function (key, kind, label, line, r, first, second) {
       if (!r) return;
-      var p = r.over, side = p >= 0.5 ? first : second, prob = p >= 0.5 ? p : 1 - p;
-      out.push({ key: key, view: view, label: label, line: line, side: side, p: prob, worth: nbaSimWorth(prob, kind, shrink), band: nbaSimBand(prob, bands), push: r.push });
+      var p = r.over, side = p >= 0.5 ? first : second, prob = p >= 0.5 ? p : 1 - p, worth = nbaSimWorth(prob, kind, shrink);
+      out.push({ key: key, view: view, label: label, line: line, side: side, p: prob, worth: worth, band: nbaSimBand(worth, bands), push: r.push });
     };
     add("total", "total", "Total", lines.total, nbaSimOver(H.total, lines.total), "OVER", "UNDER");
     add("h1", "h1", "First half", lines.h1, nbaSimOver(H.h1, lines.h1), "OVER", "UNDER");
     if (lines.sp !== null && lines.sp !== undefined && lines.sp !== "" && !isNaN(+lines.sp)) add("spread", "spread", "Spread", +lines.sp, nbaSimOver(H.margin, -(+lines.sp)), "HOME", "AWAY");
     if (view === "own") add("ml", "ml", "Moneyline", null, nbaSimOver(H.margin, 0), "HOME", "AWAY");
-    if (lines.away_tt) add("away_total", "team", "Away team total", lines.away_tt.line, nbaSimOver(H.away, lines.away_tt.line), "OVER", "UNDER");
-    if (lines.home_tt) add("home_total", "team", "Home team total", lines.home_tt.line, nbaSimOver(H.home, lines.home_tt.line), "OVER", "UNDER");
+    if (lines.away_tt) add("away_total", nbaSimTeamKind(view, "away_total"), "Away team total", lines.away_tt.line, nbaSimOver(H.away, lines.away_tt.line), "OVER", "UNDER");
+    if (lines.home_tt) add("home_total", nbaSimTeamKind(view, "home_total"), "Home team total", lines.home_tt.line, nbaSimOver(H.home, lines.home_tt.line), "OVER", "UNDER");
     return out;
   }
   /* the team totals (26 Oct 2026): the book's main line on each side from the row's odds JSON (the carded book first, the
@@ -839,7 +844,7 @@
       });
       h += '</tbody></table>';
     }
-    h += '<div class="note dim">A call is the sim\'s side at LEAN (60%) or better on the line the row carried; "says" is the sim\'s own chance, "does" the share that landed. The replays: the own view\'s total and spread calls land at 50% whatever they say (the close already carries the ratings), its win chances within 3 points of true; the first half is a coin from either view over two seasons. The team totals are the one inefficiency: the book\'s line sits off the number the game\'s own total and spread imply, the gap rule reads it (a point or more, scored over two seasons), and the anchored sim\'s calls carry the same lean with the shape on top.</div></div>';
+    h += '<div class="note dim">A call is the sim\'s side on the line the row carried whose WORTH (the chance shrunk by what the replay found) reads LEAN (60%) or better; "says" is the sim\'s own chance, "does" the share that landed. The replays: the own view\'s total and spread calls land at 50% whatever they say (the close already carries the ratings), its win chances within 3 points of true; the first half is a coin from either view over two seasons. The team totals are the one inefficiency: the book\'s line sits off the number the game\'s own total and spread imply, the gap rule reads it (a point or more, scored over two seasons), and the anchored sim\'s calls carry the same lean with the shape on top.</div></div>';
     return h;
   }
 

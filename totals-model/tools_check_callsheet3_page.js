@@ -1506,8 +1506,8 @@ const CHECKS = ["dome","playoff","agconf","hgconf","agbk","hgbk"];
   await sheet.goto(phoneT.link); await sheet.waitForTimeout(600);
   const sheetT = await sheet.evaluate(() => ({ text: document.body.innerText.replace(/\s+/g, ' ').trim(), cards: document.querySelectorAll('.pk').length, takes: document.querySelectorAll('.pk.take').length, inputs: document.querySelectorAll('input, button, select, textarea').length, wide: document.documentElement.scrollWidth <= 390 }));
   await sheetCtx.close();
-  chk(sheetErrs.length === 0 && /^The Super Model Sat, Nov 14 · made \d{1,2}:\d\d [AP]M · view only TAKING TONIGHT 2 TAKING · NBA Knicks ML 66\.6% · [-−]198 needs 66\.4% 76ers @ Knicks · Moneyline TAKING · NBA · SIMULATION STRONG Total UNDER 231\.5 7\d\.\d% · worth 5\d% · [-−]110 needs 52\.4% 76ers @ Knicks · the simulation, the sim's own view THE PARLAY FOUR 1 /.test(sheetT.text)
-      && /LIKELIEST AT ANY PRICE 1 /.test(sheetT.text) && /THE SIMULATION'S CALLS, BET OR BETTER \d /.test(sheetT.text) && /View only: the card lives in the desktop browser\./.test(sheetT.text) && sheetT.takes === 2 && sheetT.cards >= 6 && sheetT.inputs === 0 && sheetT.wide,
+  chk(sheetErrs.length === 0 && /^The Super Model Sat, Nov 14 · made \d{1,2}:\d\d [AP]M · view only TAKING TONIGHT 2 TAKING · NBA Knicks ML 66\.6% · [-−]198 needs 66\.4% 76ers @ Knicks · Moneyline TAKING · NBA · SIMULATION Total UNDER 231\.5 7\d\.\d% · worth 5\d% · [-−]110 needs 52\.4% 76ers @ Knicks · the simulation, the sim's own view THE PARLAY FOUR 1 /.test(sheetT.text)
+      && /LIKELIEST AT ANY PRICE 1 /.test(sheetT.text) && /THE SIMULATION'S CALLS, BET OR BETTER \d /.test(sheetT.text) && /View only: the card lives in the desktop browser\./.test(sheetT.text) && sheetT.takes === 2 && sheetT.cards >= 5 && sheetT.inputs === 0 && sheetT.wide,
       'phone sheet: m.html unpacks the code on a phone-width screen with no script errors and lists the bets marked Taking first, then the parlay four, the likeliest sides and the simulation\'s calls, with nothing to type into and no sideways scroll', JSON.stringify({ errs: sheetErrs, text: sheetT.text.slice(0, 500), cards: sheetT.cards, takes: sheetT.takes, inputs: sheetT.inputs, wide: sheetT.wide }));
   await pg.evaluate(async () => { await smStore.removeItem('callsheet3.card.v1'); await smStore.removeItem('callsheet3.props.v1'); document.getElementById('clear').click(); });
 
@@ -1536,11 +1536,12 @@ const CHECKS = ["dome","playoff","agconf","hgconf","agbk","hgbk"];
   // graded, with the book's team totals on the row's odds JSON (26 Oct 2026): the record takes them too
   await pg.evaluate(async () => { const c = JSON.parse(smStore.getItem('callsheet3.card.v1')); c.forEach(r => { if (/76ers @ Knicks/.test(r.matchup)) { r.finals = { fa: '112', fh: '121', f5a: '55', f5h: '60' };
     r.inputs.odds = JSON.stringify({ total: {}, ml: {}, spread: {}, book: 'fanatics', team: { AWAY: { OVER: [['fanatics', -110, 113.5], ['fanatics', 140, 117.5], ['draftkings', -112, 113.5]], UNDER: [['fanatics', -110, 113.5], ['fanatics', -170, 117.5], ['draftkings', -108, 113.5]] },
-                                                                                                    HOME: { OVER: [['fanatics', -115, 120.5]], UNDER: [['fanatics', -105, 120.5]] } } }); } }); await smStore.setItem('callsheet3.card.v1', JSON.stringify(c)); });
+                                                                                                    HOME: { OVER: [['fanatics', -115, 123.5]], UNDER: [['fanatics', -105, 123.5]] } } }); } }); await smStore.setItem('callsheet3.card.v1', JSON.stringify(c)); });
   await pg.reload(); await pg.waitForTimeout(300); await pg.evaluate(() => smStore.ready);
   const simRec = await pg.evaluate(() => { const rec = document.querySelector('#calibBox .simrec'); return { has: !!rec, text: rec ? rec.innerText.replace(/\s+/g, ' ').trim().slice(0, 300) : '', rows: rec ? [...rec.querySelectorAll('.simrectab:not(.gaptab) tbody tr')].map(tr => tr.innerText.replace(/\s+/g, ' ').trim()) : [],
     gap: rec ? [...rec.querySelectorAll('.gaptab tbody tr')].map(tr => tr.innerText.replace(/\s+/g, ' ').trim()) : [] }; });
-  // the gap rule on the card: the Knicks' 120.5 sits 2 above the implied (231.5 + 5.5) / 2 = 118.5, so UNDER by the rule; the 76ers' 113.5 sits half a point over 113, no call
+  // the gap rule on the card: the Knicks' 123.5 sits 5 above the implied (231.5 + 5.5) / 2 = 118.5, so UNDER by the rule; the 76ers' 113.5 sits half a point over 113, no call
+  // (26 Oct 2026: the band comes from the worth now, so the anchored home team total at 123.5 reads a band and the own view's does not; 121 scored, the under wins)
   const gapCard = await pg.evaluate(async () => {
     const wait = () => new Promise(r => setTimeout(r, 80));
     document.getElementById('m-nba').click(); await wait();
@@ -1562,10 +1563,10 @@ const CHECKS = ["dome","playoff","agconf","hgconf","agbk","hgbk"];
       'nba sim: the Simulation card reads the example\'s runs, lists every market with the own and the anchored chance for the line on the row, follows the line when it is typed, and the block rides with the row', JSON.stringify({ panel: simT.panel, rows: simT.rows, moved: simT.moved, chips: simT.chips.length, has: simT.hasSim }));
   chk(simRec.has && /^SIMULATION · says against does, every call at LEAN or better The sim's own view/.test(simRec.text) && simRec.rows.length >= 1
       && simRec.rows.every(r => /^(Total|First half|Spread|Moneyline|Away team total|Home team total) (STRONG|BET|LEAN) [01]-[01] \d+\.\d% (0|100)\.0% [+-]\d+\.\du$/.test(r))
-      && simRec.rows.some(r => /^(Away|Home) team total/.test(r))
-      && simRec.gap.length === 1 && /^Home team total 0-1 0\.0% -1\.0u 62% under above the number/.test(simRec.gap[0]),
-      'nba sim: once the row grades, the record block keeps the sim\'s calls at LEAN or better, says against does by view, market and band, the book\'s team totals among them, and the gap rule\'s own tally (the Knicks\' 120.5 two above the implied 118.5, under called, 121 scored: a loss)', JSON.stringify(simRec));
-  chk(gapCard.length === 2 && /^76ers team total 113\.5 fanatics -110\/-110 implied 113, gap \+0\.5 · inside a point, no call/.test(gapCard[0]) && /^Knicks team total 120\.5 fanatics -115\/-105 implied 118\.5, gap \+2 · UNDER by the gap rule/.test(gapCard[1]),
+      && simRec.rows.some(r => /^Home team total (STRONG|BET|LEAN) 1-0 /.test(r)) && /Anchored to the market MARKET BAND RECORD SAYS DOES UNITS Home team total/.test(simRec.text) && !/The sim's own view[^]*Home team total[^]*Anchored/.test(simRec.text)
+      && simRec.gap.length === 1 && /^Home team total 1-0 100\.0% \+[01]\.\du 62% under above the number/.test(simRec.gap[0]),
+      'nba sim: once the row grades, the record block keeps the calls whose worth reads LEAN or better, says against does by view, market and band, the anchored home team total among them and the own view\'s not, and the gap rule\'s own tally (the Knicks\' 123.5 five above the implied 118.5, under called, 121 scored: a win)', JSON.stringify(simRec));
+  chk(gapCard.length === 2 && /^76ers team total 113\.5 fanatics -110\/-110 implied 113, gap \+0\.5 · inside a point, no call/.test(gapCard[0]) && /^Knicks team total 123\.5 fanatics -115\/-105 implied 118\.5, gap \+5 · UNDER by the gap rule/.test(gapCard[1]),
       'nba sim: the Simulation card shows each team total\'s implied number and gap, and the gap rule\'s call when it is a point or more', JSON.stringify(gapCard));
 
   // ---- the store (25 Oct 2026): the card, the props and the slate live in IndexedDB, past localStorage's 10 MB ----

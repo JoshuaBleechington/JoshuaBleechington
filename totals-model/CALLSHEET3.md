@@ -1317,6 +1317,19 @@ view it came from; the copy text names it; What you took grades it on
 its own tile, "Simulation calls taken", the way the sim record grades (the
 half from the half-time score, team totals from each side's final).
 
+## The Simulation card's band comes from the worth, 26 Oct 2026
+
+After a 71% own-view team total read STRONG and lost by seventeen, both
+seasons were replayed with the own view's team totals added (NBA.md, "The
+own view's team totals, replayed"): null. `nbasim.SHRINK` now carries the
+team totals by view and side (anchored home 1.5, anchored away 0.3, the
+own view 0.3), `nbaSimWorth` falls back to those for a row stored before
+the split, and `nbaSimCalls` reads each call's **band off its worth**
+instead of its raw chance. The chip still shows the sim's chance; the band
+and the colour under it say what the replay found that chance to be
+worth. The sim record and the phone sheet follow, since both read the
+band from the same calls.
+
 ## The levers' tally, 26 Oct 2026
 
 The user, with a Ziaire Williams over on the screen whose What moves it

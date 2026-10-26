@@ -80,7 +80,10 @@ LEAGUE = {
 # home line a point or more above the implied under 62.1% of the time, a point or more below over 68.1% (t -5.1 on the gap);
 # the away side positive but noisy (247-226; the slope -0.67, t -0.9). The first quarter did not come back (+0.12, t 0.2): a
 # watch. The team totals are a measured market, their shrink 1.0, and the page scores the gap rule itself beside the sim's chance.
-SHRINK = {"total": 0.05, "h1": 0.1, "spread": 0.0, "ml": 0.97, "team": 1.0, "quarter": 0.1}
+SHRINK = {"total": 0.05, "h1": 0.1, "spread": 0.0, "ml": 0.97, "team": 1.5, "team_away": 0.3, "team_own": 0.3, "quarter": 0.1}
+# the team totals by view and side (26 Oct 2026, the own view's team totals replayed on both seasons): the anchored home
+# team total's does-on-says slope was 1.78 and 4.29 (t 2.9, 4.7), capped at 1.5; the anchored away 0.45 and -0.79 (null);
+# the own view's 0.30 / 0.22 at home and 0.45 / 0.08 away (t under 1.5), its 65-70% calls landing 47% both seasons
 BANDS = [(0.70, "STRONG"), (0.65, "BET"), (0.60, "LEAN")]
 
 

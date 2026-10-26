@@ -508,6 +508,20 @@ scored, for the reasons above and in the blowout row of slate/README.md. A
 run nearer tip carries the later injury report, and a second load of the
 props replaces an ungraded prop with the newer run.
 
+**The own view's team totals, replayed, 26 Oct 2026.** After the Pacers
+scored 136 on an own-view "UNDER 119.5, STRONG 71%", the question was
+whether the own view's team-total calls had ever been measured; they had
+not, only the anchored view's. Both seasons replayed with them added
+(`tools_backtest_nba_sim.py`, 588 and 473 games with a team-total line):
+the own view's does-on-says slope 0.30 and 0.22 at home, 0.45 and 0.08
+away, every t under 1.5, its 65-70% calls landing 47% of the time in both
+seasons; the anchored home team total 1.78 and 4.29 (t 2.9 and 4.7), the
+anchored away 0.45 and -0.79. So `nbasim.SHRINK` splits the team totals:
+the anchored home 1.5 (capped), the anchored away 0.3, the own view 0.3.
+And the Simulation card now reads the **band off the worth**, not the raw
+chance: a 71% worth 56% reads "no call" and an anchored 57% worth 61%
+reads LEAN, which is what the replay says each is.
+
 **The lineups test, 26 Oct 2026.** The user, after the Pacers scored 136
 on a profile that was 90% last season's Pacers: "could the simulation
 test the starting lineups? we have the individual players' info." Three

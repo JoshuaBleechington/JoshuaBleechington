@@ -1530,22 +1530,40 @@ the next render; the board is drawn again once the props grade.
 The user, on P.J. Washington's panel with three of his last games marked
 red: "on the last games, the ones that didn't cover, is there a way to put
 next to those losses what may have been the factor that led to the loss?"
-The box has most of the answer, and the slate writes it beside each game
-now (`props_game_factors`, the sixth element of each `log` entry): the
-night's causes first, a regular of his club back or out that night (a man
-on 24 minutes a game over five games or more, counted only between his
-first and last game with the club, from `nba_club_regulars`), a blowout of
-fifteen or more, a start when he usually comes off the bench or the bench
-when he usually starts; then the measured parts, ranked by their size in
-the stat's units, his minutes four or more off his usual, his shots (FGA +
-0.44 FTA) three or more off his usual at those minutes, his shooting twelve
-points of field-goal share off his season's on five attempts or more; then
-overtime and a game five possessions or more off his club's own pace. Four
-at most, nothing under three games to compare against; a rebounds or
-assists prop reads no shots or shooting. The panel's **Last games** table
-carries it as a **What happened** column, the first factor bold in the
-colour of the game's mark, red under the line and green over it, and the
-graded night's own row gets his minutes against the games above it. A file
-from before carries none and the column stays away. The game logs now keep
-his shots and makes, the club's final margin, overtime, the game's pace and
-the club's regulars out or back, for this. Shown, never scored.
+Then, on the first file: "I want them all to look like the Embiid one; I
+want all the last games to have that info." The box has most of the answer,
+and the slate writes it beside every game now (`props_game_factors`, the
+sixth element of each `log` entry), five items at most, in this order:
+
+- **The night's causes.** A regular of his club back or out that night; a
+  blowout of fifteen or more; a start when he usually comes off the bench,
+  or the bench when he usually starts.
+- **What stood out**, ranked by its size in the stat's units: his minutes
+  three or more off his usual (or 12% of it), his shots (FGA + 0.44 FTA)
+  two or more off his usual at those minutes (or a quarter of it), his
+  shooting twelve points of field-goal share off his season's on four
+  attempts or more, "cold" or "hot".
+- **The plain box** for what did not stand out: his minutes against his
+  usual, his shots against his usual at those minutes, his makes of his
+  attempts, and the margin, won or lost by.
+- **Overtime**, and a game five possessions or more off his club's own pace.
+
+"His usual" is this season's games once he has five, else those games with
+last season's thirty behind them, so the first week reads against a real
+baseline; with nothing to compare against the plain box still reads.
+A rebounds or assists prop reads no shots or shooting. The regulars come
+from `nba_club_regulars`: a man on 24 minutes a game over five games with
+the club this season, or, until he has five, over ten games last season
+(`nba_prior_mpg`); he is out when the game's own injury list names him and
+he did not play, or when he is missing from the box between his first and
+last game with the club, so a man traded in is not "out" before he arrived,
+and a man out since opening night is. Back is a regular who sat the club's
+previous game and played this one. Measured on this season's first
+fourteen games with last season behind them: every one of 322 player-games
+reads a line. The panel's **Last games** table carries it as a **What
+happened** column, the first item bold in the colour of the game's mark,
+red under the line and green over it, and the graded night's own row gets
+his minutes against the games above it. A file from before carries none
+and the column stays away. The game logs now keep his shots and makes, the
+club's final margin, overtime, the game's pace and the club's regulars out
+or back, for this. Shown, never scored.

@@ -622,7 +622,7 @@ def props_example_games() -> list:
         proj, why = slate.props_project(pr, this, last, ctx)
         item = {"pid": "x%d" % (k + 1), "name": name, "team": team, "opp": opp, "home": team == "NYK", "pos": pos, "mk": mk, "line": line, "op": op, "up": up, "book": "fanatics",
                 "books": {"fanatics": [line, op, up], "draftkings": [line + (0.5 if k % 3 == 0 else 0.0), op - 5, up + 5], "fanduel": [line, op + 2, up - 2]},
-                "log": [[g["d"], g["opp"], 1 if g["home"] else 0, g["min"], slate.props_stat(g, mk), slate.props_game_factors(g, this or last, mk, 100.5)] for g in (this or last)[-10:]], "why": why}
+                "log": [[g["d"], g["opp"], 1 if g["home"] else 0, g["min"], slate.props_stat(g, mk), slate.props_game_factors(g, this or last, mk, 100.5, last if this else None)] for g in (this or last)[-10:]], "why": why}
         if proj:
             item.update(proj)
             item["sim"] = slate.nba_prop_sim_read(gs, team == "NYK", proj)

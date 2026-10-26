@@ -1554,13 +1554,13 @@ const CHECKS = ["dome","playoff","agconf","hgconf","agbk","hgbk"];
     document.getElementById('m-nba').click(); await wait();
     return { head, h4, rows, rebWhat };
   });
-  const whatRe = /^((.+ (back|out) \(\d+ mpg\))|((won|lost) by \d+, a blowout)|(off the bench)|(a start)|(\d+ min, \d+ (under|over) his usual \d+)|(\d+ shots, \d+ (under|over) his usual at those minutes)|(\d+ of \d+ from the floor, (cold|hot) \(his season \d+%\))|(overtime)|(a (slow|fast) game, \d+ possessions against their usual \d+))$/;
+  const whatRe = /^((.+ (back|out) \(\d+ mpg\))|((won|lost) by \d+(, a blowout)?)|(off the bench)|(a start)|(\d+ min, \d+ (under|over) his usual \d+)|(\d+ min \(his usual \d+\))|(\d+ shots, \d+ (under|over) his usual at those minutes)|(\d+ shots \(his usual \d+ at those minutes\))|(\d+ of \d+ from the floor(, (cold|hot) \(his season \d+%\))?)|(overtime)|(a (slow|fast) game, \d+ possessions against their usual \d+))$/;
   chk(whatT.head.join('|') === 'Date|Opp|Min|points|What happened' && /^LAST GAMES \(\d+ of 10 over 25\.5\) · what the box says happened, the biggest factor first$/i.test(whatT.h4) && whatT.rows.length === 10
-      && whatT.rows.filter(r => r.what).length >= 6 && whatT.rows.every(r => r.what === '' || r.what.split(' · ').every(p => whatRe.test(p)))
+      && whatT.rows.every(r => r.what && r.what.split(' · ').length >= 3 && r.what.split(' · ').length <= 5 && r.what.split(' · ').every(p => whatRe.test(p)) && /(won|lost) by \d+/.test(r.what) && /\d+ min/.test(r.what) && /\d+ shots/.test(r.what))
       && whatT.rows.every(r => !r.first || (r.first === r.what.split(' · ')[0] && r.cls === (/over/.test(r.mark) ? 'over' : /under/.test(r.mark) ? 'under' : '')))
       && whatT.rows.some(r => /(back|out) \(\d+ mpg\)/.test(r.first)) && whatT.rows.some(r => /a blowout/.test(r.what)) && whatT.rows.some(r => /shots, \d+ (under|over) his usual/.test(r.what))
-      && whatT.rebWhat.length >= 4 && whatT.rebWhat.every(t => !/shots|from the floor/.test(t)),
-      'props: the panel\'s last games carry what the box says happened on each, the night\'s causes first (a regular back or out, a blowout) then his minutes, shots and shooting against his season\'s, the first factor bold in the colour of the game\'s mark; a rebounds prop reads no shots or shooting', JSON.stringify(whatT).slice(0, 1800));
+      && whatT.rebWhat.length === 10 && whatT.rebWhat.every(t => !/shots|from the floor/.test(t) && /\d+ min/.test(t) && /(won|lost) by \d+/.test(t)),
+      'props: every one of the panel\'s last games carries the line behind it, the night\'s causes first (a regular back or out, a blowout) then what stood out and the plain box with the margin, the first item bold in the colour of the game\'s mark; a rebounds prop reads no shots or shooting', JSON.stringify(whatT).slice(0, 1800));
 
   // ---- 26 Oct 2026: the pair's own panel -- a same-game pair card opens like a prop: the ticket's numbers, how the chance is made, each leg with a way
   //      into its own panel, Previous / Next across the night's tickets; Take marks the pair on both legs, lists it under Taking and grades it under What you took ----

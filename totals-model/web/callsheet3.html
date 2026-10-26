@@ -458,6 +458,9 @@
   .pk .n6 { margin-top: 8px; } .pdlg .pd-take { margin: 6px 0 2px; } table.props td.take, #board td:last-child { white-space: nowrap; }
   .takebtn.off { opacity: .45; cursor: not-allowed; } .simtab .simtake { margin-top: 5px; } .ttgap .takebtn { margin-left: 4px; vertical-align: middle; }
   table.props td.agree { font-family: var(--mono); white-space: nowrap; } .pk .tag.agree { background: var(--go); color: #fff; }
+  /* the simulation's stats on the Props page (26 Oct 2026): a card a game, the Sim column, the best cards' last line */
+  table.props td.simc { font-family: var(--mono); white-space: nowrap; } .pk .n5.simline.pos { color: var(--go); } .pk .n5.simline.neg { color: var(--bad); }
+  .pk.simg .n2 { font-family: var(--mono); } .pk.simg .n2 .dim { font-weight: 500; font-size: 13px; } .pk.simg.dim { opacity: .7; } .pk.simg .n5 b { color: var(--ink); }
   .pk.pair.agrees { border-color: var(--go); } .pk.pair.win { box-shadow: inset 4px 0 0 var(--go); } .pk.pair.loss { box-shadow: inset 4px 0 0 var(--bad); } .pdlg h3 .tag.role { background: var(--ink-2); color: var(--bg, #fff); }
   .pdlg.phone .pdlg-box { max-width: 640px; } .pdlg.phone h3 { margin: 4px 0 10px; font: 800 20px/1.2 var(--sans); } .pdlg.phone h3 .tag { vertical-align: middle; }
   .qrbox { background: #fff; padding: 10px; border-radius: 10px; width: min(100%, 520px); margin: 0 auto 10px; } .qrbox svg { display: block; width: 100%; height: auto; }
@@ -1146,11 +1149,13 @@
         credits a market a game on the history endpoint), so the tile earns everything from day one.</p>
       <div class="subhead" id="propsTakingHead" hidden>Taking <span class="tag" id="propsTakingCount"></span> <span class="tag">the props you marked with Take: the bets you are placing, listed here and on the day board, graded on their own line in Is it working</span> <button type="button" class="btn" id="propsTakingText" style="margin-left:8px;padding:4px 10px;font-size:11px">Copy as text</button></div>
       <div id="propsTaking" class="picks" hidden></div>
+      <div class="subhead">The simulation on the games <span class="tag">each game played 10,000 times at the props run: the clubs' points with the middle half against the ratings' points a game, the total against the book's, the margin, the blowout and overtime chances, the pace and the regulars out; the sim's own read of each prop is the Sim column below and the last line of the best cards. Shown, not scored: the scored part is the matchup lever, at half weight</span></div>
+      <div id="propsSim" class="picks"></div>
       <div class="subhead">Same-game pairs <span class="tag">two props from one game at 52% or better, the likeliest four a game paired, the likeliest tickets first: the chance both land (measured: two players' props land almost independently, a man's own two markets together more often), the parlay's price from the two legs and what it needs; graded on their own line</span></div>
       <div id="propsPairs" class="picks"></div>
       <div class="subhead">Best props <span class="tag">every prop whose blended chance clears its price, best edge first — BET at 3 points of edge and 55% or better, LEAN below that; a priori bands, the record decides. Click a card for the prop's own panel</span></div>
       <div id="propsBest" class="picks"></div>
-      <div class="subhead">Every prop on the date <span class="tag">by game, then by edge — click a column to sort it, filter by market, band, side, the levers or player; the Levers column counts the factors pushing toward the pick ▲ and against it ▼; click a row for the prop's own panel, then Previous and Next (or the arrow keys) walk the list as shown</span></div>
+      <div class="subhead">Every prop on the date <span class="tag">by game, then by edge — click a column to sort it, filter by market, band, side, the levers or player; the Levers column counts the factors pushing toward the pick ▲ and against it ▼, the Sim column is the simulation's own read of the stat, green on the pick's side of the line; click a row for the prop's own panel, then Previous and Next (or the arrow keys) walk the list as shown</span></div>
       <div class="row propsctl">
         <label class="f" style="flex-direction:row;align-items:center;gap:6px"><span class="tag">market</span>
           <select id="propsMk"><option value="">all</option><option value="pts">points</option><option value="reb">rebounds</option><option value="ast">assists</option><option value="tpm">threes</option><option value="pra">pts + reb + ast</option></select></label>
@@ -1164,6 +1169,8 @@
           <select id="propsRole"><option value="">all</option><option value="starter">starters</option><option value="bench">bench</option></select></label>
         <label class="f" style="flex-direction:row;align-items:center;gap:6px"><span class="tag">levers</span>
           <select id="propsAgree"><option value="">all</option><option value="all">every lever toward the pick</option><option value="most">more toward than against</option></select></label>
+        <label class="f" style="flex-direction:row;align-items:center;gap:6px"><span class="tag">simulation</span>
+          <select id="propsSimSel"><option value="">all</option><option value="yes">the sim's read on the pick's side</option><option value="no">the sim's read against the pick</option></select></label>
         <label class="f" style="flex-direction:row;align-items:center;gap:6px"><span class="tag">player or game</span><input id="propsQ" type="text" placeholder="Maxey" autocomplete="off" style="width:150px"></label>
         <span class="tag" id="propsShown"></span>
         <button type="button" class="btn" id="propsReset">Reset view</button>
@@ -3908,7 +3915,7 @@ smStore.ready.then(function () {
      the points for a player, by chance percentage and band"): a sort column with its direction, and filters by market,
      band, side and a name. Kept in this browser only; Reset view puts the table back to by game, then by edge */
   var PROPS_VIEW_KEY = "callsheet3.props.view.v1";
-  var PROPS_VIEW_DEFAULT = { sort: "default", dir: -1, mk: "", band: "", side: "", q: "", agree: "", usage: "", role: "" };
+  var PROPS_VIEW_DEFAULT = { sort: "default", dir: -1, mk: "", band: "", side: "", q: "", agree: "", usage: "", role: "", sim: "" };
   /* the floors (26 Oct 2026, the user: "PRA alt lines at 95% or more, Sengun 10+ points, 5+ rebounds, 3+ assists"): the number
      the model says he clears 95, 90 and 80% of nights, read off the median and the sigma the chance already uses. Measured on
      2025-26 (tools_nba_usage_floors.py): the 95% floors cleared 97.5% of nights, the 90% 93%, the 80% 82%; posted as a whole
@@ -3920,6 +3927,55 @@ smStore.ready.then(function () {
   function propMedian(r) { return r.med !== undefined && r.med !== null ? +r.med : +r.proj - (PROPS_MEDIAN_SHIFT[r.mk] || 0) * +r.sd; }
   function propFloor(r, q) { var f = Math.floor(propMedian(r) - PROPS_FLOOR_Z[q] * +r.sd); return f >= 1 ? f : null; }
   function propUsageBucket(r) { return r.usg === null || r.usg === undefined ? "" : r.usg < 18 ? "lo" : r.usg < 24 ? "mid" : "hi"; }
+  /* the simulation's stats on the Props page (26 Oct 2026, the user: "add the simulation stats to the Prop page as well"): the
+     game's block from the props run (each club's points with the middle half against the ratings' points a game, the total,
+     the margin, the blowout and overtime chances, the pace, the regulars out) rides on each of the game's rows, compact, and is
+     shown as a strip above the picks, one card a game; the sim's own read of each prop is a column of the table, a filter, a
+     line on the best cards and on the phone sheet. Shown, not scored: the scored part is the matchup lever at half weight */
+  function propsGameSim(gs) {
+    if (!gs || !gs.away || !gs.home) return null;
+    var side = function (s) { return [s.median, s.p25, s.p75, s.ppg === undefined ? null : s.ppg]; };
+    return { runs: gs.runs, a: side(gs.away), h: side(gs.home), t: gs.total, m: gs.margin, hw: gs.home_win, ot: gs.ot, bo: gs.blowout, poss: gs.poss,
+             out: [+((gs.out || {}).away || 0), +((gs.out || {}).home || 0)] };
+  }
+  function propSimRead(r) { return r.sim && r.sim.read !== null && r.sim.read !== undefined && isFinite(+r.sim.read) ? +r.sim.read : null; }
+  function propSimAgrees(r) { var v = propSimRead(r); if (v === null || !propHas(r) || v === +r.line) return null; return r.side === "UNDER" ? v < +r.line : v > +r.line; }
+  function propSimGap(r) { var v = propSimRead(r); if (v === null || !propHas(r)) return null; return Math.round(((r.side === "UNDER" ? +r.line - v : v - +r.line)) * 10) / 10; }
+  function propsPct(v) { v = +v * 100; return v.toFixed(v >= 10 ? 0 : 1) + "%"; }
+  function propSimLine(r) {
+    var v = propSimRead(r), ag = propSimAgrees(r), s = r.sim;
+    if (v === null) return "";
+    return 'Sim reads ' + v + ' v the ' + r.line + ' line, ' + (ag === true ? 'on the ' + esc(r.side) + '\'s side' : ag === false ? 'against the ' + esc(r.side) : 'on the line') + ' · ' + esc(r.team || 'his club') + ' ' + s.team_pts + ' (' + s.team_lo + '–' + s.team_hi + ') · blowout ' + propsPct(s.blowout);
+  }
+  function propsGameSimFromRows(gr, r0) {
+    /* a file loaded before the strip existed carries the game's block on no row; the props' own sim blocks give most of it back */
+    var aab = r0.aab || r0.away, hab = r0.hab || r0.home, a = null, h = null, any = null;
+    gr.forEach(function (x) { if (!x.sim || x.sim.team_pts === undefined || x.sim.team_pts === null) return; any = any || x.sim; if (x.team === aab && !a) a = x.sim; if (x.team === hab && !h) h = x.sim; });
+    if (!a || !h || !any) return null;
+    var side = function (s) { return [s.team_pts, s.team_lo, s.team_hi, s.team_ppg || null]; };
+    return { runs: any.runs, a: side(a), h: side(h), t: Math.round(+a.team_pts + +h.team_pts), m: null, hw: any.home_win, ot: any.ot, bo: any.blowout, poss: any.poss, out: [+(a.out || 0), +(h.out || 0)], approx: true };
+  }
+  function propsSimStripHtml(rows) {
+    var games = {}, order = [];
+    rows.forEach(function (r) {
+      if (!games[r.game]) { games[r.game] = { r: r, n: 0, yes: 0 }; order.push(r.game); }
+      var g = games[r.game]; if (!g.r.gsim && r.gsim) g.r = r;
+      if (propHas(r) && propSimAgrees(r) !== null) { g.n++; if (propSimAgrees(r)) g.yes++; }
+    });
+    if (!order.length) return '';
+    return order.sort().map(function (game) {
+      var g = games[game], r = g.r, s = r.gsim || propsGameSimFromRows(rows.filter(function (x) { return x.game === game; }), r);
+      if (!s) return '<div class="pk simg dim"><div class="n1">' + esc(game) + '</div><div class="n4">This file\'s run carried no simulation on the game; a props run with the current slate.py plays it 10,000 times.</div></div>';
+      var aab = r.aab || r.away || "away", hab = r.hab || r.home || "home", hasM = s.m !== null && s.m !== undefined && isFinite(+s.m), fav = +s.m >= 0 ? hab : aab;
+      var book = r.total !== null && r.total !== undefined && isFinite(+r.total) ? ' · the book\'s ' + r.total + ' (' + sgn(+s.t - +r.total, 1) + ')' : '';
+      var outs = [[aab, s.out[0]], [hab, s.out[1]]].filter(function (x) { return x[1]; }).map(function (x) { return ' · ' + esc(x[0]) + '\'s regulars out ' + sgn(x[1], 1) + ' per 100 on the offence'; }).join('');
+      return '<div class="pk simg"><div class="n1">' + esc(game) + ' · played ' + esc(Number(s.runs).toLocaleString()) + ' times</div>' +
+        '<div class="n2">' + esc(aab) + ' ' + s.a[0] + ' · ' + esc(hab) + ' ' + s.h[0] + ' <span class="dim">total ' + (s.approx ? 'about ' : '') + s.t + '</span></div>' +
+        '<div class="n3">' + (hasM ? esc(fav) + ' by ' + Math.abs(+s.m).toFixed(1) + ' · ' : '') + (s.hw !== null && s.hw !== undefined ? 'home win ' + propsPct(s.hw) + ' · ' : '') + 'total ' + (s.approx ? 'about ' : '') + s.t + book + '</div>' +
+        '<div class="n4">' + esc(aab) + ' middle half ' + s.a[1] + '–' + s.a[2] + (s.a[3] ? ' against ' + s.a[3] + ' a game by the ratings' : '') + ' · ' + esc(hab) + ' ' + s.h[1] + '–' + s.h[2] + (s.h[3] ? ' against ' + s.h[3] : '') + '</div>' +
+        '<div class="n5">blowout of 15 or more ' + propsPct(s.bo) + ' · overtime ' + propsPct(s.ot) + ' · ' + s.poss + ' possessions' + outs + (g.n ? ' · the sim\'s read on the pick\'s side for <b>' + g.yes + ' of ' + g.n + '</b> props' : '') + '</div></div>';
+    }).join('');
+  }
   /* two props from one game as a ticket (26 Oct 2026, the user: "the ones that hit quickly were same game parlays with 2 legs...
      offer same game parlay tickets with the players' matchups on the same games that are the most likely to hit"): the legs are
      the date's projected props at 55% or better, likeliest first, up to four a game; every pair in a game is a ticket whose chance
@@ -3977,7 +4033,7 @@ smStore.ready.then(function () {
   try { var pv0 = JSON.parse(smStore.getItem(PROPS_VIEW_KEY) || "null"); if (pv0 && typeof pv0 === "object") propsTableView = Object.assign({}, PROPS_VIEW_DEFAULT, pv0); } catch (e) {}
   function savePropsTableView() { try { smStore.setItem(PROPS_VIEW_KEY, JSON.stringify(propsTableView)); } catch (e) {} }
   var PROPS_BAND_RANK = { "BET": 0, "LEAN": 1, "no edge": 2 };
-  var PROPS_SORT_COLS = [["game", "Game"], ["name", "Player"], ["mk", "Market"], ["line", "Line"], ["side", "Pick"], ["chance", "Chance"], ["price", "Price"], ["need", "Needs"], ["edge", "Edge"], ["proj", "Proj"], ["band", "Band"], ["result", "Result"], ["agree", "Levers"]];
+  var PROPS_SORT_COLS = [["game", "Game"], ["name", "Player"], ["mk", "Market"], ["line", "Line"], ["side", "Pick"], ["chance", "Chance"], ["price", "Price"], ["need", "Needs"], ["edge", "Edge"], ["proj", "Proj"], ["band", "Band"], ["result", "Result"], ["agree", "Levers"], ["sim", "Sim"]];
   /* the levers' tally (26 Oct 2026, the user: "find props like this one, where What moves it shows multiple green bars
      pointing toward the pick"): how many of the factors push toward the pick's side and how many against, a push under
      0.05 in the stat's units counting as neither. A column to sort by, a filter, a tag on the card and the panel's heading */
@@ -3995,6 +4051,7 @@ smStore.ready.then(function () {
     var has = propHas(r);
     switch (key) {
       case "agree": return has ? (function (t) { return t.n ? (t.toward - t.against) + t.toward / 10 : -50; })(propsLeverTally(r)) : -99;
+      case "sim": return has ? (function (g) { return g === null ? -99 : g; })(propSimGap(r)) : -999;
       case "game": return r.game || "";
       case "name": return r.name || "";
       case "mk": return PROPS_LABEL[r.mk] || r.mk || "";
@@ -4019,6 +4076,7 @@ smStore.ready.then(function () {
       if (v.agree) { var t = propsLeverTally(r); if (!propHas(r) || (v.agree === "all" ? !t.all : !t.most)) return false; }
       if (v.usage && propUsageBucket(r) !== v.usage) return false;
       if (v.role && !(v.role === "starter" ? r.starter === true : r.starter === false)) return false;
+      if (v.sim) { var ag = propSimAgrees(r); if (ag === null || (v.sim === "yes" ? !ag : ag)) return false; }
       if (q && String(r.name || "").toLowerCase().indexOf(q) < 0 && String(r.game || "").toLowerCase().indexOf(q) < 0) return false;
       return true;
     });
@@ -4050,7 +4108,7 @@ smStore.ready.then(function () {
                     pid: String(x.pid), name: x.name, team: x.team, opp: x.opp, athome: !!x.home, pos: x.pos || "", mk: x.mk, line: x.line, op: x.op, up: x.up, book: x.book, books: x.books || {},
                     proj: x.proj, sd: x.sd, pm: x.pm, pb: x.pb, p: x.p, push: x.push, side: x.side, chance: x.chance, price: x.price, need: x.need, edge: x.edge, band: x.band,
                     mins: x.mins, rate36: x.rate36, base: x.base, parts: x.parts || [], why: x.why || [], log: x.log || [], sim: x.sim || null,
-                    med: x.med, usg: x.usg, sdf: x.sdf, starter: x.starter === undefined ? null : x.starter, start_src: x.start_src || null, actual: null, result: null });
+                    med: x.med, usg: x.usg, sdf: x.sdf, starter: x.starter === undefined ? null : x.starter, start_src: x.start_src || null, gsim: propsGameSim(g.sim), actual: null, result: null });
       });
     });
     return rows;
@@ -4496,8 +4554,11 @@ smStore.ready.then(function () {
         '<div class="n2">' + esc(r.name) + ' ' + esc(r.side) + ' ' + r.line + ' ' + esc(PROPS_LABEL[r.mk] || r.mk) + '</div>' +
         '<div class="n3">' + (r.chance * 100).toFixed(1) + '% · ' + sgn(r.price, 0) + ' needs ' + (r.need * 100).toFixed(1) + '% · edge ' + sgn(r.edge * 100, 1) + resChip(r) + '</div>' +
         '<div class="n4">' + esc(r.game) + ' · projected ' + r.proj + ' (±' + r.sd + ') · ' + esc(r.book) + '</div>' +
-        (propsLeversLine(r) ? '<div class="n5">Moves it: ' + propsLeversLine(r) + '</div>' : '') + '<div class="n6">' + propTakeBtn(r) + '</div></div>';
+        (propsLeversLine(r) ? '<div class="n5">Moves it: ' + propsLeversLine(r) + '</div>' : '') +
+        (propSimLine(r) ? '<div class="n5 simline' + (propSimAgrees(r) === true ? ' pos' : propSimAgrees(r) === false ? ' neg' : '') + '">' + propSimLine(r) + '</div>' : '') + '<div class="n6">' + propTakeBtn(r) + '</div></div>';
     }).join("") : '<div class="empty">' + (rows.length ? 'No prop on this date clears its price.' : 'Load a props file: Run NBA props.bat writes nba-props-DATE.json.') + '</div>';
+    /* the simulation's strip (26 Oct 2026): one card a game */
+    if ($("propsSim")) $("propsSim").innerHTML = rows.length ? propsSimStripHtml(rows) : '<div class="empty">Load a props file and each game\'s simulation lands here.</div>';
     /* the props marked as taken on the date (26 Oct 2026), above the best list */
     var taken = rows.filter(function (r) { return r.take && propHas(r); });
     if ($("propsTaking")) {
@@ -4506,7 +4567,7 @@ smStore.ready.then(function () {
       $("propsTakingCount").textContent = taken.length ? taken.length + " marked" : "";
     }
     var pool = ($("propsAll").checked ? rows : rows.filter(propHas)).slice(), list = propsTableRows(pool);
-    ["propsMk", "propsBand", "propsSide", "propsQ", "propsAgree", "propsUsage", "propsRole"].forEach(function (id) { var el = $(id); if (el) { var k = { propsMk: "mk", propsBand: "band", propsSide: "side", propsQ: "q", propsAgree: "agree", propsUsage: "usage", propsRole: "role" }[id]; if (el.value !== propsTableView[k]) el.value = propsTableView[k]; } });
+    ["propsMk", "propsBand", "propsSide", "propsQ", "propsAgree", "propsUsage", "propsRole", "propsSimSel"].forEach(function (id) { var el = $(id); if (el) { var k = { propsMk: "mk", propsBand: "band", propsSide: "side", propsQ: "q", propsAgree: "agree", propsUsage: "usage", propsRole: "role", propsSimSel: "sim" }[id]; if (el.value !== propsTableView[k]) el.value = propsTableView[k]; } });
     /* the same-game pairs (26 Oct 2026), the likeliest tickets first */
     if ($("propsPairs")) {
       var pairs = propsPairs(date, rows);
@@ -4525,6 +4586,7 @@ smStore.ready.then(function () {
                     : '<td colspan="7" class="dim">' + esc((r.why && r.why[0]) || 'no projection') + '</td>') +
         '<td>' + (r.result ? esc(r.result) + (r.actual !== null && r.actual !== undefined ? ' · ' + r.actual : '') : '') + '</td>' +
         (function (t) { return '<td class="agree' + (t.n ? (t.all ? ' pos' : t.against > t.toward ? ' neg' : '') : '') + '" title="' + esc(t.words) + '">' + t.text + '</td>'; })(propsLeverTally(r)) +
+        (function (v, ag) { return '<td class="simc' + (ag === true ? ' pos' : ag === false ? ' neg' : '') + '" title="' + (v === null ? 'no simulation on this prop' : 'the simulation\'s own read of the stat, his per 36 at his minutes scaled by his club\'s runs; ' + (ag === true ? 'on the ' + esc(r.side) + '\'s side of the line' : ag === false ? 'against the ' + esc(r.side) : 'on the line') + ' (shown, not scored)') + '">' + (v === null ? '' : v) + '</td>'; })(propSimRead(r), propSimAgrees(r)) +
         '<td class="take">' + propTakeBtn(r) + '</td></tr>';
     });
     h += '</tbody></table>';
@@ -4537,7 +4599,7 @@ smStore.ready.then(function () {
     var out = ["The Super Model — NBA props — " + gameDate(date)];
     rows.forEach(function (r, i) {
       out.push((i + 1) + ". " + (r.take ? "TAKING · " : "") + r.name + " " + r.side + " " + r.line + " " + (PROPS_LABEL[r.mk] || r.mk) + " " + sgn(r.price, 0) + " · " + (r.chance * 100).toFixed(1) + "% needs " +
-               (r.need * 100).toFixed(1) + "% · " + r.band + " · " + r.game + " · proj " + r.proj + (r.result ? " · " + r.result.toUpperCase() + (r.actual !== null && r.actual !== undefined ? " " + r.actual : "") : ""));
+               (r.need * 100).toFixed(1) + "% · " + r.band + " · " + r.game + " · proj " + r.proj + (propSimRead(r) !== null ? " · sim " + propSimRead(r) : "") + (r.result ? " · " + r.result.toUpperCase() + (r.actual !== null && r.actual !== undefined ? " " + r.actual : "") : ""));
     });
     return out.join("\n");
   }
@@ -4570,7 +4632,7 @@ smStore.ready.then(function () {
       }
       openFrom(e);
     });
-    [["propsMk", "mk"], ["propsBand", "band"], ["propsSide", "side"], ["propsQ", "q"], ["propsAgree", "agree"], ["propsUsage", "usage"], ["propsRole", "role"]].forEach(function (p) {
+    [["propsMk", "mk"], ["propsBand", "band"], ["propsSide", "side"], ["propsQ", "q"], ["propsAgree", "agree"], ["propsUsage", "usage"], ["propsRole", "role"], ["propsSimSel", "sim"]].forEach(function (p) {
       var el = $(p[0]); if (!el) return;
       el.addEventListener(p[0] === "propsQ" ? "input" : "change", function () { propsTableView[p[1]] = el.value; savePropsTableView(); renderProps(); });
     });
@@ -7093,7 +7155,7 @@ var qrcode = function() {
     bestBets(dateISO).forEach(function (x) { P.bets.push({ g: x.row.matchup, s: x.row.sport, p: x.mk.pick, m: x.mk.label, c: phoneChance(x.mk.p), pr: x.mk.price, e: x.mk.edge === null || x.mk.edge === undefined ? undefined : Math.round(x.mk.edge * 1000) / 10, b: bandOf(x.mk) || undefined, r: res(x.mk, x.row) }); });
     if (keep.likely !== false) likeliestLegs(dateISO).forEach(function (x) { P.likely.push({ g: x.row.matchup, s: x.row.sport, p: x.mk.pick, c: phoneChance(x.mk.p), pr: x.mk.price, ok: x.mk.p >= x.need ? 1 : undefined, r: res(x.mk, x.row) }); });
     propsSource().filter(function (r) { return (r.gdate || "") === dateISO && propHas(r) && r.edge > 0; }).sort(function (a, b) { return b.edge - a.edge; }).slice(0, keep.props === undefined ? 12 : keep.props)
-      .forEach(function (r) { P.props.push({ g: r.game, p: r.name + " " + r.side + " " + r.line + " " + (PROPS_LABEL[r.mk] || r.mk), c: phoneChance(r.chance), pr: r.price, e: Math.round(r.edge * 1000) / 10, b: r.band, pj: r.proj, r: propTakeRes(r) || undefined }); });
+      .forEach(function (r) { var sr = typeof propSimRead === "function" ? propSimRead(r) : null; P.props.push({ g: r.game, p: r.name + " " + r.side + " " + r.line + " " + (PROPS_LABEL[r.mk] || r.mk), c: phoneChance(r.chance), pr: r.price, e: Math.round(r.edge * 1000) / 10, b: r.band, pj: r.proj, sr: sr === null ? undefined : sr, r: propTakeRes(r) || undefined }); });
     if (keep.sim !== false) card.filter(function (r) { return r.sport === "NBA" && (r.gdate || "") === dateISO && r.inputs && r.inputs.nbasim && !isVoid(r); }).forEach(function (r) {
       var sim = null; try { sim = JSON.parse(r.inputs.nbasim); } catch (e) { sim = null; }
       if (!sim || !sim.own) return;

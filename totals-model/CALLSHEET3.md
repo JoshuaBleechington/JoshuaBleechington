@@ -1455,3 +1455,35 @@ rebuilt from the rows every time, so a graded night's tickets are the
 night's as it stood and the record grades them on their own tile,
 "Same-game pairs, at the parlay price", a pushed leg dropping out of the
 ticket as the books do it. The phone sheet carries them.
+
+## The simulation's stats on the Props page, 26 Oct 2026
+
+The user: "add the simulation stats to the Prop page as well." The game's
+simulation had lived only inside a prop's panel. Now the props run's block
+for each game (`row.sim` in the file: each club's points with the middle
+half against the ratings' points a game, the total, the margin, the home
+win, the blowout and overtime chances, the pace and the regulars out) rides
+on each of the game's rows, compact (`gsim`, `propsGameSim`), and the tab
+shows it three ways:
+
+- **The simulation on the games**, a strip above the pairs and the picks
+  with one card a game (`propsSimStripHtml`): "PHI 103 · NYK 116 total
+  219", the favourite by the mean margin, the home win, the total against
+  the book's with the gap, each club's middle half against its ratings'
+  points, the blowout, overtime, the possessions, each club's regulars out
+  in points per 100, and how many of the game's props the sim's read sides
+  with. A file loaded before the strip existed carries no game block, so
+  the strip rebuilds most of it from the props' own sim blocks
+  (`propsGameSimFromRows`, the total marked "about"); a file from a run
+  without the simulation says so in a dim card.
+- **The Sim column** of the Every-prop table: the sim's own read of the
+  stat (his per 36 at his minutes scaled by his club's runs), green on the
+  pick's side of the line, red against it, plain on the line; sortable by
+  the gap toward the pick; a **simulation** filter beside the others keeps
+  the props the read sides with, or against; Reset view clears both.
+- **The best cards' last line**: "Sim reads 27.7 v the 25.5 line, on the
+  OVER's side · PHI 103 (94–111) · blowout 52%", green or red. The phone
+  sheet's props carry the read too, and Copy props as text.
+
+Shown, not scored, as before: the scored part of the simulation is the
+matchup lever at half weight, the weight that measured.

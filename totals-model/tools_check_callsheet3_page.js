@@ -1500,6 +1500,41 @@ const CHECKS = ["dome","playoff","agconf","hgconf","agbk","hgbk"];
       && usageT.pairs.map(p => parseFloat(/both land (\d\d\.\d)%/.exec(p.text)[1])).every((c, i, a) => i === 0 || c <= a[i - 1]),
       'props: the usage and role filters keep the right men and Reset view clears them, and the same-game pairs list the date\'s tickets likeliest first with the parlay\'s price, what it needs and the measured kind of pair', JSON.stringify({ hi: usageT.hi, bench: usageT.bench, after: usageT.after, pairs: usageT.pairs.map(p => p.text.slice(0, 160)) }));
 
+  // ---- 26 Oct 2026: the simulation's stats on the Props page -- a card a game above the picks, the Sim column with its filter and sort, the best cards' last line ----
+  const simPropsT = await pg.evaluate(async () => {
+    const wait = () => new Promise(r => setTimeout(r, 90));
+    document.getElementById('propsReset').click(); await wait();
+    document.getElementById('m-props').click(); await wait(); document.getElementById('propsExample').click(); await wait();
+    const strip = [...document.querySelectorAll('#propsSim .pk.simg')].map(e => e.className + '|' + e.innerText.replace(/\s+/g, ' ').trim());
+    const head = [...document.querySelectorAll('#propsTable thead th')].map(th => th.textContent.trim());
+    const rowOf = tr => { const tds = tr.querySelectorAll('td'), c = tr.querySelector('td.simc'); return { name: tds[1].textContent.trim(), mk: tds[2].textContent.trim(), line: parseFloat(tds[3].textContent), side: tds[4].textContent.trim(), sim: c ? c.textContent.trim() : null, cls: c ? c.className : null, title: c ? c.title : '' }; };
+    const rows = [...document.querySelectorAll('#propsTable tbody tr[data-prop]')].map(rowOf);
+    const best = [...document.querySelectorAll('#propsBest .pk')].map(e => { const l = e.querySelector('.n5.simline'); return (e.querySelector('.n2') || {}).textContent + '→' + (l ? l.className + '|' + l.textContent.replace(/\s+/g, ' ').trim() : 'none'); });
+    const sel = (id, v) => { const el = document.getElementById(id); el.value = v; el.dispatchEvent(new Event('change', { bubbles: true })); };
+    const cells = () => [...document.querySelectorAll('#propsTable tbody tr[data-prop] td.simc')].map(c => c.className);
+    sel('propsSimSel', 'yes'); await wait(); const yes = cells();
+    sel('propsSimSel', 'no'); await wait(); const no = cells();
+    sel('propsSimSel', ''); await wait();
+    document.querySelector('#propsTable th[data-sort="sim"]').click(); await wait();
+    const sorted = [...document.querySelectorAll('#propsTable tbody tr[data-prop]')].map(rowOf), shown = document.getElementById('propsShown').textContent;
+    document.getElementById('propsReset').click(); await wait();
+    const after = { sim: document.getElementById('propsSimSel').value, n: document.querySelectorAll('#propsTable tbody tr[data-prop]').length, shown: document.getElementById('propsShown').textContent };
+    document.getElementById('m-nba').click(); await wait();
+    return { strip, head, rows, best, yes, no, sorted, shown, after };
+  });
+  const simGap = r => r.sim === null || r.sim === '' ? null : (r.side === 'UNDER' ? r.line - parseFloat(r.sim) : parseFloat(r.sim) - r.line);
+  const simMaxey = simPropsT.rows.find(r => /^Tyrese Maxey/.test(r.name)), simBig = simPropsT.rows.slice().sort((a, b) => simGap(b) - simGap(a))[0];
+  chk(simPropsT.strip.length === 1 && /^pk simg\|76ers @ Knicks · played 3,000 times PHI \d{2,3} · NYK \d{2,3} total \d{3} (NYK|PHI) by \d+\.\d · home win \d+(\.\d)?% · total \d{3}( · the book's [\d.]+ \([-−+][\d.]+\))? PHI middle half \d+–\d+ against [\d.]+ a game by the ratings · NYK \d+–\d+ against [\d.]+ blowout of 15 or more \d+(\.\d)?% · overtime \d+(\.\d)?% · [\d.]+ possessions · PHI's regulars out [-−][\d.]+ per 100 on the offence · the sim's read on the pick's side for \d of 7 props$/.test(simPropsT.strip[0])
+      && simPropsT.head.slice(-3).join('|') === 'Levers|Sim|Take' && simPropsT.rows.length === 7 && simPropsT.rows.every(r => /^\d+(\.\d)?$/.test(r.sim) && /^simc( pos| neg)?$/.test(r.cls) && (simGap(r) > 0) === /pos/.test(r.cls) && (simGap(r) < 0) === /neg/.test(r.cls) && /the simulation's own read of the stat/.test(r.title))
+      && simMaxey && simMaxey.side === 'OVER' && simMaxey.line === 25.5 && /^2\d\.\d$/.test(simMaxey.sim) && simMaxey.cls === 'simc ' + (parseFloat(simMaxey.sim) > 25.5 ? 'pos' : 'neg'),
+      'props: the simulation\'s strip shows the example game played 3,000 times with both clubs\' points and middle halves against the ratings, the total, the margin, the blowout, overtime, the pace and the 76ers\' regulars out, and the Sim column carries the sim\'s own read on every projected prop, green on the pick\'s side of the line', JSON.stringify({ strip: simPropsT.strip, head: simPropsT.head.slice(-4), rows: simPropsT.rows.map(r => r.name + ' ' + r.side + ' ' + r.line + ' sim ' + r.sim + ' ' + r.cls) }));
+  chk(simPropsT.best.length >= 4 && simPropsT.best.every(b => /→n5 simline( pos| neg)?\|Sim reads \d+(\.\d)? v the \d+\.5 line, (on the (OVER|UNDER)'s side|against the (OVER|UNDER)|on the line) · (PHI|NYK) \d{2,3} \(\d+–\d+\) · blowout \d+(\.\d)?%$/.test(b))
+      && simPropsT.best.filter(b => /on the (OVER|UNDER)'s side/.test(b)).every(b => /simline pos/.test(b)) && simPropsT.best.filter(b => /against the (OVER|UNDER)/.test(b)).every(b => /simline neg/.test(b)) && simPropsT.best.filter(b => /on the line/.test(b)).every(b => /simline\|/.test(b))
+      && simPropsT.yes.length >= 1 && simPropsT.yes.every(c => c === 'simc pos') && simPropsT.no.length >= 1 && simPropsT.no.every(c => c === 'simc neg') && simPropsT.yes.length + simPropsT.no.length === simPropsT.rows.filter(r => simGap(r) !== 0).length
+      && simPropsT.sorted.length === 7 && simPropsT.sorted[0].name === simBig.name && simPropsT.sorted[0].mk === simBig.mk && simPropsT.sorted.every((r, i, a) => i === 0 || simGap(r) <= simGap(a[i - 1])) && /sorted by sim ▾/.test(simPropsT.shown)
+      && simPropsT.after.sim === '' && simPropsT.after.n === 7 && !/sorted/.test(simPropsT.after.shown),
+      'props: every best card ends with the sim\'s read against the line in green or red, the simulation filter keeps the props the sim\'s read sides with (or against), the Sim column sorts by the gap toward the pick, and Reset view clears both', JSON.stringify({ best: simPropsT.best.map(b => b.slice(0, 140)), yes: simPropsT.yes, no: simPropsT.no, sorted: simPropsT.sorted.map(r => r.name + ' ' + r.side + ' ' + r.line + ' ' + r.sim), shown: simPropsT.shown, after: simPropsT.after }));
+
   // ---- 26 Oct 2026: tonight on your phone -- the Phone QR button makes a code carrying the night's picks; an independent decoder (jsQR,
   //      tools_vendor) reads it back off the drawn modules; the phone sheet m.html renders it, view only ----
   const phoneT = await pg.evaluate(async () => {

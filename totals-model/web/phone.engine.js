@@ -22,7 +22,7 @@
     bestBets(dateISO).forEach(function (x) { P.bets.push({ g: x.row.matchup, s: x.row.sport, p: x.mk.pick, m: x.mk.label, c: phoneChance(x.mk.p), pr: x.mk.price, e: x.mk.edge === null || x.mk.edge === undefined ? undefined : Math.round(x.mk.edge * 1000) / 10, b: bandOf(x.mk) || undefined, r: res(x.mk, x.row) }); });
     if (keep.likely !== false) likeliestLegs(dateISO).forEach(function (x) { P.likely.push({ g: x.row.matchup, s: x.row.sport, p: x.mk.pick, c: phoneChance(x.mk.p), pr: x.mk.price, ok: x.mk.p >= x.need ? 1 : undefined, r: res(x.mk, x.row) }); });
     propsSource().filter(function (r) { return (r.gdate || "") === dateISO && propHas(r) && r.edge > 0; }).sort(function (a, b) { return b.edge - a.edge; }).slice(0, keep.props === undefined ? 12 : keep.props)
-      .forEach(function (r) { P.props.push({ g: r.game, p: r.name + " " + r.side + " " + r.line + " " + (PROPS_LABEL[r.mk] || r.mk), c: phoneChance(r.chance), pr: r.price, e: Math.round(r.edge * 1000) / 10, b: r.band, pj: r.proj, r: propTakeRes(r) || undefined }); });
+      .forEach(function (r) { var sr = typeof propSimRead === "function" ? propSimRead(r) : null; P.props.push({ g: r.game, p: r.name + " " + r.side + " " + r.line + " " + (PROPS_LABEL[r.mk] || r.mk), c: phoneChance(r.chance), pr: r.price, e: Math.round(r.edge * 1000) / 10, b: r.band, pj: r.proj, sr: sr === null ? undefined : sr, r: propTakeRes(r) || undefined }); });
     if (keep.sim !== false) card.filter(function (r) { return r.sport === "NBA" && (r.gdate || "") === dateISO && r.inputs && r.inputs.nbasim && !isVoid(r); }).forEach(function (r) {
       var sim = null; try { sim = JSON.parse(r.inputs.nbasim); } catch (e) { sim = null; }
       if (!sim || !sim.own) return;

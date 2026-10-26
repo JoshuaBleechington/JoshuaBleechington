@@ -54,6 +54,7 @@
     if (x.pr !== undefined && x.pr !== null) parts.push(sgn(x.pr) + " needs " + (implied(x.pr) * 100).toFixed(1) + "%");
     if (x.e !== undefined) parts.push("edge " + sgn(x.e, 1));
     if (x.pj !== undefined) parts.push("proj " + x.pj);
+    if (x.sr !== undefined) parts.push("sim " + x.sr);
     if (x.g2 !== undefined) parts.push("gap " + sgn(x.g2, 1));
     if (x.ok) parts.push("the price agrees");
     return parts.join(" · ");

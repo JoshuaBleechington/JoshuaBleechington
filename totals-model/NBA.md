@@ -619,3 +619,24 @@ chance, 0.08 sigmas on points, 0.11 rebounds, 0.14 assists, 0.23 threes and
 2024-25's points; the slate reads the chance around that median now, and
 re-scoring the first two nights' 829 props with it reads 452-377 against
 423-406 as shipped, the say-so within a point of the done.
+
+**Usage, the role, the floors and the pairs (26 Oct 2026).** The user's
+review of the props, four reads and a pattern, measured on 2025-26 before
+anything was built (`tools_nba_usage_floors.py`: 93,053 player-game
+projections after eight prior games, usage the share of his club's
+possessions he ended on the floor):
+
+| Question | Answer |
+| --- | --- |
+| Does a usage rate of 24% or more pick a side? | No: the over rate at the projection's median is 49.9% under 18%, 50.8% at 18 to 24%, 49.4% at 24% and up (points, 21,467 rows). The projection is unbiased at every usage |
+| Does usage say how far the projection misses? | Yes: the miss in sigmas runs 1.13 / 1.08 / 0.93 on points, 1.18 / 1.08 / 0.91 on PRA, 1.12 / 1.00 / 0.97 on rebounds, 1.04 / 1.03 / 0.98 on assists, and the first half of the season says the same as the second (points 1.10 → 1.14, 1.05 → 1.10, 0.92 → 0.94). It is a sigma factor now, the side untouched |
+| Do starters differ from the bench? | At low usage, yes: a starter's miss 1.03 sigmas against the bench's 1.17 on points, 1.02 against 1.25 on PRA; at 24% and up 0.91 against 1.04. A starter's over rate 51% at every usage, the bench's 46 to 50% (started his previous game as the test's stand-in for the lineup; the slate reads RotoWire's five). The role table is used when the role is known, the usage table when it is not |
+| Are the 95% alternate lines honest? | Honest to conservative: the model's 95% floor (the median less 1.645 sigmas) cleared 97.5% of nights on points, 97.4% rebounds, 97.8% assists, 97.3% PRA; the 90% floor 93%; the 80% floor 82 to 86%. Rounded down to a book's whole number the 95% line cleared 98% |
+| Do one man's three floors land together? | More than independence says: 373 player-games with points, rebounds and assists floors at one or more, all three cleared 96.5% against 85.7% for three independent 95% legs; his minutes carry all three |
+| Do two players' props in one game land together? | Almost as independence says: both over the median 23.7% of 22,381 same-club pairs and 25.2% of 25,789 opposite-club pairs, against 25.0%; both over the 80% floor 67.0% and 67.9% against 64.0%. One over and one under on the same club 26.6% |
+| Does one man's two markets land together? | Yes: points with rebounds 29.3% of 15,987 pairs, points with assists 28.3%, rebounds with assists 28.8%, against 25%; points with threes 38.2% of 7,914, the threes being points |
+
+The page's same-game pairs carry those as factors on the product (0.95
+two overs on one club, 1.0 two players, 1.15 one man's two markets, 1.5
+his points with his threes), capped at the lesser leg, and are graded on
+their own tile from the first night.

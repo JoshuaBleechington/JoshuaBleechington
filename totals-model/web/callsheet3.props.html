@@ -39,6 +39,8 @@
         credits a market a game on the history endpoint), so the tile earns everything from day one.</p>
       <div class="subhead" id="propsTakingHead" hidden>Taking <span class="tag" id="propsTakingCount"></span> <span class="tag">the props you marked with Take: the bets you are placing, listed here and on the day board, graded on their own line in Is it working</span> <button type="button" class="btn" id="propsTakingText" style="margin-left:8px;padding:4px 10px;font-size:11px">Copy as text</button></div>
       <div id="propsTaking" class="picks" hidden></div>
+      <div class="subhead">Same-game pairs <span class="tag">two props from one game at 52% or better, the likeliest four a game paired, the likeliest tickets first: the chance both land (measured: two players' props land almost independently, a man's own two markets together more often), the parlay's price from the two legs and what it needs; graded on their own line</span></div>
+      <div id="propsPairs" class="picks"></div>
       <div class="subhead">Best props <span class="tag">every prop whose blended chance clears its price, best edge first — BET at 3 points of edge and 55% or better, LEAN below that; a priori bands, the record decides. Click a card for the prop's own panel</span></div>
       <div id="propsBest" class="picks"></div>
       <div class="subhead">Every prop on the date <span class="tag">by game, then by edge — click a column to sort it, filter by market, band, side, the levers or player; the Levers column counts the factors pushing toward the pick ▲ and against it ▼; click a row for the prop's own panel, then Previous and Next (or the arrow keys) walk the list as shown</span></div>
@@ -49,6 +51,10 @@
           <select id="propsBand"><option value="">all</option><option value="BET">BET</option><option value="LEAN">LEAN</option><option value="no edge">no edge</option></select></label>
         <label class="f" style="flex-direction:row;align-items:center;gap:6px"><span class="tag">side</span>
           <select id="propsSide"><option value="">all</option><option value="OVER">over</option><option value="UNDER">under</option></select></label>
+        <label class="f" style="flex-direction:row;align-items:center;gap:6px"><span class="tag">usage</span>
+          <select id="propsUsage"><option value="">all</option><option value="hi">24% and up</option><option value="mid">18 to 24%</option><option value="lo">under 18%</option></select></label>
+        <label class="f" style="flex-direction:row;align-items:center;gap:6px"><span class="tag">role</span>
+          <select id="propsRole"><option value="">all</option><option value="starter">starters</option><option value="bench">bench</option></select></label>
         <label class="f" style="flex-direction:row;align-items:center;gap:6px"><span class="tag">levers</span>
           <select id="propsAgree"><option value="">all</option><option value="all">every lever toward the pick</option><option value="most">more toward than against</option></select></label>
         <label class="f" style="flex-direction:row;align-items:center;gap:6px"><span class="tag">player or game</span><input id="propsQ" type="text" placeholder="Maxey" autocomplete="off" style="width:150px"></label>

@@ -4150,6 +4150,33 @@ PROPS_SD_K = {"pts": 1.85, "reb": 1.2, "ast": 1.15, "tpm": 1.1, "pra": 1.9}     
 # all five markets, 2024-25 points; a shift fitted on a season's first half put the second half's over
 # rate at 50 +/- 3 on every market). PROPS_MEDIAN_OVER is the over rate at the mean, for the why line.
 PROPS_MEDIAN_SHIFT = {"pts": 0.08, "reb": 0.11, "ast": 0.14, "tpm": 0.23, "pra": 0.05}
+# the sigma by usage (26 Oct 2026, the user: "usage rate of 24% or more"): a high-usage man's miss runs narrower than
+# k x sqrt(projection) and a low-usage man's wider, the same in both halves of 2025-26 (tools_nba_usage_floors.py: points
+# 1.10 / 1.14 under 18%, 1.05 / 1.10 between, 0.92 / 0.94 at 24% and up). The side does not move with usage (the over
+# rate sits at 50% in every bucket); the chance does, through the sigma. Buckets: under 18%, 18 to 24%, 24% and up
+PROPS_USAGE_SD = {"pts": (1.12, 1.07, 0.93), "pra": (1.16, 1.07, 0.90), "reb": (1.12, 1.00, 0.97), "ast": (1.03, 1.02, 0.97), "tpm": (1.0, 1.0, 1.0)}
+# and by his role (26 Oct 2026, the user's Lakers starters at 8.5 and 5.5 points): a starter's miss runs about one sigma
+# whatever his usage, a bench man's 1.15 to 1.25 at low usage (started his previous game as the test's stand-in for the
+# lineup; the slate reads RotoWire's five). Used when the role is known, the usage table alone when it is not
+PROPS_ROLE_SD = {"starter": {"pts": (1.03, 1.01, 0.91), "pra": (1.02, 0.99, 0.87), "reb": (1.01, 0.96, 0.95), "ast": (1.03, 0.99, 0.96), "tpm": (1.0, 1.0, 1.0)},
+                 "bench": {"pts": (1.17, 1.15, 1.04), "pra": (1.25, 1.18, 1.08), "reb": (1.19, 1.04, 1.06), "ast": (1.04, 1.07, 1.06), "tpm": (1.0, 1.0, 1.0)}}
+PROPS_USAGE_CUTS = (18.0, 24.0)
+
+
+def props_usage_bucket(usage):
+    return 0 if usage < PROPS_USAGE_CUTS[0] else 1 if usage < PROPS_USAGE_CUTS[1] else 2
+
+
+def props_sd_factor(mk, usage, starter):
+    """The sigma's factor from his usage and his role: the role table when the role is known, the usage table alone otherwise."""
+    if usage is None:
+        return 1.0
+    b = props_usage_bucket(float(usage))
+    if starter is True:
+        return PROPS_ROLE_SD["starter"][mk][b]
+    if starter is False:
+        return PROPS_ROLE_SD["bench"][mk][b]
+    return PROPS_USAGE_SD[mk][b]
 PROPS_MEDIAN_OVER = {"pts": 0.47, "reb": 0.46, "ast": 0.45, "tpm": 0.41, "pra": 0.48}
 PROPS_OUT_MIN_PER30 = 1.42                                                    # minutes added per 30 mpg of regulars out (t 36)
 PROPS_OUT_RATE_PER30 = {"pts": 0.56, "reb": 0.0, "ast": 0.09, "tpm": 0.0, "pra": 0.66}   # per 36, per 30 mpg out (points t 11, assists t 6; the rest null)
@@ -4254,9 +4281,47 @@ def nba_player_logs(ledger_games):
                 e["n"], e["team"] = d["n"], ab
                 if d.get("pos"):
                     e["pos"] = d["pos"]
-                e["g"].append({"d": g.get("date"), "opp": opp, "home": home, "min": float(d["min"] or 0), "st": int(d["st"] or 0),
-                               "pts": d["pts"], "reb": d["reb"], "ast": d["ast"], "tpm": d["tpm"], "full": d["full"]})
+                entry = {"d": g.get("date"), "opp": opp, "home": home, "min": float(d["min"] or 0), "st": int(d["st"] or 0),
+                         "pts": d["pts"], "reb": d["reb"], "ast": d["ast"], "tpm": d["tpm"], "full": d["full"]}
+                # his usage (26 Oct 2026): his shots, trips and turnovers against the club's possessions while he was on the floor
+                tl = g.get("sa" if key == "pa" else "sh") or {}
+                tpos = (tl.get("fga") or 0) + NBA_PACE_FT * (tl.get("fta") or 0) + (tl.get("tov") or 0)
+                tm = float(tl.get("min") or 240.0)
+                if d["full"] and entry["min"] > 0 and tpos > 0 and tm > 0:
+                    entry["u"] = round((d["fga"] or 0) + NBA_PACE_FT * (d["fta"] or 0) + (d["tov"] or 0), 2)
+                    entry["tu"] = round(tpos * entry["min"] / (tm / 5.0), 2)
+                e["g"].append(entry)
     return per
+
+
+def props_role(name, ab, lineups, logs_this, logs_last):
+    """Starter or bench tonight (26 Oct 2026): RotoWire's five for his club when
+    the page has it (confirmed or expected), else whether he started his last
+    game this season, else last season's last game. (True | False | None, the
+    source in words)."""
+    lu = nba_lineup_for(lineups, NBA_NICK.get(ab, ab), ab) if lineups else None
+    if lu and lu.get("five"):
+        key = props_name_key(name)
+        return (any(props_name_key(n) == key for _p, n in lu["five"]), "RotoWire's %s five" % (lu.get("status") or "expected"))
+    for logs, label in ((logs_this, "his last game this season"), (logs_last, "his last game last season")):
+        gs = [g for g in (logs or []) if g.get("min", 0) > 0]
+        if gs:
+            return (bool(gs[-1].get("st")), label)
+    return (None, None)
+
+
+def props_usage(logs_this, logs_last):
+    """His usage rate: the share of his club's possessions he ended while on the
+    floor, this season once he has PROPS_PLAYER_MIN_GAMES games with the box
+    stats, else last season's; (usage %, 'this season' | 'last season', games)
+    or None."""
+    for logs, label in ((logs_this, "this season"), (logs_last, "last season")):
+        gs = [g for g in (logs or []) if g.get("tu")]
+        if len(gs) >= PROPS_PLAYER_MIN_GAMES or (label == "last season" and gs):
+            tu = sum(g["tu"] for g in gs)
+            if tu > 0:
+                return (round(100.0 * sum(g["u"] for g in gs) / tu, 1), label, len(gs))
+    return None
 
 
 def props_rate(logs_this, logs_last, mk):
@@ -4640,6 +4705,15 @@ def props_project(prop, logs_this, logs_last, ctx):
             sp["home"][0], sp["road"][0], int(sp["home"][1] + sp["road"][1]), "; tonight at home" if ctx.get("home") else "; tonight on the road"))
     mu = rate * mins * f_pace * f_dvp * f_match
     sd = PROPS_SD_K[mk] * math.sqrt(max(mu, 1.0))
+    # his usage narrows or widens the miss (26 Oct 2026), measured on both halves of 2025-26; the side is untouched
+    usg, starter, f_sd = ctx.get("usage"), ctx.get("starter"), 1.0
+    if usg is not None:
+        f_sd = props_sd_factor(mk, usg, starter)
+        sd *= f_sd
+        why.append("usage %.1f%% of his club's possessions (%s)%s: a %s%s man's miss runs %.2f sigmas, measured, so the chance is read %s" % (
+            float(usg), ctx.get("usage_src") or "this season", (", a starter (%s)" % ctx["start_src"]) if starter is True and ctx.get("start_src") else (", off the bench (%s)" % ctx["start_src"]) if starter is False and ctx.get("start_src") else "",
+            "high-usage" if float(usg) >= PROPS_USAGE_CUTS[1] else "low-usage" if float(usg) < PROPS_USAGE_CUTS[0] else "mid-usage", " starting" if starter is True else " bench" if starter is False else "", f_sd,
+            "narrower" if f_sd < 1 else "wider" if f_sd > 1 else "as it is"))
     # the centre (22 Oct 2026): a box-score stat skews right, so the mean sits above the median and a
     # normal centred on the mean says 50% for a number the man clears 46% of the time (41% on threes);
     # the books post the median. The chance is read around the median, the mean shifted down by the
@@ -4676,7 +4750,9 @@ def props_project(prop, logs_this, logs_last, ctx):
         parts.append({"k": "dvp", "t": "Defence v position", "eff": round((f_dvp - 1.0) * rate * mins * f_pace, 2), "i": i_dvp})
     if abs(f_match - 1.0) > 1e-9:
         parts.append({"k": "match", "t": "The matchup, from the simulation", "eff": round((f_match - 1.0) * rate * mins * f_pace * f_dvp, 2), "i": i_match})
-    return {"proj": round(mu, 2), "sd": round(sd, 2), "pm": round(pm, 4), "pb": round(pb, 4), "p": round(p, 4), "push": round(push, 4),
+    return {"proj": round(mu, 2), "sd": round(sd, 2), "med": round(centre, 2), "usg": (round(float(usg), 1) if usg is not None else None), "sdf": round(f_sd, 2),
+            "starter": starter, "start_src": ctx.get("start_src"),
+            "pm": round(pm, 4), "pb": round(pb, 4), "p": round(p, 4), "push": round(push, 4),
             "side": side, "chance": round(chance, 4), "price": price, "need": round(need, 4), "edge": round(edge, 4), "band": band,
             "mins": round(mins, 1), "rate36": round(rate * 36.0, 2), "base": round(rate0 * mins0, 2), "parts": parts, "why": why}, why
 
@@ -4870,9 +4946,12 @@ def make_nba_props(date_iso, out_dir, log, topup=False, sim_runs=NBA_SIM_RUNS):
                     self_out = st
             dmk = "pts" if pr["mk"] == "pra" else pr["mk"]
             dv = props_dvp_blend(dvp_this.get((opp, pos, dmk)), dvp_last.get((opp, pos, dmk))) if pos else None
+            usage_ = props_usage(e1.get("g"), e2.get("g"))
+            starter_, start_src = props_role(pr["name"], team, lineups, e1.get("g"), e2.get("g"))
             ctx = {"out_mpg": out[team][0], "out_names": [(n, mpg, st) for n, mpg, st in out[team][1] if mpg is not None and mpg >= PROPS_REGULAR_MPG],
                    "maybe": out[team][2], "pace": pace, "league_pace": league_pace, "home": team == hab, "pos": pos, "opp_nick": NBA_NICK.get(opp, opp),
                    "pace_team": pace_h if team == hab else pace_a, "pace_opp": pace_a if team == hab else pace_h, "match": club_match(team, opp, team == hab),
+                   "usage": (usage_[0] if usage_ else None), "usage_src": (usage_[1] if usage_ else None), "starter": starter_, "start_src": start_src,
                    "dvp": dv, "htb": htb_line(htb, NBA_NICK.get(opp, opp), opp, pos, dmk) if pos else None, "self_out": self_out}
             proj, why = props_project(pr, e1.get("g"), e2.get("g"), ctx)
             recent = [[g_["d"], g_["opp"], 1 if g_["home"] else 0, g_["min"], props_stat(g_, pr["mk"])] for g_ in (e1.get("g") or e2.get("g") or [])[-10:]]
@@ -4894,7 +4973,7 @@ def make_nba_props(date_iso, out_dir, log, topup=False, sim_runs=NBA_SIM_RUNS):
     doc = {"format": PROPS_FORMAT, "version": 1, "date": date_iso, "generated": now_utc(), "source": "slate.py nba-props: The Odds API, the ledgers, ESPN, HashtagBasketball",
            "credits": credits_used, "games": games, "ledgers": ledgers,   # what the run read (23 Oct 2026): the page says so when nothing projects
            "method": {"anchor": PROPS_ANCHOR, "model": PROPS_MODEL_W, "sd_k": PROPS_SD_K, "out_min_per30": PROPS_OUT_MIN_PER30, "out_rate_per30": PROPS_OUT_RATE_PER30, "dvp_weight": PROPS_DVP_WEIGHT, "dvp_shrink": PROPS_DVP_SHRINK,
-                      "match_alpha": PROPS_MATCH_ALPHA, "pace": "the game's possessions against the club's own"}}
+                      "match_alpha": PROPS_MATCH_ALPHA, "pace": "the game's possessions against the club's own", "usage_sd": PROPS_USAGE_SD, "role_sd": PROPS_ROLE_SD, "usage_cuts": PROPS_USAGE_CUTS}}
     path = os.path.join(out_dir, "nba-props-%s.json" % date_iso)
     with open(path, "w", encoding="utf-8") as f:
         json.dump(doc, f, indent=1)
@@ -6264,6 +6343,26 @@ def selftest():
           and abs(proj_m["base"] + sum(parts_m[k]["eff"] for k in ("out", "pace", "dvp", "match")) - proj_m["proj"]) < 0.03 and parts_m["pace"]["eff"] < 0 and parts_m["match"]["eff"] > 0
           and why_m[parts_m["pace"]["i"]] == "the game's pace 102.0 (their 103.0, Lakers's 99.0, the league's 100.0) against their own: x0.990"
           and why_m[parts_m["match"]["i"]] == "the matchup, from the simulation's profiles: 116.0 per 100 into Lakers's 118.0 defence (league 114.0, on the road, on a back to back): x1.020 on the efficiency, at 0.5 weight, measured")
+    # his usage and his role narrow or widen the miss (26 Oct 2026): the sigma's factor, the why line, the role from RotoWire's five
+    ctx_u = dict(ctx_m)
+    ctx_u.update({"usage": 31.0, "usage_src": "this season", "starter": True, "start_src": "RotoWire's confirmed five"})
+    proj_u, why_u = props_project(prop_, lt["11"]["g"], ll["11"]["g"], ctx_u)
+    ctx_b = dict(ctx_u); ctx_b.update({"usage": 15.0, "starter": False, "start_src": "his last game this season"})
+    proj_b, _why_b = props_project(prop_, lt["11"]["g"], ll["11"]["g"], ctx_b)
+    ctx_n = dict(ctx_u); ctx_n.update({"usage": 20.0, "starter": None, "start_src": None})
+    proj_n, _why_n = props_project(prop_, lt["11"]["g"], ll["11"]["g"], ctx_n)
+    check("props: a high-usage starter's sigma narrows by the measured factor and a low-usage bench man's widens, the role unknown falls to the usage table, the projection itself does not move, and the file carries the median, the usage, the factor and the role",
+          abs(proj_u["sd"] - proj_m["sd"] * 0.91) < 0.02 and abs(proj_b["sd"] - proj_m["sd"] * 1.17) < 0.02 and abs(proj_n["sd"] - proj_m["sd"] * 1.07) < 0.02 and proj_u["proj"] == proj_m["proj"] and proj_u["pm"] > proj_m["pm"]
+          and proj_u["usg"] == 31.0 and proj_u["sdf"] == 0.91 and proj_u["starter"] is True and proj_u["start_src"] == "RotoWire's confirmed five" and proj_m["usg"] is None and proj_m["sdf"] == 1.0
+          and abs(proj_u["med"] - (proj_u["proj"] - PROPS_MEDIAN_SHIFT["pts"] * proj_u["sd"])) < 0.02
+          and any(w == "usage 31.0% of his club's possessions (this season), a starter (RotoWire's confirmed five): a high-usage starting man's miss runs 0.91 sigmas, measured, so the chance is read narrower" for w in why_u)
+          and props_sd_factor("reb", 10.0, None) == 1.12 and props_sd_factor("ast", 25.0, False) == 1.06 and props_sd_factor("pts", None, True) == 1.0)
+    check("props: the role from RotoWire's five, else his last game; the usage from his shots, trips and turnovers against the club's possessions while he was on",
+          props_role("Jalen Brunson", "NYK", {"rw": rw_}, None, None) == (True, "RotoWire's confirmed five") and props_role("Devin Carter", "BOS", {"rw": rw_}, None, None) == (False, "RotoWire's expected five")
+          and props_role("Nobody", "DAL", {}, [{"min": 30.0, "st": 1}], None) == (True, "his last game this season") and props_role("Nobody", "DAL", {}, [], [{"min": 12.0, "st": 0}]) == (False, "his last game last season")
+          and props_role("Nobody", "DAL", {}, None, None) == (None, None)
+          and props_usage([{"u": 20.0, "tu": 80.0}] * PROPS_PLAYER_MIN_GAMES, None) == (25.0, "this season", PROPS_PLAYER_MIN_GAMES) and props_usage([{"u": 20.0, "tu": 80.0}], [{"u": 10.0, "tu": 100.0}, {"u": 12.0, "tu": 100.0}]) == (11.0, "last season", 2)
+          and props_usage([], []) is None)
     # the game's simulation for the props (26 Oct 2026): run once a game, read for each prop
     if nbasim:
         prof_x = {"league": dict(nbasim.LEAGUE), "last": {},

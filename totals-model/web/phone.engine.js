@@ -9,7 +9,11 @@
   function phoneChance(p) { return p === null || p === undefined ? undefined : Math.round(p * 1000) / 10; }
   function phonePayload(dateISO, keep) {
     keep = keep || {};
-    var P = { v: 1, d: dateISO, at: new Date().toISOString(), take: [], four: [], bets: [], likely: [], props: [], sim: [] };
+    var P = { v: 1, d: dateISO, at: new Date().toISOString(), take: [], four: [], bets: [], likely: [], props: [], sim: [], pairs: [] };
+    if (typeof propsPairs === "function") propsPairs(dateISO).slice(0, 6).forEach(function (t) {
+      var res = propsPairRes(t);
+      P.pairs.push({ g: t.game, p: t.legs.map(function (r) { return r.name + " " + r.side + " " + r.line + " " + (PROPS_LABEL[r.mk] || r.mk); }).join(" + "), c: phoneChance(t.chance), pr: t.price, ok: t.chance >= t.need ? 1 : undefined, r: res || undefined });
+    });
     var res = function (mk, row) { var r = gradeMarket(mk, row.finals); return r && r !== "invalid" ? r : undefined; };
     takesOn(dateISO).forEach(function (x) { P.take.push({ k: "card", s: x.row.sport, g: x.row.matchup, p: x.mk.pick, m: x.mk.label || x.mk.key, c: phoneChance(x.mk.p), pr: x.mk.price, r: res(x.mk, x.row) }); });
     simTakesOn(dateISO).forEach(function (x) { P.take.push({ k: "sim", s: "NBA", g: x.row.matchup, p: x.t.pick, m: "the simulation, " + nbaSimTakeViewLabel(x.t.view), c: phoneChance(x.t.p), w: phoneChance(x.t.worth), b: x.t.band === "no call" ? undefined : x.t.band, pr: x.t.price === null ? undefined : x.t.price, r: nbaSimTakeRes(x.t, x.row) || undefined }); });

@@ -17,7 +17,71 @@
      the points for a player, by chance percentage and band"): a sort column with its direction, and filters by market,
      band, side and a name. Kept in this browser only; Reset view puts the table back to by game, then by edge */
   var PROPS_VIEW_KEY = "callsheet3.props.view.v1";
-  var PROPS_VIEW_DEFAULT = { sort: "default", dir: -1, mk: "", band: "", side: "", q: "", agree: "" };
+  var PROPS_VIEW_DEFAULT = { sort: "default", dir: -1, mk: "", band: "", side: "", q: "", agree: "", usage: "", role: "" };
+  /* the floors (26 Oct 2026, the user: "PRA alt lines at 95% or more, Sengun 10+ points, 5+ rebounds, 3+ assists"): the number
+     the model says he clears 95, 90 and 80% of nights, read off the median and the sigma the chance already uses. Measured on
+     2025-26 (tools_nba_usage_floors.py): the 95% floors cleared 97.5% of nights, the 90% 93%, the 80% 82%; posted as a whole
+     number ("x+") the 95% line cleared 98%; one man's three 95% floors (points, rebounds, assists) all cleared 96.5% of nights,
+     against 85.7% if they were independent, because his minutes carry all three. A file from before the slate wrote the median
+     reads it off the projection with the same shift the slate uses */
+  var PROPS_MEDIAN_SHIFT = { pts: 0.08, reb: 0.11, ast: 0.14, tpm: 0.23, pra: 0.05 };
+  var PROPS_FLOOR_Z = { 95: 1.6449, 90: 1.2816, 80: 0.8416 };
+  function propMedian(r) { return r.med !== undefined && r.med !== null ? +r.med : +r.proj - (PROPS_MEDIAN_SHIFT[r.mk] || 0) * +r.sd; }
+  function propFloor(r, q) { var f = Math.floor(propMedian(r) - PROPS_FLOOR_Z[q] * +r.sd); return f >= 1 ? f : null; }
+  function propUsageBucket(r) { return r.usg === null || r.usg === undefined ? "" : r.usg < 18 ? "lo" : r.usg < 24 ? "mid" : "hi"; }
+  /* two props from one game as a ticket (26 Oct 2026, the user: "the ones that hit quickly were same game parlays with 2 legs...
+     offer same game parlay tickets with the players' matchups on the same games that are the most likely to hit"): the legs are
+     the date's projected props at 55% or better, likeliest first, up to four a game; every pair in a game is a ticket whose chance
+     is the product of the two chances times what 2025-26 measured for the pair's kind (two players' props land almost
+     independently: two overs on one club 0.95 of the product, anything else 1.0; one man's two markets together more often,
+     1.15, and his points with his threes 1.5), capped at the lesser leg; the price is the two legs' prices multiplied and what it
+     needs is one over that. The tickets are rebuilt from the rows every time, so a graded night's tickets are the night's as
+     it stood, and the record grades them the same way */
+  var PROPS_PAIR_FACTOR = { same_club_overs: 0.95, cross: 1.0, same_man: 1.15, same_man_pts_tpm: 1.5 };
+  var PROPS_PAIR_MIN = 0.52, PROPS_PAIR_LEGS = 4, PROPS_PAIR_MAX = 8;
+  function propsPairs(dateISO, rowsIn) {
+    var rows = (rowsIn || propsSource()).filter(function (r) { return (r.gdate || "") === dateISO && propHas(r) && r.chance >= PROPS_PAIR_MIN && r.result !== "void"; });
+    var byGame = {};
+    rows.forEach(function (r) { (byGame[r.game] = byGame[r.game] || []).push(r); });
+    var out = [];
+    Object.keys(byGame).forEach(function (game) {
+      var legs = byGame[game].slice().sort(function (a, b) { return b.chance - a.chance; }).slice(0, PROPS_PAIR_LEGS);
+      for (var i = 0; i < legs.length; i++) for (var j = i + 1; j < legs.length; j++) {
+        var a = legs[i], b = legs[j], kind, f;
+        if (String(a.pid) === String(b.pid)) { if (a.mk === b.mk) continue; kind = ((a.mk === "pts" && b.mk === "tpm") || (a.mk === "tpm" && b.mk === "pts")) ? "same_man_pts_tpm" : "same_man"; }
+        else kind = (a.team === b.team && a.side === "OVER" && b.side === "OVER") ? "same_club_overs" : "cross";
+        f = PROPS_PAIR_FACTOR[kind];
+        var chance = Math.min(a.chance, b.chance, a.chance * b.chance * f), dec = decimalOf(a.price) * decimalOf(b.price);
+        out.push({ game: game, legs: [a, b], kind: kind, f: f, chance: chance, dec: dec, price: americanOf(dec), need: 1 / dec });
+      }
+    });
+    out.sort(function (x, y) { return (y.chance - x.chance) || (x.need - y.need); });
+    return out.slice(0, PROPS_PAIR_MAX);
+  }
+  function propsPairRes(t) {
+    var rs = t.legs.map(function (r) { return r.result; });
+    if (rs.some(function (r) { return !r || r === "graded"; })) return null;
+    if (rs.some(function (r) { return r === "void"; })) return null;
+    if (rs.some(function (r) { return r === "loss"; })) return "loss";
+    var live = rs.filter(function (r) { return r !== "push"; });
+    return live.length ? "win" : "push";
+  }
+  function propsPairUnits(t, res) {
+    if (res === "loss") return -1;
+    if (res !== "win") return 0;
+    var dec = 1;
+    t.legs.forEach(function (r) { if (r.result === "win") dec *= decimalOf(r.price); });   // a pushed leg drops out of the ticket
+    return dec - 1;
+  }
+  function propsPairCard(t, i) {
+    var res = propsPairRes(t), ok = t.chance >= t.need, a = t.legs[0], b = t.legs[1];
+    var leg = function (r) { return esc(r.name) + ' ' + esc(r.side) + ' ' + r.line + ' ' + esc(PROPS_LABEL[r.mk] || r.mk); };
+    var kind = t.kind === "same_club_overs" ? "two overs on one club" : t.kind === "cross" ? "two players" : t.kind === "same_man_pts_tpm" ? "one man, his points with his threes" : "one man, two markets";
+    return '<div class="pk pair' + (ok ? ' agrees' : '') + (res ? ' ' + res : '') + '"><div class="n1">PAIR #' + (i + 1) + ' · ' + esc(t.game) + ' · ' + (ok ? 'the price agrees' : 'the price asks more') + '</div>' +
+      '<div class="n2">' + leg(a) + ' <span class="amp">+</span> ' + leg(b) + (res ? ' <span class="chip ' + res + '">' + esc(res.toUpperCase()) + '</span>' : '') + '</div>' +
+      '<div class="n3">both land ' + (t.chance * 100).toFixed(1) + '% · pays ' + sgn(t.price, 0) + ' (' + t.dec.toFixed(2) + '×) needs ' + (t.need * 100).toFixed(1) + '%</div>' +
+      '<div class="n4">' + esc(a.name) + ' ' + (a.chance * 100).toFixed(1) + '% at ' + sgn(a.price, 0) + ' · ' + esc(b.name) + ' ' + (b.chance * 100).toFixed(1) + '% at ' + sgn(b.price, 0) + ' · ' + esc(kind) + ', measured ×' + t.f.toFixed(2) + '</div></div>';
+  }
   var propsTableView = Object.assign({}, PROPS_VIEW_DEFAULT);
   try { var pv0 = JSON.parse(localStorage.getItem(PROPS_VIEW_KEY) || "null"); if (pv0 && typeof pv0 === "object") propsTableView = Object.assign({}, PROPS_VIEW_DEFAULT, pv0); } catch (e) {}
   function savePropsTableView() { try { localStorage.setItem(PROPS_VIEW_KEY, JSON.stringify(propsTableView)); } catch (e) {} }
@@ -62,6 +126,8 @@
       if (v.band && (!propHas(r) || r.band !== v.band)) return false;
       if (v.side && (!propHas(r) || r.side !== v.side)) return false;
       if (v.agree) { var t = propsLeverTally(r); if (!propHas(r) || (v.agree === "all" ? !t.all : !t.most)) return false; }
+      if (v.usage && propUsageBucket(r) !== v.usage) return false;
+      if (v.role && !(v.role === "starter" ? r.starter === true : r.starter === false)) return false;
       if (q && String(r.name || "").toLowerCase().indexOf(q) < 0 && String(r.game || "").toLowerCase().indexOf(q) < 0) return false;
       return true;
     });
@@ -92,7 +158,8 @@
         rows.push({ id: 0, gdate: d.date || "", game: g.away + " @ " + g.home, away: g.away, home: g.home, aab: g.aab, hab: g.hab, spread: g.spread, total: g.total, pace: g.pace,
                     pid: String(x.pid), name: x.name, team: x.team, opp: x.opp, athome: !!x.home, pos: x.pos || "", mk: x.mk, line: x.line, op: x.op, up: x.up, book: x.book, books: x.books || {},
                     proj: x.proj, sd: x.sd, pm: x.pm, pb: x.pb, p: x.p, push: x.push, side: x.side, chance: x.chance, price: x.price, need: x.need, edge: x.edge, band: x.band,
-                    mins: x.mins, rate36: x.rate36, base: x.base, parts: x.parts || [], why: x.why || [], log: x.log || [], sim: x.sim || null, actual: null, result: null });
+                    mins: x.mins, rate36: x.rate36, base: x.base, parts: x.parts || [], why: x.why || [], log: x.log || [], sim: x.sim || null,
+                    med: x.med, usg: x.usg, sdf: x.sdf, starter: x.starter === undefined ? null : x.starter, start_src: x.start_src || null, actual: null, result: null });
       });
     });
     return rows;
@@ -220,6 +287,17 @@
     if (!graded.length) return "";
     var mk = function () { return { n: 0, w: 0, l: 0, p: 0, v: 0, says: 0, units: 0 }; };
     var all = mk(), byMk = {}, byBand = {}, bySide = {}, byEdge = {}, byChance = {}, byDate = {}, byDateBet = {}, byCentre = {}, byTake = mk();
+    /* the same-game pairs' record (26 Oct 2026): each graded date's tickets as the night built them, a ticket won when both legs did */
+    var byPair = mk(), pairDates = {};
+    graded.forEach(function (r) { if (r.gdate) pairDates[r.gdate] = true; });
+    Object.keys(pairDates).forEach(function (d) {
+      propsPairs(d, props).forEach(function (t) {
+        var res = propsPairRes(t); if (!res) return;
+        if (res === "push") { byPair.p++; return; }
+        byPair.n++; byPair.says += t.chance;
+        if (res === "win") { byPair.w++; byPair.units += propsPairUnits(t, res); } else { byPair.l++; byPair.units -= 1; }
+      });
+    });
     var dec = function (price) { return price > 0 ? 1 + price / 100 : 1 + 100 / (-price); };
     graded.forEach(function (r) {
       var d = r.gdate || "?";
@@ -255,6 +333,7 @@
     ["OVER", "UNDER"].forEach(function (sd) { if (bySide[sd]) parts.push(sd.toLowerCase() + " " + rec(bySide[sd])); });
     ["BET", "LEAN", "no edge"].forEach(function (b) { if (byBand[b]) parts.push(b + " " + rec(byBand[b]) + (byBand[b].n ? " " + sgn(byBand[b].units, 1) + "u" : "")); });
     if (byTake.n || byTake.p) parts.push("taken " + rec(byTake) + (byTake.n ? " " + sgn(byTake.units, 1) + "u" : ""));
+    if (byPair.n || byPair.p) parts.push("same-game pairs " + rec(byPair) + (byPair.n ? " " + sgn(byPair.units, 1) + "u" : ""));
     var markets = ["pts", "reb", "ast", "tpm", "pra"].map(function (k) { return byMk[k] ? tile(PROPS_LABEL[k], byMk[k], []) : ""; }).join("");
     var verdict = 'The props are a priori: the pooled rules behind them were measured on last season\'s box scores, the blend\'s weights were not. Read the BET band against the rest and <i>does</i> against <i>says</i>; under 100 graded props nothing here is a reading.';
     if (!full) {
@@ -267,6 +346,7 @@
     var h2 = '<div class="calib" data-sport="PROPS-TAB">' + tile("Every prop with a side", all, parts.slice(0, 2));
     ["BET", "LEAN", "no edge"].forEach(function (b) { if (byBand[b]) h2 += tile(b === "no edge" ? "No edge: the book's own side" : b + " band", byBand[b], []); });
     if (byTake.n || byTake.p) h2 += tile("Taken: the props you marked", byTake, []);
+    if (byPair.n || byPair.p) h2 += tile("Same-game pairs, at the parlay price", byPair, []);
     h2 += '</div>';
     h2 += '<div class="subhead">By market</div><div class="calib" data-sport="PROPS-MK">' + markets + '</div>';
     h2 += '<div class="subhead">By the edge the sheet claimed <span class="tag">the chance less what the price needs</span></div><div class="calib" data-sport="PROPS-EDGE">' +
@@ -402,7 +482,8 @@
     var has = propHas(r), lab = PROPS_LABEL[r.mk] || r.mk;
     var tile = function (k, v, s, cls) { return '<div class="pd-tile' + (cls ? ' ' + cls : '') + '"><div class="k">' + esc(k) + '</div><div class="v">' + v + '</div>' + (s ? '<div class="s">' + s + '</div>' : '') + '</div>'; };
     var h = '<div class="pd-band">' + esc(has ? r.band : "no projection") + '</div>';
-    h += '<h3>' + esc(r.name) + (r.pos ? ' <span class="tag">' + esc(r.pos) + '</span>' : '') + (r.team ? ' <span class="tag">' + esc(r.team) + '</span>' : '') + '</h3>';
+    h += '<h3>' + esc(r.name) + (r.pos ? ' <span class="tag">' + esc(r.pos) + '</span>' : '') + (r.team ? ' <span class="tag">' + esc(r.team) + '</span>' : '') +
+         (r.starter === true ? ' <span class="tag role" title="' + esc(r.start_src || '') + '">starter</span>' : r.starter === false ? ' <span class="tag role" title="' + esc(r.start_src || '') + '">bench</span>' : '') + '</h3>';
     h += '<div class="pd-pick">' + (has ? esc(r.side) + ' ' : '') + esc(String(r.line)) + ' ' + esc(lab) + propResChip(r) + '</div>';
     h += '<div class="pd-sub">' + esc(r.game) + ' · ' + esc(gameDate(r.gdate)) + (r.opp ? ' · ' + (r.athome ? 'at home against ' : 'on the road at ') + esc(r.opp) : '') +
          ' · ' + esc(r.book || "the book") + ' ' + esc(String(r.line)) + ' (' + sgn(r.op, 0) + '/' + sgn(r.up, 0) + ')</div>';
@@ -415,7 +496,19 @@
         tile("Projection", esc(String(r.proj)), "± " + esc(String(r.sd)) + " one sigma") +
         tile("Minutes", esc(String(r.mins)), "projected") +
         tile("Per 36", esc(String(r.rate36)), esc(lab) + " per 36 minutes") +
+        (r.usg !== null && r.usg !== undefined ? tile("Usage", esc(String(r.usg)) + "%", "of his club's possessions while on; " + (r.starter === true ? "a starter" : r.starter === false ? "off the bench" : "role unknown") + (r.sdf && r.sdf !== 1 ? ", the miss read at " + esc(String(r.sdf)) + " sigmas (measured)" : "")) : "") +
         '</div>';
+      /* the floors (26 Oct 2026): the number he clears 95, 90 and 80% of nights by the model, and his other markets' 95% floors tonight */
+      var f95 = propFloor(r, 95), f90 = propFloor(r, 90), f80 = propFloor(r, 80);
+      if (f95 || f90 || f80) {
+        var mine = propsSource().filter(function (x) { return String(x.pid) === String(r.pid) && (x.gdate || "") === (r.gdate || "") && propHas(x) && x.mk !== "pra"; })
+          .sort(function (a, b) { return ["pts", "reb", "ast", "tpm"].indexOf(a.mk) - ["pts", "reb", "ast", "tpm"].indexOf(b.mk); });
+        var ladder = mine.map(function (x) { var f = propFloor(x, 95); return f ? f + "+ " + (PROPS_LABEL[x.mk] || x.mk) : null; }).filter(function (s) { return s; });
+        h += '<h4>Floors <span class="dim">· the number he clears, by the model</span></h4><p class="pd-floors">' +
+             (f95 ? '95% of nights: <b>' + f95 + '+</b>' : '') + (f90 ? ' · 90%: <b>' + f90 + '+</b>' : '') + (f80 ? ' · 80%: <b>' + f80 + '+</b>' : '') + ' ' + esc(lab) +
+             (ladder.length >= 2 ? '. His 95% floors tonight: <b>' + ladder.join(', ') + '</b>' + (ladder.length >= 3 ? ' (one man\'s three 95% floors all cleared 96.5% of nights last season, his minutes carrying them together)' : '') : '') +
+             '. Measured on 2025-26: the 95% floors cleared 97.5% of nights, the 90% 93%, the 80% 82%; posted as a whole number the 95% line cleared 98%. Honest to conservative, and priced by the book as an alternate line.</p>';
+      }
     } else {
       h += '<p class="note">' + esc((r.why && r.why[0]) || "No projection on this prop.") + '</p>';
     }
@@ -512,7 +605,12 @@
       $("propsTakingCount").textContent = taken.length ? taken.length + " marked" : "";
     }
     var pool = ($("propsAll").checked ? rows : rows.filter(propHas)).slice(), list = propsTableRows(pool);
-    ["propsMk", "propsBand", "propsSide", "propsQ", "propsAgree"].forEach(function (id) { var el = $(id); if (el) { var k = { propsMk: "mk", propsBand: "band", propsSide: "side", propsQ: "q", propsAgree: "agree" }[id]; if (el.value !== propsTableView[k]) el.value = propsTableView[k]; } });
+    ["propsMk", "propsBand", "propsSide", "propsQ", "propsAgree", "propsUsage", "propsRole"].forEach(function (id) { var el = $(id); if (el) { var k = { propsMk: "mk", propsBand: "band", propsSide: "side", propsQ: "q", propsAgree: "agree", propsUsage: "usage", propsRole: "role" }[id]; if (el.value !== propsTableView[k]) el.value = propsTableView[k]; } });
+    /* the same-game pairs (26 Oct 2026), the likeliest tickets first */
+    if ($("propsPairs")) {
+      var pairs = propsPairs(date, rows);
+      $("propsPairs").innerHTML = pairs.length ? pairs.map(propsPairCard).join("") : '<div class="empty">' + (rows.length ? 'No game on this date has two props at 52% or better.' : 'Load a props file and the pairs land here.') + '</div>';
+    }
     if ($("propsShown")) $("propsShown").textContent = rows.length ? (list.length === pool.length ? pool.length + " shown" : list.length + " of " + pool.length + " shown") + (propsTableView.sort !== "default" ? " · sorted by " + (PROPS_SORT_COLS.filter(function (c) { return c[0] === propsTableView.sort; })[0] || ["", propsTableView.sort])[1].toLowerCase() + (propsTableView.dir < 0 ? " ▾" : " ▴") : "") : "";
     var h = '<table class="form props"><thead><tr>' + PROPS_SORT_COLS.map(function (c) {
       var on = propsTableView.sort === c[0];
@@ -571,7 +669,7 @@
       }
       openFrom(e);
     });
-    [["propsMk", "mk"], ["propsBand", "band"], ["propsSide", "side"], ["propsQ", "q"], ["propsAgree", "agree"]].forEach(function (p) {
+    [["propsMk", "mk"], ["propsBand", "band"], ["propsSide", "side"], ["propsQ", "q"], ["propsAgree", "agree"], ["propsUsage", "usage"], ["propsRole", "role"]].forEach(function (p) {
       var el = $(p[0]); if (!el) return;
       el.addEventListener(p[0] === "propsQ" ? "input" : "change", function () { propsTableView[p[1]] = el.value; savePropsTableView(); renderProps(); });
     });

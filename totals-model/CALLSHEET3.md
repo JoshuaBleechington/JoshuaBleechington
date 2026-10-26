@@ -1370,3 +1370,75 @@ on the phone; a browser without it is told) and renders the sections as
 cards with the result chips, in the page's light and dark looks. The
 harness makes a code on the example board, decodes it with an independent
 decoder (jsQR) off the rendered modules, and renders the sheet.
+
+## The props reviewed: usage, the role, the floors and the same-game pairs, 26 Oct 2026
+
+The user, with a night of props behind him, asked about four things he
+reads on a prop: a usage rate of 24% or more; the alternate lines a man
+clears 95% of the time (Sengun 10+ points, 5+ rebounds, 3+ assists); the
+matchup against a bottom-ten defence by position; and a true probability
+with positive edge. Then the pattern in the ones that landed first, two
+props from one game as a parlay, and two Lakers starters, Ziaire Williams
+over 8.5 points and Matisse Thybulle over 5.5, both cleared early. Each was
+measured on 2025-26 before anything was built (`tools_nba_usage_floors.py`,
+NBA.md), nothing that scored was touched, and what measured went in:
+
+**Usage.** It was not on the page. The slate reads it now (`props_usage`:
+the share of his club's possessions he ended on the floor, this season at
+three games, else last season's) and the panel shows it as a tile, "29.5%
+of his club's possessions, this season". What it measured is not what the
+user expected: the over rate at the projection's median is 50% in every
+usage bucket, so a star's usage says nothing about which side lands. What
+it says is how far the projection misses: a man at 24% and up misses by
+0.93 sigmas, a man under 18% by 1.13, and the split holds from the first
+half of the season to the second. That factor is in the sigma now
+(`props_sd_factor`, the side unchanged): a star's chance reads sharper
+either way, a role player's wider, and the why says so. A **usage** filter
+in the Every-prop table (24% and up, 18 to 24%, under 18%) finds the ones
+he asked for.
+
+**The role.** The Williams and Thybulle pattern is a real one: a starter's
+miss runs about one sigma at every usage, a bench man's 1.15 to 1.25 at low
+usage, because the starter's minutes are the steady part. The role comes
+from RotoWire's five when the run has it (`props_role`, "RotoWire's
+confirmed five"), else whether he started his last game; it picks the
+starter's or the bench's sigma table, and it is a tag on the panel's heading
+and a **role** filter beside the others.
+
+**The floors.** `propFloor` is the whole number the median less z sigmas
+rounds down to, at 95, 90 and 80% (z 1.645, 1.282, 0.842). The panel's
+Floors section says "95% of nights: 10+ · 90%: 13+ · 80%: 15+ points", and
+when he has two or more markets on the night, his 95% floors across them
+as a ladder, "10+ points, 5+ rebounds, 3+ assists". Measured: the 95%
+floors cleared 97.5% of nights, the 90% 93%, the 80% 82%; posted as a
+book's whole number the 95% line cleared 98%; and one man's three 95%
+floors all cleared 96.5% of nights against the 85.7% independence would
+say, his minutes carrying all three. Honest to conservative. The books'
+alternate-line prices are not pulled (a second market a game on the feed,
+about twice the credits), so the floors are shown, not priced.
+
+**The matchup.** Already scored: the defence's lean by position per stat,
+from the ledger's own table, at the weight that held from one half of the
+season to the other (0.75; 0.4 on threes), with HashtagBasketball's rank
+beside it. A fantasy-points-allowed rank is the same levers added up, so
+nothing new was built for it.
+
+**A true probability with positive edge.** That is the Chance column
+against what the price needs, and the BET band at three points of edge and
+55%; the Is it working block is the test of it.
+
+**Same-game pairs.** `propsPairs` makes tickets from the date's projected
+props at 52% or better: the likeliest four legs a game, every pair of them
+a ticket, likeliest first, eight at most. The chance both land is the
+product of the two chances times what the season measured for the pair's
+kind, capped at the lesser leg: two players' props land almost as
+independence says (23.7% of pairs on one club both over the median, 25.2%
+on opposite clubs, against 25.0%), so two overs on one club carry 0.95 and
+two players 1.0; one man's two markets land together more often (28 to
+29% against 25%), 1.15, and his points with his threes 38.2%, 1.5. The
+ticket's price is the two legs' prices multiplied, what it needs is one
+over that, and the card says whether the price agrees. The tickets are
+rebuilt from the rows every time, so a graded night's tickets are the
+night's as it stood and the record grades them on their own tile,
+"Same-game pairs, at the parlay price", a pushed leg dropping out of the
+ticket as the books do it. The phone sheet carries them.

@@ -172,7 +172,7 @@ def head() -> str:
              "  .pdlg ul.pd-why { margin: 0; padding-left: 18px; font: 13px/1.55 var(--sans); color: var(--ink); } .pdlg ul.pd-why li { margin: 4px 0; }\n"
              "  .pdlg table.form { margin: 4px 0 4px; } .pdlg table.form td, .pdlg table.form th { white-space: normal; } .pdlg table.form tr.carded td { font-weight: 700; }\n"
              "  .pdlg .note { margin: 14px 0 0; }\n"
-             "  .pdlg .pd-base { font: 12.5px/1.5 var(--sans); color: var(--ink-2); margin: 0 0 8px; }\n"
+             "  .pdlg .pd-base, .pdlg .pd-floors { font: 12.5px/1.5 var(--sans); color: var(--ink-2); margin: 0 0 8px; }\n"
              "  .pdlg .pd-levers { display: grid; gap: 6px; }\n"
              "  .pdlg .lever { display: grid; grid-template-columns: minmax(150px, 1.2fr) 2fr 56px; gap: 10px; align-items: center; font: 12.5px/1.4 var(--sans); }\n"
              "  .pdlg .lever .lb { height: 10px; background: var(--surface-2); border-radius: 5px; overflow: hidden; } .pdlg .lever .lb span { display: block; height: 100%; border-radius: 5px; background: var(--muted); }\n"
@@ -187,6 +187,7 @@ def head() -> str:
              "  .pk .n6 { margin-top: 8px; } .pdlg .pd-take { margin: 6px 0 2px; } table.props td.take, #board td:last-child { white-space: nowrap; }\n"
              "  .takebtn.off { opacity: .45; cursor: not-allowed; } .simtab .simtake { margin-top: 5px; } .ttgap .takebtn { margin-left: 4px; vertical-align: middle; }\n"
              "  table.props td.agree { font-family: var(--mono); white-space: nowrap; } .pk .tag.agree { background: var(--go); color: #fff; }\n"
+             "  .pk.pair.agrees { border-color: var(--go); } .pk.pair.win { box-shadow: inset 4px 0 0 var(--go); } .pk.pair.loss { box-shadow: inset 4px 0 0 var(--bad); } .pdlg h3 .tag.role { background: var(--ink-2); color: var(--bg, #fff); }\n"
              "  .pdlg.phone .pdlg-box { max-width: 640px; } .pdlg.phone h3 { margin: 4px 0 10px; font: 800 20px/1.2 var(--sans); } .pdlg.phone h3 .tag { vertical-align: middle; }\n"
              "  .qrbox { background: #fff; padding: 10px; border-radius: 10px; width: min(100%, 520px); margin: 0 auto 10px; } .qrbox svg { display: block; width: 100%; height: auto; }\n"
              "  .pk.taking, tr.taking { box-shadow: inset 4px 0 0 var(--go); } .pk.taking.sum { border-style: dashed; } .chip.taken { background: var(--go); color: #fff; }\n"
@@ -581,6 +582,8 @@ def props_example_games() -> list:
         o, d = dict(prof["teams"][team]), prof["teams"][opp]
         ppp = nbasim._target(o, d, prof["league"], home_side)
         return {"f": round(ppp * 100.0 / o["ortg"], 4), "ortg": o["ortg"], "drtg": d["drtg"], "lg": round(prof["league"]["ortg"], 1), "home": bool(home_side), "b2b": False, "n": o["n"]}
+    # his usage and his role (26 Oct 2026): the sigma's factor, as a real file carries them; Oubre off the bench for the harness's sake
+    usage = {"Jalen Brunson": 29.5, "Karl-Anthony Towns": 26.0, "Mikal Bridges": 17.0, "OG Anunoby": 16.5, "Tyrese Maxey": 29.0, "Paul George": 22.5, "Kelly Oubre Jr.": 19.0, "Joel Embiid": 31.0}
     props = []
     for k, (name, mk, line, op, up) in enumerate(lines):
         team, pos, this, last = players[name]
@@ -589,6 +592,7 @@ def props_example_games() -> list:
         pr = {"name": name, "mk": mk, "line": line, "op": op, "up": up, "book": "fanatics"}
         ctx = {"out_mpg": out[team][0], "out_names": out[team][1], "maybe": out[team][2], "pace": 98.75, "league_pace": 100.5, "home": team == "NYK", "pos": pos,
                "pace_team": prof["teams"][team]["pace"], "pace_opp": prof["teams"][opp]["pace"], "match": club_match(team, opp, team == "NYK"),
+               "usage": usage[name], "usage_src": "this season", "starter": name != "Kelly Oubre Jr.", "start_src": "his last game this season" if name == "Kelly Oubre Jr." else "RotoWire's expected five",
                "opp_nick": slate.NBA_NICK[opp], "dvp": dvp[opp][pos], "htb": htb.get((opp, pos, dmk)), "self_out": "Out" if name == "Joel Embiid" else ""}
         proj, why = slate.props_project(pr, this, last, ctx)
         item = {"pid": "x%d" % (k + 1), "name": name, "team": team, "opp": opp, "home": team == "NYK", "pos": pos, "mk": mk, "line": line, "op": op, "up": up, "book": "fanatics",

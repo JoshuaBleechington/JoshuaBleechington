@@ -72,6 +72,7 @@
     h += section("Best straight bets", P.bets, function (x, i) { return card(x, "", "#" + (i + 1) + " · " + x.s); });
     h += section("Likeliest at any price", P.likely, function (x, i) { return card(x, "", "#" + (i + 1) + " · " + x.s); });
     h += section("Best props", P.props, function (x, i) { return card(x, "", "#" + (i + 1) + " · NBA PROP"); });
+    h += section("Same-game pairs", P.pairs, function (x, i) { return card(x, "", "PAIR #" + (i + 1)); });
     h += section("The simulation's calls, BET or better", P.sim, function (x, i) { return card(x, "", "NBA · " + x.v.toUpperCase()); });
     if (!h) h = '<p class="empty">Nothing on the board for this date.</p>';
     if (P.cut) h += '<p class="empty">The night ran long for one code: ' + esc(P.cut) + ' stayed off it.</p>';

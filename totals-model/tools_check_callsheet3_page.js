@@ -992,7 +992,7 @@ const CHECKS = ["dome","playoff","agconf","hgconf","agbk","hgbk"];
   chk(/None of the 1 props has a projection\. The run read 0 games of 2026-27 and 0 of 2025-26 in C:\\Users\\J\\Downloads\. Last season's ledger, nba-ledger-202526\.json, was not read\. With a game or two this season nobody has the sixty minutes a projection needs, so every prop reads no history\. Put that file back in the slate folder beside slate\.py, with this season's ledger beside it, run the props again/.test(propsT.noneMsg),
       'props: a file that projects nothing says last season\'s ledger was not read, names the folder the run saw, and says what to put back', propsT.noneMsg.slice(0, 500));
   chk(/Nothing graded yet/.test(propsT.tabEmpty0) && /^Every prop with a side 1-1 says 54\.6% · does 50\.0%/i.test(propsT.tabCalib) && /BET band 1-0 says 56\.0% · does 100\.0%/i.test(propsT.tabCalib)
-      && propsT.tabBlocks[0] === 'PROPS-TAB:Every prop with a side|BET band|No edge: the book\'s own side' && propsT.tabBlocks[1] === 'PROPS-MK:points|rebounds|assists' && propsT.tabBlocks[2] === 'PROPS-EDGE:3 to 6 points|no edge'
+      && /^PROPS-TAB:Every prop with a side\|BET band\|No edge: the book's own side(\|Same-game pairs, at the parlay price)?$/.test(propsT.tabBlocks[0]) && propsT.tabBlocks[1] === 'PROPS-MK:points|rebounds|assists' && propsT.tabBlocks[2] === 'PROPS-EDGE:3 to 6 points|no edge'
       && propsT.tabBlocks[3] === 'PROPS-CENTRE:Called at the mean, to 21 Oct' && propsT.nights.length === 1 && /^Oct 21 1-1 1 void 54\.6% 50\.0% [-−]0\.1u 1-0 \+0\.9u$/.test(propsT.nights[0])
       && propsT.ladder.length === 2 && /^50 to 55% 1 53\.2% 0\.0% 50\.0 [-−]1\.0u$/.test(propsT.ladder[0]) && /^55 to 60% 1 56\.0% 100\.0% 50\.0 \+0\.9u$/.test(propsT.ladder[1]) && /Called at the median/.test(propsT.tabCalib) === false,
       'props: the tab\'s own Is it working block: the bands as tiles, by market, by the edge claimed, the centre the chance was read around, night by night and says against does by the chance claimed; empty until something grades',
@@ -1129,8 +1129,8 @@ const CHECKS = ["dome","playoff","agconf","hgconf","agbk","hgbk"];
       && /^Starts from 28\.\d+, his 28\.\d+ per 36 at his minutes; the regulars out, pace, the matchup and the defence take it to 28\.07, \+2\.6 against the line\./.test(propsDlg.base)
       && propsDlg.boldWhy.length === 2 && propsDlg.boldWhy.some(w => /^Joel Embiid out/.test(w)) && propsDlg.boldWhy.some(w => /^the matchup, from the simulation's profi/.test(w)) && /^Moves it: Regulars out \+1\.[5-9] · The matchup, from the simulation [-−]0\.[5-9]$/.test(propsDlg.cardLever),
       'props detail: what moves it ranks each factor\'s push on the projection with a bar, the regulars out the biggest lever on Maxey with Embiid out, the matchup from the simulation, the pace and the defence against; the two biggest bold their why lines and the card names them', JSON.stringify({ levers: propsDlg.levers, base: propsDlg.base, bold: propsDlg.boldWhy, card: propsDlg.cardLever }));
-  chk(propsDlg.hidden0 && propsDlg.open && propsDlg.noscroll && /^LEAN Tyrese Maxey G PHI OVER 25\.5 points 76ers @ Knicks/.test(propsDlg.text) && /on the road at NYK/.test(propsDlg.text) && /Why /i.test(propsDlg.text)
-      && propsDlg.tiles.join(',') === 'Chance,Price,Edge,Projection,Minutes,Per 36' && propsDlg.marks === 10 && propsDlg.books === 3 && /fanatics/.test(propsDlg.carded),
+  chk(propsDlg.hidden0 && propsDlg.open && propsDlg.noscroll && /^LEAN Tyrese Maxey G PHI( starter)? OVER 25\.5 points 76ers @ Knicks/.test(propsDlg.text) && /on the road at NYK/.test(propsDlg.text) && /Why /i.test(propsDlg.text)
+      && propsDlg.tiles.join(',') === 'Chance,Price,Edge,Projection,Minutes,Per 36,Usage' && propsDlg.marks === 10 && propsDlg.books === 3 && /fanatics/.test(propsDlg.carded),
       'props detail: a best-prop card opens the prop on its own panel with the tiles, the why, the marked last games and every book', JSON.stringify(propsDlg).slice(0, 1500));
   chk(propsDlg.closedEsc && propsDlg.closedBtn && propsDlg.closedSport, 'props detail: Escape, the Close button and a sport button each put the panel away', JSON.stringify({ esc: propsDlg.closedEsc, btn: propsDlg.closedBtn, sport: propsDlg.closedSport }));
 
@@ -1363,7 +1363,7 @@ const CHECKS = ["dome","playoff","agconf","hgconf","agbk","hgbk"];
     return { list, hidden, pHead0, pBtns, pRows, dlgOpen, pList, rowTaking, cardOn, pCount, pHead1, panelBtn, panelOn, panelOff, pList2, pHead2, pSaid, gone, boardProps };
   });
   chk(!takeR.hidden && takeR.list.length === 2 && /^TAKING · NHL/.test(takeR.list[0]), 'take: the mark survives a reload of the page', JSON.stringify({ hidden: takeR.hidden, list: takeR.list }));
-  chk(takeR.pHead0 && takeR.pBtns === 7 && takeR.pRows === 7 && !takeR.dlgOpen && takeR.pList.length === 1 && /^TAKING · NBA PROP · LEAN Tyrese Maxey OVER 25\.5 points 52\.4% · [-−]110 needs 52\.4% 76ers @ Knicks · fanatics · projected 28\.07 .*Taking$/i.test(takeR.pList[0])
+  chk(takeR.pHead0 && takeR.pBtns === 7 && takeR.pRows === 7 && !takeR.dlgOpen && takeR.pList.length === 1 && /^TAKING · NBA PROP · LEAN Tyrese Maxey OVER 25\.5 points 5\d\.\d% · [-−]110 needs 52\.4% 76ers @ Knicks · fanatics · projected 28\.07 .*Taking$/i.test(takeR.pList[0])
       && takeR.rowTaking && takeR.cardOn && takeR.pCount === '1 marked' && !takeR.pHead1 && takeR.panelOn && /Taking/.test(takeR.panelBtn) && takeR.panelOff && takeR.pList2 === 0 && takeR.pHead2
       && /Copied the props you are taking|the text is below/.test(takeR.pSaid) && takeR.gone === 0 && takeR.boardProps === 0,
       'take: a prop\'s Take button on the best card marks it without opening the panel; the row lights, Taking lists it with a count, the panel\'s own button shows it on and unmarks it, the copy button speaks, and the example\'s mark goes with the example',
@@ -1458,6 +1458,40 @@ const CHECKS = ["dome","playoff","agconf","hgconf","agbk","hgbk"];
       && leverT.onlyAll.every(s => /^\d+▲ 0▼$/.test(s)) && leverT.onlyAll.length < leverT.all.length && /^\d+ of 7 shown/.test(leverT.shownAll)
       && leverT.onlyMost.length >= leverT.onlyAll.length && leverT.onlyMost.every(s => { const m = /^(\d+)▲ (\d+)▼$/.exec(s); return m && +m[1] > +m[2]; }) && leverT.stored.agree === 'most' && leverT.after.rows === 7 && leverT.after.agree === '',
       'levers: the column sorts with the most agreement first, the filter keeps the props where every lever leans the pick\'s way or more do than not, the view is remembered and Reset view clears it', JSON.stringify({ head: leverT.headOn, scores: leverT.scores, all: leverT.onlyAll, most: leverT.onlyMost, shown: leverT.shownAll, stored: leverT.stored, after: leverT.after }));
+
+  // ---- 26 Oct 2026: usage and role on the prop, the floors, and the same-game pairs ----
+  const usageT = await pg.evaluate(async () => {
+    const wait = () => new Promise(r => setTimeout(r, 90));
+    document.getElementById('propsReset').click(); await wait();
+    document.getElementById('m-props').click(); await wait(); document.getElementById('propsExample').click(); await wait();
+    const card = () => [...document.querySelectorAll('#propsBest .pk')].find(e => /Tyrese Maxey/.test(e.textContent));
+    card().click(); await wait();
+    const dlg = document.getElementById('propDetail');
+    const h3 = (dlg.querySelector('h3') || {}).innerText.replace(/\s+/g, ' ').trim(), role = (dlg.querySelector('h3 .tag.role') || {}).title || '';
+    const usage = [...dlg.querySelectorAll('.pd-tiles .pd-tile')].map(e => e.querySelector('.k').textContent + '=' + e.querySelector('.v').textContent + '|' + ((e.querySelector('.s') || {}).textContent || '')).find(s => /^Usage=/.test(s)) || '';
+    const floorsH = ([...dlg.querySelectorAll('h4')].find(h => /^Floors/.test(h.textContent)) || {}).nextElementSibling, floors = floorsH ? floorsH.innerText.replace(/\s+/g, ' ').trim() : '';
+    const why = [...dlg.querySelectorAll('ul.pd-why li')].map(e => e.textContent).find(w => /^usage /.test(w)) || '';
+    document.getElementById('propDetailClose').click(); await wait();
+    // the filters: usage 24% and up, then the role
+    const sel = (id, v) => { const el = document.getElementById(id); el.value = v; el.dispatchEvent(new Event('change', { bubbles: true })); };
+    const names = () => [...document.querySelectorAll('#propsTable tbody tr[data-prop]')].map(tr => tr.querySelectorAll('td')[1].textContent.trim());
+    sel('propsUsage', 'hi'); await wait(); const hi = names();
+    sel('propsUsage', ''); sel('propsRole', 'bench'); await wait(); const bench = names();
+    document.getElementById('propsReset').click(); await wait();
+    const after = { n: names().length, usage: document.getElementById('propsUsage').value, role: document.getElementById('propsRole').value };
+    // the pairs
+    const pairs = [...document.querySelectorAll('#propsPairs .pk.pair')].map(e => ({ text: e.innerText.replace(/\s+/g, ' ').trim(), agrees: e.classList.contains('agrees') }));
+    document.getElementById('m-nba').click(); await wait();
+    return { h3, role, usage, floors, why, hi, bench, after, pairs };
+  });
+  chk(/^Tyrese Maxey G PHI starter$/.test(usageT.h3) && usageT.role === "RotoWire's expected five" && /^Usage=29%\|of his club's possessions while on; a starter, the miss read at 0\.91 sigmas \(measured\)$/.test(usageT.usage)
+      && /^95% of nights: 1\d\+ · 90%: 1\d\+ · 80%: (19|2\d)\+ points\. Measured on 2025-26: the 95% floors cleared 97\.5% of nights/.test(usageT.floors)
+      && /^usage 29\.0% of his club's possessions \(this season\), a starter \(RotoWire's expected five\): a high-usage starting man's miss runs 0\.91 sigmas, measured, so the chance is read narrower$/.test(usageT.why),
+      'props: the panel carries his role as a tag, his usage as a tile with the sigma factor, the floors he clears 95, 90 and 80% of nights with the measured record behind them, and the why line', JSON.stringify({ h3: usageT.h3, role: usageT.role, usage: usageT.usage, floors: usageT.floors.slice(0, 200), why: usageT.why }));
+  chk(usageT.hi.length === 3 && usageT.hi.every(n => /Jalen Brunson|Karl-Anthony Towns|Tyrese Maxey/.test(n)) && usageT.bench.length === 1 && /Kelly Oubre/.test(usageT.bench[0]) && usageT.after.n === 7 && usageT.after.usage === '' && usageT.after.role === ''
+      && usageT.pairs.length >= 3 && usageT.pairs.every(p => /^PAIR #\d · 76ers @ Knicks · the price (agrees|asks more) .+ \+ .+ both land \d\d\.\d% · pays [-−+]\d+ \(\d\.\d\d×\) needs \d\d\.\d% .+ · (two players|two overs on one club|one man, two markets|one man, his points with his threes), measured ×(0\.95|1\.00|1\.15|1\.50)$/.test(p.text))
+      && usageT.pairs.map(p => parseFloat(/both land (\d\d\.\d)%/.exec(p.text)[1])).every((c, i, a) => i === 0 || c <= a[i - 1]),
+      'props: the usage and role filters keep the right men and Reset view clears them, and the same-game pairs list the date\'s tickets likeliest first with the parlay\'s price, what it needs and the measured kind of pair', JSON.stringify({ hi: usageT.hi, bench: usageT.bench, after: usageT.after, pairs: usageT.pairs.map(p => p.text.slice(0, 160)) }));
 
   // ---- 26 Oct 2026: tonight on your phone -- the Phone QR button makes a code carrying the night's picks; an independent decoder (jsQR,
   //      tools_vendor) reads it back off the drawn modules; the phone sheet m.html renders it, view only ----

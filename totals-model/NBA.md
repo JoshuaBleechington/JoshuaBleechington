@@ -640,3 +640,20 @@ The page's same-game pairs carry those as factors on the product (0.95
 two overs on one club, 1.0 two players, 1.15 one man's two markets, 1.5
 his points with his threes), capped at the lesser leg, and are graded on
 their own tile from the first night.
+
+**Usage at home and on the road (26 Oct 2026).** The user: "does the
+simulation also account for usage on the road vs home?" The simulation has
+no players in it, so no usage at all; home court sits in the club profiles
+and reaches a prop through the matchup lever and the sim's read. The props'
+usage is his share over all his games, and `tools_nba_usage_venue.py` asked
+2025-26 whether a venue split would be worth carrying: pooled usage is
+19.99% at home and 19.99% on the road (11,416 and 11,427 player-games of
+ten minutes or more); a player's own home-less-road split has a median of
+−0.12 points of usage with the middle half −1.06 to +0.86, and the split
+over the first half of the season predicts the second half's at r 0.03
+(252 players with eight games at each venue in each half), the same null as
+his points-per-36 split (r 0.06 here, 0.08 before). The one venue effect in
+a player's line is the league's home edge, about 0.3 points per 36: the
+points projection's miss runs +0.03 sigmas at home (t 2.9) and −0.01 on
+the road, the over rate 50.9% against 49.0%, and that edge is the club's
+home court, which the matchup lever carries already. Nothing to add.

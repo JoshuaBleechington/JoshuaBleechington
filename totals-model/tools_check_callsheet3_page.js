@@ -1598,7 +1598,7 @@ const CHECKS = ["dome","playoff","agconf","hgconf","agbk","hgbk"];
       box: { '3037789': ['Trae Young', 36.2, 28, 3, 11, 4, { pa: ['28 pts + 11 ast = 39', 'won by 6'], pr: ['28 pts + 3 reb = 31', 'won by 6'] }], '4397020': ['Paolo Banchero', 34.0, 22, 9, 4, 1] } }] }, 'nba-grade-2026-10-28.json');
     const graded = JSON.parse(smStore.getItem('callsheet3.props.v1')).filter(r => r.gdate === '2026-10-28').map(r => r.name + ' ' + r.mk + ' ' + r.side + ' ' + r.line + ' -> ' + r.result + ' ' + r.actual + ' | ' + (r.awhat || []).join(' · '));
     const tile = txt(document.querySelector('#calibBox .calib[data-sport="PROPS"]'));
-    await smStore.removeItem('callsheet3.props.v1'); document.getElementById('propsClear').click(); await wait(); document.getElementById('m-nba').click(); await wait();
+    document.getElementById('m-nba').click(); await wait(); await smStore.removeItem('callsheet3.props.v1');   // the key goes last: Clear this date saves what it keeps
     return { rows, opts, onlyRa, panel, graded, tile };
   });
   await pg.reload(); await pg.waitForTimeout(300); await pg.evaluate(() => smStore.ready);   // the graded fixture rows are records and stay in memory until a reload

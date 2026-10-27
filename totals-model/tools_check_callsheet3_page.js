@@ -1601,6 +1601,7 @@ const CHECKS = ["dome","playoff","agconf","hgconf","agbk","hgbk"];
     await smStore.removeItem('callsheet3.props.v1'); document.getElementById('propsClear').click(); await wait(); document.getElementById('m-nba').click(); await wait();
     return { rows, opts, onlyRa, panel, graded, tile };
   });
+  await pg.reload(); await pg.waitForTimeout(300); await pg.evaluate(() => smStore.ready);   // the graded fixture rows are records and stay in memory until a reload
   chk(comboT.rows.length === 3 && comboT.rows.join(';') === 'Trae Young G|pts + ast|OVER|35.5;Paolo Banchero G|reb + ast|UNDER|12.5;Trae Young G|pts + reb|OVER|27.5'
       && comboT.opts.slice(-3).join(',') === 'pr=pts + reb,pa=pts + ast,ra=reb + ast' && comboT.onlyRa.join(',') === 'reb + ast'
       && /^OVER 35\.5 pts \+ ast \|\| 28 pts \+ 9 ast = 37 · 34 min \(his usual 35\)$/.test(comboT.panel)

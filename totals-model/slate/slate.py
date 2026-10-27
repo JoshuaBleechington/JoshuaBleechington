@@ -4092,7 +4092,7 @@ def nba_grade_what(date_iso, out_dir, entries, rows, log):
                 continue
             gl, season_logs = night[-1], e1["g"]
             last_g = (logs_last.get(pid) or {}).get("g")
-            what = {mk: props_game_factors(gl, season_logs, mk, league_pace, last_g) for mk in ("pts", "reb", "ast", "tpm", "pra")}
+            what = {mk: props_game_factors(gl, season_logs, mk, league_pace, last_g) for mk, _api, _lab in PROPS_MARKETS}
             while len(bl) < 6:
                 bl.append(None)
             bl.append(what)
@@ -4189,23 +4189,29 @@ def make_nba_grade(date_iso, out_dir, log):
 # ledger with the box lines (tools_backtest_nba_props.py).
 PROPS_FORMAT = "callsheet3.props"
 PROPS_MARKETS = (("pts", "player_points", "points"), ("reb", "player_rebounds", "rebounds"), ("ast", "player_assists", "assists"),
-                 ("tpm", "player_threes", "threes"), ("pra", "player_points_rebounds_assists", "points + rebounds + assists"))
-PROPS_SD_K = {"pts": 1.85, "reb": 1.2, "ast": 1.15, "tpm": 1.1, "pra": 1.9}      # one sigma = k x sqrt(projection), measured per market
+                 ("tpm", "player_threes", "threes"), ("pra", "player_points_rebounds_assists", "points + rebounds + assists"),
+                 # the combination markets (27 Oct 2026, the user: "every prop on the date doesn't have a points + rebounds market"): three more credits a game
+                 ("pr", "player_points_rebounds", "points + rebounds"), ("pa", "player_points_assists", "points + assists"), ("ra", "player_rebounds_assists", "rebounds + assists"))
+PROPS_COMBOS = {"pra": ("pts", "reb", "ast"), "pr": ("pts", "reb"), "pa": ("pts", "ast"), "ra": ("reb", "ast")}
+PROPS_SD_K = {"pts": 1.85, "reb": 1.2, "ast": 1.15, "tpm": 1.1, "pra": 1.9, "pr": 1.9, "pa": 1.86, "ra": 1.32}      # one sigma = k x sqrt(projection), measured per market (the combos 27 Oct 2026)
 # the centre (22 Oct 2026): the mean sits above the median on a right-skewed stat, so the chance is read
 # around the mean shifted down by this fraction of a sigma (tools_backtest_nba_props_median.py: 2025-26
 # all five markets, 2024-25 points; a shift fitted on a season's first half put the second half's over
 # rate at 50 +/- 3 on every market). PROPS_MEDIAN_OVER is the over rate at the mean, for the why line.
-PROPS_MEDIAN_SHIFT = {"pts": 0.08, "reb": 0.11, "ast": 0.14, "tpm": 0.23, "pra": 0.05}
+PROPS_MEDIAN_SHIFT = {"pts": 0.08, "reb": 0.11, "ast": 0.14, "tpm": 0.23, "pra": 0.05, "pr": 0.06, "pa": 0.05, "ra": 0.08}
 # the sigma by usage (26 Oct 2026, the user: "usage rate of 24% or more"): a high-usage man's miss runs narrower than
 # k x sqrt(projection) and a low-usage man's wider, the same in both halves of 2025-26 (tools_nba_usage_floors.py: points
 # 1.10 / 1.14 under 18%, 1.05 / 1.10 between, 0.92 / 0.94 at 24% and up). The side does not move with usage (the over
 # rate sits at 50% in every bucket); the chance does, through the sigma. Buckets: under 18%, 18 to 24%, 24% and up
-PROPS_USAGE_SD = {"pts": (1.12, 1.07, 0.93), "pra": (1.16, 1.07, 0.90), "reb": (1.12, 1.00, 0.97), "ast": (1.03, 1.02, 0.97), "tpm": (1.0, 1.0, 1.0)}
+PROPS_USAGE_SD = {"pts": (1.12, 1.07, 0.93), "pra": (1.16, 1.07, 0.90), "reb": (1.12, 1.00, 0.97), "ast": (1.03, 1.02, 0.97), "tpm": (1.0, 1.0, 1.0),
+                  "pr": (1.14, 1.07, 0.92), "pa": (1.14, 1.09, 0.90), "ra": (1.10, 0.99, 0.93)}
 # and by his role (26 Oct 2026, the user's Lakers starters at 8.5 and 5.5 points): a starter's miss runs about one sigma
 # whatever his usage, a bench man's 1.15 to 1.25 at low usage (started his previous game as the test's stand-in for the
 # lineup; the slate reads RotoWire's five). Used when the role is known, the usage table alone when it is not
-PROPS_ROLE_SD = {"starter": {"pts": (1.03, 1.01, 0.91), "pra": (1.02, 0.99, 0.87), "reb": (1.01, 0.96, 0.95), "ast": (1.03, 0.99, 0.96), "tpm": (1.0, 1.0, 1.0)},
-                 "bench": {"pts": (1.17, 1.15, 1.04), "pra": (1.25, 1.18, 1.08), "reb": (1.19, 1.04, 1.06), "ast": (1.04, 1.07, 1.06), "tpm": (1.0, 1.0, 1.0)}}
+PROPS_ROLE_SD = {"starter": {"pts": (1.03, 1.01, 0.91), "pra": (1.02, 0.99, 0.87), "reb": (1.01, 0.96, 0.95), "ast": (1.03, 0.99, 0.96), "tpm": (1.0, 1.0, 1.0),
+                             "pr": (1.03, 1.01, 0.90), "pa": (1.04, 1.02, 0.89), "ra": (0.98, 0.93, 0.90)},
+                 "bench": {"pts": (1.17, 1.15, 1.04), "pra": (1.25, 1.18, 1.08), "reb": (1.19, 1.04, 1.06), "ast": (1.04, 1.07, 1.06), "tpm": (1.0, 1.0, 1.0),
+                           "pr": (1.24, 1.17, 1.09), "pa": (1.22, 1.20, 1.07), "ra": (1.18, 1.04, 1.05)}}
 PROPS_USAGE_CUTS = (18.0, 24.0)
 # a thin history (27 Oct 2026): under ten games of evidence (360 minutes, last season's prior weight counted) the sigma is ×1.06, under twenty ×1.03
 PROPS_THIN_SD = ((360.0, 1.06), (720.0, 1.03))
@@ -4225,9 +4231,9 @@ def props_sd_factor(mk, usage, starter):
     if starter is False:
         return PROPS_ROLE_SD["bench"][mk][b]
     return PROPS_USAGE_SD[mk][b]
-PROPS_MEDIAN_OVER = {"pts": 0.47, "reb": 0.46, "ast": 0.45, "tpm": 0.41, "pra": 0.48}
+PROPS_MEDIAN_OVER = {"pts": 0.47, "reb": 0.46, "ast": 0.45, "tpm": 0.41, "pra": 0.48, "pr": 0.48, "pa": 0.48, "ra": 0.47}
 PROPS_OUT_MIN_PER30 = 1.42                                                    # minutes added per 30 mpg of regulars out (t 36)
-PROPS_OUT_RATE_PER30 = {"pts": 0.56, "reb": 0.0, "ast": 0.09, "tpm": 0.0, "pra": 0.66}   # per 36, per 30 mpg out (points t 11, assists t 6; the rest null)
+PROPS_OUT_RATE_PER30 = {"pts": 0.56, "reb": 0.0, "ast": 0.09, "tpm": 0.0, "pra": 0.66, "pr": 0.56, "pa": 0.65, "ra": 0.09}   # per 36, per 30 mpg out (points t 11, assists t 6; the rest null)
 PROPS_PRIOR_CAP = 1000.0
 PROPS_PRIOR_SHARE = 0.5
 PROPS_LAST_N = 5
@@ -4236,7 +4242,7 @@ PROPS_REGULAR_MPG = 24.0
 PROPS_PLAYER_MIN_GAMES = 3
 PROPS_ANCHOR = 4.0
 PROPS_MODEL_W = 2.0
-PROPS_DVP_WEIGHT = {"pts": 0.75, "reb": 0.75, "ast": 0.75, "tpm": 0.4, "pra": 0.75}   # how much of a defence's lean to carry (measured, first half to second)
+PROPS_DVP_WEIGHT = {"pts": 0.75, "reb": 0.75, "ast": 0.75, "tpm": 0.4, "pra": 0.75, "pr": 0.75, "pa": 0.75, "ra": 0.75}   # how much of a defence's lean to carry (measured, first half to second)
 # the matchup lever (25 Oct 2026, the user: "see if the simulation enhances the props"): the club's expected points per
 # possession in the simulation's own view (its offence into the opponent's defence, league-relative, home court, a back to
 # back) against its own rating, to a power. tools_backtest_nba_props_sim.py on 2025-26, 17,700 player-games, beyond the
@@ -4245,7 +4251,7 @@ PROPS_DVP_WEIGHT = {"pts": 0.75, "reb": 0.75, "ast": 0.75, "tpm": 0.4, "pra": 0.
 # defence lever in. The market's implied team points carried nothing beyond pace (t 0.8). The pace lever's form changed the
 # same day: the game's possessions against the club's OWN pace, not the two clubs' mean against the league (6.589 against
 # 6.592 on points, better on every market), since a player's rate per 36 is earned at his club's pace already.
-PROPS_MATCH_ALPHA = {"pts": 0.5, "reb": 0.0, "ast": 0.5, "tpm": 0.5, "pra": 0.5}
+PROPS_MATCH_ALPHA = {"pts": 0.5, "reb": 0.0, "ast": 0.5, "tpm": 0.5, "pra": 0.5, "pr": 0.5, "pa": 0.5, "ra": 0.5}   # on rebounds + assists the weight is scaled by his assists' share of the stat, rebounds measuring nothing
 PROPS_DVP_SHRINK = 20                                                         # games of this season before its table outweighs last season's
 PROPS_BET_EDGE = 0.03
 PROPS_BET_CHANCE = 0.55
@@ -4311,8 +4317,8 @@ def props_stat(g, mk):
         return g.get("pts")
     if not g.get("full"):
         return None
-    if mk == "pra":
-        return (g.get("pts") or 0) + (g.get("reb") or 0) + (g.get("ast") or 0)
+    if mk in PROPS_COMBOS:
+        return sum((g.get(c) or 0) for c in PROPS_COMBOS[mk])
     return g.get(mk)
 
 
@@ -4480,9 +4486,9 @@ def props_game_factors(g, logs, mk, league_pace=None, logs_last=None):
     fgnorm = gs if len([x for x in gs if x.get("full")]) >= 10 else gs + last30   # his shooting needs more games behind it
     mins = float(g["min"])
     root, stood, plain, tail = [], [], [], []
-    if mk == "pra" and g.get("full") and g.get("pts") is not None and g.get("reb") is not None and g.get("ast") is not None:   # the three behind the total (27 Oct 2026)
-        root.append("%d pts + %d reb + %d ast = %d" % (g["pts"], g["reb"], g["ast"], g["pts"] + g["reb"] + g["ast"]))
-    lift = mk in ("pts", "pra", "ast")   # the pooled rule: a regular out lifts his teammates' minutes, points and assists; rebounds and threes measured nothing
+    if mk in PROPS_COMBOS and g.get("full") and all(g.get(c) is not None for c in PROPS_COMBOS[mk]):   # the parts behind the total (27 Oct 2026)
+        root.append(" + ".join("%d %s" % (g[c], c) for c in PROPS_COMBOS[mk]) + " = %d" % sum(g[c] for c in PROPS_COMBOS[mk]))
+    lift = mk in ("pts", "pra", "ast", "pr", "pa", "ra")   # the pooled rule: a regular out lifts his teammates' minutes, points and assists; rebounds and threes measured nothing
     for name, mpg in (g.get("back") or [])[:2]:
         root.append("%s back (%s mpg%s)" % (name, ("%.0f" % mpg), ", the lift gone" if lift else ""))
     for name, mpg in (g.get("out") or [])[:2]:
@@ -4508,7 +4514,7 @@ def props_game_factors(g, logs, mk, league_pace=None, logs_last=None):
             stood.append((abs(d_min) * rate, "%d min, %d %s his usual %d" % (round(mins), round(abs(d_min)), "under" if d_min < 0 else "over", round(m_avg))))
         else:
             plain.append("%d min (his usual %d)" % (round(mins), round(m_avg)))
-        if mk in ("pts", "pra", "tpm") and has_box and len(full) >= 3:
+        if mk in ("pts", "pra", "tpm", "pr", "pa") and has_box and len(full) >= 3:
             shots36 = sum((x["fga"] or 0) + NBA_PACE_FT * (x["fta"] or 0) for x in full) / sum(x["min"] for x in full) * 36.0
             shots = (g["fga"] or 0) + NBA_PACE_FT * (g["fta"] or 0)
             usual = shots36 * mins / 36.0
@@ -4529,7 +4535,7 @@ def props_game_factors(g, logs, mk, league_pace=None, logs_last=None):
                 plain.append("%d of %d from the floor" % (g["fgm"] or 0, g["fga"] or 0))
         # the club's rebounds and assists, his share of them against his usual, and the teammate who took more than his own usual (27 Oct 2026)
         for stat, tkey, gkey, word, verb in (("reb", "treb", "grab", "rebounds", "took"), ("ast", "tast", "dish", "assists", "had")):
-            if mk not in (stat, "pra"):
+            if mk != stat and stat not in PROPS_COMBOS.get(mk, ()):
                 continue
             tot_g = g.get(tkey)
             if mk == stat and tot_g and g.get(stat) is not None:
@@ -4545,7 +4551,7 @@ def props_game_factors(g, logs, mk, league_pace=None, logs_last=None):
                 stood.append((float(tk[1]) - float(tk[2]), "%s %s %d (his usual %s)" % (tk[0], verb, int(tk[1]), ("%g" % tk[2]))))
     else:
         plain.append("%d min" % round(mins))
-        if mk in ("pts", "pra", "tpm") and has_box:
+        if mk in ("pts", "pra", "tpm", "pr", "pa") and has_box:
             plain.append("%d shots" % round((g["fga"] or 0) + NBA_PACE_FT * (g["fta"] or 0)))
             if mk != "tpm":
                 plain.append("%d of %d from the floor" % (g["fgm"] or 0, g["fga"] or 0))
@@ -4558,7 +4564,7 @@ def props_game_factors(g, logs, mk, league_pace=None, logs_last=None):
     base_pace = sum(paces) / len(paces) if len(paces) >= 5 else (float(league_pace) if league_pace else None)   # his club's own games, else the league's
     if g.get("pace") and base_pace and abs(float(g["pace"]) - base_pace) >= PROPS_WHAT_PACE:
         tail.append("a %s game, %d possessions against their usual %d" % ("slow" if float(g["pace"]) < base_pace else "fast", round(float(g["pace"])), round(base_pace)))
-    return (root + [t for _s, t in stood] + plain + tail)[:PROPS_WHAT_MAX + (1 if mk == "pra" else 0)]
+    return (root + [t for _s, t in stood] + plain + tail)[:PROPS_WHAT_MAX + (1 if mk in PROPS_COMBOS else 0)]
 
 
 def props_role(name, ab, lineups, logs_this, logs_last):
@@ -4948,9 +4954,13 @@ def props_project(prop, logs_this, logs_last, ctx):
     i_match = len(why)
     mt = ctx.get("match")
     if mt and mt.get("f") and PROPS_MATCH_ALPHA.get(mk):
-        f_match = float(mt["f"]) ** PROPS_MATCH_ALPHA[mk]
-        why.append("the matchup, from the simulation's profiles: %.1f per 100 into %s's %.1f defence (league %.1f%s%s): x%.3f on the efficiency, at %.1f weight, measured" % (
-            mt["ortg"], ctx.get("opp_nick") or "the opponent", mt["drtg"], mt["lg"], ", at home" if mt.get("home") else ", on the road", ", on a back to back" if mt.get("b2b") else "", f_match, PROPS_MATCH_ALPHA[mk]))
+        alpha = PROPS_MATCH_ALPHA[mk]
+        if mk == "ra":   # the lever measured on assists and nothing on rebounds: his assists' share of the stat carries it
+            ra_ = props_rate(logs_this, logs_last, "ast")
+            alpha = alpha * (ra_["rate"] / r["rate"]) if ra_ and r["rate"] > 0 else 0.0
+        f_match = float(mt["f"]) ** alpha if alpha > 0 else 1.0
+        why.append("the matchup, from the simulation's profiles: %.1f per 100 into %s's %.1f defence (league %.1f%s%s): x%.3f on the efficiency, at %s weight, measured%s" % (
+            mt["ortg"], ctx.get("opp_nick") or "the opponent", mt["drtg"], mt["lg"], ", at home" if mt.get("home") else ", on the road", ", on a back to back" if mt.get("b2b") else "", f_match, ("%.1f" % alpha) if mk != "ra" else ("%.2f" % alpha), " (the assists' share of the stat)" if mk == "ra" else ""))
     f_dvp = 1.0
     i_dvp = len(why)
     dv = ctx.get("dvp")
@@ -4963,7 +4973,7 @@ def props_project(prop, logs_this, logs_last, ctx):
         if dv.get("f_last") is not None:
             detail.append("last season %.2f" % dv["f_last"])
         why.append("%s allow %.2fx the league's %s per minute to %s (%s): x%.3f at %.2f weight, measured" % (
-            ctx.get("opp_nick") or "they", dv["f"], "points" if mk == "pra" else label, POS_WORD.get(ctx.get("pos"), "that position"), ", ".join(detail), f_dvp, wgt))
+            ctx.get("opp_nick") or "they", dv["f"], "points" if mk in ("pra", "pr", "pa") else ("rebounds" if ctx.get("pos") in ("F", "C") else "assists") if mk == "ra" else label, POS_WORD.get(ctx.get("pos"), "that position"), ", ".join(detail), f_dvp, wgt))
     if ctx.get("htb"):
         why.append(ctx["htb"])
     sp = props_split(logs_this, logs_last, mk)
@@ -5220,7 +5230,7 @@ def make_nba_props(date_iso, out_dir, log, topup=False, sim_runs=NBA_SIM_RUNS):
             for n, mpg, st in out[team][1]:
                 if props_name_key(n) == props_name_key(pr["name"]):
                     self_out = st
-            dmk = "pts" if pr["mk"] == "pra" else pr["mk"]
+            dmk = "pts" if pr["mk"] in ("pra", "pr", "pa") else ("reb" if pos in ("F", "C") else "ast") if pr["mk"] == "ra" else pr["mk"]   # a combo reads the defence on its points; rebounds + assists on the man's position
             dv = props_dvp_blend(dvp_this.get((opp, pos, dmk)), dvp_last.get((opp, pos, dmk))) if pos else None
             usage_ = props_usage(e1.get("g"), e2.get("g"))
             starter_, start_src = props_role(pr["name"], team, lineups, e1.get("g"), e2.get("g"))
@@ -6587,7 +6597,13 @@ def selftest():
     check("props: the club's rebounds and who took them: his share against his usual, and the teammate three or more over his own usual, named",
           lw2[-1].get("grab") == ["Kyrie Irving", 10, 4.0] and props_game_factors(lw2[-1], lw2, "reb", 100.0)[:5] == ["Kyrie Irving back (30 mpg)", "lost by 21, a blowout", "Kyrie Irving took 10 (his usual 4)", "4 of the club's 14 rebounds, 29% (his usual 64%)", "31 min, 4 under his usual 35"]
           and "Kyrie Irving took 10 (his usual 4)" in props_game_factors(lw2[-1], lw2, "pra", 100.0) and not any("took" in t for t in props_game_factors(lw2[-1], lw2, "pts", 100.0))
-          and props_game_factors(lw2[-1], lw2, "pra", 100.0)[0] == "10 pts + 4 reb + 9 ast = 23" and len(props_game_factors(lw2[-1], lw2, "pra", 100.0)) == 6 and not any("pts +" in t for t in props_game_factors(lw2[-1], lw2, "pts", 100.0)))
+          and props_game_factors(lw2[-1], lw2, "pra", 100.0)[0] == "10 pts + 4 reb + 9 ast = 23" and len(props_game_factors(lw2[-1], lw2, "pra", 100.0)) == 6 and not any("pts +" in t for t in props_game_factors(lw2[-1], lw2, "pts", 100.0))
+          and props_game_factors(lw2[-1], lw2, "pr", 100.0)[0] == "10 pts + 4 reb = 14" and "Kyrie Irving took 10 (his usual 4)" in props_game_factors(lw2[-1], lw2, "pr", 100.0) and props_game_factors(lw2[-1], lw2, "ra", 100.0)[0] == "4 reb + 9 ast = 13"
+          and not any("shots" in t for t in props_game_factors(lw2[-1], lw2, "ra", 100.0)) and any("shots" in t for t in props_game_factors(lw2[-1], lw2, "pa", 100.0)))
+    check("props: the combination markets (27 Oct 2026): the stat from the log, and every market has its sigma, centre, usage, role, out, defence and matchup constants",
+          props_stat({"full": True, "pts": 20, "reb": 8, "ast": 5}, "pr") == 28 and props_stat({"full": True, "pts": 20, "reb": 8, "ast": 5}, "pa") == 25 and props_stat({"full": True, "pts": 20, "reb": 8, "ast": 5}, "ra") == 13
+          and props_stat({"full": False, "pts": 20}, "pr") is None and [m for m, _a, _l in PROPS_MARKETS] == ["pts", "reb", "ast", "tpm", "pra", "pr", "pa", "ra"]
+          and all(m in d for m, _a, _l in PROPS_MARKETS for d in (PROPS_SD_K, PROPS_MEDIAN_SHIFT, PROPS_MEDIAN_OVER, PROPS_USAGE_SD, PROPS_ROLE_SD["starter"], PROPS_ROLE_SD["bench"], PROPS_OUT_RATE_PER30, PROPS_DVP_WEIGHT, PROPS_MATCH_ALPHA)))
     prior_e = nba_player_logs([{"id": "p%d" % k, "date": "2026-01-%02d" % (1 + k), "away": "DAL", "home": "LAL", "detail": True, "pa": [nba_player_line("22", "Kyrie Irving", 1, 31.0, 22, 0, 4, 5, 2, 15, 4, 2, 1, 0, 7, 3, "SG")], "ph": []} for k in range(12)])
     le = nba_player_logs(early, prior_logs=prior_e)["11"]["g"]
     check("props: early in the season last season's minutes name the regulars and the game's own injury list says who sat, so a line reads from the first week",

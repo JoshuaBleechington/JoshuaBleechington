@@ -17,7 +17,7 @@
       <div class="subhead">Is it working <span class="tag">every graded prop, every night, at the price posted · says is the blended chance, does is what landed</span></div>
       <div id="propsCalib"></div>
       <p class="note"><b>Run NBA props.bat</b> writes <code>nba-props-DATE.json</code>: every player prop the books post on the
-        day's games (points, rebounds, assists, threes, points + rebounds + assists), the carded book's line and prices,
+        day's games (points, rebounds, assists, threes, points + rebounds + assists, and from 27 Oct 2026 points + rebounds, points + assists and rebounds + assists), the carded book's line and prices,
         and beside each the slate's own projection. <b>Rate × minutes</b>: his per-minute rate this season with last
         season's as a prior at half its minutes, times the minutes of his last five games. <b>Regulars out</b>, scored:
         every 30 minutes a game of teammates missing who play 24 or more adds 1.42 minutes (t 36), 0.56 points per 36
@@ -48,7 +48,7 @@
       <div class="subhead">Every prop on the date <span class="tag">by game, then by edge — click a column to sort it, filter by market, band, side, the levers or player; the Levers column counts the factors pushing toward the pick ▲ and against it ▼, the Sim column is the simulation's own read of the stat, green on the pick's side of the line, the Usage column his share of his club's possessions (S a starter, B off the bench, green at 24% and up); click a row for the prop's own panel, then Previous and Next (or the arrow keys) walk the list as shown</span></div>
       <div class="row propsctl">
         <label class="f" style="flex-direction:row;align-items:center;gap:6px"><span class="tag">market</span>
-          <select id="propsMk"><option value="">all</option><option value="pts">points</option><option value="reb">rebounds</option><option value="ast">assists</option><option value="tpm">threes</option><option value="pra">pts + reb + ast</option></select></label>
+          <select id="propsMk"><option value="">all</option><option value="pts">points</option><option value="reb">rebounds</option><option value="ast">assists</option><option value="tpm">threes</option><option value="pra">pts + reb + ast</option><option value="pr">pts + reb</option><option value="pa">pts + ast</option><option value="ra">reb + ast</option></select></label>
         <label class="f" style="flex-direction:row;align-items:center;gap:6px"><span class="tag">band</span>
           <select id="propsBand"><option value="">all</option><option value="BET">BET</option><option value="LEAN">LEAN</option><option value="no edge">no edge</option></select></label>
         <label class="f" style="flex-direction:row;align-items:center;gap:6px"><span class="tag">side</span>

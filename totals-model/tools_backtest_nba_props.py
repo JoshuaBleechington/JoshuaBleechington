@@ -29,6 +29,12 @@ POS3 = {"PG": "G", "SG": "G", "G": "G", "SF": "F", "PF": "F", "F": "F", "C": "C"
 def val(p, mk):
     if mk == "pra":
         return p[4] + p[6] + p[7]
+    if mk == "pr":    # the combination markets (27 Oct 2026)
+        return p[4] + p[6]
+    if mk == "pa":
+        return p[4] + p[7]
+    if mk == "ra":
+        return p[6] + p[7]
     return p[KEYS[mk]]
 
 
@@ -44,7 +50,7 @@ def load(path):
 def scatter(games):
     """A rate x last-five-minutes projection from the player's prior games this season: bias and the miss, per market."""
     out = {}
-    for mk in ("pts", "reb", "ast", "tpm", "pra"):
+    for mk in ("pts", "reb", "ast", "tpm", "pra", "pr", "pa", "ra"):
         hist, errs = defaultdict(list), []
         for g in games:
             for key in ("pa", "ph"):
@@ -56,7 +62,7 @@ def scatter(games):
                         rate = sum(x[1] for x in h) / m_this if m_this > 0 else 0.0
                         pm = sum(x[0] for x in h[-5:]) / 5.0
                         mu = rate * pm
-                        if pm >= 15 and mu >= (6 if mk in ("pts", "pra") else 1.0):
+                        if pm >= 15 and mu >= (6 if mk in ("pts", "pra", "pr", "pa") else 1.0):
                             errs.append((mu, v))
                     h.append((mins, v))
         n = len(errs)

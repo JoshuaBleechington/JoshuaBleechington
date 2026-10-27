@@ -87,7 +87,7 @@ Three double-click files, in this order on a game day:
    for the close.
 4. **Run NBA props.bat**, or `python slate.py nba-props` (19 Oct 2026):
    writes `nba-props-DATE.json`, every player prop the books post on the
-   day's games with the slate's projection beside each, about five credits
+   day's games with the slate's projection beside each, about eight credits
    a game. In The Super Model: **NBA PROPS → Load props**. Run it late
    enough that the books have posted the props, usually by the early
    afternoon; it brings the game logs up to date itself first, reads ESPN's
@@ -142,8 +142,9 @@ Three double-click files, in this order on a game day:
 
 `python slate.py nba-props` writes `nba-props-DATE.json` for The Super
 Model's **NBA PROPS** tab. The lines come from The Odds API, one call a game
-for the five markets (points, rebounds, assists, threes, points + rebounds +
-assists), the carded book the first in the odds run's list that posts both
+for the eight markets (points, rebounds, assists, threes, points + rebounds +
+assists, and from 27 Oct 2026 points + rebounds, points + assists and rebounds
++ assists), the carded book the first in the odds run's list that posts both
 prices on one number, every book's line kept beside it. Each player is
 placed on his club by ESPN's team roster, then by the ledgers; the game's
 spread, total and pace ride along. Beside each line, the slate's own

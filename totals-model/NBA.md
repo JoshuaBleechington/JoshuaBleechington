@@ -692,3 +692,21 @@ regular out by the ledger's own rosters):
 | Does a rule by role beat the pooled rule out of sample? | Fitted on the first half (minutes starters +0.64, bench +1.78; points starters +0.36, bench +0.11), scored on the second: points rmse 6.200 against 6.211 with a regular out, rebounds 2.570 against 2.572, assists 1.920 against 1.921; the creator rule on assists 1.922. A hair, not a rule. The pooled rule stays |
 | A thin history? | The miss in sigmas by the games the rate rests on, this season alone: points 1.09 (3 to 5 games), 1.10 (6 to 9), 1.08 (10 to 19), 1.02 (20 and up); rebounds 1.06 / 1.05 / 1.02 / 1.00; assists 1.01 / 1.02 / 1.02 / 0.98. The sigma carries ×1.06 under ten games of evidence and ×1.03 under twenty |
 | The minutes to project? | The mean of his last five (rmse 6.53 on his actual minutes) beats their median (6.81), a trimmed mean (6.64) and the season mean (6.85); early in a season (3 to 5 prior games) the mean runs +0.75 high, the median +0.43 |
+
+**The combination markets (27 Oct 2026).** `tools_nba_combo_markets.py` on
+2025-26, the projection built the slate's way after eight prior games:
+
+| Market | n | k (sigma = k √proj) | over the mean | median shift | 95% floor cleared | miss in sigmas by usage (<18 / 18–24 / 24+), starters and bench |
+| --- | --- | --- | --- | --- | --- | --- |
+| points + rebounds | 21,610 | 1.90 (backtest) | 47.6% | 0.06 | 99.0% | 1.05 (S 0.93, B 1.12) / 0.98 (0.91, 1.05) / 0.84 (0.81, 0.98) |
+| points + assists | 21,577 | 1.86 | 47.7% | 0.05 | 98.9% | 1.05 (0.94, 1.10) / 1.00 (0.92, 1.08) / 0.83 (0.80, 0.96) |
+| rebounds + assists | 21,316 | 1.32 | 46.7% | 0.08 | 99.2% | 1.06 (0.94, 1.13) / 0.95 (0.89, 1.00) / 0.89 (0.87, 1.01) |
+
+The factors shipped are these scaled to the shipped sigma the way the
+first five's were (the tool's own k runs wider than the backtest's, which
+blends last season's prior in): points + rebounds (1.14, 1.07, 0.92),
+points + assists (1.14, 1.09, 0.90), rebounds + assists (1.10, 0.99, 0.93);
+starters (1.03, 1.01, 0.90) / (1.04, 1.02, 0.89) / (0.98, 0.93, 0.90), the
+bench (1.24, 1.17, 1.09) / (1.22, 1.20, 1.07) / (1.18, 1.04, 1.05). The
+same tool reproduces the first five's centres (0.07, 0.11, 0.13, 0.19 and
+0.04 against the shipped 0.08, 0.11, 0.14, 0.23 and 0.05).

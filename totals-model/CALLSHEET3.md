@@ -1639,3 +1639,27 @@ NBA card into the form (`openRow`), the props view folding away; the button
 is greyed with the reason while the NBA card has no row for the game on the
 date, and a click on it then says what to load. The row is found by the
 date and both clubs' names (`propsCardRow`), the way the grade matches them.
+
+## The combination markets, 27 Oct 2026
+
+The user: "every prop on the date doesn't have a points + rebounds market."
+The books post three the run was not asking for, and it asks for them now
+in the same call: **points + rebounds**, **points + assists** and
+**rebounds + assists**, three more credits a game. Each got what every
+market has, measured on 2025-26 first (`tools_nba_combo_markets.py`, and
+the props backtest with the combos added): one sigma k × √projection at
+1.90, 1.86 and 1.32 (the method reproduces the shipped 1.86 / 1.21 / 1.16 /
+1.10 / 1.92 on the first five); the median shift 0.06, 0.05 and 0.08
+sigmas (the over rate at the mean 47.6%, 47.7%, 46.7%); the usage and role
+sigma factors in the same shape as the first five; the regulars-out lift as
+the sum of the parts' (0.56, 0.65 and 0.09 per 36 per 30 mpg); the defence
+read on the points for the two with points in them and on the man's
+position for rebounds + assists; the matchup lever at half weight on the
+two with points, and on rebounds + assists at half weight scaled by his
+assists' share of the stat, rebounds having measured nothing; the 95% floor
+cleared 99% on all three. On the page the three list with their labels,
+filter by market, grade by the sum of the box line, take their own tiles
+in the record, and their last games open each line with the parts behind
+the total ("28 pts + 9 ast = 37"); the floors ladder leaves the combos out
+as it leaves out PRA. The grade file carries the what-happened line for all
+eight markets.

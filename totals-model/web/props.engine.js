@@ -8,7 +8,9 @@
      prop row is the slate's call as made, so the record is of what was shown
      at the price it was shown. */
   var PROPS_KEY = "callsheet3.props.v1";
-  var PROPS_LABEL = { pts: "points", reb: "rebounds", ast: "assists", tpm: "threes", pra: "pts + reb + ast" };
+  var PROPS_LABEL = { pts: "points", reb: "rebounds", ast: "assists", tpm: "threes", pra: "pts + reb + ast", pr: "pts + reb", pa: "pts + ast", ra: "reb + ast" };
+  var PROPS_COMBO = { pra: ["pts", "reb", "ast"], pr: ["pts", "reb"], pa: ["pts", "ast"], ra: ["reb", "ast"] };   // the combination markets (27 Oct 2026)
+  var PROPS_ORDER = ["pts", "reb", "ast", "tpm", "pra", "pr", "pa", "ra"];
   var props = [];
   try { props = JSON.parse(localStorage.getItem(PROPS_KEY) || "[]"); if (!Array.isArray(props)) props = []; } catch (e) { props = []; }
   var propsView = false;
@@ -25,7 +27,7 @@
      number ("x+") the 95% line cleared 98%; one man's three 95% floors (points, rebounds, assists) all cleared 96.5% of nights,
      against 85.7% if they were independent, because his minutes carry all three. A file from before the slate wrote the median
      reads it off the projection with the same shift the slate uses */
-  var PROPS_MEDIAN_SHIFT = { pts: 0.08, reb: 0.11, ast: 0.14, tpm: 0.23, pra: 0.05 };
+  var PROPS_MEDIAN_SHIFT = { pts: 0.08, reb: 0.11, ast: 0.14, tpm: 0.23, pra: 0.05, pr: 0.06, pa: 0.05, ra: 0.08 };
   var PROPS_FLOOR_Z = { 95: 1.6449, 90: 1.2816, 80: 0.8416 };
   function propMedian(r) { return r.med !== undefined && r.med !== null ? +r.med : +r.proj - (PROPS_MEDIAN_SHIFT[r.mk] || 0) * +r.sd; }
   function propFloor(r, q) { var f = Math.floor(propMedian(r) - PROPS_FLOOR_Z[q] * +r.sd); return f >= 1 ? f : null; }
@@ -436,8 +438,11 @@
      and no box line did not play, and the row is void, as the books void it */
   function propActual(r, box) {
     var b = box[r.pid]; if (!b) return null;
-    var v = { pts: b[2], reb: b[3], ast: b[4], tpm: b[5] }[r.mk];
-    if (r.mk === "pra") v = (b[2] === null || b[2] === undefined || b[3] === null || b[3] === undefined || b[4] === null || b[4] === undefined) ? null : b[2] + b[3] + b[4];
+    var idx = { pts: 2, reb: 3, ast: 4, tpm: 5 }, v;
+    if (PROPS_COMBO[r.mk]) {
+      v = 0;
+      for (var i = 0; i < PROPS_COMBO[r.mk].length; i++) { var c = b[idx[PROPS_COMBO[r.mk][i]]]; if (c === null || c === undefined) { v = null; break; } v += c; }
+    } else v = b[idx[r.mk]];
     return (v === null || v === undefined) ? undefined : v;
   }
   var propsMinsFilled = 0;   // graded props whose minutes a second load of the night's grade file filled in (25 Oct 2026)
@@ -535,7 +540,7 @@
     if (byTake.n || byTake.p) parts.push("taken " + rec(byTake) + (byTake.n ? " " + sgn(byTake.units, 1) + "u" : ""));
     if (byPair.n || byPair.p) parts.push("same-game pairs " + rec(byPair) + (byPair.n ? " " + sgn(byPair.units, 1) + "u" : ""));
     if (byPairTake.n || byPairTake.p) parts.push("pairs taken " + rec(byPairTake) + (byPairTake.n ? " " + sgn(byPairTake.units, 1) + "u" : ""));
-    var markets = ["pts", "reb", "ast", "tpm", "pra"].map(function (k) { return byMk[k] ? tile(PROPS_LABEL[k], byMk[k], []) : ""; }).join("");
+    var markets = PROPS_ORDER.map(function (k) { return byMk[k] ? tile(PROPS_LABEL[k], byMk[k], []) : ""; }).join("");
     var verdict = 'The props are a priori: the pooled rules behind them were measured on last season\'s box scores, the blend\'s weights were not. Read the BET band against the rest and <i>does</i> against <i>says</i>; under 100 graded props nothing here is a reading.';
     if (!full) {
       var h = '<div class="subhead" data-sport="PROPS">NBA player props <span class="tag">' + graded.length + ' graded · the slate\'s call as made, at the price posted · says is the blended chance</span></div>';
@@ -702,7 +707,7 @@
       /* the floors (26 Oct 2026): the number he clears 95, 90 and 80% of nights by the model, and his other markets' 95% floors tonight */
       var f95 = propFloor(r, 95), f90 = propFloor(r, 90), f80 = propFloor(r, 80);
       if (f95 || f90 || f80) {
-        var mine = propsSource().filter(function (x) { return String(x.pid) === String(r.pid) && (x.gdate || "") === (r.gdate || "") && propHas(x) && x.mk !== "pra"; })
+        var mine = propsSource().filter(function (x) { return String(x.pid) === String(r.pid) && (x.gdate || "") === (r.gdate || "") && propHas(x) && !PROPS_COMBO[x.mk]; })
           .sort(function (a, b) { return ["pts", "reb", "ast", "tpm"].indexOf(a.mk) - ["pts", "reb", "ast", "tpm"].indexOf(b.mk); });
         var ladder = mine.map(function (x) { var f = propFloor(x, 95); return f ? f + "+ " + (PROPS_LABEL[x.mk] || x.mk) : null; }).filter(function (s) { return s; });
         h += '<h4>Floors <span class="dim">· the number he clears, by the model</span></h4><p class="pd-floors">' +

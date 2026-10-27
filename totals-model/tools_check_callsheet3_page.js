@@ -1577,6 +1577,37 @@ const CHECKS = ["dome","playoff","agconf","hgconf","agbk","hgbk"];
       && whatT.praWhat.length === 10 && whatT.praWhat.every(t => { const m = /^(\d+)=(\d+) pts \+ (\d+) reb \+ (\d+) ast = (\d+)( · |$)/.exec(t); return !!m && +m[1] === +m[5] && +m[2] + +m[3] + +m[4] === +m[5]; }),
       'props: every one of the panel\'s last games carries the line behind it, the night\'s causes first (a regular back or out, a blowout) then what stood out and the plain box with the margin, the first item bold in the colour of the game\'s mark; a rebounds prop reads no shots or shooting; a PRA prop opens each game with the three behind the total, which add up to the stat', JSON.stringify(whatT).slice(0, 1800));
 
+  // ---- 27 Oct 2026: the combination markets -- points + rebounds, points + assists and rebounds + assists list, filter, grade by the sum and name their tile ----
+  const comboT = await pg.evaluate(async () => {
+    const wait = () => new Promise(r => setTimeout(r, 90));
+    const txt = e => (e ? e.innerText : '').replace(/\s+/g, ' ').trim();
+    await smStore.removeItem('callsheet3.props.v1'); document.getElementById('m-nba').click(); await wait();
+    const load = async (doc, fname) => { const dt = new DataTransfer(); dt.items.add(new File([JSON.stringify(doc)], fname, { type: 'application/json' })); const inp = document.getElementById('slateFile'); inp.files = dt.files; inp.dispatchEvent(new Event('change', { bubbles: true })); await wait(); };
+    const mk = (pid, name, mkt, line, proj, sd, chance, side) => ({ pid, name, team: 'ATL', opp: 'ORL', home: false, pos: 'G', mk: mkt, line, op: -110, up: -110, book: 'fanatics', books: {}, proj, sd, pm: chance + 0.02, pb: 0.5, p: chance, push: 0, side, chance, price: -110, need: 0.5238, edge: chance - 0.5238, band: chance >= 0.55 && chance - 0.5238 >= 0.03 ? 'BET' : chance > 0.5238 ? 'LEAN' : 'no edge', mins: 35, rate36: 30, why: ['x'], log: [['2026-10-26', 'MIA', 0, 34, 37, ['28 pts + 9 ast = 37', '34 min (his usual 35)']]] });
+    await load({ format: 'callsheet3.props', version: 1, date: '2026-10-28', games: [{ gid: '401909901', away: 'Hawks', home: 'Magic', aab: 'ATL', hab: 'ORL', props: [
+      mk('3037789', 'Trae Young', 'pa', 35.5, 38.2, 11.4, 0.57, 'OVER'), mk('3037789', 'Trae Young', 'pr', 27.5, 29.1, 9.9, 0.53, 'OVER'), mk('4397020', 'Paolo Banchero', 'ra', 12.5, 11.6, 4.6, 0.56, 'UNDER') ] }] }, 'nba-props-2026-10-28.json');
+    const rows = [...document.querySelectorAll('#propsTable tbody tr[data-prop]')].map(tr => { const t = tr.querySelectorAll('td'); return t[1].textContent.trim() + '|' + t[2].textContent.trim() + '|' + t[4].textContent.trim() + '|' + t[3].textContent.trim().split(' ')[0]; });
+    const opts = [...document.querySelectorAll('#propsMk option')].map(o => o.value + '=' + o.textContent);
+    const sel = (id, v) => { const el = document.getElementById(id); el.value = v; el.dispatchEvent(new Event('change', { bubbles: true })); };
+    sel('propsMk', 'ra'); await wait(); const onlyRa = [...document.querySelectorAll('#propsTable tbody tr[data-prop]')].map(tr => tr.querySelectorAll('td')[2].textContent.trim());
+    document.getElementById('propsReset').click(); await wait();
+    [...document.querySelectorAll('#propsTable tr[data-prop]')].find(tr => /pts \+ ast/.test(tr.textContent)).click(); await wait();
+    const panel = txt(document.querySelector('#propDetail .pd-pick')) + ' || ' + txt(document.querySelector('#propDetail .pd-log tbody tr td.pd-what'));
+    document.getElementById('propDetailClose').click(); await wait();
+    await load({ format: 'callsheet2.slate', version: 1, date: '2026-10-28', games: [{ sport: 'NBA', gdate: '2026-10-28', away: 'Hawks', home: 'Magic', gameId: '401909901', finals: { fa: '118', fh: '112', f5a: '60', f5h: '55' }, notes: [],
+      box: { '3037789': ['Trae Young', 36.2, 28, 3, 11, 4, { pa: ['28 pts + 11 ast = 39', 'won by 6'], pr: ['28 pts + 3 reb = 31', 'won by 6'] }], '4397020': ['Paolo Banchero', 34.0, 22, 9, 4, 1] } }] }, 'nba-grade-2026-10-28.json');
+    const graded = JSON.parse(smStore.getItem('callsheet3.props.v1')).filter(r => r.gdate === '2026-10-28').map(r => r.name + ' ' + r.mk + ' ' + r.side + ' ' + r.line + ' -> ' + r.result + ' ' + r.actual + ' | ' + (r.awhat || []).join(' · '));
+    const tile = txt(document.querySelector('#calibBox .calib[data-sport="PROPS"]'));
+    await smStore.removeItem('callsheet3.props.v1'); document.getElementById('propsClear').click(); await wait(); document.getElementById('m-nba').click(); await wait();
+    return { rows, opts, onlyRa, panel, graded, tile };
+  });
+  chk(comboT.rows.length === 3 && comboT.rows.join(';') === 'Trae Young G|pts + ast|OVER|35.5;Paolo Banchero G|reb + ast|UNDER|12.5;Trae Young G|pts + reb|OVER|27.5'
+      && comboT.opts.slice(-3).join(',') === 'pr=pts + reb,pa=pts + ast,ra=reb + ast' && comboT.onlyRa.join(',') === 'reb + ast'
+      && /^OVER 35\.5 pts \+ ast \|\| 28 pts \+ 9 ast = 37 · 34 min \(his usual 35\)$/.test(comboT.panel)
+      && comboT.graded.join(';') === 'Trae Young pa OVER 35.5 -> win 39 | 28 pts + 11 ast = 39 · won by 6;Trae Young pr OVER 27.5 -> win 31 | 28 pts + 3 reb = 31 · won by 6;Paolo Banchero ra UNDER 12.5 -> loss 13 | '
+      && /pts \+ ast 1-0/i.test(comboT.tile) && /pts \+ reb 1-0/i.test(comboT.tile) && /reb \+ ast 0-1/i.test(comboT.tile),
+      'props: the combination markets list with their labels, filter by market, open their panel with the parts behind each game, grade by the sum of the box (28 + 11 = 39 over 35.5; 9 + 4 = 13 against the under 12.5) and take their own tiles in the record', JSON.stringify(comboT).slice(0, 1500));
+
   // ---- 27 Oct 2026: the fives and the matchup on the prop -- both clubs' starting fives on the panel with the man marked; a Matchup button on the
   //      panel and the cards, off until the NBA card has the game, then opening it into the form ----
   const goT = await pg.evaluate(async () => {

@@ -318,7 +318,7 @@
                     pid: String(x.pid), name: x.name, team: x.team, opp: x.opp, athome: !!x.home, pos: x.pos || "", mk: x.mk, line: x.line, op: x.op, up: x.up, book: x.book, books: x.books || {},
                     proj: x.proj, sd: x.sd, pm: x.pm, pb: x.pb, p: x.p, push: x.push, side: x.side, chance: x.chance, price: x.price, need: x.need, edge: x.edge, band: x.band,
                     mins: x.mins, rate36: x.rate36, base: x.base, parts: x.parts || [], why: x.why || [], log: x.log || [], sim: x.sim || null,
-                    med: x.med, usg: x.usg, sdf: x.sdf, starter: x.starter === undefined ? null : x.starter, start_src: x.start_src || null, gsim: propsGameSim(g.sim), actual: null, result: null });
+                    med: x.med, usg: x.usg, sdf: x.sdf, starter: x.starter === undefined ? null : x.starter, start_src: x.start_src || null, gsim: propsGameSim(g.sim), fives: g.fives || null, actual: null, result: null });
       });
     });
     return rows;
@@ -331,6 +331,45 @@
     propsSay("<b>An example</b>, one game's props as a real file lists them, with the projection built the slate's way. Nothing here is saved or graded: load a real props file, press Clear this date or a sport button, and it goes.");
   }
   function propsCanon(s) { return String(s || "").toLowerCase().replace(/[^a-z0-9]+/g, " ").trim(); }
+  /* the matchup and the fives on the prop (27 Oct 2026, the user: "a button to take me to the matchup for that game, or show the
+     lineup for that team in the prop"): the NBA card's row for the prop's game, when the slate put it there, opens into the form
+     from the panel or the card; the props file carries each club's starting five from RotoWire, shown on the panel with the man marked */
+  function propsCardRow(r) {
+    if (!r || typeof card === "undefined") return null;
+    for (var i = 0; i < card.length; i++) {
+      var x = card[i];
+      if (x.sport === "NBA" && (x.gdate || "") === (r.gdate || "") && propsCanon(x.away) === propsCanon(r.away) && propsCanon(x.home) === propsCanon(r.home)) return x;
+    }
+    return null;
+  }
+  function propsGoBtn(r, big) {
+    var row = propsCardRow(r);
+    return '<button type="button" class="btn go' + (row ? '' : ' off') + '" data-pgo="' + r.id + '" title="' + (row ? 'Open ' + esc(r.game) + ' on the NBA card, into the form' : 'The NBA card has no row for ' + esc(r.game) + ' on ' + esc(gameDate(r.gdate)) + ': load the NBA slate for the date and Add the game') + '">' + (big ? 'Open the matchup on the NBA card' : 'Matchup') + '</button>';
+  }
+  function openPropMatchup(id) {
+    var r = propById(id); if (!r) return;
+    var row = propsCardRow(r);
+    if (!row) { propsSay("The NBA card has no row for <b>" + esc(r.game) + "</b> on " + esc(gameDate(r.gdate)) + ": load the NBA slate for the date (Load slate) and Add the game, and the button opens it."); return; }
+    closePropDetail(); showProps(false);
+    if (typeof openRow === "function") openRow(row.id);
+  }
+  function propsFivesHtml(r) {
+    var f = r.fives; if (!f || (!f.away && !f.home)) return '';
+    var me = propsNameKey(r.name);
+    var h = '<h4>The starting fives <span class="dim">· RotoWire\'s, as the props run read them; expected is the morning\'s lineup, confirmed the club\'s; shown, not scored</span></h4><div class="pd-fives">';
+    [["away", r.away], ["home", r.home]].forEach(function (s) {
+      var L = f[s[0]];
+      h += '<div class="five">';
+      if (!L) { h += '<p><b>' + esc(s[1]) + '</b> <span class="lbadge none">no lineup</span> <span class="dim">RotoWire had not posted this side at the run.</span></p></div>'; return; }
+      var st = String(L.status || "").toLowerCase();
+      h += '<p><b>' + esc(s[1]) + '</b> <span class="lbadge ' + (st === "confirmed" ? 'conf' : 'exp') + '">' + esc(st || 'lineup') + '</span></p><table class="form"><tbody>' +
+        (L.five || []).map(function (p) { return '<tr' + (propsNameKey(p[1]) === me ? ' class="me"' : '') + '><td class="pos">' + esc(p[0] || '') + '</td><td>' + esc(p[1] || '') + (propsNameKey(p[1]) === me ? ' <span class="tag">this prop</span>' : '') + '</td></tr>'; }).join('') + '</tbody></table>';
+      if ((L.maybe || []).length) h += '<p class="dim">May not play: ' + L.maybe.map(function (p) { return (p[0] ? esc(p[0]) + ' ' : '') + esc(p[1] || '') + (p[2] ? ' (' + esc(p[2]) + ')' : ''); }).join('; ') + '.</p>';
+      h += '</div>';
+    });
+    return h + '</div>';
+  }
+  function propsNameKey(n) { return String(n || "").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-z ]+/g, "").replace(/\b(jr|sr|ii|iii|iv)\b/g, "").replace(/\s+/g, " ").trim(); }
   function propHas(r) { return r.p !== null && r.p !== undefined; }
   /* the tab: the matchup columns go, the props section comes, the sport buttons read unpressed */
   function showProps(on) {
@@ -649,7 +688,7 @@
     h += '<div class="pd-pick">' + (has ? esc(r.side) + ' ' : '') + esc(String(r.line)) + ' ' + esc(lab) + propResChip(r) + '</div>';
     h += '<div class="pd-sub">' + esc(r.game) + ' · ' + esc(gameDate(r.gdate)) + (r.opp ? ' · ' + (r.athome ? 'at home against ' : 'on the road at ') + esc(r.opp) : '') +
          ' · ' + esc(r.book || "the book") + ' ' + esc(String(r.line)) + ' (' + sgn(r.op, 0) + '/' + sgn(r.up, 0) + ')</div>';
-    if (has && (propTakeBtn(r, true) || "").length) h += '<div class="pd-take">' + propTakeBtn(r, true) + '</div>';
+    h += '<div class="pd-take pd-go">' + (has && (propTakeBtn(r, true) || "").length ? propTakeBtn(r, true) + ' ' : '') + propsGoBtn(r, true) + '</div>';
     if (has) {
       h += '<div class="pd-tiles">' +
         tile("Chance", (r.chance * 100).toFixed(1) + "%", "blended: the over is " + (r.pm * 100).toFixed(1) + "% by the model, " + (r.pb * 100).toFixed(1) + "% by the book") +
@@ -674,6 +713,7 @@
     } else {
       h += '<p class="note">' + esc((r.why && r.why[0]) || "No projection on this prop.") + '</p>';
     }
+    h += propsFivesHtml(r);
     var levers = has ? propsLevers(r) : [];
     /* the Why's marked lines (26 Oct 2026, the user: "are those the two biggest reasons for the pick?"; they had been the two
        biggest by size in either direction, so a pace lever against the over read as a reason for it): the two biggest levers
@@ -787,7 +827,7 @@
         '<div class="n3">' + (r.chance * 100).toFixed(1) + '% · ' + sgn(r.price, 0) + ' needs ' + (r.need * 100).toFixed(1) + '% · edge ' + sgn(r.edge * 100, 1) + resChip(r) + '</div>' +
         '<div class="n4">' + esc(r.game) + ' · projected ' + r.proj + ' (±' + r.sd + ') · ' + esc(r.book) + '</div>' +
         (propsLeversLine(r) ? '<div class="n5">Moves it: ' + propsLeversLine(r) + '</div>' : '') +
-        (propSimLine(r) ? '<div class="n5 simline' + (propSimAgrees(r) === true ? ' pos' : propSimAgrees(r) === false ? ' neg' : '') + '">' + propSimLine(r) + '</div>' : '') + '<div class="n6">' + propTakeBtn(r) + '</div></div>';
+        (propSimLine(r) ? '<div class="n5 simline' + (propSimAgrees(r) === true ? ' pos' : propSimAgrees(r) === false ? ' neg' : '') + '">' + propSimLine(r) + '</div>' : '') + '<div class="n6">' + propTakeBtn(r) + propsGoBtn(r) + '</div></div>';
     }).join("") : '<div class="empty">' + (rows.length ? 'No prop on this date clears its price.' : 'Load a props file: Run NBA props.bat writes nba-props-DATE.json.') + '</div>';
     /* the simulation's strip (26 Oct 2026): one card a game */
     if ($("propsSim")) $("propsSim").innerHTML = rows.length ? propsSimStripHtml(rows) : '<div class="empty">Load a props file and each game\'s simulation lands here.</div>';
@@ -856,6 +896,10 @@
       else propsSay("<pre>" + esc(text) + "</pre>");
     });
     var openFrom = function (e) { var t = e.target.closest("[data-prop]"); if (t) openPropDetail(t.getAttribute("data-prop")); };
+    document.addEventListener("click", function (e) {
+      var t = e.target && e.target.closest ? e.target.closest("[data-pgo]") : null; if (!t) return;
+      e.stopPropagation(); e.preventDefault(); openPropMatchup(t.getAttribute("data-pgo"));
+    }, true);
     $("propsTable").addEventListener("click", function (e) {
       var th = e.target.closest("th[data-sort]");
       if (th) {

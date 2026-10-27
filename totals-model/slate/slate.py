@@ -5188,6 +5188,7 @@ def make_nba_props(date_iso, out_dir, log, topup=False, sim_runs=NBA_SIM_RUNS):
         row = {"gid": g.get("id"), "away": away, "home": home, "aab": aab, "hab": hab, "tip": g.get("t") or ev.get("commence_time"),
                "spread": odds.get("sp"), "total": odds.get("total"), "pace": round(pace, 1) if pace else None, "league_pace": round(league_pace, 1) if league_pace else None,
                "out": {ab: [[n, round(mpg, 1) if mpg is not None else None, st] for n, mpg, st in out[ab][1]] for ab in (aab, hab)},
+               "fives": {s_: (lambda rw: {"status": rw.get("status") or "", "five": rw.get("five") or [], "maybe": rw.get("maybe") or []} if rw else None)(nba_lineup_for(lineups, NBA_NICK.get(ab_, ab_), ab_)) for s_, ab_ in (("away", aab), ("home", hab))},   # the starting fives (27 Oct 2026), for the prop's panel
                "props": [], "unmatched": []}
         log("%s @ %s: %d props%s%s" % (away, home, len(props), (" · pace %.1f" % pace) if pace else "",
                                        "".join(" · %s out: %s" % (NBA_NICK.get(ab, ab), ", ".join("%s (%s)" % (n, ("%.0f mpg" % mpg) if mpg is not None else "no line") for n, mpg, _s in out[ab][1])) for ab in (aab, hab) if out[ab][1])))

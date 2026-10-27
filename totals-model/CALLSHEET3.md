@@ -1622,3 +1622,17 @@ sigma now carries it (`PROPS_THIN_SD`): ×1.06 under 360 minutes of evidence
 untouched, and the why says so. On a rookie like Cameron Boozer, whose 12.5
 rebounds per 36 rest on three games and no last season, the chance reads
 wider; the market's 8.5 had the better of a projection at 12.
+
+## The fives and the matchup on the prop, 27 Oct 2026
+
+The user: "a button to take me to the matchup for that game, or show the
+lineup for that team in the prop?" Both. The props run already read
+RotoWire's lineups page for the roles; each game in the props file now
+carries both clubs' starting fives with the status and the men who may not
+play (`fives`), and the panel shows them under the tiles, the prop's man
+marked, expected or confirmed badged, shown and never scored. And a
+**Matchup** button on the panel and on each best card opens the game on the
+NBA card into the form (`openRow`), the props view folding away; the button
+is greyed with the reason while the NBA card has no row for the game on the
+date, and a click on it then says what to load. The row is found by the
+date and both clubs' names (`propsCardRow`), the way the grade matches them.

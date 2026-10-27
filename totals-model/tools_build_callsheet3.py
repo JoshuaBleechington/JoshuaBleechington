@@ -96,6 +96,8 @@ def head() -> str:
              "  #nbaLineupPanel .lbadge { display: inline-block; margin-left: 6px; padding: 1px 6px; border-radius: 3px; font: 700 9.5px/1.6 var(--sans); letter-spacing: .06em; text-transform: uppercase; vertical-align: 1px; }\n"
              "  #nbaLineupPanel .lbadge.conf { color: var(--go); background: var(--go-wash); } #nbaLineupPanel .lbadge.exp { color: var(--edge); background: var(--edge-wash); }\n"
              "  #nbaLineupPanel .lbadge.none { color: var(--muted); background: var(--surface-2); }\n"
+             "  .pdlg .pd-fives .lbadge { display: inline-block; margin-left: 6px; padding: 1px 6px; border-radius: 3px; font: 700 9.5px/1.6 var(--sans); letter-spacing: .06em; text-transform: uppercase; vertical-align: 1px; }\n"
+             "  .pdlg .pd-fives .lbadge.conf { color: var(--go); background: var(--go-wash); } .pdlg .pd-fives .lbadge.exp { color: var(--edge); background: var(--edge-wash); } .pdlg .pd-fives .lbadge.none { color: var(--muted); background: var(--surface-2); }\n"
              "  @media (max-width: 640px) { #nbaLineupPanel .fives { grid-template-columns: 1fr; } }\n"
              "  /* the referees (22 Oct 2026): the watch on the record as two tables, the crew line on the matchup highlighted */\n"
              "  #calibBox table.refs { margin: 6px 0 10px; } #calibBox table.refs td, #calibBox table.refs th { white-space: nowrap; }\n"
@@ -197,6 +199,9 @@ def head() -> str:
              "  .pk.pair.agrees { border-color: var(--go); } .pk.pair.win { box-shadow: inset 4px 0 0 var(--go); } .pk.pair.loss { box-shadow: inset 4px 0 0 var(--bad); } .pdlg h3 .tag.role { background: var(--ink-2); color: var(--bg, #fff); }\n"
              "  /* what happened on each of his last games (26 Oct 2026): the first factor bold, red under the line and green over it */\n"
              "  .pdlg .pd-log td:not(.pd-what) { white-space: nowrap; } .pdlg .pd-log td.pd-what { font-size: 11.5px; color: var(--ink-2); white-space: normal; min-width: 220px; } .pdlg .pd-log td.pd-what b { font-weight: 600; } .pdlg .pd-log td.pd-what b.under { color: var(--bad); } .pdlg .pd-log td.pd-what b.over { color: var(--go); }\n"
+             "  /* the fives and the matchup on the prop (27 Oct 2026): both clubs' starting fives on the panel with the man marked, and a way to the game on the NBA card */\n"
+             "  .pdlg .pd-fives { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 10px; margin: 6px 0 4px; } .pdlg .pd-fives .five p { margin: 0 0 4px; } .pdlg .pd-fives table.form { margin: 0; } .pdlg .pd-fives tr.me td { font-weight: 700; color: var(--go); }\n"
+             "  .pdlg .pd-go { margin: 8px 0 2px; display: flex; gap: 8px; flex-wrap: wrap; align-items: center; } .pk .n6 .btn.go { margin-left: 6px; padding: 4px 10px; font-size: 10.5px; }\n"
              "  /* the pair's own panel (26 Oct 2026): the ticket opens like a prop, each leg in a box of its own with a way to its panel */\n"
              "  .pk[data-pair] { cursor: pointer; } .pk[data-pair]:hover { border-color: var(--ink); } .pdlg h3 .amp { color: var(--muted); font-weight: 500; }\n"
              "  .pdlg .pd-leg { border: 1px solid var(--rule); border-radius: 8px; padding: 6px 12px 10px; margin: 10px 0; } .pdlg .pd-leg h4 { margin: 6px 0 2px; } .pdlg .pd-leg .pd-tiles { margin: 8px 0 6px; }\n"
@@ -637,7 +642,10 @@ def props_example_games() -> list:
         props.append(item)
     props.sort(key=lambda x: (-(x.get("edge") if x.get("edge") is not None else -9), x["name"], x["mk"]))
     return [{"gid": "example", "away": "76ers", "home": "Knicks", "aab": "PHI", "hab": "NYK", "tip": None, "spread": -5.5, "total": 231.5, "pace": 98.75, "league_pace": 100.5,
-             "out": {"PHI": [["Joel Embiid", 31.2, "Out"]], "NYK": []}, "sim": gs, "props": props, "unmatched": []}]
+             "out": {"PHI": [["Joel Embiid", 31.2, "Out"]], "NYK": []}, "sim": gs,
+             "fives": {"away": {"status": "expected", "five": [["PG", "Tyrese Maxey"], ["SG", "VJ Edgecombe"], ["SF", "Paul George"], ["PF", "Kelly Oubre Jr."], ["C", "Adem Bona"]], "maybe": [["C", "Andre Drummond", "Questionable"]]},
+                       "home": {"status": "confirmed", "five": [["PG", "Jalen Brunson"], ["SG", "Mikal Bridges"], ["SF", "OG Anunoby"], ["PF", "Josh Hart"], ["C", "Karl-Anthony Towns"]], "maybe": []}},
+             "props": props, "unmatched": []}]
 
 
 def build() -> str:

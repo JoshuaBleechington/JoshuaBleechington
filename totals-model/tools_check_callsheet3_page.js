@@ -1572,6 +1572,45 @@ const CHECKS = ["dome","playoff","agconf","hgconf","agbk","hgbk"];
       && whatT.rebWhat.length === 10 && whatT.rebWhat.every(t => !/shots|from the floor/.test(t) && /\d+ min/.test(t) && /(won|lost) by \d+/.test(t) && /of the club's \d+ rebounds/.test(t)) && whatT.rebWhat.some(t => /(Josh Hart|Joel Embiid) took 12 \(his usual 6\.5\)/.test(t)),
       'props: every one of the panel\'s last games carries the line behind it, the night\'s causes first (a regular back or out, a blowout) then what stood out and the plain box with the margin, the first item bold in the colour of the game\'s mark; a rebounds prop reads no shots or shooting', JSON.stringify(whatT).slice(0, 1800));
 
+  // ---- 27 Oct 2026: the fives and the matchup on the prop -- both clubs' starting fives on the panel with the man marked; a Matchup button on the
+  //      panel and the cards, off until the NBA card has the game, then opening it into the form ----
+  const goT = await pg.evaluate(async () => {
+    const wait = () => new Promise(r => setTimeout(r, 90));
+    const txt = e => (e ? e.innerText : '').replace(/\s+/g, ' ').trim();
+    await smStore.removeItem('callsheet3.card.v1'); document.getElementById('clear').click(); await wait();
+    document.getElementById('propsReset').click(); await wait();
+    document.getElementById('m-props').click(); await wait(); document.getElementById('propsExample').click(); await wait();
+    const today = document.getElementById('propsDate').value, dlg = document.getElementById('propDetail');
+    const card0 = [...document.querySelectorAll('#propsBest .pk')].find(e => /Tyrese Maxey/.test(e.textContent));
+    const cardBtn0 = card0.querySelector('.btn.go[data-pgo]'), cardOff0 = cardBtn0 ? cardBtn0.classList.contains('off') : null, cardTitle0 = cardBtn0 ? cardBtn0.title : '';
+    card0.click(); await wait();
+    const fives = [...dlg.querySelectorAll('.pd-fives .five')].map(e => txt(e)), me = txt(dlg.querySelector('.pd-fives tr.me')), heads = [...dlg.querySelectorAll('.pd-fives .lbadge')].map(e => e.className + '|' + e.textContent);
+    const panelBtn = dlg.querySelector('.pd-go .btn.go[data-pgo]'), panelOff = panelBtn ? panelBtn.classList.contains('off') : null, panelText = txt(panelBtn), takeStill = !!dlg.querySelector('.pd-take .takebtn[data-ptake]');
+    panelBtn.click(); await wait();
+    const stillOpen = !dlg.hidden, said = txt(document.getElementById('propsMsg'));
+    document.getElementById('propDetailClose').click(); await wait();
+    // the NBA example on the card for the props' date, then the button is live and opens the game into the form
+    document.getElementById('m-nba').click(); await wait();
+    const set = (id, v) => { const el = document.getElementById(id); el.value = v; el.dispatchEvent(new Event('input', { bubbles: true })); };
+    set('gdate', today); document.getElementById('example').click(); await wait(); set('gdate', today); await wait();
+    document.getElementById('add').click(); await wait();
+    document.getElementById('clear').click(); await wait();
+    const awayBefore = document.getElementById('away').value;
+    document.getElementById('m-props').click(); await wait(); document.getElementById('propsExample').click(); await wait();
+    const card1 = [...document.querySelectorAll('#propsBest .pk')].find(e => /Tyrese Maxey/.test(e.textContent)), cardBtn1 = card1.querySelector('.btn.go[data-pgo]'), cardLive = cardBtn1 && !cardBtn1.classList.contains('off');
+    cardBtn1.click(); await wait();
+    const propsHidden = document.getElementById('propsView').hidden, dlgHidden = dlg.hidden, away = document.getElementById('away').value, home = document.getElementById('home').value, nbaPressed = document.getElementById('m-nba').getAttribute('aria-pressed');
+    const lineupPanel = txt(document.getElementById('nbaLineupPanel')).slice(0, 80);
+    await smStore.removeItem('callsheet3.card.v1'); document.getElementById('clear').click(); await wait();
+    return { cardOff0, cardTitle0, fives, me, heads, panelOff, panelText, takeStill, stillOpen, said, awayBefore, cardLive, propsHidden, dlgHidden, away, home, nbaPressed, lineupPanel };
+  });
+  chk(goT.cardOff0 === true && /^The NBA card has no row for 76ers @ Knicks on /.test(goT.cardTitle0) && goT.fives.length === 2 && /^76ers EXPECTED PG Tyrese Maxey THIS PROP SG VJ Edgecombe SF Paul George PF Kelly Oubre Jr\. C Adem Bona May not play: C Andre Drummond \(Questionable\)\.$/i.test(goT.fives[0])
+      && /^Knicks CONFIRMED PG Jalen Brunson SG Mikal Bridges SF OG Anunoby PF Josh Hart C Karl-Anthony Towns$/i.test(goT.fives[1]) && /^PG Tyrese Maxey THIS PROP$/i.test(goT.me) && goT.heads.join(',') === 'lbadge exp|expected,lbadge conf|confirmed'
+      && goT.panelOff === true && /^open the matchup on the nba card$/i.test(goT.panelText) && goT.takeStill && goT.stillOpen && /^The NBA card has no row for 76ers @ Knicks on .+: load the NBA slate for the date \(Load slate\) and Add the game, and the button opens it\.$/.test(goT.said),
+      'props: the panel carries both clubs\' starting fives from the props run with the prop\'s man marked and the status badges, and the Matchup button is off, with the reason, while the NBA card has no row for the game', JSON.stringify(goT).slice(0, 1200));
+  chk(goT.awayBefore === '' && goT.cardLive === true && goT.propsHidden && goT.dlgHidden && /76ers/.test(goT.away) && /Knicks/.test(goT.home) && goT.nbaPressed === 'true' && !/No lineup on the row/.test(goT.lineupPanel),
+      'props: once the NBA card has the game, Matchup on the card opens it into the form: the props view folds away, the NBA tab is pressed and the form reads the game with its lineup panel', JSON.stringify({ before: goT.awayBefore, live: goT.cardLive, hidden: goT.propsHidden, dlg: goT.dlgHidden, away: goT.away, home: goT.home, nba: goT.nbaPressed, lineup: goT.lineupPanel }));
+
   // ---- 26 Oct 2026: the pair's own panel -- a same-game pair card opens like a prop: the ticket's numbers, how the chance is made, each leg with a way
   //      into its own panel, Previous / Next across the night's tickets; Take marks the pair on both legs, lists it under Taking and grades it under What you took ----
   const pairT = await pg.evaluate(async () => {

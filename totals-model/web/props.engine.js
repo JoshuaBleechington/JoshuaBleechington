@@ -411,15 +411,18 @@
         if ((r.gdate || "") !== (g.gdate || d.date || "")) return;
         if (propsCanon(r.away) !== propsCanon(g.away) || propsCanon(r.home) !== propsCanon(g.home)) return;
         var bl = g.box[r.pid] || [], mins = bl[1] === null || bl[1] === undefined ? null : bl[1];   // his minutes that night, for the panel's last-games row
+        var what = bl[6] && typeof bl[6] === "object" && Array.isArray(bl[6][r.mk]) ? bl[6][r.mk] : null;   // what happened on his game, per market (27 Oct 2026)
         if (r.result) {
           /* graded already: the result stands, and only the minutes fill in when the row has none (25 Oct 2026, the user:
              "could the older graded props get their minutes filled in too?"): load the night's grade file again */
           if ((r.amin === null || r.amin === undefined) && mins !== null) { r.amin = mins; filled++; }
+          if (!(r.awhat && r.awhat.length) && what && what.length) { r.awhat = what; filled++; }
           return;
         }
         var v = propActual(r, g.box);
         if (v === undefined) return;
         r.amin = mins;
+        if (what && what.length) r.awhat = what;
         if (v === null) { r.result = "void"; r.actual = null; n++; return; }
         r.actual = v;
         r.result = !r.side ? "graded" : (v === r.line ? "push" : ((v > r.line) === (r.side === "OVER") ? "win" : "loss"));
@@ -706,13 +709,14 @@
          the night's causes first (a regular back or out, a blowout, his role), then his minutes, shots and shooting against his
          season's, then overtime and the pace; the first is bold, red under the line and green over it. A file from before carries
          none, and the column stays away. The graded night's own line gets his minutes against the games above it */
-      var what = (r.log || []).some(function (g) { return g[5] && g[5].length; });
+      var what = (r.log || []).some(function (g) { return g[5] && g[5].length; }) || !!(r.awhat && r.awhat.length);
       var whatCell = function (f, v) {
         if (!f || !f.length) return '<td class="pd-what"></td>';
         var side = v === null || v === undefined || r.line === null || r.line === undefined || isNaN(+r.line) ? "" : (+v > +r.line ? " over" : +v < +r.line ? " under" : "");
         return '<td class="pd-what"><b class="' + side.trim() + '">' + esc(f[0]) + '</b>' + (f.length > 1 ? ' · ' + f.slice(1).map(esc).join(' · ') : '') + '</td>';
       };
       var thisWhat = function () {
+        if (r.awhat && r.awhat.length) return r.awhat;   // the grade file's own line for the night (27 Oct 2026)
         var mins = (r.log || []).map(function (g) { return +g[3]; }).filter(function (m) { return isFinite(m) && m > 0; });
         if (r.result === "void") return ["did not play"];
         if (!mins.length || r.amin === null || r.amin === undefined) return [];

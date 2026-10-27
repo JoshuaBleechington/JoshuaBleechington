@@ -1551,11 +1551,31 @@ sixth element of each `log` entry), five items at most, in this order:
 - **The plain box** for what did not stand out: his minutes against his
   usual, his shots against his usual at those minutes, his makes of his
   attempts, and the margin, won or lost by.
+- **For a rebounds or assists prop, who had them** (27 Oct 2026, the user on
+  Cameron Boozer's seven: "did he get less rebounds because of the defence,
+  or was someone else on his team getting them?"): his share of the club's
+  rebounds (or assists) that night against his usual share, standing out at
+  five points off, and the teammate who took three or more over his own
+  usual, named: "4 of the club's 42 rebounds, 10% (his usual 27%) · Cedric
+  Coward took 11 (his usual 5)". The game logs keep the club's totals and the
+  taker for it (`treb`, `tast`, `grab`, `dish`); a PRA prop names the taker
+  without the share lines.
 - **Overtime**, and a game five possessions or more off his club's own pace.
 
-"His usual" is this season's games once he has five, else those games with
-last season's thirty behind them, so the first week reads against a real
-baseline; with nothing to compare against the plain box still reads.
+"His usual" minutes, shots and shares are this season's once he has three
+games (a man in a new role reads as he is now: Ty Jerome's 30 minutes read
+against his 32 as a Memphis starter, not his 25 off Cleveland's bench), else
+with last season's thirty behind them; his shooting share needs ten games
+before this season stands alone. With nothing to compare against the plain
+box still reads.
+
+**The graded night's own row** (27 Oct 2026, the user: "how come there is no
+info for their game yesterday?"): the grade file carried only his minutes
+and the stat. `nba-grade` now writes the same line for every man on every
+box line, per market (`nba_grade_what`: the ledgers beside the slate, the
+night's own games added when the ledger has not caught up), and the page
+keeps it on the graded prop (`awhat`) and shows it on the "this game" row;
+a second load of the night's grade file fills it in on rows graded before.
 A rebounds or assists prop reads no shots or shooting. The regulars come
 from `nba_club_regulars`: a man on 24 minutes a game over five games with
 the club this season, or, until he has five, over ten games last season
@@ -1572,3 +1592,33 @@ his minutes against the games above it. A file from before carries none
 and the column stays away. The game logs now keep his shots and makes, the
 club's final margin, overtime, the game's pace and the club's regulars out
 or back, for this. Shown, never scored.
+
+## The regulars-out lever, re-examined, and a thin history's sigma, 27 Oct 2026
+
+The user, after a week of props: "for the cards with the red for the
+regulars out the unders tend to go over; should the regulars being out be
+weighted more? Flagg played 40 minutes and got 11 assists against the under
+5.5." His week agreed with him on the face of it: the props with a
+regulars-out lever of 1.5 or more went 118-153 at a 55% say-so, on BOTH
+sides, which is not a lift too small (the unders would have lost alone) nor
+too large (the overs alone) but a chance too sure of itself on those nights
+and a lift landing on the wrong men. `tools_nba_out_targeting.py` asked
+2025-26 (NBA.md has the numbers): the minutes lift lands on the bench and
+the low-minute men, not the starters the props are mostly about; the points
+lift lands on starters and high-usage men; an absent creator lifts his
+teammates' assists where an absent scorer does not; but a rule re-targeted
+by role, fitted on the first half of the season, beat the pooled rule on the
+second half by a hair (points rmse 6.200 against 6.211 with a regular out),
+and the chance's spread with regulars out is 0.96 to 0.99 sigmas, the same
+as without. So the scored rule stays as it is, and Flagg's night reads as
+what it was: 40 minutes against a 28-minute projection dragged down by one
+17-minute game, and an eleven-assist night two sigmas out.
+
+What did measure is the thin history. A rate resting on three to nine games
+misses by 1.09 to 1.10 sigmas on points (1.06 rebounds, 1.01 assists)
+against 1.02 at twenty games and up, the rate's own sampling error. The
+sigma now carries it (`PROPS_THIN_SD`): ×1.06 under 360 minutes of evidence
+(ten games, last season's prior weight counted), ×1.03 under 720, the side
+untouched, and the why says so. On a rookie like Cameron Boozer, whose 12.5
+rebounds per 36 rest on three games and no last season, the chance reads
+wider; the market's 8.5 had the better of a projection at 12.

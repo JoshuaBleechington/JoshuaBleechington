@@ -947,12 +947,13 @@ const CHECKS = ["dome","playoff","agconf","hgconf","agbk","hgbk"];
     const tileBefore = !!document.querySelector('#calibBox .calib[data-sport="PROPS"]');
     const gradeDoc = { format: 'callsheet2.slate', version: 1, date: '2026-10-21', games: [
       { sport: 'NBA', gdate: '2026-10-21', away: 'Hawks', home: 'Magic', gameId: '401909834', finals: { fa: '118', fh: '112', f5a: '60', f5h: '55' }, notes: [],
-        box: { '3037789': ['Trae Young', 36.2, 28, 3, 11, 4], '4397020': ['Paolo Banchero', 34.0, 22, 9, 4, 1] } } ] };
+        box: { '3037789': ['Trae Young', 36.2, 28, 3, 11, 4, { pts: ['won by 6', '36 min (his usual 34)', '22 shots (his usual 21 at those minutes)', '10 of 19 from the floor'], reb: ['won by 6', '36 min (his usual 34)', '3 of the club\'s 44 rebounds (his usual 9%)'], ast: ['Dyson Daniels out (30 mpg, a lift for him)', 'won by 6', '11 of the club\'s 27 assists, 41% (his usual 30%)'], tpm: ['won by 6'], pra: ['won by 6'] }], '4397020': ['Paolo Banchero', 34.0, 22, 9, 4, 1] } } ] };
     await load(gradeDoc, 'nba-grade-2026-10-21.json');
     const after = JSON.parse(smStore.getItem('callsheet3.props.v1'));
     // the graded night joins the panel's last games, with his minutes from the box line (25 Oct 2026)
     document.querySelector('#propsTable tr[data-prop]').click(); await wait();
     const thisRow = (document.querySelector('#propDetail .pd-log tr.this') || { innerText: '' }).innerText.replace(/\s+/g, ' ').trim(), thisMark = (document.querySelector('#propDetail .pd-log tr.this b.lg') || { className: '' }).className;
+    const thisWhat = (document.querySelector('#propDetail .pd-log tr.this td.pd-what') || { innerText: '' }).innerText.replace(/\s+/g, ' ').trim(), whatHead = [...document.querySelectorAll('#propDetail .pd-log thead th')].map(t => t.textContent.trim()).join('|'), otherWhat = [...document.querySelectorAll('#propDetail .pd-log tbody tr:not(.this) td.pd-what')].map(td => td.textContent.trim());
     const logRows = document.querySelectorAll('#propDetail .pd-log tbody tr').length;
     document.getElementById('propDetailClose').click(); await wait();
     const tile = document.querySelector('#calibBox .calib[data-sport="PROPS"]');
@@ -979,11 +980,12 @@ const CHECKS = ["dome","playoff","agconf","hgconf","agbk","hgbk"];
     const viewOff = document.getElementById('propsView').hidden, colsBack = !document.querySelector('.cols').hidden, nbaPressed = document.getElementById('m-nba').getAttribute('aria-pressed');
     await smStore.removeItem('callsheet3.props.v1');
     return { viewOn, colsOff, pressed, best, rowsOn, rowsAll, count, msg, whyOpen, logMarks, tileBefore, after: after.map(r => [r.name, r.mk, r.result, r.actual]), tileText, slateMsg, restored: restored.length, viewOff, colsBack, nbaPressed,
-             tabCalib, tabBlocks, nights, ladder, tabEmpty0, noneMsg, thinMsg, inPlay, thisRow, thisMark, logRows, refill };
+             tabCalib, tabBlocks, nights, ladder, tabEmpty0, noneMsg, thinMsg, inPlay, thisRow, thisMark, logRows, refill, thisWhat, whatHead, otherWhat };
   });
   chk(propsT.refill.stripped && propsT.refill.same && JSON.stringify(propsT.refill.mins) === JSON.stringify(propsT.refill.was) && propsT.refill.mins.some(m => typeof m === 'number') && /Minutes filled in on \d+ graded props? from the box lines\./.test(propsT.refill.msg),
       'props: a second load of a night\'s grade file fills the minutes in on props graded before they were kept, leaves every result as it was, and says how many', JSON.stringify(propsT.refill));
-  chk(/^10-21 @ [A-Z]+ this game 36\.2 28$/.test(propsT.thisRow) && /lg over/.test(propsT.thisMark) && propsT.logRows === 4,
+  chk(/^10-21 @ [A-Z]+ this game 36\.2 28 won by 6 · 36 min \(his usual 34\) · 22 shots \(his usual 21 at those minutes\) · 10 of 19 from the floor$/.test(propsT.thisRow) && /lg over/.test(propsT.thisMark) && propsT.logRows === 4
+      && propsT.whatHead === 'Date|Opp|Min|points|What happened' && propsT.thisWhat === 'won by 6 · 36 min (his usual 34) · 22 shots (his usual 21 at those minutes) · 10 of 19 from the floor' && propsT.otherWhat.length === 3 && propsT.otherWhat.every(t => t === ''),
       'props: a graded prop\'s last games end with the game itself, his minutes from the box line and the stat marked against the line', JSON.stringify({ row: propsT.thisRow, mark: propsT.thisMark, rows: propsT.logRows }));
   chk(/loaded: 2 new.*Last season's ledger, nba-ledger-202526\.json, was not read by this run: 1 of the 1 projections rest on this season's two or three games a player, and 1 prop has no history at all\. Put the file back beside slate\.py, run the props again before tip, and load the new file; it replaces these\./.test(propsT.thinMsg),
       'props: a file whose projections rest on this season alone says last season\'s ledger was not read and what to do', propsT.thinMsg.slice(0, 500));
@@ -1562,12 +1564,12 @@ const CHECKS = ["dome","playoff","agconf","hgconf","agbk","hgbk"];
     document.getElementById('m-nba').click(); await wait();
     return { head, h4, rows, rebWhat };
   });
-  const whatRe = /^((.+ (back|out) \(\d+ mpg(, (a lift for him|the lift gone))?\))|((won|lost) by \d+(, a blowout)?)|(off the bench)|(a start)|(\d+ min, \d+ (under|over) his usual \d+)|(\d+ min \(his usual \d+\))|(\d+ shots, \d+ (under|over) his usual at those minutes)|(\d+ shots \(his usual \d+ at those minutes\))|(\d+ of \d+ from the floor(, (cold|hot) \(his season \d+%\))?)|(overtime)|(a (slow|fast) game, \d+ possessions against their usual \d+))$/;
+  const whatRe = /^((.+ (back|out) \(\d+ mpg(, (a lift for him|the lift gone))?\))|((won|lost) by \d+(, a blowout)?)|(off the bench)|(a start)|(\d+ min, \d+ (under|over) his usual \d+)|(\d+ min \(his usual \d+\))|(\d+ shots, \d+ (under|over) his usual at those minutes)|(\d+ shots \(his usual \d+ at those minutes\))|(\d+ of \d+ from the floor(, (cold|hot) \(his season \d+%\))?)|(overtime)|(a (slow|fast) game, \d+ possessions against their usual \d+)|(\d+ of the club's \d+ (rebounds|assists)(, \d+% \(his usual \d+%\)| \(his usual \d+%\))?)|(.+ (took|had) \d+ \(his usual \d+(\.\d)?\)))$/;
   chk(whatT.head.join('|') === 'Date|Opp|Min|points|What happened' && /^LAST GAMES \(\d+ of 10 over 25\.5\) · what the box says happened, the biggest factor first$/i.test(whatT.h4) && whatT.rows.length === 10
       && whatT.rows.every(r => r.what && r.what.split(' · ').length >= 3 && r.what.split(' · ').length <= 5 && r.what.split(' · ').every(p => whatRe.test(p)) && /(won|lost) by \d+/.test(r.what) && /\d+ min/.test(r.what) && /\d+ shots/.test(r.what))
       && whatT.rows.every(r => !r.first || (r.first === r.what.split(' · ')[0] && r.cls === (/over/.test(r.mark) ? 'over' : /under/.test(r.mark) ? 'under' : '')))
       && whatT.rows.some(r => /(back|out) \(\d+ mpg, (a lift for him|the lift gone)\)/.test(r.first)) && whatT.rows.some(r => /a blowout/.test(r.what)) && whatT.rows.some(r => /shots, \d+ (under|over) his usual/.test(r.what))
-      && whatT.rebWhat.length === 10 && whatT.rebWhat.every(t => !/shots|from the floor/.test(t) && /\d+ min/.test(t) && /(won|lost) by \d+/.test(t)),
+      && whatT.rebWhat.length === 10 && whatT.rebWhat.every(t => !/shots|from the floor/.test(t) && /\d+ min/.test(t) && /(won|lost) by \d+/.test(t) && /of the club's \d+ rebounds/.test(t)) && whatT.rebWhat.some(t => /(Josh Hart|Joel Embiid) took 12 \(his usual 6\.5\)/.test(t)),
       'props: every one of the panel\'s last games carries the line behind it, the night\'s causes first (a regular back or out, a blowout) then what stood out and the plain box with the margin, the first item bold in the colour of the game\'s mark; a rebounds prop reads no shots or shooting', JSON.stringify(whatT).slice(0, 1800));
 
   // ---- 26 Oct 2026: the pair's own panel -- a same-game pair card opens like a prop: the ticket's numbers, how the chance is made, each leg with a way

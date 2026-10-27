@@ -4061,9 +4061,48 @@ def make_nba_slate(date_iso, out_dir, log, topup=False, sim_runs=NBA_SIM_RUNS):
     return path
 
 
+def nba_grade_what(date_iso, out_dir, entries, rows, log):
+    """What happened on each man's game that night, per market, written into the
+    grade file's box lines (27 Oct 2026, the user: "how come there is no info
+    for their game yesterday?"): the same line the panel's last games carry,
+    from the ledgers beside the slate with the night's own games added when
+    the ledger has not caught up. Nothing fatal: a missing ledger logs a line."""
+    season = nba_season_id(date_iso)
+    led = load_nba_ledger(nba_ledger_path(out_dir, season))
+    prior = load_nba_ledger(nba_ledger_path(out_dir, nba_prev_season(season)))
+    if not led and not prior:
+        log("  no ledger beside the slate: the box lines carry no what-happened line (run the slate once and grade again)")
+        return 0
+    have = {str(g.get("id")) for g in (led or {}).get("games") or []}
+    games = list((led or {}).get("games") or []) + [e for e in entries if str(e.get("id")) not in have]
+    logs_last = nba_player_logs(prior["games"] if prior else [])
+    logs_this = nba_player_logs(games, prior_logs=logs_last)
+    paces = [g["pace"] for g in games if g.get("pace")]
+    if len(paces) < 20 and prior:
+        paces = [g["pace"] for g in prior["games"] if g.get("pace")]
+    league_pace = (sum(paces) / len(paces)) if paces else None
+    n = 0
+    for row in rows:
+        for pid, bl in (row.get("box") or {}).items():
+            e1 = logs_this.get(pid)
+            if not e1:
+                continue
+            night = [x for x in e1["g"] if x.get("d") == date_iso]
+            if not night:
+                continue
+            gl, season_logs = night[-1], e1["g"]
+            last_g = (logs_last.get(pid) or {}).get("g")
+            what = {mk: props_game_factors(gl, season_logs, mk, league_pace, last_g) for mk in ("pts", "reb", "ast", "tpm", "pra")}
+            while len(bl) < 6:
+                bl.append(None)
+            bl.append(what)
+            n += 1
+    return n
+
+
 def make_nba_grade(date_iso, out_dir, log):
     games = nba_day_games(date_iso)
-    rows = []
+    rows, entries = [], []
     for g in games:
         away, home = g.get("an") or NBA_NICK.get(g["away"], g["away"]), g.get("hn") or NBA_NICK.get(g["home"], g["home"])
         if not g["final"] or g["fa"] is None or g["fh"] is None:
@@ -4081,6 +4120,7 @@ def make_nba_grade(date_iso, out_dir, log):
             if (ha is None or hh is None) and len(e.get("qa") or []) >= 2 and len(e.get("qh") or []) >= 2:
                 ha, hh = e["qa"][0] + e["qa"][1], e["qh"][0] + e["qh"][1]
             box = nba_props_box(e)
+            entries.append(e)
         except Exception as ex:  # noqa: BLE001
             notes.append("Could not read the summary page (%s): no half-time score from it, and no box lines for the props." % ex)
         if ha is not None and hh is not None:
@@ -4098,6 +4138,12 @@ def make_nba_grade(date_iso, out_dir, log):
             if "after tip" in n:
                 log("  " + n)
         rows.append(row)
+    try:
+        nw = nba_grade_what(date_iso, out_dir, entries, rows, log)
+        if nw:
+            log("What happened on each man's game, per market, is on %d box lines for the Props tab's graded rows." % nw)
+    except Exception as ex:  # noqa: BLE001
+        log("  the what-happened lines failed (%s); the grade stands without them" % ex)
     doc = {"format": FORMAT, "version": VERSION, "date": date_iso, "generated": now_utc(), "source": "slate.py nba-grade: ESPN's site API", "games": rows}
     path = os.path.join(out_dir, "nba-grade-%s.json" % date_iso)
     with open(path, "w", encoding="utf-8") as f:
@@ -4161,6 +4207,8 @@ PROPS_USAGE_SD = {"pts": (1.12, 1.07, 0.93), "pra": (1.16, 1.07, 0.90), "reb": (
 PROPS_ROLE_SD = {"starter": {"pts": (1.03, 1.01, 0.91), "pra": (1.02, 0.99, 0.87), "reb": (1.01, 0.96, 0.95), "ast": (1.03, 0.99, 0.96), "tpm": (1.0, 1.0, 1.0)},
                  "bench": {"pts": (1.17, 1.15, 1.04), "pra": (1.25, 1.18, 1.08), "reb": (1.19, 1.04, 1.06), "ast": (1.04, 1.07, 1.06), "tpm": (1.0, 1.0, 1.0)}}
 PROPS_USAGE_CUTS = (18.0, 24.0)
+# a thin history (27 Oct 2026): under ten games of evidence (360 minutes, last season's prior weight counted) the sigma is ×1.06, under twenty ×1.03
+PROPS_THIN_SD = ((360.0, 1.06), (720.0, 1.03))
 
 
 def props_usage_bucket(usage):
@@ -4341,13 +4389,29 @@ def nba_player_logs(ledger_games, prior_logs=None):
     season's logs, when given, name the regulars until this season can."""
     per = {}
     regs = nba_club_regulars(ledger_games, nba_prior_mpg(prior_logs) if prior_logs else None)
+    tot = {}   # each man's rebounds and assists a game to date, for "who took them" (27 Oct 2026)
     for g in sorted(ledger_games or [], key=lambda g: (g.get("date") or "", g.get("id") or "")):
         for key, ab, opp, home in (("pa", g.get("away"), g.get("home"), False), ("ph", g.get("home"), g.get("away"), True)):
             fa, fh = g.get("fa"), g.get("fh")
             mg = None if fa is None or fh is None else (int(fh) - int(fa) if home else int(fa) - int(fh))
             club = regs.get((ab, g.get("id"))) or {}
-            for p in g.get(key) or []:
-                d = nba_player_dict(p)
+            plist = [nba_player_dict(p) for p in g.get(key) or []]
+            fulls = [d for d in plist if d["full"]]
+            treb = sum((d["reb"] or 0) for d in fulls) if fulls else None
+            tast = sum((d["ast"] or 0) for d in fulls) if fulls else None
+
+            def over_usual(stat):
+                best = None
+                for d in fulls:
+                    t = tot.get(d["id"])
+                    if d.get(stat) is None or float(d["min"] or 0) <= 0 or not t or t["g"] < 3:
+                        continue
+                    diff = d[stat] - t[stat] / t["g"]
+                    if diff >= PROPS_WHAT_TOOK and (best is None or diff > best[3]):
+                        best = [d["n"], d[stat], round(t[stat] / t["g"], 1), diff]
+                return best[:3] if best else None
+            grab, dish = over_usual("reb"), over_usual("ast")
+            for d in plist:
                 e = per.setdefault(d["id"], {"n": d["n"], "team": ab, "pos": "", "g": []})
                 e["n"], e["team"] = d["n"], ab
                 if d.get("pos"):
@@ -4364,6 +4428,12 @@ def nba_player_logs(ledger_games, prior_logs=None):
                 if club.get("out") or club.get("back"):
                     entry["out"] = [x for x in club.get("out") or [] if x[0] != d["n"]]
                     entry["back"] = [x for x in club.get("back") or [] if x[0] != d["n"]]
+                if treb is not None:
+                    entry["treb"], entry["tast"] = treb, tast
+                if grab and grab[0] != d["n"]:
+                    entry["grab"] = grab
+                if dish and dish[0] != d["n"]:
+                    entry["dish"] = dish
                 # his usage (26 Oct 2026): his shots, trips and turnovers against the club's possessions while he was on the floor
                 tl = g.get("sa" if key == "pa" else "sh") or {}
                 tpos = (tl.get("fga") or 0) + NBA_PACE_FT * (tl.get("fta") or 0) + (tl.get("tov") or 0)
@@ -4372,6 +4442,10 @@ def nba_player_logs(ledger_games, prior_logs=None):
                     entry["u"] = round((d["fga"] or 0) + NBA_PACE_FT * (d["fta"] or 0) + (d["tov"] or 0), 2)
                     entry["tu"] = round(tpos * entry["min"] / (tm / 5.0), 2)
                 e["g"].append(entry)
+            for d in fulls:   # to date, after the night
+                if float(d["min"] or 0) > 0:
+                    t = tot.setdefault(d["id"], {"g": 0, "reb": 0, "ast": 0})
+                    t["g"] += 1; t["reb"] += d["reb"] or 0; t["ast"] += d["ast"] or 0
     return per
 
 
@@ -4386,6 +4460,8 @@ PROPS_WHAT_SHOTS = 2.0      # shots (FGA + 0.44 FTA) off his usual at those minu
 PROPS_WHAT_FG = 0.12        # field-goal share off his season's, on four attempts or more
 PROPS_WHAT_BLOWOUT = 15     # a final margin of this or more either way
 PROPS_WHAT_PACE = 5.0       # possessions off his club's own
+PROPS_WHAT_SHARE = 0.05     # his share of the club's rebounds or assists off his usual share before it stands out
+PROPS_WHAT_TOOK = 3         # a teammate this many rebounds or assists over his own usual is named
 PROPS_WHAT_MAX = 5
 
 
@@ -4399,7 +4475,9 @@ def props_game_factors(g, logs, mk, league_pace=None, logs_last=None):
     if not g or g.get("min") is None:
         return []
     gs = [x for x in (logs or []) if (x.get("min") or 0) > 0]
-    norm = gs if len(gs) >= 5 else gs + [x for x in (logs_last or []) if (x.get("min") or 0) > 0][-30:]
+    last30 = [x for x in (logs_last or []) if (x.get("min") or 0) > 0][-30:]
+    norm = gs if len(gs) >= 3 else gs + last30            # his usual minutes, shots and shares: this season's once he has three games (a new role reads as his)
+    fgnorm = gs if len([x for x in gs if x.get("full")]) >= 10 else gs + last30   # his shooting needs more games behind it
     mins = float(g["min"])
     root, stood, plain, tail = [], [], [], []
     lift = mk in ("pts", "pra", "ast")   # the pooled rule: a regular out lifts his teammates' minutes, points and assists; rebounds and threes measured nothing
@@ -4417,6 +4495,7 @@ def props_game_factors(g, logs, mk, league_pace=None, logs_last=None):
         elif g.get("st") and starts <= 0.3:
             root.append("a start")
     full = [x for x in norm if x.get("full") and x.get("fga") is not None]
+    fgfull = [x for x in fgnorm if x.get("full") and x.get("fga") is not None]
     has_box = bool(g.get("full") and g.get("fga") is not None)
     if len(norm) >= 3:
         m_avg = sum(x["min"] for x in norm) / len(norm)
@@ -4438,7 +4517,7 @@ def props_game_factors(g, logs, mk, league_pace=None, logs_last=None):
             else:
                 plain.append("%d shots (his usual %d at those minutes)" % (round(shots), round(usual)))
             if mk != "tpm" and (g["fga"] or 0) >= 4:
-                fg_season = sum((x["fgm"] or 0) for x in full) / max(1.0, sum((x["fga"] or 0) for x in full))
+                fg_season = sum((x["fgm"] or 0) for x in fgfull) / max(1.0, sum((x["fga"] or 0) for x in fgfull))
                 fg = (g["fgm"] or 0) / float(g["fga"])
                 if abs(fg - fg_season) >= PROPS_WHAT_FG:
                     stood.append((abs(fg - fg_season) * (g["fga"] or 0) * 2.0, "%d of %d from the floor, %s (his season %d%%)" % (g["fgm"] or 0, g["fga"], "cold" if fg < fg_season else "hot", round(100 * fg_season))))
@@ -4446,6 +4525,22 @@ def props_game_factors(g, logs, mk, league_pace=None, logs_last=None):
                     plain.append("%d of %d from the floor" % (g["fgm"] or 0, g["fga"]))
             elif mk != "tpm" and has_box:
                 plain.append("%d of %d from the floor" % (g["fgm"] or 0, g["fga"] or 0))
+        # the club's rebounds and assists, his share of them against his usual, and the teammate who took more than his own usual (27 Oct 2026)
+        for stat, tkey, gkey, word, verb in (("reb", "treb", "grab", "rebounds", "took"), ("ast", "tast", "dish", "assists", "had")):
+            if mk not in (stat, "pra"):
+                continue
+            tot_g = g.get(tkey)
+            if mk == stat and tot_g and g.get(stat) is not None:
+                withs = [x for x in norm if x.get(tkey) and x.get(stat) is not None]
+                usual = (sum(x[stat] for x in withs) / float(sum(x[tkey] for x in withs))) if withs and sum(x[tkey] for x in withs) > 0 else None
+                share = g[stat] / float(tot_g)
+                if usual is not None and abs(share - usual) >= PROPS_WHAT_SHARE:
+                    stood.append((abs(share - usual) * tot_g, "%d of the club's %d %s, %d%% (his usual %d%%)" % (g[stat], tot_g, word, round(100 * share), round(100 * usual))))
+                else:
+                    plain.append("%d of the club's %d %s%s" % (g[stat], tot_g, word, (" (his usual %d%%)" % round(100 * usual)) if usual is not None else ""))
+            tk = g.get(gkey)
+            if tk:
+                stood.append((float(tk[1]) - float(tk[2]), "%s %s %d (his usual %s)" % (tk[0], verb, int(tk[1]), ("%g" % tk[2]))))
     else:
         plain.append("%d min" % round(mins))
         if mk in ("pts", "pra", "tpm") and has_box:
@@ -4884,6 +4979,14 @@ def props_project(prop, logs_this, logs_last, ctx):
             float(usg), ctx.get("usage_src") or "this season", (", a starter (%s)" % ctx["start_src"]) if starter is True and ctx.get("start_src") else (", off the bench (%s)" % ctx["start_src"]) if starter is False and ctx.get("start_src") else "",
             "high-usage" if float(usg) >= PROPS_USAGE_CUTS[1] else "low-usage" if float(usg) < PROPS_USAGE_CUTS[0] else "mid-usage", " starting" if starter is True else " bench" if starter is False else "", f_sd,
             "narrower" if f_sd < 1 else "wider" if f_sd > 1 else "as it is"))
+    # a thin history (27 Oct 2026): the rate's own sampling error widens the miss, measured on 2025-26 (the spread in sigmas 1.09 on
+    # points under ten games against 1.02 at twenty and up); the side is untouched
+    evid = r["m_this"] + r["w"]
+    f_thin = next((f for lim, f in PROPS_THIN_SD if evid < lim), 1.0)
+    if f_thin > 1.0:
+        sd *= f_thin
+        why.append("his rate rests on %d minutes of evidence (%d game%s this season%s): the miss runs wider on a thin history, measured, so the sigma is ×%.2f" % (
+            int(evid), r["n_this"], "" if r["n_this"] == 1 else "s", ", last season behind it" if r["w"] else ", no last season", f_thin))
     # the centre (22 Oct 2026): a box-score stat skews right, so the mean sits above the median and a
     # normal centred on the mean says 50% for a number the man clears 46% of the time (41% on threes);
     # the books post the median. The chance is read around the median, the mean shifted down by the
@@ -5144,7 +5247,7 @@ def make_nba_props(date_iso, out_dir, log, topup=False, sim_runs=NBA_SIM_RUNS):
     doc = {"format": PROPS_FORMAT, "version": 1, "date": date_iso, "generated": now_utc(), "source": "slate.py nba-props: The Odds API, the ledgers, ESPN, HashtagBasketball",
            "credits": credits_used, "games": games, "ledgers": ledgers,   # what the run read (23 Oct 2026): the page says so when nothing projects
            "method": {"anchor": PROPS_ANCHOR, "model": PROPS_MODEL_W, "sd_k": PROPS_SD_K, "out_min_per30": PROPS_OUT_MIN_PER30, "out_rate_per30": PROPS_OUT_RATE_PER30, "dvp_weight": PROPS_DVP_WEIGHT, "dvp_shrink": PROPS_DVP_SHRINK,
-                      "match_alpha": PROPS_MATCH_ALPHA, "pace": "the game's possessions against the club's own", "usage_sd": PROPS_USAGE_SD, "role_sd": PROPS_ROLE_SD, "usage_cuts": PROPS_USAGE_CUTS}}
+                      "match_alpha": PROPS_MATCH_ALPHA, "pace": "the game's possessions against the club's own", "usage_sd": PROPS_USAGE_SD, "role_sd": PROPS_ROLE_SD, "usage_cuts": PROPS_USAGE_CUTS, "thin_sd": PROPS_THIN_SD}}
     path = os.path.join(out_dir, "nba-props-%s.json" % date_iso)
     with open(path, "w", encoding="utf-8") as f:
         json.dump(doc, f, indent=1)
@@ -6467,12 +6570,20 @@ def selftest():
           props_game_factors(lw[-1], lw, "pts", 100.0) == ["Kyrie Irving back (30 mpg, the lift gone)", "lost by 21, a blowout", "9 shots, 10 under his usual at those minutes", "2 of 8 from the floor, cold (his season 49%)", "31 min, 4 under his usual 35"]
           and props_game_factors(lw[-2], lw, "pts", 100.0) == ["Kyrie Irving out (30 mpg, a lift for him)", "36 min (his usual 35)", "24 shots (his usual 22 at those minutes)", "10 of 20 from the floor", "won by 5"]
           and props_game_factors(lw[-1], lw[-2:], "pts") == ["Kyrie Irving back (30 mpg, the lift gone)", "lost by 21, a blowout", "31 min", "9 shots", "2 of 8 from the floor"]
-          and props_game_factors(lw[-1], lw, "reb", 100.0) == ["Kyrie Irving back (30 mpg)", "lost by 21, a blowout", "31 min, 4 under his usual 35", "a slow game, 93 possessions against their usual 99"]
+          and props_game_factors(lw[-1], lw, "reb", 100.0) == ["Kyrie Irving back (30 mpg)", "lost by 21, a blowout", "31 min, 4 under his usual 35", "8 of the club's 12 rebounds (his usual 69%)", "a slow game, 93 possessions against their usual 99"]
+          and lw[-1]["treb"] == 12 and lw[-1]["tast"] == 14 and lw[-2]["treb"] == 8 and lw[-1].get("grab") is None
           and lw[-1]["mg"] == -21 and lw[-1]["pace"] == 93.0 and lw[-1]["out"] == [] and lw[-1]["back"] == [["Kyrie Irving", 30.0]] and lw[-2]["out"] == [["Kyrie Irving", 30.0]] and lw[0].get("out") is None)
     # early in a season (26 Oct 2026): last season's minutes name the regulars, and the game's own injury list names who sat
     early = [{"id": "e%d" % k, "date": "2026-10-%02d" % (22 + k), "away": "DAL", "home": "LAL", "fa": 110, "fh": 105, "pace": 100.0, "detail": True,
               "pa": [nba_player_line("11", "Luka Doncic", 1, 36.0, 30, 0, 8, 9, 4, 20, 8, 3, 1, 0, 10, 7, "PG")] + ([] if k == 1 else [nba_player_line("22", "Kyrie Irving", 1, 30.0, 20, 0, 4, 5, 2, 15, 4, 2, 1, 0, 7, 3, "SG")]),
               "oa": [["22", "Kyrie Irving", "Out - Knee"]] if k == 1 else [], "ph": [nba_player_line("44", "LeBron James", 1, 35.0, 25, 0, 7, 8, 2, 18, 6, 3, 1, 1, 9, 5, "SF")]} for k in range(3)]
+    # a teammate who took the rebounds (27 Oct 2026): Kyrie grabs 10 against his usual 4 in the last game, and Luka's share falls
+    wg2 = [dict(x) for x in wg]
+    wg2[-1] = dict(wg2[-1], pa=[nba_player_line("11", "Luka Doncic", 1, 31.0, 10, 0, 4, 9, 4, 8, 2, 3, 1, 0, 2, 2, "PG"), nba_player_line("22", "Kyrie Irving", 1, 30.0, 20, 0, 10, 5, 2, 15, 4, 2, 1, 0, 7, 3, "SG")])
+    lw2 = nba_player_logs(wg2)["11"]["g"]
+    check("props: the club's rebounds and who took them: his share against his usual, and the teammate three or more over his own usual, named",
+          lw2[-1].get("grab") == ["Kyrie Irving", 10, 4.0] and props_game_factors(lw2[-1], lw2, "reb", 100.0)[:5] == ["Kyrie Irving back (30 mpg)", "lost by 21, a blowout", "Kyrie Irving took 10 (his usual 4)", "4 of the club's 14 rebounds, 29% (his usual 64%)", "31 min, 4 under his usual 35"]
+          and "Kyrie Irving took 10 (his usual 4)" in props_game_factors(lw2[-1], lw2, "pra", 100.0) and not any("took" in t for t in props_game_factors(lw2[-1], lw2, "pts", 100.0)))
     prior_e = nba_player_logs([{"id": "p%d" % k, "date": "2026-01-%02d" % (1 + k), "away": "DAL", "home": "LAL", "detail": True, "pa": [nba_player_line("22", "Kyrie Irving", 1, 31.0, 22, 0, 4, 5, 2, 15, 4, 2, 1, 0, 7, 3, "SG")], "ph": []} for k in range(12)])
     le = nba_player_logs(early, prior_logs=prior_e)["11"]["g"]
     check("props: early in the season last season's minutes name the regulars and the game's own injury list says who sat, so a line reads from the first week",
@@ -6519,9 +6630,10 @@ def selftest():
             "dvp": {"f": 25.0 / 24.0, "f_this": 25.0 / 24.0, "n_this": 10, "f_last": None, "n_last": 0}, "htb": "HashtagBasketball: Lakers allow 25.0 points a game to PGs (120th of 150, 1 the fewest); shown, not scored", "self_out": ""}
     proj_, why_ = props_project(prop_, lt["11"]["g"], ll["11"]["g"], ctx_)
     check("props: the projection is rate x minutes, the regulars out, pace and the defence, against the line; the chance read around the median (the mean less 0.08 sigmas on points)",
-          abs(proj_["proj"] - 34.48) < 0.05 and abs(proj_["sd"] - 10.86) < 0.02 and proj_["side"] == "OVER" and abs(proj_["p"] - 0.538) < 0.002 and proj_["band"] == "LEAN"
-          and abs(proj_["edge"] - 0.0144) < 0.002 and proj_["price"] == -110 and abs(proj_["mins"] - 37.4) < 0.05 and abs(proj_["pm"] - 0.6128) < 0.002
-          and abs(props_over(34.48 - 0.08 * 10.86, 10.86, 30.5)[0] - proj_["pm"]) < 0.001)
+          abs(proj_["proj"] - 34.48) < 0.05 and abs(proj_["sd"] - 11.52) < 0.02 and proj_["side"] == "OVER" and abs(proj_["p"] - 0.5354) < 0.002 and proj_["band"] == "LEAN"
+          and abs(proj_["edge"] - 0.0116) < 0.002 and proj_["price"] == -110 and abs(proj_["mins"] - 37.4) < 0.05 and abs(proj_["pm"] - 0.6048) < 0.002
+          and abs(props_over(34.48 - 0.08 * 11.52, 11.52, 30.5)[0] - proj_["pm"]) < 0.001   # the sigma carries the thin-history factor (27 Oct 2026): 10.86 x 1.06 on 143 minutes of evidence
+          and any(w == "his rate rests on 143 minutes of evidence (3 games this season, last season behind it): the miss runs wider on a thin history, measured, so the sigma is ×1.06" for w in why_))
     parts_ = dict((p["k"], p) for p in proj_["parts"])
     check("props: what moves it: the base is his rate at his minutes, the regulars out, pace and the defence sum from it to the projection, the prior and the minutes trend say what sits inside it, each pointing at its why line",
           set(parts_) == {"prior", "minutes", "out", "pace", "dvp"} and abs(proj_["base"] + parts_["out"]["eff"] + parts_["pace"]["eff"] + parts_["dvp"]["eff"] - proj_["proj"]) < 0.03
@@ -6587,7 +6699,7 @@ def selftest():
           and any(w == "Lakers allow 1.04x the league's points per minute to guards (this season 1.04 over 10 games): x1.031 at 0.75 weight, measured" for w in why_)
           and any(w == ctx_["htb"] for w in why_)
           and any(w.startswith("home 30.9 / road 31.0 per 36 over 178 minutes: shown, not scored") and w.endswith("; tonight on the road") for w in why_)
-          and any(w == "projected 34.5 against points 30.5, one sigma 10.9, the chance read around the median 33.6 (the stat skews right: at the mean the over lands 47% of the time): the over 61.3% by the projection, 50.0% by the book's prices; blended 53.8% at 4 to 2" for w in why_))
+          and any(w == "projected 34.5 against points 30.5, one sigma 11.5, the chance read around the median 33.6 (the stat skews right: at the mean the over lands 47% of the time): the over 60.5% by the projection, 50.0% by the book's prices; blended 53.5% at 4 to 2" for w in why_))
     check("props: a listed-out player gets no projection, and no history is said", props_project(prop_, lt["11"]["g"], ll["11"]["g"], dict(ctx_, self_out="Out"))[0] is None
           and props_project(prop_, [], [], ctx_)[1] == ["no history to project from (under 60 minutes with the stat in the ledgers)"])
     check("props: a prop's name finds the player on one of the two clubs, by roster, by ledger, by surname, else says so",

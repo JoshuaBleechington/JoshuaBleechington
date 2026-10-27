@@ -675,3 +675,20 @@ splits either way come from the smallest samples. Jerome's three games
 with Memphis cannot say anything, and his one miss was 35 against 35.5 on
 his usual shots. The panel's line keeps the pooled direction in words,
 "out (26 mpg, a lift for him)" and "back (26 mpg, the lift gone)".
+
+**The regulars-out lever, where the lift lands (27 Oct 2026).** The user's
+first week of props: the picks with a regulars-out lever of 1.5 or more
+went 118-153 at a 55% say-so, on both sides. `tools_nba_out_targeting.py`
+on 2025-26 (21,651 player-games after eight prior games, 69% of them with a
+regular out by the ledger's own rosters):
+
+| Question | Answer |
+| --- | --- |
+| Where does the minutes lift land? | +1.20 minutes per 30 mpg out pooled (t 28); starters +0.51 (t 8.6), bench +1.79 (t 29); his minutes under 20: +1.82, 28 and up: +0.30. One man out under 30 mpg moves nobody (−0.34, t −3.7); two or more out (48 mpg and up) +1.58 (t 19) |
+| The points lift? | +0.43 per 36 per 30 mpg out pooled (t 6.9); starters +0.60, bench +0.28; by usage 24% and up +0.59; +0.028 per 36 for each point a game the absent men had (t 5.9) |
+| Rebounds? | Null pooled (+0.02, t 0.7); +0.011 per 36 per rebound a game absent (t 1.7); the absent men at 12+ rebounds a game +0.09 (t 1.4): not enough |
+| Assists? | +0.07 per 36 per 30 mpg out pooled (t 3.3); +0.037 per 36 for each assist a game the absent men had (t 6.2): absent men at 12+ assists a game +0.44 per 36 (t 4.8), under 5 nothing |
+| Is the chance too sure of itself with regulars out? | No: the miss spreads 0.96 to 0.99 sigmas with nobody out, under 30, 30 to 48 and 48+ mpg out alike; the bias runs −0.12 to −0.21 sigmas everywhere (the mean against the median), 0.06 wider at 48+ |
+| Does a rule by role beat the pooled rule out of sample? | Fitted on the first half (minutes starters +0.64, bench +1.78; points starters +0.36, bench +0.11), scored on the second: points rmse 6.200 against 6.211 with a regular out, rebounds 2.570 against 2.572, assists 1.920 against 1.921; the creator rule on assists 1.922. A hair, not a rule. The pooled rule stays |
+| A thin history? | The miss in sigmas by the games the rate rests on, this season alone: points 1.09 (3 to 5 games), 1.10 (6 to 9), 1.08 (10 to 19), 1.02 (20 and up); rebounds 1.06 / 1.05 / 1.02 / 1.00; assists 1.01 / 1.02 / 1.02 / 0.98. The sigma carries ×1.06 under ten games of evidence and ×1.03 under twenty |
+| The minutes to project? | The mean of his last five (rmse 6.53 on his actual minutes) beats their median (6.81), a trimmed mean (6.64) and the season mean (6.85); early in a season (3 to 5 prior games) the mean runs +0.75 high, the median +0.43 |

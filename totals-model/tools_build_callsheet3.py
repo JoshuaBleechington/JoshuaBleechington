@@ -563,7 +563,8 @@ def props_example_games() -> list:
             fga = max(1, int(round(pts / 1.15 * rng2.uniform(0.85, 1.15))))
             fta = max(0, int(round(pts * 0.22 * rng2.uniform(0.5, 1.5))))
             g.update({"fga": fga, "fgm": max(0, min(fga, int(round(fga * rng2.uniform(0.36, 0.56))))), "fta": fta, "ftm": max(0, int(round(fta * 0.8))), "tov": rng2.randint(0, 4),
-                      "mg": int(round(rng2.gauss(0, 13))) or 1, "pace": round(rng2.gauss(100.5, 4.0), 1), "ot": rng2.random() < 0.06})
+                      "mg": int(round(rng2.gauss(0, 13))) or 1, "pace": round(rng2.gauss(100.5, 4.0), 1), "ot": rng2.random() < 0.06,
+                      "treb": int(round(rng2.gauss(44, 5))), "tast": int(round(rng2.gauss(25, 4)))})
             out.append(g)
         return out
     this_start, last_start = dt.date(2026, 10, 21), dt.date(2025, 11, 1)
@@ -585,6 +586,10 @@ def props_example_games() -> list:
                 g["out"], g["back"] = [[mate, 31.2]], []
             elif k % 5 == 4:
                 g["out"], g["back"] = [], [[mate, 31.2]]
+            if k % 4 == 1:
+                g["grab"] = [mate, 12, 6.5]
+            elif k % 4 == 2:
+                g["dish"] = [mate, 7, 3.5]
     lines = [("Jalen Brunson", "pts", 27.5, -110, -110), ("Karl-Anthony Towns", "reb", 11.5, -115, -105), ("Mikal Bridges", "pra", 24.5, -110, -110), ("OG Anunoby", "ast", 2.5, 100, -120),
              ("Tyrese Maxey", "pts", 25.5, -110, -110), ("Paul George", "tpm", 2.5, -120, 100), ("Kelly Oubre Jr.", "pts", 14.5, -105, -115), ("Joel Embiid", "reb", 9.5, -110, -110)]
     dvp = {"NYK": {"G": {"f": 0.97, "f_this": 0.95, "n_this": 16, "f_last": 0.99, "n_last": 82}, "F": {"f": 1.02, "f_this": 1.03, "n_this": 16, "f_last": 1.01, "n_last": 82}, "C": {"f": 1.05, "f_this": 1.07, "n_this": 16, "f_last": 1.03, "n_last": 82}},

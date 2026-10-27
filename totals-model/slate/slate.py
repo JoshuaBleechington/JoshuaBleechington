@@ -4480,6 +4480,8 @@ def props_game_factors(g, logs, mk, league_pace=None, logs_last=None):
     fgnorm = gs if len([x for x in gs if x.get("full")]) >= 10 else gs + last30   # his shooting needs more games behind it
     mins = float(g["min"])
     root, stood, plain, tail = [], [], [], []
+    if mk == "pra" and g.get("full") and g.get("pts") is not None and g.get("reb") is not None and g.get("ast") is not None:   # the three behind the total (27 Oct 2026)
+        root.append("%d pts + %d reb + %d ast = %d" % (g["pts"], g["reb"], g["ast"], g["pts"] + g["reb"] + g["ast"]))
     lift = mk in ("pts", "pra", "ast")   # the pooled rule: a regular out lifts his teammates' minutes, points and assists; rebounds and threes measured nothing
     for name, mpg in (g.get("back") or [])[:2]:
         root.append("%s back (%s mpg%s)" % (name, ("%.0f" % mpg), ", the lift gone" if lift else ""))
@@ -4556,7 +4558,7 @@ def props_game_factors(g, logs, mk, league_pace=None, logs_last=None):
     base_pace = sum(paces) / len(paces) if len(paces) >= 5 else (float(league_pace) if league_pace else None)   # his club's own games, else the league's
     if g.get("pace") and base_pace and abs(float(g["pace"]) - base_pace) >= PROPS_WHAT_PACE:
         tail.append("a %s game, %d possessions against their usual %d" % ("slow" if float(g["pace"]) < base_pace else "fast", round(float(g["pace"])), round(base_pace)))
-    return (root + [t for _s, t in stood] + plain + tail)[:PROPS_WHAT_MAX]
+    return (root + [t for _s, t in stood] + plain + tail)[:PROPS_WHAT_MAX + (1 if mk == "pra" else 0)]
 
 
 def props_role(name, ab, lineups, logs_this, logs_last):
@@ -6584,7 +6586,8 @@ def selftest():
     lw2 = nba_player_logs(wg2)["11"]["g"]
     check("props: the club's rebounds and who took them: his share against his usual, and the teammate three or more over his own usual, named",
           lw2[-1].get("grab") == ["Kyrie Irving", 10, 4.0] and props_game_factors(lw2[-1], lw2, "reb", 100.0)[:5] == ["Kyrie Irving back (30 mpg)", "lost by 21, a blowout", "Kyrie Irving took 10 (his usual 4)", "4 of the club's 14 rebounds, 29% (his usual 64%)", "31 min, 4 under his usual 35"]
-          and "Kyrie Irving took 10 (his usual 4)" in props_game_factors(lw2[-1], lw2, "pra", 100.0) and not any("took" in t for t in props_game_factors(lw2[-1], lw2, "pts", 100.0)))
+          and "Kyrie Irving took 10 (his usual 4)" in props_game_factors(lw2[-1], lw2, "pra", 100.0) and not any("took" in t for t in props_game_factors(lw2[-1], lw2, "pts", 100.0))
+          and props_game_factors(lw2[-1], lw2, "pra", 100.0)[0] == "10 pts + 4 reb + 9 ast = 23" and len(props_game_factors(lw2[-1], lw2, "pra", 100.0)) == 6 and not any("pts +" in t for t in props_game_factors(lw2[-1], lw2, "pts", 100.0)))
     prior_e = nba_player_logs([{"id": "p%d" % k, "date": "2026-01-%02d" % (1 + k), "away": "DAL", "home": "LAL", "detail": True, "pa": [nba_player_line("22", "Kyrie Irving", 1, 31.0, 22, 0, 4, 5, 2, 15, 4, 2, 1, 0, 7, 3, "SG")], "ph": []} for k in range(12)])
     le = nba_player_logs(early, prior_logs=prior_e)["11"]["g"]
     check("props: early in the season last season's minutes name the regulars and the game's own injury list says who sat, so a line reads from the first week",

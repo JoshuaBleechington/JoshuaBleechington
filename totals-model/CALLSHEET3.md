@@ -1561,6 +1561,9 @@ sixth element of each `log` entry), five items at most, in this order:
   taker for it (`treb`, `tast`, `grab`, `dish`); a PRA prop names the taker
   without the share lines.
 - **Overtime**, and a game five possessions or more off his club's own pace.
+- **On a PRA prop, the three behind the total** lead the line (27 Oct 2026,
+  the user: "how many pts, reb and ast each for the total"): "17 pts + 9 reb
+  + 6 ast = 32", with the rest as it is and one more item allowed.
 
 "His usual" minutes, shots and shares are this season's once he has three
 games (a man in a new role reads as he is now: Ty Jerome's 30 minutes read

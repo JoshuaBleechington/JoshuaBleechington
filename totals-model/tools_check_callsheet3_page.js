@@ -1561,16 +1561,21 @@ const CHECKS = ["dome","playoff","agconf","hgconf","agbk","hgbk"];
     [...document.querySelectorAll('#propsBest .pk')].find(e => /Karl-Anthony Towns/.test(e.textContent)).click(); await wait();
     const rebWhat = [...dlg.querySelectorAll('.pd-log tbody tr td.pd-what')].map(td => td.textContent.trim()).filter(t => t);
     document.getElementById('propDetailClose').click(); await wait();
+    // a PRA prop opens each game with the three behind the total (27 Oct 2026)
+    [...document.querySelectorAll('#propsTable tr[data-prop]')].find(tr => /Mikal Bridges/.test(tr.textContent)).click(); await wait();
+    const praWhat = [...dlg.querySelectorAll('.pd-log tbody tr')].map(tr => (tr.querySelectorAll('td')[3].textContent.trim()) + '=' + tr.querySelector('td.pd-what').textContent.trim());
+    document.getElementById('propDetailClose').click(); await wait();
     document.getElementById('m-nba').click(); await wait();
-    return { head, h4, rows, rebWhat };
+    return { head, h4, rows, rebWhat, praWhat };
   });
-  const whatRe = /^((.+ (back|out) \(\d+ mpg(, (a lift for him|the lift gone))?\))|((won|lost) by \d+(, a blowout)?)|(off the bench)|(a start)|(\d+ min, \d+ (under|over) his usual \d+)|(\d+ min \(his usual \d+\))|(\d+ shots, \d+ (under|over) his usual at those minutes)|(\d+ shots \(his usual \d+ at those minutes\))|(\d+ of \d+ from the floor(, (cold|hot) \(his season \d+%\))?)|(overtime)|(a (slow|fast) game, \d+ possessions against their usual \d+)|(\d+ of the club's \d+ (rebounds|assists)(, \d+% \(his usual \d+%\)| \(his usual \d+%\))?)|(.+ (took|had) \d+ \(his usual \d+(\.\d)?\)))$/;
+  const whatRe = /^((\d+ pts \+ \d+ reb \+ \d+ ast = \d+)|(.+ (back|out) \(\d+ mpg(, (a lift for him|the lift gone))?\))|((won|lost) by \d+(, a blowout)?)|(off the bench)|(a start)|(\d+ min, \d+ (under|over) his usual \d+)|(\d+ min \(his usual \d+\))|(\d+ shots, \d+ (under|over) his usual at those minutes)|(\d+ shots \(his usual \d+ at those minutes\))|(\d+ of \d+ from the floor(, (cold|hot) \(his season \d+%\))?)|(overtime)|(a (slow|fast) game, \d+ possessions against their usual \d+)|(\d+ of the club's \d+ (rebounds|assists)(, \d+% \(his usual \d+%\)| \(his usual \d+%\))?)|(.+ (took|had) \d+ \(his usual \d+(\.\d)?\)))$/;
   chk(whatT.head.join('|') === 'Date|Opp|Min|points|What happened' && /^LAST GAMES \(\d+ of 10 over 25\.5\) · what the box says happened, the biggest factor first$/i.test(whatT.h4) && whatT.rows.length === 10
       && whatT.rows.every(r => r.what && r.what.split(' · ').length >= 3 && r.what.split(' · ').length <= 5 && r.what.split(' · ').every(p => whatRe.test(p)) && /(won|lost) by \d+/.test(r.what) && /\d+ min/.test(r.what) && /\d+ shots/.test(r.what))
       && whatT.rows.every(r => !r.first || (r.first === r.what.split(' · ')[0] && r.cls === (/over/.test(r.mark) ? 'over' : /under/.test(r.mark) ? 'under' : '')))
       && whatT.rows.some(r => /(back|out) \(\d+ mpg, (a lift for him|the lift gone)\)/.test(r.first)) && whatT.rows.some(r => /a blowout/.test(r.what)) && whatT.rows.some(r => /shots, \d+ (under|over) his usual/.test(r.what))
-      && whatT.rebWhat.length === 10 && whatT.rebWhat.every(t => !/shots|from the floor/.test(t) && /\d+ min/.test(t) && /(won|lost) by \d+/.test(t) && /of the club's \d+ rebounds/.test(t)) && whatT.rebWhat.some(t => /(Josh Hart|Joel Embiid) took 12 \(his usual 6\.5\)/.test(t)),
-      'props: every one of the panel\'s last games carries the line behind it, the night\'s causes first (a regular back or out, a blowout) then what stood out and the plain box with the margin, the first item bold in the colour of the game\'s mark; a rebounds prop reads no shots or shooting', JSON.stringify(whatT).slice(0, 1800));
+      && whatT.rebWhat.length === 10 && whatT.rebWhat.every(t => !/shots|from the floor/.test(t) && /\d+ min/.test(t) && /(won|lost) by \d+/.test(t) && /of the club's \d+ rebounds/.test(t)) && whatT.rebWhat.some(t => /(Josh Hart|Joel Embiid) took 12 \(his usual 6\.5\)/.test(t))
+      && whatT.praWhat.length === 10 && whatT.praWhat.every(t => { const m = /^(\d+)=(\d+) pts \+ (\d+) reb \+ (\d+) ast = (\d+)( · |$)/.exec(t); return !!m && +m[1] === +m[5] && +m[2] + +m[3] + +m[4] === +m[5]; }),
+      'props: every one of the panel\'s last games carries the line behind it, the night\'s causes first (a regular back or out, a blowout) then what stood out and the plain box with the margin, the first item bold in the colour of the game\'s mark; a rebounds prop reads no shots or shooting; a PRA prop opens each game with the three behind the total, which add up to the stat', JSON.stringify(whatT).slice(0, 1800));
 
   // ---- 27 Oct 2026: the fives and the matchup on the prop -- both clubs' starting fives on the panel with the man marked; a Matchup button on the
   //      panel and the cards, off until the NBA card has the game, then opening it into the form ----

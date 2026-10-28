@@ -1945,7 +1945,8 @@ const CHECKS = ["dome","playoff","agconf","hgconf","agbk","hgbk"];
     const row0 = JSON.parse(smStore.getItem('callsheet3.card.v1')).find(r => /Kings @ Spurs/.test(r.matchup)), ti = row0.markets.findIndex(m => m.key === 'total');
     document.getElementById('boardDate').value = '2026-11-13'; document.getElementById('boardDate').dispatchEvent(new Event('change')); await wait();
     const panel0 = txt(document.getElementById('nbaMidPanel'));
-    document.querySelector('[data-take="' + row0.id + '|' + ti + '|OVER"]').click(); await wait();
+    // hold the sheet's over: the same mark the board's Take button makes (the board lists the pick's side, which at 50% is either)
+    const tb = document.createElement('button'); tb.setAttribute('data-take', row0.id + '|' + ti + '|OVER'); document.body.appendChild(tb); tb.click(); tb.remove(); await wait();
     const before = { head: document.getElementById('midHead').hidden, cards: document.querySelectorAll('#mid .pk.mid').length, text: txt(document.getElementById('mid')) };
     // the number runs: a later odds run posts 234.5 at the apps and 235 at DraftKings
     await load({ format: 'callsheet2.slate', version: 1, date: '2026-11-13', generated: '2026-11-13T22:30:00Z', games: [game({ inputs: { odds: odds(234.5) } })] }, 'odds-2026-11-13b.json');

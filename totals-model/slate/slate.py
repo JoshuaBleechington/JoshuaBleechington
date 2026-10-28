@@ -4234,6 +4234,12 @@ def props_sd_factor(mk, usage, starter):
 PROPS_MEDIAN_OVER = {"pts": 0.47, "reb": 0.46, "ast": 0.45, "tpm": 0.41, "pra": 0.48, "pr": 0.48, "pa": 0.48, "ra": 0.47}
 PROPS_OUT_MIN_PER30 = 1.42                                                    # minutes added per 30 mpg of regulars out (t 36)
 PROPS_OUT_RATE_PER30 = {"pts": 0.56, "reb": 0.0, "ast": 0.09, "tpm": 0.0, "pra": 0.66, "pr": 0.56, "pa": 0.65, "ra": 0.09}   # per 36, per 30 mpg out (points t 11, assists t 6; the rest null)
+# the OPPONENT'S absences (28 Oct 2026, tools_nba_opp_out.py on 2025-26): named on every prop, scored where it measured and held
+# from one half of the season to the other, a missing centre on a forward's or centre's rebounds (the bigs' rebounds landed over the
+# number 48.9% of the time against 45.1% on other nights; the per-36 regression says 0.69 but 0.30 is the size that closes that gap).
+# The opponent's absences on points lifted a third of his own club's (+0.17 per 36 per 30 mpg) and did not persist: shown, not scored
+PROPS_OPP_C_REB_PER30 = 0.30                                                  # rebounds per 36 for a forward or centre, per 30 mpg of the opponent's centres out
+PROPS_OPP_C_MARKETS = ("reb", "pra", "pr", "ra")                              # the markets with rebounds in them
 PROPS_PRIOR_CAP = 1000.0
 PROPS_PRIOR_SHARE = 0.5
 PROPS_LAST_N = 5
@@ -4872,6 +4878,28 @@ def props_out_minutes(ab, injuries, logs_this, logs_last):
     return regular, listed, maybe
 
 
+def props_out_centres(ab, injuries, logs_this, logs_last, roster_pos=None):
+    """The club's listed-out CENTRES (28 Oct 2026): (their minutes a game
+    between them, [(name, mpg)]) for the Out or Doubtful regulars whose
+    position is a centre by the ledgers, else ESPN's roster. Read for the
+    OPPONENT of a prop: a missing centre lifts the other side's bigs'
+    rebounds, measured."""
+    total, names = 0.0, []
+    for inj in (injuries or {}).get(ab) or []:
+        if str(inj.get("st") or "").lower() not in PROPS_OUT_STATUSES:
+            continue
+        pid = str(inj.get("id") or "")
+        e1, e2 = (logs_this or {}).get(pid), (logs_last or {}).get(pid)
+        mpg = props_player_avg(e1, e2, "min")
+        if mpg is None or mpg < PROPS_REGULAR_MPG:
+            continue
+        pos = POS3.get(str((e1 or {}).get("pos") or (e2 or {}).get("pos") or (roster_pos or {}).get(pid) or "").upper(), "")
+        if pos == "C":
+            total += mpg
+            names.append((inj.get("n"), round(mpg, 1)))
+    return total, names
+
+
 def props_player_avg(e1, e2, key):
     """A player's average of a box stat a game: this season's after
     PROPS_PLAYER_MIN_GAMES games, else last season's, else this season's few."""
@@ -4900,8 +4928,10 @@ def props_out_sim_list(ab, injuries, logs_this, logs_last):
 def props_project(prop, logs_this, logs_last, ctx):
     """One prop's projection: {proj, sd, pm, pb, p, push, side, chance, price,
     need, edge, band, why[]} or None with the reason. ctx carries out_mpg and
-    out_names for his club, pace and league_pace, dvp as (allowed, rank, league
-    mean) for his position against tonight's defence, home, and his own status."""
+    out_names for his club, opp_out_mpg, opp_out_names, opp_out_c_mpg and
+    opp_out_c_names for the opponent's (28 Oct 2026), pace and league_pace, dvp
+    as (allowed, rank, league mean) for his position against tonight's defence,
+    home, and his own status."""
     mk, line = prop["mk"], float(prop["line"])
     label = dict((m, lab) for m, _a, lab in PROPS_MARKETS)[mk]
     why = []
@@ -4939,6 +4969,31 @@ def props_project(prop, logs_this, logs_last, ctx):
             ", ".join(n for n, _mpg, _st in (ctx.get("out_names") or [])[:4]) or "regulars", out_mpg, dmin, drate * 36, label))
     for nm, st in (ctx.get("maybe") or [])[:3]:
         why.append("%s is %s: not counted as out" % (nm, st))
+    # the OPPONENT'S absences (28 Oct 2026, the user: "when players are out that helps the next man go over, yet it seems to
+    # think the same for the defence even when their main players are out"): named on every prop; scored where it measured and
+    # held from one half of 2025-26 to the other, a missing centre on a forward's or centre's rebounds (tools_nba_opp_out.py)
+    rate_out = rate
+    i_oppc = len(why)
+    opp_names = [n for n, _m, _s in (ctx.get("opp_out_names") or [])]
+    opp_mpg = float(ctx.get("opp_out_mpg") or 0.0)
+    opp_c = float(ctx.get("opp_out_c_mpg") or 0.0)
+    opp_nick = ctx.get("opp_nick") or "the opponent"
+    drate_c = 0.0
+    if opp_c > 0 and mk in PROPS_OPP_C_MARKETS and ctx.get("pos") in ("F", "C"):
+        drate_c = PROPS_OPP_C_REB_PER30 / 36.0 * opp_c / 30.0
+        rate += drate_c
+        c_names = [n for n, _m in (ctx.get("opp_out_c_names") or [])]
+        others = [n for n in opp_names if n not in c_names]
+        why.append("%s's centre out (%s): +%.2f rebounds per 36 for a %s, measured on 2025-26 (the bigs' rebounds landed over the number 48.9%% of the time against 45.1%% on other nights; the lift sized to close that gap), scored%s" % (
+            opp_nick, ", ".join("%s (%.0f mpg)" % (n, m) for n, m in (ctx.get("opp_out_c_names") or [])[:3]) or "a regular", drate_c * 36, "centre" if ctx.get("pos") == "C" else "forward",
+            ("; the rest of their regulars out (%s) shown, not scored" % ", ".join(others[:3])) if others else ""))
+    elif opp_names:
+        if opp_c > 0 and mk in PROPS_OPP_C_MARKETS:
+            why.append("%s's regulars out (%s; %.0f minutes a game between them): shown, not scored; a missing centre lifts the bigs' rebounds, not a guard's (+0.03 per 36 per 30 mpg on 2025-26, null)" % (
+                opp_nick, ", ".join(opp_names[:4]), opp_mpg))
+        else:
+            why.append("%s's regulars out (%s; %.0f minutes a game between them): shown, not scored on %s; on 2025-26 the opponent's absences lifted points a third as much as his own club's did (+0.17 per 36 per 30 mpg) and the lift did not hold from one half of the season to the other" % (
+                opp_nick, ", ".join(opp_names[:4]), opp_mpg, label))
     f_pace = 1.0
     i_pace = len(why)
     if ctx.get("pace_team") and ctx.get("pace_opp") and ctx.get("league_pace"):
@@ -5028,7 +5083,9 @@ def props_project(prop, logs_this, logs_last, ctx):
     if m["season"] and not m["last_season"]:
         parts.append({"k": "minutes", "t": "Minutes, his last %d against the season" % m["n"], "eff": round((mins0 - m["season"]) * rate0, 2), "i": i_mins})
     if out_mpg > 0:
-        parts.append({"k": "out", "t": "Regulars out", "eff": round(rate * mins - rate0 * mins0, 2), "i": i_out})
+        parts.append({"k": "out", "t": "Regulars out", "eff": round(rate_out * mins - rate0 * mins0, 2), "i": i_out})
+    if drate_c > 0:
+        parts.append({"k": "oppc", "t": "Their centre out", "eff": round(drate_c * mins, 2), "i": i_oppc})
     if abs(f_pace - 1.0) > 1e-9:
         parts.append({"k": "pace", "t": "Pace", "eff": round((f_pace - 1.0) * rate * mins, 2), "i": i_pace})
     if abs(f_dvp - 1.0) > 1e-9:
@@ -5193,9 +5250,10 @@ def make_nba_props(date_iso, out_dir, log, topup=False, sim_runs=NBA_SIM_RUNS):
                 log("  %s: no roster from ESPN's team page (%s); the ledgers place its players" % (NBA_NICK.get(ab, ab), e))
         pace_a, pace_h = club_pace(aab), club_pace(hab)
         pace = (pace_a + pace_h) / 2.0 if pace_a and pace_h else (pace_a or pace_h)
-        out = {}
+        out, outc = {}, {}
         for ab in (aab, hab):
             out[ab] = props_out_minutes(ab, injuries, logs_this, logs_last)
+            outc[ab] = props_out_centres(ab, injuries, logs_this, logs_last, roster_pos)   # the club's centres out, read by the other side's bigs (28 Oct 2026)
         odds = g.get("odds") or {}
         row = {"gid": g.get("id"), "away": away, "home": home, "aab": aab, "hab": hab, "tip": g.get("t") or ev.get("commence_time"),
                "spread": odds.get("sp"), "total": odds.get("total"), "pace": round(pace, 1) if pace else None, "league_pace": round(league_pace, 1) if league_pace else None,
@@ -5238,7 +5296,9 @@ def make_nba_props(date_iso, out_dir, log, topup=False, sim_runs=NBA_SIM_RUNS):
                    "maybe": out[team][2], "pace": pace, "league_pace": league_pace, "home": team == hab, "pos": pos, "opp_nick": NBA_NICK.get(opp, opp),
                    "pace_team": pace_h if team == hab else pace_a, "pace_opp": pace_a if team == hab else pace_h, "match": club_match(team, opp, team == hab),
                    "usage": (usage_[0] if usage_ else None), "usage_src": (usage_[1] if usage_ else None), "starter": starter_, "start_src": start_src,
-                   "dvp": dv, "htb": htb_line(htb, NBA_NICK.get(opp, opp), opp, pos, dmk) if pos else None, "self_out": self_out}
+                   "dvp": dv, "htb": htb_line(htb, NBA_NICK.get(opp, opp), opp, pos, dmk) if pos else None,
+                   "opp_out_mpg": out[opp][0], "opp_out_names": [(n, mpg, st) for n, mpg, st in out[opp][1] if mpg is not None and mpg >= PROPS_REGULAR_MPG],
+                   "opp_out_c_mpg": outc[opp][0], "opp_out_c_names": outc[opp][1], "self_out": self_out}
             proj, why = props_project(pr, e1.get("g"), e2.get("g"), ctx)
             season_logs = e1.get("g") or e2.get("g") or []
             recent = [[g_["d"], g_["opp"], 1 if g_["home"] else 0, g_["min"], props_stat(g_, pr["mk"]), props_game_factors(g_, season_logs, pr["mk"], league_pace, e2.get("g") if e1.get("g") else None)] for g_ in season_logs[-10:]]
@@ -6720,6 +6780,22 @@ def selftest():
           and any(w == ctx_["htb"] for w in why_)
           and any(w.startswith("home 30.9 / road 31.0 per 36 over 178 minutes: shown, not scored") and w.endswith("; tonight on the road") for w in why_)
           and any(w == "projected 34.5 against points 30.5, one sigma 11.5, the chance read around the median 33.6 (the stat skews right: at the mean the over lands 47% of the time): the over 60.5% by the projection, 50.0% by the book's prices; blended 53.5% at 4 to 2" for w in why_))
+    # the opponent's absences (28 Oct 2026): named on every prop, scored on a big man's rebounds when their centre sits
+    ctx_o = dict(ctx_m)
+    ctx_o.update({"opp_out_mpg": 62.0, "opp_out_names": [("Anthony Davis", 34.0, "Out"), ("Austin Reaves", 28.0, "Out")], "opp_out_c_mpg": 34.0, "opp_out_c_names": [("Anthony Davis", 34.0)]})
+    proj_o, why_o = props_project(prop_, lt["11"]["g"], ll["11"]["g"], ctx_o)
+    proj_og, why_og = props_project(prop_reb, lt["11"]["g"], ll["11"]["g"], ctx_o)
+    proj_oc, why_oc = props_project(prop_reb, lt["11"]["g"], ll["11"]["g"], dict(ctx_o, pos="C"))
+    parts_oc = dict((p["k"], p) for p in proj_oc["parts"])
+    check("props: the opponent's regulars out are named on every prop and scored only on a forward's or centre's rebounds when their centre sits, a lever of its own that sums into the projection",
+          proj_o["proj"] == proj_m["proj"] and "oppc" not in dict((p["k"], p) for p in proj_o["parts"])
+          and any(w == "Lakers's regulars out (Anthony Davis, Austin Reaves; 62 minutes a game between them): shown, not scored on points; on 2025-26 the opponent's absences lifted points a third as much as his own club's did (+0.17 per 36 per 30 mpg) and the lift did not hold from one half of the season to the other" for w in why_o)
+          and proj_og["proj"] == proj_r["proj"] and any(w.endswith("shown, not scored; a missing centre lifts the bigs' rebounds, not a guard's (+0.03 per 36 per 30 mpg on 2025-26, null)") for w in why_og)
+          and abs(parts_oc["oppc"]["eff"] - 0.34 / 36.0 * proj_oc["mins"]) < 0.01 and parts_oc["oppc"]["t"] == "Their centre out" and proj_oc["proj"] > proj_r["proj"]
+          and abs(proj_oc["base"] + sum(parts_oc[k]["eff"] for k in ("out", "oppc", "pace", "dvp")) - proj_oc["proj"]) < 0.03
+          and why_oc[parts_oc["oppc"]["i"]] == "Lakers's centre out (Anthony Davis (34 mpg)): +0.34 rebounds per 36 for a centre, measured on 2025-26 (the bigs' rebounds landed over the number 48.9% of the time against 45.1% on other nights; the lift sized to close that gap), scored; the rest of their regulars out (Austin Reaves) shown, not scored"
+          and props_out_centres("DAL", {"DAL": [{"id": "22", "n": "Kyrie Irving", "st": "Out"}, {"id": "99", "n": "Big Man", "st": "Doubtful"}]}, lt, {"99": {"g": [{"min": 30.0}] * 12, "pos": "C"}}) == (30.0, [("Big Man", 30.0)])
+          and props_out_centres("DAL", {"DAL": [{"id": "98", "n": "Roster Man", "st": "Out"}]}, {}, {"98": {"g": [{"min": 26.0}] * 12}}, {"98": "C"}) == (26.0, [("Roster Man", 26.0)]))
     check("props: a listed-out player gets no projection, and no history is said", props_project(prop_, lt["11"]["g"], ll["11"]["g"], dict(ctx_, self_out="Out"))[0] is None
           and props_project(prop_, [], [], ctx_)[1] == ["no history to project from (under 60 minutes with the stat in the ledgers)"])
     check("props: a prop's name finds the player on one of the two clubs, by roster, by ledger, by surname, else says so",

@@ -710,3 +710,25 @@ starters (1.03, 1.01, 0.90) / (1.04, 1.02, 0.89) / (0.98, 0.93, 0.90), the
 bench (1.24, 1.17, 1.09) / (1.22, 1.20, 1.07) / (1.18, 1.04, 1.05). The
 same tool reproduces the first five's centres (0.07, 0.11, 0.13, 0.19 and
 0.04 against the shipped 0.08, 0.11, 0.14, 0.23 and 0.05).
+
+**The opponent's absences (28 Oct 2026).** The user, after a rough night on
+the props: "when players are out that's going to help the next man go over,
+not under, yet it seems to think the same for the defence even when certain
+main players are out." It did: the props carried his own club's absences
+(the pooled regulars-out rule) and the simulation beside the card took two
+fifths of an absence off the club's defence, but the scored matchup lever
+read the opponent's full-strength rating (`club_match` zeroes both clubs'
+absence adjustments so his own club's lever is not counted twice), so
+nothing in the projection said the defence was short-handed.
+`tools_nba_opp_out.py` on 2025-26 (21,651 player-games after eight prior
+games, the opponent short a regular in 70% of them):
+
+| Question | Answer |
+| --- | --- |
+| The lift per 30 mpg of OPPONENT regulars out, his own club's held in the same regression? | Points +0.17 per 36 (t 2.7) against his own club's +0.42 (t 6.9); rebounds +0.09 (t 3.2); assists +0.05 (t 2.7); threes +0.02 (t 1.6); his minutes +0.01 (starters −0.14, t −2.5; the bench +0.15, t 2.4) |
+| By who is out for them? | A centre out: points +0.44 (t 2.5), rebounds +0.36 (t 4.5); a forward: points +0.23 (t 2.2), assists +0.09 (t 2.5); a guard: nothing. By his own position, the missing centre lifts forwards' rebounds +0.58 (t 3.9) and centres' +0.90 (t 3.5), guards' +0.03 (t 0.4); points for guards +0.42 (t 1.6) and forwards +0.62 (t 2.1) |
+| By what the absent men did? | Per rebound a game the absent men had: points +0.080 (t 3.5), rebounds +0.042 (t 3.9); per point a game they had: nothing, a shade negative (−0.021, t −2.1); per assist: nothing |
+| Does it hold from one half of the season to the other? | Points −0.02 in the first half, +0.30 in the second (t 3.8); the pooled lever fitted on the first half and scored on the second moved the rmse 6.2018 to 6.1985, nothing. Assists +0.02 then +0.13, threes −0.03 then +0.06: no. The one piece that held: forwards' and centres' rebounds per 30 mpg of an opposing centre out, +0.56 (t 2.8) in the first half, +0.78 (t 4.6) in the second, +0.69 (t 5.3) whole; as plain means +0.49 / +0.69 per 36 with 25 to 35 mpg of centre out. The centre's minutes carry it, not the absent men's rebounds a game (+0.58, t 3.7, against +0.010, t 1.1, in one regression) |
+| What the chance saw, the median shift in? | Forwards' and centres' rebounds with no opposing centre out: over the number 46.1% / 44.4% by half, bias −0.02 / −0.03 sigmas; with a centre out 48.0% / 49.8%, bias +0.02 / +0.11 (t 0.5 / 2.8). Whole season, 48.9% against 45.1% on the other nights, bias +0.067 (t 2.4) |
+| The size that lands? | The per-36 regression says 0.69, but 0.69 overshoots the miss (bias −0.081, t −3.0, the over 42.9%); 0.30 per 36 per 30 mpg zeroes it (+0.001, 45.9%; the rmse 3.1108 against 3.1145 with nothing). Shipped at 0.30 for forwards and centres on rebounds, PRA, points + rebounds and rebounds + assists (`PROPS_OPP_C_REB_PER30`); the opponent's regulars out named on every prop, shown, not scored elsewhere |
+| What the simulation's defensive share would say? | 0.4 of the cost per 100 off the opponent's defence is 2.2 per 100 in those games, 1.9% of a 114 rating: +0.23 points per 36 per 30 mpg on a 20-per-36 scorer, near the pooled +0.17 that did not persist. On the strip, not in the score |

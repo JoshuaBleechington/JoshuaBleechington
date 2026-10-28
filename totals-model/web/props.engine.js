@@ -634,9 +634,10 @@
   }
   /* what moves it (21 Oct 2026, the user: "highlight the areas of the prop bet that are helping
      with the prediction the most"): the slate writes each factor's push on the projection in the
-     stat's units (parts: regulars out, pace, the defence, last season's prior, the minutes
-     trend), each pointing at its why line. Ranked by size, largest first; a push toward the
-     pick's side helps, away from it hurts */
+     stat's units (parts: regulars out, their centre out on a big man's rebounds (28 Oct 2026),
+     pace, the defence, the matchup, last season's prior, the minutes trend), each pointing at
+     its why line. Ranked by size, largest first; a push toward the pick's side helps, away
+     from it hurts */
   function propsLevers(r) {
     return (r.parts || []).filter(function (p) { return p && isFinite(+p.eff); }).slice().sort(function (a, b) { return Math.abs(b.eff) - Math.abs(a.eff); });
   }
@@ -728,8 +729,8 @@
     var against = felt.filter(function (p) { return !propsLeverHelps(r, +p.eff); }).slice(0, 1).map(function (p) { return +p.i; });
     if (levers.length && r.base !== undefined && r.base !== null) {
       var maxE = Math.max.apply(null, levers.map(function (p) { return Math.abs(+p.eff); }).concat([0.01])), gap = r.proj - r.line;
-      var hasMatch = levers.some(function (p) { return p.k === "match"; }), tally = propsLeverTally(r);
-      h += '<h4>What moves it' + (tally.n ? ' <span class="dim">· ' + esc(tally.words) + '</span>' : '') + '</h4><p class="pd-base">Starts from <b>' + esc(String(r.base)) + '</b>, his ' + esc(String(r.rate36)) + ' per 36 at his minutes; the regulars out, pace' + (hasMatch ? ', the matchup' : '') + ' and the defence take it to <b>' + esc(String(r.proj)) +
+      var hasMatch = levers.some(function (p) { return p.k === "match"; }), hasOppc = levers.some(function (p) { return p.k === "oppc"; }), tally = propsLeverTally(r);
+      h += '<h4>What moves it' + (tally.n ? ' <span class="dim">· ' + esc(tally.words) + '</span>' : '') + '</h4><p class="pd-base">Starts from <b>' + esc(String(r.base)) + '</b>, his ' + esc(String(r.rate36)) + ' per 36 at his minutes; the regulars out' + (hasOppc ? ', their centre out' : '') + ', pace' + (hasMatch ? ', the matchup' : '') + ' and the defence take it to <b>' + esc(String(r.proj)) +
            '</b>, ' + sgn(gap, 1) + ' against the line. Green pushes toward the ' + esc(r.side || "pick") + ', red away from it. The prior and the minutes trend say what sits inside the start.</p>';
       h += '<div class="pd-levers">' + levers.map(function (p, i) {
         var helps = propsLeverHelps(r, +p.eff), w = Math.max(3, Math.round(Math.abs(+p.eff) / maxE * 100));

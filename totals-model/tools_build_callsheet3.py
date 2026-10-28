@@ -24,7 +24,7 @@ import sys
 ROOT = pathlib.Path(__file__).parent / "web"
 OPEN = "  /* ===== ENGINE BLOCK."
 CLOSE = "  /* ===== END ENGINE BLOCK ===== */"
-STAMP = "2026-10-27"   # bumped by hand when 3.0's own sources change (the harness checks it)
+STAMP = "2026-10-28"   # bumped by hand when 3.0's own sources change (the harness checks it)
 
 
 def engine_block() -> str:
@@ -608,6 +608,7 @@ def props_example_games() -> list:
            ("NYK", "F", "pts"): "HashtagBasketball: Knicks allow 22.1 points a game to SFs (43rd of 150, 1 the fewest), 21.6 points a game to PFs (38th of 150, 1 the fewest); shown, not scored",
            ("NYK", "C", "reb"): "HashtagBasketball: Knicks allow 13.4 rebounds a game to Cs (125th of 150, 1 the fewest); shown, not scored"}
     out = {"PHI": (31.2, [("Joel Embiid", 31.2, "Out")], [("Andre Drummond", "Questionable")]), "NYK": (0.0, [], [("Josh Hart", "Day-To-Day")])}
+    outc = {"PHI": (31.2, [("Joel Embiid", 31.2)]), "NYK": (0.0, [])}   # the club's centres out, read by the other side's bigs (28 Oct 2026)
     # the simulation on the props (26 Oct 2026): the NBA example's two profiles, the game played by nbasim at build
     # time (seeded) and read for each prop, and the matchup lever from the same profiles, as a real file carries them
     import nbasim  # noqa: E402
@@ -631,7 +632,8 @@ def props_example_games() -> list:
         ctx = {"out_mpg": out[team][0], "out_names": out[team][1], "maybe": out[team][2], "pace": 98.75, "league_pace": 100.5, "home": team == "NYK", "pos": pos,
                "pace_team": prof["teams"][team]["pace"], "pace_opp": prof["teams"][opp]["pace"], "match": club_match(team, opp, team == "NYK"),
                "usage": usage[name], "usage_src": "this season", "starter": name != "Kelly Oubre Jr.", "start_src": "his last game this season" if name == "Kelly Oubre Jr." else "RotoWire's expected five",
-               "opp_nick": slate.NBA_NICK[opp], "dvp": dvp[opp][pos], "htb": htb.get((opp, pos, dmk)), "self_out": "Out" if name == "Joel Embiid" else ""}
+               "opp_nick": slate.NBA_NICK[opp], "dvp": dvp[opp][pos], "htb": htb.get((opp, pos, dmk)),
+               "opp_out_mpg": out[opp][0], "opp_out_names": out[opp][1], "opp_out_c_mpg": outc[opp][0], "opp_out_c_names": outc[opp][1], "self_out": "Out" if name == "Joel Embiid" else ""}
         proj, why = slate.props_project(pr, this, last, ctx)
         item = {"pid": "x%d" % (k + 1), "name": name, "team": team, "opp": opp, "home": team == "NYK", "pos": pos, "mk": mk, "line": line, "op": op, "up": up, "book": "fanatics",
                 "books": {"fanatics": [line, op, up], "draftkings": [line + (0.5 if k % 3 == 0 else 0.0), op - 5, up + 5], "fanduel": [line, op + 2, up - 2]},

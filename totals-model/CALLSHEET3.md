@@ -1663,3 +1663,38 @@ in the record, and their last games open each line with the parts behind
 the total ("28 pts + 9 ast = 37"); the floors ladder leaves the combos out
 as it leaves out PRA. The grade file carries the what-happened line for all
 eight markets.
+
+## The opponent's absences on the prop, 28 Oct 2026
+
+The user, after a rough night on the props: "when players are out that's
+going to help the next man go over, not under, yet it seems to think the
+same for the defence even when certain main players are out." He was right
+about what the score read. The props carried his own club's absences (the
+pooled regulars-out rule) and the simulation's strip took two fifths of an
+absence off the club's defence, but the scored matchup lever read the
+opponent's full-strength rating: `club_match` zeroes both clubs' absence
+adjustments so his own club's lever is not counted twice, and the
+opponent's went with it. Nothing in the projection said the defence was
+short-handed.
+
+Measured first (`tools_nba_opp_out.py` on 2025-26, the opponent short a
+regular in 70% of 21,651 player-games): the opponent's absences lift points
++0.17 per 36 per 30 mpg against his own club's +0.42, and the lift did not
+hold from one half of the season to the other (−0.02, then +0.30), so
+points stay as they were. The piece that held is a missing **centre** on
+the other side's bigs' rebounds: +0.56 per 36 per 30 mpg in the first half,
++0.78 in the second, the bigs' rebounds landing over the number 48.9% of the
+time against 45.1% on other nights. Sized where the miss on those nights
+closes (0.30 per 36 per 30 mpg; the per-36 regression's 0.69 overshoots),
+it is scored for forwards and centres on rebounds, PRA, points + rebounds
+and rebounds + assists.
+
+On the page: every prop's why names the opponent's regulars out and what
+the sheet does with them (shown, not scored on points, with the measured
+reason); a big man's rebounds prop with their centre sitting carries "Their
+centre out" as a lever of its own under What moves it, summing into the
+projection with the rest, marked green or red like any other, and the
+What moves it paragraph names it. The example's Towns and Bridges props
+read it with Embiid out for the 76ers. The simulation's strip is unchanged:
+its defensive share of an absence is near the pooled points lift that did
+not persist, shown, not scored.

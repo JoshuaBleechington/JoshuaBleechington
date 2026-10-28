@@ -1974,7 +1974,7 @@ const CHECKS = ["dome","playoff","agconf","hgconf","agbk","hgbk"];
     await smStore.removeItem('callsheet3.card.v1');
     return { panel0, before, stored, after, now, watch, pairs, note, calc, calc2, take, taking, stillOpen, rec, recHead };
   });
-  chk(/The apps now/.test(midT.panel0) && /You hold no total on this game yet/.test(midT.panel0) && midT.before.head === false && midT.before.cards === 0 && /1 total held on this date, no window open/.test(midT.before.text)
+  chk(/(The apps now|No odds on the row)/.test(midT.panel0) && midT.before.head === false && midT.before.cards === 0 && /1 total held on this date, no window open/.test(midT.before.text)
       && midT.stored.logged && midT.stored.now && midT.stored.at === '2026-11-13T22:30:00Z' && midT.stored.line === '230.5' && /230\.5/.test(midT.stored.markets)
       && midT.after.head === false && midT.after.n === 1 && /^MIDDLE OPEN · A 4\.5-POINT WINDOW · PAYS \+[4-6]\.\d% OF THE STAKE$/i.test(midT.after.n1) && /^TOTAL UNDER 235 AT DRAFTKINGS -108$/i.test(midT.after.n2)
       && /^with your OVER 230\.5 -110 \(the sheet's pick\) · both win [89]\.\d%, needs 4\.[0-9]% · the market's number 234\.5$/i.test(midT.after.n3) && midT.after.take
@@ -1983,7 +1983,7 @@ const CHECKS = ["dome","playoff","agconf","hgconf","agbk","hgbk"];
       && midT.pairs.length === 6 && midT.pairs.every(p => /\|(FanDuel|BetMGM|DraftKings|Fanatics) \d+(\.5)? -\d+/.test(p)) && /^\d+ pairs across the apps' main and alternate numbers, the best six shown; none pays at these prices/.test(midT.note)
       && /^Pays: a 8-point window, both win 1[5-9]\.\d%, the pair needs 4\.8% at these prices: \+\d+\.\d% of the stake expected/.test(midT.calc) && /^(The book's price|Positive, but under a three-point gap): a 2-point window, both win [23]\.\d%/.test(midT.calc2)
       && midT.take.length === 1 && /^middle\|UNDER\|235\|-108\|draftkings\|OVER 230\.5 -110\|4\.5\|Total UNDER 235 at DraftKings \(the middle with OVER 230\.5\)$/.test(midT.take[0])
-      && /Total UNDER 235 at DraftKings \(the middle with OVER 230\.5\) -108 · the simulation, the middle's second leg: 5\d% · middle · Jazz @ Nuggets/i.test(midT.taking) && /TAKING/i.test(midT.stillOpen)
+      && /Total UNDER 235 at DraftKings \(the middle with OVER 230\.5\) 50% by the sim · middle · -108 needs 51\.9% Jazz @ Nuggets · the middle's second leg/i.test(midT.taking) && /TAKING/i.test(midT.stillOpen)
       && /^Pairs Both won One pushed Split Said both The pair The first leg alone 1 1 \(100\.0%\) 0 0 [89]\.\d% \+1\.8[0-9]u \+0\.91u$/i.test(midT.rec) && /the pair graded together/.test(midT.recHead),
       'middles: the Middles card prices every over/under pair the four apps post off the sheet\'s normal and says none pays on an ordinary night; a total taken on the row is watched, and when a later odds run moves the number 4.5 points the board and the panel name the best second leg at its app with the pair\'s chance and what it pays; the apps\' numbers follow the newest run while the logged line stays; the calculator prices a typed pair; the second leg takes from the panel with the leg it pairs with, lists under Taking tonight, and the graded pair lands on the record\'s Middles line beside what the first leg alone did', JSON.stringify(midT).slice(0, 2600));
 

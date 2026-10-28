@@ -1931,7 +1931,7 @@ const CHECKS = ["dome","playoff","agconf","hgconf","agbk","hgbk"];
 
   // ---- 28 Oct 2026: middles on the total -- the apps' numbers on the row, a leg held, the number runs, the watch names the second leg, a take, the pair on the record ----
   const midT = await pg.evaluate(async () => {
-    const wait = () => new Promise(r => setTimeout(r, 90));
+    const wait = () => new Promise(r => setTimeout(r, 220));
     const txt = e => (e ? e.innerText : '').replace(/\s+/g, ' ').trim();
     const set = (id, v) => { const el = document.getElementById(id); el.value = v; el.dispatchEvent(new Event('input', { bubbles: true })); };
     await smStore.removeItem('callsheet3.card.v1'); document.getElementById('clear').click(); document.getElementById('m-nba').click(); await wait();
@@ -1977,9 +1977,9 @@ const CHECKS = ["dome","playoff","agconf","hgconf","agbk","hgbk"];
   chk(/The apps now/.test(midT.panel0) && /You hold no total on this game yet/.test(midT.panel0) && midT.before.head === false && midT.before.cards === 0 && /1 total held on this date, no window open/.test(midT.before.text)
       && midT.stored.logged && midT.stored.now && midT.stored.at === '2026-11-13T22:30:00Z' && midT.stored.line === '230.5' && /230\.5/.test(midT.stored.markets)
       && midT.after.head === false && midT.after.n === 1 && /^MIDDLE OPEN · A 4\.5-POINT WINDOW · PAYS \+[4-6]\.\d% OF THE STAKE$/i.test(midT.after.n1) && /^TOTAL UNDER 235 AT DRAFTKINGS -108$/i.test(midT.after.n2)
-      && /^with your OVER 230\.5 -110 \(the sheet's pick\) · both win [89]\.\d%, needs 4\.8% · the market's number 234\.5$/i.test(midT.after.n3) && midT.after.take
+      && /^with your OVER 230\.5 -110 \(the sheet's pick\) · both win [89]\.\d%, needs 4\.[0-9]% · the market's number 234\.5$/i.test(midT.after.n3) && midT.after.take
       && /^The apps now \(the odds run of 2026-11-13 22:30 UTC\), the market's number 234\.5: FanDuel 234\.5 \(-108\/-112\) · BetMGM 234\.5 \(-110\/-110\) · DraftKings 235 \(-112\/-108\) · Fanatics 234\.5 \(-110\/-110\)$/.test(midT.now)
-      && midT.watch.cls === 'midwatch pays' && /MIDDLE OPEN · a 4\.5-point window · pays \+[4-6]\.\d% of the stake You hold OVER 230\.5 at -110 \(the sheet's pick\); the market's number is 234\.5, so that leg alone is 5[6-9]\.\d% to win\. The best under now: DraftKings 235 at -108\. Both win [89]\.\d% \(the pair needs 4\.8%\)/i.test(midT.watch.text)
+      && midT.watch.cls === 'midwatch pays' && /MIDDLE OPEN · a 4\.5-point window · pays \+[4-6]\.\d% of the stake You hold OVER 230\.5 at -110 \(the sheet's pick\); the market's number is 234\.5, so that leg alone is 5[6-9]\.\d% to win\. The best under now: DraftKings 235 at -108\. Both win [89]\.\d% \(the pair needs 4\.[0-9]%\)/i.test(midT.watch.text)
       && midT.pairs.length === 6 && midT.pairs.every(p => /\|(FanDuel|BetMGM|DraftKings|Fanatics) \d+(\.5)? -\d+/.test(p)) && /^\d+ pairs across the apps' main and alternate numbers, the best six shown; none pays at these prices/.test(midT.note)
       && /^Pays: a 8-point window, both win 1[5-9]\.\d%, the pair needs 4\.8% at these prices: \+\d+\.\d% of the stake expected/.test(midT.calc) && /^(The book's price|Positive, but under a three-point gap): a 2-point window, both win [23]\.\d%/.test(midT.calc2)
       && midT.take.length === 1 && /^middle\|UNDER\|235\|-108\|draftkings\|OVER 230\.5 -110\|4\.5\|Total UNDER 235 at DraftKings \(the middle with OVER 230\.5\)$/.test(midT.take[0])

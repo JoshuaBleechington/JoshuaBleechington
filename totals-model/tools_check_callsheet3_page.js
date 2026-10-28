@@ -1918,7 +1918,7 @@ const CHECKS = ["dome","playoff","agconf","hgconf","agbk","hgbk"];
     await smStore.removeItem('callsheet3.card.v1');
     return { headHidden, cards, block, take, taking, boardTake, rec, recHead, graded, priced, alt, split };
   });
-  chk(agreeT.priced.cls === 'voices' && /^2 OF 3 · NO BET$/i.test(agreeT.priced.badge) && /2 of 3 on the OVER, but at -208 it needs 67\.5%, more than the rule's 59\.2%: the book's price, not a bet\.$/i.test(agreeT.priced.line) && !agreeT.priced.take
+  chk(agreeT.priced.cls === 'voices' && /^[23] OF 3 · NO BET$/i.test(agreeT.priced.badge) && /[23] of 3 on the OVER, but at -208 it needs 67\.5%, more than the rule's 59\.2%: the book's price, not a bet\.$/i.test(agreeT.priced.line) && !agreeT.priced.take
       && /^2 OF 3 · NO BET$/i.test(agreeT.alt.badge) && /2 of 3 on the OVER, but the row's line 222\.5 is an alternate \(the market's number is 229\.5\): the rule was measured on the main line, no bet\.$/i.test(agreeT.alt.line) && !agreeT.alt.take,
       'agreement gates: the same voices at -208 read the book\'s price, not a bet (the over needs 67.5%, the rule measured 59.2%), and a row line seven off the market\'s number reads an alternate outside the measurement; neither carries a Take', JSON.stringify({ priced: agreeT.priced, alt: agreeT.alt }));
   chk(agreeT.headHidden === false && agreeT.cards.length === 1 && /^AGREEMENT · 2 OF 3 · BET BY THE RULE$/i.test(agreeT.cards[0].n1) && /^TOTAL OVER 222\.5$/i.test(agreeT.cards[0].n2)

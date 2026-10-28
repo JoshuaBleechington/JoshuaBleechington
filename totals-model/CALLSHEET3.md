@@ -1734,3 +1734,34 @@ reads "an alternate … the rule was measured on the main line, no bet";
 and a price on the rule's side asking more than the rule's 59.2% reads
 "the book's price, not a bet". Both show the voices with a "2 of 3 · no
 bet" badge, no Take, and no card on the board.
+
+## Middles on the total, 28 Oct 2026
+
+The user: "I use four apps, FanDuel, BetMGM, DraftKings and Fanatics; how
+could we use the model to capitalize on middle betting? Build that tool and
+see how it scores." Measured first (`tools_nba_middles.py`, NBA.md): the
+apps sit within a point of each other at tip in 99% of games and a
+one-point gap loses 3% of the stake; a number that has moved 3.5 points or
+more from a leg already held pays (+3% of the stake, +12 to 14% at five or
+more), the sheet's normal at 18 points sizing the both-win chance within a
+point of what landed; the rule the page uses, the second leg whenever the
+normal says the pair pays with a gap of three or more, ran +3.4% and +2.9%
+of the stake over the two seasons.
+
+On the page: a **Middles** card on the NBA rail, under the Simulation card,
+with the apps' numbers as the newest odds run left them (an odds file
+loaded later now refreshes a carded row's shop as `oddsNow`, the logged
+line and prices staying as the markets were scored), the full-game totals
+you hold on the row (the sheet's pick taken, a sim call, the agreement
+rule) each with the best number the apps post on the other side, the
+pair's both-win chance, what it needs at the two prices, what the leg
+alone is worth now, and a Take when the pair pays; every over/under pair
+across the apps' main and alternate numbers, the best six, with "none
+pays at these prices" on an ordinary night; and a calculator for any two
+numbers and prices, kept as you type. On the board, **Middles on the
+totals you hold** lists a green card and a Take for each open window on
+the date, or says how many legs are held with no window yet. The second
+leg marks the row like a simulation call with the app and the leg it
+pairs with, lists under Taking tonight and the phone sheet, and grades as
+a pair on the simulation record's new Middles line (both won, one pushed,
+split, the pair's units, and the first leg alone beside it).

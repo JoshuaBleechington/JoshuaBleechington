@@ -622,6 +622,54 @@ z +4.1 but the sim's own view 48% over on his row, which carried Sharpe
 out for the Blazers), the Spurs (the alternate line; the sim's own view
 46% over even at 225.5 with Murray and Raynaud out).
 
+**Middles on the total, 28 Oct 2026.** The user: "I use four apps,
+FanDuel, BetMGM, DraftKings and Fanatics; how could we use the model to
+capitalize on middle betting?" A middle is the over at one number and the
+under at a higher one: the final between them wins both legs, outside
+them one leg loses and the other wins, so the pair pays when the final
+lands between often enough to cover the juice, 4.8% of the time at −110
+on both legs. `tools_nba_middles.py` on the lines history (every book's
+total at noon and 6:30 pm Eastern from two days before each game, both
+seasons) against the finals, the four apps only:
+
+| Where the gap comes from | 2024-25 | 2025-26 |
+| --- | --- | --- |
+| The apps' numbers at tip: within a point of each other | 1,198 of 1,231 games | 1,208 of 1,231 |
+| A one-point gap between two apps at tip, the pair | 365 games, both win 1.6%, −3.5% of the stake | 565, 2.8%, −2.8% |
+| The number moved 1.5 to 3 points from two days out to tip, the pair (the best app each time) | 371, 4.3%, −0.5% | 319, 4.4%, −0.6% |
+| Moved 3.5 to 4.5 | 121, 7.4% (the normal said 9.2%), +2.7% | 69, 8.7% (9.5%), +3.2% |
+| Moved 5 or more | 112, 17.0% (15.6%), +12.4% | 60, 20.0% (16.2%), +14.3% |
+| **The page's rule**: the second leg whenever the sheet's normal says the pair pays | 473 pairs, 8.2% both win (said 9.1%), **+32.5u, +3.4% of the stake** | 362 pairs, 8.0% (8.7%), **+20.9u, +2.9%** |
+| ... of which the gap under three points | 72, 1.4%, −3.2% | 54, 3.7%, −0.5% |
+| ... three to four | 219, 6.4%, +1.3% | 210, 5.7%, +0.6% |
+| ... 4.5 to six | 109, 8.3%, +3.5% | 66, 13.6%, +8.1% |
+| ... 6.5 and up | 73, 20.5%, +16.2% | 32, 18.8%, +13.0% |
+| A window of 3.5+ points somewhere in the two days, with hindsight | 364 games (30%) | 207 (17%) |
+| The final within 1.5 of the last number (a three-integer middle) | 7.2% against the normal's 6.6% | 9.1% |
+
+So the apps agree with each other too closely to middle at the same
+moment, and the money is the move: a number that has run three points or
+more from a leg already held. The sheet's normal at 18 points sized the
+both-win chance within a point of what landed at every width, so the page
+prices any pair from it, the pushes on an integer line included, and a
+pair "pays" when that expectation is positive and the gap is three points
+or more (under three the pairs the normal liked lost in both seasons). Two
+honest notes. The measurement's first leg is taken on the side the number
+later moved away from, which is known only after; holding one leg, the
+window opens on the moves that go the other way, about half of them. And
+the pair's value is made by the first leg once the market has moved past
+it (the over at 230.5 with the number at 234.5 is 58% to win on its own);
+the second leg gives up its vig and takes the loss off the table, which
+is what a middle is for. **On the page**: a Middles card on the rail with
+the apps' numbers as the newest odds run left them, the legs held with
+the best number on the other side and whether the pair pays, every pair
+across the apps' main and alternate numbers priced, and a calculator for
+any two numbers; a Middles section on the board with a card and a Take
+for each open window; the pair graded together on the simulation record
+beside what the first leg alone did. The apps' numbers follow the newest
+odds run on a row (`oddsNow`), the logged line staying as the markets
+were scored.
+
 ## The player props, 19 Oct 2026
 
 The user: "set up another tab for player props... find the ideal scenario

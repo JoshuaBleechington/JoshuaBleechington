@@ -288,6 +288,9 @@
   .pk.agree { border: 1px solid var(--go); background: var(--go-wash); }
   .pk.agree .n1 { color: var(--go); }
   .pk.agree .n5 { margin-top: 6px; }
+  .pk.mid { border: 1px solid var(--go); background: var(--go-wash); }
+  .pk.mid .n1 { color: var(--go); }
+  .pk.mid .n5 { margin-top: 6px; }
   .pk.upset.scored .n1 { color: var(--go); }
   /* the slate panel */
   .slate .sg { display: flex; justify-content: space-between; align-items: center; gap: 10px; padding: 10px 12px;
@@ -390,6 +393,14 @@
   .voices .vbadge { display: inline-block; min-width: 52px; text-align: center; margin-right: 6px; padding: 1px 7px; border-radius: 3px; font: 800 10px/1.7 var(--sans); letter-spacing: .08em; text-transform: uppercase; color: var(--muted); background: var(--surface); border: 1px solid var(--rule); vertical-align: 1px; }
   .voices .vbadge.bet { background: var(--go); color: #fff; border-color: var(--go); }
   .voices .vline { margin-top: 3px; } .voices .vtake { margin-top: 6px; } .voices .vtag { margin-top: 4px; font-size: 11px; }
+  #nbaMidPanel .midnow { font-size: 12.5px; line-height: 1.5; margin: 2px 0 8px; }
+  .midwatch { display: block; padding: 9px 12px 9px 14px; margin: 8px 0 10px; border-radius: 8px; background: var(--surface-2); box-shadow: inset 3px 0 0 var(--muted); font-size: 12.5px; line-height: 1.5; color: var(--ink); }
+  .midwatch.pays { background: var(--go-wash); box-shadow: inset 3px 0 0 var(--go); } .midwatch .mwline { margin-top: 3px; } .midwatch .mwtake { margin-top: 6px; }
+  .midwatch .vbadge { display: inline-block; min-width: 52px; text-align: center; margin-right: 6px; padding: 1px 7px; border-radius: 3px; font: 800 10px/1.7 var(--sans); letter-spacing: .08em; text-transform: uppercase; color: var(--muted); background: var(--surface); border: 1px solid var(--rule); vertical-align: 1px; }
+  .midwatch .vbadge.bet { background: var(--go); color: #fff; border-color: var(--go); }
+  table.midtab td.good { color: var(--go); } table.midtab td.bad { color: var(--muted); } table.midtab tr.pays td { font-weight: 600; } #nbaMidPanel .midnote { margin: 4px 0 8px; font-size: 11.5px; }
+  .midcalc { margin-top: 8px; font-size: 12.5px; } .midcalc .midcalcrow { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 6px; margin: 6px 0; } .midcalc input { width: 100%; box-sizing: border-box; } #midCalcOut { font-size: 12.5px; line-height: 1.5; }
+  .simrec .midrectab td.good { color: var(--go); } .simrec .midrectab td.bad { color: var(--bad); }
   .crewchips { display: flex; flex-wrap: wrap; gap: 6px; margin: 8px 0 2px; }
   .refchip { font: 600 11px/1.5 var(--sans); padding: 2px 9px; border-radius: 12px; border: 1px solid var(--rule); background: var(--surface); color: var(--ink-2); } .refchip b { color: var(--ink); }
   .refchip.over { border-color: var(--over); color: var(--over); } .refchip.under { border-color: var(--under); color: var(--under); }
@@ -936,6 +947,22 @@
         </section>
 
         <section class="card">
+          <h2>Middles <span class="tag">the over at one number and the under at a higher one, priced off the sheet's own distribution — the apps' numbers now, the legs you hold, any pair · measured on two seasons</span></h2>
+          <div class="body">
+            <div id="nbaMidPanel" class="note">No odds on the row — load the odds file (Run NBA odds) and the apps' numbers come with it.</div>
+            <p class="note">A middle is the over at one number and the under at a higher one: the final between them wins both legs,
+              outside them one leg loses and the other wins, so the pair pays when the final lands between often enough to cover the
+              juice (4.8% of the time at -110 on both legs). Two seasons of lines history say the four apps sit within a point of
+              each other at tip in 99% of games, and a one-point gap loses 3% of the stake; the money is the move, a number that has
+              run three points or more from a leg you already hold (8-9% both win at 3.5 to 4.5 points, +3% of the stake; 17-20% at
+              five or more, +12-14%). The sheet's normal at 18 points sized those chances within a point of what landed, so every
+              pair here is priced off it, pushes on an integer line included. The first leg is a bet you wanted anyway, placed early;
+              the watch names the second once the number has run, and the second leg gives up its vig to take the loss off the
+              table. The apps' numbers follow the newest odds run on the row; the logged line stays as the markets were scored.</p>
+          </div>
+        </section>
+
+        <section class="card">
           <h2>Referee stats <span class="tag">the crew against the close — shown, not scored, with its own watch on the record</span></h2>
           <div class="body">
             <div id="nbaCrewPanel" class="note">No crew on the row — load the slate and Fill form once the league has posted the assignments (about 9 am Eastern), or type the names below.</div>
@@ -1237,6 +1264,8 @@
       <div id="upsets" class="picks"></div>
       <div class="subhead" id="agreeHead" hidden>Agreement on the total <span class="tag">basketball: the simulation's own view at 55%+ and the crew's lean on the same side of the game total, the sheet not against it — 157-108 (59.2%) over two seasons of closes, the sheet's own BET band 56.3% on the same games, so it reads BET; Take marks it on the row and it grades on its own record line</span></div>
       <div id="agree" class="picks" hidden></div>
+      <div class="subhead" id="midHead" hidden>Middles on the totals you hold <span class="tag">basketball: for every total you took, the best number the four apps post on the other side now, priced off the sheet's own distribution; a card when the pair pays (a window of three points or more that has opened since you took the leg) with a Take for the second leg; graded as a pair on the record</span></div>
+      <div id="mid" class="picks" hidden></div>
       <div class="subhead" id="altBetsHead" hidden>Alternate totals with a verdict <span class="tag">hockey: the alternate number on the sheet's side that reads STRONG BET or MAX BET with an edge, one a game — the band is the chance and the price already asks for most of it, so read the edge; graded on its own record line, never the pick or a leg</span></div>
       <div id="altBets" class="picks" hidden></div>
       <div class="subhead" id="bySportHead">One sport only <span class="tag">the same two rules, one sport at a time — only on a night with more than one</span></div>
@@ -3244,7 +3273,7 @@ smStore.ready.then(function () {
                    '<span class="crewchips">' + chips + '</span>' + call + (crew.tag ? ' <span class="ctag">' + esc(crew.tag) + '</span>' : '') + '</div>';
   }
   function forecastMatchupNba() {
-    if (!SRC) { nbaOutPanel(); nbaLineupPanel(); nbaFormPanel(); nbaSimPanel(); nbaCrewPanel(); nbaCtxPanel(); }   // the form's panels: not while a card row is being re-scored
+    if (!SRC) { nbaOutPanel(); nbaLineupPanel(); nbaFormPanel(); nbaSimPanel(); nbaMidPanel(); nbaCrewPanel(); nbaCtxPanel(); }   // the form's panels: not while a card row is being re-scored
     var f = readNba();
     var away = f.away, home = f.home, line = f.line;
     var op = num("op"), up = num("up"), hml = num("hml"), aml = num("aml");
@@ -3742,13 +3771,19 @@ smStore.ready.then(function () {
       var V = nbaVoices(row);
       if (V && V.fires && V.side === side && key === "total") c = { line: V.line, p: side === "OVER" ? V.sim.p : 1 - V.sim.p, worth: null, band: "agreement" };
     }
+    else if (view === "middle") {   // the middle's second leg (28 Oct 2026): the number, the price and the app from the watch, paired with the leg held
+      var W = nbaMiddleWatch(row).filter(function (x) { return x.side === side && String(x.other.point) === p[4] && x.other.book === p[6] && String(x.leg.id) === p[7]; })[0];
+      if (W && W.m.pays) c = { line: W.other.point, p: W.second, worth: null, band: "middle", price: W.other.price, book: W.other.book, with: { side: W.leg.side, line: W.leg.line, price: W.leg.price, how: W.leg.how }, pair: { pBoth: +W.m.pBoth.toFixed(4), ev: +W.m.ev.toFixed(4), gap: W.m.gap, mu: W.mu } };
+    }
     else if (sim) c = nbaSimCalls(sim, lines, view).filter(function (x) { return x.key === key && x.side === side; })[0] || null;
     if (!c) { say("That call is not on the card as shown now; put the line back and take it again."); return; }
     var inp = view === "agree" ? { op: (row.inputs || {}).op, up: (row.inputs || {}).up }
             : { op: $("op").value, up: $("up").value, h1op: $("h1op").value, h1up: $("h1up").value, sph: $("sph").value, spa: $("spa").value, hml: $("hml").value, aml: $("aml").value };
-    row.simTakes = (row.simTakes || []).concat([{ id: id, view: view, key: key, side: side, line: c.line, price: nbaSimPriceOf(key, side, lines, inp),
-                                                  p: c.p === null ? null : +(+c.p).toFixed(4), worth: c.worth === null ? null : +(+c.worth).toFixed(4), band: c.band,
-                                                  pick: nbaSimPickText(key, side, c.line, f.away || row.away, f.home || row.home), at: new Date().toISOString() }]);
+    var take = { id: id, view: view, key: key, side: side, line: c.line, price: view === "middle" ? c.price : nbaSimPriceOf(key, side, lines, inp),
+                 p: c.p === null ? null : +(+c.p).toFixed(4), worth: c.worth === null ? null : +(+c.worth).toFixed(4), band: c.band,
+                 pick: view === "middle" ? "Total " + side + " " + c.line + " at " + bookName(c.book) + " (the middle with " + c.with.side + " " + c.with.line + ")" : nbaSimPickText(key, side, c.line, f.away || row.away, f.home || row.home), at: new Date().toISOString() };
+    if (view === "middle") { take.book = c.book; take.with = c.with; take.pair = c.pair; }
+    row.simTakes = (row.simTakes || []).concat([take]);
     done();
   }
   /* a taken call's result off the row's finals, the sim record's reading: the half from the half-time score */
@@ -3766,18 +3801,27 @@ smStore.ready.then(function () {
     if (t.key === "home_total") return cmp(fh, +t.line, t.side === "OVER");
     return null;
   }
-  function nbaSimTakeViewLabel(view) { return view === "own" ? "the sim's own view" : view === "mkt" ? "anchored to the market" : view === "agree" ? "the agreement rule, the sim and the crew" : "the gap rule"; }
+  function nbaSimTakeViewLabel(view) { return view === "own" ? "the sim's own view" : view === "mkt" ? "anchored to the market" : view === "agree" ? "the agreement rule, the sim and the crew" : view === "middle" ? "the middle's second leg" : "the gap rule"; }
   /* the record: every graded NBA row's sim calls at LEAN or better, says against does by view, market and band */
   function nbaSimUnits(price, win) { var p = +price; if (!p || isNaN(p)) p = -110; return win ? (p > 0 ? p / 100 : 100 / -p) : -1; }
   function nbaSimRecordHtml() {
-    var rows = card.filter(function (r) { return r.sport === "NBA" && rowGraded(r) && r.inputs && r.inputs.nbasim; });
+    var rows = card.filter(function (r) { return r.sport === "NBA" && rowGraded(r) && r.inputs && (r.inputs.nbasim || (r.simTakes || []).some(function (t) { return t.view === "middle"; })); });
     if (!rows.length) return '';
     var T = {}, n = 0, G = { HOME: { n: 0, w: 0, units: 0 }, AWAY: { n: 0, w: 0, units: 0 } }, gn = 0;
     var A = { 2: { n: 0, w: 0, units: 0 }, 3: { n: 0, w: 0, units: 0 } }, an = 0;   // the agreement rule's own tally (28 Oct 2026)
+    var M = { n: 0, both: 0, half: 0, split: 0, units: 0, first: 0, says: 0 };   // the middles (28 Oct 2026): the pair graded together, and the first leg alone
     rows.forEach(function (r) {
+      var fin = r.finals || {}, fa = +fin.fa, fh = +fin.fh, half = (fin.f5a !== undefined && fin.f5a !== "" && fin.f5h !== undefined && fin.f5h !== "") ? (+fin.f5a + +fin.f5h) : null;
+      (r.simTakes || []).forEach(function (t) {
+        if (t.view !== "middle" || !t.with) return;
+        var r2 = nbaSimTakeRes(t, r), r1 = nbaSimTakeRes({ key: "total", side: t.with.side, line: t.with.line }, r);
+        if (!r2 || !r1) return;
+        var u2 = r2 === "push" ? 0 : r2 === "win" ? nbaWinAmount(t.price) : -1, u1 = r1 === "push" ? 0 : r1 === "win" ? nbaWinAmount(t.with.price) : -1;
+        M.n++; M.units += u1 + u2; M.first += u1; M.says += t.pair ? +t.pair.pBoth : 0;
+        if (r1 === "win" && r2 === "win") M.both++; else if (r1 === "push" || r2 === "push") M.half++; else M.split++;
+      });
       var sim = null; try { sim = JSON.parse(r.inputs.nbasim); } catch (e) { sim = null; }
       if (!sim || !sim.own) return;
-      var fin = r.finals || {}, fa = +fin.fa, fh = +fin.fh, half = (fin.f5a !== undefined && fin.f5a !== "" && fin.f5h !== undefined && fin.f5h !== "") ? (+fin.f5a + +fin.f5h) : null;
       var lines = nbaSimLinesFrom(r.inputs);
       var V = nbaVoices(r);
       if (V && V.fires && V.line !== null && fa + fh !== V.line) {
@@ -3811,7 +3855,7 @@ smStore.ready.then(function () {
         });
       });
     });
-    if (!n && !gn && !an) return '';
+    if (!n && !gn && !an && !M.n) return '';
     var order = { total: 0, h1: 1, spread: 2, ml: 3, away_total: 4, home_total: 5 }, bandOrder = { STRONG: 0, BET: 1, LEAN: 2 },
         label = { total: "Total", h1: "First half", spread: "Spread", ml: "Moneyline", away_total: "Away team total", home_total: "Home team total" };
     var h = '<div class="simrec"><div class="calibhead">SIMULATION · says against does, every call at LEAN or better</div>';
@@ -3844,6 +3888,11 @@ smStore.ready.then(function () {
         h += '<tr><td>' + x[1] + '</td><td>' + d.w + '-' + (d.n - d.w) + '</td><td class="' + cls + '">' + (100 * d.w / d.n).toFixed(1) + '%</td><td class="' + cls + '">' + (d.units >= 0 ? '+' : '') + d.units.toFixed(1) + 'u</td><td class="dim">' + x[2] + '</td></tr>';
       });
       h += '</tbody></table>';
+    }
+    if (M.n) {
+      var cls = M.units > 0 ? "good" : M.units < 0 ? "bad" : "";
+      h += '<div class="simrecview">Middles on the total <span class="tag">the second leg taken from the watch, the pair graded together · ' + esc(NBA_MIDDLE_TAG) + '</span></div><table class="form simrectab midrectab"><thead><tr><th>Pairs</th><th>Both won</th><th>One pushed</th><th>Split</th><th>Said both</th><th>The pair</th><th>The first leg alone</th></tr></thead><tbody>' +
+           '<tr><td>' + M.n + '</td><td>' + M.both + ' (' + (100 * M.both / M.n).toFixed(1) + '%)</td><td>' + M.half + '</td><td>' + M.split + '</td><td>' + (100 * M.says / M.n).toFixed(1) + '%</td><td class="' + cls + '">' + (M.units >= 0 ? '+' : '') + M.units.toFixed(2) + 'u</td><td>' + (M.first >= 0 ? '+' : '') + M.first.toFixed(2) + 'u</td></tr></tbody></table>';
     }
     h += '<div class="note dim">A call is the sim\'s side on the line the row carried whose WORTH (the chance shrunk by what the replay found) reads LEAN (60%) or better; "says" is the sim\'s own chance, "does" the share that landed. The replays: the own view\'s total and spread calls land at 50% whatever they say (the close already carries the ratings), its win chances within 3 points of true; the first half is a coin from either view over two seasons. The team totals are the one inefficiency: the book\'s line sits off the number the game\'s own total and spread imply, the gap rule reads it (a point or more, scored over two seasons), and the anchored sim\'s calls carry the same lean with the shape on top.</div></div>';
     return h;
@@ -3960,6 +4009,149 @@ smStore.ready.then(function () {
     var el = $("nbaVoices"); if (!el) return;
     var row = nbaSimTakeRow(readNba());
     el.innerHTML = nbaVoicesHtml(nbaVoices({ sport: "NBA", inputs: snapshot(), markets: (m && m.markets) || [] }), row);
+  }
+  /* ---- middles on the total (28 Oct 2026, the user: "I use four apps, FanDuel, BetMGM, DraftKings and Fanatics; how could
+     we use the model to capitalize on middle betting?"). The over at one number and the under at a higher one: the final
+     between them wins both legs, outside them one leg loses and the other wins. Measured on two seasons of lines history
+     (tools_nba_middles.py, NBA.md): the apps sit within a point of each other at tip in 99% of games and a one-point gap
+     loses 3% of the stake; the money is the MOVE, a number that has run 3.5+ points from a leg you already hold (8-9% both
+     win, +3% of the stake; 5+ points 17-20%, +12-14%). The sheet's normal at 18 points sizes the chance within a point of
+     what landed, so the page prices any pair from it: the chance of landing between, the pushes on an integer line, the
+     two prices. A pair pays when that expectation is positive and the gap is three points or more (under three the pairs
+     the normal liked lost in both seasons). The value is made by the first leg, a bet you wanted anyway, once the number
+     has moved away from it; the second leg gives up the vig and takes the loss off the table. The watch names it ---- */
+  var NBA_MIDDLE = { sd: NBA.TOTAL_SD, minGap: 3.0, apps: ["fanduel", "betmgm", "draftkings", "fanatics"], maxPrice: 400 };
+  var NBA_MIDDLE_TAG = "two seasons of lines history: the apps sit within a point of each other at tip in 99% of games and a one-point gap loses 3% of the stake; a number that has moved 3.5+ points from a leg you hold pays (8-9% both win, +3% of the stake; 5+ points 17-20%, +12-14%), the sheet's normal sizing the chance within a point of what landed; the pairs the rule takes ran +3.4% and +2.9% of the stake";
+  function nbaWinAmount(price) { var p = isFinite(+price) ? +price : -110; return p < 0 ? 100 / -p : p / 100; }
+  function nbaNormCdf(x) { return 0.5 * (1 + erf(x / Math.SQRT2)); }
+  /* a pair priced from the sheet's normal on integer totals: both win between the numbers, a push on an integer line, one wins and one loses outside */
+  function nbaMiddleEv(lo, loPrice, hi, hiPrice, mu) {
+    if (!isFinite(lo) || !isFinite(hi) || !isFinite(mu) || hi <= lo) return null;
+    var sd = NBA_MIDDLE.sd, wo = nbaWinAmount(loPrice), wu = nbaWinAmount(hiPrice);
+    var tLo = Math.floor(lo) - 1, tHi = Math.ceil(hi) + 1;
+    var pBelow = nbaNormCdf((tLo - 0.5 - mu) / sd), pAbove = 1 - nbaNormCdf((tHi + 0.5 - mu) / sd);
+    var ev = pBelow * (wu - 1) + pAbove * (wo - 1), pBoth = 0, pHalf = 0;
+    for (var t = tLo; t <= tHi; t++) {
+      var p = nbaNormCdf((t + 0.5 - mu) / sd) - nbaNormCdf((t - 0.5 - mu) / sd);
+      var o = t === lo ? null : t > lo, u = t === hi ? null : t < hi;
+      ev += p * ((o === null ? 0 : o ? wo : -1) + (u === null ? 0 : u ? wu : -1));
+      if (o && u) pBoth += p; else if ((o === null && u) || (u === null && o)) pHalf += p;
+    }
+    var wbar = (wo + wu) / 2, need = (1 - wbar) / (1 + wbar);
+    return { ev: ev / 2, pBoth: pBoth, pHalf: pHalf, need: need, gap: hi - lo, pays: ev > 0 && hi - lo >= NBA_MIDDLE.minGap - 1e-9, wo: wo, wu: wu };
+  }
+  /* one leg alone: the chance the over at lo (or the under at hi) wins, the push left out */
+  function nbaLegWin(side, line, mu) { var sd = NBA_MIDDLE.sd; return side === "OVER" ? 1 - nbaNormCdf((Math.floor(line) + 0.5 - mu) / sd) : nbaNormCdf((Math.ceil(line) - 0.5 - mu) / sd); }
+  /* the apps' numbers as they stand: the newest odds run on the row (oddsNow), else the odds the row was logged with */
+  function nbaOddsBlock(inp) { var raw = inp && (inp.oddsNow || inp.odds), o = null; try { o = raw ? JSON.parse(raw) : null; } catch (e) { o = null; } return o; }
+  function nbaMiddleMu(inp) { var mu = nbaMainTotal({ odds: (inp || {}).oddsNow || (inp || {}).odds }); if (mu === null) mu = parseFloat((inp || {}).line); return isFinite(mu) ? mu : null; }
+  /* every over or under the apps post on the full-game total, the main lines and the alternates: [{book, price, point, alt}] */
+  function nbaTotalLegs(o, side) {
+    var out = [], seen = {};
+    [["total", false], ["alt", true]].forEach(function (src) {
+      (((o || {})[src[0]] || {})[side] || []).forEach(function (x) {
+        if (NBA_MIDDLE.apps.indexOf(x[0]) < 0 || !isFinite(+x[2]) || !isFinite(+x[1]) || Math.abs(+x[1]) > NBA_MIDDLE.maxPrice) return;
+        var k = x[0] + "|" + x[2]; if (seen[k]) return; seen[k] = 1;
+        out.push({ book: x[0], price: +x[1], point: +x[2], alt: src[1] });
+      });
+    });
+    return out;
+  }
+  /* every over/under pair across the apps, best first; the mains for the "apps now" line */
+  function nbaMiddlePairs(inp, limit) {
+    var o = nbaOddsBlock(inp), mu = nbaMiddleMu(inp); if (!o || mu === null) return null;
+    var overs = nbaTotalLegs(o, "OVER"), unders = nbaTotalLegs(o, "UNDER"), out = [];
+    overs.forEach(function (a) { unders.forEach(function (b) {
+      var gap = b.point - a.point; if (gap < 1 || gap > 15) return;
+      var m = nbaMiddleEv(a.point, a.price, b.point, b.price, mu); if (m) out.push({ over: a, under: b, m: m });
+    }); });
+    out.sort(function (x, y) { return y.m.ev - x.m.ev; });
+    var mains = {};
+    overs.concat(unders).forEach(function (x) { if (x.alt) return; var d = mains[x.book] || (mains[x.book] = { book: x.book, over: null, under: null }); });
+    overs.forEach(function (a) { if (!a.alt && mains[a.book]) mains[a.book].over = a; });
+    unders.forEach(function (b) { if (!b.alt && mains[b.book]) mains[b.book].under = b; });
+    return { pairs: out.slice(0, limit || 6), n: out.length, pays: out.filter(function (x) { return x.m.pays; }).length, mu: mu, mains: NBA_MIDDLE.apps.map(function (b) { return mains[b]; }).filter(function (x) { return x; }) };
+  }
+  /* the full-game total legs you hold on a row: the sheet's pick taken, a sim call, the agreement rule; each {side, line, price, how, id} */
+  function nbaHeldTotals(row) {
+    var out = [];
+    (row.markets || []).forEach(function (m) {
+      if (m.key !== "total" || !m.take) return;
+      var mm = /(OVER|UNDER)\s+(\d+(?:\.\d+)?)/i.exec(String(m.take.pick || m.pick || ""));
+      if (mm) out.push({ side: mm[1].toUpperCase(), line: +mm[2], price: m.take.price === null || m.take.price === undefined ? null : +m.take.price, how: "the sheet's pick", id: "sheet" });
+    });
+    (row.simTakes || []).forEach(function (t) {
+      if (t.key !== "total" || t.view === "middle") return;
+      out.push({ side: t.side, line: +t.line, price: t.price === null || t.price === undefined ? null : +t.price, how: nbaSimTakeViewLabel(t.view), id: t.id });
+    });
+    return out;
+  }
+  /* the watch: for each leg you hold, the best number the apps post on the other side now and whether the pair pays */
+  function nbaMiddleWatch(row) {
+    var inp = (row && row.inputs) || {}, o = nbaOddsBlock(inp), mu = nbaMiddleMu(inp); if (!o || mu === null) return [];
+    var out = [];
+    nbaHeldTotals(row).forEach(function (leg) {
+      var side2 = leg.side === "OVER" ? "UNDER" : "OVER", best = null;
+      nbaTotalLegs(o, side2).forEach(function (x) {
+        var lo = leg.side === "OVER" ? leg.line : x.point, hi = leg.side === "OVER" ? x.point : leg.line;
+        var m = nbaMiddleEv(lo, leg.side === "OVER" ? leg.price : x.price, hi, leg.side === "OVER" ? x.price : leg.price, mu);
+        if (m && (!best || m.ev > best.m.ev)) best = { leg: leg, side: side2, other: x, m: m, lo: lo, hi: hi, mu: mu, first: nbaLegWin(leg.side, leg.line, mu), second: nbaLegWin(side2, x.point, mu) };
+      });
+      if (best) out.push(best);
+    });
+    return out;
+  }
+  function nbaMiddleTakeBtn(row, x) {
+    if (!row) return '';
+    var t = nbaSimTakeOf(row, "middle", "total", x.side);
+    if (isVoid(row) || rowGraded(row)) return t ? '<span class="chip taken">TAKEN</span>' : '';
+    return '<button type="button" class="takebtn' + (t ? ' on' : '') + '" data-stake="' + row.id + '|middle|total|' + x.side + '|' + x.other.point + '|' + x.other.price + '|' + x.other.book + '|' + x.leg.id + '" title="' +
+           (t ? 'Marked as the second leg you are placing: click to unmark it' : 'Mark the second leg as a bet you are placing') + '">' + (t ? '&#10003; Taking' : 'Take') + '</button>';
+  }
+  function nbaMiddleWatchHtml(x, row) {
+    var pc = function (p) { return (100 * p).toFixed(1) + "%"; }, m = x.m;
+    var head = m.pays ? 'MIDDLE OPEN · a ' + (+m.gap.toFixed(1)) + '-point window · pays ' + sgn(100 * m.ev, 1) + '% of the stake' : 'no window yet · ' + (+m.gap.toFixed(1)) + ' points between the numbers' + (m.gap >= NBA_MIDDLE.minGap ? ', the pair ' + sgn(100 * m.ev, 1) + '%' : ', the rule needs three');
+    return '<div class="midwatch' + (m.pays ? ' pays' : '') + '"><div class="mwhead"><span class="vbadge' + (m.pays ? ' bet' : '') + '">' + (m.pays ? 'middle' : 'watch') + '</span> <b>' + esc(head) + '</b></div>' +
+           '<div class="mwline">You hold <b>' + esc(x.leg.side) + ' ' + esc(String(x.leg.line)) + '</b>' + (x.leg.price === null ? '' : ' at ' + sgn(x.leg.price, 0)) + ' (' + esc(x.leg.how) + '); the market\'s number is ' + esc(String(x.mu)) +
+           ', so that leg alone is ' + pc(x.first) + ' to win. The best ' + esc(x.side.toLowerCase()) + ' now: <b>' + esc(bookName(x.other.book)) + ' ' + esc(String(x.other.point)) + ' at ' + sgn(x.other.price, 0) + '</b>' + (x.other.alt ? ' (an alternate)' : '') +
+           '. Both win ' + pc(m.pBoth) + ' (the pair needs ' + pc(m.need) + ')' + (m.pHalf > 0.001 ? ', one pushes and one wins ' + pc(m.pHalf) : '') + '; the second leg gives up its vig and takes the loss off the table.</div>' +
+           (m.pays ? '<div class="mwtake">' + nbaMiddleTakeBtn(row, x) + ' <span class="dim">Total ' + esc(x.side) + ' ' + esc(String(x.other.point)) + ' at ' + esc(bookName(x.other.book)) + ', the middle with your ' + esc(x.leg.side) + ' ' + esc(String(x.leg.line)) + '</span></div>' : '') + '</div>';
+  }
+  var midCalc = { ol: "", op: "", ul: "", up: "" };
+  function nbaMidCalcOut(mu) {
+    var lo = parseFloat(midCalc.ol), hi = parseFloat(midCalc.ul), op = parseFloat(midCalc.op), up = parseFloat(midCalc.up);
+    if (!isFinite(lo) || !isFinite(hi)) return '<span class="dim">Type an over number and an under number (the prices default to -110) and the pair is priced off the market\'s number ' + esc(String(mu)) + '.</span>';
+    var m = nbaMiddleEv(lo, isFinite(op) ? op : -110, hi, isFinite(up) ? up : -110, mu);
+    if (!m) return '<span class="dim">The under number has to sit above the over number.</span>';
+    var pc = function (p) { return (100 * p).toFixed(1) + "%"; };
+    return '<b>' + (m.pays ? 'Pays' : m.ev > 0 ? 'Positive, but under a three-point gap' : 'The book\'s price') + '</b>: a ' + (+m.gap.toFixed(1)) + '-point window, both win ' + pc(m.pBoth) + (m.pHalf > 0.001 ? ', one pushes and one wins ' + pc(m.pHalf) : '') +
+           ', the pair needs ' + pc(m.need) + ' at these prices: ' + sgn(100 * m.ev, 1) + '% of the stake expected (' + sgn(2 * m.ev, 3) + 'u on a unit each).';
+  }
+  function nbaMidCalcHtml(mu) {
+    return '<div class="midcalc"><b>Any pair</b> <span class="dim">· the over number and price, the under number and price</span><div class="midcalcrow">' +
+           '<input id="midOverLine" inputmode="decimal" placeholder="over 227.5" value="' + esc(midCalc.ol) + '"><input id="midOverPrice" inputmode="numeric" placeholder="-110" value="' + esc(midCalc.op) + '">' +
+           '<input id="midUnderLine" inputmode="decimal" placeholder="under 231.5" value="' + esc(midCalc.ul) + '"><input id="midUnderPrice" inputmode="numeric" placeholder="-110" value="' + esc(midCalc.up) + '"></div>' +
+           '<div id="midCalcOut">' + (mu === null ? '<span class="dim">No market number on the row yet: load the odds file.</span>' : nbaMidCalcOut(mu)) + '</div></div>';
+  }
+  function nbaMidPanel() {
+    var el = $("nbaMidPanel"); if (!el) return;
+    var f = readNba(), row = nbaSimTakeRow(f), inp = row ? row.inputs : snapshot();
+    var P = nbaMiddlePairs(inp, 6), pc = function (p) { return (100 * p).toFixed(1) + "%"; };
+    if (!P) { el.innerHTML = '<p class="note">No odds on the row — load the odds file (Run NBA odds) and the apps\' numbers come with it.</p>' + nbaMidCalcHtml(null); return; }
+    var h = '<div class="midnow"><b>The apps now</b>' + (row && row.inputs.oddsAt ? ' <span class="dim">(the odds run of ' + esc(String(row.inputs.oddsAt).replace("T", " ").slice(0, 16)) + ' UTC)</span>' : '') + ', the market\'s number <b>' + esc(String(P.mu)) + '</b>: ' +
+            P.mains.map(function (x) { return esc(bookName(x.book)) + ' ' + esc(String((x.over || x.under).point)) + ' (' + (x.over ? sgn(x.over.price, 0) : '?') + '/' + (x.under ? sgn(x.under.price, 0) : '?') + ')'; }).join(' · ') + '</div>';
+    var W = row ? nbaMiddleWatch(row) : [];
+    if (!row) h += '<p class="note">Add the game to the card and take a total (the sheet\'s pick, a sim call or the agreement rule): the watch then names the other leg once the number has run.</p>';
+    else if (!W.length) h += '<p class="note">You hold no total on this game yet. Take one (the sheet\'s pick, a sim call or the agreement rule) and the watch names the other leg once the number has run three points or more from it.</p>';
+    else W.forEach(function (x) { h += nbaMiddleWatchHtml(x, row); });
+    h += '<table class="form midtab"><thead><tr><th>Over</th><th>Under</th><th>Window</th><th>Both win</th><th>Needs</th><th>The pair</th></tr></thead><tbody>';
+    P.pairs.forEach(function (x) {
+      h += '<tr class="' + (x.m.pays ? 'pays' : '') + '"><td>' + esc(bookName(x.over.book)) + ' ' + esc(String(x.over.point)) + ' ' + sgn(x.over.price, 0) + (x.over.alt ? ' <span class="dim">alt</span>' : '') + '</td><td>' + esc(bookName(x.under.book)) + ' ' + esc(String(x.under.point)) + ' ' + sgn(x.under.price, 0) + (x.under.alt ? ' <span class="dim">alt</span>' : '') +
+           '</td><td>' + (+x.m.gap.toFixed(1)) + '</td><td>' + pc(x.m.pBoth) + '</td><td>' + pc(x.m.need) + '</td><td class="' + (x.m.ev > 0 ? 'good' : 'bad') + '">' + sgn(100 * x.m.ev, 1) + '%' + (x.m.pays ? ' · pays' : x.m.ev > 0 ? ' · under three points' : '') + '</td></tr>';
+    });
+    h += '</tbody></table><div class="dim midnote">' + P.n + ' pair' + (P.n === 1 ? '' : 's') + ' across the apps\' main and alternate numbers, the best six shown; ' + (P.pays ? P.pays + ' pay' + (P.pays === 1 ? 's' : '') + ' at these prices.' : 'none pays at these prices, which is the usual night: the books agree with each other, and the window opens when a number you hold has moved.') + '</div>';
+    h += nbaMidCalcHtml(P.mu);
+    el.innerHTML = h;
   }
   /* the block on the record (reworked 22 Oct 2026, the user: "add some color... a little more organized"): one table by the
      crew's lean, one by official for everyone who has worked a graded game, the colours on the season's rate and the points */
@@ -9089,6 +9281,26 @@ var qrcode = function() {
       '<div class="n4">' + esc(r.matchup) + ' · ' + esc(NBA_AGREE_TAG) + '</div>' +
       '<div class="n5">' + nbaSimTakeBtn(r, "agree", "total", V.side) + '</div></div>';
   }
+  /* middles on the totals you hold (28 Oct 2026): every NBA row on the date with a total taken, the best number the apps post
+     on the other side now and whether the pair pays (nba.engine.js, nbaMiddleWatch); the open ones are cards, the rest a count */
+  function middleWatch(dateISO) {
+    var open = [], held = 0;
+    card.forEach(function (r) {
+      if (r.sport !== "NBA" || (r.gdate || "") !== dateISO || isVoid(r) || rowGraded(r)) return;
+      nbaMiddleWatch(r).forEach(function (x) { held++; if (x.m.pays) open.push({ row: r, x: x }); });
+    });
+    open.sort(function (a, b) { return b.x.m.ev - a.x.m.ev; });
+    return { open: open, held: held };
+  }
+  function middleCard(o) {
+    var r = o.row, x = o.x, m = x.m, pc = function (p) { return (100 * p).toFixed(1) + "%"; };
+    return '<div class="pk mid" data-open="' + r.id + '" title="Load ' + esc(r.matchup) + ' into the form">' +
+      '<div class="n1">MIDDLE OPEN · a ' + (+m.gap.toFixed(1)) + '-point window · pays ' + sgn(100 * m.ev, 1) + '% of the stake</div>' +
+      '<div class="n2">Total ' + esc(x.side) + ' ' + esc(String(x.other.point)) + ' at ' + esc(bookName(x.other.book)) + ' ' + sgn(x.other.price, 0) + '</div>' +
+      '<div class="n3">with your ' + esc(x.leg.side) + ' ' + esc(String(x.leg.line)) + (x.leg.price === null ? '' : ' ' + sgn(x.leg.price, 0)) + ' (' + esc(x.leg.how) + ') · both win ' + pc(m.pBoth) + ', needs ' + pc(m.need) + ' · the market\'s number ' + esc(String(x.mu)) + '</div>' +
+      '<div class="n4">' + esc(r.matchup) + ' · that leg alone is ' + pc(x.first) + ' to win now; the second leg gives up its vig and takes the loss off the table</div>' +
+      '<div class="n5">' + nbaMiddleTakeBtn(r, x) + '</div></div>';
+  }
   /* the alternate totals with a verdict on a date (19 Oct 2026): one a hockey game, best edge first */
   function altBets(dateISO) {
     var out = [];
@@ -9164,6 +9376,14 @@ var qrcode = function() {
       if (!ag.length) agh = '<div class="empty">No NBA total on this date has the simulation and the crew on the same side with the sheet not against it.</div>';
       $("agreeHead").hidden = !nbaOn; $("agree").hidden = !nbaOn;
       $("agree").innerHTML = agh;
+    }
+    // --- middles on the totals you hold (28 Oct 2026): basketball, so the section shows when the date has an NBA game ---
+    if ($("mid")) {
+      var mw = middleWatch(dateISO), mh = "", nbaOn2 = card.some(function (r) { return r.sport === "NBA" && (r.gdate || "") === dateISO && !isVoid(r); });
+      mw.open.forEach(function (o) { mh += middleCard(o); });
+      if (!mw.open.length) mh = '<div class="empty">' + (mw.held ? mw.held + ' total' + (mw.held === 1 ? '' : 's') + ' held on this date, no window open: a middle needs a number that has moved three points or more from the leg you hold, read off the newest odds run.' : 'No total held on this date yet. Take one (the sheet\'s pick, a sim call or the agreement rule) and the watch names the other leg once the number has run.') + '</div>';
+      $("midHead").hidden = !nbaOn2; $("mid").hidden = !nbaOn2;
+      $("mid").innerHTML = mh;
     }
     // --- the alternate totals with a verdict (19 Oct 2026): hockey only, so the section shows when there is one ---
     if ($("altBets")) {
@@ -9851,6 +10071,15 @@ var qrcode = function() {
   if ($("likeliest")) $("likeliest").addEventListener("click", function (e) { var t = e.target.closest("[data-open]"); if (t) openRow(t.dataset.open); });
   if ($("upsets")) $("upsets").addEventListener("click", function (e) { var t = e.target.closest("[data-open]"); if (t) openRow(t.dataset.open); });
   if ($("agree")) $("agree").addEventListener("click", function (e) { if (e.target.closest("[data-stake]")) return; var t = e.target.closest("[data-open]"); if (t) openRow(t.dataset.open); });
+  if ($("mid")) $("mid").addEventListener("click", function (e) { if (e.target.closest("[data-stake]")) return; var t = e.target.closest("[data-open]"); if (t) openRow(t.dataset.open); });
+  /* the middle calculator's boxes (28 Oct 2026): typed into the panel, kept across renders, priced as you type */
+  if ($("nbaMidPanel")) $("nbaMidPanel").addEventListener("input", function (e) {
+    var id = e.target && e.target.id, map = { midOverLine: "ol", midOverPrice: "op", midUnderLine: "ul", midUnderPrice: "up" };
+    if (!map[id]) return;
+    midCalc[map[id]] = e.target.value;
+    var out = $("midCalcOut"), mu = nbaMiddleMu(nbaSimTakeRow(readNba()) ? nbaSimTakeRow(readNba()).inputs : snapshot());
+    if (out) out.innerHTML = mu === null ? '<span class="dim">No market number on the row yet: load the odds file.</span>' : nbaMidCalcOut(mu);
+  });
   if ($("altBets")) $("altBets").addEventListener("click", function (e) { var t = e.target.closest("[data-open]"); if (t) openRow(t.dataset.open); });
   $("bySport").addEventListener("click", function (e) { var t = e.target.closest("[data-open]"); if (t) openRow(t.dataset.open); });
   $("board").addEventListener("click", function (e) { var t = e.target.closest("tr[data-open]"); if (t) openRow(t.dataset.open); });
@@ -10014,6 +10243,9 @@ var qrcode = function() {
           if (g.inputs.dome === true && !row.inputs.dome) { row.inputs.dome = true; changed = true; }
           ["agbk", "hgbk", "agconf", "hgconf"].forEach(function (k) { if (g.inputs[k] === true && !row.inputs[k]) { row.inputs[k] = true; changed = true; } });
           ["nbalineup", "nbaout", "nbasim"].forEach(function (k) { if (!blank(g.inputs[k]) && String(g.inputs[k]) !== String(row.inputs[k] || "")) { row.inputs[k] = String(g.inputs[k]); changed = true; } });   // the starting five follows the newest slate (23 Oct 2026); so do the injury report and the simulation run from it (26 Oct 2026), shown and recorded, never scored by the engine
+          /* the apps' numbers follow the newest odds run on a basketball row (28 Oct 2026, the middles watch): the logged line
+             and prices stay as the markets were scored, the shop as it stands now goes beside them */
+          if (row.sport === "NBA" && !blank(g.inputs.odds) && String(g.inputs.odds) !== String(row.inputs.oddsNow || row.inputs.odds || "")) { row.inputs.oddsNow = String(g.inputs.odds); row.inputs.oddsAt = d.generated || ""; }
           /* The slate marks a postseason game at the game level; the row's
              Playoff box is shown, not scored, so it only splits the record. */
           if (g.playoff === true && !row.inputs.playoff) { row.inputs.playoff = true; changed = true; }

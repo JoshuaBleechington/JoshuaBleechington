@@ -1929,6 +1929,63 @@ const CHECKS = ["dome","playoff","agconf","hgconf","agbk","hgbk"];
       && agreeT.split.cls === 'voices' && /^NO RULE$/i.test(agreeT.split.badge) && /the sim UNDER 7\d% · the crew leans OVER \(z \+4\.4\) — (split, 2 on the (OVER|UNDER) with one against: no rule|no two voices on a side: no rule)\.$/i.test(agreeT.split.line),
       'agreement: a basketball total with the sim\'s own view and the crew on the same side and the sheet silent reads BET on the board\'s Agreement section and on the Simulation card\'s three-voices block in green, takes from either (the mark on the row at the row\'s price, listed under Taking tonight without a worth), grades on the rule\'s own record line, and a split (the example: the sim under, the crew over) reads no rule', JSON.stringify(agreeT).slice(0, 1800));
 
+  // ---- 28 Oct 2026: middles on the total -- the apps' numbers on the row, a leg held, the number runs, the watch names the second leg, a take, the pair on the record ----
+  const midT = await pg.evaluate(async () => {
+    const wait = () => new Promise(r => setTimeout(r, 90));
+    const txt = e => (e ? e.innerText : '').replace(/\s+/g, ' ').trim();
+    const set = (id, v) => { const el = document.getElementById(id); el.value = v; el.dispatchEvent(new Event('input', { bubbles: true })); };
+    await smStore.removeItem('callsheet3.card.v1'); document.getElementById('clear').click(); document.getElementById('m-nba').click(); await wait();
+    const load = async (doc, fname) => { const dt = new DataTransfer(); dt.items.add(new File([JSON.stringify(doc)], fname, { type: 'application/json' })); const inp = document.getElementById('slateFile'); inp.files = dt.files; inp.dispatchEvent(new Event('change', { bubbles: true })); await wait(); };
+    const odds = (pt) => JSON.stringify({ book: 'fanatics', total: { OVER: [['fanduel', -108, pt], ['betmgm', -110, pt], ['draftkings', -112, pt + 0.5], ['fanatics', -110, pt], ['pinnacle', -105, pt]], UNDER: [['fanduel', -112, pt], ['betmgm', -110, pt], ['draftkings', -108, pt + 0.5], ['fanatics', -110, pt], ['pinnacle', -115, pt]] },
+                                           alt: { OVER: [['fanduel', -135, pt - 2], ['draftkings', -150, pt - 3]], UNDER: [['fanduel', -135, pt + 2], ['draftkings', -150, pt + 3]] }, ml: {}, spread: {}, period: {}, team: {} });
+    const game = (extra) => Object.assign({ sport: 'NBA', gdate: '2026-11-13', away: 'Kings', home: 'Spurs', notes: [] }, extra);
+    set('gdate', '2026-11-13'); set('away', 'Kings'); set('home', 'Spurs'); set('line', '230.5'); set('op', '-110'); set('up', '-110'); await wait();
+    document.getElementById('add').click(); await wait();
+    await load({ format: 'callsheet2.slate', version: 1, date: '2026-11-13', generated: '2026-11-13T15:00:00Z', games: [game({ inputs: { odds: odds(230.5) } })] }, 'odds-2026-11-13.json');
+    const row0 = JSON.parse(smStore.getItem('callsheet3.card.v1')).find(r => /Kings @ Spurs/.test(r.matchup)), ti = row0.markets.findIndex(m => m.key === 'total');
+    document.getElementById('boardDate').value = '2026-11-13'; document.getElementById('boardDate').dispatchEvent(new Event('change')); await wait();
+    const panel0 = txt(document.getElementById('nbaMidPanel'));
+    document.querySelector('[data-take="' + row0.id + '|' + ti + '|OVER"]').click(); await wait();
+    const before = { head: document.getElementById('midHead').hidden, cards: document.querySelectorAll('#mid .pk.mid').length, text: txt(document.getElementById('mid')) };
+    // the number runs: a later odds run posts 234.5 at the apps and 235 at DraftKings
+    await load({ format: 'callsheet2.slate', version: 1, date: '2026-11-13', generated: '2026-11-13T22:30:00Z', games: [game({ inputs: { odds: odds(234.5) } })] }, 'odds-2026-11-13b.json');
+    const row1 = JSON.parse(smStore.getItem('callsheet3.card.v1')).find(r => /Kings @ Spurs/.test(r.matchup));
+    const stored = { logged: /230\.5/.test(row1.inputs.odds) && !/234\.5/.test(row1.inputs.odds), now: /234\.5/.test(row1.inputs.oddsNow || ''), at: row1.inputs.oddsAt, line: row1.inputs.line, markets: row1.markets.filter(m => m.key === 'total').map(m => m.label).join() };
+    const card = document.querySelector('#mid .pk.mid');
+    const after = { head: document.getElementById('midHead').hidden, n: document.querySelectorAll('#mid .pk.mid').length, n1: txt(card && card.querySelector('.n1')), n2: txt(card && card.querySelector('.n2')), n3: txt(card && card.querySelector('.n3')), take: !!(card && card.querySelector('.takebtn[data-stake*="|middle|total|UNDER|235|-108|draftkings|sheet"]')) };
+    // the rail: the row opens, the Middles panel shows the apps now, the watch, the pairs; the calculator prices a typed pair
+    card.querySelector('.n2').click(); await wait();
+    const now = txt(document.querySelector('#nbaMidPanel .midnow')), watch = { cls: (document.querySelector('#nbaMidPanel .midwatch') || {}).className || '', text: txt(document.querySelector('#nbaMidPanel .midwatch')) };
+    const pairs = [...document.querySelectorAll('#nbaMidPanel .midtab tbody tr')].map(tr => tr.className + '|' + txt(tr)), note = txt(document.querySelector('#nbaMidPanel .midnote'));
+    set('midOverLine', '226.5'); set('midOverPrice', '-110'); set('midUnderLine', '234.5'); set('midUnderPrice', '-110'); await wait();
+    const calc = txt(document.getElementById('midCalcOut'));
+    set('midUnderLine', '228.5'); await wait();
+    const calc2 = txt(document.getElementById('midCalcOut'));
+    // the second leg taken from the panel: the mark on the row with the app, the leg it pairs with, Taking tonight lists it
+    document.querySelector('#nbaMidPanel .midwatch .takebtn').click(); await wait();
+    const row2 = JSON.parse(smStore.getItem('callsheet3.card.v1')).find(r => /Kings @ Spurs/.test(r.matchup));
+    const take = (row2.simTakes || []).map(t => t.view + '|' + t.side + '|' + t.line + '|' + t.price + '|' + t.book + '|' + (t.with ? t.with.side + ' ' + t.with.line + ' ' + t.with.price : '') + '|' + (t.pair ? t.pair.gap : '') + '|' + t.pick);
+    const taking = txt(document.getElementById('taking')), stillOpen = txt(document.querySelector('#mid .pk.mid .n5'));
+    // graded between the numbers: both legs win, the record's Middles line
+    await load({ format: 'callsheet2.slate', version: 1, date: '2026-11-13', games: [game({ finals: { fa: '116', fh: '117', f5a: '58', f5h: '60' }, close: { ctot: '234.5' } })] }, 'nba-grade-2026-11-13.json');
+    const rec = txt(document.querySelector('.midrectab')), recHead = txt([...document.querySelectorAll('.simrecview')].find(e => /Middles on the total/i.test(e.textContent)));
+    document.getElementById('clear').click(); await wait();
+    await smStore.removeItem('callsheet3.card.v1');
+    return { panel0, before, stored, after, now, watch, pairs, note, calc, calc2, take, taking, stillOpen, rec, recHead };
+  });
+  chk(/The apps now/.test(midT.panel0) && /You hold no total on this game yet/.test(midT.panel0) && midT.before.head === false && midT.before.cards === 0 && /1 total held on this date, no window open/.test(midT.before.text)
+      && midT.stored.logged && midT.stored.now && midT.stored.at === '2026-11-13T22:30:00Z' && midT.stored.line === '230.5' && /230\.5/.test(midT.stored.markets)
+      && midT.after.head === false && midT.after.n === 1 && /^MIDDLE OPEN · A 4\.5-POINT WINDOW · PAYS \+[4-6]\.\d% OF THE STAKE$/i.test(midT.after.n1) && /^TOTAL UNDER 235 AT DRAFTKINGS -108$/i.test(midT.after.n2)
+      && /^with your OVER 230\.5 -110 \(the sheet's pick\) · both win [89]\.\d%, needs 4\.8% · the market's number 234\.5$/i.test(midT.after.n3) && midT.after.take
+      && /^The apps now \(the odds run of 2026-11-13 22:30 UTC\), the market's number 234\.5: FanDuel 234\.5 \(-108\/-112\) · BetMGM 234\.5 \(-110\/-110\) · DraftKings 235 \(-112\/-108\) · Fanatics 234\.5 \(-110\/-110\)$/.test(midT.now)
+      && midT.watch.cls === 'midwatch pays' && /MIDDLE OPEN · a 4\.5-point window · pays \+[4-6]\.\d% of the stake You hold OVER 230\.5 at -110 \(the sheet's pick\); the market's number is 234\.5, so that leg alone is 5[6-9]\.\d% to win\. The best under now: DraftKings 235 at -108\. Both win [89]\.\d% \(the pair needs 4\.8%\)/i.test(midT.watch.text)
+      && midT.pairs.length === 6 && midT.pairs.every(p => /\|(FanDuel|BetMGM|DraftKings|Fanatics) \d+(\.5)? -\d+/.test(p)) && /^\d+ pairs across the apps' main and alternate numbers, the best six shown; none pays at these prices/.test(midT.note)
+      && /^Pays: a 8-point window, both win 1[5-9]\.\d%, the pair needs 4\.8% at these prices: \+\d+\.\d% of the stake expected/.test(midT.calc) && /^(The book's price|Positive, but under a three-point gap): a 2-point window, both win [23]\.\d%/.test(midT.calc2)
+      && midT.take.length === 1 && /^middle\|UNDER\|235\|-108\|draftkings\|OVER 230\.5 -110\|4\.5\|Total UNDER 235 at DraftKings \(the middle with OVER 230\.5\)$/.test(midT.take[0])
+      && /Total UNDER 235 at DraftKings \(the middle with OVER 230\.5\) -108 · the simulation, the middle's second leg: 5\d% · middle · Kings @ Spurs/i.test(midT.taking) && /TAKING/i.test(midT.stillOpen)
+      && /^Pairs Both won One pushed Split Said both The pair The first leg alone 1 1 \(100\.0%\) 0 0 [89]\.\d% \+1\.8[0-9]u \+0\.91u$/i.test(midT.rec) && /the pair graded together/.test(midT.recHead),
+      'middles: the Middles card prices every over/under pair the four apps post off the sheet\'s normal and says none pays on an ordinary night; a total taken on the row is watched, and when a later odds run moves the number 4.5 points the board and the panel name the best second leg at its app with the pair\'s chance and what it pays; the apps\' numbers follow the newest run while the logged line stays; the calculator prices a typed pair; the second leg takes from the panel with the leg it pairs with, lists under Taking tonight, and the graded pair lands on the record\'s Middles line beside what the first leg alone did', JSON.stringify(midT).slice(0, 2600));
+
   const stamp = await pg.evaluate(() => (document.getElementById('build') || {}).textContent);
   const git = (cmd) => execSync(cmd, { cwd: __dirname, encoding: 'utf8' }).trim();
   let want, why;

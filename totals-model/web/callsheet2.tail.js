@@ -1485,6 +1485,26 @@
       '<div class="n4">' + esc(r.matchup) + ' · ' + esc(NBA_AGREE_TAG) + '</div>' +
       '<div class="n5">' + nbaSimTakeBtn(r, "agree", "total", V.side) + '</div></div>';
   }
+  /* middles on the totals you hold (28 Oct 2026): every NBA row on the date with a total taken, the best number the apps post
+     on the other side now and whether the pair pays (nba.engine.js, nbaMiddleWatch); the open ones are cards, the rest a count */
+  function middleWatch(dateISO) {
+    var open = [], held = 0;
+    card.forEach(function (r) {
+      if (r.sport !== "NBA" || (r.gdate || "") !== dateISO || isVoid(r) || rowGraded(r)) return;
+      nbaMiddleWatch(r).forEach(function (x) { held++; if (x.m.pays) open.push({ row: r, x: x }); });
+    });
+    open.sort(function (a, b) { return b.x.m.ev - a.x.m.ev; });
+    return { open: open, held: held };
+  }
+  function middleCard(o) {
+    var r = o.row, x = o.x, m = x.m, pc = function (p) { return (100 * p).toFixed(1) + "%"; };
+    return '<div class="pk mid" data-open="' + r.id + '" title="Load ' + esc(r.matchup) + ' into the form">' +
+      '<div class="n1">MIDDLE OPEN · a ' + (+m.gap.toFixed(1)) + '-point window · pays ' + sgn(100 * m.ev, 1) + '% of the stake</div>' +
+      '<div class="n2">Total ' + esc(x.side) + ' ' + esc(String(x.other.point)) + ' at ' + esc(bookName(x.other.book)) + ' ' + sgn(x.other.price, 0) + '</div>' +
+      '<div class="n3">with your ' + esc(x.leg.side) + ' ' + esc(String(x.leg.line)) + (x.leg.price === null ? '' : ' ' + sgn(x.leg.price, 0)) + ' (' + esc(x.leg.how) + ') · both win ' + pc(m.pBoth) + ', needs ' + pc(m.need) + ' · the market\'s number ' + esc(String(x.mu)) + '</div>' +
+      '<div class="n4">' + esc(r.matchup) + ' · that leg alone is ' + pc(x.first) + ' to win now; the second leg gives up its vig and takes the loss off the table</div>' +
+      '<div class="n5">' + nbaMiddleTakeBtn(r, x) + '</div></div>';
+  }
   /* the alternate totals with a verdict on a date (19 Oct 2026): one a hockey game, best edge first */
   function altBets(dateISO) {
     var out = [];
@@ -1560,6 +1580,14 @@
       if (!ag.length) agh = '<div class="empty">No NBA total on this date has the simulation and the crew on the same side with the sheet not against it.</div>';
       $("agreeHead").hidden = !nbaOn; $("agree").hidden = !nbaOn;
       $("agree").innerHTML = agh;
+    }
+    // --- middles on the totals you hold (28 Oct 2026): basketball, so the section shows when the date has an NBA game ---
+    if ($("mid")) {
+      var mw = middleWatch(dateISO), mh = "", nbaOn2 = card.some(function (r) { return r.sport === "NBA" && (r.gdate || "") === dateISO && !isVoid(r); });
+      mw.open.forEach(function (o) { mh += middleCard(o); });
+      if (!mw.open.length) mh = '<div class="empty">' + (mw.held ? mw.held + ' total' + (mw.held === 1 ? '' : 's') + ' held on this date, no window open: a middle needs a number that has moved three points or more from the leg you hold, read off the newest odds run.' : 'No total held on this date yet. Take one (the sheet\'s pick, a sim call or the agreement rule) and the watch names the other leg once the number has run.') + '</div>';
+      $("midHead").hidden = !nbaOn2; $("mid").hidden = !nbaOn2;
+      $("mid").innerHTML = mh;
     }
     // --- the alternate totals with a verdict (19 Oct 2026): hockey only, so the section shows when there is one ---
     if ($("altBets")) {
@@ -2217,6 +2245,15 @@
   if ($("likeliest")) $("likeliest").addEventListener("click", function (e) { var t = e.target.closest("[data-open]"); if (t) openRow(t.dataset.open); });
   if ($("upsets")) $("upsets").addEventListener("click", function (e) { var t = e.target.closest("[data-open]"); if (t) openRow(t.dataset.open); });
   if ($("agree")) $("agree").addEventListener("click", function (e) { if (e.target.closest("[data-stake]")) return; var t = e.target.closest("[data-open]"); if (t) openRow(t.dataset.open); });
+  if ($("mid")) $("mid").addEventListener("click", function (e) { if (e.target.closest("[data-stake]")) return; var t = e.target.closest("[data-open]"); if (t) openRow(t.dataset.open); });
+  /* the middle calculator's boxes (28 Oct 2026): typed into the panel, kept across renders, priced as you type */
+  if ($("nbaMidPanel")) $("nbaMidPanel").addEventListener("input", function (e) {
+    var id = e.target && e.target.id, map = { midOverLine: "ol", midOverPrice: "op", midUnderLine: "ul", midUnderPrice: "up" };
+    if (!map[id]) return;
+    midCalc[map[id]] = e.target.value;
+    var out = $("midCalcOut"), mu = nbaMiddleMu(nbaSimTakeRow(readNba()) ? nbaSimTakeRow(readNba()).inputs : snapshot());
+    if (out) out.innerHTML = mu === null ? '<span class="dim">No market number on the row yet: load the odds file.</span>' : nbaMidCalcOut(mu);
+  });
   if ($("altBets")) $("altBets").addEventListener("click", function (e) { var t = e.target.closest("[data-open]"); if (t) openRow(t.dataset.open); });
   $("bySport").addEventListener("click", function (e) { var t = e.target.closest("[data-open]"); if (t) openRow(t.dataset.open); });
   $("board").addEventListener("click", function (e) { var t = e.target.closest("tr[data-open]"); if (t) openRow(t.dataset.open); });
@@ -2354,6 +2391,9 @@
             row.inputs[k] = String(g.inputs[k]); changed = true;
           });
           if (g.inputs.dome === true && !row.inputs.dome) { row.inputs.dome = true; changed = true; }
+          /* the apps' numbers follow the newest odds run on a basketball row (28 Oct 2026, the middles watch): the logged line
+             and prices stay as the markets were scored, the shop as it stands now goes beside them */
+          if (row.sport === "NBA" && !blank(g.inputs.odds) && String(g.inputs.odds) !== String(row.inputs.oddsNow || row.inputs.odds || "")) { row.inputs.oddsNow = String(g.inputs.odds); row.inputs.oddsAt = d.generated || ""; }
           /* The slate marks a postseason game at the game level; the row's
              Playoff box is shown, not scored, so it only splits the record. */
           if (g.playoff === true && !row.inputs.playoff) { row.inputs.playoff = true; changed = true; }

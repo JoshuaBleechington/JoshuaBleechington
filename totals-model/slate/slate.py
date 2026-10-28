@@ -3497,6 +3497,8 @@ try:
 except ImportError:   # the file is not beside slate.py: the slate runs without the sim
     nbasim = None
 NBA_SIM_RUNS = 10000       # the user, 25 Oct 2026: "make sure the simulation runs 10k times per matchup"; about two seconds a game
+NBA_REF_LEAN_Z = 1.5       # an official, and a crew (the sum of its three), leans over or under at this z of its over/under record against the close
+NBA_AGREE_SIM_P = 0.55     # the agreement rule (28 Oct 2026, tools_nba_total_agree.py): the sim's own view at this chance and the crew's lean on the same side
 NBA_SIM_OUT_PPG = 0.15      # an OUT regular's cost, points per 100 possessions: his points a game times this...
 NBA_SIM_OUT_MPG = 0.03      # ...plus his minutes a game times this; three fifths on the club's offence, two fifths on its defence (a priori)
 NBA_TEND_FILE = "nba-tend.json"
@@ -3616,6 +3618,23 @@ def nba_sim_block(g, sides, prof, refs, crew, runs, log):
         mt = sm["markets"]["total"]
         line += "; at %s's %g the sim's own view says %s %.0f%% (%s)" % (block["anchor"]["book"], o["total"], mt["side"], 100 * mt["p_raw"], mt["band"])
     log(line)
+    # the three voices on the total (28 Oct 2026): the sim's own view and the crew's lean on the scoreboard total, the
+    # agreement rule the page scores (BET when they agree and the sheet is not against it; 59.2% on two seasons of closes)
+    if o.get("total") is not None and sm["markets"].get("total") and refs and crew:
+        z = 0.0
+        for n in crew:
+            d = refs["r"].get(n)
+            if d and len(d) > 4 and (d[3] + d[4]):
+                z += (d[3] - d[4]) / math.sqrt(d[3] + d[4])
+        lean = "OVER" if z >= NBA_REF_LEAN_Z else "UNDER" if z <= -NBA_REF_LEAN_Z else None
+        mt = sm["markets"]["total"]
+        sim_side = mt["side"] if mt["p_raw"] >= NBA_AGREE_SIM_P else None
+        if sim_side and lean == sim_side:
+            log("  the three voices: the sim %s %.0f%% and the crew's lean %s (z %+.1f) agree: the agreement rule fires unless the sheet is BET the other way (59%% on two seasons of closes; the page reads the sheet)" % (
+                sim_side, 100 * mt["p_raw"], lean, z))
+        else:
+            log("  the three voices: the sim %s %.0f%%%s, the crew %s (z %+.1f): no agreement rule" % (
+                mt["side"], 100 * mt["p_raw"], "" if sim_side else " (short of 55%)", ("leans " + lean) if lean else "even", z))
     if block["mkt"]:
         h1, q4, tot = block["mkt"]["h1"], block["mkt"]["q"][3], block["mkt"]["total"]
         log("  sim, anchored to %g / %s: first half median %s (middle half %s-%s), fourth quarter median %s of %s" % (

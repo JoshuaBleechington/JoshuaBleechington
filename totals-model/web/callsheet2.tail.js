@@ -1461,6 +1461,30 @@
       (x.scored ? ' The dog\'s own backup is the one signal that cleared two seasons (the dog won +7.4 points more than priced on 327 games, +39 units at the close): scored at +5 points, tagged, and this side is pickable on its own record line.'
                 : ' Nothing here moves the dog\'s chance; the record decides.') + '</div></div>';
   }
+  /* the agreement on the total (28 Oct 2026, the user: "two out of three should be enough to get a green bet"): every NBA
+     total on the date where the sim's own view and the crew point the same way with the sheet not against it, the rule
+     the replay priced at 59.2% over two seasons (nba.engine.js, nbaVoices); the card takes it like a sim call */
+  function agreeWatch(dateISO) {
+    var out = [];
+    card.forEach(function (r) {
+      if (r.sport !== "NBA" || (r.gdate || "") !== dateISO || isVoid(r)) return;
+      var V = nbaVoices(r);
+      if (V && V.fires) out.push({ row: r, v: V });
+    });
+    out.sort(function (a, b) { return (b.v.count - a.v.count) || (Math.max(b.v.sim.p, 1 - b.v.sim.p) - Math.max(a.v.sim.p, 1 - a.v.sim.p)); });
+    return out;
+  }
+  function agreeCard(x) {
+    var V = x.v, r = x.row, w = nbaVoicesWords(V);
+    var res = nbaSimTakeRes({ key: "total", side: V.side, line: V.line }, r);
+    var price = V.side === "OVER" ? numOf((r.inputs || {}).op) : numOf((r.inputs || {}).up);
+    return '<div class="pk agree" data-open="' + r.id + '" title="Load ' + esc(r.matchup) + ' into the form">' +
+      '<div class="n1">AGREEMENT · ' + V.count + ' of 3 · BET by the rule</div>' +
+      '<div class="n2">Total ' + esc(V.side) + ' ' + esc(String(V.line)) + '</div>' +
+      '<div class="n3">' + w.bits.join(' · ') + (price !== null ? ' · ' + sgn(price, 0) : '') + (res ? ' · <span class="chip ' + res + '">' + resText(res) + '</span>' : '') + '</div>' +
+      '<div class="n4">' + esc(r.matchup) + ' · ' + esc(NBA_AGREE_TAG) + '</div>' +
+      '<div class="n5">' + nbaSimTakeBtn(r, "agree", "total", V.side) + '</div></div>';
+  }
   /* the alternate totals with a verdict on a date (19 Oct 2026): one a hockey game, best edge first */
   function altBets(dateISO) {
     var out = [];
@@ -1528,6 +1552,14 @@
       ups.forEach(function (x) { uh += upsetCard(x); });
       if (!ups.length) uh = '<div class="empty">' + (rows.length ? 'No dog on this date carries a measured signal against its favourite.' : 'Add the matchups and any dog with a signal lands here.') + '</div>';
       $("upsets").innerHTML = uh;
+    }
+    // --- the agreement on the total (28 Oct 2026): basketball, so the section shows when the date has an NBA game ---
+    if ($("agree")) {
+      var ag = agreeWatch(dateISO), agh = "", nbaOn = card.some(function (r) { return r.sport === "NBA" && (r.gdate || "") === dateISO && !isVoid(r); });
+      ag.forEach(function (x) { agh += agreeCard(x); });
+      if (!ag.length) agh = '<div class="empty">No NBA total on this date has the simulation and the crew on the same side with the sheet not against it.</div>';
+      $("agreeHead").hidden = !nbaOn; $("agree").hidden = !nbaOn;
+      $("agree").innerHTML = agh;
     }
     // --- the alternate totals with a verdict (19 Oct 2026): hockey only, so the section shows when there is one ---
     if ($("altBets")) {
@@ -2184,6 +2216,7 @@
   $("bestBets").addEventListener("click", function (e) { var t = e.target.closest("[data-open]"); if (t) openRow(t.dataset.open); });
   if ($("likeliest")) $("likeliest").addEventListener("click", function (e) { var t = e.target.closest("[data-open]"); if (t) openRow(t.dataset.open); });
   if ($("upsets")) $("upsets").addEventListener("click", function (e) { var t = e.target.closest("[data-open]"); if (t) openRow(t.dataset.open); });
+  if ($("agree")) $("agree").addEventListener("click", function (e) { if (e.target.closest("[data-stake]")) return; var t = e.target.closest("[data-open]"); if (t) openRow(t.dataset.open); });
   if ($("altBets")) $("altBets").addEventListener("click", function (e) { var t = e.target.closest("[data-open]"); if (t) openRow(t.dataset.open); });
   $("bySport").addEventListener("click", function (e) { var t = e.target.closest("[data-open]"); if (t) openRow(t.dataset.open); });
   $("board").addEventListener("click", function (e) { var t = e.target.closest("tr[data-open]"); if (t) openRow(t.dataset.open); });

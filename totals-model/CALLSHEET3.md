@@ -1698,3 +1698,30 @@ What moves it paragraph names it. The example's Towns and Bridges props
 read it with Embiid out for the 76ers. The simulation's strip is unchanged:
 its defensive share of an absence is near the pooled points lift that did
 not persist, shown, not scored.
+
+## The three voices on the total, 28 Oct 2026
+
+The user: "if the simulation, the refs and the super model are all thinking
+over or under for the total, that should get a green BET signal; two out of
+three should be enough. Look at the Lakers and Spurs games: the simulation
+and the refs were pointing to the over." Measured first
+(`tools_nba_total_agree.py`, NBA.md): the sim's own view at 55%+ and the
+crew's lean on the same side of the game total, the sheet not against it,
+landed 157-108 (59.2%) over two seasons of closes, 134-98 with the sheet
+silent and 23-10 with the sheet on it too, where the sheet's own BET band
+lands 56.3%; a sheet BET the other way ran 15-20, so it blocks the rule.
+
+On the page, scored: the Simulation card opens with **The three voices on
+the total**, one line naming what the sheet, the sim and the crew each say
+(the sheet silent under 53%, the sim short under 55%, the crew even inside
+z 1.5) and the verdict; when the rule fires the block turns green with a
+BET · 2 of 3 (or 3 of 3) badge and a Take button of its own. The board gets
+an **Agreement on the total** section under the upset watch, one green card
+a game where the rule fires, with the three voices, the row's price, the
+result once graded and the same Take. A take marks the row like a
+simulation call ("the agreement rule, the sim and the crew"), lists under
+Taking tonight and on the phone sheet, and grades on the simulation
+record's new line, The agreement rule on the total, 2 of 3 and 3 of 3
+apart, with what the two seasons said beside it. The slate's log prints
+the three voices on every game it simulates. The example (the sim under,
+the crew over) reads "split … no rule".

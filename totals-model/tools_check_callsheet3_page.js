@@ -1871,6 +1871,54 @@ const CHECKS = ["dome","playoff","agconf","hgconf","agbk","hgbk"];
   chk(store2.cardRows === store1.rows && store2.localCard === null && !/not storing/.test(store2.saveState), 'store: a card the old page left in localStorage moves to the database on load and leaves localStorage', JSON.stringify(store2));
   await pg.evaluate(() => smStore.clear()); await pg.reload(); await pg.waitForTimeout(300);
 
+  // ---- 28 Oct 2026: the three voices on the total -- the sim's own view and the crew on the same side, the sheet not against it: BET on the Simulation card and the board, takeable, with its own record line ----
+  const agreeT = await pg.evaluate(async () => {
+    const wait = () => new Promise(r => setTimeout(r, 90));
+    const txt = e => (e ? e.innerText : '').replace(/\s+/g, ' ').trim();
+    const set = (id, v) => { const el = document.getElementById(id); el.value = v; el.dispatchEvent(new Event('input', { bubbles: true })); };
+    await smStore.removeItem('callsheet3.card.v1'); document.getElementById('clear').click(); document.getElementById('m-nba').click(); await wait();
+    const load = async (doc, fname) => { const dt = new DataTransfer(); dt.items.add(new File([JSON.stringify(doc)], fname, { type: 'application/json' })); const inp = document.getElementById('slateFile'); inp.files = dt.files; inp.dispatchEvent(new Event('change', { bubbles: true })); await wait(); };
+    const hist = (lo, mean, sd) => { const c = []; for (let v = lo; v <= lo + 100; v++) c.push(Math.round(10000 * Math.exp(-((v - mean) ** 2) / (2 * sd * sd)))); return { lo, c }; };
+    const sim = { v: 1, runs: 1000, own: { total: hist(170, 230, 15), h1: hist(80, 115, 10), h2: hist(80, 115, 10), q: [hist(30, 57, 7), hist(30, 57, 7), hist(30, 57, 7), hist(30, 57, 7)], margin: hist(-50, 2, 12), away: hist(80, 114, 11), home: hist(80, 116, 11), ot: 0.04 }, mkt: null, anchor: null, ft_factor: 1.0,
+                  shrink: { total: 0.05, h1: 0.1, spread: 0.0, ml: 0.97, team: 1.5, team_away: 0.3, team_own: 0.3, quarter: 0.1 }, bands: [[0.7, 'STRONG'], [0.65, 'BET'], [0.6, 'LEAN']] };
+    const refs = { lg: [2462, 44.0, 228.8], r: { 'Scott Foster': [118, 46.2, 229.1, 66, 41, 4, 2], 'Marc Davis': [102, 44.8, 230.3, 71, 51, 0, 0], 'Tony Brothers': [95, 43.1, 226.0, 56, 54, 3, 3] } };
+    // the game on the card first (a slate fills a row, it does not add one), then the slate brings the crew, the table and the runs
+    set('gdate', '2026-11-12'); set('away', 'Kings'); set('home', 'Spurs'); set('line', '222.5'); set('op', '-110'); set('up', '-110'); await wait();
+    document.getElementById('add').click(); await wait();
+    await load({ format: 'callsheet2.slate', version: 1, date: '2026-11-12', games: [{ sport: 'NBA', gdate: '2026-11-12', away: 'Kings', home: 'Spurs', notes: [], inputs: { ncrew: 'Scott Foster, Marc Davis, Tony Brothers', nbarefs: JSON.stringify(refs), nbasim: JSON.stringify(sim) } }] }, 'nba-slate-2026-11-12.json');
+    document.getElementById('boardDate').value = '2026-11-12'; document.getElementById('boardDate').dispatchEvent(new Event('change')); await wait();
+    const headHidden = document.getElementById('agreeHead').hidden;
+    const cards = [...document.querySelectorAll('#agree .pk.agree')].map(e => ({ n1: txt(e.querySelector('.n1')), n2: txt(e.querySelector('.n2')), n3: txt(e.querySelector('.n3')), n4: txt(e.querySelector('.n4')).slice(0, 40), take: !!e.querySelector('.takebtn[data-stake$="|agree|total|OVER"]') }));
+    // the card opens the row into the form: the Simulation card's block reads BET with a Take of its own
+    document.querySelector('#agree .pk.agree .n2').click(); await wait();
+    const voices = document.querySelector('#nbaVoices .voices');
+    const block = { cls: voices ? voices.className : '', badge: txt(voices && voices.querySelector('.vbadge')), line: txt(voices && voices.querySelector('.vline')), take: !!(voices && voices.querySelector('.vtake .takebtn[data-stake$="|agree|total|OVER"]')),
+                    color: voices ? getComputedStyle(voices.querySelector('.vbadge')).backgroundColor : '', simchips: document.querySelectorAll('#nbaSimPanel .simchip').length };
+    // taken from the block: the row carries the mark at the row's price, Taking tonight lists it, the board's card shows it taken
+    voices.querySelector('.vtake .takebtn').click(); await wait();
+    const row = JSON.parse(smStore.getItem('callsheet3.card.v1')).find(r => /Kings @ Spurs/.test(r.matchup));
+    const take = (row.simTakes || []).map(t => t.view + '|' + t.key + '|' + t.side + '|' + t.line + '|' + t.price + '|' + t.band + '|' + t.pick + '|' + (t.p === null ? 'null' : (+t.p).toFixed(2)) + '|' + t.worth);
+    const taking = txt(document.getElementById('taking')), boardTake = txt(document.querySelector('#agree .pk.agree .n5'));
+    // graded: the record keeps the rule's own line, the card shows the result
+    await load({ format: 'callsheet2.slate', version: 1, date: '2026-11-12', games: [{ sport: 'NBA', gdate: '2026-11-12', away: 'Kings', home: 'Spurs', finals: { fa: '118', fh: '121', f5a: '58', f5h: '60' }, close: { ctot: '222.5' }, notes: [] }] }, 'nba-grade-2026-11-12.json');
+    const rec = txt(document.querySelector('.agreetab')), recHead = txt([...document.querySelectorAll('.simrecview')].find(e => /agreement rule/i.test(e.textContent)));
+    const graded = txt(document.querySelector('#agree .pk.agree .n3'));
+    // a split: the example's sim leans under while its crew leans over, so no rule, and the words say so
+    document.getElementById('clear').click(); document.getElementById('m-nba').click(); await wait();
+    document.getElementById('gdate').value = '2026-11-10'; document.getElementById('example').click(); await wait();
+    const split = { cls: (document.querySelector('#nbaVoices .voices') || {}).className || '', badge: txt(document.querySelector('#nbaVoices .vbadge')), line: txt(document.querySelector('#nbaVoices .vline')) };
+    document.getElementById('clear').click(); await wait();
+    await smStore.removeItem('callsheet3.card.v1');
+    return { headHidden, cards, block, take, taking, boardTake, rec, recHead, graded, split };
+  });
+  chk(agreeT.headHidden === false && agreeT.cards.length === 1 && /^AGREEMENT · 2 OF 3 · BET BY THE RULE$/i.test(agreeT.cards[0].n1) && /^TOTAL OVER 222\.5$/i.test(agreeT.cards[0].n2)
+      && /^the sheet silent \((OVER|UNDER) 50\.0%, no bet\) · the sim OVER 6\d% · the crew leans OVER \(z \+4\.4\) · -110$/i.test(agreeT.cards[0].n3) && /^Kings @ Spurs · the sim's own view/.test(agreeT.cards[0].n4) && agreeT.cards[0].take
+      && agreeT.block.cls === 'voices fires' && /^BET · 2 OF 3$/i.test(agreeT.block.badge) && /2 of 3 on the OVER, none against: BET by the agreement rule\.$/i.test(agreeT.block.line) && agreeT.block.take && agreeT.block.color !== 'rgba(0, 0, 0, 0)' && agreeT.block.simchips === 7
+      && agreeT.take.length === 1 && /^agree\|total\|OVER\|222\.5\|-110\|agreement\|Total OVER 222\.5\|0\.6\d\|null$/.test(agreeT.take[0]) && /Total OVER 222\.5 -110 · the simulation, the agreement rule, the sim and the crew: 6\d% · agreement · Kings @ Spurs/i.test(agreeT.taking) && !/worth/i.test(agreeT.taking) && /TAKING/i.test(agreeT.boardTake)
+      && /^Voices Record Does Units Two seasons said 2 of 3: the sim and the crew, the sheet silent 1-0 100\.0% \+0\.9u 134-98 \(57\.8%\), \+23\.8u$/i.test(agreeT.rec) && /scored, BET/i.test(agreeT.recHead) && /WIN$/i.test(agreeT.graded)
+      && agreeT.split.cls === 'voices' && /^NO RULE$/i.test(agreeT.split.badge) && /the sim UNDER 7\d% · the crew leans OVER \(z \+4\.4\) — (split, 2 on the (OVER|UNDER) with one against: no rule|no two voices on a side: no rule)\.$/i.test(agreeT.split.line),
+      'agreement: a basketball total with the sim\'s own view and the crew on the same side and the sheet silent reads BET on the board\'s Agreement section and on the Simulation card\'s three-voices block in green, takes from either (the mark on the row at the row\'s price, listed under Taking tonight without a worth), grades on the rule\'s own record line, and a split (the example: the sim under, the crew over) reads no rule', JSON.stringify(agreeT).slice(0, 1800));
+
   const stamp = await pg.evaluate(() => (document.getElementById('build') || {}).textContent);
   const git = (cmd) => execSync(cmd, { cwd: __dirname, encoding: 'utf8' }).trim();
   let want, why;

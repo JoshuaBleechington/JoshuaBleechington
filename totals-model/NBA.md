@@ -564,6 +564,50 @@ player's on/off per 100 from the stints (the absence cost measured instead
 of assumed), each club's late-game pace and timeout habits, and a rotation
 model for the props' minutes.
 
+**The three voices on the total, 28 Oct 2026.** The user: "if the
+simulation, the refs and the super model are all thinking over or under for
+the total, that should get a green BET signal; two out of three should be
+enough. Look at the Lakers and Spurs games: the simulation and the refs were
+pointing to the over." (Kings @ Spurs closed 232.5 and landed 233, Trail
+Blazers @ Lakers 233.5 and landed 265; on both the sim's own view said over
+at 54% with three games in the profiles, the crews leaned over at z +2.1
+and +4.1, and the sheet was silent under ten games.) Each voice alone had
+measured nothing against the close (the tables above); the agreement had
+not been asked. `tools_nba_total_agree.py`, both seasons, 2,449 games with
+a close, everything known before tip: the sheet's total as the page builds
+it (the close, the faded ratings lean, the stage deltas; BET at 53%), the
+sim's own view at 400 runs from the profiles before the date, the crew's
+lean from each official's over/under record to date (the season before
+whole, this season to date; z = (W − L)/√(W + L), an official leans at 1.5,
+the crew at the sum of its three):
+
+| Voice, or the agreement | Both seasons | 2024-25 | 2025-26 |
+| --- | --- | --- | --- |
+| The sheet at BET, its side | 209-162 (56.3%), +28.0u | 56.7% | 56.0% |
+| The sim's side at 55%+ / 60%+ / 65%+ | 49.7% / 48.3% / 51.7% | 49.0 / 47.8 / 49.0 | 50.3 / 48.8 / 53.9 |
+| The crew's lean at z 1.5+ / 2.5+ | 52.7% / 52.1% | 55.4 / 51.0 | 50.2 / 53.0 |
+| **The sim (55%+) and the crew agree**, the sheet not against it | **157-108 (59.2%), z 3.0, +34.7u**; the total lands +2.9 toward that side (t 2.5) | 59.0% | 55.2% |
+| ... with the sheet silent | 134-98 (57.8%), +23.8u | 54.8 / 62.1 by half | 40.0 / 65.2 by half |
+| ... with the sheet on it too (3 of 3) | 23-10 (69.7%), +10.9u; +9.1 points toward the side (t 2.9) | 17-8 | 6-2 |
+| ... with the sheet BET the other way | 15-20 (42.9%) | | |
+| The sim and the crew disagree, the sim's side | 191-195 (49.5%) | 44.3% | 53.4% |
+| 2 of 3 point the same way, none against (any two) | 193-152 (55.9%), +23.5u | 55.1% | 57.0% |
+| By the sim's threshold with the crew: 50 / 55 / 58 / 60 / 65%+ | 55.0 / 59.2 / 62.1 / 60.8 / 69.4% (424 / 265 / 190 / 148 / 72 games) | | |
+| By the crew's threshold with the sim at 55%+: z 1.0 / 1.5 / 2.0 / 2.5 / 3.0+ | 54.3 / 59.2 / 58.8 / 60.3 / 57.8% | | |
+| The first thirty days of a season | 5-5 and 3-4: the rule rarely fires with five games in the profiles | | |
+
+So the rule the user asked for is real at the thresholds the page already
+had (the sim's 55%, the crew's 1.5), rises with the sim's confidence, holds
+in both seasons, and lands where the sheet's own BET band lands (56.3%). It
+is **scored**: the sim's own view at 55%+ and the crew's lean on the same
+side of the game total, the sheet not against it, reads BET on the
+Simulation card's three-voices block and on the board's Agreement section,
+in green, takeable like a sim call, on its own record line (2 of 3 and 3 of
+3 apart). A sheet BET the other way blocks it (42.9%). The cautions are in
+the table: the 2025-26 first half ran 14-21 with the sheet silent, and in
+the first month of a season the profiles are too thin for the rule to fire
+often. The slate's log prints the three voices on every game.
+
 ## The player props, 19 Oct 2026
 
 The user: "set up another tab for player props... find the ideal scenario

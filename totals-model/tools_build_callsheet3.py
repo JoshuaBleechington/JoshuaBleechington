@@ -112,6 +112,12 @@ def head() -> str:
              "  .crewblock .crewcall { margin: 9px 0 2px; padding: 7px 9px; border-radius: 6px; background: var(--surface); font-size: 12.5px; line-height: 1.5; }\n"
              "  .crewalert { display: inline-block; font: 800 10px/1.7 var(--sans); letter-spacing: .08em; text-transform: uppercase; padding: 1px 7px; border-radius: 3px; margin-right: 6px; vertical-align: 1px; }\n"
              "  .crewalert.over { background: var(--over); color: #fff; } .crewalert.under { background: var(--under); color: #fff; } .crewalert.even { background: var(--surface); color: var(--muted); border: 1px solid var(--rule); }\n"
+             # the three voices on the total (28 Oct 2026): the block on the Simulation card, green when the agreement rule fires
+             "  .voices { display: block; padding: 9px 12px 9px 14px; margin: 8px 0 10px; border-radius: 8px; background: var(--surface-2); box-shadow: inset 3px 0 0 var(--muted); font-size: 12.5px; line-height: 1.5; color: var(--ink); }\n"
+             "  .voices.fires { background: var(--go-wash); box-shadow: inset 3px 0 0 var(--go); }\n"
+             "  .voices .vbadge { display: inline-block; min-width: 52px; text-align: center; margin-right: 6px; padding: 1px 7px; border-radius: 3px; font: 800 10px/1.7 var(--sans); letter-spacing: .08em; text-transform: uppercase; color: var(--muted); background: var(--surface); border: 1px solid var(--rule); vertical-align: 1px; }\n"
+             "  .voices .vbadge.bet { background: var(--go); color: #fff; border-color: var(--go); }\n"
+             "  .voices .vline { margin-top: 3px; } .voices .vtake { margin-top: 6px; } .voices .vtag { margin-top: 4px; font-size: 11px; }\n"
              "  .crewchips { display: flex; flex-wrap: wrap; gap: 6px; margin: 8px 0 2px; }\n"
              "  .refchip { font: 600 11px/1.5 var(--sans); padding: 2px 9px; border-radius: 12px; border: 1px solid var(--rule); background: var(--surface); color: var(--ink-2); } .refchip b { color: var(--ink); }\n"
              "  .refchip.over { border-color: var(--over); color: var(--over); } .refchip.under { border-color: var(--under); color: var(--under); }\n"

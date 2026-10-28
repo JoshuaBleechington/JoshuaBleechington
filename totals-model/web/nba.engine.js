@@ -347,6 +347,7 @@
           ["The spread with both prices in is the anchor and nothing moves it off: the sides are priced. Shown and graded, never the pick."]));
       }
     }
+    if (!SRC) nbaVoicesFill({ markets: markets });   // the three voices on the total (28 Oct 2026), with this render's sheet
     return { sport: "NBA", away: away, home: home, matchup: away + " @ " + home, markets: markets, lamHome: lamH, lamAway: lamA, total: f, notes: notes, period: projH1 };
   }
   /* ---- the who-is-out panel: each side's list, the regulars' minutes summed, a tick for the doubtful ---- */
@@ -663,6 +664,7 @@
             tile("Overtime", (100 * (own.ot || 0)).toFixed(1) + '%', '') + '</div>';
     h += '<div class="simmeta"><b>' + String(sim.runs).replace(/\B(?=(\d{3})+(?!\d))/g, ",") + ' games</b>, the sim\'s own view. ' +
          (sim.anchor ? 'Anchored to ' + esc(sim.anchor.book) + '\'s ' + esc(String(sim.anchor.total)) + (sim.anchor.sp !== null && sim.anchor.sp !== undefined ? ' / ' + (sim.anchor.sp > 0 ? '+' : '') + esc(String(sim.anchor.sp)) : '') + ' for the market view.' : 'No book on the scoreboard at the run: no market view.') + '</div>';
+    h += '<div id="nbaVoices"></div>';   // the three voices on the total (28 Oct 2026), filled once the sheet has scored this render
     var takeRow = nbaSimTakeRow(f);   // the card row this game is on, if any: a sim call is taken on the row (26 Oct 2026)
     var cell = function (c) {
       if (!c) return '<span class="dim">—</span>';
@@ -758,9 +760,14 @@
     var sim = nbaSim(), lines = nbaSimLinesFromForm(), f = readNba();
     var tt = key === "away_total" ? lines.away_tt : key === "home_total" ? lines.home_tt : null, c = null;
     if (view === "gap") { if (tt && tt.rule && tt.rule.call === side) c = { line: tt.line, p: null, worth: null, band: "gap rule" }; }
+    else if (view === "agree") {   // the agreement rule (28 Oct 2026): read off the ROW, so the board's card takes it whatever game the form holds
+      var V = nbaVoices(row);
+      if (V && V.fires && V.side === side && key === "total") c = { line: V.line, p: side === "OVER" ? V.sim.p : 1 - V.sim.p, worth: null, band: "agreement" };
+    }
     else if (sim) c = nbaSimCalls(sim, lines, view).filter(function (x) { return x.key === key && x.side === side; })[0] || null;
     if (!c) { say("That call is not on the card as shown now; put the line back and take it again."); return; }
-    var inp = { op: $("op").value, up: $("up").value, h1op: $("h1op").value, h1up: $("h1up").value, sph: $("sph").value, spa: $("spa").value, hml: $("hml").value, aml: $("aml").value };
+    var inp = view === "agree" ? { op: (row.inputs || {}).op, up: (row.inputs || {}).up }
+            : { op: $("op").value, up: $("up").value, h1op: $("h1op").value, h1up: $("h1up").value, sph: $("sph").value, spa: $("spa").value, hml: $("hml").value, aml: $("aml").value };
     row.simTakes = (row.simTakes || []).concat([{ id: id, view: view, key: key, side: side, line: c.line, price: nbaSimPriceOf(key, side, lines, inp),
                                                   p: c.p === null ? null : +(+c.p).toFixed(4), worth: c.worth === null ? null : +(+c.worth).toFixed(4), band: c.band,
                                                   pick: nbaSimPickText(key, side, c.line, f.away || row.away, f.home || row.home), at: new Date().toISOString() }]);
@@ -781,18 +788,24 @@
     if (t.key === "home_total") return cmp(fh, +t.line, t.side === "OVER");
     return null;
   }
-  function nbaSimTakeViewLabel(view) { return view === "own" ? "the sim's own view" : view === "mkt" ? "anchored to the market" : "the gap rule"; }
+  function nbaSimTakeViewLabel(view) { return view === "own" ? "the sim's own view" : view === "mkt" ? "anchored to the market" : view === "agree" ? "the agreement rule, the sim and the crew" : "the gap rule"; }
   /* the record: every graded NBA row's sim calls at LEAN or better, says against does by view, market and band */
   function nbaSimUnits(price, win) { var p = +price; if (!p || isNaN(p)) p = -110; return win ? (p > 0 ? p / 100 : 100 / -p) : -1; }
   function nbaSimRecordHtml() {
     var rows = card.filter(function (r) { return r.sport === "NBA" && rowGraded(r) && r.inputs && r.inputs.nbasim; });
     if (!rows.length) return '';
     var T = {}, n = 0, G = { HOME: { n: 0, w: 0, units: 0 }, AWAY: { n: 0, w: 0, units: 0 } }, gn = 0;
+    var A = { 2: { n: 0, w: 0, units: 0 }, 3: { n: 0, w: 0, units: 0 } }, an = 0;   // the agreement rule's own tally (28 Oct 2026)
     rows.forEach(function (r) {
       var sim = null; try { sim = JSON.parse(r.inputs.nbasim); } catch (e) { sim = null; }
       if (!sim || !sim.own) return;
       var fin = r.finals || {}, fa = +fin.fa, fh = +fin.fh, half = (fin.f5a !== undefined && fin.f5a !== "" && fin.f5h !== undefined && fin.f5h !== "") ? (+fin.f5a + +fin.f5h) : null;
       var lines = nbaSimLinesFrom(r.inputs);
+      var V = nbaVoices(r);
+      if (V && V.fires && V.line !== null && fa + fh !== V.line) {
+        var wonA = (fa + fh > V.line) === (V.side === "OVER"), dA = A[V.count === 3 ? 3 : 2];
+        dA.n++; dA.w += wonA ? 1 : 0; dA.units += nbaSimUnits(V.side === "OVER" ? r.inputs.op : r.inputs.up, wonA); an++;
+      }
       // the gap rule's own tally
       [["AWAY", lines.away_tt, fa], ["HOME", lines.home_tt, fh]].forEach(function (x) {
         var tt = x[1];
@@ -820,7 +833,7 @@
         });
       });
     });
-    if (!n && !gn) return '';
+    if (!n && !gn && !an) return '';
     var order = { total: 0, h1: 1, spread: 2, ml: 3, away_total: 4, home_total: 5 }, bandOrder = { STRONG: 0, BET: 1, LEAN: 2 },
         label = { total: "Total", h1: "First half", spread: "Spread", ml: "Moneyline", away_total: "Away team total", home_total: "Home team total" };
     var h = '<div class="simrec"><div class="calibhead">SIMULATION · says against does, every call at LEAN or better</div>';
@@ -841,6 +854,16 @@
         if (!d.n) return;
         var cls = d.units > 0 ? "good" : d.units < 0 ? "bad" : "";
         h += '<tr><td>' + (x[0] === "HOME" ? "Home team total" : "Away team total") + '</td><td>' + d.w + '-' + (d.n - d.w) + '</td><td class="' + cls + '">' + (100 * d.w / d.n).toFixed(1) + '%</td><td class="' + cls + '">' + (d.units >= 0 ? '+' : '') + d.units.toFixed(1) + 'u</td><td class="dim">' + x[1] + '</td></tr>';
+      });
+      h += '</tbody></table>';
+    }
+    if (an) {
+      h += '<div class="simrecview">The agreement rule on the total <span class="tag">' + esc(NBA_AGREE_TAG) + ' · scored, BET</span></div><table class="form simrectab agreetab"><thead><tr><th>Voices</th><th>Record</th><th>Does</th><th>Units</th><th>Two seasons said</th></tr></thead><tbody>';
+      [[2, "2 of 3: the sim and the crew, the sheet silent", "134-98 (57.8%), +23.8u"], [3, "3 of 3: the sheet on it too", "23-10 (69.7%), +10.9u"]].forEach(function (x) {
+        var d = A[x[0]];
+        if (!d.n) return;
+        var cls = d.units > 0 ? "good" : d.units < 0 ? "bad" : "";
+        h += '<tr><td>' + x[1] + '</td><td>' + d.w + '-' + (d.n - d.w) + '</td><td class="' + cls + '">' + (100 * d.w / d.n).toFixed(1) + '%</td><td class="' + cls + '">' + (d.units >= 0 ? '+' : '') + d.units.toFixed(1) + 'u</td><td class="dim">' + x[2] + '</td></tr>';
       });
       h += '</tbody></table>';
     }
@@ -880,6 +903,59 @@
     try { refs = row.inputs.nbarefs ? JSON.parse(row.inputs.nbarefs) : null; } catch (e) { refs = null; }
     var det = nbaCrewDetails(names, refs);
     return det && det.found ? det : null;
+  }
+  /* ---- the three voices on the total (28 Oct 2026, the user: "if the simulation, the refs and the super model are all
+     thinking over or under for the total, that should get a green BET signal; two out of three should be enough. Look at
+     the Lakers and Spurs games: the simulation and the refs were pointing to the over"). Alone, each had measured nothing
+     against two seasons of closes; asked together (tools_nba_total_agree.py, 2,449 games with a close), the sim's own
+     view at 55%+ and the crew's lean on the same side, the sheet not against it, landed 157-108 (59.2%, +34.7 units at
+     -110): 134-98 with the sheet silent, 23-10 with the sheet on it too, and 15-20 when the sheet was BET the other way,
+     which is why a sheet against it blocks the rule. The sheet's own BET band lands 56.3% on the same games, so the rule
+     reads BET, green: on the Simulation card, on the board's Agreement section, takeable, with its own record line ---- */
+  var NBA_AGREE = { sim: 0.55, model: 0.53 };
+  var NBA_AGREE_TAG = "the sim's own view at 55%+ and the crew's lean on the same side, the sheet not against it: 157-108 (59.2%) over two seasons of closes, +34.7u at -110; 23-10 with the sheet on it too, 15-20 when the sheet was against it";
+  function nbaVoices(row) {
+    if (!row || (row.sport && row.sport !== "NBA")) return null;
+    var inp = row.inputs || {}, line = parseFloat(inp.line);
+    var mk = (row.markets || []).filter(function (m) { return m.key === "total"; })[0] || null;
+    var model = mk && isFinite(+mk.p) ? { side: mk.side, p: +mk.p, band: mk.band || "", votes: +mk.p >= NBA_AGREE.model ? mk.side : null } : null;
+    var sim = null; try { sim = inp.nbasim ? JSON.parse(inp.nbasim) : null; } catch (e) { sim = null; }
+    var r = sim && sim.own && sim.own.total && isFinite(line) ? nbaSimOver(sim.own.total, line) : null;
+    var simV = r ? { p: r.over, side: r.over >= 0.5 ? "OVER" : "UNDER", votes: null } : null;
+    if (simV) simV.votes = Math.max(simV.p, 1 - simV.p) >= NBA_AGREE.sim ? simV.side : null;
+    var cl = nbaCrewLean({ inputs: inp }), crew = cl ? { z: cl.z, lean: cl.lean, votes: cl.lean === "even" ? null : cl.lean.toUpperCase() } : null;
+    if (!simV && !crew) return null;
+    var v = [model && model.votes, simV && simV.votes, crew && crew.votes].filter(function (x) { return x; });
+    var side = null, count = 0, against = false;
+    ["OVER", "UNDER"].forEach(function (s) { var c = v.filter(function (x) { return x === s; }).length; if (c >= 2) { side = s; count = c; against = v.length > c; } });
+    var fires = !!side && !against && !!simV && !!crew && simV.votes === side && crew.votes === side;
+    return { model: model, sim: simV, crew: crew, line: isFinite(line) ? line : null, side: side, count: count, against: against, fires: fires };
+  }
+  function nbaVoicesWords(V) {
+    var pc = function (p) { return (100 * p).toFixed(0) + "%"; }, bits = [];
+    bits.push(V.model ? (V.model.votes ? "the sheet " + esc(V.model.side) + " " + pc(V.model.p) + " (" + esc(V.model.band || "BET") + ")" : "the sheet silent (" + esc(V.model.side) + " " + pc(V.model.p) + ", no bet)") : "the sheet not scored here");
+    bits.push(V.sim ? "the sim " + esc(V.sim.side) + " " + pc(Math.max(V.sim.p, 1 - V.sim.p)) + (V.sim.votes ? "" : " (short of 55%)") : "no simulation on the row");
+    bits.push(V.crew ? (V.crew.votes ? "the crew leans " + esc(V.crew.votes) + " (z " + sgn(V.crew.z, 1) + ")" : "the crew even (z " + sgn(V.crew.z, 1) + ")") : "no crew on the row");
+    var verdict = V.fires ? (V.count + " of 3 on the " + V.side + ", none against: BET by the agreement rule")
+      : V.side && V.against ? ("split, " + V.count + " on the " + V.side + " with one against: no rule")
+      : V.side ? (V.count + " of 3 on the " + V.side + ", but the rule needs the sim and the crew; the sheet's own call stands")
+      : "no two voices on a side: no rule";
+    return { bits: bits, verdict: verdict };
+  }
+  function nbaVoicesHtml(V, row) {
+    if (!V) return '<div class="voices none"><span class="vbadge">three voices</span> No simulation or crew on the row yet: the agreement read needs both.</div>';
+    var w = nbaVoicesWords(V);
+    var badge = V.fires ? '<span class="vbadge bet">BET · ' + V.count + ' of 3</span>' : '<span class="vbadge">' + (V.side && !V.against ? V.count + ' of 3' : 'no rule') + '</span>';
+    return '<div class="voices' + (V.fires ? ' fires' : '') + '"><div class="vhead">' + badge + ' <b>The three voices on the total' + (V.line !== null ? ' ' + esc(String(V.line)) : '') + '</b></div>' +
+           '<div class="vline">' + w.bits.join(' · ') + ' — ' + esc(w.verdict) + '.</div>' +
+           (V.fires ? '<div class="vtake">' + nbaSimTakeBtn(row, "agree", "total", V.side) + ' <span class="dim">Total ' + esc(V.side) + ' ' + esc(String(V.line)) + ' by the agreement rule</span></div>' : '') +
+           '<div class="vtag dim">Measured: ' + esc(NBA_AGREE_TAG) + '.</div></div>';
+  }
+  /* filled at the end of the form's forecast, so the sheet's voice is this render's and not the last one's */
+  function nbaVoicesFill(m) {
+    var el = $("nbaVoices"); if (!el) return;
+    var row = nbaSimTakeRow(readNba());
+    el.innerHTML = nbaVoicesHtml(nbaVoices({ sport: "NBA", inputs: snapshot(), markets: (m && m.markets) || [] }), row);
   }
   /* the block on the record (reworked 22 Oct 2026, the user: "add some color... a little more organized"): one table by the
      crew's lean, one by official for everyone who has worked a graded game, the colours on the season's rate and the points */

@@ -3890,13 +3890,31 @@ smStore.ready.then(function () {
      -110): 134-98 with the sheet silent, 23-10 with the sheet on it too, and 15-20 when the sheet was BET the other way,
      which is why a sheet against it blocks the rule. The sheet's own BET band lands 56.3% on the same games, so the rule
      reads BET, green: on the Simulation card, on the board's Agreement section, takeable, with its own record line ---- */
-  var NBA_AGREE = { sim: 0.55, model: 0.53 };
+  var NBA_AGREE = { sim: 0.55, model: 0.53, rate: 0.592, alt: 1.5 };   // the rule's measured rate gates the price; a row line 1.5+ off the market's number is an alternate, outside the measurement
   var NBA_AGREE_TAG = "the sim's own view at 55%+ and the crew's lean on the same side, the sheet not against it: 157-108 (59.2%) over two seasons of closes, +34.7u at -110; 23-10 with the sheet on it too, 15-20 when the sheet was against it";
+  /* the market's main number from the row's odds block: the carded book's total, else the commonest point across the books */
+  function nbaMainTotal(inp) {
+    var o = null; try { o = inp && inp.odds ? JSON.parse(inp.odds) : null; } catch (e) { o = null; }
+    var t = o && o.total && o.total.OVER; if (!t || !t.length) return null;
+    var pick = t.filter(function (x) { return x[0] === o.book && x[2] !== null && x[2] !== undefined && isFinite(+x[2]); })[0];
+    if (pick) return +pick[2];
+    var cnt = {}, best = null;
+    t.forEach(function (x) { if (x[2] !== null && x[2] !== undefined && isFinite(+x[2])) cnt[x[2]] = (cnt[x[2]] || 0) + 1; });
+    Object.keys(cnt).forEach(function (k) { if (best === null || cnt[k] > cnt[best]) best = k; });
+    return best === null ? null : +best;
+  }
   function nbaVoices(row) {
     if (!row || (row.sport && row.sport !== "NBA")) return null;
     var inp = row.inputs || {}, line = parseFloat(inp.line);
     var mk = (row.markets || []).filter(function (m) { return m.key === "total"; })[0] || null;
-    var model = mk && isFinite(+mk.p) ? { side: mk.side, p: +mk.p, band: mk.band || "", votes: +mk.p >= NBA_AGREE.model ? mk.side : null } : null;
+    var model = null;
+    if (mk && isFinite(+mk.p)) {
+      /* the sheet's voice is its LIKELIER side, not the pick by edge: a row at an alternate 225.5 (-208) carried "UNDER 36.6%" as
+         the pick with the over at 63.4% behind it (the user's Spurs row, 27 Oct 2026) */
+      var ms = mk.side, mp = +mk.p;
+      if (mk.other && isFinite(+mk.other.p) && +mk.other.p > mp) { ms = /^UNDER/i.test(String(mk.other.pick || "")) ? "UNDER" : "OVER"; mp = +mk.other.p; }
+      model = { side: ms, p: mp, band: mk.band1 || mk.band || "", votes: mp >= NBA_AGREE.model ? ms : null };
+    }
     var sim = null; try { sim = inp.nbasim ? JSON.parse(inp.nbasim) : null; } catch (e) { sim = null; }
     var r = sim && sim.own && sim.own.total && isFinite(line) ? nbaSimOver(sim.own.total, line) : null;
     var simV = r ? { p: r.over, side: r.over >= 0.5 ? "OVER" : "UNDER", votes: null } : null;
@@ -3906,8 +3924,14 @@ smStore.ready.then(function () {
     var v = [model && model.votes, simV && simV.votes, crew && crew.votes].filter(function (x) { return x; });
     var side = null, count = 0, against = false;
     ["OVER", "UNDER"].forEach(function (s) { var c = v.filter(function (x) { return x === s; }).length; if (c >= 2) { side = s; count = c; against = v.length > c; } });
-    var fires = !!side && !against && !!simV && !!crew && simV.votes === side && crew.votes === side;
-    return { model: model, sim: simV, crew: crew, line: isFinite(line) ? line : null, side: side, count: count, against: against, fires: fires };
+    var agree = !!side && !against && !!simV && !!crew && simV.votes === side && crew.votes === side;
+    /* the two gates (28 Oct 2026, the user's Spurs row): the rule was measured on the market's main number at -110, so an
+       alternate line is outside it, and a price that asks more than the rule's 59.2% is the book's price, not a bet */
+    var main = nbaMainTotal(inp), alt = main !== null && isFinite(line) && Math.abs(line - main) >= NBA_AGREE.alt;
+    var price = agree ? parseFloat(side === "OVER" ? inp.op : inp.up) : NaN, need = isFinite(price) ? implied(price) : implied(-110);
+    var priceOk = need <= NBA_AGREE.rate;
+    return { model: model, sim: simV, crew: crew, line: isFinite(line) ? line : null, side: side, count: count, against: against, agree: agree,
+             main: main, alt: alt, price: isFinite(price) ? price : null, need: need, priceOk: priceOk, fires: agree && !alt && priceOk };
   }
   function nbaVoicesWords(V) {
     var pc = function (p) { return (100 * p).toFixed(0) + "%"; }, bits = [];
@@ -3915,6 +3939,8 @@ smStore.ready.then(function () {
     bits.push(V.sim ? "the sim " + esc(V.sim.side) + " " + pc(Math.max(V.sim.p, 1 - V.sim.p)) + (V.sim.votes ? "" : " (short of 55%)") : "no simulation on the row");
     bits.push(V.crew ? (V.crew.votes ? "the crew leans " + esc(V.crew.votes) + " (z " + sgn(V.crew.z, 1) + ")" : "the crew even (z " + sgn(V.crew.z, 1) + ")") : "no crew on the row");
     var verdict = V.fires ? (V.count + " of 3 on the " + V.side + ", none against: BET by the agreement rule")
+      : V.agree && V.alt ? (V.count + " of 3 on the " + V.side + ", but the row's line " + V.line + " is an alternate (the market's number is " + V.main + "): the rule was measured on the main line, no bet")
+      : V.agree && !V.priceOk ? (V.count + " of 3 on the " + V.side + ", but at " + sgn(V.price, 0) + " it needs " + (100 * V.need).toFixed(1) + "%, more than the rule's " + (100 * NBA_AGREE.rate).toFixed(1) + "%: the book's price, not a bet")
       : V.side && V.against ? ("split, " + V.count + " on the " + V.side + " with one against: no rule")
       : V.side ? (V.count + " of 3 on the " + V.side + ", but the rule needs the sim and the crew; the sheet's own call stands")
       : "no two voices on a side: no rule";
@@ -3923,7 +3949,7 @@ smStore.ready.then(function () {
   function nbaVoicesHtml(V, row) {
     if (!V) return '<div class="voices none"><span class="vbadge">three voices</span> No simulation or crew on the row yet: the agreement read needs both.</div>';
     var w = nbaVoicesWords(V);
-    var badge = V.fires ? '<span class="vbadge bet">BET · ' + V.count + ' of 3</span>' : '<span class="vbadge">' + (V.side && !V.against ? V.count + ' of 3' : 'no rule') + '</span>';
+    var badge = V.fires ? '<span class="vbadge bet">BET · ' + V.count + ' of 3</span>' : '<span class="vbadge">' + (V.agree ? V.count + ' of 3 · no bet' : V.side && !V.against ? V.count + ' of 3' : 'no rule') + '</span>';
     return '<div class="voices' + (V.fires ? ' fires' : '') + '"><div class="vhead">' + badge + ' <b>The three voices on the total' + (V.line !== null ? ' ' + esc(String(V.line)) : '') + '</b></div>' +
            '<div class="vline">' + w.bits.join(' · ') + ' — ' + esc(w.verdict) + '.</div>' +
            (V.fires ? '<div class="vtake">' + nbaSimTakeBtn(row, "agree", "total", V.side) + ' <span class="dim">Total ' + esc(V.side) + ' ' + esc(String(V.line)) + ' by the agreement rule</span></div>' : '') +

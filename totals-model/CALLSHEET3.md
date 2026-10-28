@@ -1725,3 +1725,12 @@ record's new line, The agreement rule on the total, 2 of 3 and 3 of 3
 apart, with what the two seasons said beside it. The slate's log prints
 the three voices on every game it simulates. The example (the sim under,
 the crew over) reads "split … no rule".
+
+Two gates, the same day, from the user's Spurs row (an alternate 225.5 at
+−208 in the form, the market's number 232): the sheet's voice is its
+likelier side (that row's pick by edge was the under at 36.6%, the over
+at 63.4% behind it); a row line 1.5 or more off the market's main number
+reads "an alternate … the rule was measured on the main line, no bet";
+and a price on the rule's side asking more than the rule's 59.2% reads
+"the book's price, not a bet". Both show the voices with a "2 of 3 · no
+bet" badge, no Take, and no card on the board.

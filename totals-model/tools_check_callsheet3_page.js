@@ -1903,14 +1903,24 @@ const CHECKS = ["dome","playoff","agconf","hgconf","agbk","hgbk"];
     await load({ format: 'callsheet2.slate', version: 1, date: '2026-11-12', games: [{ sport: 'NBA', gdate: '2026-11-12', away: 'Kings', home: 'Spurs', finals: { fa: '118', fh: '121', f5a: '58', f5h: '60' }, close: { ctot: '222.5' }, notes: [] }] }, 'nba-grade-2026-11-12.json');
     const rec = txt(document.querySelector('.agreetab')), recHead = txt([...document.querySelectorAll('.simrecview')].find(e => /agreement rule/i.test(e.textContent)));
     const graded = txt(document.querySelector('#agree .pk.agree .n3'));
+    // the two gates (the user's Spurs row of 27 Oct 2026, an alternate 225.5 at -208 against a market number of 232): the price, then an alternate line
+    set('op', '-208'); set('up', '165'); await wait();
+    const priced = { cls: (document.querySelector('#nbaVoices .voices') || {}).className || '', badge: txt(document.querySelector('#nbaVoices .vbadge')), line: txt(document.querySelector('#nbaVoices .vline')), take: !!document.querySelector('#nbaVoices .vtake') };
+    set('op', '-110'); set('up', '-110'); await wait();
+    set('odds', JSON.stringify({ book: 'fanatics', total: { OVER: [['fanatics', -110, 229.5], ['draftkings', -108, 229.5]], UNDER: [['fanatics', -110, 229.5], ['draftkings', -112, 229.5]] } })); set('line', '222.5'); await wait();
+    const alt = { badge: txt(document.querySelector('#nbaVoices .vbadge')), line: txt(document.querySelector('#nbaVoices .vline')), take: !!document.querySelector('#nbaVoices .vtake') };
+    set('odds', ''); await wait();
     // a split: the example's sim leans under while its crew leans over, so no rule, and the words say so
     document.getElementById('clear').click(); document.getElementById('m-nba').click(); await wait();
     document.getElementById('gdate').value = '2026-11-10'; document.getElementById('example').click(); await wait();
     const split = { cls: (document.querySelector('#nbaVoices .voices') || {}).className || '', badge: txt(document.querySelector('#nbaVoices .vbadge')), line: txt(document.querySelector('#nbaVoices .vline')) };
     document.getElementById('clear').click(); await wait();
     await smStore.removeItem('callsheet3.card.v1');
-    return { headHidden, cards, block, take, taking, boardTake, rec, recHead, graded, split };
+    return { headHidden, cards, block, take, taking, boardTake, rec, recHead, graded, priced, alt, split };
   });
+  chk(agreeT.priced.cls === 'voices' && /^2 OF 3 · NO BET$/i.test(agreeT.priced.badge) && /2 of 3 on the OVER, but at -208 it needs 67\.5%, more than the rule's 59\.2%: the book's price, not a bet\.$/i.test(agreeT.priced.line) && !agreeT.priced.take
+      && /^2 OF 3 · NO BET$/i.test(agreeT.alt.badge) && /2 of 3 on the OVER, but the row's line 222\.5 is an alternate \(the market's number is 229\.5\): the rule was measured on the main line, no bet\.$/i.test(agreeT.alt.line) && !agreeT.alt.take,
+      'agreement gates: the same voices at -208 read the book\'s price, not a bet (the over needs 67.5%, the rule measured 59.2%), and a row line seven off the market\'s number reads an alternate outside the measurement; neither carries a Take', JSON.stringify({ priced: agreeT.priced, alt: agreeT.alt }));
   chk(agreeT.headHidden === false && agreeT.cards.length === 1 && /^AGREEMENT · 2 OF 3 · BET BY THE RULE$/i.test(agreeT.cards[0].n1) && /^TOTAL OVER 222\.5$/i.test(agreeT.cards[0].n2)
       && /^the sheet silent \((OVER|UNDER) 50%, no bet\) · the sim OVER 6\d% · the crew leans OVER \(z \+4\.4\) · -110$/i.test(agreeT.cards[0].n3) && /^Kings @ Spurs · the sim's own view/.test(agreeT.cards[0].n4) && agreeT.cards[0].take
       && agreeT.block.cls === 'voices fires' && /^BET · 2 OF 3$/i.test(agreeT.block.badge) && /2 of 3 on the OVER, none against: BET by the agreement rule\.$/i.test(agreeT.block.line) && agreeT.block.take && agreeT.block.color !== 'rgba(0, 0, 0, 0)' && agreeT.block.simchips === 2

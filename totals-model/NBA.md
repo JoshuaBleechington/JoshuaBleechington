@@ -608,6 +608,20 @@ the table: the 2025-26 first half ran 14-21 with the sheet silent, and in
 the first month of a season the profiles are too thin for the rule to fire
 often. The slate's log prints the three voices on every game.
 
+Two gates, from the user's own Spurs row of 27 Oct 2026 (an alternate
+225.5 at −208 in the form against a market number of 232, where every
+voice's "over" was the gap between the two lines): the sheet's voice is its
+likelier side, not the pick by edge; a row line 1.5 or more off the
+market's main number (the carded book's total in the odds block) is an
+alternate, outside the measurement, no bet; and the price on the rule's
+side must ask no more than the rule's 59.2% (−145 is the edge of it), else
+it reads "the book's price, not a bet". Read back through the four rows
+as he had them, none of the night's games fired: the Celtics (the sim
+under, the crew even), the Knicks (both even), the Lakers (the crew at
+z +4.1 but the sim's own view 48% over on his row, which carried Sharpe
+out for the Blazers), the Spurs (the alternate line; the sim's own view
+46% over even at 225.5 with Murray and Raynaud out).
+
 ## The player props, 19 Oct 2026
 
 The user: "set up another tab for player props... find the ideal scenario

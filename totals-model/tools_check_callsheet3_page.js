@@ -1938,11 +1938,11 @@ const CHECKS = ["dome","playoff","agconf","hgconf","agbk","hgbk"];
     const load = async (doc, fname) => { const dt = new DataTransfer(); dt.items.add(new File([JSON.stringify(doc)], fname, { type: 'application/json' })); const inp = document.getElementById('slateFile'); inp.files = dt.files; inp.dispatchEvent(new Event('change', { bubbles: true })); await wait(); };
     const odds = (pt) => JSON.stringify({ book: 'fanatics', total: { OVER: [['fanduel', -108, pt], ['betmgm', -110, pt], ['draftkings', -112, pt + 0.5], ['fanatics', -110, pt], ['pinnacle', -105, pt]], UNDER: [['fanduel', -112, pt], ['betmgm', -110, pt], ['draftkings', -108, pt + 0.5], ['fanatics', -110, pt], ['pinnacle', -115, pt]] },
                                            alt: { OVER: [['fanduel', -135, pt - 2], ['draftkings', -150, pt - 3]], UNDER: [['fanduel', -135, pt + 2], ['draftkings', -150, pt + 3]] }, ml: {}, spread: {}, period: {}, team: {} });
-    const game = (extra) => Object.assign({ sport: 'NBA', gdate: '2026-11-13', away: 'Kings', home: 'Spurs', notes: [] }, extra);
-    set('gdate', '2026-11-13'); set('away', 'Kings'); set('home', 'Spurs'); set('line', '230.5'); set('op', '-110'); set('up', '-110'); await wait();
+    const game = (extra) => Object.assign({ sport: 'NBA', gdate: '2026-11-13', away: 'Jazz', home: 'Nuggets', notes: [] }, extra);
+    set('gdate', '2026-11-13'); set('away', 'Jazz'); set('home', 'Nuggets'); set('line', '230.5'); set('op', '-110'); set('up', '-110'); await wait();
     document.getElementById('add').click(); await wait();
     await load({ format: 'callsheet2.slate', version: 1, date: '2026-11-13', generated: '2026-11-13T15:00:00Z', games: [game({ inputs: { odds: odds(230.5) } })] }, 'odds-2026-11-13.json');
-    const row0 = JSON.parse(smStore.getItem('callsheet3.card.v1')).find(r => /Kings @ Spurs/.test(r.matchup)), ti = row0.markets.findIndex(m => m.key === 'total');
+    const row0 = JSON.parse(smStore.getItem('callsheet3.card.v1')).find(r => /Jazz @ Nuggets/.test(r.matchup)), ti = row0.markets.findIndex(m => m.key === 'total');
     document.getElementById('boardDate').value = '2026-11-13'; document.getElementById('boardDate').dispatchEvent(new Event('change')); await wait();
     const panel0 = txt(document.getElementById('nbaMidPanel'));
     // hold the sheet's over: the same mark the board's Take button makes (the board lists the pick's side, which at 50% is either)
@@ -1950,7 +1950,7 @@ const CHECKS = ["dome","playoff","agconf","hgconf","agbk","hgbk"];
     const before = { head: document.getElementById('midHead').hidden, cards: document.querySelectorAll('#mid .pk.mid').length, text: txt(document.getElementById('mid')) };
     // the number runs: a later odds run posts 234.5 at the apps and 235 at DraftKings
     await load({ format: 'callsheet2.slate', version: 1, date: '2026-11-13', generated: '2026-11-13T22:30:00Z', games: [game({ inputs: { odds: odds(234.5) } })] }, 'odds-2026-11-13b.json');
-    const row1 = JSON.parse(smStore.getItem('callsheet3.card.v1')).find(r => /Kings @ Spurs/.test(r.matchup));
+    const row1 = JSON.parse(smStore.getItem('callsheet3.card.v1')).find(r => /Jazz @ Nuggets/.test(r.matchup));
     const stored = { logged: /230\.5/.test(row1.inputs.odds) && !/234\.5/.test(row1.inputs.odds), now: /234\.5/.test(row1.inputs.oddsNow || ''), at: row1.inputs.oddsAt, line: row1.inputs.line, markets: row1.markets.filter(m => m.key === 'total').map(m => m.label).join() };
     const card = document.querySelector('#mid .pk.mid');
     const after = { head: document.getElementById('midHead').hidden, n: document.querySelectorAll('#mid .pk.mid').length, n1: txt(card && card.querySelector('.n1')), n2: txt(card && card.querySelector('.n2')), n3: txt(card && card.querySelector('.n3')), take: !!(card && card.querySelector('.takebtn[data-stake*="|middle|total|UNDER|235|-108|draftkings|sheet"]')) };
@@ -1964,7 +1964,7 @@ const CHECKS = ["dome","playoff","agconf","hgconf","agbk","hgbk"];
     const calc2 = txt(document.getElementById('midCalcOut'));
     // the second leg taken from the panel: the mark on the row with the app, the leg it pairs with, Taking tonight lists it
     document.querySelector('#nbaMidPanel .midwatch .takebtn').click(); await wait();
-    const row2 = JSON.parse(smStore.getItem('callsheet3.card.v1')).find(r => /Kings @ Spurs/.test(r.matchup));
+    const row2 = JSON.parse(smStore.getItem('callsheet3.card.v1')).find(r => /Jazz @ Nuggets/.test(r.matchup));
     const take = (row2.simTakes || []).map(t => t.view + '|' + t.side + '|' + t.line + '|' + t.price + '|' + t.book + '|' + (t.with ? t.with.side + ' ' + t.with.line + ' ' + t.with.price : '') + '|' + (t.pair ? t.pair.gap : '') + '|' + t.pick);
     const taking = txt(document.getElementById('taking')), stillOpen = txt(document.querySelector('#mid .pk.mid .n5'));
     // graded between the numbers: both legs win, the record's Middles line
@@ -1983,7 +1983,7 @@ const CHECKS = ["dome","playoff","agconf","hgconf","agbk","hgbk"];
       && midT.pairs.length === 6 && midT.pairs.every(p => /\|(FanDuel|BetMGM|DraftKings|Fanatics) \d+(\.5)? -\d+/.test(p)) && /^\d+ pairs across the apps' main and alternate numbers, the best six shown; none pays at these prices/.test(midT.note)
       && /^Pays: a 8-point window, both win 1[5-9]\.\d%, the pair needs 4\.8% at these prices: \+\d+\.\d% of the stake expected/.test(midT.calc) && /^(The book's price|Positive, but under a three-point gap): a 2-point window, both win [23]\.\d%/.test(midT.calc2)
       && midT.take.length === 1 && /^middle\|UNDER\|235\|-108\|draftkings\|OVER 230\.5 -110\|4\.5\|Total UNDER 235 at DraftKings \(the middle with OVER 230\.5\)$/.test(midT.take[0])
-      && /Total UNDER 235 at DraftKings \(the middle with OVER 230\.5\) -108 · the simulation, the middle's second leg: 5\d% · middle · Kings @ Spurs/i.test(midT.taking) && /TAKING/i.test(midT.stillOpen)
+      && /Total UNDER 235 at DraftKings \(the middle with OVER 230\.5\) -108 · the simulation, the middle's second leg: 5\d% · middle · Jazz @ Nuggets/i.test(midT.taking) && /TAKING/i.test(midT.stillOpen)
       && /^Pairs Both won One pushed Split Said both The pair The first leg alone 1 1 \(100\.0%\) 0 0 [89]\.\d% \+1\.8[0-9]u \+0\.91u$/i.test(midT.rec) && /the pair graded together/.test(midT.recHead),
       'middles: the Middles card prices every over/under pair the four apps post off the sheet\'s normal and says none pays on an ordinary night; a total taken on the row is watched, and when a later odds run moves the number 4.5 points the board and the panel name the best second leg at its app with the pair\'s chance and what it pays; the apps\' numbers follow the newest run while the logged line stays; the calculator prices a typed pair; the second leg takes from the panel with the leg it pairs with, lists under Taking tonight, and the graded pair lands on the record\'s Middles line beside what the first leg alone did', JSON.stringify(midT).slice(0, 2600));
 

@@ -24,7 +24,7 @@ import sys
 ROOT = pathlib.Path(__file__).parent / "web"
 OPEN = "  /* ===== ENGINE BLOCK."
 CLOSE = "  /* ===== END ENGINE BLOCK ===== */"
-STAMP = "2026-10-28"   # bumped by hand when 3.0's own sources change (the harness checks it)
+STAMP = "2026-10-29"   # bumped by hand when 3.0's own sources change (the harness checks it)
 
 
 def engine_block() -> str:
@@ -124,8 +124,16 @@ def head() -> str:
              "  .midwatch.pays { background: var(--go-wash); box-shadow: inset 3px 0 0 var(--go); } .midwatch .mwline { margin-top: 3px; } .midwatch .mwtake { margin-top: 6px; }\n"
              "  .midwatch .vbadge { display: inline-block; min-width: 52px; text-align: center; margin-right: 6px; padding: 1px 7px; border-radius: 3px; font: 800 10px/1.7 var(--sans); letter-spacing: .08em; text-transform: uppercase; color: var(--muted); background: var(--surface); border: 1px solid var(--rule); vertical-align: 1px; }\n"
              "  .midwatch .vbadge.bet { background: var(--go); color: #fff; border-color: var(--go); }\n"
+             # the pairs table fits the card at any width (29 Oct 2026): fixed column widths, cells wrap, nothing scrolls sideways
+             "  #nbaMidPanel { max-width: 100%; overflow-x: hidden; } table.midtab { width: 100%; max-width: 100%; table-layout: fixed; border-collapse: collapse; font-size: 11.5px; line-height: 1.35; margin: 4px 0 2px; }\n"
+             "  table.midtab col.c1 { width: 27%; } table.midtab col.c2 { width: 10%; } table.midtab col.c3 { width: 18%; }\n"
+             "  table.midtab th { font: 600 10px/1.4 var(--sans); letter-spacing: .06em; text-transform: uppercase; color: var(--muted); text-align: left; padding: 4px 6px 4px 0; border-bottom: 1px solid var(--rule); }\n"
+             "  table.midtab td { padding: 5px 6px 5px 0; border-bottom: 1px solid var(--rule); vertical-align: top; white-space: normal; overflow-wrap: anywhere; font-family: var(--mono); }\n"
+             "  table.midtab .mbook { display: block; font-family: var(--sans); font-size: 11px; color: var(--ink-2); } table.midtab .mnum { display: block; white-space: nowrap; }\n"
+             "  table.midtab .mneed { display: block; font: 10.5px/1.3 var(--sans); color: var(--muted); }\n"
              "  table.midtab td.good { color: var(--go); } table.midtab td.bad { color: var(--muted); } table.midtab tr.pays td { font-weight: 600; } #nbaMidPanel .midnote { margin: 4px 0 8px; font-size: 11.5px; }\n"
-             "  .midcalc { margin-top: 8px; font-size: 12.5px; } .midcalc .midcalcrow { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 6px; margin: 6px 0; } .midcalc input { width: 100%; box-sizing: border-box; } #midCalcOut { font-size: 12.5px; line-height: 1.5; }\n"
+             "  .midcalc { margin-top: 8px; font-size: 12.5px; } .midcalc .midcalcrow { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 6px; margin: 6px 0; } .midcalc input { width: 100%; min-width: 0; box-sizing: border-box; } #midCalcOut { font-size: 12.5px; line-height: 1.5; }\n"
+             "  @media (max-width: 520px) { .midcalc .midcalcrow { grid-template-columns: repeat(2, minmax(0, 1fr)); } table.midtab { font-size: 11px; } }\n"
              "  .simrec .midrectab td.good { color: var(--go); } .simrec .midrectab td.bad { color: var(--bad); }\n"
              "  .crewchips { display: flex; flex-wrap: wrap; gap: 6px; margin: 8px 0 2px; }\n"
              "  .refchip { font: 600 11px/1.5 var(--sans); padding: 2px 9px; border-radius: 12px; border: 1px solid var(--rule); background: var(--surface); color: var(--ink-2); } .refchip b { color: var(--ink); }\n"

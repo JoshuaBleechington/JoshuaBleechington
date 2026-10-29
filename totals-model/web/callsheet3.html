@@ -398,8 +398,15 @@
   .midwatch.pays { background: var(--go-wash); box-shadow: inset 3px 0 0 var(--go); } .midwatch .mwline { margin-top: 3px; } .midwatch .mwtake { margin-top: 6px; }
   .midwatch .vbadge { display: inline-block; min-width: 52px; text-align: center; margin-right: 6px; padding: 1px 7px; border-radius: 3px; font: 800 10px/1.7 var(--sans); letter-spacing: .08em; text-transform: uppercase; color: var(--muted); background: var(--surface); border: 1px solid var(--rule); vertical-align: 1px; }
   .midwatch .vbadge.bet { background: var(--go); color: #fff; border-color: var(--go); }
+  #nbaMidPanel { max-width: 100%; overflow-x: hidden; } table.midtab { width: 100%; max-width: 100%; table-layout: fixed; border-collapse: collapse; font-size: 11.5px; line-height: 1.35; margin: 4px 0 2px; }
+  table.midtab col.c1 { width: 27%; } table.midtab col.c2 { width: 10%; } table.midtab col.c3 { width: 18%; }
+  table.midtab th { font: 600 10px/1.4 var(--sans); letter-spacing: .06em; text-transform: uppercase; color: var(--muted); text-align: left; padding: 4px 6px 4px 0; border-bottom: 1px solid var(--rule); }
+  table.midtab td { padding: 5px 6px 5px 0; border-bottom: 1px solid var(--rule); vertical-align: top; white-space: normal; overflow-wrap: anywhere; font-family: var(--mono); }
+  table.midtab .mbook { display: block; font-family: var(--sans); font-size: 11px; color: var(--ink-2); } table.midtab .mnum { display: block; white-space: nowrap; }
+  table.midtab .mneed { display: block; font: 10.5px/1.3 var(--sans); color: var(--muted); }
   table.midtab td.good { color: var(--go); } table.midtab td.bad { color: var(--muted); } table.midtab tr.pays td { font-weight: 600; } #nbaMidPanel .midnote { margin: 4px 0 8px; font-size: 11.5px; }
-  .midcalc { margin-top: 8px; font-size: 12.5px; } .midcalc .midcalcrow { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 6px; margin: 6px 0; } .midcalc input { width: 100%; box-sizing: border-box; } #midCalcOut { font-size: 12.5px; line-height: 1.5; }
+  .midcalc { margin-top: 8px; font-size: 12.5px; } .midcalc .midcalcrow { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 6px; margin: 6px 0; } .midcalc input { width: 100%; min-width: 0; box-sizing: border-box; } #midCalcOut { font-size: 12.5px; line-height: 1.5; }
+  @media (max-width: 520px) { .midcalc .midcalcrow { grid-template-columns: repeat(2, minmax(0, 1fr)); } table.midtab { font-size: 11px; } }
   .simrec .midrectab td.good { color: var(--go); } .simrec .midrectab td.bad { color: var(--bad); }
   .crewchips { display: flex; flex-wrap: wrap; gap: 6px; margin: 8px 0 2px; }
   .refchip { font: 600 11px/1.5 var(--sans); padding: 2px 9px; border-radius: 12px; border: 1px solid var(--rule); background: var(--surface); color: var(--ink-2); } .refchip b { color: var(--ink); }
@@ -510,7 +517,7 @@
   <header class="top">
     <div>
       <div class="eyebrow"><span id="eyebrow">MLB · every market on the game</span>
-        <span class="build">· build <span id="build">2026-10-28</span></span></div>
+        <span class="build">· build <span id="build">2026-10-29</span></span></div>
       <h1>The <em>Super</em> Model</h1>
       <p>One matchup, every market the book posts on it — in baseball the full-game total, the first five,
          the moneyline and the run line; in hockey the total, the first period, the moneyline and the puck line;
@@ -4144,10 +4151,13 @@ smStore.ready.then(function () {
     if (!row) h += '<p class="note">Add the game to the card and take a total (the sheet\'s pick, a sim call or the agreement rule): the watch then names the other leg once the number has run.</p>';
     else if (!W.length) h += '<p class="note">You hold no total on this game yet. Take one (the sheet\'s pick, a sim call or the agreement rule) and the watch names the other leg once the number has run three points or more from it.</p>';
     else W.forEach(function (x) { h += nbaMiddleWatchHtml(x, row); });
-    h += '<table class="form midtab"><thead><tr><th>Over</th><th>Under</th><th>Window</th><th>Both win</th><th>Needs</th><th>The pair</th></tr></thead><tbody>';
+    /* the table fits the card at any width (29 Oct 2026, the user: "the table for middles is off"): five columns on fixed widths, the
+       app on its own line over the number and price, the break-even under the both-win chance, the verdict in the last cell */
+    var leg = function (x) { return '<span class="mbook">' + esc(bookName(x.book)) + (x.alt ? ' <span class="dim">alt</span>' : '') + '</span><span class="mnum">' + esc(String(x.point)) + ' ' + sgn(x.price, 0) + '</span>'; };
+    h += '<table class="midtab"><colgroup><col class="c1"><col class="c1"><col class="c2"><col class="c3"><col class="c3"></colgroup><thead><tr><th>Over</th><th>Under</th><th>Gap</th><th>Both win</th><th>The pair</th></tr></thead><tbody>';
     P.pairs.forEach(function (x) {
-      h += '<tr class="' + (x.m.pays ? 'pays' : '') + '"><td>' + esc(bookName(x.over.book)) + ' ' + esc(String(x.over.point)) + ' ' + sgn(x.over.price, 0) + (x.over.alt ? ' <span class="dim">alt</span>' : '') + '</td><td>' + esc(bookName(x.under.book)) + ' ' + esc(String(x.under.point)) + ' ' + sgn(x.under.price, 0) + (x.under.alt ? ' <span class="dim">alt</span>' : '') +
-           '</td><td>' + (+x.m.gap.toFixed(1)) + '</td><td>' + pc(x.m.pBoth) + '</td><td>' + pc(x.m.need) + '</td><td class="' + (x.m.ev > 0 ? 'good' : 'bad') + '">' + sgn(100 * x.m.ev, 1) + '%' + (x.m.pays ? ' · pays' : x.m.ev > 0 ? ' · under three points' : '') + '</td></tr>';
+      h += '<tr class="' + (x.m.pays ? 'pays' : '') + '"><td>' + leg(x.over) + '</td><td>' + leg(x.under) + '</td><td>' + (+x.m.gap.toFixed(1)) + '</td><td>' + pc(x.m.pBoth) + '<span class="mneed">needs ' + pc(x.m.need) + '</span></td>' +
+           '<td class="' + (x.m.ev > 0 ? 'good' : 'bad') + '">' + sgn(100 * x.m.ev, 1) + '%<span class="mneed">' + (x.m.pays ? 'pays' : x.m.ev > 0 ? 'under three' : 'the book\'s price') + '</span></td></tr>';
     });
     h += '</tbody></table><div class="dim midnote">' + P.n + ' pair' + (P.n === 1 ? '' : 's') + ' across the apps\' main and alternate numbers, the best six shown; ' + (P.pays ? P.pays + ' pay' + (P.pays === 1 ? 's' : '') + ' at these prices.' : 'none pays at these prices, which is the usual night: the books agree with each other, and the window opens when a number you hold has moved.') + '</div>';
     h += nbaMidCalcHtml(P.mu);

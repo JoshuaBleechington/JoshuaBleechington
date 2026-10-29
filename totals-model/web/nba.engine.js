@@ -1137,10 +1137,13 @@
     if (!row) h += '<p class="note">Add the game to the card and take a total (the sheet\'s pick, a sim call or the agreement rule): the watch then names the other leg once the number has run.</p>';
     else if (!W.length) h += '<p class="note">You hold no total on this game yet. Take one (the sheet\'s pick, a sim call or the agreement rule) and the watch names the other leg once the number has run three points or more from it.</p>';
     else W.forEach(function (x) { h += nbaMiddleWatchHtml(x, row); });
-    h += '<table class="form midtab"><thead><tr><th>Over</th><th>Under</th><th>Window</th><th>Both win</th><th>Needs</th><th>The pair</th></tr></thead><tbody>';
+    /* the table fits the card at any width (29 Oct 2026, the user: "the table for middles is off"): five columns on fixed widths, the
+       app on its own line over the number and price, the break-even under the both-win chance, the verdict in the last cell */
+    var leg = function (x) { return '<span class="mbook">' + esc(bookName(x.book)) + (x.alt ? ' <span class="dim">alt</span>' : '') + '</span><span class="mnum">' + esc(String(x.point)) + ' ' + sgn(x.price, 0) + '</span>'; };
+    h += '<table class="midtab"><colgroup><col class="c1"><col class="c1"><col class="c2"><col class="c3"><col class="c3"></colgroup><thead><tr><th>Over</th><th>Under</th><th>Gap</th><th>Both win</th><th>The pair</th></tr></thead><tbody>';
     P.pairs.forEach(function (x) {
-      h += '<tr class="' + (x.m.pays ? 'pays' : '') + '"><td>' + esc(bookName(x.over.book)) + ' ' + esc(String(x.over.point)) + ' ' + sgn(x.over.price, 0) + (x.over.alt ? ' <span class="dim">alt</span>' : '') + '</td><td>' + esc(bookName(x.under.book)) + ' ' + esc(String(x.under.point)) + ' ' + sgn(x.under.price, 0) + (x.under.alt ? ' <span class="dim">alt</span>' : '') +
-           '</td><td>' + (+x.m.gap.toFixed(1)) + '</td><td>' + pc(x.m.pBoth) + '</td><td>' + pc(x.m.need) + '</td><td class="' + (x.m.ev > 0 ? 'good' : 'bad') + '">' + sgn(100 * x.m.ev, 1) + '%' + (x.m.pays ? ' · pays' : x.m.ev > 0 ? ' · under three points' : '') + '</td></tr>';
+      h += '<tr class="' + (x.m.pays ? 'pays' : '') + '"><td>' + leg(x.over) + '</td><td>' + leg(x.under) + '</td><td>' + (+x.m.gap.toFixed(1)) + '</td><td>' + pc(x.m.pBoth) + '<span class="mneed">needs ' + pc(x.m.need) + '</span></td>' +
+           '<td class="' + (x.m.ev > 0 ? 'good' : 'bad') + '">' + sgn(100 * x.m.ev, 1) + '%<span class="mneed">' + (x.m.pays ? 'pays' : x.m.ev > 0 ? 'under three' : 'the book\'s price') + '</span></td></tr>';
     });
     h += '</tbody></table><div class="dim midnote">' + P.n + ' pair' + (P.n === 1 ? '' : 's') + ' across the apps\' main and alternate numbers, the best six shown; ' + (P.pays ? P.pays + ' pay' + (P.pays === 1 ? 's' : '') + ' at these prices.' : 'none pays at these prices, which is the usual night: the books agree with each other, and the window opens when a number you hold has moved.') + '</div>';
     h += nbaMidCalcHtml(P.mu);

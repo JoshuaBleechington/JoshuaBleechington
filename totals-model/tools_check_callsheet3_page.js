@@ -1958,6 +1958,7 @@ const CHECKS = ["dome","playoff","agconf","hgconf","agbk","hgbk"];
     card.querySelector('.n2').click(); await wait();
     const now = txt(document.querySelector('#nbaMidPanel .midnow')), watch = { cls: (document.querySelector('#nbaMidPanel .midwatch') || {}).className || '', text: txt(document.querySelector('#nbaMidPanel .midwatch')) };
     const pairs = [...document.querySelectorAll('#nbaMidPanel .midtab tbody tr')].map(tr => tr.className + '|' + txt(tr)), note = txt(document.querySelector('#nbaMidPanel .midnote'));
+    const fit = (() => { const t = document.querySelector('#nbaMidPanel .midtab'), s = document.getElementById('nbaMidPanel'); return !!t && t.getBoundingClientRect().width <= s.clientWidth + 1 && s.scrollWidth <= s.clientWidth + 1; })();   // the table fits the card (29 Oct 2026)
     set('midOverLine', '226.5'); set('midOverPrice', '-110'); set('midUnderLine', '234.5'); set('midUnderPrice', '-110'); await wait();
     const calc = txt(document.getElementById('midCalcOut'));
     set('midUnderLine', '228.5'); await wait();
@@ -1972,7 +1973,7 @@ const CHECKS = ["dome","playoff","agconf","hgconf","agbk","hgbk"];
     const rec = txt(document.querySelector('.midrectab')), recHead = txt([...document.querySelectorAll('.simrecview')].find(e => /Middles on the total/i.test(e.textContent)));
     document.getElementById('clear').click(); await wait();
     await smStore.removeItem('callsheet3.card.v1');
-    return { panel0, before, stored, after, now, watch, pairs, note, calc, calc2, take, taking, stillOpen, rec, recHead };
+    return { panel0, before, stored, after, now, watch, pairs, fit, note, calc, calc2, take, taking, stillOpen, rec, recHead };
   });
   chk(/(The apps now|No odds on the row)/.test(midT.panel0) && midT.before.head === false && midT.before.cards === 0 && /1 total held on this date, no window open/.test(midT.before.text)
       && midT.stored.logged && midT.stored.now && midT.stored.at === '2026-11-13T22:30:00Z' && midT.stored.line === '230.5' && /230\.5/.test(midT.stored.markets)
@@ -1980,7 +1981,7 @@ const CHECKS = ["dome","playoff","agconf","hgconf","agbk","hgbk"];
       && /^with your OVER 230\.5 -110 \(the sheet's pick\) · both win [89]\.\d%, needs 4\.[0-9]% · the market's number 234\.5$/i.test(midT.after.n3) && midT.after.take
       && /^The apps now \(the odds run of 2026-11-13 22:30 UTC\), the market's number 234\.5: FanDuel 234\.5 \(-108\/-112\) · BetMGM 234\.5 \(-110\/-110\) · DraftKings 235 \(-112\/-108\) · Fanatics 234\.5 \(-110\/-110\)$/.test(midT.now)
       && midT.watch.cls === 'midwatch pays' && /MIDDLE OPEN · a 4\.5-point window · pays \+[4-6]\.\d% of the stake You hold OVER 230\.5 at -110 \(the sheet's pick\); the market's number is 234\.5, so that leg alone is 5[6-9]\.\d% to win\. The best under now: DraftKings 235 at -108\. Both win [89]\.\d% \(the pair needs 4\.[0-9]%\)/i.test(midT.watch.text)
-      && midT.pairs.length === 6 && midT.pairs.every(p => /\|(FanDuel|BetMGM|DraftKings|Fanatics) \d+(\.5)? -\d+/.test(p)) && /^\d+ pairs across the apps' main and alternate numbers, the best six shown; none pays at these prices/.test(midT.note)
+      && midT.pairs.length === 6 && midT.pairs.every(p => /\|(FanDuel|BetMGM|DraftKings|Fanatics)( alt)? \d+(\.5)? -\d+/.test(p)) && midT.fit === true && /^\d+ pairs across the apps' main and alternate numbers, the best six shown; none pays at these prices/.test(midT.note)
       && /^Pays: a 8-point window, both win 1[5-9]\.\d%, the pair needs 4\.8% at these prices: \+\d+\.\d% of the stake expected/.test(midT.calc) && /^(The book's price|Positive, but under a three-point gap): a 2-point window, both win [234]\.\d%/.test(midT.calc2)
       && midT.take.length === 1 && /^middle\|UNDER\|235\|-108\|draftkings\|OVER 230\.5 -110\|4\.5\|Total UNDER 235 at DraftKings \(the middle with OVER 230\.5\)$/.test(midT.take[0])
       && /Total UNDER 235 at DraftKings \(the middle with OVER 230\.5\) 50% by the sim · middle · -108 needs 51\.9% Jazz @ Nuggets · the middle's second leg/i.test(midT.taking) && /TAKING/i.test(midT.stillOpen)

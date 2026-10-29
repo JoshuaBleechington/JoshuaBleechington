@@ -1765,3 +1765,10 @@ leg marks the row like a simulation call with the app and the leg it
 pairs with, lists under Taking tonight and the phone sheet, and grades as
 a pair on the simulation record's new Middles line (both won, one pushed,
 split, the pair's units, and the first leg alone beside it).
+
+The pairs table was wider than the card (29 Oct 2026, the user: "the table
+for middles is off", the last column cut off on a laptop and the whole
+card wider than a phone): it is five columns on fixed widths now, the app
+on its own line over the number and price, the break-even under the
+both-win chance and the verdict under the pair's figure, and the harness
+measures that the table sits inside the card.

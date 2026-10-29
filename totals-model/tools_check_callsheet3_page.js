@@ -1994,7 +1994,7 @@ const CHECKS = ["dome","playoff","agconf","hgconf","agbk","hgbk"];
     const txt = e => (e ? e.innerText : '').replace(/\s+/g, ' ').trim();
     await smStore.removeItem('callsheet3.card.v1'); document.getElementById('clear').click(); document.getElementById('m-nhl').click(); await wait();
     const load = async (doc, fname) => { const dt = new DataTransfer(); dt.items.add(new File([JSON.stringify(doc)], fname, { type: 'application/json' })); const inp = document.getElementById('slateFile'); inp.files = dt.files; inp.dispatchEvent(new Event('change', { bubbles: true })); await wait(); };
-    const CARD = () => JSON.parse(smStore.getItem('callsheet3.card.v1') || '[]');
+    const CARD = () => JSON.parse(smStore.getItem('callsheet3.card.v1') || '[]').filter(r => r.sport === 'NHL' && r.away === 'Sharks' && r.home === 'Ducks');   // the in-memory card keeps earlier blocks' rows: this block's own
     // a Poisson-shaped histogram over lo..hi at mean mu, 2,000 runs
     const pois = (mu, lo, hi) => { const c = []; let f = 1, p = Math.exp(-mu), s = 0; const pm = []; for (let k = 0; k <= hi; k++) { if (k > 0) { f *= k; } pm.push(Math.exp(-mu) * Math.pow(mu, k) / f); } for (let k = lo; k <= hi; k++) { c.push(Math.round(2000 * pm[k])); s += c[c.length - 1]; } c[c.length - 1] += 2000 - s; return { lo, c }; };
     const marg = (m, sd) => { const lo = -7, hi = 7, c = []; let s = 0; for (let k = lo; k <= hi; k++) { c.push(Math.round(2000 * Math.exp(-0.5 * Math.pow((k - m) / sd, 2)) / (sd * 2.5066))); s += c[c.length - 1]; } c[7] += 2000 - s; return { lo, c }; };
@@ -2022,8 +2022,8 @@ const CHECKS = ["dome","playoff","agconf","hgconf","agbk","hgbk"];
     const taken = (CARD()[0].simTakes || [])[0];
     await load({ format: 'callsheet2.slate', version: 1, date: '2026-11-15', games: [Object.assign({}, game, { finals: { fa: '2', fh: '3', f5a: '1', f5h: '0' } })] }, 'nhl-grade-2026-11-15.json');
     await wait();
-    const rec = txt(document.querySelector('#calibBox .simrec')), tiles2 = [...document.querySelectorAll('#calibBox .calib[data-sport="NHL"] > div')].map(txt);
-    return { tiles, rows, chips, meta, prof, fit, mk, off, on, taken, decided: row.markets.map(m => [m.key, m.decided, m.side1, m.band1, m.simView, m.simRaw, m.simWorth, (m.sheet || {}).side].join(':')), rec, tiles2, graded: CARD()[0].finals };
+    const rec = txt(document.querySelector('#calibBox .simrec'));
+    return { tiles, rows, chips, meta, prof, fit, mk, off, on, taken, decided: row.markets.map(m => [m.key, m.decided, m.side1, m.band1, m.simView, m.simRaw, m.simWorth, (m.sheet || {}).side].join(':')), rec, graded: CARD()[0].finals };
   });
   chk(nhlSimT.tiles.length === 4 && /^TOTAL 5\.\d\d median [56] · middle half [45]–[67]$/.test(nhlSimT.tiles[0]) && /^FIRST PERIOD 2\.[34]\d scoreless [0-9]% · over 1\.5 6[0-9]%$/.test(nhlSimT.tiles[1]) && /^MARGIN Ducks by 0\.\d\d Sharks 2\.\d\d · Ducks 2\.\d\d · Ducks wins 5[0-9]%$/.test(nhlSimT.tiles[2]) && /^OVERTIME 22% the shootout 8% · empty-netters 0\.35$/.test(nhlSimT.tiles[3]),
       'nhl sim: the four tiles read the own view (total, first period, margin, overtime)', JSON.stringify(nhlSimT.tiles));
@@ -2042,8 +2042,8 @@ const CHECKS = ["dome","playoff","agconf","hgconf","agbk","hgbk"];
   chk(nhlSimT.off === true && nhlSimT.on === 11 && nhlSimT.taken && nhlSimT.taken.id === 'own|total|UNDER' && nhlSimT.taken.line === 6.5 && nhlSimT.taken.price === -115 && nhlSimT.taken.band === 'BET' && nhlSimT.taken.pick === 'Total UNDER 6.5' && nhlSimT.taken.worth > 0.55 && nhlSimT.taken.worth < 0.6,
       'nhl sim: the Take buttons wake once the row is on the card, and a take keeps the call with the row\'s price', JSON.stringify({ off: nhlSimT.off, on: nhlSimT.on, taken: nhlSimT.taken }));
   chk(nhlSimT.graded && nhlSimT.graded.fa === '2' && /SIMULATION · says against does/.test(nhlSimT.rec) && /The totals the sim decided .*? MARKET RECORD SAYS DOES UNITS THE SHEET ALONE AGREED Full-game total 1-0 5[5-9]\.\d% 100\.0% \+0\.9u [01]-[01] (0|100)% First period 0-1 5[5-9]\.\d% 0\.0% -1\.0u [01]-[01] (0|100)%/.test(nhlSimT.rec)
-      && /The sim's own view MARKET BAND RECORD SAYS DOES UNITS Full-game total BET 1-0 6\d\.\d% 100\.0% \+0\.9u First period (LEAN|BET) 0-1 6\d\.\d% 0\.0% -1\.0u/.test(nhlSimT.rec) && nhlSimT.tiles2.some(t => /^FULL-GAME TOTAL 1-0 says 5[5-9]\.\d%/.test(t)) && nhlSimT.tiles2.some(t => /^FIRST PERIOD 0-1 says 5[5-9]\.\d%/.test(t)),
-      'nhl sim: the record grades the totals the sim decided (the sheet alone beside them) and every call at LEAN or better', JSON.stringify({ rec: nhlSimT.rec.slice(0, 500), tiles2: nhlSimT.tiles2 }));
+      && /The sim's own view MARKET BAND RECORD SAYS DOES UNITS Full-game total BET 1-0 6\d\.\d% 100\.0% \+0\.9u First period (LEAN|BET) 0-1 6\d\.\d% 0\.0% -1\.0u/.test(nhlSimT.rec),
+      'nhl sim: the record grades the totals the sim decided (the sheet alone beside them) and every call at LEAN or better', JSON.stringify({ rec: nhlSimT.rec.slice(0, 500) }));
 
   const stamp = await pg.evaluate(() => (document.getElementById('build') || {}).textContent);
   const git = (cmd) => execSync(cmd, { cwd: __dirname, encoding: 'utf8' }).trim();

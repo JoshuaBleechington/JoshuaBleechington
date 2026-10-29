@@ -1879,12 +1879,16 @@ of the period (r 0.044 against the naive share's 0.080); against DraftKings'
 1.5 at its price the own view's chance kept 61% of its lean (slope 0.61,
 shrink 0.39), the anchored view's 78%, and the book's price itself read
 sharper (slope 1.52): betting the own view where it beat the price by three
-points went 49-56. The team totals, the moneyline, the puck line and the
-other periods had no closes to measure against and keep a priori halves.
+points went 49-56. The first half of 2024-25 (631 games with a DraftKings
+1.5, no 2023-24 behind the profiles, no full-game closes to anchor to) kept
+none of it (slope −0.15; against the price by three points 17-20), so the
+first period's shrink is the pooled 0.64 (slope 0.36 over 1,942 games).
+The team totals, the moneyline, the puck line and the other periods had
+no closes to measure against and keep a priori halves.
 
 So the sim decides, as asked, and the decision is honest about itself: a raw
 70% on the full-game total is a LEAN (worth 55%), the first period needs a
-raw 60% for one, and most nights the decision reads NO BET with the sheet's
+raw 64% for one, and most nights the decision reads NO BET with the sheet's
 own number beside it; the record's new block keeps the two side by side and
 will say, after a month of hockey, whether the sim's side or the sheet's
 side was the one to follow.

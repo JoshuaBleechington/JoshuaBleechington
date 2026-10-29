@@ -658,12 +658,13 @@
   var NHL_SIM_BAND_WORDS = { STRONG: "STRONG BET", BET: "BET", LEAN: "LEAN" };
   /* the replay of 2025-26 (tools_backtest_nhl_sim.py, 1,312 games): the own view's lean on the full-game total is worth a
      quarter of itself against Pinnacle's close (slope 0.25; the leans at 58%+ went 207-174, and with the market's own
-     price in the model the sim's weight was nil); on DraftKings' first-period 1.5 it is worth 61% (slope 0.61), the
-     anchored view 78%, and the book's price itself read sharper (slope 1.52; the own view against the price by three
-     points went 49-56). The rest had no closes to measure and keep a priori halves. A row run before this carries its
-     own shrink in the box; these stand in when the box has none. */
-  var NHL_SIM_SHRINK_DEFAULT = { total: 0.75, p1: 0.39, p1_mkt: 0.22, team: 0.5, ml: 0.5, pl: 0.5, period: 0.5 };
-  var NHL_SIM_REPLAY = "the replay of 2025-26: the own view's full-game lean worth a quarter of itself against Pinnacle's close, its first-period lean 61% against DraftKings' 1.5, the book's price the sharper read";
+     price in the model the sim's weight was nil); on DraftKings' first-period 1.5 it is worth 61% (slope 0.61) in
+     2025-26 and nothing in the first half of 2024-25 (631 games, no prior season behind the profiles; slope -0.15),
+     36% pooled (shrink 0.64); the anchored view 78%, and the book's price itself read sharper (slope 1.52; the own
+     view against the price by three points went 49-56 and 17-20). The rest had no closes to measure and keep a priori
+     halves. A row run before this carries its own shrink in the box; these stand in when the box has none. */
+  var NHL_SIM_SHRINK_DEFAULT = { total: 0.75, p1: 0.64, p1_mkt: 0.22, team: 0.5, ml: 0.5, pl: 0.5, period: 0.5 };
+  var NHL_SIM_REPLAY = "the replays of 2025-26 and the first half of 2024-25: the own view's full-game lean worth a quarter of itself against Pinnacle's close, its first-period lean 36% against DraftKings' 1.5 (61% one season, nothing the other), the book's price the sharper read";
   function nhlSimRaw() {
     var v = "";
     try { v = txt("nhlsim"); } catch (e) { v = ""; }   // the row being re-scored, else the form
@@ -764,7 +765,7 @@
     var sheetP = sheet ? (sheet.side1 && sheet.side1 !== sheet.side && sheet.other ? sheet.other.p : sheet.p) : null;
     var notes = ["<b>The simulation decides this " + (key === "p1" ? "first-period" : "full-game") + " total</b> (29 Oct 2026): its " + (dec.view === "own" ? "own view" : "market-anchored view") +
                  " puts the <b>" + esc(dec.side) + "</b> at " + (100 * dec.p).toFixed(1) + "% raw, worth <b>" + (100 * dec.worth).toFixed(1) + "%</b> after the replay's shrink (" +
-                 (key === "p1" ? "the first-period lean kept 61% of itself against DraftKings' 1.5 over 1,311 games of 2025-26, and the book's price read sharper, so the price decides the side where they differ"
+                 (key === "p1" ? "the first-period lean kept 61% of itself against DraftKings' 1.5 over 1,311 games of 2025-26 and nothing over 631 of 2024-25, 36% pooled, and the book's price read sharper, so the price decides the side where they differ"
                                : "the full-game lean kept a quarter of itself against Pinnacle's close over 1,250 games of 2025-26: the leans at 58% and up went 207-174, and the close already carried the rest") + "): " + esc(band) + "." +
                  (sheet ? " The sheet's own number says " + esc(sheetSide) + (sheetP !== null && sheetP !== undefined ? " " + (100 * sheetP).toFixed(1) + "%" : "") + (sheetBand ? " (" + esc(sheetBand) + ")" : "") +
                           (sheetSide && sheetSide !== dec.side ? ": <b>they disagree</b>, and the sim's call stands; the record keeps both." : ": shown beside it, not scored.") : "")];

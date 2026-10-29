@@ -300,28 +300,40 @@ def run(a, season, prior_season):
     return rows
 
 
+def p_live(r, k):
+    """The chance of the side with the pushes set aside: P(over) / (1 - P(push))."""
+    push = r.get(k.replace("over", "push")) or 0.0
+    return r[k] / max(1e-9, 1 - push)
+
+
 def score(rows, season):
+    all_rows = list(rows)
     rows = [r for r in rows if r.get("line") is not None]
     n = len(rows)
-    print("\n== %d games of %s with a close ==" % (n, season))
-    tot = [r["fa"] + r["fh"] for r in rows]
-    print("  landed %.3f a game (sd %.3f); the sim's own mean %.3f (sd across games %.3f); the market's fair %.3f; overtime landed %s, the sim %s; empty-netters landed %.3f, the sim %.3f" % (
-        statistics.mean(tot), statistics.pstdev(tot), statistics.mean(r["sim_mean"] for r in rows), statistics.pstdev([r["sim_mean"] for r in rows]),
-        statistics.mean(r["fair"] for r in rows), pct(sum(1 for r in rows if r["end"] != "REG") / n), pct(statistics.mean(r["sim_ot"] for r in rows)),
-        statistics.mean(r.get("en") or 0 for r in rows), statistics.mean(r["sim_en"] for r in rows)))
+    na = len(all_rows)
+    print("\n== %d games of %s, %d with a close ==" % (na, season, n))
+    tot_all = [r["fa"] + r["fh"] for r in all_rows]
+    print("  landed %.3f a game (sd %.3f); the sim's own mean %.3f (sd across games %.3f)%s; overtime landed %s, the sim %s; empty-netters landed %.3f, the sim %.3f" % (
+        statistics.mean(tot_all), statistics.pstdev(tot_all), statistics.mean(r["sim_mean"] for r in all_rows), statistics.pstdev([r["sim_mean"] for r in all_rows]),
+        ("; the market's fair %.3f" % statistics.mean(r["fair"] for r in rows)) if n else "", pct(sum(1 for r in all_rows if r["end"] != "REG") / na), pct(statistics.mean(r["sim_ot"] for r in all_rows)),
+        statistics.mean(r.get("en") or 0 for r in all_rows), statistics.mean(r["sim_en"] for r in all_rows)))
     # the first period landed vs the sim's
-    p1 = [r["p1a"] + r["p1h"] for r in rows]
-    print("  first period landed %.3f (sd %.3f); the sim's own %.3f, anchored %.3f; the naive share 0.294 x fair %.3f" % (
-        statistics.mean(p1), statistics.pstdev(p1), statistics.mean(r["sim_p1"] for r in rows), statistics.mean(r["anc_p1"] for r in rows), 0.294 * statistics.mean(r["fair"] for r in rows)))
+    p1_all = [r["p1a"] + r["p1h"] for r in all_rows]
+    print("  first period landed %.3f (sd %.3f); the sim's own %.3f%s" % (
+        statistics.mean(p1_all), statistics.pstdev(p1_all), statistics.mean(r["sim_p1"] for r in all_rows),
+        ("; anchored %.3f; the naive share 0.294 x fair %.3f" % (statistics.mean(r["anc_p1"] for r in rows), 0.294 * statistics.mean(r["fair"] for r in rows))) if n else ""))
+    c1 = ols([[r["sim_p1"]] for r in all_rows], p1_all)
+    print("  landed P1 on the own P1 alone, every game: slope %.3f (t %.1f); r %.3f" % (c1[1], t_of([r["sim_p1"] for r in all_rows], p1_all, c1), corr([r["sim_p1"] for r in all_rows], p1_all)))
+    if not n:
+        score_p1_lines(all_rows)
+        return
+    tot = [r["fa"] + r["fh"] for r in rows]
 
     # ---- the full-game total ----
     print("\n== the full-game total: the sim's own view against the close ==")
     live = [r for r in rows if (r["fa"] + r["fh"]) != r["line"]]
     ys = [1 if (r["fa"] + r["fh"]) > r["line"] else 0 for r in live]
     # calibration of the own view's P(over) (pushes set aside: P(over | no push))
-    def p_live(r, k):
-        push = r.get(k.replace("over", "push")) or 0.0
-        return r[k] / max(1e-9, 1 - push)
     xs = [logit(p_live(r, "sim_p_over")) for r in live]
     a_, b_ = fit_slope(xs, ys)
     print("  own view: logistic slope %.2f (intercept %.2f) on %d games: the raw chance is worth %.0f%% of itself -> shrink %.2f" % (b_, a_, len(live), 100 * b_, max(0.0, 1 - b_)))
@@ -384,28 +396,36 @@ def score(rows, season):
         print("  landed P1 on the %s P1 alone: slope %.3f (t %.1f); r %.3f" % (lab, c[1], t_of([r[key] for r in rows], p1, c), corr([r[key] for r in rows], p1)))
     c = ols([[0.294 * r["fair"]] for r in rows], p1)
     print("  landed P1 on the naive share alone: slope %.3f (t %.1f); r %.3f" % (c[1], t_of([0.294 * r["fair"] for r in rows], p1, c), corr([0.294 * r["fair"] for r in rows], p1)))
+    score_p1_lines(rows)
+
+
+def score_p1_lines(rows):
+    """The first-period line: the own view (and the anchored view when the game had a close) against the book's price."""
     with_p1 = [r for r in rows if r.get("p1") and r.get("sim_p1_over") is not None]
+    anc = all(r.get("anc_p1_over") is not None for r in with_p1) and bool(with_p1)
     if with_p1:
         print("\n== the first-period line (%d games with one, the user's odds-periods pull: %s first) ==" % (len(with_p1), with_p1[0]["p1"]["book"]))
         live1 = [r for r in with_p1 if (r["p1a"] + r["p1h"]) != r["p1"]["line"]]
         y1 = [1 if (r["p1a"] + r["p1h"]) > r["p1"]["line"] else 0 for r in live1]
         lines = collections.Counter(r["p1"]["line"] for r in live1)
         print("  lines: %s" % ", ".join("%g x%d" % (k, v) for k, v in sorted(lines.items())))
-        for lab, key in (("own", "sim_p1_over"), ("anchored", "anc_p1_over")):
+        views = [("own", "sim_p1_over")] + ([("anchored", "anc_p1_over")] if anc else [])
+        for lab, key in views:
             x1 = [logit(p_live(r, key)) for r in live1]
             a1, b1 = fit_slope(x1, y1)
             print("  %s view's P(over the line): slope %.2f (intercept %.2f) -> shrink %.2f" % (lab, b1, a1, max(0.0, 1 - b1)))
         xb = [logit(devig(r["p1"]["op"], r["p1"]["up"])) for r in live1]
         ab, bb = fit_slope(xb, y1)
         print("  the book's own devigged P(over): slope %.2f (intercept %.2f)" % (bb, ab))
-        both = fit2([logit(p_live(r, "anc_p1_over")) for r in live1], xb, y1)
-        if both:
-            print("  anchored view and the book together: the sim's logit %.2f, the book's %.2f" % (both[1], both[2]))
+        if anc:
+            both = fit2([logit(p_live(r, "anc_p1_over")) for r in live1], xb, y1)
+            if both:
+                print("  anchored view and the book together: the sim's logit %.2f, the book's %.2f" % (both[1], both[2]))
         both = fit2([logit(p_live(r, "sim_p1_over")) for r in live1], xb, y1)
         if both:
             print("  own view and the book together: the sim's logit %.2f, the book's %.2f" % (both[1], both[2]))
         # the record at the book's price: bet the sim's side when its chance beats the book's implied by the gap
-        for lab, key in (("own", "sim_p1_over"), ("anchored", "anc_p1_over")):
+        for lab, key in views:
             for gap in (0.03, 0.05, 0.08):
                 w = l = 0
                 units = 0.0

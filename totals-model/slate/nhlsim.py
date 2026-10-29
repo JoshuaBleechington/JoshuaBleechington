@@ -94,9 +94,10 @@ LEAGUE = {
 # (shrink 0.75): the leans at 58% and up went 207-174, at 60% and up 131-108, and with the market's own price in the same
 # model the sim's weight was nil. Against DraftKings' first-period 1.5 the own view's slope was 0.61 (shrink 0.39), the
 # anchored view's 0.78, and the book's price itself 1.52: betting the own view where it beat the price by three points
-# went 49-56. The team totals, the moneyline, the puck line and the other periods had no closes to measure against and
-# keep a priori halves.
-SHRINK = {"total": 0.75, "p1": 0.39, "p1_mkt": 0.22, "team": 0.5, "ml": 0.5, "pl": 0.5, "period": 0.5}
+# went 49-56. On the first half of 2024-25 (631 games with a line, no prior season behind the profiles) the own view's
+# first-period slope was -0.15: nothing. Pooled over the 1,942 games the slope is 0.36, so the shrink is 0.64. The team
+# totals, the moneyline, the puck line and the other periods had no closes to measure against and keep a priori halves.
+SHRINK = {"total": 0.75, "p1": 0.64, "p1_mkt": 0.22, "team": 0.5, "ml": 0.5, "pl": 0.5, "period": 0.5}
 BANDS = [(0.62, "STRONG"), (0.58, "BET"), (0.55, "LEAN")]   # on the WORTH; hockey's chances are compressed: a goal of edge on the total is sixteen points at the number
 STATES = ("5v5", "PP", "PK", "44", "33", "EN", "EXTRA")
 

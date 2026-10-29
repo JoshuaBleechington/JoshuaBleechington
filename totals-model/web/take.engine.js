@@ -58,24 +58,26 @@
     return out;
   }
   function propsTakenOn(dateISO) { return (typeof propsSource === "function" ? propsSource() : []).filter(function (r) { return (r.gdate || "") === dateISO && r.take && propHas(r); }); }
-  /* the simulation's calls taken on NBA rows (26 Oct 2026): the mark lives on the row as row.simTakes */
+  /* the simulation's calls taken on NBA rows (26 Oct 2026) and NHL rows (29 Oct 2026): the mark lives on the row as row.simTakes */
   function simTakesOn(dateISO) {
     var out = [];
     card.forEach(function (r) {
-      if ((r.gdate || "") !== dateISO || isVoid(r) || r.sport !== "NBA") return;
+      if ((r.gdate || "") !== dateISO || isVoid(r) || (r.sport !== "NBA" && r.sport !== "NHL")) return;
       (r.simTakes || []).forEach(function (t) { out.push({ row: r, t: t }); });
     });
     return out;
   }
+  function simTakeResOf(t, row) { return row && row.sport === "NHL" ? nhlSimTakeRes(t, row) : nbaSimTakeRes(t, row); }
+  function simTakeBtnOf(row, view, key, side) { return row && row.sport === "NHL" ? nhlSimTakeBtn(row, view, key, side) : nbaSimTakeBtn(row, view, key, side); }
   function simTakeCard(x) {
-    var t = x.t, res = nbaSimTakeRes(t, x.row), price = t.price === null || t.price === undefined ? -110 : t.price;
+    var t = x.t, res = simTakeResOf(t, x.row), price = t.price === null || t.price === undefined ? -110 : t.price;
     return '<div class="pk taking sim" data-open="' + x.row.id + '" title="Load ' + esc(x.row.matchup) + ' into the form">' +
-      '<div class="n1">TAKING · NBA · SIMULATION' + (t.at ? ' · marked ' + esc(takeWhen(t.at)) : '') + '</div>' +
+      '<div class="n1">TAKING · ' + esc(x.row.sport) + ' · SIMULATION' + (t.at ? ' · marked ' + esc(takeWhen(t.at)) : '') + '</div>' +
       '<div class="n2">' + esc(t.pick) + '</div>' +
       '<div class="n3">' + (t.p === null || t.p === undefined ? esc(t.band) : (100 * t.p).toFixed(0) + '% by the sim' + (t.worth === null || t.worth === undefined ? '' : ' · worth ' + (100 * t.worth).toFixed(0) + '%') + (t.band === "no call" ? ' (no call by its worth)' : ' · ' + esc(t.band))) +
         ' · ' + (t.price === null || t.price === undefined ? 'no price on the row (−110 assumed)' : sgn(t.price, 0) + ' needs ' + (implied(price) * 100).toFixed(1) + '%') + (res ? ' · <span class="chip ' + res + '">' + esc(res) + '</span>' : '') + '</div>' +
       '<div class="n4">' + esc(x.row.matchup) + ' · ' + esc(nbaSimTakeViewLabel(t.view)) + '</div>' +
-      '<div class="n6">' + nbaSimTakeBtn(x.row, t.view, t.key, t.side) + '</div></div>';
+      '<div class="n6">' + simTakeBtnOf(x.row, t.view, t.key, t.side) + '</div></div>';
   }
   function propTakeRes(r) { return !r.result || r.result === "graded" || r.result === "void" ? null : r.result; }
   /* a same-game pair you take (26 Oct 2026): rebuilt from its two legs, graded as the Same-game pairs tile grades every ticket */
@@ -108,7 +110,7 @@
     if (!n) { box.innerHTML = ""; $("takingCount").textContent = ""; return; }
     var s = { n: 0, w: 0, l: 0, p: 0, units: 0 }, h = "";
     bets.forEach(function (x) { takeTally(s, gradeMarket(x.mk, x.row.finals), x.mk.price); h += takeCard(x); });
-    sims.forEach(function (x) { takeTally(s, nbaSimTakeRes(x.t, x.row), x.t.price === null || x.t.price === undefined ? -110 : x.t.price); h += simTakeCard(x); });
+    sims.forEach(function (x) { takeTally(s, simTakeResOf(x.t, x.row), x.t.price === null || x.t.price === undefined ? -110 : x.t.price); h += simTakeCard(x); });
     ps.forEach(function (r) { takeTally(s, propTakeRes(r), r.price); h += propTakeCard(r); });
     prs.forEach(function (t, i) { pairTakeTally(s, t); h += propsPairCard(t, i, true); });
     h += '<div class="pk taking sum"><div class="n1">TONIGHT</div><div class="n2">' + n + ' bet' + (n === 1 ? '' : 's') + ' marked</div>' +
@@ -124,7 +126,7 @@
       out.push((++k) + ". " + x.mk.pick + " " + sgn(x.mk.price, 0) + " · " + (x.mk.p * 100).toFixed(1) + "% needs " + (implied(x.mk.price) * 100).toFixed(1) + "% · " + x.row.matchup + " · " + (x.mk.label || x.mk.key) + (res ? " · " + String(res).toUpperCase() : ""));
     });
     simTakesOn(dateISO).forEach(function (x) {
-      var t = x.t, res = nbaSimTakeRes(t, x.row);
+      var t = x.t, res = simTakeResOf(t, x.row);
       out.push((++k) + ". " + t.pick + " " + (t.price === null || t.price === undefined ? "(no price)" : sgn(t.price, 0)) + " · the simulation, " + nbaSimTakeViewLabel(t.view) + (t.p === null ? "" : ": " + (100 * t.p).toFixed(0) + "%" + (t.worth === null || t.worth === undefined ? "" : ", worth " + (100 * t.worth).toFixed(0) + "%")) + " · " + t.band + " · " + x.row.matchup + (res ? " · " + String(res).toUpperCase() : ""));
     });
     propsTakenOn(dateISO).forEach(function (r) {
@@ -152,8 +154,8 @@
         if (res === null || res === "invalid") return;
         takeTally(bets, res, v.price); if (res !== "push") bets.says += v.p;
       });
-      if (r.sport === "NBA") (r.simTakes || []).forEach(function (t) {
-        var res = nbaSimTakeRes(t, r); if (!res) return;
+      if (r.sport === "NBA" || r.sport === "NHL") (r.simTakes || []).forEach(function (t) {
+        var res = simTakeResOf(t, r); if (!res) return;
         takeTally(sims, res, t.price === null || t.price === undefined ? -110 : t.price); if (res !== "push") sims.says += (t.p === null || t.p === undefined ? 0.5 : t.p);
       });
     });
@@ -183,7 +185,7 @@
     else togglePropTake(t.getAttribute("data-ptake"));
   }, true);
   /* Add puts the game on the card, and the Simulation card's greyed buttons come alive once the row exists: redraw it after the add */
-  if ($("add") && $("nbaSimPanel")) $("add").addEventListener("click", function () { setTimeout(function () { if (sport === "NBA") nbaSimPanel(); }, 0); });
+  if ($("add") && ($("nbaSimPanel") || $("nhlSimPanel"))) $("add").addEventListener("click", function () { setTimeout(function () { if (sport === "NBA" && typeof nbaSimPanel === "function") nbaSimPanel(); if (sport === "NHL" && typeof nhlSimPanel === "function") nhlSimPanel(); }, 0); });
   if ($("taking")) {
     $("taking").addEventListener("click", function (e) {
       var t = e.target.closest("[data-open]"); if (t) { openRow(t.dataset.open); return; }

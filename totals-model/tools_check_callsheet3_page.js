@@ -26,7 +26,7 @@ const IDS = ["away","home","line","op","up","opened","gdate","aera","hera","aip"
              "agsv","hgsv","agsh","hgsh","asf","hsf","app","hpp","apk","hpk","pl","plh","pla","p1line","p1op","p1up",
              "ntick","ncash","ap1l10","hp1l10","axgf","axga","hxgf","hxga","xglg","nhlform",
              "ngoalies","agname","hgname","agstart","hgstart","agok","hgok",
-             "agf","aga","hgf","hga","lgg","angp","hngp","aenc","aens","henc","hens",
+             "agf","aga","hgf","hga","lgg","angp","hngp","aenc","aens","henc","hens","nhlsim",
              "h1line","h1op","h1up","naort","nhort","nadrt","nhdrt","napace","nhpace","nagp","nhgp","nlrtg","nlpace","narest","nhrest","nbaout","nbaq","nbactx","ncrew","nbarefs","nbalineup","nbaform","nbasim"];
 const CHECKS = ["dome","playoff","agconf","hgconf","agbk","hgbk"];
 
@@ -1987,6 +1987,63 @@ const CHECKS = ["dome","playoff","agconf","hgconf","agbk","hgbk"];
       && /Total UNDER 235 at DraftKings \(the middle with OVER 230\.5\) 50% by the sim · middle · -108 needs 51\.9% Jazz @ Nuggets · the middle's second leg/i.test(midT.taking) && /TAKING/i.test(midT.stillOpen)
       && /^Pairs Both won One pushed Split Said both The pair The first leg alone 1 1 \(100\.0%\) 0 0 [89]\.\d% \+1\.8[0-9]u \+0\.91u$/i.test(midT.rec) && /the pair graded together/.test(midT.recHead),
       'middles: the Middles card prices every over/under pair the four apps post off the sheet\'s normal and says none pays on an ordinary night; a total taken on the row is watched, and when a later odds run moves the number 4.5 points the board and the panel name the best second leg at its app with the pair\'s chance and what it pays; the apps\' numbers follow the newest run while the logged line stays; the calculator prices a typed pair; the second leg takes from the panel with the leg it pairs with, lists under Taking tonight, and the graded pair lands on the record\'s Middles line beside what the first leg alone did', JSON.stringify(midT).slice(0, 2600));
+
+  // ---- the hockey simulation (29 Oct 2026): the card, the sim deciding the totals, a take, the record --------------
+  const nhlSimT = await pg.evaluate(async () => {
+    const wait = () => new Promise(r => setTimeout(r, 260));
+    const txt = e => (e ? e.innerText : '').replace(/\s+/g, ' ').trim();
+    await smStore.removeItem('callsheet3.card.v1'); document.getElementById('clear').click(); document.getElementById('m-nhl').click(); await wait();
+    const load = async (doc, fname) => { const dt = new DataTransfer(); dt.items.add(new File([JSON.stringify(doc)], fname, { type: 'application/json' })); const inp = document.getElementById('slateFile'); inp.files = dt.files; inp.dispatchEvent(new Event('change', { bubbles: true })); await wait(); };
+    const CARD = () => JSON.parse(smStore.getItem('callsheet3.card.v1') || '[]');
+    // a Poisson-shaped histogram over lo..hi at mean mu, 2,000 runs
+    const pois = (mu, lo, hi) => { const c = []; let f = 1, p = Math.exp(-mu), s = 0; const pm = []; for (let k = 0; k <= hi; k++) { if (k > 0) { f *= k; } pm.push(Math.exp(-mu) * Math.pow(mu, k) / f); } for (let k = lo; k <= hi; k++) { c.push(Math.round(2000 * pm[k])); s += c[c.length - 1]; } c[c.length - 1] += 2000 - s; return { lo, c }; };
+    const marg = (m, sd) => { const lo = -7, hi = 7, c = []; let s = 0; for (let k = lo; k <= hi; k++) { c.push(Math.round(2000 * Math.exp(-0.5 * Math.pow((k - m) / sd, 2)) / (sd * 2.5066))); s += c[c.length - 1]; } c[7] += 2000 - s; return { lo, c }; };
+    const view = (tot, p1, m) => ({ total: pois(tot, 0, 14), reg: pois(tot - 0.25, 0, 14), p: [pois(p1, 0, 7), pois(tot * 0.34, 0, 7), pois(tot * 0.36, 0, 7)], p1a: pois(p1 / 2, 0, 5), p1h: pois(p1 / 2, 0, 5),
+                                   away: pois(tot / 2 - m / 2, 0, 9), home: pois(tot / 2 + m / 2, 0, 9), margin: marg(m, 2.3), ot: 0.22, so: 0.08, en: 0.35 });
+    const sim = { v: 1, runs: 2000, own: view(5.6, 2.4, 0.3), mkt: view(6.45, 1.95, 0.3), anchor: { line: 6.5, op: -105, up: -115, p_over: 0.489, p_home: 0.58, book: 'draftkings', p1line: 1.5, p1op: -125, p1up: 105 },
+                  shrink: { total: 0.5, p1: 0.5, team: 0.5, ml: 0.5, pl: 0.5, period: 0.5 }, bands: [[0.62, 'STRONG'], [0.58, 'BET'], [0.55, 'LEAN']], crew: 1.04, refs: [['Kelly Sutherland', 60, 7.2], ['Dan O\'Rourke', 95, 5.66]],
+                  prof: { away: { ab: 'SJS', n: 12, rf: 0.96, ra: 1.05, qf: 0.98, qa: 1.02, fin: 1.0, ppr: 0.97, pkr: 1.03, pen: 1.05, drawn: 0.98, b2b: false, gk: 1.01, gk_shots: 700, gk_name: 'Yaroslav Askarov' },
+                          home: { ab: 'ANA', n: 11, rf: 1.03, ra: 0.99, qf: 1.02, qa: 0.97, fin: 1.02, ppr: 1.04, pkr: 0.98, pen: 0.95, drawn: 1.02, b2b: true, gk: 0.99, gk_shots: 650, gk_name: 'Lukas Dostal' } }, credit: 'MoneyPuck.com shot data; ESPN play-by-play' };
+    const shop = JSON.stringify({ book: 'draftkings', total: { OVER: [['draftkings', -105, 6.5], ['fanduel', -110, 6.5]], UNDER: [['draftkings', -115, 6.5], ['fanduel', -110, 6.5]] },
+      team: { HOME: { OVER: [['draftkings', -120, 3.5]], UNDER: [['draftkings', 100, 3.5]] }, AWAY: { OVER: [['draftkings', 105, 2.5]], UNDER: [['draftkings', -125, 2.5]] } } });
+    const game = { sport: 'NHL', gdate: '2026-11-15', away: 'Sharks', home: 'Ducks' };
+    await load({ format: 'callsheet2.slate', version: 1, date: '2026-11-15', games: [Object.assign({}, game, { starters: { away: 'Yaroslav Askarov', home: 'Lukas Dostal' }, inputs: {
+      line: '6.5', op: '-105', up: '-115', hml: '-150', aml: '130', p1line: '1.5', p1op: '-125', p1up: '105', pl: '-1.5', plh: '180', pla: '-220', agsv: '0.905', hgsv: '0.912', agsh: '700', hgsh: '650',
+      agname: 'Yaroslav Askarov', hgname: 'Lukas Dostal', arest: '1', hrest: '0', odds: shop, nhlsim: JSON.stringify(sim) }, notes: [] })] }, 'nhl-slate-2026-11-15.json');
+    document.querySelector('#slateList [data-slate]').click(); await wait();
+    const panel = document.getElementById('nhlSimPanel');
+    const tiles = [...panel.querySelectorAll('.simtile')].map(txt), rows = [...panel.querySelectorAll('.simtab tbody tr')].map(txt), chips = [...panel.querySelectorAll('.simchip')].map(e => e.className + '|' + txt(e));
+    const meta = txt(panel.querySelector('.simmeta')), prof = txt(panel.querySelector('.simprof')), fit = panel.querySelector('.simtab').getBoundingClientRect().width <= panel.getBoundingClientRect().width + 1;
+    const mk = [...document.querySelectorAll('#markets .mk')].map(el => ({ key: el.dataset.key, pick: el.querySelector('.pick').childNodes[0].textContent.trim(), p: (el.querySelector('.p') || {}).textContent || '', band: (el.querySelector('.band') || {}).textContent || '', text: txt(el).slice(0, 600) }));
+    const off = [...panel.querySelectorAll('.takebtn')].every(b => b.disabled);
+    document.getElementById('add').click(); await wait();
+    const row = CARD()[0], on = [...document.getElementById('nhlSimPanel').querySelectorAll('.takebtn')].filter(b => !b.disabled).length;
+    const btn = [...document.getElementById('nhlSimPanel').querySelectorAll('.takebtn[data-stake]')].find(b => /\|own\|total\|UNDER$/.test(b.getAttribute('data-stake'))); if (btn) btn.click(); await wait();
+    const taken = (CARD()[0].simTakes || [])[0];
+    await load({ format: 'callsheet2.slate', version: 1, date: '2026-11-15', games: [Object.assign({}, game, { finals: { fa: '2', fh: '3', f5a: '1', f5h: '0' } })] }, 'nhl-grade-2026-11-15.json');
+    await wait();
+    const rec = txt(document.querySelector('#calibBox .simrec')), tiles2 = [...document.querySelectorAll('#calibBox .calib[data-sport="NHL"] > div')].map(txt);
+    return { tiles, rows, chips, meta, prof, fit, mk, off, on, taken, decided: row.markets.map(m => [m.key, m.decided, m.side1, m.band1, m.simView, m.simRaw, m.simWorth, (m.sheet || {}).side].join(':')), rec, tiles2, graded: CARD()[0].finals };
+  });
+  chk(nhlSimT.tiles.length === 4 && /^TOTAL 5\.\d\d median [56] · middle half [45]–[67]$/.test(nhlSimT.tiles[0]) && /^FIRST PERIOD 2\.[34]\d scoreless [0-9]% · over 1\.5 6[0-9]%$/.test(nhlSimT.tiles[1]) && /^MARGIN Ducks by 0\.\d\d Sharks 2\.\d\d · Ducks 2\.\d\d · Ducks wins 5[0-9]%$/.test(nhlSimT.tiles[2]) && /^OVERTIME 22% the shootout 8% · empty-netters 0\.35$/.test(nhlSimT.tiles[3]),
+      'nhl sim: the four tiles read the own view (total, first period, margin, overtime)', JSON.stringify(nhlSimT.tiles));
+  chk(nhlSimT.rows.length === 6 && /^Full-game total the sim decides 6\.5 UNDER 6[0-9]% BET · worth 5[5-9]% TAKE UNDER 5[0-9]% worth 5[0-4]% TAKE$/.test(nhlSimT.rows[0]) && /^First period the sim decides 1\.5 OVER 6\d% (LEAN|BET) · worth (5[5-9]|6\d)% TAKE OVER 5\d% worth 5[0-4]% TAKE$/.test(nhlSimT.rows[1])
+      && /^Puck line \(home\) -1\.5 /.test(nhlSimT.rows[2]) && /^Moneyline /.test(nhlSimT.rows[3]) && /^Sharks team total 2\.5 draftkings \+105\/-125 /.test(nhlSimT.rows[4]) && /^Ducks team total 3\.5 draftkings -120\/\+100 /.test(nhlSimT.rows[5])
+      && nhlSimT.chips.length === 11 && nhlSimT.chips.every(c => /^simchip sim(no|lean|bet|strong)\|(OVER|UNDER|HOME|AWAY) \d+%$/.test(c)) && nhlSimT.fit === true,
+      'nhl sim: six market rows with a chip, its worth and a Take in each view\'s column, and the table fits the card', JSON.stringify({ rows: nhlSimT.rows, chips: nhlSimT.chips.length, fit: nhlSimT.fit }));
+  chk(/^2,000 games, the sim's own view\. Anchored to draftkings's 6\.5 \(-105\/-115\) and a 58% home moneyline for the market view\. The sim decides the full-game and first-period totals from its own view\.$/.test(nhlSimT.meta)
+      && /^Profiles, against the league: Sharks shots ×0\.96 for \/ ×1\.05 against, quality ×0\.98 \/ ×1\.02, PP ×0\.97, PK ×1\.03, minors ×1\.05 \(12 games\); Yaroslav Askarov 1\.010 goals against expected on 700 shots · Ducks shots ×1\.03 for \/ ×0\.99 against, quality ×1\.02 \/ ×0\.97, PP ×1\.04, PK ×0\.98, minors ×0\.95, back to back \(11 games\); Lukas Dostal 0\.990 goals against expected on 650 shots · the crew's whistle ×1\.04 \(Kelly Sutherland 7\.2 a game, Dan O'Rourke 5\.7 a game\) · MoneyPuck\.com shot data; ESPN play-by-play$/.test(nhlSimT.prof),
+      'nhl sim: the view line names the anchor and the deciding view; the profiles line reads the clubs, the goalies and the crew', JSON.stringify({ meta: nhlSimT.meta, prof: nhlSimT.prof }));
+  chk(nhlSimT.mk.length >= 2 && nhlSimT.mk[0].key === 'total' && nhlSimT.mk[0].pick === 'UNDER 6.5' && /^5[5-9]\.\d%$/.test(nhlSimT.mk[0].p) && nhlSimT.mk[0].band === 'BET'
+      && nhlSimT.mk.some(m => m.key === 'p1' && m.pick === 'P1 OVER 1.5' && /^(5[5-9]|6\d)\.\d%$/.test(m.p) && m.band === 'BET'),
+      'nhl sim: the sim decides the total (UNDER 6.5 at the worth, BET) and the first period (OVER 1.5, BET)', JSON.stringify(nhlSimT.mk.map(m => [m.key, m.pick, m.p, m.band])));
+  chk(/^total:sim:UNDER:BET:own:0\.6\d+:0\.5[5-9]\d*:(OVER|UNDER)$/.test(nhlSimT.decided[0]) && /^p1:sim:OVER:(LEAN|BET):own:0\.6\d+:0\.5[5-9]\d*:(OVER|UNDER)$/.test(nhlSimT.decided.find(d => /^p1:/.test(d)) || ''),
+      'nhl sim: the stored markets carry the decision (the view, the raw chance, the worth) and the sheet\'s own side', JSON.stringify(nhlSimT.decided));
+  chk(nhlSimT.off === true && nhlSimT.on === 11 && nhlSimT.taken && nhlSimT.taken.id === 'own|total|UNDER' && nhlSimT.taken.line === 6.5 && nhlSimT.taken.price === -115 && nhlSimT.taken.band === 'BET' && nhlSimT.taken.pick === 'Total UNDER 6.5' && nhlSimT.taken.worth > 0.55 && nhlSimT.taken.worth < 0.6,
+      'nhl sim: the Take buttons wake once the row is on the card, and a take keeps the call with the row\'s price', JSON.stringify({ off: nhlSimT.off, on: nhlSimT.on, taken: nhlSimT.taken }));
+  chk(nhlSimT.graded && nhlSimT.graded.fa === '2' && /SIMULATION · says against does/.test(nhlSimT.rec) && /The totals the sim decided .*? MARKET RECORD SAYS DOES UNITS THE SHEET ALONE AGREED Full-game total 1-0 5[5-9]\.\d% 100\.0% \+0\.9u [01]-[01] (0|100)% First period 0-1 5[5-9]\.\d% 0\.0% -1\.0u [01]-[01] (0|100)%/.test(nhlSimT.rec)
+      && /The sim's own view MARKET BAND RECORD SAYS DOES UNITS Full-game total BET 1-0 6\d\.\d% 100\.0% \+0\.9u First period (LEAN|BET) 0-1 6\d\.\d% 0\.0% -1\.0u/.test(nhlSimT.rec) && nhlSimT.tiles2.some(t => /^FULL-GAME TOTAL 1-0 says 5[5-9]\.\d%/.test(t)) && nhlSimT.tiles2.some(t => /^FIRST PERIOD 0-1 says 5[5-9]\.\d%/.test(t)),
+      'nhl sim: the record grades the totals the sim decided (the sheet alone beside them) and every call at LEAN or better', JSON.stringify({ rec: nhlSimT.rec.slice(0, 500), tiles2: nhlSimT.tiles2 }));
 
   const stamp = await pg.evaluate(() => (document.getElementById('build') || {}).textContent);
   const git = (cmd) => execSync(cmd, { cwd: __dirname, encoding: 'utf8' }).trim();

@@ -19,6 +19,24 @@
 <!-- ===== FIELDS: the NHL inputs. What you do is on top; what the slate fills is folded below it ===== -->
       <div id="nhlFields" class="stack" hidden>
         <section class="card">
+          <h2>Simulation <span class="tag">the game played 10,000 times, shot by shot — it decides the totals</span></h2>
+          <div class="body">
+            <div id="nhlSimPanel" class="note simpanel">No simulation on the row — load the slate and Fill form, and the game's runs come with it.</div>
+            <p class="note">The slate plays the game shot by shot: each club's unblocked shots per 60 and their expected-goal
+              quality by strength state (five on five, the power play, the kill) from MoneyPuck's shot file, the minors from
+              ESPN's play-by-play as a penalty process with the crew's whistle on it, the named goalies' goals against expected,
+              the score effects, home ice, the goalie pull by the deficit at the measured clock, three on three and the
+              shootout goal. Two views: <b>the sim's own</b>, and <b>anchored to the market</b> (the same game at the book's
+              number and price, for the first period and the team totals). <b>The simulation is the final decision on the
+              full-game and first-period totals</b>: the sheet's own projection is shown beside it, not scored. The chance
+              shown is the sim's raw count; the <b>worth</b> is that chance shrunk by what the replay of 2025-26 found it
+              worth against the closes, and the band reads the worth. Take any call with its button; the record grades
+              every call at LEAN or better, says against does.</p>
+            <input type="hidden" id="nhlsim">
+          </div>
+        </section>
+
+        <section class="card">
           <h2>Goalies <span class="tag">the one thing to confirm before you bet</span></h2>
           <div class="body">
             <p class="note" id="goalieSummary">No goalie lines yet — load the slate, or open the boxes below.</p>

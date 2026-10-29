@@ -456,6 +456,7 @@
                 informed: m.informed === undefined ? undefined : !!m.informed,
                 point: m.point, book: m.book };   // the alternate total's number and book (19 Oct 2026); undefined on every other market
       if (m.take) o.take = m.take;   // the bet marked as taken rides with its market (26 Oct 2026)
+      if (m.decided) { o.decided = m.decided; o.simView = m.simView; o.simRaw = m.simRaw; o.simWorth = m.simWorth; o.sheet = m.sheet; }   // a total the hockey simulation decided, with the sheet's own read beside it (29 Oct 2026)
       return o;
     });
   }

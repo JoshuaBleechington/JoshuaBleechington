@@ -155,22 +155,22 @@ def head() -> str:
              "  #propsView b.lg.push, .pdlg b.lg.push { background: var(--edge-wash); color: var(--edge); }\n"
              "  .pdlg .pd-log tr.this td { font-weight: 700; border-top: 2px solid color-mix(in srgb, var(--ink) 35%, transparent); } .pdlg .pd-log tr.this .tag { margin-left: 4px; }\n"
              "  /* the simulation card and its record (25 Oct 2026) */\n"
-             "  #nbaSimPanel .simtiles { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; margin: 2px 0 8px; }\n"
-             "  @media (max-width: 720px) { #nbaSimPanel .simtiles { grid-template-columns: repeat(2, minmax(0, 1fr)); } }\n"
-             "  #nbaSimPanel .simtile { border: 1px solid var(--rule); border-radius: 8px; padding: 8px 10px; background: var(--surface-2); min-width: 0; }\n"
-             "  #nbaSimPanel .simtile .k { font: 600 10px/1.4 var(--sans); letter-spacing: .08em; text-transform: uppercase; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }\n"
-             "  #nbaSimPanel .simtile .v { font: 700 18px/1.25 var(--mono); color: var(--ink); } #nbaSimPanel .simtile .s { font: 11px/1.4 var(--sans); color: var(--muted); }\n"
-             "  #nbaSimPanel .simmeta { font: 12px/1.5 var(--sans); color: var(--ink-2); margin: 0 0 6px; }\n"
-             "  #nbaSimPanel table.simtab { table-layout: fixed; margin: 4px 0 10px; } #nbaSimPanel .simtab th:first-child, #nbaSimPanel .simtab td:first-child { width: 40%; }\n"
-             "  #nbaSimPanel .simtab td, #nbaSimPanel .simtab th { white-space: normal; vertical-align: top; padding: 6px 6px; }\n"
-             "  #nbaSimPanel .mkname { font: 700 12.5px/1.4 var(--sans); color: var(--ink); } #nbaSimPanel .mkline { font: 12px/1.5 var(--mono); } #nbaSimPanel .mkline .dim { font: 11px/1.4 var(--sans); }\n"
+             "  .simpanel .simtiles { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; margin: 2px 0 8px; }\n"
+             "  @media (max-width: 720px) { .simpanel .simtiles { grid-template-columns: repeat(2, minmax(0, 1fr)); } }\n"
+             "  .simpanel .simtile { border: 1px solid var(--rule); border-radius: 8px; padding: 8px 10px; background: var(--surface-2); min-width: 0; }\n"
+             "  .simpanel .simtile .k { font: 600 10px/1.4 var(--sans); letter-spacing: .08em; text-transform: uppercase; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }\n"
+             "  .simpanel .simtile .v { font: 700 18px/1.25 var(--mono); color: var(--ink); } .simpanel .simtile .s { font: 11px/1.4 var(--sans); color: var(--muted); }\n"
+             "  .simpanel .simmeta { font: 12px/1.5 var(--sans); color: var(--ink-2); margin: 0 0 6px; }\n"
+             "  .simpanel table.simtab { table-layout: fixed; margin: 4px 0 10px; } .simpanel .simtab th:first-child, .simpanel .simtab td:first-child { width: 40%; }\n"
+             "  .simpanel .simtab td, .simpanel .simtab th { white-space: normal; vertical-align: top; padding: 6px 6px; }\n"
+             "  .simpanel .mkname { font: 700 12.5px/1.4 var(--sans); color: var(--ink); } .simpanel .mkline { font: 12px/1.5 var(--mono); } .simpanel .mkline .dim { font: 11px/1.4 var(--sans); }\n"
              "  .simchip { display: inline-block; padding: 1px 7px; border-radius: 4px; font: 600 12px/1.6 var(--mono); background: var(--surface-2); color: var(--ink); white-space: nowrap; }\n"
              "  .simchip.simlean { background: var(--edge-wash); color: var(--edge); } .simchip.simbet { background: var(--go-wash); color: var(--go); } .simchip.simstrong { background: var(--go); color: #fff; }\n"
-             "  #nbaSimPanel .simsub { font: 11px/1.4 var(--sans); color: var(--muted); margin-top: 2px; }\n"
-             "  #nbaSimPanel table.simq { margin: 2px 0 8px; } #nbaSimPanel table.simq th, #nbaSimPanel table.simq td { text-align: center; padding: 3px 4px; } #nbaSimPanel table.simq th:first-child, #nbaSimPanel table.simq td:first-child { text-align: left; white-space: normal; font-family: var(--sans); }\n"
-             "  #nbaSimPanel .simprof { margin-top: 4px; font-size: 11.5px; line-height: 1.5; }\n"
+             "  .simpanel .simsub { font: 11px/1.4 var(--sans); color: var(--muted); margin-top: 2px; }\n"
+             "  .simpanel table.simq { margin: 2px 0 8px; } .simpanel table.simq th, .simpanel table.simq td { text-align: center; padding: 3px 4px; } .simpanel table.simq th:first-child, .simpanel table.simq td:first-child { text-align: left; white-space: normal; font-family: var(--sans); }\n"
+             "  .simpanel .simprof { margin-top: 4px; font-size: 11.5px; line-height: 1.5; }\n"
              "  .simrec { margin-top: 10px; } .simrec .simrecview { font-weight: 700; margin: 8px 0 4px; } .simrec .simrectab td.good { color: var(--go); } .simrec .simrectab td.bad { color: var(--bad); }\n"
-             "  #nbaSimPanel .ttgap { margin-top: 3px; font: 11.5px/1.5 var(--sans); } .simchip.gaprule { font-size: 11px; }\n"
+             "  .simpanel .ttgap { margin-top: 3px; font: 11.5px/1.5 var(--sans); } .simchip.gaprule { font-size: 11px; }\n"
              "  /* the Props tab's own Is it working block, in colour (22 Oct 2026) */\n"
              "  #propsCalib .calib > div.good { box-shadow: inset 3px 0 0 var(--go); } #propsCalib .calib > div.bad { box-shadow: inset 3px 0 0 var(--bad); }\n"
              "  #propsCalib .calib > div.good .v, #propsCalib .calib > div.good .units { color: var(--go); } #propsCalib .calib > div.bad .v, #propsCalib .calib > div.bad .units { color: var(--bad); }\n"
@@ -270,7 +270,7 @@ def tail() -> str:
              '                 "app","hpp","apk","hpk","al10","hl10","h2h","h2hn","arest","hrest","tick","cash",\n'
              '                 "hml","aml","pl","plh","pla","p1line","p1op","p1up","nhlform","nhlctx","ntick","ncash","ap1l10","hp1l10","axgf","axga","hxgf","hxga","xglg",\n'
              '                 "ngoalies","agname","hgname","agstart","hgstart","agok","hgok",\n'
-             '                 "odds","sharp","agf","aga","hgf","hga","lgg","angp","hngp","aenc","aens","henc","hens"];\n'
+             '                 "odds","sharp","agf","aga","hgf","hga","lgg","angp","hngp","aenc","aens","henc","hens","nhlsim"];\n'
              '  var NBA_IDS = ["away","home","line","op","up","opened","gdate","hml","aml","sp","sph","spa","h1line","h1op","h1up",\n'
              '                 "naort","nhort","nadrt","nhdrt","napace","nhpace","nagp","nhgp","nlrtg","nlpace","narest","nhrest","nbaout","nbaq","nbactx","ncrew","nbarefs","nbalineup","nbaform","nbasim","odds","sharp"];\n'
              '  var ALL = MLB_IDS.concat(WNBA_IDS).concat(NHL_IDS).concat(NBA_IDS).filter(function (v, i, a) { return a.indexOf(v) === i; });\n'
@@ -313,7 +313,7 @@ def tail() -> str:
              '  })();\n'
              '  function save() {', "relabel")
     t = once(t, "the units column is the referee.') + '</div>';\n    });",
-             "the units column is the referee.') + '</div>';\n      if (sp === \"NBA\") h += nbaRefsWatchHtml();   // the referees as a watch (22 Oct 2026)\n      if (sp === \"NBA\") h += nbaSimRecordHtml();   // the simulation's calls, says against does (25 Oct 2026)\n    });", "refs watch")
+             "the units column is the referee.') + '</div>';\n      if (sp === \"NBA\") h += nbaRefsWatchHtml();   // the referees as a watch (22 Oct 2026)\n      if (sp === \"NBA\") h += nbaSimRecordHtml();   // the simulation's calls, says against does (25 Oct 2026)\n      if (sp === \"NHL\") h += nhlSimRecordHtml();   // the hockey simulation's calls, and the totals it decided (29 Oct 2026)\n    });", "refs watch")
     t = every(t, 'sp === "WNBA" ? forecastMatchupWnba() : forecastMatchupMlb()',
               'sp === "NHL" ? forecastMatchupNhl() : sp === "NBA" ? forecastMatchupNba() : sp === "WNBA" ? forecastMatchupWnba() : forecastMatchupMlb()', "dispatch (stored)", 1)
     t = every(t, 'sport === "WNBA" ? forecastMatchupWnba() : forecastMatchupMlb()',
@@ -431,7 +431,7 @@ def tail() -> str:
              '                      "ngoalies","agname","hgname",\n'
              '                      "pl","plh","pla","p1line","p1op","p1up",\n'
              '                      "agf","aga","hgf","hga","lgg","angp","hngp","aenc","aens","henc","hens",\n'
-             '                      "sp","sph","spa","h1line","h1op","h1up","naort","nhort","nadrt","nhdrt","napace","nhpace","nagp","nhgp","nlrtg","nlpace","narest","nhrest","nbaout","nbactx","ncrew","nbarefs","nbalineup","nbaform","nbasim"];', "slate fields")
+             '                      "sp","sph","spa","h1line","h1op","h1up","naort","nhort","nadrt","nhdrt","napace","nhpace","nagp","nhgp","nlrtg","nlpace","narest","nhrest","nbaout","nbactx","ncrew","nbarefs","nbalineup","nbaform","nbasim","nhlsim"];', "slate fields")
     # the slate's backup-in-net flags are booleans, carried like the roof: into a
     # row's inputs when the card already has the game, into the form otherwise.
     # The Confirmed boxes travel the same way (19 Oct 2026): the slate ticks one
@@ -444,7 +444,7 @@ def tail() -> str:
     # other box keeps the loader's rule, blanks fill and typed values stay, so the record is of the row as logged
     t = once(t, '          ["agbk", "hgbk", "agconf", "hgconf"].forEach(function (k) { if (g.inputs[k] === true && !row.inputs[k]) { row.inputs[k] = true; changed = true; } });',
              '          ["agbk", "hgbk", "agconf", "hgconf"].forEach(function (k) { if (g.inputs[k] === true && !row.inputs[k]) { row.inputs[k] = true; changed = true; } });\n'
-             '          ["nbalineup", "nbaout", "nbasim"].forEach(function (k) { if (!blank(g.inputs[k]) && String(g.inputs[k]) !== String(row.inputs[k] || "")) { row.inputs[k] = String(g.inputs[k]); changed = true; } });   // the starting five follows the newest slate (23 Oct 2026); so do the injury report and the simulation run from it (26 Oct 2026), shown and recorded, never scored by the engine', "lineup refresh")
+             '          ["nbalineup", "nbaout", "nbasim", "nhlsim"].forEach(function (k) { if (!blank(g.inputs[k]) && String(g.inputs[k]) !== String(row.inputs[k] || "")) { row.inputs[k] = String(g.inputs[k]); changed = true; } });   // the starting five follows the newest slate (23 Oct 2026); so do the injury report and the simulation run from it (26 Oct 2026), shown and recorded, never scored by the engine; the hockey sim too (29 Oct 2026), which decides the totals', "lineup refresh")
     t = once(t, '    if (g.inputs && g.inputs.dome === true) v.dome = true;',
              '    if (g.inputs && g.inputs.dome === true) v.dome = true;\n'
              '    ["agbk", "hgbk", "agconf", "hgconf"].forEach(function (k) { if (g.inputs && g.inputs[k] === true) v[k] = true; });', "slate backup flags into the form")

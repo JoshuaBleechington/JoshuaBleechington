@@ -428,22 +428,22 @@
   #propsView b.lg.push, .pdlg b.lg.push { background: var(--edge-wash); color: var(--edge); }
   .pdlg .pd-log tr.this td { font-weight: 700; border-top: 2px solid color-mix(in srgb, var(--ink) 35%, transparent); } .pdlg .pd-log tr.this .tag { margin-left: 4px; }
   /* the simulation card and its record (25 Oct 2026) */
-  #nbaSimPanel .simtiles { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; margin: 2px 0 8px; }
-  @media (max-width: 720px) { #nbaSimPanel .simtiles { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
-  #nbaSimPanel .simtile { border: 1px solid var(--rule); border-radius: 8px; padding: 8px 10px; background: var(--surface-2); min-width: 0; }
-  #nbaSimPanel .simtile .k { font: 600 10px/1.4 var(--sans); letter-spacing: .08em; text-transform: uppercase; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  #nbaSimPanel .simtile .v { font: 700 18px/1.25 var(--mono); color: var(--ink); } #nbaSimPanel .simtile .s { font: 11px/1.4 var(--sans); color: var(--muted); }
-  #nbaSimPanel .simmeta { font: 12px/1.5 var(--sans); color: var(--ink-2); margin: 0 0 6px; }
-  #nbaSimPanel table.simtab { table-layout: fixed; margin: 4px 0 10px; } #nbaSimPanel .simtab th:first-child, #nbaSimPanel .simtab td:first-child { width: 40%; }
-  #nbaSimPanel .simtab td, #nbaSimPanel .simtab th { white-space: normal; vertical-align: top; padding: 6px 6px; }
-  #nbaSimPanel .mkname { font: 700 12.5px/1.4 var(--sans); color: var(--ink); } #nbaSimPanel .mkline { font: 12px/1.5 var(--mono); } #nbaSimPanel .mkline .dim { font: 11px/1.4 var(--sans); }
+  .simpanel .simtiles { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; margin: 2px 0 8px; }
+  @media (max-width: 720px) { .simpanel .simtiles { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+  .simpanel .simtile { border: 1px solid var(--rule); border-radius: 8px; padding: 8px 10px; background: var(--surface-2); min-width: 0; }
+  .simpanel .simtile .k { font: 600 10px/1.4 var(--sans); letter-spacing: .08em; text-transform: uppercase; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .simpanel .simtile .v { font: 700 18px/1.25 var(--mono); color: var(--ink); } .simpanel .simtile .s { font: 11px/1.4 var(--sans); color: var(--muted); }
+  .simpanel .simmeta { font: 12px/1.5 var(--sans); color: var(--ink-2); margin: 0 0 6px; }
+  .simpanel table.simtab { table-layout: fixed; margin: 4px 0 10px; } .simpanel .simtab th:first-child, .simpanel .simtab td:first-child { width: 40%; }
+  .simpanel .simtab td, .simpanel .simtab th { white-space: normal; vertical-align: top; padding: 6px 6px; }
+  .simpanel .mkname { font: 700 12.5px/1.4 var(--sans); color: var(--ink); } .simpanel .mkline { font: 12px/1.5 var(--mono); } .simpanel .mkline .dim { font: 11px/1.4 var(--sans); }
   .simchip { display: inline-block; padding: 1px 7px; border-radius: 4px; font: 600 12px/1.6 var(--mono); background: var(--surface-2); color: var(--ink); white-space: nowrap; }
   .simchip.simlean { background: var(--edge-wash); color: var(--edge); } .simchip.simbet { background: var(--go-wash); color: var(--go); } .simchip.simstrong { background: var(--go); color: #fff; }
-  #nbaSimPanel .simsub { font: 11px/1.4 var(--sans); color: var(--muted); margin-top: 2px; }
-  #nbaSimPanel table.simq { margin: 2px 0 8px; } #nbaSimPanel table.simq th, #nbaSimPanel table.simq td { text-align: center; padding: 3px 4px; } #nbaSimPanel table.simq th:first-child, #nbaSimPanel table.simq td:first-child { text-align: left; white-space: normal; font-family: var(--sans); }
-  #nbaSimPanel .simprof { margin-top: 4px; font-size: 11.5px; line-height: 1.5; }
+  .simpanel .simsub { font: 11px/1.4 var(--sans); color: var(--muted); margin-top: 2px; }
+  .simpanel table.simq { margin: 2px 0 8px; } .simpanel table.simq th, .simpanel table.simq td { text-align: center; padding: 3px 4px; } .simpanel table.simq th:first-child, .simpanel table.simq td:first-child { text-align: left; white-space: normal; font-family: var(--sans); }
+  .simpanel .simprof { margin-top: 4px; font-size: 11.5px; line-height: 1.5; }
   .simrec { margin-top: 10px; } .simrec .simrecview { font-weight: 700; margin: 8px 0 4px; } .simrec .simrectab td.good { color: var(--go); } .simrec .simrectab td.bad { color: var(--bad); }
-  #nbaSimPanel .ttgap { margin-top: 3px; font: 11.5px/1.5 var(--sans); } .simchip.gaprule { font-size: 11px; }
+  .simpanel .ttgap { margin-top: 3px; font: 11.5px/1.5 var(--sans); } .simchip.gaprule { font-size: 11px; }
   /* the Props tab's own Is it working block, in colour (22 Oct 2026) */
   #propsCalib .calib > div.good { box-shadow: inset 3px 0 0 var(--go); } #propsCalib .calib > div.bad { box-shadow: inset 3px 0 0 var(--bad); }
   #propsCalib .calib > div.good .v, #propsCalib .calib > div.good .units { color: var(--go); } #propsCalib .calib > div.bad .v, #propsCalib .calib > div.bad .units { color: var(--bad); }
@@ -735,6 +735,24 @@
 
       <div id="nhlFields" class="stack" hidden>
         <section class="card">
+          <h2>Simulation <span class="tag">the game played 10,000 times, shot by shot — it decides the totals</span></h2>
+          <div class="body">
+            <div id="nhlSimPanel" class="note simpanel">No simulation on the row — load the slate and Fill form, and the game's runs come with it.</div>
+            <p class="note">The slate plays the game shot by shot: each club's unblocked shots per 60 and their expected-goal
+              quality by strength state (five on five, the power play, the kill) from MoneyPuck's shot file, the minors from
+              ESPN's play-by-play as a penalty process with the crew's whistle on it, the named goalies' goals against expected,
+              the score effects, home ice, the goalie pull by the deficit at the measured clock, three on three and the
+              shootout goal. Two views: <b>the sim's own</b>, and <b>anchored to the market</b> (the same game at the book's
+              number and price, for the first period and the team totals). <b>The simulation is the final decision on the
+              full-game and first-period totals</b>: the sheet's own projection is shown beside it, not scored. The chance
+              shown is the sim's raw count; the <b>worth</b> is that chance shrunk by what the replay of 2025-26 found it
+              worth against the closes, and the band reads the worth. Take any call with its button; the record grades
+              every call at LEAN or better, says against does.</p>
+            <input type="hidden" id="nhlsim">
+          </div>
+        </section>
+
+        <section class="card">
           <h2>Goalies <span class="tag">the one thing to confirm before you bet</span></h2>
           <div class="body">
             <p class="note" id="goalieSummary">No goalie lines yet — load the slate, or open the boxes below.</p>
@@ -938,7 +956,7 @@
         <section class="card">
           <h2>Simulation <span class="tag">the game played 10,000 times — the sim's own view and the market-anchored view · the band from what the replay found the chance worth · shown, and recorded by band</span></h2>
           <div class="body">
-            <div id="nbaSimPanel" class="note">No simulation on the row — load the slate and Fill form, and the game's runs come with it.</div>
+            <div id="nbaSimPanel" class="note simpanel">No simulation on the row — load the slate and Fill form, and the game's runs come with it.</div>
             <p class="note">The slate plays the game possession by possession, thousands of times: each club's pace and shot mix, its
               offence into the other's defence, home court, rest, the regulars out, the crew's whistle, who is on the floor by the
               quarter, the benches when it gets away, the fouling at the end of a close one, overtime. <b>The sim's own view</b> is
@@ -2878,7 +2896,12 @@ smStore.ready.then(function () {
     var plIn = num("pl"), plh = num("plh"), pla = num("pla");
     var p1line = num("p1line"), p1op = num("p1op"), p1up = num("p1up");
     var notes = [], markets = [];
-    markets.push(totalMarket(f, line, op, up, 2));
+    /* the simulation decides the totals (29 Oct 2026): the sheet's own number becomes the note beside the sim's call */
+    var simD = nhlSim(), simLines = simD ? nhlSimLinesFrom({ line: txt("line"), p1line: txt("p1line"), pl: txt("pl"), odds: txt("odds") }) : null;
+    var tm = totalMarket(f, line, op, up, 2), simTotal = simD ? nhlSimDecide(simD, simLines, "total") : null;
+    if (simTotal) tm = nhlSimMarket(tm, simTotal, "total", line, op, up, "Full-game total " + line);
+    markets.push(tm);
+    nhlSimPanel();
     /* the alternate totals (19 Oct 2026, the user: "add the strong bets, max bets to the
        cards"): every alternate number the books post on the sheet's side, priced by the
        same projection split; the one that reads STRONG BET or MAX BET with an edge
@@ -2955,13 +2978,323 @@ smStore.ready.then(function () {
       var tw1 = est1.reduce(function (a, e) { return a + e[1]; }, 0);
       var proj1 = est1.reduce(function (a, e) { return a + e[0] * e[1]; }, 0) / tw1;
       var s1 = nhlP1Split(p1line, proj1);
-      markets.push(pickOf("p1", "First period total " + p1line,
+      var p1m = pickOf("p1", "First period total " + p1line,
         [sideOf("P1 OVER " + p1line, "OVER", s1[0], s1[1], p1op), sideOf("P1 UNDER " + p1line, "UNDER", s1[2], s1[1], p1up)],
-        p1op !== null && p1up !== null, "", p1notes.concat(["Projected " + proj1.toFixed(2) + " against " + p1line + "."])));
+        p1op !== null && p1up !== null, "", p1notes.concat(["Projected " + proj1.toFixed(2) + " against " + p1line + "."]));
+      var simP1 = simD ? nhlSimDecide(simD, simLines, "p1") : null;
+      if (simP1) { p1m.side1 = p1m.side; p1m = nhlSimMarket(p1m, simP1, "p1", p1line, p1op, p1up, "First period total " + p1line); }
+      markets.push(p1m);
     }
     return { sport: "NHL", away: away, home: home, matchup: away + " @ " + home, markets: markets, lamHome: lamH, lamAway: lamA, total: f, notes: notes,
              period: (typeof proj1 !== "undefined" ? proj1 : null) };
   }
+
+  /* ===== the hockey simulation (29 Oct 2026, slate/nhlsim.py). The user: "a simulation for the NHL model too, same
+     set up as the NBA one, focused on total goals, first period totals and full game totals", and "the NHL simulation
+     will be the final decision for the recommendation on the totals; taking in consideration all elements, the
+     simulation holds the heaviest weight." The slate plays each game shot by shot 10,000 times, twice (the sim's own
+     view; anchored to the carded book's number and price), and the row carries both as histograms in the nhlsim box.
+     The page reads the chance of any line off them, shows the Simulation card, lets any call be taken, and lets the
+     sim DECIDE the full-game and first-period totals: the sheet's own projection is shown beside it, not scored. The
+     chance shown is the sim's raw count; the WORTH is that chance shrunk by what the replay of 2025-26 found it worth
+     against the closes (nhlsim.SHRINK, carried in the box), and the band reads the worth. ===== */
+  var NHL_SIM_DECIDES = { total: "own", p1: "own" };   // the view that decides each total (tools_backtest_nhl_sim.py)
+  var NHL_SIM_BAND_WORDS = { STRONG: "STRONG BET", BET: "BET", LEAN: "LEAN" };
+  var NHL_SIM_SHRINK_DEFAULT = { total: 0.5, p1: 0.5, team: 0.5, ml: 0.5, pl: 0.5, period: 0.5 };
+  function nhlSimRaw() {
+    var v = "";
+    try { v = txt("nhlsim"); } catch (e) { v = ""; }   // the row being re-scored, else the form
+    if (!v) { var el = $("nhlsim"); v = el ? el.value : ""; }
+    return v || "";
+  }
+  function nhlSimParse(raw) { var d = null; try { d = raw ? JSON.parse(raw) : null; } catch (e) { d = null; } return d && d.own ? d : null; }
+  function nhlSim() { return nhlSimParse(nhlSimRaw()); }
+  function nhlHistOver(h, line) {
+    if (!h || line === null || line === undefined || line === "" || isNaN(+line)) return null;
+    var n = 0, over = 0, push = 0, L = +line;
+    h.c.forEach(function (c, i) { n += c; var v = h.lo + i; if (v > L) over += c; else if (v === L) push += c; });
+    if (!n) return null;
+    var live = n - push;
+    return { over: live ? over / live : 0.5, push: push / n, n: n };
+  }
+  function nhlHistQ(h, p) {
+    if (!h) return null;
+    var n = h.c.reduce(function (a, b) { return a + b; }, 0), acc = 0;
+    for (var i = 0; i < h.c.length; i++) { acc += h.c[i]; if (acc >= p * n) return h.lo + i; }
+    return h.lo + h.c.length - 1;
+  }
+  function nhlHistMean(h) {
+    if (!h) return null;
+    var n = 0, s = 0;
+    h.c.forEach(function (c, i) { n += c; s += c * (h.lo + i); });
+    return n ? s / n : null;
+  }
+  /* the worth: the raw chance pulled toward a coin by the market's shrink (a fraction: 0.5 keeps half the lean) */
+  function nhlSimWorth(p, kind, shrink) {
+    var s = (shrink || {})[kind]; if (s === undefined || s === null) s = NHL_SIM_SHRINK_DEFAULT[kind]; if (s === undefined || s === null) s = 0.5;
+    return Math.max(0, Math.min(1, 0.5 + (p - 0.5) * (1 - s)));
+  }
+  function nhlSimBand(worth, bands) {
+    var c = Math.max(worth, 1 - worth), b = bands || [[0.62, "STRONG"], [0.58, "BET"], [0.55, "LEAN"]];
+    for (var i = 0; i < b.length; i++) if (c >= b[i][0] - 1e-9) return b[i][1];
+    return "no call";
+  }
+  /* the team totals' main line on each side from the row's odds JSON, the carded book first (the point whose two prices sit closest) */
+  function nhlTeamTotalLine(oddsRaw, side) {
+    var o = null;
+    try { o = oddsRaw ? JSON.parse(oddsRaw) : null; } catch (e) { o = null; }
+    var t = o && o.team && o.team[side];
+    if (!t) return null;
+    var pick = function (bk) {
+      var byPt = {};
+      (t.OVER || []).forEach(function (x) { if (x[0] === bk && x[2] !== null && x[2] !== undefined) (byPt[x[2]] = byPt[x[2]] || {}).over = x[1]; });
+      (t.UNDER || []).forEach(function (x) { if (x[0] === bk && x[2] !== null && x[2] !== undefined) (byPt[x[2]] = byPt[x[2]] || {}).under = x[1]; });
+      var best = null;
+      Object.keys(byPt).forEach(function (pt) {
+        var e = byPt[pt];
+        if (e.over === undefined || e.under === undefined) return;
+        var gap = Math.abs((+e.over) - (+e.under));
+        if (!best || gap < best.gap) best = { line: +pt, op: +e.over, up: +e.under, gap: gap, book: bk };
+      });
+      return best;
+    };
+    var books = [o.book].concat((t.OVER || []).map(function (x) { return x[0]; })).filter(function (b, i, a) { return b && a.indexOf(b) === i; });
+    for (var i = 0; i < books.length; i++) { var b = pick(books[i]); if (b) return b; }
+    return null;
+  }
+  function nhlSimLinesFrom(inputs) {
+    var oddsRaw = inputs.odds || "";
+    return { total: blank(inputs.line) ? null : +inputs.line, p1: blank(inputs.p1line) ? null : +inputs.p1line, pl: blank(inputs.pl) ? null : +inputs.pl,
+             away_tt: nhlTeamTotalLine(oddsRaw, "AWAY"), home_tt: nhlTeamTotalLine(oddsRaw, "HOME") };
+  }
+  function nhlSimLinesFromForm() { return nhlSimLinesFrom({ line: $("line").value, p1line: $("p1line").value, pl: $("pl").value, odds: ($("odds") || {}).value || "" }); }
+  /* every call the row's lines allow, from one view's histograms: {key, view, label, line, side, p, worth, band, push} */
+  function nhlSimCalls(sim, lines, view) {
+    var H = sim[view]; if (!H) return [];
+    var out = [], bands = sim.bands, shrink = sim.shrink || {};
+    var add = function (key, kind, label, line, r, first, second) {
+      if (!r) return;
+      var p = r.over, side = p >= 0.5 ? first : second, prob = p >= 0.5 ? p : 1 - p, worth = nhlSimWorth(prob, kind, shrink);
+      out.push({ key: key, view: view, label: label, line: line, side: side, p: prob, worth: worth, band: nhlSimBand(worth, bands), push: r.push });
+    };
+    add("total", "total", "Full-game total", lines.total, nhlHistOver(H.total, lines.total), "OVER", "UNDER");
+    add("p1", "p1", "First period", lines.p1, nhlHistOver(H.p && H.p[0], lines.p1), "OVER", "UNDER");
+    if (lines.pl !== null && lines.pl !== undefined && !isNaN(+lines.pl)) add("pl", "pl", "Puck line (home)", +lines.pl, nhlHistOver(H.margin, -(+lines.pl)), "HOME", "AWAY");
+    if (view === "own") add("ml", "ml", "Moneyline", null, nhlHistOver(H.margin, 0), "HOME", "AWAY");
+    if (lines.away_tt) add("away_total", "team", "Away team total", lines.away_tt.line, nhlHistOver(H.away, lines.away_tt.line), "OVER", "UNDER");
+    if (lines.home_tt) add("home_total", "team", "Home team total", lines.home_tt.line, nhlHistOver(H.home, lines.home_tt.line), "OVER", "UNDER");
+    return out;
+  }
+  /* the decision on a total: the deciding view's call at the row's line, or null when the sim or the line is missing */
+  function nhlSimDecide(sim, lines, key) {
+    var view = NHL_SIM_DECIDES[key] || "own";
+    if (!sim[view]) view = "own";
+    return nhlSimCalls(sim, lines, view).filter(function (c) { return c.key === key; })[0] || null;
+  }
+  /* the market built from the sim's decision: the chance is the WORTH (the shrunk count), the band reads it, the sheet's
+     own read rides along as a note and in m.sheet; the better price can still be the other side, as on every market */
+  function nhlSimMarket(sheet, dec, key, line, op, up, label) {
+    var push = dec.push || 0, pO = dec.side === "OVER" ? dec.worth : 1 - dec.worth;
+    var pre = key === "p1" ? "P1 " : "";
+    var band = dec.band === "no call" ? "NO BET" : (NHL_SIM_BAND_WORDS[dec.band] || dec.band);
+    var sheetSide = sheet ? (sheet.side1 || sheet.side) : null, sheetBand = sheet ? (sheet.band1 || sheet.band || "") : "";
+    var sheetP = sheet ? (sheet.side1 && sheet.side1 !== sheet.side && sheet.other ? sheet.other.p : sheet.p) : null;
+    var notes = ["<b>The simulation decides this " + (key === "p1" ? "first-period" : "full-game") + " total</b> (29 Oct 2026): its " + (dec.view === "own" ? "own view" : "market-anchored view") +
+                 " puts the <b>" + esc(dec.side) + "</b> at " + (100 * dec.p).toFixed(1) + "% raw, worth <b>" + (100 * dec.worth).toFixed(1) + "%</b> after the replay's shrink: " + esc(band) + "." +
+                 (sheet ? " The sheet's own number says " + esc(sheetSide) + (sheetP !== null && sheetP !== undefined ? " " + (100 * sheetP).toFixed(1) + "%" : "") + (sheetBand ? " (" + esc(sheetBand) + ")" : "") +
+                          (sheetSide && sheetSide !== dec.side ? ": <b>they disagree</b>, and the sim's call stands; the record keeps both." : ": shown beside it, not scored.") : "")];
+    var m = pickOf(key, label, [sideOf(pre + "OVER " + line, "OVER", pO * (1 - push), push, op), sideOf(pre + "UNDER " + line, "UNDER", (1 - pO) * (1 - push), push, up)],
+                   true, band === "NO BET" ? "" : band, notes.concat(sheet && sheet.notes ? sheet.notes.slice(0, 1) : []));
+    m.band1 = band; m.side1 = dec.side; m.decided = "sim"; m.simView = dec.view; m.simRaw = +dec.p.toFixed(4); m.simWorth = +dec.worth.toFixed(4);
+    m.sheet = { side: sheetSide, band: sheetBand, p: sheetP === null || sheetP === undefined ? null : +(+sheetP).toFixed(4) };
+    if (m.side !== dec.side) {
+      m.band = "";
+      m.notes.push("The simulation names <b>" + esc(dec.side) + " " + line + "</b> (" + esc(band) + "). This side is picked on PRICE, not likelihood: the book is charging so much for the " + dec.side.toLowerCase() + " that the " + m.side.toLowerCase() + " is the better bet. The sim's band stays with the sim's side.");
+    }
+    return m;
+  }
+  function nhlSimChip(c) {
+    if (!c) return '<span class="dim">—</span>';
+    var cls = c.band === "no call" ? "simno" : c.band === "LEAN" ? "simlean" : c.band === "BET" ? "simbet" : "simstrong";
+    return '<span class="simchip ' + cls + '"><b>' + esc(c.side) + '</b> ' + (100 * c.p).toFixed(0) + '%</span>';
+  }
+  function nhlSimPanel() {
+    var el = $("nhlSimPanel"); if (!el) return;
+    var sim = nhlSimParse(($("nhlsim") || {}).value || "");
+    if (!sim) { el.innerHTML = "No simulation on the row — load the slate and Fill form, and the game's runs come with it."; return; }
+    var away = teamName("away", "NHL") || "Away", home = teamName("home", "NHL") || "Home";
+    var lines = nhlSimLinesFromForm(), own = sim.own, mkt = sim.mkt;
+    var calls = { own: {}, mkt: {} };
+    nhlSimCalls(sim, lines, "own").forEach(function (c) { calls.own[c.key] = c; });
+    if (mkt) nhlSimCalls(sim, lines, "mkt").forEach(function (c) { calls.mkt[c.key] = c; });
+    var fmt2 = function (x) { return x === null || x === undefined ? "?" : (+x).toFixed(2); };
+    var mA = nhlHistMean(own.away), mH = nhlHistMean(own.home), mg = nhlHistMean(own.margin), p1m = nhlHistMean(own.p && own.p[0]);
+    var tile = function (k, v, s, cls) { return '<div class="simtile' + (cls ? ' ' + cls : '') + '"><div class="k">' + k + '</div><div class="v">' + v + '</div>' + (s ? '<div class="s">' + s + '</div>' : '') + '</div>'; };
+    var h = '<div class="simtiles">' +
+            tile("Total", fmt2(nhlHistMean(own.total)), 'median ' + nhlHistQ(own.total, 0.5) + ' · middle half ' + nhlHistQ(own.total, 0.25) + '–' + nhlHistQ(own.total, 0.75)) +
+            tile("First period", fmt2(p1m), 'scoreless ' + (100 * ((nhlHistOver(own.p[0], 0) || {}).push || 0)).toFixed(0) + '% · over 1.5 ' + (100 * ((nhlHistOver(own.p[0], 1.5) || {}).over || 0)).toFixed(0) + '%') +
+            tile("Margin", esc(mg >= 0 ? home : away) + ' by ' + fmt2(Math.abs(mg)), esc(away) + ' ' + fmt2(mA) + ' · ' + esc(home) + ' ' + fmt2(mH) + ' · ' + esc(home) + ' wins ' + (100 * ((nhlHistOver(own.margin, 0) || {}).over || 0)).toFixed(0) + '%') +
+            tile("Overtime", (100 * (own.ot || 0)).toFixed(0) + '%', 'the shootout ' + (100 * (own.so || 0)).toFixed(0) + '% · empty-netters ' + fmt2(own.en)) + '</div>';
+    h += '<div class="simmeta"><b>' + String(sim.runs).replace(/\B(?=(\d{3})+(?!\d))/g, ",") + ' games</b>, the sim\'s own view. ' +
+         (sim.anchor ? 'Anchored to ' + esc(sim.anchor.book) + '\'s ' + esc(String(sim.anchor.line)) + ' (' + esc(String(sim.anchor.op)) + '/' + esc(String(sim.anchor.up)) + ')' + (sim.anchor.p_home !== null && sim.anchor.p_home !== undefined ? ' and a ' + (100 * sim.anchor.p_home).toFixed(0) + '% home moneyline' : '') + ' for the market view.' : 'No odds run for this game when the slate ran: no market view.') +
+         ' <b>The sim decides the full-game and first-period totals</b> from its ' + (NHL_SIM_DECIDES.total === "own" ? 'own view' : 'market-anchored view') + '.</div>';
+    var takeRow = nhlSimTakeRow();
+    var cell = function (c) {
+      if (!c) return '<span class="dim">—</span>';
+      return nhlSimChip(c) + '<div class="simsub">' + (c.band !== "no call" ? esc(c.band) + ' · ' : '') + 'worth ' + (100 * c.worth).toFixed(0) + '%</div>' +
+             '<div class="simtake">' + nhlSimTakeBtn(takeRow, c.view, c.key, c.side) + '</div>';
+    };
+    h += '<table class="form simtab"><thead><tr><th>Market</th><th>The sim\'s own view</th><th>Anchored to the market</th></tr></thead><tbody>';
+    [["total", "Full-game total", lines.total, true], ["p1", "First period", lines.p1, true], ["pl", "Puck line (home)", lines.pl, false], ["ml", "Moneyline", null, false],
+     ["away_total", esc(away) + " team total", lines.away_tt ? lines.away_tt.line : null, false], ["home_total", esc(home) + " team total", lines.home_tt ? lines.home_tt.line : null, false]].forEach(function (m) {
+      var first = '<div class="mkname">' + m[1] + (m[3] ? ' <span class="tag">the sim decides</span>' : '') + '</div>';
+      if (m[2] === null || m[2] === undefined) {
+        if (m[0] !== "ml") first += '<div class="mkline dim">no line on the row' + (/_total$/.test(m[0]) ? ' (the odds run brings it)' : '') + '</div>';
+      } else {
+        first += '<div class="mkline">' + esc(String(m[2]));
+        if (/_total$/.test(m[0])) { var tt = m[0] === "away_total" ? lines.away_tt : lines.home_tt; first += ' <span class="dim">' + esc(tt.book) + ' ' + (tt.op > 0 ? '+' : '') + tt.op + '/' + (tt.up > 0 ? '+' : '') + tt.up + '</span>'; }
+        first += '</div>';
+      }
+      h += '<tr><td>' + first + '</td><td>' + cell(calls.own[m[0]]) + '</td><td>' + (m[0] === "ml" ? '<span class="dim">the own view\'s</span>' : cell(calls.mkt[m[0]])) + '</td></tr>';
+    });
+    h += '</tbody></table>';
+    var V = mkt || own, tag = mkt ? "anchored to the market" : "the own view";
+    h += '<table class="form simq"><thead><tr><th>Means, ' + tag + '</th><th>P1</th><th>P2</th><th>P3</th><th>Regulation</th><th>' + esc(away) + '</th><th>' + esc(home) + '</th></tr></thead><tbody><tr><td class="dim">' +
+         'the first period ' + (100 * nhlHistMean(V.p[0]) / Math.max(1e-9, nhlHistMean(V.reg))).toFixed(1) + '% of regulation</td>' +
+         (V.p || []).map(function (q) { return '<td>' + fmt2(nhlHistMean(q)) + '</td>'; }).join('') +
+         '<td>' + fmt2(nhlHistMean(V.reg)) + '</td><td>' + fmt2(nhlHistMean(V.away)) + '</td><td>' + fmt2(nhlHistMean(V.home)) + '</td></tr></tbody></table>';
+    var pa = sim.prof && sim.prof.away, ph = sim.prof && sim.prof.home;
+    if (pa && ph) {
+      var side = function (p, nick) {
+        return esc(nick) + ' shots ×' + (+p.rf).toFixed(2) + ' for / ×' + (+p.ra).toFixed(2) + ' against, quality ×' + (+p.qf).toFixed(2) + ' / ×' + (+p.qa).toFixed(2) + ', PP ×' + (+p.ppr).toFixed(2) + ', PK ×' + (+p.pkr).toFixed(2) +
+               ', minors ×' + (+p.pen).toFixed(2) + (p.b2b ? ', back to back' : '') + ' (' + p.n + ' games)' + (p.gk_shots ? '; ' + esc(p.gk_name || 'the goalie') + ' ' + (+p.gk).toFixed(3) + ' goals against expected on ' + p.gk_shots + ' shots' : '; no goalie line, a league goalie');
+      };
+      h += '<div class="simprof dim">Profiles, against the league: ' + side(pa, away) + ' · ' + side(ph, home) +
+           (sim.crew && Math.abs(sim.crew - 1) >= 0.01 ? ' · the crew\'s whistle ×' + (+sim.crew).toFixed(2) + (sim.refs && sim.refs.length ? ' (' + sim.refs.map(function (r) { return esc(r[0]) + ' ' + (+r[2]).toFixed(1) + ' a game'; }).join(', ') + ')' : '') : ' · no crew named') +
+           (sim.credit ? ' · ' + esc(sim.credit) : '') + '</div>';
+    }
+    el.innerHTML = h;
+  }
+  /* the calls you take (the mark lives on the card row as row.simTakes, as the NBA's) */
+  function nhlSimTakeRow() {
+    var away = teamName("away", "NHL"), home = teamName("home", "NHL"), gdate = $("gdate").value;
+    if (!away || !home) return null;
+    return card.filter(function (r) { return r.sport === "NHL" && sameGame(r, { sport: "NHL", gdate: gdate, away: away, home: home }); })[0] || null;
+  }
+  function nhlSimTakeId(view, key, side) { return view + "|" + key + "|" + side; }
+  function nhlSimTakeOf(row, view, key, side) { var id = nhlSimTakeId(view, key, side); return ((row && row.simTakes) || []).filter(function (t) { return t.id === id; })[0] || null; }
+  function nhlSimTakeBtn(row, view, key, side) {
+    if (!row) return '<button type="button" class="takebtn off" disabled title="Add the game to the card first (Add, or Fill form from the slate and Add); the mark lives on the card row">Take</button>';
+    var t = nhlSimTakeOf(row, view, key, side);
+    if (isVoid(row) || rowGraded(row)) return t ? '<span class="chip taken">TAKEN</span>' : '';
+    return '<button type="button" class="takebtn' + (t ? ' on' : '') + '" data-stake="' + row.id + '|' + view + '|' + key + '|' + side + '" title="' +
+           (t ? 'Marked as a bet you are placing: click to unmark it' : 'Mark this call as a bet you are placing') + '">' + (t ? '&#10003; Taking' : 'Take') + '</button>';
+  }
+  function nhlSimPriceOf(key, side, lines, inp) {
+    var v = key === "total" ? (side === "OVER" ? inp.op : inp.up) : key === "p1" ? (side === "OVER" ? inp.p1op : inp.p1up) : key === "pl" ? (side === "HOME" ? inp.plh : inp.pla)
+          : key === "ml" ? (side === "HOME" ? inp.hml : inp.aml) : (function () { var tt = key === "away_total" ? lines.away_tt : lines.home_tt; return tt ? (side === "OVER" ? tt.op : tt.up) : null; })();
+    return v === null || v === undefined || v === "" || isNaN(+v) ? null : +v;
+  }
+  function nhlSimPickText(key, side, line, away, home) {
+    if (key === "total") return "Total " + side + " " + line;
+    if (key === "p1") return "First period " + side + " " + line;
+    if (key === "pl") return (side === "HOME" ? home + " " + fmtLine(+line) : away + " " + fmtLine(-(+line)));
+    if (key === "ml") return (side === "HOME" ? home : away) + " ML";
+    return (key === "away_total" ? away : home) + " team total " + side + " " + line;
+  }
+  /* toggleSimTake (the NBA block) hands an NHL row here; returns true when the row changed */
+  function nhlToggleSimTake(row, view, key, side, id) {
+    if (nhlSimTakeOf(row, view, key, side)) { row.simTakes = row.simTakes.filter(function (t) { return t.id !== id; }); return true; }
+    var sim = nhlSimParse(($("nhlsim") || {}).value || ""), lines = nhlSimLinesFromForm();
+    var c = sim ? nhlSimCalls(sim, lines, view).filter(function (x) { return x.key === key && x.side === side; })[0] : null;
+    if (!c) { say("That call is not on the card as shown now; put the line back and take it again."); return false; }
+    var inp = { op: $("op").value, up: $("up").value, p1op: $("p1op").value, p1up: $("p1up").value, plh: $("plh").value, pla: $("pla").value, hml: $("hml").value, aml: $("aml").value };
+    var away = teamName("away", "NHL") || row.away, home = teamName("home", "NHL") || row.home;
+    row.simTakes = (row.simTakes || []).concat([{ id: id, view: view, key: key, side: side, line: c.line, price: nhlSimPriceOf(key, side, lines, inp),
+      p: +(+c.p).toFixed(4), worth: +(+c.worth).toFixed(4), band: c.band, pick: nhlSimPickText(key, side, c.line, away, home), at: new Date().toISOString() }]);
+    return true;
+  }
+  function nhlSimTakeRes(t, row) {
+    var fin = (row && row.finals) || {};
+    if (fin.void) return null;
+    var fa = parseFloat(fin.fa), fh = parseFloat(fin.fh);
+    if (!isFinite(fa) || !isFinite(fh)) return null;
+    var cmp = function (v, line, over) { if (v === line) return "push"; return ((v > line) === over) ? "win" : "loss"; };
+    if (t.key === "total") return cmp(fa + fh, +t.line, t.side === "OVER");
+    if (t.key === "p1") { var p1a = parseFloat(fin.f5a), p1h = parseFloat(fin.f5h); if (!isFinite(p1a) || !isFinite(p1h)) return null; return cmp(p1a + p1h, +t.line, t.side === "OVER"); }
+    if (t.key === "pl") { var m = fh - fa + +t.line; if (m === 0) return "push"; return ((m > 0) === (t.side === "HOME")) ? "win" : "loss"; }
+    if (t.key === "ml") { if (fa === fh) return "push"; return ((fh > fa) === (t.side === "HOME")) ? "win" : "loss"; }
+    if (t.key === "away_total") return cmp(fa, +t.line, t.side === "OVER");
+    if (t.key === "home_total") return cmp(fh, +t.line, t.side === "OVER");
+    return null;
+  }
+  function nhlSimUnits(price, win) { var p = +price; if (!p || isNaN(p)) p = -110; return win ? (p > 0 ? p / 100 : 100 / -p) : -1; }
+  /* the record: every call at LEAN or better from either view on graded rows, says against does; and the totals the sim decided */
+  function nhlSimRecordHtml() {
+    var rows = card.filter(function (r) { return r.sport === "NHL" && rowGraded(r) && r.inputs && r.inputs.nhlsim; });
+    if (!rows.length) return '';
+    var T = {}, n = 0, D = { total: { n: 0, w: 0, units: 0, says: 0, agree: 0, sheetW: 0, sheetN: 0 }, p1: { n: 0, w: 0, units: 0, says: 0, agree: 0, sheetW: 0, sheetN: 0 } }, dn = 0;
+    rows.forEach(function (r) {
+      var fin = r.finals || {}, fa = +fin.fa, fh = +fin.fh, p1 = (fin.f5a !== undefined && fin.f5a !== "" && fin.f5h !== undefined && fin.f5h !== "") ? (+fin.f5a + +fin.f5h) : null;
+      var sim = nhlSimParse(r.inputs.nhlsim); if (!sim) return;
+      var lines = nhlSimLinesFrom(r.inputs);
+      (r.markets || []).forEach(function (m) {
+        if (m.decided !== "sim" || !m.side1) return;
+        var landed = m.key === "p1" ? p1 : fa + fh, line = lineOf(m);
+        if (landed === null || !isFinite(line) || landed === line) return;
+        var won = (landed > line) === (m.side1 === "OVER"), d = D[m.key]; if (!d) return;
+        var price = m.side1 === "OVER" ? (m.key === "p1" ? r.inputs.p1op : r.inputs.op) : (m.key === "p1" ? r.inputs.p1up : r.inputs.up);
+        d.n++; d.w += won ? 1 : 0; d.units += nhlSimUnits(price, won); d.says += m.simWorth || 0.5; dn++;
+        if (m.sheet && m.sheet.side) { d.sheetN++; if ((landed > line) === (m.sheet.side === "OVER")) d.sheetW++; if (m.sheet.side === m.side1) d.agree++; }
+      });
+      ["own", "mkt"].forEach(function (view) {
+        nhlSimCalls(sim, lines, view).forEach(function (c) {
+          if (c.band === "no call") return;
+          var won = null, price = -110;
+          if (c.key === "total") { if (fa + fh === c.line) return; won = (fa + fh > c.line) === (c.side === "OVER"); price = c.side === "OVER" ? r.inputs.op : r.inputs.up; }
+          else if (c.key === "p1") { if (p1 === null || p1 === c.line) return; won = (p1 > c.line) === (c.side === "OVER"); price = c.side === "OVER" ? r.inputs.p1op : r.inputs.p1up; }
+          else if (c.key === "pl") { var mg = fh - fa + c.line; if (mg === 0) return; won = (mg > 0) === (c.side === "HOME"); price = c.side === "HOME" ? r.inputs.plh : r.inputs.pla; }
+          else if (c.key === "ml") { if (fa === fh) return; won = (fh > fa) === (c.side === "HOME"); price = c.side === "HOME" ? r.inputs.hml : r.inputs.aml; }
+          else if (c.key === "away_total" || c.key === "home_total") {
+            var g = c.key === "away_total" ? fa : fh, tt = c.key === "away_total" ? lines.away_tt : lines.home_tt;
+            if (g === c.line) return;
+            won = (g > c.line) === (c.side === "OVER"); price = c.side === "OVER" ? tt.op : tt.up;
+          }
+          if (won === null) return;
+          var k = view + "|" + c.key + "|" + c.band;
+          var d = T[k] || (T[k] = { view: view, key: c.key, band: c.band, n: 0, w: 0, says: 0, units: 0 });
+          d.n++; d.w += won ? 1 : 0; d.says += c.p; d.units += nhlSimUnits(price, won); n++;
+        });
+      });
+    });
+    if (!n && !dn) return '';
+    var order = { total: 0, p1: 1, pl: 2, ml: 3, away_total: 4, home_total: 5 }, bandOrder = { STRONG: 0, BET: 1, LEAN: 2 },
+        label = { total: "Full-game total", p1: "First period", pl: "Puck line", ml: "Moneyline", away_total: "Away team total", home_total: "Home team total" };
+    var h = '<div class="simrec"><div class="calibhead">SIMULATION · says against does, every call at LEAN or better</div>';
+    if (dn) {
+      h += '<div class="simrecview">The totals the sim decided <span class="tag">the row\'s pick on the total and the first period, from the sim; the sheet\'s own read beside it</span></div><table class="form simrectab"><thead><tr><th>Market</th><th>Record</th><th>Says</th><th>Does</th><th>Units</th><th>The sheet alone</th><th>Agreed</th></tr></thead><tbody>';
+      ["total", "p1"].forEach(function (k) {
+        var d = D[k]; if (!d.n) return;
+        var cls = d.units > 0 ? "good" : d.units < 0 ? "bad" : "";
+        h += '<tr><td>' + label[k] + '</td><td>' + d.w + '-' + (d.n - d.w) + '</td><td>' + (100 * d.says / d.n).toFixed(1) + '%</td><td class="' + cls + '">' + (100 * d.w / d.n).toFixed(1) + '%</td><td class="' + cls + '">' + (d.units >= 0 ? '+' : '') + d.units.toFixed(1) + 'u</td>' +
+             '<td>' + (d.sheetN ? d.sheetW + '-' + (d.sheetN - d.sheetW) : '—') + '</td><td>' + (d.sheetN ? (100 * d.agree / d.sheetN).toFixed(0) + '%' : '—') + '</td></tr>';
+      });
+      h += '</tbody></table>';
+    }
+    ["own", "mkt"].forEach(function (view) {
+      var ks = Object.keys(T).filter(function (k) { return T[k].view === view; }).sort(function (a, b) { return (order[T[a].key] - order[T[b].key]) || (bandOrder[T[a].band] - bandOrder[T[b].band]); });
+      if (!ks.length) return;
+      h += '<div class="simrecview">' + (view === "own" ? "The sim's own view" : "Anchored to the market") + '</div><table class="form simrectab"><thead><tr><th>Market</th><th>Band</th><th>Record</th><th>Says</th><th>Does</th><th>Units</th></tr></thead><tbody>';
+      ks.forEach(function (k) {
+        var d = T[k], does = d.w / d.n, says = d.says / d.n, cls = d.units > 0 ? "good" : d.units < 0 ? "bad" : "";
+        h += '<tr><td>' + label[d.key] + '</td><td>' + esc(d.band) + '</td><td>' + d.w + '-' + (d.n - d.w) + '</td><td>' + (100 * says).toFixed(1) + '%</td><td class="' + cls + '">' + (100 * does).toFixed(1) + '%</td><td class="' + cls + '">' + (d.units >= 0 ? '+' : '') + d.units.toFixed(1) + 'u</td></tr>';
+      });
+      h += '</tbody></table>';
+    });
+    h += '<div class="note dim">A call is the sim\'s side on the line the row carried whose WORTH (the raw chance shrunk by what the replay of 2025-26 found it worth against the closes) reads LEAN (55%) or better; "says" is the sim\'s own chance, "does" the share that landed. The sim decides the full-game and first-period totals on every hockey row that carries a run; the sheet\'s own read is kept beside it so the record can say which of the two was right.</div></div>';
+    return h;
+  }
+  /* ===== end of the hockey simulation ===== */
 
   /* ---- the team table: an NHL page, same ordered first-hit-wins rule ------- */
   TEAM_PATTERNS.NHL = [
@@ -3766,6 +4099,7 @@ smStore.ready.then(function () {
     var view = p[1], key = p[2], side = p[3], id = nbaSimTakeId(view, key, side);
     if (rowGraded(row) || isVoid(row)) { say("<b>" + esc(row.matchup) + "</b> is graded: a bet is marked before the game, not after."); return; }
     var done = function () { save(); render(); renderCard(); renderBoard(); renderCalib(); };
+    if (row.sport === "NHL") { if (nhlToggleSimTake(row, view, key, side, id)) done(); return; }   // the hockey simulation's calls (29 Oct 2026)
     if (nbaSimTakeOf(row, view, key, side)) {   // marked already: unmark it
       row.simTakes = row.simTakes.filter(function (t) { return t.id !== id; });
       done(); return;
@@ -5230,24 +5564,26 @@ smStore.ready.then(function () {
     return out;
   }
   function propsTakenOn(dateISO) { return (typeof propsSource === "function" ? propsSource() : []).filter(function (r) { return (r.gdate || "") === dateISO && r.take && propHas(r); }); }
-  /* the simulation's calls taken on NBA rows (26 Oct 2026): the mark lives on the row as row.simTakes */
+  /* the simulation's calls taken on NBA rows (26 Oct 2026) and NHL rows (29 Oct 2026): the mark lives on the row as row.simTakes */
   function simTakesOn(dateISO) {
     var out = [];
     card.forEach(function (r) {
-      if ((r.gdate || "") !== dateISO || isVoid(r) || r.sport !== "NBA") return;
+      if ((r.gdate || "") !== dateISO || isVoid(r) || (r.sport !== "NBA" && r.sport !== "NHL")) return;
       (r.simTakes || []).forEach(function (t) { out.push({ row: r, t: t }); });
     });
     return out;
   }
+  function simTakeResOf(t, row) { return row && row.sport === "NHL" ? nhlSimTakeRes(t, row) : nbaSimTakeRes(t, row); }
+  function simTakeBtnOf(row, view, key, side) { return row && row.sport === "NHL" ? nhlSimTakeBtn(row, view, key, side) : nbaSimTakeBtn(row, view, key, side); }
   function simTakeCard(x) {
-    var t = x.t, res = nbaSimTakeRes(t, x.row), price = t.price === null || t.price === undefined ? -110 : t.price;
+    var t = x.t, res = simTakeResOf(t, x.row), price = t.price === null || t.price === undefined ? -110 : t.price;
     return '<div class="pk taking sim" data-open="' + x.row.id + '" title="Load ' + esc(x.row.matchup) + ' into the form">' +
-      '<div class="n1">TAKING · NBA · SIMULATION' + (t.at ? ' · marked ' + esc(takeWhen(t.at)) : '') + '</div>' +
+      '<div class="n1">TAKING · ' + esc(x.row.sport) + ' · SIMULATION' + (t.at ? ' · marked ' + esc(takeWhen(t.at)) : '') + '</div>' +
       '<div class="n2">' + esc(t.pick) + '</div>' +
       '<div class="n3">' + (t.p === null || t.p === undefined ? esc(t.band) : (100 * t.p).toFixed(0) + '% by the sim' + (t.worth === null || t.worth === undefined ? '' : ' · worth ' + (100 * t.worth).toFixed(0) + '%') + (t.band === "no call" ? ' (no call by its worth)' : ' · ' + esc(t.band))) +
         ' · ' + (t.price === null || t.price === undefined ? 'no price on the row (−110 assumed)' : sgn(t.price, 0) + ' needs ' + (implied(price) * 100).toFixed(1) + '%') + (res ? ' · <span class="chip ' + res + '">' + esc(res) + '</span>' : '') + '</div>' +
       '<div class="n4">' + esc(x.row.matchup) + ' · ' + esc(nbaSimTakeViewLabel(t.view)) + '</div>' +
-      '<div class="n6">' + nbaSimTakeBtn(x.row, t.view, t.key, t.side) + '</div></div>';
+      '<div class="n6">' + simTakeBtnOf(x.row, t.view, t.key, t.side) + '</div></div>';
   }
   function propTakeRes(r) { return !r.result || r.result === "graded" || r.result === "void" ? null : r.result; }
   /* a same-game pair you take (26 Oct 2026): rebuilt from its two legs, graded as the Same-game pairs tile grades every ticket */
@@ -5280,7 +5616,7 @@ smStore.ready.then(function () {
     if (!n) { box.innerHTML = ""; $("takingCount").textContent = ""; return; }
     var s = { n: 0, w: 0, l: 0, p: 0, units: 0 }, h = "";
     bets.forEach(function (x) { takeTally(s, gradeMarket(x.mk, x.row.finals), x.mk.price); h += takeCard(x); });
-    sims.forEach(function (x) { takeTally(s, nbaSimTakeRes(x.t, x.row), x.t.price === null || x.t.price === undefined ? -110 : x.t.price); h += simTakeCard(x); });
+    sims.forEach(function (x) { takeTally(s, simTakeResOf(x.t, x.row), x.t.price === null || x.t.price === undefined ? -110 : x.t.price); h += simTakeCard(x); });
     ps.forEach(function (r) { takeTally(s, propTakeRes(r), r.price); h += propTakeCard(r); });
     prs.forEach(function (t, i) { pairTakeTally(s, t); h += propsPairCard(t, i, true); });
     h += '<div class="pk taking sum"><div class="n1">TONIGHT</div><div class="n2">' + n + ' bet' + (n === 1 ? '' : 's') + ' marked</div>' +
@@ -5296,7 +5632,7 @@ smStore.ready.then(function () {
       out.push((++k) + ". " + x.mk.pick + " " + sgn(x.mk.price, 0) + " · " + (x.mk.p * 100).toFixed(1) + "% needs " + (implied(x.mk.price) * 100).toFixed(1) + "% · " + x.row.matchup + " · " + (x.mk.label || x.mk.key) + (res ? " · " + String(res).toUpperCase() : ""));
     });
     simTakesOn(dateISO).forEach(function (x) {
-      var t = x.t, res = nbaSimTakeRes(t, x.row);
+      var t = x.t, res = simTakeResOf(t, x.row);
       out.push((++k) + ". " + t.pick + " " + (t.price === null || t.price === undefined ? "(no price)" : sgn(t.price, 0)) + " · the simulation, " + nbaSimTakeViewLabel(t.view) + (t.p === null ? "" : ": " + (100 * t.p).toFixed(0) + "%" + (t.worth === null || t.worth === undefined ? "" : ", worth " + (100 * t.worth).toFixed(0) + "%")) + " · " + t.band + " · " + x.row.matchup + (res ? " · " + String(res).toUpperCase() : ""));
     });
     propsTakenOn(dateISO).forEach(function (r) {
@@ -5324,8 +5660,8 @@ smStore.ready.then(function () {
         if (res === null || res === "invalid") return;
         takeTally(bets, res, v.price); if (res !== "push") bets.says += v.p;
       });
-      if (r.sport === "NBA") (r.simTakes || []).forEach(function (t) {
-        var res = nbaSimTakeRes(t, r); if (!res) return;
+      if (r.sport === "NBA" || r.sport === "NHL") (r.simTakes || []).forEach(function (t) {
+        var res = simTakeResOf(t, r); if (!res) return;
         takeTally(sims, res, t.price === null || t.price === undefined ? -110 : t.price); if (res !== "push") sims.says += (t.p === null || t.p === undefined ? 0.5 : t.p);
       });
     });
@@ -5355,7 +5691,7 @@ smStore.ready.then(function () {
     else togglePropTake(t.getAttribute("data-ptake"));
   }, true);
   /* Add puts the game on the card, and the Simulation card's greyed buttons come alive once the row exists: redraw it after the add */
-  if ($("add") && $("nbaSimPanel")) $("add").addEventListener("click", function () { setTimeout(function () { if (sport === "NBA") nbaSimPanel(); }, 0); });
+  if ($("add") && ($("nbaSimPanel") || $("nhlSimPanel"))) $("add").addEventListener("click", function () { setTimeout(function () { if (sport === "NBA" && typeof nbaSimPanel === "function") nbaSimPanel(); if (sport === "NHL" && typeof nhlSimPanel === "function") nhlSimPanel(); }, 0); });
   if ($("taking")) {
     $("taking").addEventListener("click", function (e) {
       var t = e.target.closest("[data-open]"); if (t) { openRow(t.dataset.open); return; }
@@ -8205,7 +8541,7 @@ var qrcode = function() {
                  "app","hpp","apk","hpk","al10","hl10","h2h","h2hn","arest","hrest","tick","cash",
                  "hml","aml","pl","plh","pla","p1line","p1op","p1up","nhlform","nhlctx","ntick","ncash","ap1l10","hp1l10","axgf","axga","hxgf","hxga","xglg",
                  "ngoalies","agname","hgname","agstart","hgstart","agok","hgok",
-                 "odds","sharp","agf","aga","hgf","hga","lgg","angp","hngp","aenc","aens","henc","hens"];
+                 "odds","sharp","agf","aga","hgf","hga","lgg","angp","hngp","aenc","aens","henc","hens","nhlsim"];
   var NBA_IDS = ["away","home","line","op","up","opened","gdate","hml","aml","sp","sph","spa","h1line","h1op","h1up",
                  "naort","nhort","nadrt","nhdrt","napace","nhpace","nagp","nhgp","nlrtg","nlpace","narest","nhrest","nbaout","nbaq","nbactx","ncrew","nbarefs","nbalineup","nbaform","nbasim","odds","sharp"];
   var ALL = MLB_IDS.concat(WNBA_IDS).concat(NHL_IDS).concat(NBA_IDS).filter(function (v, i, a) { return a.indexOf(v) === i; });
@@ -8233,6 +8569,7 @@ var qrcode = function() {
                 informed: m.informed === undefined ? undefined : !!m.informed,
                 point: m.point, book: m.book };   // the alternate total's number and book (19 Oct 2026); undefined on every other market
       if (m.take) o.take = m.take;   // the bet marked as taken rides with its market (26 Oct 2026)
+      if (m.decided) { o.decided = m.decided; o.simView = m.simView; o.simRaw = m.simRaw; o.simWorth = m.simWorth; o.sheet = m.sheet; }   // a total the hockey simulation decided, with the sheet's own read beside it (29 Oct 2026)
       return o;
     });
   }
@@ -9854,6 +10191,7 @@ var qrcode = function() {
           'and compare each four against the blind rate of everything logged, not against 50%. The parlay four and the straight bets will differ most nights; the units column is the referee.') + '</div>';
       if (sp === "NBA") h += nbaRefsWatchHtml();   // the referees as a watch (22 Oct 2026)
       if (sp === "NBA") h += nbaSimRecordHtml();   // the simulation's calls, says against does (25 Oct 2026)
+      if (sp === "NHL") h += nhlSimRecordHtml();   // the hockey simulation's calls, and the totals it decided (29 Oct 2026)
     });
     h += takenRecordHtml();   // what you took (26 Oct 2026): the marked bets, graded at the price shown when marked
     /* the board's likeliest side and the two-leg parlays, across every date (15 Oct 2026,
@@ -10225,7 +10563,7 @@ var qrcode = function() {
                       "ngoalies","agname","hgname",
                       "pl","plh","pla","p1line","p1op","p1up",
                       "agf","aga","hgf","hga","lgg","angp","hngp","aenc","aens","henc","hens",
-                      "sp","sph","spa","h1line","h1op","h1up","naort","nhort","nadrt","nhdrt","napace","nhpace","nagp","nhgp","nlrtg","nlpace","narest","nhrest","nbaout","nbactx","ncrew","nbarefs","nbalineup","nbaform","nbasim"];
+                      "sp","sph","spa","h1line","h1op","h1up","naort","nhort","nadrt","nhdrt","napace","nhpace","nagp","nhgp","nlrtg","nlpace","narest","nhrest","nbaout","nbactx","ncrew","nbarefs","nbalineup","nbaform","nbasim","nhlsim"];
   function blank(v) { return v === undefined || v === null || String(v).trim() === ""; }
   function sameGame(row, g) {
     var sp = sportOf(g.sport);
@@ -10252,7 +10590,7 @@ var qrcode = function() {
           });
           if (g.inputs.dome === true && !row.inputs.dome) { row.inputs.dome = true; changed = true; }
           ["agbk", "hgbk", "agconf", "hgconf"].forEach(function (k) { if (g.inputs[k] === true && !row.inputs[k]) { row.inputs[k] = true; changed = true; } });
-          ["nbalineup", "nbaout", "nbasim"].forEach(function (k) { if (!blank(g.inputs[k]) && String(g.inputs[k]) !== String(row.inputs[k] || "")) { row.inputs[k] = String(g.inputs[k]); changed = true; } });   // the starting five follows the newest slate (23 Oct 2026); so do the injury report and the simulation run from it (26 Oct 2026), shown and recorded, never scored by the engine
+          ["nbalineup", "nbaout", "nbasim", "nhlsim"].forEach(function (k) { if (!blank(g.inputs[k]) && String(g.inputs[k]) !== String(row.inputs[k] || "")) { row.inputs[k] = String(g.inputs[k]); changed = true; } });   // the starting five follows the newest slate (23 Oct 2026); so do the injury report and the simulation run from it (26 Oct 2026), shown and recorded, never scored by the engine; the hockey sim too (29 Oct 2026), which decides the totals
           /* the apps' numbers follow the newest odds run on a basketball row (28 Oct 2026, the middles watch): the logged line
              and prices stay as the markets were scored, the shop as it stands now goes beside them */
           if (row.sport === "NBA" && !blank(g.inputs.odds) && String(g.inputs.odds) !== String(row.inputs.oddsNow || row.inputs.odds || "")) { row.inputs.oddsNow = String(g.inputs.odds); row.inputs.oddsAt = d.generated || ""; }

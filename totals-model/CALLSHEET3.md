@@ -1772,3 +1772,91 @@ card wider than a phone): it is five columns on fixed widths now, the app
 on its own line over the number and price, the break-even under the
 both-win chance and the verdict under the pair's figure, and the harness
 measures that the table sits inside the card.
+
+## The hockey simulation decides the totals, 29 Oct 2026
+
+The user, with the NHL card on rest: "a simulation for the NHL model too,
+same set up as the NBA one, focused on total goals, first period totals and
+full game totals", and then "the NHL simulation will be the final decision
+for the recommendation on the totals; taking in consideration all elements,
+the simulation will hold the heaviest weight."
+
+The engine (`slate/nhlsim.py`) plays a hockey game shot by shot. The clock
+runs in game seconds; the next event, a shot by either side or a minor on
+either side, arrives at an exponential wait from the sum of the four rates,
+cut short by whatever is scheduled first: a penalty expiring, the period
+ending, the goalie coming out. A shot becomes a goal at its expected-goal
+quality: the league's goals per unblocked shot in that strength state, times
+the shooting club's quality for, times the defending club's quality against,
+times the goalie's goals allowed against expected, with the score effects,
+the period and home ice on top; the rates work the same way from the
+league's shots per 60 of the state's time and the two clubs' rate factors.
+The strength state comes from the penalty box (a minor two minutes, a double
+four, ended by a power-play goal; two minors a two-man advantage; a minor
+each side four on four), the minors arriving at the club's rate of taking
+them times the opponent's rate of drawing them times the crew's whistle. In
+the third the trailing side within three pulls its goalie at the measured
+clock for its deficit (drawn from the measured spread), keeps it out while
+it trails, puts it back when level or four down; the leader shoots at the
+empty net at the measured rate and quality, the trailer six on five.
+Overtime at three on three, the first goal wins; still level, a shootout,
+and the winner's official score takes one more goal, which the full-game
+total carries and the periods do not.
+
+Every constant is measured (`tools_nhl_tendencies.py`, 2,624 games of
+MoneyPuck's shot files joined to ESPN's play-by-play through the ledger;
+the strength timeline rebuilt from the penalties agrees with the shot file's
+skaters at 97.6% of shots): five on five 40.3 unblocked shots per 60 a side
+at 0.0605 goals a shot over 50.2 minutes of a game, the power play 76 per
+60 at 0.098 over 530 seconds, the kill 12.5 at 0.073, 3.2 minors a side a
+game (fights and misconducts put no one in the box) with the second period
+15% heavier, the trailing side's shot rate +2 to +5% and the leader's −8
+to −14% by the margin, the leader's quality +1.5 to +4%, the first period's
+shots going in at 0.967 of their quality and the second's at 1.022, home
+ice +1.5% on the rate and +0.9% on the quality, the pull with 93 seconds
+left down one (82 down two, 246 down three; the 10th to 90th percentiles
+carried), the leader's 28.9 shots per 60 of empty time at 0.52 a shot and
+the trailer's 76 at 0.072, three on three 24.8 per 60 a side at 0.137.
+ESPN typed the penalties by their infraction from the spring of 2026 and
+the first pull missed them (477 games with no penalties); the pull now
+reads either shape and carries the minutes and kind beside the text.
+
+The club profiles: each figure relative to the league, this season's
+blended with last season's whole by games/(games + K) where K is set by
+the half-season reliability measured across 64 club-seasons (shots for
+r 0.78 so K 12 games; against 0.61, K 26; quality for and against 0.51
+and 0.53, K 39 and 36; finishing 0.29, K 101; the power play's rate 0.49,
+K 42, its quality 0.18, K 185; the kill's rate 0.39, K 63, its quality
+nil, K 400; minors taken 0.56, K 31, drawn 0.53, K 37). A goalie's goals
+against expected is shrunk toward the league at 450 expected goals faced,
+about 7,000 shots, because that is what the reliability says (half to half
+r 0.11 to 0.20 at 60 to 100 xG a half, season to season 0.16): a goalie's
+figure barely moves a game, and the card says so beside his name.
+
+On the slate: `python slate.py nhl` refreshes this season's play-by-play
+from ESPN (the days since the last game), downloads MoneyPuck's shot file
+for the season (or reads `shots_YEAR.zip` beside slate.py) and compacts it
+to per-game tallies, fetches last season's once as the prior, builds every
+club's profile before the date, and plays each game 10,000 times twice:
+the sim's own view with the named goalies, tonight's referees when the
+league has posted them, and rest; and the market view anchored to the
+carded book's number and price from the day's `odds-DATE.json` (and its
+de-vigged moneyline for the split), so the first period and the team
+totals read off the market's game. `nhl-tend.json` ships with the slate:
+the league block, 44 referees' minors a game (from 5.7 to 7.7 against the
+league's 6.4), every club's taken and drawn.
+
+On the page: a **Simulation** card at the top of the hockey rail, the NBA
+card's shape (four tiles, the view line, a three-column table of the
+markets with a chip, its worth and a Take in each view's column, the
+period means, the profiles and the goalies in words), and **the sim
+decides the full-game and first-period totals**: the row's pick on each
+is the deciding view's side at the worth (the raw chance shrunk by what
+the replay found it worth), the band reads the worth, the sheet's own
+projection rides along as a note and in the market's `sheet`, and the
+record keeps both so it can say which was right. The take buttons mark a
+call on the row like the NBA's, list under Taking tonight and the phone
+sheet, and grade off the row's finals (the first period from the P1
+boxes). The record's hockey block gets the simulation's tables: the
+totals the sim decided (record, says, does, units, the sheet alone, how
+often they agreed) and every call at LEAN or better from either view.

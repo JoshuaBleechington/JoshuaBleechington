@@ -1552,7 +1552,7 @@ def p1_from_landing(landing):
     return None, None
 
 
-def build_nhl_game(g, date_iso, season_id, summary, log, ledger=None, xg=None, goalie_summary=None, tables=None, lineups=None):
+def build_nhl_game(g, date_iso, season_id, summary, log, ledger=None, xg=None, goalie_summary=None, tables=None, lineups=None, sim=None, odds_by=None):
     away_t, home_t = g.get("awayTeam") or {}, g.get("homeTeam") or {}
     away, home = nhl_name(away_t), nhl_name(home_t)
     aab, hab = away_t.get("abbrev") or "", home_t.get("abbrev") or ""
@@ -1771,6 +1771,24 @@ def build_nhl_game(g, date_iso, season_id, summary, log, ledger=None, xg=None, g
         for c in ctx:
             log("  context: %s  [%s]" % (c["t"], c["s"]))
     out["context"] = ctx
+    # the simulation (29 Oct 2026): the game played NHL_SIM_RUNS times with the named goalies, tonight's referees when the
+    # league has posted them, and the day's odds run for the market view; the page lets it decide the totals
+    if sim:
+        refs = []
+        try:
+            gi = (nhl_right_rail(gid) or {}).get("gameInfo") or {}
+            refs = _names(gi.get("referees"))
+        except Exception as e:  # noqa: BLE001
+            log("  sim: the officials are not up yet (%s)" % e)
+        picks = {s["side"]: ((s.get("pick") or {}).get("id")) for s in ctx_sides}
+        try:
+            block = nhl_sim_block(sim, aab, hab, away, home, date_iso, picks, refs, (odds_by or {}).get((away, home)), log)
+        except Exception as e:  # noqa: BLE001
+            block = None
+            notes.append("The simulation failed for this game: %s" % e)
+        if block:
+            inputs["nhlsim"] = json.dumps(block, separators=(",", ":"))
+            out["sim"] = {"total": nhlsim.hist_mean(block["own"]["total"]), "p1": nhlsim.hist_mean(block["own"]["p"][0]), "anchor": block["anchor"]}
     for n in notes:
         log("  note: " + n)
     return out
@@ -3108,6 +3126,15 @@ def make_nba_pbp(date_iso, out_dir, log, season=None):
 ESPN_NHL = "https://site.api.espn.com/apis/site/v2/sports/hockey/nhl"
 ESPN_NHL_TRICODE = {"NJ": "NJD", "TB": "TBL", "LA": "LAK", "SJ": "SJS", "UTAH": "UTA", "WSH": "WSH"}
 NHL_PBP_FORMAT = "callsheet3.nhl-pbp"
+NHL_PBP_VERSION = 3   # 2: the officials carry their positions ([name, R/L]); 3: penalties typed by their infraction, with the minutes; older games are fetched again
+NHL_PBP_INFRACTIONS = ("Tripping", "Roughing", "Hooking", "Slashing", "Holding", "Interference", "Fighting", "High-sticking", "High sticking", "Cross checking",
+                       "Crosschecking", "Delaying Game - Puck over Glass", "Too Many Men on the Ice", "Misconduct", "Holding the Stick", "Unsportsmanlike Conduct",
+                       "Goalkeeper Interference", "Boarding", "Delay Game - Unsucc chlg", "Instigator", "Embellishment", "Elbowing", "Game Misconduct",
+                       "Penalty Shot Infraction", "Closing Hand on Puck", "Kneeing", "Leaving Crease", "Abuse of Official", "Removing opponent's helmet",
+                       "Illegal check to the head", "Hooking on Breakaway", "Broken Stick", "Thowing Object at Puck", "Delaying Game-Face-off Violation",
+                       "Tripping on Breakaway", "Aggressor", "Charging", "Slashing on Breakaway", "Delay of Game", "Holding on Breakaway", "Abusive Language",
+                       "Interference on the goalkeeper", "Delaying Game - Smothering Puck", "Throwing the Stick", "Illegal Stick", "Delaying Game - Illegal play by Goaltender",
+                       "Game Misconduct - Head Coach", "Match Penalty", "Spearing", "Butt-ending", "Head-butting", "Clipping", "Diving")
 NHL_PBP_CODES = {"G": "goal", "S": "shot on goal", "M": "missed shot", "B": "blocked shot", "P": "penalty (the text kept)", "F": "faceoff", "GC": "goalie change (the text kept)",
                  "PS": "period start", "PE": "period end", "X": "shootout attempt", "E": "end of game"}
 NHL_PBP_SKIP = ("Hit", "Giveaway", "Takeaway", "Stoppage", "Timeout", "Delayed Penalty")
@@ -3123,12 +3150,15 @@ def nhl_espn_code(ab, name):
     return ESPN_NHL_TRICODE.get(a, a)
 
 
-def nhl_games_from_espn(season8, through_iso=None, log=None):
-    """Every regular-season final of a hockey season from ESPN's scoreboard, a day a call: {id, date, away, home, an, hn, fa, fh}."""
+def nhl_games_from_espn(season8, through_iso=None, log=None, from_iso=None):
+    """Every regular-season final of a hockey season from ESPN's scoreboard, a day a call: {id, date, away, home, an, hn, fa, fh}.
+    `from_iso` starts the scan there (the nightly run lists only the days since the file's last game)."""
     y = int(str(season8)[:4])
     start, end = dt.date(y, 10, 1), dt.date(y + 1, 6, 30)
     if through_iso:
         end = min(end, dt.date.fromisoformat(through_iso))
+    if from_iso:
+        start = max(start, dt.date.fromisoformat(from_iso))
     out, d, failed = {}, start, []
     while d <= end:
         try:
@@ -3176,13 +3206,18 @@ def nhl_pbp_compact(g, summ):
         teams.setdefault(str(tm.get("id")), "home" if c.get("homeAway") == "home" else "away")
     plays, kinds = [], {}
     for p in (summ or {}).get("plays") or []:
-        ptype = ((p.get("type") or {}).get("text")) or ""
+        tp = p.get("type") or {}
+        ptype = tp.get("text") or ""
         kinds[ptype] = kinds.get(ptype, 0) + 1
         if ptype in NHL_PBP_SKIP:
             continue
         text = str(p.get("text") or "")
         low = text.lower()
         period = int(((p.get("period") or {}).get("number")) or 0)
+        # a penalty: the older feed types every one "Penalty"; from the spring of 2026 the type is the infraction itself
+        # ("Holding", "Fighting", "Delaying Game - Puck over Glass") with the minutes and the kind beside it (version 3)
+        pen_type = tp.get("penaltyType") or ""
+        is_pen = ptype == "Penalty" or bool(pen_type) or tp.get("penaltyMinutes") not in (None, "") or ptype in NHL_PBP_INFRACTIONS
         if ptype == "Goal":
             code = "X" if period >= 5 else "G"
         elif ptype == "Shot":
@@ -3191,8 +3226,10 @@ def nhl_pbp_compact(g, summ):
             code = "X" if period >= 5 else "M"
         elif ptype == "Blocked":
             code = "B"
-        elif ptype == "Penalty":
+        elif is_pen:
             code = "P"
+            if pen_type or tp.get("penaltyMinutes") not in (None, ""):
+                text = "%s [%s %s]" % (text[:84], pen_type or "?", tp.get("penaltyMinutes") or "?")
         elif ptype == "Face Off":
             code = "F"
         elif ptype == "Period Start":
@@ -3214,11 +3251,24 @@ def nhl_pbp_compact(g, summ):
         except (TypeError, ValueError):
             aw, hm = 0, 0
         plays.append([period, nba_clock_seconds((p.get("clock") or {}).get("displayValue")), code, 1 if side == "home" else (0 if side == "away" else -1), strength, aw, hm,
-                      text[:80] if code in ("P", "GC") else ""])
-    offs = [o.get("displayName") for o in (((summ or {}).get("gameInfo") or {}).get("officials") or []) if o.get("displayName")]
+                      text[:104] if code in ("P", "GC") else ""])
+    # the officials with their positions (version 2): ESPN lists the two referees and the two linesmen in one list, in no fixed
+    # order; the crew's whistle the simulation scores is the referees', so each name carries R, L or ? beside it
+    offs = []
+    for o in (((summ or {}).get("gameInfo") or {}).get("officials") or []):
+        if not o.get("displayName"):
+            continue
+        pos = str(((o.get("position") or {}).get("name")) or "").lower()
+        offs.append([o["displayName"], "R" if pos.startswith("ref") else ("L" if pos.startswith("lines") else "?")])
     last = max([pl[0] for pl in plays] + [3])
-    return {"id": g["id"], "date": g.get("date"), "away": g.get("away"), "home": g.get("home"), "fa": g.get("fa"), "fh": g.get("fh"), "end": "SO" if last >= 5 else ("OT" if last == 4 else "REG"),
-            "off": offs, "n": len(plays), "plays": plays, "kinds": kinds}
+    return {"id": g["id"], "v": NHL_PBP_VERSION, "date": g.get("date"), "away": g.get("away"), "home": g.get("home"), "fa": g.get("fa"), "fh": g.get("fh"),
+            "end": "SO" if last >= 5 else ("OT" if last == 4 else "REG"), "off": offs, "n": len(plays), "plays": plays, "kinds": kinds}
+
+
+def nhl_pbp_stale(e):
+    """A game stored by an earlier version of the pull (1: the officials without positions; 2: the penalties typed by
+    their infraction missed): fetched again."""
+    return int(e.get("v") or 1) < NHL_PBP_VERSION or any(isinstance(o, str) for o in (e.get("off") or []))
 
 
 def make_nhl_pbp(date_iso, out_dir, log, season=None):
@@ -3235,12 +3285,18 @@ def make_nhl_pbp(date_iso, out_dir, log, season=None):
             doc = json.load(f)
         if doc.get("format") != NHL_PBP_FORMAT:
             doc = None
-    doc = doc or {"format": NHL_PBP_FORMAT, "version": 1, "season": season, "codes": NHL_PBP_CODES, "games": []}
+    doc = doc or {"format": NHL_PBP_FORMAT, "version": NHL_PBP_VERSION, "season": season, "codes": NHL_PBP_CODES, "games": []}
+    doc["version"] = NHL_PBP_VERSION
     byid = {g["id"]: g for g in doc["games"]}
-    log("NHL play-by-play %s: %d game%s already in the file." % (season, len(byid), "" if len(byid) == 1 else "s"))
-    games = nhl_games_from_espn(season, None if past else date_iso, log)
-    todo = [g for g in games if g["id"] not in byid]
-    log("%d final%s listed, %d to fetch; the file is written every %d." % (len(games), "" if len(games) == 1 else "s", len(todo), NBA_LEDGER_FLUSH))
+    stale = sum(1 for e in byid.values() if nhl_pbp_stale(e))
+    log("NHL play-by-play %s: %d game%s already in the file%s." % (season, len(byid), "" if len(byid) == 1 else "s",
+                                                                   (", %d from the first version (fetched again for the officials' positions)" % stale) if stale else ""))
+    # the nightly run lists only the days since the file's last game (a day a call); a past season, or a file with stale games, lists the season
+    last_date = max([e.get("date") or "" for e in byid.values()] + [""]) if byid and not stale else ""
+    from_iso = (dt.date.fromisoformat(last_date) - dt.timedelta(days=1)).isoformat() if last_date and not past else None
+    games = nhl_games_from_espn(season, None if past else date_iso, log, from_iso=from_iso)
+    todo = [g for g in games if g["id"] not in byid or nhl_pbp_stale(byid[g["id"]])]
+    log("%d final%s listed%s, %d to fetch; the file is written every %d." % (len(games), "" if len(games) == 1 else "s", (" from %s" % from_iso) if from_iso else "", len(todo), NBA_LEDGER_FLUSH))
 
     def flush():
         doc["games"] = sorted(byid.values(), key=lambda g: ((g.get("date") or ""), g.get("id") or ""))
@@ -3266,6 +3322,306 @@ def make_nhl_pbp(date_iso, out_dir, log, season=None):
     flush()
     log("Added %d game%s (%d with no plays). Wrote %s with %d games." % (done, "" if done == 1 else "s", empty, path, len(byid)))
     return path
+
+
+# ---- the hockey simulation (29 Oct 2026): nhlsim.py beside this file ------------
+# The user: "a simulation for the NHL model too, same set up as the NBA one,
+# focused on total goals, first period totals and full game totals", and "the
+# NHL simulation will be the final decision for the recommendation on the
+# totals". The slate run plays each game NHL_SIM_RUNS times, twice: the sim's
+# own view (each club's shot rates and quality by strength state from
+# MoneyPuck's shot file, the minors from ESPN's play-by-play, the named
+# goalies' goals against expected, the crew's whistle, home ice, rest) and the
+# market-anchored view (the same game at the carded book's total and
+# moneyline from the day's odds run, for the first period and the team
+# totals). The row carries both as histograms; the page reads the chance of
+# any line without re-running, and lets the sim decide the totals.
+try:
+    import nhlsim
+except ImportError:   # the file is not beside slate.py: the slate runs without the sim
+    nhlsim = None
+NHL_SIM_RUNS = 10000
+NHL_SHOTS_URL = "https://peter-tanner.com/moneypuck/downloads/shots_%s.zip"   # MoneyPuck's shot file for a season, by the year it starts (moneypuck.com/data.htm)
+NHL_SHOTS_FORMAT = "callsheet3.nhl-shots"
+NHL_SHOTS_MAX_AGE = 10 * 3600     # the current season's tallies are rebuilt from a fresh download after this many seconds
+NHL_TEND_FILE = "nhl-tend.json"   # tools_nhl_tendencies.py: the league's measured constants, the referees' and clubs' minors a game
+NHL_SIM_CREW_K = 25.0             # a referee's minors a game is worth half the league's at this many games
+
+
+def nhl_shots_path(out_dir, season8):
+    return os.path.join(out_dir, "nhl-shots-%s.json" % season8)
+
+
+def nhl_prior_season8(season8):
+    y = int(str(season8)[:4])
+    return "%d%d" % (y - 1, y)
+
+
+def make_nhl_shots(date_iso, out_dir, log, season=None, force=False):
+    """nhl-shots-SEASON.json: MoneyPuck's shot file for the season (every unblocked shot with its strength state, its expected
+    goals, the goalie), downloaded as the zip and compacted to per-game tallies (nhlsim.shots_tallies). When the site cannot
+    be reached, shots_YEAR.zip or shots_YEAR.csv beside slate.py is read instead. A past season's file is kept once built;
+    the current season's is rebuilt when older than NHL_SHOTS_MAX_AGE."""
+    if not nhlsim:
+        raise RuntimeError("nhlsim.py is not beside slate.py")
+    d0 = dt.date.fromisoformat(date_iso)
+    current = "%d%d" % ((d0.year if d0.month >= 8 else d0.year - 1), (d0.year if d0.month >= 8 else d0.year - 1) + 1)
+    season8 = nhl_season8(season) if season else current
+    year = season8[:4]
+    path = nhl_shots_path(out_dir, season8)
+    if os.path.exists(path) and not force:
+        age = time.time() - os.path.getmtime(path)
+        if season8 != current or age < NHL_SHOTS_MAX_AGE:
+            with open(path, "r", encoding="utf-8") as f:
+                doc = json.load(f)
+            if doc.get("format") == NHL_SHOTS_FORMAT:
+                log("Shots %s: %d games in %s (%s), kept." % (season8, len(doc.get("games") or {}), os.path.basename(path), "a past season" if season8 != current else "%.0f minutes old" % (age / 60)))
+                return path
+    csv_path, src = os.path.join(out_dir, "shots_%s.csv" % year), ""
+    try:
+        import zipfile
+        req = urllib.request.Request(NHL_SHOTS_URL % year, headers={"User-Agent": UA, "Accept": "*/*"})
+        with urllib.request.urlopen(req, timeout=180) as r:
+            raw = r.read()
+        with zipfile.ZipFile(io.BytesIO(raw)) as z:
+            member = next((n for n in z.namelist() if n.lower().endswith(".csv")), None)
+            if not member:
+                raise RuntimeError("no csv in the zip")
+            with z.open(member) as fin, open(csv_path, "wb") as fout:
+                fout.write(fin.read())
+        src = "moneypuck.com (%s, %.1f MB)" % (NHL_SHOTS_URL % year, len(raw) / 1e6)
+    except Exception as e:  # noqa: BLE001
+        local_zip = os.path.join(out_dir, "shots_%s.zip" % year)
+        if os.path.exists(local_zip):
+            import zipfile
+            with zipfile.ZipFile(local_zip) as z:
+                member = next((n for n in z.namelist() if n.lower().endswith(".csv")), None)
+                with z.open(member) as fin, open(csv_path, "wb") as fout:
+                    fout.write(fin.read())
+            src = "shots_%s.zip beside slate.py (the site could not be reached: %s)" % (year, e)
+        elif os.path.exists(csv_path):
+            src = "shots_%s.csv beside slate.py (the site could not be reached: %s)" % (year, e)
+        else:
+            raise RuntimeError("could not download MoneyPuck's shots_%s.zip (%s) and there is no shots_%s.zip or .csv beside slate.py; download it from moneypuck.com/data.htm" % (year, e, year))
+    tal = nhlsim.shots_tallies(csv_path)
+    doc = {"format": NHL_SHOTS_FORMAT, "version": 1, "season": season8, "year": year, "generated": now_utc(), "source": src, "credit": "MoneyPuck.com", "games": tal["games"]}
+    with open(path, "w", encoding="utf-8") as f:
+        json.dump(doc, f, separators=(",", ":"))
+    log("Shots %s: %d games from %s -> %s." % (season8, len(tal["games"]), src, os.path.basename(path)))
+    return path
+
+
+def nhl_load_shots(out_dir, season8):
+    p = nhl_shots_path(out_dir, season8)
+    if not os.path.exists(p):
+        return None
+    with open(p, "r", encoding="utf-8") as f:
+        d = json.load(f)
+    return d if d.get("format") == NHL_SHOTS_FORMAT else None
+
+
+def nhl_load_pbp(out_dir, season8):
+    p = os.path.join(out_dir, "nhl-pbp-%s.json" % season8)
+    if not os.path.exists(p):
+        return None
+    with open(p, "r", encoding="utf-8") as f:
+        d = json.load(f)
+    return d if d.get("format") == NHL_PBP_FORMAT else None
+
+
+def nhl_load_tend(out_dir):
+    p = os.path.join(out_dir, NHL_TEND_FILE)
+    if not os.path.exists(p):
+        return None
+    try:
+        with open(p, "r", encoding="utf-8") as f:
+            return json.load(f)
+    except (OSError, ValueError):
+        return None
+
+
+def nhl_sim_league(tend):
+    """nhlsim.LEAGUE with the tendencies file's measured block on top (the keys with integer maps restored)."""
+    lg = dict(nhlsim.LEAGUE)
+    for k, v in ((tend or {}).get("league") or {}).items():
+        if k in ("score_rate", "score_q", "pull") and isinstance(v, dict):
+            lg[k] = {int(m): x for m, x in v.items()}
+        else:
+            lg[k] = v
+    return lg
+
+
+def nhl_pbp_by_gid(pbp_doc, ledger_games):
+    """{gid5: plays} from a play-by-play file, matched to the ledger's games by date and clubs (the shot file keys games by
+    the NHL id's last five digits; ESPN keys them its own way)."""
+    if not pbp_doc or not ledger_games:
+        return {}
+    by_key = {(g.get("date"), g.get("away"), g.get("home")): str(g["id"])[-5:] for g in ledger_games if g.get("id")}
+    out = {}
+    for e in pbp_doc.get("games") or []:
+        gid = by_key.get((e.get("date"), e.get("away"), e.get("home")))
+        if gid:
+            out[gid] = e["plays"]
+    return out
+
+
+def nhl_sim_setup(date_iso, out_dir, season8, ledger_games, log):
+    """What the slate's simulation needs, refreshed and loaded: this season's play-by-play (ESPN, the days since the last
+    game), this season's and last season's shot tallies (MoneyPuck), the tendencies file, and every club's profile before
+    date_iso. Returns {"prof", "tend", "league", "runs"} or None, with the reasons logged."""
+    if not nhlsim:
+        log("Simulation: nhlsim.py is not beside slate.py; the rows carry no sim.")
+        return None
+    season8 = str(season8)
+    prior8 = nhl_prior_season8(season8)
+    try:
+        make_nhl_pbp(date_iso, out_dir, log, season8)
+    except Exception as e:  # noqa: BLE001
+        log("Simulation: the play-by-play could not be refreshed (%s); the file in the folder stands." % e)
+    try:
+        make_nhl_shots(date_iso, out_dir, log, season8)
+    except Exception as e:  # noqa: BLE001
+        log("Simulation: %s" % e)
+    this_doc = nhl_load_shots(out_dir, season8)
+    prior_doc = nhl_load_shots(out_dir, prior8)
+    if not prior_doc:
+        try:
+            make_nhl_shots(date_iso, out_dir, log, prior8)
+            prior_doc = nhl_load_shots(out_dir, prior8)
+        except Exception as e:  # noqa: BLE001
+            log("Simulation: last season's shots are not in the folder (%s); the profiles start from the league." % e)
+    if not this_doc and not prior_doc:
+        log("Simulation: no shot tallies for %s or %s; the rows carry no sim." % (season8, prior8))
+        return None
+    tend = nhl_load_tend(out_dir)
+    if not tend:
+        log("Simulation: no %s in the folder; the league's a-priori constants stand and the crews are not scored." % NHL_TEND_FILE)
+    league = nhl_sim_league(tend)
+    for k, v in ((tend or {}).get("K") or {}).items():
+        if k in nhlsim.K:
+            nhlsim.K[k] = v
+    dates = {str(g["id"])[-5:]: g.get("date") for g in (ledger_games or []) if g.get("id")}
+    pbp_this = nhl_pbp_by_gid(nhl_load_pbp(out_dir, season8), ledger_games)
+    prior_led = load_ledger(ledger_path(out_dir, prior8))
+    prior_games = prior_led["games"] if prior_led else []
+    pbp_prior = nhl_pbp_by_gid(nhl_load_pbp(out_dir, prior8), prior_games)
+    tal_this = {"season": season8, "games": (this_doc or {}).get("games") or {}}
+    tal_prior = {"season": prior8, "games": (prior_doc or {}).get("games") or {}} if prior_doc else None
+    prof = nhlsim.profiles(tal_this, dates, date_iso, pbp=pbp_this, prior_tallies=tal_prior, prior_pbp=pbp_prior, league=league)
+    n_this = sum(1 for gid in tal_this["games"] if dates.get(gid) and dates[gid] < date_iso)
+    log("Simulation: profiles for %d clubs from %d games of %s (%d with play-by-play)%s, %d goalies; %s." % (
+        len(prof["teams"]), n_this, season8, sum(1 for gid in pbp_this if dates.get(gid) and dates[gid] < date_iso),
+        (" and %d of %s" % (len(tal_prior["games"]), prior8)) if tal_prior else "", len(prof["goalies"]),
+        "the league's constants measured (%s, %s games)" % (NHL_TEND_FILE, tend.get("games")) if tend else "a-priori constants"))
+    return {"prof": prof, "tend": tend, "league": league, "runs": NHL_SIM_RUNS}
+
+
+def nhl_sim_crew(refs, tend):
+    """The crew's whistle: the referees' minors a game (both sides) against the league's, each shrunk toward the league by
+    games/(games + K) and averaged; 1.0 without the file or the names."""
+    if not refs or not tend or not tend.get("refs") or not tend.get("league_minors"):
+        return 1.0, []
+    lg = float(tend["league_minors"])
+    fs, used = [], []
+    for name in refs:
+        r = tend["refs"].get(name)
+        if not r:
+            continue
+        g = float(r.get("games") or 0)
+        f = ((r["minors"] * g + NHL_SIM_CREW_K * lg) / (g + NHL_SIM_CREW_K)) / lg
+        fs.append(f)
+        used.append([name, int(g), round(r["minors"], 2)])
+    if not fs:
+        return 1.0, []
+    return sum(fs) / len(fs), used
+
+
+def nhl_day_odds(out_dir, date_iso):
+    """The day's odds run (odds-DATE.json) by matchup: {(away nick, home nick): inputs}."""
+    p = os.path.join(out_dir, "odds-%s.json" % date_iso)
+    if not os.path.exists(p):
+        return {}
+    try:
+        with open(p, "r", encoding="utf-8") as f:
+            d = json.load(f)
+    except (OSError, ValueError):
+        return {}
+    out = {}
+    for g in d.get("games") or []:
+        if g.get("sport") == "NHL":
+            out[(g.get("away"), g.get("home"))] = dict(g.get("inputs") or {}, book=g.get("book") or "")
+    return out
+
+
+def _devig(po, pu):
+    try:
+        a, b = implied_prob(float(po)), implied_prob(float(pu))
+    except (TypeError, ValueError):
+        return None
+    return a / (a + b) if a + b > 0 else None
+
+
+def implied_prob(price):
+    p = float(price)
+    return 100.0 / (p + 100.0) if p > 0 else -p / (-p + 100.0)
+
+
+def nhl_sim_block(sim, aab, hab, away, home, date_iso, picks, refs, odds, log):
+    """The row's nhlsim block: both views' histograms, the anchor, the profiles and the goalies as the sim saw them."""
+    prof = sim["prof"]
+    crew, crew_used = nhl_sim_crew(refs, sim.get("tend"))
+    gk = {"away": str(picks.get("away")) if picks.get("away") is not None else None, "home": str(picks.get("home")) if picks.get("home") is not None else None}
+    setup = nhlsim.setup_from_profiles(prof, aab, hab, date_iso, goalies=gk, crew=crew)
+    if not setup:
+        log("  sim: no profile for %s (%s / %s); the row carries no sim." % ("both clubs" if not prof["teams"].get(aab) and not prof["teams"].get(hab) else (aab if not prof["teams"].get(aab) else hab), aab, hab))
+        return None
+    runs = sim.get("runs") or NHL_SIM_RUNS
+    seed = int(re.sub(r"\D", "", date_iso + aab + hab) or "0") % 1000003 if False else abs(hash((date_iso, aab, hab))) % 1000003
+    own = nhlsim.simulate(setup, n=runs, seed=seed)
+    H = nhlsim.histograms(own)
+    o = odds or {}
+    line = float(o["line"]) if o.get("line") not in (None, "") else None
+    p_over = _devig(o.get("op"), o.get("up")) if line is not None and o.get("op") not in (None, "") and o.get("up") not in (None, "") else None
+    p_home = _devig(o.get("hml"), o.get("aml")) if o.get("hml") not in (None, "") and o.get("aml") not in (None, "") else None
+    p1line = float(o["p1line"]) if o.get("p1line") not in (None, "") else None
+    sm = nhlsim.summarize(own, {"total": line, "p1": p1line})
+    block = {"v": nhlsim.VERSION, "runs": runs, "own": H, "mkt": None, "anchor": None, "shrink": nhlsim.SHRINK, "bands": nhlsim.BANDS, "crew": round(crew, 3), "refs": crew_used,
+             "prof": {}, "credit": "MoneyPuck.com shot data; ESPN play-by-play"}
+    for s, ab in (("away", aab), ("home", hab)):
+        p = setup[s]
+        block["prof"][s] = {"ab": ab, "n": p.get("n", 0), "rf": round(p["rf"], 3), "ra": round(p["ra"], 3), "qf": round(p["qf"], 3), "qa": round(p["qa"], 3), "fin": round(p.get("fin", 1.0), 3),
+                            "ppr": round(p["ppr"], 3), "pkr": round(p["pkr"], 3), "pen": round(p["pen"], 3), "drawn": round(p["drawn"], 3), "b2b": bool(p.get("b2b")),
+                            "gk": round(p.get("gk", 1.0), 3), "gk_shots": p.get("gk_shots", 0), "gk_name": p.get("gk_name") or ""}
+    if line is not None and p_over is not None:
+        setup2 = nhlsim.setup_from_profiles(prof, aab, hab, date_iso, goalies=gk, crew=crew)
+        mkt = nhlsim.simulate_anchored(setup2, n=runs, seed=seed + 1, line=line, p_over=p_over, p_home=p_home)
+        block["mkt"] = nhlsim.histograms(mkt)
+        block["anchor"] = {"line": line, "op": o.get("op"), "up": o.get("up"), "p_over": round(p_over, 4), "p_home": round(p_home, 4) if p_home is not None else None,
+                           "book": o.get("book") or "the book", "p1line": p1line, "p1op": o.get("p1op"), "p1up": o.get("p1up")}
+    t, m, p1 = sm["total"], sm["margin"], sm["periods"][0]
+    line_txt = "  sim, %s runs: total %.2f (median %d), first period %.2f, %s by %.2f, home win %.0f%%, overtime %.0f%%, empty-netters %.2f" % (
+        "{:,}".format(runs), t["mean"], t["median"], p1["mean"], (home if m["mean"] >= 0 else away), abs(m["mean"]), 100 * sm["home_win"], 100 * sm["ot"], sm["en"])
+    if line is not None and sm["markets"].get("total"):
+        mt = sm["markets"]["total"]
+        line_txt += "; at %s's %g the sim's own view says %s %.0f%% (%s)" % (block["anchor"]["book"] if block["anchor"] else "the book", line, mt["side"], 100 * mt["p_raw"], mt["band"])
+    if p1line is not None and sm["markets"].get("p1"):
+        mp = sm["markets"]["p1"]
+        line_txt += "; first period at %g: %s %.0f%%" % (p1line, mp["side"], 100 * mp["p_raw"])
+    log(line_txt)
+    gl = []
+    for s, nick in (("away", away), ("home", home)):
+        p = block["prof"][s]
+        gl.append("%s %s (goals against expected %.3f on %d shots)" % (nick, p["gk_name"] or "no goalie named", p["gk"], p["gk_shots"]) if p["gk_shots"] else "%s: no goalie line, a league goalie" % nick)
+    log("  sim goalies: %s%s" % ("; ".join(gl), ("; crew x%.3f (%s)" % (crew, ", ".join("%s %.2f" % (u[0], u[2]) for u in crew_used))) if crew_used else "; no crew named"))
+    if block["mkt"]:
+        HM = block["mkt"]
+        log("  sim, anchored to %s's %g (%s/%s): first period median %s (mean %.2f), the %s %.0f%% to win%s" % (
+            block["anchor"]["book"], line, o.get("op"), o.get("up"), nhlsim.hist_quantile(HM["p"][0], 0.5), nhlsim.hist_mean(HM["p"][0]),
+            home, 100 * (sum(c for i, c in enumerate(HM["margin"]["c"]) if HM["margin"]["lo"] + i > 0) / float(sum(HM["margin"]["c"]))),
+            ("; first period at %g: OVER %.0f%%" % (p1line, 100 * nhlsim.hist_over(HM["p"][0], p1line)[0] / max(1e-9, 1 - nhlsim.hist_over(HM["p"][0], p1line)[1]))) if p1line is not None else ""))
+    elif line is None:
+        log("  sim: no odds-%s.json with this game in the folder, so no market view; run the odds first and the slate again for the anchored view." % date_iso)
+    return block
 
 
 # ---- the NBA slate ------------------------------------------------------------
@@ -5605,10 +5961,14 @@ def make_nhl_slate(date_iso, out_dir, log):
     except Exception as e:  # noqa: BLE001
         log("Could not fetch the goalie report (%s); the context card has no goalie line." % e)
     lineups = nhl_lineups(date_iso, log) if games else {}
+    sim = nhl_sim_setup(date_iso, out_dir, season_id, ledger, log) if games else None
+    odds_by = nhl_day_odds(out_dir, date_iso)
+    if sim and not odds_by:
+        log("No odds-%s.json in the folder: the simulation runs its own view only; run the odds first (Run odds.bat) and the slate again for the market view." % date_iso)
     rows = []
     for g in games:
         try:
-            rows.append(build_nhl_game(g, date_iso, season_id, summary, log, ledger, (xg_rates, xg_lg) if xg_rates else None, gsum, tables, lineups))
+            rows.append(build_nhl_game(g, date_iso, season_id, summary, log, ledger, (xg_rates, xg_lg) if xg_rates else None, gsum, tables, lineups, sim, odds_by))
         except Exception as e:  # noqa: BLE001
             log("%s @ %s: FAILED (%s); left out of the slate" % (nhl_name(g.get("awayTeam")), nhl_name(g.get("homeTeam")), e))
         log("")
@@ -7121,19 +7481,23 @@ def selftest():
           pp["totals_h1"] == {"fanatics": [112.5, -110, -110], "draftkings": [113.0, -112, -108]} and pp["totals_q1"] == {"fanatics": [56.5, -115, -105]}
           and pp["team_totals"] == {"fanatics": {"home": [114.5, -110, -110], "away": [107.5, -105, -115]}} and odds_periods_path(".", "NBA", "2025-26") == os.path.join(".", "odds-periods-NBA-2025-26.json"))
     # the hockey play-by-play (29 Oct 2026): ESPN's events compact, the strength state and the clock kept, penalties and goalie changes with their text
-    summ_h = {"boxscore": {"teams": [{"team": {"id": "1"}, "homeAway": "home"}, {"team": {"id": "7"}, "homeAway": "away"}]}, "gameInfo": {"officials": [{"displayName": "Steve Barton"}, {"displayName": "Dan O'Rourke"}]},
+    summ_h = {"boxscore": {"teams": [{"team": {"id": "1"}, "homeAway": "home"}, {"team": {"id": "7"}, "homeAway": "away"}]},
+              "gameInfo": {"officials": [{"displayName": "Steve Barton", "position": {"name": "Linesman"}}, {"displayName": "Dan O'Rourke", "position": {"name": "Referee"}}]},
               "plays": [{"type": {"text": "Period Start"}, "text": "Start of 1st Period", "period": {"number": 1}, "clock": {"displayValue": "0:00"}, "homeScore": 0, "awayScore": 0},
                         {"type": {"text": "Hit"}, "text": "A hit B", "period": {"number": 1}, "clock": {"displayValue": "0:35"}, "team": {"id": "1"}, "strength": {"text": "Even Strength"}, "homeScore": 0, "awayScore": 0},
                         {"type": {"text": "Penalty"}, "text": "Nikita Zadorov Holding against Jesperi Kotkaniemi", "period": {"number": 1}, "clock": {"displayValue": "13:31"}, "team": {"id": "1"}, "strength": {"text": "Even Strength"}, "homeScore": 0, "awayScore": 0},
                         {"type": {"text": "Shot"}, "text": "X shot saved", "period": {"number": 1}, "clock": {"displayValue": "14:02"}, "team": {"id": "7"}, "strength": {"text": "Power Play"}, "homeScore": 0, "awayScore": 0},
+                        {"type": {"text": "High sticking", "penaltyMinutes": "4", "penaltyType": "Double Minor"}, "text": "Eetu Luostarinen High-sticking - double minor against Rickard Rakell", "period": {"number": 2}, "clock": {"displayValue": "2:38"}, "team": {"id": "7"}, "strength": {"text": "Even Strength"}, "homeScore": 0, "awayScore": 0},
                         {"type": {"text": "Goal"}, "text": "Casey Mittelstadt Goal (4) Wrist Shot", "period": {"number": 3}, "clock": {"displayValue": "1:27"}, "team": {"id": "1"}, "strength": {"text": "Even Strength"}, "scoringPlay": True, "homeScore": 1, "awayScore": 0},
                         {"type": {"text": "Goalie"}, "text": "Goalie pulled: Frederik Andersen for the extra attacker", "period": {"number": 3}, "clock": {"displayValue": "18:40"}, "team": {"id": "7"}, "homeScore": 1, "awayScore": 0},
                         {"type": {"text": "Shootout"}, "text": "Shootout attempt", "period": {"number": 5}, "clock": {"displayValue": "0:00"}, "team": {"id": "7"}, "homeScore": 1, "awayScore": 1},
                         {"type": {"text": "End of Game"}, "text": "End of Game", "period": {"number": 5}, "clock": {"displayValue": "0:00"}, "homeScore": 2, "awayScore": 1}]}
     ph = nhl_pbp_compact({"id": "401802532", "date": "2025-11-01", "away": "CAR", "home": "BOS", "fa": 1, "fh": 2}, summ_h)
     check("nhl play-by-play: ESPN's events compact with the strength state, the clock in seconds into the period, the penalty and goalie texts kept, hits dropped but counted, the officials and the end",
-          ph["n"] == 7 and ph["kinds"]["Hit"] == 1 and ph["plays"][1] == [1, 811.0, "P", 1, "E", 0, 0, "Nikita Zadorov Holding against Jesperi Kotkaniemi"] and ph["plays"][2][2:5] == ["S", 0, "P"]
-          and ph["plays"][3][:3] == [3, 87.0, "G"] and ph["plays"][4][2] == "GC" and ph["plays"][4][7].startswith("Goalie pulled") and ph["plays"][5][2] == "X" and ph["end"] == "SO" and ph["off"] == ["Steve Barton", "Dan O'Rourke"]
+          ph["n"] == 8 and ph["kinds"]["Hit"] == 1 and ph["plays"][1] == [1, 811.0, "P", 1, "E", 0, 0, "Nikita Zadorov Holding against Jesperi Kotkaniemi"] and ph["plays"][2][2:5] == ["S", 0, "P"]
+          and ph["plays"][3] == [2, 158.0, "P", 0, "E", 0, 0, "Eetu Luostarinen High-sticking - double minor against Rickard Rakell [Double Minor 4]"]
+          and ph["plays"][4][:3] == [3, 87.0, "G"] and ph["plays"][5][2] == "GC" and ph["plays"][5][7].startswith("Goalie pulled") and ph["plays"][6][2] == "X" and ph["end"] == "SO" and ph["off"] == [["Steve Barton", "L"], ["Dan O'Rourke", "R"]]
+          and ph["v"] == NHL_PBP_VERSION and nhl_pbp_stale({"off": ["Steve Barton"]}) and nhl_pbp_stale({"v": 2, "off": [["A", "R"]]}) and not nhl_pbp_stale(ph)
           and nhl_espn_code("NJ", "Devils") == "NJD" and nhl_espn_code("TB", None) == "TBL" and nhl_espn_code("BOS", "Bruins") == "BOS")
     check("odds-periods: hockey takes the ledger's eight-digit season and pulls the first-period total and the team totals by default (29 Oct 2026)",
           nhl_season8("2025-26") == "20252026" and nhl_season8("20252026") == "20252026" and nhl_season8("2024") == "20242025" and ODDS_PERIODS_MARKETS_NHL == "totals_p1,team_totals"
@@ -7918,7 +8282,7 @@ def default_date(mode, today):
 
 def main(argv=None):
     ap = argparse.ArgumentParser(description="Write the day's slate (or yesterday's finals) for Call Sheet 2.0.")
-    ap.add_argument("mode", nargs="?", choices=["slate", "grade", "nhl", "nhl-grade", "nhl-ledger", "nhl-pbp", "nba", "nba-grade", "nba-ledger", "nba-pbp", "nba-props", "odds", "odds-history", "odds-periods"], default="slate",
+    ap.add_argument("mode", nargs="?", choices=["slate", "grade", "nhl", "nhl-grade", "nhl-ledger", "nhl-pbp", "nhl-shots", "nba", "nba-grade", "nba-ledger", "nba-pbp", "nba-props", "odds", "odds-history", "odds-periods"], default="slate",
                     help="slate (default): today's MLB inputs. grade: MLB finals. nhl: today's NHL inputs. nhl-grade: NHL finals. "
                          "nhl-ledger: every NHL final this season, measured against the sheet's assumptions. "
                          "nba: today's NBA inputs (ratings, pace, rest, who is out, the context lines). nba-grade: NBA finals with the half-time score. "
@@ -7980,6 +8344,8 @@ def main(argv=None):
             path = make_nba_pbp(date_iso, a.out, log, a.season)
         elif a.mode == "nhl-pbp":
             path = make_nhl_pbp(date_iso, a.out, log, a.season)
+        elif a.mode == "nhl-shots":
+            path = make_nhl_shots(date_iso, a.out, log, a.season, force=True)
         elif a.mode == "nba":
             path = make_nba_slate(date_iso, a.out, log, topup=not a.no_ledger, sim_runs=max(0, a.runs))
         elif a.mode == "nba-grade":

@@ -2036,7 +2036,7 @@ const CHECKS = ["dome","playoff","agconf","hgconf","agbk","hgbk"];
   const nhlSimT = await pg.evaluate(async () => {
     const wait = () => new Promise(r => setTimeout(r, 260));
     const txt = e => (e ? e.innerText : '').replace(/\s+/g, ' ').trim();
-    await smStore.removeItem('callsheet3.card.v1'); document.getElementById('clear').click(); document.getElementById('m-nhl').click(); await wait();
+    await smStore.removeItem('callsheet3.card.v1'); document.getElementById('slateClear').click(); document.getElementById('clear').click(); document.getElementById('m-nhl').click(); await wait();
     const load = async (doc, fname) => { const dt = new DataTransfer(); dt.items.add(new File([JSON.stringify(doc)], fname, { type: 'application/json' })); const inp = document.getElementById('slateFile'); inp.files = dt.files; inp.dispatchEvent(new Event('change', { bubbles: true })); await wait(); };
     const CARD = () => JSON.parse(smStore.getItem('callsheet3.card.v1') || '[]').filter(r => r.sport === 'NHL' && r.away === 'Sharks' && r.home === 'Ducks');   // the in-memory card keeps earlier blocks' rows: this block's own
     // a Poisson-shaped histogram over lo..hi at mean mu, 2,000 runs
@@ -2054,8 +2054,11 @@ const CHECKS = ["dome","playoff","agconf","hgconf","agbk","hgbk"];
     await load({ format: 'callsheet2.slate', version: 1, date: '2026-11-15', games: [Object.assign({}, game, { starters: { away: 'Yaroslav Askarov', home: 'Lukas Dostal' }, inputs: {
       line: '6.5', op: '-105', up: '-115', hml: '-150', aml: '130', p1line: '1.5', p1op: '-125', p1up: '105', pl: '-1.5', plh: '180', pla: '-220', agsv: '0.905', hgsv: '0.912', agsh: '700', hgsh: '650',
       agname: 'Yaroslav Askarov', hgname: 'Lukas Dostal', arest: '1', hrest: '0', odds: shop, nhlsim: JSON.stringify(sim) }, notes: [] })] }, 'nhl-slate-2026-11-15.json');
-    document.querySelector('#slateList [data-slate]').click(); await wait();
+    const pend = [...document.querySelectorAll('#slateList [data-slate]')];
+    const mine = pend.find(b => /Sharks @ Ducks/.test((b.closest('[data-slate]') || b).parentElement.innerText)) || pend[0];
+    if (mine) mine.click(); await wait(); await wait();
     const panel = document.getElementById('nhlSimPanel');
+    if (!panel.querySelector('.simtab')) return { err: 'no simulation table', panel: txt(panel).slice(0, 200), pending: pend.length, sport: document.getElementById('m-nhl').getAttribute('aria-pressed'), nhlsim: (document.getElementById('nhlsim').value || '').length, away: document.getElementById('away').value, home: document.getElementById('home').value };
     const tiles = [...panel.querySelectorAll('.simtile')].map(txt), rows = [...panel.querySelectorAll('.simtab tbody tr')].map(txt), chips = [...panel.querySelectorAll('.simchip')].map(e => e.className + '|' + txt(e));
     const meta = txt(panel.querySelector('.simmeta')), prof = txt(panel.querySelector('.simprof')), fit = panel.querySelector('.simtab').getBoundingClientRect().width <= panel.getBoundingClientRect().width + 1;
     const mk = [...document.querySelectorAll('#markets .mk')].map(el => ({ key: el.dataset.key, pick: el.querySelector('.pick').childNodes[0].textContent.trim(), p: (el.querySelector('.p') || {}).textContent || '', band: (el.querySelector('.band') || {}).textContent || '', text: txt(el).slice(0, 600) }));
@@ -2069,6 +2072,7 @@ const CHECKS = ["dome","playoff","agconf","hgconf","agbk","hgbk"];
     const rec = txt(document.querySelector('#calibBox .simrec'));
     return { tiles, rows, chips, meta, prof, fit, mk, off, on, taken, decided: row.markets.map(m => [m.key, m.decided, m.side1, m.band1, m.simView, m.simRaw, m.simWorth, (m.sheet || {}).side].join(':')), rec, graded: CARD()[0].finals };
   });
+  if (nhlSimT.err) { chk(false, 'nhl sim: the card rendered after Fill form', JSON.stringify(nhlSimT)); nhlSimT.tiles = []; nhlSimT.rows = []; nhlSimT.chips = []; nhlSimT.mk = []; nhlSimT.decided = []; nhlSimT.meta = ''; nhlSimT.prof = ''; nhlSimT.rec = ''; }
   chk(nhlSimT.tiles.length === 4 && /^TOTAL 5\.\d\d median [56] · middle half [45]–[67]$/.test(nhlSimT.tiles[0]) && /^FIRST PERIOD 2\.[34]\d scoreless [0-9]% · over 1\.5 6[0-9]%$/.test(nhlSimT.tiles[1]) && /^MARGIN Ducks by 0\.\d\d Sharks 2\.\d\d · Ducks 2\.\d\d · Ducks wins 5[0-9]%$/.test(nhlSimT.tiles[2]) && /^OVERTIME 22% the shootout 8% · empty-netters 0\.35$/.test(nhlSimT.tiles[3]),
       'nhl sim: the four tiles read the own view (total, first period, margin, overtime)', JSON.stringify(nhlSimT.tiles));
   chk(nhlSimT.rows.length === 6 && /^Full-game total the sim decides 6\.5 UNDER 6[0-9]% BET · worth 5[5-9]% TAKE UNDER 5[0-9]% worth 5[0-4]% TAKE$/.test(nhlSimT.rows[0]) && /^First period the sim decides 1\.5 OVER 6\d% (LEAN|BET) · worth (5[5-9]|6\d)% TAKE OVER 5\d% worth 5[0-4]% TAKE$/.test(nhlSimT.rows[1])

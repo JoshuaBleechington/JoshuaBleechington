@@ -5938,6 +5938,17 @@ def odds_history_dates(sport, season, out_dir, start=None, end=None):
 # four markets is about 49,000 credits, which the 100,000-credit plan carries; the run prints the cost and asks first.
 ODDS_PERIODS_FORMAT = "callsheet.odds-periods"
 ODDS_PERIODS_MARKETS = "totals_h1,totals_q1,totals_q3,team_totals"
+ODDS_PERIODS_MARKETS_NHL = "totals_p1,team_totals"   # hockey (29 Oct 2026): the first-period total for the hockey simulation to come, the team totals beside it
+
+
+def nhl_season8(season):
+    """'2025-26', '2025' or '20252026' -> '20252026', the hockey ledger's own form."""
+    s = str(season).strip()
+    if re.fullmatch(r"\d{8}", s):
+        return s
+    if re.fullmatch(r"\d{4}-\d{2}", s) or re.fullmatch(r"\d{4}", s):
+        return "%s%d" % (s[:4], int(s[:4]) + 1)
+    raise ValueError("a hockey season looks like 20252026 or 2025-26")
 ODDS_PERIODS_BOOKS = ["fanatics", "betmgm", "draftkings", "fanduel", "caesars", "espnbet", "betrivers"]
 ODDS_PERIODS_MINUTES = 15          # the snapshot this many minutes before tip: the close
 ODDS_PERIODS_EVENTS_AT = "18:00"   # UTC, the hour the day's events are listed at (2 pm Eastern: every game of the night is up)
@@ -6003,8 +6014,8 @@ def make_odds_periods(out_dir, log, season, markets=None, books=None, minutes=OD
     a season, from the historical event endpoint. Resumable; the file is written
     every ODDS_PERIODS_FLUSH games and the run stops at `keep` credits."""
     key = odds_key(out_dir)
-    season = nba_norm_season(str(season))
-    markets = ",".join(m.strip() for m in (markets or ODDS_PERIODS_MARKETS).split(",") if m.strip())
+    season = nhl_season8(season) if sport == "NHL" else nba_norm_season(str(season))   # hockey (29 Oct 2026): the ledger's eight-digit season
+    markets = ",".join(m.strip() for m in (markets or (ODDS_PERIODS_MARKETS_NHL if sport == "NHL" else ODDS_PERIODS_MARKETS)).split(",") if m.strip())
     mks = markets.split(",")
     books = odds_books_list(books) if books else list(ODDS_PERIODS_BOOKS)
     dates = odds_history_dates(sport, season, out_dir)
@@ -6021,7 +6032,7 @@ def make_odds_periods(out_dir, log, season, markets=None, books=None, minutes=OD
     need_days = [d for d in dates if d not in doc["pulled"]]
     todo_games = [k for k, g in have.items() if any(m not in (g.get("mk") or {}) for m in mks)]
     # the games still to list, counted off the ledger's own dates (the first run said 12 a day and 79,846 credits; a season is about 1,230 games)
-    led = load_nba_ledger(nba_ledger_path(out_dir, season)) if sport == "NBA" else None
+    led = load_nba_ledger(nba_ledger_path(out_dir, season)) if sport == "NBA" else (load_ledger(ledger_path(out_dir, season)) if sport == "NHL" else None)
     per_day = {}
     for g in (led or {}).get("games") or []:
         per_day[g.get("date")] = per_day.get(g.get("date"), 0) + 1
@@ -6100,9 +6111,10 @@ def make_odds_periods(out_dir, log, season, markets=None, books=None, minutes=OD
             break
     flush()
     priced = sum(1 for g in doc["games"].values() if all(m in (g.get("mk") or {}) for m in mks))
-    with_h1 = sum(1 for g in doc["games"].values() if (g.get("mk") or {}).get("totals_h1"))
-    log("Wrote %s: %d games listed, %d priced for %s, %d with a first-half total. %s" % (
-        path, len(doc["games"]), priced, markets, with_h1, "Send it to Claude: the simulation's first-half, quarter and team-total calls are measured against it." if not stopped else "Run again to go on where it stopped."))
+    with_h1 = sum(1 for g in doc["games"].values() if (g.get("mk") or {}).get(mks[0]))
+    log("Wrote %s: %d games listed, %d priced for %s, %d with a %s. %s" % (
+        path, len(doc["games"]), priced, markets, with_h1, "first-period total" if sport == "NHL" else "first-half total",
+        ("Send it to Claude: the hockey simulation's first-period and team-total calls are measured against it." if sport == "NHL" else "Send it to Claude: the simulation's first-half, quarter and team-total calls are measured against it.") if not stopped else "Run again to go on where it stopped."))
     return path
 
 
@@ -6939,6 +6951,9 @@ def selftest():
     check("odds periods: the first half and the quarter per book, the team totals by side",
           pp["totals_h1"] == {"fanatics": [112.5, -110, -110], "draftkings": [113.0, -112, -108]} and pp["totals_q1"] == {"fanatics": [56.5, -115, -105]}
           and pp["team_totals"] == {"fanatics": {"home": [114.5, -110, -110], "away": [107.5, -105, -115]}} and odds_periods_path(".", "NBA", "2025-26") == os.path.join(".", "odds-periods-NBA-2025-26.json"))
+    check("odds-periods: hockey takes the ledger's eight-digit season and pulls the first-period total and the team totals by default (29 Oct 2026)",
+          nhl_season8("2025-26") == "20252026" and nhl_season8("20252026") == "20252026" and nhl_season8("2024") == "20242025" and ODDS_PERIODS_MARKETS_NHL == "totals_p1,team_totals"
+          and odds_periods_path(".", "NHL", "20252026") == os.path.join(".", "odds-periods-NHL-20252026.json") and ODDS_PERIOD["NHL"] == "totals_p1")
     check("odds history: the dates come from the calendar without a ledger, or from the range", odds_history_dates("NHL", "20252026", tempfile.mkdtemp())[0] == "2025-10-01"
           and odds_history_dates("NHL", "x", ".", "2025-10-08", "2025-10-10") == ["2025-10-08", "2025-10-09", "2025-10-10"])
     # the NBA ledger (15 Oct 2026), offline: the feed's shapes, canned
@@ -7728,6 +7743,7 @@ def main(argv=None):
                          "odds-history: a past season's lines at two moments a day, for the backtest's openers (paid plans; asks before it spends).")
     ap.add_argument("--books", help="odds only: the books to read, first one carded, pinnacle never carded, e.g. fanatics,betmgm,draftkings,pinnacle (default: %s)" % ",".join(ODDS_BOOKS))
     ap.add_argument("--sports", help="odds only: which sports, e.g. NHL,MLB (default: MLB,NHL; odds-history: NHL)")
+    ap.add_argument("--sport", help="odds-periods: NBA (default) or NHL; hockey pulls the first-period total and the team totals at the close.")
     ap.add_argument("--date", help="YYYY-MM-DD. Default: today for slate, yesterday for grade.")
     ap.add_argument("--season", help="nhl-ledger, nba-ledger and odds-history: a past season to pull in full, e.g. 20252026 or 2024-25 (for the backtest).")
     ap.add_argument("--from", dest="start", help="odds-history: the first date to pull, YYYY-MM-DD (with --to; else the season's dates).")
@@ -7793,7 +7809,8 @@ def main(argv=None):
         elif a.mode == "odds-periods":
             if not a.season:
                 raise RuntimeError("odds-periods needs --season (e.g. 2025-26)")
-            path = make_odds_periods(a.out, log, a.season, a.markets if a.markets and "," in a.markets or (a.markets or "").startswith(("totals_", "team_", "spreads_")) else None, a.books, a.minutes, a.yes, a.keep)
+            path = make_odds_periods(a.out, log, a.season, a.markets if a.markets and "," in a.markets or (a.markets or "").startswith(("totals_", "team_", "spreads_")) else None, a.books, a.minutes, a.yes, a.keep,
+                                     sport=(a.sport or "NBA").upper())
         else:
             path = make_slate(date_iso, a.out, log)
     except Exception as e:  # noqa: BLE001

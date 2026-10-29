@@ -3099,6 +3099,175 @@ def make_nba_pbp(date_iso, out_dir, log, season=None):
     return path
 
 
+# ---- the hockey play-by-play (29 Oct 2026): every game's events from ESPN, for the hockey simulation ----
+# The user wants a goal-level simulation of the NHL (first-period and full-game totals). MoneyPuck's shot
+# files carry every unblocked shot with its expected-goal value, but not the penalties, the power-play
+# time or the goalie pulls with their clocks; ESPN's hockey summary carries those (the shots, misses and
+# blocks too, the goals with the strength state, the officials), one call a game. nhl-pbp-SEASON.json,
+# the hockey ledger's eight-digit season, regular season only, resumable.
+ESPN_NHL = "https://site.api.espn.com/apis/site/v2/sports/hockey/nhl"
+ESPN_NHL_TRICODE = {"NJ": "NJD", "TB": "TBL", "LA": "LAK", "SJ": "SJS", "UTAH": "UTA", "WSH": "WSH"}
+NHL_PBP_FORMAT = "callsheet3.nhl-pbp"
+NHL_PBP_CODES = {"G": "goal", "S": "shot on goal", "M": "missed shot", "B": "blocked shot", "P": "penalty (the text kept)", "F": "faceoff", "GC": "goalie change (the text kept)",
+                 "PS": "period start", "PE": "period end", "X": "shootout attempt", "E": "end of game"}
+NHL_PBP_SKIP = ("Hit", "Giveaway", "Takeaway", "Stoppage", "Timeout", "Delayed Penalty")
+NHL_STRENGTH = {"even strength": "E", "power play": "P", "short handed": "S", "shorthanded": "S"}
+
+
+def nhl_espn_code(ab, name):
+    """ESPN's hockey club to the ledger's code: by nickname first, then the abbreviation."""
+    by_name = {v: k for k, v in NHL_NICK.items()}
+    if name and by_name.get(name):
+        return by_name[name]
+    a = str(ab or "").upper()
+    return ESPN_NHL_TRICODE.get(a, a)
+
+
+def nhl_games_from_espn(season8, through_iso=None, log=None):
+    """Every regular-season final of a hockey season from ESPN's scoreboard, a day a call: {id, date, away, home, an, hn, fa, fh}."""
+    y = int(str(season8)[:4])
+    start, end = dt.date(y, 10, 1), dt.date(y + 1, 6, 30)
+    if through_iso:
+        end = min(end, dt.date.fromisoformat(through_iso))
+    out, d, failed = {}, start, []
+    while d <= end:
+        try:
+            doc = fetch_json(ESPN_NHL + "/scoreboard?dates=%s&limit=100" % d.strftime("%Y%m%d"), cache=False)
+        except Exception as ex:  # noqa: BLE001
+            failed.append(d.isoformat())
+            if log and len(failed) <= 3:
+                log("  %s: no scoreboard (%s)" % (d.isoformat(), ex))
+            d += dt.timedelta(days=1)
+            continue
+        for ev in doc.get("events") or []:
+            if int(((ev.get("season") or {}).get("type") or 0)) != 2:
+                continue
+            comp = ((ev.get("competitions") or [{}])[0]) or {}
+            if not (((comp.get("status") or {}).get("type") or {}).get("completed")):
+                continue
+            g = {"id": str(ev.get("id")), "date": nba_us_date(comp.get("date") or ev.get("date")), "t": comp.get("date") or ev.get("date"), "away": None, "home": None, "an": None, "hn": None, "fa": None, "fh": None}
+            for c in comp.get("competitors") or []:
+                t = c.get("team") or {}
+                side = "home" if c.get("homeAway") == "home" else "away"
+                g[side] = nhl_espn_code(t.get("abbreviation"), t.get("name"))
+                g["hn" if side == "home" else "an"] = t.get("name") or t.get("shortDisplayName")
+                try:
+                    g["fh" if side == "home" else "fa"] = int(c.get("score")) if c.get("score") not in (None, "") else None
+                except (TypeError, ValueError):
+                    pass
+            if g["away"] and g["home"]:
+                out[g["id"]] = g
+        d += dt.timedelta(days=1)
+    if failed and log:
+        log("  %d day%s with no scoreboard answer (first %s, last %s)." % (len(failed), "" if len(failed) == 1 else "s", failed[0], failed[-1]))
+    return sorted(out.values(), key=lambda g: (g["date"] or "", g["id"]))
+
+
+def nhl_pbp_compact(g, summ):
+    """A hockey game's events, compact, from its ESPN summary: [period, seconds into the period, code, side (1 home, 0 away,
+    -1 neither), strength (E/P/S/-), away score, home score, text (penalties and goalie changes only)]."""
+    teams = {}
+    for t in ((summ or {}).get("boxscore") or {}).get("teams") or []:
+        tm = t.get("team") or {}
+        teams[str(tm.get("id"))] = "home" if t.get("homeAway") == "home" else "away"
+    hdr = ((((summ or {}).get("header") or {}).get("competitions") or [{}])[0]) or {}
+    for c in hdr.get("competitors") or []:
+        tm = c.get("team") or {}
+        teams.setdefault(str(tm.get("id")), "home" if c.get("homeAway") == "home" else "away")
+    plays, kinds = [], {}
+    for p in (summ or {}).get("plays") or []:
+        ptype = ((p.get("type") or {}).get("text")) or ""
+        kinds[ptype] = kinds.get(ptype, 0) + 1
+        if ptype in NHL_PBP_SKIP:
+            continue
+        text = str(p.get("text") or "")
+        low = text.lower()
+        period = int(((p.get("period") or {}).get("number")) or 0)
+        if ptype == "Goal":
+            code = "X" if period >= 5 else "G"
+        elif ptype == "Shot":
+            code = "X" if period >= 5 else "S"
+        elif ptype == "Missed":
+            code = "X" if period >= 5 else "M"
+        elif ptype == "Blocked":
+            code = "B"
+        elif ptype == "Penalty":
+            code = "P"
+        elif ptype == "Face Off":
+            code = "F"
+        elif ptype == "Period Start":
+            code = "PS"
+        elif ptype == "Period End":
+            code = "PE"
+        elif ptype == "End of Game":
+            code = "E"
+        elif "goalie" in low or "goaltender" in low:
+            code = "GC"
+        elif ptype == "Shootout":
+            code = "X"
+        else:
+            continue
+        side = teams.get(str((p.get("team") or {}).get("id")), None)
+        strength = NHL_STRENGTH.get(str(((p.get("strength") or {}).get("text")) or "").lower(), "-")
+        try:
+            aw, hm = int(p.get("awayScore") or 0), int(p.get("homeScore") or 0)
+        except (TypeError, ValueError):
+            aw, hm = 0, 0
+        plays.append([period, nba_clock_seconds((p.get("clock") or {}).get("displayValue")), code, 1 if side == "home" else (0 if side == "away" else -1), strength, aw, hm,
+                      text[:80] if code in ("P", "GC") else ""])
+    offs = [o.get("displayName") for o in (((summ or {}).get("gameInfo") or {}).get("officials") or []) if o.get("displayName")]
+    last = max([pl[0] for pl in plays] + [3])
+    return {"id": g["id"], "date": g.get("date"), "away": g.get("away"), "home": g.get("home"), "fa": g.get("fa"), "fh": g.get("fh"), "end": "SO" if last >= 5 else ("OT" if last == 4 else "REG"),
+            "off": offs, "n": len(plays), "plays": plays, "kinds": kinds}
+
+
+def make_nhl_pbp(date_iso, out_dir, log, season=None):
+    """nhl-pbp-SEASON.json: every regular-season game's events from ESPN, one call a game, written every NBA_LEDGER_FLUSH
+    so a run can be stopped and resumed. This season up to date_iso, or a past season with --season."""
+    d0 = dt.date.fromisoformat(date_iso)
+    current = "%d%d" % ((d0.year if d0.month >= 8 else d0.year - 1), (d0.year if d0.month >= 8 else d0.year - 1) + 1)
+    season = nhl_season8(season) if season else current
+    past = season != current
+    path = os.path.join(out_dir, "nhl-pbp-%s.json" % season)
+    doc = None
+    if os.path.exists(path):
+        with open(path, "r", encoding="utf-8") as f:
+            doc = json.load(f)
+        if doc.get("format") != NHL_PBP_FORMAT:
+            doc = None
+    doc = doc or {"format": NHL_PBP_FORMAT, "version": 1, "season": season, "codes": NHL_PBP_CODES, "games": []}
+    byid = {g["id"]: g for g in doc["games"]}
+    log("NHL play-by-play %s: %d game%s already in the file." % (season, len(byid), "" if len(byid) == 1 else "s"))
+    games = nhl_games_from_espn(season, None if past else date_iso, log)
+    todo = [g for g in games if g["id"] not in byid]
+    log("%d final%s listed, %d to fetch; the file is written every %d." % (len(games), "" if len(games) == 1 else "s", len(todo), NBA_LEDGER_FLUSH))
+
+    def flush():
+        doc["games"] = sorted(byid.values(), key=lambda g: ((g.get("date") or ""), g.get("id") or ""))
+        doc["through"] = date_iso if not past else "%d-06-30" % (int(season[:4]) + 1)
+        doc["generated"] = now_utc()
+        with open(path, "w", encoding="utf-8") as f:
+            json.dump(doc, f, separators=(",", ":"))
+    done, empty = 0, 0
+    for g in todo:
+        try:
+            summ = fetch_json(ESPN_NHL + "/summary?event=%s" % g["id"], timeout=NBA_CDN_TIMEOUT, cache=False)
+            e = nhl_pbp_compact(g, summ)
+        except Exception as ex:  # noqa: BLE001
+            log("  game %s (%s, %s @ %s): no summary (%s)" % (g["id"], g.get("date"), g.get("away"), g.get("home"), ex))
+            continue
+        if not e["n"]:
+            empty += 1
+        byid[g["id"]] = e
+        done += 1
+        if done % NBA_LEDGER_FLUSH == 0:
+            flush()
+            log("  %d fetched (%s); written." % (done, g.get("date")))
+    flush()
+    log("Added %d game%s (%d with no plays). Wrote %s with %d games." % (done, "" if done == 1 else "s", empty, path, len(byid)))
+    return path
+
+
 # ---- the NBA slate ------------------------------------------------------------
 # Today's games with the boxes the basketball book scores or shows (totals/nba.py):
 # each club's ratings, pace and games to date from the running ledger, the
@@ -6951,6 +7120,21 @@ def selftest():
     check("odds periods: the first half and the quarter per book, the team totals by side",
           pp["totals_h1"] == {"fanatics": [112.5, -110, -110], "draftkings": [113.0, -112, -108]} and pp["totals_q1"] == {"fanatics": [56.5, -115, -105]}
           and pp["team_totals"] == {"fanatics": {"home": [114.5, -110, -110], "away": [107.5, -105, -115]}} and odds_periods_path(".", "NBA", "2025-26") == os.path.join(".", "odds-periods-NBA-2025-26.json"))
+    # the hockey play-by-play (29 Oct 2026): ESPN's events compact, the strength state and the clock kept, penalties and goalie changes with their text
+    summ_h = {"boxscore": {"teams": [{"team": {"id": "1"}, "homeAway": "home"}, {"team": {"id": "7"}, "homeAway": "away"}]}, "gameInfo": {"officials": [{"displayName": "Steve Barton"}, {"displayName": "Dan O'Rourke"}]},
+              "plays": [{"type": {"text": "Period Start"}, "text": "Start of 1st Period", "period": {"number": 1}, "clock": {"displayValue": "0:00"}, "homeScore": 0, "awayScore": 0},
+                        {"type": {"text": "Hit"}, "text": "A hit B", "period": {"number": 1}, "clock": {"displayValue": "0:35"}, "team": {"id": "1"}, "strength": {"text": "Even Strength"}, "homeScore": 0, "awayScore": 0},
+                        {"type": {"text": "Penalty"}, "text": "Nikita Zadorov Holding against Jesperi Kotkaniemi", "period": {"number": 1}, "clock": {"displayValue": "13:31"}, "team": {"id": "1"}, "strength": {"text": "Even Strength"}, "homeScore": 0, "awayScore": 0},
+                        {"type": {"text": "Shot"}, "text": "X shot saved", "period": {"number": 1}, "clock": {"displayValue": "14:02"}, "team": {"id": "7"}, "strength": {"text": "Power Play"}, "homeScore": 0, "awayScore": 0},
+                        {"type": {"text": "Goal"}, "text": "Casey Mittelstadt Goal (4) Wrist Shot", "period": {"number": 3}, "clock": {"displayValue": "1:27"}, "team": {"id": "1"}, "strength": {"text": "Even Strength"}, "scoringPlay": True, "homeScore": 1, "awayScore": 0},
+                        {"type": {"text": "Goalie"}, "text": "Goalie pulled: Frederik Andersen for the extra attacker", "period": {"number": 3}, "clock": {"displayValue": "18:40"}, "team": {"id": "7"}, "homeScore": 1, "awayScore": 0},
+                        {"type": {"text": "Shootout"}, "text": "Shootout attempt", "period": {"number": 5}, "clock": {"displayValue": "0:00"}, "team": {"id": "7"}, "homeScore": 1, "awayScore": 1},
+                        {"type": {"text": "End of Game"}, "text": "End of Game", "period": {"number": 5}, "clock": {"displayValue": "0:00"}, "homeScore": 2, "awayScore": 1}]}
+    ph = nhl_pbp_compact({"id": "401802532", "date": "2025-11-01", "away": "CAR", "home": "BOS", "fa": 1, "fh": 2}, summ_h)
+    check("nhl play-by-play: ESPN's events compact with the strength state, the clock in seconds into the period, the penalty and goalie texts kept, hits dropped but counted, the officials and the end",
+          ph["n"] == 7 and ph["kinds"]["Hit"] == 1 and ph["plays"][1] == [1, 811.0, "P", 1, "E", 0, 0, "Nikita Zadorov Holding against Jesperi Kotkaniemi"] and ph["plays"][2][2:5] == ["S", 0, "P"]
+          and ph["plays"][3][:3] == [3, 87.0, "G"] and ph["plays"][4][2] == "GC" and ph["plays"][4][7].startswith("Goalie pulled") and ph["plays"][5][2] == "X" and ph["end"] == "SO" and ph["off"] == ["Steve Barton", "Dan O'Rourke"]
+          and nhl_espn_code("NJ", "Devils") == "NJD" and nhl_espn_code("TB", None) == "TBL" and nhl_espn_code("BOS", "Bruins") == "BOS")
     check("odds-periods: hockey takes the ledger's eight-digit season and pulls the first-period total and the team totals by default (29 Oct 2026)",
           nhl_season8("2025-26") == "20252026" and nhl_season8("20252026") == "20252026" and nhl_season8("2024") == "20242025" and ODDS_PERIODS_MARKETS_NHL == "totals_p1,team_totals"
           and odds_periods_path(".", "NHL", "20252026") == os.path.join(".", "odds-periods-NHL-20252026.json") and ODDS_PERIOD["NHL"] == "totals_p1")
@@ -7734,7 +7918,7 @@ def default_date(mode, today):
 
 def main(argv=None):
     ap = argparse.ArgumentParser(description="Write the day's slate (or yesterday's finals) for Call Sheet 2.0.")
-    ap.add_argument("mode", nargs="?", choices=["slate", "grade", "nhl", "nhl-grade", "nhl-ledger", "nba", "nba-grade", "nba-ledger", "nba-pbp", "nba-props", "odds", "odds-history", "odds-periods"], default="slate",
+    ap.add_argument("mode", nargs="?", choices=["slate", "grade", "nhl", "nhl-grade", "nhl-ledger", "nhl-pbp", "nba", "nba-grade", "nba-ledger", "nba-pbp", "nba-props", "odds", "odds-history", "odds-periods"], default="slate",
                     help="slate (default): today's MLB inputs. grade: MLB finals. nhl: today's NHL inputs. nhl-grade: NHL finals. "
                          "nhl-ledger: every NHL final this season, measured against the sheet's assumptions. "
                          "nba: today's NBA inputs (ratings, pace, rest, who is out, the context lines). nba-grade: NBA finals with the half-time score. "
@@ -7794,6 +7978,8 @@ def main(argv=None):
             path = make_nba_ledger(date_iso, a.out, log, a.season)
         elif a.mode == "nba-pbp":
             path = make_nba_pbp(date_iso, a.out, log, a.season)
+        elif a.mode == "nhl-pbp":
+            path = make_nhl_pbp(date_iso, a.out, log, a.season)
         elif a.mode == "nba":
             path = make_nba_slate(date_iso, a.out, log, topup=not a.no_ledger, sim_runs=max(0, a.runs))
         elif a.mode == "nba-grade":

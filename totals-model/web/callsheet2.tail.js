@@ -2247,6 +2247,19 @@
   if ($("upsets")) $("upsets").addEventListener("click", function (e) { var t = e.target.closest("[data-open]"); if (t) openRow(t.dataset.open); });
   if ($("agree")) $("agree").addEventListener("click", function (e) { if (e.target.closest("[data-stake]")) return; var t = e.target.closest("[data-open]"); if (t) openRow(t.dataset.open); });
   if ($("mid")) $("mid").addEventListener("click", function (e) { if (e.target.closest("[data-stake]")) return; var t = e.target.closest("[data-open]"); if (t) openRow(t.dataset.open); });
+  /* the window's boxes on the Simulation card (29 Oct 2026): typed, kept across renders, priced as you type; the Take button
+     follows the numbers in the boxes, so the card is redrawn when a number changes and the price alone updates the line */
+  if ($("nbaSimPanel")) $("nbaSimPanel").addEventListener("input", function (e) {
+    var id = e.target && e.target.id, map = { winLo: "lo", winHi: "hi", winPrice: "price" };
+    if (!map[id]) return;
+    winCalc[map[id]] = e.target.value;
+    var sim = nbaSim(), out = $("winOut");
+    if (!sim || !out) return;
+    if (id === "winPrice") { out.innerHTML = nbaWindowOut(sim); return; }
+    var w = nbaWindowRead(sim), btn = $("nbaSimPanel").querySelector('.simwin .simtake');
+    out.innerHTML = nbaWindowOut(sim);
+    if (btn) btn.innerHTML = nbaSimTakeBtn(nbaSimTakeRow(readNba()), "window", "total", w ? w.side : "WINDOW");
+  });
   /* the middle calculator's boxes (28 Oct 2026): typed into the panel, kept across renders, priced as you type */
   if ($("nbaMidPanel")) $("nbaMidPanel").addEventListener("input", function (e) {
     var id = e.target && e.target.id, map = { midOverLine: "ol", midOverPrice: "op", midUnderLine: "ul", midUnderPrice: "up" };

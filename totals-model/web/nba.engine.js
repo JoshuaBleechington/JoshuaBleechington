@@ -701,6 +701,7 @@
          (tot ? 'the fourth ' + (100 * nbaSimQ(V.q[3], 0.5) / tot).toFixed(1) + '% of the game' : '') + '</td>' +
          (V.q || []).map(function (q) { return '<td>' + nbaSimQ(q, 0.5) + '</td>'; }).join('') +
          '<td>' + nbaSimQ(V.h1, 0.5) + '</td><td>' + nbaSimQ(V.h2, 0.5) + '</td><td>' + nbaSimQ(V.away, 0.5) + '</td><td>' + nbaSimQ(V.home, 0.5) + '</td></tr></tbody></table>';
+    h += nbaWindowHtml(sim, takeRow);   // the window on the total as one ticket (29 Oct 2026)
     var pa = sim.prof && sim.prof.away, ph = sim.prof && sim.prof.home;
     if (pa && ph) {
       h += '<div class="simprof dim">Profiles: ' + esc(away) + ' ' + pa.ortg + ' / ' + pa.drtg + ' per 100, pace ' + pa.pace + (pa.b2b ? ', back to back' : '') + (pa.out ? ', out ' + pa.out + ' per 100' : '') +
@@ -708,6 +709,60 @@
            (sim.ft_factor && Math.abs(sim.ft_factor - 1) >= 0.02 ? ' · the crew\'s whistle x' + sim.ft_factor : '') + '</div>';
     }
     el.innerHTML = h;
+  }
+  /* the window on the total (29 Oct 2026, the user: "select the middle half at 221-246 ... over 221 and under 246 as a
+     same game parlay"): one ticket, over the low number and under the high, paid when the total lands between them. The
+     sim's histogram gives the chance of landing inside any window directly, a push at an integer number set aside (that
+     leg voids on most apps, so the half-point numbers are the ones to type). The ANCHORED view prices the ticket, since
+     the replay found the own view's centre carries nothing the close does not; the own view's chance is shown beside it.
+     The boxes default to the anchored view's middle half on half-point numbers; the price is the app's parlay quote,
+     typed. The ticket is taken like a sim call, listed under Taking tonight, graded inside or out, and recorded on its
+     own line. Nothing here moves a call or a band. */
+  var winCalc = { lo: "", hi: "", price: "" };
+  function nbaWindowChance(H, lo, hi) {
+    if (!H || !isFinite(lo) || !isFinite(hi) || hi <= lo) return null;
+    var n = 0, inside = 0, pLo = 0, pHi = 0;
+    H.c.forEach(function (c, i) { n += c; var v = H.lo + i; if (v > lo && v < hi) inside += c; else if (v === lo) pLo += c; else if (v === hi) pHi += c; });
+    if (!n) return null;
+    return { inside: inside / n, pushLo: pLo / n, pushHi: pHi / n };
+  }
+  function nbaWindowDefault(sim) {
+    var V = (sim && (sim.mkt || sim.own)) || null; if (!V || !V.total) return null;
+    return { lo: nbaSimQ(V.total, 0.25) - 0.5, hi: nbaSimQ(V.total, 0.75) + 0.5 };
+  }
+  function nbaWindowRead(sim) {
+    var d = nbaWindowDefault(sim), lo = parseFloat(winCalc.lo), hi = parseFloat(winCalc.hi), price = parseFloat(winCalc.price);
+    if (!isFinite(lo) && d) lo = d.lo;
+    if (!isFinite(hi) && d) hi = d.hi;
+    if (!isFinite(lo) || !isFinite(hi) || hi <= lo) return null;
+    var own = nbaWindowChance(sim.own.total, lo, hi), mkt = sim.mkt ? nbaWindowChance(sim.mkt.total, lo, hi) : null;
+    if (!own && !mkt) return null;
+    return { lo: lo, hi: hi, price: isFinite(price) ? price : null, own: own, mkt: mkt, use: mkt || own, view: mkt ? "mkt" : "own", side: "WINDOW " + lo + "-" + hi };
+  }
+  function nbaWindowOut(sim) {
+    var w = nbaWindowRead(sim);
+    if (!w) {
+      var d = nbaWindowDefault(sim);
+      return '<span class="dim">' + (d ? 'The under number has to sit above the over number.' : 'Type the over number and the under number.') + '</span>';
+    }
+    var pc = function (p) { return (100 * p).toFixed(1) + "%"; }, u = w.use;
+    var h = '<b>Over ' + esc(String(w.lo)) + ' and under ' + esc(String(w.hi)) + '</b>, a ' + (+(w.hi - w.lo).toFixed(1)) + '-point window: lands inside <b>' + pc(u.inside) + '</b>' +
+            (w.mkt ? ' anchored to the market' + (w.own ? ' (the sim\'s own view ' + pc(w.own.inside) + ')' : '') : ' by the sim\'s own view') + ' · fair ' + sgn(priceFor(u.inside), 0);
+    if (u.pushLo + u.pushHi > 0.0005) h += ' · lands on a number ' + pc(u.pushLo + u.pushHi) + ' (that leg voids on most apps; the half-point numbers are the ones to type)';
+    if (w.price !== null) {
+      var need = implied(w.price), edge = u.inside - need;
+      h += ' · at ' + sgn(w.price, 0) + ' the ticket needs ' + pc(need) + ': <b>' + (edge > 0 ? 'PAYS, ' + sgn(100 * edge, 1) + ' points over the price' : 'the app\'s price, ' + sgn(100 * edge, 1) + ' points') + '</b>';
+    } else {
+      h += ' · type the app\'s parlay price and the edge reads here';
+    }
+    return h;
+  }
+  function nbaWindowHtml(sim, takeRow) {
+    var d = nbaWindowDefault(sim), w = nbaWindowRead(sim);
+    return '<div class="midcalc simwin"><b>The window</b> <span class="dim">· one ticket, over the low number and under the high, a same-game parlay · the boxes start at the middle half' + (sim.mkt ? ' anchored to the market' : '') + '</span><div class="midcalcrow">' +
+           '<input id="winLo" inputmode="decimal" placeholder="' + (d ? 'over ' + d.lo : 'over') + '" value="' + esc(winCalc.lo) + '"><input id="winHi" inputmode="decimal" placeholder="' + (d ? 'under ' + d.hi : 'under') + '" value="' + esc(winCalc.hi) + '">' +
+           '<input id="winPrice" inputmode="numeric" placeholder="parlay price" value="' + esc(winCalc.price) + '"><div class="simtake">' + nbaSimTakeBtn(takeRow, "window", "total", w ? w.side : "WINDOW") + '</div></div>' +
+           '<div id="winOut">' + nbaWindowOut(sim) + '</div></div>';
   }
   /* the simulation's calls you take (26 Oct 2026, the user: "lets say I decide to go with the Thunder team total under
      119.5 at 72%, I would like to be able to select from this field too for tracking purposes and to show on the take for
@@ -769,14 +824,21 @@
       var W = nbaMiddleWatch(row).filter(function (x) { return x.side === side && String(x.other.point) === p[4] && x.other.book === p[6] && String(x.leg.id) === p[7]; })[0];
       if (W && W.m.pays) c = { line: W.other.point, p: W.second, worth: null, band: "middle", price: W.other.price, book: W.other.book, with: { side: W.leg.side, line: W.leg.line, price: W.leg.price, how: W.leg.how }, pair: { pBoth: +W.m.pBoth.toFixed(4), ev: +W.m.ev.toFixed(4), gap: W.m.gap, mu: W.mu } };
     }
+    else if (view === "window") {   // the window on the total as one ticket (29 Oct 2026): the boxes as they stand, the anchored chance
+      var Wn = sim ? nbaWindowRead(sim) : null;
+      if (Wn && Wn.side === side) c = { line: Wn.lo + "-" + Wn.hi, p: Wn.use.inside, worth: Wn.use.inside, band: "window", price: Wn.price, lo: Wn.lo, hi: Wn.hi, winView: Wn.view };
+    }
     else if (sim) c = nbaSimCalls(sim, lines, view).filter(function (x) { return x.key === key && x.side === side; })[0] || null;
     if (!c) { say("That call is not on the card as shown now; put the line back and take it again."); return; }
     var inp = view === "agree" ? { op: (row.inputs || {}).op, up: (row.inputs || {}).up }
             : { op: $("op").value, up: $("up").value, h1op: $("h1op").value, h1up: $("h1up").value, sph: $("sph").value, spa: $("spa").value, hml: $("hml").value, aml: $("aml").value };
-    var take = { id: id, view: view, key: key, side: side, line: c.line, price: view === "middle" ? c.price : nbaSimPriceOf(key, side, lines, inp),
+    var take = { id: id, view: view, key: key, side: side, line: c.line, price: (view === "middle" || view === "window") ? c.price : nbaSimPriceOf(key, side, lines, inp),
                  p: c.p === null ? null : +(+c.p).toFixed(4), worth: c.worth === null ? null : +(+c.worth).toFixed(4), band: c.band,
-                 pick: view === "middle" ? "Total " + side + " " + c.line + " at " + bookName(c.book) + " (the middle with " + c.with.side + " " + c.with.line + ")" : nbaSimPickText(key, side, c.line, f.away || row.away, f.home || row.home), at: new Date().toISOString() };
+                 pick: view === "middle" ? "Total " + side + " " + c.line + " at " + bookName(c.book) + " (the middle with " + c.with.side + " " + c.with.line + ")"
+                     : view === "window" ? "Total window " + c.lo + "-" + c.hi + " (over the low, under the high), one ticket"
+                     : nbaSimPickText(key, side, c.line, f.away || row.away, f.home || row.home), at: new Date().toISOString() };
     if (view === "middle") { take.book = c.book; take.with = c.with; take.pair = c.pair; }
+    if (view === "window") { take.lo = c.lo; take.hi = c.hi; take.winView = c.winView; }
     row.simTakes = (row.simTakes || []).concat([take]);
     done();
   }
@@ -787,6 +849,7 @@
     var fa = parseFloat(fin.fa), fh = parseFloat(fin.fh);
     if (!isFinite(fa) || !isFinite(fh)) return null;
     var cmp = function (v, line, over) { if (v === line) return "push"; return ((v > line) === over) ? "win" : "loss"; };
+    if (t.view === "window") { var tw = fa + fh; if (tw === +t.lo || tw === +t.hi) return "push"; return (tw > +t.lo && tw < +t.hi) ? "win" : "loss"; }   // inside the window wins the ticket (29 Oct 2026)
     if (t.key === "total") return cmp(fa + fh, +t.line, t.side === "OVER");
     if (t.key === "h1") { var f5a = parseFloat(fin.f5a), f5h = parseFloat(fin.f5h); if (!isFinite(f5a) || !isFinite(f5h)) return null; return cmp(f5a + f5h, +t.line, t.side === "OVER"); }
     if (t.key === "spread") { var m = fh - fa + +t.line; if (m === 0) return "push"; return ((m > 0) === (t.side === "HOME")) ? "win" : "loss"; }
@@ -795,18 +858,25 @@
     if (t.key === "home_total") return cmp(fh, +t.line, t.side === "OVER");
     return null;
   }
-  function nbaSimTakeViewLabel(view) { return view === "own" ? "the sim's own view" : view === "mkt" ? "anchored to the market" : view === "agree" ? "the agreement rule, the sim and the crew" : view === "middle" ? "the middle's second leg" : "the gap rule"; }
+  function nbaSimTakeViewLabel(view) { return view === "own" ? "the sim's own view" : view === "mkt" ? "anchored to the market" : view === "agree" ? "the agreement rule, the sim and the crew" : view === "middle" ? "the middle's second leg" : view === "window" ? "the window, one ticket (anchored to the market)" : "the gap rule"; }
   /* the record: every graded NBA row's sim calls at LEAN or better, says against does by view, market and band */
   function nbaSimUnits(price, win) { var p = +price; if (!p || isNaN(p)) p = -110; return win ? (p > 0 ? p / 100 : 100 / -p) : -1; }
   function nbaSimRecordHtml() {
-    var rows = card.filter(function (r) { return r.sport === "NBA" && rowGraded(r) && r.inputs && (r.inputs.nbasim || (r.simTakes || []).some(function (t) { return t.view === "middle"; })); });
+    var rows = card.filter(function (r) { return r.sport === "NBA" && rowGraded(r) && r.inputs && (r.inputs.nbasim || (r.simTakes || []).some(function (t) { return t.view === "middle" || t.view === "window"; })); });
     if (!rows.length) return '';
     var T = {}, n = 0, G = { HOME: { n: 0, w: 0, units: 0 }, AWAY: { n: 0, w: 0, units: 0 } }, gn = 0;
     var A = { 2: { n: 0, w: 0, units: 0 }, 3: { n: 0, w: 0, units: 0 } }, an = 0;   // the agreement rule's own tally (28 Oct 2026)
     var M = { n: 0, both: 0, half: 0, split: 0, units: 0, first: 0, says: 0 };   // the middles (28 Oct 2026): the pair graded together, and the first leg alone
+    var Wd = { n: 0, w: 0, p: 0, says: 0, units: 0 };   // the windows (29 Oct 2026): one ticket, inside or out
     rows.forEach(function (r) {
       var fin = r.finals || {}, fa = +fin.fa, fh = +fin.fh, half = (fin.f5a !== undefined && fin.f5a !== "" && fin.f5h !== undefined && fin.f5h !== "") ? (+fin.f5a + +fin.f5h) : null;
       (r.simTakes || []).forEach(function (t) {
+        if (t.view === "window") {
+          var rw = nbaSimTakeRes(t, r); if (!rw) return;
+          if (rw === "push") { Wd.p++; return; }
+          Wd.n++; Wd.w += rw === "win" ? 1 : 0; Wd.says += t.p || 0.5; Wd.units += rw === "win" ? nbaWinAmount(t.price) : -1;
+          return;
+        }
         if (t.view !== "middle" || !t.with) return;
         var r2 = nbaSimTakeRes(t, r), r1 = nbaSimTakeRes({ key: "total", side: t.with.side, line: t.with.line }, r);
         if (!r2 || !r1) return;
@@ -849,7 +919,7 @@
         });
       });
     });
-    if (!n && !gn && !an && !M.n) return '';
+    if (!n && !gn && !an && !M.n && !Wd.n && !Wd.p) return '';
     var order = { total: 0, h1: 1, spread: 2, ml: 3, away_total: 4, home_total: 5 }, bandOrder = { STRONG: 0, BET: 1, LEAN: 2 },
         label = { total: "Total", h1: "First half", spread: "Spread", ml: "Moneyline", away_total: "Away team total", home_total: "Home team total" };
     var h = '<div class="simrec"><div class="calibhead">SIMULATION · says against does, every call at LEAN or better</div>';
@@ -887,6 +957,11 @@
       var cls = M.units > 0 ? "good" : M.units < 0 ? "bad" : "";
       h += '<div class="simrecview">Middles on the total <span class="tag">the second leg taken from the watch, the pair graded together · ' + esc(NBA_MIDDLE_TAG) + '</span></div><table class="form simrectab midrectab"><thead><tr><th>Pairs</th><th>Both won</th><th>One pushed</th><th>Split</th><th>Said both</th><th>The pair</th><th>The first leg alone</th></tr></thead><tbody>' +
            '<tr><td>' + M.n + '</td><td>' + M.both + ' (' + (100 * M.both / M.n).toFixed(1) + '%)</td><td>' + M.half + '</td><td>' + M.split + '</td><td>' + (100 * M.says / M.n).toFixed(1) + '%</td><td class="' + cls + '">' + (M.units >= 0 ? '+' : '') + M.units.toFixed(2) + 'u</td><td>' + (M.first >= 0 ? '+' : '') + M.first.toFixed(2) + 'u</td></tr></tbody></table>';
+    }
+    if (Wd.n || Wd.p) {
+      var wcls = Wd.units > 0 ? "good" : Wd.units < 0 ? "bad" : "";
+      h += '<div class="simrecview">Windows on the total <span class="tag">one ticket, over the low number and under the high; the chance is the anchored sim\'s mass inside the window</span></div><table class="form simrectab"><thead><tr><th>Tickets</th><th>Record</th><th>Says</th><th>Does</th><th>Units</th></tr></thead><tbody>' +
+           '<tr><td>' + (Wd.n + Wd.p) + (Wd.p ? ' (' + Wd.p + ' on a number)' : '') + '</td><td>' + Wd.w + '-' + (Wd.n - Wd.w) + '</td><td>' + (Wd.n ? (100 * Wd.says / Wd.n).toFixed(1) + '%' : '—') + '</td><td class="' + wcls + '">' + (Wd.n ? (100 * Wd.w / Wd.n).toFixed(1) + '%' : '—') + '</td><td class="' + wcls + '">' + (Wd.units >= 0 ? '+' : '') + Wd.units.toFixed(2) + 'u</td></tr></tbody></table>';
     }
     h += '<div class="note dim">A call is the sim\'s side on the line the row carried whose WORTH (the chance shrunk by what the replay found) reads LEAN (60%) or better; "says" is the sim\'s own chance, "does" the share that landed. The replays: the own view\'s total and spread calls land at 50% whatever they say (the close already carries the ratings), its win chances within 3 points of true; the first half is a coin from either view over two seasons. The team totals are the one inefficiency: the book\'s line sits off the number the game\'s own total and spread imply, the gap rule reads it (a point or more, scored over two seasons), and the anchored sim\'s calls carry the same lean with the shape on top.</div></div>';
     return h;

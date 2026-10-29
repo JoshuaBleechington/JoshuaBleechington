@@ -1892,3 +1892,29 @@ raw 64% for one, and most nights the decision reads NO BET with the sheet's
 own number beside it; the record's new block keeps the two side by side and
 will say, after a month of hockey, whether the sim's side or the sheet's
 side was the one to follow.
+
+## The window on the total, one ticket, 29 Oct 2026
+
+The user, looking at the Simulation card's middle half (221–246 on a
+233): "is there a way for me to select the middle half ... over 221 and
+under 246 as a same game parlay?" The apps take an over and an under on
+the same total as one ticket, paid when the total lands between the two
+numbers: a window, and the sim's histogram gives the chance of landing
+inside any window directly.
+
+On the Simulation card, under the medians: **The window**, three boxes
+(the over number, the under number, the app's parlay price) that start at
+the market-anchored view's middle half on half-point numbers, and a line
+that reads the chance of landing inside from the anchored view (the own
+view's beside it; the replay found the own view's centre carries nothing
+the close does not, so the anchored shape prices the ticket), the fair
+price, the width, a note when a number is an integer (the sim's mass on
+it, since that leg voids on most apps; the half-point numbers are the
+ones to type), and with a price typed, what the ticket needs and the
+edge: PAYS or the app's price. A Take marks the ticket on the row like a
+sim call (the two numbers, the price, the chance), it lists under Taking
+tonight and the phone sheet, grades inside or out (a push on a number),
+and the simulation record gets a Windows line: tickets, record, says,
+does, units. Nothing here moves a call or a band. The hockey card can
+take the same block when the user wants it; a hockey window is coarse
+(five to seven goals) and the apps' alternate numbers on a total are few.

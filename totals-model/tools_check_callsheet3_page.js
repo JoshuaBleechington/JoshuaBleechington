@@ -1988,6 +1988,50 @@ const CHECKS = ["dome","playoff","agconf","hgconf","agbk","hgbk"];
       && /^Pairs Both won One pushed Split Said both The pair The first leg alone 1 1 \(100\.0%\) 0 0 [89]\.\d% \+1\.8[0-9]u \+0\.91u$/i.test(midT.rec) && /the pair graded together/.test(midT.recHead),
       'middles: the Middles card prices every over/under pair the four apps post off the sheet\'s normal and says none pays on an ordinary night; a total taken on the row is watched, and when a later odds run moves the number 4.5 points the board and the panel name the best second leg at its app with the pair\'s chance and what it pays; the apps\' numbers follow the newest run while the logged line stays; the calculator prices a typed pair; the second leg takes from the panel with the leg it pairs with, lists under Taking tonight, and the graded pair lands on the record\'s Middles line beside what the first leg alone did', JSON.stringify(midT).slice(0, 2600));
 
+  // ---- the window on the total (29 Oct 2026): one ticket over the low number and under the high, priced off the sim ----
+  const winT = await pg.evaluate(async () => {
+    const wait = () => new Promise(r => setTimeout(r, 260));
+    const txt = e => (e ? e.innerText : '').replace(/\s+/g, ' ').trim();
+    await smStore.removeItem('callsheet3.card.v1'); document.getElementById('clear').click(); document.getElementById('m-nba').click(); await wait();
+    document.getElementById('example').click(); await wait();
+    const CARD = () => JSON.parse(smStore.getItem('callsheet3.card.v1') || '[]').filter(r => r.sport === 'NBA' && /76ers @ Knicks/.test(r.matchup));
+    const set = (id, v) => { const el = document.getElementById(id); el.value = v; el.dispatchEvent(new Event('input', { bubbles: true })); };
+    const block = document.querySelector('#nbaSimPanel .simwin');
+    const head = txt(block), out0 = txt(document.getElementById('winOut')), ph = ['winLo', 'winHi', 'winPrice'].map(id => document.getElementById(id).placeholder);
+    const sim = JSON.parse(document.getElementById('nbasim').value), V = sim.mkt || sim.own;
+    const q = (h, p) => { const n = h.c.reduce((a, b) => a + b, 0); let acc = 0; for (let i = 0; i < h.c.length; i++) { acc += h.c[i]; if (acc >= p * n) return h.lo + i; } return h.lo + h.c.length - 1; };
+    const lo = q(V.total, 0.25) - 0.5, hi = q(V.total, 0.75) + 0.5;
+    const inside = (h, a, b) => { let n = 0, k = 0; h.c.forEach((c, i) => { n += c; const v = h.lo + i; if (v > a && v < b) k += c; }); return k / n; };
+    const pDefault = inside(V.total, lo, hi);
+    set('winLo', String(lo + 2)); set('winHi', String(hi - 2)); await wait();
+    const out1 = txt(document.getElementById('winOut')), pTyped = inside(V.total, lo + 2, hi - 2);
+    set('winPrice', '+120'); await wait();
+    const out2 = txt(document.getElementById('winOut'));
+    const btnOff = !!document.querySelector('#nbaSimPanel .simwin .takebtn[disabled]');
+    document.getElementById('add').click(); await wait();
+    const btn = document.querySelector('#nbaSimPanel .simwin .takebtn[data-stake]'); const stake = btn ? btn.getAttribute('data-stake') : '';
+    if (btn) btn.click(); await wait();
+    const row = CARD()[0], taken = row && (row.simTakes || [])[0];
+    const btnOn = txt(document.querySelector('#nbaSimPanel .simwin .takebtn, #nbaSimPanel .simwin .chip'));
+    // the finals land inside the window: the ticket wins
+    const c = JSON.parse(smStore.getItem('callsheet3.card.v1')); c.forEach(r => { if (/76ers @ Knicks/.test(r.matchup)) r.finals = { fa: String(Math.floor((lo + hi) / 2) - 110), fh: '110', f5a: '55', f5h: '60' }; }); await smStore.setItem('callsheet3.card.v1', JSON.stringify(c));
+    return { head, out0, ph, lo, hi, pDefault, out1, pTyped, out2, btnOff, stake, taken, btnOn, rowId: row && row.id };
+  });
+  await pg.reload(); await pg.waitForTimeout(300); await pg.evaluate(() => smStore.ready);
+  const winRec = await pg.evaluate(() => { const rec = document.querySelector('#calibBox .simrec'); const t = rec ? rec.innerText.replace(/\s+/g, ' ').trim() : ''; const i = t.indexOf('Windows on the total'); return i >= 0 ? t.slice(i, i + 260) : t.slice(0, 200); });
+  const pc = p => (100 * p).toFixed(1) + '%';
+  chk(/^The window · one ticket, over the low number and under the high, a same-game parlay · the boxes start at the middle half anchored to the market/.test(winT.head) && winT.ph[0] === 'over ' + winT.lo && winT.ph[1] === 'under ' + winT.hi && winT.ph[2] === 'parlay price'
+      && winT.out0.indexOf('Over ' + winT.lo + ' and under ' + winT.hi + ', a ' + (winT.hi - winT.lo) + '-point window: lands inside ' + pc(winT.pDefault) + ' anchored to the market (the sim\'s own view ') === 0 && /· fair [+-]\d+ · type the app's parlay price and the edge reads here$/.test(winT.out0),
+      'window: the block starts at the anchored middle half on half-point numbers, with the chance inside, the own view beside it and the fair price', JSON.stringify({ head: winT.head.slice(0, 160), out0: winT.out0, ph: winT.ph, lo: winT.lo, hi: winT.hi }));
+  chk(winT.out1.indexOf('Over ' + (winT.lo + 2) + ' and under ' + (winT.hi - 2) + ', a ' + (winT.hi - winT.lo - 4) + '-point window: lands inside ' + pc(winT.pTyped)) === 0
+      && new RegExp('at \\+120 the ticket needs 45\\.5%: (PAYS, \\+\\d+\\.\\d points over the price|the app\'s price, -\\d+\\.\\d points)$').test(winT.out2) && ((winT.pTyped > 0.4545) === /PAYS/.test(winT.out2)),
+      'window: typed numbers reprice as you type, and the app\'s parlay price turns into the need and the edge', JSON.stringify({ out1: winT.out1, out2: winT.out2, p: winT.pTyped }));
+  chk(winT.btnOff === true && /\|window\|total\|WINDOW [0-9.]+-[0-9.]+$/.test(winT.stake) && winT.taken && winT.taken.view === 'window' && winT.taken.lo === winT.lo + 2 && winT.taken.hi === winT.hi - 2 && winT.taken.price === 120
+      && Math.abs(winT.taken.p - winT.pTyped) < 0.001 && winT.taken.band === 'window' && winT.taken.pick === 'Total window ' + (winT.lo + 2) + '-' + (winT.hi - 2) + ' (over the low, under the high), one ticket' && /taking/i.test(winT.btnOn),
+      'window: the Take wakes with the row, and the ticket keeps the two numbers, the price and the anchored chance', JSON.stringify({ off: winT.btnOff, stake: winT.stake, taken: winT.taken, btn: winT.btnOn }));
+  chk(/^Windows on the total .*? TICKETS RECORD SAYS DOES UNITS 1 1-0 \d\d\.\d% 100\.0% \+1\.20u/.test(winRec), 'window: the record grades the ticket inside or out on its own line', winRec);
+  await pg.evaluate(async () => { await smStore.removeItem('callsheet3.card.v1'); }); await pg.reload(); await pg.waitForTimeout(300); await pg.evaluate(() => smStore.ready);
+
   // ---- the hockey simulation (29 Oct 2026): the card, the sim deciding the totals, a take, the record --------------
   const nhlSimT = await pg.evaluate(async () => {
     const wait = () => new Promise(r => setTimeout(r, 260));

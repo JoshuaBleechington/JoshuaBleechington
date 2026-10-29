@@ -1860,3 +1860,31 @@ sheet, and grade off the row's finals (the first period from the P1
 boxes). The record's hockey block gets the simulation's tables: the
 totals the sim decided (record, says, does, units, the sheet alone, how
 often they agreed) and every call at LEAN or better from either view.
+
+What the replay says (`tools_backtest_nhl_sim.py`, 1,312 games of 2025-26
+at 1,500 runs a game, the profiles built from the games before each date
+with 2024-25 as the prior, the goalies who actually started, the referees'
+minors to date): the sim reproduces the game's level and shape (the first
+period 1.76 goals a game against 1.76 landed; the total 6.00 against the
+market's 6.10 and a hot season's 6.25; overtime 19% against 25% landed,
+which is the one shape it under-draws) and its own view's lean on the
+full-game total is worth a quarter of itself against Pinnacle's close
+(logistic slope 0.25, so the shrink is 0.75): the leans at 58% and up went
+207-174 and at 60% and up 131-108, 51.8% in the first half of the season and
+49.6% in the second, and with the market's own price in the same model the
+sim's weight was nil; the landed total regressed on the sim's mean and the
+market's fair number gives the sim 10% of the weight. On the first period
+the sim's own mean is as calibrated as the market's share but carries less
+of the period (r 0.044 against the naive share's 0.080); against DraftKings'
+1.5 at its price the own view's chance kept 61% of its lean (slope 0.61,
+shrink 0.39), the anchored view's 78%, and the book's price itself read
+sharper (slope 1.52): betting the own view where it beat the price by three
+points went 49-56. The team totals, the moneyline, the puck line and the
+other periods had no closes to measure against and keep a priori halves.
+
+So the sim decides, as asked, and the decision is honest about itself: a raw
+70% on the full-game total is a LEAN (worth 55%), the first period needs a
+raw 60% for one, and most nights the decision reads NO BET with the sheet's
+own number beside it; the record's new block keeps the two side by side and
+will say, after a month of hockey, whether the sim's side or the sheet's
+side was the one to follow.

@@ -88,9 +88,16 @@ LEAGUE = {
     # what the profiles need of the league: the seconds a game at five on five and on one power play, xG per shot, minors a game
     "t55": 3009.1, "tpp": 530.3, "xg5": 0.0610, "xgpp": 0.0987, "pen_game": 3.208,
 }
-# the shrink each market's raw probability gets before it is shown (tools_backtest_nhl_sim.py sets these)
-SHRINK = {"total": 0.5, "p1": 0.5, "team": 0.5, "ml": 0.5, "pl": 0.5, "period": 0.5}
-BANDS = [(0.62, "STRONG"), (0.58, "BET"), (0.55, "LEAN")]   # hockey's chances are compressed: a goal of edge on the total is eight points
+# the shrink each market's raw probability gets before it is shown: the share of the lean the replay found worth nothing
+# (tools_backtest_nhl_sim.py, 1,312 games of 2025-26 at 1,500 runs a game, the profiles built from the games before each
+# date with 2024-25 as the prior). The own view's chance of the over at Pinnacle's close carried a logistic slope of 0.25
+# (shrink 0.75): the leans at 58% and up went 207-174, at 60% and up 131-108, and with the market's own price in the same
+# model the sim's weight was nil. Against DraftKings' first-period 1.5 the own view's slope was 0.61 (shrink 0.39), the
+# anchored view's 0.78, and the book's price itself 1.52: betting the own view where it beat the price by three points
+# went 49-56. The team totals, the moneyline, the puck line and the other periods had no closes to measure against and
+# keep a priori halves.
+SHRINK = {"total": 0.75, "p1": 0.39, "p1_mkt": 0.22, "team": 0.5, "ml": 0.5, "pl": 0.5, "period": 0.5}
+BANDS = [(0.62, "STRONG"), (0.58, "BET"), (0.55, "LEAN")]   # on the WORTH; hockey's chances are compressed: a goal of edge on the total is sixteen points at the number
 STATES = ("5v5", "PP", "PK", "44", "33", "EN", "EXTRA")
 
 

@@ -807,7 +807,6 @@
     var view = p[1], key = p[2], side = p[3], id = nbaSimTakeId(view, key, side);
     if (rowGraded(row) || isVoid(row)) { say("<b>" + esc(row.matchup) + "</b> is graded: a bet is marked before the game, not after."); return; }
     var done = function () { save(); render(); renderCard(); renderBoard(); renderCalib(); };
-    if (row.sport === "NHL") { if (nhlToggleSimTake(row, view, key, side, id)) done(); return; }   // the hockey simulation's calls (29 Oct 2026)
     if (nbaSimTakeOf(row, view, key, side)) {   // marked already: unmark it
       row.simTakes = row.simTakes.filter(function (t) { return t.id !== id; });
       done(); return;

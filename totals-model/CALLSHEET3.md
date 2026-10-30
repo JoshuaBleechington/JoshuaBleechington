@@ -1918,3 +1918,34 @@ and the simulation record gets a Windows line: tickets, record, says,
 does, units. Nothing here moves a call or a band. The hockey card can
 take the same block when the user wants it; a hockey window is coarse
 (five to seven goals) and the apps' alternate numbers on a total are few.
+
+## The hockey book retired, 30 Oct 2026
+
+The user: "after careful consideration ... remove the NHL model completely
+from the super model. Stats and all. Give me a pdf of the stats but lets
+remove that sport completely. Keeping NBA, NBA props, MLB and WNBA."
+
+The record first: the latest backup (29 Oct 2026, 143 graded hockey games
+from 1 to 20 Oct) loaded into the page as it stood, and what the page
+rendered written to a PDF, "The Super Model - the NHL record": the record
+tiles as shown (the pick 28-36-1, −13.6 units; the full-game total 60-79-4,
+−24.8 units, with its splits by side, band, crowd, rest, backup and
+goalie; the first period 62-79-1, −18.2; the moneyline 53-90, −25.5; the
+puck line 57-86; the alternate totals 1-1; the parlay four 39-23, −7.7;
+the best straight bets 20-37, −18.5), the forecast line (the projected
+total 1.65 goals from the final against the line's 1.63), the favourite
+table by price, a tally by market from the rows, and every graded game
+with its picks and results. The record said what the user concluded.
+
+Then the sport off the page: the NHL button, the hockey fields and board
+boxes (the puck line, the first period), the hockey engine block, the
+hockey rows of the record, the Simulation card and its takes, the hockey
+example, the slate's hockey boxes, the BetMGM hockey link (the basketball
+board takes its place) and every line of help copy that named hockey. A
+hockey row leaves the card on load, a backup's hockey rows stay out of a
+restore or a move, and a slate, odds or grade file with hockey games skips
+them and says so. The harness drops its hockey cases and sections and
+checks the block, the button and the fields are gone. The sources stay in
+the repository with their measurements (web/nhl.engine.js, the hockey
+fields, the slate's hockey modes, nhlsim.py, the backtests), so the book
+can be read, and brought back if ever wanted.

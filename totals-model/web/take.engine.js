@@ -58,17 +58,17 @@
     return out;
   }
   function propsTakenOn(dateISO) { return (typeof propsSource === "function" ? propsSource() : []).filter(function (r) { return (r.gdate || "") === dateISO && r.take && propHas(r); }); }
-  /* the simulation's calls taken on NBA rows (26 Oct 2026) and NHL rows (29 Oct 2026): the mark lives on the row as row.simTakes */
+  /* the simulation's calls taken on NBA rows (26 Oct 2026): the mark lives on the row as row.simTakes */
   function simTakesOn(dateISO) {
     var out = [];
     card.forEach(function (r) {
-      if ((r.gdate || "") !== dateISO || isVoid(r) || (r.sport !== "NBA" && r.sport !== "NHL")) return;
+      if ((r.gdate || "") !== dateISO || isVoid(r) || r.sport !== "NBA") return;
       (r.simTakes || []).forEach(function (t) { out.push({ row: r, t: t }); });
     });
     return out;
   }
-  function simTakeResOf(t, row) { return row && row.sport === "NHL" ? nhlSimTakeRes(t, row) : nbaSimTakeRes(t, row); }
-  function simTakeBtnOf(row, view, key, side) { return row && row.sport === "NHL" ? nhlSimTakeBtn(row, view, key, side) : nbaSimTakeBtn(row, view, key, side); }
+  function simTakeResOf(t, row) { return nbaSimTakeRes(t, row); }
+  function simTakeBtnOf(row, view, key, side) { return nbaSimTakeBtn(row, view, key, side); }
   function simTakeCard(x) {
     var t = x.t, res = simTakeResOf(t, x.row), price = t.price === null || t.price === undefined ? -110 : t.price;
     return '<div class="pk taking sim" data-open="' + x.row.id + '" title="Load ' + esc(x.row.matchup) + ' into the form">' +
@@ -154,7 +154,7 @@
         if (res === null || res === "invalid") return;
         takeTally(bets, res, v.price); if (res !== "push") bets.says += v.p;
       });
-      if (r.sport === "NBA" || r.sport === "NHL") (r.simTakes || []).forEach(function (t) {
+      if (r.sport === "NBA") (r.simTakes || []).forEach(function (t) {
         var res = simTakeResOf(t, r); if (!res) return;
         takeTally(sims, res, t.price === null || t.price === undefined ? -110 : t.price); if (res !== "push") sims.says += (t.p === null || t.p === undefined ? 0.5 : t.p);
       });
@@ -185,7 +185,7 @@
     else togglePropTake(t.getAttribute("data-ptake"));
   }, true);
   /* Add puts the game on the card, and the Simulation card's greyed buttons come alive once the row exists: redraw it after the add */
-  if ($("add") && ($("nbaSimPanel") || $("nhlSimPanel"))) $("add").addEventListener("click", function () { setTimeout(function () { if (sport === "NBA" && typeof nbaSimPanel === "function") nbaSimPanel(); if (sport === "NHL" && typeof nhlSimPanel === "function") nhlSimPanel(); }, 0); });
+  if ($("add") && $("nbaSimPanel")) $("add").addEventListener("click", function () { setTimeout(function () { if (sport === "NBA") nbaSimPanel(); }, 0); });
   if ($("taking")) {
     $("taking").addEventListener("click", function (e) {
       var t = e.target.closest("[data-open]"); if (t) { openRow(t.dataset.open); return; }

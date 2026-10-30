@@ -27,6 +27,8 @@ rest and last five still come from a stats site by hand.
 
 ## Hockey (Call Sheet 3.0)
 
+**The hockey book was retired from The Super Model on 30 Oct 2026** at the user's request: the page no longer takes hockey (a slate, odds or grade file with hockey games skips them and says so). The hockey modes below still run and write their files, for the record and in case the book is ever wanted back.
+
 Two more double-click files: **Run NHL slate.bat** before the games and
 **Grade NHL yesterday.bat** the morning after, or `python3 slate.py nhl` and
 `python3 slate.py nhl-grade`. They write `nhl-slate-DATE.json` and

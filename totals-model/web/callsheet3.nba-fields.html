@@ -1,0 +1,153 @@
+<!-- BOARD: the NBA first-half total, inserted into the board card next to the spread -->
+          <div id="h1Fields" hidden>
+            <div class="subhead">First half total <span class="tag">its own market, its own anchor</span></div>
+            <div class="grid3">
+              <div class="f"><label for="h1line">1H total</label><input id="h1line" type="number" step="0.5" inputmode="decimal" placeholder="114.5"></div>
+              <div class="f"><label for="h1op">1H over price</label><input id="h1op" type="number" step="5" inputmode="numeric" placeholder="-110"></div>
+              <div class="f"><label for="h1up">1H under price</label><input id="h1up" type="number" step="5" inputmode="numeric" placeholder="-110"></div>
+            </div>
+          </div>
+<!-- ===== FIELDS: the NBA inputs. Who is out on top; what the slate fills folded below it ===== -->
+      <div id="nbaFields" class="stack" hidden>
+        <section class="card">
+          <h2>Who is out <span class="tag">the one input the market learns late</span></h2>
+          <div class="body">
+            <div id="nbaOutPanel" class="note">No list on the row — load the slate and Fill form, and each side's injury report comes with it.</div>
+            <div class="subhead">Starting five <span class="tag">RotoWire's lineup for each side, expected or confirmed · shown, not scored</span></div>
+            <div id="nbaLineupPanel" class="note">No lineup on the row — load the slate and Fill form, and RotoWire's starting five for each side comes with it (today's and tomorrow's games only).</div>
+            <p class="note">Each side's injury report, from the slate: every player listed with his status and his minutes, points and
+              plus-minus a game this season. A player marked <b>Out</b> counts; tick the box on a doubtful one when he is ruled out.
+              The regulars' minutes (20 a game or more) are summed and shown in the why list. <b>Shown, not scored</b>: against two
+              seasons of closes the announced absences were already in the number (the total's slope on missing minutes 0.00; the
+              side's +0.29, t 1.2). What the close cannot carry is the late scratch, and that is what the record measures from
+              opening night: the sheet logs the list as it stood when the row was added, so the two can be split.
+              <b>The starting five</b> is RotoWire's: <b>expected</b> in the morning, <b>confirmed</b> once the club says so, with the men
+              who may not play under it. The slate reads today's page and tomorrow's, the two RotoWire shows; run it again late and the
+              newer lineup rides on the newer file. Shown, not scored: a lineup is a name on the card, not a number on the line.</p>
+            <div class="links">
+              <a href="https://official.nba.com/nba-injury-report-2026-27-season/" target="_blank" rel="noopener">NBA · official injury report</a>
+              <a href="https://www.espn.com/nba/injuries" target="_blank" rel="noopener">ESPN · injuries</a>
+              <a href="https://www.rotowire.com/basketball/nba-lineups.php" target="_blank" rel="noopener">RotoWire · NBA lineups</a>
+            </div>
+            <input type="hidden" id="nbaout"><input type="hidden" id="nbaq"><input type="hidden" id="nbactx"><input type="hidden" id="nbalineup">
+          </div>
+        </section>
+
+        <section class="card">
+          <h2>Recent form <span class="tag">last five, each side — the score, the half, the total and the spread against the close · shown, not scored</span></h2>
+          <div class="body">
+            <div id="nbaFormPanel" class="note">No recent games on the row — load the slate and Fill form, and each side's last five come with it.</div>
+            <p class="note">Each side's last five finals from the ledger, with the half-time score, and against each one the close the
+              odds run last saw: the total (over or under), the first-half total, and the spread (covered or not, from this
+              side's view). A game the odds run never saw shows its score alone; a game on this card borrows the card's
+              close. <b>Shown, not scored</b>: five games of scores is noise dressed as a trend, and a club's own over/under
+              run measured null within a season against two seasons of closes (slope −0.05 on 2,137 games). It is here to
+              catch what the season line hides: a club suddenly scoring 130, a half that keeps coming in under.</p>
+            <input type="hidden" id="nbaform">
+          </div>
+        </section>
+
+        <section class="card">
+          <h2>Simulation <span class="tag">the game played 10,000 times — the sim's own view and the market-anchored view · the band from what the replay found the chance worth · shown, and recorded by band</span></h2>
+          <div class="body">
+            <div id="nbaSimPanel" class="note simpanel">No simulation on the row — load the slate and Fill form, and the game's runs come with it.</div>
+            <p class="note">The slate plays the game possession by possession, thousands of times: each club's pace and shot mix, its
+              offence into the other's defence, home court, rest, the regulars out, the crew's whistle, who is on the floor by the
+              quarter, the benches when it gets away, the fouling at the end of a close one, overtime. <b>The sim's own view</b> is
+              that game from the ledger's ratings alone; <b>anchored to the market</b> is the same game centred on the scoreboard
+              book's total and spread, so what is left is the shape: how the halves split, what the fourth does, the team totals.
+              The chance beside each market is read off the runs for the line on this row, so it follows the line you type.
+              <b>Worth</b> is that chance shrunk by what the replay of 2025-26 found: the own view's total and spread calls landed at
+              50% whatever they said, because the close already carries the ratings; its win chances were within three points of
+              true. The record below keeps says against does by band from the first night, and nothing here moves a number until
+              it earns it there.</p>
+            <input type="hidden" id="nbasim">
+          </div>
+        </section>
+
+        <section class="card">
+          <h2>Middles <span class="tag">the over at one number and the under at a higher one, priced off the sheet's own distribution — the apps' numbers now, the legs you hold, any pair · measured on two seasons</span></h2>
+          <div class="body">
+            <div id="nbaMidPanel" class="note">No odds on the row — load the odds file (Run NBA odds) and the apps' numbers come with it.</div>
+            <p class="note">A middle is the over at one number and the under at a higher one: the final between them wins both legs,
+              outside them one leg loses and the other wins, so the pair pays when the final lands between often enough to cover the
+              juice (4.8% of the time at -110 on both legs). Two seasons of lines history say the four apps sit within a point of
+              each other at tip in 99% of games, and a one-point gap loses 3% of the stake; the money is the move, a number that has
+              run three points or more from a leg you already hold (8-9% both win at 3.5 to 4.5 points, +3% of the stake; 17-20% at
+              five or more, +12-14%). The sheet's normal at 18 points sized those chances within a point of what landed, so every
+              pair here is priced off it, pushes on an integer line included. The first leg is a bet you wanted anyway, placed early;
+              the watch names the second once the number has run, and the second leg gives up its vig to take the loss off the
+              table. The apps' numbers follow the newest odds run on the row; the logged line stays as the markets were scored.</p>
+          </div>
+        </section>
+
+        <section class="card">
+          <h2>Referee stats <span class="tag">the crew against the close — shown, not scored, with its own watch on the record</span></h2>
+          <div class="body">
+            <div id="nbaCrewPanel" class="note">No crew on the row — load the slate and Fill form once the league has posted the assignments (about 9 am Eastern), or type the names below.</div>
+            <div>
+              <div class="f"><label for="ncrew">Crew <span class="tag">the referees, comma-separated; the slate fills it when the league has posted the assignments</span></label><input id="ncrew" type="text" placeholder="Scott Foster, Tony Brothers, Marc Davis" autocomplete="off"></div>
+            </div>
+            <p class="note">Each referee's free throws and points a game over the ledger seasons against the league's, and his record against
+              the closing total: the last two seasons, frozen, and this one as it builds. An official 1.5 sigma or more over or under
+              across the two seasons <b>leans</b>, and the crew leans by the sum of its three: the badge and the colour say so. <b>Shown,
+              not scored</b>: crews predict the night's free throws (t 7.3) and the total does not follow them (t −1.0), so a lean is a
+              watch, and the record's referee block keeps the season's totals against the close by the crew's lean. The league posts
+              the crews about 9 am Eastern; the slate fills the box from its feed, or you type the names from the link below.</p>
+            <div class="links">
+              <a href="https://official.nba.com/referee-assignments/" target="_blank" rel="noopener">NBA · referee assignments</a>
+            </div>
+            <input type="hidden" id="nbarefs">
+          </div>
+        </section>
+
+        <section class="card">
+          <h2>Context <span class="tag">where each club stands in the league, and what the sheet did with it</span></h2>
+          <div class="body">
+            <div id="nbaCtxPanel" class="note">No context on the row — load the slate and Fill form, and the lines come with it.</div>
+            <p class="note">Each line is a club's rank against the other 29 on a number the slate already holds: offensive and
+              defensive rating, pace, points scored and allowed, the last ten, free-throw rate, three-point rate, home and road
+              records, the regulars out. A club shows up when it sits in the top or bottom six of the league; the stage of the
+              season and the two watched clubs always. <b>The tag is the point.</b> "3rd worst defence" is what the public bets
+              and the book moves to, so each line says what the sheet already did with the fact: <b>faded</b> because the market
+              over-moves with early-season ratings, <b>scored</b> when a stage delta is on the line, <b>shown</b> because it measured
+              inside the number against two seasons of closes, or a <b>label</b>. Nothing here moves a number on its own.</p>
+          </div>
+        </section>
+
+        <details class="card fold" id="nbaSlateBoxes">
+          <summary><span>Filled by the slate</span> <span class="tag">ratings, pace, games played, rest — open to check or edit</span></summary>
+          <div class="body">
+            <div class="grid4">
+              <div class="f"><label for="naort">Away offensive rating <span class="tag">per 100, to date</span></label><input id="naort" type="number" step="0.1" inputmode="decimal" placeholder="113.5"></div>
+              <div class="f"><label for="nadrt">Away defensive rating</label><input id="nadrt" type="number" step="0.1" inputmode="decimal" placeholder="112.0"></div>
+              <div class="f"><label for="nhort">Home offensive rating</label><input id="nhort" type="number" step="0.1" inputmode="decimal" placeholder="114.0"></div>
+              <div class="f"><label for="nhdrt">Home defensive rating</label><input id="nhdrt" type="number" step="0.1" inputmode="decimal" placeholder="111.5"></div>
+            </div>
+            <div class="grid4">
+              <div class="f"><label for="napace">Away pace <span class="tag">possessions / 48</span></label><input id="napace" type="number" step="0.1" inputmode="decimal" placeholder="101.5"></div>
+              <div class="f"><label for="nhpace">Home pace</label><input id="nhpace" type="number" step="0.1" inputmode="decimal" placeholder="101.5"></div>
+              <div class="f"><label for="nagp">Away games played</label><input id="nagp" type="number" step="1" inputmode="numeric" placeholder="12"></div>
+              <div class="f"><label for="nhgp">Home games played</label><input id="nhgp" type="number" step="1" inputmode="numeric" placeholder="11"></div>
+            </div>
+            <div class="grid4">
+              <div class="f"><label for="nlrtg">League rating <span class="tag">blank = 112.7</span></label><input id="nlrtg" type="number" step="0.1" inputmode="decimal" placeholder="112.7"></div>
+              <div class="f"><label for="nlpace">League pace <span class="tag">blank = 101.5</span></label><input id="nlpace" type="number" step="0.1" inputmode="decimal" placeholder="101.5"></div>
+              <div class="f"><label for="narest">Away days rest</label><input id="narest" type="number" step="1" min="0" max="14" inputmode="numeric" placeholder="1"></div>
+              <div class="f"><label for="nhrest">Home days rest</label><input id="nhrest" type="number" step="1" min="0" max="14" inputmode="numeric" placeholder="2"></div>
+            </div>
+            <p class="note">The four ratings are each club's points scored and allowed per 100 possessions this season, from the
+              league ledger, with the pace beside them; the projection is each offence into the defence it faces over the two paces'
+              mean. <b>Faded, tagged</b>: against two seasons of closes the market over-moved with early-season ratings (the final ran
+              0.22 a point the other way per point of lean under fifty games a side, t −2.6, both seasons; nothing after fifty), so
+              the lean, shrunk by games played, goes on the line at −0.25 a point until fifty games and is shown after. The four
+              travel together, ten games a side. <b>Rest</b> is a label: back to backs, the second night on the road, three in four and
+              time zones all flipped sign between seasons. The stage of the season moves the total on its own from the date on the
+              row: +1.0 after the trade deadline, +2.0 in the last two weeks, both tagged (933 and 224 games, both seasons the same
+              way). Two clubs, the Nuggets and the Jazz, ran over the close both seasons home and away: a label on the row, not a
+              number, since a club's own over/under record does not carry within a season. The spread and the moneyline are the
+              book's own numbers through a normal margin at 12.5 points: measured priced against everything in the box score, so
+              they are shown and graded, never the pick. The total and the first half are the pickable markets.</p>
+          </div>
+        </details>
+      </div>

@@ -976,3 +976,15 @@ the own view's 0.3. After the overtime-minutes fix, on a third of each
 season's games: the sim's total sits −0.01 from the close in 2025-26 (sd
 4.9) and −0.79 in 2024-25 (sd 4.5), against the finals +0.9 and +1.0 where
 the close itself sat +0.9 and +0.2 under them.
+
+**The shape replay with the second engine** (the anchored game, 1,145 games
+of 2025-26 at 2,000 runs): the probability integral transform of the actual
+total inside the sim's distribution sits flat across the deciles (9.4 to
+10.8; the old engine piled 11.5 in the middle), the margin's too (8.4 to
+11.6, against the old 5.7 to 13.9); the total lands inside the sim's middle
+half 50.1% of the time (52.1% before), the window averaging 24.8 points wide
+(26.2); the total's spread 18.31 against the market's 18.22 (19.10 before),
+the margin's 13.37 against 13.93 (16.76), the first half's 11.99 against
+12.09; overtime 4.3% against 4.2% (3.3%). By the game's pace, three-point
+share and closing total the sim's spread moves with the real one within half
+a point in every tercile.

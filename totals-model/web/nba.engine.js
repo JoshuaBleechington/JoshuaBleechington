@@ -663,7 +663,9 @@
             tile(esc(home) + " wins", (100 * (nbaSimOver(own.margin, 0) || {}).over).toFixed(0) + '%', 'the one chance the replay found true') +
             tile("Overtime", (100 * (own.ot || 0)).toFixed(1) + '%', '') + '</div>';
     h += '<div class="simmeta"><b>' + String(sim.runs).replace(/\B(?=(\d{3})+(?!\d))/g, ",") + ' games</b>, the sim\'s own view. ' +
-         (sim.anchor ? 'Anchored to ' + esc(sim.anchor.book) + '\'s ' + esc(String(sim.anchor.total)) + (sim.anchor.sp !== null && sim.anchor.sp !== undefined ? ' / ' + (sim.anchor.sp > 0 ? '+' : '') + esc(String(sim.anchor.sp)) : '') + ' for the market view.' : 'No book on the scoreboard at the run: no market view.') + '</div>';
+         (sim.anchor ? 'Anchored to ' + esc(sim.anchor.book) + '\'s ' + esc(String(sim.anchor.total)) + (sim.anchor.sp !== null && sim.anchor.sp !== undefined ? ' / ' + (sim.anchor.sp > 0 ? '+' : '') + esc(String(sim.anchor.sp)) : '') + ' for the market view.' : 'No book on the scoreboard at the run: no market view.') +
+         (sim.level && sim.level.ortg ? ' The ratings ride the league\'s level of the last fortnight, ' + esc(String(sim.level.ortg)) + ' per 100 at ' + esc(String(sim.level.pace)) + ' possessions (30 Oct 2026).' : '') +
+         (sim.v >= 2 ? ' Engine 2: score effects, the market\'s shape (30 Oct 2026).' : '') + '</div>';
     h += '<div id="nbaVoices"></div>';   // the three voices on the total (28 Oct 2026), filled once the sheet has scored this render
     var takeRow = nbaSimTakeRow(f);   // the card row this game is on, if any: a sim call is taken on the row (26 Oct 2026)
     var cell = function (c) {
@@ -1008,7 +1010,7 @@
      which is why a sheet against it blocks the rule. The sheet's own BET band lands 56.3% on the same games, so the rule
      reads BET, green: on the Simulation card, on the board's Agreement section, takeable, with its own record line ---- */
   var NBA_AGREE = { sim: 0.55, model: 0.53, rate: 0.592, alt: 1.5 };   // the rule's measured rate gates the price; a row line 1.5+ off the market's number is an alternate, outside the measurement
-  var NBA_AGREE_TAG = "the sim's own view at 55%+ and the crew's lean on the same side, the sheet not against it: 157-108 (59.2%) over two seasons of closes, +34.7u at -110; 23-10 with the sheet on it too, 15-20 when the sheet was against it";
+  var NBA_AGREE_TAG = "the sim's own view at 55%+ and the crew's lean on the same side, the sheet not against it: 157-108 (59.2%) over two seasons of closes, +34.7u at -110; 23-10 with the sheet on it too, 15-20 when the sheet was against it. On watch (30 Oct 2026): an official's over/under lean did not carry from 2024-25 to 2025-26 (r -0.09 over 60 officials), so the crew's voice may be noise and the replay's 59% a lucky cut; the live record decides";
   /* the market's main number from the row's odds block: the carded book's total, else the commonest point across the books */
   function nbaMainTotal(inp) {
     var o = null; try { o = inp && inp.odds ? JSON.parse(inp.odds) : null; } catch (e) { o = null; }

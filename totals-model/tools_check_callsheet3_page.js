@@ -27,6 +27,7 @@ const CHECKS = ["dome","playoff"];
 (async () => {
   const b = await chromium.launch({ executablePath: process.env.CHROMIUM_PATH || '/opt/pw-browsers/chromium' });
   const pg = await b.newPage({ viewport: { width: 1280, height: 1400 } });
+  const reloaded = async () => { await pg.reload(); await pg.waitForFunction(() => window.smStore && window.smStore.ready); await pg.waitForTimeout(300); };   // a reload waits for the store, not a fixed 300 ms (30 Oct 2026: the harness raced the page under load)
   const errs = [];
   pg.on('pageerror', e => errs.push(String(e)));
   pg.on('console', m => {
@@ -514,7 +515,7 @@ const CHECKS = ["dome","playoff"];
     const view2 = { chances: cells(5), head: document.querySelector('#propsTable th[data-sort="chance"]').textContent, shown: document.getElementById('propsShown').textContent, order: JSON.parse(localStorage.getItem('callsheet3.props.view.v1') || '{}') };
     document.querySelector('#propsTable th[data-sort="chance"]').click(); await wait();
     const view3 = { chances: cells(5) };
-    sel('propsBand', 'LEAN'); sel('propsQ', 'maxey'); await wait();
+    sel('propsBand', 'LEAN'); sel('propsQ', 'george'); await wait();
     const view4 = { names: cells(1), bands: cells(10), shown: document.getElementById('propsShown').textContent };
     document.getElementById('propsReset').click(); await wait();
     const view5 = { rows: document.querySelectorAll('#propsTable tbody tr[data-prop]').length, shown: document.getElementById('propsShown').textContent, stored: localStorage.getItem('callsheet3.props.view.v1'), mk: document.getElementById('propsMk').value, q: document.getElementById('propsQ').value };
@@ -530,13 +531,13 @@ const CHECKS = ["dome","playoff"];
   chk(propsEx.view1.markets.length >= 1 && propsEx.view1.markets.every(m => m === 'rebounds') && /of 8 shown$/.test(propsEx.view1.shown)
       && propsEx.view2.chances.length === 8 && propsEx.view2.chances.slice(0, 7).every((c, i) => isNaN(pct(c)) ? false : pct(c) >= (isNaN(pct(propsEx.view2.chances[i + 1])) ? -1 : pct(propsEx.view2.chances[i + 1]))) && /Chance ▾/.test(propsEx.view2.head) && /sorted by chance ▾/.test(propsEx.view2.shown) && propsEx.view2.order.sort === 'chance'
       && propsEx.view3.chances.filter(c => !isNaN(pct(c))).every((c, i, a) => i === 0 || pct(c) >= pct(a[i - 1]))
-      && propsEx.view4.names.every(n => /Maxey/.test(n)) && propsEx.view4.bands.every(b => b === 'LEAN') && propsEx.view4.names.length >= 1
+      && propsEx.view4.names.every(n => /George/.test(n)) && propsEx.view4.bands.every(b => b === 'LEAN') && propsEx.view4.names.length >= 1
       && propsEx.view5.rows === 8 && propsEx.view5.shown === '8 shown' && propsEx.view5.stored === null && propsEx.view5.mk === '' && propsEx.view5.q === '',
       'props table: the market filter keeps the rebounds, a click on Chance sorts it high to low and again low to high, the band and name filters narrow it, and Reset view puts it back', JSON.stringify({ v1: propsEx.view1, v2: { head: propsEx.view2.head, shown: propsEx.view2.shown, chances: propsEx.view2.chances }, v3: propsEx.view3, v4: propsEx.view4, v5: propsEx.view5 }));
   chk(propsEx.on && /^EXAMPLE · 8 props on/.test(propsEx.count) && /An example/.test(propsEx.msg) && propsEx.rows === 7 && propsEx.rowsAll === 8,
       'props example: eight props on 76ers @ Knicks, seven projected (Embiid is out), the count says EXAMPLE', JSON.stringify({ count: propsEx.count, rows: propsEx.rows, all: propsEx.rowsAll }));
-  chk(propsEx.best.length >= 2 && /#1 · (BET|LEAN)/.test(propsEx.best[0]) && propsEx.best.some(b => /Tyrese Maxey OVER 25\.5 points/.test(b)),
-      'props example: the best list ranks the props by edge, Maxey over with Embiid out among them', JSON.stringify(propsEx.best.slice(0, 3)));
+  chk(propsEx.best.length >= 2 && /#1 · (BET|LEAN)/.test(propsEx.best[0]) && propsEx.best.some(b => /Paul George UNDER 2\.5 threes/.test(b)) && !propsEx.best.some(b => /Tyrese Maxey/.test(b)),
+      'props example: the best list ranks the props by edge with the market as the spine (30 Oct 2026): George under the threes among them, Maxey over the points no longer an edge at the book\'s 50/50', JSON.stringify(propsEx.best.slice(0, 3)));
   chk(propsEx.whys.some(w => /Joel Embiid out \(31 minutes a game between them\): \+1\.5 minutes and \+0\.58 points per 36, the pooled rule, scored/.test(w)) && propsEx.whys.some(w => /listed Out on ESPN: no projection/.test(w))
       && propsEx.whys.some(w => /Knicks allow 0\.97x the league's points per minute to guards \(this season 0\.95 over 16 games, last season 0\.99\): x0\.978 at 0\.75 weight, measured/.test(w)) && propsEx.whys.some(w => /HashtagBasketball: 76ers allow/.test(w)),
       'props example: the why lines are the slate\'s own, the regulars-out rule, the defence factor, the website\'s rank and the listed-out man', JSON.stringify(propsEx.whys.slice(0, 2)).slice(0, 600));
@@ -548,7 +549,7 @@ const CHECKS = ["dome","playoff"];
     document.getElementById('m-props').click(); await wait();
     document.getElementById('propsExample').click(); await wait();
     const dlg = document.getElementById('propDetail'), hidden0 = dlg.hidden;
-    const card = [...document.querySelectorAll('#propsBest .pk')].find(e => /Tyrese Maxey/.test(e.textContent)), id = card.getAttribute('data-prop');
+    const card = [...document.querySelectorAll('#propsBest .pk')].find(e => /Paul George/.test(e.textContent)), id = card.getAttribute('data-prop');
     card.click(); await wait();
     const open = !dlg.hidden, text = document.getElementById('propDetailBody').innerText.replace(/\s+/g, ' ').trim();
     const tiles = [...dlg.querySelectorAll('.pd-tiles .pd-tile .k')].map(e => e.textContent);
@@ -587,10 +588,10 @@ const CHECKS = ["dome","playoff"];
     return { hidden0, open, text: text.slice(0, 3200), tiles, simTiles, simText, simBeforeWhy, marks, books, carded, fromCardPos, noscroll, closedEsc, closedBtn, closedSport, levers, base, boldWhy, againstWhy, whyHead, boldTags, cardLever,
              n: trs.length, rowNames, rowOpen, name0, pos0, prevOff0, navShown, name1, pos1, prevOff1, name2, name1b, nextOffLast, posLast };
   });
-  chk(propsDlg.simTiles.length === 6 && /^PHI points=1[01]\d\|middle half \d+–\d+ · 112\.9 a game by the ratings\|/.test(propsDlg.simTiles[0]) && /^Sim's read=2\d\.\d\|his per 36 at his minutes × 0\.\d\d; [-−+]\d\.\d against the model's 28\.07\|/.test(propsDlg.simTiles[1])
-      && /^Matchup lever=[-−]0\.8\|the scored part, at half weight, against the OVER\|pd-tile bad$/.test(propsDlg.simTiles[2]) && /^Blowout=\d+%\|15 or more either way; shown, not scored\|/.test(propsDlg.simTiles[3])
+  chk(propsDlg.simTiles.length === 6 && /^PHI points=1[01]\d\|middle half \d+–\d+ · 112\.9 a game by the ratings\|/.test(propsDlg.simTiles[0]) && /^Sim's read=\d+(\.\d)?\|his per 36 at his minutes × 0\.\d\d; [-−+]\d\.\d against the model's 2\.12\|/.test(propsDlg.simTiles[1])
+      && /^Matchup lever=[-−]0\.1\|the scored part, at half weight, toward the UNDER\|pd-tile good$/.test(propsDlg.simTiles[2]) && /^Blowout=\d+%\|15 or more either way; shown, not scored\|/.test(propsDlg.simTiles[3])
       && /^Overtime=\d\.\d%\|/.test(propsDlg.simTiles[4]) && /^Possessions=9\d\.\d\|the game's pace in the runs\|/.test(propsDlg.simTiles[5])
-      && /^SIMULATION · 76ers @ Knicks played 3,000 times /.test(propsDlg.simText) && /What the score takes from the simulation is the matchup lever, [-−]0\.8 here, at half weight/.test(propsDlg.simText)
+      && /^SIMULATION · 76ers @ Knicks played 3,000 times /.test(propsDlg.simText) && /What the score takes from the simulation is the matchup lever, [-−]0\.1 here, at half weight/.test(propsDlg.simText)
       && /The blowout chance \(\d+%\) and overtime \(\d\.\d%\) are shown, not scored/.test(propsDlg.simText) && propsDlg.simBeforeWhy,
       'props detail: the Simulation section carries the game\'s runs on the prop: his club\'s points with the middle half against the ratings\' number, the sim\'s full-weight read against the projection, the matchup lever as the scored part in colour, the blowout, overtime and the possessions, shown not scored, before the why',
       JSON.stringify({ tiles: propsDlg.simTiles, text: propsDlg.simText.slice(0, 700), beforeWhy: propsDlg.simBeforeWhy }));
@@ -599,17 +600,17 @@ const CHECKS = ["dome","playoff"];
       && propsDlg.nextOffLast && propsDlg.posLast === propsDlg.n + ' of ' + propsDlg.n && /^\d+ of \d+$/.test(propsDlg.fromCardPos),
       'props detail: a row of the Every-prop table opens the same panel, Next and the arrow keys walk the table\'s order with the position shown, Previous is off on the first and Next on the last, and a card opened from the best list knows its place too',
       JSON.stringify({ n: propsDlg.n, rows: propsDlg.rowNames, name0: propsDlg.name0, pos0: propsDlg.pos0, name1: propsDlg.name1, pos1: propsDlg.pos1, name2: propsDlg.name2, back: propsDlg.name1b, last: propsDlg.posLast, card: propsDlg.fromCardPos }));
-  chk(propsDlg.levers.length === 6 && /^lever helps top\|Regulars out biggest lever\|\+1\.[5-9]$/.test(propsDlg.levers[0]) && propsDlg.levers.some(l => /^lever hurts\|Defence v position\|[-−]0\./.test(l)) && propsDlg.levers.some(l => /^lever hurts\|Pace\|[-−]0\./.test(l))
-      && propsDlg.levers.some(l => /^lever hurts\|The matchup, from the simulation\|[-−]0\.[5-9]$/.test(l))
-      && /^Starts from 28\.\d+, his 28\.\d+ per 36 at his minutes; the regulars out, pace, the matchup and the defence take it to 28\.07, \+2\.6 against the line\./.test(propsDlg.base)
-      && propsDlg.boldWhy.length === 2 && propsDlg.boldWhy.some(w => /^Joel Embiid out/.test(w)) && propsDlg.boldWhy.some(w => /^27\.7 points per 36 this season/.test(w)) && !propsDlg.boldWhy.some(w => /^the matchup|^the game's pace/.test(w))
-      && propsDlg.againstWhy.length === 1 && /^(the matchup, from the simulation's profiles|the game's pace)/.test(propsDlg.againstWhy[0]) && /the biggest against the OVER$/.test(propsDlg.againstWhy[0])
-      && /the biggest reasons for the OVER in green, the biggest against it in red/.test(propsDlg.whyHead)
-      && propsDlg.boldTags.length === 2 && propsDlg.boldTags.some(t => /^Joel Embiid →the biggest for the OVER\|/.test(t)) && propsDlg.boldTags.some(t => /^27\.7 points →the second biggest for the OVER\|/.test(t))
+  chk(propsDlg.levers.length === 6 && /^lever hurts top\|Last season's prior on his rate biggest lever\|\+0\.2$/.test(propsDlg.levers[0]) && propsDlg.levers.some(l => /^lever hurts\|Regulars out\|\+0\.1$/.test(l)) && propsDlg.levers.some(l => /^lever helps\|Pace\|[-−]0\.1$/.test(l))
+      && propsDlg.levers.some(l => /^lever helps\|The matchup, from the simulation\|[-−]0\.1$/.test(l))
+      && /^Starts from 2\.1\d, his 2\.25 per 36 at his minutes; the regulars out, pace, the matchup and the defence take it to 2\.12, [-−]0\.4 against the line\./.test(propsDlg.base)
+      && propsDlg.boldWhy.length === 2 && propsDlg.boldWhy.some(w => /^the game's pace/.test(w)) && propsDlg.boldWhy.some(w => /^the matchup, from the simulation/.test(w)) && !propsDlg.boldWhy.some(w => /^Joel Embiid out|^2\.0 threes/.test(w))
+      && propsDlg.againstWhy.length === 1 && /^2\.0 threes per 36 this season/.test(propsDlg.againstWhy[0]) && /the biggest against the UNDER$/.test(propsDlg.againstWhy[0])
+      && /the biggest reasons for the UNDER in green, the biggest against it in red/.test(propsDlg.whyHead)
+      && propsDlg.boldTags.length === 2 && propsDlg.boldTags.some(t => /^the game's p→the biggest for the UNDER\|/.test(t)) && propsDlg.boldTags.some(t => /^the matchup,→the second biggest for the UNDER\|/.test(t))
       && propsDlg.boldTags.every(t => /\|rgb\(\d+, \d+, \d+\)\|600$/.test(t)) && new Set(propsDlg.boldTags.map(t => t.split('|')[1])).size === 1 && propsDlg.boldTags[0].split('|')[1] !== 'rgb(0, 0, 0)'
-      && /^Moves it: Regulars out \+1\.[5-9] · The matchup, from the simulation [-−]0\.[5-9]$/.test(propsDlg.cardLever),
-      'props detail: what moves it ranks each factor\'s push on the projection with a bar, the regulars out the biggest lever on Maxey with Embiid out, the matchup from the simulation, the pace and the defence against; the two biggest toward the OVER (Embiid out, the prior) bold their why lines in green with a tag each, the biggest against it (the matchup) is tagged in red, and the card names the top two by size', JSON.stringify({ levers: propsDlg.levers, base: propsDlg.base, bold: propsDlg.boldWhy, tags: propsDlg.boldTags, against: propsDlg.againstWhy, head: propsDlg.whyHead, card: propsDlg.cardLever }));
-  chk(propsDlg.hidden0 && propsDlg.open && propsDlg.noscroll && /^LEAN Tyrese Maxey G PHI( starter)? OVER 25\.5 points 76ers @ Knicks/.test(propsDlg.text) && /on the road at NYK/.test(propsDlg.text) && /Why /i.test(propsDlg.text)
+      && /^Moves it: Last season's prior on his rate \+0\.2 · Regulars out \+0\.1$/.test(propsDlg.cardLever),
+      'props detail: what moves it ranks each factor\'s push on the projection with a bar, the prior the biggest lever on George\'s threes with the regulars out behind it, the pace and the matchup from the simulation toward the UNDER; the two biggest toward the UNDER (the pace, the matchup) bold their why lines in green with a tag each, the biggest against it (the prior) is tagged in red, and the card names the top two by size (the market the spine, 30 Oct 2026)', JSON.stringify({ levers: propsDlg.levers, base: propsDlg.base, bold: propsDlg.boldWhy, tags: propsDlg.boldTags, against: propsDlg.againstWhy, head: propsDlg.whyHead, card: propsDlg.cardLever }));
+  chk(propsDlg.hidden0 && propsDlg.open && propsDlg.noscroll && /^LEAN Paul George F PHI( starter)? UNDER 2\.5 threes 76ers @ Knicks/.test(propsDlg.text) && /on the road at NYK/.test(propsDlg.text) && /Why /i.test(propsDlg.text)
       && propsDlg.tiles.join(',') === 'Chance,Price,Edge,Projection,Minutes,Per 36,Usage' && propsDlg.marks === 10 && propsDlg.books === 3 && /fanatics/.test(propsDlg.carded),
       'props detail: a best-prop card opens the prop on its own panel with the tiles, the why, the marked last games and every book', JSON.stringify(propsDlg).slice(0, 1500));
   chk(propsDlg.closedEsc && propsDlg.closedBtn && propsDlg.closedSport, 'props detail: Escape, the Close button and a sport button each put the panel away', JSON.stringify({ esc: propsDlg.closedEsc, btn: propsDlg.closedBtn, sport: propsDlg.closedSport }));
@@ -650,7 +651,7 @@ const CHECKS = ["dome","playoff"];
   });
   chk(relabel.refresh.lu1 && relabel.refresh.rest1 === '1' && relabel.refresh.lu2 && relabel.refresh.rest2 === '1' && relabel.refresh.out1 && relabel.refresh.out2 && relabel.refresh.sim1 && relabel.refresh.sim2,
       'slate reload: a later slate replaces the starting five, the injury report and the simulation on a carded row (expected to confirmed, questionable to out, the newer runs) and leaves the filled boxes as logged', JSON.stringify(relabel.refresh));
-  await pg.reload(); await pg.waitForTimeout(300); await pg.evaluate(() => smStore.ready);
+  await reloaded(); await pg.evaluate(() => smStore.ready);
   const relabelled = await pg.evaluate(async () => {
     const row = JSON.parse(smStore.getItem('callsheet3.card.v1')).find(r => /Celtics @ Pistons/.test(r.matchup));
     const out = row.markets.filter(m => m.key === 'ml' || m.key === 'spread').map(m => ({ key: m.key, side: m.side, pick: m.pick, other: (m.other || {}).pick, label: m.label }));
@@ -750,14 +751,14 @@ const CHECKS = ["dome","playoff"];
       && takeT.took.length === 1 && new RegExp('^Game bets taken ' + (takeT.res3.toLowerCase() === 'win' ? '1-0' : takeT.res3.toLowerCase() === 'loss' ? '0-1' : '0-0-1') + ' ', 'i').test(takeT.took[0]) && /says \d+\.\d% · does \d+\.\d% \(±\d+\.\d\) · [-−+]\d\.\d\du$/.test(takeT.took[0])
       && new RegExp('graded ' + (takeT.res3.toLowerCase() === 'win' ? '1-0' : takeT.res3.toLowerCase() === 'loss' ? '0-1' : '0-0-1') + ' · ').test(takeT.list3[1]),
       'take: once the game grades the marked bet shows its result on its card and the board, the button becomes a TAKEN chip, no mark can be added to the graded row, and What you took keeps the record at the price marked', JSON.stringify({ list3: takeT.list3, res: takeT.res3, board: takeT.boardRes, chip: takeT.chip3, took: takeT.took, other: takeT.otherBtns }));
-  await pg.reload(); await pg.waitForTimeout(300); await pg.evaluate(() => smStore.ready);
+  await reloaded(); await pg.evaluate(() => smStore.ready);
   const takeR = await pg.evaluate(async () => {
     const wait = () => new Promise(r => setTimeout(r, 90));
     document.getElementById('boardDate').value = '2026-11-12'; document.getElementById('boardDate').dispatchEvent(new Event('change')); await wait();
     const list = [...document.querySelectorAll('#taking .pk')].map(e => e.innerText.replace(/\s+/g, ' ').trim()), hidden = document.getElementById('takingHead').hidden;
     // the props: the example's best card, the table row and the panel each carry the button; Taking lists the mark; the board's Taking tonight lists it on the props' date
     document.getElementById('m-props').click(); await wait(); document.getElementById('propsExample').click(); await wait();
-    const card = () => [...document.querySelectorAll('#propsBest .pk')].find(e => /Tyrese Maxey/.test(e.textContent)), id = card().getAttribute('data-prop');   // re-found after every re-render
+    const card = () => [...document.querySelectorAll('#propsBest .pk')].find(e => /Paul George/.test(e.textContent)), id = card().getAttribute('data-prop');   // re-found after every re-render
     const pHead0 = document.getElementById('propsTakingHead').hidden, pBtns = document.querySelectorAll('#propsTable tr[data-prop] .takebtn').length, pRows = document.querySelectorAll('#propsTable tr[data-prop]').length;
     card().querySelector('.takebtn').click(); await wait();
     const dlgOpen = !document.getElementById('propDetail').hidden;
@@ -784,7 +785,7 @@ const CHECKS = ["dome","playoff"];
     return { list, hidden, pHead0, pBtns, pRows, dlgOpen, pList, rowTaking, cardOn, pCount, pHead1, panelBtn, panelOn, panelOff, pList2, pHead2, pSaid, gone, boardProps };
   });
   chk(!takeR.hidden && takeR.list.length === 2 && /^TAKING · MLB/.test(takeR.list[0]), 'take: the mark survives a reload of the page', JSON.stringify({ hidden: takeR.hidden, list: takeR.list }));
-  chk(takeR.pHead0 && takeR.pBtns === 7 && takeR.pRows === 7 && !takeR.dlgOpen && takeR.pList.length === 1 && /^TAKING · NBA PROP · LEAN Tyrese Maxey OVER 25\.5 points 5\d\.\d% · [-−]110 needs 52\.4% 76ers @ Knicks · fanatics · projected 28\.07 .*Taking$/i.test(takeR.pList[0])
+  chk(takeR.pHead0 && takeR.pBtns === 7 && takeR.pRows === 7 && !takeR.dlgOpen && takeR.pList.length === 1 && /^TAKING · NBA PROP · LEAN Paul George UNDER 2\.5 threes 5\d\.\d% · \+100 needs 50\.0% 76ers @ Knicks · fanatics · projected 2\.12 .*Taking$/i.test(takeR.pList[0])
       && takeR.rowTaking && takeR.cardOn && takeR.pCount === '1 marked' && !takeR.pHead1 && takeR.panelOn && /Taking/.test(takeR.panelBtn) && takeR.panelOff && takeR.pList2 === 0 && takeR.pHead2
       && /Copied the props you are taking|the text is below/.test(takeR.pSaid) && takeR.gone === 0 && takeR.boardProps === 0,
       'take: a prop\'s Take button on the best card marks it without opening the panel; the row lights, Taking lists it with a count, the panel\'s own button shows it on and unmarks it, the copy button speaks, and the example\'s mark goes with the example',
@@ -847,7 +848,7 @@ const CHECKS = ["dome","playoff"];
     const wait = () => new Promise(r => setTimeout(r, 90));
     document.getElementById('propsReset').click(); await wait();
     document.getElementById('m-props').click(); await wait(); document.getElementById('propsExample').click(); await wait();
-    const card = () => [...document.querySelectorAll('#propsBest .pk')].find(e => /Tyrese Maxey/.test(e.textContent)), id = card().getAttribute('data-prop');
+    const card = () => [...document.querySelectorAll('#propsBest .pk')].find(e => /Paul George/.test(e.textContent)), id = card().getAttribute('data-prop');
     const cell = (tr) => (tr.querySelector('td.agree') || {}).textContent || '';
     const head = document.querySelector('#propsTable th[data-sort="agree"]').textContent;
     const maxey = document.querySelector('#propsTable tr[data-prop="' + id + '"]'), maxeyCell = cell(maxey), maxeyCls = maxey.querySelector('td.agree').className, maxeyTitle = maxey.querySelector('td.agree').title;
@@ -872,9 +873,9 @@ const CHECKS = ["dome","playoff"];
     document.getElementById('propDetailClose').click(); await wait(); document.getElementById('m-nba').click(); await wait();
     return { head, maxeyCell, maxeyCls, maxeyTitle, tag, tagTitle, all, sorted, headOn, scores: sorted.map(score), onlyAll, shownAll, onlyMost, stored, after, h4 };
   });
-  chk(leverT.head === 'Levers' && leverT.maxeyCell === '2▲ 4▼' && /\bneg\b/.test(leverT.maxeyCls) && leverT.maxeyTitle === '2 of 6 levers toward the OVER, 4 against' && leverT.tag === 'levers 2▲ 4▼' && leverT.tagTitle === leverT.maxeyTitle
-      && leverT.all.length === 7 && leverT.all.every(s => /^\d+▲ \d+▼$/.test(s)) && /^What moves it · 2 of 6 levers toward the OVER, 4 against$/.test(leverT.h4.replace(/\s+/g, ' ').trim()),
-      'levers: the Every-prop table counts each prop\'s levers toward the pick and against, Maxey 2 up 4 down in red, the best card carries the tally as a tag and the panel\'s heading says it in words', JSON.stringify(leverT).slice(0, 900));
+  chk(leverT.head === 'Levers' && leverT.maxeyCell === '2▲ 2▼' && !/\b(neg|pos)\b/.test(leverT.maxeyCls) && /\bagree\b/.test(leverT.maxeyCls) && leverT.maxeyTitle === '2 of 4 levers toward the UNDER, 2 against' && leverT.tag === 'levers 2▲ 2▼' && leverT.tagTitle === leverT.maxeyTitle
+      && leverT.all.length === 7 && leverT.all.every(s => /^\d+▲ \d+▼$/.test(s)) && leverT.all.some(s => s === '4▲ 2▼') && /^What moves it · 2 of 4 levers toward the UNDER, 2 against$/.test(leverT.h4.replace(/\s+/g, ' ').trim()),
+      'levers: the Every-prop table counts each prop\'s levers toward the pick and against (George 2 up 2 down, even; Maxey\'s under 4 up 2 down), the best card carries the tally as a tag and the panel\'s heading says it in words', JSON.stringify(leverT).slice(0, 900));
   chk(/Levers ▾/.test(leverT.headOn) && leverT.scores.every((s, i, a) => i === 0 || s <= a[i - 1]) && leverT.scores[0] > leverT.scores[leverT.scores.length - 1]
       && leverT.onlyAll.every(s => /^\d+▲ 0▼$/.test(s)) && leverT.onlyAll.length < leverT.all.length && /^\d+ of 7 shown/.test(leverT.shownAll)
       && leverT.onlyMost.length >= leverT.onlyAll.length && leverT.onlyMost.every(s => { const m = /^(\d+)▲ (\d+)▼$/.exec(s); return m && +m[1] > +m[2]; }) && leverT.stored.agree === 'most' && leverT.after.rows === 7 && leverT.after.agree === '',
@@ -885,7 +886,7 @@ const CHECKS = ["dome","playoff"];
     const wait = () => new Promise(r => setTimeout(r, 90));
     document.getElementById('propsReset').click(); await wait();
     document.getElementById('m-props').click(); await wait(); document.getElementById('propsExample').click(); await wait();
-    const card = () => [...document.querySelectorAll('#propsBest .pk')].find(e => /Tyrese Maxey/.test(e.textContent));
+    const card = () => [...document.querySelectorAll('#propsBest .pk')].find(e => /Paul George/.test(e.textContent));
     card().click(); await wait();
     const dlg = document.getElementById('propDetail');
     const h3 = (dlg.querySelector('h3') || {}).innerText.replace(/\s+/g, ' ').trim(), role = (dlg.querySelector('h3 .tag.role') || {}).title || '';
@@ -911,10 +912,10 @@ const CHECKS = ["dome","playoff"];
     document.getElementById('m-nba').click(); await wait();
     return { h3, role, usage, floors, why, hi, bench, after, pairs, usgCells, usgSorted, usgShown, aligned };
   });
-  chk(/^Tyrese Maxey G PHI starter$/.test(usageT.h3) && usageT.role === "RotoWire's expected five" && /^Usage=29%\|of his club's possessions while on; a starter, the miss read at 0\.91 sigmas \(measured\)$/.test(usageT.usage)
-      && /^95% of nights: 1\d\+ · 90%: 1\d\+ · 80%: (19|2\d)\+ points\. Measured on 2025-26: the 95% floors cleared 97\.5% of nights/.test(usageT.floors)
-      && /^usage 29\.0% of his club's possessions \(this season\), a starter \(RotoWire's expected five\): a high-usage starting man's miss runs 0\.91 sigmas, measured, so the chance is read narrower$/.test(usageT.why),
-      'props: the panel carries his role as a tag, his usage as a tile with the sigma factor, the floors he clears 95, 90 and 80% of nights with the measured record behind them, and the why line', JSON.stringify({ h3: usageT.h3, role: usageT.role, usage: usageT.usage, floors: usageT.floors.slice(0, 200), why: usageT.why }));
+  chk(/^Paul George F PHI starter$/.test(usageT.h3) && usageT.role === "RotoWire's expected five" && /^Usage=22\.5%\|of his club's possessions while on; a starter$/.test(usageT.usage)
+      && usageT.floors === ''
+      && /^usage 22\.5% of his club's possessions \(this season\), a starter \(RotoWire's expected five\): a mid-usage starting man's miss runs 1\.00 sigmas, measured, so the chance is read as it is$/.test(usageT.why),
+      'props: the panel carries his role as a tag, his usage as a tile (a mid-usage starter on threes: the miss read as it is, no floors on a threes line), and the why line', JSON.stringify({ h3: usageT.h3, role: usageT.role, usage: usageT.usage, floors: usageT.floors.slice(0, 200), why: usageT.why }));
   chk(usageT.aligned && usageT.usgCells.length === 7 && usageT.usgCells.some(c => /^Tyrese:29% S:usgc pos$/.test(c)) && usageT.usgCells.some(c => /^Kelly:19% B:usgc$/.test(c)) && usageT.usgCells.every(c => /:\d+(\.\d)?% [SB]:usgc( pos)?$/.test(c))
       && usageT.usgSorted.length === 7 && usageT.usgSorted.every((u, i, a) => i === 0 || u <= a[i - 1]) && /sorted by usage ▾/.test(usageT.usgShown)
       && usageT.hi.length === 3 && usageT.hi.every(n => /Jalen Brunson|Karl-Anthony Towns|Tyrese Maxey/.test(n)) && usageT.bench.length === 1 && /Kelly Oubre/.test(usageT.bench[0]) && usageT.after.n === 7 && usageT.after.usage === '' && usageT.after.role === ''
@@ -948,7 +949,7 @@ const CHECKS = ["dome","playoff"];
   const simMaxey = simPropsT.rows.find(r => /^Tyrese Maxey/.test(r.name)), simBig = simPropsT.rows.slice().sort((a, b) => simGap(b) - simGap(a))[0];
   chk(simPropsT.strip.length === 1 && /^pk simg\|76ers @ Knicks · played 3,000 times PHI \d{2,3} · NYK \d{2,3} total \d{3} (NYK|PHI) by \d+\.\d · home win \d+(\.\d)?% · total \d{3}( · the book's [\d.]+ \([-−+][\d.]+\))? PHI middle half \d+–\d+ against [\d.]+ a game by the ratings · NYK \d+–\d+ against [\d.]+ blowout of 15 or more \d+(\.\d)?% · overtime \d+(\.\d)?% · [\d.]+ possessions · PHI's regulars out [-−][\d.]+ per 100 on the offence · the sim's read on the pick's side for \d of [67] props$/.test(simPropsT.strip[0])
       && simPropsT.head.slice(-4).join('|') === 'Levers|Sim|Usage|Take' && simPropsT.rows.length === 7 && simPropsT.rows.every(r => /^\d+(\.\d)?$/.test(r.sim) && /^simc( pos| neg)?$/.test(r.cls) && (simGap(r) > 0) === /pos/.test(r.cls) && (simGap(r) < 0) === /neg/.test(r.cls) && /the simulation's own read of the stat/.test(r.title))
-      && simMaxey && simMaxey.side === 'OVER' && simMaxey.line === 25.5 && /^2\d\.\d$/.test(simMaxey.sim) && simMaxey.cls === 'simc ' + (parseFloat(simMaxey.sim) > 25.5 ? 'pos' : 'neg'),
+      && simMaxey && simMaxey.side === 'UNDER' && simMaxey.line === 25.5 && /^2\d(\.\d)?$/.test(simMaxey.sim) && simMaxey.cls === 'simc ' + (parseFloat(simMaxey.sim) < 25.5 ? 'pos' : 'neg'),
       'props: the simulation\'s strip shows the example game played 3,000 times with both clubs\' points and middle halves against the ratings, the total, the margin, the blowout, overtime, the pace and the 76ers\' regulars out, and the Sim column carries the sim\'s own read on every projected prop, green on the pick\'s side of the line', JSON.stringify({ strip: simPropsT.strip, head: simPropsT.head.slice(-4), rows: simPropsT.rows.map(r => r.name + ' ' + r.side + ' ' + r.line + ' sim ' + r.sim + ' ' + r.cls) }));
   chk(simPropsT.best.length >= 4 && simPropsT.best.every(b => /→n5 simline( pos| neg)?\|Sim reads \d+(\.\d)? v the \d+\.5 line, (on the (OVER|UNDER)'s side|against the (OVER|UNDER)|on the line) · (PHI|NYK) \d{2,3} \(\d+–\d+\) · blowout \d+(\.\d)?%$/.test(b))
       && simPropsT.best.filter(b => /on the (OVER|UNDER)'s side/.test(b)).every(b => /simline pos/.test(b)) && simPropsT.best.filter(b => /against the (OVER|UNDER)/.test(b)).every(b => /simline neg/.test(b)) && simPropsT.best.filter(b => /on the line/.test(b)).every(b => /simline\|/.test(b))
@@ -964,7 +965,7 @@ const CHECKS = ["dome","playoff"];
     const wait = () => new Promise(r => setTimeout(r, 90));
     document.getElementById('propsReset').click(); await wait();
     document.getElementById('m-props').click(); await wait(); document.getElementById('propsExample').click(); await wait();
-    [...document.querySelectorAll('#propsBest .pk')].find(e => /Tyrese Maxey/.test(e.textContent)).click(); await wait();
+    [...document.querySelectorAll('#propsBest .pk')].find(e => /Kelly Oubre/.test(e.textContent)).click(); await wait();
     const dlg = document.getElementById('propDetail');
     const head = [...dlg.querySelectorAll('.pd-log thead th')].map(t => t.textContent), h4 = ([...dlg.querySelectorAll('h4')].find(h => /^Last games/i.test(h.textContent)) || {}).innerText.replace(/\s+/g, ' ').trim();
     const rows = [...dlg.querySelectorAll('.pd-log tbody tr')].map(tr => { const tds = tr.querySelectorAll('td'), b = tr.querySelector('td.pd-what b'); return { stat: tds[3].textContent.trim(), mark: tds[3].querySelector('b.lg').className, what: tds[4] ? tds[4].textContent.trim() : null, first: b ? b.textContent : '', cls: b ? b.className : '' }; });
@@ -981,7 +982,7 @@ const CHECKS = ["dome","playoff"];
     return { head, h4, rows, rebWhat, praWhat };
   });
   const whatRe = /^((\d+ pts \+ \d+ reb \+ \d+ ast = \d+)|(.+ (back|out) \(\d+ mpg(, (a lift for him|the lift gone))?\))|((won|lost) by \d+(, a blowout)?)|(off the bench)|(a start)|(\d+ min, \d+ (under|over) his usual \d+)|(\d+ min \(his usual \d+\))|(\d+ shots, \d+ (under|over) his usual at those minutes)|(\d+ shots \(his usual \d+ at those minutes\))|(\d+ of \d+ from the floor(, (cold|hot) \(his season \d+%\))?)|(overtime)|(a (slow|fast) game, \d+ possessions against their usual \d+)|(\d+ of the club's \d+ (rebounds|assists)(, \d+% \(his usual \d+%\)| \(his usual \d+%\))?)|(.+ (took|had) \d+ \(his usual \d+(\.\d)?\)))$/;
-  chk(whatT.head.join('|') === 'Date|Opp|Min|points|What happened' && /^LAST GAMES \(\d+ of 10 over 25\.5\) · what the box says happened, the biggest factor first$/i.test(whatT.h4) && whatT.rows.length === 10
+  chk(whatT.head.join('|') === 'Date|Opp|Min|points|What happened' && /^LAST GAMES \(\d+ of 10 over 14\.5\) · what the box says happened, the biggest factor first$/i.test(whatT.h4) && whatT.rows.length === 10
       && whatT.rows.every(r => r.what && r.what.split(' · ').length >= 3 && r.what.split(' · ').length <= 5 && r.what.split(' · ').every(p => whatRe.test(p)) && /(won|lost) by \d+/.test(r.what) && /\d+ min/.test(r.what) && /\d+ shots/.test(r.what))
       && whatT.rows.every(r => !r.first || (r.first === r.what.split(' · ')[0] && r.cls === (/over/.test(r.mark) ? 'over' : /under/.test(r.mark) ? 'under' : '')))
       && whatT.rows.some(r => /(back|out) \(\d+ mpg, (a lift for him|the lift gone)\)/.test(r.first)) && whatT.rows.some(r => /a blowout/.test(r.what)) && whatT.rows.some(r => /shots, \d+ (under|over) his usual/.test(r.what))
@@ -1013,7 +1014,7 @@ const CHECKS = ["dome","playoff"];
     document.getElementById('m-nba').click(); await wait(); await smStore.removeItem('callsheet3.props.v1');   // the key goes last: Clear this date saves what it keeps
     return { rows, opts, onlyRa, panel, graded, tile };
   });
-  await pg.reload(); await pg.waitForTimeout(300); await pg.evaluate(() => smStore.ready);   // the graded fixture rows are records and stay in memory until a reload
+  await reloaded(); await pg.evaluate(() => smStore.ready);   // the graded fixture rows are records and stay in memory until a reload
   chk(comboT.rows.length === 3 && comboT.rows.join(';') === 'Trae Young G|pts + ast|OVER|35.5;Paolo Banchero G|reb + ast|UNDER|12.5;Trae Young G|pts + reb|OVER|27.5'
       && comboT.opts.slice(-3).join(',') === 'pr=pts + reb,pa=pts + ast,ra=reb + ast' && comboT.onlyRa.join(',') === 'reb + ast'
       && /^OVER 35\.5 pts \+ ast \|\| 28 pts \+ 9 ast = 37 · 34 min \(his usual 35\)$/.test(comboT.panel)
@@ -1030,7 +1031,7 @@ const CHECKS = ["dome","playoff"];
     document.getElementById('propsReset').click(); await wait();
     document.getElementById('m-props').click(); await wait(); document.getElementById('propsExample').click(); await wait();
     const today = document.getElementById('propsDate').value, dlg = document.getElementById('propDetail');
-    const card0 = [...document.querySelectorAll('#propsBest .pk')].find(e => /Tyrese Maxey/.test(e.textContent));
+    const card0 = [...document.querySelectorAll('#propsBest .pk')].find(e => /Paul George/.test(e.textContent));
     const cardBtn0 = card0.querySelector('.btn.go[data-pgo]'), cardOff0 = cardBtn0 ? cardBtn0.classList.contains('off') : null, cardTitle0 = cardBtn0 ? cardBtn0.title : '';
     card0.click(); await wait();
     const fives = [...dlg.querySelectorAll('.pd-fives .five')].map(e => txt(e)), me = txt(dlg.querySelector('.pd-fives tr.me')), heads = [...dlg.querySelectorAll('.pd-fives .lbadge')].map(e => e.className + '|' + e.textContent);
@@ -1046,15 +1047,15 @@ const CHECKS = ["dome","playoff"];
     document.getElementById('clear').click(); await wait();
     const awayBefore = document.getElementById('away').value;
     document.getElementById('m-props').click(); await wait(); document.getElementById('propsExample').click(); await wait();
-    const card1 = [...document.querySelectorAll('#propsBest .pk')].find(e => /Tyrese Maxey/.test(e.textContent)), cardBtn1 = card1.querySelector('.btn.go[data-pgo]'), cardLive = cardBtn1 && !cardBtn1.classList.contains('off');
+    const card1 = [...document.querySelectorAll('#propsBest .pk')].find(e => /Paul George/.test(e.textContent)), cardBtn1 = card1.querySelector('.btn.go[data-pgo]'), cardLive = cardBtn1 && !cardBtn1.classList.contains('off');
     cardBtn1.click(); await wait();
     const propsHidden = document.getElementById('propsView').hidden, dlgHidden = dlg.hidden, away = document.getElementById('away').value, home = document.getElementById('home').value, nbaPressed = document.getElementById('m-nba').getAttribute('aria-pressed');
     const lineupPanel = txt(document.getElementById('nbaLineupPanel')).slice(0, 80);
     await smStore.removeItem('callsheet3.card.v1'); document.getElementById('clear').click(); await wait();
     return { cardOff0, cardTitle0, fives, me, heads, panelOff, panelText, takeStill, stillOpen, said, awayBefore, cardLive, propsHidden, dlgHidden, away, home, nbaPressed, lineupPanel };
   });
-  chk(goT.cardOff0 === true && /^The NBA card has no row for 76ers @ Knicks on /.test(goT.cardTitle0) && goT.fives.length === 2 && /^76ers EXPECTED PG Tyrese Maxey THIS PROP SG VJ Edgecombe SF Paul George PF Kelly Oubre Jr\. C Adem Bona May not play: C Andre Drummond \(Questionable\)\.$/i.test(goT.fives[0])
-      && /^Knicks CONFIRMED PG Jalen Brunson SG Mikal Bridges SF OG Anunoby PF Josh Hart C Karl-Anthony Towns$/i.test(goT.fives[1]) && /^PG Tyrese Maxey THIS PROP$/i.test(goT.me) && goT.heads.join(',') === 'lbadge exp|expected,lbadge conf|confirmed'
+  chk(goT.cardOff0 === true && /^The NBA card has no row for 76ers @ Knicks on /.test(goT.cardTitle0) && goT.fives.length === 2 && /^76ers EXPECTED PG Tyrese Maxey SG VJ Edgecombe SF Paul George THIS PROP PF Kelly Oubre Jr\. C Adem Bona May not play: C Andre Drummond \(Questionable\)\.$/i.test(goT.fives[0])
+      && /^Knicks CONFIRMED PG Jalen Brunson SG Mikal Bridges SF OG Anunoby PF Josh Hart C Karl-Anthony Towns$/i.test(goT.fives[1]) && /^SF Paul George THIS PROP$/i.test(goT.me) && goT.heads.join(',') === 'lbadge exp|expected,lbadge conf|confirmed'
       && goT.panelOff === true && /^open the matchup on the nba card$/i.test(goT.panelText) && goT.takeStill && goT.stillOpen && /^The NBA card has no row for 76ers @ Knicks on .+: load the NBA slate for the date \(Load slate\) and Add the game, and the button opens it\.$/.test(goT.said),
       'props: the panel carries both clubs\' starting fives from the props run with the prop\'s man marked and the status badges, and the Matchup button is off, with the reason, while the NBA card has no row for the game', JSON.stringify(goT).slice(0, 1200));
   chk(goT.awayBefore === '' && goT.cardLive === true && goT.propsHidden && goT.dlgHidden && /76ers/.test(goT.away) && /Knicks/.test(goT.home) && goT.nbaPressed === 'true' && !/No lineup on the row/.test(goT.lineupPanel),
@@ -1192,14 +1193,14 @@ const CHECKS = ["dome","playoff"];
   await sheet.goto(phoneT.link); await sheet.waitForTimeout(600);
   const sheetT = await sheet.evaluate(() => ({ text: document.body.innerText.replace(/\s+/g, ' ').trim(), cards: document.querySelectorAll('.pk').length, takes: document.querySelectorAll('.pk.take').length, inputs: document.querySelectorAll('input, button, select, textarea').length, wide: document.documentElement.scrollWidth <= 390 }));
   await sheetCtx.close();
-  chk(sheetErrs.length === 0 && /^The Super Model Sat, Nov 14 · made \d{1,2}:\d\d [AP]M · view only TAKING TONIGHT 2 TAKING · NBA Knicks ML 66\.6% · [-−]198 needs 66\.4% 76ers @ Knicks · Moneyline TAKING · NBA · SIMULATION Total UNDER 231\.5 7\d\.\d% · worth 5\d% · [-−]110 needs 52\.4% 76ers @ Knicks · the simulation, the sim's own view THE PARLAY FOUR 1 /.test(sheetT.text)
+  chk(sheetErrs.length === 0 && /^The Super Model Sat, Nov 14 · made \d{1,2}:\d\d [AP]M · view only TAKING TONIGHT 2 TAKING · NBA Knicks ML 66\.6% · [-−]198 needs 66\.4% 76ers @ Knicks · Moneyline TAKING · NBA · SIMULATION Total UNDER 231\.5 [6-9]\d\.\d% · worth 5\d% · [-−]110 needs 52\.4% 76ers @ Knicks · the simulation, the sim's own view THE PARLAY FOUR 1 /.test(sheetT.text)
       && /LIKELIEST AT ANY PRICE 1 /.test(sheetT.text) && /THE SIMULATION'S CALLS, BET OR BETTER \d /.test(sheetT.text) && /View only: the card lives in the desktop browser\./.test(sheetT.text) && sheetT.takes === 2 && sheetT.cards >= 5 && sheetT.inputs === 0 && sheetT.wide,
       'phone sheet: m.html unpacks the code on a phone-width screen with no script errors and lists the bets marked Taking first, then the parlay four, the likeliest sides and the simulation\'s calls, with nothing to type into and no sideways scroll', JSON.stringify({ errs: sheetErrs, text: sheetT.text.slice(0, 500), cards: sheetT.cards, takes: sheetT.takes, inputs: sheetT.inputs, wide: sheetT.wide }));
   await pg.evaluate(async () => { await smStore.removeItem('callsheet3.card.v1'); await smStore.removeItem('callsheet3.props.v1'); document.getElementById('clear').click(); });
 
   // ---- the build stamp ------------------------------------------------------------
   // ---- the simulation (25 Oct 2026): the card on the example, the block stored with the row, the record once graded ----
-  await pg.evaluate(async () => { await smStore.removeItem('callsheet3.card.v1'); }); await pg.reload(); await pg.waitForTimeout(300); await pg.evaluate(() => smStore.ready);
+  await pg.evaluate(async () => { await smStore.removeItem('callsheet3.card.v1'); }); await reloaded(); await pg.evaluate(() => smStore.ready);
   const simT = await pg.evaluate(async () => {
     const wait = () => new Promise(r => setTimeout(r, 80));
     document.getElementById('clear').click(); document.getElementById('m-nba').click(); await wait();
@@ -1223,7 +1224,7 @@ const CHECKS = ["dome","playoff"];
   await pg.evaluate(async () => { const c = JSON.parse(smStore.getItem('callsheet3.card.v1')); c.forEach(r => { if (/76ers @ Knicks/.test(r.matchup)) { r.finals = { fa: '112', fh: '121', f5a: '55', f5h: '60' };
     r.inputs.odds = JSON.stringify({ total: {}, ml: {}, spread: {}, book: 'fanatics', team: { AWAY: { OVER: [['fanatics', -110, 113.5], ['fanatics', 140, 117.5], ['draftkings', -112, 113.5]], UNDER: [['fanatics', -110, 113.5], ['fanatics', -170, 117.5], ['draftkings', -108, 113.5]] },
                                                                                                     HOME: { OVER: [['fanatics', -115, 123.5]], UNDER: [['fanatics', -105, 123.5]] } } }); } }); await smStore.setItem('callsheet3.card.v1', JSON.stringify(c)); });
-  await pg.reload(); await pg.waitForTimeout(300); await pg.evaluate(() => smStore.ready);
+  await reloaded(); await pg.evaluate(() => smStore.ready);
   const simRec = await pg.evaluate(() => { const rec = document.querySelector('#calibBox .simrec'); return { has: !!rec, text: rec ? rec.innerText.replace(/\s+/g, ' ').trim().slice(0, 300) : '', rows: rec ? [...rec.querySelectorAll('.simrectab:not(.gaptab) tbody tr')].map(tr => tr.innerText.replace(/\s+/g, ' ').trim()) : [],
     gap: rec ? [...rec.querySelectorAll('.gaptab tbody tr')].map(tr => tr.innerText.replace(/\s+/g, ' ').trim()) : [] }; });
   // the gap rule on the card: the Knicks' 123.5 sits 5 above the implied (231.5 + 5.5) / 2 = 118.5, so UNDER by the rule; the 76ers' 113.5 sits half a point over 113, no call
@@ -1239,9 +1240,9 @@ const CHECKS = ["dome","playoff"];
     document.getElementById('clear').click(); await wait();
     return rows.slice(4);
   });
-  await pg.evaluate(async () => { await smStore.removeItem('callsheet3.card.v1'); }); await pg.reload(); await pg.waitForTimeout(300); await pg.evaluate(() => smStore.ready);
+  await pg.evaluate(async () => { await smStore.removeItem('callsheet3.card.v1'); }); await reloaded(); await pg.evaluate(() => smStore.ready);
   chk(simT.tiles.length === 4 && /^Total=\d+$/.test(simT.tiles[0]) && /^Margin=Knicks by \d+\.\d$/.test(simT.tiles[1]) && /^Knicks wins=\d+%$/.test(simT.tiles[2]) && /^Overtime=\d\.\d%$/.test(simT.tiles[3])
-      && /^3,000 games, the sim's own view\. Anchored to DraftKings's 231\.5 \/ -5\.5 for the market view\.$/.test(simT.meta)
+      && /^3,000 games, the sim's own view\. Anchored to DraftKings's 231\.5 \/ -5\.5 for the market view\.( The ratings ride the league's level of the last fortnight, [\d.]+ per 100 at [\d.]+ possessions \(30 Oct 2026\)\.)?( Engine 2: score effects, the market's shape \(30 Oct 2026\)\.)?$/.test(simT.meta)
       && /^Medians, anchored to the market Q1 Q2 Q3 Q4 1H 2H 76ers Knicks the fourth \d+\.\d% of the game( \d+){8}$/i.test(simT.medians)
       && simT.rows.length === 6 && /^Total 231\.5 (OVER|UNDER) \d+%/.test(simT.rows[0]) && /^First half 115\.5 (OVER|UNDER) \d+%/.test(simT.rows[1]) && /^Spread \(home\) -5\.5 (HOME|AWAY) \d+%/.test(simT.rows[2]) && /^Moneyline (HOME|AWAY) \d+%.*the own view's$/.test(simT.rows[3])
       && /^76ers team total no line on the row \(the odds run brings it\) — —$/.test(simT.rows[4]) && /^Knicks team total no line on the row/.test(simT.rows[5])
@@ -1249,9 +1250,9 @@ const CHECKS = ["dome","playoff"];
       'nba sim: the Simulation card reads the example\'s runs, lists every market with the own and the anchored chance for the line on the row, follows the line when it is typed, and the block rides with the row', JSON.stringify({ panel: simT.panel, rows: simT.rows, moved: simT.moved, chips: simT.chips.length, has: simT.hasSim }));
   chk(simRec.has && /^SIMULATION · says against does, every call at LEAN or better The sim's own view/.test(simRec.text) && simRec.rows.length >= 1
       && simRec.rows.every(r => /^(Total|First half|Spread|Moneyline|Away team total|Home team total) (STRONG|BET|LEAN) [01]-[01] \d+\.\d% (0|100)\.0% [+-]\d+\.\du$/.test(r))
-      && simRec.rows.some(r => /^Home team total (STRONG|BET|LEAN) 1-0 /.test(r)) && /Anchored to the market MARKET BAND RECORD SAYS DOES UNITS Home team total/.test(simRec.text) && !/The sim's own view[^]*Home team total[^]*Anchored/.test(simRec.text)
+      && simRec.rows.some(r => /^Home team total (STRONG|BET|LEAN) 1-0 /.test(r)) && /Anchored to the market MARKET BAND RECORD SAYS DOES UNITS Home team total/.test(simRec.text)
       && simRec.gap.length === 1 && /^Home team total 1-0 100\.0% \+[01]\.\du 62% under above the number/.test(simRec.gap[0]),
-      'nba sim: once the row grades, the record block keeps the calls whose worth reads LEAN or better, says against does by view, market and band, the anchored home team total among them and the own view\'s not, and the gap rule\'s own tally (the Knicks\' 123.5 five above the implied 118.5, under called, 121 scored: a win)', JSON.stringify(simRec));
+      'nba sim: once the row grades, the record block keeps the calls whose worth reads LEAN or better, says against does by view, market and band, the anchored home team total among them (and the own view\'s once Engine 2\'s tighter team variance lifts its worth to LEAN, 30 Oct 2026), and the gap rule\'s own tally (the Knicks\' 123.5 five above the implied 118.5, under called, 121 scored: a win)', JSON.stringify(simRec));
   chk(gapCard.length === 2 && /^76ers team total 113\.5 fanatics -110\/-110 implied 113, gap \+0\.5 · inside a point, no call/.test(gapCard[0]) && /^Knicks team total 123\.5 fanatics -115\/-105 implied 118\.5, gap \+5 · UNDER by the gap rule/.test(gapCard[1]),
       'nba sim: the Simulation card shows each team total\'s implied number and gap, and the gap rule\'s call when it is a point or more', JSON.stringify(gapCard));
 
@@ -1271,7 +1272,7 @@ const CHECKS = ["dome","playoff"];
     const inLocal = window.localStorage.getItem('callsheet3.props.v1');   // the browser's own store, on purpose: the key must not be there
     return { before, backend: smStore.backend(), why: smStore.why(), rows: JSON.parse(row).length, bigLen: big.length, propsInLocal: inLocal === null ? null : inLocal.length, keys: Object.keys(localStorage) };
   });
-  await pg.reload(); await pg.waitForTimeout(300);
+  await reloaded();
   const store2 = await pg.evaluate(async () => {
     await smStore.ready;
     const p = smStore.getItem('callsheet3.props.v1'), c = JSON.parse(smStore.getItem('callsheet3.card.v1') || '[]');
@@ -1281,7 +1282,7 @@ const CHECKS = ["dome","playoff"];
   chk(store1.backend === 'indexeddb' && store1.rows >= 1 && store1.propsInLocal === null, 'store: the page keeps the card and the props in IndexedDB, not localStorage', JSON.stringify(store1));
   chk(store2.pLen === store1.bigLen && store2.localProps === null, 'store: a props list far past the localStorage limit saves and comes back after a reload', JSON.stringify({ pLen: store2.pLen, bigLen: store1.bigLen }));
   chk(store2.cardRows === store1.rows && store2.localCard === null && !/not storing/.test(store2.saveState), 'store: a card the old page left in localStorage moves to the database on load and leaves localStorage', JSON.stringify(store2));
-  await pg.evaluate(() => smStore.clear()); await pg.reload(); await pg.waitForTimeout(300);
+  await pg.evaluate(() => smStore.clear()); await reloaded();
 
   // ---- 28 Oct 2026: the three voices on the total -- the sim's own view and the crew on the same side, the sheet not against it: BET on the Simulation card and the board, takeable, with its own record line ----
   const agreeT = await pg.evaluate(async () => {
@@ -1338,7 +1339,7 @@ const CHECKS = ["dome","playoff"];
       && agreeT.block.cls === 'voices fires' && /^BET · 2 OF 3$/i.test(agreeT.block.badge) && /2 of 3 on the OVER, none against: BET by the agreement rule\.$/i.test(agreeT.block.line) && agreeT.block.take && agreeT.block.color !== 'rgba(0, 0, 0, 0)' && agreeT.block.simchips === 2
       && agreeT.take.length === 1 && /^agree\|total\|OVER\|222\.5\|-110\|agreement\|Total OVER 222\.5\|0\.6\d\|null$/.test(agreeT.take[0]) && /Total OVER 222\.5 6\d% by the sim · agreement · -110 needs 52\.4% Kings @ Spurs · the agreement rule, the sim and the crew/i.test(agreeT.taking) && !/worth/i.test(agreeT.taking) && /TAKING/i.test(agreeT.boardTake)
       && /^Voices Record Does Units Two seasons said 2 of 3: the sim and the crew, the sheet silent 1-0 100\.0% \+0\.9u 134-98 \(57\.8%\), \+23\.8u$/i.test(agreeT.rec) && /scored, BET/i.test(agreeT.recHead) && /WIN$/i.test(agreeT.graded)
-      && agreeT.split.cls === 'voices' && /^NO RULE$/i.test(agreeT.split.badge) && /the sim UNDER 7\d% · the crew leans OVER \(z \+4\.4\) — (split, 2 on the (OVER|UNDER) with one against: no rule|no two voices on a side: no rule)\.$/i.test(agreeT.split.line),
+      && agreeT.split.cls === 'voices' && /^NO RULE$/i.test(agreeT.split.badge) && /the sim UNDER [6-9]\d% · the crew leans OVER \(z \+4\.4\) — (split, 2 on the (OVER|UNDER) with one against: no rule|no two voices on a side: no rule)\.$/i.test(agreeT.split.line),
       'agreement: a basketball total with the sim\'s own view and the crew on the same side and the sheet silent reads BET on the board\'s Agreement section and on the Simulation card\'s three-voices block in green, takes from either (the mark on the row at the row\'s price, listed under Taking tonight without a worth), grades on the rule\'s own record line, and a split (the example: the sim under, the crew over) reads no rule', JSON.stringify(agreeT).slice(0, 1800));
 
   // ---- 28 Oct 2026: middles on the total -- the apps' numbers on the row, a leg held, the number runs, the watch names the second leg, a take, the pair on the record ----
@@ -1429,7 +1430,7 @@ const CHECKS = ["dome","playoff"];
     const c = JSON.parse(smStore.getItem('callsheet3.card.v1')); c.forEach(r => { if (/76ers @ Knicks/.test(r.matchup)) r.finals = { fa: String(Math.floor((lo + hi) / 2) - 110), fh: '110', f5a: '55', f5h: '60' }; }); await smStore.setItem('callsheet3.card.v1', JSON.stringify(c));
     return { head, out0, ph, lo, hi, pDefault, out1, pTyped, out2, btnOff, stake, taken, btnOn, rowId: row && row.id };
   });
-  await pg.reload(); await pg.waitForTimeout(300); await pg.evaluate(() => smStore.ready);
+  await reloaded(); await pg.evaluate(() => smStore.ready);
   const winRec = await pg.evaluate(() => { const rec = document.querySelector('#calibBox .simrec'); const t = rec ? rec.innerText.replace(/\s+/g, ' ').trim() : ''; const i = t.indexOf('Windows on the total'); return i >= 0 ? t.slice(i, i + 260) : t.slice(0, 200); });
   const pc = p => (100 * p).toFixed(1) + '%';
   chk(/^The window · one ticket, over the low number and under the high, a same-game parlay · the boxes start at the middle half anchored to the market/.test(winT.head) && winT.ph[0] === 'over ' + winT.lo && winT.ph[1] === 'under ' + winT.hi && winT.ph[2] === 'parlay price'
@@ -1442,7 +1443,7 @@ const CHECKS = ["dome","playoff"];
       && Math.abs(winT.taken.p - winT.pTyped) < 0.001 && winT.taken.band === 'window' && winT.taken.pick === 'Total window ' + (winT.lo + 2) + '-' + (winT.hi - 2) + ' (over the low, under the high), one ticket' && /taking/i.test(winT.btnOn),
       'window: the Take wakes with the row, and the ticket keeps the two numbers, the price and the anchored chance', JSON.stringify({ off: winT.btnOff, stake: winT.stake, taken: winT.taken, btn: winT.btnOn }));
   chk(/^Windows on the total .*? TICKETS RECORD SAYS DOES UNITS 1 1-0 \d\d\.\d% 100\.0% \+1\.20u/.test(winRec), 'window: the record grades the ticket inside or out on its own line', winRec);
-  await pg.evaluate(async () => { await smStore.removeItem('callsheet3.card.v1'); }); await pg.reload(); await pg.waitForTimeout(300); await pg.evaluate(() => smStore.ready);
+  await pg.evaluate(async () => { await smStore.removeItem('callsheet3.card.v1'); }); await reloaded(); await pg.evaluate(() => smStore.ready);
 
   const stamp = await pg.evaluate(() => (document.getElementById('build') || {}).textContent);
   const git = (cmd) => execSync(cmd, { cwd: __dirname, encoding: 'utf8' }).trim();

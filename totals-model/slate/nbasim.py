@@ -26,6 +26,26 @@ The game, each run
   * The crew: the officials' free-throw rate against the league scales the trip
     rate for both clubs.
 
+Engine 2 (30 Oct 2026, the scenario lab, two seasons of closes and 2,469
+games of play-by-play):
+  * Score effects: the side in front eases and the side behind presses, each
+    by score_k points per possession per point of margin. Independent
+    possessions spread the margin 16.7 points around the spread; the market's
+    games spread 13.7, a side's first-half surplus comes back 10% in the second
+    half and the margin's 21%. The constant was set on those moments.
+  * The level: the ratings blend as deviations from their own season's league
+    level and ride the league's level of the last fortnight, so the sim's
+    centre no longer lags the league's scoring by months (October 2025 ran 4
+    points under the close, January 4.6 over, with absolute blending).
+  * The lift: the engine's own regulation scoring over the ratings' implied
+    total (the last-30-second branch, garbage time) is measured and divided
+    out, so the sim's mean total is the ratings' total; overtime sits on top.
+  * Rest: a back-to-back costs 1.7 per 100 (the close docks it so), the third
+    game in four nights 0.35. The last possession of a level game is a held,
+    contested shot, which lifts overtime toward the 4.7% played.
+  * Absences (slate.py): a newly absent man costs his club's offence 0.075 per
+    100 a point of his scoring and the other side nothing, the market's price.
+
 Everything that moves a number here is a named constant with a measured or
 a-priori source, and the backtest (tools_backtest_nba_sim.py) sets the shrink
 each market's raw probability gets before it is shown. Pure standard library,
@@ -34,13 +54,13 @@ so it runs on the user's machine beside slate.py.
 import math
 import random
 
-VERSION = 1
+VERSION = 2
 
 # ---- the league's a-priori figures (2025-26 as the ledger measured them; the slate replaces what it can) ----
 LEAGUE = {
     "ortg": 114.5,        # points per 100 possessions
     "pace": 99.0,         # possessions a team per 48 minutes
-    "pace_sd": 2.0,       # a game's pace around its expectation (the replays: 4.2 made the total's spread 20.6 and 3.0 19.8, against the market's 18.2)
+    "pace_sd": 1.0,       # a game's pace around its expectation, shared by both sides (30 Oct 2026, the shape replay: with the score effects carrying the sides' covariance, 1.0 lands the total's spread on the market's 18.0; it was 2.0)
     "tov": 0.135,         # turnovers per possession
     "trip": 0.105,        # trips to the line per possession (two shots each)
     "ft": 0.782,          # free-throw percentage
@@ -59,7 +79,18 @@ LEAGUE = {
     "foul_reach": 9,      # the margin inside which it fouls
     "quick_a3": 0.80,     # the trailing side's three share in the window
     "quick_secs": 6.5,    # seconds a quick possession takes; a free-throw trip takes 3
-    "rest_b2b": -1.0,     # points per 100 for a club on the second night of a back-to-back
+    "rest_b2b": -1.7,     # points per 100 for a club on the second night of a back-to-back (30 Oct 2026: the close docks a back-to-back 0.7 more than the old -1.0 did, t 2.6, two seasons)
+    "rest_3in4": -0.35,   # points per 100 for a club's third game in four nights (30 Oct 2026: the close, t 2.0)
+    # score effects (30 Oct 2026): the side in front eases and the side behind presses, each by score_k points per possession
+    # per point of margin. Two seasons of closes: a side's first-half surplus comes back 10% in the second half, the margin's
+    # 21%, and the margin's spread around the spread is 13.7 where independent possessions give 16.7. The possession-level
+    # read is hidden by team quality (the leader is the better side), so the constant was set on the second moments: at
+    # 0.0025 the margin's spread lands 13.4, a side's variance 129 against the market's 128, the two sides' covariance 39
+    # against 34, the first-half-to-second-half reversion -0.09 / -0.22 against -0.10 / -0.21, overtime 4.5% against 4.7%
+    "score_k": 0.0025,
+    "lift": 1.0063,       # the engine's own regulation scoring over the ratings' implied total (the last 30 seconds, the fewer blowouts the score effects leave garbage time), 286 real matchups at 2,000 runs with the shape above, 30 Oct 2026: the ratings already carry it, so the bases are divided by it
+    "q_noise": 0.0,       # possessions of noise on each quarter's count beyond the game's pace (both sides share it); the shape replay set it to none
+    "last_shot": -0.3,    # points per possession off the base for the one possession a level game ends on, a held and contested shot (the last minute of a level game scores 4.3 points against 6.3 within nine; lifts overtime from 3.3% toward the 4.7% played)
     "ot_poss": 10.5,      # possessions a side in overtime
 }
 
@@ -80,7 +111,10 @@ LEAGUE = {
 # home line a point or more above the implied under 62.1% of the time, a point or more below over 68.1% (t -5.1 on the gap);
 # the away side positive but noisy (247-226; the slope -0.67, t -0.9). The first quarter did not come back (+0.12, t 0.2): a
 # watch. The team totals are a measured market, their shrink 1.0, and the page scores the gap rule itself beside the sim's chance.
-SHRINK = {"total": 0.05, "h1": 0.1, "spread": 0.0, "ml": 0.97, "team": 1.5, "team_away": 0.3, "team_own": 0.3, "quarter": 0.1}
+# Engine 2's replay (30 Oct 2026, both seasons at 1,000 runs): the own view's total slope -0.17 and -0.14 (nothing, a faint fade), the
+# spread -0.07 and -0.01, the moneyline +0.91 and +1.53; the anchored home team total +1.01 (t 1.9; 355-233, 60.4%), the away +0.80;
+# the first half +0.42 and -0.50 (a coin); the first quarter +0.47 (one season). The total's shrink goes to nothing; the rest hold
+SHRINK = {"total": 0.0, "h1": 0.1, "spread": 0.0, "ml": 0.97, "team": 1.5, "team_away": 0.3, "team_own": 0.3, "quarter": 0.1}
 # the team totals by view and side (26 Oct 2026, the own view's team totals replayed on both seasons): the anchored home
 # team total's does-on-says slope was 1.78 and 4.29 (t 2.9, 4.7), capped at 1.5; the anchored away 0.45 and -0.79 (null);
 # the own view's 0.30 / 0.22 at home and 0.45 / 0.08 away (t under 1.5), its 65-70% calls landing 47% both seasons
@@ -196,6 +230,8 @@ def _target(off, dfn, lg, home_side):
     ppp += (lg["home"] / 2.0 if home_side else -lg["home"] / 2.0) / (lg["pace"])   # the home margin, half a side, per possession
     if off.get("b2b"):
         ppp += lg["rest_b2b"] / 100.0
+    if off.get("r3in4"):
+        ppp += lg.get("rest_3in4", 0.0) / 100.0
     ppp += (off.get("out_adj") or 0.0) / 100.0
     ppp -= (dfn.get("out_dadj") or 0.0) / 100.0
     return ppp
@@ -216,8 +252,9 @@ def sim_game(setup, rng):
     sa = sh = 0
     gap = lg["bench_gap"] / 100.0
     mean_st = sum(lg["starters"]) / 4.0
+    q_noise = lg.get("q_noise", 1.0)
     for q in range(4):
-        n = pace * q_share[q] + rng.gauss(0.0, 1.0)
+        n = pace * q_share[q] + (rng.gauss(0.0, q_noise) if q_noise else 0.0)
         margin = sh - sa
         garbage = q == 3 and abs(margin) >= lg["garbage"]
         if garbage:
@@ -229,11 +266,18 @@ def sim_game(setup, rng):
         shift_a = sh_a * gap + (lg["garbage_ppp"] if garbage else 0.0)
         shift_h = sh_h * gap + (lg["garbage_ppp"] if garbage else 0.0)
         ta, th = sides[0].table(shift_a), sides[1].table(shift_h)
+        k_score = lg.get("score_k") or 0.0
+        if isinstance(k_score, (list, tuple)):
+            k_score = k_score[q] if q < len(k_score) else k_score[-1]
         secs = 720.0 / n
         clock = 720.0
         i = 0
         while i < n:
             # a possession each, the away side first (who gets the extra one is noise)
+            if k_score:
+                # score effects (30 Oct 2026): the side in front eases, the side behind presses, in proportion to the margin
+                m = (sh - sa) * k_score
+                ta, th = sides[0].table(shift_a + m), sides[1].table(shift_h - m)
             pa_ = _draw(ta, rng.random())
             qa[q] += pa_
             sa += pa_
@@ -282,7 +326,8 @@ def _endgame(setup, rng, clock, pa_q, ph_q, sa, sh, ta, th):
             # game kept trading possessions): level, one side holds for the last shot; down one to three, the trailer takes one try
             if margin == 0:
                 trailer_home = rng.random() < 0.5
-                tq = th if trailer_home else ta
+                last = lg.get("last_shot") or 0.0
+                tq = setup["_sides"][1 if trailer_home else 0].table(last) if last else (th if trailer_home else ta)
             else:
                 trailer_home = margin < 0
                 tq = quick[1] if trailer_home else quick[0]
@@ -293,11 +338,21 @@ def _endgame(setup, rng, clock, pa_q, ph_q, sa, sh, ta, th):
                 pa_q += pts; sa += pts
             break
         if margin == 0 or abs(margin) > lg["foul_reach"]:
-            # play it out: one possession each at the game's pace
-            secs = 14.0
+            # play it out: one possession each at the game's pace, 14 seconds a possession. A round needs its 28 seconds
+            # (30 Oct 2026: a round on two seconds of clock gave every game an extra possession a side, 1.5 points over the
+            # ratings' total); with less than that one side holds the ball, a single possession when there is time for one
+            if clock < 28.0:
+                if clock >= 7.0:
+                    home_ball = rng.random() < 0.5
+                    pts = _draw(th if home_ball else ta, rng.random())
+                    if home_ball:
+                        ph_q += pts; sh += pts
+                    else:
+                        pa_q += pts; sa += pts
+                break
             pa_ = _draw(ta, rng.random()); pa_q += pa_; sa += pa_
             ph_ = _draw(th, rng.random()); ph_q += ph_; sh += ph_
-            clock -= secs * 2
+            clock -= 28.0
             continue
         trailer_home = margin < 0
         # the trailer's quick possession
@@ -331,8 +386,9 @@ def prepare(setup):
     pa, ph = dict(a), dict(h)
     pa["trip"] = a["trip"] * ft_factor
     ph["trip"] = h["trip"] * ft_factor
-    base_a = _target(a, h, lg, False) + (pa["trip"] - a["trip"]) * 2 * a["ft"]   # the crew's extra trips add their points on top
-    base_h = _target(h, a, lg, True) + (ph["trip"] - h["trip"]) * 2 * h["ft"]
+    lift = float(lg.get("lift") or 1.0)
+    base_a = (_target(a, h, lg, False) + (pa["trip"] - a["trip"]) * 2 * a["ft"]) / lift   # the crew's extra trips add their points on top
+    base_h = (_target(h, a, lg, True) + (ph["trip"] - h["trip"]) * 2 * h["ft"]) / lift
     setup["_sides"] = [Side(pa, base_a), Side(ph, base_h)]
     qa, qh = dict(pa), dict(ph)
     qa["a3"] = qh["a3"] = lg["quick_a3"]
@@ -481,7 +537,11 @@ def _team_game_lines(g):
         if not s or pts is None:
             return None
         poss = s["fga"] - s["oreb"] + s["tov"] + PACE_FT * s["fta"]
-        line = {"pts": pts, "opts": opts, "poss": poss, "fga": s["fga"], "fta": s["fta"], "oreb": s["oreb"], "tov": s["tov"], "min": s.get("min") or 240.0,
+        # the box keeps 240 team minutes whatever the overtime (30 Oct 2026: every one of 114 overtime games in two ledgers), so the
+        # minutes come from the periods played; without this the pace of an overtime game read as 48 minutes of play, the league's
+        # level carried the overtime scoring, and the engine's own overtime counted it twice (about a point a game)
+        n_ot = max(len(g.get("ota") or []), len(g.get("oth") or []))
+        line = {"pts": pts, "opts": opts, "poss": poss, "fga": s["fga"], "fta": s["fta"], "oreb": s["oreb"], "tov": s["tov"], "min": 240.0 + 25.0 * n_ot,
                 "fgm": 0, "ftm": 0, "tpm": 0, "tpa": 0, "full": False}
         players = g.get(pl_key) or []
         if players and all(len(p) >= 16 for p in players):
@@ -535,19 +595,66 @@ def _profile_of(acc, lg):
     return p
 
 
-def profiles_from_ledger(games, date_iso, prior_games=None, league=None, k_prior=K_PRIOR, tend=None):
+LEVEL_KEYS = ("ortg", "drtg", "pace")   # the ratings that ride the league's level (30 Oct 2026)
+LEVEL_HALFLIFE = 10.0    # days: the league's scoring level tracked with this half-life (the level lab: 7 to 14 all tightened the sim's gap to the close from 5.3 to 4.9 points; 10 had the smallest monthly wander)
+LEVEL_K = 150.0          # team-lines of weight the season-to-date level keeps against the recent one
+
+
+def _level_acc(games, date_iso, halflife):
+    """The league's recent level: every team-line before date_iso weighted
+    0.5^(days back / halflife). Returns (points per 100, pace, effective lines)."""
+    import datetime as _dt
+    try:
+        d0 = _dt.date.fromisoformat(date_iso)
+    except ValueError:
+        return None
+    w_pts = w_poss = w_min = w_n = 0.0
+    for g in games or []:
+        if (g.get("date") or "") >= date_iso or not g.get("detail"):
+            continue
+        try:
+            back = (d0 - _dt.date.fromisoformat(g["date"])).days
+        except ValueError:
+            continue
+        w = 0.5 ** (back / float(halflife))
+        if w < 0.01:
+            continue
+        lines = _team_game_lines(g)
+        if not lines:
+            continue
+        for line in lines:
+            w_pts += w * line["pts"]
+            w_poss += w * line["poss"]
+            w_min += w * (line.get("min") or 240.0)
+            w_n += w
+    if w_poss <= 0 or w_n < 1:
+        return None
+    return 100.0 * w_pts / w_poss, w_poss * 48.0 / (w_min / 5.0), w_n
+
+
+def profiles_from_ledger(games, date_iso, prior_games=None, league=None, k_prior=K_PRIOR, tend=None, relative=True, level_halflife=LEVEL_HALFLIFE, level_k=LEVEL_K):
     """Every club's profile before date_iso: this season's lines blended with
     last season's whole profile by n/(n+k). `tend` (tools_nba_tendencies.py's
     file) supplies what the box score does not carry: the three-point share
     and percentages, and each club's starters' share of the quarters. Returns
-    {"league": {...}, "teams": {ab: profile}, "last": {ab: last game date}}."""
+    {"league": {...}, "teams": {ab: profile}, "last": {ab: last game date}}.
+
+    The level (30 Oct 2026, the scenario lab): the league's scoring moves
+    within a season (2025-26 opened at 234 points a game, sat at 227 in
+    January and closed at 234) and the market follows it while a profile
+    blended on absolute ratings lags it by months (the sim's own total sat 4
+    points under the close in October 2025 and 4.6 over in January). With
+    `relative` the ratings and the pace blend as deviations from their own
+    season's league level and ride the current level; with `level_halflife`
+    the current level is the recent games' (weighted by half-life in days,
+    `level_k` team-lines of the season-to-date level kept beside it)."""
     lg = dict(league or LEAGUE)
     tl = (tend or {}).get("league") or {}
     if _sane_mix(tl):
         lg["a3"], lg["p3"], lg["p2"] = tl["a3"], tl["p3"], tl["p2"]
     if tl.get("starters_q") and len(tl["starters_q"]) == 4 and all(0.2 <= x <= 0.95 for x in tl["starters_q"]):
         lg["starters"] = tl["starters_q"]
-    this, last_date = {}, {}
+    this, last_date, recent_dates = {}, {}, {}
     lg_acc = _new_acc()
     for g in sorted(games or [], key=lambda g: (g.get("date") or "", g.get("id") or "")):
         if (g.get("date") or "") >= date_iso or not g.get("detail"):
@@ -559,15 +666,20 @@ def profiles_from_ledger(games, date_iso, prior_games=None, league=None, k_prior
             _acc_profile(this.setdefault(ab, _new_acc()), line, other["poss"])
             _acc_profile(lg_acc, line, other["poss"])
             last_date[ab] = g["date"]
+            recent_dates.setdefault(ab, []).append(g["date"])
+            if len(recent_dates[ab]) > 3:
+                recent_dates[ab] = recent_dates[ab][-3:]
+    lg_this = {"ortg": lg["ortg"], "pace": lg["pace"]}    # the season-to-date league level the clubs' lines sit around
     if lg_acc["n"] >= 40:
         lp = _profile_of(lg_acc, lg)
         for k in ("ortg", "pace", "tov", "trip", "ft", "oreb"):
             lg[k] = lp[k]
+        lg_this = {"ortg": lp["ortg"], "pace": lp["pace"]}
         if lg_acc["full"] == lg_acc["n"] and lg_acc["tpa"]:
             lg["a3"], lg["p3"], lg["p2"] = lp["a3"], lp["p3"], lp["p2"]
-    prior = {}
+    prior, lg_prior = {}, None
     if prior_games:
-        p_acc = {}
+        p_acc, p_all = {}, _new_acc()
         for g in prior_games:
             if not g.get("detail"):
                 continue
@@ -576,24 +688,53 @@ def profiles_from_ledger(games, date_iso, prior_games=None, league=None, k_prior
                 continue
             _acc_profile(p_acc.setdefault(g["away"], _new_acc()), lines[0], lines[1]["poss"])
             _acc_profile(p_acc.setdefault(g["home"], _new_acc()), lines[1], lines[0]["poss"])
+            _acc_profile(p_all, lines[0], lines[1]["poss"])
+            _acc_profile(p_all, lines[1], lines[0]["poss"])
         for ab, acc in p_acc.items():
             pr = _profile_of(acc, lg)
             if pr:
                 prior[ab] = pr
+        if p_all["n"] >= 40:
+            pl = _profile_of(p_all, lg)
+            lg_prior = {"ortg": pl["ortg"], "pace": pl["pace"]}
+            if lg_acc["n"] < 40:
+                # no season to speak of yet: the league's level is last season's, not the a-priori constant
+                lg["ortg"], lg["pace"] = pl["ortg"], pl["pace"]
+                lg_this = {"ortg": pl["ortg"], "pace": pl["pace"]}
+    if relative and level_halflife:
+        rec = _level_acc(games, date_iso, level_halflife)
+        if rec:
+            w_rec = rec[2] / (rec[2] + level_k)
+            lg["ortg"] = lg["ortg"] + w_rec * (rec[0] - lg["ortg"])
+            lg["pace"] = lg["pace"] + w_rec * (rec[1] - lg["pace"])
+    lg["level"] = {"ortg": round(lg["ortg"], 2), "pace": round(lg["pace"], 2), "relative": bool(relative)}
     teams = {}
+
+    def centre(k, src):
+        """What a rating is measured against in its own season, for the relative blend."""
+        if not relative or k not in LEVEL_KEYS:
+            return 0.0
+        base = src or lg_this
+        return base["pace"] if k == "pace" else base["ortg"]
+
+    def level(k):
+        if not relative or k not in LEVEL_KEYS:
+            return 0.0
+        return lg["pace"] if k == "pace" else lg["ortg"]
+
     for ab in set(list(this.keys()) + list(prior.keys())):
         t = _profile_of(this[ab], lg) if ab in this else None
         pr = prior.get(ab)
         if t and pr:
             w = t["n"] / (t["n"] + k_prior)
-            prof = {k: w * t[k] + (1 - w) * pr[k] for k in PROFILE_KEYS}
+            prof = {k: level(k) + w * (t[k] - centre(k, lg_this)) + (1 - w) * (pr[k] - centre(k, lg_prior)) for k in PROFILE_KEYS}
             prof["n"] = t["n"]
         elif t:
             w = t["n"] / (t["n"] + k_prior)
-            prof = {k: w * t[k] + (1 - w) * lg[k if k not in ("drtg",) else "ortg"] for k in PROFILE_KEYS}
+            prof = {k: level(k) + w * (t[k] - centre(k, lg_this)) + (1 - w) * (lg[k if k not in ("drtg",) else "ortg"] - centre(k, None)) for k in PROFILE_KEYS}
             prof["n"] = t["n"]
         else:
-            prof = dict(pr)
+            prof = {k: level(k) + (pr[k] - centre(k, lg_prior)) for k in PROFILE_KEYS}
             prof["n"] = 0
         prof["ab"] = ab
         tt = ((tend or {}).get("teams") or {}).get(ab) or {}
@@ -602,7 +743,7 @@ def profiles_from_ledger(games, date_iso, prior_games=None, league=None, k_prior
         if tt.get("starters_q") and len(tt["starters_q"]) == 4 and tt.get("games", 0) >= 10:
             prof["starters"] = tt["starters_q"]
         teams[ab] = prof
-    return {"league": lg, "teams": teams, "last": last_date}
+    return {"league": lg, "teams": teams, "last": last_date, "recent": recent_dates}
 
 
 # ---- histograms, for the page: P(over any line) without re-running anything ----
@@ -658,17 +799,25 @@ def _sane_mix(d):
         return False
 
 
-def rest_flags(last_date, ab, date_iso):
-    """Back-to-back: a game yesterday."""
+def rest_flags(last_date, ab, date_iso, recent=None):
+    """Back-to-back: a game yesterday. Three in four: two games in the three days before (30 Oct 2026)."""
     d = last_date.get(ab)
     if not d:
-        return {"b2b": False, "rest": None}
+        return {"b2b": False, "rest": None, "r3in4": False}
     try:
         import datetime as _dt
-        days = (_dt.date.fromisoformat(date_iso) - _dt.date.fromisoformat(d)).days
+        today = _dt.date.fromisoformat(date_iso)
+        days = (today - _dt.date.fromisoformat(d)).days
+        within3 = 0
+        for x in (recent or {}).get(ab) or []:
+            try:
+                if 0 < (today - _dt.date.fromisoformat(x)).days <= 3:
+                    within3 += 1
+            except ValueError:
+                pass
     except ValueError:
-        return {"b2b": False, "rest": None}
-    return {"b2b": days == 1, "rest": days}
+        return {"b2b": False, "rest": None, "r3in4": False}
+    return {"b2b": days == 1, "rest": days, "r3in4": within3 >= 2}
 
 
 def setup_from_profiles(prof, away_ab, home_ab, date_iso, ft_factor=1.0, out_adj=None):
@@ -677,8 +826,8 @@ def setup_from_profiles(prof, away_ab, home_ab, date_iso, ft_factor=1.0, out_adj
     if not a or not h:
         return None
     a, h = dict(a), dict(h)
-    a.update(rest_flags(prof["last"], away_ab, date_iso))
-    h.update(rest_flags(prof["last"], home_ab, date_iso))
+    a.update(rest_flags(prof["last"], away_ab, date_iso, prof.get("recent")))
+    h.update(rest_flags(prof["last"], home_ab, date_iso, prof.get("recent")))
     a["out_adj"] = (out_adj or {}).get("away", 0.0)
     h["out_adj"] = (out_adj or {}).get("home", 0.0)
     return {"league": prof["league"], "away": a, "home": h, "ft_factor": ft_factor}
@@ -699,7 +848,12 @@ def selftest():
     t = sm["total"]
     assert 215 < t["mean"] < 242, t
     assert 14 < t["sd"] < 22, t
-    assert 0.03 < sm["ot"] < 0.09, sm["ot"]
+    assert 0.025 < sm["ot"] < 0.09, sm["ot"]
+    # the engine's regulation mean sits on the ratings' implied total (30 Oct 2026: the lift measured and divided out)
+    lg_, a_, h_ = s["league"], s["away"], s["home"]
+    implied = _pace_game(a_, h_, lg_) * (_target(a_, h_, lg_, False) + _target(h_, a_, lg_, True) + (s["ft_factor"] - 1.0) * (a_["trip"] * 2 * a_["ft"] + h_["trip"] * 2 * h_["ft"]))
+    reg = sum(sum(r["qa"]) + sum(r["qh"]) for r in res) / float(len(res))
+    assert abs(reg - implied) < 1.5, (reg, implied)
     assert abs(sum(sm["q_share"]) - 1.0) < 1e-3
     assert sm["markets"]["total"]["side"] in ("OVER", "UNDER") and 0.5 <= sm["markets"]["total"]["p"] <= 1.0
     assert sm["markets"]["spread"]["first"] == "HOME"

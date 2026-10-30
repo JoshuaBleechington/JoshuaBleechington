@@ -71,6 +71,22 @@ the goalies.
 
 ## Basketball (The Super Model, 15 Oct 2026)
 
+**The engine's second version (30 Oct 2026, `slate/nbasim.py` VERSION 2):**
+the game's two sides now play with score effects (the side in front eases,
+the side behind presses, 0.0025 points per possession per point of margin,
+set on two seasons of closes: the margin's spread around the spread 13.4
+against the market's 13.7 where independent possessions gave 16.7), the
+ratings ride the league's scoring level of the last fortnight instead of
+lagging it by months, the engine's own lift over the ratings' total is
+divided out, a back-to-back costs 1.7 per 100 and a third game in four
+nights 0.35 (the close's prices), and a listed-out regular costs his club's
+offence 0.075 per 100 a point of his scoring and the other side nothing
+(the market's price for a newly absent man, measured within the club). The
+props run leans on the market (the model at a ninth of the weight, measured
+on 4,321 graded props), reads the book's over chance 2.5 points lower (the
+public plays overs), and moves a starter's minutes with the simulation's
+expected margin (the game script). Nothing to run differently.
+
 Three double-click files, in this order on a game day:
 
 1. **Run NBA ledger.bat** is no longer a daily step (25 Oct 2026): the

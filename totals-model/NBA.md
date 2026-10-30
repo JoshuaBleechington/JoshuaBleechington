@@ -838,3 +838,141 @@ games, the opponent short a regular in 70% of them):
 | What the chance saw, the median shift in? | Forwards' and centres' rebounds with no opposing centre out: over the number 46.1% / 44.4% by half, bias −0.02 / −0.03 sigmas; with a centre out 48.0% / 49.8%, bias +0.02 / +0.11 (t 0.5 / 2.8). Whole season, 48.9% against 45.1% on the other nights, bias +0.067 (t 2.4) |
 | The size that lands? | The per-36 regression says 0.69, but 0.69 overshoots the miss (bias −0.081, t −3.0, the over 42.9%); 0.30 per 36 per 30 mpg zeroes it (+0.001, 45.9%; the rmse 3.1108 against 3.1145 with nothing). Shipped at 0.30 for forwards and centres on rebounds, PRA, points + rebounds and rebounds + assists (`PROPS_OPP_C_REB_PER30`); the opponent's regulars out named on every prop, shown, not scored elsewhere |
 | What the simulation's defensive share would say? | 0.4 of the cost per 100 off the opponent's defence is 2.2 per 100 in those games, 1.9% of a 114 rating: +0.23 points per 36 per 30 mpg on a 20-per-36 scorer, near the pooled +0.17 that did not persist. On the strip, not in the score |
+
+## The simulation's second engine, 30 Oct 2026
+
+The user asked what pattern sat behind the 20th and the 25th on the props'
+night-by-night table, and for the missing link in the simulation's DNA with
+every scenario run. The pattern is in CALLSHEET3.md (the overs bleed, the
+model's lean on a prop is worth nothing against the book's price); this
+section keeps the measurements behind the engine's second version.
+
+**The shape, two seasons of closes (2,449 games with quarters).** Around the
+market's numbers each side's points vary 127 and 129 (sd 11.3), the two
+sides covary 33.7 (r 0.26), so the total spreads 17.97 and the margin 13.73.
+A side's first-half surplus comes back in the second half (slope −0.12 away,
+−0.08 home), the margin's comes back 21% (r −0.21), the total's does not
+(−0.01). Overtime 4.7%. The engine as it stood, on the demo matchup: a side's
+variance 160, covariance 21.6, total 19.06, margin 16.65, no reversion
+(+0.00), overtime 3.3%. Independent possessions at the real possession's
+own variance (1.43 per possession, measured on 487,468 possessions; the
+engine's 1.37) cannot make 13.7: the game regresses on itself.
+
+The possession-level read of the score effect (points per possession by the
+offence's margin at the time, by period) shows the gap small and the leader
+often ahead, because the leader is the better side on average; so the
+constant was set on the moments above. The grid (demo matchup, 20,000 runs
+a cell; the real moments as the target):
+
+| score_k | pace noise | quarter noise | last shot | a side's var | cov | total sd | margin sd | OT | a side's half corr | the margin's |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| target | | | | 128 | 33.7 | 17.97 | 13.73 | 0.047 | −0.10 | −0.21 |
+| 0 (the engine before) | 2.0 | 1.0 | 0 | 160.7 | 21.2 | 19.08 | 16.70 | 0.032 | +0.02 | 0.00 |
+| 0.0020 | 1.0 | 0 | 0 | 131.5 | 35.2 | 18.26 | 13.88 | 0.041 | −0.07 | −0.18 |
+| **0.0025** | **1.0** | **0** | **−0.3** | **128.7** | **39.3** | **18.33** | **13.37** | **0.045** | **−0.09** | **−0.22** |
+| 0.0030 | 1.0 | 0 | −0.3 | 125.7 | 43.0 | 18.37 | 12.86 | 0.044 | −0.10 | −0.25 |
+
+**The level.** The clubs' ratings blended absolutely with last season's
+profile, so the sim's centre carried last season's scoring level into this
+one and followed the league's within-season swings months late. The gap of
+the sim's expected total to the close by month, 2025-26: October −4.1,
+November −1.9, December −0.2, January +4.6, February +2.2, March +0.8 (the
+league scored 233.8 a game in October, 227.5 in January, 234.2 in March).
+With the ratings as deviations from their own season's league level riding
+the last fortnight's level (half-life 10 days, 150 team-lines of the season
+kept beside it) the monthly means sit within 2.3 points of each other and
+the sim-to-close gap tightens from 5.3 to 4.9 points (sd), on 2,293 games.
+The lean carries nothing beyond the close either way (slope −0.05 before,
+−0.10 after, t −1.3).
+
+**The lift.** The engine's regulation mean sat over the ratings' implied
+total: the last-30-seconds branch spent 28 seconds a round and then ran a
+round on two seconds of clock, a possession a side every game (+1.5 points);
+the fouling sequences and garbage time the rest. The branch now needs its 28
+seconds (a held ball, or one possession when seven seconds remain), and the
+measured lift (1.0063 on 286 real matchups at 2,000 runs, with the shape
+above) is divided out of both sides' bases; a selftest guard holds the
+regulation mean within 1.5 points of the implied total. Overtime's points sit
+on top of the ratings' 48 minutes, as they do in the finals.
+
+**Absences, within the club.** A man with 18+ ppg who played eight of his
+club's last ten games and is listed out tonight (188 cases, two seasons): the
+market's expected margin for his club, less the sim's, relative to the same
+club's other games, −1.46 (se 0.28), −0.62 per 10 ppg of the absent man (18-22
+ppg −1.09, 22-26 −1.53, 26+ −2.54); the close total less the sim's, −1.81
+(−0.77 per 10 ppg): his club scores less, the other side does not score more.
+The market's own miss on absences is null (the 15 Oct table said the same),
+so the market's price is the right cost. The slate's cost was 0.15 a point
+plus 0.03 a minute per 100, three fifths offence and two fifths defence: 4.7
+points of margin for a 25-point man. Now 0.075 a point, all offence.
+
+**Rest.** What the close carries that the sim did not (the close's expected
+margin less the sim's, 2,293 games): a back-to-back for the home side less
+the away −0.70 (t −2.6) beyond the sim's −1.0 per 100, a third game in four
+nights −0.34 (t −2.0), a road trip of three or more −0.36 (t −1.8); the
+market's own miss on each null. The sim's constants: −1.7 and −0.35 per 100.
+
+**The crew, across seasons.** 60 officials with 25+ games in both seasons:
+the correlation of an official's mean total-minus-close from 2024-25 to
+2025-26 −0.09, of his over rate −0.10, of the pace of his games −0.01, of his
+free throws a game 0.13. 2025-26 games whose crews had leaned under by 1.5+
+points the season before ran +0.95 over the close (n 81), over-leaning crews
++0.53 (n 432). The agreement rule's crew voice is on watch; its live record
+(1-5 as of the 30th) decides.
+
+**Labels and watches.** Denver's and Utah's games ran over the close at home
+(+7.5 and +0.5, then +1.3 and +9.8) and on the road (+2.7 / +5.5, +7.3 /
++1.7): a club label, not altitude. An away side two or more zones east: the
+home side covered by +1.9 and +2.5 (two seasons, 136 games); two or more
+zones west: −3.1 and −2.4 (121): a watch, not scored. March and April ran
+over the close 56.9% and 54.3% (+2.2 and +3.2); October 2025 ran over 59%
+(+3.3), so the early-season under of the literature is gone. Day-to-day men
+who ended up sitting moved the home side's cover (t −2.2): the late scratch
+the close cannot see, nothing to act on.
+
+**The props, measured on the first ten nights (4,321 graded).** Brier of
+the chance for the sheet's side, on the 1,671 props Pinnacle priced at the
+same number: the sheet's blend 0.2505, the model alone 0.2664, the carded
+book's devigged price 0.2468, Pinnacle's 0.2468, all books' consensus
+0.2467; the blend's weight on the model fit best at none and worse at every
+step up. Where the model stood 10+ points above Pinnacle the outcome landed
+48.3% (the model said 67.7%, Pinnacle 50.3%); 5-10 points above, 49.7%
+against 59.4% said. Blind at the best price across the books: every under
+53.2% (the prices said 50.7%, +0.8% ROI), every over 46.8% (49.3%, −8.8%); at
+Pinnacle's prices 54.3% and 45.7%. By market the under beat the over in
+every scoring stat (assists 59% to 50%, threes 59% to 51%, PRA 55% to 46%)
+and not on rebounds (56% to 55%). Line shopping against the consensus fair
+at the same number found 64 props with 4+ points of price edge, 36-28: too
+few. The game script: 20,729 starter-games against the closes, a starter's
+minutes land 0.187 under his last-ten mean per point the final margin runs
+above 13.5 (+1.73 inside five, −3.64 at 25 and up; −0.096 a point of the
+spread), the bench's +0.006 a point. The sheet now runs with the market as
+its spine (`PROPS_MODEL_W` 0.5 against the anchor's 4.0), the book's over
+chance read 2.5 points lower, and the game script on starters' minutes from
+the simulation's expected margin.
+
+**The replay with the second engine** (`tools_backtest_nba_sim.py`, 1,000
+runs a game, the period lines where the pull has them; the first run before
+the overtime-minutes fix, which took about a point off the sim's level):
+
+| | 2025-26 (1,145 games) | 2024-25 (1,148) |
+| --- | --- | --- |
+| The sim's gap to the close (sd) | 5.0, from 5.6 | 4.8 |
+| The sim's own spread of the total | 18.4, from 19.1 (the market's 18.2) | 18.3 (17.6) |
+| Overtime | 4.6%, from 3.3% (played 4.7%) | 4.5% |
+| The total, the own view: slope of does on says | −0.17 (t −0.8); 65%+ 110-99 | −0.14 (t −0.6); 65%+ 84-100 |
+| The spread, the own view | −0.07 (t −0.3) | −0.01 |
+| The moneyline, the own view | +0.91 (t 6.7); 70%+ says 77.2, does 78.5 (281-77) | +1.53 (t 9.6; no prior season, the ratings shrunk to the mean) |
+| First half, anchored / own | +0.42 / +0.25 (t 0.8 / 1.0) | −0.50 / −0.04 |
+| First quarter, anchored | +0.47 (t 1.0); 60-65: 82-53 | no lines in the pull |
+| Home team total, anchored | **+1.01 (t 1.9); 355-233 (60.4%), +93u**; 55-60 says 57.2 does 65.4 | no lines in the pull |
+| Away team total, anchored | +0.80 (t 1.4); 322-265 (54.8%) | |
+| Home / away team total, own view | +0.56 (t 2.0) / +0.39 | |
+
+The shrinks after it (`nbasim.SHRINK`): the total 0.0 (from 0.05), the
+spread 0.0, the moneyline 0.97, the first half 0.1, the first quarter 0.1,
+the anchored team totals 1.5 (the home side's says still run under its does),
+the own view's 0.3. After the overtime-minutes fix, on a third of each
+season's games: the sim's total sits −0.01 from the close in 2025-26 (sd
+4.9) and −0.79 in 2024-25 (sd 4.5), against the finals +0.9 and +1.0 where
+the close itself sat +0.9 and +0.2 under them.

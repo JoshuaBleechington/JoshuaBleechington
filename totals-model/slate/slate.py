@@ -4024,8 +4024,8 @@ except ImportError:   # the file is not beside slate.py: the slate runs without 
 NBA_SIM_RUNS = 10000       # the user, 25 Oct 2026: "make sure the simulation runs 10k times per matchup"; about two seconds a game
 NBA_REF_LEAN_Z = 1.5       # an official, and a crew (the sum of its three), leans over or under at this z of its over/under record against the close
 NBA_AGREE_SIM_P = 0.55     # the agreement rule (28 Oct 2026, tools_nba_total_agree.py): the sim's own view at this chance and the crew's lean on the same side
-NBA_SIM_OUT_PPG = 0.15      # an OUT regular's cost, points per 100 possessions: his points a game times this...
-NBA_SIM_OUT_MPG = 0.03      # ...plus his minutes a game times this; three fifths on the club's offence, two fifths on its defence (a priori)
+NBA_SIM_OUT_PPG = 0.075     # an OUT regular's cost, points per 100 possessions off his club's offence: his points a game times this (30 Oct 2026, measured within the club over two seasons of closes, 188 cases: a newly absent scorer costs 0.62 points of margin and 0.77 of total per 10 ppg at the close, nothing on the other side's scoring; the old 0.15 plus 0.03 a minute, split three fifths offence and two fifths defence, cost a 25-point man 4.7 points of margin, three times the market's)
+NBA_SIM_OUT_MPG = 0.0       # his minutes a game add nothing beyond his points (the same measurement)
 NBA_TEND_FILE = "nba-tend.json"
 
 
@@ -4042,12 +4042,13 @@ def nba_load_tend(out_dir):
 
 
 def nba_sim_out_adj(out_list):
-    """(offence, defence) adjustments per 100 possessions from a club's who-is-out list."""
+    """(offence, defence) adjustments per 100 possessions from a club's who-is-out list: the cost comes off the club's
+    own scoring; the other side's scoring does not move (the market's pricing of a newly absent man, 30 Oct 2026)."""
     cost = 0.0
     for e in out_list or []:
         if str(e.get("st", "")).lower().startswith("out") and (e.get("mpg") or 0) >= NBA_REGULAR_MPG:
             cost += NBA_SIM_OUT_PPG * (e.get("ppg") or 0) + NBA_SIM_OUT_MPG * (e.get("mpg") or 0)
-    return -0.6 * cost, 0.4 * cost
+    return -cost, 0.0
 
 
 def nba_sim_ft_factor(crew, refs):
@@ -4084,6 +4085,7 @@ def nba_props_game_sim(prof, aab, hab, date_iso, runs, seed=None, out=None):
     n = float(sum(mh["c"]))
     blowout = sum(c for i, c in enumerate(mh["c"]) if abs(mh["lo"] + i) >= 15) / n
     home_win = sum(c for i, c in enumerate(mh["c"]) if mh["lo"] + i > 0) / n
+    emargin = sum(abs(mh["lo"] + i) * c for i, c in enumerate(mh["c"])) / n    # the expected size of the final margin, the game script (30 Oct 2026)
 
     def side(key, ab):
         h, t = H[key], prof["teams"].get(ab) or {}
@@ -4093,8 +4095,8 @@ def nba_props_game_sim(prof, aab, hab, date_iso, runs, seed=None, out=None):
                 "ppg": round(t["ortg"] * t["pace"] / 100.0, 1) if t.get("ortg") and t.get("pace") else None}
     return {"runs": runs, "away": side("away", aab), "home": side("home", hab), "total": nbasim.hist_quantile(H["total"], 0.5),
             "margin": round(sum((mh["lo"] + i) * c for i, c in enumerate(mh["c"])) / n, 1), "home_win": round(home_win, 3), "ot": H["ot"],
-            "blowout": round(blowout, 3), "poss": round(nbasim._pace_game(setup["away"], setup["home"], setup["league"]), 1),
-            "out": {"away": round(adj_a[0], 2), "home": round(adj_h[0], 2)}}
+            "blowout": round(blowout, 3), "emargin": round(emargin, 1), "poss": round(nbasim._pace_game(setup["away"], setup["home"], setup["league"]), 1),
+            "level": (setup["league"].get("level") or {}).get("ortg"), "out": {"away": round(adj_a[0], 2), "home": round(adj_h[0], 2)}}
 
 
 def nba_prop_sim_read(gs, home_side, proj):
@@ -4125,7 +4127,7 @@ def nba_sim_block(g, sides, prof, refs, crew, runs, log):
     seed = int(str(g.get("id") or "0")[-6:] or 0)
     own = nbasim.simulate(setup, n=runs, seed=seed)
     block = {"v": nbasim.VERSION, "runs": runs, "own": nbasim.histograms(own), "mkt": None, "anchor": None, "ft_factor": round(ftf, 3),
-             "shrink": nbasim.SHRINK, "bands": nbasim.BANDS,
+             "shrink": nbasim.SHRINK, "bands": nbasim.BANDS, "level": setup["league"].get("level"),   # the league's level the ratings ride (30 Oct 2026)
              "prof": {s: {"ortg": round(setup[s]["ortg"], 1), "drtg": round(setup[s]["drtg"], 1), "pace": round(setup[s]["pace"], 1), "n": setup[s].get("n", 0),
                           "b2b": bool(setup[s].get("b2b")), "out": round(out_adj[s], 2), "a3": round(setup[s]["a3"], 3)} for s in ("away", "home")}}
     o = g.get("odds") or {}
@@ -4791,7 +4793,22 @@ PROPS_MIN_MINUTES = 60.0
 PROPS_REGULAR_MPG = 24.0
 PROPS_PLAYER_MIN_GAMES = 3
 PROPS_ANCHOR = 4.0
-PROPS_MODEL_W = 2.0
+# the model's weight against the market's (30 Oct 2026): on the 4,321 graded props of the first ten nights the sheet's
+# chance fit the outcomes worse than the book's devigged price alone at every weight above nothing (Brier 0.2505 at the
+# old 2.0 against 0.2468 at none; where the model stood 10 points from Pinnacle the outcome followed Pinnacle, 48% to the
+# model's 68% said). Kept at a ninth so the model's lean still reads and the record can judge it; the bands follow
+PROPS_MODEL_W = 0.5
+# the over's shade (30 Oct 2026): at the books' own devigged prices the under landed 53.2% of the time where the prices
+# said 50.7% and the over 46.8% against 49.3%, on 4,017 props at the best price across the books (at Pinnacle's prices
+# 54.3 against 51.1 on 1,946); the public plays overs and the books price for it. The book's over chance is read this
+# much lower before the blend
+PROPS_SIDE_SHADE = 0.025
+# the game script (30 Oct 2026): two seasons, 20,729 starter-games against the closes: a starter's minutes land 0.187 a
+# game under his last-ten mean per point the final margin runs above the league's 13.5, and over it in a close one
+# (+1.7 minutes inside five, -3.6 at 25 and up); the bench's do not move (+0.006 a point). The simulation's expected
+# margin for the game sets the lever on starters' minutes
+PROPS_SCRIPT_PER_POINT = 0.187
+PROPS_SCRIPT_BASE = 13.5
 PROPS_DVP_WEIGHT = {"pts": 0.75, "reb": 0.75, "ast": 0.75, "tpm": 0.4, "pra": 0.75, "pr": 0.75, "pa": 0.75, "ra": 0.75}   # how much of a defence's lean to carry (measured, first half to second)
 # the matchup lever (25 Oct 2026, the user: "see if the simulation enhances the props"): the club's expected points per
 # possession in the simulation's own view (its offence into the opponent's defence, league-relative, home court, a back to
@@ -5513,6 +5530,17 @@ def props_project(prop, logs_this, logs_last, ctx):
             ", ".join(n for n, _mpg, _st in (ctx.get("out_names") or [])[:4]) or "regulars", out_mpg, dmin, drate * 36, label))
     for nm, st in (ctx.get("maybe") or [])[:3]:
         why.append("%s is %s: not counted as out" % (nm, st))
+    # the game script (30 Oct 2026): a starter's minutes follow how lopsided the game is expected to run
+    i_script = len(why)
+    dmin_script = 0.0
+    sc = ctx.get("script")
+    if sc and sc.get("emargin") is not None and ctx.get("starter") is True:
+        dmin_script = -PROPS_SCRIPT_PER_POINT * (float(sc["emargin"]) - PROPS_SCRIPT_BASE)
+        mins += dmin_script
+        why.append("the game script: the simulation expects a final margin of %.1f against the league's %.1f (a blowout of 15 or more %.0f%% of the time), so a starter's minutes read %+.1f, measured on 20,729 starter-games over two seasons, scored" % (
+            float(sc["emargin"]), PROPS_SCRIPT_BASE, 100 * float(sc.get("blowout") or 0), dmin_script))
+    elif sc and sc.get("emargin") is not None and ctx.get("starter") is False:
+        why.append("the game script: the simulation expects a final margin of %.1f; a bench man's minutes did not move with it over two seasons (+0.006 a point), nothing scored" % float(sc["emargin"]))
     # the OPPONENT'S absences (28 Oct 2026, the user: "when players are out that helps the next man go over, yet it seems to
     # think the same for the defence even when their main players are out"): named on every prop; scored where it measured and
     # held from one half of 2025-26 to the other, a missing centre on a forward's or centre's rebounds (tools_nba_opp_out.py)
@@ -5605,7 +5633,7 @@ def props_project(prop, logs_this, logs_last, ctx):
     centre = mu - PROPS_MEDIAN_SHIFT[mk] * sd
     pm, push = props_over(centre, sd, line)
     pm_c = pm / (1.0 - push) if push < 1.0 else 0.5
-    pb = props_devig(prop["op"], prop["up"])
+    pb = props_devig(prop["op"], prop["up"]) - PROPS_SIDE_SHADE   # the book's over chance, less the over's shade (30 Oct 2026)
     p = props_blend(pb, pm_c)
     side = "OVER" if p >= 0.5 else "UNDER"
     chance = p if side == "OVER" else 1.0 - p
@@ -5613,8 +5641,8 @@ def props_project(prop, logs_this, logs_last, ctx):
     need = props_implied(price)
     edge = chance - need
     band = "BET" if (edge >= PROPS_BET_EDGE and chance >= PROPS_BET_CHANCE) else ("LEAN" if edge > 0 else "no edge")
-    why.append("projected %.1f against %s %.1f, one sigma %.1f, the chance read around the median %.1f (the stat skews right: at the mean the over lands %.0f%% of the time): the over %.1f%% by the projection, %.1f%% by the book's prices; blended %.1f%% at %.0f to %.0f" % (
-        mu, label, line, sd, centre, PROPS_MEDIAN_OVER[mk] * 100, pm * 100, pb * 100, p * 100, PROPS_ANCHOR, PROPS_MODEL_W))
+    why.append("projected %.1f against %s %.1f, one sigma %.1f, the chance read around the median %.1f (the stat skews right: at the mean the over lands %.0f%% of the time): the over %.1f%% by the projection, %.1f%% by the book's prices less the over's %.1f-point shade (the public plays overs, measured); blended %.1f%% at %.0f to %.1f, the market the spine: on 4,321 graded props the model's lean added nothing to the book's price" % (
+        mu, label, line, sd, centre, PROPS_MEDIAN_OVER[mk] * 100, pm * 100, pb * 100, PROPS_SIDE_SHADE * 100, p * 100, PROPS_ANCHOR, PROPS_MODEL_W))
     # what moves it (21 Oct 2026, the user: "highlight the areas of the prop bet that are
     # helping with the prediction the most"): each factor's push on the projection in the
     # stat's units, the others held, each pointing at its why line. The base is his own
@@ -5627,7 +5655,9 @@ def props_project(prop, logs_this, logs_last, ctx):
     if m["season"] and not m["last_season"]:
         parts.append({"k": "minutes", "t": "Minutes, his last %d against the season" % m["n"], "eff": round((mins0 - m["season"]) * rate0, 2), "i": i_mins})
     if out_mpg > 0:
-        parts.append({"k": "out", "t": "Regulars out", "eff": round(rate_out * mins - rate0 * mins0, 2), "i": i_out})
+        parts.append({"k": "out", "t": "Regulars out", "eff": round(rate_out * (mins - dmin_script) - rate0 * mins0, 2), "i": i_out})
+    if abs(dmin_script) > 1e-9:
+        parts.append({"k": "script", "t": "The game script, from the simulation", "eff": round(rate_out * dmin_script, 2), "i": i_script})
     if drate_c > 0:
         parts.append({"k": "oppc", "t": "Their centre out", "eff": round(drate_c * mins, 2), "i": i_oppc})
     if abs(f_pace - 1.0) > 1e-9:
@@ -5840,6 +5870,7 @@ def make_nba_props(date_iso, out_dir, log, topup=False, sim_runs=NBA_SIM_RUNS):
                    "maybe": out[team][2], "pace": pace, "league_pace": league_pace, "home": team == hab, "pos": pos, "opp_nick": NBA_NICK.get(opp, opp),
                    "pace_team": pace_h if team == hab else pace_a, "pace_opp": pace_a if team == hab else pace_h, "match": club_match(team, opp, team == hab),
                    "usage": (usage_[0] if usage_ else None), "usage_src": (usage_[1] if usage_ else None), "starter": starter_, "start_src": start_src,
+                   "script": ({"emargin": gs.get("emargin"), "blowout": gs.get("blowout")} if gs and gs.get("emargin") is not None else None),   # the game script (30 Oct 2026)
                    "dvp": dv, "htb": htb_line(htb, NBA_NICK.get(opp, opp), opp, pos, dmk) if pos else None,
                    "opp_out_mpg": out[opp][0], "opp_out_names": [(n, mpg, st) for n, mpg, st in out[opp][1] if mpg is not None and mpg >= PROPS_REGULAR_MPG],
                    "opp_out_c_mpg": outc[opp][0], "opp_out_c_names": outc[opp][1], "self_out": self_out}
@@ -5863,7 +5894,7 @@ def make_nba_props(date_iso, out_dir, log, topup=False, sim_runs=NBA_SIM_RUNS):
         games.append(row)
     doc = {"format": PROPS_FORMAT, "version": 1, "date": date_iso, "generated": now_utc(), "source": "slate.py nba-props: The Odds API, the ledgers, ESPN, HashtagBasketball",
            "credits": credits_used, "games": games, "ledgers": ledgers,   # what the run read (23 Oct 2026): the page says so when nothing projects
-           "method": {"anchor": PROPS_ANCHOR, "model": PROPS_MODEL_W, "sd_k": PROPS_SD_K, "out_min_per30": PROPS_OUT_MIN_PER30, "out_rate_per30": PROPS_OUT_RATE_PER30, "dvp_weight": PROPS_DVP_WEIGHT, "dvp_shrink": PROPS_DVP_SHRINK,
+           "method": {"anchor": PROPS_ANCHOR, "model": PROPS_MODEL_W, "side_shade": PROPS_SIDE_SHADE, "script_per_point": PROPS_SCRIPT_PER_POINT, "script_base": PROPS_SCRIPT_BASE, "sd_k": PROPS_SD_K, "out_min_per30": PROPS_OUT_MIN_PER30, "out_rate_per30": PROPS_OUT_RATE_PER30, "dvp_weight": PROPS_DVP_WEIGHT, "dvp_shrink": PROPS_DVP_SHRINK,
                       "match_alpha": PROPS_MATCH_ALPHA, "pace": "the game's possessions against the club's own", "usage_sd": PROPS_USAGE_SD, "role_sd": PROPS_ROLE_SD, "usage_cuts": PROPS_USAGE_CUTS, "thin_sd": PROPS_THIN_SD}}
     path = os.path.join(out_dir, "nba-props-%s.json" % date_iso)
     with open(path, "w", encoding="utf-8") as f:
@@ -7238,7 +7269,7 @@ def selftest():
           and props_minutes([], ll["11"]["g"]) == {"proj": 35.0, "n": 2, "season": None, "starts": 2, "last_season": True} and props_minutes([], []) is None)
     check("props: the chance of the over from a normal, a whole line pushing on the number", abs(props_over(34.134, 10.5165, 30.5)[0] - 0.6352) < 0.001 and props_over(34.134, 10.5165, 30.5)[1] == 0
           and abs(sum(props_over(30.0, 5.0, 30)) - (1 - _phi(-0.1))) < 1e-9 and props_over(20.0, 0.0, 19.5) == (1.0, 0.0))
-    check("props: the blend leans on the market", abs(props_blend(0.5, 0.6352) - 0.5461) < 0.001 and props_blend(0.5, 0.5) == 0.5 and abs(props_devig(-110, -110) - 0.5) < 1e-9 and abs(props_implied(150) - 0.4) < 1e-9)
+    check("props: the blend leans on the market (the model at a ninth, 30 Oct 2026)", abs(props_blend(0.5, 0.6352) - 0.5154) < 0.001 and props_blend(0.5, 0.5) == 0.5 and abs(props_devig(-110, -110) - 0.5) < 1e-9 and abs(props_implied(150) - 0.4) < 1e-9)
     inj_ = {"DAL": [{"id": "22", "n": "Kyrie Irving", "st": "Out", "note": "knee"}, {"id": "33", "n": "Some Body", "st": "Questionable", "note": "ankle"}]}
     out_mpg, listed, maybe = props_out_minutes("DAL", inj_, lt, ll)
     check("props: the regulars out, at their own minutes, the questionable listed apart", out_mpg == 30.0 and listed == [("Kyrie Irving", 30.0, "Out")] and maybe == [("Some Body", "Questionable")])
@@ -7270,8 +7301,8 @@ def selftest():
             "dvp": {"f": 25.0 / 24.0, "f_this": 25.0 / 24.0, "n_this": 10, "f_last": None, "n_last": 0}, "htb": "HashtagBasketball: Lakers allow 25.0 points a game to PGs (120th of 150, 1 the fewest); shown, not scored", "self_out": ""}
     proj_, why_ = props_project(prop_, lt["11"]["g"], ll["11"]["g"], ctx_)
     check("props: the projection is rate x minutes, the regulars out, pace and the defence, against the line; the chance read around the median (the mean less 0.08 sigmas on points)",
-          abs(proj_["proj"] - 34.48) < 0.05 and abs(proj_["sd"] - 11.52) < 0.02 and proj_["side"] == "OVER" and abs(proj_["p"] - 0.5354) < 0.002 and proj_["band"] == "LEAN"
-          and abs(proj_["edge"] - 0.0116) < 0.002 and proj_["price"] == -110 and abs(proj_["mins"] - 37.4) < 0.05 and abs(proj_["pm"] - 0.6048) < 0.002
+          abs(proj_["proj"] - 34.48) < 0.05 and abs(proj_["sd"] - 11.52) < 0.02 and proj_["side"] == "UNDER" and abs(proj_["p"] - 0.4896) < 0.002 and proj_["band"] == "no edge"   # the market the spine (30 Oct 2026): the book at 50/50 less the over's shade outweighs the projection's 60%
+          and abs(proj_["edge"] - (-0.0134)) < 0.002 and proj_["price"] == -110 and abs(proj_["mins"] - 37.4) < 0.05 and abs(proj_["pm"] - 0.6048) < 0.002
           and abs(props_over(34.48 - 0.08 * 11.52, 11.52, 30.5)[0] - proj_["pm"]) < 0.001   # the sigma carries the thin-history factor (27 Oct 2026): 10.86 x 1.06 on 143 minutes of evidence
           and any(w == "his rate rests on 143 minutes of evidence (3 games this season, last season behind it): the miss runs wider on a thin history, measured, so the sigma is ×1.06" for w in why_))
     parts_ = dict((p["k"], p) for p in proj_["parts"])
@@ -7326,7 +7357,7 @@ def selftest():
         out_x = props_out_sim_list("DAL", inj_, lt, ll)
         gs_o = nba_props_game_sim(prof_x, "BOS", "NYK", "2026-10-26", 400, seed=3, out={"home": [{"st": "Out", "mpg": 34.0, "ppg": 25.0}], "away": [{"st": "Questionable", "mpg": 30.0, "ppg": 20.0}]})
         check("props sim: the listed-out men, at their minutes and points a game, take the slate's absence cost off the club in the runs; a questionable man costs nothing",
-              out_x == [{"n": "Kyrie Irving", "st": "Out", "mpg": 30.0, "ppg": 20.0}] and gs_o["out"] == {"away": 0.0, "home": round(-0.6 * (0.15 * 25.0 + 0.03 * 34.0), 2)}
+              out_x == [{"n": "Kyrie Irving", "st": "Out", "mpg": 30.0, "ppg": 20.0}] and gs_o["out"] == {"away": 0.0, "home": round(-(0.075 * 25.0), 2)}
               and gs_o["home"]["median"] < gs_x["home"]["median"] and nba_prop_sim_read(gs_o, True, proj_m)["out"] == gs_o["out"]["home"])
     prop_reb = dict(prop_); prop_reb["mk"] = "reb"; prop_reb["line"] = 6.5
     proj_r, _why_r = props_project(prop_reb, lt["11"]["g"], ll["11"]["g"], ctx_m)
@@ -7339,7 +7370,7 @@ def selftest():
           and any(w == "Lakers allow 1.04x the league's points per minute to guards (this season 1.04 over 10 games): x1.031 at 0.75 weight, measured" for w in why_)
           and any(w == ctx_["htb"] for w in why_)
           and any(w.startswith("home 30.9 / road 31.0 per 36 over 178 minutes: shown, not scored") and w.endswith("; tonight on the road") for w in why_)
-          and any(w == "projected 34.5 against points 30.5, one sigma 11.5, the chance read around the median 33.6 (the stat skews right: at the mean the over lands 47% of the time): the over 60.5% by the projection, 50.0% by the book's prices; blended 53.5% at 4 to 2" for w in why_))
+          and any(w == "projected 34.5 against points 30.5, one sigma 11.5, the chance read around the median 33.6 (the stat skews right: at the mean the over lands 47% of the time): the over 60.5% by the projection, 47.5% by the book's prices less the over's 2.5-point shade (the public plays overs, measured); blended 49.0% at 4 to 0.5, the market the spine: on 4,321 graded props the model's lean added nothing to the book's price" for w in why_))
     # the opponent's absences (28 Oct 2026): named on every prop, scored on a big man's rebounds when their centre sits
     ctx_o = dict(ctx_m)
     ctx_o.update({"opp_out_mpg": 62.0, "opp_out_names": [("Anthony Davis", 34.0, "Out"), ("Austin Reaves", 28.0, "Out")], "opp_out_c_mpg": 34.0, "opp_out_c_names": [("Anthony Davis", 34.0)]})
@@ -7670,8 +7701,8 @@ def selftest():
           and set(sb["own"].keys()) >= {"total", "h1", "h2", "q", "margin", "away", "home", "ot"} and len(sb["own"]["q"]) == 4 and sb["prof"]["home"]["ortg"] > 90)
     check("nba sim: the slate log names the runs and the sim's own total",
           any(l.startswith("  sim, 300 runs: total ") and "home win" in l for l in lines7) and any(l.startswith("Simulation: ") and "runs a game" in l for l in lines7))
-    check("nba sim: an OUT regular costs his club on both ends, a listed doubtful man nothing, and the crew's whistle scales inside its bounds",
-          nba_sim_out_adj([{"st": "Out", "mpg": 34.0, "ppg": 25.0}, {"st": "Questionable", "mpg": 30.0, "ppg": 20.0}, {"st": "Out", "mpg": 12.0, "ppg": 4.0}]) == (-0.6 * (0.15 * 25.0 + 0.03 * 34.0), 0.4 * (0.15 * 25.0 + 0.03 * 34.0))
+    check("nba sim: an OUT regular costs his club's offence 0.075 per 100 a point of his scoring and the other side nothing (30 Oct 2026), a listed doubtful man nothing, and the crew's whistle scales inside its bounds",
+          nba_sim_out_adj([{"st": "Out", "mpg": 34.0, "ppg": 25.0}, {"st": "Questionable", "mpg": 30.0, "ppg": 20.0}, {"st": "Out", "mpg": 12.0, "ppg": 4.0}]) == (-(0.075 * 25.0), 0.0)
           and nba_sim_ft_factor(["A", "B"], {"r": {"A": [50, 48.0, 230.0], "B": [40, 44.0, 228.0]}, "lg": [1000, 44.0, 228.8]}) == (46.0 / 44.0) and nba_sim_ft_factor(["A"], {"r": {"A": [50, 80.0, 230.0]}, "lg": [1000, 44.0, 228.8]}) == 1.15
           and nba_sim_ft_factor(None, {"r": {}, "lg": [1000, 44.0, 228.8]}) == 1.0)
     check("nba play-by-play: the play codes", [nba_pbp_code(t, s, p) for t, s, p in (("Substitution", False, 0), ("Shooting Foul", False, 0), ("Offensive Charge", False, 0), ("Full Timeout", False, 0), ("Official Timeout", False, 0),

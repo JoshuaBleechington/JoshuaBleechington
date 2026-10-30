@@ -1949,3 +1949,71 @@ checks the block, the button and the fields are gone. The sources stay in
 the repository with their measurements (web/nhl.engine.js, the hockey
 fields, the slate's hockey modes, nhlsim.py, the backtests), so the book
 can be read, and brought back if ever wanted.
+
+## The simulation's second engine, 30 Oct 2026
+
+The user, with the morning's backup: "Looking at the 20th and the 25th on the
+night by night, what is the pattern there and what could enhance my
+simulation to the max? You have full access to all domains, find the missing
+link in the simulation's DNA and have it run all sorts of scenarios. Scour
+the internet with your absolute best effort to make sure there is nothing
+missing that we could consider."
+
+**The pattern.** The Props tab's night-by-night table shows the 20th
+(102-80, the BET band 13-5) and the 25th (200-160, BET 16-8) as the two
+nights where *does* beat *says* and the BET band paid. Across all ten nights
+the real pattern is a side: the sheet's chance ran about three points high
+on overs and three low on unders at every band and in every scoring market
+(rebounds alone balanced), overs 1,162-1,183 at prices saying 56% and unders
+1,113-863; the 20th and the 25th were simply the two nights the overs did not
+bleed. Behind it, on the 4,321 graded props, the model's own lean fit the
+outcomes worse than the book's devigged price at any weight above nothing
+(Brier 0.2505 at the old third against 0.2468 at none; where the model stood
+ten points from Pinnacle the outcome followed Pinnacle 48% to the model's
+68%), and the books' own prices lean the public's way: the under landed 53.2%
+at the best price where the prices said 50.7%, the over 46.8% against 49.3%
+(at Pinnacle's prices 54.3 against 51.1 on 1,946). The first night's 182
+props ran on last season's rates alone and the 25th was the first night with
+the simulation's matchup lever; neither made the difference, the overs did.
+
+**The simulation's DNA, measured** (the scenario lab: `tools_backtest_nba_sim.py`,
+the lab scripts, two seasons of closes joined to the ledgers and 2,469 games
+of play-by-play):
+
+| What | Found | Done |
+| --- | --- | --- |
+| The margin's shape | independent possessions spread the margin 16.7 points around the spread; the market's games spread 13.7. A side's first-half surplus comes back 10% in the second half (r −0.11 / −0.08), the margin's 21%; the possession-level read of the effect is hidden by team quality (the leader is the better side) | **score effects**: the side in front eases, the side behind presses, 0.0025 points per possession per point of margin; set on the second moments: margin 13.4, a side's variance 129 against the market's 128, the sides' covariance 39 against 34, the half-to-half reversion −0.09 / −0.22 against −0.10 / −0.21, overtime 4.5% against 4.7% |
+| The total's shape | the anchored total spread 19.1 against the market's 18.0, inside its middle half 52.1% of the time; the pace noise and a quarter-count noise both sides shared carried covariance the score effects now carry | pace noise 2.0 → 1.0 a game, the quarter noise off, the last possession of a level game a held shot (−0.3 a possession) |
+| The level | absolute blending with last season's profile lagged the league's scoring by months: October 2025 the sim sat 4.1 under the close, January 4.6 over; the market followed the league within weeks | the ratings and the pace blend as deviations from their own season's league level and ride the league's level of the last fortnight (half-life 10 days, 150 team-lines of the season kept beside it): the sim's gap to the close 5.3 → 4.9 points, the monthly wander 8.7 → 2.3 points |
+| The engine's lift | the last-30-seconds branch played a round on two seconds of clock, a possession a side over the ratings' total; with the fouling and garbage time the engine scored 0.6% over the ratings' implied total, which the ratings already contain | the branch fixed; the measured lift (1.0063 on 286 real matchups) divided out of the bases, with a selftest guard |
+| Overtime, twice | the box keeps 240 team minutes whatever the overtime (every one of 114 overtime games in two ledgers), so an overtime game's pace read as 48 minutes of play, the league's level carried the overtime scoring, and the engine's own overtime counted it again, about a point a game | the minutes come from the periods played; the sim's total now sits on the close (−0.01 in 2025-26, −0.8 in 2024-25, on a third of each season's games) |
+| The own view's worth | the replay with the second engine: the own total's slope of does on says −0.17 and −0.14, the spread −0.07 and −0.01, the moneyline +0.91 and +1.53, the anchored home team total +1.01 (355-233, 60.4%) | `SHRINK["total"]` 0.05 → 0.0; the rest hold |
+| Absences | within the club, the close docks a newly absent 18+ ppg scorer 1.5 points of margin and 1.8 of total (0.62 and 0.77 per 10 ppg, 188 cases); the sim's cost for a 25-point man was 4.7 points of margin and 0.9 of total, three fifths offence two fifths defence | the cost 0.075 per 100 a point of his scoring, all on his club's offence, nothing on the other side (`slate.py nba_sim_out_adj`) |
+| Rest | the close docks a back-to-back 0.7 more than the sim did (t 2.6), a third game in four nights 0.35 (t 2.0); the market's own miss on either is null | `rest_b2b` −1.7, `rest_3in4` −0.35 per 100 |
+| The crew | an official's over/under residual did not carry from 2024-25 to 2025-26 (r −0.09 over 60 officials with 25+ games both seasons), nor his free throws a game (r 0.13), nor pace (r −0.01); crews the first season leaned under by 1.5+ ran +0.95 the next | nothing scored; the agreement rule's crew voice is **on watch**, its tag says so, the live record (1-5 as of the 30th) decides |
+| Altitude, travel, the stage of the season | Denver's and Utah's games ran over the close home and away (a club label, as the 15 Oct table said); an away side two zones east saw the home side cover by +2.2, two zones west −2.8 (both seasons, 257 games, a watch); March and April ran over the close 56.9% and 54.3% (+2.2, +3.2); the early season did not run under (October 2025 ran over) | labels and watches, not scored |
+| Player ratings | the 26 Oct lineup test stands: ridge ratings from the stints at the projected rotation did not beat the club model or add to the close | nothing |
+| The props | the model's lean worth nothing against the book's price (above); a starter's minutes land 0.187 a game under his last-ten mean per point the final margin runs above the league's 13.5 (20,729 starter-games; +1.7 inside five, −3.6 at 25 and up), the bench's do not move | the market the spine (`PROPS_MODEL_W` 2.0 → 0.5), the over read 2.5 points lower (`PROPS_SIDE_SHADE`), **the game script** lever on starters' minutes from the sim's expected margin, each prop's why saying so |
+
+Measured and found nothing new on the price: the early-season under of the
+literature (the first month ran under 46% of the time both seasons), line
+shopping at the same number across the eight books (the best price beat the
+consensus fair by 4+ points on 64 props, 36-28, too few to read), the
+officials, rest and travel as edges on the close.
+
+**What the internet added.** The possession-based Markov models (Shirley
+2007; Štrumbelj and Vračar 2012; the shot-clock MDP of 2018) are the
+engine's lineage; the random-walk papers (Gabel and Redner 2012; Clauset,
+Kogan and Redner 2015) describe scoring as an anti-persistent walk, which is
+the score effect measured here in points per possession; the early-season
+totals bias paper and the player-absence paper say what the two seasons
+said, the market prices absences by the close and the early-season under has
+gone; the eastward-travel paper (Journal of Sports Economics, 2023) points
+the same way as the two-zone watch above; the vendor data on a million
+graded props (unders lose less than overs in every sport) matches the shade.
+Nothing found that the ledgers could not measure better.
+
+**On the page.** The Simulation card's meta line names the level the
+ratings ride and the engine's version; the Props tab's verdict says what
+changed on the 30th and that earlier nights carry the old weights; the
+agreement rule's tag carries the watch. The replay tables are in NBA.md.

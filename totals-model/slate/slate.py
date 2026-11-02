@@ -4808,7 +4808,10 @@ PROPS_SIDE_SHADE = 0.025
 # (+1.7 minutes inside five, -3.6 at 25 and up); the bench's do not move (+0.006 a point). The simulation's expected
 # margin for the game sets the lever on starters' minutes
 PROPS_SCRIPT_PER_POINT = 0.187
-PROPS_SCRIPT_BASE = 13.5
+# the base is the engine's own expected |margin| averaged over a season of its games (12.60 over 1,145 games of 2025-26 at its
+# 13.4 spread), not the actual mean of 13.47: the lever then averages to nothing across a season. At 13.5 it had added 0.4
+# minutes to every starter (2 Nov 2026: the first three nights' games expected 11.2 on average), a push toward the over
+PROPS_SCRIPT_BASE = 12.6
 PROPS_DVP_WEIGHT = {"pts": 0.75, "reb": 0.75, "ast": 0.75, "tpm": 0.4, "pra": 0.75, "pr": 0.75, "pa": 0.75, "ra": 0.75}   # how much of a defence's lean to carry (measured, first half to second)
 # the matchup lever (25 Oct 2026, the user: "see if the simulation enhances the props"): the club's expected points per
 # possession in the simulation's own view (its offence into the opponent's defence, league-relative, home court, a back to
@@ -5537,7 +5540,7 @@ def props_project(prop, logs_this, logs_last, ctx):
     if sc and sc.get("emargin") is not None and ctx.get("starter") is True:
         dmin_script = -PROPS_SCRIPT_PER_POINT * (float(sc["emargin"]) - PROPS_SCRIPT_BASE)
         mins += dmin_script
-        why.append("the game script: the simulation expects a final margin of %.1f against the league's %.1f (a blowout of 15 or more %.0f%% of the time), so a starter's minutes read %+.1f, measured on 20,729 starter-games over two seasons, scored" % (
+        why.append("the game script: the simulation expects a final margin of %.1f against its season average of %.1f (a blowout of 15 or more %.0f%% of the time), so a starter's minutes read %+.1f, measured on 20,729 starter-games over two seasons, scored" % (
             float(sc["emargin"]), PROPS_SCRIPT_BASE, 100 * float(sc.get("blowout") or 0), dmin_script))
     elif sc and sc.get("emargin") is not None and ctx.get("starter") is False:
         why.append("the game script: the simulation expects a final margin of %.1f; a bench man's minutes did not move with it over two seasons (+0.006 a point), nothing scored" % float(sc["emargin"]))

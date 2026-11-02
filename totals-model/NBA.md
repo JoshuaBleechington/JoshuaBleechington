@@ -946,7 +946,12 @@ at the same number found 64 props with 4+ points of price edge, 36-28: too
 few. The game script: 20,729 starter-games against the closes, a starter's
 minutes land 0.187 under his last-ten mean per point the final margin runs
 above 13.5 (+1.73 inside five, −3.64 at 25 and up; −0.096 a point of the
-spread), the bench's +0.006 a point. The sheet now runs with the market as
+spread), the bench's +0.006 a point. The lever's base is the engine's own
+expected |margin| averaged over a season of its games (12.60 over 1,145
+games of 2025-26 at its 13.4 spread; 10.8 for a game it has within three,
+16.0 at ten and up), not the actual mean of 13.47: the first three nights'
+games expected 11.2 on average, and at 13.5 the lever had added 0.4 minutes
+to every starter (2 Nov 2026). The sheet now runs with the market as
 its spine (`PROPS_MODEL_W` 0.5 against the anchor's 4.0), the book's over
 chance read 2.5 points lower, and the game script on starters' minutes from
 the simulation's expected margin.

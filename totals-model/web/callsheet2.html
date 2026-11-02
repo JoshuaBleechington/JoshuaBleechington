@@ -1,3 +1,4 @@
+<meta charset="utf-8">
 <title>Call Sheet 2.0</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -285,6 +286,12 @@
   .pk.upset { border: 1px dashed var(--away); background: transparent; }
   .pk.upset .n1 { color: var(--away); }
   .pk.upset.scored { border: 1px solid var(--go); background: var(--go-wash); }
+  .pk.agree { border: 1px solid var(--go); background: var(--go-wash); }
+  .pk.agree .n1 { color: var(--go); }
+  .pk.agree .n5 { margin-top: 6px; }
+  .pk.mid { border: 1px solid var(--go); background: var(--go-wash); }
+  .pk.mid .n1 { color: var(--go); }
+  .pk.mid .n5 { margin-top: 6px; }
   .pk.upset.scored .n1 { color: var(--go); }
   /* the slate panel */
   .slate .sg { display: flex; justify-content: space-between; align-items: center; gap: 10px; padding: 10px 12px;
@@ -673,8 +680,11 @@
         <label class="f" style="flex-direction:row;align-items:center;gap:6px"><span class="tag">date</span><input id="boardDate" type="date" style="padding:6px 8px;font-size:13px"></label>
         <label class="check" style="font-size:12px"><input type="checkbox" id="byEdge"> Rank table by edge</label>
         <span class="tag" id="boardCount"></span>
+        <button type="button" class="btn" id="phone" style="padding:4px 10px;font-size:11px" title="A QR code that carries tonight's picks to your phone, view only">Phone QR</button>
       </span></h2>
     <div class="body">
+      <div class="subhead" id="takingHead" hidden>Taking tonight <span class="tag" id="takingCount"></span> <span class="tag">the bets you marked with Take, on the card and on the props, with the result once the game grades · one unit each</span> <button type="button" class="btn" id="takingText" style="margin-left:8px;padding:4px 10px;font-size:11px">Copy as text</button></div>
+      <div id="taking" class="picks" hidden></div>
       <div class="subhead">The parlay four <span class="tag">the likeliest side on each game at any price, alternate totals included — one a game, likeliest first; each card says whether its price agrees and names the value side it passed over</span></div>
       <div id="picks" class="picks"></div>
       <div class="subhead">Best straight bets <span class="tag">#1's BET or better first, then the WNBA cheaper side, then the best edges — up to eight</span></div>
@@ -685,6 +695,10 @@
       <div id="twoLegs" class="picks"></div>
       <div class="subhead">Upset watch <span class="tag">every dog on the date with a measured signal against its favourite — the dog's backup in net is scored (hockey, +5 points), the rest are watched; the dog's price and the sheet's chance beside each</span></div>
       <div id="upsets" class="picks"></div>
+      <div class="subhead" id="agreeHead" hidden>Agreement on the total <span class="tag">basketball: the simulation's own view at 55%+ and the crew's lean on the same side of the game total, the sheet not against it — 157-108 (59.2%) over two seasons of closes, the sheet's own BET band 56.3% on the same games, so it reads BET; Take marks it on the row and it grades on its own record line</span></div>
+      <div id="agree" class="picks" hidden></div>
+      <div class="subhead" id="midHead" hidden>Middles on the totals you hold <span class="tag">basketball: for every total you took, the best number the four apps post on the other side now, priced off the sheet's own distribution; a card when the pair pays (a window of three points or more that has opened since you took the leg) with a Take for the second leg; graded as a pair on the record</span></div>
+      <div id="mid" class="picks" hidden></div>
       <div class="subhead" id="altBetsHead" hidden>Alternate totals with a verdict <span class="tag">hockey: the alternate number on the sheet's side that reads STRONG BET or MAX BET with an edge, one a game — the band is the chance and the price already asks for most of it, so read the edge; graded on its own record line, never the pick or a leg</span></div>
       <div id="altBets" class="picks" hidden></div>
       <div class="subhead" id="bySportHead">One sport only <span class="tag">the same two rules, MLB and WNBA apart — only on a night with both</span></div>
@@ -2105,11 +2119,14 @@
   }
   function slimMarkets(ms) {
     return ms.map(function (m) {
-      return { key: m.key, label: m.label, pick: m.pick, side: m.side, p: +m.p.toFixed(5), pPush: +m.pPush.toFixed(5),
-               price: m.price, edge: m.edge === null ? null : +m.edge.toFixed(5), fair: +m.fair.toFixed(1),
-               anchored: m.anchored, band: m.band, band1: m.band1, side1: m.side1, other: m.other,
-               informed: m.informed === undefined ? undefined : !!m.informed,
-               point: m.point, book: m.book };   // the alternate total's number and book (19 Oct 2026); undefined on every other market
+      var o = { key: m.key, label: m.label, pick: m.pick, side: m.side, p: +m.p.toFixed(5), pPush: +m.pPush.toFixed(5),
+                price: m.price, edge: m.edge === null ? null : +m.edge.toFixed(5), fair: +m.fair.toFixed(1),
+                anchored: m.anchored, band: m.band, band1: m.band1, side1: m.side1, other: m.other,
+                informed: m.informed === undefined ? undefined : !!m.informed,
+                point: m.point, book: m.book };   // the alternate total's number and book (19 Oct 2026); undefined on every other market
+      if (m.take) o.take = m.take;   // the bet marked as taken rides with its market (26 Oct 2026)
+      if (m.decided) { o.decided = m.decided; o.simView = m.simView; o.simRaw = m.simRaw; o.simWorth = m.simWorth; o.sheet = m.sheet; }   // a total the hockey simulation decided, with the sheet's own read beside it (29 Oct 2026)
+      return o;
     });
   }
 
@@ -3000,7 +3017,8 @@
       '<div class="n3">' + (x.mk.p * 100).toFixed(1) + '% · ' + (x.mk.price !== null ? sgn(x.mk.price, 0) + ' · edge ' + sgn(x.mk.edge * 100, 1) : 'no price') +
         (res ? ' · <span class="chip ' + res + '">' + resText(res) + '</span>' : '') + '</div>' +
       '<div class="n4">' + esc(x.row.matchup) + ' · ' + esc(x.mk.label) +
-        (x.mk.key === "total" && marksOf(x.row.sport, x.row.inputs, x.row.markets).grain ? ' <span class="tagm warn">over against the grain</span>' : '') + '</div>' + (extra || '') + (callOf(x.row, x.mk) ? callWhy(x) : '') + '</div>';
+        (x.mk.key === "total" && marksOf(x.row.sport, x.row.inputs, x.row.markets).grain ? ' <span class="tagm warn">over against the grain</span>' : '') + '</div>' + (extra || '') + (callOf(x.row, x.mk) ? callWhy(x) : '') +
+      '<div class="n6">' + takeBtn(x.row, x.mk) + '</div></div>';
   }
   /* ---- the likeliest side in each game at any price, and the two-leg parlays built
      from them (15 Oct 2026, the user: "put the likeliest card on the board too and
@@ -3048,7 +3066,8 @@
       '<div class="n1">#' + x.rank + (ok ? ' · the price agrees' : ' · the book\'s price, not an edge') + '</div>' +
       '<div class="n2">' + esc(x.mk.pick) + '</div>' +
       '<div class="n3">' + (x.mk.p * 100).toFixed(1) + '% · ' + sgn(x.mk.price, 0) + ' needs ' + (x.need * 100).toFixed(1) + '%' + (res ? ' · <span class="chip ' + res + '">' + resText(res) + '</span>' : '') + '</div>' +
-      '<div class="n4">' + esc(x.row.matchup) + ' · ' + esc(x.mk.label || x.mk.key) + '</div></div>';
+      '<div class="n4">' + esc(x.row.matchup) + ' · ' + esc(x.mk.label || x.mk.key) + '</div>' +
+      '<div class="n6">' + takeBtn(x.row, x.mk) + '</div></div>';
   }
   /* ---- the upset watch on the board (16 Oct 2026, the user: "look for potential upsets
      too"): every game on the date where the dog carries a measured signal against the
@@ -3112,6 +3131,50 @@
       (x.scored ? ' The dog\'s own backup is the one signal that cleared two seasons (the dog won +7.4 points more than priced on 327 games, +39 units at the close): scored at +5 points, tagged, and this side is pickable on its own record line.'
                 : ' Nothing here moves the dog\'s chance; the record decides.') + '</div></div>';
   }
+  /* the agreement on the total (28 Oct 2026, the user: "two out of three should be enough to get a green bet"): every NBA
+     total on the date where the sim's own view and the crew point the same way with the sheet not against it, the rule
+     the replay priced at 59.2% over two seasons (nba.engine.js, nbaVoices); the card takes it like a sim call */
+  function agreeWatch(dateISO) {
+    var out = [];
+    card.forEach(function (r) {
+      if (r.sport !== "NBA" || (r.gdate || "") !== dateISO || isVoid(r)) return;
+      var V = nbaVoices(r);
+      if (V && V.fires) out.push({ row: r, v: V });
+    });
+    out.sort(function (a, b) { return (b.v.count - a.v.count) || (Math.max(b.v.sim.p, 1 - b.v.sim.p) - Math.max(a.v.sim.p, 1 - a.v.sim.p)); });
+    return out;
+  }
+  function agreeCard(x) {
+    var V = x.v, r = x.row, w = nbaVoicesWords(V);
+    var res = nbaSimTakeRes({ key: "total", side: V.side, line: V.line }, r);
+    var price = V.side === "OVER" ? numOf((r.inputs || {}).op) : numOf((r.inputs || {}).up);
+    return '<div class="pk agree" data-open="' + r.id + '" title="Load ' + esc(r.matchup) + ' into the form">' +
+      '<div class="n1">AGREEMENT · ' + V.count + ' of 3 · BET by the rule</div>' +
+      '<div class="n2">Total ' + esc(V.side) + ' ' + esc(String(V.line)) + '</div>' +
+      '<div class="n3">' + w.bits.join(' · ') + (price !== null ? ' · ' + sgn(price, 0) : '') + (res ? ' · <span class="chip ' + res + '">' + resText(res) + '</span>' : '') + '</div>' +
+      '<div class="n4">' + esc(r.matchup) + ' · ' + esc(NBA_AGREE_TAG) + '</div>' +
+      '<div class="n5">' + nbaSimTakeBtn(r, "agree", "total", V.side) + '</div></div>';
+  }
+  /* middles on the totals you hold (28 Oct 2026): every NBA row on the date with a total taken, the best number the apps post
+     on the other side now and whether the pair pays (nba.engine.js, nbaMiddleWatch); the open ones are cards, the rest a count */
+  function middleWatch(dateISO) {
+    var open = [], held = 0;
+    card.forEach(function (r) {
+      if (r.sport !== "NBA" || (r.gdate || "") !== dateISO || isVoid(r) || rowGraded(r)) return;
+      nbaMiddleWatch(r).forEach(function (x) { held++; if (x.m.pays) open.push({ row: r, x: x }); });
+    });
+    open.sort(function (a, b) { return b.x.m.ev - a.x.m.ev; });
+    return { open: open, held: held };
+  }
+  function middleCard(o) {
+    var r = o.row, x = o.x, m = x.m, pc = function (p) { return (100 * p).toFixed(1) + "%"; };
+    return '<div class="pk mid" data-open="' + r.id + '" title="Load ' + esc(r.matchup) + ' into the form">' +
+      '<div class="n1">MIDDLE OPEN · a ' + (+m.gap.toFixed(1)) + '-point window · pays ' + sgn(100 * m.ev, 1) + '% of the stake</div>' +
+      '<div class="n2">Total ' + esc(x.side) + ' ' + esc(String(x.other.point)) + ' at ' + esc(bookName(x.other.book)) + ' ' + sgn(x.other.price, 0) + '</div>' +
+      '<div class="n3">with your ' + esc(x.leg.side) + ' ' + esc(String(x.leg.line)) + (x.leg.price === null ? '' : ' ' + sgn(x.leg.price, 0)) + ' (' + esc(x.leg.how) + ') · both win ' + pc(m.pBoth) + ', needs ' + pc(m.need) + ' · the market\'s number ' + esc(String(x.mu)) + '</div>' +
+      '<div class="n4">' + esc(r.matchup) + ' · that leg alone is ' + pc(x.first) + ' to win now; the second leg gives up its vig and takes the loss off the table</div>' +
+      '<div class="n5">' + nbaMiddleTakeBtn(r, x) + '</div></div>';
+  }
   /* the alternate totals with a verdict on a date (19 Oct 2026): one a hockey game, best edge first */
   function altBets(dateISO) {
     var out = [];
@@ -3127,7 +3190,8 @@
     return '<div class="pk likely alt' + (res ? ' ' + res : '') + '" data-open="' + x.row.id + '" title="Load ' + esc(x.row.matchup) + ' into the form"><div class="n1">#' + (i + 1) + ' · ' + esc(mk.band) + ' · the price ' + (mk.p >= need ? 'agrees' : 'asks more') + '</div>' +
       '<div class="n2">' + esc(mk.pick) + '</div>' +
       '<div class="n3">' + (mk.p * 100).toFixed(1) + '% · ' + sgn(mk.price, 0) + ' needs ' + (need * 100).toFixed(1) + '% · edge ' + sgn(mk.edge * 100, 1) + (res ? ' · <span class="chip ' + res + '">' + resText(res) + '</span>' : '') + '</div>' +
-      '<div class="n4">' + esc(x.row.matchup) + ' · ' + esc(mk.label) + (mk.book ? ' at ' + esc(bookName(mk.book)) : '') + '</div></div>';
+      '<div class="n4">' + esc(x.row.matchup) + ' · ' + esc(mk.label) + (mk.book ? ' at ' + esc(bookName(mk.book)) : '') + '</div>' +
+      '<div class="n6">' + takeBtn(x.row, mk) + '</div></div>';
   }
   function twoLegCard(x, i) {
     var a = x.legs[0], b = x.legs[1], ok = x.p >= x.need, res = parlayResult(x.legs);
@@ -3141,6 +3205,7 @@
     var dateISO = $("boardDate").value || todayISO(), byProb = !$("byEdge").checked;
     var rows = boardRows(dateISO, byProb);
     $("boardCount").textContent = rows.length ? rows.length + " priced markets on " + gameDate(dateISO) : "nothing logged for " + gameDate(dateISO);
+    renderTaking(dateISO);   // the bets marked as taken on the date (26 Oct 2026)
 
     // --- the parlay four ---
     var legs = parlayFour(dateISO), ph = "";
@@ -3178,6 +3243,22 @@
       if (!ups.length) uh = '<div class="empty">' + (rows.length ? 'No dog on this date carries a measured signal against its favourite.' : 'Add the matchups and any dog with a signal lands here.') + '</div>';
       $("upsets").innerHTML = uh;
     }
+    // --- the agreement on the total (28 Oct 2026): basketball, so the section shows when the date has an NBA game ---
+    if ($("agree")) {
+      var ag = agreeWatch(dateISO), agh = "", nbaOn = card.some(function (r) { return r.sport === "NBA" && (r.gdate || "") === dateISO && !isVoid(r); });
+      ag.forEach(function (x) { agh += agreeCard(x); });
+      if (!ag.length) agh = '<div class="empty">No NBA total on this date has the simulation and the crew on the same side with the sheet not against it.</div>';
+      $("agreeHead").hidden = !nbaOn; $("agree").hidden = !nbaOn;
+      $("agree").innerHTML = agh;
+    }
+    // --- middles on the totals you hold (28 Oct 2026): basketball, so the section shows when the date has an NBA game ---
+    if ($("mid")) {
+      var mw = middleWatch(dateISO), mh = "", nbaOn2 = card.some(function (r) { return r.sport === "NBA" && (r.gdate || "") === dateISO && !isVoid(r); });
+      mw.open.forEach(function (o) { mh += middleCard(o); });
+      if (!mw.open.length) mh = '<div class="empty">' + (mw.held ? mw.held + ' total' + (mw.held === 1 ? '' : 's') + ' held on this date, no window open: a middle needs a number that has moved three points or more from the leg you hold, read off the newest odds run.' : 'No total held on this date yet. Take one (the sheet\'s pick, a sim call or the agreement rule) and the watch names the other leg once the number has run.') + '</div>';
+      $("midHead").hidden = !nbaOn2; $("mid").hidden = !nbaOn2;
+      $("mid").innerHTML = mh;
+    }
     // --- the alternate totals with a verdict (19 Oct 2026): hockey only, so the section shows when there is one ---
     if ($("altBets")) {
       var ab = altBets(dateISO), ah = "";
@@ -3209,11 +3290,11 @@
     $("bySport").innerHTML = sh;
 
     if (!rows.length) { $("board").innerHTML = '<div class="empty">Add today\'s matchups to the card and every priced market lands here, best edge first.</div>'; return; }
-    var h = '<table><thead><tr><th>#</th><th>Matchup</th><th>Market</th><th>Pick</th><th>Chance</th><th>Price</th><th>Needs</th><th>Edge</th><th>Fair</th><th>Result</th></tr></thead><tbody>';
+    var h = '<table><thead><tr><th>#</th><th>Matchup</th><th>Market</th><th>Pick</th><th>Chance</th><th>Price</th><th>Needs</th><th>Edge</th><th>Fair</th><th>Result</th><th>Take</th></tr></thead><tbody>';
     rows.forEach(function (x) {
       var mk = x.mk, res = gradeMarket(mk, x.row.finals);
       var inFour = (byProb ? legs : bets).some(function (y) { return y.row.id === x.row.id && y.mk.pick === mk.pick; });
-      h += '<tr class="' + (inFour ? 'pick4' : '') + '" data-open="' + x.row.id + '" title="Load ' + esc(x.row.matchup) + ' into the form">' +
+      h += '<tr class="' + (inFour ? 'pick4' : '') + (isTaken(x.row, mk) ? ' taking' : '') + '" data-open="' + x.row.id + '" title="Load ' + esc(x.row.matchup) + ' into the form">' +
         '<td><span class="rank">' + x.rank + '</span>' + (x.corr.length ? '<span class="chip corr">corr #' + x.corr.join(' #') + '</span>' : '') + '</td>' +
         '<td>' + esc(x.row.matchup) + ' <span class="gdate">' + esc(x.row.sport) + '</span></td>' +
         '<td>' + esc(mk.label) + (!mk.anchored ? ' <span class="chip dim">derived</span>' : '') + (!pickable(mk, x.row.sport, x.row.gdate) ? ' <span class="chip dim">not picked</span>' : '') + '</td>' +
@@ -3223,7 +3304,8 @@
         '<td class="n">' + (implied(mk.price) * 100).toFixed(1) + '%</td>' +
         '<td class="n"><span class="edge ' + (mk.edge > 0 ? 'pos' : 'neg') + '">' + sgn(mk.edge * 100, 1) + '</span></td>' +
         '<td class="n">' + sgn(mk.fair, 0) + '</td>' +
-        '<td>' + (res ? '<span class="chip ' + res + '">' + resText(res) + '</span>' : '<span class="gdate">—</span>') + '</td></tr>';
+        '<td>' + (res ? '<span class="chip ' + res + '">' + resText(res) + '</span>' : '<span class="gdate">—</span>') + '</td>' +
+        '<td>' + takeBtn(x.row, mk) + '</td></tr>';
     });
     $("board").innerHTML = h + '</tbody></table>';
   }
@@ -3357,7 +3439,7 @@
   /* the last word of a goalie's name, lower-cased, accents dropped: "Igor Shesterkin" and "I. Shesterkin" agree */
   function lastName(s) {
     var w = String(s || "").trim().split(/\s+/); if (!w.length) return "";
-    return w[w.length - 1].normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase();
+    return w[w.length - 1].normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();   // the marks escaped (2 Nov 2026): as literal characters the range broke whenever the browser guessed the file's encoding wrong
   }
   function marksOf(sp, inputs, markets) {
     var out = { profile: "", lean: "", grain: "", crowd: "", b2b: "", backup: "", goalie: "" };
@@ -3630,6 +3712,7 @@
         : '<b>' + totalN + ' graded ' + sp + ' markets.</b> Compare each market\'s <i>does</i> against its <i>says</i> before believing either; ' +
           'and compare each four against the blind rate of everything logged, not against 50%. The parlay four and the straight bets will differ most nights; the units column is the referee.') + '</div>';
     });
+    h += takenRecordHtml();   // what you took (26 Oct 2026): the marked bets, graded at the price shown when marked
     /* the board's likeliest side and the two-leg parlays, across every date (15 Oct 2026,
        the user: "add the two-leg parlays to the grade log too"). Graded the way the board
        builds them, from the rows as logged, so the record is of what the board showed at
@@ -3739,7 +3822,7 @@
       return;
     }
     if (dup) {
-      dup.inputs = inputs; dup.markets = slimMarkets(last.markets); dup.away = last.away; dup.home = last.home; dup.matchup = last.matchup; dup.proj = projOf(last);
+      dup.inputs = inputs; dup.markets = carryTakes(dup.markets, slimMarkets(last.markets)); dup.away = last.away; dup.home = last.home; dup.matchup = last.matchup; dup.proj = projOf(last);
       save(); renderCard(); renderBoard(); renderCalib();
       say("Updated <b>" + esc(dup.matchup) + "</b>, already on the card for " + esc(gameDate(gdate)) + ": its inputs and picks were replaced with what is in the form. One row per matchup per date, so nothing was logged twice.");
       return;
@@ -3831,6 +3914,29 @@
   $("bestBets").addEventListener("click", function (e) { var t = e.target.closest("[data-open]"); if (t) openRow(t.dataset.open); });
   if ($("likeliest")) $("likeliest").addEventListener("click", function (e) { var t = e.target.closest("[data-open]"); if (t) openRow(t.dataset.open); });
   if ($("upsets")) $("upsets").addEventListener("click", function (e) { var t = e.target.closest("[data-open]"); if (t) openRow(t.dataset.open); });
+  if ($("agree")) $("agree").addEventListener("click", function (e) { if (e.target.closest("[data-stake]")) return; var t = e.target.closest("[data-open]"); if (t) openRow(t.dataset.open); });
+  if ($("mid")) $("mid").addEventListener("click", function (e) { if (e.target.closest("[data-stake]")) return; var t = e.target.closest("[data-open]"); if (t) openRow(t.dataset.open); });
+  /* the window's boxes on the Simulation card (29 Oct 2026): typed, kept across renders, priced as you type; the Take button
+     follows the numbers in the boxes, so the card is redrawn when a number changes and the price alone updates the line */
+  if ($("nbaSimPanel")) $("nbaSimPanel").addEventListener("input", function (e) {
+    var id = e.target && e.target.id, map = { winLo: "lo", winHi: "hi", winPrice: "price" };
+    if (!map[id]) return;
+    winCalc[map[id]] = e.target.value;
+    var sim = nbaSim(), out = $("winOut");
+    if (!sim || !out) return;
+    if (id === "winPrice") { out.innerHTML = nbaWindowOut(sim); return; }
+    var w = nbaWindowRead(sim), btn = $("nbaSimPanel").querySelector('.simwin .simtake');
+    out.innerHTML = nbaWindowOut(sim);
+    if (btn) btn.innerHTML = nbaSimTakeBtn(nbaSimTakeRow(readNba()), "window", "total", w ? w.side : "WINDOW");
+  });
+  /* the middle calculator's boxes (28 Oct 2026): typed into the panel, kept across renders, priced as you type */
+  if ($("nbaMidPanel")) $("nbaMidPanel").addEventListener("input", function (e) {
+    var id = e.target && e.target.id, map = { midOverLine: "ol", midOverPrice: "op", midUnderLine: "ul", midUnderPrice: "up" };
+    if (!map[id]) return;
+    midCalc[map[id]] = e.target.value;
+    var out = $("midCalcOut"), mu = nbaMiddleMu(nbaSimTakeRow(readNba()) ? nbaSimTakeRow(readNba()).inputs : snapshot());
+    if (out) out.innerHTML = mu === null ? '<span class="dim">No market number on the row yet: load the odds file.</span>' : nbaMidCalcOut(mu);
+  });
   if ($("altBets")) $("altBets").addEventListener("click", function (e) { var t = e.target.closest("[data-open]"); if (t) openRow(t.dataset.open); });
   $("bySport").addEventListener("click", function (e) { var t = e.target.closest("[data-open]"); if (t) openRow(t.dataset.open); });
   $("board").addEventListener("click", function (e) { var t = e.target.closest("tr[data-open]"); if (t) openRow(t.dataset.open); });
@@ -3968,10 +4074,13 @@
             row.inputs[k] = String(g.inputs[k]); changed = true;
           });
           if (g.inputs.dome === true && !row.inputs.dome) { row.inputs.dome = true; changed = true; }
+          /* the apps' numbers follow the newest odds run on a basketball row (28 Oct 2026, the middles watch): the logged line
+             and prices stay as the markets were scored, the shop as it stands now goes beside them */
+          if (row.sport === "NBA" && !blank(g.inputs.odds) && String(g.inputs.odds) !== String(row.inputs.oddsNow || row.inputs.odds || "")) { row.inputs.oddsNow = String(g.inputs.odds); row.inputs.oddsAt = d.generated || ""; }
           /* The slate marks a postseason game at the game level; the row's
              Playoff box is shown, not scored, so it only splits the record. */
           if (g.playoff === true && !row.inputs.playoff) { row.inputs.playoff = true; changed = true; }
-          if (changed) { var m = scoreMatchup(row.sport, row.inputs); if (m) { row.markets = slimMarkets(m.markets); row.proj = projOf(m); } filled++; }
+          if (changed) { var m = scoreMatchup(row.sport, row.inputs); if (m) { row.markets = carryTakes(row.markets, slimMarkets(m.markets)); row.proj = projOf(m); } filled++; }
         }
       }
       if (hasFinals(g.finals)) {
@@ -4081,7 +4190,7 @@
       var graded = (r.markets || []).some(function (mk) { return gradeMarket(mk, r.finals) !== null; });
       if (graded) { kept++; return; }
       var m = scoreMatchup(r.sport, r.inputs); if (!m) return;
-      r.markets = slimMarkets(m.markets); n++;
+      r.markets = carryTakes(r.markets, slimMarkets(m.markets)); n++;
     });
     save(); renderCard(); renderBoard(); renderCalib();
     say("Rescored <b>" + n + "</b> ungraded matchup" + (n === 1 ? "" : "s") + " through the model as it stands today." +

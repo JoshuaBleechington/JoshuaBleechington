@@ -1770,7 +1770,7 @@
   /* the last word of a goalie's name, lower-cased, accents dropped: "Igor Shesterkin" and "I. Shesterkin" agree */
   function lastName(s) {
     var w = String(s || "").trim().split(/\s+/); if (!w.length) return "";
-    return w[w.length - 1].normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase();
+    return w[w.length - 1].normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();   // the marks escaped (2 Nov 2026): as literal characters the range broke whenever the browser guessed the file's encoding wrong
   }
   function marksOf(sp, inputs, markets) {
     var out = { profile: "", lean: "", grain: "", crowd: "", b2b: "", backup: "", goalie: "" };

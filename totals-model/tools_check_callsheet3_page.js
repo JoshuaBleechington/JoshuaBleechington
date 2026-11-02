@@ -27,7 +27,16 @@ const CHECKS = ["dome","playoff"];
 (async () => {
   const b = await chromium.launch({ executablePath: process.env.CHROMIUM_PATH || '/opt/pw-browsers/chromium' });
   const pg = await b.newPage({ viewport: { width: 1280, height: 1400 } });
-  const reloaded = async () => { await pg.reload(); await pg.waitForFunction(() => window.smStore && window.smStore.ready); await pg.waitForTimeout(300); };   // a reload waits for the store, not a fixed 300 ms (30 Oct 2026: the harness raced the page under load)
+  const reloaded = async () => {
+    await pg.reload();
+    try { await pg.waitForFunction(() => window.smStore && window.smStore.ready, null, { timeout: 60000 }); }
+    catch (e) {   // 2 Nov 2026: a reload stalled 30 s once under load; say what the page looks like before giving up
+      const state = await pg.evaluate(() => ({ ready: document.readyState, store: typeof window.smStore, url: location.href.slice(-40), scripts: document.scripts.length })).catch(err => String(err));
+      console.log('reload stalled:', JSON.stringify(state), 'page errors so far:', JSON.stringify(errs.slice(-5)));
+      throw e;
+    }
+    await pg.waitForTimeout(300);
+  };   // a reload waits for the store, not a fixed 300 ms (30 Oct 2026: the harness raced the page under load)
   const errs = [];
   pg.on('pageerror', e => errs.push(String(e)));
   pg.on('console', m => {
@@ -536,8 +545,9 @@ const CHECKS = ["dome","playoff"];
       'props table: the market filter keeps the rebounds, a click on Chance sorts it high to low and again low to high, the band and name filters narrow it, and Reset view puts it back', JSON.stringify({ v1: propsEx.view1, v2: { head: propsEx.view2.head, shown: propsEx.view2.shown, chances: propsEx.view2.chances }, v3: propsEx.view3, v4: propsEx.view4, v5: propsEx.view5 }));
   chk(propsEx.on && /^EXAMPLE · 8 props on/.test(propsEx.count) && /An example/.test(propsEx.msg) && propsEx.rows === 7 && propsEx.rowsAll === 8,
       'props example: eight props on 76ers @ Knicks, seven projected (Embiid is out), the count says EXAMPLE', JSON.stringify({ count: propsEx.count, rows: propsEx.rows, all: propsEx.rowsAll }));
-  chk(propsEx.best.length >= 2 && /#1 · (BET|LEAN)/.test(propsEx.best[0]) && propsEx.best.some(b => /Paul George UNDER 2\.5 threes/.test(b)) && !propsEx.best.some(b => /Tyrese Maxey/.test(b)),
-      'props example: the best list ranks the props by edge with the market as the spine (30 Oct 2026): George under the threes among them, Maxey over the points no longer an edge at the book\'s 50/50', JSON.stringify(propsEx.best.slice(0, 3)));
+  chk(propsEx.best.length === 7 && /#1 · LEAN .*Paul George UNDER 2\.5 threes 53\.7% · \+100 needs 50\.0% · edge \+3\.7/.test(propsEx.best[0]) && propsEx.best.every(b => /UNDER/.test(b) && / · LEAN/.test(b))
+      && propsEx.best.some(b => /Tyrese Maxey UNDER 25\.5 points 52\.6% · [-−]110 needs 52\.4% · edge \+0\.3/.test(b)) && propsEx.best.some(b => /Karl-Anthony Towns UNDER 11\.5 rebounds 51\.4% · [-−]105 needs 51\.2% · edge \+0\.2/.test(b)),
+      'props example: the best list ranks the props by edge with the market as the spine and the over\'s shade by market (2 Nov 2026): George under the threes first (the threes\' 4-point shade at +100), every projected prop an UNDER lean, Maxey\'s under a lean by a hair at the book\'s 50/50 (the points\' 4 less the vig less the model\'s lean to the over at a ninth) and Towns\' rebounds the same with the rebounds\' 1.5', JSON.stringify(propsEx.best.map(b => b.slice(0, 90))));
   chk(propsEx.whys.some(w => /Joel Embiid out \(31 minutes a game between them\): \+1\.5 minutes and \+0\.58 points per 36, the pooled rule, scored/.test(w)) && propsEx.whys.some(w => /listed Out on ESPN: no projection/.test(w))
       && propsEx.whys.some(w => /Knicks allow 0\.97x the league's points per minute to guards \(this season 0\.95 over 16 games, last season 0\.99\): x0\.978 at 0\.75 weight, measured/.test(w)) && propsEx.whys.some(w => /HashtagBasketball: 76ers allow/.test(w)),
       'props example: the why lines are the slate\'s own, the regulars-out rule, the defence factor, the website\'s rank and the listed-out man', JSON.stringify(propsEx.whys.slice(0, 2)).slice(0, 600));
@@ -1283,6 +1293,65 @@ const CHECKS = ["dome","playoff"];
   chk(store2.pLen === store1.bigLen && store2.localProps === null, 'store: a props list far past the localStorage limit saves and comes back after a reload', JSON.stringify({ pLen: store2.pLen, bigLen: store1.bigLen }));
   chk(store2.cardRows === store1.rows && store2.localCard === null && !/not storing/.test(store2.saveState), 'store: a card the old page left in localStorage moves to the database on load and leaves localStorage', JSON.stringify(store2));
   await pg.evaluate(() => smStore.clear()); await reloaded();
+
+  // ---- 2 Nov 2026: the save trimmed -- a prop on a night older than the last seven keeps its record and loses the panel's detail; the backup writes a prop a line ----
+  await pg.evaluate(async () => {
+    await smStore.ready;
+    const heavy = (id, gdate, name, mk, side, result) => ({ id, gdate, game: 'Heat @ Hornets', away: 'Heat', home: 'Hornets', aab: 'MIA', hab: 'CHA', pid: String(id), name, team: 'MIA', opp: 'CHA', pos: 'G', mk, line: 20.5, op: -110, up: -110, book: 'fanatics',
+      books: { fanatics: [20.5, -110, -110], draftkings: [20.5, -112, -108] }, proj: 22.1, sd: 7, pm: 0.58, pb: 0.475, p: 0.49, push: 0, side, chance: side === 'OVER' ? 0.49 : 0.51, price: -110, need: 0.524, edge: side === 'OVER' ? -0.034 : -0.014, band: 'no edge', mins: 30, rate36: 26, base: 25, med: 21.5, usg: 25, sdf: 0.93, starter: true, start_src: 'RotoWire',
+      why: ['26.0 points per 36 this season', 'the chance read around the median 21.5 (' + 'x'.repeat(400) + ')'], log: [['2026-10-15', 'MIA', 0, 34.0, 26], ['2026-10-17', 'CHI', 1, 31.0, 22, ['won by 6', '31 min']]], parts: [{ k: 'pace', t: 'Pace', eff: 0.4, i: 0 }],
+      sim: { runs: 10000, team_pts: 115, team_lo: 106, team_hi: 124, read: 21.0, blowout: 0.3, ot: 0.04, poss: 100 }, gsim: { runs: 10000, a: [115, 106, 124, 116], h: [110, 101, 119, 111], t: 225, m: -5, hw: 0.4, ot: 0.04, bo: 0.3, poss: 100, out: [0, 0] },
+      fives: { away: { status: 'confirmed', five: [['G', name]] }, home: null }, awhat: ['won by 6'], actual: result === 'win' ? (side === 'UNDER' ? 18 : 24) : (side === 'UNDER' ? 24 : 18), amin: 33, result });
+    const dates = ['2026-10-20', '2026-10-21', '2026-10-22', '2026-10-23', '2026-10-24', '2026-10-25', '2026-10-26', '2026-10-27', '2026-10-28'];
+    const rows = []; dates.forEach((d, i) => { rows.push(heavy(i * 2 + 1, d, 'Tyler Herro', 'pts', 'UNDER', 'win')); rows.push(heavy(i * 2 + 2, d, 'Bam Adebayo', 'reb', 'OVER', 'loss')); });
+    rows.push(Object.assign(heavy(99, '2026-10-29', 'Norman Powell', 'pts', 'UNDER', null), { result: null, actual: null, amin: null }));   // tonight's, ungraded: the tenth night on the tab
+    await smStore.setItem('callsheet3.props.v1', JSON.stringify(rows));
+  });
+  await reloaded();
+  const trimT = await pg.evaluate(async () => {
+    const wait = () => new Promise(r => setTimeout(r, 90));
+    const txt = e => (e ? e.innerText : '').replace(/\s+/g, ' ').trim();
+    await smStore.ready;
+    const stored = JSON.parse(smStore.getItem('callsheet3.props.v1'));
+    const byDate = {}; stored.forEach(r => { (byDate[r.gdate] = byDate[r.gdate] || []).push(r); });
+    const dates = Object.keys(byDate).sort();
+    const trimmed = dates.filter(d => byDate[d].every(r => r.trim)), whole = dates.filter(d => byDate[d].every(r => !r.trim && r.why && r.log && r.books && r.sim && r.gsim && r.fives && r.parts && r.awhat));
+    const old = stored.filter(r => r.trim);
+    const gone = old.length > 0 && old.every(r => ['why', 'log', 'parts', 'books', 'sim', 'gsim', 'fives', 'awhat'].every(k => r[k] === undefined));
+    const kept = old.every(r => r.result && r.chance && r.price && r.band && r.side && r.mk && r.gdate && r.name && r.centre === 'median' && r.actual !== undefined && r.amin === 33 && r.med === 21.5 && /^\d{4}-\d{2}-\d{2}$/.test(r.trim));
+    // the tab: the record counts every graded night, a trimmed night's strip and panel say so, a whole night's panel keeps its detail
+    document.getElementById('m-props').click(); await wait();
+    const tile = txt(document.querySelector('#propsCalib .calib[data-sport="PROPS-TAB"]')), nights = document.querySelectorAll('#propsNights tbody tr').length;
+    const sel = document.getElementById('propsDate'); sel.value = '2026-10-20'; sel.dispatchEvent(new Event('change')); await wait();
+    const strip = txt(document.getElementById('propsSim'));
+    document.getElementById('propsAll').checked = true; document.getElementById('propsAll').dispatchEvent(new Event('change', { bubbles: true })); await wait();
+    document.querySelector('#propsTable tr[data-prop]').click(); await wait();
+    const panel = txt(document.getElementById('propDetailBody')), h4s = [...document.querySelectorAll('#propDetailBody h4')].map(h => h.textContent.trim().split(' ')[0]);
+    const thisRow = txt(document.querySelector('#propDetail .pd-log tr.this'));
+    document.getElementById('propDetailClose').click(); await wait();
+    sel.value = '2026-10-28'; sel.dispatchEvent(new Event('change')); await wait();
+    document.querySelector('#propsTable tr[data-prop]').click(); await wait();
+    const wholePanel = txt(document.getElementById('propDetailBody')), wholeStrip = txt(document.getElementById('propsSim'));
+    document.getElementById('propDetailClose').click(); await wait();
+    // the backup: a prop a line, compact, the trimmed rows without their detail; the file parses as a backup
+    let blob = null; const mkURL = URL.createObjectURL, click = HTMLAnchorElement.prototype.click;
+    URL.createObjectURL = b => { blob = b; return 'blob:x'; }; HTMLAnchorElement.prototype.click = function () {};
+    document.getElementById('backup').click(); await wait(); await wait();
+    URL.createObjectURL = mkURL; HTMLAnchorElement.prototype.click = click;
+    const text = blob ? await blob.text() : '', parsed = text ? JSON.parse(text) : null;
+    const backup = parsed ? { format: parsed.format, props: parsed.props.length, propLines: text.slice(text.indexOf('"props": [')).split('\n').filter(l => /^    \{"id":/.test(l)).length, trimmedInFile: parsed.props.filter(r => r.trim).length, whyInFile: parsed.props.filter(r => r.why).length, card: Array.isArray(parsed.card), draft: !!parsed.draft, msg: txt(document.getElementById('saveMsg')) } : null;
+    document.getElementById('m-nba').click(); await wait(); await smStore.removeItem('callsheet3.props.v1');
+    return { trimmed, whole, gone, kept, tile: tile.slice(0, 160), nights, strip: strip.slice(0, 200), panel: panel.slice(0, 700), h4s, thisRow, wholeHas: /what moves it/i.test(wholePanel) && /\bwhy\b/i.test(wholePanel) && /every book/i.test(wholePanel) && /simulation · Heat @ Hornets played 10,000 times/i.test(wholePanel) && !/trimmed from the save/.test(wholePanel), wholeStrip: wholeStrip.slice(0, 120), backup };
+  });
+  chk(JSON.stringify(trimT.trimmed) === JSON.stringify(['2026-10-20', '2026-10-21', '2026-10-22']) && JSON.stringify(trimT.whole) === JSON.stringify(['2026-10-23', '2026-10-24', '2026-10-25', '2026-10-26', '2026-10-27', '2026-10-28', '2026-10-29']) && trimT.gone && trimT.kept,
+      'trim: on load, a prop on a night older than the last seven on the tab loses the panel\'s detail (the why, the last games, the levers, the books, the simulation, the fives, what happened) and keeps its record (the call, the price, the chance, the band, the result, his minutes, the median, the centre), stamped with the day; the last seven nights stay whole, tonight\'s ungraded one among them',
+      JSON.stringify({ trimmed: trimT.trimmed, whole: trimT.whole, gone: trimT.gone, kept: trimT.kept }));
+  chk(/every prop with a side 9-9/i.test(trimT.tile) && trimT.nights === 9 && /trimmed from the save with the night's detail/.test(trimT.strip) && /was trimmed from the save on [A-Z][a-z]{2} \d{1,2} to keep the backup small/.test(trimT.panel) && JSON.stringify(trimT.h4s) === JSON.stringify(['Floors', 'Last']) && /this game 33 18/.test(trimT.thisRow)
+      && trimT.wholeHas && /played 10,000 times/.test(trimT.wholeStrip),
+      'trim: the record still counts every graded night (9-9 over nine), a trimmed night\'s strip and panel say the detail was trimmed and when, the panel keeps the floors and the graded game\'s own line, and a whole night keeps its why, levers, books, simulation and strip',
+      JSON.stringify({ tile: trimT.tile, nights: trimT.nights, strip: trimT.strip, panel: trimT.panel.slice(0, 320), h4s: trimT.h4s, thisRow: trimT.thisRow, wholeHas: trimT.wholeHas, wholeStrip: trimT.wholeStrip }));
+  chk(trimT.backup && trimT.backup.format === 'callsheet3.backup' && trimT.backup.card && trimT.backup.draft && trimT.backup.props === 19 && trimT.backup.propLines === 19 && trimT.backup.trimmedInFile === 6 && trimT.backup.whyInFile === 13 && /Backup saved as/.test(trimT.backup.msg),
+      'trim: the backup file writes a prop a line, compact, the trimmed rows without their detail, and parses as a backup with the card and the draft', JSON.stringify(trimT.backup));
 
   // ---- 28 Oct 2026: the three voices on the total -- the sim's own view and the crew on the same side, the sheet not against it: BET on the Simulation card and the board, takeable, with its own record line ----
   const agreeT = await pg.evaluate(async () => {

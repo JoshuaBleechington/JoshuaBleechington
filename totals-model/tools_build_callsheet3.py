@@ -27,7 +27,7 @@ import sys
 ROOT = pathlib.Path(__file__).parent / "web"
 OPEN = "  /* ===== ENGINE BLOCK."
 CLOSE = "  /* ===== END ENGINE BLOCK ===== */"
-STAMP = "2026-10-30"   # bumped by hand when 3.0's own sources change (the harness checks it)
+STAMP = "2026-11-02"   # bumped by hand when 3.0's own sources change (the harness checks it)
 
 
 def engine_block() -> str:
@@ -436,7 +436,10 @@ def tail() -> str:
     # loader takes a props file too and grades the props from a grade file's box lines; the record block
     # ends with the props tile; a sport button leaves the tab
     t = once(t, '                            card: card, draft: { sport: sport, inputs: snapshot() } }, null, 2);',
-             '                            card: card, props: props, draft: { sport: sport, inputs: snapshot() } }, null, 2);', "backup props")
+             '                            card: card, draft: { sport: sport, inputs: snapshot() } }, null, 2)\n'
+             '      /* the props a row a line (2 Nov 2026): pretty-printed, a prop\'s last games ran a number a line and the file of 1 Nov came to\n'
+             '         44.6 MB for 29 compact; with the old nights trimmed (props.engine.js) the file holds the last seven nights whole */\n'
+             '      .replace(/\\n}$/, \',\\n  "props": [\\n\' + props.map(function (r) { return "    " + JSON.stringify(r); }).join(",\\n") + \'\\n  ]\\n}\');', "backup props")
     t = once(t, '        } else card = d.card;\n        save(); renderCard(); renderBoard(); renderCalib();',
              '        } else card = d.card;\n'
              '        if (!moved && Array.isArray(d.props)) { props = d.props; saveProps(); renderProps(); }\n'

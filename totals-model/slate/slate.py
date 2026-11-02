@@ -4801,8 +4801,22 @@ PROPS_MODEL_W = 0.5
 # the over's shade (30 Oct 2026): at the books' own devigged prices the under landed 53.2% of the time where the prices
 # said 50.7% and the over 46.8% against 49.3%, on 4,017 props at the best price across the books (at Pinnacle's prices
 # 54.3 against 51.1 on 1,946); the public plays overs and the books price for it. The book's over chance is read this
-# much lower before the blend
-PROPS_SIDE_SHADE = 0.025
+# much lower before the blend.
+# By market (2 Nov 2026, the user: "for the unders on the props and the bet bands, can we enhance or find more winning
+# props based on that data?"): on the 6,216 graded props of the thirteen nights to 1 Nov, regime-free against the carded
+# book's own devigged price, the under landed 54.4% where the prices said 50.6% (+3.9; ten of thirteen nights up; +3.6
+# against Pinnacle's prices on 2,321): +1.3 on rebounds and +1.5 on rebounds + assists, +3.5 points, +4.3 assists, +3.7
+# threes, +5.9 PRA, +6.0 points + rebounds, +6.5 points + assists, each the same in both halves of the nights (the public's
+# over money sits on the points-bearing markets). The shade lives at the coin-flip prices, in the line rather than the
+# price: +3.5 where the book's under chance sat 46-49%, +4.6 at 49-52, +5.9 at 52-55, +2 at 43-46 and at 55-61, nothing
+# beyond. Cross-validated night by night, the market grouping beat a flat shade on log-likelihood and on units out of
+# sample; the sheet's bands replayed with it read BET 160-123 and LEAN 1,185-949 (+91 units, both halves of the nights up)
+# where the flat 2.5 had read 477-414 (-9) and left the money in no edge (2,128-1,547, +96). The model's lean added nothing
+# again (its coefficient 0.005 +/- 0.071 beside the book's price), the spread, the total, the role and the usage nothing
+# that held in both halves. Flat 3.9 would have read 1,270-1,028 (+37, the second half -3): the hump and the markets matter
+PROPS_SIDE_SHADE = {"pts": 0.04, "ast": 0.04, "tpm": 0.04, "reb": 0.015, "ra": 0.015, "pra": 0.055, "pr": 0.055, "pa": 0.055}
+# the shade's reach over the book's own under chance: in full between the inner pair, fading straight to nothing at the outer
+PROPS_SHADE_TENT = (0.40, 0.46, 0.55, 0.63)
 # the game script (30 Oct 2026): two seasons, 20,729 starter-games against the closes: a starter's minutes land 0.187 a
 # game under his last-ten mean per point the final margin runs above the league's 13.5, and over it in a close one
 # (+1.7 minutes inside five, -3.6 at 25 and up); the bench's do not move (+0.006 a point). The simulation's expected
@@ -4849,6 +4863,14 @@ def props_devig(over, under):
     """The book's own chance of the over, the margin taken out."""
     a, b = props_implied(over), props_implied(under)
     return a / (a + b) if a + b > 0 else 0.5
+
+
+def props_shade(mk, p_over_book):
+    """The over's shade on this prop: the market's, in full at a coin-flip price and fading to nothing past the tent."""
+    pu = 1.0 - p_over_book
+    lo, flo, fhi, hi = PROPS_SHADE_TENT
+    w = 0.0 if (pu <= lo or pu >= hi) else (pu - lo) / (flo - lo) if pu < flo else (hi - pu) / (hi - fhi) if pu > fhi else 1.0
+    return PROPS_SIDE_SHADE.get(mk, 0.04) * w
 
 
 def props_over(mu, sd, line):
@@ -5636,7 +5658,9 @@ def props_project(prop, logs_this, logs_last, ctx):
     centre = mu - PROPS_MEDIAN_SHIFT[mk] * sd
     pm, push = props_over(centre, sd, line)
     pm_c = pm / (1.0 - push) if push < 1.0 else 0.5
-    pb = props_devig(prop["op"], prop["up"]) - PROPS_SIDE_SHADE   # the book's over chance, less the over's shade (30 Oct 2026)
+    pb0 = props_devig(prop["op"], prop["up"])
+    shade = props_shade(mk, pb0)   # the over's shade (30 Oct 2026): by market, in full at a coin-flip price (2 Nov 2026)
+    pb = pb0 - shade
     p = props_blend(pb, pm_c)
     side = "OVER" if p >= 0.5 else "UNDER"
     chance = p if side == "OVER" else 1.0 - p
@@ -5644,8 +5668,11 @@ def props_project(prop, logs_this, logs_last, ctx):
     need = props_implied(price)
     edge = chance - need
     band = "BET" if (edge >= PROPS_BET_EDGE and chance >= PROPS_BET_CHANCE) else ("LEAN" if edge > 0 else "no edge")
-    why.append("projected %.1f against %s %.1f, one sigma %.1f, the chance read around the median %.1f (the stat skews right: at the mean the over lands %.0f%% of the time): the over %.1f%% by the projection, %.1f%% by the book's prices less the over's %.1f-point shade (the public plays overs, measured); blended %.1f%% at %.0f to %.1f, the market the spine: on 4,321 graded props the model's lean added nothing to the book's price" % (
-        mu, label, line, sd, centre, PROPS_MEDIAN_OVER[mk] * 100, pm * 100, pb * 100, PROPS_SIDE_SHADE * 100, p * 100, PROPS_ANCHOR, PROPS_MODEL_W))
+    full = PROPS_SIDE_SHADE.get(mk, 0.04)
+    why.append("projected %.1f against %s %.1f, one sigma %.1f, the chance read around the median %.1f (the stat skews right: at the mean the over lands %.0f%% of the time): the over %.1f%% by the projection, %.1f%% by the book's prices less the over's %.1f-point shade (%s's %.1f %s; the public plays overs, measured on 6,216 graded props); blended %.1f%% at %.0f to %.1f, the market the spine: on 4,321 graded props the model's lean added nothing to the book's price" % (
+        mu, label, line, sd, centre, PROPS_MEDIAN_OVER[mk] * 100, pm * 100, pb * 100, shade * 100, label, full * 100,
+        "in full at a coin-flip price" if shade >= full - 1e-9 else ("at nothing, the price this far from a coin flip" if shade <= 1e-9 else "fading, the price this far from a coin flip"),
+        p * 100, PROPS_ANCHOR, PROPS_MODEL_W))
     # what moves it (21 Oct 2026, the user: "highlight the areas of the prop bet that are
     # helping with the prediction the most"): each factor's push on the projection in the
     # stat's units, the others held, each pointing at its why line. The base is his own
@@ -5897,7 +5924,7 @@ def make_nba_props(date_iso, out_dir, log, topup=False, sim_runs=NBA_SIM_RUNS):
         games.append(row)
     doc = {"format": PROPS_FORMAT, "version": 1, "date": date_iso, "generated": now_utc(), "source": "slate.py nba-props: The Odds API, the ledgers, ESPN, HashtagBasketball",
            "credits": credits_used, "games": games, "ledgers": ledgers,   # what the run read (23 Oct 2026): the page says so when nothing projects
-           "method": {"anchor": PROPS_ANCHOR, "model": PROPS_MODEL_W, "side_shade": PROPS_SIDE_SHADE, "script_per_point": PROPS_SCRIPT_PER_POINT, "script_base": PROPS_SCRIPT_BASE, "sd_k": PROPS_SD_K, "out_min_per30": PROPS_OUT_MIN_PER30, "out_rate_per30": PROPS_OUT_RATE_PER30, "dvp_weight": PROPS_DVP_WEIGHT, "dvp_shrink": PROPS_DVP_SHRINK,
+           "method": {"anchor": PROPS_ANCHOR, "model": PROPS_MODEL_W, "side_shade": PROPS_SIDE_SHADE, "shade_tent": PROPS_SHADE_TENT, "script_per_point": PROPS_SCRIPT_PER_POINT, "script_base": PROPS_SCRIPT_BASE, "sd_k": PROPS_SD_K, "out_min_per30": PROPS_OUT_MIN_PER30, "out_rate_per30": PROPS_OUT_RATE_PER30, "dvp_weight": PROPS_DVP_WEIGHT, "dvp_shrink": PROPS_DVP_SHRINK,
                       "match_alpha": PROPS_MATCH_ALPHA, "pace": "the game's possessions against the club's own", "usage_sd": PROPS_USAGE_SD, "role_sd": PROPS_ROLE_SD, "usage_cuts": PROPS_USAGE_CUTS, "thin_sd": PROPS_THIN_SD}}
     path = os.path.join(out_dir, "nba-props-%s.json" % date_iso)
     with open(path, "w", encoding="utf-8") as f:
@@ -7304,8 +7331,10 @@ def selftest():
             "dvp": {"f": 25.0 / 24.0, "f_this": 25.0 / 24.0, "n_this": 10, "f_last": None, "n_last": 0}, "htb": "HashtagBasketball: Lakers allow 25.0 points a game to PGs (120th of 150, 1 the fewest); shown, not scored", "self_out": ""}
     proj_, why_ = props_project(prop_, lt["11"]["g"], ll["11"]["g"], ctx_)
     check("props: the projection is rate x minutes, the regulars out, pace and the defence, against the line; the chance read around the median (the mean less 0.08 sigmas on points)",
-          abs(proj_["proj"] - 34.48) < 0.05 and abs(proj_["sd"] - 11.52) < 0.02 and proj_["side"] == "UNDER" and abs(proj_["p"] - 0.4896) < 0.002 and proj_["band"] == "no edge"   # the market the spine (30 Oct 2026): the book at 50/50 less the over's shade outweighs the projection's 60%
-          and abs(proj_["edge"] - (-0.0134)) < 0.002 and proj_["price"] == -110 and abs(proj_["mins"] - 37.4) < 0.05 and abs(proj_["pm"] - 0.6048) < 0.002
+          abs(proj_["proj"] - 34.48) < 0.05 and abs(proj_["sd"] - 11.52) < 0.02 and proj_["side"] == "UNDER" and abs(proj_["p"] - 0.4762) < 0.002 and proj_["band"] == "no edge"   # the market the spine (30 Oct 2026): the book at 50/50 less the over's shade outweighs the projection's 60%
+          and abs(proj_["edge"]) < 0.0005 and proj_["price"] == -110 and abs(proj_["mins"] - 37.4) < 0.05 and abs(proj_["pm"] - 0.6048) < 0.002   # the points shade (4.0, 2 Nov 2026) less the model's lean to the over at a ninth lands on the vig: no edge by a hair
+          and abs(props_shade("pts", 0.5) - 0.04) < 1e-9 and abs(props_shade("reb", 0.5) - 0.015) < 1e-9 and abs(props_shade("pra", 0.4892) - 0.055) < 1e-9   # the shade by market, in full at a coin-flip price (2 Nov 2026)
+          and abs(props_shade("pts", 0.569) - 0.0207) < 0.0005 and props_shade("pts", 0.6341) == 0.0 and abs(props_shade("tpm", 0.4038) - 0.0169) < 0.0005 and props_shade("ast", 0.35) == 0.0   # fading past the tent, nothing beyond it
           and abs(props_over(34.48 - 0.08 * 11.52, 11.52, 30.5)[0] - proj_["pm"]) < 0.001   # the sigma carries the thin-history factor (27 Oct 2026): 10.86 x 1.06 on 143 minutes of evidence
           and any(w == "his rate rests on 143 minutes of evidence (3 games this season, last season behind it): the miss runs wider on a thin history, measured, so the sigma is ×1.06" for w in why_))
     parts_ = dict((p["k"], p) for p in proj_["parts"])
@@ -7373,7 +7402,7 @@ def selftest():
           and any(w == "Lakers allow 1.04x the league's points per minute to guards (this season 1.04 over 10 games): x1.031 at 0.75 weight, measured" for w in why_)
           and any(w == ctx_["htb"] for w in why_)
           and any(w.startswith("home 30.9 / road 31.0 per 36 over 178 minutes: shown, not scored") and w.endswith("; tonight on the road") for w in why_)
-          and any(w == "projected 34.5 against points 30.5, one sigma 11.5, the chance read around the median 33.6 (the stat skews right: at the mean the over lands 47% of the time): the over 60.5% by the projection, 47.5% by the book's prices less the over's 2.5-point shade (the public plays overs, measured); blended 49.0% at 4 to 0.5, the market the spine: on 4,321 graded props the model's lean added nothing to the book's price" for w in why_))
+          and any(w == "projected 34.5 against points 30.5, one sigma 11.5, the chance read around the median 33.6 (the stat skews right: at the mean the over lands 47% of the time): the over 60.5% by the projection, 46.0% by the book's prices less the over's 4.0-point shade (points's 4.0 in full at a coin-flip price; the public plays overs, measured on 6,216 graded props); blended 47.6% at 4 to 0.5, the market the spine: on 4,321 graded props the model's lean added nothing to the book's price" for w in why_))
     # the opponent's absences (28 Oct 2026): named on every prop, scored on a big man's rebounds when their centre sits
     ctx_o = dict(ctx_m)
     ctx_o.update({"opp_out_mpg": 62.0, "opp_out_names": [("Anthony Davis", 34.0, "Out"), ("Austin Reaves", 28.0, "Out")], "opp_out_c_mpg": 34.0, "opp_out_c_names": [("Anthony Davis", 34.0)]})

@@ -13,6 +13,28 @@
   var PROPS_ORDER = ["pts", "reb", "ast", "tpm", "pra", "pr", "pa", "ra"];
   var props = [];
   try { props = JSON.parse(localStorage.getItem(PROPS_KEY) || "[]"); if (!Array.isArray(props)) props = []; } catch (e) { props = []; }
+  /* the save trimmed (2 Nov 2026, the user: "the save files are getting larger too"; "do the trim, keep the last 7 nights
+     whole"): the backup of 1 Nov ran 44.6 MB with 6,858 props, 10 MB of it why lines, 3 the last games, 2 each the fives and
+     the levers, a night adding about 4 MB. A prop on a night older than the last seven on the tab keeps what the record, the
+     tickets, the table and the phone sheet read (the call, the price, the chance, the band, the result, his minutes, the centre
+     the chance was read around) and drops the panel's detail: the why, the last games, the levers, every book's line, the
+     simulation, the fives, what happened. The panel says so. Runs on load and before every save, so a restored backup trims
+     on its way in; a night's file loaded again is whole until its night falls off the seven */
+  var PROPS_WHOLE_NIGHTS = 7;
+  var PROPS_TRIM_FIELDS = ["why", "log", "parts", "books", "sim", "gsim", "fives", "awhat"];
+  function propsTrim() {
+    var seen = {}; props.forEach(function (r) { if (r.gdate) seen[r.gdate] = true; });
+    var whole = {}; Object.keys(seen).sort().slice(-PROPS_WHOLE_NIGHTS).forEach(function (d) { whole[d] = true; });
+    var n = 0, stamp = todayISO();
+    props.forEach(function (r) {
+      if (r.trim || !r.gdate || whole[r.gdate]) return;
+      r.centre = propsCentre(r);   // the centre the chance was read around, off the why line about to go
+      PROPS_TRIM_FIELDS.forEach(function (k) { delete r[k]; });
+      r.trim = stamp; n++;
+    });
+    return n;
+  }
+  if (propsTrim()) saveProps();
   var propsView = false;
   var propsOrder = [], propDetailId = null;   // the Every-prop table's order, and the prop the panel shows (22 Oct 2026)
   var pairsOrder = [], propDetailKind = "prop";   // the night's tickets in order, and whether the panel shows a prop or a pair (26 Oct 2026)
@@ -70,7 +92,7 @@
     if (!order.length) return '';
     return order.sort().map(function (game) {
       var g = games[game], r = g.r, s = r.gsim || propsGameSimFromRows(rows.filter(function (x) { return x.game === game; }), r);
-      if (!s) return '<div class="pk simg dim"><div class="n1">' + esc(game) + '</div><div class="n4">This file\'s run carried no simulation on the game; a props run with the current slate.py plays it 10,000 times.</div></div>';
+      if (!s) return '<div class="pk simg dim"><div class="n1">' + esc(game) + '</div><div class="n4">' + (r.trim ? 'The simulation on this game was trimmed from the save with the night\'s detail; the last seven nights keep theirs.' : 'This file\'s run carried no simulation on the game; a props run with the current slate.py plays it 10,000 times.') + '</div></div>';
       var aab = r.aab || r.away || "away", hab = r.hab || r.home || "home", hasM = s.m !== null && s.m !== undefined && isFinite(+s.m), fav = +s.m >= 0 ? hab : aab;
       var book = r.total !== null && r.total !== undefined && isFinite(+r.total) ? ' · the book\'s ' + r.total + ' (' + sgn(+s.t - +r.total, 1) + ')' : '';
       var outs = [[aab, s.out[0]], [hab, s.out[1]]].filter(function (x) { return x[1]; }).map(function (x) { return ' · ' + esc(x[0]) + '\'s regulars out ' + sgn(x[1], 1) + ' per 100 on the offence'; }).join('');
@@ -307,7 +329,7 @@
   var PROPS_EXAMPLE_GAMES = /*PROPS_EXAMPLE*/[];
   var propsPreview = null;
   function propsSource() { return propsPreview || props; }
-  function saveProps() { try { localStorage.setItem(PROPS_KEY, JSON.stringify(props)); } catch (e) {} }
+  function saveProps() { propsTrim(); try { localStorage.setItem(PROPS_KEY, JSON.stringify(props)); } catch (e) {} }
   function propsSay(msg) { var el = $("propsMsg"); if (!el) return; el.hidden = false; el.innerHTML = msg; }
   function propKey(r) { return (r.gdate || "") + "|" + r.pid + "|" + r.mk; }
   function propsDates() { var d = {}; propsSource().forEach(function (r) { if (r.gdate) d[r.gdate] = true; }); return Object.keys(d).sort(); }
@@ -487,7 +509,7 @@
   var PROPS_CHANCE_BUCKETS = ["50 to 55%", "55 to 60%", "60 to 65%", "65% and up"];
   function propsEdgeBucket(r) { var e = (r.edge || 0) * 100; return e >= 10 ? PROPS_EDGE_BUCKETS[0] : e >= 6 ? PROPS_EDGE_BUCKETS[1] : e >= 3 ? PROPS_EDGE_BUCKETS[2] : e > 0 ? PROPS_EDGE_BUCKETS[3] : PROPS_EDGE_BUCKETS[4]; }
   function propsChanceBucket(r) { var c = (r.chance || 0) * 100; return c < 55 ? PROPS_CHANCE_BUCKETS[0] : c < 60 ? PROPS_CHANCE_BUCKETS[1] : c < 65 ? PROPS_CHANCE_BUCKETS[2] : PROPS_CHANCE_BUCKETS[3]; }
-  function propsCentre(r) { return (r.why || []).some(function (w) { return /around the median/.test(String(w)); }) ? "median" : "mean"; }
+  function propsCentre(r) { return r.centre || ((r.why || []).some(function (w) { return /around the median/.test(String(w)); }) ? "median" : "mean"); }
   function propsRecordHtml(full) {
     var graded = props.filter(function (r) { return r.result && r.result !== "graded"; });
     if (!graded.length) return "";
@@ -542,7 +564,8 @@
     if (byPairTake.n || byPairTake.p) parts.push("pairs taken " + rec(byPairTake) + (byPairTake.n ? " " + sgn(byPairTake.units, 1) + "u" : ""));
     var markets = PROPS_ORDER.map(function (k) { return byMk[k] ? tile(PROPS_LABEL[k], byMk[k], []) : ""; }).join("");
     var verdict = 'The props are a priori: the pooled rules behind them were measured on last season\'s box scores. Read the BET band against the rest and <i>does</i> against <i>says</i>; under 100 graded props nothing here is a reading. ' +
-                  'Measured on the first ten nights (30 Oct 2026, 4,321 graded props): the model\'s own lean added nothing to the book\'s price (the best weight on it was none; where it stood ten points from Pinnacle the outcome followed Pinnacle), the over\'s shade is real (the under landed 53.2% at prices saying 50.7%), and a starter\'s minutes follow the game script. From the 30th the sheet runs with the market as its spine (the model at a ninth, the over read 2.5 points lower) and the game script on starters\' minutes; the nights before carry the old weights.';
+                  'Measured on the first ten nights (30 Oct 2026, 4,321 graded props): the model\'s own lean added nothing to the book\'s price (the best weight on it was none; where it stood ten points from Pinnacle the outcome followed Pinnacle), the over\'s shade is real (the under landed 53.2% at prices saying 50.7%), and a starter\'s minutes follow the game script. From the 30th the sheet runs with the market as its spine (the model at a ninth, the over read 2.5 points lower) and the game script on starters\' minutes; the nights before carry the old weights. ' +
+                  'From 2 Nov the over\'s shade is by market, measured on the 6,216 graded props of the first thirteen nights (1.5 points on rebounds, 4 on points, assists and threes, 5.5 on the combinations), in full at a coin-flip price and fading past it, and the bands follow it: replayed on those nights the BET and LEAN unders read 1,345-1,072 (+91 units) where the sheet as it stood had 477-414 (−9) and had left the money in no edge; every over at the carded price went 2,832-3,384 (−875).';
     if (!full) {
       var h = '<div class="subhead" data-sport="PROPS">NBA player props <span class="tag">' + graded.length + ' graded · the slate\'s call as made, at the price posted · says is the blended chance</span></div>';
       h += '<div class="calib" data-sport="PROPS">' + tile("Every prop with a side", all, parts) + markets + '</div>';
@@ -696,6 +719,7 @@
     h += '<div class="pd-sub">' + esc(r.game) + ' · ' + esc(gameDate(r.gdate)) + (r.opp ? ' · ' + (r.athome ? 'at home against ' : 'on the road at ') + esc(r.opp) : '') +
          ' · ' + esc(r.book || "the book") + ' ' + esc(String(r.line)) + ' (' + sgn(r.op, 0) + '/' + sgn(r.up, 0) + ')</div>';
     h += '<div class="pd-take pd-go">' + (has && (propTakeBtn(r, true) || "").length ? propTakeBtn(r, true) + ' ' : '') + propsGoBtn(r, true) + '</div>';
+    if (r.trim) h += '<p class="note trimmed">The detail on this prop (the reasons, the last games, the levers, every book\'s line, the simulation, the fives and what happened) was <b>trimmed from the save on ' + esc(gameDate(r.trim)) + '</b> to keep the backup small: the last seven nights on the tab stay whole, older nights keep the call, the price, the chance, the band and the result.</p>';
     if (has) {
       h += '<div class="pd-tiles">' +
         tile("Chance", (r.chance * 100).toFixed(1) + "%", "blended: the over is " + (r.pm * 100).toFixed(1) + "% by the model, " + (r.pb * 100).toFixed(1) + "% by the book") +
@@ -739,7 +763,7 @@
                '<div class="lb"><span style="width:' + w + '%"></span></div><div class="lv">' + sgn(+p.eff, 1) + '</div></div>';
       }).join("") + '</div>';
     }
-    if (has) h += propsSimHtml(r, tile);
+    if (has && !r.trim) h += propsSimHtml(r, tile);
     if (r.why && r.why.length) h += '<h4>Why' + (felt.length ? ' <span class="dim">· ' + (top.length ? 'the biggest reason' + (top.length > 1 ? 's' : '') + ' for the ' + esc(r.side || "pick") + ' in green' : 'no lever toward the ' + esc(r.side || "pick")) + (against.length ? (top.length ? ', ' : '; ') + 'the biggest against it in red' : '') + '</span>' : '') + '</h4><ul class="pd-why">' + r.why.map(function (w, i) {
       var rank = top.indexOf(i), cls = rank >= 0 ? ' class="lever-line"' : against.indexOf(i) >= 0 ? ' class="lever-against"' : '';
       return '<li' + cls + '>' + esc(w) + (rank >= 0 ? ' <span class="tag helps">the ' + (rank === 0 ? '' : 'second ') + 'biggest for the ' + esc(r.side || "pick") + '</span>' : '') +

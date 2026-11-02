@@ -2017,3 +2017,134 @@ Nothing found that the ledgers could not measure better.
 ratings ride and the engine's version; the Props tab's verdict says what
 changed on the 30th and that earlier nights carry the old weights; the
 agreement rule's tag carries the watch. The replay tables are in NBA.md.
+
+## The save trimmed, and the over's shade by market, 2 Nov 2026
+
+The user, with the backup of 1 Nov: "The save files are getting larger too
+lol", then "lets do the trim bro, keep the last 7 nights whole. And for the
+unders on the props and the bet bands and can we enhance or find more
+winning props based on that data?"
+
+**The trim.** The file of 1 Nov came to 44.6 MB: 6,858 props on thirteen
+nights, 21.4 MB of them compact (the why lines 9.9 MB, the last games 3.1,
+the fives 1.9, the levers 1.7, every book's line 1.0, the simulation 0.8,
+what happened 0.7, the game's block 0.6), the pretty print doubling it, a
+night adding about 4 MB. From today a prop on a night older than the last
+seven on the Props tab keeps what the record, the tickets, the table and the
+phone sheet read (the call, the price, the chance, the band, the result, his
+minutes, the median, the centre the chance was read around) and drops the
+panel's detail: the why, the last games, the levers, every book's line, the
+simulation, the fives, what happened; `trim` carries the day it went
+(`propsTrim` in props.engine.js). It runs on load and before every save, so
+a restored backup trims on its way in and a night's file loaded again is
+whole until its night falls off the seven. The panel says the detail was
+trimmed and when, and keeps the floors and the graded game's own line; a
+trimmed night's simulation strip says so too; the record tile reads the
+centre off the row. The backup writes the props a row a line
+(pretty-printed, a prop's last games had run a number a line; the card stays
+pretty, its bulk the simulation runs' histograms, which are one line
+already). The file of 1 Nov written this way: 24 MB, the seven whole
+nights' props 19 MB of it, the card 3.6, the 2,555 trimmed rows 1.4 at 540
+bytes each; zipped 2.5 MB against 3.6. The harness seeds ten nights and
+checks the three oldest trimmed, the seven whole, the record, the panel,
+the strip and the file.
+
+**The unders and the bands, measured.** Every graded prop of the thirteen
+nights (6,216 with a projection and a price), regime-free: the under's
+landing rate against the carded book's own devigged price, whatever side
+the sheet took (`scratchpad/lab2/unders.py`, `rules.py`, `shade_cv.py`,
+`bands.py`).
+
+| The shade | n | under | the book said | shade | first 7 / last 6 nights | nights up |
+| --- | --- | --- | --- | --- | --- | --- |
+| every prop | 6,216 | 54.4% | 50.6% | +3.9 | +2.9 / +4.6 | 10 of 13 |
+| against Pinnacle's price | 2,321 | 55.1 | 51.5 | +3.6 | +5.3 / +1.9 | 8 of 13 |
+| points | 1,108 | 53.4 | 49.9 | +3.5 | +2.1 / +5.2 | 9 of 13 |
+| rebounds | 1,062 | 51.8 | 50.5 | +1.3 | +0.9 / +1.7 | 9 of 13 |
+| assists | 910 | 55.2 | 50.9 | +4.3 | +4.1 / +4.6 | 8 of 13 |
+| threes | 942 | 55.9 | 52.3 | +3.7 | +4.0 / +3.3 | 9 of 13 |
+| PRA | 929 | 56.0 | 50.0 | +5.9 | +4.2 / +7.9 | 10 of 13 |
+| points + rebounds (six nights) | 488 | 55.7 | 49.8 | +6.0 | | 5 of 6 |
+| points + assists (six nights) | 400 | 56.5 | 50.0 | +6.5 | | 5 of 6 |
+| rebounds + assists (six nights) | 377 | 51.7 | 50.2 | +1.5 | | 4 of 6 |
+
+The public's over money sits on the points-bearing markets; rebounds carry
+almost none of it. And the shade lives at the coin-flip prices, in the line
+rather than the price (where the book has moved the price, it has moved it
+enough):
+
+| The book's own under chance | n | shade | first 7 / last 6 |
+| --- | --- | --- | --- |
+| 40 to 43% | 214 | +0.3 | −2.5 / +4.0 |
+| 43 to 46 | 444 | +2.0 | +1.6 / +2.4 |
+| 46 to 49 | 1,526 | +3.5 | +3.1 / +3.8 |
+| 49 to 52 | 1,744 | +4.6 | +3.7 / +5.2 |
+| 52 to 55 | 1,226 | +5.9 | +4.5 / +6.8 |
+| 55 to 58 | 491 | +2.2 | +2.5 / +1.9 |
+| 58 to 61 | 246 | +2.4 | +2.4 / +2.5 |
+| 61 to 64 | 121 | −3.4 | −7.6 / +2.0 |
+
+The same read as bets at the carded book's price, every prop's under taken
+whatever the sheet said: −110 to −145 1,907-1,515 (55.7%, +60 units, +1.7%
+a bet; not rebounds 1,531-1,197, +80, +2.9%), −146 to −175 367-255 (59.0%
+but −23 units), heavier than −175 177-87 (67.0%, −2), −109 or cheaper
+933-975 (+2). Every under 3,384-2,832 (+37, −33 in the first seven nights
+and +69 in the last six); every over 2,832-3,384 (−875 units, −14.1% a bet,
+one night of thirteen up). The bands as the file carried them: BET UNDER
+104-97 (−13.5), BET OVER 127-141 (−32), LEAN OVER 331-368 (−82), LEAN UNDER
+440-355 (+17), no edge UNDER 1,443-1,018 (+55), no edge OVER 904-888
+(−221): the BET band was the model's lean, and the money sat in no edge.
+
+The model's lean, again: a logistic fit of the under on the book's logit
+price and the model's z gives z +0.005 ± 0.071; Pinnacle's price beside the
+carded book's carries nothing of its own (−0.07 ± 0.48 against +1.07 ±
+0.52). Cross-validated by night (odd against even nights, the halves) the
+out-of-sample log-likelihood per prop: the book alone −0.6861, a flat 2.5
+−0.6835, a flat 3.9 −0.6831, by market group −0.6831 (the best fold −0.6807),
+the coin-flip rung −0.6833; taking every under whose shaded chance clears
+the price by a point, the market grouping made +62 units on the two folds
+where the flat fit lost 32.
+
+**The bands replayed** with the sheet's own blend (the model at a ninth,
+BET at three points of edge and 55%):
+
+| The shade | BET | LEAN | BET + LEAN | the halves | no edge UNDER |
+| --- | --- | --- | --- | --- | --- |
+| flat 2.5, as it stood | 41-27 +5.3 | 436-387 −14.7 | 477-414 −9.4 | −2.8 / −6.6 | 2,128-1,547 +96.4 |
+| flat 3.9 | 95-77 +1.0 | 1,175-951 +35.5 | 1,270-1,028 +36.5 | +39.9 / −3.4 | 1,618-1,198 +54.5 |
+| by market group (1.5 / 4 / 5.5) | 162-130 +6.0 | 1,264-1,003 +71.3 | 1,426-1,133 +77.3 | +34.3 / +43.0 | 1,422-1,063 +4.4 |
+| **market group × the tent** | **160-123 +11.9** | **1,185-949 +79.0** | **1,345-1,072 +90.9** | **+42.1 / +48.8** | **1,498-1,118 −8.8** |
+| the same, the model at nothing | | 1,981-1,600 +113.6 | | +12.2 / +101.4 | 938-680 −51.8 |
+| the same, BET at two points and 53% | 387-339 −4.8 | 958-733 +95.7 | | | |
+
+So the shade is now by market, 1.5 points on rebounds and rebounds +
+assists, 4 on points, assists and threes, 5.5 on PRA, points + rebounds and
+points + assists (`PROPS_SIDE_SHADE`), in full where the book's own under
+chance sits between 46 and 55% and fading straight to nothing at 40 and 63%
+(`PROPS_SHADE_TENT`, `props_shade`); the model stays at a ninth (it sorts
+the halves: +42 / +49 against +12 / +101 without it) and the BET band keeps
+its three points and 55% (two points made BET worse than LEAN). The "no
+edge" band now holds the losers (−8.8 on the unders, −108 on the overs),
+which is what a band is for.
+
+Measured and not scored: the spread on his club (favoured 4-8 +7.8, dog 8+
++6.6, dog 4-8 −0.9, favoured 8+ +3.4: no shape a mechanism gives, the linear
+term nothing), the game's total (under 222 +5.9, but −2.7 in the first seven
+nights and +9.1 in the last six), a teammate out lifting him (+2.4 against
++5.1 without, two sigma: a watch), the role and the usage (nothing beyond the
+shade), the line against his base (the book's price carries it), the model's
+lean at plus money (93 props). Thirteen nights is thirteen nights: the
+record tile stays the test, and the verdict on the Props tab says what
+changed from 2 Nov.
+
+**Found on the way: the page's encoding.** The harness stalled twice on a
+reload with `smStore` undefined and one page error: "Invalid regular
+expression: /[Ì€-Í¯]/g: Range out of order in character class". The built
+page declared no charset (it opened with `<title>`), so a browser reading
+it off the disk guessed the encoding from the first chunk of bytes; when
+that chunk was pure ASCII it fell back to Windows-1252, and the one regex
+written with literal combining marks (`callsheet2.tail.js`, the name key's
+`normalize("NFD")`) became an out-of-order range, which killed the whole
+script. That was the 30 Oct "smStore is not defined" flake too. The head
+now opens with `<meta charset="utf-8">` (both builds) and the marks are
+written as `̀-ͯ`.

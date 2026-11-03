@@ -42,7 +42,7 @@
      the points for a player, by chance percentage and band"): a sort column with its direction, and filters by market,
      band, side and a name. Kept in this browser only; Reset view puts the table back to by game, then by edge */
   var PROPS_VIEW_KEY = "callsheet3.props.view.v1";
-  var PROPS_VIEW_DEFAULT = { sort: "default", dir: -1, mk: "", band: "", side: "", q: "", agree: "", usage: "", role: "", sim: "" };
+  var PROPS_VIEW_DEFAULT = { sort: "default", dir: -1, mk: "", band: "", side: "", q: "", agree: "", usage: "", role: "", sim: "", taken: "" };   // taken: the props you marked (3 Nov 2026)
   /* the floors (26 Oct 2026, the user: "PRA alt lines at 95% or more, Sengun 10+ points, 5+ rebounds, 3+ assists"): the number
      the model says he clears 95, 90 and 80% of nights, read off the median and the sigma the chance already uses. Measured on
      2025-26 (tools_nba_usage_floors.py): the 95% floors cleared 97.5% of nights, the 90% 93%, the 80% 82%; posted as a whole
@@ -311,6 +311,7 @@
       if (v.usage && propUsageBucket(r) !== v.usage) return false;
       if (v.role && !(v.role === "starter" ? r.starter === true : r.starter === false)) return false;
       if (v.sim) { var ag = propSimAgrees(r); if (ag === null || (v.sim === "yes" ? !ag : ag)) return false; }
+      if (v.taken && !r.take) return false;   // the props you marked (3 Nov 2026)
       if (q && String(r.name || "").toLowerCase().indexOf(q) < 0 && String(r.game || "").toLowerCase().indexOf(q) < 0) return false;
       return true;
     });
@@ -514,7 +515,7 @@
     var graded = props.filter(function (r) { return r.result && r.result !== "graded"; });
     if (!graded.length) return "";
     var mk = function () { return { n: 0, w: 0, l: 0, p: 0, v: 0, says: 0, units: 0 }; };
-    var all = mk(), byMk = {}, byBand = {}, bySide = {}, byEdge = {}, byChance = {}, byDate = {}, byDateBet = {}, byCentre = {}, byTake = mk();
+    var all = mk(), byMk = {}, byBand = {}, bySide = {}, byEdge = {}, byChance = {}, byDate = {}, byDateBet = {}, byDateTake = {}, byCentre = {}, byTake = mk();
     /* the same-game pairs' record (26 Oct 2026): each graded date's tickets as the night built them, a ticket won when both legs did */
     var byPair = mk(), byPairTake = mk(), pairDates = {};
     graded.forEach(function (r) { if (r.gdate) pairDates[r.gdate] = true; });
@@ -532,7 +533,7 @@
                    byEdge[propsEdgeBucket(r)] || (byEdge[propsEdgeBucket(r)] = mk()), byChance[propsChanceBucket(r)] || (byChance[propsChanceBucket(r)] = mk()),
                    byDate[d] || (byDate[d] = mk()), byCentre[propsCentre(r)] || (byCentre[propsCentre(r)] = mk())];
       if (r.band === "BET") sinks.push(byDateBet[d] || (byDateBet[d] = mk()));
-      if (r.take) sinks.push(byTake);   // the props marked as taken (26 Oct 2026)
+      if (r.take) { sinks.push(byTake); sinks.push(byDateTake[d] || (byDateTake[d] = mk())); }   // the props marked as taken (26 Oct 2026), and by night (3 Nov 2026)
       sinks.forEach(function (s) {
         if (r.result === "void") { s.v++; return; }
         if (r.result === "push") { s.p++; return; }
@@ -584,12 +585,13 @@
     h2 += '<div class="subhead">By the centre the chance was read around <span class="tag">the mean to 21 Oct 2026, the median from the 22nd: a box-score stat skews right</span></div><div class="calib" data-sport="PROPS-CENTRE">' +
           (byCentre.mean ? tile("Called at the mean, to 21 Oct", byCentre.mean, []) : "") + (byCentre.median ? tile("Called at the median, from 22 Oct", byCentre.median, []) : "") + '</div>';
     h2 += '<div class="subhead">Night by night <span class="tag">' + dates.length + ' night' + (dates.length === 1 ? '' : 's') + ' graded</span></div>' +
-          '<table class="form" id="propsNights"><thead><tr><th>Night</th><th>Record</th><th>Says</th><th>Does</th><th>Units</th><th>BET band</th></tr></thead><tbody>' +
+          '<table class="form" id="propsNights"><thead><tr><th>Night</th><th>Record</th><th>Says</th><th>Does</th><th>Units</th><th>BET band</th><th>You took</th></tr></thead><tbody>' +
           dates.slice().reverse().map(function (d) {
-            var s = byDate[d], b = byDateBet[d];
+            var s = byDate[d], b = byDateBet[d], t = byDateTake[d];
             var up = s.n && s.w / s.n >= s.says / s.n;
             return '<tr><td>' + esc(gameDate(d)) + '</td><td class="' + (s.units >= 0 ? 'pos' : 'neg') + '">' + rec(s) + (s.v ? ' <span class="dim">' + s.v + ' void</span>' : '') + '</td><td>' + says(s) + '</td><td class="' + (up ? 'pos' : 'neg') + '">' + does(s) + '</td><td class="' + (s.units >= 0 ? 'pos' : 'neg') + '">' + sgn(s.units, 1) + 'u</td>' +
-                   '<td class="' + (b ? (b.units >= 0 ? 'pos' : 'neg') : '') + '">' + (b ? rec(b) + ' ' + sgn(b.units, 1) + 'u' : '—') + '</td></tr>';
+                   '<td class="' + (b ? (b.units >= 0 ? 'pos' : 'neg') : '') + '">' + (b ? rec(b) + ' ' + sgn(b.units, 1) + 'u' : '—') + '</td>' +
+                   '<td class="' + (t && t.n ? (t.units >= 0 ? 'pos' : 'neg') : '') + '" title="' + (t && t.n ? 'the props you marked Taking that night: the sheet said ' + says(t) + ', ' + does(t) + ' landed' : 'no prop marked that night') + '">' + (t ? rec(t) + (t.n ? ' ' + sgn(t.units, 1) + 'u' : '') : '—') + '</td></tr>';
           }).join("") + '</tbody></table>';
     h2 += '<div class="subhead">Says against does, by the chance claimed <span class="tag">a calibrated sheet reads the same in both columns</span></div>' +
           '<table class="form" id="propsLadder"><thead><tr><th>Chance claimed</th><th>Props</th><th>Says</th><th>Does</th><th>±</th><th>Units</th></tr></thead><tbody>' +
@@ -870,7 +872,7 @@
       $("propsTakingCount").textContent = nTaken ? nTaken + " marked" : "";
     }
     var pool = ($("propsAll").checked ? rows : rows.filter(propHas)).slice(), list = propsTableRows(pool);
-    ["propsMk", "propsBand", "propsSide", "propsQ", "propsAgree", "propsUsage", "propsRole", "propsSimSel"].forEach(function (id) { var el = $(id); if (el) { var k = { propsMk: "mk", propsBand: "band", propsSide: "side", propsQ: "q", propsAgree: "agree", propsUsage: "usage", propsRole: "role", propsSimSel: "sim" }[id]; if (el.value !== propsTableView[k]) el.value = propsTableView[k]; } });
+    ["propsMk", "propsBand", "propsSide", "propsQ", "propsAgree", "propsUsage", "propsRole", "propsSimSel", "propsTakenSel"].forEach(function (id) { var el = $(id); if (el) { var k = { propsMk: "mk", propsBand: "band", propsSide: "side", propsQ: "q", propsAgree: "agree", propsUsage: "usage", propsRole: "role", propsSimSel: "sim", propsTakenSel: "taken" }[id]; if (el.value !== propsTableView[k]) el.value = propsTableView[k]; } });
     /* the same-game pairs (26 Oct 2026), the likeliest tickets first */
     if ($("propsPairs")) {
       var pairs = propsPairs(date, rows);
@@ -941,7 +943,7 @@
       }
       openFrom(e);
     });
-    [["propsMk", "mk"], ["propsBand", "band"], ["propsSide", "side"], ["propsQ", "q"], ["propsAgree", "agree"], ["propsUsage", "usage"], ["propsRole", "role"], ["propsSimSel", "sim"]].forEach(function (p) {
+    [["propsMk", "mk"], ["propsBand", "band"], ["propsSide", "side"], ["propsQ", "q"], ["propsAgree", "agree"], ["propsUsage", "usage"], ["propsRole", "role"], ["propsSimSel", "sim"], ["propsTakenSel", "taken"]].forEach(function (p) {
       var el = $(p[0]); if (!el) return;
       el.addEventListener(p[0] === "propsQ" ? "input" : "change", function () { propsTableView[p[1]] = el.value; savePropsTableView(); renderProps(); });
     });

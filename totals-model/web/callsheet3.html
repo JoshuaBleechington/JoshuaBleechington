@@ -518,7 +518,7 @@
   <header class="top">
     <div>
       <div class="eyebrow"><span id="eyebrow">MLB · every market on the game</span>
-        <span class="build">· build <span id="build">2026-11-02</span></span></div>
+        <span class="build">· build <span id="build">2026-11-03</span></span></div>
       <h1>The <em>Super</em> Model</h1>
       <p>One matchup, every market the book posts on it — in baseball the full-game total, the first five,
          the moneyline and the run line;
@@ -1047,6 +1047,8 @@
           <select id="propsAgree"><option value="">all</option><option value="all">every lever toward the pick</option><option value="most">more toward than against</option></select></label>
         <label class="f" style="flex-direction:row;align-items:center;gap:6px"><span class="tag">simulation</span>
           <select id="propsSimSel"><option value="">all</option><option value="yes">the sim's read on the pick's side</option><option value="no">the sim's read against the pick</option></select></label>
+        <label class="f" style="flex-direction:row;align-items:center;gap:6px"><span class="tag">taken</span>
+          <select id="propsTakenSel"><option value="">all</option><option value="yes">the props I took</option></select></label>
         <label class="f" style="flex-direction:row;align-items:center;gap:6px"><span class="tag">player or game</span><input id="propsQ" type="text" placeholder="Maxey" autocomplete="off" style="width:150px"></label>
         <span class="tag" id="propsShown"></span>
         <button type="button" class="btn" id="propsReset">Reset view</button>
@@ -3475,7 +3477,7 @@ smStore.ready.then(function () {
      the points for a player, by chance percentage and band"): a sort column with its direction, and filters by market,
      band, side and a name. Kept in this browser only; Reset view puts the table back to by game, then by edge */
   var PROPS_VIEW_KEY = "callsheet3.props.view.v1";
-  var PROPS_VIEW_DEFAULT = { sort: "default", dir: -1, mk: "", band: "", side: "", q: "", agree: "", usage: "", role: "", sim: "" };
+  var PROPS_VIEW_DEFAULT = { sort: "default", dir: -1, mk: "", band: "", side: "", q: "", agree: "", usage: "", role: "", sim: "", taken: "" };   // taken: the props you marked (3 Nov 2026)
   /* the floors (26 Oct 2026, the user: "PRA alt lines at 95% or more, Sengun 10+ points, 5+ rebounds, 3+ assists"): the number
      the model says he clears 95, 90 and 80% of nights, read off the median and the sigma the chance already uses. Measured on
      2025-26 (tools_nba_usage_floors.py): the 95% floors cleared 97.5% of nights, the 90% 93%, the 80% 82%; posted as a whole
@@ -3744,6 +3746,7 @@ smStore.ready.then(function () {
       if (v.usage && propUsageBucket(r) !== v.usage) return false;
       if (v.role && !(v.role === "starter" ? r.starter === true : r.starter === false)) return false;
       if (v.sim) { var ag = propSimAgrees(r); if (ag === null || (v.sim === "yes" ? !ag : ag)) return false; }
+      if (v.taken && !r.take) return false;   // the props you marked (3 Nov 2026)
       if (q && String(r.name || "").toLowerCase().indexOf(q) < 0 && String(r.game || "").toLowerCase().indexOf(q) < 0) return false;
       return true;
     });
@@ -3947,7 +3950,7 @@ smStore.ready.then(function () {
     var graded = props.filter(function (r) { return r.result && r.result !== "graded"; });
     if (!graded.length) return "";
     var mk = function () { return { n: 0, w: 0, l: 0, p: 0, v: 0, says: 0, units: 0 }; };
-    var all = mk(), byMk = {}, byBand = {}, bySide = {}, byEdge = {}, byChance = {}, byDate = {}, byDateBet = {}, byCentre = {}, byTake = mk();
+    var all = mk(), byMk = {}, byBand = {}, bySide = {}, byEdge = {}, byChance = {}, byDate = {}, byDateBet = {}, byDateTake = {}, byCentre = {}, byTake = mk();
     /* the same-game pairs' record (26 Oct 2026): each graded date's tickets as the night built them, a ticket won when both legs did */
     var byPair = mk(), byPairTake = mk(), pairDates = {};
     graded.forEach(function (r) { if (r.gdate) pairDates[r.gdate] = true; });
@@ -3965,7 +3968,7 @@ smStore.ready.then(function () {
                    byEdge[propsEdgeBucket(r)] || (byEdge[propsEdgeBucket(r)] = mk()), byChance[propsChanceBucket(r)] || (byChance[propsChanceBucket(r)] = mk()),
                    byDate[d] || (byDate[d] = mk()), byCentre[propsCentre(r)] || (byCentre[propsCentre(r)] = mk())];
       if (r.band === "BET") sinks.push(byDateBet[d] || (byDateBet[d] = mk()));
-      if (r.take) sinks.push(byTake);   // the props marked as taken (26 Oct 2026)
+      if (r.take) { sinks.push(byTake); sinks.push(byDateTake[d] || (byDateTake[d] = mk())); }   // the props marked as taken (26 Oct 2026), and by night (3 Nov 2026)
       sinks.forEach(function (s) {
         if (r.result === "void") { s.v++; return; }
         if (r.result === "push") { s.p++; return; }
@@ -4017,12 +4020,13 @@ smStore.ready.then(function () {
     h2 += '<div class="subhead">By the centre the chance was read around <span class="tag">the mean to 21 Oct 2026, the median from the 22nd: a box-score stat skews right</span></div><div class="calib" data-sport="PROPS-CENTRE">' +
           (byCentre.mean ? tile("Called at the mean, to 21 Oct", byCentre.mean, []) : "") + (byCentre.median ? tile("Called at the median, from 22 Oct", byCentre.median, []) : "") + '</div>';
     h2 += '<div class="subhead">Night by night <span class="tag">' + dates.length + ' night' + (dates.length === 1 ? '' : 's') + ' graded</span></div>' +
-          '<table class="form" id="propsNights"><thead><tr><th>Night</th><th>Record</th><th>Says</th><th>Does</th><th>Units</th><th>BET band</th></tr></thead><tbody>' +
+          '<table class="form" id="propsNights"><thead><tr><th>Night</th><th>Record</th><th>Says</th><th>Does</th><th>Units</th><th>BET band</th><th>You took</th></tr></thead><tbody>' +
           dates.slice().reverse().map(function (d) {
-            var s = byDate[d], b = byDateBet[d];
+            var s = byDate[d], b = byDateBet[d], t = byDateTake[d];
             var up = s.n && s.w / s.n >= s.says / s.n;
             return '<tr><td>' + esc(gameDate(d)) + '</td><td class="' + (s.units >= 0 ? 'pos' : 'neg') + '">' + rec(s) + (s.v ? ' <span class="dim">' + s.v + ' void</span>' : '') + '</td><td>' + says(s) + '</td><td class="' + (up ? 'pos' : 'neg') + '">' + does(s) + '</td><td class="' + (s.units >= 0 ? 'pos' : 'neg') + '">' + sgn(s.units, 1) + 'u</td>' +
-                   '<td class="' + (b ? (b.units >= 0 ? 'pos' : 'neg') : '') + '">' + (b ? rec(b) + ' ' + sgn(b.units, 1) + 'u' : '—') + '</td></tr>';
+                   '<td class="' + (b ? (b.units >= 0 ? 'pos' : 'neg') : '') + '">' + (b ? rec(b) + ' ' + sgn(b.units, 1) + 'u' : '—') + '</td>' +
+                   '<td class="' + (t && t.n ? (t.units >= 0 ? 'pos' : 'neg') : '') + '" title="' + (t && t.n ? 'the props you marked Taking that night: the sheet said ' + says(t) + ', ' + does(t) + ' landed' : 'no prop marked that night') + '">' + (t ? rec(t) + (t.n ? ' ' + sgn(t.units, 1) + 'u' : '') : '—') + '</td></tr>';
           }).join("") + '</tbody></table>';
     h2 += '<div class="subhead">Says against does, by the chance claimed <span class="tag">a calibrated sheet reads the same in both columns</span></div>' +
           '<table class="form" id="propsLadder"><thead><tr><th>Chance claimed</th><th>Props</th><th>Says</th><th>Does</th><th>±</th><th>Units</th></tr></thead><tbody>' +
@@ -4303,7 +4307,7 @@ smStore.ready.then(function () {
       $("propsTakingCount").textContent = nTaken ? nTaken + " marked" : "";
     }
     var pool = ($("propsAll").checked ? rows : rows.filter(propHas)).slice(), list = propsTableRows(pool);
-    ["propsMk", "propsBand", "propsSide", "propsQ", "propsAgree", "propsUsage", "propsRole", "propsSimSel"].forEach(function (id) { var el = $(id); if (el) { var k = { propsMk: "mk", propsBand: "band", propsSide: "side", propsQ: "q", propsAgree: "agree", propsUsage: "usage", propsRole: "role", propsSimSel: "sim" }[id]; if (el.value !== propsTableView[k]) el.value = propsTableView[k]; } });
+    ["propsMk", "propsBand", "propsSide", "propsQ", "propsAgree", "propsUsage", "propsRole", "propsSimSel", "propsTakenSel"].forEach(function (id) { var el = $(id); if (el) { var k = { propsMk: "mk", propsBand: "band", propsSide: "side", propsQ: "q", propsAgree: "agree", propsUsage: "usage", propsRole: "role", propsSimSel: "sim", propsTakenSel: "taken" }[id]; if (el.value !== propsTableView[k]) el.value = propsTableView[k]; } });
     /* the same-game pairs (26 Oct 2026), the likeliest tickets first */
     if ($("propsPairs")) {
       var pairs = propsPairs(date, rows);
@@ -4374,7 +4378,7 @@ smStore.ready.then(function () {
       }
       openFrom(e);
     });
-    [["propsMk", "mk"], ["propsBand", "band"], ["propsSide", "side"], ["propsQ", "q"], ["propsAgree", "agree"], ["propsUsage", "usage"], ["propsRole", "role"], ["propsSimSel", "sim"]].forEach(function (p) {
+    [["propsMk", "mk"], ["propsBand", "band"], ["propsSide", "side"], ["propsQ", "q"], ["propsAgree", "agree"], ["propsUsage", "usage"], ["propsRole", "role"], ["propsSimSel", "sim"], ["propsTakenSel", "taken"]].forEach(function (p) {
       var el = $(p[0]); if (!el) return;
       el.addEventListener(p[0] === "propsQ" ? "input" : "change", function () { propsTableView[p[1]] = el.value; savePropsTableView(); renderProps(); });
     });
@@ -4576,8 +4580,73 @@ smStore.ready.then(function () {
       return '<div class="' + (s.n ? (s.units > 0 ? 'good' : s.units < 0 ? 'bad' : '') : '') + '"><p class="k">' + esc(label) + '</p><p class="v">' + s.w + '-' + s.l + (s.p ? '-' + s.p : '') + '</p>' +
              '<p class="s">' + (s.n ? 'says ' + says.toFixed(1) + '% · does ' + does.toFixed(1) + '% (±' + (100 / Math.sqrt(s.n) / 2).toFixed(1) + ') · ' + sgn(s.units, 2) + 'u' : 'pushes only') + '</p></div>';
     };
-    return '<div class="subhead" data-sport="TAKEN">What you took <span class="tag">every bet marked Taking before its game, graded at the price shown when it was marked · one unit each · says is the sheet\'s chance</span></div>' +
-           '<div class="calib" data-sport="TAKEN">' + tile("Game bets taken", bets) + tile("Simulation calls taken", sims) + tile("Props taken", pr) + tile("Same-game pairs taken", prs) + '</div>';
+    var h = '<div class="subhead" data-sport="TAKEN">What you took <span class="tag">every bet marked Taking before its game, graded at the price shown when it was marked · one unit each · says is the sheet\'s chance</span></div>' +
+            '<div class="calib" data-sport="TAKEN">' + tile("Game bets taken", bets) + tile("Simulation calls taken", sims) + tile("Props taken", pr) + tile("Same-game pairs taken", prs) + '</div>';
+    /* your picks (3 Nov 2026, the user: "is there a way to have the props that I select taken be graded or tracked so I can
+       see how I'm picking the bets?"): every marked bet that has graded, night by night with the sheet's own BET and LEAN
+       props that night beside it, the props you took by side, band, market and price, and the list of every pick, newest
+       first. Says is the sheet's chance on what you took; a gap between says and does here that the sheet's own tiles do
+       not show is selection, the picks you choose from its list landing less (or more) often than their chances say */
+    var picks = [], payOf = function (price, res) { return res === "win" ? payout(price) : res === "loss" ? -1 : 0; };
+    card.forEach(function (r) {
+      if (isVoid(r)) return;
+      (r.markets || []).forEach(function (m) {
+        if (!m.take) return;
+        var v = takeView(m), res = gradeMarket(v, r.finals);
+        if (res === null || res === "invalid") return;
+        picks.push({ d: r.gdate || "", kind: "game bet", text: v.pick + " · " + r.matchup, p: v.p, price: v.price, res: res, units: payOf(v.price, res) });
+      });
+      if (r.sport === "NBA") (r.simTakes || []).forEach(function (t) {
+        var res = simTakeResOf(t, r); if (!res) return;
+        var price = t.price === null || t.price === undefined ? -110 : t.price;
+        picks.push({ d: r.gdate || "", kind: "simulation call", text: t.pick + " · " + r.matchup, p: t.p === null || t.p === undefined ? 0.5 : t.p, price: price, res: res, units: payOf(price, res) });
+      });
+    });
+    (typeof props === "undefined" ? [] : props).forEach(function (r) {
+      var res = propTakeRes(r); if (!r.take || !res) return;
+      picks.push({ d: r.gdate || "", kind: "prop", text: r.name + " " + r.side + " " + r.line + " " + (PROPS_LABEL[r.mk] || r.mk) + " · " + r.game, p: r.chance, price: r.price, res: res, units: payOf(r.price, res), mk: r.mk, side: r.side, band: r.band || "no edge" });
+    });
+    if (typeof pairTakesAll === "function") pairTakesAll().forEach(function (t) {
+      var res = propsPairRes(t); if (!res) return;
+      picks.push({ d: t.legs[0].gdate || "", kind: "same-game pair", text: t.legs.map(function (r) { return r.name + " " + r.side + " " + r.line + " " + (PROPS_LABEL[r.mk] || r.mk); }).join(" + ") + " · " + t.game, p: t.chance, price: t.price, res: res, units: res === "win" ? propsPairUnits(t, res) : res === "loss" ? -1 : 0 });
+    });
+    if (!picks.length) return h;
+    var agg = function () { return { n: 0, w: 0, l: 0, p: 0, says: 0, units: 0 }; };
+    var put = function (s, x) { if (x.res === "push") { s.p++; return; } s.n++; s.says += x.p; if (x.res === "win") s.w++; else s.l++; s.units += x.units; };
+    var byNight = {}, sheetNight = {};
+    picks.forEach(function (x) { put(byNight[x.d] || (byNight[x.d] = agg()), x); });
+    (typeof props === "undefined" ? [] : props).forEach(function (r) {   // the sheet's own BET and LEAN props each night, the comparison
+      if (!r.gdate || (r.band !== "BET" && r.band !== "LEAN") || !r.result || r.result === "graded" || r.result === "void") return;
+      put(sheetNight[r.gdate] || (sheetNight[r.gdate] = agg()), { res: r.result, p: r.chance, units: payOf(r.price, r.result) });
+    });
+    var line = function (s) { return s.w + "-" + s.l + (s.p ? "-" + s.p : ""); }, pc = function (v) { return (100 * v).toFixed(1) + "%"; };
+    var cls = function (s) { return s.n ? (s.units > 0 ? "pos" : s.units < 0 ? "neg" : "") : ""; }, upcls = function (s) { return s.n ? (s.w / s.n >= s.says / s.n ? "pos" : "neg") : ""; };
+    var nights = Object.keys(byNight).sort().reverse();
+    h += '<div class="subhead" data-sport="TAKEN-NIGHTS">Your picks, night by night <span class="tag">every bet you marked, graded at the price marked · says is the sheet\'s chance on it · beside it, what the sheet\'s own BET and LEAN props did that night</span></div>' +
+         '<table class="form" id="takenNights"><thead><tr><th>Night</th><th>Graded</th><th>Record</th><th>Says</th><th>Does</th><th>Units</th><th>The sheet\'s BET + LEAN props</th></tr></thead><tbody>' +
+         nights.map(function (d) {
+           var s = byNight[d], sh = sheetNight[d], kinds = {};
+           picks.forEach(function (x) { if (x.d === d) kinds[x.kind] = (kinds[x.kind] || 0) + 1; });
+           return '<tr><td>' + esc(gameDate(d)) + '</td><td>' + (s.n + s.p) + ' <span class="dim">' + esc(Object.keys(kinds).map(function (k) { return kinds[k] + " " + k + (kinds[k] === 1 ? "" : "s"); }).join(", ")) + '</span></td>' +
+                  '<td class="' + cls(s) + '">' + line(s) + '</td><td>' + (s.n ? pc(s.says / s.n) : "—") + '</td><td class="' + upcls(s) + '">' + (s.n ? pc(s.w / s.n) : "—") + '</td><td class="' + cls(s) + '">' + sgn(s.units, 1) + 'u</td>' +
+                  '<td class="' + (sh ? cls(sh) : '') + '">' + (sh && sh.n ? line(sh) + ' · ' + pc(sh.w / sh.n) + ' · ' + sgn(sh.units, 1) + 'u' : '—') + '</td></tr>';
+         }).join("") + '</tbody></table>';
+    var pp = picks.filter(function (x) { return x.kind === "prop"; });
+    if (pp.length) {
+      var groups = [], add = function (label, sel) { var s = agg(); pp.forEach(function (x) { if (sel(x)) put(s, x); }); if (s.n || s.p) groups.push([label, s]); };
+      add("Overs", function (x) { return x.side === "OVER"; }); add("Unders", function (x) { return x.side === "UNDER"; });
+      ["BET", "LEAN", "no edge"].forEach(function (b) { add(b === "no edge" ? "No edge: the book's own side" : b + " band", function (x) { return x.band === b; }); });
+      PROPS_ORDER.forEach(function (k) { add(PROPS_LABEL[k], function (x) { return x.mk === k; }); });
+      [["−150 and heavier", -99999, -150], ["−120 to −150", -150, -120], ["−120 to +100", -120, 101], ["plus money", 101, 99999]].forEach(function (b) { add(b[0], function (x) { return x.price >= b[1] && x.price < b[2]; }); });
+      h += '<div class="subhead" data-sport="TAKEN-PROPS">Your props, by side, band, market and price <span class="tag">the breakdown the sheet keeps of its own calls, on the props you took</span></div>' +
+           '<table class="form" id="takenProps"><thead><tr><th>Cut</th><th>Record</th><th>Says</th><th>Does</th><th>Units</th></tr></thead><tbody>' +
+           groups.map(function (g) { var s = g[1]; return '<tr><td>' + esc(g[0]) + '</td><td class="' + cls(s) + '">' + line(s) + '</td><td>' + (s.n ? pc(s.says / s.n) : "—") + '</td><td class="' + upcls(s) + '">' + (s.n ? pc(s.w / s.n) : "—") + '</td><td class="' + cls(s) + '">' + sgn(s.units, 1) + 'u</td></tr>'; }).join("") + '</tbody></table>';
+    }
+    picks.sort(function (a, b) { return (b.d < a.d ? -1 : b.d > a.d ? 1 : 0) || (b.p - a.p); });
+    h += '<details class="takenlist"><summary>Every pick you marked, newest night first · ' + picks.length + ' graded</summary><table class="form" id="takenList"><thead><tr><th>Night</th><th>Bet</th><th>Kind</th><th>Says</th><th>Price</th><th>Result</th><th>Units</th></tr></thead><tbody>' +
+         picks.map(function (x) { return '<tr class="' + esc(x.res) + '"><td>' + esc(gameDate(x.d)) + '</td><td>' + esc(x.text) + '</td><td>' + esc(x.kind) + '</td><td>' + pc(x.p) + '</td><td>' + sgn(x.price, 0) + '</td><td><span class="chip ' + esc(x.res) + '">' + esc(String(x.res).toUpperCase()) + '</span></td><td class="' + (x.units > 0 ? 'pos' : x.units < 0 ? 'neg' : '') + '">' + sgn(x.units, 2) + 'u</td></tr>'; }).join("") + '</tbody></table></details>';
+    h += '<div class="verdict">Says is the sheet\'s chance on what you took, does how often it landed. The sheet\'s own tiles say whether its chances are honest; a gap here that is not there is selection, the picks you choose from its list landing less (or more) often than their chances say. Nothing reads under a hundred picks.</div>';
+    return h;
   }
   /* the buttons: caught before the card or the row underneath opens anything */
   document.addEventListener("click", function (e) {

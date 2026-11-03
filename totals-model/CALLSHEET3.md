@@ -2148,3 +2148,37 @@ written with literal combining marks (`callsheet2.tail.js`, the name key's
 script. That was the 30 Oct "smStore is not defined" flake too. The head
 now opens with `<meta charset="utf-8">` (both builds) and the marks are
 written as `̀-ͯ`.
+
+## Your picks, 3 Nov 2026
+
+The user, with the backup of 2 Nov: "is there a way to have the props that
+I select taken be graded or tracked so I can see how I'm picking the bets?"
+
+They already were, in two places: the **Taken** tile on the Props tab's
+record and **What you took** in Is it working (26 Oct 2026), four tiles for
+the game bets, the simulation's calls, the props and the same-game pairs
+you marked, each graded at the price shown when it was marked. What was
+missing was the view that answers *how am I picking*: night by night, by
+what, against what the sheet itself would have done. So:
+
+- **What you took** goes on to **Your picks, night by night**: every
+  marked bet that has graded, by night, with the record, says (the sheet's
+  chance on what you took), does and the units, and beside each night what
+  the sheet's own BET and LEAN props did that night, the comparison that
+  says whether choosing from the list beat taking the list.
+- **Your props, by side, band, market and price**: the breakdown the sheet
+  keeps of its own calls, on the props you took.
+- **Every pick you marked, newest night first**, folded under a summary:
+  the bet, its kind, the chance, the price, the result and the units.
+- The Props tab's night-by-night table carries a **You took** column, and
+  the Every-prop table a **taken** filter ("the props I took"), kept with
+  the view like the other filters and cleared by Reset view.
+
+The verdict under it says what the numbers mean: the sheet's own tiles say
+whether its chances are honest; a gap between says and does here that is
+not there is selection, the picks chosen from the list landing less (or
+more) often than their chances say. On the 91 props marked to 2 Nov the
+sheet said 60.0% and 53.9% landed (48-41, −3.1 units): the heaviest
+favourites among its calls (−120 to −150 went 16-17), with the BET band
+chosen most (31-24). Nothing reads under a hundred picks, and the line is
+there to read it from.

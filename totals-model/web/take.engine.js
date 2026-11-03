@@ -172,8 +172,73 @@
       return '<div class="' + (s.n ? (s.units > 0 ? 'good' : s.units < 0 ? 'bad' : '') : '') + '"><p class="k">' + esc(label) + '</p><p class="v">' + s.w + '-' + s.l + (s.p ? '-' + s.p : '') + '</p>' +
              '<p class="s">' + (s.n ? 'says ' + says.toFixed(1) + '% · does ' + does.toFixed(1) + '% (±' + (100 / Math.sqrt(s.n) / 2).toFixed(1) + ') · ' + sgn(s.units, 2) + 'u' : 'pushes only') + '</p></div>';
     };
-    return '<div class="subhead" data-sport="TAKEN">What you took <span class="tag">every bet marked Taking before its game, graded at the price shown when it was marked · one unit each · says is the sheet\'s chance</span></div>' +
-           '<div class="calib" data-sport="TAKEN">' + tile("Game bets taken", bets) + tile("Simulation calls taken", sims) + tile("Props taken", pr) + tile("Same-game pairs taken", prs) + '</div>';
+    var h = '<div class="subhead" data-sport="TAKEN">What you took <span class="tag">every bet marked Taking before its game, graded at the price shown when it was marked · one unit each · says is the sheet\'s chance</span></div>' +
+            '<div class="calib" data-sport="TAKEN">' + tile("Game bets taken", bets) + tile("Simulation calls taken", sims) + tile("Props taken", pr) + tile("Same-game pairs taken", prs) + '</div>';
+    /* your picks (3 Nov 2026, the user: "is there a way to have the props that I select taken be graded or tracked so I can
+       see how I'm picking the bets?"): every marked bet that has graded, night by night with the sheet's own BET and LEAN
+       props that night beside it, the props you took by side, band, market and price, and the list of every pick, newest
+       first. Says is the sheet's chance on what you took; a gap between says and does here that the sheet's own tiles do
+       not show is selection, the picks you choose from its list landing less (or more) often than their chances say */
+    var picks = [], payOf = function (price, res) { return res === "win" ? payout(price) : res === "loss" ? -1 : 0; };
+    card.forEach(function (r) {
+      if (isVoid(r)) return;
+      (r.markets || []).forEach(function (m) {
+        if (!m.take) return;
+        var v = takeView(m), res = gradeMarket(v, r.finals);
+        if (res === null || res === "invalid") return;
+        picks.push({ d: r.gdate || "", kind: "game bet", text: v.pick + " · " + r.matchup, p: v.p, price: v.price, res: res, units: payOf(v.price, res) });
+      });
+      if (r.sport === "NBA") (r.simTakes || []).forEach(function (t) {
+        var res = simTakeResOf(t, r); if (!res) return;
+        var price = t.price === null || t.price === undefined ? -110 : t.price;
+        picks.push({ d: r.gdate || "", kind: "simulation call", text: t.pick + " · " + r.matchup, p: t.p === null || t.p === undefined ? 0.5 : t.p, price: price, res: res, units: payOf(price, res) });
+      });
+    });
+    (typeof props === "undefined" ? [] : props).forEach(function (r) {
+      var res = propTakeRes(r); if (!r.take || !res) return;
+      picks.push({ d: r.gdate || "", kind: "prop", text: r.name + " " + r.side + " " + r.line + " " + (PROPS_LABEL[r.mk] || r.mk) + " · " + r.game, p: r.chance, price: r.price, res: res, units: payOf(r.price, res), mk: r.mk, side: r.side, band: r.band || "no edge" });
+    });
+    if (typeof pairTakesAll === "function") pairTakesAll().forEach(function (t) {
+      var res = propsPairRes(t); if (!res) return;
+      picks.push({ d: t.legs[0].gdate || "", kind: "same-game pair", text: t.legs.map(function (r) { return r.name + " " + r.side + " " + r.line + " " + (PROPS_LABEL[r.mk] || r.mk); }).join(" + ") + " · " + t.game, p: t.chance, price: t.price, res: res, units: res === "win" ? propsPairUnits(t, res) : res === "loss" ? -1 : 0 });
+    });
+    if (!picks.length) return h;
+    var agg = function () { return { n: 0, w: 0, l: 0, p: 0, says: 0, units: 0 }; };
+    var put = function (s, x) { if (x.res === "push") { s.p++; return; } s.n++; s.says += x.p; if (x.res === "win") s.w++; else s.l++; s.units += x.units; };
+    var byNight = {}, sheetNight = {};
+    picks.forEach(function (x) { put(byNight[x.d] || (byNight[x.d] = agg()), x); });
+    (typeof props === "undefined" ? [] : props).forEach(function (r) {   // the sheet's own BET and LEAN props each night, the comparison
+      if (!r.gdate || (r.band !== "BET" && r.band !== "LEAN") || !r.result || r.result === "graded" || r.result === "void") return;
+      put(sheetNight[r.gdate] || (sheetNight[r.gdate] = agg()), { res: r.result, p: r.chance, units: payOf(r.price, r.result) });
+    });
+    var line = function (s) { return s.w + "-" + s.l + (s.p ? "-" + s.p : ""); }, pc = function (v) { return (100 * v).toFixed(1) + "%"; };
+    var cls = function (s) { return s.n ? (s.units > 0 ? "pos" : s.units < 0 ? "neg" : "") : ""; }, upcls = function (s) { return s.n ? (s.w / s.n >= s.says / s.n ? "pos" : "neg") : ""; };
+    var nights = Object.keys(byNight).sort().reverse();
+    h += '<div class="subhead" data-sport="TAKEN-NIGHTS">Your picks, night by night <span class="tag">every bet you marked, graded at the price marked · says is the sheet\'s chance on it · beside it, what the sheet\'s own BET and LEAN props did that night</span></div>' +
+         '<table class="form" id="takenNights"><thead><tr><th>Night</th><th>Graded</th><th>Record</th><th>Says</th><th>Does</th><th>Units</th><th>The sheet\'s BET + LEAN props</th></tr></thead><tbody>' +
+         nights.map(function (d) {
+           var s = byNight[d], sh = sheetNight[d], kinds = {};
+           picks.forEach(function (x) { if (x.d === d) kinds[x.kind] = (kinds[x.kind] || 0) + 1; });
+           return '<tr><td>' + esc(gameDate(d)) + '</td><td>' + (s.n + s.p) + ' <span class="dim">' + esc(Object.keys(kinds).map(function (k) { return kinds[k] + " " + k + (kinds[k] === 1 ? "" : "s"); }).join(", ")) + '</span></td>' +
+                  '<td class="' + cls(s) + '">' + line(s) + '</td><td>' + (s.n ? pc(s.says / s.n) : "—") + '</td><td class="' + upcls(s) + '">' + (s.n ? pc(s.w / s.n) : "—") + '</td><td class="' + cls(s) + '">' + sgn(s.units, 1) + 'u</td>' +
+                  '<td class="' + (sh ? cls(sh) : '') + '">' + (sh && sh.n ? line(sh) + ' · ' + pc(sh.w / sh.n) + ' · ' + sgn(sh.units, 1) + 'u' : '—') + '</td></tr>';
+         }).join("") + '</tbody></table>';
+    var pp = picks.filter(function (x) { return x.kind === "prop"; });
+    if (pp.length) {
+      var groups = [], add = function (label, sel) { var s = agg(); pp.forEach(function (x) { if (sel(x)) put(s, x); }); if (s.n || s.p) groups.push([label, s]); };
+      add("Overs", function (x) { return x.side === "OVER"; }); add("Unders", function (x) { return x.side === "UNDER"; });
+      ["BET", "LEAN", "no edge"].forEach(function (b) { add(b === "no edge" ? "No edge: the book's own side" : b + " band", function (x) { return x.band === b; }); });
+      PROPS_ORDER.forEach(function (k) { add(PROPS_LABEL[k], function (x) { return x.mk === k; }); });
+      [["−150 and heavier", -99999, -150], ["−120 to −150", -150, -120], ["−120 to +100", -120, 101], ["plus money", 101, 99999]].forEach(function (b) { add(b[0], function (x) { return x.price >= b[1] && x.price < b[2]; }); });
+      h += '<div class="subhead" data-sport="TAKEN-PROPS">Your props, by side, band, market and price <span class="tag">the breakdown the sheet keeps of its own calls, on the props you took</span></div>' +
+           '<table class="form" id="takenProps"><thead><tr><th>Cut</th><th>Record</th><th>Says</th><th>Does</th><th>Units</th></tr></thead><tbody>' +
+           groups.map(function (g) { var s = g[1]; return '<tr><td>' + esc(g[0]) + '</td><td class="' + cls(s) + '">' + line(s) + '</td><td>' + (s.n ? pc(s.says / s.n) : "—") + '</td><td class="' + upcls(s) + '">' + (s.n ? pc(s.w / s.n) : "—") + '</td><td class="' + cls(s) + '">' + sgn(s.units, 1) + 'u</td></tr>'; }).join("") + '</tbody></table>';
+    }
+    picks.sort(function (a, b) { return (b.d < a.d ? -1 : b.d > a.d ? 1 : 0) || (b.p - a.p); });
+    h += '<details class="takenlist"><summary>Every pick you marked, newest night first · ' + picks.length + ' graded</summary><table class="form" id="takenList"><thead><tr><th>Night</th><th>Bet</th><th>Kind</th><th>Says</th><th>Price</th><th>Result</th><th>Units</th></tr></thead><tbody>' +
+         picks.map(function (x) { return '<tr class="' + esc(x.res) + '"><td>' + esc(gameDate(x.d)) + '</td><td>' + esc(x.text) + '</td><td>' + esc(x.kind) + '</td><td>' + pc(x.p) + '</td><td>' + sgn(x.price, 0) + '</td><td><span class="chip ' + esc(x.res) + '">' + esc(String(x.res).toUpperCase()) + '</span></td><td class="' + (x.units > 0 ? 'pos' : x.units < 0 ? 'neg' : '') + '">' + sgn(x.units, 2) + 'u</td></tr>'; }).join("") + '</tbody></table></details>';
+    h += '<div class="verdict">Says is the sheet\'s chance on what you took, does how often it landed. The sheet\'s own tiles say whether its chances are honest; a gap here that is not there is selection, the picks you choose from its list landing less (or more) often than their chances say. Nothing reads under a hundred picks.</div>';
+    return h;
   }
   /* the buttons: caught before the card or the row underneath opens anything */
   document.addEventListener("click", function (e) {

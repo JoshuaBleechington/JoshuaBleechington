@@ -476,7 +476,7 @@ const CHECKS = ["dome","playoff"];
       'props: a file that projects nothing says last season\'s ledger was not read, names the folder the run saw, and says what to put back', propsT.noneMsg.slice(0, 500));
   chk(/Nothing graded yet/.test(propsT.tabEmpty0) && /^Every prop with a side 1-1 says 54\.6% · does 50\.0%/i.test(propsT.tabCalib) && /BET band 1-0 says 56\.0% · does 100\.0%/i.test(propsT.tabCalib)
       && /^PROPS-TAB:Every prop with a side\|BET band\|No edge: the book's own side(\|Same-game pairs, at the parlay price)?$/.test(propsT.tabBlocks[0]) && propsT.tabBlocks[1] === 'PROPS-MK:points|rebounds|assists' && propsT.tabBlocks[2] === 'PROPS-EDGE:3 to 6 points|no edge'
-      && propsT.tabBlocks[3] === 'PROPS-CENTRE:Called at the mean, to 21 Oct' && propsT.nights.length === 1 && /^Oct 21 1-1 1 void 54\.6% 50\.0% [-−]0\.1u 1-0 \+0\.9u$/.test(propsT.nights[0])
+      && propsT.tabBlocks[3] === 'PROPS-CENTRE:Called at the mean, to 21 Oct' && propsT.nights.length === 1 && /^Oct 21 1-1 1 void 54\.6% 50\.0% [-−]0\.1u 1-0 \+0\.9u —$/.test(propsT.nights[0])
       && propsT.ladder.length === 2 && /^50 to 55% 1 53\.2% 0\.0% 50\.0 [-−]1\.0u$/.test(propsT.ladder[0]) && /^55 to 60% 1 56\.0% 100\.0% 50\.0 \+0\.9u$/.test(propsT.ladder[1]) && /Called at the median/.test(propsT.tabCalib) === false,
       'props: the tab\'s own Is it working block: the bands as tiles, by market, by the edge claimed, the centre the chance was read around, night by night and says against does by the chance claimed; empty until something grades',
       JSON.stringify({ blocks: propsT.tabBlocks, nights: propsT.nights, ladder: propsT.ladder, head: propsT.tabCalib.slice(0, 160), empty: propsT.tabEmpty0.slice(0, 60) }));
@@ -1305,6 +1305,9 @@ const CHECKS = ["dome","playoff"];
     const dates = ['2026-10-20', '2026-10-21', '2026-10-22', '2026-10-23', '2026-10-24', '2026-10-25', '2026-10-26', '2026-10-27', '2026-10-28'];
     const rows = []; dates.forEach((d, i) => { rows.push(heavy(i * 2 + 1, d, 'Tyler Herro', 'pts', 'UNDER', 'win')); rows.push(heavy(i * 2 + 2, d, 'Bam Adebayo', 'reb', 'OVER', 'loss')); });
     rows.push(Object.assign(heavy(99, '2026-10-29', 'Norman Powell', 'pts', 'UNDER', null), { result: null, actual: null, amin: null }));   // tonight's, ungraded: the tenth night on the tab
+    // three of Herro's unders marked Taking (3 Nov 2026: your picks), one on a night the trim takes, and a LEAN on the sheet's own side on the 28th for the comparison
+    rows.filter(r => r.name === 'Tyler Herro' && ['2026-10-20', '2026-10-23', '2026-10-28'].indexOf(r.gdate) >= 0).forEach(r => { r.take = true; });
+    rows.filter(r => r.name === 'Bam Adebayo' && r.gdate === '2026-10-28').forEach(r => { r.band = 'LEAN'; r.edge = 0.012; });
     await smStore.setItem('callsheet3.props.v1', JSON.stringify(rows));
   });
   await reloaded();
@@ -1340,8 +1343,19 @@ const CHECKS = ["dome","playoff"];
     URL.createObjectURL = mkURL; HTMLAnchorElement.prototype.click = click;
     const text = blob ? await blob.text() : '', parsed = text ? JSON.parse(text) : null;
     const backup = parsed ? { format: parsed.format, props: parsed.props.length, propLines: text.slice(text.indexOf('"props": [')).split('\n').filter(l => /^    \{"id":/.test(l)).length, trimmedInFile: parsed.props.filter(r => r.trim).length, whyInFile: parsed.props.filter(r => r.why).length, card: Array.isArray(parsed.card), draft: !!parsed.draft, msg: txt(document.getElementById('saveMsg')) } : null;
-    document.getElementById('m-nba').click(); await wait(); await smStore.removeItem('callsheet3.props.v1');
-    return { trimmed, whole, gone, kept, tile: tile.slice(0, 160), nights, strip: strip.slice(0, 200), panel: panel.slice(0, 700), h4s, thisRow, wholeHas: /what moves it/i.test(wholePanel) && /\bwhy\b/i.test(wholePanel) && /every book/i.test(wholePanel) && /simulation · Heat @ Hornets played 10,000 times/i.test(wholePanel) && !/trimmed from the save/.test(wholePanel), wholeStrip: wholeStrip.slice(0, 120), backup };
+    // your picks (3 Nov 2026): the night table's You took column, the Taken filter, and the record's night-by-night, the props' cuts and the list
+    const youTook = [...document.querySelectorAll('#propsNights tbody tr')].map(tr => { const td = tr.querySelectorAll('td'); return td[0].textContent.trim() + '|' + td[6].textContent.trim() + '|' + td[6].className; });
+    sel.value = '2026-10-23'; sel.dispatchEvent(new Event('change')); await wait();
+    const takenSel = document.getElementById('propsTakenSel'); takenSel.value = 'yes'; takenSel.dispatchEvent(new Event('change', { bubbles: true })); await wait();
+    const onlyTaken = [...document.querySelectorAll('#propsTable tbody tr[data-prop]')].map(tr => tr.querySelectorAll('td')[1].textContent.trim()), takenShown = txt(document.getElementById('propsShown')), takenStored = JSON.parse(localStorage.getItem('callsheet3.props.view.v1') || '{}').taken;
+    document.getElementById('propsReset').click(); await wait();
+    const afterReset = { n: document.querySelectorAll('#propsTable tbody tr[data-prop]').length, taken: document.getElementById('propsTakenSel').value };
+    document.getElementById('m-nba').click(); await wait();
+    const fold = document.querySelector('.takenlist'); if (fold) fold.open = true;   // the list sits folded; innerText reads nothing from a closed fold
+    const yourNights = [...document.querySelectorAll('#takenNights tbody tr')].map(tr => txt(tr)), yourProps = [...document.querySelectorAll('#takenProps tbody tr')].map(tr => txt(tr)), yourList = [...document.querySelectorAll('#takenList tbody tr')].map(tr => txt(tr)), yourSummary = txt(document.querySelector('.takenlist summary'));
+    await smStore.removeItem('callsheet3.props.v1');
+    return { trimmed, whole, gone, kept, tile: tile.slice(0, 160), nights, strip: strip.slice(0, 200), panel: panel.slice(0, 700), h4s, thisRow, wholeHas: /what moves it/i.test(wholePanel) && /\bwhy\b/i.test(wholePanel) && /every book/i.test(wholePanel) && /simulation · Heat @ Hornets played 10,000 times/i.test(wholePanel) && !/trimmed from the save/.test(wholePanel), wholeStrip: wholeStrip.slice(0, 120), backup,
+             youTook, onlyTaken, takenShown, takenStored, afterReset, yourNights, yourProps, yourList, yourSummary };
   });
   chk(JSON.stringify(trimT.trimmed) === JSON.stringify(['2026-10-20', '2026-10-21', '2026-10-22']) && JSON.stringify(trimT.whole) === JSON.stringify(['2026-10-23', '2026-10-24', '2026-10-25', '2026-10-26', '2026-10-27', '2026-10-28', '2026-10-29']) && trimT.gone && trimT.kept,
       'trim: on load, a prop on a night older than the last seven on the tab loses the panel\'s detail (the why, the last games, the levers, the books, the simulation, the fives, what happened) and keeps its record (the call, the price, the chance, the band, the result, his minutes, the median, the centre), stamped with the day; the last seven nights stay whole, tonight\'s ungraded one among them',
@@ -1352,6 +1366,13 @@ const CHECKS = ["dome","playoff"];
       JSON.stringify({ tile: trimT.tile, nights: trimT.nights, strip: trimT.strip, panel: trimT.panel.slice(0, 320), h4s: trimT.h4s, thisRow: trimT.thisRow, wholeHas: trimT.wholeHas, wholeStrip: trimT.wholeStrip }));
   chk(trimT.backup && trimT.backup.format === 'callsheet3.backup' && trimT.backup.card && trimT.backup.draft && trimT.backup.props === 19 && trimT.backup.propLines === 19 && trimT.backup.trimmedInFile === 6 && trimT.backup.whyInFile === 13 && /Backup saved as/.test(trimT.backup.msg),
       'trim: the backup file writes a prop a line, compact, the trimmed rows without their detail, and parses as a backup with the card and the draft', JSON.stringify(trimT.backup));
+  chk(trimT.youTook.length === 9 && trimT.youTook.filter(s => /\|1-0 \+0\.9u\|pos$/.test(s)).length === 3 && trimT.youTook.filter(s => /\|—\|$/.test(s)).length === 6 && /^Oct 28\|1-0/.test(trimT.youTook[0]) && /^Oct 20\|1-0/.test(trimT.youTook[8])
+      && JSON.stringify(trimT.onlyTaken) === JSON.stringify(['Tyler Herro G']) && /^1 of 2 shown$/.test(trimT.takenShown) && trimT.takenStored === 'yes' && trimT.afterReset.n === 2 && trimT.afterReset.taken === '',
+      'your picks: the Props tab\'s night table carries a You took column (the marked props\' record that night, a dash on a night with none, a trimmed night counted too), and the Taken filter keeps only the props you marked until Reset view', JSON.stringify({ youTook: trimT.youTook, onlyTaken: trimT.onlyTaken, shown: trimT.takenShown, stored: trimT.takenStored, after: trimT.afterReset }));
+  chk(trimT.yourNights.length === 3 && /^Oct 28 1 1 prop 1-0 51\.0% 100\.0% \+0\.9u 0-1 · 0\.0% · [-−]1\.0u$/.test(trimT.yourNights[0]) && /^Oct 23 1 1 prop 1-0 51\.0% 100\.0% \+0\.9u —$/.test(trimT.yourNights[1]) && /^Oct 20 1 1 prop 1-0 51\.0% 100\.0% \+0\.9u —$/.test(trimT.yourNights[2])
+      && trimT.yourProps.length === 4 && /^Unders 3-0 51\.0% 100\.0% \+2\.7u$/.test(trimT.yourProps[0]) && /^No edge: the book's own side 3-0/.test(trimT.yourProps[1]) && /^points 3-0/.test(trimT.yourProps[2]) && /^[-−]120 to \+100 3-0/.test(trimT.yourProps[3])
+      && trimT.yourList.length === 3 && /^Oct 28 Tyler Herro UNDER 20\.5 points · Heat @ Hornets prop 51\.0% [-−]110 WIN \+0\.91u$/.test(trimT.yourList[0]) && /^Oct 20 /.test(trimT.yourList[2]) && /^Every pick you marked, newest night first · 3 graded$/.test(trimT.yourSummary),
+      'your picks: What you took goes on to your picks night by night with the sheet\'s own BET and LEAN props beside each night (the 28th\'s lean lost, the other nights had none), your props by side, band, market and price, and every pick newest first', JSON.stringify({ nights: trimT.yourNights, props: trimT.yourProps, list: trimT.yourList, summary: trimT.yourSummary }));
 
   // ---- 28 Oct 2026: the three voices on the total -- the sim's own view and the crew on the same side, the sheet not against it: BET on the Simulation card and the board, takeable, with its own record line ----
   const agreeT = await pg.evaluate(async () => {

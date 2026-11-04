@@ -2321,3 +2321,61 @@ book's. The simulation's table carries the same read under its two
 team-total rows, beside the gap rule, so the crowd sits next to the one
 scored call on those markets. Shown, not scored, like the rest of the
 exchange.
+
+## Easier on the eyes, 4 Nov 2026
+
+The user: "Could you add a little color and since the to the KALSHI so it
+stands out on the props and game matchups? and i dont know why but for
+the 'this matchup' section, its seems a little too wordy or much on the
+eye and it never gives a green bet signal anymore and not sure if we can
+condense that section and make the other sections, like the simulation,
+refs, lineups, Kalshi, the board, the middles, the context be a little
+more of the forefront and just easier on the eyes to navigate since we
+have made many changes lol".
+
+**Why the pick card is grey on most NBA rows.** The sheet's pick is the
+likeliest side among the markets its inputs inform, and only where those
+inputs move the chance a point off the book's own number. On the NBA the
+close already carries the ratings, the rest and the announced absences
+(measured against two seasons of closes, and faded or shown accordingly),
+so the inputs rarely move a point and the card reads "No pick yet". The
+green that does fire on the NBA lives in the engines down the card: the
+agreement rule (the three voices), the simulation's bands by worth, the
+gap rule on the team totals, a middle that pays, the upset signal, and
+the watches (Pinnacle's shade, the crew's lean, the crowd against
+Pinnacle). None of that was visible from the rail.
+
+**Tonight's signals.** The matchup rail now opens with a strip of chips,
+one for every engine's call on the row: the pick and #1's verdict, the
+upset signal, Pinnacle's shade, the three voices, the simulation's calls
+with their worth, the gap rule, the middles, the crew's lean, the crowd on
+Kalshi (the sharp side, and its winner, spread, total and team totals at
+even money) and who is out. Green when a scored rule fires, gold for a
+watch, the exchange's purple for the crowd, grey for information; each
+chip is a link to its section. When nothing fires the strip says so in one
+line. `signalList()` builds the list off the same functions the panels
+use (`nbaVoices`, `nbaSimCalls`, the gap rule on `nbaSimLinesFromForm`,
+`nbaMiddleWatch` and `nbaMiddlePairs`, `nbaCrewLean`, `kalshiOf` and
+`kalshiSharpOf`, `nbaOutList`), and `signalStrip()` renders it at the end
+of every render of the rail. Shown: it adds no number and takes nothing.
+
+**The jump bar and the live lines.** The NBA card starts with a sticky bar
+of links to its sections (who is out, form, simulation, middles,
+referees, Kalshi, context) and on to the board, the card and the record;
+each section's dot lights in the colour of its strongest signal, and the
+section heading carries a live line with the same words ("gap rule:
+Lakers team total UNDER 119.5 · gap +1.5"), so a scroll down the card
+reads like a list. The explanations under every section fold under
+"about this section", the rail's long how-to folds under "how to read
+this card", each market row's reasoning folds under "the reasoning" with
+the numbers and chips left in view, and the why list's alternates line
+keeps the four nearest numbers and counts the rest. The harness reads the
+strip, the dots, the live lines and the folds on the Hawks @ Wizards row.
+
+**Kalshi in its own colour.** A `--crowd` token (purple, with a dark-mode
+shade) marks the exchange wherever it shows: the word on every line, the
+prop card's line and the props strip, the prop panel's tile, the board's
+chips (a solid purple chip when the exchange's price is better after the
+fee), the simulation table's line under the team totals, the Kalshi
+section's heading and its panel's bold figures. Green stays what it was:
+a scored rule that fires.

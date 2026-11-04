@@ -393,7 +393,7 @@
     }
     if (k.totMed !== null && k.totMed !== undefined) bits.push("total " + k.totMed.toFixed(1) + (r.total !== null && r.total !== undefined && isFinite(+r.total) ? " (the book's " + esc(String(r.total)) + ")" : ""));
     if (k.ml) bits.push(esc(k.ph >= 0.5 ? home : away) + " to win " + (100 * Math.max(k.ph, k.pa)).toFixed(1) + "%");
-    return bits.length ? "The crowd on Kalshi: " + bits.join(" · ") : "";
+    return bits.length ? 'The crowd on <b class="kname">Kalshi</b>: ' + bits.join(" · ") : "";
   }
   /* the crowd on the prop itself (4 Nov 2026, the user's player listings): the props run keeps the player's ladder on the prop
      (kal.r, the exchange's "25+" as a floor of 24.5, the same rule as the book's line), so the crowd's chance of the pick's side at
@@ -411,21 +411,21 @@
   }
   function propKalshiLine(r) {
     var q = propKalshi(r); if (!q) return "";
-    if (q.p === null) return "Kalshi: the crowd's ladder runs " + q.lo + "+ to " + q.hi + "+; the line " + esc(String(r.line)) + " sits outside it";
-    var s = "Kalshi: the crowd " + (100 * q.p).toFixed(1) + "% on the " + esc(r.side) + " (the sheet " + (100 * r.chance).toFixed(1) + "%)";
+    if (q.p === null) return '<b class="kname">Kalshi</b>: the crowd\'s ladder runs ' + q.lo + "+ to " + q.hi + "+; the line " + esc(String(r.line)) + " sits outside it";
+    var s = '<b class="kname">Kalshi</b>: the crowd <b>' + (100 * q.p).toFixed(1) + "%</b> on the " + esc(r.side) + " (the sheet " + (100 * r.chance).toFixed(1) + "%)";
     if (q.need !== null && r.price !== null && r.price !== undefined) {
       var bn = implied(+r.price), better = q.need < bn - 0.001;
-      s += " · " + (better ? "better on Kalshi: " : "") + kalshiCents(q.ask) + " needs " + (100 * q.need).toFixed(1) + "% after the fee v " + sgn(+r.price, 0) + " needing " + (100 * bn).toFixed(1) + "%" + (better ? "" : ": the book");
+      s += " · " + (better ? "<b>better on Kalshi</b>: " : "") + kalshiCents(q.ask) + " needs " + (100 * q.need).toFixed(1) + "% after the fee v " + sgn(+r.price, 0) + " needing " + (100 * bn).toFixed(1) + "%" + (better ? "" : ": the book");
     } else s += " · no rung at the line, so no price to compare";
     return s;
   }
   function propKalshiTile(r, tile) {
     var q = propKalshi(r); if (!q) return "";
-    if (q.p === null) return tile("Kalshi's crowd", "–", "the crowd's ladder runs " + q.lo + "+ to " + q.hi + "+; the line sits outside it");
+    if (q.p === null) return tile("Kalshi's crowd", "–", "the crowd's ladder runs " + q.lo + "+ to " + q.hi + "+; the line sits outside it", "kal");
     var sub = "the crowd's chance of the " + esc(r.side) + " at " + esc(String(r.line)) + (q.med !== null ? " · its number " + q.med.toFixed(1) : "");
     if (q.need !== null) sub += " · " + kalshiCents(q.ask) + " needs " + (100 * q.need).toFixed(1) + "% after the fee" + (r.price !== null && r.price !== undefined ? (q.need < implied(+r.price) - 0.001 ? ", better than " : ", not better than ") + sgn(+r.price, 0) : "");
     else sub += " · no rung at the line, so no price";
-    return tile("Kalshi's crowd", (100 * q.p).toFixed(1) + "%", sub);
+    return tile("Kalshi's crowd", (100 * q.p).toFixed(1) + "%", sub, "kal");
   }
   function propsFivesHtml(r) {
     var f = r.fives; if (!f || (!f.away && !f.home)) return '';

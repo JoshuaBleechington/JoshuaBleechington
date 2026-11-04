@@ -589,7 +589,7 @@
     catch (e) { m = null; }
     last = m;
     var box = $("markets"), why = $("why");
-    if (!m) { box.innerHTML = '<div class="empty">Enter a total to start. Add both moneyline prices for the sides.</div>'; why.innerHTML = ""; return; }
+    if (!m) { box.innerHTML = '<div class="empty">Enter a total to start. Add both moneyline prices for the sides.</div>'; why.innerHTML = ""; if (typeof signalStrip === "function") signalStrip(null); return; }
     /* The rail ranks by EDGE, always: the toggle on the day board orders the
        table, not this list. Probability stays the big number on every row. */
     var byProb = false;
@@ -662,7 +662,8 @@
         '</div>' +
         '<div class="mkdetail"><span class="other' + (isLikely && likely.onOther ? ' likely' : '') + '">Other side: ' + esc(mk.other.pick) + ' ' + (mk.other.p * 100).toFixed(1) + '%' +
           (mk.other.edge !== null ? ' at ' + sgn(mk.other.price, 0) + ', edge ' + sgn(mk.other.edge * 100, 1) : '') + (isLikely && likely.onOther ? ': the likeliest outcome in this game' : '') + '.</span> ' +
-          mk.notes.map(function (n) { return n; }).join(" ") + '</div>';
+          /* the reasoning folds under the row (4 Nov 2026, the user: "a little too wordy"): the numbers stay in view, the words open on a click */
+          (mk.notes.length ? '<details class="mknotes"><summary>the reasoning</summary><div>' + mk.notes.map(function (n) { return n; }).join(" ") + '</div></details>' : '') + '</div>';
     });
     /* THE PICK above, the rest folded under it (12 Oct 2026, at the user's
        request). In the hockey window the call row is the list, as before. */
@@ -679,6 +680,7 @@
     }
     box.innerHTML = html;
     why.innerHTML = m.notes.concat(m.total.notes).concat(lastFiveNote()).concat(shopNotes(m)).map(function (n) { return "<li>" + n + "</li>"; }).join("");
+    if (typeof signalStrip === "function") signalStrip(m, pk, upsetView, likely, leg);   // tonight's signals at the top of the rail (4 Nov 2026)
   }
   /* The last five starts ride along on the row and the rail but touch no
      number. The line names them so a reader knows they were seen. */
@@ -902,8 +904,11 @@
     }
     var alts = altLines(m, txt("odds")), side = m.total.side, mine = alts.filter(function (a) { return a.side === side; });
     if (mine.length) {
+      /* the nearest four alternates, the rest counted (4 Nov 2026, the user: "too wordy"): the odds file lists dozens, and the ones a step or two off the number are the ones shopped */
+      var shown = mine.slice(0, 4), more = mine.length - shown.length;
       notes.push("<b>Alternates on the " + esc(String(side).toLowerCase()) + ", priced by the sheet's projection of " + m.total.projected.toFixed(2) + ", shown, not picked:</b> " +
-        mine.map(function (a) { return esc(String(a.point)) + " at " + sgn(a.price, 0) + " (" + esc(bookName(a.book)) + ") " + (a.p * 100).toFixed(1) + "%, edge " + sgn(a.edge * 100, 1); }).join("; ") +
+        shown.map(function (a) { return esc(String(a.point)) + " at " + sgn(a.price, 0) + " (" + esc(bookName(a.book)) + ") " + (a.p * 100).toFixed(1) + "%, edge " + sgn(a.edge * 100, 1); }).join("; ") +
+        (more > 0 ? "; and " + more + " more further from the number, in the odds file" : "") +
         ". The Line box stays on the book's main number; an alternate is shopped here, not typed there.");
     }
     var sp = splitOf(txt("odds"));

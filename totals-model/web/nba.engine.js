@@ -313,7 +313,98 @@
       var bn = isFinite(+bp) && +bp ? implied(+bp) : null, better = bn !== null && q.need < bn - 0.001;
       return ' · ' + nm + ' ' + kalshiCents(q.ask) + ' needs ' + (100 * q.need).toFixed(1) + '% after the fee' + (bn !== null ? (better ? ', <b>better than</b> ' : ', not better than ') + sgn(+bp, 0) + ' needing ' + (100 * bn).toFixed(1) + '%' : '');
     };
-    return 'Kalshi: the crowd <b>' + (100 * qo.p).toFixed(1) + '%</b> over at ' + esc(String(line)) + (qo.rung ? px('over', qo, op) + px('under', qu, up) : ' · no rung at the line, so no price');
+    return '<b class="kname">Kalshi</b>: the crowd <b>' + (100 * qo.p).toFixed(1) + '%</b> over at ' + esc(String(line)) + (qo.rung ? px('over', qo, op) + px('under', qu, up) : ' · no rung at the line, so no price');
+  }
+  /* ---- tonight's signals (4 Nov 2026, the user: "it never gives a green bet signal anymore... make the other sections, like
+     the simulation, refs, lineups, Kalshi, the board, the middles, the context be a little more of the forefront"). The
+     sheet's own pick stays grey on most NBA rows because the close already carries what its inputs know; the calls that do
+     fire live in the engines down the card. This strip gathers every one of them at the top of the matchup rail: the pick
+     and #1's verdict, the upset signal, Pinnacle's shade, the agreement rule, the simulation's bands, the gap rule, the
+     middles, the crew's lean, the crowd on Kalshi and who is out. Green when a scored rule fires, gold for a watch, the
+     exchange in its own colour, each chip a link to its section; the jump bar's dots and the sections' live lines read
+     off the same list. Shown: it adds no number and takes nothing ---- */
+  function signalChip(cls, go, badge, html) { return { cls: cls, go: go, badge: badge, html: html, text: badge + ": " + html.replace(/<[^>]+>/g, "") }; }
+  function signalList(m, pk, upsetView, leg) {
+    var out = [], pc = function (p) { return (100 * p).toFixed(1) + "%"; }, nba = sport === "NBA";
+    if (pk && !pk.none && pk.mk) {
+      var hot = !!(pk.mk.band && pk.mk.band !== "NO BET");
+      out.push(signalChip(hot ? "go" : "watch", "markets", hot ? "the pick · " + pk.mk.band : "the pick", "<b>" + esc(pk.mk.pick) + "</b> · " + pc(pk.mk.p) + (pk.mk.edge !== null && pk.mk.edge !== undefined ? " · edge " + sgn(pk.mk.edge * 100, 1) : "")));
+    }
+    if (leg && typeof bandOf === "function" && bandOf(leg)) out.push(signalChip("go", "markets", "#1 says " + bandOf(leg), "<b>" + esc(leg.pick) + "</b> · " + pc(leg.p) + " at " + sgn(leg.price, 0)));
+    if (upsetView && upsetView.dog) out.push(signalChip(upsetView.scored ? "go" : "watch", "markets", upsetView.scored ? "upset signal" : "upset watch", "<b>" + esc(upsetView.dog.pick) + "</b> · " + pc(upsetView.dog.p)));
+    var ss = typeof sharpShadeOf === "function" ? sharpShadeOf(($("sharp") || {}).value || "") : null;
+    if (ss) out.push(signalChip("watch", "markets", "Pinnacle", "shades the <b>" + esc(ss.side) + "</b> by " + ss.pts.toFixed(1) + " points"));
+    if (!nba) return out;
+    var inputs = snapshot(), f = readNba(), row = nbaSimTakeRow(f), away = f.away || "Away", home = f.home || "Home";
+    var V = null; try { V = nbaVoices({ sport: "NBA", inputs: inputs, markets: (m && m.markets) || [] }); } catch (e) { V = null; }
+    if (V && V.fires) out.push(signalChip("go", "secSim", "three voices · BET", "<b>" + esc(V.side) + " " + esc(String(V.line)) + "</b> · " + V.count + " of 3 on it, none against"));
+    else if (V && V.side && !V.against) out.push(signalChip("watch", "secSim", "three voices", V.count + " of 3 on the <b>" + esc(V.side) + "</b>" + (V.agree ? (V.alt ? ", but the row's line is an alternate" : ", but the price asks more than the rule's rate") : ", no rule without the sim and the crew")));
+    var sim = nbaSim(), lines = nbaSimLinesFromForm();
+    if (sim) {
+      var seen = {};
+      ["own", "mkt"].forEach(function (view) {
+        if (view === "mkt" && !sim.mkt) return;
+        nbaSimCalls(sim, lines, view).forEach(function (c) {
+          if (c.band === "no call" || seen[c.key + c.side]) return;
+          seen[c.key + c.side] = true;
+          var what = c.key === "away_total" ? away + " team total " + c.side + " " + c.line : c.key === "home_total" ? home + " team total " + c.side + " " + c.line
+                   : c.key === "ml" ? (c.side === "HOME" ? home : away) + " ML" : c.key === "spread" ? (c.side === "HOME" ? home : away) + " " + sgn(c.side === "HOME" ? +c.line : -c.line, 1)
+                   : (c.key === "h1" ? "1H " : "") + c.side + " " + c.line;
+          out.push(signalChip(c.band === "LEAN" ? "watch" : "go", "secSim", "sim · " + c.band, "<b>" + esc(what) + "</b> · worth " + (100 * c.worth).toFixed(0) + "%" + (view === "mkt" ? " · anchored to the market" : "")));
+        });
+      });
+    }
+    [["away_tt", away], ["home_tt", home]].forEach(function (t) {
+      var tt = lines[t[0]]; if (!tt || !tt.rule || !tt.rule.call) return;
+      out.push(signalChip("go", "secSim", "gap rule", "<b>" + esc(t[1]) + " team total " + tt.rule.call + " " + esc(String(tt.line)) + "</b> · gap " + (tt.rule.gap > 0 ? "+" : "") + tt.rule.gap));
+    });
+    try {
+      var W = row ? nbaMiddleWatch(row) : [], paying = W.filter(function (x) { return x.m.pays; })[0];
+      if (paying) out.push(signalChip("go", "secMid", "middle open", "<b>" + esc(paying.side) + " " + esc(String(paying.other.point)) + " at " + esc(bookName(paying.other.book)) + "</b> with your " + esc(paying.leg.side) + " " + esc(String(paying.leg.line)) + " · pays " + sgn(100 * paying.m.ev, 1) + "%"));
+      else {
+        var P = nbaMiddlePairs(row ? row.inputs : inputs, 6), pp = P ? P.pairs.filter(function (x) { return x.m.pays; })[0] : null;
+        if (pp) out.push(signalChip("go", "secMid", "a pair pays", "<b>over " + esc(String(pp.over.point)) + " / under " + esc(String(pp.under.point)) + "</b> · " + sgn(100 * pp.m.ev, 1) + "% of the stake"));
+      }
+    } catch (e) {}
+    var cl = null; try { cl = nbaCrewLean({ inputs: inputs }); } catch (e) { cl = null; }
+    if (cl && cl.lean && cl.lean !== "even") out.push(signalChip("watch", "secCrew", "crew", "leans <b>" + esc(String(cl.lean).toUpperCase()) + "</b> · z " + sgn(cl.z, 1)));
+    var k = kalshiOf(($("nbakalshi") || {}).value || "");
+    if (k) {
+      var ks = kalshiSharpOf({ inputs: inputs });
+      if (ks) out.push(signalChip("crowd", "secKalshi", "Kalshi", "the sharp side <b>" + esc(ks.side === "HOME" ? home : away) + "</b> · the crowd " + ks.pts.toFixed(1) + " points over Pinnacle on the " + esc(ks.side === "HOME" ? away : home)));
+      var bits = [];
+      if (k.ml) bits.push("<b>" + esc(k.ph >= 0.5 ? home : away) + "</b> to win " + pc(Math.max(k.ph, k.pa)));
+      if (k.spMed !== null) bits.push("spread <b>" + (Math.abs(k.spMed) < 0.05 ? "a pick" : esc(k.spMed > 0 ? home : away) + " " + sgn(-Math.abs(k.spMed), 1)) + "</b>");
+      if (k.totMed !== null) bits.push("total <b>" + k.totMed.toFixed(1) + "</b>");
+      if (k.ttAMed !== null || k.ttHMed !== null) bits.push("team totals " + [k.ttAMed !== null ? esc(away) + " <b>" + k.ttAMed.toFixed(1) + "</b>" : "", k.ttHMed !== null ? esc(home) + " <b>" + k.ttHMed.toFixed(1) + "</b>" : ""].filter(Boolean).join(", "));
+      if (bits.length) out.push(signalChip("crowd", "secKalshi", "the crowd", bits.join(" · ")));
+    }
+    try {
+      var d = nbaOutList(), outs = function (s) { return (d[s] || []).filter(function (p) { return /^out/i.test(String(p.st || "")); }).length; }, oa = outs("away"), oh = outs("home");
+      if (oa || oh) out.push(signalChip("info", "secOut", "out", [oa ? esc(away) + " <b>" + oa + "</b> (" + nbaOutMinutes("away").toFixed(0) + " min of regulars)" : "", oh ? esc(home) + " <b>" + oh + "</b> (" + nbaOutMinutes("home").toFixed(0) + " min of regulars)" : ""].filter(Boolean).join(" · ")));
+    } catch (e) {}
+    return out;
+  }
+  function signalStrip(m, pk, upsetView, likely, leg) {
+    var el = $("signals"); if (!el) return;
+    var nav = $("nbaNav"), live = { secOut: [], secSim: [], secMid: [], secCrew: [], secKalshi: [] };
+    var list = [];
+    if (m) { try { list = signalList(m, pk, upsetView, leg); } catch (e) { list = []; } }
+    if (!m) { el.hidden = true; el.innerHTML = ""; }
+    else {
+      el.hidden = false;
+      el.innerHTML = '<div class="sighead">Tonight\'s signals <span class="tag">every engine\'s call on this row · green fires, gold watches, purple the crowd</span></div>' +
+        (list.length ? list.map(function (s) { return '<a class="sig ' + s.cls + '" href="#' + s.go + '"><span class="sb">' + esc(s.badge) + '</span><span class="st">' + s.html + '</span></a>'; }).join("")   // two flex items: the badge, then the words as one span, so the gap never splits a sentence
+                     : '<span class="quiet">Nothing fires on this row tonight: the sheet\'s pick, the simulation, the agreement rule, the gap rule, the middles and the watches all sit inside their lines.</span>');
+    }
+    list.forEach(function (s) { if (live[s.go]) live[s.go].push(s); });
+    Object.keys(live).forEach(function (id) {
+      var t = $(id + "Live"); if (t) t.textContent = live[id].map(function (s) { return s.text; }).join(" · ");
+      if (nav) {
+        var dot = nav.querySelector('a[data-go="' + id + '"] .dot');
+        if (dot) { var top = live[id].filter(function (s) { return s.cls === "go"; })[0] || live[id].filter(function (s) { return s.cls === "watch"; })[0] || live[id][0]; dot.className = "dot" + (top ? " " + top.cls : ""); }
+      }
+    });
   }
   function kalshiSharpRaw(raw) { var s = null; try { s = raw ? JSON.parse(raw) : null; } catch (e) { s = null; } return s && isFinite(+s.hml) && isFinite(+s.aml) && +s.hml && +s.aml ? s : null; }
   function kalshiSharpOf(row) {
@@ -332,9 +423,9 @@
     var line = mk.key === "ml" ? null : (typeof lineOf === "function" ? lineOf(mk) : mk.point), q = kalshiSideQuote(k, mk.key, mk.side, line);
     if (!q) return "";
     var crowd = 'the crowd ' + (q.p * 100).toFixed(1) + '%' + (mk.key === "ml" ? '' : ' at this line');
-    if (q.need === null || mk.price === null || mk.price === undefined) return ' <span class="tagm">Kalshi: ' + crowd + '</span>';
+    if (q.need === null || mk.price === null || mk.price === undefined) return ' <span class="tagm kal">Kalshi: ' + crowd + '</span>';
     var book = implied(+mk.price), better = q.need < book - 0.001;
-    return ' <span class="tagm' + (better ? ' warn' : '') + '" title="' + (better ? 'The exchange\'s price for this side needs less than the book\'s after Kalshi\'s fee on the win' : 'The book\'s price needs less than the exchange\'s after Kalshi\'s fee on the win') + '">' +
+    return ' <span class="tagm kal' + (better ? ' warn' : '') + '" title="' + (better ? 'The exchange\'s price for this side needs less than the book\'s after Kalshi\'s fee on the win' : 'The book\'s price needs less than the exchange\'s after Kalshi\'s fee on the win') + '">' +
            (better ? 'better on Kalshi: ' : 'Kalshi ') + kalshiCents(q.ask) + ' needs ' + (q.need * 100).toFixed(1) + '% after the fee v ' + sgn(+mk.price, 0) + ' needing ' + (book * 100).toFixed(1) + '%' + (better ? '' : ': the book') + ' · ' + crowd + '</span>';
   }
   function nbaKalshiPanel() {
@@ -359,7 +450,7 @@
       } else if (need !== null) price = ' · ' + kalshiCents(s.ask) + ' needs ' + pc(need) + ' after the fee';
       return '<li><b>' + esc(nick) + '</b> ' + kalshiCents(kalshiMid(s)) + ' <span class="dim">(bid ' + kalshiCents(s.bid) + ' / ask ' + kalshiCents(s.ask) + ' · ' + kalshiVol(s.vol) + ')</span>: ' + bits.join(' · ') + price + '</li>';
     };
-    var h = '<div class="kalshi"><p><b>The crowd on Kalshi</b>' + (whenTxt ? ' <span class="dim">· as the run read it, ' + esc(whenTxt) + '</span>' : '') + '</p>';
+    var h = '<div class="kalshi"><p><b>The crowd on <span class="kname">Kalshi</span></b>' + (whenTxt ? ' <span class="dim">· as the run read it, ' + esc(whenTxt) + '</span>' : '') + '</p>';
     var gapTxt = "";
     if (k.ml) {
       h += '<ul class="ctx">' + line(away, k.a, k.pa, book ? book.a : null, pin ? pin.a : null, book ? book.aml : null, k.needA) +
@@ -910,7 +1001,7 @@
                      (tt.rule.call ? '<span class="simchip simbet gaprule"><b>' + tt.rule.call + '</b> by the gap rule</span> ' + nbaSimTakeBtn(takeRow, "gap", m[0], tt.rule.call) : '<span class="dim">inside a point, no call</span>') + '</div>';
           }
           var kk = typeof kalshiOf === "function" ? kalshiOf(($("nbakalshi") || {}).value || "") : null, kl = kk ? kalshiTTLine(kk, m[0], +m[2], tt.op, tt.up) : "";   // the crowd on Kalshi beside the gap rule (4 Nov 2026)
-          if (kl) first += '<div class="ttgap">' + kl + '</div>';
+          if (kl) first += '<div class="ttgap kal">' + kl + '</div>';
         } else {
           first += '</div>';
         }

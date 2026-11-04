@@ -1579,6 +1579,10 @@ const CHECKS = ["dome","playoff"];
                                    shrink: { total: 0.05, h1: 0.1, spread: 0.0, ml: 0.97, team: 1.5, team_away: 0.3, team_own: 0.3, quarter: 0.1 }, bands: [[0.7, 'STRONG'], [0.65, 'BET'], [0.6, 'LEAN']] })); await wait();
     const withSim = txt(document.getElementById('nbaKalshiPanel'));
     const simTT = [...document.querySelectorAll('#nbaSimPanel .simtab td')].map(td => txt(td)).filter(s => /team total/i.test(s));
+    // tonight's signals on the rail (4 Nov 2026): the gap rule's two calls, the crowd's sharp side and numbers; the jump bar's dots and the live lines read off the same list
+    const signals = txt(document.getElementById('signals')), simLive = txt(document.getElementById('secSimLive')), kalLive = txt(document.getElementById('secKalshiLive'));
+    const dots = [...document.querySelectorAll('#nbaNav a[data-go]')].map(a => a.dataset.go + ':' + ((a.querySelector('.dot') || {}).className || ''));
+    const folded = { about: [...document.querySelectorAll('#nbaFields details.about')].length, aboutOpen: [...document.querySelectorAll('#nbaFields details.about[open]')].length, rail: !!document.querySelector('#markets + details.about, .rail details.about'), notes: [...document.querySelectorAll('#markets details.mknotes')].length };
     set('nbasim', ''); await wait();
     document.getElementById('add').click(); await wait();
     document.getElementById('boardDate').value = '2026-11-14'; document.getElementById('boardDate').dispatchEvent(new Event('change')); await wait();
@@ -1595,8 +1599,16 @@ const CHECKS = ["dome","playoff"];
     await load({ format: 'callsheet2.slate', version: 1, date: '2026-11-15', games: [{ sport: 'NBA', gdate: '2026-11-15', away: 'Kings', home: 'Spurs', notes: [], inputs: { nbakalshi: JSON.stringify(Object.assign({}, kal, { ev: 'KXNBAGAME-26NOV15SACSAS', a: { bid: 0.60, ask: 0.61, last: 0.61, vol: 5000, oi: 4000 } })) } }] }, 'nba-slate-2026-11-15b.json');
     const second = ((JSON.parse(smStore.getItem('callsheet3.card.v1')).find(r => /Kings @ Spurs/.test(r.matchup)) || { inputs: {} }).inputs.nbakalshi || '');
     document.getElementById('clear').click(); await wait(); await smStore.removeItem('callsheet3.card.v1');
-    return { empty, panel, noPin, chips, stored, mlTile, first: first.slice(0, 60), second: second.indexOf('"bid":0.6') >= 0, between, withSim, simTT };
+    return { empty, panel, noPin, chips, stored, mlTile, first: first.slice(0, 60), second: second.indexOf('"bid":0.6') >= 0, between, withSim, simTT, signals, simLive, kalLive, dots, folded };
   });
+  chk(/gap rule:? ?Hawks team total UNDER 118\.5 · gap \+1\b/i.test(kalT.signals) && /gap rule:? ?Wizards team total OVER 113\.5 · gap -1\.5/i.test(kalT.signals)
+      && /Kalshi:? ?the sharp side Hawks · the crowd 3\.7 points over Pinnacle on the Wizards/i.test(kalT.signals)
+      && /the crowd:? ?Hawks to win 57\.5% · spread Hawks [-−]2\.8 · total 232\.3 · team totals Hawks 117\.5, Wizards 114\.1/i.test(kalT.signals)
+      && /gap rule: Hawks team total UNDER 118\.5 · gap \+1 · gap rule: Wizards team total OVER 113\.5/.test(kalT.simLive) && /^Kalshi: the sharp side Hawks/.test(kalT.kalLive)
+      && kalT.dots.indexOf('secSim:dot go') >= 0 && kalT.dots.indexOf('secKalshi:dot crowd') >= 0 && kalT.dots.indexOf('secMid:dot') >= 0 && kalT.dots.indexOf('boardDate:') >= 0
+      && kalT.folded.about === 7 && kalT.folded.aboutOpen === 0 && kalT.folded.rail && kalT.folded.notes >= 3,
+      'signals: the matchup rail opens with tonight\'s signals, every engine\'s call on the row as a chip that links to its section (the gap rule\'s two calls green, the crowd\'s sharp side and its numbers in the exchange\'s colour); the jump bar\'s dots and the sections\' live lines read off the same list, and the explanations fold under a line on the rail, on every NBA section and under each market row',
+      JSON.stringify({ signals: kalT.signals.slice(0, 900), simLive: kalT.simLive, kalLive: kalT.kalLive, dots: kalT.dots, folded: kalT.folded }));
   chk(/The spread: the crowd Hawks [-−]2\.8 · the book Hawks [-−]2\.5\. At the book's number: Wizards covers 49\.0% by the crowd, \d+\.\d% by the sheet · Wizards \+2\.5 49\.0% by the crowd, better on Kalshi: 50¢ needs 51\.[78]% after the fee against [-−]110 needing 52\.4% · Hawks [-−]2\.5 51\.0% by the crowd, the book's price: 52¢ needs 53\.7% after the fee against [-−]110 needing 52\.4%\./.test(kalT.panel)
       && /The total: the crowd 232\.3 · the book 232\.5 · Pinnacle 232\.5\. At the book's 232\.5: the over 49\.0% by the crowd, \d+\.\d% by the sheet · over 232\.5 49\.0% by the crowd, better on Kalshi: 50¢ needs 51\.[78]% after the fee against [-−]110 needing 52\.4% · under 232\.5 51\.0% by the crowd, the book's price: 52¢ needs 53\.7% after the fee against [-−]110 needing 52\.4%\./.test(kalT.panel)
       && /At the book's 231\.5: the over 53\.0% by the crowd, \d+\.\d% by the sheet · no rung at the book's number on the exchange \(its ladder runs two points apart\), so no price to compare\./.test(kalT.between),

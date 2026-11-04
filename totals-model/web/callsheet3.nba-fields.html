@@ -7,14 +7,31 @@
               <div class="f"><label for="h1up">1H under price</label><input id="h1up" type="number" step="5" inputmode="numeric" placeholder="-110"></div>
             </div>
           </div>
-<!-- ===== FIELDS: the NBA inputs. Who is out on top; what the slate fills folded below it ===== -->
+<!-- ===== FIELDS: the NBA inputs. A jump bar first (4 Nov 2026), then who is out on top; what the slate fills folded below it.
+     Each section's explanation folds under "about this section" so the numbers lead; the live line under a heading and the
+     jump bar's dots read off tonight's signals on the matchup rail ===== -->
       <div id="nbaFields" class="stack" hidden>
-        <section class="card">
-          <h2>Who is out <span class="tag">the one input the market learns late</span></h2>
+        <nav id="nbaNav" class="jumpbar" aria-label="Sections of the NBA card">
+          <a href="#secOut" data-go="secOut"><i class="dot"></i>Who is out</a>
+          <a href="#secForm" data-go="secForm"><i class="dot"></i>Form</a>
+          <a href="#secSim" data-go="secSim"><i class="dot"></i>Simulation</a>
+          <a href="#secMid" data-go="secMid"><i class="dot"></i>Middles</a>
+          <a href="#secCrew" data-go="secCrew"><i class="dot"></i>Referees</a>
+          <a href="#secKalshi" data-go="secKalshi"><i class="dot"></i>Kalshi</a>
+          <a href="#secCtx" data-go="secCtx"><i class="dot"></i>Context</a>
+          <span class="sep"></span>
+          <a href="#boardDate" data-go="boardDate">Board</a>
+          <a href="#cardCount" data-go="cardCount">Card</a>
+          <a href="#calibBox" data-go="calibBox">Record</a>
+        </nav>
+
+        <section class="card" id="secOut">
+          <h2>Who is out <span class="tag">the one input the market learns late</span><span class="live" id="secOutLive"></span></h2>
           <div class="body">
             <div id="nbaOutPanel" class="note">No list on the row — load the slate and Fill form, and each side's injury report comes with it.</div>
             <div class="subhead">Starting five <span class="tag">RotoWire's lineup for each side, expected or confirmed · shown, not scored</span></div>
             <div id="nbaLineupPanel" class="note">No lineup on the row — load the slate and Fill form, and RotoWire's starting five for each side comes with it (today's and tomorrow's games only).</div>
+            <details class="about"><summary>about this section</summary>
             <p class="note">Each side's injury report, from the slate: every player listed with his status and his minutes, points and
               plus-minus a game this season. A player marked <b>Out</b> counts; tick the box on a doubtful one when he is ruled out.
               The regulars' minutes (20 a game or more) are summed and shown in the why list. <b>Shown, not scored</b>: against two
@@ -24,6 +41,7 @@
               <b>The starting five</b> is RotoWire's: <b>expected</b> in the morning, <b>confirmed</b> once the club says so, with the men
               who may not play under it. The slate reads today's page and tomorrow's, the two RotoWire shows; run it again late and the
               newer lineup rides on the newer file. Shown, not scored: a lineup is a name on the card, not a number on the line.</p>
+            </details>
             <div class="links">
               <a href="https://official.nba.com/nba-injury-report-2026-27-season/" target="_blank" rel="noopener">NBA · official injury report</a>
               <a href="https://www.espn.com/nba/injuries" target="_blank" rel="noopener">ESPN · injuries</a>
@@ -33,24 +51,27 @@
           </div>
         </section>
 
-        <section class="card">
-          <h2>Recent form <span class="tag">last five, each side — the score, the half, the total and the spread against the close · shown, not scored</span></h2>
+        <section class="card" id="secForm">
+          <h2>Recent form <span class="tag">last five a side, against the close · shown, not scored</span></h2>
           <div class="body">
             <div id="nbaFormPanel" class="note">No recent games on the row — load the slate and Fill form, and each side's last five come with it.</div>
+            <details class="about"><summary>about this section</summary>
             <p class="note">Each side's last five finals from the ledger, with the half-time score, and against each one the close the
               odds run last saw: the total (over or under), the first-half total, and the spread (covered or not, from this
               side's view). A game the odds run never saw shows its score alone; a game on this card borrows the card's
               close. <b>Shown, not scored</b>: five games of scores is noise dressed as a trend, and a club's own over/under
               run measured null within a season against two seasons of closes (slope −0.05 on 2,137 games). It is here to
               catch what the season line hides: a club suddenly scoring 130, a half that keeps coming in under.</p>
+            </details>
             <input type="hidden" id="nbaform">
           </div>
         </section>
 
-        <section class="card">
-          <h2>Simulation <span class="tag">the game played 10,000 times — the sim's own view and the market-anchored view · the band from what the replay found the chance worth · shown, and recorded by band</span></h2>
+        <section class="card" id="secSim">
+          <h2>Simulation <span class="tag">the game played 10,000 times · the sim's own view and the market-anchored view · recorded by band</span><span class="live" id="secSimLive"></span></h2>
           <div class="body">
             <div id="nbaSimPanel" class="note simpanel">No simulation on the row — load the slate and Fill form, and the game's runs come with it.</div>
+            <details class="about"><summary>about this section</summary>
             <p class="note">The slate plays the game possession by possession, thousands of times: each club's pace and shot mix, its
               offence into the other's defence, home court, rest, the regulars out, the crew's whistle, who is on the floor by the
               quarter, the benches when it gets away, the fouling at the end of a close one, overtime. <b>The sim's own view</b> is
@@ -61,14 +82,16 @@
               50% whatever they said, because the close already carries the ratings; its win chances were within three points of
               true. The record below keeps says against does by band from the first night, and nothing here moves a number until
               it earns it there.</p>
+            </details>
             <input type="hidden" id="nbasim">
           </div>
         </section>
 
-        <section class="card">
-          <h2>Middles <span class="tag">the over at one number and the under at a higher one, priced off the sheet's own distribution — the apps' numbers now, the legs you hold, any pair · measured on two seasons</span></h2>
+        <section class="card" id="secMid">
+          <h2>Middles <span class="tag">the over at one number and the under at a higher one · the apps' numbers now, the legs you hold</span><span class="live" id="secMidLive"></span></h2>
           <div class="body">
             <div id="nbaMidPanel" class="note">No odds on the row — load the odds file (Run NBA odds) and the apps' numbers come with it.</div>
+            <details class="about"><summary>about this section</summary>
             <p class="note">A middle is the over at one number and the under at a higher one: the final between them wins both legs,
               outside them one leg loses and the other wins, so the pair pays when the final lands between often enough to cover the
               juice (4.8% of the time at -110 on both legs). Two seasons of lines history say the four apps sit within a point of
@@ -78,22 +101,25 @@
               pair here is priced off it, pushes on an integer line included. The first leg is a bet you wanted anyway, placed early;
               the watch names the second once the number has run, and the second leg gives up its vig to take the loss off the
               table. The apps' numbers follow the newest odds run on the row; the logged line stays as the markets were scored.</p>
+            </details>
           </div>
         </section>
 
-        <section class="card">
-          <h2>Referee stats <span class="tag">the crew against the close — shown, not scored, with its own watch on the record</span></h2>
+        <section class="card" id="secCrew">
+          <h2>Referee stats <span class="tag">the crew against the close · a watch on the record</span><span class="live" id="secCrewLive"></span></h2>
           <div class="body">
             <div id="nbaCrewPanel" class="note">No crew on the row — load the slate and Fill form once the league has posted the assignments (about 9 am Eastern), or type the names below.</div>
             <div>
               <div class="f"><label for="ncrew">Crew <span class="tag">the referees, comma-separated; the slate fills it when the league has posted the assignments</span></label><input id="ncrew" type="text" placeholder="Scott Foster, Tony Brothers, Marc Davis" autocomplete="off"></div>
             </div>
+            <details class="about"><summary>about this section</summary>
             <p class="note">Each referee's free throws and points a game over the ledger seasons against the league's, and his record against
               the closing total: the last two seasons, frozen, and this one as it builds. An official 1.5 sigma or more over or under
               across the two seasons <b>leans</b>, and the crew leans by the sum of its three: the badge and the colour say so. <b>Shown,
               not scored</b>: crews predict the night's free throws (t 7.3) and the total does not follow them (t −1.0), so a lean is a
               watch, and the record's referee block keeps the season's totals against the close by the crew's lean. The league posts
               the crews about 9 am Eastern; the slate fills the box from its feed, or you type the names from the link below.</p>
+            </details>
             <div class="links">
               <a href="https://official.nba.com/referee-assignments/" target="_blank" rel="noopener">NBA · referee assignments</a>
             </div>
@@ -101,10 +127,11 @@
           </div>
         </section>
 
-        <section class="card">
-          <h2>The crowd on Kalshi <span class="tag">the exchange's price on each side beside the book's and Pinnacle's — shown, not scored, the sharp side against the crowd on watch</span></h2>
+        <section class="card" id="secKalshi">
+          <h2>The crowd on Kalshi <span class="tag">the exchange's price beside the book's and Pinnacle's · the sharp side on watch · shown, not scored</span><span class="live" id="secKalshiLive"></span></h2>
           <div class="body">
             <div id="nbaKalshiPanel" class="note">No Kalshi price on the row — load the slate or the odds file and Fill form, and the exchange's game-winner market comes with it.</div>
+            <details class="about"><summary>about this section</summary>
             <p class="note">A Kalshi contract pays a dollar if the club wins and trades in cents, so its price is the crowd's chance with no vig
               and the bid-ask spread is the only juice; the fee is taken on the win, 7% of the expected profit a contract, so a yes at
               57 cents needs 58.7% to break even. The card reads each side three ways, the crowd, the book's own devigged moneyline and
@@ -114,14 +141,16 @@
               or team total, the chance at the book's number is read straight between two rungs, and on a rung each side's price is
               set against the book's after the fee. <b>Shown, not scored</b>: a prediction market's price is a
               market price, and the market is already the sheet's spine.</p>
+            </details>
             <input type="hidden" id="nbakalshi">
           </div>
         </section>
 
-        <section class="card">
-          <h2>Context <span class="tag">where each club stands in the league, and what the sheet did with it</span></h2>
+        <section class="card" id="secCtx">
+          <h2>Context <span class="tag">each club's league ranks, and what the sheet did with them</span></h2>
           <div class="body">
             <div id="nbaCtxPanel" class="note">No context on the row — load the slate and Fill form, and the lines come with it.</div>
+            <details class="about"><summary>about this section</summary>
             <p class="note">Each line is a club's rank against the other 29 on a number the slate already holds: offensive and
               defensive rating, pace, points scored and allowed, the last ten, free-throw rate, three-point rate, home and road
               records, the regulars out. A club shows up when it sits in the top or bottom six of the league; the stage of the
@@ -129,6 +158,7 @@
               and the book moves to, so each line says what the sheet already did with the fact: <b>faded</b> because the market
               over-moves with early-season ratings, <b>scored</b> when a stage delta is on the line, <b>shown</b> because it measured
               inside the number against two seasons of closes, or a <b>label</b>. Nothing here moves a number on its own.</p>
+            </details>
           </div>
         </section>
 

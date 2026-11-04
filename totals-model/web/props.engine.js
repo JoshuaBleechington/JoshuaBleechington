@@ -392,6 +392,9 @@
       bits.push((Math.abs(m) < 0.05 ? "a pick" : esc(m > 0 ? home : away) + " by " + Math.abs(m).toFixed(1)) + (sp !== null ? " (the book's spread " + esc(sp <= 0 ? home : away) + " " + sgn(-Math.abs(sp), 1) + ")" : ""));
     }
     if (k.totMed !== null && k.totMed !== undefined) bits.push("total " + k.totMed.toFixed(1) + (r.total !== null && r.total !== undefined && isFinite(+r.total) ? " (the book's " + esc(String(r.total)) + ")" : ""));
+    /* the team totals too (4 Nov 2026, the user: "what about the team totals for each matchup?"): each club's number at even money off its own ladder */
+    var tta = k.ttAMed !== null && k.ttAMed !== undefined ? esc(away) + " " + k.ttAMed.toFixed(1) : "", tth = k.ttHMed !== null && k.ttHMed !== undefined ? esc(home) + " " + k.ttHMed.toFixed(1) : "";
+    if (tta || tth) bits.push("team totals " + [tta, tth].filter(Boolean).join(" · "));
     if (k.ml) bits.push(esc(k.ph >= 0.5 ? home : away) + " to win " + (100 * Math.max(k.ph, k.pa)).toFixed(1) + "%");
     return bits.length ? 'The crowd on <b class="kname">Kalshi</b>: ' + bits.join(" · ") : "";
   }

@@ -1060,7 +1060,8 @@ const CHECKS = ["dome","playoff"];
     // the crowd on the row (4 Nov 2026): the Knicks by 5.25 at even money on the ladders (57% by 3.5, 49% by 5.5), the total 229.25, the Knicks to win 69.5%
     const rung = (x, mid, vol) => [x, +(mid - 0.01).toFixed(2), +(mid + 0.01).toFixed(2), +mid.toFixed(2), vol];
     set('nbakalshi', JSON.stringify({ at: '2026-11-14T20:00:00Z', ev: 'KXNBAGAME-26NOV14PHINYK', fee: 0.07, a: { bid: 0.30, ask: 0.31, last: 0.31, vol: 5000, oi: 4000 }, h: { bid: 0.69, ask: 0.70, last: 0.70, vol: 9000, oi: 8000 },
-      sp: { h: [rung(1.5, 0.66, 100), rung(3.5, 0.57, 100), rung(5.5, 0.49, 100), rung(7.5, 0.41, 100)], a: [rung(1.5, 0.26, 10), rung(3.5, 0.2, 10)] }, tot: [rung(227.5, 0.57, 100), rung(229.5, 0.49, 100), rung(231.5, 0.42, 100)] })); await wait();
+      sp: { h: [rung(1.5, 0.66, 100), rung(3.5, 0.57, 100), rung(5.5, 0.49, 100), rung(7.5, 0.41, 100)], a: [rung(1.5, 0.26, 10), rung(3.5, 0.2, 10)] }, tot: [rung(227.5, 0.57, 100), rung(229.5, 0.49, 100), rung(231.5, 0.42, 100)],
+      tt: { a: [rung(106.5, 0.58, 50), rung(108.5, 0.49, 50), rung(110.5, 0.40, 50)], h: [rung(116.5, 0.60, 50), rung(118.5, 0.52, 50), rung(120.5, 0.43, 50)] } })); await wait();   // the team totals: the 76ers 108.3 and the Knicks 118.9 at even money
     document.getElementById('add').click(); await wait();
     document.getElementById('clear').click(); await wait();
     const awayBefore = document.getElementById('away').value;
@@ -1075,9 +1076,9 @@ const CHECKS = ["dome","playoff"];
     await smStore.removeItem('callsheet3.card.v1'); document.getElementById('clear').click(); await wait();
     return { cardOff0, cardTitle0, fives, me, heads, panelOff, panelText, takeStill, stillOpen, said, awayBefore, cardLive, propsHidden, dlgHidden, away, home, nbaPressed, lineupPanel, kalLine, kalStrip };
   });
-  chk(/^The crowd on Kalshi: Knicks by 5\.3 \(the book's spread (Knicks|76ers) [-−]\d+(\.\d)?\) · total 229\.3 \(the book's \d+(\.\d)?\) · Knicks to win 69\.5% · from the matchup's row on the NBA card; shown, not scored$/.test(goT.kalLine)
-      && goT.kalStrip.length === 1 && /^The crowd on Kalshi: Knicks by 5\.3 \(the book's spread (Knicks|76ers) [-−]\d+(\.\d)?\) · total 229\.3 \(the book's \d+(\.\d)?\) · Knicks to win 69\.5%$/.test(goT.kalStrip[0]),
-      'props: once the NBA card\'s row for the game carries the crowd on Kalshi, the prop\'s panel and the game\'s strip read the crowd\'s spread, total and winner off it beside the book\'s numbers (the Knicks by 5.3 at even money, the total 229.3, the Knicks to win 69.5%)', JSON.stringify({ line: goT.kalLine, strip: goT.kalStrip }));
+  chk(/^The crowd on Kalshi: Knicks by 5\.3 \(the book's spread (Knicks|76ers) [-−]\d+(\.\d)?\) · total 229\.3 \(the book's \d+(\.\d)?\) · team totals 76ers 108\.3 · Knicks 118\.9 · Knicks to win 69\.5% · from the matchup's row on the NBA card; shown, not scored$/.test(goT.kalLine)
+      && goT.kalStrip.length === 1 && /^The crowd on Kalshi: Knicks by 5\.3 \(the book's spread (Knicks|76ers) [-−]\d+(\.\d)?\) · total 229\.3 \(the book's \d+(\.\d)?\) · team totals 76ers 108\.3 · Knicks 118\.9 · Knicks to win 69\.5%$/.test(goT.kalStrip[0]),
+      'props: once the NBA card\'s row for the game carries the crowd on Kalshi, the prop\'s panel and the game\'s strip read the crowd\'s spread, total, team totals and winner off it beside the book\'s numbers (the Knicks by 5.3 at even money, the total 229.3, the 76ers 108.3 and the Knicks 118.9, the Knicks to win 69.5%)', JSON.stringify({ line: goT.kalLine, strip: goT.kalStrip }));
   chk(goT.cardOff0 === true && /^The NBA card has no row for 76ers @ Knicks on /.test(goT.cardTitle0) && goT.fives.length === 2 && /^76ers EXPECTED PG Tyrese Maxey SG VJ Edgecombe SF Paul George THIS PROP PF Kelly Oubre Jr\. C Adem Bona May not play: C Andre Drummond \(Questionable\)\.$/i.test(goT.fives[0])
       && /^Knicks CONFIRMED PG Jalen Brunson SG Mikal Bridges SF OG Anunoby PF Josh Hart C Karl-Anthony Towns$/i.test(goT.fives[1]) && /^SF Paul George THIS PROP$/i.test(goT.me) && goT.heads.join(',') === 'lbadge exp|expected,lbadge conf|confirmed'
       && goT.panelOff === true && /^open the matchup on the nba card$/i.test(goT.panelText) && goT.takeStill && goT.stillOpen && /^The NBA card has no row for 76ers @ Knicks on .+: load the NBA slate for the date \(Load slate\) and Add the game, and the button opens it\.$/.test(goT.said),
@@ -1603,11 +1604,13 @@ const CHECKS = ["dome","playoff"];
   });
   chk(/gap rule:? ?Hawks team total UNDER 118\.5 · gap \+1\b/i.test(kalT.signals) && /gap rule:? ?Wizards team total OVER 113\.5 · gap -1\.5/i.test(kalT.signals)
       && /Kalshi:? ?the sharp side Hawks · the crowd 3\.7 points over Pinnacle on the Wizards/i.test(kalT.signals)
-      && /the crowd:? ?Hawks to win 57\.5% · spread Hawks [-−]2\.8 · total 232\.3 · team totals Hawks 117\.5, Wizards 114\.1/i.test(kalT.signals)
+      && /the crowd:? ?Hawks to win 57\.5% · spread Hawks [-−]2\.8 · total 232\.3\b/i.test(kalT.signals)
+      && /Kalshi team total:? ?Hawks 117\.5 · the book 118\.5 · leans UNDER, the over 45\.0% at the book's number/i.test(kalT.signals)
+      && /Kalshi team total:? ?Wizards 114\.1 · the book 113\.5 · sits with the book, the over 53\.0% at the book's number/i.test(kalT.signals)
       && /gap rule: Hawks team total UNDER 118\.5 · gap \+1 · gap rule: Wizards team total OVER 113\.5/.test(kalT.simLive) && /^Kalshi: the sharp side Hawks/.test(kalT.kalLive)
       && kalT.dots.indexOf('secSim:dot go') >= 0 && kalT.dots.indexOf('secKalshi:dot crowd') >= 0 && kalT.dots.indexOf('secMid:dot') >= 0 && kalT.dots.indexOf('boardDate:') >= 0
       && kalT.folded.about === 7 && kalT.folded.aboutOpen === 0 && kalT.folded.rail && kalT.folded.notes >= 3,
-      'signals: the matchup rail opens with tonight\'s signals, every engine\'s call on the row as a chip that links to its section (the gap rule\'s two calls green, the crowd\'s sharp side and its numbers in the exchange\'s colour); the jump bar\'s dots and the sections\' live lines read off the same list, and the explanations fold under a line on the rail, on every NBA section and under each market row',
+      'signals: the matchup rail opens with tonight\'s signals, every engine\'s call on the row as a chip that links to its section (the gap rule\'s two calls green, the crowd\'s sharp side and its numbers in the exchange\'s colour, each club\'s team total as a chip of its own against the book\'s line with the side the crowd leans to); the jump bar\'s dots and the sections\' live lines read off the same list, and the explanations fold under a line on the rail, on every NBA section and under each market row',
       JSON.stringify({ signals: kalT.signals.slice(0, 900), simLive: kalT.simLive, kalLive: kalT.kalLive, dots: kalT.dots, folded: kalT.folded }));
   chk(/The spread: the crowd Hawks [-−]2\.8 · the book Hawks [-−]2\.5\. At the book's number: Wizards covers 49\.0% by the crowd, \d+\.\d% by the sheet · Wizards \+2\.5 49\.0% by the crowd, better on Kalshi: 50¢ needs 51\.[78]% after the fee against [-−]110 needing 52\.4% · Hawks [-−]2\.5 51\.0% by the crowd, the book's price: 52¢ needs 53\.7% after the fee against [-−]110 needing 52\.4%\./.test(kalT.panel)
       && /The total: the crowd 232\.3 · the book 232\.5 · Pinnacle 232\.5\. At the book's 232\.5: the over 49\.0% by the crowd, \d+\.\d% by the sheet · over 232\.5 49\.0% by the crowd, better on Kalshi: 50¢ needs 51\.[78]% after the fee against [-−]110 needing 52\.4% · under 232\.5 51\.0% by the crowd, the book's price: 52¢ needs 53\.7% after the fee against [-−]110 needing 52\.4%\./.test(kalT.panel)

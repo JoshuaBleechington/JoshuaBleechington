@@ -2320,7 +2320,19 @@ simulation's, and on a rung each side's price after the fee against the
 book's. The simulation's table carries the same read under its two
 team-total rows, beside the gap rule, so the crowd sits next to the one
 scored call on those markets. Shown, not scored, like the rest of the
-exchange.
+exchange. Asked again later that night ("what about the team totals for
+each matchup?"), the Props tab's matchup line, on each game's strip and
+on the prop's panel, carries them too, between the total and the winner
+("team totals 76ers 108.3 · Knicks 118.9"). And on the matchup rail,
+at the user's word ("can I have the team totals predictions from Kalshi
+be on the matchup section with a color like you have the other
+signals"), each club's team total is a purple chip of its own in
+tonight's signals: the crowd's number at even money, the book's
+team-total line, the side the crowd leans to when it sits a point or more
+off that line (or "sits with the book"), and the crowd's chance of the
+over at the book's number; without a book line, the number the book's
+total and spread imply. A row shows any of this only once the slate or
+odds run that read the series has been loaded on it.
 
 ## Easier on the eyes, 4 Nov 2026
 

@@ -2613,8 +2613,25 @@ smStore.ready.then(function () {
       if (k.ml) bits.push("<b>" + esc(k.ph >= 0.5 ? home : away) + "</b> to win " + pc(Math.max(k.ph, k.pa)));
       if (k.spMed !== null) bits.push("spread <b>" + (Math.abs(k.spMed) < 0.05 ? "a pick" : esc(k.spMed > 0 ? home : away) + " " + sgn(-Math.abs(k.spMed), 1)) + "</b>");
       if (k.totMed !== null) bits.push("total <b>" + k.totMed.toFixed(1) + "</b>");
-      if (k.ttAMed !== null || k.ttHMed !== null) bits.push("team totals " + [k.ttAMed !== null ? esc(away) + " <b>" + k.ttAMed.toFixed(1) + "</b>" : "", k.ttHMed !== null ? esc(home) + " <b>" + k.ttHMed.toFixed(1) + "</b>" : ""].filter(Boolean).join(", "));
       if (bits.length) out.push(signalChip("crowd", "secKalshi", "the crowd", bits.join(" · ")));
+      /* the team totals as chips of their own (4 Nov 2026, the user: "can i have the team totals predictions from kalshi be on the
+         matchup section with a color like you have the other signals"): each club's number at even money against the book's
+         team-total line, the side the crowd leans to when it sits a point or more off it, and the crowd's chance of the over at
+         the book's number; without a book line, against the number the book's total and spread imply */
+      var oddsRaw = ($("odds") || {}).value || "", tl = parseFloat(inputs.line), spv = parseFloat(inputs.sp);
+      [["AWAY", away, k.ttAMed, "away_total"], ["HOME", home, k.ttHMed, "home_total"]].forEach(function (t) {
+        if (t[2] === null || t[2] === undefined) return;
+        var bl = typeof nbaTeamTotalLine === "function" ? nbaTeamTotalLine(oddsRaw, t[0]) : null, s = "<b>" + esc(t[1]) + " " + t[2].toFixed(1) + "</b>";
+        var lean = function (d) { return d <= -1 ? "<b>leans UNDER</b>" : d >= 1 ? "<b>leans OVER</b>" : "sits with the book"; };
+        if (bl) {
+          var q = kalshiSideQuote(k, t[3], "OVER", bl.line);
+          s += " · the book " + bl.line + " · " + lean(t[2] - bl.line) + (q ? ", the over " + pc(q.p) + " at the book's number" : "");
+        } else if (isFinite(tl) && isFinite(spv)) {
+          var imp = t[0] === "HOME" ? (tl - spv) / 2 : (tl + spv) / 2;
+          s += " · the book's total and spread imply " + imp.toFixed(1) + " · " + lean(t[2] - imp).replace("sits with the book", "sits with that number");
+        }
+        out.push(signalChip("crowd", "secKalshi", "Kalshi team total", s));
+      });
     }
     try {
       var d = nbaOutList(), outs = function (s) { return (d[s] || []).filter(function (p) { return /^out/i.test(String(p.st || "")); }).length; }, oa = outs("away"), oh = outs("home");
@@ -4230,6 +4247,9 @@ smStore.ready.then(function () {
       bits.push((Math.abs(m) < 0.05 ? "a pick" : esc(m > 0 ? home : away) + " by " + Math.abs(m).toFixed(1)) + (sp !== null ? " (the book's spread " + esc(sp <= 0 ? home : away) + " " + sgn(-Math.abs(sp), 1) + ")" : ""));
     }
     if (k.totMed !== null && k.totMed !== undefined) bits.push("total " + k.totMed.toFixed(1) + (r.total !== null && r.total !== undefined && isFinite(+r.total) ? " (the book's " + esc(String(r.total)) + ")" : ""));
+    /* the team totals too (4 Nov 2026, the user: "what about the team totals for each matchup?"): each club's number at even money off its own ladder */
+    var tta = k.ttAMed !== null && k.ttAMed !== undefined ? esc(away) + " " + k.ttAMed.toFixed(1) : "", tth = k.ttHMed !== null && k.ttHMed !== undefined ? esc(home) + " " + k.ttHMed.toFixed(1) : "";
+    if (tta || tth) bits.push("team totals " + [tta, tth].filter(Boolean).join(" · "));
     if (k.ml) bits.push(esc(k.ph >= 0.5 ? home : away) + " to win " + (100 * Math.max(k.ph, k.pa)).toFixed(1) + "%");
     return bits.length ? 'The crowd on <b class="kname">Kalshi</b>: ' + bits.join(" · ") : "";
   }

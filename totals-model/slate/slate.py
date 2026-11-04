@@ -4400,8 +4400,10 @@ KALSHI_API = "https://api.elections.kalshi.com/trade-api/v2"
 # the three series (4 Nov 2026, the user's listings): the game winner, one contract a side; the spread, a ladder a club
 # ("Memphis wins by over 6.5 points", the floor in floor_strike, a point apart near the number and two apart further out);
 # the total, one ladder ("Full Game: Over 228.5 points scored", two points apart). The ladders are the crowd's whole
-# distribution of the margin and the total, read against the simulation's on the page
-KALSHI_SERIES = {"NBA": {"ml": "KXNBAGAME", "sp": "KXNBASPREAD", "tot": "KXNBATOTAL"}}
+# distribution of the margin and the total, read against the simulation's on the page. The team totals too (later that
+# evening, the user's address off the Game Props tab, KXNBATEAMTOTAL-26NOV04PHIDET-PHI109): a ladder a club, the club's
+# code then the number in the ticker's tail, the floor in floor_strike like the rest
+KALSHI_SERIES = {"NBA": {"ml": "KXNBAGAME", "sp": "KXNBASPREAD", "tot": "KXNBATOTAL", "tt": "KXNBATEAMTOTAL"}}
 KALSHI_FEE = 0.07
 KALSHI_MONTHS = {"JAN": 1, "FEB": 2, "MAR": 3, "APR": 4, "MAY": 5, "JUN": 6, "JUL": 7, "AUG": 8, "SEP": 9, "OCT": 10, "NOV": 11, "DEC": 12}
 KALSHI_CODES = {"WSH": "WAS", "GS": "GSW", "NY": "NYK", "NO": "NOP", "SA": "SAS", "UTAH": "UTA", "PHO": "PHX"}   # a club's code as other feeds write it
@@ -4423,7 +4425,7 @@ def kalshi_num(v):
 
 
 def kalshi_kind(event_ticker):
-    """Which of the sport's series an event belongs to: 'ml', 'sp', 'tot' or None."""
+    """Which of the sport's series an event belongs to: 'ml', 'sp', 'tot', 'tt' (the team totals) or None."""
     head = str(event_ticker or "").split("-")[0]
     for kinds in KALSHI_SERIES.values():
         for kind, series in kinds.items():
@@ -4434,9 +4436,10 @@ def kalshi_kind(event_ticker):
 
 def kalshi_parse(doc):
     """The exchange's markets -> {"ml": {(date, codeA, codeB): {"ev", "sides": {code: {bid, ask, last, vol, oi, name}}}},
-    "sp": {key: {"ev", "sides": {code: [[floor, bid, ask, last, vol], ...]}}}, "tot": {key: {"ev", "rungs": [[floor, bid, ask, last, vol], ...]}}},
+    "sp": {key: {"ev", "sides": {code: [[floor, bid, ask, last, vol], ...]}}}, "tot": {key: {"ev", "rungs": [[floor, bid, ask, last, vol], ...]}},
+    "tt": {key: {"ev", "sides": {code: [rungs]}}} (each club's team total, a ladder a club like the spread)},
     the prices in dollars, the volume and the open interest in contracts, the ladders by their floor."""
-    out = {"ml": {}, "sp": {}, "tot": {}}
+    out = {"ml": {}, "sp": {}, "tot": {}, "tt": {}}
     for m in (doc or {}).get("markets") or []:
         key, kind = kalshi_event_key(m.get("event_ticker")), kalshi_kind(m.get("event_ticker"))
         if not key or not kind:
@@ -4451,14 +4454,15 @@ def kalshi_parse(doc):
         if floor is None:
             continue
         rung = [floor, bid, ask, last, int(round(vol)) if vol is not None else None]
-        if kind == "sp":
+        if kind in ("sp", "tt"):
             code = "".join(c for c in suffix if c.isalpha())
-            out["sp"].setdefault(key, {"ev": m.get("event_ticker"), "sides": {}})["sides"].setdefault(code, []).append(rung)
+            out[kind].setdefault(key, {"ev": m.get("event_ticker"), "sides": {}})["sides"].setdefault(code, []).append(rung)
         else:
             out["tot"].setdefault(key, {"ev": m.get("event_ticker"), "rungs": []})["rungs"].append(rung)
-    for ev in out["sp"].values():
-        for rungs in ev["sides"].values():
-            rungs.sort(key=lambda r: r[0])
+    for kind in ("sp", "tt"):
+        for ev in out[kind].values():
+            for rungs in ev["sides"].values():
+                rungs.sort(key=lambda r: r[0])
     for ev in out["tot"].values():
         ev["rungs"].sort(key=lambda r: r[0])
     return out
@@ -4482,14 +4486,14 @@ def kalshi_fetch(sport, log):
                 if not cursor or not page:
                     break
         except Exception as e:  # noqa: BLE001
-            log("Kalshi: the %s series (%s) could not be read (%s)." % ({"ml": "game-winner", "sp": "spread", "tot": "total"}[kind], series, e))
+            log("Kalshi: the %s series (%s) could not be read (%s)." % ({"ml": "game-winner", "sp": "spread", "tot": "total", "tt": "team-total"}[kind], series, e))
         counts[kind] = n
     if not markets:
         log("Kalshi: the exchange could not be read; the rows carry no crowd price.")
         return None
     parsed = kalshi_parse({"markets": markets})
-    log("Kalshi: %d %s game%s open on the exchange (%d game-winner, %d spread and %d total markets)." % (
-        len(parsed["ml"]), sport, "" if len(parsed["ml"]) == 1 else "s", counts.get("ml", 0), counts.get("sp", 0), counts.get("tot", 0)))
+    log("Kalshi: %d %s game%s open on the exchange (%d game-winner, %d spread, %d total and %d team-total markets)." % (
+        len(parsed["ml"]), sport, "" if len(parsed["ml"]) == 1 else "s", counts.get("ml", 0), counts.get("sp", 0), counts.get("tot", 0), counts.get("tt", 0)))
     return parsed
 
 
@@ -4502,8 +4506,8 @@ def kalshi_find(table, date_iso, a_code, h_code):
 
 def kalshi_game(parsed, date_iso, away_code, home_code):
     """The crowd's block for one game, the clubs matched by code in either order: the game winner a side (a, h), the spread
-    ladders (sp.a, sp.h: the club wins by over the floor) and the total ladder (tot: over the floor); None when the exchange
-    has nothing on the game."""
+    ladders (sp.a, sp.h: the club wins by over the floor), the total ladder (tot: over the floor) and the team-total ladders
+    (tt.a, tt.h: the club scores over the floor); None when the exchange has nothing on the game."""
     if not parsed:
         return None
     a_code, h_code = KALSHI_CODES.get(away_code, away_code), KALSHI_CODES.get(home_code, home_code)
@@ -4520,6 +4524,10 @@ def kalshi_game(parsed, date_iso, away_code, home_code):
     if tot and tot.get("rungs"):
         block["tot"] = tot["rungs"]
         ev = ev or tot.get("ev")
+    tt = kalshi_find(parsed.get("tt"), date_iso, a_code, h_code)
+    if tt and (tt["sides"].get(a_code) or tt["sides"].get(h_code)):
+        block["tt"] = {"a": tt["sides"].get(a_code) or [], "h": tt["sides"].get(h_code) or []}
+        ev = ev or tt.get("ev")
     if not ev:
         return None
     block["ev"] = ev
@@ -4547,6 +4555,12 @@ def kalshi_crowd_lines(block):
     return kalshi_median(pts), kalshi_median([(r[0], kalshi_mid(r)) for r in tot])
 
 
+def kalshi_team_totals(block):
+    """(the away side's team total at even money, the home side's), either None without its ladder."""
+    tt = block.get("tt") or {}
+    return tuple(kalshi_median([(r[0], kalshi_mid(r)) for r in tt.get(k) or []]) for k in ("a", "h"))
+
+
 def kalshi_summary(block, away, home):
     """One line for the log: each side's mid price in cents, the bid and ask, the contracts traded; the crowd's spread and total."""
     def side(s, nick):
@@ -4562,6 +4576,9 @@ def kalshi_summary(block, away, home):
         bits.append("the crowd's spread %s %.1f" % ((home, -margin) if margin >= 0 else (away, margin)))
     if total is not None:
         bits.append("the crowd's total %.1f" % total)
+    tta, tth = kalshi_team_totals(block)
+    if tta is not None or tth is not None:
+        bits.append("the crowd's team totals " + " · ".join("%s %.1f" % (nick, v) for nick, v in ((away, tta), (home, tth)) if v is not None))
     return " · ".join(bits) if bits else "no price"
 
 
@@ -7624,21 +7641,30 @@ def selftest():
         {"ticker": "KXNBATOTAL-26NOV04ATLWAS-235", "event_ticker": "KXNBATOTAL-26NOV04ATLWAS", "floor_strike": 234.5, "yes_bid_dollars": "0.4000", "yes_ask_dollars": "0.4200", "last_price_dollars": "0.4100", "volume_fp": "300"},
         {"ticker": "KXNBATOTAL-26NOV04ATLWAS-231", "event_ticker": "KXNBATOTAL-26NOV04ATLWAS", "floor_strike": 230.5, "yes_bid_dollars": "0.5600", "yes_ask_dollars": "0.5800", "last_price_dollars": "0.5700", "volume_fp": "1500"},
         {"ticker": "KXNBATOTAL-26NOV04ATLWAS-233", "event_ticker": "KXNBATOTAL-26NOV04ATLWAS", "floor_strike": 232.5, "yes_bid_dollars": "0.4800", "yes_ask_dollars": "0.5000", "last_price_dollars": "0.4900", "volume_fp": "8000"},
+        # the team totals (the user's address off the Game Props tab): a ladder a club, the Hawks 117.5 and the Wizards 114.1 at even money
+        {"ticker": "KXNBATEAMTOTAL-26NOV04ATLWAS-ATL119", "event_ticker": "KXNBATEAMTOTAL-26NOV04ATLWAS", "floor_strike": 118.5, "yes_bid_dollars": "0.4400", "yes_ask_dollars": "0.4600", "last_price_dollars": "0.4500", "volume_fp": "600"},
+        {"ticker": "KXNBATEAMTOTAL-26NOV04ATLWAS-ATL117", "event_ticker": "KXNBATEAMTOTAL-26NOV04ATLWAS", "floor_strike": 116.5, "yes_bid_dollars": "0.5400", "yes_ask_dollars": "0.5600", "last_price_dollars": "0.5500", "volume_fp": "400"},
+        {"ticker": "KXNBATEAMTOTAL-26NOV04ATLWAS-WAS113", "event_ticker": "KXNBATEAMTOTAL-26NOV04ATLWAS", "floor_strike": 112.5, "yes_bid_dollars": "0.5700", "yes_ask_dollars": "0.5900", "last_price_dollars": "0.5800", "volume_fp": "300"},
+        {"ticker": "KXNBATEAMTOTAL-26NOV04ATLWAS-WAS115", "event_ticker": "KXNBATEAMTOTAL-26NOV04ATLWAS", "floor_strike": 114.5, "yes_bid_dollars": "0.4700", "yes_ask_dollars": "0.4900", "last_price_dollars": "0.4800", "volume_fp": "700"},
         {"ticker": "SOMETHING-ELSE", "event_ticker": "KXNBASERIES-26-BOS"}]}
     kal_p = kalshi_parse(kal_doc)
     kal_g = kalshi_game(kal_p, "2026-11-04", "WSH", "ATL")   # the sheet's codes as ESPN writes them, the clubs the other way round
-    check("kalshi: the event ticker reads as the date and the two clubs' codes, the three series parse by game (a side each on the winner, a ladder a club on the spread, one ladder on the total, by the floor), and a game matches by code in either order",
+    check("kalshi: the event ticker reads as the date and the two clubs' codes, the four series parse by game (a side each on the winner, a ladder a club on the spread and on the team totals, one ladder on the total, by the floor), and a game matches by code in either order",
           kalshi_event_key("KXNBAGAME-26NOV04ATLWAS") == ("2026-11-04", "ATL", "WAS") and kalshi_event_key("KXNBASERIES-26-BOS") is None and kalshi_event_key(None) is None
           and kalshi_kind("KXNBASPREAD-26NOV04ATLWAS") == "sp" and kalshi_kind("KXNBATOTAL-26NOV04ATLWAS") == "tot" and kalshi_kind("KXNBAGAME-26NOV04ATLWAS") == "ml" and kalshi_kind("KXNBASERIES-26-BOS") is None
+          and kalshi_kind("KXNBATEAMTOTAL-26NOV04ATLWAS") == "tt" and [r[0] for r in kal_g["tt"]["h"]] == [116.5, 118.5] and kal_g["tt"]["h"][1] == [118.5, 0.44, 0.46, 0.45, 600] and [r[0] for r in kal_g["tt"]["a"]] == [112.5, 114.5]
+          and "tt" not in kalshi_game(kal_p, "2026-11-07", "SAS", "POR")
           and set(kal_p["ml"]) == {("2026-11-04", "ATL", "WAS"), ("2026-11-07", "SAS", "POR")} and kal_p["ml"][("2026-11-04", "ATL", "WAS")]["sides"]["ATL"]["ask"] == 0.58 and kal_p["ml"][("2026-11-04", "ATL", "WAS")]["sides"]["WAS"]["name"] == "Washington"
           and kal_g is not None and kal_g["ev"] == "KXNBAGAME-26NOV04ATLWAS" and kal_g["fee"] == KALSHI_FEE and kal_g["a"] == {"bid": 0.42, "ask": 0.43, "last": 0.43, "vol": 140050.68, "oi": 115253.7} and kal_g["h"]["bid"] == 0.57
           and [r[0] for r in kal_g["sp"]["h"]] == [1.5, 2.5, 3.5, 4.5] and kal_g["sp"]["h"][1] == [2.5, 0.5, 0.52, 0.51, 1200] and [r[0] for r in kal_g["sp"]["a"]] == [1.5, 3.5] and [r[0] for r in kal_g["tot"]] == [230.5, 232.5, 234.5] and kal_g["tot"][1][4] == 8000
           and kalshi_game(kal_p, "2026-11-05", "ATL", "WAS") is None and kalshi_game(kal_p, "2026-11-04", "BOS", "ATL") is None and kalshi_game(None, "2026-11-04", "ATL", "WAS") is None
           and "sp" not in kalshi_game(kal_p, "2026-11-07", "SAS", "POR") and "tot" not in kalshi_game(kal_p, "2026-11-07", "SAS", "POR"))
     kal_m, kal_t = kalshi_crowd_lines(kal_g)
-    check("kalshi: the crowd's spread and total are the ladders' even-money crossings read straight between rungs (the Hawks by 2.75: 51% at 2.5 and 47% at 3.5; the total 232.25: 57% at 230.5 and 49% at 232.5), and the log line says so",
+    kal_tta, kal_tth = kalshi_team_totals(kal_g)
+    check("kalshi: the crowd's spread, total and team totals are the ladders' even-money crossings read straight between rungs (the Hawks by 2.75: 51% at 2.5 and 47% at 3.5; the total 232.25: 57% at 230.5 and 49% at 232.5; the Wizards 114.1 and the Hawks 117.5), and the log line says so",
           abs(kal_m - 2.75) < 1e-9 and abs(kal_t - 232.25) < 1e-9 and kalshi_median([(1.5, 0.3), (3.5, 0.2)]) is None and kalshi_median([]) is None
-          and kalshi_summary(kal_g, "Wizards", "Hawks") == "Wizards 42.5 cents (42/43, 140k contracts) · Hawks 57.5 cents (57/58, 150k contracts) · the crowd's spread Hawks -2.8 · the crowd's total 232.2"
+          and abs(kal_tta - 114.1) < 1e-9 and abs(kal_tth - 117.5) < 1e-9 and kalshi_team_totals({}) == (None, None) and kalshi_team_totals({"tt": {"a": kal_g["tt"]["a"]}}) == (114.1, None)
+          and kalshi_summary(kal_g, "Wizards", "Hawks") == "Wizards 42.5 cents (42/43, 140k contracts) · Hawks 57.5 cents (57/58, 150k contracts) · the crowd's spread Hawks -2.8 · the crowd's total 232.2 · the crowd's team totals Wizards 114.1 · Hawks 117.5"
           and kalshi_summary(kalshi_game(kal_p, "2026-11-07", "SAS", "POR"), "Spurs", "Trail Blazers") == "Spurs 60.5 cents (54/67, 12 contracts) · Trail Blazers 40.5 cents (35/46, 24 contracts)")
     # the player ladders (4 Nov 2026): the exchange's "25+" as a floor of 24.5, the name off the title with its accents, the club off the ticker
     kal_pdoc = {"markets": [

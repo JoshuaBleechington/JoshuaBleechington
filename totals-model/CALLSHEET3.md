@@ -2303,3 +2303,21 @@ is the no side, one less the yes bid). The ladder rides through the save
 prop: whether the crowd's price or the book's predicts the outcome better,
 and whether the crowd shades the over as the books do. Until then, shown,
 not scored.
+
+**The team totals, later that evening.** The user: "Can we also have team
+totals too?" with the address of a market off the game page's Game Props
+tab, `KXNBATEAMTOTAL-26NOV04PHIDET-PHI109`: a series the run had not been
+reading, a ladder a club like the spread's, the club's code then the
+number in the ticker's tail and the floor on the market like the rest.
+The slate and odds runs read it with the other three and keep each club's
+ladder on the row (`tt.a`, `tt.h`); the log's summary adds "the crowd's
+team totals Wizards 114.1 · Hawks 117.5". On the card the Kalshi section
+gets a paragraph a club: the crowd's team total at even money, the book's
+team-total line with its prices (the odds run's), the number the book's
+own total and spread imply, and the simulation's mean when the row
+carries the sim; at the book's line, the crowd's chance of the over, the
+simulation's, and on a rung each side's price after the fee against the
+book's. The simulation's table carries the same read under its two
+team-total rows, beside the gap rule, so the crowd sits next to the one
+scored call on those markets. Shown, not scored, like the rest of the
+exchange.

@@ -268,7 +268,10 @@
     k.total = kalshiRungs(k.tot);
     k.spMed = k.margin.length >= 2 ? kalshiMedian(k.margin) : null;   // the crowd's spread, as the home margin at even money
     k.totMed = k.total.length >= 2 ? kalshiMedian(k.total) : null;    // the crowd's total at even money
-    if (!k.ml && !k.margin.length && !k.total.length) return null;
+    /* the team totals (4 Nov 2026, the user's address off the Game Props tab): a ladder a club, P(the club scores more than x) */
+    k.ttA = kalshiRungs(k.tt && k.tt.a); k.ttH = kalshiRungs(k.tt && k.tt.h);
+    k.ttAMed = k.ttA.length >= 2 ? kalshiMedian(k.ttA) : null; k.ttHMed = k.ttH.length >= 2 ? kalshiMedian(k.ttH) : null;
+    if (!k.ml && !k.margin.length && !k.total.length && !k.ttA.length && !k.ttH.length) return null;
     return k;
   }
   /* the crowd on one side of one market at one line: its chance, and when the line is a rung of the ladder, the price it trades at
@@ -290,8 +293,27 @@
       if (+line < 0) { r = kalshiRungAt(k.spH, -(+line)); if (r) { q.rung = true; q.ask = side === "HOME" ? r.ask : 1 - r.bid; } }
       else if (+line > 0) { r = kalshiRungAt(k.spA, +line); if (r) { q.rung = true; q.ask = side === "AWAY" ? r.ask : 1 - r.bid; } }
       if (q.rung) q.need = kalshiNeedAt(q.ask, k.fee);
+    } else if (key === "away_total" || key === "home_total") {
+      var lad = key === "away_total" ? k.ttA : k.ttH;
+      if (!lad.length || !isFinite(+line)) return null;
+      var pt = kalshiCurveAt(lad, +line); if (pt === null) return null;
+      q.p = side === "OVER" ? pt : 1 - pt;
+      r = kalshiRungAt(lad, +line);
+      if (r) { q.rung = true; q.ask = side === "OVER" ? r.ask : 1 - r.bid; q.need = kalshiNeedAt(q.ask, k.fee); }
     } else return null;
     return q.p === null ? null : q;
+  }
+  /* the team totals on the simulation's table (4 Nov 2026): one line under the row's team-total line, the crowd's chance of the
+     over at the book's number and, on a rung, each side's price after the fee against the book's */
+  function kalshiTTLine(k, key, line, op, up) {
+    var qo = kalshiSideQuote(k, key, "OVER", line), qu = kalshiSideQuote(k, key, "UNDER", line);
+    if (!qo) return "";
+    var px = function (nm, q, bp) {
+      if (!q || q.need === null) return '';
+      var bn = isFinite(+bp) && +bp ? implied(+bp) : null, better = bn !== null && q.need < bn - 0.001;
+      return ' · ' + nm + ' ' + kalshiCents(q.ask) + ' needs ' + (100 * q.need).toFixed(1) + '% after the fee' + (bn !== null ? (better ? ', <b>better than</b> ' : ', not better than ') + sgn(+bp, 0) + ' needing ' + (100 * bn).toFixed(1) + '%' : '');
+    };
+    return 'Kalshi: the crowd <b>' + (100 * qo.p).toFixed(1) + '%</b> over at ' + esc(String(line)) + (qo.rung ? px('over', qo, op) + px('under', qu, up) : ' · no rung at the line, so no price');
   }
   function kalshiSharpRaw(raw) { var s = null; try { s = raw ? JSON.parse(raw) : null; } catch (e) { s = null; } return s && isFinite(+s.hml) && isFinite(+s.aml) && +s.hml && +s.aml ? s : null; }
   function kalshiSharpOf(row) {
@@ -391,6 +413,27 @@
       }
       h += s3 + '.</p>';
     }
+    /* the team totals (4 Nov 2026, the user: "Can we also have team totals too?"): a paragraph a club, the crowd's team total at
+       even money against the book's team-total line (the odds run's), the number the book's own total and spread imply and the
+       simulation's mean; at the book's line the crowd's chance of the over, the simulation's, and on a rung each side's price */
+    var oddsRaw = ($("odds") || {}).value || "";
+    [["AWAY", away, k.ttA, k.ttAMed, "away"], ["HOME", home, k.ttH, k.ttHMed, "home"]].forEach(function (t) {
+      var side = t[0], nick = t[1], lad = t[2], med = t[3], hk = t[4];
+      if (lad.length < 2) return;
+      var bl = typeof nbaTeamTotalLine === "function" ? nbaTeamTotalLine(oddsRaw, side) : null, imp = line0 !== null && sp !== null ? (side === "HOME" ? (line0 - sp) / 2 : (line0 + sp) / 2) : null;
+      var hist = sim && sim.own ? sim.own[hk] : null, simMean = hist ? nbaSimMean(hist) : null;
+      var s4 = '<p><b>The ' + esc(nick) + ' team total</b>: the crowd ' + (med === null ? 'no even-money number inside the ladder' : med.toFixed(1));
+      if (bl) s4 += ' · the book ' + bl.line + ' (' + esc(String(bl.book)) + ' ' + sgn(bl.op, 0) + '/' + sgn(bl.up, 0) + ')';
+      if (imp !== null) s4 += ' · implied by the book\'s total and spread ' + imp.toFixed(1);
+      if (simMean !== null) s4 += ' · the simulation\'s own view ' + simMean.toFixed(1);
+      if (bl) {
+        var qo = kalshiSideQuote(k, hk + "_total", "OVER", bl.line), qu = kalshiSideQuote(k, hk + "_total", "UNDER", bl.line), simO = hist ? nbaSimOver(hist, bl.line) : null;
+        s4 += '. At the book\'s ' + bl.line + (qo ? ': the over ' + pc(qo.p) + ' by the crowd' + (simO ? ', ' + pc(simO.over) + ' by the simulation\'s own view' : '') : ': the crowd\'s ladder does not reach it');
+        if (qo && qo.rung) s4 += sideTxt('over ' + bl.line, qo, bl.op) + sideTxt('under ' + bl.line, qu, bl.up);
+        else if (qo) s4 += ' · <span class="dim">no rung at the book\'s number on the exchange, so no price to compare</span>';
+      } else s4 += ' · <span class="dim">no book team total on the row (the odds run brings it)</span>';
+      h += s4 + '.</p>';
+    });
     el.innerHTML = h + gapTxt + '<p class="dim">Shown, not scored: a prediction market\'s price is a market price, which is already the sheet\'s spine. The fee is Kalshi\'s on the win, ' + (k.fee * 100).toFixed(0) + '% of the expected profit a contract.</p></div>';
   }
   function nbaCtxPanel() {
@@ -866,6 +909,8 @@
             first += '<div class="ttgap">implied <b>' + tt.rule.implied + '</b>, gap <b>' + (tt.rule.gap > 0 ? '+' : '') + tt.rule.gap + '</b> · ' +
                      (tt.rule.call ? '<span class="simchip simbet gaprule"><b>' + tt.rule.call + '</b> by the gap rule</span> ' + nbaSimTakeBtn(takeRow, "gap", m[0], tt.rule.call) : '<span class="dim">inside a point, no call</span>') + '</div>';
           }
+          var kk = typeof kalshiOf === "function" ? kalshiOf(($("nbakalshi") || {}).value || "") : null, kl = kk ? kalshiTTLine(kk, m[0], +m[2], tt.op, tt.up) : "";   // the crowd on Kalshi beside the gap rule (4 Nov 2026)
+          if (kl) first += '<div class="ttgap">' + kl + '</div>';
         } else {
           first += '</div>';
         }

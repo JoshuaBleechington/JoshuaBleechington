@@ -4565,6 +4565,75 @@ def kalshi_summary(block, away, home):
     return " · ".join(bits) if bits else "no price"
 
 
+# the player ladders (4 Nov 2026, the user's points listing and the series names off the game page): one contract a rung a
+# player ("Luka Dončić: 25+ points", the floor 24.5 with the same greater-than rule as the totals, the rungs five apart), the
+# name in the title, the club in the ticker's player key (LALLDONCIC77). The props run keeps each prop's ladder on the prop
+# (kal.r) when the exchange runs the market; the page reads the crowd's chance of the pick's side at the book's line off it,
+# exact when the line is a rung (24.5 is 25+) and straight between two otherwise, with the price after the fee on a rung.
+# Shown, not scored: two weeks of the crowd's price beside the book's on the same props is the test of which predicts the
+# outcome, and whether the crowd shades the over as the books do
+KALSHI_PLAYER_SERIES = {"pts": "KXNBAPTS", "reb": "KXNBAREB", "ast": "KXNBAAST", "pra": "KXNBAPRA"}
+
+
+def kalshi_player_parse(doc, mk):
+    """A player series' markets -> {(date, codeA, codeB): {name key: {"name", "team", "mk": {mk: [[floor, bid, ask, last, vol], ...]}}}}."""
+    out = {}
+    for m in (doc or {}).get("markets") or []:
+        key, floor, parts = kalshi_event_key(m.get("event_ticker")), kalshi_num(m.get("floor_strike")), str(m.get("ticker") or "").split("-")
+        if not key or floor is None or len(parts) < 4:
+            continue
+        name = str(m.get("title") or "").split(":")[0].strip()
+        if not name:
+            continue
+        team = "".join(c for c in parts[2][:3] if c.isalpha())
+        vol = kalshi_num(m.get("volume_fp"))
+        rung = [floor, kalshi_num(m.get("yes_bid_dollars")), kalshi_num(m.get("yes_ask_dollars")), kalshi_num(m.get("last_price_dollars")), int(round(vol)) if vol is not None else None]
+        p = out.setdefault(key, {}).setdefault(props_name_key(name), {"name": name, "team": team, "mk": {}})
+        p["mk"].setdefault(mk, []).append(rung)
+    for game in out.values():
+        for p in game.values():
+            for rungs in p["mk"].values():
+                rungs.sort(key=lambda r: r[0])
+    return out
+
+
+def kalshi_fetch_players(log):
+    """Every open player market of the four series, paged and merged by game and player; None when nothing could be read."""
+    merged, counts = {}, {}
+    for mk, series in KALSHI_PLAYER_SERIES.items():
+        markets, cursor = [], ""
+        try:
+            for _ in range(40):
+                doc = fetch_json("%s/markets?series_ticker=%s&status=open&limit=200%s" % (KALSHI_API, series, ("&cursor=" + cursor) if cursor else ""), cache=False)
+                page = doc.get("markets") or []
+                markets.extend(page)
+                cursor = doc.get("cursor") or ""
+                if not cursor or not page:
+                    break
+        except Exception as e:  # noqa: BLE001
+            log("Kalshi: the %s player series (%s) could not be read (%s)." % (mk, series, e))
+        counts[mk] = len(markets)
+        for key, players in kalshi_player_parse({"markets": markets}, mk).items():
+            dst = merged.setdefault(key, {})
+            for nk, p in players.items():
+                dst.setdefault(nk, {"name": p["name"], "team": p["team"], "mk": {}})["mk"].update(p["mk"])
+    if not merged:
+        log("Kalshi: no player markets could be read; the props carry no crowd ladder.")
+        return None
+    log("Kalshi: player markets on %d games (%s)." % (len(merged), ", ".join("%d %s" % (counts[mk], mk) for mk in KALSHI_PLAYER_SERIES)))
+    return merged
+
+
+def kalshi_prop(players, date_iso, aab, hab, name, team, mk):
+    """The crowd's ladder for one prop: the game by code in either order, the player by name; None when the exchange does not run it."""
+    if not players or mk not in KALSHI_PLAYER_SERIES:
+        return None
+    game = kalshi_find(players, date_iso, KALSHI_CODES.get(aab, aab), KALSHI_CODES.get(hab, hab))
+    p = (game or {}).get(props_name_key(name))
+    rungs = [r for r in ((p or {}).get("mk") or {}).get(mk) or [] if r[1] is not None or r[2] is not None]
+    return {"r": rungs, "team": p.get("team")} if rungs else None
+
+
 def build_nba_game(g, date_iso, tables, league, players, prior_players, injuries, log, have_ledger=True, officials=None, refs=None, lineups=None, form=None, sim=None, kalshi=None):
     away, home = g.get("an") or NBA_NICK.get(g["away"], g["away"]), g.get("hn") or NBA_NICK.get(g["home"], g["home"])
     inputs = {k: "" for k in NBA_INPUT_IDS}
@@ -6015,6 +6084,7 @@ def make_nba_props(date_iso, out_dir, log, topup=False, sim_runs=NBA_SIM_RUNS):
         log("Nothing to project for %s. The run is for today unless told otherwise: python slate.py nba-props --date 2026-10-21 (or add --date to the bat file's click)." % date_iso)
     markets = ",".join(api for _mk, api, _lab in PROPS_MARKETS)
     games, credits_used, roster_cache = [], 0, {}
+    kal_players = kalshi_fetch_players(log) if events else None   # the crowd's ladders on the players (4 Nov 2026), shown beside the book's line
     for ev in events:
         aab, hab = nba_nick_tricode(ev.get("away_team")), nba_nick_tricode(ev.get("home_team"))
         away, home = NBA_NICK.get(aab, ev.get("away_team")), NBA_NICK.get(hab, ev.get("home_team"))
@@ -6067,6 +6137,7 @@ def make_nba_props(date_iso, out_dir, log, topup=False, sim_runs=NBA_SIM_RUNS):
                 "{:,}".format(gs["runs"]), away, gs["away"]["median"], gs["away"]["p25"], gs["away"]["p75"], gs["away"]["ppg"], home, gs["home"]["median"], gs["home"]["p25"], gs["home"]["p75"], gs["home"]["ppg"],
                 100 * gs["blowout"], 100 * gs["ot"], gs["poss"],
                 "".join("; %s's regulars out: %+.1f per 100 on the offence" % (NBA_NICK.get(ab, ab), gs["out"][s]) for ab, s in ((aab, "away"), (hab, "home")) if gs["out"][s])))
+        n_kal = 0
         for pr in props:
             pid, team, how = props_match_player(pr["name"], (aab, hab), logs_this, logs_last, rosters)
             if not pid or not team:
@@ -6096,11 +6167,17 @@ def make_nba_props(date_iso, out_dir, log, topup=False, sim_runs=NBA_SIM_RUNS):
             recent = [[g_["d"], g_["opp"], 1 if g_["home"] else 0, g_["min"], props_stat(g_, pr["mk"]), props_game_factors(g_, season_logs, pr["mk"], league_pace, e2.get("g") if e1.get("g") else None)] for g_ in season_logs[-10:]]
             item = {"pid": pid, "name": e1.get("n") or e2.get("n") or pr["name"], "team": team, "opp": opp, "home": team == hab, "pos": pos,
                     "mk": pr["mk"], "line": pr["line"], "op": pr["op"], "up": pr["up"], "book": pr["book"], "books": pr["books"], "log": recent, "why": why}
+            kal = kalshi_prop(kal_players, date_iso, aab, hab, pr["name"], team, pr["mk"])
+            if kal:
+                item["kal"] = kal
+                n_kal += 1
             if proj:
                 item.update(proj)
                 if gs:
                     item["sim"] = nba_prop_sim_read(gs, team == hab, proj)
             row["props"].append(item)
+        if kal_players:
+            log("  Kalshi: %d of %d props carry the crowd's ladder (points, rebounds, assists and PRA; the exchange runs no threes or two-stat combos)" % (n_kal, len(row["props"])))
         row["props"].sort(key=lambda x: (-(x.get("edge") if x.get("edge") is not None else -9), x["name"], x["mk"]))
         projected = sum(1 for x in row["props"] if x.get("p") is not None)
         log("  %d placed and projected, %d placed without a projection, %d not placed%s" % (
@@ -7562,6 +7639,20 @@ def selftest():
           abs(kal_m - 2.75) < 1e-9 and abs(kal_t - 232.25) < 1e-9 and kalshi_median([(1.5, 0.3), (3.5, 0.2)]) is None and kalshi_median([]) is None
           and kalshi_summary(kal_g, "Wizards", "Hawks") == "Wizards 42.5 cents (42/43, 140k contracts) · Hawks 57.5 cents (57/58, 150k contracts) · the crowd's spread Hawks -2.8 · the crowd's total 232.2"
           and kalshi_summary(kalshi_game(kal_p, "2026-11-07", "SAS", "POR"), "Spurs", "Trail Blazers") == "Spurs 60.5 cents (54/67, 12 contracts) · Trail Blazers 40.5 cents (35/46, 24 contracts)")
+    # the player ladders (4 Nov 2026): the exchange's "25+" as a floor of 24.5, the name off the title with its accents, the club off the ticker
+    kal_pdoc = {"markets": [
+        {"ticker": "KXNBAPTS-26NOV04LALSAC-LALLDONCIC77-25", "event_ticker": "KXNBAPTS-26NOV04LALSAC", "title": "Luka Dončić: 25+ points", "floor_strike": 24.5, "yes_bid_dollars": "0.8300", "yes_ask_dollars": "0.8400", "last_price_dollars": "0.8400", "volume_fp": "1262.12"},
+        {"ticker": "KXNBAPTS-26NOV04LALSAC-LALLDONCIC77-35", "event_ticker": "KXNBAPTS-26NOV04LALSAC", "title": "Luka Dončić: 35+ points", "floor_strike": 34.5, "yes_bid_dollars": "0.4800", "yes_ask_dollars": "0.4900", "last_price_dollars": "0.4900", "volume_fp": "3248.51"},
+        {"ticker": "KXNBAPTS-26NOV04LALSAC-LALLDONCIC77-30", "event_ticker": "KXNBAPTS-26NOV04LALSAC", "title": "Luka Dončić: 30+ points", "floor_strike": 29.5, "yes_bid_dollars": "0.7100", "yes_ask_dollars": "0.7200", "last_price_dollars": "0.7000", "volume_fp": "389.96"},
+        {"ticker": "KXNBAPTS-26NOV04LALSAC-SACDSABONIS11-10", "event_ticker": "KXNBAPTS-26NOV04LALSAC", "title": "Domantas Sabonis: 10+ points", "floor_strike": 9.5, "yes_bid_dollars": "0.6900", "yes_ask_dollars": "0.8000", "last_price_dollars": "0.8000", "volume_fp": "9.68"}]}
+    kal_pl = kalshi_player_parse(kal_pdoc, "pts")
+    kal_lal = kal_pl.get(("2026-11-04", "LAL", "SAC")) or {}
+    check("kalshi: a player series parses by game and player (the name off the title, the club off the ticker, the rungs by floor), and a prop finds its ladder by name whatever the accents, the clubs either way round, and nothing for a market the exchange does not run",
+          set(kal_pl) == {("2026-11-04", "LAL", "SAC")} and set(kal_lal) == {props_name_key("Luka Doncic"), props_name_key("Domantas Sabonis")}
+          and kal_lal[props_name_key("Luka Doncic")]["team"] == "LAL" and kal_lal[props_name_key("Luka Doncic")]["name"] == "Luka Dončić" and [r[0] for r in kal_lal[props_name_key("Luka Doncic")]["mk"]["pts"]] == [24.5, 29.5, 34.5]
+          and kalshi_prop(kal_pl, "2026-11-04", "SAC", "LAL", "Luka Doncic", "LAL", "pts") == {"r": [[24.5, 0.83, 0.84, 0.84, 1262], [29.5, 0.71, 0.72, 0.7, 390], [34.5, 0.48, 0.49, 0.49, 3249]], "team": "LAL"}
+          and kalshi_prop(kal_pl, "2026-11-04", "LAL", "SAC", "Luka Doncic", "LAL", "tpm") is None and kalshi_prop(kal_pl, "2026-11-04", "LAL", "SAC", "Austin Reaves", "LAL", "pts") is None
+          and kalshi_prop(kal_pl, "2026-11-05", "LAL", "SAC", "Luka Doncic", "LAL", "pts") is None and kalshi_prop(None, "2026-11-04", "LAL", "SAC", "Luka Doncic", "LAL", "pts") is None)
     parts_ = dict((p["k"], p) for p in proj_["parts"])
     check("props: what moves it: the base is his rate at his minutes, the regulars out, pace and the defence sum from it to the projection, the prior and the minutes trend say what sits inside it, each pointing at its why line",
           set(parts_) == {"prior", "minutes", "out", "pace", "dvp"} and abs(proj_["base"] + parts_["out"]["eff"] + parts_["pace"]["eff"] + parts_["dvp"]["eff"] - proj_["proj"]) < 0.03

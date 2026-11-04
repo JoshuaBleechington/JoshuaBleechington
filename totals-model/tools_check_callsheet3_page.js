@@ -389,6 +389,7 @@ const CHECKS = ["dome","playoff"];
       { gid: '401909834', away: 'Hawks', home: 'Magic', aab: 'ATL', hab: 'ORL', spread: -4.5, total: 229.5, pace: 99.8, props: [
         { pid: '3037789', name: 'Trae Young', team: 'ATL', opp: 'ORL', home: false, pos: 'PG', mk: 'pts', line: 24.5, op: -110, up: -110, book: 'fanatics', books: { fanatics: [24.5, -110, -110], draftkings: [25.5, -115, -105] },
           proj: 27.2, sd: 9.4, pm: 0.612, pb: 0.5, p: 0.5604, push: 0, side: 'OVER', chance: 0.5604, price: -110, need: 0.5238, edge: 0.0366, band: 'BET', mins: 35.1, rate36: 27.9,
+          kal: { r: [[19.5, 0.70, 0.72, 0.71, 100], [24.5, 0.46, 0.48, 0.47, 500], [29.5, 0.24, 0.26, 0.25, 50]], team: 'ATL' },   // the crowd's ladder (4 Nov 2026): 47% for 25+, the line a rung
           why: ['27.9 points per 36 this season (3 games, 104 minutes)', '35.1 minutes projected'], log: [['2026-10-15', 'MIA', 0, 34.0, 26], ['2026-10-17', 'CHI', 1, 31.0, 22], ['2026-10-19', 'BOS', 0, 12.5, null]] },
         { pid: '4066261', name: 'Jalen Suggs', team: 'ORL', opp: 'ATL', home: true, pos: 'SG', mk: 'ast', line: 4.5, op: -120, up: -100, book: 'fanatics', books: { fanatics: [4.5, -120, -100] },
           why: ['no history to project from (under 60 minutes with the stat in the ledgers)'], log: [] },
@@ -496,6 +497,9 @@ const CHECKS = ["dome","playoff"];
       'props: the record tile keeps the props by band, side and market, the void counted apart', propsT.tileText.slice(0, 500));
   chk(/3 props graded on the Props tab/.test(propsT.slateMsg), 'props: the slate message says how many props the grade file graded', propsT.slateMsg.slice(-160));
   chk(propsT.restored === 1 && propsT.viewOff && propsT.colsBack && propsT.nbaPressed === 'true', 'props: a backup\'s props restore, and a sport button brings the matchup columns back', JSON.stringify({ restored: propsT.restored, off: propsT.viewOff, cols: propsT.colsBack, nba: propsT.nbaPressed }));
+  chk(propsT.best.length >= 1 && /Kalshi: the crowd 47\.0% on the OVER \(the sheet 56\.0%\) · better on Kalshi: 48¢ needs 49\.7% after the fee v [-−]110 needing 52\.4%/.test(propsT.best[0])
+      && propsT.whyOpen.length === 1 && /KALSHI'S CROWD 47\.0% the crowd's chance of the OVER at 24\.5 · its number 23\.9 · 48¢ needs 49\.7% after the fee, better than [-−]110/i.test(propsT.whyOpen[0]),
+      'props: a prop that carries the crowd\'s ladder reads the crowd\'s chance of its side at the book\'s line on the best card and as a panel tile (47% for Trae Young 25+, the line a rung), the crowd\'s own number (23.9), and the price after the fee against the book\'s', JSON.stringify({ best: (propsT.best[0] || '').slice(-260), panel: (propsT.whyOpen[0] || '').replace(/^[\s\S]*?(KALSHI'S CROWD)/i, '$1').slice(0, 200) }));
   // the Example button: one game's props computed at build time through the slate's projection, previewed and never saved
   const propsEx = await pg.evaluate(async () => {
     const wait = () => new Promise(r => setTimeout(r, 80));

@@ -2277,3 +2277,27 @@ money beside the numbers the props file carried, and the winner's chance
 total 229.3 (the book's 231.5) · Knicks to win 69.5%"). It needs the game
 on the NBA card with the slate or the odds file loaded on it, which the
 routine already does; the Matchup button still opens the full card.
+
+**The player ladders, the same evening.** The user, asked whether the
+exchange runs player markets, found them on the game page and sent the
+points listing and the series names off the market addresses: points
+`KXNBAPTS`, rebounds `KXNBAREB`, assists `KXNBAAST` and the combo
+`KXNBAPRA`; no threes, no two-stat combos. A player market is one contract
+a rung ("Luka Dončić: 25+ points"), the rungs five apart on points, and the
+exchange stores "25+" as a floor of 24.5 with the same greater-than rule as
+the totals, so the book's 24.5 line is an exact rung and any other line
+reads straight between two. The name sits in the title with its accents
+(the props' own name key strips them), the club in the ticker's player
+key (`LALLDONCIC77`). The props run reads the four series (paged), matches
+each prop's player by name within its game, and keeps his ladder on the
+prop (`kal.r`, each rung as floor, bid, ask, last and contracts), with a
+log line a game ("31 of 48 props carry the crowd's ladder"). On the page
+the prop's best card carries a line and its panel a tile, *Kalshi's
+crowd*: the crowd's chance of the pick's side at the book's line, the
+crowd's own number for the player (the ladder's even-money crossing), and
+on a rung each side's price after the fee against the book's (the under
+is the no side, one less the yes bid). The ladder rides through the save
+(not trimmed) so the measurement to come has both prices on every graded
+prop: whether the crowd's price or the book's predicts the outcome better,
+and whether the crowd shades the over as the books do. Until then, shown,
+not scored.

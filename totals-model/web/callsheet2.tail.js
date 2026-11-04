@@ -1348,7 +1348,8 @@
       '<div class="n3">' + (x.mk.p * 100).toFixed(1) + '% · ' + (x.mk.price !== null ? sgn(x.mk.price, 0) + ' · edge ' + sgn(x.mk.edge * 100, 1) : 'no price') +
         (res ? ' · <span class="chip ' + res + '">' + resText(res) + '</span>' : '') + '</div>' +
       '<div class="n4">' + esc(x.row.matchup) + ' · ' + esc(x.mk.label) +
-        (x.mk.key === "total" && marksOf(x.row.sport, x.row.inputs, x.row.markets).grain ? ' <span class="tagm warn">over against the grain</span>' : '') + '</div>' + (extra || '') + (callOf(x.row, x.mk) ? callWhy(x) : '') +
+        (x.mk.key === "total" && marksOf(x.row.sport, x.row.inputs, x.row.markets).grain ? ' <span class="tagm warn">over against the grain</span>' : '') +
+        (typeof kalshiChip === "function" ? kalshiChip(x.row, x.mk) : '') + '</div>' + (extra || '') + (callOf(x.row, x.mk) ? callWhy(x) : '') +
       '<div class="n6">' + takeBtn(x.row, x.mk) + '</div></div>';
   }
   /* ---- the likeliest side in each game at any price, and the two-leg parlays built
@@ -1923,6 +1924,11 @@
           if (row.sport === "NHL") count(t.upset || (t.upset = { w: 0, l: 0, p: 0 }), dres);
           else count(t.shortDog || (t.shortDog = { w: 0, l: 0, p: 0 }), dres);
         }
+        /* the sharp side against Kalshi's crowd (4 Nov 2026): the side Pinnacle rates three points or more above the exchange, graded at the carded price; a watch */
+        if (mk.key === "ml" && row.sport === "NBA" && typeof kalshiSharpOf === "function") {
+          var ks = kalshiSharpOf(row), kv = ks ? bothSides(mk).filter(function (v) { return v.side === ks.side; })[0] : null, kr = kv ? gradeMarket(kv, row.finals) : null;
+          if (kr !== null && kr !== "invalid") count(t.kalshi || (t.kalshi = { w: 0, l: 0, p: 0 }), kr);
+        }
         if (mk.key === "total" || mk.key === "f5") {
           var tg = marksOf(row.sport, row.inputs, row.markets);
           if (tg.profile) count(t.profile || (t.profile = { w: 0, l: 0, p: 0 }), res);
@@ -2016,6 +2022,7 @@
       if (s.sharpShade) parts.push("Pinnacle's shade, 3+ points " + rec(s.sharpShade));
       if (s.upset) parts.push("the dog with a backup in net " + rec(s.upset));
       if (s.shortDog) parts.push("the short dog " + rec(s.shortDog));
+      if (s.kalshi) parts.push("the sharp side against Kalshi's crowd, 3+ points " + rec(s.kalshi));
       if (s.clv.n) parts.push('beat the close ' + s.clv.beat + '-' + s.clv.lost + (s.clv.even ? '-' + s.clv.even : '') + ' · ' + sgn(s.clv.runs / s.clv.n, 2) + ' ' + (unit || 'runs') + ' avg');
       return '<div><p class="k">' + esc(s.label) + '</p><p class="v">' + s.w + '-' + s.l + (s.p ? '-' + s.p : '') + '</p>' +
         '<p class="s">' + (s.n ? 'says ' + says.toFixed(1) + '% · does ' + does.toFixed(1) + '% (±' + se.toFixed(1) + ') · ' + sgn(s.units, 2) + 'u' : 'pushes only') + '</p>' +

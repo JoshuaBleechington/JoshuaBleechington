@@ -1536,6 +1536,48 @@ const CHECKS = ["dome","playoff"];
   await pg.evaluate(async () => { await smStore.removeItem('callsheet3.card.v1'); }); await reloaded(); await pg.evaluate(() => smStore.ready);
 
   const stamp = await pg.evaluate(() => (document.getElementById('build') || {}).textContent);
+  // ---- 4 Nov 2026: the crowd on Kalshi -- the exchange's game-winner prices on the row, the card beside the book and Pinnacle, the better price after the fee on the board, the sharp side against the crowd on the moneyline tile ----
+  const kalT = await pg.evaluate(async () => {
+    const wait = () => new Promise(r => setTimeout(r, 120));
+    const txt = e => (e ? e.innerText : '').replace(/\s+/g, ' ').trim();
+    const set = (id, v) => { const el = document.getElementById(id); el.value = v; el.dispatchEvent(new Event('input', { bubbles: true })); };
+    const load = async (doc, fname) => { const dt = new DataTransfer(); dt.items.add(new File([JSON.stringify(doc)], fname, { type: 'application/json' })); const inp = document.getElementById('slateFile'); inp.files = dt.files; inp.dispatchEvent(new Event('change', { bubbles: true })); await wait(); };
+    await smStore.removeItem('callsheet3.card.v1'); document.getElementById('clear').click(); document.getElementById('m-nba').click(); await wait();
+    const empty = txt(document.getElementById('nbaKalshiPanel'));
+    const kal = { at: '2026-11-14T20:00:00Z', ev: 'KXNBAGAME-26NOV14ATLWAS', fee: 0.07, a: { bid: 0.57, ask: 0.58, last: 0.58, vol: 149511, oi: 136925 }, h: { bid: 0.42, ask: 0.43, last: 0.43, vol: 140051, oi: 115254 } };
+    const pin = JSON.stringify({ book: 'pinnacle', line: 232.5, op: -108, up: -108, hml: 150, aml: -170 });
+    set('gdate', '2026-11-14'); set('away', 'Hawks'); set('home', 'Wizards'); set('line', '232.5'); set('op', '-110'); set('up', '-110'); set('hml', '140'); set('aml', '-165');
+    set('sharp', pin); set('nbakalshi', JSON.stringify(kal)); await wait();
+    const panel = txt(document.getElementById('nbaKalshiPanel'));
+    set('sharp', ''); await wait(); const noPin = txt(document.getElementById('nbaKalshiPanel'));
+    set('sharp', pin); await wait();
+    document.getElementById('add').click(); await wait();
+    document.getElementById('boardDate').value = '2026-11-14'; document.getElementById('boardDate').dispatchEvent(new Event('change')); await wait();
+    const chips = [...document.querySelectorAll('.pk')].filter(e => /Hawks ML|Wizards ML/.test(e.textContent)).map(e => txt(e.querySelector('.n4')));
+    const row = JSON.parse(smStore.getItem('callsheet3.card.v1')).find(r => /Hawks @ Wizards/.test(r.matchup)), stored = !!((row.inputs || {}).nbakalshi);
+    // graded: the sharp side (the Hawks, Pinnacle's 61.2% against the crowd's 57.5%) wins, and the moneyline tile keeps the line
+    await load({ format: 'callsheet2.slate', version: 1, date: '2026-11-14', games: [{ sport: 'NBA', gdate: '2026-11-14', away: 'Hawks', home: 'Wizards', finals: { fa: '118', fh: '110', f5a: '60', f5h: '55' }, close: { ctot: '232.5' }, notes: [] }] }, 'nba-grade-2026-11-14.json');
+    const mlTile = txt([...document.querySelectorAll('#calibBox .calib[data-sport="NBA"] > div')].find(d => /^MONEYLINE/i.test(txt(d))));
+    // the loader: a bare row takes the block from a slate, and a newer slate's block replaces it
+    document.getElementById('clear').click(); await wait();
+    set('gdate', '2026-11-15'); set('away', 'Kings'); set('home', 'Spurs'); set('line', '222.5'); set('op', '-110'); set('up', '-110'); await wait(); document.getElementById('add').click(); await wait();
+    await load({ format: 'callsheet2.slate', version: 1, date: '2026-11-15', games: [{ sport: 'NBA', gdate: '2026-11-15', away: 'Kings', home: 'Spurs', notes: [], inputs: { nbakalshi: JSON.stringify(Object.assign({}, kal, { ev: 'KXNBAGAME-26NOV15SACSAS' })) } }] }, 'nba-slate-2026-11-15.json');
+    const first = ((JSON.parse(smStore.getItem('callsheet3.card.v1')).find(r => /Kings @ Spurs/.test(r.matchup)) || { inputs: {} }).inputs.nbakalshi || '');
+    await load({ format: 'callsheet2.slate', version: 1, date: '2026-11-15', games: [{ sport: 'NBA', gdate: '2026-11-15', away: 'Kings', home: 'Spurs', notes: [], inputs: { nbakalshi: JSON.stringify(Object.assign({}, kal, { ev: 'KXNBAGAME-26NOV15SACSAS', a: { bid: 0.60, ask: 0.61, last: 0.61, vol: 5000, oi: 4000 } })) } }] }, 'nba-slate-2026-11-15b.json');
+    const second = ((JSON.parse(smStore.getItem('callsheet3.card.v1')).find(r => /Kings @ Spurs/.test(r.matchup)) || { inputs: {} }).inputs.nbakalshi || '');
+    document.getElementById('clear').click(); await wait(); await smStore.removeItem('callsheet3.card.v1');
+    return { empty, panel, noPin, chips, stored, mlTile, first: first.slice(0, 60), second: second.indexOf('"bid":0.6') >= 0 };
+  });
+  chk(/^No Kalshi price on the row/.test(kalT.empty)
+      && /^The crowd on Kalshi · as the run read it, Nov 14, \d{1,2}:\d\d [AP]M Hawks 57\.5¢ \(bid 57¢ \/ ask 58¢ · 150k contracts\): the crowd 57\.5% · the book 59\.9% \([-−]165\) · Pinnacle 61\.2% · better on Kalshi: 58¢ needs 59\.7% after the fee against [-−]165 needing 62\.3% Wizards 42\.5¢ \(bid 42¢ \/ ask 43¢ · 140k contracts\): the crowd 42\.5% · the book 40\.1% \(\+140\) · Pinnacle 38\.8% · the book's price: 43¢ needs 44\.7% after the fee against \+140 needing 41\.7% The crowd sits 3\.7 points above Pinnacle on the Wizards: the sharp side is the Hawks\./.test(kalT.panel)
+      && /No Pinnacle moneyline on the row to set the crowd against/.test(kalT.noPin) && !/sharp side/.test(kalT.noPin),
+      'kalshi: the form\'s card reads each side three ways (the crowd\'s no-vig price, the book\'s devigged moneyline, Pinnacle\'s) with the bid, the ask and the contracts, says which price is better after the 7% fee on the win (the Hawks at 58¢ needing 59.7% against -165 needing 62.3%), and names the sharp side when the crowd sits three points from Pinnacle; without Pinnacle it says so',
+      JSON.stringify({ empty: kalT.empty, panel: kalT.panel.slice(0, 520), noPin: kalT.noPin.slice(0, 200) }));
+  chk(kalT.stored && kalT.chips.length >= 2 && /better on Kalshi: 58¢ needs 59\.7% after the fee v [-−]165 needing 62\.3% · the crowd 57\.5%/i.test(kalT.chips[0]) && /Kalshi 43¢ needs 44\.7% after the fee v \+140 needing 41\.7%: the book · the crowd 42\.5%/i.test(kalT.chips[1])
+      && /the sharp side against Kalshi's crowd, 3\+ points 1-0/.test(kalT.mlTile) && /^\{"at":"2026-11-14T20:00:00Z","ev":"KXNBAGAME-26NOV15SACSAS",/.test(kalT.first) && kalT.second,
+      'kalshi: Add carries the block on the row, the board\'s moneyline cards carry the exchange\'s price for their side against the book\'s after the fee, the moneyline tile keeps the sharp side against the crowd once the game grades (the Hawks, 1-0), and a slate fills a bare row\'s block and a newer slate replaces it',
+      JSON.stringify({ stored: kalT.stored, chips: kalT.chips, tile: kalT.mlTile, first: kalT.first, second: kalT.second }));
+
   const git = (cmd) => execSync(cmd, { cwd: __dirname, encoding: 'utf8' }).trim();
   let want, why;
   try {

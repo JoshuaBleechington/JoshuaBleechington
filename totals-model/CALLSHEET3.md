@@ -2182,3 +2182,64 @@ sheet said 60.0% and 53.9% landed (48-41, −3.1 units): the heaviest
 favourites among its calls (−120 to −150 went 16-17), with the BET band
 chosen most (31-24). Nothing reads under a hundred picks, and the line is
 there to read it from.
+
+## The crowd on Kalshi, 4 Nov 2026
+
+The user: "If I wanted to use some metrics from Kalshi such as public
+percentages on who may win the game for NBA or the totals or spreads, what
+could I get for you or something we can add to help the model or give me
+more info at a glance on the matchups or props?" Then, asked for one, the
+exchange's own listing of its open NBA game-winner markets (64 markets, 32
+games from 4 to 7 Nov).
+
+**What the exchange is.** A Kalshi game-winner market is one binary
+contract a side ("Atlanta wins", "Washington wins") that pays a dollar and
+trades in cents, so its price is the crowd's probability with no vig and
+the bid-ask spread is the only juice. The fee is taken on the win: 7% of
+the expected profit a contract, so a yes at 57 cents costs 57 + 0.07 × 57 ×
+43 = 58.7 and needs 58.7% to break even. The listing carries each side's
+bid, ask, last price, volume and open interest; the event ticker reads
+`KXNBAGAME-26NOV04ATLWAS`, the date and then the two clubs' codes (the
+away club first, as far as the schedule says, though the slate matches the
+codes in either order). The night's games trade at a cent of spread on
+10,000 to 860,000 contracts; games two or three days out trade at five to
+thirteen cents of spread on a few dozen, so the bid and the ask are shown,
+never the last trade alone. The market endpoint needs no key, and the
+exchange is blocked from this environment, so the slate reads it from the
+user's machine.
+
+**What a crowd percentage is worth.** It is a market price. The sheet's
+own measurement said the market price is the best single predictor it has
+(the model's lean on props fit worse than the book's devigged price at any
+weight above none; the simulation's own total is anchored to the close),
+and fading the crowd on NBA sides has never cleared a coin flip in the
+literature, so the exchange's number is not a lean and goes nowhere near
+the chance. It earns its place three ways: as a second price (a no-vig
+price at a cent of spread often beats −110 even after the fee), as a
+cross-check at a glance (the crowd, the book and Pinnacle on one line), and
+as the crowd against the sharp book, the moneyline cousin of the Pinnacle
+shade on totals (56.3% at a shade of three points over two seasons), which
+goes on the record as a watch until the data says what it is worth.
+
+**On the slate.** `kalshi_fetch` reads the open game-winner markets
+(paged), `kalshi_parse` keys them by date and the two clubs, and
+`kalshi_game` matches a game by code in either order on the date; the slate
+run and the odds run both attach each side's bid, ask, last, volume and
+open interest to the NBA row as `nbakalshi`, log a line ("Hawks 57.5 cents
+(57/58, 150k contracts) · Wizards 42.5 cents (42/43, 140k contracts)") and
+note a game the exchange has not listed. The loader carries the field and
+a newer slate or odds file replaces it, as the lineup and the simulation
+do.
+
+**On the page.** The NBA form has a card, *The crowd on Kalshi*: each side
+read three ways (the crowd's mid, the book's devigged moneyline, Pinnacle's
+when the odds run brought it), the bid, the ask and the contracts, which
+price is better after the fee, and, when the crowd sits three points or
+more from Pinnacle, the sharp side named as a watch. The board's moneyline
+cards carry a chip with the exchange's price for their side against the
+book's after the fee ("better on Kalshi: 58¢ needs 59.7% after the fee v
+−165 needing 62.3%"). The moneyline tile keeps the sharp side's record
+("the sharp side against Kalshi's crowd, 3+ points W-L"), graded at the
+carded book's price. Not built, for want of a sample: the exchange's
+spread, total and player markets; the same path takes them once a listing
+of those series is in hand.

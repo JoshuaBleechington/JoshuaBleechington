@@ -27,7 +27,7 @@ import sys
 ROOT = pathlib.Path(__file__).parent / "web"
 OPEN = "  /* ===== ENGINE BLOCK."
 CLOSE = "  /* ===== END ENGINE BLOCK ===== */"
-STAMP = "2026-11-03"   # bumped by hand when 3.0's own sources change (the harness checks it)
+STAMP = "2026-11-04"   # bumped by hand when 3.0's own sources change (the harness checks it)
 
 
 def engine_block() -> str:
@@ -270,7 +270,8 @@ def tail() -> str:
              '  var WNBA_IDS = ["away","home","line","op","up","opened","gdate","apace","hpace","aort","hort","adrt","hdrt",\n'
              '                  "arest","hrest","al5","hl5","hml","aml","sp","sph","spa"];\n'
              '  var NBA_IDS = ["away","home","line","op","up","opened","gdate","hml","aml","sp","sph","spa","h1line","h1op","h1up",\n'
-             '                 "naort","nhort","nadrt","nhdrt","napace","nhpace","nagp","nhgp","nlrtg","nlpace","narest","nhrest","nbaout","nbaq","nbactx","ncrew","nbarefs","nbalineup","nbaform","nbasim","odds","sharp"];\n'
+             '                 "naort","nhort","nadrt","nhdrt","napace","nhpace","nagp","nhgp","nlrtg","nlpace","narest","nhrest","nbaout","nbaq","nbactx","ncrew","nbarefs","nbalineup","nbaform","nbasim","odds","sharp",\n'
+             '                 "nbakalshi"];   // the crowd on Kalshi (4 Nov 2026)\n'
              '  var ALL = MLB_IDS.concat(WNBA_IDS).concat(NBA_IDS).filter(function (v, i, a) { return a.indexOf(v) === i; });\n'
              '  var CHECKS = ["dome","playoff"];\n'
              '  function sportOf(s) { return s === "WNBA" ? "WNBA" : s === "NBA" ? "NBA" : "MLB"; }\n'
@@ -421,7 +422,8 @@ def tail() -> str:
              'if (!moved) say("Loaded <b>" + card.length + "</b> matchups from " + esc(f.name) + ".");', "restore message")
     t = once(t, '                      "line","op","up","opened","hml","aml","rl","rlh","rla","f5line","f5op","f5up","odds","sharp"];',
              '                      "line","op","up","opened","hml","aml","rl","rlh","rla","f5line","f5op","f5up","odds","sharp",\n'
-             '                      "sp","sph","spa","h1line","h1op","h1up","naort","nhort","nadrt","nhdrt","napace","nhpace","nagp","nhgp","nlrtg","nlpace","narest","nhrest","nbaout","nbactx","ncrew","nbarefs","nbalineup","nbaform","nbasim"];', "slate fields")
+             '                      "sp","sph","spa","h1line","h1op","h1up","naort","nhort","nadrt","nhdrt","napace","nhpace","nagp","nhgp","nlrtg","nlpace","narest","nhrest","nbaout","nbactx","ncrew","nbarefs","nbalineup","nbaform","nbasim",\n'
+             '                      "nbakalshi"];   // the crowd on Kalshi (4 Nov 2026): the exchange\'s game-winner prices, from the slate and the odds run', "slate fields")
     # the slate's backup-in-net flags are booleans, carried like the roof: into a
     # row's inputs when the card already has the game, into the form otherwise.
     # The Confirmed boxes travel the same way (19 Oct 2026): the slate ticks one
@@ -431,7 +433,7 @@ def tail() -> str:
     # other box keeps the loader's rule, blanks fill and typed values stay, so the record is of the row as logged
     t = once(t, '          if (g.inputs.dome === true && !row.inputs.dome) { row.inputs.dome = true; changed = true; }',
              '          if (g.inputs.dome === true && !row.inputs.dome) { row.inputs.dome = true; changed = true; }\n'
-             '          ["nbalineup", "nbaout", "nbasim"].forEach(function (k) { if (!blank(g.inputs[k]) && String(g.inputs[k]) !== String(row.inputs[k] || "")) { row.inputs[k] = String(g.inputs[k]); changed = true; } });   // the starting five follows the newest slate (23 Oct 2026); so do the injury report and the simulation run from it (26 Oct 2026), shown and recorded, never scored by the engine', "lineup refresh")
+             '          ["nbalineup", "nbaout", "nbasim", "nbakalshi"].forEach(function (k) { if (!blank(g.inputs[k]) && String(g.inputs[k]) !== String(row.inputs[k] || "")) { row.inputs[k] = String(g.inputs[k]); changed = true; } });   // the starting five follows the newest slate (23 Oct 2026); so do the injury report and the simulation run from it (26 Oct 2026) and the crowd\'s price on Kalshi (4 Nov 2026), shown and recorded, never scored by the engine', "lineup refresh")
     # the Props tab (19 Oct 2026): the backup carries the props and a restore brings them back; the slate
     # loader takes a props file too and grades the props from a grade file's box lines; the record block
     # ends with the props tile; a sport button leaves the tab

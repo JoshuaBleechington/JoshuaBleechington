@@ -518,7 +518,7 @@
   <header class="top">
     <div>
       <div class="eyebrow"><span id="eyebrow">MLB · every market on the game</span>
-        <span class="build">· build <span id="build">2026-11-03</span></span></div>
+        <span class="build">· build <span id="build">2026-11-04</span></span></div>
       <h1>The <em>Super</em> Model</h1>
       <p>One matchup, every market the book posts on it — in baseball the full-game total, the first five,
          the moneyline and the run line;
@@ -806,6 +806,20 @@
               <a href="https://official.nba.com/referee-assignments/" target="_blank" rel="noopener">NBA · referee assignments</a>
             </div>
             <input type="hidden" id="nbarefs">
+          </div>
+        </section>
+
+        <section class="card">
+          <h2>The crowd on Kalshi <span class="tag">the exchange's price on each side beside the book's and Pinnacle's — shown, not scored, the sharp side against the crowd on watch</span></h2>
+          <div class="body">
+            <div id="nbaKalshiPanel" class="note">No Kalshi price on the row — load the slate or the odds file and Fill form, and the exchange's game-winner market comes with it.</div>
+            <p class="note">A Kalshi contract pays a dollar if the club wins and trades in cents, so its price is the crowd's chance with no vig
+              and the bid-ask spread is the only juice; the fee is taken on the win, 7% of the expected profit a contract, so a yes at
+              57 cents needs 58.7% to break even. The card reads each side three ways, the crowd, the book's own devigged moneyline and
+              Pinnacle's, says which price is better after the fee, and when the crowd sits three points or more from Pinnacle names the
+              sharp side as a watch with its own line on the moneyline tile. <b>Shown, not scored</b>: a prediction market's price is a
+              market price, and the market is already the sheet's spine.</p>
+            <input type="hidden" id="nbakalshi">
           </div>
         </section>
 
@@ -2363,6 +2377,84 @@ smStore.ready.then(function () {
     });
     return { side: "game", k: "crew", s: "shown", t: "Crew: " + bits.join("; ") + (refs && refs.lg ? "; the league " + (+refs.lg[1]).toFixed(1) + " and " + (+refs.lg[2]).toFixed(1) + "." : "."), tag: NBA_CREW_TAG };
   }
+  /* the crowd on Kalshi (4 Nov 2026, the user: "if I wanted to use some metrics from Kalshi such as public percentages on who
+     may win the game... what could we add?"): the slate keeps each side's bid, ask, last, volume and open interest from the
+     exchange's game-winner market on the row (nbakalshi). A contract's price is the crowd's probability with no vig; the fee
+     is taken on the win (7% of the expected profit), so a 57-cent yes needs 58.7%. The card shows the crowd beside the book's
+     devigged moneyline and Pinnacle's, says which price is better after the fee, and names the sharp side when the crowd sits
+     three points or more from Pinnacle: a watch with its own line on the moneyline tile's record. Shown, not scored */
+  var KALSHI_GAP = 0.03;
+  function kalshiMid(s) {
+    if (!s) return null;
+    var b = +s.bid, a = +s.ask;
+    if (isFinite(b) && isFinite(a) && a > 0) return (b + a) / 2;
+    return isFinite(+s.last) && +s.last > 0 ? +s.last : null;
+  }
+  function kalshiNeed(s, fee) { var a = +(s || {}).ask; if (!isFinite(a) || a <= 0 || a >= 1) return null; return a + fee * a * (1 - a); }   // what a yes at the ask needs, the fee on the win counted
+  function kalshiOf(raw) {
+    var k = null; try { k = raw ? JSON.parse(raw) : null; } catch (e) { k = null; }
+    if (!k || !k.a || !k.h) return null;
+    var ma = kalshiMid(k.a), mh = kalshiMid(k.h);
+    if (ma === null || mh === null || ma + mh <= 0) return null;
+    k.fee = isFinite(+k.fee) ? +k.fee : 0.07;
+    k.pa = ma / (ma + mh); k.ph = mh / (ma + mh);   // the crowd's chances: the two sides' mids made to sum to one
+    k.needA = kalshiNeed(k.a, k.fee); k.needH = kalshiNeed(k.h, k.fee);
+    return k;
+  }
+  function kalshiSharpRaw(raw) { var s = null; try { s = raw ? JSON.parse(raw) : null; } catch (e) { s = null; } return s && isFinite(+s.hml) && isFinite(+s.aml) && +s.hml && +s.aml ? s : null; }
+  function kalshiSharpOf(row) {
+    var i = (row && row.inputs) || {}, k = kalshiOf(i.nbakalshi), sh = kalshiSharpRaw(i.sharp);
+    if (!k || !sh) return null;
+    var ih = implied(+sh.hml), ia = implied(+sh.aml), ph = ih / (ih + ia), gap = k.ph - ph;   // the crowd above the sharp book on the home side
+    if (Math.abs(gap) < KALSHI_GAP) return null;
+    return { side: gap > 0 ? "AWAY" : "HOME", pts: Math.abs(gap) * 100, crowdHome: k.ph, sharpHome: ph };
+  }
+  function kalshiCents(v) { return v === null || v === undefined || !isFinite(+v) ? "–" : (Math.round(+v * 1000) / 10).toFixed(1).replace(/\.0$/, "") + "¢"; }
+  function kalshiVol(v) { return v === null || v === undefined || !isFinite(+v) ? "?" : (+v >= 1000 ? Math.round(+v / 1000) + "k" : String(Math.round(+v))) + " contracts"; }
+  /* the chip on a moneyline pick card (the board): the exchange's price for the pick's side against the book's, after the fee */
+  function kalshiChip(row, mk) {
+    if (!row || !mk || mk.key !== "ml" || row.sport !== "NBA") return "";
+    var k = kalshiOf((row.inputs || {}).nbakalshi); if (!k) return "";
+    var s = mk.side === "HOME" ? k.h : k.a, need = mk.side === "HOME" ? k.needH : k.needA, p = mk.side === "HOME" ? k.ph : k.pa;
+    if (need === null || mk.price === null || mk.price === undefined) return ' <span class="tagm">Kalshi\'s crowd ' + (p * 100).toFixed(1) + '%</span>';
+    var book = implied(+mk.price), better = need < book - 0.001;
+    return ' <span class="tagm' + (better ? ' warn' : '') + '" title="' + (better ? 'The exchange\'s ask for this side needs less than the book\'s price after Kalshi\'s fee on the win' : 'The book\'s price needs less than the exchange\'s ask after Kalshi\'s fee on the win') + '">' +
+           (better ? 'better on Kalshi: ' : 'Kalshi ') + kalshiCents(s.ask) + ' needs ' + (need * 100).toFixed(1) + '% after the fee v ' + sgn(+mk.price, 0) + ' needing ' + (book * 100).toFixed(1) + '%' + (better ? '' : ': the book') + ' · the crowd ' + (p * 100).toFixed(1) + '%</span>';
+  }
+  function nbaKalshiPanel() {
+    var el = $("nbaKalshiPanel"); if (!el) return;
+    var k = kalshiOf(($("nbakalshi") || {}).value || "");
+    if (!k) { el.innerHTML = "No Kalshi price on the row — load the slate or the odds file and Fill form, and the exchange's game-winner market comes with it."; return; }
+    var away = ($("away") || {}).value || "the away side", home = ($("home") || {}).value || "the home side";
+    var hml = +(($("hml") || {}).value), aml = +(($("aml") || {}).value), book = null;
+    if (isFinite(hml) && isFinite(aml) && hml && aml) { var ih = implied(hml), ia = implied(aml); book = { h: ih / (ih + ia), a: ia / (ih + ia), hml: hml, aml: aml }; }
+    var sh = kalshiSharpRaw(($("sharp") || {}).value || ""), pin = null;
+    if (sh) { var sh_h = implied(+sh.hml), sh_a = implied(+sh.aml); pin = { h: sh_h / (sh_h + sh_a), a: sh_a / (sh_h + sh_a), hml: +sh.hml, aml: +sh.aml }; }
+    var when = k.at ? new Date(k.at) : null, whenTxt = when && !isNaN(when.getTime()) ? when.toLocaleString([], { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" }) : "";
+    var pc = function (v) { return (v * 100).toFixed(1) + "%"; };
+    var line = function (nick, s, p, pb, pr, ml, need) {
+      var bits = ['the crowd <b>' + pc(p) + '</b>'];
+      if (pb !== null) bits.push('the book ' + pc(pb) + ' (' + sgn(ml, 0) + ')');
+      if (pr !== null) bits.push('Pinnacle ' + pc(pr));
+      var price = '';
+      if (need !== null && pb !== null) {
+        var bn = implied(ml), better = need < bn - 0.001;
+        price = ' · ' + (better ? '<b>better on Kalshi</b>: ' : 'the book\'s price: ') + kalshiCents(s.ask) + ' needs ' + pc(need) + ' after the fee against ' + sgn(ml, 0) + ' needing ' + pc(bn);
+      } else if (need !== null) price = ' · ' + kalshiCents(s.ask) + ' needs ' + pc(need) + ' after the fee';
+      return '<li><b>' + esc(nick) + '</b> ' + kalshiCents(kalshiMid(s)) + ' <span class="dim">(bid ' + kalshiCents(s.bid) + ' / ask ' + kalshiCents(s.ask) + ' · ' + kalshiVol(s.vol) + ')</span>: ' + bits.join(' · ') + price + '</li>';
+    };
+    var h = '<div class="kalshi"><p><b>The crowd on Kalshi</b>' + (whenTxt ? ' <span class="dim">· as the run read it, ' + esc(whenTxt) + '</span>' : '') + '</p><ul class="ctx">' +
+            line(away, k.a, k.pa, book ? book.a : null, pin ? pin.a : null, book ? book.aml : null, k.needA) +
+            line(home, k.h, k.ph, book ? book.h : null, pin ? pin.h : null, book ? book.hml : null, k.needH) + '</ul>';
+    var gapTxt = "";
+    if (pin) {
+      var gap = k.ph - pin.h, over = gap > 0 ? home : away, sharp = gap > 0 ? away : home;
+      gapTxt = Math.abs(gap) >= KALSHI_GAP
+        ? '<p><b>The crowd sits ' + (Math.abs(gap) * 100).toFixed(1) + ' points above Pinnacle on the ' + esc(over) + ': the sharp side is the ' + esc(sharp) + '.</b> <span class="dim">A watch, on the moneyline tile\'s record; the Pinnacle shade on totals hit 56% at three points over two seasons, and this is its moneyline cousin, unmeasured.</span></p>'
+        : '<p class="dim">The crowd and Pinnacle sit within three points of each other (' + (Math.abs(gap) * 100).toFixed(1) + ' on the home side): no watch.</p>';
+    } else gapTxt = '<p class="dim">No Pinnacle moneyline on the row to set the crowd against (the odds run brings it).</p>';
+    el.innerHTML = h + gapTxt + '<p class="dim">Shown, not scored: a prediction market\'s price is a market price, which is already the sheet\'s spine. The fee is Kalshi\'s on the win, ' + (k.fee * 100).toFixed(0) + '% of the expected profit a contract.</p></div>';
+  }
   function nbaCtxPanel() {
     var el = $("nbaCtxPanel"); if (!el) return;
     var raw = ($("nbactx") || {}).value || "", ctx = null;
@@ -2412,7 +2504,7 @@ smStore.ready.then(function () {
                    '<span class="crewchips">' + chips + '</span>' + call + (crew.tag ? ' <span class="ctag">' + esc(crew.tag) + '</span>' : '') + '</div>';
   }
   function forecastMatchupNba() {
-    if (!SRC) { nbaOutPanel(); nbaLineupPanel(); nbaFormPanel(); nbaSimPanel(); nbaMidPanel(); nbaCrewPanel(); nbaCtxPanel(); }   // the form's panels: not while a card row is being re-scored
+    if (!SRC) { nbaOutPanel(); nbaLineupPanel(); nbaFormPanel(); nbaSimPanel(); nbaMidPanel(); nbaCrewPanel(); nbaKalshiPanel(); nbaCtxPanel(); }   // the form's panels: not while a card row is being re-scored
     var f = readNba();
     var away = f.away, home = f.home, line = f.line;
     var op = num("op"), up = num("up"), hml = num("hml"), aml = num("aml");
@@ -7505,7 +7597,8 @@ var qrcode = function() {
   var WNBA_IDS = ["away","home","line","op","up","opened","gdate","apace","hpace","aort","hort","adrt","hdrt",
                   "arest","hrest","al5","hl5","hml","aml","sp","sph","spa"];
   var NBA_IDS = ["away","home","line","op","up","opened","gdate","hml","aml","sp","sph","spa","h1line","h1op","h1up",
-                 "naort","nhort","nadrt","nhdrt","napace","nhpace","nagp","nhgp","nlrtg","nlpace","narest","nhrest","nbaout","nbaq","nbactx","ncrew","nbarefs","nbalineup","nbaform","nbasim","odds","sharp"];
+                 "naort","nhort","nadrt","nhdrt","napace","nhpace","nagp","nhgp","nlrtg","nlpace","narest","nhrest","nbaout","nbaq","nbactx","ncrew","nbarefs","nbalineup","nbaform","nbasim","odds","sharp",
+                 "nbakalshi"];   // the crowd on Kalshi (4 Nov 2026)
   var ALL = MLB_IDS.concat(WNBA_IDS).concat(NBA_IDS).filter(function (v, i, a) { return a.indexOf(v) === i; });
   var CHECKS = ["dome","playoff"];
   function sportOf(s) { return s === "WNBA" ? "WNBA" : s === "NBA" ? "NBA" : "MLB"; }
@@ -8458,7 +8551,8 @@ var qrcode = function() {
       '<div class="n3">' + (x.mk.p * 100).toFixed(1) + '% · ' + (x.mk.price !== null ? sgn(x.mk.price, 0) + ' · edge ' + sgn(x.mk.edge * 100, 1) : 'no price') +
         (res ? ' · <span class="chip ' + res + '">' + resText(res) + '</span>' : '') + '</div>' +
       '<div class="n4">' + esc(x.row.matchup) + ' · ' + esc(x.mk.label) +
-        (x.mk.key === "total" && marksOf(x.row.sport, x.row.inputs, x.row.markets).grain ? ' <span class="tagm warn">over against the grain</span>' : '') + '</div>' + (extra || '') + (callOf(x.row, x.mk) ? callWhy(x) : '') +
+        (x.mk.key === "total" && marksOf(x.row.sport, x.row.inputs, x.row.markets).grain ? ' <span class="tagm warn">over against the grain</span>' : '') +
+        (typeof kalshiChip === "function" ? kalshiChip(x.row, x.mk) : '') + '</div>' + (extra || '') + (callOf(x.row, x.mk) ? callWhy(x) : '') +
       '<div class="n6">' + takeBtn(x.row, x.mk) + '</div></div>';
   }
   /* ---- the likeliest side in each game at any price, and the two-leg parlays built
@@ -9035,6 +9129,11 @@ var qrcode = function() {
           if (row.sport === "NHL") count(t.upset || (t.upset = { w: 0, l: 0, p: 0 }), dres);
           else count(t.shortDog || (t.shortDog = { w: 0, l: 0, p: 0 }), dres);
         }
+        /* the sharp side against Kalshi's crowd (4 Nov 2026): the side Pinnacle rates three points or more above the exchange, graded at the carded price; a watch */
+        if (mk.key === "ml" && row.sport === "NBA" && typeof kalshiSharpOf === "function") {
+          var ks = kalshiSharpOf(row), kv = ks ? bothSides(mk).filter(function (v) { return v.side === ks.side; })[0] : null, kr = kv ? gradeMarket(kv, row.finals) : null;
+          if (kr !== null && kr !== "invalid") count(t.kalshi || (t.kalshi = { w: 0, l: 0, p: 0 }), kr);
+        }
         if (mk.key === "total" || isPeriod(mk)) {
           var tg = marksOf(row.sport, row.inputs, row.markets);
           if (tg.profile) count(t.profile || (t.profile = { w: 0, l: 0, p: 0 }), res);
@@ -9129,6 +9228,7 @@ var qrcode = function() {
       if (s.sharpShade) parts.push("Pinnacle's shade, 3+ points " + rec(s.sharpShade));
       if (s.upset) parts.push("the dog with a backup in net " + rec(s.upset));
       if (s.shortDog) parts.push("the short dog " + rec(s.shortDog));
+      if (s.kalshi) parts.push("the sharp side against Kalshi's crowd, 3+ points " + rec(s.kalshi));
       if (s.clv.n) parts.push('beat the close ' + s.clv.beat + '-' + s.clv.lost + (s.clv.even ? '-' + s.clv.even : '') + ' · ' + sgn(s.clv.runs / s.clv.n, 2) + ' ' + (unit || 'runs') + ' avg');
       return '<div><p class="k">' + esc(s.label) + '</p><p class="v">' + s.w + '-' + s.l + (s.p ? '-' + s.p : '') + '</p>' +
         '<p class="s">' + (s.n ? 'says ' + says.toFixed(1) + '% · does ' + does.toFixed(1) + '% (±' + se.toFixed(1) + ') · ' + sgn(s.units, 2) + 'u' : 'pushes only') + '</p>' +
@@ -9533,7 +9633,8 @@ var qrcode = function() {
                       /* the odds file (12 Oct 2026): the book's lines and prices, the opener, and
                          every book's price for the shop -- blank boxes fill, typed ones stay */
                       "line","op","up","opened","hml","aml","rl","rlh","rla","f5line","f5op","f5up","odds","sharp",
-                      "sp","sph","spa","h1line","h1op","h1up","naort","nhort","nadrt","nhdrt","napace","nhpace","nagp","nhgp","nlrtg","nlpace","narest","nhrest","nbaout","nbactx","ncrew","nbarefs","nbalineup","nbaform","nbasim"];
+                      "sp","sph","spa","h1line","h1op","h1up","naort","nhort","nadrt","nhdrt","napace","nhpace","nagp","nhgp","nlrtg","nlpace","narest","nhrest","nbaout","nbactx","ncrew","nbarefs","nbalineup","nbaform","nbasim",
+                      "nbakalshi"];   // the crowd on Kalshi (4 Nov 2026): the exchange's game-winner prices, from the slate and the odds run
   function blank(v) { return v === undefined || v === null || String(v).trim() === ""; }
   function sameGame(row, g) {
     var sp = sportOf(g.sport);
@@ -9561,7 +9662,7 @@ var qrcode = function() {
             row.inputs[k] = String(g.inputs[k]); changed = true;
           });
           if (g.inputs.dome === true && !row.inputs.dome) { row.inputs.dome = true; changed = true; }
-          ["nbalineup", "nbaout", "nbasim"].forEach(function (k) { if (!blank(g.inputs[k]) && String(g.inputs[k]) !== String(row.inputs[k] || "")) { row.inputs[k] = String(g.inputs[k]); changed = true; } });   // the starting five follows the newest slate (23 Oct 2026); so do the injury report and the simulation run from it (26 Oct 2026), shown and recorded, never scored by the engine
+          ["nbalineup", "nbaout", "nbasim", "nbakalshi"].forEach(function (k) { if (!blank(g.inputs[k]) && String(g.inputs[k]) !== String(row.inputs[k] || "")) { row.inputs[k] = String(g.inputs[k]); changed = true; } });   // the starting five follows the newest slate (23 Oct 2026); so do the injury report and the simulation run from it (26 Oct 2026) and the crowd's price on Kalshi (4 Nov 2026), shown and recorded, never scored by the engine
           /* the apps' numbers follow the newest odds run on a basketball row (28 Oct 2026, the middles watch): the logged line
              and prices stay as the markets were scored, the shop as it stands now goes beside them */
           if (row.sport === "NBA" && !blank(g.inputs.odds) && String(g.inputs.odds) !== String(row.inputs.oddsNow || row.inputs.odds || "")) { row.inputs.oddsNow = String(g.inputs.odds); row.inputs.oddsAt = d.generated || ""; }

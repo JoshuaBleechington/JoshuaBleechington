@@ -4386,7 +4386,103 @@ def nba_odds_note(o, away, home):
     return "%s on ESPN's scoreboard at the slate run: %s. Shown for the opener and as a check on the carded book; the lines come from the odds run." % (o.get("book") or "The book", "; ".join(bits))
 
 
-def build_nba_game(g, date_iso, tables, league, players, prior_players, injuries, log, have_ledger=True, officials=None, refs=None, lineups=None, form=None, sim=None):
+# ---- the crowd on Kalshi (4 Nov 2026) -------------------------------------------------------------------------
+# The user: "if I wanted to use some metrics from Kalshi such as public percentages on who may win the game... what
+# could we add to help the model or give me more info at a glance?" Kalshi's market endpoint needs no key. A game-winner
+# market is one binary contract a side, priced in cents: the price is the crowd's probability with no vig, the bid-ask
+# spread the only juice, and the fee is taken on the win (7% of the expected profit a contract, so a yes at 57 cents
+# costs 57 + 0.07 x 57 x 43 = 58.7). The slate keeps each side's bid, ask, last, volume and open interest on the row
+# (nbakalshi) from the slate run and the odds run; the page shows the crowd beside the book and Pinnacle, says which
+# price is better after the fee, and keeps the sharp side against the crowd (three points or more from Pinnacle) on a
+# record line. Shown, not scored: a prediction market's price is a market price, not a lean, and the market price is
+# already the sheet's spine. The event ticker reads KXNBAGAME-26NOV04ATLWAS, the date then the two clubs' codes
+KALSHI_API = "https://api.elections.kalshi.com/trade-api/v2"
+KALSHI_SERIES = {"NBA": "KXNBAGAME"}
+KALSHI_FEE = 0.07
+KALSHI_MONTHS = {"JAN": 1, "FEB": 2, "MAR": 3, "APR": 4, "MAY": 5, "JUN": 6, "JUL": 7, "AUG": 8, "SEP": 9, "OCT": 10, "NOV": 11, "DEC": 12}
+KALSHI_CODES = {"WSH": "WAS", "GS": "GSW", "NY": "NYK", "NO": "NOP", "SA": "SAS", "UTAH": "UTA", "PHO": "PHX"}   # a club's code as other feeds write it
+
+
+def kalshi_event_key(event_ticker):
+    """'KXNBAGAME-26NOV04ATLWAS' -> ('2026-11-04', 'ATL', 'WAS'): the date and the two clubs' codes, or None."""
+    m = re.search(r"-(\d{2})([A-Z]{3})(\d{2})([A-Z]{3})([A-Z]{3})$", str(event_ticker or ""))
+    if not m or m.group(2) not in KALSHI_MONTHS:
+        return None
+    return ("20%s-%02d-%s" % (m.group(1), KALSHI_MONTHS[m.group(2)], m.group(3)), m.group(4), m.group(5))
+
+
+def kalshi_num(v):
+    try:
+        return float(v)
+    except (TypeError, ValueError):
+        return None
+
+
+def kalshi_parse(doc):
+    """A game-winner series' markets -> {(date, codeA, codeB): {"ev": ticker, "sides": {code: {bid, ask, last, vol, oi, name}}}},
+    the prices in dollars, the volume and the open interest in contracts."""
+    out = {}
+    for m in (doc or {}).get("markets") or []:
+        key = kalshi_event_key(m.get("event_ticker"))
+        if not key:
+            continue
+        code = str(m.get("ticker") or "").rsplit("-", 1)[-1]
+        side = {"bid": kalshi_num(m.get("yes_bid_dollars")), "ask": kalshi_num(m.get("yes_ask_dollars")), "last": kalshi_num(m.get("last_price_dollars")),
+                "vol": kalshi_num(m.get("volume_fp")), "oi": kalshi_num(m.get("open_interest_fp")), "name": m.get("yes_sub_title") or ""}
+        out.setdefault(key, {"ev": m.get("event_ticker"), "sides": {}})["sides"][code] = side
+    return out
+
+
+def kalshi_fetch(sport, log):
+    """Every open game-winner market of the sport's series on the exchange, paged; None when it cannot be read."""
+    series = KALSHI_SERIES.get(sport)
+    if not series:
+        return None
+    markets, cursor = [], ""
+    try:
+        for _ in range(10):
+            doc = fetch_json("%s/markets?series_ticker=%s&status=open&limit=200%s" % (KALSHI_API, series, ("&cursor=" + cursor) if cursor else ""), cache=False)
+            markets.extend(doc.get("markets") or [])
+            cursor = doc.get("cursor") or ""
+            if not cursor:
+                break
+    except Exception as e:  # noqa: BLE001
+        log("Kalshi: the exchange could not be read (%s); the rows carry no crowd price." % e)
+        return None
+    parsed = kalshi_parse({"markets": markets})
+    log("Kalshi: %d %s game%s open on the exchange (%d markets)." % (len(parsed), sport, "" if len(parsed) == 1 else "s", len(markets)))
+    return parsed
+
+
+def kalshi_game(parsed, date_iso, away_code, home_code):
+    """The crowd's block for one game, the clubs matched by code in either order; None when the exchange has no market on it."""
+    if not parsed:
+        return None
+    a_code, h_code = KALSHI_CODES.get(away_code, away_code), KALSHI_CODES.get(home_code, home_code)
+    for key, ev in parsed.items():
+        if key[0] != date_iso or {key[1], key[2]} != {a_code, h_code}:
+            continue
+        a, h = ev["sides"].get(a_code), ev["sides"].get(h_code)
+        if not a or not h:
+            return None
+        pick = lambda s: {k: s.get(k) for k in ("bid", "ask", "last", "vol", "oi")}  # noqa: E731
+        return {"at": now_utc(), "ev": ev.get("ev"), "fee": KALSHI_FEE, "a": pick(a), "h": pick(h)}
+    return None
+
+
+def kalshi_summary(block, away, home):
+    """One line for the log: each side's mid price in cents, the bid and ask, the contracts traded."""
+    def side(s, nick):
+        bid, ask, vol = s.get("bid"), s.get("ask"), s.get("vol")
+        mid = (bid + ask) / 2.0 if bid is not None and ask is not None else s.get("last")
+        if mid is None:
+            return "%s no price" % nick
+        return "%s %.1f cents (%s/%s, %s contracts)" % (nick, mid * 100, int(round(bid * 100)) if bid is not None else "-", int(round(ask * 100)) if ask is not None else "-",
+                                                      ("%dk" % round(vol / 1000.0)) if vol and vol >= 1000 else (str(int(vol)) if vol is not None else "?"))
+    return side(block["a"], away) + " · " + side(block["h"], home)
+
+
+def build_nba_game(g, date_iso, tables, league, players, prior_players, injuries, log, have_ledger=True, officials=None, refs=None, lineups=None, form=None, sim=None, kalshi=None):
     away, home = g.get("an") or NBA_NICK.get(g["away"], g["away"]), g.get("hn") or NBA_NICK.get(g["home"], g["home"])
     inputs = {k: "" for k in NBA_INPUT_IDS}
     notes = []
@@ -4485,6 +4581,13 @@ def build_nba_game(g, date_iso, tables, league, players, prior_players, injuries
         log("  crew: " + nba_crew_summary(crew, refs))
     elif officials is not None:
         notes.append("No crew on the league's feed for this game yet (posted about 9 am Eastern): type the names in the Crew box when they are up.")
+    # the crowd on Kalshi (4 Nov 2026): each side's price on the exchange, shown beside the book's, never scored
+    kal = kalshi_game(kalshi, date_iso, g["away"], g["home"]) if kalshi else None
+    if kal:
+        inputs["nbakalshi"] = json.dumps(kal, separators=(",", ":"))
+        log("  Kalshi: " + kalshi_summary(kal, away, home))
+    elif kalshi:
+        notes.append("Kalshi has no open market on this game yet: the crowd's price stays off the row until a later run finds one.")
     # the simulation (25 Oct 2026): both views on the row as histograms
     if sim and sim.get("prof"):
         try:
@@ -4586,6 +4689,7 @@ def make_nba_slate(date_iso, out_dir, log, topup=False, sim_runs=NBA_SIM_RUNS):
     lineups = nba_lineups(date_iso, log) if games else {}
     if (lineups or {}).get("rw"):   # the two reports together (26 Oct 2026): RotoWire's outs and confirmed starters into ESPN's list
         injuries, _rw_notes = nba_injuries_rotowire(injuries, lineups, [players, prior_players], log)
+    kalshi = kalshi_fetch("NBA", log) if games else None   # the crowd's prices on the exchange (4 Nov 2026), shown beside the book's
     try:
         with open(odds_log_path(out_dir), encoding="utf-8") as f:
             logd = json.load(f)
@@ -4595,7 +4699,7 @@ def make_nba_slate(date_iso, out_dir, log, topup=False, sim_runs=NBA_SIM_RUNS):
     for g in games:
         try:
             form = {"away": nba_recent_form(led["games"], g["away"], date_iso, logd), "home": nba_recent_form(led["games"], g["home"], date_iso, logd)} if led else None
-            rows.append(build_nba_game(g, date_iso, tables, league, players, prior_players, injuries, log, have_ledger=bool(led and led.get("games")), officials=officials, refs=refs, lineups=lineups, form=form, sim=sim))
+            rows.append(build_nba_game(g, date_iso, tables, league, players, prior_players, injuries, log, have_ledger=bool(led and led.get("games")), officials=officials, refs=refs, lineups=lineups, form=form, sim=sim, kalshi=kalshi))
         except Exception as e:  # noqa: BLE001
             log("%s @ %s: FAILED (%s); left out of the slate" % (g.get("an"), g.get("hn"), e))
         log("")
@@ -6433,6 +6537,7 @@ def make_odds(date_iso, out_dir, log, books=None, sports=("MLB", "NHL", "NBA")):
     key = odds_key(out_dir)
     books = odds_books_list(books)
     rows, now, spent, left = [], now_utc(), 0, None
+    kalshi = kalshi_fetch("NBA", log) if "NBA" in sports else None   # the crowd's prices on the exchange (4 Nov 2026), on the NBA rows beside the book's
     for sport in sports:
         try:
             evs = fetch_odds(sport, key, books)
@@ -6456,6 +6561,11 @@ def make_odds(date_iso, out_dir, log, books=None, sports=("MLB", "NHL", "NBA")):
             except Exception as e:  # noqa: BLE001
                 log("  %s @ %s: no period, alternate or team totals on the feed (%s)" % (odds_nick(ev.get("away_team")), odds_nick(ev.get("home_team")), e))
             g = odds_game(ev, sport, books, extra)
+            if sport == "NBA" and kalshi:
+                kb = kalshi_game(kalshi, date_iso, NBA_TRICODE.get(g["away"], g["away"]), NBA_TRICODE.get(g["home"], g["home"]))
+                if kb:
+                    g["inputs"]["nbakalshi"] = json.dumps(kb, separators=(",", ":"))
+                    log("    Kalshi: " + kalshi_summary(kb, g["away"], g["home"]))
             e = odds_log_update(odds_log_path(out_dir), g, now)
             opener = (e.get("first") or {}).get("line")
             if opener and not g["inputs"].get("opened"):
@@ -7337,6 +7447,22 @@ def selftest():
           and abs(props_shade("pts", 0.569) - 0.0207) < 0.0005 and props_shade("pts", 0.6341) == 0.0 and abs(props_shade("tpm", 0.4038) - 0.0169) < 0.0005 and props_shade("ast", 0.35) == 0.0   # fading past the tent, nothing beyond it
           and abs(props_over(34.48 - 0.08 * 11.52, 11.52, 30.5)[0] - proj_["pm"]) < 0.001   # the sigma carries the thin-history factor (27 Oct 2026): 10.86 x 1.06 on 143 minutes of evidence
           and any(w == "his rate rests on 143 minutes of evidence (3 games this season, last season behind it): the miss runs wider on a thin history, measured, so the sigma is ×1.06" for w in why_))
+    # the crowd on Kalshi (4 Nov 2026): the exchange's markets parsed, matched to a game by code in either order, summarised
+    kal_doc = {"markets": [
+        {"ticker": "KXNBAGAME-26NOV04ATLWAS-WAS", "event_ticker": "KXNBAGAME-26NOV04ATLWAS", "yes_sub_title": "Washington", "yes_bid_dollars": "0.4200", "yes_ask_dollars": "0.4300", "last_price_dollars": "0.4300", "volume_fp": "140050.68", "open_interest_fp": "115253.70"},
+        {"ticker": "KXNBAGAME-26NOV04ATLWAS-ATL", "event_ticker": "KXNBAGAME-26NOV04ATLWAS", "yes_sub_title": "Atlanta", "yes_bid_dollars": "0.5700", "yes_ask_dollars": "0.5800", "last_price_dollars": "0.5800", "volume_fp": "149511.06", "open_interest_fp": "136925.31"},
+        {"ticker": "KXNBAGAME-26NOV07SASPOR-SAS", "event_ticker": "KXNBAGAME-26NOV07SASPOR", "yes_sub_title": "San Antonio", "yes_bid_dollars": "0.5400", "yes_ask_dollars": "0.6700", "last_price_dollars": "0.7000", "volume_fp": "12.15", "open_interest_fp": "12.15"},
+        {"ticker": "KXNBAGAME-26NOV07SASPOR-POR", "event_ticker": "KXNBAGAME-26NOV07SASPOR", "yes_sub_title": "Portland", "yes_bid_dollars": "0.3500", "yes_ask_dollars": "0.4600", "last_price_dollars": "0.4500", "volume_fp": "24.64", "open_interest_fp": "24.64"},
+        {"ticker": "SOMETHING-ELSE", "event_ticker": "KXNBASERIES-26-BOS"}]}
+    kal_p = kalshi_parse(kal_doc)
+    kal_g = kalshi_game(kal_p, "2026-11-04", "WSH", "ATL")   # the sheet's codes as ESPN writes them, the clubs the other way round
+    check("kalshi: the event ticker reads as the date and the two clubs' codes, the markets parse by game and side, and a game matches by code in either order with each side's bid, ask, last, volume and open interest",
+          kalshi_event_key("KXNBAGAME-26NOV04ATLWAS") == ("2026-11-04", "ATL", "WAS") and kalshi_event_key("KXNBASERIES-26-BOS") is None and kalshi_event_key(None) is None
+          and set(kal_p) == {("2026-11-04", "ATL", "WAS"), ("2026-11-07", "SAS", "POR")} and kal_p[("2026-11-04", "ATL", "WAS")]["sides"]["ATL"]["ask"] == 0.58 and kal_p[("2026-11-04", "ATL", "WAS")]["sides"]["WAS"]["name"] == "Washington"
+          and kal_g is not None and kal_g["ev"] == "KXNBAGAME-26NOV04ATLWAS" and kal_g["fee"] == KALSHI_FEE and kal_g["a"] == {"bid": 0.42, "ask": 0.43, "last": 0.43, "vol": 140050.68, "oi": 115253.7} and kal_g["h"]["bid"] == 0.57
+          and kalshi_game(kal_p, "2026-11-05", "ATL", "WAS") is None and kalshi_game(kal_p, "2026-11-04", "BOS", "ATL") is None and kalshi_game(None, "2026-11-04", "ATL", "WAS") is None
+          and kalshi_summary(kal_g, "Wizards", "Hawks") == "Wizards 42.5 cents (42/43, 140k contracts) · Hawks 57.5 cents (57/58, 150k contracts)"
+          and kalshi_summary(kalshi_game(kal_p, "2026-11-07", "SAS", "POR"), "Spurs", "Trail Blazers") == "Spurs 60.5 cents (54/67, 12 contracts) · Trail Blazers 40.5 cents (35/46, 24 contracts)")
     parts_ = dict((p["k"], p) for p in proj_["parts"])
     check("props: what moves it: the base is his rate at his minutes, the regulars out, pace and the defence sum from it to the projection, the prior and the minutes trend say what sits inside it, each pointing at its why line",
           set(parts_) == {"prior", "minutes", "out", "pace", "dvp"} and abs(proj_["base"] + parts_["out"]["eff"] + parts_["pace"]["eff"] + parts_["dvp"]["eff"] - proj_["proj"]) < 0.03

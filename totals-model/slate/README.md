@@ -88,7 +88,13 @@ measured shade (2 Nov 2026, on 6,216 graded props: 1.5 points on rebounds,
 4 on points, assists and threes, 5.5 on the combinations, in full at a
 coin-flip price and fading to nothing past it; the public plays overs), and
 moves a starter's minutes with the simulation's expected margin (the game
-script). Nothing to run differently.
+script). The slate run and the odds run also read Kalshi's open NBA
+game-winner markets (4 Nov 2026, no key needed) and put each side's bid,
+ask, last, volume and open interest on the row: the sheet's card shows the
+crowd's no-vig price beside the book's and Pinnacle's, which price is
+better after the exchange's 7% fee on the win, and the sharp side when the
+crowd sits three points from Pinnacle, a watch on the moneyline tile.
+Nothing to run differently.
 
 Three double-click files, in this order on a game day:
 

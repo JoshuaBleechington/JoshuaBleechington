@@ -2240,6 +2240,30 @@ cards carry a chip with the exchange's price for their side against the
 book's after the fee ("better on Kalshi: 58¢ needs 59.7% after the fee v
 −165 needing 62.3%"). The moneyline tile keeps the sharp side's record
 ("the sharp side against Kalshi's crowd, 3+ points W-L"), graded at the
-carded book's price. Not built, for want of a sample: the exchange's
-spread, total and player markets; the same path takes them once a listing
-of those series is in hand.
+carded book's price.
+
+**The ladders, the same day.** The user then sent the exchange's spread
+and total listings (`KXNBASPREAD`, `KXNBATOTAL`). A spread market is one
+contract a rung a club ("Memphis wins by over 6.5 points", the floor in
+`floor_strike`, a point apart near the number and two apart further out,
+the favourite's ladder finer than the dog's); a total market is one
+contract a rung ("Full Game: Over 228.5 points scored", two points apart).
+Each rung's price is the crowd's chance of more than the floor, so a
+club's ladder and the game's total ladder are the crowd's whole
+distribution of the margin and the total, the thing the simulation also
+has. The slate reads all three series (paged), keeps the ladders on the
+row beside the game-winner prices (`sp.a`, `sp.h`, `tot`, each rung as
+floor, bid, ask, last and contracts), and the log line names the crowd's
+spread and total at even money. On the page the card goes on: **the
+spread**, the crowd's number at even money (the home margin's curve built
+from both ladders, the away side's rungs read as the home side falling
+short) beside the book's, and at the book's number the home cover's
+chance by the crowd, by the sheet and by the simulation's own view; **the
+total** the same way, with Pinnacle's number and the simulation's own
+median beside it. When the book's number is a rung of the ladder, each
+side's price on the exchange (the yes ask for the side the ladder names,
+one less the yes bid for the other) is read against the book's after the
+fee, as the moneyline is; between rungs the chance is read straight and
+there is no price to compare. The board's spread and total cards carry the
+same chip as the moneyline's. The record keeps only the moneyline watch;
+the ladders are shown, not scored. Player markets wait on a listing.

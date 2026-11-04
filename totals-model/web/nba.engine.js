@@ -231,20 +231,72 @@
     return isFinite(+s.last) && +s.last > 0 ? +s.last : null;
   }
   function kalshiNeed(s, fee) { var a = +(s || {}).ask; if (!isFinite(a) || a <= 0 || a >= 1) return null; return a + fee * a * (1 - a); }   // what a yes at the ask needs, the fee on the win counted
+  function kalshiNeedAt(ask, fee) { return !isFinite(ask) || ask <= 0 || ask >= 1 ? null : ask + fee * ask * (1 - ask); }
+  /* the ladders (4 Nov 2026, the user's spread and total listings): a club's spread markets ("Memphis wins by over 6.5 points")
+     and the game's total markets ("Over 228.5 points") each read as the crowd's chance of more than the floor, so together they
+     are the crowd's distribution of the margin and the total: the number at even money is the crowd's spread or total, and the
+     chance at the book's line is read straight between two rungs */
+  function kalshiRungs(list) {
+    return (list || []).map(function (r) { var bid = +r[1], ask = +r[2]; return isFinite(bid) && isFinite(ask) && ask > 0 && isFinite(+r[0]) ? { x: +r[0], p: (bid + ask) / 2, bid: bid, ask: ask, vol: +r[4] || 0 } : null; })
+      .filter(function (r) { return r; }).sort(function (a, b) { return a.x - b.x; });
+  }
+  function kalshiCurveAt(pts, x) {   // P(more than x) off the rungs, straight between two, null outside them
+    if (!pts || !pts.length || x < pts[0].x || x > pts[pts.length - 1].x) return null;
+    for (var i = 0; i < pts.length; i++) {
+      if (x === pts[i].x) return pts[i].p;
+      if (i && x < pts[i].x) { var a = pts[i - 1], b = pts[i]; return a.p + (b.p - a.p) * (x - a.x) / (b.x - a.x); }
+    }
+    return null;
+  }
+  function kalshiMedian(pts) {   // the number the crowd puts at even money
+    for (var i = 1; i < (pts || []).length; i++) { var a = pts[i - 1], b = pts[i]; if (a.p >= 0.5 && b.p < 0.5) return a.p === b.p ? a.x : a.x + (a.p - 0.5) / (a.p - b.p) * (b.x - a.x); }
+    return null;
+  }
+  function kalshiRungAt(pts, x) { for (var i = 0; i < (pts || []).length; i++) if (pts[i].x === x) return pts[i]; return null; }
   function kalshiOf(raw) {
     var k = null; try { k = raw ? JSON.parse(raw) : null; } catch (e) { k = null; }
-    if (!k || !k.a || !k.h) return null;
-    var ma = kalshiMid(k.a), mh = kalshiMid(k.h);
-    if (ma === null || mh === null || ma + mh <= 0) return null;
+    if (!k || typeof k !== "object") return null;
     k.fee = isFinite(+k.fee) ? +k.fee : 0.07;
-    k.pa = ma / (ma + mh); k.ph = mh / (ma + mh);   // the crowd's chances: the two sides' mids made to sum to one
-    k.needA = kalshiNeed(k.a, k.fee); k.needH = kalshiNeed(k.h, k.fee);
+    var ma = kalshiMid(k.a), mh = kalshiMid(k.h);
+    k.ml = !!(k.a && k.h && ma !== null && mh !== null && ma + mh > 0);
+    if (k.ml) { k.pa = ma / (ma + mh); k.ph = mh / (ma + mh); k.needA = kalshiNeed(k.a, k.fee); k.needH = kalshiNeed(k.h, k.fee); }   // the crowd's chances: the two sides' mids made to sum to one
+    else { k.pa = k.ph = k.needA = k.needH = null; }
+    k.spH = kalshiRungs(k.sp && k.sp.h); k.spA = kalshiRungs(k.sp && k.sp.a);
+    /* the home margin's curve: P(the home side wins by more than x) from its own ladder, and from the away ladder as P(the away side
+       wins by more than y) = P(the home margin is under -y), the margins never landing on a half */
+    k.margin = k.spH.map(function (r) { return { x: r.x, p: r.p }; }).concat(k.spA.map(function (r) { return { x: -r.x, p: 1 - r.p }; })).sort(function (a, b) { return a.x - b.x; });
+    k.total = kalshiRungs(k.tot);
+    k.spMed = k.margin.length >= 2 ? kalshiMedian(k.margin) : null;   // the crowd's spread, as the home margin at even money
+    k.totMed = k.total.length >= 2 ? kalshiMedian(k.total) : null;    // the crowd's total at even money
+    if (!k.ml && !k.margin.length && !k.total.length) return null;
     return k;
+  }
+  /* the crowd on one side of one market at one line: its chance, and when the line is a rung of the ladder, the price it trades at
+     (the yes ask for the side the ladder names, the no ask -- one less the yes bid -- for the other) and what that needs after the fee */
+  function kalshiSideQuote(k, key, side, line) {
+    if (!k) return null;
+    var q = { p: null, ask: null, need: null, rung: false }, r;
+    if (key === "ml") { if (!k.ml) return null; q.p = side === "HOME" ? k.ph : k.pa; q.ask = +(side === "HOME" ? k.h : k.a).ask; q.need = side === "HOME" ? k.needH : k.needA; q.rung = true; }
+    else if (key === "total") {
+      if (!k.total.length || !isFinite(+line)) return null;
+      var po = kalshiCurveAt(k.total, +line); if (po === null) return null;
+      q.p = side === "OVER" ? po : 1 - po;
+      r = kalshiRungAt(k.total, +line);
+      if (r) { q.rung = true; q.ask = side === "OVER" ? r.ask : 1 - r.bid; q.need = kalshiNeedAt(q.ask, k.fee); }
+    } else if (key === "spread") {
+      if (!k.margin.length || !isFinite(+line)) return null;
+      var ph = kalshiCurveAt(k.margin, -(+line)); if (ph === null) return null;   // the home side covers when its margin beats the number it gives
+      q.p = side === "HOME" ? ph : 1 - ph;
+      if (+line < 0) { r = kalshiRungAt(k.spH, -(+line)); if (r) { q.rung = true; q.ask = side === "HOME" ? r.ask : 1 - r.bid; } }
+      else if (+line > 0) { r = kalshiRungAt(k.spA, +line); if (r) { q.rung = true; q.ask = side === "AWAY" ? r.ask : 1 - r.bid; } }
+      if (q.rung) q.need = kalshiNeedAt(q.ask, k.fee);
+    } else return null;
+    return q.p === null ? null : q;
   }
   function kalshiSharpRaw(raw) { var s = null; try { s = raw ? JSON.parse(raw) : null; } catch (e) { s = null; } return s && isFinite(+s.hml) && isFinite(+s.aml) && +s.hml && +s.aml ? s : null; }
   function kalshiSharpOf(row) {
     var i = (row && row.inputs) || {}, k = kalshiOf(i.nbakalshi), sh = kalshiSharpRaw(i.sharp);
-    if (!k || !sh) return null;
+    if (!k || !k.ml || !sh) return null;
     var ih = implied(+sh.hml), ia = implied(+sh.aml), ph = ih / (ih + ia), gap = k.ph - ph;   // the crowd above the sharp book on the home side
     if (Math.abs(gap) < KALSHI_GAP) return null;
     return { side: gap > 0 ? "AWAY" : "HOME", pts: Math.abs(gap) * 100, crowdHome: k.ph, sharpHome: ph };
@@ -253,13 +305,15 @@
   function kalshiVol(v) { return v === null || v === undefined || !isFinite(+v) ? "?" : (+v >= 1000 ? Math.round(+v / 1000) + "k" : String(Math.round(+v))) + " contracts"; }
   /* the chip on a moneyline pick card (the board): the exchange's price for the pick's side against the book's, after the fee */
   function kalshiChip(row, mk) {
-    if (!row || !mk || mk.key !== "ml" || row.sport !== "NBA") return "";
+    if (!row || !mk || row.sport !== "NBA" || (mk.key !== "ml" && mk.key !== "total" && mk.key !== "spread")) return "";
     var k = kalshiOf((row.inputs || {}).nbakalshi); if (!k) return "";
-    var s = mk.side === "HOME" ? k.h : k.a, need = mk.side === "HOME" ? k.needH : k.needA, p = mk.side === "HOME" ? k.ph : k.pa;
-    if (need === null || mk.price === null || mk.price === undefined) return ' <span class="tagm">Kalshi\'s crowd ' + (p * 100).toFixed(1) + '%</span>';
-    var book = implied(+mk.price), better = need < book - 0.001;
-    return ' <span class="tagm' + (better ? ' warn' : '') + '" title="' + (better ? 'The exchange\'s ask for this side needs less than the book\'s price after Kalshi\'s fee on the win' : 'The book\'s price needs less than the exchange\'s ask after Kalshi\'s fee on the win') + '">' +
-           (better ? 'better on Kalshi: ' : 'Kalshi ') + kalshiCents(s.ask) + ' needs ' + (need * 100).toFixed(1) + '% after the fee v ' + sgn(+mk.price, 0) + ' needing ' + (book * 100).toFixed(1) + '%' + (better ? '' : ': the book') + ' · the crowd ' + (p * 100).toFixed(1) + '%</span>';
+    var line = mk.key === "ml" ? null : (typeof lineOf === "function" ? lineOf(mk) : mk.point), q = kalshiSideQuote(k, mk.key, mk.side, line);
+    if (!q) return "";
+    var crowd = 'the crowd ' + (q.p * 100).toFixed(1) + '%' + (mk.key === "ml" ? '' : ' at this line');
+    if (q.need === null || mk.price === null || mk.price === undefined) return ' <span class="tagm">Kalshi: ' + crowd + '</span>';
+    var book = implied(+mk.price), better = q.need < book - 0.001;
+    return ' <span class="tagm' + (better ? ' warn' : '') + '" title="' + (better ? 'The exchange\'s price for this side needs less than the book\'s after Kalshi\'s fee on the win' : 'The book\'s price needs less than the exchange\'s after Kalshi\'s fee on the win') + '">' +
+           (better ? 'better on Kalshi: ' : 'Kalshi ') + kalshiCents(q.ask) + ' needs ' + (q.need * 100).toFixed(1) + '% after the fee v ' + sgn(+mk.price, 0) + ' needing ' + (book * 100).toFixed(1) + '%' + (better ? '' : ': the book') + ' · ' + crowd + '</span>';
   }
   function nbaKalshiPanel() {
     var el = $("nbaKalshiPanel"); if (!el) return;
@@ -283,16 +337,60 @@
       } else if (need !== null) price = ' · ' + kalshiCents(s.ask) + ' needs ' + pc(need) + ' after the fee';
       return '<li><b>' + esc(nick) + '</b> ' + kalshiCents(kalshiMid(s)) + ' <span class="dim">(bid ' + kalshiCents(s.bid) + ' / ask ' + kalshiCents(s.ask) + ' · ' + kalshiVol(s.vol) + ')</span>: ' + bits.join(' · ') + price + '</li>';
     };
-    var h = '<div class="kalshi"><p><b>The crowd on Kalshi</b>' + (whenTxt ? ' <span class="dim">· as the run read it, ' + esc(whenTxt) + '</span>' : '') + '</p><ul class="ctx">' +
-            line(away, k.a, k.pa, book ? book.a : null, pin ? pin.a : null, book ? book.aml : null, k.needA) +
-            line(home, k.h, k.ph, book ? book.h : null, pin ? pin.h : null, book ? book.hml : null, k.needH) + '</ul>';
+    var h = '<div class="kalshi"><p><b>The crowd on Kalshi</b>' + (whenTxt ? ' <span class="dim">· as the run read it, ' + esc(whenTxt) + '</span>' : '') + '</p>';
     var gapTxt = "";
-    if (pin) {
-      var gap = k.ph - pin.h, over = gap > 0 ? home : away, sharp = gap > 0 ? away : home;
-      gapTxt = Math.abs(gap) >= KALSHI_GAP
-        ? '<p><b>The crowd sits ' + (Math.abs(gap) * 100).toFixed(1) + ' points above Pinnacle on the ' + esc(over) + ': the sharp side is the ' + esc(sharp) + '.</b> <span class="dim">A watch, on the moneyline tile\'s record; the Pinnacle shade on totals hit 56% at three points over two seasons, and this is its moneyline cousin, unmeasured.</span></p>'
-        : '<p class="dim">The crowd and Pinnacle sit within three points of each other (' + (Math.abs(gap) * 100).toFixed(1) + ' on the home side): no watch.</p>';
-    } else gapTxt = '<p class="dim">No Pinnacle moneyline on the row to set the crowd against (the odds run brings it).</p>';
+    if (k.ml) {
+      h += '<ul class="ctx">' + line(away, k.a, k.pa, book ? book.a : null, pin ? pin.a : null, book ? book.aml : null, k.needA) +
+           line(home, k.h, k.ph, book ? book.h : null, pin ? pin.h : null, book ? book.hml : null, k.needH) + '</ul>';
+      if (pin) {
+        var gap = k.ph - pin.h, over = gap > 0 ? home : away, sharp = gap > 0 ? away : home;
+        gapTxt = Math.abs(gap) >= KALSHI_GAP
+          ? '<p><b>The crowd sits ' + (Math.abs(gap) * 100).toFixed(1) + ' points above Pinnacle on the ' + esc(over) + ': the sharp side is the ' + esc(sharp) + '.</b> <span class="dim">A watch, on the moneyline tile\'s record; the Pinnacle shade on totals hit 56% at three points over two seasons, and this is its moneyline cousin, unmeasured.</span></p>'
+          : '<p class="dim">The crowd and Pinnacle sit within three points of each other (' + (Math.abs(gap) * 100).toFixed(1) + ' on the home side): no watch.</p>';
+      } else gapTxt = '<p class="dim">No Pinnacle moneyline on the row to set the crowd against (the odds run brings it).</p>';
+    } else h += '<p class="dim">No game-winner market on the row.</p>';
+    /* the ladders (4 Nov 2026): the crowd's spread and total at even money against the book's numbers, the sheet's chance at the
+       book's line and the simulation's, and the price of each side at the book's line when it is a rung of the ladder */
+    var sheet = (typeof last !== "undefined" && last && last.markets) ? last.markets : [], sheetOf = function (key) { return sheet.filter(function (m) { return m.key === key; })[0] || null; };
+    var sim = typeof nbaSim === "function" ? nbaSim() : null;
+    var sideTxt = function (nick, q, bookPrice) {
+      if (!q) return '';
+      var s = ' · <b>' + esc(nick) + '</b> ' + pc(q.p) + ' by the crowd';
+      if (q.need !== null && bookPrice !== null && isFinite(bookPrice)) {
+        var bn = implied(bookPrice), better = q.need < bn - 0.001;
+        s += (better ? ', <b>better on Kalshi</b>: ' : ', the book\'s price: ') + kalshiCents(q.ask) + ' needs ' + pc(q.need) + ' after the fee against ' + sgn(bookPrice, 0) + ' needing ' + pc(bn);
+      } else if (q.need !== null) s += ', ' + kalshiCents(q.ask) + ' on the exchange (needs ' + pc(q.need) + ' after the fee)';
+      return s;
+    };
+    var spIn = ($("sp") || {}).value, sp = spIn === "" || spIn === undefined || isNaN(+spIn) ? null : +spIn, sph = +(($("sph") || {}).value), spa = +(($("spa") || {}).value);
+    if (k.margin.length >= 2) {
+      var m = k.spMed, mTxt = m === null ? 'no even-money number inside the ladder' : (Math.abs(m) < 0.05 ? 'a pick' : esc(m > 0 ? home : away) + ' ' + sgn(-Math.abs(m), 1));
+      var s2 = '<p><b>The spread</b>: the crowd ' + mTxt;
+      if (sp !== null) {
+        s2 += ' · the book ' + esc(sp <= 0 ? home : away) + ' ' + sgn(-Math.abs(sp), 1);
+        var sm = sheetOf("spread"), simSp = sim && sim.own && sim.own.margin ? nbaSimOver(sim.own.margin, -sp) : null;
+        var qh = kalshiSideQuote(k, "spread", "HOME", sp), qa = kalshiSideQuote(k, "spread", "AWAY", sp);
+        s2 += '. At the book\'s number' + (qh ? ': ' + esc(home) + ' covers ' + pc(qh.p) + ' by the crowd' + (sm && isFinite(+sm.p) ? ', ' + pc(sm.side === "HOME" ? +sm.p : 1 - +sm.p) + ' by the sheet' : '') + (simSp ? ', ' + pc(simSp.over) + ' by the simulation\'s own view' : '') : ': the crowd\'s ladder does not reach it');
+        if (qh && qh.rung) s2 += sideTxt(home + ' ' + sgn(sp, 1), qh, isFinite(sph) && sph ? sph : null) + sideTxt(away + ' ' + sgn(-sp, 1), qa, isFinite(spa) && spa ? spa : null);
+        else if (qh) s2 += ' · <span class="dim">no rung at the book\'s number on the exchange (its ladder runs on halves), so no price to compare</span>';
+      }
+      h += s2 + '.</p>';
+    }
+    var tl = ($("line") || {}).value, line0 = tl === "" || tl === undefined || isNaN(+tl) ? null : +tl, op = +(($("op") || {}).value), up = +(($("up") || {}).value);
+    if (k.total.length >= 2) {
+      var t = k.totMed, s3 = '<p><b>The total</b>: the crowd ' + (t === null ? 'no even-money number inside the ladder' : t.toFixed(1));
+      if (line0 !== null) s3 += ' · the book ' + line0;
+      if (sh && isFinite(+sh.line)) s3 += ' · Pinnacle ' + (+sh.line);
+      if (sim && sim.own && sim.own.total) { var q50 = nbaSimQ(sim.own.total, 0.5); if (q50 !== null) s3 += ' · the simulation\'s own view ' + q50 + (sim.mkt && sim.mkt.total ? ' (anchored to the market ' + nbaSimQ(sim.mkt.total, 0.5) + ')' : ''); }
+      if (line0 !== null) {
+        var tm = sheetOf("total"), simT = sim && sim.own && sim.own.total ? nbaSimOver(sim.own.total, line0) : null;
+        var qo = kalshiSideQuote(k, "total", "OVER", line0), qu = kalshiSideQuote(k, "total", "UNDER", line0);
+        s3 += '. At the book\'s ' + line0 + (qo ? ': the over ' + pc(qo.p) + ' by the crowd' + (tm && isFinite(+tm.p) ? ', ' + pc(tm.side === "OVER" ? +tm.p : 1 - +tm.p) + ' by the sheet' : '') + (simT ? ', ' + pc(simT.over) + ' by the simulation\'s own view' : '') : ': the crowd\'s ladder does not reach it');
+        if (qo && qo.rung) s3 += sideTxt('over ' + line0, qo, isFinite(op) && op ? op : null) + sideTxt('under ' + line0, qu, isFinite(up) && up ? up : null);
+        else if (qo) s3 += ' · <span class="dim">no rung at the book\'s number on the exchange (its ladder runs two points apart), so no price to compare</span>';
+      }
+      h += s3 + '.</p>';
+    }
     el.innerHTML = h + gapTxt + '<p class="dim">Shown, not scored: a prediction market\'s price is a market price, which is already the sheet\'s spine. The fee is Kalshi\'s on the win, ' + (k.fee * 100).toFixed(0) + '% of the expected profit a contract.</p></div>';
   }
   function nbaCtxPanel() {

@@ -1544,11 +1544,16 @@ const CHECKS = ["dome","playoff"];
     const load = async (doc, fname) => { const dt = new DataTransfer(); dt.items.add(new File([JSON.stringify(doc)], fname, { type: 'application/json' })); const inp = document.getElementById('slateFile'); inp.files = dt.files; inp.dispatchEvent(new Event('change', { bubbles: true })); await wait(); };
     await smStore.removeItem('callsheet3.card.v1'); document.getElementById('clear').click(); document.getElementById('m-nba').click(); await wait();
     const empty = txt(document.getElementById('nbaKalshiPanel'));
-    const kal = { at: '2026-11-14T20:00:00Z', ev: 'KXNBAGAME-26NOV14ATLWAS', fee: 0.07, a: { bid: 0.57, ask: 0.58, last: 0.58, vol: 149511, oi: 136925 }, h: { bid: 0.42, ask: 0.43, last: 0.43, vol: 140051, oi: 115254 } };
+    // the game winner a side, and the ladders (the Hawks by 2.75 at even money: 51% to win by 2.5 and 47% by 3.5; the total 232.25)
+    const rung = (x, mid, vol) => [x, +(mid - 0.01).toFixed(2), +(mid + 0.01).toFixed(2), +mid.toFixed(2), vol];
+    const kal = { at: '2026-11-14T20:00:00Z', ev: 'KXNBAGAME-26NOV14ATLWAS', fee: 0.07, a: { bid: 0.57, ask: 0.58, last: 0.58, vol: 149511, oi: 136925 }, h: { bid: 0.42, ask: 0.43, last: 0.43, vol: 140051, oi: 115254 },
+      sp: { a: [rung(1.5, 0.56, 900), rung(2.5, 0.51, 1200), rung(3.5, 0.47, 800), rung(4.5, 0.41, 500), rung(6.5, 0.33, 60)], h: [rung(1.5, 0.33, 40), rung(3.5, 0.25, 0)] },
+      tot: [rung(230.5, 0.57, 1500), rung(232.5, 0.49, 8000), rung(234.5, 0.41, 300)] };
     const pin = JSON.stringify({ book: 'pinnacle', line: 232.5, op: -108, up: -108, hml: 150, aml: -170 });
-    set('gdate', '2026-11-14'); set('away', 'Hawks'); set('home', 'Wizards'); set('line', '232.5'); set('op', '-110'); set('up', '-110'); set('hml', '140'); set('aml', '-165');
+    set('gdate', '2026-11-14'); set('away', 'Hawks'); set('home', 'Wizards'); set('line', '232.5'); set('op', '-110'); set('up', '-110'); set('hml', '140'); set('aml', '-165'); set('sp', '2.5'); set('sph', '-110'); set('spa', '-110');
     set('sharp', pin); set('nbakalshi', JSON.stringify(kal)); await wait();
     const panel = txt(document.getElementById('nbaKalshiPanel'));
+    set('line', '231.5'); await wait(); const between = txt(document.getElementById('nbaKalshiPanel')); set('line', '232.5'); await wait();
     set('sharp', ''); await wait(); const noPin = txt(document.getElementById('nbaKalshiPanel'));
     set('sharp', pin); await wait();
     document.getElementById('add').click(); await wait();
@@ -1566,10 +1571,16 @@ const CHECKS = ["dome","playoff"];
     await load({ format: 'callsheet2.slate', version: 1, date: '2026-11-15', games: [{ sport: 'NBA', gdate: '2026-11-15', away: 'Kings', home: 'Spurs', notes: [], inputs: { nbakalshi: JSON.stringify(Object.assign({}, kal, { ev: 'KXNBAGAME-26NOV15SACSAS', a: { bid: 0.60, ask: 0.61, last: 0.61, vol: 5000, oi: 4000 } })) } }] }, 'nba-slate-2026-11-15b.json');
     const second = ((JSON.parse(smStore.getItem('callsheet3.card.v1')).find(r => /Kings @ Spurs/.test(r.matchup)) || { inputs: {} }).inputs.nbakalshi || '');
     document.getElementById('clear').click(); await wait(); await smStore.removeItem('callsheet3.card.v1');
-    return { empty, panel, noPin, chips, stored, mlTile, first: first.slice(0, 60), second: second.indexOf('"bid":0.6') >= 0 };
+    return { empty, panel, noPin, chips, stored, mlTile, first: first.slice(0, 60), second: second.indexOf('"bid":0.6') >= 0, between };
   });
+  chk(/The spread: the crowd Hawks [-−]2\.8 · the book Hawks [-−]2\.5\. At the book's number: Wizards covers 49\.0% by the crowd, \d+\.\d% by the sheet · Wizards \+2\.5 49\.0% by the crowd, better on Kalshi: 50¢ needs 51\.[78]% after the fee against [-−]110 needing 52\.4% · Hawks [-−]2\.5 51\.0% by the crowd, the book's price: 52¢ needs 53\.7% after the fee against [-−]110 needing 52\.4%\./.test(kalT.panel)
+      && /The total: the crowd 232\.3 · the book 232\.5 · Pinnacle 232\.5\. At the book's 232\.5: the over 49\.0% by the crowd, \d+\.\d% by the sheet · over 232\.5 49\.0% by the crowd, better on Kalshi: 50¢ needs 51\.[78]% after the fee against [-−]110 needing 52\.4% · under 232\.5 51\.0% by the crowd, the book's price: 52¢ needs 53\.7% after the fee against [-−]110 needing 52\.4%\./.test(kalT.panel)
+      && /At the book's 231\.5: the over 53\.0% by the crowd, \d+\.\d% by the sheet · no rung at the book's number on the exchange \(its ladder runs two points apart\), so no price to compare\./.test(kalT.between),
+      'kalshi ladders: the card reads the crowd\'s spread and total at even money off the ladders (the Hawks by 2.8, the total 232.3), the chance of each side at the book\'s number read straight between rungs with the sheet\'s beside it, and when the number is a rung the price of each side after the fee against the book\'s (the no side one less the yes bid); a number between rungs gets the chance and no price',
+      JSON.stringify({ panel: kalT.panel.slice(500, 1500), between: kalT.between.slice(900, 1300) }));
   chk(/^No Kalshi price on the row/.test(kalT.empty)
-      && /^The crowd on Kalshi · as the run read it, Nov 14, \d{1,2}:\d\d [AP]M Hawks 57\.5¢ \(bid 57¢ \/ ask 58¢ · 150k contracts\): the crowd 57\.5% · the book 59\.9% \([-−]165\) · Pinnacle 61\.2% · better on Kalshi: 58¢ needs 59\.7% after the fee against [-−]165 needing 62\.3% Wizards 42\.5¢ \(bid 42¢ \/ ask 43¢ · 140k contracts\): the crowd 42\.5% · the book 40\.1% \(\+140\) · Pinnacle 38\.8% · the book's price: 43¢ needs 44\.7% after the fee against \+140 needing 41\.7% The crowd sits 3\.7 points above Pinnacle on the Wizards: the sharp side is the Hawks\./.test(kalT.panel)
+      && /^The crowd on Kalshi · as the run read it, Nov 14, \d{1,2}:\d\d [AP]M Hawks 57\.5¢ \(bid 57¢ \/ ask 58¢ · 150k contracts\): the crowd 57\.5% · the book 59\.9% \([-−]165\) · Pinnacle 61\.2% · better on Kalshi: 58¢ needs 59\.7% after the fee against [-−]165 needing 62\.3% Wizards 42\.5¢ \(bid 42¢ \/ ask 43¢ · 140k contracts\): the crowd 42\.5% · the book 40\.1% \(\+140\) · Pinnacle 38\.8% · the book's price: 43¢ needs 44\.7% after the fee against \+140 needing 41\.7% The spread:/.test(kalT.panel)
+      && /The crowd sits 3\.7 points above Pinnacle on the Wizards: the sharp side is the Hawks\./.test(kalT.panel)
       && /No Pinnacle moneyline on the row to set the crowd against/.test(kalT.noPin) && !/sharp side/.test(kalT.noPin),
       'kalshi: the form\'s card reads each side three ways (the crowd\'s no-vig price, the book\'s devigged moneyline, Pinnacle\'s) with the bid, the ask and the contracts, says which price is better after the 7% fee on the win (the Hawks at 58¢ needing 59.7% against -165 needing 62.3%), and names the sharp side when the crowd sits three points from Pinnacle; without Pinnacle it says so',
       JSON.stringify({ empty: kalT.empty, panel: kalT.panel.slice(0, 520), noPin: kalT.noPin.slice(0, 200) }));

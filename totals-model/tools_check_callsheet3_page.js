@@ -1053,17 +1053,27 @@ const CHECKS = ["dome","playoff"];
     document.getElementById('m-nba').click(); await wait();
     const set = (id, v) => { const el = document.getElementById(id); el.value = v; el.dispatchEvent(new Event('input', { bubbles: true })); };
     set('gdate', today); document.getElementById('example').click(); await wait(); set('gdate', today); await wait();
+    // the crowd on the row (4 Nov 2026): the Knicks by 5.25 at even money on the ladders (57% by 3.5, 49% by 5.5), the total 229.25, the Knicks to win 69.5%
+    const rung = (x, mid, vol) => [x, +(mid - 0.01).toFixed(2), +(mid + 0.01).toFixed(2), +mid.toFixed(2), vol];
+    set('nbakalshi', JSON.stringify({ at: '2026-11-14T20:00:00Z', ev: 'KXNBAGAME-26NOV14PHINYK', fee: 0.07, a: { bid: 0.30, ask: 0.31, last: 0.31, vol: 5000, oi: 4000 }, h: { bid: 0.69, ask: 0.70, last: 0.70, vol: 9000, oi: 8000 },
+      sp: { h: [rung(1.5, 0.66, 100), rung(3.5, 0.57, 100), rung(5.5, 0.49, 100), rung(7.5, 0.41, 100)], a: [rung(1.5, 0.26, 10), rung(3.5, 0.2, 10)] }, tot: [rung(227.5, 0.57, 100), rung(229.5, 0.49, 100), rung(231.5, 0.42, 100)] })); await wait();
     document.getElementById('add').click(); await wait();
     document.getElementById('clear').click(); await wait();
     const awayBefore = document.getElementById('away').value;
     document.getElementById('m-props').click(); await wait(); document.getElementById('propsExample').click(); await wait();
     const card1 = [...document.querySelectorAll('#propsBest .pk')].find(e => /Paul George/.test(e.textContent)), cardBtn1 = card1.querySelector('.btn.go[data-pgo]'), cardLive = cardBtn1 && !cardBtn1.classList.contains('off');
+    card1.click(); await wait();
+    const kalLine = txt(dlg.querySelector('.pd-kalshi')), kalStrip = [...document.querySelectorAll('#propsSim .pk .kalshi-strip')].map(txt);
+    document.getElementById('propDetailClose').click(); await wait();
     cardBtn1.click(); await wait();
     const propsHidden = document.getElementById('propsView').hidden, dlgHidden = dlg.hidden, away = document.getElementById('away').value, home = document.getElementById('home').value, nbaPressed = document.getElementById('m-nba').getAttribute('aria-pressed');
     const lineupPanel = txt(document.getElementById('nbaLineupPanel')).slice(0, 80);
     await smStore.removeItem('callsheet3.card.v1'); document.getElementById('clear').click(); await wait();
-    return { cardOff0, cardTitle0, fives, me, heads, panelOff, panelText, takeStill, stillOpen, said, awayBefore, cardLive, propsHidden, dlgHidden, away, home, nbaPressed, lineupPanel };
+    return { cardOff0, cardTitle0, fives, me, heads, panelOff, panelText, takeStill, stillOpen, said, awayBefore, cardLive, propsHidden, dlgHidden, away, home, nbaPressed, lineupPanel, kalLine, kalStrip };
   });
+  chk(/^The crowd on Kalshi: Knicks by 5\.3 \(the book's spread (Knicks|76ers) [-−]\d+(\.\d)?\) · total 229\.3 \(the book's \d+(\.\d)?\) · Knicks to win 69\.5% · from the matchup's row on the NBA card; shown, not scored$/.test(goT.kalLine)
+      && goT.kalStrip.length === 1 && /^The crowd on Kalshi: Knicks by 5\.3 \(the book's spread (Knicks|76ers) [-−]\d+(\.\d)?\) · total 229\.3 \(the book's \d+(\.\d)?\) · Knicks to win 69\.5%$/.test(goT.kalStrip[0]),
+      'props: once the NBA card\'s row for the game carries the crowd on Kalshi, the prop\'s panel and the game\'s strip read the crowd\'s spread, total and winner off it beside the book\'s numbers (the Knicks by 5.3 at even money, the total 229.3, the Knicks to win 69.5%)', JSON.stringify({ line: goT.kalLine, strip: goT.kalStrip }));
   chk(goT.cardOff0 === true && /^The NBA card has no row for 76ers @ Knicks on /.test(goT.cardTitle0) && goT.fives.length === 2 && /^76ers EXPECTED PG Tyrese Maxey SG VJ Edgecombe SF Paul George THIS PROP PF Kelly Oubre Jr\. C Adem Bona May not play: C Andre Drummond \(Questionable\)\.$/i.test(goT.fives[0])
       && /^Knicks CONFIRMED PG Jalen Brunson SG Mikal Bridges SF OG Anunoby PF Josh Hart C Karl-Anthony Towns$/i.test(goT.fives[1]) && /^SF Paul George THIS PROP$/i.test(goT.me) && goT.heads.join(',') === 'lbadge exp|expected,lbadge conf|confirmed'
       && goT.panelOff === true && /^open the matchup on the nba card$/i.test(goT.panelText) && goT.takeStill && goT.stillOpen && /^The NBA card has no row for 76ers @ Knicks on .+: load the NBA slate for the date \(Load slate\) and Add the game, and the button opens it\.$/.test(goT.said),

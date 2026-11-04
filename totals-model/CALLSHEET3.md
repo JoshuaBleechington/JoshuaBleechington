@@ -2267,3 +2267,13 @@ fee, as the moneyline is; between rungs the chance is read straight and
 there is no price to compare. The board's spread and total cards carry the
 same chip as the moneyline's. The record keeps only the moneyline watch;
 the ladders are shown, not scored. Player markets wait on a listing.
+
+**On the prop's panel.** The user, having loaded the runs: "how can I see
+the Kalshi on the props cards I open?" The prop's panel and the game's
+strip on the Props tab now read the crowd off the matchup's row on the NBA
+card (the same `nbakalshi` block): the crowd's spread and total at even
+money beside the numbers the props file carried, and the winner's chance
+("The crowd on Kalshi: Knicks by 5.3 (the book's spread Knicks −5.5) ·
+total 229.3 (the book's 231.5) · Knicks to win 69.5%"). It needs the game
+on the NBA card with the slate or the odds file loaded on it, which the
+routine already does; the Matchup button still opens the full card.

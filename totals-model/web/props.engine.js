@@ -92,7 +92,8 @@
     if (!order.length) return '';
     return order.sort().map(function (game) {
       var g = games[game], r = g.r, s = r.gsim || propsGameSimFromRows(rows.filter(function (x) { return x.game === game; }), r);
-      if (!s) return '<div class="pk simg dim"><div class="n1">' + esc(game) + '</div><div class="n4">' + (r.trim ? 'The simulation on this game was trimmed from the save with the night\'s detail; the last seven nights keep theirs.' : 'This file\'s run carried no simulation on the game; a props run with the current slate.py plays it 10,000 times.') + '</div></div>';
+      var kl = propsKalshiLine(r), klHtml = kl ? '<div class="n5 kalshi-strip">' + kl + '</div>' : '';
+      if (!s) return '<div class="pk simg dim"><div class="n1">' + esc(game) + '</div><div class="n4">' + (r.trim ? 'The simulation on this game was trimmed from the save with the night\'s detail; the last seven nights keep theirs.' : 'This file\'s run carried no simulation on the game; a props run with the current slate.py plays it 10,000 times.') + '</div>' + klHtml + '</div>';
       var aab = r.aab || r.away || "away", hab = r.hab || r.home || "home", hasM = s.m !== null && s.m !== undefined && isFinite(+s.m), fav = +s.m >= 0 ? hab : aab;
       var book = r.total !== null && r.total !== undefined && isFinite(+r.total) ? ' · the book\'s ' + r.total + ' (' + sgn(+s.t - +r.total, 1) + ')' : '';
       var outs = [[aab, s.out[0]], [hab, s.out[1]]].filter(function (x) { return x[1]; }).map(function (x) { return ' · ' + esc(x[0]) + '\'s regulars out ' + sgn(x[1], 1) + ' per 100 on the offence'; }).join('');
@@ -100,7 +101,7 @@
         '<div class="n2">' + esc(aab) + ' ' + s.a[0] + ' · ' + esc(hab) + ' ' + s.h[0] + ' <span class="dim">total ' + (s.approx ? 'about ' : '') + s.t + '</span></div>' +
         '<div class="n3">' + (hasM ? esc(fav) + ' by ' + Math.abs(+s.m).toFixed(1) + ' · ' : '') + (s.hw !== null && s.hw !== undefined ? 'home win ' + propsPct(s.hw) + ' · ' : '') + 'total ' + (s.approx ? 'about ' : '') + s.t + book + '</div>' +
         '<div class="n4">' + esc(aab) + ' middle half ' + s.a[1] + '–' + s.a[2] + (s.a[3] ? ' against ' + s.a[3] + ' a game by the ratings' : '') + ' · ' + esc(hab) + ' ' + s.h[1] + '–' + s.h[2] + (s.h[3] ? ' against ' + s.h[3] : '') + '</div>' +
-        '<div class="n5">blowout of 15 or more ' + propsPct(s.bo) + ' · overtime ' + propsPct(s.ot) + ' · ' + s.poss + ' possessions' + outs + (g.n ? ' · the sim\'s read on the pick\'s side for <b>' + g.yes + ' of ' + g.n + '</b> props' : '') + '</div></div>';
+        '<div class="n5">blowout of 15 or more ' + propsPct(s.bo) + ' · overtime ' + propsPct(s.ot) + ' · ' + s.poss + ' possessions' + outs + (g.n ? ' · the sim\'s read on the pick\'s side for <b>' + g.yes + ' of ' + g.n + '</b> props' : '') + '</div>' + klHtml + '</div>';
     }).join('');
   }
   /* two props from one game as a ticket (26 Oct 2026, the user: "the ones that hit quickly were same game parlays with 2 legs...
@@ -377,6 +378,22 @@
     if (!row) { propsSay("The NBA card has no row for <b>" + esc(r.game) + "</b> on " + esc(gameDate(r.gdate)) + ": load the NBA slate for the date (Load slate) and Add the game, and the button opens it."); return; }
     closePropDetail(); showProps(false);
     if (typeof openRow === "function") openRow(row.id);
+  }
+  /* the crowd on the prop (4 Nov 2026, the user: "how can I see the Kalshi on the props cards I open?"): the matchup's row on the
+     NBA card carries the exchange's prices (nbakalshi, from the slate and the odds run); the prop's panel and the game's strip read
+     the crowd's spread, total and winner off it, beside the numbers the props file carried. Shown, not scored */
+  function propsKalshiLine(r) {
+    if (typeof kalshiOf !== "function") return "";
+    var row = propsCardRow(r); if (!row) return "";
+    var k = kalshiOf((row.inputs || {}).nbakalshi); if (!k) return "";
+    var away = r.away || "the away side", home = r.home || "the home side", bits = [];
+    if (k.spMed !== null && k.spMed !== undefined) {
+      var m = k.spMed, sp = r.spread !== null && r.spread !== undefined && isFinite(+r.spread) ? +r.spread : null;
+      bits.push((Math.abs(m) < 0.05 ? "a pick" : esc(m > 0 ? home : away) + " by " + Math.abs(m).toFixed(1)) + (sp !== null ? " (the book's spread " + esc(sp <= 0 ? home : away) + " " + sgn(-Math.abs(sp), 1) + ")" : ""));
+    }
+    if (k.totMed !== null && k.totMed !== undefined) bits.push("total " + k.totMed.toFixed(1) + (r.total !== null && r.total !== undefined && isFinite(+r.total) ? " (the book's " + esc(String(r.total)) + ")" : ""));
+    if (k.ml) bits.push(esc(k.ph >= 0.5 ? home : away) + " to win " + (100 * Math.max(k.ph, k.pa)).toFixed(1) + "%");
+    return bits.length ? "The crowd on Kalshi: " + bits.join(" · ") : "";
   }
   function propsFivesHtml(r) {
     var f = r.fives; if (!f || (!f.away && !f.home)) return '';
@@ -722,6 +739,8 @@
          ' · ' + esc(r.book || "the book") + ' ' + esc(String(r.line)) + ' (' + sgn(r.op, 0) + '/' + sgn(r.up, 0) + ')</div>';
     h += '<div class="pd-take pd-go">' + (has && (propTakeBtn(r, true) || "").length ? propTakeBtn(r, true) + ' ' : '') + propsGoBtn(r, true) + '</div>';
     if (r.trim) h += '<p class="note trimmed">The detail on this prop (the reasons, the last games, the levers, every book\'s line, the simulation, the fives and what happened) was <b>trimmed from the save on ' + esc(gameDate(r.trim)) + '</b> to keep the backup small: the last seven nights on the tab stay whole, older nights keep the call, the price, the chance, the band and the result.</p>';
+    var kl = propsKalshiLine(r);
+    if (kl) h += '<p class="note pd-kalshi">' + kl + ' <span class="dim">· from the matchup\'s row on the NBA card; shown, not scored</span></p>';
     if (has) {
       h += '<div class="pd-tiles">' +
         tile("Chance", (r.chance * 100).toFixed(1) + "%", "blended: the over is " + (r.pm * 100).toFixed(1) + "% by the model, " + (r.pb * 100).toFixed(1) + "% by the book") +

@@ -2282,13 +2282,15 @@ routine already does; the Matchup button still opens the full card.
 exchange runs player markets, found them on the game page and sent the
 points listing and the series names off the market addresses: points
 `KXNBAPTS`, rebounds `KXNBAREB`, assists `KXNBAAST` and the combo
-`KXNBAPRA`; no threes, no two-stat combos. A player market is one contract
-a rung ("Luka Dončić: 25+ points"), the rungs five apart on points, and the
+`KXNBAPRA`, and a few minutes later, off a second address, threes
+`KXNBA3PT`; no two-stat combo market has turned up. A player market is one
+contract a rung ("Luka Dončić: 25+ points"), the rungs five apart on
+points and a make apart on threes ("1+" a floor of 0.5), and the
 exchange stores "25+" as a floor of 24.5 with the same greater-than rule as
 the totals, so the book's 24.5 line is an exact rung and any other line
 reads straight between two. The name sits in the title with its accents
 (the props' own name key strips them), the club in the ticker's player
-key (`LALLDONCIC77`). The props run reads the four series (paged), matches
+key (`LALLDONCIC77`). The props run reads the five series (paged), matches
 each prop's player by name within its game, and keeps his ladder on the
 prop (`kal.r`, each rung as floor, bid, ask, last and contracts), with a
 log line a game ("31 of 48 props carry the crowd's ladder"). On the page

@@ -4566,13 +4566,14 @@ def kalshi_summary(block, away, home):
 
 
 # the player ladders (4 Nov 2026, the user's points listing and the series names off the game page): one contract a rung a
-# player ("Luka Dončić: 25+ points", the floor 24.5 with the same greater-than rule as the totals, the rungs five apart), the
+# player ("Luka Dončić: 25+ points", the floor 24.5 with the same greater-than rule as the totals, the rungs five apart on
+# points and a make apart on threes, "1+" a floor of 0.5), the
 # name in the title, the club in the ticker's player key (LALLDONCIC77). The props run keeps each prop's ladder on the prop
 # (kal.r) when the exchange runs the market; the page reads the crowd's chance of the pick's side at the book's line off it,
 # exact when the line is a rung (24.5 is 25+) and straight between two otherwise, with the price after the fee on a rung.
 # Shown, not scored: two weeks of the crowd's price beside the book's on the same props is the test of which predicts the
 # outcome, and whether the crowd shades the over as the books do
-KALSHI_PLAYER_SERIES = {"pts": "KXNBAPTS", "reb": "KXNBAREB", "ast": "KXNBAAST", "pra": "KXNBAPRA"}
+KALSHI_PLAYER_SERIES = {"pts": "KXNBAPTS", "reb": "KXNBAREB", "ast": "KXNBAAST", "tpm": "KXNBA3PT", "pra": "KXNBAPRA"}
 
 
 def kalshi_player_parse(doc, mk):
@@ -4598,7 +4599,7 @@ def kalshi_player_parse(doc, mk):
 
 
 def kalshi_fetch_players(log):
-    """Every open player market of the four series, paged and merged by game and player; None when nothing could be read."""
+    """Every open player market of each series, paged and merged by game and player; None when nothing could be read."""
     merged, counts = {}, {}
     for mk, series in KALSHI_PLAYER_SERIES.items():
         markets, cursor = [], ""
@@ -6177,7 +6178,7 @@ def make_nba_props(date_iso, out_dir, log, topup=False, sim_runs=NBA_SIM_RUNS):
                     item["sim"] = nba_prop_sim_read(gs, team == hab, proj)
             row["props"].append(item)
         if kal_players:
-            log("  Kalshi: %d of %d props carry the crowd's ladder (points, rebounds, assists and PRA; the exchange runs no threes or two-stat combos)" % (n_kal, len(row["props"])))
+            log("  Kalshi: %d of %d props carry the crowd's ladder (points, rebounds, assists, threes and PRA; no two-stat combo market found on the exchange)" % (n_kal, len(row["props"])))
         row["props"].sort(key=lambda x: (-(x.get("edge") if x.get("edge") is not None else -9), x["name"], x["mk"]))
         projected = sum(1 for x in row["props"] if x.get("p") is not None)
         log("  %d placed and projected, %d placed without a projection, %d not placed%s" % (
@@ -7651,8 +7652,17 @@ def selftest():
           set(kal_pl) == {("2026-11-04", "LAL", "SAC")} and set(kal_lal) == {props_name_key("Luka Doncic"), props_name_key("Domantas Sabonis")}
           and kal_lal[props_name_key("Luka Doncic")]["team"] == "LAL" and kal_lal[props_name_key("Luka Doncic")]["name"] == "Luka Dončić" and [r[0] for r in kal_lal[props_name_key("Luka Doncic")]["mk"]["pts"]] == [24.5, 29.5, 34.5]
           and kalshi_prop(kal_pl, "2026-11-04", "SAC", "LAL", "Luka Doncic", "LAL", "pts") == {"r": [[24.5, 0.83, 0.84, 0.84, 1262], [29.5, 0.71, 0.72, 0.7, 390], [34.5, 0.48, 0.49, 0.49, 3249]], "team": "LAL"}
-          and kalshi_prop(kal_pl, "2026-11-04", "LAL", "SAC", "Luka Doncic", "LAL", "tpm") is None and kalshi_prop(kal_pl, "2026-11-04", "LAL", "SAC", "Austin Reaves", "LAL", "pts") is None
+          and kalshi_prop(kal_pl, "2026-11-04", "LAL", "SAC", "Luka Doncic", "LAL", "pr") is None and kalshi_prop(kal_pl, "2026-11-04", "LAL", "SAC", "Austin Reaves", "LAL", "pts") is None
           and kalshi_prop(kal_pl, "2026-11-05", "LAL", "SAC", "Luka Doncic", "LAL", "pts") is None and kalshi_prop(None, "2026-11-04", "LAL", "SAC", "Luka Doncic", "LAL", "pts") is None)
+    # the threes series (the user's second address, KXNBA3PT): a make a rung, "1+" a floor of 0.5
+    kal_3 = kalshi_player_parse({"markets": [
+        {"ticker": "KXNBA3PT-26NOV04PHIDET-DETCCUNNINGHAM2-1", "event_ticker": "KXNBA3PT-26NOV04PHIDET", "title": "Cade Cunningham: 1+ threes", "floor_strike": 0.5, "yes_bid_dollars": "0.9000", "yes_ask_dollars": "0.9200", "last_price_dollars": "0.9100", "volume_fp": "55"},
+        {"ticker": "KXNBA3PT-26NOV04PHIDET-DETCCUNNINGHAM2-3", "event_ticker": "KXNBA3PT-26NOV04PHIDET", "title": "Cade Cunningham: 3+ threes", "floor_strike": 2.5, "yes_bid_dollars": "0.3000", "yes_ask_dollars": "0.3200", "last_price_dollars": "0.3100", "volume_fp": "80.4"},
+        {"ticker": "KXNBA3PT-26NOV04PHIDET-DETCCUNNINGHAM2-2", "event_ticker": "KXNBA3PT-26NOV04PHIDET", "title": "Cade Cunningham: 2+ threes", "floor_strike": 1.5, "yes_bid_dollars": "0.6200", "yes_ask_dollars": "0.6400", "last_price_dollars": "0.6300", "volume_fp": "210"}]}, "tpm")
+    check("kalshi: the threes series parses a make a rung (1+ a floor of 0.5, the rungs sorted), a threes prop finds its ladder, and a two-stat combo, which the exchange does not run, gets nothing",
+          KALSHI_PLAYER_SERIES["tpm"] == "KXNBA3PT" and "pr" not in KALSHI_PLAYER_SERIES and set(kal_3) == {("2026-11-04", "PHI", "DET")}
+          and kalshi_prop(kal_3, "2026-11-04", "PHI", "DET", "Cade Cunningham", "DET", "tpm") == {"r": [[0.5, 0.9, 0.92, 0.91, 55], [1.5, 0.62, 0.64, 0.63, 210], [2.5, 0.3, 0.32, 0.31, 80]], "team": "DET"}
+          and kalshi_prop(kal_3, "2026-11-04", "PHI", "DET", "Cade Cunningham", "DET", "pr") is None and kalshi_prop(kal_3, "2026-11-04", "PHI", "DET", "Cade Cunningham", "DET", "pts") is None)
     parts_ = dict((p["k"], p) for p in proj_["parts"])
     check("props: what moves it: the base is his rate at his minutes, the regulars out, pace and the defence sum from it to the projection, the prior and the minutes trend say what sits inside it, each pointing at its why line",
           set(parts_) == {"prior", "minutes", "out", "pace", "dvp"} and abs(proj_["base"] + parts_["out"]["eff"] + parts_["pace"]["eff"] + parts_["dvp"]["eff"] - proj_["proj"]) < 0.03

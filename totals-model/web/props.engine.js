@@ -74,6 +74,40 @@
     if (v === null) return "";
     return 'Sim reads ' + v + ' v the ' + r.line + ' line, ' + (ag === true ? 'on the ' + esc(r.side) + '\'s side' : ag === false ? 'against the ' + esc(r.side) : 'on the line') + ' · ' + esc(r.team || 'his club') + ' ' + s.team_pts + ' (' + s.team_lo + '–' + s.team_hi + ') · blowout ' + propsPct(s.blowout);
   }
+  /* the books' consensus in the simulation's place (5 Nov 2026, the user: "turn the simulation off for the props... what do you
+     recommend we replace the simulation spot with"): the props run keeps on each prop the median line across the books posting
+     one, Pinnacle's own and the carded line's gap to the median (cons), and the market on the game (mkt: his club's points
+     implied by the total and spread against its points a game, the spread's expected margin and blowout chance). Measured on
+     the 4,800 graded props of 27 Oct to 2 Nov with the simulation backed out: the carded line sat half a point or more off the
+     consensus on 872, and there the truth sat about half way toward the consensus (the over +6.7 points above its market's
+     rate when the others sat above the carded line, the under +3.8 when below; r +0.06, t 4.0). The slate scores it at half
+     that on the book's chance; the page reads it on the best cards, the panel, the table's column and its filter, and the
+     record keeps the consensus's own line. The simulation's own read, when an older file carries one, still shows */
+  function propCons(r) { return r.cons && r.cons.line !== null && r.cons.line !== undefined && isFinite(+r.cons.line) ? r.cons : null; }
+  function propShopGap(r) { var c = propCons(r); if (!c || !propHas(r)) return null; var g = +c.line - +r.line; return Math.round((r.side === "UNDER" ? -g : g) * 10) / 10; }   // the consensus's gap toward the pick's side, in the stat's units
+  function propShopAgrees(r) { var g = propShopGap(r); return g === null || g === 0 ? null : g > 0; }
+  function propShopLine(r) {
+    var c = propCons(r); if (!c) return "";
+    var g = +c.line - +r.line, ag = propShopAgrees(r), gap = Math.abs(g).toFixed(1).replace(/\.0$/, "");
+    var s = 'The books: ' + c.n + ' post <b>' + esc(String(c.line)) + '</b>' + (c.pin !== null && c.pin !== undefined ? ' (Pinnacle ' + esc(String(c.pin)) + ')' : '') + ' · ' + esc(r.book || 'the carded book') + ' ' + esc(String(r.line)) +
+            (Math.abs(g) < 0.05 ? ' sits with them' : ' sits ' + gap + ' ' + (g < 0 ? 'above' : 'below') + ' them, ' + (ag ? 'the ' + esc(r.side) + '\'s way' : 'against the ' + esc(r.side)));
+    if (c.shift) s += ' · the book\'s chance read ' + sgn(100 * c.shift, 1) + ' on the over, measured';
+    return s;
+  }
+  function propsMarketHtml(r, tile) {
+    var m = r.mkt || null, c = propCons(r), club = r.team || "his club";
+    if (!m && !c) return "";
+    var pc = function (v) { return (v * 100).toFixed(v * 100 >= 10 ? 0 : 1) + "%"; }, g = c ? +c.line - +r.line : null;
+    var h = '<div class="pd-sim pd-mkt"><h4>The market on this game <span class="dim">· the books\' numbers in the simulation\'s old place; the consensus is the scored part</span></h4><div class="pd-simtiles">';
+    if (c) h += tile("The books", esc(String(c.line)), c.n + " post it" + (c.pin !== null && c.pin !== undefined ? " · Pinnacle " + esc(String(c.pin)) : "") + " · " + esc(r.book || "the book") + " " + esc(String(r.line)) + (Math.abs(g) < 0.05 ? ", with them" : ", " + Math.abs(g).toFixed(1).replace(/\.0$/, "") + (g < 0 ? " above" : " below")), g === null || Math.abs(g) < 0.05 ? "" : (propShopAgrees(r) ? "good" : "bad"));
+    if (c && c.shift) h += tile("Consensus lever", sgn(100 * c.shift, 1) + " pts", "on the book's over chance: half the measured slope, capped at six", propsLeverHelps(r, +c.shift) ? "good" : "bad");
+    if (m && m.tt !== null && m.tt !== undefined) h += tile(esc(club) + " points", esc(String(m.tt)), "implied by the book's total and spread" + (m.ppg ? " · " + esc(String(m.ppg)) + " a game by the ratings" + (m.f ? " (×" + (+m.f).toFixed(3) + ", shown: measured null as a lever)" : "") : ""));
+    if (m && m.em !== null && m.em !== undefined) h += tile("Expected margin", esc(String(m.em)), "off the spread · a starter's minutes follow it (the game script, scored)");
+    if (m && m.blow !== null && m.blow !== undefined) h += tile("Blowout", pc(+m.blow), "15 or more either way, off the spread");
+    h += '</div><p class="pd-base">The simulation came off the props on 5 Nov 2026: replayed on 4,800 graded props with its two levers backed out, the record did not move and its pushes landed on the wrong side; the market\'s own team points measured the same null. ' +
+         'What the score takes from the market now is the <b>books\' consensus</b>: where the carded line sits off the median across the books, the truth sat about half way toward the consensus (the over +6.7 points above its market\'s rate when the others sat above the carded line, the under +3.8 when below), scored at half that on the book\'s chance. The expected margin sets the game script on a starter\'s minutes; the club\'s implied points are shown, not scored.</p></div>';
+    return h;
+  }
   function propsGameSimFromRows(gr, r0) {
     /* a file loaded before the strip existed carries the game's block on no row; the props' own sim blocks give most of it back */
     var aab = r0.aab || r0.away, hab = r0.hab || r0.home, a = null, h = null, any = null;
@@ -93,7 +127,22 @@
     return order.sort().map(function (game) {
       var g = games[game], r = g.r, s = r.gsim || propsGameSimFromRows(rows.filter(function (x) { return x.game === game; }), r);
       var kl = propsKalshiLine(r), klHtml = kl ? '<div class="n5 kalshi-strip">' + kl + '</div>' : '';
-      if (!s) return '<div class="pk simg dim"><div class="n1">' + esc(game) + '</div><div class="n4">' + (r.trim ? 'The simulation on this game was trimmed from the save with the night\'s detail; the last seven nights keep theirs.' : 'This file\'s run carried no simulation on the game; a props run with the current slate.py plays it 10,000 times.') + '</div>' + klHtml + '</div>';
+      if (!s) {
+        /* the market on the game (5 Nov 2026), in the simulation's place: the two clubs' points implied by the book's total and
+           spread against their points a game, the expected margin and the blowout chance, and how many carded lines sit off the books' consensus */
+        var gr = rows.filter(function (x) { return x.game === game; }), tts = {}, mk0 = null, off = 0, withSide = 0;
+        gr.forEach(function (x) { if (x.mkt && x.mkt.tt !== null && x.mkt.tt !== undefined) { tts[x.team] = x.mkt; mk0 = mk0 || x.mkt; } if (propHas(x)) { withSide++; if (propShopAgrees(x) !== null) off++; } });
+        var aab0 = r.aab || r.away || "away", hab0 = r.hab || r.home || "home";
+        if (mk0 && tts[aab0] && tts[hab0]) {
+          var pcs = function (v) { return (v * 100).toFixed(v * 100 >= 10 ? 0 : 1) + "%"; };
+          var side = function (ab) { var m = tts[ab]; return esc(ab) + ' ' + m.tt + (m.ppg ? ' <span class="dim">(' + m.ppg + ' a game)</span>' : ''); };
+          return '<div class="pk simg mkt"><div class="n1">' + esc(game) + ' · the market</div>' +
+            '<div class="n2">' + side(aab0) + ' · ' + side(hab0) + (r.total !== null && r.total !== undefined ? ' <span class="dim">total ' + esc(String(r.total)) + (r.spread !== null && r.spread !== undefined ? ' · spread ' + esc(String(r.spread)) : '') + '</span>' : '') + '</div>' +
+            '<div class="n4">each club\'s points implied by the book\'s total and spread, against its points a game by the ratings · shown, not scored</div>' +
+            '<div class="n5">expected margin ' + esc(String(mk0.em)) + ' · blowout of 15 or more ' + pcs(+mk0.blow) + ', off the spread' + (withSide ? ' · the carded line sits off the books\' consensus on <b>' + off + ' of ' + withSide + '</b> props' : '') + '</div>' + klHtml + '</div>';
+        }
+        return '<div class="pk simg dim"><div class="n1">' + esc(game) + '</div><div class="n4">' + (r.trim ? 'The simulation on this game was trimmed from the save with the night\'s detail; the last seven nights keep theirs.' : 'This file\'s run carried no simulation on the game and no market block; a props run with the current slate.py carries the market\'s numbers.') + '</div>' + klHtml + '</div>';
+      }
       var aab = r.aab || r.away || "away", hab = r.hab || r.home || "home", hasM = s.m !== null && s.m !== undefined && isFinite(+s.m), fav = +s.m >= 0 ? hab : aab;
       var book = r.total !== null && r.total !== undefined && isFinite(+r.total) ? ' · the book\'s ' + r.total + ' (' + sgn(+s.t - +r.total, 1) + ')' : '';
       var outs = [[aab, s.out[0]], [hab, s.out[1]]].filter(function (x) { return x[1]; }).map(function (x) { return ' · ' + esc(x[0]) + '\'s regulars out ' + sgn(x[1], 1) + ' per 100 on the offence'; }).join('');
@@ -226,7 +275,7 @@
          (ok ? 'the price agrees by ' + ((t.chance - t.need) * 100).toFixed(1) + ' points' : 'the price asks ' + ((t.need - t.chance) * 100).toFixed(1) + ' points more than the sheet gives') +
          '. A pushed leg drops out of the ticket as the books do it; a lost leg loses it.</p>';
     [a, b].forEach(function (r, i) {
-      var lv = propsLeversLine(r), sl = propSimLine(r), tally = propsLeverTally(r), tl = propsLogTally(r), ag = propSimAgrees(r);
+      var lv = propsLeversLine(r), sl = propShopLine(r) || propSimLine(r), tally = propsLeverTally(r), tl = propsLogTally(r), ag = propShopAgrees(r) !== null ? propShopAgrees(r) : propSimAgrees(r);   // the books' consensus first (5 Nov 2026)
       h += '<div class="pd-leg"><h4>Leg ' + (i + 1) + ' <span class="dim">· ' + leg(r) + (r.pos ? ' · ' + esc(r.pos) : '') + (r.team ? ' ' + esc(r.team) : '') + (r.starter === true ? ' · starter' : r.starter === false ? ' · bench' : '') + '</span></h4>';
       h += '<div class="pd-tiles">' +
         tile("Chance", pc(r.chance), "the over " + pc(r.pm) + " by the model, " + pc(r.pb) + " by the book") +
@@ -285,7 +334,7 @@
     var has = propHas(r);
     switch (key) {
       case "agree": return has ? (function (t) { return t.n ? (t.toward - t.against) + t.toward / 10 : -50; })(propsLeverTally(r)) : -99;
-      case "sim": return has ? (function (g) { return g === null ? -99 : g; })(propSimGap(r)) : -999;
+      case "sim": return has ? (function (g) { return g === null ? -99 : g; })(propShopGap(r) !== null ? propShopGap(r) : propSimGap(r)) : -999;
       case "usage": return r.usg === null || r.usg === undefined ? -1 : +r.usg;
       case "game": return r.game || "";
       case "name": return r.name || "";
@@ -311,7 +360,7 @@
       if (v.agree) { var t = propsLeverTally(r); if (!propHas(r) || (v.agree === "all" ? !t.all : !t.most)) return false; }
       if (v.usage && propUsageBucket(r) !== v.usage) return false;
       if (v.role && !(v.role === "starter" ? r.starter === true : r.starter === false)) return false;
-      if (v.sim) { var ag = propSimAgrees(r); if (ag === null || (v.sim === "yes" ? !ag : ag)) return false; }
+      if (v.sim) { var ag = propShopAgrees(r); if (ag === null) ag = propSimAgrees(r); if (ag === null || (v.sim === "yes" ? !ag : ag)) return false; }   // the books' consensus first (5 Nov 2026), the sim's read on older files
       if (v.taken && !r.take) return false;   // the props you marked (3 Nov 2026)
       if (q && String(r.name || "").toLowerCase().indexOf(q) < 0 && String(r.game || "").toLowerCase().indexOf(q) < 0) return false;
       return true;
@@ -344,6 +393,7 @@
                     pid: String(x.pid), name: x.name, team: x.team, opp: x.opp, athome: !!x.home, pos: x.pos || "", mk: x.mk, line: x.line, op: x.op, up: x.up, book: x.book, books: x.books || {},
                     proj: x.proj, sd: x.sd, pm: x.pm, pb: x.pb, p: x.p, push: x.push, side: x.side, chance: x.chance, price: x.price, need: x.need, edge: x.edge, band: x.band,
                     mins: x.mins, rate36: x.rate36, base: x.base, parts: x.parts || [], why: x.why || [], log: x.log || [], sim: x.sim || null,
+                    mkt: x.mkt || null, cons: x.cons || null,   // the market on the game and the books' consensus (5 Nov 2026), in the simulation's place
                     med: x.med, usg: x.usg, sdf: x.sdf, starter: x.starter === undefined ? null : x.starter, start_src: x.start_src || null, kal: x.kal || null, gsim: propsGameSim(g.sim), fives: g.fives || null, actual: null, result: null });
       });
     });
@@ -569,7 +619,7 @@
     var mk = function () { return { n: 0, w: 0, l: 0, p: 0, v: 0, says: 0, units: 0 }; };
     var all = mk(), byMk = {}, byBand = {}, bySide = {}, byEdge = {}, byChance = {}, byDate = {}, byDateBet = {}, byDateTake = {}, byCentre = {}, byTake = mk();
     /* the same-game pairs' record (26 Oct 2026): each graded date's tickets as the night built them, a ticket won when both legs did */
-    var byPair = mk(), byPairTake = mk(), pairDates = {};
+    var byPair = mk(), byPairTake = mk(), pairDates = {}, byCons = { toward: mk(), against: mk() };   // the books' consensus's own line (5 Nov 2026): the picks it sided with and the ones it stood against, half a point or more
     graded.forEach(function (r) { if (r.gdate) pairDates[r.gdate] = true; });
     var pairSink = function (s) { return function (t) {
       var res = propsPairRes(t); if (!res) return;
@@ -586,6 +636,7 @@
                    byDate[d] || (byDate[d] = mk()), byCentre[propsCentre(r)] || (byCentre[propsCentre(r)] = mk())];
       if (r.band === "BET") sinks.push(byDateBet[d] || (byDateBet[d] = mk()));
       if (r.take) { sinks.push(byTake); sinks.push(byDateTake[d] || (byDateTake[d] = mk())); }   // the props marked as taken (26 Oct 2026), and by night (3 Nov 2026)
+      var cg = propShopGap(r); if (cg !== null && Math.abs(cg) >= 0.5) sinks.push(cg > 0 ? byCons.toward : byCons.against);
       sinks.forEach(function (s) {
         if (r.result === "void") { s.v++; return; }
         if (r.result === "push") { s.p++; return; }
@@ -615,6 +666,7 @@
     if (byTake.n || byTake.p) parts.push("taken " + rec(byTake) + (byTake.n ? " " + sgn(byTake.units, 1) + "u" : ""));
     if (byPair.n || byPair.p) parts.push("same-game pairs " + rec(byPair) + (byPair.n ? " " + sgn(byPair.units, 1) + "u" : ""));
     if (byPairTake.n || byPairTake.p) parts.push("pairs taken " + rec(byPairTake) + (byPairTake.n ? " " + sgn(byPairTake.units, 1) + "u" : ""));
+    if (byCons.toward.n || byCons.against.n) parts.push("the books' consensus with the pick " + rec(byCons.toward) + (byCons.toward.n ? " " + sgn(byCons.toward.units, 1) + "u" : "") + " · against it " + rec(byCons.against) + (byCons.against.n ? " " + sgn(byCons.against.units, 1) + "u" : ""));
     var markets = PROPS_ORDER.map(function (k) { return byMk[k] ? tile(PROPS_LABEL[k], byMk[k], []) : ""; }).join("");
     var verdict = 'The props are a priori: the pooled rules behind them were measured on last season\'s box scores. Read the BET band against the rest and <i>does</i> against <i>says</i>; under 100 graded props nothing here is a reading. ' +
                   'Measured on the first ten nights (30 Oct 2026, 4,321 graded props): the model\'s own lean added nothing to the book\'s price (the best weight on it was none; where it stood ten points from Pinnacle the outcome followed Pinnacle), the over\'s shade is real (the under landed 53.2% at prices saying 50.7%), and a starter\'s minutes follow the game script. From the 30th the sheet runs with the market as its spine (the model at a ninth, the over read 2.5 points lower) and the game script on starters\' minutes; the nights before carry the old weights. ' +
@@ -630,6 +682,8 @@
     ["BET", "LEAN", "no edge"].forEach(function (b) { if (byBand[b]) h2 += tile(b === "no edge" ? "No edge: the book's own side" : b + " band", byBand[b], []); });
     if (byTake.n || byTake.p) h2 += tile("Taken: the props you marked", byTake, []);
     if (byPair.n || byPair.p) h2 += tile("Same-game pairs, at the parlay price", byPair, []);
+    if (byCons.toward.n || byCons.toward.p) h2 += tile("The books' consensus with the pick, half a point or more", byCons.toward, []);
+    if (byCons.against.n || byCons.against.p) h2 += tile("The books' consensus against the pick", byCons.against, []);
     h2 += '</div>';
     h2 += '<div class="subhead">By market</div><div class="calib" data-sport="PROPS-MK">' + markets + '</div>';
     h2 += '<div class="subhead">By the edge the sheet claimed <span class="tag">the chance less what the price needs</span></div><div class="calib" data-sport="PROPS-EDGE">' +
@@ -820,7 +874,7 @@
                '<div class="lb"><span style="width:' + w + '%"></span></div><div class="lv">' + sgn(+p.eff, 1) + '</div></div>';
       }).join("") + '</div>';
     }
-    if (has && !r.trim) h += propsSimHtml(r, tile);
+    if (has && !r.trim) h += (r.mkt || propCons(r)) ? propsMarketHtml(r, tile) : propsSimHtml(r, tile);   // the market in the simulation's place (5 Nov 2026); older files keep their sim block
     if (r.why && r.why.length) h += '<h4>Why' + (felt.length ? ' <span class="dim">· ' + (top.length ? 'the biggest reason' + (top.length > 1 ? 's' : '') + ' for the ' + esc(r.side || "pick") + ' in green' : 'no lever toward the ' + esc(r.side || "pick")) + (against.length ? (top.length ? ', ' : '; ') + 'the biggest against it in red' : '') + '</span>' : '') + '</h4><ul class="pd-why">' + r.why.map(function (w, i) {
       var rank = top.indexOf(i), cls = rank >= 0 ? ' class="lever-line"' : against.indexOf(i) >= 0 ? ' class="lever-against"' : '';
       return '<li' + cls + '>' + esc(w) + (rank >= 0 ? ' <span class="tag helps">the ' + (rank === 0 ? '' : 'second ') + 'biggest for the ' + esc(r.side || "pick") + '</span>' : '') +
@@ -915,7 +969,8 @@
         '<div class="n3">' + (r.chance * 100).toFixed(1) + '% · ' + sgn(r.price, 0) + ' needs ' + (r.need * 100).toFixed(1) + '% · edge ' + sgn(r.edge * 100, 1) + resChip(r) + '</div>' +
         '<div class="n4">' + esc(r.game) + ' · projected ' + r.proj + ' (±' + r.sd + ') · ' + esc(r.book) + '</div>' +
         (propsLeversLine(r) ? '<div class="n5">Moves it: ' + propsLeversLine(r) + '</div>' : '') +
-        (propSimLine(r) ? '<div class="n5 simline' + (propSimAgrees(r) === true ? ' pos' : propSimAgrees(r) === false ? ' neg' : '') + '">' + propSimLine(r) + '</div>' : '') +
+        (propShopLine(r) ? '<div class="n5 shopline' + (propShopAgrees(r) === true ? ' pos' : propShopAgrees(r) === false ? ' neg' : '') + '">' + propShopLine(r) + '</div>' :
+         propSimLine(r) ? '<div class="n5 simline' + (propSimAgrees(r) === true ? ' pos' : propSimAgrees(r) === false ? ' neg' : '') + '">' + propSimLine(r) + '</div>' : '') +
         (propKalshiLine(r) ? '<div class="n5 kalprop">' + propKalshiLine(r) + '</div>' : '') + '<div class="n6">' + propTakeBtn(r) + propsGoBtn(r) + '</div></div>';
     }).join("") : '<div class="empty">' + (rows.length ? 'No prop on this date clears its price.' : 'Load a props file: Run NBA props.bat writes nba-props-DATE.json.') + '</div>';
     /* the simulation's strip (26 Oct 2026): one card a game */
@@ -948,7 +1003,9 @@
                     : '<td colspan="7" class="dim">' + esc((r.why && r.why[0]) || 'no projection') + '</td>') +
         '<td>' + (r.result ? esc(r.result) + (r.actual !== null && r.actual !== undefined ? ' · ' + r.actual : '') : '') + '</td>' +
         (function (t) { return '<td class="agree' + (t.n ? (t.all ? ' pos' : t.against > t.toward ? ' neg' : '') : '') + '" title="' + esc(t.words) + '">' + t.text + '</td>'; })(propsLeverTally(r)) +
-        (function (v, ag) { return '<td class="simc' + (ag === true ? ' pos' : ag === false ? ' neg' : '') + '" title="' + (v === null ? 'no simulation on this prop' : 'the simulation\'s own read of the stat, his per 36 at his minutes scaled by his club\'s runs; ' + (ag === true ? 'on the ' + esc(r.side) + '\'s side of the line' : ag === false ? 'against the ' + esc(r.side) : 'on the line') + ' (shown, not scored)') + '">' + (v === null ? '' : v) + '</td>'; })(propSimRead(r), propSimAgrees(r)) +
+        (function (v, ag, c) {   // the books' consensus first (5 Nov 2026): its line, green when it sits the pick's way; the sim's read on an older file
+          if (c) return '<td class="simc' + (propShopAgrees(r) === true ? ' pos' : propShopAgrees(r) === false ? ' neg' : '') + '" title="the books\' consensus line across ' + c.n + ' books' + (c.pin !== null && c.pin !== undefined ? ' (Pinnacle ' + esc(String(c.pin)) + ')' : '') + '; ' + (propShopAgrees(r) === true ? 'the carded line sits off it the ' + esc(r.side) + '\'s way' : propShopAgrees(r) === false ? 'the carded line sits off it against the ' + esc(r.side) : 'the carded line sits with it') + ' (scored at half the measured slope)">' + esc(String(c.line)) + '</td>';
+          return '<td class="simc' + (ag === true ? ' pos' : ag === false ? ' neg' : '') + '" title="' + (v === null ? 'no simulation on this prop' : 'the simulation\'s own read of the stat, his per 36 at his minutes scaled by his club\'s runs; ' + (ag === true ? 'on the ' + esc(r.side) + '\'s side of the line' : ag === false ? 'against the ' + esc(r.side) : 'on the line') + ' (shown, not scored)') + '">' + (v === null ? '' : v) + '</td>'; })(propSimRead(r), propSimAgrees(r), propCons(r)) +
         (function (u) { return '<td class="usgc' + (u === "hi" ? ' pos' : '') + '" title="' + (r.usg === null || r.usg === undefined ? 'no usage on this prop' : 'his share of his club\'s possessions while on the floor' + (r.starter === true ? '; a starter' : r.starter === false ? '; off the bench' : '') + (r.sdf && r.sdf !== 1 ? '; the miss read at ' + r.sdf + ' sigmas (measured)' : '')) + '">' + (r.usg === null || r.usg === undefined ? '' : esc(String(r.usg)) + '%' + (r.starter === true ? ' <span class="tag">S</span>' : r.starter === false ? ' <span class="tag">B</span>' : '')) + '</td>'; })(propUsageBucket(r)) +
         '<td class="take">' + propTakeBtn(r) + '</td></tr>';
     });

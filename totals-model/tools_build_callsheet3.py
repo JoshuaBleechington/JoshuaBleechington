@@ -27,7 +27,7 @@ import sys
 ROOT = pathlib.Path(__file__).parent / "web"
 OPEN = "  /* ===== ENGINE BLOCK."
 CLOSE = "  /* ===== END ENGINE BLOCK ===== */"
-STAMP = "2026-11-04"   # bumped by hand when 3.0's own sources change (the harness checks it)
+STAMP = "2026-11-05"   # bumped by hand when 3.0's own sources change (the harness checks it)
 
 
 def engine_block() -> str:
@@ -627,13 +627,16 @@ def props_example_games() -> list:
            ("NYK", "C", "reb"): "HashtagBasketball: Knicks allow 13.4 rebounds a game to Cs (125th of 150, 1 the fewest); shown, not scored"}
     out = {"PHI": (31.2, [("Joel Embiid", 31.2, "Out")], [("Andre Drummond", "Questionable")]), "NYK": (0.0, [], [("Josh Hart", "Day-To-Day")])}
     outc = {"PHI": (31.2, [("Joel Embiid", 31.2)]), "NYK": (0.0, [])}   # the club's centres out, read by the other side's bigs (28 Oct 2026)
-    # the simulation on the props (26 Oct 2026): the NBA example's two profiles, the game played by nbasim at build
-    # time (seeded) and read for each prop, and the matchup lever from the same profiles, as a real file carries them
+    # the profiles (26 Oct 2026): the NBA example's two clubs, for the matchup line (shown at no weight from 5 Nov 2026) and the
+    # ratings' points a game; the game's runs no longer play for the props (5 Nov 2026, measured null), so the example carries
+    # the market on the game and the books' consensus instead, as a real file does
     import nbasim  # noqa: E402
     prof = {"league": dict(nbasim.LEAGUE), "last": {},
             "teams": {"PHI": {"ab": "PHI", "ortg": 113.5, "drtg": 115.0, "pace": 99.5, "tov": 0.135, "trip": 0.10, "ft": 0.79, "a3": 0.41, "p3": 0.36, "p2": 0.55, "oreb": 0.27, "n": 15},
                       "NYK": {"ab": "NYK", "ortg": 118.0, "drtg": 109.0, "pace": 98.0, "tov": 0.125, "trip": 0.11, "ft": 0.80, "a3": 0.44, "p3": 0.37, "p2": 0.56, "oreb": 0.29, "n": 16}}}
-    gs = slate.nba_props_game_sim(prof, "PHI", "NYK", "2026-10-26", 3000, seed=7, out={"away": [{"n": "Joel Embiid", "st": "Out", "mpg": 31.2, "ppg": 27.5}], "home": []})
+    odds = {"total": 231.5, "sp": -5.5}
+    script = slate.props_spread_script(odds["sp"])
+    ppg = {ab: round(t["ortg"] * t["pace"] / 100.0, 1) for ab, t in prof["teams"].items()}
 
     def club_match(team, opp, home_side):
         o, d = dict(prof["teams"][team]), prof["teams"][opp]
@@ -647,22 +650,26 @@ def props_example_games() -> list:
         opp = "NYK" if team == "PHI" else "PHI"
         dmk = "pts" if mk == "pra" else mk
         pr = {"name": name, "mk": mk, "line": line, "op": op, "up": up, "book": "fanatics"}
+        # the other books' lines (5 Nov 2026): a point above the carded line on every third prop, a point below on the next, level on the rest, so the consensus lever reads each way
+        off = 1.0 if k % 3 == 0 else -1.0 if k % 3 == 1 else 0.0
+        books = {"fanatics": [line, op, up], "draftkings": [line + off, op - 5, up + 5], "fanduel": [line + off, op + 2, up - 2]}
         ctx = {"out_mpg": out[team][0], "out_names": out[team][1], "maybe": out[team][2], "pace": 98.75, "league_pace": 100.5, "home": team == "NYK", "pos": pos,
                "pace_team": prof["teams"][team]["pace"], "pace_opp": prof["teams"][opp]["pace"], "match": club_match(team, opp, team == "NYK"),
+               "script": script, "cons": slate.props_consensus(books, line),
                "usage": usage[name], "usage_src": "this season", "starter": name != "Kelly Oubre Jr.", "start_src": "his last game this season" if name == "Kelly Oubre Jr." else "RotoWire's expected five",
                "opp_nick": slate.NBA_NICK[opp], "dvp": dvp[opp][pos], "htb": htb.get((opp, pos, dmk)),
                "opp_out_mpg": out[opp][0], "opp_out_names": out[opp][1], "opp_out_c_mpg": outc[opp][0], "opp_out_c_names": outc[opp][1], "self_out": "Out" if name == "Joel Embiid" else ""}
         proj, why = slate.props_project(pr, this, last, ctx)
         item = {"pid": "x%d" % (k + 1), "name": name, "team": team, "opp": opp, "home": team == "NYK", "pos": pos, "mk": mk, "line": line, "op": op, "up": up, "book": "fanatics",
-                "books": {"fanatics": [line, op, up], "draftkings": [line + (0.5 if k % 3 == 0 else 0.0), op - 5, up + 5], "fanduel": [line, op + 2, up - 2]},
+                "books": books,
                 "log": [[g["d"], g["opp"], 1 if g["home"] else 0, g["min"], slate.props_stat(g, mk), slate.props_game_factors(g, this or last, mk, 100.5, last if this else None)] for g in (this or last)[-10:]], "why": why}
         if proj:
             item.update(proj)
-            item["sim"] = slate.nba_prop_sim_read(gs, team == "NYK", proj)
+            item["mkt"] = slate.props_market_block(odds, team == "NYK", ppg[team])
         props.append(item)
     props.sort(key=lambda x: (-(x.get("edge") if x.get("edge") is not None else -9), x["name"], x["mk"]))
-    return [{"gid": "example", "away": "76ers", "home": "Knicks", "aab": "PHI", "hab": "NYK", "tip": None, "spread": -5.5, "total": 231.5, "pace": 98.75, "league_pace": 100.5,
-             "out": {"PHI": [["Joel Embiid", 31.2, "Out"]], "NYK": []}, "sim": gs,
+    return [{"gid": "example", "away": "76ers", "home": "Knicks", "aab": "PHI", "hab": "NYK", "tip": None, "spread": odds["sp"], "total": odds["total"], "pace": 98.75, "league_pace": 100.5,
+             "out": {"PHI": [["Joel Embiid", 31.2, "Out"]], "NYK": []},
              "fives": {"away": {"status": "expected", "five": [["PG", "Tyrese Maxey"], ["SG", "VJ Edgecombe"], ["SF", "Paul George"], ["PF", "Kelly Oubre Jr."], ["C", "Adem Bona"]], "maybe": [["C", "Andre Drummond", "Questionable"]]},
                        "home": {"status": "confirmed", "five": [["PG", "Jalen Brunson"], ["SG", "Mikal Bridges"], ["SF", "OG Anunoby"], ["PF", "Josh Hart"], ["C", "Karl-Anthony Towns"]], "maybe": []}},
              "props": props, "unmatched": []}]

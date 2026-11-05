@@ -2391,3 +2391,73 @@ chips (a solid purple chip when the exchange's price is better after the
 fee), the simulation table's line under the team totals, the Kalshi
 section's heading and its panel's bold figures. Green stays what it was:
 a scored rule that fires.
+
+## The simulation off the props, 5 Nov 2026
+
+The user: "I'd like to see what the results would show without any input
+from the simulation at all for the props. Can you test the last log I gave
+you? I'm not seeing any benefits of the simulation whatsoever." Then:
+"Just turn the simulation off for the props and use all the other great
+metrics and statistics to help with player props... What do you recommend
+we replace the simulation spot with now that have more games in the
+season plus a plethora of odds and matchups stuff."
+
+**The test.** The simulation reached a prop through two scored levers,
+the matchup factor (the club's efficiency into tonight's defence from the
+profiles, to the half power) and the game script (a starter's minutes
+against the runs' expected margin). Both are stored on every prop of the
+last seven nights, so the 4,800 graded props of 27 Oct to 2 Nov were
+replayed with the levers backed out of the projection, the model's chance
+recomputed, re-blended with the book at the same weight, the side and the
+band re-read, and graded on the actual stat (every stored chance
+reproduced first). The record did not move: BET 110-126 (−33.1u) with the
+simulation, 108-126 (−35.2u) without; LEAN 738-631 against 746-637; 24
+props changed side, the simulation's side 10-14 on them. Where the
+simulation moved a projection a quarter point or more the actual landed
+on its side 39% of the time, at half a point 27% (r −0.12, t −8); when it
+pushed a number up the over landed at its market's normal rate, no lift.
+Its own read on the cards split nothing (picks it agreed with 54.0%,
+disagreed with 54.9%). The game script was miscalibrated besides: the
+runs' expected margins ran 10.9 to 12.1 on every game against a base of
+12.6, so the lever only ever added minutes, while the real margins
+averaged 13.3.
+
+**The candidates, measured the same way.** The market's own team points
+(the book's total and spread against the club's average) as a matchup
+lever: null, r −0.03, the pushed-up overs 5 points under their market's
+rate at a quarter point. A prop's line already carries the game, so any
+club-level multiplier on top counts it twice. The spread's expected
+margin against a starter's minutes: real, r −0.12 (t −7.2), −0.32
+minutes a point on 3,801 starter props, the mechanism the two-season rule
+was built on. The books' consensus against the carded line: the carded
+line sat half a point or more off the median across the books on 872
+props, and there the truth sat about half way toward the consensus (the
+over +6.7 points above its market's rate when the others sat above the
+carded line, the under +3.8 when below; r +0.06, t 4.0; Pinnacle's line
+alone +4.1 and +3.6). Projected minutes miss by 4.2 a game on average and
+run 0.6 high.
+
+**What changed.** The matchup lever is shown at no weight (its why line
+says so) and the game's 10,000 runs no longer play for the props, which
+also takes minutes off the props run. The game script reads the spread's
+expected margin (a normal at 12.5 around the number) against a base of
+11.8, the mean over the season's graded games, at the measured 0.187
+minutes a point. The books' consensus is the scored lever in the
+simulation's place: the median line across the books posting one (three
+or more), its gap to the carded line read on the book's chance at 0.11 of
+a point a sigma of gap (half the measured 0.22), capped at six points,
+with a part on the levers list ("The books' consensus, on the market's
+number"), a why line, and the block on the prop (`cons`: the line, the
+count, Pinnacle's, the gap, the shift). The market on the game rides on
+each prop (`mkt`: the club's implied points against its average, the
+expected margin, the blowout chance). On the page the market takes the
+simulation's spots: the strip above the picks (each club's implied points,
+the margin, the blowout, how many carded lines sit off the consensus, the
+crowd on Kalshi), the panel's tiles (the books, the consensus lever, the
+club's points, the expected margin, the blowout), the best cards' last
+line (green when the consensus sits the pick's way), the table's column
+and its filter, and the record's own line for the consensus (with the pick
+and against it, half a point or more). A file from before the change
+still shows its simulation. The selftest covers the spread's script, the
+consensus and the market block; the harness reads the strip, the card,
+the panel, the column and the filter on a seeded night.

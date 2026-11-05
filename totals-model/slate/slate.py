@@ -5093,13 +5093,15 @@ PROPS_SIDE_SHADE = {"pts": 0.04, "ast": 0.04, "tpm": 0.04, "reb": 0.015, "ra": 0
 PROPS_SHADE_TENT = (0.40, 0.46, 0.55, 0.63)
 # the game script (30 Oct 2026): two seasons, 20,729 starter-games against the closes: a starter's minutes land 0.187 a
 # game under his last-ten mean per point the final margin runs above the league's 13.5, and over it in a close one
-# (+1.7 minutes inside five, -3.6 at 25 and up); the bench's do not move (+0.006 a point). The simulation's expected
-# margin for the game sets the lever on starters' minutes
+# (+1.7 minutes inside five, -3.6 at 25 and up); the bench's do not move (+0.006 a point). From 5 Nov 2026 the SPREAD sets
+# the lever: the expected size of the final margin for a normal at PROPS_MARGIN_SD around the book's number. The simulation's
+# own expected margin had run 10.9 to 12.1 on every game against a base of 12.6, so it only ever added minutes; on 3,801
+# starter props of 27 Oct to 2 Nov the spread's expected margin carried the minutes (r -0.12, t -7.2, -0.32 minutes a point)
 PROPS_SCRIPT_PER_POINT = 0.187
-# the base is the engine's own expected |margin| averaged over a season of its games (12.60 over 1,145 games of 2025-26 at its
-# 13.4 spread), not the actual mean of 13.47: the lever then averages to nothing across a season. At 13.5 it had added 0.4
-# minutes to every starter (2 Nov 2026: the first three nights' games expected 11.2 on average), a push toward the over
-PROPS_SCRIPT_BASE = 12.6
+PROPS_MARGIN_SD = 12.5
+# the base is the spread's expected margin averaged over the season's games (11.8 over the 107 graded games of 20 Oct to
+# 2 Nov 2026), so the lever averages to nothing across a season
+PROPS_SCRIPT_BASE = 11.8
 PROPS_DVP_WEIGHT = {"pts": 0.75, "reb": 0.75, "ast": 0.75, "tpm": 0.4, "pra": 0.75, "pr": 0.75, "pa": 0.75, "ra": 0.75}   # how much of a defence's lean to carry (measured, first half to second)
 # the matchup lever (25 Oct 2026, the user: "see if the simulation enhances the props"): the club's expected points per
 # possession in the simulation's own view (its offence into the opponent's defence, league-relative, home court, a back to
@@ -5109,7 +5111,20 @@ PROPS_DVP_WEIGHT = {"pts": 0.75, "reb": 0.75, "ast": 0.75, "tpm": 0.4, "pra": 0.
 # defence lever in. The market's implied team points carried nothing beyond pace (t 0.8). The pace lever's form changed the
 # same day: the game's possessions against the club's OWN pace, not the two clubs' mean against the league (6.589 against
 # 6.592 on points, better on every market), since a player's rate per 36 is earned at his club's pace already.
-PROPS_MATCH_ALPHA = {"pts": 0.5, "reb": 0.0, "ast": 0.5, "tpm": 0.5, "pra": 0.5, "pr": 0.5, "pa": 0.5, "ra": 0.5}   # on rebounds + assists the weight is scaled by his assists' share of the stat, rebounds measuring nothing
+# OFF from 5 Nov 2026 (the user: "turn the simulation off for the props"): replayed on the 4,800 graded props of 27 Oct to
+# 2 Nov with the lever and the game script backed out, the record did not move (BET 110-126 with, 108-126 without; LEAN
+# 738-631 against 746-637) and the pushes landed on the wrong side (the actual on the simulation's side 39% of the time
+# at a quarter point and more, r -0.12, t -8); the market's own team points measured the same null (r -0.03). The lever is
+# shown at no weight, and the game's 10,000 runs no longer play for the props
+PROPS_MATCH_ALPHA = {"pts": 0.0, "reb": 0.0, "ast": 0.0, "tpm": 0.0, "pra": 0.0, "pr": 0.0, "pa": 0.0, "ra": 0.0}   # the weights to 4 Nov 2026: 0.5 on all but rebounds (0), rebounds + assists scaled by his assists' share
+# the books' consensus (5 Nov 2026), in the simulation's place: the median line across the books posting one, against the
+# carded line. On the same 4,800 props the carded line sat half a point or more off the consensus on 872; where the others
+# sat above it the over landed +6.7 points above its market's rate, where below the under +3.8 (r +0.06, t 4.0; Pinnacle's
+# line alone +4.1 / +3.6): the truth sits about half way toward the consensus. Scored at half that slope on the book's
+# chance, 0.11 of a chance point a sigma of gap, capped at six points, three books or more posting a line
+PROPS_CONS_K = 0.11
+PROPS_CONS_CAP = 0.06
+PROPS_CONS_MIN_BOOKS = 3
 PROPS_DVP_SHRINK = 20                                                         # games of this season before its table outweighs last season's
 PROPS_BET_EDGE = 0.03
 PROPS_BET_CHANCE = 0.55
@@ -5145,6 +5160,52 @@ def props_shade(mk, p_over_book):
     lo, flo, fhi, hi = PROPS_SHADE_TENT
     w = 0.0 if (pu <= lo or pu >= hi) else (pu - lo) / (flo - lo) if pu < flo else (hi - pu) / (hi - fhi) if pu > fhi else 1.0
     return PROPS_SIDE_SHADE.get(mk, 0.04) * w
+
+
+def props_spread_script(spread):
+    """The game script off the book's spread (5 Nov 2026): the expected size of the final margin and the chance of a blowout
+    of 15 or more, for a normal at PROPS_MARGIN_SD around the number; None without a spread."""
+    try:
+        mu = abs(float(spread))
+    except (TypeError, ValueError):
+        return None
+    sd = PROPS_MARGIN_SD
+    em = sd * math.sqrt(2.0 / math.pi) * math.exp(-mu * mu / (2.0 * sd * sd)) + mu * (1.0 - 2.0 * _phi(-mu / sd))
+    blow = (1.0 - _phi((15.0 - mu) / sd)) + _phi((-15.0 - mu) / sd)
+    return {"emargin": round(em, 1), "blowout": round(blow, 3), "src": "the spread"}
+
+
+def props_consensus(books, line):
+    """The books' consensus on a prop's line (5 Nov 2026): the median across the books posting one (PROPS_CONS_MIN_BOOKS or
+    more), Pinnacle's own, and the carded line's gap to the median; None without enough books."""
+    lines, pin = [], None
+    for k, v in (books or {}).items():
+        try:
+            val = float(v[0])
+        except (TypeError, ValueError, IndexError):
+            continue
+        lines.append(val)
+        if k == "pinnacle":
+            pin = val
+    if len(lines) < PROPS_CONS_MIN_BOOKS:
+        return None
+    lines.sort()
+    n = len(lines)
+    med = lines[n // 2] if n % 2 else (lines[n // 2 - 1] + lines[n // 2]) / 2.0
+    return {"line": med, "n": n, "gap": round(med - float(line), 2), "pin": pin}
+
+
+def props_market_block(odds, home_side, ppg):
+    """The market on the game for one prop (5 Nov 2026, in the simulation's place): his club's points implied by the book's
+    total and spread against its points a game by the ratings (shown, measured null as a lever), and the spread's expected
+    margin and blowout chance (the game script reads the margin); None without the two numbers."""
+    try:
+        tot, sp = float((odds or {}).get("total")), float((odds or {}).get("sp"))
+    except (TypeError, ValueError):
+        return None
+    tt = (tot - sp) / 2.0 if home_side else (tot + sp) / 2.0
+    sc = props_spread_script(sp) or {}
+    return {"tt": round(tt, 1), "ppg": ppg, "f": round(tt / ppg, 3) if ppg else None, "em": sc.get("emargin"), "blow": sc.get("blowout")}
 
 
 def props_over(mu, sd, line):
@@ -5836,10 +5897,10 @@ def props_project(prop, logs_this, logs_last, ctx):
     if sc and sc.get("emargin") is not None and ctx.get("starter") is True:
         dmin_script = -PROPS_SCRIPT_PER_POINT * (float(sc["emargin"]) - PROPS_SCRIPT_BASE)
         mins += dmin_script
-        why.append("the game script: the simulation expects a final margin of %.1f against its season average of %.1f (a blowout of 15 or more %.0f%% of the time), so a starter's minutes read %+.1f, measured on 20,729 starter-games over two seasons, scored" % (
-            float(sc["emargin"]), PROPS_SCRIPT_BASE, 100 * float(sc.get("blowout") or 0), dmin_script))
+        why.append("the game script: %s's expected margin %.1f against the season's %.1f (a blowout of 15 or more %.0f%% of the time), so a starter's minutes read %+.1f, measured on 20,729 starter-games over two seasons, scored" % (
+            sc.get("src") or "the simulation", float(sc["emargin"]), PROPS_SCRIPT_BASE, 100 * float(sc.get("blowout") or 0), dmin_script))
     elif sc and sc.get("emargin") is not None and ctx.get("starter") is False:
-        why.append("the game script: the simulation expects a final margin of %.1f; a bench man's minutes did not move with it over two seasons (+0.006 a point), nothing scored" % float(sc["emargin"]))
+        why.append("the game script: %s's expected margin %.1f; a bench man's minutes did not move with it over two seasons (+0.006 a point), nothing scored" % (sc.get("src") or "the simulation", float(sc["emargin"])))
     # the OPPONENT'S absences (28 Oct 2026, the user: "when players are out that helps the next man go over, yet it seems to
     # think the same for the defence even when their main players are out"): named on every prop; scored where it measured and
     # held from one half of 2025-26 to the other, a missing centre on a forward's or centre's rebounds (tools_nba_opp_out.py)
@@ -5879,14 +5940,18 @@ def props_project(prop, logs_this, logs_last, ctx):
     f_match = 1.0
     i_match = len(why)
     mt = ctx.get("match")
-    if mt and mt.get("f") and PROPS_MATCH_ALPHA.get(mk):
-        alpha = PROPS_MATCH_ALPHA[mk]
-        if mk == "ra":   # the lever measured on assists and nothing on rebounds: his assists' share of the stat carries it
+    if mt and mt.get("f"):
+        alpha = PROPS_MATCH_ALPHA.get(mk, 0.0)
+        if alpha and mk == "ra":   # the lever measured on assists and nothing on rebounds: his assists' share of the stat carries it
             ra_ = props_rate(logs_this, logs_last, "ast")
             alpha = alpha * (ra_["rate"] / r["rate"]) if ra_ and r["rate"] > 0 else 0.0
-        f_match = float(mt["f"]) ** alpha if alpha > 0 else 1.0
-        why.append("the matchup, from the simulation's profiles: %.1f per 100 into %s's %.1f defence (league %.1f%s%s): x%.3f on the efficiency, at %s weight, measured%s" % (
-            mt["ortg"], ctx.get("opp_nick") or "the opponent", mt["drtg"], mt["lg"], ", at home" if mt.get("home") else ", on the road", ", on a back to back" if mt.get("b2b") else "", f_match, ("%.1f" % alpha) if mk != "ra" else ("%.2f" % alpha), " (the assists' share of the stat)" if mk == "ra" else ""))
+        if alpha > 0:
+            f_match = float(mt["f"]) ** alpha
+            why.append("the matchup, from the simulation's profiles: %.1f per 100 into %s's %.1f defence (league %.1f%s%s): x%.3f on the efficiency, at %s weight, measured%s" % (
+                mt["ortg"], ctx.get("opp_nick") or "the opponent", mt["drtg"], mt["lg"], ", at home" if mt.get("home") else ", on the road", ", on a back to back" if mt.get("b2b") else "", f_match, ("%.1f" % alpha) if mk != "ra" else ("%.2f" % alpha), " (the assists' share of the stat)" if mk == "ra" else ""))
+        else:   # shown at no weight (5 Nov 2026): the lever measured null on 4,800 graded props, its pushes landing on the wrong side
+            why.append("the matchup, from the profiles: %.1f per 100 into %s's %.1f defence (league %.1f%s%s): x%.3f on the efficiency, shown, not scored (5 Nov 2026: the lever measured null on 4,800 graded props, its pushes landing on the wrong side, and the market's own team points the same)" % (
+                mt["ortg"], ctx.get("opp_nick") or "the opponent", mt["drtg"], mt["lg"], ", at home" if mt.get("home") else ", on the road", ", on a back to back" if mt.get("b2b") else "", float(mt["f"])))
     f_dvp = 1.0
     i_dvp = len(why)
     dv = ctx.get("dvp")
@@ -5935,6 +6000,13 @@ def props_project(prop, logs_this, logs_last, ctx):
     pb0 = props_devig(prop["op"], prop["up"])
     shade = props_shade(mk, pb0)   # the over's shade (30 Oct 2026): by market, in full at a coin-flip price (2 Nov 2026)
     pb = pb0 - shade
+    # the books' consensus (5 Nov 2026), in the simulation's place: the carded line against the median across the books, read on the book's chance
+    cs, cons_shift, i_cons = ctx.get("cons"), 0.0, len(why)
+    if cs and cs.get("line") is not None and sd > 0:
+        cons_shift = max(-PROPS_CONS_CAP, min(PROPS_CONS_CAP, PROPS_CONS_K * (float(cs["line"]) - line) / sd))
+        pb = min(max(pb + cons_shift, 0.02), 0.98)
+        why.append("the books' consensus %g across %d books%s against %s's %g: the over read %+.1f points on the book's chance (the truth sat about half way toward the consensus on the 872 carded lines off it, 27 Oct to 2 Nov 2026: the over +6.7 points above its market's rate when the others sat above the carded line, the under +3.8 when below; scored at half that, capped at six)" % (
+            float(cs["line"]), int(cs["n"]), (" (Pinnacle %g)" % float(cs["pin"])) if cs.get("pin") is not None else "", prop.get("book") or "the book", line, 100 * cons_shift))
     p = props_blend(pb, pm_c)
     side = "OVER" if p >= 0.5 else "UNDER"
     chance = p if side == "OVER" else 1.0 - p
@@ -5961,7 +6033,7 @@ def props_project(prop, logs_this, logs_last, ctx):
     if out_mpg > 0:
         parts.append({"k": "out", "t": "Regulars out", "eff": round(rate_out * (mins - dmin_script) - rate0 * mins0, 2), "i": i_out})
     if abs(dmin_script) > 1e-9:
-        parts.append({"k": "script", "t": "The game script, from the simulation", "eff": round(rate_out * dmin_script, 2), "i": i_script})
+        parts.append({"k": "script", "t": "The game script, from %s" % ((sc or {}).get("src") or "the simulation"), "eff": round(rate_out * dmin_script, 2), "i": i_script})
     if drate_c > 0:
         parts.append({"k": "oppc", "t": "Their centre out", "eff": round(drate_c * mins, 2), "i": i_oppc})
     if abs(f_pace - 1.0) > 1e-9:
@@ -5970,9 +6042,11 @@ def props_project(prop, logs_this, logs_last, ctx):
         parts.append({"k": "dvp", "t": "Defence v position", "eff": round((f_dvp - 1.0) * rate * mins * f_pace, 2), "i": i_dvp})
     if abs(f_match - 1.0) > 1e-9:
         parts.append({"k": "match", "t": "The matchup, from the simulation", "eff": round((f_match - 1.0) * rate * mins * f_pace * f_dvp, 2), "i": i_match})
+    if abs(cons_shift) > 1e-9:   # on the market's number, not the projection: the shift as the centre it stands for, in the stat's units
+        parts.append({"k": "cons", "t": "The books' consensus, on the market's number", "eff": round(cons_shift * sd / 0.4, 2), "i": i_cons})
     return {"proj": round(mu, 2), "sd": round(sd, 2), "med": round(centre, 2), "usg": (round(float(usg), 1) if usg is not None else None), "sdf": round(f_sd, 2),
             "starter": starter, "start_src": ctx.get("start_src"),
-            "pm": round(pm, 4), "pb": round(pb, 4), "p": round(p, 4), "push": round(push, 4),
+            "pm": round(pm, 4), "pb": round(pb, 4), "p": round(p, 4), "push": round(push, 4), "cons": (dict(cs, shift=round(cons_shift, 4)) if cs else None),
             "side": side, "chance": round(chance, 4), "price": price, "need": round(need, 4), "edge": round(edge, 4), "band": band,
             "mins": round(mins, 1), "rate36": round(rate * 36.0, 2), "base": round(rate0 * mins0, 2), "parts": parts, "why": why}, why
 
@@ -6046,8 +6120,7 @@ def make_nba_props(date_iso, out_dir, log, topup=False, sim_runs=NBA_SIM_RUNS):
     if nbasim and (led or prior):
         try:
             sim_prof = nbasim.profiles_from_ledger(led["games"] if led else [], date_iso, prior_games=prior["games"] if prior else None, tend=nba_load_tend(out_dir))
-            log("Simulation: %d clubs profiled; the matchup lever at %.1f weight on points, assists, threes and PRA, none on rebounds (measured); %s." % (
-                len(sim_prof["teams"]), PROPS_MATCH_ALPHA["pts"], ("each game played {:,} times, the runs attached to every prop".format(sim_runs)) if sim_runs else "the runs turned off (--runs 0)"))
+            log("Profiles: %d clubs; the matchup lever shown at no weight and the game's runs off the props (5 Nov 2026: both measured null on 4,800 graded props); the game script reads the spread, the books' consensus is the scored lever." % len(sim_prof["teams"]))
         except Exception as e:  # noqa: BLE001
             log("Simulation profiles could not be built (%s): no matchup lever today." % e)
 
@@ -6141,20 +6214,17 @@ def make_nba_props(date_iso, out_dir, log, topup=False, sim_runs=NBA_SIM_RUNS):
                "props": [], "unmatched": []}
         log("%s @ %s: %d props%s%s" % (away, home, len(props), (" · pace %.1f" % pace) if pace else "",
                                        "".join(" · %s out: %s" % (NBA_NICK.get(ab, ab), ", ".join("%s (%s)" % (n, ("%.0f mpg" % mpg) if mpg is not None else "no line") for n, mpg, _s in out[ab][1])) for ab in (aab, hab) if out[ab][1])))
-        # the game's simulation (26 Oct 2026): run once a game, attached to the row and, read for each prop, to the prop
-        gs = None
-        if sim_prof and sim_runs:
-            try:
-                gs = nba_props_game_sim(sim_prof, aab, hab, date_iso, sim_runs,
-                                        out={"away": props_out_sim_list(aab, injuries, logs_this, logs_last), "home": props_out_sim_list(hab, injuries, logs_this, logs_last)})
-            except Exception as e:  # noqa: BLE001
-                log("  the simulation failed for this game (%s); the props carry the matchup lever alone" % e)
-        if gs:
-            row["sim"] = gs
-            log("  sim, %s runs: %s %d (%d–%d) against %s a game by the ratings, %s %d (%d–%d) against %s; blowout of 15+ %.0f%%, overtime %.1f%%, %s possessions%s" % (
-                "{:,}".format(gs["runs"]), away, gs["away"]["median"], gs["away"]["p25"], gs["away"]["p75"], gs["away"]["ppg"], home, gs["home"]["median"], gs["home"]["p25"], gs["home"]["p75"], gs["home"]["ppg"],
-                100 * gs["blowout"], 100 * gs["ot"], gs["poss"],
-                "".join("; %s's regulars out: %+.1f per 100 on the offence" % (NBA_NICK.get(ab, ab), gs["out"][s]) for ab, s in ((aab, "away"), (hab, "home")) if gs["out"][s])))
+        # the market on the game (5 Nov 2026), in the simulation's place: each club's points implied by the book's total and spread
+        # against its points a game by the ratings, the spread's expected margin and blowout chance (the game script reads the margin)
+        def prof_ppg(ab):
+            t = (sim_prof or {}).get("teams", {}).get(ab)
+            return round(t["ortg"] * t["pace"] / 100.0, 1) if t and t.get("ortg") and t.get("pace") else None
+        script = props_spread_script(odds.get("sp")) if odds.get("sp") is not None else None
+        mk_a, mk_h = props_market_block(odds, False, prof_ppg(aab)), props_market_block(odds, True, prof_ppg(hab))
+        if mk_a and mk_h:
+            log("  the market: %s %.1f and %s %.1f implied by the total %s and the spread %s%s; the expected margin %.1f, a blowout of 15 or more %.0f%% of the time" % (
+                away, mk_a["tt"], home, mk_h["tt"], odds.get("total"), odds.get("sp"),
+                (" (the ratings' %s and %s a game)" % (mk_a["ppg"], mk_h["ppg"])) if mk_a.get("ppg") and mk_h.get("ppg") else "", script["emargin"], 100 * script["blowout"]))
         n_kal = 0
         for pr in props:
             pid, team, how = props_match_player(pr["name"], (aab, hab), logs_this, logs_last, rosters)
@@ -6176,7 +6246,8 @@ def make_nba_props(date_iso, out_dir, log, topup=False, sim_runs=NBA_SIM_RUNS):
                    "maybe": out[team][2], "pace": pace, "league_pace": league_pace, "home": team == hab, "pos": pos, "opp_nick": NBA_NICK.get(opp, opp),
                    "pace_team": pace_h if team == hab else pace_a, "pace_opp": pace_a if team == hab else pace_h, "match": club_match(team, opp, team == hab),
                    "usage": (usage_[0] if usage_ else None), "usage_src": (usage_[1] if usage_ else None), "starter": starter_, "start_src": start_src,
-                   "script": ({"emargin": gs.get("emargin"), "blowout": gs.get("blowout")} if gs and gs.get("emargin") is not None else None),   # the game script (30 Oct 2026)
+                   "script": script,   # the game script (30 Oct 2026), off the spread from 5 Nov 2026
+                   "cons": props_consensus(pr.get("books"), pr["line"]),   # the books' consensus (5 Nov 2026), the scored lever in the simulation's place
                    "dvp": dv, "htb": htb_line(htb, NBA_NICK.get(opp, opp), opp, pos, dmk) if pos else None,
                    "opp_out_mpg": out[opp][0], "opp_out_names": [(n, mpg, st) for n, mpg, st in out[opp][1] if mpg is not None and mpg >= PROPS_REGULAR_MPG],
                    "opp_out_c_mpg": outc[opp][0], "opp_out_c_names": outc[opp][1], "self_out": self_out}
@@ -6191,8 +6262,9 @@ def make_nba_props(date_iso, out_dir, log, topup=False, sim_runs=NBA_SIM_RUNS):
                 n_kal += 1
             if proj:
                 item.update(proj)
-                if gs:
-                    item["sim"] = nba_prop_sim_read(gs, team == hab, proj)
+                mk_ = mk_h if team == hab else mk_a
+                if mk_:
+                    item["mkt"] = mk_
             row["props"].append(item)
         if kal_players:
             log("  Kalshi: %d of %d props carry the crowd's ladder (points, rebounds, assists, threes and PRA; no two-stat combo market found on the exchange)" % (n_kal, len(row["props"])))
@@ -6207,7 +6279,8 @@ def make_nba_props(date_iso, out_dir, log, topup=False, sim_runs=NBA_SIM_RUNS):
     doc = {"format": PROPS_FORMAT, "version": 1, "date": date_iso, "generated": now_utc(), "source": "slate.py nba-props: The Odds API, the ledgers, ESPN, HashtagBasketball",
            "credits": credits_used, "games": games, "ledgers": ledgers,   # what the run read (23 Oct 2026): the page says so when nothing projects
            "method": {"anchor": PROPS_ANCHOR, "model": PROPS_MODEL_W, "side_shade": PROPS_SIDE_SHADE, "shade_tent": PROPS_SHADE_TENT, "script_per_point": PROPS_SCRIPT_PER_POINT, "script_base": PROPS_SCRIPT_BASE, "sd_k": PROPS_SD_K, "out_min_per30": PROPS_OUT_MIN_PER30, "out_rate_per30": PROPS_OUT_RATE_PER30, "dvp_weight": PROPS_DVP_WEIGHT, "dvp_shrink": PROPS_DVP_SHRINK,
-                      "match_alpha": PROPS_MATCH_ALPHA, "pace": "the game's possessions against the club's own", "usage_sd": PROPS_USAGE_SD, "role_sd": PROPS_ROLE_SD, "usage_cuts": PROPS_USAGE_CUTS, "thin_sd": PROPS_THIN_SD}}
+                      "match_alpha": PROPS_MATCH_ALPHA, "pace": "the game's possessions against the club's own", "usage_sd": PROPS_USAGE_SD, "role_sd": PROPS_ROLE_SD, "usage_cuts": PROPS_USAGE_CUTS, "thin_sd": PROPS_THIN_SD,
+                      "script_src": "the spread", "margin_sd": PROPS_MARGIN_SD, "cons_k": PROPS_CONS_K, "cons_cap": PROPS_CONS_CAP, "cons_min_books": PROPS_CONS_MIN_BOOKS, "sim": "off the props from 5 Nov 2026 (measured null)"}}
     path = os.path.join(out_dir, "nba-props-%s.json" % date_iso)
     with open(path, "w", encoding="utf-8") as f:
         json.dump(doc, f, indent=1)
@@ -7700,11 +7773,35 @@ def selftest():
     ctx_m.update({"pace_team": 103.0, "pace_opp": 99.0, "league_pace": 100.0, "match": {"f": 1.04, "ortg": 116.0, "drtg": 118.0, "lg": 114.0, "home": False, "b2b": True, "n": 12}})
     proj_m, why_m = props_project(prop_, lt["11"]["g"], ll["11"]["g"], ctx_m)
     parts_m = dict((p["k"], p) for p in proj_m["parts"])
-    check("props: the pace lever is the game's possessions against the club's own, the matchup lever the sim's efficiency to the half, each a part that sums to the projection with its why line",
-          abs(proj_m["proj"] - proj_["proj"] / 1.0204 * (102.0 / 103.0) * (1.04 ** 0.5)) < 0.05 and set(parts_m) == {"prior", "minutes", "out", "pace", "dvp", "match"}
-          and abs(proj_m["base"] + sum(parts_m[k]["eff"] for k in ("out", "pace", "dvp", "match")) - proj_m["proj"]) < 0.03 and parts_m["pace"]["eff"] < 0 and parts_m["match"]["eff"] > 0
+    check("props: the pace lever is the game's possessions against the club's own, a part that sums to the projection with its why line; the matchup lever is shown at no weight (5 Nov 2026), its why line saying so, and no part carries it",
+          abs(proj_m["proj"] - proj_["proj"] / 1.0204 * (102.0 / 103.0)) < 0.05 and set(parts_m) == {"prior", "minutes", "out", "pace", "dvp"}
+          and abs(proj_m["base"] + sum(parts_m[k]["eff"] for k in ("out", "pace", "dvp")) - proj_m["proj"]) < 0.03 and parts_m["pace"]["eff"] < 0
           and why_m[parts_m["pace"]["i"]] == "the game's pace 102.0 (their 103.0, Lakers's 99.0, the league's 100.0) against their own: x0.990"
-          and why_m[parts_m["match"]["i"]] == "the matchup, from the simulation's profiles: 116.0 per 100 into Lakers's 118.0 defence (league 114.0, on the road, on a back to back): x1.020 on the efficiency, at 0.5 weight, measured")
+          and any(w.startswith("the matchup, from the profiles: 116.0 per 100 into Lakers's 118.0 defence (league 114.0, on the road, on a back to back): x1.040 on the efficiency, shown, not scored") for w in why_m)
+          and all(PROPS_MATCH_ALPHA[m] == 0.0 for m in PROPS_MATCH_ALPHA))
+    # the simulation off the props (5 Nov 2026): the game script off the spread, the books' consensus the scored lever in its place, the market block on the prop
+    sc_s = props_spread_script(-12.5)
+    check("props: the game script reads the spread: a 12.5-point number expects a 14.6 margin and a blowout 43% of the time, a pick 10.0 and 23%, and a starter's minutes read against the season's base",
+          abs(sc_s["emargin"] - 14.6) < 0.06 and abs(sc_s["blowout"] - 0.435) < 0.003 and sc_s["src"] == "the spread" and abs(props_spread_script(0)["emargin"] - 10.0) < 0.06 and abs(props_spread_script("0")["blowout"] - 0.230) < 0.003
+          and props_spread_script(None) is None and props_spread_script("x") is None and abs(PROPS_SCRIPT_BASE - 11.8) < 1e-9)
+    ctx_s = dict(ctx_m); ctx_s.update({"starter": True, "script": sc_s})
+    proj_s, why_s = props_project(prop_, lt["11"]["g"], ll["11"]["g"], ctx_s)
+    check("props: a starter's minutes follow the spread's expected margin at the measured 0.187 a point (14.6 against 11.8: -0.5 minutes), the why line naming the spread, the part on the projection",
+          abs(proj_s["mins"] - (proj_m["mins"] - 0.187 * (14.6 - 11.8))) < 0.06 and any(w.startswith("the game script: the spread's expected margin 14.6 against the season's 11.8 (a blowout of 15 or more 44% of the time), so a starter's minutes read -0.5") for w in why_s)
+          and "script" in dict((p["k"], p) for p in proj_s["parts"]) and dict((p["k"], p) for p in proj_s["parts"])["script"]["eff"] < 0)
+    cons_ = props_consensus({"fanduel": [26.5, -112, -118], "betmgm": [27.5, 105, -140], "draftkings": [26.5, -108, -118], "pinnacle": [26.5, -115, -115], "bovada": [None, None, None]}, 27.5)
+    check("props: the books' consensus is the median line across the books posting one, with Pinnacle's own and the carded line's gap; fewer than three books give nothing",
+          cons_ == {"line": 26.5, "n": 4, "gap": -1.0, "pin": 26.5} and props_consensus({"fanduel": [26.5, -112, -118], "betmgm": [27.5, 105, -140]}, 27.5) is None and props_consensus(None, 27.5) is None
+          and props_consensus({"a": [20.5, -110, -110], "b": [21.5, -110, -110], "c": [22.5, -110, -110], "d": [23.5, -110, -110]}, 22.5) == {"line": 22.0, "n": 4, "gap": -0.5, "pin": None})
+    ctx_c = dict(ctx_m); ctx_c["cons"] = {"line": 31.5, "n": 4, "gap": 1.0, "pin": 31.5}
+    proj_c, why_c = props_project(prop_, lt["11"]["g"], ll["11"]["g"], ctx_c)
+    parts_c = dict((p["k"], p) for p in proj_c["parts"])
+    check("props: the consensus a point above the carded line lifts the book's over chance by 0.11 of a point a sigma (about one point here), a part on the market's number says so, the why line names the books, and the file carries the block with the shift",
+          abs((proj_c["pb"] - proj_m["pb"]) - 0.11 * 1.0 / proj_m["sd"]) < 0.0015 and proj_c["proj"] == proj_m["proj"] and proj_c["p"] > proj_m["p"] and "cons" in parts_c and parts_c["cons"]["eff"] > 0
+          and abs(parts_c["cons"]["eff"] - 0.11 * 1.0 / proj_m["sd"] * proj_m["sd"] / 0.4) < 0.02 and proj_c["cons"]["line"] == 31.5 and proj_c["cons"]["n"] == 4 and abs(proj_c["cons"]["shift"] - 0.11 / proj_m["sd"]) < 0.0015
+          and why_c[parts_c["cons"]["i"]].startswith("the books' consensus 31.5 across 4 books (Pinnacle 31.5) against fanatics's 30.5: the over read +1.0 points on the book's chance")
+          and proj_m["cons"] is None and props_market_block({"total": 222.5, "sp": -12.5}, True, 115.4) == {"tt": 117.5, "ppg": 115.4, "f": 1.018, "em": 14.6, "blow": 0.435}
+          and props_market_block({"total": 222.5, "sp": -12.5}, False, None)["tt"] == 105.0 and props_market_block({"total": None, "sp": -12.5}, True, 115.4) is None)
     # his usage and his role narrow or widen the miss (26 Oct 2026): the sigma's factor, the why line, the role from RotoWire's five
     ctx_u = dict(ctx_m)
     ctx_u.update({"usage": 31.0, "usage_src": "this season", "starter": True, "start_src": "RotoWire's confirmed five"})

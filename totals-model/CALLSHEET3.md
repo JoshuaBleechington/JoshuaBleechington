@@ -2612,3 +2612,82 @@ that the slate has no player series left. The harness reads a prop that
 still carries a ladder with no crowd line and no crowd tile, the panel
 and the strip without the crowd's matchup line while the NBA card's row
 carries it, and the example's best list at the new blend.
+
+## Recent form shown, three levers measured and left off, 5 Nov 2026
+
+The user, after the realignment: "What would have helped the model be
+able to see those picks as likely to go over instead of under and would
+have been wins?" Then: "Go ahead and make the adjustment and triple the
+results to make sure everything is aligned correctly and no issues."
+
+**What the box said afterwards** on the 35 losing unders of 4 Nov: minutes
+over his usual on 16, hot shooting on 10, shots over his usual on 8, a
+blowout on 1. Bam Adebayo played 41 minutes against his usual 33, took 24
+shots against his usual 19 and hit 14 of 20. In-game variance, unreadable
+before tip.
+
+**The signals on the sheet before tip** (`lab/props_signals.py`): the
+book's own price lean, the books' consensus, his last 3 and last 5
+against the line, the share of his last 10 over it, the minutes trend,
+the opponent's and his own club's regulars out, the total, the spread, home
+or road, the simulation's read, the model's own chance, Kalshi's crowd.
+On the 64 BET unders of 4 Nov (29-35) one separated the losers from the
+winners: his last three games averaging over the line, on 14 of the 35
+losers against 4 of the 29 winners. Across every graded prop with a log
+(5,647, 28 Oct to 4 Nov) it moves the outcome beyond the book's price:
+the over landed 6.7 points under the book's chance where his last three
+had averaged half a sigma or more under the line, 3.7 a little under, 4.1
+about on it, 3.3 a little over, and 0.2 under it where they had averaged
+half a sigma or more over. Two more turned up pointing under: a club
+favoured by 5 to 10 lands over 43% against the book's 49% (both halves of
+the nights; starters on favourites of 7 or more play 1.5 minutes under
+their projection), and when his last five games' minutes run above his
+season the projection takes the spike at face value and he plays 1.7
+minutes under it (1.6 to 3.1 over it when they run below).
+
+**The three levers, measured twice walk-forward** (`lab/props_levers3.py`,
+`lab/props_bookside.py`): each lever's size fitted by least squares on
+the nights before each night and applied to that night, from the fourth
+night on, first as a push on the projection in the stat's units (form:
+the gap between his last three games' per-36 and his rate, at his
+minutes; the favourite: his club's spread on the projection; the minutes
+shrink: a share of the minutes part taken off), then as a correction on
+the book's chance where the consensus lever lives (capped at six points).
+The BET band at the shipped blend, 12 nights:
+
+| Lever | As a push on the projection | As a correction on the book's chance |
+|---|---|---|
+| none | 133-97, +8.0 units | 132-97, +7.4 |
+| recent form | 160-120, +4.7 | 166-125, +6.6 |
+| the favourite's script | 128-95, +6.0 | 139-106, +5.3 |
+| the minutes shrink | 136-101, +6.1 | 136-111, −3.9 |
+| all three | 164-123, +4.9 | 201-165, −5.9 |
+
+Says against does did not improve on any of them (61.0 against 57.8
+without, 57.1 to 54.9 with); the model's side where it stands 20 points
+from the book landed 52.1% without the levers and 52.4% with all three;
+the model's own Brier moved from 0.2632 to 0.2628 with the minutes
+shrink and nowhere with the others. In sample the form push over-corrects
+(the hot bucket's say-so goes from 47.6% to 54.5% against a landed
+46.5%): the model's projection already carries most of his form, and what
+the bucket table had found was the book's line lagging it, which the blend
+inherits at four parts in five. Seven nights of logs are too few to size
+that correction, and the walk-forward says the first attempt loses money.
+The minutes slope came out at −1.95, full reversion and beyond, which is
+not a model, and the favourite's at a tenth of what the bucket table
+shows, so the residual regression is swamped by the big-stat markets. None
+of the three goes on the sheet. The shade is the lesson: a measured lean
+bolted on in sample lost out of sample.
+
+**What changed.** Recent form rides on the props as a line of its own,
+shown, not scored: `props_form` on the slate (his last three games with
+the stat, how many over the line, on it, their mean; `form` on every
+prop, kept through the trim), a why line that says it is shown and why,
+and on the page `propForm` (the slate's block, or the log a file from
+before carries), `propFormAgrees` (with the pick when two of the three
+landed its side, against it when two landed the other, split otherwise),
+the line on the best card and the panel in green or red, and the record
+tile's own line, "his last three with the pick W-L · against it W-L
+(shown, not scored)", with two tiles on the Props tab. The selftest reads
+the form block and the why line; the harness reads the line on George's
+card and panel with its colour and the why line. Nothing scored changed.

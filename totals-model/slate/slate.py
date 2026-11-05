@@ -4998,6 +4998,17 @@ PROPS_OPP_C_MARKETS = ("reb", "pra", "pr", "ra")                              # 
 PROPS_PRIOR_CAP = 1000.0
 PROPS_PRIOR_SHARE = 0.5
 PROPS_LAST_N = 5
+# recent form (5 Nov 2026, the user: "what would have helped the model see those picks as likely to go over?"): his last
+# three games against the line. On the 5,647 graded props with a log (28 Oct to 4 Nov) the over landed 6.7 points under the
+# book's chance where his last three had averaged half a sigma or more under the line, and on the book's number where they had
+# averaged half a sigma or more over it; on 4 Nov it had pointed over on 14 of the 35 losing unders against 4 of the 29 that
+# won. SHOWN, NOT SCORED: read as a push on the projection (a slope fitted on the nights before, applied to the next) the BET
+# band went 160-120 against 133-97 without it, and read as a correction on the book's chance 166-125 against 132-97; seven
+# nights of logs are too few to size it, so it rides on the card, the panel and the record tile's own line until the record
+# says otherwise. The favourite's script (a club favoured by 5 to 10 lands over 43% against the book's 49%) and a shrink of the
+# last five games' minutes toward the season (a minutes spike reverses) were measured the same two ways the same day and did
+# not help the bet either (128-95 and 136-101 as pushes; 139-106 and 136-111 on the book's chance): on record, not on the sheet
+PROPS_FORM_N = 3
 PROPS_MIN_MINUTES = 60.0
 PROPS_REGULAR_MPG = 24.0
 PROPS_PLAYER_MIN_GAMES = 3
@@ -5143,6 +5154,17 @@ def props_consensus(books, line):
     n = len(lines)
     med = lines[n // 2] if n % 2 else (lines[n // 2 - 1] + lines[n // 2]) / 2.0
     return {"line": med, "n": n, "gap": round(med - float(line), 2), "pin": pin}
+
+
+def props_form(logs, mk, line):
+    """His last PROPS_FORM_N games with the stat against the line (5 Nov 2026): the numbers, how many landed over it, on it,
+    and their mean; None under three games. Shown, not scored."""
+    vals = [props_stat(g, mk) for g in (logs or []) if g.get("min") and g["min"] > 0]
+    vals = [float(v) for v in vals if v is not None][-PROPS_FORM_N:]
+    if len(vals) < PROPS_FORM_N:
+        return None
+    line = float(line)
+    return {"vals": [int(v) if v == int(v) else v for v in vals], "over": sum(1 for v in vals if v > line), "on": sum(1 for v in vals if v == line), "avg": round(sum(vals) / len(vals), 1)}
 
 
 def props_market_block(odds, home_side, ppg):
@@ -5957,6 +5979,11 @@ def props_project(prop, logs_this, logs_last, ctx):
         pb = min(max(pb + cons_shift, 0.02), 0.98)
         why.append("the books' consensus %g across %d books%s against %s's %g: the over read %+.1f points on the book's chance (the truth sat about half way toward the consensus on the 872 carded lines off it, 27 Oct to 2 Nov 2026: the over +6.7 points above its market's rate when the others sat above the carded line, the under +3.8 when below; scored at half that, capped at six)" % (
             float(cs["line"]), int(cs["n"]), (" (Pinnacle %g)" % float(cs["pin"])) if cs.get("pin") is not None else "", prop.get("book") or "the book", line, 100 * cons_shift))
+    # recent form (5 Nov 2026): his last three against the line, shown, not scored
+    fm = props_form(logs_this, mk, line)
+    if fm:
+        why.append("his last %d games: %s against %g (%d of %d over%s): shown, not scored (5 Nov 2026: read as a push on the projection or on the book's chance it did not help the bet walk-forward on seven nights of logs; its own line on the record tile is the measure)" % (
+            PROPS_FORM_N, ", ".join("%g" % v for v in fm["vals"]), line, fm["over"], PROPS_FORM_N, (", %d on it" % fm["on"]) if fm["on"] else ""))
     p = props_blend(pb, pm_c)
     side = "OVER" if p >= 0.5 else "UNDER"
     chance = p if side == "OVER" else 1.0 - p
@@ -6002,7 +6029,7 @@ def props_project(prop, logs_this, logs_last, ctx):
         parts.append({"k": "cons", "t": "The books' consensus, on the market's number", "eff": round(cons_shift * sd / 0.4, 2), "i": i_cons})
     return {"proj": round(mu, 2), "sd": round(sd, 2), "med": round(centre, 2), "usg": (round(float(usg), 1) if usg is not None else None), "sdf": round(f_sd, 2),
             "starter": starter, "start_src": ctx.get("start_src"),
-            "pm": round(pm, 4), "pb": round(pb, 4), "p": round(p, 4), "push": round(push, 4), "cons": (dict(cs, shift=round(cons_shift, 4)) if cs else None),
+            "pm": round(pm, 4), "pb": round(pb, 4), "p": round(p, 4), "push": round(push, 4), "cons": (dict(cs, shift=round(cons_shift, 4)) if cs else None), "form": fm,
             "side": side, "chance": round(chance, 4), "price": price, "need": round(need, 4), "edge": round(edge, 4), "band": band,
             "mins": round(mins, 1), "rate36": round(rate * 36.0, 2), "base": round(rate0 * mins0, 2), "parts": parts, "why": why}, why
 
@@ -6230,7 +6257,8 @@ def make_nba_props(date_iso, out_dir, log, topup=False, sim_runs=NBA_SIM_RUNS):
            "method": {"anchor": PROPS_ANCHOR, "model": PROPS_MODEL_W, "side_shade": PROPS_SIDE_SHADE, "shade_tent": PROPS_SHADE_TENT, "script_per_point": PROPS_SCRIPT_PER_POINT, "script_base": PROPS_SCRIPT_BASE, "sd_k": PROPS_SD_K, "out_min_per30": PROPS_OUT_MIN_PER30, "out_rate_per30": PROPS_OUT_RATE_PER30, "dvp_weight": PROPS_DVP_WEIGHT, "dvp_shrink": PROPS_DVP_SHRINK,
                       "match_alpha": PROPS_MATCH_ALPHA, "pace": "the game's possessions against the club's own", "usage_sd": PROPS_USAGE_SD, "role_sd": PROPS_ROLE_SD, "usage_cuts": PROPS_USAGE_CUTS, "thin_sd": PROPS_THIN_SD,
                       "script_src": "the spread", "margin_sd": PROPS_MARGIN_SD, "cons_k": PROPS_CONS_K, "cons_cap": PROPS_CONS_CAP, "cons_min_books": PROPS_CONS_MIN_BOOKS, "sim": "off the props from 5 Nov 2026 (measured null)",
-                      "shade": "off from 5 Nov 2026 (it had called the under on four props in five)", "kalshi": "off the props from 5 Nov 2026"}}
+                      "shade": "off from 5 Nov 2026 (it had called the under on four props in five)", "kalshi": "off the props from 5 Nov 2026",
+                      "form_n": PROPS_FORM_N, "form": "shown, not scored (5 Nov 2026): his last three against the line, on its own record line"}}
     path = os.path.join(out_dir, "nba-props-%s.json" % date_iso)
     with open(path, "w", encoding="utf-8") as f:
         json.dump(doc, f, indent=1)
@@ -7783,6 +7811,14 @@ def selftest():
           and any(w == ctx_["htb"] for w in why_)
           and any(w.startswith("home 30.9 / road 31.0 per 36 over 178 minutes: shown, not scored") and w.endswith("; tonight on the road") for w in why_)
           and any(w == "projected 34.5 against points 30.5, one sigma 11.5, the chance read around the median 33.6 (the stat skews right: at the mean the over lands 47% of the time): the over 60.5% by the projection, 50.0% by the book's prices; blended 52.1% at 4 to 1.0, the market the spine and the model 20% of the say (5 Nov 2026: the over's shade is off, it had called the under on four props in five; the model's lean reads at its extremes, which is where the BET band fires)" for w in why_))
+    # recent form (5 Nov 2026): his last three against the line on the prop, shown, not scored
+    fm_ = props_form(lt["11"]["g"], "pts", 30.5)
+    check("props: recent form is his last three games with the stat against the line, shown on the prop and in a why line, not scored; under three games there is none",
+          fm_ is not None and len(fm_["vals"]) == 3 and fm_["over"] == sum(1 for v in fm_["vals"] if v > 30.5) and fm_["on"] == sum(1 for v in fm_["vals"] if v == 30.5) and abs(fm_["avg"] - sum(fm_["vals"]) / 3.0) < 0.06
+          and proj_["form"] == fm_ and fm_["vals"] == [g["pts"] for g in lt["11"]["g"]] and fm_["vals"][-1] == 35
+          and props_form([], "pts", 30.5) is None and props_form(lt["11"]["g"][:2], "pts", 30.5) is None and props_form(lt["11"]["g"], "reb", 7.5)["vals"] == [g["reb"] for g in lt["11"]["g"]]
+          and any(w.startswith("his last 3 games: %s against 30.5 (%d of 3 over): shown, not scored" % (", ".join("%g" % v for v in fm_["vals"]), fm_["over"])) for w in why_)
+          and PROPS_FORM_N == 3)
     # the opponent's absences (28 Oct 2026): named on every prop, scored on a big man's rebounds when their centre sits
     ctx_o = dict(ctx_m)
     ctx_o.update({"opp_out_mpg": 62.0, "opp_out_names": [("Anthony Davis", 34.0, "Out"), ("Austin Reaves", 28.0, "Out")], "opp_out_c_mpg": 34.0, "opp_out_c_names": [("Anthony Davis", 34.0)]})

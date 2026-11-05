@@ -568,6 +568,9 @@ const CHECKS = ["dome","playoff"];
     card.click(); await wait();
     const open = !dlg.hidden, text = document.getElementById('propDetailBody').innerText.replace(/\s+/g, ' ').trim();
     const tiles = [...dlg.querySelectorAll('.pd-tiles .pd-tile .k')].map(e => e.textContent);
+    // recent form (5 Nov 2026): his last three against the line on the card and the panel, shown, not scored
+    const formCard = ((card.querySelector('.n5.formline') || {}).textContent || ''), formCardCls = ((card.querySelector('.n5.formline') || {}).className || ''), formPanel = ((dlg.querySelector('.pd-form') || {}).textContent || '').replace(/\s+/g, ' ').trim(), formPanelCls = ((dlg.querySelector('.pd-form') || {}).className || '');
+    const formWhy = ([...dlg.querySelectorAll('ul.pd-why li')].map(e => e.textContent.replace(/\s+/g, ' ').trim()).find(t => /^his last 3 games/.test(t)) || '');
     // the simulation on the prop (26 Oct 2026): six tiles of its own under What moves it, and the paragraph that says what was scored
     const simTiles = [...dlg.querySelectorAll('.pd-simtiles .pd-tile')].map(e => e.querySelector('.k').textContent + '=' + e.querySelector('.v').textContent + '|' + ((e.querySelector('.s') || {}).textContent || '') + '|' + e.className);
     const simText = ((dlg.querySelector('.pd-sim') || {}).innerText || '').replace(/\s+/g, ' ').trim(), simBeforeWhy = (() => { const s = dlg.querySelector('.pd-sim'); let n = s && s.nextElementSibling; return !!(n && /^H4$/i.test(n.tagName) && /^Why/.test(n.textContent)); })();
@@ -601,8 +604,13 @@ const CHECKS = ["dome","playoff"];
     const nextOffLast = document.getElementById('propDetailNext').disabled, posLast = document.getElementById('propDetailPos').textContent;
     document.getElementById('propDetailClose').click(); await wait(); document.getElementById('m-nba').click(); await wait();
     return { hidden0, open, text: text.slice(0, 3200), tiles, simTiles, simText, simBeforeWhy, marks, books, carded, fromCardPos, noscroll, closedEsc, closedBtn, closedSport, levers, base, boldWhy, againstWhy, whyHead, boldTags, cardLever,
-             n: trs.length, rowNames, rowOpen, name0, pos0, prevOff0, navShown, name1, pos1, prevOff1, name2, name1b, nextOffLast, posLast };
+             n: trs.length, rowNames, rowOpen, name0, pos0, prevOff0, navShown, name1, pos1, prevOff1, name2, name1b, nextOffLast, posLast, formCard, formCardCls, formPanel, formPanelCls, formWhy };
   });
+  chk(/^His last 3: \d+ · \d+ · \d+ against 2\.5 · [0-3] of 3 over(, [1-3] on it)?(, with the UNDER|, against the UNDER|, split)$/.test(propsDlg.formCard) && /^n5 formline( pos| neg)?$/.test(propsDlg.formCardCls)
+      && ((/, with the UNDER$/.test(propsDlg.formCard) && /formline pos$/.test(propsDlg.formCardCls)) || (/, against the UNDER$/.test(propsDlg.formCard) && /formline neg$/.test(propsDlg.formCardCls)) || (/, split$/.test(propsDlg.formCard) && propsDlg.formCardCls === 'n5 formline'))
+      && propsDlg.formPanel.indexOf(propsDlg.formCard) === 0 && /· shown, not scored: it did not help the bet as a lever walk-forward \(5 Nov 2026\), so it is measured on the record tile's own line$/.test(propsDlg.formPanel) && propsDlg.formPanelCls.replace('note ', '').replace('pd-form', 'n5 formline') === propsDlg.formCardCls
+      && /^his last 3 games: \d+, \d+, \d+ against 2\.5 \([0-3] of 3 over(, [1-3] on it)?\): shown, not scored \(5 Nov 2026: read as a push on the projection or on the book's chance it did not help the bet walk-forward on seven nights of logs; its own line on the record tile is the measure\)/.test(propsDlg.formWhy),
+      'props detail: recent form (5 Nov 2026) reads his last three games against the line on George\'s card and his panel, green with the pick and red against it, split when neither side has two, with the why line saying it is shown, not scored', JSON.stringify({ card: propsDlg.formCard, cls: propsDlg.formCardCls, panel: propsDlg.formPanel, pcls: propsDlg.formPanelCls, why: propsDlg.formWhy }));
   chk(propsDlg.simTiles.length === 4 && /^The books=2\.5\|3 post it · fanatics 2\.5, with them\|pd-tile$/.test(propsDlg.simTiles[0]) && /^PHI points=113\|implied by the book's total and spread · 112\.9 a game by the ratings \(×1\.001, shown: measured null as a lever\)\|pd-tile$/.test(propsDlg.simTiles[1])
       && /^Expected margin=10\.9\|off the spread · a starter's minutes follow it \(the game script, scored\)\|pd-tile$/.test(propsDlg.simTiles[2]) && /^Blowout=27%\|15 or more either way, off the spread\|pd-tile$/.test(propsDlg.simTiles[3])
       && /^THE MARKET ON THIS GAME · the books' numbers in the simulation's old place; the consensus is the scored part /i.test(propsDlg.simText) && /The simulation came off the props on 5 Nov 2026/.test(propsDlg.simText)

@@ -94,6 +94,33 @@
     if (c.shift) s += ' · the book\'s chance read ' + sgn(100 * c.shift, 1) + ' on the over, measured';
     return s;
   }
+  /* recent form (5 Nov 2026, the user: "what would have helped the model see those picks as likely to go over?"): his last
+     three games with the stat against the line, from the slate's form block or the log a file from before carries. On the
+     5,647 graded props with a log the over landed 6.7 points under the book's chance where his last three had averaged half a
+     sigma or more under the line, and on the book's number where they had averaged over it; on 4 Nov it pointed over on 14 of
+     the 35 losing unders against 4 of the 29 that won. Read as a lever, as a push on the projection or as a correction on the
+     book's chance, it did not help the BET band walk-forward on seven nights of logs, so it is SHOWN, NOT SCORED, on the card,
+     the panel and the record tile's own line */
+  var PROPS_FORM_N = 3;
+  function propForm(r) {
+    if (r && r.form && r.form.vals && r.form.vals.length) return { vals: r.form.vals.map(Number), over: +r.form.over, on: +(r.form.on || 0), avg: +r.form.avg, n: r.form.vals.length };
+    if (!r || r.line === null || r.line === undefined || isNaN(+r.line)) return null;
+    var vals = (r.log || []).filter(function (g) { return g[3] && +g[3] > 0 && g[4] !== null && g[4] !== undefined && g[4] !== "" && !isNaN(+g[4]); }).map(function (g) { return +g[4]; }).slice(-PROPS_FORM_N);
+    if (vals.length < PROPS_FORM_N) return null;
+    var line = +r.line;
+    return { vals: vals, over: vals.filter(function (v) { return v > line; }).length, on: vals.filter(function (v) { return v === line; }).length, avg: Math.round(vals.reduce(function (a, b) { return a + b; }, 0) / vals.length * 10) / 10, n: vals.length };
+  }
+  function propFormAgrees(r) {
+    var f = propForm(r); if (!f || !propHas(r)) return null;
+    var under = f.n - f.over - f.on, mine = r.side === "OVER" ? f.over : under, theirs = r.side === "OVER" ? under : f.over;
+    return mine >= 2 ? true : theirs >= 2 ? false : null;
+  }
+  function propFormLine(r) {
+    var f = propForm(r); if (!f) return "";
+    var ag = propFormAgrees(r);
+    return 'His last ' + f.n + ': <b>' + f.vals.map(function (v) { return esc(String(v)); }).join(" · ") + '</b> against ' + esc(String(r.line)) + ' · ' + f.over + ' of ' + f.n + ' over' + (f.on ? ', ' + f.on + ' on it' : '') +
+           (ag === true ? ', with the ' + esc(r.side) : ag === false ? ', against the ' + esc(r.side) : propHas(r) ? ', split' : '');
+  }
   function propsMarketHtml(r, tile) {
     var m = r.mkt || null, c = propCons(r), club = r.team || "his club";
     if (!m && !c) return "";
@@ -649,6 +676,7 @@
     var all = mk(), byMk = {}, byBand = {}, bySide = {}, byEdge = {}, byChance = {}, byDate = {}, byDateBet = {}, byDateTake = {}, byCentre = {}, byTake = mk();
     /* the same-game pairs' record (26 Oct 2026): each graded date's tickets as the night built them, a ticket won when both legs did */
     var byPair = mk(), byPairTake = mk(), pairDates = {}, byCons = { toward: mk(), against: mk() };   // the books' consensus's own line (5 Nov 2026): the picks it sided with and the ones it stood against, half a point or more
+    var byForm = { toward: mk(), against: mk() };   // recent form's own line (5 Nov 2026): the picks his last three sided with (two of three or more) and the ones they stood against; shown, not scored
     graded.forEach(function (r) { if (r.gdate) pairDates[r.gdate] = true; });
     var pairSink = function (s) { return function (t) {
       var res = propsPairRes(t); if (!res) return;
@@ -666,6 +694,7 @@
       if (r.band === "BET") sinks.push(byDateBet[d] || (byDateBet[d] = mk()));
       if (r.take) { sinks.push(byTake); sinks.push(byDateTake[d] || (byDateTake[d] = mk())); }   // the props marked as taken (26 Oct 2026), and by night (3 Nov 2026)
       var cg = propShopGap(r); if (cg !== null && Math.abs(cg) >= 0.5) sinks.push(cg > 0 ? byCons.toward : byCons.against);
+      var fa = propFormAgrees(r); if (fa !== null) sinks.push(fa ? byForm.toward : byForm.against);
       sinks.forEach(function (s) {
         if (r.result === "void") { s.v++; return; }
         if (r.result === "push") { s.p++; return; }
@@ -696,11 +725,13 @@
     if (byPair.n || byPair.p) parts.push("same-game pairs " + rec(byPair) + (byPair.n ? " " + sgn(byPair.units, 1) + "u" : ""));
     if (byPairTake.n || byPairTake.p) parts.push("pairs taken " + rec(byPairTake) + (byPairTake.n ? " " + sgn(byPairTake.units, 1) + "u" : ""));
     if (byCons.toward.n || byCons.against.n) parts.push("the books' consensus with the pick " + rec(byCons.toward) + (byCons.toward.n ? " " + sgn(byCons.toward.units, 1) + "u" : "") + " · against it " + rec(byCons.against) + (byCons.against.n ? " " + sgn(byCons.against.units, 1) + "u" : ""));
+    if (byForm.toward.n || byForm.against.n) parts.push("his last three with the pick " + rec(byForm.toward) + (byForm.toward.n ? " " + sgn(byForm.toward.units, 1) + "u" : "") + " · against it " + rec(byForm.against) + (byForm.against.n ? " " + sgn(byForm.against.units, 1) + "u" : "") + " (shown, not scored)");
     var markets = PROPS_ORDER.map(function (k) { return byMk[k] ? tile(PROPS_LABEL[k], byMk[k], []) : ""; }).join("");
     var verdict = 'The props are a priori: the pooled rules behind them were measured on last season\'s box scores. Read the BET band against the rest and <i>does</i> against <i>says</i>; under 100 graded props nothing here is a reading. ' +
                   'Measured on the first ten nights (30 Oct 2026, 4,321 graded props): the model\'s own lean added nothing to the book\'s price (the best weight on it was none; where it stood ten points from Pinnacle the outcome followed Pinnacle), the over\'s shade is real (the under landed 53.2% at prices saying 50.7%), and a starter\'s minutes follow the game script. From the 30th the sheet runs with the market as its spine (the model at a ninth, the over read 2.5 points lower) and the game script on starters\' minutes; the nights before carry the old weights. ' +
                   'From 2 Nov the over\'s shade is by market, measured on the 6,216 graded props of the first thirteen nights (1.5 points on rebounds, 4 on points, assists and threes, 5.5 on the combinations), in full at a coin-flip price and fading past it, and the bands follow it: replayed on those nights the BET and LEAN unders read 1,345-1,072 (+91 units) where the sheet as it stood had 477-414 (−9) and had left the money in no edge; every over at the carded price went 2,832-3,384 (−875). ' +
-                  'From 5 Nov the shade is OFF and the model has a fifth of the say instead of a ninth: with the shade in, the book\'s price less the shade was the pick and the sheet called the under on four props in five from 30 Oct (on 4 Nov every BET and LEAN an under, 257-272, −50 units; the shade\'s BET band 83-85 over its life). Replayed on the 8,676 graded props of the fifteen nights to 4 Nov, the new blend\'s BET band read 146-106 (+10.6 units, 52-34 then 94-72 in the two halves, eight nights of fifteen up; 1,000 bootstrap draws of the nights put it above water 71% of the time) where a ninth with no shade left two BETs a night and the old 2.0 read 53% and −42; the LEAN band read 51.6% and is not an edge. The nights before carry their own weights; the record decides.';
+                  'From 5 Nov the shade is OFF and the model has a fifth of the say instead of a ninth: with the shade in, the book\'s price less the shade was the pick and the sheet called the under on four props in five from 30 Oct (on 4 Nov every BET and LEAN an under, 257-272, −50 units; the shade\'s BET band 83-85 over its life). Replayed on the 8,676 graded props of the fifteen nights to 4 Nov, the new blend\'s BET band read 146-106 (+10.6 units, 52-34 then 94-72 in the two halves, eight nights of fifteen up; 1,000 bootstrap draws of the nights put it above water 71% of the time) where a ninth with no shade left two BETs a night and the old 2.0 read 53% and −42; the LEAN band read 51.6% and is not an edge. The nights before carry their own weights; the record decides. ' +
+                  'The same day three more levers were measured walk-forward, each fitted on the nights before and scored on the next, as pushes on the projection and as corrections on the book\'s chance, and none helped the bet: recent form (his last three against the line), the favourite\'s script (a club favoured by 5 to 10 lands over 43% against the book\'s 49%) and a shrink of the last five games\' minutes toward the season (a minutes spike reverses). Recent form rides on the cards and the panel as a line of its own, shown, not scored, with its record here; the other two are on record in CALLSHEET3.md.';
     if (!full) {
       var h = '<div class="subhead" data-sport="PROPS">NBA player props <span class="tag">' + graded.length + ' graded · the slate\'s call as made, at the price posted · says is the blended chance</span></div>';
       h += '<div class="calib" data-sport="PROPS">' + tile("Every prop with a side", all, parts) + markets + '</div>';
@@ -714,6 +745,8 @@
     if (byPair.n || byPair.p) h2 += tile("Same-game pairs, at the parlay price", byPair, []);
     if (byCons.toward.n || byCons.toward.p) h2 += tile("The books' consensus with the pick, half a point or more", byCons.toward, []);
     if (byCons.against.n || byCons.against.p) h2 += tile("The books' consensus against the pick", byCons.against, []);
+    if (byForm.toward.n || byForm.toward.p) h2 += tile("His last three with the pick (shown, not scored)", byForm.toward, []);
+    if (byForm.against.n || byForm.against.p) h2 += tile("His last three against the pick (shown, not scored)", byForm.against, []);
     h2 += '</div>';
     h2 += '<div class="subhead">By market</div><div class="calib" data-sport="PROPS-MK">' + markets + '</div>';
     h2 += '<div class="subhead">By the edge the sheet claimed <span class="tag">the chance less what the price needs</span></div><div class="calib" data-sport="PROPS-EDGE">' +
@@ -876,6 +909,7 @@
         tile("Per 36", esc(String(r.rate36)), esc(lab) + " per 36 minutes") +
         (r.usg !== null && r.usg !== undefined ? tile("Usage", esc(String(r.usg)) + "%", "of his club's possessions while on; " + (r.starter === true ? "a starter" : r.starter === false ? "off the bench" : "role unknown") + (r.sdf && r.sdf !== 1 ? ", the miss read at " + esc(String(r.sdf)) + " sigmas (measured)" : "")) : "") +
         '</div>';
+      if (propFormLine(r)) h += '<p class="note pd-form' + (propFormAgrees(r) === true ? ' pos' : propFormAgrees(r) === false ? ' neg' : '') + '">' + propFormLine(r) + ' <span class="dim">· shown, not scored: it did not help the bet as a lever walk-forward (5 Nov 2026), so it is measured on the record tile\'s own line</span></p>';
       /* the floors (26 Oct 2026): the number he clears 95, 90 and 80% of nights by the model, and his other markets' 95% floors tonight */
       var f95 = propFloor(r, 95), f90 = propFloor(r, 90), f80 = propFloor(r, 80);
       if (f95 || f90 || f80) {
@@ -1009,6 +1043,7 @@
         (propsLeversLine(r) ? '<div class="n5">Moves it: ' + propsLeversLine(r) + '</div>' : '') +
         (propShopLine(r) ? '<div class="n5 shopline' + (propShopAgrees(r) === true ? ' pos' : propShopAgrees(r) === false ? ' neg' : '') + '">' + propShopLine(r) + '</div>' :
          propSimLine(r) ? '<div class="n5 simline' + (propSimAgrees(r) === true ? ' pos' : propSimAgrees(r) === false ? ' neg' : '') + '">' + propSimLine(r) + '</div>' : '') +
+        (propFormLine(r) ? '<div class="n5 formline' + (propFormAgrees(r) === true ? ' pos' : propFormAgrees(r) === false ? ' neg' : '') + '">' + propFormLine(r) + '</div>' : '') +
         '<div class="n6">' + propTakeBtn(r) + propsGoBtn(r) + '</div></div>';
     }).join("") : '<div class="empty">' + (rows.length ? 'No prop on this date clears its price.' : 'Load a props file: Run NBA props.bat writes nba-props-DATE.json.') + '</div>';
     /* the simulation's strip (26 Oct 2026): one card a game */

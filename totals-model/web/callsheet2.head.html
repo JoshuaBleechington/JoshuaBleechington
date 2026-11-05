@@ -386,11 +386,10 @@
   .jumpbar .dot.go { background: var(--go); } .jumpbar .dot.watch { background: var(--edge); } .jumpbar .dot.crowd { background: var(--crowd); } .jumpbar .dot.info { background: var(--ink-2); }
   .jumpbar .sep { flex: 1; min-width: 6px; }
   section.card[id], #boardDate, #cardCount, #calibBox { scroll-margin-top: 54px; }
-  /* the crowd on Kalshi, in its own colour (4 Nov 2026, the user: "add a little color... so it stands out on the props and game matchups") */
+  /* the crowd on Kalshi, in its own colour (4 Nov 2026, the user: "add a little color... so it stands out on the props and game matchups"); off the props from 5 Nov 2026, so the colour lives on the NBA card, the board and the simulation's table */
   .kname { color: var(--crowd); font-weight: 800; }
-  .pk .n5.kalprop, .pk .n5.kalshi-strip, .pdlg .pd-kalshi, .simpanel .ttgap.kal { border-left: 3px solid var(--crowd); background: var(--crowd-wash); padding: 5px 9px; border-radius: 0 6px 6px 0; color: var(--ink); }
-  .pk .n5.kalprop b, .pk .n5.kalshi-strip b, .pdlg .pd-kalshi b, .simpanel .ttgap.kal b, .kalshi b { color: var(--crowd); }
-  .pdlg .pd-tile.kal { border-color: var(--crowd); background: var(--crowd-wash); } .pdlg .pd-tile.kal .k, .pdlg .pd-tile.kal .v { color: var(--crowd); }
+  .simpanel .ttgap.kal { border-left: 3px solid var(--crowd); background: var(--crowd-wash); padding: 5px 9px; border-radius: 0 6px 6px 0; color: var(--ink); }
+  .simpanel .ttgap.kal b, .kalshi b { color: var(--crowd); }
   .pk .tagm.kal { color: var(--crowd); border-color: var(--crowd); } .pk .tagm.kal.warn { background: var(--crowd); color: #fff; }
   .kalshi { border-left: 3px solid var(--crowd); padding: 2px 0 2px 12px; } .kalshi ul.ctx li { border-bottom-color: var(--crowd-wash); }
   #secKalshi > h2 { color: var(--crowd); } #secKalshi > h2 .tag { color: var(--crowd); opacity: .8; }

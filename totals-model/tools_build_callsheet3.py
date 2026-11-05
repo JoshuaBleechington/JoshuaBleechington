@@ -613,8 +613,10 @@ def props_example_games() -> list:
                 g["grab"] = [mate, 12, 6.5]
             elif k % 4 == 2:
                 g["dish"] = [mate, 7, 3.5]
+    # the prices (5 Nov 2026, the shade off and the model a fifth of the say): Maxey's over favoured at -120 and George's threes
+    # at -105/-115, so the example keeps three legs at 52% or better and the same-game pairs show as a real night's would
     lines = [("Jalen Brunson", "pts", 27.5, -110, -110), ("Karl-Anthony Towns", "reb", 11.5, -115, -105), ("Mikal Bridges", "pra", 24.5, -110, -110), ("OG Anunoby", "ast", 2.5, 100, -120),
-             ("Tyrese Maxey", "pts", 25.5, -110, -110), ("Paul George", "tpm", 2.5, -120, 100), ("Kelly Oubre Jr.", "pts", 14.5, -105, -115), ("Joel Embiid", "reb", 9.5, -110, -110)]
+             ("Tyrese Maxey", "pts", 25.5, -120, 100), ("Paul George", "tpm", 2.5, -105, -115), ("Kelly Oubre Jr.", "pts", 14.5, -105, -115), ("Joel Embiid", "reb", 9.5, -110, -110)]
     dvp = {"NYK": {"G": {"f": 0.97, "f_this": 0.95, "n_this": 16, "f_last": 0.99, "n_last": 82}, "F": {"f": 1.02, "f_this": 1.03, "n_this": 16, "f_last": 1.01, "n_last": 82}, "C": {"f": 1.05, "f_this": 1.07, "n_this": 16, "f_last": 1.03, "n_last": 82}},
            "PHI": {"G": {"f": 1.06, "f_this": 1.08, "n_this": 15, "f_last": 1.02, "n_last": 82}, "F": {"f": 1.01, "f_this": 1.00, "n_this": 15, "f_last": 1.02, "n_last": 82}, "C": {"f": 0.93, "f_this": 0.90, "n_this": 15, "f_last": 0.96, "n_last": 82}}}
     htb = {("PHI", "G", "pts"): "HashtagBasketball: 76ers allow 24.0 points a game to PGs (116th of 150, 1 the fewest), 22.6 points a game to SGs (61st of 150, 1 the fewest); shown, not scored",

@@ -126,7 +126,6 @@
     if (!order.length) return '';
     return order.sort().map(function (game) {
       var g = games[game], r = g.r, s = r.gsim || propsGameSimFromRows(rows.filter(function (x) { return x.game === game; }), r);
-      var kl = propsKalshiLine(r), klHtml = kl ? '<div class="n5 kalshi-strip">' + kl + '</div>' : '';
       if (!s) {
         /* the market on the game (5 Nov 2026), in the simulation's place: the two clubs' points implied by the book's total and
            spread against their points a game, the expected margin and the blowout chance, and how many carded lines sit off the books' consensus */
@@ -139,9 +138,9 @@
           return '<div class="pk simg mkt"><div class="n1">' + esc(game) + ' · the market</div>' +
             '<div class="n2">' + side(aab0) + ' · ' + side(hab0) + (r.total !== null && r.total !== undefined ? ' <span class="dim">total ' + esc(String(r.total)) + (r.spread !== null && r.spread !== undefined ? ' · spread ' + esc(String(r.spread)) : '') + '</span>' : '') + '</div>' +
             '<div class="n4">each club\'s points implied by the book\'s total and spread, against its points a game by the ratings · shown, not scored</div>' +
-            '<div class="n5">expected margin ' + esc(String(mk0.em)) + ' · blowout of 15 or more ' + pcs(+mk0.blow) + ', off the spread' + (withSide ? ' · the carded line sits off the books\' consensus on <b>' + off + ' of ' + withSide + '</b> props' : '') + '</div>' + klHtml + '</div>';
+            '<div class="n5">expected margin ' + esc(String(mk0.em)) + ' · blowout of 15 or more ' + pcs(+mk0.blow) + ', off the spread' + (withSide ? ' · the carded line sits off the books\' consensus on <b>' + off + ' of ' + withSide + '</b> props' : '') + '</div></div>';
         }
-        return '<div class="pk simg dim"><div class="n1">' + esc(game) + '</div><div class="n4">' + (r.trim ? 'The simulation on this game was trimmed from the save with the night\'s detail; the last seven nights keep theirs.' : 'This file\'s run carried no simulation on the game and no market block; a props run with the current slate.py carries the market\'s numbers.') + '</div>' + klHtml + '</div>';
+        return '<div class="pk simg dim"><div class="n1">' + esc(game) + '</div><div class="n4">' + (r.trim ? 'The simulation on this game was trimmed from the save with the night\'s detail; the last seven nights keep theirs.' : 'This file\'s run carried no simulation on the game and no market block; a props run with the current slate.py carries the market\'s numbers.') + '</div></div>';
       }
       var aab = r.aab || r.away || "away", hab = r.hab || r.home || "home", hasM = s.m !== null && s.m !== undefined && isFinite(+s.m), fav = +s.m >= 0 ? hab : aab;
       var book = r.total !== null && r.total !== undefined && isFinite(+r.total) ? ' · the book\'s ' + r.total + ' (' + sgn(+s.t - +r.total, 1) + ')' : '';
@@ -150,7 +149,7 @@
         '<div class="n2">' + esc(aab) + ' ' + s.a[0] + ' · ' + esc(hab) + ' ' + s.h[0] + ' <span class="dim">total ' + (s.approx ? 'about ' : '') + s.t + '</span></div>' +
         '<div class="n3">' + (hasM ? esc(fav) + ' by ' + Math.abs(+s.m).toFixed(1) + ' · ' : '') + (s.hw !== null && s.hw !== undefined ? 'home win ' + propsPct(s.hw) + ' · ' : '') + 'total ' + (s.approx ? 'about ' : '') + s.t + book + '</div>' +
         '<div class="n4">' + esc(aab) + ' middle half ' + s.a[1] + '–' + s.a[2] + (s.a[3] ? ' against ' + s.a[3] + ' a game by the ratings' : '') + ' · ' + esc(hab) + ' ' + s.h[1] + '–' + s.h[2] + (s.h[3] ? ' against ' + s.h[3] : '') + '</div>' +
-        '<div class="n5">blowout of 15 or more ' + propsPct(s.bo) + ' · overtime ' + propsPct(s.ot) + ' · ' + s.poss + ' possessions' + outs + (g.n ? ' · the sim\'s read on the pick\'s side for <b>' + g.yes + ' of ' + g.n + '</b> props' : '') + '</div>' + klHtml + '</div>';
+        '<div class="n5">blowout of 15 or more ' + propsPct(s.bo) + ' · overtime ' + propsPct(s.ot) + ' · ' + s.poss + ' possessions' + outs + (g.n ? ' · the sim\'s read on the pick\'s side for <b>' + g.yes + ' of ' + g.n + '</b> props' : '') + '</div></div>';
     }).join('');
   }
   /* two props from one game as a ticket (26 Oct 2026, the user: "the ones that hit quickly were same game parlays with 2 legs...
@@ -171,10 +170,13 @@
   var PROPS_APPS = ["fanatics", "draftkings", "fanduel", "betmgm"];
   var PROPS_PAIR_APP_FROM = "2026-11-05";
   /* the slate's own blend, re-read at another line and price pair: the model's chance from the centre and the sigma (a whole
-     line pushing), the book's from the prices less the over's shade by market, the books' consensus shift at that line, the
-     two blended on the logit at the anchor's weight. The constants mirror slate.py */
+     line pushing), the book's from the prices (less the over's shade by market on the nights that carried one), the books'
+     consensus shift at that line, the two blended on the logit at the anchor's weight. The constants mirror slate.py by the
+     night: to 4 Nov 2026 the shade by market and the model at a ninth; from 5 Nov the shade off and the model a fifth of the
+     say (the shade had called the under on four props in five, so the sheet chooses on the prop's own evidence again) */
   var PROPS_SHADE = { pts: 0.04, ast: 0.04, tpm: 0.04, reb: 0.015, ra: 0.015, pra: 0.055, pr: 0.055, pa: 0.055 }, PROPS_SHADE_TENT = [0.40, 0.46, 0.55, 0.63];
-  var PROPS_ANCHOR = 4.0, PROPS_MODEL_W = 0.5, PROPS_CONS_K = 0.11, PROPS_CONS_CAP = 0.06;
+  var PROPS_ANCHOR = 4.0, PROPS_CONS_K = 0.11, PROPS_CONS_CAP = 0.06, PROPS_BLEND_FROM = "2026-11-05";
+  function propsBlendFor(dateISO) { return (dateISO || "") >= PROPS_BLEND_FROM ? { w: 1.0, shade: false } : { w: 0.5, shade: true }; }
   function propChanceAt(r, line, op, up) {
     var med = propMedian(r), sd = +r.sd; line = +line;
     if (!isFinite(med) || !isFinite(sd) || sd <= 0 || !isFinite(line) || !isFinite(+op) || !isFinite(+up) || typeof nbaNormCdf !== "function") return null;
@@ -182,11 +184,11 @@
     if (Math.abs(line - Math.round(line)) < 1e-9) { var hi = nbaNormCdf((line + 0.5 - med) / sd), lo = nbaNormCdf((line - 0.5 - med) / sd); pm = 1 - hi; push = hi - lo; } else pm = 1 - nbaNormCdf((line - med) / sd);
     var pmc = push < 1 ? pm / (1 - push) : 0.5;
     var io = implied(+op), iu = implied(+up), pb0 = io + iu > 0 ? io / (io + iu) : 0.5;
-    var pu = 1 - pb0, t = PROPS_SHADE_TENT, w = (pu <= t[0] || pu >= t[3]) ? 0 : pu < t[1] ? (pu - t[0]) / (t[1] - t[0]) : pu > t[2] ? (t[3] - pu) / (t[3] - t[2]) : 1;
-    var pb = pb0 - (PROPS_SHADE[r.mk] || 0.04) * w, c = propCons(r);
+    var bl = propsBlendFor(r.gdate), pu = 1 - pb0, t = PROPS_SHADE_TENT, w = (pu <= t[0] || pu >= t[3]) ? 0 : pu < t[1] ? (pu - t[0]) / (t[1] - t[0]) : pu > t[2] ? (t[3] - pu) / (t[3] - t[2]) : 1;
+    var pb = pb0 - (bl.shade ? (PROPS_SHADE[r.mk] || 0.04) * w : 0), c = propCons(r);
     if (c) pb = Math.min(Math.max(pb + Math.max(-PROPS_CONS_CAP, Math.min(PROPS_CONS_CAP, PROPS_CONS_K * (+c.line - line) / sd)), 0.02), 0.98);
     var lg = function (p) { p = Math.min(Math.max(p, 1e-4), 1 - 1e-4); return Math.log(p / (1 - p)); };
-    var z = (PROPS_ANCHOR * lg(pb) + PROPS_MODEL_W * lg(pmc)) / (PROPS_ANCHOR + PROPS_MODEL_W), p = 1 / (1 + Math.exp(-z));
+    var z = (PROPS_ANCHOR * lg(pb) + bl.w * lg(pmc)) / (PROPS_ANCHOR + bl.w), p = 1 / (1 + Math.exp(-z));
     return r.side === "OVER" ? p : 1 - p;
   }
   /* one leg at one app: its line there, the pick's price and the chance at that line (the sheet's own when the line is the carded one) */
@@ -469,7 +471,7 @@
                     proj: x.proj, sd: x.sd, pm: x.pm, pb: x.pb, p: x.p, push: x.push, side: x.side, chance: x.chance, price: x.price, need: x.need, edge: x.edge, band: x.band,
                     mins: x.mins, rate36: x.rate36, base: x.base, parts: x.parts || [], why: x.why || [], log: x.log || [], sim: x.sim || null,
                     mkt: x.mkt || null, cons: x.cons || null,   // the market on the game and the books' consensus (5 Nov 2026), in the simulation's place
-                    med: x.med, usg: x.usg, sdf: x.sdf, starter: x.starter === undefined ? null : x.starter, start_src: x.start_src || null, kal: x.kal || null, gsim: propsGameSim(g.sim), fives: g.fives || null, actual: null, result: null });
+                    med: x.med, usg: x.usg, sdf: x.sdf, starter: x.starter === undefined ? null : x.starter, start_src: x.start_src || null, gsim: propsGameSim(g.sim), fives: g.fives || null, actual: null, result: null });
       });
     });
     return rows;
@@ -504,57 +506,9 @@
     closePropDetail(); showProps(false);
     if (typeof openRow === "function") openRow(row.id);
   }
-  /* the crowd on the prop (4 Nov 2026, the user: "how can I see the Kalshi on the props cards I open?"): the matchup's row on the
-     NBA card carries the exchange's prices (nbakalshi, from the slate and the odds run); the prop's panel and the game's strip read
-     the crowd's spread, total and winner off it, beside the numbers the props file carried. Shown, not scored */
-  function propsKalshiLine(r) {
-    if (typeof kalshiOf !== "function") return "";
-    var row = propsCardRow(r); if (!row) return "";
-    var k = kalshiOf((row.inputs || {}).nbakalshi); if (!k) return "";
-    var away = r.away || "the away side", home = r.home || "the home side", bits = [];
-    if (k.spMed !== null && k.spMed !== undefined) {
-      var m = k.spMed, sp = r.spread !== null && r.spread !== undefined && isFinite(+r.spread) ? +r.spread : null;
-      bits.push((Math.abs(m) < 0.05 ? "a pick" : esc(m > 0 ? home : away) + " by " + Math.abs(m).toFixed(1)) + (sp !== null ? " (the book's spread " + esc(sp <= 0 ? home : away) + " " + sgn(-Math.abs(sp), 1) + ")" : ""));
-    }
-    if (k.totMed !== null && k.totMed !== undefined) bits.push("total " + k.totMed.toFixed(1) + (r.total !== null && r.total !== undefined && isFinite(+r.total) ? " (the book's " + esc(String(r.total)) + ")" : ""));
-    /* the team totals too (4 Nov 2026, the user: "what about the team totals for each matchup?"): each club's number at even money off its own ladder */
-    var tta = k.ttAMed !== null && k.ttAMed !== undefined ? esc(away) + " " + k.ttAMed.toFixed(1) : "", tth = k.ttHMed !== null && k.ttHMed !== undefined ? esc(home) + " " + k.ttHMed.toFixed(1) : "";
-    if (tta || tth) bits.push("team totals " + [tta, tth].filter(Boolean).join(" · "));
-    if (k.ml) bits.push(esc(k.ph >= 0.5 ? home : away) + " to win " + (100 * Math.max(k.ph, k.pa)).toFixed(1) + "%");
-    return bits.length ? 'The crowd on <b class="kname">Kalshi</b>: ' + bits.join(" · ") : "";
-  }
-  /* the crowd on the prop itself (4 Nov 2026, the user's player listings): the props run keeps the player's ladder on the prop
-     (kal.r, the exchange's "25+" as a floor of 24.5, the same rule as the book's line), so the crowd's chance of the pick's side at
-     the book's line reads off it, exact on a rung and straight between two, with the price after the fee on a rung. Shown, not
-     scored: the rows keep the crowd's price beside the book's for the measurement to come */
-  function propKalshi(r) {
-    if (!r || !r.kal || !r.kal.r || !propHas(r) || typeof kalshiRungs !== "function") return null;
-    var pts = kalshiRungs(r.kal.r), line = +r.line;
-    if (!pts.length || !isFinite(line)) return null;
-    var rung = kalshiRungAt(pts, line), po = pts.length >= 2 ? kalshiCurveAt(pts, line) : (rung ? rung.p : null);
-    var q = { n: pts.length, lo: pts[0].x + 0.5, hi: pts[pts.length - 1].x + 0.5, med: pts.length >= 2 ? kalshiMedian(pts) : null, p: null, ask: null, need: null, rung: !!rung };
-    if (po !== null) q.p = r.side === "UNDER" ? 1 - po : po;
-    if (rung) { q.ask = r.side === "UNDER" ? 1 - rung.bid : rung.ask; q.need = kalshiNeedAt(q.ask, 0.07); }
-    return q;
-  }
-  function propKalshiLine(r) {
-    var q = propKalshi(r); if (!q) return "";
-    if (q.p === null) return '<b class="kname">Kalshi</b>: the crowd\'s ladder runs ' + q.lo + "+ to " + q.hi + "+; the line " + esc(String(r.line)) + " sits outside it";
-    var s = '<b class="kname">Kalshi</b>: the crowd <b>' + (100 * q.p).toFixed(1) + "%</b> on the " + esc(r.side) + " (the sheet " + (100 * r.chance).toFixed(1) + "%)";
-    if (q.need !== null && r.price !== null && r.price !== undefined) {
-      var bn = implied(+r.price), better = q.need < bn - 0.001;
-      s += " · " + (better ? "<b>better on Kalshi</b>: " : "") + kalshiCents(q.ask) + " needs " + (100 * q.need).toFixed(1) + "% after the fee v " + sgn(+r.price, 0) + " needing " + (100 * bn).toFixed(1) + "%" + (better ? "" : ": the book");
-    } else s += " · no rung at the line, so no price to compare";
-    return s;
-  }
-  function propKalshiTile(r, tile) {
-    var q = propKalshi(r); if (!q) return "";
-    if (q.p === null) return tile("Kalshi's crowd", "–", "the crowd's ladder runs " + q.lo + "+ to " + q.hi + "+; the line sits outside it", "kal");
-    var sub = "the crowd's chance of the " + esc(r.side) + " at " + esc(String(r.line)) + (q.med !== null ? " · its number " + q.med.toFixed(1) : "");
-    if (q.need !== null) sub += " · " + kalshiCents(q.ask) + " needs " + (100 * q.need).toFixed(1) + "% after the fee" + (r.price !== null && r.price !== undefined ? (q.need < implied(+r.price) - 0.001 ? ", better than " : ", not better than ") + sgn(+r.price, 0) : "");
-    else sub += " · no rung at the line, so no price";
-    return tile("Kalshi's crowd", (100 * q.p).toFixed(1) + "%", sub, "kal");
-  }
+  /* Kalshi is off the props (5 Nov 2026, the user: "remove the kalshi completely from the props"): the crowd's lines on the
+     matchup and the player ladders rode on the cards, the panel and the strip from 4 Nov and came off; a row's kal field, where a
+     file from the 4th still carries one, is ignored. The crowd stays on the NBA card's matchup, where the sheet reads it */
   function propsFivesHtml(r) {
     var f = r.fives; if (!f || (!f.away && !f.home)) return '';
     var me = propsNameKey(r.name);
@@ -745,7 +699,8 @@
     var markets = PROPS_ORDER.map(function (k) { return byMk[k] ? tile(PROPS_LABEL[k], byMk[k], []) : ""; }).join("");
     var verdict = 'The props are a priori: the pooled rules behind them were measured on last season\'s box scores. Read the BET band against the rest and <i>does</i> against <i>says</i>; under 100 graded props nothing here is a reading. ' +
                   'Measured on the first ten nights (30 Oct 2026, 4,321 graded props): the model\'s own lean added nothing to the book\'s price (the best weight on it was none; where it stood ten points from Pinnacle the outcome followed Pinnacle), the over\'s shade is real (the under landed 53.2% at prices saying 50.7%), and a starter\'s minutes follow the game script. From the 30th the sheet runs with the market as its spine (the model at a ninth, the over read 2.5 points lower) and the game script on starters\' minutes; the nights before carry the old weights. ' +
-                  'From 2 Nov the over\'s shade is by market, measured on the 6,216 graded props of the first thirteen nights (1.5 points on rebounds, 4 on points, assists and threes, 5.5 on the combinations), in full at a coin-flip price and fading past it, and the bands follow it: replayed on those nights the BET and LEAN unders read 1,345-1,072 (+91 units) where the sheet as it stood had 477-414 (−9) and had left the money in no edge; every over at the carded price went 2,832-3,384 (−875).';
+                  'From 2 Nov the over\'s shade is by market, measured on the 6,216 graded props of the first thirteen nights (1.5 points on rebounds, 4 on points, assists and threes, 5.5 on the combinations), in full at a coin-flip price and fading past it, and the bands follow it: replayed on those nights the BET and LEAN unders read 1,345-1,072 (+91 units) where the sheet as it stood had 477-414 (−9) and had left the money in no edge; every over at the carded price went 2,832-3,384 (−875). ' +
+                  'From 5 Nov the shade is OFF and the model has a fifth of the say instead of a ninth: with the shade in, the book\'s price less the shade was the pick and the sheet called the under on four props in five from 30 Oct (on 4 Nov every BET and LEAN an under, 257-272, −50 units; the shade\'s BET band 83-85 over its life). Replayed on the 8,676 graded props of the fifteen nights to 4 Nov, the new blend\'s BET band read 146-106 (+10.6 units, 52-34 then 94-72 in the two halves, eight nights of fifteen up; 1,000 bootstrap draws of the nights put it above water 71% of the time) where a ninth with no shade left two BETs a night and the old 2.0 read 53% and −42; the LEAN band read 51.6% and is not an edge. The nights before carry their own weights; the record decides.';
     if (!full) {
       var h = '<div class="subhead" data-sport="PROPS">NBA player props <span class="tag">' + graded.length + ' graded · the slate\'s call as made, at the price posted · says is the blended chance</span></div>';
       h += '<div class="calib" data-sport="PROPS">' + tile("Every prop with a side", all, parts) + markets + '</div>';
@@ -911,8 +866,6 @@
          ' · ' + esc(r.book || "the book") + ' ' + esc(String(r.line)) + ' (' + sgn(r.op, 0) + '/' + sgn(r.up, 0) + ')</div>';
     h += '<div class="pd-take pd-go">' + (has && (propTakeBtn(r, true) || "").length ? propTakeBtn(r, true) + ' ' : '') + propsGoBtn(r, true) + '</div>';
     if (r.trim) h += '<p class="note trimmed">The detail on this prop (the reasons, the last games, the levers, the simulation, the fives and what happened) was <b>trimmed from the save on ' + esc(gameDate(r.trim)) + '</b> to keep the backup small: the last seven nights on the tab stay whole, older nights keep the call, the price, the chance, the band, the result and every book\'s line.</p>';
-    var kl = propsKalshiLine(r);
-    if (kl) h += '<p class="note pd-kalshi">' + kl + ' <span class="dim">· from the matchup\'s row on the NBA card; shown, not scored</span></p>';
     if (has) {
       h += '<div class="pd-tiles">' +
         tile("Chance", (r.chance * 100).toFixed(1) + "%", "blended: the over is " + (r.pm * 100).toFixed(1) + "% by the model, " + (r.pb * 100).toFixed(1) + "% by the book") +
@@ -922,7 +875,6 @@
         tile("Minutes", esc(String(r.mins)), "projected") +
         tile("Per 36", esc(String(r.rate36)), esc(lab) + " per 36 minutes") +
         (r.usg !== null && r.usg !== undefined ? tile("Usage", esc(String(r.usg)) + "%", "of his club's possessions while on; " + (r.starter === true ? "a starter" : r.starter === false ? "off the bench" : "role unknown") + (r.sdf && r.sdf !== 1 ? ", the miss read at " + esc(String(r.sdf)) + " sigmas (measured)" : "")) : "") +
-        propKalshiTile(r, tile) +
         '</div>';
       /* the floors (26 Oct 2026): the number he clears 95, 90 and 80% of nights by the model, and his other markets' 95% floors tonight */
       var f95 = propFloor(r, 95), f90 = propFloor(r, 90), f80 = propFloor(r, 80);
@@ -1057,7 +1009,7 @@
         (propsLeversLine(r) ? '<div class="n5">Moves it: ' + propsLeversLine(r) + '</div>' : '') +
         (propShopLine(r) ? '<div class="n5 shopline' + (propShopAgrees(r) === true ? ' pos' : propShopAgrees(r) === false ? ' neg' : '') + '">' + propShopLine(r) + '</div>' :
          propSimLine(r) ? '<div class="n5 simline' + (propSimAgrees(r) === true ? ' pos' : propSimAgrees(r) === false ? ' neg' : '') + '">' + propSimLine(r) + '</div>' : '') +
-        (propKalshiLine(r) ? '<div class="n5 kalprop">' + propKalshiLine(r) + '</div>' : '') + '<div class="n6">' + propTakeBtn(r) + propsGoBtn(r) + '</div></div>';
+        '<div class="n6">' + propTakeBtn(r) + propsGoBtn(r) + '</div></div>';
     }).join("") : '<div class="empty">' + (rows.length ? 'No prop on this date clears its price.' : 'Load a props file: Run NBA props.bat writes nba-props-DATE.json.') + '</div>';
     /* the simulation's strip (26 Oct 2026): one card a game */
     if ($("propsSim")) $("propsSim").innerHTML = rows.length ? propsSimStripHtml(rows) : '<div class="empty">Load a props file and each game\'s simulation lands here.</div>';

@@ -2490,3 +2490,125 @@ season's prior and the minutes trend are what sits inside the start, not
 pushes on it, and the matchup from the profiles measured null; they read
 as a line of their own under What moves it ("Inside the start, not a
 lever") and stay in the why.
+
+## The props realigned, 5 Nov 2026
+
+The user, with the 5 Nov backup: "Last night the props were terrible. I
+think I did too much by adding the simulation and the Kalshi to the
+props. The model said under on most and all but one actually went under.
+I want to remove the Kalshi completely from the props... 10/20 was 13-5,
+10/25 was 8-1. You have to find what the misalignment is and fix it
+immediately." Then: "do thorough testing to make sure it's aligned...
+measure a thousand times to make one cut."
+
+**What the backup said.** Fifteen graded nights, 8,676 props with a
+projection. Through 29 Oct the sheet called the under on 43 to 56% of the
+props a night; from 30 Oct on 79, 78, 75, 83 and 82%. On 4 Nov every BET
+and every LEAN was an under (257-272, −50 units), and the seven props the
+user took went 1-6, all unders, five of them PRA or points + assists. The
+nights he remembers were the old blend (the model at 2.0, no shade):
+13-5 on 20 Oct and 16-8 on 25 Oct, inside a span that read 217-229 on
+the BET band over its ten nights.
+
+**The misalignment.** The over's shade. It went in on 30 Oct (2.5 points
+off the book's over chance, the same day the model's weight fell from 2.0
+to a ninth) and was widened by market on 2 Nov (4 points on points,
+assists and threes, 5.5 on the combinations, 1.5 on rebounds, in full at
+a coin-flip price). With the model at a ninth the book's price *is* the
+pick, so the price less the shade turned every coin-flip prop into an
+under. The shade had been fitted on the thirteen nights to 1 Nov, where
+the under had run 54.4%; out of that fit it read +10.5 on 2 Nov and −49.9
+on 4 Nov, and over its whole life its BET band read 83-85 (−14 units).
+The under's lean at the books' coin-flip prices is real in the aggregate
+(the over landed 44% where the book's chance said 45-50) and the under's
+own price eats it (−120 to −135 at those lines, 55 to 57% needed). A
+blanket lean to one side at the book's prices is not an edge, and it
+stopped the sheet choosing. Kalshi had nothing to do with the record: it
+was shown on the props and never scored. The simulation had come off the
+props the day before.
+
+**The measurements before the cut** (`lab/props_variants.py`,
+`props_grid.py`, `props_pick.py`, `props_deep.py`, `props_bias.py`,
+`props_recentre.py` in the session's scratchpad, all off the stored
+rows: the book's devigged chance from the two prices, the model's chance
+from the projection, the sigma and the median shift, the consensus from
+the books kept on each prop, the blend re-run and the picks regraded).
+
+- *The model's lean on its own* is noise in the middle and reads only at
+  its extremes: its side landed 51% of the time over both halves of the
+  nights (r +0.04 and +0.025 against the book's +0.12 and +0.08); where it
+  stood 20 points or more from the book, 51-53%; 30 or more, 55% then 53%.
+  Alone it reads 2,447-2,439 (−352 units) at the BET floor.
+- *The blend's fit* (Brier over every prop) is best with the model at
+  nothing (0.2470) and a hair worse at a fifth (0.2478) than at a ninth
+  (0.2473): the bands are what the sheet is for, so the bands were the
+  test.
+- *The grid* (weight ½, 1, 2 × shade off, half, full × consensus off, 0.11,
+  0.22), both halves of the nights apart. With the shade off, a ninth
+  leaves two BETs a night (20-14 in all); the old 2.0 fifty to a hundred
+  and fifty a night at 53.3% (562-492, −28 units); a fifth 15 to 20 a
+  night at 57.9% (146-106, +10.6 units; 52-34 then 94-72; eight nights
+  of fifteen up). The consensus lever helps at every weight (at a fifth,
+  122-95 without it).
+- *A walk-forward over the grid* (the cell with the best record on the
+  nights before, applied to the next night) read 152-153 (−29 units):
+  chasing the best recent setting does not work, so the cut is not "the
+  grid's winner"; it is the measured middle between a weight that gives
+  nothing to bet and one measured bad.
+- *A bootstrap by night* (1,000 draws of the fifteen nights whole): at a
+  fifth with no shade the BET band's units sit above water 71% of the
+  time (median +11, 5th to 95th −20 to +47; the win rate's 5th percentile
+  51.2%); the sheet as it stood 35%; the old 2.0 12%.
+- *Says against does* at a fifth: the BET band says 60.8% and does 57.9%;
+  the unders 62.1 against 60.0, the overs 57.8 against 53.2. The LEAN band
+  says 55.5% and does 51.6% (679-636): not an edge.
+- *The model's bias.* The points projection runs high this season: the
+  per-36 rate at the minutes he actually played is 5.6% high on points
+  (7.2% in the first eight nights, 4.4% in the last seven; 3-4% on
+  assists, PRA and the two-stat combinations; rebounds and threes on the
+  money), the minutes 0.85 high (starters 0.5, the bench 1.2), and the
+  median miss on points sits 0.23 sigmas under the centre in both halves
+  (0.24 then 0.21) against the shipped 0.08 shift. Last season's prior
+  carries about half of it where it applies (the 143 points props with a
+  prior at four games or fewer: 0.90 at half share, 0.95 at none, 0.97
+  for men with no last season). But re-centring the model on the
+  season's own misses, walk-forward (each market's shift the median miss
+  on the nights before), read 171-139 against 133-97 with the shipped
+  shifts, and in sample 162-121 against 144-104: the book carries the
+  same bias (the over landed 46% against its lines), so moving the model
+  toward the actuals moves it away from the book without moving the
+  picks the right way. The shifts stand, the bias is on record.
+- *The BET floor.* Edges of 5 points and more read 65-37 at a fifth,
+  3 to 5 points 101-88; raising the floor would be the same chasing the
+  walk-forward just failed, so the bands stand and the record tile keeps
+  the edge buckets.
+
+**What changed.** `PROPS_SIDE_SHADE` stands at nothing on every market
+(the machinery stays, with its history); `PROPS_MODEL_W` is 1.0 (the
+model a fifth of the say); the consensus lever, the median shifts, the
+game script and the bands are as they were. The why line on a prop reads
+"blended at 4 to 1.0, the market the spine and the model 20% of the say
+(5 Nov 2026: the over's shade is off...)"; the method block records the
+shade off and Kalshi off. On the page the slate's blend mirror
+(`propChanceAt`, the pairs re-read at an app's line) follows the night:
+to 4 Nov the shade by market and the model at a ninth, from 5 Nov the
+shade off and a fifth (`PROPS_BLEND_FROM`), so earlier nights' tickets
+stand as they were. The record tile's verdict says what moved and why.
+
+**Kalshi off the props.** The player series (`KXNBAPTS`, `KXNBAREB`,
+`KXNBAAST`, `KXNBA3PT`, `KXNBAPRA`), their parser, the fetch and the
+ladder on the prop are out of the slate; the props run reads no exchange
+market. On the page the crowd's line on the best cards, the panel's tile,
+the matchup line on the panel and on the strip are gone, a `kal` field a
+4 Nov file still carries is ignored, and the Kalshi styles on the Props
+tab are gone with them. The crowd stays where the user liked it: the NBA
+card's matchup (the winner, the spread, the total, the team totals), the
+signals strip, the board's chips and the simulation's table.
+
+**Tests.** The selftest reads the blend at a fifth (50/50 against 63.5%
+blends to 52.8%), the projection test's prop at 52.1% and no edge with
+the shade at nothing on every market and the why line's new wording, and
+that the slate has no player series left. The harness reads a prop that
+still carries a ladder with no crowd line and no crowd tile, the panel
+and the strip without the crowd's matchup line while the NBA card's row
+carries it, and the example's best list at the new blend.

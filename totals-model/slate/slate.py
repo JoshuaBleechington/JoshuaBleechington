@@ -4582,74 +4582,9 @@ def kalshi_summary(block, away, home):
     return " · ".join(bits) if bits else "no price"
 
 
-# the player ladders (4 Nov 2026, the user's points listing and the series names off the game page): one contract a rung a
-# player ("Luka Dončić: 25+ points", the floor 24.5 with the same greater-than rule as the totals, the rungs five apart on
-# points and a make apart on threes, "1+" a floor of 0.5), the
-# name in the title, the club in the ticker's player key (LALLDONCIC77). The props run keeps each prop's ladder on the prop
-# (kal.r) when the exchange runs the market; the page reads the crowd's chance of the pick's side at the book's line off it,
-# exact when the line is a rung (24.5 is 25+) and straight between two otherwise, with the price after the fee on a rung.
-# Shown, not scored: two weeks of the crowd's price beside the book's on the same props is the test of which predicts the
-# outcome, and whether the crowd shades the over as the books do
-KALSHI_PLAYER_SERIES = {"pts": "KXNBAPTS", "reb": "KXNBAREB", "ast": "KXNBAAST", "tpm": "KXNBA3PT", "pra": "KXNBAPRA"}
-
-
-def kalshi_player_parse(doc, mk):
-    """A player series' markets -> {(date, codeA, codeB): {name key: {"name", "team", "mk": {mk: [[floor, bid, ask, last, vol], ...]}}}}."""
-    out = {}
-    for m in (doc or {}).get("markets") or []:
-        key, floor, parts = kalshi_event_key(m.get("event_ticker")), kalshi_num(m.get("floor_strike")), str(m.get("ticker") or "").split("-")
-        if not key or floor is None or len(parts) < 4:
-            continue
-        name = str(m.get("title") or "").split(":")[0].strip()
-        if not name:
-            continue
-        team = "".join(c for c in parts[2][:3] if c.isalpha())
-        vol = kalshi_num(m.get("volume_fp"))
-        rung = [floor, kalshi_num(m.get("yes_bid_dollars")), kalshi_num(m.get("yes_ask_dollars")), kalshi_num(m.get("last_price_dollars")), int(round(vol)) if vol is not None else None]
-        p = out.setdefault(key, {}).setdefault(props_name_key(name), {"name": name, "team": team, "mk": {}})
-        p["mk"].setdefault(mk, []).append(rung)
-    for game in out.values():
-        for p in game.values():
-            for rungs in p["mk"].values():
-                rungs.sort(key=lambda r: r[0])
-    return out
-
-
-def kalshi_fetch_players(log):
-    """Every open player market of each series, paged and merged by game and player; None when nothing could be read."""
-    merged, counts = {}, {}
-    for mk, series in KALSHI_PLAYER_SERIES.items():
-        markets, cursor = [], ""
-        try:
-            for _ in range(40):
-                doc = fetch_json("%s/markets?series_ticker=%s&status=open&limit=200%s" % (KALSHI_API, series, ("&cursor=" + cursor) if cursor else ""), cache=False)
-                page = doc.get("markets") or []
-                markets.extend(page)
-                cursor = doc.get("cursor") or ""
-                if not cursor or not page:
-                    break
-        except Exception as e:  # noqa: BLE001
-            log("Kalshi: the %s player series (%s) could not be read (%s)." % (mk, series, e))
-        counts[mk] = len(markets)
-        for key, players in kalshi_player_parse({"markets": markets}, mk).items():
-            dst = merged.setdefault(key, {})
-            for nk, p in players.items():
-                dst.setdefault(nk, {"name": p["name"], "team": p["team"], "mk": {}})["mk"].update(p["mk"])
-    if not merged:
-        log("Kalshi: no player markets could be read; the props carry no crowd ladder.")
-        return None
-    log("Kalshi: player markets on %d games (%s)." % (len(merged), ", ".join("%d %s" % (counts[mk], mk) for mk in KALSHI_PLAYER_SERIES)))
-    return merged
-
-
-def kalshi_prop(players, date_iso, aab, hab, name, team, mk):
-    """The crowd's ladder for one prop: the game by code in either order, the player by name; None when the exchange does not run it."""
-    if not players or mk not in KALSHI_PLAYER_SERIES:
-        return None
-    game = kalshi_find(players, date_iso, KALSHI_CODES.get(aab, aab), KALSHI_CODES.get(hab, hab))
-    p = (game or {}).get(props_name_key(name))
-    rungs = [r for r in ((p or {}).get("mk") or {}).get(mk) or [] if r[1] is not None or r[2] is not None]
-    return {"r": rungs, "team": p.get("team")} if rungs else None
+# The player ladders (KXNBAPTS, KXNBAREB, KXNBAAST, KXNBA3PT, KXNBAPRA) rode on the props from 4 Nov 2026 and came off on
+# 5 Nov 2026 (the user: "remove the kalshi completely from the props"): the crowd stays on the game's row, where the sheet
+# reads it against the book, Pinnacle and the simulation; the props carry the books alone
 
 
 def build_nba_game(g, date_iso, tables, league, players, prior_players, injuries, log, have_ledger=True, officials=None, refs=None, lineups=None, form=None, sim=None, kalshi=None):
@@ -5067,11 +5002,19 @@ PROPS_MIN_MINUTES = 60.0
 PROPS_REGULAR_MPG = 24.0
 PROPS_PLAYER_MIN_GAMES = 3
 PROPS_ANCHOR = 4.0
-# the model's weight against the market's (30 Oct 2026): on the 4,321 graded props of the first ten nights the sheet's
+# the model's weight against the market's. 30 Oct 2026: on the 4,321 graded props of the first ten nights the sheet's
 # chance fit the outcomes worse than the book's devigged price alone at every weight above nothing (Brier 0.2505 at the
 # old 2.0 against 0.2468 at none; where the model stood 10 points from Pinnacle the outcome followed Pinnacle, 48% to the
-# model's 68% said). Kept at a ninth so the model's lean still reads and the record can judge it; the bands follow
-PROPS_MODEL_W = 0.5
+# model's 68% said), so the weight went from 2.0 to a ninth. 5 Nov 2026 (the user, after 4 Nov's BET 29-35 and LEAN
+# 229-237: "find what the misalignment is and fix it"): replayed on the 8,676 graded props of the fifteen nights to 4 Nov
+# with the over's shade off, a ninth leaves two BETs a night (20-14 in all), the old 2.0 fifty to a hundred and fifty a
+# night at 53.3% (562-492, -28 units), and a FIFTH 15 to 20 a night at 57.9% (BET 146-106, +10.6 units, both halves of
+# the nights up, 52-34 then 94-72, eight nights of fifteen up). The model's lean is noise in the middle (its side right
+# 51% of the time, r +0.03 against the book's +0.10) and reads only at its extremes (20 points or more from the book,
+# 51-53%; 30 or more, 55% then 53%), which is where a fifth of the say fires the BET band and a ninth cannot. The blended
+# chance's fit across every prop is a hair worse at a fifth than at a ninth (Brier 0.2478 against 0.2473): the bands are
+# what the sheet is for, and the record judges them
+PROPS_MODEL_W = 1.0
 # the over's shade (30 Oct 2026): at the books' own devigged prices the under landed 53.2% of the time where the prices
 # said 50.7% and the over 46.8% against 49.3%, on 4,017 props at the best price across the books (at Pinnacle's prices
 # 54.3 against 51.1 on 1,946); the public plays overs and the books price for it. The book's over chance is read this
@@ -5088,7 +5031,14 @@ PROPS_MODEL_W = 0.5
 # where the flat 2.5 had read 477-414 (-9) and left the money in no edge (2,128-1,547, +96). The model's lean added nothing
 # again (its coefficient 0.005 +/- 0.071 beside the book's price), the spread, the total, the role and the usage nothing
 # that held in both halves. Flat 3.9 would have read 1,270-1,028 (+37, the second half -3): the hump and the markets matter
-PROPS_SIDE_SHADE = {"pts": 0.04, "ast": 0.04, "tpm": 0.04, "reb": 0.015, "ra": 0.015, "pra": 0.055, "pr": 0.055, "pa": 0.055}
+# OFF from 5 Nov 2026 (the user: "the model said under on most"). With the model at a ninth the book's price less the shade
+# WAS the pick, and the sheet called the under on four props in five from 30 Oct (79, 78, 75, 83 and 82% of the props a
+# night against 43 to 56% before; on 4 Nov every BET and LEAN was an under, 257-272, -50 units, and the seven taken 1-6).
+# The shade was fitted on the thirteen nights to 1 Nov, where the under had run 54.4%; over its life the BET band read 83-85
+# (-14 units), 2 Nov +10.5 and 4 Nov -49.9 out of the fit, and the under's own price ate the lean: the over landed 44% where
+# the book's chance said 45-50, and the under there costs -120 to -135 (55 to 57% needed). A blanket lean to one side at the
+# book's prices is not an edge, and it stopped the sheet choosing. The machinery stays, at nothing a market
+PROPS_SIDE_SHADE = {"pts": 0.0, "ast": 0.0, "tpm": 0.0, "reb": 0.0, "ra": 0.0, "pra": 0.0, "pr": 0.0, "pa": 0.0}   # to 4 Nov 2026: pts .04, ast .04, tpm .04, reb .015, ra .015, pra .055, pr .055, pa .055
 # the shade's reach over the book's own under chance: in full between the inner pair, fading straight to nothing at the outer
 PROPS_SHADE_TENT = (0.40, 0.46, 0.55, 0.63)
 # the game script (30 Oct 2026): two seasons, 20,729 starter-games against the closes: a starter's minutes land 0.187 a
@@ -5159,7 +5109,7 @@ def props_shade(mk, p_over_book):
     pu = 1.0 - p_over_book
     lo, flo, fhi, hi = PROPS_SHADE_TENT
     w = 0.0 if (pu <= lo or pu >= hi) else (pu - lo) / (flo - lo) if pu < flo else (hi - pu) / (hi - fhi) if pu > fhi else 1.0
-    return PROPS_SIDE_SHADE.get(mk, 0.04) * w
+    return PROPS_SIDE_SHADE.get(mk, 0.0) * w
 
 
 def props_spread_script(spread):
@@ -6014,11 +5964,17 @@ def props_project(prop, logs_this, logs_last, ctx):
     need = props_implied(price)
     edge = chance - need
     band = "BET" if (edge >= PROPS_BET_EDGE and chance >= PROPS_BET_CHANCE) else ("LEAN" if edge > 0 else "no edge")
-    full = PROPS_SIDE_SHADE.get(mk, 0.04)
-    why.append("projected %.1f against %s %.1f, one sigma %.1f, the chance read around the median %.1f (the stat skews right: at the mean the over lands %.0f%% of the time): the over %.1f%% by the projection, %.1f%% by the book's prices less the over's %.1f-point shade (%s's %.1f %s; the public plays overs, measured on 6,216 graded props); blended %.1f%% at %.0f to %.1f, the market the spine: on 4,321 graded props the model's lean added nothing to the book's price" % (
-        mu, label, line, sd, centre, PROPS_MEDIAN_OVER[mk] * 100, pm * 100, pb * 100, shade * 100, label, full * 100,
-        "in full at a coin-flip price" if shade >= full - 1e-9 else ("at nothing, the price this far from a coin flip" if shade <= 1e-9 else "fading, the price this far from a coin flip"),
-        p * 100, PROPS_ANCHOR, PROPS_MODEL_W))
+    full = PROPS_SIDE_SHADE.get(mk, 0.0)
+    if full > 0:
+        why.append("projected %.1f against %s %.1f, one sigma %.1f, the chance read around the median %.1f (the stat skews right: at the mean the over lands %.0f%% of the time): the over %.1f%% by the projection, %.1f%% by the book's prices less the over's %.1f-point shade (%s's %.1f %s; the public plays overs, measured on 6,216 graded props); blended %.1f%% at %.0f to %.1f, the market the spine" % (
+            mu, label, line, sd, centre, PROPS_MEDIAN_OVER[mk] * 100, pm * 100, pb * 100, shade * 100, label, full * 100,
+            "in full at a coin-flip price" if shade >= full - 1e-9 else ("at nothing, the price this far from a coin flip" if shade <= 1e-9 else "fading, the price this far from a coin flip"),
+            p * 100, PROPS_ANCHOR, PROPS_MODEL_W))
+    else:
+        # the shade off and the model at a fifth (5 Nov 2026): the sheet chooses a side on the prop's own evidence again
+        why.append("projected %.1f against %s %.1f, one sigma %.1f, the chance read around the median %.1f (the stat skews right: at the mean the over lands %.0f%% of the time): the over %.1f%% by the projection, %.1f%% by the book's prices%s; blended %.1f%% at %.0f to %.1f, the market the spine and the model %.0f%% of the say (5 Nov 2026: the over's shade is off, it had called the under on four props in five; the model's lean reads at its extremes, which is where the BET band fires)" % (
+            mu, label, line, sd, centre, PROPS_MEDIAN_OVER[mk] * 100, pm * 100, pb * 100, (" with the consensus read in" if abs(cons_shift) > 1e-9 else ""),
+            p * 100, PROPS_ANCHOR, PROPS_MODEL_W, 100.0 * PROPS_MODEL_W / (PROPS_ANCHOR + PROPS_MODEL_W)))
     # what moves it (21 Oct 2026, the user: "highlight the areas of the prop bet that are
     # helping with the prediction the most"): each factor's push on the projection in the
     # stat's units, the others held, each pointing at its why line. The base is his own
@@ -6175,7 +6131,7 @@ def make_nba_props(date_iso, out_dir, log, topup=False, sim_runs=NBA_SIM_RUNS):
         log("Nothing to project for %s. The run is for today unless told otherwise: python slate.py nba-props --date 2026-10-21 (or add --date to the bat file's click)." % date_iso)
     markets = ",".join(api for _mk, api, _lab in PROPS_MARKETS)
     games, credits_used, roster_cache = [], 0, {}
-    kal_players = kalshi_fetch_players(log) if events else None   # the crowd's ladders on the players (4 Nov 2026), shown beside the book's line
+    # Kalshi is off the props from 5 Nov 2026 (the user: "remove the kalshi completely from the props"); the crowd stays on the game's row
     for ev in events:
         aab, hab = nba_nick_tricode(ev.get("away_team")), nba_nick_tricode(ev.get("home_team"))
         away, home = NBA_NICK.get(aab, ev.get("away_team")), NBA_NICK.get(hab, ev.get("home_team"))
@@ -6225,7 +6181,6 @@ def make_nba_props(date_iso, out_dir, log, topup=False, sim_runs=NBA_SIM_RUNS):
             log("  the market: %s %.1f and %s %.1f implied by the total %s and the spread %s%s; the expected margin %.1f, a blowout of 15 or more %.0f%% of the time" % (
                 away, mk_a["tt"], home, mk_h["tt"], odds.get("total"), odds.get("sp"),
                 (" (the ratings' %s and %s a game)" % (mk_a["ppg"], mk_h["ppg"])) if mk_a.get("ppg") and mk_h.get("ppg") else "", script["emargin"], 100 * script["blowout"]))
-        n_kal = 0
         for pr in props:
             pid, team, how = props_match_player(pr["name"], (aab, hab), logs_this, logs_last, rosters)
             if not pid or not team:
@@ -6256,18 +6211,12 @@ def make_nba_props(date_iso, out_dir, log, topup=False, sim_runs=NBA_SIM_RUNS):
             recent = [[g_["d"], g_["opp"], 1 if g_["home"] else 0, g_["min"], props_stat(g_, pr["mk"]), props_game_factors(g_, season_logs, pr["mk"], league_pace, e2.get("g") if e1.get("g") else None)] for g_ in season_logs[-10:]]
             item = {"pid": pid, "name": e1.get("n") or e2.get("n") or pr["name"], "team": team, "opp": opp, "home": team == hab, "pos": pos,
                     "mk": pr["mk"], "line": pr["line"], "op": pr["op"], "up": pr["up"], "book": pr["book"], "books": pr["books"], "log": recent, "why": why}
-            kal = kalshi_prop(kal_players, date_iso, aab, hab, pr["name"], team, pr["mk"])
-            if kal:
-                item["kal"] = kal
-                n_kal += 1
             if proj:
                 item.update(proj)
                 mk_ = mk_h if team == hab else mk_a
                 if mk_:
                     item["mkt"] = mk_
             row["props"].append(item)
-        if kal_players:
-            log("  Kalshi: %d of %d props carry the crowd's ladder (points, rebounds, assists, threes and PRA; no two-stat combo market found on the exchange)" % (n_kal, len(row["props"])))
         row["props"].sort(key=lambda x: (-(x.get("edge") if x.get("edge") is not None else -9), x["name"], x["mk"]))
         projected = sum(1 for x in row["props"] if x.get("p") is not None)
         log("  %d placed and projected, %d placed without a projection, %d not placed%s" % (
@@ -6280,7 +6229,8 @@ def make_nba_props(date_iso, out_dir, log, topup=False, sim_runs=NBA_SIM_RUNS):
            "credits": credits_used, "games": games, "ledgers": ledgers,   # what the run read (23 Oct 2026): the page says so when nothing projects
            "method": {"anchor": PROPS_ANCHOR, "model": PROPS_MODEL_W, "side_shade": PROPS_SIDE_SHADE, "shade_tent": PROPS_SHADE_TENT, "script_per_point": PROPS_SCRIPT_PER_POINT, "script_base": PROPS_SCRIPT_BASE, "sd_k": PROPS_SD_K, "out_min_per30": PROPS_OUT_MIN_PER30, "out_rate_per30": PROPS_OUT_RATE_PER30, "dvp_weight": PROPS_DVP_WEIGHT, "dvp_shrink": PROPS_DVP_SHRINK,
                       "match_alpha": PROPS_MATCH_ALPHA, "pace": "the game's possessions against the club's own", "usage_sd": PROPS_USAGE_SD, "role_sd": PROPS_ROLE_SD, "usage_cuts": PROPS_USAGE_CUTS, "thin_sd": PROPS_THIN_SD,
-                      "script_src": "the spread", "margin_sd": PROPS_MARGIN_SD, "cons_k": PROPS_CONS_K, "cons_cap": PROPS_CONS_CAP, "cons_min_books": PROPS_CONS_MIN_BOOKS, "sim": "off the props from 5 Nov 2026 (measured null)"}}
+                      "script_src": "the spread", "margin_sd": PROPS_MARGIN_SD, "cons_k": PROPS_CONS_K, "cons_cap": PROPS_CONS_CAP, "cons_min_books": PROPS_CONS_MIN_BOOKS, "sim": "off the props from 5 Nov 2026 (measured null)",
+                      "shade": "off from 5 Nov 2026 (it had called the under on four props in five)", "kalshi": "off the props from 5 Nov 2026"}}
     path = os.path.join(out_dir, "nba-props-%s.json" % date_iso)
     with open(path, "w", encoding="utf-8") as f:
         json.dump(doc, f, indent=1)
@@ -7660,7 +7610,8 @@ def selftest():
           and props_minutes([], ll["11"]["g"]) == {"proj": 35.0, "n": 2, "season": None, "starts": 2, "last_season": True} and props_minutes([], []) is None)
     check("props: the chance of the over from a normal, a whole line pushing on the number", abs(props_over(34.134, 10.5165, 30.5)[0] - 0.6352) < 0.001 and props_over(34.134, 10.5165, 30.5)[1] == 0
           and abs(sum(props_over(30.0, 5.0, 30)) - (1 - _phi(-0.1))) < 1e-9 and props_over(20.0, 0.0, 19.5) == (1.0, 0.0))
-    check("props: the blend leans on the market (the model at a ninth, 30 Oct 2026)", abs(props_blend(0.5, 0.6352) - 0.5154) < 0.001 and props_blend(0.5, 0.5) == 0.5 and abs(props_devig(-110, -110) - 0.5) < 1e-9 and abs(props_implied(150) - 0.4) < 1e-9)
+    check("props: the blend leans on the market (the model a fifth of the say, 5 Nov 2026; a ninth from 30 Oct)", abs(props_blend(0.5, 0.6352) - 0.5277) < 0.001 and props_blend(0.5, 0.5) == 0.5 and abs(props_devig(-110, -110) - 0.5) < 1e-9 and abs(props_implied(150) - 0.4) < 1e-9
+          and PROPS_MODEL_W == 1.0 and PROPS_ANCHOR == 4.0)
     inj_ = {"DAL": [{"id": "22", "n": "Kyrie Irving", "st": "Out", "note": "knee"}, {"id": "33", "n": "Some Body", "st": "Questionable", "note": "ankle"}]}
     out_mpg, listed, maybe = props_out_minutes("DAL", inj_, lt, ll)
     check("props: the regulars out, at their own minutes, the questionable listed apart", out_mpg == 30.0 and listed == [("Kyrie Irving", 30.0, "Out")] and maybe == [("Some Body", "Questionable")])
@@ -7692,10 +7643,10 @@ def selftest():
             "dvp": {"f": 25.0 / 24.0, "f_this": 25.0 / 24.0, "n_this": 10, "f_last": None, "n_last": 0}, "htb": "HashtagBasketball: Lakers allow 25.0 points a game to PGs (120th of 150, 1 the fewest); shown, not scored", "self_out": ""}
     proj_, why_ = props_project(prop_, lt["11"]["g"], ll["11"]["g"], ctx_)
     check("props: the projection is rate x minutes, the regulars out, pace and the defence, against the line; the chance read around the median (the mean less 0.08 sigmas on points)",
-          abs(proj_["proj"] - 34.48) < 0.05 and abs(proj_["sd"] - 11.52) < 0.02 and proj_["side"] == "UNDER" and abs(proj_["p"] - 0.4762) < 0.002 and proj_["band"] == "no edge"   # the market the spine (30 Oct 2026): the book at 50/50 less the over's shade outweighs the projection's 60%
-          and abs(proj_["edge"]) < 0.0005 and proj_["price"] == -110 and abs(proj_["mins"] - 37.4) < 0.05 and abs(proj_["pm"] - 0.6048) < 0.002   # the points shade (4.0, 2 Nov 2026) less the model's lean to the over at a ninth lands on the vig: no edge by a hair
-          and abs(props_shade("pts", 0.5) - 0.04) < 1e-9 and abs(props_shade("reb", 0.5) - 0.015) < 1e-9 and abs(props_shade("pra", 0.4892) - 0.055) < 1e-9   # the shade by market, in full at a coin-flip price (2 Nov 2026)
-          and abs(props_shade("pts", 0.569) - 0.0207) < 0.0005 and props_shade("pts", 0.6341) == 0.0 and abs(props_shade("tpm", 0.4038) - 0.0169) < 0.0005 and props_shade("ast", 0.35) == 0.0   # fading past the tent, nothing beyond it
+          abs(proj_["proj"] - 34.48) < 0.05 and abs(proj_["sd"] - 11.52) < 0.02 and proj_["side"] == "OVER" and abs(proj_["p"] - 0.5213) < 0.002 and proj_["band"] == "no edge"   # the market the spine, the model a fifth (5 Nov 2026): the book at 50/50 and the projection's 60% blend to 52.1, short of the vig
+          and abs(proj_["edge"] + 0.0025) < 0.001 and proj_["price"] == -110 and abs(proj_["mins"] - 37.4) < 0.05 and abs(proj_["pm"] - 0.6048) < 0.002
+          and props_shade("pts", 0.5) == 0.0 and props_shade("reb", 0.5) == 0.0 and props_shade("pra", 0.4892) == 0.0 and props_shade("tpm", 0.4038) == 0.0 and all(v == 0.0 for v in PROPS_SIDE_SHADE.values()) and set(PROPS_SIDE_SHADE) == set(PROPS_SD_K)   # the over's shade off (5 Nov 2026): it had called the under on four props in five
+          and any("the over's shade is off" in w and "the model 20% of the say" in w for w in why_)
           and abs(props_over(34.48 - 0.08 * 11.52, 11.52, 30.5)[0] - proj_["pm"]) < 0.001   # the sigma carries the thin-history factor (27 Oct 2026): 10.86 x 1.06 on 143 minutes of evidence
           and any(w == "his rate rests on 143 minutes of evidence (3 games this season, last season behind it): the miss runs wider on a thin history, measured, so the sigma is ×1.06" for w in why_))
     # the crowd on Kalshi (4 Nov 2026): the exchange's markets parsed, matched to a game by code in either order, summarised
@@ -7739,29 +7690,9 @@ def selftest():
           and abs(kal_tta - 114.1) < 1e-9 and abs(kal_tth - 117.5) < 1e-9 and kalshi_team_totals({}) == (None, None) and kalshi_team_totals({"tt": {"a": kal_g["tt"]["a"]}}) == (114.1, None)
           and kalshi_summary(kal_g, "Wizards", "Hawks") == "Wizards 42.5 cents (42/43, 140k contracts) · Hawks 57.5 cents (57/58, 150k contracts) · the crowd's spread Hawks -2.8 · the crowd's total 232.2 · the crowd's team totals Wizards 114.1 · Hawks 117.5"
           and kalshi_summary(kalshi_game(kal_p, "2026-11-07", "SAS", "POR"), "Spurs", "Trail Blazers") == "Spurs 60.5 cents (54/67, 12 contracts) · Trail Blazers 40.5 cents (35/46, 24 contracts)")
-    # the player ladders (4 Nov 2026): the exchange's "25+" as a floor of 24.5, the name off the title with its accents, the club off the ticker
-    kal_pdoc = {"markets": [
-        {"ticker": "KXNBAPTS-26NOV04LALSAC-LALLDONCIC77-25", "event_ticker": "KXNBAPTS-26NOV04LALSAC", "title": "Luka Dončić: 25+ points", "floor_strike": 24.5, "yes_bid_dollars": "0.8300", "yes_ask_dollars": "0.8400", "last_price_dollars": "0.8400", "volume_fp": "1262.12"},
-        {"ticker": "KXNBAPTS-26NOV04LALSAC-LALLDONCIC77-35", "event_ticker": "KXNBAPTS-26NOV04LALSAC", "title": "Luka Dončić: 35+ points", "floor_strike": 34.5, "yes_bid_dollars": "0.4800", "yes_ask_dollars": "0.4900", "last_price_dollars": "0.4900", "volume_fp": "3248.51"},
-        {"ticker": "KXNBAPTS-26NOV04LALSAC-LALLDONCIC77-30", "event_ticker": "KXNBAPTS-26NOV04LALSAC", "title": "Luka Dončić: 30+ points", "floor_strike": 29.5, "yes_bid_dollars": "0.7100", "yes_ask_dollars": "0.7200", "last_price_dollars": "0.7000", "volume_fp": "389.96"},
-        {"ticker": "KXNBAPTS-26NOV04LALSAC-SACDSABONIS11-10", "event_ticker": "KXNBAPTS-26NOV04LALSAC", "title": "Domantas Sabonis: 10+ points", "floor_strike": 9.5, "yes_bid_dollars": "0.6900", "yes_ask_dollars": "0.8000", "last_price_dollars": "0.8000", "volume_fp": "9.68"}]}
-    kal_pl = kalshi_player_parse(kal_pdoc, "pts")
-    kal_lal = kal_pl.get(("2026-11-04", "LAL", "SAC")) or {}
-    check("kalshi: a player series parses by game and player (the name off the title, the club off the ticker, the rungs by floor), and a prop finds its ladder by name whatever the accents, the clubs either way round, and nothing for a market the exchange does not run",
-          set(kal_pl) == {("2026-11-04", "LAL", "SAC")} and set(kal_lal) == {props_name_key("Luka Doncic"), props_name_key("Domantas Sabonis")}
-          and kal_lal[props_name_key("Luka Doncic")]["team"] == "LAL" and kal_lal[props_name_key("Luka Doncic")]["name"] == "Luka Dončić" and [r[0] for r in kal_lal[props_name_key("Luka Doncic")]["mk"]["pts"]] == [24.5, 29.5, 34.5]
-          and kalshi_prop(kal_pl, "2026-11-04", "SAC", "LAL", "Luka Doncic", "LAL", "pts") == {"r": [[24.5, 0.83, 0.84, 0.84, 1262], [29.5, 0.71, 0.72, 0.7, 390], [34.5, 0.48, 0.49, 0.49, 3249]], "team": "LAL"}
-          and kalshi_prop(kal_pl, "2026-11-04", "LAL", "SAC", "Luka Doncic", "LAL", "pr") is None and kalshi_prop(kal_pl, "2026-11-04", "LAL", "SAC", "Austin Reaves", "LAL", "pts") is None
-          and kalshi_prop(kal_pl, "2026-11-05", "LAL", "SAC", "Luka Doncic", "LAL", "pts") is None and kalshi_prop(None, "2026-11-04", "LAL", "SAC", "Luka Doncic", "LAL", "pts") is None)
-    # the threes series (the user's second address, KXNBA3PT): a make a rung, "1+" a floor of 0.5
-    kal_3 = kalshi_player_parse({"markets": [
-        {"ticker": "KXNBA3PT-26NOV04PHIDET-DETCCUNNINGHAM2-1", "event_ticker": "KXNBA3PT-26NOV04PHIDET", "title": "Cade Cunningham: 1+ threes", "floor_strike": 0.5, "yes_bid_dollars": "0.9000", "yes_ask_dollars": "0.9200", "last_price_dollars": "0.9100", "volume_fp": "55"},
-        {"ticker": "KXNBA3PT-26NOV04PHIDET-DETCCUNNINGHAM2-3", "event_ticker": "KXNBA3PT-26NOV04PHIDET", "title": "Cade Cunningham: 3+ threes", "floor_strike": 2.5, "yes_bid_dollars": "0.3000", "yes_ask_dollars": "0.3200", "last_price_dollars": "0.3100", "volume_fp": "80.4"},
-        {"ticker": "KXNBA3PT-26NOV04PHIDET-DETCCUNNINGHAM2-2", "event_ticker": "KXNBA3PT-26NOV04PHIDET", "title": "Cade Cunningham: 2+ threes", "floor_strike": 1.5, "yes_bid_dollars": "0.6200", "yes_ask_dollars": "0.6400", "last_price_dollars": "0.6300", "volume_fp": "210"}]}, "tpm")
-    check("kalshi: the threes series parses a make a rung (1+ a floor of 0.5, the rungs sorted), a threes prop finds its ladder, and a two-stat combo, which the exchange does not run, gets nothing",
-          KALSHI_PLAYER_SERIES["tpm"] == "KXNBA3PT" and "pr" not in KALSHI_PLAYER_SERIES and set(kal_3) == {("2026-11-04", "PHI", "DET")}
-          and kalshi_prop(kal_3, "2026-11-04", "PHI", "DET", "Cade Cunningham", "DET", "tpm") == {"r": [[0.5, 0.9, 0.92, 0.91, 55], [1.5, 0.62, 0.64, 0.63, 210], [2.5, 0.3, 0.32, 0.31, 80]], "team": "DET"}
-          and kalshi_prop(kal_3, "2026-11-04", "PHI", "DET", "Cade Cunningham", "DET", "pr") is None and kalshi_prop(kal_3, "2026-11-04", "PHI", "DET", "Cade Cunningham", "DET", "pts") is None)
+    # the player ladders came off the props on 5 Nov 2026 (the user: "remove the kalshi completely from the props"); the props run carries no Kalshi
+    check("props: Kalshi is off the props (5 Nov 2026): no player series, no ladder on a prop, and the slate says so in its method block",
+          "kalshi_prop" not in globals() and "kalshi_fetch_players" not in globals() and "KALSHI_PLAYER_SERIES" not in globals() and "kal" not in proj_)
     parts_ = dict((p["k"], p) for p in proj_["parts"])
     check("props: what moves it: the base is his rate at his minutes, the regulars out, pace and the defence sum from it to the projection, the prior and the minutes trend say what sits inside it, each pointing at its why line",
           set(parts_) == {"prior", "minutes", "out", "pace", "dvp"} and abs(proj_["base"] + parts_["out"]["eff"] + parts_["pace"]["eff"] + parts_["dvp"]["eff"] - proj_["proj"]) < 0.03
@@ -7851,7 +7782,7 @@ def selftest():
           and any(w == "Lakers allow 1.04x the league's points per minute to guards (this season 1.04 over 10 games): x1.031 at 0.75 weight, measured" for w in why_)
           and any(w == ctx_["htb"] for w in why_)
           and any(w.startswith("home 30.9 / road 31.0 per 36 over 178 minutes: shown, not scored") and w.endswith("; tonight on the road") for w in why_)
-          and any(w == "projected 34.5 against points 30.5, one sigma 11.5, the chance read around the median 33.6 (the stat skews right: at the mean the over lands 47% of the time): the over 60.5% by the projection, 46.0% by the book's prices less the over's 4.0-point shade (points's 4.0 in full at a coin-flip price; the public plays overs, measured on 6,216 graded props); blended 47.6% at 4 to 0.5, the market the spine: on 4,321 graded props the model's lean added nothing to the book's price" for w in why_))
+          and any(w == "projected 34.5 against points 30.5, one sigma 11.5, the chance read around the median 33.6 (the stat skews right: at the mean the over lands 47% of the time): the over 60.5% by the projection, 50.0% by the book's prices; blended 52.1% at 4 to 1.0, the market the spine and the model 20% of the say (5 Nov 2026: the over's shade is off, it had called the under on four props in five; the model's lean reads at its extremes, which is where the BET band fires)" for w in why_))
     # the opponent's absences (28 Oct 2026): named on every prop, scored on a big man's rebounds when their centre sits
     ctx_o = dict(ctx_m)
     ctx_o.update({"opp_out_mpg": 62.0, "opp_out_names": [("Anthony Davis", 34.0, "Out"), ("Austin Reaves", 28.0, "Out")], "opp_out_c_mpg": 34.0, "opp_out_c_names": [("Anthony Davis", 34.0)]})

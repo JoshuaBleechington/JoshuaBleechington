@@ -389,7 +389,7 @@ const CHECKS = ["dome","playoff"];
       { gid: '401909834', away: 'Hawks', home: 'Magic', aab: 'ATL', hab: 'ORL', spread: -4.5, total: 229.5, pace: 99.8, props: [
         { pid: '3037789', name: 'Trae Young', team: 'ATL', opp: 'ORL', home: false, pos: 'PG', mk: 'pts', line: 24.5, op: -110, up: -110, book: 'fanatics', books: { fanatics: [24.5, -110, -110], draftkings: [25.5, -115, -105] },
           proj: 27.2, sd: 9.4, pm: 0.612, pb: 0.5, p: 0.5604, push: 0, side: 'OVER', chance: 0.5604, price: -110, need: 0.5238, edge: 0.0366, band: 'BET', mins: 35.1, rate36: 27.9,
-          kal: { r: [[19.5, 0.70, 0.72, 0.71, 100], [24.5, 0.46, 0.48, 0.47, 500], [29.5, 0.24, 0.26, 0.25, 50]], team: 'ATL' },   // the crowd's ladder (4 Nov 2026): 47% for 25+, the line a rung
+          kal: { r: [[19.5, 0.70, 0.72, 0.71, 100], [24.5, 0.46, 0.48, 0.47, 500], [29.5, 0.24, 0.26, 0.25, 50]], team: 'ATL' },   // a ladder a file from 4 Nov 2026 still carries: ignored from 5 Nov (Kalshi is off the props)
           why: ['27.9 points per 36 this season (3 games, 104 minutes)', '35.1 minutes projected'], log: [['2026-10-15', 'MIA', 0, 34.0, 26], ['2026-10-17', 'CHI', 1, 31.0, 22], ['2026-10-19', 'BOS', 0, 12.5, null]] },
         { pid: '4066261', name: 'Jalen Suggs', team: 'ORL', opp: 'ATL', home: true, pos: 'SG', mk: 'ast', line: 4.5, op: -120, up: -100, book: 'fanatics', books: { fanatics: [4.5, -120, -100] },
           why: ['no history to project from (under 60 minutes with the stat in the ledgers)'], log: [] },
@@ -497,9 +497,8 @@ const CHECKS = ["dome","playoff"];
       'props: the record tile keeps the props by band, side and market, the void counted apart', propsT.tileText.slice(0, 500));
   chk(/3 props graded on the Props tab/.test(propsT.slateMsg), 'props: the slate message says how many props the grade file graded', propsT.slateMsg.slice(-160));
   chk(propsT.restored === 1 && propsT.viewOff && propsT.colsBack && propsT.nbaPressed === 'true', 'props: a backup\'s props restore, and a sport button brings the matchup columns back', JSON.stringify({ restored: propsT.restored, off: propsT.viewOff, cols: propsT.colsBack, nba: propsT.nbaPressed }));
-  chk(propsT.best.length >= 1 && /Kalshi: the crowd 47\.0% on the OVER \(the sheet 56\.0%\) · better on Kalshi: 48¢ needs 49\.7% after the fee v [-−]110 needing 52\.4%/.test(propsT.best[0])
-      && propsT.whyOpen.length === 1 && /KALSHI'S CROWD 47\.0% the crowd's chance of the OVER at 24\.5 · its number 23\.9 · 48¢ needs 49\.7% after the fee, better than [-−]110/i.test(propsT.whyOpen[0]),
-      'props: a prop that carries the crowd\'s ladder reads the crowd\'s chance of its side at the book\'s line on the best card and as a panel tile (47% for Trae Young 25+, the line a rung), the crowd\'s own number (23.9), and the price after the fee against the book\'s', JSON.stringify({ best: (propsT.best[0] || '').slice(-260), panel: (propsT.whyOpen[0] || '').replace(/^[\s\S]*?(KALSHI'S CROWD)/i, '$1').slice(0, 200) }));
+  chk(propsT.best.length >= 1 && !/Kalshi/i.test(propsT.best[0]) && propsT.whyOpen.length === 1 && !/Kalshi/i.test(propsT.whyOpen[0]),
+      'props: Kalshi is off the props (5 Nov 2026): a prop that still carries a ladder from a 4 Nov file shows no crowd line on the best card and no crowd tile on its panel', JSON.stringify({ best: (propsT.best[0] || '').slice(-200), panel: (propsT.whyOpen[0] || '').slice(0, 200) }));
   // the Example button: one game's props computed at build time through the slate's projection, previewed and never saved
   const propsEx = await pg.evaluate(async () => {
     const wait = () => new Promise(r => setTimeout(r, 80));
@@ -513,6 +512,7 @@ const CHECKS = ["dome","playoff"];
     const rows = document.querySelectorAll('#propsTable tr[data-prop]').length;
     document.getElementById('propsAll').checked = true; document.getElementById('propsAll').dispatchEvent(new Event('change', { bubbles: true })); await wait();
     const rowsAll = document.querySelectorAll('#propsTable tr[data-prop]').length;
+    const sides = [...document.querySelectorAll('#propsTable tr[data-prop]')].map(tr => tr.querySelectorAll('td')[1].textContent.trim().replace(/\s+[A-Z]$/, '') + ' ' + tr.querySelectorAll('td')[4].textContent.trim());
     const whys = [];
     for (const tr of [...document.querySelectorAll('#propsTable tr[data-prop]')]) {
       tr.click(); await wait();
@@ -538,7 +538,7 @@ const CHECKS = ["dome","playoff"];
     document.getElementById('m-props').click(); await wait();
     const after = document.getElementById('propsCount').textContent;
     document.getElementById('m-nba').click(); await wait();
-    return { on, count, msg, best, rows, rowsAll, whys, saved, tileSame: tileBefore === tileAfter, before, after, view1, view2, view3, view4, view5 };
+    return { on, count, msg, best, rows, rowsAll, sides, whys, saved, tileSame: tileBefore === tileAfter, before, after, view1, view2, view3, view4, view5 };
   });
   const pct = (s) => parseFloat(String(s).replace('%', ''));
   chk(propsEx.view1.markets.length >= 1 && propsEx.view1.markets.every(m => m === 'rebounds') && /of 8 shown$/.test(propsEx.view1.shown)
@@ -549,10 +549,10 @@ const CHECKS = ["dome","playoff"];
       'props table: the market filter keeps the rebounds, a click on Chance sorts it high to low and again low to high, the band and name filters narrow it, and Reset view puts it back', JSON.stringify({ v1: propsEx.view1, v2: { head: propsEx.view2.head, shown: propsEx.view2.shown, chances: propsEx.view2.chances }, v3: propsEx.view3, v4: propsEx.view4, v5: propsEx.view5 }));
   chk(propsEx.on && /^EXAMPLE · 8 props on/.test(propsEx.count) && /An example/.test(propsEx.msg) && propsEx.rows === 7 && propsEx.rowsAll === 8,
       'props example: eight props on 76ers @ Knicks, seven projected (Embiid is out), the count says EXAMPLE', JSON.stringify({ count: propsEx.count, rows: propsEx.rows, all: propsEx.rowsAll }));
-  chk(propsEx.best.length === 5 && /#1 · LEAN .*Paul George UNDER 2\.5 threes 53\.5% · \+100 needs 50\.0% · edge \+3\.5/.test(propsEx.best[0]) && propsEx.best.every(b => /UNDER/.test(b) && / · LEAN/.test(b))
-      && propsEx.best.some(b => /Tyrese Maxey UNDER 25\.5 points 53\.3% · [-−]110 needs 52\.4% · edge \+0\.9/.test(b)) && propsEx.best.some(b => /Karl-Anthony Towns UNDER 11\.5 rebounds 53\.9% · [-−]105 needs 51\.2% · edge \+2\.7/.test(b))
-      && !propsEx.best.some(b => /Jalen Brunson|OG Anunoby/.test(b)),
-      'props example: the best list ranks the props by edge with the market as the spine, the over\'s shade by market (2 Nov 2026) and the books\' consensus in the simulation\'s place (5 Nov 2026): George under the threes first (the threes\' 4-point shade at +100, the books level with the carded line), every projected prop an UNDER lean, Maxey\'s and Towns\' unders lifted by a consensus a point under the carded line, and Brunson\'s and Anunoby\'s unders out of the list with the books a point above it', JSON.stringify(propsEx.best.map(b => b.slice(0, 90))));
+  chk(propsEx.best.length === 2 && /#1 · LEAN .*Karl-Anthony Towns UNDER 11\.5 rebounds 53\.2% · [-−]105 needs 51\.2% · edge \+2\.0/.test(propsEx.best[0]) && /#2 · LEAN .*Paul George UNDER 2\.5 threes 54\.2% · [-−]115 needs 53\.5% · edge \+0\.7/.test(propsEx.best[1])
+      && !propsEx.best.some(b => /Jalen Brunson|OG Anunoby|Tyrese Maxey|Mikal Bridges|Kelly Oubre/.test(b))
+      && propsEx.sides.length === 8 && propsEx.sides.filter(s => / OVER$/.test(s)).length === 2 && propsEx.sides.some(s => /^Jalen Brunson OVER$/.test(s)) && propsEx.sides.some(s => /^Tyrese Maxey OVER$/.test(s)) && propsEx.sides.filter(s => / UNDER$/.test(s)).length === 5 && propsEx.sides.filter(s => /Joel Embiid listed Out/.test(s)).length === 1,
+      'props example: with the over\'s shade off and the model a fifth of the say (5 Nov 2026) the sheet chooses on the prop\'s own evidence again, both ways: Brunson\'s and Maxey\'s points read OVER in the table, five props UNDER, Embiid\'s row says he is out, and the best list holds the two that clear their price, Towns\' under first (the books a point under the carded line) and George\'s under at -115 second; no prop reaches the BET band', JSON.stringify({ best: propsEx.best.map(b => b.slice(0, 90)), sides: propsEx.sides }));
   chk(propsEx.whys.some(w => /Joel Embiid out \(31 minutes a game between them\): \+1\.5 minutes and \+0\.58 points per 36, the pooled rule, scored/.test(w)) && propsEx.whys.some(w => /listed Out on ESPN: no projection/.test(w))
       && propsEx.whys.some(w => /Knicks allow 0\.97x the league's points per minute to guards \(this season 0\.95 over 16 games, last season 0\.99\): x0\.978 at 0\.75 weight, measured/.test(w)) && propsEx.whys.some(w => /HashtagBasketball: 76ers allow/.test(w)),
       'props example: the why lines are the slate\'s own, the regulars-out rule, the defence factor, the website\'s rank and the listed-out man', JSON.stringify(propsEx.whys.slice(0, 2)).slice(0, 600));
@@ -799,7 +799,7 @@ const CHECKS = ["dome","playoff"];
     return { list, hidden, pHead0, pBtns, pRows, dlgOpen, pList, rowTaking, cardOn, pCount, pHead1, panelBtn, panelOn, panelOff, pList2, pHead2, pSaid, gone, boardProps };
   });
   chk(!takeR.hidden && takeR.list.length === 2 && /^TAKING · MLB/.test(takeR.list[0]), 'take: the mark survives a reload of the page', JSON.stringify({ hidden: takeR.hidden, list: takeR.list }));
-  chk(takeR.pHead0 && takeR.pBtns === 7 && takeR.pRows === 7 && !takeR.dlgOpen && takeR.pList.length === 1 && /^TAKING · NBA PROP · LEAN Paul George UNDER 2\.5 threes 5\d\.\d% · \+100 needs 50\.0% 76ers @ Knicks · fanatics · projected 2\.\d\d .*Taking$/i.test(takeR.pList[0])
+  chk(takeR.pHead0 && takeR.pBtns === 7 && takeR.pRows === 7 && !takeR.dlgOpen && takeR.pList.length === 1 && /^TAKING · NBA PROP · LEAN Paul George UNDER 2\.5 threes 5\d\.\d% · [-−]115 needs 53\.5% 76ers @ Knicks · fanatics · projected 2\.\d\d .*Taking$/i.test(takeR.pList[0])
       && takeR.rowTaking && takeR.cardOn && takeR.pCount === '1 marked' && !takeR.pHead1 && takeR.panelOn && /Taking/.test(takeR.panelBtn) && takeR.panelOff && takeR.pList2 === 0 && takeR.pHead2
       && /Copied the props you are taking|the text is below/.test(takeR.pSaid) && takeR.gone === 0 && takeR.boardProps === 0,
       'take: a prop\'s Take button on the best card marks it without opening the panel; the row lights, Taking lists it with a count, the panel\'s own button shows it on and unmarks it, the copy button speaks, and the example\'s mark goes with the example',
@@ -963,15 +963,15 @@ const CHECKS = ["dome","playoff"];
   const simMaxey = simPropsT.rows.find(r => /^Tyrese Maxey/.test(r.name)), simBig = simPropsT.rows.slice().sort((a, b) => simGap(b) - simGap(a))[0];
   chk(simPropsT.strip.length === 1 && /^pk simg mkt\|76ers @ Knicks · the market PHI 113 \(112\.9 a game\) · NYK 118\.5 \(115\.6 a game\) total 231\.5 · spread -5\.5 each club's points implied by the book's total and spread, against its points a game by the ratings · shown, not scored expected margin 10\.9 · blowout of 15 or more 27%, off the spread · the carded line sits off the books' consensus on 5 of 7 props$/.test(simPropsT.strip[0])
       && simPropsT.head.slice(-4).join('|') === 'Levers|Sim|Usage|Take' && simPropsT.rows.length === 7 && simPropsT.rows.every(r => /^\d+(\.\d)?$/.test(r.sim) && /^simc( pos| neg)?$/.test(r.cls) && (simGap(r) > 0) === /pos/.test(r.cls) && (simGap(r) < 0) === /neg/.test(r.cls) && /the books' consensus line across 3 books/.test(r.title))
-      && simMaxey && simMaxey.side === 'UNDER' && simMaxey.line === 25.5 && simMaxey.sim === '24.5' && simMaxey.cls === 'simc pos',
-      'props: the market\'s strip takes the simulation\'s place above the picks (5 Nov 2026): each club\'s points implied by the book\'s total and spread against the ratings\' number, the expected margin and the blowout off the spread, and how many carded lines sit off the books\' consensus; the Sim column carries the consensus line on every projected prop, green when the carded line sits off it the pick\'s way (Maxey\'s under at 25.5 with the books at 24.5)', JSON.stringify({ strip: simPropsT.strip, head: simPropsT.head.slice(-4), rows: simPropsT.rows.map(r => r.name + ' ' + r.side + ' ' + r.line + ' sim ' + r.sim + ' ' + r.cls) }));
-  chk(simPropsT.best.length === 5 && simPropsT.best.every(b => /→n5 shopline( pos| neg)?\|The books: 3 post \d+(\.\d)? · fanatics \d+(\.\d)? sits (with them|1 (above|below) them, (the UNDER's way|against the UNDER) · the book's chance read [-−+]\d\.\d on the over, measured)$/.test(b))
+      && simMaxey && simMaxey.side === 'OVER' && simMaxey.line === 25.5 && simMaxey.sim === '24.5' && simMaxey.cls === 'simc neg',
+      'props: the market\'s strip takes the simulation\'s place above the picks (5 Nov 2026): each club\'s points implied by the book\'s total and spread against the ratings\' number, the expected margin and the blowout off the spread, and how many carded lines sit off the books\' consensus; the Sim column carries the consensus line on every projected prop, green when the carded line sits off it the pick\'s way and red against it (Maxey\'s over at 25.5 with the books at 24.5, red)', JSON.stringify({ strip: simPropsT.strip, head: simPropsT.head.slice(-4), rows: simPropsT.rows.map(r => r.name + ' ' + r.side + ' ' + r.line + ' sim ' + r.sim + ' ' + r.cls) }));
+  chk(simPropsT.best.length === 2 && simPropsT.best.every(b => /→n5 shopline( pos| neg)?\|The books: 3 post \d+(\.\d)? · fanatics \d+(\.\d)? sits (with them|1 (above|below) them, (the UNDER's way|against the UNDER) · the book's chance read [-−+]\d\.\d on the over, measured)$/.test(b))
       && simPropsT.best.filter(b => /the UNDER's way/.test(b)).every(b => /shopline pos/.test(b)) && simPropsT.best.filter(b => /against the UNDER/.test(b)).every(b => /shopline neg/.test(b)) && simPropsT.best.filter(b => /sits with them/.test(b)).every(b => /shopline\|/.test(b))
-      && simPropsT.best.filter(b => /the UNDER's way/.test(b)).length === 2 && simPropsT.best.filter(b => /against the UNDER/.test(b)).length === 1
+      && simPropsT.best.filter(b => /the UNDER's way/.test(b)).length === 1 && simPropsT.best.filter(b => /against the UNDER/.test(b)).length === 0 && simPropsT.best.filter(b => /sits with them/.test(b)).length === 1
       && simPropsT.yes.length === 2 && simPropsT.yes.every(c => c === 'simc pos') && simPropsT.no.length === 3 && simPropsT.no.every(c => c === 'simc neg') && simPropsT.yes.length + simPropsT.no.length === simPropsT.rows.filter(r => simGap(r) !== 0).length
       && simPropsT.sorted.length === 7 && simPropsT.sorted[0].name === simBig.name && simPropsT.sorted[0].mk === simBig.mk && simPropsT.sorted.every((r, i, a) => i === 0 || simGap(r) <= simGap(a[i - 1])) && /sorted by sim ▾/.test(simPropsT.shown)
       && simPropsT.after.sim === '' && simPropsT.after.n === 7 && !/sorted/.test(simPropsT.after.shown),
-      'props: every best card ends with the books\' consensus against the carded line, green when it sits the pick\'s way and red against it (two unders lifted, one against, two level), the filter keeps the props the consensus sides with (or against), the column sorts by the gap toward the pick, and Reset view clears both', JSON.stringify({ best: simPropsT.best.map(b => b.slice(0, 140)), yes: simPropsT.yes, no: simPropsT.no, sorted: simPropsT.sorted.map(r => r.name + ' ' + r.side + ' ' + r.line + ' ' + r.sim), shown: simPropsT.shown, after: simPropsT.after }));
+      'props: every best card ends with the books\' consensus against the carded line, green when it sits the pick\'s way and red against it (Towns\' under lifted, George\'s level), the filter keeps the props the consensus sides with (or against), the column sorts by the gap toward the pick, and Reset view clears both', JSON.stringify({ best: simPropsT.best.map(b => b.slice(0, 140)), yes: simPropsT.yes, no: simPropsT.no, sorted: simPropsT.sorted.map(r => r.name + ' ' + r.side + ' ' + r.line + ' ' + r.sim), shown: simPropsT.shown, after: simPropsT.after }));
 
   // ---- 26 Oct 2026: what happened on each of his last games -- the slate writes beside each game what the box says (a regular back or out,
   //      a blowout, his role, then his minutes, shots and shooting against his season's, then overtime and the pace); the panel's Last games table
@@ -980,7 +980,7 @@ const CHECKS = ["dome","playoff"];
     const wait = () => new Promise(r => setTimeout(r, 90));
     document.getElementById('propsReset').click(); await wait();
     document.getElementById('m-props').click(); await wait(); document.getElementById('propsExample').click(); await wait();
-    [...document.querySelectorAll('#propsBest .pk')].find(e => /Kelly Oubre/.test(e.textContent)).click(); await wait();
+    [...document.querySelectorAll('#propsTable tr[data-prop]')].find(e => /Kelly Oubre/.test(e.textContent)).click(); await wait();   // off the best list since 5 Nov 2026 (his under clears no price at the new blend): the table row opens the same panel
     const dlg = document.getElementById('propDetail');
     const head = [...dlg.querySelectorAll('.pd-log thead th')].map(t => t.textContent), h4 = ([...dlg.querySelectorAll('h4')].find(h => /^Last games/i.test(h.textContent)) || {}).innerText.replace(/\s+/g, ' ').trim();
     const rows = [...dlg.querySelectorAll('.pd-log tbody tr')].map(tr => { const tds = tr.querySelectorAll('td'), b = tr.querySelector('td.pd-what b'); return { stat: tds[3].textContent.trim(), mark: tds[3].querySelector('b.lg').className, what: tds[4] ? tds[4].textContent.trim() : null, first: b ? b.textContent : '', cls: b ? b.className : '' }; });
@@ -1069,17 +1069,16 @@ const CHECKS = ["dome","playoff"];
     document.getElementById('m-props').click(); await wait(); document.getElementById('propsExample').click(); await wait();
     const card1 = [...document.querySelectorAll('#propsBest .pk')].find(e => /Paul George/.test(e.textContent)), cardBtn1 = card1.querySelector('.btn.go[data-pgo]'), cardLive = cardBtn1 && !cardBtn1.classList.contains('off');
     card1.click(); await wait();
-    const kalLine = txt(dlg.querySelector('.pd-kalshi')), kalStrip = [...document.querySelectorAll('#propsSim .pk .kalshi-strip')].map(txt);
+    const kalLine = dlg.querySelector('.pd-kalshi') ? txt(dlg.querySelector('.pd-kalshi')) : '', kalStrip = [...document.querySelectorAll('#propsSim .pk .kalshi-strip')].map(txt), panelKal = /Kalshi/i.test(txt(dlg)), stripKal = /Kalshi/i.test(txt(document.getElementById('propsSim')));
     document.getElementById('propDetailClose').click(); await wait();
     cardBtn1.click(); await wait();
     const propsHidden = document.getElementById('propsView').hidden, dlgHidden = dlg.hidden, away = document.getElementById('away').value, home = document.getElementById('home').value, nbaPressed = document.getElementById('m-nba').getAttribute('aria-pressed');
     const lineupPanel = txt(document.getElementById('nbaLineupPanel')).slice(0, 80);
     await smStore.removeItem('callsheet3.card.v1'); document.getElementById('clear').click(); await wait();
-    return { cardOff0, cardTitle0, fives, me, heads, panelOff, panelText, takeStill, stillOpen, said, awayBefore, cardLive, propsHidden, dlgHidden, away, home, nbaPressed, lineupPanel, kalLine, kalStrip };
+    return { cardOff0, cardTitle0, fives, me, heads, panelOff, panelText, takeStill, stillOpen, said, awayBefore, cardLive, propsHidden, dlgHidden, away, home, nbaPressed, lineupPanel, kalLine, kalStrip, panelKal, stripKal };
   });
-  chk(/^The crowd on Kalshi: Knicks by 5\.3 \(the book's spread (Knicks|76ers) [-−]\d+(\.\d)?\) · total 229\.3 \(the book's \d+(\.\d)?\) · team totals 76ers 108\.3 · Knicks 118\.9 · Knicks to win 69\.5% · from the matchup's row on the NBA card; shown, not scored$/.test(goT.kalLine)
-      && goT.kalStrip.length === 1 && /^The crowd on Kalshi: Knicks by 5\.3 \(the book's spread (Knicks|76ers) [-−]\d+(\.\d)?\) · total 229\.3 \(the book's \d+(\.\d)?\) · team totals 76ers 108\.3 · Knicks 118\.9 · Knicks to win 69\.5%$/.test(goT.kalStrip[0]),
-      'props: once the NBA card\'s row for the game carries the crowd on Kalshi, the prop\'s panel and the game\'s strip read the crowd\'s spread, total, team totals and winner off it beside the book\'s numbers (the Knicks by 5.3 at even money, the total 229.3, the 76ers 108.3 and the Knicks 118.9, the Knicks to win 69.5%)', JSON.stringify({ line: goT.kalLine, strip: goT.kalStrip }));
+  chk(goT.kalLine === '' && goT.kalStrip.length === 0 && goT.panelKal === false && goT.stripKal === false,
+      'props: Kalshi is off the props (5 Nov 2026): with the crowd\'s block on the NBA card\'s row for the game, the prop\'s panel and the game\'s strip carry no crowd line (the crowd stays on the NBA card)', JSON.stringify({ line: goT.kalLine, strip: goT.kalStrip, panel: goT.panelKal, stripKal: goT.stripKal }));
   chk(goT.cardOff0 === true && /^The NBA card has no row for 76ers @ Knicks on /.test(goT.cardTitle0) && goT.fives.length === 2 && /^76ers EXPECTED PG Tyrese Maxey SG VJ Edgecombe SF Paul George THIS PROP PF Kelly Oubre Jr\. C Adem Bona May not play: C Andre Drummond \(Questionable\)\.$/i.test(goT.fives[0])
       && /^Knicks CONFIRMED PG Jalen Brunson SG Mikal Bridges SF OG Anunoby PF Josh Hart C Karl-Anthony Towns$/i.test(goT.fives[1]) && /^SF Paul George THIS PROP$/i.test(goT.me) && goT.heads.join(',') === 'lbadge exp|expected,lbadge conf|confirmed'
       && goT.panelOff === true && /^open the matchup on the nba card$/i.test(goT.panelText) && goT.takeStill && goT.stillOpen && /^The NBA card has no row for 76ers @ Knicks on .+: load the NBA slate for the date \(Load slate\) and Add the game, and the button opens it\.$/.test(goT.said),

@@ -2461,3 +2461,32 @@ and against it, half a point or more). A file from before the change
 still shows its simulation. The selftest covers the spread's script, the
 consensus and the market block; the harness reads the strip, the card,
 the panel, the column and the filter on a seeded night.
+
+**One app a ticket, the same evening.** The user: "when you put together
+the same game pairs or the best 2 leg parlays, can you pair them up with
+the same bet app?... that way its easier to put the pairs in the correct
+apps." From 5 November each same-game pair is built at one of the four
+apps (Fanatics, DraftKings, FanDuel, BetMGM): both legs read at that app's
+line and price off the books the props run keeps on every prop, the
+chance re-read at the app's line by the slate's own blend on the page
+(`propChanceAt`: the model's chance from the centre and the sigma, the
+book's from the prices less the shade, the consensus shift at that line,
+blended at the anchor's weight) when it differs from the carded one, the
+app with the best edge chosen. The card says "at DraftKings", the panel
+says it and lists the same ticket at each app with the chosen one marked;
+a pair no single app posts is listed last, its legs split across apps.
+A ticket's legs grade on the app's lines against the actual, and its
+units at the app's prices. Nights before the 5th keep the carded legs, so
+the record stands as it was, and the books stay on a prop through the
+trim so the pairs can always be rebuilt.
+
+**The levers that count.** The user: "for the levers, I want to keep the
+ones that matter and only have levers for measurable movement that helps
+make the prop bet more accurate." The levers list, the tally on the card
+and in the table, the bold why lines and the Levers filter now read the
+measured levers only: the regulars out, their centre out, the game
+script, pace, the defence by position and the books' consensus. Last
+season's prior and the minutes trend are what sits inside the start, not
+pushes on it, and the matchup from the profiles measured null; they read
+as a line of their own under What moves it ("Inside the start, not a
+lever") and stay in the why.

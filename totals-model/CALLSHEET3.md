@@ -2691,3 +2691,93 @@ tile's own line, "his last three with the pick W-L · against it W-L
 (shown, not scored)", with two tiles on the Props tab. The selftest reads
 the form block and the why line; the harness reads the line on George's
 card and panel with its colour and the why line. Nothing scored changed.
+
+## The close, the best app, the BET band in front, the prior capped, 6 Nov 2026
+
+The user, on the suggestions: "Ok let make the suggested changes with
+thorough testing first. And for the bet band cards, make that more visible
+and why. The shrink you are referring to, let do that as well but really
+make sure its tested because i dont want to run into any of the recent
+issues we fixed."
+
+**The prior, tested before it was touched** (`lab/props_prior.py`). The
+test opened with a finding: last season's prior has been read on one night
+this season. On 28 Oct 995 of the 1,054 projected props said "blended
+with last season's"; from the 29th none have (8 on the 29th, Dejounte
+Murray; 0 of the 5,000 since), because the props run found no
+last-season ledger beside slate.py. The slate's log says so at the top of
+every run ("LAST SEASON'S LEDGER NOT FOUND") and the page when a file is
+loaded. Every projection since the 29th rests on this season's games
+alone. On the one night the prior was in play, the why line carries this
+season's rate and games, last season's rate and minutes, so the blend can
+be re-read at other rules and the projection rescaled: 965 graded men,
+three or four games each.
+
+| Rule for last season's weight | Rate at his minutes (1.00 on the money) | Model's fit on those men (Brier) | BET band on those men |
+|---|---|---|---|
+| half of its minutes (as shipped) | 0.924 | 0.2625 | 2-10 |
+| a quarter | 0.931 | 0.2619 | 2-5 |
+| a quarter, capped at this season's minutes | 0.942 | 0.2639 | 3-4 |
+| none | 0.971 | 0.2778 | 36-26 |
+
+Half runs 7.6% high and loses. None calibrates the level but fits worst:
+three games alone is too thin, and 56 of the 965 men would lose their
+projection to the sixty-minute floor. A quarter capped at this season's
+minutes is the middle, better calibrated and a better band than half with
+the fit within 0.002 of the best, and 11 men lose a projection. That is
+what ships: `PROPS_PRIOR_SHARE` 0.25 and `w = min(last season's minutes
+capped at 1,000 × 0.25, this season's minutes)` in `props_rate`, the why
+line saying the weight and whether the cap bound. One night of evidence,
+honestly labelled; it matters only once the ledger is back, and the record
+judges it then.
+
+**Closing line value.** `python slate.py nba-props --close` (Close NBA
+props.bat), a few minutes before the first tip: the same run, written as
+`nba-props-close-DATE.json` in the close format (`PROPS_CLOSE_FORMAT`).
+Loaded on the Props tab after the morning's file, `applyPropsClose`
+attaches each prop's closing line and prices to the row already loaded
+(`close`: line, op, up, book, at) and adds none; a prop in the close file
+with no morning row is counted and ignored. A pick's value against the
+close (`propClv`) is the edge it was bought at less the edge at the close:
+the chance re-read at the closing line by the sheet's own blend
+(`propChanceAt`) and the need from the closing price, so a pick beats the
+close when the market moved its way, in line or in price. The card and the
+panel carry the line ("The close: 24.5 at −110 · the line moved the pick's
+way · beat the close by 2.1 points of edge", green or red); the record
+keeps how many picks beat the close and the points a pick, by band, on the
+card's tile and as a tile on the tab. A sheet that keeps beating the close
+has an edge the market agrees with, read in weeks where results at 55 to
+60% take months.
+
+**The best app for a single pick** (`propBestApp`): the pick's side read at
+each of the four apps' line and price off the books on the prop, the
+chance re-read at the app's line, the app named on the card and the panel
+when it beats the carded book ("Best app: DraftKings 5.5 at −112 · 56.1%
+there, edge +4.9 against +2.0 at fanatics"). On 185 BET picks of ten
+nights the best app had a better line or price on 64, 0.3 points of edge a
+pick. The call and the grade stay at the carded book.
+
+**The BET band in front.** A BET card carries a badge, its edge tier ("3
+to 5 points of edge", "5 to 8", "8 and up") and a why line in words from
+its own numbers (`propBetWhy`): "Why a BET: 56.4% clears the 52.4% that
+−110 needs by 4.0 points · the model says 58% at a fifth of the say, the
+book 50% · the books' consensus with it (−1.5 on the over) · the top
+lever Pace +0.3, against it." The panel carries the same line above the
+tiles. The LEANs sit quieter under a divider that says what the record
+says of them (the band says 55% and does 52% over 1,300 graded picks).
+
+**Two more lines that measure themselves** on the record: a man on a club
+favoured by five or more, and a man whose last five games' minutes ran
+above his season, each by the side the sheet took, shown, not scored, so
+the favourite's script and the minutes spike keep counting without a
+script.
+
+**Tests.** The selftest reads the prior's weight at a quarter and the cap
+(70 minutes last season weigh 17.5; 2,000 would weigh 250 and are capped at
+his 50), the why line's new wording, and the close file's name and format.
+The harness, on a seeded night: the BET card's badge, tier and why line
+against the panel's, the LEANs' class and the divider's place and words,
+the best app on Brunson's over and none on Maxey's under, the close file
+attached to two props with one ignored, the card and panel lines with
+their colour, the stored close, the record's close line and tile, and the
+favourite's and the spike's lines on the tile and as tiles.

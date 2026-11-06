@@ -121,6 +121,73 @@
     return 'His last ' + f.n + ': <b>' + f.vals.map(function (v) { return esc(String(v)); }).join(" · ") + '</b> against ' + esc(String(r.line)) + ' · ' + f.over + ' of ' + f.n + ' over' + (f.on ? ', ' + f.on + ' on it' : '') +
            (ag === true ? ', with the ' + esc(r.side) : ag === false ? ', against the ' + esc(r.side) : propHas(r) ? ', split' : '');
   }
+  /* the best app for a single pick (6 Nov 2026, the user: "shop the line on single picks, the way the pairs already do"): the
+     pick's side read at each of the four apps' line and price off the books kept on the prop, the chance re-read at the app's
+     line by the slate's own blend, the app with the most edge named when it beats the carded book. On 185 BET picks of ten
+     nights the best app had a better line or price on 64, worth 0.3 points of edge a pick. The call and the grade stay at the
+     carded book: this is where to place it, not a rescore */
+  function propBestApp(r) {
+    if (!propHas(r) || !r.books) return null;
+    var best = null, carded = +r.edge;
+    PROPS_APPS.forEach(function (app) {
+      var b = r.books[app]; if (!b || b.length < 3 || app === r.book) return;
+      var line = +b[0], op = +b[1], up = +b[2]; if (!isFinite(line) || !isFinite(op) || !isFinite(up)) return;
+      var price = r.side === "OVER" ? op : up, ch = propChanceAt(r, line, op, up); if (ch === null) return;
+      var edge = ch - implied(price);
+      if (edge > carded + 0.001 && (!best || edge > best.edge)) best = { app: app, line: line, price: price, chance: ch, edge: edge };
+    });
+    return best;
+  }
+  function propBestAppLine(r) {
+    var b = propBestApp(r); if (!b) return "";
+    return 'Best app: <b>' + esc(PROPS_APP_NAME[b.app] || b.app) + ' ' + esc(String(b.line)) + ' at ' + sgn(b.price, 0) + '</b> · ' + (100 * b.chance).toFixed(1) + '% there, edge ' + sgn(100 * b.edge, 1) + ' against ' + sgn(100 * +r.edge, 1) + ' at ' + esc(r.book || 'the carded book');
+  }
+  /* why a BET (6 Nov 2026, the user: "for the BET band cards, make that more visible and why"): one line in words from the row's
+     own numbers, the chance against what the price needs, the model's and the book's say in the blend, the consensus, the top lever */
+  var PROPS_EDGE_TIER = function (edge) { var e = 100 * edge; return e >= 8 ? "8 points of edge and up" : e >= 5 ? "5 to 8 points of edge" : "3 to 5 points of edge"; };
+  function propBetWhy(r) {
+    if (!propHas(r) || r.band !== "BET") return "";
+    var bits = [(100 * r.chance).toFixed(1) + "% clears the " + (100 * r.need).toFixed(1) + "% that " + sgn(r.price, 0) + " needs by " + (100 * r.edge).toFixed(1) + " points"];
+    if (r.pm !== null && r.pm !== undefined && r.pb !== null && r.pb !== undefined) {
+      var sideP = function (p) { return 100 * (r.side === "OVER" ? +p : 1 - +p); };
+      bits.push("the model says " + sideP(r.pm).toFixed(0) + "% at a fifth of the say, the book " + sideP(r.pb).toFixed(0) + "%");
+    }
+    var c = propCons(r); if (c && c.shift) bits.push("the books' consensus " + (propShopAgrees(r) === true ? "with it" : propShopAgrees(r) === false ? "against it" : "level") + " (" + sgn(100 * c.shift, 1) + " on the over)");
+    var lv = propsLevers(r)[0]; if (lv && Math.abs(+lv.eff) >= 0.05) bits.push("the top lever " + esc(lv.t) + " " + sgn(+lv.eff, 1) + (propsLeverHelps(r, +lv.eff) ? ", its way" : ", against it"));
+    return "Why a BET: " + bits.join(" · ") + ".";
+  }
+  /* closing line value (6 Nov 2026, the user's first suggestion taken: "measure closing line value, not just results"): the
+     closing-line run (Close NBA props.bat, a few minutes before tip) is loaded after the morning's props and attaches each prop's
+     closing line and prices to its row (close: line, op, up, book, at). A pick's value against the close is the edge it was bought
+     at less the edge at the close, the chance re-read at the closing line by the slate's own blend and the need from the closing
+     price: positive when the market moved the pick's way, in line or in price. The record keeps how many picks beat the close and
+     the points a pick, by band: a sheet that keeps beating the close has an edge the market agrees with, read in weeks */
+  function propClose(r) { return r && r.close && r.close.line !== null && r.close.line !== undefined && isFinite(+r.close.line) ? r.close : null; }
+  function propClv(r) {
+    var c = propClose(r); if (!c || !propHas(r)) return null;
+    var price = r.side === "OVER" ? +c.op : +c.up, ch = propChanceAt(r, +c.line, +c.op, +c.up); if (ch === null || !isFinite(price)) return null;
+    return { line: +c.line, price: price, chance: ch, edge: ch - implied(price), clv: +r.edge - (ch - implied(price)), moved: (+c.line - +r.line) * (r.side === "OVER" ? 1 : -1) };
+  }
+  function propClvLine(r) {
+    var v = propClv(r); if (!v) return "";
+    var how = v.moved > 0 ? "the line moved the pick's way" : v.moved < 0 ? "the line moved against the pick" : (v.price < +r.price ? "the price moved the pick's way" : v.price > +r.price ? "the price moved against the pick" : "the close sat where it was carded");
+    return 'The close: <b>' + esc(String(v.line)) + ' at ' + sgn(v.price, 0) + '</b> · ' + how + ' · ' + (v.clv > 0.0005 ? 'beat the close by ' : v.clv < -0.0005 ? 'behind the close by ' : 'level with the close, ') + Math.abs(100 * v.clv).toFixed(1) + ' points of edge';
+  }
+  function applyPropsClose(d, name) {
+    if (!d || d.format !== "callsheet3.props.close" || !Array.isArray(d.games)) throw new Error("not a Super Model closing-line file");
+    var have = {}; props.forEach(function (r, i) { have[propKey(r)] = i; });
+    var matched = 0, missed = 0, at = String(d.generated || "");
+    propsRowsFrom(d).forEach(function (row) {
+      var i = have[propKey(row)];
+      if (i === undefined) { missed++; return; }
+      props[i].close = { line: row.line, op: row.op, up: row.up, book: row.book, at: at }; matched++;
+    });
+    saveProps();
+    if ($("propsDate") && d.date) $("propsDate").value = d.date;
+    showProps(true); renderCalib();
+    propsSay("The close " + (name ? "<b>" + esc(name) + "</b> " : "") + "attached to <b>" + matched + "</b> prop" + (matched === 1 ? "" : "s") + (missed ? "; " + missed + " in the file had no prop loaded for the morning (load the morning's props first; the close adds none)" : "") + ". Every pick now reads against the close on its card, its panel and the record.");
+    return { matched: matched, missed: missed };
+  }
   function propsMarketHtml(r, tile) {
     var m = r.mkt || null, c = propCons(r), club = r.team || "his club";
     if (!m && !c) return "";
@@ -194,7 +261,7 @@
      four apps, both legs read at that app's line and price (the chance re-read at the app's line by the slate's own blend
      when it differs from the carded one), the app with the best edge chosen; a pair no single app posts is listed last,
      its legs split across apps. Nights before keep the carded legs, so the record stands as it was */
-  var PROPS_APPS = ["fanatics", "draftkings", "fanduel", "betmgm"];
+  var PROPS_APPS = ["fanatics", "draftkings", "fanduel", "betmgm"], PROPS_APP_NAME = { fanatics: "Fanatics", draftkings: "DraftKings", fanduel: "FanDuel", betmgm: "BetMGM" };
   var PROPS_PAIR_APP_FROM = "2026-11-05";
   /* the slate's own blend, re-read at another line and price pair: the model's chance from the centre and the sigma (a whole
      line pushing), the book's from the prices (less the over's shade by market on the nights that carried one), the books'
@@ -677,6 +744,14 @@
     /* the same-game pairs' record (26 Oct 2026): each graded date's tickets as the night built them, a ticket won when both legs did */
     var byPair = mk(), byPairTake = mk(), pairDates = {}, byCons = { toward: mk(), against: mk() };   // the books' consensus's own line (5 Nov 2026): the picks it sided with and the ones it stood against, half a point or more
     var byForm = { toward: mk(), against: mk() };   // recent form's own line (5 Nov 2026): the picks his last three sided with (two of three or more) and the ones they stood against; shown, not scored
+    /* two more lines that measure themselves (6 Nov 2026): a man on a club favoured by five or more (the favourite's players landed over 43%
+       against the book's 49% on the first sixteen nights) and a man whose last five games' minutes ran above his season (a spike reverses);
+       shown, not scored, by the side the sheet took. And the close (6 Nov 2026): how many picks beat it and the points of edge a pick, by band */
+    var byFav = { UNDER: mk(), OVER: mk() }, bySpike = { UNDER: mk(), OVER: mk() }, byClose = { BET: [0, 0, 0.0], LEAN: [0, 0, 0.0], "no edge": [0, 0, 0.0] };
+    props.forEach(function (r) {
+      var v = propClv(r); if (!v || !byClose[r.band]) return;
+      byClose[r.band][0]++; if (v.clv > 0.0005) byClose[r.band][1]++; byClose[r.band][2] += v.clv;
+    });
     graded.forEach(function (r) { if (r.gdate) pairDates[r.gdate] = true; });
     var pairSink = function (s) { return function (t) {
       var res = propsPairRes(t); if (!res) return;
@@ -695,6 +770,10 @@
       if (r.take) { sinks.push(byTake); sinks.push(byDateTake[d] || (byDateTake[d] = mk())); }   // the props marked as taken (26 Oct 2026), and by night (3 Nov 2026)
       var cg = propShopGap(r); if (cg !== null && Math.abs(cg) >= 0.5) sinks.push(cg > 0 ? byCons.toward : byCons.against);
       var fa = propFormAgrees(r); if (fa !== null) sinks.push(fa ? byForm.toward : byForm.against);
+      var fav = r.spread !== null && r.spread !== undefined && isFinite(+r.spread) ? (r.athome ? -(+r.spread) : +r.spread) : null;
+      if (fav !== null && fav >= 5 && byFav[r.side]) sinks.push(byFav[r.side]);
+      var mpart = (r.parts || []).filter(function (p) { return p.k === "minutes"; })[0];
+      if (mpart && +mpart.eff >= 0.3 && bySpike[r.side]) sinks.push(bySpike[r.side]);
       sinks.forEach(function (s) {
         if (r.result === "void") { s.v++; return; }
         if (r.result === "push") { s.p++; return; }
@@ -726,6 +805,10 @@
     if (byPairTake.n || byPairTake.p) parts.push("pairs taken " + rec(byPairTake) + (byPairTake.n ? " " + sgn(byPairTake.units, 1) + "u" : ""));
     if (byCons.toward.n || byCons.against.n) parts.push("the books' consensus with the pick " + rec(byCons.toward) + (byCons.toward.n ? " " + sgn(byCons.toward.units, 1) + "u" : "") + " · against it " + rec(byCons.against) + (byCons.against.n ? " " + sgn(byCons.against.units, 1) + "u" : ""));
     if (byForm.toward.n || byForm.against.n) parts.push("his last three with the pick " + rec(byForm.toward) + (byForm.toward.n ? " " + sgn(byForm.toward.units, 1) + "u" : "") + " · against it " + rec(byForm.against) + (byForm.against.n ? " " + sgn(byForm.against.units, 1) + "u" : "") + " (shown, not scored)");
+    if (byFav.UNDER.n || byFav.OVER.n) parts.push("a man on a club favoured by 5 or more: unders " + rec(byFav.UNDER) + (byFav.UNDER.n ? " " + sgn(byFav.UNDER.units, 1) + "u" : "") + " · overs " + rec(byFav.OVER) + (byFav.OVER.n ? " " + sgn(byFav.OVER.units, 1) + "u" : "") + " (shown, not scored)");
+    if (bySpike.UNDER.n || bySpike.OVER.n) parts.push("a minutes spike (his last five above his season): unders " + rec(bySpike.UNDER) + (bySpike.UNDER.n ? " " + sgn(bySpike.UNDER.units, 1) + "u" : "") + " · overs " + rec(bySpike.OVER) + (bySpike.OVER.n ? " " + sgn(bySpike.OVER.units, 1) + "u" : "") + " (shown, not scored)");
+    var closeN = byClose.BET[0] + byClose.LEAN[0] + byClose["no edge"][0];
+    if (closeN) parts.push("against the close: BET beat it " + byClose.BET[1] + " of " + byClose.BET[0] + (byClose.BET[0] ? " (" + sgn(100 * byClose.BET[2] / byClose.BET[0], 1) + " pts a pick)" : "") + " · LEAN " + byClose.LEAN[1] + " of " + byClose.LEAN[0] + (byClose.LEAN[0] ? " (" + sgn(100 * byClose.LEAN[2] / byClose.LEAN[0], 1) + ")" : "") + " · no edge " + byClose["no edge"][1] + " of " + byClose["no edge"][0]);
     var markets = PROPS_ORDER.map(function (k) { return byMk[k] ? tile(PROPS_LABEL[k], byMk[k], []) : ""; }).join("");
     var verdict = 'The props are a priori: the pooled rules behind them were measured on last season\'s box scores. Read the BET band against the rest and <i>does</i> against <i>says</i>; under 100 graded props nothing here is a reading. ' +
                   'Measured on the first ten nights (30 Oct 2026, 4,321 graded props): the model\'s own lean added nothing to the book\'s price (the best weight on it was none; where it stood ten points from Pinnacle the outcome followed Pinnacle), the over\'s shade is real (the under landed 53.2% at prices saying 50.7%), and a starter\'s minutes follow the game script. From the 30th the sheet runs with the market as its spine (the model at a ninth, the over read 2.5 points lower) and the game script on starters\' minutes; the nights before carry the old weights. ' +
@@ -747,6 +830,12 @@
     if (byCons.against.n || byCons.against.p) h2 += tile("The books' consensus against the pick", byCons.against, []);
     if (byForm.toward.n || byForm.toward.p) h2 += tile("His last three with the pick (shown, not scored)", byForm.toward, []);
     if (byForm.against.n || byForm.against.p) h2 += tile("His last three against the pick (shown, not scored)", byForm.against, []);
+    if (byFav.UNDER.n || byFav.OVER.n) h2 += tile("A favourite's man (5+), the under (shown, not scored)", byFav.UNDER, []) + tile("A favourite's man (5+), the over", byFav.OVER, []);
+    if (bySpike.UNDER.n || bySpike.OVER.n) h2 += tile("A minutes spike, the under (shown, not scored)", bySpike.UNDER, []) + tile("A minutes spike, the over", bySpike.OVER, []);
+    if (closeN) {
+      var cb = byClose.BET, cl = byClose.LEAN, cn = byClose["no edge"], beat = cb[1] + cl[1] + cn[1], tot = cb[2] + cl[2] + cn[2];
+      h2 += '<div' + (tot > 0 ? ' class="good"' : tot < 0 ? ' class="bad"' : '') + '><p class="k">Against the close · closing line value</p><p class="v">' + beat + ' of ' + closeN + '</p><p class="s">' + sgn(100 * tot / closeN, 1) + ' points of edge a pick kept against the close · BET ' + cb[1] + ' of ' + cb[0] + (cb[0] ? ' (' + sgn(100 * cb[2] / cb[0], 1) + ')' : '') + ' · LEAN ' + cl[1] + ' of ' + cl[0] + (cl[0] ? ' (' + sgn(100 * cl[2] / cl[0], 1) + ')' : '') + ' · no edge ' + cn[1] + ' of ' + cn[0] + '</p><p class="s sides">a pick beats the close when the market moved its way, in line or in price, read by the sheet\'s own blend at the closing line; a sheet that keeps beating the close has an edge the market agrees with</p></div>';
+    }
     h2 += '</div>';
     h2 += '<div class="subhead">By market</div><div class="calib" data-sport="PROPS-MK">' + markets + '</div>';
     h2 += '<div class="subhead">By the edge the sheet claimed <span class="tag">the chance less what the price needs</span></div><div class="calib" data-sport="PROPS-EDGE">' +
@@ -900,6 +989,7 @@
     h += '<div class="pd-take pd-go">' + (has && (propTakeBtn(r, true) || "").length ? propTakeBtn(r, true) + ' ' : '') + propsGoBtn(r, true) + '</div>';
     if (r.trim) h += '<p class="note trimmed">The detail on this prop (the reasons, the last games, the levers, the simulation, the fives and what happened) was <b>trimmed from the save on ' + esc(gameDate(r.trim)) + '</b> to keep the backup small: the last seven nights on the tab stay whole, older nights keep the call, the price, the chance, the band, the result and every book\'s line.</p>';
     if (has) {
+      if (propBetWhy(r)) h += '<p class="note pd-betwhy">' + propBetWhy(r) + '</p>';
       h += '<div class="pd-tiles">' +
         tile("Chance", (r.chance * 100).toFixed(1) + "%", "blended: the over is " + (r.pm * 100).toFixed(1) + "% by the model, " + (r.pb * 100).toFixed(1) + "% by the book") +
         tile("Price", sgn(r.price, 0), "needs " + (r.need * 100).toFixed(1) + "%") +
@@ -910,6 +1000,8 @@
         (r.usg !== null && r.usg !== undefined ? tile("Usage", esc(String(r.usg)) + "%", "of his club's possessions while on; " + (r.starter === true ? "a starter" : r.starter === false ? "off the bench" : "role unknown") + (r.sdf && r.sdf !== 1 ? ", the miss read at " + esc(String(r.sdf)) + " sigmas (measured)" : "")) : "") +
         '</div>';
       if (propFormLine(r)) h += '<p class="note pd-form' + (propFormAgrees(r) === true ? ' pos' : propFormAgrees(r) === false ? ' neg' : '') + '">' + propFormLine(r) + ' <span class="dim">· shown, not scored: it did not help the bet as a lever walk-forward (5 Nov 2026), so it is measured on the record tile\'s own line</span></p>';
+      if (propBestAppLine(r)) h += '<p class="note pd-bestapp">' + propBestAppLine(r) + ' <span class="dim">· where to place it; the call and the grade stay at the carded book</span></p>';
+      var clvP = propClv(r); if (clvP) h += '<p class="note pd-clv' + (clvP.clv > 0.0005 ? ' pos' : clvP.clv < -0.0005 ? ' neg' : '') + '">' + propClvLine(r) + ' <span class="dim">· the chance re-read at the closing line by the sheet\'s own blend, the need from the closing price</span></p>';
       /* the floors (26 Oct 2026): the number he clears 95, 90 and 80% of nights by the model, and his other markets' 95% floors tonight */
       var f95 = propFloor(r, 95), f90 = propFloor(r, 90), f80 = propFloor(r, 80);
       if (f95 || f90 || f80) {
@@ -1034,16 +1126,24 @@
                                               : (propsSource().length ? "no props on this date" : "no props loaded"));
     var resChip = propResChip;
     var picks = rows.filter(function (r) { return propHas(r) && r.edge > 0; }).sort(function (a, b) { return b.edge - a.edge; });
+    /* the BET band in front (6 Nov 2026, the user: "for the BET band cards, make that more visible and why"): a BET card carries
+       a badge, its edge tier and a line that says why in words; the LEANs sit under a divider that says what the record says of them */
+    var leanDivider = false;
     $("propsBest").innerHTML = picks.length ? picks.slice(0, 12).map(function (r, i) {
-      var tl = propsLeverTally(r);
-      return '<div class="pk' + (r.band === "BET" ? ' scored' : '') + '" data-prop="' + r.id + '"><div class="n1">#' + (i + 1) + ' · ' + esc(r.band) + (tl.n ? ' <span class="tag' + (tl.all ? ' agree' : '') + '" title="' + esc(tl.words) + '">levers ' + tl.text + '</span>' : '') + '</div>' +
+      var tl = propsLeverTally(r), isBet = r.band === "BET", div = '';
+      if (!isBet && !leanDivider) { leanDivider = true; div = '<div class="pk-divider">' + (i === 0 ? 'No BET on this date. ' : '') + 'LEANs below: information, not a measured edge (the band says 55% and does 52% over 1,300 graded picks)' + (i === 0 ? '.' : '; the BETs above are the bets.') + '</div>'; }
+      var clv = propClv(r);
+      return div + '<div class="pk' + (isBet ? ' scored bet' : ' lean') + '" data-prop="' + r.id + '"><div class="n1">' + (isBet ? '<span class="betbadge">BET</span> ' : '') + '#' + (i + 1) + ' · ' + esc(r.band) + (isBet ? ' · ' + esc(PROPS_EDGE_TIER(+r.edge)) : '') + (tl.n ? ' <span class="tag' + (tl.all ? ' agree' : '') + '" title="' + esc(tl.words) + '">levers ' + tl.text + '</span>' : '') + '</div>' +
         '<div class="n2">' + esc(r.name) + ' ' + esc(r.side) + ' ' + r.line + ' ' + esc(PROPS_LABEL[r.mk] || r.mk) + '</div>' +
         '<div class="n3">' + (r.chance * 100).toFixed(1) + '% · ' + sgn(r.price, 0) + ' needs ' + (r.need * 100).toFixed(1) + '% · edge ' + sgn(r.edge * 100, 1) + resChip(r) + '</div>' +
         '<div class="n4">' + esc(r.game) + ' · projected ' + r.proj + ' (±' + r.sd + ') · ' + esc(r.book) + '</div>' +
+        (propBetWhy(r) ? '<div class="n5 betwhy">' + propBetWhy(r) + '</div>' : '') +
         (propsLeversLine(r) ? '<div class="n5">Moves it: ' + propsLeversLine(r) + '</div>' : '') +
         (propShopLine(r) ? '<div class="n5 shopline' + (propShopAgrees(r) === true ? ' pos' : propShopAgrees(r) === false ? ' neg' : '') + '">' + propShopLine(r) + '</div>' :
          propSimLine(r) ? '<div class="n5 simline' + (propSimAgrees(r) === true ? ' pos' : propSimAgrees(r) === false ? ' neg' : '') + '">' + propSimLine(r) + '</div>' : '') +
         (propFormLine(r) ? '<div class="n5 formline' + (propFormAgrees(r) === true ? ' pos' : propFormAgrees(r) === false ? ' neg' : '') + '">' + propFormLine(r) + '</div>' : '') +
+        (propBestAppLine(r) ? '<div class="n5 bestapp">' + propBestAppLine(r) + '</div>' : '') +
+        (clv ? '<div class="n5 clvline' + (clv.clv > 0.0005 ? ' pos' : clv.clv < -0.0005 ? ' neg' : '') + '">' + propClvLine(r) + '</div>' : '') +
         '<div class="n6">' + propTakeBtn(r) + propsGoBtn(r) + '</div></div>';
     }).join("") : '<div class="empty">' + (rows.length ? 'No prop on this date clears its price.' : 'Load a props file: Run NBA props.bat writes nba-props-DATE.json.') + '</div>';
     /* the simulation's strip (26 Oct 2026): one card a game */

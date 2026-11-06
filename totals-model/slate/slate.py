@@ -4943,6 +4943,7 @@ def make_nba_grade(date_iso, out_dir, log):
 # endpoint), so the tile is the test. All measured 19 Oct 2026 on the 2025-26
 # ledger with the box lines (tools_backtest_nba_props.py).
 PROPS_FORMAT = "callsheet3.props"
+PROPS_CLOSE_FORMAT = "callsheet3.props.close"   # the closing-line run (6 Nov 2026): the same props a few minutes before tip, attached to the morning's rows by the page
 PROPS_MARKETS = (("pts", "player_points", "points"), ("reb", "player_rebounds", "rebounds"), ("ast", "player_assists", "assists"),
                  ("tpm", "player_threes", "threes"), ("pra", "player_points_rebounds_assists", "points + rebounds + assists"),
                  # the combination markets (27 Oct 2026, the user: "every prop on the date doesn't have a points + rebounds market"): three more credits a game
@@ -4996,7 +4997,17 @@ PROPS_OUT_RATE_PER30 = {"pts": 0.56, "reb": 0.0, "ast": 0.09, "tpm": 0.0, "pra":
 PROPS_OPP_C_REB_PER30 = 0.30                                                  # rebounds per 36 for a forward or centre, per 30 mpg of the opponent's centres out
 PROPS_OPP_C_MARKETS = ("reb", "pra", "pr", "ra")                              # the markets with rebounds in them
 PROPS_PRIOR_CAP = 1000.0
-PROPS_PRIOR_SHARE = 0.5
+# last season's prior (6 Nov 2026, the user: "the shrink... really make sure it's tested"). The prior has been read on one
+# night this season, 28 Oct (995 of 1,054 projected props; from the 29th the props run found no last-season ledger, so every
+# projection since rests on this season alone). On that night's 965 graded prior men the rate at his minutes ran 7.6% high at
+# half of last season's minutes (0.924), 6.9% at a quarter (0.931), 5.8% with a quarter capped at this season's minutes
+# (0.942) and 2.9% with no prior (0.971); the model's own fit on those men was best at a quarter (Brier 0.2619, half 0.2625,
+# the cap 0.2639) and worst with none (0.2778: three or four games alone is too thin); the BET band replayed with the rule on
+# those men read 2-10 at half, 2-5 at a quarter, 3-4 capped, 36-26 with none. A quarter, capped at this season's minutes,
+# is the middle: better calibrated and a better band than half, the fit within 0.002 of the best, and 11 of the 965 men lose
+# a projection to the sixty-minute floor where none would cost 56. One night of evidence; the record decides once the
+# ledger is back (nba-ledger-202526.json beside slate.py)
+PROPS_PRIOR_SHARE = 0.25   # to 5 Nov 2026: 0.5, and not capped
 PROPS_LAST_N = 5
 # recent form (5 Nov 2026, the user: "what would have helped the model see those picks as likely to go over?"): his last
 # three games against the line. On the 5,647 graded props with a log (28 Oct to 4 Nov) the over landed 6.7 points under the
@@ -5515,7 +5526,9 @@ def props_rate(logs_this, logs_last, mk):
     s1, m1, n1 = sums(logs_this)
     s2, m2, n2 = sums(logs_last)
     prior = (s2 / m2) if m2 > 0 else None
-    w = min(m2, PROPS_PRIOR_CAP) * PROPS_PRIOR_SHARE if prior is not None else 0.0
+    # the prior's weight (6 Nov 2026): a quarter of last season's minutes (PROPS_PRIOR_CAP of them at most), and never more
+    # than this season's own minutes, so last season can match this season's evidence but not outweigh it
+    w = min(min(m2, PROPS_PRIOR_CAP) * PROPS_PRIOR_SHARE, m1) if prior is not None else 0.0
     denom = m1 + w
     if denom < PROPS_MIN_MINUTES:
         return None
@@ -5836,8 +5849,9 @@ def props_project(prop, logs_this, logs_last, ctx):
         return None, ["no history to project from (under %d minutes with the stat in the ledgers)" % int(PROPS_MIN_MINUTES)]
     rate36 = r["rate"] * 36.0
     if r["this"] is not None and r["prior"] is not None:
-        why.append("%.1f %s per 36 this season (%d games, %d minutes), blended with last season's %.1f (%d of %d minutes, at half): %.1f per 36" % (
-            r["this"] * 36, label, r["n_this"], int(r["m_this"]), r["prior"] * 36, int(round(r["w"] / PROPS_PRIOR_SHARE)), int(r["m_last"]), rate36))
+        capped = r["w"] + 1e-9 < min(r["m_last"], PROPS_PRIOR_CAP) * PROPS_PRIOR_SHARE
+        why.append("%.1f %s per 36 this season (%d games, %d minutes), blended with last season's %.1f (%d of %d minutes at a quarter, weight %g%s): %.1f per 36" % (
+            r["this"] * 36, label, r["n_this"], int(r["m_this"]), r["prior"] * 36, int(min(r["m_last"], PROPS_PRIOR_CAP)), int(r["m_last"]), round(r["w"], 1), ", capped at his minutes this season" if capped else "", rate36))
     elif r["this"] is not None:
         why.append("%.1f %s per 36 this season (%d games, %d minutes); no last season to blend" % (rate36, label, r["n_this"], int(r["m_this"])))
     else:
@@ -6061,12 +6075,25 @@ def espn_team_roster(ab):
     return out
 
 
-def make_nba_props(date_iso, out_dir, log, topup=False, sim_runs=NBA_SIM_RUNS):
+def nba_props_path(out_dir, date_iso, close=False):
+    """nba-props-DATE.json, or nba-props-close-DATE.json for the closing-line run (6 Nov 2026)."""
+    return os.path.join(out_dir, ("nba-props-close-%s.json" if close else "nba-props-%s.json") % date_iso)
+
+
+def make_nba_props(date_iso, out_dir, log, topup=False, sim_runs=NBA_SIM_RUNS, close=False):
     """The day's player props with the slate's projection beside each, for The
     Super Model's Props tab: nba-props-DATE.json. The lines come from The Odds
     API (a credit a market a game), the history from the ledgers, who is out
-    from ESPN, the defence table from HashtagBasketball."""
+    from ESPN, the defence table from HashtagBasketball.
+    With close=True (6 Nov 2026, the closing line): the same run a few minutes
+    before the first tip, written as nba-props-close-DATE.json in the close
+    format; the page attaches each prop's closing line and prices to the row
+    already loaded and grades every pick against the close as well as the
+    box (closing line value: the market's last word, read in weeks where the
+    results take months)."""
     key = odds_key(out_dir)
+    if close:
+        log("The closing-line run (6 Nov 2026): the lines as the books post them now, written beside the morning's file; load it on the Props tab after the morning's props and before the grade.")
     if topup:
         nba_ledger_topup(date_iso, out_dir, log)
     season = nba_season_id(date_iso)
@@ -6252,18 +6279,21 @@ def make_nba_props(date_iso, out_dir, log, topup=False, sim_runs=NBA_SIM_RUNS):
             if x.get("p") is not None:
                 log("    %s %s %s %s at %+d: %.1f%% (needs %.1f%%) %s · proj %.1f" % (x["name"], x["side"], x["line"], dict((m, lab) for m, _a, lab in PROPS_MARKETS)[x["mk"]], x["price"], x["chance"] * 100, x["need"] * 100, x["band"], x["proj"]))
         games.append(row)
-    doc = {"format": PROPS_FORMAT, "version": 1, "date": date_iso, "generated": now_utc(), "source": "slate.py nba-props: The Odds API, the ledgers, ESPN, HashtagBasketball",
+    doc = {"format": PROPS_CLOSE_FORMAT if close else PROPS_FORMAT, "version": 1, "date": date_iso, "generated": now_utc(), "source": "slate.py nba-props%s: The Odds API, the ledgers, ESPN, HashtagBasketball" % (" --close" if close else ""),
            "credits": credits_used, "games": games, "ledgers": ledgers,   # what the run read (23 Oct 2026): the page says so when nothing projects
            "method": {"anchor": PROPS_ANCHOR, "model": PROPS_MODEL_W, "side_shade": PROPS_SIDE_SHADE, "shade_tent": PROPS_SHADE_TENT, "script_per_point": PROPS_SCRIPT_PER_POINT, "script_base": PROPS_SCRIPT_BASE, "sd_k": PROPS_SD_K, "out_min_per30": PROPS_OUT_MIN_PER30, "out_rate_per30": PROPS_OUT_RATE_PER30, "dvp_weight": PROPS_DVP_WEIGHT, "dvp_shrink": PROPS_DVP_SHRINK,
                       "match_alpha": PROPS_MATCH_ALPHA, "pace": "the game's possessions against the club's own", "usage_sd": PROPS_USAGE_SD, "role_sd": PROPS_ROLE_SD, "usage_cuts": PROPS_USAGE_CUTS, "thin_sd": PROPS_THIN_SD,
                       "script_src": "the spread", "margin_sd": PROPS_MARGIN_SD, "cons_k": PROPS_CONS_K, "cons_cap": PROPS_CONS_CAP, "cons_min_books": PROPS_CONS_MIN_BOOKS, "sim": "off the props from 5 Nov 2026 (measured null)",
                       "shade": "off from 5 Nov 2026 (it had called the under on four props in five)", "kalshi": "off the props from 5 Nov 2026",
                       "form_n": PROPS_FORM_N, "form": "shown, not scored (5 Nov 2026): his last three against the line, on its own record line"}}
-    path = os.path.join(out_dir, "nba-props-%s.json" % date_iso)
+    path = nba_props_path(out_dir, date_iso, close)
     with open(path, "w", encoding="utf-8") as f:
         json.dump(doc, f, indent=1)
     n = sum(len(g["props"]) for g in games)
-    log("Wrote %s: %d props on %d game%s, %d credits. Open The Super Model -> NBA PROPS -> Load props." % (path, n, len(games), "" if len(games) == 1 else "s", credits_used))
+    if close:
+        log("Wrote %s: the closing lines on %d props on %d game%s, %d credits. Open The Super Model -> NBA PROPS -> Load props and pick it: it attaches the close to the props already loaded and the record reads every pick against the close." % (path, n, len(games), "" if len(games) == 1 else "s", credits_used))
+    else:
+        log("Wrote %s: %d props on %d game%s, %d credits. Open The Super Model -> NBA PROPS -> Load props." % (path, n, len(games), "" if len(games) == 1 else "s", credits_used))
     return path
 
 
@@ -7630,7 +7660,9 @@ def selftest():
           nba_prior_mpg(prior_e) == {("DAL", "22"): ("Kyrie Irving", 31.0)} and le[1]["out"] == [["Kyrie Irving", 31.0]] and le[2]["back"] == [["Kyrie Irving", 31.0]] and le[0].get("out") is None
           and props_game_factors(le[1], le, "pts", 100.0, prior_e["22"]["g"])[0] == "Kyrie Irving out (31 mpg, a lift for him)" and nba_player_logs(early)["11"]["g"][1].get("out") is None)
     pr_ = props_rate(lt["11"]["g"], ll["11"]["g"], "pts")
-    check("props: the rate blends this season with last season's at half its minutes", abs(pr_["rate"] * 36 - 30.965) < 0.01 and pr_["m_this"] == 108 and pr_["w"] == 35 and abs(pr_["prior"] * 36 - 30.857) < 0.01
+    check("props: the rate blends this season with last season's at a quarter of its minutes, never more than this season's own (6 Nov 2026)", abs(pr_["rate"] * 36 - 30.98) < 0.01 and pr_["m_this"] == 108 and pr_["w"] == 17.5 and abs(pr_["prior"] * 36 - 30.857) < 0.01
+          and PROPS_PRIOR_SHARE == 0.25 and props_rate([{"min": 50, "pts": 25}], [{"min": 500, "pts": 300}] * 4, "pts")["w"] == 50 and abs(props_rate([{"min": 50, "pts": 25}], [{"min": 500, "pts": 300}] * 4, "pts")["rate"] - 0.55) < 1e-9   # 2,000 minutes last season at a quarter would weigh 250; capped at his 50
+          and props_rate([{"min": 50, "pts": 25}], [{"min": 100, "pts": 60}], "pts")["w"] == 25
           and props_rate([], [], "pts") is None and props_rate(lt["11"]["g"], ll["11"]["g"], "pra")["n_this"] == 3)
     pm_ = props_minutes(lt["11"]["g"], ll["11"]["g"])
     check("props: the minutes are the last five games' mean this season, else last season's whole-season mean",
@@ -7676,7 +7708,7 @@ def selftest():
           and props_shade("pts", 0.5) == 0.0 and props_shade("reb", 0.5) == 0.0 and props_shade("pra", 0.4892) == 0.0 and props_shade("tpm", 0.4038) == 0.0 and all(v == 0.0 for v in PROPS_SIDE_SHADE.values()) and set(PROPS_SIDE_SHADE) == set(PROPS_SD_K)   # the over's shade off (5 Nov 2026): it had called the under on four props in five
           and any("the over's shade is off" in w and "the model 20% of the say" in w for w in why_)
           and abs(props_over(34.48 - 0.08 * 11.52, 11.52, 30.5)[0] - proj_["pm"]) < 0.001   # the sigma carries the thin-history factor (27 Oct 2026): 10.86 x 1.06 on 143 minutes of evidence
-          and any(w == "his rate rests on 143 minutes of evidence (3 games this season, last season behind it): the miss runs wider on a thin history, measured, so the sigma is ×1.06" for w in why_))
+          and any(w == "his rate rests on 125 minutes of evidence (3 games this season, last season behind it): the miss runs wider on a thin history, measured, so the sigma is ×1.06" for w in why_))   # 108 this season and last season's 17.5 (6 Nov 2026: a quarter, capped)
     # the crowd on Kalshi (4 Nov 2026): the exchange's markets parsed, matched to a game by code in either order, summarised
     kal_doc = {"markets": [
         {"ticker": "KXNBAGAME-26NOV04ATLWAS-WAS", "event_ticker": "KXNBAGAME-26NOV04ATLWAS", "yes_sub_title": "Washington", "yes_bid_dollars": "0.4200", "yes_ask_dollars": "0.4300", "last_price_dollars": "0.4300", "volume_fp": "140050.68", "open_interest_fp": "115253.70"},
@@ -7803,7 +7835,7 @@ def selftest():
     proj_r, _why_r = props_project(prop_reb, lt["11"]["g"], ll["11"]["g"], ctx_m)
     check("props: rebounds take no matchup lever (measured null)", proj_r is None or "match" not in dict((p["k"], p) for p in proj_r["parts"]))
     check("props: the why says each step",
-          any(w.startswith("31.0 points per 36 this season (3 games, 108 minutes), blended with last season's 30.9 (70 of 70 minutes, at half): 31.0 per 36") for w in why_)
+          any(w.startswith("31.0 points per 36 this season (3 games, 108 minutes), blended with last season's 30.9 (70 of 70 minutes at a quarter, weight 17.5): 31.0 per 36") for w in why_)
           and any(w.startswith("36.0 minutes projected: his last 3 games (season 36.0), 3 of them starts") for w in why_)
           and any(w == "Kyrie Irving out (30 minutes a game between them): +1.4 minutes and +0.56 points per 36, the pooled rule, scored" for w in why_)
           and any(w == "Some Body is Questionable: not counted as out" for w in why_) and any(w == "pace 100.0 against the league's 98.0: x1.020" for w in why_)
@@ -7811,6 +7843,10 @@ def selftest():
           and any(w == ctx_["htb"] for w in why_)
           and any(w.startswith("home 30.9 / road 31.0 per 36 over 178 minutes: shown, not scored") and w.endswith("; tonight on the road") for w in why_)
           and any(w == "projected 34.5 against points 30.5, one sigma 11.5, the chance read around the median 33.6 (the stat skews right: at the mean the over lands 47% of the time): the over 60.5% by the projection, 50.0% by the book's prices; blended 52.1% at 4 to 1.0, the market the spine and the model 20% of the say (5 Nov 2026: the over's shade is off, it had called the under on four props in five; the model's lean reads at its extremes, which is where the BET band fires)" for w in why_))
+    # the closing-line run (6 Nov 2026): its file name and format, apart from the morning's
+    check("props: the closing-line run writes nba-props-close-DATE.json in the close format, the morning's run nba-props-DATE.json",
+          nba_props_path("out", "2026-11-06", close=True) == os.path.join("out", "nba-props-close-2026-11-06.json") and nba_props_path("out", "2026-11-06") == os.path.join("out", "nba-props-2026-11-06.json")
+          and PROPS_CLOSE_FORMAT == "callsheet3.props.close" and PROPS_FORMAT == "callsheet3.props")
     # recent form (5 Nov 2026): his last three against the line on the prop, shown, not scored
     fm_ = props_form(lt["11"]["g"], "pts", 30.5)
     check("props: recent form is his last three games with the stat against the line, shown on the prop and in a why line, not scored; under three games there is none",
@@ -8166,7 +8202,7 @@ def selftest():
           pb["n"] == 3 and pb["plays"][0] == [1, 469.0, "S", 0, ["11", "12"], 6, 16, 0] and pb["plays"][1] == [1, 450.0, "X", 1, ["21"], 6, 16, 3] and pb["plays"][2][2] == "E" and pb["plays"][2][3] == -1 and pb["ot"] == 0)
     check("nba top-up: the slate run brings this season's ledger up to date first, and a failure is logged while the run goes on",
           calls == [("2026-10-21", tmp7, None)] and lines10[0] == "Bringing this season's ledger up to date first:" and lines10[1] == "  stub ran"
-          and any(l == "  Could not bring the ledger up to date (ESPN down); the run goes on with the ledger as it is." for l in lines10) and p11 == (False, NBA_SIM_RUNS) and NBA_SIM_RUNS == 10000)
+          and any(l == "  Could not bring the ledger up to date (ESPN down); the run goes on with the ledger as it is." for l in lines10) and p11 == (False, NBA_SIM_RUNS, False) and NBA_SIM_RUNS == 10000)   # the third default: not the closing-line run (6 Nov 2026)
     check("nba slate: the scoreboard for a day, finals and scheduled games alike, on the US date with the half-time score",
           len(day) == 4 and day[0]["final"] is True and day[0]["ha"] == 51 and day[0]["hh"] == 49 and day[0]["fa"] == 101 and day[0]["date"] == "2026-10-21"
           and day[1]["final"] is False and day[1]["state"] == "Scheduled" and day[1]["away"] == "BOS" and day[1]["home"] == "NYK" and day[1]["hn"] == "Knicks" and day[1]["venue"] == "Madison Square Garden"
@@ -8784,6 +8820,7 @@ def main(argv=None):
     ap.add_argument("--refs", action="store_true", help="nhl-ledger only: also fetch each game's side panel for the referees, linesmen and scratches (one call a game; about 20 minutes a season).")
     ap.add_argument("--no-ledger", action="store_true", help="nba and nba-props: do not bring this season's ledger up to date first (they do by default, 25 Oct 2026).")
     ap.add_argument("--runs", type=int, default=NBA_SIM_RUNS, help="nba and nba-props: how many times the simulation plays each game (default %d; 0 turns it off)." % NBA_SIM_RUNS)
+    ap.add_argument("--close", action="store_true", help="nba-props: the closing-line run (6 Nov 2026), a few minutes before the first tip: writes nba-props-close-DATE.json, which the page attaches to the morning's props and grades every pick against.")
     ap.add_argument("--out", default=".", help="folder to write into (default: where you run it)")
     ap.add_argument("--selftest", action="store_true", help="run the offline checks and exit")
     ap.add_argument("--quiet", action="store_true", help="print only the final line")
@@ -8830,7 +8867,7 @@ def main(argv=None):
         elif a.mode == "nba-grade":
             path = make_nba_grade(date_iso, a.out, log)
         elif a.mode == "nba-props":
-            path = make_nba_props(date_iso, a.out, log, topup=not a.no_ledger, sim_runs=max(0, a.runs))
+            path = make_nba_props(date_iso, a.out, log, topup=not a.no_ledger, sim_runs=max(0, a.runs), close=a.close)
         elif a.mode == "odds":
             sports = tuple(s.strip().upper() for s in a.sports.split(",") if s.strip()) if a.sports else ("MLB", "NHL", "NBA")
             path = make_odds(date_iso, a.out, log, a.books, sports)

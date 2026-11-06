@@ -395,6 +395,11 @@
   #secKalshi > h2 { color: var(--crowd); } #secKalshi > h2 .tag { color: var(--crowd); opacity: .8; }
   /* the books' consensus in the simulation's place on the props (5 Nov 2026): the best cards' last line, green toward the pick */
   .pk .n5.shopline.pos { color: var(--go); } .pk .n5.shopline.neg { color: var(--bad); } .pk.simg.mkt .n1 { color: var(--ink-2); }
+  /* the BET band in front (6 Nov 2026): a BET card carries a badge, its edge tier and a why line in green inside a thicker green frame; the LEANs sit quieter under a divider; the best app and the close are lines of their own */
+  .pk.bet { border: 2px solid var(--go); box-shadow: 0 0 0 3px rgba(31, 122, 76, .12); } .pk .betbadge { display: inline-block; background: var(--go); color: #fff; font-weight: 800; padding: 1px 7px; border-radius: 4px; letter-spacing: .04em; font-size: 11px; vertical-align: middle; }
+  .pk .n5.betwhy, .pdlg .pd-betwhy { color: var(--go); font-weight: 600; } .pk.lean { opacity: .9; } .pk.lean .n1 { color: var(--ink-2); }
+  .pk-divider { grid-column: 1 / -1; flex-basis: 100%; width: 100%; font-size: 12px; color: var(--ink-2); border-top: 1px dashed var(--ink-2); padding: 7px 2px 1px; margin-top: 2px; }
+  .pk .n5.bestapp b, .pdlg .pd-bestapp b { color: var(--go); } .pk .n5.clvline.pos, .pdlg .pd-clv.pos { color: var(--go); } .pk .n5.clvline.neg, .pdlg .pd-clv.neg { color: var(--bad); }
   /* recent form on the props (5 Nov 2026): his last three against the line, green with the pick and red against it; shown, not scored */
   .pk .n5.formline.pos, .pdlg .pd-form.pos { color: var(--go); } .pk .n5.formline.neg, .pdlg .pd-form.neg { color: var(--bad); } .pdlg .pd-form .dim { color: var(--ink-2); }
 

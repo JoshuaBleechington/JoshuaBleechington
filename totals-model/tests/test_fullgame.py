@@ -1,0 +1,1683 @@
+"""Tests for the full-game model.
+
+The first block is the most important thing in this file. The model this
+replaces carried a permanent over-lean because its calibration anchor was a
+number I picked, and a game with no information in it came back OVER 50.8%.
+These tests pin the property that makes that impossible: anything league
+average moves the forecast by exactly zero, as arithmetic rather than as a
+calibration that happened to come out right.
+"""
+
+import math
+import unittest
+
+from totals.fullgame import (
+    BANDS,
+    BULLPEN_INNINGS,
+    DISPERSION_PHI,
+    ERA_OVERDISPERSION,
+    ERA_STABLE_AT,
+    STARTER_TALENT_SD,
+    era_weight,
+    shrink_era,
+    H2H_FULL_WEIGHT_AT,
+    LEAGUE_BULLPEN_ERA,
+    LEAGUE_COMBINED_RPG,
+    LEAGUE_STARTER_ERA,
+    RESIDUAL_SD,
+    STARTER_INNINGS,
+    WEIGHTS,
+    arm_differential,
+    calibration,
+    margin_guard,
+    residual_spread,
+    devig,
+    fair_total,
+    hold,
+    market_confidence,
+    complete_pair,
+    TYPICAL_HOLD,
+    HOLD_90TH,
+    forecast_mlb,
+    forecast_wnba,
+    resolve_wind,
+    bearing_to_axial,
+    WIND_QUARTERING,
+    normal_split,
+    rest_penalty,
+    WNBA_LEAGUE_PACE,
+    WNBA_LEAGUE_RATING,
+    WNBA_TOTAL_SD,
+    h2h_weight,
+    implied,
+    nb_pmf,
+    nb_split,
+    park_scale,
+    sensitivity,
+    slate,
+    split_for,
+    alt_ladder,
+    alt_edge,
+    cents_between,
+    price_for,
+)
+
+
+class TestNoHiddenLean(unittest.TestCase):
+    """The bug that killed the previous model, pinned shut.
+
+    It anchored its pitcher estimate to a league-average total I derived from
+    two numbers I chose, and books post a different one, so every projection
+    carried +0.16 runs toward the over before anything was read.
+    """
+
+    def test_an_empty_card_is_exactly_a_coin_flip(self):
+        for line in (7.0, 7.5, 8.0, 8.5, 9.0, 9.5, 10.5, 12.0):
+            f = forecast_mlb("a @ b", line)
+            self.assertAlmostEqual(f.p_resolved, 0.5, places=9,
+                                   msg=f"line {line} leaned {f.side} {f.p_resolved}")
+            # and the two sides are even in raw terms too, with the push carved
+            # out of both rather than taken from one
+            self.assertAlmostEqual(f.p_over, f.p_under, places=9)
+
+    def test_league_average_everything_moves_nothing(self):
+        f = forecast_mlb(
+            "a @ b", 8.5,
+            away_starter_era=LEAGUE_STARTER_ERA, home_starter_era=LEAGUE_STARTER_ERA,
+            away_bullpen_era=LEAGUE_BULLPEN_ERA, home_bullpen_era=LEAGUE_BULLPEN_ERA,
+            park_factor=100, temp_f=70.0, wind_mph=5, wind_direction="out")
+        self.assertAlmostEqual(f.p_resolved, 0.5, places=9)
+
+    def test_a_league_average_arm_has_a_zero_differential(self):
+        self.assertAlmostEqual(
+            arm_differential(LEAGUE_STARTER_ERA, LEAGUE_STARTER_ERA, STARTER_INNINGS, None), 0.0)
+        self.assertAlmostEqual(
+            arm_differential(LEAGUE_BULLPEN_ERA, LEAGUE_BULLPEN_ERA, BULLPEN_INNINGS, None), 0.0)
+
+    def test_the_differential_is_anchored_to_fair_and_not_to_the_line(self):
+        """The second half of the same bug, found while fixing the first.
+
+        A posted line is the point that splits the two sides evenly, and for a
+        right-skewed count distribution the mean sits above it. Anchoring the
+        differentials to the LINE while the market estimate sits at the FAIR
+        MEAN made two league-average staffs come back UNDER 51.9%.
+        """
+        f = forecast_mlb("a @ b", 8.5, away_starter_era=LEAGUE_STARTER_ERA,
+                         home_starter_era=LEAGUE_STARTER_ERA)
+        market = next(e for e in f.estimates if e.name == "Market")
+        starters = next(e for e in f.estimates if e.name == "Starters")
+        self.assertAlmostEqual(starters.total, market.total, places=9)
+        self.assertGreater(market.total, 8.5, "the fair mean must exceed the line")
+
+    def test_the_error_a_wrong_league_constant_can_cause_is_small(self):
+        """Differential form is what buys this.
+
+        The league numbers cannot be verified from inside the sandbox, so what
+        matters is that being wrong about them is cheap. A 0.20 ERA error moves
+        a projection by well under a tenth of a run; the anchor bug it replaced
+        was worth 0.16 runs permanently.
+        """
+        s = sensitivity(0.20)
+        self.assertLess(s["runs_on_projection"], 0.10)
+        self.assertGreater(s["runs_on_projection"], 0.0)
+        # and it scales linearly, so a catastrophic 1.0 error is still bounded
+        self.assertLess(sensitivity(1.0)["runs_on_projection"], 0.40)
+
+
+class TestPushesArePricedOut(unittest.TestCase):
+    """A push refunds, so it sits outside the pricing and outside the band.
+
+    Both of these were wrong on the first pass. Matching a de-vigged price to
+    the UNCONDITIONAL P(over) made an empty card on a total of 8 come back over
+    50.0 / under 40.5 -- a lean the market never expressed. And cutting the band
+    from the raw probability called a 52.2% bet a coin flip because 9.6% of the
+    mass sat on the number.
+    """
+
+    def test_an_even_market_on_a_pushable_line_is_even_on_both_sides(self):
+        for line in (8, 9, 10):
+            f = forecast_mlb("a @ b", line, over_price=-110, under_price=-110)
+            self.assertAlmostEqual(f.p_over, f.p_under, places=9)
+            self.assertGreater(f.p_push, 0.05)
+            self.assertAlmostEqual(f.p_resolved, 0.5, places=9)
+            self.assertAlmostEqual(f.fair_price, 100.0, places=6)
+
+    def test_the_same_prices_give_the_same_resolved_odds_push_or_not(self):
+        """A total of 8 and 8.5 at the same price describe the same bet in
+        resolved terms; only the push mass differs."""
+        for op, up in ((-120, 100), (-140, 120), (-105, -115)):
+            whole = forecast_mlb("a @ b", 8, over_price=op, under_price=up)
+            half = forecast_mlb("a @ b", 8.5, over_price=op, under_price=up)
+            self.assertAlmostEqual(whole.p_resolved, half.p_resolved, places=6)
+            self.assertEqual(whole.band, half.band)
+            self.assertAlmostEqual(whole.fair_price, half.fair_price, places=3)
+            self.assertGreater(whole.p_push, 0.05)
+            self.assertAlmostEqual(half.p_push, 0.0)
+
+    def test_the_band_reads_the_resolved_probability(self):
+        f = forecast_mlb("a @ b", 8, over_price=-140, under_price=120)
+        self.assertLess(f.p_side, 0.53)          # raw looks like a coin flip
+        self.assertGreater(f.p_resolved, 0.56)   # resolved is a real lean
+        self.assertEqual(f.band, "BET")
+
+    def test_even_money_prints_as_plus_one_hundred_not_minus(self):
+        """Without a tolerance the sign flips on a floating-point hair and an
+        identical coin flip prints -100 on one card and +100 on the next."""
+        for line in (7.5, 8, 8.5, 9, 10.5):
+            self.assertAlmostEqual(forecast_mlb("a @ b", line).fair_price, 100.0, places=6)
+
+
+class TestTheDistribution(unittest.TestCase):
+    def test_the_pmf_is_a_distribution(self):
+        for mu in (5.0, 9.04, 14.0):
+            total = sum(nb_pmf(k, mu, DISPERSION_PHI["MLB"]) for k in range(0, 120))
+            self.assertAlmostEqual(total, 1.0, places=9)
+
+    def test_it_reproduces_the_measured_mean_and_spread(self):
+        """phi is derived from the measured 4.39, so this must come back exact."""
+        mu, phi = LEAGUE_COMBINED_RPG, DISPERSION_PHI["MLB"]
+        ks = range(0, 140)
+        m = sum(k * nb_pmf(k, mu, phi) for k in ks)
+        v = sum((k - m) ** 2 * nb_pmf(k, mu, phi) for k in ks)
+        self.assertAlmostEqual(m, LEAGUE_COMBINED_RPG, places=6)
+        self.assertAlmostEqual(math.sqrt(v), RESIDUAL_SD["MLB"], places=4)
+
+    def test_run_totals_are_right_skewed_so_the_mean_beats_the_median(self):
+        """A normal cannot express this, and it is why the anchor matters.
+
+        Fifteen-run games happen; minus-two-run games do not. The mass above
+        the mean is thinner and longer than the mass below it.
+        """
+        mu, phi = 9.04, DISPERSION_PHI["MLB"]
+        over_the_mean, _, under_the_mean = nb_split(mu, mu, phi)
+        self.assertLess(over_the_mean, under_the_mean)
+
+    def test_a_whole_number_line_can_push_and_a_half_cannot(self):
+        for line in (8.0, 9.0, 10.0):
+            _, push, _ = split_for("MLB", line, 8.7)
+            self.assertGreater(push, 0.05, f"line {line} should push meaningfully")
+        for line in (8.5, 9.5):
+            _, push, _ = split_for("MLB", line, 8.7)
+            self.assertAlmostEqual(push, 0.0)
+
+    def test_the_three_outcomes_always_sum_to_one(self):
+        for line in (7.0, 7.5, 8.0, 9.5, 11.0):
+            for mu in (6.0, 8.7, 12.0):
+                o, p, u = split_for("MLB", line, mu)
+                self.assertAlmostEqual(o + p + u, 1.0, places=8)
+
+    def test_under_a_whole_number_equals_under_the_half_below_it(self):
+        """Under 9 and under 8.5 are the same event: nine runs or fewer minus
+        the push. A model that disagrees has an off-by-one in its summation."""
+        o85, _, u85 = split_for("MLB", 8.5, 8.7)
+        o9, p9, u9 = split_for("MLB", 9.0, 8.7)
+        self.assertAlmostEqual(u85, u9, places=9)
+        self.assertAlmostEqual(o85, o9 + p9, places=9)
+
+    def test_the_push_is_taken_from_both_sides_not_invented(self):
+        f = forecast_mlb("a @ b", 8.0, wind_mph=25, wind_direction="out")
+        self.assertGreater(f.p_push, 0.05)
+        self.assertAlmostEqual(f.p_over + f.p_push + f.p_under, 1.0, places=8)
+        self.assertIn("pushes and the stake comes back", " ".join(f.notes))
+
+
+class TestThePricesAreInformation(unittest.TestCase):
+    def test_implied_and_devig(self):
+        self.assertAlmostEqual(implied(-110), 110 / 210)
+        self.assertAlmostEqual(implied(+100), 0.5)
+        o, u = devig(-110, -110)
+        self.assertAlmostEqual(o, 0.5)
+        self.assertAlmostEqual(o + u, 1.0)
+
+    def test_a_juiced_over_means_fair_sits_above_the_posted_number(self):
+        even, _ = fair_total("MLB", 8.5, -110, -110)
+        juiced, _ = fair_total("MLB", 8.5, -120, +100)
+        shaded, _ = fair_total("MLB", 8.5, -105, -115)
+        self.assertGreater(juiced, even)
+        self.assertLess(shaded, even)
+
+    def test_no_prices_assumes_an_even_market_rather_than_a_mean(self):
+        """The line is a 50/50 point, not an average. Treating it as an average
+        is what made an empty card come back UNDER 55%."""
+        assumed, why = fair_total("MLB", 8.5, None, None)
+        priced, _ = fair_total("MLB", 8.5, -110, -110)
+        self.assertAlmostEqual(assumed, priced, places=6)
+        self.assertGreater(assumed, 8.5)
+        self.assertIn("right-skewed", why)
+
+    def test_reading_the_prices_changes_the_call(self):
+        plain = forecast_mlb("a @ b", 8.5)
+        priced = forecast_mlb("a @ b", 8.5, over_price=-125, under_price=+105)
+        self.assertAlmostEqual(plain.p_resolved, 0.5, places=9)
+        self.assertEqual(priced.side, "OVER")
+        self.assertGreater(priced.p_resolved, 0.52)
+
+
+class TestAWideMarketIsALessCertainOne(unittest.TestCase):
+    """Found on 2026-09-04 from a real card.
+
+    A total entered at 8.5 when the main number had moved to 9 picked up an
+    ALTERNATE-line quote of -150/-110: a 12.4% hold where every other game that
+    night sat at 2.4-4.8%. Proportional de-vig read 53.4% over and pushed the
+    card from LEAN to STRONG on what was mostly markup rather than opinion.
+    """
+
+    def test_a_normal_hold_is_left_completely_alone(self):
+        for op, up in ((-110, -110), (-115, -105), (-120, 100), (-105, -115),
+                       (100, -110), (-250, 200)):
+            self.assertLessEqual(hold(op, up), 0.05 + 1e-9)
+            self.assertAlmostEqual(market_confidence(hold(op, up)), 1.0)
+            raw, _ = devig(op, up, shrink=False)
+            shrunk, _ = devig(op, up)
+            self.assertAlmostEqual(raw, shrunk, places=12,
+                                   msg=f"{op}/{up} must be untouched")
+
+    def test_a_wide_market_is_pulled_back_toward_even(self):
+        raw, _ = devig(-150, -110, shrink=False)
+        shrunk, _ = devig(-150, -110)
+        self.assertGreater(raw, shrunk)
+        self.assertGreater(shrunk, 0.5)          # never flips the side
+        self.assertAlmostEqual(hold(-150, -110), 0.1238, places=4)
+        self.assertAlmostEqual(market_confidence(0.1238), 0.05 / 0.1238, places=6)
+
+    def test_the_shrink_never_crosses_even_or_changes_direction(self):
+        for op, up in ((-150, -110), (-300, -110), (-110, -300), (500, -110)):
+            raw, _ = devig(op, up, shrink=False)
+            shrunk, _ = devig(op, up)
+            self.assertEqual(raw > 0.5, shrunk > 0.5)
+            self.assertLessEqual(abs(shrunk - 0.5), abs(raw - 0.5) + 1e-12)
+
+    def test_a_symmetric_quote_stays_exactly_even_at_any_hold(self):
+        """Neutrality must survive the change. A shrink toward even cannot
+        move something that is already even."""
+        for op in (-110, -105, -150, -400):
+            p_over, p_under = devig(op, op)
+            self.assertAlmostEqual(p_over, 0.5, places=12)
+            self.assertAlmostEqual(p_under, 0.5, places=12)
+
+    def test_it_says_the_quote_looks_like_an_alternate_line(self):
+        _, why = fair_total("MLB", 8.5, -150, -110)
+        self.assertIn("ALTERNATE line", why)
+        self.assertIn("12.4% hold", why)
+        _, normal = fair_total("MLB", 8.5, -115, -105)
+        self.assertNotIn("ALTERNATE", normal)
+
+    def test_the_real_card_moves_by_about_a_point_and_a_half(self):
+        kw = dict(away_starter_era=3.46, home_starter_era=3.32, away_rpg=4.24,
+                  home_rpg=4.91, away_bullpen_era=4.00, home_bullpen_era=5.15,
+                  away_last10_total=8.9, home_last10_total=9.8, h2h_total=12.0,
+                  h2h_meetings=2, park_factor=106, wind_mph=11.8,
+                  wind_direction="out", temp_f=96.5, ticket_pct_over=55,
+                  money_pct_over=59)
+        f = forecast_mlb("MIA @ KC", 8.5, over_price=-150, under_price=-110, **kw)
+        self.assertEqual(f.side, "OVER")
+        # 58.7% before the hold change; 56-57.5% with the starters scored; the
+        # two good arms were holding it DOWN, so 59.6% with them unscored.
+        self.assertLess(f.p_resolved, 0.61)
+        self.assertGreater(f.p_resolved, 0.585)
+
+    def test_shin_is_deliberately_not_used(self):
+        """Shin corrects favourite-longshot bias and moves the favourite UP.
+
+        It is a real effect and the wrong one here: under Shin a -150/-110 quote
+        reads 53.8% against proportional's 53.4%, which would have made the
+        alternate line MORE confident rather than less. This pins the direction
+        so nobody re-adds it thinking it fixes this.
+        """
+        raw, _ = devig(-150, -110, shrink=False)
+        shrunk, _ = devig(-150, -110)
+        self.assertLess(shrunk, raw)             # we go DOWN, Shin goes up
+
+
+class TestItAlwaysAnswers(unittest.TestCase):
+    def test_every_card_gets_a_side(self):
+        for f in (forecast_mlb("a @ b", 8.5),
+                  forecast_mlb("a @ b", 9.0, away_starter_era=6.0, home_starter_era=2.0),
+                  forecast_mlb("a @ b", 11.5, over_price=-130, under_price=110)):
+            self.assertIn(f.side, ("OVER", "UNDER"))
+            self.assertIn(f.band, [name for _, name in BANDS])
+
+    def test_the_named_side_is_the_likelier_one(self):
+        # Two elite pens, since the starters are shown and not scored (26 Sept).
+        f = forecast_mlb("a @ b", 9.5, away_bullpen_era=2.30, home_bullpen_era=2.10)
+        self.assertEqual(f.side, "UNDER")
+        self.assertGreater(f.p_under, f.p_over)
+
+    def test_missing_inputs_reweight_rather_than_stall(self):
+        with_h2h = forecast_mlb("a @ b", 8.5, away_last10_total=10.0,
+                                home_last10_total=10.0, h2h_total=11.0, h2h_meetings=4)
+        without = forecast_mlb("a @ b", 8.5, away_last10_total=10.0,
+                               home_last10_total=10.0)
+        self.assertGreater(with_h2h.projected, without.projected)
+        self.assertIn("No head-to-head", " ".join(without.notes))
+
+    def test_weights_are_shares_not_absolutes(self):
+        """Doubling every weight must change no forecast. If it ever does, the
+        blend has stopped being a weighted mean and started summing, which is
+        the shape that needed caps and produced runaway numbers."""
+        kw = dict(away_starter_era=5.9, home_starter_era=3.1, away_bullpen_era=5.0,
+                  home_bullpen_era=3.2, away_last10_total=10.4, home_last10_total=8.2)
+        before = forecast_mlb("a @ b", 8.5, **kw).projected
+        original = dict(WEIGHTS["MLB"])
+        try:
+            WEIGHTS["MLB"] = {k: v * 3 for k, v in original.items()}
+            after = forecast_mlb("a @ b", 8.5, **kw).projected
+        finally:
+            WEIGHTS["MLB"] = original
+        self.assertAlmostEqual(before, after, places=9)
+
+    def test_a_blend_cannot_leave_the_range_of_its_parts(self):
+        f = forecast_mlb("a @ b", 7.0, away_last10_total=16.0, home_last10_total=15.0)
+        totals = [e.total for e in f.estimates]
+        self.assertGreaterEqual(f.projected, min(totals))
+        self.assertLessEqual(f.projected, max(totals))
+
+    def test_one_starter_alone_is_not_a_differential(self):
+        f = forecast_mlb("a @ b", 8.5, away_starter_era=7.9)
+        self.assertNotIn("Starters", [e.name for e in f.estimates])
+        self.assertIn("needs both arms", " ".join(f.notes))
+
+
+class TestPricingTheCall(unittest.TestCase):
+    def test_fair_price_round_trips_through_the_probability(self):
+        f = forecast_mlb("a @ b", 8.5, wind_mph=22, wind_direction="out")
+        self.assertAlmostEqual(implied(f.fair_price), f.p_resolved, places=6)
+
+    def test_a_coin_flip_is_priced_at_even_money(self):
+        f = forecast_mlb("a @ b", 8.5)
+        self.assertAlmostEqual(abs(f.fair_price), 100.0, places=4)
+
+    def test_edge_is_negative_when_the_price_is_worse_than_fair(self):
+        f = forecast_mlb("a @ b", 8.5, wind_mph=20, wind_direction="out")
+        self.assertGreater(f.edge_vs(+150), 0)      # generous price
+        self.assertLess(f.edge_vs(-300), 0)         # terrible price
+        self.assertAlmostEqual(f.edge_vs(f.fair_price), 0.0, places=6)
+
+    def test_a_push_refunds_rather_than_losing(self):
+        """A whole-number line with real push mass must price better than the
+        same probability with none, because the stake comes back."""
+        f = forecast_mlb("a @ b", 8.0, wind_mph=20, wind_direction="out")
+        self.assertGreater(f.p_push, 0.05)
+        # edge at fair is zero by construction even with the push present
+        self.assertAlmostEqual(f.edge_vs(f.fair_price), 0.0, places=6)
+
+
+class TestHeadToHeadSampleSize(unittest.TestCase):
+    def test_the_weight_scales_with_meetings_up_to_four(self):
+        self.assertAlmostEqual(h2h_weight(1.0, 1), 0.25)
+        self.assertAlmostEqual(h2h_weight(1.0, 4), 1.00)
+        self.assertAlmostEqual(h2h_weight(1.0, 40), 1.00)
+        self.assertAlmostEqual(h2h_weight(1.0, 0), 0.00)
+
+    def test_one_meeting_still_beats_leaving_it_out(self):
+        without = forecast_mlb("a @ b", 8.5, away_last10_total=9.0,
+                               home_last10_total=9.0)
+        with_one = forecast_mlb("a @ b", 8.5, away_last10_total=9.0,
+                                home_last10_total=9.0, h2h_total=14.0, h2h_meetings=1)
+        self.assertGreater(with_one.projected, without.projected)
+
+    def test_a_thin_head_to_head_says_it_was_discounted(self):
+        f = forecast_mlb("a @ b", 8.5, h2h_total=11.0, h2h_meetings=1)
+        h = next(e for e in f.estimates if e.name.startswith("Head"))
+        self.assertIn("Discounted", h.detail)
+        self.assertAlmostEqual(h.weight, WEIGHTS["MLB"]["h2h"] / H2H_FULL_WEIGHT_AT)
+
+
+class TestSoftInputsCannotBuyABand(unittest.TestCase):
+    """A measured-null input may move the forecast. It may not be the bet.
+
+    The Tigers/Guardians card is the reason this exists. Head to head at 6.4
+    over nine meetings and a public-money flag dragged a card the market and
+    both pitching staffs read as a coin flip into an UNDER LEAN, against the
+    price. It went twelve runs. The outcome was a 1-in-5 tail and proves
+    nothing; the reasoning was the problem.
+    """
+
+    #: The real card, as logged.
+    TIGERS = dict(
+        line=8.0, over_price=-120, under_price=100,
+        away_starter_era=3.24, home_starter_era=3.77,
+        away_rpg=4.05, home_rpg=4.12,
+        away_bullpen_era=4.00, home_bullpen_era=3.73,
+        away_last10_total=9.0, home_last10_total=8.9,
+        h2h_total=6.4, h2h_meetings=9, park_factor=98,
+        wind_mph=6, wind_direction="cross", temp_f=76,
+        ticket_pct_over=67, money_pct_over=38,
+    )
+
+    #: A card the gate holds under the engine as it stands since 26 Sept, when
+    #: the starters stopped being scored: the market and two league-average
+    #: pens read a coin flip, and only the two tagged inputs (Last 10 and head
+    #: to head) carry it to a band. Built for the test rather than logged,
+    #: because the two logged cards below no longer reach a bet on any read.
+    HELD = dict(
+        line=8.5, over_price=-110, under_price=-110,
+        away_bullpen_era=4.05, home_bullpen_era=4.05,
+        away_last10_total=11.5, home_last10_total=11.0,
+        h2h_total=12.0, h2h_meetings=8,
+    )
+
+    #: A live card the gate held on 20 Sept, when the starters were still
+    #: scored. Since 26 Sept it reads NO BET on both reads, so it can no longer
+    #: demonstrate the hold; it stays as a probability fixture.
+    BRAVES = dict(
+        line=8.5, over_price=100, under_price=-130,
+        away_starter_era=3.07, home_starter_era=3.43,
+        away_starter_ip=137.2, home_starter_ip=97.0,
+        away_rpg=3.87, home_rpg=4.79,
+        away_bullpen_era=3.58, home_bullpen_era=4.20,
+        away_last10_total=9.9, home_last10_total=7.8,
+        h2h_total=8.5, h2h_meetings=2, park_factor=99,
+        temp_f=91, dome=True, ticket_pct_over=96, money_pct_over=96,
+    )
+
+    def test_the_card_that_prompted_this_no_longer_reaches_a_bet_at_all(self):
+        """It used to read BET ungated and be held to NO BET. Three points of
+        that came from the money split, which is not scored any more, so the
+        card now falls under the floor on its own and the gate has nothing left
+        to do. The class keeps it because it is why the gate was built."""
+        f = forecast_mlb("Tigers @ Guardians", **self.TIGERS)
+        self.assertEqual(f.band_ungated, "NO BET")
+        self.assertEqual(f.band, "NO BET")
+        # Since the starters stopped being scored (26 Sept) the card is a coin
+        # flip on both reads: the two aces that pulled it under are listed and
+        # ignored, and nothing else on it leans.
+        self.assertAlmostEqual(f.p_resolved, 0.5, delta=0.01)
+        self.assertAlmostEqual(f.p_corroborated, 0.5, delta=0.03)
+
+    def test_a_live_card_is_still_held(self):
+        f = forecast_mlb("a @ b", **self.HELD)
+        self.assertNotEqual(f.band_ungated, "NO BET")
+        self.assertEqual(f.band, "NO BET")
+        self.assertGreater(f.p_resolved, f.p_corroborated)
+
+    def test_the_braves_card_reads_no_bet_on_both_reads_now(self):
+        """It was BET ungated and held to NO BET while the starters were
+        scored; two good arms were most of that lean. Unscored, nothing is
+        left to hold."""
+        f = forecast_mlb("Braves @ Astros", **self.BRAVES)
+        self.assertEqual(f.band_ungated, "NO BET")
+        self.assertEqual(f.band, "NO BET")
+
+    def test_the_headline_probability_is_untouched(self):
+        """The gate governs the band, never the forecast.
+
+        The probability is the best estimate of what happens; the band is the
+        recommendation. Silently moving the first to justify the second would
+        corrupt the calibration measure, which reads the probability.
+        """
+        # 0.5078 / 8.462 and 0.5399 while the starters were scored (to 25 Sept).
+        f = forecast_mlb("Tigers @ Guardians", **self.TIGERS)
+        self.assertAlmostEqual(f.p_resolved, 0.5040, places=3)
+        self.assertAlmostEqual(f.projected, 8.573, places=2)
+        g = forecast_mlb("Braves @ Astros", **self.BRAVES)
+        self.assertAlmostEqual(g.p_resolved, 0.5275, places=3)
+
+    def test_it_says_plainly_that_it_pulled_the_band(self):
+        f = forecast_mlb("a @ b", **self.HELD)
+        note = next(n for n in f.notes if "Held at" in n)
+        self.assertIn("NO BET", note)
+        self.assertIn("BET", note)
+
+    def test_a_card_with_no_soft_inputs_is_left_completely_alone(self):
+        """Not an approximation of a no-op -- an actual one."""
+        # Market and bullpens only: the two inputs still carrying a mechanism.
+        bare = dict(line=8.5, over_price=-115, under_price=-105,
+                    away_bullpen_era=3.10, home_bullpen_era=5.10)
+        f = forecast_mlb("a @ b", **bare)
+        self.assertEqual(f.band, f.band_ungated)
+        self.assertAlmostEqual(f.projected_corroborated, f.projected, places=12)
+        self.assertAlmostEqual(f.p_corroborated, f.p_resolved, places=12)
+        self.assertFalse(any("Held at" in n for n in f.notes))
+
+    def test_soft_inputs_agreeing_with_the_core_keep_the_band(self):
+        """The gate is a veto, not a tax. Corroborated confidence survives.
+
+        The core is the market and the bullpens; everything else is soft now.
+        """
+        kw = dict(line=8.5, over_price=-110, under_price=-110,
+                  away_bullpen_era=6.90, home_bullpen_era=6.80)
+        core = forecast_mlb("a @ b", **kw)
+        withsoft = forecast_mlb("a @ b", away_last10_total=11.0,
+                                home_last10_total=11.4, **kw)
+        self.assertEqual(core.side, "OVER")
+        self.assertEqual(withsoft.side, "OVER")
+        self.assertEqual(withsoft.band, withsoft.band_ungated)
+        self.assertNotEqual(withsoft.band, "NO BET")
+
+    def test_soft_inputs_can_still_cut_confidence(self):
+        """Deleting them is never allowed to RAISE the band."""
+        kw = dict(line=8.5, over_price=-110, under_price=-110,
+                  away_bullpen_era=6.90, home_bullpen_era=6.80)
+        cut = forecast_mlb("a @ b", away_last10_total=7.0,
+                           home_last10_total=7.2, **kw)
+        self.assertLessEqual(BANDS_ORDER[cut.band], BANDS_ORDER[cut.band_ungated])
+
+    def test_the_band_never_exceeds_either_read(self):
+        """min(), stated as a property rather than trusted to one example."""
+        for h2h in (4.0, 6.0, 8.0, 10.0, 14.0):
+            for split in ((70, 30), (30, 70), (50, 50)):
+                f = forecast_mlb(
+                    "a @ b", line=8.5, over_price=-110, under_price=-110,
+                    away_starter_era=3.10, home_starter_era=3.30,
+                    away_bullpen_era=3.40, home_bullpen_era=3.20,
+                    h2h_total=h2h, h2h_meetings=6,
+                    ticket_pct_over=split[0], money_pct_over=split[1])
+                floor = next(fl for fl, n in BANDS if n == f.band)
+                if f.band != "NO BET":
+                    self.assertGreaterEqual(f.p_resolved, floor)
+                    self.assertGreaterEqual(f.p_corroborated, floor)
+
+    def test_wind_and_temperature_are_mechanism_and_survive_the_gate(self):
+        """Wind is the one input the market prices imperfectly. It is not soft."""
+        f = forecast_mlb("a @ b", line=8.5, wind_mph=25, wind_direction="out",
+                         away_starter_era=4.16, home_starter_era=4.16)
+        wind = next(d for d in f.deltas if d.name == "Wind")
+        self.assertTrue(wind.mechanism)
+        self.assertGreater(f.projected_corroborated, f.line)
+
+    def test_exactly_the_four_measured_null_inputs_are_tagged(self):
+        """Starters joined the list on 2026-09-20.
+
+        Measured the same way as the others on 156 settled games: r = -0.076
+        against the market's error, t = -0.95, sign backwards. Worst MAE of any
+        real input (3.157 against the market's 2.803), and the blend containing
+        it predicts finals worse than the market anchor alone. A stronger case
+        than either form or head to head had when they were tagged.
+        """
+        f = forecast_mlb(
+            "a @ b", line=8.5, away_starter_era=3.9, home_starter_era=4.4,
+            away_bullpen_era=3.8, home_bullpen_era=4.3,
+            away_last10_total=9.0, home_last10_total=9.2,
+            h2h_total=9.1, h2h_meetings=5, wind_mph=14, wind_direction="out",
+            temp_f=84, ticket_pct_over=70, money_pct_over=40)
+        soft = {e.name for e in f.estimates if not e.mechanism}
+        soft |= {d.name for d in f.deltas if not d.mechanism}
+        # The money split used to be in this set. It is not scored at all now,
+        # so it cannot be soft — there is nothing left of it to tag.
+        self.assertEqual(soft, {"Starters", "Last 10", "Head to head (5)"})
+        # and the market and the bullpens are what is left standing
+        hard = {e.name for e in f.estimates if e.mechanism}
+        self.assertEqual(hard, {"Market", "Bullpens"})
+
+BANDS_ORDER = {name: i for i, (_floor, name) in enumerate(BANDS)}
+
+
+class TestWeatherAndPark(unittest.TestCase):
+    def test_wind_out_and_in_mirror(self):
+        out = forecast_mlb("a @ b", 8.5, wind_mph=20, wind_direction="out")
+        into = forecast_mlb("a @ b", 8.5, wind_mph=20, wind_direction="in")
+        self.assertAlmostEqual(out.deltas[0].runs, -into.deltas[0].runs)
+        self.assertEqual(out.side, "OVER")
+        self.assertEqual(into.side, "UNDER")
+
+    def test_nothing_under_the_dead_zone_counts(self):
+        f = forecast_mlb("a @ b", 8.5, wind_mph=6, wind_direction="out")
+        self.assertAlmostEqual(f.deltas[0].runs, 0.0)
+
+    def test_a_cross_wind_is_a_reading_worth_zero(self):
+        f = forecast_mlb("a @ b", 8.5, wind_mph=30, wind_direction="cross")
+        self.assertAlmostEqual(f.deltas[0].runs, 0.0)
+        self.assertIn("neither way", f.deltas[0].detail)
+
+    def test_a_shut_roof_removes_the_weather(self):
+        f = forecast_mlb("a @ b", 8.5, wind_mph=30, wind_direction="out", temp_f=98,
+                         dome=True)
+        self.assertEqual([d.name for d in f.deltas], ["Roof shut"])
+        self.assertAlmostEqual(f.p_resolved, 0.5, places=9)
+
+    def test_the_park_never_touches_the_market_anchor(self):
+        """Park factor is inside the posted number already. Counting it twice
+        is the double count that put the fourteen-input model behind the line."""
+        f = forecast_mlb("a @ b", 10.5, park_factor=118)
+        self.assertAlmostEqual(f.p_resolved, 0.5, places=9)
+
+    def test_the_park_does_reach_the_differentials(self):
+        neutral = forecast_mlb("a @ b", 8.5, away_bullpen_era=6.0, home_bullpen_era=6.0,
+                               park_factor=100)
+        coors = forecast_mlb("a @ b", 8.5, away_bullpen_era=6.0, home_bullpen_era=6.0,
+                             park_factor=118)
+        self.assertGreater(coors.projected, neutral.projected)
+        # and the starter estimate, shown and not scored, still scales with it
+        ns = forecast_mlb("a @ b", 8.5, away_starter_era=6.0, home_starter_era=6.0, park_factor=100)
+        cs = forecast_mlb("a @ b", 8.5, away_starter_era=6.0, home_starter_era=6.0, park_factor=118)
+        self.assertGreater(next(e.total for e in cs.estimates if e.name == "Starters"),
+                           next(e.total for e in ns.estimates if e.name == "Starters"))
+
+    def test_an_implausible_park_is_a_typo(self):
+        self.assertAlmostEqual(park_scale(1.13), 1.0)
+        self.assertAlmostEqual(park_scale(1130), 1.0)
+        self.assertAlmostEqual(park_scale(113), 1.13)
+
+    def test_line_movement_is_shown_and_never_scored(self):
+        """The gate model subtracted movement, correctly, because it scored
+        news against the number. Here the current line IS the anchor, so the
+        move is already inside it."""
+        moved = forecast_mlb("a @ b", 9.5, opened=8.5)
+        still = forecast_mlb("a @ b", 9.5)
+        self.assertAlmostEqual(moved.projected, still.projected, places=9)
+        self.assertIn("NOT", " ".join(moved.notes))
+
+
+class TestGuards(unittest.TestCase):
+    def test_an_impossible_line_is_refused(self):
+        with self.assertRaises(ValueError):
+            forecast_mlb("a @ b", 162.5)          # a basketball number
+        with self.assertRaises(ValueError):
+            forecast_mlb("a @ b", 1.5)            # no MLB total is ever this low
+
+    def test_an_impossible_era_is_ignored_rather_than_believed(self):
+        f = forecast_mlb("a @ b", 8.5, away_starter_era=99.0, home_starter_era=4.16)
+        self.assertNotIn("Starters", [e.name for e in f.estimates])
+
+
+class TestOnePriceIsNotNoPrice(unittest.TestCase):
+    """A card with only the over filled in used to throw the price away.
+
+    `fair_total` fell back to "assume -110/-110" and the heaviest input on the
+    board went in blind. On a real Brewers/Pirates card that cost 1.8 points of
+    probability. A -120 over is the book saying fair sits north of the posted
+    number, and that survives without its partner.
+    """
+
+    def test_a_complete_quote_is_left_alone(self):
+        """The whole change must be invisible when both prices are given."""
+        self.assertIsNone(complete_pair(-120, 100))
+        for op, up in ((-110, -110), (-120, 100), (-150, 125), (105, -125)):
+            a = forecast_mlb("a @ b", 8.5, over_price=op, under_price=up)
+            self.assertEqual(a.projected, forecast_mlb(
+                "a @ b", 8.5, over_price=op, under_price=up).projected)
+            self.assertNotIn("reconstructed", a.estimates[0].detail)
+
+    def test_no_price_at_all_still_falls_back_the_old_way(self):
+        self.assertIsNone(complete_pair(None, None))
+        f = forecast_mlb("a @ b", 8.5)
+        self.assertAlmostEqual(f.p_resolved, 0.5, places=9)
+        self.assertIn("No prices given", f.estimates[0].detail)
+
+    def test_a_lone_over_price_pushes_the_anchor_up(self):
+        blind = fair_total("MLB", 8.5, None, None)[0]
+        lone = fair_total("MLB", 8.5, -120, None)[0]
+        self.assertGreater(lone, blind, "a -120 over says fair is north of the line")
+        self.assertIn("reconstructed", fair_total("MLB", 8.5, -120, None)[1])
+
+    def test_a_lone_under_price_pushes_the_anchor_down(self):
+        blind = fair_total("MLB", 8.5, None, None)[0]
+        lone = fair_total("MLB", 8.5, None, -120)[0]
+        self.assertLess(lone, blind)
+
+    def test_the_two_sides_are_mirror_images_in_probability(self):
+        """A lone -140 over and a lone -140 under must lean equally hard.
+
+        The symmetry lives in the PROBABILITY, not in the mean. Asserting that
+        the anchor moves by the same number of runs each way fails by 0.012,
+        and that failure is correct: the run distribution is right-skewed, so
+        the map from probability to mean is not linear. The reconstruction
+        itself is exactly symmetric and that is what gets pinned.
+        """
+        for price in (-120, -140, -175):
+            o = complete_pair(price, None)
+            u = complete_pair(None, price)
+            self.assertAlmostEqual(devig(*o, shrink=False)[0] - 0.5,
+                                   0.5 - devig(*u, shrink=False)[0], places=12)
+        # and the anchor still moves the right way on each side
+        blind = fair_total("MLB", 8.5, None, None)[0]
+        self.assertGreater(fair_total("MLB", 8.5, -140, None)[0], blind)
+        self.assertLess(fair_total("MLB", 8.5, None, -140)[0], blind)
+
+    def test_a_reconstructed_quote_does_not_get_full_authority(self):
+        """Its hold is assumed, not observed, so it is cut against the 90th
+        percentile of what this book actually charges."""
+        rebuilt = complete_pair(-120, None)
+        raw, _ = devig(rebuilt[0], rebuilt[1], shrink=False)
+        kept, _ = devig(rebuilt[0], rebuilt[1], confidence_hold=HOLD_90TH)
+        self.assertLess(abs(kept - 0.5), abs(raw - 0.5))
+        self.assertAlmostEqual(kept - 0.5, (raw - 0.5) * market_confidence(HOLD_90TH),
+                               places=9)
+        self.assertLess(market_confidence(HOLD_90TH), 1.0)
+
+    def test_it_never_invents_a_price_past_certainty(self):
+        """A longshot so long the usual hold cannot cover it falls back."""
+        self.assertIsNone(complete_pair(+2000, None))
+        f = forecast_mlb("a @ b", 8.5, over_price=+2000)
+        self.assertIn("No prices given", f.estimates[0].detail)
+
+    def test_the_reconstruction_beats_discarding_the_price(self):
+        """The property the whole change rests on, on real-shaped quotes.
+
+        Measured across 133 logged two-priced cards it lands 73-78% closer to
+        the true answer and 122 of 133 improve; this pins the direction.
+        """
+        for op, up in ((-120, 100), (-140, 105), (-150, 120), (-105, -115), (100, -120)):
+            truth = fair_total("MLB", 8.5, op, up)[0]
+            blind = fair_total("MLB", 8.5, None, None)[0]
+            rebuilt_o = fair_total("MLB", 8.5, op, None)[0]
+            rebuilt_u = fair_total("MLB", 8.5, None, up)[0]
+            for got in (rebuilt_o, rebuilt_u):
+                self.assertLess(abs(got - truth), abs(blind - truth),
+                                f"{op}/{up}: reconstruction was no better than discarding")
+
+    def test_the_measured_hold_constants_are_what_the_book_charges(self):
+        """These are measured on the logged card, so they must stay ordered and
+        stay in the range a main line actually trades at."""
+        self.assertLess(TYPICAL_HOLD, HOLD_90TH)
+        self.assertLess(0.02, TYPICAL_HOLD)
+        self.assertLess(HOLD_90TH, 0.10)
+
+
+class TestTheGuardIsMeasuredNotRemembered(unittest.TestCase):
+    """A constant that cites a live measurement is the one that goes stale.
+
+    The page carried `OVERCONFIDENCE = 3.0` with the comment "measured, not
+    chosen: the model has said 54.2% and done 51.1%". True when written, false
+    by 110 graded calls (55.41% against 55.45%). Nobody re-checks a number that
+    claims it was measured, so it is computed now.
+    """
+
+    def test_an_underconfident_model_does_not_earn_extra_margin(self):
+        """Doing better than you said is not a licence to bet thinner."""
+        recs = [(0.55, i % 100 < 70) for i in range(400)]     # says 55, does 70
+        g = margin_guard(recs)
+        self.assertEqual(g.bias, 0.0)
+        self.assertGreater(g.points, 0.0, "noise alone still floors it")
+
+    def test_a_measured_overconfidence_is_carried_in_full(self):
+        recs = [(0.60, i % 100 < 45) for i in range(400)]     # says 60, does 45
+        g = margin_guard(recs)
+        self.assertAlmostEqual(g.bias, 0.15, places=6)
+        self.assertGreater(g.points, 0.15)
+
+    def test_the_guard_tightens_as_the_card_grows(self):
+        """The property the hardcoded 3.0 could never have."""
+        last = float("inf")
+        for n in (50, 110, 400, 1000, 4000):
+            g = margin_guard([(0.55, i % 100 < 55) for i in range(n)])
+            self.assertLess(g.points, last)
+            last = g.points
+
+    def test_a_thin_card_blocks_everything_without_a_special_case(self):
+        """At ten calls one standard error is enormous, which IS the answer."""
+        g = margin_guard([(0.55, i % 2 == 0) for i in range(10)])
+        self.assertGreater(g.points, 0.10,
+                           "ten calls cannot establish a margin of any size")
+
+    def test_no_graded_calls_is_not_a_clean_bill_of_health(self):
+        g = margin_guard([])
+        self.assertEqual(g.n, 0)
+        self.assertEqual(g.points, float("inf"))
+        self.assertIn("unmeasured", g.detail)
+
+    def test_the_spread_check_reports_rather_than_refits(self):
+        """It must never quietly move RESIDUAL_SD. Chasing a fortnight's
+        residuals is how a dispersion parameter ends up fitting noise."""
+        tight = residual_spread([0.2, -0.3, 0.1, -0.2, 0.25, -0.15] * 30)
+        self.assertFalse(tight.consistent)
+        self.assertIn("OUTSIDE", tight.detail)
+        self.assertEqual(tight.assumed, RESIDUAL_SD["MLB"],
+                         "the constant is reported, never rewritten")
+        self.assertEqual(RESIDUAL_SD["MLB"], 4.39)
+
+    def test_a_spread_matching_the_constant_is_reported_as_settled(self):
+        import random
+        rng = random.Random(7)
+        got = residual_spread([rng.gauss(1.0, 4.39) for _ in range(600)])
+        self.assertTrue(got.consistent)
+        self.assertLessEqual(got.lo, 4.39)
+        self.assertGreaterEqual(got.hi, 4.39)
+
+    def test_the_interval_brackets_the_true_spread(self):
+        """The chi-square approximation has to actually cover."""
+        import random
+        rng = random.Random(11)
+        covered = 0
+        for _ in range(200):
+            got = residual_spread([rng.gauss(0.0, 4.0) for _ in range(120)], assumed=4.0)
+            covered += got.consistent
+        self.assertGreater(covered, 180, f"95% interval covered only {covered}/200")
+
+    def test_too_few_games_refuses_to_measure_a_spread(self):
+        got = residual_spread([1.0, -2.0])
+        self.assertIn("not enough", got.detail)
+
+
+class TestAStarterERAIsAMeasurement(unittest.TestCase):
+    """A short season is a noisy season, and the model has to know it.
+
+    Before this block a call-up's 5.24 in 22 innings carried exactly the
+    authority of an ace's 5.24 in 190. The fix is empirical Bayes on the
+    innings count. What these tests mostly pin is that it is SAFE: it is off
+    unless asked for, it only ever pulls toward the league, and it can never
+    invent a number more extreme than the one typed.
+    """
+
+    def test_a_blank_innings_field_changes_absolutely_nothing(self):
+        """The whole feature has to be invisible to every card logged before it.
+
+        This is the guarantee the change stands on. If it fails, a back
+        catalogue of graded cards silently re-scores and the record is gone.
+        """
+        for line, aera, hera in ((8.5, 5.24, 5.53), (9.0, 2.10, 6.40),
+                                 (7.5, 4.16, 4.16), (11.0, 3.01, 3.99)):
+            plain = forecast_mlb("a @ b", line, over_price=-110, under_price=-110,
+                                 away_starter_era=aera, home_starter_era=hera)
+            blank = forecast_mlb("a @ b", line, over_price=-110, under_price=-110,
+                                 away_starter_era=aera, home_starter_era=hera,
+                                 away_starter_ip=None, home_starter_ip=None)
+            self.assertEqual(plain.projected, blank.projected)
+            self.assertEqual(plain.p_resolved, blank.p_resolved)
+            self.assertEqual(plain.band, blank.band)
+            self.assertEqual(plain.side, blank.side)
+
+    def test_the_stabilisation_point_is_derived_not_chosen(self):
+        """ERA_STABLE_AT must fall out of the other two constants.
+
+        If someone edits it by hand to tune a backtest, this fails -- which is
+        the point. It is 9 * overdispersion * league ERA / talent variance.
+        """
+        expected = (9.0 * ERA_OVERDISPERSION * LEAGUE_STARTER_ERA
+                    / STARTER_TALENT_SD ** 2)
+        self.assertAlmostEqual(ERA_STABLE_AT, expected, places=9)
+        self.assertAlmostEqual(era_weight(ERA_STABLE_AT), 0.5, places=9,
+                               msg="at the stabilisation point it is a 50/50 split")
+
+    def test_more_innings_is_always_more_trust_and_never_full_trust(self):
+        last = -1.0
+        for ip in (1, 10, 22.1, 60, 90.7, 143.1, 190, 300):
+            w = era_weight(ip)
+            self.assertGreater(w, last, "weight must rise with innings")
+            self.assertGreater(w, 0.0)
+            self.assertLess(w, 1.0, "a season is a sample, never a reading")
+            last = w
+
+    def test_shrinking_only_ever_pulls_toward_the_league(self):
+        """It can move a number in, never out, and never past the prior."""
+        for era in (1.20, 2.80, 4.16, 5.24, 7.90):
+            for ip in (5, 22.1, 90, 143.1, 220):
+                out = shrink_era(era, ip)
+                lo, hi = sorted((era, LEAGUE_STARTER_ERA))
+                self.assertGreaterEqual(out, lo - 1e-12)
+                self.assertLessEqual(out, hi + 1e-12)
+                self.assertLessEqual(abs(out - LEAGUE_STARTER_ERA),
+                                     abs(era - LEAGUE_STARTER_ERA) + 1e-12)
+
+    def test_a_league_average_arm_is_untouched_by_any_sample_size(self):
+        """Shrinking toward the mean cannot move something already at it."""
+        for ip in (1, 22.1, 90.7, 200, None):
+            self.assertAlmostEqual(shrink_era(LEAGUE_STARTER_ERA, ip),
+                                   LEAGUE_STARTER_ERA, places=12)
+
+    def test_the_same_era_moves_the_card_less_on_fewer_innings(self):
+        """The ordering that makes the feature worth having at all."""
+        def proj(ip):
+            # The starters estimate itself: it is shown, not scored, in the
+            # full game since 26 Sept, so the projection no longer moves with it.
+            f = forecast_mlb("a @ b", 8.5, over_price=-110, under_price=-110,
+                             away_starter_era=6.50, home_starter_era=4.16,
+                             away_starter_ip=ip, home_starter_ip=200.0)
+            return next(e.total for e in f.estimates if e.name == "Starters")
+        self.assertLess(proj(20), proj(80))
+        self.assertLess(proj(80), proj(180))
+        self.assertLess(proj(180), proj(None), "blank must be the most credulous")
+
+    def test_an_implausible_innings_count_is_ignored_rather_than_believed(self):
+        """Same posture as an implausible ERA: fall back, do not extrapolate."""
+        for junk in (-5.0, 0.0, 9999.0):
+            self.assertEqual(era_weight(junk), 1.0)
+
+    def test_the_card_says_when_it_has_discounted_an_arm(self):
+        f = forecast_mlb("a @ b", 8.5, over_price=-110, under_price=-110,
+                         away_starter_era=5.24, home_starter_era=5.53,
+                         away_starter_ip=22.1, home_starter_ip=143.1)
+        detail = next(e for e in f.estimates if e.name == "Starters").detail
+        self.assertIn("22.1 IP", detail)
+        self.assertIn("sample size", detail)
+        plain = forecast_mlb("a @ b", 8.5, over_price=-110, under_price=-110,
+                             away_starter_era=5.24, home_starter_era=5.53)
+        self.assertNotIn("sample size",
+                         next(e for e in plain.estimates if e.name == "Starters").detail,
+                         "a card with no innings typed must not claim a discount")
+
+
+class TestAlternateLines(unittest.TestCase):
+    """The one thing here that does not need the model to be right.
+
+    A book prices its MAIN line efficiently -- that is the single fact this
+    project has established. It prices the alternate ladder off a template. So
+    the fair price at every other number is arithmetic on the market's own
+    distribution, and comparing it to what the book offers is a relative
+    judgement that needs no forecasting edge at all.
+    """
+
+    def test_the_main_rung_reproduces_the_main_line(self):
+        rungs = alt_ladder("MLB", 8.5, -115, -105, span=2.0)
+        main = next(r for r in rungs if abs(r.line - 8.5) < 1e-9)
+        f = forecast_mlb("a @ b", 8.5, over_price=-115, under_price=-105)
+        market = next(e for e in f.estimates if e.name == "Market")
+        over, _push, under = split_for("MLB", 8.5, market.total)
+        self.assertAlmostEqual(main.p_over, over / (over + under), places=9)
+
+    def test_the_ladder_is_monotone(self):
+        """A higher total can only ever be harder to go over."""
+        rungs = alt_ladder("MLB", 8.5, -110, -110, span=3.0)
+        for a, b in zip(rungs, rungs[1:]):
+            self.assertGreater(a.p_over, b.p_over,
+                               f"{a.line} -> {b.line} did not fall")
+
+    def test_only_whole_numbers_push(self):
+        for r in alt_ladder("MLB", 8.5, -110, -110, span=2.0):
+            if abs(r.line - round(r.line)) < 1e-9:
+                self.assertGreater(r.p_push, 0.05)
+            else:
+                self.assertAlmostEqual(r.p_push, 0.0, places=9)
+
+    def test_the_two_sides_of_a_rung_are_complementary(self):
+        for r in alt_ladder("MLB", 9.0, -120, 100, span=2.0):
+            self.assertAlmostEqual(implied(r.fair_over) + implied(r.fair_under),
+                                   1.0, places=6)
+
+    def test_cents_and_expected_value_never_disagree_in_sign(self):
+        """The bug this caught.
+
+        The index rises with implied probability and a higher implied
+        probability is a WORSE price, so the subtraction was backwards: a book
+        offering +145 where fair was +195 reported as FIFTY CENTS OF VALUE while
+        its expected value was -0.17 a unit.
+        """
+        rungs = alt_ladder("MLB", 8.5, -115, -105, span=3.0)
+        for r in rungs:
+            for side in ("OVER", "UNDER"):
+                fair = r.fair_over if side == "OVER" else r.fair_under
+                for offered in (fair - 60, fair - 20, fair + 20, fair + 60,
+                                -110, 100, 150, -200):
+                    e = alt_edge(r, side, offered)
+                    if abs(e["cents"]) < 1e-6:
+                        continue
+                    self.assertEqual(
+                        e["cents"] > 0, e["ev_per_unit"] > 0,
+                        f"{side} {r.line} fair {fair:+.0f} offered {offered:+.0f}: "
+                        f"{e['cents']:+.1f} cents but EV {e['ev_per_unit']:+.4f}")
+
+    def test_the_fair_price_is_exactly_zero_edge(self):
+        for r in alt_ladder("MLB", 8.5, -110, -110, span=2.0):
+            for side in ("OVER", "UNDER"):
+                fair = r.fair_over if side == "OVER" else r.fair_under
+                e = alt_edge(r, side, fair)
+                self.assertAlmostEqual(e["cents"], 0.0, places=6)
+                self.assertAlmostEqual(e["ev_per_unit"], 0.0, places=6)
+
+    def test_a_better_price_is_always_worth_more(self):
+        r = next(x for x in alt_ladder("MLB", 8.5, -110, -110, span=2.0)
+                 if abs(x.line - 10.5) < 1e-9)
+        worse = alt_edge(r, "OVER", 150)
+        better = alt_edge(r, "OVER", 250)
+        self.assertGreater(better["cents"], worse["cents"])
+        self.assertGreater(better["ev_per_unit"], worse["ev_per_unit"])
+
+    def test_the_model_ladder_can_be_asked_for_separately(self):
+        """Two ladders, and the difference between them matters.
+
+        The MARKET ladder needs only the main line to be efficient. The MODEL
+        ladder is only as good as the model, which on 106 logged games has added
+        nothing over the base rate. They must not be confused.
+        """
+        market = alt_ladder("MLB", 8.5, -110, -110, span=1.0)
+        model = alt_ladder("MLB", 8.5, -110, -110, span=1.0, mu=10.5)
+        self.assertGreater(model[0].p_over, market[0].p_over)
+
+    def test_a_pushable_rung_prices_on_the_resolved_outcome(self):
+        r = next(x for x in alt_ladder("MLB", 8.5, -110, -110, span=1.0)
+                 if abs(x.line - 9.0) < 1e-9)
+        self.assertGreater(r.p_push, 0.05)
+        # the two fair prices must still be a complete book once the push is out
+        self.assertAlmostEqual(implied(r.fair_over) + implied(r.fair_under),
+                               1.0, places=6)
+
+
+class TestCalibration(unittest.TestCase):
+    """Does a 60% call win 60% of the time? The previous model could not say."""
+
+    def test_a_perfectly_calibrated_run_is_recognised(self):
+        import random
+        random.seed(11)
+        recs = []
+        for _ in range(4000):
+            p = random.uniform(0.50, 0.70)
+            recs.append((p, random.random() < p))
+        c = calibration(recs)
+        self.assertLess(c.brier, 0.25)
+        self.assertIn("Calibrated within noise", c.verdict)
+
+    def test_an_overconfident_model_is_caught(self):
+        import random
+        random.seed(12)
+        # says 65%, actually does 50% — the exact failure mode that matters
+        recs = [(0.65, random.random() < 0.50) for _ in range(2000)]
+        c = calibration(recs)
+        self.assertIn("Miscalibrated", c.verdict)
+        self.assertLess(c.hit_rate, c.mean_forecast)
+
+    def test_a_worthless_model_is_named_as_worthless(self):
+        import random
+        random.seed(13)
+        recs = [(0.52, random.random() < 0.50) for _ in range(3000)]
+        c = calibration(recs)
+        self.assertGreaterEqual(c.brier, 0.24)
+
+    def test_a_short_run_refuses_to_judge(self):
+        c = calibration([(0.6, True)] * 12)
+        self.assertIn("not enough to judge", c.verdict)
+        self.assertIn("Keep logging", c.verdict)
+
+    def test_buckets_report_what_was_said_against_what_happened(self):
+        recs = [(0.55, True)] * 30 + [(0.55, False)] * 30 + [(0.65, True)] * 40
+        c = calibration(recs)
+        labels = {b["label"] for b in c.buckets}
+        self.assertIn("53-57%", labels)
+        self.assertIn("62%+", labels)
+        mid = next(b for b in c.buckets if b["label"] == "53-57%")
+        self.assertAlmostEqual(mid["did"], 0.5)
+        self.assertIn("said", c.report())
+
+    def test_it_refuses_an_empty_record(self):
+        with self.assertRaises(ValueError):
+            calibration([])
+
+
+class TestSlate(unittest.TestCase):
+    def test_ordered_by_conviction_and_names_every_side(self):
+        rows = [forecast_mlb("Quiet @ Game", 8.5),
+                forecast_mlb("Loud @ Game", 8.5, wind_mph=28, wind_direction="in")]
+        text = slate(rows)
+        self.assertLess(text.index("Loud @ Game"), text.index("Quiet @ Game"))
+        self.assertNotIn("PASS", text)
+
+    def test_an_empty_card_says_so(self):
+        self.assertIn("Nothing", slate([]))
+
+
+if __name__ == "__main__":
+    unittest.main()
+
+
+class TestInningsMustBeFilledOnBothSidesOrNeither(unittest.TestCase):
+    """A blank innings box is not neutral, and that is easy to miss.
+
+    Blank means "trust this ERA in full", which is more authority than 210
+    innings earns. So shrinking one arm while the other keeps full trust tilts
+    the differential toward whichever box was left empty -- on a 3.00 against
+    5.50 card it flips the side on which box got typed into.
+    """
+
+    KW = dict(over_price=-110, under_price=-110,
+              away_starter_era=3.00, home_starter_era=5.50)
+    WARN = "one starter and not the other"
+
+    def _warned(self, f):
+        return any(self.WARN in n for n in f.notes)
+
+    def test_a_one_sided_fill_tilts_the_starter_read(self):
+        """It used to flip the full-game side. The starters are shown and not
+        scored there since 26 Sept, so the side no longer moves -- but the
+        starter estimate the first five reads still lands on opposite sides of
+        the anchor depending on which box was typed into, which is the tilt the
+        warning is about."""
+        away = forecast_mlb("a @ b", 8.5, away_starter_ip=165.1, **self.KW)
+        home = forecast_mlb("a @ b", 8.5, home_starter_ip=165.1, **self.KW)
+        anchor = away.estimates[0].total
+        sa = next(e.total for e in away.estimates if e.name == "Starters")
+        sh = next(e.total for e in home.estimates if e.name == "Starters")
+        self.assertGreater(sa, anchor)
+        self.assertLess(sh, anchor)
+        self.assertEqual(away.side, home.side)
+
+    def test_a_one_sided_fill_is_called_out(self):
+        for kw in ({"away_starter_ip": 165.1}, {"home_starter_ip": 190.0}):
+            self.assertTrue(self._warned(forecast_mlb("a @ b", 8.5, **kw, **self.KW)))
+
+    def test_both_or_neither_is_not_warned_about(self):
+        self.assertFalse(self._warned(forecast_mlb("a @ b", 8.5, **self.KW)))
+        self.assertFalse(self._warned(forecast_mlb(
+            "a @ b", 8.5, away_starter_ip=165.1, home_starter_ip=190.0, **self.KW)))
+
+    def test_an_ignored_innings_count_does_not_trip_the_warning(self):
+        """An implausible figure falls back to full trust, so the card is
+        effectively 'neither' and must not claim a one-sided fill."""
+        self.assertFalse(self._warned(forecast_mlb(
+            "a @ b", 8.5, away_starter_ip=9999.0, **self.KW)))
+
+    def test_baseball_notation_does_not_need_converting(self):
+        """165.1 means 165 and a third. Typing the decimal is harmless.
+
+        Pinned as a bound on the error, and the bound is measured rather than
+        guessed -- I asserted 0.001 first and it failed at 60.2 IP, because the
+        weight curve is steepest at low innings where a third of an inning is a
+        larger share of the sample. Swept across 5-230 IP the worst drift is
+        0.00458 of weight, at 5.2 IP. What that is worth downstream is the
+        number that matters: at most 0.004 of an ERA on the value that enters
+        the blend, which is nothing.
+        """
+        worst = 0.0
+        for whole in range(5, 231):
+            for tenth, third in ((0.1, 1 / 3), (0.2, 2 / 3)):
+                worst = max(worst, abs(era_weight(whole + tenth)
+                                       - era_weight(whole + third)))
+        self.assertLess(worst, 0.005, "the notation shortcut has stopped being free")
+        # and the thing that actually reaches the projection
+        for ip, third, era in ((22.2, 22 + 2 / 3, 5.24), (165.1, 165 + 1 / 3, 3.00)):
+            self.assertLess(abs(shrink_era(era, ip) - shrink_era(era, third)), 0.005)
+
+
+class TestStartersAreShownNotScored(unittest.TestCase):
+    """Tagged 2026-09-20, unscored 2026-09-26, and both reasons are written
+    down so either can be undone.
+
+    The tag: on 156 settled games the starter differential correlated with the
+    market's error at r = -0.076, t = -0.95, SIGN BACKWARDS, so it was barred
+    from buying a band. The tag was not enough. Re-scoring all 229 graded MLB
+    totals (1-25 Sept) with the starters out of the full-game blend changed the
+    side on 24 cards, and those 24 went 17-7 WITHOUT the starters -- 7-17 with
+    them; 55.8% -> 60.3% overall, in both halves of the dates. The market
+    already carries the probable starters; a season ERA adds noise on top.
+
+    So the estimate is still built, still listed, and still read by the first
+    five at its weight, but the full-game projection ignores it. If a later
+    re-measure on 400+ games finds the starters helping, flip `scored` back.
+    """
+
+    def test_the_weight_is_untouched_because_the_first_five_reads_it(self):
+        self.assertEqual(WEIGHTS["MLB"]["starters"], 1.6)
+
+    def test_starters_no_longer_move_the_projection(self):
+        flat = forecast_mlb("a @ b", 8.5, over_price=-110, under_price=-110,
+                            away_starter_era=4.16, home_starter_era=4.16)
+        steep = forecast_mlb("a @ b", 8.5, over_price=-110, under_price=-110,
+                             away_starter_era=6.50, home_starter_era=6.50)
+        self.assertAlmostEqual(steep.projected, flat.projected, places=9)
+        self.assertAlmostEqual(steep.p_resolved, flat.p_resolved, places=9)
+
+    def test_but_the_estimate_is_still_built_and_listed(self):
+        f = forecast_mlb("a @ b", 8.5, over_price=-110, under_price=-110,
+                         away_starter_era=6.50, home_starter_era=6.50)
+        s = next(e for e in f.estimates if e.name == "Starters")
+        self.assertFalse(s.scored)
+        self.assertEqual(s.weight, 1.6)
+        self.assertGreater(s.total, f.estimates[0].total + 0.5)
+        self.assertIn("scored", s.to_dict())
+
+    def test_two_awful_starters_and_nothing_else_is_a_coin_flip(self):
+        f = forecast_mlb("a @ b", 8.5, over_price=-110, under_price=-110,
+                         away_starter_era=6.50, home_starter_era=6.50)
+        self.assertEqual(f.band_ungated, "NO BET")
+        self.assertEqual(f.band, "NO BET")
+        self.assertAlmostEqual(f.projected, f.estimates[0].total, places=9)
+
+    def test_the_projection_is_the_blend_of_the_scored_estimates_only(self):
+        kw = dict(line=8.5, over_price=-110, under_price=-110,
+                  away_starter_era=6.50, home_starter_era=5.90,
+                  away_bullpen_era=4.10, home_bullpen_era=4.00)
+        f = forecast_mlb("a @ b", **kw)
+        scored = [e for e in f.estimates if e.scored]
+        self.assertEqual([e.name for e in scored], ["Market", "Bullpens"])
+        self.assertAlmostEqual(
+            f.projected,
+            sum(e.total * e.weight for e in scored) / sum(e.weight for e in scored),
+            places=9)
+
+    def test_the_card_says_why(self):
+        f = forecast_mlb("a @ b", 8.5, away_starter_era=3.0, home_starter_era=3.0)
+        detail = next(e for e in f.estimates if e.name == "Starters").detail
+        self.assertIn("SHOWN, NOT SCORED", detail)
+        self.assertIn("229 graded games", detail)
+        self.assertIn("17-7 without", detail)
+        self.assertIn("first five still scores", detail)
+
+    def test_the_held_note_never_names_them(self):
+        f = forecast_mlb("a @ b", away_starter_era=2.5, home_starter_era=2.6,
+                         **TestSoftInputsCannotBuyABand.HELD)
+        note = next(n for n in f.notes if "Held at" in n)
+        self.assertNotIn("Starters", note)
+
+class TestAPercentageOutsideAHundredIsATypo(unittest.TestCase):
+    """A logged card carried money% = 925, meaning 92.5.
+
+    The split delta fired at full strength on it and moved that projection 0.30
+    runs. Nothing on screen said anything was wrong. Same posture as an
+    implausible ERA: drop it and say so, rather than believe it.
+    """
+
+    KW = dict(line=8.5, over_price=-118, under_price=-102,
+              away_starter_era=3.49, home_starter_era=3.70,
+              away_bullpen_era=3.41, home_bullpen_era=4.10)
+
+    @staticmethod
+    def _split_note(f):
+        return [n for n in f.notes if "of tickets but" in n]
+
+    def test_the_real_card_now_scores_as_if_the_field_were_empty(self):
+        bad = forecast_mlb("Braves @ Astros", ticket_pct_over=89,
+                           money_pct_over=925, **self.KW)
+        absent = forecast_mlb("Braves @ Astros", ticket_pct_over=89, **self.KW)
+        self.assertAlmostEqual(bad.projected, absent.projected, places=12)
+        self.assertEqual(self._split_note(bad), [])
+
+    def test_it_says_so_rather_than_failing_silently(self):
+        f = forecast_mlb("a @ b", ticket_pct_over=89, money_pct_over=925, **self.KW)
+        note = next(n for n in f.notes if "percentage" in n)
+        self.assertIn("925", note)
+        self.assertIn("decimal", note)
+
+    def test_a_real_percentage_still_works(self):
+        f = forecast_mlb("a @ b", ticket_pct_over=89, money_pct_over=40, **self.KW)
+        self.assertEqual(len(self._split_note(f)), 1)
+        self.assertFalse(any("percentage" in n for n in f.notes))
+
+    def test_both_ends_of_the_window_are_guarded(self):
+        for tick, cash in ((-5, 40), (89, -1), (101, 40), (89, 1000)):
+            f = forecast_mlb("a @ b", ticket_pct_over=tick, money_pct_over=cash, **self.KW)
+            self.assertEqual(self._split_note(f), [],
+                             f"{tick}/{cash} should have been dropped")
+        # and the boundaries themselves are valid
+        edge = forecast_mlb("a @ b", ticket_pct_over=100, money_pct_over=0, **self.KW)
+        self.assertEqual(len(self._split_note(edge)), 1)
+
+
+class TestTheMoneySplitIsShownAndNeverScored(unittest.TestCase):
+    """It moved the projection a flat 0.30 runs on a 20-point gap. Across 172
+    logged games that pointed the RIGHT way 27 of the 58 times it fired — 46.6%
+    against a coin's 50% — and no threshold from 5 to 40 points did better. The
+    direction is documented, the size never was, so it joins the opening line
+    and the NFL quarterback: shown, never scored."""
+
+    KW = dict(line=8.5, over_price=-118, under_price=-102,
+              away_starter_era=3.49, home_starter_era=3.70,
+              away_bullpen_era=3.41, home_bullpen_era=4.10)
+
+    def test_it_moves_the_projection_by_exactly_nothing(self):
+        blank = forecast_mlb("a @ b", **self.KW)
+        for tick, cash in ((90, 30), (30, 90), (50, 50), (100, 0), (0, 100)):
+            f = forecast_mlb("a @ b", ticket_pct_over=tick, money_pct_over=cash, **self.KW)
+            self.assertAlmostEqual(f.projected, blank.projected, places=12,
+                                   msg=f"{tick}/{cash} moved the projection")
+            self.assertAlmostEqual(f.p_resolved, blank.p_resolved, places=12,
+                                   msg=f"{tick}/{cash} moved the probability")
+            self.assertEqual(f.band, blank.band)
+            self.assertEqual(f.side, blank.side)
+
+    def test_it_is_not_a_delta_any_more(self):
+        f = forecast_mlb("a @ b", ticket_pct_over=90, money_pct_over=30, **self.KW)
+        self.assertNotIn("Money split", [d.name for d in f.deltas])
+
+    def test_but_a_real_gap_is_still_reported(self):
+        f = forecast_mlb("a @ b", ticket_pct_over=90, money_pct_over=30, **self.KW)
+        note = next(n for n in f.notes if "of tickets but" in n)
+        self.assertIn("60-point gap", note)
+        self.assertIn("big money on the under", note)
+        # and it says plainly that it did not touch the number
+        self.assertIn("NOT scored", note)
+
+    def test_the_direction_reads_the_right_way_round(self):
+        under = forecast_mlb("a @ b", ticket_pct_over=90, money_pct_over=30, **self.KW)
+        over = forecast_mlb("a @ b", ticket_pct_over=30, money_pct_over=90, **self.KW)
+        self.assertIn("big money on the under",
+                      next(n for n in under.notes if "of tickets but" in n))
+        self.assertIn("big money on the over",
+                      next(n for n in over.notes if "of tickets but" in n))
+
+    def test_a_gap_under_the_threshold_says_nothing_at_all(self):
+        f = forecast_mlb("a @ b", ticket_pct_over=60, money_pct_over=45, **self.KW)
+        self.assertEqual([n for n in f.notes if "of tickets but" in n], [])
+
+    def test_it_cannot_buy_a_band_it_no_longer_earns(self):
+        """The old delta was tagged mechanism=False so it could not corroborate.
+        Deleting it must not have handed the gate back a vote."""
+        f = forecast_mlb("a @ b", ticket_pct_over=95, money_pct_over=20, **self.KW)
+        blank = forecast_mlb("a @ b", **self.KW)
+        self.assertAlmostEqual(f.p_corroborated, blank.p_corroborated, places=12)
+        self.assertEqual(f.band, blank.band)
+
+
+class TestWnbaIsNeutralByArithmetic(unittest.TestCase):
+    """The property the whole architecture exists for, ported to basketball.
+
+    Six league-average inputs must move the number by EXACTLY zero. Not
+    approximately: the estimates are multiplicative factors against the market
+    anchor, so a league-average card reduces to the anchor as arithmetic. The
+    first version of this project carried +0.16 runs of permanent lean toward
+    the over because a constant was chosen rather than derived, and this test
+    is what makes that impossible to reintroduce here.
+    """
+
+    BASE = dict(line=161.5, over_price=-110, under_price=-110)
+
+    def test_a_league_average_card_is_the_market(self):
+        blank = forecast_wnba("a @ b", **self.BASE)
+        full = forecast_wnba(
+            "a @ b", away_pace=WNBA_LEAGUE_PACE, home_pace=WNBA_LEAGUE_PACE,
+            away_off_rating=WNBA_LEAGUE_RATING, home_off_rating=WNBA_LEAGUE_RATING,
+            away_def_rating=WNBA_LEAGUE_RATING, home_def_rating=WNBA_LEAGUE_RATING,
+            away_rest_days=2, home_rest_days=2, **self.BASE)
+        self.assertAlmostEqual(full.projected, blank.projected, places=10)
+        self.assertAlmostEqual(full.p_resolved, blank.p_resolved, places=12)
+
+    def test_an_even_market_is_exactly_a_coin_flip(self):
+        f = forecast_wnba("a @ b", **self.BASE)
+        self.assertAlmostEqual(f.p_resolved, 0.5, places=12)
+
+    def test_the_anchor_sits_ON_the_line_not_above_it(self):
+        """The useful difference from the baseball book.
+
+        An MLB empty card projects line + 0.543, because a run total is
+        right-skewed and the posted line is its median rather than its mean. A
+        basketball total is near-symmetric, so the two coincide and the anchor
+        lands on the number. Getting this backwards would put a permanent lean
+        on every WNBA card.
+        """
+        f = forecast_wnba("a @ b", **self.BASE)
+        self.assertAlmostEqual(f.projected, 161.5, places=6)
+
+
+class TestWnbaDistributionCanPush(unittest.TestCase):
+    def test_a_whole_number_line_has_a_real_push(self):
+        f = forecast_wnba("a @ b", line=162, over_price=-110, under_price=-110)
+        # 1 / (sd * sqrt(2*pi)) at the mean, ~2.5% for sd 16
+        self.assertGreater(f.p_push, 0.02)
+        self.assertLess(f.p_push, 0.03)
+
+    def test_a_half_point_line_cannot_push(self):
+        f = forecast_wnba("a @ b", line=161.5, over_price=-110, under_price=-110)
+        self.assertEqual(f.p_push, 0.0)
+
+    def test_the_three_outcomes_sum_to_one(self):
+        for line in (155, 161.5, 162, 170.5):
+            f = forecast_wnba("a @ b", line=line, over_price=-115, under_price=-105)
+            self.assertAlmostEqual(f.p_over + f.p_push + f.p_under, 1.0, places=9)
+
+
+class TestWnbaInputsPointTheRightWay(unittest.TestCase):
+    BASE = dict(line=161.5, over_price=-110, under_price=-110)
+    FLAT = dict(away_off_rating=107.0, home_off_rating=107.0,
+                away_def_rating=107.0, home_def_rating=107.0)
+
+    def test_faster_teams_raise_the_total(self):
+        fast = forecast_wnba("a @ b", away_pace=88.0, home_pace=87.0, **self.BASE)
+        slow = forecast_wnba("a @ b", away_pace=78.0, home_pace=79.0, **self.BASE)
+        self.assertGreater(fast.projected, slow.projected)
+
+    def test_better_offence_raises_it_and_better_defence_lowers_it(self):
+        good_o = forecast_wnba("a @ b", away_off_rating=115.0, home_off_rating=107.0,
+                               away_def_rating=107.0, home_def_rating=107.0, **self.BASE)
+        good_d = forecast_wnba("a @ b", away_off_rating=107.0, home_off_rating=107.0,
+                               away_def_rating=97.0, home_def_rating=107.0, **self.BASE)
+        flat = forecast_wnba("a @ b", **dict(self.FLAT, **self.BASE))
+        self.assertGreater(good_o.projected, flat.projected)
+        self.assertLess(good_d.projected, flat.projected)
+
+    def test_rest_can_only_push_the_total_down(self):
+        """It is the one honest mechanism behind hunting unders, and it is
+        one-directional by construction: there is no well-rested bonus."""
+        flat = forecast_wnba("a @ b", **dict(self.FLAT, **self.BASE))
+        for a, h in ((0, 0), (0, 2), (1, 1), (1, 3)):
+            tired = forecast_wnba("a @ b", away_rest_days=a, home_rest_days=h,
+                                  **dict(self.FLAT, **self.BASE))
+            self.assertLess(tired.projected, flat.projected, f"{a}/{h}")
+
+    def test_two_days_rest_or_more_is_the_baseline_and_moves_nothing(self):
+        flat = forecast_wnba("a @ b", **dict(self.FLAT, **self.BASE))
+        for days in (2, 3, 7):
+            f = forecast_wnba("a @ b", away_rest_days=days, home_rest_days=days,
+                              **dict(self.FLAT, **self.BASE))
+            self.assertAlmostEqual(f.projected, flat.projected, places=12)
+
+
+class TestWnbaTagsWhatItCannotJustify(unittest.TestCase):
+    BASE = dict(line=161.5, over_price=-110, under_price=-110)
+
+    def test_rest_and_form_are_tagged_but_pace_and_efficiency_are_not(self):
+        f = forecast_wnba(
+            "a @ b", away_pace=85.0, home_pace=84.0,
+            away_off_rating=110.0, home_off_rating=104.0,
+            away_def_rating=101.0, home_def_rating=108.0,
+            away_rest_days=0, home_rest_days=2,
+            away_last5_total=170.0, home_last5_total=166.0, **self.BASE)
+        soft = {e.name for e in f.estimates if not e.mechanism}
+        soft |= {d.name for d in f.deltas if not d.mechanism}
+        self.assertEqual(soft, {"Last 5", "Rest"})
+        hard = {e.name for e in f.estimates if e.mechanism}
+        self.assertEqual(hard, {"Market", "Pace", "Efficiency"})
+
+    def test_rest_alone_cannot_buy_a_band(self):
+        """A card carried only by the hand-sized coefficient is held, exactly
+        as an MLB card carried only by form and head-to-head is."""
+        f = forecast_wnba("a @ b", away_rest_days=0, home_rest_days=0, **self.BASE)
+        self.assertEqual(f.band, "NO BET")
+        # the forecast itself still moved -- the gate governs the band only
+        blank = forecast_wnba("a @ b", **self.BASE)
+        self.assertLess(f.projected, blank.projected)
+
+    def test_the_playoff_flag_moves_the_number_by_exactly_zero(self):
+        off = forecast_wnba("a @ b", **self.BASE)
+        on = forecast_wnba("a @ b", playoff=True, **self.BASE)
+        self.assertAlmostEqual(on.projected, off.projected, places=12)
+        self.assertAlmostEqual(on.p_resolved, off.p_resolved, places=12)
+        self.assertEqual(on.band, off.band)
+        self.assertTrue(any("PLAYOFF" in n for n in on.notes))
+
+
+class TestTheHeldNoteNamesTheInputsItActuallyDeleted(unittest.TestCase):
+    """Reported from the page: a held WNBA card told the reader to delete "last
+    ten, head to head and the money split".
+
+    The gate's arithmetic was right -- it deletes whatever carries
+    mechanism=False -- but the sentence describing it was three MLB names typed
+    in by hand. They went stale twice: the money split stopped being scored, and
+    the WNBA arrived carrying a different set of tagged inputs entirely. So the
+    note named two inputs the sport does not have, one input no sport scores any
+    more, and left out the starters, which MLB really does delete.
+
+    The names now come off the same flag the gate reads, so the sentence cannot
+    describe a blend other than the one on the card.
+    """
+
+    #: Sparks @ Aces, 22 Sept, exactly as logged -- the card in the report.
+    SPARKS = dict(
+        line=181.5, over_price=110, under_price=-145,
+        away_pace=82.66, home_pace=80.58,
+        away_off_rating=105.7, home_off_rating=112.7,
+        away_def_rating=110.5, home_def_rating=106.2,
+        away_rest_days=1, home_rest_days=1,
+        away_last5_total=169.5, home_last5_total=175.4,
+    )
+
+    def test_a_held_wnba_card_names_last_five_and_rest(self):
+        f = forecast_wnba("Sparks @ Aces", **self.SPARKS)
+        self.assertEqual(f.band, "NO BET")
+        # STRONG BET at the inherited spread of 11.5; BET since the spread moved to 16 (25 Sept)
+        self.assertEqual(f.band_ungated, "BET")
+        note = next(n for n in f.notes if "Held at" in n)
+        self.assertIn("Delete Last 5 and Rest", note)
+
+    def test_a_held_wnba_card_never_mentions_the_mlb_inputs(self):
+        f = forecast_wnba("Sparks @ Aces", **self.SPARKS)
+        note = next(n for n in f.notes if "Held at" in n)
+        for absent in ("head to head", "Head to head", "money split",
+                       "last ten", "Last 10", "Starters"):
+            self.assertNotIn(absent, note)
+
+    def test_the_arithmetic_the_note_describes_was_never_wrong(self):
+        """Only the prose was broken, so the number it quotes is unchanged."""
+        f = forecast_wnba("Sparks @ Aces", **self.SPARKS)
+        # 0.4807 and "OVER 51.9%" at the inherited spread of 11.5; the wider spread of 16 pulls both toward 50%
+        self.assertAlmostEqual(f.p_corroborated, 0.4978, places=3)
+        self.assertIn("OVER 50.2%, the other side",
+                      next(n for n in f.notes if "Held at" in n))
+
+    def test_a_held_mlb_card_names_what_the_gate_deletes_and_nothing_else(self):
+        """Named "Starters, Last 10 and Head to head" from 20 to 25 Sept. The
+        starters are shown and not scored since 26 Sept, so the gate no longer
+        deletes them and the sentence must not say it does."""
+        f = forecast_mlb("a @ b", **TestSoftInputsCannotBuyABand.HELD)
+        note = next(n for n in f.notes if "Held at" in n)
+        self.assertIn("Delete Last 10 and Head to head", note)
+        self.assertNotIn("Starters", note)
+        self.assertNotIn("money split", note)
+
+    def test_the_meeting_count_is_dropped_from_the_sentence(self):
+        """"Head to head (2)" earns its count in the weight table. In a
+        sentence the count reads as a typo."""
+        f = forecast_mlb("a @ b", **TestSoftInputsCannotBuyABand.HELD)
+        self.assertTrue(any(e.name.startswith("Head to head (")
+                            for e in f.estimates))
+        note = next(n for n in f.notes if "Held at" in n)
+        self.assertNotIn("Head to head (", note)
+
+    def test_one_tagged_input_reads_as_a_name_not_a_list(self):
+        f = forecast_wnba("a @ b", line=161.5, over_price=-110, under_price=-110,
+                          away_rest_days=0, home_rest_days=0)
+        note = next(n for n in f.notes if "Held at" in n)
+        self.assertIn("Delete Rest --", note)
+
+
+class TestWnbaPartialInputsAreDroppedNotHalfApplied(unittest.TestCase):
+    BASE = dict(line=161.5, over_price=-110, under_price=-110)
+
+    def test_one_pace_is_no_pace(self):
+        blank = forecast_wnba("a @ b", **self.BASE)
+        one = forecast_wnba("a @ b", away_pace=90.0, **self.BASE)
+        self.assertAlmostEqual(one.projected, blank.projected, places=12)
+        self.assertNotIn("Pace", [e.name for e in one.estimates])
+        self.assertTrue(any("one side only" in n for n in one.notes))
+
+    def test_three_ratings_are_no_ratings(self):
+        blank = forecast_wnba("a @ b", **self.BASE)
+        three = forecast_wnba("a @ b", away_off_rating=115.0, home_off_rating=104.0,
+                              away_def_rating=99.0, **self.BASE)
+        self.assertAlmostEqual(three.projected, blank.projected, places=12)
+        self.assertNotIn("Efficiency", [e.name for e in three.estimates])
+
+    def test_an_implausible_reading_is_refused(self):
+        blank = forecast_wnba("a @ b", **self.BASE)
+        # 831 is 83.1 with a lost decimal point
+        typo = forecast_wnba("a @ b", away_pace=831.0, home_pace=83.1, **self.BASE)
+        self.assertAlmostEqual(typo.projected, blank.projected, places=12)
+
+
+class TestOnlyTheAxialWindCarriesABall(unittest.TestCase):
+    """A wind arriving at a diagonal does part of its work sideways.
+
+    The model took one direction word and the full speed, so a quartering wind
+    was scored as though it blew straight in. Rays @ Yankees, 22 Sept 2026:
+    Outlier reported ENE 14.9 mph at a park whose axis runs north-northeast, so
+    roughly 10.5 mph of it was axial and 10.5 across. Entered at face value it
+    moved the total 0.71 runs and bought a BET; resolved, it moves 0.26 and
+    there is no bet.
+    """
+
+    KW = dict(line=6.5, over_price=-120, under_price=100,
+              away_starter_era=2.94, home_starter_era=2.95,
+              away_bullpen_era=4.16, home_bullpen_era=3.13)
+
+    def test_the_quartering_factor_is_geometry_not_a_guess(self):
+        self.assertAlmostEqual(WIND_QUARTERING, math.sqrt(0.5), places=12)
+
+    def test_straight_in_and_out_are_untouched(self):
+        """The change must not move a single card already in the log."""
+        self.assertEqual(resolve_wind(14.9, "out")[0], 14.9)
+        self.assertEqual(resolve_wind(14.9, "in")[0], -14.9)
+        self.assertIsNone(resolve_wind(14.9, "cross")[0])
+        self.assertIsNone(resolve_wind(14.9, "")[0])
+        self.assertIsNone(resolve_wind(14.9, "nonsense")[0])
+
+    def test_quartering_keeps_cos_45_of_the_speed(self):
+        self.assertAlmostEqual(resolve_wind(14.9, "quarter-in")[0],
+                               -14.9 * math.sqrt(0.5), places=12)
+        self.assertAlmostEqual(resolve_wind(14.9, "quarter-out")[0],
+                               14.9 * math.sqrt(0.5), places=12)
+
+    def test_the_spellings_a_stored_row_might_carry_all_resolve(self):
+        for word in ("quarter-in", "quartering-in", "QUARTERING IN", "qin", "Quarter_In"):
+            self.assertLess(resolve_wind(10.0, word)[0], 0, word)
+        for word in ("quarter-out", "quartering-out", "QUARTERING OUT", "qout"):
+            self.assertGreater(resolve_wind(10.0, word)[0], 0, word)
+
+    def test_a_quartering_wind_moves_the_total_less_than_a_straight_one(self):
+        straight = forecast_mlb("a @ b", wind_mph=14.9, wind_direction="in", **self.KW)
+        quarter = forecast_mlb("a @ b", wind_mph=14.9, wind_direction="quarter-in", **self.KW)
+        none_ = forecast_mlb("a @ b", **self.KW)
+        sw = next(d.runs for d in straight.deltas if d.name == "Wind")
+        qw = next(d.runs for d in quarter.deltas if d.name == "Wind")
+        self.assertLess(sw, qw)          # both negative; the quartering one is smaller
+        self.assertLess(qw, 0.0)
+        self.assertGreater(none_.projected, quarter.projected)
+        self.assertGreater(quarter.projected, straight.projected)
+
+    def test_the_dead_zone_bites_the_resolved_speed_not_the_raw_one(self):
+        """The reason this matters so much. 14.9 raw clears the 8 mph zone by
+        6.9; its axial 10.5 clears it by only 2.5, so the adjustment falls by
+        far more than the 29% the speed did."""
+        straight = forecast_mlb("a @ b", wind_mph=14.9, wind_direction="in", **self.KW)
+        quarter = forecast_mlb("a @ b", wind_mph=14.9, wind_direction="quarter-in", **self.KW)
+        sw = abs(next(d.runs for d in straight.deltas if d.name == "Wind"))
+        qw = abs(next(d.runs for d in quarter.deltas if d.name == "Wind"))
+        self.assertLess(qw / sw, 0.45)          # not the 0.707 of the raw speed
+        self.assertGreater(qw / sw, 0.30)
+
+    def test_a_quartering_wind_under_the_zone_once_resolved_does_nothing(self):
+        """11 mph raw is over the dead zone; quartered it is 7.8 and under it."""
+        f = forecast_mlb("a @ b", wind_mph=11.0, wind_direction="quarter-in", **self.KW)
+        blank = forecast_mlb("a @ b", **self.KW)
+        self.assertAlmostEqual(f.projected, blank.projected, places=12)
+
+    def test_the_card_that_prompted_it_stops_being_a_bet(self):
+        card = dict(line=6.5, over_price=-120, under_price=100,
+                    away_starter_era=2.94, home_starter_era=2.95,
+                    away_starter_ip=171.1, home_starter_ip=76.1,
+                    away_rpg=4.03, home_rpg=3.72,
+                    away_bullpen_era=4.16, home_bullpen_era=3.13,
+                    away_last10_total=6.7, home_last10_total=10.0,
+                    h2h_total=7.6, h2h_meetings=9, park_factor=103, temp_f=65.4)
+        face = forecast_mlb("Rays @ Yankees", wind_mph=14.9,
+                            wind_direction="in", **card)
+        real = forecast_mlb("Rays @ Yankees", wind_mph=14.9,
+                            wind_direction="quarter-in", **card)
+        self.assertEqual(face.side, "UNDER")
+        self.assertNotEqual(face.band, "NO BET")
+        self.assertEqual(real.band, "NO BET")
+        self.assertLess(real.p_resolved, face.p_resolved)
+
+
+class TestTheGeneralBearingResolver(unittest.TestCase):
+    """Correct general form, tested, and deliberately NOT wired in.
+
+    It needs a table of thirty park orientations to be useful, and no such
+    table can be verified from inside this project -- every source for it
+    refuses the connection. It is here so the geometry does not have to be
+    re-derived if a verified table ever arrives.
+    """
+
+    def test_a_wind_from_dead_behind_home_blows_straight_out(self):
+        # park axis due north; wind FROM the south blows toward the north
+        axial, cross = bearing_to_axial(10.0, 180.0, 0.0)
+        self.assertAlmostEqual(axial, 10.0, places=9)
+        self.assertAlmostEqual(cross, 0.0, places=9)
+
+    def test_a_wind_from_centre_field_blows_straight_in(self):
+        axial, cross = bearing_to_axial(10.0, 0.0, 0.0)
+        self.assertAlmostEqual(axial, -10.0, places=9)
+        self.assertAlmostEqual(cross, 0.0, places=9)
+
+    def test_a_wind_off_the_foul_line_is_pure_crosswind(self):
+        axial, cross = bearing_to_axial(10.0, 90.0, 0.0)
+        self.assertAlmostEqual(axial, 0.0, places=9)
+        self.assertAlmostEqual(cross, 10.0, places=9)
+
+    def test_it_reproduces_the_yankee_stadium_reading(self):
+        # ENE is 67.5 degrees; the park axis runs about 27
+        axial, cross = bearing_to_axial(14.9, 67.5, 27.0)
+        self.assertLess(axial, 0)                       # blowing in
+        self.assertAlmostEqual(abs(axial), 11.3, delta=0.2)
+        self.assertAlmostEqual(cross, 9.7, delta=0.2)
+
+    def test_the_components_conserve_the_wind(self):
+        for bearing in range(0, 360, 15):
+            axial, cross = bearing_to_axial(12.0, float(bearing), 27.0)
+            self.assertAlmostEqual(math.hypot(axial, cross), 12.0, places=9)

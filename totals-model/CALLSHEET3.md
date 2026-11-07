@@ -2781,3 +2781,32 @@ the best app on Brunson's over and none on Maxey's under, the close file
 attached to two props with one ignored, the card and panel lines with
 their colour, the stored close, the record's close line and tile, and the
 favourite's and the spike's lines on the tile and as tiles.
+
+## The form block kept, and what the first graded night of the close said, 7 Nov 2026
+
+The 6 Nov backup carried the slate's "his last 3 games" why line on every
+projected prop and no form block on any row: the page copies a fixed list
+of fields off a props file and the block was not on it. The card and the
+panel read the log instead, so nothing showed; but the log is trimmed
+with the night after seven, and the form line and the record's two form
+tiles would have gone with it where the block, small and not trimmed,
+stays. The row keeps the block now. The harness seeds a props file whose
+Trae Young prop carries a block with three games and a log with two games
+with the stat, so his form line can only come off the block, and reads it
+on the card and in the stored row.
+
+The first night with the close loaded read 4 of 817 picks beating it, with
+one line and five prices moved of 825: the close file was written at
+20:11 UTC, nearly four hours before the first tip, and the morning's file
+close to it. The close run belongs within minutes of the first tip.
+
+The record tiles, read for what they cover: the BET, LEAN, no-edge, taken
+and pairs tiles are life to date and carry each night's band as carded,
+so they mix three models (the model at a third of the say to 29 Oct, the
+shade from 30 Oct to 4 Nov, the realigned blend from 5 Nov); the
+favourite's tiles are life to date too, off the spread, which stays on
+the row; the form and the minutes-spike tiles read the log and the
+levers, which the trim drops after seven nights, so they cover the last
+seven nights on the tab; the consensus tiles cover the nights with a
+consensus on the row, 5 Nov on; the close tile the nights with a close
+loaded.

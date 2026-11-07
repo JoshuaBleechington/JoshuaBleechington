@@ -390,6 +390,7 @@ const CHECKS = ["dome","playoff"];
         { pid: '3037789', name: 'Trae Young', team: 'ATL', opp: 'ORL', home: false, pos: 'PG', mk: 'pts', line: 24.5, op: -110, up: -110, book: 'fanatics', books: { fanatics: [24.5, -110, -110], draftkings: [25.5, -115, -105] },
           proj: 27.2, sd: 9.4, pm: 0.612, pb: 0.5, p: 0.5604, push: 0, side: 'OVER', chance: 0.5604, price: -110, need: 0.5238, edge: 0.0366, band: 'BET', mins: 35.1, rate36: 27.9,
           kal: { r: [[19.5, 0.70, 0.72, 0.71, 100], [24.5, 0.46, 0.48, 0.47, 500], [29.5, 0.24, 0.26, 0.25, 50]], team: 'ATL' },   // a ladder a file from 4 Nov 2026 still carries: ignored from 5 Nov (Kalshi is off the props)
+          form: { vals: [20, 21, 30], over: 1, on: 0, avg: 23.7 },   // the slate's block (7 Nov 2026): the log below has two games with the stat, so the card's form line can only come off the block
           why: ['27.9 points per 36 this season (3 games, 104 minutes)', '35.1 minutes projected'], log: [['2026-10-15', 'MIA', 0, 34.0, 26], ['2026-10-17', 'CHI', 1, 31.0, 22], ['2026-10-19', 'BOS', 0, 12.5, null]] },
         { pid: '4066261', name: 'Jalen Suggs', team: 'ORL', opp: 'ATL', home: true, pos: 'SG', mk: 'ast', line: 4.5, op: -120, up: -100, book: 'fanatics', books: { fanatics: [4.5, -120, -100] },
           why: ['no history to project from (under 60 minutes with the stat in the ledgers)'], log: [] },
@@ -418,6 +419,8 @@ const CHECKS = ["dome","playoff"];
     const tabEmpty0 = document.getElementById('propsCalib').innerText.replace(/\s+/g, ' ').trim();
     const viewOn = !document.getElementById('propsView').hidden, colsOff = document.querySelector('.cols').hidden, pressed = document.getElementById('m-props').getAttribute('aria-pressed');
     const best = [...document.querySelectorAll('#propsBest .pk')].map(e => e.innerText.replace(/\s+/g, ' ').trim());
+    const formBlock = (() => { const c = [...document.querySelectorAll('#propsBest .pk')].find(e => /Trae Young/.test(e.textContent)), fl = c && c.querySelector('.n5.formline'); return fl ? fl.textContent.replace(/\s+/g, ' ').trim() + '|' + fl.className : ''; })();
+    const formStored = await (async () => { try { const raw = (window.smStore ? await smStore.getItem('callsheet3.props.v1') : null) || localStorage.getItem('callsheet3.props.v1') || '[]'; const r = JSON.parse(raw).find(x => x.pid === '3037789'); return r && r.form ? JSON.stringify(r.form) : ''; } catch (e) { return 'err ' + e; } })();
     const rowsOn = document.querySelectorAll('#propsTable tr[data-prop]').length;
     document.getElementById('propsAll').checked = true; document.getElementById('propsAll').dispatchEvent(new Event('change', { bubbles: true })); await wait();
     const rowsAll = document.querySelectorAll('#propsTable tr[data-prop]').length;
@@ -461,9 +464,11 @@ const CHECKS = ["dome","playoff"];
     document.getElementById('m-nba').click(); await wait();
     const viewOff = document.getElementById('propsView').hidden, colsBack = !document.querySelector('.cols').hidden, nbaPressed = document.getElementById('m-nba').getAttribute('aria-pressed');
     await smStore.removeItem('callsheet3.props.v1');
-    return { viewOn, colsOff, pressed, best, rowsOn, rowsAll, count, msg, whyOpen, logMarks, tileBefore, after: after.map(r => [r.name, r.mk, r.result, r.actual]), tileText, slateMsg, restored: restored.length, viewOff, colsBack, nbaPressed,
+    return { viewOn, colsOff, pressed, best, formBlock, formStored, rowsOn, rowsAll, count, msg, whyOpen, logMarks, tileBefore, after: after.map(r => [r.name, r.mk, r.result, r.actual]), tileText, slateMsg, restored: restored.length, viewOff, colsBack, nbaPressed,
              tabCalib, tabBlocks, nights, ladder, tabEmpty0, noneMsg, thinMsg, inPlay, thisRow, thisMark, logRows, refill, thisWhat, whatHead, otherWhat };
   });
+  chk(propsT.formBlock === 'His last 3: 20 · 21 · 30 against 24.5 · 1 of 3 over, against the OVER|n5 formline neg' && propsT.formStored === '{"vals":[20,21,30],"over":1,"on":0,"avg":23.7}',
+      'props file: the slate\'s form block lands on the row and the card\'s form line reads it (7 Nov 2026; the seeded log has two games with the stat, so the line can only come off the block)', JSON.stringify({ card: propsT.formBlock, stored: propsT.formStored }));
   chk(propsT.refill.stripped && propsT.refill.same && JSON.stringify(propsT.refill.mins) === JSON.stringify(propsT.refill.was) && propsT.refill.mins.some(m => typeof m === 'number') && /Minutes filled in on \d+ graded props? from the box lines\./.test(propsT.refill.msg),
       'props: a second load of a night\'s grade file fills the minutes in on props graded before they were kept, leaves every result as it was, and says how many', JSON.stringify(propsT.refill));
   chk(/^10-21 @ [A-Z]+ this game 36\.2 28 won by 6 · 36 min \(his usual 34\) · 22 shots \(his usual 21 at those minutes\) · 10 of 19 from the floor$/.test(propsT.thisRow) && /lg over/.test(propsT.thisMark) && propsT.logRows === 4
@@ -476,7 +481,7 @@ const CHECKS = ["dome","playoff"];
   chk(/None of the 1 props has a projection\. The run read 0 games of 2026-27 and 0 of 2025-26 in C:\\Users\\J\\Downloads\. Last season's ledger, nba-ledger-202526\.json, was not read\. With a game or two this season nobody has the sixty minutes a projection needs, so every prop reads no history\. Put that file back in the slate folder beside slate\.py, with this season's ledger beside it, run the props again/.test(propsT.noneMsg),
       'props: a file that projects nothing says last season\'s ledger was not read, names the folder the run saw, and says what to put back', propsT.noneMsg.slice(0, 500));
   chk(/Nothing graded yet/.test(propsT.tabEmpty0) && /^Every prop with a side 1-1 says 54\.6% · does 50\.0%/i.test(propsT.tabCalib) && /BET band 1-0 says 56\.0% · does 100\.0%/i.test(propsT.tabCalib)
-      && /^PROPS-TAB:Every prop with a side\|BET band\|No edge: the book's own side(\|Same-game pairs, at the parlay price)?$/.test(propsT.tabBlocks[0]) && propsT.tabBlocks[1] === 'PROPS-MK:points|rebounds|assists' && propsT.tabBlocks[2] === 'PROPS-EDGE:3 to 6 points|no edge'
+      && /^PROPS-TAB:Every prop with a side\|BET band\|No edge: the book's own side(\|Same-game pairs, at the parlay price)?\|His last three against the pick \(shown, not scored\)$/.test(propsT.tabBlocks[0])   // the form tile off Trae Young's block (7 Nov 2026): his last three ran 1 of 3 over, against his OVER && propsT.tabBlocks[1] === 'PROPS-MK:points|rebounds|assists' && propsT.tabBlocks[2] === 'PROPS-EDGE:3 to 6 points|no edge'
       && propsT.tabBlocks[3] === 'PROPS-CENTRE:Called at the mean, to 21 Oct' && propsT.nights.length === 1 && /^Oct 21 1-1 1 void 54\.6% 50\.0% [-−]0\.1u 1-0 \+0\.9u —$/.test(propsT.nights[0])
       && propsT.ladder.length === 2 && /^50 to 55% 1 53\.2% 0\.0% 50\.0 [-−]1\.0u$/.test(propsT.ladder[0]) && /^55 to 60% 1 56\.0% 100\.0% 50\.0 \+0\.9u$/.test(propsT.ladder[1]) && /Called at the median/.test(propsT.tabCalib) === false,
       'props: the tab\'s own Is it working block: the bands as tiles, by market, by the edge claimed, the centre the chance was read around, night by night and says against does by the chance claimed; empty until something grades',

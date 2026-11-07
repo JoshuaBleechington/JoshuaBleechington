@@ -565,6 +565,7 @@
                     proj: x.proj, sd: x.sd, pm: x.pm, pb: x.pb, p: x.p, push: x.push, side: x.side, chance: x.chance, price: x.price, need: x.need, edge: x.edge, band: x.band,
                     mins: x.mins, rate36: x.rate36, base: x.base, parts: x.parts || [], why: x.why || [], log: x.log || [], sim: x.sim || null,
                     mkt: x.mkt || null, cons: x.cons || null,   // the market on the game and the books' consensus (5 Nov 2026), in the simulation's place
+                    form: x.form || null,   // his last three against the line (7 Nov 2026: the block was not copied off the file, so the line read the log and went with it when the night was trimmed)
                     med: x.med, usg: x.usg, sdf: x.sdf, starter: x.starter === undefined ? null : x.starter, start_src: x.start_src || null, gsim: propsGameSim(g.sim), fives: g.fives || null, actual: null, result: null });
       });
     });

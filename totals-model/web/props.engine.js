@@ -121,6 +121,51 @@
     return 'His last ' + f.n + ': <b>' + f.vals.map(function (v) { return esc(String(v)); }).join(" · ") + '</b> against ' + esc(String(r.line)) + ' · ' + f.over + ' of ' + f.n + ' over' + (f.on ? ', ' + f.on + ' on it' : '') +
            (ag === true ? ', with the ' + esc(r.side) : ag === false ? ', against the ' + esc(r.side) : propHas(r) ? ', split' : '');
   }
+  /* the tells (7 Nov 2026, the user: "a color indicator on the lever that would stand out so i can see if that is a bet worth
+     taking", "the props that fit in the green categories"): the two record lines a pick can sit in that held walk-forward, a
+     minutes spike and a favourite's man, each read live off the record on the pick's side and coloured by it: green where the
+     slice has done at least what it claimed on PROPS_TELL_MIN graded picks or more, red where less, grey under that. Measured
+     walk-forward on the 17 nights to 6 Nov, each night reading the nights before it: a BET or LEAN pick with a green tell and no
+     red did 52.3% against the band's 51.6% on 1,414 picks, and in the BET band 46% against 49%, because the form tells (his last
+     three with or against the pick) flip from week to week; the favourite's over stayed at 42% after reading red (232 picks) and
+     the spike stayed green after reading green (59% on the under over 180, 70% on the over over 33). So these two are the tells;
+     his last three stays a line of its own with no colour for its record. Shown, not scored: the chance does not move */
+  var PROPS_TELL_MIN = 50;
+  function propFav(r) { return r && r.spread !== null && r.spread !== undefined && isFinite(+r.spread) ? (r.athome ? -(+r.spread) : +r.spread) : null; }   // his club's margin on the spread, positive when favoured
+  function propSpike(r) { var p = ((r && r.parts) || []).filter(function (p) { return p.k === "minutes"; })[0]; return p && isFinite(+p.eff) ? +p.eff : null; }   // the minutes lever: his last five against his season, in the stat's units
+  var tellPools = null;   // cleared whenever the props change; the record and the chips read the same pools
+  function propsTellPools() {
+    if (tellPools) return tellPools;
+    var mk = function () { return { n: 0, w: 0, l: 0, says: 0 }; };
+    var pools = { fav: { UNDER: mk(), OVER: mk() }, spike: { UNDER: mk(), OVER: mk() } };
+    props.forEach(function (r) {
+      if (!r.side || !r.result || r.result === "graded" || r.result === "void" || r.result === "push") return;
+      var sinks = [], fv = propFav(r), sp = propSpike(r);
+      if (fv !== null && fv >= 5 && pools.fav[r.side]) sinks.push(pools.fav[r.side]);
+      if (sp !== null && sp >= 0.3 && pools.spike[r.side]) sinks.push(pools.spike[r.side]);
+      sinks.forEach(function (s) { s.n++; s.says += +r.chance; if (r.result === "win") s.w++; else s.l++; });
+    });
+    tellPools = pools; return pools;
+  }
+  function propTells(r) {
+    if (!propHas(r)) return [];
+    var pools = propsTellPools(), out = [];
+    var state = function (s) { return s.n < PROPS_TELL_MIN ? "few" : (s.w / s.n >= s.says / s.n ? "green" : "red"); };
+    var words = function (s, who) { return "the " + r.side.toLowerCase() + " on " + who + (s.n ? " does " + (100 * s.w / s.n).toFixed(1) + "%, claimed " + (100 * s.says / s.n).toFixed(1) + "%, on " + s.n + " pick" + (s.n === 1 ? "" : "s") + (s.n < PROPS_TELL_MIN ? ", too few to read" : "") : " has no graded pick yet"); };
+    var sp = propSpike(r);
+    if (sp !== null && sp >= 0.3) out.push({ k: "spike", state: state(pools.spike[r.side]), label: "Minutes spike " + sgn(sp, 1), words: words(pools.spike[r.side], "a spike man") });
+    var fv = propFav(r);
+    if (fv !== null && fv >= 5) out.push({ k: "fav", state: state(pools.fav[r.side]), label: "His club favoured by " + fv, words: words(pools.fav[r.side], "a favourite's man") });
+    return out;
+  }
+  function propTellsLine(r) {
+    return propTells(r).map(function (t) { return '<span class="tell ' + t.state + '" title="' + esc(t.words) + '">' + esc(t.label) + ' · ' + esc(t.words) + '</span>'; }).join(" ");
+  }
+  function propTellsFilter(r, mode) {   // the best list's filter: a green tell and no red, or a red tell
+    if (!mode) return true;
+    var st = propTells(r).map(function (t) { return t.state; });
+    return mode === "green" ? (st.indexOf("green") >= 0 && st.indexOf("red") < 0) : mode === "red" ? st.indexOf("red") >= 0 : true;
+  }
   /* the best app for a single pick (6 Nov 2026, the user: "shop the line on single picks, the way the pairs already do"): the
      pick's side read at each of the four apps' line and price off the books kept on the prop, the chance re-read at the app's
      line by the slate's own blend, the app with the most edge named when it beats the carded book. On 185 BET picks of ten
@@ -551,7 +596,7 @@
   var PROPS_EXAMPLE_GAMES = /*PROPS_EXAMPLE*/[];
   var propsPreview = null;
   function propsSource() { return propsPreview || props; }
-  function saveProps() { propsTrim(); try { localStorage.setItem(PROPS_KEY, JSON.stringify(props)); } catch (e) {} }
+  function saveProps() { tellPools = null; propsTrim(); try { localStorage.setItem(PROPS_KEY, JSON.stringify(props)); } catch (e) {} }
   function propsSay(msg) { var el = $("propsMsg"); if (!el) return; el.hidden = false; el.innerHTML = msg; }
   function propKey(r) { return (r.gdate || "") + "|" + r.pid + "|" + r.mk; }
   function propsDates() { var d = {}; propsSource().forEach(function (r) { if (r.gdate) d[r.gdate] = true; }); return Object.keys(d).sort(); }
@@ -771,10 +816,10 @@
       if (r.take) { sinks.push(byTake); sinks.push(byDateTake[d] || (byDateTake[d] = mk())); }   // the props marked as taken (26 Oct 2026), and by night (3 Nov 2026)
       var cg = propShopGap(r); if (cg !== null && Math.abs(cg) >= 0.5) sinks.push(cg > 0 ? byCons.toward : byCons.against);
       var fa = propFormAgrees(r); if (fa !== null) sinks.push(fa ? byForm.toward : byForm.against);
-      var fav = r.spread !== null && r.spread !== undefined && isFinite(+r.spread) ? (r.athome ? -(+r.spread) : +r.spread) : null;
+      var fav = propFav(r);   // the same predicates as the cards' tells (7 Nov 2026), so the tile and the chip never disagree
       if (fav !== null && fav >= 5 && byFav[r.side]) sinks.push(byFav[r.side]);
-      var mpart = (r.parts || []).filter(function (p) { return p.k === "minutes"; })[0];
-      if (mpart && +mpart.eff >= 0.3 && bySpike[r.side]) sinks.push(bySpike[r.side]);
+      var spk = propSpike(r);
+      if (spk !== null && spk >= 0.3 && bySpike[r.side]) sinks.push(bySpike[r.side]);
       sinks.forEach(function (s) {
         if (r.result === "void") { s.v++; return; }
         if (r.result === "push") { s.p++; return; }
@@ -815,7 +860,8 @@
                   'Measured on the first ten nights (30 Oct 2026, 4,321 graded props): the model\'s own lean added nothing to the book\'s price (the best weight on it was none; where it stood ten points from Pinnacle the outcome followed Pinnacle), the over\'s shade is real (the under landed 53.2% at prices saying 50.7%), and a starter\'s minutes follow the game script. From the 30th the sheet runs with the market as its spine (the model at a ninth, the over read 2.5 points lower) and the game script on starters\' minutes; the nights before carry the old weights. ' +
                   'From 2 Nov the over\'s shade is by market, measured on the 6,216 graded props of the first thirteen nights (1.5 points on rebounds, 4 on points, assists and threes, 5.5 on the combinations), in full at a coin-flip price and fading past it, and the bands follow it: replayed on those nights the BET and LEAN unders read 1,345-1,072 (+91 units) where the sheet as it stood had 477-414 (−9) and had left the money in no edge; every over at the carded price went 2,832-3,384 (−875). ' +
                   'From 5 Nov the shade is OFF and the model has a fifth of the say instead of a ninth: with the shade in, the book\'s price less the shade was the pick and the sheet called the under on four props in five from 30 Oct (on 4 Nov every BET and LEAN an under, 257-272, −50 units; the shade\'s BET band 83-85 over its life). Replayed on the 8,676 graded props of the fifteen nights to 4 Nov, the new blend\'s BET band read 146-106 (+10.6 units, 52-34 then 94-72 in the two halves, eight nights of fifteen up; 1,000 bootstrap draws of the nights put it above water 71% of the time) where a ninth with no shade left two BETs a night and the old 2.0 read 53% and −42; the LEAN band read 51.6% and is not an edge. The nights before carry their own weights; the record decides. ' +
-                  'The same day three more levers were measured walk-forward, each fitted on the nights before and scored on the next, as pushes on the projection and as corrections on the book\'s chance, and none helped the bet: recent form (his last three against the line), the favourite\'s script (a club favoured by 5 to 10 lands over 43% against the book\'s 49%) and a shrink of the last five games\' minutes toward the season (a minutes spike reverses). Recent form rides on the cards and the panel as a line of its own, shown, not scored, with its record here; the other two are on record in CALLSHEET3.md.';
+                  'The same day three more levers were measured walk-forward, each fitted on the nights before and scored on the next, as pushes on the projection and as corrections on the book\'s chance, and none helped the bet: recent form (his last three against the line), the favourite\'s script (a club favoured by 5 to 10 lands over 43% against the book\'s 49%) and a shrink of the last five games\' minutes toward the season (a minutes spike reverses). Recent form rides on the cards and the panel as a line of its own, shown, not scored, with its record here; the other two are on record in CALLSHEET3.md. ' +
+                  'On 7 Nov the record\'s own lines were read walk-forward as tells for the cards, each night reading the nights before it: a BET or LEAN pick with a green tell and no red did 52.3% against the band\'s 51.6% on 1,414 picks, and in the BET band 46% against 49%, because his last three flips from week to week; the favourite\'s over stayed at 42% after reading red on 232 picks and the minutes spike stayed green after reading green (59% on the under over 180 picks, 70% on the over over 33). Those two ride on the best cards as chips coloured live off these tiles on the pick\'s side, green where the slice has done at least what it claimed on 50 picks or more; the form stays a line.';
     if (!full) {
       var h = '<div class="subhead" data-sport="PROPS">NBA player props <span class="tag">' + graded.length + ' graded · the slate\'s call as made, at the price posted · says is the blended chance</span></div>';
       h += '<div class="calib" data-sport="PROPS">' + tile("Every prop with a side", all, parts) + markets + '</div>';
@@ -1001,6 +1047,7 @@
         (r.usg !== null && r.usg !== undefined ? tile("Usage", esc(String(r.usg)) + "%", "of his club's possessions while on; " + (r.starter === true ? "a starter" : r.starter === false ? "off the bench" : "role unknown") + (r.sdf && r.sdf !== 1 ? ", the miss read at " + esc(String(r.sdf)) + " sigmas (measured)" : "")) : "") +
         '</div>';
       if (propFormLine(r)) h += '<p class="note pd-form' + (propFormAgrees(r) === true ? ' pos' : propFormAgrees(r) === false ? ' neg' : '') + '">' + propFormLine(r) + ' <span class="dim">· shown, not scored: it did not help the bet as a lever walk-forward (5 Nov 2026), so it is measured on the record tile\'s own line</span></p>';
+      if (propTellsLine(r)) h += '<p class="note pd-tells">' + propTellsLine(r) + ' <span class="dim">· the tells: the two record lines that held walk-forward (7 Nov 2026), read live off every graded pick on this side, green where the slice has done at least what it claimed on ' + PROPS_TELL_MIN + ' picks or more, red where less; shown, not scored</span></p>';
       if (propBestAppLine(r)) h += '<p class="note pd-bestapp">' + propBestAppLine(r) + ' <span class="dim">· where to place it; the call and the grade stay at the carded book</span></p>';
       var clvP = propClv(r); if (clvP) h += '<p class="note pd-clv' + (clvP.clv > 0.0005 ? ' pos' : clvP.clv < -0.0005 ? ' neg' : '') + '">' + propClvLine(r) + ' <span class="dim">· the chance re-read at the closing line by the sheet\'s own blend, the need from the closing price</span></p>';
       /* the floors (26 Oct 2026): the number he clears 95, 90 and 80% of nights by the model, and his other markets' 95% floors tonight */
@@ -1118,6 +1165,7 @@
   }
   function renderProps() {
     var v = $("propsView"); if (!v) return;
+    tellPools = null;   // the tells read the record as it stands now
     var dates = propsDates(), sel = $("propsDate");
     if (!sel.value || dates.indexOf(sel.value) < 0) sel.value = dates.length ? dates[dates.length - 1] : "";
     var date = sel.value;
@@ -1126,13 +1174,14 @@
     $("propsCount").textContent =(propsPreview ? "EXAMPLE · " : "") + (rows.length ? rows.length + " props on " + gameDate(date) + " · " + dates.length + " date" + (dates.length === 1 ? "" : "s") + " kept"
                                               : (propsSource().length ? "no props on this date" : "no props loaded"));
     var resChip = propResChip;
-    var picks = rows.filter(function (r) { return propHas(r) && r.edge > 0; }).sort(function (a, b) { return b.edge - a.edge; });
+    var tellMode = $("propsTells") ? $("propsTells").value : "";   // the tells filter (7 Nov 2026): a green tell and no red, or a red tell
+    var picks = rows.filter(function (r) { return propHas(r) && r.edge > 0 && propTellsFilter(r, tellMode); }).sort(function (a, b) { return b.edge - a.edge; });
     /* the BET band in front (6 Nov 2026, the user: "for the BET band cards, make that more visible and why"): a BET card carries
        a badge, its edge tier and a line that says why in words; the LEANs sit under a divider that says what the record says of them */
     var leanDivider = false;
     $("propsBest").innerHTML = picks.length ? picks.slice(0, 12).map(function (r, i) {
       var tl = propsLeverTally(r), isBet = r.band === "BET", div = '';
-      if (!isBet && !leanDivider) { leanDivider = true; div = '<div class="pk-divider">' + (i === 0 ? 'No BET on this date. ' : '') + 'LEANs below: information, not a measured edge (the band says 55% and does 52% over 1,300 graded picks)' + (i === 0 ? '.' : '; the BETs above are the bets.') + '</div>'; }
+      if (!isBet && !leanDivider) { leanDivider = true; div = '<div class="pk-divider">' + (i === 0 ? (tellMode ? 'No BET among these. ' : 'No BET on this date. ') : '') + 'LEANs below: information, not a measured edge (the band says 55% and does 52% over 1,300 graded picks)' + (i === 0 ? '.' : '; the BETs above are the bets.') + '</div>'; }
       var clv = propClv(r);
       return div + '<div class="pk' + (isBet ? ' scored bet' : ' lean') + '" data-prop="' + r.id + '"><div class="n1">' + (isBet ? '<span class="betbadge">BET</span> ' : '') + '#' + (i + 1) + ' · ' + esc(r.band) + (isBet ? ' · ' + esc(PROPS_EDGE_TIER(+r.edge)) : '') + (tl.n ? ' <span class="tag' + (tl.all ? ' agree' : '') + '" title="' + esc(tl.words) + '">levers ' + tl.text + '</span>' : '') + '</div>' +
         '<div class="n2">' + esc(r.name) + ' ' + esc(r.side) + ' ' + r.line + ' ' + esc(PROPS_LABEL[r.mk] || r.mk) + '</div>' +
@@ -1140,13 +1189,14 @@
         '<div class="n4">' + esc(r.game) + ' · projected ' + r.proj + ' (±' + r.sd + ') · ' + esc(r.book) + '</div>' +
         (propBetWhy(r) ? '<div class="n5 betwhy">' + propBetWhy(r) + '</div>' : '') +
         (propsLeversLine(r) ? '<div class="n5">Moves it: ' + propsLeversLine(r) + '</div>' : '') +
+        (propTellsLine(r) ? '<div class="n5 tells">' + propTellsLine(r) + '</div>' : '') +
         (propShopLine(r) ? '<div class="n5 shopline' + (propShopAgrees(r) === true ? ' pos' : propShopAgrees(r) === false ? ' neg' : '') + '">' + propShopLine(r) + '</div>' :
          propSimLine(r) ? '<div class="n5 simline' + (propSimAgrees(r) === true ? ' pos' : propSimAgrees(r) === false ? ' neg' : '') + '">' + propSimLine(r) + '</div>' : '') +
         (propFormLine(r) ? '<div class="n5 formline' + (propFormAgrees(r) === true ? ' pos' : propFormAgrees(r) === false ? ' neg' : '') + '">' + propFormLine(r) + '</div>' : '') +
         (propBestAppLine(r) ? '<div class="n5 bestapp">' + propBestAppLine(r) + '</div>' : '') +
         (clv ? '<div class="n5 clvline' + (clv.clv > 0.0005 ? ' pos' : clv.clv < -0.0005 ? ' neg' : '') + '">' + propClvLine(r) + '</div>' : '') +
         '<div class="n6">' + propTakeBtn(r) + propsGoBtn(r) + '</div></div>';
-    }).join("") : '<div class="empty">' + (rows.length ? 'No prop on this date clears its price.' : 'Load a props file: Run NBA props.bat writes nba-props-DATE.json.') + '</div>';
+    }).join("") : '<div class="empty">' + (rows.length ? (tellMode === "green" ? 'No pick on this date carries a green tell without a red one.' : tellMode === "red" ? 'No pick on this date carries a red tell.' : 'No prop on this date clears its price.') : 'Load a props file: Run NBA props.bat writes nba-props-DATE.json.') + '</div>';
     /* the simulation's strip (26 Oct 2026): one card a game */
     if ($("propsSim")) $("propsSim").innerHTML = rows.length ? propsSimStripHtml(rows) : '<div class="empty">Load a props file and each game\'s simulation lands here.</div>';
     /* the props marked as taken on the date (26 Oct 2026), above the best list */
@@ -1202,6 +1252,7 @@
     $("loadProps").addEventListener("click", function () { $("slateFile").click(); });
     $("propsDate").addEventListener("change", renderProps);
     $("propsAll").addEventListener("change", renderProps);
+    if ($("propsTells")) $("propsTells").addEventListener("change", renderProps);
     $("propsExample").addEventListener("click", propsExample);
     $("propsClear").addEventListener("click", function () {
       if (propsPreview) { propsPreview = null; renderProps(); propsSay("The example is gone. Load a real props file when you have one."); return; }

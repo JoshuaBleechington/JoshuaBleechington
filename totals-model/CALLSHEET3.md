@@ -2810,3 +2810,55 @@ levers, which the trim drops after seven nights, so they cover the last
 seven nights on the tab; the consensus tiles cover the nights with a
 consensus on the row, 5 Nov on; the close tile the nights with a close
 loaded.
+
+## The tells on the cards, 7 Nov 2026
+
+The user, reading the Is it working block: "add to the cards that have
+the minutes spikes some sort of color indicator on the level that would
+stand out so i can see if that is a bet worth taking", and "have it
+provide the props that fit in the green categories".
+
+Measured first, walk-forward on the 17 nights to 6 Nov, each night
+reading the record of the nights before it and nothing of its own: a
+slice (a minutes spike on the pick's side, a favourite's man on the
+pick's side, the books' consensus with or against the pick, his last
+three with or against it) is green when it has done at least what it
+claimed on 50 graded picks or more, red when less. A BET or LEAN pick
+with a green tell and no red one:
+
+    BET+LEAN, every pick        1682-1576  says 56.2  does 51.6  -142u
+    a green tell, no red         740-674   says 55.6  does 52.3   -38u
+    a red tell                   275-265   says 56.2  does 50.9   -31u
+    BET, every pick              306-316   says 60.2  does 49.2   -59u
+    BET, a green tell, no red     80-94    says 58.4  does 46.0   -26u
+    BET, a red tell               56-48    says 60.1  does 53.8    -1u
+
+A blanket rule of the green categories does not beat the band, and in
+the BET band it does worse, because the most common tells are the form
+ones and they flip from week to week (his last three against the pick,
+read green on the nights before, went 255-270 after; read red, 22-12).
+Slice by slice, two held:
+
+    the favourite's over, read red     98-134   does 42.2 against 55.6 claimed
+    the favourite's under, read green  208-162  does 56.2 against 55.8
+    the minutes spike's under, green   107-73   does 59.4 against 54.7
+    the minutes spike's over, green    23-10    does 69.7 against 56.1
+
+So the page carries two tells, not a green-category rule: on a best card
+and the prop's panel, a chip for a minutes spike (the lever "Minutes,
+his last 5 against the season" at +0.3 or more) and a chip for a
+favourite's man (his club favoured by five or more), each coloured live
+off the Is it working line on the pick's side, green where that line has
+done at least what it claimed on 50 graded picks or more, red where
+less, grey under that, with the line's does, claimed and count in the
+chip. The record and the chips read the same predicates, so a tile and
+a chip never disagree. A filter above the best list keeps the picks with
+a green tell and no red one, or with a red one. His last three stays a
+line of its own, coloured by with or against the pick, with no colour
+for its record. Shown, not scored: the chance does not move.
+
+The harness seeds a pool of graded picks on an earlier night so the
+spike's over reads green (41-20), the favourite's over red (20-41) and
+the spike's under too few (6-4), and reads the chips on Embiid's,
+Towns' and Brunson's cards and none on Maxey's, the filter both ways,
+and the panel's chip and note.

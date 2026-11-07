@@ -2328,12 +2328,13 @@ NBA_ID_LIMIT = 1320
 # attempts, turnovers, steals, blocks, field goals and free throws made, the
 # position ESPN lists. An older entry is six long; nba_player_dict reads
 # either and the ledger run refills the short ones from the summaries.
-NBA_PLAYER_KEYS = ("id", "n", "st", "min", "pts", "pm", "reb", "ast", "tpm", "fga", "fta", "tov", "stl", "blk", "fgm", "ftm", "pos")
+NBA_PLAYER_KEYS = ("id", "n", "st", "min", "pts", "pm", "reb", "ast", "tpm", "fga", "fta", "tov", "stl", "blk", "fgm", "ftm", "pos", "tpa")   # the three-point tries last (7 Nov 2026); a line from before is 17 long and reads them as None
 
 
-def nba_player_line(pid, name, starter, mins, pts, pm, reb=0, ast=0, tpm=0, fga=0, fta=0, tov=0, stl=0, blk=0, fgm=0, ftm=0, pos=""):
+def nba_player_line(pid, name, starter, mins, pts, pm, reb=0, ast=0, tpm=0, fga=0, fta=0, tov=0, stl=0, blk=0, fgm=0, ftm=0, pos="", tpa=None):
     return [pid, name, int(starter or 0), round(float(mins or 0), 1), int(pts or 0), int(pm or 0),
-            int(reb or 0), int(ast or 0), int(tpm or 0), int(fga or 0), int(fta or 0), int(tov or 0), int(stl or 0), int(blk or 0), int(fgm or 0), int(ftm or 0), str(pos or "")]
+            int(reb or 0), int(ast or 0), int(tpm or 0), int(fga or 0), int(fta or 0), int(tov or 0), int(stl or 0), int(blk or 0), int(fgm or 0), int(ftm or 0), str(pos or ""),
+            (int(float(tpa)) if tpa is not None and str(tpa) != "" else None)]
 
 
 def nba_player_dict(entry):
@@ -2548,10 +2549,10 @@ def nba_entry_from_espn(g, summ):
                         return 0, 0
                 fgm, fga = _made_att(ix["FG"])
                 ftm, fta = _made_att(ix["FT"])
-                tpm, _tpa = _made_att(ix["3PT"])
+                tpm, tpa = _made_att(ix["3PT"])
                 pos = str(((ath.get("position") or {}).get("abbreviation") if isinstance(ath.get("position"), dict) else ath.get("position")) or "")
                 played.append(nba_player_line(pid, name, 1 if a.get("starter") else 0, mins, _i(ix["PTS"]), _i(ix["+/-"]),
-                                              _i(ix["REB"]), _i(ix["AST"]), tpm, fga, fta, _i(ix["TO"]), _i(ix["STL"]), _i(ix["BLK"]), fgm, ftm, pos))
+                                              _i(ix["REB"]), _i(ix["AST"]), tpm, fga, fta, _i(ix["TO"]), _i(ix["STL"]), _i(ix["BLK"]), fgm, ftm, pos, tpa))
     # the injury list on the page: who was out before the game, with the status
     for team in (summ or {}).get("injuries") or []:
         ab = espn_tricode((team.get("team") or {}).get("abbreviation"))
@@ -2703,7 +2704,7 @@ def _nba_team_from_cdn(t):
             played.append(nba_player_line(p.get("personId"), name, 1 if str(p.get("starter") or "0") == "1" else 0, mins,
                                           s.get("points"), s.get("plusMinusPoints"), s.get("reboundsTotal"), s.get("assists"), s.get("threePointersMade"),
                                           s.get("fieldGoalsAttempted"), s.get("freeThrowsAttempted"), s.get("turnovers"), s.get("steals"), s.get("blocks"),
-                                          s.get("fieldGoalsMade"), s.get("freeThrowsMade"), p.get("position")))
+                                          s.get("fieldGoalsMade"), s.get("freeThrowsMade"), p.get("position"), s.get("threePointersAttempted")))
         else:
             out.append([p.get("personId"), name, str(p.get("notPlayingReason") or "DNP")])
     return reg, ot, line, played, out
@@ -2756,7 +2757,7 @@ def nba_entry_from_stats(g, trad, summary):
             if mins > 0:
                 played.append(nba_player_line(p.get("personId"), name, 1 if (p.get("position") or "") else 0, mins, s.get("points"), s.get("plusMinusPoints"),
                                               s.get("reboundsTotal"), s.get("assists"), s.get("threePointersMade"), s.get("fieldGoalsAttempted"), s.get("freeThrowsAttempted"),
-                                              s.get("turnovers"), s.get("steals"), s.get("blocks"), s.get("fieldGoalsMade"), s.get("freeThrowsMade"), p.get("position")))
+                                              s.get("turnovers"), s.get("steals"), s.get("blocks"), s.get("fieldGoalsMade"), s.get("freeThrowsMade"), p.get("position"), s.get("threePointersAttempted")))
             else:
                 out.append([p.get("personId"), name, str(p.get("comment") or "DNP")])
         sides[key] = (t.get("teamTricode"), line, played, out)
@@ -2937,9 +2938,9 @@ def make_nba_ledger(date_iso, out_dir, log, season=None):
     # the box lines (19 Oct 2026): a game whose player entries predate them is
     # read again from its ESPN summary, so an older ledger fills in place;
     # written every NBA_LEDGER_FLUSH like the rest, so this too can be resumed
-    short = [g for g in byid.values() if g.get("detail") and any(len(p) < 16 for p in (g.get("pa") or []) + (g.get("ph") or []))]
+    short = [g for g in byid.values() if g.get("detail") and any(len(p) < 18 for p in (g.get("pa") or []) + (g.get("ph") or []))]   # 18 from 7 Nov 2026: the three-point tries
     if short and source == "espn":
-        log("%d game%s in the ledger carry the old six-item player lines: reading their summaries again for the box stats (rebounds, assists, threes, the rest)." % (len(short), "" if len(short) == 1 else "s"))
+        log("%d game%s in the ledger carry player lines from before the three-point tries (7 Nov 2026) or the old six items: reading their summaries again to fill them." % (len(short), "" if len(short) == 1 else "s"))
         filled = 0
         for g in sorted(short, key=lambda g: (g.get("date") or "", g.get("id") or "")):
             try:
@@ -2947,11 +2948,17 @@ def make_nba_ledger(date_iso, out_dir, log, season=None):
             except Exception as e:  # noqa: BLE001
                 log("  game %s (%s): no summary (%s); its lines stay short" % (g["id"], g.get("date"), e))
                 continue
+            # a re-read never costs the ledger a man (7 Nov 2026): a summary that lists fewer players than the entry holds,
+            # or none, leaves the entry as it was, so the logs and the projections behind them do not move
+            was, now = len((g.get("pa") or []) + (g.get("ph") or [])), len((e.get("pa") or []) + (e.get("ph") or []))
+            if now < was or not now:
+                log("  game %s (%s): the summary lists %d player%s against the %d the ledger holds; its lines stay as they are" % (g["id"], g.get("date"), now, "" if now == 1 else "s", was))
+                continue
             took(e)
             filled += 1
         log("Filled the box lines on %d game%s." % (filled, "" if filled == 1 else "s"))
     elif short:
-        log("%d game%s carry the old six-item player lines and this ledger did not come from ESPN; they stay as they are." % (len(short), "" if len(short) == 1 else "s"))
+        log("%d game%s carry player lines from before the three-point tries or the old six items, and this ledger did not come from ESPN; they stay as they are." % (len(short), "" if len(short) == 1 else "s"))
     flush()
     log("Added %d game%s. Wrote %s." % (done[0], "" if done[0] == 1 else "s", path))
     nba_ledger_report(led["measure"], log)
@@ -4848,9 +4855,11 @@ def nba_grade_what(date_iso, out_dir, entries, rows, log):
             gl, season_logs = night[-1], e1["g"]
             last_g = (logs_last.get(pid) or {}).get("g")
             what = {mk: props_game_factors(gl, season_logs, mk, league_pace, last_g) for mk, _api, _lab in PROPS_MARKETS}
+            tries = {mk: props_game_tries(gl, season_logs, mk, last_g) for mk, _api, _lab in PROPS_MARKETS}   # the tries eighth (7 Nov 2026)
             while len(bl) < 6:
                 bl.append(None)
             bl.append(what)
+            bl.append(tries)
             n += 1
     return n
 
@@ -5335,7 +5344,7 @@ def nba_player_logs(ledger_games, prior_logs=None):
                 entry = {"d": g.get("date"), "opp": opp, "home": home, "min": float(d["min"] or 0), "st": int(d["st"] or 0),
                          "pts": d["pts"], "reb": d["reb"], "ast": d["ast"], "tpm": d["tpm"], "full": d["full"]}
                 if d["full"]:
-                    entry.update({"fga": d["fga"], "fgm": d["fgm"], "fta": d["fta"], "ftm": d["ftm"], "tov": d["tov"]})
+                    entry.update({"fga": d["fga"], "fgm": d["fgm"], "fta": d["fta"], "ftm": d["ftm"], "tov": d["tov"], "tpa": d.get("tpa")})   # the three-point tries (7 Nov 2026), None on a line from before
                 if mg is not None:
                     entry["mg"] = mg
                 entry["ot"] = bool(g.get("ota") or g.get("oth")) or (str(g.get("end") or "REG") != "REG")
@@ -5475,6 +5484,33 @@ def props_game_factors(g, logs, mk, league_pace=None, logs_last=None):
     if g.get("pace") and base_pace and abs(float(g["pace"]) - base_pace) >= PROPS_WHAT_PACE:
         tail.append("a %s game, %d possessions against their usual %d" % ("slow" if float(g["pace"]) < base_pace else "fast", round(float(g["pace"])), round(base_pace)))
     return (root + [t for _s, t in stood] + plain + tail)[:PROPS_WHAT_MAX + (1 if mk in PROPS_COMBOS else 0)]
+
+
+def props_game_tries(g, logs, mk, logs_last=None):
+    """The tries behind one of his games (7 Nov 2026, the user: "how many
+    attempts the player made at the 3's"): his shots from the floor, from three
+    and from the line, the market's own kind first with his usual number at
+    those minutes; the page gives the line its own colour beside what the box
+    says. A ledger line from before the three-point tries were kept says so;
+    the ledger run reads those games again and fills them."""
+    if not g or not g.get("full") or g.get("fga") is None or float(g.get("min") or 0) <= 0:
+        return ""
+    gs = [x for x in (logs or []) if (x.get("min") or 0) > 0]
+    last30 = [x for x in (logs_last or []) if (x.get("min") or 0) > 0][-30:]
+    norm = gs if len(gs) >= 3 else gs + last30
+    mins = float(g["min"])
+
+    def usual(key):
+        full = [x for x in norm if x.get("full") and x.get(key) is not None and (x.get("min") or 0) > 0]
+        if len(full) < 3:
+            return None
+        return sum((x[key] or 0) for x in full) / sum(float(x["min"]) for x in full) * mins
+    fga, fta, ftm, tpm, tpa = g.get("fga") or 0, g.get("fta") or 0, g.get("ftm") or 0, g.get("tpm") or 0, g.get("tpa")
+    u_fg, u_tp = usual("fga"), usual("tpa")
+    floor = "%d from the floor" % fga + ((" (his usual %d at those minutes)" % round(u_fg)) if mk != "tpm" and u_fg is not None else "")
+    three = ("%d of %d from three" % (tpm, tpa) + ((" (his usual %.1f at those minutes)" % u_tp) if mk == "tpm" and u_tp is not None else "")) if tpa is not None else ("%d from three, the tries not in the ledger for this game" % tpm)
+    line = "%d of %d from the line" % (ftm, fta)
+    return "tries: " + " · ".join([three, floor, line] if mk == "tpm" else [floor, three, line])
 
 
 def props_role(name, ab, lineups, logs_this, logs_last):
@@ -6262,7 +6298,8 @@ def make_nba_props(date_iso, out_dir, log, topup=False, sim_runs=NBA_SIM_RUNS, c
                    "opp_out_c_mpg": outc[opp][0], "opp_out_c_names": outc[opp][1], "self_out": self_out}
             proj, why = props_project(pr, e1.get("g"), e2.get("g"), ctx)
             season_logs = e1.get("g") or e2.get("g") or []
-            recent = [[g_["d"], g_["opp"], 1 if g_["home"] else 0, g_["min"], props_stat(g_, pr["mk"]), props_game_factors(g_, season_logs, pr["mk"], league_pace, e2.get("g") if e1.get("g") else None)] for g_ in season_logs[-10:]]
+            recent = [[g_["d"], g_["opp"], 1 if g_["home"] else 0, g_["min"], props_stat(g_, pr["mk"]), props_game_factors(g_, season_logs, pr["mk"], league_pace, e2.get("g") if e1.get("g") else None),
+                       props_game_tries(g_, season_logs, pr["mk"], e2.get("g") if e1.get("g") else None)] for g_ in season_logs[-10:]]   # the tries seventh (7 Nov 2026), in the page's own colour
             item = {"pid": pid, "name": e1.get("n") or e2.get("n") or pr["name"], "team": team, "opp": opp, "home": team == hab, "pos": pos,
                     "mk": pr["mk"], "line": pr["line"], "op": pr["op"], "up": pr["up"], "book": pr["book"], "books": pr["books"], "log": recent, "why": why}
             if proj:
@@ -7629,6 +7666,20 @@ def selftest():
         wg.append({"id": "w%d" % k, "date": "2026-11-%02d" % (1 + k), "away": "DAL", "home": "LAL", "fa": 100 if k == 8 else 115, "fh": 121 if k == 8 else 110, "pace": 93.0 if k == 8 else 100.0, "detail": True,
                    "pa": pa, "ph": [nba_player_line("44", "LeBron James", 1, 35.0, 25, 0, 7, 8, 2, 18, 6, 3, 1, 1, 9, 5, "SF")]})
     lw = nba_player_logs(wg)["11"]["g"]
+    # the tries (7 Nov 2026): the ledger line keeps the three-point attempts last, the log carries them, the line beside the box reads the market's own kind first
+    wt = [{"id": "t%d" % k, "date": "2026-11-%02d" % (10 + k), "away": "DAL", "home": "LAL", "fa": 110, "fh": 105, "pace": 100.0, "detail": True,
+           "pa": [nba_player_line("11", "Luka Doncic", 1, 36.0, 30, 0, 8, 9, 2 if k == 4 else 4, 20, 8, 3, 1, 0, 10, 7, "PG", 6 if k == 4 else 9)],
+           "ph": [nba_player_line("44", "LeBron James", 1, 35.0, 25, 0, 7, 8, 2, 18, 6, 3, 1, 1, 9, 5, "SF")]} for k in range(5)]
+    lt2 = nba_player_logs(wt)["11"]["g"]
+    old17 = nba_player_dict(nba_player_line("11", "Luka Doncic", 1, 36.0, 30, 0, 8, 9, 4, 20, 8, 3, 1, 0, 10, 7, "PG")[:17])
+    check("props: the tries (7 Nov 2026): the ledger line is 18 long with the three-point tries last, a 17-long line from before reads them as None and still full, the log carries them, and the line beside the box reads the market's own kind first with his usual at those minutes, says when the ledger has no tries for a game, and reads nothing without a box",
+          len(nba_player_line("1", "x", 1, 30, 10, 0, tpa=5)) == 18 and nba_player_line("1", "x", 1, 30, 10, 0, tpa="5")[-1] == 5 and nba_player_line("1", "x", 1, 30, 10, 0)[-1] is None and old17["tpa"] is None and old17["full"] is True
+          and lt2[-1]["tpa"] == 6 and lt2[0]["tpa"] == 9 and lw[-1].get("tpa") is None
+          and props_game_tries(lt2[-1], lt2, "tpm") == "tries: 2 of 6 from three (his usual 8.4 at those minutes) · 20 from the floor · 7 of 8 from the line"
+          and props_game_tries(lt2[-1], lt2, "pts") == "tries: 20 from the floor (his usual 20 at those minutes) · 2 of 6 from three · 7 of 8 from the line"
+          and props_game_tries(lt2[-1], lt2, "ast") == props_game_tries(lt2[-1], lt2, "pts")
+          and props_game_tries(lw[-1], lw, "tpm") == "tries: 4 from three, the tries not in the ledger for this game · 8 from the floor · 2 of 2 from the line"
+          and props_game_tries({"min": 30, "full": False}, lw, "pts") == "" and props_game_tries(None, lw, "pts") == "")
     check("props: the line behind one of his last games: the regulars back or out and the blowout first, then what stood out by its size, then the plain box and the margin, five at most, and a game with nothing to compare against still reads its box",
           props_game_factors(lw[-1], lw, "pts", 100.0) == ["Kyrie Irving back (30 mpg, the lift gone)", "lost by 21, a blowout", "9 shots, 10 under his usual at those minutes", "2 of 8 from the floor, cold (his season 49%)", "31 min, 4 under his usual 35"]
           and props_game_factors(lw[-2], lw, "pts", 100.0) == ["Kyrie Irving out (30 mpg, a lift for him)", "36 min (his usual 35)", "24 shots (his usual 22 at those minutes)", "10 of 20 from the floor", "won by 5"]
@@ -8051,11 +8102,11 @@ def selftest():
           e1["pa"][0][:6] == [201, "Jalen B", 1, 34.2, 25, -12] and e1["pa"][1][2] == 0 and len(e1["pa"]) == 2 and e1["oa"] == [[203, "Hurt Guy", "Injury/Illness - Left Knee"], [204, "Benched Guy", "DNP - Coach's Decision"]]
           and e1["ph"][0][1] == "Jayson T" and e1["oh"] == [])
     check("nba box: the player line carries the box stats (19 Oct 2026) and reads as a dict either length",
-          len(e1["pa"][0]) == 17 and nba_player_dict(e1["pa"][0])["full"] is True and nba_player_dict(e1["pa"][0])["reb"] == 0
-          and nba_player_dict([201, "Jalen B", 1, 34.2, 25, -12]) == {"id": "201", "n": "Jalen B", "st": 1, "min": 34.2, "pts": 25, "pm": -12, "reb": None, "ast": None, "tpm": None, "fga": None, "fta": None, "tov": None, "stl": None, "blk": None, "fgm": None, "ftm": None, "pos": None, "full": False}
-          and nba_player_line("9", "X", True, 31.26, "20", None, reb="7", pos="PG") == ["9", "X", 1, 31.3, 20, 0, 7, 0, 0, 0, 0, 0, 0, 0, 0, 0, "PG"])
+          len(e1["pa"][0]) == 18 and nba_player_dict(e1["pa"][0])["full"] is True and nba_player_dict(e1["pa"][0])["reb"] == 0
+          and nba_player_dict([201, "Jalen B", 1, 34.2, 25, -12]) == {"id": "201", "n": "Jalen B", "st": 1, "min": 34.2, "pts": 25, "pm": -12, "reb": None, "ast": None, "tpm": None, "fga": None, "fta": None, "tov": None, "stl": None, "blk": None, "fgm": None, "ftm": None, "pos": None, "tpa": None, "full": False}
+          and nba_player_line("9", "X", True, 31.26, "20", None, reb="7", pos="PG") == ["9", "X", 1, 31.3, 20, 0, 7, 0, 0, 0, 0, 0, 0, 0, 0, 0, "PG", None])
     check("nba box (stats site): quarters from the summary's line score, starters by position, the DNP comment",
-          e2["qa"] == [20, 30, 25, 28] and e2["qh"] == [30, 28, 20, 25] and e2["ota"] == [5] and e2["oth"] == [10] and e2["end"] == "OT" and e2["pa"][0][:6] == [301, "Anthony E", 1, 38.5, 30, 4] and len(e2["pa"][0]) == 17
+          e2["qa"] == [20, 30, 25, 28] and e2["qh"] == [30, 28, 20, 25] and e2["ota"] == [5] and e2["oth"] == [10] and e2["end"] == "OT" and e2["pa"][0][:6] == [301, "Anthony E", 1, 38.5, 30, 4] and len(e2["pa"][0]) == 18 and e2["pa"][0][-1] is None
           and e2["oa"] == [[302, "Sat Out", "DNP - Injury/Illness"]] and e2["pace"] is not None and e2["detail"] is True and any("trying the stats site" in l for l in lines3))
     check("nba schedule (CDN): this season's finals only, dates normalised", sch == [{"id": "0022600003", "date": "2026-10-22", "away": "GSW", "home": "LAL", "fa": 110, "fh": 115}])
     check("nba box: tip-off and the crew ride along for the rest, travel and referee tests",
@@ -8120,9 +8171,9 @@ def selftest():
     check("nba espn: quarters from the line scores, the box lines and pace", es["qa"] == [28, 25, 30, 26] and es["qh"] == [35, 31, 33, 33] and es["ota"] == [] and es["end"] == "REG"
           and es["sa"] == {"fga": 90, "fta": 25, "oreb": 10, "tov": 12, "min": 240.0} and es["sh"]["tov"] == 14 and es["pace"] == 101.9 and es["detail"] is True)
     check("nba espn: every man who played with his minutes, starters flagged; the DNPs and the injury list as who sat; the crew",
-          es["pa"] == [["3934672", "Jalen Brunson", 1, 34.0, 25, -12, 3, 8, 2, 18, 5, 2, 1, 0, 9, 5, "PG"], ["1", "Bench Guy", 0, 12.0, 4, -3, 2, 0, 0, 4, 0, 0, 0, 0, 2, 0, ""]]
+          es["pa"] == [["3934672", "Jalen Brunson", 1, 34.0, 25, -12, 3, 8, 2, 18, 5, 2, 1, 0, 9, 5, "PG", 5], ["1", "Bench Guy", 0, 12.0, 4, -3, 2, 0, 0, 4, 0, 0, 0, 0, 2, 0, "", 1]]   # the three-point tries last (7 Nov 2026)
           and es["oa"] == [["2", "Benched Guy", "COACH'S DECISION"], ["3", "Hurt Guy", "Out - Knee"]]
-          and es["ph"] == [["4065648", "Jayson Tatum", 1, 36.0, 37, 20, 4, 10, 8, 18, 1, 1, 1, 0, 14, 1, ""]] and es["oh"] == [] and es["off"] == ["Scott Foster", "Tony Brothers"] and es["t"] == "2024-10-22T23:30Z")
+          and es["ph"] == [["4065648", "Jayson Tatum", 1, 36.0, 37, 20, 4, 10, 8, 18, 1, 1, 1, 0, 14, 1, "", 14]] and es["oh"] == [] and es["off"] == ["Scott Foster", "Tony Brothers"] and es["t"] == "2024-10-22T23:30Z")
     check("nba ledger: a past season reads from ESPN first", any("ESPN scoreboard: 1 regular-season finals listed" in l for l in lines6) and len(led6["games"]) == 1 and led6["games"][0]["id"] == "401704001"
           and led6["games"][0]["hn"] == "Celtics" and led6["games"][0]["detail"] is True and led6["measure"]["games"] == 1)
     # the NBA slate and the morning grade (15 Oct 2026), offline: the scoreboard, the injury page and two small ledgers

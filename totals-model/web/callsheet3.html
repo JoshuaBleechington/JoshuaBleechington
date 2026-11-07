@@ -402,6 +402,8 @@
   .pk .n5.bestapp b, .pdlg .pd-bestapp b { color: var(--go); } .pk .n5.clvline.pos, .pdlg .pd-clv.pos { color: var(--go); } .pk .n5.clvline.neg, .pdlg .pd-clv.neg { color: var(--bad); }
   /* recent form on the props (5 Nov 2026): his last three against the line, green with the pick and red against it; shown, not scored */
   .pk .n5.formline.pos, .pdlg .pd-form.pos { color: var(--go); } .pk .n5.formline.neg, .pdlg .pd-form.neg { color: var(--bad); } .pdlg .pd-form .dim { color: var(--ink-2); }
+  /* the tries (7 Nov 2026): his shots from the floor, from three and from the line beside what the box says, in their own colour */
+  .pdlg .pd-log .tries, .pdlg h4 .tries { color: var(--crowd); background: var(--crowd-wash); padding: 0 5px; border-radius: 3px; font-weight: 600; }
   /* the tells (7 Nov 2026): chips on the best cards and the panel, coloured live off the record on the pick's side */
   .pk .n5.tells .tell, .pdlg .pd-tells .tell { display: inline-block; padding: 2px 8px; border-radius: 4px; border: 1px solid var(--ink-2); color: var(--ink-2); font-weight: 600; margin: 2px 4px 2px 0; line-height: 1.35; }
   .pk .n5.tells .tell.green, .pdlg .pd-tells .tell.green { color: var(--go); border-color: var(--go); background: rgba(31, 122, 76, .10); }
@@ -3890,7 +3892,7 @@ smStore.ready.then(function () {
      simulation, the fives, what happened. The panel says so. Runs on load and before every save, so a restored backup trims
      on its way in; a night's file loaded again is whole until its night falls off the seven */
   var PROPS_WHOLE_NIGHTS = 7;
-  var PROPS_TRIM_FIELDS = ["why", "log", "parts", "sim", "gsim", "fives", "awhat"];   // the books stay (5 Nov 2026): the pairs are rebuilt at one app from them
+  var PROPS_TRIM_FIELDS = ["why", "log", "parts", "sim", "gsim", "fives", "awhat", "atries"];   // the books stay (5 Nov 2026): the pairs are rebuilt at one app from them
   function propsTrim() {
     var seen = {}; props.forEach(function (r) { if (r.gdate) seen[r.gdate] = true; });
     var whole = {}; Object.keys(seen).sort().slice(-PROPS_WHOLE_NIGHTS).forEach(function (d) { whole[d] = true; });
@@ -4619,17 +4621,20 @@ smStore.ready.then(function () {
         if (propsCanon(r.away) !== propsCanon(g.away) || propsCanon(r.home) !== propsCanon(g.home)) return;
         var bl = g.box[r.pid] || [], mins = bl[1] === null || bl[1] === undefined ? null : bl[1];   // his minutes that night, for the panel's last-games row
         var what = bl[6] && typeof bl[6] === "object" && Array.isArray(bl[6][r.mk]) ? bl[6][r.mk] : null;   // what happened on his game, per market (27 Oct 2026)
+        var tries = bl[7] && typeof bl[7] === "object" && typeof bl[7][r.mk] === "string" && bl[7][r.mk] ? bl[7][r.mk] : null;   // the tries behind it (7 Nov 2026)
         if (r.result) {
           /* graded already: the result stands, and only the minutes fill in when the row has none (25 Oct 2026, the user:
              "could the older graded props get their minutes filled in too?"): load the night's grade file again */
           if ((r.amin === null || r.amin === undefined) && mins !== null) { r.amin = mins; filled++; }
           if (!(r.awhat && r.awhat.length) && what && what.length) { r.awhat = what; filled++; }
+          if (!r.atries && tries) { r.atries = tries; filled++; }
           return;
         }
         var v = propActual(r, g.box);
         if (v === undefined) return;
         r.amin = mins;
         if (what && what.length) r.awhat = what;
+        if (tries) r.atries = tries;
         if (v === null) { r.result = "void"; r.actual = null; n++; return; }
         r.actual = v;
         r.result = !r.side ? "graded" : (v === r.line ? "push" : ((v > r.line) === (r.side === "OVER") ? "win" : "loss"));
@@ -4972,11 +4977,17 @@ smStore.ready.then(function () {
          the night's causes first (a regular back or out, a blowout, his role), then his minutes, shots and shooting against his
          season's, then overtime and the pace; the first is bold, red under the line and green over it. A file from before carries
          none, and the column stays away. The graded night's own line gets his minutes against the games above it */
-      var what = (r.log || []).some(function (g) { return g[5] && g[5].length; }) || !!(r.awhat && r.awhat.length);
-      var whatCell = function (f, v) {
-        if (!f || !f.length) return '<td class="pd-what"></td>';
+      /* the tries (7 Nov 2026, the user: "how many attempts the player made at the 3's", "in the same section as what the box
+         says happened", "highlight in yellow or purple"): the slate's seventh element on a game, and the grade file's eighth on
+         the night's box line, his shots from the floor, from three and from the line with the market's own kind first and his
+         usual at those minutes, in its own colour after the factors */
+      var what = (r.log || []).some(function (g) { return (g[5] && g[5].length) || g[6]; }) || !!(r.awhat && r.awhat.length) || !!r.atries;
+      var anyTries = (r.log || []).some(function (g) { return !!g[6]; }) || !!r.atries;
+      var whatCell = function (f, v, t) {
+        var tries = t ? '<span class="tries">' + esc(t) + '</span>' : '';
+        if (!f || !f.length) return '<td class="pd-what">' + tries + '</td>';
         var side = v === null || v === undefined || r.line === null || r.line === undefined || isNaN(+r.line) ? "" : (+v > +r.line ? " over" : +v < +r.line ? " under" : "");
-        return '<td class="pd-what"><b class="' + side.trim() + '">' + esc(f[0]) + '</b>' + (f.length > 1 ? ' · ' + f.slice(1).map(esc).join(' · ') : '') + '</td>';
+        return '<td class="pd-what"><b class="' + side.trim() + '">' + esc(f[0]) + '</b>' + (f.length > 1 ? ' · ' + f.slice(1).map(esc).join(' · ') : '') + (tries ? ' ' + tries : '') + '</td>';
       };
       var thisWhat = function () {
         if (r.awhat && r.awhat.length) return r.awhat;   // the grade file's own line for the night (27 Oct 2026)
@@ -4986,12 +4997,12 @@ smStore.ready.then(function () {
         var avg = mins.reduce(function (a, b) { return a + b; }, 0) / mins.length, d = +r.amin - avg;
         return Math.abs(d) >= 4 ? [Math.round(+r.amin) + " min, " + Math.round(Math.abs(d)) + (d < 0 ? " under" : " over") + " his usual " + Math.round(avg)] : [];
       };
-      h += '<h4>Last games' + propsLogTally(r) + (what ? ' <span class="dim">· what the box says happened, the biggest factor first</span>' : '') + '</h4><table class="form pd-log"><thead><tr><th>Date</th><th>Opp</th><th>Min</th><th>' + esc(lab) + '</th>' + (what ? '<th>What happened</th>' : '') + '</tr></thead><tbody>' +
+      h += '<h4>Last games' + propsLogTally(r) + (what ? ' <span class="dim">· what the box says happened, the biggest factor first' + (anyTries ? ', <span class="tries">the tries</span> in their own colour' : '') + '</span>' : '') + '</h4><table class="form pd-log"><thead><tr><th>Date</th><th>Opp</th><th>Min</th><th>' + esc(lab) + '</th>' + (what ? '<th>What happened</th>' : '') + '</tr></thead><tbody>' +
         (r.log || []).map(function (g) {
-          return '<tr><td>' + esc(String(g[0] || "").slice(5)) + '</td><td>' + esc((g[2] ? "v " : "@ ") + (g[1] || "")) + '</td><td>' + esc(String(g[3] === null || g[3] === undefined ? "" : g[3])) + '</td><td>' + propsLogMark(g[4], r.line) + '</td>' + (what ? whatCell(g[5], g[4]) : '') + '</tr>';
+          return '<tr><td>' + esc(String(g[0] || "").slice(5)) + '</td><td>' + esc((g[2] ? "v " : "@ ") + (g[1] || "")) + '</td><td>' + esc(String(g[3] === null || g[3] === undefined ? "" : g[3])) + '</td><td>' + propsLogMark(g[4], r.line) + '</td>' + (what ? whatCell(g[5], g[4], g[6]) : '') + '</tr>';
         }).join("") +
         (played ? '<tr class="this"><td>' + esc(String(r.gdate || "").slice(5)) + '</td><td>' + esc((r.athome ? "v " : "@ ") + (r.opp || "")) + ' <span class="tag">this game</span></td><td>' +
-                  esc(r.amin === null || r.amin === undefined ? "–" : String(r.amin)) + '</td><td>' + (r.result === "void" ? '<b class="lg">DNP</b>' : propsLogMark(r.actual, r.line)) + '</td>' + (what ? whatCell(thisWhat(), r.actual) : '') + '</tr>' : '') +
+                  esc(r.amin === null || r.amin === undefined ? "–" : String(r.amin)) + '</td><td>' + (r.result === "void" ? '<b class="lg">DNP</b>' : propsLogMark(r.actual, r.line)) + '</td>' + (what ? whatCell(thisWhat(), r.actual, r.atries) : '') + '</tr>' : '') +
         '</tbody></table>';
     }
     var bks = Object.keys(r.books || {});

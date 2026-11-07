@@ -234,7 +234,7 @@ regulars out, pace, the defence, last season's prior and the minutes trend,
 ranked with a bar, green toward the pick and red away from it, the biggest
 named on the card too), the why with the two biggest levers toward the
 pick in bold green and the biggest against it tagged red (26 Oct 2026), the
-last games as a table (each game's stat marked, green over the prop's line, and from 26 Oct 2026 what the box says happened on each, a regular back or out, a blowout, his minutes, shots and shooting against his season's, the biggest first
+last games as a table (each game's stat marked, green over the prop's line, and from 26 Oct 2026 what the box says happened on each, a regular back or out, a blowout, his minutes, shots and shooting against his season's, the biggest first, and from 7 Nov 2026 the tries in purple after them: his shots from the floor, from three and from the line, the market's own kind first with his usual at those minutes; the ledger keeps the three-point tries from that date and the daily ledger run reads older games again to fill them
 and red under it, with a tally of how many cleared the number) and every
 book's line. Props cannot be backtested against lines
 (ten credits a market a game on the history endpoint). A player listed Out

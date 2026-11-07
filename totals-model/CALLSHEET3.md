@@ -2862,3 +2862,41 @@ spike's over reads green (41-20), the favourite's over red (20-41) and
 the spike's under too few (6-4), and reads the chips on Embiid's,
 Towns' and Brunson's cards and none on Maxey's, the filter both ways,
 and the panel's chip and note.
+
+## The tries beside what the box says, 7 Nov 2026
+
+The user, on De'Aaron Fox's panel: "are we able to track how many
+attempts the player made at the 3's for example, or assists, things like
+that", "in the same section as what the box says happened area",
+"highlight in yellow or purple or some separate from the data already
+there".
+
+The ledger's player line had never kept the three-point attempts, only
+the makes, so this is a slate change first. The line keeps the tries
+last, as an 18th item (NBA_PLAYER_KEYS, nba_player_line), read from
+ESPN's 3PT made-attempted column and the league's box scores'
+threePointersAttempted; a line from before is 17 long and reads them as
+None, and the daily ledger run, which already read older games' summaries
+again to fill the six-item lines, now reads any game whose lines are
+short of 18, so one run fills the season. The player logs carry the
+tries, and props_game_tries words them beside the box: his shots from
+the floor, from three and from the line, the market's own kind first
+with his usual number at those minutes ("tries: 2 of 6 from three (his
+usual 8.4 at those minutes) · 20 from the floor · 7 of 8 from the line"
+on a threes prop; the floor first on a points one). A game whose line
+predates the tries says so in the same place. The props run writes the
+line as each game's seventh element on the row's log; the grade writes
+it as the eighth item on the night's box line, per market.
+
+The page reads both: the what-happened cell ends with the tries in
+their own colour, the crowd's purple with its wash, after the factors
+in green, red and plain; the heading says the tries are in their own
+colour; the graded night's own line keeps them on the row (atries,
+trimmed with the rest after seven nights). A file from before carries
+none and the cell reads as it did.
+
+The selftest reads the line's length and last item, a 17-long line's
+None, the log's tries, the wording on a threes prop and a points prop,
+the no-tries wording and the empty cases; the harness seeds a game with
+the factors and the tries and a grade file with the eighth item, and
+reads the cells, the heading and the stored row.

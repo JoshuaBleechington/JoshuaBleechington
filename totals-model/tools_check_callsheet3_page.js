@@ -391,7 +391,8 @@ const CHECKS = ["dome","playoff"];
           proj: 27.2, sd: 9.4, pm: 0.612, pb: 0.5, p: 0.5604, push: 0, side: 'OVER', chance: 0.5604, price: -110, need: 0.5238, edge: 0.0366, band: 'BET', mins: 35.1, rate36: 27.9,
           kal: { r: [[19.5, 0.70, 0.72, 0.71, 100], [24.5, 0.46, 0.48, 0.47, 500], [29.5, 0.24, 0.26, 0.25, 50]], team: 'ATL' },   // a ladder a file from 4 Nov 2026 still carries: ignored from 5 Nov (Kalshi is off the props)
           form: { vals: [20, 21, 30], over: 1, on: 0, avg: 23.7 },   // the slate's block (7 Nov 2026): the log below has two games with the stat, so the card's form line can only come off the block
-          why: ['27.9 points per 36 this season (3 games, 104 minutes)', '35.1 minutes projected'], log: [['2026-10-15', 'MIA', 0, 34.0, 26], ['2026-10-17', 'CHI', 1, 31.0, 22], ['2026-10-19', 'BOS', 0, 12.5, null]] },
+          why: ['27.9 points per 36 this season (3 games, 104 minutes)', '35.1 minutes projected'],
+          log: [['2026-10-15', 'MIA', 0, 34.0, 26, ['won by 3', '34 min (his usual 33)'], 'tries: 20 from the floor (his usual 19 at those minutes) · 3 of 8 from three · 5 of 6 from the line'], ['2026-10-17', 'CHI', 1, 31.0, 22], ['2026-10-19', 'BOS', 0, 12.5, null]] },   // the first game carries the factors and the tries (7 Nov 2026)
         { pid: '4066261', name: 'Jalen Suggs', team: 'ORL', opp: 'ATL', home: true, pos: 'SG', mk: 'ast', line: 4.5, op: -120, up: -100, book: 'fanatics', books: { fanatics: [4.5, -120, -100] },
           why: ['no history to project from (under 60 minutes with the stat in the ledgers)'], log: [] },
         { pid: '4397020', name: 'Paolo Banchero', team: 'ORL', opp: 'ATL', home: true, pos: 'PF', mk: 'reb', line: 7.5, op: -105, up: -115, book: 'fanatics', books: { fanatics: [7.5, -105, -115] },
@@ -432,7 +433,7 @@ const CHECKS = ["dome","playoff"];
     const tileBefore = !!document.querySelector('#calibBox .calib[data-sport="PROPS"]');
     const gradeDoc = { format: 'callsheet2.slate', version: 1, date: '2026-10-21', games: [
       { sport: 'NBA', gdate: '2026-10-21', away: 'Hawks', home: 'Magic', gameId: '401909834', finals: { fa: '118', fh: '112', f5a: '60', f5h: '55' }, notes: [],
-        box: { '3037789': ['Trae Young', 36.2, 28, 3, 11, 4, { pts: ['won by 6', '36 min (his usual 34)', '22 shots (his usual 21 at those minutes)', '10 of 19 from the floor'], reb: ['won by 6', '36 min (his usual 34)', '3 of the club\'s 44 rebounds (his usual 9%)'], ast: ['Dyson Daniels out (30 mpg, a lift for him)', 'won by 6', '11 of the club\'s 27 assists, 41% (his usual 30%)'], tpm: ['won by 6'], pra: ['won by 6'] }], '4397020': ['Paolo Banchero', 34.0, 22, 9, 4, 1] } } ] };
+        box: { '3037789': ['Trae Young', 36.2, 28, 3, 11, 4, { pts: ['won by 6', '36 min (his usual 34)', '22 shots (his usual 21 at those minutes)', '10 of 19 from the floor'], reb: ['won by 6', '36 min (his usual 34)', '3 of the club\'s 44 rebounds (his usual 9%)'], ast: ['Dyson Daniels out (30 mpg, a lift for him)', 'won by 6', '11 of the club\'s 27 assists, 41% (his usual 30%)'], tpm: ['won by 6'], pra: ['won by 6'] }, { pts: 'tries: 19 from the floor (his usual 18 at those minutes) · 3 of 7 from three · 6 of 7 from the line', tpm: 'tries: 3 of 7 from three (his usual 6.5 at those minutes) · 19 from the floor · 6 of 7 from the line' }], '4397020': ['Paolo Banchero', 34.0, 22, 9, 4, 1] } } ] };   // the tries eighth (7 Nov 2026)
     await load(gradeDoc, 'nba-grade-2026-10-21.json');
     const after = JSON.parse(smStore.getItem('callsheet3.props.v1'));
     // the graded night joins the panel's last games, with his minutes from the box line (25 Oct 2026)
@@ -440,6 +441,11 @@ const CHECKS = ["dome","playoff"];
     const thisRow = (document.querySelector('#propDetail .pd-log tr.this') || { innerText: '' }).innerText.replace(/\s+/g, ' ').trim(), thisMark = (document.querySelector('#propDetail .pd-log tr.this b.lg') || { className: '' }).className;
     const thisWhat = (document.querySelector('#propDetail .pd-log tr.this td.pd-what') || { innerText: '' }).innerText.replace(/\s+/g, ' ').trim(), whatHead = [...document.querySelectorAll('#propDetail .pd-log thead th')].map(t => t.textContent.trim()).join('|'), otherWhat = [...document.querySelectorAll('#propDetail .pd-log tbody tr:not(.this) td.pd-what')].map(td => td.textContent.trim());
     const logRows = document.querySelectorAll('#propDetail .pd-log tbody tr').length;
+    const triesCells = [...document.querySelectorAll('#propDetail .pd-log tbody tr')].map(tr => { const s = tr.querySelector('td.pd-what .tries'); return (tr.classList.contains('this') ? 'this:' : '') + (s ? s.className + '|' + s.textContent.trim() : ''); });
+    const lastH4 = [...document.querySelectorAll('#propDetail h4')].find(h => /^Last games/.test(h.textContent.trim())) || document.createElement('h4');
+    const headDim = [...lastH4.querySelectorAll('.dim')].find(d => /what the box says/.test(d.textContent)) || document.createElement('span');   // the tally's own dim span comes first
+    const triesHead = (headDim.textContent || '').replace(/\s+/g, ' ').trim(), triesHeadCls = ((headDim.querySelector('.tries') || {}).className || '');
+    const triesStored = (after.find(r => r.pid === '3037789' && r.mk === 'pts') || {}).atries || '';
     document.getElementById('propDetailClose').click(); await wait();
     const tile = document.querySelector('#calibBox .calib[data-sport="PROPS"]');
     const tileText = tile ? tile.innerText.replace(/\s+/g, ' ').trim() : '';
@@ -465,15 +471,19 @@ const CHECKS = ["dome","playoff"];
     const viewOff = document.getElementById('propsView').hidden, colsBack = !document.querySelector('.cols').hidden, nbaPressed = document.getElementById('m-nba').getAttribute('aria-pressed');
     await smStore.removeItem('callsheet3.props.v1');
     return { viewOn, colsOff, pressed, best, formBlock, formStored, rowsOn, rowsAll, count, msg, whyOpen, logMarks, tileBefore, after: after.map(r => [r.name, r.mk, r.result, r.actual]), tileText, slateMsg, restored: restored.length, viewOff, colsBack, nbaPressed,
-             tabCalib, tabBlocks, nights, ladder, tabEmpty0, noneMsg, thinMsg, inPlay, thisRow, thisMark, logRows, refill, thisWhat, whatHead, otherWhat };
+             tabCalib, tabBlocks, nights, ladder, tabEmpty0, noneMsg, thinMsg, inPlay, thisRow, thisMark, logRows, refill, thisWhat, whatHead, otherWhat, triesCells, triesHead, triesHeadCls, triesStored };
   });
   chk(propsT.formBlock === 'His last 3: 20 · 21 · 30 against 24.5 · 1 of 3 over, against the OVER|n5 formline neg' && propsT.formStored === '{"vals":[20,21,30],"over":1,"on":0,"avg":23.7}',
       'props file: the slate\'s form block lands on the row and the card\'s form line reads it (7 Nov 2026; the seeded log has two games with the stat, so the line can only come off the block)', JSON.stringify({ card: propsT.formBlock, stored: propsT.formStored }));
   chk(propsT.refill.stripped && propsT.refill.same && JSON.stringify(propsT.refill.mins) === JSON.stringify(propsT.refill.was) && propsT.refill.mins.some(m => typeof m === 'number') && /Minutes filled in on \d+ graded props? from the box lines\./.test(propsT.refill.msg),
       'props: a second load of a night\'s grade file fills the minutes in on props graded before they were kept, leaves every result as it was, and says how many', JSON.stringify(propsT.refill));
-  chk(/^10-21 @ [A-Z]+ this game 36\.2 28 won by 6 · 36 min \(his usual 34\) · 22 shots \(his usual 21 at those minutes\) · 10 of 19 from the floor$/.test(propsT.thisRow) && /lg over/.test(propsT.thisMark) && propsT.logRows === 4
-      && propsT.whatHead === 'Date|Opp|Min|points|What happened' && propsT.thisWhat === 'won by 6 · 36 min (his usual 34) · 22 shots (his usual 21 at those minutes) · 10 of 19 from the floor' && propsT.otherWhat.length === 3 && propsT.otherWhat.every(t => t === ''),
-      'props: a graded prop\'s last games end with the game itself, his minutes from the box line and the stat marked against the line', JSON.stringify({ row: propsT.thisRow, mark: propsT.thisMark, rows: propsT.logRows }));
+  chk(/^10-21 @ [A-Z]+ this game 36\.2 28 won by 6 · 36 min \(his usual 34\) · 22 shots \(his usual 21 at those minutes\) · 10 of 19 from the floor tries: 19 from the floor \(his usual 18 at those minutes\) · 3 of 7 from three · 6 of 7 from the line$/.test(propsT.thisRow) && /lg over/.test(propsT.thisMark) && propsT.logRows === 4
+      && propsT.whatHead === 'Date|Opp|Min|points|What happened' && propsT.thisWhat === 'won by 6 · 36 min (his usual 34) · 22 shots (his usual 21 at those minutes) · 10 of 19 from the floor tries: 19 from the floor (his usual 18 at those minutes) · 3 of 7 from three · 6 of 7 from the line'
+      && propsT.otherWhat.length === 3 && propsT.otherWhat[0] === 'won by 3 · 34 min (his usual 33) tries: 20 from the floor (his usual 19 at those minutes) · 3 of 8 from three · 5 of 6 from the line' && propsT.otherWhat.slice(1).every(t => t === ''),
+      'props: a graded prop\'s last games end with the game itself, his minutes from the box line and the stat marked against the line', JSON.stringify({ row: propsT.thisRow, mark: propsT.thisMark, rows: propsT.logRows, other: propsT.otherWhat }));
+  chk(JSON.stringify(propsT.triesCells) === JSON.stringify(['tries|tries: 20 from the floor (his usual 19 at those minutes) · 3 of 8 from three · 5 of 6 from the line', '', '', 'this:tries|tries: 19 from the floor (his usual 18 at those minutes) · 3 of 7 from three · 6 of 7 from the line'])
+      && propsT.triesHead === '· what the box says happened, the biggest factor first, the tries in their own colour' && propsT.triesHeadCls === 'tries' && propsT.triesStored === 'tries: 19 from the floor (his usual 18 at those minutes) · 3 of 7 from three · 6 of 7 from the line',
+      'props: the tries (7 Nov 2026): a game\'s seventh element and the grade file\'s eighth land in the what-happened cell in their own class after the factors, the heading says so, and the graded night\'s tries are kept on the row for the market', JSON.stringify({ cells: propsT.triesCells, head: propsT.triesHead, cls: propsT.triesHeadCls, stored: propsT.triesStored }));
   chk(/loaded: 2 new.*Last season's ledger, nba-ledger-202526\.json, was not read by this run: 1 of the 1 projections rest on this season's two or three games a player, and 1 prop has no history at all\. Put the file back beside slate\.py, run the props again before tip, and load the new file; it replaces these\./.test(propsT.thinMsg),
       'props: a file whose projections rest on this season alone says last season\'s ledger was not read and what to do', propsT.thinMsg.slice(0, 500));
   chk(/loaded: 1 new, 0 replaced, 0 graded and left as they were, 1 on 1 game already under way left out \(in-play lines; the calls made before tip stand\)/.test(propsT.inPlay.msg) && propsT.inPlay.names.join(',') === 'Paul George',
@@ -493,8 +503,8 @@ const CHECKS = ["dome","playoff"];
       'props: the best list carries the one prop that clears its price, with its band, chance, price, need, edge and projection', JSON.stringify(propsT.best));
   chk(propsT.rowsOn === 2 && propsT.rowsAll === 3 && /3 props on .*21/.test(propsT.count) && /3.* new/.test(propsT.msg),
       'props: the table lists the projected props, every prop with the box ticked, and the count names the date', JSON.stringify({ on: propsT.rowsOn, all: propsT.rowsAll, count: propsT.count, msg: propsT.msg }));
-  chk(propsT.whyOpen.length === 1 && /27\.9 points per 36/.test(propsT.whyOpen[0]) && /10-15 @ MIA 34 26/.test(propsT.whyOpen[0]) && /fanatics carded 24\.5 [-−]110 [-−]110 draftkings 25\.5 [-−]115 [-−]105/.test(propsT.whyOpen[0]) && !/what happened/i.test(propsT.whyOpen[0]),
-      'props: a click on a table row opens the prop\'s panel with the reasons, the last games and every book\'s line; a file from before the what-happened column carries none and the column stays away', JSON.stringify(propsT.whyOpen));
+  chk(propsT.whyOpen.length === 1 && /27\.9 points per 36/.test(propsT.whyOpen[0]) && /10-15 @ MIA 34 26 won by 3 · 34 min \(his usual 33\) tries: 20 from the floor/.test(propsT.whyOpen[0]) && /fanatics carded 24\.5 [-−]110 [-−]110 draftkings 25\.5 [-−]115 [-−]105/.test(propsT.whyOpen[0]) && /what happened/i.test(propsT.whyOpen[0]),
+      'props: a click on a table row opens the prop\'s panel with the reasons, the last games and every book\'s line; the what-happened column shows because one seeded game carries the factors and the tries (7 Nov 2026)', JSON.stringify(propsT.whyOpen));
   chk(!propsT.tileBefore, 'props: no record tile before anything is graded', '');
   chk(propsT.after[0][2] === 'win' && propsT.after[0][3] === 28 && propsT.after[2][2] === 'loss' && propsT.after[2][3] === 9 && propsT.after[1][2] === 'void',
       'props: the grade file\'s box grades each prop by its side (28 over 24.5 wins; 9 rebounds beat the under 7.5), and a player with no box line is void', JSON.stringify(propsT.after));

@@ -42,7 +42,7 @@
      the points for a player, by chance percentage and band"): a sort column with its direction, and filters by market,
      band, side and a name. Kept in this browser only; Reset view puts the table back to by game, then by edge */
   var PROPS_VIEW_KEY = "callsheet3.props.view.v1";
-  var PROPS_VIEW_DEFAULT = { sort: "default", dir: -1, mk: "", band: "", side: "", q: "", agree: "", usage: "", role: "", sim: "", taken: "" };   // taken: the props you marked (3 Nov 2026)
+  var PROPS_VIEW_DEFAULT = { sort: "default", dir: -1, mk: "", band: "", side: "", q: "", agree: "", usage: "", role: "", sim: "", taken: "", tell: "" };   // taken: the props you marked (3 Nov 2026); tell: a minutes spike, a favourite's man, a green or a red tell (9 Nov 2026)
   /* the floors (26 Oct 2026, the user: "PRA alt lines at 95% or more, Sengun 10+ points, 5+ rebounds, 3+ assists"): the number
      the model says he clears 95, 90 and 80% of nights, read off the median and the sigma the chance already uses. Measured on
      2025-26 (tools_nba_usage_floors.py): the 95% floors cleared 97.5% of nights, the 90% 93%, the 80% 82%; posted as a whole
@@ -532,7 +532,7 @@
   try { var pv0 = JSON.parse(localStorage.getItem(PROPS_VIEW_KEY) || "null"); if (pv0 && typeof pv0 === "object") propsTableView = Object.assign({}, PROPS_VIEW_DEFAULT, pv0); } catch (e) {}
   function savePropsTableView() { try { localStorage.setItem(PROPS_VIEW_KEY, JSON.stringify(propsTableView)); } catch (e) {} }
   var PROPS_BAND_RANK = { "BET": 0, "LEAN": 1, "no edge": 2 };
-  var PROPS_SORT_COLS = [["game", "Game"], ["name", "Player"], ["mk", "Market"], ["line", "Line"], ["side", "Pick"], ["chance", "Chance"], ["price", "Price"], ["need", "Needs"], ["edge", "Edge"], ["proj", "Proj"], ["band", "Band"], ["result", "Result"], ["agree", "Levers"], ["sim", "Sim"], ["usage", "Usage"]];
+  var PROPS_SORT_COLS = [["game", "Game"], ["name", "Player"], ["mk", "Market"], ["line", "Line"], ["side", "Pick"], ["chance", "Chance"], ["price", "Price"], ["need", "Needs"], ["edge", "Edge"], ["proj", "Proj"], ["band", "Band"], ["result", "Result"], ["agree", "Levers"], ["sim", "Sim"], ["usage", "Usage"], ["spike", "Spike"]];   // Spike (9 Nov 2026, the user: "a filter on the every props on the date section to find the players with minute spikes")
   /* the levers' tally (26 Oct 2026, the user: "find props like this one, where What moves it shows multiple green bars
      pointing toward the pick"): how many of the factors push toward the pick's side and how many against, a push under
      0.05 in the stat's units counting as neither. A column to sort by, a filter, a tag on the card and the panel's heading */
@@ -552,6 +552,7 @@
       case "agree": return has ? (function (t) { return t.n ? (t.toward - t.against) + t.toward / 10 : -50; })(propsLeverTally(r)) : -99;
       case "sim": return has ? (function (g) { return g === null ? -99 : g; })(propShopGap(r) !== null ? propShopGap(r) : propSimGap(r)) : -999;
       case "usage": return r.usg === null || r.usg === undefined ? -1 : +r.usg;
+      case "spike": return (function (s) { return s === null ? -99 : s; })(propSpike(r));   // the minutes lever, his last five against his season, in the stat's units
       case "game": return r.game || "";
       case "name": return r.name || "";
       case "mk": return PROPS_LABEL[r.mk] || r.mk || "";
@@ -578,6 +579,12 @@
       if (v.role && !(v.role === "starter" ? r.starter === true : r.starter === false)) return false;
       if (v.sim) { var ag = propShopAgrees(r); if (ag === null) ag = propSimAgrees(r); if (ag === null || (v.sim === "yes" ? !ag : ag)) return false; }   // the books' consensus first (5 Nov 2026), the sim's read on older files
       if (v.taken && !r.take) return false;   // the props you marked (3 Nov 2026)
+      if (v.tell) {   // the tells (9 Nov 2026): a minutes spike, a favourite's man, or the chips' colour on the pick
+        var sp = propSpike(r), fv = propFav(r);
+        if (v.tell === "spike" && !(sp !== null && sp >= 0.3)) return false;
+        if (v.tell === "fav" && !(fv !== null && fv >= 5)) return false;
+        if ((v.tell === "green" || v.tell === "red") && !propTellsFilter(r, v.tell)) return false;
+      }
       if (q && String(r.name || "").toLowerCase().indexOf(q) < 0 && String(r.game || "").toLowerCase().indexOf(q) < 0) return false;
       return true;
     });
@@ -1216,7 +1223,7 @@
       $("propsTakingCount").textContent = nTaken ? nTaken + " marked" : "";
     }
     var pool = ($("propsAll").checked ? rows : rows.filter(propHas)).slice(), list = propsTableRows(pool);
-    ["propsMk", "propsBand", "propsSide", "propsQ", "propsAgree", "propsUsage", "propsRole", "propsSimSel", "propsTakenSel"].forEach(function (id) { var el = $(id); if (el) { var k = { propsMk: "mk", propsBand: "band", propsSide: "side", propsQ: "q", propsAgree: "agree", propsUsage: "usage", propsRole: "role", propsSimSel: "sim", propsTakenSel: "taken" }[id]; if (el.value !== propsTableView[k]) el.value = propsTableView[k]; } });
+    ["propsMk", "propsBand", "propsSide", "propsQ", "propsAgree", "propsUsage", "propsRole", "propsSimSel", "propsTakenSel", "propsTellSel"].forEach(function (id) { var el = $(id); if (el) { var k = { propsMk: "mk", propsBand: "band", propsSide: "side", propsQ: "q", propsAgree: "agree", propsUsage: "usage", propsRole: "role", propsSimSel: "sim", propsTakenSel: "taken", propsTellSel: "tell" }[id]; if (el.value !== (propsTableView[k] || "")) el.value = propsTableView[k] || ""; } });
     /* the same-game pairs (26 Oct 2026), the likeliest tickets first */
     if ($("propsPairs")) {
       var pairs = propsPairs(date, rows);
@@ -1240,6 +1247,8 @@
           if (c) return '<td class="simc' + (propShopAgrees(r) === true ? ' pos' : propShopAgrees(r) === false ? ' neg' : '') + '" title="the books\' consensus line across ' + c.n + ' books' + (c.pin !== null && c.pin !== undefined ? ' (Pinnacle ' + esc(String(c.pin)) + ')' : '') + '; ' + (propShopAgrees(r) === true ? 'the carded line sits off it the ' + esc(r.side) + '\'s way' : propShopAgrees(r) === false ? 'the carded line sits off it against the ' + esc(r.side) : 'the carded line sits with it') + ' (scored at half the measured slope)">' + esc(String(c.line)) + '</td>';
           return '<td class="simc' + (ag === true ? ' pos' : ag === false ? ' neg' : '') + '" title="' + (v === null ? 'no simulation on this prop' : 'the simulation\'s own read of the stat, his per 36 at his minutes scaled by his club\'s runs; ' + (ag === true ? 'on the ' + esc(r.side) + '\'s side of the line' : ag === false ? 'against the ' + esc(r.side) : 'on the line') + ' (shown, not scored)') + '">' + (v === null ? '' : v) + '</td>'; })(propSimRead(r), propSimAgrees(r), propCons(r)) +
         (function (u) { return '<td class="usgc' + (u === "hi" ? ' pos' : '') + '" title="' + (r.usg === null || r.usg === undefined ? 'no usage on this prop' : 'his share of his club\'s possessions while on the floor' + (r.starter === true ? '; a starter' : r.starter === false ? '; off the bench' : '') + (r.sdf && r.sdf !== 1 ? '; the miss read at ' + r.sdf + ' sigmas (measured)' : '')) + '">' + (r.usg === null || r.usg === undefined ? '' : esc(String(r.usg)) + '%' + (r.starter === true ? ' <span class="tag">S</span>' : r.starter === false ? ' <span class="tag">B</span>' : '')) + '</td>'; })(propUsageBucket(r)) +
+        (function (s) {   // the minutes spike (9 Nov 2026): the minutes lever's push, green at +0.3 and up (the chip's own rule), red at -0.3 and under, a column to sort by
+          return '<td class="spikec' + (s !== null && s >= 0.3 ? ' pos' : s !== null && s <= -0.3 ? ' neg' : '') + '" title="' + (s === null ? 'no minutes lever on this prop' : 'Minutes, his last 5 against the season: ' + sgn(s, 1) + ' ' + esc(PROPS_LABEL[r.mk] || r.mk) + ' at his minutes; a spike at +0.3 and up, read on the record as its own line') + '">' + (s === null ? '' : sgn(s, 1)) + '</td>'; })(propSpike(r)) +
         '<td class="take">' + propTakeBtn(r) + '</td></tr>';
     });
     h += '</tbody></table>';
@@ -1290,7 +1299,7 @@
       }
       openFrom(e);
     });
-    [["propsMk", "mk"], ["propsBand", "band"], ["propsSide", "side"], ["propsQ", "q"], ["propsAgree", "agree"], ["propsUsage", "usage"], ["propsRole", "role"], ["propsSimSel", "sim"], ["propsTakenSel", "taken"]].forEach(function (p) {
+    [["propsMk", "mk"], ["propsBand", "band"], ["propsSide", "side"], ["propsQ", "q"], ["propsAgree", "agree"], ["propsUsage", "usage"], ["propsRole", "role"], ["propsSimSel", "sim"], ["propsTakenSel", "taken"], ["propsTellSel", "tell"]].forEach(function (p) {
       var el = $(p[0]); if (!el) return;
       el.addEventListener(p[0] === "propsQ" ? "input" : "change", function () { propsTableView[p[1]] = el.value; savePropsTableView(); renderProps(); });
     });

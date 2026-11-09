@@ -2900,3 +2900,22 @@ None, the log's tries, the wording on a threes prop and a points prop,
 the no-tries wording and the empty cases; the harness seeds a game with
 the factors and the tries and a grade file with the eighth item, and
 reads the cells, the heading and the stored row.
+
+## The Spike column and the tells filter on the table, 9 Nov 2026
+
+The user: "is there a way to have a filter on the every props on the
+date section to be able to find the players with minute spikes?"
+
+The table of every prop on the date gains a Spike column: the minutes
+lever's push, his last five games' minutes against his season in the
+stat's units, the same number the chip reads, green at +0.3 and up and
+red at −0.3 and under, blank where a prop has no minutes lever, and
+sortable like the rest so the spikes come first. The filter row gains a
+tells select: a minutes spike, a favourite's man (his club favoured by
+five or more), a green tell with no red, or a red tell, the last two the
+chips' own colour read live off Is it working. The view is kept with the
+rest of the table's view. Shown, not scored.
+
+The harness, on the seeded night: the column's header, Embiid's green
++0.5 with its title and Maxey's blank, the four filters' lists, and the
+sort with Embiid first.

@@ -985,7 +985,7 @@ const CHECKS = ["dome","playoff"];
   const simGap = r => r.sim === null || r.sim === '' ? null : (r.side === 'UNDER' ? r.line - parseFloat(r.sim) : parseFloat(r.sim) - r.line);
   const simMaxey = simPropsT.rows.find(r => /^Tyrese Maxey/.test(r.name)), simBig = simPropsT.rows.slice().sort((a, b) => simGap(b) - simGap(a))[0];
   chk(simPropsT.strip.length === 1 && /^pk simg mkt\|76ers @ Knicks · the market PHI 113 \(112\.9 a game\) · NYK 118\.5 \(115\.6 a game\) total 231\.5 · spread -5\.5 each club's points implied by the book's total and spread, against its points a game by the ratings · shown, not scored expected margin 10\.9 · blowout of 15 or more 27%, off the spread · the carded line sits off the books' consensus on 5 of 7 props$/.test(simPropsT.strip[0])
-      && simPropsT.head.slice(-4).join('|') === 'Levers|Sim|Usage|Take' && simPropsT.rows.length === 7 && simPropsT.rows.every(r => /^\d+(\.\d)?$/.test(r.sim) && /^simc( pos| neg)?$/.test(r.cls) && (simGap(r) > 0) === /pos/.test(r.cls) && (simGap(r) < 0) === /neg/.test(r.cls) && /the books' consensus line across 3 books/.test(r.title))
+      && simPropsT.head.slice(-5).join('|') === 'Levers|Sim|Usage|Spike|Take' && simPropsT.rows.length === 7 && simPropsT.rows.every(r => /^\d+(\.\d)?$/.test(r.sim) && /^simc( pos| neg)?$/.test(r.cls) && (simGap(r) > 0) === /pos/.test(r.cls) && (simGap(r) < 0) === /neg/.test(r.cls) && /the books' consensus line across 3 books/.test(r.title))
       && simMaxey && simMaxey.side === 'OVER' && simMaxey.line === 25.5 && simMaxey.sim === '24.5' && simMaxey.cls === 'simc neg',
       'props: the market\'s strip takes the simulation\'s place above the picks (5 Nov 2026): each club\'s points implied by the book\'s total and spread against the ratings\' number, the expected margin and the blowout off the spread, and how many carded lines sit off the books\' consensus; the Sim column carries the consensus line on every projected prop, green when the carded line sits off it the pick\'s way and red against it (Maxey\'s over at 25.5 with the books at 24.5, red)', JSON.stringify({ strip: simPropsT.strip, head: simPropsT.head.slice(-4), rows: simPropsT.rows.map(r => r.name + ' ' + r.side + ' ' + r.line + ' sim ' + r.sim + ' ' + r.cls) }));
   chk(simPropsT.best.length === 3 && simPropsT.best.every(b => /→n5 shopline( pos| neg)?\|The books: 3 post \d+(\.\d)? · fanatics \d+(\.\d)? sits (with them|1 (above|below) them, (the (UNDER|OVER)'s way|against the (UNDER|OVER)) · the book's chance read [-−+]\d\.\d on the over, measured)$/.test(b))
@@ -1637,6 +1637,17 @@ const CHECKS = ["dome","playoff"];
     sel('propsSimSel', 'yes'); await wait(); const yes = [...document.querySelectorAll('#propsTable tbody tr[data-prop] td:nth-child(2)')].map(td => td.textContent.trim());
     sel('propsSimSel', 'no'); await wait(); const no = [...document.querySelectorAll('#propsTable tbody tr[data-prop] td:nth-child(2)')].map(td => td.textContent.trim());
     sel('propsSimSel', ''); await wait();
+    // the Spike column and the tells filter on the table (9 Nov 2026)
+    const nm = () => [...document.querySelectorAll('#propsTable tbody tr[data-prop] td:nth-child(2)')].map(td => td.textContent.trim().split(' ').slice(0, 2).join(' '));
+    const spikeCells = [...document.querySelectorAll('#propsTable tbody tr[data-prop]')].map(tr => { const td = tr.querySelector('td.spikec'); return tr.querySelectorAll('td')[1].textContent.trim().split(' ').slice(0, 2).join(' ') + '|' + (td ? td.className + '|' + td.textContent.trim() + '|' + td.title.slice(0, 110) : 'none'); });
+    const spikeHead = ((document.querySelector('#propsTable th[data-sort="spike"]') || {}).textContent || '').trim();
+    sel('propsTellSel', 'spike'); await wait(); const tellSpike = nm();
+    sel('propsTellSel', 'fav'); await wait(); const tellFav = nm();
+    sel('propsTellSel', 'green'); await wait(); const tellGreen = nm();
+    sel('propsTellSel', 'red'); await wait(); const tellRed = nm();
+    sel('propsTellSel', ''); await wait();
+    document.querySelector('#propsTable th[data-sort="spike"]').click(); await wait(); const spikeSorted = nm(), spikeHeadOn = document.querySelector('#propsTable th[data-sort="spike"]').textContent.trim();
+    document.getElementById('propsReset').click(); await wait();
     const record = txt(document.getElementById('propsCalib'));
     // the same-game pairs at one app (5 Nov 2026): the card names the app, the panel reads the same ticket at each of the four apps
     const pairs = [...document.querySelectorAll('#propsPairs .pk')].map(e => txt(e).slice(0, 220));
@@ -1648,7 +1659,7 @@ const CHECKS = ["dome","playoff"];
     document.getElementById('propsReset').click(); await wait(); document.getElementById('m-nba').click(); await wait();
     await smStore.removeItem('callsheet3.props.v1');
     return { strip, best, tiles, head, simBlock, levers, cells, yes, no, record, selLabel, subhead, pairs, pairApps, pairSub, pairHow, betCard, betCls, betN1, betWhy, leanCls, divider, dividerAt, bestApp, closeMsg, clvCards, storedClose, panelBetWhy, panelClv, panelClvCls, cardTile,
-             tells, tellsGreen, tellsGreenDiv, tellsRed, panelTells, panelTellsDim };
+             tells, tellsGreen, tellsGreenDiv, tellsRed, panelTells, panelTellsDim, spikeCells, spikeHead, tellSpike, tellFav, tellGreen, tellRed, spikeSorted, spikeHeadOn };
   });
   chk(/^pk scored bet$/.test(mktT.betCls) && /^BET #1 · BET · 3 to 5 points of edge levers/.test(mktT.betN1) && mktT.leanCls.length === 3 && mktT.leanCls.every(c => c === 'pk lean')
       && /^Why a BET: 56\.4% clears the 52\.4% that [-−]110 needs by 4\.0 points · the model says 58% at a fifth of the say, the book 50% · the books' consensus with it \([-−]1\.5 on the over\) · the top lever Pace \+0\.3, against it\.$/.test(mktT.betWhy) && mktT.panelBetWhy === mktT.betWhy
@@ -1671,6 +1682,10 @@ const CHECKS = ["dome","playoff"];
       && JSON.stringify(mktT.tellsGreen) === '["Joel Embiid OVER 10.5 rebounds"]' && /^No BET among these\. LEANs below: information, not a measured edge/.test(mktT.tellsGreenDiv) && JSON.stringify(mktT.tellsRed.slice().sort()) === '["Jalen Brunson OVER 6.5 assists","Karl-Anthony Towns OVER 22.5 points"]'
       && mktT.panelTells.length === 1 && /^tell green\|Minutes spike \+0\.5 · the over on a spike man does 67\.2%, claimed 53\.0%, on 61 picks$/.test(mktT.panelTells[0]) && /^· the tells: the two record lines that held walk-forward \(7 Nov 2026\), read live off every graded pick on this side, green where the slice has done at least what it claimed on 50 picks or more, red where less; shown, not scored$/.test(mktT.panelTellsDim),
       'props: the tells (7 Nov 2026): a minutes spike and a favourite\'s man ride on the best cards as chips coloured live off the record on the pick\'s side (Embiid\'s spike green at 67% on 61 picks, Brunson\'s and Towns\' favourite\'s over red at 33%, Maxey none), the panel carries the same chip and its note, and the tells filter keeps the picks with a green tell and no red, or with a red one', JSON.stringify({ tells: mktT.tells, green: mktT.tellsGreen, div: mktT.tellsGreenDiv, red: mktT.tellsRed, panel: mktT.panelTells, dim: mktT.panelTellsDim }));
+  chk(mktT.spikeHead === 'Spike' && mktT.spikeCells.some(c => /^Joel Embiid\|spikec pos\|\+0\.5\|Minutes, his last 5 against the season: \+0\.5 rebounds at his minutes; a spike at \+0\.3/.test(c)) && mktT.spikeCells.some(c => /^Tyrese Maxey\|spikec\|\|no minutes lever on this prop$/.test(c)) && mktT.spikeCells.length === 4
+      && JSON.stringify(mktT.tellSpike) === '["Joel Embiid"]' && JSON.stringify(mktT.tellFav.slice().sort()) === '["Jalen Brunson","Karl-Anthony Towns"]' && JSON.stringify(mktT.tellGreen) === '["Joel Embiid"]' && JSON.stringify(mktT.tellRed.slice().sort()) === '["Jalen Brunson","Karl-Anthony Towns"]'
+      && mktT.spikeSorted[0] === 'Joel Embiid' && mktT.spikeSorted.length === 4 && /^Spike ▾$/.test(mktT.spikeHeadOn),
+      'props: the Spike column and the tells filter on the table (9 Nov 2026): the minutes lever\'s push in its own column, green at +0.3 and up with the words in the title, blank where a prop has no minutes lever, sortable with the spikes first, and the tells filter keeps the spikes, the favourites\' men, or the picks with a green or a red chip', JSON.stringify({ head: mktT.spikeHead, cells: mktT.spikeCells, spike: mktT.tellSpike, fav: mktT.tellFav, green: mktT.tellGreen, red: mktT.tellRed, sorted: mktT.spikeSorted, headOn: mktT.spikeHeadOn }));
   chk(mktT.pairs.length >= 3 && mktT.pairs.every(p => /^PAIR #\d · 76ers @ Knicks · at (Fanatics|DraftKings|FanDuel|BetMGM) · the price (agrees|asks more) /.test(p))
       && mktT.pairApps.length === 4 && mktT.pairApps.some(r => /chosen/.test(r)) && mktT.pairApps.some(r => /^BetMGM — — does not post both legs$/.test(r)) && mktT.pairApps.filter(r => /^(Fanatics|DraftKings|FanDuel)( chosen)? \d+(\.\d)? [-−+]\d+ \d+(\.\d)? [-−+]\d+ \d\d\.\d% [-−+]\d+ \d\d\.\d% [-−+]\d+\.\d$/.test(r)).length === 3
       && / · both at (Fanatics|DraftKings|FanDuel)$/.test(mktT.pairSub) && /Both legs are read at (Fanatics|DraftKings|FanDuel), (at the carded lines|the chance re-read at its line where it differs from the carded one), so the ticket goes into one app as it reads here\.$/.test(mktT.pairHow),

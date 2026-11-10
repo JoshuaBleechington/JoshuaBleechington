@@ -1680,10 +1680,10 @@ const CHECKS = ["dome","playoff"];
   chk(/a man on a club favoured by 5 or more: unders 0-0 · overs 20-41 [-−]\d+\.\du \(shown, not scored\)/.test(mktT.cardTile) && /a minutes spike \(his last five above his season\): unders 6-4 \+\d\.\du · overs 41-20 \+\d+\.\du \(shown, not scored\)/.test(mktT.cardTile)
       && /A favourite's man \(5\+\), the under \(shown, not scored\) 0-0/i.test(mktT.record) && /A favourite's man \(5\+\), the over 20-41/i.test(mktT.record) && /A minutes spike, the under \(shown, not scored\) 6-4/i.test(mktT.record) && /A minutes spike, the over 41-20/i.test(mktT.record),
       'props: two lines that measure themselves (6 Nov 2026): a man on a club favoured by five or more (Towns on the Knicks at -5.5, the over, lost, after a seeded pool of 60) and a minutes spike (Embiid\'s last five above his season, the over, won, after a pool of 60; ten unders), by the side the sheet took, on the card\'s tile and as tiles on the tab', JSON.stringify({ tile: mktT.cardTile.slice(0, 900) }));
-  chk(mktT.tells.some(t => /^Tyrese Maxey UNDER 25\.5 points→$/.test(t)) && mktT.tells.some(t => /^Joel Embiid OVER 10\.5 rebounds→tell green\|Minutes spike \+0\.5 · the over on a spike man does 67\.2%, claimed 53\.0%, on 61 picks$/.test(t))
+  chk(mktT.tells.some(t => /^Tyrese Maxey UNDER 25\.5 points→$/.test(t)) && mktT.tells.some(t => /^Joel Embiid OVER 10\.5 rebounds→tell green\|Minutes spike \+0\.5 · the over on a spike man not on a favourite does 67\.2%, claimed 53\.0%, on 61 BET and LEAN picks$/.test(t))
       && mktT.tells.some(t => /^Karl-Anthony Towns OVER 22\.5 points→tell red\|His club favoured by 5\.5 · the over on a favourite's man does 32\.8%, claimed 53\.0%, on 61 picks$/.test(t)) && mktT.tells.some(t => /^Jalen Brunson OVER 6\.5 assists→tell red\|His club favoured by 5\.5 · the over on a favourite's man does 32\.8%, claimed 53\.0%, on 61 picks$/.test(t))
       && JSON.stringify(mktT.tellsGreen) === '["Joel Embiid OVER 10.5 rebounds"]' && /^No BET among these\. LEANs below: information, not a measured edge/.test(mktT.tellsGreenDiv) && JSON.stringify(mktT.tellsRed.slice().sort()) === '["Jalen Brunson OVER 6.5 assists","Karl-Anthony Towns OVER 22.5 points"]'
-      && mktT.panelTells.length === 1 && /^tell green\|Minutes spike \+0\.5 · the over on a spike man does 67\.2%, claimed 53\.0%, on 61 picks$/.test(mktT.panelTells[0]) && /^· the tells: the two record lines that held walk-forward \(7 Nov 2026\), read live off every graded pick on this side, green where the slice has done at least what it claimed on 50 picks or more, red where less; shown, not scored$/.test(mktT.panelTellsDim),
+      && mktT.panelTells.length === 1 && /^tell green\|Minutes spike \+0\.5 · the over on a spike man not on a favourite does 67\.2%, claimed 53\.0%, on 61 BET and LEAN picks$/.test(mktT.panelTells[0]) && /^· the tells \(7 Nov 2026\), shown, not scored: the favourite's chip reads every graded pick on this side, the spike's chip the BET and LEAN picks on a spike man not on a favourite \(10 Nov 2026: on a favourite's man the spike swings by the night and carries no colour\); green where the line has done at least what it claimed on 50 picks or more, red where less$/.test(mktT.panelTellsDim),
       'props: the tells (7 Nov 2026): a minutes spike and a favourite\'s man ride on the best cards as chips coloured live off the record on the pick\'s side (Embiid\'s spike green at 67% on 61 picks, Brunson\'s and Towns\' favourite\'s over red at 33%, Maxey none), the panel carries the same chip and its note, and the tells filter keeps the picks with a green tell and no red, or with a red one', JSON.stringify({ tells: mktT.tells, green: mktT.tellsGreen, div: mktT.tellsGreenDiv, red: mktT.tellsRed, panel: mktT.panelTells, dim: mktT.panelTellsDim }));
   chk(mktT.spikeHead === 'Spike' && mktT.spikeCells.some(c => /^Joel Embiid\|spikec pos\|\+0\.5\|Minutes, his last 5 against the season: \+0\.5 rebounds at his minutes; a spike at \+0\.3/.test(c)) && mktT.spikeCells.some(c => /^Tyrese Maxey\|spikec\|\|no minutes lever on this prop$/.test(c)) && mktT.spikeCells.length === 4
       && JSON.stringify(mktT.tellSpike) === '["Joel Embiid"]' && JSON.stringify(mktT.tellFav.slice().sort()) === '["Jalen Brunson","Karl-Anthony Towns"]' && JSON.stringify(mktT.tellGreen) === '["Joel Embiid"]' && JSON.stringify(mktT.tellRed.slice().sort()) === '["Jalen Brunson","Karl-Anthony Towns"]'
@@ -1753,6 +1753,47 @@ const CHECKS = ["dome","playoff"];
   chk(/BET band 2-2 says 5\d\.\d% · does 50\.0%/i.test(oneT.record) && /BET band, one bet a man a night 1-1 says 5\d\.\d% · does 50\.0% \(±35\.4\) · [-−]0\.13u the over on a favourite's man 0-1 [-−]1\.0u · every other 1-0 \+0\.9u/i.test(oneT.record)
       && /BET, one a man a night 1-1 [-−]0\.1u \(the over on a favourite's man 0-1\)/.test(oneT.cardTile),
       'props: the record reads the BET band one bet a man a night beside the count by cards (10 Nov 2026): Curry\'s three BETs on the graded night count once, as the one with the most edge, which lost, the Pelican\'s under won, and the over on a favourite\'s man keeps its own count on the tile and on the card\'s line', JSON.stringify({ record: oneT.record.replace(/^[\s\S]*?(BET band)/i, '$1').slice(0, 420), tile: oneT.cardTile.slice(0, 500) }));
+
+  // ---- 10 Nov 2026: the spike's chip split by the favourite -- read off the BET and LEAN picks, coloured off a favourite, plain on one ----
+  await pg.evaluate(async () => {
+    await smStore.ready;
+    const row = (id, gdate, pid, name, team, side, band, edge, chance, result, spk) => ({ id, gdate, game: 'Pelicans @ Warriors', away: 'Pelicans', home: 'Warriors', aab: 'NOP', hab: 'GSW', pid: String(pid), name, team, opp: team === 'GSW' ? 'NOP' : 'GSW', athome: team === 'GSW', pos: 'G', mk: 'pts', line: 20.5, op: -110, up: -110, book: 'betmgm',
+      books: { betmgm: [20.5, -110, -110] }, proj: 22.5, sd: 7, pm: 0.6, pb: 0.5, p: side === 'OVER' ? chance : 1 - chance, push: 0, side, chance, price: -110, need: 0.524, edge, band, mins: 30, rate36: 24, base: 20, med: 22, usg: 24, sdf: 1, starter: true, start_src: "RotoWire's expected five",
+      total: 232.5, spread: -9.5, why: ['24.0 per 36 this season'], log: [], parts: spk ? [{ k: 'minutes', t: 'Minutes, his last 5 against the season', eff: spk, i: 0 }] : [], mkt: null, cons: null,
+      actual: result === 'win' ? (side === 'UNDER' ? 17 : 24) : result === 'loss' ? (side === 'UNDER' ? 24 : 17) : null, amin: result ? 30 : null, result });
+    const rows = []; let id = 0;
+    const pool = (n, w, team, band, spk) => { for (let i = 0; i < n; i++) { id++; rows.push(row(id, '2026-11-08', 300 + id, 'Pool Man ' + id, team, 'OVER', band, band === 'no edge' ? -0.01 : 0.01, 0.53, i < w ? 'win' : 'loss', spk)); } };
+    pool(60, 40, 'NOP', 'LEAN', 0.8);      // a spike, not on a favourite, in the bet bands: 40-20, green
+    pool(60, 20, 'GSW', 'LEAN', 0.8);      // a spike on a favourite's man, in the bet bands: 20-40, no colour of its own; the favourite's over reads 20-40 off the same men
+    pool(30, 0, 'NOP', 'no edge', 0.8);    // spike picks with no edge, every one lost: outside the chip's pools, inside the tile's
+    rows.push(row(901, '2026-11-09', 901, 'Jeremiah Fears', 'NOP', 'OVER', 'LEAN', 0.02, 0.544, null, 0.6), row(902, '2026-11-09', 902, 'Stephen Curry', 'GSW', 'OVER', 'LEAN', 0.015, 0.539, null, 0.6), row(903, '2026-11-09', 903, 'Zion Williamson', 'NOP', 'OVER', 'LEAN', 0.01, 0.534, null, 0));
+    await smStore.setItem('callsheet3.props.v1', JSON.stringify(rows));
+  });
+  await reloaded();
+  const splitT = await pg.evaluate(async () => {
+    const wait = () => new Promise(r => setTimeout(r, 90));
+    const txt = e => (e ? e.innerText : '').replace(/\s+/g, ' ').trim();
+    await smStore.ready;
+    document.getElementById('propsReset').click(); await wait();
+    document.getElementById('m-props').click(); await wait();
+    const all = [...document.querySelectorAll('#propsBest .pk')].map(e => txt(e.querySelector('.n2')).split(' OVER')[0] + '→' + [...e.querySelectorAll('.n5.tells .tell')].map(t => t.className + '|' + txt(t)).join(' ; '));
+    const selT = (v) => { const el = document.getElementById('propsTells'); el.value = v; el.dispatchEvent(new Event('change', { bubbles: true })); };
+    const names = () => [...document.querySelectorAll('#propsBest .pk .n2')].map(e => txt(e).split(' OVER')[0]);
+    selT('green'); await wait(); const green = names();
+    selT('red'); await wait(); const red = names();
+    selT(''); await wait();
+    const record = txt(document.getElementById('propsCalib')), cardTile = txt(document.querySelector('#calibBox .calib[data-sport="PROPS"] .sides'));
+    document.getElementById('propsReset').click(); await wait(); document.getElementById('m-nba').click(); await wait();
+    await smStore.removeItem('callsheet3.props.v1');
+    return { all, green, red, record, cardTile };
+  });
+  chk(splitT.all.length === 3 && splitT.all[0] === 'Jeremiah Fears→tell green|Minutes spike +0.6 · the over on a spike man not on a favourite does 66.7%, claimed 53.0%, on 60 BET and LEAN picks'
+      && splitT.all[1] === "Stephen Curry→tell plain|Minutes spike +0.6 · on a favourite's man the spike carries no colour: the over there is 20-40 on the BET and LEAN picks and swings by the night, so the favourite's chip is the read ; tell red|His club favoured by 9.5 · the over on a favourite's man does 33.3%, claimed 53.0%, on 60 picks"
+      && splitT.all[2] === 'Zion Williamson→' && JSON.stringify(splitT.green) === '["Jeremiah Fears"]' && JSON.stringify(splitT.red) === '["Stephen Curry"]',
+      'props: the spike\'s chip split by the favourite (10 Nov 2026): on a spike man not on a favourite it reads the BET and LEAN picks and takes their colour (40-20, green; thirty no-edge losses stay out of the pool), on a favourite\'s man it carries no colour and names the favourite\'s chip as the read, a man with neither carries nothing, and the tells filter follows', JSON.stringify({ all: splitT.all, green: splitT.green, red: splitT.red }));
+  chk(/A minutes spike, the over 60-90 .*?the chip reads the BET and LEAN picks: not on a favourite 40-20 \(66\.7%\) · on a favourite 20-40 \(33\.3%\), no colour/i.test(splitT.record)
+      && /the chip reads the BET and LEAN picks: the over off a favourite 40-20, on one 20-40/.test(splitT.cardTile),
+      'props: the spike\'s tile keeps every band\'s count and says under it what the chip reads, off a favourite and on one, and the card\'s line the same (10 Nov 2026)', JSON.stringify({ record: splitT.record.replace(/^[\s\S]*?(A minutes spike, the over)/i, '$1').slice(0, 330), tile: splitT.cardTile.slice(-260) }));
 
   // ---- 4 Nov 2026: the crowd on Kalshi -- the exchange's game-winner prices on the row, the card beside the book and Pinnacle, the better price after the fee on the board, the sharp side against the crowd on the moneyline tile ----
   const kalT = await pg.evaluate(async () => {

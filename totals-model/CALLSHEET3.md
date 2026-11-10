@@ -3006,3 +3006,66 @@ The harness seeds a graded night with Curry's three BETs, the one with
 the most edge a loss, and a Pelican's under, and a night on the tab with
 his three again and Podziemski's, and reads the note, the four cards'
 lines, the panel's, the tile and the card's line.
+
+## The spike's chip split by the favourite, 10 Nov 2026
+
+The user, after the one-bet change: "which would be more impactful, the
+minutes spike for the over or the spread chip towards the under?" On
+Curry's cards the two chips had pulled against each other, a green spike
+beside a red favourite.
+
+Head to head on the ten nights that keep the levers, 30 Oct to 9 Nov,
+7,207 graded props, each replayed under the current blend (the nights
+before 2 Nov from an earlier backup, where their levers were whole).
+
+The market's own fact, the over's landing rate less the book's chance:
+
+    a spike, on a favourite          -6.3 on   402   (-6.8, -6.2 by half)
+    no spike, on a favourite         -5.9 on 1,768   (-6.6, -4.8)
+    a spike, not on a favourite      -1.5 on 1,051   (-6.6, +2.4)
+    no spike, not on a favourite     -2.8 on 3,986   (-2.5, -3.3)
+
+The books price a man's rising minutes; they do not price the favourite.
+The favourite is the larger of the two by four points, in both halves.
+
+The split as first promised to the user, a spike on a favourite's man
+reading red and a spike elsewhere reading green, was tested before it
+was built and did not hold as stated. Read off every graded prop, as the
+chips did, the spike's over is red on both sides of the split (43.1% and
+49.1% against claims of 53), because the sheet's chance on a no-edge
+over runs high everywhere; and read from the nights before, neither the
+pooled colour nor the split one called the night: the BET and LEAN picks
+under a red chip went 116-85, under a green one 9-9.
+
+Read off the BET and LEAN picks, the picks a card is drawn for, one side
+is steady:
+
+    the over on a spike man, not on a favourite   71-41   63.4%
+        by night 1-2, 13-8, 10-8, 10-3, 13-3, 9-5, 11-8, 4-4
+        one a man a night 31-20; after its own record read green 47-23
+    the over on a spike man, on a favourite       24-38   38.7%
+        by night 2-6, 6-6, 0-3, 0-11, 9-0, 7-12
+        after its own record read red 16-12
+    no spike, on a favourite                      72-54   57.1%
+    no spike, not on a favourite                 100-105  48.8%
+
+So the chip is built on what held. A spike on a man not on a favourite
+reads its own pool, the BET and LEAN picks on such men by side, and
+takes their colour at 50 picks or more. A spike on a favourite's man
+carries no colour and says so, with its count, naming the favourite's
+chip as the read: its record swings by the game and has no steady
+colour to show. The favourite's chip is unchanged, read off every graded
+pick, which is where its evidence lies. The spike's two tiles keep every
+band's count and carry under them what the chip reads, off a favourite
+and on one, and the card's line the same, so a tile and a chip still
+read the same numbers. Shown, not scored.
+
+Corrected with it: the day's advice that an over under the red chip is a
+pass "with or without a spike". In the bet bands the favourite's over
+without a spike went 72-54 on these nights; the market's fact stands,
+and the chip is a caution on the price, not a rule on the pick.
+
+The harness seeds forty wins in sixty on spike men off a favourite,
+twenty in sixty on a favourite's spike men, and thirty no-edge losses
+that must stay out of the chip's pool, and reads the three cards' chips,
+the filter both ways, the tile's line and the card's.

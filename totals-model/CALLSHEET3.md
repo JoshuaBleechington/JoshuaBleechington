@@ -2919,3 +2919,90 @@ rest of the table's view. Shown, not scored.
 The harness, on the seeded night: the column's header, Embiid's green
 +0.5 with its title and Maxey's blank, the four filters' lists, and the
 sort with Embiid first.
+
+## One bet a man a night, and the favourite's over measured as a rule, 10 Nov 2026
+
+On 9 Nov the BET band was five overs in one game, four of them Stephen
+Curry's. The Warriors won 138-87, Curry played 21 minutes of a projected
+36 and all four lost; the record counted 1-4. The night before, Darius
+Acuff's five overs had counted as five wins. The user took both
+suggestions made in the grade and asked for thorough testing.
+
+### One bet a man
+
+A man's BETs on a date land or miss together. The best list opens with a
+note when the date's BETs sit on fewer men than cards, or on several men
+in one game ("The 4 BETs on this date sit on 2 men in 1 game: a man's
+BETs land or miss together, so that is 2 bets, not 4; and one game
+carries them all, so a blowout or a slow night hits every one."). The
+card with the most edge among a man's BETs says it is the one; his
+others say they are the same bet as that one; the panel carries the same
+line. The record keeps a tile beside the BET band, one bet a man a
+night, the man's BET with the most edge standing for the night, with the
+over on a favourite's man counted on its own line, and the card's tile
+carries the same count. Counted that way the band since 5 Nov was 11-5
+on 16 man-nights where the cards said 21-11.
+
+### The favourite's over, measured two ways and not scored
+
+The grade had said the leak sat with clubs favoured by five to eight.
+Measured on the 11,528 graded props of the twenty nights to 9 Nov, each
+replayed under the current blend (the market the spine, the model a
+fifth, no shade; the replay reproduces the bands as carded since 5 Nov
+on 2,850 of 2,852):
+
+The market's own fact, whatever side the sheet took. The over lands
+under the book's devigged chance nearly everywhere, and by more on a
+favourite's man:
+
+    favoured by 5 to 8    1,397 props  42.7% against 49.5%  -6.8 (5.1 SE)
+    favoured by 8 to 11   1,064 props  45.9% against 49.4%  -3.5 (2.3 SE)
+    favoured by 11+         762 props  44.0% against 49.6%  -5.6 (3.1 SE)
+    favoured by 5+        3,223 props                       -5.4, both halves
+    within 2              1,321 props  46.8% against 49.6%  -2.8
+    dog by 5 to 8         1,229 props  50.9% against 49.6%  +1.4
+
+One point of spread at a time the gap runs -1.1, -6.4, -10.2, -10.5,
+-0.7, +1.9, +2.5, -3.7, -7.7, -11.0 from five to fourteen: the bucket of
+five to eight was noise. The effect is the favourite, not a size of
+favourite.
+
+As a hold on the BET band (an OVER on a man favoured by five or more is
+kept out). A hold only removes picks, so it helps by what the held picks
+lose:
+
+    held, by cards              11-16  -6.5u  lose in 88% of 2,000 draws
+    held, one a man a night      8-7   -0.0u
+    held, 5 to 11, by cards      5-11  -6.6u  91%; one a man a night 4-6
+    holds chosen from the nights before alone (the market's gap at
+    2 SE or 1 SE, or the sheet's own overs): 5-4, 6-8, 6-7 by cards,
+    3-2, 4-3, 4-2 one a man a night
+
+By cards the held picks lose; counted as independent bets they break
+even, on fifteen man-nights; and the rules that choose what to hold out
+of sample do not help.
+
+As a correction on the book's chance (a share of the gap measured on the
+nights before comes off the book's over chance for a favourite's man,
+the sheet re-read):
+
+    half the gap, 5+     BET +1.2u by cards (55% of 4,000 draws),
+                         +2.2u one a man a night (60%); 89 unders
+                         added at 47-42, 20 overs removed at 7-13
+    the whole gap, 5+    BET +21.6u by cards (81%), +9.4u one a man
+                         a night (77%), all of it in the second half;
+                         the BET band 593 cards from 284, 87% unders,
+                         the under on three favourites' men in four
+    half the gap, 8+     nothing; 2+ worse (25%, 8%)
+
+The whole gap is the over's shade again on a quarter of the board, with
+a gain inside the noise. Neither rule is scored. The red chip stays a
+tell on the card, read live off the record; the one-a-man tile carries
+the over on a favourite's man on its own line, so the question keeps an
+honest sample; and the under on a favourite's man, 943-691 at 57.7% on
+every band replayed, stays the green chip it was.
+
+The harness seeds a graded night with Curry's three BETs, the one with
+the most edge a loss, and a Pelican's under, and a night on the tab with
+his three again and Podziemski's, and reads the note, the four cards'
+lines, the panel's, the tile and the card's line.

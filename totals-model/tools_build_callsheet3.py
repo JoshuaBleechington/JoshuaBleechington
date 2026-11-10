@@ -27,7 +27,7 @@ import sys
 ROOT = pathlib.Path(__file__).parent / "web"
 OPEN = "  /* ===== ENGINE BLOCK."
 CLOSE = "  /* ===== END ENGINE BLOCK ===== */"
-STAMP = "2026-11-09"   # bumped by hand when 3.0's own sources change (the harness checks it)
+STAMP = "2026-11-10"   # bumped by hand when 3.0's own sources change (the harness checks it)
 
 
 def engine_block() -> str:

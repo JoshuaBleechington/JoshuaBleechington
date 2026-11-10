@@ -491,7 +491,7 @@ const CHECKS = ["dome","playoff"];
   chk(/None of the 1 props has a projection\. The run read 0 games of 2026-27 and 0 of 2025-26 in C:\\Users\\J\\Downloads\. Last season's ledger, nba-ledger-202526\.json, was not read\. With a game or two this season nobody has the sixty minutes a projection needs, so every prop reads no history\. Put that file back in the slate folder beside slate\.py, with this season's ledger beside it, run the props again/.test(propsT.noneMsg),
       'props: a file that projects nothing says last season\'s ledger was not read, names the folder the run saw, and says what to put back', propsT.noneMsg.slice(0, 500));
   chk(/Nothing graded yet/.test(propsT.tabEmpty0) && /^Every prop with a side 1-1 says 54\.6% · does 50\.0%/i.test(propsT.tabCalib) && /BET band 1-0 says 56\.0% · does 100\.0%/i.test(propsT.tabCalib)
-      && /^PROPS-TAB:Every prop with a side\|BET band\|No edge: the book's own side(\|Same-game pairs, at the parlay price)?\|His last three against the pick \(shown, not scored\)$/.test(propsT.tabBlocks[0])   // the form tile off Trae Young's block (7 Nov 2026): his last three ran 1 of 3 over, against his OVER && propsT.tabBlocks[1] === 'PROPS-MK:points|rebounds|assists' && propsT.tabBlocks[2] === 'PROPS-EDGE:3 to 6 points|no edge'
+      && /^PROPS-TAB:Every prop with a side\|BET band\|BET band, one bet a man a night\|No edge: the book's own side(\|Same-game pairs, at the parlay price)?\|His last three against the pick \(shown, not scored\)$/.test(propsT.tabBlocks[0])   // the one-a-man tile beside the band (10 Nov 2026)   // the form tile off Trae Young's block (7 Nov 2026): his last three ran 1 of 3 over, against his OVER && propsT.tabBlocks[1] === 'PROPS-MK:points|rebounds|assists' && propsT.tabBlocks[2] === 'PROPS-EDGE:3 to 6 points|no edge'
       && propsT.tabBlocks[3] === 'PROPS-CENTRE:Called at the mean, to 21 Oct' && propsT.nights.length === 1 && /^Oct 21 1-1 1 void 54\.6% 50\.0% [-−]0\.1u 1-0 \+0\.9u —$/.test(propsT.nights[0])
       && propsT.ladder.length === 2 && /^50 to 55% 1 53\.2% 0\.0% 50\.0 [-−]1\.0u$/.test(propsT.ladder[0]) && /^55 to 60% 1 56\.0% 100\.0% 50\.0 \+0\.9u$/.test(propsT.ladder[1]) && /Called at the median/.test(propsT.tabCalib) === false,
       'props: the tab\'s own Is it working block: the bands as tiles, by market, by the edge claimed, the centre the chance was read around, night by night and says against does by the chance claimed; empty until something grades',
@@ -1062,6 +1062,9 @@ const CHECKS = ["dome","playoff"];
 
   // ---- 27 Oct 2026: the fives and the matchup on the prop -- both clubs' starting fives on the panel with the man marked; a Matchup button on the
   //      panel and the cards, off until the NBA card has the game, then opening it into the form ----
+  // an empty card in memory first (10 Nov 2026): earlier blocks add the example game dated 2026-11-10, and on that day the props example,
+  // dated today, found the row; removing the stored card and loading the page again leaves none whatever the date
+  await pg.evaluate(async () => { await smStore.removeItem('callsheet3.card.v1'); }); await reloaded(); await pg.evaluate(() => smStore.ready);
   const goT = await pg.evaluate(async () => {
     const wait = () => new Promise(r => setTimeout(r, 90));
     const txt = e => (e ? e.innerText : '').replace(/\s+/g, ' ').trim();
@@ -1706,6 +1709,50 @@ const CHECKS = ["dome","playoff"];
       && /^the books the books' consensus on the pick's side$/i.test(mktT.selLabel.replace(/\s+all.*$/i, '').replace(/^the books\s+/i, 'the books ').slice(0, 9) + mktT.selLabel.slice(9).replace(/^.*?(the books' consensus on the pick's side).*$/i, ' $1')) || /the books/i.test(mktT.selLabel)
       && /^The market on the games in the simulation's place from 5 Nov 2026/i.test(mktT.subhead),
       'props: the prop\'s panel carries the market in the simulation\'s old place (the books with the carded line\'s gap, the consensus lever, the club\'s implied points, the expected margin, the blowout) and no simulation block, the levers list names the consensus, the table\'s column shows the consensus line green when it sits the pick\'s way, the filter keeps the props the consensus sides with (or against), and the record keeps the consensus\'s own line', JSON.stringify({ head: mktT.head, tiles: mktT.tiles, levers: mktT.levers, cells: mktT.cells, yes: mktT.yes, no: mktT.no, record: mktT.record.slice(0, 700), sel: mktT.selLabel, sub: mktT.subhead.slice(0, 80) }));
+
+  // ---- 10 Nov 2026: one bet a man a night -- the note above the best list, the line on a man's several BET cards and on the panel, the record's tile and its line on the card's tile ----
+  await pg.evaluate(async () => {
+    await smStore.ready;
+    const row = (id, gdate, pid, name, team, mk, side, line, edge, chance, result) => ({ id, gdate, game: 'Pelicans @ Warriors', away: 'Pelicans', home: 'Warriors', aab: 'NOP', hab: 'GSW', pid: String(pid), name, team, opp: team === 'GSW' ? 'NOP' : 'GSW', athome: team === 'GSW', pos: 'G', mk, line, op: -115, up: -115, book: 'betmgm',
+      books: { betmgm: [line, -115, -115] }, proj: line + (side === 'OVER' ? 6 : -6), sd: 8, pm: side === 'OVER' ? 0.8 : 0.2, pb: 0.5, p: side === 'OVER' ? chance : 1 - chance, push: 0, side, chance, price: -115, need: 0.535, edge, band: 'BET', mins: 34, rate36: 30, base: 28, med: line + (side === 'OVER' ? 5.5 : -5.5), usg: 30, sdf: 0.9, starter: true, start_src: "RotoWire's expected five",
+      total: 232.5, spread: -9.5, why: ['30.0 per 36 this season'], log: [], parts: [{ k: 'pace', t: 'Pace', eff: 1.0, i: 0 }], mkt: null, cons: null,
+      actual: result === 'win' ? (side === 'UNDER' ? line - 3 : line + 3) : result === 'loss' ? (side === 'UNDER' ? line + 3 : line - 3) : null, amin: result ? 30 : null, result });
+    const rows = [
+      // a graded night: Curry's three BETs (the one with the most edge lost, one of the others won) and one BET on a Pelican, the dog
+      row(1, '2026-11-08', 201, 'Stephen Curry', 'GSW', 'pra', 'OVER', 37.5, 0.047, 0.582, 'loss'), row(2, '2026-11-08', 201, 'Stephen Curry', 'GSW', 'pa', 'OVER', 33.5, 0.045, 0.58, 'loss'), row(3, '2026-11-08', 201, 'Stephen Curry', 'GSW', 'pts', 'OVER', 28.5, 0.038, 0.573, 'win'),
+      row(4, '2026-11-08', 202, 'Dejounte Murray', 'NOP', 'ast', 'UNDER', 7.5, 0.04, 0.575, 'win'),
+      // the night on the tab: Curry's three BETs again and one on Podziemski, all in one game
+      row(5, '2026-11-09', 201, 'Stephen Curry', 'GSW', 'pra', 'OVER', 37.5, 0.047, 0.582, null), row(6, '2026-11-09', 201, 'Stephen Curry', 'GSW', 'pa', 'OVER', 33.5, 0.045, 0.58, null), row(7, '2026-11-09', 201, 'Stephen Curry', 'GSW', 'pts', 'OVER', 28.5, 0.038, 0.573, null),
+      row(8, '2026-11-09', 203, 'Brandin Podziemski', 'GSW', 'pra', 'OVER', 24.5, 0.036, 0.571, null)];
+    await smStore.setItem('callsheet3.props.v1', JSON.stringify(rows));
+  });
+  await reloaded();
+  const oneT = await pg.evaluate(async () => {
+    const wait = () => new Promise(r => setTimeout(r, 90));
+    const txt = e => (e ? e.innerText : '').replace(/\s+/g, ' ').trim();
+    await smStore.ready;
+    document.getElementById('propsReset').click(); await wait();
+    document.getElementById('m-props').click(); await wait();
+    const best = document.getElementById('propsBest');
+    const note = txt(best.querySelector('.pk-note')), noteAt = [...best.children].findIndex(e => e.classList.contains('pk-note'));
+    const cards = [...best.querySelectorAll('.pk')].map(e => txt(e.querySelector('.n2')) + '→' + txt(e.querySelector('.n5.onebet')));
+    const card2 = [...best.querySelectorAll('.pk')].find(e => /Stephen Curry OVER 33\.5/.test(e.textContent)); card2.click(); await wait();
+    const panel = txt(document.querySelector('#propDetail .pd-onebet'));
+    document.getElementById('propDetailClose').click(); await wait();
+    const record = txt(document.getElementById('propsCalib'));
+    const cardTile = txt(document.querySelector('#calibBox .calib[data-sport="PROPS"] .sides'));
+    document.getElementById('propsReset').click(); await wait(); document.getElementById('m-nba').click(); await wait();
+    await smStore.removeItem('callsheet3.props.v1');
+    return { note, noteAt, cards, panel, record, cardTile };
+  });
+  chk(oneT.note === "The 4 BETs on this date sit on 2 men in 1 game: a man's BETs land or miss together, so that is 2 bets, not 4; and one game carries them all, so a blowout or a slow night hits every one." && oneT.noteAt === 0
+      && oneT.cards.length === 4 && oneT.cards[0] === 'Stephen Curry OVER 37.5 pts + reb + ast→One bet, not 3: he holds 3 BETs on this date (pts + reb + ast, pts + ast, points) and they land or miss together. This is the one with the most edge.'
+      && oneT.cards[1] === 'Stephen Curry OVER 33.5 pts + ast→The same bet as his OVER 37.5 pts + reb + ast: one outcome, so take one of his 3 BETs, not all 3.' && oneT.cards[2] === 'Stephen Curry OVER 28.5 points→The same bet as his OVER 37.5 pts + reb + ast: one outcome, so take one of his 3 BETs, not all 3.'
+      && oneT.cards[3] === 'Brandin Podziemski OVER 24.5 pts + reb + ast→' && oneT.panel === 'The same bet as his OVER 37.5 pts + reb + ast: one outcome, so take one of his 3 BETs, not all 3.',
+      'props: one bet a man (10 Nov 2026): the best list opens with how many men and games the date\'s BETs sit on, the card with the most edge says it is the one of his three, his other two say they are the same bet, a man with one BET carries no line, and the panel says the same', JSON.stringify({ note: oneT.note, at: oneT.noteAt, cards: oneT.cards, panel: oneT.panel }));
+  chk(/BET band 2-2 says 5\d\.\d% · does 50\.0%/i.test(oneT.record) && /BET band, one bet a man a night 1-1 says 5\d\.\d% · does 50\.0% \(±35\.4\) · [-−]0\.13u the over on a favourite's man 0-1 [-−]1\.0u · every other 1-0 \+0\.9u/i.test(oneT.record)
+      && /BET, one a man a night 1-1 [-−]0\.1u \(the over on a favourite's man 0-1\)/.test(oneT.cardTile),
+      'props: the record reads the BET band one bet a man a night beside the count by cards (10 Nov 2026): Curry\'s three BETs on the graded night count once, as the one with the most edge, which lost, the Pelican\'s under won, and the over on a favourite\'s man keeps its own count on the tile and on the card\'s line', JSON.stringify({ record: oneT.record.replace(/^[\s\S]*?(BET band)/i, '$1').slice(0, 420), tile: oneT.cardTile.slice(0, 500) }));
 
   // ---- 4 Nov 2026: the crowd on Kalshi -- the exchange's game-winner prices on the row, the card beside the book and Pinnacle, the better price after the fee on the board, the sharp side against the crowd on the moneyline tile ----
   const kalT = await pg.evaluate(async () => {

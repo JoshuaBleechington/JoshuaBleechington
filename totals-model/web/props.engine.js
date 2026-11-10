@@ -190,6 +190,31 @@
   /* why a BET (6 Nov 2026, the user: "for the BET band cards, make that more visible and why"): one line in words from the row's
      own numbers, the chance against what the price needs, the model's and the book's say in the blend, the consensus, the top lever */
   var PROPS_EDGE_TIER = function (edge) { var e = 100 * edge; return e >= 8 ? "8 points of edge and up" : e >= 5 ? "5 to 8 points of edge" : "3 to 5 points of edge"; };
+  /* one bet a man (10 Nov 2026, the user took the suggestion the morning after Curry's four BETs lost as one in a 51-point win):
+     a man's BETs on a date land or miss together, so the card with the most edge says it is the one and his others say they are
+     the same bet; the list opens with how many men and games the date's BETs really sit on; and the record reads the band one
+     bet a man a night beside the count by cards */
+  function propsBetsOfMan(r) {
+    return propsSource().filter(function (x) { return (x.gdate || "") === (r.gdate || "") && String(x.pid) === String(r.pid) && propHas(x) && x.band === "BET" && x.edge > 0; })
+                        .sort(function (a, b) { return (b.edge - a.edge) || (String(a.id) < String(b.id) ? -1 : 1); });
+  }
+  function propOneBetLine(r) {
+    if (!propHas(r) || r.band !== "BET") return "";
+    var mine = propsBetsOfMan(r); if (mine.length < 2) return "";
+    var top = mine[0];
+    return String(top.id) === String(r.id)
+      ? "One bet, not " + mine.length + ": he holds " + mine.length + " BETs on this date (" + esc(mine.map(function (x) { return PROPS_LABEL[x.mk] || x.mk; }).join(", ")) + ") and they land or miss together. This is the one with the most edge."
+      : "The same bet as his " + esc(top.side) + " " + esc(String(top.line)) + " " + esc(PROPS_LABEL[top.mk] || top.mk) + ": one outcome, so take one of his " + mine.length + " BETs, " + (mine.length === 2 ? "not both" : "not all " + mine.length) + ".";
+  }
+  function propsBetsNote(rows) {
+    var bets = rows.filter(function (r) { return propHas(r) && r.band === "BET" && r.edge > 0; }); if (bets.length < 2) return "";
+    var men = {}, games = {}; bets.forEach(function (r) { men[r.pid] = 1; games[r.game] = 1; });
+    var n = bets.length, m = Object.keys(men).length, g = Object.keys(games).length;
+    if (n === m && !(g === 1 && m > 1)) return "";
+    return "The " + n + " BETs on this date sit on " + m + " " + (m === 1 ? "man" : "men") + " in " + g + " game" + (g === 1 ? "" : "s") +
+           (n > m ? ": a man's BETs land or miss together, so that is " + m + " bet" + (m === 1 ? "" : "s") + ", not " + n : "") +
+           (g === 1 && m > 1 ? (n > m ? "; and " : ": ") + "one game carries them all, so a blowout or a slow night hits every one" : "") + ".";
+  }
   function propBetWhy(r) {
     if (!propHas(r) || r.band !== "BET") return "";
     var bits = [(100 * r.chance).toFixed(1) + "% clears the " + (100 * r.need).toFixed(1) + "% that " + sgn(r.price, 0) + " needs by " + (100 * r.edge).toFixed(1) + " points"];
@@ -837,6 +862,24 @@
         if (r.result === "win") { s.w++; s.units += dec(r.price) - 1; } else { s.l++; s.units -= 1; }
       });
     });
+    /* one bet a man a night (10 Nov 2026): a man's BETs on a night land or miss together, so the band is also read with one bet
+       a man a night, the one with the most edge; and of those the over on a favourite's man on its own, the slice the cards
+       flag red, so the question keeps its honest sample */
+    var byBetOne = mk(), byBetOneFav = mk(), byBetOneRest = mk(), oneKey = {};
+    graded.forEach(function (r) {
+      if (r.band !== "BET" || !propHas(r)) return;
+      var k = (r.gdate || "?") + "|" + r.pid;
+      if (!oneKey[k] || +r.edge > +oneKey[k].edge) oneKey[k] = r;
+    });
+    Object.keys(oneKey).forEach(function (k) {
+      var r = oneKey[k], fv1 = propFav(r), favOver = r.side === "OVER" && fv1 !== null && fv1 >= 5;
+      [byBetOne, favOver ? byBetOneFav : byBetOneRest].forEach(function (s) {
+        if (r.result === "void") { s.v++; return; }
+        if (r.result === "push") { s.p++; return; }
+        s.n++; s.says += r.chance;
+        if (r.result === "win") { s.w++; s.units += dec(r.price) - 1; } else { s.l++; s.units -= 1; }
+      });
+    });
     var rec = function (s) { return s.w + "-" + s.l + (s.p ? "-" + s.p : ""); };
     var says = function (s) { return s.n ? (s.says / s.n * 100).toFixed(1) + "%" : "—"; };
     var does = function (s) { return s.n ? (s.w / s.n * 100).toFixed(1) + "%" : "—"; };
@@ -856,6 +899,7 @@
     var parts = [];
     ["OVER", "UNDER"].forEach(function (sd) { if (bySide[sd]) parts.push(sd.toLowerCase() + " " + rec(bySide[sd])); });
     ["BET", "LEAN", "no edge"].forEach(function (b) { if (byBand[b]) parts.push(b + " " + rec(byBand[b]) + (byBand[b].n ? " " + sgn(byBand[b].units, 1) + "u" : "")); });
+    if (byBetOne.n || byBetOne.p) parts.push("BET, one a man a night " + rec(byBetOne) + (byBetOne.n ? " " + sgn(byBetOne.units, 1) + "u" : "") + " (the over on a favourite's man " + rec(byBetOneFav) + ")");
     if (byTake.n || byTake.p) parts.push("taken " + rec(byTake) + (byTake.n ? " " + sgn(byTake.units, 1) + "u" : ""));
     if (byPair.n || byPair.p) parts.push("same-game pairs " + rec(byPair) + (byPair.n ? " " + sgn(byPair.units, 1) + "u" : ""));
     if (byPairTake.n || byPairTake.p) parts.push("pairs taken " + rec(byPairTake) + (byPairTake.n ? " " + sgn(byPairTake.units, 1) + "u" : ""));
@@ -871,7 +915,8 @@
                   'From 2 Nov the over\'s shade is by market, measured on the 6,216 graded props of the first thirteen nights (1.5 points on rebounds, 4 on points, assists and threes, 5.5 on the combinations), in full at a coin-flip price and fading past it, and the bands follow it: replayed on those nights the BET and LEAN unders read 1,345-1,072 (+91 units) where the sheet as it stood had 477-414 (−9) and had left the money in no edge; every over at the carded price went 2,832-3,384 (−875). ' +
                   'From 5 Nov the shade is OFF and the model has a fifth of the say instead of a ninth: with the shade in, the book\'s price less the shade was the pick and the sheet called the under on four props in five from 30 Oct (on 4 Nov every BET and LEAN an under, 257-272, −50 units; the shade\'s BET band 83-85 over its life). Replayed on the 8,676 graded props of the fifteen nights to 4 Nov, the new blend\'s BET band read 146-106 (+10.6 units, 52-34 then 94-72 in the two halves, eight nights of fifteen up; 1,000 bootstrap draws of the nights put it above water 71% of the time) where a ninth with no shade left two BETs a night and the old 2.0 read 53% and −42; the LEAN band read 51.6% and is not an edge. The nights before carry their own weights; the record decides. ' +
                   'The same day three more levers were measured walk-forward, each fitted on the nights before and scored on the next, as pushes on the projection and as corrections on the book\'s chance, and none helped the bet: recent form (his last three against the line), the favourite\'s script (a club favoured by 5 to 10 lands over 43% against the book\'s 49%) and a shrink of the last five games\' minutes toward the season (a minutes spike reverses). Recent form rides on the cards and the panel as a line of its own, shown, not scored, with its record here; the other two are on record in CALLSHEET3.md. ' +
-                  'On 7 Nov the record\'s own lines were read walk-forward as tells for the cards, each night reading the nights before it: a BET or LEAN pick with a green tell and no red did 52.3% against the band\'s 51.6% on 1,414 picks, and in the BET band 46% against 49%, because his last three flips from week to week; the favourite\'s over stayed at 42% after reading red on 232 picks and the minutes spike stayed green after reading green (59% on the under over 180 picks, 70% on the over over 33). Those two ride on the best cards as chips coloured live off these tiles on the pick\'s side, green where the slice has done at least what it claimed on 50 picks or more; the form stays a line.';
+                  'On 7 Nov the record\'s own lines were read walk-forward as tells for the cards, each night reading the nights before it: a BET or LEAN pick with a green tell and no red did 52.3% against the band\'s 51.6% on 1,414 picks, and in the BET band 46% against 49%, because his last three flips from week to week; the favourite\'s over stayed at 42% after reading red on 232 picks and the minutes spike stayed green after reading green (59% on the under over 180 picks, 70% on the over over 33). Those two ride on the best cards as chips coloured live off these tiles on the pick\'s side, green where the slice has done at least what it claimed on 50 picks or more; the form stays a line. ' +
+                  'On 10 Nov, the morning after Curry\'s four BETs lost as one in a 51-point win, the BET band is also read one bet a man a night (a man\'s BETs land or miss together, and the cards say so), and the favourite\'s over was measured as a rule two ways on the 11,528 graded props of twenty nights replayed under the current blend. Held out of the BET band, the overs on men favoured by five or more lost by cards (11-16) and broke even one a man a night (8-7), and holds chosen from the nights before alone did not help. As a correction on the book\'s chance (the over on such a man lands 5.4 points under the book\'s own number on 3,223 props, in both halves), half the gap changed nothing, and the whole gap put the BET band at three times its size and 87% unders for a gain inside the noise (above zero in 77% of 4,000 draws of the nights). Neither is scored; the red chip stays a tell and the one-a-man tile carries the favourite\'s over on its own line.';
     if (!full) {
       var h = '<div class="subhead" data-sport="PROPS">NBA player props <span class="tag">' + graded.length + ' graded · the slate\'s call as made, at the price posted · says is the blended chance</span></div>';
       h += '<div class="calib" data-sport="PROPS">' + tile("Every prop with a side", all, parts) + markets + '</div>';
@@ -880,7 +925,10 @@
     }
     var dates = Object.keys(byDate).sort();
     var h2 = '<div class="calib" data-sport="PROPS-TAB">' + tile("Every prop with a side", all, parts.slice(0, 2));
-    ["BET", "LEAN", "no edge"].forEach(function (b) { if (byBand[b]) h2 += tile(b === "no edge" ? "No edge: the book's own side" : b + " band", byBand[b], []); });
+    ["BET", "LEAN", "no edge"].forEach(function (b) {
+      if (byBand[b]) h2 += tile(b === "no edge" ? "No edge: the book's own side" : b + " band", byBand[b], []);
+      if (b === "BET" && (byBetOne.n || byBetOne.p)) h2 += tile("BET band, one bet a man a night", byBetOne, ["the over on a favourite's man " + rec(byBetOneFav) + (byBetOneFav.n ? " " + sgn(byBetOneFav.units, 1) + "u" : "") + " · every other " + rec(byBetOneRest) + (byBetOneRest.n ? " " + sgn(byBetOneRest.units, 1) + "u" : "")]);
+    });
     if (byTake.n || byTake.p) h2 += tile("Taken: the props you marked", byTake, []);
     if (byPair.n || byPair.p) h2 += tile("Same-game pairs, at the parlay price", byPair, []);
     if (byCons.toward.n || byCons.toward.p) h2 += tile("The books' consensus with the pick, half a point or more", byCons.toward, []);
@@ -1047,6 +1095,7 @@
     if (r.trim) h += '<p class="note trimmed">The detail on this prop (the reasons, the last games, the levers, the simulation, the fives and what happened) was <b>trimmed from the save on ' + esc(gameDate(r.trim)) + '</b> to keep the backup small: the last seven nights on the tab stay whole, older nights keep the call, the price, the chance, the band, the result and every book\'s line.</p>';
     if (has) {
       if (propBetWhy(r)) h += '<p class="note pd-betwhy">' + propBetWhy(r) + '</p>';
+      if (propOneBetLine(r)) h += '<p class="note pd-onebet">' + propOneBetLine(r) + '</p>';
       h += '<div class="pd-tiles">' +
         tile("Chance", (r.chance * 100).toFixed(1) + "%", "blended: the over is " + (r.pm * 100).toFixed(1) + "% by the model, " + (r.pb * 100).toFixed(1) + "% by the book") +
         tile("Price", sgn(r.price, 0), "needs " + (r.need * 100).toFixed(1) + "%") +
@@ -1194,8 +1243,8 @@
     var picks = rows.filter(function (r) { return propHas(r) && r.edge > 0 && propTellsFilter(r, tellMode); }).sort(function (a, b) { return b.edge - a.edge; });
     /* the BET band in front (6 Nov 2026, the user: "for the BET band cards, make that more visible and why"): a BET card carries
        a badge, its edge tier and a line that says why in words; the LEANs sit under a divider that says what the record says of them */
-    var leanDivider = false;
-    $("propsBest").innerHTML = picks.length ? picks.slice(0, 12).map(function (r, i) {
+    var leanDivider = false, betsNote = propsBetsNote(rows);   // how many men and games the date's BETs really sit on (10 Nov 2026)
+    $("propsBest").innerHTML = picks.length ? (betsNote ? '<div class="pk-note">' + esc(betsNote) + '</div>' : '') + picks.slice(0, 12).map(function (r, i) {
       var tl = propsLeverTally(r), isBet = r.band === "BET", div = '';
       if (!isBet && !leanDivider) { leanDivider = true; div = '<div class="pk-divider">' + (i === 0 ? (tellMode ? 'No BET among these. ' : 'No BET on this date. ') : '') + 'LEANs below: information, not a measured edge (the band says 55% and does 52% over 1,300 graded picks)' + (i === 0 ? '.' : '; the BETs above are the bets.') + '</div>'; }
       var clv = propClv(r);
@@ -1204,6 +1253,7 @@
         '<div class="n3">' + (r.chance * 100).toFixed(1) + '% · ' + sgn(r.price, 0) + ' needs ' + (r.need * 100).toFixed(1) + '% · edge ' + sgn(r.edge * 100, 1) + resChip(r) + '</div>' +
         '<div class="n4">' + esc(r.game) + ' · projected ' + r.proj + ' (±' + r.sd + ') · ' + esc(r.book) + '</div>' +
         (propBetWhy(r) ? '<div class="n5 betwhy">' + propBetWhy(r) + '</div>' : '') +
+        (propOneBetLine(r) ? '<div class="n5 onebet">' + propOneBetLine(r) + '</div>' : '') +
         (propsLeversLine(r) ? '<div class="n5">Moves it: ' + propsLeversLine(r) + '</div>' : '') +
         (propTellsLine(r) ? '<div class="n5 tells">' + propTellsLine(r) + '</div>' : '') +
         (propShopLine(r) ? '<div class="n5 shopline' + (propShopAgrees(r) === true ? ' pos' : propShopAgrees(r) === false ? ' neg' : '') + '">' + propShopLine(r) + '</div>' :

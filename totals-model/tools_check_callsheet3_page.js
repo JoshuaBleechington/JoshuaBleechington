@@ -1230,18 +1230,20 @@ const CHECKS = ["dome","playoff"];
     const closed = document.getElementById('phoneDlg').hidden && !document.body.classList.contains('noscroll');
     return { hidden0, open, link, note: note.replace(/\s+/g, ' ').trim(), dim, n, mods, closed };
   });
-  let decoded = null;
-  try {
-    const jsQR = require('./tools_vendor/jsQR.js');
-    const scale = 4, q = 4, size = (phoneT.n + 2 * q) * scale, data = new Uint8ClampedArray(size * size * 4);
-    for (let y = 0; y < size; y++) for (let x = 0; x < size; x++) {
-      const r = Math.floor(y / scale) - q, c = Math.floor(x / scale) - q, dark = r >= 0 && c >= 0 && r < phoneT.n && c < phoneT.n && phoneT.mods[r][c];
-      const v = dark ? 0 : 255, i = (y * size + x) * 4; data[i] = v; data[i + 1] = v; data[i + 2] = v; data[i + 3] = 255;
-    }
-    const res = jsQR(data, size, size); decoded = res ? res.data : null;
-  } catch (e) { decoded = 'decoder error: ' + e.message; }
+  const qrRead = (n, mods) => {   // the drawn modules through an independent decoder (jsQR, tools_vendor): what a phone's camera reads
+    try {
+      const jsQR = require('./tools_vendor/jsQR.js');
+      const scale = 4, q = 4, size = (n + 2 * q) * scale, data = new Uint8ClampedArray(size * size * 4);
+      for (let y = 0; y < size; y++) for (let x = 0; x < size; x++) {
+        const r = Math.floor(y / scale) - q, c = Math.floor(x / scale) - q, dark = r >= 0 && c >= 0 && r < n && c < n && mods[r][c];
+        const v = dark ? 0 : 255, i = (y * size + x) * 4; data[i] = v; data[i + 1] = v; data[i + 2] = v; data[i + 3] = 255;
+      }
+      const res = jsQR(data, size, size); return res ? res.data : null;
+    } catch (e) { return 'decoder error: ' + e.message; }
+  };
+  const decoded = qrRead(phoneT.n, phoneT.mods);
   chk(phoneT.hidden0 && phoneT.open && /\/m\.html#z[A-Za-z0-9_-]+$/.test(phoneT.link) && phoneT.n >= 57 && phoneT.n % 4 === 1 && decoded === phoneT.link
-      && /^Point your phone's camera at the code and open the link\. It shows \d+ lines: the bets you are taking, the parlay four, the best straight bets, the likeliest sides, the best props and the simulation's calls, view only\./.test(phoneT.note)
+      && /^Point your phone's camera at the code and open the link\. It shows \d+ lines: the bets you are taking, the parlay four, the best straight bets, the likeliest sides, the best props, the night's tickets and the simulation's calls, view only\./.test(phoneT.note)
       && /nothing is uploaded/.test(phoneT.note) && /signed in to claude\.ai/.test(phoneT.note) && new RegExp(phoneT.n + ' modules a side').test(phoneT.dim) && phoneT.closed,
       'phone: the Phone QR button draws a code whose link carries the night\'s picks deflated into the hash of m.html, an independent decoder reads the very link back off the drawn modules, the note says what is in it and how it works, and Escape closes it',
       JSON.stringify({ hidden0: phoneT.hidden0, open: phoneT.open, link: phoneT.link.slice(0, 90), n: phoneT.n, decoded: decoded === phoneT.link ? 'matches' : String(decoded).slice(0, 80), note: phoneT.note.slice(0, 160), dim: phoneT.dim, closed: phoneT.closed }));
@@ -2020,6 +2022,225 @@ const CHECKS = ["dome","playoff"];
       && tkA.tickets[2] >= 20 && tkA.tickets[3] >= 10 && tkA.empties >= 5 && tkB.tickets[2] >= 60 && tkB.tickets[3] >= 60 && tkB.sizes.slice().sort((a, b) => b - a)[0] >= 1000,
       'the tickets are the best ones (11 Nov 2026): on fourteen ordinary random nights and six busy ones, every two-leg and three-leg ticket the page lists, either side, the overs and the unders, is a valid ticket worth exactly what the best one left is worth by brute force over every pair and three at every app, a man in one ticket, two legs never on one game, and a list ends only when nothing valid is left or at six',
       JSON.stringify({ ordinary: tkTool.report(tkA), busy: tkTool.report(tkB), fails: tkA.fails.concat(tkB.fails).slice(0, 6) }));
+
+  // ---- 11 Nov 2026: the phone sheet through the page's own store on claude.ai (the user: "I saved the log for today for what I am betting and then took the
+  //      picture with my phone and it brings up the model but nothing in it"; then: "what if I want to share the QR or have someone else see it too without
+  //      changing" anything). On claude.ai the page is private and framed by the viewer: the code's link to m.html lands on the main page with a phone's empty
+  //      storage. So where the viewer gives the page a store, the button saves the night's sheet there, the code carries the page's address, a phone-width or
+  //      bare view opens the sheet by itself, and someone the page is shared with gets the sheet and nothing else. The viewer here is a stand-in:
+  //      window.claude.use("db" | "user") over an in-memory store, every call logged, set() refusing on demand with the store's own codes ----
+  const claudeMock = (o) => {
+    o = o || {};
+    const M = window.__mock = { docs: JSON.parse(JSON.stringify(o.docs || {})), calls: [], fail: (o.fail || []).slice(), subs: [] };
+    const has = (path) => Object.prototype.hasOwnProperty.call(M.docs, path);
+    const snap = (path) => ({ id: path.split('/').pop(), exists: has(path), data: () => (has(path) ? Object.freeze(JSON.parse(JSON.stringify(M.docs[path]))) : undefined), metadata: { fromCache: false, hasPendingWrites: false } });
+    const put = (path, body) => { M.docs[path] = JSON.parse(JSON.stringify(body)); M.subs.filter(x => x.path === path).forEach(x => setTimeout(() => x.next(snap(path)), 0)); };
+    M.put = put;
+    const db = Object.freeze({
+      doc(path) {
+        if (path.split('/').length % 2) throw new TypeError('a document path has an even number of segments: ' + path);
+        return { id: path.split('/').pop(), path,
+          get() { M.calls.push('get ' + path); return Promise.resolve(snap(path)); },
+          set(data) {
+            M.calls.push('set ' + path);
+            if (M.fail.length) { const code = M.fail.shift(); return Promise.reject({ code, message: 'stand-in ' + code }); }
+            if (!data || typeof data !== 'object' || Array.isArray(data) || JSON.stringify(data) !== JSON.stringify(JSON.parse(JSON.stringify(data)))) return Promise.reject({ code: 'invalid_argument', message: 'the body is not a plain JSON object' });
+            put(path, data); return Promise.resolve();
+          },
+          onSnapshot(next) { M.calls.push('sub ' + path); const x = { path, next }; M.subs.push(x); setTimeout(() => next(snap(path)), 0); return () => { M.subs = M.subs.filter(y => y !== x); }; } };
+      },
+      collection(path) { throw new Error('the page keeps one document, not a collection: ' + path); },
+    });
+    const user = Object.freeze({ isOwner: () => { M.calls.push('isOwner'); return Promise.resolve(!!o.owner); } });
+    window.claude = { use(name) { M.calls.push('use ' + name); return Promise.resolve(name === 'db' ? (o.db === false ? null : db) : name === 'user' ? (o.owner === null ? null : user) : null); } };
+  };
+  const PH_URL = 'https://claude.ai/artifact/TESTtestTEST0123456789';
+  belowFree = true;
+  await pg.evaluate(async () => { await smStore.ready; await smStore.removeItem('callsheet3.props.v1'); });
+  await reloaded();
+  const phS = await pg.evaluate(async ({ src, url }) => {
+    const wait = (ms) => new Promise(r => setTimeout(r, ms || 110));
+    const txt = e => (e ? e.innerText : '').replace(/\s+/g, ' ').trim();
+    await smStore.ready;
+    const copies = []; try { Object.defineProperty(navigator, 'clipboard', { configurable: true, value: { writeText: t => { copies.push(String(t)); return Promise.resolve(); } } }); } catch (e) {}
+    const load = async (doc, name) => { const dt = new DataTransfer(); dt.items.add(new File([JSON.stringify(doc)], name, { type: 'application/json' })); const inp = document.getElementById('slateFile'); inp.files = dt.files; inp.dispatchEvent(new Event('change', { bubbles: true })); await wait(); await wait(); };
+    const G = [['Hawks', 'Magic', 'ATL', 'ORL', -2.5], ['Bulls', 'Bucks', 'CHI', 'MIL', -2.5], ['Heat', 'Jazz', 'MIA', 'UTA', -2.5]];
+    const ov = L => [L + 2, L - 2, L + 3, L - 1, L + 1, L + 2, L + 4, L - 3, L + 1, L + 2], un = L => [L - 2, L + 2, L - 3, L + 1, L - 1, L - 2, L - 4, L + 3, L - 1, L - 2];
+    const up = [{ k: 'pace', t: 'Pace', eff: 0.4, i: 0 }, { k: 'dvp', t: 'Defence v position', eff: 0.6, i: 0 }], dn = [{ k: 'pace', t: 'Pace', eff: -0.4, i: 0 }, { k: 'dvp', t: 'Defence v position', eff: -0.6, i: 0 }];
+    const man = (pid, name, team, gi, mk, side, line, chance, vals, parts) => ({ gi, pid: String(pid), name, team, opp: team === G[gi][2] ? G[gi][3] : G[gi][2], home: team === G[gi][3], pos: 'G', mk, line, op: -110, up: -110, book: 'fanduel',
+      books: { fanduel: [line, -110, -110], draftkings: [line, -115, -115] }, proj: line + (side === 'OVER' ? 2 : -2), sd: 6, pm: side === 'OVER' ? 0.7 : 0.3, pb: 0.5, p: side === 'OVER' ? chance : Math.round((1 - chance) * 10000) / 10000, push: 0, side, chance, price: -110, need: 0.5238,
+      edge: Math.round((chance - 0.5238) * 10000) / 10000, band: 'LEAN', mins: 32, rate36: 20, base: 18, med: line + (side === 'OVER' ? 1.5 : -1.5), usg: 22, sdf: 1, starter: true, start_src: "RotoWire's expected five", why: ['x'],
+      log: vals.map((v, i) => ['2026-10-' + String(20 + i), 'OPP', i % 2, 32, v, ['won by 3']]), parts });
+    const men = [man(1, 'Man One', 'ATL', 0, 'pts', 'OVER', 20.5, 0.60, ov(20.5), up), man(2, 'Man Two', 'CHI', 1, 'reb', 'OVER', 7.5, 0.59, ov(7.5), up), man(3, 'Man Three', 'MIA', 2, 'ast', 'UNDER', 5.5, 0.58, un(5.5), dn), man(8, 'Man Eight', 'MIL', 1, 'pts', 'OVER', 12.5, 0.56, ov(12.5), up)];
+    await load({ format: 'callsheet3.props', version: 1, date: '2026-11-12', games: G.map((g, gi) => ({ gid: 'ph' + gi, away: g[0], home: g[1], aab: g[2], hab: g[3], spread: g[4], total: 225.5, props: men.filter(m => m.gi === gi) })) }, 'nba-props-2026-11-12.json');
+    if (document.getElementById('propsView').hidden) { document.getElementById('m-props').click(); await wait(); }
+    document.getElementById('propsReset').click(); await wait();
+    const pick = (id, v) => { const el = document.getElementById(id); el.value = v; el.dispatchEvent(new Event('change', { bubbles: true })); };
+    pick('propsLegs', '2'); pick('propsBelow', 't3'); await wait();
+    const best = document.getElementById('propsBest'), listed = best.querySelectorAll('.pk.t3').length;
+    best.querySelector('.pk.t3 [data-t3take]').click(); await wait();
+    document.getElementById('m-nba').click(); await wait();
+    const bd = document.getElementById('boardDate'), day = (v) => { bd.value = v; bd.dispatchEvent(new Event('change')); };
+    day('2026-11-12'); await wait();
+    const body = document.getElementById('phoneBody'), dlg = document.getElementById('phoneDlg'), esc = async () => { document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })); await wait(); };
+    const notes = () => [...body.querySelectorAll('.note')].map(txt), press = async (ms) => { document.getElementById('phone').click(); await wait(ms || 500); };
+    const mods = (cell, margin) => {
+      const d = (body.querySelector('svg path') || { getAttribute: () => '' }).getAttribute('d') || '';
+      const pts = [...d.matchAll(/M(-?\d+(?:\.\d+)?),(-?\d+(?:\.\d+)?)[hl]/g)].map(m => [Math.round(((+m[1]) - margin) / cell), Math.round(((+m[2]) - margin) / cell)]);
+      const n = pts.length ? Math.max(...pts.map(q => q[0])) + 1 : 0, out = [];
+      for (let r = 0; r < n; r++) { const row = []; for (let c = 0; c < n; c++) row.push(0); out.push(row); }
+      pts.forEach(q => { out[q[1]][q[0]] = 1; });
+      return { n, mods: out };
+    };
+    // a) no viewer: the code carries the picks to m.html, the ticket taken and the night's tickets with them
+    await press(700);
+    const code = { link: (body.querySelector('a') || {}).href || '', note: notes()[0] || '' };
+    await esc();
+    // b) the viewer, its store unavailable once: one more try, and the sheet is saved whole
+    const mock = (0, eval)('(' + src + ')');
+    mock({ docs: { 'phone/config': { url } }, owner: true, fail: ['unavailable'] });
+    await press(1800);
+    const saved = { notes: notes(), calls: window.__mock.calls.slice(), doc: JSON.parse(JSON.stringify(window.__mock.docs['phone/latest'] || null)), qr: mods(6, 4), links: [...body.querySelectorAll('a')].map(a => a.id + '|' + a.getAttribute('href')), tag: txt(body.querySelector('h3')) };
+    document.getElementById('phonePreview').click(); await wait();
+    const sh = document.getElementById('phoneSheet');
+    const preview = { open: !!(sh && !sh.hidden), how: sh.dataset.how, btn: txt(sh.querySelector('[data-pshclose]')), text: txt(sh), heads: [...sh.querySelectorAll('h2')].map(txt), takes: sh.querySelectorAll('.pshk.take').length, cards: sh.querySelectorAll('.pshk').length };
+    await esc();
+    const afterEsc = { sheet: sh.hidden, dlg: !dlg.hidden, noscroll: document.body.classList.contains('noscroll') };
+    document.getElementById('phoneCopy').click(); await wait();
+    const copied = { text: copies[copies.length - 1] || '', said: txt(document.getElementById('phoneSaid')) };
+    await esc();
+    const closed = dlg.hidden && !document.body.classList.contains('noscroll');
+    // c) the store refuses the write: said in the dialog, no code drawn, the last sheet left as it was
+    window.__mock.fail = ['invalid_argument']; window.__mock.calls.length = 0;
+    await press(500);
+    const refused = { notes: notes(), qr: !!body.querySelector('svg'), calls: window.__mock.calls.slice(), same: JSON.stringify(window.__mock.docs['phone/latest']) === JSON.stringify(saved.doc) };
+    await esc();
+    // d) the viewer gives the page no store: said, and no code that would land on an empty page
+    mock({ docs: {}, owner: true, db: false });
+    await press(400);
+    const nostore = { notes: notes(), qr: !!body.querySelector('svg'), link: !!body.querySelector('a'), calls: window.__mock.calls.slice() };
+    await esc();
+    // e) a date with nothing on the board: nothing is written
+    mock({ docs: {}, owner: true });
+    day('2027-01-01'); await wait();
+    await press(400);
+    const empty = { notes: notes(), wrote: Object.keys(window.__mock.docs), calls: window.__mock.calls.slice() };
+    await esc();
+    // f) the store with no address beside the sheet: saved all the same, and the words stand in for the code
+    day('2026-11-12'); await wait();
+    await press(500);
+    const noUrl = { notes: notes(), qr: !!body.querySelector('svg'), wrote: Object.keys(window.__mock.docs) };
+    await esc();
+    delete window.claude; delete window.__mock;
+    day(''); pick('propsBelow', 'leans'); await wait();
+    return { listed, code, saved, preview, afterEsc, copied, closed, refused, nostore, empty, noUrl };
+  }, { src: claudeMock.toString(), url: PH_URL });
+  const phQr = qrRead(phS.saved.qr.n, phS.saved.qr.mods);
+  // the views that open the page with the sheet in the store: the owner's phone, a guest's, a guest at a desk, and the two with nothing to show
+  const phView = async (opts, vp, steps) => {
+    const c = await pg.context().browser().newContext({ viewport: vp }), p = await c.newPage(), e2 = [];
+    p.on('pageerror', e => e2.push(e.message));
+    await p.addInitScript(claudeMock, opts);
+    if (opts.later) await p.addInitScript((d) => { window.__later = d; }, opts.later);
+    await p.goto('file://' + path.join(__dirname, 'web/callsheet3.html'));
+    await p.waitForFunction(() => window.smStore && window.smStore.ready, null, { timeout: 60000 }); await p.waitForTimeout(700);
+    if (steps === 'card') {   // a view with a card of its own: add the example, load again, and see what it asked of the viewer
+      await p.evaluate(async () => { const wait = () => new Promise(r => setTimeout(r, 110)); document.getElementById('m-nba').click(); await wait(); document.getElementById('example').click(); await wait(); document.getElementById('add').click(); await wait(); await wait(); });
+      await p.reload(); await p.waitForFunction(() => window.smStore && window.smStore.ready, null, { timeout: 60000 }); await p.waitForTimeout(700);
+    }
+    const r = await p.evaluate(async (steps) => {
+      const wait = (ms) => new Promise(r => setTimeout(r, ms || 140)), txt = e => (e ? e.innerText : '').replace(/\s+/g, ' ').trim();
+      const s = document.getElementById('phoneSheet'), o = { open: !!(s && !s.hidden), how: s ? s.dataset.how : '', btn: s ? txt(s.querySelector('[data-pshclose]')) : '', text: txt(s), heads: s ? [...s.querySelectorAll('h2')].map(txt) : [],
+        takes: s ? s.querySelectorAll('.pshk.take').length : 0, cards: s ? s.querySelectorAll('.pshk').length : 0, controls: s ? s.querySelectorAll('input, button, select, textarea, a').length : 0,
+        fits: document.documentElement.scrollWidth <= window.innerWidth && (!s || s.scrollWidth <= s.clientWidth), calls: window.__mock.calls.slice(),
+        hint: (h => (h && !h.hidden ? txt(h.querySelector('span')) : ''))(document.getElementById('phoneHint')) };
+      if (steps === 'arrives') {   // nothing saved when the phone opened the page; then the computer saves one
+        window.__mock.put('phone/latest', steps && window.__later); await wait(300);
+        const s2 = document.getElementById('phoneSheet'), h2 = document.getElementById('phoneHint');
+        o.arrived = !!(s2 && !s2.hidden); o.arrivedTakes = s2 ? s2.querySelectorAll('.pshk.take').length : 0; o.hintAfter = !!(h2 && !h2.hidden);
+        return o;
+      }
+      if (!s) return o;
+      document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })); await wait();
+      o.escShut = s.hidden;
+      if (steps === 'newer') {   // shut by hand, the same sheet again stays shut, a newer one opens
+        const d = JSON.parse(JSON.stringify(window.__mock.docs['phone/latest']));
+        window.__mock.put('phone/latest', d); await wait(); o.sameStaysShut = s.hidden && !document.body.classList.contains('noscroll');
+        d.at = '2026-11-12T23:59:00.000Z'; d.sheet.at = d.at; d.sheet.take = []; window.__mock.put('phone/latest', d); await wait();
+        o.newerOpens = !s.hidden; o.newerTakes = s.querySelectorAll('.pshk.take').length; o.subs = window.__mock.calls.filter(x => /^sub /.test(x)).length;
+      }
+      return o;
+    }, steps);
+    await c.close(); r.errs = e2; return r;
+  };
+  const phDocs = { 'phone/latest': phS.saved.doc, 'phone/config': { url: PH_URL } };
+  const phOwner = await phView({ docs: phDocs, owner: true }, { width: 390, height: 844 }, 'newer');
+  const phGuest = await phView({ docs: phDocs, owner: false }, { width: 390, height: 844 });
+  const phGuestDesk = await phView({ docs: phDocs, owner: false }, { width: 1280, height: 900 });
+  const phOwnDesk = await phView({ docs: phDocs, owner: true }, { width: 1280, height: 900 }, 'card');
+  const phNone = await phView({ docs: {}, owner: true, later: phS.saved.doc }, { width: 390, height: 844 }, 'arrives');
+  const phGuestNone = await phView({ docs: {}, owner: false }, { width: 390, height: 844 });
+  const phNoStore = await phView({ docs: phDocs, owner: true, db: false }, { width: 390, height: 844 });
+  // m.html with the code's link: the same night as the store's sheet, line for line
+  const mCtx = await pg.context().browser().newContext({ viewport: { width: 390, height: 844 } }), mPage = await mCtx.newPage(), mErrs = [];
+  mPage.on('pageerror', e => mErrs.push(e.message));
+  await mPage.goto(phS.code.link); await mPage.waitForTimeout(600);
+  const mText = await mPage.evaluate(() => document.body.innerText.replace(/\s+/g, ' ').trim());
+  await mCtx.close();
+  await pg.evaluate(async () => { await smStore.ready; await smStore.removeItem('callsheet3.props.v1'); });
+  belowFree = false;
+  await reloaded();
+  const phLines = (t) => { const a = t.search(/TAKING TONIGHT/i), b = t.search(/View only:/i); return a >= 0 && b > a ? t.slice(a, b).trim().toLowerCase() : ''; };
+  const phSheet = (phS.saved.doc || {}).sheet || {}, phTake = (phSheet.take || [])[0] || {};
+  chk(phS.listed === 2 && /\/m\.html#z[A-Za-z0-9_-]+$/.test(phS.code.link) && /the best props, the night's tickets and the simulation's calls, view only\./.test(phS.code.note) && /nothing is uploaded/.test(phS.code.note)
+      && mErrs.length === 0 && /TAKING TONIGHT 1 TAKING · NBA · 2-LEG TICKET Man One OVER 20\.5 Points \+ Man Two OVER 7\.5 Rebounds 3[0-9]\.\d% · \+26\d needs 27\.\d% Hawks @ Magic · Bulls @ Bucks · at FanDuel/i.test(mText)
+      && /TWO-LEG TICKETS, TO TEST 2 TICKET #1 Man One OVER 20\.5 Points \+ Man Two OVER 7\.5 Rebounds/i.test(mText),
+      'phone, off claude.ai: with no viewer the button draws the code as before, its link carrying the night to m.html, and the night now includes the ticket marked Taking (two legs at FanDuel, the games, the chance both land and the parlay price) and the night\'s two tickets under the best props',
+      JSON.stringify({ listed: phS.listed, link: phS.code.link.slice(0, 80), note: phS.code.note.slice(0, 260), m: mText.slice(0, 420), errs: mErrs }));
+  chk(JSON.stringify(phS.saved.calls) === JSON.stringify(['use db', 'set phone/latest', 'set phone/latest', 'get phone/config'])
+      && phS.saved.doc && phS.saved.doc.v === 2 && phS.saved.doc.d === '2026-11-12' && phS.saved.doc.at === phSheet.at && Object.keys(phS.saved.doc).join() === 'v,d,at,sheet'
+      && phSheet.take.length === 1 && phTake.k === 'ticket' && phTake.n === 2 && phTake.p === 'Man One OVER 20.5 points + Man Two OVER 7.5 rebounds' && phTake.m === 'at FanDuel' && phTake.g === 'Hawks @ Magic · Bulls @ Bucks' && phTake.pr >= 260 && phTake.pr <= 269 && phTake.c > 30 && phTake.c < 40
+      && phSheet.t3.length === 2 && phSheet.t3[0].n === 2 && phSheet.props.length === 4 && !('cut' in phSheet)
+      && /^Saved for your phone at \d{1,2}:\d\d [AP]M: \d+ lines, the bets and tickets you are taking first, then the parlay four, the best straight bets, the likeliest sides, the best props, the night's tickets and the simulation's calls\.$/.test(phS.saved.notes[0])
+      && /^Point your phone's camera at the code, or open The Super Model in the Claude app on your phone\. Tonight's sheet opens by itself, view only\./.test(phS.saved.notes[1])
+      && phQr === PH_URL && phS.saved.qr.n >= 25 && !phS.saved.links.some(l => /m\.html/.test(l)) && phS.saved.links.join() === 'phoneCopy|#,phonePreview|#',
+      'phone, on claude.ai: where the viewer gives the page its store, the button saves the night\'s sheet there whole (one document, the ticket you are taking in it, nothing trimmed), tries once more when the store is unavailable, says it is saved and how many lines, and the code it draws is the page\'s own address from the store, read back off the drawn modules by an independent decoder, with no link to m.html',
+      JSON.stringify({ calls: phS.saved.calls, keys: phS.saved.doc && Object.keys(phS.saved.doc), take: phTake, t3: (phSheet.t3 || []).length, props: (phSheet.props || []).length, notes: phS.saved.notes.map(n => n.slice(0, 150)), qr: phQr, n: phS.saved.qr.n, links: phS.saved.links }));
+  chk(/^For someone else to see it: share this page with them from the Share menu on claude\.ai \(Viewer is enough\)\. Signed in to Claude, they scan the same code and get tonight's sheet and nothing else, view only: only you can save over it, and your card never leaves this browser\. For someone with no Claude account, copy the sheet as text and send it\./.test(phS.saved.notes[2])
+      && /readable by you and by anyone you share the page with, and each save replaces the last\./.test(phS.saved.notes[3])
+      && phS.preview.open && phS.preview.how === 'preview' && phS.preview.btn === 'Close' && phS.preview.takes === 1 && phS.preview.cards === 8
+      && phS.preview.heads.join('|').toLowerCase() === 'taking tonight 1|best props 4|two-leg tickets, to test 2|same-game pairs 1'
+      && phS.afterEsc.sheet && phS.afterEsc.dlg && phS.afterEsc.noscroll && phS.closed
+      && /^The Super Model · Thu, Nov 12 · view only\n\nTAKING TONIGHT\n1\. Man One OVER 20\.5 points \+ Man Two OVER 7\.5 rebounds · 3\d\.\d% · \+26\d needs 27\.\d% · Hawks @ Magic · Bulls @ Bucks · at FanDuel\n\nBEST PROPS\n#1 Man One OVER 20\.5 points \[LEAN\]/.test(phS.copied.text)
+      && /\n\nTWO-LEG TICKETS, TO TEST\n#1 /.test(phS.copied.text) && /\n\nSAME-GAME PAIRS\n#1 /.test(phS.copied.text) && phS.copied.said === 'Copied the sheet as text.',
+      'phone, sharing: the dialog says how someone else sees the sheet (share the page from the Share menu, Viewer is enough; they get the sheet and nothing else, and only the owner saves over it) and who can read the store; the sheet opens as the phone shows it over the dialog and Escape shuts it first, the dialog after; and the sheet copies as plain text for someone with no account',
+      JSON.stringify({ notes: phS.saved.notes.slice(2).map(n => n.slice(0, 200)), preview: { open: phS.preview.open, how: phS.preview.how, btn: phS.preview.btn, heads: phS.preview.heads, takes: phS.preview.takes, cards: phS.preview.cards }, afterEsc: phS.afterEsc, closed: phS.closed, copied: phS.copied.text.slice(0, 330), said: phS.copied.said }));
+  chk(/^The sheet could not be saved for the phone: the store refused it: only the page's owner saves the sheet\. Press the button again in a moment\./.test(phS.refused.notes[0] || '') && !phS.refused.qr && phS.refused.same && JSON.stringify(phS.refused.calls) === JSON.stringify(['use db', 'set phone/latest'])
+      && /^The sheet could not be saved for the phone: this view was not given the page's store on claude\.ai\./.test(phS.nostore.notes[0] || '') && !phS.nostore.qr && !phS.nostore.link && JSON.stringify(phS.nostore.calls) === JSON.stringify(['use db'])
+      && /^Nothing on the board for .*2027.* yet|^Nothing on the board for /.test(phS.empty.notes[0] || '') && phS.empty.wrote.length === 0 && JSON.stringify(phS.empty.calls) === JSON.stringify(['use db'])
+      && /^Saved for your phone/.test(phS.noUrl.notes[0] || '') && !phS.noUrl.qr && /^Open The Super Model in the Claude app on your phone, or in its browser signed in to claude\.ai\./.test(phS.noUrl.notes[1] || '') && phS.noUrl.wrote.join() === 'phone/latest',
+      'phone, when it cannot: a write the store refuses is said in the dialog with no code drawn and the last sheet left as it was; a viewer that gives the page no store is said too, with no code that would land on an empty page; a date with nothing on the board writes nothing; and a store with no address beside the sheet still saves it and says where to open it in words',
+      JSON.stringify({ refused: phS.refused, nostore: phS.nostore, empty: phS.empty, noUrl: { notes: phS.noUrl.notes.map(n => n.slice(0, 120)), qr: phS.noUrl.qr, wrote: phS.noUrl.wrote } }));
+  chk(phOwner.errs.length === 0 && phOwner.open && phOwner.how === 'auto' && phOwner.btn === 'Open the full model' && phOwner.takes === 1 && phOwner.cards === 8 && phOwner.fits
+      && /^The Super Model Thu, Nov 12 · made \d{1,2}:\d\d [AP]M · view only Open the full model (This sheet is for Thu, Nov 12\. Press Phone QR on the day board of the computer for tonight's\. )?TAKING TONIGHT 1 TAKING · NBA · 2-LEG TICKET Man One OVER 20\.5 Points \+ Man Two OVER 7\.5 Rebounds/i.test(phOwner.text)
+      && JSON.stringify(phOwner.calls) === JSON.stringify(['use db', 'use user', 'isOwner', 'sub phone/latest']) && phOwner.escShut && phOwner.sameStaysShut && phOwner.newerOpens && phOwner.newerTakes === 0 && phOwner.subs === 1
+      && phLines(phOwner.text) === phLines(mText) && phLines(mText).length > 300,
+      'phone, the owner\'s: a view the width of a phone with nothing of its own asks the store once and opens the night\'s sheet over the page by itself, the ticket you are taking first, line for line what m.html draws from the code, with no sideways scroll and no script error; a button opens the model behind it, a sheet shut by hand stays shut, and a newer one saved from the computer opens on the one subscription',
+      JSON.stringify({ errs: phOwner.errs, open: phOwner.open, how: phOwner.how, btn: phOwner.btn, takes: phOwner.takes, cards: phOwner.cards, fits: phOwner.fits, text: phOwner.text.slice(0, 300), calls: phOwner.calls, escShut: phOwner.escShut, same: phOwner.sameStaysShut, newer: phOwner.newerOpens, newerTakes: phOwner.newerTakes, subs: phOwner.subs, lines: phLines(phOwner.text) === phLines(mText), len: phLines(mText).length }));
+  chk(phGuest.errs.length === 0 && phGuest.open && phGuest.how === 'guest' && phGuest.btn === '' && phGuest.controls === 0 && phGuest.escShut === false && phGuest.takes === 1 && phGuest.fits && /view only SHARED WITH YOU/i.test(phGuest.text)
+      && /View only: this is the owner's sheet for the night, and it follows when they save a new one\./.test(phGuest.text) && phLines(phGuest.text) === phLines(phOwner.text)
+      && phGuestDesk.errs.length === 0 && phGuestDesk.open && phGuestDesk.how === 'guest' && phGuestDesk.controls === 0 && phGuestDesk.escShut === false,
+      'phone, someone the page is shared with: they get the same sheet, marked shared with you, with nothing to press, type or follow and no way past it (Escape leaves it up), on a phone and at a desk alike; the store\'s rule, read by all the page is shared with and written by its owner alone, is declared at the publish',
+      JSON.stringify({ phone: { errs: phGuest.errs, open: phGuest.open, how: phGuest.how, btn: phGuest.btn, controls: phGuest.controls, esc: phGuest.escShut, text: phGuest.text.slice(0, 160) }, desk: { open: phGuestDesk.open, how: phGuestDesk.how, controls: phGuestDesk.controls, esc: phGuestDesk.escShut } }));
+  chk(phOwnDesk.errs.length === 0 && !phOwnDesk.open && phOwnDesk.calls.length === 0
+      && phOwnDesk.hint === '' && phOwner.hint === '' && phGuest.hint === ''
+      && phNone.errs.length === 0 && !phNone.open && JSON.stringify(phNone.calls) === JSON.stringify(['use db', 'use user', 'isOwner', 'sub phone/latest'])
+      && phNone.hint === 'No sheet saved for the phone yet. On the computer, press Phone QR on the day board and it opens here by itself.' && phNone.arrived && phNone.arrivedTakes === 1 && !phNone.hintAfter
+      && phGuestNone.errs.length === 0 && !phGuestNone.open && phGuestNone.hint === 'The owner has not saved a sheet yet. It opens here by itself when they do.'
+      && phNoStore.errs.length === 0 && !phNoStore.open && JSON.stringify(phNoStore.calls) === JSON.stringify(['use db'])
+      && phNoStore.hint === "Tonight's sheet is kept in this page's store on claude.ai, and this view was not given it. Open the page in your phone's browser signed in to claude.ai, and allow it if a box asks.",
+      'phone, when there is nothing to open: a view with a card of its own asks the viewer nothing at load, so the computer sees no prompt it did not ask for; a phone with no sheet in the store says so across the top and what to press, and the sheet opens there by itself when the computer saves one; a guest is told the owner has not saved one; and a phone whose view gives the page no store is told to open it in the browser signed in, with no script error anywhere',
+      JSON.stringify({ desk: { open: phOwnDesk.open, calls: phOwnDesk.calls, errs: phOwnDesk.errs, hint: phOwnDesk.hint }, none: { open: phNone.open, calls: phNone.calls, hint: phNone.hint, arrived: phNone.arrived, takes: phNone.arrivedTakes, hintAfter: phNone.hintAfter }, guestNone: { open: phGuestNone.open, hint: phGuestNone.hint }, nostore: { open: phNoStore.open, calls: phNoStore.calls, hint: phNoStore.hint } }));
 
   // ---- 11 Nov 2026: the NBA record counts the sheet's calls (the user: "fix the NBA record so tiles count only real calls") -- a market where neither side is priced below its chance is the book's own number, listed under the tile as no call and left out of its count ----
   const callsKeep = await pg.evaluate(async () => { await smStore.ready; const k = { card: await smStore.getItem('callsheet3.card.v1'), slate: await smStore.getItem('callsheet3.slate.v1') }; await smStore.removeItem('callsheet3.card.v1'); return k; });

@@ -1389,6 +1389,11 @@ cards with the result chips, in the page's light and dark looks. The
 harness makes a code on the example board, decodes it with an independent
 decoder (jsQR) off the rendered modules, and renders the sheet.
 
+On claude.ai the code's link never reached the phone with its picks; from
+11 Nov 2026 the sheet goes through the page's own store there. See "The
+phone sheet through the page's store" at the end of this file. The code
+in the link is still how it works off claude.ai.
+
 ## The props reviewed: usage, the role, the floors and the same-game pairs, 26 Oct 2026
 
 The user, with a night of props behind him, asked about four things he
@@ -3356,4 +3361,84 @@ gold signal with no green one beside it, the jump bar's dot, and a block
 built today carrying 0.3. The page was then loaded with the backup of 10
 Nov: the gap 7-6 at home and 4-8 away as before, the seven calls of the
 old weight on their own row, no script errors.
+
+## The phone sheet through the page's store, 11 Nov 2026
+
+The user: "I saved the log for today for what I am betting and then took
+the picture with my phone and it brings up the model but nothing in it."
+The code's link went to `m.html` on the page's own host with the night in
+its hash. On claude.ai the page is private and is shown framed by the
+viewer; a phone that follows that link is sent to the viewer and the main
+page, with a phone's empty storage, and the hash never arrives. The sheet
+also had no place for a ticket marked Taking, since the tickets came
+after it.
+
+**The store.** Where the viewer gives the page its store (`claude.use("db")`),
+the Phone QR button saves the night's sheet there, whole: one document,
+`phone/latest`, `{v: 2, d, at, sheet}`, the sheet being `phonePayload` with
+nothing trimmed. One write a press; a store that answers `unavailable`
+gets one more try. The dialog says it is saved and how many lines, and
+the code it draws is the page's own address on claude.ai, read from
+`phone/config` beside the sheet (written through the database at the
+publish, so no address sits in the source). With no address there the
+words stand in for the code: open the page in the Claude app. A write the
+store refuses, or a viewer that gives no store, is said in the dialog and
+no code is drawn, since the old link would land on an empty page.
+
+**The phone.** `phoneWatch` runs once after the first draw. A view the
+width of a phone (760 pixels or less), or one with no card and no props
+of its own, subscribes to `phone/latest` and opens the sheet over the
+page (`phoneSheetShow`): the same sections and lines `m.html` draws, the
+date with its weekday, when it was made, and a note when it is not
+today's. A button opens the model behind it; a sheet shut by hand stays
+shut until a newer one is saved, and a newer one opens on the same
+subscription. A view with a card of its own asks the viewer nothing at
+load, so the computer sees no prompt it did not ask for.
+
+When a phone's view has no sheet to open, a line across the top says why
+and what to do (`phoneHint`), since the page behind it is an empty model
+on a phone, which is what the user met: nothing saved yet (press Phone QR
+on the computer, and the sheet opens there by itself when it is saved);
+for a guest, the owner has not saved one; and where the view gives the
+page no store, open it in the phone's browser signed in to claude.ai.
+
+**Shared, view only.** The user, the same hour: "what if I want to share
+the QR or have someone else see it too without changing" anything. The
+store's rule, declared at the publish, lets everyone the page is shared
+with read `phone` and only the page's owner write it:
+
+    capabilities: { downloads: true, db: { rules: [ { path: "phone", read: "view", write: "owner" } ] } }
+
+Someone the owner shares the page with from the Share menu (Viewer is
+enough, signed in to Claude) scans the same code and gets the sheet marked
+"shared with you" with nothing to press and no way past it
+(`user.isOwner()` false; the Escape key leaves it up). The card, the props
+and the record live in the owner's browser and never reach the store, so
+there is nothing of his for them to change. For someone with no account
+the dialog copies the sheet as plain text (`phoneSheetText`).
+
+**The tickets.** `phonePayload` now carries a ticket marked Taking among
+the takes (its legs, the app, the games, the chance all land, the parlay
+price) and the night's tickets as the tab shows them, up to six, under
+the best props. `m.html` draws both, so the code off claude.ai has them
+too; a long night drops the tickets from the code after the likeliest
+list.
+
+**Checked.** The harness stands in for the viewer (`window.claude.use` for
+`db` and `user` over an in-memory store, every call logged, `set` refusing
+on demand with the store's own codes) and reads: the save with one retry
+and the document's shape, the code decoded off its modules to the page's
+address, the dialog's lines, the preview over the dialog and the order
+Escape shuts them, the text copy; a refused write, no store, an empty
+date, a store with no address; the owner's phone opening the sheet line
+for line what `m.html` draws from the code, shut and reopened by a newer
+sheet on one subscription; a guest on a phone and at a desk with no
+control in the sheet; a view with a card asking nothing at load; the
+three lines a phone shows when there is no sheet, and the sheet arriving
+under the first. On the
+published page the database took `phone/config`, gave it back at the
+Viewer's level, and refused a write at the Editor's level with the code
+the page words as "only the page's owner saves the sheet". What only the
+owner can confirm is the page inside claude.ai's viewer on his own
+computer and phone.
 

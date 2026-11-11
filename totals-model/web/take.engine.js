@@ -88,6 +88,14 @@
     if (res === "win") { s.w++; s.units += propsPairUnits(t, res); } else { s.l++; s.units -= 1; }
   }
   function pairTakesList(dateISO) { return typeof pairTakesOn === "function" ? pairTakesOn(dateISO) : []; }
+  /* a three-leg ticket you take (11 Nov 2026): kept on its rows with what each leg read at the app, graded on those lines */
+  function t3TakesList(dateISO) { return typeof propsT3TakesOn === "function" ? propsT3TakesOn(dateISO) : []; }
+  function t3TakeTally(s, t) {
+    var res = propsT3Res(t); if (!res || res === "void") return;
+    if (res === "push") { s.p++; return; }
+    s.n++; if (s.says !== undefined) s.says += t.chance;
+    if (res === "win") { s.w++; s.units += propsT3Units(t, res); } else { s.l++; s.units -= 1; }
+  }
   function takeTally(s, res, price) {
     if (res === null || res === undefined || res === "invalid") return;
     if (res === "push") { s.p++; return; }
@@ -105,7 +113,7 @@
   }
   function renderTaking(dateISO) {
     var box = $("taking"); if (!box) return;
-    var bets = takesOn(dateISO), sims = simTakesOn(dateISO), ps = propsTakenOn(dateISO), prs = pairTakesList(dateISO), n = bets.length + sims.length + ps.length + prs.length;
+    var bets = takesOn(dateISO), sims = simTakesOn(dateISO), ps = propsTakenOn(dateISO), prs = pairTakesList(dateISO), t3s = t3TakesList(dateISO), n = bets.length + sims.length + ps.length + prs.length + t3s.length;
     $("takingHead").hidden = !n; box.hidden = !n;
     if (!n) { box.innerHTML = ""; $("takingCount").textContent = ""; return; }
     var s = { n: 0, w: 0, l: 0, p: 0, units: 0 }, h = "";
@@ -113,9 +121,10 @@
     sims.forEach(function (x) { takeTally(s, simTakeResOf(x.t, x.row), x.t.price === null || x.t.price === undefined ? -110 : x.t.price); h += simTakeCard(x); });
     ps.forEach(function (r) { takeTally(s, propTakeRes(r), r.price); h += propTakeCard(r); });
     prs.forEach(function (t, i) { pairTakeTally(s, t); h += propsPairCard(t, i, true); });
+    t3s.forEach(function (t, i) { t3TakeTally(s, t); h += propsT3Card(t, i, true); });
     h += '<div class="pk taking sum"><div class="n1">TONIGHT</div><div class="n2">' + n + ' bet' + (n === 1 ? '' : 's') + ' marked</div>' +
          '<div class="n3">' + (s.n || s.p ? 'graded ' + s.w + '-' + s.l + (s.p ? '-' + s.p : '') + ' · ' + sgn(s.units, 2) + 'u at one unit each' : 'none graded yet · one unit each') + '</div>' +
-         '<div class="n4">' + bets.length + ' on the card, ' + sims.length + ' from the simulation, ' + ps.length + ' prop' + (ps.length === 1 ? '' : 's') + (prs.length ? ', ' + prs.length + ' same-game pair' + (prs.length === 1 ? '' : 's') : '') + '</div></div>';
+         '<div class="n4">' + bets.length + ' on the card, ' + sims.length + ' from the simulation, ' + ps.length + ' prop' + (ps.length === 1 ? '' : 's') + (prs.length ? ', ' + prs.length + ' same-game pair' + (prs.length === 1 ? '' : 's') : '') + (t3s.length ? ', ' + t3s.length + ' three-leg ticket' + (t3s.length === 1 ? '' : 's') : '') + '</div></div>';
     box.innerHTML = h;
     $("takingCount").textContent = n + " marked";
   }
@@ -135,6 +144,10 @@
     pairTakesList(dateISO).forEach(function (t) {
       var res = propsPairRes(t);
       out.push((++k) + ". SAME-GAME PAIR " + t.legs.map(function (r) { return r.name + " " + r.side + " " + r.line + " " + (PROPS_LABEL[r.mk] || r.mk); }).join(" + ") + " " + sgn(t.price, 0) + " · both land " + (t.chance * 100).toFixed(1) + "% needs " + (t.need * 100).toFixed(1) + "% · " + t.game + (res ? " · " + res.toUpperCase() : ""));
+    });
+    t3TakesList(dateISO).forEach(function (t) {
+      var res = propsT3Res(t);
+      out.push((++k) + ". 3-LEG TICKET at " + bookName(t.app) + ": " + t.legs.map(function (l) { return propsT3LegText(l) + " " + sgn(l.price, 0); }).join(" + ") + " · pays " + sgn(t.price, 0) + " · all three land " + (t.chance * 100).toFixed(1) + "% needs " + (t.need * 100).toFixed(1) + "%" + (res ? " · " + res.toUpperCase() : ""));
     });
     return out.join("\n");
   }
@@ -163,9 +176,10 @@
       var res = propTakeRes(r); if (!r.take || !res) return;
       takeTally(pr, res, r.price); if (res !== "push") pr.says += r.chance;
     });
-    var prs = mk();
+    var prs = mk(), t3r = mk();
     if (typeof pairTakesAll === "function") pairTakesAll().forEach(function (t) { pairTakeTally(prs, t); });
-    if (!bets.n && !bets.p && !sims.n && !sims.p && !pr.n && !pr.p && !prs.n && !prs.p) return "";
+    if (typeof propsT3TakesAll === "function") propsT3TakesAll().forEach(function (t) { t3TakeTally(t3r, t); });
+    if (!bets.n && !bets.p && !sims.n && !sims.p && !pr.n && !pr.p && !prs.n && !prs.p && !t3r.n && !t3r.p) return "";
     var tile = function (label, s) {
       if (!s.n && !s.p) return "";
       var says = s.n ? s.says / s.n * 100 : 0, does = s.n ? s.w / s.n * 100 : 0;
@@ -173,7 +187,7 @@
              '<p class="s">' + (s.n ? 'says ' + says.toFixed(1) + '% · does ' + does.toFixed(1) + '% (±' + (100 / Math.sqrt(s.n) / 2).toFixed(1) + ') · ' + sgn(s.units, 2) + 'u' : 'pushes only') + '</p></div>';
     };
     var h = '<div class="subhead" data-sport="TAKEN">What you took <span class="tag">every bet marked Taking before its game, graded at the price shown when it was marked · one unit each · says is the sheet\'s chance</span></div>' +
-            '<div class="calib" data-sport="TAKEN">' + tile("Game bets taken", bets) + tile("Simulation calls taken", sims) + tile("Props taken", pr) + tile("Same-game pairs taken", prs) + '</div>';
+            '<div class="calib" data-sport="TAKEN">' + tile("Game bets taken", bets) + tile("Simulation calls taken", sims) + tile("Props taken", pr) + tile("Same-game pairs taken", prs) + tile("Three-leg tickets taken", t3r) + '</div>';
     /* your picks (3 Nov 2026, the user: "is there a way to have the props that I select taken be graded or tracked so I can
        see how I'm picking the bets?"): every marked bet that has graded, night by night with the sheet's own BET and LEAN
        props that night beside it, the props you took by side, band, market and price, and the list of every pick, newest
@@ -201,6 +215,10 @@
     if (typeof pairTakesAll === "function") pairTakesAll().forEach(function (t) {
       var res = propsPairRes(t); if (!res) return;
       picks.push({ d: t.legs[0].gdate || "", kind: "same-game pair", text: t.legs.map(function (r) { return r.name + " " + r.side + " " + r.line + " " + (PROPS_LABEL[r.mk] || r.mk); }).join(" + ") + " · " + t.game, p: t.chance, price: t.price, res: res, units: res === "win" ? propsPairUnits(t, res) : res === "loss" ? -1 : 0 });
+    });
+    if (typeof propsT3TakesAll === "function") propsT3TakesAll().forEach(function (t) {
+      var res = propsT3Res(t); if (!res || res === "void") return;
+      picks.push({ d: t.gdate || "", kind: "three-leg ticket", text: t.legs.map(propsT3LegText).join(" + ") + " · at " + bookName(t.app), p: t.chance, price: t.price, res: res, units: res === "win" ? propsT3Units(t, res) : res === "loss" ? -1 : 0 });
     });
     if (!picks.length) return h;
     var agg = function () { return { n: 0, w: 0, l: 0, p: 0, says: 0, units: 0 }; };
@@ -242,11 +260,13 @@
   }
   /* the buttons: caught before the card or the row underneath opens anything */
   document.addEventListener("click", function (e) {
-    var t = e.target && e.target.closest ? e.target.closest("[data-take],[data-ptake],[data-stake],[data-ttake]") : null; if (!t) return;
+    var t = e.target && e.target.closest ? e.target.closest("[data-take],[data-ptake],[data-stake],[data-ttake],[data-t3take],[data-t3copy]") : null; if (!t) return;
     e.stopPropagation(); e.preventDefault();
     if (t.hasAttribute("data-take")) toggleTake(t.getAttribute("data-take"));
     else if (t.hasAttribute("data-stake")) toggleSimTake(t.getAttribute("data-stake"));
     else if (t.hasAttribute("data-ttake")) togglePairTake(t.getAttribute("data-ttake"));
+    else if (t.hasAttribute("data-t3take")) { if (typeof toggleT3Take === "function") toggleT3Take(t.getAttribute("data-t3take")); }   // a three-leg ticket (11 Nov 2026)
+    else if (t.hasAttribute("data-t3copy")) { var t3c = typeof propsT3Find === "function" ? propsT3Find(t.getAttribute("data-t3copy")) : null; if (t3c) copyText(propsT3Text(t3c), typeof propsSay === "function" && $("propsView") && !$("propsView").hidden ? propsSay : say, "the ticket"); }
     else togglePropTake(t.getAttribute("data-ptake"));
   }, true);
   /* Add puts the game on the card, and the Simulation card's greyed buttons come alive once the row exists: redraw it after the add */

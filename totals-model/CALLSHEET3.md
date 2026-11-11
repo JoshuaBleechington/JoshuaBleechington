@@ -3069,3 +3069,140 @@ The harness seeds forty wins in sixty on spike men off a favourite,
 twenty in sixty on a favourite's spike men, and thirty no-edge losses
 that must stay out of the chip's pool, and reads the three cards' chips,
 the filter both ways, the tile's line and the card's.
+
+## Three-leg tickets under the BETs, 11 Nov 2026
+
+The user, the morning after 10 Nov, with Aday Mara, Bennett Stirtz and
+Collin Gillespie as his examples: "you see how they all have some edge,
+and the last 5-10 hit rates looked really good too, along with the
+levers and no red chips towards the over. I'd like for you to put
+together and replace in the leans section of the 'Leans Below' with 3
+leg props cards, in the same betting apps that have great last 5-10 hit
+rates, no reds chips, levers towards the over that i can use to test for
+3 leg parlays." Then: "Or what about for unders too", "basically 3 guys
+on a card that have really recent history towards that outcome", and
+"make it awesome".
+
+### What a leg is, and a ticket
+
+A leg is a pick with an edge on its card and at the app's own line and
+price, whose last five games went the pick's way four times or more and
+whose last ten (eight or more played) at least half the time, with more
+measured levers toward the pick than against, and no red chip. The over
+on a man whose club is favoured by five or more stays out unless its own
+record reads green, so a page with little graded yet does not list the
+measured leak for want of a colour.
+
+A ticket is three legs on three men at one app (Fanatics, DraftKings,
+FanDuel, BetMGM), each leg read at that app's line and price, the chance
+re-read at the app's line by the slate's own blend when it differs from
+the carded one. Three different games come before a shared one, because
+the apps price same-game legs their own way; then the most expected
+value. A man sits in one ticket a date, six tickets at most. The chance
+is the product of the three legs' chances (two players' props land
+almost independently, measured for the pairs), never more than the
+weakest leg's, and two overs on one club carry the pairs' measured 0.95.
+
+Under the BETs the choice is "3-leg tickets, either side" (the default),
+"overs", "unders", or "the LEANs one by one", which is the list as it
+was. The choice is kept.
+
+### Measured before it was built
+
+First by the carded lines (lab `props_trebles.py`), then exactly as the
+page builds them (lab `props_t3_apps.py`): each leg at each app's own
+line and price, the chips read from the nights before, nothing known
+after the tip, on the eleven nights that keep the game logs and the
+levers, 30 Oct to 10 Nov, replayed under the current blend (the replayed
+call matches the stored one on 99.9% of the 3,600 props from 5 Nov).
+
+What each test does to a BET or LEAN pick taken alone, by the carded
+line:
+
+    every BET and LEAN pick              751-595   55.8%   says 56.4%
+    last 5: four or five his way         322-247   56.6%
+    last 5: three                        230-179   56.2%
+    last 5: two or fewer                  98-84    53.8%
+    last 10: seven or more                64-44    59.3%
+    last 10: five or six                 105-69    60.3%
+    last 10: under half                   35-28    55.6%
+    more levers toward than against      437-346   55.8%
+    levers level or against              314-249   55.8%
+    a red chip                           105-104   50.2%
+    no red chip                          646-491   56.8%
+
+No one of them is an edge by itself: the recent hit rate moves the
+landing rate by a point or three, the levers by nothing, and the red
+chip is the largest, five to six points, which is the favourite's over
+again.
+
+Together, as the page asks them of a leg:
+
+    the qualifying legs, one at a time    45-28   61.6%   (a sample of 73: plus or minus 5.9)
+        the overs                         20-7
+        the unders                        25-21
+    the tickets, either side              2 of 12, the sheet said 21.1%, +0.7 units
+        by night  4 Nov 0 of 1 · 6 Nov 1 of 3 · 7 Nov 0 of 1 · 8 Nov 0 of 4 · 9 Nov 0 of 2 · 10 Nov 1 of 1
+    the overs alone                       1 of 4, +2.9 units
+    the unders alone                      2 of 8, +1.0 units
+    held to three different games         1 of 9, -3.1 units
+
+The nights before 4 Nov list nothing: nobody had eight games in his log.
+On 10 Nov the page's ticket was Stirtz's points, Mara's points and
+rebounds and De'Andre Hunter's points and assists at FanDuel, two of
+them on one club, and it won at +587. Of the user's three examples Mara
+(four of his last five, five of ten) and Stirtz (five of five, seven of
+ten) are legs; Gillespie's assists over 2.5, which won, is not: two of
+his last five and four of nine had cleared it.
+
+Twelve tickets say nothing yet. Three legs at 62% land together 23% of
+the time and the usual price asks 18 to 19, so the tickets pay if the
+legs' rate is real, and the legs' rate sits one sigma above the band's.
+A test with a record of its own, not a measured edge, and the divider
+above the tickets says so with these numbers.
+
+### The record is kept honest
+
+A date's list is written to its rows when the date is graded, before any
+result lands: each ticket as a spec on its first leg's row (`t3`), the
+app, the three legs' keys and what each read there (line, price, chance,
+side). A date with a result already on it is never listed after the
+fact. The record carries "Three-leg tickets as listed, to test" from
+those specs alone, at the product of the three prices, a void or pushed
+leg dropping out as the apps settle it. A list asked for on a graded
+date that kept none (an older night, or another choice of sides) is
+rebuilt from the rows for study, says so, and stays out of the record.
+
+Take marks a ticket as one being placed. The spec keeps the legs as they
+read when it was taken, so a reload of the props file that moves a line
+or turns a pick to the other side leaves the ticket as placed, and it is
+graded on its own lines and sides. Taken tickets sit in the Taking strip
+on the Props tab and on the day board, in the copied text, on "Three-leg
+tickets you took" on the Props record and under What you took. Copy
+ticket puts one ticket in words, to key into the app.
+
+### The card
+
+A ticket: the app and the price in a band, each leg a line that opens
+his panel, with the pick and the market in the side's colour, the price
+and the chance, his last ten as pips (filled where the game went the
+pick's way, a ring where it did not, the last five set apart, each pip
+naming its game), the counts, his last five's average and the levers; a
+perforation, then the chance all three land, what the price needs, the
+edge and what a unit wins, or the result once graded. Green or red in
+the band when it has graded.
+
+Shown, not scored: no chance on any prop moves, and slate.py is
+untouched.
+
+The harness loads a props file of ten men on four games and reads the
+two tickets either side (three games first, then two legs sharing a game
+with the 0.95), the four men who make no leg (a cold hand, the levers
+against him, another app alone, the over on a favourite's man with no
+record), the overs alone, the unders alone saying there are none, the
+LEANs back; a leg's panel, the copied text, the take and its spec; the
+file loaded again with a pick turned and a line moved, the taken ticket
+unchanged and the list rebuilt; the day board; then the grade, the list
+kept before the results, the taken ticket winning on the side it was
+taken on where the card's row lost, the three record lines, and a
+rebuilt list that stays out of the record.

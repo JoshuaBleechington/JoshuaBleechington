@@ -27,6 +27,10 @@ const CHECKS = ["dome","playoff"];
 (async () => {
   const b = await chromium.launch({ executablePath: process.env.CHROMIUM_PATH || '/opt/pw-browsers/chromium' });
   const pg = await b.newPage({ viewport: { width: 1280, height: 1400 } });
+  // 11 Nov 2026: three-leg tickets sit under the BETs by default; the blocks written before read the LEAN cards there, so every load
+  // puts the LEANs back unless a block frees the choice
+  let belowFree = false;
+  const leansBelow = async () => { if (belowFree) return; await pg.evaluate(async () => { await window.smStore.ready; const el = document.getElementById('propsBelow'); if (el && el.value !== 'leans') { el.value = 'leans'; el.dispatchEvent(new Event('change', { bubbles: true })); } }); };
   const reloaded = async () => {
     await pg.reload();
     try { await pg.waitForFunction(() => window.smStore && window.smStore.ready, null, { timeout: 60000 }); }
@@ -36,6 +40,7 @@ const CHECKS = ["dome","playoff"];
       throw e;
     }
     await pg.waitForTimeout(300);
+    await leansBelow();
   };   // a reload waits for the store, not a fixed 300 ms (30 Oct 2026: the harness raced the page under load)
   const errs = [];
   pg.on('pageerror', e => errs.push(String(e)));
@@ -49,6 +54,8 @@ const CHECKS = ["dome","playoff"];
   await pg.evaluate(() => smStore.ready.then(() => smStore.clear()));
   await pg.reload();
   await pg.waitForTimeout(300);
+  const belowDefault = await pg.evaluate(async () => { await window.smStore.ready; return (document.getElementById('propsBelow') || {}).value; });   // the choice on a first visit
+  await leansBelow();
 
   let fails = 0;
   const chk = (ok, m, d) => { if (!ok) fails++; console.log(`${ok ? 'PASS' : 'FAIL'}  ${m}${ok ? '' : '\n        ' + d}`); };
@@ -1794,6 +1801,134 @@ const CHECKS = ["dome","playoff"];
   chk(/A minutes spike, the over 60-90 .*?the chip reads the BET and LEAN picks: not on a favourite 40-20 \(66\.7%\) · on a favourite 20-40 \(33\.3%\), no colour/i.test(splitT.record)
       && /the chip reads the BET and LEAN picks: the over off a favourite 40-20, on one 20-40/.test(splitT.cardTile),
       'props: the spike\'s tile keeps every band\'s count and says under it what the chip reads, off a favourite and on one, and the card\'s line the same (10 Nov 2026)', JSON.stringify({ record: splitT.record.replace(/^[\s\S]*?(A minutes spike, the over)/i, '$1').slice(0, 330), tile: splitT.cardTile.slice(-260) }));
+
+  // ---- 11 Nov 2026: three-leg tickets under the BETs -- the legs' test, one app a ticket, three games before a shared one, a man in one ticket, the three modes, the copy, the take through a reload, the day board, the list kept at grading and the record ----
+  belowFree = true;
+  const t3Keep = await pg.evaluate(async () => { await smStore.ready; const k = { card: await smStore.getItem('callsheet3.card.v1'), slate: await smStore.getItem('callsheet3.slate.v1') }; await smStore.removeItem('callsheet3.props.v1'); return k; });
+  await reloaded();
+  const t3T = await pg.evaluate(async () => {
+    const wait = () => new Promise(r => setTimeout(r, 110));
+    const txt = e => (e ? e.innerText : '').replace(/\s+/g, ' ').trim();
+    await smStore.ready;
+    const copies = []; try { Object.defineProperty(navigator, 'clipboard', { configurable: true, value: { writeText: t => { copies.push(String(t)); return Promise.resolve(); } } }); } catch (e) {}
+    const load = async (doc, name) => { const dt = new DataTransfer(); dt.items.add(new File([JSON.stringify(doc)], name, { type: 'application/json' })); const inp = document.getElementById('slateFile'); inp.files = dt.files; inp.dispatchEvent(new Event('change', { bubbles: true })); await wait(); await wait(); };
+    const G = [['Hawks', 'Magic', 'ATL', 'ORL', -2.5], ['Bulls', 'Bucks', 'CHI', 'MIL', -2.5], ['Heat', 'Jazz', 'MIA', 'UTA', -2.5], ['Suns', 'Kings', 'PHX', 'SAC', -7.5]];
+    const ov = L => [L + 2, L - 2, L + 3, L - 1, L + 1, L + 2, L + 4, L - 3, L + 1, L + 2], un = L => [L - 2, L + 2, L - 3, L + 1, L - 1, L - 2, L - 4, L + 3, L - 1, L - 2];   // four of the last five and seven of the last ten the pick's way
+    const up = [{ k: 'pace', t: 'Pace', eff: 0.4, i: 0 }, { k: 'dvp', t: 'Defence v position', eff: 0.6, i: 0 }], dn = [{ k: 'pace', t: 'Pace', eff: -0.4, i: 0 }, { k: 'dvp', t: 'Defence v position', eff: -0.6, i: 0 }];
+    const man = (pid, name, team, gi, mk, side, line, chance, vals, parts, books) => ({ gi, pid: String(pid), name, team, opp: team === G[gi][2] ? G[gi][3] : G[gi][2], home: team === G[gi][3], pos: 'G', mk, line, op: -110, up: -110, book: books ? Object.keys(books)[0] : 'fanduel',
+      books: books || { fanduel: [line, -110, -110], draftkings: [line, -115, -115] }, proj: line + (side === 'OVER' ? 2 : -2), sd: 6, pm: side === 'OVER' ? 0.7 : 0.3, pb: 0.5, p: side === 'OVER' ? chance : Math.round((1 - chance) * 10000) / 10000, push: 0, side, chance, price: -110, need: 0.5238,
+      edge: Math.round((chance - 0.5238) * 10000) / 10000, band: 'LEAN', mins: 32, rate36: 20, base: 18, med: line + (side === 'OVER' ? 1.5 : -1.5), usg: 22, sdf: 1, starter: true, start_src: "RotoWire's expected five", why: ['x'],
+      log: vals.map((v, i) => ['2026-10-' + String(20 + i), 'OPP', i % 2, 32, v, ['won by 3']]), parts });
+    const men = () => [man(1, 'Man One', 'ATL', 0, 'pts', 'OVER', 20.5, 0.60, ov(20.5), up), man(2, 'Man Two', 'CHI', 1, 'reb', 'OVER', 7.5, 0.59, ov(7.5), up), man(3, 'Man Three', 'MIA', 2, 'ast', 'UNDER', 5.5, 0.58, un(5.5), dn),
+      man(7, 'Man Seven', 'ORL', 0, 'tpm', 'UNDER', 4.5, 0.57, un(4.5), dn), man(8, 'Man Eight', 'MIL', 1, 'pts', 'OVER', 12.5, 0.56, ov(12.5), up), man(9, 'Man Nine', 'MIL', 1, 'reb', 'OVER', 6.5, 0.55, ov(6.5), up),
+      man(4, 'Cold Hand', 'ATL', 0, 'pts', 'OVER', 15.5, 0.60, [17.5, 17.5, 18.5, 16.5, 16.5, 13.5, 14.5, 17.5, 12.5, 16.5], up),   // two of his last five: no leg
+      man(5, 'Wrong Levers', 'CHI', 1, 'ast', 'OVER', 4.5, 0.60, ov(4.5), dn),                                                    // the levers against the over: no leg
+      man(6, 'Other App', 'MIA', 2, 'pts', 'OVER', 18.5, 0.60, ov(18.5), up, { betmgm: [18.5, -110, -110] }),                      // a leg at BetMGM alone: no three there
+      man(10, 'Big Fav', 'SAC', 3, 'pts', 'OVER', 22.5, 0.62, ov(22.5), up)];                                                      // the over on a favourite's man: out until its record reads green
+    const doc = (list) => ({ format: 'callsheet3.props', version: 1, date: '2026-11-12', games: G.map((g, gi) => ({ gid: 't3' + gi, away: g[0], home: g[1], aab: g[2], hab: g[3], spread: g[4], total: 225.5, props: list.filter(m => m.gi === gi) })) });
+    await load(doc(men()), 'nba-props-2026-11-12.json');
+    if (document.getElementById('propsView').hidden) { document.getElementById('m-props').click(); await wait(); }
+    document.getElementById('propsReset').click(); await wait();
+    const sel = (v) => { const el = document.getElementById('propsBelow'); el.value = v; el.dispatchEvent(new Event('change', { bubbles: true })); };
+    const best = document.getElementById('propsBest');
+    const tix = (root) => [...(root || best).querySelectorAll('.pk.t3')].map(e => ({ n1: txt(e.querySelector('.n1')), pay: txt(e.querySelector('.t3pay')), legs: [...e.querySelectorAll('.leg')].map(txt), pips: [...e.querySelectorAll('.leg .pips')].map(p => [...p.querySelectorAll('i')].map(i => i.className.replace(' g5', '|')).join('')).join(','), stats: txt(e.querySelector('.t3stats')), n4: txt(e.querySelector('.n4')), n6: txt(e.querySelector('.n6')), cls: e.className }));
+    const opts = [...document.querySelectorAll('#propsBelow option')].map(o => o.value + '=' + o.textContent);
+    sel('t3'); await wait();
+    const either = tix(), divider = txt(best.querySelector('.pk-divider.t3d')), others = best.querySelectorAll('.pk:not(.t3)').length, inGrid = best.querySelectorAll('.t3grid > .pk.t3').length, pipTitle = (best.querySelector('.pk.t3 .pips i') || {}).title, pipAria = best.querySelector('.pk.t3 .pips') ? best.querySelector('.pk.t3 .pips').getAttribute('aria-label') : '';
+    sel('t3o'); await wait(); const overs = tix(), dividerO = txt(best.querySelector('.pk-divider.t3d'));
+    sel('t3u'); await wait(); const unders = tix(), none = txt(best.querySelector('.empty.t3none'));
+    sel('leans'); await wait(); const leans = [...best.querySelectorAll('.pk')].map(e => txt(e.querySelector('.n2'))), leansT3 = best.querySelectorAll('.pk.t3').length, leansDiv = txt(best.querySelector('.pk-divider'));
+    sel('t3'); await wait();
+    const stored0 = await smStore.getItem('callsheet3.props.below.v1');
+    // a leg opens his panel; Copy puts the ticket in words and opens nothing; Take marks it and the strip carries it
+    best.querySelector('.pk.t3 .leg').click(); await wait();
+    const legPanel = document.getElementById('propDetail').hidden ? '' : txt(document.querySelector('#propDetailBody h3'));
+    document.getElementById('propDetailClose').click(); await wait();
+    best.querySelector('.pk.t3 [data-t3copy]').click(); await wait(); await wait();
+    const copied = copies.slice(), copySay = txt(document.getElementById('propsMsg')), panelAfterCopy = !document.getElementById('propDetail').hidden;
+    best.querySelector('.pk.t3 [data-t3take]').click(); await wait();
+    const taking = tix(document.getElementById('propsTaking')), takingCount = txt(document.getElementById('propsTakingCount')), takeBtn = txt(document.querySelector('#propsBest .pk.t3 [data-t3take]')), bestCls = best.querySelector('.pk.t3').className;
+    const spec0 = (JSON.parse(await smStore.getItem('callsheet3.props.v1')).find(r => r.pid === '1') || {}).t3 || [];
+    // the file loaded again with Man Two's pick turned to the under at a moved line: the ticket taken keeps its own legs, lines and sides
+    const again = men(), two = again.find(m => m.pid === '2'); two.side = 'UNDER'; two.line = 8.5; two.chance = 0.55; two.p = 0.45; two.edge = 0.0262; two.books = { fanduel: [8.5, -110, -110], draftkings: [8.5, -115, -115] };
+    await load(doc(again), 'nba-props-2026-11-12.json');
+    if (document.getElementById('propsView').hidden) { document.getElementById('m-props').click(); await wait(); }
+    const msg2 = txt(document.getElementById('propsMsg')).slice(0, 90), taking2 = tix(document.getElementById('propsTaking')), live2 = tix();
+    // the day board carries the ticket, and its text
+    document.getElementById('m-nba').click(); await wait();
+    const bd = document.getElementById('boardDate'); bd.value = '2026-11-12'; bd.dispatchEvent(new Event('change')); await wait();
+    const board = tix(document.getElementById('taking')), boardSum = txt(document.querySelector('#taking .pk.taking.sum')), boardCount = txt(document.getElementById('takingCount'));
+    copies.length = 0; document.getElementById('takingText').click(); await wait(); await wait();
+    const boardText = copies.slice();
+    document.getElementById('m-props').click(); await wait();
+    // the grade: the list is kept on the rows before the results land, then each ticket is graded on its own lines and sides
+    const box = (pid, name, pts, reb, ast, tpm) => [pid, [name, 32, pts, reb, ast, tpm]];
+    const gdoc = { format: 'callsheet2.slate', version: 1, date: '2026-11-12', games: [
+      { sport: 'NBA', gdate: '2026-11-12', away: 'Hawks', home: 'Magic', gameId: 't3a', finals: { fa: '110', fh: '105', f5a: '55', f5h: '50' }, notes: [], box: Object.fromEntries([box('1', 'Man One', 25, 4, 4, 2), box('7', 'Man Seven', 12, 3, 2, 6), box('4', 'Cold Hand', 10, 2, 2, 1)]) },
+      { sport: 'NBA', gdate: '2026-11-12', away: 'Bulls', home: 'Bucks', gameId: 't3b', finals: { fa: '100', fh: '111', f5a: '50', f5h: '56' }, notes: [], box: Object.fromEntries([box('2', 'Man Two', 14, 9, 3, 1), box('8', 'Man Eight', 10, 4, 2, 1), box('9', 'Man Nine', 8, 8, 1, 0), box('5', 'Wrong Levers', 9, 2, 6, 0)]) },
+      { sport: 'NBA', gdate: '2026-11-12', away: 'Heat', home: 'Jazz', gameId: 't3c', finals: { fa: '104', fh: '99', f5a: '52', f5h: '49' }, notes: [], box: Object.fromEntries([box('3', 'Man Three', 11, 3, 3, 1), box('6', 'Other App', 22, 5, 3, 2)]) },
+      { sport: 'NBA', gdate: '2026-11-12', away: 'Suns', home: 'Kings', gameId: 't3d', finals: { fa: '101', fh: '120', f5a: '50', f5h: '61' }, notes: [], box: Object.fromEntries([box('10', 'Big Fav', 30, 5, 3, 2)]) }] };
+    await load(gdoc, 'nba-grade-2026-11-12.json');
+    if (document.getElementById('propsView').hidden) { document.getElementById('m-props').click(); await wait(); }
+    const after = tix(), afterDiv = txt(best.querySelector('.pk-divider.t3d')), afterTaking = tix(document.getElementById('propsTaking'));
+    const rowsNow = JSON.parse(await smStore.getItem('callsheet3.props.v1')), specs = rowsNow.filter(r => r.t3).map(r => r.name + ':' + r.t3.map(sp => sp.app + '/' + sp.m + '/' + sp.ks.length + (sp.listed ? '/listed' + sp.n : '') + (sp.take ? '/take' : '')).join(',')).join(';');
+    const twoRow = rowsNow.find(r => r.pid === '2');
+    const record = txt(document.getElementById('propsCalib')), cardTile = txt(document.querySelector('#calibBox .calib[data-sport="PROPS"] .sides')), took = txt(document.querySelector('#calibBox .calib[data-sport="TAKEN"]'));
+    sel('t3o'); await wait(); const afterO = tix(), afterODiv = txt(best.querySelector('.pk-divider.t3d'));
+    sel('t3'); await wait();
+    await load(gdoc, 'nba-grade-2026-11-12.json');   // the grade loaded again leaves the list as it was kept
+    const specs2 = JSON.parse(await smStore.getItem('callsheet3.props.v1')).filter(r => r.t3).map(r => r.name + ':' + r.t3.length).join(',');
+    sel('leans'); await wait();
+    if (!document.getElementById('propsView').hidden) { document.getElementById('propsReset').click(); await wait(); } document.getElementById('m-nba').click(); await wait();
+    return { opts, either, divider, others, inGrid, pipTitle, pipAria, overs, dividerO, unders, none, leans, leansT3, leansDiv, stored0, legPanel, copied, copySay, panelAfterCopy, taking, takingCount, takeBtn, bestCls, spec0, msg2, taking2, live2, board, boardSum, boardCount, boardText, after, afterDiv, afterTaking, specs, twoRow: [twoRow.side, twoRow.line, twoRow.result, twoRow.actual], record, cardTile, took, afterO, afterODiv, specs2 };
+  });
+  await pg.evaluate(async (k) => { await smStore.removeItem('callsheet3.props.v1'); if (k.card === null || k.card === undefined) await smStore.removeItem('callsheet3.card.v1'); else await smStore.setItem('callsheet3.card.v1', k.card); if (k.slate === null || k.slate === undefined) await smStore.removeItem('callsheet3.slate.v1'); else await smStore.setItem('callsheet3.slate.v1', k.slate); }, t3Keep);
+  belowFree = false;
+  await reloaded();
+  const lc = v => String(v || '').toLowerCase(), legOf = (t, i) => lc(t && t.legs[i]);
+  const t3Leg = (n, name, pick, price, pct, where, avg) => `${n} ${name} ${pick} ${price} · ${pct}% last 5: 4 of 5 · last 10: 7 of 10 ${where} · averaging ${avg} his last five · levers 2▲ 0▼`.toLowerCase();
+  chk(belowDefault === 't3' && t3T.opts.join('|') === 't3=3-leg tickets, either side|t3o=3-leg tickets, overs|t3u=3-leg tickets, unders|leans=the LEANs one by one' && t3T.stored0 === 't3'
+      && t3T.either.length === 2 && t3T.inGrid === 2 && t3T.others === 0
+      && t3T.divider === "No BET on this date. Three-leg tickets below, to test, in the LEANs' place: three men at one app, each a pick with an edge whose last five games went his way four times or more and his last ten at least half, more levers toward the pick than against and no red chip. Replayed on the eleven nights that keep the logs and the levers, exactly as built here: such legs went 45-28 one at a time (the overs 20-7, the unders 25-21) and the tickets 2 of 12 for +0.7 units. A test, not a measured edge: its record builds in Is it working, and the LEANs are one choice away."
+      && t3T.either[0].n1 === '3 LEGS #1 · at FanDuel · three games' && t3T.either[0].pay === '+596 6.96×' && t3T.either[0].legs.length === 3
+      && legOf(t3T.either[0], 0) === t3Leg(1, 'Man One', 'OVER 20.5 points', '-110', '60.0', 'ATL @ ORL', '21.7') && legOf(t3T.either[0], 1) === t3Leg(2, 'Man Two', 'OVER 7.5 rebounds', '-110', '59.0', 'CHI @ MIL', '8.7')
+      && legOf(t3T.either[0], 2) === t3Leg(3, 'Man Three', 'UNDER 5.5 assists', '-110', '58.0', 'MIA @ UTA', '4.3') && t3T.either[0].pips === 'hmhmhh|hmhh,hmhmhh|hmhh,hmhmhh|hmhh'
+      && lc(t3T.either[0].stats) === 'all three land 20.5% needs 14.4% edge +6.2 a unit wins 5.96u' && t3T.either[0].n4 === '' && lc(t3T.either[0].n6) === 'take copy ticket'
+      && t3T.pipTitle === '10-20 @ OPP: 22.5, his way' && t3T.pipAria === "his last 10 games, oldest first: 7 went the pick's way",
+      'three-leg tickets (11 Nov 2026): under the BETs on a first visit, either side, in their own grid with the LEAN cards away; a leg is a pick with an edge, four of his last five and half of his last ten his way and the levers toward him, three men at one app on three games with the most expected value first; the card carries the price, each leg\'s chip, price and chance, his last ten as pips with the last five set apart, the counts, his last five\'s average and the levers, and the ticket\'s chance, what it needs, the edge and what a unit wins', JSON.stringify({ def: belowDefault, opts: t3T.opts, either: t3T.either[0], divider: t3T.divider, others: t3T.others, inGrid: t3T.inGrid, pip: [t3T.pipTitle, t3T.pipAria] }));
+  chk(t3T.either.length === 2 && t3T.either[1].n1 === '3 LEGS #2 · at FanDuel · two games' && legOf(t3T.either[1], 0) === t3Leg(1, 'Man Seven', 'UNDER 4.5 threes', '-110', '57.0', 'ORL v ATL', '3.3')
+      && legOf(t3T.either[1], 1) === t3Leg(2, 'Man Eight', 'OVER 12.5 points', '-110', '56.0', 'MIL v CHI', '13.7') && legOf(t3T.either[1], 2) === t3Leg(3, 'Man Nine', 'OVER 6.5 rebounds', '-110', '55.0', 'MIL v CHI', '7.7')
+      && lc(t3T.either[1].stats) === 'all three land 16.7% needs 14.4% edge +2.3 a unit wins 5.96u'
+      && t3T.either[1].n4 === 'Two legs share a game: the app prices same-game legs its own way, usually a little under the product shown; two overs on one club carry the measured ×0.95.'
+      && !/Cold Hand|Wrong Levers|Other App|Big Fav/i.test(JSON.stringify([t3T.either, t3T.overs])),
+      'three-leg tickets: a man sits in one ticket, so the second is built from the three left; with no three games among them two legs share a game, the card says so and two overs on one club carry the measured 0.95; the cold hand, the man with the levers against him, the man posted at another app alone and the over on a favourite\'s man with no record yet make no leg', JSON.stringify({ second: t3T.either[1] }));
+  chk(t3T.overs.length === 1 && t3T.overs[0].n1 === '3 LEGS #1 · at FanDuel · two games' && t3T.overs[0].legs.map(l => l.split(' ').slice(1, 3).join(' ')).join(',') === 'Man One,Man Two,Man Eight'
+      && lc(t3T.overs[0].stats) === 'all three land 19.8% needs 14.4% edge +5.5 a unit wins 5.96u' && t3T.overs[0].n4 === 'Two legs share a game: the app prices same-game legs its own way, usually a little under the product shown.'
+      && /and no red chip, the overs only\. Replayed on the eleven nights/.test(t3T.dividerO)
+      && t3T.unders.length === 0 && t3T.none === 'No three legs on this date pass the test at one app among the unders.'
+      && t3T.leansT3 === 0 && t3T.leans.length === 10 && t3T.leans[0] === 'Big Fav OVER 22.5 points' && /^No BET on this date\. LEANs below/.test(t3T.leansDiv),
+      'three-leg tickets: the overs alone make one ticket, on two games for want of a third, with the note on the app\'s own price and no factor where the two share no club; the unders alone make none and say so; the LEANs one by one bring the ten cards back with no ticket', JSON.stringify({ overs: t3T.overs, dividerO: t3T.dividerO.slice(260, 380), unders: t3T.unders, none: t3T.none, leans: t3T.leans, leansT3: t3T.leansT3, leansDiv: t3T.leansDiv }));
+  chk(/^Man One/.test(t3T.legPanel) && t3T.panelAfterCopy === false && t3T.copySay === 'Copied the ticket.' && t3T.copied.length === 1
+      && t3T.copied[0] === '3-leg ticket at FanDuel · pays +596 (6.96x) · all three land 20.5%, needs 14.4%\n1. Man One OVER 20.5 points -110 · last 5: 4 of 5, last 10: 7 of 10 · Hawks @ Magic\n2. Man Two OVER 7.5 rebounds -110 · last 5: 4 of 5, last 10: 7 of 10 · Bulls @ Bucks\n3. Man Three UNDER 5.5 assists -110 · last 5: 4 of 5, last 10: 7 of 10 · Heat @ Jazz'
+      && t3T.taking.length === 1 && t3T.taking[0].n1 === 'TAKING · 3 LEGS · at FanDuel · three games' && /^1 marked$/i.test(t3T.takingCount) && /taking/i.test(t3T.takeBtn) && /\btaking\b/.test(t3T.bestCls) && lc(t3T.taking[0].n6) === '✓ taking copy ticket'
+      && JSON.stringify(t3T.spec0) === '[{"id":"t3|2026-11-12|fanduel|1:pts|2:reb|3:ast","app":"fanduel","m":"t3","ks":["2026-11-12|1|pts","2026-11-12|2|reb","2026-11-12|3|ast"],"at":[[20.5,-110,0.6,"OVER"],[7.5,-110,0.59,"OVER"],[5.5,-110,0.58,"UNDER"]],"take":true}]',
+      'three-leg tickets: a leg opens his panel, Copy puts the ticket in words for the app and opens nothing, Take marks the ticket on its first leg\'s row with the app and what each leg read there (line, price, chance, side), and the Taking strip carries it', JSON.stringify({ panel: t3T.legPanel, copied: t3T.copied, say: t3T.copySay, taking: t3T.taking, count: t3T.takingCount, btn: t3T.takeBtn, spec: t3T.spec0 }));
+  chk(/0 new, 10 replaced/.test(t3T.msg2) && t3T.taking2.length === 1 && legOf(t3T.taking2[0], 0) === t3Leg(1, 'Man One', 'OVER 20.5 points', '-110', '60.0', 'ATL @ ORL', '21.7')
+      && legOf(t3T.taking2[0], 1) === "2 man two over 7.5 rebounds -110 · 59.0% last 5: 4 of 5 · last 10: 7 of 10 chi @ mil · averaging 8.7 his last five · 7.5 on the ticket, the card's 8.5" && lc(t3T.taking2[0].stats) === 'all three land 20.5% needs 14.4% edge +6.2 a unit wins 5.96u'
+      && t3T.live2.length === 1 && t3T.live2[0].n1 === '3 LEGS #1 · at FanDuel · three games' && t3T.live2[0].legs.map(l => l.split(' ').slice(1, 3).join(' ')).join(',') === 'Man One,Man Three,Man Eight' && lc(t3T.live2[0].stats) === 'all three land 19.5% needs 14.4% edge +5.1 a unit wins 5.96u' && lc(t3T.live2[0].n6) === 'take copy ticket'
+      && t3T.board.length === 1 && t3T.board[0].n1 === 'TAKING · 3 LEGS · at FanDuel · three games' && /^TONIGHT 1 bet marked none graded yet · one unit each 0 on the card, 0 from the simulation, 0 props, 1 three-leg ticket$/.test(t3T.boardSum) && /^1 marked$/i.test(t3T.boardCount)
+      && t3T.boardText.length === 1 && /\n1\. 3-LEG TICKET at FanDuel: Man One OVER 20\.5 points -110 \+ Man Two OVER 7\.5 rebounds -110 \+ Man Three UNDER 5\.5 assists -110 · pays \+596 · all three land 20\.5% needs 14\.4%$/.test(t3T.boardText[0]),
+      'three-leg tickets: the props file loaded again, a pick turned to the other side at a moved line, leaves the ticket taken with its own legs, lines and sides and says where the card now differs, while the list is rebuilt from the rows as they stand; the day board\'s Taking strip carries the ticket and its text', JSON.stringify({ msg: t3T.msg2, taking: t3T.taking2, live: t3T.live2, board: t3T.board, sum: t3T.boardSum, count: t3T.boardCount, text: t3T.boardText }));
+  chk(t3T.after.length === 1 && /pk t3 agrees loss/.test(t3T.after[0].cls) && t3T.after[0].n1 === '3 LEGS #1 · at FanDuel · three games LOSS' && / win · 25$/.test(legOf(t3T.after[0], 0)) && / win · 3$/.test(legOf(t3T.after[0], 1)) && / loss · 10$/.test(legOf(t3T.after[0], 2))
+      && lc(t3T.after[0].stats) === 'all three land 19.5% needs 14.4% edge +5.1 result -1.00u' && lc(t3T.after[0].n6) === 'copy ticket' && t3T.afterDiv.endsWith('and the LEANs are one choice away. This list was kept before the games and is in the record.')
+      && t3T.afterTaking.length === 1 && /pk t3 agrees win taking/.test(t3T.afterTaking[0].cls) && t3T.afterTaking[0].n1 === 'TAKING · 3 LEGS · at FanDuel · three games WIN' && /7\.5 on the ticket, the card's 8\.5 win · 9$/.test(legOf(t3T.afterTaking[0], 1))
+      && lc(t3T.afterTaking[0].stats) === 'all three land 20.5% needs 14.4% edge +6.2 result +5.96u' && lc(t3T.afterTaking[0].n6) === 'taken copy ticket'
+      && t3T.specs === 'Man One:fanduel/t3/3/take,fanduel/t3/3/listed1' && JSON.stringify(t3T.twoRow) === '["UNDER",8.5,"loss",9]' && t3T.specs2 === 'Man One:2',
+      'three-leg tickets: the grade keeps the date\'s list on the rows before the results land (the list as the rows then stood, not the ticket taken earlier), grades each ticket on its own lines and sides (the ticket taken wins on the over it was taken on, though the card\'s row had turned to the under and lost), the cards carry the results, and a second load of the grade lists nothing more', JSON.stringify({ after: t3T.after, div: t3T.afterDiv.slice(-100), taking: t3T.afterTaking, specs: t3T.specs, two: t3T.twoRow, specs2: t3T.specs2 }));
+  chk(/Three-leg tickets as listed, to test 0-1 says 19\.5% · does 0\.0% \(±50\.0\) · -1\.00u at the product of the three legs' prices; a void or pushed leg drops out Three-leg tickets you took 1-0 says 20\.5% · does 100\.0% \(±50\.0\) · \+5\.96u/i.test(t3T.record)
+      && /three-leg tickets as listed 0-1 -1\.0u · three-leg tickets taken 1-0 \+6\.0u/.test(t3T.cardTile) && /Three-leg tickets taken 1-0 says 20\.5% · does 100\.0% \(±50\.0\) · \+5\.96u/i.test(t3T.took)
+      && t3T.afterO.length === 1 && /pk t3 agrees loss/.test(t3T.afterO[0].cls) && t3T.afterO[0].legs.map(l => l.split(' ').slice(1, 3).join(' ')).join(',') === 'Man One,Man Eight,Man Nine' && t3T.afterODiv.endsWith("and the LEANs are one choice away. Rebuilt from the night's rows after the games: for study, not in the record."),
+      'three-leg tickets: the record keeps the tickets as listed and the ones taken on tiles of their own, on the card\'s line and under What you took; a list asked for after the games in another mode is rebuilt for study, says so and stays out of the record', JSON.stringify({ record: t3T.record.replace(/^[\s\S]*?(Three-leg tickets as listed)/i, '$1').slice(0, 300), tile: (t3T.cardTile.match(/three-leg tickets[^·]*·[^·]*/i) || [''])[0], took: t3T.took.replace(/^[\s\S]*?(Three-leg tickets taken)/i, '$1').slice(0, 110), afterO: t3T.afterO, div: t3T.afterODiv.slice(-120) }));
 
   // ---- 4 Nov 2026: the crowd on Kalshi -- the exchange's game-winner prices on the row, the card beside the book and Pinnacle, the better price after the fee on the board, the sharp side against the crowd on the moneyline tile ----
   const kalT = await pg.evaluate(async () => {

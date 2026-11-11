@@ -402,6 +402,40 @@
   .pk .n5.bestapp b, .pdlg .pd-bestapp b { color: var(--go); } .pk .n5.clvline.pos, .pdlg .pd-clv.pos { color: var(--go); } .pk .n5.clvline.neg, .pdlg .pd-clv.neg { color: var(--bad); }
   /* recent form on the props (5 Nov 2026): his last three against the line, green with the pick and red against it; shown, not scored */
   .pk .n5.formline.pos, .pdlg .pd-form.pos { color: var(--go); } .pk .n5.formline.neg, .pdlg .pd-form.neg { color: var(--bad); } .pdlg .pd-form .dim { color: var(--ink-2); }
+  /* three-leg tickets (11 Nov 2026): a ticket a card, the price up front in a band, each leg a line that opens his panel with his last
+     ten as pips (filled where the game went the pick's way, a ring where it did not, the last five set apart), a perforation above the stub */
+  :root { --band: #14181a; --band-ink: #f2f4f3; }
+  @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) { --band: #2b3634; --band-ink: #e7ebea; } }
+  :root[data-theme="dark"] { --band: #2b3634; --band-ink: #e7ebea; }
+  .t3grid { grid-column: 1 / -1; display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 350px), 1fr)); gap: 14px; align-items: start; margin-top: 4px; }
+  .picks > .pk.t3 { grid-column: 1 / -1; max-width: 640px; }
+  .pk.t3 { --t3line: var(--band); display: block; padding: 0; border: 0; background: transparent; border-radius: 0; opacity: 1; }
+  .pk.t3 .t3top { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 11px 14px; background: var(--t3line); color: var(--band-ink); border: 1.5px solid var(--t3line); border-bottom: 0; border-radius: 12px 12px 0 0; }
+  .pk.t3 .t3top .n1 { color: inherit; font-size: 11px; line-height: 1.5; } .pk.t3 .t3top .chip { background: rgba(255, 255, 255, .24); color: inherit; margin-left: 6px; }
+  .pk.t3 .t3pay { text-align: right; white-space: nowrap; } .pk.t3 .t3pay b { display: block; font: 800 23px/1 var(--mono); letter-spacing: -.02em; } .pk.t3 .t3pay span { font: 600 10.5px/1.5 var(--mono); opacity: .78; }
+  .pk.t3 .n2.legs { font: 400 12px/1.4 var(--sans); padding: 2px 14px; background: var(--surface); border-left: 1.5px solid var(--t3line); border-right: 1.5px solid var(--t3line); }
+  .pk.t3 .leg { display: grid; gap: 5px; padding: 10px 0 9px; border-bottom: 1px solid var(--rule); cursor: pointer; } .pk.t3 .leg:last-child { border-bottom: 0; } .pk.t3 .leg:hover .lname { text-decoration: underline; }
+  .pk.t3 .l1 { display: grid; grid-template-columns: 18px minmax(0, 1fr) auto; align-items: start; column-gap: 7px; font-size: 14.5px; }
+  .pk.t3 .lwho { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 7px; min-width: 0; } .pk.t3 .l1 .lno { margin-top: 1px; } .pk.t3 .llev { white-space: nowrap; }
+  .pk.t3 .lno { display: inline-grid; place-items: center; width: 18px; height: 18px; border-radius: 50%; background: var(--surface-2); color: var(--ink-2); font: 800 10px/1 var(--mono); flex: none; }
+  .pk.t3 .lname { font-weight: 800; letter-spacing: -.01em; } .pk.t3 .l1 .chip { white-space: normal; line-height: 1.25; padding: 4px 8px; } .pk.t3 .l1 .chip i { font-style: normal; font-weight: 600; opacity: .88; margin-left: 3px; } .pk.t3 .lpr { font: 600 12px/1.6 var(--mono); white-space: nowrap; text-align: right; }
+  .pk.t3 .l2 { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 10px; padding-left: 25px; } .pk.t3 .lhr { font: 500 11.5px/1.2 var(--mono); color: var(--ink-2); } .pk.t3 .lhr b { color: var(--go); font-weight: 700; }
+  .pk.t3 .l3 { padding-left: 25px; font-size: 11px; line-height: 1.7; color: var(--muted); }
+  .pk.t3 .l3 .tell { display: inline-block; padding: 0 6px; border-radius: 4px; border: 1px solid var(--go); color: var(--go); background: var(--go-wash); font-weight: 600; font-size: 10.5px; }
+  .pips { display: inline-flex; align-items: center; gap: 3px; } .pips i { display: inline-block; box-sizing: border-box; width: 10px; height: 10px; border-radius: 50%; }
+  .pips i.h { background: var(--go); } .pips i.m { border: 2px solid var(--bad); } .pips i.p { background: var(--muted); } .pips i.g5 { margin-left: 7px; }
+  .pk.t3 .t3foot { position: relative; padding: 12px 14px; background: var(--surface-2); border: 1.5px solid var(--t3line); border-top: 2px dashed var(--rule-firm); border-radius: 0 0 12px 12px; }
+  .pk.t3 .t3foot::before, .pk.t3 .t3foot::after { content: ""; position: absolute; top: -10px; width: 18px; height: 18px; box-sizing: border-box; border-radius: 50%; background: var(--surface); border: 1.5px solid transparent; }
+  .pk.t3 .t3foot::before { left: -10.5px; border-right-color: var(--t3line); border-top-color: var(--t3line); transform: rotate(45deg); }
+  .pk.t3 .t3foot::after { right: -10.5px; border-left-color: var(--t3line); border-bottom-color: var(--t3line); transform: rotate(45deg); }
+  .pk.t3 .t3stats { display: grid; grid-template-columns: repeat(4, auto); justify-content: space-between; gap: 8px; }
+  .pk.t3 .t3stats span { display: block; font: 700 9px/1.3 var(--sans); letter-spacing: .08em; text-transform: uppercase; color: var(--muted); } .pk.t3 .t3stats b { font: 700 15px/1.35 var(--mono); }
+  .pk.t3 .t3stats b.pos { color: var(--go); } .pk.t3 .t3stats b.neg { color: var(--bad); }
+  .pk.t3 .n4 { margin-top: 9px; line-height: 1.45; } .pk.t3 .n6 { margin-top: 11px; display: flex; flex-wrap: wrap; align-items: center; gap: 8px; } .pk.t3 .takebtn { border-color: var(--rule-firm); background: var(--surface); } .pk.t3 .takebtn.on { background: var(--go); border-color: var(--go); }
+  .pk.t3.win { --t3line: var(--go); } .pk.t3.loss { --t3line: var(--bad); } .pk.t3.win .t3top, .pk.t3.loss .t3top { color: #fff; }
+  .pk.t3 .leg.win .lname { color: var(--go); } .pk.t3 .leg.loss .lname { color: var(--bad); }
+  .pk.t3.taking { box-shadow: none; } .pk.t3.taking .t3top { box-shadow: inset 0 -4px 0 var(--go); }
+  .pk-divider.t3d { line-height: 1.5; } .pk-divider.t3d b { color: var(--ink); }
   /* one bet a man (10 Nov 2026): the line on a man's several BET cards and the note above the best list */
   .pk .n5.onebet, .pdlg .pd-onebet { color: var(--edge); font-weight: 600; }
   .pk-note { grid-column: 1 / -1; flex-basis: 100%; width: 100%; box-sizing: border-box; font-size: 12.5px; font-weight: 600; color: var(--edge); background: var(--edge-wash); border-left: 3px solid var(--edge); border-radius: 4px; padding: 7px 10px; }

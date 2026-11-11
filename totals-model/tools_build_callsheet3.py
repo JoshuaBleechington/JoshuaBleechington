@@ -27,7 +27,7 @@ import sys
 ROOT = pathlib.Path(__file__).parent / "web"
 OPEN = "  /* ===== ENGINE BLOCK."
 CLOSE = "  /* ===== END ENGINE BLOCK ===== */"
-STAMP = "2026-11-10"   # bumped by hand when 3.0's own sources change (the harness checks it)
+STAMP = "2026-11-11"   # bumped by hand when 3.0's own sources change (the harness checks it)
 
 
 def engine_block() -> str:
@@ -685,7 +685,7 @@ def build() -> str:
     # the store (25 Oct 2026): the card, the props and the slate outgrew localStorage's 10 MB, so every storage call goes
     # through smStore (web/store.js), which keeps those three in IndexedDB behind a cache filled before the page's code
     # runs; the page's one closure waits for that cache. The shim itself keeps its own localStorage calls, so it goes in after
-    html = every(html, "localStorage.", "smStore.", "storage shim", 15)
+    html = every(html, "localStorage.", "smStore.", "storage shim", 17)   # 17 from 11 Nov 2026: the choice of what sits under the BETs is kept too
     html = once(html, '<script>\n(function () {\n  "use strict";\n',
                 '<script>\n' + (ROOT / "store.js").read_text() + 'smStore.ready.then(function () {\n(function () {\n  "use strict";\n', "store start")
     html = once(html, '  render(); renderCard(); renderBoard(); renderCalib();\n})();\n</script>',

@@ -486,6 +486,197 @@
       '<div class="n4">' + propsPairLegAt(t, 0) + ' · ' + propsPairLegAt(t, 1) + ' · ' + esc(propsPairKindWords(t.kind)) + ', measured ×' + t.f.toFixed(2) + '</div>' +
       '<div class="n6">' + propsPairTakeBtn(t) + '</div></div>';
   }
+  /* three-leg tickets to test (11 Nov 2026, the user: "replace in the leans section of the 'Leans Below' with 3 leg props cards,
+     in the same betting apps, that have great last 5-10 hit rates, no red chips, levers towards the over, that I can use to test
+     for 3 leg parlays", then "what about for unders too... basically 3 guys on a card that have really recent history towards
+     that outcome", then "make it awesome"). A leg is a pick with an edge at the app's own line and price whose last five games
+     went his way four times or more and whose last ten at least half the time, with more measured levers toward the pick than
+     against and no red chip; a ticket is three legs on three men at one app, three different games before a shared one (the
+     apps price same-game legs their own way), the most expected value first, a man in one ticket a date. Two overs on one club
+     carry the pairs' measured 0.95. Measured before it was built (lab props_t3_apps.py: the page's own rule at each app's own
+     line and price, the chips read from the nights before, nothing known after the tip): on the eleven nights that keep the
+     logs and the levers the qualifying legs went 45-28 one at a time (61.6%; the overs 20-7, the unders 25-21) and the
+     tickets 2 of 12 for +0.7 units, the overs alone 1 of 4, the unders alone 2 of 8; held to three different games 1 of 9.
+     A test with its own record line, not a measured edge. A date's list is kept on its rows when the date is graded, before
+     the results land, so the record grades the tickets the tab showed and nothing chosen after the fact */
+  var PROPS_T3 = { l5: 4, l10: 0.5, n10: 8, max: 6, pool: 16 }, PROPS_BELOW_KEY = "callsheet3.props.below.v1";
+  var PROPS_BELOW_MODES = { t3: 1, t3o: 1, t3u: 1, leans: 1 };
+  var T3_MEASURED = "Replayed on the eleven nights that keep the logs and the levers, exactly as built here: such legs went 45-28 one at a time (the overs 20-7, the unders 25-21) and the tickets 2 of 12 for +0.7 units. A test, not a measured edge: its record builds in Is it working, and the LEANs are one choice away.";
+  var propsBelow = "t3";   // what sits under the BETs: three-leg tickets from either side, the overs only, the unders only, or the LEANs one by one
+  try { var below0 = localStorage.getItem(PROPS_BELOW_KEY); if (PROPS_BELOW_MODES[below0]) propsBelow = below0; } catch (e) {}
+  function propsT3Mode() { return propsBelow === "t3o" || propsBelow === "t3u" ? propsBelow : "t3"; }
+  function propLastGames(r) { return (r.log || []).filter(function (g) { return g && g[3] && +g[3] > 0 && g[4] !== null && g[4] !== undefined && g[4] !== "" && !isNaN(+g[4]); }).slice(-10); }
+  function propHitRate(r, line, side) {   // his last five and last ten against a line, on a side (the pick's own unless given)
+    var gs = propLastGames(r), sd = side || r.side, on = function (g) { return sd === "OVER" ? +g[4] > +line : +g[4] < +line; }, l5 = gs.slice(-5), sum = 0;
+    l5.forEach(function (g) { sum += +g[4]; });
+    return { h5: l5.filter(on).length, n5: l5.length, h10: gs.filter(on).length, n10: gs.length, avg5: l5.length ? sum / l5.length : null, games: gs };
+  }
+  function propT3Leg(r, app, mode) {
+    if (!propHas(r) || !(r.edge > 0)) return null;   // a man who then did not play stays a leg: nothing known after the tip chooses the list, and his leg drops out of the ticket as the apps settle it
+    if ((mode === "t3o" && r.side !== "OVER") || (mode === "t3u" && r.side !== "UNDER")) return null;
+    var l = propLegAt(r, app); if (!l) return null;
+    var edge = l.chance - implied(l.price); if (!(edge > 0)) return null;
+    var hr = propHitRate(r, l.line);
+    if (hr.n5 < 5 || hr.h5 < PROPS_T3.l5 || hr.n10 < PROPS_T3.n10 || hr.h10 / hr.n10 < PROPS_T3.l10) return null;
+    var t = propsLeverTally(r); if (!(t.toward > t.against)) return null;
+    var tells = propTells(r), fv = propFav(r);
+    if (tells.some(function (x) { return x.state === "red"; })) return null;
+    /* the over on a favourite's man is the measured leak (5.4 points under the book's chance on 3,223 props, both halves): out
+       unless its own record reads green, so a page with little graded yet does not list it for want of a colour */
+    if (r.side === "OVER" && fv !== null && fv >= 5 && !tells.some(function (x) { return x.k === "fav" && x.state === "green"; })) return null;
+    return { r: r, side: r.side, line: l.line, price: l.price, chance: l.chance, same: l.same, hr: hr, ev: l.chance * decimalOf(l.price) - 1 };
+  }
+  function propsT3Make(app, legs, spec) {
+    var f = 1, dec = 1, ch = 1, games = {};
+    for (var i = 0; i < legs.length; i++) {
+      dec *= decimalOf(legs[i].price); ch *= legs[i].chance; games[legs[i].r.game] = 1;
+      for (var j = i + 1; j < legs.length; j++) if (legs[i].r.team === legs[j].r.team && legs[i].r.game === legs[j].r.game && legs[i].side === "OVER" && legs[j].side === "OVER") f *= PROPS_PAIR_FACTOR.same_club_overs;
+    }
+    var chance = Math.min.apply(null, legs.map(function (l) { return l.chance; }).concat([ch * f]));
+    /* the id is the app and the three legs whatever their order, so a ticket taken before a reload is the same ticket after it */
+    return { id: "t3|" + (legs[0].r.gdate || "") + "|" + app + "|" + legs.map(function (l) { return l.r.pid + ":" + l.r.mk; }).sort().join("|"), app: app, gdate: legs[0].r.gdate || "", legs: legs, f: f, chance: chance, dec: dec,
+             price: americanOf(dec), need: 1 / dec, ev: chance * dec - 1, games: Object.keys(games).length, spec: spec || null };
+  }
+  function propsTreblesLive(dateISO, rowsIn, mode) {
+    var rows = (rowsIn || propsSource()).filter(function (r) { return (r.gdate || "") === dateISO; }), pools = {}, usedMan = {}, out = [];
+    PROPS_APPS.forEach(function (app) { pools[app] = rows.map(function (r) { return propT3Leg(r, app, mode); }).filter(Boolean).sort(function (a, b) { return (b.ev - a.ev) || (String(a.r.id) < String(b.r.id) ? -1 : 1); }); });
+    while (out.length < PROPS_T3.max) {
+      var best = null;
+      PROPS_APPS.forEach(function (app) {
+        var c = pools[app].filter(function (l) { return !usedMan[l.r.pid]; }).slice(0, PROPS_T3.pool);
+        for (var i = 0; i < c.length; i++) for (var j = i + 1; j < c.length; j++) for (var k = j + 1; k < c.length; k++) {
+          if (c[i].r.pid === c[j].r.pid || c[i].r.pid === c[k].r.pid || c[j].r.pid === c[k].r.pid) continue;
+          var t = propsT3Make(app, [c[i], c[j], c[k]]);
+          if (!best || t.games > best.games || (t.games === best.games && t.ev > best.ev + 1e-12)) best = t;   // three games before a shared one, then the most expected value
+        }
+      });
+      if (!best) break;
+      out.push(best); best.legs.forEach(function (l) { usedMan[l.r.pid] = true; });
+    }
+    return out;
+  }
+  /* a ticket kept on the rows: the spec sits on its first leg's row (`t3`), with the app, the three legs' keys and what each read
+     at the app (line, price, chance, side), so it rides through a backup, a reload of the props file and the trim, and is graded
+     on the app's own lines and the side it was listed on */
+  function propsT3Spec(t, mode) { return { id: t.id, app: t.app, m: mode, ks: t.legs.map(function (l) { return propKey(l.r); }), at: t.legs.map(function (l) { return [l.line, l.price, Math.round(l.chance * 10000) / 10000, l.side]; }) }; }
+  function propsT3FromSpec(spec, byKey) {
+    var legs = [];
+    for (var i = 0; i < spec.ks.length; i++) {
+      var r = byKey[spec.ks[i]], a = spec.at[i]; if (!r || !a) return null;
+      var side = a[3] || r.side;
+      legs.push({ r: r, side: side, line: +a[0], price: +a[1], chance: +a[2], same: Math.abs(+a[0] - +r.line) < 1e-9, hr: propLastGames(r).length ? propHitRate(r, +a[0], side) : null });
+    }
+    return legs.length === 3 ? propsT3Make(spec.app, legs, spec) : null;
+  }
+  function propsT3Stored(dateISO) {   // every ticket kept on the date's rows (every date's when none is given), as tickets
+    var src = propsPreview ? propsSource() : props, rows = src.filter(function (r) { return !dateISO || (r.gdate || "") === dateISO; }), byKey = {}, seen = {}, out = [];
+    if (!rows.some(function (r) { return r.t3 && r.t3.length; })) return out;
+    src.forEach(function (r) { byKey[propKey(r)] = r; });
+    rows.forEach(function (r) { (r.t3 || []).forEach(function (sp) { if (!sp || !sp.ks || !sp.at || seen[sp.id]) return; var t = propsT3FromSpec(sp, byKey); if (t) { seen[sp.id] = true; out.push(t); } }); });
+    return out;
+  }
+  function propsT3SpecOf(t) {   // the ticket's spec, on whichever of its three rows carries it
+    for (var i = 0; i < t.legs.length; i++) { var s = (t.legs[i].r.t3 || []).filter(function (x) { return x.id === t.id; })[0]; if (s) return { sp: s, row: t.legs[i].r }; }
+    return null;
+  }
+  function propsT3Kept(dateISO, mode) { return propsT3Stored(dateISO).filter(function (t) { return t.spec.listed && (t.spec.m || "t3") === mode; }).sort(function (a, b) { return (a.spec.n || 0) - (b.spec.n || 0); }); }
+  function propsTrebles(dateISO, rowsIn, mode) {   // the date's tickets: the list kept before the games once the date is graded, else as the rows stand now
+    var kept = propsT3Kept(dateISO, mode);
+    return kept.length ? kept : propsTreblesLive(dateISO, rowsIn, mode);
+  }
+  function propsT3Find(id) {
+    var d = String(id).split("|")[1] || "", pick = function (l) { return l.filter(function (t) { return t.id === id; })[0]; };
+    return pick(propsT3Stored(d)) || pick(propsTreblesLive(d, null, propsT3Mode())) || pick(propsTreblesLive(d, null, "t3")) || pick(propsTreblesLive(d, null, "t3o")) || pick(propsTreblesLive(d, null, "t3u")) || null;
+  }
+  function propsT3Freeze(dateISO) {   // at grading: the list as the tab would show it, kept before any result lands; a date with a result already on it is never listed after the fact
+    var rows = props.filter(function (r) { return (r.gdate || "") === dateISO; });
+    if (!rows.length || rows.some(function (r) { return !!r.result; }) || rows.some(function (r) { return (r.t3 || []).some(function (sp) { return sp.listed; }); })) return 0;
+    var mode = propsT3Mode(), n = 0;
+    propsTreblesLive(dateISO, rows, mode).forEach(function (t) {
+      var has = propsT3SpecOf(t), sp = has ? has.sp : null;
+      if (!sp) { sp = propsT3Spec(t, mode); t.legs[0].r.t3 = (t.legs[0].r.t3 || []).concat([sp]); }
+      sp.listed = true; sp.m = mode; sp.n = ++n;
+    });
+    return n;
+  }
+  function propsT3LegRes(t, i) {   // a leg on the ticket's own line and side: the actual against the app's line
+    var l = t.legs[i], r = l.r;
+    if (!r.result || r.result === "graded") return null;
+    if (r.result === "void") return "void";
+    if (r.actual === null || r.actual === undefined || !isFinite(+r.actual)) return l.side === r.side ? r.result : null;
+    return +r.actual > l.line ? (l.side === "OVER" ? "win" : "loss") : +r.actual < l.line ? (l.side === "UNDER" ? "win" : "loss") : "push";
+  }
+  function propsT3Res(t) {
+    var rs = t.legs.map(function (l, i) { return propsT3LegRes(t, i); });
+    if (rs.some(function (x) { return !x; })) return null;
+    if (rs.some(function (x) { return x === "loss"; })) return "loss";
+    if (rs.every(function (x) { return x === "void"; })) return "void";
+    return rs.some(function (x) { return x === "win"; }) ? "win" : "push";
+  }
+  function propsT3Units(t, res) {   // a void or pushed leg drops out and the ticket pays on the rest, as the apps settle it
+    if (res === "loss") return -1;
+    if (res !== "win") return 0;
+    var dec = 1; t.legs.forEach(function (l, i) { if (propsT3LegRes(t, i) === "win") dec *= decimalOf(l.price); });
+    return dec - 1;
+  }
+  function propsT3Taken(t) { var has = propsT3SpecOf(t); return !!(has && has.sp.take); }
+  function propsT3TakesOn(dateISO) { return propsT3Stored(dateISO).filter(function (t) { return t.spec.take; }); }
+  function propsT3TakesAll() { return propsT3Stored("").filter(function (t) { return t.spec.take; }); }
+  function propsT3LegText(l) { return l.r.name + " " + l.side + " " + l.line + " " + (PROPS_LABEL[l.r.mk] || l.r.mk); }
+  function propsT3Text(t) {
+    var res = propsT3Res(t);
+    return "3-leg ticket at " + bookName(t.app) + " · pays " + sgn(t.price, 0) + " (" + t.dec.toFixed(2) + "x) · all three land " + (t.chance * 100).toFixed(1) + "%, needs " + (t.need * 100).toFixed(1) + "%" + (res ? " · " + res.toUpperCase() : "") + "\n" +
+      t.legs.map(function (l, i) { return (i + 1) + ". " + propsT3LegText(l) + " " + sgn(l.price, 0) + (l.hr ? " · last 5: " + l.hr.h5 + " of " + l.hr.n5 + ", last 10: " + l.hr.h10 + " of " + l.hr.n10 : "") + " · " + l.r.game; }).join("\n");
+  }
+  function propsT3TakeBtn(t) {
+    var on = propsT3Taken(t);
+    if (t.legs.some(function (l) { return !!l.r.result; })) return on ? '<span class="chip taken">TAKEN</span>' : "";
+    return '<button type="button" class="takebtn' + (on ? ' on' : '') + '" data-t3take="' + esc(t.id) + '" title="' + (on ? 'Marked as a ticket you are placing: click to unmark it' : 'Mark this three-leg ticket as one you are placing') + '">' + (on ? '&#10003; Taking' : 'Take') + '</button>';
+  }
+  function toggleT3Take(id) {
+    var t = propsT3Find(id); if (!t) return;
+    if (t.legs.some(function (l) { return !!l.r.result; })) { propsSay("That ticket has a graded leg: a ticket is marked before the games, not after."); return; }
+    var has = propsT3SpecOf(t), sp = has ? has.sp : null;
+    if (sp && sp.take) { delete sp.take; if (!sp.listed) { has.row.t3 = has.row.t3.filter(function (x) { return x !== sp; }); if (!has.row.t3.length) delete has.row.t3; } }
+    else { if (!sp) { sp = propsT3Spec(t, propsT3Mode()); t.legs[0].r.t3 = (t.legs[0].r.t3 || []).concat([sp]); } sp.take = true; }
+    if (!propsPreview) saveProps();
+    renderProps(); renderCalib(); if (typeof renderBoard === "function") renderBoard();
+  }
+  /* the card: a ticket, the price up front, each leg a line that opens his panel with his last ten as pips (filled where the
+     game went the pick's way, a ring where it did not, the last five set apart), the counts, his last five's average, the levers */
+  function propsT3Pips(l) {
+    var gs = l.hr && l.hr.games; if (!gs || !gs.length) return "";
+    var n = gs.length;
+    return '<span class="pips" role="img" aria-label="his last ' + n + ' games, oldest first: ' + l.hr.h10 + ' went the pick\'s way">' + gs.map(function (g, i) {
+      var v = +g[4], st = v === l.line ? "p" : ((v > l.line) === (l.side === "OVER") ? "h" : "m");
+      return '<i class="' + st + (n > 5 && i === n - 5 ? ' g5' : '') + '" title="' + esc(String(g[0] || "").slice(5) + " " + (g[2] ? "v " : "@ ") + (g[1] || "") + ": " + v + (st === "h" ? ", his way" : st === "m" ? ", against" : ", on the line")) + '"></i>';
+    }).join("") + '</span>';
+  }
+  function propsT3Card(t, i, asTaking) {
+    var res = propsT3Res(t), on = propsT3Taken(t), ok = t.chance >= t.need, units = res ? propsT3Units(t, res) : null;
+    var legLine = function (l, k) {
+      var r = l.r, lr = propsT3LegRes(t, k), tl = (r.parts && r.parts.length && l.side === r.side) ? propsLeverTally(r) : null, hr = l.hr;
+      var tells = l.side === r.side ? propTells(r).filter(function (x) { return x.state === "green"; }) : [];
+      return '<div class="leg' + (lr ? ' ' + lr : '') + '" data-prop="' + r.id + '" title="Open his panel">' +
+        '<div class="l1"><span class="lno">' + (k + 1) + '</span><span class="lwho"><b class="lname">' + esc(r.name) + '</b> <span class="chip ' + (l.side === "OVER" ? 'over' : 'under') + '">' + esc(l.side) + ' ' + esc(String(l.line)) + ' <i>' + esc(PROPS_LABEL[r.mk] || r.mk) + '</i></span></span>' +
+          '<span class="lpr">' + sgn(l.price, 0) + ' · ' + (l.chance * 100).toFixed(1) + '%</span></div>' +
+        (hr ? '<div class="l2">' + propsT3Pips(l) + '<span class="lhr">last 5: <b>' + hr.h5 + ' of ' + hr.n5 + '</b> · last 10: <b>' + hr.h10 + ' of ' + hr.n10 + '</b></span></div>' : '') +
+        '<div class="l3">' + esc((r.team || "") + (r.athome ? " v " : " @ ") + (r.opp || "")) + (hr && hr.avg5 !== null ? ' · averaging ' + hr.avg5.toFixed(1) + ' his last five' : '') + (tl && tl.n ? ' · <span class="llev" title="' + esc(tl.words) + '">levers ' + tl.text + '</span>' : '') +
+          (l.same ? '' : ' · ' + esc(String(l.line)) + (t.spec ? ' on the ticket' : ' at this app') + ', the card\'s ' + esc(String(r.line))) +
+          tells.map(function (x) { return ' <span class="tell green" title="' + esc(x.words) + '">' + esc(x.label) + '</span>'; }).join("") +
+          (lr ? ' <span class="chip ' + lr + '">' + esc(lr.toUpperCase()) + (r.actual !== null && r.actual !== undefined ? ' · ' + esc(String(r.actual)) : '') + '</span>' : '') + '</div></div>';
+    };
+    return '<div class="pk t3' + (ok ? ' agrees' : '') + (res ? ' ' + res : '') + (on ? ' taking' : '') + '" data-t3="' + esc(t.id) + '">' +
+      '<div class="t3top"><div class="n1">' + (asTaking ? 'TAKING · 3 LEGS' : '3 LEGS #' + (i + 1)) + ' · at ' + esc(bookName(t.app)) + ' · ' + (t.games >= 3 ? 'three games' : t.games === 2 ? 'two games' : 'one game') +
+        (res ? ' <span class="chip ' + res + '">' + esc(res.toUpperCase()) + '</span>' : '') + '</div>' +
+        '<div class="t3pay" title="what a unit wins: the product of the three legs\' prices at this app"><b>' + sgn(t.price, 0) + '</b><span>' + t.dec.toFixed(2) + '×</span></div></div>' +
+      '<div class="n2 legs">' + t.legs.map(legLine).join("") + '</div>' +
+      '<div class="t3foot"><div class="t3stats"><div><span>all three land</span><b>' + (t.chance * 100).toFixed(1) + '%</b></div><div><span>needs</span><b>' + (t.need * 100).toFixed(1) + '%</b></div>' +
+        '<div><span>edge</span><b class="' + (ok ? 'pos' : 'neg') + '">' + sgn((t.chance - t.need) * 100, 1) + '</b></div>' +
+        (res ? '<div><span>result</span><b class="' + (units > 0 ? 'pos' : units < 0 ? 'neg' : '') + '">' + sgn(units, 2) + 'u</b></div>' : '<div><span>a unit wins</span><b>' + (t.dec - 1).toFixed(2) + 'u</b></div>') + '</div>' +
+      (t.games < 3 ? '<div class="n4">Two legs share a game: the app prices same-game legs its own way, usually a little under the product shown' + (t.f < 1 ? '; two overs on one club carry the measured ×' + PROPS_PAIR_FACTOR.same_club_overs.toFixed(2) : '') + '.</div>' : '') +
+      '<div class="n6">' + propsT3TakeBtn(t) + ' <button type="button" class="takebtn copy" data-t3copy="' + esc(t.id) + '" title="Copy this ticket as text, to key it into the app">Copy ticket</button></div></div></div>';
+  }
   /* the pair's own panel (26 Oct 2026): the ticket's numbers as tiles, how the chance is made from the two legs and the
      measured factor, then each leg's numbers with a button to its own panel. Previous / Next walk the night's tickets */
   function propsPairMeasured(kind) {
@@ -737,7 +928,7 @@
     propsRowsFrom(d).forEach(function (row) {
       if (startedGames[row.game]) { inPlay++; return; }
       var k = propKey(row), i = have[k];
-      if (i !== undefined) { if (props[i].result) { kept++; return; } row.id = props[i].id; if (props[i].take) row.take = true; if (props[i].pairs) row.pairs = props[i].pairs; props[i] = row; replaced++; }   // the take and pair marks ride through a reload (26 Oct 2026)
+      if (i !== undefined) { if (props[i].result) { kept++; return; } row.id = props[i].id; if (props[i].take) row.take = true; if (props[i].pairs) row.pairs = props[i].pairs; if (props[i].t3) row.t3 = props[i].t3; props[i] = row; replaced++; }   // the take and pair marks ride through a reload (26 Oct 2026), and the three-leg tickets kept on the row (11 Nov 2026)
       else { row.id = nextP++; have[k] = props.length; props.push(row); added++; }
     });
     saveProps();
@@ -787,6 +978,9 @@
   function gradeProps(d) {
     if (!d || !Array.isArray(d.games)) return 0;
     var n = 0, filled = 0;
+    /* the three-leg tickets as the tab lists them (11 Nov 2026), kept on the date's rows before the results land */
+    var t3Dates = {}; d.games.forEach(function (g) { if (g.box) { var gd = g.gdate || d.date || ""; if (gd) t3Dates[gd] = true; } });
+    Object.keys(t3Dates).forEach(function (gd) { tellPools = null; propsT3Freeze(gd); });
     d.games.forEach(function (g) {
       if (!g.box) return;
       props.forEach(function (r) {
@@ -892,6 +1086,17 @@
         if (r.result === "win") { s.w++; s.units += dec(r.price) - 1; } else { s.l++; s.units -= 1; }
       });
     });
+    /* the three-leg tickets (11 Nov 2026): the list frozen when each date was graded, and the ones marked as taken */
+    var byT3 = mk(), byT3Take = mk();
+    propsT3Stored().forEach(function (t) {
+      var res3 = propsT3Res(t); if (!res3 || res3 === "void") return;
+      [t.spec.listed ? byT3 : null, t.spec.take ? byT3Take : null].forEach(function (s) {
+        if (!s) return;
+        if (res3 === "push") { s.p++; return; }
+        s.n++; s.says += t.chance;
+        if (res3 === "win") { s.w++; s.units += propsT3Units(t, res3); } else { s.l++; s.units -= 1; }
+      });
+    });
     var rec = function (s) { return s.w + "-" + s.l + (s.p ? "-" + s.p : ""); };
     var says = function (s) { return s.n ? (s.says / s.n * 100).toFixed(1) + "%" : "—"; };
     var does = function (s) { return s.n ? (s.w / s.n * 100).toFixed(1) + "%" : "—"; };
@@ -915,6 +1120,8 @@
     if (byTake.n || byTake.p) parts.push("taken " + rec(byTake) + (byTake.n ? " " + sgn(byTake.units, 1) + "u" : ""));
     if (byPair.n || byPair.p) parts.push("same-game pairs " + rec(byPair) + (byPair.n ? " " + sgn(byPair.units, 1) + "u" : ""));
     if (byPairTake.n || byPairTake.p) parts.push("pairs taken " + rec(byPairTake) + (byPairTake.n ? " " + sgn(byPairTake.units, 1) + "u" : ""));
+    if (byT3.n || byT3.p) parts.push("three-leg tickets as listed " + rec(byT3) + (byT3.n ? " " + sgn(byT3.units, 1) + "u" : ""));
+    if (byT3Take.n || byT3Take.p) parts.push("three-leg tickets taken " + rec(byT3Take) + (byT3Take.n ? " " + sgn(byT3Take.units, 1) + "u" : ""));
     if (byCons.toward.n || byCons.against.n) parts.push("the books' consensus with the pick " + rec(byCons.toward) + (byCons.toward.n ? " " + sgn(byCons.toward.units, 1) + "u" : "") + " · against it " + rec(byCons.against) + (byCons.against.n ? " " + sgn(byCons.against.units, 1) + "u" : ""));
     if (byForm.toward.n || byForm.against.n) parts.push("his last three with the pick " + rec(byForm.toward) + (byForm.toward.n ? " " + sgn(byForm.toward.units, 1) + "u" : "") + " · against it " + rec(byForm.against) + (byForm.against.n ? " " + sgn(byForm.against.units, 1) + "u" : "") + " (shown, not scored)");
     if (byFav.UNDER.n || byFav.OVER.n) parts.push("a man on a club favoured by 5 or more: unders " + rec(byFav.UNDER) + (byFav.UNDER.n ? " " + sgn(byFav.UNDER.units, 1) + "u" : "") + " · overs " + rec(byFav.OVER) + (byFav.OVER.n ? " " + sgn(byFav.OVER.units, 1) + "u" : "") + " (shown, not scored)");
@@ -944,6 +1151,8 @@
     });
     if (byTake.n || byTake.p) h2 += tile("Taken: the props you marked", byTake, []);
     if (byPair.n || byPair.p) h2 += tile("Same-game pairs, at the parlay price", byPair, []);
+    if (byT3.n || byT3.p) h2 += tile("Three-leg tickets as listed, to test", byT3, ["at the product of the three legs' prices; a void or pushed leg drops out"]);
+    if (byT3Take.n || byT3Take.p) h2 += tile("Three-leg tickets you took", byT3Take, []);
     if (byCons.toward.n || byCons.toward.p) h2 += tile("The books' consensus with the pick, half a point or more", byCons.toward, []);
     if (byCons.against.n || byCons.against.p) h2 += tile("The books' consensus against the pick", byCons.against, []);
     if (byForm.toward.n || byForm.toward.p) h2 += tile("His last three with the pick (shown, not scored)", byForm.toward, []);
@@ -1257,10 +1466,18 @@
     var resChip = propResChip;
     var tellMode = $("propsTells") ? $("propsTells").value : "";   // the tells filter (7 Nov 2026): a green tell and no red, or a red tell
     var picks = rows.filter(function (r) { return propHas(r) && r.edge > 0 && propTellsFilter(r, tellMode); }).sort(function (a, b) { return b.edge - a.edge; });
+    /* under the BETs (11 Nov 2026): three-leg tickets to test, from the overs or either side, in the LEANs' place; or the LEANs one by one */
+    if ($("propsBelow") && $("propsBelow").value !== propsBelow) $("propsBelow").value = propsBelow;
+    var t3Mode = propsBelow === "leans" ? "" : propsBelow, t3List = t3Mode ? propsTrebles(date, rows, t3Mode) : [], nBetCards = picks.filter(function (r) { return r.band === "BET"; }).length;
+    if (t3Mode) picks = picks.filter(function (r) { return r.band === "BET"; });
+    var t3Kept = t3Mode && t3List.length && t3List[0].spec && t3List[0].spec.listed, t3Graded = rows.some(function (r) { return !!r.result; });
+    var t3Html = !t3Mode ? '' : '<div class="pk-divider t3d">' + (nBetCards ? '' : (tellMode ? 'No BET among these. ' : 'No BET on this date. ')) + '<b>Three-leg tickets below, to test</b>, in the LEANs\' place: three men at one app, each a pick with an edge whose last five games went his way four times or more and his last ten at least half, more levers toward the pick than against and no red chip' + (t3Mode === "t3o" ? ', the overs only' : t3Mode === "t3u" ? ', the unders only' : '') + '. ' + T3_MEASURED +
+      (t3Kept ? ' This list was kept before the games and is in the record.' : (t3Graded && t3List.length ? ' Rebuilt from the night\'s rows after the games: for study, not in the record.' : '')) + '</div>' +
+      (t3List.length ? '<div class="t3grid">' + t3List.map(function (t, i) { return propsT3Card(t, i); }).join("") + '</div>' : '<div class="empty t3none">' + (rows.length ? 'No three legs on this date pass the test at one app' + (t3Mode === "t3o" ? ' among the overs' : t3Mode === "t3u" ? ' among the unders' : '') + '.' : 'Load a props file and the tickets land here.') + '</div>');
     /* the BET band in front (6 Nov 2026, the user: "for the BET band cards, make that more visible and why"): a BET card carries
        a badge, its edge tier and a line that says why in words; the LEANs sit under a divider that says what the record says of them */
     var leanDivider = false, betsNote = propsBetsNote(rows);   // how many men and games the date's BETs really sit on (10 Nov 2026)
-    $("propsBest").innerHTML = picks.length ? (betsNote ? '<div class="pk-note">' + esc(betsNote) + '</div>' : '') + picks.slice(0, 12).map(function (r, i) {
+    $("propsBest").innerHTML = (picks.length || (t3Mode && rows.length)) ? (betsNote ? '<div class="pk-note">' + esc(betsNote) + '</div>' : '') + picks.slice(0, 12).map(function (r, i) {
       var tl = propsLeverTally(r), isBet = r.band === "BET", div = '';
       if (!isBet && !leanDivider) { leanDivider = true; div = '<div class="pk-divider">' + (i === 0 ? (tellMode ? 'No BET among these. ' : 'No BET on this date. ') : '') + 'LEANs below: information, not a measured edge (the band says 55% and does 52% over 1,300 graded picks)' + (i === 0 ? '.' : '; the BETs above are the bets.') + '</div>'; }
       var clv = propClv(r);
@@ -1278,14 +1495,14 @@
         (propBestAppLine(r) ? '<div class="n5 bestapp">' + propBestAppLine(r) + '</div>' : '') +
         (clv ? '<div class="n5 clvline' + (clv.clv > 0.0005 ? ' pos' : clv.clv < -0.0005 ? ' neg' : '') + '">' + propClvLine(r) + '</div>' : '') +
         '<div class="n6">' + propTakeBtn(r) + propsGoBtn(r) + '</div></div>';
-    }).join("") : '<div class="empty">' + (rows.length ? (tellMode === "green" ? 'No pick on this date carries a green tell without a red one.' : tellMode === "red" ? 'No pick on this date carries a red tell.' : 'No prop on this date clears its price.') : 'Load a props file: Run NBA props.bat writes nba-props-DATE.json.') + '</div>';
+    }).join("") + t3Html : '<div class="empty">' + (rows.length ? (tellMode === "green" ? 'No pick on this date carries a green tell without a red one.' : tellMode === "red" ? 'No pick on this date carries a red tell.' : 'No prop on this date clears its price.') : 'Load a props file: Run NBA props.bat writes nba-props-DATE.json.') + '</div>';
     /* the simulation's strip (26 Oct 2026): one card a game */
     if ($("propsSim")) $("propsSim").innerHTML = rows.length ? propsSimStripHtml(rows) : '<div class="empty">Load a props file and each game\'s simulation lands here.</div>';
     /* the props marked as taken on the date (26 Oct 2026), above the best list */
-    var taken = rows.filter(function (r) { return r.take && propHas(r); }), takenPairs = pairTakesOn(date), nTaken = taken.length + takenPairs.length;
+    var taken = rows.filter(function (r) { return r.take && propHas(r); }), takenPairs = pairTakesOn(date), takenT3 = propsT3TakesOn(date), nTaken = taken.length + takenPairs.length + takenT3.length;
     if ($("propsTaking")) {
       $("propsTakingHead").hidden = !nTaken; $("propsTaking").hidden = !nTaken;
-      $("propsTaking").innerHTML = takenPairs.map(function (t, i) { return propsPairCard(t, i, true); }).join("") + taken.map(propTakeCard).join("");
+      $("propsTaking").innerHTML = takenT3.map(function (t, i) { return propsT3Card(t, i, true); }).join("") + takenPairs.map(function (t, i) { return propsPairCard(t, i, true); }).join("") + taken.map(propTakeCard).join("");
       $("propsTakingCount").textContent = nTaken ? nTaken + " marked" : "";
     }
     var pool = ($("propsAll").checked ? rows : rows.filter(propHas)).slice(), list = propsTableRows(pool);
@@ -1337,6 +1554,7 @@
     $("propsDate").addEventListener("change", renderProps);
     $("propsAll").addEventListener("change", renderProps);
     if ($("propsTells")) $("propsTells").addEventListener("change", renderProps);
+    if ($("propsBelow")) $("propsBelow").addEventListener("change", function () { var v = $("propsBelow").value; propsBelow = PROPS_BELOW_MODES[v] ? v : "t3"; try { localStorage.setItem(PROPS_BELOW_KEY, propsBelow); } catch (e) {} renderProps(); });
     $("propsExample").addEventListener("click", propsExample);
     $("propsClear").addEventListener("click", function () {
       if (propsPreview) { propsPreview = null; renderProps(); propsSay("The example is gone. Load a real props file when you have one."); return; }

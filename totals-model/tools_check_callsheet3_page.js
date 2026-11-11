@@ -1284,7 +1284,7 @@ const CHECKS = ["dome","playoff"];
     r.inputs.odds = JSON.stringify({ total: {}, ml: {}, spread: {}, book: 'fanatics', team: { AWAY: { OVER: [['fanatics', -110, 113.5], ['fanatics', 140, 117.5], ['draftkings', -112, 113.5]], UNDER: [['fanatics', -110, 113.5], ['fanatics', -170, 117.5], ['draftkings', -108, 113.5]] },
                                                                                                     HOME: { OVER: [['fanatics', -115, 123.5]], UNDER: [['fanatics', -105, 123.5]] } } }); } }); await smStore.setItem('callsheet3.card.v1', JSON.stringify(c)); });
   await reloaded(); await pg.evaluate(() => smStore.ready);
-  const simRec = await pg.evaluate(() => { const rec = document.querySelector('#calibBox .simrec'); return { has: !!rec, text: rec ? rec.innerText.replace(/\s+/g, ' ').trim().slice(0, 300) : '', rows: rec ? [...rec.querySelectorAll('.simrectab:not(.gaptab) tbody tr')].map(tr => tr.innerText.replace(/\s+/g, ' ').trim()) : [],
+  const simRec = await pg.evaluate(() => { const rec = document.querySelector('#calibBox .simrec'); return { has: !!rec, text: rec ? rec.innerText.replace(/\s+/g, ' ').trim().slice(0, 300) : '', gapHead: rec ? ((e) => e ? e.innerText.replace(/\s+/g, ' ').trim() : '')([...rec.querySelectorAll('.simrecview')].find(e => /team-total gap rule/i.test(e.textContent))) : '', rows: rec ? [...rec.querySelectorAll('.simrectab:not(.gaptab) tbody tr')].map(tr => tr.innerText.replace(/\s+/g, ' ').trim()) : [],
     gap: rec ? [...rec.querySelectorAll('.gaptab tbody tr')].map(tr => tr.innerText.replace(/\s+/g, ' ').trim()) : [] }; });
   // the gap rule on the card: the Knicks' 123.5 sits 5 above the implied (231.5 + 5.5) / 2 = 118.5, so UNDER by the rule; the 76ers' 113.5 sits half a point over 113, no call
   // (26 Oct 2026: the band comes from the worth now, so the anchored home team total at 123.5 reads a band and the own view's does not; 121 scored, the under wins)
@@ -1310,8 +1310,9 @@ const CHECKS = ["dome","playoff"];
   chk(simRec.has && /^SIMULATION · says against does, every call at LEAN or better The sim's own view/.test(simRec.text) && simRec.rows.length >= 1
       && simRec.rows.every(r => /^(Total|First half|Spread|Moneyline|Away team total|Home team total) (STRONG|BET|LEAN) [01]-[01] \d+\.\d% (0|100)\.0% [+-]\d+\.\du$/.test(r))
       && simRec.rows.some(r => /^Home team total (STRONG|BET|LEAN) 1-0 /.test(r)) && /Anchored to the market MARKET BAND RECORD SAYS DOES UNITS Home team total/.test(simRec.text)
-      && simRec.gap.length === 1 && /^Home team total 1-0 100\.0% \+[01]\.\du 62% under above the number/.test(simRec.gap[0]),
-      'nba sim: once the row grades, the record block keeps the calls whose worth reads LEAN or better, says against does by view, market and band, the anchored home team total among them (and the own view\'s once Engine 2\'s tighter team variance lifts its worth to LEAN, 30 Oct 2026), and the gap rule\'s own tally (the Knicks\' 123.5 five above the implied 118.5, under called, 121 scored: a win)', JSON.stringify(simRec));
+      && simRec.gap.length === 1 && /^Home team total 1-0 100\.0% \+[01]\.\du 62% under above the number/.test(simRec.gap[0])
+      && /^The team-total gap rule the book's line a point or more off the number the game's total and spread imply · scored, two seasons · under re-test from 11 Nov 2026: the backtest held one book's line against another source's closing total and spread/i.test(simRec.gapHead) && /Run NBA gap retest\.bat holds the two seasons to the same test and decides whether the rule stays scored$/i.test(simRec.gapHead),
+      'nba sim: once the row grades, the record block keeps the calls whose worth reads LEAN or better, says against does by view, market and band, the anchored home team total among them (and the own view\'s once Engine 2\'s tighter team variance lifts its worth to LEAN, 30 Oct 2026), and the gap rule\'s own tally (the Knicks\' 123.5 five above the implied 118.5, under called, 121 scored: a win), its heading saying it is under re-test from 11 Nov 2026 and what decides', JSON.stringify(simRec));
   chk(gapCard.length === 2 && /^76ers team total 113\.5 fanatics -110\/-110 implied 113, gap \+0\.5 · inside a point, no call/.test(gapCard[0]) && /^Knicks team total 123\.5 fanatics -115\/-105 implied 118\.5, gap \+5 · UNDER by the gap rule/.test(gapCard[1]),
       'nba sim: the Simulation card shows each team total\'s implied number and gap, and the gap rule\'s call when it is a point or more', JSON.stringify(gapCard));
 
@@ -1994,6 +1995,50 @@ const CHECKS = ["dome","playoff"];
       && tkA.tickets[2] >= 20 && tkA.tickets[3] >= 10 && tkA.empties >= 5 && tkB.tickets[2] >= 60 && tkB.tickets[3] >= 60 && tkB.sizes.slice().sort((a, b) => b - a)[0] >= 1000,
       'the tickets are the best ones (11 Nov 2026): on fourteen ordinary random nights and six busy ones, every two-leg and three-leg ticket the page lists, either side, the overs and the unders, is a valid ticket worth exactly what the best one left is worth by brute force over every pair and three at every app, a man in one ticket, two legs never on one game, and a list ends only when nothing valid is left or at six',
       JSON.stringify({ ordinary: tkTool.report(tkA), busy: tkTool.report(tkB), fails: tkA.fails.concat(tkB.fails).slice(0, 6) }));
+
+  // ---- 11 Nov 2026: the NBA record counts the sheet's calls (the user: "fix the NBA record so tiles count only real calls") -- a market where neither side is priced below its chance is the book's own number, listed under the tile as no call and left out of its count ----
+  const callsKeep = await pg.evaluate(async () => { await smStore.ready; const k = { card: await smStore.getItem('callsheet3.card.v1'), slate: await smStore.getItem('callsheet3.slate.v1') }; await smStore.removeItem('callsheet3.card.v1'); return k; });
+  await reloaded();
+  const callsT = await pg.evaluate(async () => {
+    const wait = () => new Promise(r => setTimeout(r, 90));
+    const txt = e => (e ? e.innerText : '').replace(/\s+/g, ' ').trim();
+    await smStore.ready;
+    const set = (id, v) => { const el = document.getElementById(id); el.value = v; el.dispatchEvent(new Event('input', { bubbles: true })); };
+    const load = async (doc, name) => { const dt = new DataTransfer(); dt.items.add(new File([JSON.stringify(doc)], name, { type: 'application/json' })); const inp = document.getElementById('slateFile'); inp.files = dt.files; inp.dispatchEvent(new Event('change', { bubbles: true })); await wait(); await wait(); };
+    document.getElementById('clear').click(); document.getElementById('m-nba').click(); await wait();
+    const game = async (away, home, line, op, up, hml, aml, sp, h1) => { document.getElementById('clear').click(); await wait(); set('gdate', '2026-11-22'); set('away', away); set('home', home); set('line', line); set('op', op); set('up', up); set('hml', hml); set('aml', aml);
+      set('sp', sp); set('sph', sp ? '-110' : ''); set('spa', sp ? '-110' : ''); set('h1line', h1); set('h1op', '-110'); set('h1up', '-110'); await wait(); document.getElementById('add').click(); await wait(); };
+    await game('Hornets', 'Bucks', '229.5', '-110', '-110', '-120', '100', '', '114.5');          // a short dog priced below its lifted chance: a moneyline call; no spread on the row
+    await game('Pistons', 'Celtics', '224', '-110', '-110', '-300', '240', '-7.5', '111.5');      // a long dog, the closer of two sides neither priced below its chance: nobody's call
+    await game('Jazz', 'Suns', '223.5', '-210', '160', '-150', '130', '-3.5', '110.5');           // the under at a price a hair below its chance: a call on the total; a short dog lifted but not below its price: no call
+    const stored = JSON.parse(smStore.getItem('callsheet3.card.v1')).map(r => r.matchup + ' :: ' + r.markets.map(m => m.key + ' ' + m.pick + ' e' + (m.edge === null ? 'null' : (m.edge > 0 ? '+' : '-')) + (m.informed ? ' informed' : '')).join(' | '));
+    await load({ format: 'callsheet2.slate', version: 1, date: '2026-11-22', games: [
+      { sport: 'NBA', gdate: '2026-11-22', away: 'Hornets', home: 'Bucks', finals: { fa: '118', fh: '110', f5a: '60', f5h: '55' }, notes: [] },
+      { sport: 'NBA', gdate: '2026-11-22', away: 'Pistons', home: 'Celtics', finals: { fa: '100', fh: '120', f5a: '48', f5h: '62' }, notes: [] },
+      { sport: 'NBA', gdate: '2026-11-22', away: 'Jazz', home: 'Suns', finals: { fa: '100', fh: '110', f5a: '52', f5h: '54' }, notes: [] }] }, 'nba-grade-2026-11-22.json');
+    const head = txt(document.querySelector('#calibBox .subhead[data-sport="NBA"]'));
+    const tiles = [...document.querySelectorAll('#calibBox .calib[data-sport="NBA"] > div')].map(d => [d.className, txt(d.querySelector('.k')), txt(d.querySelector('.v')), txt(d.querySelector('.s')), txt(d.querySelector('.s.sides'))].join(' | '));
+    const verdict = txt([...document.querySelectorAll('#calibBox .verdict')].find(v => /graded NBA call/.test(v.textContent)));
+    const others = txt(document.querySelector('#calibBox .subhead[data-sport="MLB"]')) + ' / ' + txt(document.querySelector('#calibBox .subhead[data-sport="WNBA"]'));
+    document.getElementById('clear').click(); await wait();
+    return { stored, head, tiles, verdict, others };
+  });
+  await pg.evaluate(async (k) => { if (k.card === null || k.card === undefined) await smStore.removeItem('callsheet3.card.v1'); else await smStore.setItem('callsheet3.card.v1', k.card); if (k.slate === null || k.slate === undefined) await smStore.removeItem('callsheet3.slate.v1'); else await smStore.setItem('callsheet3.slate.v1', k.slate); }, callsKeep);
+  await reloaded();
+  const callsTile = (re) => callsT.tiles.find(t => re.test(t)) || '';
+  chk(/^Hornets @ Bucks :: total OVER 229\.5 e- \| h1 1H OVER 114\.5 e- \| ml Hornets ML e\+ informed$/.test(callsT.stored[0]) && / \| ml Pistons ML e- \| spread Celtics -7\.5 e-$/.test(callsT.stored[1])
+      && /^Jazz @ Suns :: total UNDER 223\.5 e\+ \| h1 1H OVER 110\.5 e- \| ml Jazz ML e- informed \| spread Suns -3\.5 e-$/.test(callsT.stored[2])
+      && /^NBA 3 graded games · 2 calls graded, the rest the book's own number$/i.test(callsT.head)
+      && /^ \| Full-game total · calls \| 1-0 \| says 38\.9% · does 100\.0% \(±0\.0\) · \+1\.60u \| under 1-0 · no call on 2 games, the book's own number: the closer side 0-2, not counted$/i.test(callsTile(/Full-game total/i))
+      && /^ \| Moneyline · calls \| 1-0 \| says 51\.8% · does 100\.0% \(±0\.0\) · \+1\.00u \| away 1-0 · the short dog 1-1 · no call on 2 games, the book's own number: the closer side 0-2, not counted$/i.test(callsTile(/Moneyline/i)),
+      'nba record, calls only (11 Nov 2026): three graded games, and the tiles count the two calls the sheet made (the under priced a hair below its chance, the short dog priced below its lifted chance); the two totals and the two moneylines that were only the closer of two sides are listed under the tile as no call with their own record and left out of the count; the short dog\'s own line still reads every lifted dog',
+      JSON.stringify({ stored: callsT.stored, head: callsT.head, total: callsTile(/Full-game total/i), ml: callsTile(/Moneyline/i) }));
+  chk(/^nocall \| First half · calls \| no call \| no side priced below its chance yet \| no call on 3 games, the book's own number: the closer side 1-2, not counted$/i.test(callsTile(/First half/i))
+      && /^nocall \| Spread · calls \| no call \| no side priced below its chance yet \| no call on 2 games, the book's own number: the closer side 2-0, not counted$/i.test(callsTile(/Spread/i))
+      && /^2 graded NBA calls\. Nothing here can be read yet/.test(callsT.verdict) && /A call is a side the sheet prices below its chance, or one a verdict sits on\. Where neither side is, the market is the book's own number: it is listed under the tile as no call and left out of the tile's count/.test(callsT.verdict)
+      && /The watches under a tile read every game\.$/.test(callsT.verdict) && /^MLB nothing graded yet \/ WNBA nothing graded yet$/i.test(callsT.others),
+      'nba record, calls only: a market the sheet has not called says no call in place of a record (the first half and the spread, the book\'s own number on every game) with the closer side\'s record beside it for scale; the verdict says what a call is; the other sports\' blocks are untouched',
+      JSON.stringify({ h1: callsTile(/First half/i), spread: callsTile(/Spread/i), verdict: callsT.verdict.slice(0, 80) + ' … ' + callsT.verdict.slice(-330), others: callsT.others }));
 
   // ---- 4 Nov 2026: the crowd on Kalshi -- the exchange's game-winner prices on the row, the card beside the book and Pinnacle, the better price after the fee on the board, the sharp side against the crowd on the moneyline tile ----
   const kalT = await pg.evaluate(async () => {

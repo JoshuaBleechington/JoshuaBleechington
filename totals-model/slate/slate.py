@@ -7205,6 +7205,280 @@ def make_odds_history(out_dir, log, books=None, sports=("NHL",), season=None, st
     return paths[-1] if paths else out_dir
 
 
+# ---- the team-total gap rule, re-tested (11 Nov 2026) ------------------------
+# The gap rule (26 Oct 2026) is scored on two seasons: the book's team-total line a point or more off the number the game's
+# own total and spread imply, (total -/+ spread) / 2, the under landing 62 to 63% above the number at home and the over 63 to
+# 68% below it. This season it does not confirm (11 Nov 2026: the page's own tally 7-6 at home and 4-8 away; each of the three
+# apps' lines against that app's own total and spread 21-17 and 28-27, no slope), and the reason looks like the measure, not
+# the market: the backtest held ONE book's team total, fifteen minutes before tip, against ANOTHER source's closing total and
+# spread (KillerSports), where a gap of a point or more showed on 66% of games; a book against its own numbers shows one on
+# about 10%. And the history file keeps one line a book a side, the FIRST point listed with the LAST over and under prices,
+# so a book that lists alternates (BetRivers lists four) can carry one line's number with another line's prices.
+# This mode reads the three files already in the folder (the ledger, the period lines, the full-game lines history) and
+# holds every team-total line against three numbers: as it was scored (the backtest's own choice of book against the US
+# books' mean total and spread at the last snapshot before tip), the same book's own total and spread, and the middle of the
+# other books' (the market). It marks the price pairs that cannot be one line's, and writes nba-gap-retest.txt to send back.
+GAP_RETEST_APPS = ("fanduel", "draftkings", "betmgm")
+GAP_RETEST_US = ("fanatics", "betmgm", "draftkings", "fanduel", "caesars", "espnbet", "betrivers")
+GAP_RETEST_MIN = 1.0
+GAP_RETEST_VIG = (1.02, 1.085)     # one line's two prices sum to about 1.045 of chance; a pair outside this is two lines' prices read as one
+GAP_RETEST_NEAR = 90               # minutes: a tip this close to the full-game snapshot is a like-for-like moment
+GAP_RETEST_FILE = "nba-gap-retest.txt"
+
+
+def gap_retest_minutes(a_iso, b_iso):
+    """Minutes from a to b (both UTC ISO stamps); None when either will not parse."""
+    try:
+        a = dt.datetime.strptime(str(a_iso)[:19], "%Y-%m-%dT%H:%M:%S")
+        b = dt.datetime.strptime(str(b_iso)[:19], "%Y-%m-%dT%H:%M:%S")
+    except (TypeError, ValueError):
+        return None
+    return (b - a).total_seconds() / 60.0
+
+
+def gap_retest_snapshot(hist_game, start=None):
+    """The last full-game snapshot before tip: (stamp, {book: row}); (None, {}) when the file holds none."""
+    snaps = (hist_game or {}).get("snaps") or {}
+    start = start or (hist_game or {}).get("start") or ""
+    pre = sorted(ts for ts in snaps if not start or str(ts) < str(start))
+    return (pre[-1], snaps[pre[-1]]) if pre else (None, {})
+
+
+def gap_retest_book(snap, book):
+    """(total, home spread) one book posted in a snapshot row [total, over, under, home ML, away ML, home spread, ...]; None without both."""
+    row = (snap or {}).get(book)
+    if not row or len(row) < 6 or row[0] is None or row[5] is None:
+        return None
+    return float(row[0]), float(row[5])
+
+
+def gap_retest_median(xs):
+    xs = sorted(xs)
+    n = len(xs)
+    return None if not n else (xs[n // 2] if n % 2 else (xs[n // 2 - 1] + xs[n // 2]) / 2.0)
+
+
+def gap_retest_market(snap, skip=None, least=3):
+    """The middle of the other books' totals and home spreads, three or more of them; None otherwise."""
+    rows = [gap_retest_book(snap, b) for b in (snap or {}) if b != skip]
+    rows = [r for r in rows if r]
+    if len(rows) < least:
+        return None
+    return gap_retest_median([r[0] for r in rows]), gap_retest_median([r[1] for r in rows])
+
+
+def gap_retest_mean(snap):
+    """The US books' mean total and home spread, as the lines-history tool reads the close; None without one."""
+    rows = [gap_retest_book(snap, b) for b in (snap or {}) if b in GAP_RETEST_US]
+    rows = [r for r in rows if r]
+    if not rows:
+        return None
+    return sum(r[0] for r in rows) / len(rows), sum(r[1] for r in rows) / len(rows)
+
+
+def gap_retest_implied(numbers, side):
+    """The team total a game total and a home spread imply: (total - spread) / 2 at home, (total + spread) / 2 away."""
+    if not numbers:
+        return None
+    return (numbers[0] - numbers[1]) / 2.0 if side == "home" else (numbers[0] + numbers[1]) / 2.0
+
+
+def gap_retest_readings(ledger_games, periods_doc, history_doc):
+    """Every team-total line a book posted for a game with a final, beside the score and the three numbers it is held against."""
+    led = {(g.get("date"), g.get("an"), g.get("hn")): g for g in (ledger_games or []) if g.get("fa") is not None and g.get("fh") is not None}
+    out = []
+    for k, pg in sorted(((periods_doc or {}).get("games") or {}).items()):
+        tt = (pg.get("mk") or {}).get("team_totals") or {}
+        lg = led.get((pg.get("gdate"), pg.get("away"), pg.get("home")))
+        if not tt or not lg:
+            continue
+        hg = ((history_doc or {}).get("games") or {}).get(k) or {}
+        start = pg.get("start") or hg.get("start") or ""
+        stamp, snap = gap_retest_snapshot(hg, start)
+        lag = gap_retest_minutes(stamp, start) if stamp else None
+        mean = gap_retest_mean(snap)
+        for side in ("home", "away"):
+            score = float(lg["fh"] if side == "home" else lg["fa"])
+            first = None      # the backtest's own choice: Fanatics, else the first book by name with a line on this side
+            for b in ["fanatics"] + sorted(tt):
+                row = (tt.get(b) or {}).get(side)
+                if row and row[0] is not None:
+                    first = b
+                    break
+            for b in sorted(tt):
+                row = (tt.get(b) or {}).get(side)
+                if not row or len(row) < 3 or row[0] is None or row[1] is None or row[2] is None:
+                    continue
+                try:
+                    line, op, up = float(row[0]), float(row[1]), float(row[2])
+                    vig = implied_prob(op) + implied_prob(up)
+                except (TypeError, ValueError, ZeroDivisionError):
+                    continue
+                out.append({"key": k, "date": pg.get("gdate"), "book": b, "side": side, "line": line, "op": op, "up": up, "score": score,
+                            "clean": GAP_RETEST_VIG[0] <= vig <= GAP_RETEST_VIG[1], "first": b == first, "lag": lag,
+                            "scored": gap_retest_implied(mean, side), "own": gap_retest_implied(gap_retest_book(snap, b), side),
+                            "market": gap_retest_implied(gap_retest_market(snap, skip=b), side)})
+    return out
+
+
+def gap_retest_tally(rows, key, gap_min=GAP_RETEST_MIN):
+    """The rule on a set of readings against one of the three numbers: how often the gap is a point or more, the call's
+    record and units at the line's own prices, each direction, and the slope of the over's landing on the gap."""
+    t = {"n": 0, "calls": 0, "w": 0, "l": 0, "p": 0, "units": 0.0, "under": [0, 0], "over": [0, 0], "slope": None, "t": None, "sd": None}
+    pts = []
+    for r in rows:
+        imp = r.get(key)
+        if imp is None:
+            continue
+        gap = r["line"] - imp
+        t["n"] += 1
+        if r["score"] != r["line"]:
+            pts.append((gap, 1.0 if r["score"] > r["line"] else 0.0))
+        if abs(gap) < gap_min - 1e-9:
+            continue
+        t["calls"] += 1
+        call = "under" if gap > 0 else "over"
+        if r["score"] == r["line"]:
+            t["p"] += 1
+            continue
+        won = (r["score"] > r["line"]) == (call == "over")
+        price = r["up"] if call == "under" else r["op"]
+        t["w" if won else "l"] += 1
+        t[call][0 if won else 1] += 1
+        t["units"] += ((price / 100.0 if price > 0 else 100.0 / -price) if won else -1.0)
+    if t["n"]:
+        gaps = [r["line"] - r[key] for r in rows if r.get(key) is not None]
+        m = sum(gaps) / len(gaps)
+        t["sd"] = math.sqrt(sum((g - m) ** 2 for g in gaps) / len(gaps))
+    if len(pts) >= 20:
+        mx, my = sum(x for x, _ in pts) / len(pts), sum(y for _, y in pts) / len(pts)
+        sxx = sum((x - mx) ** 2 for x, _ in pts)
+        if sxx > 1e-9:
+            slope = sum((x - mx) * (y - my) for x, y in pts) / sxx
+            sse = sum((y - my - slope * (x - mx)) ** 2 for x, y in pts)
+            se = math.sqrt(sse / (len(pts) - 2) / sxx) if sse > 0 else 0.0
+            t["slope"], t["t"] = slope, (slope / se if se > 0 else None)
+    return t
+
+
+def gap_retest_best(rows, key, books=GAP_RETEST_APPS, gap_min=GAP_RETEST_MIN):
+    """One reading a game a side: among the named books, the one whose line sits furthest from the number (a point or more)."""
+    best = {}
+    for r in rows:
+        if r["book"] not in books or r.get(key) is None or abs(r["line"] - r[key]) < gap_min - 1e-9:
+            continue
+        k = (r["key"], r["side"])
+        if k not in best or abs(r["line"] - r[key]) > abs(best[k]["line"] - best[k][key]):
+            best[k] = r
+    return list(best.values())
+
+
+def gap_retest_line(label, t, what="a point or more", picked=False):
+    """One line of the report. `picked` is a set chosen for its gap (one call a game): it says how many games had a call, not a share."""
+    if not t["n"]:
+        return "   %-58s no reading" % label
+    wl = t["w"] + t["l"]
+    head = ("a call on %d game%s" % (t["calls"], "" if t["calls"] == 1 else "s")) if picked else ("gap of %s on %d of %d (%.0f%%, sd %.2f)" % (what, t["calls"], t["n"], 100.0 * t["calls"] / t["n"], t["sd"] or 0.0))
+    return "   %-58s %s · the call %d-%d%s%s · under above %d-%d, over below %d-%d%s" % (
+        label, head, t["w"], t["l"], ("-%d" % t["p"]) if t["p"] else "",
+        (" (%.1f%%) %+.1fu" % (100.0 * t["w"] / wl, t["units"])) if wl else "", t["under"][0], t["under"][1], t["over"][0], t["over"][1],
+        (" · slope %+.3f a point (t %.1f)" % (t["slope"], t["t"])) if t["slope"] is not None and t["t"] is not None else "")
+
+
+def gap_retest_report(readings, label):
+    """The report's lines for one season (or the seasons pooled)."""
+    out = []
+    games = len({r["key"] for r in readings})
+    snapped = len({r["key"] for r in readings if r["scored"] is not None})
+    out.append("")
+    out.append("=== %s · %d games with a team total and a final, %d of them with a full-game snapshot before tip ===" % (label, games, snapped))
+    if not readings:
+        out.append("   nothing to read: the period lines hold no team totals for games in the ledger")
+        return out
+    firsts = {}
+    for r in readings:
+        if r["first"]:
+            firsts[r["book"]] = firsts.get(r["book"], 0) + 1
+    out.append("   the line the backtest read (Fanatics, else the first book by name), by book: " + ", ".join("%s %d" % (b, n) for b, n in sorted(firsts.items(), key=lambda kv: -kv[1])))
+    dirty = []
+    for b in sorted({r["book"] for r in readings}):
+        rs = [r for r in readings if r["book"] == b]
+        bad = sum(1 for r in rs if not r["clean"])
+        dirty.append("%s %d of %d" % (b, bad, len(rs)))
+    out.append("   price pairs that cannot be one line's (the two chances sum outside %.2f to %.3f), by book: %s" % (GAP_RETEST_VIG[0], GAP_RETEST_VIG[1], ", ".join(dirty)))
+    for side in ("home", "away"):
+        rs = [r for r in readings if r["side"] == side]
+        out.append("")
+        out.append(" %s TEAM TOTAL" % side.upper())
+        out.append("  A. as it was scored: the backtest's own book against the number the US books' mean total and spread imply")
+        first = [r for r in rs if r["first"]]
+        out.append(gap_retest_line("every line it read", gap_retest_tally(first, "scored")))
+        out.append(gap_retest_line("the lines whose two prices are one line's", gap_retest_tally([r for r in first if r["clean"]], "scored")))
+        out.append(gap_retest_line("the lines whose prices are not", gap_retest_tally([r for r in first if not r["clean"]], "scored")))
+        out.append("  B. the same book: each book's line against the number its OWN total and spread imply")
+        for b in sorted({r["book"] for r in rs}):
+            out.append(gap_retest_line(b, gap_retest_tally([r for r in rs if r["book"] == b and r["clean"]], "own")))
+        apps = [r for r in rs if r["book"] in GAP_RETEST_APPS and r["clean"]]
+        out.append(gap_retest_line("the three apps, one call a game (the biggest gap)", gap_retest_tally(gap_retest_best(apps, "own"), "own"), picked=True))
+        near = [r for r in apps if r["lag"] is not None and 0 <= r["lag"] <= GAP_RETEST_NEAR]
+        out.append(gap_retest_line("   the same, tips within %d minutes of the snapshot" % GAP_RETEST_NEAR, gap_retest_tally(gap_retest_best(near, "own"), "own"), picked=True))
+        out.append("  C. against the market: each book's line against the number the OTHER books' middle total and spread imply")
+        for b in sorted({r["book"] for r in rs}):
+            out.append(gap_retest_line(b, gap_retest_tally([r for r in rs if r["book"] == b and r["clean"]], "market")))
+        out.append(gap_retest_line("the three apps, one call a game (the biggest gap)", gap_retest_tally(gap_retest_best(apps, "market"), "market"), picked=True))
+        out.append(gap_retest_line("   the same, tips within %d minutes of the snapshot" % GAP_RETEST_NEAR, gap_retest_tally(gap_retest_best(near, "market"), "market"), picked=True))
+        out.append(gap_retest_line("   the same at a point and a half or more", gap_retest_tally(gap_retest_best(apps, "market", gap_min=1.5), "market", gap_min=1.5), picked=True))
+    return out
+
+
+def make_nba_gap_retest(out_dir, log, season=None):
+    """nba-gap-retest.txt: the team-total gap rule held against three numbers, from the ledger, the period lines and the
+    full-game lines history already in the folder. Reads files only; no call to any site and no credit spent."""
+    seasons = [nba_norm_season(str(season))] if season else ["2024-25", "2025-26"]
+    lines = ["THE TEAM-TOTAL GAP RULE, RE-TESTED · written %s by slate.py nba-gap-retest" % dt.datetime.utcnow().strftime("%Y-%m-%d %H:%M UTC"),
+             "A gap is a book's team-total line less the number a game total and a home spread imply, (total - spread) / 2 at home and (total + spread) / 2 away.",
+             "A call is the UNDER a point or more above that number and the OVER a point or more below it, graded at the line's own prices.",
+             "A: the number as the backtest of 26 Oct 2026 had it (another source's closing total and spread; here the US books' mean at the last snapshot before tip).",
+             "B: the number the SAME book's own total and spread imply. C: the number the OTHER books' middle total and spread imply.",
+             "If the rule is the book's own inconsistency, B shows it. If it is one book's line off the market, C shows it and B does not. If only A shows it, it was the two sources."]
+    pooled, used = [], []
+    for sn in seasons:
+        paths = (nba_ledger_path(out_dir, sn), odds_periods_path(out_dir, "NBA", sn), odds_history_path(out_dir, "NBA", sn))
+        missing = [os.path.basename(pth) for pth in paths if not os.path.exists(pth)]
+        if missing:
+            how = {"nba-ledger": "Run NBA ledger.bat", "odds-periods": "Run NBA period lines.bat", "odds-history": "Run NBA lines history.bat"}
+            msg = "%s: not read, %s missing from this folder (%s)." % (sn, " and ".join(missing), "; ".join(sorted({how[k] for k in how for m in missing if m.startswith(k)})))
+            log(msg)
+            lines += ["", msg]
+            continue
+        led = load_nba_ledger(paths[0])
+        try:
+            with open(paths[1], encoding="utf-8") as f:
+                per = json.load(f)
+            with open(paths[2], encoding="utf-8") as f:
+                hist = json.load(f)
+        except (OSError, ValueError) as e:
+            msg = "%s: a file would not read (%s)." % (sn, e)
+            log(msg)
+            lines += ["", msg]
+            continue
+        rows = gap_retest_readings((led or {}).get("games") or [], per, hist)
+        lines += gap_retest_report(rows, "NBA %s" % sn)
+        pooled += rows
+        used.append(sn)
+        log("%s: %d team-total lines read on %d games." % (sn, len(rows), len({r["key"] for r in rows})))
+    if len(used) > 1:
+        lines += gap_retest_report(pooled, "the %d seasons together" % len(used))
+    path = os.path.join(out_dir, GAP_RETEST_FILE)
+    with open(path, "w", encoding="utf-8") as f:
+        f.write("\n".join(lines) + "\n")
+    for ln in lines:
+        log(ln)
+    log("")
+    log("Wrote %s. Send that file to Claude: it decides whether the gap rule stays scored, is rebuilt against the market, or becomes a watch." % path)
+    return path
+
+
 # ---- modes -----------------------------------------------------------------
 
 def make_slate(date_iso, out_dir, log):
@@ -8070,6 +8344,72 @@ def selftest():
           and odds_periods_path(".", "NHL", "20252026") == os.path.join(".", "odds-periods-NHL-20252026.json") and ODDS_PERIOD["NHL"] == "totals_p1")
     check("odds history: the dates come from the calendar without a ledger, or from the range", odds_history_dates("NHL", "20252026", tempfile.mkdtemp())[0] == "2025-10-01"
           and odds_history_dates("NHL", "x", ".", "2025-10-08", "2025-10-10") == ["2025-10-08", "2025-10-09", "2025-10-10"])
+    # the team-total gap rule, re-tested (11 Nov 2026): 24 canned games, the three files' own shapes, each number the mode reports worked by hand
+    gr_led, gr_per, gr_hist = [], {"format": ODDS_PERIODS_FORMAT, "games": {}}, {"format": ODDS_HISTORY_FORMAT, "games": {}}
+    for gi in range(24):
+        gd = "2025-11-%02d" % (gi + 1)
+        gk = odds_log_key("NBA", gd, "Hawks", "Magic")
+        up_half = gi < 12                                   # twelve games with FanDuel's home line a point and a half ABOVE the number, twelve BELOW
+        under_hits = gi < 9 or 12 <= gi < 17                # the home club lands under the line in nine of the first twelve and five of the last
+        fd_home = 112.0 + (1.5 if up_half else -1.5)        # the number every book implies at home: (220 - -4) / 2 = 112
+        gr_led.append({"date": gd, "an": "Hawks", "hn": "Magic", "fa": 100, "fh": int(fd_home - 4.5) if under_hits else int(fd_home + 4.5)})
+        gr_per["games"][gk] = {"sport": "NBA", "gdate": gd, "away": "Hawks", "home": "Magic", "start": gd + "T23:10:00Z", "mk": {"team_totals": {
+            "fanduel": {"home": [fd_home, -110, -110], "away": [108.5, -110, -110]},
+            "betmgm": {"home": [112.5, -115, -105], "away": [108.0, -110, -110]},
+            "betrivers": {"home": [110.5, -148, -129], "away": [108.0, None, -110]},      # an alternate's number with two lines' prices; and a side with one price
+            "draftkings": {"home": [112.5, -110, -110]}}}}
+        gr_hist["games"][gk] = {"sport": "NBA", "gdate": gd, "away": "Hawks", "home": "Magic", "start": gd + "T23:10:00Z", "snaps": {
+            gd + "T16:00:00Z": {"fanduel": [218.0, -110, -110, -150, 130, -3.0, -110, -110]},           # the noon snapshot: not the last before tip
+            gd + "T22:30:00Z": {"fanduel": [220.0, -110, -110, -150, 130, -4.0, -110, -110], "draftkings": [220.5, -110, -110, -150, 130, -3.5, -110, -110],
+                                "betmgm": [220.0, -110, -110, -150, 130, -4.0, -110, -110], "pinnacle": [220.0, -105, -105, -155, 140, -4.0, -105, -105], "caesars": [221.0, -110, -110]},
+            gd + "T23:30:00Z": {"fanduel": [230.0, -110, -110, -150, 130, -9.0, -110, -110]}}}           # after the tip: never read
+    gr_rows = gap_retest_readings(gr_led, gr_per, gr_hist)
+    gr_fd = [r for r in gr_rows if r["book"] == "fanduel" and r["side"] == "home"]
+    gr_own, gr_mkt, gr_sc = gap_retest_tally(gr_fd, "own"), gap_retest_tally(gr_fd, "market"), gap_retest_tally([r for r in gr_rows if r["first"] and r["side"] == "home"], "scored")
+    gr_stamp, gr_snap = gap_retest_snapshot(gr_hist["games"][odds_log_key("NBA", "2025-11-01", "Hawks", "Magic")])
+    check("gap retest: the last full-game snapshot before tip is read, the noon one and the one after the tip are not, and the tip sits forty minutes on",
+          gr_stamp == "2025-11-01T22:30:00Z" and gap_retest_book(gr_snap, "fanduel") == (220.0, -4.0) and gap_retest_book(gr_snap, "caesars") is None
+          and gap_retest_minutes(gr_stamp, "2025-11-01T23:10:00Z") == 40.0 and gap_retest_snapshot({}) == (None, {}) and all(r["lag"] == 40.0 for r in gr_rows))
+    check("gap retest: a book's own number, the market's (the middle of the OTHER books, three or more) and the US books' mean are three numbers",
+          gap_retest_implied((220.0, -4.0), "home") == 112.0 and gap_retest_implied((220.0, -4.0), "away") == 108.0 and gap_retest_implied(None, "home") is None
+          and gap_retest_market(gr_snap, skip="fanduel") == (220.0, -4.0) and gap_retest_market(gr_snap, skip="draftkings") == (220.0, -4.0)
+          and gap_retest_market({"fanduel": [220.0, 0, 0, 0, 0, -4.0], "betmgm": [221.0, 0, 0, 0, 0, -3.0]}) is None
+          and abs(gap_retest_mean(gr_snap)[0] - 220.1667) < 1e-3 and abs(gap_retest_mean(gr_snap)[1] + 3.8333) < 1e-3 and gap_retest_median([3, 1, 2]) == 2 and gap_retest_median([4, 1, 2, 3]) == 2.5 and gap_retest_median([]) is None)
+    check("gap retest: every line with both prices is a reading; a pair of prices that cannot be one line's is marked, a side with one price is left out, and the backtest's own book is named",
+          len(gr_rows) == 24 * 6 and len(gr_fd) == 24 and all(r["clean"] for r in gr_fd) and all(not r["clean"] for r in gr_rows if r["book"] == "betrivers")
+          and not any(r["book"] == "betrivers" and r["side"] == "away" for r in gr_rows) and {r["book"] for r in gr_rows if r["first"]} == {"betmgm"}
+          and all(abs(r["own"] - 112.0) < 1e-9 and abs(r["market"] - 112.0) < 1e-9 and abs(r["scored"] - 112.0) < 1e-3 for r in gr_fd)
+          and all(r["own"] is None and r["market"] is not None for r in gr_rows if r["book"] == "betrivers"))
+    check("gap retest: FanDuel's home line a point and a half off its own number on all 24, the call 16-8 (the under above 9-3, the over below 7-5) for +6.55 units at -110, the slope of the over on the gap -0.111 a point",
+          gr_own["n"] == 24 and gr_own["calls"] == 24 and (gr_own["w"], gr_own["l"], gr_own["p"]) == (16, 8, 0) and gr_own["under"] == [9, 3] and gr_own["over"] == [7, 5]
+          and abs(gr_own["units"] - (16 * 100.0 / 110 - 8)) < 1e-9 and abs(gr_own["slope"] + 0.1111) < 1e-3 and gr_own["t"] is not None and gr_own["t"] < 0 and abs(gr_own["sd"] - 1.5) < 1e-9
+          and (gr_mkt["w"], gr_mkt["l"]) == (16, 8) and gr_sc["n"] == 24 and gr_sc["calls"] == 0 and (gr_sc["w"], gr_sc["l"]) == (0, 0))
+    gr_best = gap_retest_best(gr_rows, "market")
+    gr_rep = "\n".join(gap_retest_report(gr_rows, "NBA canned"))
+    check("gap retest: one call a game a side at the three apps takes the line furthest from the number, and the report carries the three readings side by side with the books' counts",
+          len(gr_best) == 24 and {r["book"] for r in gr_best} == {"fanduel"} and len(gap_retest_best(gr_rows, "market", gap_min=2.0)) == 0
+          and "=== NBA canned · 24 games with a team total and a final, 24 of them with a full-game snapshot before tip ===" in gr_rep
+          and "the line the backtest read (Fanatics, else the first book by name), by book: betmgm 48" in gr_rep and "betrivers 24 of 24" in gr_rep and "fanduel 0 of 48" in gr_rep
+          and "gap of a point or more on 24 of 24 (100%, sd 1.50) · the call 16-8 (66.7%) +6.5u · under above 9-3, over below 7-5 · slope -0.111 a point (t -1.7)" in gr_rep
+          and "a call on 24 games · the call 16-8 (66.7%) +6.5u · under above 9-3, over below 7-5" in gr_rep and gr_rep.count("a call on 24 games") == 5 and gr_rep.count("no reading") == 9
+          and gr_rep.count("the three apps, one call a game (the biggest gap)") == 4 and "tips within 90 minutes of the snapshot" in gr_rep and "no reading" in gr_rep)
+    gr_dir = tempfile.mkdtemp()
+    gr_log = []
+    gr_path0 = make_nba_gap_retest(gr_dir, gr_log.append)
+    with open(nba_ledger_path(gr_dir, "2025-26"), "w", encoding="utf-8") as f:
+        json.dump({"format": NBA_LEDGER_FORMAT, "season": "2025-26", "games": gr_led}, f)
+    with open(odds_periods_path(gr_dir, "NBA", "2025-26"), "w", encoding="utf-8") as f:
+        json.dump(gr_per, f)
+    with open(odds_history_path(gr_dir, "NBA", "2025-26"), "w", encoding="utf-8") as f:
+        json.dump(gr_hist, f)
+    gr_log2 = []
+    gr_path = make_nba_gap_retest(gr_dir, gr_log2.append)
+    with open(gr_path, encoding="utf-8") as f:
+        gr_txt = f.read()
+    check("gap retest: the mode reads the three files of a season from the folder, writes nba-gap-retest.txt, names what is missing with the bat that makes it, and spends nothing",
+          os.path.basename(gr_path0) == GAP_RETEST_FILE and any("2025-26: not read, nba-ledger-202526.json and odds-periods-NBA-2025-26.json and odds-history-NBA-2025-26.json missing" in x and "Run NBA period lines.bat" in x for x in gr_log)
+          and os.path.basename(gr_path) == GAP_RETEST_FILE and "=== NBA 2025-26 · 24 games with a team total and a final" in gr_txt and "2024-25: not read" in gr_txt and "the seasons together" not in gr_txt
+          and "THE TEAM-TOTAL GAP RULE, RE-TESTED" in gr_txt and any("2025-26: 144 team-total lines read on 24 games." == x for x in gr_log2))
     # the NBA ledger (15 Oct 2026), offline: the feed's shapes, canned
     check("nba: the season from a date", nba_season_id("2026-10-15") == "2026-27" and nba_season_id("2027-04-10") == "2026-27" and nba_season_id("2027-07-01") == "2026-27" and nba_season_id("2027-08-15") == "2027-28")
     check("nba: season spellings", nba_norm_season("2024-25") == "2024-25" and nba_norm_season("2024") == "2024-25" and nba_norm_season("20242025") == "2024-25" and nba_norm_season("202425") == "2024-25")
@@ -8848,11 +9188,12 @@ def default_date(mode, today):
 
 def main(argv=None):
     ap = argparse.ArgumentParser(description="Write the day's slate (or yesterday's finals) for Call Sheet 2.0.")
-    ap.add_argument("mode", nargs="?", choices=["slate", "grade", "nhl", "nhl-grade", "nhl-ledger", "nhl-pbp", "nhl-shots", "nba", "nba-grade", "nba-ledger", "nba-pbp", "nba-props", "odds", "odds-history", "odds-periods"], default="slate",
+    ap.add_argument("mode", nargs="?", choices=["slate", "grade", "nhl", "nhl-grade", "nhl-ledger", "nhl-pbp", "nhl-shots", "nba", "nba-grade", "nba-ledger", "nba-pbp", "nba-props", "nba-gap-retest", "odds", "odds-history", "odds-periods"], default="slate",
                     help="slate (default): today's MLB inputs. grade: MLB finals. nhl: today's NHL inputs. nhl-grade: NHL finals. "
                          "nhl-ledger: every NHL final this season, measured against the sheet's assumptions. "
                          "nba: today's NBA inputs (ratings, pace, rest, who is out, the context lines). nba-grade: NBA finals with the half-time score. "
                          "nba-ledger: every NBA final of a season with quarters, pace and every player's minutes (--season 2024-25 for a past season). "
+                         "nba-gap-retest: the team-total gap rule held against three numbers, from the ledger, the period lines and the lines history in the folder (no credit spent). "
                          "odds: today's lines, prices, openers, the sharp line, the alternates and every book's price from The Odds API (needs odds_key.txt). "
                          "odds-history: a past season's lines at two moments a day, for the backtest's openers (paid plans; asks before it spends).")
     ap.add_argument("--books", help="odds only: the books to read, first one carded, pinnacle never carded, e.g. fanatics,betmgm,draftkings,pinnacle (default: %s)" % ",".join(ODDS_BOOKS))
@@ -8919,6 +9260,8 @@ def main(argv=None):
             path = make_nba_grade(date_iso, a.out, log)
         elif a.mode == "nba-props":
             path = make_nba_props(date_iso, a.out, log, topup=not a.no_ledger, sim_runs=max(0, a.runs), close=a.close)
+        elif a.mode == "nba-gap-retest":
+            path = make_nba_gap_retest(a.out, log, a.season)
         elif a.mode == "odds":
             sports = tuple(s.strip().upper() for s in a.sports.split(",") if s.strip()) if a.sports else ("MLB", "NHL", "NBA")
             path = make_odds(date_iso, a.out, log, a.books, sports)

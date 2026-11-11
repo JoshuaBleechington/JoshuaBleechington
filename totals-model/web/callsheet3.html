@@ -442,6 +442,7 @@
   .pk.t3 .leg.win .lname { color: var(--go); } .pk.t3 .leg.loss .lname { color: var(--bad); }
   .pk.t3.taking { box-shadow: none; } .pk.t3.taking .t3top { box-shadow: inset 0 -4px 0 var(--go); }
   .pk-divider.t3d { line-height: 1.5; } .pk-divider.t3d b { color: var(--ink); }
+  .calib > div.nocall .v { color: var(--muted); font-size: 14px; }   /* an NBA market the sheet has not called (11 Nov 2026): the tile says so instead of a record */
   #propsBestCtl { margin: 4px 0 10px; } #propsBestCtl .tag { white-space: nowrap; }   /* the best list's three choices on a row of their own (11 Nov 2026): tells, what sits under the BETs, legs a ticket */
   /* one bet a man (10 Nov 2026): the line on a man's several BET cards and the note above the best list */
   .pk .n5.onebet, .pdlg .pd-onebet { color: var(--edge); font-weight: 600; }
@@ -3247,11 +3248,29 @@ smStore.ready.then(function () {
     for (var i = 0; i < books.length; i++) { var b = pick(books[i]); if (b) return b; }
     return null;
   }
+  /* a call on the record (11 Nov 2026, the user: "fix the NBA record so tiles count only real calls"). The NBA card reads the
+     book's own number on the spread, the first half and most totals and moneylines, and its "pick" there is only the closer of
+     two sides neither of which is priced below its chance (the note on the market says so). The record's tiles had counted
+     every row: on the 160 games to 10 Nov the moneyline's line read 79-81 for -28.9 units, of which 130 rows were no call (35
+     long dogs among them, 3-32 for -24.8) and 29 were calls (11-18, -6.7); the spread's 73-86-1 and the first half's 80-80
+     were a coin less the price on a side nobody had called. A call is a side priced below the sheet's chance (an edge above
+     zero) or one a verdict sits on; the rest is listed under the tile as no call and left out of its count. The watches that
+     read both sides of a market (Pinnacle's shade, the short dog, the crowd on Kalshi, the 54%+ line) keep every game. No
+     chance and no pick moves: this is the record's arithmetic alone */
+  function nbaIsCall(mk) { return !!mk && ((mk.edge !== null && mk.edge !== undefined && mk.edge > 1e-9) || !!bandOf(mk)); }
   /* the gap rule (26 Oct 2026): the book's team total against the number the game's own total and spread imply, (total -/+
      spread) / 2. Two seasons of closes: a home line a point or more ABOVE the implied went under 62.1% and 63.2% of the time
      (169 and 247 games), a point or more BELOW went over 68.1% and 63.1% (94 and 195); the away side 55.4% / 56.8% and
      57.1% / 56.5%; the slope of the over's chance on the gap -0.080 and -0.057 a point at home (t -5.1, -5.7), -0.036 and
      -0.030 away (t -2.4, -2.8). Scored: a gap of a point or more is a call, and the record keeps it from the first night */
+  /* Under re-test from 11 Nov 2026. The backtest took the game's total and spread from KillerSports' close and the team total
+     from one book's line fifteen minutes before tip (Fanatics, else the first book by name), and a gap of a point or more
+     showed on 66% of games; on this season's rows a book's team total against that book's own total and spread shows one on
+     about 10% of lines, and the call reads 20-18 at home and 27-28 away at the three apps (the page's own tally, one book a
+     row, 7-6 and 4-8). So the two-season edge may be two sources disagreeing, not a book failing to reconcile its own
+     numbers. slate.py nba-gap-retest (Run NBA gap retest.bat) holds every team-total line of both seasons against the
+     backtest's number, the same book's and the other books' middle, and its file decides: scored as it is, rebuilt against
+     the market, or a watch. Nothing is changed here until that file is read */
   var NBA_TT_GAP = 1.0;
   function nbaTeamTotalGap(tt, total, sp, side) {
     if (!tt || total === null || total === undefined || sp === null || sp === undefined || isNaN(+total) || isNaN(+sp)) return null;
@@ -3569,7 +3588,7 @@ smStore.ready.then(function () {
       h += '</tbody></table>';
     });
     if (gn) {
-      h += '<div class="simrecview">The team-total gap rule <span class="tag">the book\'s line a point or more off the number the game\'s total and spread imply · scored, two seasons</span></div><table class="form simrectab gaptab"><thead><tr><th>Side</th><th>Record</th><th>Does</th><th>Units</th><th>Two seasons said</th></tr></thead><tbody>';
+      h += '<div class="simrecview">The team-total gap rule <span class="tag">the book\'s line a point or more off the number the game\'s total and spread imply · scored, two seasons · under re-test from 11 Nov 2026: the backtest held one book\'s line against another source\'s closing total and spread, where a gap of a point or more showed on two games in three; a book against its own numbers shows one on one line in ten, and this season that reads 20-18 at home and 27-28 away at the three apps. Run NBA gap retest.bat holds the two seasons to the same test and decides whether the rule stays scored</span></div><table class="form simrectab gaptab"><thead><tr><th>Side</th><th>Record</th><th>Does</th><th>Units</th><th>Two seasons said</th></tr></thead><tbody>';
       [["HOME", "62% under above the number, 66% over below (169 and 247, 94 and 195 games)"], ["AWAY", "56% under above, 57% over below"]].forEach(function (x) {
         var d = G[x[0]];
         if (!d.n) return;
@@ -10225,7 +10244,7 @@ var qrcode = function() {
   }
   function renderCalib() {
     var KEYS = { MLB: [["total","Full-game total"],["f5","First five"],["ml","Moneyline"],["rl","Run line"]],
-                 NBA: [["total","Full-game total"],["h1","First half"],["ml","Moneyline"],["spread","Spread"]],
+                 NBA: [["total","Full-game total · calls"],["h1","First half · calls"],["ml","Moneyline · calls"],["spread","Spread · calls"]],
                  WNBA: [["total","Full-game total"],["ml","Moneyline"],["spread","Spread"]] };
     var box = $("calibBox");
     backfillProj();
@@ -10243,11 +10262,11 @@ var qrcode = function() {
     });
     var count = function (c, res) { if (res === "push") c.p++; else if (res === "win") c.w++; else c.l++; };
     var tally = function (t, mk, res, row, clvRow) {
+      var noCall = !!(row && row.sport === "NBA" && typeof nbaIsCall === "function" && !nbaIsCall(mk));   // the book's own number, not a call (11 Nov 2026)
       var cl = clvOf(mk, clvRow || row);
-      if (cl !== null) { t.clv.n++; t.clv.runs += cl; if (cl > 1e-9) t.clv.beat++; else if (cl < -1e-9) t.clv.lost++; else t.clv.even++; }
+      if (cl !== null && !noCall) { t.clv.n++; t.clv.runs += cl; if (cl > 1e-9) t.clv.beat++; else if (cl < -1e-9) t.clv.lost++; else t.clv.even++; }
       if (row) {
-        var sd = t.sides[mk.side] || (t.sides[mk.side] = { w: 0, l: 0, p: 0 });
-        count(sd, res);
+        if (!noCall) { var sd = t.sides[mk.side] || (t.sides[mk.side] = { w: 0, l: 0, p: 0 }); count(sd, res); }
         /* the 54%+ line: every pick the sheet called 54% or better, whatever
            its price. Asked for on 5 Oct ("54% or higher even without an edge
            should be considered a bet... let's test it"): the record is the
@@ -10301,6 +10320,7 @@ var qrcode = function() {
           }
         }
       }
+      if (noCall) { var nc = t.nocall || (t.nocall = { w: 0, l: 0, p: 0, units: 0 }); count(nc, res); if (res !== "push") nc.units += unitsOf(mk, res); return; }
       if (res === "push") { t.p++; return; }
       t.n++; t.says += mk.p; t.w += res === "win" ? 1 : 0; t.l += res === "loss" ? 1 : 0; t.units += unitsOf(mk, res);
     };
@@ -10344,7 +10364,7 @@ var qrcode = function() {
       h += '<p class="note">Enter finals on the card — away and home runs, and the first-five runs for MLB — and every market grades itself, one block per sport.</p>';
     }
     var tiles = function (s, unit) {
-      if (!s.n && !s.p) return '';
+      if (!s.n && !s.p && !s.nocall) return '';
       var says = s.n ? s.says / s.n * 100 : 0, does = s.n ? s.w / s.n * 100 : 0;
       var se = s.n ? Math.sqrt(Math.max(does / 100 * (1 - does / 100), 1e-9) / s.n) * 100 : 0;
       var rec = function (c) { return c.w + '-' + c.l + (c.p ? '-' + c.p : ''); };
@@ -10367,8 +10387,10 @@ var qrcode = function() {
       if (s.shortDog) parts.push("the short dog " + rec(s.shortDog));
       if (s.kalshi) parts.push("the sharp side against Kalshi's crowd, 3+ points " + rec(s.kalshi));
       if (s.clv.n) parts.push('beat the close ' + s.clv.beat + '-' + s.clv.lost + (s.clv.even ? '-' + s.clv.even : '') + ' · ' + sgn(s.clv.runs / s.clv.n, 2) + ' ' + (unit || 'runs') + ' avg');
-      return '<div><p class="k">' + esc(s.label) + '</p><p class="v">' + s.w + '-' + s.l + (s.p ? '-' + s.p : '') + '</p>' +
-        '<p class="s">' + (s.n ? 'says ' + says.toFixed(1) + '% · does ' + does.toFixed(1) + '% (±' + se.toFixed(1) + ') · ' + sgn(s.units, 2) + 'u' : 'pushes only') + '</p>' +
+      if (s.nocall) { var ncN = s.nocall.w + s.nocall.l + s.nocall.p; parts.push('no call on ' + ncN + ' game' + (ncN === 1 ? '' : 's') + ", the book's own number: the closer side " + rec(s.nocall) + ', not counted'); }
+      var noCalls = !!s.nocall && !s.n && !s.p;   // an NBA market the sheet has not called yet (11 Nov 2026)
+      return '<div' + (noCalls ? ' class="nocall"' : '') + '><p class="k">' + esc(s.label) + '</p><p class="v">' + (noCalls ? 'no call' : s.w + '-' + s.l + (s.p ? '-' + s.p : '')) + '</p>' +
+        '<p class="s">' + (s.n ? 'says ' + says.toFixed(1) + '% · does ' + does.toFixed(1) + '% (±' + se.toFixed(1) + ') · ' + sgn(s.units, 2) + 'u' : noCalls ? 'no side priced below its chance yet' : 'pushes only') + '</p>' +
         (parts.length ? '<p class="s sides">' + esc(parts.join(' · ')) + '</p>' : '') + '</div>';
     };
     ["MLB", "NBA", "WNBA"].forEach(function (sp) {
@@ -10380,18 +10402,19 @@ var qrcode = function() {
       }
       var totalN = KEYS[sp].reduce(function (a, k) { return a + b.stats[k[0]].n; }, 0);
       var graded = card.filter(function (r) { return r.sport === sp && (r.markets || []).some(function (mk) { return gradeMarket(mk, r.finals) !== null; }); }).length;
-      h += '<div class="subhead" data-sport="' + sp + '">' + sp + ' <span class="tag">' + graded + ' graded game' + (graded === 1 ? '' : 's') + ' · ' + totalN + ' graded markets</span></div>';
+      h += '<div class="subhead" data-sport="' + sp + '">' + sp + ' <span class="tag">' + graded + ' graded game' + (graded === 1 ? '' : 's') + ' · ' + (sp === "NBA" ? totalN + ' call' + (totalN === 1 ? '' : 's') + ' graded, the rest the book\'s own number' : totalN + ' graded markets') + '</span></div>';
       h += forecastBlock(sp);
       h += favBlock(sp);
       var unit = (sp === "WNBA" || sp === "NBA") ? "pts" : "runs";
       h += '<div class="calib" data-sport="' + sp + '">' + tiles(b.pick, unit) + KEYS[sp].map(function (k) { return tiles(b.stats[k[0]], unit); }).join('') + tiles(b.top, unit) + tiles(b.topE, unit) + '</div>';
       h += '<div class="verdict">' + (totalN < 30
-        ? '<b>' + totalN + ' graded ' + sp + ' markets.</b> Nothing here can be read yet — one standard error on a hit rate is ' +
+        ? '<b>' + totalN + ' graded ' + sp + (sp === "NBA" ? ' call' + (totalN === 1 ? '' : 's') : ' markets') + '.</b> Nothing here can be read yet — one standard error on a hit rate is ' +
           (totalN ? (100 / Math.sqrt(totalN) / 2).toFixed(0) : '—') + ' points at this size. ' +
           (sp === "MLB" ? 'The run line and the moneyline are shown, not picked, since 27 Sept: watch whether the run line\'s <i>does</i> climbs back toward its <i>says</i>; it comes back at 150 picks if it does. The two fours are the reason the sheet exists.'
                         : sp === "NBA" ? 'The spread and the moneyline are shown, not picked: measured priced against everything in the box score over two seasons of closes, with one exception, the short dog (a dog the book makes 40% or better, +5.6 points on 626 games, both seasons), which lifts the dog and makes its moneyline pickable on its own record line. The total and the first half are the pickable markets; the ratings fade and the stage deltas are tagged, and the record decides what they earn.' : 'With seven games in the season book and this sheet newer than that, the WNBA block will read as noise for weeks; it is here so the two sports never get pooled.')
-        : '<b>' + totalN + ' graded ' + sp + ' markets.</b> Compare each market\'s <i>does</i> against its <i>says</i> before believing either; ' +
-          'and compare each four against the blind rate of everything logged, not against 50%. The parlay four and the straight bets will differ most nights; the units column is the referee.') + '</div>';
+        : '<b>' + totalN + ' graded ' + sp + (sp === "NBA" ? ' call' + (totalN === 1 ? '' : 's') : ' markets') + '.</b> Compare each market\'s <i>does</i> against its <i>says</i> before believing either; ' +
+          'and compare each four against the blind rate of everything logged, not against 50%. The parlay four and the straight bets will differ most nights; the units column is the referee.') +
+        (sp === "NBA" ? ' <b>A call</b> is a side the sheet prices below its chance, or one a verdict sits on. Where neither side is, the market is the book\'s own number: it is listed under the tile as no call and left out of the tile\'s count (11 Nov 2026: the tiles had counted every row, and the moneyline\'s line read 79-81 for −28.9 units on 160 games, of which 29 were calls and 35 were long dogs that were nobody\'s call, 3-32). The watches under a tile read every game.' : '') + '</div>';
       if (sp === "NBA") h += nbaRefsWatchHtml();   // the referees as a watch (22 Oct 2026)
       if (sp === "NBA") h += nbaSimRecordHtml();   // the simulation's calls, says against does (25 Oct 2026)
     });

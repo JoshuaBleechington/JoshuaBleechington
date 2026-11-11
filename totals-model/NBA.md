@@ -993,3 +993,100 @@ the margin's 13.37 against 13.93 (16.76), the first half's 11.99 against
 12.09; overtime 4.3% against 4.2% (3.3%). By the game's pace, three-point
 share and closing total the sim's spread moves with the real one within half
 a point in every tercile.
+
+## The record counts the calls, and the gap rule under re-test, 11 Nov 2026
+
+The user, with the props settled: "I'd like to see what we can do
+regarding the NBA model." The card's 160 graded games, 20 Oct to 10 Nov,
+read from his backup, and then: "Go ahead and build 1 and 2 with thorough
+testing."
+
+**What the record said.** The projection is the book's own line on 142
+games of 160 and misses the final by 14.3 points where the line misses by
+14.2; no NBA market has carried a band all season. The four tiles read
+total 72-82-6 (−13.1 units), first half 80-80 (−5.0), spread 73-86-1
+(−18.3), moneyline 79-81 (−28.9), which looks like a model losing on
+everything and is not one: the tiles counted every row's "pick", and on a
+row where neither side is priced below its chance the pick is only the
+closer of the two (the market's own note says so). The moneyline's line,
+by what kind of row it was:
+
+    the side priced below its chance (a call)       29    11-18    −6.7 units
+    the closer of two sides, nobody's call         130    68-62   −22.2
+        of which dogs the book makes under 40%      35     3-32   −24.8
+    (one row more carried no price: the page lists it with the no-call rows, 68-63 on 131)
+
+The finals have run 2.3 points under the lines (86 unders, 68 overs; one
+standard error is 1.4), where the two Octobers before ran over: noise.
+The favourites won 112 of 159 where the book said 66.6%, and dogs under
+20% went 0 for 21; two seasons said the moneyline is calibrated but for
+the short dog, so this stays unscored.
+
+**1. The record counts the calls.** A call is a side the sheet prices
+below its chance (an edge above zero) or one a verdict sits on
+(`nbaIsCall`, `web/nba.engine.js`). A market where neither side is, is the
+book's own number: the tile lists it underneath as no call, with the
+closer side's record for scale, and leaves it out of its count, its sides
+and its close. A market with no call yet says "no call" in place of a
+record. The watches that read both sides of a market keep every game:
+Pinnacle's shade, the short dog, the crowd on Kalshi, the 54%+ line. On
+the same 160 games the block now reads 30 calls graded: the total 1-0,
+the first half and the spread no call, the moneyline 11-18 for −6.7 units
+with the short dog 24-25 beside it and no call on 131 games. No chance
+and no pick moves; the pick, the parlay four and the straight bets keep
+their own tiles. The change is the 3.0 build's patch to the shared record
+code, so MLB, the WNBA and Call Sheet 2 are untouched.
+
+**2. The gap rule under re-test.** The rule is scored on two seasons: the
+under 62 to 63% a point or more above the implied number at home, the over
+63 to 68% below it. This season the page's own tally is 7-6 at home and
+4-8 away. Read every way the rows allow, each book's main team-total line
+(the one whose two prices are nearest even) on 160 games:
+
+    a book against its OWN total and spread
+        a gap of a point or more          6 to 14% of lines a book (sd 0.5)
+        the three apps, one call a game   home 20-18, away 27-28
+        slope of the over on the gap      −0.03 at home (t −0.4), two seasons said −0.06 to −0.08 (t −5)
+    a book against the OTHER books' middle total and spread
+        the three apps, one call a game   home 13-9, away 19-20
+
+The backtest's own code says why the two disagree. It took the game's
+total and spread from KillerSports' close and the team total from one
+book's line fifteen minutes before tip (Fanatics, else the first book by
+name, which was BetMGM), and a gap of a point or more showed on 66% of
+games; a book against its own numbers shows one on a line in ten. So the
+gap it measured was two sources disagreeing. And the period-lines file
+keeps one line a book a side as the first point listed with the last over
+and under prices, so a book that lists alternates can carry one line's
+number with another line's prices. A first reading of this season's rows
+that mixed books the same way (the carded book's total and spread against
+every book's team total, the biggest gap taken) read 35-20 at home, and
+was dropped for the strict one above before it was told as a finding.
+
+`slate.py nba-gap-retest` (Run NBA gap retest.bat) holds the two seasons
+to the same test. It reads the three files already in the folder (the
+ledger, the period lines, the full-game lines history), calls no site and
+spends no credit, and writes `nba-gap-retest.txt`: every team-total line
+with both prices, against A the number as the backtest had it (the US
+books' mean total and spread at the last snapshot before tip, the nearest
+thing in these files to the other source's close), B the same book's own
+total and spread, and C the middle of the other books'; each book, the
+three apps at one call a game, the tips within ninety minutes of the
+snapshot apart, the price pairs that cannot be one line's marked and
+counted by book, the slope of the over on the gap. If B shows it the rule
+stands as built. If C shows it and B does not, the rule is one app's line
+off the market and is rebuilt to read each app against the other books.
+If only A shows it, it was the two sources, and the rule becomes a watch.
+Until the file is read the rule stays scored and the page says, on the
+rule's own record line, that it is under re-test and why.
+
+Checked: the selftest works the mode's numbers by hand on 24 canned games
+in the three files' own shapes (the last snapshot before tip and not the
+one after it, the three numbers, the marked price pairs, a side with one
+price left out, the backtest's own book, the call's record, units and
+slope, the report's lines, a folder with files missing); and the mode,
+run on this season's 160 games written out in the same shapes, returns
+book for book what a separate script had found (FanDuel 11-8 at home and
+15-15 away, DraftKings 5-5 and 8-7, BetMGM 7-7 and 10-12). The page
+harness adds three games through the form, graded, and reads the calls,
+the no-call lines and the tiles of the markets not yet called.

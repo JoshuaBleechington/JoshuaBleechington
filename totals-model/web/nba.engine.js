@@ -942,11 +942,29 @@
     for (var i = 0; i < books.length; i++) { var b = pick(books[i]); if (b) return b; }
     return null;
   }
+  /* a call on the record (11 Nov 2026, the user: "fix the NBA record so tiles count only real calls"). The NBA card reads the
+     book's own number on the spread, the first half and most totals and moneylines, and its "pick" there is only the closer of
+     two sides neither of which is priced below its chance (the note on the market says so). The record's tiles had counted
+     every row: on the 160 games to 10 Nov the moneyline's line read 79-81 for -28.9 units, of which 130 rows were no call (35
+     long dogs among them, 3-32 for -24.8) and 29 were calls (11-18, -6.7); the spread's 73-86-1 and the first half's 80-80
+     were a coin less the price on a side nobody had called. A call is a side priced below the sheet's chance (an edge above
+     zero) or one a verdict sits on; the rest is listed under the tile as no call and left out of its count. The watches that
+     read both sides of a market (Pinnacle's shade, the short dog, the crowd on Kalshi, the 54%+ line) keep every game. No
+     chance and no pick moves: this is the record's arithmetic alone */
+  function nbaIsCall(mk) { return !!mk && ((mk.edge !== null && mk.edge !== undefined && mk.edge > 1e-9) || !!bandOf(mk)); }
   /* the gap rule (26 Oct 2026): the book's team total against the number the game's own total and spread imply, (total -/+
      spread) / 2. Two seasons of closes: a home line a point or more ABOVE the implied went under 62.1% and 63.2% of the time
      (169 and 247 games), a point or more BELOW went over 68.1% and 63.1% (94 and 195); the away side 55.4% / 56.8% and
      57.1% / 56.5%; the slope of the over's chance on the gap -0.080 and -0.057 a point at home (t -5.1, -5.7), -0.036 and
      -0.030 away (t -2.4, -2.8). Scored: a gap of a point or more is a call, and the record keeps it from the first night */
+  /* Under re-test from 11 Nov 2026. The backtest took the game's total and spread from KillerSports' close and the team total
+     from one book's line fifteen minutes before tip (Fanatics, else the first book by name), and a gap of a point or more
+     showed on 66% of games; on this season's rows a book's team total against that book's own total and spread shows one on
+     about 10% of lines, and the call reads 20-18 at home and 27-28 away at the three apps (the page's own tally, one book a
+     row, 7-6 and 4-8). So the two-season edge may be two sources disagreeing, not a book failing to reconcile its own
+     numbers. slate.py nba-gap-retest (Run NBA gap retest.bat) holds every team-total line of both seasons against the
+     backtest's number, the same book's and the other books' middle, and its file decides: scored as it is, rebuilt against
+     the market, or a watch. Nothing is changed here until that file is read */
   var NBA_TT_GAP = 1.0;
   function nbaTeamTotalGap(tt, total, sp, side) {
     if (!tt || total === null || total === undefined || sp === null || sp === undefined || isNaN(+total) || isNaN(+sp)) return null;
@@ -1264,7 +1282,7 @@
       h += '</tbody></table>';
     });
     if (gn) {
-      h += '<div class="simrecview">The team-total gap rule <span class="tag">the book\'s line a point or more off the number the game\'s total and spread imply · scored, two seasons</span></div><table class="form simrectab gaptab"><thead><tr><th>Side</th><th>Record</th><th>Does</th><th>Units</th><th>Two seasons said</th></tr></thead><tbody>';
+      h += '<div class="simrecview">The team-total gap rule <span class="tag">the book\'s line a point or more off the number the game\'s total and spread imply · scored, two seasons · under re-test from 11 Nov 2026: the backtest held one book\'s line against another source\'s closing total and spread, where a gap of a point or more showed on two games in three; a book against its own numbers shows one on one line in ten, and this season that reads 20-18 at home and 27-28 away at the three apps. Run NBA gap retest.bat holds the two seasons to the same test and decides whether the rule stays scored</span></div><table class="form simrectab gaptab"><thead><tr><th>Side</th><th>Record</th><th>Does</th><th>Units</th><th>Two seasons said</th></tr></thead><tbody>';
       [["HOME", "62% under above the number, 66% over below (169 and 247, 94 and 195 games)"], ["AWAY", "56% under above, 57% over below"]].forEach(function (x) {
         var d = G[x[0]];
         if (!d.n) return;

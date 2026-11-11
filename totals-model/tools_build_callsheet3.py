@@ -343,6 +343,33 @@ def tail() -> str:
              'NBA: [["total","Full-game total"],["h1","First half"],["ml","Moneyline"],["spread","Spread"]],\n'
              '                 WNBA: [["total","Full-game total"],["ml","Moneyline"],["spread","Spread"]] };', "calib keys")
     t = every(t, '["MLB", "WNBA"]', '["MLB", "NBA", "WNBA"]', "sport loops", 4)
+    # the NBA record counts the sheet's calls (11 Nov 2026, the user: "fix the NBA record so tiles count only real calls"): a market where
+    # neither side is priced below its chance is the book's own number; it is listed under the tile as no call and left out of its count.
+    # The watches that read both sides (Pinnacle's shade, the short dog, the crowd on Kalshi, the 54%+ line) keep every game.
+    t = once(t, 'NBA: [["total","Full-game total"],["h1","First half"],["ml","Moneyline"],["spread","Spread"]],',
+             'NBA: [["total","Full-game total · calls"],["h1","First half · calls"],["ml","Moneyline · calls"],["spread","Spread · calls"]],', "nba calls: labels")
+    t = once(t, '    var tally = function (t, mk, res, row, clvRow) {\n      var cl = clvOf(mk, clvRow || row);\n      if (cl !== null) {',
+             '    var tally = function (t, mk, res, row, clvRow) {\n'
+             '      var noCall = !!(row && row.sport === "NBA" && typeof nbaIsCall === "function" && !nbaIsCall(mk));   // the book\'s own number, not a call (11 Nov 2026)\n'
+             '      var cl = clvOf(mk, clvRow || row);\n      if (cl !== null && !noCall) {', "nba calls: tally")
+    t = once(t, '        var sd = t.sides[mk.side] || (t.sides[mk.side] = { w: 0, l: 0, p: 0 });\n        count(sd, res);',
+             '        if (!noCall) { var sd = t.sides[mk.side] || (t.sides[mk.side] = { w: 0, l: 0, p: 0 }); count(sd, res); }', "nba calls: sides")
+    t = once(t, '      if (res === "push") { t.p++; return; }\n      t.n++; t.says += mk.p;',
+             '      if (noCall) { var nc = t.nocall || (t.nocall = { w: 0, l: 0, p: 0, units: 0 }); count(nc, res); if (res !== "push") nc.units += unitsOf(mk, res); return; }\n'
+             '      if (res === "push") { t.p++; return; }\n      t.n++; t.says += mk.p;', "nba calls: no call")
+    t = once(t, "      if (!s.n && !s.p) return '';\n      var says = s.n ? s.says / s.n * 100 : 0,", "      if (!s.n && !s.p && !s.nocall) return '';\n      var says = s.n ? s.says / s.n * 100 : 0,", "nba calls: tile shown")
+    t = once(t, "      return '<div><p class=\"k\">' + esc(s.label) + '</p><p class=\"v\">' + s.w + '-' + s.l + (s.p ? '-' + s.p : '') + '</p>' +\n"
+                "        '<p class=\"s\">' + (s.n ? 'says ' + says.toFixed(1) + '% · does ' + does.toFixed(1) + '% (±' + se.toFixed(1) + ') · ' + sgn(s.units, 2) + 'u' : 'pushes only') + '</p>' +",
+             "      if (s.nocall) { var ncN = s.nocall.w + s.nocall.l + s.nocall.p; parts.push('no call on ' + ncN + ' game' + (ncN === 1 ? '' : 's') + \", the book's own number: the closer side \" + rec(s.nocall) + ', not counted'); }\n"
+             "      var noCalls = !!s.nocall && !s.n && !s.p;   // an NBA market the sheet has not called yet (11 Nov 2026)\n"
+             "      return '<div' + (noCalls ? ' class=\"nocall\"' : '') + '><p class=\"k\">' + esc(s.label) + '</p><p class=\"v\">' + (noCalls ? 'no call' : s.w + '-' + s.l + (s.p ? '-' + s.p : '')) + '</p>' +\n"
+             "        '<p class=\"s\">' + (s.n ? 'says ' + says.toFixed(1) + '% · does ' + does.toFixed(1) + '% (±' + se.toFixed(1) + ') · ' + sgn(s.units, 2) + 'u' : noCalls ? 'no side priced below its chance yet' : 'pushes only') + '</p>' +", "nba calls: tile")
+    t = once(t, "' · ' + totalN + ' graded markets</span></div>';",
+             "' · ' + (sp === \"NBA\" ? totalN + ' call' + (totalN === 1 ? '' : 's') + ' graded, the rest the book\\'s own number' : totalN + ' graded markets') + '</span></div>';", "nba calls: heading")
+    t = every(t, "'<b>' + totalN + ' graded ' + sp + ' markets.</b>", "'<b>' + totalN + ' graded ' + sp + (sp === \"NBA\" ? ' call' + (totalN === 1 ? '' : 's') : ' markets') + '.</b>", "nba calls: verdict count", 2)
+    t = once(t, "The parlay four and the straight bets will differ most nights; the units column is the referee.') + '</div>';",
+             "The parlay four and the straight bets will differ most nights; the units column is the referee.') +\n"
+             "        (sp === \"NBA\" ? ' <b>A call</b> is a side the sheet prices below its chance, or one a verdict sits on. Where neither side is, the market is the book\\'s own number: it is listed under the tile as no call and left out of the tile\\'s count (11 Nov 2026: the tiles had counted every row, and the moneyline\\'s line read 79-81 for −28.9 units on 160 games, of which 29 were calls and 35 were long dogs that were nobody\\'s call, 3-32). The watches under a tile read every game.' : '') + '</div>';", "nba calls: verdict words")
     t = once(t, 'if (!bySport.MLB.any && !bySport.WNBA.any)', 'if (!bySport.MLB.any && !bySport.NBA.any && !bySport.WNBA.any)', "any graded")
     t = once(t, '                       WNBA: "Nothing graded yet. Type the final on the card and the three markets grade themselves." };',
              '                       NBA: "Nothing graded yet. Type the final and the half-time score on the card and the four markets grade themselves.",\n'

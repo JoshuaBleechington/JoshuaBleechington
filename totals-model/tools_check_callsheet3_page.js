@@ -55,6 +55,7 @@ const CHECKS = ["dome","playoff"];
   await pg.reload();
   await pg.waitForTimeout(300);
   const belowDefault = await pg.evaluate(async () => { await window.smStore.ready; return (document.getElementById('propsBelow') || {}).value; });   // the choice on a first visit
+  const legsDefault = await pg.evaluate(() => (document.getElementById('propsLegs') || {}).value);   // and the legs a ticket
   await leansBelow();
 
   let fails = 0;
@@ -1833,8 +1834,18 @@ const CHECKS = ["dome","playoff"];
     const sel = (v) => { const el = document.getElementById('propsBelow'); el.value = v; el.dispatchEvent(new Event('change', { bubbles: true })); };
     const best = document.getElementById('propsBest');
     const tix = (root) => [...(root || best).querySelectorAll('.pk.t3')].map(e => ({ n1: txt(e.querySelector('.n1')), pay: txt(e.querySelector('.t3pay')), legs: [...e.querySelectorAll('.leg')].map(txt), pips: [...e.querySelectorAll('.leg .pips')].map(p => [...p.querySelectorAll('i')].map(i => i.className.replace(' g5', '|')).join('')).join(','), stats: txt(e.querySelector('.t3stats')), n4: txt(e.querySelector('.n4')), n6: txt(e.querySelector('.n6')), cls: e.className }));
-    const opts = [...document.querySelectorAll('#propsBelow option')].map(o => o.value + '=' + o.textContent);
+    const opts = [...document.querySelectorAll('#propsBelow option')].map(o => o.value + '=' + o.textContent), legOpts = [...document.querySelectorAll('#propsLegs option')].map(o => o.value + '=' + o.textContent);
+    const selLegs = (v) => { const el = document.getElementById('propsLegs'); el.value = v; el.dispatchEvent(new Event('change', { bubbles: true })); };
+    const tabsOf = (c) => [...c.querySelectorAll('.t3apps .t3app')].map(a => txt(a) + (a.classList.contains('on') ? '*' : a.classList.contains('off') ? ' (off)' : ''));
+    const brief = (t) => t.n1 + ' :: ' + t.legs.map(l => l.split(' ').slice(1, 3).join(' ')).join(' + ') + ' :: ' + t.stats.toLowerCase() + ' :: ' + t.cls;
+    // two legs a ticket, the default: the best pair first, on two games, by the same leg rule
+    sel('t3'); selLegs('2'); await wait();
+    const twoL = tix(), twoDiv = txt(best.querySelector('.pk-divider.t3d')), twoTabs = [...best.querySelectorAll('.pk.t3')].map(tabsOf), twoWhys = [...best.querySelectorAll('.pk.t3')].map(c => txt(c.querySelector('.t3why'))), twoLabel = txt(best.querySelector('.pk.t3 .t3apl')), storedLegs = await smStore.getItem('callsheet3.props.legs.v1');
+    sel('t3o'); await wait(); const twoO = tix().map(brief);
+    sel('t3u'); await wait(); const twoU = tix().map(brief);
     sel('t3'); await wait();
+    copies.length = 0; best.querySelector('.pk.t3 [data-t3copy]').click(); await wait(); await wait(); const twoCopy = copies.slice();
+    selLegs('3'); await wait();
     const either = tix(), divider = txt(best.querySelector('.pk-divider.t3d')), others = best.querySelectorAll('.pk:not(.t3)').length, inGrid = best.querySelectorAll('.t3grid > .pk.t3').length, pipTitle = (best.querySelector('.pk.t3 .pips i') || {}).title, pipAria = best.querySelector('.pk.t3 .pips') ? best.querySelector('.pk.t3 .pips').getAttribute('aria-label') : '';
     sel('t3o'); await wait(); const overs = tix(), dividerO = txt(best.querySelector('.pk-divider.t3d'));
     sel('t3u'); await wait(); const unders = tix(), none = txt(best.querySelector('.empty.t3none'));
@@ -1842,7 +1853,6 @@ const CHECKS = ["dome","playoff"];
     sel('t3'); await wait();
     const stored0 = await smStore.getItem('callsheet3.props.below.v1');
     // the same three at another app: the tabs, the ticket shown there, the copy and the take there, and back
-    const tabsOf = (c) => [...c.querySelectorAll('.t3apps .t3app')].map(a => txt(a) + (a.classList.contains('on') ? '*' : a.classList.contains('off') ? ' (off)' : ''));
     const cards0 = [...best.querySelectorAll('.pk.t3')], tabs = cards0.map(tabsOf), whys = cards0.map(c => txt(c.querySelector('.t3why'))), tabLabel = txt(cards0[0].querySelector('.t3apl'));
     cards0[0].querySelector('button.t3app:not(.on)').click(); await wait();
     const atDK = tix()[0], tabsDK = tabsOf(best.querySelector('.pk.t3')), secondStays = tix()[1].n1;
@@ -1888,22 +1898,33 @@ const CHECKS = ["dome","playoff"];
     const rowsNow = JSON.parse(await smStore.getItem('callsheet3.props.v1')), specs = rowsNow.filter(r => r.t3).map(r => r.name + ':' + r.t3.map(sp => sp.app + '/' + sp.m + '/' + sp.ks.length + (sp.listed ? '/listed' + sp.n : '') + (sp.take ? '/take' : '')).join(',')).join(';');
     const twoRow = rowsNow.find(r => r.pid === '2');
     const record = txt(document.getElementById('propsCalib')), cardTile = txt(document.querySelector('#calibBox .calib[data-sport="PROPS"] .sides')), took = txt(document.querySelector('#calibBox .calib[data-sport="TAKEN"]'));
+    selLegs('2'); await wait(); const afterTwo = tix().map(brief), afterTwoDiv = txt(best.querySelector('.pk-divider.t3d')); selLegs('3'); await wait();
     sel('t3o'); await wait(); const afterO = tix(), afterODiv = txt(best.querySelector('.pk-divider.t3d'));
     sel('t3'); await wait();
     await load(gdoc, 'nba-grade-2026-11-12.json');   // the grade loaded again leaves the list as it was kept
     const specs2 = JSON.parse(await smStore.getItem('callsheet3.props.v1')).filter(r => r.t3).map(r => r.name + ':' + r.t3.length).join(',');
-    sel('leans'); await wait();
+    selLegs('2'); sel('leans'); await wait();
     if (!document.getElementById('propsView').hidden) { document.getElementById('propsReset').click(); await wait(); } document.getElementById('m-nba').click(); await wait();
-    return { tabs, whys, tabLabel, atDK, tabsDK, secondStays, copiedDK, dkTaking, dkTabs, dkSpec, dkUntaken, backAtFD, opts, either, divider, others, inGrid, pipTitle, pipAria, overs, dividerO, unders, none, leans, leansT3, leansDiv, stored0, legPanel, copied, copySay, panelAfterCopy, taking, takingCount, takeBtn, bestCls, spec0, msg2, taking2, live2, board, boardSum, boardCount, boardText, after, afterDiv, afterTaking, specs, twoRow: [twoRow.side, twoRow.line, twoRow.result, twoRow.actual], record, cardTile, took, afterO, afterODiv, specs2 };
+    return { legOpts, two: twoL, twoDiv, twoTabs, twoWhys, twoLabel, storedLegs, twoO, twoU, twoCopy, afterTwo, afterTwoDiv, tabs, whys, tabLabel, atDK, tabsDK, secondStays, copiedDK, dkTaking, dkTabs, dkSpec, dkUntaken, backAtFD, opts, either, divider, others, inGrid, pipTitle, pipAria, overs, dividerO, unders, none, leans, leansT3, leansDiv, stored0, legPanel, copied, copySay, panelAfterCopy, taking, takingCount, takeBtn, bestCls, spec0, msg2, taking2, live2, board, boardSum, boardCount, boardText, after, afterDiv, afterTaking, specs, twoRow: [twoRow.side, twoRow.line, twoRow.result, twoRow.actual], record, cardTile, took, afterO, afterODiv, specs2 };
   });
   await pg.evaluate(async (k) => { await smStore.removeItem('callsheet3.props.v1'); if (k.card === null || k.card === undefined) await smStore.removeItem('callsheet3.card.v1'); else await smStore.setItem('callsheet3.card.v1', k.card); if (k.slate === null || k.slate === undefined) await smStore.removeItem('callsheet3.slate.v1'); else await smStore.setItem('callsheet3.slate.v1', k.slate); }, t3Keep);
   belowFree = false;
   await reloaded();
   const lc = v => String(v || '').toLowerCase(), legOf = (t, i) => lc(t && t.legs[i]);
   const t3Leg = (n, name, pick, price, pct, where, avg) => `${n} ${name} ${pick} ${price} · ${pct}% last 5: 4 of 5 · last 10: 7 of 10 ${where} · averaging ${avg} his last five · levers 2▲ 0▼`.toLowerCase();
-  chk(belowDefault === 't3' && t3T.opts.join('|') === 't3=3-leg tickets, either side|t3o=3-leg tickets, overs|t3u=3-leg tickets, unders|leans=the LEANs one by one' && t3T.stored0 === 't3'
+  chk(legsDefault === '2' && t3T.legOpts.join('|') === '2=2 legs|3=3 legs' && t3T.storedLegs === '2' && t3T.two.length === 2
+      && t3T.twoDiv === "No BET on this date. Two-leg tickets below, to test, in the LEANs' place: two men at one app on two games, each a pick with an edge whose last five games went his way four times or more and his last ten at least half, more levers toward the pick than against and no red chip. A card is one app throughout; where the same two also pass at another app, a tab on the card shows the ticket there. Replayed on the eleven nights that keep the logs and the levers, exactly as built here: such legs went 45-28 one at a time (the overs 20-7, the unders 25-21) and the tickets 7 of 20 for +2.8 units, where three legs went 2 of 12 for +0.7. A test, not a measured edge: its record builds in Is it working, and the LEANs are one choice away."
+      && t3T.two[0].n1 === '2 LEGS #1 · at FanDuel · two games' && t3T.two[0].pay === '+264 3.64×' && t3T.two[0].legs.length === 2 && legOf(t3T.two[0], 0) === t3Leg(1, 'Man One', 'OVER 20.5 points', '-110', '60.0', 'ATL @ ORL', '21.7') && legOf(t3T.two[0], 1) === t3Leg(2, 'Man Two', 'OVER 7.5 rebounds', '-110', '59.0', 'CHI @ MIL', '8.7')
+      && lc(t3T.two[0].stats) === 'both land 35.4% needs 27.4% edge +8.0 a unit wins 2.64u' && t3T.two[0].n4 === '' && lc(t3T.two[0].n6) === 'take copy ticket'
+      && t3T.two[1].n1 === '2 LEGS #2 · at FanDuel · two games' && t3T.two[1].legs.map(l => l.split(' ').slice(1, 3).join(' ')).join(',') === 'Man Three,Man Seven' && lc(t3T.two[1].stats) === 'both land 33.1% needs 27.4% edge +5.6 a unit wins 2.64u'
+      && /^the same two at$/i.test(t3T.twoLabel) && JSON.stringify(t3T.twoTabs) === '[["DraftKings +250 35.4%","FanDuel +264 35.4%*"],["DraftKings × (off)","FanDuel +264 33.1%*"]]' && t3T.twoWhys[1] === "Not at DraftKings: Man Seven's line is 3.5 there, 3 of his last 5 under it."
+      && t3T.twoO.length === 1 && /^2 LEGS #1 · at FanDuel · two games :: Man One \+ Man Two :: both land 35\.4%/.test(t3T.twoO[0]) && t3T.twoU.length === 1 && /^2 LEGS #1 · at FanDuel · two games :: Man Three \+ Man Seven :: both land 33\.1%/.test(t3T.twoU[0])
+      && t3T.twoCopy.length === 1 && t3T.twoCopy[0] === '2-leg ticket at FanDuel · pays +264 (3.64x) · both land 35.4%, needs 27.4%\n1. Man One OVER 20.5 points -110 · last 5: 4 of 5, last 10: 7 of 10 · Hawks @ Magic\n2. Man Two OVER 7.5 rebounds -110 · last 5: 4 of 5, last 10: 7 of 10 · Bulls @ Bucks'
+      && !/Cold Hand|Wrong Levers|Other App|Big Fav|Man Eight|Man Nine/i.test(JSON.stringify(t3T.two)),
+      'two-leg tickets (11 Nov 2026, the user: what about instead of the 3, we do 2 legs, the absolute best 2 men pairs): two legs are the default on a first visit and the choice is kept; the same leg rule, the best pair first by expected value, two men on two games at one app, a man in one ticket; the two men left on one game make no ticket (a same-game two is the pairs\' own section); the card reads both land, the tabs the same two at another app, the overs and the unders alone their own pair, and Copy the two-leg ticket in words', JSON.stringify({ def: legsDefault, opts: t3T.legOpts, stored: t3T.storedLegs, two: t3T.two, div: t3T.twoDiv.slice(0, 140), tabs: t3T.twoTabs, whys: t3T.twoWhys, label: t3T.twoLabel, overs: t3T.twoO, unders: t3T.twoU, copy: t3T.twoCopy }));
+  chk(belowDefault === 't3' && t3T.opts.join('|') === 't3=tickets, either side|t3o=tickets, overs|t3u=tickets, unders|leans=the LEANs one by one' && t3T.stored0 === 't3'
       && t3T.either.length === 2 && t3T.inGrid === 2 && t3T.others === 0
-      && t3T.divider === "No BET on this date. Three-leg tickets below, to test, in the LEANs' place: three men at one app, each a pick with an edge whose last five games went his way four times or more and his last ten at least half, more levers toward the pick than against and no red chip. A card is one app throughout; where the same three also pass at another app, a tab on the card shows the ticket there. Replayed on the eleven nights that keep the logs and the levers, exactly as built here: such legs went 45-28 one at a time (the overs 20-7, the unders 25-21) and the tickets 2 of 12 for +0.7 units. A test, not a measured edge: its record builds in Is it working, and the LEANs are one choice away."
+      && t3T.divider === "No BET on this date. Three-leg tickets below, to test, in the LEANs' place: three men at one app, each a pick with an edge whose last five games went his way four times or more and his last ten at least half, more levers toward the pick than against and no red chip. A card is one app throughout; where the same three also pass at another app, a tab on the card shows the ticket there. Replayed on the eleven nights that keep the logs and the levers, exactly as built here: such legs went 45-28 one at a time (the overs 20-7, the unders 25-21) and the tickets 2 of 12 for +0.7 units, where two legs went 7 of 20 for +2.8. A test, not a measured edge: its record builds in Is it working, and the LEANs are one choice away."
       && t3T.either[0].n1 === '3 LEGS #1 · at FanDuel · three games' && t3T.either[0].pay === '+596 6.96×' && t3T.either[0].legs.length === 3
       && legOf(t3T.either[0], 0) === t3Leg(1, 'Man One', 'OVER 20.5 points', '-110', '60.0', 'ATL @ ORL', '21.7') && legOf(t3T.either[0], 1) === t3Leg(2, 'Man Two', 'OVER 7.5 rebounds', '-110', '59.0', 'CHI @ MIL', '8.7')
       && legOf(t3T.either[0], 2) === t3Leg(3, 'Man Three', 'UNDER 5.5 assists', '-110', '58.0', 'MIA @ UTA', '4.3') && t3T.either[0].pips === 'hmhmhh|hmhh,hmhmhh|hmhh,hmhmhh|hmhh'
@@ -1945,12 +1966,34 @@ const CHECKS = ["dome","playoff"];
       && lc(t3T.after[0].stats) === 'all three land 19.5% needs 14.4% edge +5.1 result -1.00u' && lc(t3T.after[0].n6) === 'copy ticket' && t3T.afterDiv.endsWith('and the LEANs are one choice away. This list was kept before the games and is in the record.')
       && t3T.afterTaking.length === 1 && /pk t3 agrees win taking/.test(t3T.afterTaking[0].cls) && t3T.afterTaking[0].n1 === 'TAKING · 3 LEGS · at FanDuel · three games WIN' && /7\.5 on the ticket, the card's 8\.5 win · 9$/.test(legOf(t3T.afterTaking[0], 1))
       && lc(t3T.afterTaking[0].stats) === 'all three land 20.5% needs 14.4% edge +6.2 result +5.96u' && lc(t3T.afterTaking[0].n6) === 'taken copy ticket'
-      && t3T.specs === 'Man One:fanduel/t3/3/take,fanduel/t3/3/listed1' && JSON.stringify(t3T.twoRow) === '["UNDER",8.5,"loss",9]' && t3T.specs2 === 'Man One:2',
-      'three-leg tickets: the grade keeps the date\'s list on the rows before the results land (the list as the rows then stood, not the ticket taken earlier), grades each ticket on its own lines and sides (the ticket taken wins on the over it was taken on, though the card\'s row had turned to the under and lost), the cards carry the results, and a second load of the grade lists nothing more', JSON.stringify({ after: t3T.after, div: t3T.afterDiv.slice(-100), taking: t3T.afterTaking, specs: t3T.specs, two: t3T.twoRow, specs2: t3T.specs2 }));
-  chk(/Three-leg tickets as listed, to test 0-1 says 19\.5% · does 0\.0% \(±50\.0\) · -1\.00u at the product of the three legs' prices; a void or pushed leg drops out Three-leg tickets you took 1-0 says 20\.5% · does 100\.0% \(±50\.0\) · \+5\.96u/i.test(t3T.record)
-      && /three-leg tickets as listed 0-1 -1\.0u · three-leg tickets taken 1-0 \+6\.0u/.test(t3T.cardTile) && /Three-leg tickets taken 1-0 says 20\.5% · does 100\.0% \(±50\.0\) · \+5\.96u/i.test(t3T.took)
+      && t3T.specs === 'Man One:fanduel/t3/3/take,fanduel/t3/2/listed1,fanduel/t3/3/listed1;Man Seven:fanduel/t3/2/listed2' && JSON.stringify(t3T.twoRow) === '["UNDER",8.5,"loss",9]' && t3T.specs2 === 'Man One:3,Man Seven:1'
+      && t3T.afterTwo.length === 2 && t3T.afterTwo[0] === '2 LEGS #1 · at FanDuel · two games WIN :: Man One + Man Three :: both land 34.8% needs 27.4% edge +7.4 result +2.64u :: pk t3 agrees win'
+      && t3T.afterTwo[1] === '2 LEGS #2 · at FanDuel · two games LOSS :: Man Seven + Man Eight :: both land 31.9% needs 27.4% edge +4.5 result -1.00u :: pk t3 agrees loss' && t3T.afterTwoDiv.endsWith('This list was kept before the games and is in the record.'),
+      'three-leg tickets: the grade keeps the date\'s lists on the rows before the results land, the two-leg list and the three-leg one, whichever the tab showed (the lists as the rows then stood, not the ticket taken earlier), grades each ticket on its own lines and sides (the ticket taken wins on the over it was taken on, though the card\'s row had turned to the under and lost), the cards carry the results, and a second load of the grade lists nothing more', JSON.stringify({ after: t3T.after, div: t3T.afterDiv.slice(-100), taking: t3T.afterTaking, specs: t3T.specs, two: t3T.twoRow, specs2: t3T.specs2, afterTwo: t3T.afterTwo, afterTwoDiv: t3T.afterTwoDiv.slice(-70) }));
+  chk(/Two-leg tickets as listed, to test 1-1 says 33\.4% · does 50\.0% \(±35\.4\) · \+1\.64u at the product of the two legs' prices; a void or pushed leg drops out Three-leg tickets as listed, to test 0-1 says 19\.5% · does 0\.0% \(±50\.0\) · -1\.00u at the product of the three legs' prices; a void or pushed leg drops out Three-leg tickets you took 1-0 says 20\.5% · does 100\.0% \(±50\.0\) · \+5\.96u/i.test(t3T.record)
+      && /two-leg tickets as listed 1-1 \+1\.6u · three-leg tickets as listed 0-1 -1\.0u · three-leg tickets taken 1-0 \+6\.0u/.test(t3T.cardTile) && /Three-leg tickets taken 1-0 says 20\.5% · does 100\.0% \(±50\.0\) · \+5\.96u/i.test(t3T.took)
       && t3T.afterO.length === 1 && /pk t3 agrees loss/.test(t3T.afterO[0].cls) && t3T.afterO[0].legs.map(l => l.split(' ').slice(1, 3).join(' ')).join(',') === 'Man One,Man Eight,Man Nine' && t3T.afterODiv.endsWith("and the LEANs are one choice away. Rebuilt from the night's rows after the games: for study, not in the record."),
-      'three-leg tickets: the record keeps the tickets as listed and the ones taken on tiles of their own, on the card\'s line and under What you took; a list asked for after the games in another mode is rebuilt for study, says so and stays out of the record', JSON.stringify({ record: t3T.record.replace(/^[\s\S]*?(Three-leg tickets as listed)/i, '$1').slice(0, 300), tile: (t3T.cardTile.match(/three-leg tickets[^·]*·[^·]*/i) || [''])[0], took: t3T.took.replace(/^[\s\S]*?(Three-leg tickets taken)/i, '$1').slice(0, 110), afterO: t3T.afterO, div: t3T.afterODiv.slice(-120) }));
+      'three-leg tickets: the record keeps the two-leg tickets as listed, the three-leg ones and the ones taken on tiles of their own, on the card\'s line and under What you took; a list asked for after the games in another mode is rebuilt for study, says so and stays out of the record', JSON.stringify({ record: t3T.record.replace(/^[\s\S]*?(Two-leg tickets as listed)/i, '$1').slice(0, 460), tile: (t3T.cardTile.match(/two-leg tickets[^·]*·[^·]*·[^·]*/i) || [''])[0], took: t3T.took.replace(/^[\s\S]*?(Three-leg tickets taken)/i, '$1').slice(0, 110), afterO: t3T.afterO, div: t3T.afterODiv.slice(-120) }));
+
+  // ---- 11 Nov 2026: is the page finding the best tickets? (the user: "thoroughly test multiple times to make sure the algorithm is finding the best pairs") -- a short seeded sample of the brute-force checker, tools_check_tickets.js: random nights, every valid ticket enumerated apart from the page's code, the page's ticket at each step worth exactly what the best one left is worth ----
+  belowFree = true;
+  await pg.evaluate(async () => { await smStore.ready; await smStore.removeItem('callsheet3.props.v1'); });
+  await reloaded();
+  const tkTool = require('./tools_check_tickets.js');
+  const tkA = await tkTool.checkNights(pg, 14, 31, false, '2027-01-01'), tkB = await tkTool.checkNights(pg, 6, 9100, true, '2027-03-01');
+  await pg.evaluate(async () => {
+    await smStore.ready; const wait = () => new Promise(r => setTimeout(r, 110));
+    const set = (id, v) => { const el = document.getElementById(id); if (el && el.value !== v) { el.value = v; el.dispatchEvent(new Event('change', { bubbles: true })); } };
+    set('propsLegs', '2'); set('propsBelow', 'leans'); await wait();
+    if (!document.getElementById('propsView').hidden) { document.getElementById('propsReset').click(); await wait(); } document.getElementById('m-nba').click(); await wait();
+    await smStore.removeItem('callsheet3.props.v1');
+  });
+  belowFree = false;
+  await reloaded();
+  chk(tkA.fails.length === 0 && tkB.fails.length === 0 && tkA.nights === 14 && tkB.nights === 6 && tkA.checks === 84 && tkB.checks === 36
+      && tkA.tickets[2] >= 20 && tkA.tickets[3] >= 10 && tkA.empties >= 5 && tkB.tickets[2] >= 60 && tkB.tickets[3] >= 60 && tkB.sizes.slice().sort((a, b) => b - a)[0] >= 1000,
+      'the tickets are the best ones (11 Nov 2026): on fourteen ordinary random nights and six busy ones, every two-leg and three-leg ticket the page lists, either side, the overs and the unders, is a valid ticket worth exactly what the best one left is worth by brute force over every pair and three at every app, a man in one ticket, two legs never on one game, and a list ends only when nothing valid is left or at six',
+      JSON.stringify({ ordinary: tkTool.report(tkA), busy: tkTool.report(tkB), fails: tkA.fails.concat(tkB.fails).slice(0, 6) }));
 
   // ---- 4 Nov 2026: the crowd on Kalshi -- the exchange's game-winner prices on the row, the card beside the book and Pinnacle, the better price after the fee on the board, the sharp side against the crowd on the moneyline tile ----
   const kalT = await pg.evaluate(async () => {

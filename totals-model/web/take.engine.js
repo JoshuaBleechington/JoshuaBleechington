@@ -88,7 +88,8 @@
     if (res === "win") { s.w++; s.units += propsPairUnits(t, res); } else { s.l++; s.units -= 1; }
   }
   function pairTakesList(dateISO) { return typeof pairTakesOn === "function" ? pairTakesOn(dateISO) : []; }
-  /* a three-leg ticket you take (11 Nov 2026): kept on its rows with what each leg read at the app, graded on those lines */
+  /* a two- or three-leg ticket you take (11 Nov 2026): kept on its rows with what each leg read at the app, graded on those lines */
+  function t3Word(n) { return n === 2 ? "two" : "three"; }
   function t3TakesList(dateISO) { return typeof propsT3TakesOn === "function" ? propsT3TakesOn(dateISO) : []; }
   function t3TakeTally(s, t) {
     var res = propsT3Res(t); if (!res || res === "void") return;
@@ -124,7 +125,8 @@
     t3s.forEach(function (t, i) { t3TakeTally(s, t); h += propsT3Card(t, i, true); });
     h += '<div class="pk taking sum"><div class="n1">TONIGHT</div><div class="n2">' + n + ' bet' + (n === 1 ? '' : 's') + ' marked</div>' +
          '<div class="n3">' + (s.n || s.p ? 'graded ' + s.w + '-' + s.l + (s.p ? '-' + s.p : '') + ' · ' + sgn(s.units, 2) + 'u at one unit each' : 'none graded yet · one unit each') + '</div>' +
-         '<div class="n4">' + bets.length + ' on the card, ' + sims.length + ' from the simulation, ' + ps.length + ' prop' + (ps.length === 1 ? '' : 's') + (prs.length ? ', ' + prs.length + ' same-game pair' + (prs.length === 1 ? '' : 's') : '') + (t3s.length ? ', ' + t3s.length + ' three-leg ticket' + (t3s.length === 1 ? '' : 's') : '') + '</div></div>';
+         '<div class="n4">' + bets.length + ' on the card, ' + sims.length + ' from the simulation, ' + ps.length + ' prop' + (ps.length === 1 ? '' : 's') + (prs.length ? ', ' + prs.length + ' same-game pair' + (prs.length === 1 ? '' : 's') : '') +
+         [2, 3].map(function (k) { var c = t3s.filter(function (t) { return t.legs.length === k; }).length; return c ? ', ' + c + ' ' + t3Word(k) + '-leg ticket' + (c === 1 ? '' : 's') : ''; }).join("") + '</div></div>';
     box.innerHTML = h;
     $("takingCount").textContent = n + " marked";
   }
@@ -147,7 +149,7 @@
     });
     t3TakesList(dateISO).forEach(function (t) {
       var res = propsT3Res(t);
-      out.push((++k) + ". 3-LEG TICKET at " + bookName(t.app) + ": " + t.legs.map(function (l) { return propsT3LegText(l) + " " + sgn(l.price, 0); }).join(" + ") + " · pays " + sgn(t.price, 0) + " · all three land " + (t.chance * 100).toFixed(1) + "% needs " + (t.need * 100).toFixed(1) + "%" + (res ? " · " + res.toUpperCase() : ""));
+      out.push((++k) + ". " + t.legs.length + "-LEG TICKET at " + bookName(t.app) + ": " + t.legs.map(function (l) { return propsT3LegText(l) + " " + sgn(l.price, 0); }).join(" + ") + " · pays " + sgn(t.price, 0) + " · " + (t.legs.length === 2 ? "both" : "all three") + " land " + (t.chance * 100).toFixed(1) + "% needs " + (t.need * 100).toFixed(1) + "%" + (res ? " · " + res.toUpperCase() : ""));
     });
     return out.join("\n");
   }
@@ -176,10 +178,10 @@
       var res = propTakeRes(r); if (!r.take || !res) return;
       takeTally(pr, res, r.price); if (res !== "push") pr.says += r.chance;
     });
-    var prs = mk(), t3r = mk();
+    var prs = mk(), t3r = { 2: mk(), 3: mk() };
     if (typeof pairTakesAll === "function") pairTakesAll().forEach(function (t) { pairTakeTally(prs, t); });
-    if (typeof propsT3TakesAll === "function") propsT3TakesAll().forEach(function (t) { t3TakeTally(t3r, t); });
-    if (!bets.n && !bets.p && !sims.n && !sims.p && !pr.n && !pr.p && !prs.n && !prs.p && !t3r.n && !t3r.p) return "";
+    if (typeof propsT3TakesAll === "function") propsT3TakesAll().forEach(function (t) { t3TakeTally(t3r[t.legs.length], t); });
+    if (!bets.n && !bets.p && !sims.n && !sims.p && !pr.n && !pr.p && !prs.n && !prs.p && !t3r[2].n && !t3r[2].p && !t3r[3].n && !t3r[3].p) return "";
     var tile = function (label, s) {
       if (!s.n && !s.p) return "";
       var says = s.n ? s.says / s.n * 100 : 0, does = s.n ? s.w / s.n * 100 : 0;
@@ -187,7 +189,7 @@
              '<p class="s">' + (s.n ? 'says ' + says.toFixed(1) + '% · does ' + does.toFixed(1) + '% (±' + (100 / Math.sqrt(s.n) / 2).toFixed(1) + ') · ' + sgn(s.units, 2) + 'u' : 'pushes only') + '</p></div>';
     };
     var h = '<div class="subhead" data-sport="TAKEN">What you took <span class="tag">every bet marked Taking before its game, graded at the price shown when it was marked · one unit each · says is the sheet\'s chance</span></div>' +
-            '<div class="calib" data-sport="TAKEN">' + tile("Game bets taken", bets) + tile("Simulation calls taken", sims) + tile("Props taken", pr) + tile("Same-game pairs taken", prs) + tile("Three-leg tickets taken", t3r) + '</div>';
+            '<div class="calib" data-sport="TAKEN">' + tile("Game bets taken", bets) + tile("Simulation calls taken", sims) + tile("Props taken", pr) + tile("Same-game pairs taken", prs) + tile("Two-leg tickets taken", t3r[2]) + tile("Three-leg tickets taken", t3r[3]) + '</div>';
     /* your picks (3 Nov 2026, the user: "is there a way to have the props that I select taken be graded or tracked so I can
        see how I'm picking the bets?"): every marked bet that has graded, night by night with the sheet's own BET and LEAN
        props that night beside it, the props you took by side, band, market and price, and the list of every pick, newest
@@ -218,7 +220,7 @@
     });
     if (typeof propsT3TakesAll === "function") propsT3TakesAll().forEach(function (t) {
       var res = propsT3Res(t); if (!res || res === "void") return;
-      picks.push({ d: t.gdate || "", kind: "three-leg ticket", text: t.legs.map(propsT3LegText).join(" + ") + " · at " + bookName(t.app), p: t.chance, price: t.price, res: res, units: res === "win" ? propsT3Units(t, res) : res === "loss" ? -1 : 0 });
+      picks.push({ d: t.gdate || "", kind: t3Word(t.legs.length) + "-leg ticket", text: t.legs.map(propsT3LegText).join(" + ") + " · at " + bookName(t.app), p: t.chance, price: t.price, res: res, units: res === "win" ? propsT3Units(t, res) : res === "loss" ? -1 : 0 });
     });
     if (!picks.length) return h;
     var agg = function () { return { n: 0, w: 0, l: 0, p: 0, says: 0, units: 0 }; };

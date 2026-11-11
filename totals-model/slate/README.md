@@ -236,16 +236,19 @@ named on the card too), the why with the two biggest levers toward the
 pick in bold green and the biggest against it tagged red (26 Oct 2026), the
 last games as a table (each game's stat marked, green over the prop's line, and from 26 Oct 2026 what the box says happened on each, a regular back or out, a blowout, his minutes, shots and shooting against his season's, the biggest first, and from 7 Nov 2026 the tries in purple after them: his shots from the floor, from three and from the line, the market's own kind first with his usual at those minutes; the ledger keeps the three-point tries from that date and the daily ledger run reads older games again to fill them
 and red under it, with a tally of how many cleared the number) and every
-book's line. Under the BETs on the Props tab (11 Nov 2026) sit three-leg
-tickets to test, in the LEANs' place: three men at one app, each a pick
+book's line. Under the BETs on the Props tab (11 Nov 2026) sit tickets
+to test, in the LEANs' place: two men on two games at one app, the best
+pair first (the default), or three men at one app, each a pick
 with an edge whose last five games went his way four times or more and
 his last ten at least half, more levers toward the pick than against and
 no red chip, from either side, the overs or the unders, with the LEANs
 one by one a choice away; the page builds them from the props file as it
 is, the list is kept when the date is graded and has a record line of
 its own (CALLSHEET3.md, "Three-leg tickets under the BETs": the legs
-45-28 one at a time on eleven nights, the tickets 2 of 12 and about
-level, a test and not a measured edge). Props cannot be backtested against lines
+45-28 one at a time on eleven nights, two-leg tickets 7 of 20 for +2.8
+units and three-leg 2 of 12 for +0.7, a test and not a measured edge;
+`node tools_check_tickets.js` checks by brute force that the page lists
+the best pair). Props cannot be backtested against lines
 (ten credits a market a game on the history endpoint). A player listed Out
 or Doubtful gets no projection; a name the rosters and ledgers cannot place
 is listed under the game as unmatched.

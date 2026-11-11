@@ -3206,6 +3206,69 @@ with 23.5% to land and +724 at FanDuel with 15.2%. On the thirteen
 tickets of 4 to 10 Nov in the user's backup, seven could go in a second
 app and five named an app where one leg failed.
 
+### Two legs or three
+
+The user, the same day: "what about instead of the 3, we do 2 legs?
+would those be better?", "the absolute best 2 men pairs based on the way
+we are setting up the 3 legs but for two? Maybe the hit chances for the
+parlay will be better percentages", and "thoroughly test multiple times
+to make sure the algorithm is finding the best pairs."
+
+The legs are the same either way, so the question is the parlay's own.
+Replayed by the same rule on the same eleven nights (`props_t3_apps.py`
+with the legs a ticket as an argument):
+
+                          two legs, on two games     three legs
+    either side           7 of 20   +2.8 units       2 of 12   +0.7
+        the sheet said    34.9%, the price 31.4%     21.1%, the price 18.2%
+    the overs alone       5 of 6    +10.0            1 of 4    +2.9
+    the unders alone      5 of 11   +3.9             2 of 8    +1.0
+
+Two legs land about one ticket in three against one in five, so a record
+reads sooner and the losing runs are shorter; three pay more a ticket if
+the legs' rate is real, and lose faster if it is not. Twenty tickets
+settle nothing between them. So two legs are the default, three a choice
+away (the "legs" box beside "under the BETs", kept), and the list kept
+at grading keeps both, the two-leg list and the three-leg one whichever
+the tab showed, each with its own record line, so the page answers the
+question on the nights to come.
+
+A two-leg ticket is the best pair first: two men on two games at one
+app, by the same leg rule, the most expected value, a man in one ticket,
+six at most. Two legs never share a game: a same-game two is priced the
+app's own way and has the Same-game pairs section. The pair search reads
+every qualifying leg at every app (the three-leg search the first sixty
+by expected value, beyond any night's count), and since a ticket's value
+is the product of its legs' values the best pair is exact.
+
+**Is it the best pair.** Checked three ways, each apart from the page's
+own code:
+
+- `tools_check_tickets.js`, an oracle with the leg's rule written a
+  second time from the words above: a random night of props (games, men,
+  markets, lines, chances, each app's prices, logs, levers, spreads),
+  every valid ticket enumerated by brute force at every app, and at each
+  step the page's ticket must be valid and worth exactly what the best
+  one left is worth, two legs and three, either side, the overs, the
+  unders, the list ending only when nothing valid is left or at six.
+  750 ordinary nights on three seeds and 150 busy ones (a thousand valid
+  tickets on the median list, 143,838 on the largest): 4,977 two-leg
+  tickets and 3,697 three-leg tickets, no failure.
+- The checker checked: four wrong builds of the page (the least value
+  first, only the first three legs read, two of the four apps searched,
+  a same-game two let through) are each caught, the last on the ordinary
+  nights, which is why the harness runs both kinds.
+- The six real nights of 5 to 10 Nov in the user's backup: every list
+  the page builds, two legs and three, the three choices of sides, 55
+  tickets, against an exhaustive replay in Python on the rows' own
+  numbers: identical. Under the replay's unrounded chances one list
+  differed, 8 Nov's unders, where two pairs sat within 0.0001 of each
+  other (0.13756 against 0.13750): a photo finish decided by the fourth
+  decimal the row stores, not a different rule.
+
+The harness runs a seeded sample of the checker on every build, fourteen
+ordinary nights and six busy ones.
+
 ### The card
 
 A ticket: the app and the price in a band, each leg a line that opens
@@ -3234,4 +3297,8 @@ rebuilt list that stays out of the record. For the tabs it posts one man
 a point lower at DraftKings at a price with an edge, and reads the two
 cards' tabs, the crossed app and its reason, the first ticket shown at
 DraftKings, the copy and the take there with the tick on its tab, the
-take undone, and the card back at FanDuel.
+take undone, and the card back at FanDuel. For two legs it reads the
+default on a first visit and the kept choice, the two pairs on two games
+(the two men left on one game make no ticket), the tabs, the overs and
+the unders alone, the copy, and after the grade the two-leg list kept
+beside the three-leg one with its own record line.

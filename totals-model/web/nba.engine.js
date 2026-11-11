@@ -445,7 +445,12 @@
     return ' <span class="tagm kal' + (better ? ' warn' : '') + '" title="' + (better ? 'The exchange\'s price for this side needs less than the book\'s after Kalshi\'s fee on the win' : 'The book\'s price needs less than the exchange\'s after Kalshi\'s fee on the win') + '">' +
            (better ? 'better on Kalshi: ' : 'Kalshi ') + kalshiCents(q.ask) + ' needs ' + (q.need * 100).toFixed(1) + '% after the fee v ' + sgn(+mk.price, 0) + ' needing ' + (book * 100).toFixed(1) + '%' + (better ? '' : ': the book') + ' · ' + crowd + '</span>';
   }
-  function nbaKalshiPanel() {
+  /* mks: the sheet's markets for the game on the form, from the forecast that is drawing it. The card read them off the page's
+     last result until 11 Nov 2026, and the card is drawn before the forecast it sits in has finished, so a game opened from the
+     board carried the "by the sheet" chances of the game drawn before it until something redrew the form (Bucks @ Knicks on
+     10 Nov read 50.0% at the spread and the total where its own were 48.9%). The forecast now draws the card first without the
+     sheet's figures and again with its own markets once it has them */
+  function nbaKalshiPanel(mks) {
     var el = $("nbaKalshiPanel"); if (!el) return;
     var k = kalshiOf(($("nbakalshi") || {}).value || "");
     if (!k) { el.innerHTML = "No Kalshi price on the row — load the slate or the odds file and Fill form, and the exchange's game-winner market comes with it."; return; }
@@ -481,7 +486,7 @@
     } else h += '<p class="dim">No game-winner market on the row.</p>';
     /* the ladders (4 Nov 2026): the crowd's spread and total at even money against the book's numbers, the sheet's chance at the
        book's line and the simulation's, and the price of each side at the book's line when it is a rung of the ladder */
-    var sheet = (typeof last !== "undefined" && last && last.markets) ? last.markets : [], sheetOf = function (key) { return sheet.filter(function (m) { return m.key === key; })[0] || null; };
+    var sheet = mks || [], sheetOf = function (key) { return sheet.filter(function (m) { return m.key === key; })[0] || null; };
     var sim = typeof nbaSim === "function" ? nbaSim() : null;
     var sideTxt = function (nick, q, bookPrice) {
       if (!q) return '';
@@ -674,7 +679,7 @@
           ["The spread with both prices in is the anchor and nothing moves it off: the sides are priced. Shown and graded, never the pick."]));
       }
     }
-    if (!SRC) nbaVoicesFill({ markets: markets });   // the three voices on the total (28 Oct 2026), with this render's sheet
+    if (!SRC) { nbaVoicesFill({ markets: markets }); nbaKalshiPanel(markets); }   // the three voices on the total (28 Oct 2026) and the crowd's card, with this render's sheet
     return { sport: "NBA", away: away, home: home, matchup: away + " @ " + home, markets: markets, lamHome: lamH, lamAway: lamA, total: f, notes: notes, period: projH1 };
   }
   /* ---- the who-is-out panel: each side's list, the regulars' minutes summed, a tick for the doubtful ---- */

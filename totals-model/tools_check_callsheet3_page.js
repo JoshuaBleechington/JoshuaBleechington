@@ -2237,7 +2237,7 @@ const CHECKS = ["dome","playoff"];
       'phone, off claude.ai: with no viewer the button draws the code as before, its link carrying the night to m.html, and the night now includes the ticket marked Taking (two legs at FanDuel, the games, the chance both land and the parlay price) and the night\'s two tickets under the best props',
       JSON.stringify({ listed: phS.listed, link: phS.code.link.slice(0, 80), note: phS.code.note.slice(0, 260), m: mText.slice(0, 420), errs: mErrs }));
   chk(JSON.stringify(phS.saved.calls) === JSON.stringify(['use db', 'set phone/latest', 'set phone/latest', 'get phone/config'])
-      && phS.saved.doc && phS.saved.doc.v === 3 && phS.saved.doc.d === '2026-11-12' && phS.saved.doc.at === phSheet.at && Object.keys(phS.saved.doc).join() === 'v,d,at,sheet,panels' && /^z[A-Za-z0-9_-]{400,}$/.test(phS.saved.doc.panels)
+      && phS.saved.doc && phS.saved.doc.v === 4 && phS.saved.doc.d === '2026-11-12' && phS.saved.doc.at === phSheet.at && Object.keys(phS.saved.doc).join() === 'v,d,at,sheet,panels,games' && phS.saved.doc.games === 0 && !Object.keys(phSheet).some(k => Array.isArray(phSheet[k]) && phSheet[k].some(x => x.gid !== undefined)) && /^z[A-Za-z0-9_-]{400,}$/.test(phS.saved.doc.panels)
       && phTake.ids.length === 2 && phSheet.props.every(x => x.ids && x.ids.length === 1) && phSheet.t3.every(x => x.ids.length === 2) && JSON.stringify(phS.saved.doc).length < 200000
       && phSheet.take.length === 1 && phTake.k === 'ticket' && phTake.n === 2 && phTake.p === 'Man One OVER 20.5 points + Man Two OVER 7.5 rebounds' && phTake.m === 'at FanDuel' && phTake.g === 'Hawks @ Magic · Bulls @ Bucks' && phTake.pr >= 260 && phTake.pr <= 269 && phTake.c > 30 && phTake.c < 40
       && phSheet.t3.length === 2 && phSheet.t3[0].n === 2 && phSheet.props.length === 4 && !('cut' in phSheet)
@@ -2246,7 +2246,7 @@ const CHECKS = ["dome","playoff"];
       && phQr === PH_URL && phS.saved.qr.n >= 25 && !phS.saved.links.some(l => /m\.html/.test(l)) && phS.saved.links.join() === 'phoneFile|#,phoneCopy|#,phonePreview|#',
       'phone, on claude.ai: where the viewer gives the page its store, the button saves the night\'s sheet there whole (one document, the ticket you are taking in it, nothing trimmed), tries once more when the store is unavailable, says it is saved and how many lines, and the code it draws is the page\'s own address from the store, read back off the drawn modules by an independent decoder, with no link to m.html',
       JSON.stringify({ calls: phS.saved.calls, keys: phS.saved.doc && Object.keys(phS.saved.doc), take: phTake, t3: (phSheet.t3 || []).length, props: (phSheet.props || []).length, notes: phS.saved.notes.map(n => n.slice(0, 150)), qr: phQr, n: phS.saved.qr.n, links: phS.saved.links }));
-  chk(/^For someone else to see it: share this page with them from the Share menu on claude\.ai \(Viewer is enough\)\. Signed in to Claude, they scan the same code and get tonight's sheet with the detail behind each pick and nothing else, view only: only you can save over it, and your card never leaves this browser\. For someone with no Claude account, save the sheet as a file to send \(the detail is folded under each pick, and it opens on any phone\), or copy it as text\./.test(phS.saved.notes[2])
+  chk(/^For someone else to see it: share this page with them from the Share menu on claude\.ai \(Viewer is enough\)\. Signed in to Claude, they scan the same code and get tonight's sheet with the detail behind each pick, the games' cards with it, and nothing else, view only: only you can save over it, and your card never leaves this browser\. For someone with no Claude account, save the sheet as a file to send \(the detail is folded under each pick, and it opens on any phone\), or copy it as text\./.test(phS.saved.notes[2])
       && /readable by you and by anyone you share the page with, and each save replaces the last\./.test(phS.saved.notes[3])
       && phS.preview.open && phS.preview.how === 'preview' && phS.preview.btn === 'Close' && phS.preview.takes === 1 && phS.preview.cards === 8
       && phS.preview.heads.join('|').toLowerCase() === 'taking tonight 1|best props 4|two-leg tickets, to test 2|same-game pairs 1'
@@ -2300,6 +2300,234 @@ const CHECKS = ["dome","playoff"];
       && phNoStore.hint === "Tonight's sheet is kept in this page's store on claude.ai, and this view was not given it. Open the page in your phone's browser signed in to claude.ai, and allow it if a box asks.",
       'phone, when there is nothing to open: a view with a card of its own asks the viewer nothing at load, so the computer sees no prompt it did not ask for; a phone with no sheet in the store says so across the top and what to press, and the sheet opens there by itself when the computer saves one; a guest is told the owner has not saved one; and a phone whose view gives the page no store is told to open it in the browser signed in, with no script error anywhere',
       JSON.stringify({ desk: { open: phOwnDesk.open, calls: phOwnDesk.calls, errs: phOwnDesk.errs, hint: phOwnDesk.hint }, none: { open: phNone.open, calls: phNone.calls, hint: phNone.hint, arrived: phNone.arrived, takes: phNone.arrivedTakes, hintAfter: phNone.hintAfter }, guestNone: { open: phGuestNone.open, hint: phGuestNone.hint }, nostore: { open: phNoStore.open, calls: phNoStore.calls, hint: phNoStore.hint } }));
+
+  // ---- 11 Nov 2026: a game line opens its game's card on the phone (the user: "can you have it so the game lines open as well like the props? I really like this
+  //      to view on the go or show someone on the fly"). At the save each game on the sheet is put in the form, drawn by the page's own render and read off, and
+  //      the form is put back as it stood; the cards ride in a document of their own beside the sheet, phone/games, written first and stamped with the sheet's time.
+  //      Every line of a game opens the same card under the line that was pressed: a bet you are taking, a parlay leg, a likeliest side, a simulation call ----
+  const phGKeep = await pg.evaluate(async () => { await smStore.ready; const k = {}; for (const x of ['callsheet3.card.v1', 'callsheet3.props.v1', 'callsheet3.draft.v1']) k[x] = await smStore.getItem(x); await smStore.removeItem('callsheet3.card.v1'); await smStore.removeItem('callsheet3.props.v1'); return k; });
+  await reloaded();
+  const phG = await pg.evaluate(async ({ src, url }) => {
+    const wait = (ms) => new Promise(r => setTimeout(r, ms || 110)), txt = e => (e ? e.innerText : '').replace(/\s+/g, ' ').trim();
+    const set = (id, v) => { const el = document.getElementById(id); el.value = v; el.dispatchEvent(new Event('input', { bubbles: true })); };
+    await smStore.ready;
+    document.getElementById('clear').click(); document.getElementById('m-nba').click(); await wait();
+    // a game of the night before, graded: it is opened in the form, locked, for one of the presses below
+    set('gdate', '2026-11-12'); document.getElementById('example').click(); await wait(); set('gdate', '2026-11-12'); await wait();
+    document.getElementById('add').click(); await wait();
+    const C = JSON.parse(smStore.getItem('callsheet3.card.v1')).find(x => x.gdate === '2026-11-12');
+    const grade = (k, v) => { const el = document.querySelector('#cardTable .grade[data-id="' + C.id + '"][data-k="' + k + '"]'); el.value = v; el.dispatchEvent(new Event('input', { bubbles: true })); el.dispatchEvent(new Event('change', { bubbles: true })); };
+    grade('fa', '110'); grade('fh', '120'); await wait();
+    document.getElementById('clear').click(); document.getElementById('m-nba').click(); await wait();
+    set('gdate', '2026-11-13'); document.getElementById('example').click(); await wait(); set('gdate', '2026-11-13'); await wait();
+    document.getElementById('add').click(); await wait();
+    set('away', 'Celtics'); set('home', 'Lakers'); set('line', '219.5'); set('sp', '-3.5'); await wait();
+    document.getElementById('add').click(); await wait();
+    const bd = document.getElementById('boardDate'); bd.value = '2026-11-13'; bd.dispatchEvent(new Event('change')); await wait();
+    const rows = () => JSON.parse(smStore.getItem('callsheet3.card.v1')).filter(x => x.gdate === '2026-11-13');
+    const A = rows().find(x => /76ers @ Knicks/.test(x.matchup)), B = rows().find(x => /Celtics @ Lakers/.test(x.matchup));
+    // a bet on the second game from the board, a simulation call on the first from its own card
+    const brow = [...document.querySelectorAll('#board tbody tr')].find(t => /Celtics @ Lakers/.test(t.innerText) && t.querySelector('.takebtn')); brow.querySelector('.takebtn').click(); await wait();
+    document.querySelector('#cardTable [data-open="' + A.id + '"]').click(); await wait();
+    document.querySelector('#nbaSimPanel .takebtn[data-stake*="|own|total|"]').click(); await wait();
+    // the form holds a draft of a third game when the button is pressed, with a fold standing open in the rail
+    document.getElementById('clear').click(); await wait(); document.getElementById('m-nba').click(); await wait();
+    set('away', 'Bulls'); set('home', 'Heat'); set('line', '230.5'); set('op', '-110'); set('up', '-110'); set('hml', '-150'); set('aml', '130'); set('gdate', '2026-11-13'); await wait();
+    const foldOf = () => document.querySelector('#markets details.mknotes') || document.querySelector('#markets details'); if (foldOf()) foldOf().open = true;
+    const state = () => {
+      const vals = {}; document.querySelectorAll('input, select, textarea').forEach((e, i) => { vals[e.id || ('#' + i)] = e.type === 'checkbox' ? e.checked : e.value; });
+      const html = {}; ['signals', 'forecastLine', 'markets', 'why', 'nbaOutPanel', 'nbaLineupPanel', 'nbaFormPanel', 'nbaSimPanel', 'nbaMidPanel', 'nbaCrewPanel', 'nbaKalshiPanel', 'nbaCtxPanel', 'rankTag', 'secSimLive', 'secOutLive', 'secKalshiLive', 'secCrewLive', 'secMidLive', 'nbaNav', 'eyebrow', 'picks', 'bestBets', 'likeliest', 'board', 'cardTable', 'taking', 'saveState', 'lockNote']
+        .forEach(k => { const e = document.getElementById(k); html[k] = e ? e.innerHTML + '|' + e.hidden : null; });
+      return JSON.stringify({ vals, html, open: [...document.querySelectorAll('details')].map(d => d.open ? 1 : 0).join(''), dis: [...document.querySelectorAll('input, select, textarea, button')].map(e => e.disabled ? 1 : 0).join(''),
+        pressed: ['m-mlb', 'm-nba', 'm-wnba'].map(id => document.getElementById(id).getAttribute('aria-pressed')).join(), store: ['callsheet3.card.v1', 'callsheet3.draft.v1', 'callsheet3.props.v1', 'callsheet3.slate.v1'].map(k => smStore.getItem(k)) });
+    };
+    const body = document.getElementById('phoneBody'), esc = async () => { document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })); await wait(); };
+    const notes = () => [...body.querySelectorAll('.note')].map(txt), press = async (ms) => { document.getElementById('phone').click(); await wait(ms || 900); };
+    const mock = (0, eval)('(' + src + ')'); mock({ docs: { 'phone/config': { url } }, owner: true });
+    const before = state(), fold0 = !!(foldOf() && foldOf().open);
+    await press(1000);
+    const after = state(), diff = [];
+    if (before !== after) { const X = JSON.parse(before), Y = JSON.parse(after); for (const k of Object.keys(X)) { if (X[k] && typeof X[k] === 'object') { for (const j of Object.keys(X[k])) if (X[k][j] !== Y[k][j]) diff.push(k + '.' + j); } else if (X[k] !== Y[k]) diff.push(k); } }
+    const doc = JSON.parse(JSON.stringify(window.__mock.docs['phone/latest'] || null)), gdoc = JSON.parse(JSON.stringify(window.__mock.docs['phone/games'] || null));
+    const gids = k => ((doc.sheet || {})[k] || []).map(x => x.gid === undefined ? '-' : x.gid === String(A.id) ? 'A' : x.gid === String(B.id) ? 'B' : '?').join('');
+    const saved = { notes: notes(), calls: window.__mock.calls.slice(), same: before === after, diff, fold0, fold1: !!(foldOf() && foldOf().open), v: doc.v, keys: Object.keys(doc).join(), games: doc.games, gkeys: gdoc ? Object.keys(gdoc).join() : '', gv: gdoc && gdoc.v, gd: gdoc && gdoc.d,
+      gat: !!gdoc && gdoc.at === doc.at, gz: !!gdoc && /^z[A-Za-z0-9_-]{2000,}$/.test(gdoc.panels), gbytes: gdoc ? JSON.stringify(gdoc).length : 0, bytes: JSON.stringify(doc).length,
+      gid: { take: gids('take'), four: gids('four'), likely: gids('likely'), sim: gids('sim') }, take: doc.sheet.take.map(x => x.k + ':' + x.p), ids: ['take', 'four', 'bets', 'likely', 'sim'].some(k => (doc.sheet[k] || []).some(x => x.ids)) };
+    // the sheet as the phone shows it: a game line opens its game's card over the sheet, under the line that was pressed
+    document.getElementById('phonePreview').click(); await wait();
+    const sh = document.getElementById('phoneSheet'), pp = () => document.getElementById('phonePanel'), ppb = () => document.getElementById('phonePanelBody');
+    const cardOf = re => [...sh.querySelectorAll('[data-pgid]')].find(c => re.test(c.innerText));
+    const read = () => { const p = ppb(); return { open: !pp().hidden, line: txt(p.querySelector('.pp-line')), head: txt(p.querySelector('.pgame h3')), band: txt(p.querySelector('.pgame .pd-band')), sigs: p.querySelectorAll('.signals .sig').length, sigLinks: p.querySelectorAll('.signals a').length,
+      fc: /^Forecast/.test(txt(p.querySelector('.pg-fc'))), mks: p.querySelectorAll('.mk').length, others: !!(p.querySelector('details.others') || {}).open, pick: txt(p.querySelector('.pickcard .lab')), split: !!p.querySelector('.split'),
+      secs: [...p.querySelectorAll('details.pg-sec')].map(d => txt(d.querySelector('.pg-t')) + (d.open ? '*' : '')), simRows: p.querySelectorAll('.simtab tbody tr').length, tiles: p.querySelectorAll('.simtile').length, taking: [...p.querySelectorAll('.simtab .chip.taken')].map(txt),
+      why: p.querySelectorAll('ul.why li').length, controls: p.querySelectorAll('button, a, input, select, textarea').length, data: (p.innerHTML.match(/\sdata-[a-z-]+=/g) || []).length, ids: (p.innerHTML.match(/\sid=/g) || []).length, titles: (p.innerHTML.match(/\stitle=/g) || []).length,
+      words: /Press Clear|Type the inputs|type the app's parlay price|into the form/.test(p.innerText) }; };
+    const preview = { tip: txt(sh.querySelector('.psh-tip')), gtaps: sh.querySelectorAll('[data-pgid]').length, ptaps: sh.querySelectorAll('[data-pids]').length, plain: sh.querySelectorAll('.pshk:not(.tap)').length, heads: [...sh.querySelectorAll('h2')].map(txt) };
+    cardOf(/TAKING · NBA(?! · SIM)/).click(); await wait(350); preview.bet = read();
+    await esc(); preview.afterEsc = { panel: pp().hidden, sheet: sh.hidden };
+    cardOf(/TAKING · NBA · SIMULATION/).click(); await wait(350); preview.simTake = read();
+    await esc(); await esc();
+    // the file to send: the game's card folded under each of its lines
+    document.getElementById('phoneFile').click(); await wait(500);
+    const filed = { name: (window.__mock.saved || {}).filename || '', data: (window.__mock.saved || {}).data || '' };
+    await esc();
+    // the games' document refused by a full store: the sheet is saved all the same, its game lines plain, and the dialog says so
+    window.__mock.fail = ['quota_exceeded']; window.__mock.calls.length = 0;
+    await press(1000);
+    const d2 = window.__mock.docs['phone/latest'];
+    const noGames = { note: notes()[0] || '', calls: window.__mock.calls.slice(), games: d2.games, gid: ['take', 'four', 'bets', 'likely', 'sim'].map(k => (d2.sheet[k] || []).filter(x => x.gid !== undefined).length).join() };
+    document.getElementById('phonePreview').click(); await wait();
+    noGames.taps = sh.querySelectorAll('.pshk.tap').length; noGames.cards = sh.querySelectorAll('.pshk').length; noGames.tip = !!sh.querySelector('.psh-tip'); await esc(); await esc();
+    // a graded game open in the form, locked, when the button is pressed: the rail's grading and the lock stand after it
+    document.querySelector('#cardTable [data-open="' + C.id + '"]').click(); await wait();
+    const before3 = state(), final3 = txt(document.querySelector('#markets .final'));
+    window.__mock.calls.length = 0; await press(1000);
+    const graded = { same: before3 === state(), final0: final3, final1: txt(document.querySelector('#markets .final')), lock: !document.getElementById('lockNote').hidden, dis: document.getElementById('line').disabled, games: window.__mock.docs['phone/latest'].games };
+    await esc();
+    // the store unavailable once on the games' document: one more try, then the sheet. The form is on another sport for this press, a baseball game in it and the
+    // NBA card out of sight, and the page is read before and after it again
+    document.getElementById('clear').click(); await wait(); document.getElementById('m-mlb').click(); await wait(); document.getElementById('example').click(); await wait();
+    if (foldOf()) foldOf().open = true;
+    const before2 = state(), fold2 = !!(foldOf() && foldOf().open), sport2 = ['m-mlb', 'm-nba', 'm-wnba'].map(id => document.getElementById(id).getAttribute('aria-pressed')).join();
+    window.__mock.fail = ['unavailable']; window.__mock.calls.length = 0;
+    await press(2200);
+    const after2 = state(), diff2 = [];
+    if (before2 !== after2) { const X = JSON.parse(before2), Y = JSON.parse(after2); for (const k of Object.keys(X)) { if (X[k] && typeof X[k] === 'object') { for (const j of Object.keys(X[k])) if (X[k][j] !== Y[k][j]) diff2.push(k + '.' + j); } else if (X[k] !== Y[k]) diff2.push(k); } }
+    const again = { calls: window.__mock.calls.slice(), games: window.__mock.docs['phone/latest'].games, gat: window.__mock.docs['phone/games'].at === window.__mock.docs['phone/latest'].at, note: notes()[0] || '',
+      same: before2 === after2, diff: diff2, fold0: fold2, fold1: !!(foldOf() && foldOf().open), sport: sport2, away: document.getElementById('away').value + ' @ ' + document.getElementById('home').value, rail: txt(document.querySelector('#markets .pickcard .lab')) };
+    await esc();
+    const docs = JSON.parse(JSON.stringify(window.__mock.docs));
+    delete window.claude; delete window.__mock;
+    document.getElementById('clear').click(); await wait(); document.getElementById('m-nba').click(); await wait();
+    bd.value = ''; bd.dispatchEvent(new Event('change')); await wait();
+    return { saved, preview, filed, noGames, graded, again, docs };
+  }, { src: claudeMock.toString(), url: PH_URL });
+  const phGView = async (opts) => {
+    const c = await pg.context().browser().newContext({ viewport: { width: 390, height: 844 } }), p = await c.newPage(), e2 = [];
+    p.on('pageerror', e => e2.push(e.message));
+    await p.addInitScript(claudeMock, opts);
+    await p.goto('file://' + path.join(__dirname, 'web/callsheet3.html'));
+    await p.waitForFunction(() => window.smStore && window.smStore.ready, null, { timeout: 60000 }); await p.waitForTimeout(800);
+    const r = await p.evaluate(async () => {
+      const wait = (ms) => new Promise(r => setTimeout(r, ms || 140)), txt = e => (e ? e.innerText : '').replace(/\s+/g, ' ').trim();
+      const s = document.getElementById('phoneSheet'); if (!s || s.hidden) return { open: false, calls: window.__mock.calls.slice() };
+      const g = [...s.querySelectorAll('[data-pgid]')], o = { open: true, how: s.dataset.how, gtaps: g.length, cards: s.querySelectorAll('.pshk').length, tip: txt(s.querySelector('.psh-tip')), controls: s.querySelectorAll('input, button, select, textarea, a').length, atOpen: window.__mock.calls.slice(), right: 0, wrong: 0, none: 0, fits: true, pcontrols: 0, shut: 0 };
+      for (const c of g) {
+        c.click(); await wait(220);
+        const pp = document.getElementById('phonePanel'), p = document.getElementById('phonePanelBody'), h = txt(p.querySelector('.pgame h3')), m = txt(c.querySelector('.a4'));
+        if (!h) o.none++; else if (m.indexOf(h) === 0 && txt(p.querySelector('.pp-line')) === txt(c)) o.right++; else o.wrong++;
+        o.last = txt(p).slice(0, 200); o.fits = o.fits && pp.scrollWidth <= pp.clientWidth + 1; o.pcontrols += p.querySelectorAll('button, a, input, select, textarea').length; o.shut = pp.querySelectorAll('[data-ppclose]').length;
+        document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })); await wait(60);
+      }
+      o.sheetStays = !s.hidden; o.calls = window.__mock.calls.slice(); o.pageFits = document.documentElement.scrollWidth <= window.innerWidth;
+      return o;
+    });
+    await c.close(); r.errs = e2; return r;
+  };
+  const phGDocs = phG.docs || {};
+  const phGOwner = await phGView({ docs: phGDocs, owner: true });
+  const phGGuest = await phGView({ docs: phGDocs, owner: false });
+  const phGStale = await phGView({ docs: Object.assign({}, phGDocs, { 'phone/games': Object.assign({}, phGDocs['phone/games'], { at: '2026-01-01T00:00:00.000Z' }) }), owner: true });
+  const phGGone = await phGView({ docs: { 'phone/latest': phGDocs['phone/latest'], 'phone/config': phGDocs['phone/config'] }, owner: false });
+  const phGFilePath = path.join(require('os').tmpdir(), 'cs3-harness-' + process.pid + '-games.html');
+  fs.writeFileSync(phGFilePath, phG.filed.data || '<!doctype html><title>nothing saved</title>');
+  const gCtx = await pg.context().browser().newContext({ viewport: { width: 390, height: 844 }, javaScriptEnabled: false }), gPage = await gCtx.newPage(), gReqs = [];
+  gPage.on('request', q => { if (!/^(file|data):/.test(q.url())) gReqs.push(q.url()); });
+  await gPage.goto('file://' + phGFilePath); await gPage.waitForTimeout(400);
+  const gFolds = await gPage.locator('details.pfd').count(), gGameFolds = await gPage.locator('details.pfd:has(.pgame)').count();
+  const gTip = gFolds ? (await gPage.locator('.psh-tip').innerText()).replace(/\s+/g, ' ').trim() : '';
+  if (gGameFolds) { await gPage.locator('details.pfd:has(.pgame) > summary').first().click(); await gPage.waitForTimeout(200); }
+  const gOpen = await gPage.locator('details.pfd[open]').count();
+  const gHead = gOpen ? (await gPage.locator('details.pfd[open] .pgame h3').first().innerText()).trim() : '', gUnder = gOpen ? (await gPage.locator('details.pfd[open] > summary .a4').first().innerText()).trim() : '';
+  const gSecs0 = await gPage.locator('details.pfd[open] details.pg-sec[open]').count();
+  if (gOpen) { await gPage.locator('details.pfd[open] details.pg-sec:not([open]) > summary').first().click(); await gPage.waitForTimeout(200); }
+  const gSecs1 = await gPage.locator('details.pfd[open] details.pg-sec[open]').count(), gWide = await gPage.evaluate(() => document.documentElement.scrollWidth);
+  await gCtx.close(); try { fs.unlinkSync(phGFilePath); } catch (e) {}
+  await pg.evaluate(async (k) => { for (const x of Object.keys(k)) { if (k[x] === null || k[x] === undefined) await smStore.removeItem(x); else await smStore.setItem(x, k[x]); } }, phGKeep);
+  await reloaded();
+  const phGs = phG.saved, gfd = phG.filed.data || '';
+  chk(JSON.stringify(phGs.calls) === JSON.stringify(['use db', 'set phone/games', 'set phone/latest', 'get phone/config'])
+      && phGs.v === 4 && phGs.keys === 'v,d,at,sheet,panels,games' && phGs.games === 2 && phGs.gkeys === 'v,d,at,panels' && phGs.gv === 1 && phGs.gd === '2026-11-13' && phGs.gat && phGs.gz && phGs.gbytes < 200000 && phGs.bytes < 200000
+      && phGs.gid.take === 'BA' && phGs.gid.four.split('').sort().join('') === 'AB' && phGs.gid.likely.split('').sort().join('') === 'AB' && /^[AB]+$/.test(phGs.gid.sim) && !phGs.ids
+      && /^card:Lakers ML$/.test(phGs.take[0]) && /^sim:Total (OVER|UNDER) 231\.5$/.test(phGs.take[1])
+      && /^Saved for your phone at \d{1,2}:\d\d [AP]M: \d+ lines, .* and the simulation's calls\. Tap a game line and its game's card opens, the signals, the pick, every market and the simulation: 2 games\.$/.test(phGs.notes[0] || '')
+      && /they scan the same code and get tonight's sheet with the detail behind each pick, the games' cards with it, and nothing else, view only/.test(phGs.notes[2] || ''),
+      'phone, the games\' cards at the save (11 Nov 2026, the user: "have it so the game lines open as well like the props"): with games on the board the button writes the games\' cards to a document of their own first (phone/games, packed, stamped with the sheet\'s date and time), then the sheet, which says how many it carries; every game line of the sheet, the bet and the simulation call you are taking, the parlay legs, the likeliest sides and the simulation\'s calls, carries its own game\'s mark; and the dialog says a game line opens its game\'s card and how many games',
+      JSON.stringify({ calls: phGs.calls, v: phGs.v, keys: phGs.keys, games: phGs.games, gkeys: phGs.gkeys, gv: phGs.gv, gd: phGs.gd, gat: phGs.gat, gz: phGs.gz, gbytes: phGs.gbytes, bytes: phGs.bytes, gid: phGs.gid, ids: phGs.ids, take: phGs.take, notes: phGs.notes.map(n => n.slice(0, 330)) }));
+  chk(phGs.same && phGs.diff.length === 0 && phGs.fold0 && phGs.fold1
+      && phG.again.same && phG.again.diff.length === 0 && phG.again.fold0 && phG.again.fold1 && phG.again.sport === 'true,false,false' && /^Rays @ Yankees$/.test(phG.again.away) && /^THE PICK/i.test(phG.again.rail)
+      && phG.graded.same && /^Final: 76ers 110, Knicks 120 /.test(phG.graded.final0) && /this card went \d+-\d+/.test(phG.graded.final0) && phG.graded.final1 === phG.graded.final0 && phG.graded.lock && phG.graded.dis && phG.graded.games === 2,
+      'phone, the page after the save: drawing the games\' cards puts each game through the form, and when the button has done the form is as it stood, a draft of a third game in it: every box and tick, the rail and every section of the NBA card, the board, the card table, the bets marked Taking, which sport is pressed, what is disabled, the fold that stood open in the rail, and everything in the page\'s storage, the draft included; the same with a graded game of the night before open in the form, its final and its record still on the rail and the form still locked; and the same with the form on another sport, a baseball game in it and the NBA card out of sight, which holds after the save what it held before',
+      JSON.stringify({ same: phGs.same, diff: phGs.diff.slice(0, 12), fold0: phGs.fold0, fold1: phGs.fold1, graded: phG.graded, mlb: { same: phG.again.same, diff: phG.again.diff.slice(0, 12), fold0: phG.again.fold0, fold1: phG.again.fold1, sport: phG.again.sport, away: phG.again.away, rail: phG.again.rail } }));
+  const gBet = phG.preview.bet || {}, gSim = phG.preview.simTake || {};
+  chk(phG.preview.tip === "Tap a game line for its game's card." && phG.preview.gtaps === 8 && phG.preview.ptaps === 0 && phG.preview.plain === 0
+      && phG.preview.heads.join('|').toLowerCase() === "taking tonight 2|the parlay four 2|likeliest at any price 2|the simulation's calls, bet or better 2"
+      && gBet.open && /^TAKING · NBA Lakers ML \d/.test(gBet.line) && / Celtics @ Lakers · Moneyline$/.test(gBet.line) && gBet.head === 'Celtics @ Lakers' && /^NBA · NOV 13$/i.test(gBet.band)
+      && gBet.sigs >= 2 && gBet.sigLinks === 0 && gBet.fc && gBet.mks === 4 && gBet.others && /^THE PICK/i.test(gBet.pick) && gBet.split && gBet.secs[0] === 'SIMULATION*' && gBet.secs[gBet.secs.length - 1] === 'WHY' && gBet.secs.slice(1).every(s => !/\*$/.test(s)) && gBet.secs.length >= 4
+      && gBet.simRows === 6 && gBet.tiles === 4 && gBet.taking.length === 0 && gBet.why >= 3 && gBet.controls === 0 && gBet.data === 0 && gBet.ids === 0 && gBet.titles === 0 && !gBet.words
+      && phG.preview.afterEsc.panel && !phG.preview.afterEsc.sheet
+      && gSim.open && /^TAKING · NBA · SIMULATION Total (OVER|UNDER) 231\.5 /.test(gSim.line) && / 76ers @ Knicks · the simulation, the sim's own view$/.test(gSim.line) && gSim.head === '76ers @ Knicks' && gSim.mks === 4 && gSim.simRows === 6
+      && gSim.taking.join() === 'TAKING' && gSim.controls === 0 && gSim.data === 0 && gSim.ids === 0 && gSim.titles === 0 && !gSim.words,
+      'phone, a game line opens its game\'s card: every line of a game on the sheet carries the mark and none is left plain; a press opens that game\'s card over the sheet under the line that was pressed, as the computer draws the game: tonight\'s signals as chips (no link in them), the forecast, the pick and its why, the four markets standing open with their numbers, the split, the simulation standing open with its tiles and its table, and the rest of the NBA card and the why folded under their headings; the simulation call you are taking is marked in its table on its own game and not on the other; no button, field, link, id, hover note or handler is in it, nor a word telling the reader to press something on the computer; and Escape shuts the card and leaves the sheet',
+      JSON.stringify({ tip: phG.preview.tip, gtaps: phG.preview.gtaps, ptaps: phG.preview.ptaps, plain: phG.preview.plain, heads: phG.preview.heads, bet: gBet, afterEsc: phG.preview.afterEsc, sim: gSim }));
+  const gCalls = ['use db', 'use user', 'isOwner', 'sub phone/latest', 'get phone/games'];
+  chk(phGOwner.errs.length === 0 && phGOwner.open && phGOwner.how === 'auto' && phGOwner.gtaps === 8 && phGOwner.cards === 8 && phGOwner.right === 8 && phGOwner.wrong === 0 && phGOwner.none === 0 && phGOwner.fits && phGOwner.pageFits && phGOwner.pcontrols === 0 && phGOwner.shut === 1 && phGOwner.sheetStays
+      && JSON.stringify(phGOwner.atOpen) === JSON.stringify(gCalls) && JSON.stringify(phGOwner.calls) === JSON.stringify(gCalls) && phGOwner.tip === "Tap a game line for its game's card."
+      && phGGuest.errs.length === 0 && phGGuest.open && phGGuest.how === 'guest' && phGGuest.controls === 0 && phGGuest.gtaps === 8 && phGGuest.right === 8 && phGGuest.wrong === 0 && phGGuest.none === 0 && phGGuest.fits && phGGuest.pcontrols === 0 && phGGuest.sheetStays
+      && JSON.stringify(phGGuest.calls) === JSON.stringify(gCalls),
+      'phone, the games\' cards on the owner\'s phone and a guest\'s: the sheet that lands says games\' cards ride beside it, so the phone reads that document once as the sheet opens and never again; each of the eight game lines opens its own game\'s card under its own line, inside the screen\'s width, with nothing in it to press but Close, and Escape leaves the sheet; someone the page is shared with gets the same, with no control anywhere on the sheet, and no script error on either',
+      JSON.stringify({ owner: { errs: phGOwner.errs, open: phGOwner.open, how: phGOwner.how, gtaps: phGOwner.gtaps, cards: phGOwner.cards, right: phGOwner.right, wrong: phGOwner.wrong, none: phGOwner.none, fits: phGOwner.fits, pageFits: phGOwner.pageFits, pcontrols: phGOwner.pcontrols, shut: phGOwner.shut, atOpen: phGOwner.atOpen, calls: phGOwner.calls, tip: phGOwner.tip },
+        guest: { errs: phGGuest.errs, open: phGGuest.open, how: phGGuest.how, controls: phGGuest.controls, gtaps: phGGuest.gtaps, right: phGGuest.right, wrong: phGGuest.wrong, none: phGGuest.none, fits: phGGuest.fits, pcontrols: phGGuest.pcontrols, calls: phGGuest.calls } }));
+  chk(phGStale.errs.length === 0 && phGStale.open && phGStale.gtaps === 8 && phGStale.none === 8 && phGStale.right === 0 && phGStale.wrong === 0 && / The detail of this one is not in the save\. Press Phone QR on the computer again, or open it there\.$/.test(phGStale.last || '') && phGStale.sheetStays
+      && phGGone.errs.length === 0 && phGGone.open && phGGone.gtaps === 8 && phGGone.none === 8 && phGGone.right === 0 && / The detail of this one is not in the save\./.test(phGGone.last || '')
+      && /^Saved for your phone at .* and the simulation's calls\. The games' cards did not save \(the page's store is full\), so a game line does not open tonight; press the button again for them\.$/.test(phG.noGames.note)
+      && JSON.stringify(phG.noGames.calls) === JSON.stringify(['use db', 'set phone/games', 'set phone/latest', 'get phone/config']) && phG.noGames.games === 0 && phG.noGames.gid === '0,0,0,0,0' && phG.noGames.taps === 0 && phG.noGames.cards === 8 && !phG.noGames.tip
+      && JSON.stringify(phG.again.calls) === JSON.stringify(['use db', 'set phone/games', 'set phone/games', 'set phone/latest', 'get phone/config']) && phG.again.games === 2 && phG.again.gat && /: 2 games\.$/.test(phG.again.note),
+      'phone, when a game\'s card is not there: games\' cards stamped with another save\'s time are not this sheet\'s and are not shown, and a sheet whose games\' document is gone says the same under the line that was pressed, with no script error; a full store that refuses the games\' document still gets the sheet, saved with its game lines plain and the dialog saying the games\' cards did not save and why; and a store unavailable once on the games\' document is tried once more before the sheet is written',
+      JSON.stringify({ stale: { errs: phGStale.errs, open: phGStale.open, gtaps: phGStale.gtaps, none: phGStale.none, right: phGStale.right, wrong: phGStale.wrong, last: (phGStale.last || '').slice(-120) }, gone: { errs: phGGone.errs, gtaps: phGGone.gtaps, none: phGGone.none, last: (phGGone.last || '').slice(-120) }, noGames: phG.noGames, again: { calls: phG.again.calls, games: phG.again.games, gat: phG.again.gat, note: phG.again.note.slice(-60) } }));
+  chk(phG.filed.name === 'super-model-2026-11-13.html' && /^<!doctype html><html lang="en">/.test(gfd) && !/<script|<button|<a\b|<input|<select|<textarea|<iframe|<img|\son[a-z]+\s*=|\sdata-[a-z-]+=|\sid=|https?:\/\//i.test(gfd)
+      && gFolds === 8 && gGameFolds === 8 && gTip === "Tap a game line for its game's card." && gOpen === 1 && /^(76ers @ Knicks|Celtics @ Lakers)$/.test(gHead) && gUnder.indexOf(gHead) === 0 && gSecs0 === 1 && gSecs1 === 2 && gWide <= 390 && gReqs.length === 0,
+      'phone, the file to send with the games in it: each game line of the saved file folds its game\'s card under it, a still copy with no script, button, link, field, id, handler or outside address; opened with scripts off on a phone-width screen a tap on a line opens that game\'s card, a tap on a heading inside it opens that section, nothing is fetched and nothing runs off the side',
+      JSON.stringify({ name: phG.filed.name, bytes: gfd.length, folds: gFolds, gameFolds: gGameFolds, tip: gTip, open: gOpen, head: gHead, under: gUnder.slice(0, 60), secs0: gSecs0, secs1: gSecs1, wide: gWide, reqs: gReqs.slice(0, 3) }));
+
+  // ---- 11 Nov 2026: the Kalshi card reads the sheet's chances of the game on the form. It read them off the page's last result, and the card is drawn before the
+  //      forecast it sits in has finished, so a game opened from the board carried the "by the sheet" chances of the game drawn before it until something redrew
+  //      the form (found while the games' cards were being drawn for the phone, each of which is one draw). Two games here, priced apart, opened one after the other ----
+  const kalLagKeep = await pg.evaluate(async () => { await smStore.ready; const k = {}; for (const x of ['callsheet3.card.v1', 'callsheet3.draft.v1']) k[x] = await smStore.getItem(x); await smStore.removeItem('callsheet3.card.v1'); return k; });
+  await reloaded();
+  const kalLag = await pg.evaluate(async () => {
+    const wait = () => new Promise(r => setTimeout(r, 120));
+    const set = (id, v) => { const el = document.getElementById(id); el.value = v; el.dispatchEvent(new Event('input', { bubbles: true })); };
+    await smStore.ready;
+    const rung = (x, mid, vol) => [x, +(mid - 0.01).toFixed(2), +(mid + 0.01).toFixed(2), +mid.toFixed(2), vol];
+    const kal = { at: '2026-11-14T20:00:00Z', ev: 'KXNBAGAME-26NOV14', fee: 0.07, a: { bid: 0.57, ask: 0.58, last: 0.58, vol: 149511, oi: 136925 }, h: { bid: 0.42, ask: 0.43, last: 0.43, vol: 140051, oi: 115254 },
+      sp: { a: [rung(1.5, 0.56, 900), rung(2.5, 0.51, 1200), rung(3.5, 0.47, 800), rung(4.5, 0.41, 500)], h: [rung(1.5, 0.33, 40), rung(3.5, 0.25, 0)] }, tot: [rung(230.5, 0.57, 1500), rung(232.5, 0.49, 8000), rung(234.5, 0.41, 300)] };
+    const game = async (away, home, op, up, sph, spa) => {
+      document.getElementById('clear').click(); document.getElementById('m-nba').click(); await wait();
+      set('gdate', '2026-11-14'); set('away', away); set('home', home); set('line', '232.5'); set('op', op); set('up', up); set('hml', '140'); set('aml', '-165'); set('sp', '2.5'); set('sph', sph); set('spa', spa); set('nbakalshi', JSON.stringify(kal)); await wait();
+      document.getElementById('add').click(); await wait();
+    };
+    await game('Hawks', 'Wizards', '-110', '-110', '-110', '-110');
+    await game('Kings', 'Spurs', '-135', '115', '-130', '110');
+    document.getElementById('clear').click(); await wait();
+    const ids = JSON.parse(smStore.getItem('callsheet3.card.v1')).filter(r => r.gdate === '2026-11-14').map(r => [r.matchup, r.id]);
+    const card = () => { const t = document.getElementById('nbaKalshiPanel').innerText.replace(/\s+/g, ' '), sp = /covers [\d.]+% by the crowd, ([\d.]+)% by the sheet/.exec(t), to = /the over [\d.]+% by the crowd, ([\d.]+)% by the sheet/.exec(t); return [sp ? sp[1] : '', to ? to[1] : ''].join('/'); };
+    const own = (home) => { const one = (k, mine) => { const m = document.querySelector('#markets .mk[data-key="' + k + '"]'); if (!m) return ''; const p = parseFloat(m.querySelector('.nums .p').textContent), name = m.querySelector('.pick').childNodes[0].textContent; return (mine(name) ? p : 100 - p).toFixed(1); };
+      return [one('spread', n => n.indexOf(home) === 0), one('total', n => /^OVER/.test(n))].join('/'); };
+    const seen = [];
+    for (const [m, id, home] of [[ids[0][0], ids[0][1], 'Wizards'], [ids[1][0], ids[1][1], 'Spurs'], [ids[0][0], ids[0][1], 'Wizards'], [ids[1][0], ids[1][1], 'Spurs']]) {
+      document.querySelector('#cardTable [data-open="' + id + '"]').click(); await wait();   // one draw of the form: what a click on a card gives
+      seen.push({ game: m, card: card(), own: own(home) });
+    }
+    document.getElementById('clear').click(); await wait();
+    return { seen };
+  });
+  await pg.evaluate(async (k) => { for (const x of Object.keys(k)) { if (k[x] === null || k[x] === undefined) await smStore.removeItem(x); else await smStore.setItem(x, k[x]); } }, kalLagKeep);
+  await reloaded();
+  chk(kalLag.seen.length === 4 && kalLag.seen.every(x => /^\d+\.\d\/\d+\.\d$/.test(x.card) && x.card === x.own) && kalLag.seen[0].card === '50.0/50.0' && kalLag.seen[1].card !== kalLag.seen[0].card && kalLag.seen[2].card === kalLag.seen[0].card && kalLag.seen[3].card === kalLag.seen[1].card
+      && /Hawks @ Wizards/.test(kalLag.seen[0].game) && /Kings @ Spurs/.test(kalLag.seen[1].game),
+      'kalshi, the sheet\'s own game: a game opened from the card shows, on the crowd\'s card, the sheet\'s chance at the book\'s spread and total for that game on the first draw, the same figures its own market rows carry, and not the figures of the game that was drawn before it; two games priced apart, opened in turn and again, each read their own',
+      JSON.stringify(kalLag.seen));
 
   // ---- 11 Nov 2026: the NBA record counts the sheet's calls (the user: "fix the NBA record so tiles count only real calls") -- a market where neither side is priced below its chance is the book's own number, listed under the tile as no call and left out of its count ----
   const callsKeep = await pg.evaluate(async () => { await smStore.ready; const k = { card: await smStore.getItem('callsheet3.card.v1'), slate: await smStore.getItem('callsheet3.slate.v1') }; await smStore.removeItem('callsheet3.card.v1'); return k; });

@@ -3465,6 +3465,70 @@ the best props. `m.html` draws both, so the code off claude.ai has them
 too; a long night drops the tickets from the code after the likeliest
 list.
 
+**A game line opens its game's card.** The user, with the props opening:
+"can you have it so the game lines open as well like the props? I really
+like this to view on the go or show someone on the fly." On the computer
+a game line opens its game in the form: tonight's signals, the forecast,
+the pick and its why, every market with its chance, price, edge and fair,
+the split, and under them the NBA card (the simulation, who is out and
+the starting five, recent form, the middles, the referees, the crowd on
+Kalshi, the context) and the why list. All of it is drawn off the form,
+so the phone's copy is made the way the page makes its own: at the save
+`phoneGamesDraw` keeps the form's sport, every box, the row it had open
+and the window's boxes, puts each game of the sheet in, lets `render()`
+draw it, reads the containers off (`phoneGameCompose`), and puts the form
+back and draws it again before it returns. It is one step with nothing
+saved and no draft written; the folds that stood open in the rail stand
+open after. A window ticket marked Taking is read at its own numbers.
+
+`phoneGameTidy` makes the card fit a phone that only reads: a signal is
+a link to its section on the computer and a chip here; a call marked
+Taking keeps a TAKING chip and every other button goes; the two
+calculators go, the window keeping its reading; the markets stand open;
+the sentences that tell the reader to press something on the computer go
+(Press Clear, Type the inputs, type the app's price); the hover notes go.
+A section with nothing on the row is left out. The simulation stands
+open; the rest fold under their headings, each with its live line. Then
+`phoneClean`, as for a prop's panel (it now keeps a fold's open mark).
+At a phone's width a market's row sets its numbers on a line under the
+pick, where the rail sets them in a column at the right.
+
+A game's card is bigger than a prop's panel: about 33,000 characters, a
+little under 10,000 packed. So the games ride in a document of their own,
+`phone/games`, `{v: 1, d, at, panels}`, under the same rule as the rest
+of `phone`, with its own 190,000 characters (the six games of 10 Nov
+were 57,000; a full night of fifteen would be about 145,000). It is
+written first and stamped with the sheet's time, then the sheet,
+`{v: 4, d, at, sheet, panels, games}`, `games` the count that ride. Every
+game line of the sheet keeps its card row's id (`gid`): a bet marked
+Taking and a simulation call marked Taking first, then the parlay four
+and the straight bets, then the likeliest sides and the simulation's
+calls, which is the order the queue is cut in when a night is too big. A
+line whose game has no card in the save is a plain line. If the store
+refuses the games' document the sheet is saved all the same, its game
+lines plain, and the dialog says the games' cards did not save and why.
+
+On the phone a sheet that says games ride beside it reads `phone/games`
+once as it opens (`phoneGamesMap`), so a press opens a card without
+waiting on the store. A document stamped with another save's time is not
+this sheet's and is not used; a read that failed is tried again on the
+next press. Every line of a game opens the same card, under the line
+that was pressed (`phonePanelOpen({gid, line})`). The file to send folds
+the card under each of its lines: 1.4 million characters on the night of
+10 Nov, fifty-two folds, nineteen of them a game's card. The legacy code
+off claude.ai carries no `gid` and `m.html` is unchanged.
+
+**The Kalshi card read the game before.** Drawing six games one after the
+other showed it: the crowd's card sets the sheet's chance at the book's
+spread and total beside the crowd's, and it read that chance off the
+page's last result, while the card is drawn before the forecast it sits
+in has finished. A game opened from the board therefore carried the "by
+the sheet" figures of the game drawn before it until something redrew the
+form: Bucks @ Knicks on 10 Nov read 50.0% at the spread and the total
+where its own were 48.9%. `forecastMatchupNba` now draws the card first
+without the sheet's figures and again with its own markets once it has
+them. Shown figures only; no chance, band or pick reads them.
+
 **Checked.** The harness stands in for the viewer (`window.claude.use` for
 `db` and `user` over an in-memory store, every call logged, `set` refusing
 on demand with the store's own codes) and reads: the save with one retry
@@ -3488,4 +3552,43 @@ Viewer's level, and refused a write at the Editor's level with the code
 the page words as "only the page's owner saves the sheet". What only the
 owner can confirm is the page inside claude.ai's viewer on his own
 computer and phone.
+
+For the games the harness puts two games on the board, a bet marked
+Taking on one and a simulation call on the other, and a draft of a third
+in the form with a fold open, and reads: the two documents, their order,
+their shape and the stamp they share; each line's own game; the page
+after the save against the page before it, every box and tick, the rail,
+the NBA card's sections, the board, the card table, what is disabled,
+which sport is pressed, the open fold, and the page's storage with the
+draft in it; the card opened from the preview under the line that was
+pressed (the signals as chips, the forecast, the pick, four markets
+standing open, the split, the simulation open with its table, the rest
+folded, the TAKING chip on its own game and not on the other, no
+control, id, hover note or handler); the owner's phone and a guest's
+reading the games' document once and each of eight lines opening its own
+game inside the screen's width; games stamped with another save's time
+and a games' document that is gone, both said under the line; a full
+store on the games' document and a store unavailable once; and the file
+opened with scripts off, a line folding its game's card open and a
+heading inside it its section. With the backup of 10 Nov: six games,
+nineteen game lines and thirty-three prop lines all opening, the page
+identical after the save, nothing off the side at 390 pixels with every
+fold open, the save done in half a second. A baseball game, a WNBA game
+and an NBA game on one sheet each opened its own card, the form left on
+baseball as it stood. With the limit cut so one game would not fit, two
+of three were kept, the one marked Taking first, and the third game's
+lines were plain. The Kalshi card's check opens two games priced apart
+in turn and reads each one's own figures; the same check fails on the
+page as it was published before. The harness's scenario was also run
+by hand against copies of the page broken on purpose (the boxes not put
+back, the sport not put back, the open row not put back, the last draw
+left out, the hidden NBA card left as the last game drew it, every line
+given the first game's mark, the two documents written in the other
+order) and each one was caught; two of them were not at first, which is
+why the scenario presses the button with a graded game open and again
+with the form on baseball.
+On the published page (version 157) the database took `phone/games` as
+an empty document with no stamp, which the page does not use, gave it
+back at the Viewer's level and refused a write at the Editor's level, as
+it does for the sheet.
 

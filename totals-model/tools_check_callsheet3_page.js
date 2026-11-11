@@ -2052,7 +2052,8 @@ const CHECKS = ["dome","playoff"];
       collection(path) { throw new Error('the page keeps one document, not a collection: ' + path); },
     });
     const user = Object.freeze({ isOwner: () => { M.calls.push('isOwner'); return Promise.resolve(!!o.owner); } });
-    window.claude = { use(name) { M.calls.push('use ' + name); return Promise.resolve(name === 'db' ? (o.db === false ? null : db) : name === 'user' ? (o.owner === null ? null : user) : null); } };
+    const downloads = Object.freeze({ save(req) { M.calls.push('save ' + req.filename); if (M.dlFail) return Promise.reject({ code: M.dlFail, message: 'stand-in ' + M.dlFail }); M.saved = { filename: req.filename, data: String(req.data) }; return Promise.resolve({ status: 'saved' }); } });
+    window.claude = { use(name) { M.calls.push('use ' + name); return Promise.resolve(name === 'db' ? (o.db === false ? null : db) : name === 'user' ? (o.owner === null ? null : user) : name === 'downloads' ? downloads : null); } };
   };
   const PH_URL = 'https://claude.ai/artifact/TESTtestTEST0123456789';
   belowFree = true;
@@ -2104,10 +2105,26 @@ const CHECKS = ["dome","playoff"];
     document.getElementById('phonePreview').click(); await wait();
     const sh = document.getElementById('phoneSheet');
     const preview = { open: !!(sh && !sh.hidden), how: sh.dataset.how, btn: txt(sh.querySelector('[data-pshclose]')), text: txt(sh), heads: [...sh.querySelectorAll('h2')].map(txt), takes: sh.querySelectorAll('.pshk.take').length, cards: sh.querySelectorAll('.pshk').length };
+    // (11 Nov 2026) a card with detail opens it over the sheet: the ticket's two legs, each the prop's own panel as the computer draws it
+    const tapCards = [...sh.querySelectorAll('.pshk.tap')], ticketCard = tapCards.find(c => /2-LEG TICKET/i.test(c.innerText));
+    ticketCard.click(); await wait(350);
+    const pp = document.getElementById('phonePanel'), ppb = document.getElementById('phonePanelBody');
+    const panel = { open: !!(pp && !pp.hidden), legs: ppb.querySelectorAll('.pp-leg').length, heads: [...ppb.querySelectorAll('.pp-legn')].map(txt), names: [...ppb.querySelectorAll('h3')].map(txt), picks: [...ppb.querySelectorAll('.pd-pick')].map(txt),
+      tiles: ppb.querySelectorAll('.pd-tile').length, logs: ppb.querySelectorAll('.pd-log tbody tr').length, books: ppb.querySelectorAll('.pd-books tbody tr').length, levers: ppb.querySelectorAll('.pd-levers .lever').length,
+      controls: ppb.querySelectorAll('button, a, input, select, textarea').length, data: (ppb.innerHTML.match(/\sdata-[a-z-]+=/g) || []).length, taps: tapCards.length, plain: sh.querySelectorAll('.pshk:not(.tap)').length, tip: txt(sh.querySelector('.psh-tip')) };
+    const single = tapCards.find(c => /#1 · NBA PROP/i.test(c.innerText)); single.click(); await wait(350);
+    panel.single = { legs: ppb.querySelectorAll('.pp-leg').length, heads: ppb.querySelectorAll('.pp-legn').length, name: txt(ppb.querySelector('h3')) };
+    await esc();
+    const afterEsc0 = { panel: pp.hidden, sheet: sh.hidden };
     await esc();
     const afterEsc = { sheet: sh.hidden, dlg: !dlg.hidden, noscroll: document.body.classList.contains('noscroll') };
     document.getElementById('phoneCopy').click(); await wait();
     const copied = { text: copies[copies.length - 1] || '', said: txt(document.getElementById('phoneSaid')) };
+    // the sheet as a file to send: saved through the viewer's own save, a still copy with the detail folded under each pick
+    document.getElementById('phoneFile').click(); await wait(400);
+    const filed = { name: (window.__mock.saved || {}).filename || '', data: (window.__mock.saved || {}).data || '', said: txt(document.getElementById('phoneSaid')), calls: window.__mock.calls.filter(c => /^(use downloads|save )/.test(c)) };
+    window.__mock.dlFail = 'declined'; document.getElementById('phoneFile').click(); await wait(300);
+    const declined = txt(document.getElementById('phoneSaid')); window.__mock.dlFail = null;
     await esc();
     const closed = dlg.hidden && !document.body.classList.contains('noscroll');
     // c) the store refuses the write: said in the dialog, no code drawn, the last sheet left as it was
@@ -2133,7 +2150,7 @@ const CHECKS = ["dome","playoff"];
     await esc();
     delete window.claude; delete window.__mock;
     day(''); pick('propsBelow', 'leans'); await wait();
-    return { listed, code, saved, preview, afterEsc, copied, closed, refused, nostore, empty, noUrl };
+    return { listed, code, saved, preview, panel, afterEsc0, afterEsc, copied, filed, declined, closed, refused, nostore, empty, noUrl };
   }, { src: claudeMock.toString(), url: PH_URL });
   const phQr = qrRead(phS.saved.qr.n, phS.saved.qr.mods);
   // the views that open the page with the sheet in the store: the owner's phone, a guest's, a guest at a desk, and the two with nothing to show
@@ -2161,6 +2178,16 @@ const CHECKS = ["dome","playoff"];
         return o;
       }
       if (!s) return o;
+      const tap = [...s.querySelectorAll('.pshk.tap')], tk = tap.find(c => /2-LEG TICKET/i.test(c.innerText));
+      o.taps = tap.length; o.tip = txt(s.querySelector('.psh-tip'));
+      if (tk) {
+        tk.click(); await wait(450);
+        const pp = document.getElementById('phonePanel'), ppb = document.getElementById('phonePanelBody');
+        o.panel = { open: !!(pp && !pp.hidden), legs: ppb.querySelectorAll('.pp-leg').length, names: [...ppb.querySelectorAll('h3')].map(txt), tiles: ppb.querySelectorAll('.pd-tile').length, logs: ppb.querySelectorAll('.pd-log tbody tr').length,
+          controls: ppb.querySelectorAll('button, a, input, select, textarea').length, shut: pp.querySelectorAll('[data-ppclose]').length, fits: pp.scrollWidth <= pp.clientWidth + 1 };
+        document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })); await wait();
+        o.panelShut = pp.hidden; o.sheetStays = !s.hidden;
+      }
       document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })); await wait();
       o.escShut = s.hidden;
       if (steps === 'newer') {   // shut by hand, the same sheet again stays shut, a newer one opens
@@ -2187,6 +2214,18 @@ const CHECKS = ["dome","playoff"];
   await mPage.goto(phS.code.link); await mPage.waitForTimeout(600);
   const mText = await mPage.evaluate(() => document.body.innerText.replace(/\s+/g, ' ').trim());
   await mCtx.close();
+  const phFilePath = path.join(require('os').tmpdir(), 'cs3-harness-' + process.pid + '-sheet.html');
+  fs.writeFileSync(phFilePath, phS.filed.data || '<!doctype html><title>nothing saved</title>');
+  const fCtx = await pg.context().browser().newContext({ viewport: { width: 390, height: 844 }, javaScriptEnabled: false }), fPage = await fCtx.newPage(), fReqs = [];
+  fPage.on('request', q => { if (!/^(file|data):/.test(q.url())) fReqs.push(q.url()); });
+  await fPage.goto('file://' + phFilePath); await fPage.waitForTimeout(400);
+  const fFolds = await fPage.locator('details.pfd').count(), fOpen0 = await fPage.locator('details.pfd[open]').count();
+  if (fFolds) { await fPage.locator('details.pfd > summary').first().click(); await fPage.waitForTimeout(200); }
+  const fOpen1 = await fPage.locator('details.pfd[open]').count();
+  const fText = (await fPage.locator('body').innerText()).replace(/\s+/g, ' ').trim();
+  const fBox = fOpen1 ? await fPage.locator('details.pfd[open] .pdlg-box').first().boundingBox() : null;
+  const fPanel = { tiles: await fPage.locator('details.pfd[open] .pd-tile').count(), legs: await fPage.locator('details.pfd[open] .pp-leg').count(), wide: await fPage.evaluate(() => document.documentElement.scrollWidth) };
+  await fCtx.close(); try { fs.unlinkSync(phFilePath); } catch (e) {}
   await pg.evaluate(async () => { await smStore.ready; await smStore.removeItem('callsheet3.props.v1'); });
   belowFree = false;
   await reloaded();
@@ -2198,15 +2237,16 @@ const CHECKS = ["dome","playoff"];
       'phone, off claude.ai: with no viewer the button draws the code as before, its link carrying the night to m.html, and the night now includes the ticket marked Taking (two legs at FanDuel, the games, the chance both land and the parlay price) and the night\'s two tickets under the best props',
       JSON.stringify({ listed: phS.listed, link: phS.code.link.slice(0, 80), note: phS.code.note.slice(0, 260), m: mText.slice(0, 420), errs: mErrs }));
   chk(JSON.stringify(phS.saved.calls) === JSON.stringify(['use db', 'set phone/latest', 'set phone/latest', 'get phone/config'])
-      && phS.saved.doc && phS.saved.doc.v === 2 && phS.saved.doc.d === '2026-11-12' && phS.saved.doc.at === phSheet.at && Object.keys(phS.saved.doc).join() === 'v,d,at,sheet'
+      && phS.saved.doc && phS.saved.doc.v === 3 && phS.saved.doc.d === '2026-11-12' && phS.saved.doc.at === phSheet.at && Object.keys(phS.saved.doc).join() === 'v,d,at,sheet,panels' && /^z[A-Za-z0-9_-]{400,}$/.test(phS.saved.doc.panels)
+      && phTake.ids.length === 2 && phSheet.props.every(x => x.ids && x.ids.length === 1) && phSheet.t3.every(x => x.ids.length === 2) && JSON.stringify(phS.saved.doc).length < 200000
       && phSheet.take.length === 1 && phTake.k === 'ticket' && phTake.n === 2 && phTake.p === 'Man One OVER 20.5 points + Man Two OVER 7.5 rebounds' && phTake.m === 'at FanDuel' && phTake.g === 'Hawks @ Magic · Bulls @ Bucks' && phTake.pr >= 260 && phTake.pr <= 269 && phTake.c > 30 && phTake.c < 40
       && phSheet.t3.length === 2 && phSheet.t3[0].n === 2 && phSheet.props.length === 4 && !('cut' in phSheet)
-      && /^Saved for your phone at \d{1,2}:\d\d [AP]M: \d+ lines, the bets and tickets you are taking first, then the parlay four, the best straight bets, the likeliest sides, the best props, the night's tickets and the simulation's calls\.$/.test(phS.saved.notes[0])
+      && /^Saved for your phone at \d{1,2}:\d\d [AP]M: \d+ lines, the bets and tickets you are taking first, then the parlay four, the best straight bets, the likeliest sides, the best props, the night's tickets and the simulation's calls\. Tap a prop, a ticket or a pair on the phone and its detail opens as it reads here: 4 props\.$/.test(phS.saved.notes[0])
       && /^Point your phone's camera at the code, or open The Super Model in the Claude app on your phone\. Tonight's sheet opens by itself, view only\./.test(phS.saved.notes[1])
-      && phQr === PH_URL && phS.saved.qr.n >= 25 && !phS.saved.links.some(l => /m\.html/.test(l)) && phS.saved.links.join() === 'phoneCopy|#,phonePreview|#',
+      && phQr === PH_URL && phS.saved.qr.n >= 25 && !phS.saved.links.some(l => /m\.html/.test(l)) && phS.saved.links.join() === 'phoneFile|#,phoneCopy|#,phonePreview|#',
       'phone, on claude.ai: where the viewer gives the page its store, the button saves the night\'s sheet there whole (one document, the ticket you are taking in it, nothing trimmed), tries once more when the store is unavailable, says it is saved and how many lines, and the code it draws is the page\'s own address from the store, read back off the drawn modules by an independent decoder, with no link to m.html',
       JSON.stringify({ calls: phS.saved.calls, keys: phS.saved.doc && Object.keys(phS.saved.doc), take: phTake, t3: (phSheet.t3 || []).length, props: (phSheet.props || []).length, notes: phS.saved.notes.map(n => n.slice(0, 150)), qr: phQr, n: phS.saved.qr.n, links: phS.saved.links }));
-  chk(/^For someone else to see it: share this page with them from the Share menu on claude\.ai \(Viewer is enough\)\. Signed in to Claude, they scan the same code and get tonight's sheet and nothing else, view only: only you can save over it, and your card never leaves this browser\. For someone with no Claude account, copy the sheet as text and send it\./.test(phS.saved.notes[2])
+  chk(/^For someone else to see it: share this page with them from the Share menu on claude\.ai \(Viewer is enough\)\. Signed in to Claude, they scan the same code and get tonight's sheet with the detail behind each pick and nothing else, view only: only you can save over it, and your card never leaves this browser\. For someone with no Claude account, save the sheet as a file to send \(the detail is folded under each pick, and it opens on any phone\), or copy it as text\./.test(phS.saved.notes[2])
       && /readable by you and by anyone you share the page with, and each save replaces the last\./.test(phS.saved.notes[3])
       && phS.preview.open && phS.preview.how === 'preview' && phS.preview.btn === 'Close' && phS.preview.takes === 1 && phS.preview.cards === 8
       && phS.preview.heads.join('|').toLowerCase() === 'taking tonight 1|best props 4|two-leg tickets, to test 2|same-game pairs 1'
@@ -2215,6 +2255,22 @@ const CHECKS = ["dome","playoff"];
       && /\n\nTWO-LEG TICKETS, TO TEST\n#1 /.test(phS.copied.text) && /\n\nSAME-GAME PAIRS\n#1 /.test(phS.copied.text) && phS.copied.said === 'Copied the sheet as text.',
       'phone, sharing: the dialog says how someone else sees the sheet (share the page from the Share menu, Viewer is enough; they get the sheet and nothing else, and only the owner saves over it) and who can read the store; the sheet opens as the phone shows it over the dialog and Escape shuts it first, the dialog after; and the sheet copies as plain text for someone with no account',
       JSON.stringify({ notes: phS.saved.notes.slice(2).map(n => n.slice(0, 200)), preview: { open: phS.preview.open, how: phS.preview.how, btn: phS.preview.btn, heads: phS.preview.heads, takes: phS.preview.takes, cards: phS.preview.cards }, afterEsc: phS.afterEsc, closed: phS.closed, copied: phS.copied.text.slice(0, 330), said: phS.copied.said }));
+  chk(phS.panel.open && phS.panel.taps === 8 && phS.panel.plain === 0 && phS.panel.tip === 'Tap a prop, a ticket or a pair for its detail.'
+      && phS.panel.legs === 2 && phS.panel.heads.join('|').toLowerCase() === 'leg 1 of 2|leg 2 of 2' && /^Man One/.test(phS.panel.names[0]) && /^Man Two/.test(phS.panel.names[1])
+      && /^OVER 20\.5 points/i.test(phS.panel.picks[0]) && /^OVER 7\.5 rebounds/i.test(phS.panel.picks[1]) && phS.panel.tiles >= 12 && phS.panel.logs === 20 && phS.panel.books === 4 && phS.panel.levers >= 4
+      && phS.panel.controls === 0 && phS.panel.data === 0 && phS.panel.single.legs === 1 && phS.panel.single.heads === 0 && /^Man One/.test(phS.panel.single.name)
+      && phS.afterEsc0.panel && !phS.afterEsc0.sheet,
+      'phone, the detail behind a pick (11 Nov 2026, the user: "see the prop cards when I select it so I can see the graphs and info too"): every card that stands on a prop carries a mark and opens the prop\'s own panel as the computer draws it, over the sheet (the tiles, the levers, his last games, every book); a ticket opens its two legs one under the other, a single prop one panel with no leg heading; the buttons and every attribute that would act are out of the markup; and Escape shuts the detail and leaves the sheet',
+      JSON.stringify({ open: phS.panel.open, taps: phS.panel.taps, plain: phS.panel.plain, tip: phS.panel.tip, legs: phS.panel.legs, heads: phS.panel.heads, names: phS.panel.names, picks: phS.panel.picks, tiles: phS.panel.tiles, logs: phS.panel.logs, books: phS.panel.books, levers: phS.panel.levers, controls: phS.panel.controls, data: phS.panel.data, single: phS.panel.single, afterEsc0: phS.afterEsc0 }));
+  const fd = phS.filed.data || '';
+  chk(phS.filed.name === 'super-model-2026-11-12.html' && JSON.stringify(phS.filed.calls) === JSON.stringify(['use downloads', 'save super-model-2026-11-12.html'])
+      && /^Saved super-model-2026-11-12\.html\. Send it as it is: it opens on any phone, view only, with the detail under each pick\.$/.test(phS.filed.said) && phS.declined === 'Not saved.'
+      && /^<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport"/.test(fd) && !/<script|<button|<a\b|<input|<select|<textarea|<iframe|<img|\son[a-z]+\s*=|\sdata-[a-z-]+=|https?:\/\//i.test(fd)
+      && fFolds === 8 && fOpen0 === 0 && fOpen1 === 1 && fReqs.length === 0 && fPanel.legs === 2 && fPanel.tiles >= 12 && fPanel.wide <= 390 && fBox && fBox.x >= 0 && fBox.x + fBox.width <= 391
+      && /^The Super Model Thu, Nov 12 · made \d{1,2}:\d\d [AP]M · view only a copy Tap a prop, a ticket or a pair for its detail\. TAKING TONIGHT 1 TAKING · NBA · 2-LEG TICKET Man One OVER 20\.5 points \+ Man Two OVER 7\.5 rebounds/i.test(fText)
+      && /Leg 1 of 2 .*Man One .*Leg 2 of 2 .*Man Two /i.test(fText) && /View only: a copy of the sheet as it stood on [^.]*\. Nothing in this file changes anything\./.test(fText),
+      'phone, the sheet as a file to send (the user: "share my picks for the day with someone, and have them see the details behind the pick without them changing" anything "but able to see from their phone"): the dialog saves the sheet through the viewer\'s own save as one .html file, a still copy with the detail folded under each pick; it holds no script, button, link, field, handler or outside address, opens with scripts off and nothing fetched on a phone-width screen with no sideways scroll, and a tap opens a pick\'s detail; a save the viewer declines is said and nothing more',
+      JSON.stringify({ name: phS.filed.name, calls: phS.filed.calls, said: phS.filed.said, declined: phS.declined, bytes: fd.length, head: fd.slice(0, 90), folds: fFolds, open0: fOpen0, open1: fOpen1, reqs: fReqs.slice(0, 3), panel: fPanel, box: fBox && [Math.round(fBox.x), Math.round(fBox.x + fBox.width)], text: fText.slice(0, 260) }));
   chk(/^The sheet could not be saved for the phone: the store refused it: only the page's owner saves the sheet\. Press the button again in a moment\./.test(phS.refused.notes[0] || '') && !phS.refused.qr && phS.refused.same && JSON.stringify(phS.refused.calls) === JSON.stringify(['use db', 'set phone/latest'])
       && /^The sheet could not be saved for the phone: this view was not given the page's store on claude\.ai\./.test(phS.nostore.notes[0] || '') && !phS.nostore.qr && !phS.nostore.link && JSON.stringify(phS.nostore.calls) === JSON.stringify(['use db'])
       && /^Nothing on the board for .*2027.* yet|^Nothing on the board for /.test(phS.empty.notes[0] || '') && phS.empty.wrote.length === 0 && JSON.stringify(phS.empty.calls) === JSON.stringify(['use db'])
@@ -2222,16 +2278,19 @@ const CHECKS = ["dome","playoff"];
       'phone, when it cannot: a write the store refuses is said in the dialog with no code drawn and the last sheet left as it was; a viewer that gives the page no store is said too, with no code that would land on an empty page; a date with nothing on the board writes nothing; and a store with no address beside the sheet still saves it and says where to open it in words',
       JSON.stringify({ refused: phS.refused, nostore: phS.nostore, empty: phS.empty, noUrl: { notes: phS.noUrl.notes.map(n => n.slice(0, 120)), qr: phS.noUrl.qr, wrote: phS.noUrl.wrote } }));
   chk(phOwner.errs.length === 0 && phOwner.open && phOwner.how === 'auto' && phOwner.btn === 'Open the full model' && phOwner.takes === 1 && phOwner.cards === 8 && phOwner.fits
-      && /^The Super Model Thu, Nov 12 · made \d{1,2}:\d\d [AP]M · view only Open the full model (This sheet is for Thu, Nov 12\. Press Phone QR on the day board of the computer for tonight's\. )?TAKING TONIGHT 1 TAKING · NBA · 2-LEG TICKET Man One OVER 20\.5 Points \+ Man Two OVER 7\.5 Rebounds/i.test(phOwner.text)
+      && phOwner.taps === 8 && phOwner.panel && phOwner.panel.open && phOwner.panel.legs === 2 && /^Man One/.test(phOwner.panel.names[0]) && phOwner.panel.tiles >= 12 && phOwner.panel.logs === 20 && phOwner.panel.controls === 0 && phOwner.panel.shut === 1 && phOwner.panel.fits && phOwner.panelShut && phOwner.sheetStays
+      && /^The Super Model Thu, Nov 12 · made \d{1,2}:\d\d [AP]M · view only Open the full model Tap a prop, a ticket or a pair for its detail\. (This sheet is for Thu, Nov 12\. Press Phone QR on the day board of the computer for tonight's\. )?TAKING TONIGHT 1 TAKING · NBA · 2-LEG TICKET Man One OVER 20\.5 Points \+ Man Two OVER 7\.5 Rebounds/i.test(phOwner.text)
       && JSON.stringify(phOwner.calls) === JSON.stringify(['use db', 'use user', 'isOwner', 'sub phone/latest']) && phOwner.escShut && phOwner.sameStaysShut && phOwner.newerOpens && phOwner.newerTakes === 0 && phOwner.subs === 1
       && phLines(phOwner.text) === phLines(mText) && phLines(mText).length > 300,
-      'phone, the owner\'s: a view the width of a phone with nothing of its own asks the store once and opens the night\'s sheet over the page by itself, the ticket you are taking first, line for line what m.html draws from the code, with no sideways scroll and no script error; a button opens the model behind it, a sheet shut by hand stays shut, and a newer one saved from the computer opens on the one subscription',
-      JSON.stringify({ errs: phOwner.errs, open: phOwner.open, how: phOwner.how, btn: phOwner.btn, takes: phOwner.takes, cards: phOwner.cards, fits: phOwner.fits, text: phOwner.text.slice(0, 300), calls: phOwner.calls, escShut: phOwner.escShut, same: phOwner.sameStaysShut, newer: phOwner.newerOpens, newerTakes: phOwner.newerTakes, subs: phOwner.subs, lines: phLines(phOwner.text) === phLines(mText), len: phLines(mText).length }));
+      'phone, the owner\'s: a view the width of a phone with nothing of its own asks the store once and opens the night\'s sheet over the page by itself, the ticket you are taking first, line for line what m.html draws from the code, with no sideways scroll and no script error; a tap on the ticket unpacks the detail the store holds and opens its two legs over the sheet, inside the screen\'s width, and Escape shuts the detail and leaves the sheet; a button opens the model behind it, a sheet shut by hand stays shut, and a newer one saved from the computer opens on the one subscription',
+      JSON.stringify({ errs: phOwner.errs, open: phOwner.open, how: phOwner.how, btn: phOwner.btn, takes: phOwner.takes, cards: phOwner.cards, fits: phOwner.fits, taps: phOwner.taps, panel: phOwner.panel, panelShut: phOwner.panelShut, sheetStays: phOwner.sheetStays, text: phOwner.text.slice(0, 300), calls: phOwner.calls, escShut: phOwner.escShut, same: phOwner.sameStaysShut, newer: phOwner.newerOpens, newerTakes: phOwner.newerTakes, subs: phOwner.subs, lines: phLines(phOwner.text) === phLines(mText), len: phLines(mText).length }));
   chk(phGuest.errs.length === 0 && phGuest.open && phGuest.how === 'guest' && phGuest.btn === '' && phGuest.controls === 0 && phGuest.escShut === false && phGuest.takes === 1 && phGuest.fits && /view only SHARED WITH YOU/i.test(phGuest.text)
       && /View only: this is the owner's sheet for the night, and it follows when they save a new one\./.test(phGuest.text) && phLines(phGuest.text) === phLines(phOwner.text)
-      && phGuestDesk.errs.length === 0 && phGuestDesk.open && phGuestDesk.how === 'guest' && phGuestDesk.controls === 0 && phGuestDesk.escShut === false,
-      'phone, someone the page is shared with: they get the same sheet, marked shared with you, with nothing to press, type or follow and no way past it (Escape leaves it up), on a phone and at a desk alike; the store\'s rule, read by all the page is shared with and written by its owner alone, is declared at the publish',
-      JSON.stringify({ phone: { errs: phGuest.errs, open: phGuest.open, how: phGuest.how, btn: phGuest.btn, controls: phGuest.controls, esc: phGuest.escShut, text: phGuest.text.slice(0, 160) }, desk: { open: phGuestDesk.open, how: phGuestDesk.how, controls: phGuestDesk.controls, esc: phGuestDesk.escShut } }));
+      && phGuestDesk.errs.length === 0 && phGuestDesk.open && phGuestDesk.how === 'guest' && phGuestDesk.controls === 0 && phGuestDesk.escShut === false
+      && phGuest.taps === 8 && phGuest.panel && phGuest.panel.open && phGuest.panel.legs === 2 && phGuest.panel.tiles >= 12 && phGuest.panel.controls === 0 && phGuest.panel.fits && phGuest.panelShut && phGuest.sheetStays
+      && phGuestDesk.panel && phGuestDesk.panel.open && phGuestDesk.panel.controls === 0,
+      'phone, someone the page is shared with: they get the same sheet, marked shared with you, with no button, field or link in it and no way past it (Escape leaves it up), on a phone and at a desk alike; a pick opens the detail behind it for them as it does for the owner, with nothing in the detail to press but Close; the store\'s rule, read by all the page is shared with and written by its owner alone, is declared at the publish',
+      JSON.stringify({ phone: { errs: phGuest.errs, open: phGuest.open, how: phGuest.how, btn: phGuest.btn, controls: phGuest.controls, esc: phGuest.escShut, taps: phGuest.taps, panel: phGuest.panel, panelShut: phGuest.panelShut, sheetStays: phGuest.sheetStays, text: phGuest.text.slice(0, 160) }, desk: { open: phGuestDesk.open, how: phGuestDesk.how, controls: phGuestDesk.controls, esc: phGuestDesk.escShut, panel: phGuestDesk.panel } }));
   chk(phOwnDesk.errs.length === 0 && !phOwnDesk.open && phOwnDesk.calls.length === 0
       && phOwnDesk.hint === '' && phOwner.hint === '' && phGuest.hint === ''
       && phNone.errs.length === 0 && !phNone.open && JSON.stringify(phNone.calls) === JSON.stringify(['use db', 'use user', 'isOwner', 'sub phone/latest'])

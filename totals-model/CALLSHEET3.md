@@ -3417,6 +3417,47 @@ and the record live in the owner's browser and never reach the store, so
 there is nothing of his for them to change. For someone with no account
 the dialog copies the sheet as plain text (`phoneSheetText`).
 
+**The detail behind a pick.** The user, once it worked: "I'd like to be
+able to see the prop cards when I select it so I can see the graphs and
+info too", and then: "if I want to share my picks for the day with
+someone, and have them see the details behind the pick without them
+changing" anything "but able to see from their phone." The phone has no
+props of its own to draw a panel from, and a panel reads more than its
+row (the tells off the record, his other markets' floors, the one bet a
+man). So on the save the computer draws each prop's own panel as it
+stands there (`propsDetailHtml`) for every prop on the sheet: the ones
+marked Taking, the best props, the legs of the tickets and the pairs.
+`phoneClean` parses each in a template, where nothing loads or runs, and
+takes out the buttons, links, fields, images and every attribute but
+class, title and a plain style. `phonePanels` packs the lot as
+`{id: markup}` through `phoneEncode` (deflate, base64) and the document
+carries it beside the sheet: `{v: 3, d, at, sheet, panels}`. Thirty
+panels of about 16,000 characters pack to 49,000; the document was
+56,000 on the night of 10 Nov against the store's 256 KiB. Over 190,000
+packed characters the queue is cut from its least important end (the
+pairs, then the night's tickets, then the best props; what is marked
+Taking goes last) and the dialog says how many of how many fit. A prop
+met first in a pair and then among the takes counts as a take.
+
+A line of the sheet that stands on props keeps their ids, and on the
+phone its card carries a mark and opens the detail over the sheet
+(`phonePanelOpen`): one panel for a prop, the legs one under the other
+for a ticket or a pair, each cleaned again before it is shown. Escape
+shuts the detail, then the sheet, then the dialog. Someone the page is
+shared with opens the detail the same way; nothing in it can be pressed
+but Close. The last-games table's what-happened column asked for 220
+pixels and ran the panel off a phone's side; under 640 pixels it now
+wraps and the table scrolls inside itself if it must.
+
+**The file to send.** For someone with no Claude account the dialog saves
+the sheet as one file (`phoneFileHtml`, through the viewer's own save,
+`downloads`): `super-model-DATE.html`, the page's own style with the
+picks and, folded under each one in a `details`, its detail. It is a
+still copy: no script, button, link, field, handler or outside address,
+so it opens in any phone's browser or preview and there is nothing in it
+to change. About 770,000 characters on the night of 10 Nov, the panels
+repeated under each card that shows them.
+
 **The tickets.** `phonePayload` now carries a ticket marked Taking among
 the takes (its legs, the app, the games, the chance all land, the parlay
 price) and the night's tickets as the tab shows them, up to six, under
@@ -3435,7 +3476,13 @@ for line what `m.html` draws from the code, shut and reopened by a newer
 sheet on one subscription; a guest on a phone and at a desk with no
 control in the sheet; a view with a card asking nothing at load; the
 three lines a phone shows when there is no sheet, and the sheet arriving
-under the first. On the
+under the first; the detail opened from the preview, from the owner's
+phone and from a guest's (the ticket's two legs, the tiles, the levers,
+the last games, every book, no control in it, inside the screen's
+width); and the file, saved through the stand-in, opened with scripts
+off and nothing fetched, a tap opening a pick's detail. With the backup
+of 10 Nov and the limit cut to 20,000 characters, nine of thirty panels
+were kept, the takes among them, and a card without one says so. On the
 published page the database took `phone/config`, gave it back at the
 Viewer's level, and refused a write at the Editor's level with the code
 the page words as "only the page's owner saves the sheet". What only the

@@ -413,6 +413,12 @@
   .pk.t3 .t3top { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 11px 14px; background: var(--t3line); color: var(--band-ink); border: 1.5px solid var(--t3line); border-bottom: 0; border-radius: 12px 12px 0 0; }
   .pk.t3 .t3top .n1 { color: inherit; font-size: 11px; line-height: 1.5; } .pk.t3 .t3top .chip { background: rgba(255, 255, 255, .24); color: inherit; margin-left: 6px; }
   .pk.t3 .t3pay { text-align: right; white-space: nowrap; } .pk.t3 .t3pay b { display: block; font: 800 23px/1 var(--mono); letter-spacing: -.02em; } .pk.t3 .t3pay span { font: 600 10.5px/1.5 var(--mono); opacity: .78; }
+  .pk.t3 .t3apps { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; padding: 8px 14px; background: var(--surface-2); border-left: 1.5px solid var(--t3line); border-right: 1.5px solid var(--t3line); border-bottom: 1px solid var(--rule); }
+  .pk.t3 .t3apl { font: 700 9px/1 var(--sans); letter-spacing: .08em; text-transform: uppercase; color: var(--muted); margin-right: 2px; }
+  .pk.t3 .t3app { font: 700 10.5px/1 var(--sans); letter-spacing: .02em; padding: 5px 9px; border-radius: 999px; border: 1.5px solid var(--rule-firm); background: var(--surface); color: var(--ink-2); cursor: pointer; white-space: nowrap; }
+  .pk.t3 .t3app b { font-family: var(--mono); font-weight: 700; margin-left: 3px; } .pk.t3 .t3app i { font: 500 10px/1 var(--mono); font-style: normal; opacity: .8; margin-left: 2px; } .pk.t3 button.t3app:not(.on):hover { border-color: var(--ink); color: var(--ink); }
+  .pk.t3 .t3app.on { background: var(--band); border-color: var(--band); color: var(--band-ink); cursor: default; } .pk.t3 .t3app.off { opacity: .6; border-style: dashed; cursor: help; }
+  .pk.t3 .t3why { flex-basis: 100%; font-size: 11px; line-height: 1.45; color: var(--muted); }
   .pk.t3 .n2.legs { font: 400 12px/1.4 var(--sans); padding: 2px 14px; background: var(--surface); border-left: 1.5px solid var(--t3line); border-right: 1.5px solid var(--t3line); }
   .pk.t3 .leg { display: grid; gap: 5px; padding: 10px 0 9px; border-bottom: 1px solid var(--rule); cursor: pointer; } .pk.t3 .leg:last-child { border-bottom: 0; } .pk.t3 .leg:hover .lname { text-decoration: underline; }
   .pk.t3 .l1 { display: grid; grid-template-columns: 18px minmax(0, 1fr) auto; align-items: start; column-gap: 7px; font-size: 14.5px; }
@@ -4452,7 +4458,7 @@ smStore.ready.then(function () {
   }
   function propsTreblesLive(dateISO, rowsIn, mode) {
     var rows = (rowsIn || propsSource()).filter(function (r) { return (r.gdate || "") === dateISO; }), pools = {}, usedMan = {}, out = [];
-    PROPS_APPS.forEach(function (app) { pools[app] = rows.map(function (r) { return propT3Leg(r, app, mode); }).filter(Boolean).sort(function (a, b) { return (b.ev - a.ev) || (String(a.r.id) < String(b.r.id) ? -1 : 1); }); });
+    PROPS_APPS.forEach(function (app) { pools[app] = rows.map(function (r) { return propT3Leg(r, app, mode); }).filter(Boolean).sort(propsT3LegSort); });
     while (out.length < PROPS_T3.max) {
       var best = null;
       PROPS_APPS.forEach(function (app) {
@@ -4467,6 +4473,44 @@ smStore.ready.then(function () {
       out.push(best); best.legs.forEach(function (l) { usedMan[l.r.pid] = true; });
     }
     return out;
+  }
+  /* the same three at another app (11 Nov 2026, the user: "it's important that each card for the 3 legs it comes up with is all
+     for the same betting app, or if the same guy can cover his line in two or more betting apps along with 2 other guys as
+     well, that way I can have a mix"): a ticket is always one app. Where the same three men each pass the leg's test at
+     another app's own line and price the card carries a tab for that app and shows the ticket there, Take and Copy acting on
+     the version shown; where all three are posted but one does not pass, the card says which and why. The list, the list kept
+     at grading and the record stay on the app with the most expected value, so a ticket is counted once */
+  var t3View = {};   // the app a ticket is shown at, by its date, men and markets: a view, not kept
+  function propsT3LegSort(a, b) { return (b.ev - a.ev) || (String(a.r.id) < String(b.r.id) ? -1 : 1); }
+  function propsT3Base(t) { return (t.gdate || "") + "|" + t.legs.map(function (l) { return l.r.pid + ":" + l.r.mk; }).sort().join("|"); }
+  function propT3LegWhy(r, app, side) {   // "" when the leg passes at the app's line and price, null when the app does not post it, else why it does not
+    var l = propLegAt(r, app); if (!l) return null;
+    if (!(l.chance - implied(l.price) > 0)) return r.name + " has no edge at " + sgn(l.price, 0) + " there" + (l.same ? "" : ", the line " + l.line);
+    var hr = propHitRate(r, l.line, side);
+    if (hr.n5 < 5 || hr.h5 < PROPS_T3.l5) return r.name + "'s line is " + l.line + " there, " + hr.h5 + " of his last " + hr.n5 + " " + (side === "OVER" ? "over" : "under") + " it";
+    if (hr.n10 < PROPS_T3.n10 || hr.h10 / hr.n10 < PROPS_T3.l10) return r.name + "'s line is " + l.line + " there, " + hr.h10 + " of his last " + hr.n10 + " " + (side === "OVER" ? "over" : "under") + " it";
+    return "";
+  }
+  function propsT3At(t, app) {   // the same three legs at another app, each passing there; null when one does not
+    var legs = [];
+    for (var i = 0; i < t.legs.length; i++) { var l0 = t.legs[i]; if (l0.side !== l0.r.side) return null; var l = propT3Leg(l0.r, app, "t3"); if (!l) return null; legs.push(l); }
+    return propsT3Make(app, legs.sort(propsT3LegSort));
+  }
+  function propsT3Apps(t) {   // the apps that post all three: the ticket there when all three pass, else why not; the ticket's own app among them
+    return PROPS_APPS.map(function (app) {
+      if (app === t.app) return { app: app, t: t };
+      var whys = t.legs.map(function (l) { return l.side === l.r.side ? propT3LegWhy(l.r, app, l.side) : null; });
+      if (whys.some(function (w) { return w === null; })) return null;
+      var alt = propsT3At(t, app);
+      return { app: app, t: alt, why: alt ? "" : (whys.filter(Boolean)[0] || "one of the three does not pass the test there") };
+    }).filter(Boolean);
+  }
+  function propsT3FromId(id) {   // a ticket from its id alone: the app and the three legs, each read at that app as the rows stand
+    var p = String(id).split("|"); if (p.length !== 6 || p[0] !== "t3") return null;
+    var byKey = {}, legs = [];
+    propsSource().forEach(function (r) { if ((r.gdate || "") === p[1]) byKey[r.pid + ":" + r.mk] = r; });
+    for (var i = 3; i < 6; i++) { var r = byKey[p[i]], l = r ? propT3Leg(r, p[2], "t3") : null; if (!l) return null; legs.push(l); }
+    return propsT3Make(p[2], legs.sort(propsT3LegSort));
   }
   /* a ticket kept on the rows: the spec sits on its first leg's row (`t3`), with the app, the three legs' keys and what each read
      at the app (line, price, chance, side), so it rides through a backup, a reload of the props file and the trim, and is graded
@@ -4497,10 +4541,7 @@ smStore.ready.then(function () {
     var kept = propsT3Kept(dateISO, mode);
     return kept.length ? kept : propsTreblesLive(dateISO, rowsIn, mode);
   }
-  function propsT3Find(id) {
-    var d = String(id).split("|")[1] || "", pick = function (l) { return l.filter(function (t) { return t.id === id; })[0]; };
-    return pick(propsT3Stored(d)) || pick(propsTreblesLive(d, null, propsT3Mode())) || pick(propsTreblesLive(d, null, "t3")) || pick(propsTreblesLive(d, null, "t3o")) || pick(propsTreblesLive(d, null, "t3u")) || null;
-  }
+  function propsT3Find(id) { var d = String(id).split("|")[1] || ""; return propsT3Stored(d).filter(function (t) { return t.id === id; })[0] || propsT3FromId(id); }
   function propsT3Freeze(dateISO) {   // at grading: the list as the tab would show it, kept before any result lands; a date with a result already on it is never listed after the fact
     var rows = props.filter(function (r) { return (r.gdate || "") === dateISO; });
     if (!rows.length || rows.some(function (r) { return !!r.result; }) || rows.some(function (r) { return (r.t3 || []).some(function (sp) { return sp.listed; }); })) return 0;
@@ -4579,10 +4620,16 @@ smStore.ready.then(function () {
           tells.map(function (x) { return ' <span class="tell green" title="' + esc(x.words) + '">' + esc(x.label) + '</span>'; }).join("") +
           (lr ? ' <span class="chip ' + lr + '">' + esc(lr.toUpperCase()) + (r.actual !== null && r.actual !== undefined ? ' · ' + esc(String(r.actual)) : '') + '</span>' : '') + '</div></div>';
     };
+    var base = t.primary || t, apps = asTaking ? [] : propsT3Apps(base), offs = apps.filter(function (a) { return !a.t; });
+    var tabs = apps.length < 2 ? '' : '<div class="t3apps"><span class="t3apl">the same three at</span>' + apps.map(function (a) {
+      var cur = a.app === t.app;
+      return a.t ? '<button type="button" class="t3app' + (cur ? ' on' : '') + '" data-t3app="' + a.app + '" data-t3base="' + esc(propsT3Base(base)) + '" aria-pressed="' + (cur ? 'true' : 'false') + '" title="' + (cur ? 'Shown at ' : 'Show this ticket at ') + esc(bookName(a.app)) + ': the same three legs at its own lines and prices, what it pays and the chance all three land there">' + (propsT3Taken(a.t) ? '&#10003; ' : '') + esc(bookName(a.app)) + ' <b>' + sgn(a.t.price, 0) + '</b> <i>' + (a.t.chance * 100).toFixed(1) + '%</i></button>'
+                 : '<span class="t3app off" title="' + esc(a.why) + '">' + esc(bookName(a.app)) + ' <b>&times;</b></span>';
+    }).join("") + (offs.length ? '<span class="t3why">' + offs.map(function (a) { return 'Not at ' + esc(bookName(a.app)) + ': ' + esc(a.why) + '.'; }).join(" ") + '</span>' : '') + '</div>';
     return '<div class="pk t3' + (ok ? ' agrees' : '') + (res ? ' ' + res : '') + (on ? ' taking' : '') + '" data-t3="' + esc(t.id) + '">' +
       '<div class="t3top"><div class="n1">' + (asTaking ? 'TAKING · 3 LEGS' : '3 LEGS #' + (i + 1)) + ' · at ' + esc(bookName(t.app)) + ' · ' + (t.games >= 3 ? 'three games' : t.games === 2 ? 'two games' : 'one game') +
         (res ? ' <span class="chip ' + res + '">' + esc(res.toUpperCase()) + '</span>' : '') + '</div>' +
-        '<div class="t3pay" title="what a unit wins: the product of the three legs\' prices at this app"><b>' + sgn(t.price, 0) + '</b><span>' + t.dec.toFixed(2) + '×</span></div></div>' +
+        '<div class="t3pay" title="what a unit wins: the product of the three legs\' prices at this app"><b>' + sgn(t.price, 0) + '</b><span>' + t.dec.toFixed(2) + '×</span></div></div>' + tabs +
       '<div class="n2 legs">' + t.legs.map(legLine).join("") + '</div>' +
       '<div class="t3foot"><div class="t3stats"><div><span>all three land</span><b>' + (t.chance * 100).toFixed(1) + '%</b></div><div><span>needs</span><b>' + (t.need * 100).toFixed(1) + '%</b></div>' +
         '<div><span>edge</span><b class="' + (ok ? 'pos' : 'neg') + '">' + sgn((t.chance - t.need) * 100, 1) + '</b></div>' +
@@ -5383,8 +5430,9 @@ smStore.ready.then(function () {
     if ($("propsBelow") && $("propsBelow").value !== propsBelow) $("propsBelow").value = propsBelow;
     var t3Mode = propsBelow === "leans" ? "" : propsBelow, t3List = t3Mode ? propsTrebles(date, rows, t3Mode) : [], nBetCards = picks.filter(function (r) { return r.band === "BET"; }).length;
     if (t3Mode) picks = picks.filter(function (r) { return r.band === "BET"; });
-    var t3Kept = t3Mode && t3List.length && t3List[0].spec && t3List[0].spec.listed, t3Graded = rows.some(function (r) { return !!r.result; });
-    var t3Html = !t3Mode ? '' : '<div class="pk-divider t3d">' + (nBetCards ? '' : (tellMode ? 'No BET among these. ' : 'No BET on this date. ')) + '<b>Three-leg tickets below, to test</b>, in the LEANs\' place: three men at one app, each a pick with an edge whose last five games went his way four times or more and his last ten at least half, more levers toward the pick than against and no red chip' + (t3Mode === "t3o" ? ', the overs only' : t3Mode === "t3u" ? ', the unders only' : '') + '. ' + T3_MEASURED +
+    t3List = t3List.map(function (t) { var a = t3View[propsT3Base(t)], alt = a && a !== t.app ? propsT3At(t, a) : null; if (alt) alt.primary = t; return alt || t; });   // the same three at the app chosen on the card
+    var t3Kept = t3Mode && t3List.length && (t3List[0].primary || t3List[0]).spec && (t3List[0].primary || t3List[0]).spec.listed, t3Graded = rows.some(function (r) { return !!r.result; });
+    var t3Html = !t3Mode ? '' : '<div class="pk-divider t3d">' + (nBetCards ? '' : (tellMode ? 'No BET among these. ' : 'No BET on this date. ')) + '<b>Three-leg tickets below, to test</b>, in the LEANs\' place: three men at one app, each a pick with an edge whose last five games went his way four times or more and his last ten at least half, more levers toward the pick than against and no red chip' + (t3Mode === "t3o" ? ', the overs only' : t3Mode === "t3u" ? ', the unders only' : '') + '. A card is one app throughout; where the same three also pass at another app, a tab on the card shows the ticket there. ' + T3_MEASURED +
       (t3Kept ? ' This list was kept before the games and is in the record.' : (t3Graded && t3List.length ? ' Rebuilt from the night\'s rows after the games: for study, not in the record.' : '')) + '</div>' +
       (t3List.length ? '<div class="t3grid">' + t3List.map(function (t, i) { return propsT3Card(t, i); }).join("") + '</div>' : '<div class="empty t3none">' + (rows.length ? 'No three legs on this date pass the test at one app' + (t3Mode === "t3o" ? ' among the overs' : t3Mode === "t3u" ? ' among the unders' : '') + '.' : 'Load a props file and the tickets land here.') + '</div>');
     /* the BET band in front (6 Nov 2026, the user: "for the BET band cards, make that more visible and why"): a BET card carries
@@ -5502,6 +5550,12 @@ smStore.ready.then(function () {
     });
     if ($("propsReset")) $("propsReset").addEventListener("click", function () { propsTableView = Object.assign({}, PROPS_VIEW_DEFAULT); try { smStore.removeItem(PROPS_VIEW_KEY); } catch (e) {} renderProps(); });
     $("propsBest").addEventListener("click", openFrom);
+    $("propsBest").addEventListener("click", function (e) {   // a ticket's app tab (11 Nov 2026): the same three at another app
+      var a = e.target.closest("button[data-t3app]"); if (!a) return;
+      var b = a.getAttribute("data-t3base"), app = a.getAttribute("data-t3app");
+      if (a.classList.contains("on")) return;
+      t3View[b] = app; renderProps();
+    });
     var openPairFrom = function (e) { var t = e.target.closest("[data-pair]"); if (t) { openPairDetail(t.getAttribute("data-pair")); return true; } return false; };
     if ($("propsPairs")) $("propsPairs").addEventListener("click", openPairFrom);
     if ($("propsTaking")) {

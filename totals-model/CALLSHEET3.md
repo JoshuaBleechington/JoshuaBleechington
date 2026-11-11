@@ -3181,6 +3181,31 @@ on the Props tab and on the day board, in the copied text, on "Three-leg
 tickets you took" on the Props record and under What you took. Copy
 ticket puts one ticket in words, to key into the app.
 
+### The same three at another app
+
+The user, on seeing the cards: "it's important that each card for the 3
+legs it comes up with is all for the same betting app. Or if the same
+guy can cover his line in two or more betting apps along with 2 other
+guys as well, that way I can have a mix?"
+
+A card is one app throughout, as built. Where the same three men each
+pass the leg's test at another app's own line and price, the card
+carries a tab for that app under the band, with what the ticket pays and
+the chance all three land there; the tab shows the ticket at that app,
+each leg re-read at its line and price, and Take and Copy act on the
+version shown, so the same three can go in one app or two. Where an app
+posts all three and one does not pass, the app is crossed and the card
+says which man and why: his line there and how many of his last five or
+ten cleared it, or no edge at its price. An app that does not post all
+three is left off.
+
+The list, the list kept at grading and the record stay on the app with
+the most expected value, so a ticket is counted once. A bigger price on
+a tab is a harder line: on 8 Nov the first ticket read +465 at BetMGM
+with 23.5% to land and +724 at FanDuel with 15.2%. On the thirteen
+tickets of 4 to 10 Nov in the user's backup, seven could go in a second
+app and five named an app where one leg failed.
+
 ### The card
 
 A ticket: the app and the price in a band, each leg a line that opens
@@ -3205,4 +3230,8 @@ file loaded again with a pick turned and a line moved, the taken ticket
 unchanged and the list rebuilt; the day board; then the grade, the list
 kept before the results, the taken ticket winning on the side it was
 taken on where the card's row lost, the three record lines, and a
-rebuilt list that stays out of the record.
+rebuilt list that stays out of the record. For the tabs it posts one man
+a point lower at DraftKings at a price with an edge, and reads the two
+cards' tabs, the crossed app and its reason, the first ticket shown at
+DraftKings, the copy and the take there with the tick on its tab, the
+take undone, and the card back at FanDuel.

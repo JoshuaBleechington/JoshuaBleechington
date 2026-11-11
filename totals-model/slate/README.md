@@ -312,9 +312,9 @@ resumable, each stopping at 3,000 credits left:
 | Bat | What it pulls | Credits |
 | --- | --- | --- |
 | **Run NHL period lines.bat** (29 Oct 2026) | `python slate.py odds-periods --sport NHL --season 20252026`: the first-period total and the team totals at the close for every game of a hockey season, from the same endpoint, into `odds-periods-NHL-SEASON.json` beside the hockey ledger (the eight-digit season the ledger uses); the dates come from `nhl-ledger-SEASON.json`. The hockey simulation's first-period calls are measured against it. Type `totals_p1` at the markets prompt for the first period alone | 2025-26, the first period alone: about 13,300; with the team totals about 26,500 |
-| **Run NBA period lines.bat** | `python slate.py odds-periods --season 2025-26`: the first-half, first-quarter and third-quarter totals and the team totals at the close (fifteen minutes before each tip; `--minutes`) for every game of the season from the historical event endpoint, into `odds-periods-NBA-SEASON.json`. A credit a game day to list the games, ten a market a game. The US books only: Pinnacle sits in another region and would double the bill. Type `totals_h1` at the markets prompt for the first half alone | 2025-26, four markets: about 49,000. 2024-25, the first half alone: about 12,300 |
+| **Run NBA period lines.bat** | `python slate.py odds-periods --season 2025-26`: the first-half, first-quarter and third-quarter totals and the team totals at the close (fifteen minutes before each tip; `--minutes`) for every game of the season from the historical event endpoint, into `odds-periods-NBA-SEASON.json`. A credit a game day to list the games, ten a market a game. The US books only: Pinnacle sits in another region and would double the bill. Type `totals_h1` at the markets prompt for the first half alone. From 11 Nov 2026 the line kept for a book is its main one, the pair priced nearest even with that point's own prices, and the game is marked `main`; a file pulled before kept the first point a book listed with the last prices, which is an alternate for a book that lists several (BetRivers, ESPN BET) | 2025-26, four markets: about 49,000. 2024-25, the first half alone: about 12,300 |
 | **Run NBA lines history.bat** | `python slate.py odds-history --sports NBA --season 2025-26 --markets totals,spreads,h2h --times 16:00,22:30`: every book's total, spread and moneyline at noon and 6:30 pm Eastern for every game day, into the same `odds-history-NBA-SEASON.json` the moneyline pull wrote (it adds the opener snapshot and the markets; the spread now rides after the moneylines). Pinnacle included, for the sharp line | about 10,000 a season |
-| **Run NBA gap retest.bat** | `python slate.py nba-gap-retest`: the team-total gap rule held against three numbers on the two seasons (11 Nov 2026), from three files already in the folder (the ledger, the period lines, the lines history; no site is called, no credit spent). Every team-total line with both prices against the number as the backtest had it, the same book's own total and spread, and the middle of the other books', by book and for the three apps, with the price pairs that cannot be one line's marked | `nba-gap-retest.txt`: send it back; it decides whether the gap rule stays scored, is rebuilt against the market, or becomes a watch (NBA.md, "The record counts the calls, and the gap rule under re-test") |
+| **Run NBA gap retest.bat** | `python slate.py nba-gap-retest`: the team-total gap rule held against three numbers on the two seasons (11 Nov 2026), from three files already in the folder (the ledger, the period lines, the lines history; no site is called, no credit spent). Every team-total line with both prices against the number as the backtest had it, the same book's own total and spread, and the middle of the other books', by book and for the three apps, with the price pairs that cannot be one line's marked | `nba-gap-retest.txt`: send it back. Read on 11 Nov 2026 for 2025-26: the edge sat on BetRivers' line alone and that line was an alternate kept with another point's prices, so the rule is a watch (NBA.md, "The team-total edge was the season pull's fault"). The report now says how its lines were kept and which books to read; 2024-25 reads once `nba-ledger-202425.json` is in the folder |
 
 The pulls (26 Oct 2026) ran to late January of each season and measured
 (NBA.md, "The period lines"): the first half is a coin from either view
@@ -326,6 +326,19 @@ below went over 68% and 63%. The Simulation card shows the implied number
 and the gap under each team total and calls the side by the gap rule; the
 record keeps the rule's tally. The odds run brings the team totals, so
 the rule is live on every game the odds run has seen.
+
+Withdrawn 11 Nov 2026. The re-test (`Run NBA gap retest.bat`, the table
+above) found the edge on one book's line alone, BetRivers', and that line
+was not the book's: the period-lines pull kept the first point a book
+listed with the last over and under prices, and BetRivers lists four or
+five team-total points a side. On the books that list one point the call
+is a coin less the price (136-117 at home, 130-123 away at the apps over
+2025-26). The gap is a watch on the page, the simulation's weight on the
+anchored home team total is 0.3 with the others (`nbasim.SHRINK`), and
+the pull keeps a book's main line from here: the pair priced nearest
+even, with that point's own prices (`odds_periods_main`). The files
+pulled before this day keep the old lines; read them on DraftKings,
+FanDuel and BetMGM, which list one point. NBA.md has the tables.
 
 ## The odds feed (The Odds API)
 

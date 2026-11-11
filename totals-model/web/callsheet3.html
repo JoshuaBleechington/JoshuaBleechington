@@ -550,6 +550,8 @@
   .simpanel .simprof { margin-top: 4px; font-size: 11.5px; line-height: 1.5; }
   .simrec { margin-top: 10px; } .simrec .simrecview { font-weight: 700; margin: 8px 0 4px; } .simrec .simrectab td.good { color: var(--go); } .simrec .simrectab td.bad { color: var(--bad); }
   .simpanel .ttgap { margin-top: 3px; font: 11.5px/1.5 var(--sans); } .simchip.gaprule { font-size: 11px; }
+  /* the gap as a watch (11 Nov 2026): a dashed outline, not a band's fill, so it never reads as a LEAN or a BET */
+  .simchip.simwatch { background: transparent; border: 1px dashed var(--edge); color: var(--edge); padding: 0 6px; }
   /* the Props tab's own Is it working block, in colour (22 Oct 2026) */
   #propsCalib .calib > div.good { box-shadow: inset 3px 0 0 var(--go); } #propsCalib .calib > div.bad { box-shadow: inset 3px 0 0 var(--bad); }
   #propsCalib .calib > div.good .v, #propsCalib .calib > div.good .units { color: var(--go); } #propsCalib .calib > div.bad .v, #propsCalib .calib > div.bad .units { color: var(--bad); }
@@ -2625,7 +2627,7 @@ smStore.ready.then(function () {
      the simulation, refs, lineups, Kalshi, the board, the middles, the context be a little more of the forefront"). The
      sheet's own pick stays grey on most NBA rows because the close already carries what its inputs know; the calls that do
      fire live in the engines down the card. This strip gathers every one of them at the top of the matchup rail: the pick
-     and #1's verdict, the upset signal, Pinnacle's shade, the agreement rule, the simulation's bands, the gap rule, the
+     and #1's verdict, the upset signal, Pinnacle's shade, the agreement rule, the simulation's bands, the gap watch, the
      middles, the crew's lean, the crowd on Kalshi and who is out. Green when a scored rule fires, gold for a watch, the
      exchange in its own colour, each chip a link to its section; the jump bar's dots and the sections' live lines read
      off the same list. Shown: it adds no number and takes nothing ---- */
@@ -2662,7 +2664,7 @@ smStore.ready.then(function () {
     }
     [["away_tt", away], ["home_tt", home]].forEach(function (t) {
       var tt = lines[t[0]]; if (!tt || !tt.rule || !tt.rule.call) return;
-      out.push(signalChip("go", "secSim", "gap rule", "<b>" + esc(t[1]) + " team total " + tt.rule.call + " " + esc(String(tt.line)) + "</b> · gap " + (tt.rule.gap > 0 ? "+" : "") + tt.rule.gap));
+      out.push(signalChip("watch", "secSim", "gap watch", "<b>" + esc(t[1]) + " team total " + tt.rule.call + " " + esc(String(tt.line)) + "</b> · gap " + (tt.rule.gap > 0 ? "+" : "") + tt.rule.gap + " · not scored"));   // gold from 11 Nov 2026: the two-season edge was a fault in the season pull
     });
     try {
       var W = row ? nbaMiddleWatch(row) : [], paying = W.filter(function (x) { return x.m.pays; })[0];
@@ -2718,7 +2720,7 @@ smStore.ready.then(function () {
       el.hidden = false;
       el.innerHTML = '<div class="sighead">Tonight\'s signals <span class="tag">every engine\'s call on this row · green fires, gold watches, purple the crowd</span></div>' +
         (list.length ? list.map(function (s) { return '<a class="sig ' + s.cls + '" href="#' + s.go + '"><span class="sb">' + esc(s.badge) + '</span><span class="st">' + s.html + '</span></a>'; }).join("")   // two flex items: the badge, then the words as one span, so the gap never splits a sentence
-                     : '<span class="quiet">Nothing fires on this row tonight: the sheet\'s pick, the simulation, the agreement rule, the gap rule, the middles and the watches all sit inside their lines.</span>');
+                     : '<span class="quiet">Nothing fires on this row tonight: the sheet\'s pick, the simulation, the agreement rule, the middles and the watches all sit inside their lines.</span>');
     }
     list.forEach(function (s) { if (live[s.go]) live[s.go].push(s); });
     Object.keys(live).forEach(function (id) {
@@ -3202,8 +3204,21 @@ smStore.ready.then(function () {
   /* the worth (26 Oct 2026): the team totals' shrink depends on the view and the side (nbasim.SHRINK); a row stored before
      the split lacks the new keys, so the measured defaults stand in. The band is read off the WORTH, not the raw chance,
      so a 71% that is worth 56% reads as no call and a 57% worth 61% reads LEAN: the replay's answer, not the sim's say-so */
-  var NBA_SIM_SHRINK_DEFAULT = { team: 1.5, team_away: 0.3, team_own: 0.3 };
-  function nbaSimWorth(p, kind, shrink) { var k = (shrink || {})[kind]; if (k === undefined || k === null) k = NBA_SIM_SHRINK_DEFAULT[kind]; if (k === undefined || k === null) k = 1; return Math.max(0, Math.min(1, 0.5 + (p - 0.5) * k)); }
+  /* The home side's boost withdrawn (11 Nov 2026). The anchored home team total carried 1.5: the replay had its calls
+     landing 60.7% and 59.0% over two seasons. The lines it was replayed on were not the book's. The season pull kept one
+     line a book as the FIRST point listed with the LAST over and under prices, and the one book it read in 2025-26 was
+     BetRivers on 673 of 674 games, which lists four or five team-total points a side. This season's rows keep every point,
+     so the fault can be replayed on them: the point that pull would have kept is BetRivers' main line on three sides in
+     ten and one or two points off it on the rest, a "gap" of a point or more shows on 63% of sides where the main line
+     shows one on 2%, and the call on the kept point lands 111-77 (59.0%), +23.0 units at the prices kept beside it and
+     +0.9 at the point's own. So the boost measured the fault, not the sim: an alternate's number at another line's price.
+     The home side reads at the 0.3 of its two siblings on every row, whatever shrink the slate stored with it
+     (NBA_SIM_SHRINK_RULES), and the record keeps what the boost would have called as a watch, so the place can be earned
+     back on lines that are the book's. The gap rule below went the same way for the same reason */
+  var NBA_SIM_SHRINK_DEFAULT = { team: 0.3, team_away: 0.3, team_own: 0.3 };
+  var NBA_SIM_SHRINK_RULES = { team: 0.3 };   // the page's word over the row's: every slate written before 11 Nov 2026 stored 1.5
+  var NBA_SIM_TEAM_WAS = 1.5;                 // the withdrawn boost, kept to tally what it would have called
+  function nbaSimWorth(p, kind, shrink) { var k = NBA_SIM_SHRINK_RULES[kind]; if (k === undefined || k === null) k = (shrink || {})[kind]; if (k === undefined || k === null) k = NBA_SIM_SHRINK_DEFAULT[kind]; if (k === undefined || k === null) k = 1; return Math.max(0, Math.min(1, 0.5 + (p - 0.5) * k)); }
   function nbaSimTeamKind(view, key) { return view === "own" ? "team_own" : key === "away_total" ? "team_away" : "team"; }
   /* every call the row's lines allow, from one view's histograms: {key, view, label, line, side, p, worth, band, push} */
   function nbaSimCalls(sim, lines, view) {
@@ -3225,7 +3240,9 @@ smStore.ready.then(function () {
   /* the team totals (26 Oct 2026): the book's main line on each side from the row's odds JSON (the carded book first, the
      point whose two prices sit closest together; the shop also lists the alternates). The replay of 588 games of 2025-26
      found the book's team-total line sitting off the number the game's total and spread imply, and the anchored sim's call
-     landing 60.7% at home and 53.9% away, so these two get their own rows and their own record */
+     landing 60.7% at home and 53.9% away, so these two get their own rows and their own record. That replay's lines were
+     not the book's (11 Nov 2026, the note above NBA_SIM_SHRINK_RULES): the rows and the record stay, the edge does not.
+     This picker is the guard the season pull lacked: of the points a book lists, the one priced nearest even */
   function nbaTeamTotalLine(oddsRaw, side) {
     var o = null;
     try { o = oddsRaw ? JSON.parse(oddsRaw) : null; } catch (e) { o = null; }
@@ -3263,14 +3280,19 @@ smStore.ready.then(function () {
      (169 and 247 games), a point or more BELOW went over 68.1% and 63.1% (94 and 195); the away side 55.4% / 56.8% and
      57.1% / 56.5%; the slope of the over's chance on the gap -0.080 and -0.057 a point at home (t -5.1, -5.7), -0.036 and
      -0.030 away (t -2.4, -2.8). Scored: a gap of a point or more is a call, and the record keeps it from the first night */
-  /* Under re-test from 11 Nov 2026. The backtest took the game's total and spread from KillerSports' close and the team total
-     from one book's line fifteen minutes before tip (Fanatics, else the first book by name), and a gap of a point or more
-     showed on 66% of games; on this season's rows a book's team total against that book's own total and spread shows one on
-     about 10% of lines, and the call reads 20-18 at home and 27-28 away at the three apps (the page's own tally, one book a
-     row, 7-6 and 4-8). So the two-season edge may be two sources disagreeing, not a book failing to reconcile its own
-     numbers. slate.py nba-gap-retest (Run NBA gap retest.bat) holds every team-total line of both seasons against the
-     backtest's number, the same book's and the other books' middle, and its file decides: scored as it is, rebuilt against
-     the market, or a watch. Nothing is changed here until that file is read */
+  /* A watch from 11 Nov 2026, shown and not scored. The re-test (slate.py nba-gap-retest, the user's file of 674 games of
+     2025-26) held every team-total line against three numbers. As the backtest had it the call went 278-177 at home
+     (61.1%, t -5.2 on the gap), and every one of those lines but two was BetRivers'. BetRivers against its OWN total and
+     spread: 177-107 (62.3%), a gap of a point or more on 73% of lines, sd 1.95. DraftKings, ESPN BET and FanDuel against
+     theirs: 114-96, 164-150 and 72-62 at home, 100-102, 178-164 and 65-65 away, a gap on 20 to 47% of lines, sd 0.8 to 0.9,
+     no slope above t 1.3. One call a game at the apps (FanDuel, DraftKings, BetMGM): 136-117 at home (53.8%, +3.4 units)
+     and 130-123 away (-7.7) against the book's own number, 104-93 (-1.2) and 103-97 (-5.9) against the other books'
+     middle. So the edge was one book's line, and that line was not the book's: the season pull kept the first point
+     BetRivers listed with another point's prices (the note above NBA_SIM_SHRINK_RULES has the replay of the fault on this
+     season's rows, where the call on the kept point is worth +23.0 units at the kept prices and +0.9 at its own). On the
+     books' own lines the gap is a coin less the price. The number, the gap and the side still show on the Simulation
+     card, the signal is gold, the Take button stays, and the record keeps counting both sides: a book that hangs a line
+     a point off its own numbers can still earn the rule back */
   var NBA_TT_GAP = 1.0;
   function nbaTeamTotalGap(tt, total, sp, side) {
     if (!tt || total === null || total === undefined || sp === null || sp === undefined || isNaN(+total) || isNaN(+sp)) return null;
@@ -3339,7 +3361,7 @@ smStore.ready.then(function () {
           first += ' <span class="dim">' + esc(tt.book) + ' ' + (tt.op > 0 ? '+' : '') + tt.op + '/' + (tt.up > 0 ? '+' : '') + tt.up + '</span></div>';
           if (tt.rule) {
             first += '<div class="ttgap">implied <b>' + tt.rule.implied + '</b>, gap <b>' + (tt.rule.gap > 0 ? '+' : '') + tt.rule.gap + '</b> · ' +
-                     (tt.rule.call ? '<span class="simchip simbet gaprule"><b>' + tt.rule.call + '</b> by the gap rule</span> ' + nbaSimTakeBtn(takeRow, "gap", m[0], tt.rule.call) : '<span class="dim">inside a point, no call</span>') + '</div>';
+                     (tt.rule.call ? '<span class="simchip simwatch gaprule"><b>' + tt.rule.call + '</b> by the gap</span> <span class="dim">a watch, not scored</span> ' + nbaSimTakeBtn(takeRow, "gap", m[0], tt.rule.call) : '<span class="dim">inside a point</span>') + '</div>';
           }
           var kk = typeof kalshiOf === "function" ? kalshiOf(($("nbakalshi") || {}).value || "") : null, kl = kk ? kalshiTTLine(kk, m[0], +m[2], tt.op, tt.up) : "";   // the crowd on Kalshi beside the gap rule (4 Nov 2026)
           if (kl) first += '<div class="ttgap kal">' + kl + '</div>';
@@ -3469,7 +3491,7 @@ smStore.ready.then(function () {
     // mark it as the card shows it now: the call from the form's own runs and lines
     var sim = nbaSim(), lines = nbaSimLinesFromForm(), f = readNba();
     var tt = key === "away_total" ? lines.away_tt : key === "home_total" ? lines.home_tt : null, c = null;
-    if (view === "gap") { if (tt && tt.rule && tt.rule.call === side) c = { line: tt.line, p: null, worth: null, band: "gap rule" }; }
+    if (view === "gap") { if (tt && tt.rule && tt.rule.call === side) c = { line: tt.line, p: null, worth: null, band: "gap watch" }; }
     else if (view === "agree") {   // the agreement rule (28 Oct 2026): read off the ROW, so the board's card takes it whatever game the form holds
       var V = nbaVoices(row);
       if (V && V.fires && V.side === side && key === "total") c = { line: V.line, p: side === "OVER" ? V.sim.p : 1 - V.sim.p, worth: null, band: "agreement" };
@@ -3512,7 +3534,7 @@ smStore.ready.then(function () {
     if (t.key === "home_total") return cmp(fh, +t.line, t.side === "OVER");
     return null;
   }
-  function nbaSimTakeViewLabel(view) { return view === "own" ? "the sim's own view" : view === "mkt" ? "anchored to the market" : view === "agree" ? "the agreement rule, the sim and the crew" : view === "middle" ? "the middle's second leg" : view === "window" ? "the window, one ticket (anchored to the market)" : "the gap rule"; }
+  function nbaSimTakeViewLabel(view) { return view === "own" ? "the sim's own view" : view === "mkt" ? "anchored to the market" : view === "agree" ? "the agreement rule, the sim and the crew" : view === "middle" ? "the middle's second leg" : view === "window" ? "the window, one ticket (anchored to the market)" : "the gap, a watch"; }
   /* the record: every graded NBA row's sim calls at LEAN or better, says against does by view, market and band */
   function nbaSimUnits(price, win) { var p = +price; if (!p || isNaN(p)) p = -110; return win ? (p > 0 ? p / 100 : 100 / -p) : -1; }
   function nbaSimRecordHtml() {
@@ -3520,6 +3542,7 @@ smStore.ready.then(function () {
     if (!rows.length) return '';
     var T = {}, n = 0, G = { HOME: { n: 0, w: 0, units: 0 }, AWAY: { n: 0, w: 0, units: 0 } }, gn = 0;
     var A = { 2: { n: 0, w: 0, units: 0 }, 3: { n: 0, w: 0, units: 0 } }, an = 0;   // the agreement rule's own tally (28 Oct 2026)
+    var B = { n: 0, w: 0, says: 0, units: 0 };   // the withdrawn boost (11 Nov 2026): what the anchored home team total would have called at 1.5 and no longer does
     var M = { n: 0, both: 0, half: 0, split: 0, units: 0, first: 0, says: 0 };   // the middles (28 Oct 2026): the pair graded together, and the first leg alone
     var Wd = { n: 0, w: 0, p: 0, says: 0, units: 0 };   // the windows (29 Oct 2026): one ticket, inside or out
     rows.forEach(function (r) {
@@ -3546,7 +3569,7 @@ smStore.ready.then(function () {
         var wonA = (fa + fh > V.line) === (V.side === "OVER"), dA = A[V.count === 3 ? 3 : 2];
         dA.n++; dA.w += wonA ? 1 : 0; dA.units += nbaSimUnits(V.side === "OVER" ? r.inputs.op : r.inputs.up, wonA); an++;
       }
-      // the gap rule's own tally
+      // the gap's own tally: a watch from 11 Nov 2026, counted as it always was
       [["AWAY", lines.away_tt, fa], ["HOME", lines.home_tt, fh]].forEach(function (x) {
         var tt = x[1];
         if (!tt || !tt.rule || !tt.rule.call || x[2] === tt.line) return;
@@ -3555,6 +3578,11 @@ smStore.ready.then(function () {
       });
       ["own", "mkt"].forEach(function (view) {
         nbaSimCalls(sim, lines, view).forEach(function (c) {
+          if (view === "mkt" && c.key === "home_total" && c.band === "no call" && lines.home_tt && fh !== c.line &&
+              nbaSimBand(Math.max(0, Math.min(1, 0.5 + (c.p - 0.5) * NBA_SIM_TEAM_WAS)), sim.bands) !== "no call") {
+            var wonB = (fh > c.line) === (c.side === "OVER");
+            B.n++; B.w += wonB ? 1 : 0; B.says += c.p; B.units += nbaSimUnits(c.side === "OVER" ? lines.home_tt.op : lines.home_tt.up, wonB);
+          }
           if (c.band === "no call") return;
           var won = null, price = -110;
           if (c.key === "total") { if (fa + fh === c.line) return; won = (fa + fh > c.line) === (c.side === "OVER"); price = c.side === "OVER" ? r.inputs.op : r.inputs.up; }
@@ -3573,7 +3601,7 @@ smStore.ready.then(function () {
         });
       });
     });
-    if (!n && !gn && !an && !M.n && !Wd.n && !Wd.p) return '';
+    if (!n && !gn && !an && !B.n && !M.n && !Wd.n && !Wd.p) return '';
     var order = { total: 0, h1: 1, spread: 2, ml: 3, away_total: 4, home_total: 5 }, bandOrder = { STRONG: 0, BET: 1, LEAN: 2 },
         label = { total: "Total", h1: "First half", spread: "Spread", ml: "Moneyline", away_total: "Away team total", home_total: "Home team total" };
     var h = '<div class="simrec"><div class="calibhead">SIMULATION · says against does, every call at LEAN or better</div>';
@@ -3588,14 +3616,19 @@ smStore.ready.then(function () {
       h += '</tbody></table>';
     });
     if (gn) {
-      h += '<div class="simrecview">The team-total gap rule <span class="tag">the book\'s line a point or more off the number the game\'s total and spread imply · scored, two seasons · under re-test from 11 Nov 2026: the backtest held one book\'s line against another source\'s closing total and spread, where a gap of a point or more showed on two games in three; a book against its own numbers shows one on one line in ten, and this season that reads 20-18 at home and 27-28 away at the three apps. Run NBA gap retest.bat holds the two seasons to the same test and decides whether the rule stays scored</span></div><table class="form simrectab gaptab"><thead><tr><th>Side</th><th>Record</th><th>Does</th><th>Units</th><th>Two seasons said</th></tr></thead><tbody>';
-      [["HOME", "62% under above the number, 66% over below (169 and 247, 94 and 195 games)"], ["AWAY", "56% under above, 57% over below"]].forEach(function (x) {
+      h += '<div class="simrecview">The team-total gap, a watch <span class="tag">the book\'s line a point or more off the number the game\'s total and spread imply · shown, not scored, from 11 Nov 2026 · the two seasons behind the rule read one book\'s line, and the season pull had kept that book\'s alternate points with another point\'s prices: 61% on those, a coin less the price on the books\' own lines</span></div><table class="form simrectab gaptab"><thead><tr><th>Side</th><th>Record</th><th>Does</th><th>Units</th><th>The re-test said, 2025-26</th></tr></thead><tbody>';
+      [["HOME", "136-117 (53.8%), +3.4u at the apps against the book\'s own number; 104-93, −1.2u against the other books\'"], ["AWAY", "130-123 (51.4%), −7.7u; 103-97, −5.9u"]].forEach(function (x) {
         var d = G[x[0]];
         if (!d.n) return;
         var cls = d.units > 0 ? "good" : d.units < 0 ? "bad" : "";
         h += '<tr><td>' + (x[0] === "HOME" ? "Home team total" : "Away team total") + '</td><td>' + d.w + '-' + (d.n - d.w) + '</td><td class="' + cls + '">' + (100 * d.w / d.n).toFixed(1) + '%</td><td class="' + cls + '">' + (d.units >= 0 ? '+' : '') + d.units.toFixed(1) + 'u</td><td class="dim">' + x[1] + '</td></tr>';
       });
       h += '</tbody></table>';
+    }
+    if (B.n) {
+      var bcls = B.units > 0 ? "good" : B.units < 0 ? "bad" : "";
+      h += '<div class="simrecview">The anchored home team total at its old weight, a watch <span class="tag">the sim\'s chance times 1.5, the weight the same replay gave it · withdrawn 11 Nov 2026 with the gap rule: it reads at 0.3 now, like the away side, and calls nothing here until a replay on the books\' own lines says otherwise</span></div><table class="form simrectab boosttab"><thead><tr><th>Calls it would have made</th><th>Record</th><th>Says</th><th>Does</th><th>Units</th></tr></thead><tbody>' +
+           '<tr><td>' + B.n + '</td><td>' + B.w + '-' + (B.n - B.w) + '</td><td>' + (100 * B.says / B.n).toFixed(1) + '%</td><td class="' + bcls + '">' + (100 * B.w / B.n).toFixed(1) + '%</td><td class="' + bcls + '">' + (B.units >= 0 ? '+' : '') + B.units.toFixed(1) + 'u</td></tr></tbody></table>';
     }
     if (an) {
       h += '<div class="simrecview">The agreement rule on the total <span class="tag">' + esc(NBA_AGREE_TAG) + ' · scored, BET</span></div><table class="form simrectab agreetab"><thead><tr><th>Voices</th><th>Record</th><th>Does</th><th>Units</th><th>Two seasons said</th></tr></thead><tbody>';
@@ -3617,7 +3650,7 @@ smStore.ready.then(function () {
       h += '<div class="simrecview">Windows on the total <span class="tag">one ticket, over the low number and under the high; the chance is the anchored sim\'s mass inside the window</span></div><table class="form simrectab"><thead><tr><th>Tickets</th><th>Record</th><th>Says</th><th>Does</th><th>Units</th></tr></thead><tbody>' +
            '<tr><td>' + (Wd.n + Wd.p) + (Wd.p ? ' (' + Wd.p + ' on a number)' : '') + '</td><td>' + Wd.w + '-' + (Wd.n - Wd.w) + '</td><td>' + (Wd.n ? (100 * Wd.says / Wd.n).toFixed(1) + '%' : '—') + '</td><td class="' + wcls + '">' + (Wd.n ? (100 * Wd.w / Wd.n).toFixed(1) + '%' : '—') + '</td><td class="' + wcls + '">' + (Wd.units >= 0 ? '+' : '') + Wd.units.toFixed(2) + 'u</td></tr></tbody></table>';
     }
-    h += '<div class="note dim">A call is the sim\'s side on the line the row carried whose WORTH (the chance shrunk by what the replay found) reads LEAN (60%) or better; "says" is the sim\'s own chance, "does" the share that landed. The replays: the own view\'s total and spread calls land at 50% whatever they say (the close already carries the ratings), its win chances within 3 points of true; the first half is a coin from either view over two seasons. The team totals are the one inefficiency: the book\'s line sits off the number the game\'s own total and spread imply, the gap rule reads it (a point or more, scored over two seasons), and the anchored sim\'s calls carry the same lean with the shape on top.</div></div>';
+    h += '<div class="note dim">A call is the sim\'s side on the line the row carried whose WORTH (the chance shrunk by what the replay found) reads LEAN (60%) or better; "says" is the sim\'s own chance, "does" the share that landed. The replays: the own view\'s total and spread calls land at 50% whatever they say (the close already carries the ratings), its win chances within 3 points of true; the first half is a coin from either view over two seasons. The team totals were scored until 11 Nov 2026 on a replay whose lines were not the book\'s: the season pull had kept, for the one book it read, an alternate point with another point\'s prices. On the books\' own lines the gap between a team total and the number the game\'s total and spread imply reads a coin less the price, so the gap and the anchored home team total are watches now, counted above and scored nowhere.</div></div>';
     return h;
   }
 
@@ -8243,10 +8276,9 @@ var qrcode = function() {
           P.sim.push({ g: r.matchup, p: nbaSimPickText(c.key, c.side, c.line, r.away, r.home), v: view === "own" ? "own view" : "anchored", c: phoneChance(c.p), w: phoneChance(c.worth), b: c.band });
         });
       });
-      [["AWAY", lines.away_tt, r.away], ["HOME", lines.home_tt, r.home]].forEach(function (x) {
-        var tt = x[1]; if (!tt || !tt.rule || !tt.rule.call) return;
-        P.sim.push({ g: r.matchup, p: x[2] + " team total " + tt.rule.call + " " + tt.line, v: "gap rule", g2: tt.rule.gap, b: "gap rule" });
-      });
+      // the gap rode in this list as a call until 11 Nov 2026. It is a watch now (the two seasons behind it read a line the season
+      // pull had kept wrong), and this list is the calls at BET or better, so the phone does not carry it. m.html still reads an
+      // old code's "gap rule" entries
     });
     return P;
   }
@@ -10565,7 +10597,7 @@ var qrcode = function() {
         nbactx: "[{\"side\":\"home\",\"k\":\"ratings_faded\",\"s\":\"faded\",\"t\":\"Knicks score 118.0 per 100 possessions, 3rd best in the league (16 games).\",\"tag\":\"faded: the market over-moves with early-season ratings, so the projection's lean goes on the line at \\u22120.25 a point until fifty games, tagged\"},{\"side\":\"home\",\"k\":\"ratings_faded\",\"s\":\"faded\",\"t\":\"Knicks allow 109.0 per 100 possessions, 4th best in the league (16 games).\",\"tag\":\"faded: the market over-moves with early-season ratings, so the projection's lean goes on the line at \\u22120.25 a point until fifty games, tagged\"},{\"side\":\"away\",\"k\":\"ratings_faded\",\"s\":\"faded\",\"t\":\"76ers allow 115.0 per 100 possessions, 6th worst in the league (15 games).\",\"tag\":\"faded: the market over-moves with early-season ratings, so the projection's lean goes on the line at \\u22120.25 a point until fifty games, tagged\"},{\"side\":\"home\",\"k\":\"pace\",\"s\":\"shown\",\"t\":\"Knicks play at 98.0 possessions a game, 5th slowest in the league.\",\"tag\":\"shown, not scored: pace alone measured null against the close; it feeds the projection\"},{\"side\":\"home\",\"k\":\"record\",\"s\":\"shown\",\"t\":\"Knicks are 7-1 at home.\",\"tag\":\"shown, not scored: the spread is priced against the box score\"},{\"side\":\"game\",\"k\":\"move\",\"s\":\"shown\",\"t\":\"DraftKings: the total opened 229.5 and sits 231.5, up 2; Knicks opened -3.5 and sit -5.5.\",\"tag\":\"shown, not scored: the current line is the anchor and the move is already inside it\"},{\"side\":\"home\",\"k\":\"rest\",\"s\":\"label\",\"t\":\"Knicks on a back to back.\",\"tag\":\"a label: rest measured inside the number against two seasons of closes\"},{\"side\":\"away\",\"k\":\"out\",\"s\":\"shown\",\"t\":\"76ers without Joel Embiid: 32 minutes a game of regulars.\",\"tag\":\"shown, not scored: announced absences are in the close; the card measures the late ones\"},{\"side\":\"home\",\"k\":\"out\",\"s\":\"shown\",\"t\":\"Knicks without Mitchell Robinson: 22 minutes a game of regulars.\",\"tag\":\"shown, not scored: announced absences are in the close; the card measures the late ones\"}]",
         nbalineup: "{\"away\":{\"status\":\"expected\",\"five\":[[\"PG\",\"Tyrese Maxey\"],[\"SG\",\"VJ Edgecombe\"],[\"SF\",\"Paul George\"],[\"PF\",\"Kelly Oubre Jr.\"],[\"C\",\"Adem Bona\"]],\"maybe\":[[\"G\",\"Anfernee Simons\",\"Ques\"],[\"F\",\"Dominick Barlow\",\"GTD\"],[\"C\",\"Joel Embiid\",\"Out\"]]},\"home\":{\"status\":\"confirmed\",\"five\":[[\"PG\",\"Jalen Brunson\"],[\"SG\",\"Mikal Bridges\"],[\"SF\",\"Josh Hart\"],[\"PF\",\"OG Anunoby\"],[\"C\",\"Karl-Anthony Towns\"]],\"maybe\":[[\"C\",\"Mitchell Robinson\",\"Out\"]]},\"src\":\"RotoWire\"}",
         nbaform: "{\"away\":[{\"date\":\"2026-10-30\",\"opp\":\"Celtics\",\"home\":false,\"pf\":104,\"pa\":112,\"h1f\":51,\"h1a\":58,\"end\":\"REG\",\"ctot\":221.5,\"ch1\":110.5,\"csp\":-6.5},{\"date\":\"2026-11-01\",\"opp\":\"Hornets\",\"home\":true,\"pf\":118,\"pa\":109,\"h1f\":60,\"h1a\":52,\"end\":\"REG\",\"ctot\":224.0,\"ch1\":112.0,\"csp\":-7.5},{\"date\":\"2026-11-03\",\"opp\":\"Bulls\",\"home\":true,\"pf\":112,\"pa\":115,\"h1f\":55,\"h1a\":57,\"end\":\"OT\",\"ctot\":226.5,\"ch1\":113.0,\"csp\":-4.0},{\"date\":\"2026-11-05\",\"opp\":\"Heat\",\"home\":false,\"pf\":99,\"pa\":101,\"h1f\":48,\"h1a\":50,\"end\":\"REG\",\"ctot\":null,\"ch1\":null,\"csp\":null},{\"date\":\"2026-11-08\",\"opp\":\"Magic\",\"home\":true,\"pf\":121,\"pa\":108,\"h1f\":63,\"h1a\":49,\"end\":\"REG\",\"ctot\":219.5,\"ch1\":109.5,\"csp\":-3.5}],\"home\":[{\"date\":\"2026-10-31\",\"opp\":\"Nets\",\"home\":true,\"pf\":124,\"pa\":106,\"h1f\":64,\"h1a\":50,\"end\":\"REG\",\"ctot\":228.5,\"ch1\":114.5,\"csp\":-9.5},{\"date\":\"2026-11-02\",\"opp\":\"Bucks\",\"home\":false,\"pf\":110,\"pa\":117,\"h1f\":52,\"h1a\":61,\"end\":\"REG\",\"ctot\":230.0,\"ch1\":115.0,\"csp\":-2.5},{\"date\":\"2026-11-04\",\"opp\":\"Pacers\",\"home\":true,\"pf\":131,\"pa\":120,\"h1f\":68,\"h1a\":59,\"end\":\"REG\",\"ctot\":235.5,\"ch1\":118.0,\"csp\":-5.5},{\"date\":\"2026-11-06\",\"opp\":\"Cavaliers\",\"home\":false,\"pf\":103,\"pa\":98,\"h1f\":49,\"h1a\":47,\"end\":\"REG\",\"ctot\":222.0,\"ch1\":111.5,\"csp\":3.0},{\"date\":\"2026-11-09\",\"opp\":\"Raptors\",\"home\":true,\"pf\":115,\"pa\":100,\"h1f\":57,\"h1a\":46,\"end\":\"REG\",\"ctot\":225.0,\"ch1\":112.5,\"csp\":-8.0}]}",
-        nbasim: "{\"v\":2,\"runs\":3000,\"own\":{\"total\":{\"lo\":164,\"c\":[1,0,1,0,1,0,3,1,2,4,4,5,3,8,5,7,12,8,5,13,7,14,16,19,19,20,19,26,27,27,34,34,22,36,38,39,53,51,42,60,49,58,69,63,53,70,51,75,79,70,71,77,60,58,81,83,78,63,62,61,58,53,44,57,56,57,40,60,45,43,37,36,43,36,33,29,26,26,18,16,25,17,9,18,7,8,9,14,4,3,5,9,7,4,3,2,2,3,1,2,0,1,0,1,1,2,0,1,0,4,3,1,0,0,0,0,0,1,0,0,1,1,0,0,0,0,0,0,0,0,0,1]},\"h1\":{\"lo\":67,\"c\":[1,0,0,0,0,0,1,1,0,2,2,2,2,3,5,11,7,7,9,15,13,14,22,16,28,27,40,48,45,53,57,63,72,71,82,88,71,89,83,93,84,111,93,118,112,89,114,88,97,83,94,71,73,80,56,57,56,55,49,32,30,30,28,26,19,12,18,10,15,9,9,3,12,3,4,1,4,3,2,2,4,1]},\"h2\":{\"lo\":70,\"c\":[1,2,1,0,2,0,8,1,9,8,6,12,16,13,14,23,25,37,32,36,42,49,50,54,51,86,72,75,76,84,105,99,110,109,113,113,99,97,121,99,85,80,93,72,70,71,72,52,60,53,41,40,43,30,30,23,22,25,20,15,11,9,9,7,6,1,2,3,3,1,0,0,1]},\"q\":[{\"lo\":29,\"c\":[2,2,3,6,4,3,4,11,15,12,21,18,39,40,46,60,56,89,67,95,119,109,136,138,125,132,143,141,151,108,124,120,123,100,107,96,73,66,55,56,38,44,25,10,14,9,12,12,5,3,3,3,0,2,2,2,1]},{\"lo\":28,\"c\":[1,0,2,7,2,3,11,9,9,16,15,33,36,38,28,63,75,61,93,100,91,119,140,125,114,158,143,157,177,122,125,124,120,100,95,66,72,65,59,35,51,35,26,23,10,10,11,10,5,2,2,5,0,0,1]},{\"lo\":28,\"c\":[2,0,1,2,5,5,5,7,10,9,14,13,31,34,46,58,62,60,73,97,80,110,148,116,138,149,128,143,156,136,134,137,126,119,93,85,84,69,52,52,46,50,29,19,15,14,9,10,6,4,3,4,1,1]},{\"lo\":24,\"c\":[2,0,2,1,1,2,5,6,9,13,17,19,35,45,63,44,59,75,86,104,125,126,129,143,146,139,151,131,140,133,137,133,114,105,96,83,81,55,43,53,39,20,25,15,21,7,6,6,3,1,1,3,2]}],\"margin\":{\"lo\":-44,\"c\":[1,1,0,0,0,0,0,0,1,0,0,0,0,1,0,0,0,2,4,2,4,3,8,8,12,10,7,19,17,21,24,20,26,24,38,38,43,57,55,46,52,73,79,52,0,87,92,93,80,107,113,106,87,87,99,98,94,97,78,90,74,64,64,71,60,59,51,42,48,50,36,33,20,32,15,14,15,14,11,8,6,11,11,6,7,2,3,3,5,2,2,1,2,1,0,0,0,0,0,1]},\"away\":{\"lo\":68,\"c\":[1,0,2,0,1,0,2,0,5,10,6,8,10,10,14,15,14,34,35,41,35,47,44,44,62,62,93,61,88,90,89,103,118,112,104,96,111,111,111,103,108,103,95,82,79,69,67,74,52,52,50,39,36,31,25,19,20,17,19,14,8,11,11,1,7,4,4,4,0,1,3,1,0,0,0,0,0,0,1,0,0,1]},\"home\":{\"lo\":77,\"c\":[1,0,0,0,0,3,2,7,2,3,6,8,14,14,12,23,20,20,25,35,34,40,58,58,71,69,81,94,90,100,104,103,93,111,123,104,95,138,117,91,109,88,98,68,76,69,80,59,58,59,39,33,33,29,23,30,14,13,16,8,2,8,3,3,5,1,0,2,0,2,0,1,0,2]},\"ot\":0.0263},\"mkt\":{\"total\":{\"lo\":168,\"c\":[1,0,0,0,0,0,1,0,0,2,0,0,0,2,0,1,3,2,0,3,0,0,5,5,1,7,5,5,7,10,13,6,10,15,13,19,11,21,23,18,34,33,40,32,33,47,41,44,47,54,69,61,55,52,69,60,49,72,65,58,66,64,60,69,71,82,66,81,55,64,59,56,62,51,53,53,39,59,53,38,38,25,36,33,36,44,28,31,25,35,22,17,20,14,13,12,15,16,12,12,10,7,6,6,4,7,5,4,3,7,2,4,2,4,0,1,2,1,2,0,1,1,0,0,1,1,0,1,1,0,1,0,0,1,2,1,1,1,0,0,0,0,0,0,0,0,1]},\"h1\":{\"lo\":77,\"c\":[1,0,1,0,0,2,2,1,3,2,4,1,2,5,6,9,7,6,12,14,26,27,29,37,31,52,45,54,63,59,74,70,78,71,95,105,77,94,90,102,101,97,91,96,104,103,86,93,81,88,74,71,73,47,46,49,47,43,34,33,30,31,21,17,9,13,10,11,10,2,8,4,2,5,4,2,3,0,1,0,1,1,1]},\"h2\":{\"lo\":73,\"c\":[2,0,0,0,0,0,3,3,4,2,4,4,11,7,4,17,17,12,30,21,20,28,25,35,39,51,53,53,62,57,67,76,67,92,90,97,109,96,92,70,104,89,101,80,119,92,95,91,80,76,84,60,55,58,58,45,38,48,27,28,37,16,22,17,15,11,3,5,5,4,2,0,3,4,1,1,3,0,0,1,1,1]},\"q\":[{\"lo\":32,\"c\":[1,1,0,3,3,0,7,3,8,12,18,18,24,24,37,52,56,71,67,90,100,107,123,122,129,131,154,134,139,135,135,123,145,136,101,80,86,70,67,52,46,44,33,29,15,19,9,11,12,3,4,5,4,0,0,1,0,0,1]},{\"lo\":30,\"c\":[1,0,0,0,1,1,4,5,4,7,15,19,23,15,41,42,34,55,68,74,86,100,119,120,107,154,133,146,143,152,142,148,126,133,101,89,109,81,68,61,54,43,32,22,26,27,16,14,12,8,6,5,1,3,2,1,0,0,1]},{\"lo\":31,\"c\":[1,0,3,3,2,5,6,5,12,14,14,20,24,34,35,47,56,61,79,68,82,84,104,123,121,152,145,159,134,126,140,130,127,123,113,99,93,73,65,49,65,39,29,35,22,24,5,12,11,9,6,3,3,1,3,1,1]},{\"lo\":29,\"c\":[1,6,3,1,4,1,5,13,19,18,27,32,32,57,51,77,70,94,96,112,134,137,153,129,139,140,138,146,131,118,143,136,101,92,76,81,53,46,42,32,34,15,17,6,12,11,4,7,3,2,1,1,0,1]}],\"margin\":{\"lo\":-36,\"c\":[1,2,0,3,2,3,3,6,4,2,5,9,12,5,8,16,10,15,21,19,19,37,36,34,41,38,40,55,61,64,64,63,66,90,104,85,0,103,105,102,77,89,85,106,92,84,81,92,89,59,76,50,71,56,71,49,54,40,36,35,33,24,19,25,29,27,17,13,11,15,10,6,3,4,3,2,4,0,3,2,1,1,0,0,0,2,0,0,0,0,0,0,0,0,0,0,1]},\"away\":{\"lo\":81,\"c\":[2,0,1,4,2,4,8,9,7,9,13,13,14,18,31,36,30,32,40,60,70,62,77,81,109,82,104,102,98,105,104,124,103,110,88,102,111,97,80,83,80,77,66,67,51,48,47,45,38,41,31,36,24,14,18,11,9,20,7,5,7,8,6,6,2,2,1,0,1,2,1,2,1,0,1]},\"home\":{\"lo\":76,\"c\":[1,0,1,0,2,0,0,1,0,0,0,1,1,4,6,3,4,9,8,11,9,15,16,25,26,25,40,42,56,58,52,59,71,66,77,71,107,101,101,104,119,111,102,98,107,102,97,91,99,82,100,65,84,68,65,44,45,50,44,44,36,22,26,25,13,15,14,11,7,7,7,3,3,5,3,3,3,3,1,1,1,0,0,0,0,0,1]},\"ot\":0.0363},\"anchor\":{\"total\":231.5,\"sp\":-5.5,\"book\":\"DraftKings\"},\"ft_factor\":1.03,\"shrink\":{\"total\":0.0,\"h1\":0.1,\"spread\":0.0,\"ml\":0.97,\"team\":1.5,\"team_away\":0.3,\"team_own\":0.3,\"quarter\":0.1},\"bands\":[[0.7,\"STRONG\"],[0.65,\"BET\"],[0.6,\"LEAN\"]],\"prof\":{\"away\":{\"ortg\":113.5,\"drtg\":115.0,\"pace\":99.5,\"n\":15,\"b2b\":false,\"out\":-2.1,\"a3\":0.41},\"home\":{\"ortg\":118.0,\"drtg\":109.0,\"pace\":98.0,\"n\":16,\"b2b\":true,\"out\":-1.0,\"a3\":0.44}}}",
+        nbasim: "{\"v\":2,\"runs\":3000,\"own\":{\"total\":{\"lo\":164,\"c\":[1,0,1,0,1,0,3,1,2,4,4,5,3,8,5,7,12,8,5,13,7,14,16,19,19,20,19,26,27,27,34,34,22,36,38,39,53,51,42,60,49,58,69,63,53,70,51,75,79,70,71,77,60,58,81,83,78,63,62,61,58,53,44,57,56,57,40,60,45,43,37,36,43,36,33,29,26,26,18,16,25,17,9,18,7,8,9,14,4,3,5,9,7,4,3,2,2,3,1,2,0,1,0,1,1,2,0,1,0,4,3,1,0,0,0,0,0,1,0,0,1,1,0,0,0,0,0,0,0,0,0,1]},\"h1\":{\"lo\":67,\"c\":[1,0,0,0,0,0,1,1,0,2,2,2,2,3,5,11,7,7,9,15,13,14,22,16,28,27,40,48,45,53,57,63,72,71,82,88,71,89,83,93,84,111,93,118,112,89,114,88,97,83,94,71,73,80,56,57,56,55,49,32,30,30,28,26,19,12,18,10,15,9,9,3,12,3,4,1,4,3,2,2,4,1]},\"h2\":{\"lo\":70,\"c\":[1,2,1,0,2,0,8,1,9,8,6,12,16,13,14,23,25,37,32,36,42,49,50,54,51,86,72,75,76,84,105,99,110,109,113,113,99,97,121,99,85,80,93,72,70,71,72,52,60,53,41,40,43,30,30,23,22,25,20,15,11,9,9,7,6,1,2,3,3,1,0,0,1]},\"q\":[{\"lo\":29,\"c\":[2,2,3,6,4,3,4,11,15,12,21,18,39,40,46,60,56,89,67,95,119,109,136,138,125,132,143,141,151,108,124,120,123,100,107,96,73,66,55,56,38,44,25,10,14,9,12,12,5,3,3,3,0,2,2,2,1]},{\"lo\":28,\"c\":[1,0,2,7,2,3,11,9,9,16,15,33,36,38,28,63,75,61,93,100,91,119,140,125,114,158,143,157,177,122,125,124,120,100,95,66,72,65,59,35,51,35,26,23,10,10,11,10,5,2,2,5,0,0,1]},{\"lo\":28,\"c\":[2,0,1,2,5,5,5,7,10,9,14,13,31,34,46,58,62,60,73,97,80,110,148,116,138,149,128,143,156,136,134,137,126,119,93,85,84,69,52,52,46,50,29,19,15,14,9,10,6,4,3,4,1,1]},{\"lo\":24,\"c\":[2,0,2,1,1,2,5,6,9,13,17,19,35,45,63,44,59,75,86,104,125,126,129,143,146,139,151,131,140,133,137,133,114,105,96,83,81,55,43,53,39,20,25,15,21,7,6,6,3,1,1,3,2]}],\"margin\":{\"lo\":-44,\"c\":[1,1,0,0,0,0,0,0,1,0,0,0,0,1,0,0,0,2,4,2,4,3,8,8,12,10,7,19,17,21,24,20,26,24,38,38,43,57,55,46,52,73,79,52,0,87,92,93,80,107,113,106,87,87,99,98,94,97,78,90,74,64,64,71,60,59,51,42,48,50,36,33,20,32,15,14,15,14,11,8,6,11,11,6,7,2,3,3,5,2,2,1,2,1,0,0,0,0,0,1]},\"away\":{\"lo\":68,\"c\":[1,0,2,0,1,0,2,0,5,10,6,8,10,10,14,15,14,34,35,41,35,47,44,44,62,62,93,61,88,90,89,103,118,112,104,96,111,111,111,103,108,103,95,82,79,69,67,74,52,52,50,39,36,31,25,19,20,17,19,14,8,11,11,1,7,4,4,4,0,1,3,1,0,0,0,0,0,0,1,0,0,1]},\"home\":{\"lo\":77,\"c\":[1,0,0,0,0,3,2,7,2,3,6,8,14,14,12,23,20,20,25,35,34,40,58,58,71,69,81,94,90,100,104,103,93,111,123,104,95,138,117,91,109,88,98,68,76,69,80,59,58,59,39,33,33,29,23,30,14,13,16,8,2,8,3,3,5,1,0,2,0,2,0,1,0,2]},\"ot\":0.0263},\"mkt\":{\"total\":{\"lo\":168,\"c\":[1,0,0,0,0,0,1,0,0,2,0,0,0,2,0,1,3,2,0,3,0,0,5,5,1,7,5,5,7,10,13,6,10,15,13,19,11,21,23,18,34,33,40,32,33,47,41,44,47,54,69,61,55,52,69,60,49,72,65,58,66,64,60,69,71,82,66,81,55,64,59,56,62,51,53,53,39,59,53,38,38,25,36,33,36,44,28,31,25,35,22,17,20,14,13,12,15,16,12,12,10,7,6,6,4,7,5,4,3,7,2,4,2,4,0,1,2,1,2,0,1,1,0,0,1,1,0,1,1,0,1,0,0,1,2,1,1,1,0,0,0,0,0,0,0,0,1]},\"h1\":{\"lo\":77,\"c\":[1,0,1,0,0,2,2,1,3,2,4,1,2,5,6,9,7,6,12,14,26,27,29,37,31,52,45,54,63,59,74,70,78,71,95,105,77,94,90,102,101,97,91,96,104,103,86,93,81,88,74,71,73,47,46,49,47,43,34,33,30,31,21,17,9,13,10,11,10,2,8,4,2,5,4,2,3,0,1,0,1,1,1]},\"h2\":{\"lo\":73,\"c\":[2,0,0,0,0,0,3,3,4,2,4,4,11,7,4,17,17,12,30,21,20,28,25,35,39,51,53,53,62,57,67,76,67,92,90,97,109,96,92,70,104,89,101,80,119,92,95,91,80,76,84,60,55,58,58,45,38,48,27,28,37,16,22,17,15,11,3,5,5,4,2,0,3,4,1,1,3,0,0,1,1,1]},\"q\":[{\"lo\":32,\"c\":[1,1,0,3,3,0,7,3,8,12,18,18,24,24,37,52,56,71,67,90,100,107,123,122,129,131,154,134,139,135,135,123,145,136,101,80,86,70,67,52,46,44,33,29,15,19,9,11,12,3,4,5,4,0,0,1,0,0,1]},{\"lo\":30,\"c\":[1,0,0,0,1,1,4,5,4,7,15,19,23,15,41,42,34,55,68,74,86,100,119,120,107,154,133,146,143,152,142,148,126,133,101,89,109,81,68,61,54,43,32,22,26,27,16,14,12,8,6,5,1,3,2,1,0,0,1]},{\"lo\":31,\"c\":[1,0,3,3,2,5,6,5,12,14,14,20,24,34,35,47,56,61,79,68,82,84,104,123,121,152,145,159,134,126,140,130,127,123,113,99,93,73,65,49,65,39,29,35,22,24,5,12,11,9,6,3,3,1,3,1,1]},{\"lo\":29,\"c\":[1,6,3,1,4,1,5,13,19,18,27,32,32,57,51,77,70,94,96,112,134,137,153,129,139,140,138,146,131,118,143,136,101,92,76,81,53,46,42,32,34,15,17,6,12,11,4,7,3,2,1,1,0,1]}],\"margin\":{\"lo\":-36,\"c\":[1,2,0,3,2,3,3,6,4,2,5,9,12,5,8,16,10,15,21,19,19,37,36,34,41,38,40,55,61,64,64,63,66,90,104,85,0,103,105,102,77,89,85,106,92,84,81,92,89,59,76,50,71,56,71,49,54,40,36,35,33,24,19,25,29,27,17,13,11,15,10,6,3,4,3,2,4,0,3,2,1,1,0,0,0,2,0,0,0,0,0,0,0,0,0,0,1]},\"away\":{\"lo\":81,\"c\":[2,0,1,4,2,4,8,9,7,9,13,13,14,18,31,36,30,32,40,60,70,62,77,81,109,82,104,102,98,105,104,124,103,110,88,102,111,97,80,83,80,77,66,67,51,48,47,45,38,41,31,36,24,14,18,11,9,20,7,5,7,8,6,6,2,2,1,0,1,2,1,2,1,0,1]},\"home\":{\"lo\":76,\"c\":[1,0,1,0,2,0,0,1,0,0,0,1,1,4,6,3,4,9,8,11,9,15,16,25,26,25,40,42,56,58,52,59,71,66,77,71,107,101,101,104,119,111,102,98,107,102,97,91,99,82,100,65,84,68,65,44,45,50,44,44,36,22,26,25,13,15,14,11,7,7,7,3,3,5,3,3,3,3,1,1,1,0,0,0,0,0,1]},\"ot\":0.0363},\"anchor\":{\"total\":231.5,\"sp\":-5.5,\"book\":\"DraftKings\"},\"ft_factor\":1.03,\"shrink\":{\"total\":0.0,\"h1\":0.1,\"spread\":0.0,\"ml\":0.97,\"team\":0.3,\"team_away\":0.3,\"team_own\":0.3,\"quarter\":0.1},\"bands\":[[0.7,\"STRONG\"],[0.65,\"BET\"],[0.6,\"LEAN\"]],\"prof\":{\"away\":{\"ortg\":113.5,\"drtg\":115.0,\"pace\":99.5,\"n\":15,\"b2b\":false,\"out\":-2.1,\"a3\":0.41},\"home\":{\"ortg\":118.0,\"drtg\":109.0,\"pace\":98.0,\"n\":16,\"b2b\":true,\"out\":-1.0,\"a3\":0.44}}}",
         ncrew: "Scott Foster, Tony Brothers, Marc Davis", nbarefs: "{\"lg\":[2462,44.0,228.8],\"r\":{\"Scott Foster\":[118,46.2,229.1,66,41,4,2],\"Tony Brothers\":[95,43.1,226.0,56,54,3,3],\"Marc Davis\":[102,44.8,230.3,71,51,0,0],\"Zach Zarba\":[110,42.9,227.4,58,60,2,5]}}" });
     } else {
       restore({ away: "Sun", home: "Mystics", line: "162.5", op: "118", up: "-155", gdate: $("gdate").value,

@@ -34,10 +34,9 @@
           P.sim.push({ g: r.matchup, p: nbaSimPickText(c.key, c.side, c.line, r.away, r.home), v: view === "own" ? "own view" : "anchored", c: phoneChance(c.p), w: phoneChance(c.worth), b: c.band });
         });
       });
-      [["AWAY", lines.away_tt, r.away], ["HOME", lines.home_tt, r.home]].forEach(function (x) {
-        var tt = x[1]; if (!tt || !tt.rule || !tt.rule.call) return;
-        P.sim.push({ g: r.matchup, p: x[2] + " team total " + tt.rule.call + " " + tt.line, v: "gap rule", g2: tt.rule.gap, b: "gap rule" });
-      });
+      // the gap rode in this list as a call until 11 Nov 2026. It is a watch now (the two seasons behind it read a line the season
+      // pull had kept wrong), and this list is the calls at BET or better, so the phone does not carry it. m.html still reads an
+      // old code's "gap rule" entries
     });
     return P;
   }

@@ -6968,11 +6968,43 @@ def fetch_odds_history_event(sport, key, books, event_id, at_iso, markets):
     return fetch_json("%s/historical/sports/%s/events/%s/odds?%s" % (ODDS_API, ODDS_SPORTS[sport], event_id, q), cache=False)
 
 
+def odds_periods_main(points):
+    """The MAIN line of one book's postings on one market (or one club's team total). `points` is {point: [over, under]} in
+    the order the book listed them. The point with both prices whose two chances sit nearest each other, the first listed
+    on a tie, with ITS OWN prices; a book with no two-sided point keeps its first priced point as it stands.
+    [line, over, under], or None when nothing is priced.
+
+    11 Nov 2026. The parse kept the FIRST team-total point a book listed with the LAST over and under prices (and, for a
+    period total, the last point). A book that lists one point came through right. BetRivers lists four or five team-total
+    points a side and ESPN BET three, so their lines in the season files are an alternate's number beside another point's
+    prices, and the backtest of 26 Oct 2026 read BetRivers on 673 of 674 games of 2025-26. Graded at those prices the
+    "gap" between that number and the one the game's total and spread imply won 61% at home over two seasons; on this
+    season's rows, which keep every point, the same kept point wins 59% and is worth +23.0 units at the kept prices and
+    +0.9 at its own. That is where the team-total gap rule and the simulation's 1.5 on the home team total came from."""
+    both = [(abs(_imp(v[0]) - _imp(v[1])), i, pt, v) for i, (pt, v) in enumerate(points.items()) if v[0] is not None and v[1] is not None]
+    if both:
+        _d, _i, pt, v = min(both)
+        return [pt, v[0], v[1]]
+    for pt, v in points.items():
+        if v[0] is not None or v[1] is not None:
+            return [pt, v[0], v[1]]
+    return None
+
+
 def odds_periods_parse(ev):
     """{market: {book: [line, over, under]}} for the period totals, and for the
-    team totals {book: {"home": [line, over, under], "away": [...]}}."""
+    team totals {book: {"home": [line, over, under], "away": [...]}}. One line a
+    book: its main one (odds_periods_main), never an alternate."""
     out = {}
     full_home, full_away = ev.get("home_team"), ev.get("away_team")
+
+    def price_into(points, o):
+        row = points.setdefault(float(o["point"]), [None, None])
+        try:
+            row[0 if o.get("name") == "Over" else 1] = int(round(float(o.get("price"))))
+        except (TypeError, ValueError):
+            pass
+
     for bk in (ev or {}).get("bookmakers") or []:
         b = bk.get("key")
         for m in bk.get("markets") or []:
@@ -6983,24 +7015,22 @@ def odds_periods_parse(ev):
                     side = "home" if o.get("description") == full_home else ("away" if o.get("description") == full_away else None)
                     if not side or o.get("point") is None:
                         continue
-                    row = sides.setdefault(side, [float(o["point"]), None, None])
-                    try:
-                        row[1 if o.get("name") == "Over" else 2] = int(round(float(o.get("price"))))
-                    except (TypeError, ValueError):
-                        pass
-                if sides:
-                    out.setdefault(mk, {})[b] = sides
+                    price_into(sides.setdefault(side, {}), o)
+                kept = {}
+                for side, points in sides.items():
+                    row = odds_periods_main(points)
+                    if row:
+                        kept[side] = row
+                if kept:
+                    out.setdefault(mk, {})[b] = kept
             else:
-                row = [None, None, None]
+                points = {}
                 for o in m.get("outcomes") or []:
                     if o.get("point") is None:
                         continue
-                    row[0] = float(o["point"])
-                    try:
-                        row[1 if o.get("name") == "Over" else 2] = int(round(float(o.get("price"))))
-                    except (TypeError, ValueError):
-                        pass
-                if row[0] is not None and (row[1] is not None or row[2] is not None):
+                    price_into(points, o)
+                row = odds_periods_main(points)
+                if row:
                     out.setdefault(mk, {})[b] = row
     return out
 
@@ -7092,6 +7122,7 @@ def make_odds_periods(out_dir, log, season, markets=None, books=None, minutes=OD
             ev = doc_ev.get("data") if isinstance(doc_ev, dict) and "data" in doc_ev else doc_ev
             parsed = odds_periods_parse(ev or {})
             g["at"] = (doc_ev.get("timestamp") if isinstance(doc_ev, dict) else None) or at
+            g["main"] = 1          # 11 Nov 2026: these lines are each book's main one; a game without the mark was kept the old way
             for m in mks:
                 g["mk"][m] = parsed.get(m) or {}
             n_priced += 1
@@ -7206,18 +7237,28 @@ def make_odds_history(out_dir, log, books=None, sports=("NHL",), season=None, st
 
 
 # ---- the team-total gap rule, re-tested (11 Nov 2026) ------------------------
-# The gap rule (26 Oct 2026) is scored on two seasons: the book's team-total line a point or more off the number the game's
+# The gap rule (26 Oct 2026) was scored on two seasons: the book's team-total line a point or more off the number the game's
 # own total and spread imply, (total -/+ spread) / 2, the under landing 62 to 63% above the number at home and the over 63 to
-# 68% below it. This season it does not confirm (11 Nov 2026: the page's own tally 7-6 at home and 4-8 away; each of the three
-# apps' lines against that app's own total and spread 21-17 and 28-27, no slope), and the reason looks like the measure, not
-# the market: the backtest held ONE book's team total, fifteen minutes before tip, against ANOTHER source's closing total and
-# spread (KillerSports), where a gap of a point or more showed on 66% of games; a book against its own numbers shows one on
-# about 10%. And the history file keeps one line a book a side, the FIRST point listed with the LAST over and under prices,
-# so a book that lists alternates (BetRivers lists four) can carry one line's number with another line's prices.
+# 68% below it. This season it did not confirm (the page's own tally 7-6 at home and 4-8 away; each of the three apps' lines
+# against that app's own total and spread 21-17 and 28-27, no slope), and the backtest's own code said where to look: it held
+# ONE book's team total, fifteen minutes before tip, against ANOTHER source's closing total and spread (KillerSports), where a
+# gap of a point or more showed on 66% of games; a book against its own numbers shows one on about 10%.
 # This mode reads the three files already in the folder (the ledger, the period lines, the full-game lines history) and
 # holds every team-total line against three numbers: as it was scored (the backtest's own choice of book against the US
 # books' mean total and spread at the last snapshot before tip), the same book's own total and spread, and the middle of the
 # other books' (the market). It marks the price pairs that cannot be one line's, and writes nba-gap-retest.txt to send back.
+# WHAT IT FOUND (the user's file, 674 games of 2025-26, read the same day). The backtest's book was BetRivers on 673 games.
+# On BetRivers' line the call won 278-177 at home as it was scored, 177-107 against BetRivers' own total and spread and
+# 295-183 against the other books' middle, the gap a point or more on 68 to 73% of lines (sd 1.9). On DraftKings, ESPN BET
+# and FanDuel: 114-96, 164-150 and 72-62 at home against their own numbers, a gap on 20 to 47% of lines (sd 0.8 to 0.9), no
+# slope above t 1.3; the three apps at one call a game 136-117 at home (+3.4 units) and 130-123 away (-7.7). So neither the
+# two sources nor a book failing to reconcile itself: ONE book's line, and that line was not the book's. The season pull kept
+# one line a book a side as the FIRST point listed with the LAST over and under prices (odds_periods_parse, until this
+# day), BetRivers lists four or five points a side, and its pair of prices is a real pair, another point's, so the check for
+# prices that cannot be one line's passed it (6 of 1,348). This season's rows keep every point, and the fault replays on
+# them: the kept point is BetRivers' main line on three sides in ten, the call on it lands 111-77, worth +23.0 units at the
+# prices kept and +0.9 at its own. The rule is a watch on the page, the simulation's 1.5 on the anchored home team total is
+# withdrawn with it (nbasim.SHRINK), and the pull keeps a book's main line from here (odds_periods_main).
 GAP_RETEST_APPS = ("fanduel", "draftkings", "betmgm")
 GAP_RETEST_US = ("fanatics", "betmgm", "draftkings", "fanduel", "caesars", "espnbet", "betrivers")
 GAP_RETEST_MIN = 1.0
@@ -7315,7 +7356,7 @@ def gap_retest_readings(ledger_games, periods_doc, history_doc):
                 except (TypeError, ValueError, ZeroDivisionError):
                     continue
                 out.append({"key": k, "date": pg.get("gdate"), "book": b, "side": side, "line": line, "op": op, "up": up, "score": score,
-                            "clean": GAP_RETEST_VIG[0] <= vig <= GAP_RETEST_VIG[1], "first": b == first, "lag": lag,
+                            "clean": GAP_RETEST_VIG[0] <= vig <= GAP_RETEST_VIG[1], "first": b == first, "lag": lag, "main": bool(pg.get("main")),
                             "scored": gap_retest_implied(mean, side), "own": gap_retest_implied(gap_retest_book(snap, b), side),
                             "market": gap_retest_implied(gap_retest_market(snap, skip=b), side)})
     return out
@@ -7406,6 +7447,13 @@ def gap_retest_report(readings, label):
         bad = sum(1 for r in rs if not r["clean"])
         dirty.append("%s %d of %d" % (b, bad, len(rs)))
     out.append("   price pairs that cannot be one line's (the two chances sum outside %.2f to %.3f), by book: %s" % (GAP_RETEST_VIG[0], GAP_RETEST_VIG[1], ", ".join(dirty)))
+    old = len({r["key"] for r in readings if not r.get("main")})
+    if old:
+        out.append("   kept the old way, %d of %d games: the pull before 11 Nov 2026 kept the FIRST point a book listed with the LAST prices, so a book that lists several" % (old, games))
+        out.append("   team-total points (BetRivers four or five, ESPN BET three) carries an alternate's number at another point's prices here, and the check above cannot see it.")
+        out.append("   Read B and C on the books that list one point: DraftKings, FanDuel, BetMGM. A book whose gap spreads twice as wide as theirs is such a book.")
+    else:
+        out.append("   every game's lines are the books' main ones (pulled from 11 Nov 2026).")
     for side in ("home", "away"):
         rs = [r for r in readings if r["side"] == side]
         out.append("")
@@ -7440,7 +7488,9 @@ def make_nba_gap_retest(out_dir, log, season=None):
              "A call is the UNDER a point or more above that number and the OVER a point or more below it, graded at the line's own prices.",
              "A: the number as the backtest of 26 Oct 2026 had it (another source's closing total and spread; here the US books' mean at the last snapshot before tip).",
              "B: the number the SAME book's own total and spread imply. C: the number the OTHER books' middle total and spread imply.",
-             "If the rule is the book's own inconsistency, B shows it. If it is one book's line off the market, C shows it and B does not. If only A shows it, it was the two sources."]
+             "If the rule is the book's own inconsistency, B shows it. If it is one book's line off the market, C shows it and B does not. If only A shows it, it was the two sources.",
+             "Read on 11 Nov 2026, 674 games of 2025-26: the edge sat on BetRivers' line alone, in A, B and C alike (61 to 62% at home), and that line was an alternate's number",
+             "kept with another point's prices. On the books that list one point the call was 136-117 at home and 130-123 away, a coin less the price. The rule is a watch on the page."]
     pooled, used = [], []
     for sn in seasons:
         paths = (nba_ledger_path(out_dir, sn), odds_periods_path(out_dir, "NBA", sn), odds_history_path(out_dir, "NBA", sn))
@@ -8320,6 +8370,27 @@ def selftest():
     check("odds periods: the first half and the quarter per book, the team totals by side",
           pp["totals_h1"] == {"fanatics": [112.5, -110, -110], "draftkings": [113.0, -112, -108]} and pp["totals_q1"] == {"fanatics": [56.5, -115, -105]}
           and pp["team_totals"] == {"fanatics": {"home": [114.5, -110, -110], "away": [107.5, -105, -115]}} and odds_periods_path(".", "NBA", "2025-26") == os.path.join(".", "odds-periods-NBA-2025-26.json"))
+    # 11 Nov 2026: a book that lists several points keeps its MAIN one with that point's own prices. The parse before kept the first
+    # team-total point with the last prices (here 112.5 at +104/-132) and a period total's last point (115.5 at +150/-190)
+    pp2 = odds_periods_parse({"home_team": "Boston Celtics", "away_team": "New York Knicks", "bookmakers": [
+        {"key": "betrivers", "markets": [
+            {"key": "team_totals", "outcomes": [
+                {"name": "Over", "description": "Boston Celtics", "price": -150, "point": 112.5}, {"name": "Under", "description": "Boston Celtics", "price": 118, "point": 112.5},
+                {"name": "Over", "description": "Boston Celtics", "price": -128, "point": 113.5}, {"name": "Under", "description": "Boston Celtics", "price": 100, "point": 113.5},
+                {"name": "Over", "description": "Boston Celtics", "price": -112, "point": 114.5}, {"name": "Under", "description": "Boston Celtics", "price": -114, "point": 114.5},
+                {"name": "Over", "description": "Boston Celtics", "price": 104, "point": 115.5}, {"name": "Under", "description": "Boston Celtics", "price": -132, "point": 115.5},
+                {"name": "Over", "description": "New York Knicks", "price": -105, "point": 107.5},      # one side priced: kept as it stands
+                {"name": "Over", "description": "Chicago Bulls", "price": -110, "point": 99.5}]},       # a club not in the game: dropped
+            {"key": "totals_h1", "outcomes": [
+                {"name": "Over", "price": -110, "point": 112.5}, {"name": "Under", "price": -110, "point": 112.5},
+                {"name": "Over", "price": 150, "point": 115.5}, {"name": "Under", "price": -190, "point": 115.5}]},
+            {"key": "totals_q1", "outcomes": [{"name": "Over", "price": -108, "point": 56.5}, {"name": "Under", "price": -112, "point": 57.5}]},
+            {"key": "totals_q3", "outcomes": [{"name": "Over", "price": "x", "point": 55.5}]}]}]})
+    check("odds periods: a book that lists several points keeps its MAIN one, the pair priced nearest even, with that point's own prices, never the first point with the last prices; a period total's alternate listed last is not its line; a side with one price is kept as it stands and nothing unpriced is kept",
+          pp2["team_totals"] == {"betrivers": {"home": [114.5, -112, -114], "away": [107.5, -105, None]}} and pp2["totals_h1"] == {"betrivers": [112.5, -110, -110]}
+          and pp2["totals_q1"] == {"betrivers": [56.5, -108, None]} and "totals_q3" not in pp2
+          and odds_periods_main({110.5: [-140, 110], 111.5: [-110, -110], 112.5: [-110, -110]}) == [111.5, -110, -110]
+          and odds_periods_main({110.5: [-110, -110], 111.5: [-140, 110]}) == [110.5, -110, -110] and odds_periods_main({}) is None and odds_periods_main({1.5: [None, None]}) is None)
     # the hockey play-by-play (29 Oct 2026): ESPN's events compact, the strength state and the clock kept, penalties and goalie changes with their text
     summ_h = {"boxscore": {"teams": [{"team": {"id": "1"}, "homeAway": "home"}, {"team": {"id": "7"}, "homeAway": "away"}]},
               "gameInfo": {"officials": [{"displayName": "Steve Barton", "position": {"name": "Linesman"}}, {"displayName": "Dan O'Rourke", "position": {"name": "Referee"}}]},
@@ -8410,6 +8481,16 @@ def selftest():
           os.path.basename(gr_path0) == GAP_RETEST_FILE and any("2025-26: not read, nba-ledger-202526.json and odds-periods-NBA-2025-26.json and odds-history-NBA-2025-26.json missing" in x and "Run NBA period lines.bat" in x for x in gr_log)
           and os.path.basename(gr_path) == GAP_RETEST_FILE and "=== NBA 2025-26 · 24 games with a team total and a final" in gr_txt and "2024-25: not read" in gr_txt and "the seasons together" not in gr_txt
           and "THE TEAM-TOTAL GAP RULE, RE-TESTED" in gr_txt and any("2025-26: 144 team-total lines read on 24 games." == x for x in gr_log2))
+    gr_per_main = json.loads(json.dumps(gr_per))
+    for gr_g in gr_per_main["games"].values():
+        gr_g["main"] = 1
+    gr_rows_main = gap_retest_readings(gr_led, gr_per_main, gr_hist)
+    gr_rep_main = "\n".join(gap_retest_report(gr_rows_main, "NBA canned"))
+    check("gap retest: the report says how its lines were kept, by the mark the pull leaves on a game from 11 Nov 2026: the old way (the first point with the last prices, where a book that lists several carries an alternate, and which books to read instead) or each book's main line; and the file opens with what the first reading found",
+          "kept the old way, 24 of 24 games" in gr_rep and "Read B and C on the books that list one point: DraftKings, FanDuel, BetMGM." in gr_rep and "every game's lines are the books' main ones" not in gr_rep
+          and "every game's lines are the books' main ones (pulled from 11 Nov 2026)." in gr_rep_main and "kept the old way" not in gr_rep_main
+          and all(not r["main"] for r in gr_rows) and all(r["main"] for r in gr_rows_main) and len(gr_rows_main) == len(gr_rows)
+          and "Read on 11 Nov 2026, 674 games of 2025-26: the edge sat on BetRivers' line alone" in gr_txt and "The rule is a watch on the page." in gr_txt)
     # the NBA ledger (15 Oct 2026), offline: the feed's shapes, canned
     check("nba: the season from a date", nba_season_id("2026-10-15") == "2026-27" and nba_season_id("2027-04-10") == "2026-27" and nba_season_id("2027-07-01") == "2026-27" and nba_season_id("2027-08-15") == "2027-28")
     check("nba: season spellings", nba_norm_season("2024-25") == "2024-25" and nba_norm_season("2024") == "2024-25" and nba_norm_season("20242025") == "2024-25" and nba_norm_season("202425") == "2024-25")

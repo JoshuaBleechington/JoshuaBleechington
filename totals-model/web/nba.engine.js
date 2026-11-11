@@ -319,7 +319,7 @@
      the simulation, refs, lineups, Kalshi, the board, the middles, the context be a little more of the forefront"). The
      sheet's own pick stays grey on most NBA rows because the close already carries what its inputs know; the calls that do
      fire live in the engines down the card. This strip gathers every one of them at the top of the matchup rail: the pick
-     and #1's verdict, the upset signal, Pinnacle's shade, the agreement rule, the simulation's bands, the gap rule, the
+     and #1's verdict, the upset signal, Pinnacle's shade, the agreement rule, the simulation's bands, the gap watch, the
      middles, the crew's lean, the crowd on Kalshi and who is out. Green when a scored rule fires, gold for a watch, the
      exchange in its own colour, each chip a link to its section; the jump bar's dots and the sections' live lines read
      off the same list. Shown: it adds no number and takes nothing ---- */
@@ -356,7 +356,7 @@
     }
     [["away_tt", away], ["home_tt", home]].forEach(function (t) {
       var tt = lines[t[0]]; if (!tt || !tt.rule || !tt.rule.call) return;
-      out.push(signalChip("go", "secSim", "gap rule", "<b>" + esc(t[1]) + " team total " + tt.rule.call + " " + esc(String(tt.line)) + "</b> · gap " + (tt.rule.gap > 0 ? "+" : "") + tt.rule.gap));
+      out.push(signalChip("watch", "secSim", "gap watch", "<b>" + esc(t[1]) + " team total " + tt.rule.call + " " + esc(String(tt.line)) + "</b> · gap " + (tt.rule.gap > 0 ? "+" : "") + tt.rule.gap + " · not scored"));   // gold from 11 Nov 2026: the two-season edge was a fault in the season pull
     });
     try {
       var W = row ? nbaMiddleWatch(row) : [], paying = W.filter(function (x) { return x.m.pays; })[0];
@@ -412,7 +412,7 @@
       el.hidden = false;
       el.innerHTML = '<div class="sighead">Tonight\'s signals <span class="tag">every engine\'s call on this row · green fires, gold watches, purple the crowd</span></div>' +
         (list.length ? list.map(function (s) { return '<a class="sig ' + s.cls + '" href="#' + s.go + '"><span class="sb">' + esc(s.badge) + '</span><span class="st">' + s.html + '</span></a>'; }).join("")   // two flex items: the badge, then the words as one span, so the gap never splits a sentence
-                     : '<span class="quiet">Nothing fires on this row tonight: the sheet\'s pick, the simulation, the agreement rule, the gap rule, the middles and the watches all sit inside their lines.</span>');
+                     : '<span class="quiet">Nothing fires on this row tonight: the sheet\'s pick, the simulation, the agreement rule, the middles and the watches all sit inside their lines.</span>');
     }
     list.forEach(function (s) { if (live[s.go]) live[s.go].push(s); });
     Object.keys(live).forEach(function (id) {
@@ -896,8 +896,21 @@
   /* the worth (26 Oct 2026): the team totals' shrink depends on the view and the side (nbasim.SHRINK); a row stored before
      the split lacks the new keys, so the measured defaults stand in. The band is read off the WORTH, not the raw chance,
      so a 71% that is worth 56% reads as no call and a 57% worth 61% reads LEAN: the replay's answer, not the sim's say-so */
-  var NBA_SIM_SHRINK_DEFAULT = { team: 1.5, team_away: 0.3, team_own: 0.3 };
-  function nbaSimWorth(p, kind, shrink) { var k = (shrink || {})[kind]; if (k === undefined || k === null) k = NBA_SIM_SHRINK_DEFAULT[kind]; if (k === undefined || k === null) k = 1; return Math.max(0, Math.min(1, 0.5 + (p - 0.5) * k)); }
+  /* The home side's boost withdrawn (11 Nov 2026). The anchored home team total carried 1.5: the replay had its calls
+     landing 60.7% and 59.0% over two seasons. The lines it was replayed on were not the book's. The season pull kept one
+     line a book as the FIRST point listed with the LAST over and under prices, and the one book it read in 2025-26 was
+     BetRivers on 673 of 674 games, which lists four or five team-total points a side. This season's rows keep every point,
+     so the fault can be replayed on them: the point that pull would have kept is BetRivers' main line on three sides in
+     ten and one or two points off it on the rest, a "gap" of a point or more shows on 63% of sides where the main line
+     shows one on 2%, and the call on the kept point lands 111-77 (59.0%), +23.0 units at the prices kept beside it and
+     +0.9 at the point's own. So the boost measured the fault, not the sim: an alternate's number at another line's price.
+     The home side reads at the 0.3 of its two siblings on every row, whatever shrink the slate stored with it
+     (NBA_SIM_SHRINK_RULES), and the record keeps what the boost would have called as a watch, so the place can be earned
+     back on lines that are the book's. The gap rule below went the same way for the same reason */
+  var NBA_SIM_SHRINK_DEFAULT = { team: 0.3, team_away: 0.3, team_own: 0.3 };
+  var NBA_SIM_SHRINK_RULES = { team: 0.3 };   // the page's word over the row's: every slate written before 11 Nov 2026 stored 1.5
+  var NBA_SIM_TEAM_WAS = 1.5;                 // the withdrawn boost, kept to tally what it would have called
+  function nbaSimWorth(p, kind, shrink) { var k = NBA_SIM_SHRINK_RULES[kind]; if (k === undefined || k === null) k = (shrink || {})[kind]; if (k === undefined || k === null) k = NBA_SIM_SHRINK_DEFAULT[kind]; if (k === undefined || k === null) k = 1; return Math.max(0, Math.min(1, 0.5 + (p - 0.5) * k)); }
   function nbaSimTeamKind(view, key) { return view === "own" ? "team_own" : key === "away_total" ? "team_away" : "team"; }
   /* every call the row's lines allow, from one view's histograms: {key, view, label, line, side, p, worth, band, push} */
   function nbaSimCalls(sim, lines, view) {
@@ -919,7 +932,9 @@
   /* the team totals (26 Oct 2026): the book's main line on each side from the row's odds JSON (the carded book first, the
      point whose two prices sit closest together; the shop also lists the alternates). The replay of 588 games of 2025-26
      found the book's team-total line sitting off the number the game's total and spread imply, and the anchored sim's call
-     landing 60.7% at home and 53.9% away, so these two get their own rows and their own record */
+     landing 60.7% at home and 53.9% away, so these two get their own rows and their own record. That replay's lines were
+     not the book's (11 Nov 2026, the note above NBA_SIM_SHRINK_RULES): the rows and the record stay, the edge does not.
+     This picker is the guard the season pull lacked: of the points a book lists, the one priced nearest even */
   function nbaTeamTotalLine(oddsRaw, side) {
     var o = null;
     try { o = oddsRaw ? JSON.parse(oddsRaw) : null; } catch (e) { o = null; }
@@ -957,14 +972,19 @@
      (169 and 247 games), a point or more BELOW went over 68.1% and 63.1% (94 and 195); the away side 55.4% / 56.8% and
      57.1% / 56.5%; the slope of the over's chance on the gap -0.080 and -0.057 a point at home (t -5.1, -5.7), -0.036 and
      -0.030 away (t -2.4, -2.8). Scored: a gap of a point or more is a call, and the record keeps it from the first night */
-  /* Under re-test from 11 Nov 2026. The backtest took the game's total and spread from KillerSports' close and the team total
-     from one book's line fifteen minutes before tip (Fanatics, else the first book by name), and a gap of a point or more
-     showed on 66% of games; on this season's rows a book's team total against that book's own total and spread shows one on
-     about 10% of lines, and the call reads 20-18 at home and 27-28 away at the three apps (the page's own tally, one book a
-     row, 7-6 and 4-8). So the two-season edge may be two sources disagreeing, not a book failing to reconcile its own
-     numbers. slate.py nba-gap-retest (Run NBA gap retest.bat) holds every team-total line of both seasons against the
-     backtest's number, the same book's and the other books' middle, and its file decides: scored as it is, rebuilt against
-     the market, or a watch. Nothing is changed here until that file is read */
+  /* A watch from 11 Nov 2026, shown and not scored. The re-test (slate.py nba-gap-retest, the user's file of 674 games of
+     2025-26) held every team-total line against three numbers. As the backtest had it the call went 278-177 at home
+     (61.1%, t -5.2 on the gap), and every one of those lines but two was BetRivers'. BetRivers against its OWN total and
+     spread: 177-107 (62.3%), a gap of a point or more on 73% of lines, sd 1.95. DraftKings, ESPN BET and FanDuel against
+     theirs: 114-96, 164-150 and 72-62 at home, 100-102, 178-164 and 65-65 away, a gap on 20 to 47% of lines, sd 0.8 to 0.9,
+     no slope above t 1.3. One call a game at the apps (FanDuel, DraftKings, BetMGM): 136-117 at home (53.8%, +3.4 units)
+     and 130-123 away (-7.7) against the book's own number, 104-93 (-1.2) and 103-97 (-5.9) against the other books'
+     middle. So the edge was one book's line, and that line was not the book's: the season pull kept the first point
+     BetRivers listed with another point's prices (the note above NBA_SIM_SHRINK_RULES has the replay of the fault on this
+     season's rows, where the call on the kept point is worth +23.0 units at the kept prices and +0.9 at its own). On the
+     books' own lines the gap is a coin less the price. The number, the gap and the side still show on the Simulation
+     card, the signal is gold, the Take button stays, and the record keeps counting both sides: a book that hangs a line
+     a point off its own numbers can still earn the rule back */
   var NBA_TT_GAP = 1.0;
   function nbaTeamTotalGap(tt, total, sp, side) {
     if (!tt || total === null || total === undefined || sp === null || sp === undefined || isNaN(+total) || isNaN(+sp)) return null;
@@ -1033,7 +1053,7 @@
           first += ' <span class="dim">' + esc(tt.book) + ' ' + (tt.op > 0 ? '+' : '') + tt.op + '/' + (tt.up > 0 ? '+' : '') + tt.up + '</span></div>';
           if (tt.rule) {
             first += '<div class="ttgap">implied <b>' + tt.rule.implied + '</b>, gap <b>' + (tt.rule.gap > 0 ? '+' : '') + tt.rule.gap + '</b> · ' +
-                     (tt.rule.call ? '<span class="simchip simbet gaprule"><b>' + tt.rule.call + '</b> by the gap rule</span> ' + nbaSimTakeBtn(takeRow, "gap", m[0], tt.rule.call) : '<span class="dim">inside a point, no call</span>') + '</div>';
+                     (tt.rule.call ? '<span class="simchip simwatch gaprule"><b>' + tt.rule.call + '</b> by the gap</span> <span class="dim">a watch, not scored</span> ' + nbaSimTakeBtn(takeRow, "gap", m[0], tt.rule.call) : '<span class="dim">inside a point</span>') + '</div>';
           }
           var kk = typeof kalshiOf === "function" ? kalshiOf(($("nbakalshi") || {}).value || "") : null, kl = kk ? kalshiTTLine(kk, m[0], +m[2], tt.op, tt.up) : "";   // the crowd on Kalshi beside the gap rule (4 Nov 2026)
           if (kl) first += '<div class="ttgap kal">' + kl + '</div>';
@@ -1163,7 +1183,7 @@
     // mark it as the card shows it now: the call from the form's own runs and lines
     var sim = nbaSim(), lines = nbaSimLinesFromForm(), f = readNba();
     var tt = key === "away_total" ? lines.away_tt : key === "home_total" ? lines.home_tt : null, c = null;
-    if (view === "gap") { if (tt && tt.rule && tt.rule.call === side) c = { line: tt.line, p: null, worth: null, band: "gap rule" }; }
+    if (view === "gap") { if (tt && tt.rule && tt.rule.call === side) c = { line: tt.line, p: null, worth: null, band: "gap watch" }; }
     else if (view === "agree") {   // the agreement rule (28 Oct 2026): read off the ROW, so the board's card takes it whatever game the form holds
       var V = nbaVoices(row);
       if (V && V.fires && V.side === side && key === "total") c = { line: V.line, p: side === "OVER" ? V.sim.p : 1 - V.sim.p, worth: null, band: "agreement" };
@@ -1206,7 +1226,7 @@
     if (t.key === "home_total") return cmp(fh, +t.line, t.side === "OVER");
     return null;
   }
-  function nbaSimTakeViewLabel(view) { return view === "own" ? "the sim's own view" : view === "mkt" ? "anchored to the market" : view === "agree" ? "the agreement rule, the sim and the crew" : view === "middle" ? "the middle's second leg" : view === "window" ? "the window, one ticket (anchored to the market)" : "the gap rule"; }
+  function nbaSimTakeViewLabel(view) { return view === "own" ? "the sim's own view" : view === "mkt" ? "anchored to the market" : view === "agree" ? "the agreement rule, the sim and the crew" : view === "middle" ? "the middle's second leg" : view === "window" ? "the window, one ticket (anchored to the market)" : "the gap, a watch"; }
   /* the record: every graded NBA row's sim calls at LEAN or better, says against does by view, market and band */
   function nbaSimUnits(price, win) { var p = +price; if (!p || isNaN(p)) p = -110; return win ? (p > 0 ? p / 100 : 100 / -p) : -1; }
   function nbaSimRecordHtml() {
@@ -1214,6 +1234,7 @@
     if (!rows.length) return '';
     var T = {}, n = 0, G = { HOME: { n: 0, w: 0, units: 0 }, AWAY: { n: 0, w: 0, units: 0 } }, gn = 0;
     var A = { 2: { n: 0, w: 0, units: 0 }, 3: { n: 0, w: 0, units: 0 } }, an = 0;   // the agreement rule's own tally (28 Oct 2026)
+    var B = { n: 0, w: 0, says: 0, units: 0 };   // the withdrawn boost (11 Nov 2026): what the anchored home team total would have called at 1.5 and no longer does
     var M = { n: 0, both: 0, half: 0, split: 0, units: 0, first: 0, says: 0 };   // the middles (28 Oct 2026): the pair graded together, and the first leg alone
     var Wd = { n: 0, w: 0, p: 0, says: 0, units: 0 };   // the windows (29 Oct 2026): one ticket, inside or out
     rows.forEach(function (r) {
@@ -1240,7 +1261,7 @@
         var wonA = (fa + fh > V.line) === (V.side === "OVER"), dA = A[V.count === 3 ? 3 : 2];
         dA.n++; dA.w += wonA ? 1 : 0; dA.units += nbaSimUnits(V.side === "OVER" ? r.inputs.op : r.inputs.up, wonA); an++;
       }
-      // the gap rule's own tally
+      // the gap's own tally: a watch from 11 Nov 2026, counted as it always was
       [["AWAY", lines.away_tt, fa], ["HOME", lines.home_tt, fh]].forEach(function (x) {
         var tt = x[1];
         if (!tt || !tt.rule || !tt.rule.call || x[2] === tt.line) return;
@@ -1249,6 +1270,11 @@
       });
       ["own", "mkt"].forEach(function (view) {
         nbaSimCalls(sim, lines, view).forEach(function (c) {
+          if (view === "mkt" && c.key === "home_total" && c.band === "no call" && lines.home_tt && fh !== c.line &&
+              nbaSimBand(Math.max(0, Math.min(1, 0.5 + (c.p - 0.5) * NBA_SIM_TEAM_WAS)), sim.bands) !== "no call") {
+            var wonB = (fh > c.line) === (c.side === "OVER");
+            B.n++; B.w += wonB ? 1 : 0; B.says += c.p; B.units += nbaSimUnits(c.side === "OVER" ? lines.home_tt.op : lines.home_tt.up, wonB);
+          }
           if (c.band === "no call") return;
           var won = null, price = -110;
           if (c.key === "total") { if (fa + fh === c.line) return; won = (fa + fh > c.line) === (c.side === "OVER"); price = c.side === "OVER" ? r.inputs.op : r.inputs.up; }
@@ -1267,7 +1293,7 @@
         });
       });
     });
-    if (!n && !gn && !an && !M.n && !Wd.n && !Wd.p) return '';
+    if (!n && !gn && !an && !B.n && !M.n && !Wd.n && !Wd.p) return '';
     var order = { total: 0, h1: 1, spread: 2, ml: 3, away_total: 4, home_total: 5 }, bandOrder = { STRONG: 0, BET: 1, LEAN: 2 },
         label = { total: "Total", h1: "First half", spread: "Spread", ml: "Moneyline", away_total: "Away team total", home_total: "Home team total" };
     var h = '<div class="simrec"><div class="calibhead">SIMULATION · says against does, every call at LEAN or better</div>';
@@ -1282,14 +1308,19 @@
       h += '</tbody></table>';
     });
     if (gn) {
-      h += '<div class="simrecview">The team-total gap rule <span class="tag">the book\'s line a point or more off the number the game\'s total and spread imply · scored, two seasons · under re-test from 11 Nov 2026: the backtest held one book\'s line against another source\'s closing total and spread, where a gap of a point or more showed on two games in three; a book against its own numbers shows one on one line in ten, and this season that reads 20-18 at home and 27-28 away at the three apps. Run NBA gap retest.bat holds the two seasons to the same test and decides whether the rule stays scored</span></div><table class="form simrectab gaptab"><thead><tr><th>Side</th><th>Record</th><th>Does</th><th>Units</th><th>Two seasons said</th></tr></thead><tbody>';
-      [["HOME", "62% under above the number, 66% over below (169 and 247, 94 and 195 games)"], ["AWAY", "56% under above, 57% over below"]].forEach(function (x) {
+      h += '<div class="simrecview">The team-total gap, a watch <span class="tag">the book\'s line a point or more off the number the game\'s total and spread imply · shown, not scored, from 11 Nov 2026 · the two seasons behind the rule read one book\'s line, and the season pull had kept that book\'s alternate points with another point\'s prices: 61% on those, a coin less the price on the books\' own lines</span></div><table class="form simrectab gaptab"><thead><tr><th>Side</th><th>Record</th><th>Does</th><th>Units</th><th>The re-test said, 2025-26</th></tr></thead><tbody>';
+      [["HOME", "136-117 (53.8%), +3.4u at the apps against the book\'s own number; 104-93, −1.2u against the other books\'"], ["AWAY", "130-123 (51.4%), −7.7u; 103-97, −5.9u"]].forEach(function (x) {
         var d = G[x[0]];
         if (!d.n) return;
         var cls = d.units > 0 ? "good" : d.units < 0 ? "bad" : "";
         h += '<tr><td>' + (x[0] === "HOME" ? "Home team total" : "Away team total") + '</td><td>' + d.w + '-' + (d.n - d.w) + '</td><td class="' + cls + '">' + (100 * d.w / d.n).toFixed(1) + '%</td><td class="' + cls + '">' + (d.units >= 0 ? '+' : '') + d.units.toFixed(1) + 'u</td><td class="dim">' + x[1] + '</td></tr>';
       });
       h += '</tbody></table>';
+    }
+    if (B.n) {
+      var bcls = B.units > 0 ? "good" : B.units < 0 ? "bad" : "";
+      h += '<div class="simrecview">The anchored home team total at its old weight, a watch <span class="tag">the sim\'s chance times 1.5, the weight the same replay gave it · withdrawn 11 Nov 2026 with the gap rule: it reads at 0.3 now, like the away side, and calls nothing here until a replay on the books\' own lines says otherwise</span></div><table class="form simrectab boosttab"><thead><tr><th>Calls it would have made</th><th>Record</th><th>Says</th><th>Does</th><th>Units</th></tr></thead><tbody>' +
+           '<tr><td>' + B.n + '</td><td>' + B.w + '-' + (B.n - B.w) + '</td><td>' + (100 * B.says / B.n).toFixed(1) + '%</td><td class="' + bcls + '">' + (100 * B.w / B.n).toFixed(1) + '%</td><td class="' + bcls + '">' + (B.units >= 0 ? '+' : '') + B.units.toFixed(1) + 'u</td></tr></tbody></table>';
     }
     if (an) {
       h += '<div class="simrecview">The agreement rule on the total <span class="tag">' + esc(NBA_AGREE_TAG) + ' · scored, BET</span></div><table class="form simrectab agreetab"><thead><tr><th>Voices</th><th>Record</th><th>Does</th><th>Units</th><th>Two seasons said</th></tr></thead><tbody>';
@@ -1311,7 +1342,7 @@
       h += '<div class="simrecview">Windows on the total <span class="tag">one ticket, over the low number and under the high; the chance is the anchored sim\'s mass inside the window</span></div><table class="form simrectab"><thead><tr><th>Tickets</th><th>Record</th><th>Says</th><th>Does</th><th>Units</th></tr></thead><tbody>' +
            '<tr><td>' + (Wd.n + Wd.p) + (Wd.p ? ' (' + Wd.p + ' on a number)' : '') + '</td><td>' + Wd.w + '-' + (Wd.n - Wd.w) + '</td><td>' + (Wd.n ? (100 * Wd.says / Wd.n).toFixed(1) + '%' : '—') + '</td><td class="' + wcls + '">' + (Wd.n ? (100 * Wd.w / Wd.n).toFixed(1) + '%' : '—') + '</td><td class="' + wcls + '">' + (Wd.units >= 0 ? '+' : '') + Wd.units.toFixed(2) + 'u</td></tr></tbody></table>';
     }
-    h += '<div class="note dim">A call is the sim\'s side on the line the row carried whose WORTH (the chance shrunk by what the replay found) reads LEAN (60%) or better; "says" is the sim\'s own chance, "does" the share that landed. The replays: the own view\'s total and spread calls land at 50% whatever they say (the close already carries the ratings), its win chances within 3 points of true; the first half is a coin from either view over two seasons. The team totals are the one inefficiency: the book\'s line sits off the number the game\'s own total and spread imply, the gap rule reads it (a point or more, scored over two seasons), and the anchored sim\'s calls carry the same lean with the shape on top.</div></div>';
+    h += '<div class="note dim">A call is the sim\'s side on the line the row carried whose WORTH (the chance shrunk by what the replay found) reads LEAN (60%) or better; "says" is the sim\'s own chance, "does" the share that landed. The replays: the own view\'s total and spread calls land at 50% whatever they say (the close already carries the ratings), its win chances within 3 points of true; the first half is a coin from either view over two seasons. The team totals were scored until 11 Nov 2026 on a replay whose lines were not the book\'s: the season pull had kept, for the one book it read, an alternate point with another point\'s prices. On the books\' own lines the gap between a team total and the number the game\'s total and spread imply reads a coin less the price, so the gap and the anchored home team total are watches now, counted above and scored nowhere.</div></div>';
     return h;
   }
 

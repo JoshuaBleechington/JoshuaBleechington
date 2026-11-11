@@ -111,13 +111,23 @@ LEAGUE = {
 # home line a point or more above the implied under 62.1% of the time, a point or more below over 68.1% (t -5.1 on the gap);
 # the away side positive but noisy (247-226; the slope -0.67, t -0.9). The first quarter did not come back (+0.12, t 0.2): a
 # watch. The team totals are a measured market, their shrink 1.0, and the page scores the gap rule itself beside the sim's chance.
+# (11 Nov 2026: they were not. The lines were one book's alternates at another point's prices; see the note under SHRINK.)
 # Engine 2's replay (30 Oct 2026, both seasons at 1,000 runs): the own view's total slope -0.17 and -0.14 (nothing, a faint fade), the
 # spread -0.07 and -0.01, the moneyline +0.91 and +1.53; the anchored home team total +1.01 (t 1.9; 355-233, 60.4%), the away +0.80;
 # the first half +0.42 and -0.50 (a coin); the first quarter +0.47 (one season). The total's shrink goes to nothing; the rest hold
-SHRINK = {"total": 0.0, "h1": 0.1, "spread": 0.0, "ml": 0.97, "team": 1.5, "team_away": 0.3, "team_own": 0.3, "quarter": 0.1}
+SHRINK = {"total": 0.0, "h1": 0.1, "spread": 0.0, "ml": 0.97, "team": 0.3, "team_away": 0.3, "team_own": 0.3, "quarter": 0.1}
 # the team totals by view and side (26 Oct 2026, the own view's team totals replayed on both seasons): the anchored home
 # team total's does-on-says slope was 1.78 and 4.29 (t 2.9, 4.7), capped at 1.5; the anchored away 0.45 and -0.79 (null);
 # the own view's 0.30 / 0.22 at home and 0.45 / 0.08 away (t under 1.5), its 65-70% calls landing 47% both seasons
+# THE HOME SIDE'S 1.5 WITHDRAWN (11 Nov 2026): 0.3, like its two siblings. Every team-total number above was replayed on the
+# period-lines file, whose team-total line a book was the FIRST point listed with the LAST over and under prices, and the book
+# the replay read was BetRivers (673 of 674 games of 2025-26), which lists four or five points a side. So the line was an
+# alternate's number at another point's prices, and the anchored game, built on the number the total and spread imply, "beat"
+# it 60.7% and 59.0% of the time. The re-test (slate.py nba-gap-retest, the user's file) reads the same call on the books
+# that list one point at 136-117 at home and 130-123 away, a coin less the price, and on this season's rows the kept point
+# is worth +23.0 units at the kept prices and +0.9 at its own. None of the team-total shrinks is a measurement any more; 0.3
+# keeps all three from calling until a replay on the books' main lines says what they are worth. The page rules the same
+# way on every row, whatever shrink its slate stored (NBA_SIM_SHRINK_RULES in web/nba.engine.js)
 BANDS = [(0.70, "STRONG"), (0.65, "BET"), (0.60, "LEAN")]
 
 

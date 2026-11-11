@@ -1277,18 +1277,29 @@ const CHECKS = ["dome","playoff"];
     set('line', '231.5'); await wait();
     document.getElementById('add').click(); await wait();
     const stored = JSON.parse(smStore.getItem('callsheet3.card.v1')).find(r => /76ers @ Knicks/.test(r.matchup));
-    return { panel: panel.slice(0, 420), tiles, meta: meta.replace(/\s+/g, ' ').trim(), medians: medians.replace(/\s+/g, ' ').trim(), rows, chips, moved, hasSim: !!(stored && stored.inputs.nbasim && stored.inputs.nbasim.length > 1000) };
+    return { panel: panel.slice(0, 420), tiles, meta: meta.replace(/\s+/g, ' ').trim(), medians: medians.replace(/\s+/g, ' ').trim(), rows, chips, moved, hasSim: !!(stored && stored.inputs.nbasim && stored.inputs.nbasim.length > 1000),
+             teamShrink: stored ? ((JSON.parse(stored.inputs.nbasim).shrink || {}).team) : null };
   });
   // graded, with the book's team totals on the row's odds JSON (26 Oct 2026): the record takes them too
+  // (11 Nov 2026: and with the 1.5 a slate written before that day stored for the anchored home team total, which the page no longer takes from the row)
   await pg.evaluate(async () => { const c = JSON.parse(smStore.getItem('callsheet3.card.v1')); c.forEach(r => { if (/76ers @ Knicks/.test(r.matchup)) { r.finals = { fa: '112', fh: '121', f5a: '55', f5h: '60' };
+    const sb = JSON.parse(r.inputs.nbasim); sb.shrink.team = 1.5; r.inputs.nbasim = JSON.stringify(sb);
     r.inputs.odds = JSON.stringify({ total: {}, ml: {}, spread: {}, book: 'fanatics', team: { AWAY: { OVER: [['fanatics', -110, 113.5], ['fanatics', 140, 117.5], ['draftkings', -112, 113.5]], UNDER: [['fanatics', -110, 113.5], ['fanatics', -170, 117.5], ['draftkings', -108, 113.5]] },
                                                                                                     HOME: { OVER: [['fanatics', -115, 123.5]], UNDER: [['fanatics', -105, 123.5]] } } }); } }); await smStore.setItem('callsheet3.card.v1', JSON.stringify(c)); });
   await reloaded(); await pg.evaluate(() => smStore.ready);
-  const simRec = await pg.evaluate(() => { const rec = document.querySelector('#calibBox .simrec'); return { has: !!rec, text: rec ? rec.innerText.replace(/\s+/g, ' ').trim().slice(0, 300) : '', gapHead: rec ? ((e) => e ? e.innerText.replace(/\s+/g, ' ').trim() : '')([...rec.querySelectorAll('.simrecview')].find(e => /team-total gap rule/i.test(e.textContent))) : '', rows: rec ? [...rec.querySelectorAll('.simrectab:not(.gaptab) tbody tr')].map(tr => tr.innerText.replace(/\s+/g, ' ').trim()) : [],
-    gap: rec ? [...rec.querySelectorAll('.gaptab tbody tr')].map(tr => tr.innerText.replace(/\s+/g, ' ').trim()) : [] }; });
-  // the gap rule on the card: the Knicks' 123.5 sits 5 above the implied (231.5 + 5.5) / 2 = 118.5, so UNDER by the rule; the 76ers' 113.5 sits half a point over 113, no call
-  // (26 Oct 2026: the band comes from the worth now, so the anchored home team total at 123.5 reads a band and the own view's does not; 121 scored, the under wins)
-  const gapCard = await pg.evaluate(async () => {
+  const simRec = await pg.evaluate(() => { const rec = document.querySelector('#calibBox .simrec'); return { has: !!rec, text: rec ? rec.innerText.replace(/\s+/g, ' ').trim().slice(0, 300) : '', gapHead: rec ? ((e) => e ? e.innerText.replace(/\s+/g, ' ').trim() : '')([...rec.querySelectorAll('.simrecview')].find(e => /team-total gap/i.test(e.textContent))) : '', rows: rec ? [...rec.querySelectorAll('.simrectab:not(.gaptab):not(.boosttab) tbody tr')].map(tr => tr.innerText.replace(/\s+/g, ' ').trim()) : [],
+    gap: rec ? [...rec.querySelectorAll('.gaptab tbody tr')].map(tr => tr.innerText.replace(/\s+/g, ' ').trim()) : [],
+    // 11 Nov 2026: the anchored home team total's 1.5 is withdrawn; what it would have called is a watch row of its own, and the note says why
+    boost: rec ? [...rec.querySelectorAll('.boosttab tbody tr')].map(tr => tr.innerText.replace(/\s+/g, ' ').trim()) : [],
+    boostHead: rec ? ((e) => e ? e.innerText.replace(/\s+/g, ' ').trim() : '')([...rec.querySelectorAll('.simrecview')].find(e => /anchored home team total/i.test(e.textContent))) : '',
+    anchoredTab: rec ? [...rec.querySelectorAll('.simrecview')].some(e => /^Anchored to the market$/i.test(e.textContent.trim())) : null,
+    note: rec ? ((e) => e ? e.innerText.replace(/\s+/g, ' ').trim() : '')(rec.querySelector('.note')) : '',
+    storedTeam: (() => { try { const r = JSON.parse(smStore.getItem('callsheet3.card.v1')).find(x => /76ers @ Knicks/.test(x.matchup)); return JSON.parse(r.inputs.nbasim).shrink.team; } catch (e) { return null; } })() }; });
+  // the gap on the card: the Knicks' 123.5 sits 5 above the implied (231.5 + 5.5) / 2 = 118.5, so UNDER by the gap; the 76ers' 113.5 sits half a point over 113, inside a point
+  // (26 Oct 2026: the band comes from the worth, so the anchored home team total at 123.5 read a band at its 1.5; 121 scored, the under wins)
+  // (11 Nov 2026: the gap is a watch and the 1.5 is withdrawn. The re-test showed the two seasons behind both read a line the season pull had kept wrong. The gap's chip is a dashed
+  //  outline that says "a watch, not scored"; the anchored home team total's 67% is worth 55% at 0.3, no band, on a row whose slate stored 1.5; the record keeps both as watches)
+  const gapCardT = await pg.evaluate(async () => {
     const wait = () => new Promise(r => setTimeout(r, 80));
     document.getElementById('m-nba').click(); await wait();
     const row = JSON.parse(smStore.getItem('callsheet3.card.v1')).find(r => /76ers @ Knicks/.test(r.matchup));
@@ -1296,9 +1307,12 @@ const CHECKS = ["dome","playoff"];
     if (btn) { btn.click(); await wait(); }
     else { document.getElementById('odds').value = row.inputs.odds; document.getElementById('line').value = '231.5'; document.getElementById('sp').value = '-5.5'; document.getElementById('nbasim').value = row.inputs.nbasim; document.getElementById('away').value = '76ers'; document.getElementById('home').value = 'Knicks'; document.getElementById('line').dispatchEvent(new Event('input', { bubbles: true })); await wait(); }
     const rows = [...document.querySelectorAll('#nbaSimPanel .simtab tbody tr')].map(tr => tr.innerText.replace(/\s+/g, ' ').trim());
+    const chips = [...document.querySelectorAll('#nbaSimPanel .simtab tbody tr')].slice(4).map(tr => [...tr.querySelectorAll('.simchip')].map(e => e.className + '|' + e.textContent.replace(/\s+/g, ' ').trim()));
+    const sig = [...document.querySelectorAll('#signals a.sig')].map(a => a.className + '|' + a.innerText.replace(/\s+/g, ' ').trim());
     document.getElementById('clear').click(); await wait();
-    return rows.slice(4);
+    return { rows: rows.slice(4), chips, sig };
   });
+  const gapCard = gapCardT.rows;
   await pg.evaluate(async () => { await smStore.removeItem('callsheet3.card.v1'); }); await reloaded(); await pg.evaluate(() => smStore.ready);
   chk(simT.tiles.length === 4 && /^Total=\d+$/.test(simT.tiles[0]) && /^Margin=Knicks by \d+\.\d$/.test(simT.tiles[1]) && /^Knicks wins=\d+%$/.test(simT.tiles[2]) && /^Overtime=\d\.\d%$/.test(simT.tiles[3])
       && /^3,000 games, the sim's own view\. Anchored to DraftKings's 231\.5 \/ -5\.5 for the market view\.( The ratings ride the league's level of the last fortnight, [\d.]+ per 100 at [\d.]+ possessions \(30 Oct 2026\)\.)?( Engine 2: score effects, the market's shape \(30 Oct 2026\)\.)?$/.test(simT.meta)
@@ -1309,12 +1323,22 @@ const CHECKS = ["dome","playoff"];
       'nba sim: the Simulation card reads the example\'s runs, lists every market with the own and the anchored chance for the line on the row, follows the line when it is typed, and the block rides with the row', JSON.stringify({ panel: simT.panel, rows: simT.rows, moved: simT.moved, chips: simT.chips.length, has: simT.hasSim }));
   chk(simRec.has && /^SIMULATION · says against does, every call at LEAN or better The sim's own view/.test(simRec.text) && simRec.rows.length >= 1
       && simRec.rows.every(r => /^(Total|First half|Spread|Moneyline|Away team total|Home team total) (STRONG|BET|LEAN) [01]-[01] \d+\.\d% (0|100)\.0% [+-]\d+\.\du$/.test(r))
-      && simRec.rows.some(r => /^Home team total (STRONG|BET|LEAN) 1-0 /.test(r)) && /Anchored to the market MARKET BAND RECORD SAYS DOES UNITS Home team total/.test(simRec.text)
-      && simRec.gap.length === 1 && /^Home team total 1-0 100\.0% \+[01]\.\du 62% under above the number/.test(simRec.gap[0])
-      && /^The team-total gap rule the book's line a point or more off the number the game's total and spread imply · scored, two seasons · under re-test from 11 Nov 2026: the backtest held one book's line against another source's closing total and spread/i.test(simRec.gapHead) && /Run NBA gap retest\.bat holds the two seasons to the same test and decides whether the rule stays scored$/i.test(simRec.gapHead),
-      'nba sim: once the row grades, the record block keeps the calls whose worth reads LEAN or better, says against does by view, market and band, the anchored home team total among them (and the own view\'s once Engine 2\'s tighter team variance lifts its worth to LEAN, 30 Oct 2026), and the gap rule\'s own tally (the Knicks\' 123.5 five above the implied 118.5, under called, 121 scored: a win), its heading saying it is under re-test from 11 Nov 2026 and what decides', JSON.stringify(simRec));
-  chk(gapCard.length === 2 && /^76ers team total 113\.5 fanatics -110\/-110 implied 113, gap \+0\.5 · inside a point, no call/.test(gapCard[0]) && /^Knicks team total 123\.5 fanatics -115\/-105 implied 118\.5, gap \+5 · UNDER by the gap rule/.test(gapCard[1]),
-      'nba sim: the Simulation card shows each team total\'s implied number and gap, and the gap rule\'s call when it is a point or more', JSON.stringify(gapCard));
+      && simRec.gap.length === 1 && /^Home team total 1-0 100\.0% \+[01]\.\du 136-117 \(53\.8%\), \+3\.4u at the apps against the book's own number; 104-93, [-−]1\.2u against the other books'$/.test(simRec.gap[0])
+      && /^The team-total gap, a watch the book's line a point or more off the number the game's total and spread imply · shown, not scored, from 11 Nov 2026 · the two seasons behind the rule read one book's line, and the season pull had kept that book's alternate points with another point's prices: 61% on those, a coin less the price on the books' own lines$/i.test(simRec.gapHead)
+      && !/scored, two seasons|under re-test/i.test(simRec.gapHead),
+      'nba sim: once the row grades, the record block keeps the calls whose worth reads LEAN or better, says against does by view, market and band, and the gap\'s own tally as a watch (the Knicks\' 123.5 five above the implied 118.5, under called, 121 scored: a win): its heading says shown, not scored, from 11 Nov 2026 and why, and the column beside the tally carries what the re-test read on the books\' own lines', JSON.stringify(simRec));
+  chk(simT.teamShrink === 0.3 && simRec.storedTeam === 1.5 && simRec.anchoredTab === false && !simRec.rows.some(r => /^Home team total (STRONG|BET|LEAN) 1-0 6\d\.\d% /.test(r))
+      && simRec.boost.length === 1 && /^1 1-0 6\d\.\d% 100\.0% \+[01]\.\du$/.test(simRec.boost[0])
+      && /^The anchored home team total at its old weight, a watch the sim's chance times 1\.5, the weight the same replay gave it · withdrawn 11 Nov 2026 with the gap rule: it reads at 0\.3 now, like the away side, and calls nothing here until a replay on the books' own lines says otherwise$/i.test(simRec.boostHead)
+      && /The team totals were scored until 11 Nov 2026 on a replay whose lines were not the book's: the season pull had kept, for the one book it read, an alternate point with another point's prices\. On the books' own lines the gap between a team total and the number the game's total and spread imply reads a coin less the price, so the gap and the anchored home team total are watches now, counted above and scored nowhere\.$/.test(simRec.note)
+      && !/the one inefficiency/i.test(simRec.note),
+      'nba sim: the anchored home team total\'s 1.5 is withdrawn: a block built today carries 0.3, and a row whose slate stored 1.5 with it reads at 0.3 all the same: its 67% under 123.5 is worth 55% and no call, so no anchored table opens for it; the record keeps what the old weight would have called as a watch of its own (one call, a win) and the note under the record says the team totals were scored on lines that were not the book\'s', JSON.stringify({ built: simT.teamShrink, stored: simRec.storedTeam, anchoredTab: simRec.anchoredTab, rows: simRec.rows, boost: simRec.boost, boostHead: simRec.boostHead, note: simRec.note.slice(-420) }));
+  chk(gapCard.length === 2 && /^76ers team total 113\.5 fanatics -110\/-110 implied 113, gap \+0\.5 · inside a point (OVER|UNDER) \d+% worth \d+% (OVER|UNDER) \d+% worth \d+%$/.test(gapCard[0])
+      && /^Knicks team total 123\.5 fanatics -115\/-105 implied 118\.5, gap \+5 · UNDER by the gap a watch, not scored UNDER \d+% (LEAN · |BET · |STRONG · )?worth \d+% UNDER 6\d% worth 5[45]%$/.test(gapCard[1])
+      && gapCardT.chips.length === 2 && gapCardT.chips[0].every(c => !/gaprule/.test(c)) && gapCardT.chips[1][0] === 'simchip simwatch gaprule|UNDER by the gap' && /^simchip simno\|UNDER 6\d%$/.test(gapCardT.chips[1][2])
+      && !gapCardT.chips[1].some(c => /simbet gaprule/.test(c))
+      && gapCardT.sig.some(c => /^sig watch\|GAP WATCH Knicks team total UNDER 123\.5 · gap \+5 · not scored$/i.test(c)) && !gapCardT.sig.some(c => /^sig go\|GAP/i.test(c)) && !gapCardT.sig.some(c => /gap rule/i.test(c)),
+      'nba sim: the Simulation card shows each team total\'s implied number and gap, and the side the gap points to when it is a point or more as a watch: a dashed chip that says not scored where the green BET chip was, the anchored home team total beside it reading no band at its new weight, and the signal on the rail gold, not green', JSON.stringify(gapCardT));
 
   // ---- the store (25 Oct 2026): the card, the props and the slate live in IndexedDB, past localStorage's 10 MB ----
   await fill(CASES[0].sport, CASES[0].inputs);
@@ -2069,7 +2093,7 @@ const CHECKS = ["dome","playoff"];
                                    shrink: { total: 0.05, h1: 0.1, spread: 0.0, ml: 0.97, team: 1.5, team_away: 0.3, team_own: 0.3, quarter: 0.1 }, bands: [[0.7, 'STRONG'], [0.65, 'BET'], [0.6, 'LEAN']] })); await wait();
     const withSim = txt(document.getElementById('nbaKalshiPanel'));
     const simTT = [...document.querySelectorAll('#nbaSimPanel .simtab td')].map(td => txt(td)).filter(s => /team total/i.test(s));
-    // tonight's signals on the rail (4 Nov 2026): the gap rule's two calls, the crowd's sharp side and numbers; the jump bar's dots and the live lines read off the same list
+    // tonight's signals on the rail (4 Nov 2026): the gap's two sides (a watch from 11 Nov 2026), the crowd's sharp side and numbers; the jump bar's dots and the live lines read off the same list
     const signals = txt(document.getElementById('signals')), simLive = txt(document.getElementById('secSimLive')), kalLive = txt(document.getElementById('secKalshiLive'));
     const dots = [...document.querySelectorAll('#nbaNav a[data-go]')].map(a => a.dataset.go + ':' + ((a.querySelector('.dot') || {}).className || ''));
     const folded = { about: [...document.querySelectorAll('#nbaFields details.about')].length, aboutOpen: [...document.querySelectorAll('#nbaFields details.about[open]')].length, rail: !!document.querySelector('#markets + details.about, .rail details.about'), notes: [...document.querySelectorAll('#markets details.mknotes')].length };
@@ -2091,15 +2115,15 @@ const CHECKS = ["dome","playoff"];
     document.getElementById('clear').click(); await wait(); await smStore.removeItem('callsheet3.card.v1');
     return { empty, panel, noPin, chips, stored, mlTile, first: first.slice(0, 60), second: second.indexOf('"bid":0.6') >= 0, between, withSim, simTT, signals, simLive, kalLive, dots, folded };
   });
-  chk(/gap rule:? ?Hawks team total UNDER 118\.5 · gap \+1\b/i.test(kalT.signals) && /gap rule:? ?Wizards team total OVER 113\.5 · gap -1\.5/i.test(kalT.signals)
+  chk(/gap watch:? ?Hawks team total UNDER 118\.5 · gap \+1 · not scored/i.test(kalT.signals) && /gap watch:? ?Wizards team total OVER 113\.5 · gap -1\.5 · not scored/i.test(kalT.signals) && !/gap rule/i.test(kalT.signals)
       && /Kalshi:? ?the sharp side Hawks · the crowd 3\.7 points over Pinnacle on the Wizards/i.test(kalT.signals)
       && /the crowd:? ?Hawks to win 57\.5% · spread Hawks [-−]2\.8 · total 232\.3\b/i.test(kalT.signals)
       && /Kalshi team total:? ?Hawks 117\.5 · the book 118\.5 · leans UNDER, the over 45\.0% at the book's number/i.test(kalT.signals)
       && /Kalshi team total:? ?Wizards 114\.1 · the book 113\.5 · sits with the book, the over 53\.0% at the book's number/i.test(kalT.signals)
-      && /gap rule: Hawks team total UNDER 118\.5 · gap \+1 · gap rule: Wizards team total OVER 113\.5/.test(kalT.simLive) && /^Kalshi: the sharp side Hawks/.test(kalT.kalLive)
-      && kalT.dots.indexOf('secSim:dot go') >= 0 && kalT.dots.indexOf('secKalshi:dot crowd') >= 0 && kalT.dots.indexOf('secMid:dot') >= 0 && kalT.dots.indexOf('boardDate:') >= 0
+      && /gap watch: Hawks team total UNDER 118\.5 · gap \+1 · not scored · gap watch: Wizards team total OVER 113\.5 · gap -1\.5 · not scored/.test(kalT.simLive) && /^Kalshi: the sharp side Hawks/.test(kalT.kalLive)
+      && kalT.dots.indexOf('secSim:dot watch') >= 0 && kalT.dots.indexOf('secSim:dot go') < 0 && kalT.dots.indexOf('secKalshi:dot crowd') >= 0 && kalT.dots.indexOf('secMid:dot') >= 0 && kalT.dots.indexOf('boardDate:') >= 0
       && kalT.folded.about === 7 && kalT.folded.aboutOpen === 0 && kalT.folded.rail && kalT.folded.notes >= 3,
-      'signals: the matchup rail opens with tonight\'s signals, every engine\'s call on the row as a chip that links to its section (the gap rule\'s two calls green, the crowd\'s sharp side and its numbers in the exchange\'s colour, each club\'s team total as a chip of its own against the book\'s line with the side the crowd leans to); the jump bar\'s dots and the sections\' live lines read off the same list, and the explanations fold under a line on the rail, on every NBA section and under each market row',
+      'signals: the matchup rail opens with tonight\'s signals, every engine\'s call on the row as a chip that links to its section (the gap\'s two sides gold, a watch from 11 Nov 2026 and green before it, the crowd\'s sharp side and its numbers in the exchange\'s colour, each club\'s team total as a chip of its own against the book\'s line with the side the crowd leans to); the jump bar\'s dots and the sections\' live lines read off the same list, and the explanations fold under a line on the rail, on every NBA section and under each market row',
       JSON.stringify({ signals: kalT.signals.slice(0, 900), simLive: kalT.simLive, kalLive: kalT.kalLive, dots: kalT.dots, folded: kalT.folded }));
   chk(/The spread: the crowd Hawks [-−]2\.8 · the book Hawks [-−]2\.5\. At the book's number: Wizards covers 49\.0% by the crowd, \d+\.\d% by the sheet · Wizards \+2\.5 49\.0% by the crowd, better on Kalshi: 50¢ needs 51\.[78]% after the fee against [-−]110 needing 52\.4% · Hawks [-−]2\.5 51\.0% by the crowd, the book's price: 52¢ needs 53\.7% after the fee against [-−]110 needing 52\.4%\./.test(kalT.panel)
       && /The total: the crowd 232\.3 · the book 232\.5 · Pinnacle 232\.5\. At the book's 232\.5: the over 49\.0% by the crowd, \d+\.\d% by the sheet · over 232\.5 49\.0% by the crowd, better on Kalshi: 50¢ needs 51\.[78]% after the fee against [-−]110 needing 52\.4% · under 232\.5 51\.0% by the crowd, the book's price: 52¢ needs 53\.7% after the fee against [-−]110 needing 52\.4%\./.test(kalT.panel)
@@ -2113,7 +2137,7 @@ const CHECKS = ["dome","playoff"];
   chk(/the simulation's own view 117\.0\. At the book's 118\.5: the over 45\.0% by the crowd, 4\d\.\d% by the simulation's own view/.test(kalT.withSim)
       && kalT.simTT.length === 2 && /Kalshi: the crowd 45\.0% over at 118\.5 · over 46¢ needs 47\.7% after the fee, better than [-−]110 needing 52\.4% · under 56¢ needs 57\.7% after the fee, not better than [-−]110 needing 52\.4%/.test(kalT.simTT[0])
       && /Kalshi: the crowd 53\.0% over at 113\.5 · no rung at the line, so no price/.test(kalT.simTT[1]),
-      'kalshi team totals: with the simulation on the row the card adds its mean and its chance at the book\'s line, and the simulation\'s table carries the crowd\'s read under each team-total row beside the gap rule',
+      'kalshi team totals: with the simulation on the row the card adds its mean and its chance at the book\'s line, and the simulation\'s table carries the crowd\'s read under each team-total row beside the gap',
       JSON.stringify({ withSim: kalT.withSim.slice(1400, 2400), simTT: kalT.simTT }));
   chk(/^No Kalshi price on the row/.test(kalT.empty)
       && /^The crowd on Kalshi · as the run read it, Nov 14, \d{1,2}:\d\d [AP]M Hawks 57\.5¢ \(bid 57¢ \/ ask 58¢ · 150k contracts\): the crowd 57\.5% · the book 59\.9% \([-−]165\) · Pinnacle 61\.2% · better on Kalshi: 58¢ needs 59\.7% after the fee against [-−]165 needing 62\.3% Wizards 42\.5¢ \(bid 42¢ \/ ask 43¢ · 140k contracts\): the crowd 42\.5% · the book 40\.1% \(\+140\) · Pinnacle 38\.8% · the book's price: 43¢ needs 44\.7% after the fee against \+140 needing 41\.7% The spread:/.test(kalT.panel)

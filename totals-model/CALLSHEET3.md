@@ -1078,6 +1078,11 @@ said beside it. The rule needs the team totals on the row, which the odds
 run brings (`team` in the odds JSON), so a game added by hand shows "no
 line on the row".
 
+Withdrawn 11 Nov 2026: the two seasons read one book's alternate points
+kept with another point's prices. The gap is a watch and the anchored home
+team total carries no weight of its own; see "The team-total gap becomes a
+watch" at the end of this file.
+
 ## The Simulation card, 25 Oct 2026
 
 The user: "a simulation model for the super model... run the matchup 500
@@ -3302,3 +3307,52 @@ default on a first visit and the kept choice, the two pairs on two games
 (the two men left on one game make no ticket), the tabs, the overs and
 the unders alone, the copy, and after the grade the two-leg list kept
 beside the three-leg one with its own record line.
+
+## The team-total gap becomes a watch, 11 Nov 2026
+
+The re-test's file came back the same day (NBA.md, "The team-total edge
+was the season pull's fault"). The two seasons behind the gap rule and
+behind the simulation's weight on the anchored home team total read one
+book's line, and the season pull had kept that book's alternate points
+with another point's prices. On the books' own lines the gap reads a coin
+less the price. Both come off the score; nothing is hidden.
+
+**The gap.** `nbaTeamTotalGap` is unchanged: the implied number, the gap
+and the side a point or more off it. What it is called changed.
+
+- On the rail, `signalList` pushes it as a watch: gold, the badge "gap
+  watch", the words ending "not scored". The Simulation section's dot on
+  the jump bar is gold with it, green only when a scored call is live.
+- On the Simulation card the chip is `simchip simwatch gaprule`, a dashed
+  outline where the green BET fill was, reading "UNDER by the gap", with
+  "a watch, not scored" beside it. Inside a point the row says so and no
+  more. The Take button stays; a take marked from here carries the band
+  "gap watch", and one marked before keeps "gap rule" as it was marked.
+- In the record the table is "The team-total gap, a watch", the same
+  tally by side, with what the re-test read at the apps in the column
+  where the two seasons' figures were: 136-117 at home for +3.4 units
+  against the book's own number and 104-93 against the other books',
+  130-123 and 103-97 away.
+- The phone sheet's list of the simulation's calls at BET or better no
+  longer carries the gap (`phonePayload`); `m.html` still reads an old
+  code's entries.
+
+**The anchored home team total.** Its shrink was 1.5, written by the slate
+into every row's simulation block. `NBA_SIM_SHRINK_RULES` now rules that
+key from the page, 0.3, whatever the row stored, so a slate written before
+this day reads the same as one written after; the away side and the own
+view were 0.3 already. A 67% is worth 55% and reads no band. What the 1.5
+would have called and the page no longer does is tallied as a watch of
+its own under the gap's table, "The anchored home team total at its old
+weight": calls, record, says, does, units. On the 160 games so far that
+is seven calls, 6-1. The note under the record says the team totals were
+scored on lines that were not the book's.
+
+The harness stores 1.5 on a graded row and reads the home team total at
+no band with no anchored table opened for it, the watch row with its one
+call, the gap's heading and column, the dashed chip and its class, the
+gold signal with no green one beside it, the jump bar's dot, and a block
+built today carrying 0.3. The page was then loaded with the backup of 10
+Nov: the gap 7-6 at home and 4-8 away as before, the seven calls of the
+old weight on their own row, no script errors.
+

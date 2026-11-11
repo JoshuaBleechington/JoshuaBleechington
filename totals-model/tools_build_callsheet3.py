@@ -170,6 +170,8 @@ def head() -> str:
              "  .simpanel .simprof { margin-top: 4px; font-size: 11.5px; line-height: 1.5; }\n"
              "  .simrec { margin-top: 10px; } .simrec .simrecview { font-weight: 700; margin: 8px 0 4px; } .simrec .simrectab td.good { color: var(--go); } .simrec .simrectab td.bad { color: var(--bad); }\n"
              "  .simpanel .ttgap { margin-top: 3px; font: 11.5px/1.5 var(--sans); } .simchip.gaprule { font-size: 11px; }\n"
+             "  /* the gap as a watch (11 Nov 2026): a dashed outline, not a band's fill, so it never reads as a LEAN or a BET */\n"
+             "  .simchip.simwatch { background: transparent; border: 1px dashed var(--edge); color: var(--edge); padding: 0 6px; }\n"
              "  /* the Props tab's own Is it working block, in colour (22 Oct 2026) */\n"
              "  #propsCalib .calib > div.good { box-shadow: inset 3px 0 0 var(--go); } #propsCalib .calib > div.bad { box-shadow: inset 3px 0 0 var(--bad); }\n"
              "  #propsCalib .calib > div.good .v, #propsCalib .calib > div.good .units { color: var(--go); } #propsCalib .calib > div.bad .v, #propsCalib .calib > div.bad .units { color: var(--bad); }\n"

@@ -1090,3 +1090,104 @@ book for book what a separate script had found (FanDuel 11-8 at home and
 15-15 away, DraftKings 5-5 and 8-7, BetMGM 7-7 and 10-12). The page
 harness adds three games through the form, graded, and reads the calls,
 the no-call lines and the tiles of the markets not yet called.
+
+## The team-total edge was the season pull's fault, 11 Nov 2026
+
+The user ran the re-test the same day and sent `nba-gap-retest.txt`: 674
+games of 2025-26 (the 2024-25 ledger was not in the folder, so that
+season is still to read). The call is the under a point or more above the
+number the game's total and spread imply and the over a point or more
+below it, graded at the line's own prices.
+
+| 2025-26, the call's record | Home | Away |
+| --- | --- | --- |
+| A. as it was scored (the backtest's own book) | 278-177 (61.1%), +80.1u, slope t −5.2 | 244-197 (55.3%), +26.8u, t −2.5 |
+| B. BetRivers against its own total and spread | 177-107 (62.3%), +57.5u, t −4.7 | 140-117 (54.5%), +11.9u |
+| B. DraftKings against its own | 114-96 (54.3%), +5.5u, t −1.3 | 100-102, −12.7u |
+| B. ESPN BET against its own | 164-150 (52.2%), +7.2u | 178-164, +7.7u |
+| B. FanDuel against its own | 72-62 (53.7%), +2.4u | 65-65, −7.4u |
+| B. the three apps, one call a game | **136-117 (53.8%), +3.4u**, t −1.2 | **130-123 (51.4%), −7.7u** |
+| C. BetRivers against the other books' middle | 295-183 (61.7%), +89.5u, t −5.1 | 254-210 (54.7%), +23.3u |
+| C. the three apps, one call a game | 104-93 (52.8%), −1.2u | 103-97 (51.5%), −5.9u |
+| C. the same at a point and a half or more | 40-36, −0.8u | 30-40, −13.4u |
+
+The three apps are FanDuel, DraftKings and BetMGM; BetMGM is in the
+season pull on one game and Fanatics on none. The backtest's own book
+(Fanatics, else the first by name) was BetRivers on 673 of the 674 games.
+
+So it was neither of the two things the re-test was built to tell apart.
+The edge is the same against the other source, against the book's own
+numbers and against the market, and it sits on one book. A gap of a point
+or more shows on 68 to 73% of BetRivers' lines (sd 1.9) and on 20 to 47%
+of the other three books' (sd 0.8 to 0.9, and part of that is the hours
+between the 5:30 pm snapshot of the total and spread and the close the
+team total was read at).
+
+**Why BetRivers: the line in the file is not the book's.** The season
+pull kept one line a book a side as the first point listed with the last
+over and under prices (`odds_periods_parse`). A book that lists one point
+came through right. This season's rows keep every point a book lists, so
+the fault replays on them (160 games, each book against its own total and
+spread at the same moment):
+
+| Book | Points a side | The kept point is the main line | Gap of a point or more: main line | kept point | The call on the main line | on the kept point |
+| --- | --- | --- | --- | --- | --- | --- |
+| BetRivers | 4 or 5 on 288 of 300 | 3 sides in 10 (−2, −1, 0, +1, +2 off it on 49, 63, 90, 65, 33) | 6 of 300 (2%) | 188 of 300 (63%) | 2-4 | **111-77 (59.0%)** |
+| ESPN BET | 3 on 158 of 300 | 167 of 300 (a point under it on 133) | 43 of 300 | 109 of 300 | 13-30 | 44-65 |
+| DraftKings | 1 | all | 25 of 306 (8%) | the same | 13-12 | the same |
+| FanDuel | 1 | all | 49 of 316 (16%) | the same | 26-23 | the same |
+| BetMGM | 1 | all | 36 of 312 (12%) | the same | 17-19 | the same |
+| Pinnacle | 1 | all | 23 of 320 (7%) | the same | 13-10 | the same |
+
+The call on BetRivers' kept point is worth **+23.0 units at the prices
+kept beside it** (the middle one −110, another point's) and **+0.9 at the
+point's own** (the middle one −143). An alternate a point or two the right
+side of the main line wins 59% of the time and is priced to. The pair of
+prices kept is a real pair, so the re-test's check for prices that cannot
+be one line's passed it (6 of 1,348). The two seasons' 62% was this.
+
+**What rested on those lines, and what did not.**
+
+- The gap rule, scored 26 Oct. Withdrawn: a watch.
+- The simulation's weight on the anchored home team total, 1.5 (its calls
+  "landed" 60.7% and 59.0%). The anchored game is built on the number the
+  total and spread imply, so its call against a kept alternate is the gap
+  again. Withdrawn: 0.3, the weight of the away side and the own view,
+  which were fit on the same lines and already call nothing.
+- The first half and the quarters were read off the same file, where the
+  parse kept a period total's last point with that point's own prices: a
+  real line at its real price, an alternate at times. Nothing is scored
+  on them (0.1), and they read a coin.
+- Not touched: the agreement rule and the moneyline's 0.97 (closing
+  totals and moneylines from the other source), the hockey simulation
+  (DraftKings' first period, one point; its team totals were never
+  measured), and every line the page reads at night: the odds run takes
+  the number most books post (`odds_main_line`, 13 Oct) and the page picks
+  a book's team total as the point priced nearest even
+  (`nbaTeamTotalLine`).
+
+**What changed.**
+
+- The page. The gap's signal on the rail is gold, "gap watch ... not
+  scored"; on the Simulation card the green BET chip is a dashed outline,
+  "by the gap", "a watch, not scored"; the Take button stays. The record
+  keeps the gap's tally by side under "The team-total gap, a watch", with
+  what the re-test read at the apps where the two seasons' column was.
+  The anchored home team total reads at 0.3 on every row, whatever shrink
+  its slate stored (`NBA_SIM_SHRINK_RULES`), and the record keeps what
+  the 1.5 would have called as a watch of its own. The phone sheet's
+  list of the simulation's calls no longer carries the gap.
+- `slate.py`. `odds_periods_main` keeps a book's main line, the pair
+  priced nearest even with that point's own prices, for the team totals
+  and the period totals, and the pull marks a game kept that way
+  (`main`). The re-test's report says how its lines were kept and which
+  books to read, and opens with what the first reading found.
+  `nbasim.SHRINK` carries 0.3 for the anchored home team total.
+
+**What is left.** At the apps the home call is 136-117 over 2025-26 and
+20-18 this season, 53.6% on 291: one standard error above the price, not
+a rule. The watch keeps counting it. The 2024-25 season reads once
+`nba-ledger-202425.json` is in the folder (Run NBA ledger.bat, free) and
+the re-test is run again; the report now says which books to read. The
+team-total weights want a replay of the simulation on the one-point
+books' lines, which needs the two seasons' period and history files here.

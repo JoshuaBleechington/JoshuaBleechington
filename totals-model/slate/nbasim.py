@@ -124,7 +124,8 @@ SHRINK = {"total": 0.0, "h1": 0.1, "spread": 0.0, "ml": 0.97, "team": 0.3, "team
 # the replay read was BetRivers (673 of 674 games of 2025-26), which lists four or five points a side. So the line was an
 # alternate's number at another point's prices, and the anchored game, built on the number the total and spread imply, "beat"
 # it 60.7% and 59.0% of the time. The re-test (slate.py nba-gap-retest, the user's file) reads the same call on the books
-# that list one point at 136-117 at home and 130-123 away, a coin less the price, and on this season's rows the kept point
+# that list one point at 136-117 at home and 130-123 away in 2025-26 and 76-93 and 92-87 in 2024-25 (212-210 and 222-210
+# over the two), a coin less the price, and on this season's rows the kept point
 # is worth +23.0 units at the kept prices and +0.9 at its own. None of the team-total shrinks is a measurement any more; 0.3
 # keeps all three from calling until a replay on the books' main lines says what they are worth. The page rules the same
 # way on every row, whatever shrink its slate stored (NBA_SIM_SHRINK_RULES in web/nba.engine.js)

@@ -7259,6 +7259,15 @@ def make_odds_history(out_dir, log, books=None, sports=("NHL",), season=None, st
 # them: the kept point is BetRivers' main line on three sides in ten, the call on it lands 111-77, worth +23.0 units at the
 # prices kept and +0.9 at its own. The rule is a watch on the page, the simulation's 1.5 on the anchored home team total is
 # withdrawn with it (nbasim.SHRINK), and the pull keeps a book's main line from here (odds_periods_main).
+# 2024-25 (554 games, the user's ledger and two files, run here the same day): BetRivers again, on 552 games; 142-92 at
+# home as it was scored, 152-106 against its own numbers, 157-105 against the other books'. DraftKings 54-66 and FanDuel 50-70
+# at home against their own; the three apps 76-93 at home (-25.7 units) and 92-87 away. Two seasons at the apps: 212-210
+# at home (-22.3) and 222-210 away (-13.6) against the book's own number, 176-190 and 194-179 against the other books'.
+# That file shows the fault itself: BetRivers' stored point is a point or more off DraftKings' and FanDuel's line on 723 of
+# 1,106 sides, its stored pair is priced like an alternate on 585 and even on 50, and where the point is off, the price
+# belongs to a point on the other side of the main line on 561 of 692. Its first-half and first-quarter lines there are
+# alternates too (92% and 84% a point or more off the other books), at their own prices, since the old parse kept a period
+# total's last point with that point's prices; the backtest read the first half on BetMGM's main line (549 of 554 games).
 GAP_RETEST_APPS = ("fanduel", "draftkings", "betmgm")
 GAP_RETEST_US = ("fanatics", "betmgm", "draftkings", "fanduel", "caesars", "espnbet", "betrivers")
 GAP_RETEST_MIN = 1.0
@@ -7489,8 +7498,9 @@ def make_nba_gap_retest(out_dir, log, season=None):
              "A: the number as the backtest of 26 Oct 2026 had it (another source's closing total and spread; here the US books' mean at the last snapshot before tip).",
              "B: the number the SAME book's own total and spread imply. C: the number the OTHER books' middle total and spread imply.",
              "If the rule is the book's own inconsistency, B shows it. If it is one book's line off the market, C shows it and B does not. If only A shows it, it was the two sources.",
-             "Read on 11 Nov 2026, 674 games of 2025-26: the edge sat on BetRivers' line alone, in A, B and C alike (61 to 62% at home), and that line was an alternate's number",
-             "kept with another point's prices. On the books that list one point the call was 136-117 at home and 130-123 away, a coin less the price. The rule is a watch on the page.",
+             "Read on 11 Nov 2026, both seasons (674 games of 2025-26, 554 of 2024-25): the edge sat on BetRivers' line alone, in A, B and C alike (59 to 62% at home), and that",
+             "line was an alternate's number kept with another point's prices. On the books that list one point the call went 212-210 at home and 222-210 away over the two",
+             "seasons, a coin less the price (136-117 and 130-123, then 76-93 and 92-87). The rule is a watch on the page.",
              "Folder read: %s" % os.path.abspath(out_dir)]
     pooled, used = [], []
     for sn in seasons:
@@ -8515,7 +8525,8 @@ def selftest():
           "kept the old way, 24 of 24 games" in gr_rep and "Read B and C on the books that list one point: DraftKings, FanDuel, BetMGM." in gr_rep and "every game's lines are the books' main ones" not in gr_rep
           and "every game's lines are the books' main ones (pulled from 11 Nov 2026)." in gr_rep_main and "kept the old way" not in gr_rep_main
           and all(not r["main"] for r in gr_rows) and all(r["main"] for r in gr_rows_main) and len(gr_rows_main) == len(gr_rows)
-          and "Read on 11 Nov 2026, 674 games of 2025-26: the edge sat on BetRivers' line alone" in gr_txt and "The rule is a watch on the page." in gr_txt)
+          and "Read on 11 Nov 2026, both seasons (674 games of 2025-26, 554 of 2024-25): the edge sat on BetRivers' line alone" in gr_txt
+          and "the call went 212-210 at home and 222-210 away over the two" in gr_txt and "The rule is a watch on the page." in gr_txt)
     # the NBA ledger (15 Oct 2026), offline: the feed's shapes, canned
     check("nba: the season from a date", nba_season_id("2026-10-15") == "2026-27" and nba_season_id("2027-04-10") == "2026-27" and nba_season_id("2027-07-01") == "2026-27" and nba_season_id("2027-08-15") == "2027-28")
     check("nba: season spellings", nba_norm_season("2024-25") == "2024-25" and nba_norm_season("2024") == "2024-25" and nba_norm_season("20242025") == "2024-25" and nba_norm_season("202425") == "2024-25")

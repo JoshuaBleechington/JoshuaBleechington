@@ -3292,7 +3292,14 @@ smStore.ready.then(function () {
      season's rows, where the call on the kept point is worth +23.0 units at the kept prices and +0.9 at its own). On the
      books' own lines the gap is a coin less the price. The number, the gap and the side still show on the Simulation
      card, the signal is gold, the Take button stays, and the record keeps counting both sides: a book that hangs a line
-     a point off its own numbers can still earn the rule back */
+     a point off its own numbers can still earn the rule back.
+     2024-25 read the same day (554 games, the user's two files and ledger): BetRivers' line again, on 552 of them, 142-92
+     at home as it was scored and 152-106 against its own numbers; at the apps the home call LOST, 76-93 (-25.7 units), and
+     the away call went 92-87. Two seasons at the apps, one call a game: 212-210 at home (-22.3 units) and 222-210 away
+     (-13.6) against the book's own number, 176-190 (-34.8) and 194-179 (-7.8) against the other books' middle. In that
+     file BetRivers' stored point sits a point or more off DraftKings' and FanDuel's line on 65% of sides, and where it does
+     the stored price belongs to a point on the other side of the main line four times in five. The 53.8% at home in
+     2025-26 was one season's noise */
   var NBA_TT_GAP = 1.0;
   function nbaTeamTotalGap(tt, total, sp, side) {
     if (!tt || total === null || total === undefined || sp === null || sp === undefined || isNaN(+total) || isNaN(+sp)) return null;
@@ -3616,8 +3623,8 @@ smStore.ready.then(function () {
       h += '</tbody></table>';
     });
     if (gn) {
-      h += '<div class="simrecview">The team-total gap, a watch <span class="tag">the book\'s line a point or more off the number the game\'s total and spread imply · shown, not scored, from 11 Nov 2026 · the two seasons behind the rule read one book\'s line, and the season pull had kept that book\'s alternate points with another point\'s prices: 61% on those, a coin less the price on the books\' own lines</span></div><table class="form simrectab gaptab"><thead><tr><th>Side</th><th>Record</th><th>Does</th><th>Units</th><th>The re-test said, 2025-26</th></tr></thead><tbody>';
-      [["HOME", "136-117 (53.8%), +3.4u at the apps against the book\'s own number; 104-93, −1.2u against the other books\'"], ["AWAY", "130-123 (51.4%), −7.7u; 103-97, −5.9u"]].forEach(function (x) {
+      h += '<div class="simrecview">The team-total gap, a watch <span class="tag">the book\'s line a point or more off the number the game\'s total and spread imply · shown, not scored, from 11 Nov 2026 · the two seasons behind the rule read one book\'s line, and the season pull had kept that book\'s alternate points with another point\'s prices: 61% on those, a coin less the price on the books\' own lines</span></div><table class="form simrectab gaptab"><thead><tr><th>Side</th><th>Record</th><th>Does</th><th>Units</th><th>The re-test said, two seasons</th></tr></thead><tbody>';
+      [["HOME", "212-210 (50.2%), −22.3u at the apps against the book\'s own number; 176-190, −34.8u against the other books\'"], ["AWAY", "222-210 (51.4%), −13.6u; 194-179, −7.8u"]].forEach(function (x) {
         var d = G[x[0]];
         if (!d.n) return;
         var cls = d.units > 0 ? "good" : d.units < 0 ? "bad" : "";

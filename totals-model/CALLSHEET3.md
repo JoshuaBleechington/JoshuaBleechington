@@ -3329,10 +3329,11 @@ and the side a point or more off it. What it is called changed.
   more. The Take button stays; a take marked from here carries the band
   "gap watch", and one marked before keeps "gap rule" as it was marked.
 - In the record the table is "The team-total gap, a watch", the same
-  tally by side, with what the re-test read at the apps in the column
-  where the two seasons' figures were: 136-117 at home for +3.4 units
-  against the book's own number and 104-93 against the other books',
-  130-123 and 103-97 away.
+  tally by side, with what the re-test read at the apps over the two
+  seasons in the column where the old figures were: 212-210 at home for
+  −22.3 units against the book's own number and 176-190 against the other
+  books', 222-210 and 194-179 away. (The column first carried 2025-26
+  alone, 136-117 at home; 2024-25 was read the same day and went 76-93.)
 - The phone sheet's list of the simulation's calls at BET or better no
   longer carries the gap (`phonePayload`); `m.html` still reads an old
   code's entries.

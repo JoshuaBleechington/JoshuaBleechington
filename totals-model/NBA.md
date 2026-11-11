@@ -1202,3 +1202,56 @@ already bought. It now says they are copied from the folder that has
 them and never pulled again, that the ledger alone is free to build, and
 the report names the folder it read. 2024-25 is still to read.
 
+**2024-25, read the same day.** The user sent the 2024-25 ledger and the
+season's two odds files, and the re-test ran here on them: 554 games, 22
+Oct 2024 to 9 Jan 2025. The backtest's own book was BetRivers again, on
+552 of them.
+
+| 2024-25, the call's record | Home | Away |
+| --- | --- | --- |
+| A. as it was scored (BetRivers' line) | 142-92 (60.7%), +58.4u, slope t −3.2 | 148-107 (58.0%), +49.3u, t −2.8 |
+| B. BetRivers against its own total and spread | 152-106 (58.9%), +52.4u | 168-115 (59.4%), +61.0u |
+| B. DraftKings against its own | 54-66 (45.0%), −18.2u | 65-67, −9.5u |
+| B. FanDuel against its own | 50-70 (41.7%), −25.2u | 65-56, +1.9u |
+| B. the three apps, one call a game | **76-93 (45.0%), −25.7u** | **92-87 (51.4%), −5.9u** |
+| C. BetRivers against the other books' middle | 157-105 (59.9%), +61.7u | 165-112 (59.6%), +59.5u |
+| C. the three apps, one call a game | 72-97 (42.6%), −33.6u | 91-82 (52.6%), −1.9u |
+| C. the same at a point and a half or more | 25-33, −11.0u | 32-32, −3.9u |
+
+The home call at the apps lost in 2024-25 where it won 136-117 in
+2025-26: that 53.8% was one season's noise. Over the two seasons, one
+call a game at the apps:
+
+| Two seasons at the apps | Home | Away |
+| --- | --- | --- |
+| against the book's own number | 212-210 (50.2%), −22.3u | 222-210 (51.4%), −13.6u |
+| against the other books' middle | 176-190 (48.1%), −34.8u | 194-179 (52.0%), −7.8u |
+| at a point and a half or more, against the market | 65-69 | 62-72 |
+| on BetRivers' stored line, as it was scored | 420-269 (61.0%), +138.5u | 392-304 (56.3%), +76.1u |
+
+This file shows the fault itself, where the 2025-26 reading had to be
+replayed on this season's rows. On 1,106 sides with DraftKings and
+FanDuel beside it, BetRivers' stored point is their line (within a half)
+on 383 and one to four points off it on 723 (65%). Its stored pair of
+prices is even on 50, tilted on 471 and an alternate's on 585. And where
+the point is a point or more off and the pair is not even, the price
+belongs to a point on the other side of the main line on 561 of 692: a
+point above the line with the over priced as the favourite. That is the
+first point listed beside the last point's prices.
+
+The first half and the first quarter in the same file, since the old
+parse kept a period total's last point with that point's own prices:
+BetRivers' stored first-half line is an alternate on 92% of games and its
+first-quarter line on 84%, at their own prices. The backtest read the
+first half on BetMGM (549 of 554 games), whose line sits with the other
+books' (sd 0.41, every pair priced even), and the first quarter on BetMGM
+on 455 games and BetRivers on 98. Nothing is scored on either.
+
+**What is left, as it stands now.** Nothing to read: both seasons are in.
+The gap at the books' own lines is a coin less the price on two seasons
+and at a point and a half or more, so the anchored game's team total,
+which is that gap with the shape on top, has nothing to be replayed for;
+the three team-total weights stay at 0.3 and call nothing. The gap stays
+on the page as a watch with its tally, and the page's column beside the
+tally carries the two seasons.
+

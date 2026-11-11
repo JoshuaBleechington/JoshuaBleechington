@@ -2,7 +2,7 @@
 rem The team-total gap rule, re-tested (11 Nov 2026). The rule is scored on two
 rem seasons where a gap of a point or more showed on two games in three; this
 rem season a book against its own total and spread shows one on about one line
-rem in ten, and the calls are 21-17 at home. This reads the three files already
+rem in ten, and the calls are 20-18 at home. This reads the three files already
 rem in this folder for 2024-25 and 2025-26 and holds every team-total line
 rem against three numbers: as the backtest had it, the same book's own total
 rem and spread, and the middle of the other books'.

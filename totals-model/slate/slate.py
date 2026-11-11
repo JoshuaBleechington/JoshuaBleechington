@@ -7490,14 +7490,25 @@ def make_nba_gap_retest(out_dir, log, season=None):
              "B: the number the SAME book's own total and spread imply. C: the number the OTHER books' middle total and spread imply.",
              "If the rule is the book's own inconsistency, B shows it. If it is one book's line off the market, C shows it and B does not. If only A shows it, it was the two sources.",
              "Read on 11 Nov 2026, 674 games of 2025-26: the edge sat on BetRivers' line alone, in A, B and C alike (61 to 62% at home), and that line was an alternate's number",
-             "kept with another point's prices. On the books that list one point the call was 136-117 at home and 130-123 away, a coin less the price. The rule is a watch on the page."]
+             "kept with another point's prices. On the books that list one point the call was 136-117 at home and 130-123 away, a coin less the price. The rule is a watch on the page.",
+             "Folder read: %s" % os.path.abspath(out_dir)]
     pooled, used = [], []
     for sn in seasons:
         paths = (nba_ledger_path(out_dir, sn), odds_periods_path(out_dir, "NBA", sn), odds_history_path(out_dir, "NBA", sn))
         missing = [os.path.basename(pth) for pth in paths if not os.path.exists(pth)]
         if missing:
-            how = {"nba-ledger": "Run NBA ledger.bat", "odds-periods": "Run NBA period lines.bat", "odds-history": "Run NBA lines history.bat"}
-            msg = "%s: not read, %s missing from this folder (%s)." % (sn, " and ".join(missing), "; ".join(sorted({how[k] for k in how for m in missing if m.startswith(k)})))
+            # 11 Nov 2026: the line used to name the bat that makes each file. The user ran the mode in a second folder that held none
+            # of the season files, and the line told him to run the two pulls that cost about 60,000 credits a season for files he
+            # already has in the first. The ledger is free to build; the lines are copied, never pulled again
+            paid = [m for m in missing if not m.startswith("nba-ledger")]
+            free = [m for m in missing if m.startswith("nba-ledger")]
+            msg = "%s: not read, %s missing from this folder." % (sn, " and ".join(missing))
+            if paid:
+                msg += " %s bought with credits: copy %s here from the folder that has %s; do not pull %s again." % (
+                    (paid[0] + " was") if len(paid) == 1 else (" and ".join(paid) + " were"),
+                    "it" if len(paid) == 1 else "them", "it" if len(paid) == 1 else "them", "it" if len(paid) == 1 else "them")
+            if free:
+                msg += " %s is free to build (Run NBA ledger.bat, season %s)." % (free[0], sn)
             log(msg)
             lines += ["", msg]
             continue
@@ -8477,10 +8488,24 @@ def selftest():
     gr_path = make_nba_gap_retest(gr_dir, gr_log2.append)
     with open(gr_path, encoding="utf-8") as f:
         gr_txt = f.read()
-    check("gap retest: the mode reads the three files of a season from the folder, writes nba-gap-retest.txt, names what is missing with the bat that makes it, and spends nothing",
-          os.path.basename(gr_path0) == GAP_RETEST_FILE and any("2025-26: not read, nba-ledger-202526.json and odds-periods-NBA-2025-26.json and odds-history-NBA-2025-26.json missing" in x and "Run NBA period lines.bat" in x for x in gr_log)
+    check("gap retest: the mode reads the three files of a season from the folder, writes nba-gap-retest.txt with the folder it read, names what is missing, says the lines were bought and are copied not pulled again and that the ledger alone is free to build, and spends nothing",
+          os.path.basename(gr_path0) == GAP_RETEST_FILE and any("2025-26: not read, nba-ledger-202526.json and odds-periods-NBA-2025-26.json and odds-history-NBA-2025-26.json missing from this folder." in x
+                                                                    and "odds-periods-NBA-2025-26.json and odds-history-NBA-2025-26.json were bought with credits: copy them here from the folder that has them; do not pull them again." in x
+                                                                    and "nba-ledger-202526.json is free to build (Run NBA ledger.bat, season 2025-26)." in x
+                                                                    and "Run NBA period lines.bat" not in x and "Run NBA lines history.bat" not in x for x in gr_log)
+          and "2024-25: not read, nba-ledger-202425.json and odds-periods-NBA-2024-25.json and odds-history-NBA-2024-25.json missing from this folder." in gr_txt and ("Folder read: " + os.path.abspath(gr_dir)) in gr_txt
           and os.path.basename(gr_path) == GAP_RETEST_FILE and "=== NBA 2025-26 · 24 games with a team total and a final" in gr_txt and "2024-25: not read" in gr_txt and "the seasons together" not in gr_txt
           and "THE TEAM-TOTAL GAP RULE, RE-TESTED" in gr_txt and any("2025-26: 144 team-total lines read on 24 games." == x for x in gr_log2))
+    gr_dir1 = tempfile.mkdtemp()
+    with open(nba_ledger_path(gr_dir1, "2025-26"), "w", encoding="utf-8") as f:
+        json.dump({"format": NBA_LEDGER_FORMAT, "season": "2025-26", "games": gr_led}, f)
+    with open(odds_history_path(gr_dir1, "NBA", "2025-26"), "w", encoding="utf-8") as f:
+        json.dump(gr_hist, f)
+    gr_log1 = []
+    make_nba_gap_retest(gr_dir1, gr_log1.append, "2025-26")
+    check("gap retest: one bought file missing is named alone, to copy and not to pull, and no bat is named for it",
+          any(x == "2025-26: not read, odds-periods-NBA-2025-26.json missing from this folder. odds-periods-NBA-2025-26.json was bought with credits: copy it here from the folder that has it; do not pull it again." for x in gr_log1)
+          and not any(".bat" in x for x in gr_log1 if x.startswith("2025-26")))
     gr_per_main = json.loads(json.dumps(gr_per))
     for gr_g in gr_per_main["games"].values():
         gr_g["main"] = 1

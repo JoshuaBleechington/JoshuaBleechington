@@ -13,6 +13,10 @@ rem   odds-history-NBA-SEASON.json    (Run NBA lines history.bat)
 rem
 rem It reads files only: no site is called and no credit is spent. It writes
 rem nba-gap-retest.txt in this folder. Send that file to Claude.
+rem
+rem All six files have to be in THIS folder. The period lines and the lines
+rem history were bought with credits: if they sit in another folder, copy
+rem them here. Do not pull them again. The ledger alone is free to build.
 cd /d "%~dp0"
 python slate.py nba-gap-retest %*
 echo.

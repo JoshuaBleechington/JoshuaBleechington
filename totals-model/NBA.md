@@ -1191,3 +1191,14 @@ a rule. The watch keeps counting it. The 2024-25 season reads once
 the re-test is run again; the report now says which books to read. The
 team-total weights want a replay of the simulation on the one-point
 books' lines, which needs the two seasons' period and history files here.
+
+**The second run, the same day.** The user built the 2024-25 ledger and
+ran the re-test again, in a second folder that held the new ledger and
+none of the other five files, so nothing was read; the first run had
+been in the folder that holds them. The mode's line for a missing file
+had named the bat that makes it, which for the period lines and the
+lines history is a pull of about 60,000 credits a season for files
+already bought. It now says they are copied from the folder that has
+them and never pulled again, that the ledger alone is free to build, and
+the report names the folder it read. 2024-25 is still to read.
+

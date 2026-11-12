@@ -830,6 +830,13 @@
     if (pts < SHARP_SHADE_PTS) return null;
     return { side: +s.op < +s.up ? "OVER" : "UNDER", pts: pts };
   }
+  /* On basketball the shade is not shown (12 Nov 2026, the user, told it had pointed the wrong way: "Take care of these bro").
+     It is a hockey measure, where the sharp book moves its price before its number. On an NBA total it moves the number, so a
+     shade of three points is rare (56 of 1,219 closes in 2024-25) and the shaded side went 29-27 at that season's last snapshot,
+     15-26 at its opener and 8-22 on this season's rows, the over 3-10 and the under 5-12. The chip on the total, the line in
+     tonight's signals and the sentence in the why read this; the record keeps counting the shade on its own line, marked as off
+     the card, so the line says if that ever turns */
+  function sharpShadeShown(raw) { return sport === "NBA" ? null : sharpShadeOf(raw); }
   function altLines(m, raw) {
     var shop = shopOf(raw), f = m && m.total;
     if (!shop || !shop.alt || !f || f.projected === undefined || f.line === undefined || f.line === null) return [];
@@ -876,7 +883,7 @@
         ' title="Pinnacle, the sharp book, read beside the carded line. Shown, not scored: the odds log keeps the gap nightly and it is measured before it can move a number.">' +
         (off ? 'sharp line ' + esc(String(sh.line)) + ' (' + sgn(+sh.op, 0) + '/' + sgn(+sh.up, 0) + '), here ' + esc(String(line))
              : 'Pinnacle agrees at ' + esc(String(sh.line)) + ' (' + sgn(+sh.op, 0) + '/' + sgn(+sh.up, 0) + ')') + '</span>';
-      var ss = sharpShadeOf(txt("sharp"));
+      var ss = sharpShadeShown(txt("sharp"));
       if (ss) out += '<span class="cap" style="color:var(--go);border-color:var(--go)" title="The side Pinnacle prices shorter, by three points of implied chance or more. Measured on the 2025-26 history: at the best retail price at the same number it went 56.3% (+3.8% a bet) over 693 closes, and 54.9% at the opener. A rule with its own record line on the total tile; it moves no number.">Pinnacle shades ' + esc(ss.side) + ' by ' + ss.pts.toFixed(1) + ' points</span>';
     }
     altLines(m, txt("odds")).filter(function (a) { return a.side === mk.side; }).slice(0, 2).forEach(function (a) {
@@ -900,7 +907,7 @@
         (sh.hml !== undefined && sh.aml !== undefined ? ", moneyline " + sgn(+sh.aml, 0) + "/" + sgn(+sh.hml, 0) : "") +
         (off ? ", <b>" + (+sh.line > line ? "above" : "below") + " the carded " + line + "</b>" : ", the same number as the card") +
         ". Shown, not scored: the odds log keeps the gap nightly and it is measured before it can move a number." +
-        (function () { var ss = sharpShadeOf(txt("sharp")); return ss ? " <b>It shades the " + ss.side.toLowerCase() + " by " + ss.pts.toFixed(1) + " points</b>: on the 2025-26 history that side went 56.3% at the best retail price over 693 closes with a shade of three points or more (+3.8% a bet), and 54.9% at the opener. A rule with its own record line on the total tile, not a weight." : ""; })());
+        (function () { var ss = sharpShadeShown(txt("sharp")); return ss ? " <b>It shades the " + ss.side.toLowerCase() + " by " + ss.pts.toFixed(1) + " points</b>: on the 2025-26 history that side went 56.3% at the best retail price over 693 closes with a shade of three points or more (+3.8% a bet), and 54.9% at the opener. A rule with its own record line on the total tile, not a weight." : ""; })());
     }
     var alts = altLines(m, txt("odds")), side = m.total.side, mine = alts.filter(function (a) { return a.side === side; });
     if (mine.length) {
@@ -1955,7 +1962,7 @@
             /* Pinnacle's shade (13 Oct 2026): the side the sharp book prices shorter by 20+ cents, on its own line */
             var ss = sharpShadeOf((row.inputs || {}).sharp), sv = ss ? bothSides(mk).filter(function (v) { return v.side === ss.side; })[0] : null;
             var sr = sv ? gradeMarket(sv, row.finals) : null;
-            if (sr !== null && sr !== "invalid") count(t.sharpShade || (t.sharpShade = { w: 0, l: 0, p: 0 }), sr);
+            if (sr !== null && sr !== "invalid") count(t.sharpShade || (t.sharpShade = { w: 0, l: 0, p: 0, off: row.sport === "NBA" }), sr);   // counted on basketball too, where it is off the card
           }
           if ((tg.b2b || tg.backup) && mk.key === "total") {
             var uv = bothSides(mk).filter(function (v) { return v.side === "UNDER"; })[0];
@@ -2032,7 +2039,7 @@
       if (s.hb2bBackup) parts.push('home back to back with a backup, the under ' + rec(s.hb2bBackup));
       ["goalies right", "goalie line wrong"].forEach(function (k) { if (s.goalie[k]) parts.push(k + ' ' + rec(s.goalie[k])); });
       if (s.call) parts.push('the call, ' + NHL_TOTAL_ONLY_LABEL + ' ' + rec(s.call));
-      if (s.sharpShade) parts.push("Pinnacle's shade, 3+ points " + rec(s.sharpShade));
+      if (s.sharpShade) parts.push("Pinnacle's shade, 3+ points " + rec(s.sharpShade) + (s.sharpShade.off ? " (off the card here: a hockey measure)" : ""));
       if (s.upset) parts.push("the dog with a backup in net " + rec(s.upset));
       if (s.shortDog) parts.push("the short dog " + rec(s.shortDog));
       if (s.kalshi) parts.push("the sharp side against Kalshi's crowd, 3+ points " + rec(s.kalshi));

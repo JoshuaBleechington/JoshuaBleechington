@@ -1719,7 +1719,7 @@ const CHECKS = ["dome","playoff"];
   chk(mktT.tells.some(t => /^Tyrese Maxey UNDER 25\.5 points→$/.test(t)) && mktT.tells.some(t => /^Joel Embiid OVER 10\.5 rebounds→tell green\|Minutes spike \+0\.5 · the over on a spike man not on a favourite does 67\.2%, claimed 53\.0%, on 61 BET and LEAN picks$/.test(t))
       && mktT.tells.some(t => /^Karl-Anthony Towns OVER 22\.5 points→tell red\|His club favoured by 5\.5 · the over on a favourite's man does 32\.8%, claimed 53\.0%, on 61 picks$/.test(t)) && mktT.tells.some(t => /^Jalen Brunson OVER 6\.5 assists→tell red\|His club favoured by 5\.5 · the over on a favourite's man does 32\.8%, claimed 53\.0%, on 61 picks$/.test(t))
       && JSON.stringify(mktT.tellsGreen) === '["Joel Embiid OVER 10.5 rebounds"]' && /^No BET among these\. LEANs below: information, not a measured edge/.test(mktT.tellsGreenDiv) && JSON.stringify(mktT.tellsRed.slice().sort()) === '["Jalen Brunson OVER 6.5 assists","Karl-Anthony Towns OVER 22.5 points"]'
-      && mktT.panelTells.length === 1 && /^tell green\|Minutes spike \+0\.5 · the over on a spike man not on a favourite does 67\.2%, claimed 53\.0%, on 61 BET and LEAN picks$/.test(mktT.panelTells[0]) && /^· the tells \(7 Nov 2026\), shown, not scored: the favourite's chip reads every graded pick on this side, the spike's chip the BET and LEAN picks on a spike man not on a favourite \(10 Nov 2026: on a favourite's man the spike swings by the night and carries no colour\); green where the line has done at least what it claimed on 50 picks or more, red where less$/.test(mktT.panelTellsDim),
+      && mktT.panelTells.length === 1 && /^tell green\|Minutes spike \+0\.5 · the over on a spike man not on a favourite does 67\.2%, claimed 53\.0%, on 61 BET and LEAN picks$/.test(mktT.panelTells[0]) && /^· the tells \(7 Nov 2026\), shown, not scored: the favourite's chip reads every graded pick on this side, the spike's chip the BET and LEAN picks on a spike man not on a favourite \(10 Nov 2026: on a favourite's man the spike swings by the night and carries no colour\), the even-money chip the BET and LEAN picks at \+100 or longer since the blend changed on 5 Nov \(12 Nov 2026: a test\); green where the line has done at least what it claimed on 50 picks or more, red where less$/.test(mktT.panelTellsDim),
       'props: the tells (7 Nov 2026): a minutes spike and a favourite\'s man ride on the best cards as chips coloured live off the record on the pick\'s side (Embiid\'s spike green at 67% on 61 picks, Brunson\'s and Towns\' favourite\'s over red at 33%, Maxey none), the panel carries the same chip and its note, and the tells filter keeps the picks with a green tell and no red, or with a red one', JSON.stringify({ tells: mktT.tells, green: mktT.tellsGreen, div: mktT.tellsGreenDiv, red: mktT.tellsRed, panel: mktT.panelTells, dim: mktT.panelTellsDim }));
   chk(mktT.spikeHead === 'Spike' && mktT.spikeCells.some(c => /^Joel Embiid\|spikec pos\|\+0\.5\|Minutes, his last 5 against the season: \+0\.5 rebounds at his minutes; a spike at \+0\.3/.test(c)) && mktT.spikeCells.some(c => /^Tyrese Maxey\|spikec\|\|no minutes lever on this prop$/.test(c)) && mktT.spikeCells.length === 4
       && JSON.stringify(mktT.tellSpike) === '["Joel Embiid"]' && JSON.stringify(mktT.tellFav.slice().sort()) === '["Jalen Brunson","Karl-Anthony Towns"]' && JSON.stringify(mktT.tellGreen) === '["Joel Embiid"]' && JSON.stringify(mktT.tellRed.slice().sort()) === '["Jalen Brunson","Karl-Anthony Towns"]'
@@ -1950,7 +1950,7 @@ const CHECKS = ["dome","playoff"];
       && t3T.twoCopy.length === 1 && t3T.twoCopy[0] === '2-leg ticket at FanDuel · pays +264 (3.64x) · both land 35.4%, needs 27.4%\n1. Man One OVER 20.5 points -110 · last 5: 4 of 5, last 10: 7 of 10 · Hawks @ Magic\n2. Man Two OVER 7.5 rebounds -110 · last 5: 4 of 5, last 10: 7 of 10 · Bulls @ Bucks'
       && !/Cold Hand|Wrong Levers|Other App|Big Fav|Man Eight|Man Nine/i.test(JSON.stringify(t3T.two)),
       'two-leg tickets (11 Nov 2026, the user: what about instead of the 3, we do 2 legs, the absolute best 2 men pairs): two legs are the default on a first visit and the choice is kept; the same leg rule, the best pair first by expected value, two men on two games at one app, a man in one ticket; the two men left on one game make no ticket (a same-game two is the pairs\' own section); the card reads both land, the tabs the same two at another app, the overs and the unders alone their own pair, and Copy the two-leg ticket in words', JSON.stringify({ def: legsDefault, opts: t3T.legOpts, stored: t3T.storedLegs, two: t3T.two, div: t3T.twoDiv.slice(0, 140), tabs: t3T.twoTabs, whys: t3T.twoWhys, label: t3T.twoLabel, overs: t3T.twoO, unders: t3T.twoU, copy: t3T.twoCopy }));
-  chk(belowDefault === 't3' && t3T.opts.join('|') === 't3=tickets, either side|t3o=tickets, overs|t3u=tickets, unders|t3c=tickets, best chance|leans=the LEANs one by one' && t3T.stored0 === 't3'
+  chk(belowDefault === 't3' && t3T.opts.join('|') === 't3=tickets, either side|t3o=tickets, overs|t3u=tickets, unders|t3c=tickets, best chance|plus=even money or better|leans=the LEANs one by one' && t3T.stored0 === 't3'
       && t3T.either.length === 2 && t3T.inGrid === 2 && t3T.others === 0
       && t3T.divider === "No BET on this date. Three-leg tickets below, to test, in the LEANs' place: three men at one app, each a pick with an edge whose last five games went his way four times or more and his last ten at least half, more levers toward the pick than against and no red chip. A card is one app throughout; where the same three also pass at another app, a tab on the card shows the ticket there. Replayed on the eleven nights that keep the logs and the levers, exactly as built here: such legs went 45-28 one at a time (the overs 20-7, the unders 25-21) and the tickets 2 of 12 for +0.7 units, where two legs went 7 of 20 for +2.8. A test, not a measured edge: its record builds in Is it working, and the LEANs are one choice away."
       && t3T.either[0].n1 === '3 LEGS #1 · at FanDuel · three games' && t3T.either[0].pay === '+596 6.96×' && t3T.either[0].legs.length === 3
@@ -2764,6 +2764,211 @@ const CHECKS = ["dome","playoff"];
       && /^Two-leg tickets you took 0-1 says 46\.2% · does 0\.0% \(±50\.0\) · -1\.00u$/i.test(tc.tookTile) && tc.line === 'two-leg tickets by best chance 2-1 +3.6u · three-leg tickets by best chance 1-1 +4.2u',
       'tickets by best chance, at the grade: the best-chance lists are kept on the rows before the results land, two legs and three, each with its rank, whichever the tab showed; the cards carry the results and say the list is in the record; the record keeps them on tiles of their own and on the card\'s line, apart from the last-five tickets (none listed here) and from the ticket taken',
       JSON.stringify({ kept: tc.kept, after2: tc.after2.map(c => c.n1 + ' :: ' + c.who), after3: tc.after3.map(c => c.n1 + ' :: ' + c.who), div: tc.afterDiv, form: tc.afterForm, formTile: tc.formTile, tiles: tc.tiles, took: tc.tookTile, line: tc.line }));
+
+  // ---- 12 Nov 2026: the sharp book's price shade is off the NBA card (the user, told it had pointed the wrong way: "Take care of these bro"). It is a hockey measure,
+  //      where the sharp book moves its price before its number; on an NBA total a shade of three points is rare and the shaded side went 29-27 at last season's last
+  //      snapshot, 15-26 at its opener and 8-22 on this season's rows. The chip on the total, the line in tonight's signals and the sentence in the why are gone on
+  //      basketball and stay on the other sports; the record keeps counting the shade on its own line and says it is off the card ----
+  const shKeep = await pg.evaluate(async () => { await smStore.ready; const k = {}; for (const x of ['callsheet3.card.v1', 'callsheet3.props.v1', 'callsheet3.draft.v1']) k[x] = await smStore.getItem(x); await smStore.removeItem('callsheet3.card.v1'); await smStore.removeItem('callsheet3.props.v1'); return k; });
+  await reloaded();
+  const shRead = async (c) => { await fill(c.sport, c.inputs); return pg.evaluate(async () => {
+    const wait = (ms) => new Promise(r => setTimeout(r, ms || 120)), txt = e => (e ? e.innerText : '').replace(/\s+/g, ' ').trim();
+    const line = +document.getElementById('line').value, sh = document.getElementById('sharp');
+    sh.value = JSON.stringify({ book: 'pinnacle', line, op: -125, up: 105 }); sh.dispatchEvent(new Event('input', { bubbles: true })); await wait();
+    const o = { line, chips: [...document.querySelectorAll('#markets .mk[data-key="total"] .cap')].map(txt).filter(t => /pinnacle|sharp/i.test(t)), signals: document.getElementById('signals').textContent.replace(/\s+/g, ' '),
+      why: [...document.querySelectorAll('#why li')].map(txt).filter(t => /Pinnacle, the sharp book/.test(t)).join(' ') };
+    sh.value = ''; sh.dispatchEvent(new Event('input', { bubbles: true })); await wait();
+    return o; }); };
+  const shNba = await shRead(CASES.find(c => c.sport === 'NBA')), shMlb = await shRead(CASES.find(c => c.sport === 'MLB'));
+  const shRec = await pg.evaluate(async () => {
+    const wait = (ms) => new Promise(r => setTimeout(r, ms || 100)), txt = e => (e ? e.innerText : '').replace(/\s+/g, ' ').trim();
+    const set = (id, v) => { const el = document.getElementById(id); el.value = v; el.dispatchEvent(new Event('input', { bubbles: true })); };
+    await smStore.ready;
+    document.getElementById('clear').click(); document.getElementById('m-nba').click(); await wait();
+    const f = { gdate: '2026-11-25', away: 'Suns', home: 'Kings', line: '229.5', op: '-110', up: '-110', hml: '-190', aml: '160', sharp: JSON.stringify({ book: 'pinnacle', line: 229.5, op: -125, up: 105 }) };
+    Object.keys(f).forEach(k => set(k, f[k])); await wait(); document.getElementById('add').click(); await wait();
+    const r = JSON.parse(smStore.getItem('callsheet3.card.v1')).find(x => x.gdate === '2026-11-25' && x.away === 'Suns');
+    for (const [k, v] of [['fa', 110], ['fh', 115]]) { const el = document.querySelector('#cardTable .grade[data-id="' + r.id + '"][data-k="' + k + '"]'); el.value = String(v); el.dispatchEvent(new Event('input', { bubbles: true })); el.dispatchEvent(new Event('change', { bubbles: true })); }
+    await wait(160);
+    return [...document.querySelectorAll('#calibBox .calib > div')].map(txt).filter(t => /Pinnacle's shade/.test(t)).map(t => (t.match(/Pinnacle's shade, 3\+ points [^·]*/) || [''])[0].trim());
+  });
+  await pg.evaluate(async (k) => { for (const x of Object.keys(k)) { if (k[x] === null || k[x] === undefined) await smStore.removeItem(x); else await smStore.setItem(x, k[x]); } }, shKeep);
+  await reloaded();
+  chk(shNba.chips.length === 1 && new RegExp('^Pinnacle agrees at ' + String(shNba.line).replace('.', '\\.') + ' \\(-125/\\+105\\)$', 'i').test(shNba.chips[0]) && !/shades/i.test(shNba.signals) && /Pinnacle, the sharp book: [\d.]+ \(-125\/\+105\)/.test(shNba.why) && !/shades/i.test(shNba.why),
+      'the shade off the NBA card (12 Nov 2026): on a basketball game whose sharp book prices the over 6.8 points shorter than the under, the total carries the sharp line\'s chip and no shade chip, tonight\'s signals carry no Pinnacle line and the why names the sharp book\'s number and prices with no sentence about a shade',
+      JSON.stringify(shNba));
+  chk(shMlb.chips.length === 2 && /^Pinnacle agrees at /i.test(shMlb.chips[0]) && /^Pinnacle shades OVER by 6\.8 points$/i.test(shMlb.chips[1]) && /shades the OVER by 6\.8 points/i.test(shMlb.signals) && /It shades the over by 6\.8 points/.test(shMlb.why),
+      'the shade stays on the other sports: the same sharp prices on a baseball game carry the shade\'s chip on the total, its line in the signals and its sentence in the why',
+      JSON.stringify(shMlb));
+  chk(shRec.length === 1 && shRec[0] === "Pinnacle's shade, 3+ points 0-1 (off the card here: a hockey measure)",
+      'the shade\'s record line is kept on basketball: a graded NBA game whose sharp book shaded the over, which lost, counts 0-1 on the total tile\'s own line, and the line says the shade is off the card here',
+      JSON.stringify(shRec));
+
+  // ---- 12 Nov 2026: the pick at even money or better, a list of its own (the user, told the sheet's plus-money sides had gone 83-58: "Take care of these bro"). Under
+  //      the BETs a choice lists every pick with an edge whose price pays +100 or longer; each such pick carries a chip coloured by its own record, read from the
+  //      day the blend changed and grey under fifty graded picks; the record keeps a tile for it. Shown, not scored ----
+  const pmKeep = await pg.evaluate(async () => { await smStore.ready; const k = {}; for (const x of ['callsheet3.card.v1', 'callsheet3.props.v1', 'callsheet3.draft.v1']) k[x] = await smStore.getItem(x); k.below = localStorage.getItem('callsheet3.props.below.v1'); await smStore.removeItem('callsheet3.card.v1'); await smStore.removeItem('callsheet3.props.v1'); return k; });
+  await reloaded();
+  const pm = await pg.evaluate(async () => {
+    const wait = (ms) => new Promise(r => setTimeout(r, ms || 120)), txt = e => (e ? e.innerText : '').replace(/\s+/g, ' ').trim();
+    await smStore.ready;
+    const load = async (doc, name) => { const dt = new DataTransfer(); dt.items.add(new File([JSON.stringify(doc)], name, { type: 'application/json' })); const inp = document.getElementById('slateFile'); inp.files = dt.files; inp.dispatchEvent(new Event('change', { bubbles: true })); await wait(); await wait(); };
+    const need = (price) => price < 0 ? -price / (-price + 100) : 100 / (price + 100);
+    const man = (pid, name, mk, side, line, chance, price, band) => { const other = price >= 100 ? -125 : 100, op = side === 'OVER' ? price : other, up = side === 'UNDER' ? price : other;
+      return { pid: String(pid), name, team: 'ATL', opp: 'ORL', home: false, pos: 'G', mk, line, op, up, book: 'fanduel', books: { fanduel: [line, op, up] }, proj: line + (side === 'OVER' ? 2 : -2), sd: 6, pm: side === 'OVER' ? 0.75 : 0.25, pb: 0.46,
+        p: side === 'OVER' ? chance : Math.round((1 - chance) * 10000) / 10000, push: 0, side, chance, price, need: Math.round(need(price) * 10000) / 10000, edge: Math.round((chance - need(price)) * 10000) / 10000, band, mins: 32, rate36: 20, base: 18, med: line + (side === 'OVER' ? 1.5 : -1.5),
+        usg: 22, sdf: 1, starter: true, start_src: "RotoWire's expected five", why: ['x'], log: [12, 9, 11, 8, 13, 10, 9, 12, 11, 10].map((v, i) => ['2026-11-' + String(10 + i), 'OPP', i % 2, 32, v, ['won by 3']]), parts: [{ k: 'pace', t: 'Pace', eff: side === 'OVER' ? 0.4 : -0.4, i: 0 }] }; };
+    const file = (date, men) => ({ format: 'callsheet3.props', version: 1, date, games: [{ gid: 'pm' + date, away: 'Hawks', home: 'Magic', aab: 'ATL', hab: 'ORL', spread: -2.5, total: 225.5, props: men }] });
+    const grade = (date, men, win) => ({ format: 'callsheet2.slate', version: 1, date, games: [{ sport: 'NBA', gdate: date, away: 'Hawks', home: 'Magic', finals: { fa: '110', fh: '104', f5a: '55', f5h: '50' }, notes: [],
+      box: Object.fromEntries(men.map(m => [m.pid, [m.name, 30, (win(m) ? m.side === 'OVER' : m.side !== 'OVER') ? 14 : 8, 5, 5, 2]])) }] });
+    // tonight: two BETs (one of them at plus money), an under at +105, an over at +100, a lean at -110 and a plus-money side with no edge
+    const D = '2026-11-26';
+    await load(file(D, [man(1, 'Big Bet', 'pts', 'UNDER', 20.5, 0.60, -120, 'BET'), man(2, 'Plus Bet', 'ast', 'UNDER', 3.5, 0.56, 102, 'BET'), man(3, 'Plus Under', 'reb', 'UNDER', 5.5, 0.52, 105, 'LEAN'), man(4, 'Even Over', 'ast', 'OVER', 2.5, 0.515, 100, 'LEAN'),
+      man(5, 'Minus Lean', 'pts', 'UNDER', 8.5, 0.55, -110, 'LEAN'), man(6, 'Plus No Edge', 'tpm', 'OVER', 1.5, 0.45, 110, 'no edge')]), 'nba-props-2026-11-26.json');
+    if (document.getElementById('propsView').hidden) { document.getElementById('m-props').click(); await wait(); }
+    document.getElementById('propsReset').click(); await wait();
+    const pick = async (id, v) => { const el = document.getElementById(id); el.value = v; el.dispatchEvent(new Event('change', { bubbles: true })); await wait(); };
+    const day = async (d) => { const pd = document.getElementById('propsDate'); pd.value = d; pd.dispatchEvent(new Event('change', { bubbles: true })); await wait(); };
+    const best = document.getElementById('propsBest');
+    const cards = () => [...best.querySelectorAll('.pk[data-prop]')].map(c => ({ who: txt(c.querySelector('.n2')), band: /scored bet/.test(c.className) ? 'BET' : 'LEAN', tell: [...c.querySelectorAll('.n5.tells .tell')].filter(t => /even money/i.test(t.textContent)).map(t => t.className.replace('tell ', '') + ' | ' + txt(t)).join(' ## ') }));
+    const o = { options: [...document.getElementById('propsBelow').options].map(x => x.value + '=' + x.textContent).join(' | ') };
+    await pick('propsBelow', 'leans'); o.leans = cards();
+    await pick('propsBelow', 'plus'); o.plus = cards(); o.div = txt(best.querySelector('.pk-divider.plusd')); o.stored = localStorage.getItem('callsheet3.props.below.v1'); o.none0 = !!best.querySelector('.plusnone');
+    // the chip on the prop's own panel: on the pick at +105, not on the plus-money side with no edge, not on the lean at -110
+    const panelTells = async (name) => { const tr = [...document.querySelectorAll('#propsTable tr[data-prop]')].find(r => r.textContent.indexOf(name) >= 0); if (!tr) return -1; tr.click(); await wait();
+      const n = document.getElementById('propDetail').hidden ? -2 : [...document.querySelectorAll('#propDetailBody .pd-tells .tell')].filter(x => /even money/i.test(x.textContent)).length;
+      document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })); await wait(); return n; };
+    o.panel = [await panelTells('Plus Under'), await panelTells('Plus No Edge'), await panelTells('Minus Lean')].join(',');
+    // a night under the blend as it stands: 52 picks at +105, the unders 20-10 and the overs 12-10; a lean at -110 and a plus-money side with no edge beside them count for nothing
+    const N = '2026-11-24', made = [];
+    for (let i = 0; i < 30; i++) made.push(Object.assign(man(100 + i, 'Under ' + i, 'pts', 'UNDER', 10.5, 0.52, 105, 'LEAN'), { win: i < 20 }));
+    for (let i = 0; i < 22; i++) made.push(Object.assign(man(200 + i, 'Over ' + i, 'pts', 'OVER', 10.5, 0.52, 105, 'LEAN'), { win: i < 12 }));
+    made.push(Object.assign(man(300, 'Lean Loser', 'pts', 'UNDER', 10.5, 0.55, -110, 'LEAN'), { win: false })); made.push(Object.assign(man(301, 'Edge None', 'pts', 'OVER', 10.5, 0.44, 120, 'no edge'), { win: false }));
+    await load(file(N, made.map(m => { const c = Object.assign({}, m); delete c.win; return c; })), 'nba-props-2026-11-24.json'); await load(grade(N, made, m => m.win), 'nba-grade-2026-11-24.json'); await wait(200);
+    // and a night under the older blend, thirty such picks that all lost: before the day the blend changed, not in the pool
+    const O = '2026-11-03', old = []; for (let i = 0; i < 30; i++) old.push(man(400 + i, 'Old ' + i, 'pts', 'UNDER', 10.5, 0.52, 100, 'LEAN'));
+    await load(file(O, old), 'nba-props-2026-11-03.json'); await load(grade(O, old, () => false), 'nba-grade-2026-11-03.json'); await wait(200);
+    if (document.getElementById('propsView').hidden) { document.getElementById('m-props').click(); await wait(); }
+    await day(D); await pick('propsBelow', 'plus'); o.after = cards();
+    o.tile = [...document.querySelectorAll('#propsCalib .calib > div')].map(txt).filter(t => /^The pick at even money or better/i.test(t));
+    // the older night's thirty are picks with an edge at +100, so they list on their own date; they are only out of the chip's pool
+    await day(O); o.oldCards = cards().length;
+    // a date with a BET and a lean at -110 and nothing at even money: the BET, and a line that says there is none under it
+    const E = '2026-11-25'; await load(file(E, [man(500, 'Solo Lean', 'pts', 'UNDER', 8.5, 0.55, -110, 'LEAN'), man(501, 'Solo Bet', 'pts', 'UNDER', 20.5, 0.60, -120, 'BET')]), 'nba-props-2026-11-25.json');
+    if (document.getElementById('propsView').hidden) { document.getElementById('m-props').click(); await wait(); }
+    await day(E); await pick('propsBelow', 'plus'); o.eCards = cards(); o.eNone = txt(best.querySelector('.plusnone')); o.eDiv = !!best.querySelector('.pk-divider.plusd');
+    await day(D); await pick('propsBelow', 't3');
+    return o;
+  });
+  await pg.evaluate(async (k) => { for (const x of Object.keys(k)) { if (x === 'below') { if (k[x] === null) localStorage.removeItem('callsheet3.props.below.v1'); else localStorage.setItem('callsheet3.props.below.v1', k[x]); continue; } if (k[x] === null || k[x] === undefined) await smStore.removeItem(x); else await smStore.setItem(x, k[x]); } }, pmKeep);
+  await reloaded();
+  const pmWho = (cs) => (cs || []).map(c => c.band + ' ' + c.who).join(' | ');
+  chk(/\| plus=even money or better \| leans=the LEANs one by one$/.test(pm.options) && pmWho(pm.leans) === 'BET Plus Bet UNDER 3.5 assists | BET Big Bet UNDER 20.5 points | LEAN Plus Under UNDER 5.5 rebounds | LEAN Minus Lean UNDER 8.5 points | LEAN Even Over OVER 2.5 assists'
+      && pmWho(pm.plus) === 'BET Plus Bet UNDER 3.5 assists | BET Big Bet UNDER 20.5 points | LEAN Plus Under UNDER 5.5 rebounds | LEAN Even Over OVER 2.5 assists' && pm.stored === 'plus' && pm.none0 === false
+      && /^The sheet's side at even money or better below, to test, in the LEANs' place: every pick with an edge whose price pays \+100 or longer, the most edge first\. .* went 83-58 \(58\.9%\) .* the unders 49-34, the overs 34-24, .* not a scored edge\.$/.test(pm.div),
+      'the pick at even money or better (12 Nov 2026): the choice sits under the BETs beside the tickets and the LEANs and is kept; it lists the BETs as always and under them every other pick with an edge at +100 or longer, the most edge first (the under at +105, the over at +100), leaving out the lean at -110 and the plus-money side with no edge, under a line that says what was measured and that it is a test',
+      JSON.stringify({ options: pm.options, leans: pmWho(pm.leans), plus: pmWho(pm.plus), div: pm.div.slice(0, 200), stored: pm.stored }));
+  const pmTell = (cs, who) => ((cs || []).find(c => c.who.indexOf(who) === 0) || {}).tell;
+  chk(/^few \| Pays even money or better · the sheet's side at \+100 or longer has no graded pick since 5 Nov yet; replayed on fourteen nights it went 83-58$/i.test(pmTell(pm.plus, 'Plus Under') || '') && /^few \| Pays even money or better/i.test(pmTell(pm.plus, 'Plus Bet') || '') && /^few \| /.test(pmTell(pm.plus, 'Even Over') || '')
+      && pmTell(pm.plus, 'Big Bet') === '' && pmTell(pm.leans, 'Minus Lean') === '' && pm.panel === '1,0,0'
+      && /^green \| Pays even money or better · the sheet's side at \+100 or longer does 61\.5%, claimed 52\.0%, on 52 BET and LEAN picks since 5 Nov \(unders 20-10, overs 12-10\); replayed on fourteen nights it went 83-58$/i.test(pmTell(pm.after, 'Plus Under') || '')
+      && /^green \| /.test(pmTell(pm.after, 'Even Over') || '') && pmTell(pm.after, 'Big Bet') === '',
+      'the even-money chip: a pick with an edge at +100 or longer carries it, on its card and on its panel, a BET among them too, and a pick at a shorter price does not, nor a plus-money side with no edge; with nothing graded since the blend changed it is grey and says so; after a night of 52 such picks that went 32-20 it reads green with its own numbers by side, counting neither the thirty that lost under the older blend, nor a lean at -110, nor a plus-money side with no edge',
+      JSON.stringify({ panel: pm.panel, before: (pm.plus || []).map(c => c.who + ' :: ' + c.tell), after: (pm.after || []).map(c => c.who + ' :: ' + c.tell) }));
+  chk((pm.tile || []).length === 1 && /^The pick at even money or better, to test 32-20 says 52\.0% · does 61\.5% \(±6\.9\) · \+13\.60u an edge on the card at a price of \+100 or longer, as carded since 5 Nov \(the blend as it stands\): unders 20-10 \+11\.0u · overs 12-10 \+2\.6u · replayed under this blend on fourteen nights it went 83-58 \(shown, not scored\)$/i.test(pm.tile[0])
+      && pm.oldCards === 30 && pmWho(pm.eCards) === 'BET Solo Bet UNDER 20.5 points' && pm.eDiv === true && pm.eNone === 'No pick with an edge on this date pays even money or better outside the BETs above.',
+      'the even-money record: its own tile on the props record from the day the blend changed, by side, at the prices carded; the older night\'s thirty still list on their own date, being picks with an edge at +100; and a date with a BET and nothing at even money shows the BET and says under it that there is none',
+      JSON.stringify({ tile: pm.tile, oldCards: pm.oldCards, eCards: pmWho(pm.eCards), eNone: pm.eNone, eDiv: pm.eDiv }));
+
+  // ---- 12 Nov 2026: a marks file puts a bet back as it was marked (the user, of three bets of 11 Nov the page had recorded wrong: "Take care of these bro"). The marks
+  //      of that night were flags, so the record read each bet at the lines a later run carded. The file corrects a mark that is on the page and makes none: a prop
+  //      not marked, or a pair whose legs do not name each other, is left alone; a key the page does not hold is passed over; an entry it cannot read is refused ----
+  const mkKeep = await pg.evaluate(async () => { await smStore.ready; const k = {}; for (const x of ['callsheet3.card.v1', 'callsheet3.props.v1', 'callsheet3.draft.v1']) k[x] = await smStore.getItem(x); await smStore.removeItem('callsheet3.card.v1'); await smStore.removeItem('callsheet3.props.v1'); return k; });
+  await reloaded();
+  const mkSrc = () => {
+    const need = (price) => price < 0 ? -price / (-price + 100) : 100 / (price + 100);
+    const man = (pid, name, team, mk, side, line, chance, price) => ({ pid: String(pid), name, team, opp: team === 'SAS' ? 'CHI' : 'SAS', home: team === 'CHI', pos: 'F', mk, line, op: side === 'OVER' ? price : 100, up: side === 'UNDER' ? price : 100, book: 'betmgm',
+      books: { betmgm: [line, side === 'OVER' ? price : 100, side === 'UNDER' ? price : 100] }, proj: line + (side === 'OVER' ? 1.5 : -1.5), sd: 3, pm: side === 'OVER' ? 0.7 : 0.3, pb: 0.5, p: side === 'OVER' ? chance : Math.round((1 - chance) * 10000) / 10000, push: 0, side, chance, price,
+      need: Math.round(need(price) * 10000) / 10000, edge: Math.round((chance - need(price)) * 10000) / 10000, band: chance - need(price) > 0 ? 'LEAN' : 'no edge', mins: 30, rate36: 8, base: 7, med: line, usg: 15, sdf: 1, starter: true, start_src: "RotoWire's expected five",
+      why: ['x'], log: [6, 5, 7, 4, 6, 5, 8, 5, 6, 4].map((v, i) => ['2026-11-' + String(10 + i), 'OPP', i % 2, 30, v, ['won by 3']]), parts: [{ k: 'pace', t: 'Pace', eff: side === 'OVER' ? 0.3 : -0.3, i: 0 }] });
+    const D = '2026-11-27';
+    // the rows as a later run left them: the under at 6.5 is an over at 5.5 now, and the pair's second leg has turned to the over at 5.5
+    const men = [man(21, 'Rebound Man', 'CHI', 'reb', 'OVER', 5.5, 0.518, -135), man(22, 'Dime Man', 'SAS', 'tpm', 'OVER', 0.5, 0.668, -210), man(22, 'Dime Man', 'SAS', 'ast', 'OVER', 5.5, 0.512, -125), man(23, 'Free Man', 'CHI', 'pts', 'OVER', 10.5, 0.60, -120),
+      man(24, 'Loose One', 'SAS', 'reb', 'UNDER', 7.5, 0.60, -120), man(25, 'Loose Two', 'CHI', 'ast', 'OVER', 3.5, 0.58, -110)];
+    const props = { format: 'callsheet3.props', version: 1, date: D, games: [{ gid: 'mk0', away: 'Spurs', home: 'Bulls', aab: 'SAS', hab: 'CHI', spread: -2.5, total: 225.5, props: men }] };
+    // the box: five rebounds, two threes and nine assists, fourteen points
+    const grade = { format: 'callsheet2.slate', version: 1, date: D, games: [{ sport: 'NBA', gdate: D, away: 'Spurs', home: 'Bulls', finals: { fa: '110', fh: '104', f5a: '55', f5h: '50' }, notes: [],
+      box: { 21: ['Rebound Man', 30, 9, 5, 2, 1], 22: ['Dime Man', 30, 12, 4, 9, 2], 23: ['Free Man', 30, 14, 4, 2, 1], 24: ['Loose One', 30, 9, 6, 2, 1], 25: ['Loose Two', 30, 9, 4, 5, 1] } }] };
+    const k = (pid, mk) => D + '|' + pid + '|' + mk;
+    const marks = { format: 'callsheet3.marks', version: 1, date: D, props: [
+        { key: k(21, 'reb'), name: 'Rebound Man', took: { side: 'UNDER', line: 6.5, price: -155, chance: 0.622, band: 'LEAN', book: 'betmgm', proj: 5.46 } },
+        { key: k(23, 'pts'), name: 'Free Man', took: { side: 'UNDER', line: 10.5, price: -110, chance: 0.55 } },          // never marked: left alone
+        { key: k(99, 'pts'), name: 'Nobody', took: { side: 'OVER', line: 1.5, price: -110, chance: 0.5 } },                // not on the page: passed over
+        { key: k(21, 'reb'), name: 'Bad Side', took: { side: 'UP', line: 6.5, price: -155, chance: 0.6 } }],                 // not a side: refused
+      pairs: [
+        { ks: [k(22, 'tpm'), k(22, 'ast')], names: ['Dime Man OVER 0.5 threes', 'Dime Man UNDER 6.5 assists'], app: 'betmgm', kind: 'same_man', f: 1.15, chance: 0.508, at: [[0.5, -210, 0.672, 'OVER', 0.5], [6.5, -200, 0.658, 'UNDER', 6.5]] },
+        { ks: [k(24, 'reb'), k(25, 'ast')], names: ['Loose One', 'Loose Two'], app: 'betmgm', chance: 0.4, at: [[7.5, -120, 0.6, 'UNDER', 7.5], [3.5, -110, 0.58, 'OVER', 3.5]] },   // a pair nobody marked: left alone
+        { ks: [k(22, 'tpm'), k(22, 'ast')], names: ['Bad Pair'], chance: 0.5, at: [[0.5, -210, 0.672, 'OVER', 0.5]] }] };                                                          // one leg: refused
+    return { D, props, grade, marks, k };
+  };
+  await pg.evaluate(async (src) => {
+    const wait = (ms) => new Promise(r => setTimeout(r, ms || 130));
+    await smStore.ready;
+    const { D, props, k } = (0, eval)('(' + src + ')')();
+    const load = async (doc, name) => { const dt = new DataTransfer(); dt.items.add(new File([JSON.stringify(doc)], name, { type: 'application/json' })); const inp = document.getElementById('slateFile'); inp.files = dt.files; inp.dispatchEvent(new Event('change', { bubbles: true })); await wait(); await wait(); };
+    await load(props, 'nba-props-2026-11-27.json');
+    // the marks as they were before a mark kept anything: a flag on the prop, each leg naming the other. Written after the last click of this visit
+    const all = JSON.parse(smStore.getItem('callsheet3.props.v1')), row = (pid, mk) => all.find(x => x.gdate === D && String(x.pid) === String(pid) && x.mk === mk);
+    row(21, 'reb').take = true; row(22, 'tpm').pairs = [k(22, 'ast')]; row(22, 'ast').pairs = [k(22, 'tpm')];
+    await smStore.setItem('callsheet3.props.v1', JSON.stringify(all));
+  }, mkSrc.toString());
+  await reloaded();
+  const mk = await pg.evaluate(async (src) => {
+    const wait = (ms) => new Promise(r => setTimeout(r, ms || 130)), txt = e => (e ? e.innerText : '').replace(/\s+/g, ' ').trim();
+    await smStore.ready;
+    const { D, grade, marks } = (0, eval)('(' + src + ')')();
+    const load = async (doc, name) => { const dt = new DataTransfer(); dt.items.add(new File([JSON.stringify(doc)], name, { type: 'application/json' })); const inp = document.getElementById('slateFile'); inp.files = dt.files; inp.dispatchEvent(new Event('change', { bubbles: true })); await wait(); await wait(); };
+    await load(grade, 'nba-grade-2026-11-27.json'); await wait(200);
+    const read = async () => {
+      if (document.getElementById('propsView').hidden) { document.getElementById('m-props').click(); await wait(); }
+      const pd = document.getElementById('propsDate'); pd.value = D; pd.dispatchEvent(new Event('change', { bubbles: true })); await wait();
+      const o = { taking: [...document.querySelectorAll('#propsTaking .pk')].map(txt), said: txt(document.getElementById('propsMsg')), shown: !document.getElementById('propsView').hidden, date: document.getElementById('propsDate').value };
+      const strip = (x) => { if (!x) return null; const c = JSON.parse(JSON.stringify(x)); (Array.isArray(c) ? c : [c]).forEach(y => { o.fixed = (o.fixed || 0) + (y.fixed ? 1 : 0); delete y.fixed; }); return c; };
+      o.rows = JSON.parse(smStore.getItem('callsheet3.props.v1')).filter(x => x.gdate === D).map(x => x.name + ' ' + x.mk + ' | take ' + !!x.take + ' | took ' + JSON.stringify(strip(x.took)) + ' | pairs ' + JSON.stringify(x.pairs || null) + ' | kept ' + JSON.stringify(strip(x.pairsAt)));
+      document.getElementById('m-nba').click(); await wait();
+      o.took = [...document.querySelectorAll('#calibBox .calib[data-sport="TAKEN"] > div')].map(txt);
+      o.list = [...document.querySelectorAll('#takenList tbody tr')].map(e => e.textContent.replace(/\s+/g, ' ').trim());
+      return o;
+    };
+    const o = { before: await read() };
+    document.getElementById('m-nba').click(); await wait();   // loaded from the board's tab: the file opens the props at its date
+    await load(marks, 'nba-marks-2026-11-27.json'); o.opened = { shown: !document.getElementById('propsView').hidden, date: document.getElementById('propsDate').value, said: txt(document.getElementById('propsMsg')) };
+    o.after = await read();
+    await load(marks, 'nba-marks-2026-11-27.json'); o.again = await read();
+    return o;
+  }, mkSrc.toString());
+  await pg.evaluate(async (k) => { for (const x of Object.keys(k)) { if (k[x] === null || k[x] === undefined) await smStore.removeItem(x); else await smStore.setItem(x, k[x]); } }, mkKeep);
+  await reloaded();
+  const mkOne = (xs, re) => (xs || []).filter(x => re.test(x));
+  chk(mkOne(mk.before.taking, /Rebound Man OVER 5\.5 rebounds 51\.8% · -135 needs 57\.5% LOSS · 5/i).length === 1 && mkOne(mk.before.taking, /Dime Man OVER 0\.5 threes \+ Dime Man OVER 5\.5 assists WIN/i).length === 1
+      && mkOne(mk.before.took, /^Props taken 0-1 /i).length === 1 && mkOne(mk.before.took, /^Same-game pairs taken 1-0 /i).length === 1,
+      'a marks file, the night before it (12 Nov 2026): a prop marked with a flag and a pair marked by its legs\' keys read as the rows stand after a later run, the under at 6.5 as an over at 5.5 that lost on five rebounds and the pair with its second leg turned, a win',
+      JSON.stringify({ taking: mk.before.taking.map(t => t.slice(0, 200)), took: mk.before.took }));
+  chk(mk.opened.shown === true && mk.opened.date === '2026-11-27'
+      && mk.opened.said === "The marks file nba-marks-2026-11-27.json put 2 bets back as they were marked: Rebound Man UNDER 6.5 rebounds at -155; Dime Man OVER 0.5 threes + Dime Man UNDER 6.5 assists at +121. Each is listed and graded from here on the line and the side kept, at the price kept. 2 left alone, not marked on this page: Free Man; Loose One + Loose Two. 1 passed over, not among the props this page holds: Nobody. 2 refused, not a mark this page can read: Bad Side; Bad Pair."
+      && mkOne(mk.after.rows, /^Rebound Man reb \| take true \| took \{"side":"UNDER","line":6\.5,"price":-155,"chance":0\.622,"band":"LEAN","book":"betmgm","proj":5\.46\} \| pairs null \| kept null$/).length === 1
+      && mkOne(mk.after.rows, /^Dime Man tpm \| take false \| took null \| pairs \["2026-11-27\|22\|ast"\] \| kept \[\{"ks":\["2026-11-27\|22\|tpm","2026-11-27\|22\|ast"\],"app":"betmgm","kind":"same_man","f":1\.15,"chance":0\.508,"at":\[\[0\.5,-210,0\.672,"OVER",0\.5\],\[6\.5,-200,0\.658,"UNDER",6\.5\]\]\}\]$/).length === 1
+      && mkOne(mk.after.rows, /^Dime Man ast \| take false \| took null \| pairs \["2026-11-27\|22\|tpm"\] \| kept null$/).length === 1
+      && mkOne(mk.after.rows, /^Free Man pts \| take false \| took null \| pairs null \| kept null$/).length === 1 && mkOne(mk.after.rows, /^Loose (One reb|Two ast) \| take false \| took null \| pairs null \| kept null$/).length === 2 && mk.after.fixed === 2,
+      'a marks file, loaded: it opens the props at its date and says what it did; the prop marked on the page takes the bet the file kept (its side, line, price, chance, band and book) and the marked pair its ticket (the app, each leg\'s line, price, chance and side), stamped as put back; a prop nobody marked and a pair nobody marked are left alone, a key the page does not hold is passed over, and an entry with no side or one leg is refused',
+      JSON.stringify({ opened: mk.opened, rows: mk.after.rows, fixed: mk.after.fixed }));
+  chk(mkOne(mk.after.taking, /Rebound Man UNDER 6\.5 rebounds 62\.2% · -155 needs 60\.8% WIN · 5 .*The card has moved since you marked it: OVER 5\.5 at -135 now \(no edge\)\. Your bet stays as marked\./i).length === 1
+      && mkOne(mk.after.taking, /Dime Man OVER 0\.5 threes \+ Dime Man UNDER 6\.5 assists LOSS both land 50\.8% · pays \+121 \(2\.21×\) needs 45\.2% Dime Man 67\.2% at -210 · Dime Man 65\.8% at -200 · one man, two markets, measured ×1\.15 As you marked it: the card has moved since/i).length === 1
+      && mkOne(mk.after.took, /^Props taken 1-0 says 62\.2% · does 100\.0% \(±50\.0\) · \+0\.65u$/i).length === 1 && mkOne(mk.after.took, /^Same-game pairs taken 0-1 says 50\.8% · does 0\.0% \(±50\.0\) · [-−]1\.00u$/i).length === 1
+      && mkOne(mk.after.list, /Rebound Man UNDER 6\.5 rebounds · Spurs @ Bullsprop62\.2%[-−]155WIN\+0\.65u$/).length === 1 && mkOne(mk.after.list, /Dime Man OVER 0\.5 threes \+ Dime Man UNDER 6\.5 assists · Spurs @ Bullssame-game pair50\.8%\+121LOSS[-−]1\.00u$/).length === 1
+      && JSON.stringify(mk.again.rows) === JSON.stringify(mk.after.rows) && JSON.stringify(mk.again.took) === JSON.stringify(mk.after.took) && mk.again.said === mk.opened.said,
+      'a marks file, the night after it: the prop is listed and graded as it was marked, the under at 6.5 a win on five rebounds at -155, with the card it has moved to named beside it; the pair is the ticket that was marked, a loss on nine assists at +121; What you took and the list of every pick read them so; and loading the file a second time changes nothing and keeps one ticket',
+      JSON.stringify({ taking: mk.after.taking.map(t => t.slice(0, 330)), took: mk.after.took, list: (mk.after.list || []).slice(0, 4), same: JSON.stringify(mk.again.rows) === JSON.stringify(mk.after.rows), said2: mk.again.said.slice(0, 120) }));
 
   // ---- 12 Nov 2026: a call on every game (the user: "the model wont give 'green bet' ... it still need to be able to provide a bet on something because an outcome is
   //      going to happen"). One a game on the board, by this order: the agreement rule, a side the sheet prices below its chance, a total at one of the four apps a

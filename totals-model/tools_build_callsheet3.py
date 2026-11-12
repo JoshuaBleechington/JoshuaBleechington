@@ -539,7 +539,7 @@ def tail() -> str:
              ' + (propsMinsFilled ? " Minutes filled in on <b>" + propsMinsFilled + "</b> graded prop" + (propsMinsFilled === 1 ? "" : "s") + " from the box lines." : "")'
              ' + (hockey ? " <b>" + hockey + "</b> hockey game" + (hockey === 1 ? "" : "s") + " skipped: hockey is retired from the sheet." : ""));', "grade props message")
     t = once(t, '      try { applySlate(JSON.parse(rd.result), f.name); }',
-             '      try { var sd = JSON.parse(rd.result); if (sd && sd.format === "callsheet3.props") applyProps(sd, f.name); else if (sd && sd.format === "callsheet3.props.close") applyPropsClose(sd, f.name); else applySlate(sd, f.name); }', "props file")
+             '      try { var sd = JSON.parse(rd.result); if (sd && sd.format === "callsheet3.props") applyProps(sd, f.name); else if (sd && sd.format === "callsheet3.props.close") applyPropsClose(sd, f.name); else if (sd && sd.format === "callsheet3.marks") applyMarks(sd, f.name); else applySlate(sd, f.name); }', "props file")
     t = once(t, '    box.innerHTML = h;\n  }\n\n\n  /* ---- the WNBA paste', '    h += propsRecordHtml();\n    box.innerHTML = h;\n  }\n\n\n  /* ---- the WNBA paste', "props record")
     t = once(t, '    $("opened").placeholder = s === "WNBA" ? "165.5" : s === "NBA" ? "228.5" : "8.5";',
              '    $("opened").placeholder = s === "WNBA" ? "165.5" : s === "NBA" ? "228.5" : "8.5";\n'

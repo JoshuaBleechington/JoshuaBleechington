@@ -3911,7 +3911,8 @@ heavy favourite at the best of four prices close to tip, which was
 about a fair price (-0.3% a bet; -3.7% at the opener) and no more.
 Everything else is the book's margin, and a pick on every game pays
 it. The sharp book's shade is a hockey measure; on NBA totals it has
-pointed the wrong way, and its chip on the NBA card is not a signal.
+pointed the wrong way, and its chip came off the NBA card the same day
+(the next section).
 
 ### The call
 
@@ -3999,3 +4000,154 @@ the simulation's, the app left off the pick, the night's line, the
 Taking card's words, no Take on the number): two of the first seven
 were not caught at first, which is why the scenario has the sharp book
 alone off the middle and a rule that has lost once and is still given.
+
+## Three loose ends closed, 12 Nov 2026
+
+The report on the calls ended with three things found and not
+changed, and the user answered: "Take care of these bro".
+
+### The sharp book's shade comes off the NBA card
+
+Pinnacle's shade is the side the sharp book prices shorter, by three
+points of implied chance or more. It was measured on hockey (13 Oct
+2026: 372-289-32 on 693 closes), where the sharp book moves its price
+before its number, and the chip, the line in tonight's signals and the
+sentence in the why were drawn for every sport. On an NBA total the
+book moves the number, so the shade is rare and says nothing (lab
+`shade_nba.py`, his 2024-25 lines file and this season's rows):
+
+    2024-25, the last snapshot, 3+ points     29-27   at Pinnacle's own number and price   (56 of 1,219 closes)
+        at the best of the four apps there    23-17
+    2024-25, the opener                       15-26
+    this season, the first odds run           8-22    the over 3-10, the under 5-12
+    this season, the newest odds run          8-16-1
+    2+ points                                 113-111, 54-61, 25-32, 16-21-1
+    the page's own record line                8-22
+
+`sharpShadeShown` returns nothing on basketball and the three places
+read it; the other sports keep the shade as it was. The record keeps
+counting it on the NBA total tile's own line, marked "off the card
+here: a hockey measure", so the line says if it ever turns. The sharp
+book's line and prices stay on the card: they are the number, not a
+call.
+
+### The pick at even money or better, a list of its own
+
+The sheet's blend is four parts book to one part model, so it only
+sides against the book's favourite when its own model sits far from
+the book (the model alone near 70%, the book at 45%). Replayed under
+the blend as it stands on the fourteen nights that keep the logs, 28
+Oct to 11 Nov, 1,566 picks with an edge (lab `plus_money.py`,
+`plus_money2.py`, `plus_money3.py`, `plus_final.py`, `plus_carded.py`):
+
+    the pick at +100 or longer            83-58    58.9%   says 51.5%   the prices ask 49.2%   +27.5 units
+        by half                           59-41, then 24-17
+        the unders, the overs             49-34, 34-24
+        at +100 itself, longer            45-33, 38-25
+        one a man a night                 68-55    +14.9 units
+        by night                          eleven of fourteen up, two down, one level
+        the nights drawn again 5,000 times   above zero in 99.6%; a bet returns +8.4% to +30.8% in the middle 90%
+        walk-forward                      75-53, each night's picks taken only once the nights before were above water
+    every other pick with an edge         768-657  53.9%   -25.2 units
+        the over at -110 to -101          87-127   40.7%   (the under there 111-92)
+
+It is the sheet's choice and not the price: every plus-money side on
+the board went 1,222-1,637 (42.7%) for -7.1% a bet, the ones the sheet
+sided against 1,184-1,612. And it is not one side: both land near 59%.
+What the picks share is the model's distance from the book (74% alone
+against the book's 45% on the strictly plus-money ones).
+
+As the page carded them the picture is narrower, which is why this is
+a test and not a rule. From 5 Nov, the blend as it stands, 24-17
+(unders 14-8, overs 10-9). To 4 Nov, under the older blends that gave
+the model more say and sided with the dog far more readily (281 such
+picks in fifteen nights against six a night now), 147-134 with the
+unders 101-73 and the overs 46-61. The replay says the current blend's
+choices are better than those; a hundred and forty-one picks cannot
+say how much.
+
+On the page (`props.engine.js`, `propIsPlus`, `PROPS_PLUS`):
+
+- under the BETs, a choice "even money or better" beside the tickets
+  and the LEANs: the BETs as always, then every other pick with an
+  edge at +100 or longer, the most edge first, under a line that says
+  what was measured; a date with none says so;
+- a chip on each such pick, on its card and its panel, "Pays even
+  money or better", coloured by its own record like the other tells:
+  the BET and LEAN picks at +100 or longer graded since the blend
+  changed (`PROPS_BLEND_FROM`), one pool for both sides with each
+  side's count in its words, grey under fifty graded picks. A red
+  chip here keeps no leg out of a last-five ticket: it is a test of
+  its own;
+- a tile on the props record, "The pick at even money or better, to
+  test", from the same pool, by side, and a part on the short line.
+
+Shown, not scored: no chance, band or ticket moves.
+
+The same replay answered the user's question of the evening, Duncan
+Robinson OVER 1.5 assists at -190 with ten of his last ten over and
+his club favoured by 10.5 (lab `fav_over.py`, `fav_over2.py`). The
+over that has landed in every one of a man's last five landed 105-83
+where the book said 52.3%, about what its price asks; the hit rate of
+his last ten shows no relation to landing (the overs that hit 70 to
+89% of them landed 48.0%). The heavy over, one the book gives 60% or
+more, went 25-26 on a man favoured by five or more where the price
+said 63.1% (6-8 favoured by ten or more), 27-24 on a dog by five or
+more, and 59-36 in a close game, on the price. The red chip and the
+best-chance rule's bar on an over in a lopsided game stay as they
+are.
+
+### A marks file: three bets of 11 Nov put back as they were marked
+
+The grading of 11 Nov found three of his bets recorded wrong, because
+a mark made that night was a flag and a later props run had moved the
+cards (the section "A mark keeps the bet"). From v158 a mark keeps the
+bet, and a night already graded was left as recorded. The sheet his
+phone had saved at 19:35 UTC that evening kept each bet as it was made,
+with the detail panels of every leg, so the night can be put right
+exactly.
+
+`applyMarks` reads a file of format `callsheet3.marks` through the
+same box as a slate or a props file: `props: [{key, name, took}]` and
+`pairs: [{ks, names, app, kind, f, chance, at}]`, the shapes a mark
+made today writes (`took`, `pairsAt`). It corrects a mark that is on
+the page and makes none: a prop not marked Taking, or a pair whose two
+legs do not name each other, is left alone; a key the page does not
+hold is passed over; an entry it cannot read is refused; what the page
+had kept of a pair gives way to the file's ticket, so loading the file
+twice changes nothing. It opens the props at the file's date and says
+what it did.
+
+`nba-marks-2026-11-11.json`, made from his backup's keys and the
+phone's saved panels (lab `make_marks.py`, `phone_panels.py`):
+
+    Caleb Wilson UNDER 6.5 rebounds, -155, 62.2%, LEAN, BetMGM      five rebounds: a WIN     (read OVER 5.5, a loss)
+    Jakob Poeltl UNDER 8.5 rebounds, -140, 63.7%, BET, BetMGM       nine: a loss either way  (read UNDER 7.5 at -110)
+    De'Aaron Fox OVER 0.5 threes + UNDER 6.5 assists, BetMGM,
+        -210 and -200, +121, 50.8%                                  nine assists: a LOSS     (read with the over at 5.5, a win)
+    Al Horford UNDER 1.5 threes + Marcus Smart OVER 0.5 threes,
+        DraftKings, -224 and -232, +107, 48.9%                      none and two: a WIN      (read with both legs turned, a loss)
+    Ajay Mitchell UNDER 1.5 + Shai Gilgeous-Alexander UNDER 2.5
+        threes, BetMGM, -220 and -200, +118, 44.5%                  Mitchell did not play: no result, as before
+
+Loaded on a copy of his 12 Nov backup (lab `marks_probe.js`): the
+night reads 2-14 for -12.3 units where it read 1-15 for -13.3, the
+props he took 79-66 where 78-67, the pairs 15-10 for +11.00 where
++11.58, and a second load changes nothing.
+
+Checked: nine harness checks in three blocks. The shade: a basketball
+game whose sharp book prices the over 6.8 points shorter carries the
+sharp line's chip and no shade chip, signal or sentence; the same
+prices on a baseball game carry all three; a graded NBA game counts
+on the record's line with its note. The even-money list: two BETs,
+one at plus money, an under at +105, an over at +100, a lean at -110
+and a plus-money side with no edge; the list, the divider, the chip
+grey and then green after a night of 52 such picks, a night under the
+older blend left out of the pool, the tile, a date with none. The
+marks file: a flagged prop and a keyed pair read at the moved rows,
+then as marked after the file, with an unmarked prop, an unmarked
+pair, a key not held and two unreadable entries left as the message
+says, and a second load. Run against twenty-nine copies broken on
+purpose (seven, twelve and ten); one was not caught at first, a
+plus-money side with no edge given the chip, which is why the check
+opens three panels.

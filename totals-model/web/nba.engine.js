@@ -332,7 +332,7 @@
     }
     if (leg && typeof bandOf === "function" && bandOf(leg)) out.push(signalChip("go", "markets", "#1 says " + bandOf(leg), "<b>" + esc(leg.pick) + "</b> · " + pc(leg.p) + " at " + sgn(leg.price, 0)));
     if (upsetView && upsetView.dog) out.push(signalChip(upsetView.scored ? "go" : "watch", "markets", upsetView.scored ? "upset signal" : "upset watch", "<b>" + esc(upsetView.dog.pick) + "</b> · " + pc(upsetView.dog.p)));
-    var ss = typeof sharpShadeOf === "function" ? sharpShadeOf(($("sharp") || {}).value || "") : null;
+    var ss = typeof sharpShadeShown === "function" ? sharpShadeShown(($("sharp") || {}).value || "") : null;   // not on basketball (12 Nov 2026)
     if (ss) out.push(signalChip("watch", "markets", "Pinnacle", "shades the <b>" + esc(ss.side) + "</b> by " + ss.pts.toFixed(1) + " points"));
     if (!nba) return out;
     var inputs = snapshot(), f = readNba(), row = nbaSimTakeRow(f), away = f.away || "Away", home = f.home || "Home";
@@ -1517,17 +1517,21 @@
      total, none on a spread or a first half and 32 on a moneyline (11-21): the card reads the book's own number, because two
      seasons of closes say the sheet's own number on a total or a spread is worth a coin. Measured the same day, on the user's
      2024-25 file (1,242 games, every book at one moment, the last snapshot before tip unless said) and on the 170 rows here
-     (lab sharp_value.py, board_value.py, sharp_dir.py, kalshi_check.py):
+     (lab sharp_value.py, board_value.py, sharp_dir.py, shade_nba.py, kalshi_check2.py):
        - a total at one of the four apps a point or more off the middle of every book's number: 105-84 (55.6%, +5.0% a bet) last
          season, 78-70 at the opener, 41-35 and 18-16 on the rows here. Half a point off is the price (353-344);
        - the favourite at the best of the four apps' prices: where the market gives him 80% or more 231-31 for -0.3% a bet last
          season (24-0 here), 70 to 80% 216-81 (-5.8%), 60 to 70% 230-134 (-6.0%), nearer a coin 162-146 (-8.2%); the dogs -1.7%;
        - the spread at the best number: 600-615, and no gap in it paid (a point or more off the middle 10-8, then 19-20 and 8-14
          here); the sharp book's line against the apps' middle called the side 227-234 and 46-41;
-       - the sharp book's price shade, measured on hockey: 30-27 and 34-51 on last season's NBA totals, 8-22 on the rows here;
-       - Kalshi moves no pick. On the 63 games here that carry its winner market the crowd's price was the closest of the three
-         to what happened (Brier 0.161, the carded book 0.165, the sharp book 0.163), the side it liked two points or more above
-         the book won 10 of 12, and the favourite was cheaper there after the fee on 41 games by a point of chance.
+       - the sharp book's price shade, measured on hockey: three points or more is rare on an NBA total (56 of 1,219 closes) and
+         the shaded side went 29-27 at last season's last snapshot, 15-26 at its opener and 8-22 on the rows here. Off the NBA
+         card the same day (sharpShadeShown), its record line kept;
+       - Kalshi moves no pick. Read against the books in the same odds run on the 63 games here that carry its winner market, it
+         is the books' number to within a point (Brier 0.1609, the middle of the books 0.1619; 0.85 points apart on average), a
+         little higher on the heavy favourite, and after the fee it beat the best of the four apps' prices on 20 favourites, lost
+         on 36 and tied on 7. A first reading against the price the row was logged with (cheaper on 41, the better score) set a
+         later quote beside an earlier price and is withdrawn.
      So every game is given one call, by this order: the agreement rule when it fires (BET); a side the sheet prices below its
      chance, or one a verdict sits on (BET); a total a point or more off the market's middle at one of the four apps (VALUE);
      else the likelier winner at the best of the four prices (LEAN), which is the book's price and says what it has cost. Shown,
@@ -1598,7 +1602,7 @@
     ["w50", "LEAN · the likelier winner, near a coin", "the book's price on a game near a coin: 162-146 last season, -8.2% a bet; the cheapest thing on this game is to pass it"]];
   /* A kind that has lost money here over ten or more graded calls is COLD: it is still counted on its own line, and it is left
      out of the order until its record is back above water, so the call a game is given is one whose kind is paying here or has
-     not been tried. On the rows to 11 Nov that is the agreement rule (3-10) and the sheet's own calls (11-20) */
+     not been tried. On the rows to 11 Nov that is the agreement rule (3-10) and the sheet's own calls (12-21) */
   var NBA_CALL_COLD = 10;
   var nbaCallsMemo = null;   // the record of every kind, replayed from the graded rows: built again when a final changes
   function nbaCallsStamp() { var n = 0, s = 0; card.forEach(function (r) { if (r.sport === "NBA" && r.finals && r.finals.fa !== undefined && r.finals.fa !== "") { n++; s += (+r.finals.fa || 0) * 3 + (+r.finals.fh || 0) * 7 + (r.finals.void ? 1 : 0); } }); return n + "|" + s + "|" + card.length; }

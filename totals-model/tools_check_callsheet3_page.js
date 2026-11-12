@@ -2765,6 +2765,113 @@ const CHECKS = ["dome","playoff"];
       'tickets by best chance, at the grade: the best-chance lists are kept on the rows before the results land, two legs and three, each with its rank, whichever the tab showed; the cards carry the results and say the list is in the record; the record keeps them on tiles of their own and on the card\'s line, apart from the last-five tickets (none listed here) and from the ticket taken',
       JSON.stringify({ kept: tc.kept, after2: tc.after2.map(c => c.n1 + ' :: ' + c.who), after3: tc.after3.map(c => c.n1 + ' :: ' + c.who), div: tc.afterDiv, form: tc.afterForm, formTile: tc.formTile, tiles: tc.tiles, took: tc.tookTile, line: tc.line }));
 
+  // ---- 12 Nov 2026: a call on every game (the user: "the model wont give 'green bet' ... it still need to be able to provide a bet on something because an outcome is
+  //      going to happen"). One a game on the board, by this order: the agreement rule, a side the sheet prices below its chance, a total at one of the four apps a
+  //      point or more off the middle of every book's number, else the likelier winner at the best of the four prices. Each kind keeps its own record, replayed from the
+  //      rows, and a rule that has lost over ten or more calls is cold: left out of the order, named on the card, counted on its line. Shown, not scored ----
+  const clKeep = await pg.evaluate(async () => { await smStore.ready; const k = {}; for (const x of ['callsheet3.card.v1', 'callsheet3.props.v1', 'callsheet3.draft.v1']) k[x] = await smStore.getItem(x); await smStore.removeItem('callsheet3.card.v1'); await smStore.removeItem('callsheet3.props.v1'); return k; });
+  await reloaded();
+  const cl = await pg.evaluate(async () => {
+    const wait = (ms) => new Promise(r => setTimeout(r, ms || 90)), txt = e => (e ? e.innerText : '').replace(/\s+/g, ' ').trim();
+    const set = (id, v) => { const el = document.getElementById(id); el.value = v; el.dispatchEvent(new Event('input', { bubbles: true })); };
+    await smStore.ready;
+    const game = async (date, away, home, f) => { document.getElementById('clear').click(); document.getElementById('m-nba').click(); await wait(); set('gdate', date); set('away', away); set('home', home); set('line', '229.5'); set('op', '-110'); set('up', '-110');
+      Object.keys(f).forEach(k => set(k, f[k])); await wait(); document.getElementById('add').click(); await wait(); };
+    const rows = () => JSON.parse(smStore.getItem('callsheet3.card.v1')), rowOf = (date, away) => rows().find(x => x.gdate === date && x.away === away);
+    const grade = async (date, away, fa, fh) => { const r = rowOf(date, away); for (const [k, v] of [['fa', fa], ['fh', fh]]) { const el = document.querySelector('#cardTable .grade[data-id="' + r.id + '"][data-k="' + k + '"]'); el.value = String(v); el.dispatchEvent(new Event('input', { bubbles: true })); el.dispatchEvent(new Event('change', { bubbles: true })); } await wait(); };
+    const board = async (d) => { const bd = document.getElementById('boardDate'); bd.value = d; bd.dispatchEvent(new Event('change')); await wait(140); return { hidden: document.getElementById('callsHead').hidden && document.getElementById('calls').hidden,
+      cards: [...document.querySelectorAll('#calls .pk.call')].map(c => ({ cls: c.className, n1: txt(c.querySelector('.n1')), n2: txt(c.querySelector('.n2')), n3: txt(c.querySelector('.n3')), n4: txt(c.querySelector('.n4')), also: txt(c.querySelector('.n4.also')), take: !!c.querySelector('.takebtn'), btn: txt(c.querySelector('.n6')) })) }; };
+    const taking = () => [...document.querySelectorAll('#taking .pk.taking')].map(e => txt(e));
+    const table = () => { const t = document.querySelector('#calibBox .callstab'); return t ? [...t.querySelectorAll('tbody tr')].map(tr => [...tr.children].slice(0, 5).map(td => txt(td)).join(' | ')) : null; };
+    const tot = (lines) => { const o = { OVER: [], UNDER: [] }; Object.keys(lines).forEach(b => { o.OVER.push([b, -110, lines[b]]); o.UNDER.push([b, -110, lines[b]]); }); return o; };
+    const ml = (h, a) => { const o = { HOME: [], AWAY: [] }; Object.keys(h).forEach(b => { o.HOME.push([b, h[b], null]); o.AWAY.push([b, a[b], null]); }); return o; };
+    const hist = (lo, mean, sd) => { const c = []; for (let v = lo; v <= lo + 100; v++) c.push(Math.round(10000 * Math.exp(-((v - mean) ** 2) / (2 * sd * sd)))); return { lo, c }; };
+    const D = '2026-11-23', o = {};
+    // A: a short dog the sheet prices below its chance. B: a total at FanDuel a point and a half over the middle of five books. C: a heavy favourite, the best of the four
+    // prices at DraftKings, and the crowd's price dearer than that and cheaper than the row's own. D: a favourite at 63%, the carded book alone. E: the simulation and
+    // the crew both under the total
+    await game(D, 'Hornets', 'Bucks', { hml: '-120', aml: '100' });
+    await game(D, 'Celtics', 'Lakers', { hml: '-600', aml: '440', odds: JSON.stringify({ book: 'fanatics', total: tot({ fanatics: 225.5, draftkings: 225.5, fanduel: 227, betmgm: 225.5, pinnacle: 225.5 }) }) });
+    await game(D, 'Heat', 'Jazz', { hml: '-650', aml: '460', nbakalshi: JSON.stringify({ h: { bid: 0.84, ask: 0.85 }, a: { bid: 0.15, ask: 0.16 }, fee: 0.07 }), odds: JSON.stringify({ book: 'fanatics', total: tot({ fanatics: 229.5, draftkings: 229.5, fanduel: 230, betmgm: 229.5, pinnacle: 231.5 }),   // the sharp book two points off the middle is not one of the four apps: no number here
+      ml: ml({ fanatics: -650, draftkings: -600, fanduel: -620, betmgm: -640, pinnacle: -610 }, { fanatics: 460, draftkings: 440, fanduel: 450, betmgm: 455, pinnacle: 470 }) }) });
+    await game(D, 'Suns', 'Kings', { hml: '-190', aml: '160' });
+    await game(D, 'Bulls', 'Pistons', { line: '232', hml: '-190', aml: '160', ncrew: 'Ref One, Ref Two, Ref Three', nbarefs: JSON.stringify({ lg: [2462, 44.0, 228.8], r: { 'Ref One': [70, 44, 228, 10, 30, 0, 0], 'Ref Two': [70, 44, 228, 12, 30, 0, 0], 'Ref Three': [70, 44, 228, 11, 30, 0, 0] } }),
+      nbasim: JSON.stringify({ v: 1, runs: 1000, own: { total: hist(160, 215, 12), h1: hist(60, 108, 9), h2: hist(60, 108, 9), q: [hist(20, 54, 6), hist(20, 54, 6), hist(20, 54, 6), hist(20, 54, 6)], margin: hist(-50, 3, 12), away: hist(60, 106, 10), home: hist(60, 109, 10), ot: 0.04 }, mkt: null, anchor: null, ft_factor: 1,
+        shrink: { total: 0.0, h1: 0.1, spread: 0.0, ml: 0.97, team: 0.3, team_away: 0.3, team_own: 0.3, quarter: 0.1 }, bands: [[0.7, 'STRONG'], [0.65, 'BET'], [0.6, 'LEAN']] }) });
+    o.before = await board(D);
+    o.noNba = (await board('2026-07-04')).hidden;
+    // the Take on the number and on the winner (cards 3 and 4): the mark keeps the app, the line and the price its card shows, not the row's own
+    await board(D);
+    for (const i of [2, 3]) { document.querySelectorAll('#calls .pk.call')[i].querySelector('[data-stake]').click(); await wait(160); }
+    const bare = (ts) => (ts || []).map(t => { const c = Object.assign({}, t); delete c.at; return c; });
+    o.taken = { btns: (await board(D)).cards.map(c => c.btn), list: taking(), b: bare(rowOf(D, 'Celtics').simTakes), c: bare(rowOf(D, 'Heat').simTakes) };
+    // the finals: the dog wins, 228 lands over FanDuel's 227 and under the row's own 229.5 (the call is graded at the app's number), the Jazz and the Lakers win at
+    // home, the Kings lose, 241 lands over 232 with the Pistons winning (the rule's one call a loss: one loss does not make a kind cold)
+    await grade(D, 'Hornets', 110, 100); await grade(D, 'Celtics', 108, 120); await grade(D, 'Heat', 100, 120); await grade(D, 'Suns', 115, 110); await grade(D, 'Bulls', 120, 121);
+    o.after = await board(D); o.table = table();
+    o.took = [...document.querySelectorAll('#calibBox .calib[data-sport="TAKEN"] > div')].map(d => txt(d));
+    o.tookList = [...document.querySelectorAll('#takenList tbody tr')].map(e => e.textContent.replace(/\s+/g, ' ').trim());
+    o.takingGraded = taking();
+    // ten short dogs that lose on the days before: the sheet's own call goes cold, and the next short dog is given the lean with the cold call named
+    for (let i = 1; i <= 10; i++) { const d = '2026-11-' + String(i).padStart(2, '0'); await game(d, 'Hornets', 'Bucks', { hml: '-120', aml: '100' }); await grade(d, 'Hornets', 100, 112); }
+    await game('2026-11-24', 'Hornets', 'Bucks', { hml: '-120', aml: '100' });
+    o.cold = await board('2026-11-24'); o.tableCold = table();
+    // the ten wiped, the call is the sheet's own again
+    const keep = rows().filter(x => !(x.gdate >= '2026-11-01' && x.gdate <= '2026-11-10'));
+    // and a later odds run on the Jazz game: DraftKings out to -700, FanDuel the best of the four at -590. The card follows it; the mark does not
+    const later = keep.find(x => x.gdate === D && x.away === 'Heat'); later.inputs.oddsNow = JSON.stringify({ book: 'fanatics', total: tot({ fanatics: 229.5, draftkings: 229.5, fanduel: 230, betmgm: 229.5, pinnacle: 231.5 }),
+      ml: ml({ fanatics: -650, draftkings: -700, fanduel: -590, betmgm: -640, pinnacle: -610 }, { fanatics: 460, draftkings: 500, fanduel: 430, betmgm: 455, pinnacle: 470 }) });
+    await smStore.setItem('callsheet3.card.v1', JSON.stringify(keep));
+    return o;
+  });
+  await reloaded();
+  const clBack = await pg.evaluate(async () => { const txt = e => (e ? e.innerText : '').replace(/\s+/g, ' ').trim(), wait = (ms) => new Promise(r => setTimeout(r, ms || 140)); await smStore.ready; document.getElementById('m-nba').click(); await wait();
+    const bd = document.getElementById('boardDate'); bd.value = '2026-11-24'; bd.dispatchEvent(new Event('change')); await wait(); const back = [...document.querySelectorAll('#calls .pk.call')].map(c => txt(c.querySelector('.n1')) + ' :: ' + txt(c.querySelector('.n2')) + ' :: ' + (c.querySelector('.n4.also') ? 'also' : 'no also'));
+    bd.value = '2026-11-23'; bd.dispatchEvent(new Event('change')); await wait();
+    const jazz = [...document.querySelectorAll('#calls .pk.call')].filter(c => /Jazz to win/.test(txt(c.querySelector('.n2')))).map(c => txt(c.querySelector('.n3')) + ' [' + txt(c.querySelector('.n6')) + ']');
+    return { back, jazz, taking: [...document.querySelectorAll('#taking .pk.taking')].map(e => txt(e)) }; });
+  await pg.evaluate(async (k) => { for (const x of Object.keys(k)) { if (k[x] === null || k[x] === undefined) await smStore.removeItem(x); else await smStore.setItem(x, k[x]); } }, clKeep);
+  await reloaded();
+  const clc = (cards) => cards.map(c => c.cls.replace('pk call ', '') + ' | ' + c.n1.toUpperCase() + ' | ' + c.n2);
+  chk(cl.before.hidden === false && cl.noNba === true && clc(cl.before.cards).join(' ## ') === "bet | BET · THE AGREEMENT RULE | Total UNDER 232 ## bet | BET · THE SHEET'S OWN CALL | Hornets ML ## value | VALUE · THE BEST NUMBER ON THE BOARD | Total UNDER 227 ## lean | LEAN · THE LIKELIER WINNER, 80% OR MORE | Jazz to win ## lean | LEAN · THE LIKELIER WINNER, 60 TO 70% | Kings to win"
+      && /^2 of 3 voices · -110 needs 52\.4% · the rule's rate 59\.2%$/.test(cl.before.cards[0].n3) && /^Bulls @ Pistons · the simulation and the crew on the same side of the total, the sheet not against it: 157-108 \(59\.2%\) over two seasons of closes · none graded here yet$/.test(cl.before.cards[0].n4)
+      && /^51\.8% by the sheet · \+100 needs 50\.0%$/.test(cl.before.cards[1].n3) && /^Hornets @ Bucks · a side the sheet prices below its chance, or one a verdict sits on · none graded here yet$/.test(cl.before.cards[1].n4)
+      && cl.before.cards[2].n3 === '-110 at FanDuel · the middle of 5 books is 225.5: 1.5 points over it, on your side' && /^Celtics @ Lakers · a total at one of your four apps a point or more off the middle of every book's number: 105-84 \(55\.6%\) on last season's closes, 78-70 at the opener · none graded here yet$/.test(cl.before.cards[2].n4)
+      && /^82\.8% by the middle of 5 books · -600 at DraftKings needs 85\.7% · costs 3\.4% a bet Kalshi 85¢ needs 85\.9% after the fee v -600 needing 85\.7%: the book · the crowd 84\.5%$/i.test(cl.before.cards[3].n3) && /^Heat @ Jazz · the book's price: such favourites at the best of the four prices went 231-31 last season, -0\.3% a bet · none graded here yet$/.test(cl.before.cards[3].n4)
+      && /^63\.0% by the middle of the carded book · -190 needs 65\.5% · costs 3\.8% a bet$/.test(cl.before.cards[4].n3) && /^Suns @ Kings · the book's price: 230-134 last season at the best of the four prices, -6\.0% a bet · none graded here yet$/.test(cl.before.cards[4].n4)
+      && cl.before.cards.map(c => c.take ? 'T' : '-').join('') === 'TTTTT' && cl.before.cards.every(c => c.also === ''),
+      'a call on every game (12 Nov 2026): the board gives every basketball game one call and the section is away on a date with none; the agreement rule where the simulation and the crew sit on one side of the total, a side the sheet prices below its chance, a total at one of the four apps a point or more off the middle of every book\'s number with the app and how far, else the likelier winner at the best of the four apps\' prices (the carded book alone where the shop is thin) with what the price costs; the BETs first, then the value, then the leans, the likelier first; each card says what its kind was measured to be and how it has done here, and carries Take; the crowd\'s chip on a winner reads against the price on the card (85.9% after the fee is dearer than -600 at DraftKings, though cheaper than the -650 the row was logged with)',
+      JSON.stringify({ hidden: cl.before.hidden, noNba: cl.noNba, cards: cl.before.cards }));
+  chk(clc(cl.after.cards).join(' ## ') === "bet loss | BET · THE AGREEMENT RULE | Total UNDER 232 LOSS ## bet win | BET · THE SHEET'S OWN CALL | Hornets ML WIN ## value loss | VALUE · THE BEST NUMBER ON THE BOARD | Total UNDER 227 LOSS ## lean win | LEAN · THE LIKELIER WINNER, 80% OR MORE | Jazz to win WIN ## lean loss | LEAN · THE LIKELIER WINNER, 60 TO 70% | Kings to win LOSS"
+      && cl.table && cl.table.join(' ## ') === "BET · the agreement rule | 0-1 | 59.2% | 0.0% | -1.0u ## BET · the sheet's own call | 1-0 | " + ((cl.table[1] || '').split(' | ')[2] || '') + " | 100.0% | +1.0u ## VALUE · the best number on the board | 0-1 |  | 0.0% | -1.0u ## LEAN · the likelier winner, 80% or more | 2-0 | " + ((cl.table[3] || '').split(' | ')[2] || '') + " | 100.0% | +0.3u ## LEAN · the likelier winner, 70 to 80% | none yet |  |  |  ## LEAN · the likelier winner, 60 to 70% | 1-1 | " + ((cl.table[5] || '').split(' | ')[2] || '') + " | 50.0% | -0.5u ## LEAN · the likelier winner, near a coin | 0-1 | " + ((cl.table[6] || '').split(' | ')[2] || '') + " | 0.0% | -1.0u ## The call as given, one a game | 2-3 |  | 40.0% | -1.8u"
+      && /0-1 here, -1\.0u$/.test(cl.after.cards[0].n4) && /2-0 here, \+0\.3u$/.test(cl.after.cards[3].n4) && /1-1 here, -0\.5u$/.test(cl.after.cards[4].n4),
+      'a call on every game, graded: each call is graded on its own line and side (the total at the app\'s number, where 228 loses the under at 227 though it sits under the row\'s 229.5; the winner on the final) and the cards carry the results; the NBA record keeps every kind on every game it speaks to (the likelier winner on all five, by how likely the market made him), and the call as the board gave it, one a game',
+      JSON.stringify({ cards: clc(cl.after.cards), n4: cl.after.cards.map(c => c.n4.slice(-28)), table: cl.table }));
+  chk(cl.cold.cards.length === 1 && cl.cold.cards[0].n1 === 'LEAN · the likelier winner, near a coin' && cl.cold.cards[0].n2 === 'Bucks to win' && /^52\.2% by the middle of the carded book · -120 needs 54\.5% · costs 4\.3% a bet$/.test(cl.cold.cards[0].n3)
+      && /^Also on this game: the sheet's own call says Hornets ML \(1-10 here, -9\.0u: cold, and left out of the order until its record turns\)\.$/.test(cl.cold.cards[0].also)
+      && /^BET · the sheet's own call · cold here \| 1-10 \| /.test((cl.tableCold || [])[1] || '') && /^BET · the agreement rule \| 0-1 \| /.test((cl.tableCold || [])[0] || '') && /^The call as given, one a game \| 11-4 \| /.test((cl.tableCold || [])[7] || '')
+      && clBack.back.length === 1 && clBack.back[0] === "BET · the sheet's own call :: Hornets ML :: no also",
+      'a call on every game, a kind gone cold: ten short dogs lose on the days before and the sheet\'s own call, 1-10, is cold: the next short dog is given the likelier winner, the card names the call that was left out and its record, the record marks the kind cold and counts the call as given by what the board would give now (the day the dog won reads the favourite, a loss); with the ten gone the same game is the sheet\'s call again',
+      JSON.stringify({ cold: cl.cold.cards, table: cl.tableCold, back: clBack.back }));
+  const clT = cl.taken || {}, clOne = (xs, re) => (xs || []).filter(x => re.test(x));
+  chk(JSON.stringify(clT.btns) === JSON.stringify(['Take', 'Take', '✓ Taking', '✓ Taking', 'Take'].map(s => s)) || JSON.stringify((clT.btns || []).map(s => s.toUpperCase())) === JSON.stringify(['TAKE', 'TAKE', '✓ TAKING', '✓ TAKING', 'TAKE'])
+      , 'a call on every game, taken: Take on the best number and on the likelier winner turns to Taking on those two cards and no other',
+      JSON.stringify(clT.btns));
+  chk(JSON.stringify(clT.b) === JSON.stringify([{ id: 'call|total|UNDER', view: 'call', key: 'total', side: 'UNDER', line: 227, price: -110, p: null, worth: null, band: 'value', pick: 'Total UNDER 227 at FanDuel', book: 'fanduel', call: 'number' }])
+      && JSON.stringify(clT.c) === JSON.stringify([{ id: 'call|ml|HOME', view: 'call', key: 'ml', side: 'HOME', line: null, price: -600, p: 0.8276, worth: null, band: 'lean', pick: 'Jazz ML at DraftKings', book: 'draftkings', call: 'winner' }])
+      && (clT.list || []).length === 3
+      && clOne(clT.list, /^TAKING · NBA · A CALL ON THE GAME · marked .+ Total UNDER 227 at FanDuel value · the best number on the board · -110 needs 52\.4% Celtics @ Lakers · a call on the game ✓ Taking$/i).length === 1
+      && clOne(clT.list, /^TAKING · NBA · A CALL ON THE GAME · marked .+ Jazz ML at DraftKings lean · 82\.8% by the books' middle · -600 needs 85\.7% Heat @ Jazz · a call on the game ✓ Taking$/i).length === 1
+      && /^TONIGHT 2 bets marked none graded yet · one unit each 0 on the card, 0 from the simulation, 2 calls on the game, 0 props$/i.test(clT.list[2])
+      && clOne(cl.took, /^Calls on the game taken 1-1 says 66\.4% · does 50\.0% \(±35\.4\) · [-−]0\.83u$/i).length === 1 && clOne(cl.took, /^Simulation calls taken/i).length === 0 && clOne(cl.took, /^Game bets taken/i).length === 0
+      && clOne(cl.tookList, /Jazz ML at DraftKings · Heat @ Jazzgame call82\.8%[-−]600WIN\+0\.17u$/).length === 1 && clOne(cl.tookList, /Total UNDER 227 at FanDuel · Celtics @ Lakersgame call50\.0%[-−]110LOSS[-−]1\.00u$/).length === 1
+      && clOne(cl.takingGraded, /Total UNDER 227 at FanDuel .*-110 needs 52\.4% · loss Celtics @ Lakers/i).length === 1 && clOne(cl.takingGraded, /Jazz ML at DraftKings .*-600 needs 85\.7% · win Heat @ Jazz/i).length === 1
+      && clOne(cl.takingGraded, /^TONIGHT 2 bets marked graded 1-1 · [-−]0\.83u at one unit each/i).length === 1
+      && (clBack.jazz || []).length === 1 && /^82\.9% by the middle of 5 books · -590 at FanDuel needs 85\.5% · costs \d\.\d% a bet Kalshi 85¢ needs 85\.9% after the fee v -590 needing 85\.5%: the book · the crowd 84\.5% \[TAKEN\]$/i.test(clBack.jazz[0])
+      && clOne(clBack.taking, /Jazz ML at DraftKings lean · 82\.8% by the books' middle · -600 needs 85\.7% · win Heat @ Jazz · a call on the game/i).length === 1,
+      'a call on every game, the mark keeps the bet: the number is kept at the app\'s line and price (UNDER 227 at FanDuel, not the row\'s 229.5) and the winner at the app and price on the card (-600 at DraftKings, not the -650 the row was logged with), with the chance by the books\' middle; they list under Taking as calls on the game and are counted apart from the simulation\'s; graded, each on its own line (228 loses the under at 227), they sit on their own tile of What you took and in the list of every pick as game calls; and after a later odds run moves the best price to another app the card follows it and the mark does not',
+      JSON.stringify({ b: clT.b, c: clT.c, list: clT.list, took: cl.took, tookList: (cl.tookList || []).slice(0, 4), graded: cl.takingGraded, jazz: clBack.jazz, backTaking: clBack.taking }));
+
   // ---- 11 Nov 2026: the NBA record counts the sheet's calls (the user: "fix the NBA record so tiles count only real calls") -- a market where neither side is priced below its chance is the book's own number, listed under the tile as no call and left out of its count ----
   const callsKeep = await pg.evaluate(async () => { await smStore.ready; const k = { card: await smStore.getItem('callsheet3.card.v1'), slate: await smStore.getItem('callsheet3.slate.v1') }; await smStore.removeItem('callsheet3.card.v1'); return k; });
   await reloaded();
@@ -2845,7 +2952,7 @@ const CHECKS = ["dome","playoff"];
     set('nbasim', ''); await wait();
     document.getElementById('add').click(); await wait();
     document.getElementById('boardDate').value = '2026-11-14'; document.getElementById('boardDate').dispatchEvent(new Event('change')); await wait();
-    const chips = [...document.querySelectorAll('.pk')].filter(e => /Hawks ML|Wizards ML/.test(e.textContent)).map(e => txt(e.querySelector('.n4')));
+    const chips = [...document.querySelectorAll('.pk:not(.call)')].filter(e => /Hawks ML|Wizards ML/.test(e.textContent)).map(e => txt(e.querySelector('.n4')));   // the board's own moneyline cards; the calls section (12 Nov 2026) has its own check
     const row = JSON.parse(smStore.getItem('callsheet3.card.v1')).find(r => /Hawks @ Wizards/.test(r.matchup)), stored = !!((row.inputs || {}).nbakalshi);
     // graded: the sharp side (the Hawks, Pinnacle's 61.2% against the crowd's 57.5%) wins, and the moneyline tile keeps the line
     await load({ format: 'callsheet2.slate', version: 1, date: '2026-11-14', games: [{ sport: 'NBA', gdate: '2026-11-14', away: 'Hawks', home: 'Wizards', finals: { fa: '118', fh: '110', f5a: '60', f5h: '55' }, close: { ctot: '232.5' }, notes: [] }] }, 'nba-grade-2026-11-14.json');

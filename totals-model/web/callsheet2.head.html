@@ -290,6 +290,11 @@
   .pk.upset { border: 1px dashed var(--away); background: transparent; }
   .pk.upset .n1 { color: var(--away); }
   .pk.upset.scored { border: 1px solid var(--go); background: var(--go-wash); }
+  .pk.call { border: 1px solid var(--go); background: var(--go-wash); }
+  .pk.call .n1 { color: var(--go); }
+  .pk.call.lean { border: 1px dashed var(--ink-2); background: transparent; }
+  .pk.call.lean .n1 { color: var(--ink-2); }
+  .pk.call .n4 { font-size: 11.5px; }
   .pk.agree { border: 1px solid var(--go); background: var(--go-wash); }
   .pk.agree .n1 { color: var(--go); }
   .pk.agree .n5 { margin-top: 6px; }
@@ -793,6 +798,8 @@
     <div class="body">
       <div class="subhead" id="takingHead" hidden>Taking tonight <span class="tag" id="takingCount"></span> <span class="tag">the bets you marked with Take, on the card and on the props, with the result once the game grades · one unit each</span> <button type="button" class="btn" id="takingText" style="margin-left:8px;padding:4px 10px;font-size:11px">Copy as text</button></div>
       <div id="taking" class="picks" hidden></div>
+      <div class="subhead" id="callsHead" hidden>A call on every game <span class="tag">basketball, one a game: the agreement rule when it fires and a side the sheet prices below its chance read BET; a total at one of your four apps a point or more off the middle of every book's number reads VALUE; else the likelier winner at the best of the four prices, a LEAN that says what the price costs — shown, not scored; each kind keeps its own record under Is it working</span></div>
+      <div id="calls" class="picks" hidden></div>
       <div class="subhead">The parlay four <span class="tag">the likeliest side on each game at any price, alternate totals included — one a game, likeliest first; each card says whether its price agrees and names the value side it passed over</span></div>
       <div id="picks" class="picks"></div>
       <div class="subhead">Best straight bets <span class="tag">#1's BET or better first, then the WNBA cheaper side, then the best edges — up to eight</span></div>

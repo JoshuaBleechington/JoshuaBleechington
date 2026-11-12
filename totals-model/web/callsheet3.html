@@ -290,6 +290,11 @@
   .pk.upset { border: 1px dashed var(--away); background: transparent; }
   .pk.upset .n1 { color: var(--away); }
   .pk.upset.scored { border: 1px solid var(--go); background: var(--go-wash); }
+  .pk.call { border: 1px solid var(--go); background: var(--go-wash); }
+  .pk.call .n1 { color: var(--go); }
+  .pk.call.lean { border: 1px dashed var(--ink-2); background: transparent; }
+  .pk.call.lean .n1 { color: var(--ink-2); }
+  .pk.call .n4 { font-size: 11.5px; }
   .pk.agree { border: 1px solid var(--go); background: var(--go-wash); }
   .pk.agree .n1 { color: var(--go); }
   .pk.agree .n5 { margin-top: 6px; }
@@ -1291,6 +1296,8 @@
     <div class="body">
       <div class="subhead" id="takingHead" hidden>Taking tonight <span class="tag" id="takingCount"></span> <span class="tag">the bets you marked with Take, on the card and on the props, with the result once the game grades · one unit each</span> <button type="button" class="btn" id="takingText" style="margin-left:8px;padding:4px 10px;font-size:11px">Copy as text</button></div>
       <div id="taking" class="picks" hidden></div>
+      <div class="subhead" id="callsHead" hidden>A call on every game <span class="tag">basketball, one a game: the agreement rule when it fires and a side the sheet prices below its chance read BET; a total at one of your four apps a point or more off the middle of every book's number reads VALUE; else the likelier winner at the best of the four prices, a LEAN that says what the price costs — shown, not scored; each kind keeps its own record under Is it working</span></div>
+      <div id="calls" class="picks" hidden></div>
       <div class="subhead">The parlay four <span class="tag">the likeliest side on each game at any price, alternate totals included — one a game, likeliest first; each card says whether its price agrees and names the value side it passed over</span></div>
       <div id="picks" class="picks"></div>
       <div class="subhead">Best straight bets <span class="tag">#1's BET or better first, then the WNBA cheaper side, then the best edges — up to eight</span></div>
@@ -3564,17 +3571,23 @@ smStore.ready.then(function () {
       var Wn = sim ? nbaWindowRead(sim) : null;
       if (Wn && Wn.side === side) c = { line: Wn.lo + "-" + Wn.hi, p: Wn.use.inside, worth: Wn.use.inside, band: "window", price: Wn.price, lo: Wn.lo, hi: Wn.hi, winView: Wn.view };
     }
+    else if (view === "call") {   // a call on the game (12 Nov 2026): the best number or the likelier winner, at the app, the line and the price its card shows
+      var K = nbaCallKinds(row).filter(function (x) { return (x.kind === "number" || x.kind === "winner") && x.key === key && x.side === side; })[0];
+      if (K) c = { line: K.kind === "number" ? K.line : null, p: K.p, worth: null, band: K.kind === "number" ? "value" : "lean", price: K.price, book: K.app, call: K.kind };
+    }
     else if (sim) c = nbaSimCalls(sim, lines, view).filter(function (x) { return x.key === key && x.side === side; })[0] || null;
     if (!c) { say("That call is not on the card as shown now; put the line back and take it again."); return; }
     var inp = view === "agree" ? { op: (row.inputs || {}).op, up: (row.inputs || {}).up }
             : { op: $("op").value, up: $("up").value, h1op: $("h1op").value, h1up: $("h1up").value, sph: $("sph").value, spa: $("spa").value, hml: $("hml").value, aml: $("aml").value };
-    var take = { id: id, view: view, key: key, side: side, line: c.line, price: (view === "middle" || view === "window") ? c.price : nbaSimPriceOf(key, side, lines, inp),
+    var take = { id: id, view: view, key: key, side: side, line: c.line, price: (view === "middle" || view === "window" || view === "call") ? c.price : nbaSimPriceOf(key, side, lines, inp),
                  p: c.p === null ? null : +(+c.p).toFixed(4), worth: c.worth === null ? null : +(+c.worth).toFixed(4), band: c.band,
                  pick: view === "middle" ? "Total " + side + " " + c.line + " at " + bookName(c.book) + " (the middle with " + c.with.side + " " + c.with.line + ")"
                      : view === "window" ? "Total window " + c.lo + "-" + c.hi + " (over the low, under the high), one ticket"
+                     : view === "call" ? (c.call === "number" ? "Total " + side + " " + c.line : (side === "HOME" ? row.home : row.away) + " ML") + (c.book ? " at " + bookName(c.book) : "")
                      : nbaSimPickText(key, side, c.line, f.away || row.away, f.home || row.home), at: new Date().toISOString() };
     if (view === "middle") { take.book = c.book; take.with = c.with; take.pair = c.pair; }
     if (view === "window") { take.lo = c.lo; take.hi = c.hi; take.winView = c.winView; }
+    if (view === "call") { take.book = c.book; take.call = c.call; }
     row.simTakes = (row.simTakes || []).concat([take]);
     done();
   }
@@ -3594,7 +3607,8 @@ smStore.ready.then(function () {
     if (t.key === "home_total") return cmp(fh, +t.line, t.side === "OVER");
     return null;
   }
-  function nbaSimTakeViewLabel(view) { return view === "own" ? "the sim's own view" : view === "mkt" ? "anchored to the market" : view === "agree" ? "the agreement rule, the sim and the crew" : view === "middle" ? "the middle's second leg" : view === "window" ? "the window, one ticket (anchored to the market)" : "the gap, a watch"; }
+  function nbaSimTakeViewLabel(view) { return view === "own" ? "the sim's own view" : view === "mkt" ? "anchored to the market" : view === "agree" ? "the agreement rule, the sim and the crew" : view === "middle" ? "the middle's second leg" : view === "window" ? "the window, one ticket (anchored to the market)" : view === "call" ? "a call on the game" : "the gap, a watch"; }
+  function nbaSimTakeFrom(t) { return (t && t.view === "call" ? "" : "the simulation, ") + nbaSimTakeViewLabel(t && t.view); }   // whose call it was, in words: a call on the game is the board's, not the simulation's (12 Nov 2026)
   /* the record: every graded NBA row's sim calls at LEAN or better, says against does by view, market and band */
   function nbaSimUnits(price, win) { var p = +price; if (!p || isNaN(p)) p = -110; return win ? (p > 0 ? p / 100 : 100 / -p) : -1; }
   function nbaSimRecordHtml() {
@@ -3858,6 +3872,167 @@ smStore.ready.then(function () {
   }
   /* one leg alone: the chance the over at lo (or the under at hi) wins, the push left out */
   function nbaLegWin(side, line, mu) { var sd = NBA_MIDDLE.sd; return side === "OVER" ? 1 - nbaNormCdf((Math.floor(line) + 0.5 - mu) / sd) : nbaNormCdf((Math.ceil(line) - 0.5 - mu) / sd); }
+  /* ---- a call on every game (12 Nov 2026) ----
+     The user: "the model wont give 'green bet' and thats not cool. I know the model is not going to be 100% perfect but it still
+     need to be able to provide a bet on something because an outcome is going to happen. game goes over or it goes under, team A
+     covers the spread or Team B covers the + points, or upset likely to happen and take this team. Something bro", and "for the
+     gamelines im not sure the Kalshi is helping or hurting". On the 170 games graded to 11 Nov the sheet had made one call on a
+     total, none on a spread or a first half and 32 on a moneyline (11-21): the card reads the book's own number, because two
+     seasons of closes say the sheet's own number on a total or a spread is worth a coin. Measured the same day, on the user's
+     2024-25 file (1,242 games, every book at one moment, the last snapshot before tip unless said) and on the 170 rows here
+     (lab sharp_value.py, board_value.py, sharp_dir.py, kalshi_check.py):
+       - a total at one of the four apps a point or more off the middle of every book's number: 105-84 (55.6%, +5.0% a bet) last
+         season, 78-70 at the opener, 41-35 and 18-16 on the rows here. Half a point off is the price (353-344);
+       - the favourite at the best of the four apps' prices: where the market gives him 80% or more 231-31 for -0.3% a bet last
+         season (24-0 here), 70 to 80% 216-81 (-5.8%), 60 to 70% 230-134 (-6.0%), nearer a coin 162-146 (-8.2%); the dogs -1.7%;
+       - the spread at the best number: 600-615, and no gap in it paid (a point or more off the middle 10-8, then 19-20 and 8-14
+         here); the sharp book's line against the apps' middle called the side 227-234 and 46-41;
+       - the sharp book's price shade, measured on hockey: 30-27 and 34-51 on last season's NBA totals, 8-22 on the rows here;
+       - Kalshi moves no pick. On the 63 games here that carry its winner market the crowd's price was the closest of the three
+         to what happened (Brier 0.161, the carded book 0.165, the sharp book 0.163), the side it liked two points or more above
+         the book won 10 of 12, and the favourite was cheaper there after the fee on 41 games by a point of chance.
+     So every game is given one call, by this order: the agreement rule when it fires (BET); a side the sheet prices below its
+     chance, or one a verdict sits on (BET); a total a point or more off the market's middle at one of the four apps (VALUE);
+     else the likelier winner at the best of the four prices (LEAN), which is the book's price and says what it has cost. Shown,
+     not scored: no chance, band or pick on the card moves; each kind keeps its own record, replayed from the rows. */
+  var NBA_CALL = { apps: ["fanatics", "draftkings", "fanduel", "betmgm"], gap: 1, books: 4 };
+  function nbaMedian(xs) { var a = xs.slice().sort(function (p, q) { return p - q; }), n = a.length; return n ? (n % 2 ? a[(n - 1) / 2] : (a[n / 2 - 1] + a[n / 2]) / 2) : null; }
+  function nbaCallNumber(inp) {   // the total at one of the four apps furthest on his side of the middle of every book's number, when that is a point or more
+    var o = nbaOddsBlock(inp), t = o && o.total; if (!t || !t.OVER || !t.UNDER) return null;
+    var num = function (v) { return v !== null && v !== undefined && v !== "" && isFinite(+v); };
+    var lines = t.OVER.filter(function (x) { return num(x[2]); }).map(function (x) { return +x[2]; });
+    if (lines.length < NBA_CALL.books) return null;
+    var mid = nbaMedian(lines), best = null;
+    NBA_CALL.apps.forEach(function (app) {
+      var ov = t.OVER.filter(function (x) { return x[0] === app && num(x[2]) && num(x[1]); })[0], un = t.UNDER.filter(function (x) { return x[0] === app && num(x[1]); })[0];
+      if (!ov || !un) return;
+      [["OVER", mid - +ov[2], +ov[1]], ["UNDER", +ov[2] - mid, +un[1]]].forEach(function (c) {
+        if (!best || c[1] > best.gap + 1e-9 || (Math.abs(c[1] - best.gap) <= 1e-9 && implied(c[2]) < implied(best.price) - 1e-12)) best = { side: c[0], gap: c[1], price: c[2], line: +ov[2], app: app, mid: mid, books: lines.length };
+      });
+    });
+    return best && best.gap >= NBA_CALL.gap - 1e-9 ? best : null;
+  }
+  function nbaCallWinner(row) {   // the side the middle of the books' prices makes the likelier winner, at the best of the four apps' prices
+    var inp = row.inputs || {}, o = nbaOddsBlock(inp), ml = o && o.ml, pairs = {}, ps = [];
+    var num = function (v) { return v !== null && v !== undefined && v !== "" && isFinite(+v); };
+    if (ml && ml.HOME && ml.AWAY) {
+      ml.HOME.forEach(function (x) { if (num(x[1])) (pairs[x[0]] = pairs[x[0]] || {}).h = +x[1]; });
+      ml.AWAY.forEach(function (x) { if (num(x[1])) (pairs[x[0]] = pairs[x[0]] || {}).a = +x[1]; });
+    }
+    Object.keys(pairs).forEach(function (b) { var q = pairs[b]; if (q.h !== undefined && q.a !== undefined) ps.push(implied(q.h) / (implied(q.h) + implied(q.a))); });
+    var hml = num(inp.hml) ? +inp.hml : null, aml = num(inp.aml) ? +inp.aml : null;
+    if (ps.length < NBA_CALL.books) { if (hml === null || aml === null) return null; ps = [implied(hml) / (implied(hml) + implied(aml))]; }   // the carded book alone where the shop is thin
+    var ph = nbaMedian(ps), home = ph >= 0.5, best = null;
+    NBA_CALL.apps.forEach(function (app) {
+      var q = pairs[app], pr = q ? (home ? q.h : q.a) : undefined; if (pr === undefined) return;
+      if (!best || implied(pr) < implied(best.price) - 1e-12) best = { price: pr, app: app };
+    });
+    if (!best) { var cp = home ? hml : aml; if (cp === null) return null; best = { price: cp, app: (o && o.book) || "" }; }
+    return { side: home ? "HOME" : "AWAY", team: home ? row.home : row.away, p: home ? ph : 1 - ph, price: best.price, app: best.app, need: implied(best.price), books: ps.length };
+  }
+  function nbaCallKinds(row) {   // every kind of call the game carries, in the order they are given
+    if (!row || row.sport !== "NBA" || isVoid(row)) return [];
+    var inp = row.inputs || {}, V = nbaVoices(row), out = [];
+    if (V && V.fires) out.push({ kind: "rule", tier: "BET", key: "total", side: V.side, line: V.line, price: V.price !== null ? V.price : -110, app: "", p: NBA_AGREE.rate, pick: "Total " + V.side + " " + V.line, count: V.count });
+    var calls = (row.markets || []).filter(function (mk) { return (mk.key === "total" || mk.key === "ml" || mk.key === "spread" || mk.key === "h1") && nbaIsCall(mk) && mk.price !== null && mk.price !== undefined && isFinite(+mk.price) && isFinite(+mk.p); })
+      .sort(function (a, b) { return (+b.edge || 0) - (+a.edge || 0); });
+    if (calls.length) out.push({ kind: "sheet", tier: "BET", key: calls[0].key, side: calls[0].side, price: +calls[0].price, app: "", p: +calls[0].p, pick: calls[0].pick, mk: calls[0] });
+    var nb = nbaCallNumber(inp);
+    if (nb) out.push({ kind: "number", tier: "VALUE", key: "total", side: nb.side, line: nb.line, price: nb.price, app: nb.app, p: null, pick: "Total " + nb.side + " " + nb.line, gap: nb.gap, mid: nb.mid, books: nb.books });
+    var w = nbaCallWinner(row);
+    if (w) out.push({ kind: "winner", tier: "LEAN", key: "ml", side: w.side, price: w.price, app: w.app, p: w.p, pick: w.team + " to win", need: w.need, books: w.books });
+    return out;
+  }
+  function nbaCallRes(c, row) {   // a call against the final: its own line and side
+    var fin = row && row.finals; if (!c || !fin || isVoid(row)) return null;
+    if (c.kind === "sheet") { var g = gradeMarket(c.mk, fin); return g === "invalid" ? null : g; }
+    var fh = parseFloat(fin.fh), fa = parseFloat(fin.fa); if (!isFinite(fh) || !isFinite(fa)) return null;
+    if (c.key === "total") { var tot = fh + fa; return Math.abs(tot - c.line) < 1e-9 ? "push" : ((tot > c.line) === (c.side === "OVER") ? "win" : "loss"); }
+    return ((fh > fa) === (c.side === "HOME")) ? "win" : "loss";
+  }
+  function nbaCallBucket(c) { return c.kind !== "winner" ? c.kind : c.p >= 0.8 ? "w80" : c.p >= 0.7 ? "w70" : c.p >= 0.6 ? "w60" : "w50"; }
+  var NBA_CALL_KINDS = [
+    ["rule", "BET · the agreement rule", "the simulation and the crew on the same side of the total, the sheet not against it: 157-108 (59.2%) over two seasons of closes"],
+    ["sheet", "BET · the sheet's own call", "a side the sheet prices below its chance, or one a verdict sits on"],
+    ["number", "VALUE · the best number on the board", "a total at one of your four apps a point or more off the middle of every book's number: 105-84 (55.6%) on last season's closes, 78-70 at the opener"],
+    ["w80", "LEAN · the likelier winner, 80% or more", "the book's price: such favourites at the best of the four prices went 231-31 last season, -0.3% a bet"],
+    ["w70", "LEAN · the likelier winner, 70 to 80%", "the book's price: 216-81 last season at the best of the four prices, -5.8% a bet"],
+    ["w60", "LEAN · the likelier winner, 60 to 70%", "the book's price: 230-134 last season at the best of the four prices, -6.0% a bet"],
+    ["w50", "LEAN · the likelier winner, near a coin", "the book's price on a game near a coin: 162-146 last season, -8.2% a bet; the cheapest thing on this game is to pass it"]];
+  /* A kind that has lost money here over ten or more graded calls is COLD: it is still counted on its own line, and it is left
+     out of the order until its record is back above water, so the call a game is given is one whose kind is paying here or has
+     not been tried. On the rows to 11 Nov that is the agreement rule (3-10) and the sheet's own calls (11-20) */
+  var NBA_CALL_COLD = 10;
+  var nbaCallsMemo = null;   // the record of every kind, replayed from the graded rows: built again when a final changes
+  function nbaCallsStamp() { var n = 0, s = 0; card.forEach(function (r) { if (r.sport === "NBA" && r.finals && r.finals.fa !== undefined && r.finals.fa !== "") { n++; s += (+r.finals.fa || 0) * 3 + (+r.finals.fh || 0) * 7 + (r.finals.void ? 1 : 0); } }); return n + "|" + s + "|" + card.length; }
+  function nbaCallsRecord() {
+    var stamp = nbaCallsStamp();
+    if (nbaCallsMemo && nbaCallsMemo.stamp === stamp) return nbaCallsMemo.rec;
+    var mk = function () { return { w: 0, l: 0, p: 0, units: 0, says: 0, sn: 0, n: 0 }; }, rec = { given: mk() }, graded = [];
+    NBA_CALL_KINDS.forEach(function (k) { rec[k[0]] = mk(); });
+    var add = function (s, c, res) {
+      if (res === "push") { s.p++; return; }
+      s.n++; if (c.p !== null && isFinite(c.p)) { s.says += c.p; s.sn++; }
+      if (res === "win") { s.w++; s.units += decimalOf(c.price) - 1; } else { s.l++; s.units -= 1; }
+    };
+    card.forEach(function (r) {
+      if (r.sport !== "NBA" || isVoid(r)) return;
+      var ks = nbaCallKinds(r).map(function (c) { return { c: c, res: nbaCallRes(c, r) }; }).filter(function (x) { return x.res; });
+      if (!ks.length) return;
+      ks.forEach(function (x) { add(rec[nbaCallBucket(x.c)], x.c, x.res); });   // every kind on its own line, on every game it speaks to
+      graded.push(ks);
+    });
+    NBA_CALL_KINDS.forEach(function (k) { var s = rec[k[0]]; s.cold = s.n >= NBA_CALL_COLD && s.units < 0 && (k[0] === "rule" || k[0] === "sheet"); });
+    graded.forEach(function (ks) { var x = ks.filter(function (y) { return !rec[nbaCallBucket(y.c)].cold; })[0] || ks[ks.length - 1]; add(rec.given, x.c, x.res); });   // the call as given: the first kind in the order that is not cold
+    nbaCallsMemo = { stamp: stamp, rec: rec };
+    return rec;
+  }
+  function nbaCallOf(row) {   // the game's call: the first kind in the order whose record here is not cold; the cold ones ride along as a note
+    var ks = nbaCallKinds(row); if (!ks.length) return null;
+    var rec = nbaCallsRecord(), live = ks.filter(function (c) { return !rec[nbaCallBucket(c)].cold; }), c = live[0] || ks[ks.length - 1];
+    c.also = ks.filter(function (x) { return x !== c && rec[nbaCallBucket(x)].cold; });
+    return c;
+  }
+  function nbaCallsOn(dateISO) {   // the date's calls, one a game: the BETs first, then the value, then the leans, the likelier first
+    var out = [], rank = { BET: 0, VALUE: 1, LEAN: 2 };
+    card.forEach(function (r) { if (r.sport !== "NBA" || (r.gdate || "") !== dateISO || isVoid(r)) return; var c = nbaCallOf(r); if (c) out.push({ row: r, c: c }); });
+    out.sort(function (a, b) { return (rank[a.c.tier] - rank[b.c.tier]) || ((b.c.p || 0) - (a.c.p || 0)) || (String(a.row.matchup) < String(b.row.matchup) ? -1 : 1); });
+    return out;
+  }
+  function nbaCallRecWords(s) { return s && (s.n || s.p) ? s.w + "-" + s.l + (s.p ? "-" + s.p : "") + " here, " + sgn(s.units, 1) + "u" : "none graded here yet"; }
+  function nbaCallCard(x) {
+    var c = x.c, r = x.row, res = nbaCallRes(c, r), all = nbaCallsRecord(), kind = NBA_CALL_KINDS.filter(function (k) { return k[0] === nbaCallBucket(c); })[0], rec = all[kind[0]];
+    var at = c.app ? " at " + esc(bookName(c.app)) : "", line3, btn = "";
+    if (c.kind === "rule") { line3 = c.count + " of 3 voices · " + sgn(c.price, 0) + " needs " + (implied(c.price) * 100).toFixed(1) + "% · the rule's rate 59.2%"; btn = typeof nbaSimTakeBtn === "function" ? nbaSimTakeBtn(r, "agree", "total", c.side) : ""; }
+    else if (c.kind === "sheet") { line3 = (c.p * 100).toFixed(1) + "% by the sheet · " + sgn(c.price, 0) + " needs " + (implied(c.price) * 100).toFixed(1) + "%"; btn = typeof takeBtn === "function" ? takeBtn(r, c.mk) : ""; }
+    else if (c.kind === "number") { line3 = sgn(c.price, 0) + at + " · the middle of " + c.books + " books is " + c.mid + ": " + (Math.abs(c.gap - 1) < 1e-9 ? "a point" : c.gap + " points") + " " + (c.side === "OVER" ? "under" : "over") + " it, on your side"; btn = nbaSimTakeBtn(r, "call", "total", c.side); }
+    else {
+      var cost = c.p * (decimalOf(c.price) - 1) - (1 - c.p);
+      line3 = (c.p * 100).toFixed(1) + "% by the middle of " + (c.books > 1 ? c.books + " books" : "the carded book") + " · " + sgn(c.price, 0) + at + " needs " + (c.need * 100).toFixed(1) + "% · " + (cost >= 0 ? "pays " + sgn(cost * 100, 1) + "% a bet at that" : "costs " + (-cost * 100).toFixed(1) + "% a bet");
+      btn = nbaSimTakeBtn(r, "call", "ml", c.side);   // the mark keeps this app and this price, not the price the row was logged with
+      if (typeof kalshiChip === "function") line3 += kalshiChip(r, { key: "ml", side: c.side, price: c.price });   // the crowd against the price on this card
+    }
+    var also = (c.also || []).map(function (a) { var ak = NBA_CALL_KINDS.filter(function (k) { return k[0] === nbaCallBucket(a); })[0]; return esc(ak[1].replace(/^[A-Z]+ · /, "")) + " says " + esc(a.pick) + " (" + esc(nbaCallRecWords(all[ak[0]])) + ": cold, and left out of the order until its record turns)"; });
+    return '<div class="pk call ' + c.tier.toLowerCase() + (res ? ' ' + res : '') + '" data-open="' + r.id + '" title="Load ' + esc(r.matchup) + ' into the form">' +
+      '<div class="n1">' + esc(kind[1]) + '</div>' +
+      '<div class="n2">' + esc(c.pick) + (res ? ' <span class="chip ' + res + '">' + esc(resText(res).toUpperCase()) + '</span>' : '') + '</div>' +
+      '<div class="n3">' + line3 + '</div>' +
+      '<div class="n4">' + esc(r.matchup) + ' · ' + esc(kind[2]) + ' · ' + esc(nbaCallRecWords(rec)) + '</div>' +
+      (also.length ? '<div class="n4 also">Also on this game: ' + also.join("; ") + '.</div>' : '') +
+      (btn ? '<div class="n6">' + btn + '</div>' : '') + '</div>';
+  }
+  function nbaCallsRecordHtml() {   // on the NBA record: each kind on every game it speaks to, and the call as it is given
+    var rec = nbaCallsRecord(), any = false, cls = function (s) { return s.units > 0 ? "good" : s.units < 0 ? "bad" : ""; };
+    var row = function (label, s, note) {
+      if (s.n || s.p) any = true;
+      return '<tr><td>' + label + '</td><td>' + (s.n || s.p ? s.w + "-" + s.l + (s.p ? "-" + s.p : "") : "none yet") + '</td><td>' + (s.sn && s.sn === s.n ? (100 * s.says / s.n).toFixed(1) + "%" : "") + '</td><td class="' + cls(s) + '">' + (s.n ? (100 * s.w / s.n).toFixed(1) + "%" : "") + '</td><td class="' + cls(s) + '">' + (s.n ? sgn(s.units, 1) + "u" : "") + '</td><td class="dim">' + note + '</td></tr>';
+    };
+    var h = '<div class="simrecview">A call on every game <span class="tag">each kind on every game it speaks to, replayed from the rows as their last odds run before tip stood; then the call as the board gives it, one a game · a kind that has lost here over ' + NBA_CALL_COLD + ' or more calls is cold and left out of the order until its record turns · shown, not scored</span></div><table class="form simrectab callstab"><thead><tr><th>Kind</th><th>Record</th><th>Says</th><th>Does</th><th>Units</th><th>Measured before</th></tr></thead><tbody>';
+    NBA_CALL_KINDS.forEach(function (k) { h += row(esc(k[1]) + (rec[k[0]].cold ? ' <b>· cold here</b>' : ''), rec[k[0]], esc(k[2])); });
+    h += row('<b>The call as given, one a game</b>', rec.given, 'the first kind in the order that is not cold');
+    return any ? h + '</tbody></table>' : "";
+  }
+
   /* the apps' numbers as they stand: the newest odds run on the row (oddsNow), else the odds the row was logged with */
   function nbaOddsBlock(inp) { var raw = inp && (inp.oddsNow || inp.odds), o = null; try { o = raw ? JSON.parse(raw) : null; } catch (e) { o = null; } return o; }
   function nbaMiddleMu(inp) { var mu = nbaMainTotal({ odds: (inp || {}).oddsNow || (inp || {}).odds }); if (mu === null) mu = parseFloat((inp || {}).line); return isFinite(mu) ? mu : null; }
@@ -5989,11 +6164,12 @@ smStore.ready.then(function () {
   function simTakeResOf(t, row) { return nbaSimTakeRes(t, row); }
   function simTakeBtnOf(row, view, key, side) { return nbaSimTakeBtn(row, view, key, side); }
   function simTakeCard(x) {
-    var t = x.t, res = simTakeResOf(t, x.row), price = t.price === null || t.price === undefined ? -110 : t.price;
+    var t = x.t, res = simTakeResOf(t, x.row), price = t.price === null || t.price === undefined ? -110 : t.price, isCall = t.view === "call";   // a call on the game is the board's: its own words (12 Nov 2026)
     return '<div class="pk taking sim" data-open="' + x.row.id + '" title="Load ' + esc(x.row.matchup) + ' into the form">' +
-      '<div class="n1">TAKING · ' + esc(x.row.sport) + ' · SIMULATION' + (t.at ? ' · marked ' + esc(takeWhen(t.at)) : '') + '</div>' +
+      '<div class="n1">TAKING · ' + esc(x.row.sport) + (isCall ? ' · A CALL ON THE GAME' : ' · SIMULATION') + (t.at ? ' · marked ' + esc(takeWhen(t.at)) : '') + '</div>' +
       '<div class="n2">' + esc(t.pick) + '</div>' +
-      '<div class="n3">' + (t.p === null || t.p === undefined ? esc(t.band) : (100 * t.p).toFixed(0) + '% by the sim' + (t.worth === null || t.worth === undefined ? '' : ' · worth ' + (100 * t.worth).toFixed(0) + '%') + (t.band === "no call" ? ' (no call by its worth)' : ' · ' + esc(t.band))) +
+      '<div class="n3">' + (isCall ? (t.p === null || t.p === undefined ? 'value · the best number on the board' : 'lean · ' + (100 * t.p).toFixed(1) + '% by the books\' middle')
+        : t.p === null || t.p === undefined ? esc(t.band) : (100 * t.p).toFixed(0) + '% by the sim' + (t.worth === null || t.worth === undefined ? '' : ' · worth ' + (100 * t.worth).toFixed(0) + '%') + (t.band === "no call" ? ' (no call by its worth)' : ' · ' + esc(t.band))) +
         ' · ' + (t.price === null || t.price === undefined ? 'no price on the row (−110 assumed)' : sgn(t.price, 0) + ' needs ' + (implied(price) * 100).toFixed(1) + '%') + (res ? ' · <span class="chip ' + res + '">' + esc(res) + '</span>' : '') + '</div>' +
       '<div class="n4">' + esc(x.row.matchup) + ' · ' + esc(nbaSimTakeViewLabel(t.view)) + '</div>' +
       '<div class="n6">' + simTakeBtnOf(x.row, t.view, t.key, t.side) + '</div></div>';
@@ -6036,7 +6212,7 @@ smStore.ready.then(function () {
     var bets = takesOn(dateISO), sims = simTakesOn(dateISO), ps = propsTakenOn(dateISO), prs = pairTakesList(dateISO), t3s = t3TakesList(dateISO), n = bets.length + sims.length + ps.length + prs.length + t3s.length;
     $("takingHead").hidden = !n; box.hidden = !n;
     if (!n) { box.innerHTML = ""; $("takingCount").textContent = ""; return; }
-    var s = { n: 0, w: 0, l: 0, p: 0, units: 0 }, h = "";
+    var s = { n: 0, w: 0, l: 0, p: 0, units: 0 }, h = "", callN = sims.filter(function (x) { return x.t.view === "call"; }).length;   // a call on the game is the board's, counted apart from the simulation's (12 Nov 2026)
     bets.forEach(function (x) { takeTally(s, gradeMarket(x.mk, x.row.finals), x.mk.price); h += takeCard(x); });
     sims.forEach(function (x) { takeTally(s, simTakeResOf(x.t, x.row), x.t.price === null || x.t.price === undefined ? -110 : x.t.price); h += simTakeCard(x); });
     ps.forEach(function (r) { takeTally(s, propTakeRes(r), r.price); h += propTakeCard(r); });
@@ -6044,7 +6220,7 @@ smStore.ready.then(function () {
     t3s.forEach(function (t, i) { t3TakeTally(s, t); h += propsT3Card(t, i, true); });
     h += '<div class="pk taking sum"><div class="n1">TONIGHT</div><div class="n2">' + n + ' bet' + (n === 1 ? '' : 's') + ' marked</div>' +
          '<div class="n3">' + (s.n || s.p ? 'graded ' + s.w + '-' + s.l + (s.p ? '-' + s.p : '') + ' · ' + sgn(s.units, 2) + 'u at one unit each' : 'none graded yet · one unit each') + '</div>' +
-         '<div class="n4">' + bets.length + ' on the card, ' + sims.length + ' from the simulation, ' + ps.length + ' prop' + (ps.length === 1 ? '' : 's') + (prs.length ? ', ' + prs.length + ' same-game pair' + (prs.length === 1 ? '' : 's') : '') +
+         '<div class="n4">' + bets.length + ' on the card, ' + (sims.length - callN) + ' from the simulation, ' + (callN ? callN + ' call' + (callN === 1 ? '' : 's') + ' on the game, ' : '') + ps.length + ' prop' + (ps.length === 1 ? '' : 's') + (prs.length ? ', ' + prs.length + ' same-game pair' + (prs.length === 1 ? '' : 's') : '') +
          [2, 3].map(function (k) { var c = t3s.filter(function (t) { return t.legs.length === k; }).length; return c ? ', ' + c + ' ' + t3Word(k) + '-leg ticket' + (c === 1 ? '' : 's') : ''; }).join("") + '</div></div>';
     box.innerHTML = h;
     $("takingCount").textContent = n + " marked";
@@ -6057,7 +6233,7 @@ smStore.ready.then(function () {
     });
     simTakesOn(dateISO).forEach(function (x) {
       var t = x.t, res = simTakeResOf(t, x.row);
-      out.push((++k) + ". " + t.pick + " " + (t.price === null || t.price === undefined ? "(no price)" : sgn(t.price, 0)) + " · the simulation, " + nbaSimTakeViewLabel(t.view) + (t.p === null ? "" : ": " + (100 * t.p).toFixed(0) + "%" + (t.worth === null || t.worth === undefined ? "" : ", worth " + (100 * t.worth).toFixed(0) + "%")) + " · " + t.band + " · " + x.row.matchup + (res ? " · " + String(res).toUpperCase() : ""));
+      out.push((++k) + ". " + t.pick + " " + (t.price === null || t.price === undefined ? "(no price)" : sgn(t.price, 0)) + " · " + nbaSimTakeFrom(t) + (t.p === null ? "" : ": " + (100 * t.p).toFixed(0) + "%" + (t.worth === null || t.worth === undefined ? "" : ", worth " + (100 * t.worth).toFixed(0) + "%")) + " · " + t.band + " · " + x.row.matchup + (res ? " · " + String(res).toUpperCase() : ""));
     });
     propsTakenOn(dateISO).forEach(function (r) {
       out.push((++k) + ". " + r.name + " " + r.side + " " + r.line + " " + (PROPS_LABEL[r.mk] || r.mk) + " " + sgn(r.price, 0) + " · " + (r.chance * 100).toFixed(1) + "% needs " + (r.need * 100).toFixed(1) + "% · " + r.game + (r.result ? " · " + r.result.toUpperCase() : ""));
@@ -6079,7 +6255,7 @@ smStore.ready.then(function () {
   }
   /* the record: every marked bet that has graded, at the price shown when it was marked */
   function takenRecordHtml() {
-    var mk = function () { return { n: 0, w: 0, l: 0, p: 0, says: 0, units: 0 }; }, bets = mk(), sims = mk(), pr = mk();
+    var mk = function () { return { n: 0, w: 0, l: 0, p: 0, says: 0, units: 0 }; }, bets = mk(), sims = mk(), pr = mk(), calls = mk();
     card.forEach(function (r) {
       if (isVoid(r)) return;
       (r.markets || []).forEach(function (m) {
@@ -6090,7 +6266,8 @@ smStore.ready.then(function () {
       });
       if (r.sport === "NBA") (r.simTakes || []).forEach(function (t) {
         var res = simTakeResOf(t, r); if (!res) return;
-        takeTally(sims, res, t.price === null || t.price === undefined ? -110 : t.price); if (res !== "push") sims.says += (t.p === null || t.p === undefined ? 0.5 : t.p);
+        var into = t.view === "call" ? calls : sims;   // a call on the game on its own tile (12 Nov 2026)
+        takeTally(into, res, t.price === null || t.price === undefined ? -110 : t.price); if (res !== "push") into.says += (t.p === null || t.p === undefined ? 0.5 : t.p);
       });
     });
     (typeof props === "undefined" ? [] : props).forEach(function (r0) {
@@ -6101,7 +6278,7 @@ smStore.ready.then(function () {
     var prs = mk(), t3r = { 2: mk(), 3: mk() };
     if (typeof pairTakesAll === "function") pairTakesAll().forEach(function (t) { pairTakeTally(prs, t); });
     if (typeof propsT3TakesAll === "function") propsT3TakesAll().forEach(function (t) { t3TakeTally(t3r[t.legs.length], t); });
-    if (!bets.n && !bets.p && !sims.n && !sims.p && !pr.n && !pr.p && !prs.n && !prs.p && !t3r[2].n && !t3r[2].p && !t3r[3].n && !t3r[3].p) return "";
+    if (!bets.n && !bets.p && !sims.n && !sims.p && !calls.n && !calls.p && !pr.n && !pr.p && !prs.n && !prs.p && !t3r[2].n && !t3r[2].p && !t3r[3].n && !t3r[3].p) return "";
     var tile = function (label, s) {
       if (!s.n && !s.p) return "";
       var says = s.n ? s.says / s.n * 100 : 0, does = s.n ? s.w / s.n * 100 : 0;
@@ -6109,7 +6286,7 @@ smStore.ready.then(function () {
              '<p class="s">' + (s.n ? 'says ' + says.toFixed(1) + '% · does ' + does.toFixed(1) + '% (±' + (100 / Math.sqrt(s.n) / 2).toFixed(1) + ') · ' + sgn(s.units, 2) + 'u' : 'pushes only') + '</p></div>';
     };
     var h = '<div class="subhead" data-sport="TAKEN">What you took <span class="tag">every bet marked Taking before its game, graded at the price shown when it was marked · one unit each · says is the sheet\'s chance</span></div>' +
-            '<div class="calib" data-sport="TAKEN">' + tile("Game bets taken", bets) + tile("Simulation calls taken", sims) + tile("Props taken", pr) + tile("Same-game pairs taken", prs) + tile("Two-leg tickets taken", t3r[2]) + tile("Three-leg tickets taken", t3r[3]) + '</div>';
+            '<div class="calib" data-sport="TAKEN">' + tile("Game bets taken", bets) + tile("Calls on the game taken", calls) + tile("Simulation calls taken", sims) + tile("Props taken", pr) + tile("Same-game pairs taken", prs) + tile("Two-leg tickets taken", t3r[2]) + tile("Three-leg tickets taken", t3r[3]) + '</div>';
     /* your picks (3 Nov 2026, the user: "is there a way to have the props that I select taken be graded or tracked so I can
        see how I'm picking the bets?"): every marked bet that has graded, night by night with the sheet's own BET and LEAN
        props that night beside it, the props you took by side, band, market and price, and the list of every pick, newest
@@ -6127,7 +6304,7 @@ smStore.ready.then(function () {
       if (r.sport === "NBA") (r.simTakes || []).forEach(function (t) {
         var res = simTakeResOf(t, r); if (!res) return;
         var price = t.price === null || t.price === undefined ? -110 : t.price;
-        picks.push({ d: r.gdate || "", kind: "simulation call", text: t.pick + " · " + r.matchup, p: t.p === null || t.p === undefined ? 0.5 : t.p, price: price, res: res, units: payOf(price, res) });
+        picks.push({ d: r.gdate || "", kind: t.view === "call" ? "game call" : "simulation call", text: t.pick + " · " + r.matchup, p: t.p === null || t.p === undefined ? 0.5 : t.p, price: price, res: res, units: payOf(price, res) });
       });
     });
     (typeof props === "undefined" ? [] : props).forEach(function (r0) {
@@ -8604,7 +8781,7 @@ var qrcode = function() {
     });
     var res = function (mk, row) { var r = gradeMarket(mk, row.finals); return r && r !== "invalid" ? r : undefined; };
     takesOn(dateISO).forEach(function (x) { P.take.push(phoneGameRef(keep, { k: "card", s: x.row.sport, g: x.row.matchup, p: x.mk.pick, m: x.mk.label || x.mk.key, c: phoneChance(x.mk.p), pr: x.mk.price, r: res(x.mk, x.row) }, x.row, 0)); });
-    simTakesOn(dateISO).forEach(function (x) { P.take.push(phoneGameRef(keep, { k: "sim", s: "NBA", g: x.row.matchup, p: x.t.pick, m: "the simulation, " + nbaSimTakeViewLabel(x.t.view), c: phoneChance(x.t.p), w: phoneChance(x.t.worth), b: x.t.band === "no call" ? undefined : x.t.band, pr: x.t.price === null ? undefined : x.t.price, r: nbaSimTakeRes(x.t, x.row) || undefined }, x.row, 0)); });
+    simTakesOn(dateISO).forEach(function (x) { P.take.push(phoneGameRef(keep, { k: x.t.view === "call" ? "call" : "sim", s: "NBA", g: x.row.matchup, p: x.t.pick, m: nbaSimTakeFrom(x.t), c: phoneChance(x.t.p), w: phoneChance(x.t.worth), b: x.t.band === "no call" ? undefined : x.t.band, pr: x.t.price === null ? undefined : x.t.price, r: nbaSimTakeRes(x.t, x.row) || undefined }, x.row, 0)); });
     propsTakenOn(dateISO).forEach(function (r) { P.take.push(phoneRefs(keep, { k: "prop", s: "NBA", g: r.game, p: r.name + " " + r.side + " " + r.line + " " + (PROPS_LABEL[r.mk] || r.mk), m: "prop", c: phoneChance(r.chance), pr: r.price, b: r.band, r: propTakeRes(r) || undefined }, [r._row || r], 0)); });   // the bet as it was marked; its panel is the prop as the card stands
     if (typeof pairTakesOn === "function") pairTakesOn(dateISO).forEach(function (t) { P.take.push(phoneRefs(keep, { k: "pair", s: "NBA", g: t.game, p: t.legs.map(function (r) { return r.name + " " + r.side + " " + r.line + " " + (PROPS_LABEL[r.mk] || r.mk); }).join(" + "), m: "same-game pair at the parlay price", c: phoneChance(t.chance), pr: t.price, r: propsPairRes(t) || undefined }, t.legs.map(function (l) { return l._row || l; }), 0)); });
     if (typeof propsT3TakesOn === "function") propsT3TakesOn(dateISO).forEach(function (t) { var x = phoneTicket(t); x.k = "ticket"; P.take.push(phoneRefs(keep, x, t.legs.map(function (l) { return l.r; }), 0)); });   // 11 Nov 2026: a ticket you are taking is a bet you are taking
@@ -8882,7 +9059,7 @@ var qrcode = function() {
     var one = g && typeof g[gid] === "string" ? phoneClean(g[gid]) : "";
     return one ? '<div class="pp-leg">' + one + '</div>' : (missing || "");
   }
-  function phoneTakeLabel(x) { return "TAKING · " + (x.k === "prop" ? "NBA PROP" : x.k === "sim" ? "NBA · SIMULATION" : x.k === "pair" ? "NBA · SAME-GAME PAIR" : x.k === "ticket" ? "NBA · " + (x.n || 2) + "-LEG TICKET" : x.s); }
+  function phoneTakeLabel(x) { return "TAKING · " + (x.k === "prop" ? "NBA PROP" : x.k === "sim" ? "NBA · SIMULATION" : x.k === "call" ? "NBA · A CALL ON THE GAME" : x.k === "pair" ? "NBA · SAME-GAME PAIR" : x.k === "ticket" ? "NBA · " + (x.n || 2) + "-LEG TICKET" : x.s); }
   function phoneDate(iso) { try { return new Date(iso + "T12:00:00").toLocaleDateString([], { weekday: "short", month: "short", day: "numeric" }); } catch (e) { return String(iso); } }   // the weekday with it, as m.html writes it
   function phoneSheetHtml(P, tap) {
     var sec = function (title, items, fn) { if (!items || !items.length) return ''; return '<h2>' + esc(title) + ' <span class="pshc">' + items.length + '</span></h2>' + items.map(fn).join(''); };
@@ -10768,6 +10945,14 @@ var qrcode = function() {
     $("boardCount").textContent = rows.length ? rows.length + " priced markets on " + gameDate(dateISO) : "nothing logged for " + gameDate(dateISO);
     renderTaking(dateISO);   // the bets marked as taken on the date (26 Oct 2026)
 
+    // --- a call on every game (12 Nov 2026): basketball, so the section shows when the date has an NBA game ---
+    if ($("calls") && typeof nbaCallsOn === "function") {
+      var cl = nbaCallsOn(dateISO), ch = "";
+      cl.forEach(function (x) { ch += nbaCallCard(x); });
+      $("callsHead").hidden = !cl.length; $("calls").hidden = !cl.length;
+      $("calls").innerHTML = ch;
+    }
+
     // --- the parlay four ---
     var legs = parlayFour(dateISO), ph = "";
     legs.forEach(function (x) { ph += pickCard(x, "", legNote(x)); });
@@ -11287,6 +11472,7 @@ var qrcode = function() {
         (sp === "NBA" ? ' <b>A call</b> is a side the sheet prices below its chance, or one a verdict sits on. Where neither side is, the market is the book\'s own number: it is listed under the tile as no call and left out of the tile\'s count (11 Nov 2026: the tiles had counted every row, and the moneyline\'s line read 79-81 for −28.9 units on 160 games, of which 29 were calls and 35 were long dogs that were nobody\'s call, 3-32). The watches under a tile read every game.' : '') + '</div>';
       if (sp === "NBA") h += nbaRefsWatchHtml();   // the referees as a watch (22 Oct 2026)
       if (sp === "NBA") h += nbaSimRecordHtml();   // the simulation's calls, says against does (25 Oct 2026)
+      if (sp === "NBA") h += nbaCallsRecordHtml();   // a call on every game, each kind's record (12 Nov 2026)
     });
     h += takenRecordHtml();   // what you took (26 Oct 2026): the marked bets, graded at the price shown when marked
     /* the board's likeliest side and the two-leg parlays, across every date (15 Oct 2026,
@@ -11510,6 +11696,7 @@ var qrcode = function() {
   if ($("likeliest")) $("likeliest").addEventListener("click", function (e) { var t = e.target.closest("[data-open]"); if (t) openRow(t.dataset.open); });
   if ($("upsets")) $("upsets").addEventListener("click", function (e) { var t = e.target.closest("[data-open]"); if (t) openRow(t.dataset.open); });
   if ($("agree")) $("agree").addEventListener("click", function (e) { if (e.target.closest("[data-stake]")) return; var t = e.target.closest("[data-open]"); if (t) openRow(t.dataset.open); });
+  if ($("calls")) $("calls").addEventListener("click", function (e) { if (e.target.closest("[data-stake],[data-take],a")) return; var t = e.target.closest("[data-open]"); if (t) openRow(t.dataset.open); });
   if ($("mid")) $("mid").addEventListener("click", function (e) { if (e.target.closest("[data-stake]")) return; var t = e.target.closest("[data-open]"); if (t) openRow(t.dataset.open); });
   /* the window's boxes on the Simulation card (29 Oct 2026): typed, kept across renders, priced as you type; the Take button
      follows the numbers in the boxes, so the card is redrawn when a number changes and the price alone updates the line */

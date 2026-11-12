@@ -1544,6 +1544,14 @@
     $("boardCount").textContent = rows.length ? rows.length + " priced markets on " + gameDate(dateISO) : "nothing logged for " + gameDate(dateISO);
     renderTaking(dateISO);   // the bets marked as taken on the date (26 Oct 2026)
 
+    // --- a call on every game (12 Nov 2026): basketball, so the section shows when the date has an NBA game ---
+    if ($("calls") && typeof nbaCallsOn === "function") {
+      var cl = nbaCallsOn(dateISO), ch = "";
+      cl.forEach(function (x) { ch += nbaCallCard(x); });
+      $("callsHead").hidden = !cl.length; $("calls").hidden = !cl.length;
+      $("calls").innerHTML = ch;
+    }
+
     // --- the parlay four ---
     var legs = parlayFour(dateISO), ph = "";
     legs.forEach(function (x) { ph += pickCard(x, "", legNote(x)); });
@@ -2258,6 +2266,7 @@
   if ($("likeliest")) $("likeliest").addEventListener("click", function (e) { var t = e.target.closest("[data-open]"); if (t) openRow(t.dataset.open); });
   if ($("upsets")) $("upsets").addEventListener("click", function (e) { var t = e.target.closest("[data-open]"); if (t) openRow(t.dataset.open); });
   if ($("agree")) $("agree").addEventListener("click", function (e) { if (e.target.closest("[data-stake]")) return; var t = e.target.closest("[data-open]"); if (t) openRow(t.dataset.open); });
+  if ($("calls")) $("calls").addEventListener("click", function (e) { if (e.target.closest("[data-stake],[data-take],a")) return; var t = e.target.closest("[data-open]"); if (t) openRow(t.dataset.open); });
   if ($("mid")) $("mid").addEventListener("click", function (e) { if (e.target.closest("[data-stake]")) return; var t = e.target.closest("[data-open]"); if (t) openRow(t.dataset.open); });
   /* the window's boxes on the Simulation card (29 Oct 2026): typed, kept across renders, priced as you type; the Take button
      follows the numbers in the boxes, so the card is redrawn when a number changes and the price alone updates the line */

@@ -1208,17 +1208,23 @@
       var Wn = sim ? nbaWindowRead(sim) : null;
       if (Wn && Wn.side === side) c = { line: Wn.lo + "-" + Wn.hi, p: Wn.use.inside, worth: Wn.use.inside, band: "window", price: Wn.price, lo: Wn.lo, hi: Wn.hi, winView: Wn.view };
     }
+    else if (view === "call") {   // a call on the game (12 Nov 2026): the best number or the likelier winner, at the app, the line and the price its card shows
+      var K = nbaCallKinds(row).filter(function (x) { return (x.kind === "number" || x.kind === "winner") && x.key === key && x.side === side; })[0];
+      if (K) c = { line: K.kind === "number" ? K.line : null, p: K.p, worth: null, band: K.kind === "number" ? "value" : "lean", price: K.price, book: K.app, call: K.kind };
+    }
     else if (sim) c = nbaSimCalls(sim, lines, view).filter(function (x) { return x.key === key && x.side === side; })[0] || null;
     if (!c) { say("That call is not on the card as shown now; put the line back and take it again."); return; }
     var inp = view === "agree" ? { op: (row.inputs || {}).op, up: (row.inputs || {}).up }
             : { op: $("op").value, up: $("up").value, h1op: $("h1op").value, h1up: $("h1up").value, sph: $("sph").value, spa: $("spa").value, hml: $("hml").value, aml: $("aml").value };
-    var take = { id: id, view: view, key: key, side: side, line: c.line, price: (view === "middle" || view === "window") ? c.price : nbaSimPriceOf(key, side, lines, inp),
+    var take = { id: id, view: view, key: key, side: side, line: c.line, price: (view === "middle" || view === "window" || view === "call") ? c.price : nbaSimPriceOf(key, side, lines, inp),
                  p: c.p === null ? null : +(+c.p).toFixed(4), worth: c.worth === null ? null : +(+c.worth).toFixed(4), band: c.band,
                  pick: view === "middle" ? "Total " + side + " " + c.line + " at " + bookName(c.book) + " (the middle with " + c.with.side + " " + c.with.line + ")"
                      : view === "window" ? "Total window " + c.lo + "-" + c.hi + " (over the low, under the high), one ticket"
+                     : view === "call" ? (c.call === "number" ? "Total " + side + " " + c.line : (side === "HOME" ? row.home : row.away) + " ML") + (c.book ? " at " + bookName(c.book) : "")
                      : nbaSimPickText(key, side, c.line, f.away || row.away, f.home || row.home), at: new Date().toISOString() };
     if (view === "middle") { take.book = c.book; take.with = c.with; take.pair = c.pair; }
     if (view === "window") { take.lo = c.lo; take.hi = c.hi; take.winView = c.winView; }
+    if (view === "call") { take.book = c.book; take.call = c.call; }
     row.simTakes = (row.simTakes || []).concat([take]);
     done();
   }
@@ -1238,7 +1244,8 @@
     if (t.key === "home_total") return cmp(fh, +t.line, t.side === "OVER");
     return null;
   }
-  function nbaSimTakeViewLabel(view) { return view === "own" ? "the sim's own view" : view === "mkt" ? "anchored to the market" : view === "agree" ? "the agreement rule, the sim and the crew" : view === "middle" ? "the middle's second leg" : view === "window" ? "the window, one ticket (anchored to the market)" : "the gap, a watch"; }
+  function nbaSimTakeViewLabel(view) { return view === "own" ? "the sim's own view" : view === "mkt" ? "anchored to the market" : view === "agree" ? "the agreement rule, the sim and the crew" : view === "middle" ? "the middle's second leg" : view === "window" ? "the window, one ticket (anchored to the market)" : view === "call" ? "a call on the game" : "the gap, a watch"; }
+  function nbaSimTakeFrom(t) { return (t && t.view === "call" ? "" : "the simulation, ") + nbaSimTakeViewLabel(t && t.view); }   // whose call it was, in words: a call on the game is the board's, not the simulation's (12 Nov 2026)
   /* the record: every graded NBA row's sim calls at LEAN or better, says against does by view, market and band */
   function nbaSimUnits(price, win) { var p = +price; if (!p || isNaN(p)) p = -110; return win ? (p > 0 ? p / 100 : 100 / -p) : -1; }
   function nbaSimRecordHtml() {
@@ -1502,6 +1509,167 @@
   }
   /* one leg alone: the chance the over at lo (or the under at hi) wins, the push left out */
   function nbaLegWin(side, line, mu) { var sd = NBA_MIDDLE.sd; return side === "OVER" ? 1 - nbaNormCdf((Math.floor(line) + 0.5 - mu) / sd) : nbaNormCdf((Math.ceil(line) - 0.5 - mu) / sd); }
+  /* ---- a call on every game (12 Nov 2026) ----
+     The user: "the model wont give 'green bet' and thats not cool. I know the model is not going to be 100% perfect but it still
+     need to be able to provide a bet on something because an outcome is going to happen. game goes over or it goes under, team A
+     covers the spread or Team B covers the + points, or upset likely to happen and take this team. Something bro", and "for the
+     gamelines im not sure the Kalshi is helping or hurting". On the 170 games graded to 11 Nov the sheet had made one call on a
+     total, none on a spread or a first half and 32 on a moneyline (11-21): the card reads the book's own number, because two
+     seasons of closes say the sheet's own number on a total or a spread is worth a coin. Measured the same day, on the user's
+     2024-25 file (1,242 games, every book at one moment, the last snapshot before tip unless said) and on the 170 rows here
+     (lab sharp_value.py, board_value.py, sharp_dir.py, kalshi_check.py):
+       - a total at one of the four apps a point or more off the middle of every book's number: 105-84 (55.6%, +5.0% a bet) last
+         season, 78-70 at the opener, 41-35 and 18-16 on the rows here. Half a point off is the price (353-344);
+       - the favourite at the best of the four apps' prices: where the market gives him 80% or more 231-31 for -0.3% a bet last
+         season (24-0 here), 70 to 80% 216-81 (-5.8%), 60 to 70% 230-134 (-6.0%), nearer a coin 162-146 (-8.2%); the dogs -1.7%;
+       - the spread at the best number: 600-615, and no gap in it paid (a point or more off the middle 10-8, then 19-20 and 8-14
+         here); the sharp book's line against the apps' middle called the side 227-234 and 46-41;
+       - the sharp book's price shade, measured on hockey: 30-27 and 34-51 on last season's NBA totals, 8-22 on the rows here;
+       - Kalshi moves no pick. On the 63 games here that carry its winner market the crowd's price was the closest of the three
+         to what happened (Brier 0.161, the carded book 0.165, the sharp book 0.163), the side it liked two points or more above
+         the book won 10 of 12, and the favourite was cheaper there after the fee on 41 games by a point of chance.
+     So every game is given one call, by this order: the agreement rule when it fires (BET); a side the sheet prices below its
+     chance, or one a verdict sits on (BET); a total a point or more off the market's middle at one of the four apps (VALUE);
+     else the likelier winner at the best of the four prices (LEAN), which is the book's price and says what it has cost. Shown,
+     not scored: no chance, band or pick on the card moves; each kind keeps its own record, replayed from the rows. */
+  var NBA_CALL = { apps: ["fanatics", "draftkings", "fanduel", "betmgm"], gap: 1, books: 4 };
+  function nbaMedian(xs) { var a = xs.slice().sort(function (p, q) { return p - q; }), n = a.length; return n ? (n % 2 ? a[(n - 1) / 2] : (a[n / 2 - 1] + a[n / 2]) / 2) : null; }
+  function nbaCallNumber(inp) {   // the total at one of the four apps furthest on his side of the middle of every book's number, when that is a point or more
+    var o = nbaOddsBlock(inp), t = o && o.total; if (!t || !t.OVER || !t.UNDER) return null;
+    var num = function (v) { return v !== null && v !== undefined && v !== "" && isFinite(+v); };
+    var lines = t.OVER.filter(function (x) { return num(x[2]); }).map(function (x) { return +x[2]; });
+    if (lines.length < NBA_CALL.books) return null;
+    var mid = nbaMedian(lines), best = null;
+    NBA_CALL.apps.forEach(function (app) {
+      var ov = t.OVER.filter(function (x) { return x[0] === app && num(x[2]) && num(x[1]); })[0], un = t.UNDER.filter(function (x) { return x[0] === app && num(x[1]); })[0];
+      if (!ov || !un) return;
+      [["OVER", mid - +ov[2], +ov[1]], ["UNDER", +ov[2] - mid, +un[1]]].forEach(function (c) {
+        if (!best || c[1] > best.gap + 1e-9 || (Math.abs(c[1] - best.gap) <= 1e-9 && implied(c[2]) < implied(best.price) - 1e-12)) best = { side: c[0], gap: c[1], price: c[2], line: +ov[2], app: app, mid: mid, books: lines.length };
+      });
+    });
+    return best && best.gap >= NBA_CALL.gap - 1e-9 ? best : null;
+  }
+  function nbaCallWinner(row) {   // the side the middle of the books' prices makes the likelier winner, at the best of the four apps' prices
+    var inp = row.inputs || {}, o = nbaOddsBlock(inp), ml = o && o.ml, pairs = {}, ps = [];
+    var num = function (v) { return v !== null && v !== undefined && v !== "" && isFinite(+v); };
+    if (ml && ml.HOME && ml.AWAY) {
+      ml.HOME.forEach(function (x) { if (num(x[1])) (pairs[x[0]] = pairs[x[0]] || {}).h = +x[1]; });
+      ml.AWAY.forEach(function (x) { if (num(x[1])) (pairs[x[0]] = pairs[x[0]] || {}).a = +x[1]; });
+    }
+    Object.keys(pairs).forEach(function (b) { var q = pairs[b]; if (q.h !== undefined && q.a !== undefined) ps.push(implied(q.h) / (implied(q.h) + implied(q.a))); });
+    var hml = num(inp.hml) ? +inp.hml : null, aml = num(inp.aml) ? +inp.aml : null;
+    if (ps.length < NBA_CALL.books) { if (hml === null || aml === null) return null; ps = [implied(hml) / (implied(hml) + implied(aml))]; }   // the carded book alone where the shop is thin
+    var ph = nbaMedian(ps), home = ph >= 0.5, best = null;
+    NBA_CALL.apps.forEach(function (app) {
+      var q = pairs[app], pr = q ? (home ? q.h : q.a) : undefined; if (pr === undefined) return;
+      if (!best || implied(pr) < implied(best.price) - 1e-12) best = { price: pr, app: app };
+    });
+    if (!best) { var cp = home ? hml : aml; if (cp === null) return null; best = { price: cp, app: (o && o.book) || "" }; }
+    return { side: home ? "HOME" : "AWAY", team: home ? row.home : row.away, p: home ? ph : 1 - ph, price: best.price, app: best.app, need: implied(best.price), books: ps.length };
+  }
+  function nbaCallKinds(row) {   // every kind of call the game carries, in the order they are given
+    if (!row || row.sport !== "NBA" || isVoid(row)) return [];
+    var inp = row.inputs || {}, V = nbaVoices(row), out = [];
+    if (V && V.fires) out.push({ kind: "rule", tier: "BET", key: "total", side: V.side, line: V.line, price: V.price !== null ? V.price : -110, app: "", p: NBA_AGREE.rate, pick: "Total " + V.side + " " + V.line, count: V.count });
+    var calls = (row.markets || []).filter(function (mk) { return (mk.key === "total" || mk.key === "ml" || mk.key === "spread" || mk.key === "h1") && nbaIsCall(mk) && mk.price !== null && mk.price !== undefined && isFinite(+mk.price) && isFinite(+mk.p); })
+      .sort(function (a, b) { return (+b.edge || 0) - (+a.edge || 0); });
+    if (calls.length) out.push({ kind: "sheet", tier: "BET", key: calls[0].key, side: calls[0].side, price: +calls[0].price, app: "", p: +calls[0].p, pick: calls[0].pick, mk: calls[0] });
+    var nb = nbaCallNumber(inp);
+    if (nb) out.push({ kind: "number", tier: "VALUE", key: "total", side: nb.side, line: nb.line, price: nb.price, app: nb.app, p: null, pick: "Total " + nb.side + " " + nb.line, gap: nb.gap, mid: nb.mid, books: nb.books });
+    var w = nbaCallWinner(row);
+    if (w) out.push({ kind: "winner", tier: "LEAN", key: "ml", side: w.side, price: w.price, app: w.app, p: w.p, pick: w.team + " to win", need: w.need, books: w.books });
+    return out;
+  }
+  function nbaCallRes(c, row) {   // a call against the final: its own line and side
+    var fin = row && row.finals; if (!c || !fin || isVoid(row)) return null;
+    if (c.kind === "sheet") { var g = gradeMarket(c.mk, fin); return g === "invalid" ? null : g; }
+    var fh = parseFloat(fin.fh), fa = parseFloat(fin.fa); if (!isFinite(fh) || !isFinite(fa)) return null;
+    if (c.key === "total") { var tot = fh + fa; return Math.abs(tot - c.line) < 1e-9 ? "push" : ((tot > c.line) === (c.side === "OVER") ? "win" : "loss"); }
+    return ((fh > fa) === (c.side === "HOME")) ? "win" : "loss";
+  }
+  function nbaCallBucket(c) { return c.kind !== "winner" ? c.kind : c.p >= 0.8 ? "w80" : c.p >= 0.7 ? "w70" : c.p >= 0.6 ? "w60" : "w50"; }
+  var NBA_CALL_KINDS = [
+    ["rule", "BET · the agreement rule", "the simulation and the crew on the same side of the total, the sheet not against it: 157-108 (59.2%) over two seasons of closes"],
+    ["sheet", "BET · the sheet's own call", "a side the sheet prices below its chance, or one a verdict sits on"],
+    ["number", "VALUE · the best number on the board", "a total at one of your four apps a point or more off the middle of every book's number: 105-84 (55.6%) on last season's closes, 78-70 at the opener"],
+    ["w80", "LEAN · the likelier winner, 80% or more", "the book's price: such favourites at the best of the four prices went 231-31 last season, -0.3% a bet"],
+    ["w70", "LEAN · the likelier winner, 70 to 80%", "the book's price: 216-81 last season at the best of the four prices, -5.8% a bet"],
+    ["w60", "LEAN · the likelier winner, 60 to 70%", "the book's price: 230-134 last season at the best of the four prices, -6.0% a bet"],
+    ["w50", "LEAN · the likelier winner, near a coin", "the book's price on a game near a coin: 162-146 last season, -8.2% a bet; the cheapest thing on this game is to pass it"]];
+  /* A kind that has lost money here over ten or more graded calls is COLD: it is still counted on its own line, and it is left
+     out of the order until its record is back above water, so the call a game is given is one whose kind is paying here or has
+     not been tried. On the rows to 11 Nov that is the agreement rule (3-10) and the sheet's own calls (11-20) */
+  var NBA_CALL_COLD = 10;
+  var nbaCallsMemo = null;   // the record of every kind, replayed from the graded rows: built again when a final changes
+  function nbaCallsStamp() { var n = 0, s = 0; card.forEach(function (r) { if (r.sport === "NBA" && r.finals && r.finals.fa !== undefined && r.finals.fa !== "") { n++; s += (+r.finals.fa || 0) * 3 + (+r.finals.fh || 0) * 7 + (r.finals.void ? 1 : 0); } }); return n + "|" + s + "|" + card.length; }
+  function nbaCallsRecord() {
+    var stamp = nbaCallsStamp();
+    if (nbaCallsMemo && nbaCallsMemo.stamp === stamp) return nbaCallsMemo.rec;
+    var mk = function () { return { w: 0, l: 0, p: 0, units: 0, says: 0, sn: 0, n: 0 }; }, rec = { given: mk() }, graded = [];
+    NBA_CALL_KINDS.forEach(function (k) { rec[k[0]] = mk(); });
+    var add = function (s, c, res) {
+      if (res === "push") { s.p++; return; }
+      s.n++; if (c.p !== null && isFinite(c.p)) { s.says += c.p; s.sn++; }
+      if (res === "win") { s.w++; s.units += decimalOf(c.price) - 1; } else { s.l++; s.units -= 1; }
+    };
+    card.forEach(function (r) {
+      if (r.sport !== "NBA" || isVoid(r)) return;
+      var ks = nbaCallKinds(r).map(function (c) { return { c: c, res: nbaCallRes(c, r) }; }).filter(function (x) { return x.res; });
+      if (!ks.length) return;
+      ks.forEach(function (x) { add(rec[nbaCallBucket(x.c)], x.c, x.res); });   // every kind on its own line, on every game it speaks to
+      graded.push(ks);
+    });
+    NBA_CALL_KINDS.forEach(function (k) { var s = rec[k[0]]; s.cold = s.n >= NBA_CALL_COLD && s.units < 0 && (k[0] === "rule" || k[0] === "sheet"); });
+    graded.forEach(function (ks) { var x = ks.filter(function (y) { return !rec[nbaCallBucket(y.c)].cold; })[0] || ks[ks.length - 1]; add(rec.given, x.c, x.res); });   // the call as given: the first kind in the order that is not cold
+    nbaCallsMemo = { stamp: stamp, rec: rec };
+    return rec;
+  }
+  function nbaCallOf(row) {   // the game's call: the first kind in the order whose record here is not cold; the cold ones ride along as a note
+    var ks = nbaCallKinds(row); if (!ks.length) return null;
+    var rec = nbaCallsRecord(), live = ks.filter(function (c) { return !rec[nbaCallBucket(c)].cold; }), c = live[0] || ks[ks.length - 1];
+    c.also = ks.filter(function (x) { return x !== c && rec[nbaCallBucket(x)].cold; });
+    return c;
+  }
+  function nbaCallsOn(dateISO) {   // the date's calls, one a game: the BETs first, then the value, then the leans, the likelier first
+    var out = [], rank = { BET: 0, VALUE: 1, LEAN: 2 };
+    card.forEach(function (r) { if (r.sport !== "NBA" || (r.gdate || "") !== dateISO || isVoid(r)) return; var c = nbaCallOf(r); if (c) out.push({ row: r, c: c }); });
+    out.sort(function (a, b) { return (rank[a.c.tier] - rank[b.c.tier]) || ((b.c.p || 0) - (a.c.p || 0)) || (String(a.row.matchup) < String(b.row.matchup) ? -1 : 1); });
+    return out;
+  }
+  function nbaCallRecWords(s) { return s && (s.n || s.p) ? s.w + "-" + s.l + (s.p ? "-" + s.p : "") + " here, " + sgn(s.units, 1) + "u" : "none graded here yet"; }
+  function nbaCallCard(x) {
+    var c = x.c, r = x.row, res = nbaCallRes(c, r), all = nbaCallsRecord(), kind = NBA_CALL_KINDS.filter(function (k) { return k[0] === nbaCallBucket(c); })[0], rec = all[kind[0]];
+    var at = c.app ? " at " + esc(bookName(c.app)) : "", line3, btn = "";
+    if (c.kind === "rule") { line3 = c.count + " of 3 voices · " + sgn(c.price, 0) + " needs " + (implied(c.price) * 100).toFixed(1) + "% · the rule's rate 59.2%"; btn = typeof nbaSimTakeBtn === "function" ? nbaSimTakeBtn(r, "agree", "total", c.side) : ""; }
+    else if (c.kind === "sheet") { line3 = (c.p * 100).toFixed(1) + "% by the sheet · " + sgn(c.price, 0) + " needs " + (implied(c.price) * 100).toFixed(1) + "%"; btn = typeof takeBtn === "function" ? takeBtn(r, c.mk) : ""; }
+    else if (c.kind === "number") { line3 = sgn(c.price, 0) + at + " · the middle of " + c.books + " books is " + c.mid + ": " + (Math.abs(c.gap - 1) < 1e-9 ? "a point" : c.gap + " points") + " " + (c.side === "OVER" ? "under" : "over") + " it, on your side"; btn = nbaSimTakeBtn(r, "call", "total", c.side); }
+    else {
+      var cost = c.p * (decimalOf(c.price) - 1) - (1 - c.p);
+      line3 = (c.p * 100).toFixed(1) + "% by the middle of " + (c.books > 1 ? c.books + " books" : "the carded book") + " · " + sgn(c.price, 0) + at + " needs " + (c.need * 100).toFixed(1) + "% · " + (cost >= 0 ? "pays " + sgn(cost * 100, 1) + "% a bet at that" : "costs " + (-cost * 100).toFixed(1) + "% a bet");
+      btn = nbaSimTakeBtn(r, "call", "ml", c.side);   // the mark keeps this app and this price, not the price the row was logged with
+      if (typeof kalshiChip === "function") line3 += kalshiChip(r, { key: "ml", side: c.side, price: c.price });   // the crowd against the price on this card
+    }
+    var also = (c.also || []).map(function (a) { var ak = NBA_CALL_KINDS.filter(function (k) { return k[0] === nbaCallBucket(a); })[0]; return esc(ak[1].replace(/^[A-Z]+ · /, "")) + " says " + esc(a.pick) + " (" + esc(nbaCallRecWords(all[ak[0]])) + ": cold, and left out of the order until its record turns)"; });
+    return '<div class="pk call ' + c.tier.toLowerCase() + (res ? ' ' + res : '') + '" data-open="' + r.id + '" title="Load ' + esc(r.matchup) + ' into the form">' +
+      '<div class="n1">' + esc(kind[1]) + '</div>' +
+      '<div class="n2">' + esc(c.pick) + (res ? ' <span class="chip ' + res + '">' + esc(resText(res).toUpperCase()) + '</span>' : '') + '</div>' +
+      '<div class="n3">' + line3 + '</div>' +
+      '<div class="n4">' + esc(r.matchup) + ' · ' + esc(kind[2]) + ' · ' + esc(nbaCallRecWords(rec)) + '</div>' +
+      (also.length ? '<div class="n4 also">Also on this game: ' + also.join("; ") + '.</div>' : '') +
+      (btn ? '<div class="n6">' + btn + '</div>' : '') + '</div>';
+  }
+  function nbaCallsRecordHtml() {   // on the NBA record: each kind on every game it speaks to, and the call as it is given
+    var rec = nbaCallsRecord(), any = false, cls = function (s) { return s.units > 0 ? "good" : s.units < 0 ? "bad" : ""; };
+    var row = function (label, s, note) {
+      if (s.n || s.p) any = true;
+      return '<tr><td>' + label + '</td><td>' + (s.n || s.p ? s.w + "-" + s.l + (s.p ? "-" + s.p : "") : "none yet") + '</td><td>' + (s.sn && s.sn === s.n ? (100 * s.says / s.n).toFixed(1) + "%" : "") + '</td><td class="' + cls(s) + '">' + (s.n ? (100 * s.w / s.n).toFixed(1) + "%" : "") + '</td><td class="' + cls(s) + '">' + (s.n ? sgn(s.units, 1) + "u" : "") + '</td><td class="dim">' + note + '</td></tr>';
+    };
+    var h = '<div class="simrecview">A call on every game <span class="tag">each kind on every game it speaks to, replayed from the rows as their last odds run before tip stood; then the call as the board gives it, one a game · a kind that has lost here over ' + NBA_CALL_COLD + ' or more calls is cold and left out of the order until its record turns · shown, not scored</span></div><table class="form simrectab callstab"><thead><tr><th>Kind</th><th>Record</th><th>Says</th><th>Does</th><th>Units</th><th>Measured before</th></tr></thead><tbody>';
+    NBA_CALL_KINDS.forEach(function (k) { h += row(esc(k[1]) + (rec[k[0]].cold ? ' <b>· cold here</b>' : ''), rec[k[0]], esc(k[2])); });
+    h += row('<b>The call as given, one a game</b>', rec.given, 'the first kind in the order that is not cold');
+    return any ? h + '</tbody></table>' : "";
+  }
+
   /* the apps' numbers as they stand: the newest odds run on the row (oddsNow), else the odds the row was logged with */
   function nbaOddsBlock(inp) { var raw = inp && (inp.oddsNow || inp.odds), o = null; try { o = raw ? JSON.parse(raw) : null; } catch (e) { o = null; } return o; }
   function nbaMiddleMu(inp) { var mu = nbaMainTotal({ odds: (inp || {}).oddsNow || (inp || {}).odds }); if (mu === null) mu = parseFloat((inp || {}).line); return isFinite(mu) ? mu : null; }

@@ -3822,3 +3822,180 @@ purpose (no floor, the lopsided over let in, on the favourite's side
 only, the swinging over let in, ranked by value, the list not kept);
 two were not caught at first, which is why the scenario has a leg left
 alone on its game and puts the lopsided over on the dog.
+
+## A call on every game, 12 Nov 2026
+
+The user, with the 12 Nov backup: "For the gamelines im not sure the
+Kalshi is helping or hurting. I noticed the model wont give 'green bet'
+and thats not cool. I know the model is not going to be 100% perfect
+but it still need to be able to provide a bet on something because an
+outcome is going to happen. game goes over or it goes under, team A
+covers the spread or Team B covers the + points, or upset likely to
+happen and take this team. Something bro"
+
+### Why there was no green
+
+A game line goes green on the card when the sheet's chance beats the
+price. The NBA sheet reads the book's own number for the total and the
+spread, so its chance sits at the price and nothing clears it; what
+went green this season were the two rules built on top, and both have
+lost here: the agreement rule 3-10 (-7.3 units; 157-108 over the two
+seasons it was measured on) and the sheet's own calls 12-21 (-8.1
+units). A night with neither left the board with no call at all.
+
+### Kalshi
+
+It moves no pick: the crowd's price is shown on the card, on the board
+chips and beside the simulation, and one watch reads it (the sharp side
+against the crowd). So it has neither helped nor hurt a pick. What it
+has been worth as a number and as a price, on the 63 graded games that
+carry it (4 to 11 Nov), read against the books in the same odds run
+(lab `kalshi_check2.py`; the crowd's quote on a row is from the newest
+run, so it is not read against the price the row was logged with):
+
+    Brier, the crowd's chance of the home win           0.1609
+    Brier, the middle of the books' no-vig chances      0.1619
+    the crowd against the books' middle                 0.85 points apart on average; 2 or more on 2 games
+    a point or more apart (25 games)                    the crowd further on the favourite all 25; they won 22
+    the favourite won                                   49 of 63
+    the favourite, Kalshi after the fee against the
+    best of the four apps' prices                       cheaper on 20 (by 0.6 points), dearer on 36 (by 1.0), level on 7
+    the watch, the sharp side against the crowd         2-5
+
+As a number it is the books' number: the same to within a point on
+nearly every game and no better on the score. Where it differs it sits
+a little higher on the heavy favourite (the books' two prices carry
+more of the margin on the dog), and favourites have won 49 of 63, which
+is all that the crowd's side winning 22 of 25 says. As a price it is a
+fifth app: the best of the five on about one favourite in three. A
+first reading against the price the row was logged with had it cheaper
+on 41 of 63 and better on the score by 0.004; that compared a later
+quote with an earlier price and is withdrawn.
+
+It stays shown. The chip on a call card for the likelier winner reads
+the crowd's price against the price on that card, the best of the four
+apps', so "better on Kalshi" there means better than the best app.
+
+### What a forced pick costs
+
+Measured on his 2024-25 lines file (1,231 games read, every book at
+one moment, the opener and the last snapshot before tip) and on this
+season's 170 graded rows (the first odds run on the row and the
+newest), lab `board_value.py`, `sharp_value.py`, `sharp_now2.py`,
+`sharp_dir.py`. No model in any of it: what the board alone gives.
+
+    the best number at the four apps on every game           pays the book's margin:
+        the total -2.6% a bet at the last snapshot and -4.9% at the opener, the spread -5.9% and
+        -4.0%, the favourite's moneyline -5.3% and -6.2%
+    a total at one of the four apps a point or more off
+    the middle of every book's number, the app's side        105-84   55.6%   +5.0% a bet   (the last snapshot)
+        the same at the opener                                78-70
+        this season's rows, the first run and the newest      41-35, 18-16
+    the same on spreads                                       600-615 on every game; a point or more off 10-8 and 11-9
+                                                              last season, 19-20 and 8-14 here: nothing
+    the favourite at the best of the four apps' prices
+        80% or more by the books' middle                      231-31   -0.3% a bet
+        70 to 80%                                             216-81   -5.8%
+        60 to 70%                                             230-134  -6.0%
+        50 to 60%                                             162-146  -8.2%
+    the dog at the best of the four prices                    -1.7% a bet at the last snapshot, +4.0% at the opener,
+                                                              -24.2% here (favourites 119-51): nothing steady
+    the sharp book's total against the apps' middle,
+    as a guide to the side                                    227-234 last season, 46-41 here: nothing
+    the sharp book's price shade on an NBA total              30-27 and 34-51 last season, 8-22 here
+
+Two things on the board carry something: a total left a point or more
+off the market at one of his apps (better than even at the last
+snapshot, even at the opener and even on this season's rows), and a
+heavy favourite at the best of four prices close to tip, which was
+about a fair price (-0.3% a bet; -3.7% at the opener) and no more.
+Everything else is the book's margin, and a pick on every game pays
+it. The sharp book's shade is a hockey measure; on NBA totals it has
+pointed the wrong way, and its chip on the NBA card is not a signal.
+
+### The call
+
+`nba.engine.js`, `nbaCallKinds`: every game carries the kinds that
+speak to it, in this order, and the board gives it the first one.
+
+    BET     the agreement rule            the simulation and the crew on a side of the total, the sheet not against it
+    BET     the sheet's own call          a market the sheet prices below its chance, or one a verdict sits on (the most edge)
+    VALUE   the best number on the board  a total at Fanatics, DraftKings, FanDuel or BetMGM a point or more off the
+                                          middle of every book's total (four books or more), the side the number favours,
+                                          at that app's line and price; of two as far off, the cheaper
+    LEAN    the likelier winner           the side the middle of the books' no-vig moneylines makes the favourite
+                                          (four books or more, else the carded book's), at the best of the four apps'
+                                          prices, with what that price needs and what it costs or pays a bet
+
+A BET kind that has lost money here over ten or more graded calls is
+cold (`NBA_CALL_COLD`): it is left out of the order, named under the
+card ("Also on this game: ... cold, and left out of the order until its
+record turns") and still counted on its own line of the record, so it
+comes back by itself when its record is above water. On the rows to 11
+Nov both BET kinds are cold. The number and the winner are never cold:
+the first is arithmetic on the board and the second is the fallback.
+
+A card shows the kind, the pick with its result once the game is
+final, the numbers behind it (the voices, or the sheet's chance and
+what the price needs, or the app, the price and the middle, or the
+chance by the books' middle, the best price, what it needs and what it
+costs a bet, with the crowd's chip), the matchup, what the kind did
+when it was measured and its record here. The section sits above the
+parlay four and opens the game on a click.
+
+Take marks the call. The rule's and the sheet's go through their own
+buttons. The number and the winner are kept on the row beside the
+simulation's calls (`row.simTakes`, view `call`) with what the card
+showed at the mark: the app, the line, the price and the chance by the
+books' middle ("Total UNDER 227 at FanDuel", "Jazz ML at DraftKings"),
+so a later odds run that moves the best price to another app moves the
+card and not the bet, and the number is graded at the app's line, not
+the row's. They list under Taking tonight as calls on the game, ride to
+the phone's sheet under that name, are counted apart from the
+simulation's in the night's line, and once graded sit on their own
+tile of What you took ("Calls on the game taken") and in the list of
+every pick as game calls.
+
+### The record
+
+`nbaCallsRecord` replays every kind on every graded game it speaks to,
+from the row's last odds run before tip (the odds run skips a game that
+has started), each call graded on its own line and side at its own
+price, and then the call as the board gives it, one a game. On the NBA
+record under the simulation's table. On the 170 graded rows of the 12
+Nov backup:
+
+    BET · the agreement rule                    3-10     -7.3u   cold here
+    BET · the sheet's own call                  12-21    -8.1u   cold here
+    VALUE · the best number on the board        34-30-1  +0.0u
+    LEAN · the likelier winner, 80% or more     23-0     +3.2u
+    LEAN · the likelier winner, 70 to 80%       36-8     +2.4u
+    LEAN · the likelier winner, 60 to 70%       32-18    -1.6u
+    LEAN · the likelier winner, near a coin     27-26    -5.7u
+    The call as given, one a game               107-62-1 63.3%   +0.1u
+
+Shown, not scored: no chance, band or pick on the sheet moves, and
+slate.py is untouched.
+
+Checked: the harness builds five games on a date (a sheet call on a
+short dog; a total a point and a half off the middle at FanDuel; a
+heavy favourite priced at five books, the sharp book alone two points
+off the middle of its total, the crowd's price dearer than the best app
+and cheaper than the row's own; a favourite read from the carded book
+alone; a game the agreement rule fires on), reads each card, takes the
+number and the winner and reads the marks, the Taking cards and the
+night's line, grades the night and reads each call graded on its own
+line with the record's table, the tile and the list; then ten short
+dogs lose, the sheet's own call goes cold, and a new short dog is given
+the likelier winner with the cold call named under it, until the ten
+are wiped and it is the sheet's call again; and a later odds run moves
+the favourite's best price to another app, the card following it and
+the mark not. Five checks, run against fifteen copies broken on purpose
+(the gap at two points, the worst of the four prices, no cold rule,
+graded at the row's line, the rule left out, the number read at any
+book, cold without the ten, the mark at the row's price, the chip
+against the row's price, the mark at the row's line, a call counted as
+the simulation's, the app left off the pick, the night's line, the
+Taking card's words, no Take on the number): two of the first seven
+were not caught at first, which is why the scenario has the sharp book
+alone off the middle and a rule that has lost once and is still given.

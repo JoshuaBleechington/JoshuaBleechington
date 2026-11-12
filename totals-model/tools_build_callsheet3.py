@@ -367,7 +367,7 @@ def tail() -> str:
              '  })();\n'
              '  function save() {', "relabel")
     t = once(t, "the units column is the referee.') + '</div>';\n    });",
-             "the units column is the referee.') + '</div>';\n      if (sp === \"NBA\") h += nbaRefsWatchHtml();   // the referees as a watch (22 Oct 2026)\n      if (sp === \"NBA\") h += nbaSimRecordHtml();   // the simulation's calls, says against does (25 Oct 2026)\n    });", "refs watch")
+             "the units column is the referee.') + '</div>';\n      if (sp === \"NBA\") h += nbaRefsWatchHtml();   // the referees as a watch (22 Oct 2026)\n      if (sp === \"NBA\") h += nbaSimRecordHtml();   // the simulation's calls, says against does (25 Oct 2026)\n      if (sp === \"NBA\") h += nbaCallsRecordHtml();   // a call on every game, each kind's record (12 Nov 2026)\n    });", "refs watch")
     t = every(t, 'sp === "WNBA" ? forecastMatchupWnba() : forecastMatchupMlb()',
               'sp === "NBA" ? forecastMatchupNba() : sp === "WNBA" ? forecastMatchupWnba() : forecastMatchupMlb()', "dispatch (stored)", 1)
     t = every(t, 'sport === "WNBA" ? forecastMatchupWnba() : forecastMatchupMlb()',

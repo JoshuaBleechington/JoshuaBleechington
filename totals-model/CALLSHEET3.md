@@ -3702,3 +3702,123 @@ because one of them was not at first. With the backup of 12 Nov the
 graded night of 11 Nov read the same on this build as on the published
 one, every card, list, sheet and tile, and the bar showed on 5 to 8 and
 11 Nov and on no other date.
+
+## Tickets by best chance, and what separates a leg that lands, 12 Nov 2026
+
+The user, the night after the tickets' first night (his nine went 0-9;
+the page's own two-leg list 3-3): "What if we go away from the parlay 2
+leg and 3 legs for the props based on the last 5 and instead put
+together the best two and three guys that a good chance to each hit to
+complete the parlay", then "or we can still keep them as we have but add
+the new option as well for the props. i guess its still early to go away
+from it", and, with the night's six two-leg cards on the screen (the
+unders in them 5-1, the overs 1-4), "Find how we were able to get the
+one that hit vs the ones that didnt?"
+
+### What separates a leg that lands
+
+Measured on the fourteen nights that still keep the game logs and the
+levers, 28 Oct to 11 Nov, merged from the four backups that hold them in
+full (the page keeps a night's logs for seven dates): 10,014 graded
+picks, each replayed under the current blend as the page reads it,
+nothing known after the tip used (lab `props_hits.py`,
+`props_halves.py`). Every split below was read in both halves of the
+nights, seven and seven, and is quoted where it held in each.
+
+The picks with an edge on the card (BET and LEAN), 1,566 of them:
+
+    every pick with an edge                 851-715   54.3%   says 55.8%   +0.1% a pick
+    the unders                              509-380   57.3%                +4.6%
+    the overs                               342-335   50.5%                -5.7%
+    an over, a spread of 5+ either way      187-210   47.1%   47.0% then 47.3% by half
+    an over, a close game                   155-125   55.4%   53.9% then 57.1%
+    an under, a spread of 5+ either way     285-194   59.5%   59.0% then 60.3%
+    an over, his minutes swing              22-52     29.7%   11-26 in each half
+    an over, his minutes steady            305-257    54.3%
+    an under, his minutes down              83-49     62.9%   61.1% then 63.5%
+    the sheet says 58% or more             212-131    61.8%   60.3% then 63.8%
+    a plus-money side the sheet takes       83-58     58.9%   59.0% then 58.5%
+
+The spread is the game's, read from his club's side: five or more
+either way is a game the book expects to be decided early, and the
+starters' minutes go with it. The existing red chip is the favourite's
+over (124-138 here); the dog's over is as poor (63-72). A man's minutes
+swing when the spread (sd) of the minutes of his last ten games played
+is six or more: a man moving between the bench and the five, or back
+from an absence, whose last five flatter the over.
+
+The sheet's chance is honest all the way up. On every pick with a side,
+edge or none: picks it gives 50 to 55% land 50.8%, 55 to 58% land
+55.0%, 58 to 62% land 58.4%, 62 to 66% land 65.6%, 66 to 72% land 68.1%.
+Across every prop the books posted the under won 53.9% (5,400 of
+10,014), fifty or more on each of the fourteen nights.
+
+So the night's six cards were the season in small: the legs that landed
+were unders and an over in a close game; the four that missed were
+overs, three of them on men whose minutes had just jumped. On the
+last-five rule's own legs (91 on these nights, 57-34) no split is large
+enough to read.
+
+### The rule
+
+A leg, by best chance, is a pick with an edge on its card and at the
+app's own line and price which the sheet gives 58% or more at that line
+(`PROPS_T3C.chance`); an over in a game with a spread of five or more
+is left out (`lop`), and an over on a man whose minutes swing (`swing`,
+`propMinSwing`). The last five, the last ten and the levers are not
+asked. A ticket is the two or three legs likeliest to land together at
+one app, each on its own game, so its price is the plain product of the
+legs'; then the most expected value. A man sits in one ticket a date,
+six tickets at most. With a leg a game the likeliest ticket never needs
+a game's second leg, so the search keeps each game's likeliest leg and
+is exact.
+
+Under the BETs the choice gains "tickets, best chance" beside "either
+side", "overs", "unders" and "the LEANs one by one"; two legs or three
+as before. The card is the tickets' card: the same pips, the same tabs
+for the same legs at another app (each leg must pass the best-chance
+test there, and an app where one does not says why), Take, Copy.
+
+### Replayed
+
+Lab `props_chance.py`, the same fourteen nights, each leg at each app's
+own line and price, six tickets a night at most:
+
+    two legs, by best chance      31 of 71   43.7%   the sheet said 41.3%, the prices asked 37.8%   +11.0 units
+        by half                   16 of 38, then 15 of 33
+        the first ticket a night   8 of 14;  the first three 21 of 42
+    two legs, the last-five rule   8 of 25   32.0%   said 33.8%   +1.6 units
+    three legs, by best chance    10 of 55   18.2%   said 25.7%   -12.7 units
+    three legs, the last-five rule 2 of 12
+
+The legs in the best-chance pools landed 208-128 one at a time. Asking
+no edge of a leg landed more tickets (42 of 84 at two legs, 26 of 78 at
+three) at prices that asked as much as the sheet gave them; ranked by
+expected value in place of the chance, 30 of 70. The rule keeps the
+edge and the chance. Three legs have not paid under it, and the note
+above them says so. On the page the lists of 10 and 11 Nov, rebuilt
+from the backup, are the replay's own, ticket for ticket and in order
+(two of three, then one of six).
+
+### The record
+
+At grading both rules' lists are kept on the rows before any result
+lands, two legs and three: the last-five list as before (`listed`, `m`,
+`n` on the spec) and the best-chance list by its own rank (`c`), so a
+ticket both rules list is kept once and counted on each rule's line.
+The record carries "Two-leg tickets by best chance, as listed, to test"
+and the three-leg tile beside the last-five tiles, and the card's line
+names both. A ticket taken from the best-chance list keeps the rule
+that built it (`m: "t3c"`).
+
+Checked: the harness lists the two- and three-leg tickets on a date
+where nobody passes the last-five test, with an over on the dog's man
+in a lopsided game, an over on swinging minutes, a pick under 58% and
+one with no edge all left out and an under in each of those places a
+leg; takes one and unmarks it; reads the same two at another app and
+the reason at a third; grades the night and reads the kept lists, the
+cards and the tiles. The block was run against six copies broken on
+purpose (no floor, the lopsided over let in, on the favourite's side
+only, the swinging over let in, ranked by value, the list not kept);
+two were not caught at first, which is why the scenario has a leg left
+alone on its game and puts the lopsided over on the dog.

@@ -587,7 +587,21 @@
      A test with its own record line, not a measured edge. A date's list is kept on its rows when the date is graded, before
      the results land, so the record grades the tickets the tab showed and nothing chosen after the fact */
   var PROPS_T3 = { l5: 4, l10: 0.5, n10: 8, max: 6, pool: 60 }, PROPS_BELOW_KEY = "callsheet3.props.below.v1";
-  var PROPS_BELOW_MODES = { t3: 1, t3o: 1, t3u: 1, leans: 1 };
+  var PROPS_BELOW_MODES = { t3: 1, t3o: 1, t3u: 1, t3c: 1, leans: 1 };
+  /* tickets by best chance (12 Nov 2026, the user: "put together the best two and three guys that have a good chance to each hit to
+     complete the parlay ... keep them as we have but add the new option as well", and of a night's six tickets, "find how we were
+     able to get the one that hit vs the ones that didn't"). Measured on the fourteen nights that keep the logs and the levers
+     (28 Oct to 11 Nov, 10,014 graded picks replayed under the current blend, lab props_hits.py and props_halves.py), each split
+     read in both halves of the nights: the sheet's chance is honest all the way up (picks it gives 58 to 62% land 58.4%, 62 to
+     66% land 65.6%, 66 to 72% land 68.1%); among the picks with an edge the unders land 57.3% and the overs 50.5%; an over in
+     a game with a spread of five or more, either club, lands 47.0% then 47.3% where an over in a close game lands 55.4%; and an
+     over on a man whose minutes swing (a spread of six or more across his last ten) lands 11 of 37 in each half. So a leg here
+     is a pick with an edge on its card and at the app's own line and price that the sheet gives 58% or more there, no over in
+     a lopsided game and none on swinging minutes, and a ticket is the two or three most likely to land together, each on its
+     own game. Replayed (lab props_chance.py): two legs landed 31 of 71 where the sheet said 41.3% and the prices asked 37.8%,
+     +11.0 units, 16 of 38 then 15 of 33 by half; the last-five rule's two legs landed 8 of 25 on the same nights. Three legs
+     landed 10 of 55 where the sheet said 25.7%. A test with a record of its own: both lists are kept at grading */
+  var PROPS_T3C = { chance: 0.58, lop: 5, swing: 6 };
   /* two legs or three (11 Nov 2026, the user: "what about instead of the 3, we do 2 legs? would those be better?"). The same
      legs either way, so the question is the parlay's own: replayed on the same eleven nights by the same rule, two legs on
      separate games went 7 of 20 for +2.8 units (the sheet said 34.9%, the price needed 31.4%), the overs alone 5 of 6, the
@@ -604,18 +618,42 @@
   }
   var propsBelow = "t3";   // what sits under the BETs: the tickets from either side, the overs only, the unders only, or the LEANs one by one
   try { var below0 = localStorage.getItem(PROPS_BELOW_KEY); if (PROPS_BELOW_MODES[below0]) propsBelow = below0; } catch (e) {}
-  function propsT3Mode() { return propsBelow === "t3o" || propsBelow === "t3u" ? propsBelow : "t3"; }
+  function propsT3Mode() { return propsBelow === "t3o" || propsBelow === "t3u" || propsBelow === "t3c" ? propsBelow : "t3"; }
+  function propsT3FormMode() { var m = propsT3Mode(); return m === "t3c" ? "t3" : m; }   // the last-five list kept at grading beside the best-chance one
+  function propsT3CMeasured(k) {
+    return "Replayed on the fourteen nights that keep the logs and the levers: such legs landed 208-128 one at a time, and the tickets " +
+      (k === 2 ? "31 of 71 at two legs for +11.0 units (the sheet said 41.3%, the prices asked 37.8%; 16 of 38 then 15 of 33 by half), where the last-five rule's two legs landed 8 of 25"
+               : "10 of 55 at three legs, under the 25.7% the sheet gave them, where two legs landed 31 of 71 for +11.0 units") +
+      ". A test, not a measured edge: its record builds in Is it working beside the last-five tickets'.";
+  }
   function propLastGames(r) { return (r.log || []).filter(function (g) { return g && g[3] && +g[3] > 0 && g[4] !== null && g[4] !== undefined && g[4] !== "" && !isNaN(+g[4]); }).slice(-10); }
   function propHitRate(r, line, side) {   // his last five and last ten against a line, on a side (the pick's own unless given)
     var gs = propLastGames(r), sd = side || r.side, on = function (g) { return sd === "OVER" ? +g[4] > +line : +g[4] < +line; }, l5 = gs.slice(-5), sum = 0;
     l5.forEach(function (g) { sum += +g[4]; });
     return { h5: l5.filter(on).length, n5: l5.length, h10: gs.filter(on).length, n10: gs.length, avg5: l5.length ? sum / l5.length : null, games: gs };
   }
+  function propMinSwing(r) {   // how far his minutes swing: the spread (sd) of the minutes of his last ten games played, null under four
+    var gs = propLastGames(r), n = gs.length; if (n < 4) return null;
+    var m = 0, v = 0; gs.forEach(function (g) { m += +g[3]; }); m /= n; gs.forEach(function (g) { v += (+g[3] - m) * (+g[3] - m); });
+    return Math.sqrt(v / n);
+  }
+  function propT3CWhy(r, l) {   // why a pick is not a best-chance leg at an app's line and price; "" when it is
+    if (!(l.chance - implied(l.price) > 0)) return r.name + " has no edge at " + sgn(l.price, 0) + " there" + (l.same ? "" : ", the line " + l.line);
+    if (l.chance < PROPS_T3C.chance) return r.name + " reads " + (l.chance * 100).toFixed(1) + "% at " + l.line + " there, under the " + Math.round(PROPS_T3C.chance * 100) + "% a leg asks";
+    var fv = propFav(r), sw = propMinSwing(r);
+    if (r.side === "OVER" && fv !== null && Math.abs(fv) >= PROPS_T3C.lop) return r.name + "'s is an over in a game with a spread of " + Math.abs(fv);
+    if (r.side === "OVER" && sw !== null && sw >= PROPS_T3C.swing) return r.name + "'s is an over on minutes that swing";
+    return "";
+  }
   function propT3Leg(r, app, mode) {
     if (!propHas(r) || !(r.edge > 0)) return null;   // a man who then did not play stays a leg: nothing known after the tip chooses the list, and his leg drops out of the ticket as the apps settle it
     if ((mode === "t3o" && r.side !== "OVER") || (mode === "t3u" && r.side !== "UNDER")) return null;
     var l = propLegAt(r, app); if (!l) return null;
     var edge = l.chance - implied(l.price); if (!(edge > 0)) return null;
+    if (mode === "t3c") {   // by best chance: the sheet's own chance at the app's line, and the two measured leaks on the over kept out
+      if (propT3CWhy(r, l) !== "") return null;
+      return { r: r, side: r.side, line: l.line, price: l.price, chance: l.chance, same: l.same, hr: propLastGames(r).length ? propHitRate(r, l.line) : null, ev: l.chance * decimalOf(l.price) - 1 };
+    }
     var hr = propHitRate(r, l.line);
     if (hr.n5 < 5 || hr.h5 < PROPS_T3.l5 || hr.n10 < PROPS_T3.n10 || hr.h10 / hr.n10 < PROPS_T3.l10) return null;
     var t = propsLeverTally(r); if (!(t.toward > t.against)) return null;
@@ -640,17 +678,24 @@
   function propsTreblesLive(dateISO, rowsIn, mode, k) {
     k = k === 3 ? 3 : 2;
     var rows = (rowsIn || propsSource()).filter(function (r) { return (r.gdate || "") === dateISO; }), pools = {}, usedMan = {}, out = [];
-    PROPS_APPS.forEach(function (app) { pools[app] = rows.map(function (r) { return propT3Leg(r, app, mode); }).filter(Boolean).sort(propsT3LegSort); });
+    var byCh = mode === "t3c";
+    PROPS_APPS.forEach(function (app) { pools[app] = rows.map(function (r) { return propT3Leg(r, app, mode); }).filter(Boolean).sort(byCh ? propsT3LegSortCh : propsT3LegSort); });
     while (out.length < PROPS_T3.max) {
       var best = null;
       var consider = function (app, legs) {
         for (var a = 0; a < legs.length; a++) for (var b = a + 1; b < legs.length; b++) if (legs[a].r.pid === legs[b].r.pid) return;
         var t = propsT3Make(app, legs);
+        if (byCh) {   // each leg on its own game, then the most likely to land together, then the most expected value
+          if (t.games < k) return;
+          if (!best || t.chance > best.chance + 1e-12 || (Math.abs(t.chance - best.chance) <= 1e-12 && t.ev > best.ev + 1e-12)) best = t;
+          return;
+        }
         if (k === 2 && t.games < 2) return;   // two legs sit on two games: a same-game two is priced the app's own way and has the pairs' section
         if (!best || t.games > best.games || (t.games === best.games && t.ev > best.ev + 1e-12)) best = t;   // separate games before a shared one, then the most expected value
       };
       PROPS_APPS.forEach(function (app) {
         var c = pools[app].filter(function (l) { return !usedMan[l.r.pid]; });
+        if (byCh) { var seenG = {}; c = c.filter(function (l) { if (seenG[l.r.game]) return false; seenG[l.r.game] = true; return true; }); }   // a game's likeliest leg left: with a leg a game the likeliest ticket never needs another, so the search is exact and small
         if (k === 3) c = c.slice(0, PROPS_T3.pool);   // two legs read every qualifying leg, so the best pair is exact; three read the first sixty by expected value, beyond any night's count
         for (var i = 0; i < c.length; i++) for (var j = i + 1; j < c.length; j++) {
           if (k === 2) consider(app, [c[i], c[j]]);
@@ -658,6 +703,7 @@
         }
       });
       if (!best) break;
+      best.mode = mode;
       out.push(best); best.legs.forEach(function (l) { usedMan[l.r.pid] = true; });
     }
     return out;
@@ -670,9 +716,12 @@
      at grading and the record stay on the app with the most expected value, so a ticket is counted once */
   var t3View = {};   // the app a ticket is shown at, by its date, men and markets: a view, not kept
   function propsT3LegSort(a, b) { return (b.ev - a.ev) || (String(a.r.id) < String(b.r.id) ? -1 : 1); }
+  function propsT3LegSortCh(a, b) { return (b.chance - a.chance) || (b.ev - a.ev) || (String(a.r.id) < String(b.r.id) ? -1 : 1); }
+  function propsT3ModeOf(t) { var b = t && (t.primary || t), m = b && (b.mode || (b.spec && b.spec.m)); return m === "t3c" ? "t3c" : "t3"; }   // which rule a ticket was built by: the last five, or best chance
   function propsT3Base(t) { return (t.gdate || "") + "|" + t.legs.map(function (l) { return l.r.pid + ":" + l.r.mk; }).sort().join("|"); }
-  function propT3LegWhy(r, app, side) {   // "" when the leg passes at the app's line and price, null when the app does not post it, else why it does not
+  function propT3LegWhy(r, app, side, mode) {   // "" when the leg passes at the app's line and price, null when the app does not post it, else why it does not
     var l = propLegAt(r, app); if (!l) return null;
+    if (mode === "t3c") return propT3CWhy(r, l);
     if (!(l.chance - implied(l.price) > 0)) return r.name + " has no edge at " + sgn(l.price, 0) + " there" + (l.same ? "" : ", the line " + l.line);
     var hr = propHitRate(r, l.line, side);
     if (hr.n5 < 5 || hr.h5 < PROPS_T3.l5) return r.name + "'s line is " + l.line + " there, " + hr.h5 + " of his last " + hr.n5 + " " + (side === "OVER" ? "over" : "under") + " it";
@@ -681,13 +730,15 @@
   }
   function propsT3At(t, app) {   // the same three legs at another app, each passing there; null when one does not
     var legs = [];
-    for (var i = 0; i < t.legs.length; i++) { var l0 = t.legs[i]; if (l0.side !== l0.r.side) return null; var l = propT3Leg(l0.r, app, "t3"); if (!l) return null; legs.push(l); }
-    return propsT3Make(app, legs.sort(propsT3LegSort));
+    var md = propsT3ModeOf(t);
+    for (var i = 0; i < t.legs.length; i++) { var l0 = t.legs[i]; if (l0.side !== l0.r.side) return null; var l = propT3Leg(l0.r, app, md); if (!l) return null; legs.push(l); }
+    var alt = propsT3Make(app, legs.sort(md === "t3c" ? propsT3LegSortCh : propsT3LegSort)); alt.mode = md;
+    return alt;
   }
   function propsT3Apps(t) {   // the apps that post all three: the ticket there when all three pass, else why not; the ticket's own app among them
     return PROPS_APPS.map(function (app) {
       if (app === t.app) return { app: app, t: t };
-      var whys = t.legs.map(function (l) { return l.side === l.r.side ? propT3LegWhy(l.r, app, l.side) : null; });
+      var whys = t.legs.map(function (l) { return l.side === l.r.side ? propT3LegWhy(l.r, app, l.side, propsT3ModeOf(t)) : null; });
       if (whys.some(function (w) { return w === null; })) return null;
       var alt = propsT3At(t, app);
       return { app: app, t: alt, why: alt ? "" : (whys.filter(Boolean)[0] || "one leg does not pass the test there") };
@@ -697,8 +748,10 @@
     var p = String(id).split("|"); if ((p.length !== 5 && p.length !== 6) || p[0] !== "t3") return null;
     var byKey = {}, legs = [];
     propsSource().forEach(function (r) { if ((r.gdate || "") === p[1]) byKey[r.pid + ":" + r.mk] = r; });
-    for (var i = 3; i < p.length; i++) { var r = byKey[p[i]], l = r ? propT3Leg(r, p[2], "t3") : null; if (!l) return null; legs.push(l); }
-    return propsT3Make(p[2], legs.sort(propsT3LegSort));
+    var md = "t3";
+    for (var i = 3; i < p.length; i++) { var r = byKey[p[i]], l = r ? (propT3Leg(r, p[2], "t3") || propT3Leg(r, p[2], "t3c")) : null; if (!l) return null; if (r && !propT3Leg(r, p[2], "t3")) md = "t3c"; legs.push(l); }
+    var made = propsT3Make(p[2], legs.sort(md === "t3c" ? propsT3LegSortCh : propsT3LegSort)); made.mode = md;
+    return made;
   }
   /* a ticket kept on the rows: the spec sits on its first leg's row (`t3`), with the app, the three legs' keys and what each read
      at the app (line, price, chance, side), so it rides through a backup, a reload of the props file and the trim, and is graded
@@ -724,22 +777,34 @@
     for (var i = 0; i < t.legs.length; i++) { var s = (t.legs[i].r.t3 || []).filter(function (x) { return x.id === t.id; })[0]; if (s) return { sp: s, row: t.legs[i].r }; }
     return null;
   }
-  function propsT3Kept(dateISO, mode, k) { return propsT3Stored(dateISO).filter(function (t) { return t.spec.listed && (t.spec.m || "t3") === mode && t.legs.length === k; }).sort(function (a, b) { return (a.spec.n || 0) - (b.spec.n || 0); }); }
+  function propsT3Kept(dateISO, mode, k) {
+    if (mode === "t3c") return propsT3Stored(dateISO).filter(function (t) { return t.spec.c && t.legs.length === k; }).sort(function (a, b) { return a.spec.c - b.spec.c; });   // the best-chance list: its own rank on the spec
+    return propsT3Stored(dateISO).filter(function (t) { return t.spec.listed && (t.spec.m || "t3") === mode && t.legs.length === k; }).sort(function (a, b) { return (a.spec.n || 0) - (b.spec.n || 0); });
+  }
   function propsTrebles(dateISO, rowsIn, mode, k) {   // the date's tickets at k legs: the list kept before the games once the date is graded, else as the rows stand now
     var kept = propsT3Kept(dateISO, mode, k);
+    kept.forEach(function (t) { t.mode = mode; });
     return kept.length ? kept : propsTreblesLive(dateISO, rowsIn, mode, k);
   }
   function propsT3Find(id) { var d = String(id).split("|")[1] || ""; return propsT3Stored(d).filter(function (t) { return t.id === id; })[0] || propsT3FromId(id); }
   function propsT3Freeze(dateISO) {   // at grading: the list as the tab would show it, kept before any result lands; a date with a result already on it is never listed after the fact
     var rows = props.filter(function (r) { return (r.gdate || "") === dateISO; });
-    if (!rows.length || rows.some(function (r) { return !!r.result; }) || rows.some(function (r) { return (r.t3 || []).some(function (sp) { return sp.listed; }); })) return 0;
-    var mode = propsT3Mode(), n = 0;
+    if (!rows.length || rows.some(function (r) { return !!r.result; }) || rows.some(function (r) { return (r.t3 || []).some(function (sp) { return sp.listed || sp.c; }); })) return 0;
+    var mode = propsT3FormMode(), n = 0;
     [2, 3].forEach(function (k) {   // both lists are kept, two legs and three, so each has its record whichever the tab showed
       var rank = 0;
       propsTreblesLive(dateISO, rows, mode, k).forEach(function (t) {
         var has = propsT3SpecOf(t), sp = has ? has.sp : null;
         if (!sp) { sp = propsT3Spec(t, mode); t.legs[0].r.t3 = (t.legs[0].r.t3 || []).concat([sp]); }
         sp.listed = true; sp.m = mode; sp.n = ++rank; n++;
+      });
+      /* and the best-chance list (12 Nov 2026), whichever the tab showed: its rank sits on the spec as `c`, so a ticket both rules
+         list is kept once and counted on each rule's line */
+      var rankC = 0;
+      propsTreblesLive(dateISO, rows, "t3c", k).forEach(function (t) {
+        var has = propsT3SpecOf(t), sp = has ? has.sp : null;
+        if (!sp) { sp = propsT3Spec(t, "t3c"); t.legs[0].r.t3 = (t.legs[0].r.t3 || []).concat([sp]); }
+        sp.c = ++rankC; n++;
       });
     });
     return n;
@@ -782,7 +847,7 @@
     var t = propsT3Find(id); if (!t) return;
     if (t.legs.some(function (l) { return !!l.r.result; })) { propsSay("That ticket has a graded leg: a ticket is marked before the games, not after."); return; }
     var has = propsT3SpecOf(t), sp = has ? has.sp : null;
-    if (sp && sp.take) { delete sp.take; if (!sp.listed) { has.row.t3 = has.row.t3.filter(function (x) { return x !== sp; }); if (!has.row.t3.length) delete has.row.t3; } }
+    if (sp && sp.take) { delete sp.take; if (!sp.listed && !sp.c) { has.row.t3 = has.row.t3.filter(function (x) { return x !== sp; }); if (!has.row.t3.length) delete has.row.t3; } }
     else { if (!sp) { sp = propsT3Spec(t, propsT3Mode()); t.legs[0].r.t3 = (t.legs[0].r.t3 || []).concat([sp]); } sp.take = true; }
     if (!propsPreview) saveProps();
     renderProps(); renderCalib(); if (typeof renderBoard === "function") renderBoard();
@@ -1252,10 +1317,10 @@
       });
     });
     /* the three-leg tickets (11 Nov 2026): the list frozen when each date was graded, and the ones marked as taken */
-    var byT3 = { 2: mk(), 3: mk() }, byT3Take = { 2: mk(), 3: mk() };
+    var byT3 = { 2: mk(), 3: mk() }, byT3Take = { 2: mk(), 3: mk() }, byT3C = { 2: mk(), 3: mk() };   // byT3C: the best-chance list kept at grading (12 Nov 2026)
     propsT3Stored().forEach(function (t) {
       var res3 = propsT3Res(t); if (!res3 || res3 === "void") return;
-      [t.spec.listed ? byT3[t.legs.length] : null, t.spec.take ? byT3Take[t.legs.length] : null].forEach(function (s) {
+      [t.spec.listed ? byT3[t.legs.length] : null, t.spec.take ? byT3Take[t.legs.length] : null, t.spec.c ? byT3C[t.legs.length] : null].forEach(function (s) {
         if (!s) return;
         if (res3 === "push") { s.p++; return; }
         s.n++; s.says += t.chance;
@@ -1286,6 +1351,7 @@
     if (byPair.n || byPair.p) parts.push("same-game pairs " + rec(byPair) + (byPair.n ? " " + sgn(byPair.units, 1) + "u" : ""));
     if (byPairTake.n || byPairTake.p) parts.push("pairs taken " + rec(byPairTake) + (byPairTake.n ? " " + sgn(byPairTake.units, 1) + "u" : ""));
     [2, 3].forEach(function (k) { if (byT3[k].n || byT3[k].p) parts.push(propsT3Word(k) + "-leg tickets as listed " + rec(byT3[k]) + (byT3[k].n ? " " + sgn(byT3[k].units, 1) + "u" : "")); });
+    [2, 3].forEach(function (k) { if (byT3C[k].n || byT3C[k].p) parts.push(propsT3Word(k) + "-leg tickets by best chance " + rec(byT3C[k]) + (byT3C[k].n ? " " + sgn(byT3C[k].units, 1) + "u" : "")); });
     [2, 3].forEach(function (k) { if (byT3Take[k].n || byT3Take[k].p) parts.push(propsT3Word(k) + "-leg tickets taken " + rec(byT3Take[k]) + (byT3Take[k].n ? " " + sgn(byT3Take[k].units, 1) + "u" : "")); });
     if (byCons.toward.n || byCons.against.n) parts.push("the books' consensus with the pick " + rec(byCons.toward) + (byCons.toward.n ? " " + sgn(byCons.toward.units, 1) + "u" : "") + " · against it " + rec(byCons.against) + (byCons.against.n ? " " + sgn(byCons.against.units, 1) + "u" : ""));
     if (byForm.toward.n || byForm.against.n) parts.push("his last three with the pick " + rec(byForm.toward) + (byForm.toward.n ? " " + sgn(byForm.toward.units, 1) + "u" : "") + " · against it " + rec(byForm.against) + (byForm.against.n ? " " + sgn(byForm.against.units, 1) + "u" : "") + " (shown, not scored)");
@@ -1317,6 +1383,7 @@
     if (byTake.n || byTake.p) h2 += tile("Taken: the props you marked", byTake, []);
     if (byPair.n || byPair.p) h2 += tile("Same-game pairs, at the parlay price", byPair, []);
     [2, 3].forEach(function (k) { if (byT3[k].n || byT3[k].p) h2 += tile(propsT3Word(k, true) + "-leg tickets as listed, to test", byT3[k], ["at the product of the " + propsT3Word(k) + " legs' prices; a void or pushed leg drops out"]); });
+    [2, 3].forEach(function (k) { if (byT3C[k].n || byT3C[k].p) h2 += tile(propsT3Word(k, true) + "-leg tickets by best chance, as listed, to test", byT3C[k], ["the " + propsT3Word(k) + " picks likeliest to land together, each on its own game, at the product of their prices; a void or pushed leg drops out"]); });
     [2, 3].forEach(function (k) { if (byT3Take[k].n || byT3Take[k].p) h2 += tile(propsT3Word(k, true) + "-leg tickets you took", byT3Take[k], []); });
     if (byCons.toward.n || byCons.toward.p) h2 += tile("The books' consensus with the pick, half a point or more", byCons.toward, []);
     if (byCons.against.n || byCons.against.p) h2 += tile("The books' consensus against the pick", byCons.against, []);
@@ -1649,10 +1716,13 @@
     var t3Mode = propsBelow === "leans" ? "" : propsBelow, t3List = t3Mode ? propsTrebles(date, rows, t3Mode, propsLegs) : [], nBetCards = picks.filter(function (r) { return r.band === "BET"; }).length;
     if (t3Mode) picks = picks.filter(function (r) { return r.band === "BET"; });
     t3List = t3List.map(function (t) { var a = t3View[propsT3Base(t)], alt = a && a !== t.app ? propsT3At(t, a) : null; if (alt) alt.primary = t; return alt || t; });   // the same three at the app chosen on the card
-    var t3Kept = t3Mode && t3List.length && (t3List[0].primary || t3List[0]).spec && (t3List[0].primary || t3List[0]).spec.listed, t3Graded = rows.some(function (r) { return !!r.result; });
-    var t3Html = !t3Mode ? '' : '<div class="pk-divider t3d">' + (nBetCards ? '' : (tellMode ? 'No BET among these. ' : 'No BET on this date. ')) + '<b>' + propsT3Word(propsLegs, true) + '-leg tickets below, to test</b>, in the LEANs\' place: ' + propsT3Word(propsLegs) + ' men at one app' + (propsLegs === 2 ? ' on two games' : '') + ', each a pick with an edge whose last five games went his way four times or more and his last ten at least half, more levers toward the pick than against and no red chip' + (t3Mode === "t3o" ? ', the overs only' : t3Mode === "t3u" ? ', the unders only' : '') + '. A card is one app throughout; where the same ' + propsT3Word(propsLegs) + ' also pass at another app, a tab on the card shows the ticket there. ' + propsT3Measured(propsLegs) +
+    var t3Spec0 = t3Mode && t3List.length ? (t3List[0].primary || t3List[0]).spec : null, t3Kept = !!(t3Spec0 && (t3Mode === "t3c" ? t3Spec0.c : t3Spec0.listed)), t3Graded = rows.some(function (r) { return !!r.result; });
+    var t3Html = !t3Mode ? '' : '<div class="pk-divider t3d">' + (nBetCards ? '' : (tellMode ? 'No BET among these. ' : 'No BET on this date. ')) +
+      (t3Mode === "t3c"
+        ? '<b>' + propsT3Word(propsLegs, true) + '-leg tickets by best chance below, to test</b>, in the LEANs\' place: the ' + propsT3Word(propsLegs) + ' picks likeliest to land together at one app, each on its own game. A leg is a pick with an edge on its card and at the app\'s own line and price that the sheet gives ' + Math.round(PROPS_T3C.chance * 100) + '% or more there; an over in a game with a spread of ' + PROPS_T3C.lop + ' or more is left out, and an over on a man whose minutes swing. A card is one app throughout; where the same ' + propsT3Word(propsLegs) + ' also pass at another app, a tab on the card shows the ticket there. ' + propsT3CMeasured(propsLegs)
+        : '<b>' + propsT3Word(propsLegs, true) + '-leg tickets below, to test</b>, in the LEANs\' place: ' + propsT3Word(propsLegs) + ' men at one app' + (propsLegs === 2 ? ' on two games' : '') + ', each a pick with an edge whose last five games went his way four times or more and his last ten at least half, more levers toward the pick than against and no red chip' + (t3Mode === "t3o" ? ', the overs only' : t3Mode === "t3u" ? ', the unders only' : '') + '. A card is one app throughout; where the same ' + propsT3Word(propsLegs) + ' also pass at another app, a tab on the card shows the ticket there. ' + propsT3Measured(propsLegs)) +
       (t3Kept ? ' This list was kept before the games and is in the record.' : (t3Graded && t3List.length ? ' Rebuilt from the night\'s rows after the games: for study, not in the record.' : '')) + '</div>' +
-      (t3List.length ? '<div class="t3grid">' + t3List.map(function (t, i) { return propsT3Card(t, i); }).join("") + '</div>' : '<div class="empty t3none">' + (rows.length ? 'No ' + propsT3Word(propsLegs) + ' legs on this date pass the test at one app' + (propsLegs === 2 ? ' on two games' : '') + (t3Mode === "t3o" ? ' among the overs' : t3Mode === "t3u" ? ' among the unders' : '') + '.' : 'Load a props file and the tickets land here.') + '</div>');
+      (t3List.length ? '<div class="t3grid">' + t3List.map(function (t, i) { return propsT3Card(t, i); }).join("") + '</div>' : '<div class="empty t3none">' + (rows.length ? (t3Mode === "t3c" ? 'No ' + propsT3Word(propsLegs) + ' picks on this date pass the best-chance test at one app on ' + propsT3Word(propsLegs) + ' games.' : 'No ' + propsT3Word(propsLegs) + ' legs on this date pass the test at one app' + (propsLegs === 2 ? ' on two games' : '') + (t3Mode === "t3o" ? ' among the overs' : t3Mode === "t3u" ? ' among the unders' : '') + '.') : 'Load a props file and the tickets land here.') + '</div>');
     /* the BET band in front (6 Nov 2026, the user: "for the BET band cards, make that more visible and why"): a BET card carries
        a badge, its edge tier and a line that says why in words; the LEANs sit under a divider that says what the record says of them */
     var leanDivider = false, betsNote = propsBetsNote(rows);   // how many men and games the date's BETs really sit on (10 Nov 2026)

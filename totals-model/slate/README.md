@@ -107,6 +107,43 @@ price is better after the exchange's 7% fee on the win, and the sharp side
 when the crowd sits three points from Pinnacle on the moneyline, a watch on
 the moneyline tile. Nothing to run differently.
 
+**The folder (12 Nov 2026).** A run reads and writes in the folder its
+bat sits in, and nowhere else: the ledgers, `odds_key.txt`, the odds log
+the grade reads the close from, the day's files. The simplest way to work
+is one folder kept for good, with a new `slate.py` saved over the old one.
+A new folder for a new version leaves the ledgers behind, and a props run
+with no `nba-ledger-202526.json` beside it projects every player from
+this season's games alone: that happened from 29 Oct to 8 Nov and again
+on 11 Nov, and the one line that said so scrolled past in the window.
+
+So a run now brings a ledger it needs and does not find. When
+`nba-ledger-SEASON.json` is not in the run's folder it looks for it,
+names only, in the folder and the folders in it, the folders beside it
+and one level further out, then OneDrive, Documents, Desktop and
+Downloads under the home folder three levels down (folders named for the
+model first; hidden and system folders never; at most 4,000 folders or
+twelve seconds). The fullest file that reads as that season's ledger is
+copied in, whatever follows the season in its name (`(1)`, ` - Copy`),
+and the window says where it came from:
+
+```
+nba-ledger-202526.json is not in this folder (C:\...\The Super Model v158). Looking for it in the folders around this one and under your home folder.
+  Found in C:\...\The Super Model v139: 1235 games. Copied into this folder; it is read from here from now on.
+```
+
+The slate, the props, the grade and the ledger run all do it, for this
+season, last season and (the slate, for the referees) the one before; a
+new folder's first run carries this season's ledger on from the copy it
+finds and fetches only the days since. A file that is already in the
+folder is read as it is and never written over. Where no copy is found,
+the props and the slate are written without last season and the last
+lines of the window say so in a block of stars, with the folder to copy
+the file into and the free way to build it (`Run NBA ledger.bat`, the
+season at the prompt). The page says it too: a red bar on the Props tab
+for as long as that date is shown. The files bought with credits (the
+period lines, the lines history) are not looked for or moved: copy those
+by hand.
+
 Three double-click files, in this order on a game day:
 
 1. **Run NBA ledger.bat** is no longer a daily step (25 Oct 2026): the

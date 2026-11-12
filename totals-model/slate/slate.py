@@ -37,6 +37,7 @@ import json
 import math
 import os
 import re
+import shutil
 import sys
 import time
 import unicodedata
@@ -2371,6 +2372,198 @@ def nba_ledger_path(out_dir, season):
     return os.path.join(out_dir, "nba-ledger-%s.json" % season.replace("-", ""))
 
 
+# ---- a ledger that is not in the run's folder (12 Nov 2026) ----
+# A run reads its ledgers from the folder it is started in. The user keeps a folder a version of the files ("The Super
+# Model v139") and starts the next version from a new one, and last season's ledger stayed behind each time: from 29 Oct to
+# 8 Nov and again on 11 Nov every projection rested on this season's games alone, and the one line that said so scrolled
+# past in the window (9 Nov, the same folder forty minutes apart: 0 games of 2025-26 read, then 1,235 once the file was
+# in it). A ledger that is not in the run's folder is now looked for in the folders around it and in the usual places
+# under the home folder (OneDrive, Documents, Desktop, Downloads), nearest first and bounded, and the fullest copy that
+# reads as that season's ledger is copied in, so the folder is whole from then on. Only names are listed, and nothing but
+# a file called nba-ledger-SEASON*.json is opened. A file that IS in the folder is read as before, whatever it holds.
+# The selftest turns the look off and names its own folders.
+LEDGER_FIND = {"on": True, "dirs": 4000, "secs": 12.0, "read": 8, "roots": None}   # folders listed at most, seconds spent, copies opened; roots None = ledger_find_roots
+LEDGER_FIND_SKIP = ("appdata", "application data", "node_modules", "__pycache__", "windows", "program files", "program files (x86)", "programdata",
+                    "site-packages", "library", "system volume information")
+LEDGER_FIND_LIKELY = ("super model", "supermodel", "call sheet", "callsheet", "slate", "ledger", "totals", "betting", "bets", "nba")   # a folder so named, and what is in it, is opened first at its level
+_LEDGER_SCANS = {}   # one look a run a folder
+_LEDGER_FROM = {}    # (folder, season) -> the folder a ledger was brought from
+
+
+def ledger_find_roots(out_dir):
+    """Where a ledger that is not in the run's folder is looked for, nearest
+    first: (folder, how many levels below it are opened). The run's folder and
+    the folders in it; where slate.py sits; the folders beside each, one level
+    further out and their folders; then OneDrive, Documents, Desktop and
+    Downloads under the home folder, three levels down."""
+    out = []
+
+    def add(p, depth):
+        if not p:
+            return
+        p = os.path.abspath(p)
+        if not os.path.isdir(p):
+            return
+        for i, (q, d) in enumerate(out):
+            if os.path.normcase(p) == os.path.normcase(q):
+                out[i] = (q, max(d, depth))   # named twice: once, at the deeper of the two
+                return
+        out.append((p, depth))
+    here = os.path.abspath(out_dir)
+    add(here, 1)
+    add(HERE, 1)
+    for base in (here, HERE):
+        parent = os.path.dirname(base)
+        add(parent, 2)
+        add(os.path.dirname(parent), 2)
+    home = os.path.expanduser("~")
+    for k in ("OneDrive", "OneDriveConsumer", "OneDriveCommercial"):
+        add(os.environ.get(k), 3)
+    try:
+        names = sorted(os.listdir(home))
+    except OSError:
+        names = []
+    for n in names:
+        if n.lower().startswith("onedrive"):
+            add(os.path.join(home, n), 3)
+    for n in ("Documents", "Desktop", "Downloads"):
+        add(os.path.join(home, n), 3)
+    return out
+
+
+def ledger_scan(out_dir):
+    """Every file named nba-ledger-*.json in the folders around a run's
+    folder, nearest first: {"files": [...], "dirs": folders listed, "cut":
+    whether a limit stopped it}. One look a run; names only, nothing opened.
+    A folder that cannot be listed is passed over; hidden and system folders
+    are not opened."""
+    key = os.path.normcase(os.path.abspath(out_dir))
+    if key in _LEDGER_SCANS:
+        return _LEDGER_SCANS[key]
+    roots = LEDGER_FIND["roots"] if LEDGER_FIND["roots"] is not None else ledger_find_roots(out_dir)
+    files, got, seen, n_dirs, cut, t0 = [], set(), {}, 0, False, time.time()
+    for root, depth in roots:
+        level = [(os.path.abspath(root), False)]
+        for left in range(depth, -1, -1):   # left: the levels that may still be opened below this one
+            nxt = []
+            for folder, likely in level:
+                k = os.path.normcase(folder)
+                if seen.get(k, -1) >= left:
+                    continue
+                if n_dirs >= LEDGER_FIND["dirs"] or time.time() - t0 > LEDGER_FIND["secs"]:
+                    cut = True
+                    break
+                seen[k] = left
+                n_dirs += 1
+                try:
+                    with os.scandir(folder) as it:
+                        entries = sorted(it, key=lambda e: e.name.lower())
+                except OSError:
+                    continue
+                for e in entries:
+                    low = e.name.lower()
+                    try:
+                        if e.is_dir(follow_symlinks=False):
+                            if left > 0 and not low.startswith((".", "$", "~")) and low not in LEDGER_FIND_SKIP:
+                                nxt.append((e.path, likely or any(w in low for w in LEDGER_FIND_LIKELY)))
+                        elif low.startswith("nba-ledger-") and low.endswith(".json") and os.path.normcase(e.path) not in got:
+                            got.add(os.path.normcase(e.path))
+                            files.append(e.path)
+                    except OSError:
+                        continue
+            if cut:
+                break
+            level = sorted(nxt, key=lambda x: not x[1])   # the likely folders first, the rest in the order they were met: a big home folder does not hide the model's own
+        if cut:
+            break
+    res = {"files": files, "dirs": n_dirs, "cut": cut}
+    _LEDGER_SCANS[key] = res
+    return res
+
+
+def ledger_best_copy(season, files, log=None):
+    """Of the files a look found, the fullest that reads as that season's
+    ledger: (ledger, path), or (None, None). A name that starts
+    nba-ledger-SEASON counts (a second download's "(1)", a copy's " - Copy");
+    a file that is not JSON, not a ledger, empty, or another season's inside
+    is passed over. The nearest LEDGER_FIND["read"] are opened; of two as
+    full, the nearer."""
+    want = "nba-ledger-%s" % season.replace("-", "")
+    best = (None, None)
+    for path in [f for f in files if os.path.basename(f).lower().startswith(want)][:LEDGER_FIND["read"]]:
+        try:
+            with open(path, "r", encoding="utf-8") as f:
+                d = json.load(f)
+        except (OSError, ValueError) as e:
+            if log:
+                log("  %s could not be read (%s); passed over." % (path, str(e)[:80]))
+            continue
+        if not isinstance(d, dict) or d.get("format") != NBA_LEDGER_FORMAT or not isinstance(d.get("games"), list) or not d["games"]:
+            continue
+        if d.get("season") and nba_norm_season(d["season"]) != season:
+            continue
+        if best[0] is None or len(d["games"]) > len(best[0]["games"]):
+            best = (d, path)
+    return best
+
+
+def nba_ledger_for(out_dir, season, log):
+    """A season's ledger for a run: the file in the run's folder, read as
+    load_nba_ledger reads it; when no such file is there, the fullest copy
+    found around the folder, copied in (12 Nov 2026). None when there is
+    none. A look that fails never stops a run."""
+    path = nba_ledger_path(out_dir, season)
+    if os.path.exists(path):
+        return load_nba_ledger(path)
+    if not LEDGER_FIND["on"]:
+        return None
+    name, here = os.path.basename(path), os.path.abspath(out_dir)
+    log("%s is not in this folder (%s). Looking for it in the folders around this one and under your home folder." % (name, here))
+    try:
+        scan = ledger_scan(out_dir)
+        led, src = ledger_best_copy(season, scan["files"], log)
+    except Exception as e:  # noqa: BLE001
+        log("  The look failed (%s); the run goes on without that ledger." % e)
+        return None
+    if led is None:
+        log("  No copy found: %d folder%s looked in%s." % (scan["dirs"], "" if scan["dirs"] == 1 else "s", ", and the look was cut short at its limit" if scan["cut"] else ""))
+        return None
+    src_dir = os.path.dirname(os.path.abspath(src))
+    part = path + ".part"
+    try:
+        shutil.copyfile(src, part)
+        os.replace(part, path)
+        log("  Found in %s: %d games%s. Copied into this folder; it is read from here from now on." % (
+            src_dir, len(led["games"]), "" if os.path.basename(src).lower() == name.lower() else " (the file there is named %s)" % os.path.basename(src)))
+    except OSError as e:
+        try:
+            if os.path.exists(part):
+                os.remove(part)
+        except OSError:
+            pass
+        log("  Found in %s: %d games. It could not be copied into this folder (%s), so this run reads it where it is." % (src_dir, len(led["games"]), e))
+    _LEDGER_FROM[(os.path.normcase(here), season)] = src_dir
+    return led
+
+
+def ledger_shout(log, out_dir, season, what):
+    """The last word of a run made without last season's ledger: a block just
+    above the line that names the file written, where the window stops."""
+    name = os.path.basename(nba_ledger_path(out_dir, season))
+    for s in ("",
+              "  " + "*" * 78,
+              "  LAST SEASON'S LEDGER WAS NOT READ: %s" % name,
+              "  " + what,
+              "  It is not in this folder, the folders around it, or OneDrive, Documents,",
+              "  Desktop and Downloads. Either copy it into",
+              "      %s" % os.path.abspath(out_dir),
+              "  or build it here: Run NBA ledger.bat and type %s (free, about ten minutes)." % season,
+              "  Then run this again.",
+              "  " + "*" * 78,
+              ""):
+        log(s)
+
+
 def nba_stats_json(path, params, tries=1):
     url = NBA_STATS + path + "?" + urllib.parse.urlencode(params)
     return fetch_json(url, tries=tries, headers=NBA_STATS_HEADERS, timeout=NBA_STATS_TIMEOUT)
@@ -2854,6 +3047,8 @@ def make_nba_ledger(date_iso, out_dir, log, season=None):
     season = nba_norm_season(season) if season else current
     past = season != current
     path = nba_ledger_path(out_dir, season)
+    if not os.path.exists(path):
+        nba_ledger_for(out_dir, season, log)   # a new folder carries on from the fullest copy around it (12 Nov 2026), not from nothing
     led = None
     if os.path.exists(path):
         with open(path, "r", encoding="utf-8") as f:
@@ -4753,8 +4948,8 @@ def make_nba_slate(date_iso, out_dir, log, topup=False, sim_runs=NBA_SIM_RUNS):
     if not games:
         log("No NBA games on the feed for %s." % date_iso)
     season = nba_season_id(date_iso)
-    led = load_nba_ledger(nba_ledger_path(out_dir, season))
-    prior = load_nba_ledger(nba_ledger_path(out_dir, nba_prev_season(season)))
+    led = nba_ledger_for(out_dir, season, log)                       # a ledger left in another folder is brought in (12 Nov 2026)
+    prior = nba_ledger_for(out_dir, nba_prev_season(season), log)
     tables, league = nba_team_tables(led["games"] if led else [], date_iso)
     players = nba_player_tables(led["games"] if led else [])
     prior_players = nba_player_tables(prior["games"] if prior else [])
@@ -4774,7 +4969,7 @@ def make_nba_slate(date_iso, out_dir, log, topup=False, sim_runs=NBA_SIM_RUNS):
         log("Injury report: %d clubs, %d players listed." % (len(injuries), sum(len(v) for v in injuries.values())))
     except Exception as e:  # noqa: BLE001
         log("Could not read the injury report (%s)." % e)
-    prior2 = load_nba_ledger(nba_ledger_path(out_dir, nba_prev_season(nba_prev_season(season))))   # two seasons back, for the referees' lines only
+    prior2 = nba_ledger_for(out_dir, nba_prev_season(nba_prev_season(season)), log)   # two seasons back, for the referees' lines only
     refs = nba_referee_tables((led["games"] if led else []) + (prior["games"] if prior else []) + (prior2["games"] if prior2 else []), led["games"] if led else [], odds_log_path(out_dir))
     if refs:
         log("Referees: %d officials' lines over %d ledger games%s (league %.1f free throws and %.1f points a game)." % (
@@ -4819,6 +5014,8 @@ def make_nba_slate(date_iso, out_dir, log, topup=False, sim_runs=NBA_SIM_RUNS):
     path = os.path.join(out_dir, "nba-slate-%s.json" % date_iso)
     with open(path, "w", encoding="utf-8") as f:
         json.dump(doc, f, indent=1)
+    if not prior and LEDGER_FIND["on"]:
+        ledger_shout(log, out_dir, nba_prev_season(season), "The who-is-out list and the simulation's club profiles in this slate rest on this season alone.")
     log("Wrote %s with %d game%s. Open The Super Model -> Saving -> Load slate; then run the odds for the lines." % (path, len(rows), "" if len(rows) == 1 else "s"))
     return path
 
@@ -4830,8 +5027,8 @@ def nba_grade_what(date_iso, out_dir, entries, rows, log):
     from the ledgers beside the slate with the night's own games added when
     the ledger has not caught up. Nothing fatal: a missing ledger logs a line."""
     season = nba_season_id(date_iso)
-    led = load_nba_ledger(nba_ledger_path(out_dir, season))
-    prior = load_nba_ledger(nba_ledger_path(out_dir, nba_prev_season(season)))
+    led = nba_ledger_for(out_dir, season, log)
+    prior = nba_ledger_for(out_dir, nba_prev_season(season), log)
     if not led and not prior:
         log("  no ledger beside the slate: the box lines carry no what-happened line (run the slate once and grade again)")
         return 0
@@ -6133,8 +6330,8 @@ def make_nba_props(date_iso, out_dir, log, topup=False, sim_runs=NBA_SIM_RUNS, c
     if topup:
         nba_ledger_topup(date_iso, out_dir, log)
     season = nba_season_id(date_iso)
-    led = load_nba_ledger(nba_ledger_path(out_dir, season))
-    prior = load_nba_ledger(nba_ledger_path(out_dir, nba_prev_season(season)))
+    led = nba_ledger_for(out_dir, season, log)                       # a ledger left in another folder is brought in (12 Nov 2026)
+    prior = nba_ledger_for(out_dir, nba_prev_season(season), log)
     logs_last = nba_player_logs(prior["games"] if prior else [])
     logs_this = nba_player_logs(led["games"] if led else [], prior_logs=logs_last)   # last season names the regulars until this season can (26 Oct 2026)
     full_this = sum(1 for e in logs_this.values() for g in e["g"] if g["full"])
@@ -6143,6 +6340,9 @@ def make_nba_props(date_iso, out_dir, log, topup=False, sim_runs=NBA_SIM_RUNS, c
         season, len(led["games"]) if led else 0, full_this, nba_prev_season(season), len(prior["games"]) if prior else 0, full_last))
     ledgers = {"folder": os.path.abspath(out_dir), "this": {"season": season, "games": len(led["games"]) if led else 0, "lines": full_this},
                "last": {"season": nba_prev_season(season), "games": len(prior["games"]) if prior else 0, "lines": full_last}}
+    brought = dict((s, _LEDGER_FROM[(os.path.normcase(os.path.abspath(out_dir)), s)]) for s in (season, nba_prev_season(season)) if (os.path.normcase(os.path.abspath(out_dir)), s) in _LEDGER_FROM)
+    if brought:
+        ledgers["brought"] = brought   # the folder a ledger was copied in from on this run (12 Nov 2026)
     if not led and not prior:
         log("  NO LEDGER FOUND in %s: every prop will read 'no history to project from'. The props run reads nba-ledger-%s.json and nba-ledger-%s.json from the folder it is started in; run it from the slate folder (Run NBA props.bat there), with the ledgers beside it." % (
             ledgers["folder"], season.replace("-", ""), nba_prev_season(season).replace("-", "")))
@@ -6327,6 +6527,8 @@ def make_nba_props(date_iso, out_dir, log, topup=False, sim_runs=NBA_SIM_RUNS, c
     with open(path, "w", encoding="utf-8") as f:
         json.dump(doc, f, indent=1)
     n = sum(len(g["props"]) for g in games)
+    if not prior and not close and LEDGER_FIND["on"]:
+        ledger_shout(log, out_dir, nba_prev_season(season), "Every projection in this file rests on this season's games alone: no last season to blend.")
     if close:
         log("Wrote %s: the closing lines on %d props on %d game%s, %d credits. Open The Super Model -> NBA PROPS -> Load props and pick it: it attaches the close to the props already loaded and the record reads every pick against the close." % (path, n, len(games), "" if len(games) == 1 else "s", credits_used))
     else:
@@ -7609,6 +7811,7 @@ def make_grade(date_iso, out_dir, log):
 
 def selftest():
     fails = []
+    LEDGER_FIND["on"] = False   # no check may look around the machine it runs on (12 Nov 2026); the ledger-finder's own checks name their folders
 
     def check(name, cond):
         if not cond:
@@ -8586,8 +8789,22 @@ def selftest():
         with open(p3, "r", encoding="utf-8") as f:
             led3 = json.load(f)
         p4 = make_nba_ledger("2026-10-15", tmp3, lines4.append, "2024-25")   # again: nothing to fetch
+        new3 = tempfile.mkdtemp()   # a new folder (12 Nov 2026): the ledger run carries on from the copy found in the old one
+        LEDGER_FIND.update(on=True, roots=[(new3, 1), (tmp3, 0)])
+        try:
+            lines5 = []
+            p5 = make_nba_ledger("2026-10-15", new3, lines5.append, "2024-25")
+            with open(p5, "r", encoding="utf-8") as f:
+                led5 = json.load(f)
+        finally:
+            LEDGER_FIND.update(on=False, roots=None)
     finally:
         fetch_json = real
+    check("a ledger left in another folder: the ledger run in a new folder copies the season's file in from the old one and carries on from it, fetching nothing",
+          os.path.dirname(p5) == new3 and os.path.basename(p5) == "nba-ledger-202425.json" and [g["id"] for g in led5["games"]] == [g["id"] for g in led3["games"]]
+          and lines5[0].startswith("nba-ledger-202425.json is not in this folder (%s). Looking for it" % os.path.abspath(new3))
+          and lines5[1] == "  Found in %s: 2 games. Copied into this folder; it is read from here from now on." % os.path.abspath(tmp3)
+          and any("2 games already in the ledger with detail" in l for l in lines5) and any("0 games to fetch" in l for l in lines5) and not os.path.exists(p5 + ".part"))
     check("nba ledger (stats log): a past season's file, with detail, the measure and the through date; a second run fetches nothing",
           led3["format"] == NBA_LEDGER_FORMAT and led3["season"] == "2024-25" and len(led3["games"]) == 2 and led3["through"] == "2025-06-30" and led3["measure"]["games"] == 2
           and os.path.basename(p3) == "nba-ledger-202425.json" and p4 == p3 and any("0 games to fetch" in l for l in lines4) and any("League game log: 2" in l for l in lines4))
@@ -8671,6 +8888,33 @@ def selftest():
             gr8 = json.load(f)
         lines9 = []
         bare = build_nba_game(day[1], "2026-10-21", {}, None, {}, {}, {}, lines9.append, have_ledger=False)
+        # a ledger left in another folder (12 Nov 2026): the same slate run from a new folder beside the old one, which holds both ledgers
+        base12 = tempfile.mkdtemp()
+        old12, new12, bare12 = os.path.join(base12, "The Super Model v139"), os.path.join(base12, "The Super Model v158"), os.path.join(tempfile.mkdtemp(), "nothing near")
+        for d12 in (old12, new12, bare12):
+            os.makedirs(d12)
+        for season, games in (("2026-27", led_now), ("2025-26", led_prior)):
+            with open(nba_ledger_path(old12, season), "w", encoding="utf-8") as f:
+                json.dump({"format": NBA_LEDGER_FORMAT, "season": season, "through": games[-1]["date"], "games": games}, f)
+        with open(nba_ledger_path(bare12, "2026-27"), "w", encoding="utf-8") as f:   # a folder with this season and nothing of last season anywhere near
+            json.dump({"format": NBA_LEDGER_FORMAT, "season": "2026-27", "through": led_now[-1]["date"], "games": led_now}, f)
+        for d12 in (new12, bare12):
+            shutil.copyfile(odds_log_path(tmp7), odds_log_path(d12))
+        _LEDGER_SCANS.clear()
+        _LEDGER_FROM.clear()
+        try:
+            LEDGER_FIND.update(on=True, roots=[(new12, 1), (base12, 2)])
+            lines12 = []
+            p12 = make_nba_slate("2026-10-21", new12, lines12.append, sim_runs=300)
+            with open(p12, "r", encoding="utf-8") as f:
+                sl12 = json.load(f)
+            lines12b = []
+            again12 = nba_ledger_for(new12, "2025-26", lines12b.append)
+            LEDGER_FIND.update(on=True, roots=[(bare12, 1), (os.path.dirname(bare12), 2)])
+            lines13 = []
+            p13 = make_nba_slate("2026-10-21", bare12, lines13.append, sim_runs=0)
+        finally:
+            LEDGER_FIND.update(on=False, roots=None)
         # the top-up (25 Oct 2026): the slate and props runs bring the ledger up to date first, and a failure is logged, not fatal
         real_led, calls, lines10 = make_nba_ledger, [], []
         make_nba_ledger = lambda d, o, lg, season=None: calls.append((d, o, season)) or lg("  stub ran")
@@ -8685,6 +8929,175 @@ def selftest():
         fetch_json = real
         _cache.pop(ROTOWIRE_NBA, None)
         _cache.pop(ROTOWIRE_NBA + "?date=tomorrow", None)
+    # ---- a ledger left in another folder (12 Nov 2026) ----
+    print("a ledger left in another folder")
+    same_bytes = lambda a, b: open(a, "rb").read() == open(b, "rb").read()
+    no_sim = lambda sl: [dict(g, inputs=dict((k, v) for k, v in g["inputs"].items() if k != "nbasim")) for g in sl["games"]]
+    check("a ledger left in another folder: a slate run from a new folder beside the old one copies both ledgers in, says where from, and writes the slate the old folder writes",
+          no_sim(sl12) == no_sim(sl7) and len(sl12["games"]) == len(sl7["games"]) > 0
+          and all(same_bytes(nba_ledger_path(new12, s), nba_ledger_path(old12, s)) for s in ("2026-27", "2025-26")) and not [n for n in os.listdir(new12) if n.endswith(".part")]
+          and lines12[0].startswith("nba-ledger-202627.json is not in this folder (%s). Looking for it in the folders around this one and under your home folder." % os.path.abspath(new12))
+          and lines12[1] == "  Found in %s: %d games. Copied into this folder; it is read from here from now on." % (os.path.abspath(old12), len(led_now))
+          and lines12[2].startswith("nba-ledger-202526.json is not in this folder (") and lines12[3] == "  Found in %s: %d games. Copied into this folder; it is read from here from now on." % (os.path.abspath(old12), len(led_prior))
+          and any(l.startswith("Last season's ledger: ") for l in lines12) and not any("LAST SEASON'S LEDGER WAS NOT READ" in l for l in lines12)
+          and any(l.startswith("nba-ledger-202425.json is not in this folder (") for l in lines12) and any(l.startswith("  No copy found: ") for l in lines12)
+          and again12 is not None and len(again12["games"]) == len(led_prior) and lines12b == [])
+    shout13 = [i for i, l in enumerate(lines13) if "LAST SEASON'S LEDGER WAS NOT READ: nba-ledger-202526.json" in l]
+    check("a ledger left in another folder: where last season's is nowhere near, the slate is written without it and the last lines of the run say so, with the folder to copy it into and how to build it",
+          os.path.exists(p13) and len(shout13) == 1 and lines13[-1].startswith("Wrote ") and len(lines13) - shout13[0] == 10 and lines13[shout13[0] - 1].strip() == "*" * 78
+          and lines13[shout13[0] + 1] == "  The who-is-out list and the simulation's club profiles in this slate rest on this season alone."
+          and lines13[shout13[0] + 4] == "      " + os.path.abspath(bare12) and "Run NBA ledger.bat and type 2025-26" in lines13[shout13[0] + 5]
+          and not os.path.exists(nba_ledger_path(bare12, "2025-26")) and any(l.startswith("No ledger for 2025-26 in the folder") for l in lines13)
+          and not any("LAST SEASON'S LEDGER WAS NOT READ" in l for l in lines7))
+    lf = tempfile.mkdtemp()
+
+    def lf_put(rel, body, raw=False):
+        path = os.path.join(lf, *rel.split("/"))
+        os.makedirs(os.path.dirname(path), exist_ok=True)
+        with open(path, "w", encoding="utf-8") as f:
+            f.write(body if raw else json.dumps(body))
+        return path
+    lf_led = lambda season, n: {"format": NBA_LEDGER_FORMAT, "season": season, "games": [{"id": str(k), "date": "2025-11-%02d" % (k % 28 + 1)} for k in range(n)]}
+    lf_a = lf_put("The Super Model v139/nba-ledger-202526.json", lf_led("2025-26", 5))
+    lf_put("The Super Model v139/nba-ledger-202627.json", lf_led("2026-27", 3))
+    lf_put("The Super Model v139/notes.txt", "x", raw=True)
+    lf_b = lf_put("elsewhere/deep/nba-ledger-202526 (1).json", lf_led("2025-26", 7))     # the fullest, two levels down, under a second download's name
+    lf_put("junk/nba-ledger-202526.json", "{not json", raw=True)
+    lf_put("wrong/nba-ledger-202526.json", {"format": "something.else", "season": "2025-26", "games": [{"id": "1"}] * 40})
+    lf_put("mislabelled/nba-ledger-202526.json", lf_led("2024-25", 30))                  # another season's inside
+    lf_put("empty/nba-ledger-202526.json", lf_led("2025-26", 0))
+    lf_put("too/deep/er/nba-ledger-202526.json", lf_led("2025-26", 99))                  # three levels down: not opened at two
+    lf_put("AppData/nba-ledger-202526.json", lf_led("2025-26", 50))                      # a system folder: not opened
+    lf_put(".hidden/nba-ledger-202526.json", lf_led("2025-26", 60))                      # a hidden one: not opened
+    lf_new, lf_off, lf_bad, lf_cap, lf_nocopy = [os.path.join(lf, n) for n in ("new", "new off", "new bad", "new cap", "new nocopy")]
+    os.makedirs(lf_new)
+    _LEDGER_SCANS.clear()
+    _LEDGER_FROM.clear()
+    LEDGER_FIND.update(on=True, roots=[(lf_new, 1), (lf, 2)])
+    real_copy = shutil.copyfile
+    try:
+        sc = ledger_scan(lf_new)
+        best_led, best_path = ledger_best_copy("2025-26", sc["files"])
+        lf1, lf2, lf3, lf4 = [], [], [], []
+        got1 = nba_ledger_for(lf_new, "2025-26", lf1.append)
+        got2 = nba_ledger_for(lf_new, "2025-26", lf2.append)        # again: the file is in the folder now
+        got3 = nba_ledger_for(lf_new, "2026-27", lf3.append)
+        got4 = nba_ledger_for(lf_new, "2023-24", lf4.append)        # a season nobody has
+        from12 = dict(_LEDGER_FROM)
+        # the look off: nothing is looked for and nothing is said
+        os.makedirs(lf_off)
+        LEDGER_FIND["on"] = False
+        lf5 = []
+        got5 = nba_ledger_for(lf_off, "2025-26", lf5.append)
+        LEDGER_FIND["on"] = True
+        # a file in the run's folder that is not a ledger is read as before and left as it is: nothing is copied over it
+        os.makedirs(lf_bad)
+        with open(nba_ledger_path(lf_bad, "2025-26"), "w", encoding="utf-8") as f:
+            f.write('{"format": "something.else", "games": []}')
+        lf6 = []
+        _LEDGER_SCANS.clear()
+        LEDGER_FIND["roots"] = [(lf_bad, 1), (lf, 2)]
+        got6 = nba_ledger_for(lf_bad, "2025-26", lf6.append)
+        bad_after = open(nba_ledger_path(lf_bad, "2025-26"), encoding="utf-8").read()
+        # the copy refused: the run reads the ledger where it is
+        os.makedirs(lf_nocopy)
+        _LEDGER_SCANS.clear()
+        LEDGER_FIND["roots"] = [(lf_nocopy, 1), (lf, 2)]
+
+        def no_copy(src, dst):
+            with open(dst, "w") as f:
+                f.write("half")
+            raise OSError("disk full")
+        shutil.copyfile = no_copy
+        lf7 = []
+        got7 = nba_ledger_for(lf_nocopy, "2025-26", lf7.append)
+        shutil.copyfile = real_copy
+        # the limit on folders: the look stops and says it was cut short
+        os.makedirs(lf_cap)
+        _LEDGER_SCANS.clear()
+        LEDGER_FIND.update(roots=[(lf_cap, 1), (lf, 2)], dirs=3)
+        sc_cap = ledger_scan(lf_cap)
+        lf8 = []
+        got8 = nba_ledger_for(lf_cap, "2023-24", lf8.append)
+        # a big home folder: thirty folders of three before "My files", and a limit that reaches a third of the way into their folders;
+        # the folder named for the model is opened first at its level and its ledger is found all the same
+        big = tempfile.mkdtemp()
+        for a in range(30):
+            for b in range(3):
+                os.makedirs(os.path.join(big, "a%02d" % a, "b%d" % b))
+        os.makedirs(os.path.join(big, "My files", "The Super Model v139"))
+        with open(os.path.join(big, "My files", "The Super Model v139", "nba-ledger-202526.json"), "w", encoding="utf-8") as f:
+            json.dump(lf_led("2025-26", 9), f)
+        big_run = os.path.join(tempfile.mkdtemp(), "run")
+        os.makedirs(big_run)
+        _LEDGER_SCANS.clear()
+        LEDGER_FIND.update(roots=[(big_run, 1), (big, 2)], dirs=40)
+        sc_big = ledger_scan(big_run)
+        lf10 = []
+        got10 = nba_ledger_for(big_run, "2025-26", lf10.append)
+        # a look that fails says so and the run goes on
+        _LEDGER_SCANS.clear()
+        LEDGER_FIND.update(roots=[(lf_cap, "not a number")], dirs=4000)
+        lf9 = []
+        got9 = nba_ledger_for(lf_cap, "2025-26", lf9.append)
+    finally:
+        shutil.copyfile = real_copy
+        LEDGER_FIND.update(on=False, roots=None, dirs=4000)
+    rel = sorted(os.path.relpath(f, lf).replace(os.sep, "/") for f in sc["files"])
+    check("a ledger left in another folder, the look: the folders around the run's are listed to their depth, nearest first; hidden and system folders and anything deeper are not opened; only names are read",
+          rel == ["The Super Model v139/nba-ledger-202526.json", "The Super Model v139/nba-ledger-202627.json", "elsewhere/deep/nba-ledger-202526 (1).json", "empty/nba-ledger-202526.json",
+                  "junk/nba-ledger-202526.json", "mislabelled/nba-ledger-202526.json", "wrong/nba-ledger-202526.json"] and sc["dirs"] == 11 and sc["cut"] is False
+          and sc["files"].index(lf_a) < sc["files"].index(lf_b))
+    check("a ledger left in another folder, the copy chosen: the fullest file that reads as that season's ledger, whatever comes after the season in its name; not JSON, not a ledger, another season's inside and an empty one are passed over",
+          best_path == lf_b and len(best_led["games"]) == 7 and ledger_best_copy("2026-27", sc["files"])[1].endswith("nba-ledger-202627.json") and ledger_best_copy("2023-24", sc["files"]) == (None, None)
+          and ledger_best_copy("2025-26", [f for f in sc["files"] if f not in (lf_a, lf_b)]) == (None, None))
+    check("a ledger left in another folder, brought in: the file is copied into the run's folder whole under the season's own name, the run reads it, and the log says where it came from; the next read finds it in the folder and looks nowhere",
+          got1 is not None and len(got1["games"]) == 7 and same_bytes(nba_ledger_path(lf_new, "2025-26"), lf_b) and not os.path.exists(nba_ledger_path(lf_new, "2025-26") + ".part")
+          and lf1[0] == "nba-ledger-202526.json is not in this folder (%s). Looking for it in the folders around this one and under your home folder." % os.path.abspath(lf_new)
+          and len(lf1) == 3 and lf1[1].startswith("  " + os.path.join(lf, "junk", "nba-ledger-202526.json") + " could not be read (") and lf1[1].endswith("; passed over.")
+          and lf1[2] == "  Found in %s: 7 games (the file there is named nba-ledger-202526 (1).json). Copied into this folder; it is read from here from now on." % os.path.dirname(lf_b)
+          and got2 is not None and len(got2["games"]) == 7 and lf2 == [] and got3 is not None and len(got3["games"]) == 3 and len(lf3) == 2 and "Found in %s: 3 games. Copied" % os.path.dirname(lf_a) in lf3[1]
+          and from12 == {(os.path.normcase(os.path.abspath(lf_new)), "2025-26"): os.path.dirname(lf_b), (os.path.normcase(os.path.abspath(lf_new)), "2026-27"): os.path.dirname(lf_a)})
+    check("a ledger left in another folder, not found: a season nobody has reads as none and says how many folders were looked in; nothing is written",
+          got4 is None and lf4 == ["nba-ledger-202324.json is not in this folder (%s). Looking for it in the folders around this one and under your home folder." % os.path.abspath(lf_new), "  No copy found: 11 folders looked in."]
+          and not os.path.exists(nba_ledger_path(lf_new, "2023-24")) and sorted(os.listdir(lf_new)) == ["nba-ledger-202526.json", "nba-ledger-202627.json"])
+    check("a ledger left in another folder, the look off: nothing is looked for, said or written; and a file in the run's folder that is not a ledger is read as before and left as it is",
+          got5 is None and lf5 == [] and os.listdir(lf_off) == [] and got6 is None and lf6 == [] and bad_after == '{"format": "something.else", "games": []}')
+    check("a ledger left in another folder, the copy refused: the run reads the ledger where it is and says so, and no half-written file is left; of two copies as full, the nearer is the one read",
+          got7 is not None and len(got7["games"]) == 7 and os.listdir(lf_nocopy) == []
+          and lf7[-1] == "  Found in %s: 7 games. It could not be copied into this folder (disk full), so this run reads it where it is." % os.path.abspath(lf_new))
+    check("a ledger left in another folder, the limits: the look stops at its count of folders and says it was cut short; a look that fails says so and the run goes on without the ledger",
+          sc_cap["dirs"] == 3 and sc_cap["cut"] is True and [os.path.relpath(f, lf).replace(os.sep, "/") for f in sc_cap["files"]] == ["The Super Model v139/nba-ledger-202526.json", "The Super Model v139/nba-ledger-202627.json"]
+          and got8 is None and lf8[-1] == "  No copy found: 3 folders looked in, and the look was cut short at its limit."
+          and got9 is None and len(lf9) == 2 and lf9[1].startswith("  The look failed (") and lf9[1].endswith("); the run goes on without that ledger."))
+    check("a ledger left in another folder, a big home folder: a folder named for the model is opened first at its level, so its ledger is found though the look is cut short long before the folders beside it are done",
+          sc_big["cut"] is True and sc_big["dirs"] == 40 and len(sc_big["files"]) == 1 and got10 is not None and len(got10["games"]) == 9
+          and lf10[-1] == "  Found in %s: 9 games. Copied into this folder; it is read from here from now on." % os.path.join(big, "My files", "The Super Model v139"))
+    # where the look goes when nobody names its folders: around the run's folder first, then the usual places under the home folder
+    home12 = tempfile.mkdtemp()
+    for n in ("OneDrive - Personal/My files/The Super Model v139", "Documents", "Downloads", "Music", "Elsewhere/OneDrive"):
+        os.makedirs(os.path.join(home12, *n.split("/")))
+    run12 = os.path.join(home12, "OneDrive - Personal", "My files", "The Super Model v158")
+    os.makedirs(run12)
+    env12 = dict((k, os.environ.get(k)) for k in ("HOME", "USERPROFILE", "OneDrive", "OneDriveConsumer", "OneDriveCommercial"))
+    try:
+        os.environ["HOME"] = os.environ["USERPROFILE"] = home12
+        os.environ["OneDrive"] = os.path.join(home12, "Elsewhere", "OneDrive")
+        os.environ.pop("OneDriveConsumer", None)
+        os.environ["OneDriveCommercial"] = os.path.join(home12, "no such folder")
+        roots12 = ledger_find_roots(run12)
+    finally:
+        for k, v in env12.items():
+            if v is None:
+                os.environ.pop(k, None)
+            else:
+                os.environ[k] = v
+    in_home = [(os.path.relpath(r, home12).replace(os.sep, "/"), d) for r, d in roots12 if os.path.normcase(r).startswith(os.path.normcase(home12))]
+    check("a ledger left in another folder, where it looks: the run's folder and the folders in it, the folders beside it and one level further out, where slate.py sits, then OneDrive (the system's own and any under the home folder), Documents, Desktop and Downloads three levels down; a folder that is not there is left out and none is listed twice",
+          roots12[0] == (os.path.abspath(run12), 1) and (os.path.abspath(HERE), 1) in roots12
+          and in_home == [("OneDrive - Personal/My files/The Super Model v158", 1), ("OneDrive - Personal/My files", 2), ("OneDrive - Personal", 3), ("Elsewhere/OneDrive", 3), ("Documents", 3), ("Downloads", 3)]
+          and len(set(os.path.normcase(r) for r, _d in roots12)) == len(roots12) and all(os.path.isdir(r) for r, _d in roots12))
+
     # the simulation on the row (25 Oct 2026): both views as histograms, the anchor from the scoreboard's book, the calls off the runs
     sim_rows = [g for g in sl7["games"] if g["inputs"].get("nbasim")]
     sb = json.loads(sim_rows[0]["inputs"]["nbasim"]) if sim_rows else {}

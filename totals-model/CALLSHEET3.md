@@ -3660,6 +3660,31 @@ costs nothing and pulls nothing, and run them again. On a graded date it
 says the night is graded as it was made. The load's own line names the
 folder the run was started in when the file carries it.
 
+**Why the ledger was not read, and the run that now brings it.** The
+user: "How do we fix it so it runs last seasons numbers? I have the
+ledgers but not sure why it's not pulling them". A run reads its ledgers
+from the folder its bat sits in. His props of 9 Nov were run in
+`...\OneDrive\My files\The Super Model v139`: at 16:26 UTC that folder
+gave the closing-line run 0 games of 2025-26, and at 17:07, with the file
+in it, 1,235. On 11 Nov the gap re-test of 11:11 UTC read 2025-26 in a
+folder that had it, and the one of 16:03, run with the `slate.py` sent
+that day, was in a folder that held `nba-ledger-202425.json` and no
+`nba-ledger-202526.json`; the evening's props were run there. A new
+folder for a new version had left last season's ledger behind, as it had
+on 29 Oct. `slate.py` now looks for a ledger that is not in its folder in
+the folders around it and under the home folder and copies the fullest
+copy in (`nba_ledger_for`, `ledger_scan`, `ledger_best_copy`; the README's
+"The folder"), and a slate or a props file made without last season ends
+its window with a block that says so. The selftest has twelve checks on
+it, a slate run from a new folder beside the old one among them, and was
+run against twelve copies broken on purpose, each caught; on a copy of
+his layout with a real 1,234-game ledger a run started beside the old
+folder, in Downloads, on the Desktop, outside the home folder, with the
+only copy a second download named `(1)`, and with OneDrive on another
+drive each found it and copied it whole in under half a second, and a
+home folder of 6,700 folders, where the look is cut short at its limit,
+still found it.
+
 **Checked.** The harness marks a prop and a pair, unmarks and marks them
 again, plants a flag and a pair of keys with nothing kept, loads the
 page again, loads a later file for the date in which every one of them

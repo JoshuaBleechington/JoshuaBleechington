@@ -3592,3 +3592,88 @@ an empty document with no stamp, which the page does not use, gave it
 back at the Viewer's level and refused a write at the Editor's level, as
 it does for the sheet.
 
+
+## A mark keeps the bet, 12 Nov 2026
+
+The backup of 12 Nov was graded against the sheet the user's phone had
+saved the evening before, and three of his bets on 11 Nov read wrong on
+the page. He had marked Caleb Wilson UNDER 6.5 rebounds at -155; Wilson
+took five, a win, and the page listed OVER 5.5 at a loss. A pair on
+De'Aaron Fox (OVER 0.5 threes with UNDER 6.5 assists, nine assists, a
+loss) read as a win, and a pair on Horford and Smart that won read as a
+loss.
+
+**The cause.** A bet on a game keeps its side, price and chance at the
+mark, and so does a simulation call and a ticket. A prop's mark was a
+flag on its row (`take: true`) and a pair's was the other leg's key
+(`pairs: [key]`). A props file loaded later replaces a date's ungraded
+rows and carries the flags over, so a mark made at four o'clock was read
+from six o'clock's row: the newer line, the newer price, and the other
+side where the pick had turned. The pair was built again from the two
+newer rows by `propsPairBest`.
+
+**The mark.** Marking a prop writes `took` on the row:
+`{side, line, price, chance, band, book, proj, at}`. Marking a pair
+writes a spec on one of its two rows, `pairsAt: [{ks, app, kind, f,
+chance, at, at0}]`, where `at` is one entry a leg, `[the app's line, its
+price, the chance there, the side, the card's line]`. Unmarking takes
+them off with the mark. `applyProps` carries both to the row that
+replaces theirs.
+
+**Reading it.** `propTook(row)` gives a marked prop as it was marked: a
+view over the row (`Object.create(row)`, the row itself at `_row`) with
+the side, line, price, chance, band, book and projection of the mark,
+the need and the edge worked from them, and the result read from what
+the player did against the marked line by `propResOn`. A row with no
+`took` reads as itself. `propsPairKept(a, b)` builds the ticket from its
+spec the same way, each leg a view on its marked side and line, the
+payout from the prices kept. Everything that lists a bet you are taking
+reads through these two: the Taking cards on the Props tab and the
+board, the copy, the sheet for the phone, What you took and the list of
+every pick, and the props record's own line for the props and pairs
+taken. A panel opened from a Taking line is the player's panel as the
+card stands now, with a line on it saying what was marked.
+
+**Saying it.** A marked prop's card carries the time of the mark. Where
+the row has moved from it the card says so and to what ("The card has
+moved since you marked it: OVER 5.5 at -135 now (no edge). Your bet
+stays as marked."), and the pair's card names the legs that read
+differently at its app.
+
+**Marks made before.** A mark that kept nothing cannot be given back
+what it read: the row it was made on is gone. `propsFreezeMarks` runs in
+`applyProps` on a date's rows just before a file replaces them and keeps
+every such mark as the rows stand then, with no time, so a mark is never
+re-read a second time. A graded night is left as it was recorded.
+
+**The props made without last season's ledger.** All 982 projections on
+11 Nov read "no last season to blend", as on 5 to 8 Nov; on 9 and 10 Nov
+one in twelve did. The run had been started in a folder without
+`nba-ledger-202526.json`. The page had said so in the line under the
+buttons when the file was loaded, and the line is gone at the next
+press. `#propsWarn` now stands above the lists for as long as such a
+date is shown: where twenty or more projections carry a why and more
+than half of them read no last season, it gives the count, the file's
+name (the season before the date's own, as `slate.py` names it) and
+what to do: copy the file into the folder the props are run from, which
+costs nothing and pulls nothing, and run them again. On a graded date it
+says the night is graded as it was made. The load's own line names the
+folder the run was started in when the file carries it.
+
+**Checked.** The harness marks a prop and a pair, unmarks and marks them
+again, plants a flag and a pair of keys with nothing kept, loads the
+page again, loads a later file for the date in which every one of them
+has moved and three have turned, and grades the night: the cards, the
+panels, the board, the copy, the phone's sheet, the tiles, the list and
+the record's line read the bets as marked, and the rows themselves
+grade on the later lines. The same file, made without last season,
+raises the bar where the morning's did not. The block was run against
+eleven copies of the page broken on purpose (the mark not read, not
+kept at the reload for a prop or for a pair, not carried for either, the
+pair built again, the unmark leaving what was kept for either, the bar
+never shown or always shown, the result taken from the row) and each
+was caught; the pair marked the old way was added to the scenario
+because one of them was not at first. With the backup of 12 Nov the
+graded night of 11 Nov read the same on this build as on the published
+one, every card, list, sheet and tile, and the bar showed on 5 to 8 and
+11 Nov and on no other date.

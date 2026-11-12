@@ -492,8 +492,8 @@ const CHECKS = ["dome","playoff"];
   chk(JSON.stringify(propsT.triesCells) === JSON.stringify(['tries|tries: 20 from the floor (his usual 19 at those minutes) · 3 of 8 from three · 5 of 6 from the line', '', '', 'this:tries|tries: 19 from the floor (his usual 18 at those minutes) · 3 of 7 from three · 6 of 7 from the line'])
       && propsT.triesHead === '· what the box says happened, the biggest factor first, the tries in their own colour' && propsT.triesHeadCls === 'tries' && propsT.triesStored === 'tries: 19 from the floor (his usual 18 at those minutes) · 3 of 7 from three · 6 of 7 from the line',
       'props: the tries (7 Nov 2026): a game\'s seventh element and the grade file\'s eighth land in the what-happened cell in their own class after the factors, the heading says so, and the graded night\'s tries are kept on the row for the market', JSON.stringify({ cells: propsT.triesCells, head: propsT.triesHead, cls: propsT.triesHeadCls, stored: propsT.triesStored }));
-  chk(/loaded: 2 new.*Last season's ledger, nba-ledger-202526\.json, was not read by this run: 1 of the 1 projections rest on this season's two or three games a player, and 1 prop has no history at all\. Put the file back beside slate\.py, run the props again before tip, and load the new file; it replaces these\./.test(propsT.thinMsg),
-      'props: a file whose projections rest on this season alone says last season\'s ledger was not read and what to do', propsT.thinMsg.slice(0, 500));
+  chk(/loaded: 2 new.*Last season's ledger, nba-ledger-202526\.json, was not read by this run: 1 of the 1 projections rest on this season's two or three games a player, and 1 prop has no history at all\. The run was started in C:\\Users\\J\\slate: copy the file into that folder, beside slate\.py, run the props again before tip, and load the new file; it replaces these\./.test(propsT.thinMsg),
+      'props: a file whose projections rest on this season alone says last season\'s ledger was not read, names the folder the run was started in (12 Nov 2026) and says what to do', propsT.thinMsg.slice(0, 600));
   chk(/loaded: 1 new, 0 replaced, 0 graded and left as they were, 1 on 1 game already under way left out \(in-play lines; the calls made before tip stand\)/.test(propsT.inPlay.msg) && propsT.inPlay.names.join(',') === 'Paul George',
       'props: a file written after a game tipped leaves that game\'s props out and says so, and keeps the games still to come', JSON.stringify(propsT.inPlay));
   chk(/None of the 1 props has a projection\. The run read 0 games of 2026-27 and 0 of 2025-26 in C:\\Users\\J\\Downloads\. Last season's ledger, nba-ledger-202526\.json, was not read\. With a game or two this season nobody has the sixty minutes a projection needs, so every prop reads no history\. Put that file back in the slate folder beside slate\.py, with this season's ledger beside it, run the props again/.test(propsT.noneMsg),
@@ -830,7 +830,7 @@ const CHECKS = ["dome","playoff"];
     return { list, hidden, pHead0, pBtns, pRows, dlgOpen, pList, rowTaking, cardOn, pCount, pHead1, panelBtn, panelOn, panelOff, pList2, pHead2, pSaid, gone, boardProps };
   });
   chk(!takeR.hidden && takeR.list.length === 2 && /^TAKING · MLB/.test(takeR.list[0]), 'take: the mark survives a reload of the page', JSON.stringify({ hidden: takeR.hidden, list: takeR.list }));
-  chk(takeR.pHead0 && takeR.pBtns === 7 && takeR.pRows === 7 && !takeR.dlgOpen && takeR.pList.length === 1 && /^TAKING · NBA PROP · LEAN Paul George UNDER 2\.5 threes 5\d\.\d% · [-−]115 needs 53\.5% 76ers @ Knicks · fanatics · projected 2\.\d\d .*Taking$/i.test(takeR.pList[0])
+  chk(takeR.pHead0 && takeR.pBtns === 7 && takeR.pRows === 7 && !takeR.dlgOpen && takeR.pList.length === 1 && /^TAKING · NBA PROP · LEAN · marked \d{1,2}:\d\d [AP]M Paul George UNDER 2\.5 threes 5\d\.\d% · [-−]115 needs 53\.5% 76ers @ Knicks · fanatics · projected 2\.\d\d .*Taking$/i.test(takeR.pList[0])
       && takeR.rowTaking && takeR.cardOn && takeR.pCount === '1 marked' && !takeR.pHead1 && takeR.panelOn && /Taking/.test(takeR.panelBtn) && takeR.panelOff && takeR.pList2 === 0 && takeR.pHead2
       && /Copied the props you are taking|the text is below/.test(takeR.pSaid) && takeR.gone === 0 && takeR.boardProps === 0,
       'take: a prop\'s Take button on the best card marks it without opening the panel; the row lights, Taking lists it with a count, the panel\'s own button shows it on and unmarks it, the copy button speaks, and the example\'s mark goes with the example',
@@ -2528,6 +2528,151 @@ const CHECKS = ["dome","playoff"];
       && /Hawks @ Wizards/.test(kalLag.seen[0].game) && /Kings @ Spurs/.test(kalLag.seen[1].game),
       'kalshi, the sheet\'s own game: a game opened from the card shows, on the crowd\'s card, the sheet\'s chance at the book\'s spread and total for that game on the first draw, the same figures its own market rows carry, and not the figures of the game that was drawn before it; two games priced apart, opened in turn and again, each read their own',
       JSON.stringify(kalLag.seen));
+
+  // ---- 12 Nov 2026: a mark keeps what was marked. A prop's mark was a flag and a pair's the other leg's key, so a props file loaded after the mark re-read the
+  //      bet at the newer run's line, side and price: on 11 Nov the user's Caleb Wilson UNDER 6.5 rebounds (five rebounds, a win) was recorded as OVER 5.5, a loss,
+  //      and two of his pairs were rebuilt and read the wrong way. Here a prop and a pair are marked, the page is loaded again, a later run moves the lines and
+  //      turns the picks, and the night is graded: the bets stay as marked. A mark with nothing kept (one made before this) is kept as the rows stand before the
+  //      later file replaces them. And a date whose props were made without last season's ledger says so on the tab for as long as the date is shown ----
+  const fzKeep = await pg.evaluate(async () => { await smStore.ready; const k = {}; for (const x of ['callsheet3.card.v1', 'callsheet3.props.v1', 'callsheet3.draft.v1']) k[x] = await smStore.getItem(x); await smStore.removeItem('callsheet3.card.v1'); await smStore.removeItem('callsheet3.props.v1'); return k; });
+  await reloaded();
+  const fzMen = () => {
+    const G = [['Spurs', 'Bulls', 'SAS', 'CHI', -2.5]];
+    const need = (price) => price < 0 ? -price / (-price + 100) : 100 / (price + 100);
+    const man = (pid, name, team, mk, side, line, chance, price, why, o) => Object.assign({ gi: 0, pid: String(pid), name, team, opp: team === 'SAS' ? 'CHI' : 'SAS', home: team === 'CHI', pos: 'F', mk, line, op: side === 'OVER' ? price : 100, up: side === 'UNDER' ? price : 100, book: 'betmgm',
+      books: { betmgm: [line, side === 'OVER' ? price : 100, side === 'UNDER' ? price : 100], draftkings: [line, -115, -105] }, proj: line + (side === 'OVER' ? 1.5 : -1.5), sd: 3, pm: side === 'OVER' ? 0.7 : 0.3, pb: 0.5, p: side === 'OVER' ? chance : Math.round((1 - chance) * 10000) / 10000, push: 0, side, chance, price, need: Math.round(need(price) * 10000) / 10000,
+      edge: Math.round((chance - need(price)) * 10000) / 10000, band: chance - need(price) > 0.012 ? 'LEAN' : 'no edge', mins: 30, rate36: 8, base: 7, med: line, usg: 15, sdf: 1, starter: true, start_src: "RotoWire's expected five",
+      why: [why], log: [6, 5, 7, 4, 6, 5, 8, 5, 6, 4].map((v, i) => ['2026-10-' + String(20 + i), 'OPP', i % 2, 30, v, ['won by 3']]), parts: [{ k: 'pace', t: 'Pace', eff: side === 'OVER' ? 0.3 : -0.3, i: 0 }] }, o || {});
+    const file = (men, gen) => ({ format: 'callsheet3.props', version: 1, date: '2026-11-20', generated: gen, games: G.map((g, gi) => ({ gid: 'fz' + gi, away: g[0], home: g[1], aab: g[2], hab: g[3], spread: g[4], total: 225.5, props: men })) });
+    const WITH = "7.0 rebounds per 36 this season (9 games, 250 minutes), blended with last season's 6.5 (900 of 900 minutes at a quarter, weight 225): 6.8 per 36", NONE = '7.0 rebounds per 36 this season (9 games, 250 minutes); no last season to blend';
+    const crowd = (why) => { const out = []; for (let i = 0; i < 22; i++) out.push(man(100 + i, 'Bench Man ' + (i + 1), i % 2 ? 'CHI' : 'SAS', 'pts', 'UNDER', 8.5, 0.5, -110, why)); return out; };
+    return { man, file, WITH, NONE, crowd };
+  };
+  const fz1 = await pg.evaluate(async (src) => {
+    const wait = (ms) => new Promise(r => setTimeout(r, ms || 130)), txt = e => (e ? e.innerText : '').replace(/\s+/g, ' ').trim();
+    await smStore.ready;
+    const { man, file, WITH, crowd } = (0, eval)('(' + src + ')')();
+    const load = async (doc, name) => { const dt = new DataTransfer(); dt.items.add(new File([JSON.stringify(doc)], name, { type: 'application/json' })); const inp = document.getElementById('slateFile'); inp.files = dt.files; inp.dispatchEvent(new Event('change', { bubbles: true })); await wait(); await wait(); };
+    // the morning's run, made with last season's ledger: Wilson UNDER 6.5 rebounds at -155, Fox OVER 0.5 threes and UNDER 6.5 assists
+    await load(file([man(11, 'Caleb Wilson', 'CHI', 'reb', 'UNDER', 6.5, 0.622, -155, WITH), man(12, "De'Aaron Fox", 'SAS', 'tpm', 'OVER', 0.5, 0.668, -120, WITH), man(12, "De'Aaron Fox", 'SAS', 'ast', 'UNDER', 6.5, 0.64, -155, WITH), man(13, 'Old Mark', 'CHI', 'pts', 'OVER', 10.5, 0.60, -120, WITH),
+      man(14, 'Old Mate', 'SAS', 'reb', 'UNDER', 7.5, 0.60, -120, WITH), man(15, 'Old Pal', 'CHI', 'ast', 'OVER', 3.5, 0.58, -110, WITH)].concat(crowd(WITH)), '2026-11-20T15:00:00Z'), 'nba-props-2026-11-20.json');
+    if (document.getElementById('propsView').hidden) { document.getElementById('m-props').click(); await wait(); }
+    const stored = () => JSON.parse(smStore.getItem('callsheet3.props.v1')).filter(x => x.gdate === '2026-11-20'), row = (name, mk) => stored().find(x => x.name === name && x.mk === mk);
+    const warn0 = document.getElementById('propsWarn').hidden;
+    document.querySelector('#propsTable tr[data-prop="' + row('Caleb Wilson', 'reb').id + '"] .takebtn').click(); await wait();
+    const pairCard = [...document.querySelectorAll('#propsPairs .pk.pair')].find(c => /Fox .* \+ De'Aaron Fox/.test(c.innerText) && c.querySelector('.takebtn'));
+    const pairText0 = txt(pairCard).replace(/ Take$/i, ''); pairCard.querySelector('.takebtn').click(); await wait();
+    const w = row('Caleb Wilson', 'reb'), sp = (row("De'Aaron Fox", 'tpm').pairsAt || []).concat(row("De'Aaron Fox", 'ast').pairsAt || []);
+    // unmarking takes what was kept with it; marking again keeps it again
+    document.querySelector('#propsTaking .pk[data-prop="' + w.id + '"] .takebtn').click(); await wait();
+    const off = { take: !!row('Caleb Wilson', 'reb').take, took: row('Caleb Wilson', 'reb').took === undefined };
+    document.querySelector('#propsTable tr[data-prop="' + w.id + '"] .takebtn').click(); await wait();
+    [...document.querySelectorAll('#propsTaking .pk.pair .takebtn')][0].click(); await wait();
+    const pairOff = { pairs: !row("De'Aaron Fox", 'tpm').pairs && !row("De'Aaron Fox", 'ast').pairs, kept: !row("De'Aaron Fox", 'tpm').pairsAt && !row("De'Aaron Fox", 'ast').pairsAt };
+    [...document.querySelectorAll('#propsPairs .pk.pair')].find(c => /Fox .* \+ De'Aaron Fox/.test(c.innerText) && c.querySelector('.takebtn')).querySelector('.takebtn').click(); await wait();
+    const o = { warn0, pairText0, took: w.took, specs: sp, off, pairOff, tookAgain: row('Caleb Wilson', 'reb').took, specsAgain: (row("De'Aaron Fox", 'tpm').pairsAt || []).concat(row("De'Aaron Fox", 'ast').pairsAt || []).length,
+      taking: [...document.querySelectorAll('#propsTaking .pk')].map(txt) };
+    // a mark from before the marks kept anything: a flag and nothing else. Written after the last click of this visit, so nothing the page saves writes over it
+    { const all = JSON.parse(smStore.getItem('callsheet3.props.v1')); all.find(x => x.name === 'Old Mark').take = true;
+      all.find(x => x.name === 'Old Mate').pairs = ['2026-11-20|15|ast']; all.find(x => x.name === 'Old Pal').pairs = ['2026-11-20|14|reb']; await smStore.setItem('callsheet3.props.v1', JSON.stringify(all)); }
+    o.oldMark = (m => ({ take: m.take, took: m.took === undefined }))(row('Old Mark', 'pts'));
+    o.oldPair = { a: row('Old Mate', 'reb').pairs, b: row('Old Pal', 'ast').pairs, kept: row('Old Mate', 'reb').pairsAt === undefined && row('Old Pal', 'ast').pairsAt === undefined };
+    return o;
+  }, fzMen.toString());
+  await reloaded();
+  const fz2 = await pg.evaluate(async ({ src, mockSrc, url }) => {
+    const wait = (ms) => new Promise(r => setTimeout(r, ms || 130)), txt = e => (e ? e.innerText : '').replace(/\s+/g, ' ').trim();
+    await smStore.ready;
+    const { man, file, NONE, crowd } = (0, eval)('(' + src + ')')();
+    const load = async (doc, name) => { const dt = new DataTransfer(); dt.items.add(new File([JSON.stringify(doc)], name, { type: 'application/json' })); const inp = document.getElementById('slateFile'); inp.files = dt.files; inp.dispatchEvent(new Event('change', { bubbles: true })); await wait(); await wait(); };
+    // the page as it comes back: the flag-only mark lists as its row stands, with no time of its own
+    if (document.getElementById('propsView').hidden) { document.getElementById('m-props').click(); await wait(); }
+    { const pd = document.getElementById('propsDate'); pd.value = '2026-11-20'; pd.dispatchEvent(new Event('change', { bubbles: true })); await wait(); }
+    const back = { taking: [...document.querySelectorAll('#propsTaking .pk')].map(txt), flag: (m => ({ take: m.take, took: m.took === undefined }))(JSON.parse(smStore.getItem('callsheet3.props.v1')).find(x => x.name === 'Old Mark')) };
+    // the afternoon's run, started in a folder with no last-season ledger: the lines have moved and the picks have turned
+    await load(file([man(11, 'Caleb Wilson', 'CHI', 'reb', 'OVER', 5.5, 0.518, -135, NONE), man(12, "De'Aaron Fox", 'SAS', 'tpm', 'OVER', 0.5, 0.668, -210, NONE), man(12, "De'Aaron Fox", 'SAS', 'ast', 'OVER', 5.5, 0.512, -125, NONE), man(13, 'Old Mark', 'CHI', 'pts', 'UNDER', 9.5, 0.55, -110, NONE),
+      man(14, 'Old Mate', 'SAS', 'reb', 'OVER', 6.5, 0.53, -115, NONE), man(15, 'Old Pal', 'CHI', 'ast', 'OVER', 4.5, 0.55, -110, NONE)].concat(crowd(NONE)), '2026-11-20T20:00:00Z'), 'nba-props-2026-11-20b.json');
+    if (document.getElementById('propsView').hidden) { document.getElementById('m-props').click(); await wait(); }
+    const stored = () => JSON.parse(smStore.getItem('callsheet3.props.v1')).filter(x => x.gdate === '2026-11-20'), row = (name, mk) => stored().find(x => x.name === name && x.mk === mk);
+    const o = { back, wilson: (w => ({ side: w.side, line: w.line, price: w.price, take: w.take, took: w.took }))(row('Caleb Wilson', 'reb')), oldMark: (w => ({ side: w.side, line: w.line, took: w.took }))(row('Old Mark', 'pts')),
+      specs: (row("De'Aaron Fox", 'tpm').pairsAt || []).concat(row("De'Aaron Fox", 'ast').pairsAt || []).length, taking: [...document.querySelectorAll('#propsTaking .pk')].map(txt),
+      oldPair: (row('Old Mate', 'reb').pairsAt || []).concat(row('Old Pal', 'ast').pairsAt || []),
+      warn: txt(document.getElementById('propsWarn')), warnShown: !document.getElementById('propsWarn').hidden, said: txt(document.getElementById('propsMsg')) };
+    document.querySelector('#propsTaking .pk[data-prop="' + row('Caleb Wilson', 'reb').id + '"]').click(); await wait();
+    o.panel = { pick: txt(document.querySelector('#propDetailBody .pd-pick')), took: txt(document.querySelector('#propDetailBody .pd-took')) };
+    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })); await wait();
+    [...document.querySelectorAll('#propsTaking .pk.pair')][0].click(); await wait();
+    o.pairPanel = { head: txt(document.querySelector('#propDetailBody h3')), pick: txt(document.querySelector('#propDetailBody .pd-pick')), took: txt(document.querySelector('#propDetailBody .pd-took')) };
+    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })); await wait();
+    // the board's Taking tonight, its copy, and the sheet for the phone
+    const copies = []; try { Object.defineProperty(navigator, 'clipboard', { configurable: true, value: { writeText: t => { copies.push(String(t)); return Promise.resolve(); } } }); } catch (e) {}
+    document.getElementById('m-nba').click(); await wait();
+    const bd = document.getElementById('boardDate'); bd.value = '2026-11-20'; bd.dispatchEvent(new Event('change')); await wait();
+    o.board = [...document.querySelectorAll('#taking .pk')].map(txt);
+    document.getElementById('takingText').click(); await wait(250); o.copied = copies[copies.length - 1] || '';
+    const mock = (0, eval)('(' + mockSrc + ')'); mock({ docs: { 'phone/config': { url } }, owner: true });
+    document.getElementById('phone').click(); await wait(900);
+    o.sheet = ((window.__mock.docs['phone/latest'] || {}).sheet || { take: [] }).take.map(x => x.k + ': ' + x.p + ' | ' + x.c + ' | ' + x.pr + (x.ids ? ' | ids ' + x.ids.length : ''));
+    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })); await wait();
+    delete window.claude; delete window.__mock;
+    // the grade: Wilson five rebounds, Fox two threes and nine assists, Old Mark ten points, Old Mate seven rebounds, Old Pal four assists
+    await load({ format: 'callsheet2.slate', version: 1, date: '2026-11-20', games: [{ sport: 'NBA', gdate: '2026-11-20', away: 'Spurs', home: 'Bulls', finals: { fa: '110', fh: '100', f5a: '50', f5h: '48' }, notes: [],
+      box: { '11': ['Caleb Wilson', 15, 2, 5, 1, 0], '12': ["De'Aaron Fox", 31, 20, 3, 9, 2], '13': ['Old Mark', 30, 10, 4, 2, 1], '14': ['Old Mate', 28, 8, 7, 3, 0], '15': ['Old Pal', 26, 9, 2, 4, 1] } }] }, 'nba-grade-2026-11-20.json');
+    await wait(300);
+    if (document.getElementById('propsView').hidden) { document.getElementById('m-props').click(); await wait(); }
+    o.rows = stored().filter(x => !/^Bench Man/.test(x.name)).map(x => [x.name, x.mk, x.side, x.line, x.actual, x.result].join(' '));
+    o.graded = [...document.querySelectorAll('#propsTaking .pk')].map(txt);
+    o.tiles = [...document.querySelectorAll('#calibBox .calib[data-sport="TAKEN"] > div')].map(txt);
+    o.list = [...document.querySelectorAll('#takenList tbody tr')].map(e => e.textContent.replace(/\s+/g, ' ').trim());
+    o.recordLine = (txt(document.getElementById('calibBox')).match(/taken \d+-\d+ [^·]+· same-game pairs[^·]*· pairs taken [^·]+/) || [''])[0].trim();
+    o.warnGraded = txt(document.getElementById('propsWarn'));
+    // the backup carries what the marks kept
+    const blob = JSON.parse(smStore.getItem('callsheet3.props.v1'));
+    o.kept = { took: blob.filter(x => x.took).length, pairsAt: blob.filter(x => x.pairsAt).length };
+    return o;
+  }, { src: fzMen.toString(), mockSrc: claudeMock.toString(), url: PH_URL });
+  await pg.evaluate(async (k) => { for (const x of Object.keys(k)) { if (k[x] === null || k[x] === undefined) await smStore.removeItem(x); else await smStore.setItem(x, k[x]); } }, fzKeep);
+  await reloaded();
+  const fzSp = (fz1.specs || [])[0] || {};
+  chk(fz1.warn0 && fz1.took && fz1.took.side === 'UNDER' && fz1.took.line === 6.5 && fz1.took.price === -155 && fz1.took.chance === 0.622 && fz1.took.band === 'LEAN' && fz1.took.book === 'betmgm' && /^\d{4}-\d\d-\d\dT/.test(fz1.took.at || '')
+      && fz1.specs.length === 1 && fzSp.ks.join() === '2026-11-20|12|tpm,2026-11-20|12|ast' && /^(fanatics|draftkings|fanduel|betmgm)$/.test(fzSp.app) && fzSp.at.length === 2 && fzSp.at[0][3] === 'OVER' && fzSp.at[1][3] === 'UNDER' && fzSp.at[0][4] === 0.5 && fzSp.at[1][4] === 6.5 && /^\d{4}-/.test(fzSp.at0 || '')
+      && fz1.off.take === false && fz1.off.took && fz1.pairOff.pairs && fz1.pairOff.kept && fz1.tookAgain && fz1.tookAgain.line === 6.5 && fz1.specsAgain === 1 && fz1.oldMark.take === true && fz1.oldMark.took
+      && fz1.oldPair.a.join() === '2026-11-20|15|ast' && fz1.oldPair.b.join() === '2026-11-20|14|reb' && fz1.oldPair.kept
+      && fz2.back.taking.some(t => /^TAKING · SAME-GAME PAIR · Spurs @ Bulls · at [A-Za-z]+ · .* (Old Mate UNDER 7\.5 rebounds \+ Old Pal OVER 3\.5 assists|Old Pal OVER 3\.5 assists \+ Old Mate UNDER 7\.5 rebounds) both land /.test(t) && !/As you marked|moved/.test(t))
+      && fz2.back.flag.take === true && fz2.back.flag.took && fz2.back.taking.length === 4 && fz2.back.taking.some(t => /^TAKING · NBA PROP · LEAN Old Mark OVER 10\.5 points 60\.0% · -120 needs 54\.5% Spurs @ Bulls · betmgm · projected 12 /.test(t) && !/marked|moved/.test(t))
+      && fz2.back.taking.some(t => /^TAKING · NBA PROP · LEAN · marked \d{1,2}:\d\d [AP]M Caleb Wilson UNDER 6\.5 rebounds 62\.2% · -155 /.test(t) && !/moved/.test(t))
+      && fz1.taking.length === 2 && fz1.taking.some(t => t.indexOf(fz1.pairText0.replace(/^PAIR #\d+/, 'TAKING · SAME-GAME PAIR')) === 0 && / As you marked it at \d{1,2}:\d\d [AP]M\. /.test(t))
+      && fz1.taking.some(t => /^TAKING · NBA PROP · LEAN · marked \d{1,2}:\d\d [AP]M Caleb Wilson UNDER 6\.5 rebounds 62\.2% · -155 needs 60\.8% Spurs @ Bulls · betmgm · projected 5 /.test(t) && !/moved/.test(t)),
+      'marks, what a mark keeps: marking a prop keeps its side, line, price, chance, band, book and the time on the row, and marking a pair keeps the ticket on one of its two rows (the app, and each leg\'s line, price and chance there, its side and the card\'s line); the Taking cards read as the cards did and say when they were marked; unmarking takes what was kept with it and marking again keeps it again; and when the page is loaded again the marks read the same, and a mark that kept nothing, as every mark did before (a flag on a prop, the other leg\'s key on a pair), lists as its rows stand with no time of its own',
+      JSON.stringify({ back: { flag: fz2.back.flag, taking: fz2.back.taking.map(t => t.slice(0, 200)) }, oldPair: fz1.oldPair, warn0: fz1.warn0, took: fz1.took, specs: fz1.specs, off: fz1.off, pairOff: fz1.pairOff, specsAgain: fz1.specsAgain, oldMark: fz1.oldMark, pairText0: fz1.pairText0.slice(0, 200), taking: fz1.taking.map(t => t.slice(0, 260)) }));
+  chk(fz2.wilson.side === 'OVER' && fz2.wilson.line === 5.5 && fz2.wilson.take === true && fz2.wilson.took && fz2.wilson.took.side === 'UNDER' && fz2.wilson.took.line === 6.5 && fz2.wilson.took.price === -155
+      && fz2.oldMark.side === 'UNDER' && fz2.oldMark.took && fz2.oldMark.took.side === 'OVER' && fz2.oldMark.took.line === 10.5 && fz2.oldMark.took.price === -120 && fz2.oldMark.took.at === undefined && fz2.specs === 1
+      && fz2.oldPair.length === 1 && fz2.oldPair[0].at0 === undefined && fz2.oldPair[0].ks.slice().sort().join() === '2026-11-20|14|reb,2026-11-20|15|ast' && fz2.oldPair[0].at.map(x => x[3] + ' ' + x[4]).sort().join() === 'OVER 3.5,UNDER 7.5'
+      && fz2.taking.some(t => /^TAKING · SAME-GAME PAIR · Spurs @ Bulls · at [A-Za-z]+ · .* (Old Mate UNDER 7\.5 rebounds \+ Old Pal OVER 3\.5 assists|Old Pal OVER 3\.5 assists \+ Old Mate UNDER 7\.5 rebounds) both land .* As you marked it: the card has moved since \(.*Old Mate OVER 6\.5 at [-+]\d+.*Old Pal OVER 4\.5 at [-+]\d+.* now\)\. Your ticket stays as marked\./.test(t) || /^TAKING · SAME-GAME PAIR · Spurs @ Bulls · at [A-Za-z]+ · .* (Old Mate UNDER 7\.5 rebounds \+ Old Pal OVER 3\.5 assists|Old Pal OVER 3\.5 assists \+ Old Mate UNDER 7\.5 rebounds) both land .* As you marked it: the card has moved since \(.*Old Pal OVER 4\.5 at [-+]\d+.*Old Mate OVER 6\.5 at [-+]\d+.* now\)\. Your ticket stays as marked\./.test(t))
+      && fz2.taking.length === 4 && fz2.taking.some(t => t.indexOf(fz1.pairText0.replace(/^PAIR #\d+/, 'TAKING · SAME-GAME PAIR')) === 0 && /As you marked it at \d{1,2}:\d\d [AP]M: the card has moved since \(.*De'Aaron Fox OVER 5\.5 at [-+]\d+ now\)\. Your ticket stays as marked\./.test(t))
+      && fz2.taking.some(t => /^TAKING · NBA PROP · LEAN · marked \d{1,2}:\d\d [AP]M Caleb Wilson UNDER 6\.5 rebounds 62\.2% · -155 needs 60\.8% Spurs @ Bulls · betmgm · projected 5 The card has moved since you marked it: OVER 5\.5 at -135 now \(no edge\)\. Your bet stays as marked\./.test(t))
+      && fz2.taking.some(t => /^TAKING · NBA PROP · LEAN Old Mark OVER 10\.5 points 60\.0% · -120 needs 54\.5% .* The card has moved since you marked it: UNDER 9\.5 at -110 now/.test(t))
+      && /^OVER 5\.5 rebounds/.test(fz2.panel.pick) && /^You marked UNDER 6\.5 at -155 \(62\.2%, LEAN\) at \d{1,2}:\d\d [AP]M\. The card has moved since and reads as above; your bet is listed and graded as you marked it\.$/.test(fz2.panel.took)
+      && fz2.pairPanel.head === "De'Aaron Fox OVER 0.5 threes + De'Aaron Fox UNDER 6.5 assists" && /^As you marked it at .*: the card has moved since .* Your ticket stays as marked\. The ticket above is the one you marked, graded on its own lines; each leg's panel reads as the card stands now\.$/.test(fz2.pairPanel.took)
+      && fz2.board.some(t => /Caleb Wilson UNDER 6\.5 rebounds 62\.2% · -155/.test(t)) && fz2.board.some(t => /De'Aaron Fox OVER 0\.5 threes \+ De'Aaron Fox UNDER 6\.5 assists/.test(t)) && /TONIGHT 4 bets marked/.test(fz2.board[fz2.board.length - 1] || '') && fz2.board.some(t => /(Old Mate UNDER 7\.5 rebounds \+ Old Pal OVER 3\.5 assists|Old Pal OVER 3\.5 assists \+ Old Mate UNDER 7\.5 rebounds)/.test(t))
+      && /\d\. Caleb Wilson UNDER 6\.5 rebounds -155 · 62\.2% needs 60\.8% · Spurs @ Bulls/.test(fz2.copied) && /\d\. Old Mark OVER 10\.5 points -120/.test(fz2.copied) && /SAME-GAME PAIR De'Aaron Fox OVER 0\.5 threes \+ De'Aaron Fox UNDER 6\.5 assists/.test(fz2.copied) && /SAME-GAME PAIR (Old Mate UNDER 7\.5 rebounds \+ Old Pal OVER 3\.5 assists|Old Pal OVER 3\.5 assists \+ Old Mate UNDER 7\.5 rebounds)/.test(fz2.copied)
+      && fz2.sheet.some(s => /^prop: Caleb Wilson UNDER 6\.5 rebounds \| 62\.2 \| -155 \| ids 1$/.test(s)) && fz2.sheet.some(s => /^prop: Old Mark OVER 10\.5 points \| 60 \| -120 \| ids 1$/.test(s)) && fz2.sheet.some(s => /^pair: De'Aaron Fox OVER 0\.5 threes \+ De'Aaron Fox UNDER 6\.5 assists \| [\d.]+ \| \d+ \| ids 2$/.test(s)) && fz2.sheet.some(s => /^pair: (Old Mate UNDER 7\.5 rebounds \+ Old Pal OVER 3\.5 assists|Old Pal OVER 3\.5 assists \+ Old Mate UNDER 7\.5 rebounds) \| [\d.]+ \| \d+ \| ids 2$/.test(s)),
+      'marks, through a later run: the page is loaded again and a later props file moves the lines and turns the picks (Wilson to OVER 5.5, Fox\'s assists to OVER 5.5); the marked prop still reads UNDER 6.5 at -155 with the chance and the band it had, and says the card has moved and to what; the marked pair still reads as it was marked, at its app\'s prices, and says which legs have moved; the marks that had kept nothing (the flag on a prop, the keys of a pair) are kept as their rows stood before the later file replaced them, with no time; the prop\'s own panel shows the card as it stands and says what was marked; and the board\'s list, its copy and the sheet for the phone carry the bets as marked',
+      JSON.stringify({ wilson: fz2.wilson, oldMark: fz2.oldMark, oldPair: fz2.oldPair, specs: fz2.specs, taking: fz2.taking.map(t => t.slice(0, 420)), panel: fz2.panel, pairPanel: fz2.pairPanel, board: fz2.board.map(t => t.slice(0, 120)), copied: fz2.copied.slice(0, 500), sheet: fz2.sheet }));
+  chk(fz2.rows.join(' | ') === "Caleb Wilson reb OVER 5.5 5 loss | De'Aaron Fox tpm OVER 0.5 2 win | De'Aaron Fox ast OVER 5.5 9 win | Old Mark pts UNDER 9.5 10 loss | Old Mate reb OVER 6.5 7 win | Old Pal ast OVER 4.5 4 loss"
+      && fz2.graded.some(t => /Caleb Wilson UNDER 6\.5 rebounds 62\.2% · -155 needs 60\.8% WIN · 5 /.test(t)) && fz2.graded.some(t => /Old Mark OVER 10\.5 points 60\.0% · -120 needs 54\.5% LOSS · 10 /.test(t))
+      && fz2.graded.some(t => /De'Aaron Fox OVER 0\.5 threes \+ De'Aaron Fox UNDER 6\.5 assists LOSS /.test(t)) && fz2.graded.some(t => /(Old Mate UNDER 7\.5 rebounds \+ Old Pal OVER 3\.5 assists|Old Pal OVER 3\.5 assists \+ Old Mate UNDER 7\.5 rebounds) WIN /.test(t))
+      && /^PROPS TAKEN 1-1 says 61\.1% · does 50\.0% \(±35\.4\) · -0\.35u$/i.test(fz2.tiles.find(t => /^PROPS TAKEN/i.test(t)) || '') && /^SAME-GAME PAIRS TAKEN 1-1 says \d\d\.\d% · does 50\.0% \(±35\.4\) · \+\d\.\d\du$/i.test(fz2.tiles.find(t => /^SAME-GAME PAIRS TAKEN/i.test(t)) || '')
+      && fz2.list.some(l => /Caleb Wilson UNDER 6\.5 rebounds · Spurs @ Bullsprop62\.2%-155WIN\+0\.65u$/.test(l)) && fz2.list.some(l => /Old Mark OVER 10\.5 points · Spurs @ Bullsprop60\.0%-120LOSS-1\.00u$/.test(l))
+      && fz2.list.some(l => /De'Aaron Fox OVER 0\.5 threes \+ De'Aaron Fox UNDER 6\.5 assists · Spurs @ Bullssame-game pair\d\d\.\d%\+\d+LOSS-1\.00u$/.test(l))
+      && fz2.list.some(l => /(Old Mate UNDER 7\.5 rebounds \+ Old Pal OVER 3\.5 assists|Old Pal OVER 3\.5 assists \+ Old Mate UNDER 7\.5 rebounds) · Spurs @ Bullssame-game pair\d\d\.\d%\+\d+WIN\+\d\.\d\du$/.test(l))
+      && /^taken 1-1 -0\.4u · same-game pairs .* pairs taken 1-1 \+\d\.\du$/.test(fz2.recordLine) && fz2.kept.took === 2 && fz2.kept.pairsAt === 2,
+      'marks, at the grade: the rows grade on the later run\'s lines (Wilson OVER 5.5 a loss on five rebounds, Fox\'s assists OVER 5.5 a win on nine), and the bets grade as they were marked: Wilson UNDER 6.5 a win at -155, the flag-only mark a loss on the line it had, the pair a loss on Fox UNDER 6.5 assists, and the pair marked the old way a win on the two lines it had where the later run\'s would have lost; What you took, the list of every pick and the props record\'s own line count them so, at the prices and chances marked; and what the marks kept is in the saved props, so a backup carries it',
+      JSON.stringify({ rows: fz2.rows, graded: fz2.graded.map(t => t.slice(0, 200)), tiles: fz2.tiles, list: fz2.list, recordLine: fz2.recordLine, kept: fz2.kept }));
+  chk(fz1.warn0 && fz2.warnShown && /^The props on this date were made without last season's ledger\. 28 of the 28 projections rest on this season's games alone, with nothing from last season behind them, .* The run did not find last season's ledger file, nba-ledger-202526\.json, in the folder it was started in\. Copy that file into the folder you run the props from, beside slate\.py \(a copy costs nothing and nothing is pulled again\), run the props again before tip and load the new file: it replaces these, and a bet you have marked stays as you marked it\.$/.test(fz2.warn)
+      && /The night is graded as it was made\.$/.test(fz2.warnGraded) && /Last season's ledger, nba-ledger-202526\.json, was not read by this run: 28 of the 28 projections .* Put the file back beside slate\.py, run the props again before tip, and load the new file; it replaces these\./.test(fz2.said),
+      'props, a date made without last season\'s ledger: a file whose projections were blended with last season shows no warning; a later file for the same date in which more than half of the projections read no last season to blend puts a standing warning on the tab, above the lists, for as long as the date is shown, with the count, the cause (last season\'s ledger file, named for the season before the date\'s own, was not in the folder the run was started in) and what to do (copy the file, not pull it again, and run the props again; a marked bet stays as marked); once the night is graded it says the night is graded as it was made',
+      JSON.stringify({ warn0: fz1.warn0, shown: fz2.warnShown, warn: fz2.warn, graded: fz2.warnGraded.slice(-120), said: fz2.said.slice(0, 400) }));
 
   // ---- 11 Nov 2026: the NBA record counts the sheet's calls (the user: "fix the NBA record so tiles count only real calls") -- a market where neither side is priced below its chance is the book's own number, listed under the tile as no call and left out of its count ----
   const callsKeep = await pg.evaluate(async () => { await smStore.ready; const k = { card: await smStore.getItem('callsheet3.card.v1'), slate: await smStore.getItem('callsheet3.slate.v1') }; await smStore.removeItem('callsheet3.card.v1'); return k; });

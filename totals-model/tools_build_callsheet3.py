@@ -27,7 +27,7 @@ import sys
 ROOT = pathlib.Path(__file__).parent / "web"
 OPEN = "  /* ===== ENGINE BLOCK."
 CLOSE = "  /* ===== END ENGINE BLOCK ===== */"
-STAMP = "2026-11-11"   # bumped by hand when 3.0's own sources change (the harness checks it)
+STAMP = "2026-11-12"   # bumped by hand when 3.0's own sources change (the harness checks it)
 
 
 def engine_block() -> str:
@@ -277,6 +277,9 @@ def head() -> str:
              "  @media (max-width: 640px) { .pdlg .pd-log { display: block; overflow-x: auto; } .pdlg .pd-log td.pd-what { min-width: 0; overflow-wrap: anywhere; } .pdlg .pd-log th, .pdlg .pd-log td { padding-left: 3px; padding-right: 3px; } }\n"
              "  .phint { display: flex; gap: 10px; align-items: center; justify-content: space-between; background: var(--edge-wash); color: var(--edge); padding: 10px 14px; font: 13px/1.45 var(--sans); border-bottom: 1px solid var(--rule); } .phint .btn { flex: none; padding: 6px 10px; font-size: 11px; }\n"
              "  .pk.taking, tr.taking { box-shadow: inset 4px 0 0 var(--go); } .pk.taking.sum { border-style: dashed; } .chip.taken { background: var(--go); color: #fff; }\n"
+             "  /* a bet kept as it was marked (12 Nov 2026): the line under its card when the card has moved since, the same on the panel, and the standing warning on a date made without last season's ledger */\n"
+             "  .pk .n5.marked { color: var(--edge); font-weight: 600; } .pdlg .pd-took { margin: 6px 0 2px; padding: 7px 10px; border-radius: 6px; background: var(--edge-wash); color: var(--ink); }\n"
+             "  .warnbar { margin: 0 0 12px; padding: 10px 13px; border-radius: 8px; border-left: 4px solid var(--bad); background: var(--bad-wash); color: var(--ink); font-size: 13px; line-height: 1.5; } .warnbar[hidden] { display: none; }\n"
              "  #calibBox .calib[data-sport=\"TAKEN\"] > div.good { box-shadow: inset 3px 0 0 var(--go); } #calibBox .calib[data-sport=\"TAKEN\"] > div.bad { box-shadow: inset 3px 0 0 var(--bad); }\n"
              "  @media (max-width: 640px) { .pdlg .lever { grid-template-columns: 1fr 1fr 50px; } }\n"
              "  @media (max-width: 640px) { .pdlg { padding: 10px 8px; } .pdlg-box { padding: 16px 14px 18px; } .pdlg h3 { font-size: 20px; } }\n"

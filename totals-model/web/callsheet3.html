@@ -657,6 +657,9 @@
   @media (max-width: 640px) { .pdlg .pd-log { display: block; overflow-x: auto; } .pdlg .pd-log td.pd-what { min-width: 0; overflow-wrap: anywhere; } .pdlg .pd-log th, .pdlg .pd-log td { padding-left: 3px; padding-right: 3px; } }
   .phint { display: flex; gap: 10px; align-items: center; justify-content: space-between; background: var(--edge-wash); color: var(--edge); padding: 10px 14px; font: 13px/1.45 var(--sans); border-bottom: 1px solid var(--rule); } .phint .btn { flex: none; padding: 6px 10px; font-size: 11px; }
   .pk.taking, tr.taking { box-shadow: inset 4px 0 0 var(--go); } .pk.taking.sum { border-style: dashed; } .chip.taken { background: var(--go); color: #fff; }
+  /* a bet kept as it was marked (12 Nov 2026): the line under its card when the card has moved since, the same on the panel, and the standing warning on a date made without last season's ledger */
+  .pk .n5.marked { color: var(--edge); font-weight: 600; } .pdlg .pd-took { margin: 6px 0 2px; padding: 7px 10px; border-radius: 6px; background: var(--edge-wash); color: var(--ink); }
+  .warnbar { margin: 0 0 12px; padding: 10px 13px; border-radius: 8px; border-left: 4px solid var(--bad); background: var(--bad-wash); color: var(--ink); font-size: 13px; line-height: 1.5; } .warnbar[hidden] { display: none; }
   #calibBox .calib[data-sport="TAKEN"] > div.good { box-shadow: inset 3px 0 0 var(--go); } #calibBox .calib[data-sport="TAKEN"] > div.bad { box-shadow: inset 3px 0 0 var(--bad); }
   @media (max-width: 640px) { .pdlg .lever { grid-template-columns: 1fr 1fr 50px; } }
   @media (max-width: 640px) { .pdlg { padding: 10px 8px; } .pdlg-box { padding: 16px 14px 18px; } .pdlg h3 { font-size: 20px; } }
@@ -669,7 +672,7 @@
   <header class="top">
     <div>
       <div class="eyebrow"><span id="eyebrow">MLB · every market on the game</span>
-        <span class="build">· build <span id="build">2026-11-11</span></span></div>
+        <span class="build">· build <span id="build">2026-11-12</span></span></div>
       <h1>The <em>Super</em> Model</h1>
       <p>One matchup, every market the book posts on it — in baseball the full-game total, the first five,
          the moneyline and the run line;
@@ -1199,6 +1202,7 @@
         <button type="button" class="btn" id="propsExample">Example</button>
       </div>
       <p class="note" id="propsMsg" hidden></p>
+      <div id="propsWarn" class="warnbar" role="status" hidden></div>
       <div class="subhead">Is it working <span class="tag">every graded prop, every night, at the price posted · says is the blended chance, does is what landed</span></div>
       <div id="propsCalib"></div>
       <p class="note"><b>Run NBA props.bat</b> writes <code>nba-props-DATE.json</code>: every player prop the books post on the
@@ -4449,6 +4453,82 @@ smStore.ready.then(function () {
      something similar to how the props are for the singles"): the mark lives on both legs as the other leg's key (`pairs`),
      so it rides through a reload like a prop's own mark, and the ticket is rebuilt from the two rows as the night stood */
   function propsPairTaken(t) { return ((t.legs[0].pairs || []).indexOf(propKey(t.legs[1])) >= 0); }
+  /* THE MARK KEEPS WHAT WAS MARKED (12 Nov 2026). A prop's mark was a flag and a pair's was the other leg's key, so a props
+     file loaded after the mark re-read the bet at whatever the newer run carried: on 11 Nov the user marked Caleb Wilson
+     UNDER 6.5 rebounds at -155 (five rebounds: a win) and the later run moved the card to OVER 5.5, which is what the record
+     graded, a loss; his Horford and Smart pair was rebuilt with both sides turned and read a loss where it won, and his Fox
+     pair read a win where it lost (the sheet he had saved to the phone at the mark is what showed it). From here a mark
+     keeps the bet: a prop's side, line, price, chance, band and book (`took`), a pair's app with each leg's line, price,
+     chance and side (`pairsAt`, on one of its two rows, like a ticket's spec). They ride through a reload, a backup and
+     the trim, and the bet is listed, copied, sent to the phone and graded on them: the actual against the line that was
+     marked, at the price that was marked, the chance the sheet gave it then. A mark made before this is kept as the rows
+     stand just before the next props file replaces them (propsFreezeMarks), the nearest thing to the mark there is; a
+     night already graded stays as it was recorded. The card and the panel still show the prop as it stands now, and say
+     so when it has moved from the mark */
+  function propTookSpec(r, at) { var s = { side: r.side, line: +r.line, price: +r.price, chance: Math.round(+r.chance * 10000) / 10000, band: r.band || "no edge", book: r.book || "", proj: r.proj }; if (at) s.at = at; return s; }
+  function propResOn(r, side, line) {   // the row's result read on another line and side: the actual against it; void and ungraded stay as they are
+    if (!r.result || r.result === "graded" || r.result === "void") return r.result;
+    if (r.actual === null || r.actual === undefined || !isFinite(+r.actual)) return side === r.side && Math.abs(+line - +r.line) < 1e-9 ? r.result : undefined;
+    return +r.actual > +line ? (side === "OVER" ? "win" : "loss") : +r.actual < +line ? (side === "UNDER" ? "win" : "loss") : "push";
+  }
+  function propAsMarked(r, side, line, price, chance, extra) {   // the row seen as a bet on it was marked: a view over the row, never stored
+    var v = Object.create(r);
+    v._row = r; v.side = side; v.line = +line; v.price = +price; v.chance = isFinite(+chance) ? +chance : r.chance; v.need = implied(v.price); v.edge = v.chance - v.need;
+    v.moved = !(side === r.side && Math.abs(+line - +r.line) < 1e-9 && +price === +r.price);
+    var res = propResOn(r, side, line); v.result = res === undefined ? null : res;   // graded on the line and the side that were marked
+    if (extra) Object.keys(extra).forEach(function (k) { v[k] = extra[k]; });
+    return v;
+  }
+  function propTook(r) {   // a marked prop as it was marked; the row itself when the mark kept nothing
+    var t = r && r.take ? r.took : null;
+    if (!t || (t.side !== "OVER" && t.side !== "UNDER") || !isFinite(+t.line) || !isFinite(+t.price)) return r;
+    return propAsMarked(r, t.side, t.line, t.price, t.chance, { band: t.band || r.band, book: t.book || r.book, proj: t.proj === undefined ? r.proj : t.proj });
+  }
+  function propsPairSpecOf(a, b) {   // the kept ticket of a marked pair, on whichever of its two rows carries it
+    var ka = propKey(a), kb = propKey(b), rows = [a._row || a, b._row || b];
+    for (var i = 0; i < rows.length; i++) {
+      var s = (rows[i].pairsAt || []).filter(function (x) { return x && x.ks && x.at && x.ks.length === 2 && ((x.ks[0] === ka && x.ks[1] === kb) || (x.ks[0] === kb && x.ks[1] === ka)); })[0];
+      if (s) return { sp: s, row: rows[i] };
+    }
+    return null;
+  }
+  /* a leg of a kept pair: what it read at the ticket's app (line, price, chance), its side, and the card's own line then, which
+     is what the ticket's heading names (a pair's card heads each leg as carded and says the app's line beside it where it differs) */
+  function propsPairSpec(t, at) {
+    var s = { ks: t.legs.map(function (r) { return propKey(r); }), app: t.app || null, kind: t.kind, f: t.f, chance: Math.round(t.chance * 10000) / 10000,
+              at: t.legs.map(function (r, i) { var l = t.at ? t.at[i] : { line: +r.line, price: +r.price, chance: r.chance }; return [+l.line, +l.price, Math.round(+l.chance * 10000) / 10000, r.side, +r.line]; }) };
+    if (t.split) s.split = true; if (at) s.at0 = at;
+    return s;
+  }
+  function propsPairFromSpec(sp, a, b) {   // the ticket as it was marked: its two legs on the side and the lines kept, at the app's prices kept
+    var rows = propKey(a) === sp.ks[0] ? [a, b] : [b, a], carded = function (x) { return x[4] === undefined || x[4] === null ? +x[0] : +x[4]; };
+    var legs = rows.map(function (r0, i) { var r = r0._row || r0; return propAsMarked(r, sp.at[i][3] || r.side, carded(sp.at[i]), r.price, r.chance); });
+    var at = sp.at.map(function (x) { return { app: sp.app || null, line: +x[0], price: +x[1], chance: +x[2], same: Math.abs(+x[0] - carded(x)) < 1e-9 }; });
+    var dec = decimalOf(at[0].price) * decimalOf(at[1].price);
+    var t = { id: legs[0].id + "|" + legs[1].id, game: legs[0].game, legs: legs, at: at, app: sp.app || null, split: !!sp.split, kind: sp.kind, f: +sp.f || 1, chance: +sp.chance, dec: dec, price: americanOf(dec), need: 1 / dec, kept: sp };
+    t.now = legs.map(function (l, i) {   // each leg as the rows read it now, at the ticket's app: null where nothing has moved from the mark
+      var r = l._row, n = sp.app ? propLegAt(r, sp.app) : (propHas(r) ? { line: +r.line, price: +r.price } : null);
+      if (propHas(r) && r.side === l.side && n && Math.abs(n.line - at[i].line) < 1e-9 && n.price === at[i].price) return null;
+      return !propHas(r) || !n ? esc(r.name) + ' off ' + (sp.app ? esc(bookName(sp.app)) + '\'s' : 'the') + ' board' : esc(r.name) + ' ' + esc(r.side) + ' ' + n.line + ' at ' + sgn(n.price, 0);
+    });
+    t.moved = t.now.some(function (x) { return !!x; });
+    return t;
+  }
+  function propsPairKept(a, b) { var has = a && b ? propsPairSpecOf(a, b) : null; return has ? propsPairFromSpec(has.sp, a._row || a, b._row || b) : null; }
+  /* before a props file replaces a date's rows: every mark on them that kept nothing is kept as the rows stand */
+  function propsFreezeMarks(rows) {
+    var byKey = {}, n = 0; rows.forEach(function (r) { byKey[propKey(r)] = r; });
+    rows.forEach(function (r) {
+      if (r.result) return;
+      if (r.take && !r.took && propHas(r)) { r.took = propTookSpec(r); n++; }
+      (r.pairs || []).forEach(function (k) {
+        var o = byKey[k]; if (!o || o.result || !propHas(r) || !propHas(o) || propsPairSpecOf(r, o)) return;
+        var t = propsPairBest(r, o, r.gdate); if (!t) return;
+        r.pairsAt = (r.pairsAt || []).concat([propsPairSpec(t)]); n++;
+      });
+    });
+    return n;
+  }
   function propsPairTakeBtn(t, big) {
     var a = t.legs[0], b = t.legs[1], on = propsPairTaken(t);
     if (a.result || b.result) return on ? ' <span class="chip taken">TAKEN</span>' : "";
@@ -4461,7 +4541,13 @@ smStore.ready.then(function () {
     var ka = propKey(a), kb = propKey(b), on = (a.pairs || []).indexOf(kb) >= 0;
     var drop = function (r, k) { r.pairs = (r.pairs || []).filter(function (x) { return x !== k; }); if (!r.pairs.length) delete r.pairs; };
     var add = function (r, k) { if ((r.pairs || []).indexOf(k) < 0) r.pairs = (r.pairs || []).concat([k]); };
-    if (on) { drop(a, kb); drop(b, ka); } else { add(a, kb); add(b, ka); }
+    var unkeep = function () { var has = propsPairSpecOf(a, b); while (has) { has.row.pairsAt = has.row.pairsAt.filter(function (x) { return x !== has.sp; }); if (!has.row.pairsAt.length) delete has.row.pairsAt; has = propsPairSpecOf(a, b); } };
+    if (on) { drop(a, kb); drop(b, ka); unkeep(); }
+    else {
+      var shown = propsPairBest(a, b, a.gdate);   // the ticket as its card reads now: what the mark keeps (12 Nov 2026)
+      add(a, kb); add(b, ka); unkeep();
+      if (shown) a.pairsAt = (a.pairsAt || []).concat([propsPairSpec(shown, new Date().toISOString())]);
+    }
     if (!propsPreview) saveProps();
     renderProps(); renderCalib(); if (typeof renderBoard === "function") renderBoard();
     refreshPropDetail();
@@ -4471,7 +4557,7 @@ smStore.ready.then(function () {
     rows.forEach(function (r) { byKey[propKey(r)] = r; });
     rows.forEach(function (a) {
       (a.pairs || []).forEach(function (k) {
-        var b = byKey[k], t = b ? propsPairBest(a, b, dateISO) : null; if (!t || seen[t.id]) return;
+        var b = byKey[k], t = b ? (propsPairKept(a, b) || propsPairBest(a, b, dateISO)) : null; if (!t || seen[t.id]) return;   // as it was marked, where the mark kept it
         seen[t.id] = true; out.push(t);
       });
     });
@@ -4508,6 +4594,10 @@ smStore.ready.then(function () {
   }
   function propsPairKindWords(kind) { return kind === "same_club_overs" ? "two overs on one club" : kind === "cross" ? "two players" : kind === "same_man_pts_tpm" ? "one man, his points with his threes" : "one man, two markets"; }
   function propsPairLeg(r) { return esc(r.name) + ' ' + esc(r.side) + ' ' + r.line + ' ' + esc(PROPS_LABEL[r.mk] || r.mk); }
+  function propsPairMarkedWords(t) {   // under a marked pair: when it was marked, and whether its legs have moved from it
+    var when = t.kept && t.kept.at0 && typeof takeWhen === "function" ? takeWhen(t.kept.at0) : "";
+    return 'As you marked it' + (when ? ' at ' + esc(when) : '') + (t.moved ? ': the card has moved since (' + t.now.filter(Boolean).join(', ') + ' now). Your ticket stays as marked.' : '.');
+  }
   function propsPairCard(t, i, asTaking) {
     var res = propsPairRes(t), ok = t.chance >= t.need, a = t.legs[0], b = t.legs[1], on = propsPairTaken(t), leg = propsPairLeg;
     var appW = propsPairAppWords(t);
@@ -4515,6 +4605,7 @@ smStore.ready.then(function () {
       '<div class="n2">' + leg(a) + ' <span class="amp">+</span> ' + leg(b) + (res ? ' <span class="chip ' + res + '">' + esc(res.toUpperCase()) + '</span>' : '') + '</div>' +
       '<div class="n3">both land ' + (t.chance * 100).toFixed(1) + '% · pays ' + sgn(t.price, 0) + ' (' + t.dec.toFixed(2) + '×) needs ' + (t.need * 100).toFixed(1) + '%</div>' +
       '<div class="n4">' + propsPairLegAt(t, 0) + ' · ' + propsPairLegAt(t, 1) + ' · ' + esc(propsPairKindWords(t.kind)) + ', measured ×' + t.f.toFixed(2) + '</div>' +
+      (t.kept ? '<div class="n5 marked">' + propsPairMarkedWords(t) + '</div>' : '') +
       '<div class="n6">' + propsPairTakeBtn(t) + '</div></div>';
   }
   /* three-leg tickets to test (11 Nov 2026, the user: "replace in the leans section of the 'Leans Below' with 3 leg props cards,
@@ -4790,6 +4881,7 @@ smStore.ready.then(function () {
     var la = t.at ? t.at[0] : { line: +a.line, price: +a.price, chance: a.chance, same: true }, lb = t.at ? t.at[1] : { line: +b.line, price: +b.price, chance: b.chance, same: true }, appW = propsPairAppWords(t);
     h += '<div class="pd-sub">' + esc(t.game) + ' · ' + esc(gameDate(a.gdate)) + ' · ' + esc(propsPairKindWords(t.kind)) + ', measured ×' + t.f.toFixed(2) + ' · ' + (t.app ? 'both ' + appW : t.split ? appW + ': ' + esc(a.book || "the book") + (b.book && b.book !== a.book ? ' and ' + esc(b.book) : '') : esc(a.book || "the book") + (b.book && b.book !== a.book ? ' and ' + esc(b.book) : '')) + '</div>';
     if ((propsPairTakeBtn(t, true) || "").length) h += '<div class="pd-take">' + propsPairTakeBtn(t, true) + '</div>';
+    if (t.kept) h += '<p class="note pd-took">' + propsPairMarkedWords(t) + ' The ticket above is the one you marked, graded on its own lines; each leg\'s panel reads as the card stands now.</p>';
     h += '<div class="pd-tiles">' +
       tile("Both land", pc(t.chance), "the two chances multiplied, × " + t.f.toFixed(2) + " measured, capped at the lesser leg") +
       tile("Parlay price", sgn(t.price, 0), t.dec.toFixed(2) + "× the stake · needs " + pc(t.need)) +
@@ -4833,7 +4925,7 @@ smStore.ready.then(function () {
   }
   function openPairDetail(spec) {
     var p = String(spec).split("|"), a = propById(p[0]), b = propById(p[1]), dlg = $("propDetail"); if (!a || !b || !dlg) return;
-    var t = propsPairBest(a, b, a.gdate); if (!t) return;
+    var t = propsPairKept(a, b) || propsPairBest(a, b, a.gdate); if (!t) return;   // a marked pair opens as it was marked
     propDetailId = String(t.id); propDetailKind = "pair";
     $("propDetailBody").innerHTML = propsPairDetailHtml(t);
     var i = pairsOrder.indexOf(propDetailId), nav = $("propDetailNav");
@@ -4849,7 +4941,7 @@ smStore.ready.then(function () {
   }
   function refreshPropDetail() {
     var dlg = $("propDetail"); if (!dlg || dlg.hidden || !propDetailId) return;
-    if (propDetailKind === "pair") { var p = propDetailId.split("|"), a = propById(p[0]), b = propById(p[1]), t = a && b ? propsPairTicket(a, b) : null; if (t) $("propDetailBody").innerHTML = propsPairDetailHtml(t); }
+    if (propDetailKind === "pair") { var p = propDetailId.split("|"), a = propById(p[0]), b = propById(p[1]), t = a && b ? (propsPairKept(a, b) || propsPairTicket(a, b)) : null; if (t) $("propDetailBody").innerHTML = propsPairDetailHtml(t); }
     else { var r = propById(propDetailId); if (r) $("propDetailBody").innerHTML = propsDetailHtml(r); }
   }
   var propsTableView = Object.assign({}, PROPS_VIEW_DEFAULT);
@@ -5016,6 +5108,8 @@ smStore.ready.then(function () {
     var added = 0, replaced = 0, kept = 0, inPlay = 0, nextP = props.reduce(function (m, r) { return Math.max(m, r.id || 0); }, 0) + 1;
     var have = {}; props.forEach(function (r, i) { have[propKey(r)] = i; });
     propsPreview = null;
+    var dates = {}; (d.games || []).forEach(function (g) { if (g.date) dates[g.date] = true; }); if (d.date) dates[d.date] = true;
+    propsFreezeMarks(props.filter(function (r) { return dates[r.gdate || ""]; }));   // a mark that kept nothing keeps the bet as it reads before this file replaces it (12 Nov 2026)
     /* a game that had tipped when the file was written carries in-play lines (23 Oct 2026, the Bulls at the Bucks in the
        second half): its props are left out, so the calls made before tip stand. The run skips such games from today;
        this guards a file from an older run */
@@ -5024,7 +5118,7 @@ smStore.ready.then(function () {
     propsRowsFrom(d).forEach(function (row) {
       if (startedGames[row.game]) { inPlay++; return; }
       var k = propKey(row), i = have[k];
-      if (i !== undefined) { if (props[i].result) { kept++; return; } row.id = props[i].id; if (props[i].take) row.take = true; if (props[i].pairs) row.pairs = props[i].pairs; if (props[i].t3) row.t3 = props[i].t3; props[i] = row; replaced++; }   // the take and pair marks ride through a reload (26 Oct 2026), and the three-leg tickets kept on the row (11 Nov 2026)
+      if (i !== undefined) { if (props[i].result) { kept++; return; } row.id = props[i].id; if (props[i].take) row.take = true; if (props[i].took) row.took = props[i].took; if (props[i].pairs) row.pairs = props[i].pairs; if (props[i].pairsAt) row.pairsAt = props[i].pairsAt; if (props[i].t3) row.t3 = props[i].t3; props[i] = row; replaced++; }   // the take and pair marks ride through a reload (26 Oct 2026), and the three-leg tickets kept on the row (11 Nov 2026)
       else { row.id = nextP++; have[k] = props.length; props.push(row); added++; }
     });
     saveProps();
@@ -5051,7 +5145,8 @@ smStore.ready.then(function () {
       var lastSeason2 = (lg && lg.last && lg.last.season) || "2025-26";
       warn += " <b>Last season's ledger, nba-ledger-" + esc(lastSeason2.replace("-", "")) + ".json, was not read by this run:</b> " + thin + " of the " + withSide.length +
               " projections rest on this season's two or three games a player, and " + noHist + (noHist === 1 ? " prop has" : " props have") +
-              " no history at all. Put the file back beside slate.py, run the props again before tip, and load the new file; it replaces these.";
+              " no history at all. " + (lg && lg.folder ? "The run was started in <b>" + esc(lg.folder) + "</b>: copy the file into that folder, beside slate.py" : "Put the file back beside slate.py") +
+              ", run the props again before tip, and load the new file; it replaces these.";
     }
     propsSay("Props " + (name ? "<b>" + esc(name) + "</b> " : "") + "loaded: <b>" + added + "</b> new, " + replaced + " replaced, " + kept + " graded and left as " +
              (kept === 1 ? "it was" : "they were") + (inPlay ? ", <b>" + inPlay + "</b> on " + Object.keys(startedGames).length + " game" + (Object.keys(startedGames).length === 1 ? "" : "s") + " already under way left out (in-play lines; the calls made before tip stand)" : "") +
@@ -5150,7 +5245,16 @@ smStore.ready.then(function () {
                    byEdge[propsEdgeBucket(r)] || (byEdge[propsEdgeBucket(r)] = mk()), byChance[propsChanceBucket(r)] || (byChance[propsChanceBucket(r)] = mk()),
                    byDate[d] || (byDate[d] = mk()), byCentre[propsCentre(r)] || (byCentre[propsCentre(r)] = mk())];
       if (r.band === "BET") sinks.push(byDateBet[d] || (byDateBet[d] = mk()));
-      if (r.take) { sinks.push(byTake); sinks.push(byDateTake[d] || (byDateTake[d] = mk())); }   // the props marked as taken (26 Oct 2026), and by night (3 Nov 2026)
+      if (r.take) {   // the props marked as taken (26 Oct 2026), and by night (3 Nov 2026), each as it was marked (12 Nov 2026): its own line, side, price and chance
+        var tv = propTook(r);
+        [byTake, byDateTake[d] || (byDateTake[d] = mk())].forEach(function (s) {
+          if (tv.result === "void") { s.v++; return; }
+          if (tv.result === "push") { s.p++; return; }
+          if (tv.result !== "win" && tv.result !== "loss") return;
+          s.n++; s.says += tv.chance;
+          if (tv.result === "win") { s.w++; s.units += dec(tv.price) - 1; } else { s.l++; s.units -= 1; }
+        });
+      }
       var cg = propShopGap(r); if (cg !== null && Math.abs(cg) >= 0.5) sinks.push(cg > 0 ? byCons.toward : byCons.against);
       var fa = propFormAgrees(r); if (fa !== null) sinks.push(fa ? byForm.toward : byForm.against);
       var fav = propFav(r);   // the same predicates as the cards' tells (7 Nov 2026), so the tile and the chip never disagree
@@ -5304,16 +5408,27 @@ smStore.ready.then(function () {
     return '<button type="button" class="takebtn' + (r.take ? ' on' : '') + (big ? ' big' : '') + '" data-ptake="' + r.id + '" title="' +
            (r.take ? 'Marked as a bet you are placing: click to unmark it' : 'Mark this prop as a bet you are placing') + '">' + (r.take ? '&#10003; Taking' : (big ? 'Take this prop' : 'Take')) + '</button>';
   }
-  function propTakeCard(r) {
-    return '<div class="pk taking" data-prop="' + r.id + '"><div class="n1">TAKING · NBA PROP · ' + esc(r.band) + '</div>' +
+  function propTakeCard(r0) {   // the bet as it was marked; under it, where the card has moved since
+    var r = propTook(r0._row || r0), b = r._row || r, t = b.took, when = t && t.at && typeof takeWhen === "function" ? takeWhen(t.at) : "";
+    return '<div class="pk taking" data-prop="' + r.id + '"><div class="n1">TAKING · NBA PROP · ' + esc(r.band) + (when ? ' · marked ' + esc(when) : '') + '</div>' +
       '<div class="n2">' + esc(r.name) + ' ' + esc(r.side) + ' ' + r.line + ' ' + esc(PROPS_LABEL[r.mk] || r.mk) + '</div>' +
       '<div class="n3">' + (r.chance * 100).toFixed(1) + '% · ' + sgn(r.price, 0) + ' needs ' + (r.need * 100).toFixed(1) + '%' + propResChip(r) + '</div>' +
-      '<div class="n4">' + esc(r.game) + ' · ' + esc(r.book) + ' · projected ' + r.proj + '</div><div class="n6">' + propTakeBtn(r) + '</div></div>';
+      '<div class="n4">' + esc(r.game) + ' · ' + esc(r.book) + ' · projected ' + r.proj + '</div>' +
+      (r.moved ? '<div class="n5 marked">The card has moved since you marked it: ' + esc(b.side) + ' ' + b.line + ' at ' + sgn(b.price, 0) + ' now (' + esc(b.band) + '). Your bet stays as marked.</div>' : '') +
+      '<div class="n6">' + propTakeBtn(b) + '</div></div>';
+  }
+  function propTookWords(r) {   // on the prop's own panel: what was marked, and whether the card has moved from it
+    if (!r.take || !r.took) return "";
+    var v = propTook(r), t = r.took, when = t.at && typeof takeWhen === "function" ? takeWhen(t.at) : "", res = v.result && v.result !== "graded" ? v.result : "";
+    return 'You marked <b>' + esc(v.side) + ' ' + v.line + '</b> at ' + sgn(v.price, 0) + ' (' + (v.chance * 100).toFixed(1) + '%, ' + esc(v.band) + ')' + (when ? ' at ' + esc(when) : '') + '. ' +
+           (v.moved ? 'The card has moved since and reads as above; your bet is listed and graded as you marked it' + (res ? ': <b>' + esc(res === "void" ? "void, did not play" : res.toUpperCase()) + '</b>' : '') + '.'
+                    : 'The card reads the same now.');
   }
   function togglePropTake(id) {
     var r = propById(id); if (!r || !propHas(r)) return;
     if (r.result) { propsSay("<b>" + esc(r.name) + "</b> is graded: a prop is marked before the game, not after."); return; }
     r.take = !r.take;
+    if (r.take) r.took = propTookSpec(r, new Date().toISOString()); else delete r.took;   // the mark keeps the bet as it reads now (12 Nov 2026)
     if (!propsPreview) saveProps();
     renderProps(); renderCalib(); if (typeof renderBoard === "function") renderBoard();
     refreshPropDetail();
@@ -5413,6 +5528,7 @@ smStore.ready.then(function () {
     h += '<div class="pd-sub">' + esc(r.game) + ' · ' + esc(gameDate(r.gdate)) + (r.opp ? ' · ' + (r.athome ? 'at home against ' : 'on the road at ') + esc(r.opp) : '') +
          ' · ' + esc(r.book || "the book") + ' ' + esc(String(r.line)) + ' (' + sgn(r.op, 0) + '/' + sgn(r.up, 0) + ')</div>';
     h += '<div class="pd-take pd-go">' + (has && (propTakeBtn(r, true) || "").length ? propTakeBtn(r, true) + ' ' : '') + propsGoBtn(r, true) + '</div>';
+    if (propTookWords(r)) h += '<p class="note pd-took">' + propTookWords(r) + '</p>';
     if (r.trim) h += '<p class="note trimmed">The detail on this prop (the reasons, the last games, the levers, the simulation, the fives and what happened) was <b>trimmed from the save on ' + esc(gameDate(r.trim)) + '</b> to keep the backup small: the last seven nights on the tab stay whole, older nights keep the call, the price, the chance, the band, the result and every book\'s line.</p>';
     if (has) {
       if (propBetWhy(r)) h += '<p class="note pd-betwhy">' + propBetWhy(r) + '</p>';
@@ -5596,8 +5712,21 @@ smStore.ready.then(function () {
     }).join("") + t3Html : '<div class="empty">' + (rows.length ? (tellMode === "green" ? 'No pick on this date carries a green tell without a red one.' : tellMode === "red" ? 'No pick on this date carries a red tell.' : 'No prop on this date clears its price.') : 'Load a props file: Run NBA props.bat writes nba-props-DATE.json.') + '</div>';
     /* the simulation's strip (26 Oct 2026): one card a game */
     if ($("propsSim")) $("propsSim").innerHTML = rows.length ? propsSimStripHtml(rows) : '<div class="empty">Load a props file and each game\'s simulation lands here.</div>';
+    /* a date whose props were made without last season's ledger (12 Nov 2026): the load says so once and the line scrolls away,
+       and on 11 Nov the night was bet on 982 props that read this season alone. The rows say it themselves, so the tab says
+       it for as long as the date is shown: more than half of the projections reading "no last season to blend" is the run's
+       folder, not the players (a normal night has one such projection in twelve) */
+    if ($("propsWarn")) {
+      var wSide = rows.filter(function (r) { return propHas(r) && r.why && r.why.length; }), wThin = wSide.filter(function (r) { return r.why.some(function (w) { return /no last season to blend/.test(String(w)); }); }).length;
+      var wOn = wSide.length >= 20 && wThin > wSide.length / 2, wGraded = rows.some(function (r) { return !!r.result; });
+      var wY = +String(date).slice(0, 4) - (+String(date).slice(5, 7) >= 8 ? 1 : 2), wFile = "nba-ledger-" + wY + ("0" + ((wY + 1) % 100)).slice(-2) + ".json";   // the season before the date's own, as slate.py names it
+      $("propsWarn").hidden = !wOn;
+      $("propsWarn").innerHTML = !wOn ? "" : '<b>The props on this date were made without last season\'s ledger.</b> ' + wThin + ' of the ' + wSide.length + ' projections rest on this season\'s games alone, with nothing from last season behind them, and the defence a position faces reads this season alone too. ' +
+        'The run did not find last season\'s ledger file, ' + wFile + ', in the folder it was started in. ' +
+        (wGraded ? 'The night is graded as it was made.' : 'Copy that file into the folder you run the props from, beside slate.py (a copy costs nothing and nothing is pulled again), run the props again before tip and load the new file: it replaces these, and a bet you have marked stays as you marked it.');
+    }
     /* the props marked as taken on the date (26 Oct 2026), above the best list */
-    var taken = rows.filter(function (r) { return r.take && propHas(r); }), takenPairs = pairTakesOn(date), takenT3 = propsT3TakesOn(date), nTaken = taken.length + takenPairs.length + takenT3.length;
+    var taken = rows.filter(function (r) { return r.take && propHas(r); }).map(propTook), takenPairs = pairTakesOn(date), takenT3 = propsT3TakesOn(date), nTaken = taken.length + takenPairs.length + takenT3.length;
     if ($("propsTaking")) {
       $("propsTakingHead").hidden = !nTaken; $("propsTaking").hidden = !nTaken;
       $("propsTaking").innerHTML = takenT3.map(function (t, i) { return propsT3Card(t, i, true); }).join("") + takenPairs.map(function (t, i) { return propsPairCard(t, i, true); }).join("") + taken.map(propTakeCard).join("");
@@ -5721,7 +5850,9 @@ smStore.ready.then(function () {
      the page the ones I will place." A Take button sits on every priced market on the day board,
      on the pick cards and on every projected prop. It marks the bet on the stored row: a market's
      `take` keeps the side, the pick, the price and the chance as shown when it was marked (the
-     board can show either side of a market, so the mark says which one); a prop's `take` is a flag.
+     board can show either side of a market, so the mark says which one); a prop's `take` was a flag,
+     and from 12 Nov 2026 the mark keeps the prop's side, line, price, chance and band too (`took`, in
+     the props block), so a props file loaded after the mark does not re-read the bet.
      The marked bets for the date are listed under Taking tonight on the board and under Taking on
      the Props tab, with a copy button, and the mark rides through a slate reload and a rescore
      (carryTakes). Nothing here scores or grades anything: "What you took" in Is it working reads
@@ -5775,7 +5906,7 @@ smStore.ready.then(function () {
     });
     return out;
   }
-  function propsTakenOn(dateISO) { return (typeof propsSource === "function" ? propsSource() : []).filter(function (r) { return (r.gdate || "") === dateISO && r.take && propHas(r); }); }
+  function propsTakenOn(dateISO) { return (typeof propsSource === "function" ? propsSource() : []).filter(function (r) { return (r.gdate || "") === dateISO && r.take && propHas(r); }).map(propTook); }   // each as it was marked (12 Nov 2026)
   /* the simulation's calls taken on NBA rows (26 Oct 2026): the mark lives on the row as row.simTakes */
   function simTakesOn(dateISO) {
     var out = [];
@@ -5892,8 +6023,9 @@ smStore.ready.then(function () {
         takeTally(sims, res, t.price === null || t.price === undefined ? -110 : t.price); if (res !== "push") sims.says += (t.p === null || t.p === undefined ? 0.5 : t.p);
       });
     });
-    (typeof props === "undefined" ? [] : props).forEach(function (r) {
-      var res = propTakeRes(r); if (!r.take || !res) return;
+    (typeof props === "undefined" ? [] : props).forEach(function (r0) {
+      if (!r0.take) return;
+      var r = propTook(r0), res = propTakeRes(r); if (!res) return;   // as it was marked: its own line, price and chance
       takeTally(pr, res, r.price); if (res !== "push") pr.says += r.chance;
     });
     var prs = mk(), t3r = { 2: mk(), 3: mk() };
@@ -5928,8 +6060,9 @@ smStore.ready.then(function () {
         picks.push({ d: r.gdate || "", kind: "simulation call", text: t.pick + " · " + r.matchup, p: t.p === null || t.p === undefined ? 0.5 : t.p, price: price, res: res, units: payOf(price, res) });
       });
     });
-    (typeof props === "undefined" ? [] : props).forEach(function (r) {
-      var res = propTakeRes(r); if (!r.take || !res) return;
+    (typeof props === "undefined" ? [] : props).forEach(function (r0) {
+      if (!r0.take) return;
+      var r = propTook(r0), res = propTakeRes(r); if (!res) return;
       picks.push({ d: r.gdate || "", kind: "prop", text: r.name + " " + r.side + " " + r.line + " " + (PROPS_LABEL[r.mk] || r.mk) + " · " + r.game, p: r.chance, price: r.price, res: res, units: payOf(r.price, res), mk: r.mk, side: r.side, band: r.band || "no edge" });
     });
     if (typeof pairTakesAll === "function") pairTakesAll().forEach(function (t) {
@@ -8402,8 +8535,8 @@ var qrcode = function() {
     var res = function (mk, row) { var r = gradeMarket(mk, row.finals); return r && r !== "invalid" ? r : undefined; };
     takesOn(dateISO).forEach(function (x) { P.take.push(phoneGameRef(keep, { k: "card", s: x.row.sport, g: x.row.matchup, p: x.mk.pick, m: x.mk.label || x.mk.key, c: phoneChance(x.mk.p), pr: x.mk.price, r: res(x.mk, x.row) }, x.row, 0)); });
     simTakesOn(dateISO).forEach(function (x) { P.take.push(phoneGameRef(keep, { k: "sim", s: "NBA", g: x.row.matchup, p: x.t.pick, m: "the simulation, " + nbaSimTakeViewLabel(x.t.view), c: phoneChance(x.t.p), w: phoneChance(x.t.worth), b: x.t.band === "no call" ? undefined : x.t.band, pr: x.t.price === null ? undefined : x.t.price, r: nbaSimTakeRes(x.t, x.row) || undefined }, x.row, 0)); });
-    propsTakenOn(dateISO).forEach(function (r) { P.take.push(phoneRefs(keep, { k: "prop", s: "NBA", g: r.game, p: r.name + " " + r.side + " " + r.line + " " + (PROPS_LABEL[r.mk] || r.mk), m: "prop", c: phoneChance(r.chance), pr: r.price, b: r.band, r: propTakeRes(r) || undefined }, [r], 0)); });
-    if (typeof pairTakesOn === "function") pairTakesOn(dateISO).forEach(function (t) { P.take.push(phoneRefs(keep, { k: "pair", s: "NBA", g: t.game, p: t.legs.map(function (r) { return r.name + " " + r.side + " " + r.line + " " + (PROPS_LABEL[r.mk] || r.mk); }).join(" + "), m: "same-game pair at the parlay price", c: phoneChance(t.chance), pr: t.price, r: propsPairRes(t) || undefined }, t.legs, 0)); });
+    propsTakenOn(dateISO).forEach(function (r) { P.take.push(phoneRefs(keep, { k: "prop", s: "NBA", g: r.game, p: r.name + " " + r.side + " " + r.line + " " + (PROPS_LABEL[r.mk] || r.mk), m: "prop", c: phoneChance(r.chance), pr: r.price, b: r.band, r: propTakeRes(r) || undefined }, [r._row || r], 0)); });   // the bet as it was marked; its panel is the prop as the card stands
+    if (typeof pairTakesOn === "function") pairTakesOn(dateISO).forEach(function (t) { P.take.push(phoneRefs(keep, { k: "pair", s: "NBA", g: t.game, p: t.legs.map(function (r) { return r.name + " " + r.side + " " + r.line + " " + (PROPS_LABEL[r.mk] || r.mk); }).join(" + "), m: "same-game pair at the parlay price", c: phoneChance(t.chance), pr: t.price, r: propsPairRes(t) || undefined }, t.legs.map(function (l) { return l._row || l; }), 0)); });
     if (typeof propsT3TakesOn === "function") propsT3TakesOn(dateISO).forEach(function (t) { var x = phoneTicket(t); x.k = "ticket"; P.take.push(phoneRefs(keep, x, t.legs.map(function (l) { return l.r; }), 0)); });   // 11 Nov 2026: a ticket you are taking is a bet you are taking
     if (keep.t3 !== false && typeof propsTrebles === "function" && propsBelow !== "leans") propsTrebles(dateISO, null, propsT3Mode(), propsLegs).slice(0, 6).forEach(function (t) { P.t3.push(phoneRefs(keep, phoneTicket(t), t.legs.map(function (l) { return l.r; }), 2)); });
     parlayFour(dateISO).forEach(function (x) { P.four.push(phoneGameRef(keep, { g: x.row.matchup, s: x.row.sport, p: x.mk.pick, m: x.mk.label, c: phoneChance(x.mk.p), pr: x.mk.price === null ? undefined : x.mk.price, b: bandOf(x.mk) || undefined, r: res(x.mk, x.row) }, x.row, 1)); });

@@ -3,7 +3,9 @@
      the page the ones I will place." A Take button sits on every priced market on the day board,
      on the pick cards and on every projected prop. It marks the bet on the stored row: a market's
      `take` keeps the side, the pick, the price and the chance as shown when it was marked (the
-     board can show either side of a market, so the mark says which one); a prop's `take` is a flag.
+     board can show either side of a market, so the mark says which one); a prop's `take` was a flag,
+     and from 12 Nov 2026 the mark keeps the prop's side, line, price, chance and band too (`took`, in
+     the props block), so a props file loaded after the mark does not re-read the bet.
      The marked bets for the date are listed under Taking tonight on the board and under Taking on
      the Props tab, with a copy button, and the mark rides through a slate reload and a rescore
      (carryTakes). Nothing here scores or grades anything: "What you took" in Is it working reads
@@ -57,7 +59,7 @@
     });
     return out;
   }
-  function propsTakenOn(dateISO) { return (typeof propsSource === "function" ? propsSource() : []).filter(function (r) { return (r.gdate || "") === dateISO && r.take && propHas(r); }); }
+  function propsTakenOn(dateISO) { return (typeof propsSource === "function" ? propsSource() : []).filter(function (r) { return (r.gdate || "") === dateISO && r.take && propHas(r); }).map(propTook); }   // each as it was marked (12 Nov 2026)
   /* the simulation's calls taken on NBA rows (26 Oct 2026): the mark lives on the row as row.simTakes */
   function simTakesOn(dateISO) {
     var out = [];
@@ -174,8 +176,9 @@
         takeTally(sims, res, t.price === null || t.price === undefined ? -110 : t.price); if (res !== "push") sims.says += (t.p === null || t.p === undefined ? 0.5 : t.p);
       });
     });
-    (typeof props === "undefined" ? [] : props).forEach(function (r) {
-      var res = propTakeRes(r); if (!r.take || !res) return;
+    (typeof props === "undefined" ? [] : props).forEach(function (r0) {
+      if (!r0.take) return;
+      var r = propTook(r0), res = propTakeRes(r); if (!res) return;   // as it was marked: its own line, price and chance
       takeTally(pr, res, r.price); if (res !== "push") pr.says += r.chance;
     });
     var prs = mk(), t3r = { 2: mk(), 3: mk() };
@@ -210,8 +213,9 @@
         picks.push({ d: r.gdate || "", kind: "simulation call", text: t.pick + " · " + r.matchup, p: t.p === null || t.p === undefined ? 0.5 : t.p, price: price, res: res, units: payOf(price, res) });
       });
     });
-    (typeof props === "undefined" ? [] : props).forEach(function (r) {
-      var res = propTakeRes(r); if (!r.take || !res) return;
+    (typeof props === "undefined" ? [] : props).forEach(function (r0) {
+      if (!r0.take) return;
+      var r = propTook(r0), res = propTakeRes(r); if (!res) return;
       picks.push({ d: r.gdate || "", kind: "prop", text: r.name + " " + r.side + " " + r.line + " " + (PROPS_LABEL[r.mk] || r.mk) + " · " + r.game, p: r.chance, price: r.price, res: res, units: payOf(r.price, res), mk: r.mk, side: r.side, band: r.band || "no edge" });
     });
     if (typeof pairTakesAll === "function") pairTakesAll().forEach(function (t) {

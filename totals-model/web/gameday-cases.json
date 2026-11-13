@@ -1,0 +1,862 @@
+[
+  {
+    "name": "nothing entered",
+    "inputs": {
+      "away": "Rays",
+      "home": "Tigers",
+      "line": 7.5,
+      "open": null,
+      "mph": null,
+      "dir": null,
+      "dome": null,
+      "temp": null,
+      "pf": null,
+      "spa": null,
+      "spai": null,
+      "sph": null,
+      "sphi": null,
+      "bpa": null,
+      "bph": null,
+      "fa": null,
+      "fh": null,
+      "fg": null,
+      "h2h": null,
+      "h2hn": null,
+      "tick": null,
+      "cash": null
+    },
+    "expect": {
+      "strict": {
+        "verdict": "PASS",
+        "side": "\u2014",
+        "net": 0,
+        "items": 0,
+        "go": false
+      },
+      "trial": {
+        "verdict": "PASS",
+        "side": "\u2014",
+        "net": 0,
+        "items": 0,
+        "go": false
+      }
+    }
+  },
+  {
+    "name": "light wind alone",
+    "inputs": {
+      "away": "Cubs",
+      "home": "Reds",
+      "line": 9.0,
+      "open": 9.0,
+      "mph": 6,
+      "dir": "out",
+      "dome": null,
+      "temp": null,
+      "pf": null,
+      "spa": null,
+      "spai": null,
+      "sph": null,
+      "sphi": null,
+      "bpa": null,
+      "bph": null,
+      "fa": null,
+      "fh": null,
+      "fg": null,
+      "h2h": null,
+      "h2hn": null,
+      "tick": null,
+      "cash": null
+    },
+    "expect": {
+      "strict": {
+        "verdict": "PASS",
+        "side": "\u2014",
+        "net": 0.0,
+        "items": 1,
+        "go": false
+      },
+      "trial": {
+        "verdict": "PASS",
+        "side": "\u2014",
+        "net": 0.0,
+        "items": 1,
+        "go": false
+      }
+    }
+  },
+  {
+    "name": "strong wind out, unmoved",
+    "inputs": {
+      "away": "Cubs",
+      "home": "Reds",
+      "line": 8.5,
+      "open": 8.5,
+      "mph": 22,
+      "dir": "out",
+      "dome": null,
+      "temp": null,
+      "pf": null,
+      "spa": null,
+      "spai": null,
+      "sph": null,
+      "sphi": null,
+      "bpa": null,
+      "bph": null,
+      "fa": null,
+      "fh": null,
+      "fg": null,
+      "h2h": null,
+      "h2hn": null,
+      "tick": null,
+      "cash": null
+    },
+    "expect": {
+      "strict": {
+        "verdict": "BET",
+        "side": "OVER",
+        "net": 1.4,
+        "items": 1,
+        "go": true
+      },
+      "trial": {
+        "verdict": "BET",
+        "side": "OVER",
+        "net": 1.4,
+        "items": 1,
+        "go": true
+      }
+    }
+  },
+  {
+    "name": "wind in, unmoved",
+    "inputs": {
+      "away": "Mets",
+      "home": "Giants",
+      "line": 7.5,
+      "open": 7.5,
+      "mph": 19,
+      "dir": "in",
+      "dome": null,
+      "temp": null,
+      "pf": null,
+      "spa": null,
+      "spai": null,
+      "sph": null,
+      "sphi": null,
+      "bpa": null,
+      "bph": null,
+      "fa": null,
+      "fh": null,
+      "fg": null,
+      "h2h": null,
+      "h2hn": null,
+      "tick": null,
+      "cash": null
+    },
+    "expect": {
+      "strict": {
+        "verdict": "BET",
+        "side": "UNDER",
+        "net": -1.1,
+        "items": 1,
+        "go": true
+      },
+      "trial": {
+        "verdict": "BET",
+        "side": "UNDER",
+        "net": -1.1,
+        "items": 1,
+        "go": true
+      }
+    }
+  },
+  {
+    "name": "wind out lifted by a hitters park",
+    "inputs": {
+      "away": "Rockies",
+      "home": "Padres",
+      "line": 10.5,
+      "open": 10.5,
+      "mph": 20,
+      "dir": "out",
+      "dome": null,
+      "temp": null,
+      "pf": 118,
+      "spa": null,
+      "spai": null,
+      "sph": null,
+      "sphi": null,
+      "bpa": null,
+      "bph": null,
+      "fa": null,
+      "fh": null,
+      "fg": null,
+      "h2h": null,
+      "h2hn": null,
+      "tick": null,
+      "cash": null
+    },
+    "expect": {
+      "strict": {
+        "verdict": "BET",
+        "side": "OVER",
+        "net": 1.416,
+        "items": 1,
+        "go": true
+      },
+      "trial": {
+        "verdict": "BET",
+        "side": "OVER",
+        "net": 1.416,
+        "items": 1,
+        "go": true
+      }
+    }
+  },
+  {
+    "name": "wind out damped by a pitchers park",
+    "inputs": {
+      "away": "Mets",
+      "home": "Giants",
+      "line": 7.5,
+      "open": 7.5,
+      "mph": 20,
+      "dir": "out",
+      "dome": null,
+      "temp": null,
+      "pf": 88,
+      "spa": null,
+      "spai": null,
+      "sph": null,
+      "sphi": null,
+      "bpa": null,
+      "bph": null,
+      "fa": null,
+      "fh": null,
+      "fg": null,
+      "h2h": null,
+      "h2hn": null,
+      "tick": null,
+      "cash": null
+    },
+    "expect": {
+      "strict": {
+        "verdict": "BET",
+        "side": "OVER",
+        "net": 1.056,
+        "items": 1,
+        "go": true
+      },
+      "trial": {
+        "verdict": "BET",
+        "side": "OVER",
+        "net": 1.056,
+        "items": 1,
+        "go": true
+      }
+    }
+  },
+  {
+    "name": "a park with no wind is not evidence",
+    "inputs": {
+      "away": "Rockies",
+      "home": "Padres",
+      "line": 10.5,
+      "open": 10.5,
+      "mph": null,
+      "dir": null,
+      "dome": null,
+      "temp": null,
+      "pf": 118,
+      "spa": null,
+      "spai": null,
+      "sph": null,
+      "sphi": null,
+      "bpa": null,
+      "bph": null,
+      "fa": null,
+      "fh": null,
+      "fg": null,
+      "h2h": null,
+      "h2hn": null,
+      "tick": null,
+      "cash": null
+    },
+    "expect": {
+      "strict": {
+        "verdict": "PASS",
+        "side": "\u2014",
+        "net": 0,
+        "items": 0,
+        "go": false
+      },
+      "trial": {
+        "verdict": "PASS",
+        "side": "\u2014",
+        "net": 0,
+        "items": 0,
+        "go": false
+      }
+    }
+  },
+  {
+    "name": "park factor typed as 1.13 is ignored",
+    "inputs": {
+      "away": "Rockies",
+      "home": "Padres",
+      "line": 10.5,
+      "open": 10.5,
+      "mph": 20,
+      "dir": "out",
+      "dome": null,
+      "temp": null,
+      "pf": 1.13,
+      "spa": null,
+      "spai": null,
+      "sph": null,
+      "sphi": null,
+      "bpa": null,
+      "bph": null,
+      "fa": null,
+      "fh": null,
+      "fg": null,
+      "h2h": null,
+      "h2hn": null,
+      "tick": null,
+      "cash": null
+    },
+    "expect": {
+      "strict": {
+        "verdict": "BET",
+        "side": "OVER",
+        "net": 1.2,
+        "items": 1,
+        "go": true
+      },
+      "trial": {
+        "verdict": "BET",
+        "side": "OVER",
+        "net": 1.2,
+        "items": 1,
+        "go": true
+      }
+    }
+  },
+  {
+    "name": "wind out but line already ran",
+    "inputs": {
+      "away": "Rockies",
+      "home": "Padres",
+      "line": 11.0,
+      "open": 9.5,
+      "mph": 20,
+      "dir": "out",
+      "dome": null,
+      "temp": null,
+      "pf": null,
+      "spa": null,
+      "spai": null,
+      "sph": null,
+      "sphi": null,
+      "bpa": null,
+      "bph": null,
+      "fa": null,
+      "fh": null,
+      "fg": null,
+      "h2h": null,
+      "h2hn": null,
+      "tick": null,
+      "cash": null
+    },
+    "expect": {
+      "strict": {
+        "verdict": "PASS",
+        "side": "\u2014",
+        "net": 0.0,
+        "items": 1,
+        "go": false
+      },
+      "trial": {
+        "verdict": "PASS",
+        "side": "\u2014",
+        "net": 0.0,
+        "items": 1,
+        "go": false
+      }
+    }
+  },
+  {
+    "name": "roof shut kills wind and temperature",
+    "inputs": {
+      "away": "Astros",
+      "home": "Rangers",
+      "line": 8.0,
+      "open": 8.0,
+      "mph": 25,
+      "dir": "out",
+      "dome": true,
+      "temp": 95,
+      "pf": null,
+      "spa": null,
+      "spai": null,
+      "sph": null,
+      "sphi": null,
+      "bpa": null,
+      "bph": null,
+      "fa": null,
+      "fh": null,
+      "fg": null,
+      "h2h": null,
+      "h2hn": null,
+      "tick": null,
+      "cash": null
+    },
+    "expect": {
+      "strict": {
+        "verdict": "PASS",
+        "side": "\u2014",
+        "net": 0.0,
+        "items": 1,
+        "go": false
+      },
+      "trial": {
+        "verdict": "PASS",
+        "side": "\u2014",
+        "net": 0.0,
+        "items": 1,
+        "go": false
+      }
+    }
+  },
+  {
+    "name": "warm night cannot carry a call alone",
+    "inputs": {
+      "away": "Angels",
+      "home": "Athletics",
+      "line": 9.5,
+      "open": 9.5,
+      "mph": null,
+      "dir": null,
+      "dome": null,
+      "temp": 101,
+      "pf": null,
+      "spa": null,
+      "spai": null,
+      "sph": null,
+      "sphi": null,
+      "bpa": null,
+      "bph": null,
+      "fa": null,
+      "fh": null,
+      "fg": null,
+      "h2h": null,
+      "h2hn": null,
+      "tick": null,
+      "cash": null
+    },
+    "expect": {
+      "strict": {
+        "verdict": "PASS",
+        "side": "\u2014",
+        "net": 0.248,
+        "items": 1,
+        "go": false
+      },
+      "trial": {
+        "verdict": "PASS",
+        "side": "\u2014",
+        "net": 0.248,
+        "items": 1,
+        "go": false
+      }
+    }
+  },
+  {
+    "name": "sharp under money on its own is short",
+    "inputs": {
+      "away": "Phillies",
+      "home": "Mariners",
+      "line": 8.0,
+      "open": 8.0,
+      "mph": null,
+      "dir": null,
+      "dome": null,
+      "temp": null,
+      "pf": null,
+      "spa": null,
+      "spai": null,
+      "sph": null,
+      "sphi": null,
+      "bpa": null,
+      "bph": null,
+      "fa": null,
+      "fh": null,
+      "fg": null,
+      "h2h": null,
+      "h2hn": null,
+      "tick": 76,
+      "cash": 46
+    },
+    "expect": {
+      "strict": {
+        "verdict": "PASS",
+        "side": "\u2014",
+        "net": -0.3,
+        "items": 1,
+        "go": false
+      },
+      "trial": {
+        "verdict": "PASS",
+        "side": "\u2014",
+        "net": -0.3,
+        "items": 1,
+        "go": false
+      }
+    }
+  },
+  {
+    "name": "wind out fought by sharp under money",
+    "inputs": {
+      "away": "Phillies",
+      "home": "Mariners",
+      "line": 8.0,
+      "open": 8.0,
+      "mph": 16,
+      "dir": "out",
+      "dome": null,
+      "temp": null,
+      "pf": null,
+      "spa": null,
+      "spai": null,
+      "sph": null,
+      "sphi": null,
+      "bpa": null,
+      "bph": null,
+      "fa": null,
+      "fh": null,
+      "fg": null,
+      "h2h": null,
+      "h2hn": null,
+      "tick": 80,
+      "cash": 44
+    },
+    "expect": {
+      "strict": {
+        "verdict": "PASS",
+        "side": "\u2014",
+        "net": 0.5,
+        "items": 2,
+        "go": false
+      },
+      "trial": {
+        "verdict": "PASS",
+        "side": "\u2014",
+        "net": 0.5,
+        "items": 2,
+        "go": false
+      }
+    }
+  },
+  {
+    "name": "wind and money agreeing on the under",
+    "inputs": {
+      "away": "Twins",
+      "home": "White Sox",
+      "line": 9.0,
+      "open": 9.0,
+      "mph": 18,
+      "dir": "in",
+      "dome": null,
+      "temp": null,
+      "pf": null,
+      "spa": null,
+      "spai": null,
+      "sph": null,
+      "sphi": null,
+      "bpa": null,
+      "bph": null,
+      "fa": null,
+      "fh": null,
+      "fg": null,
+      "h2h": null,
+      "h2hn": null,
+      "tick": 80,
+      "cash": 44
+    },
+    "expect": {
+      "strict": {
+        "verdict": "BET",
+        "side": "UNDER",
+        "net": -1.3,
+        "items": 2,
+        "go": true
+      },
+      "trial": {
+        "verdict": "BET",
+        "side": "UNDER",
+        "net": -1.3,
+        "items": 2,
+        "go": true
+      }
+    }
+  },
+  {
+    "name": "two bad starters, nothing documented",
+    "inputs": {
+      "away": "Twins",
+      "home": "White Sox",
+      "line": 9.0,
+      "open": 9.0,
+      "mph": null,
+      "dir": null,
+      "dome": null,
+      "temp": null,
+      "pf": null,
+      "spa": 7.8,
+      "spai": 27,
+      "sph": 6.9,
+      "sphi": 25,
+      "bpa": null,
+      "bph": null,
+      "fa": null,
+      "fh": null,
+      "fg": null,
+      "h2h": null,
+      "h2hn": null,
+      "tick": null,
+      "cash": null
+    },
+    "expect": {
+      "strict": {
+        "verdict": "PASS",
+        "side": "\u2014",
+        "net": 0.606185,
+        "items": 1,
+        "go": false
+      },
+      "trial": {
+        "verdict": "LEAN",
+        "side": "OVER",
+        "net": 0.606185,
+        "items": 1,
+        "go": true
+      }
+    }
+  },
+  {
+    "name": "bad pens and hot form, nothing documented",
+    "inputs": {
+      "away": "Braves",
+      "home": "Pirates",
+      "line": 8.5,
+      "open": 8.5,
+      "mph": null,
+      "dir": null,
+      "dome": null,
+      "temp": null,
+      "pf": null,
+      "spa": null,
+      "spai": null,
+      "sph": null,
+      "sphi": null,
+      "bpa": 6.2,
+      "bph": 5.8,
+      "fa": 11.2,
+      "fh": 10.4,
+      "fg": 5,
+      "h2h": null,
+      "h2hn": null,
+      "tick": null,
+      "cash": null
+    },
+    "expect": {
+      "strict": {
+        "verdict": "PASS",
+        "side": "\u2014",
+        "net": 0.945,
+        "items": 2,
+        "go": false
+      },
+      "trial": {
+        "verdict": "LEAN",
+        "side": "OVER",
+        "net": 0.945,
+        "items": 2,
+        "go": true
+      }
+    }
+  },
+  {
+    "name": "h2h under three meetings does not read",
+    "inputs": {
+      "away": "Guardians",
+      "home": "Royals",
+      "line": 7.0,
+      "open": 7.0,
+      "mph": 18,
+      "dir": "in",
+      "dome": null,
+      "temp": null,
+      "pf": null,
+      "spa": null,
+      "spai": null,
+      "sph": null,
+      "sphi": null,
+      "bpa": null,
+      "bph": null,
+      "fa": null,
+      "fh": null,
+      "fg": null,
+      "h2h": 12.0,
+      "h2hn": 2,
+      "tick": null,
+      "cash": null
+    },
+    "expect": {
+      "strict": {
+        "verdict": "BET",
+        "side": "UNDER",
+        "net": -1.0,
+        "items": 1,
+        "go": true
+      },
+      "trial": {
+        "verdict": "BET",
+        "side": "UNDER",
+        "net": -1.0,
+        "items": 1,
+        "go": true
+      }
+    }
+  },
+  {
+    "name": "roof shut with only the trial tier",
+    "inputs": {
+      "away": "Astros",
+      "home": "Rangers",
+      "line": 8.5,
+      "open": 8.5,
+      "mph": null,
+      "dir": null,
+      "dome": true,
+      "temp": null,
+      "pf": null,
+      "spa": 6.8,
+      "spai": 27,
+      "sph": 6.4,
+      "sphi": 26,
+      "bpa": 5.9,
+      "bph": 5.6,
+      "fa": null,
+      "fh": null,
+      "fg": null,
+      "h2h": null,
+      "h2hn": null,
+      "tick": null,
+      "cash": null
+    },
+    "expect": {
+      "strict": {
+        "verdict": "PASS",
+        "side": "\u2014",
+        "net": 1.062865,
+        "items": 3,
+        "go": false
+      },
+      "trial": {
+        "verdict": "LEAN",
+        "side": "OVER",
+        "net": 1.062865,
+        "items": 3,
+        "go": true
+      }
+    }
+  },
+  {
+    "name": "wind in with the whole trial tier agreeing",
+    "inputs": {
+      "away": "Guardians",
+      "home": "Royals",
+      "line": 9.5,
+      "open": 9.5,
+      "mph": 18,
+      "dir": "in",
+      "dome": null,
+      "temp": null,
+      "pf": null,
+      "spa": 2.1,
+      "spai": 28,
+      "sph": 2.4,
+      "sphi": 30,
+      "bpa": 2.9,
+      "bph": 3.1,
+      "fa": 6.4,
+      "fh": 6.8,
+      "fg": 5,
+      "h2h": 6.9,
+      "h2hn": 6,
+      "tick": null,
+      "cash": null
+    },
+    "expect": {
+      "strict": {
+        "verdict": "BET",
+        "side": "UNDER",
+        "net": -2.737342,
+        "items": 5,
+        "go": true
+      },
+      "trial": {
+        "verdict": "BET",
+        "side": "UNDER",
+        "net": -2.737342,
+        "items": 5,
+        "go": true
+      }
+    }
+  },
+  {
+    "name": "everything at once",
+    "inputs": {
+      "away": "Rays",
+      "home": "Tigers",
+      "line": 7.5,
+      "open": 7.5,
+      "mph": 11,
+      "dir": "out",
+      "dome": null,
+      "temp": 78,
+      "pf": 101,
+      "spa": 5.9,
+      "spai": 26,
+      "sph": 3.1,
+      "sphi": 29,
+      "bpa": 4.6,
+      "bph": 3.4,
+      "fa": 9.4,
+      "fh": 8.2,
+      "fg": 5,
+      "h2h": 9.1,
+      "h2hn": 6,
+      "tick": 76,
+      "cash": 46
+    },
+    "expect": {
+      "strict": {
+        "verdict": "PASS",
+        "side": "\u2014",
+        "net": 0.303875,
+        "items": 7,
+        "go": false
+      },
+      "trial": {
+        "verdict": "PASS",
+        "side": "\u2014",
+        "net": 0.303875,
+        "items": 7,
+        "go": false
+      }
+    }
+  }
+]

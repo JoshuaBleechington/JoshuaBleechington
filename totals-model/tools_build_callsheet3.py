@@ -705,6 +705,14 @@ def props_example_games() -> list:
            ("NYK", "C", "reb"): "HashtagBasketball: Knicks allow 13.4 rebounds a game to Cs (125th of 150, 1 the fewest); shown, not scored"}
     out = {"PHI": (31.2, [("Joel Embiid", 31.2, "Out")], [("Andre Drummond", "Questionable")]), "NYK": (0.0, [], [("Josh Hart", "Day-To-Day")])}
     outc = {"PHI": (31.2, [("Joel Embiid", 31.2)]), "NYK": (0.0, [])}   # the club's centres out, read by the other side's bigs (28 Oct 2026)
+    # who is out as the corrected levers read it (13 Nov 2026): Embiid newly out, with each 76er in four of his last five, and
+    # McCain back after missing three of them (a regular back takes minutes away); Hart day-to-day for the Knicks, counted 45%
+    # out; the league's level of the day 21 minutes a game a club; last season's rates at this season's level
+    change = {"PHI": {"new": 31.2 * 4 / 5, "back": 28.0 * 3 / 5, "new_names": [("Joel Embiid", 31.2, 4, "Out")], "back_names": [("Jared McCain", 28.0, 3, "")], "n": 5},
+              "NYK": {"new": 0.45 * 30.4, "back": 0.0, "new_names": [("Josh Hart", 30.4, 5, "Day-To-Day")], "back_names": [], "n": 5}}
+    level = {"PHI": 31.2, "NYK": 0.45 * 30.4}
+    maybes = {"PHI": [], "NYK": [("Josh Hart", "Day-To-Day", 0.55)]}
+    drift = {"pts": 0.97, "reb": 0.99, "ast": 0.97, "tpm": 0.98, "pra": 0.975, "pr": 0.975, "pa": 0.97, "ra": 0.98}
     # the profiles (26 Oct 2026): the NBA example's two clubs, for the matchup line (shown at no weight from 5 Nov 2026) and the
     # ratings' points a game; the game's runs no longer play for the props (5 Nov 2026, measured null), so the example carries
     # the market on the game and the books' consensus instead, as a real file does
@@ -736,7 +744,8 @@ def props_example_games() -> list:
                "script": script, "cons": slate.props_consensus(books, line),
                "usage": usage[name], "usage_src": "this season", "starter": name != "Kelly Oubre Jr.", "start_src": "his last game this season" if name == "Kelly Oubre Jr." else "RotoWire's expected five",
                "opp_nick": slate.NBA_NICK[opp], "dvp": dvp[opp][pos], "htb": htb.get((opp, pos, dmk)),
-               "opp_out_mpg": out[opp][0], "opp_out_names": out[opp][1], "opp_out_c_mpg": outc[opp][0], "opp_out_c_names": outc[opp][1], "self_out": "Out" if name == "Joel Embiid" else ""}
+               "opp_out_mpg": out[opp][0], "opp_out_names": out[opp][1], "opp_out_c_mpg": outc[opp][0], "opp_out_c_names": outc[opp][1], "self_out": "Out" if name == "Joel Embiid" else "",
+               "out_change": change[team], "out_level": level[team], "out_league": 21.0, "maybes": maybes[team], "drift": drift, "dvps": dict((c, dvp[opp][pos]) for c in slate.PROPS_COMBOS.get(mk, ()))}
         proj, why = slate.props_project(pr, this, last, ctx)
         item = {"pid": "x%d" % (k + 1), "name": name, "team": team, "opp": opp, "home": team == "NYK", "pos": pos, "mk": mk, "line": line, "op": op, "up": up, "book": "fanatics",
                 "books": books,
@@ -748,6 +757,7 @@ def props_example_games() -> list:
     props.sort(key=lambda x: (-(x.get("edge") if x.get("edge") is not None else -9), x["name"], x["mk"]))
     return [{"gid": "example", "away": "76ers", "home": "Knicks", "aab": "PHI", "hab": "NYK", "tip": None, "spread": odds["sp"], "total": odds["total"], "pace": 98.75, "league_pace": 100.5,
              "out": {"PHI": [["Joel Embiid", 31.2, "Out"]], "NYK": []},
+             "maybe": {"PHI": [], "NYK": [["Josh Hart", 30.4, "Day-To-Day", 0.55]]}, "lvl": {"PHI": 31.2, "NYK": round(0.45 * 30.4, 1)}, "lg": 21.0,
              "fives": {"away": {"status": "expected", "five": [["PG", "Tyrese Maxey"], ["SG", "VJ Edgecombe"], ["SF", "Paul George"], ["PF", "Kelly Oubre Jr."], ["C", "Adem Bona"]], "maybe": [["C", "Andre Drummond", "Questionable"]]},
                        "home": {"status": "confirmed", "five": [["PG", "Jalen Brunson"], ["SG", "Mikal Bridges"], ["SF", "OG Anunoby"], ["PF", "Josh Hart"], ["C", "Karl-Anthony Towns"]], "maybe": []}},
              "props": props, "unmatched": []}]

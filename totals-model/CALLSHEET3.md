@@ -4417,3 +4417,214 @@ old run, a man with no pick, a plain man): the cards, the panels and
 the note; the best-chance ticket and the rows; the two tiles and the
 marks through a trim by seven later dates. Run against sixteen copies
 broken on purpose, all caught.
+
+## The levers' audit, and the levers corrected, 13 Nov 2026
+
+The user, the same evening as the short game: "Please make sure the
+levers are accurate", and of the role read left off that afternoon,
+"Do it, explore the confirmed lineups".
+
+### What was measured on
+
+Every game a rotation man played with five behind him that season, in
+2024-25, 2025-26 and 2026-27 to 12 Nov, each with the season before it
+as the run's prior: 39,523 games (the minutes also on 2023-24). For
+each, what the run would have had before the tip, through slate.py's
+own functions: his rate with the prior, his minutes read, who of his
+club's regulars sat and how new that was, the pace and defence factors,
+the expected margin; and what he then did (lab `audit_build.py`,
+`audit_levers.py`, `audit_levers2.py`, `audit_dvp.py`,
+`dvp_byseason.py`, `audit_outrate.py`, `audit_drift.py`,
+`shape_checks.py`, `shape_minutes.py`, `fit_final.py`, `fit_role.py`,
+`role_few.py`). Then the corrected code end to end: both versions of
+`props_project` itself run over the same 39,523 games (lab
+`audit_e2e.py`), and over the sixteen graded nights of props with the
+row's own line, prices and report (lab `replay_levers.py`).
+
+Who is out is read off who played, not off the box scores' inactive
+lists (they name about a third of the regulars who sat). A regular is a
+man on 24 minutes a game whose last game was for the club and inside
+its last fifteen.
+
+### Lever by lever
+
+    lever                        as the run stood                 what the seasons say                           now
+    regulars out, the minutes    +1.42 a 30 mpg out TONIGHT       the level carries +0.17 once the CHANGE from   the change, by his starts
+                                                                  his five is read; newly out +1.9 a 30 mpg     and his own minutes
+                                                                  (t 43), back -1.8 (t -39)
+    regulars out, the rate       +0.56 points, +0.09 assists      the slope is right, the centre is not: the     the level over the league's
+                                 per 36 a 30 mpg, on every man    average man was lifted 0.6 per 36; and the     of the day; points 3.5% of
+                                                                  points lift is a share of his own rate         his rate, assists 0.11
+    pace                         in full                          0.62 of it beside the defence's table          0.65
+    defence v position           (n x this + 20 x last)/(n+20)    right as built: 0.57 to 0.83 of the blend      as it was; a combo by its
+                                 at 0.75                          shows early, 1.0 late; no fitted shape beats   parts; no raw young table
+                                                                  it on a left-out season
+    last season's prior          a quarter of last season's       the weight is right (0.38 to 0.48 fitted,      the prior at this season's
+                                 minutes, its level as it was     0.42 run); this season runs 0.92 of last       level (the drift)
+                                                                  season's points rates
+    the game script              -0.187 a point over 11.8         -0.183 (t -6) on the books' spreads            as it was
+    their centre out             +0.30 rebounds per 36            +0.25 (t 4) for a forward or centre            as it was
+    one sigma                    K 1.85 points ...                0.95 to 1.00 of the run's sigma for men who    as it was
+                                                                  started all five
+    the median's shift           0.08 sigma points ...            the median is beaten 50 to 51% (threes 54%)    as it was
+
+**The minutes.** The old lever's slope was measured against a man's
+season mean; on top of his last five it counts an absence twice
+whenever the man was already out through those five. Left-out-season
+miss in minutes: no lever 4.955, the old lever 5.111 (2.3 minutes over
+where 30 mpg were out, 2.9 over where regulars were back), one pair of
+constants 4.785, by his starts in five 4.752, by his starts and
+straight in his own minutes 4.714. The more he already plays the less
+he gains when others sit and the more he gives up when they return
+(`PROPS_OUT_CHANGE`, minutes a 30 mpg newly out and off a 30 mpg back,
+each at a read of 26 minutes and per ten minutes more):
+
+    started all five    +0.99 -1.29    0.84 +1.59      a 36-minute starter gains nothing and gives up 2.43
+    some of five        +1.68 -1.63    2.59 +1.21
+    none of five        +1.04 -2.37    2.48 +0.65      a 16-minute bench man gains 3.41 and gives up 1.83
+
+A man with one to four games behind him (2,936 games) is helped too:
+4.70 to 4.59.
+
+**Who plays.** On the sixteen graded nights: a man listed Out sat 131
+times in 135; a regular listed day-to-day or questionable played 48 in
+91, the same whether he had played his club's last game or not (0.55
+in, 0.45 out); a regular the report did not name played 1,099 in 1,112
+when he had played his club's last game, 27 in 31 after missing it, 8
+in 12 after missing two or three, none in 3 after four or more
+(`PROPS_UNLISTED_PLAYS`: 1.0, 0.9, 0.65, then taken as still out).
+
+**The rate.** By quarter of his own points rate the lift is 3.45, 3.53,
+3.65 and 3.28% a 30 mpg: a share, 3.5% (t 18; left-out-season miss
+5.8466 against 5.8505 flat and 5.8716 with none). Assists run flat by
+quarter, 0.11 per 36 (t 10). Rebounds and threes null. Centred on the
+league's level the miss is level across how many are out (+0.07,
+-0.07, +0.07, +0.28 per 36).
+
+**Pace.** Alone the pace factor shows at 1.25: a fast opponent is also
+a defence that allows more a minute, so the defence's table already
+holds part of it. Beside the table 0.62 of it shows on points, 0.61
+rebounds, 0.62 assists, 0.64 threes.
+
+**The defence.** The afternoon's note said the lever "leans too hard on
+last season's early". That reading came from the graded nights and does
+not stand: 7,784 of their 10,715 rows were carded on nights the run had
+no last season's ledger (29 Oct to 8 Nov and 11 Nov), where
+`props_dvp_blend` passed this season's table RAW (x0.342 on four
+games; the push's sigma 9 to 13% of the projection against 4.5% on a
+night with the ledger), and none of that showed up in what the men did.
+With the ledger in place the blend shows this season as in the others
+(0.71 of its points lean in a defence's first twelve games; 0.71 and
+0.25 the two seasons before). Corrected: a young table with no last
+season behind it is pulled to the league's 1.00 by the same twenty
+games. And a combination reads each part off its own table by his own
+split of the stat (0.84 to 0.90 of the lean shows, against 0.66 to 0.81
+off the points lean alone; the miss a hair lower on all four).
+
+**The prior's level.** The men with both seasons are scoring 0.92 of
+what last season's rates make of their minutes (0.98 to 1.04 in the two
+seasons before). The early-season bias on points, as it was and with
+the prior scaled: -0.23 to -0.19, +0.09 to -0.11, -0.93 to -0.24: the
+three seasons agree once it is in (`props_prior_drift`, from 10,000
+minutes of such men, held inside 0.85 to 1.15).
+
+### The role, when the five is confirmed
+
+With the real starters, his games in tonight's role read a new role far
+better than his last five (11,314 games where the role was not that of
+all his last five: the miss 6.26 from his last five, 5.50 with the
+corrected lever on who is out, 5.03 from his role games, 4.86 with the
+lever fitted to that read). Where the role is the one he has had all
+along the two reads are one; and under five games the pull to the flat
+number only added a bias (+0.8 to +1.5 minutes on a starter), so the
+role read is for a NEW role only. It is used when RotoWire's five is
+CONFIRMED: an expected five named the role wrongly on 61 of the 272
+role changes of the graded nights, and a wrong role costs ten minutes.
+Lineups confirm about half an hour before each tip, so a morning run
+reads none; a run made then does (each props run spends credits).
+
+### End to end, three seasons
+
+Both versions of the code over the 39,523 games, who sat known:
+
+                                     as the run stood    corrected    corrected, the real role
+    minutes: he played less it       -1.96               -0.12        -0.17
+    minutes: the mean miss           5.11                4.74         4.55
+    points: bias / rms               -9.1% / 6.69        +1.2% / 6.58   +1.0% / 6.53
+    rebounds                         -7.6% / 2.67        -1.1% / 2.61
+    assists                          -7.3% / 2.02        +1.8% / 2.01
+    threes                           -6.4% / 1.51        -0.4% / 1.51
+    points + rebounds + assists      -8.5% / 8.52        +0.7% / 8.18
+    he beat the median (points)      42.5%               51.3%
+    (rebounds, assists, the combos)  41 to 46%           50 to 51%
+
+Every season and every month the same way (points by season: -8.7 to
++1.8%, -9.4 to +0.7%, -10.3 to -1.5%). The run's projections were 7 to
+9% high and its "median" was beaten four times in ten: it called the
+over about eight points too often.
+
+### The sixteen graded nights, replayed
+
+10,715 graded rows, each projected again by the code as it stood and as
+corrected, both with the ledgers in place (on 12 Nov, a night the run
+had them, the replay matched the card within 0.01 on 357 rows of 362).
+
+                                     as carded     as it stood, ledgers in    corrected
+    minutes, bias / miss             -0.93 / 4.35  -0.91 / 4.33               +0.01 / 4.21
+    the projection, bias / rms       -5.3% / 5.92  -6.3% / 5.76               +1.2% / 5.62
+    the model alone on the over      49.4%         50.6%                      45.5%   (it landed 46.4%)
+    Brier, the blend (book 0.2479)                 0.2481                     0.2475
+    the model's earned share                       0.04                       0.21    (the blend gives it 0.20)
+    every pick with an edge                        465-383 (54.8%) -8.6u      523-402 (56.5%) +17.0u
+    the leans                                      433-370 -19.9u             493-373 +24.7u
+    the BET band                                   32-13 +11.3u               30-29 -7.7u
+
+The corrected blend's chance matched what happened at every level
+(said 51.0, 52.9, 54.9, 56.9, 59.6, 65.1; won 50.7, 52.6, 55.9, 57.4,
+57.8, 63.9). The BET band is the model's furthest disagreements with
+the book: 59 picks on 40 man-nights (22 winning nights to 18) against
+45 on 30 (20 to 10), fifty of the 59 in the season's first week. Too
+few to tell apart; the record tile below keeps the count from here.
+
+### On record, not built
+
+- **The season's ramp.** Corrected, points run -3.3% in October, level
+  November to January, +1.7% February, +3.1% March, +6.7% April; the
+  assists drift climbs from 0.93 to above 1.0 through every season. A
+  lever on the league's recent level against its season to date, to
+  measure before February.
+- **The first fortnight.** Where regulars are still named by last
+  season's minutes the lever's "back" ran 0.8 minutes heavy (228
+  man-nights of the replay; 130 thin-history starters of three
+  seasons). To measure before next October.
+- **Sigma off the bench.** For men who started none of their five the
+  miss runs 0.81 to 0.93 of the run's sigma (threes 1.00): the sigma
+  is wide there, the chance read toward 50%. Few of them carry a line.
+
+### The code
+
+`slate.py`: `props_club_dates`, `props_club_night`, `props_out_level`,
+`props_out_change`, `props_out_change_minutes`, `props_unlisted_plays`,
+`props_maybe_plays`, `props_minutes_role`, `props_prior_drift`,
+`props_dvp_lean`; `props_rate(..., drift)`; `props_dvp_blend` (the
+young table); every log entry carries its club (`tm`). A row carries
+`lv` 2, `chg` {new, back, dmin, lvl, lg, drate36}, `mrole` and `drift`;
+the game row the regulars listed short of Out and each club's level.
+The part "Regulars out" is "Who is out". With no injury report read,
+who is out is not read at all.
+
+The page: the row keeps `lv`, `chg` and `mrole`; `propRoleLine` says on
+the card and the panel how the minutes were read by the role; the
+record has a tile, "Picks under the levers as corrected (from 13 Nov
+2026)", by band and side with the sixteen replayed nights beside it.
+
+Checked: slate.py's selftest 294 (six new: the club's night, the change
+and the unlisted man, the corrected projection by its own arithmetic on
+four markets, the role read, a combo by its parts, the drift). The
+page: three harness checks on a date of six men, run against 23 copies
+broken on purpose, all caught; the Example reads through the corrected
+levers (Embiid newly out, a regular back, Hart day-to-day) and five of
+its checks were re-set by hand; 1,339 checks in all. And the whole
+props run as the bat file starts it, the odds calls stubbed out, on the
+day's real report, lineups and rosters: 144 made-up props on three
+games written, every projected row marked, and the page read the file.

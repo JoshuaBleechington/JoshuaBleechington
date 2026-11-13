@@ -65,6 +65,15 @@
              : which + (m.min.length > 1 ? " count" : " counts") + " as half a game (his last two run above the five)";
     return "Minutes: " + what + ". The read is " + (+m.read).toFixed(1) + " a game where the mean of his last five says " + (+m.mean).toFixed(1) + ". Scored from 13 Nov 2026, measured on four seasons of box scores.";
   }
+  function propRoleLine(r) {   // his games in tonight's role (13 Nov 2026): the run reads them when RotoWire's five is confirmed and the role is not that of all his last five; "" otherwise
+    var m = r && r.mrole; if (!m || !m.how || r.p === null || r.p === undefined || !isFinite(m.read)) return "";
+    var as = m.starter ? "as a starter" : "off the bench", flat = m.starter ? "27.5" : "20.5";
+    var what = m.how === "role" ? "his last " + m.games + " games " + as
+             : m.how === "few" ? "his " + m.games + " game" + (m.games === 1 ? "" : "s") + " " + as + " this season, with one game's weight on the " + flat + " a rotation man with none plays"
+             : "no game " + as + " this season, so the " + flat + " a rotation man with none plays, held to his own five";
+    return "Minutes: the five is confirmed and he " + (m.starter ? "starts" : "comes off the bench") + " tonight, a role he has not had in all his last five. The read is " + what + ": " + (+m.read).toFixed(1) +
+           " a game where the mean of his last five says " + (+m.mean).toFixed(1) + ". Scored from 13 Nov 2026: with the real starters such a night misses by 5.0 minutes this way and 6.3 from his last five (three seasons of box scores).";
+  }
   function propsTrim() {
     var seen = {}; props.forEach(function (r) { if (r.gdate) seen[r.gdate] = true; });
     var whole = {}; Object.keys(seen).sort().slice(-PROPS_WHOLE_NIGHTS).forEach(function (d) { whole[d] = true; });
@@ -1196,7 +1205,13 @@
                     mkt: x.mkt || null, cons: x.cons || null,   // the market on the game and the books' consensus (5 Nov 2026), in the simulation's place
                     form: x.form || null,   // his last three against the line (7 Nov 2026: the block was not copied off the file, so the line read the log and went with it when the night was trimmed)
                     med: x.med, usg: x.usg, sdf: x.sdf, starter: x.starter === undefined ? null : x.starter, start_src: x.start_src || null, gsim: propsGameSim(g.sim), fives: g.fives || null, actual: null, result: null,
-                    mshort: x.mshort && x.mshort.how ? { how: String(x.mshort.how), min: (x.mshort.min || []).map(Number), mean: +x.mshort.mean, read: +x.mshort.read } : null });   // a short game the run set aside in his minutes (13 Nov 2026)
+                    mshort: x.mshort && x.mshort.how ? { how: String(x.mshort.how), min: (x.mshort.min || []).map(Number), mean: +x.mshort.mean, read: +x.mshort.read } : null,   // a short game the run set aside in his minutes (13 Nov 2026)
+                    /* the levers as corrected on 13 Nov 2026 (the levers' audit): the run's mark on the row, his games in tonight's role when the
+                       five is confirmed and the role is new, and what the lever on who is out read; the record splits its picks on the mark */
+                    lv: isFinite(+x.lv) && +x.lv > 0 ? +x.lv : null,
+                    mrole: x.mrole && x.mrole.how ? { how: String(x.mrole.how), games: +x.mrole.games || 0, starter: !!x.mrole.starter, mean: +x.mrole.mean, read: +x.mrole.read } : null,
+                    chg: x.chg ? { nw: x.chg["new"] === null || x.chg["new"] === undefined ? null : +x.chg["new"], back: x.chg.back === null || x.chg.back === undefined ? null : +x.chg.back, dmin: +x.chg.dmin || 0,
+                                   lvl: x.chg.lvl === null || x.chg.lvl === undefined ? null : +x.chg.lvl, lg: x.chg.lg === null || x.chg.lg === undefined ? null : +x.chg.lg } : null });
       });
     });
     return rows;
@@ -1391,6 +1406,7 @@
     var byPlus = mk(), byPlusSide = { UNDER: mk(), OVER: mk() };   // the pick at even money or better, as carded from the day the blend changed (12 Nov 2026): the chip's own pool
     var byRamp = mk();   // the sheet's under, BET or LEAN, on a man whose minutes are on the way back (13 Nov 2026): shown, not scored
     var byShort = { UNDER: mk(), OVER: mk() }, byShortAll = mk();   // the BET and LEAN picks on a man whose short game the run set aside in his minutes (13 Nov 2026): scored, so it measures itself
+    var byLv = { BET: mk(), LEAN: mk() }, byLvSide = { UNDER: mk(), OVER: mk() }, byLvAll = mk();   // the picks made under the levers as corrected on 13 Nov 2026 (the run's mark on the row): their own pool, so the correction measures itself
     props.forEach(function (r) {
       var v = propClv(r); if (!v || !byClose[r.band]) return;
       byClose[r.band][0]++; if (v.clv > 0.0005) byClose[r.band][1]++; byClose[r.band][2] += v.clv;
@@ -1429,6 +1445,7 @@
       if ((r.band === "BET" || r.band === "LEAN") && isFinite(+r.price) && +r.price >= PROPS_PLUS && d >= PROPS_BLEND_FROM) { sinks.push(byPlus); if (byPlusSide[r.side]) sinks.push(byPlusSide[r.side]); }
       if ((r.band === "BET" || r.band === "LEAN") && propRampUnder(r)) sinks.push(byRamp);
       if ((r.band === "BET" || r.band === "LEAN") && r.mshort && r.mshort.how) { sinks.push(byShortAll); if (byShort[r.side]) sinks.push(byShort[r.side]); }
+      if ((r.band === "BET" || r.band === "LEAN") && r.lv >= 2) { sinks.push(byLvAll); sinks.push(byLv[r.band]); if (byLvSide[r.side]) sinks.push(byLvSide[r.side]); }
       sinks.forEach(function (s) {
         if (r.result === "void") { s.v++; return; }
         if (r.result === "push") { s.p++; return; }
@@ -1494,6 +1511,7 @@
     if (byPlus.n || byPlus.p) parts.push("picks at even money or better since " + propsBlendDay() + " " + rec(byPlus) + (byPlus.n ? " " + sgn(byPlus.units, 1) + "u" : ""));
     if (byRamp.n || byRamp.p) parts.push("unders on a man whose minutes are on the way back " + rec(byRamp) + (byRamp.n ? " " + sgn(byRamp.units, 1) + "u" : "") + " (shown, not scored)");
     if (byShortAll.n || byShortAll.p) parts.push("picks on a man with a short game set aside in his minutes " + rec(byShortAll) + (byShortAll.n ? " " + sgn(byShortAll.units, 1) + "u" : ""));
+    if (byLvAll.n || byLvAll.p) parts.push("picks under the levers as corrected on 13 Nov 2026: the BET band " + rec(byLv.BET) + (byLv.BET.n ? " " + sgn(byLv.BET.units, 1) + "u" : "") + " · the leans " + rec(byLv.LEAN) + (byLv.LEAN.n ? " " + sgn(byLv.LEAN.units, 1) + "u" : ""));
     if (byCons.toward.n || byCons.against.n) parts.push("the books' consensus with the pick " + rec(byCons.toward) + (byCons.toward.n ? " " + sgn(byCons.toward.units, 1) + "u" : "") + " · against it " + rec(byCons.against) + (byCons.against.n ? " " + sgn(byCons.against.units, 1) + "u" : ""));
     if (byForm.toward.n || byForm.against.n) parts.push("his last three with the pick " + rec(byForm.toward) + (byForm.toward.n ? " " + sgn(byForm.toward.units, 1) + "u" : "") + " · against it " + rec(byForm.against) + (byForm.against.n ? " " + sgn(byForm.against.units, 1) + "u" : "") + " (shown, not scored)");
     if (byFav.UNDER.n || byFav.OVER.n) parts.push("a man on a club favoured by 5 or more: unders " + rec(byFav.UNDER) + (byFav.UNDER.n ? " " + sgn(byFav.UNDER.units, 1) + "u" : "") + " · overs " + rec(byFav.OVER) + (byFav.OVER.n ? " " + sgn(byFav.OVER.units, 1) + "u" : "") + " (shown, not scored)");
@@ -1529,6 +1547,9 @@
     if (byPlus.n || byPlus.p) h2 += tile("The pick at even money or better, to test", byPlus, ["an edge on the card at a price of +100 or longer, as carded since " + propsBlendDay() + " (the blend as it stands): unders " + rec(byPlusSide.UNDER) + (byPlusSide.UNDER.n ? " " + sgn(byPlusSide.UNDER.units, 1) + "u" : "") + " · overs " + rec(byPlusSide.OVER) + (byPlusSide.OVER.n ? " " + sgn(byPlusSide.OVER.units, 1) + "u" : "") + " · replayed under this blend on fourteen nights it went 83-58 (shown, not scored)"]);
     if (byRamp.n || byRamp.p) h2 += tile("The under on a man whose minutes are on the way back (shown, not scored)", byRamp, ["a short game in his last five and his last two above them: the projection's minutes run low; counted from the nights whose logs the page holds · measured on fourteen nights before it, 14-32"]);
     if (byShortAll.n || byShortAll.p) h2 += tile("A short game set aside in his minutes (scored from 13 Nov 2026)", byShortAll, ["the BET and LEAN picks on a man whose short game the run left out of his minutes or counted as half a game: unders " + rec(byShort.UNDER) + (byShort.UNDER.n ? " " + sgn(byShort.UNDER.units, 1) + "u" : "") + " · overs " + rec(byShort.OVER) + (byShort.OVER.n ? " " + sgn(byShort.OVER.units, 1) + "u" : "") + " · measured on four seasons of box scores: the minutes missed by 6.3 with the short game in, 5.6 with it set aside"]);
+    if (byLvAll.n || byLvAll.p) h2 += tile("Picks under the levers as corrected (from 13 Nov 2026)", byLvAll, ["the BET band " + rec(byLv.BET) + (byLv.BET.n ? " " + sgn(byLv.BET.units, 1) + "u" : "") + " · the leans " + rec(byLv.LEAN) + (byLv.LEAN.n ? " " + sgn(byLv.LEAN.units, 1) + "u" : "") +
+      " · unders " + rec(byLvSide.UNDER) + (byLvSide.UNDER.n ? " " + sgn(byLvSide.UNDER.units, 1) + "u" : "") + " · overs " + rec(byLvSide.OVER) + (byLvSide.OVER.n ? " " + sgn(byLvSide.OVER.units, 1) + "u" : "") +
+      " · the sixteen nights before it, replayed with the ledgers in place: every pick with an edge 523-402 corrected against 465-383 as the levers stood, the BET band 30-29 against 32-13 (59 and 45 picks: too few to tell apart, so this tile keeps the count)"]);
     if (byCons.toward.n || byCons.toward.p) h2 += tile("The books' consensus with the pick, half a point or more", byCons.toward, []);
     if (byCons.against.n || byCons.against.p) h2 += tile("The books' consensus against the pick", byCons.against, []);
     if (byForm.toward.n || byForm.toward.p) h2 += tile("His last three with the pick (shown, not scored)", byForm.toward, []);
@@ -1721,6 +1742,7 @@
       if (propFormLine(r)) h += '<p class="note pd-form' + (propFormAgrees(r) === true ? ' pos' : propFormAgrees(r) === false ? ' neg' : '') + '">' + propFormLine(r) + ' <span class="dim">· shown, not scored: it did not help the bet as a lever walk-forward (5 Nov 2026), so it is measured on the record tile\'s own line</span></p>';
       if (propRampLine(r)) h += '<p class="note pd-ramp">' + esc(propRampLine(r)) + '</p>';
       if (propShortLine(r)) h += '<p class="note pd-msh">' + esc(propShortLine(r)) + '</p>';
+      if (propRoleLine(r)) h += '<p class="note pd-mrole">' + esc(propRoleLine(r)) + '</p>';
       if (propTellsLine(r)) h += '<p class="note pd-tells">' + propTellsLine(r) + ' <span class="dim">· the tells (7 Nov 2026), shown, not scored: the favourite\'s chip reads every graded pick on this side, the spike\'s chip the BET and LEAN picks on a spike man not on a favourite (10 Nov 2026: on a favourite\'s man the spike swings by the night and carries no colour), the even-money chip the BET and LEAN picks at +100 or longer since the blend changed on ' + propsBlendDay() + ' (12 Nov 2026: a test); green where the line has done at least what it claimed on ' + PROPS_TELL_MIN + ' picks or more, red where less</span></p>';
       if (propBestAppLine(r)) h += '<p class="note pd-bestapp">' + propBestAppLine(r) + ' <span class="dim">· where to place it; the call and the grade stay at the carded book</span></p>';
       var clvP = propClv(r); if (clvP) h += '<p class="note pd-clv' + (clvP.clv > 0.0005 ? ' pos' : clvP.clv < -0.0005 ? ' neg' : '') + '">' + propClvLine(r) + ' <span class="dim">· the chance re-read at the closing line by the sheet\'s own blend, the need from the closing price</span></p>';
@@ -1887,6 +1909,7 @@
         (propOneBetLine(r) ? '<div class="n5 onebet">' + propOneBetLine(r) + '</div>' : '') +
         (propRampLine(r) ? '<div class="n5 ramp">' + esc(propRampLine(r)) + '</div>' : '') +
         (propShortLine(r) ? '<div class="n5 msh">' + esc(propShortLine(r)) + '</div>' : '') +
+        (propRoleLine(r) ? '<div class="n5 mrole">' + esc(propRoleLine(r)) + '</div>' : '') +
         (propsLeversLine(r) ? '<div class="n5">Moves it: ' + propsLeversLine(r) + '</div>' : '') +
         (propTellsLine(r) ? '<div class="n5 tells">' + propTellsLine(r) + '</div>' : '') +
         (propShopLine(r) ? '<div class="n5 shopline' + (propShopAgrees(r) === true ? ' pos' : propShopAgrees(r) === false ? ' neg' : '') + '">' + propShopLine(r) + '</div>' :

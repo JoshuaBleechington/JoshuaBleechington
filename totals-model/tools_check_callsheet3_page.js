@@ -3048,6 +3048,90 @@ const CHECKS = ["dome","playoff"];
       'minutes on the way back, the record: the sheet\'s unders on such men, two lost and one won, sit on their own tile (the over on the other such man is not counted); and when seven later dates push the night out and its rows are trimmed, the log goes, the mark stays on the two men\'s rows and the tile reads the same',
       JSON.stringify({ tile: rp.tile, kept: rp.kept, after: rp.tileAfter }));
 
+  // ---- 13 Nov 2026: a short game set aside in the minutes (the user: "do it"). slate.py now leaves a short game out of a starter's minutes, or counts it as half
+  //      a game for another man on the rise, measured on four seasons of box scores, and marks the row (`mshort`). On such a row the page's own caution stands
+  //      down, the card and the panel say what was set aside and what the five say untouched, the under is a ticket leg again, and the record keeps a tile for the
+  //      picks on such rows, by side; a row of the same shape from the old run keeps the caution ----
+  const msKeep = await pg.evaluate(async () => { await smStore.ready; const k = {}; for (const x of ['callsheet3.card.v1', 'callsheet3.props.v1', 'callsheet3.draft.v1']) k[x] = await smStore.getItem(x); k.below = localStorage.getItem('callsheet3.props.below.v1'); k.legs = localStorage.getItem('callsheet3.props.legs.v1'); await smStore.removeItem('callsheet3.card.v1'); await smStore.removeItem('callsheet3.props.v1'); return k; });
+  await reloaded();
+  const ms = await pg.evaluate(async () => {
+    const wait = (ms) => new Promise(r => setTimeout(r, ms || 120)), txt = e => (e ? e.innerText : '').replace(/\s+/g, ' ').trim();
+    await smStore.ready;
+    const load = async (doc, name) => { const dt = new DataTransfer(); dt.items.add(new File([JSON.stringify(doc)], name, { type: 'application/json' })); const inp = document.getElementById('slateFile'); inp.files = dt.files; inp.dispatchEvent(new Event('change', { bubbles: true })); await wait(); await wait(); };
+    const G = [['Hawks', 'Magic', 'ATL', 'ORL', -2.5], ['Bulls', 'Bucks', 'CHI', 'MIL', 3.5], ['Heat', 'Jazz', 'MIA', 'UTA', -1.5]];
+    const need = (price) => price < 0 ? -price / (-price + 100) : 100 / (price + 100);
+    const steady = [31, 33, 32, 30, 34, 32, 31, 33, 32, 30], back = [30, 31, 30, 29, 30, 7, 19, 19, 28, 31];
+    const cold = L => [L + 2, L - 2, L + 3, L - 1, L + 1, L - 2, L + 2, L - 3, L + 1, L - 1];
+    const man = (pid, name, gi, home, mk, side, line, chance, price, band, mins, mshort) => Object.assign({ gi, pid: String(pid), name, team: G[gi][home ? 3 : 2], opp: G[gi][home ? 2 : 3], home: !!home, pos: 'F', mk, line,
+      op: side === 'OVER' ? price : 100, up: side === 'UNDER' ? price : 100, book: 'fanduel', books: { fanduel: [line, side === 'OVER' ? price : 100, side === 'UNDER' ? price : 100] },
+      proj: line + (side === 'OVER' ? 2 : -2), sd: 6, pm: side === 'OVER' ? 0.7 : 0.3, pb: 0.5, p: side === 'OVER' ? chance : Math.round((1 - chance) * 10000) / 10000, push: 0, side, chance, price, need: Math.round(need(price) * 10000) / 10000,
+      edge: Math.round((chance - need(price)) * 10000) / 10000, band, mins: 24, rate36: 20, base: 18, med: line + (side === 'OVER' ? 1.5 : -1.5), usg: 22, sdf: 1, starter: true, start_src: "RotoWire's expected five", why: ['x'],
+      log: cold(line).slice(0, mins.length).map((v, i) => ['2026-11-' + String(10 + i), 'OPP', i % 2, mins[i], v, ['won by 3']]), parts: [{ k: 'pace', t: 'Pace', eff: side === 'OVER' ? 0.4 : -0.4, i: 0 }] }, mshort ? { mshort } : {});
+    const D = '2026-12-20';
+    const men = [man(11, 'Set Aside', 0, 0, 'pts', 'UNDER', 20.5, 0.70, -180, 'BET', back, { how: 'out', min: [7], mean: 20.8, read: 24.3 }),                  // the new run: a starter's 7-minute game left out
+      man(12, 'Old Run', 1, 0, 'reb', 'UNDER', 8.5, 0.66, -150, 'LEAN', back),                                                                             // the same five from the old run: the caution
+      man(13, 'Half Man', 1, 1, 'ast', 'OVER', 5.5, 0.60, -130, 'LEAN', [20, 20, 20, 20, 20, 20, 8, 21, 24, 25], { how: 'half', min: [8], mean: 19.6, read: 20.9 }),
+      man(14, 'Two Back', 2, 0, 'pts', 'UNDER', 12.5, 0.59, -125, 'LEAN', [30, 30, 30, 30, 30, 30, 31, 29, 7, 30], { how: 'half2', min: [7], mean: 25.4, read: 27.4 }),
+      man(15, 'Two Short', 0, 1, 'reb', 'UNDER', 5.5, 0.585, -120, 'LEAN', [30, 30, 30, 30, 30, 8, 30, 9, 31, 32], { how: 'out', min: [8, 9], mean: 22, read: 31 }),
+      man(16, 'No Edge Short', 2, 1, 'reb', 'UNDER', 7.5, 0.52, -120, 'no edge', back, { how: 'out', min: [7], mean: 20.8, read: 24.3 }),                   // no pick: the panel says what was set aside, the record does not count it
+      man(17, 'Plain', 2, 1, 'ast', 'UNDER', 4.5, 0.64, -140, 'LEAN', steady)];
+    const file = (date, list) => ({ format: 'callsheet3.props', version: 1, date, games: G.map((g, gi) => ({ gid: 'ms' + gi, away: g[0], home: g[1], aab: g[2], hab: g[3], spread: g[4], total: 225.5, props: list.filter(m => m.gi === gi) })) });
+    await load(file(D, men), 'nba-props-2026-12-20.json');
+    if (document.getElementById('propsView').hidden) { document.getElementById('m-props').click(); await wait(); }
+    document.getElementById('propsReset').click(); await wait();
+    const pick = async (id, v) => { const el = document.getElementById(id); el.value = v; el.dispatchEvent(new Event('change', { bubbles: true })); await wait(); };
+    const day = async (d) => { const pd = document.getElementById('propsDate'); pd.value = d; pd.dispatchEvent(new Event('change', { bubbles: true })); await wait(); };
+    const best = document.getElementById('propsBest');
+    const cards = () => [...best.querySelectorAll('.pk[data-prop]')].map(c => txt(c.querySelector('.n2')) + ' :: ' + (c.querySelector('.n5.ramp') ? 'CAUTION' : '') + ' :: ' + txt(c.querySelector('.n5.msh')));
+    const tix = () => [...best.querySelectorAll('.pk.t3')].map(e => [...e.querySelectorAll('.leg .lname')].map(x => x.textContent).join(' + '));
+    const o = {};
+    await pick('propsBelow', 'leans'); o.note = txt(best.querySelector('.pk-note')); o.cards = cards();
+    const panel = async (name) => { const tr = [...document.querySelectorAll('#propsTable tr[data-prop]')].find(r => r.textContent.indexOf(name) >= 0); tr.click(); await wait(); const b = document.querySelector('#propDetailBody');
+      const t = document.getElementById('propDetail').hidden ? 'closed' : (b.querySelector('.pd-ramp') ? 'CAUTION' : '') + ' :: ' + txt(b.querySelector('.pd-msh'));
+      document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })); await wait(); return t; };
+    o.panel = [await panel('Set Aside'), await panel('Old Run'), await panel('No Edge Short'), await panel('Plain')];
+    await pick('propsLegs', '2'); await pick('propsBelow', 't3c'); o.c2 = tix();
+    o.rows = JSON.parse(smStore.getItem('callsheet3.props.v1')).filter(x => x.gdate === D).map(x => x.name + ':' + JSON.stringify(x.mshort)).sort().join(' | ');
+    // the night: Set Aside's under wins (15 points), Half Man's over loses (4 assists), Two Back's under wins (9), Two Short's under loses (7 rebounds), Old Run's under loses (10 rebounds)
+    const box = { 'Set Aside': [15, 4, 2], 'Old Run': [9, 10, 2], 'Half Man': [9, 4, 4], 'Two Back': [9, 4, 2], 'Two Short': [9, 7, 2], 'No Edge Short': [9, 5, 2], 'Plain': [9, 4, 3] };
+    await load({ format: 'callsheet2.slate', version: 1, date: D, games: G.map((g, gi) => ({ sport: 'NBA', gdate: D, away: g[0], home: g[1], finals: { fa: '110', fh: '104', f5a: '55', f5h: '50' }, notes: [],
+      box: Object.fromEntries(men.filter(m => m.gi === gi).map(m => [m.pid, [m.name, 30, box[m.name][0], box[m.name][1], box[m.name][2], 1]])) })) }, 'nba-grade-2026-12-20.json'); await wait(250);
+    if (document.getElementById('propsView').hidden) { document.getElementById('m-props').click(); await wait(); }
+    await day(D);
+    const tiles = () => [...document.querySelectorAll('#propsCalib .calib > div')].map(txt).filter(t => /way back|set aside/i.test(t));
+    o.tiles = tiles(); o.short = ([...document.querySelectorAll('p.sides')].map(txt).join(' · ').match(/picks on a man with a short game set aside in his minutes [^·]*/) || [''])[0].trim();
+    for (let i = 1; i <= 7; i++) { const d = '2026-12-' + String(20 + i); await load(file(d, [man(950 + i, 'Later ' + i, 0, 0, 'pts', 'UNDER', 10.5, 0.5, -110, 'no edge', steady)]), 'nba-props-' + d + '.json'); }
+    if (document.getElementById('propsView').hidden) { document.getElementById('m-props').click(); await wait(); }
+    await day(D);
+    o.kept = JSON.parse(smStore.getItem('callsheet3.props.v1')).filter(x => x.gdate === D).map(x => x.name + ':' + (x.trim ? 'trim' : 'whole') + (x.log ? ':log' : '') + (x.rmp ? ':rmp' : '') + (x.mshort ? ':msh-' + x.mshort.how : '')).sort().join(' | ');
+    o.tilesAfter = tiles();
+    await pick('propsBelow', 't3');
+    return o;
+  });
+  await pg.evaluate(async (k) => { for (const x of Object.keys(k)) { if (x === 'below' || x === 'legs') { const key = x === 'below' ? 'callsheet3.props.below.v1' : 'callsheet3.props.legs.v1'; if (k[x] === null) localStorage.removeItem(key); else localStorage.setItem(key, k[x]); continue; } if (k[x] === null || k[x] === undefined) await smStore.removeItem(x); else await smStore.setItem(x, k[x]); } }, msKeep);
+  await reloaded();
+  const msTail = ' Scored from 13 Nov 2026, measured on four seasons of box scores.';
+  const msOut = 'Minutes: his 7-minute game is left out (he started all five, and a game cut short three or more back says nothing of tonight). The read is 24.3 a game where the mean of his last five says 20.8.' + msTail;
+  chk(ms.note === ''
+      && (ms.cards || []).join(' ## ') === ['Old Run UNDER 8.5 rebounds :: CAUTION :: ', 'Set Aside UNDER 20.5 points ::  :: ' + msOut, 'Plain UNDER 4.5 assists ::  :: ',
+        'Two Short UNDER 5.5 rebounds ::  :: Minutes: his 8- and 9-minute games are left out (he started all five, and a game cut short three or more back says nothing of tonight). The read is 31.0 a game where the mean of his last five says 22.0.' + msTail,
+        'Half Man OVER 5.5 assists ::  :: Minutes: his 8-minute game counts as half a game (his last two run above the five). The read is 20.9 a game where the mean of his last five says 19.6.' + msTail,
+        'Two Back UNDER 12.5 points ::  :: Minutes: his 7-minute game two games back counts as half a game (he started all five and his last was a full game). The read is 27.4 a game where the mean of his last five says 25.4.' + msTail].join(' ## ')
+      && JSON.stringify(ms.panel) === JSON.stringify([' :: ' + msOut, 'CAUTION :: ', ' :: ' + msOut, ' :: ']),
+      'a short game set aside in the minutes (13 Nov 2026): a row the run marked carries no caution and says on its card and its panel which game was set aside, how, the read and what the five say untouched (left out, half a game, half a game two back, two games left out); the same five from the old run keeps the caution and has no such line; a man with no pick still says it on his panel; and the BETs\' note has nothing to add on a BET the run has already read right',
+      JSON.stringify({ note: ms.note, cards: ms.cards, panel: ms.panel }));
+  chk(JSON.stringify(ms.c2) === JSON.stringify(['Set Aside + Plain', 'Half Man + Two Back'])
+      && ms.rows === 'Half Man:{"how":"half","min":[8],"mean":19.6,"read":20.9} | No Edge Short:{"how":"out","min":[7],"mean":20.8,"read":24.3} | Old Run:null | Plain:null | Set Aside:{"how":"out","min":[7],"mean":20.8,"read":24.3} | Two Back:{"how":"half2","min":[7],"mean":25.4,"read":27.4} | Two Short:{"how":"out","min":[8,9],"mean":22,"read":31}',
+      'a short game set aside, the tickets and the rows: the under the run has read right makes a leg of the first best-chance ticket and the two half-game men the second, where the same five from the old run, the pick with the most edge on the date, makes none; and each row keeps the mark as the file gave it',
+      JSON.stringify({ c2: ms.c2, rows: ms.rows }));
+  chk((ms.tiles || []).length === 2
+      && /^The under on a man whose minutes are on the way back \(shown, not scored\) 0-1 says 66\.0% · does 0\.0% \(±50\.0\) · [-−]1\.00u /i.test(ms.tiles[0])
+      && /^A short game set aside in his minutes \(scored from 13 Nov 2026\) 2-2 says 61\.9% · does 50\.0% \(±25\.0\) · [-−]0\.64u the BET and LEAN picks on a man whose short game the run left out of his minutes or counted as half a game: unders 2-1 \+0\.4u · overs 0-1 [-−]1\.0u · measured on four seasons of box scores: the minutes missed by 6\.3 with the short game in, 5\.6 with it set aside$/i.test(ms.tiles[1])
+      && /^picks on a man with a short game set aside in his minutes 2-2 [-−]0\.6u$/.test(ms.short)
+      && ms.kept === 'Half Man:trim:msh-half | No Edge Short:trim:msh-out | Old Run:trim:rmp | Plain:trim | Set Aside:trim:msh-out | Two Back:trim:msh-half2 | Two Short:trim:msh-out'
+      && JSON.stringify(ms.tilesAfter) === JSON.stringify(ms.tiles),
+      'a short game set aside, the record: the four picks on rows the run marked, two won and two lost, sit on their own tile by side (the man with no pick is not counted, nor the old run\'s row, which stays on the caution\'s tile); and when seven later dates push the night out and its rows are trimmed the marks stay, the old run\'s row keeps the caution\'s mark and no other, and both tiles read the same',
+      JSON.stringify({ tiles: ms.tiles, short: ms.short, kept: ms.kept, after: ms.tilesAfter }));
   // ---- 12 Nov 2026: a call on every game (the user: "the model wont give 'green bet' ... it still need to be able to provide a bet on something because an outcome is
   //      going to happen"). One a game on the board, by this order: the agreement rule, a side the sheet prices below its chance, a total at one of the four apps a
   //      point or more off the middle of every book's number, else the likelier winner at the best of the four prices. Each kind keeps its own record, replayed from the

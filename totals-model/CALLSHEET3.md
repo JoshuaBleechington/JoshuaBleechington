@@ -4248,3 +4248,172 @@ rules; the record's tile, and the mark kept through a trim by seven
 later dates. Run against fourteen copies broken on purpose; one was
 not caught at first, the short game read against the mean, which is
 why the ninth man is there.
+
+## The minutes after a short game, measured on four seasons, 13 Nov 2026
+
+The page's caution said the read was low and left the chance alone,
+"the cure is in the run's minutes". The user, the same evening: "Do
+it".
+
+### What was measured on
+
+The props run projects a man's minutes as the mean of his last five
+games played this season. Every game a man played with five behind him
+that season, in four seasons of box scores: his own 2024-25 ledger
+(1,234 games) and 2023-24, 2025-26 and 2026-27 to 12 Nov built here
+with the ledger run from ESPN's open pages (1,232, 1,235 and 174
+games; no odds call, nothing spent). 72,645 such games, 57,141 of them
+by a rotation man (the median of his five 15 minutes or more). For each
+one, what he played against what each way of reading the five would
+have said (lab `minutes_rule.py` to `minutes_rule6.py`, `minrules.py`).
+A short game is one under half the median of the five. Everything
+below is read from history alone: nothing about that night's lineup.
+
+    where the five stand                              games    he played less the mean of five   the mean miss
+    every rotation game                              57,141    -0.29                             4.89
+    a short game, one of the first three, his last
+    two not short                                     3,889    +2.21                             6.29
+        a starter in all five                           693    +4.39  (3.49, 4.94, 4.60 by season)  6.32
+        his last two 3+ above the five (the caution)  2,448    +3.01  (2.58, 3.32, 3.01, 4.42)   6.53
+    a short game his second last                      1,198    +0.32                             6.02
+        a starter in all five                           247    +2.18                             5.00
+    a short game his last                             1,668    -2.88                             7.21
+    no short game, his last two 3+ above the five     7,248    +0.68                             4.99
+    no short game, his last two 3+ below              6,985    -1.53                             5.11
+
+The caution's profile is real on four seasons: three minutes low, a
+starter four and a half. And a short game that was his LAST points the
+other way: he plays less.
+
+### The rule
+
+How much of an old short game to keep was fitted cell by cell (read =
+the other four + k × (the five - the other four); k 1 is as it was, 0
+leaves it out):
+
+    a starter in all five                     k 0.04    left out: +4.39 -> -0.15, the miss 6.32 -> 4.55
+        whatever his last two did             +0.02, -0.86, +0.81 (3+ above, 0 to 3 above, below the five)
+        the short game the oldest, second,
+        third of the five                     +0.77, -0.33, -0.87 left out
+        two short games among the first three +9.95 -> -0.42 (37 games)
+    a starter in all five, the short game
+    his second last, the last a full game     half way: +2.18 -> +0.33, the miss 5.00 -> 4.63 (left out: -1.99)
+    another man, his last two 3+ above        k 0.38 to 0.49    half a game: +2.56 -> +0.87, the miss 6.50 -> 6.14
+                                              (2.36, 2.74, 2.47 -> 0.69, 1.03, 0.76 by season; left out: 1.5 over)
+    another man, his last two under 3 above   k 0.65 to 1.4     as it was: +0.9 and -0.9; left out it reads 2.0 and 3.7 over
+
+A starter's short game is an accident (hurt, thrown out, a blowout sat
+out) and says nothing of tonight. Another man's is partly his role, and
+only counts for less when he has plainly climbed since.
+
+`slate.py`, `props_short_game` (`PROPS_SHORT_SHARE` 0.5,
+`PROPS_SHORT_RISE` 3.0, `PROPS_SHORT_HALF` 0.5), read by
+`props_minutes`:
+
+- a man who started all five: a short game among the first three, with
+  neither of his last two short, is left out (`out`); a short game his
+  second last with a full game after it counts as half a game (`half2`);
+- any other man: a short game among the first three counts as half a
+  game when his last two run 3 or more above the mean of the five
+  (`half`);
+- a short game that was his last, and anything under five games: as it
+  was.
+
+On the four seasons the rule moves 2,915 of the 57,141 rotation games
+(one in twenty): the read 2.96 under what he played before and 0.58
+under after, the miss on them down 0.70 (0.60 to 0.79 with the men
+drawn again 1,000 times), closer on 1,813 and further on 1,099; on a
+deep-bench man (the median under 15) it helps too (+3.72 -> +2.55).
+Over every rotation game the miss falls 0.036, below zero in every one
+of 1,000 draws of the men.
+
+The why line names the game, how it was read and what the five say
+untouched ("30.0 minutes projected: his last 5 games without the
+7-minute one (season 25.4), 5 of them starts; the mean of the five says
+25.4; he started all five and a game cut short three or more back says
+nothing of tonight: ... (693 games), scored"), and the row carries
+`mshort` {how, min, mean, read}. The minutes lever on the card ("his
+last 5 against the season") reads the new minutes.
+
+### Measured the same day and left off
+
+- **His games in tonight's role.** The largest miss in the minutes is a
+  changed role: a man who starts tonight having started none of his
+  last five played 9.4 minutes more than the mean of five said (1,697
+  games), one of five 6.5 more, a starter sent to the bench 2 to 6.5
+  fewer. Read from his last five games in the role he had THAT NIGHT
+  the miss on the 15,913 changed-role games fell from 6.37 to 5.12, on
+  every season. But that reads who really started. The run knows
+  RotoWire's expected five, and on the sixteen graded nights it was
+  right on 93.9% of 1,536 men-nights and on 211 of the 272 where the
+  flag's role was not the role of all his last five (77.6%; of the 93
+  wrong, 50 started who were not in the expected five and 42 were in it
+  and did not; no spelling fault among them). Read from the flag the
+  miss on those 272 was no better (4.90, then 5.00), even where the
+  flag and his last game agreed (4.48 -> 5.04 for a starter). A read to
+  come back to with confirmed lineups, not with expected ones.
+- **The first game back.** From three or more of his club's games
+  missed he played 0.86 of the read (1,079 games; 0.90 after three
+  missed down to 0.76 after thirteen; 0.85, 0.89 and 0.84 by season).
+  Five such men-nights in 1,536 on the props: too few to score.
+- **A short last game off the bench.** He played 3.4 fewer than the
+  five say (1,254 games). Seven men-nights with a short last game of
+  any kind on the props.
+- **The last ten games weighted to the recent** (0.75 a game back):
+  the miss over every game 4.89 -> 4.76, the best single read. It would
+  move every projection and the levers measured on top of the mean of
+  five, and has not been through the props: on record.
+- **The median of the five** misses more than the mean (4.99).
+
+### The graded nights replayed
+
+Sixteen nights, 27 Oct to 12 Nov, 10,629 graded rows from eleven
+backups joined to the box scores as they stood before each night (the
+ledger agreed with what the run had read on all but 15 of 1,747
+men-nights). Each row re-read with slate.py's own functions under
+today's blend, the projection scaled by the new minutes over the old
+(lab `minutes_replay_build.py`, `minutes_replay_picks.py`); replayed
+as it is, the chance matched the cards of 5 to 12 Nov to 0.0001.
+
+    the rule moves                        28 men-nights, 189 rows, on 10 nights
+    the sheet's minutes on them           he played 3.73 more as it was, 1.25 more under the rule; the miss 5.76 -> 4.85
+    the over on the moved rows            landed 51.9%; the sheet said 46.9%, the rule 48.4%, the book 49.1%
+    picks on the moved rows, as it was    19-29 (unders 19-28), the BET band 5-6
+        under the rule                    12-25 (unders 9-16, overs 3-9), the BET band 4-2
+    every pick with an edge               887-733 +13.9u as it was, 880-729 +12.1u under the rule
+    the BET band                          99-76 +6.3u as it was, 98-72 +9.7u under the rule
+
+Twenty-eight men-nights cannot say whether the picks are better (22
+lean unders drop out that had gone 10-12; 11 slim lean overs come in
+and went 3-8, seven of them on one man); they say the minutes are
+closer and the chance nearer the book's and the result. The four
+seasons carry the decision.
+
+On 13 Nov's sheet, re-read the same way without a run: four men move
+(Ivica Zubac 20.8 -> 24.2, Jarrett Allen 22.0 -> 25.8, Jalen Smith
+24.4 -> 28.8, Isaiah Collier 13.6 -> 14.8). Zubac's five BET unders
+become leans (55.0% to 60.9%), Allen's lean under loses its edge, Smith
+gains three leans on the over by under a point.
+
+### The page
+
+`props.engine.js`: a row with `mshort` is no longer a row the caution
+warns of (`propRamp` returns nothing), so the red line, the BETs'
+note's sentence and the ticket guard stand down on it and stay on a row
+of the same shape from the old run. `propShortLine` says on the card
+and the panel what was set aside, how, the read and what the five say
+untouched. The record has a tile, "A short game set aside in his
+minutes (scored from 13 Nov 2026)", the BET and LEAN picks on such
+rows by side, and a part on the short line; the mark stays on a
+trimmed row.
+
+Checked: slate.py's selftest 288 (three new: the shapes, the rise at
+2.98 and 3.04 minutes, the why line and the mark through
+`props_project`); `props_minutes` against the lab's rule on 83,158
+reads over the four seasons, none different (lab `xcheck_minutes.py`).
+The page: three harness checks on a date of seven men (left out, half a
+game, half a game two back, two games left out, the same five from the
+old run, a man with no pick, a plain man): the cards, the panels and
+the note; the best-chance ticket and the rows; the two tiles and the
+marks through a trim by seven later dates. Run against sixteen copies
+broken on purpose, all caught.

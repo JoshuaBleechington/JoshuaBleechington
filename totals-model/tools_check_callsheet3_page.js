@@ -2970,6 +2970,84 @@ const CHECKS = ["dome","playoff"];
       'a marks file, the night after it: the prop is listed and graded as it was marked, the under at 6.5 a win on five rebounds at -155, with the card it has moved to named beside it; the pair is the ticket that was marked, a loss on nine assists at +121; What you took and the list of every pick read them so; and loading the file a second time changes nothing and keeps one ticket',
       JSON.stringify({ taking: mk.after.taking.map(t => t.slice(0, 330)), took: mk.after.took, list: (mk.after.list || []).slice(0, 4), same: JSON.stringify(mk.again.rows) === JSON.stringify(mk.after.rows), said2: mk.again.said.slice(0, 120) }));
 
+  // ---- 13 Nov 2026: minutes on the way back. The props run reads a man's minutes off the mean of his last five games; with a short game among the five and his last
+  //      two above them the mean runs low and the sheet calls the under on him (Zubac: 7, 19, 19, 28, 31, six unders lost on 11 Nov and five BETs on the under again
+  //      on the 13th). Measured on fourteen nights: such a man played 4.8 minutes more than projected and the sheet's unders on him went 14-32. The card and the
+  //      panel say so, the BETs' note counts them, such an under makes no leg of a ticket by either rule, and the record keeps its line through the trim ----
+  const rpKeep = await pg.evaluate(async () => { await smStore.ready; const k = {}; for (const x of ['callsheet3.card.v1', 'callsheet3.props.v1', 'callsheet3.draft.v1']) k[x] = await smStore.getItem(x); k.below = localStorage.getItem('callsheet3.props.below.v1'); k.legs = localStorage.getItem('callsheet3.props.legs.v1'); await smStore.removeItem('callsheet3.card.v1'); await smStore.removeItem('callsheet3.props.v1'); return k; });
+  await reloaded();
+  const rp = await pg.evaluate(async () => {
+    const wait = (ms) => new Promise(r => setTimeout(r, ms || 120)), txt = e => (e ? e.innerText : '').replace(/\s+/g, ' ').trim();
+    await smStore.ready;
+    const load = async (doc, name) => { const dt = new DataTransfer(); dt.items.add(new File([JSON.stringify(doc)], name, { type: 'application/json' })); const inp = document.getElementById('slateFile'); inp.files = dt.files; inp.dispatchEvent(new Event('change', { bubbles: true })); await wait(); await wait(); };
+    const G = [['Hawks', 'Magic', 'ATL', 'ORL', -2.5], ['Bulls', 'Bucks', 'CHI', 'MIL', 3.5], ['Heat', 'Jazz', 'MIA', 'UTA', -1.5]];
+    const need = (price) => price < 0 ? -price / (-price + 100) : 100 / (price + 100);
+    const steady = [31, 33, 32, 30, 34, 32, 31, 33, 32, 30], back = [30, 31, 30, 29, 30, 7, 19, 19, 28, 31];   // back: a short game five games ago and the last two above the five
+    const cold = L => [L + 2, L - 2, L + 3, L - 1, L + 1, L - 2, L + 2, L - 3, L + 1, L - 1];   // three of his last five either way: no leg by the last-five rule
+    const man = (pid, name, gi, home, mk, side, line, chance, price, band, mins, vals) => ({ gi, pid: String(pid), name, team: G[gi][home ? 3 : 2], opp: G[gi][home ? 2 : 3], home: !!home, pos: 'F', mk, line,
+      op: side === 'OVER' ? price : 100, up: side === 'UNDER' ? price : 100, book: 'fanduel', books: { fanduel: [line, side === 'OVER' ? price : 100, side === 'UNDER' ? price : 100] },
+      proj: line + (side === 'OVER' ? 2 : -2), sd: 6, pm: side === 'OVER' ? 0.7 : 0.3, pb: 0.5, p: side === 'OVER' ? chance : Math.round((1 - chance) * 10000) / 10000, push: 0, side, chance, price, need: Math.round(need(price) * 10000) / 10000,
+      edge: Math.round((chance - need(price)) * 10000) / 10000, band, mins: 24, rate36: 20, base: 18, med: line + (side === 'OVER' ? 1.5 : -1.5), usg: 22, sdf: 1, starter: true, start_src: "RotoWire's expected five", why: ['x'],
+      log: (vals || cold(line)).slice(0, mins.length).map((v, i) => ['2026-11-' + String(10 + i), 'OPP', i % 2, mins[i], v, ['won by 3']]), parts: [{ k: 'pace', t: 'Pace', eff: side === 'OVER' ? 0.4 : -0.4, i: 0 }] });
+    const D = '2026-12-10';
+    const men = [man(1, 'Ramp Under', 0, 0, 'pts', 'UNDER', 20.5, 0.70, -180, 'BET', back, [18, 25, 17, 19, 16, 4, 12, 14, 22, 18]), man(1, 'Ramp Under', 0, 0, 'reb', 'UNDER', 8.5, 0.66, -150, 'BET', back, [7, 10, 6, 8, 7, 2, 5, 6, 9, 7]),
+      man(2, 'Ramp Over', 1, 0, 'ast', 'OVER', 5.5, 0.60, -130, 'LEAN', back),                                    // the same last five, and the sheet's side is the over: no caution
+      man(3, 'Steady Under', 1, 1, 'reb', 'UNDER', 6.5, 0.64, -140, 'LEAN', steady, [5, 8, 6, 4, 7, 5, 6, 8, 5, 4]),
+      man(4, 'Form Under', 2, 0, 'ast', 'UNDER', 4.5, 0.62, -135, 'LEAN', steady, [3, 6, 4, 2, 5, 3, 4, 6, 3, 2]),
+      man(5, 'Short Last', 2, 1, 'pts', 'UNDER', 12.5, 0.59, -125, 'LEAN', [30, 31, 30, 29, 30, 31, 30, 31, 29, 7]),  // the short game is his last one: his last two sit under the five
+      man(6, 'Rise No Short', 0, 1, 'reb', 'UNDER', 5.5, 0.60, -130, 'LEAN', [20, 20, 20, 20, 20, 20, 20, 20, 28, 30]),  // his last two above the five and no short game among them
+      man(7, 'Four Games', 1, 0, 'pts', 'UNDER', 9.5, 0.585, -120, 'LEAN', [7, 19, 28, 31]),                        // four games behind him: no last five to read
+      man(8, 'Median Man', 2, 1, 'reb', 'UNDER', 7.5, 0.57, -120, 'LEAN', [30, 30, 30, 30, 30, 12, 26, 26, 27, 28])];  // short against the median of his five (12 under half of 26), not against their mean (23.8): the median is the measure
+    const file = (date, list) => ({ format: 'callsheet3.props', version: 1, date, games: G.map((g, gi) => ({ gid: 'rp' + gi, away: g[0], home: g[1], aab: g[2], hab: g[3], spread: g[4], total: 225.5, props: list.filter(m => m.gi === gi) })) });
+    await load(file(D, men), 'nba-props-2026-12-10.json');
+    if (document.getElementById('propsView').hidden) { document.getElementById('m-props').click(); await wait(); }
+    document.getElementById('propsReset').click(); await wait();
+    const pick = async (id, v) => { const el = document.getElementById(id); el.value = v; el.dispatchEvent(new Event('change', { bubbles: true })); await wait(); };
+    const day = async (d) => { const pd = document.getElementById('propsDate'); pd.value = d; pd.dispatchEvent(new Event('change', { bubbles: true })); await wait(); };
+    const best = document.getElementById('propsBest');
+    const cards = () => [...best.querySelectorAll('.pk[data-prop]')].map(c => txt(c.querySelector('.n2')) + ' :: ' + txt(c.querySelector('.n5.ramp')));
+    const tix = () => [...best.querySelectorAll('.pk.t3')].map(e => [...e.querySelectorAll('.leg .lname')].map(x => x.textContent).join(' + '));
+    const o = {};
+    await pick('propsBelow', 'leans'); o.note = txt(best.querySelector('.pk-note')); o.cards = cards();
+    const panel = async (name) => { const tr = [...document.querySelectorAll('#propsTable tr[data-prop]')].find(r => r.textContent.indexOf(name) >= 0); tr.click(); await wait(); const t = document.getElementById('propDetail').hidden ? 'closed' : txt(document.querySelector('#propDetailBody .pd-ramp'));
+      document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })); await wait(); return t; };
+    o.panel = [await panel('Ramp Under'), await panel('Ramp Over'), await panel('Steady Under')];
+    await pick('propsLegs', '2'); await pick('propsBelow', 't3c'); o.c2 = tix(); await pick('propsLegs', '3'); o.c3 = tix();
+    await pick('propsLegs', '2'); await pick('propsBelow', 't3'); o.f2 = tix();
+    // the night: his two unders lose (26 points, 10 rebounds), the over on the other man wins
+    const box = { 'Ramp Under': [26, 10, 3], 'Ramp Over': [9, 4, 7], 'Steady Under': [9, 5, 2], 'Form Under': [9, 4, 6], 'Short Last': [10, 4, 2], 'Rise No Short': [9, 4, 2], 'Four Games': [12, 4, 2], 'Median Man': [9, 5, 2] };
+    await load({ format: 'callsheet2.slate', version: 1, date: D, games: G.map((g, gi) => ({ sport: 'NBA', gdate: D, away: g[0], home: g[1], finals: { fa: '110', fh: '104', f5a: '55', f5h: '50' }, notes: [],
+      box: Object.fromEntries(men.filter(m => m.gi === gi).map(m => [m.pid, [m.name, 30, box[m.name][0], box[m.name][1], box[m.name][2], 1]])) })) }, 'nba-grade-2026-12-10.json'); await wait(250);
+    if (document.getElementById('propsView').hidden) { document.getElementById('m-props').click(); await wait(); }
+    await day(D);
+    const tile = () => [...document.querySelectorAll('#propsCalib .calib > div')].map(txt).filter(t => /way back/i.test(t));
+    o.tile = tile();
+    // seven later dates push the night out of the whole ones: its rows are trimmed, the log goes, the mark stays and the record's line with it
+    for (let i = 1; i <= 7; i++) { const d = '2026-12-' + String(10 + i); await load(file(d, [man(900 + i, 'Later ' + i, 0, 0, 'pts', 'UNDER', 10.5, 0.5, -110, 'no edge', steady)]), 'nba-props-' + d + '.json'); }
+    if (document.getElementById('propsView').hidden) { document.getElementById('m-props').click(); await wait(); }
+    await day(D);
+    o.kept = JSON.parse(smStore.getItem('callsheet3.props.v1')).filter(x => x.gdate === D).map(x => x.name + ' ' + x.mk + ':' + (x.trim ? 'trim' : 'whole') + (x.log ? ':log' : '') + (x.rmp ? ':rmp' : '')).sort().join(' | ');
+    o.tileAfter = tile();
+    await pick('propsBelow', 't3');
+    return o;
+  });
+  await pg.evaluate(async (k) => { for (const x of Object.keys(k)) { if (x === 'below' || x === 'legs') { const key = x === 'below' ? 'callsheet3.props.below.v1' : 'callsheet3.props.legs.v1'; if (k[x] === null) localStorage.removeItem(key); else localStorage.setItem(key, k[x]); continue; } if (k[x] === null || k[x] === undefined) await smStore.removeItem(x); else await smStore.setItem(x, k[x]); } }, rpKeep);
+  await reloaded();
+  const rpLine = 'Minutes on the way back: the projection reads his last five games (7, 19, 19, 28, 31 minutes, 20.8 a game) and one of them is a short game; his last two ran 29.5. Such a man played 4.8 minutes more than the sheet projected on fourteen nights and its under on him went 14-32. Shown, not scored: the chance on this card is not changed.';
+  chk(rp.note === "The 2 BETs on this date sit on 1 man in 1 game: a man's BETs land or miss together, so that is 1 bet, not 2. Both BETs on this date are unders on a man whose minutes are on the way back (Ramp Under): the projection reads a short game in his last five, and the sheet's under on such a man went 14-32."
+      && (rp.cards || []).join(' ## ') === ['Ramp Under UNDER 8.5 rebounds :: ' + rpLine, 'Ramp Under UNDER 20.5 points :: ' + rpLine, 'Steady Under UNDER 6.5 rebounds :: ', 'Form Under UNDER 4.5 assists :: ', 'Four Games UNDER 9.5 points :: ', 'Rise No Short UNDER 5.5 rebounds :: ', 'Ramp Over OVER 5.5 assists :: ', 'Short Last UNDER 12.5 points :: ', 'Median Man UNDER 7.5 rebounds :: ' + rpLine.replace('7, 19, 19, 28, 31 minutes, 20.8 a game', '12, 26, 26, 27, 28 minutes, 23.8 a game').replace('ran 29.5', 'ran 27.5')].join(' ## ')
+      && JSON.stringify(rp.panel) === JSON.stringify([rpLine, '', '']),
+      'minutes on the way back (13 Nov 2026): the sheet\'s under on a man with a short game in his last five and his last two above them carries the caution on its card and its panel, with his five and what they average, and the BETs\' note says how many of the BETs are such unders and on whom; the over on such a man carries none, nor an under on steady minutes, nor one whose short game is his last, nor one whose minutes rose with no short game, nor a man with four games behind him; and the short game is read against the median of the five, not their mean',
+      JSON.stringify({ note: rp.note, cards: rp.cards, panel: rp.panel }));
+  chk(JSON.stringify(rp.c2) === JSON.stringify(['Steady Under + Form Under', 'Rise No Short + Short Last']) && JSON.stringify(rp.c3) === JSON.stringify(['Steady Under + Form Under + Rise No Short']) && JSON.stringify(rp.f2) === JSON.stringify(['Steady Under + Form Under']),
+      'minutes on the way back, the tickets: his under is the likeliest pick on the date and the one with the form, and it makes no leg by either rule: the best-chance tickets are built from the next likeliest on each game and the last-five ticket from the other two men with the form',
+      JSON.stringify({ c2: rp.c2, c3: rp.c3, f2: rp.f2 }));
+  chk((rp.tile || []).length === 1 && /^The under on a man whose minutes are on the way back \(shown, not scored\) 1-2 says 64\.3% · does 33\.3% \(±28\.9\) · [-−]1\.17u a short game in his last five and his last two above them: the projection's minutes run low; counted from the nights whose logs the page holds · measured on fourteen nights before it, 14-32$/i.test(rp.tile[0])
+      && rp.kept === 'Form Under ast:trim | Four Games pts:trim | Median Man reb:trim:rmp | Ramp Over ast:trim:rmp | Ramp Under pts:trim:rmp | Ramp Under reb:trim:rmp | Rise No Short reb:trim | Short Last pts:trim | Steady Under reb:trim'
+      && JSON.stringify(rp.tileAfter) === JSON.stringify(rp.tile),
+      'minutes on the way back, the record: the sheet\'s unders on such men, two lost and one won, sit on their own tile (the over on the other such man is not counted); and when seven later dates push the night out and its rows are trimmed, the log goes, the mark stays on the two men\'s rows and the tile reads the same',
+      JSON.stringify({ tile: rp.tile, kept: rp.kept, after: rp.tileAfter }));
+
   // ---- 12 Nov 2026: a call on every game (the user: "the model wont give 'green bet' ... it still need to be able to provide a bet on something because an outcome is
   //      going to happen"). One a game on the board, by this order: the agreement rule, a side the sheet prices below its chance, a total at one of the four apps a
   //      point or more off the middle of every book's number, else the likelier winner at the best of the four prices. Each kind keeps its own record, replayed from the

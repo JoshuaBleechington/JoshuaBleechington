@@ -4151,3 +4151,100 @@ says, and a second load. Run against twenty-nine copies broken on
 purpose (seven, twelve and ten); one was not caught at first, a
 plus-money side with no edge given the chip, which is why the check
 opens three panels.
+
+## The night of 12 Nov, and minutes on the way back, 13 Nov 2026
+
+The 13 Nov backup, saved 15:21 UTC with the night graded (four games,
+394 props) and the marks file of 11 Nov loaded (five bets put back;
+that night reads 2-14).
+
+### The night
+
+His fifteen bets went 6-9 for -5.49 units: the four moneylines 4-0
+(+1.38), seven props 1-6, four same-game pairs 1-3. Every one reads on
+the page as the sheet his phone saved at 22:51 UTC had it, the first
+full night of "a mark keeps the bet": ten of the eleven props and
+pairs had their cards moved by a later run and each is graded as it
+was marked (Duncan Robinson OVER 1.5 assists at -190, one assist in 41
+minutes of an overtime game, a loss, where the row now reads UNDER 2.5
+and a win).
+
+Four of the seven props were BETs of the day's first props run that
+the second run took down to no edge or a bare lean (Coby White's
+points projected 8.85, then 12.78; Cade Cunningham's points, rebounds
+and assists 31.56, then 36.23): the shape of a run made without last
+season's ledger, which the day's later run had. They went 0-4, and the
+Taking cards had said the card had moved to no edge.
+
+The sheet's own night: no BET at the last run; the LEAN band 35-18 for
++11.4 units by cards and 12-11 one a man (five men 22-0 across their
+markets), the overs 30-12 and the unders 5-6. A call on every game
+4-0, two of them totals a point off the market by the last odds run
+(the call as given 111-62-1, +2.9 units). The best-chance tickets as
+kept 1-1 at two legs (+0.32) and 0-1 at three; the last-five tickets
+0-2 and 0-1; the pick at even money or better 2-1 (26-18 from 5 Nov).
+
+### Minutes on the way back
+
+Seven BETs on 13 Nov sat on two men, five of them unders on Ivica
+Zubac, projected 16.9 points, rebounds and assists against the books'
+25.5. The run reads a man's minutes off the mean of his last five
+games, and his were 7, 19, 19, 28, 31: 20.8 a game, 22.3 with a
+team-mate out, where he had just played 28 and 31. On 11 Nov the same
+read (21.2 minutes projected, 31 played) lost six unders on him.
+
+Measured on the fourteen nights that keep the logs, 29 Oct to 12 Nov,
+one row a man a night with five games behind him (1,208 men-nights;
+lab `ramp.py`). The profile: a short game in his last five (under half
+the median of the five) and his last two games 3 minutes or more a
+game above the five.
+
+    what he played less what the sheet projected
+        every man                                    -1.02 minutes   (1,208)
+        his last two 6+ above his five               +1.57           (23; starters +3.61 on 16)
+        his last two 3+ below his five               -2.1            (152)
+        the profile                                  +4.84           (17; se 1.15; 4+ over on ten, never 4+ under)
+    every prop on a man of the profile               the over landed 57.9% where the book said 48.7%   (107 props)
+    the sheet's under on him, BET or LEAN            14-32   30.4%   says 57.8%   -21.3 units   (the BET band 1-4)
+        by man and night                             four up, nine down of thirteen
+    the sheet's over on him                          none carded
+
+A rise alone is not the signal: the sheet's unders on every man whose
+last two ran 3 or more above his five went 160-148, and its BET-band
+unders among them 25-14. It is the short game inside the five that
+pulls the mean under his real minutes. The other direction is worth a
+look of its own: where his last two ran 3 or more below his five the
+over landed 41.4% against the book's 49.7% (1,042 props) and the
+sheet's unders went 118-76.
+
+On the page (`props.engine.js`, `propRamp`, `propRampUnder`,
+`PROPS_RAMP`), shown, not scored:
+
+- the sheet's under on such a man carries a caution in red on its
+  card and its panel, with his five, what they average and what his
+  last two ran;
+- the BETs' note above the cards says how many of the date's BETs are
+  such unders and on whom;
+- such an under makes no leg of a ticket, by the best-chance rule or
+  the last-five rule (on 13 Nov both best-chance two-leg tickets
+  carried one: Zubac's rebounds and Jarrett Allen's rebounds and
+  assists);
+- the record has a tile, "The under on a man whose minutes are on the
+  way back", counted from the nights whose logs the page holds (0-8 on
+  the 13 Nov backup: Zubac's six and Poeltl's two of 11 Nov), and a row
+  keeps the mark (`rmp`) when its log is trimmed.
+
+The chance on the card is slate.py's and is not changed: the cure is
+in the run's minutes (the median of the five, or the five without the
+short game), which wants its own measurement on the minutes of every
+man before it is scored.
+
+Checked: three harness checks on a date of nine men (his two unders,
+an over on a man with the same five, an under on steady minutes, one
+whose short game is his last, one whose minutes rose with no short
+game, one with four games, one short against the median and not the
+mean): the cards, the panel and the BETs' note; the tickets by both
+rules; the record's tile, and the mark kept through a trim by seven
+later dates. Run against fourteen copies broken on purpose; one was
+not caught at first, the short game read against the mean, which is
+why the ninth man is there.

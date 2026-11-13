@@ -708,8 +708,15 @@ def props_example_games() -> list:
     # who is out as the corrected levers read it (13 Nov 2026): Embiid newly out, with each 76er in four of his last five, and
     # McCain back after missing three of them (a regular back takes minutes away); Hart day-to-day for the Knicks, counted 45%
     # out; the league's level of the day 21 minutes a game a club; last season's rates at this season's level
-    change = {"PHI": {"new": 31.2 * 4 / 5, "back": 28.0 * 3 / 5, "new_names": [("Joel Embiid", 31.2, 4, "Out")], "back_names": [("Jared McCain", 28.0, 3, "")], "n": 5},
-              "NYK": {"new": 0.45 * 30.4, "back": 0.0, "new_names": [("Josh Hart", 30.4, 5, "Day-To-Day")], "back_names": [], "n": 5}}
+    # (the second pass the same day: the shares are read over the ten games of the minutes read, each game back counting three
+    # quarters of the one after it: Embiid sat the second and the seventh game back, McCain the last four; and George is in his
+    # first game back, his club having played two since his last)
+    w10 = [slate.PROPS_READ_DECAY ** k for k in range(9, -1, -1)]
+    sh_embiid = 1.0 - (w10[3] + w10[8]) / sum(w10)      # 0.754: the ten games he shared, by their weight
+    ms_mccain = sum(w10[6:]) / sum(w10)                 # 0.724: the last four, missed
+    change = {"PHI": {"new": 31.2 * sh_embiid, "back": 28.0 * ms_mccain, "new_names": [("Joel Embiid", 31.2, 8, "Out")], "back_names": [("Jared McCain", 28.0, 4, "")], "n": 10},
+              "NYK": {"new": 0.45 * 30.4, "back": 0.0, "new_names": [("Josh Hart", 30.4, 10, "Day-To-Day")], "back_names": [], "n": 10}}
+    missed = {"Paul George": 2}
     level = {"PHI": 31.2, "NYK": 0.45 * 30.4}
     maybes = {"PHI": [], "NYK": [("Josh Hart", "Day-To-Day", 0.55)]}
     drift = {"pts": 0.97, "reb": 0.99, "ast": 0.97, "tpm": 0.98, "pra": 0.975, "pr": 0.975, "pa": 0.97, "ra": 0.98}
@@ -745,7 +752,8 @@ def props_example_games() -> list:
                "usage": usage[name], "usage_src": "this season", "starter": name != "Kelly Oubre Jr.", "start_src": "his last game this season" if name == "Kelly Oubre Jr." else "RotoWire's expected five",
                "opp_nick": slate.NBA_NICK[opp], "dvp": dvp[opp][pos], "htb": htb.get((opp, pos, dmk)),
                "opp_out_mpg": out[opp][0], "opp_out_names": out[opp][1], "opp_out_c_mpg": outc[opp][0], "opp_out_c_names": outc[opp][1], "self_out": "Out" if name == "Joel Embiid" else "",
-               "out_change": change[team], "out_level": level[team], "out_league": 21.0, "maybes": maybes[team], "drift": drift, "dvps": dict((c, dvp[opp][pos]) for c in slate.PROPS_COMBOS.get(mk, ()))}
+               "out_change": change[team], "out_level": level[team], "out_league": 21.0, "maybes": maybes[team], "drift": drift, "dvps": dict((c, dvp[opp][pos]) for c in slate.PROPS_COMBOS.get(mk, ())),
+               "missed": missed.get(name, 0)}
         proj, why = slate.props_project(pr, this, last, ctx)
         item = {"pid": "x%d" % (k + 1), "name": name, "team": team, "opp": opp, "home": team == "NYK", "pos": pos, "mk": mk, "line": line, "op": op, "up": up, "book": "fanatics",
                 "books": books,

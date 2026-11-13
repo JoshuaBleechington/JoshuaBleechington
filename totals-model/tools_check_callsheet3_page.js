@@ -572,18 +572,24 @@ const CHECKS = ["dome","playoff"];
       'props table: the market filter keeps the rebounds, a click on Chance sorts it high to low and again low to high, the band and name filters narrow it, and Reset view puts it back', JSON.stringify({ v1: propsEx.view1, v2: { head: propsEx.view2.head, shown: propsEx.view2.shown, chances: propsEx.view2.chances }, v3: propsEx.view3, v4: propsEx.view4, v5: propsEx.view5 }));
   chk(propsEx.on && /^EXAMPLE · 8 props on/.test(propsEx.count) && /An example/.test(propsEx.msg) && propsEx.rows === 7 && propsEx.rowsAll === 8,
       'props example: eight props on 76ers @ Knicks, seven projected (Embiid is out), the count says EXAMPLE', JSON.stringify({ count: propsEx.count, rows: propsEx.rows, all: propsEx.rowsAll }));
-  chk(propsEx.best.length === 2 && /#1 · LEAN .*Karl-Anthony Towns UNDER 11\.5 rebounds 53\.2% · [-−]105 needs 51\.2% · edge \+2\.0/.test(propsEx.best[0]) && /#2 · LEAN .*Paul George UNDER 2\.5 threes 55\.4% · [-−]115 needs 53\.5% · edge \+1\.9/.test(propsEx.best[1])
+  chk(propsEx.best.length === 2 && /#1 · LEAN .*Paul George UNDER 2\.5 threes 55\.5% · [-−]115 needs 53\.5% · edge \+2\.1/.test(propsEx.best[0]) && /#2 · LEAN .*Karl-Anthony Towns UNDER 11\.5 rebounds 52\.9% · [-−]105 needs 51\.2% · edge \+1\.7/.test(propsEx.best[1])
       && !propsEx.best.some(b => /OG Anunoby|Tyrese Maxey|Mikal Bridges|Kelly Oubre|Jalen Brunson/.test(b))
       && propsEx.sides.length === 8 && propsEx.sides.filter(s => / OVER$/.test(s)).length === 2 && propsEx.sides.some(s => /^Jalen Brunson OVER$/.test(s)) && propsEx.sides.some(s => /^Tyrese Maxey OVER$/.test(s)) && propsEx.sides.filter(s => / UNDER$/.test(s)).length === 5 && propsEx.sides.filter(s => /Joel Embiid listed Out/.test(s)).length === 1,
-      'props example: with the over\'s shade off and the model a fifth of the say (5 Nov 2026) the sheet chooses on the prop\'s own evidence again, both ways: Brunson\'s and Maxey\'s points read OVER in the table, five props UNDER, Embiid\'s row says he is out, and the best list holds the two that clear their price, Towns\' under first (the books a point under the carded line) and George\'s under at -115 second; Brunson\'s over, level with its price until the levers were corrected, sits 0.3 under it (13 Nov 2026); no prop reaches the BET band', JSON.stringify({ best: propsEx.best.map(b => b.slice(0, 90)), sides: propsEx.sides }));
-  chk(propsEx.whys.some(w => /who is out against his last 5: newly out: Joel Embiid \(31 mpg, with him in 4 of his last 5\); back: Jared McCain \(28 mpg, missed 3 of his last 5\): [-−]1\.4 minutes \(0\.00 a 30 mpg newly out and 2\.52 off a 30 mpg back for a man who started all of them on 36\.6 minutes/.test(w))
+      'props example: with the over\'s shade off and the model a fifth of the say (5 Nov 2026) the sheet chooses on the prop\'s own evidence again, both ways: Brunson\'s and Maxey\'s points read OVER in the table, five props UNDER, Embiid\'s row says he is out, and the best list holds the two that clear their price, George\'s under at -115 first (13 Nov 2026, the second pass: his first game back and a regular back take minutes off him) and Towns\' under second (the books a point under the carded line); Brunson\'s over, level with its price until the levers were corrected, sits 0.3 under it; no prop reaches the BET band', JSON.stringify({ best: propsEx.best.map(b => b.slice(0, 90)), sides: propsEx.sides }));
+  chk(propsEx.whys.some(w => /who is out against his last 10: newly out: Joel Embiid \(31 mpg, with him in 8 of his last 10\); back: Jared McCain \(28 mpg, missed 4 of his last 10\): [-−]1\.0 minutes \(0\.00 a 30 mpg newly out and 1\.42 off a 30 mpg back for a man who started all of his last five on 36\.0 minutes/.test(w))
+      // the second pass (13 Nov 2026): the read of ten, his season's pull, the first game back, the top of the minutes, the league's home and road, the role's lean
+      && propsEx.whys.some(w => /36\.0 minutes projected: his last 10 games, the recent counting most \(season 37\.1\), 5 of his last 5 starts/.test(w) && /his season's mean is 37\.1 minutes against the read's 36\.0: .* 0\.50 of the gap for a man who started all of his last five .* so \+0\.6 minutes, scored/.test(w))
+      && propsEx.whys.some(w => /his club has played 2 games since his last: in his first game back from that many a man who started all of his last five plays 0\.96 of the read .* so [-−]1\.3 minutes, scored/.test(w))
+      && propsEx.whys.some(w => /the top of the minutes: a man projected past 36 played 1\.4 minutes less .* so every minute over 36 is read at half: [-−]1\.0 minutes, scored/.test(w))
+      && propsEx.whys.some(w => /on the road: x0\.993, the league's own gap over and above his rate/.test(w)) && propsEx.whys.some(w => /at home: x1\.011, the league's own gap/.test(w)) && propsEx.whys.filter(w => /the league's own gap/.test(w)).length === 6   // not on Towns' rebounds, nor on the man listed out
+      && propsEx.whys.some(w => /the median for a man who started all of his last five is read 0\.04 sigmas above the market's own shift/.test(w))
       && propsEx.whys.some(w => /his club's regulars out tonight run 31 minutes a game against the league's 21 on the day's report: \+1\.2% on his points rate \(3\.5% a 30 mpg\), \+0\.33 points per 36/.test(w))
       && propsEx.whys.some(w => /Josh Hart is Day-To-Day: counted 45% out \(a regular so listed played 46 nights in 76 on the graded nights\)/.test(w)) && !propsEx.whys.some(w => /the pooled rule|not counted as out/.test(w))
       && propsEx.whys.some(w => /the game's pace 97\.0 \(their 99\.5, Knicks's 98\.0, the league's 100\.5\) against their own: x0\.975, carried at 65% beside the defence's table/.test(w) && /: x0\.984/.test(w))
       && propsEx.whys.some(w => /blended with last season's 27\.7 \(1000 of 1909 minutes at a quarter, weight 250, last season's 28\.5 at x0\.970, how the men with both seasons are running this season\): 27\.7 per 36/.test(w))
       && propsEx.whys.some(w => /listed Out on ESPN: no projection/.test(w))
       && propsEx.whys.some(w => /Knicks allow 0\.97x the league's points per minute to guards \(this season 0\.95 over 16 games, last season 0\.99\): x0\.978 at 0\.75 weight, measured/.test(w)) && propsEx.whys.some(w => /HashtagBasketball: 76ers allow/.test(w)),
-      'props example: the why lines are the slate\'s own, as the levers were corrected (13 Nov 2026): who is out against his last five (Embiid newly out, a regular back) and against the league\'s night, a man listed day-to-day by his chance, pace at its share, last season\'s rate at this season\'s level, the defence factor, the website\'s rank and the listed-out man', JSON.stringify(propsEx.whys.slice(0, 2)).slice(0, 600));
+      'props example: the why lines are the slate\'s own, as the levers were corrected (13 Nov 2026) and the second pass left them: who is out against the ten games read (Embiid newly out, a regular back) and against the league\'s night, his season\'s pull, a first game back, the top of the minutes, home and road, the role\'s lean, a man listed day-to-day by his chance, pace at its share, last season\'s rate at this season\'s level, the defence factor, the website\'s rank and the listed-out man', JSON.stringify(propsEx.whys.slice(0, 2)).slice(0, 600));
   chk(propsEx.saved === null && propsEx.tileSame && propsEx.after === propsEx.before, 'props example: nothing is saved or graded, and a sport button puts it away', JSON.stringify({ saved: propsEx.saved, same: propsEx.tileSame, before: propsEx.before, after: propsEx.after }));
 
   // ---- the prop's own panel (21 Oct 2026): a best-prop card opens it, a table row still folds its why, Escape or Close puts it away
@@ -608,7 +614,7 @@ const CHECKS = ["dome","playoff"];
     const base = (dlg.querySelector('.pd-base') || {}).textContent || '', boldWhy = [...dlg.querySelectorAll('ul.pd-why li.lever-line')].map(e => e.textContent.slice(0, 40));
     const againstWhy = [...dlg.querySelectorAll('ul.pd-why li.lever-against')].map(e => e.textContent.replace(/\s+/g, ' ').trim()), whyHead = ((dlg.querySelector('h4 + ul.pd-why') || {}).previousElementSibling || {}).textContent || '';
     const boldTags = [...dlg.querySelectorAll('ul.pd-why li.lever-line')].map(e => e.textContent.slice(0, 12) + '→' + ((e.querySelector('.tag.helps') || {}).textContent || '') + '|' + getComputedStyle(e).color + '|' + getComputedStyle(e).fontWeight);
-    const cardLever = (card.querySelector('.n5') || {}).textContent || '';
+    const cardLever = [...card.querySelectorAll('.n5')].map(e => e.textContent).find(t => /^Moves it:/.test(t)) || '', cardBack = (card.querySelector('.n5.mret') || {}).textContent || '';   // the first game back sits above what moves it (13 Nov 2026, the second pass)
     document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })); await wait();
     const closedEsc = dlg.hidden && !document.body.classList.contains('noscroll');
     card.click(); await wait(); document.getElementById('propDetailClose').click(); await wait();
@@ -631,7 +637,7 @@ const CHECKS = ["dome","playoff"];
     trs[trs.length - 1].click(); await wait();
     const nextOffLast = document.getElementById('propDetailNext').disabled, posLast = document.getElementById('propDetailPos').textContent;
     document.getElementById('propDetailClose').click(); await wait(); document.getElementById('m-nba').click(); await wait();
-    return { hidden0, open, text: text.slice(0, 3200), tiles, simTiles, simText, simBeforeWhy, marks, books, carded, fromCardPos, noscroll, closedEsc, closedBtn, closedSport, levers, base, boldWhy, againstWhy, whyHead, boldTags, cardLever,
+    return { hidden0, open, text: text.slice(0, 3200), tiles, simTiles, simText, simBeforeWhy, marks, books, carded, fromCardPos, noscroll, closedEsc, closedBtn, closedSport, levers, base, boldWhy, againstWhy, whyHead, boldTags, cardLever, cardBack,
              n: trs.length, rowNames, rowOpen, name0, pos0, prevOff0, navShown, name1, pos1, prevOff1, name2, name1b, nextOffLast, posLast, formCard, formCardCls, formPanel, formPanelCls, formWhy };
   });
   chk(/^His last 3: \d+ · \d+ · \d+ against 2\.5 · [0-3] of 3 over(, [1-3] on it)?(, with the UNDER|, against the UNDER|, split)$/.test(propsDlg.formCard) && /^n5 formline( pos| neg)?$/.test(propsDlg.formCardCls)
@@ -650,16 +656,18 @@ const CHECKS = ["dome","playoff"];
       && propsDlg.nextOffLast && propsDlg.posLast === propsDlg.n + ' of ' + propsDlg.n && /^\d+ of \d+$/.test(propsDlg.fromCardPos),
       'props detail: a row of the Every-prop table opens the same panel, Next and the arrow keys walk the table\'s order with the position shown, Previous is off on the first and Next on the last, and a card opened from the best list knows its place too',
       JSON.stringify({ n: propsDlg.n, rows: propsDlg.rowNames, name0: propsDlg.name0, pos0: propsDlg.pos0, name1: propsDlg.name1, pos1: propsDlg.pos1, name2: propsDlg.name2, back: propsDlg.name1b, last: propsDlg.posLast, card: propsDlg.fromCardPos }));
-  chk(propsDlg.levers.length === 4 && /^lever helps top\|Who is out biggest lever\|[-−]0\.1$/.test(propsDlg.levers[0]) && propsDlg.levers.some(l => /^lever helps\|Pace\|[-−]0\.0$/.test(l)) && propsDlg.levers.some(l => /^lever (hurts|helps)\|Defence v position\|[-−+]0\.0$/.test(l))
+  chk(propsDlg.levers.length === 7 && /^lever helps top\|His first games back biggest lever\|[-−]0\.1$/.test(propsDlg.levers[0]) && /^lever helps\|Who is out\|[-−]0\.1$/.test(propsDlg.levers[1]) && propsDlg.levers.some(l => /^lever helps\|Pace\|[-−]0\.0$/.test(l)) && propsDlg.levers.some(l => /^lever (hurts|helps)\|Defence v position\|[-−+]0\.0$/.test(l))
+      && propsDlg.levers.some(l => /^lever helps\|Home and road\|[-−]0\.0$/.test(l)) && propsDlg.levers.some(l => /^lever helps\|His season's minutes\|[-−]0\.0$/.test(l))
       && propsDlg.levers.some(l => /^lever (hurts|helps)\|The game script, from the spread\|[-−+]0\.0$/.test(l)) && !propsDlg.levers.some(l => /matchup|prior|Minutes/.test(l))
-      && /^Starts from 2\.05, his 2\.17 per 36 at his minutes; the regulars out, the game script, pace and the defence take it to 1\.97, [-−]0\.5 against the line\. Green pushes toward the UNDER, red away from it: the measured levers only \(5 Nov 2026\)\. Inside the start, not a lever: Last season's prior on his rate \+0\.1 · Minutes, his last 5 against the season \+0\.0\.$/.test(propsDlg.base)
-      && propsDlg.boldWhy.length === 1 && /^who is out against his last 5: newly out/.test(propsDlg.boldWhy[0]) && !propsDlg.boldWhy.some(w => /^the game's pace|^2\.0 threes/.test(w))
+      && /^Starts from 2\.05, his 2\.17 per 36 at his minutes; his season's minutes, the regulars out, his first games back, the game script, pace, home and road and the defence take it to 1\.88, [-−]0\.6 against the line\. Green pushes toward the UNDER, red away from it: the measured levers only \(5 Nov 2026\)\. Inside the start, not a lever: Last season's prior on his rate \+0\.1 · Minutes, his last 10 against the season \+0\.0\.$/.test(propsDlg.base)
+      && propsDlg.boldWhy.length === 2 && /^who is out against his last 10: newly ou$/.test(propsDlg.boldWhy[0]) && /^his club has played 2 games since his la/.test(propsDlg.boldWhy[1]) && !propsDlg.boldWhy.some(w => /^the game's pace|^2\.0 threes/.test(w))
       && propsDlg.againstWhy.length === 0   // nothing against the under is big enough to tag: the defence and the script each move it 0.02 or less
-      && /the biggest reason for the UNDER in green$/.test(propsDlg.whyHead.trim()) && !/against it in red/.test(propsDlg.whyHead)   // the heading names only what the list tags
-      && propsDlg.boldTags.length === 1 && /^who is out a→the biggest for the UNDER\|/.test(propsDlg.boldTags[0])
+      && /the biggest reasons for the UNDER in green$/.test(propsDlg.whyHead.trim()) && !/against it in red/.test(propsDlg.whyHead)   // the heading names only what the list tags
+      && propsDlg.boldTags.length === 2 && /^who is out a→the second biggest for the UNDER\|/.test(propsDlg.boldTags[0]) && /^his club has→the biggest for the UNDER\|/.test(propsDlg.boldTags[1])
       && propsDlg.boldTags.every(t => /\|rgb\(\d+, \d+, \d+\)\|600$/.test(t)) && propsDlg.boldTags[0].split('|')[1] !== 'rgb(0, 0, 0)'
-      && /^Moves it: Who is out [-−]0\.1 · Pace [-−]0\.0$/.test(propsDlg.cardLever),
-      'props detail: what moves it keeps the measured levers only (5 Nov 2026): the regulars out, the game script off the spread, pace and the defence on George\'s threes, with last season\'s prior and the minutes trend named as what sits inside the start and no matchup lever; the biggest lever toward the UNDER (who is out, 13 Nov 2026: Embiid newly out gives a 34-minute starter nothing and McCain back takes 1.2 minutes) bolds its why line in green with a tag, nothing against it is big enough to tag in red, and the card names the top two levers by size', JSON.stringify({ levers: propsDlg.levers, base: propsDlg.base, bold: propsDlg.boldWhy, tags: propsDlg.boldTags, against: propsDlg.againstWhy, head: propsDlg.whyHead, card: propsDlg.cardLever }));
+      && /^Moves it: His first games back [-−]0\.1 · Who is out [-−]0\.1$/.test(propsDlg.cardLever)
+      && /^Minutes: his club has played 2 games since his last\. In his first game back from that many such a man plays 0\.96 of what his games say: [-−]1\.3 minutes\. Scored from 13 Nov 2026, measured on four seasons of box scores\.$/.test(propsDlg.cardBack),
+      'props detail: what moves it keeps the measured levers only (5 Nov 2026): the regulars out, the game script off the spread, pace and the defence on George\'s threes, with last season\'s prior and the minutes trend named as what sits inside the start and no matchup lever; the two biggest levers toward the UNDER (his first game back, his club having played two since his last, and who is out: Embiid newly out gives a 34-minute starter nothing and McCain back takes 0.9 minutes; the second pass, 13 Nov 2026, which also lists his season\'s minutes and home and road) bold their why lines in green with a tag each, nothing against it is big enough to tag in red, and the card says his first game back and names the top two levers by size', JSON.stringify({ levers: propsDlg.levers, base: propsDlg.base, bold: propsDlg.boldWhy, tags: propsDlg.boldTags, against: propsDlg.againstWhy, head: propsDlg.whyHead, card: propsDlg.cardLever, back: propsDlg.cardBack }));
   chk(propsDlg.hidden0 && propsDlg.open && propsDlg.noscroll && /^LEAN Paul George F PHI( starter)? UNDER 2\.5 threes 76ers @ Knicks/.test(propsDlg.text) && /on the road at NYK/.test(propsDlg.text) && /Why /i.test(propsDlg.text)
       && propsDlg.tiles.join(',') === 'Chance,Price,Edge,Projection,Minutes,Per 36,Usage' && propsDlg.marks === 10 && propsDlg.books === 3 && /fanatics/.test(propsDlg.carded),
       'props detail: a best-prop card opens the prop on its own panel with the tiles, the why, the marked last games and every book', JSON.stringify(propsDlg).slice(0, 1500));
@@ -923,9 +931,9 @@ const CHECKS = ["dome","playoff"];
     document.getElementById('propDetailClose').click(); await wait(); document.getElementById('m-nba').click(); await wait();
     return { head, maxeyCell, maxeyCls, maxeyTitle, tag, tagTitle, all, sorted, headOn, scores: sorted.map(score), onlyAll, shownAll, onlyMost, stored, after, h4 };
   });
-  chk(leverT.head === 'Levers' && leverT.maxeyCell === '1▲ 0▼' && !/\b(neg|pos)\b/.test(leverT.maxeyCls) && /\bagree\b/.test(leverT.maxeyCls) && leverT.maxeyTitle === '1 of 1 lever toward the UNDER' && leverT.tag === 'levers 1▲ 0▼' && leverT.tagTitle === leverT.maxeyTitle
-      && leverT.all.length === 7 && leverT.all.every(s => /^\d+▲ \d+▼$/.test(s)) && leverT.all.some(s => s === '3▲ 2▼') && /^What moves it · 1 of 1 lever toward the UNDER$/.test(leverT.h4.replace(/\s+/g, ' ').trim()),
-      'levers: the Every-prop table counts the measured levers toward the pick and against (George 1 up and none down: who is out, a regular back, with the prior and the minutes trend read as what sits inside the start, 5 Nov 2026, and the pace, the defence and the script too small to count, 13 Nov 2026; Towns\' under 3 up 2 down with the books\' consensus a lever of its own), the best card carries the tally as a tag and the panel\'s heading says it in words', JSON.stringify(leverT).slice(0, 900));
+  chk(leverT.head === 'Levers' && leverT.maxeyCell === '2▲ 0▼' && /\bpos\b/.test(leverT.maxeyCls) && /\bagree\b/.test(leverT.maxeyCls) && leverT.maxeyTitle === '2 of 2 levers toward the UNDER' && leverT.tag === 'levers 2▲ 0▼' && leverT.tagTitle === leverT.maxeyTitle
+      && leverT.all.length === 7 && leverT.all.every(s => /^\d+▲ \d+▼$/.test(s)) && leverT.all.some(s => s === '3▲ 2▼') && leverT.all.some(s => s === '3▲ 3▼') && /^What moves it · 2 of 2 levers toward the UNDER$/.test(leverT.h4.replace(/\s+/g, ' ').trim()),
+      'levers: the Every-prop table counts the measured levers toward the pick and against (George 2 up and none down: his first game back and who is out, a regular back, with the prior and the minutes trend read as what sits inside the start, 5 Nov 2026, and the pace, the defence, the script, his season\'s minutes and home and road too small to count, 13 Nov 2026; Towns\' under 3 up 3 down with the books\' consensus a lever of its own), the best card carries the tally as a tag and the panel\'s heading says it in words', JSON.stringify(leverT).slice(0, 900));
   chk(/Levers ▾/.test(leverT.headOn) && leverT.scores.every((s, i, a) => i === 0 || s <= a[i - 1]) && leverT.scores[0] > leverT.scores[leverT.scores.length - 1]
       && leverT.onlyAll.every(s => /^\d+▲ 0▼$/.test(s)) && leverT.onlyAll.length < leverT.all.length && /^\d+ of 7 shown/.test(leverT.shownAll)
       && leverT.onlyMost.length >= leverT.onlyAll.length && leverT.onlyMost.every(s => { const m = /^(\d+)▲ (\d+)▼$/.exec(s); return m && +m[1] > +m[2]; }) && leverT.stored.agree === 'most' && leverT.after.rows === 7 && leverT.after.agree === '',
@@ -962,10 +970,10 @@ const CHECKS = ["dome","playoff"];
     document.getElementById('m-nba').click(); await wait();
     return { h3, role, usage, floors, why, hi, bench, after, pairs, usgCells, usgSorted, usgShown, aligned };
   });
-  chk(/^Paul George F PHI starter$/.test(usageT.h3) && usageT.role === "RotoWire's expected five" && /^Usage=22\.5%\|of his club's possessions while on; a starter$/.test(usageT.usage)
+  chk(/^Paul George F PHI starter$/.test(usageT.h3) && usageT.role === "RotoWire's expected five" && /^Usage=22\.5%\|of his club's possessions while on; a starter, the miss read at 0\.94 sigmas \(measured\)$/.test(usageT.usage)
       && usageT.floors === ''
-      && /^usage 22\.5% of his club's possessions \(this season\), a starter \(RotoWire's expected five\): a mid-usage starting man's miss runs 1\.00 sigmas, measured, so the chance is read as it is$/.test(usageT.why),
-      'props: the panel carries his role as a tag, his usage as a tile (a mid-usage starter on threes: the miss read as it is, no floors on a threes line), and the why line', JSON.stringify({ h3: usageT.h3, role: usageT.role, usage: usageT.usage, floors: usageT.floors.slice(0, 200), why: usageT.why }));
+      && /^usage 22\.5% of his club's possessions \(this season\), a starter \(RotoWire's expected five\): a mid-usage starting man's miss runs 0\.94 sigmas, measured, so the chance is read narrower$/.test(usageT.why),
+      'props: the panel carries his role as a tag, his usage as a tile (a mid-usage starter on threes: the miss read at 0.94 sigmas from 13 Nov 2026, no floors on a threes line), and the why line', JSON.stringify({ h3: usageT.h3, role: usageT.role, usage: usageT.usage, floors: usageT.floors.slice(0, 200), why: usageT.why }));
   chk(usageT.aligned && usageT.usgCells.length === 7 && usageT.usgCells.some(c => /^Tyrese:29% S:usgc pos$/.test(c)) && usageT.usgCells.some(c => /^Kelly:19% B:usgc$/.test(c)) && usageT.usgCells.every(c => /:\d+(\.\d)?% [SB]:usgc( pos)?$/.test(c))
       && usageT.usgSorted.length === 7 && usageT.usgSorted.every((u, i, a) => i === 0 || u <= a[i - 1]) && /sorted by usage ▾/.test(usageT.usgShown)
       && usageT.hi.length === 3 && usageT.hi.every(n => /Jalen Brunson|Karl-Anthony Towns|Tyrese Maxey/.test(n)) && usageT.bench.length === 1 && /Kelly Oubre/.test(usageT.bench[0]) && usageT.after.n === 7 && usageT.after.usage === '' && usageT.after.role === ''
@@ -3131,7 +3139,7 @@ const CHECKS = ["dome","playoff"];
       JSON.stringify({ c2: ms.c2, rows: ms.rows }));
   chk((ms.tiles || []).length === 2
       && /^The under on a man whose minutes are on the way back \(shown, not scored\) 0-1 says 66\.0% · does 0\.0% \(±50\.0\) · [-−]1\.00u /i.test(ms.tiles[0])
-      && /^A short game set aside in his minutes \(scored from 13 Nov 2026\) 2-2 says 61\.9% · does 50\.0% \(±25\.0\) · [-−]0\.64u the BET and LEAN picks on a man whose short game the run left out of his minutes or counted as half a game: unders 2-1 \+0\.4u · overs 0-1 [-−]1\.0u · measured on four seasons of box scores: the minutes missed by 6\.3 with the short game in, 5\.6 with it set aside$/i.test(ms.tiles[1])
+      && /^A short game set aside in his minutes \(scored from 13 Nov 2026\) 2-2 says 61\.9% · does 50\.0% \(±25\.0\) · [-−]0\.64u the BET and LEAN picks on a man whose short game the run left out of his minutes or counted only in part: unders 2-1 \+0\.4u · overs 0-1 [-−]1\.0u · measured on four seasons of box scores: the minutes missed by 6\.3 with the short game in, 5\.6 with it set aside$/i.test(ms.tiles[1])
       && /^picks on a man with a short game set aside in his minutes 2-2 [-−]0\.6u$/.test(ms.short)
       && ms.kept === 'Half Man:trim:msh-half | No Edge Short:trim:msh-out | Old Run:trim:rmp | Plain:trim | Set Aside:trim:msh-out | Two Back:trim:msh-half2 | Two Short:trim:msh-out'
       && JSON.stringify(ms.tilesAfter) === JSON.stringify(ms.tiles),
@@ -3211,12 +3219,134 @@ const CHECKS = ["dome","playoff"];
       'the levers as corrected, the rows: each keeps the run\'s mark, the role read and what the lever on who is out read as the file gave them; a row from the run as it stood has none of the three',
       lvr.rows);
   chk((lvr.tiles || []).length === 1
-      && /^Picks under the levers as corrected \(from 13 Nov 2026\) 3-1 says 59\.8% · does 75\.0% \(±25\.0\) · \+1\.43u the BET band 1-1 [-−]0\.2u · the leans 2-0 \+1\.6u · unders 1-1 [-−]0\.2u · overs 2-0 \+1\.6u · the sixteen nights before it, replayed with the ledgers in place: every pick with an edge 523-402 corrected against 465-383 as the levers stood, the BET band 30-29 against 32-13 \(59 and 45 picks: too few to tell apart, so this tile keeps the count\)$/i.test(lvr.tiles[0])
+      && /^Picks under the levers as corrected \(from 13 Nov 2026\) 3-1 says 59\.8% · does 75\.0% \(±25\.0\) · \+1\.43u the BET band 1-1 [-−]0\.2u · the leans 2-0 \+1\.6u · unders 1-1 [-−]0\.2u · overs 2-0 \+1\.6u · the sixteen nights before it, replayed with the ledgers in place: every pick with an edge 518-445 as the levers stand against 464-384 as they stood, the BET band 38-33 against 32-13 \(71 and 45 picks: too few to tell apart, so this tile keeps the count\)$/i.test(lvr.tiles[0])
       && /^picks under the levers as corrected on 13 Nov 2026: the BET band 1-1 [-−]0\.2u · the leans 2-0 \+1\.6u$/.test(lvr.sides)
       && lvr.kept === 'No Edge New:trim:lv2:role-role | Old Levers:trim | Plain New:trim:lv2:chg | Role Bench:trim:lv2:role-few:chg | Role Five:trim:lv2:role-role | Role Start:trim:lv2:role-flat:chg'
       && JSON.stringify(lvr.tilesAfter) === JSON.stringify(lvr.tiles),
       'the levers as corrected, the record: the four BET and LEAN picks the corrected run made, three won and one lost, sit on a tile of their own by band and by side with the sixteen replayed nights beside them (the old run\'s BET, a winner, is not counted, nor the man with no pick); and when seven later dates push the night out and its rows are trimmed the marks stay and the tile reads the same',
       JSON.stringify({ tiles: lvr.tiles, sides: lvr.sides, kept: lvr.kept, after: lvr.tilesAfter }));
+  // ---- 13 Nov 2026: the second pass on the levers (the user: "Make sure those levers are as perfect as they can be"). A row marked `lv` 3 had its minutes
+  //      read from his last ten games, the recent counting most: a short game kept in part counts three tenths (a starter's short LAST game among them),
+  //      his games in tonight's role are read the same way with the flat number standing as the game before his first, and after his own games missed
+  //      the run reads a share for his first game back (`ret`). The card and the panel say each in the second pass's words; a row marked `lv` 2 reads as
+  //      it did; and his season's minutes, his first games back, the bench confirmed, the top of the minutes and home and road are levers on the panel ----
+  const l3Keep = await pg.evaluate(async () => { await smStore.ready; const k = {}; for (const x of ['callsheet3.card.v1', 'callsheet3.props.v1', 'callsheet3.draft.v1']) k[x] = await smStore.getItem(x); k.below = localStorage.getItem('callsheet3.props.below.v1'); k.legs = localStorage.getItem('callsheet3.props.legs.v1'); await smStore.removeItem('callsheet3.card.v1'); await smStore.removeItem('callsheet3.props.v1'); return k; });
+  await reloaded();
+  const l3 = await pg.evaluate(async () => {
+    const wait = (ms) => new Promise(r => setTimeout(r, ms || 120)), txt = e => (e ? e.innerText : '').replace(/\s+/g, ' ').trim();
+    await smStore.ready;
+    const load = async (doc, name) => { const dt = new DataTransfer(); dt.items.add(new File([JSON.stringify(doc)], name, { type: 'application/json' })); const inp = document.getElementById('slateFile'); inp.files = dt.files; inp.dispatchEvent(new Event('change', { bubbles: true })); await wait(); await wait(); };
+    const G = [['Hawks', 'Magic', 'ATL', 'ORL', -2.5], ['Bulls', 'Bucks', 'CHI', 'MIL', 3.5], ['Heat', 'Jazz', 'MIA', 'UTA', -1.5], ['Suns', 'Kings', 'PHX', 'SAC', 1.5]];
+    const need = (price) => price < 0 ? -price / (-price + 100) : 100 / (price + 100);
+    const steady = [31, 33, 32, 30, 34, 32, 31, 33, 32, 30];
+    const cold = L => [L + 2, L - 2, L + 3, L - 1, L + 1, L - 2, L + 2, L - 3, L + 1, L - 1];
+    const man = (pid, name, gi, home, mk, side, line, chance, price, band, extra) => Object.assign({ gi, pid: String(pid), name, team: G[gi][home ? 3 : 2], opp: G[gi][home ? 2 : 3], home: !!home, pos: 'F', mk, line,
+      op: side === 'OVER' ? price : 100, up: side === 'UNDER' ? price : 100, book: 'fanduel', books: { fanduel: [line, side === 'OVER' ? price : 100, side === 'UNDER' ? price : 100] },
+      proj: line + (side === 'OVER' ? 2 : -2), sd: 6, pm: side === 'OVER' ? 0.7 : 0.3, pb: 0.5, p: side === 'OVER' ? chance : Math.round((1 - chance) * 10000) / 10000, push: 0, side, chance, price, need: Math.round(need(price) * 10000) / 10000,
+      edge: Math.round((chance - need(price)) * 10000) / 10000, band, mins: 24, rate36: 20, base: 18, med: line + (side === 'OVER' ? 1.5 : -1.5), usg: 22, sdf: 1, starter: true, start_src: "RotoWire's confirmed five", why: ['x'],
+      log: cold(line).map((v, i) => ['2026-11-' + String(10 + i), 'OPP', i % 2, steady[i], v, ['won by 3']]), parts: [{ k: 'out', t: 'Who is out', eff: side === 'OVER' ? 0.4 : -0.4, i: 0 }] }, extra || {});
+    const D = '2027-02-09';
+    const half = { how: 'half', min: [7], mean: 28.2, read: 31.3 };
+    // every lever of the second pass on one man, with the two parts that sit inside the start (an UNDER: a minus helps)
+    const every = [['pull', "His season's minutes", 0.3], ['out', 'Who is out', -0.2], ['ret', 'His first games back', -0.6], ['stay', 'The bench confirmed', -0.26], ['oppc', 'Their centre out', 0.1], ['script', 'The game script, from the spread', -0.16],
+      ['top', 'The top of the minutes', -0.34], ['pace', 'Pace', 0.12], ['home', 'Home and road', -0.08], ['dvp', 'Defence v position', 0.4], ['cons', "The books' consensus", 0.04], ['prior', "Last season's prior on his rate", 0.2], ['minutes', 'Minutes, his last 10 against the season', -0.1]]
+      .map((x, i) => ({ k: x[0], t: x[1], eff: x[2], i }));
+    const men = [
+      man(31, 'Last Short', 0, 0, 'pts', 'OVER', 14.5, 0.62, -125, 'BET', { lv: 3, mshort: { how: 'last', min: [7], mean: 22.4, read: 27.0 } }),                                // a starter whose last game was the short one
+      man(32, 'Half Three', 1, 0, 'reb', 'UNDER', 6.5, 0.60, -130, 'BET', { lv: 3, mshort: half }),                                                                             // a short game kept in part: three tenths from the second pass
+      man(33, 'Half Two', 2, 0, 'ast', 'OVER', 4.5, 0.58, -120, 'LEAN', { lv: 2, mshort: half }),                                                                               // the same mark on a row of the first pass: half a game
+      man(34, 'Role Three', 0, 1, 'pts', 'UNDER', 18.5, 0.59, -125, 'LEAN', { lv: 3, mrole: { how: 'few', games: 3, starter: true, mean: 22.4, read: 29.6 } }),                 // three starts, the flat number as the game before them
+      man(35, 'Role One', 1, 1, 'ast', 'UNDER', 5.5, 0.64, -140, 'BET', { lv: 3, starter: false, mrole: { how: 'few', games: 1, starter: false, mean: 26.1, read: 21.9 } }),    // one game off the bench
+      man(36, 'Role Ten', 2, 1, 'reb', 'UNDER', 7.5, 0.57, -120, 'LEAN', { lv: 3, mrole: { how: 'role', games: 10, starter: true, mean: 24.0, read: 30.2 } }),                  // ten starts: no flat number left in the read
+      man(37, 'Role None', 3, 0, 'pts', 'OVER', 9.5, 0.58, -120, 'LEAN', { lv: 3, starter: false, mrole: { how: 'flat', games: 0, starter: false, mean: 27.0, read: 20.5 } }),  // no bench game this season
+      man(38, 'Role Old', 3, 0, 'reb', 'OVER', 5.5, 0.58, -120, 'LEAN', { lv: 2, mrole: { how: 'few', games: 3, starter: true, mean: 22.4, read: 29.6 } }),                     // the first pass's role read: its own words
+      man(39, 'Back Two', 3, 1, 'pts', 'UNDER', 21.5, 0.60, -125, 'BET', { lv: 3, ret: { missed: 2, f: 0.96, dmin: -1.3 } }),                                                   // his club has played two since his last
+      man(40, 'Back One', 3, 1, 'ast', 'UNDER', 6.5, 0.57, -120, 'LEAN', { lv: 3, ret: { missed: 1, f: 0.98, dmin: -0.7 }, mshort: { how: 'out', min: [5, 9], mean: 25.1, read: 31.0 } }),   // one missed, and two short games left out
+      man(41, 'Back None', 3, 1, 'reb', 'UNDER', 8.5, 0.52, -120, 'no edge', { lv: 3, ret: { missed: 0, f: 1, dmin: 0 } }),                                                     // he played his club's last game: nothing to say (no pick: the list shows twelve cards)
+      man(42, 'Back Bare', 3, 1, 'tpm', 'UNDER', 2.5, 0.57, -120, 'LEAN', { lv: 3, ret: { missed: 12, f: 0.74 } }),                                                             // a file with no minutes beside the share
+      man(43, 'Back No Edge', 3, 0, 'ast', 'UNDER', 3.5, 0.52, -120, 'no edge', { lv: 3, ret: { missed: 6, f: 0.85, dmin: -4.2 } }),                                            // no pick: the panel says it
+      man(45, 'Back Flat', 0, 1, 'reb', 'UNDER', 4.5, 0.52, -120, 'no edge', { lv: 3, ret: { missed: 3, f: 1, dmin: 0 } }),                                                    // a share of one: nothing to say
+      man(44, 'Every Lever', 2, 1, 'pts', 'UNDER', 20.5, 0.60, -125, 'BET', { lv: 3, base: 19.0, rate36: 22.8, proj: 18.5, parts: every })];
+    const file = (date, list) => ({ format: 'callsheet3.props', version: 1, date, levers: 3, games: G.map((g, gi) => ({ gid: 'l3' + gi, away: g[0], home: g[1], aab: g[2], hab: g[3], spread: g[4], total: 225.5, props: list.filter(m => m.gi === gi) })) });
+    await load(file(D, men), 'nba-props-2027-02-09.json');
+    if (document.getElementById('propsView').hidden) { document.getElementById('m-props').click(); await wait(); }
+    document.getElementById('propsReset').click(); await wait();
+    const pick = async (id, v) => { const el = document.getElementById(id); el.value = v; el.dispatchEvent(new Event('change', { bubbles: true })); await wait(); };
+    const day = async (d) => { const pd = document.getElementById('propsDate'); pd.value = d; pd.dispatchEvent(new Event('change', { bubbles: true })); await wait(); };
+    const best = document.getElementById('propsBest');
+    const o = {};
+    await pick('propsBelow', 'leans');
+    const lines = c => ['.n5.msh', '.n5.mrole', '.n5.mret'].map(q => txt(c.querySelector(q))).filter(Boolean);
+    o.cards = Object.fromEntries([...best.querySelectorAll('.pk[data-prop]')].map(c => [txt(c.querySelector('.n2')).replace(/ (OVER|UNDER) .*$/, ''), lines(c)]));
+    o.moves = (c => c ? txt([...c.querySelectorAll('.n5')].find(e => /^Moves it:/.test(txt(e)))) : 'no card')([...best.querySelectorAll('.pk[data-prop]')].find(c => /Every Lever/.test(txt(c.querySelector('.n2')))));
+    const panel = async (name, f) => { const tr = [...document.querySelectorAll('#propsTable tr[data-prop]')].find(r => r.textContent.indexOf(name) >= 0); tr.click(); await wait(); const b = document.querySelector('#propDetailBody');
+      const t = document.getElementById('propDetail').hidden ? 'closed' : f(b);
+      document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })); await wait(); return t; };
+    const plines = b => ['.pd-msh', '.pd-mrole', '.pd-mret'].map(q => txt(b.querySelector(q))).filter(Boolean);
+    o.panels = {}; for (const m of men) o.panels[m.name] = await panel(m.name, plines);
+    o.every = await panel('Every Lever', b => ({ base: txt(b.querySelector('.pd-base')), h4: ((h) => h ? h.textContent.replace(/\s+/g, ' ').trim() : '')([...b.querySelectorAll('h4')].find(h => /^What moves it/.test(h.textContent))),
+      levers: [...b.querySelectorAll('.pd-levers .lever')].map(l => (/\bhelps\b/.test(l.className) ? 'helps' : 'hurts') + (/\btop\b/.test(l.className) ? ' top' : '') + '|' + txt(l.querySelector('.lt')) + '|' + txt(l.querySelector('.lv'))) }));
+    o.cell = (tr => tr ? txt(tr.querySelector('td.lvt') || [...tr.querySelectorAll('td')].find(td => /^\d+▲ \d+▼$/.test(txt(td)))) : 'no row')([...document.querySelectorAll('#propsTable tr[data-prop]')].find(r => r.textContent.indexOf('Every Lever') >= 0));
+    o.rows = JSON.parse(smStore.getItem('callsheet3.props.v1')).filter(x => x.gdate === D).map(x => x.name + ':' + JSON.stringify([x.lv, x.ret, x.mshort ? x.mshort.how : null, x.mrole ? x.mrole.games : null])).sort().join(' | ');
+    // the night, points, rebounds, assists (one three each). The BETs 4-1: Last Short's over wins (20 points), Half Three's under loses (9 rebounds), Role One's under wins (3 assists), Back Two's under wins (15 points),
+    // Every Lever's under wins (17). The leans: Half Two's over wins (6 assists), Role Three's under wins (12 points), Role Ten's under loses (9 rebounds), Role None's over wins (12 points), Role Old's over loses (4 rebounds),
+    // Back One's under loses (8 assists), Back Bare's under wins (1 three): 4-3. Unders 5-3, overs 3-1; the three men with no pick are not counted
+    const box = { 'Last Short': [20, 4, 2], 'Half Three': [9, 9, 2], 'Half Two': [9, 4, 6], 'Role Three': [12, 4, 2], 'Role One': [9, 4, 3], 'Role Ten': [9, 9, 2], 'Role None': [12, 4, 2], 'Role Old': [9, 4, 2], 'Back Two': [15, 4, 2], 'Back One': [9, 4, 8], 'Back None': [9, 6, 2], 'Back Bare': [9, 4, 2], 'Back No Edge': [9, 4, 2], 'Back Flat': [9, 4, 2], 'Every Lever': [17, 4, 2] };
+    await load({ format: 'callsheet2.slate', version: 1, date: D, games: G.map((g, gi) => ({ sport: 'NBA', gdate: D, away: g[0], home: g[1], finals: { fa: '110', fh: '104', f5a: '55', f5h: '50' }, notes: [],
+      box: Object.fromEntries(men.filter(m => m.gi === gi).map(m => [m.pid, [m.name, 30, box[m.name][0], box[m.name][1], box[m.name][2], 1]])) })) }, 'nba-grade-2027-02-09.json'); await wait(250);
+    if (document.getElementById('propsView').hidden) { document.getElementById('m-props').click(); await wait(); }
+    await day(D);
+    const tiles = () => [...document.querySelectorAll('#propsCalib .calib > div')].map(txt).filter(t => /levers as corrected/i.test(t)).map(t => t.replace(/ · the sixteen nights before it.*$/, ''));
+    o.tiles = tiles();
+    for (let i = 1; i <= 7; i++) { const d = '2027-02-' + String(9 + i); await load(file(d, [man(970 + i, 'Later ' + i, 0, 0, 'pts', 'UNDER', 10.5, 0.5, -110, 'no edge', {})]), 'nba-props-' + d + '.json'); }
+    if (document.getElementById('propsView').hidden) { document.getElementById('m-props').click(); await wait(); }
+    await day(D);
+    o.kept = JSON.parse(smStore.getItem('callsheet3.props.v1')).filter(x => x.gdate === D).map(x => x.name + ':' + (x.trim ? 'trim' : 'whole') + (x.lv ? ':lv' + x.lv : '') + (x.ret ? ':ret' + x.ret.missed : '') + (x.mshort ? ':msh-' + x.mshort.how : '') + (x.mrole ? ':role-' + x.mrole.how : '')).sort().join(' | ');
+    await pick('propsBelow', 'leans');
+    o.cardsAfter = Object.fromEntries([...best.querySelectorAll('.pk[data-prop]')].map(c => [txt(c.querySelector('.n2')).replace(/ (OVER|UNDER) .*$/, ''), lines(c)]));
+    o.tilesAfter = tiles();
+    await pick('propsBelow', 't3');
+    return o;
+  });
+  await pg.evaluate(async (k) => { for (const x of Object.keys(k)) { if (x === 'below' || x === 'legs') { const key = x === 'below' ? 'callsheet3.props.below.v1' : 'callsheet3.props.legs.v1'; if (k[x] === null) localStorage.removeItem(key); else localStorage.setItem(key, k[x]); continue; } if (k[x] === null || k[x] === undefined) await smStore.removeItem(x); else await smStore.setItem(x, k[x]); } }, l3Keep);
+  await reloaded();
+  const l3Four = ' Scored from 13 Nov 2026, measured on four seasons of box scores.';
+  const l3Role = ' Scored from 13 Nov 2026: with the real starters such a night misses by 4.8 minutes this way and 5.3 from his games of any kind (four seasons of box scores).';
+  const l3Head = (starts) => 'Minutes: the five is confirmed and he ' + (starts ? 'starts' : 'comes off the bench') + ' tonight, a role he has not had in all his last five. The read is ';
+  const l3Want = {
+    'Last Short': ['Minutes: his 7-minute game, his last, counts as three tenths of a game (he started all five and only his last was short). The read is 27.0 a game where the same games untouched say 22.4.' + l3Four],
+    'Half Three': ['Minutes: his 7-minute game counts as three tenths of a game (his last two run above the five). The read is 31.3 a game where the same games untouched say 28.2.' + l3Four],
+    'Half Two': ['Minutes: his 7-minute game counts as half a game (his last two run above the five). The read is 31.3 a game where the mean of his last five says 28.2.' + l3Four],
+    'Role Three': [l3Head(true) + 'his last 3 games as a starter, the recent counting most, with the 27.5 a rotation man with none plays standing as the game before them: 29.6 a game where his games of any kind say 22.4.' + l3Role],
+    'Role One': [l3Head(false) + 'his last 1 game off the bench, with the 20.5 a rotation man with none plays standing as the game before it: 21.9 a game where his games of any kind say 26.1.' + l3Role],
+    'Role Ten': [l3Head(true) + 'his last 10 games as a starter, the recent counting most: 30.2 a game where his games of any kind say 24.0.' + l3Role],
+    'Role None': [l3Head(false) + 'no game off the bench this season, so the 20.5 a rotation man with none plays, held to his own games: 20.5 a game where his games of any kind say 27.0.' + l3Role],
+    'Role Old': [l3Head(true) + 'his 3 games as a starter this season, with one game\'s weight on the 27.5 a rotation man with none plays: 29.6 a game where the mean of his last five says 22.4. Scored from 13 Nov 2026: with the real starters such a night misses by 5.0 minutes this way and 6.3 from his last five (three seasons of box scores).'],
+    'Back Two': ['Minutes: his club has played 2 games since his last. In his first game back from that many such a man plays 0.96 of what his games say: -1.3 minutes.' + l3Four],
+    'Back One': ['Minutes: his 5- and 9-minute games are left out (he started all five, and a game cut short three or more back says nothing of tonight). The read is 31.0 a game where the same games untouched say 25.1.' + l3Four,
+      'Minutes: his club has played 1 game since his last. In his first game back from that many such a man plays 0.98 of what his games say: -0.7 minutes.' + l3Four],
+    'Back None': [], 'Back Flat': [],
+    'Back Bare': ['Minutes: his club has played 12 games since his last. In his first game back from that many such a man plays 0.74 of what his games say.' + l3Four],
+    'Back No Edge': ['Minutes: his club has played 6 games since his last. In his first game back from that many such a man plays 0.85 of what his games say: -4.2 minutes.' + l3Four],
+    'Every Lever': [] };
+  const l3Minus = s => String(s).replace(/−/g, '-');
+  const l3Carded = Object.keys(l3Want).filter(n => !/^Back (No Edge|None|Flat)$/.test(n));   // a man with no pick has no card
+  chk(JSON.stringify(Object.keys(l3.cards).sort()) === JSON.stringify(l3Carded.slice().sort()) && l3Carded.every(n => l3Minus(JSON.stringify(l3.cards[n])) === JSON.stringify(l3Want[n]))
+      && Object.keys(l3Want).every(n => l3Minus(JSON.stringify(l3.panels[n])) === JSON.stringify(l3Want[n])),
+      'the second pass on the levers, what the card and the panel say of the minutes (13 Nov 2026): on a row marked 3 a short game kept in part counts three tenths of a game, a starter\'s short last game among them, against what the same games say untouched; his games in tonight\'s role are read with the recent counting most and the flat number standing as the game before his first (none of it left at ten games, the flat number alone with none), against his games of any kind, with the four seasons\' misses; his first game back says how many his club has played since his last, the share and the minutes (no minutes where the file gives none; nothing where he missed none or the share is one); a row marked 2 keeps the first pass\'s words; a man with no pick says it on his panel',
+      JSON.stringify({ cards: l3.cards, panels: l3.panels }));
+  chk(l3Minus(l3.every.base) === 'Starts from 19, his 22.8 per 36 at his minutes; his season\'s minutes, the regulars out, his first games back, the bench confirmed, their centre out, the game script, the top of the minutes, pace, home and road and the defence take it to 18.5, -2.0 against the line; the books\' consensus moves the market\'s number, not the projection. Green pushes toward the UNDER, red away from it: the measured levers only (5 Nov 2026). Inside the start, not a lever: Last season\'s prior on his rate +0.2 · Minutes, his last 10 against the season -0.1.'
+      && JSON.stringify(l3.every.levers.map(l3Minus)) === JSON.stringify(['helps top|His first games back biggest lever|-0.6', 'hurts|Defence v position|+0.4', 'helps|The top of the minutes|-0.3', 'hurts|His season\'s minutes|+0.3', 'helps|The bench confirmed|-0.3', 'helps|Who is out|-0.2', 'helps|The game script, from the spread|-0.2',
+        'hurts|Pace|+0.1', 'hurts|Their centre out|+0.1', 'helps|Home and road|-0.1', 'hurts|The books\' consensus|+0.0'])
+      && l3.every.h4.replace(/\s+/g, ' ') === 'What moves it · 6 of 10 levers toward the UNDER, 4 against' && l3.cell === '6▲ 4▼' && l3Minus(l3.moves) === 'Moves it: His first games back -0.6 · Defence v position +0.4',
+      'the second pass on the levers, what moves it: his season\'s minutes, his first games back, the bench confirmed, the top of the minutes and home and road are levers on the panel beside the six there were, biggest first and green where they push toward the pick; the sentence above them names each that moves the projection in the order the run applies them; the prior and the minutes trend stay inside the start; the tally counts the ten of 0.05 or more (the books\' consensus at 0.04 is listed, not counted) on the panel and in the table, and the card names the two biggest',
+      JSON.stringify({ every: l3.every, cell: l3.cell, moves: l3.moves }));
+  chk(l3.rows === 'Back Bare:[3,{"missed":12,"f":0.74,"dmin":null},null,null] | Back Flat:[3,{"missed":3,"f":1,"dmin":0},null,null] | Back No Edge:[3,{"missed":6,"f":0.85,"dmin":-4.2},null,null] | Back None:[3,null,null,null] | Back One:[3,{"missed":1,"f":0.98,"dmin":-0.7},"out",null] | Back Two:[3,{"missed":2,"f":0.96,"dmin":-1.3},null,null] | Every Lever:[3,null,null,null] | Half Three:[3,null,"half",null] | Half Two:[2,null,"half",null] | Last Short:[3,null,"last",null] | Role None:[3,null,null,0] | Role Old:[2,null,null,3] | Role One:[3,null,null,1] | Role Ten:[3,null,null,10] | Role Three:[3,null,null,3]'
+      && l3.tiles.length === 1 && /^Picks under the levers as corrected \(from 13 Nov 2026\) 8-4 says /i.test(l3.tiles[0]) && /the BET band 4-1 /.test(l3.tiles[0]) && /the leans 4-3 /.test(l3.tiles[0]) && /unders 5-3 /.test(l3.tiles[0]) && /overs 3-1 /.test(l3.tiles[0])
+      && l3.kept === 'Back Bare:trim:lv3:ret12 | Back Flat:trim:lv3:ret3 | Back No Edge:trim:lv3:ret6 | Back None:trim:lv3 | Back One:trim:lv3:ret1:msh-out | Back Two:trim:lv3:ret2 | Every Lever:trim:lv3 | Half Three:trim:lv3:msh-half | Half Two:trim:lv2:msh-half | Last Short:trim:lv3:msh-last | Role None:trim:lv3:role-flat | Role Old:trim:lv2:role-few | Role One:trim:lv3:role-few | Role Ten:trim:lv3:role-role | Role Three:trim:lv3:role-few'
+      && l3Carded.every(n => l3Minus(JSON.stringify(l3.cardsAfter[n])) === JSON.stringify(l3Want[n])) && JSON.stringify(l3.tilesAfter) === JSON.stringify(l3.tiles),
+      'the second pass on the levers, the rows and the record: each row keeps the run\'s mark and his first game back as the file gave them (none where he missed none, no minutes where the file gave none); the twelve picks of both passes, eight won and four lost, count on the one tile for the levers as corrected, by band and by side (the three men with no pick are not counted); and when seven later dates push the night out and its rows are trimmed the marks stay, the cards say the same of the minutes and the tile reads the same',
+      JSON.stringify({ rows: l3.rows, tiles: l3.tiles, kept: l3.kept, cardsAfter: l3.cardsAfter, after: l3.tilesAfter }));
   // ---- 12 Nov 2026: a call on every game (the user: "the model wont give 'green bet' ... it still need to be able to provide a bet on something because an outcome is
   //      going to happen"). One a game on the board, by this order: the agreement rule, a side the sheet prices below its chance, a total at one of the four apps a
   //      point or more off the middle of every book's number, else the likelier winner at the best of the four prices. Each kind keeps its own record, replayed from the

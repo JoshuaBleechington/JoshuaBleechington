@@ -4628,3 +4628,257 @@ its checks were re-set by hand; 1,339 checks in all. And the whole
 props run as the bat file starts it, the odds calls stubbed out, on the
 day's real report, lineups and rosters: 144 made-up props on three
 games written, every projected row marked, and the page read the file.
+
+## The second pass on the levers, 13 Nov 2026
+
+The user, the same evening as the levers' audit: "Perfect. Make sure
+those levers are as perfect as they can be". What the first pass had
+left on record was measured, built where it held, and three things
+turned up on the way that mattered more than the list.
+
+### What was measured on
+
+Every game a rotation man played with a game or more behind him in
+2023-24, 2024-25, 2025-26 and 2026-27 to 12 Nov: 63,083 games, 57,908
+of them with five behind him (lab `audit3_build.py`, the `m2_*.py` and
+`m3_*.py` scripts). Each piece was fitted on three seasons and read on
+the fourth. Then both files end to end through `props_project` itself,
+the one sent with v164 and this one, over the same games (lab
+`e2e2.py`, `e2e2_read.py`), the chance at half-point lines (lab
+`calib.py`, `calib2.py`, `calib3.py`) and the sixteen graded nights
+(lab `replay2.py`, `replay_share.py`).
+
+### Found on the way
+
+**The All-Star games were in the ledgers.** ESPN's scoreboard lists
+them as regular-season finals (West @ East in 2024, three games of four
+made-up teams in 2025, four of three in 2026) and `slate.py nba-ledger`
+took them. An All-Star's last games after the break then read as 8 to
+28 minutes for a club that is not his: two 9-minute games take a
+35-minute man's read to 23, and every regular of his own club counts as
+back from a game missed. `nba_club_game` keeps a game between two of
+the thirty clubs; the builder skips the rest, `load_nba_ledger` reads
+them out of a ledger that holds them (the file is left as it is), and
+the logs and the defence's table skip them too. Everything below is on
+the ledgers without them; the first pass's constants were not.
+
+**A man traded inside the games read.** The lever on who is out counted
+each of his new club's regulars as having missed his games for the old
+one: on the 1,176 games inside ten of a trade it took 43 minutes a game
+of "returns" and docked him 2.5 minutes (the miss 5.50). The shares are
+read over his games for THIS club alone now (4.97). His first game for
+a new club (118 games: 0.88 of the read, 1.11 where he started and 0.78
+off the bench) is said on the prop and not scored.
+
+**With the levers corrected the sigma was too wide.** See the chance,
+below.
+
+### The minutes, step by step
+
+The mean miss with a season left out, 57,908 games:
+
+    the mean of his last five, the short game set aside, the lever (the first pass)     4.690
+    his last TEN, each game back three quarters of the one after it                     4.595
+    the lever's shares over his games for this club, its constants on clean ledgers     4.575
+    his first games back, the game script, the top of the minutes                       4.542
+    his season's minutes                                                                4.520
+
+**The read.** Ten games at 0.75 (0.70: 4.601, 0.80: 4.599, twelve at
+0.80 the same). It runs on about four games' worth, which is what the
+two pieces below answer.
+
+**The short game.** Kept in part it counts three tenths of a game where
+it counted half: at half a starter's second-last short game left +0.8
+minutes and another man's old one +0.5; at three tenths +0.1 and +0.2.
+A starter's short LAST game is a class of its own (302 games): with it
+in full he played 2.5 minutes more than the read, at three tenths 0.4
+less.
+
+**Who is out** (`PROPS_OUT_CHANGE`, minutes a 30 mpg newly out and off
+a 30 mpg back, each at a read of 26 minutes and per ten more):
+
+    started all five    +1.18 -1.53    0.66 +0.76      a 36-minute starter gains nothing and gives up 1.42 (2.43 in the first pass)
+    some of five        +2.11 -1.62    2.79 -0.10
+    none of five        +1.52 -2.22    2.49 -0.06      a 16-minute bench man gains 3.74 and gives up 2.55
+
+The All-Star games had tilted the first line: after the break a star's
+read sat low and his club's regulars all read as back.
+
+**His first games back** (`PROPS_BACK_GAMES`). After his own games
+missed he plays less than the read: by his club's games since his last
+for it (1, 2, 3 to 5, 6 to 10, 11 to 20, more), 0.98, 0.96, 0.93, 0.85,
+0.81, 0.74 of it for a man who started all of his last five and 0.94,
+0.89, 0.89, 0.89, 0.80, 0.70 for another (4,328 games: he played 1.6
+minutes less than the read, the miss 5.32; with the factors level,
+5.11). On the role read 0.94 after one and 0.90 after more (1,420
+games, 5.28 to 5.14; a column by tonight's role or by his last five did
+no better).
+
+**His season's minutes** (`PROPS_SEASON_PULL`). What is left follows
+the gap between his season's mean and the read: a read 1 to 3 minutes
+under his season and he played 0.7 more, 3 to 6 under 1.1 more, 6 and
+more 1.4; a read over his season and he played 0.6 less whatever the
+gap. The read takes back half the gap for a man who started all of his
+last five, 0.11 some, 0.21 none (0.49 to 0.51, 0.08 to 0.14, 0.20 to
+0.22 by the season left out), the gap held to 2 down and 6 up. Not on
+the role read; not where an old short game is set aside (the season's
+mean holds that game).
+
+**The top of the minutes** (`PROPS_TOP_AT` 36, `PROPS_TOP_SHARE` 0.5).
+A man projected past 36 played 1.4 minutes less (2,722 games, every
+season: 36 to 37 -1.2, 37 to 38 -1.3, 38 and up -2.2) and did less with
+it (1,542 games with a season behind the rate: points -2.4%, rebounds
+-5.9%, the three together -2.8%; 37 and up -4.0% and -3.7% in both full
+seasons). Every minute over 36 is read at half: points -0.8%, the three
+together -1.2%, the median beaten 50.5% and 50.3% where it was 49.0%
+and 47.7%. A plain hinge from 34.5 fixed the minutes and put the stat
+2 points over its median: under 36 the stat was level already.
+
+**The five confirmed.** His games in tonight's role: his last ten in
+the role weighted as the read is, the flat number (27.5 a starter, 20.5
+a bench man) standing as the game before his first while he has fewer
+than ten, a starter's short role game set aside (451 games: +2.1 with
+it in, +0.5 so). With its own lever (`PROPS_OUT_CHANGE_ROLE`: a starter
+1.07 -1.77, 0.80 +1.48; a bench man 0.55 -2.00, 1.45 +0.55) the miss on
+a new role is 4.79 where his games of any kind miss by 5.29 (15,671
+games). And a bench man confirmed on the bench (`PROPS_BENCH_STAYS`):
+the lever reads a man who started none of his five as he is on the
+average night, and on one night in ten he starts (10.5%, then 4.8
+minutes over the read); with the five confirmed without him he played
+0.96 of the projection (14,290 games; -0.83, -0.73, -0.78, -0.98 by
+season).
+
+### The rate
+
+**Home and road** (`PROPS_HOME_RATE`). The league's own gap, over and
+above his rate: points 0.7% (t 3.1; +0.7, +0.6, +1.2 by season),
+assists 1.1% (t 4.0), threes 1.6% (t 4.2), rebounds 0.35% (t 1.5, left
+off); his minutes do not move. A combination by his own split. His OWN
+split stays shown and unscored.
+
+Measured and left: the league's recent level against its season to
+date (slope 1 on a 1% gap: nothing to gain); the opponent's absences
+(points +1.1% a 30 mpg, t 6.1, all of it from March on: on record for
+the All-Star break); the men-out centre, pace and the defence's shares
+on the corrected rate (level).
+
+### The chance
+
+At half-point lines set 0, 0.3 and 0.6 sigmas either side of the
+model's own median (the books' lines sat inside 0.4 of it on the graded
+nights), 39,410 games with a season behind the rate, a probit of the
+outcome on what the model said:
+
+- **The sigma** was 6 to 16% too wide on every market in each season
+  (points 10%, rebounds 11, assists 10, threes 6, the combinations 9 to
+  16), most off the bench: k was sized on 2025-26 with the projection
+  as it then stood. `PROPS_ROLE_SD` and `PROPS_USAGE_SD` hold what the
+  lines say on the plain k x sqrt(projection), by role and usage (0.83
+  to 1.02); fitted on one full season and read on the other, the
+  Brier score and the log loss are better on all eight markets both
+  ways. A thin history widens it by 1.04 under 360 minutes and by
+  nothing over them (`PROPS_THIN_SD`).
+- **The median's shift**: assists 0.14 to 0.10 and threes 0.23 to 0.14
+  (the over had landed 51.5% and 53.6% at the line nearest the median,
+  every season and both halves of the season). The others stand.
+- **The role's lean** (`PROPS_MEDIAN_LEAN`, 0.04 sigmas on six markets,
+  none on rebounds and threes): at the model's median the over landed
+  more than said for a man who started all of his last five and less
+  for another, October to January in each of three seasons (points
+  +0.07, +0.06, +0.02 against -0.02, -0.06, -0.07). A bench man starts
+  one night in ten: a long upper tail that lifts his mean over his
+  median. Not read where the bench man's minutes are already taken
+  down.
+
+With all of it in, every season: b 0.98 to 1.01 on every market, said
+against landed level in every band (points 39/40, 44/45, 50/51, 56/57,
+61/61). What is left is the season's ramp: the over lands 0.01 of a
+sigma more than said from October to January and 0.06 to 0.09 more from
+February.
+
+### End to end, four seasons
+
+The file sent with v164 and this one, 57,879 games with five behind
+him, who sat known:
+
+                                         v164              now               now, the real role
+    minutes: he played less it           -0.10             -0.01             +0.10
+    minutes: the mean miss / rms         4.694 / 6.10      4.518 / 5.88      4.377 / 5.69   (v164, the real role: 4.523)
+    by season, the mean miss             4.78 4.69 4.64 4.36   4.60 4.51 4.48 4.24
+    after his own games missed (4,318)   -0.9 to -5.4      -0.0 to -0.3
+    points: rms (three seasons)          6.487             6.458
+    rebounds / assists / threes          2.588 1.991 1.509   2.571 1.986 1.507
+    points + rebounds + assists          8.032             7.947
+    the miss in his own sigmas           0.89 to 0.99      1.00 to 1.05
+    over the median, threes / assists    53.6% / 51.4%     48.9% / 49.2%
+
+Home and road are level now (points +1.3% at home and +1.5% on the
+road where they were +1.9 and +0.7).
+
+### The sixteen graded nights, replayed
+
+10,715 rows, each projected by the file as it stood on 12 Nov, by the
+first pass and by this one, all with the ledgers in place:
+
+                                     as it stood      the first pass     now
+    minutes, bias / miss             -0.91 / 4.33     +0.01 / 4.21       -0.00 / 4.11
+    the projection, bias / rms       -6.3% / 5.763    +1.2% / 5.622      +1.1% / 5.605
+    the miss in his own sigmas       0.895            0.912              1.003
+    the model alone on the over      50.7%            45.5%              46.6%   (it landed 46.4%)
+    Brier, the blend (book 0.2479)   0.2481           0.2475             0.2475
+    the model's earned share         0.04             0.21               0.22    (the blend gives it 0.20)
+    every pick with an edge          464-384          522-400            518-445
+    the BET band                     32-13            30-28              38-33
+
+The picks do not tell the two passes apart: the same Brier score, the
+same earned share, and the 963 and 922 picks differ by 220 new ones
+that went 113-107 and 179 dropped ones that went 117-62, inside sixteen
+nights whose results move together. Taken apart piece by piece (lab
+`replay2.py` with `VARIANT`), every variant of the new file sits between
+53.2 and 55.6% on every edge (the first pass 56.6%) and inside 0.0001 on
+the blend's Brier score. So on these sixteen nights the second pass is
+better on the minutes, the projection and the sigma, and no better on
+the picks' record; the record tile is the measure from here.
+
+### On record, not built
+
+- **The season's ramp.** The over lands more than said from February
+  (points +2.1% in February, +3.5% in March, +6.8% in April), most of it
+  where the opponent's regulars sit. To measure before the All-Star
+  break.
+- **RotoWire's expected five.** With the five CONFIRMED a bench man
+  plays 0.96 of the read; an expected five might say most of that in
+  the morning, and there are sixteen nights of them, not four seasons.
+- **A starter with a low read** (a man who started all five projected
+  under 28: +0.4 minutes after his season's pull).
+
+### The code
+
+`slate.py`: `nba_club_game`; `props_short_weights`, `props_read_weights`,
+`props_minutes` (the weights `w`, the starts over his last five `n5`);
+`props_out_change` (the read's window, this club's games); `props_games_missed`,
+`props_back_factor`; `props_minutes_role`; in `props_project` the steps
+in order: the read, his season's pull, who is out, his first games back,
+the bench confirmed, the script, the top of the minutes; the rate's
+home and road; the sigma's factors, the median's shift with the role's
+lean. A row carries `lv` 3 and, where read, `pull`, `ret` {missed, f,
+dmin}, `stay`, `top`, `lean`; the parts `pull`, `ret`, `stay`, `top`
+and `home` sum with the rest from the base to the projection. The props
+file's method block carries every constant.
+
+The page: the lever list knows the five new parts; `propShortLine` and
+`propRoleLine` word a row of the second pass as it was read (three
+tenths of a game, the same games untouched, his games of any kind),
+`propBackLine` says a first game back on the card and the panel; the
+short game's tile says "counted only in part" for both passes; the
+picks of both passes count on the one tile for the levers as corrected;
+the Example reads through the new file (George in his first game back,
+the window of ten).
+
+Checked: slate.py's selftest 300 (six new, a dozen rewritten, every
+expected number by hand); a full props run on the day's real report
+with the odds stubbed out (144 props, every projected row's parts
+summing to its projection, four exhibition games read out of last
+season's ledger). The page: three harness checks on a date of fifteen
+men, run against 47 copies broken on purpose; five of the Example's
+checks re-set by hand; 1,342 checks in all.

@@ -453,6 +453,9 @@
   .pk .n5.onebet, .pdlg .pd-onebet { color: var(--edge); font-weight: 600; }
   .pk .n5.ramp, .pdlg .pd-ramp { color: var(--bad); font-weight: 600; }   /* minutes on the way back (13 Nov 2026) */
   .pk-note { grid-column: 1 / -1; flex-basis: 100%; width: 100%; box-sizing: border-box; font-size: 12.5px; font-weight: 600; color: var(--edge); background: var(--edge-wash); border-left: 3px solid var(--edge); border-radius: 4px; padding: 7px 10px; }
+  /* the over priced -110 to -101, left off the lists (15 Nov 2026): the note above the cards, the panel's line and the table's tag */
+  .pk-note.heldn { color: var(--bad); background: var(--bad-wash); border-left-color: var(--bad); }
+  .pdlg .pd-held { color: var(--bad); font-weight: 600; } table.props td .tag.heldt { color: var(--bad); white-space: nowrap; }
   /* the Spike column (9 Nov 2026): the minutes lever's push, green at a spike and red at a dip */
   table.props td.spikec.pos { color: var(--go); font-weight: 700; } table.props td.spikec.neg { color: var(--bad); }
   /* the tries (7 Nov 2026): his shots from the floor, from three and from the line beside what the box says, in their own colour */
@@ -4520,12 +4523,50 @@ smStore.ready.then(function () {
   /* why a BET (6 Nov 2026, the user: "for the BET band cards, make that more visible and why"): one line in words from the row's
      own numbers, the chance against what the price needs, the model's and the book's say in the blend, the consensus, the top lever */
   var PROPS_EDGE_TIER = function (edge) { var e = 100 * edge; return e >= 8 ? "8 points of edge and up" : e >= 5 ? "5 to 8 points of edge" : "3 to 5 points of edge"; };
+  /* THE OVER PRICED -110 TO -101, LEFT OFF THE LISTS (15 Nov 2026, the user, of the picks at that price: "Measure and let me know
+     right away please"). Four readings of the same price, which asks 51.6% (lab px_bucket.py, px_over.py):
+       with no model, both sides of every graded prop of the 25 nights to 14 Nov
+                                           the over 1,271-1,679 (43.1%, -16.5% a bet, 3 nights of 25 up) · the under 1,591-1,498 (51.5%)
+       the sheet's picks as carded on those nights
+                                           the over 149-221 (40.3%: the BET band 31-45, the LEANs 118-176; 105-171 to 4 Nov, 44-49
+                                           from the 5th) · the under 345-324 (51.6%)
+       the levers as they stood under the blend as it is, fourteen nights replayed
+                                           the over 87-127 · the under 111-92
+       the levers as they stand, eighteen nights
+                                           the over 11-12 · the under 83-104
+     It is the sheet's worst price on the over by a distance: as carded its overs either side went 124-122 at -115 to -111
+     and 56-68 at +100 to +119, and 91-52 at -159 to -130. With no model the over loses at every price on the board (9 to 17%
+     a bet at the carded book, 9 to 14% at each app's own line), so the sheet has to choose well to bet one, and at this
+     price it has not. So from 15 Nov 2026 a pick that is an over priced -110 to -101 at the carded book is left off the
+     best list, the BETs' count, the tickets and the phone sheet, and a leg that is an over at such a price at an app makes
+     no ticket there (replayed on the eighteen nights, lab tix_coin.py, no ticket of either rule changes: 27 of 69 and 13
+     of 46 stand). The prop keeps the band the slate gave it and stays in the table and the same-game pairs; its panel says
+     why; a tile counts what the ones left off did, so the rule measures itself. The under at that price stays on the lists:
+     level with no model and as carded, 83-104 under the levers as they stand, so it has a tile of its own from the same
+     day. A watch: nothing moves on it */
+  var PROPS_COIN = { lo: -110, hi: -101, from: "2026-11-15" };
+  var PROPS_COIN_WORDS = "with no model the over at such a price landed 43.1% on 25 nights where the price asks 51.6%, and the sheet's own went 149-221 as carded";
+  function propCoinPrice(price) { return price !== null && price !== undefined && price !== "" && isFinite(+price) && +price >= PROPS_COIN.lo && +price <= PROPS_COIN.hi; }
+  function propCoinOver(r, price) { return !!r && r.side === "OVER" && (r.gdate || "") >= PROPS_COIN.from && propCoinPrice(price); }   // an over at such a price, on a date the rule covers
+  function propHeld(r) { return !!r && propHas(r) && +r.edge > 0 && propCoinOver(r, r.price); }   // a pick the lists leave off: the over carded at such a price
+  function propCoinWhy(r, l) { return r.name + "'s is an over priced " + sgn(l.price, 0) + " there, and an over at " + PROPS_COIN.lo + " to " + PROPS_COIN.hi + " is left out"; }
+  function propHeldLine(r) {
+    if (!propHeld(r)) return "";
+    return "Left off the lists: an over priced " + PROPS_COIN.lo + " to " + PROPS_COIN.hi + " (this one " + sgn(r.price, 0) + " at " + (PROPS_APP_NAME[r.book] || r.book || "the carded book") + "). " + PROPS_COIN_WORDS.charAt(0).toUpperCase() + PROPS_COIN_WORDS.slice(1) +
+           " (the BET band 31-45), so from 15 Nov 2026 such a pick makes no card and no ticket leg. The band is the slate's own, and a tile in Is it working counts what the ones left off do.";
+  }
+  function propsHeldNote(rows) {   // the date's picks left off the lists, said above the cards
+    var held = rows.filter(propHeld).sort(function (a, b) { return (b.edge - a.edge) || (String(a.id) < String(b.id) ? -1 : 1); }); if (!held.length) return "";
+    var names = held.map(function (r) { return r.name + " OVER " + r.line + " " + (PROPS_LABEL[r.mk] || r.mk) + " at " + sgn(r.price, 0); });
+    return (held.length === 1 ? "One over priced " : held.length + " overs priced ") + PROPS_COIN.lo + " to " + PROPS_COIN.hi + (held.length === 1 ? " is" : " are") + " left off the lists on this date (" +
+           names.slice(0, 6).join("; ") + (names.length > 6 ? "; and " + (names.length - 6) + " more" : "") + "): " + PROPS_COIN_WORDS + ". " + (held.length === 1 ? "It stays" : "They stay") + " in the table below, and the panel says why.";
+  }
   /* one bet a man (10 Nov 2026, the user took the suggestion the morning after Curry's four BETs lost as one in a 51-point win):
      a man's BETs on a date land or miss together, so the card with the most edge says it is the one and his others say they are
      the same bet; the list opens with how many men and games the date's BETs really sit on; and the record reads the band one
      bet a man a night beside the count by cards */
   function propsBetsOfMan(r) {
-    return propsSource().filter(function (x) { return (x.gdate || "") === (r.gdate || "") && String(x.pid) === String(r.pid) && propHas(x) && x.band === "BET" && x.edge > 0; })
+    return propsSource().filter(function (x) { return (x.gdate || "") === (r.gdate || "") && String(x.pid) === String(r.pid) && propHas(x) && x.band === "BET" && x.edge > 0 && !propHeld(x); })
                         .sort(function (a, b) { return (b.edge - a.edge) || (String(a.id) < String(b.id) ? -1 : 1); });
   }
   function propOneBetLine(r) {
@@ -4537,7 +4578,7 @@ smStore.ready.then(function () {
       : "The same bet as his " + esc(top.side) + " " + esc(String(top.line)) + " " + esc(PROPS_LABEL[top.mk] || top.mk) + ": one outcome, so take one of his " + mine.length + " BETs, " + (mine.length === 2 ? "not both" : "not all " + mine.length) + ".";
   }
   function propsBetsNote(rows) {
-    var bets = rows.filter(function (r) { return propHas(r) && r.band === "BET" && r.edge > 0; });
+    var bets = rows.filter(function (r) { return propHas(r) && r.band === "BET" && r.edge > 0 && !propHeld(r); });   // a BET the lists leave off is not counted among them (15 Nov 2026)
     /* the BETs that are unders on a man whose minutes are on the way back (13 Nov 2026): said here, above the cards */
     var ramp = bets.filter(function (r) { return propRampUnder(r); }), rmen = []; ramp.forEach(function (r) { if (rmen.indexOf(r.name) < 0) rmen.push(r.name); });
     var rnote = !ramp.length ? "" : (ramp.length === bets.length ? (bets.length === 1 ? "The BET on this date is an under" : bets.length === 2 ? "Both BETs on this date are unders" : "All " + bets.length + " BETs on this date are unders") : ramp.length + " of the " + bets.length + " BETs " + (ramp.length === 1 ? "is an under" : "are unders")) +
@@ -5056,6 +5097,7 @@ smStore.ready.then(function () {
   function propT3CWhy(r, l) {   // why a pick is not a best-chance leg at an app's line and price; "" when it is
     if (!(l.chance - implied(l.price) > 0)) return r.name + " has no edge at " + sgn(l.price, 0) + " there" + (l.same ? "" : ", the line " + l.line);
     if (propT3Heavy(l.price)) return propT3HeavyWhy(r, l);   // 15 Nov 2026: such a price asks 67% or more and those favourites landed 64.6%
+    if (propCoinOver(r, l.price)) return propCoinWhy(r, l);   // 15 Nov 2026: the over priced -110 to -101
     if (l.chance < PROPS_T3C.chance) return r.name + " reads " + (l.chance * 100).toFixed(1) + "% at " + l.line + " there, under the " + Math.round(PROPS_T3C.chance * 100) + "% a leg asks";
     var fv = propFav(r), sw = propMinSwing(r);
     if (r.side === "OVER" && fv !== null && Math.abs(fv) >= PROPS_T3C.lop) return r.name + "'s is an over in a game with a spread of " + Math.abs(fv);
@@ -5065,10 +5107,12 @@ smStore.ready.then(function () {
   }
   function propT3Leg(r, app, mode) {
     if (!propHas(r) || !(r.edge > 0)) return null;   // a man who then did not play stays a leg: nothing known after the tip chooses the list, and his leg drops out of the ticket as the apps settle it
+    if (propHeld(r)) return null;   // a pick left off the lists makes no leg at any app (15 Nov 2026): the over carded at -110 to -101
     if ((mode === "t3o" && r.side !== "OVER") || (mode === "t3u" && r.side !== "UNDER")) return null;
     var l = propLegAt(r, app); if (!l) return null;
     var edge = l.chance - implied(l.price); if (!(edge > 0)) return null;
     if (propT3Heavy(l.price)) return null;   // no leg priced -200 or shorter in either rule's ticket (15 Nov 2026)
+    if (propCoinOver(r, l.price)) return null;   // and no over priced -110 to -101 at the app (15 Nov 2026)
     if (mode === "t3c") {   // by best chance: the sheet's own chance at the app's line, and the two measured leaks on the over kept out
       if (propT3CWhy(r, l) !== "") return null;
       return { r: r, side: r.side, line: l.line, price: l.price, chance: l.chance, same: l.same, hr: propLastGames(r).length ? propHitRate(r, l.line) : null, ev: l.chance * decimalOf(l.price) - 1 };
@@ -5144,6 +5188,7 @@ smStore.ready.then(function () {
     if (mode === "t3c") return propT3CWhy(r, l);
     if (!(l.chance - implied(l.price) > 0)) return r.name + " has no edge at " + sgn(l.price, 0) + " there" + (l.same ? "" : ", the line " + l.line);
     if (propT3Heavy(l.price)) return propT3HeavyWhy(r, l);
+    if (propCoinOver(r, l.price)) return propCoinWhy(r, l);
     var hr = propHitRate(r, l.line, side);
     if (hr.n5 < 5 || hr.h5 < PROPS_T3.l5) return r.name + "'s line is " + l.line + " there, " + hr.h5 + " of his last " + hr.n5 + " " + (side === "OVER" ? "over" : "under") + " it";
     if (hr.n10 < PROPS_T3.n10 || hr.h10 / hr.n10 < PROPS_T3.l10) return r.name + "'s line is " + l.line + " there, " + hr.h10 + " of his last " + hr.n10 + " " + (side === "OVER" ? "over" : "under") + " it";
@@ -5688,6 +5733,9 @@ smStore.ready.then(function () {
     var byPlus = mk(), byPlusSide = { UNDER: mk(), OVER: mk() };   // the pick at even money or better, as carded from the day the blend changed (12 Nov 2026): the chip's own pool
     var byRamp = mk();   // the sheet's under, BET or LEAN, on a man whose minutes are on the way back (13 Nov 2026): shown, not scored
     var byShort = { UNDER: mk(), OVER: mk() }, byShortAll = mk();   // the BET and LEAN picks on a man whose short game the run set aside in his minutes (13 Nov 2026): scored, so it measures itself
+    /* the pick priced -110 to -101 from the day its over was left off the lists (15 Nov 2026): the overs left off, counted as the slate carded
+       them so the rule measures itself, and the unders, which stay on the lists and are watched */
+    var byCoin = { OVER: mk(), UNDER: mk() }, byCoinBand = { OVER: { BET: mk(), LEAN: mk() }, UNDER: { BET: mk(), LEAN: mk() } };
     var byLv = { BET: mk(), LEAN: mk() }, byLvSide = { UNDER: mk(), OVER: mk() }, byLvAll = mk();   // the picks made under the levers as corrected on 13 Nov 2026 (the run's mark on the row): their own pool, so the correction measures itself
     props.forEach(function (r) {
       var v = propClv(r); if (!v || !byClose[r.band]) return;
@@ -5728,6 +5776,7 @@ smStore.ready.then(function () {
       if ((r.band === "BET" || r.band === "LEAN") && propRampUnder(r)) sinks.push(byRamp);
       if ((r.band === "BET" || r.band === "LEAN") && r.mshort && r.mshort.how) { sinks.push(byShortAll); if (byShort[r.side]) sinks.push(byShort[r.side]); }
       if ((r.band === "BET" || r.band === "LEAN") && r.lv >= 2) { sinks.push(byLvAll); sinks.push(byLv[r.band]); if (byLvSide[r.side]) sinks.push(byLvSide[r.side]); }
+      if ((r.band === "BET" || r.band === "LEAN") && byCoin[r.side] && d >= PROPS_COIN.from && propCoinPrice(r.price)) { sinks.push(byCoin[r.side]); sinks.push(byCoinBand[r.side][r.band]); }
       sinks.forEach(function (s) {
         if (r.result === "void") { s.v++; return; }
         if (r.result === "push") { s.p++; return; }
@@ -5770,7 +5819,7 @@ smStore.ready.then(function () {
     var rec = function (s) { return s.w + "-" + s.l + (s.p ? "-" + s.p : ""); };
     var t3CapNote = function (all, cap) {   // what the lists did before a leg priced -200 or shorter was left out, and since
       var bw = all.w - cap.w, bl = all.l - cap.l;
-      return " · from 15 Nov 2026 no leg priced " + PROPS_T3_HEAVY + " or shorter: " + (cap.n ? rec(cap) + " " + sgn(cap.units, 1) + "u since" : "none graded since") + ", " + bw + "-" + bl + " before it";
+      return " · from 15 Nov 2026 no leg priced " + PROPS_T3_HEAVY + " or shorter and no over priced " + PROPS_COIN.lo + " to " + PROPS_COIN.hi + ": " + (cap.n ? rec(cap) + " " + sgn(cap.units, 1) + "u since" : "none graded since") + ", " + bw + "-" + bl + " before it";
     };
     var says = function (s) { return s.n ? (s.says / s.n * 100).toFixed(1) + "%" : "—"; };
     var does = function (s) { return s.n ? (s.w / s.n * 100).toFixed(1) + "%" : "—"; };
@@ -5839,6 +5888,12 @@ smStore.ready.then(function () {
     if (byLvAll.n || byLvAll.p) h2 += tile("Picks under the levers as corrected (from 13 Nov 2026)", byLvAll, ["the BET band " + rec(byLv.BET) + (byLv.BET.n ? " " + sgn(byLv.BET.units, 1) + "u" : "") + " · the leans " + rec(byLv.LEAN) + (byLv.LEAN.n ? " " + sgn(byLv.LEAN.units, 1) + "u" : "") +
       " · unders " + rec(byLvSide.UNDER) + (byLvSide.UNDER.n ? " " + sgn(byLvSide.UNDER.units, 1) + "u" : "") + " · overs " + rec(byLvSide.OVER) + (byLvSide.OVER.n ? " " + sgn(byLvSide.OVER.units, 1) + "u" : "") +
       " · the sixteen nights before it, replayed with the ledgers in place: every pick with an edge 518-445 as the levers stand against 464-384 as they stood, the BET band 38-33 against 32-13 (71 and 45 picks: too few to tell apart, so this tile keeps the count)"]);
+    /* the pick priced -110 to -101 (15 Nov 2026): what the overs left off the lists did, and the unders, which stay on them */
+    var coinBands = function (sd) { var b = byCoinBand[sd]; return "the BET band " + rec(b.BET) + (b.BET.n ? " " + sgn(b.BET.units, 1) + "u" : "") + " · the leans " + rec(b.LEAN) + (b.LEAN.n ? " " + sgn(b.LEAN.units, 1) + "u" : ""); };
+    if (byCoin.OVER.n || byCoin.OVER.p) h2 += tile("The over priced " + PROPS_COIN.lo + " to " + PROPS_COIN.hi + ", left off the lists (from 15 Nov 2026)", byCoin.OVER,
+      ["the BET and LEAN overs at that price as the slate carded them, not listed and not in a ticket: " + coinBands("OVER") + " · " + PROPS_COIN_WORDS + " (the price's own worst for the sheet: 124-122 at -115 to -111, 56-68 at +100 to +119), so this tile says whether leaving them off earns its place"]);
+    if (byCoin.UNDER.n || byCoin.UNDER.p) h2 += tile("The under priced " + PROPS_COIN.lo + " to " + PROPS_COIN.hi + ", a watch (from 15 Nov 2026)", byCoin.UNDER,
+      ["the BET and LEAN unders at that price, which stay on the lists: " + coinBands("UNDER") + " · with no model the under at such a price landed 51.5% on 25 nights where the price asks 51.6% and the sheet's own went 345-324 as carded, but replayed under the levers as they stand on the eighteen nights to 14 Nov they went 83-104, so this tile keeps the count before anything moves"]);
     if (byCons.toward.n || byCons.toward.p) h2 += tile("The books' consensus with the pick, half a point or more", byCons.toward, []);
     if (byCons.against.n || byCons.against.p) h2 += tile("The books' consensus against the pick", byCons.against, []);
     if (byForm.toward.n || byForm.toward.p) h2 += tile("His last three with the pick (shown, not scored)", byForm.toward, []);
@@ -6007,7 +6062,7 @@ smStore.ready.then(function () {
   function propsDetailHtml(r) {
     var has = propHas(r), lab = PROPS_LABEL[r.mk] || r.mk;
     var tile = function (k, v, s, cls) { return '<div class="pd-tile' + (cls ? ' ' + cls : '') + '"><div class="k">' + esc(k) + '</div><div class="v">' + v + '</div>' + (s ? '<div class="s">' + s + '</div>' : '') + '</div>'; };
-    var h = '<div class="pd-band">' + esc(has ? r.band : "no projection") + '</div>';
+    var h = '<div class="pd-band">' + esc(has ? r.band : "no projection") + (propHeld(r) ? ' · left off the lists' : '') + '</div>';
     h += '<h3>' + esc(r.name) + (r.pos ? ' <span class="tag">' + esc(r.pos) + '</span>' : '') + (r.team ? ' <span class="tag">' + esc(r.team) + '</span>' : '') +
          (r.starter === true ? ' <span class="tag role" title="' + esc(r.start_src || '') + '">starter</span>' : r.starter === false ? ' <span class="tag role" title="' + esc(r.start_src || '') + '">bench</span>' : '') + '</h3>';
     h += '<div class="pd-pick">' + (has ? esc(r.side) + ' ' : '') + esc(String(r.line)) + ' ' + esc(lab) + propResChip(r) + '</div>';
@@ -6017,8 +6072,11 @@ smStore.ready.then(function () {
     if (propTookWords(r)) h += '<p class="note pd-took">' + propTookWords(r) + '</p>';
     if (r.trim) h += '<p class="note trimmed">The detail on this prop (the reasons, the last games, the levers, the simulation, the fives and what happened) was <b>trimmed from the save on ' + esc(gameDate(r.trim)) + '</b> to keep the backup small: the last seven nights on the tab stay whole, older nights keep the call, the price, the chance, the band, the result and every book\'s line.</p>';
     if (has) {
-      if (propBetWhy(r)) h += '<p class="note pd-betwhy">' + propBetWhy(r) + '</p>';
-      if (propOneBetLine(r)) h += '<p class="note pd-onebet">' + propOneBetLine(r) + '</p>';
+      if (propHeld(r)) h += '<p class="note pd-held">' + esc(propHeldLine(r)) + '</p>';   // the over priced -110 to -101 (15 Nov 2026): said first, and the BET's own lines stand down
+      else {
+        if (propBetWhy(r)) h += '<p class="note pd-betwhy">' + propBetWhy(r) + '</p>';
+        if (propOneBetLine(r)) h += '<p class="note pd-onebet">' + propOneBetLine(r) + '</p>';
+      }
       h += '<div class="pd-tiles">' +
         tile("Chance", (r.chance * 100).toFixed(1) + "%", "blended: the over is " + (r.pm * 100).toFixed(1) + "% by the model, " + (r.pb * 100).toFixed(1) + "% by the book") +
         tile("Price", sgn(r.price, 0), "needs " + (r.need * 100).toFixed(1) + "%") +
@@ -6167,7 +6225,7 @@ smStore.ready.then(function () {
                                               : (propsSource().length ? "no props on this date" : "no props loaded"));
     var resChip = propResChip;
     var tellMode = $("propsTells") ? $("propsTells").value : "";   // the tells filter (7 Nov 2026): a green tell and no red, or a red tell
-    var picks = rows.filter(function (r) { return propHas(r) && r.edge > 0 && propTellsFilter(r, tellMode); }).sort(function (a, b) { return b.edge - a.edge; });
+    var picks = rows.filter(function (r) { return propHas(r) && r.edge > 0 && !propHeld(r) && propTellsFilter(r, tellMode); }).sort(function (a, b) { return b.edge - a.edge; });   // an over priced -110 to -101 is left off (15 Nov 2026)
     /* under the BETs (11 Nov 2026): three-leg tickets to test, from the overs or either side, in the LEANs' place; or the LEANs one by one */
     if ($("propsBelow") && $("propsBelow").value !== propsBelow) $("propsBelow").value = propsBelow;
     if ($("propsLegs") && $("propsLegs").value !== String(propsLegs)) $("propsLegs").value = String(propsLegs);
@@ -6180,14 +6238,15 @@ smStore.ready.then(function () {
     var t3Spec0 = t3Mode && t3List.length ? (t3List[0].primary || t3List[0]).spec : null, t3Kept = !!(t3Spec0 && (t3Mode === "t3c" ? t3Spec0.c : t3Spec0.listed)), t3Graded = rows.some(function (r) { return !!r.result; });
     var t3Html = !t3Mode ? '' : '<div class="pk-divider t3d">' + (nBetCards ? '' : (tellMode ? 'No BET among these. ' : 'No BET on this date. ')) +
       (t3Mode === "t3c"
-        ? '<b>' + propsT3Word(propsLegs, true) + '-leg tickets by best chance below, to test</b>, in the LEANs\' place: the ' + propsT3Word(propsLegs) + ' picks likeliest to land together at one app, each on its own game. A leg is a pick with an edge on its card and at the app\'s own line and price that the sheet gives ' + Math.round(PROPS_T3C.chance * 100) + '% or more there; an over in a game with a spread of ' + PROPS_T3C.lop + ' or more is left out, an over on a man whose minutes swing, and from 15 Nov 2026 any leg priced ' + PROPS_T3_HEAVY + ' or shorter. A card is one app throughout; where the same ' + propsT3Word(propsLegs) + ' also pass at another app, a tab on the card shows the ticket there. ' + propsT3CMeasured(propsLegs)
-        : '<b>' + propsT3Word(propsLegs, true) + '-leg tickets below, to test</b>, in the LEANs\' place: ' + propsT3Word(propsLegs) + ' men at one app' + (propsLegs === 2 ? ' on two games' : '') + ', each a pick with an edge whose last five games went his way four times or more and his last ten at least half, more levers toward the pick than against, no red chip and, from 15 Nov 2026, no leg priced ' + PROPS_T3_HEAVY + ' or shorter' + (t3Mode === "t3o" ? ', the overs only' : t3Mode === "t3u" ? ', the unders only' : '') + '. A card is one app throughout; where the same ' + propsT3Word(propsLegs) + ' also pass at another app, a tab on the card shows the ticket there. ' + propsT3Measured(propsLegs)) +
+        ? '<b>' + propsT3Word(propsLegs, true) + '-leg tickets by best chance below, to test</b>, in the LEANs\' place: the ' + propsT3Word(propsLegs) + ' picks likeliest to land together at one app, each on its own game. A leg is a pick with an edge on its card and at the app\'s own line and price that the sheet gives ' + Math.round(PROPS_T3C.chance * 100) + '% or more there; an over in a game with a spread of ' + PROPS_T3C.lop + ' or more is left out, an over on a man whose minutes swing, and from 15 Nov 2026 any leg priced ' + PROPS_T3_HEAVY + ' or shorter and any over priced ' + PROPS_COIN.lo + ' to ' + PROPS_COIN.hi + '. A card is one app throughout; where the same ' + propsT3Word(propsLegs) + ' also pass at another app, a tab on the card shows the ticket there. ' + propsT3CMeasured(propsLegs)
+        : '<b>' + propsT3Word(propsLegs, true) + '-leg tickets below, to test</b>, in the LEANs\' place: ' + propsT3Word(propsLegs) + ' men at one app' + (propsLegs === 2 ? ' on two games' : '') + ', each a pick with an edge whose last five games went his way four times or more and his last ten at least half, more levers toward the pick than against, no red chip and, from 15 Nov 2026, no leg priced ' + PROPS_T3_HEAVY + ' or shorter and no over priced ' + PROPS_COIN.lo + ' to ' + PROPS_COIN.hi + (t3Mode === "t3o" ? ', the overs only' : t3Mode === "t3u" ? ', the unders only' : '') + '. A card is one app throughout; where the same ' + propsT3Word(propsLegs) + ' also pass at another app, a tab on the card shows the ticket there. ' + propsT3Measured(propsLegs)) +
       (t3Kept ? ' This list was kept before the games and is in the record.' : (t3Graded && t3List.length ? ' Rebuilt from the night\'s rows after the games: for study, not in the record.' : '')) + '</div>' +
       (t3List.length ? '<div class="t3grid">' + t3List.map(function (t, i) { return propsT3Card(t, i); }).join("") + '</div>' : '<div class="empty t3none">' + (rows.length ? (t3Mode === "t3c" ? 'No ' + propsT3Word(propsLegs) + ' picks on this date pass the best-chance test at one app on ' + propsT3Word(propsLegs) + ' games.' : 'No ' + propsT3Word(propsLegs) + ' legs on this date pass the test at one app' + (propsLegs === 2 ? ' on two games' : '') + (t3Mode === "t3o" ? ' among the overs' : t3Mode === "t3u" ? ' among the unders' : '') + '.') : 'Load a props file and the tickets land here.') + '</div>');
     /* the BET band in front (6 Nov 2026, the user: "for the BET band cards, make that more visible and why"): a BET card carries
        a badge, its edge tier and a line that says why in words; the LEANs sit under a divider that says what the record says of them */
     var leanDivider = false, betsNote = propsBetsNote(rows);   // how many men and games the date's BETs really sit on (10 Nov 2026)
-    $("propsBest").innerHTML = (picks.length || ((t3Mode || plusMode) && rows.length)) ? (betsNote ? '<div class="pk-note">' + esc(betsNote) + '</div>' : '') + (plusMode ? picks : picks.slice(0, 12)).map(function (r, i) {
+    var heldNote = propsHeldNote(rows), heldHtml = heldNote ? '<div class="pk-note heldn">' + esc(heldNote) + '</div>' : '';   // the picks left off the lists, said whatever the list shows (15 Nov 2026)
+    $("propsBest").innerHTML = (picks.length || ((t3Mode || plusMode) && rows.length)) ? (betsNote ? '<div class="pk-note">' + esc(betsNote) + '</div>' : '') + heldHtml + (plusMode ? picks : picks.slice(0, 12)).map(function (r, i) {
       var tl = propsLeverTally(r), isBet = r.band === "BET", div = '';
       if (!isBet && !leanDivider) { leanDivider = true; div = '<div class="pk-divider' + (plusMode ? ' plusd' : '') + '">' + (i === 0 ? (tellMode ? 'No BET among these. ' : 'No BET on this date. ') : '') + (plusMode ? propsPlusWords() : 'LEANs below: information, not a measured edge (the band says 55% and does 52% over 1,300 graded picks)' + (i === 0 ? '.' : '; the BETs above are the bets.')) + '</div>'; }
       var clv = propClv(r);
@@ -6209,7 +6268,7 @@ smStore.ready.then(function () {
         (propBestAppLine(r) ? '<div class="n5 bestapp">' + propBestAppLine(r) + '</div>' : '') +
         (clv ? '<div class="n5 clvline' + (clv.clv > 0.0005 ? ' pos' : clv.clv < -0.0005 ? ' neg' : '') + '">' + propClvLine(r) + '</div>' : '') +
         '<div class="n6">' + propTakeBtn(r) + propsGoBtn(r) + '</div></div>';
-    }).join("") + t3Html + plusNone : '<div class="empty">' + (rows.length ? (tellMode === "green" ? 'No pick on this date carries a green tell without a red one.' : tellMode === "red" ? 'No pick on this date carries a red tell.' : 'No prop on this date clears its price.') : 'Load a props file: Run NBA props.bat writes nba-props-DATE.json.') + '</div>';
+    }).join("") + t3Html + plusNone : heldHtml + '<div class="empty">' + (rows.length ? (tellMode === "green" ? 'No pick on this date carries a green tell without a red one.' : tellMode === "red" ? 'No pick on this date carries a red tell.' : 'No prop on this date clears its price.') : 'Load a props file: Run NBA props.bat writes nba-props-DATE.json.') + '</div>';
     /* the simulation's strip (26 Oct 2026): one card a game */
     if ($("propsSim")) $("propsSim").innerHTML = rows.length ? propsSimStripHtml(rows) : '<div class="empty">Load a props file and each game\'s simulation lands here.</div>';
     /* a date whose props were made without last season's ledger (12 Nov 2026): the load says so once and the line scrolls away,
@@ -6249,7 +6308,7 @@ smStore.ready.then(function () {
       h += '<tr data-prop="' + r.id + '" class="' + (r.result || '') + (r.take ? ' taking' : '') + '"><td>' + esc(r.game) + '</td><td>' + esc(r.name) + (r.pos ? ' <span class="tag">' + esc(r.pos) + '</span>' : '') + '</td>' +
         '<td>' + esc(PROPS_LABEL[r.mk] || r.mk) + '</td><td>' + r.line + ' (' + sgn(r.op, 0) + '/' + sgn(r.up, 0) + ')</td>' +
         (propHas(r) ? '<td>' + esc(r.side) + '</td><td>' + (r.chance * 100).toFixed(1) + '%</td><td>' + sgn(r.price, 0) + '</td><td>' + (r.need * 100).toFixed(1) + '%</td>' +
-                      '<td class="' + (r.edge > 0 ? 'pos' : 'neg') + '">' + sgn(r.edge * 100, 1) + '</td><td>' + r.proj + '</td><td>' + esc(r.band) + '</td>'
+                      '<td class="' + (r.edge > 0 ? 'pos' : 'neg') + '">' + sgn(r.edge * 100, 1) + '</td><td>' + r.proj + '</td><td>' + esc(r.band) + (propHeld(r) ? ' <span class="tag heldt" title="' + esc(propHeldLine(r)) + '">off the lists</span>' : '') + '</td>'
                     : '<td colspan="7" class="dim">' + esc((r.why && r.why[0]) || 'no projection') + '</td>') +
         '<td>' + (r.result ? esc(r.result) + (r.actual !== null && r.actual !== undefined ? ' · ' + r.actual : '') : '') + '</td>' +
         (function (t) { return '<td class="agree' + (t.n ? (t.all ? ' pos' : t.against > t.toward ? ' neg' : '') : '') + '" title="' + esc(t.words) + '">' + t.text + '</td>'; })(propsLeverTally(r)) +
@@ -6271,7 +6330,7 @@ smStore.ready.then(function () {
     var out = ["The Super Model — NBA props — " + gameDate(date)];
     rows.forEach(function (r, i) {
       out.push((i + 1) + ". " + (r.take ? "TAKING · " : "") + r.name + " " + r.side + " " + r.line + " " + (PROPS_LABEL[r.mk] || r.mk) + " " + sgn(r.price, 0) + " · " + (r.chance * 100).toFixed(1) + "% needs " +
-               (r.need * 100).toFixed(1) + "% · " + r.band + " · " + r.game + " · proj " + r.proj + (propSimRead(r) !== null ? " · sim " + propSimRead(r) : "") + (r.result ? " · " + r.result.toUpperCase() + (r.actual !== null && r.actual !== undefined ? " " + r.actual : "") : ""));
+               (r.need * 100).toFixed(1) + "% · " + r.band + (propHeld(r) ? " (off the lists: an over priced " + PROPS_COIN.lo + " to " + PROPS_COIN.hi + ")" : "") + " · " + r.game + " · proj " + r.proj + (propSimRead(r) !== null ? " · sim " + propSimRead(r) : "") + (r.result ? " · " + r.result.toUpperCase() + (r.actual !== null && r.actual !== undefined ? " " + r.actual : "") : ""));
     });
     return out.join("\n");
   }
@@ -9044,7 +9103,7 @@ var qrcode = function() {
     parlayFour(dateISO).forEach(function (x) { P.four.push(phoneGameRef(keep, { g: x.row.matchup, s: x.row.sport, p: x.mk.pick, m: x.mk.label, c: phoneChance(x.mk.p), pr: x.mk.price === null ? undefined : x.mk.price, b: bandOf(x.mk) || undefined, r: res(x.mk, x.row) }, x.row, 1)); });
     bestBets(dateISO).forEach(function (x) { P.bets.push(phoneGameRef(keep, { g: x.row.matchup, s: x.row.sport, p: x.mk.pick, m: x.mk.label, c: phoneChance(x.mk.p), pr: x.mk.price, e: x.mk.edge === null || x.mk.edge === undefined ? undefined : Math.round(x.mk.edge * 1000) / 10, b: bandOf(x.mk) || undefined, r: res(x.mk, x.row) }, x.row, 1)); });
     if (keep.likely !== false) likeliestLegs(dateISO).forEach(function (x) { P.likely.push(phoneGameRef(keep, { g: x.row.matchup, s: x.row.sport, p: x.mk.pick, c: phoneChance(x.mk.p), pr: x.mk.price, ok: x.mk.p >= x.need ? 1 : undefined, r: res(x.mk, x.row) }, x.row, 2)); });
-    propsSource().filter(function (r) { return (r.gdate || "") === dateISO && propHas(r) && r.edge > 0; }).sort(function (a, b) { return b.edge - a.edge; }).slice(0, keep.props === undefined ? 12 : keep.props)
+    propsSource().filter(function (r) { return (r.gdate || "") === dateISO && propHas(r) && r.edge > 0 && !(typeof propHeld === "function" && propHeld(r)); }).sort(function (a, b) { return b.edge - a.edge; })   // an over priced -110 to -101 is left off the sheet too (15 Nov 2026).slice(0, keep.props === undefined ? 12 : keep.props)
       .forEach(function (r) { var sr = typeof propSimRead === "function" ? propSimRead(r) : null; P.props.push(phoneRefs(keep, { g: r.game, p: r.name + " " + r.side + " " + r.line + " " + (PROPS_LABEL[r.mk] || r.mk), c: phoneChance(r.chance), pr: r.price, e: Math.round(r.edge * 1000) / 10, b: r.band, pj: r.proj, sr: sr === null ? undefined : sr, r: propTakeRes(r) || undefined }, [r], 1)); });
     if (keep.sim !== false) card.filter(function (r) { return r.sport === "NBA" && (r.gdate || "") === dateISO && r.inputs && r.inputs.nbasim && !isVoid(r); }).forEach(function (r) {
       var sim = null; try { sim = JSON.parse(r.inputs.nbasim); } catch (e) { sim = null; }

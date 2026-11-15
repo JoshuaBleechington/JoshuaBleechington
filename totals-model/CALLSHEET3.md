@@ -5048,3 +5048,165 @@ at -250, a man at -200 at one app, -210 at another and -190 at the
 third, one at -199), graded with the night before it, run against 28
 copies broken on purpose, all caught; two earlier ticket blocks re-set
 for the note and the tiles. slate.py is untouched.
+
+## The over priced -110 to -101, left off the lists, 15 Nov 2026
+
+The user, told the picks priced -110 to -101 were the sheet's weak spot
+under the levers as they stand (94-116): "Measure and let me know right
+away please".
+
+### Four readings of one price
+
+The price asks 51.6%. Lab `px_bucket.py` and `px_over.py`, on the 15 Nov
+backup (25 graded nights, 14,573 props) and the replays of 12 and 15 Nov.
+
+| Reading | The over | The under |
+|---|---|---|
+| No model: both sides of every graded prop, 25 nights | 1,271-1,679 (43.1%, -16.5% a bet, 3 nights of 25 up) | 1,591-1,498 (51.5%, -0.3%) |
+| The sheet's BET and LEAN picks as carded, 25 nights | 149-221 (40.3%) | 345-324 (51.6%) |
+| The levers as they stood, the blend as it is, 14 nights replayed | 87-127 | 111-92 |
+| The levers as they stand, 18 nights | 11-12 | 83-104 (44.4%) |
+
+As carded the over's 149-221 is the BET band 31-45 and the LEANs
+118-176, so the band does not save it; it is 105-171 to 4 Nov under the
+older blends (no night of ten up) and 44-49 from the 5th. The page's
+picks at this price landed 47.5%, the sides it did not pick 47.4%: at
+this price the sheet has not been choosing.
+
+Is the cut in the right place? The sheet's overs as carded, finer:
+
+| The over's price | As carded | A pick |
+|---|---|---|
+| -159 to -130 | 91-52 | +9.3% |
+| -129 to -121 | 90-88 | -8.8% |
+| -120 to -116 | 113-97 | -1.1% |
+| -115 to -111 | 124-122 | -5.3% |
+| -110 to -106 | 72-90 | -14.7% |
+| -105 to -101 | 77-131 | -27.6% |
+| +100 to +119 | 56-68 | -8.0% |
+
+The two halves of the range are the two worst rows, and the rows either
+side are a third as bad or better. With no model the over loses at every
+price on the board: 9 to 17% a bet at the carded book, 9 to 14% at each
+app's own line and price on the 17 nights that keep the books (the over
+at -110 to -101 there 44.7%, BetMGM's 41.9%). So an over has to be
+chosen well to be worth a bet, and at this price the sheet's have not
+been. Under the levers as they stand it makes few of them (23 in 18
+nights, two on 15 Nov), so the rule costs little and the old record is
+the evidence; a tile keeps the count from here.
+
+The under at this price is another matter: level with no model, level as
+carded, ahead under the old levers and 83-104 under the levers as they
+stand (54-73 on the first nine nights, 29-31 on the last). That is one
+reading of four against it. It stays on the lists and has a tile of its
+own.
+
+### The rule and the page
+
+`PROPS_COIN` `{ lo: -110, hi: -101, from: "2026-11-15" }`.
+`propCoinOver(r, price)` is an over at such a price on a date from 15
+Nov; `propHeld(r)` is a pick (a side, an edge) that is one at the carded
+book. From 15 Nov such a pick:
+
+- makes no card on the best list (`renderProps`), whatever sits under
+  the BETs, and is not counted among the date's BETs or a man's BETs
+  (`propsBetsNote`, `propsBetsOfMan`), so a man's other BET is not
+  called one of two;
+- makes no ticket leg at any app, under either rule (`propT3Leg`): the
+  carded book is the first of the apps that posts the prop, not the best
+  price, so the same over is often shorter elsewhere and no better;
+- stays off the phone sheet's best props (`phonePayload`).
+
+An over priced so at an app makes no leg at that app though its card is
+priced otherwise (`propT3Leg`), and the tab for the app says so
+(`propT3CWhy`, `propT3LegWhy`: "X's is an over priced -105 there, and an
+over at -110 to -101 is left out").
+
+What stays: the band the slate gave it (the page scores nothing here),
+its row in the table with a tag, its panel (the band reads "BET · left
+off the lists", a line says why with the price and the app, the BET's
+own why stands down), the Take button, the copied text (marked), and
+the same-game pairs. A note above the cards names the date's overs left
+off, the most edge first, and stands above an empty list too. The
+ticket notes and the ticket tiles name both prices left out from 15 Nov.
+
+Two tiles in Is it working, both from 15 Nov: "The over priced -110 to
+-101, left off the lists" counts the BET and LEAN overs at that price as
+the slate carded them, by band, so the rule measures itself; "The under
+priced -110 to -101, a watch" counts the unders, which stay.
+
+Replayed on the eighteen nights (lab `tix_coin.py`) the tickets do not
+change: the best-chance pools hold no such over (58% at that price is
+rare) and the last-five pools held two, in no ticket. 27 of 69 at two
+legs and 13 of 46 at three stand. The same-game pairs used such an over
+twice in 200 tickets (lab `pairs_coin.py`), so they are left as they
+are.
+
+On the day's sheet two picks are left off, both Obi Toppin's (OVER 15.5
+pts + reb + ast and OVER 5.5 reb + ast, -105 at BetMGM, edges of 1.3
+and 0.3 points); the first twelve cards, the tickets, the even-money
+list and the pairs read as they did.
+
+### Found on the way: the same-game pairs since 10 Nov
+
+Rebuilt as the page builds them, each pair at the one app with the most
+edge (lab `pairs_replay.py`; the page's own tile reads 99-101, this
+rebuild 101-99):
+
+| Same-game pairs | To 9 Nov | 10 to 14 Nov |
+|---|---|---|
+| As carded, 25 nights | 95-65 (+67.1u) | 6-34 (-25.7u) |
+| The levers as they stand, 18 nights | 61-43 (+30.5u) | 7-33 (-23.8u) |
+| As carded, one leg priced -200 or shorter | 43-27 | 0-15 |
+| As carded, both legs so priced | 20-9 | 1-11 |
+| As carded, no such leg | 32-29 | 5-8 |
+
+It is the nights and not the levers: the drop is the same with the
+levers as they stand replayed on those nights. With no model (lab
+`heavy_nights.py`) every favourite priced -200 or shorter at the carded
+book landed 213-95 to 9 Nov (69.2% where the prices ask 69.1%) and
+30-38 on 10 to 14 Nov: 5-14 on 11 Nov and 4-7 on 12 Nov, 21-17 on the
+other three nights; the threes' unders 13-23. The grades are right:
+every graded prop's actual was checked against the same man's game log
+as a later night's file carries it (lab `grade_xcheck.py`), and 799 of
+799 on 11 Nov and 317 of 317 on 12 Nov agree (89 of 12,827 differ, by
+one or two, on older nights: the league's stat corrections after the
+grade).
+
+No rule tried turns the pairs into a steady winner under the levers as
+they stand (18 nights): as built 68-76 (+6.7u; 40-32 then 28-44); with
+no leg priced -200 or shorter 50-92 (-12.4u); every leg a pick with an
+edge 47-95; the ticket's chance clearing its price 54-80; two different
+men 66-78. Leaving the heavy legs out, which helped the tickets, makes
+the pairs worse: the pairs are the four likeliest props of a game, and
+those are the heavy prices. So the pairs are left as they are. Over the
+whole stretch they landed about what they said (as carded 50.5% where
+they said 47.6% and the prices asked 42.4%; as the levers stand 47.2%,
+said 45.4%, asked 44.7%): a hot run and then a cold one, on legs the
+book prices fairly. The page's units are at the product of the two
+legs' prices, and an app prices a same-game parlay under that, so the
+record flatters them. The user was told to pass the pairs on 15 Nov. On
+record: a pair is not a measured edge.
+
+### On record, not built
+
+- The under priced -110 to -101: the tile watches it.
+- Every over, with no model: 9 to 17% a bet under water at the carded
+  book on 25 nights. The sheet's overs as carded are 497-446 without
+  this range (-3.3% a pick) and its unders 1,343-1,142 (level).
+
+### Checked
+
+Four harness checks on the rule's first day (eleven props of ten men:
+overs carded at -105, -110 and -101, one of them the likeliest pick on
+the date and -120 at another app; overs at -111 and +100; an over at
+-105 with no edge; an over carded at -115 that is -105 at another app;
+unders at -105 and -108), a day whose only pick is such an over, and
+the day before the rule graded first: the list, the notes, the BETs'
+count, the table, the panel, the copied text, the phone sheet, both
+rules' tickets and their tabs, the two tiles and the ticket tiles' own
+note. Run against 42 copies broken on purpose, all caught. The ticket
+blocks before it were re-set for the notes, and the independent ticket
+checker (`tools_check_tickets.js`), which tests the page's lists
+against every valid ticket on random nights dated after the rule, was
+told the two prices in its own words. slate.py is untouched.

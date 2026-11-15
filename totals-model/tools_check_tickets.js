@@ -11,6 +11,9 @@
 // card and at the app's price, four of his last five and half of his last ten (eight or more) the pick's way, more measured
 // levers toward the pick than against, and the over on a favourite's man out. The app's line is the carded one on these
 // nights, so the chance at an app is the card's; a line that differs by app is covered by the replay on the real nights.
+// From 15 Nov 2026 two prices keep a leg out, as the user was told them: a leg priced -200 or shorter, and an over priced
+// -110 to -101 (the pick carded at such a price is left off the lists, so it is a leg at no app; a pick carded at another
+// price is no leg at an app that prices its over so).
 const APPS = ['fanatics', 'draftkings', 'fanduel', 'betmgm'], APPNAME = { fanatics: 'Fanatics', draftkings: 'DraftKings', fanduel: 'FanDuel', betmgm: 'BetMGM' };
 const LABEL = { pts: 'points', reb: 'rebounds', ast: 'assists', tpm: 'threes', pra: 'pts + reb + ast', pr: 'pts + reb', pa: 'pts + ast', ra: 'reb + ast' };
 const rng = (seed) => () => { seed |= 0; seed = seed + 0x6D2B79F5 | 0; let t = Math.imul(seed ^ seed >>> 15, 1 | seed); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; };
@@ -46,11 +49,14 @@ function night(seed, date, DENSE) {   // a random night: games, men, markets, li
   return { doc: { format: 'callsheet3.props', version: 1, date, games: games.map(g => ({ gid: 'r' + seed + '-' + g.gi, away: g.away, home: g.home, aab: g.aab, hab: g.hab, spread: g.spread, total: 225.5, props: men.filter(m => m.gi === g.gi) })) }, games, men };
 }
 // the oracle: a leg at an app, by the rule as the user was told it
-function legAt(m, app, g) {
+function legAt(m, app, g, date) {
   if (!(m.edge > 0)) return null;
   const bk = m.books[app]; if (!bk) return null;
   const price = m.side === 'OVER' ? bk[1] : bk[2], chance = m.chance;   // the app's line is the carded one on these nights, so the chance is the card's
   if (!(chance - implied(price) > 0)) return null;
+  if (price <= -200) return null;   // no leg priced -200 or shorter
+  const coin = (p) => p >= -110 && p <= -101;   // the over priced -110 to -101, on a date from 15 Nov 2026: the card's own price, or the app's
+  if (m.side === 'OVER' && date >= '2026-11-15' && (coin(m.price) || coin(price))) return null;
   const vals = m.log.map(x => x[4]).slice(-10), on = v => m.side === 'OVER' ? v > m.line : v < m.line, l5 = vals.slice(-5);
   if (l5.length < 5 || l5.filter(on).length < 4 || vals.length < 8 || vals.filter(on).length / vals.length < 0.5) return null;
   let tow = 0, ag = 0; m.parts.forEach(p => { if (!{ out: 1, oppc: 1, script: 1, pace: 1, dvp: 1, cons: 1 }[p.k] || Math.abs(p.eff) < 0.05) return; if (m.side === 'UNDER' ? p.eff < 0 : p.eff > 0) tow++; else ag++; });
@@ -69,7 +75,7 @@ function combos(xs, k) { const out = []; const go = (s, acc) => { if (acc.length
 function bestLeft(N, k, used, mode) {   // every valid ticket among the men not yet used, at every app; the best by games then value
   let best = null, count = 0;
   for (const app of APPS) {
-    const legs = N.men.map(m => (mode === 't3o' && m.side !== 'OVER') || (mode === 't3u' && m.side !== 'UNDER') ? null : legAt(m, app, N.games[m.gi])).filter(l => l && !used.has(l.m.pid));
+    const legs = N.men.map(m => (mode === 't3o' && m.side !== 'OVER') || (mode === 't3u' && m.side !== 'UNDER') ? null : legAt(m, app, N.games[m.gi], N.doc.date)).filter(l => l && !used.has(l.m.pid));
     for (const c of combos(legs, k)) {
       if (new Set(c.map(l => l.m.pid)).size < k) continue;
       const w = worth(c); if (k === 2 && w.games < 2) continue;
@@ -108,7 +114,7 @@ async function checkNights(pg, nights, seed0, dense, dateBase, verbose) {
           if (!list.length && !best) stats.empties++;
           break;
         }
-        const t = list[i], app = Object.keys(APPNAME).find(a => APPNAME[a] === t.app), legs = t.legs.map(x => byNameLabel[x]).map(m => m && legAt(m, app, N.games[m.gi]));
+        const t = list[i], app = Object.keys(APPNAME).find(a => APPNAME[a] === t.app), legs = t.legs.map(x => byNameLabel[x]).map(m => m && legAt(m, app, N.games[m.gi], N.doc.date));
         if (!app || legs.length !== k || legs.some(l => !l) || new Set(legs.map(l => l.m.pid)).size < k || legs.some(l => used.has(l.m.pid)) || (mode === 't3o' && legs.some(l => l.m.side !== 'OVER')) || (mode === 't3u' && legs.some(l => l.m.side !== 'UNDER'))) { ok = false; stats.fails.push(`seed ${seed} k${k} ${mode} #${i + 1}: not a valid ticket: ${JSON.stringify(t)}`); break; }
         const w = worth(legs); stats.valid++; stats.tickets[k]++; if (w.games < k) stats.shared++;
         if (!best || w.games !== best.games || Math.abs(w.ev - best.ev) > 1e-9) { ok = false; stats.fails.push(`seed ${seed} k${k} ${mode} #${i + 1}: the page's ticket is worth ${w.ev.toFixed(5)} on ${w.games} games (${legs.map(l => l.m.name).join(' + ')} at ${app}); the best left is ${best ? best.ev.toFixed(5) + ' on ' + best.games + ' games (' + best.legs.map(l => l.m.name).join(' + ') + ' at ' + best.app + ')' : 'none'}`); break; }

@@ -4882,3 +4882,169 @@ summing to its projection, four exhibition games read out of last
 season's ledger). The page: three harness checks on a date of fifteen
 men, run against 47 copies broken on purpose; five of the Example's
 checks re-set by hand; 1,342 checks in all.
+
+## The nights of 13 and 14 Nov, the expected five measured, and no leg priced -200 or shorter, 15 Nov 2026
+
+The user sent the 15 Nov backup (13 and 14 Nov graded, the day's sheet
+on it), and an hour in: "And lets see what can be done regarding the 2
+legs and 3 legs pairs we recent built. I dont like that they are not
+hitting. Find the issue and lets win today".
+
+### The two nights
+
+His own: 13 Nov 4-5 for +0.1 units (four props 2-2, three pairs 1-2 and
+one no action, two two-leg tickets 1-1); 14 Nov four pairs, 0-3 and one
+with a leg that did not play. The sheet: no BET and the LEANs 33-20 on
+13 Nov (16-11 one a man; six of them unders on Zubac, 2-4, his minutes
+read 26.7 and played 26), one BET and the LEANs 6-8 on 14 Nov; a call
+on every game 6-3 and 3-2.
+
+Both nights were carded by the second pass (`lv` 3), its first out of
+sample. From the rows as carded (lab `night19_levers.py`,
+`night19_share.py`), beside the four nights before as they were carded:
+
+                                       9 to 12 Nov (as it stood)   13 and 14 Nov
+    minutes, he played less the read   -1.19 / 4.68 (362 men)      +0.89 / 4.75 (167 men)
+    points, actual against projected   -5.9%                       +5.4%
+    the miss in his own sigmas         0.85 to 0.92                0.99 to 1.09
+    the over landed / the blend said   47.0% / 50.0%               50.6% / 49.2%
+    Brier, the blend less the book     -0.0008                     +0.0006
+    the model's earned share           0.28                        -0.13
+    the model against the book, apart  0.08 of chance              0.06
+
+Two nights say nothing either way: night by night under the old levers
+the earned share ran -0.34 to +0.54, two neighbours at a time -0.23 to
++0.41 (four of 22 pairs at or under -0.13), and with the men of the two
+nights drawn again 2,000 times the share runs -0.69 to +0.40. What is
+plain is that the sheet now sits nearer the books and picks less: 72
+picks with an edge in two nights and one BET.
+
+### RotoWire's expected five as a role: measured, and left
+
+All nine BETs of 15 Nov were unders on two men who had come off the
+bench and whom the expected five had starting (a regular out in front
+of each), read at 22 and 24 minutes. The role read fires on a CONFIRMED
+five only; the second pass left the expected five on record.
+
+The record of the expected five, on the 19 nights whose rows keep it
+(26 Oct to 14 Nov, 1,886 men-nights against who started, from the
+ledger; lab `exp_role.py`, `exp_role_read.py`):
+
+    the role of all his last five expected      right 98.0% (a starter), 95.3% (a bench man)
+    a new role expected                          320, right 78.1%
+       to start                                  166, right 82.5%   (started none 78%, one or two 82%, three or four 82%)
+       to the bench                              154, right 73.4%   (started all five: 0 of 7)
+
+A man expected to start in a new role played 3.3 minutes more than his
+games of any kind say (the raw reads), and 1.87 more than the run as it
+stands, whose lever on who is out already reads part of it (139 men,
+through `props_project` on the sixteen nights that keep the logs; lab
+`replay_exp.py`, `exp_mix_read.py`). The two paths of the run mixed at
+w (the five as expected; the five taken as confirmed):
+
+                               w = 0          0.5            0.8            1.0
+    minutes, bias / miss       +1.87 / 4.51   +0.56 / 4.49   -0.22 / 4.70   -0.75 / 4.92
+    actual against projected   +7.5%                         -0.1%
+    Brier, the blend (book 0.2466)   0.2446                  0.2457
+    the sheet's unders on them  88-59                        28-26
+
+So the mix levels the projection and makes the chance worse; on every
+row of the nights the blend's Brier goes 0.24750 to 0.24760 and the
+earned share 0.219 to 0.195. Not built. By his starts (lab
+`exp_mix_groups.py`): for a man who started none or one or two of his
+last five (53 men, 341 rows) the over landed 50.7% where the book said
+49.4%, and the sheet's unders went 40-22 by cards and 12-12 one a man:
+the sheet's 58 to 60% on such an under is not earned, and it is not a
+loser either. (A figure of 65% on 101 rows of six nights, given to the
+user first, was corrected the same hour.)
+
+To the bench (132 men, 747 rows; lab `exp_mix_bench.py`) the mix does
+lower the minutes' miss, -0.71 / 4.62 as the run stands and +0.32 / 4.39
+at a half, and the chance reads better the further it goes (Brier
+0.2484, 0.2475 at a half, 0.2465 with the five taken as confirmed; the
+book 0.2480). But on these sixteen nights the over landed 46 to 47% of
+the time on every kind of man where the books' prices say 49.5%, so
+whatever lowers a projection reads better and whatever raises one reads
+worse: that is the market's lean to the over, not the role. The minutes
+are the evidence, and they are 132 men. On record: the expected five to
+the bench, to measure again when there are more nights of it.
+
+### Why the tickets were not hitting
+
+As listed since they went up: by best chance 2-8 at two legs and 0-5 at
+three (said 42% and 29%), by the last-five rule 4-6 and 1-5; his own
+1-6 and 0-4. The eighteen legs of the best-chance lists of 12 to 14 Nov
+went 8-10 where the sheet said about 65%: unders on threes and assists
+at -165 to -235, most with under two points of edge.
+
+The best-chance list ranks by the sheet's chance, so it leads with the
+heaviest prices. With no model, every graded prop of the 25 nights to
+14 Nov with both prices (14,573; lab `tix_market.py`), the side its
+price favours:
+
+    priced             props   landed   plain no-vig   the price asks   a bet
+    -250 or shorter       38   81.6%    70.4%          75.3%            +8.5%
+    -249 to -200         338   62.7%    63.7%          68.3%            -8.3%
+    -199 to -160       1,433   59.0%    59.1%          63.2%            -6.6%   (the under 60.7%, the over 56.6%)
+    -159 to -130       4,325   54.8%    54.5%          58.5%            -6.2%   (57.4%, 52.0%)
+    -129 to -111       8,439   51.8%    51.2%          54.7%            -5.2%   (54.4% and -0.3% a bet, 48.2%)
+
+At -200 or shorter together: 376 props, the price asks 69.0% and they
+landed 64.6% (69.2%, 68.7% and 56.0% by thirds of the nights). For the
+sheet to show an edge at such a price its model must sit far over the
+book, and those are its worst reads: under the levers as they stand
+(sixteen nights replayed through slate.py and 13 and 14 Nov as carded;
+lab `tix_legs.py`) its picks with an edge by price:
+
+    -200 or shorter       43   landed 53.5%   said 69.4%   the price asked 68.4%
+    -199 to -160         102   65.7%          64.7%        63.3%      (the under 51 of 73, the over 16 of 29)
+    -159 to -130         146   56.2%          60.2%        58.9%
+    -129 to -111         486   54.7%          55.6%        54.5%
+    -110 to -101         210   44.8%          52.9%        51.7%
+    +100 and longer       39   53.8%          51.1%        49.7%
+
+And the tickets, each leg at one app's own line and price as the page
+builds them, six a night at most (lab `tix_replay.py`):
+
+                                                     two legs                     three legs
+    as first built (an edge, 58%+, by chance)        26 of 77, said 42.3%         11 of 53, said 27.1%
+    legs priced -200 or shorter alone                 3 of 16                      0 of 6
+    with those legs left out                         27 of 69, said 40.1%,        13 of 46, said 25.1%,
+                                                     the prices asked 37.6%       asked 22.9%
+       by half of the nights                         18 of 40, then 9 of 29        8 of 32, then 5 of 14
+       the first ticket of a night                    8 of 17                      7 of 17
+    left out at -180 or shorter                      18 of 62                      7 of 40
+    left out at -160 or shorter                      15 of 45                      5 of 27
+    and a point of edge or more                      23 of 51                      7 of 29
+    and the unders alone                             26 of 63                     10 of 43
+    55% or more in place of 58%                      37 of 92                     20 of 72
+
+Only the first cut is the same at two legs and at three, and it is the
+market's fact, not a fit: a leg priced -200 or shorter is left out. The
+rest moved one way at two legs and the other at three and is left as it
+was. With the cut the tickets land about what the sheet says: a small
+plus on the replay, weaker on its second half; no more is claimed.
+
+### The rule and the page
+
+`PROPS_T3_HEAVY` -200: `propT3Heavy(price)` keeps a leg out of either
+rule's ticket at an app where it is priced -200 or shorter
+(`propT3Leg`); the tab for that app says so (`propT3CWhy`,
+`propT3LegWhy`: "X is priced -210 there, and a leg at -200 or shorter
+is left out"). The pick stays on its card and in the same-game pairs,
+whose record is level (99-101 at the parlay price, +31.4 units). The
+note above each list says the rule, and the best-chance note the replay
+under the levers as they stand. A list kept at grading is not touched;
+each list's tile says what it did before 15 Nov and since
+(`PROPS_T3_HEAVY_FROM`, `t3CapNote`).
+
+On the day's sheet the best-chance list had opened on six legs at -190
+to -220; with the rule it reads Gilgeous-Alexander UNDER 2.5 threes +
+Wiggins UNDER 2.5 threes (+140), Burries UNDER 3.5 assists + Green OVER
+2.5 rebounds (+167), and at three legs the first two with Green (+295).
+
+Checked: three harness checks on a date of five men (the likeliest pick
+at -250, a man at -200 at one app, -210 at another and -190 at the
+third, one at -199), graded with the night before it, run against 28
+copies broken on purpose, all caught; two earlier ticket blocks re-set
+for the note and the tiles. slate.py is untouched.

@@ -766,6 +766,21 @@
      +11.0 units, 16 of 38 then 15 of 33 by half; the last-five rule's two legs landed 8 of 25 on the same nights. Three legs
      landed 10 of 55 where the sheet said 25.7%. A test with a record of its own: both lists are kept at grading */
   var PROPS_T3C = { chance: 0.58, lop: 5, swing: 6 };
+  /* no leg priced -200 or shorter (15 Nov 2026, the user, of the tickets: "I dont like that they are not hitting. Find the issue and
+     lets win today"). The best-chance list ranks by the sheet's chance, so it led with the heaviest prices, and since the levers were
+     corrected the sheet sits near the books: most such legs show under a point of edge. Measured with no model on every graded prop
+     of the 25 nights to 14 Nov (14,573; lab tix_market.py): a favourite priced -200 or shorter asks 69% and landed 64.6% (376 props;
+     69% on the first sixteen nights, 56% on the last nine). Under the levers as they stand (sixteen nights replayed through slate.py
+     and 13 and 14 Nov as carded; lab tix_legs.py, tix_replay.py) the sheet's own picks at such a price landed 23 of 43 where it said
+     69.4%, and the tickets as first built 26 of 77 at two legs (said 42.3%) and 11 of 53 at three (said 27.1%); tickets of such legs
+     alone 3 of 16 and 0 of 6; with them left out 27 of 69 (said 40.1%, the prices asked 37.6%; 18 of 40 then 9 of 29 by half) and
+     13 of 46 (said 25.1%, asked 22.9%; 8 of 32 then 5 of 14). A cap at -180 or -160 did worse (the unders at -199 to -160 are the
+     sheet's best legs, 51 of 73), an edge of a point or more helped two legs and not three, unders alone the same: left as it is.
+     The price is the market's, so it keeps a leg out of either rule's ticket at that app; the pick stays on its card and in the
+     same-game pairs, whose record is level (99-101 at the parlay price). The lists kept from this day have their own count */
+  var PROPS_T3_HEAVY = -200, PROPS_T3_HEAVY_FROM = "2026-11-15";
+  function propT3Heavy(price) { return isFinite(+price) && +price <= PROPS_T3_HEAVY; }
+  function propT3HeavyWhy(r, l) { return r.name + " is priced " + sgn(l.price, 0) + " there, and a leg at " + PROPS_T3_HEAVY + " or shorter is left out"; }
   /* two legs or three (11 Nov 2026, the user: "what about instead of the 3, we do 2 legs? would those be better?"). The same
      legs either way, so the question is the parlay's own: replayed on the same eleven nights by the same rule, two legs on
      separate games went 7 of 20 for +2.8 units (the sheet said 34.9%, the price needed 31.4%), the overs alone 5 of 6, the
@@ -785,9 +800,12 @@
   function propsT3Mode() { return propsBelow === "t3o" || propsBelow === "t3u" || propsBelow === "t3c" ? propsBelow : "t3"; }
   function propsT3FormMode() { var m = propsT3Mode(); return m === "t3c" ? "t3" : m; }   // the last-five list kept at grading beside the best-chance one
   function propsT3CMeasured(k) {
-    return "Replayed on the fourteen nights that keep the logs and the levers: such legs landed 208-128 one at a time, and the tickets " +
-      (k === 2 ? "31 of 71 at two legs for +11.0 units (the sheet said 41.3%, the prices asked 37.8%; 16 of 38 then 15 of 33 by half), where the last-five rule's two legs landed 8 of 25"
-               : "10 of 55 at three legs, under the 25.7% the sheet gave them, where two legs landed 31 of 71 for +11.0 units") +
+    return "Replayed on the eighteen nights to 14 Nov under the levers as they stand: as first built the tickets landed " +
+      (k === 2 ? "26 of 77 at two legs where the sheet said 42.3%, and tickets of legs priced -200 or shorter alone 3 of 16"
+               : "11 of 53 at three legs where the sheet said 27.1%, and tickets of legs priced -200 or shorter alone 0 of 6") +
+      " (such a price asks 69%, and every favourite so priced landed 64.6% on 25 nights, the sheet's own picks among them 23 of 43); with those legs left out, " +
+      (k === 2 ? "27 of 69 (the sheet said 40.1%, the prices asked 37.6%; 18 of 40 then 9 of 29 by half)"
+               : "13 of 46 (the sheet said 25.1%, the prices asked 22.9%; 8 of 32 then 5 of 14 by half)") +
       ". A test, not a measured edge: its record builds in Is it working beside the last-five tickets'.";
   }
   function propLastGames(r) { return (r.log || []).filter(function (g) { return g && g[3] && +g[3] > 0 && g[4] !== null && g[4] !== undefined && g[4] !== "" && !isNaN(+g[4]); }).slice(-10); }
@@ -803,6 +821,7 @@
   }
   function propT3CWhy(r, l) {   // why a pick is not a best-chance leg at an app's line and price; "" when it is
     if (!(l.chance - implied(l.price) > 0)) return r.name + " has no edge at " + sgn(l.price, 0) + " there" + (l.same ? "" : ", the line " + l.line);
+    if (propT3Heavy(l.price)) return propT3HeavyWhy(r, l);   // 15 Nov 2026: such a price asks 67% or more and those favourites landed 64.6%
     if (l.chance < PROPS_T3C.chance) return r.name + " reads " + (l.chance * 100).toFixed(1) + "% at " + l.line + " there, under the " + Math.round(PROPS_T3C.chance * 100) + "% a leg asks";
     var fv = propFav(r), sw = propMinSwing(r);
     if (r.side === "OVER" && fv !== null && Math.abs(fv) >= PROPS_T3C.lop) return r.name + "'s is an over in a game with a spread of " + Math.abs(fv);
@@ -815,6 +834,7 @@
     if ((mode === "t3o" && r.side !== "OVER") || (mode === "t3u" && r.side !== "UNDER")) return null;
     var l = propLegAt(r, app); if (!l) return null;
     var edge = l.chance - implied(l.price); if (!(edge > 0)) return null;
+    if (propT3Heavy(l.price)) return null;   // no leg priced -200 or shorter in either rule's ticket (15 Nov 2026)
     if (mode === "t3c") {   // by best chance: the sheet's own chance at the app's line, and the two measured leaks on the over kept out
       if (propT3CWhy(r, l) !== "") return null;
       return { r: r, side: r.side, line: l.line, price: l.price, chance: l.chance, same: l.same, hr: propLastGames(r).length ? propHitRate(r, l.line) : null, ev: l.chance * decimalOf(l.price) - 1 };
@@ -889,6 +909,7 @@
     var l = propLegAt(r, app); if (!l) return null;
     if (mode === "t3c") return propT3CWhy(r, l);
     if (!(l.chance - implied(l.price) > 0)) return r.name + " has no edge at " + sgn(l.price, 0) + " there" + (l.same ? "" : ", the line " + l.line);
+    if (propT3Heavy(l.price)) return propT3HeavyWhy(r, l);
     var hr = propHitRate(r, l.line, side);
     if (hr.n5 < 5 || hr.h5 < PROPS_T3.l5) return r.name + "'s line is " + l.line + " there, " + hr.h5 + " of his last " + hr.n5 + " " + (side === "OVER" ? "over" : "under") + " it";
     if (hr.n10 < PROPS_T3.n10 || hr.h10 / hr.n10 < PROPS_T3.l10) return r.name + "'s line is " + l.line + " there, " + hr.h10 + " of his last " + hr.n10 + " " + (side === "OVER" ? "over" : "under") + " it";
@@ -1500,9 +1521,12 @@
     });
     /* the three-leg tickets (11 Nov 2026): the list frozen when each date was graded, and the ones marked as taken */
     var byT3 = { 2: mk(), 3: mk() }, byT3Take = { 2: mk(), 3: mk() }, byT3C = { 2: mk(), 3: mk() };   // byT3C: the best-chance list kept at grading (12 Nov 2026)
+    var byT3Cap = { 2: mk(), 3: mk() }, byT3CCap = { 2: mk(), 3: mk() };   // the lists kept from the day a leg priced -200 or shorter was left out (15 Nov 2026)
     propsT3Stored().forEach(function (t) {
       var res3 = propsT3Res(t); if (!res3 || res3 === "void") return;
-      [t.spec.listed ? byT3[t.legs.length] : null, t.spec.take ? byT3Take[t.legs.length] : null, t.spec.c ? byT3C[t.legs.length] : null].forEach(function (s) {
+      var capped = (t.gdate || "") >= PROPS_T3_HEAVY_FROM;
+      [t.spec.listed ? byT3[t.legs.length] : null, t.spec.take ? byT3Take[t.legs.length] : null, t.spec.c ? byT3C[t.legs.length] : null,
+       capped && t.spec.listed ? byT3Cap[t.legs.length] : null, capped && t.spec.c ? byT3CCap[t.legs.length] : null].forEach(function (s) {
         if (!s) return;
         if (res3 === "push") { s.p++; return; }
         s.n++; s.says += t.chance;
@@ -1510,6 +1534,10 @@
       });
     });
     var rec = function (s) { return s.w + "-" + s.l + (s.p ? "-" + s.p : ""); };
+    var t3CapNote = function (all, cap) {   // what the lists did before a leg priced -200 or shorter was left out, and since
+      var bw = all.w - cap.w, bl = all.l - cap.l;
+      return " · from 15 Nov 2026 no leg priced " + PROPS_T3_HEAVY + " or shorter: " + (cap.n ? rec(cap) + " " + sgn(cap.units, 1) + "u since" : "none graded since") + ", " + bw + "-" + bl + " before it";
+    };
     var says = function (s) { return s.n ? (s.says / s.n * 100).toFixed(1) + "%" : "—"; };
     var does = function (s) { return s.n ? (s.w / s.n * 100).toFixed(1) + "%" : "—"; };
     var line = function (s) {
@@ -1568,8 +1596,8 @@
     });
     if (byTake.n || byTake.p) h2 += tile("Taken: the props you marked", byTake, []);
     if (byPair.n || byPair.p) h2 += tile("Same-game pairs, at the parlay price", byPair, []);
-    [2, 3].forEach(function (k) { if (byT3[k].n || byT3[k].p) h2 += tile(propsT3Word(k, true) + "-leg tickets as listed, to test", byT3[k], ["at the product of the " + propsT3Word(k) + " legs' prices; a void or pushed leg drops out"]); });
-    [2, 3].forEach(function (k) { if (byT3C[k].n || byT3C[k].p) h2 += tile(propsT3Word(k, true) + "-leg tickets by best chance, as listed, to test", byT3C[k], ["the " + propsT3Word(k) + " picks likeliest to land together, each on its own game, at the product of their prices; a void or pushed leg drops out"]); });
+    [2, 3].forEach(function (k) { if (byT3[k].n || byT3[k].p) h2 += tile(propsT3Word(k, true) + "-leg tickets as listed, to test", byT3[k], ["at the product of the " + propsT3Word(k) + " legs' prices; a void or pushed leg drops out" + t3CapNote(byT3[k], byT3Cap[k])]); });
+    [2, 3].forEach(function (k) { if (byT3C[k].n || byT3C[k].p) h2 += tile(propsT3Word(k, true) + "-leg tickets by best chance, as listed, to test", byT3C[k], ["the " + propsT3Word(k) + " picks likeliest to land together, each on its own game, at the product of their prices; a void or pushed leg drops out" + t3CapNote(byT3C[k], byT3CCap[k])]); });
     [2, 3].forEach(function (k) { if (byT3Take[k].n || byT3Take[k].p) h2 += tile(propsT3Word(k, true) + "-leg tickets you took", byT3Take[k], []); });
     if (byPlus.n || byPlus.p) h2 += tile("The pick at even money or better, to test", byPlus, ["an edge on the card at a price of +100 or longer, as carded since " + propsBlendDay() + " (the blend as it stands): unders " + rec(byPlusSide.UNDER) + (byPlusSide.UNDER.n ? " " + sgn(byPlusSide.UNDER.units, 1) + "u" : "") + " · overs " + rec(byPlusSide.OVER) + (byPlusSide.OVER.n ? " " + sgn(byPlusSide.OVER.units, 1) + "u" : "") + " · replayed under this blend on fourteen nights it went 83-58 (shown, not scored)"]);
     if (byRamp.n || byRamp.p) h2 += tile("The under on a man whose minutes are on the way back (shown, not scored)", byRamp, ["a short game in his last five and his last two above them: the projection's minutes run low; counted from the nights whose logs the page holds · measured on fourteen nights before it, 14-32"]);
@@ -1918,8 +1946,8 @@
     var t3Spec0 = t3Mode && t3List.length ? (t3List[0].primary || t3List[0]).spec : null, t3Kept = !!(t3Spec0 && (t3Mode === "t3c" ? t3Spec0.c : t3Spec0.listed)), t3Graded = rows.some(function (r) { return !!r.result; });
     var t3Html = !t3Mode ? '' : '<div class="pk-divider t3d">' + (nBetCards ? '' : (tellMode ? 'No BET among these. ' : 'No BET on this date. ')) +
       (t3Mode === "t3c"
-        ? '<b>' + propsT3Word(propsLegs, true) + '-leg tickets by best chance below, to test</b>, in the LEANs\' place: the ' + propsT3Word(propsLegs) + ' picks likeliest to land together at one app, each on its own game. A leg is a pick with an edge on its card and at the app\'s own line and price that the sheet gives ' + Math.round(PROPS_T3C.chance * 100) + '% or more there; an over in a game with a spread of ' + PROPS_T3C.lop + ' or more is left out, and an over on a man whose minutes swing. A card is one app throughout; where the same ' + propsT3Word(propsLegs) + ' also pass at another app, a tab on the card shows the ticket there. ' + propsT3CMeasured(propsLegs)
-        : '<b>' + propsT3Word(propsLegs, true) + '-leg tickets below, to test</b>, in the LEANs\' place: ' + propsT3Word(propsLegs) + ' men at one app' + (propsLegs === 2 ? ' on two games' : '') + ', each a pick with an edge whose last five games went his way four times or more and his last ten at least half, more levers toward the pick than against and no red chip' + (t3Mode === "t3o" ? ', the overs only' : t3Mode === "t3u" ? ', the unders only' : '') + '. A card is one app throughout; where the same ' + propsT3Word(propsLegs) + ' also pass at another app, a tab on the card shows the ticket there. ' + propsT3Measured(propsLegs)) +
+        ? '<b>' + propsT3Word(propsLegs, true) + '-leg tickets by best chance below, to test</b>, in the LEANs\' place: the ' + propsT3Word(propsLegs) + ' picks likeliest to land together at one app, each on its own game. A leg is a pick with an edge on its card and at the app\'s own line and price that the sheet gives ' + Math.round(PROPS_T3C.chance * 100) + '% or more there; an over in a game with a spread of ' + PROPS_T3C.lop + ' or more is left out, an over on a man whose minutes swing, and from 15 Nov 2026 any leg priced ' + PROPS_T3_HEAVY + ' or shorter. A card is one app throughout; where the same ' + propsT3Word(propsLegs) + ' also pass at another app, a tab on the card shows the ticket there. ' + propsT3CMeasured(propsLegs)
+        : '<b>' + propsT3Word(propsLegs, true) + '-leg tickets below, to test</b>, in the LEANs\' place: ' + propsT3Word(propsLegs) + ' men at one app' + (propsLegs === 2 ? ' on two games' : '') + ', each a pick with an edge whose last five games went his way four times or more and his last ten at least half, more levers toward the pick than against, no red chip and, from 15 Nov 2026, no leg priced ' + PROPS_T3_HEAVY + ' or shorter' + (t3Mode === "t3o" ? ', the overs only' : t3Mode === "t3u" ? ', the unders only' : '') + '. A card is one app throughout; where the same ' + propsT3Word(propsLegs) + ' also pass at another app, a tab on the card shows the ticket there. ' + propsT3Measured(propsLegs)) +
       (t3Kept ? ' This list was kept before the games and is in the record.' : (t3Graded && t3List.length ? ' Rebuilt from the night\'s rows after the games: for study, not in the record.' : '')) + '</div>' +
       (t3List.length ? '<div class="t3grid">' + t3List.map(function (t, i) { return propsT3Card(t, i); }).join("") + '</div>' : '<div class="empty t3none">' + (rows.length ? (t3Mode === "t3c" ? 'No ' + propsT3Word(propsLegs) + ' picks on this date pass the best-chance test at one app on ' + propsT3Word(propsLegs) + ' games.' : 'No ' + propsT3Word(propsLegs) + ' legs on this date pass the test at one app' + (propsLegs === 2 ? ' on two games' : '') + (t3Mode === "t3o" ? ' among the overs' : t3Mode === "t3u" ? ' among the unders' : '') + '.') : 'Load a props file and the tickets land here.') + '</div>');
     /* the BET band in front (6 Nov 2026, the user: "for the BET band cards, make that more visible and why"): a BET card carries

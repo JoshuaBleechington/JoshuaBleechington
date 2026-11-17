@@ -5210,3 +5210,73 @@ blocks before it were re-set for the notes, and the independent ticket
 checker (`tools_check_tickets.js`), which tests the page's lists
 against every valid ticket on random nights dated after the rule, was
 told the two prices in its own words. slate.py is untouched.
+
+## The over behind a tired favourite, a call on the game, 17 Nov 2026
+
+The user: "Can you test the back to back games this season to see if
+there is anything there? The celtics were on a back to back and played
+at home with full starters and lost by 10."
+
+The measurement is in NBA.md ("The back to back, against three seasons
+of lines"): 2,409 games with a line near the tip. The side is priced: a
+club on the second night won 408 of 875 where the moneylines priced 411
+and covered 425-441. The total is not, where the club on the second
+night is a favourite of 70% or more and the other club is rested: the
+game went over 66-33 on 99 games (32-16, 28-15 and 6-2 by season, 7.4
+points over the total, t 3.6), and the same favourites rested went
+360-367. It was found by taking the back to back apart, so it is a
+strong lean and not a proof, and the page treats it so.
+
+### What the page does
+
+- A fifth kind of call on the game (12 Nov's four: the agreement rule,
+  the sheet's own call, the best number on the board, the likelier
+  winner), third in the order. `nbaCallRest` fires where the likelier
+  winner by the middle of the books (`nbaCallWinner`: four books or
+  more, else the carded book) is at `NBA_REST.fav` 0.70 or more, the
+  row's rest days say that club played the day before and the other
+  club did not. A row with either rest blank gets nothing.
+- The call is the over at the lowest total one of the four apps posts
+  (`nbaCallBestOver`): the better over price on a tie, and the carded
+  total and price where the row has no shop. The sharp book's number is
+  not one of the four.
+- The card reads "REST · the over behind a tired favourite", the pick,
+  the price and the app, who is tired and at what chance by the books,
+  how long the other club rested, what three seasons measured, and the
+  kind's record here.
+- Take marks the kind whose card is shown, at its app, line and price
+  (`call: "rest"`, band "rest"), and the Taking list words it "rest ·
+  the over behind a tired favourite". Where the rest call is cold and
+  the best number says the over too, the card is the best number's and
+  so is the mark.
+- The NBA record's table of calls carries its line between the sheet's
+  own call and the best number. Each kind is still counted on every
+  game it speaks to; "the call as given" counts the rest call where it
+  is the one given.
+- Cold like the two BET kinds: with ten or more graded calls and under
+  water here it steps out of the order, and is named with its record on
+  the card of the kind given in its place.
+- The card's note on a back to back (the label) now says what three
+  seasons measured on the side, and where the total is not priced.
+
+On this season's rows to 16 Nov it speaks to eight games and went 6-2
+(+3.4 units); the call as given moves from +7.4 to +10.6 units on the
+same 133-71-1. No game on 17 Nov is one: the Trail Blazers and the
+Timberwolves are both on the second night, which reads level (over
+70-73 on 144 games). Shown, not scored: no chance, band or pick on the
+card moves, and slate.py is untouched (the rest days were on the row
+already).
+
+### Checked
+
+Four harness checks. A day of seven games: three that are the spot (at
+home with a shop; at home where the best number on the board is the
+under at another app and the lowest total is at three apps; on the road
+with no shop) and four that are not (a favourite at 69.5%, both clubs
+on the second night, the favourite with a day of rest, a row with a
+rest blank). The Take on one of them. The grades, the cards' results
+and the record's table. Ten losing games on the days before for the
+cold kind, and a day after with one game given the likelier winner and
+one given the best number, whose Take marks the best number. Run
+against 30 copies of the page broken on purpose, all caught. The calls
+block of 12 Nov was re-set for the table's new line.

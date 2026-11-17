@@ -681,7 +681,7 @@
   <header class="top">
     <div>
       <div class="eyebrow"><span id="eyebrow">MLB · every market on the game</span>
-        <span class="build">· build <span id="build">2026-11-15</span></span></div>
+        <span class="build">· build <span id="build">2026-11-17</span></span></div>
       <h1>The <em>Super</em> Model</h1>
       <p>One matchup, every market the book posts on it — in baseball the full-game total, the first five,
          the moneyline and the run line;
@@ -2553,7 +2553,10 @@ smStore.ready.then(function () {
     var ar = num("narest"), hr = num("nhrest"), b2b = [];
     if (ar !== null && ar <= 0) b2b.push("away");
     if (hr !== null && hr <= 0) b2b.push("home");
-    if (b2b.length) notes.push("Back to back for the " + b2b.join(" and ") + " side. <b>A LABEL</b>: rest, the second night on the road, three in four and the time zones all flipped sign between seasons against two seasons of closes. The market prices rest.");
+    /* 17 Nov 2026 (the user: "test the back to back games this season to see if there is anything there"): on three seasons of closing lines
+       a club on the second night won 408 of 875 where the moneylines priced 411 and covered 425-441, so the side stays a label. The total is
+       another matter where the tired club is a heavy favourite and the other is rested: that is the rest call on the game (nbaCallRest) */
+    if (b2b.length) notes.push("Back to back for the " + b2b.join(" and ") + " side. <b>A LABEL</b> on the side: on three seasons of closing lines a club on the second night won 408 of 875 where the moneylines priced 411 and covered the spread 425-441, and rest, the second night on the road and three in four flipped sign between seasons. The market prices rest on the side. On the total it does not where the club on the second night is a favourite of 70% or more and the other is rested: the game went over 66-33, and the call on the game carries it.");
     var outA = nbaOutMinutes("away"), outH = nbaOutMinutes("home"), outBits = [];
     if (outA > 0) outBits.push("away " + outA.toFixed(0));
     if (outH > 0) outBits.push("home " + outH.toFixed(0));
@@ -3595,8 +3598,9 @@ smStore.ready.then(function () {
       if (Wn && Wn.side === side) c = { line: Wn.lo + "-" + Wn.hi, p: Wn.use.inside, worth: Wn.use.inside, band: "window", price: Wn.price, lo: Wn.lo, hi: Wn.hi, winView: Wn.view };
     }
     else if (view === "call") {   // a call on the game (12 Nov 2026): the best number or the likelier winner, at the app, the line and the price its card shows
-      var K = nbaCallKinds(row).filter(function (x) { return (x.kind === "number" || x.kind === "winner") && x.key === key && x.side === side; })[0];
-      if (K) c = { line: K.kind === "number" ? K.line : null, p: K.p, worth: null, band: K.kind === "number" ? "value" : "lean", price: K.price, book: K.app, call: K.kind };
+      var Ks = nbaCallKinds(row).filter(function (x) { return (x.kind === "rest" || x.kind === "number" || x.kind === "winner") && x.key === key && x.side === side; });
+      var G = nbaCallOf(row), K = Ks.filter(function (x) { return G && x.kind === G.kind; })[0] || Ks[0];   // the kind whose card is shown: the rest call where it and the best number both say the over, the best number where the rest call is cold
+      if (K) c = { line: K.kind === "winner" ? null : K.line, p: K.p, worth: null, band: K.kind === "number" ? "value" : K.kind === "rest" ? "rest" : "lean", price: K.price, book: K.app, call: K.kind };
     }
     else if (sim) c = nbaSimCalls(sim, lines, view).filter(function (x) { return x.key === key && x.side === side; })[0] || null;
     if (!c) { say("That call is not on the card as shown now; put the line back and take it again."); return; }
@@ -3606,7 +3610,7 @@ smStore.ready.then(function () {
                  p: c.p === null ? null : +(+c.p).toFixed(4), worth: c.worth === null ? null : +(+c.worth).toFixed(4), band: c.band,
                  pick: view === "middle" ? "Total " + side + " " + c.line + " at " + bookName(c.book) + " (the middle with " + c.with.side + " " + c.with.line + ")"
                      : view === "window" ? "Total window " + c.lo + "-" + c.hi + " (over the low, under the high), one ticket"
-                     : view === "call" ? (c.call === "number" ? "Total " + side + " " + c.line : (side === "HOME" ? row.home : row.away) + " ML") + (c.book ? " at " + bookName(c.book) : "")
+                     : view === "call" ? (c.call !== "winner" ? "Total " + side + " " + c.line : (side === "HOME" ? row.home : row.away) + " ML") + (c.book ? " at " + bookName(c.book) : "")
                      : nbaSimPickText(key, side, c.line, f.away || row.away, f.home || row.home), at: new Date().toISOString() };
     if (view === "middle") { take.book = c.book; take.with = c.with; take.pair = c.pair; }
     if (view === "window") { take.lo = c.lo; take.hi = c.hi; take.winView = c.winView; }
@@ -3919,9 +3923,51 @@ smStore.ready.then(function () {
          on 36 and tied on 7. A first reading against the price the row was logged with (cheaper on 41, the better score) set a
          later quote beside an earlier price and is withdrawn.
      So every game is given one call, by this order: the agreement rule when it fires (BET); a side the sheet prices below its
-     chance, or one a verdict sits on (BET); a total a point or more off the market's middle at one of the four apps (VALUE);
-     else the likelier winner at the best of the four prices (LEAN), which is the book's price and says what it has cost. Shown,
-     not scored: no chance, band or pick on the card moves; each kind keeps its own record, replayed from the rows. */
+     chance, or one a verdict sits on (BET); the over behind a tired favourite (REST, 17 Nov 2026, below); a total a point or
+     more off the market's middle at one of the four apps (VALUE); else the likelier winner at the best of the four prices
+     (LEAN), which is the book's price and says what it has cost. Shown, not scored: no chance, band or pick on the card moves;
+     each kind keeps its own record, replayed from the rows.
+
+     THE OVER BEHIND A TIRED FAVOURITE (17 Nov 2026, the user: "Can you test the back to back games this season to see if there
+     is anything there? The celtics were on a back to back and played at home with full starters and lost by 10"). Measured on
+     2,409 games with a closing line (lab b2b.py to b2b6.py): all of 2024-25 at the middle of eight books, 2025-26 from late
+     November at DraftKings' close as ESPN's game page keeps it, and this season's card to 16 Nov. A club is on the second night
+     when it played the day before.
+       - the side is priced: a club on the second night won 408 of 875 where the moneylines priced 410.6 and covered 425-441;
+         the favourite on one won 264 of 396 where priced 269.3 (128 of 207 against 140.4 in 2024-25, then 112 of 156 against
+         107.6 and 24 of 33 against 21.3);
+       - the total is not, where the club on the second night is a favourite of 70% or more and the other club is rested: the
+         game's points less the total +7.4 (t 3.6) on 99 games, over 66-33 (32-16, 28-15 and 6-2 by season). The tired
+         favourite still wins as priced (77 of 99 against 77.7); the other club scores 4.6 more than the lines imply for it and
+         the favourite 2.8 more. At home 47-23, on the road 19-10; at full strength 21-11, twenty minutes or more of regulars
+         out 39-20; the other club rested one day 55-26, two or more 11-7; with the total set two points over the close 63-35;
+         the cut moved, 60% or more 110-69 and 75% or more 42-23. January and February are the one level stretch (11-11);
+       - the base: the same favourites with a day of rest and a rested dog 360-367 (+0.1); both clubs on the second night 36-31;
+         the favourite rested and the dog on the second night 91-82. Ninety-nine games drawn at random from the 829 with a
+         favourite of 70% or more and a rested dog ran this far over once in ten thousand draws.
+     Found by taking the back to back apart, so it is a strong lean on 99 games and not a proof: a call of its own, on the over
+     at the lowest total the four apps post, ahead of the best number on the board (55.6%), with its own record line, and cold
+     like the two BET kinds when it has lost here over ten or more calls. */
+  var NBA_REST = { fav: 0.70 };
+  function nbaCallBestOver(inp) {   // the lowest total one of the four apps posts, with its over price (the better price on a tie); the carded line where the shop is empty
+    var o = nbaOddsBlock(inp), t = o && o.total, best = null;
+    var num = function (v) { return v !== null && v !== undefined && v !== "" && isFinite(+v); };
+    if (t && t.OVER) NBA_CALL.apps.forEach(function (app) {
+      var ov = t.OVER.filter(function (x) { return x[0] === app && num(x[2]) && num(x[1]); })[0]; if (!ov) return;
+      if (!best || +ov[2] < best.line - 1e-9 || (Math.abs(+ov[2] - best.line) <= 1e-9 && implied(+ov[1]) < implied(best.price) - 1e-12)) best = { line: +ov[2], price: +ov[1], app: app };
+    });
+    if (!best && num(inp.line)) best = { line: +inp.line, price: num(inp.op) ? +inp.op : -110, app: (o && o.book) || "" };
+    return best;
+  }
+  function nbaCallRest(row) {   // the likelier winner at 70% or more on the second night of a back to back, the other club with a day or more: the over
+    var inp = row.inputs || {}, num = function (v) { return v !== null && v !== undefined && v !== "" && isFinite(+v); };
+    if (!num(inp.narest) || !num(inp.nhrest)) return null;
+    var w = nbaCallWinner(row); if (!w || !(w.p >= NBA_REST.fav)) return null;
+    var favRest = w.side === "HOME" ? +inp.nhrest : +inp.narest, dogRest = w.side === "HOME" ? +inp.narest : +inp.nhrest;
+    if (!(favRest <= 0) || !(dogRest >= 1)) return null;
+    var b = nbaCallBestOver(inp); if (!b) return null;
+    return { fav: w.team, dog: w.side === "HOME" ? row.away : row.home, pfav: w.p, dogRest: dogRest, line: b.line, price: b.price, app: b.app };
+  }
   var NBA_CALL = { apps: ["fanatics", "draftkings", "fanduel", "betmgm"], gap: 1, books: 4 };
   function nbaMedian(xs) { var a = xs.slice().sort(function (p, q) { return p - q; }), n = a.length; return n ? (n % 2 ? a[(n - 1) / 2] : (a[n / 2 - 1] + a[n / 2]) / 2) : null; }
   function nbaCallNumber(inp) {   // the total at one of the four apps furthest on his side of the middle of every book's number, when that is a point or more
@@ -3964,6 +4010,8 @@ smStore.ready.then(function () {
     var calls = (row.markets || []).filter(function (mk) { return (mk.key === "total" || mk.key === "ml" || mk.key === "spread" || mk.key === "h1") && nbaIsCall(mk) && mk.price !== null && mk.price !== undefined && isFinite(+mk.price) && isFinite(+mk.p); })
       .sort(function (a, b) { return (+b.edge || 0) - (+a.edge || 0); });
     if (calls.length) out.push({ kind: "sheet", tier: "BET", key: calls[0].key, side: calls[0].side, price: +calls[0].price, app: "", p: +calls[0].p, pick: calls[0].pick, mk: calls[0] });
+    var rs = nbaCallRest(row);
+    if (rs) out.push({ kind: "rest", tier: "REST", key: "total", side: "OVER", line: rs.line, price: rs.price, app: rs.app, p: null, pick: "Total OVER " + rs.line, fav: rs.fav, dog: rs.dog, pfav: rs.pfav, dogRest: rs.dogRest });
     var nb = nbaCallNumber(inp);
     if (nb) out.push({ kind: "number", tier: "VALUE", key: "total", side: nb.side, line: nb.line, price: nb.price, app: nb.app, p: null, pick: "Total " + nb.side + " " + nb.line, gap: nb.gap, mid: nb.mid, books: nb.books });
     var w = nbaCallWinner(row);
@@ -3981,6 +4029,7 @@ smStore.ready.then(function () {
   var NBA_CALL_KINDS = [
     ["rule", "BET · the agreement rule", "the simulation and the crew on the same side of the total, the sheet not against it: 157-108 (59.2%) over two seasons of closes"],
     ["sheet", "BET · the sheet's own call", "a side the sheet prices below its chance, or one a verdict sits on"],
+    ["rest", "REST · the over behind a tired favourite", "a favourite of 70% or more on the second night of a back to back, the other club rested: the game went over the closing total 66-33 (66.7%) on three seasons, 32-16, 28-15 and 6-2; the same favourites rested 360-367"],
     ["number", "VALUE · the best number on the board", "a total at one of your four apps a point or more off the middle of every book's number: 105-84 (55.6%) on last season's closes, 78-70 at the opener"],
     ["w80", "LEAN · the likelier winner, 80% or more", "the book's price: such favourites at the best of the four prices went 231-31 last season, -0.3% a bet"],
     ["w70", "LEAN · the likelier winner, 70 to 80%", "the book's price: 216-81 last season at the best of the four prices, -5.8% a bet"],
@@ -4009,7 +4058,7 @@ smStore.ready.then(function () {
       ks.forEach(function (x) { add(rec[nbaCallBucket(x.c)], x.c, x.res); });   // every kind on its own line, on every game it speaks to
       graded.push(ks);
     });
-    NBA_CALL_KINDS.forEach(function (k) { var s = rec[k[0]]; s.cold = s.n >= NBA_CALL_COLD && s.units < 0 && (k[0] === "rule" || k[0] === "sheet"); });
+    NBA_CALL_KINDS.forEach(function (k) { var s = rec[k[0]]; s.cold = s.n >= NBA_CALL_COLD && s.units < 0 && (k[0] === "rule" || k[0] === "sheet" || k[0] === "rest"); });   // the rest call is new and rests on 99 games: it steps out of the order too when it has lost here
     graded.forEach(function (ks) { var x = ks.filter(function (y) { return !rec[nbaCallBucket(y.c)].cold; })[0] || ks[ks.length - 1]; add(rec.given, x.c, x.res); });   // the call as given: the first kind in the order that is not cold
     nbaCallsMemo = { stamp: stamp, rec: rec };
     return rec;
@@ -4020,8 +4069,8 @@ smStore.ready.then(function () {
     c.also = ks.filter(function (x) { return x !== c && rec[nbaCallBucket(x)].cold; });
     return c;
   }
-  function nbaCallsOn(dateISO) {   // the date's calls, one a game: the BETs first, then the value, then the leans, the likelier first
-    var out = [], rank = { BET: 0, VALUE: 1, LEAN: 2 };
+  function nbaCallsOn(dateISO) {   // the date's calls, one a game: the BETs first, then the rest call, the value, and the leans, the likelier first
+    var out = [], rank = { BET: 0, REST: 1, VALUE: 2, LEAN: 3 };
     card.forEach(function (r) { if (r.sport !== "NBA" || (r.gdate || "") !== dateISO || isVoid(r)) return; var c = nbaCallOf(r); if (c) out.push({ row: r, c: c }); });
     out.sort(function (a, b) { return (rank[a.c.tier] - rank[b.c.tier]) || ((b.c.p || 0) - (a.c.p || 0)) || (String(a.row.matchup) < String(b.row.matchup) ? -1 : 1); });
     return out;
@@ -4032,6 +4081,7 @@ smStore.ready.then(function () {
     var at = c.app ? " at " + esc(bookName(c.app)) : "", line3, btn = "";
     if (c.kind === "rule") { line3 = c.count + " of 3 voices · " + sgn(c.price, 0) + " needs " + (implied(c.price) * 100).toFixed(1) + "% · the rule's rate 59.2%"; btn = typeof nbaSimTakeBtn === "function" ? nbaSimTakeBtn(r, "agree", "total", c.side) : ""; }
     else if (c.kind === "sheet") { line3 = (c.p * 100).toFixed(1) + "% by the sheet · " + sgn(c.price, 0) + " needs " + (implied(c.price) * 100).toFixed(1) + "%"; btn = typeof takeBtn === "function" ? takeBtn(r, c.mk) : ""; }
+    else if (c.kind === "rest") { line3 = sgn(c.price, 0) + at + " · " + esc(c.fav) + " are " + (c.pfav * 100).toFixed(1) + "% by the books on the second night of a back to back, " + esc(c.dog) + " rested " + (c.dogRest === 1 ? "a day" : c.dogRest + " days") + (c.app ? ": the lowest total at your four apps" : ": the carded total"); btn = nbaSimTakeBtn(r, "call", "total", c.side); }
     else if (c.kind === "number") { line3 = sgn(c.price, 0) + at + " · the middle of " + c.books + " books is " + c.mid + ": " + (Math.abs(c.gap - 1) < 1e-9 ? "a point" : c.gap + " points") + " " + (c.side === "OVER" ? "under" : "over") + " it, on your side"; btn = nbaSimTakeBtn(r, "call", "total", c.side); }
     else {
       var cost = c.p * (decimalOf(c.price) - 1) - (1 - c.p);
@@ -6482,7 +6532,7 @@ smStore.ready.then(function () {
     return '<div class="pk taking sim" data-open="' + x.row.id + '" title="Load ' + esc(x.row.matchup) + ' into the form">' +
       '<div class="n1">TAKING · ' + esc(x.row.sport) + (isCall ? ' · A CALL ON THE GAME' : ' · SIMULATION') + (t.at ? ' · marked ' + esc(takeWhen(t.at)) : '') + '</div>' +
       '<div class="n2">' + esc(t.pick) + '</div>' +
-      '<div class="n3">' + (isCall ? (t.p === null || t.p === undefined ? 'value · the best number on the board' : 'lean · ' + (100 * t.p).toFixed(1) + '% by the books\' middle')
+      '<div class="n3">' + (isCall ? (t.call === "rest" ? 'rest · the over behind a tired favourite' : t.p === null || t.p === undefined ? 'value · the best number on the board' : 'lean · ' + (100 * t.p).toFixed(1) + '% by the books\' middle')
         : t.p === null || t.p === undefined ? esc(t.band) : (100 * t.p).toFixed(0) + '% by the sim' + (t.worth === null || t.worth === undefined ? '' : ' · worth ' + (100 * t.worth).toFixed(0) + '%') + (t.band === "no call" ? ' (no call by its worth)' : ' · ' + esc(t.band))) +
         ' · ' + (t.price === null || t.price === undefined ? 'no price on the row (−110 assumed)' : sgn(t.price, 0) + ' needs ' + (implied(price) * 100).toFixed(1) + '%') + (res ? ' · <span class="chip ' + res + '">' + esc(res) + '</span>' : '') + '</div>' +
       '<div class="n4">' + esc(x.row.matchup) + ' · ' + esc(nbaSimTakeViewLabel(t.view)) + '</div>' +

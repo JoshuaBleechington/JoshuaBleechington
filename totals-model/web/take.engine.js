@@ -76,7 +76,7 @@
     return '<div class="pk taking sim" data-open="' + x.row.id + '" title="Load ' + esc(x.row.matchup) + ' into the form">' +
       '<div class="n1">TAKING · ' + esc(x.row.sport) + (isCall ? ' · A CALL ON THE GAME' : ' · SIMULATION') + (t.at ? ' · marked ' + esc(takeWhen(t.at)) : '') + '</div>' +
       '<div class="n2">' + esc(t.pick) + '</div>' +
-      '<div class="n3">' + (isCall ? (t.p === null || t.p === undefined ? 'value · the best number on the board' : 'lean · ' + (100 * t.p).toFixed(1) + '% by the books\' middle')
+      '<div class="n3">' + (isCall ? (t.call === "rest" ? 'rest · the over behind a tired favourite' : t.p === null || t.p === undefined ? 'value · the best number on the board' : 'lean · ' + (100 * t.p).toFixed(1) + '% by the books\' middle')
         : t.p === null || t.p === undefined ? esc(t.band) : (100 * t.p).toFixed(0) + '% by the sim' + (t.worth === null || t.worth === undefined ? '' : ' · worth ' + (100 * t.worth).toFixed(0) + '%') + (t.band === "no call" ? ' (no call by its worth)' : ' · ' + esc(t.band))) +
         ' · ' + (t.price === null || t.price === undefined ? 'no price on the row (−110 assumed)' : sgn(t.price, 0) + ' needs ' + (implied(price) * 100).toFixed(1) + '%') + (res ? ' · <span class="chip ' + res + '">' + esc(res) + '</span>' : '') + '</div>' +
       '<div class="n4">' + esc(x.row.matchup) + ' · ' + esc(nbaSimTakeViewLabel(t.view)) + '</div>' +

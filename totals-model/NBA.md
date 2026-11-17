@@ -44,7 +44,7 @@ over 1,243-1,195; the spread's residual −0.15 (sd 13.7), the home side 1,237-
 | Missing regulars' minutes, away minus home (the side) | 2,449 | +0.29 (t 1.2) | +0.14 / +0.42 | weak, same sign both seasons; not scored. Big gaps (60+ minutes) ran +1.2 to the home side on 280 games |
 | Pace × efficiency margin projection, minus the spread | 2,142 | −0.01 | +0.06 / −0.09 | **the spread is priced**: nothing from the box score moves a side |
 | Rest days, home minus away; time zones; the trip's length | 2,418 | +0.18 / −0.18 / null | signs flip | null on the side and the total |
-| Back to back (either, away, home, both); three in four; the second night on the road | 455-1,087 | residuals −1.9 to +0.8, every t under 1.3 | signs flip | **labels only**; the market prices rest |
+| Back to back (either, away, home, both); three in four; the second night on the road | 455-1,087 | residuals −1.9 to +0.8, every t under 1.3 | signs flip | **labels only** on the side; the market prices rest. On the total it does not behind a tired favourite: see the back to back against three seasons of lines, 17 Nov 2026 |
 | The crew's free throws to date (the total) | 2,066 | −1.3 per 10 FTA (t −1.0) | | crews DO predict the night's free throws (slope 0.60, t 7.3) and a little pace (t 2.5); the total does not follow. Not an input |
 | The crew's own over/under residual to date | 2,062 | +0.17 (t 1.0) | | null |
 | A club's own over/under residual to date (last 10 / 20 / season) | 2,137 | −0.07 / +0.05 / −0.05 | | null within a season. Across the two seasons the clubs' residuals correlate at r +0.40 (20 of 30 the same sign): Nuggets +5.1 / +4.3 and Jazz +3.0 / +5.7 over, Celtics −2.9 / −3.2 and Hornets −2.9 / −3.6 under. **Watched, a label on the card**, not scored |
@@ -1255,3 +1255,148 @@ the three team-total weights stay at 0.3 and call nothing. The gap stays
 on the page as a watch with its tally, and the page's column beside the
 tally carries the two seasons.
 
+
+## The back to back, against three seasons of lines, 17 Nov 2026
+
+The user: "Can you test the back to back games this season to see if
+there is anything there? The celtics were on a back to back and played
+at home with full starters and lost by 10."
+
+### The data
+
+2,409 games with a line near the tip (lab `b2b.py` to `b2b6.py`,
+`b2b_rematch.py`): all 1,231 of 2024-25 at the middle of eight books at
+the last snapshot before the tip (the odds history the user pulled);
+973 of 2025-26, from late November on, at DraftKings' close as ESPN's
+game page keeps it (`espn_close.py`, free; ESPN's page has no line for
+the 258 games before that, and none for earlier seasons); and the 205
+games of 2026-27 to 16 Nov as the user's card last carried them. A club
+is on the second night when it played the calendar day before (the
+ledgers' dates; the card's own rest days agree on every one of this
+season's 205). A regular is a man who played five or more of his club's
+last ten games at 20 minutes or more.
+
+### The side is priced
+
+| The club on the second night | Games | Won, against the moneyline's own chance | Against the spread |
+| --- | --- | --- | --- |
+| Every club | 875 | 408 v 410.6 (z -0.2) | -0.37 (t -0.8), 425-441 |
+| At home | 430 | 213 v 221.8 | 212-215 |
+| On the road | 445 | 195 v 188.8 | 213-226 |
+| The other club rested | 587 | 264 v 266.6 | 282-298 |
+| The favourite | 396 | 264 v 269.3 (z -0.6) | -0.52 (t -0.7), 190-202 |
+| The favourite, by season | | 128 of 207 v 140.4, 112 of 156 v 107.6, 24 of 33 v 21.3 | 91-112, 82-74, 17-16 |
+| A favourite of 70% or more | 166 | 127 v 131.2 (z -0.8) | 79-85 |
+| The favourite, the dog rested | 255 | 164 v 171.3 (z -1.0) | -1.67 (t -1.9), 116-136 |
+| The dog | 473 | 141 v 138.3 | 232-236 |
+
+The favourite on the second night ran under its price in 2024-25 and
+over it in both seasons since: the sign flips, as the two-season study
+of 16 Oct found. This season to 16 Nov a club on the second night won 35
+of 72 where priced 34.1 and covered 37-34, and a favourite of 70% or
+more on one won 9 of 10. The Celtics' loss is the one.
+
+### The total is not, behind a tired favourite
+
+The game's points less the total, by who is on the second night:
+
+| | Games | Points less the total | Over-under |
+| --- | --- | --- | --- |
+| Neither club | 1,678 | +0.09 | 843-828 |
+| Both clubs | 144 | -1.44 (t -0.9) | 70-73 |
+| The road club alone | 301 | +1.38 (t 1.3) | 150-149 |
+| The home club alone | 286 | +2.31 (t 2.0) | 155-131 |
+
+It is not the venue. It is the price of the tired club, with the other
+club rested:
+
+| The club on the second night | Games | Points less the total | Over-under | By season |
+| --- | --- | --- | --- | --- |
+| **A favourite of 70% or more** | **99** | **+7.37 (t 3.6)** | **66-33** | **32-16, 28-15, 6-2** |
+| A favourite of 60 to 70% | 80 | +2.60 (t 1.3) | 44-36 | 27-20, 13-13, 4-3 |
+| A favourite of 50 to 60% | 76 | -1.49 | 34-42 | |
+| A dog of 30 to 50% | 157 | -1.15 | 70-87 | |
+| A dog under 30% | 175 | +2.46 (t 1.7) | 91-82 | |
+
+The 99 games taken apart: at home 47-23, on the road 19-10; at full
+strength 21-11, twenty minutes or more of regulars out 39-20; the other
+club rested one day 55-26, two or more 11-7; the second night in another
+city 35-21, in the same city 31-12; October to December 22-9, January
+and February 11-11 (the one level stretch), March and April 33-13; the
+total 230 or more 29-16, under it 37-17. With the cut moved: 60% or more
+110-69, 65% 86-52, 75% 42-23, 80% 24-16. With the total set two points
+over the close 63-35, three points 59-40. The median miss is 9.5 points
+over.
+
+The tired favourite still wins as priced (77 of 99 against 77.7) and
+covers 44-54. The other club scores 4.6 points more than the lines imply
+for it (over its implied total 64-33) and the favourite 2.8 more: both
+ends of the floor, the tired one's defence most.
+
+The base: the same favourites with a day or more of rest and a rested
+dog, 730 games, +0.06, 360-367. Both clubs on the second night with a
+favourite of 70% or more, 36-31. The big favourite rested and the dog on
+the second night, 91-82. Ninety-nine games drawn at random 50,000 times
+from the 829 with a favourite of 70% or more and a rested dog ran +7.37
+or more over in 0.01% of draws and had 66 or more overs in 0.09%. With
+2024-25 set aside, the season it was first seen in, the other two went
+34-17.
+
+What it is not: proven. It was found by taking the back to back apart
+(some forty cells were looked at), it is 99 games, and no line is at
+hand for 2023-24 or the first weeks of 2025-26 to try it on. It is the
+same size in each season, it moves with the price of the tired club as
+tired legs would have it, and it holds on either side of every other
+cut but midwinter.
+
+### Both clubs on the second night, and the rematch
+
+The user, the same day: "What about the trailblazers vs the timberwolves
+tonight? They are on a back to back." Both clubs on the second night,
+144 games: the total -1.44 (70-73 over), the home club 76-67 against the
+spread and 73 wins where priced 76.6. A rematch of the night before at
+the same site, 19 games: over 9-10, the home club 12-7 against the
+spread, the first night's loser 9 of 19 where priced 7.8; the books set
+the second game's total 2.7 under the first's. Nothing to read on either.
+
+### What was built
+
+A call of its own on the game (`nbaCallRest`, `NBA_REST.fav` 0.70): where
+the likelier winner by the middle of the books is 70% or more, played the
+day before, and the other club did not, the call is the over at the
+lowest total one of the four apps posts (`nbaCallBestOver`: the better
+price on a tie, the carded total where the row has no shop). It stands
+after the two BET kinds and ahead of the best number on the board, whose
+own record is 55.6%: where the best number is an under at another app,
+the rest call is the one given, and both are still counted on their own
+lines. Its line in the record reads "REST · the over behind a tired
+favourite" with what was measured before; it is cold like the BET kinds
+when it has lost here over ten or more calls, and then steps out of the
+order and is named on the card. Take marks the kind whose card is shown,
+at the app, the line and the price on it (`call: "rest"`; where the rest
+call is cold and the best number says the over too, the card and the
+mark are the best number's). The card's note on a back to back now says
+the side is priced and where the total is not.
+
+Replayed on this season's rows it speaks to eight games and went 6-2
+(+3.4 units): Thunder v Suns, Celtics v Nets, Knicks @ Bulls, Hawks v
+Nets, Pistons v Wizards and Celtics v Magic over; Pistons v Hornets and
+Spurs @ Jazz under. The call as given moves from +7.4 to +10.6 units on
+the same 133-71-1.
+
+Shown, not scored: no chance, band or pick on the card moves, and
+slate.py is untouched (the rest days were on the row already).
+
+### On record, not built
+
+- The favourite on the second night against a rested dog, against the
+  spread: 116-136 (-1.67, t -1.9; 58-75, 47-48, 11-13 by season). One
+  season's, mostly.
+- A favourite of 60 to 70% on the second night: over 44-36. The same
+  way, half the size; the call keeps to 70%.
+- The home club alone on the second night with its first night at home:
+  76-97 against the spread (t -2.7). One cell of many.
+- The older watch on the upset card (a favourite of ten or more on a
+  back to back, dogs +3.9 points on 86 games) is left as it reads: on
+  three seasons of moneylines a favourite of 70% or more on one won 127
+  of 166 where priced 131.2.

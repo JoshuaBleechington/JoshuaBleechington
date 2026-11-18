@@ -1423,7 +1423,8 @@
   function upsetSignals(r) {
     var i = r.inputs || {}, mks = r.markets || [], ml = mks.filter(function (m) { return m.key === "ml"; })[0];
     if (!ml || ml.price === null || ml.price === undefined || !ml.other || ml.other.price === null || ml.other.price === undefined) return null;
-    var listedDog = ml.price > 0 || (ml.price === ml.other.price && ml.p < ml.other.p);
+    /* the dog is the side with the longer price, not the side with a plus sign (18 Nov 2026): at -105 against -115 the first is the dog */
+    var listedDog = decimalOf(ml.price) > decimalOf(ml.other.price) || (ml.price === ml.other.price && ml.p < ml.other.p);
     var dog = { pick: listedDog ? ml.pick : ml.other.pick, p: listedDog ? ml.p : ml.other.p, price: listedDog ? ml.price : ml.other.price, side: listedDog ? ml.side : (FLIP[ml.side] || ml.side) };
     var dogHome = dog.side === "HOME", sig = [], scored = false;
     var n = function (k) { var v = parseFloat(i[k]); return isFinite(v) ? v : null; };

@@ -329,9 +329,12 @@
   function signalChip(cls, go, badge, html) { return { cls: cls, go: go, badge: badge, html: html, text: badge + ": " + html.replace(/<[^>]+>/g, "") }; }
   function signalList(m, pk, upsetView, leg) {
     var out = [], pc = function (p) { return (100 * p).toFixed(1) + "%"; }, nba = sport === "NBA";
-    if (pk && !pk.none && pk.mk) {
-      var hot = !!(pk.mk.band && pk.mk.band !== "NO BET");
-      out.push(signalChip(hot ? "go" : "watch", "markets", hot ? "the pick · " + pk.mk.band : "the pick", "<b>" + esc(pk.mk.pick) + "</b> · " + pc(pk.mk.p) + (pk.mk.edge !== null && pk.mk.edge !== undefined ? " · edge " + sgn(pk.mk.edge * 100, 1) : "")));
+    var dec = null;
+    if (nba && m) { try { dec = nbaCallOf(nbaDecRow(m, null)); } catch (e) { dec = null; } }
+    if (dec) out.push(signalChip("go", "markets", "the decision · BET", "<b>" + esc(dec.pick) + "</b> · " + (dec.p !== null && dec.p !== undefined && isFinite(+dec.p) && dec.kind !== "rule" ? pc(dec.p) + " · " : "") + sgn(dec.price, 0) + (dec.app ? " at " + esc(bookName(dec.app)) : "")));
+    if (pk && !pk.none && pk.mk && !(dec && dec.key === pk.mk.key && dec.side === pk.mk.side)) {
+      var hot = !!(pk.mk.band && pk.mk.band !== "NO BET"), lab = dec ? "the sheet's read" : "the pick";
+      out.push(signalChip(hot ? "go" : "watch", "markets", hot ? lab + " · " + pk.mk.band : lab, "<b>" + esc(pk.mk.pick) + "</b> · " + pc(pk.mk.p) + (pk.mk.edge !== null && pk.mk.edge !== undefined ? " · edge " + sgn(pk.mk.edge * 100, 1) : "")));
     }
     if (leg && typeof bandOf === "function" && bandOf(leg)) out.push(signalChip("go", "markets", "#1 says " + bandOf(leg), "<b>" + esc(leg.pick) + "</b> · " + pc(leg.p) + " at " + sgn(leg.price, 0)));
     if (upsetView && upsetView.dog) out.push(signalChip(upsetView.scored ? "go" : "watch", "markets", upsetView.scored ? "upset signal" : "upset watch", "<b>" + esc(upsetView.dog.pick) + "</b> · " + pc(upsetView.dog.p)));
@@ -340,7 +343,9 @@
     if (!nba) return out;
     var inputs = snapshot(), f = readNba(), row = nbaSimTakeRow(f), away = f.away || "Away", home = f.home || "Home";
     var V = null; try { V = nbaVoices({ sport: "NBA", inputs: inputs, markets: (m && m.markets) || [] }); } catch (e) { V = null; }
-    if (V && V.fires) out.push(signalChip("go", "secSim", "three voices · BET", "<b>" + esc(V.side) + " " + esc(String(V.line)) + "</b> · " + V.count + " of 3 on it, none against"));
+    var vrec = null; try { vrec = nbaCallsRecord().rule; } catch (e) { vrec = null; }
+    if (V && V.fires && vrec && vrec.cold) out.push(signalChip("watch", "secSim", "three voices · cold here", "<b>" + esc(V.side) + " " + esc(String(V.line)) + "</b> · " + V.count + " of 3 on it · " + esc(nbaCallRecWords(vrec)) + ", so it is left out of the decision"));
+    else if (V && V.fires) out.push(signalChip("go", "secSim", "three voices · BET", "<b>" + esc(V.side) + " " + esc(String(V.line)) + "</b> · " + V.count + " of 3 on it, none against"));
     else if (V && V.side && !V.against) out.push(signalChip("watch", "secSim", "three voices", V.count + " of 3 on the <b>" + esc(V.side) + "</b>" + (V.agree ? (V.alt ? ", but the row's line is an alternate" : ", but the price asks more than the rule's rate") : ", no rule without the sim and the crew")));
     var sim = nbaSim(), lines = nbaSimLinesFromForm();
     if (sim) {
@@ -1628,13 +1633,32 @@
     if (rs) out.push({ kind: "rest", tier: "REST", key: "total", side: "OVER", line: rs.line, price: rs.price, app: rs.app, p: null, pick: "Total OVER " + rs.line, fav: rs.fav, dog: rs.dog, pfav: rs.pfav, dogRest: rs.dogRest });
     var nb = nbaCallNumber(inp);
     if (nb) out.push({ kind: "number", tier: "VALUE", key: "total", side: nb.side, line: nb.line, price: nb.price, app: nb.app, p: null, pick: "Total " + nb.side + " " + nb.line, gap: nb.gap, mid: nb.mid, books: nb.books });
+    var rd = nbaCallRead(row);
+    if (rd) out.push(rd);
     var w = nbaCallWinner(row);
     if (w) out.push({ kind: "winner", tier: "LEAN", key: "ml", side: w.side, price: w.price, app: w.app, p: w.p, pick: w.team + " to win", need: w.need, books: w.books });
     return out;
   }
+  /* THE SHEET'S OWN READ AS A CALL (18 Nov 2026, the user: "it would be nice if it actually made a decision and not a no bet ...
+     if it believes the Magic are going to win then stand by that ... if it's an over/under game then make that choice"). The pick
+     the matchup card names (thePick: the likeliest side among the markets the sheet's inputs inform, where they move its chance a
+     point or more off the book's own number) is a kind of call, after the measured kinds and ahead of the likelier winner, so a
+     game the sheet reads as an over game is given the over where nothing measured speaks. It is not held to the other kinds'
+     cold rule (any loss over ten calls: it stood 11-12 on the day and the user asked for it to stand); it steps out only under
+     four wins in ten over ten calls or more, and where it names the very pick of a kind that is cold on the game */
+  var NBA_READ_COLD = 0.40;   // the sheet's read steps out of the order only under four wins in ten over NBA_CALL_COLD calls or more
+  function nbaCallRead(row) {
+    if (typeof thePick !== "function") return null;
+    var pk = null; try { pk = thePick(row.markets || [], "NBA", row.gdate || ""); } catch (e) { pk = null; }
+    if (!pk || pk.none || !pk.mk) return null;
+    var mk = pk.mk;
+    if (mk.price === null || mk.price === undefined || !isFinite(+mk.price) || !isFinite(+mk.p)) return null;
+    return { kind: "read", tier: "READ", key: mk.key, side: mk.side, price: +mk.price, app: "", p: +mk.p, pick: mk.pick, mk: mk, type: pk.type,
+             pMkt: isFinite(+mk.pMkt) ? +mk.pMkt : null, lean: isFinite(+mk.lean) ? +mk.lean : null };
+  }
   function nbaCallRes(c, row) {   // a call against the final: its own line and side
     var fin = row && row.finals; if (!c || !fin || isVoid(row)) return null;
-    if (c.kind === "sheet") { var g = gradeMarket(c.mk, fin); return g === "invalid" ? null : g; }
+    if (c.kind === "sheet" || c.kind === "read") { var g = gradeMarket(c.mk, fin); return g === "invalid" ? null : g; }
     var fh = parseFloat(fin.fh), fa = parseFloat(fin.fa); if (!isFinite(fh) || !isFinite(fa)) return null;
     if (c.key === "total") { var tot = fh + fa; return Math.abs(tot - c.line) < 1e-9 ? "push" : ((tot > c.line) === (c.side === "OVER") ? "win" : "loss"); }
     return ((fh > fa) === (c.side === "HOME")) ? "win" : "loss";
@@ -1645,6 +1669,7 @@
     ["sheet", "BET · the sheet's own call", "a side the sheet prices below its chance, or one a verdict sits on"],
     ["rest", "REST · the over behind a tired favourite", "a favourite of 70% or more on the second night of a back to back, the other club rested: the game went over the closing total 66-33 (66.7%) on three seasons, 32-16, 28-15 and 6-2; the same favourites rested 360-367"],
     ["number", "VALUE · the best number on the board", "a total at one of your four apps a point or more off the middle of every book's number: 105-84 (55.6%) on last season's closes, 78-70 at the opener"],
+    ["read", "READ · the sheet's own read of the game", "the likeliest side where the sheet's inputs move its chance a point or more off the book's own number; no measured edge at the price, so it is given where nothing measured speaks, and it stands unless it wins under four in ten here"],
     ["w80", "LEAN · the likelier winner, 80% or more", "the book's price: such favourites at the best of the four prices went 231-31 last season, -0.3% a bet"],
     ["w70", "LEAN · the likelier winner, 70 to 80%", "the book's price: 216-81 last season at the best of the four prices, -5.8% a bet"],
     ["w60", "LEAN · the likelier winner, 60 to 70%", "the book's price: 230-134 last season at the best of the four prices, -6.0% a bet"],
@@ -1673,18 +1698,29 @@
       graded.push(ks);
     });
     NBA_CALL_KINDS.forEach(function (k) { var s = rec[k[0]]; s.cold = s.n >= NBA_CALL_COLD && s.units < 0 && (k[0] === "rule" || k[0] === "sheet" || k[0] === "rest"); });   // the rest call is new and rests on 99 games: it steps out of the order too when it has lost here
-    graded.forEach(function (ks) { var x = ks.filter(function (y) { return !rec[nbaCallBucket(y.c)].cold; })[0] || ks[ks.length - 1]; add(rec.given, x.c, x.res); });   // the call as given: the first kind in the order that is not cold
+    rec.read.cold = rec.read.n >= NBA_CALL_COLD && rec.read.w / rec.read.n < NBA_READ_COLD;   // the sheet's read stands through a losing run and steps out only when it is clearly losing here
+    graded.forEach(function (ks) { var cs = ks.map(function (y) { return y.c; }), c = nbaCallLive(cs, rec)[0] || cs[cs.length - 1], x = ks.filter(function (y) { return y.c === c; })[0]; add(rec.given, x.c, x.res); });   // the call as given: the first kind in the order that is live
     nbaCallsMemo = { stamp: stamp, rec: rec };
     return rec;
   }
-  function nbaCallOf(row) {   // the game's call: the first kind in the order whose record here is not cold; the cold ones ride along as a note
+  /* the calls that are live on a game: every kind whose record here is not cold, less a read that names the very pick of a kind
+     that is cold on this game (18 Nov 2026: the sheet's own call, cold at 1-10, would come straight back as the sheet's read) */
+  function nbaCallLive(ks, rec) {
+    var cold = ks.filter(function (c) { return rec[nbaCallBucket(c)].cold; });
+    return ks.filter(function (c) {
+      if (rec[nbaCallBucket(c)].cold) return false;
+      if (c.kind === "read" && cold.some(function (x) { return x.key === c.key && x.side === c.side; })) { c.dup = true; return false; }
+      return true;
+    });
+  }
+  function nbaCallOf(row) {   // the game's call: the first kind in the order that is live; the cold ones ride along as a note
     var ks = nbaCallKinds(row); if (!ks.length) return null;
-    var rec = nbaCallsRecord(), live = ks.filter(function (c) { return !rec[nbaCallBucket(c)].cold; }), c = live[0] || ks[ks.length - 1];
+    var rec = nbaCallsRecord(), live = nbaCallLive(ks, rec), c = live[0] || ks[ks.length - 1];
     c.also = ks.filter(function (x) { return x !== c && rec[nbaCallBucket(x)].cold; });
     return c;
   }
   function nbaCallsOn(dateISO) {   // the date's calls, one a game: the BETs first, then the rest call, the value, and the leans, the likelier first
-    var out = [], rank = { BET: 0, REST: 1, VALUE: 2, LEAN: 3 };
+    var out = [], rank = { BET: 0, REST: 1, VALUE: 2, READ: 3, LEAN: 4 };
     card.forEach(function (r) { if (r.sport !== "NBA" || (r.gdate || "") !== dateISO || isVoid(r)) return; var c = nbaCallOf(r); if (c) out.push({ row: r, c: c }); });
     out.sort(function (a, b) { return (rank[a.c.tier] - rank[b.c.tier]) || ((b.c.p || 0) - (a.c.p || 0)) || (String(a.row.matchup) < String(b.row.matchup) ? -1 : 1); });
     return out;
@@ -1696,6 +1732,7 @@
     if (c.kind === "rule") { line3 = c.count + " of 3 voices · " + sgn(c.price, 0) + " needs " + (implied(c.price) * 100).toFixed(1) + "% · the rule's rate 59.2%"; btn = typeof nbaSimTakeBtn === "function" ? nbaSimTakeBtn(r, "agree", "total", c.side) : ""; }
     else if (c.kind === "sheet") { line3 = (c.p * 100).toFixed(1) + "% by the sheet · " + sgn(c.price, 0) + " needs " + (implied(c.price) * 100).toFixed(1) + "%"; btn = typeof takeBtn === "function" ? takeBtn(r, c.mk) : ""; }
     else if (c.kind === "rest") { line3 = sgn(c.price, 0) + at + " · " + esc(c.fav) + " are " + (c.pfav * 100).toFixed(1) + "% by the books on the second night of a back to back, " + esc(c.dog) + " rested " + (c.dogRest === 1 ? "a day" : c.dogRest + " days") + (c.app ? ": the lowest total at your four apps" : ": the carded total"); btn = nbaSimTakeBtn(r, "call", "total", c.side); }
+    else if (c.kind === "read") { line3 = (c.p * 100).toFixed(1) + "% by the sheet" + (c.pMkt !== null ? " where the book's own prices say " + (c.pMkt * 100).toFixed(1) + "%" : "") + " · " + sgn(c.price, 0) + " needs " + (implied(c.price) * 100).toFixed(1) + "%" + " · " + esc(nbaDecType(c)); btn = typeof takeBtn === "function" ? takeBtn(r, c.mk) : ""; }
     else if (c.kind === "number") { line3 = sgn(c.price, 0) + at + " · the middle of " + c.books + " books is " + c.mid + ": " + (Math.abs(c.gap - 1) < 1e-9 ? "a point" : c.gap + " points") + " " + (c.side === "OVER" ? "under" : "over") + " it, on your side"; btn = nbaSimTakeBtn(r, "call", "total", c.side); }
     else {
       var cost = c.p * (decimalOf(c.price) - 1) - (1 - c.p);
@@ -1724,6 +1761,301 @@
     return any ? h + '</tbody></table>' : "";
   }
 
+  /* ============================ THE DECISION ON EVERY GAME (18 Nov 2026) ============================
+     The user: "the 'this matchup' setup for the NBA games, it would be nice if it actually made a decision and not a no bet ... If
+     the model is going to make a decision, and it needs to for every game, then it needs to say bet ... it doesn't need to be all
+     about the price ... let the explanation for the pick be detailed in sense of some math but trends for the teams, players,
+     travel, usage increase for certain players ... If it's an over/under game then make that choice. I still like seeing the
+     additional info in tonight's signals."
+     So on a basketball matchup the pick card is THE DECISION: the game's call (nbaCallOf, the first kind in the order that is not
+     cold, the sheet's own read among them from this day), named with a green BET on every game, with what kind of read it is and
+     that kind's record, and a why in sections: the call, the numbers, each club's form, pace and the matchup, rest and the
+     schedule, who is out and who steps up, the crew, what else speaks on the game, and what the kind has done.
+     What the past says, so the card says it too (lab decide_read.py, the season's 210 graded games to 17 Nov):
+       the sheet's own read where it had one (23 games)   11-12 (-1.8u): the total 7-6, the moneyline 4-6
+       the sheet's side of the total on every game        97-107-6 (-15.4u), its overs 80-89
+       the short dog 26-35 (after 315 of 626 where priced 280 on two seasons) · the simulation's side of the total 73-91-5 ·
+       the crew's lean 56-59 · the three voices' rule 5-10
+       the best number on the board 47-36-1 (+5.7u) · the over behind a tired favourite 6-2 · the likelier winner 145-65 (-3.7u)
+     and on last season's closes every way of committing where nothing measured speaks costs the book's cut (lab board_value.py):
+     a total half a point off the middle 353-344 (-3.6% a bet), the favourite at the best of four prices -0.3% at 80% and up
+     and -6 to -8% below it. The decision says BET because the user asked it to; its strength line says which of these it is.
+     Tested the same day for "other players stepping up", against three seasons of lines (lab star_out.py to star_out3.py): with a
+     scorer of 18 points a game or more out three to fifteen of his club's games (so the books know) the SIDE is priced (49 to
+     53% either way) and the game's TOTAL ran over 207-157 (56.9%, t 3.3; 95-70, 98-75, 14-12 by season), but 110-70 from
+     February and 97-87 before it: on record, to build before the trade deadline. A scorer's FIRST games out could not be tested
+     fairly: the 2024-25 lines are from two and a half hours before the tip, before the late scratches */
+  var NBA_DEC_STRENGTH = { rule: "measured on two seasons of closes", sheet: "the sheet's own edge at the price", rest: "measured on three seasons of lines: the strongest read on the board",
+    number: "measured on last season's closes", read: "no measured edge at the price: a small bet", winner: "the book's favourite at the book's price: a small bet or a parlay leg" };
+  function nbaJson(v) { var d = null; try { d = v ? (typeof v === "string" ? JSON.parse(v) : v) : null; } catch (e) { d = null; } return d && typeof d === "object" ? d : null; }
+  function nbaDecNum(v) { return v !== null && v !== undefined && v !== "" && isFinite(+v); }
+  function nbaDecType(c) {
+    if (c.key === "total" || c.key === "h1") return (c.side === "OVER" ? "an OVER" : "an UNDER") + " game" + (c.key === "h1" ? ", first half" : "");
+    if (c.key === "ml") {
+      var o = c.mk && c.mk.other ? c.mk.other.price : null;
+      var dog = +c.price > 0 || (o !== null && o !== undefined && isFinite(+o) && decimalOf(+c.price) > decimalOf(+o));
+      return c.kind !== "winner" && dog ? "an UPSET game" : "a MONEYLINE game";
+    }
+    return "a SPREAD game";
+  }
+  function nbaDecRow(m, fin) {   // the game in the form as a row the calls can read
+    return { sport: "NBA", id: 0, gdate: ($("gdate") || {}).value || "", away: m.away, home: m.home, matchup: m.matchup, inputs: snapshot(), markets: m.markets || [], finals: fin || {} };
+  }
+  function nbaDecFormOf(list, nick, gdate) {   // a club's last five off the row: the record, the scoring, its totals and spreads against their closes, the run it is on
+    var g = (list || []).filter(function (x) { return nbaDecNum(x.pf) && nbaDecNum(x.pa); });
+    if (!g.length) return null;
+    var w = 0, pf = 0, pa = 0, ov = 0, un = 0, cov = 0, ncov = 0;
+    g.forEach(function (x) {
+      var us = +x.pf, them = +x.pa; if (us > them) w++; pf += us; pa += them;
+      var fb = (!nbaDecNum(x.ctot) || !nbaDecNum(x.csp)) ? nbaCardCloseFor(x.date, x.home ? x.opp : nick, x.home ? nick : x.opp) : {};
+      var ctot = nbaDecNum(x.ctot) ? +x.ctot : fb.ctot, csp = nbaDecNum(x.csp) ? +x.csp : fb.csp;
+      if (nbaDecNum(ctot)) { if (us + them > ctot) ov++; else if (us + them < ctot) un++; }
+      if (nbaDecNum(csp)) { var mg = us - them + (x.home ? +csp : -csp); if (mg > 0) cov++; else if (mg < 0) ncov++; }
+    });
+    var n = g.length, lw = +g[n - 1].pf > +g[n - 1].pa, streak = 1, road = 0, home = 0, i;
+    for (i = n - 2; i >= 0; i--) { if ((+g[i].pf > +g[i].pa) === lw) streak++; else break; }
+    for (i = n - 1; i >= 0; i--) { if (!g[i].home) road++; else break; }
+    for (i = n - 1; i >= 0; i--) { if (g[i].home) home++; else break; }
+    var dates = g.map(function (x) { return String(x.date || ""); }), since = gdate ? dates.filter(function (d) { return d >= nbaDecDaysBefore(gdate, 3) && d < gdate; }).length : 0;
+    return { n: n, w: w, l: n - w, pf: pf / n, pa: pa / n, ov: ov, un: un, cov: cov, ncov: ncov, streak: streak, won: lw, road: road, home: home, three4: since >= 2 };
+  }
+  function nbaDecDaysBefore(iso, d) { var t = Date.parse(iso + "T12:00:00Z"); if (!isFinite(t)) return ""; return new Date(t - d * 86400000).toISOString().slice(0, 10); }
+  function nbaDecFormLine(nick, f, atHome) {
+    var words = ["", "one", "two", "three", "four", "five", "six", "seven", "eight", "nine", "ten"], nth = ["", "first", "second", "third", "fourth", "fifth", "sixth", "seventh"];
+    var s = "<b>" + esc(nick) + "</b> " + f.w + "-" + f.l + " in their last " + (words[f.n] || f.n) + ", " + f.pf.toFixed(1) + " for and " + f.pa.toFixed(1) + " against";
+    if (f.ov + f.un) s += "; their totals went over " + f.ov + "-" + f.un;
+    if (f.cov + f.ncov) s += (f.ov + f.un ? " and they covered " : "; they covered ") + f.cov + "-" + f.ncov;
+    s += "; " + (f.streak >= 2 ? (f.won ? "won " : "lost ") + "the last " + (words[f.streak] || f.streak) : (f.won ? "won" : "lost") + " the last one");
+    if (f.three4) s += "; tonight is their third game in four nights";
+    if (!atHome && f.road >= 2) s += "; the " + (nth[f.road + 1] || (f.road + 1) + "th") + " straight on the road";
+    else if (atHome && f.road >= 3) s += "; home after " + (words[f.road] || f.road) + " on the road";
+    else if (atHome && f.home >= 3) s += "; the " + (nth[f.home + 1] || (f.home + 1) + "th") + " straight at home";
+    return s + ".";
+  }
+  function nbaDecRestWords(r) { return r <= 0 ? "on the second night of a back to back" : r === 1 ? "on a day's rest" : "on " + r + " days' rest"; }
+  function nbaDecOut(list, ticked) {   // a club's men out (listed Out, or ticked out on the card), the scorers first, and the men listed short of it
+    var out = [], maybe = [];
+    (list || []).forEach(function (p) {
+      if (!nbaDecNum(p.mpg) || +p.mpg < 10) return;
+      (/^out/i.test(String(p.st || "")) || ticked.indexOf(String(p.id)) >= 0 ? out : maybe).push(p);
+    });
+    var byPts = function (a, b) { return (+b.ppg || 0) - (+a.ppg || 0); };
+    out.sort(byPts); maybe.sort(byPts);
+    return { out: out, maybe: maybe, pts: out.reduce(function (t, p) { return t + (+p.ppg || 0); }, 0) };
+  }
+  /* WHO STEPS UP (18 Nov 2026, the user: "other players stepping up ... usage increase for certain players"). For a club's leading
+     scorer out (ten points a game or more): each teammate's points, minutes and usage in his games without the man against his
+     games with him. From the props run's `step` on his points row (slate.py props_step_up, runs from 19 Nov 2026: his games for
+     the club this season). A run before it carries only the game log's notes over his last ten, which name at most two men out
+     a game, so that reading is kept to a man whose minutes are first or second among the club's absences. Shown, never scored */
+  var NBA_STEP = { ppg: 10, games: 2, diff: 1.0, show: 3, watchPpg: 18, watchLo: 3, watchHi: 15, newPpg: 15 };
+  function nbaDecClubRows(row, side) {   // the club's points rows on the night's props
+    if (typeof props === "undefined" || !props || !props.length) return [];
+    return props.filter(function (r) {
+      return (r.gdate || "") === (row.gdate || "") && r.mk === "pts" && !!r.athome === (side === "home") &&
+        canonTeam(r.away, "NBA") === canonTeam(row.away, "NBA") && canonTeam(r.home, "NBA") === canonTeam(row.home, "NBA");
+    });
+  }
+  function nbaDecMissed(rows, name) {   // the club's games a man out has missed, by the props run's own split: the most any teammate has played without him; null where the run did not read him
+    var n = null;
+    rows.forEach(function (r) { (r.step || []).forEach(function (x) { if (x && x.n === name && isFinite(+x.gwo)) n = n === null ? +x.gwo : Math.max(n, +x.gwo); }); });
+    return n;
+  }
+  /* the watch (NBA.md, "A scorer out, against three seasons of lines"): a scorer of 18 a game out three to fifteen of his club's
+     games, and no 15-point man on the club inside his first three games out. {fires, clean} for one club */
+  function nbaDecOutWatch(row, side, d) {
+    var rows = nbaDecClubRows(row, side), fires = false, clean = true;
+    d.out.forEach(function (p) {
+      if (!(+p.ppg >= NBA_STEP.newPpg)) return;
+      var ms = nbaDecMissed(rows, p.n);
+      if (ms === null && p.src === "last season") ms = 99;   // the run did not read him and his numbers are last season's: out since before the watch's fifteen games, as far as the page can tell
+      if (ms === null || ms < NBA_STEP.watchLo) clean = false;
+      else if (+p.ppg >= NBA_STEP.watchPpg && ms <= NBA_STEP.watchHi) fires = true;
+    });
+    return { fires: fires, clean: clean };
+  }
+  function nbaDecStepUps(row, side, d) {
+    var res = { man: null, src: "", split: [], flat: false, gone: false, fresh: false, lift: [], top: [] };
+    var man = d.out.filter(function (p) { return +p.ppg >= NBA_STEP.ppg; })[0];
+    if (!man) return res;
+    res.man = man;
+    var rows = nbaDecClubRows(row, side).filter(function (r) { return r.name !== man.n; });
+    if (!rows.length) return res;
+    var byMpg = d.out.slice().sort(function (a, b) { return (+b.mpg || 0) - (+a.mpg || 0); }), named = byMpg.slice(0, 2).indexOf(man) >= 0;
+    var avg = function (gs, i) { return gs.length ? gs.reduce(function (t, g) { return t + (+g[i] || 0); }, 0) / gs.length : null; };
+    var list = [];
+    rows.forEach(function (r) {
+      var e = (r.step || []).filter(function (x) { return x && x.n === man.n; })[0], src = "step";
+      if (!e && named && r.log && r.log.length) {   // the game log's notes, his last ten
+        var wo = r.log.filter(function (g) { return (g[5] || []).some(function (t) { return String(t).indexOf(man.n + " out (") === 0; }); });
+        var w = r.log.filter(function (g) { return wo.indexOf(g) < 0; });
+        e = { gw: w.length, gwo: wo.length, pw: avg(w, 4), pwo: avg(wo, 4), mw: avg(w, 3), mwo: avg(wo, 3), uw: null, uwo: null }; src = "log";
+      }
+      if (!e) return;
+      var part = (r.parts || []).filter(function (x) { return x && x.k === "out" && isFinite(+x.eff); })[0];
+      list.push({ name: r.name, e: e, src: src, proj: isFinite(+r.proj) ? +r.proj : null, usg: isFinite(+r.usg) && r.usg !== null ? +r.usg : null,
+                  eff: part ? +part.eff : null, dmin: r.chg && isFinite(+r.chg.dmin) ? +r.chg.dmin : null });
+    });
+    var byProj = function (a, b) { return (b.proj || 0) - (a.proj || 0); };
+    res.top = rows.map(function (r) { return { name: r.name, proj: isFinite(+r.proj) ? +r.proj : null, usg: isFinite(+r.usg) && r.usg !== null ? +r.usg : null }; }).filter(function (x) { return x.proj !== null; }).sort(byProj).slice(0, NBA_STEP.show);
+    res.src = list.some(function (x) { return x.src === "step"; }) ? "step" : "log";
+    if (res.src === "step") list = list.filter(function (x) { return x.src === "step"; });
+    else if (man.src === "last season") { res.gone = true; return res; }   // his numbers are last season's: a game or two this season at most, so their numbers are already without him, whatever the log's notes name
+    if (!list.length) return res;
+    var maxWo = Math.max.apply(null, list.map(function (x) { return x.e.gwo; })), maxW = Math.max.apply(null, list.map(function (x) { return x.e.gw; }));
+    var both = list.filter(function (x) { return x.e.gw >= NBA_STEP.games && x.e.gwo >= NBA_STEP.games && x.e.pw !== null && x.e.pwo !== null; });
+    if (both.length) {
+      res.split = both.filter(function (x) { return x.e.pwo - x.e.pw >= NBA_STEP.diff; }).sort(function (a, b) { return (b.e.pwo - b.e.pw) - (a.e.pwo - a.e.pw); }).slice(0, NBA_STEP.show);
+      res.flat = !res.split.length && res.src === "step";   // the log's notes name two men a game at most: no "nobody moved" on them
+    } else if (maxWo < NBA_STEP.games && (res.src === "step" || maxWo > 0)) {   // no games without him to read: newly out
+      res.fresh = true;
+      res.lift = list.filter(function (x) { return x.eff !== null && x.eff >= 0.3; }).sort(function (a, b) { return b.eff - a.eff; }).slice(0, NBA_STEP.show);
+    } else if (maxW < NBA_STEP.games && res.src === "step") res.gone = true;
+    return res;
+  }
+  function nbaDecStepWords(st) {
+    if (!st.man) return "";
+    var last = function (n) { return String(n).split(" ").slice(1).join(" ") || String(n); }, who = esc(last(st.man.n)), f1 = function (v) { return (+v).toFixed(1); };
+    var topWords = function () { return st.top.map(function (x) { return esc(x.name) + " " + f1(x.proj) + (x.usg !== null ? " (usage " + f1(x.usg) + "%)" : ""); }).join(", "); };
+    if (st.split.length) return " Stepping up without " + who + " (" + (st.src === "step" ? "each man's games for the club this season" : "each man's last ten games") + "): " + st.split.map(function (x) {
+      var e = x.e, u = e.uwo !== null && e.uw !== null && e.uwo !== undefined && e.uw !== undefined;
+      return esc(x.name) + " " + f1(e.pwo) + " points in " + f1(e.mwo) + " minutes" + (u ? " on " + f1(e.uwo) + "% usage" : "") + " over the " + e.gwo + " without him, " +
+        f1(e.pw) + " in " + f1(e.mw) + (u ? " on " + f1(e.uw) + "%" : "") + " over the " + e.gw + " with him";
+    }).join("; ") + ".";
+    if (st.flat) return " Nobody's scoring has moved a point a game without " + who + " this season." + (st.top.length ? " Tonight's scoring by the props run: " + topWords() + "." : "");
+    if (st.fresh) return " " + who + " is newly out: " + (st.src === "step" ? "no more than one game without him this season" : "no more than one game without him in their last ten") +
+      (st.lift.length ? ". The props run lifts " + st.lift.map(function (x) { return esc(x.name) + " " + sgn(x.eff, 1) + " points to " + f1(x.proj) + (x.dmin !== null && Math.abs(x.dmin) >= 0.5 ? " (" + sgn(x.dmin, 1) + " minutes)" : ""); }).join(", ") : "") + ".";
+    if (st.gone && st.top.length) return " " + who + (st.src !== "step" ? " has hardly played this season" : " has hardly played with them this season") + ": the scoring already runs through " + topWords() + " by the props run.";
+    if (st.top.length) return " Tonight's scoring by the props run: " + topWords() + ".";
+    return "";
+  }
+  function nbaDecCallWords(c, row, m, V) {   // the first paragraph: the call itself, by its kind
+    var pc = function (p) { return (100 * p).toFixed(1) + "%"; };
+    if (c.kind === "rest") return "<b>" + esc(c.fav) + "</b> are " + pc(c.pfav) + " by the books and played last night; <b>" + esc(c.dog) + "</b> rested " + (c.dogRest === 1 ? "a day" : c.dogRest + " days") +
+      ". A favourite of 70% or more on the second night against a rested club went over the total 66-33 on three seasons of lines (32-16, 28-15 and 6-2), at home and on the road, where the same favourites rested went 360-367: the tired club still wins as priced, and the other scores more than the lines allow. So the over, at " + (c.app ? "the lowest total your four apps post" : "the carded total") + ".";
+    if (c.kind === "number") {
+      var s = (c.app ? esc(bookName(c.app)) + " posts " : "The app posts ") + c.line + " where the middle of " + c.books + " books is " + c.mid + ": " + (Math.abs(c.gap - 1) < 1e-9 ? "a point" : c.gap + " points") + " " + (c.side === "OVER" ? "under" : "over") +
+        " it, on the " + c.side.toLowerCase() + "'s side. A total a point or more off the middle at one of your four apps won 105-84 (55.6%) on last season's closes.";
+      if (m && m.total && isFinite(+m.total.projected)) {
+        var sp = nbaSplit(+c.line, +m.total.projected), mine = c.side === "OVER" ? sp[0] : sp[2], live = 1 - sp[1];
+        mine = live > 0 ? mine / live : 0.5;
+        s += " The sheet's own projection is " + (+m.total.projected).toFixed(1) + ": at " + c.line + " that is the " + c.side.toLowerCase() + " " + pc(mine) + " of the time, so the sheet " + (mine >= 0.5 ? "does not argue." : "leans the other way; the number has the better record.");
+      }
+      return s;
+    }
+    if (c.kind === "rule" && V) { var vw = nbaVoicesWords(V); return "Three voices on the total: " + vw.bits.join("; ") + ". " + vw.verdict + ". The simulation and the crew on one side with the sheet not against it went 157-108 (59.2%) over two seasons of closes."; }
+    if (c.kind === "sheet" || c.kind === "read") {
+      var w0 = ""; try { w0 = pickWhy({ mk: c.mk, type: c.type || "" }, m, "NBA"); } catch (e) { w0 = ""; }
+      if (c.kind === "read") w0 = w0.replace("the price asks more than that chance, so this is the likeliest side, not a value bet.", "the price asks a little more than that chance: this is the sheet's read of the game and not an edge at the price, so the bet is a small one.");
+      return w0 || (esc(c.pick) + " at " + pc(c.p) + " by the sheet.");
+    }
+    var cost = c.p * (decimalOf(c.price) - 1) - (1 - c.p);
+    return "By the middle of " + (c.books > 1 ? c.books + " books" : "the carded book") + " <b>" + esc(c.pick.replace(/ to win$/, "")) + "</b> win " + pc(c.p) + " of the time; the best of your four prices is " + sgn(c.price, 0) + (c.app ? " at " + esc(bookName(c.app)) : "") +
+      ", which needs " + pc(c.need) + ": " + (cost >= 0 ? "it pays " + sgn(cost * 100, 1) + "% a bet at that." : "it costs " + (-cost * 100).toFixed(1) + "% a bet.") + " Nothing measured speaks on this game and the sheet's inputs do not move a side a point off the book, so the decision is the likelier winner.";
+  }
+  function nbaDecWhy(c, row, m) {
+    var inp = row.inputs || {}, pc = function (p) { return (100 * p).toFixed(1) + "%"; }, li = [], V = null, all = nbaCallsRecord();
+    try { V = nbaVoices(row); } catch (e) { V = null; }
+    /* the numbers */
+    var nums = [];
+    if (m && m.total && isFinite(+m.total.projected)) {
+      var line = parseFloat(inp.line), o = nbaOddsBlock(inp), tl = o && o.total && o.total.OVER ? o.total.OVER.filter(function (x) { return nbaDecNum(x[2]); }).map(function (x) { return +x[2]; }) : [];
+      nums.push("The sheet projects " + (nbaDecNum(m.lamAway) && nbaDecNum(m.lamHome) ? "<b>" + esc(m.away) + " " + (+m.lamAway).toFixed(1) + ", " + esc(m.home) + " " + (+m.lamHome).toFixed(1) + "</b>, " : "") + "a total of <b>" + (+m.total.projected).toFixed(1) + "</b>" +
+        (isFinite(line) ? " against the card's " + line + (nbaDecNum(inp.opened) && +inp.opened !== line ? " (it opened " + (+inp.opened) + ")" : "") : "") + (tl.length >= NBA_CALL.books ? "; the middle of " + tl.length + " books is " + nbaMedian(tl) : "") + ".");
+    }
+    if (nbaDecNum(inp.sp)) nums.push(+inp.sp === 0 ? "The spread is a pick'em." : "The spread is " + esc(+inp.sp > 0 ? row.away : row.home) + " -" + Math.abs(+inp.sp) + ".");
+    var w = nbaCallWinner(row), ml = (row.markets || []).filter(function (k) { return k.key === "ml"; })[0];
+    if (w) {
+      var mine = ml && isFinite(+ml.p) ? (ml.side === w.side ? +ml.p : 1 - +ml.p) : null;
+      nums.push("<b>" + esc(w.team) + "</b> win " + pc(w.p) + " of the time by the middle of " + (w.books > 1 ? w.books + " books" : "the carded book") + (mine !== null ? ", " + pc(mine) + " by the sheet" : "") + ".");
+    }
+    if (V && V.sim) nums.push("The simulation's own view has the " + V.sim.side.toLowerCase() + " at " + (100 * Math.max(V.sim.p, 1 - V.sim.p)).toFixed(0) + "%.");
+    var k = kalshiOf(inp.nbakalshi || "");
+    if (k && (k.ml || k.totMed !== null)) nums.push("The crowd on Kalshi: " + [k.ml ? esc(k.ph >= 0.5 ? row.home : row.away) + " " + pc(Math.max(k.ph, k.pa)) : "", k.totMed !== null ? "a total of " + k.totMed.toFixed(1) : ""].filter(Boolean).join(", ") + ".");
+    if (nums.length) li.push(["The numbers", nums.join(" ")]);
+    /* form */
+    var form = nbaJson(inp.nbaform) || {}, fa = nbaDecFormOf(form.away, row.away, row.gdate), fh = nbaDecFormOf(form.home, row.home, row.gdate), ctx = nbaJson(inp.nbactx), ctxList = ctx && ctx.length ? ctx : [];
+    var ctxOf = function (side, kinds) { return ctxList.filter(function (x) { return x && x.side === side && kinds.indexOf(x.k) >= 0 && x.t; }).map(function (x) { return esc(String(x.t)); }); };
+    var fbits = [];
+    if (fa) fbits.push(nbaDecFormLine(row.away, fa, false));
+    if (fh) fbits.push(nbaDecFormLine(row.home, fh, true));
+    fbits = fbits.concat(ctxOf("away", ["record", "form"])).concat(ctxOf("home", ["record", "form"]));
+    if (fbits.length) li.push(["Form", fbits.join(" ")]);
+    /* pace and the matchup */
+    var mbits = [];
+    if (nbaDecNum(inp.napace) && nbaDecNum(inp.nhpace)) mbits.push("Pace: " + esc(row.away) + " " + (+inp.napace).toFixed(1) + " possessions a game, " + esc(row.home) + " " + (+inp.nhpace).toFixed(1) + (nbaDecNum(inp.nlpace) ? " (the league " + (+inp.nlpace).toFixed(1) + ")" : "") + ".");
+    if (nbaDecNum(inp.naort) && nbaDecNum(inp.nhdrt) && nbaDecNum(inp.nhort) && nbaDecNum(inp.nadrt)) mbits.push(esc(row.away) + " score " + (+inp.naort).toFixed(1) + " per 100 into a defence that allows " + (+inp.nhdrt).toFixed(1) + "; " + esc(row.home) + " score " + (+inp.nhort).toFixed(1) + " into one that allows " + (+inp.nadrt).toFixed(1) + (nbaDecNum(inp.nlrtg) ? " (the league " + (+inp.nlrtg).toFixed(1) + ")" : "") + ".");
+    mbits = mbits.concat(ctxOf("away", ["pace", "points", "ratings_faded", "ft", "watched"]).slice(0, 3)).concat(ctxOf("home", ["pace", "points", "ratings_faded", "ft", "watched"]).slice(0, 3));
+    if (mbits.length) li.push(["Pace and the matchup", mbits.join(" ")]);
+    /* rest and the schedule */
+    var rbits = [];
+    if (nbaDecNum(inp.narest) && nbaDecNum(inp.nhrest)) {
+      var ra = +inp.narest, rh = +inp.nhrest;
+      rbits.push(ra === rh ? "Both clubs " + nbaDecRestWords(ra) + "." : esc(row.away) + " " + nbaDecRestWords(ra) + ", " + esc(row.home) + " " + nbaDecRestWords(rh) + ".");
+      if (ra <= 0 && rh <= 0) rbits.push("Both on the second night reads level on three seasons of lines (the over 70-73).");
+      else if (ra <= 0 || rh <= 0) rbits.push("The books price rest on the side: a club on the second night won 408 of 875 where the moneylines priced 411" + (c.kind === "rest" ? "; the total is the part they miss, and it is this game's call." : "; the total moves only behind a favourite of 70% or more, which this is not."));
+    }
+    if ((fa && (fa.road >= 2 || fa.three4)) || (fh && (fh.road >= 3 || fh.three4))) rbits.push("Rest days, time zones, a long trip and a third game in four nights each read nothing on the side or the total against two seasons of closing lines: the books price the schedule, so it is shown and not scored.");
+    var mv = ctxOf("game", ["move"]); if (mv.length) rbits.push(mv.join(" "));
+    if (rbits.length) li.push(["Rest and the schedule", rbits.join(" ")]);
+    /* who is out, who steps up */
+    var outs = nbaJson(inp.nbaout) || {}, ticked = String(inp.nbaq || "").split(",").filter(function (x) { return x; }), obits = [], wfire = false, wclean = true;
+    [["away", row.away], ["home", row.home]].forEach(function (sd) {
+      var d = nbaDecOut(outs[sd[0]], ticked);
+      if (!d.out.length && !d.maybe.length) return;
+      var man = function (p) { return esc(String(p.n)) + " (" + (nbaDecNum(p.ppg) ? (+p.ppg).toFixed(1) + " points" : "") + (nbaDecNum(p.mpg) ? (nbaDecNum(p.ppg) ? ", " : "") + (+p.mpg).toFixed(0) + " minutes" : "") + ")"; };
+      var t = "<b>" + esc(sd[1]) + "</b>";
+      if (d.out.length) t += " without " + d.out.slice(0, 4).map(man).join(", ") + (d.out.length > 4 ? " and " + (d.out.length - 4) + " more" : "") + ": " + d.pts.toFixed(1) + " points a game out";
+      if (d.maybe.length) t += (d.out.length ? "; " : " ") + "listed short of out: " + d.maybe.slice(0, 3).map(function (p) { return esc(String(p.n)) + " (" + esc(String(p.st || "")) + (nbaDecNum(p.ppg) ? ", " + (+p.ppg).toFixed(1) + " points" : "") + ")"; }).join(", ");
+      var st = nbaDecStepUps(row, sd[0], d), ww = nbaDecOutWatch(row, sd[0], d);
+      if (ww.fires) wfire = true;
+      if (!ww.clean) wclean = false;
+      obits.push(t + "." + nbaDecStepWords(st));
+    });
+    if (obits.length) {
+      if (wfire && wclean) obits.push("Watched, not scored: with a scorer of 18 a game out three to fifteen of his club's games, and nobody of 15 a game newly out, the total ran over 207-157 on three seasons of lines (56.9%), nearly all of it from February on (110-70, against 97-87 before); the side was priced.");
+      obits.push("A club's own absences are in the line by the tip; what moves is the players' own numbers, which the props read.");
+      li.push(["Who is out, who steps up", obits.join(" ")]);
+    }
+    /* the crew */
+    var names = nbaCrewNames(inp.ncrew), cl = null; try { cl = nbaCrewLean(row); } catch (e) { cl = null; }
+    if (names.length) li.push(["The crew", esc(names.join(", ")) + (cl ? ": " + (cl.lean === "even" ? "no lean (z " + sgn(cl.z, 1) + ")" : "leans " + cl.lean + " (z " + sgn(cl.z, 1) + ")") + ". A crew predicts the night's free throws, not the total: its lean alone went 56-59 on this season's games to 17 Nov, so it is a voice and not a call." : ": not in the table.")]);
+    /* what else speaks on the game */
+    var ks = nbaCallKinds(row); nbaCallLive(ks, all);   // marks a read that repeats a cold call's pick
+    var also = ks.filter(function (x) { return x.kind !== c.kind; }).map(function (x) {
+      var kd = NBA_CALL_KINDS.filter(function (q) { return q[0] === nbaCallBucket(x); })[0], rec = all[kd[0]];
+      var t = esc(kd[1].replace(/^[A-Z]+ · /, "")) + " says <b>" + esc(x.pick) + "</b>" + (x.app ? " at " + esc(bookName(x.app)) : "") + " (" + esc(nbaCallRecWords(rec)) + (rec.cold ? ": cold, left out of the order" : x.dup ? ": the same pick as a call that is cold here, left out with it" : "") + ")";
+      var xl = parseFloat(inp.line);
+      if (x.kind === "read" && x.key === "total" && c.key === "total" && x.side !== c.side && nbaDecNum(c.line) && isFinite(xl) && m && m.total && isFinite(+m.total.projected)) {
+        var pj = +m.total.projected, lo = Math.min(+c.line, xl), hi = Math.max(+c.line, xl);
+        if (pj > lo && pj < hi) t += ": the sheet's " + pj.toFixed(1) + " sits between the two numbers, so it is the " + c.side.toLowerCase() + " at " + c.line + " and the " + x.side.toLowerCase() + " at " + xl + " at once, and the decision takes the better number";
+      }
+      return t;
+    });
+    if (also.length) { var at = also.join("; ") + "."; li.push(["Also on this game", at.charAt(0).toUpperCase() + at.slice(1)]); }
+    return li;
+  }
+  function nbaDecisionBlock(pk, m, fin) {
+    var row = nbaDecRow(m, fin), c = null;
+    try { c = nbaCallOf(row); } catch (e) { c = null; }
+    if (!c) return pickBlock(pk, m, "NBA");
+    var kd = NBA_CALL_KINDS.filter(function (q) { return q[0] === nbaCallBucket(c); })[0], rec = nbaCallsRecord()[kd[0]], given = nbaCallsRecord().given;
+    var res = fin ? nbaCallRes(c, row) : null, V = null; try { V = nbaVoices(row); } catch (e) { V = null; }
+    var o = nbaOddsBlock(row.inputs), where = c.app ? esc(bookName(c.app)) : (o && o.book && (c.kind === "read" || c.kind === "sheet" || c.kind === "rule") ? esc(bookName(o.book)) + ", the card's book" : "");
+    var big = c.p !== null && c.p !== undefined && isFinite(+c.p) && c.kind !== "rule" ? (c.p * 100).toFixed(1) + "%" : sgn(c.price, 0);
+    var why = nbaDecWhy(c, row, m), likely = likeliestOf(m && m.markets);
+    var h = '<div class="pickcard decision ' + esc(c.kind) + (res ? ' ' + res : '') + '" data-key="' + esc(c.key) + '" data-side="' + esc(c.side) + '" data-kind="' + esc(c.kind) + '">' +
+      '<div class="lab">The decision · ' + esc(nbaDecType(c)) + '</div>' +
+      '<div class="head"><div class="pick ' + sideClass(c.side) + '">' + esc(c.pick) + '<span class="band hot">BET</span>' + (res ? '<span class="chip ' + res + '" style="margin-left:8px;vertical-align:2px">' + esc(resText(res)) + '</span>' : '') + '</div>' +
+      '<div class="p">' + big + '</div></div>' +
+      '<div class="dplace">' + (big === sgn(c.price, 0) ? (where ? 'at ' + where + ' · ' : '') : sgn(c.price, 0) + (where ? ' at ' + where : '') + ' · ') + 'needs ' + (implied(c.price) * 100).toFixed(1) + '%</div>' +
+      '<div class="dkind"><b>' + esc(kd[1].replace(/^[A-Z]+ · /, "")) + '</b> · ' + esc(nbaCallRecWords(rec)) + ' · ' + esc(NBA_DEC_STRENGTH[c.kind] || "") + '</div>' +
+      '<div class="why"><b>Why</b>: ' + nbaDecCallWords(c, row, m, V) + '</div>' +
+      (why.length ? '<ul class="dwhy">' + why.map(function (x) { return '<li><b>' + esc(x[0]) + '.</b> ' + x[1] + '</li>'; }).join("") + '</ul>' : '') +
+      '<div class="also">The decision as given, one a game: ' + esc(nbaCallRecWords(given)) + '. Each kind keeps its own line in the NBA record. A measured kind that has lost here over ' + NBA_CALL_COLD + ' or more calls steps out of the order; the sheet\'s own read steps out only under four wins in ten over as many; the likelier winner always stands.</div></div>';
+    var lb = likely && likely.key === c.key && likely.side === c.side ? "" : likelyBlock(likely, pk).replace("Likeliest at any price · not the pick", "Likeliest at any price · not the decision");
+    return h + lb;
+  }
   /* the apps' numbers as they stand: the newest odds run on the row (oddsNow), else the odds the row was logged with */
   function nbaOddsBlock(inp) { var raw = inp && (inp.oddsNow || inp.odds), o = null; try { o = raw ? JSON.parse(raw) : null; } catch (e) { o = null; } return o; }
   function nbaMiddleMu(inp) { var mu = nbaMainTotal({ odds: (inp || {}).oddsNow || (inp || {}).odds }); if (mu === null) mu = parseFloat((inp || {}).line); return isFinite(mu) ? mu : null; }

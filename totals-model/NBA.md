@@ -1400,3 +1400,69 @@ slate.py is untouched (the rest days were on the row already).
   back to back, dogs +3.9 points on 86 games) is left as it reads: on
   three seasons of moneylines a favourite of 70% or more on one won 127
   of 166 where priced 131.2.
+
+## A scorer out, against three seasons of lines, 18 Nov 2026
+
+The user, asking for a decision on every game: "If the Magic are doing well
+recently such as other players stepping up ... then have it make the pick ...
+we should be able to find the human patterns as well to exploit." So the
+question was put to the lines: when a club's scorer is out, does the game
+do something the books do not price?
+
+The data (lab `star_out.py`, `star_out82.py`, `star_out2.py`,
+`star_out3.py`): the ledgers of 2024-25, 2025-26 and 2026-27 to 16 Nov,
+4,506 club-games with a line near the tip (2024-25 at the middle of eight
+books, the rest ESPN's closing line) joined to who played. A scorer is a
+man averaging the cut in points a game before the night; "out" is a game
+his club played without him after one he played.
+
+**The side is priced, and a trap for a test.** Read plainly, a club in its
+scorer's first games out covered less (22 points a game or more: 142-162
+against the spread in his first game out, 116-156 in his second to
+fourth). It is not an edge: the 2024-25 lines are a snapshot from a median
+two and a half hours before the tip, before the late scratches, so a
+"first game out" there is often an absence the line had not seen (2024-25
+alone 69-94 and 60-82; 2025-26 at ESPN's close 64-65 and 53-67). Out five
+games or more, where every book knows, the side is level: 298-281 at 18
+points, 188-197 at 22, the club winning 234 where the moneylines priced
+234.1. By every point a game out, however long, the short-handed club
+covered 179-220 at the far end, the same snapshot at work on the newest
+absences. Nothing here is scored on a side.
+
+**The total behind a scorer long out ran over.** Games with a scorer of 18
+points a game or more out three to fifteen of his club's games, and no
+15-point man on either side inside his first three games out (so every
+absence is one the books have seen):
+
+| | Games | Over | | Points over the close |
+| --- | --- | --- | --- | --- |
+| A scorer of 18+ out 3 to 15 games | 365 | 207-157 | 56.9% | +3.19 (t 3.3) |
+| by season | | 95-70, 98-75, 14-12 | | |
+| No scorer out three games or more | 582 | 287-290 | 49.7% | -0.22 |
+| Less its own month's drift | 324 | | | +3.13 (t 3.1) |
+| October to January | 184 | 97-87 | 52.7% | +1.58 (t 1.2) |
+| February to April | 181 | 110-70 | 61.1% | +4.82 (t 3.6) |
+| Out 3 to 5 games | 88 | 46-42 | 52.3% | |
+| Out 5 to 10 | 124 | 69-54 | 56.1% | |
+| Out 10 to 15 | 82 | 48-34 | 58.5% | |
+| Out 15 to 25 | 100 | 60-40 | 60.0% | |
+| His club still a favourite of 60%+ | 77 | 49-28 | 63.6% | both clubs +3.8 over their implied points |
+| Near a coin | 101 | 51-50 | 50.5% | |
+| A dog under 40% | 216 | 124-91 | 57.7% | |
+| With the total set 1 / 2 / 3 points higher | | 200-162, 188-173, 179-186 | | |
+| The cut at 12 / 15 / 20 / 22 / 25 points a game | | 54.1%, 55.1%, 56.2%, 57.1%, 54.9% | | |
+| Every game, a man newly out or not | 774 | 409-364 | 52.9% | +1.22 (t 1.8) |
+
+Both clubs score more than their implied points, at home and on the road
+alike. The reading is about three points of total the close does not
+carry once a scorer has been gone a while: the others' scoring has grown
+into the hole and the number still leans on the club's season.
+
+**Not built yet.** Nearly all of it is February to April (110-70 against
+97-87 before), which is also when the rotations after the trade deadline
+and the late-season rest sit, so it may be a late-season effect that a
+scorer's absence only marks; this season's games so far are 14-12. On
+record to test again and build before the trade deadline. Until then the
+decision card names it as a watch on a game that qualifies (from the props
+run's own count of the games each man has missed) and scores nothing.
+

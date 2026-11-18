@@ -6605,6 +6605,54 @@ def props_out_carry(pid, logs_this, logs_last, club):
     return out
 
 
+# Who steps up when a man is out (18 Nov 2026, the user, on the decision the page gives on every game: "other players stepping
+# up ... usage increase for certain players"): each player's own games for the club this season, split by whether each of the
+# club's scorers out tonight played in them, with his points, minutes and usage a game either way. For the page's decision
+# card. SHOWN, NEVER SCORED: a man's own games without an absent teammate did not help a pick the same day (picks against them
+# went 28-12, with them 34-25), a club's absences are in the game's line by the tip (the side 49 to 53% either way on three
+# seasons with a scorer out three to fifteen games), and the levers on who is out already read his minutes and rates.
+PROPS_STEP_MEN = 2          # the club's men out tonight read this way: the two who score the most
+PROPS_STEP_PPG = 10.0       # ... of those averaging this many points a game
+
+
+def props_step_up(pid, logs_this, logs_last, club):
+    """[{n, ppg, gw, gwo, pw, pwo, mw, mwo, uw, uwo}], one for each of the
+    PROPS_STEP_MEN highest scorers of his club listed Out tonight (PROPS_STEP_PPG
+    points a game or more): `gw` of his games for the club this season had the
+    man in them (his points `pw`, minutes `mw` and usage % `uw` a game) and `gwo`
+    did not (`pwo`, `mwo`, `uwo`). A number with no game behind it is None. []
+    when no such man is out or he has no game for the club this season."""
+    pid = str(pid)
+    ab = (club or {}).get("ab")
+    mine = [g for g in ((logs_this or {}).get(pid) or {}).get("g") or [] if g.get("min", 0) > 0 and g.get("tm") == ab]
+    if not mine or not club:
+        return []
+    men = []
+    for rid, name, _mpg, _st in club.get("out") or []:
+        if str(rid) == pid:
+            continue
+        ppg = props_player_avg((logs_this or {}).get(rid), (logs_last or {}).get(rid), "pts")
+        if ppg is not None and ppg >= PROPS_STEP_PPG:
+            men.append((ppg, str(rid), name))
+    men.sort(key=lambda x: (-x[0], x[2]))
+
+    def avg(gs, key):
+        return round(sum(float(g.get(key) or 0) for g in gs) / len(gs), 1) if gs else None
+
+    def usage(gs):
+        gs = [g for g in gs if g.get("tu")]
+        tu = sum(g["tu"] for g in gs)
+        return round(100.0 * sum(g.get("u") or 0 for g in gs) / tu, 1) if tu > 0 else None
+    out = []
+    for ppg, rid, name in men[:PROPS_STEP_MEN]:
+        ks = set((g.get("d"), g.get("opp"), g.get("home")) for g in ((logs_this or {}).get(rid) or {}).get("g") or [] if g.get("min", 0) > 0 and g.get("tm") == ab)
+        w = [g for g in mine if (g.get("d"), g.get("opp"), g.get("home")) in ks]
+        wo = [g for g in mine if (g.get("d"), g.get("opp"), g.get("home")) not in ks]
+        out.append({"n": name, "ppg": round(ppg, 1), "gw": len(w), "gwo": len(wo), "pw": avg(w, "pts"), "pwo": avg(wo, "pts"),
+                    "mw": avg(w, "min"), "mwo": avg(wo, "min"), "uw": usage(w), "uwo": usage(wo)})
+    return out
+
+
 def props_out_carry_share(carry, stat):
     """The lever's share of his rate in one stat (PROPS_OUT_CARRY), before the cap; 0.0 for a stat it does not read."""
     co = PROPS_OUT_CARRY.get(stat)
@@ -7381,6 +7429,13 @@ def make_nba_props(date_iso, out_dir, log, topup=False, sim_runs=NBA_SIM_RUNS, c
                        props_game_tries(g_, season_logs, pr["mk"], e2.get("g") if e1.get("g") else None)] for g_ in season_logs[-10:]]   # the tries seventh (7 Nov 2026), in the page's own colour
             item = {"pid": pid, "name": e1.get("n") or e2.get("n") or pr["name"], "team": team, "opp": opp, "home": team == hab, "pos": pos,
                     "mk": pr["mk"], "line": pr["line"], "op": pr["op"], "up": pr["up"], "book": pr["book"], "books": pr["books"], "log": recent, "why": why}
+            if pr["mk"] == "pts" and night[team]:   # who steps up (18 Nov 2026): on his points row, for the page's decision card; shown, never scored
+                try:
+                    step = props_step_up(pid, logs_this, logs_last, night[team])
+                except Exception:           # a reading that is only shown must never cost the run
+                    step = None
+                if step:
+                    item["step"] = step
             if proj:
                 item.update(proj)
                 mk_ = mk_h if team == hab else mk_a
@@ -9621,6 +9676,31 @@ def selftest():
     pkb_, _w = props_project(dict(prop_, line=30.5), lc["11"]["g"], None, dict(ctx_c2, carry=dict(carry_c, new=dict(carry_c["new"], pts=300.0))))
     pkn_, wkn_ = props_project(dict(prop_, line=30.5), lc["11"]["g"], None, dict(ctx_c2, carry=dict(carry_c, new_names=[], back_names=[])))
     out_k, out_j = dict((p_["k"], p_) for p_ in pk_["parts"])["out"], dict((p_["k"], p_) for p_ in pj_["parts"])["out"]
+    # WHO STEPS UP (18 Nov 2026): six Dallas games. Luka scores 24 in 34 minutes on 18 shots in the four Kyrie plays and 36 in 38 on
+    # 26 in the two he misses; Klay (15 a game) plays every other game; a 12-point man and a 9-point man are out too
+    def step_line(pid, name, mins, pts, fga, fta, tov):
+        return nba_player_line(pid, name, 1, mins, pts, 0, 5, 5, 2, fga, fta, tov, 1, 0, fga // 2, fta, "PG")
+    step_g = [{"id": "s%d" % k, "date": "2026-11-%02d" % (1 + k), "away": "DAL", "home": "LAL", "detail": True, "sa": {"fga": 90, "fta": 20, "tov": 14, "min": 240},
+            "pa": [step_line("11", "Luka Doncic", 34.0, 24, 18, 5, 3) if k <= 3 else step_line("11", "Luka Doncic", 38.0, 36, 26, 10, 4)]
+                  + ([step_line("22", "Kyrie Irving", 30.0, 20, 15, 4, 2)] if k <= 3 else []) + ([step_line("23", "Klay Thompson", 28.0, 15, 12, 2, 1)] if k % 2 == 0 else [])
+                  + ([step_line("26", "Twelve Points", 24.0, 12, 10, 2, 1)] if k <= 4 else []) + ([step_line("27", "Nine Points", 20.0, 9, 8, 1, 1)] if k <= 1 else []),
+            "ph": [step_line("44", "LeBron James", 35.0, 25, 18, 6, 3)]} for k in range(6)]
+    step_l = nba_player_logs(step_g)
+    step_c = {"ab": "DAL", "out": [("27", "Nine Points", 20.0, "Out"), ("26", "Twelve Points", 24.0, "Out"), ("23", "Klay Thompson", 28.0, "Out"), ("22", "Kyrie Irving", 30.0, "Out")]}
+    step_a = props_step_up("11", step_l, None, step_c)
+    step_tp = 90 + NBA_PACE_FT * 20 + 14
+    step_uw, step_uwo = 100.0 * (18 + NBA_PACE_FT * 5 + 3) / round(step_tp * 34.0 / 48.0, 2), 100.0 * (26 + NBA_PACE_FT * 10 + 4) / round(step_tp * 38.0 / 48.0, 2)
+    step_k = props_step_up("22", step_l, None, step_c)
+    check("props: who steps up (18 Nov 2026, for the page's decision card; shown, never scored): his games for the club this season split by whether each of the two highest scorers out tonight played in them, with his points, minutes and usage a game either way; a man under ten points a game is not read, nor the third scorer, nor himself",
+          [x_["n"] for x_ in step_a] == ["Kyrie Irving", "Klay Thompson"] and step_a[0]["ppg"] == 20.0 and step_a[1]["ppg"] == 15.0
+          and (step_a[0]["gw"], step_a[0]["gwo"], step_a[0]["pw"], step_a[0]["pwo"], step_a[0]["mw"], step_a[0]["mwo"]) == (4, 2, 24.0, 36.0, 34.0, 38.0)
+          and step_a[0]["uw"] == round(step_uw, 1) and step_a[0]["uwo"] == round(step_uwo, 1) and 28.5 < step_a[0]["uw"] < 29.5 and 38.0 < step_a[0]["uwo"] < 39.0
+          and (step_a[1]["gw"], step_a[1]["gwo"], step_a[1]["pw"], step_a[1]["pwo"], step_a[1]["mw"], step_a[1]["mwo"]) == (3, 3, 28.0, 28.0, 35.3, 35.3) and step_a[1]["uw"] == step_a[1]["uwo"]
+          and [x_["n"] for x_ in step_k] == ["Klay Thompson", "Twelve Points"] and step_k[1]["ppg"] == 12.0
+          and props_step_up("99", step_l, None, step_c) == [] and props_step_up("44", step_l, None, step_c) == [] and props_step_up("11", step_l, None, None) == []
+          and props_step_up("11", step_l, None, {"ab": "DAL", "out": [("27", "Nine Points", 20.0, "Out")]}) == []
+          and props_step_up("23", step_l, None, {"ab": "DAL", "out": [("22", "Kyrie Irving", 30.0, "Out")]})[0]["gwo"] == 1    # Klay's three games: Kyrie in the first two, out of the third
+          and PROPS_STEP_MEN == 2 and PROPS_STEP_PPG == 10.0)
     check("props: what the men out carried (18 Nov 2026): beside the minutes of the regulars out, what they average in the stat, each by the share of his games for the club the man shared (a man back by the share he missed, a man listed short of Out by the chance he sits); as a share of his rate in each part of the market on top of the lever on the level, held inside 15%, threes left alone, the 'who is out' part carrying it, the row keeping what was read",
           abs(carry_c["mnew"] - cm_new) < 1e-9 and abs(carry_c["mback"] - cm_back) < 1e-9 and carry_c["n"] == 6
           and all(abs(carry_c["new"][c_] - cn_[c_]) < 1e-9 and abs(carry_c["back"][c_] - cb_[c_]) < 1e-9 for c_ in ("pts", "reb", "ast"))

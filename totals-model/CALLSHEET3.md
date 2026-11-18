@@ -5436,3 +5436,250 @@ untouched; the hold; nothing where no man is named). The page: two
 harness checks (the rows keep what the lever read, through the trim; the
 tile's count, its four cuts and the 2% line to the dot), run against 26
 copies of the page broken on purpose, all caught.
+
+## The decision on every game, 18 Nov 2026
+
+The user, on the night's sheet: "the 'this matchup' setup for the NBA
+games, it would be nice if it actually made a decision and not a no bet.
+Check out the Bulls vs the Nets game, where it says the pick is an over
+game. I like that and it should also put the green bet, same with the
+Lakers game and same with the 76ers vs the Magic. If the model is going to
+make a decision, and it needs to for every game, then it needs to say bet.
+If it believes the Magic are going to win ... then stand by that
+especially if it highlights it. And it doesn't need to be all about the
+price, let it be about exploitable patterns that the model sees ... let
+the explanation for the pick be detailed in sense of some math but trends
+for the teams, players, travel, usage increase for certain players ... If
+it's an over/under game then make that choice. I still like seeing the
+additional info in tonight's signals."
+
+What stood there: the matchup's pick card was `thePick`, the likeliest
+side among the markets the sheet's inputs inform where they move its
+chance a point or more off the book's own number. It named a side on 23
+of this season's 210 graded games and wore NO BET on nearly all of them;
+the other 187 games had "no pick yet". The board's calls strip gave a
+call on every game, but the matchup did not say it.
+
+### 1. What it is now
+
+On a basketball matchup the pick card is **the decision**: the game's
+call (`nbaCallOf`, the first kind in the order whose record here is not
+cold), named with a green BET on every game. `nbaDecisionBlock` in
+`web/nba.engine.js`; the build swaps it in for `pickBlock` on the NBA.
+
+The order of the kinds, with one added:
+
+| Kind | Tier | What it is |
+| --- | --- | --- |
+| rule | BET | the three voices on the total, two of three and none against |
+| sheet | BET | the sheet's own call with an edge at the price |
+| rest | REST | the over behind a favourite of 70% on the second night |
+| number | VALUE | a total a point or more off the middle at one of the four apps |
+| **read** | **READ** | **new: the sheet's own read (`thePick`) as a call** |
+| winner | LEAN | the likelier winner at the best of the four prices |
+
+`nbaCallRead` gives the read as a kind, after the measured kinds and
+ahead of the likelier winner, so a game the sheet reads as an over game
+is given the over where nothing measured speaks, and a game it reads for
+the short dog is given the dog. It is not held to the measured kinds'
+cold rule (any loss over ten calls): it stood 11-12 on the day and the
+user asked for it to stand. It steps out in two cases only:
+
+- under four wins in ten over ten calls or more (`NBA_READ_COLD`), so a
+  read that is clearly losing here does not go on being given;
+- on a game where it names the very pick of a kind that is cold there
+  (`nbaCallLive`). The first run of the harness showed why: the sheet's
+  own call on a short dog, cold at 1-10, came straight back as "the
+  sheet's read" on the next short dog.
+
+The calls strip (the READ cards sit between the value and the leans, in
+green with a dashed border), the record table and "the call as given"
+follow the same order, so the board and the matchup name the same bet.
+
+The card:
+
+- the label "The decision · an OVER game" (an UNDER, an UPSET, a
+  MONEYLINE game), the pick, the green BET, and the chance where the kind
+  has one (else the price);
+- where to place it and what the price needs;
+- the kind, its record here, and how strong a read it is in plain words
+  ("measured on three seasons of lines: the strongest read on the board"
+  down to "no measured edge at the price: a small bet" and "the book's
+  favourite at the book's price: a small bet or a parlay leg");
+- **Why**, the call itself by its kind, then a list:
+  - **The numbers**: the sheet's projection a club and the total against
+    the card's line and the opener, the middle of the books, the spread,
+    the winner by the books and by the sheet, the simulation's side, the
+    crowd on Kalshi.
+  - **Form**: each club's last five off the row: the record, points for
+    and against, its totals against their closes, its games against the
+    spread, the streak, a third game in four nights, a run on the road or
+    at home; then the slate's own sentences (road and home records, the
+    last ten's scoring).
+  - **Pace and the matchup**: possessions a game and each offence into
+    the defence it meets, with the league's, then the slate's rankings.
+  - **Rest and the schedule**: each club's rest; what the lines say of a
+    back to back (the side priced, 408 of 875 where 411 was priced; both
+    on the second night level, 70-73; the total moving only behind a
+    favourite of 70% or more); the line's move since the open. Where a
+    club is on a third game in four nights or a long trip, that the
+    schedule read nothing against two seasons of closes.
+  - **Who is out, who steps up**: section 2.
+  - **The crew**: the three officials and their lean; a voice, not a
+    call.
+  - **Also on this game**: every other kind that speaks on the game, with
+    its record, the cold ones named as cold. Where the sheet's read at
+    the card's number and a call at another app's number are opposite
+    sides with the projection between them (228.0 against 227.5 and
+    228.5), it says so.
+- the record of the decision as given, one a game, and when a kind
+  steps out.
+
+The "likeliest at any price" card stays under it where the likeliest
+side is another market, worded "not the decision". The markets stand
+open under it, titled "the markets on the card". Tonight's signals stay:
+the first chip is "the decision · BET"; where the sheet's own read is
+another side it has its own chip, "the sheet's read"; and the three
+voices' chip is gold and says "cold here" with the rule's record where
+the rule is cold, in place of a green BET that the decision does not
+follow.
+
+### 2. Who steps up
+
+`slate.py` `props_step_up` (shown, never scored): for each of the two
+highest scorers of a club listed Out (ten points a game or more), every
+teammate's own games for the club this season split by whether that man
+played: his points, minutes and usage a game either way. It rides on the
+teammate's points row as `step` (`[{n, ppg, gw, gwo, pw, pwo, mw, mwo,
+uw, uwo}]`), the page keeps it until the row is trimmed, and the card
+reads the club's leading absent scorer:
+
+- games both ways: "Stepping up without Markkanen: George 22.2 points in
+  34.5 minutes on 30.1% usage over the 6 without him, 17.5 in 31.8 on
+  26.0% over the 4 with him", the three largest lifts of a point a game
+  or more;
+- no game without him: "newly out", with what the props run lifts
+  tonight (the "who is out" part on points, and the minutes);
+- hardly a game with him: "has hardly played with them this season: the
+  scoring already runs through ...", the club's three highest
+  projections and their usage.
+
+A props file from before this run has no `step`. For those rows the card
+falls back on the notes of each man's game log (his last ten), which
+name at most two men out a game: it reads them only for a man whose
+minutes are first or second among his club's absences, never says
+"nobody's scoring moved" on them, and says of a man whose numbers are
+last season's that he has hardly played this season, whatever the notes
+name. Where the run did read such a man, its own split is the reading.
+
+On the user's own ledgers to 16 Nov (lab `step_real.py`, the function as
+shipped): the Jazz without Markkanen, Peterson 22.7 points on 30.8% usage
+in his six games without him against 13.0 on 19.8% in the eight with
+him, and George level (20.6 against 20.1) where his last ten by the
+notes had said 22.2 against 17.5, so the season's split is the steadier
+reading; the Magic without Banchero, who has played two games, Wagner
+24.9 in 37.9 minutes over eleven against 20.0 over the two, Bane 20.2
+against 11.5; the Pacers without Haliburton, nobody up a point; the
+76ers with Brown newly out, one game without him.
+
+Why shown and not scored: the same day's measurement on props (picks
+against a man's games without an absent teammate went 28-12, with them
+34-25), and a club's absences are in the game's line by the tip (NBA.md,
+"A scorer out, against three seasons of lines": the side level at 298-281
+with a scorer out five games or more). One thing in that measurement did
+hold, the total: 207-157 over (56.9%) with a scorer of 18 a game out
+three to fifteen games and nobody of 15 a game newly out, 110-70 of it
+from February on. The card names it as a watch on a game that qualifies
+by the run's own count of games missed; it is on record to test again
+and build before the trade deadline.
+
+### 3. What the past says, and why the card says it too
+
+The user asked for a BET on every game. The card says BET; its second
+line says what kind of BET, because the kinds are not equal. On this
+season's 210 graded games to 17 Nov, replayed through the page's own
+functions (lab `decide_probe.js`, `decide_read.py`):
+
+| A way of deciding | Record | Units at the price |
+| --- | --- | --- |
+| The over behind a tired favourite (rest) | 6-2 | +3.4 |
+| The best number on the board (number) | 47-36-1 | +5.7 |
+| The likelier winner at the best price | 145-65 | -3.7 |
+| The sheet's own read where it had one (23 games) | 11-12 | -1.8 |
+| ... the total 7-6, the moneyline 4-6 | | |
+| The sheet's side of the total on every game | 97-107-6 | -15.4 |
+| ... its overs 80-89 | | |
+| The short dog | 26-35 | -7.5 |
+| The simulation's side of the total | 73-91-5 | |
+| The crew's lean (z 1 or more) | 56-59 | |
+| ... (z 3 or more) | 5-14 | |
+| The three voices' rule | 5-10 | cold |
+| The sheet's own call with an edge | 14-26 | cold |
+
+And on last season's closes at the four apps (lab `board_value.py`): a
+total a point or more off the middle 105-84 (+5.0% a bet); half a point
+off 353-344 (-3.6%); with the middle -4.7%; nothing on spreads; the
+favourite at the best of four prices -0.3% a bet at 80% and up and -5.8%
+to -8.2% below; every dog -1.7%.
+
+So where a measured kind speaks, the decision is that kind. Where none
+does, the decision is the sheet's read if it has one and the likelier
+winner if not, and the card says so in words: no measured edge, a small
+bet. Putting the read into the order costs the replayed "call as given"
+two games on those 23 (135-74-1, +9.2u before; 133-76-1, +7.6u with it):
+that is the price of the sheet standing by its read, and the READ line on
+the record will show whether it earns it.
+
+### 4. The dog by the two prices
+
+Found on the 76ers at Magic card: the book had Magic -105 and 76ers
+-115, the sheet's read was Magic (48.9% by the book, 50.8% with the short
+dog's four points), and the upset card under it named the 76ers as the
+dog. `upsetSignals` took the dog as the side with a plus sign; with two
+minus prices neither has one. It now takes the side with the longer
+price. The decision's label does the same ("an UPSET game" for Magic at
+-105 against -115).
+
+### 5. Checked
+
+`slate.py --selftest`: 302 checks, one new ("props: who steps up": the
+split by each of the two highest scorers out, a man under ten points a
+game not read, nor the third scorer, nor the player himself).
+
+The page's harness: 1,365 checks. Ten new ones in the block "18 Nov
+2026: the decision on every game":
+
+- who steps up from the run's split, the row keeping it off the file and
+  dropping it at the trim;
+- newly out, hardly a game with him, nobody up a point, no props;
+- the watch's edges (two games missed out, three in, fifteen in, sixteen
+  out, a 16-point man newly out taking it off);
+- the fallback on the log's notes, where it is not read, and a man
+  whose numbers are last season's with the run's split and without it;
+- the sheet's read as the decision, the likeliest card under it, the
+  signals, the open markets, a baseball card untouched;
+- the upset read at -105 against -115 and the upset card naming the
+  same club; the sheet's own call ahead of its read;
+- the winner, the rest call and the agreement rule as decisions;
+- the best number against the sheet's read with the projection between
+  the two numbers;
+- form and the schedule, checked against a count by hand;
+- the record: the read's own line, a read left out with the cold call it
+  repeats, a read standing beside a cold kind that names another pick,
+  the three voices' chip gone cold, the board's cards, the call as
+  given, a graded game's result on the card.
+
+Each was run against 63 copies of the page broken in one place (lab
+`mk_dec_mutants.py`, `run_mut12.sh`). On the first run of 59, 56 were
+caught and three were not (a read left out whenever any kind is cold, a read of a total not
+graded on its own line, the watch asking four games in place of three),
+and each got a fixture that catches it; the 63 as they stand are all
+caught.
+
+Eight older checks were brought up to the card: the example's likeliest
+card (the decision is that side now, so no second card), the example's
+pick label, the phone sheet's game card, and the calls and rest blocks'
+record tables, which gained the READ line. One of them, the short dog
+gone cold, is where the returning pick was found: its expectation (the
+next short dog is given the likelier winner) stayed as written and the
+page was changed to meet it.

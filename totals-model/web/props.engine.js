@@ -21,7 +21,7 @@
      simulation, the fives, what happened. The panel says so. Runs on load and before every save, so a restored backup trims
      on its way in; a night's file loaded again is whole until its night falls off the seven */
   var PROPS_WHOLE_NIGHTS = 7;
-  var PROPS_TRIM_FIELDS = ["why", "log", "parts", "sim", "gsim", "fives", "awhat", "atries"];   // the books stay (5 Nov 2026): the pairs are rebuilt at one app from them
+  var PROPS_TRIM_FIELDS = ["why", "log", "parts", "sim", "gsim", "fives", "awhat", "atries", "step"];   // the books stay (5 Nov 2026): the pairs are rebuilt at one app from them
   /* MINUTES ON THE WAY BACK (13 Nov 2026). The props run reads a man's minutes off the mean of his last five games. When one
      of the five is a short game (a night he left early, or his first one back) and he has climbed since, that mean is too
      low and the sheet calls the under on him: Ivica Zubac, 7, 19, 19, 28 then 31 minutes, read at 21 and then at 22, six
@@ -1316,7 +1316,8 @@
                     chg: x.chg ? { nw: x.chg["new"] === null || x.chg["new"] === undefined ? null : +x.chg["new"], back: x.chg.back === null || x.chg.back === undefined ? null : +x.chg.back, dmin: +x.chg.dmin || 0,
                                    lvl: x.chg.lvl === null || x.chg.lvl === undefined ? null : +x.chg.lvl, lg: x.chg.lg === null || x.chg.lg === undefined ? null : +x.chg.lg } : null,
                     /* what the men out carried (18 Nov 2026): what the lever added to his rate per 36, and the minutes newly out and back it read */
-                    carry: x.carry && isFinite(+x.carry.drate36) && +x.carry.drate36 !== 0 ? { d36: +x.carry.drate36, mnew: isFinite(+x.carry.mnew) ? +x.carry.mnew : null, mback: isFinite(+x.carry.mback) ? +x.carry.mback : null } : null });
+                    carry: x.carry && isFinite(+x.carry.drate36) && +x.carry.drate36 !== 0 ? { d36: +x.carry.drate36, mnew: isFinite(+x.carry.mnew) ? +x.carry.mnew : null, mback: isFinite(+x.carry.mback) ? +x.carry.mback : null } : null,
+                    step: x.step && x.step.length ? x.step : null });   // who steps up (18 Nov 2026): his games with and without his club's scorers out, for the game's decision card
       });
     });
     return rows;

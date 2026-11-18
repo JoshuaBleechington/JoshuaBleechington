@@ -3481,6 +3481,80 @@ const CHECKS = ["dome","playoff"];
       && JSON.stringify(lvr.tilesAfter) === JSON.stringify(lvr.tiles),
       'the levers as corrected, the record: the four BET and LEAN picks the corrected run made, three won and one lost, sit on a tile of their own by band and by side with the sixteen replayed nights beside them (the old run\'s BET, a winner, is not counted, nor the man with no pick); and when seven later dates push the night out and its rows are trimmed the marks stay and the tile reads the same',
       JSON.stringify({ tiles: lvr.tiles, sides: lvr.sides, kept: lvr.kept, after: lvr.tilesAfter }));
+  // ---- 18 Nov 2026: what the men out carried. The day's first BET was an under on a guard's assists with his club's lead guard out; the lever on who is out read
+  //      the absent men by their minutes alone. Measured on 36,502 man-games of two seasons, what those men average in the stat says more, so slate.py scores it
+  //      as a share of his rate and writes what it read on the row (`carry`). The page keeps it off the file and through the trim, and counts on a tile of its own
+  //      the BET and LEAN picks whose projection the lever moved 2% or more: lifted and cut, the pick on the lever's side and against it ----
+  const cyKeep = await pg.evaluate(async () => { await smStore.ready; const k = {}; for (const x of ['callsheet3.card.v1', 'callsheet3.props.v1', 'callsheet3.draft.v1']) k[x] = await smStore.getItem(x); k.below = localStorage.getItem('callsheet3.props.below.v1'); k.legs = localStorage.getItem('callsheet3.props.legs.v1'); await smStore.removeItem('callsheet3.card.v1'); await smStore.removeItem('callsheet3.props.v1'); return k; });
+  await reloaded();
+  const cyr = await pg.evaluate(async () => {
+    const wait = (ms) => new Promise(r => setTimeout(r, ms || 120)), txt = e => (e ? e.innerText : '').replace(/\s+/g, ' ').trim();
+    await smStore.ready;
+    const load = async (doc, name) => { const dt = new DataTransfer(); dt.items.add(new File([JSON.stringify(doc)], name, { type: 'application/json' })); const inp = document.getElementById('slateFile'); inp.files = dt.files; inp.dispatchEvent(new Event('change', { bubbles: true })); await wait(); await wait(); };
+    const G = [['Hawks', 'Magic', 'ATL', 'ORL', -2.5], ['Bulls', 'Bucks', 'CHI', 'MIL', 3.5], ['Heat', 'Jazz', 'MIA', 'UTA', -1.5]];
+    const need = (price) => price < 0 ? -price / (-price + 100) : 100 / (price + 100);
+    const steady = [31, 33, 32, 30, 34, 32, 31, 33, 32, 30];
+    const cold = L => [L + 2, L - 2, L + 3, L - 1, L + 1, L - 2, L + 2, L - 3, L + 1, L - 1];
+    const man = (pid, name, gi, home, mk, side, line, chance, price, band, extra) => Object.assign({ gi, pid: String(pid), name, team: G[gi][home ? 3 : 2], opp: G[gi][home ? 2 : 3], home: !!home, pos: 'F', mk, line,
+      op: side === 'OVER' ? price : 100, up: side === 'UNDER' ? price : 100, book: 'fanduel', books: { fanduel: [line, side === 'OVER' ? price : 100, side === 'UNDER' ? price : 100] },
+      proj: line + (side === 'OVER' ? 2 : -2), sd: 6, pm: side === 'OVER' ? 0.7 : 0.3, pb: 0.5, p: side === 'OVER' ? chance : Math.round((1 - chance) * 10000) / 10000, push: 0, side, chance, price, need: Math.round(need(price) * 10000) / 10000,
+      edge: Math.round((chance - need(price)) * 10000) / 10000, band, mins: 24, rate36: 20, base: 18, med: line + (side === 'OVER' ? 1.5 : -1.5), usg: 22, sdf: 1, starter: true, start_src: "RotoWire's confirmed five", why: ['x'], lv: 4,
+      log: cold(line).map((v, i) => ['2026-11-' + String(10 + i), 'OPP', i % 2, steady[i], v, ['won by 3']]), parts: [{ k: 'out', t: 'Who is out', eff: side === 'OVER' ? 0.4 : -0.4, i: 0 }] }, extra || {});
+    const D = '2026-12-27';
+    const cy = (d36, mnew, mback) => ({ carry: { mnew, mback, 'new': { pts: 12.5 }, back: { pts: 0 }, share: { pts: 0.05 }, drate36: d36, n: 9 } });
+    const men = [man(31, 'Lift Over', 0, 0, 'pts', 'OVER', 14.5, 0.58, -125, 'LEAN', cy(1.0, 30, 0)),                                  // +1.0 on a rate of 19.0 without it: lifted 5.3%, the over on its side
+      man(32, 'Lift Under', 1, 0, 'reb', 'UNDER', 6.5, 0.62, -130, 'BET', cy(0.8, 24.5, 3)),                                           // lifted 4.2%, the under against it
+      man(33, 'Cut Under', 2, 0, 'ast', 'UNDER', 5.5, 0.57, -120, 'LEAN', cy(-0.6, 2, 28)),                                             // -0.6 on 20.6: cut 2.9%, the under on its side
+      man(34, 'Cut Over', 0, 1, 'pts', 'OVER', 18.5, 0.56, -110, 'LEAN', cy(-1.2, 0, 33.3)),                                            // cut 5.7%, the over against it
+      man(35, 'Small Move', 1, 1, 'ast', 'UNDER', 4.5, 0.61, -125, 'BET', { carry: { drate36: 0.3 } }),                                 // +0.3 on 19.7: 1.5%, under the line; the minutes not on the file
+      man(36, 'Edge Two', 2, 1, 'reb', 'UNDER', 7.5, 0.60, -115, 'LEAN', Object.assign({ rate36: 25.5 }, cy(0.5, 15, 0))),              // +0.5 on 25.0: 2.0% to the dot, counted
+      man(37, 'No Carry', 0, 0, 'reb', 'UNDER', 10.5, 0.59, -125, 'LEAN', {}),                                                          // the new run, nobody new out and nobody back: nothing read
+      man(38, 'No Edge', 1, 0, 'pts', 'UNDER', 22.5, 0.52, -120, 'no edge', cy(2.0, 40, 0)),                                            // lifted 11% and no pick: not counted
+      man(39, 'Nought', 2, 0, 'pts', 'OVER', 12.5, 0.57, -120, 'LEAN', cy(0, 10, 10))];                                                 // the two sides cancelled: the row keeps nothing
+    const file = (date, list) => ({ format: 'callsheet3.props', version: 1, date, levers: 4, games: G.map((g, gi) => ({ gid: 'cy' + gi, away: g[0], home: g[1], aab: g[2], hab: g[3], spread: g[4], total: 225.5, props: list.filter(m => m.gi === gi) })) });
+    // the night before, graded, with one plain pick the lever did not touch: the record is drawn, and the lever's tile is not on it
+    const D0 = '2026-12-26', plain = [man(30, 'Plain Day', 0, 0, 'pts', 'UNDER', 16.5, 0.58, -120, 'LEAN', {})];
+    await load(file(D0, plain), 'nba-props-2026-12-26.json');
+    await load({ format: 'callsheet2.slate', version: 1, date: D0, games: G.map((g, gi) => ({ sport: 'NBA', gdate: D0, away: g[0], home: g[1], finals: { fa: '110', fh: '104', f5a: '55', f5h: '50' }, notes: [],
+      box: Object.fromEntries(plain.filter(m => m.gi === gi).map(m => [m.pid, [m.name, 30, 12, 4, 2, 1]])) })) }, 'nba-grade-2026-12-26.json'); await wait(250);
+    await load(file(D, men), 'nba-props-2026-12-27.json');
+    if (document.getElementById('propsView').hidden) { document.getElementById('m-props').click(); await wait(); }
+    document.getElementById('propsReset').click(); await wait();
+    const day = async (d) => { const pd = document.getElementById('propsDate'); pd.value = d; pd.dispatchEvent(new Event('change', { bubbles: true })); await wait(); };
+    const o = {};
+    await day(D);
+    o.drawn = [...document.querySelectorAll('#propsCalib .calib > div')].map(txt).filter(t => /levers as corrected/i.test(t)).map(t => t.slice(0, 62));
+    const stored = () => JSON.parse(smStore.getItem('callsheet3.props.v1')).filter(x => x.gdate === D).map(x => x.name + ':' + JSON.stringify(x.carry) + (x.trim ? ':trim' : '')).sort().join(' | ');
+    const tiles = () => [...document.querySelectorAll('#propsCalib .calib > div')].map(txt).filter(t => /men out carried/i.test(t));
+    o.rows = stored(); o.before = tiles();
+    // the night: Lift Over 20 points (win), Lift Under 9 rebounds (loss), Cut Under 3 assists (win), Cut Over 25 points (win), Small Move 2 assists (win), Edge Two 5 rebounds (win),
+    // No Carry 8 rebounds (win), No Edge 30 points, Nought 15 points (win)
+    const box = { 'Lift Over': [20, 4, 2], 'Lift Under': [9, 9, 2], 'Cut Under': [9, 4, 3], 'Cut Over': [25, 4, 2], 'Small Move': [9, 4, 2], 'Edge Two': [9, 5, 2], 'No Carry': [9, 8, 2], 'No Edge': [30, 4, 2], 'Nought': [15, 4, 2] };
+    await load({ format: 'callsheet2.slate', version: 1, date: D, games: G.map((g, gi) => ({ sport: 'NBA', gdate: D, away: g[0], home: g[1], finals: { fa: '110', fh: '104', f5a: '55', f5h: '50' }, notes: [],
+      box: Object.fromEntries(men.filter(m => m.gi === gi).map(m => [m.pid, [m.name, 30, box[m.name][0], box[m.name][1], box[m.name][2], 1]])) })) }, 'nba-grade-2026-12-27.json'); await wait(250);
+    if (document.getElementById('propsView').hidden) { document.getElementById('m-props').click(); await wait(); }
+    await day(D);
+    o.tiles = tiles(); o.results = JSON.parse(smStore.getItem('callsheet3.props.v1')).filter(x => x.gdate === D).map(x => x.name + ':' + x.result).sort().join(' | ');
+    o.lv = [...document.querySelectorAll('#propsCalib .calib > div')].map(txt).filter(t => /levers as corrected/i.test(t)).map(t => t.slice(0, 62));
+    for (let i = 1; i <= 7; i++) { const d = i <= 4 ? '2026-12-' + String(27 + i) : '2027-01-0' + String(i - 4); await load(file(d, [man(970 + i, 'Later ' + i, 0, 0, 'pts', 'UNDER', 10.5, 0.5, -110, 'no edge', {})]), 'nba-props-' + d + '.json'); }
+    if (document.getElementById('propsView').hidden) { document.getElementById('m-props').click(); await wait(); }
+    await day(D);
+    o.kept = stored(); o.tilesAfter = tiles();
+    return o;
+  });
+  await pg.evaluate(async (k) => { for (const x of Object.keys(k)) { if (x === 'below' || x === 'legs') { const key = x === 'below' ? 'callsheet3.props.below.v1' : 'callsheet3.props.legs.v1'; if (k[x] === null) localStorage.removeItem(key); else localStorage.setItem(key, k[x]); continue; } if (k[x] === null || k[x] === undefined) await smStore.removeItem(x); else await smStore.setItem(x, k[x]); } }, cyKeep);
+  await reloaded();
+  const cyRows = 'Cut Over:{"d36":-1.2,"mnew":0,"mback":33.3} | Cut Under:{"d36":-0.6,"mnew":2,"mback":28} | Edge Two:{"d36":0.5,"mnew":15,"mback":0} | Lift Over:{"d36":1,"mnew":30,"mback":0} | Lift Under:{"d36":0.8,"mnew":24.5,"mback":3} | No Carry:null | No Edge:{"d36":2,"mnew":40,"mback":0} | Nought:null | Small Move:{"d36":0.3,"mnew":null,"mback":null}';
+  chk(cyr.rows === cyRows && JSON.stringify(cyr.before) === '[]' && (cyr.drawn || []).length === 1 && /^Picks under the levers as corrected \(from 13 Nov 2026\) 1-0 /i.test(cyr.drawn[0])
+      && cyr.kept === cyRows.split(' | ').map(x => x + ':trim').join(' | '),
+      'what the men out carried (18 Nov 2026), the rows: each keeps what the lever added to his rate per 36 and the minutes newly out and back it read, as the file gave them (the minutes blank where the file has none); a row the lever did not touch, and one where the two sides cancelled to nought, keep nothing; with the record drawn for a night before (one plain pick, graded) the lever\'s tile is not on it until a pick it moved is graded; and the reading stays on the row when the night is trimmed from the save',
+      JSON.stringify({ rows: cyr.rows, before: cyr.before, drawn: cyr.drawn, kept: cyr.kept }));
+  chk((cyr.tiles || []).length === 1
+      && /^What the men out carried, 2% or more on the read \(scored from 19 Nov 2026\) 4-1 says 58\.6% · does 80\.0% \(±22\.4\) · \+2\.41u the BET and LEAN picks whose projection the lever moved 2% or more: lifted 2-1 \+0\.7u · cut 2-0 \+1\.7u · the pick on the lever's side 2-0 \+1\.6u · against it 2-1 \+0\.8u · measured on 36,502 man-games of two seasons \(assists t 10, points t 8 and 11, rebounds t 5\); replayed on 21 graded nights the 54 picks it dropped went 23-31 and the 83 it added 43-40$/i.test(cyr.tiles[0])
+      && cyr.results === 'Cut Over:win | Cut Under:win | Edge Two:win | Lift Over:win | Lift Under:loss | No Carry:win | No Edge:loss | Nought:win | Small Move:win'
+      && JSON.stringify(cyr.tilesAfter) === JSON.stringify(cyr.tiles) && (cyr.lv || []).length === 1 && /^Picks under the levers as corrected \(from 13 Nov 2026\) 8-1 /i.test(cyr.lv[0]),
+      'what the men out carried, the record: the five BET and LEAN picks whose projection the lever moved 2% or more (two lifted 5.3% and 4.2%, two cut 2.9% and 5.7%, one lifted 2.0% to the dot) sit on a tile of their own, four won and one lost, split by lifted and cut and by whether the pick is on the lever\'s side (an over on a lift, an under on a cut) or against it; a pick moved 1.5% is not counted, nor a pick the lever did not touch, nor the man with no pick though it moved him 11%; the rate is read against his rate without the lever; the tile reads the same after the night is trimmed; and the picks stay on the levers\' own tile, which counts every pick of the new run',
+      JSON.stringify({ tiles: cyr.tiles, results: cyr.results, after: cyr.tilesAfter, lv: cyr.lv }));
   // ---- 13 Nov 2026: the second pass on the levers (the user: "Make sure those levers are as perfect as they can be"). A row marked `lv` 3 had its minutes
   //      read from his last ten games, the recent counting most: a short game kept in part counts three tenths (a starter's short LAST game among them),
   //      his games in tonight's role are read the same way with the flat number standing as the game before his first, and after his own games missed

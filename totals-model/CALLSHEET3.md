@@ -5280,3 +5280,159 @@ cold kind, and a day after with one game given the likelier winner and
 one given the best number, whose Take marks the best number. Run
 against 30 copies of the page broken on purpose, all caught. The calls
 block of 12 Nov was re-set for the table's new line.
+
+## What the men out carried, and two ideas tested and left, 18 Nov 2026
+
+Reading the 18 Nov sheet. The day's first BET was Jeremiah Fears UNDER
+6.5 assists (56.4% at -111, projected 4.65) with his club's lead guard
+out: in his five games without Dejounte Murray he had 7, 7, 7, 7 and 10,
+and every book but the carded one priced the over the favourite. The
+user was told to pass it. Three things were then measured, one was
+built, and the advice was taken back the same day.
+
+### 1. What the men out carried (built)
+
+The lever on who is out read the absent regulars by their minutes alone
+(the minutes by the change against his last ten; the rate by the level
+over the league's night: 3.5% of his points rate and 0.11 assists per 36
+for every 30 minutes out).
+
+The data (lab `vac_build.py`): every game a rotation man played in
+2024-25, 2025-26 and 2026-27 to 16 Nov with five games behind him
+(39,912 man-games), his rate that night against the run's own blended
+rate (`props_rate`), and beside the minutes of his club's regulars out
+what those men average a game in the stat, each counted by how new the
+absence is to him: the share of his games this season the man played in
+too (for a man back, the share he missed).
+
+As a share of his own rate, per 30 minutes a game and per 5 assists, 8
+rebounds or 15 points a game of the men concerned, on top of the lever
+as it stood, the errors clustered by the club's game (`vac_fit3.py`,
+36,502 man-games of the two full seasons):
+
+| | Minutes newly out | What left with them | Minutes back | What is back |
+| --- | --- | --- | --- | --- |
+| Assists | -0.097 (t -9.2) | +0.149 (t 10.5) | +0.080 (t 6.1) | -0.118 (t -7.0) |
+| Rebounds | -0.039 (t -4.6) | +0.063 (t 5.1) | +0.029 (t 2.3) | -0.052 (t -2.8) |
+| Points | -0.077 (t -7.2) | +0.079 (t 8.2) | +0.132 (t 9.8) | -0.129 (t -10.6) |
+| Threes | nothing (t 0.7) | nothing (t -0.2) | +0.046 (t 2.7) | -0.069 (t -3.8) |
+
+The same sign in each season on every cell of the first three rows
+(assists 2024-25 -0.087 +0.139 +0.070 -0.117; 2025-26 -0.107 +0.158
++0.095 -0.123). Minutes out with nothing in the stat leaving LOWER a
+teammate's rate (the man who finished the passes is gone); what the man
+carried raises it. So a 31-minute guard with 7 assists a game newly out
+is +11% on a teammate's assists, a 30-minute big with 1.5 is -5%, and a
+34-minute, 27-point scorer back after missing a man's games is -8% on
+his points beyond the lever as it stood.
+
+Fitted on one season and read on the other (`vac_fit3.py`): the bias
+where five assists a game or more had newly left fell from +0.21 per 36
+to +0.00 and +0.04; on points from +0.35 and +0.23 to +0.02 and -0.12;
+on rebounds from +0.13 and +0.15 to +0.05; the miss a hair better both
+ways. On 2026-27 to 16 Nov (1,951 man-games) the signs hold and nothing
+is significant; on points this season's new side runs the other way as
+it stands (-0.50 per 36 where fifteen points or more had newly left, 458
+man-games).
+
+Replayed on this season's graded props under the blend as it stands:
+
+| | Picks as carded | Picks with it | Dropped | Added | The nights drawn again |
+| --- | --- | --- | --- | --- | --- |
+| With the measurement's own table (`vac_replay.py`, 7,538 props, 18 nights) | 491-383, +21.4u | 514-391, +33.2u | 53: 23-30 | 84: 46-38 | +11.8u; ahead in 88% (95% -8 to +31) |
+| As built, through `props_out_carry` with the men who sat read as Out (`carry_real.py`, 7,930 props, 21 nights) | 502-406, +6.6u | 522-415, +14.6u | 54: 23-31 | 83: 43-40 | +7.9u; ahead in 78% (95% -13 to +27); better on 10 nights, worse on 5 |
+
+By part, on the first replay: points alone +7.8 units, assists alone
++1.3, rebounds alone -2.0; the back side alone +9.7, the new side alone
++2.6. A man's night counted once, the over's rate against the book's own
+chance was +3.0 points where the lever lifts a projection 3 to 5% (95%
+-3.5 to +9.1) and -5.0 where it cuts one 3% or more (-13.4 to +3.4).
+
+It is a modest lever. It moves a projection 2% or more on one prop in
+five and 5% or more on one in thirty; four props of 7,930 reach the
+hold. On the day's three BETs it reads +2.0% on Fears's assists (4.65 to
+4.74, still a BET: Murray averages 4.4 assists, and was out of six of
+Fears's fifteen games already), nothing on Turner and nothing on
+Embiid's threes.
+
+What was built:
+
+- `slate.py`: `PROPS_OUT_CARRY` (the table above, three stats),
+  `PROPS_OUT_CARRY_CAP` 0.15, `props_out_carry` (the minutes and the
+  stat newly out and back, off his games for the club this season; a man
+  listed short of Out by the chance he sits, a regular the report does
+  not name by the chance after the games he has missed, as
+  `props_out_change` counts them), `props_out_carry_share`. In
+  `props_project` the share is taken on each part of the market's rate
+  after the lever on the level, the whole held inside 15% of the part;
+  threes are not read; the "Who is out" part carries it; the why line
+  names the men, what each averages and the share; the row keeps
+  `carry`. `PROPS_LEVERS` is 4.
+- The page: the importer keeps `carry` as `{d36, mnew, mback}` (it is
+  not trimmed); `propCarryMove` reads the share of his rate the lever
+  moved (what it added per 36 over the rate without it); a tile, "What
+  the men out carried, 2% or more on the read (scored from 19 Nov
+  2026)", counts the BET and LEAN picks so moved: lifted and cut, the
+  pick on the lever's side (an over on a lift, an under on a cut) and
+  against it.
+
+### 2. The middle of the books' prices at the carded number (not built)
+
+The run anchors a prop's chance on the carded book's own two prices (the
+first of Fanatics, BetMGM, DraftKings, FanDuel to post both); the
+consensus lever reads the other books' LINES, not their prices. On
+Fears the carded book had the over -120 and the under -111 where the
+rest had the over -130 to -141.
+
+With no model, on the 9,868 graded props with the carded number at two
+or more other books (`px_cons.py`): the truth sat 1.01 of the way from
+the carded book's devigged chance to the other books' middle (the nights
+drawn again, 0.34 to 1.66; the first half of the nights 1.43, the second
+0.54; near 1 on points, rebounds, assists and threes).
+
+Replayed on the 8,556 graded props under the blend as it stands
+(`px_cons2.py`): as carded the picks went 519-421 (+5.4 units); with the
+book's chance read all the way to the middle of every book at the number
+673-566 (-1.2); the 388 picks it adds went 203-185 and the 89 it drops
+49-40; the nights drawn again, -6.6 units at the median (95% -46 to
++32), better on 10 nights of 28. At half the way to the others' middle
++17.0 units, at three quarters +11.3, all the way -0.6, at one and a
+quarter -1.7: no steady reading. Not built. The page's "Best app" line
+already names the app with the better price for the pick (DraftKings
++107 against the card's -111 on Fears).
+
+### 3. His own games without tonight's absent men (not built; the advice taken back)
+
+On the 2,956 graded BET and LEAN picks of 21 nights that still carry
+their log, gathered across the backups (`full_rows.py`,
+`without_him.py`): 1,300 name a man out. Where the man had three or more
+logged games without the first man named, the picks his own such games
+agreed with (two thirds or more on the pick's side of tonight's number)
+went 25-17 and the picks they went against 19-8; with two or more games,
+34-25 and 28-12 (unders alone 10-13 and 7-2). The nights drawn again,
+"with" less "against" ran -11 points at the median (95% -43 to +9).
+Several of the forty are one man's markets on one night. It is no reason
+to pass a pick, and the user was told so the same afternoon: the Fears
+BET stands as the page gives it, at the best app's price. The same was
+said of the note on Turner's last ten games: the page's own record on a
+man's last three (52.4% with the pick, 53.5% against) reads nothing.
+
+### On record
+
+- Points this season run the other way on the new side so far, and the
+  rebounds' part replays a hair under water alone. The lever is to be
+  measured again at the All-Star break with this season's games in.
+- The lead guard's own teammates, by role (the next ball handler against
+  the rest), were not cut finer: the share form reads the same across a
+  man's own thirds (per five assists newly out +0.85 per 36 for the top
+  third of passers, +0.25 for the bottom: the same share of the rate).
+
+### Checked
+
+`slate.py --selftest`: 301 checks (one new: the sums and the names off a
+six-game fixture with a man Out, one Questionable and one back; the
+shares; the projection on points, assists, rebounds and a combo; threes
+untouched; the hold; nothing where no man is named). The page: two
+harness checks (the rows keep what the lever read, through the trim; the
+tile's count, its four cuts and the 2% line to the dot), run against 26
+copies of the page broken on purpose, all caught.

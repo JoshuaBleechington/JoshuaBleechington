@@ -5355,7 +5355,37 @@ PROPS_DRIFT_CLAMP = (0.85, 1.15)
 PROPS_DRIFT_LAST_MIN = 300.0                                                  # a man's minutes last season before he counts toward the drift
 PROPS_ROLE_FLAT = {True: 27.5, False: 20.5}                                   # what a rotation man with no game in the role plays: a starter, a bench man (four seasons)
 PROPS_CLUB_RECENT = 15   # a regular counts with his club while his last game for it is inside its last fifteen (the audit's measure)
-PROPS_LEVERS = 3                                                              # 2: the levers as corrected on 13 Nov 2026; 3: the second pass the same day (the weighted read, the first games back, home and road)
+PROPS_LEVERS = 4                                                              # 2: the levers as corrected on 13 Nov 2026; 3: the second pass the same day (the weighted read, the first games back, home and road); 4: what the men out carried (18 Nov 2026)
+# WHAT THE MEN OUT CARRIED (18 Nov 2026). The day's first BET was the under on a second-year guard's assists with his club's lead
+# guard out; in his five games without that man he had gone over the number five times, and every book but the carded one leaned over.
+# The lever on who is out read the absent men by their MINUTES alone. Measured on every game a rotation man played in 2024-25 and
+# 2025-26 (36,502 man-games, his rate that night against the run's own blended rate, the errors clustered by the club's game), with
+# the lever as it stood taken off first: beside the minutes of the regulars out, what those men AVERAGE in the stat says more.
+# As a share of his own rate, per 30 minutes a game and per 5 assists / 8 rebounds / 15 points a game of the men concerned, each
+# man counted by how new his absence is to him (the share of his games for the club this season that the man played in too; for a
+# man back, the share he missed):
+#                 minutes newly out   what left with them    minutes back      what is back
+#     assists      -0.097 (t -9.2)     +0.149 (t 10.5)       +0.080 (t 6.1)    -0.118 (t -7.0)
+#     rebounds     -0.039 (t -4.6)     +0.063 (t 5.1)        +0.029 (t 2.3)    -0.052 (t -2.8)
+#     points       -0.077 (t -7.2)     +0.079 (t 8.2)        +0.132 (t 9.8)    -0.129 (t -10.6)
+#     threes       nothing on the new side (t 0.7, -0.2); left alone
+# the same sign in each season on every cell (assists 2024-25 -0.087 +0.139 +0.070 -0.117, 2025-26 -0.107 +0.158 +0.095 -0.123).
+# So a 31-minute guard with 7 assists a game newly out is +11% on a teammate's assists; a 30-minute big with 1.5 is -5% (the man who
+# finished the passes is gone); a 34-minute, 27-point scorer back after missing his games is -8% on a teammate's points beyond the
+# lever as it stood. Fitted on one season and read on the other the bias where 5 assists or more had newly left fell from +0.21 a
+# 36 to +0.00 and +0.04, on points from +0.35 and +0.23 to +0.02 and -0.12, the miss a hair better both ways; on 2026-27 to 16 Nov
+# (1,951 man-games) the signs hold and nothing is significant. Replayed on this season's 7,930 graded props under the blend as it
+# stands, through props_out_carry itself with the men who sat read as Out (lab carry_real.py): the picks 502-406 (+6.6 units) as
+# carded and 522-415 (+14.6) with it; the 54 picks it drops went 23-31, the 83 it adds 43-40; the nights drawn again, ahead in 78%
+# of draws (95% -13 to +27 units), better on 10 nights of 21 and worse on 5. A modest lever: it moves a projection 2% or more on
+# one prop in five and 5% or more on one in thirty, and would not have moved the three BETs of the day it was built (the guard's
+# assists +2.0%). Scored on top of the lever as it stands, the whole of it held inside 15% of his rate.
+# Tried the same day and NOT built: the book's chance read from the middle of the books' prices at the carded number (model-free the
+# truth sat 1.0 of the way to the others' middle on 9,868 graded props, the nights drawn again 0.3 to 1.7; replayed, the 388 picks
+# it adds went 203-185 and the picks' units did not improve), and a man's own games without tonight's absent men as a reason to
+# pass a pick (picks against those games went 28-12 on 21 nights, with them 34-25)
+PROPS_OUT_CARRY = {"pts": (-0.077, 0.079, 0.132, -0.129, 15.0), "reb": (-0.039, 0.063, 0.029, -0.052, 8.0), "ast": (-0.097, 0.149, 0.080, -0.118, 5.0)}   # (minutes new, the stat new, minutes back, the stat back, the stat's unit a game)
+PROPS_OUT_CARRY_CAP = 0.15
 PROPS_OUT_RATE_PER30 = {"pts": 0.56, "reb": 0.0, "ast": 0.09, "tpm": 0.0, "pra": 0.66, "pr": 0.56, "pa": 0.65, "ra": 0.09}   # per 36, per 30 mpg out (points t 11, assists t 6; the rest null)
 # the OPPONENT'S absences (28 Oct 2026, tools_nba_opp_out.py on 2025-26): named on every prop, scored where it measured and held
 # from one half of the season to the other, a missing centre on a forward's or centre's rebounds (the bigs' rebounds landed over the
@@ -6522,6 +6552,67 @@ def props_out_change(pid, logs_this, club, weights=None):
     return {"new": new, "back": back, "new_names": new_names, "back_names": back_names, "n": n}
 
 
+def props_out_carry(pid, logs_this, logs_last, club):
+    """What the men out carried, for the lever on his rates (18 Nov 2026):
+    {mnew, mback, new: {pts, reb, ast}, back: {...}, new_names, back_names, n}.
+    `mnew` is the mpg of his club's regulars out tonight, each times the share
+    of HIS games for this club this season that the regular played in too (a
+    man out through all of them is already in his rate); `new[c]` the same sum
+    over what each averages a game in the stat (props_player_avg). `mback` and
+    `back[c]` are the regulars playing tonight, each times the share of his
+    games the regular missed. A man listed short of Out counts by the chance
+    he plays, a regular the report does not name by the chance after the
+    games he has missed, as props_out_change counts them. The names carry
+    (name, mpg, {stat: a game}, his games shared or missed, status). None when
+    he has no game for this club this season."""
+    pid = str(pid)
+    ab = (club or {}).get("ab")
+    mine = [g for g in ((logs_this or {}).get(pid) or {}).get("g") or [] if g.get("min", 0) > 0 and g.get("tm") == ab]
+    if not mine or not club:
+        return None
+    keys = set((g.get("d"), g.get("opp"), g.get("home")) for g in mine)
+    n = len(keys)
+    out = {"mnew": 0.0, "mback": 0.0, "new": dict((c, 0.0) for c in PROPS_OUT_CARRY), "back": dict((c, 0.0) for c in PROPS_OUT_CARRY), "new_names": [], "back_names": [], "n": n}
+    seen = set([pid])
+
+    def count(rid, name, mpg, sits, st):
+        if rid in seen:
+            return
+        seen.add(rid)
+        ks = set((g.get("d"), g.get("opp"), g.get("home")) for g in ((logs_this or {}).get(rid) or {}).get("g") or [] if g.get("min", 0) > 0 and g.get("tm") == ab)
+        k = len(keys & ks)
+        sh = k / float(n)
+        a = dict((c, props_player_avg((logs_this or {}).get(rid), (logs_last or {}).get(rid), c) or 0.0) for c in PROPS_OUT_CARRY)
+        w_new, w_back = sits * sh, (1.0 - sits) * (1.0 - sh)
+        if w_new > 0:
+            out["mnew"] += w_new * mpg
+            for c in PROPS_OUT_CARRY:
+                out["new"][c] += w_new * a[c]
+            out["new_names"].append((name, round(mpg, 1), dict((c, round(a[c], 1)) for c in PROPS_OUT_CARRY), k, st))
+        if w_back > 0:
+            out["mback"] += w_back * mpg
+            for c in PROPS_OUT_CARRY:
+                out["back"][c] += w_back * a[c]
+            out["back_names"].append((name, round(mpg, 1), dict((c, round(a[c], 1)) for c in PROPS_OUT_CARRY), n - k, st))
+    for rid, name, mpg, st in club.get("out") or []:
+        count(rid, name, mpg, 1.0, st)
+    for rid, name, mpg, st, plays in club.get("maybe") or []:
+        count(rid, name, mpg, 1.0 - plays, st)
+    unl = club.get("plays") or {}
+    for rid, (name, mpg) in sorted((club.get("regs") or {}).items(), key=lambda kv: -kv[1][1]):
+        plays = float(unl.get(rid, 1.0))
+        count(rid, name, mpg, 1.0 - plays, ("not on the report, counted %.0f%% out" % (100 * (1.0 - plays))) if plays < 1.0 else "")
+    return out
+
+
+def props_out_carry_share(carry, stat):
+    """The lever's share of his rate in one stat (PROPS_OUT_CARRY), before the cap; 0.0 for a stat it does not read."""
+    co = PROPS_OUT_CARRY.get(stat)
+    if not carry or not co:
+        return 0.0
+    return (co[0] * carry["mnew"] / 30.0 + co[1] * carry["new"][stat] / co[4] + co[2] * carry["mback"] / 30.0 + co[3] * carry["back"][stat] / co[4])
+
+
 def props_games_missed(pid, ab, logs_this, club_dates=None):
     """His club's games since his last for it (the first games back, 13 Nov 2026): 0 when he played its last game, None when he has no game for it this season."""
     mine = [g.get("d") for g in ((logs_this or {}).get(str(pid)) or {}).get("g") or [] if g.get("min", 0) > 0 and g.get("tm") == ab]
@@ -6768,6 +6859,29 @@ def props_project(prop, logs_this, logs_last, ctx):
                 bits.append("%+.2f assists per 36 (%.2f a 30 mpg)" % (PROPS_OUT_AST_PER30 * over, PROPS_OUT_AST_PER30))
             why.append("his club's regulars out tonight run %.0f minutes a game against the league's %.0f on the day's report: %s, %+.2f %s per 36; his rate was earned on the usual night, so only the gap from it is read (points 3.5%% of his rate a 30 mpg, t 18, assists 0.11, t 10, on three seasons), scored" % (
                 float(lvl), float(lg), " and ".join(bits), drate * 36, label))
+    # WHAT THE MEN OUT CARRIED (18 Nov 2026): beside their minutes, what the regulars out (and back) average in the stat, each by how
+    # new it is to him, as a share of his own rate in each part of the market; on top of the lever above, held inside PROPS_OUT_CARRY_CAP
+    carry, d_carry, carry_sh = ctx.get("carry"), 0.0, {}
+    if carry and (carry.get("new_names") or carry.get("back_names")):
+        for c in comps:
+            if c in PROPS_OUT_CARRY and part_rate.get(c):
+                carry_sh[c] = max(-PROPS_OUT_CARRY_CAP, min(PROPS_OUT_CARRY_CAP, props_out_carry_share(carry, c)))
+                d_carry += part_rate[c] * carry_sh[c]
+        d_carry = max(d_carry, -0.5 * rate)
+        if abs(d_carry) > 1e-12:
+            rate += d_carry
+            STATW = {"pts": "points", "reb": "rebounds", "ast": "assists"}
+            shown = [c for c in comps if c in carry_sh]
+
+            def men(names, word):
+                return ", ".join("%s (%.0f mpg, %s a game, %s %d of his %d)" % (n_, mpg_, " / ".join("%.1f %s" % (a_[c], STATW[c]) for c in shown), word, k_, carry["n"]) for n_, mpg_, a_, k_, _st in names[:3])
+            said = []
+            if carry.get("new_names"):
+                said.append("out: " + men(carry["new_names"], "with him in"))
+            if carry.get("back_names"):
+                said.append("back: " + men(carry["back_names"], "missed"))
+            why.append("what the men out carried: %s: %s, %+.2f %s per 36; a teammate's rate follows what left with the men out more than their minutes, and falls when it comes back (36,502 man-games over two seasons, assists t 10, points t 8 and 11, rebounds t 5, the same sign in each; on this season's graded props the 54 picks it dropped went 23-31 and the 83 it added 43-40), scored" % (
+                "; ".join(said), " and ".join("%+.1f%% on his %s rate" % (100 * carry_sh[c], STATW[c]) for c in shown), d_carry * 36, label))
     for ent in (ctx.get("maybes") if ctx.get("maybes") is not None else [(nm_, st_, None) for nm_, st_ in (ctx.get("maybe") or [])])[:3]:
         nm_, st_, plays_ = ent[0], ent[1], ent[2]
         if plays_ is None:
@@ -6964,7 +7078,7 @@ def props_project(prop, logs_this, logs_last, ctx):
         parts.append({"k": "minutes", "t": ("Minutes, his games in tonight's role against the season" if mrole else "Minutes, his last %d against the season" % m["n"]), "eff": round((mins0 - m["season"]) * rate0, 2), "i": i_mins})
     if abs(d_pull) > 1e-9:
         parts.append({"k": "pull", "t": "His season's minutes", "eff": round(rate0 * d_pull, 2), "i": i_pull})
-    if abs(dmin) > 1e-9 or abs(drate) > 1e-12:
+    if abs(dmin) > 1e-9 or abs(drate) > 1e-12 or abs(d_carry) > 1e-12:
         parts.append({"k": "out", "t": "Who is out", "eff": round(rate_out * mins_a - rate0 * mins_p, 2), "i": i_out})
     if abs(d_ret) > 1e-9:
         parts.append({"k": "ret", "t": "His first games back", "eff": round(rate_out * d_ret, 2), "i": i_ret})
@@ -7000,6 +7114,9 @@ def props_project(prop, logs_this, logs_last, ctx):
     if chg or lvl is not None:
         res["chg"] = {"new": round(chg["new"], 1) if chg else None, "back": round(chg["back"], 1) if chg else None, "dmin": round(dmin, 2),
                       "lvl": round(float(lvl), 1) if lvl is not None else None, "lg": round(float(lg), 1) if lg is not None else None, "drate36": round(drate * 36.0, 3)}
+    if abs(d_carry) > 1e-12:   # what the men out carried (18 Nov 2026): the minutes and the stat new and back, and the share on each part of his rate
+        res["carry"] = {"mnew": round(carry["mnew"], 1), "mback": round(carry["mback"], 1), "new": dict((c, round(carry["new"][c], 2)) for c in carry_sh), "back": dict((c, round(carry["back"][c], 2)) for c in carry_sh),
+                        "share": dict((c, round(v, 4)) for c, v in carry_sh.items()), "drate36": round(d_carry * 36.0, 3), "n": carry["n"]}
     if r.get("drift"):
         res["drift"] = round(r["drift"], 4)
     if abs(d_ret) > 1e-9:
@@ -7256,6 +7373,7 @@ def make_nba_props(date_iso, out_dir, log, topup=False, sim_runs=NBA_SIM_RUNS, c
                    "missed": props_games_missed(pid, team, logs_this, club_dates),   # his club's games since his last for it (the second pass)
                    "debut": bool(logs_this.get(pid) and logs_this[pid].get("g")) and props_games_missed(pid, team, logs_this, club_dates) is None,   # games this season, none of them for this club
                    "out_level": props_out_level(night[team], skip=str(pid)) if night[team] else None, "out_league": league_out,
+                   "carry": props_out_carry(pid, logs_this, logs_last, night[team]) if night[team] else None,   # what the men out carried (18 Nov 2026)
                    "maybes": [(n, st, plays) for rid, n, _mpg, st, plays in (night[team] or {}).get("maybe") or [] if rid != str(pid)] if night[team] else None}
             proj, why = props_project(pr, e1.get("g"), e2.get("g"), ctx)
             season_logs = e1.get("g") or e2.get("g") or []
@@ -7288,7 +7406,7 @@ def make_nba_props(date_iso, out_dir, log, topup=False, sim_runs=NBA_SIM_RUNS, c
                       "short_game": {"share": PROPS_SHORT_SHARE, "rise": PROPS_SHORT_RISE, "half": PROPS_SHORT_HALF, "from": "13 Nov 2026: a short game in his last five set aside in the minutes (out for a man who started all five, half a game otherwise)"},
                       "levers": {"version": PROPS_LEVERS, "from": "13 Nov 2026, the levers' audit: who is out read as the change against his last five on the minutes and against the league's night on the rate; pace at its share; a combo's defence by its parts; last season's prior at this season's level; his games in tonight's role when the five is confirmed",
                                  "out_change": PROPS_OUT_CHANGE, "out_change_role": {"starter": PROPS_OUT_CHANGE_ROLE[True], "bench": PROPS_OUT_CHANGE_ROLE[False]}, "out_change_at": PROPS_OUT_CHANGE_AT, "maybe_plays": PROPS_MAYBE_PLAYS, "unlisted_plays": PROPS_UNLISTED_PLAYS,
-                                 "out_pts_share": PROPS_OUT_PTS_SHARE, "out_ast_per30": PROPS_OUT_AST_PER30, "pace_share": PROPS_PACE_SHARE, "drift_min": PROPS_DRIFT_MIN, "drift_clamp": PROPS_DRIFT_CLAMP,
+                                 "out_pts_share": PROPS_OUT_PTS_SHARE, "out_ast_per30": PROPS_OUT_AST_PER30, "out_carry": dict((c, list(v)) for c, v in PROPS_OUT_CARRY.items()), "out_carry_cap": PROPS_OUT_CARRY_CAP, "out_carry_from": "18 Nov 2026: what the regulars out and back average in the stat, by how new it is to him, as a share of his rate (minutes new, the stat new, minutes back, the stat back, the stat's unit a game)", "pace_share": PROPS_PACE_SHARE, "drift_min": PROPS_DRIFT_MIN, "drift_clamp": PROPS_DRIFT_CLAMP,
                                  "role_flat": {"starter": PROPS_ROLE_FLAT[True], "bench": PROPS_ROLE_FLAT[False]}, "club_recent": PROPS_CLUB_RECENT,
                                  "second_pass": "13 Nov 2026: his minutes from his last ten games, the recent counting most; a starter's short last game at half; the first games back after his own games missed; the league's home and road on the rate",
                                  "read_n": PROPS_READ_N, "read_decay": PROPS_READ_DECAY, "short_last": PROPS_SHORT_LAST, "back_games": PROPS_BACK_GAMES, "home_rate": PROPS_HOME_RATE,
@@ -9154,7 +9272,7 @@ def selftest():
     check("props: the projection is rate x minutes, who is out, pace and the defence, against the line; the chance read around the median (the mean less 0.08 sigmas on points, 0.04 of it back for a man who started all of his last five)",
           abs(mu_x - 32.57) < 0.01 and abs(proj_["proj"] - mu_x) < 0.006 and abs(proj_["sd"] - sd_x) < 0.006 and proj_["side"] == "OVER" and abs(proj_["p"] - props_blend(0.5, pm_x)) < 0.0002 and proj_["band"] == "no edge"   # the market the spine, the model a fifth (5 Nov 2026)
           and abs(proj_["edge"] - (props_blend(0.5, pm_x) - props_implied(-110))) < 0.0002 and proj_["price"] == -110 and proj_["mins"] == 36.1 and proj_["top"] == -0.05 and proj_["pull"] == -0.11 and abs(proj_["pm"] - pm_x) < 0.0002
-          and proj_["lv"] == PROPS_LEVERS == 3 and proj_["chg"] == {"new": 30.0, "back": 0.0, "dmin": 0.0, "lvl": 30.0, "lg": 20.0, "drate36": round(pr_["rate"] * 36 * 0.035 / 3.0, 3)} and "mrole" not in proj_ and "drift" not in proj_ and "ret" not in proj_
+          and proj_["lv"] == PROPS_LEVERS == 4 and proj_["chg"] == {"new": 30.0, "back": 0.0, "dmin": 0.0, "lvl": 30.0, "lg": 20.0, "drate36": round(pr_["rate"] * 36 * 0.035 / 3.0, 3)} and "mrole" not in proj_ and "drift" not in proj_ and "ret" not in proj_
           and props_shade("pts", 0.5) == 0.0 and props_shade("reb", 0.5) == 0.0 and props_shade("pra", 0.4892) == 0.0 and props_shade("tpm", 0.4038) == 0.0 and all(v == 0.0 for v in PROPS_SIDE_SHADE.values()) and set(PROPS_SIDE_SHADE) == set(PROPS_SD_K)   # the over's shade off (5 Nov 2026): it had called the under on four props in five
           and any("the over's shade is off" in w and "the model 20% of the say" in w for w in why_)
           and abs(props_over(proj_["proj"] - 0.04 * proj_["sd"], proj_["sd"], 30.5)[0] - proj_["pm"]) < 0.001   # the sigma carries the thin-history factor (27 Oct 2026; x 1.04 from 13 Nov) on 125 minutes of evidence
@@ -9441,7 +9559,7 @@ def selftest():
           and abs(pa_["proj"] - (9.0 + 0.11 * over_c) / 36.0 * mins_c * 0.989) < 0.006 and abs(pr2_["proj"] - 8.0 / 36.0 * mins_c) < 0.006
           and abs(pc_["proj"] - (47.0 + 30.0 * 0.035 * over_c + 0.11 * over_c) / 36.0 * mins_c * (1 - hr_c)) < 0.006
           and abs(pb_["proj"] - 0.5 * (1 + 0.035 * over_c) * mins_b * 0.993) < 0.006 and abs(mins_b - 18.8073) < 1e-4 and pb_["mins"] == 18.8
-          and pj_["chg"] == {"new": 25.7, "back": 4.7, "dmin": round(mins_c - 36.0, 2), "lvl": 41.7, "lg": 20.0, "drate36": round(30.0 * 0.035 * over_c, 3)} and pj_["lv"] == 3
+          and pj_["chg"] == {"new": 25.7, "back": 4.7, "dmin": round(mins_c - 36.0, 2), "lvl": 41.7, "lg": 20.0, "drate36": round(30.0 * 0.035 * over_c, 3)} and pj_["lv"] == 4
           and dict((p_["k"], p_) for p_ in pj_["parts"])["out"]["eff"] == round(30.0 / 36.0 * (1 + 0.035 * over_c) * mins_c - 30.0, 2)
           and any(w == "who is out against his last 6: newly out: Kyrie Irving (30 mpg, with him in 4 of his last 6), PJ Washington (26 mpg, with him in 6 of his last 6, listed Questionable and counted 45% out); back: Klay Thompson (28 mpg, missed 2 of his last 6): -0.2 minutes (0.00 a 30 mpg newly out and 1.42 off a 30 mpg back for a man who started all of his last five on 36.0 minutes; a man out through all of them is already in his minutes; 57,908 games over four seasons, the miss 4.80 with no lever and 4.58 with this), scored" for w in wj_)
           and any(w.startswith("who is out against his last 6: newly out: Kyrie Irving (30 mpg, with him in 4 of his last 6), PJ Washington") and ": +2.8 minutes (3.74 a 30 mpg newly out and 2.55 off a 30 mpg back for a man who started none of his last five on 16.0 minutes" in w for w in wb_)
@@ -9483,6 +9601,55 @@ def selftest():
           # the game script reads after it: a starter's minutes move with the spread on top of the share
           and abs(psc_["mins"] - (mins_c * 0.93 - 0.187 * (props_spread_script(-12.5)["emargin"] - 11.8))) < 0.06 and psc_["ret"]["f"] == 0.93
           and abs(psc_["base"] + sum(parts_sc[k_]["eff"] for k_ in ("out", "ret", "script", "home")) - psc_["proj"]) < 0.03)
+    # WHAT THE MEN OUT CARRIED (18 Nov 2026): Kyrie (30 mpg; 20 points, 4 rebounds, 5 assists a game) is Out and shared four of
+    # Luka's six games; PJ Washington (26; 12, 7, 2) is Questionable, counted 45% out, and shared all six; Klay (28; 15, 3, 2) plays
+    # and missed two of the six
+    carry_c = props_out_carry("11", lc, None, nc)
+    cm_new, cm_back = 30.0 * 4 / 6.0 + 0.45 * 26.0, 28.0 * 2 / 6.0
+    cn_ = {"pts": 20.0 * 4 / 6.0 + 0.45 * 12.0, "reb": 4.0 * 4 / 6.0 + 0.45 * 7.0, "ast": 5.0 * 4 / 6.0 + 0.45 * 2.0}
+    cb_ = {"pts": 15.0 * 2 / 6.0, "reb": 3.0 * 2 / 6.0, "ast": 2.0 * 2 / 6.0}
+    sh_p = -0.077 * cm_new / 30.0 + 0.079 * cn_["pts"] / 15.0 + 0.132 * cm_back / 30.0 - 0.129 * cb_["pts"] / 15.0
+    sh_r = -0.039 * cm_new / 30.0 + 0.063 * cn_["reb"] / 8.0 + 0.029 * cm_back / 30.0 - 0.052 * cb_["reb"] / 8.0
+    sh_a = -0.097 * cm_new / 30.0 + 0.149 * cn_["ast"] / 5.0 + 0.080 * cm_back / 30.0 - 0.118 * cb_["ast"] / 5.0
+    ctx_k = dict(ctx_c2, carry=carry_c)
+    pk_, wk_ = props_project(dict(prop_, line=30.5), lc["11"]["g"], None, ctx_k)
+    pka_, _w = props_project(dict(prop_, mk="ast", line=8.5), lc["11"]["g"], None, ctx_k)
+    pkr_, _w = props_project(dict(prop_, mk="reb", line=7.5), lc["11"]["g"], None, ctx_k)
+    pkc_, wkc_ = props_project(dict(prop_, mk="pra", line=46.5), lc["11"]["g"], None, ctx_k)
+    pkt_, wkt_ = props_project(dict(prop_, mk="tpm", line=3.5), lc["11"]["g"], None, ctx_k)
+    pt0_, _w = props_project(dict(prop_, mk="tpm", line=3.5), lc["11"]["g"], None, ctx_c2)
+    pkb_, _w = props_project(dict(prop_, line=30.5), lc["11"]["g"], None, dict(ctx_c2, carry=dict(carry_c, new=dict(carry_c["new"], pts=300.0))))
+    pkn_, wkn_ = props_project(dict(prop_, line=30.5), lc["11"]["g"], None, dict(ctx_c2, carry=dict(carry_c, new_names=[], back_names=[])))
+    out_k, out_j = dict((p_["k"], p_) for p_ in pk_["parts"])["out"], dict((p_["k"], p_) for p_ in pj_["parts"])["out"]
+    check("props: what the men out carried (18 Nov 2026): beside the minutes of the regulars out, what they average in the stat, each by the share of his games for the club the man shared (a man back by the share he missed, a man listed short of Out by the chance he sits); as a share of his rate in each part of the market on top of the lever on the level, held inside 15%, threes left alone, the 'who is out' part carrying it, the row keeping what was read",
+          abs(carry_c["mnew"] - cm_new) < 1e-9 and abs(carry_c["mback"] - cm_back) < 1e-9 and carry_c["n"] == 6
+          and all(abs(carry_c["new"][c_] - cn_[c_]) < 1e-9 and abs(carry_c["back"][c_] - cb_[c_]) < 1e-9 for c_ in ("pts", "reb", "ast"))
+          and carry_c["new_names"] == [("Kyrie Irving", 30.0, {"pts": 20.0, "reb": 4.0, "ast": 5.0}, 4, "Out"), ("PJ Washington", 26.0, {"pts": 12.0, "reb": 7.0, "ast": 2.0}, 6, "Questionable")]
+          and carry_c["back_names"] == [("Klay Thompson", 28.0, {"pts": 15.0, "reb": 3.0, "ast": 2.0}, 2, "")]
+          and abs(props_out_carry_share(carry_c, "pts") - sh_p) < 1e-12 and abs(props_out_carry_share(carry_c, "ast") - sh_a) < 1e-12 and abs(props_out_carry_share(carry_c, "reb") - sh_r) < 1e-12
+          and props_out_carry_share(carry_c, "tpm") == 0.0 and props_out_carry_share(None, "pts") == 0.0
+          and 0.012 < sh_p < 0.019 and 0.028 < sh_a < 0.038 and 0.004 < sh_r < 0.011      # +1.5% on points, +3.3% on assists, +0.7% on rebounds
+          # a man with no game for this club, a club with no night: nothing to read
+          and props_out_carry("44", lc, None, nc) is None and props_out_carry("99", lc, None, nc) is None and props_out_carry("11", lc, None, None) is None
+          # nobody out and nobody back who missed a game of his: the sums are nought and no name is carried
+          and props_out_carry("11", lc, None, dict(nc, out=[], maybe=[], regs={"11": ("Luka Doncic", 36.0), "24": ("PJ Washington", 26.0)}, plays={})) == {"mnew": 0.0, "mback": 0.0, "new": {"pts": 0.0, "reb": 0.0, "ast": 0.0}, "back": {"pts": 0.0, "reb": 0.0, "ast": 0.0}, "new_names": [], "back_names": [], "n": 6}
+          # the projection: his points rate x (1 + the lever on the level + the share), the minutes as they were
+          and abs(pk_["proj"] - 30.0 / 36.0 * (1 + 0.035 * over_c + sh_p) * mins_c * 0.993) < 0.006 and pk_["mins"] == pj_["mins"] and pk_["lv"] == 4
+          and abs((pka_["proj"] - pa_["proj"]) - 9.0 / 36.0 * sh_a * mins_c * 0.989) < 0.012 and abs((pkr_["proj"] - pr2_["proj"]) - 8.0 / 36.0 * sh_r * mins_c) < 0.012
+          and pk_["carry"] == {"mnew": round(cm_new, 1), "mback": round(cm_back, 1), "new": {"pts": round(cn_["pts"], 2)}, "back": {"pts": round(cb_["pts"], 2)}, "share": {"pts": round(sh_p, 4)}, "drate36": round(30.0 * sh_p, 3), "n": 6}
+          and pk_["chg"] == pj_["chg"]                                                    # the lever on the level and the minutes read as they did
+          and abs((out_k["eff"] - out_j["eff"]) - 30.0 / 36.0 * sh_p * mins_c) < 0.011 and out_k["i"] == out_j["i"]
+          and any(w.startswith("what the men out carried: out: Kyrie Irving (30 mpg, 20.0 points a game, with him in 4 of his 6), PJ Washington (26 mpg, 12.0 points a game, with him in 6 of his 6); back: Klay Thompson (28 mpg, 15.0 points a game, missed 2 of his 6): %+.1f%% on his points rate, %+.2f points per 36; a teammate's rate follows what left with the men out more than their minutes" % (100 * sh_p, 30.0 * sh_p)) and w.endswith(", scored") for w in wk_)
+          and not any(w.startswith("what the men out carried") for w in wj_) and "carry" not in pj_
+          # a combo by its parts, each on its own share
+          and pkc_["carry"]["share"] == {"pts": round(sh_p, 4), "reb": round(sh_r, 4), "ast": round(sh_a, 4)} and pkc_["carry"]["drate36"] == round(30.0 * sh_p + 8.0 * sh_r + 9.0 * sh_a, 3)
+          and abs((pkc_["proj"] - pc_["proj"]) - (30.0 * sh_p + 8.0 * sh_r + 9.0 * sh_a) / 36.0 * mins_c * (1 - hr_c)) < 0.02
+          and any(w.startswith("what the men out carried: out: Kyrie Irving (30 mpg, 20.0 points / 4.0 rebounds / 5.0 assists a game, with him in 4 of his 6)") and ("%+.1f%% on his points rate and %+.1f%% on his rebounds rate and %+.1f%% on his assists rate" % (100 * sh_p, 100 * sh_r, 100 * sh_a)) in w for w in wkc_)
+          # threes are not read; the share is held at 15%; no man named, nothing moves
+          and pkt_["proj"] == pt0_["proj"] and "carry" not in pkt_ and not any(w.startswith("what the men out carried") for w in wkt_)
+          and pkb_["carry"]["share"] == {"pts": 0.15} and abs(pkb_["proj"] - 30.0 / 36.0 * (1 + 0.035 * over_c + 0.15) * mins_c * 0.993) < 0.006
+          and pkn_["proj"] == pj_["proj"] and "carry" not in pkn_ and not any(w.startswith("what the men out carried") for w in wkn_)
+          and PROPS_OUT_CARRY == {"pts": (-0.077, 0.079, 0.132, -0.129, 15.0), "reb": (-0.039, 0.063, 0.029, -0.052, 8.0), "ast": (-0.097, 0.149, 0.080, -0.118, 5.0)} and PROPS_OUT_CARRY_CAP == 0.15)
     # THE LEAGUE'S HOME AND ROAD (the second pass, 13 Nov 2026): over and above his rate, a combo by its parts, rebounds none
     ctx_h0 = {"pos": "G", "opp_nick": "Lakers", "self_out": ""}
     ph_ = dict((mk_, props_project(dict(prop_, mk=mk_, line=ln_), lc["11"]["g"], None, dict(ctx_h0, home=True))) for mk_, ln_ in (("pts", 30.5), ("reb", 7.5), ("ast", 8.5), ("tpm", 3.5), ("pra", 46.5), ("ra", 16.5)))

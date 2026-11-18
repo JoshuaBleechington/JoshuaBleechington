@@ -70,6 +70,19 @@
      on the panel. The chance was re-measured the same day: the sigma narrower on every market, assists' and threes' median
      nearer the mean, and the median leaning by whether he started all of his last five (the run's why lines say each) */
   function propLv3(r) { return !!r && +r.lv >= 3; }
+  /* WHAT THE MEN OUT CARRIED (18 Nov 2026). slate.py's lever on who is out read the absent regulars by their minutes alone; measured on
+     36,502 man-games of two seasons, what those men average in the stat says more (a teammate's assists rate +15% per five assists a game
+     newly out and -10% per thirty minutes; the same shape on points and rebounds, and the other way when a man is back; assists t 10,
+     points t 8 and 11, rebounds t 5, the same sign in each season). The run now scores it as a share of his rate and writes what it read
+     on the row (`carry`). Replayed on 21 graded nights through the run's own functions it dropped 54 picks that went 23-31 and added 83
+     that went 43-40 (+7.9 units; the nights drawn again, ahead in 78% of draws): a modest lever, so it keeps its own count here, the
+     BET and LEAN picks whose projection it moved PROPS_CARRY_SHOW or more */
+  var PROPS_CARRY_SHOW = 0.02;
+  function propCarryMove(r) {   // the share of his rate the lever moved: what it added per 36 over the rate without it
+    if (!r || !r.carry || !isFinite(+r.carry.d36) || !isFinite(+r.rate36)) return null;
+    var base = +r.rate36 - +r.carry.d36;
+    return base > 0 ? +r.carry.d36 / base : null;
+  }
   function propShortLine(r) {   // what the run set aside in his minutes (13 Nov 2026); "" on a row made the old way or with nothing set aside
     var m = r && r.mshort; if (!m || !m.how || !m.min || !m.min.length || r.p === null || r.p === undefined) return "";
     var which = "his " + m.min.join("- and ") + "-minute game" + (m.min.length > 1 ? "s" : "");
@@ -1301,7 +1314,9 @@
                     ret: x.ret && +x.ret.missed > 0 && isFinite(+x.ret.f) ? { missed: +x.ret.missed, f: +x.ret.f, dmin: isFinite(+x.ret.dmin) ? +x.ret.dmin : null } : null,   // his first game back (the second pass)
                     mrole: x.mrole && x.mrole.how ? { how: String(x.mrole.how), games: +x.mrole.games || 0, starter: !!x.mrole.starter, mean: +x.mrole.mean, read: +x.mrole.read } : null,
                     chg: x.chg ? { nw: x.chg["new"] === null || x.chg["new"] === undefined ? null : +x.chg["new"], back: x.chg.back === null || x.chg.back === undefined ? null : +x.chg.back, dmin: +x.chg.dmin || 0,
-                                   lvl: x.chg.lvl === null || x.chg.lvl === undefined ? null : +x.chg.lvl, lg: x.chg.lg === null || x.chg.lg === undefined ? null : +x.chg.lg } : null });
+                                   lvl: x.chg.lvl === null || x.chg.lvl === undefined ? null : +x.chg.lvl, lg: x.chg.lg === null || x.chg.lg === undefined ? null : +x.chg.lg } : null,
+                    /* what the men out carried (18 Nov 2026): what the lever added to his rate per 36, and the minutes newly out and back it read */
+                    carry: x.carry && isFinite(+x.carry.drate36) && +x.carry.drate36 !== 0 ? { d36: +x.carry.drate36, mnew: isFinite(+x.carry.mnew) ? +x.carry.mnew : null, mback: isFinite(+x.carry.mback) ? +x.carry.mback : null } : null });
       });
     });
     return rows;
@@ -1496,6 +1511,7 @@
     var byPlus = mk(), byPlusSide = { UNDER: mk(), OVER: mk() };   // the pick at even money or better, as carded from the day the blend changed (12 Nov 2026): the chip's own pool
     var byRamp = mk();   // the sheet's under, BET or LEAN, on a man whose minutes are on the way back (13 Nov 2026): shown, not scored
     var byShort = { UNDER: mk(), OVER: mk() }, byShortAll = mk();   // the BET and LEAN picks on a man whose short game the run set aside in his minutes (13 Nov 2026): scored, so it measures itself
+    var byCarry = { up: mk(), down: mk(), "with": mk(), against: mk() }, byCarryAll = mk();   // the BET and LEAN picks whose projection the lever on what the men out carried moved 2% or more (18 Nov 2026): scored, so it measures itself
     /* the pick priced -110 to -101 from the day its over was left off the lists (15 Nov 2026): the overs left off, counted as the slate carded
        them so the rule measures itself, and the unders, which stay on the lists and are watched */
     var byCoin = { OVER: mk(), UNDER: mk() }, byCoinBand = { OVER: { BET: mk(), LEAN: mk() }, UNDER: { BET: mk(), LEAN: mk() } };
@@ -1539,6 +1555,8 @@
       if ((r.band === "BET" || r.band === "LEAN") && propRampUnder(r)) sinks.push(byRamp);
       if ((r.band === "BET" || r.band === "LEAN") && r.mshort && r.mshort.how) { sinks.push(byShortAll); if (byShort[r.side]) sinks.push(byShort[r.side]); }
       if ((r.band === "BET" || r.band === "LEAN") && r.lv >= 2) { sinks.push(byLvAll); sinks.push(byLv[r.band]); if (byLvSide[r.side]) sinks.push(byLvSide[r.side]); }
+      var cmv = propCarryMove(r);
+      if ((r.band === "BET" || r.band === "LEAN") && cmv !== null && Math.abs(cmv) >= PROPS_CARRY_SHOW - 1e-9) { sinks.push(byCarryAll); sinks.push(cmv > 0 ? byCarry.up : byCarry.down); sinks.push((cmv > 0) === (r.side === "OVER") ? byCarry["with"] : byCarry.against); }
       if ((r.band === "BET" || r.band === "LEAN") && byCoin[r.side] && d >= PROPS_COIN.from && propCoinPrice(r.price)) { sinks.push(byCoin[r.side]); sinks.push(byCoinBand[r.side][r.band]); }
       sinks.forEach(function (s) {
         if (r.result === "void") { s.v++; return; }
@@ -1651,6 +1669,10 @@
     if (byLvAll.n || byLvAll.p) h2 += tile("Picks under the levers as corrected (from 13 Nov 2026)", byLvAll, ["the BET band " + rec(byLv.BET) + (byLv.BET.n ? " " + sgn(byLv.BET.units, 1) + "u" : "") + " · the leans " + rec(byLv.LEAN) + (byLv.LEAN.n ? " " + sgn(byLv.LEAN.units, 1) + "u" : "") +
       " · unders " + rec(byLvSide.UNDER) + (byLvSide.UNDER.n ? " " + sgn(byLvSide.UNDER.units, 1) + "u" : "") + " · overs " + rec(byLvSide.OVER) + (byLvSide.OVER.n ? " " + sgn(byLvSide.OVER.units, 1) + "u" : "") +
       " · the sixteen nights before it, replayed with the ledgers in place: every pick with an edge 518-445 as the levers stand against 464-384 as they stood, the BET band 38-33 against 32-13 (71 and 45 picks: too few to tell apart, so this tile keeps the count)"]);
+    var cu = function (x) { return rec(x) + (x.n ? " " + sgn(x.units, 1) + "u" : ""); };
+    if (byCarryAll.n || byCarryAll.p) h2 += tile("What the men out carried, 2% or more on the read (scored from 19 Nov 2026)", byCarryAll, ["the BET and LEAN picks whose projection the lever moved 2% or more: lifted " + cu(byCarry.up) + " · cut " + cu(byCarry.down) +
+      " · the pick on the lever's side " + cu(byCarry["with"]) + " · against it " + cu(byCarry.against) +
+      " · measured on 36,502 man-games of two seasons (assists t 10, points t 8 and 11, rebounds t 5); replayed on 21 graded nights the 54 picks it dropped went 23-31 and the 83 it added 43-40"]);
     /* the pick priced -110 to -101 (15 Nov 2026): what the overs left off the lists did, and the unders, which stay on them */
     var coinBands = function (sd) { var b = byCoinBand[sd]; return "the BET band " + rec(b.BET) + (b.BET.n ? " " + sgn(b.BET.units, 1) + "u" : "") + " · the leans " + rec(b.LEAN) + (b.LEAN.n ? " " + sgn(b.LEAN.units, 1) + "u" : ""); };
     if (byCoin.OVER.n || byCoin.OVER.p) h2 += tile("The over priced " + PROPS_COIN.lo + " to " + PROPS_COIN.hi + ", left off the lists (from 15 Nov 2026)", byCoin.OVER,

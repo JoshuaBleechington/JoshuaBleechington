@@ -7702,6 +7702,18 @@ def us_game_date(iso_utc):
     return (t - dt.timedelta(hours=4 if summer else 5)).date().isoformat()
 
 
+def us_eastern(iso_utc):
+    """A UTC moment as Eastern wall time (a naive datetime), by the same rule as us_game_date, which is its date."""
+    t = dt.datetime.strptime(str(iso_utc)[:19], "%Y-%m-%dT%H:%M:%S")
+    y = t.year
+    mar = dt.date(y, 3, 8)
+    mar += dt.timedelta(days=(6 - mar.weekday()) % 7)
+    nov = dt.date(y, 11, 1)
+    nov += dt.timedelta(days=(6 - nov.weekday()) % 7)
+    summer = dt.datetime.combine(mar, dt.time(7)) <= t < dt.datetime.combine(nov, dt.time(6))
+    return t - dt.timedelta(hours=4 if summer else 5)
+
+
 def fetch_odds(sport, key, books):
     q = urllib.parse.urlencode({"apiKey": key, "markets": "h2h,spreads,totals", "oddsFormat": "american",
                                 "dateFormat": "iso", "bookmakers": ",".join(books)})
@@ -8031,6 +8043,231 @@ def make_odds(date_iso, out_dir, log, books=None, sports=("MLB", "NHL", "NBA")):
         json.dump(doc, f, indent=1)
     log("Credits: this run used %s; %s left this month." % (spent, left if left is not None else "unknown"))
     log("Wrote %s with %d game%s. Load it into the sheet with the slate: blank line boxes fill, anything typed stays, and the best price on each side shows on the rail." % (path, len(rows), "" if len(rows) == 1 else "s"))
+    try:   # the bets against the money (19 Nov 2026): DraftKings' own open page, no key and no credit; logged to be measured, and never able to stop this run
+        make_splits(date_iso, out_dir, log, tuple(sorted(set(g["sport"] for g in rows))))
+    except Exception as e:  # noqa: BLE001
+        log("Betting splits: not read this run (%s). Nothing else is affected." % e)
+    return path
+
+
+# ---- the betting splits: the share of the bets against the share of the money ----
+# 19 Nov 2026, the user with a screenshot of a video ("reverse line movement,
+# sharp money vs public money": the Lakers with 85% of the bets and 35% of the
+# money, the Trail Blazers with 15% and 65%): "Sharp betting from pros and
+# where the money is going type stuff." DraftKings prints both shares for
+# every game's moneyline, spread and total on an open page of its own (no
+# key, no credit; its robots file allows the read). The page shows today
+# only and nothing held could test the idea, so each odds run keeps what the
+# page showed, keyed as the odds log keys a game, for the measure to come:
+# does the side with more of the money than of the bets beat the close, and
+# does it win. Logged and printed, never scored. NBA.md has the day's tests.
+SPLITS_URL = "https://dknetwork.draftkings.com/draftkings-sportsbook-betting-splits/"
+SPLITS_LEAGUE = {"NBA": 42648, "NHL": 42133, "MLB": 84240}
+SPLITS_LOG = "splits-log.json"
+SPLITS_FORMAT = "callsheet.splits-log"
+SPLITS_GAP = 20          # money less bets, in points of share, that the run's printout names (a mark for the eye, not a call)
+SPLITS_PAGES = 4         # the page lists ten games a page; a full night is two
+SPLITS = {"on": True}    # the self-test turns it off: no check may call a site
+
+
+def splits_num(s):
+    """'\u2212690' -> -690.0, '+411' -> 411.0, '87%' -> 87.0; None for anything else."""
+    s = str(s or "").replace("\u2212", "-").replace("\u2013", "-").replace("+", "").replace("%", "").replace(",", "").strip()
+    try:
+        return float(s)
+    except ValueError:
+        return None
+
+
+def splits_parse(page):
+    """DraftKings' betting-splits page as {updated, pages, games: [{away, home, when, event, markets}]}.
+    markets: Moneyline, Spread (hockey's puck line, baseball's run line) and Total, each two rows of {sel, odds, handle, bets}
+    (shares in whole per cent).
+    A market that does not read as two sides whose shares each add to about a hundred is left out, so a change
+    in the page's markup yields fewer games here and never a wrong number."""
+    def txt(s):
+        return re.sub(r"\s+", " ", html.unescape(re.sub(r"<[^>]+>", " ", s))).strip()
+    upd = re.search(r"Updated\s+([0-9: ]+[AP]M\s*ET)", page)
+    games = []
+    for card in re.split(r'<div class="tb-se\s', page)[1:]:
+        tm = re.search(r'class="tb-se-title[^"]*"[^>]*>\s*<h5[^>]*>(.*?)</h5>', card, re.S)    # the heading has a class of its own on a card with club badges only (basketball has them, hockey not)
+        title = txt(tm.group(1)) if tm else ""
+        if " @ " not in title:
+            continue
+        away, home = [x.strip() for x in title.split(" @ ", 1)]
+        wm = re.search(r"</h5>\s*<span[^>]*>(.*?)</span>", card, re.S)
+        ev = re.search(r"sportsbook\.draftkings\.com/event/(\d+)", card)
+        g = {"away": away, "home": home, "when": txt(wm.group(1)) if wm else "", "event": ev.group(1) if ev else "", "markets": {}}
+        wrap = card.split('class="tb-market-wrap', 1)
+        if len(wrap) < 2:
+            continue
+        parts = re.split(r'<div class="[^"]*text-brand-orange[^"]*">\s*([^<]{1,40}?)\s*</div>', wrap[1])     # every label cuts, so a market not kept cannot run into its neighbour
+        for k in range(1, len(parts) - 1, 2):
+            name = {"moneyline": "Moneyline", "spread": "Spread", "puck line": "Spread", "run line": "Spread", "total": "Total"}.get(parts[k].strip().lower())
+            if not name or name in g["markets"]:
+                continue
+            rows = []
+            for row in re.split(r'<div class="tb-sodd\s', parts[k + 1])[1:]:
+                sm = re.search(r'class="tb-slipline[^"]*">(.*?)</div>', row, re.S)
+                om = re.search(r'class="tb-odd-s[^"]*"[^>]*>(.*?)</a>', row, re.S)
+                pc = re.findall(r">\s*(\d{1,3})\s*%\s*<", row)
+                if not sm or len(pc) != 2:
+                    continue
+                rows.append({"sel": txt(sm.group(1)), "odds": splits_num(txt(om.group(1))) if om else None, "handle": int(pc[0]), "bets": int(pc[1])})
+            if len(rows) == 2 and all(abs(rows[0][f] + rows[1][f] - 100) <= 2 for f in ("handle", "bets")):
+                g["markets"][name] = rows
+        if g["markets"]:
+            games.append(g)
+    pages = sorted(set(int(n) for n in re.findall(r"tb_page=(\d+)", page)))
+    return {"updated": upd.group(1).strip() if upd else "", "pages": pages, "games": games}
+
+
+def splits_when(when, today_iso):
+    """'Thu 11/19 \u00b7 8:10 PM ET' -> ('2026-11-19', '20:10'): Eastern, the year today's (the next where December has turned to January)."""
+    d = re.search(r"(\d{1,2})/(\d{1,2})", when or "")
+    c = re.search(r"(\d{1,2}):(\d{2})\s*([AP]M)", when or "")
+    if not d:
+        return None, None
+    today = dt.date.fromisoformat(today_iso)
+    mo, da = int(d.group(1)), int(d.group(2))
+    y = today.year + (1 if (mo == 1 and today.month == 12) else -1 if (mo == 12 and today.month == 1) else 0)
+    try:
+        date = dt.date(y, mo, da).isoformat()
+    except ValueError:
+        return None, None
+    if not c:
+        return date, None
+    h = int(c.group(1)) % 12 + (12 if c.group(3) == "PM" else 0)
+    return date, "%02d:%s" % (h, c.group(2))
+
+
+def splits_game(g, today_iso):
+    """A parsed game as the log keeps it: (date, away nickname, home nickname, tip, markets), the markets as
+    ml {a, h: [odds, money, bets]}, sp {a, h: [number, odds, money, bets]} and tot {o, u: [number, odds, money, bets]}.
+    None where the date or a club cannot be read; a market whose two sides cannot be told apart is left out."""
+    date, tip = splits_when(g.get("when"), today_iso)
+    away, home = odds_nick(g.get("away")), odds_nick(g.get("home"))
+    if not date or not away or not home or away == home:
+        return None
+    def side(sel):
+        s = re.sub(r"\s*[-+\u2212]?\d+(?:\.\d+)?\s*$", "", sel).strip()      # 'POR Trail Blazers -11.5' -> the club
+        n = odds_nick(s)
+        return "a" if n == away else "h" if n == home else None
+    def number(sel):
+        m = re.search(r"([-+\u2212]?\d+(?:\.\d+)?)\s*$", sel)
+        return splits_num(m.group(1)) if m else None
+    out = {}
+    mk = g.get("markets") or {}
+    ml = {side(r["sel"]): [r["odds"], r["handle"], r["bets"]] for r in mk.get("Moneyline", [])}
+    if set(ml) == {"a", "h"}:
+        out["ml"] = ml
+    sp = {side(r["sel"]): [number(r["sel"]), r["odds"], r["handle"], r["bets"]] for r in mk.get("Spread", [])}
+    if set(sp) == {"a", "h"} and sp["a"][0] is not None and sp["h"][0] is not None:
+        out["sp"] = sp
+    tot = {("o" if r["sel"].lower().startswith("over") else "u" if r["sel"].lower().startswith("under") else None): [number(r["sel"]), r["odds"], r["handle"], r["bets"]] for r in mk.get("Total", [])}
+    if set(tot) == {"o", "u"} and tot["o"][0] is not None:
+        out["tot"] = tot
+    return (date, away, home, tip, out) if out else None
+
+
+def splits_log_path(out_dir):
+    return os.path.join(out_dir, SPLITS_LOG)
+
+
+def splits_log_update(path, sport, games, now, updated, today_iso):
+    """Add this run's reading to the log: one snapshot a game, skipped where the shares and numbers are those of the
+    game's last snapshot. A snapshot says whether it was taken before the tip (pre). Returns the games kept, as
+    (key, entry, added)."""
+    try:
+        with open(path, encoding="utf-8") as f:
+            doc = json.load(f)
+        if not isinstance(doc, dict) or not isinstance(doc.get("games"), dict):
+            raise ValueError("not a splits log")
+    except (OSError, ValueError):
+        if os.path.exists(path):      # a log that does not read is set aside, never written over: the page shows today only, so what was kept cannot be had again
+            os.replace(path, "%s.unreadable-%s.json" % (path[:-5], re.sub(r"\D", "", now)[:14]))
+        doc = {"format": SPLITS_FORMAT, "version": 1, "source": "DraftKings Sportsbook betting splits (dknetwork.draftkings.com): the share of the money (handle) and of the bets", "games": {}}
+    et = us_eastern(now)
+    out = []
+    for g in games:
+        r = splits_game(g, today_iso)
+        if not r:
+            continue
+        date, away, home, tip, mk = r
+        k = odds_log_key(sport, date, away, home)
+        e = doc["games"].get(k) or {"snaps": []}
+        if tip:
+            e["tip"] = "%s %s" % (date, tip)
+        if g.get("event"):
+            e["event"] = g["event"]
+        snap = dict(mk)
+        last = {x: v for x, v in (e["snaps"][-1] if e["snaps"] else {}).items() if x in ("ml", "sp", "tot")}
+        added = snap != last
+        if added:
+            snap["at"], snap["updated"] = now, updated
+            if tip:
+                snap["pre"] = et < dt.datetime.strptime("%s %s" % (date, tip), "%Y-%m-%d %H:%M")
+            e["snaps"].append(snap)
+        doc["games"][k] = e
+        out.append((k, e, added))
+    if out:
+        tmp = path + ".tmp"
+        with open(tmp, "w", encoding="utf-8") as f:
+            json.dump(doc, f, separators=(",", ":"))
+        os.replace(tmp, path)         # whole or not at all
+    return out
+
+
+def splits_line(e, away, home):
+    """One game's last snapshot in words: the side of each market with more of the money than of the bets, where the two are SPLITS_GAP apart."""
+    s = (e.get("snaps") or [{}])[-1]
+    bits = []
+    for key, name, sides in (("sp", "spread", (("a", away), ("h", home))), ("tot", "total", (("o", "Over"), ("u", "Under"))), ("ml", "moneyline", (("a", away), ("h", home)))):
+        m = s.get(key)
+        if not m:
+            continue
+        for sd, lab in sides:
+            v = m[sd]
+            money, bets = v[-2], v[-1]
+            if money - bets >= SPLITS_GAP:
+                num = "" if key == "ml" else (" %s" % fmt(v[0], 1)) if key == "tot" else (" %+g" % v[0])
+                bits.append("%s: %s%s has %d%% of the money on %d%% of the bets (+%d)" % (name, lab, num, money, bets, money - bets))
+    return bits
+
+
+def make_splits(date_iso, out_dir, log, sports=("NBA",), page_of=None):
+    """Read DraftKings' betting-splits page for each sport and add what it shows to splits-log.json. Free: an open
+    page, no key, no credit. page_of(sport, page) -> the page's text, for the self-test."""
+    if not SPLITS["on"] and page_of is None:
+        return None
+    def read(sport, n):
+        q = {"tb_eg": SPLITS_LEAGUE[sport], "tb_edate": "today", "tb_emt": 0}
+        if n > 1:
+            q["tb_page"] = n
+        return fetch_text(SPLITS_URL + "?" + urllib.parse.urlencode(q))
+    page_of = page_of or read
+    now, path, total = now_utc(), splits_log_path(out_dir), 0
+    for sport in sports:
+        if sport not in SPLITS_LEAGUE:
+            continue
+        doc = splits_parse(page_of(sport, 1))
+        games = list(doc["games"])
+        for n in [p for p in doc["pages"] if p > 1][:SPLITS_PAGES - 1]:
+            games += splits_parse(page_of(sport, n))["games"]
+        kept = splits_log_update(path, sport, games, now, doc["updated"], date_iso)
+        todays = [(k, e, added) for k, e, added in kept if k.split("|")[1] == date_iso]
+        if not todays:
+            log("Betting splits, %s: no game of %s on DraftKings' page%s." % (sport, date_iso, "" if games else " (it listed none, or its layout has changed)"))
+            continue
+        total += len(todays)
+        log("Betting splits, %s: %d game%s from DraftKings' own page (updated %s; free, no credit). The share of the money against the share of the bets, %d or more apart:" % (
+            sport, len(todays), "" if len(todays) == 1 else "s", doc["updated"] or "time not shown", SPLITS_GAP))
+        for k, e, added in todays:
+            away, home = k.split("|")[2].split(" @ ")
+            bits = splits_line(e, away, home)
+            log("  %s @ %s  ·  %s%s" % (away, home, "  ·  ".join(bits) if bits else "nothing %d apart" % SPLITS_GAP, "" if added else "  (unchanged since the last run)"))
+    if total:
+        log("Kept in %s to be measured against the close and the finals. Logged, not scored: nothing on the sheet moves on these." % path)
     return path
 
 
@@ -8756,6 +8993,7 @@ def make_grade(date_iso, out_dir, log):
 def selftest():
     fails = []
     LEDGER_FIND["on"] = False   # no check may look around the machine it runs on (12 Nov 2026); the ledger-finder's own checks name their folders
+    SPLITS["on"] = False        # nor read DraftKings' page (19 Nov 2026); the splits checks hand the reader a page of their own
 
     def check(name, cond):
         if not cond:
@@ -10673,6 +10911,120 @@ def selftest():
           and any("expected goals left blank until 5" in n for n in row4["notes"]))
     check("ledger: without a ledger the slate says so", any("No league ledger" in n for n in row["notes"]))
 
+    print("betting splits")
+    # DraftKings' page in the shape it has (19 Nov 2026): a card a game, a label a market, a row a side with its odds, its share of the money and of the bets
+    def spl_row(sel, odds, money, bets):
+        return ('<div class="tb-sodd grid py-1 text-sm"> <div class="tb-slipline min-w-0 font-medium">%s</div> <div> <a target="_blank" class="tb-odd-s inline-block" href="https://sportsbook.draftkings.com/event/35038013?outcomes=0ML_1&#038;x=1"> %s </a> </div> '
+                '<div>%d%% <div class="tb-progress h-2"> <div class="h-2 bg-brand-green" style="width: %d%%"></div> </div> </div> <div>%d%% <div class="tb-progress h-2"> <div class="h-2" style="width: %d%%"></div> </div> </div> </div>') % (sel, odds, money, money, bets, bets)
+
+    def spl_card(title, when, markets, badge=True):
+        head = ('<h5 class="tb-se-title-new mt-0 mb-0"> <a target="_blank" href="https://sportsbook.draftkings.com/event/35038013?a=1" class="block"> <img class=\'mr-2\' src=\'x.png\' alt=\'\'/> %s </a> </h5>' if badge else
+                '<h5 class="mt-0 mb-0"> <a target="_blank" href="https://sportsbook.draftkings.com/event/35040607?a=1" class="no-underline text-brand-orange"> %s </a> </h5>') % title
+        body = "".join('<div class="py-2.5"> <div class="mb-1 text-[11px] font-bold uppercase text-brand-orange"> %s </div> <div class="tb-sm space-y-0.5"> %s </div> </div>' % (lab, "".join(spl_row(*r) for r in rows)) for lab, rows in markets)
+        return ('<div class="tb-se rounded-lg border p-3"> <div class="tb-se-title flex"> %s <span class="shrink-0 text-xs">%s</span> </div> <div class="tb-se-head grid"> <div>Selection</div> <div>Odds</div> <div>Handle</div> <div>Bets</div> </div> '
+                '<div class="tb-market-wrap divide-y"> %s </div> </div>') % (head, when, body)
+    spl_p1 = ('<html><body> <span>Updated 2:29 PM ET</span> <div class="space-y-4"> '
+              + spl_card("POR Trail Blazers @ MIL Bucks", "Thu 11/19 \u00b7 8:10 PM ET", [("Moneyline", [("MIL Bucks", "+411", 13, 5), ("POR Trail Blazers", "\u2212546", 87, 95)]),
+                                                                                    ("Spread", [("POR Trail Blazers -11.5", "\u2212108", 87, 66), ("MIL Bucks +11.5", "\u2212112", 13, 34)]),
+                                                                                    ("Total", [("Over 230.5", "\u2212112", 1, 23), ("Under 230.5", "\u2212108", 99, 77)])])
+              + spl_card("PHI 76ers @ LA Clippers", "Thu 11/19 \u00b7 10:30 PM ET", [("Moneyline", [("LA Clippers", "\u2212150", 50, 60), ("PHI 76ers", "+125", 80, 40)]),      # the money shares add to 130: not kept
+                                                                                 ("Alternate Spread", [("LA Clippers -9.5", "+250", 70, 30), ("PHI 76ers +9.5", "\u2212320", 30, 70)]),   # a market the log does not keep: it must not run into the next
+                                                                                 ("Total", [("Over 221", "\u2212110", 45, 61), ("Under 221", "\u2212110", 55, 39)])])
+              + spl_card("No game here", "Thu 11/19 \u00b7 9:00 PM ET", [("Total", [("Over 5.5", "\u2212110", 50, 50), ("Under 5.5", "\u2212110", 50, 50)])])
+              + ' </div> <a href="https://dknetwork.draftkings.com/draftkings-sportsbook-betting-splits/?tb_eg=42133&#038;itm_content=NHL&#038;tb_page=1">1</a> <a href="?tb_eg=42133&#038;tb_page=2">2</a> </body></html>')
+    spl_p2 = ('<html><body> <span>Updated 2:29 PM ET</span> '
+              + spl_card("MTL Canadiens @ CAR Hurricanes", "Thu 11/19 \u00b7 7:10 PM ET", [("Moneyline", [("CAR Hurricanes", "\u2212345", 85, 93), ("MTL Canadiens", "+275", 15, 7)]),
+                                                                                     ("Puck Line", [("CAR Hurricanes -1.5", "\u2212130", 97, 61), ("MTL Canadiens +1.5", "+110", 3, 39)]),
+                                                                                     ("Total", [("Over 6.5", "\u2212110", 90, 83), ("Under 6.5", "\u2212110", 10, 17)])], badge=False)
+              + " </body></html>")
+    spl_d1, spl_d2 = splits_parse(spl_p1), splits_parse(spl_p2)
+    check("splits: the page reads as a game a card, three markets of two sides each with odds, the money's share and the bets' share; the time it was updated; its pages",
+          spl_d1["updated"] == "2:29 PM ET" and spl_d1["pages"] == [1, 2] and [(g["away"], g["home"], g["when"], g["event"]) for g in spl_d1["games"]] == [
+              ("POR Trail Blazers", "MIL Bucks", "Thu 11/19 \u00b7 8:10 PM ET", "35038013"), ("PHI 76ers", "LA Clippers", "Thu 11/19 \u00b7 10:30 PM ET", "35038013")]
+          and spl_d1["games"][0]["markets"] == {"Moneyline": [{"sel": "MIL Bucks", "odds": 411.0, "handle": 13, "bets": 5}, {"sel": "POR Trail Blazers", "odds": -546.0, "handle": 87, "bets": 95}],
+                                                "Spread": [{"sel": "POR Trail Blazers -11.5", "odds": -108.0, "handle": 87, "bets": 66}, {"sel": "MIL Bucks +11.5", "odds": -112.0, "handle": 13, "bets": 34}],
+                                                "Total": [{"sel": "Over 230.5", "odds": -112.0, "handle": 1, "bets": 23}, {"sel": "Under 230.5", "odds": -108.0, "handle": 99, "bets": 77}]})
+    check("splits: shares that do not add to a hundred are not kept, a market the log has no place for does not run into the next one, and a card with no two clubs is no game",
+          list(spl_d1["games"][1]["markets"]) == ["Total"] and spl_d1["games"][1]["markets"]["Total"][0] == {"sel": "Over 221", "odds": -110.0, "handle": 45, "bets": 61} and len(spl_d1["games"]) == 2)
+    check("splits: hockey's card (no badge heading, a puck line) reads the same, the puck line as the spread",
+          len(spl_d2["games"]) == 1 and spl_d2["games"][0]["away"] == "MTL Canadiens" and spl_d2["games"][0]["event"] == "35040607"
+          and spl_d2["games"][0]["markets"]["Spread"] == [{"sel": "CAR Hurricanes -1.5", "odds": -130.0, "handle": 97, "bets": 61}, {"sel": "MTL Canadiens +1.5", "odds": 110.0, "handle": 3, "bets": 39}])
+    check("splits: a page that is not the page gives no games and no error", splits_parse("<html>Access denied</html>") == {"updated": "", "pages": [], "games": []} and splits_parse("") ["games"] == [])
+    check("splits: the card's day and hour are Eastern, the year today's, January after a December run the next year's",
+          splits_when("Thu 11/19 \u00b7 8:10 PM ET", "2026-11-19") == ("2026-11-19", "20:10") and splits_when("Fri 1/1 \u00b7 12:30 AM ET", "2026-12-31") == ("2027-01-01", "00:30")
+          and splits_when("Sat 12/31 \u00b7 12:05 PM ET", "2027-01-01") == ("2026-12-31", "12:05") and splits_when("Thu 11/19", "2026-11-19") == ("2026-11-19", None)
+          and splits_when("tonight", "2026-11-19") == (None, None) and splits_when("Thu 2/30 \u00b7 8:10 PM ET", "2026-02-27") == (None, None))
+    spl_g = splits_game(spl_d1["games"][0], "2026-11-19")
+    check("splits: a game as the log keeps it: the date, the nicknames the odds log uses, the tip, each side by its club whatever the order of the rows",
+          spl_g == ("2026-11-19", "Trail Blazers", "Bucks", "20:10", {"ml": {"h": [411.0, 13, 5], "a": [-546.0, 87, 95]}, "sp": {"a": [-11.5, -108.0, 87, 66], "h": [11.5, -112.0, 13, 34]},
+                                                                      "tot": {"o": [230.5, -112.0, 1, 23], "u": [230.5, -108.0, 99, 77]}})
+          and splits_game(spl_d1["games"][1], "2026-11-19") == ("2026-11-19", "76ers", "Clippers", "22:30", {"tot": {"o": [221.0, -110.0, 45, 61], "u": [221.0, -110.0, 55, 39]}})
+          and splits_game(spl_d2["games"][0], "2026-11-19")[1:3] == ("Canadiens", "Hurricanes") and splits_game(spl_d2["games"][0], "2026-11-19")[4]["sp"] == {"h": [-1.5, -130.0, 97, 61], "a": [1.5, 110.0, 3, 39]}
+          and splits_game({"away": "X Foo", "home": "Y Foo", "when": "Thu 11/19 \u00b7 8:10 PM ET", "markets": spl_d1["games"][0]["markets"]}, "2026-11-19") is None
+          and splits_game(dict(spl_d1["games"][0], when="soon"), "2026-11-19") is None
+          and "ml" not in splits_game(dict(spl_d1["games"][0], markets=dict(spl_d1["games"][0]["markets"], Moneyline=[{"sel": "MIL Bucks", "odds": 411.0, "handle": 13, "bets": 5}, {"sel": "BOS Celtics", "odds": -546.0, "handle": 87, "bets": 95}])), "2026-11-19")[4])
+    check("splits: Eastern wall time is the Eastern date's own clock, either side of both clock changes",
+          all(us_eastern(x).date().isoformat() == us_game_date(x) for x in ("2026-11-20T01:10:00Z", "2026-11-20T04:59:59Z", "2026-11-20T05:00:00Z", "2026-07-04T03:59:00Z", "2026-07-04T04:00:00Z", "2026-03-08T06:59:00Z", "2026-03-08T07:00:00Z", "2026-11-01T05:59:00Z", "2026-11-01T06:00:00Z"))
+          and us_eastern("2026-11-20T01:10:00Z") == dt.datetime(2026, 11, 19, 20, 10) and us_eastern("2026-07-04T03:59:00Z") == dt.datetime(2026, 7, 3, 23, 59))
+    spl_dir = tempfile.mkdtemp()
+    spl_path = splits_log_path(spl_dir)
+    spl_k1 = splits_log_update(spl_path, "NBA", spl_d1["games"], "2026-11-19T19:30:00Z", "2:29 PM ET", "2026-11-19")
+    with open(spl_path, encoding="utf-8") as f:
+        spl_doc = json.load(f)
+    spl_e = spl_doc["games"]["NBA|2026-11-19|Trail Blazers @ Bucks"]
+    check("splits: the log keys a game as the odds log does, keeps the tip, the event and a snapshot with its moment, the page's own time and that it was before the tip",
+          spl_doc["format"] == SPLITS_FORMAT and sorted(spl_doc["games"]) == ["NBA|2026-11-19|76ers @ Clippers", "NBA|2026-11-19|Trail Blazers @ Bucks"] and odds_log_key("NBA", "2026-11-19", "Trail Blazers", "Bucks") in spl_doc["games"]
+          and spl_e["tip"] == "2026-11-19 20:10" and spl_e["event"] == "35038013" and len(spl_e["snaps"]) == 1 and spl_e["snaps"][0]["at"] == "2026-11-19T19:30:00Z" and spl_e["snaps"][0]["updated"] == "2:29 PM ET" and spl_e["snaps"][0]["pre"] is True
+          and spl_e["snaps"][0]["sp"] == {"a": [-11.5, -108.0, 87, 66], "h": [11.5, -112.0, 13, 34]} and [x[2] for x in spl_k1] == [True, True] and not os.path.exists(spl_path + ".tmp"))
+    spl_k2 = splits_log_update(spl_path, "NBA", spl_d1["games"], "2026-11-19T21:00:00Z", "4:00 PM ET", "2026-11-19")
+    spl_moved = [dict(spl_d1["games"][0], markets=dict(spl_d1["games"][0]["markets"], Total=[{"sel": "Over 229.5", "odds": -110.0, "handle": 2, "bets": 24}, {"sel": "Under 229.5", "odds": -110.0, "handle": 98, "bets": 76}]))]
+    spl_k3 = splits_log_update(spl_path, "NBA", spl_moved, "2026-11-20T01:15:00Z", "8:14 PM ET", "2026-11-19")
+    with open(spl_path, encoding="utf-8") as f:
+        spl_doc = json.load(f)
+    spl_e = spl_doc["games"]["NBA|2026-11-19|Trail Blazers @ Bucks"]
+    check("splits: a run that reads the same shares adds nothing; a moved share or number adds a snapshot; one taken after the tip says so; the other game is left as it was",
+          [x[2] for x in spl_k2] == [False, False] and [x[2] for x in spl_k3] == [True] and len(spl_e["snaps"]) == 2 and spl_e["snaps"][1]["tot"] == {"o": [229.5, -110.0, 2, 24], "u": [229.5, -110.0, 98, 76]}
+          and spl_e["snaps"][1]["pre"] is False and spl_e["snaps"][0]["pre"] is True and len(spl_doc["games"]["NBA|2026-11-19|76ers @ Clippers"]["snaps"]) == 1)
+    with open(spl_path, "w", encoding="utf-8") as f:
+        f.write("{ not json")
+    splits_log_update(spl_path, "NBA", spl_d1["games"], "2026-11-20T15:00:00Z", "10:00 AM ET", "2026-11-19")
+    with open(spl_path, encoding="utf-8") as f:
+        spl_doc2 = json.load(f)
+    spl_aside = [n for n in os.listdir(spl_dir) if n.startswith("splits-log.unreadable-")]
+    with open(os.path.join(spl_dir, spl_aside[0]), encoding="utf-8") as f:
+        spl_bad = f.read()
+    check("splits: a log that does not read is set aside whole and a new one begun, never written over (the page shows today only)",
+          spl_aside == ["splits-log.unreadable-20261120150000.json"] and spl_bad == "{ not json" and len(spl_doc2["games"]) == 2)
+    spl_empty = splits_log_update(os.path.join(spl_dir, "none.json"), "NBA", [], "2026-11-20T15:00:00Z", "", "2026-11-19")
+    check("splits: nothing read, nothing written", spl_empty == [] and not os.path.exists(os.path.join(spl_dir, "none.json")))
+    check("splits: a game's line names the side with more of the money than of the bets where the two are twenty apart, by market, and nothing under that",
+          splits_line(spl_e, "Trail Blazers", "Bucks") == ["spread: Trail Blazers -11.5 has 87% of the money on 66% of the bets (+21)", "total: Under 229.5 has 98% of the money on 76% of the bets (+22)"]
+          and splits_line({"snaps": [{"ml": {"a": [-113.0, 98, 72], "h": [-104.0, 2, 28]}, "sp": {"a": [-1.5, -102.0, 57, 48], "h": [1.5, -119.0, 43, 52]}}]}, "Knicks", "Timberwolves") == ["moneyline: Knicks has 98% of the money on 72% of the bets (+26)"]
+          and splits_line({"snaps": [{"sp": {"a": [15.5, -110.0, 59, 40], "h": [-15.5, -110.0, 41, 60]}}]}, "Clippers", "Spurs") == [] and splits_line({"snaps": []}, "A", "B") == [] and SPLITS_GAP == 20
+          and splits_line({"snaps": [{"tot": {"o": [224.0, -110.0, 60, 40], "u": [224.0, -110.0, 40, 60]}}]}, "A", "B") == ["total: Over 224.0 has 60% of the money on 40% of the bets (+20)"])
+    spl_dir2, spl_log, spl_asked = tempfile.mkdtemp(), [], []
+
+    def spl_page(sport, n):
+        spl_asked.append((sport, n))
+        return {("NHL", 1): spl_p1.replace("POR Trail Blazers", "LA Kings").replace("MIL Bucks", "TOR Maple Leafs").replace("PHI 76ers", "NY Islanders").replace("LA Clippers", "WPG Jets"), ("NHL", 2): spl_p2}.get((sport, n), "<html></html>")
+    spl_out = make_splits("2026-11-19", spl_dir2, spl_log.append, ("NHL", "NBA", "WNBA"), page_of=spl_page)
+    with open(spl_out, encoding="utf-8") as f:
+        spl_doc3 = json.load(f)
+    check("splits: the run follows the page's second page, keeps every game under its sport, says what it kept and that it is logged and not scored; a sport with no games says so; one the page is not asked for is skipped",
+          spl_asked == [("NHL", 1), ("NHL", 2), ("NBA", 1)] and sorted(spl_doc3["games"]) == ["NHL|2026-11-19|Canadiens @ Hurricanes", "NHL|2026-11-19|Islanders @ Jets", "NHL|2026-11-19|Kings @ Maple Leafs"]
+          and spl_log[0] == "Betting splits, NHL: 3 games from DraftKings' own page (updated 2:29 PM ET; free, no credit). The share of the money against the share of the bets, 20 or more apart:"
+          and spl_log[1] == "  Kings @ Maple Leafs  \u00b7  spread: Kings -11.5 has 87% of the money on 66% of the bets (+21)  \u00b7  total: Under 230.5 has 99% of the money on 77% of the bets (+22)"
+          and spl_log[2] == "  Islanders @ Jets  \u00b7  nothing 20 apart" and spl_log[3] == "  Canadiens @ Hurricanes  \u00b7  spread: Hurricanes -1.5 has 97% of the money on 61% of the bets (+36)"
+          and spl_log[4] == "Betting splits, NBA: no game of 2026-11-19 on DraftKings' page (it listed none, or its layout has changed)."
+          and spl_log[5].startswith("Kept in ") and spl_log[5].endswith("to be measured against the close and the finals. Logged, not scored: nothing on the sheet moves on these.") and len(spl_log) == 6)
+    spl_log2 = []
+    make_splits("2026-11-19", spl_dir2, spl_log2.append, ("NHL",), page_of=spl_page)
+    make_splits("2026-11-20", spl_dir2, spl_log2.append, ("NHL",), page_of=spl_page)
+    check("splits: a second run with nothing moved says unchanged; a run for another day's date finds no game of that day",
+          spl_log2[1].endswith("(+22)  (unchanged since the last run)") and spl_log2[-1] == "Betting splits, NHL: no game of 2026-11-20 on DraftKings' page.")
+    check("splits: the self-test never reads the site, and the three leagues are DraftKings' own numbers",
+          SPLITS["on"] is False and make_splits("2026-11-19", spl_dir2, spl_log2.append, ("NBA",)) is None and SPLITS_LEAGUE == {"NBA": 42648, "NHL": 42133, "MLB": 84240} and "splits" in TODAY_MODES)
+
     print()
     if fails:
         print("%d check%s failed: %s" % (len(fails), "" if len(fails) == 1 else "s", ", ".join(fails)))
@@ -11092,7 +11444,7 @@ def _canned_rotowire_nba(date_line):
 # The slates run for today, the grades for yesterday. The props run was left
 # off this list on 19 Oct 2026 and the user's first run wrote an empty file
 # for the 18th; the list is a name now, and the self-test reads it.
-TODAY_MODES = ("slate", "nhl", "nhl-ledger", "nba", "nba-ledger", "nba-props", "odds")
+TODAY_MODES = ("slate", "nhl", "nhl-ledger", "nba", "nba-ledger", "nba-props", "odds", "splits")
 
 
 def default_date(mode, today):
@@ -11101,14 +11453,15 @@ def default_date(mode, today):
 
 def main(argv=None):
     ap = argparse.ArgumentParser(description="Write the day's slate (or yesterday's finals) for Call Sheet 2.0.")
-    ap.add_argument("mode", nargs="?", choices=["slate", "grade", "nhl", "nhl-grade", "nhl-ledger", "nhl-pbp", "nhl-shots", "nba", "nba-grade", "nba-ledger", "nba-pbp", "nba-props", "nba-gap-retest", "odds", "odds-history", "odds-periods"], default="slate",
+    ap.add_argument("mode", nargs="?", choices=["slate", "grade", "nhl", "nhl-grade", "nhl-ledger", "nhl-pbp", "nhl-shots", "nba", "nba-grade", "nba-ledger", "nba-pbp", "nba-props", "nba-gap-retest", "odds", "odds-history", "odds-periods", "splits"], default="slate",
                     help="slate (default): today's MLB inputs. grade: MLB finals. nhl: today's NHL inputs. nhl-grade: NHL finals. "
                          "nhl-ledger: every NHL final this season, measured against the sheet's assumptions. "
                          "nba: today's NBA inputs (ratings, pace, rest, who is out, the context lines). nba-grade: NBA finals with the half-time score. "
                          "nba-ledger: every NBA final of a season with quarters, pace and every player's minutes (--season 2024-25 for a past season). "
                          "nba-gap-retest: the team-total gap rule held against three numbers, from the ledger, the period lines and the lines history in the folder (no credit spent). "
                          "odds: today's lines, prices, openers, the sharp line, the alternates and every book's price from The Odds API (needs odds_key.txt). "
-                         "odds-history: a past season's lines at two moments a day, for the backtest's openers (paid plans; asks before it spends).")
+                         "odds-history: a past season's lines at two moments a day, for the backtest's openers (paid plans; asks before it spends). "
+                         "splits: the share of the bets and of the money on today's games from DraftKings' open page, into splits-log.json (free; the odds run does it too).")
     ap.add_argument("--books", help="odds only: the books to read, first one carded, pinnacle never carded, e.g. fanatics,betmgm,draftkings,pinnacle (default: %s)" % ",".join(ODDS_BOOKS))
     ap.add_argument("--sports", help="odds only: which sports, e.g. NHL,MLB (default: MLB,NHL; odds-history: NHL)")
     ap.add_argument("--sport", help="odds-periods: NBA (default) or NHL; hockey pulls the first-period total and the team totals at the close.")
@@ -11178,6 +11531,9 @@ def main(argv=None):
         elif a.mode == "odds":
             sports = tuple(s.strip().upper() for s in a.sports.split(",") if s.strip()) if a.sports else ("MLB", "NHL", "NBA")
             path = make_odds(date_iso, a.out, log, a.books, sports)
+        elif a.mode == "splits":
+            sports = tuple(s.strip().upper() for s in a.sports.split(",") if s.strip()) if a.sports else ("NBA", "NHL")
+            path = make_splits(date_iso, a.out, log, sports)
         elif a.mode == "odds-history":
             sports = tuple(s.strip().upper() for s in a.sports.split(",") if s.strip()) if a.sports else ("NHL",)
             path = make_odds_history(a.out, log, a.books, sports, a.season, a.start, a.end, a.times, a.markets, a.yes, a.keep)

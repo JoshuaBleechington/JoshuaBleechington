@@ -17,6 +17,8 @@ slate/nhl-slate-*.json
 slate/nhl-grade-*.json
 slate/odds-*.json
 slate/odds-log.json
+slate/splits-log.json
+slate/splits-log.unreadable-*.json
 
 # The Odds API key. This repository is public, so the key must never land in
 # it: the script reads it from this file beside itself, and nowhere else.

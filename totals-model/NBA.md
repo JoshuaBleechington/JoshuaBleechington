@@ -1549,3 +1549,273 @@ What it says:
   of the books went 78-70 at the day's first snapshot (about noon) and
   105-84 at the last one before the tip.
 
+## Three in-play ideas and where the money goes, 19 Nov 2026
+
+The user, with two screenshots and a video link: "I would [like] you to
+test and see and tell me what you need as well. I want to look into the
+screenshots I provide along with some context. The heavy underdog in the
+first quarter. Sharp betting from pros and where the money is going type
+stuff."
+
+The video is Professor MJ's "3 Smart NBA In-Game Betting Strategies
+(Crush the Live Odds!)", published 9 May 2025. YouTube gives its
+description and chapter list and keeps the transcript behind its bot
+check, so the exact rules were not read. The three: **the heavy underdog
+in the 1st quarter** (the first screenshot, four reasons: big favourites
+take their opponents lightly, know they can come back later, might want
+to challenge themselves, and their stars spread the ball around early),
+**the blowout**, and **the underdog running away with the game**. The
+second screenshot is another idea, **reverse line movement**: the Lakers
+with 85% of the bets and 35% of the money, the Trail Blazers with 15% and
+65%.
+
+What is held: the four quarters of every game of four seasons (the
+ledgers); the full-game spread, total and moneylines of three (2024-25
+the middle of the books at the first snapshot and the last one before the
+tip, 1,231 games; 2025-26 from 24 Nov and 2026-27 to 16 Nov DraftKings'
+opener and close by ESPN, 979 and 205). 2,415 games with a spread. **No
+first-quarter spread or moneyline, no in-play price and no count of bets
+or money is in any file**, so the scores answer the claims and the prices
+are named as what is needed.
+
+### 1. The heavy underdog in the first quarter
+
+The favourite's margin a quarter, regulation only (lab `q1_test.py`):
+
+| Spread | Games | Q1 | Q2 | Q3 | Q4 | Q1 as a share of the spread |
+| --- | --- | --- | --- | --- | --- | --- |
+| 0.5 to 3 | 494 | +0.33 | -0.05 | +0.75 | +0.13 | 16% |
+| 3.5 to 6 | 657 | +0.48 | +1.27 | +1.10 | +0.87 | 10% |
+| 6.5 to 9.5 | 652 | +1.57 | +2.42 | +2.46 | +0.95 | 20% |
+| 10 to 12.5 | 316 | +5.16 | +2.24 | +2.45 | +2.31 | 46% |
+| 13 to 15.5 | 187 | +4.64 | +4.85 | +4.16 | +2.58 | 33% |
+| 16 and up | 95 | +6.08 | +4.07 | +5.43 | +3.75 | 34% |
+| **10 and up** | **601** | **+5.18** | **+3.32** | **+3.49** | **+2.62** | **39%** |
+
+A heavy favourite's first quarter is its best quarter, not its slowest:
++5.18 (se 0.34), 39% of the spread (33 to 43% on 4,000 resamples of the
+games), against 18 to 20% in the fourth, when its bench is on. It lost or
+tied the first quarter 170 times in 601 (28%) and won it by ten or more
+185 times (31%).
+
+The heavy dog (10 and up) in the first quarter:
+
+- straight up: won 140, tied 30, lost 431: 24.5% of those decided, which
+  needs +308 to break even. By season 27.0%, 22.7% and 18.4% (40 games).
+  At home 26.6%, away 23.5%. October to December 25.4%, January and
+  February 26.4%, March and April 22.3%.
+- against a first-quarter line taken as a share of the full-game spread
+  (to the half point; a stand-in, since no such line is held): a quarter
+  of the spread 244-344-13 (41.5%), 30% 261-328-12 (44.3%), a third
+  271-309-21 (46.7%), 37.5% 293-295-13 (49.8%), 40% 300-282-19 (51.5%).
+  No share a book would post reaches the 52.4% a bet at -110 needs.
+- a fourth season the test never saw (2023-24 has quarters and no lines;
+  a stand-in spread from each club's margin a game to date, 0.87 with the
+  real spread where both exist, lab `q1_fourth.py`): the favourite of ten
+  and up won the first quarter by +5.01 (38% of the spread) and the dog
+  won it 47-136-7 (25.7%).
+
+So the first screenshot's bet is a losing one on every reading the scores
+allow. The four reasons describe something that does not happen to heavy
+favourites as a group.
+
+### 2. The middle favourites do start slowly
+
+Not what the video claims, and found in passing, so held to a higher bar.
+On spreads of 3.5 to 9.5 (1,315 games) the favourite makes +1.03 in the
+first quarter, 17% of its spread, against +1.82 and +1.76 in the second
+and third. The dog given 30% of the spread (lab `q1_more.py`):
+
+| | Q1 | Q2 | Q3 | Q4 |
+| --- | --- | --- | --- | --- |
+| Three seasons | 727-561-27 (56.4%) | 49.9% | 50.6% | 54.8% |
+| 2024-25 | 379-287-15 (56.9%) | 51.9% | 48.6% | 58.3% |
+| 2025-26 | 277-228-11 (54.9%) | 49.3% | 54.7% | 49.0% |
+| 2026-27 | 71-46-1 (60.7%) | 40.9% | 44.1% | 59.5% |
+
+The second and third quarters are the placebo and they are a coin. The
+first quarter holds in each season; the fourth is the bench. On 2023-24
+by the stand-in spread the first-quarter dog went 235-211-13 (52.7%),
+where the same stand-in gives 54.5% on the two seasons whose real spread
+gives 56.0%: the same direction, smaller.
+
+It is not a call. The 30% is a stand-in: if the books post less than that
+on a middle favourite the edge is already theirs, and a first-quarter
+line usually carries more juice than a full-game one. It is on record as
+the one thing here that real first-quarter lines could turn into a call.
+
+### 3. After the first quarter, the game swings back
+
+The rest of regulation on the spread and on the margin so far (lab
+`inplay_table.py`):
+
+| After | The rest of regulation | By season |
+| --- | --- | --- |
+| one quarter | -0.71 + 0.874 x spread - 0.280 x margin (se 0.031) | -0.322, -0.228, -0.269 |
+| the half | -0.37 + 0.596 x spread - 0.191 x margin (se 0.020) | -0.230, -0.158, -0.129 |
+| three quarters | -0.36 + 0.322 x spread - 0.132 x margin (se 0.012) | -0.135, -0.129, -0.130 |
+
+A club gives back about a quarter of whatever it led by after one
+quarter, beyond what the spread says of the rest, a fifth of a half-time
+lead and an eighth of a lead after three. 2023-24 by the stand-in: -0.231
+(se 0.046) after one quarter. As a rule of thumb the final is 0.72 x the
+first quarter's margin + 0.87 x the spread - 0.7; at the half 0.81 x the
+margin + 0.60 x the spread - 0.4.
+
+The heavy favourite (10 and up) by its first quarter: behind by six or
+more (57 games, behind by 10.0 on average) it then made +14.9 over the
+last three quarters where its spread's usual share is +9.3 (se 1.6), and
+won 40 (70%); ahead by ten or more (185 games) it made +7.6 where the
+share is +9.6, and won 96%.
+
+What the scoreboard has meant: the favourite's share of wins and its
+average final margin, by its spread before the game:
+
+After the first quarter:
+
+| The favourite stood | Spread 1 to 4.5 | Spread 5 to 9.5 | Spread 10 and up |
+| --- | --- | --- | --- |
+| behind by 10 or more | 34% (116), -7.5 | 52% (82), -0.9 | 62% (26), +2.8 |
+| behind by 5 to 9 | 40% (129), -3.6 | 61% (135), +1.7 | 72% (46), +6.3 |
+| behind by 1 to 4 | 51% (166), -0.2 | 60% (169), +2.7 | 81% (68), +8.6 |
+| level to 4 ahead | 57% (205), +2.3 | 72% (217), +6.9 | 84% (145), +11.3 |
+| ahead by 5 to 9 | 69% (166), +6.7 | 80% (148), +10.6 | 91% (131), +16.2 |
+| ahead by 10 or more | 81% (122), +13.0 | 88% (152), +15.7 | 96% (185), +22.3 |
+
+At the half:
+
+| The favourite stood | Spread 1 to 4.5 | Spread 5 to 9.5 | Spread 10 and up |
+| --- | --- | --- | --- |
+| behind by 15 or more | 9% (76), -14.9 | 28% (36), -11.6 | too few (10) |
+| behind by 10 to 14 | 25% (95), -6.7 | 35% (65), -4.8 | 30% (23), -5.0 |
+| behind by 5 to 9 | 35% (133), -4.5 | 52% (112), +0.1 | 68% (37), +3.9 |
+| behind by 1 to 4 | 48% (108), -0.3 | 58% (112), +1.4 | 68% (57), +6.7 |
+| level to 4 ahead | 60% (150), +1.4 | 71% (157), +4.8 | 87% (91), +10.5 |
+| ahead by 5 to 9 | 72% (137), +6.4 | 79% (161), +8.3 | 91% (100), +13.0 |
+| ahead by 10 to 14 | 85% (109), +10.7 | 89% (120), +14.1 | 96% (109), +16.8 |
+| ahead by 15 or more | 96% (96), +20.3 | 96% (140), +20.3 | 98% (174), +25.1 |
+
+This is the part of the video's reasoning the scores bear out: a
+favourite that falls behind early does come back more than the score
+says. Whether a live line pays for it is not known here. A book's live
+model is fitted on the same history, so the working assumption is that it
+is priced until a held live price says otherwise.
+
+### 4. The blowout
+
+Once a club leads by twenty or more after three quarters (479 games), it
+loses the fourth by 1.29 on average (se 0.38) where the spread alone says
+it wins it by 1.24, and the trailing club wins the quarter 259-200-20
+(56.4%); by fifteen or more 432-334-36 (56.4%), by twenty-five or more
+138-115-13 (54.5%). A lead of twenty at the half is different: the leader
+wins the second half by +0.56 (se 0.77) where the spread says +3.09, and
+the trailing club wins the half 124-122-5. Where it is the dog that leads
+by twenty after three (77 games) the favourite wins the fourth 50-24-3,
+by 3.4 on average. Garbage time is real in the fourth quarter; the live
+or fourth-quarter price for it is not held.
+
+### 5. The underdog running away with the game
+
+A dog of five points or more that leads by ten or more:
+
+| When | Games | The dog ahead by | The favourite then | Where the spread alone says | The favourite came back to win |
+| --- | --- | --- | --- | --- | --- |
+| after one quarter | 108 | 13.1 | +12.80 (se 1.19) | +6.01 | 59 (55%) |
+| at the half | 134 | 14.3 | +7.47 (se 0.94) | +3.73 | 46 (34%) |
+| after three | 132 | 15.9 | +4.76 (se 0.74) | +1.41 | 21 (16%) |
+
+The favourite gets back about twice what its spread alone says of the
+rest of the game, and a lead of thirteen after one quarter is still a
+coin. The same caution: no in-play price is held.
+
+### 6. The line's own move: following the money at the close
+
+The larger money leaves a footprint with no count of bets needed: the
+line's move from the opener to the close. 2,366 games with both (lab
+`rlm_proxy.py`):
+
+| | At the close | By season | The same side at the opener's number (hindsight) |
+| --- | --- | --- | --- |
+| The spread moved a point or more (62% of games): the side it moved to | 752-698-6 (51.9%) | 50.4%, 53.9%, 47.5% | 58.2% |
+| ... two points or more | 327-305-2 (51.7%) | 48.6%, 56.3%, 38.9% | 61.3% |
+| ... toward the dog, against the side the public likes | 334-318-5 (51.2%) | 47.3%, 55.9%, 44.2% | 57.3% |
+| ... toward the favourite | 418-380-1 (52.4%) | 52.7%, 52.3%, 51.4% | 59.0% |
+| The total moved a point or more (79%): the side it moved to | 933-930-2 (50.1%) | 49.2%, 50.9%, 50.3% | 56.7% |
+| ... three points or more | 416-396 (51.2%) | 50.7%, 50.7%, 56.4% | 62.0% |
+| ... down, against the over the public likes | 457-464-2 (49.6%) | 46.0%, 53.8%, 49.5% | 55.9% |
+| ... up | 476-466 (50.5%) | 52.7%, 48.6%, 51.4% | 57.5% |
+
+Backing the side the money moved to, at the number it left behind, is a
+coin, and no better where the move went against the favourite or the
+over. All of the value is in the number before the move (57 to 62%), and
+that column is hindsight: it needs the move known before it is made.
+That is the only thing a count of bets and money could add: a sign, seen
+early, of which way a line will go. So the test of the second screenshot
+is not "does the money's side win" at the close; it is "does a gap
+between the money and the bets, read at the run, come before a move".
+
+### 7. The bets against the money: logged from DraftKings' own page
+
+DraftKings prints the share of the bets and the share of the money on
+every game's moneyline, spread and total on an open page of its own
+(dknetwork.draftkings.com/draftkings-sportsbook-betting-splits; no key,
+no credit; its robots file allows the read; it answers the script's own
+plain user agent). It shows today and the days ahead, never the past, so
+nothing can be tested until it is kept. From this day `slate.py` keeps
+it:
+
+- `splits_parse` reads the page (a card a game, a label a market, a row
+  a side: selection, odds, the money's share, the bets' share). A market
+  is kept only where it reads as two sides whose shares each add to about
+  a hundred, so a change of markup gives fewer games and never a wrong
+  number. Hockey's card has no badge heading and a puck line in the
+  spread's place; both read.
+- `splits_game` turns a card into the odds log's own key
+  (`NBA|2026-11-19|Trail Blazers @ Bucks`), each side told by its club.
+- `splits_log_update` appends a snapshot a game to `splits-log.json`
+  (`ml {a, h: [odds, money, bets]}`, `sp {a, h: [number, odds, money,
+  bets]}`, `tot {o, u: [number, odds, money, bets]}`, `at`, the page's
+  own `updated`, `pre` for taken before the tip), nothing where the
+  shares are those of the last snapshot. The write is whole or not at
+  all, and a log that does not read is set aside, never written over.
+- `make_splits` is the run: `python slate.py splits` alone, and at the
+  end of every odds run for the sports that had a game, inside a guard so
+  that the page being down, changed or empty costs one printed line and
+  nothing else. It prints each game with the side of a market that has
+  twenty points more of the money than of the bets.
+
+Checked: 15 selftest checks on a page in the real shape (317 in all);
+22 copies broken on purpose, each failing the selftest, with an untouched
+control; the odds run with the read failing, finding nothing and finding
+no game (lab `odds_hook_test.py`); the real page read through the real
+command, 4 NBA games and 12 NHL games across its two pages.
+
+What it showed at 2:35 pm Eastern on the day: the Trail Blazers -11.5
+with 87% of the money on 66% of the bets and the under 230.5 with 99% on
+77%; the under 224.5 in Warriors at Grizzlies 94% on 65%; the under 216.5
+in Knicks at Timberwolves 87% on 59% and the Knicks' moneyline 98% on
+72%. In hockey the puck lines ran 50 to 70 points apart on most games,
+which is a reading of how few bets a plus-price puck line takes by mid
+afternoon and how far one large bet moves a share, more than of who is
+sharp. Cautions that go with any reading: it is one book's customers;
+a share is of money and bets so far, thin early; DraftKings limits the
+bettors a "sharp" label is meant for.
+
+Logged and printed, never scored. The measure, once about 150 games are
+kept (three weeks): a gap of 10, 20 and 30 points between the money and
+the bets at the last snapshot before the tip and at the morning one,
+against (a) the line's move from that snapshot to the close in the odds
+log, (b) the result at that snapshot's number and (c) the result at the
+close.
+
+### 8. What is needed
+
+- **First-quarter lines** for section 2. The Odds API has them
+  (`spreads_q1`, `h2h_q1`): two credits a game a run on the nightly odds
+  pull, or about 12,300 credits a market for a past season from the
+  history endpoint. Neither is wired and neither is spent without the
+  user's word.
+- **In-play prices** for sections 3 to 5. None are held and none are
+  cheap. The user's own note of the live line at the moment (the score,
+  the quarter, the price offered) is the practical source.
+- **The splits**, which the run now keeps for nothing.

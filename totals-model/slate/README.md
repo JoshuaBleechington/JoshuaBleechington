@@ -403,6 +403,21 @@ The sheet's own number never moves: the line boxes are the book's main
 market, exactly as before, just typed by the script. Shop alternates on the
 sheet, not in the Line box.
 
+**The betting splits** (19 Nov 2026). DraftKings prints the share of the
+bets and the share of the money on every game's moneyline, spread and
+total on an open page of its own (no key, no credit). The page shows
+today only, so every odds run now keeps what it showed for the sports
+that had a game, in `splits-log.json` beside `odds-log.json` and keyed
+the same way, and prints each game with the side of a market that has
+twenty points more of the money than of the bets. `python slate.py
+splits` does the same alone (`--sports NBA,NHL`), as often as wanted. A
+snapshot is added only when a share or a number has moved, and says
+whether it was taken before the tip. If the page is down, empty or
+changed the odds run prints one line and is otherwise untouched; a log
+that does not read is set aside, never written over. Logged to be
+measured against the close and the finals (NBA.md, "Three in-play ideas
+and where the money goes"); nothing on the sheet reads it.
+
 **The history mode**, for the backtest. `python slate.py odds-history
 --season 20252026`, or **Run odds history.bat**, pulls a past season's
 hockey totals at two moments a day (noon and 7:30 pm Eastern) from every

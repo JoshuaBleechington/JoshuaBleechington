@@ -1785,8 +1785,11 @@
      53% either way) and the game's TOTAL ran over 207-157 (56.9%, t 3.3; 95-70, 98-75, 14-12 by season), but 110-70 from
      February and 97-87 before it: on record, to build before the trade deadline. A scorer's FIRST games out could not be tested
      fairly: the 2024-25 lines are from two and a half hours before the tip, before the late scratches */
+  /* 19 Nov 2026, after the best number went 1-6 on the card's first night and the user wrote "the Bucks vs the Heat went over by 30 points" (the under
+     237.5 at one app against a middle of 236.5; the game ended 267): the better number is worth the games that land inside it, 10 of 280 over two
+     seasons (lab board_side.py), about two wins in a hundred, so the card calls it a small edge and a small bet and not a measured read */
   var NBA_DEC_STRENGTH = { rule: "measured on two seasons of closes", sheet: "the sheet's own edge at the price", rest: "measured on three seasons of lines: the strongest read on the board",
-    number: "measured on last season's closes", read: "no measured edge at the price: a small bet", winner: "the book's favourite at the book's price: a small bet or a parlay leg" };
+    number: "a point better than the market's number: a small edge, so a small bet", read: "no measured edge at the price: a small bet", winner: "the book's favourite at the book's price: a small bet or a parlay leg" };
   function nbaJson(v) { var d = null; try { d = v ? (typeof v === "string" ? JSON.parse(v) : v) : null; } catch (e) { d = null; } return d && typeof d === "object" ? d : null; }
   function nbaDecNum(v) { return v !== null && v !== undefined && v !== "" && isFinite(+v); }
   function nbaDecType(c) {
@@ -1935,7 +1938,7 @@
       ". A favourite of 70% or more on the second night against a rested club went over the total 66-33 on three seasons of lines (32-16, 28-15 and 6-2), at home and on the road, where the same favourites rested went 360-367: the tired club still wins as priced, and the other scores more than the lines allow. So the over, at " + (c.app ? "the lowest total your four apps post" : "the carded total") + ".";
     if (c.kind === "number") {
       var s = (c.app ? esc(bookName(c.app)) + " posts " : "The app posts ") + c.line + " where the middle of " + c.books + " books is " + c.mid + ": " + (Math.abs(c.gap - 1) < 1e-9 ? "a point" : c.gap + " points") + " " + (c.side === "OVER" ? "under" : "over") +
-        " it, on the " + c.side.toLowerCase() + "'s side. A total a point or more off the middle at one of your four apps won 105-84 (55.6%) on last season's closes.";
+        " it, on the " + c.side.toLowerCase() + "'s side. A total a point or more off the middle at one of your four apps won 105-84 (55.6%) on last season's closes. The point itself decides few games: the final landed within a point of the app's number on 10 of 280 such calls over two seasons, so this is a small edge and no read of the game.";
       if (m && m.total && isFinite(+m.total.projected)) {
         var sp = nbaSplit(+c.line, +m.total.projected), mine = c.side === "OVER" ? sp[0] : sp[2], live = 1 - sp[1];
         mine = live > 0 ? mine / live : 0.5;

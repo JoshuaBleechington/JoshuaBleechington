@@ -5371,7 +5371,7 @@ What was built:
 - The page: the importer keeps `carry` as `{d36, mnew, mback}` (it is
   not trimmed); `propCarryMove` reads the share of his rate the lever
   moved (what it added per 36 over the rate without it); a tile, "What
-  the men out carried, 2% or more on the read (scored from 19 Nov
+  the men out carried, 2% or more on the read (scored from 18 Nov
   2026)", counts the BET and LEAN picks so moved: lifted and cut, the
   pick on the lever's side (an over on a lift, an under on a cut) and
   against it.
@@ -5683,3 +5683,94 @@ record tables, which gained the READ line. One of them, the short dog
 gone cold, is where the returning pick was found: its expectation (the
 next short dog is given the likelier winner) stayed as written and the
 page was changed to meet it.
+
+### 6. The first night, 18 Nov
+
+Graded from the backup of 19 Nov (twelve games; the props run under the
+new slate.py, 1,042 of 1,070 rows at levers 4, 81 points rows with the
+split).
+
+The decision on every game:
+
+| | As listed that morning | As the board gave it at the last odds run |
+| --- | --- | --- |
+| The best number on the board | 1-5 | 1-6 |
+| The sheet's own read | 1-1 | 3-0 |
+| The likelier winner | 3-1 | 0-2 |
+| The night | 5-7 | 4-8 |
+
+The record after it: rest 6-2, the best number 48-42-1 (+0.5u), the read
+14-13 (-0.1u), the likelier winner 150-72, the call as given 137-84-1
+(+3.2u). The agreement rule 6-10 and the sheet's own call 16-27 stay
+cold; the sheet's own call won two of three on the night, both short
+dogs (Bulls and Nuggets).
+
+The three games the user had named: Bulls at Nets, the read's over 240
+won (244). 76ers at Magic, the read's Magic lost 116-121. Jazz at
+Lakers went 206: the sheet's read at the card's number, the under 228.5,
+won by 22, and the morning's decision, the over 227.5 at FanDuel that
+the order put ahead of it, lost; by the last odds run the apps had
+closed up, the best number was gone and the board's decision was the
+read's under. One game is not a reason to change the order, and it is
+the case the user raised, so it is written down.
+
+The props: the BET band 3-1 (Embiid's threes, Fears' assists and his
+rebounds and assists; Turner's assists lost), the leans 34-17 (+9.2u),
+unders 34-15. The tile of the picks the new lever moved 2% or more
+opened 0-4 with three void (Okoro and Buzelis under 2.5 assists, cut
+2.7% each and four apiece; Wells over 14.5 points, rebounds and assists,
+lifted 3.3%; Embiid under 23.5 points, lifted 2.0%): four picks, nothing
+to read yet. The picks it moved less than that went 28-13 and the ones it
+did not touch 9-1. Its label said "scored from 19 Nov"; the user ran the
+new slate.py before the games of the 18th, so the count starts there and
+the label now says 18 Nov.
+
+The user took five same-game pairs: 2-3, -0.65u.
+
+### 7. What a point of number is worth, 19 Nov
+
+The user, the morning after: "the Bucks vs the Heat went over by 30
+points". The page's decision on that game was the best number on the
+board, the under 237.5 at one app against a middle of 236.5; the sheet
+projected 236.7, the simulation leaned under, the crowd on Kalshi had
+236.3, and DraftKings opened 236.5 and closed 235.5. It ended 137-130
+in regulation: 74-48 at the half, 145 points after it (the Bucks, the
+league's second-lowest scorers at 106 a game, scored 82 of them 26
+down), 83 free throws on 60 fouls, 22 threes by the Heat.
+
+How often: on 979 games of 2025-26 the final was 30 or more over
+DraftKings' close on 52 (5.3%) and 30 or more under on 52; the miss has
+a standard deviation of 18.5 points. A twelve-game night expects one
+such game.
+
+What it showed about the kind (lab `board_side.py`; the call replayed on
+the 2024-25 lines at the last snapshot and on this season's rows at the
+newest odds run):
+
+| | 2024-25 | 2026-27 to 18 Nov |
+| --- | --- | --- |
+| The call | 105-84 | 48-42-1 |
+| ... the over | 49-32 | 24-22-1 |
+| ... the under | 56-52 | 24-20 |
+| ... the favourite 80% or more | 19-24 | 7-6 |
+| ... the favourite 65 to 80% | 46-26 | 25-15 |
+| ... the favourite under 65% | 40-34 | 16-21-1 |
+| ... the middle 232 or higher | 37-34 | 13-13-1 |
+| The final within a point of the app's number | 8 of 189 | 2 of 91 |
+
+The better number decides only the games that land inside it, 10 of 280
+(3.6%): about two wins in a hundred over a coin, which at -110 to -115 is
+close to the book's cut. Last season's 55.6% is one standard error above
+that and this season's 53.3% sits on it. No split holds across the two
+seasons but the favourite of 65 to 80% (71-41 together), found after the
+fact among three: on record, not a rule.
+
+So the kind stays where it is in the order (a point of number is still
+worth more than nothing) and the card stops calling it a measured read.
+Its strength line was "measured on last season's closes" with no word on
+size, where the read and the likelier winner said "a small bet"; it now
+reads "a point better than the market's number: a small edge, so a small
+bet", and the why says that the final landed inside the point on 10 of
+280 such calls. The one game read on the board that has earned more than
+that is the over behind a tired favourite.
+

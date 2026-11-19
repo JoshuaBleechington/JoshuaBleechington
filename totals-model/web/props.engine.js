@@ -1671,7 +1671,7 @@
       " · unders " + rec(byLvSide.UNDER) + (byLvSide.UNDER.n ? " " + sgn(byLvSide.UNDER.units, 1) + "u" : "") + " · overs " + rec(byLvSide.OVER) + (byLvSide.OVER.n ? " " + sgn(byLvSide.OVER.units, 1) + "u" : "") +
       " · the sixteen nights before it, replayed with the ledgers in place: every pick with an edge 518-445 as the levers stand against 464-384 as they stood, the BET band 38-33 against 32-13 (71 and 45 picks: too few to tell apart, so this tile keeps the count)"]);
     var cu = function (x) { return rec(x) + (x.n ? " " + sgn(x.units, 1) + "u" : ""); };
-    if (byCarryAll.n || byCarryAll.p) h2 += tile("What the men out carried, 2% or more on the read (scored from 19 Nov 2026)", byCarryAll, ["the BET and LEAN picks whose projection the lever moved 2% or more: lifted " + cu(byCarry.up) + " · cut " + cu(byCarry.down) +
+    if (byCarryAll.n || byCarryAll.p) h2 += tile("What the men out carried, 2% or more on the read (scored from 18 Nov 2026)", byCarryAll, ["the BET and LEAN picks whose projection the lever moved 2% or more: lifted " + cu(byCarry.up) + " · cut " + cu(byCarry.down) +
       " · the pick on the lever's side " + cu(byCarry["with"]) + " · against it " + cu(byCarry.against) +
       " · measured on 36,502 man-games of two seasons (assists t 10, points t 8 and 11, rebounds t 5); replayed on 21 graded nights the 54 picks it dropped went 23-31 and the 83 it added 43-40"]);
     /* the pick priced -110 to -101 (15 Nov 2026): what the overs left off the lists did, and the unders, which stay on them */

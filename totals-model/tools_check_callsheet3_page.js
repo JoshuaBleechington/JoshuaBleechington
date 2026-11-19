@@ -3889,6 +3889,103 @@ const CHECKS = ["dome","playoff"];
       'the over behind a tired favourite, gone cold: ten such games on the days before stay under and the kind, 2-11, is cold: the next such game is given the likelier winner with the rest call named and its record, one where the best number says the over too is given the best number and Take on its card marks the best number (not the rest call, though both say the over at the same app), the record marks the kind cold, and the earlier day reads by what the board would give now (the best number on the two games that have one, the likelier winner on the third)',
       JSON.stringify({ cold: rs.cold, coldTake: rs.coldTake, coldTaking: rs.coldTaking, tableCold: rs.tableCold, dayCold: rs.dayCold }));
 
+  // ---- 19 Nov 2026: the bets against the money on the game's card (the user, with a screenshot of "sharp money vs public money", a club with 15% of the bets
+  //      and 65% of the money: "Sharp betting from pros and where the money is going type stuff", and then "Is there an example I may be able to see ... regarding
+  //      the model"). DraftKings prints the share of the bets and of the money on a game's spread, total and moneyline; the odds run puts the newest count on the
+  //      basketball row (nbasplits). The decision's why says where the money sits and how the decision's own side stands in it; tonight's signals carry the widest
+  //      gap in gold. Shown, never scored ----
+  const mnKeep = await pg.evaluate(async () => { await smStore.ready; const k = {}; for (const x of ['callsheet3.card.v1', 'callsheet3.props.v1', 'callsheet3.draft.v1']) k[x] = await smStore.getItem(x); await smStore.removeItem('callsheet3.card.v1'); await smStore.removeItem('callsheet3.props.v1'); return k; });
+  await reloaded();
+  const mn = await pg.evaluate(async () => {
+    const wait = (ms) => new Promise(r => setTimeout(r, ms || 90)), txt = e => (e ? e.textContent : '').replace(/\s+/g, ' ').trim();
+    const set = (id, v) => { const el = document.getElementById(id); el.value = v; el.dispatchEvent(new Event('input', { bubbles: true })); };
+    await smStore.ready;
+    const card = () => { const c = document.querySelector('#markets .pickcard'); if (!c) return null;
+      const secs = {}; [...c.querySelectorAll('ul.dwhy li')].forEach(li => { const h = txt(li.querySelector('b')); secs[h.replace(/\.$/, '')] = txt(li).slice(h.length).trim(); });
+      return { kind: c.dataset.kind || '', key: c.dataset.key || '', side: c.dataset.side || '', pick: c.querySelector('.pick') ? c.querySelector('.pick').childNodes[0].textContent.trim() : '', order: Object.keys(secs), money: secs['Where the money is'],
+        bold: [...c.querySelectorAll('ul.dwhy li')].filter(li => /^Where the money is/.test(txt(li))).map(li => [...li.querySelectorAll('b')].map(txt).join(' | '))[0] || '',
+        sigs: [...document.querySelectorAll('#signals .sig')].map(s => txt(s.querySelector('.sb')) + ' :: ' + txt(s.querySelector('.st'))), gold: [...document.querySelectorAll('#signals .sig')].filter(s => /^the money/.test(txt(s.querySelector('.sb')))).map(s => s.className).join(' ') }; };
+    const game = async (away, home, f, add) => { document.getElementById('clear').click(); document.getElementById('m-nba').click(); await wait(); set('gdate', '2026-11-19'); set('away', away); set('home', home); set('line', '229.5'); set('op', '-110'); set('up', '-110');
+      Object.keys(f).forEach(k => set(k, f[k])); await wait(140); const c = card(); if (add) { document.getElementById('add').click(); await wait(); } return c; };
+    const rows = () => JSON.parse(smStore.getItem('callsheet3.card.v1') || '[]'), rowOf = (away) => rows().find(x => x.gdate === '2026-11-19' && x.away === away);
+    const load = async (doc, name) => { const dt = new DataTransfer(); dt.items.add(new File([JSON.stringify(doc)], name, { type: 'application/json' })); const inp = document.getElementById('slateFile'); inp.files = dt.files; inp.dispatchEvent(new Event('change', { bubbles: true })); await wait(); await wait(); };
+    const J = (x) => JSON.stringify(x), W = { hml: '-190', aml: '160' }, o = {};
+    const money = (c) => c && c.sigs.filter(s => /^the money ::/.test(s));
+    // A. the likelier winner is the decision; the count has the three markets and the larger bets are on the other side
+    o.a = await game('Knicks', 'Timberwolves', Object.assign({ nbasplits: J({ at: '2026-11-19T20:08:44Z', upd: '3:08 PM ET', n: 2, ml: { a: [160, 60, 30], h: [-190, 40, 70] }, sp: { a: [4.5, -110, 45, 40], h: [-4.5, -110, 55, 60] }, tot: { o: [229.5, -110, 30, 55], u: [229.5, -110, 70, 45] } }) }, W));
+    // B. the moneyline alone, the larger bets with the decision, no time on the count
+    o.b = await game('Knicks', 'Timberwolves', Object.assign({ nbasplits: J({ ml: { a: [160, 5, 30], h: [-190, 95, 70] } }) }, W));
+    // C. no gap of twenty either way, and a count taken after the tip
+    o.c = await game('Knicks', 'Timberwolves', Object.assign({ nbasplits: J({ upd: '8:14 PM ET', pre: false, ml: { a: [160, 25, 30], h: [-190, 75, 70] } }) }, W));
+    // D. the over behind a tired favourite is the decision (a total): three sides named, the widest first, the chip counts the rest
+    o.d = await game('Knicks', 'Bulls', { narest: '0', nhrest: '3', hml: '240', aml: '-300', nbasplits: J({ upd: '3:08 PM ET', ml: { a: [-300, 99, 70], h: [240, 1, 30] }, sp: { a: [-7.5, -110, 80, 50], h: [7.5, -110, 20, 50] }, tot: { o: [229.5, -110, 30, 55], u: [229.5, -110, 70, 45] } }) });
+    // E. the edges: twenty apart is named and nineteen is not; ten apart leads its market and under ten the side with most of the money does
+    o.e = await game('Knicks', 'Timberwolves', Object.assign({ nbasplits: J({ upd: '3:08 PM ET', ml: { a: [160, 49, 30], h: [-190, 51, 70] }, sp: { a: [4.5, -110, 40, 30], h: [-4.5, -110, 60, 70] }, tot: { o: [229.5, -110, 60, 40], u: [229.5, -110, 40, 60] } }) }, W));
+    o.e9 = await game('Knicks', 'Timberwolves', Object.assign({ nbasplits: J({ sp: { a: [4.5, -110, 39, 30], h: [-4.5, -110, 61, 70] } }) }, W));
+    o.e20 = await game('Knicks', 'Timberwolves', Object.assign({ nbasplits: J({ ml: { a: [160, 50, 30], h: [-190, 50, 70] } }) }, W));      // the decision's side exactly twenty under
+    o.e20b = await game('Knicks', 'Timberwolves', Object.assign({ nbasplits: J({ ml: { a: [160, 10, 30], h: [-190, 90, 70] } }) }, W));    // and exactly twenty over
+    // F. nothing on the row, and a box that does not read: no line, no chip
+    o.none = await game('Knicks', 'Timberwolves', W);
+    o.bad = [];
+    for (const raw of ['not json', J({ at: 'x' }), J({ ml: { a: [160, 60], h: [-190, 40, 70] } }), J({ ml: { a: [160, 140, 30], h: [-190, 40, 70] } }), J({ tot: { o: ['', -110, 30, 55], u: [229.5, -110, 70, 45] } }), J([1, 2]), J({ sp: { a: [4.5, -110, 45, 40] } }), J({ ml: { a: [160, 60, 30, 99], h: [-190, 40, 70, 1] } })]) {
+      const c = await game('Knicks', 'Timberwolves', Object.assign({ nbasplits: raw }, W)); o.bad.push(!!c && c.money === undefined && money(c).length === 0 && c.pick === 'Timberwolves to win'); }
+    // one market that does not read leaves the others standing
+    o.part = await game('Knicks', 'Timberwolves', Object.assign({ nbasplits: J({ ml: { a: [160, 60], h: [-190, 40, 70] }, tot: { o: [229.5, -110, 30, 55], u: [229.5, -110, 70, 45] } }) }, W));
+    // G. the row keeps the box; an odds file fills it on a carded game and a later one replaces it, the typed line staying
+    await game('Kings', 'Spurs', Object.assign({}, W), true);
+    const A = J({ upd: '11:02 AM ET', ml: { a: [160, 60, 30], h: [-190, 40, 70] } }), B = J({ upd: '3:08 PM ET', n: 2, ml: { a: [160, 20, 30], h: [-190, 80, 70] } });
+    const doc = (box) => ({ format: 'callsheet2.slate', version: 1, date: '2026-11-19', games: [{ sport: 'NBA', gdate: '2026-11-19', away: 'Kings', home: 'Spurs', notes: [], inputs: { line: '240.5', nbasplits: box } }] });
+    o.before = (rowOf('Kings').inputs || {}).nbasplits || '';
+    await load(doc(A), 'odds-2026-11-19.json'); o.first = rowOf('Kings').inputs.nbasplits === A; o.line1 = rowOf('Kings').inputs.line;
+    await load(doc(B), 'odds-2026-11-19.json'); o.second = rowOf('Kings').inputs.nbasplits === B; o.line2 = rowOf('Kings').inputs.line;
+    document.querySelector('#cardTable [data-open="' + rowOf('Kings').id + '"]').click(); await wait(200); o.opened = card();
+    await game('Hawks', 'Wizards', Object.assign({ nbasplits: A }, W), true); o.kept = rowOf('Hawks').inputs.nbasplits === A;
+    // a game of the file that is not carded: its line in the slate list fills the form, the count with it
+    document.getElementById('clear').click(); await wait();
+    await load({ format: 'callsheet2.slate', version: 1, date: '2026-11-19', games: [{ sport: 'NBA', gdate: '2026-11-19', away: 'Suns', home: 'Jazz', notes: [], inputs: { line: '231.5', op: '-110', up: '-110', hml: '-190', aml: '160', nbasplits: B } }] }, 'odds-2026-11-19.json');
+    const sl = [...document.querySelectorAll('#slateList [data-slate]')].filter(e => /Suns/.test(e.closest('li, tr, div').textContent))[0] || document.querySelector('#slateList [data-slate]');
+    if (sl) { sl.click(); await wait(200); } o.filled = { box: document.getElementById('nbasplits').value === B, away: document.getElementById('away').value, money: (card() || {}).money || '' };
+    return o;
+  });
+  const mnTail = " Shown, not scored: one book's customers, thin early in the day, and kept from 19 Nov to be measured. Backing the side a line had already moved to went 752-698 on spreads and 933-930 on totals at the closing number.";
+  const mnSig = (c) => (c ? c.sigs.filter(s => /^the money ::/.test(s)) : ['no card']).join(' ## ');
+  chk(mn.a && mn.a.kind === 'winner' && mn.a.pick === 'Timberwolves to win' && mn.a.side === 'HOME'
+      && mn.a.money === "DraftKings' own count at 3:08 PM ET: the spread, Timberwolves -4.5 55% of the money on 60% of the bets; the total, the under 229.5 70% of the money on 45% of the bets; the moneyline, Knicks to win 60% of the money on 30% of the bets. More of the money than of the bets by 20 points or more: Knicks to win (+30), the under 229.5 (+25). The decision's side (Timberwolves to win at DraftKings) has 40% of the money on 70% of the bets: the larger bets are on the other side." + mnTail
+      && mn.a.bold === 'Where the money is. | Knicks to win | the under 229.5' && mnSig(mn.a) === 'the money :: Knicks to win · 60% of the money on 30% of the bets · and the under 229.5 · DraftKings, not scored' && /\bwatch\b/.test(mn.a.gold) && !/\bgo\b/.test(mn.a.gold)
+      && mn.a.sigs[0] === 'the decision · BET :: Timberwolves to win · 63.0% · -190' && mn.a.sigs[1] === mnSig(mn.a) && mn.a.order.join(' | ') === 'The numbers | Where the money is',
+      'the money, on the card (the user: "where the money is going type stuff ... an example I may be able to see regarding the model"): with DraftKings\' count on the row the decision\'s why gains "Where the money is": the side of each market with clearly more of the money than of the bets (the spread\'s two are five apart, so it names the side with most of the money), the sides twenty points or more apart in bold with the widest first, how the decision\'s own side stands (40% of the money on 70% of the bets: the larger bets are on the other side), and that it is shown and not scored with what following a move has been worth; tonight\'s signals carry the widest gap in gold right after the decision, never green',
+      JSON.stringify({ a: mn.a }));
+  chk(mn.b && mn.b.money === "DraftKings' own count: the moneyline, Timberwolves to win 95% of the money on 70% of the bets. More of the money than of the bets by 20 points or more: Timberwolves to win (+25). The decision's side (Timberwolves to win at DraftKings) has 95% of the money on 70% of the bets: the larger bets are with it." + mnTail
+      && mnSig(mn.b) === 'the money :: Timberwolves to win · 95% of the money on 70% of the bets · DraftKings, not scored'
+      && mn.c && mn.c.money === "DraftKings' own count at 8:14 PM ET, taken after the tip: the moneyline, Timberwolves to win 75% of the money on 70% of the bets. No side has 20 points more of the money than of the bets. The decision's side (Timberwolves to win at DraftKings) has 75% of the money on 70% of the bets: no gap of 20 points either way." + mnTail
+      && mnSig(mn.c) === '' && mn.c.bold === 'Where the money is.',
+      'the money, the three ways a decision can stand in it: the larger bets with it (95% of the money on 70% of the bets), on the other side, or no gap of twenty either way, where nothing is in bold and tonight\'s signals carry no chip; a count with one market says that market alone, one with no time says none, and one taken after the tip says so',
+      JSON.stringify({ b: mn.b && mn.b.money, bs: mnSig(mn.b), c: mn.c && mn.c.money, cs: mnSig(mn.c), cb: mn.c && mn.c.bold }));
+  chk(mn.d && mn.d.kind === 'rest' && mn.d.pick === 'Total OVER 229.5'
+      && mn.d.money === "DraftKings' own count at 3:08 PM ET: the spread, Knicks -7.5 80% of the money on 50% of the bets; the total, the under 229.5 70% of the money on 45% of the bets; the moneyline, Knicks to win 99% of the money on 70% of the bets. More of the money than of the bets by 20 points or more: Knicks -7.5 (+30), Knicks to win (+29), the under 229.5 (+25). The decision's side (the over 229.5 at DraftKings) has 30% of the money on 55% of the bets: the larger bets are on the other side." + mnTail
+      && mnSig(mn.d) === 'the money :: Knicks -7.5 · 80% of the money on 50% of the bets · and Knicks to win, 1 more · DraftKings, not scored'
+      && mn.d.order.indexOf('Where the money is') === mn.d.order.length - 2 && mn.d.order[mn.d.order.length - 1] === 'Also on this game',
+      'the money, a decision on the total: the over behind a tired favourite is read against the total\'s count (the over has 30% of the money on 55% of the bets), three sides are named with the widest first, the chip names two and counts the third, and the line sits last but one in the why, ahead of what else speaks on the game',
+      JSON.stringify({ d: mn.d }));
+  chk(mn.e && mn.e.money === "DraftKings' own count at 3:08 PM ET: the spread, Knicks +4.5 40% of the money on 30% of the bets; the total, the over 229.5 60% of the money on 40% of the bets; the moneyline, Knicks to win 49% of the money on 30% of the bets. More of the money than of the bets by 20 points or more: the over 229.5 (+20). The decision's side (Timberwolves to win at DraftKings) has 51% of the money on 70% of the bets: no gap of 20 points either way." + mnTail
+      && mnSig(mn.e) === 'the money :: the over 229.5 · 60% of the money on 40% of the bets · DraftKings, not scored'
+      && mn.e9 && /^DraftKings' own count: the spread, Timberwolves -4\.5 61% of the money on 70% of the bets\. No side has 20 points/.test(mn.e9.money) && !/The decision's side/.test(mn.e9.money)
+      && mn.e20 && /More of the money than of the bets by 20 points or more: Knicks to win \(\+20\)\. The decision's side \(Timberwolves to win at DraftKings\) has 50% of the money on 70% of the bets: the larger bets are on the other side\. /.test(mn.e20.money)
+      && mn.e20b && /More of the money than of the bets by 20 points or more: Timberwolves to win \(\+20\)\. The decision's side \(Timberwolves to win at DraftKings\) has 90% of the money on 70% of the bets: the larger bets are with it\. /.test(mn.e20b.money),
+      'the money, the edges: twenty points apart is named and nineteen is not (the over at 60 on 40, the Knicks\' moneyline at 49 on 30); a side ten apart leads its market though it has less than half the money, and under ten the side with most of the money leads; a decision whose market the count does not have is not read against it; a decision\'s side exactly twenty under has the larger bets on the other side and exactly twenty over has them with it',
+      JSON.stringify({ e: mn.e && mn.e.money, es: mnSig(mn.e), e9: mn.e9 && mn.e9.money, e20: mn.e20 && mn.e20.money, e20b: mn.e20b && mn.e20b.money }));
+  chk(mn.none && mn.none.money === undefined && mnSig(mn.none) === '' && mn.none.order.join(' | ') === 'The numbers' && mn.bad.length === 8 && mn.bad.every(Boolean)
+      && mn.part && /^DraftKings' own count: the total, the under 229\.5 70% of the money on 45% of the bets\. More of the money than of the bets by 20 points or more: the under 229\.5 \(\+25\)\. Shown, not scored/.test(mn.part.money),
+      'the money, nothing to read: a row with no count has no line and no chip, as before; a box that is not a count (not JSON, no market, a side short of a number, a share over a hundred, a total with no number, a list, half a market, a moneyline in the shape of a spread) draws nothing and the decision stands; a count with one market that does not read keeps the ones that do',
+      JSON.stringify({ none: mn.none, bad: mn.bad, part: mn.part && mn.part.money }));
+  chk(mn.before === '' && mn.first === true && mn.second === true && mn.line1 === '229.5' && mn.line2 === '229.5' && mn.kept === true
+      && mn.opened && /^DraftKings' own count at 3:08 PM ET: the moneyline, Spurs to win 80% of the money on 70% of the bets\. No side has 20 points/.test(mn.opened.money)
+      && mn.filled && mn.filled.box === true && mn.filled.away === 'Suns' && /^DraftKings' own count at 3:08 PM ET: the moneyline, Jazz to win 80% of the money on 70% of the bets\. /.test(mn.filled.money),
+      'the money, on the row: a matchup carded with a count keeps it; an odds file fills the box on a game already carded and a later run\'s file replaces it (the count moves through the day) while the typed line stays; the row opened again reads the newer count; a game of the file that is not carded fills the form from the slate list, the count with it',
+      JSON.stringify({ before: mn.before, first: mn.first, second: mn.second, l1: mn.line1, l2: mn.line2, kept: mn.kept, opened: mn.opened && mn.opened.money, filled: mn.filled }));
+  await pg.evaluate(async (k) => { for (const x of Object.keys(k)) { if (k[x] === null || k[x] === undefined) await smStore.removeItem(x); else await smStore.setItem(x, k[x]); } }, mnKeep);
+  await reloaded();
+
   // ---- 18 Nov 2026: the decision on every game (the user: "it would be nice if it actually made a decision and not a no bet ... If the model is going to make a
   //      decision, and it needs to for every game, then it needs to say bet ... let the explanation for the pick be detailed in sense of some math but trends for the
   //      teams, players, travel, usage increase for certain players"). On a basketball matchup the pick card is the decision: the game's call with a green BET, where

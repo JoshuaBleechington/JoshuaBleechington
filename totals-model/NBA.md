@@ -1801,8 +1801,12 @@ sharp. Cautions that go with any reading: it is one book's customers;
 a share is of money and bets so far, thin early; DraftKings limits the
 bettors a "sharp" label is meant for.
 
-Logged and printed, never scored. The measure, once about 150 games are
-kept (three weeks): a gap of 10, 20 and 30 points between the money and
+From the same day the count also rides on each basketball row of the
+odds file and the page shows it on the game's card (CALLSHEET3.md, "Where
+the money is, on the game card").
+
+Logged, printed and shown, never scored. The measure, once about 150
+games are kept (three weeks): a gap of 10, 20 and 30 points between the money and
 the bets at the last snapshot before the tip and at the morning one,
 against (a) the line's move from that snapshot to the close in the odds
 log, (b) the result at that snapshot's number and (c) the result at the

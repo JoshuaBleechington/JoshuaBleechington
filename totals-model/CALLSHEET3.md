@@ -5774,3 +5774,122 @@ bet", and the why says that the final landed inside the point on 10 of
 280 such calls. The one game read on the board that has earned more than
 that is the over behind a tired favourite.
 
+## Where the money is, on the game card, 19 Nov 2026
+
+The user, after the day's tests of the sharp-money ideas (NBA.md, "Three
+in-play ideas and where the money goes"): "I'm thinking sharp money
+information from pros might help us", and then: "Is there an example I
+may be able to see in regards to the sharp bettor info? Regarding the
+model."
+
+The morning's work had begun keeping DraftKings' own count of the bets
+and the money (`splits-log.json`) and printing it in the odds run. Nothing
+on the page read it. Now the page shows it on every basketball game that
+has one. Page v172.
+
+### 1. From the odds run to the row
+
+`slate.py`, `make_odds`: the read of DraftKings' betting-splits page
+(`make_splits`) moves ahead of the odds file, and `splits_onto_rows` puts
+each basketball game's newest count on its row as the hidden box
+`nbasplits`:
+
+    {"at": "2026-11-19T20:08:44Z", "upd": "3:08 PM ET", "n": 2,
+     "ml":  {"a": [odds, money, bets], "h": [...]},
+     "sp":  {"a": [number, odds, money, bets], "h": [...]},
+     "tot": {"o": [number, odds, money, bets], "u": [...]}}
+
+`n` is how many counts the log holds for the game; `pre: false` rides
+only where the count was taken after the tip. A game the log does not
+have, a hockey row, and a log that is missing or does not read take
+nothing. The guard is the morning's: whatever the read does, the odds
+file is written, and the run still ends on its credits line and its
+"Wrote" line.
+
+On the page the box is one of the basketball ids (kept on the row and in
+the backup), one of the slate's fields (a game's line in the slate list
+fills the form with it) and one of the boxes a later file replaces on a
+game already carded (with the starting five, who is out, the simulation
+and the crowd), so the count follows the newest odds run while the typed
+line stays.
+
+### 2. What the card says
+
+`web/nba.engine.js`:
+
+- `nbaSplitsOf` reads the box and keeps a market only where both sides
+  are there in the right shape with shares between 0 and 100 (and a
+  number, on the spread and the total). A box that is not a count draws
+  nothing; one market that does not read leaves the others.
+- `nbaSplitsSides` lists every side: the market, the side, its label
+  ("Knicks -1.5", "the under 216.5", "Knicks to win"), its share of the
+  money, of the bets, and the gap between them.
+- `nbaSplitsTop`: the sides with twenty points or more of the money than
+  of the bets (`NBA_SPLITS_GAP`), the widest first.
+- `nbaSplitsWords` is the line in the decision's why, **Where the money
+  is**, after the crew and ahead of what else speaks on the game:
+  - for the spread, the total and the moneyline, one side each: the side
+    with ten points or more of the money than of the bets, else the side
+    with most of the money ("the spread, Knicks -1.5 63% of the money on
+    51% of the bets");
+  - the sides twenty or more apart, in bold, or that none is;
+  - the decision's own side in the count, where the count has its market:
+    "the larger bets are with it" at twenty or more over, "the larger
+    bets are on the other side" at twenty or more under, "no gap of 20
+    points either way" between;
+  - that it is shown and not scored, why (one book's customers, thin
+    early in the day, kept from 19 Nov to be measured), and what backing
+    a line's move has been worth (752-698 on spreads, 933-930 on totals,
+    at the closing number).
+- `signalList`: a gold chip, **the money**, right after the decision's:
+  the widest gap, "and" the next, "N more" beyond that, "DraftKings, not
+  scored". No chip where no side is twenty apart. Never green.
+
+The phone's game card is the computer's own markup, so the chip and the
+line go with it.
+
+### 3. Why it is shown and not scored
+
+Nothing measured supports a call on it yet, and the day's tests point the
+other way on its nearest relatives: the sharp book's numbers are no
+nearer the final than any of the four apps' (the winner's log loss 0.5761
+against 0.5759 to 0.5770; NBA.md section 9), betting an app where it pays
+more than the sharp book's fair price lost on the moneyline (38-160) and
+the spread (23-38-1), and backing the side a line had moved to was a coin
+at the close. The count itself has never been tested, because it could
+not be had for a past game; the log began this day. The measure, at about
+150 games: a gap of 10, 20 and 30 points at the morning count and the
+last one before the tip, against the line's move to the close and against
+the result. Until then the card says where the money is and how the
+decision stands in it, and no more.
+
+### 4. The example sent
+
+A free slate run for the night (no key) and DraftKings' own numbers from
+the count as the lines gave four cards. Knicks at Timberwolves at 3:08 pm
+Eastern: the spread, Knicks -1.5 63% of the money on 51% of the bets; the
+under 216.5 87% on 55% (+32) and the Knicks' moneyline 98% on 73% (+25),
+both in bold, the under on the chip; the decision on that example sheet
+was Timberwolves ML, "2% of the money on 28% of the bets: the larger bets
+are on the other side". Warriors at Grizzlies: the under 224.5 94% on 65%
+and the decision, the under, "the larger bets are with it". Clippers at
+Spurs: no side twenty apart, no chip. The user's own sheet may decide
+those games differently once the odds run has the four apps' numbers.
+
+### 5. Checked
+
+Six harness checks (1,371 in all, passing): the three markets with the
+decision on the other side and the chip in gold after the decision's; the
+three ways a decision stands in the count, one market alone, no time, a
+count after the tip; a decision on the total with three sides named and
+the chip counting the third; the edges at 19, 20, 9 and 10 points and the
+decision's side exactly twenty either way; eight boxes that are not a
+count and one with a single bad market; the box kept on a carded row,
+filled and then replaced by odds files with the typed line staying, and
+filled from the slate list. 38 copies of the page broken on purpose, each
+failing a check, beside an untouched control; two survived the first pass
+(a moneyline in the shape of a spread, and the slate list's fill) and
+each got a check. `slate.py` selftest 320 (three on the rows). The odds
+run driven with stand-ins five ways (lab `odds_hook_test.py`): the read
+failing, the count read and on the row, a page with nothing, no game on
+the feed, and the order of the run's last lines.

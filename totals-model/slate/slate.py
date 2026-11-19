@@ -8036,6 +8036,11 @@ def make_odds(date_iso, out_dir, log, books=None, sports=("MLB", "NHL", "NBA")):
                 ("%s (%s/%s)" % (fmt(sharp["line"], 1), sharp.get("op"), sharp.get("up"))) if sharp.get("line") is not None else "-",
                 nalt, "" if nalt == 1 else "s", " · team totals" if shop.get("team") else ""))
             rows.append(g)
+    try:   # the bets against the money (19 Nov 2026): DraftKings' own open page, no key and no credit; kept to be measured, shown on the basketball card, and never able to stop this run
+        make_splits(date_iso, out_dir, log, tuple(sorted(set(g["sport"] for g in rows))))
+        splits_onto_rows(rows, splits_log_path(out_dir))
+    except Exception as e:  # noqa: BLE001
+        log("Betting splits: not read this run (%s). Nothing else is affected." % e)
     doc = {"format": FORMAT, "version": VERSION, "date": date_iso, "generated": now,
            "source": "slate.py odds: The Odds API (%s)" % ", ".join(books), "games": rows}
     path = os.path.join(out_dir, "odds-%s.json" % date_iso)
@@ -8043,10 +8048,6 @@ def make_odds(date_iso, out_dir, log, books=None, sports=("MLB", "NHL", "NBA")):
         json.dump(doc, f, indent=1)
     log("Credits: this run used %s; %s left this month." % (spent, left if left is not None else "unknown"))
     log("Wrote %s with %d game%s. Load it into the sheet with the slate: blank line boxes fill, anything typed stays, and the best price on each side shows on the rail." % (path, len(rows), "" if len(rows) == 1 else "s"))
-    try:   # the bets against the money (19 Nov 2026): DraftKings' own open page, no key and no credit; logged to be measured, and never able to stop this run
-        make_splits(date_iso, out_dir, log, tuple(sorted(set(g["sport"] for g in rows))))
-    except Exception as e:  # noqa: BLE001
-        log("Betting splits: not read this run (%s). Nothing else is affected." % e)
     return path
 
 
@@ -8216,6 +8217,32 @@ def splits_log_update(path, sport, games, now, updated, today_iso):
             json.dump(doc, f, separators=(",", ":"))
         os.replace(tmp, path)         # whole or not at all
     return out
+
+
+def splits_onto_rows(rows, path):
+    """Each basketball row of an odds run takes its game's newest count from the splits log, as the hidden box nbasplits:
+    {at, upd, n, ml, sp, tot} (pre: false where it was taken after the tip). The page says where the money sits on the
+    game's card and never scores it. Returns how many rows took one; a log that is missing or does not read gives none."""
+    try:
+        with open(path, encoding="utf-8") as f:
+            games = json.load(f).get("games") or {}
+    except (OSError, ValueError, AttributeError):
+        return 0
+    n = 0
+    for g in rows:
+        if g.get("sport") != "NBA":
+            continue
+        snaps = (games.get(odds_log_key(g["sport"], g.get("gdate"), g.get("away"), g.get("home"))) or {}).get("snaps") or []
+        if not snaps:
+            continue
+        s = snaps[-1]
+        out = {"at": s.get("at"), "upd": s.get("updated") or "", "n": len(snaps)}
+        if s.get("pre") is False:
+            out["pre"] = False
+        out.update({k: s[k] for k in ("ml", "sp", "tot") if s.get(k)})
+        g["inputs"]["nbasplits"] = json.dumps(out, separators=(",", ":"))
+        n += 1
+    return n
 
 
 def splits_line(e, away, home):
@@ -11022,6 +11049,33 @@ def selftest():
     make_splits("2026-11-20", spl_dir2, spl_log2.append, ("NHL",), page_of=spl_page)
     check("splits: a second run with nothing moved says unchanged; a run for another day's date finds no game of that day",
           spl_log2[1].endswith("(+22)  (unchanged since the last run)") and spl_log2[-1] == "Betting splits, NHL: no game of 2026-11-20 on DraftKings' page.")
+    spl_rows = [{"sport": "NBA", "gdate": "2026-11-19", "away": "Trail Blazers", "home": "Bucks", "inputs": {"line": "230.5"}},
+                {"sport": "NBA", "gdate": "2026-11-19", "away": "Knicks", "home": "Timberwolves", "inputs": {}},
+                {"sport": "NHL", "gdate": "2026-11-19", "away": "Kings", "home": "Maple Leafs", "inputs": {}}]
+    spl_n = splits_onto_rows(spl_rows, spl_path)
+    spl_box = json.loads(spl_rows[0]["inputs"]["nbasplits"])
+    check("splits: a basketball row of the odds run takes its game's newest count as nbasplits, with the moment, the page's time and how many were kept; a game not in the log and a hockey row take none",
+          spl_n == 1 and spl_box == {"at": "2026-11-20T15:00:00Z", "upd": "10:00 AM ET", "n": 1, "pre": False, "ml": {"h": [411.0, 13, 5], "a": [-546.0, 87, 95]}, "sp": {"a": [-11.5, -108.0, 87, 66], "h": [11.5, -112.0, 13, 34]},
+                                     "tot": {"o": [230.5, -112.0, 1, 23], "u": [230.5, -108.0, 99, 77]}}
+          and spl_rows[0]["inputs"]["line"] == "230.5" and "nbasplits" not in spl_rows[1]["inputs"] and "nbasplits" not in spl_rows[2]["inputs"])
+    spl_rows2 = [{"sport": "NHL", "gdate": "2026-11-19", "away": "Kings", "home": "Maple Leafs", "inputs": {}}, {"sport": "NBA", "gdate": "2026-11-19", "away": "Kings", "home": "Maple Leafs", "inputs": {}}]
+    with open(os.path.join(spl_dir, "bad.json"), "w", encoding="utf-8") as f:
+        f.write("[1, 2")
+    with open(os.path.join(spl_dir, "list.json"), "w", encoding="utf-8") as f:
+        f.write("[1, 2]")
+    check("splits: the newest of a game's snapshots is the one a row takes, with the count of them; a log that is missing, does not read or is not a log gives no row anything",
+          splits_onto_rows(spl_rows2, os.path.join(spl_dir2, SPLITS_LOG)) == 0 and all("nbasplits" not in r["inputs"] for r in spl_rows2)
+          and splits_onto_rows([dict(spl_rows[0], inputs={})], os.path.join(spl_dir, "nope.json")) == 0 and splits_onto_rows([dict(spl_rows[0], inputs={})], os.path.join(spl_dir, "bad.json")) == 0
+          and splits_onto_rows([dict(spl_rows[0], inputs={})], os.path.join(spl_dir, "list.json")) == 0)
+    spl_dir3 = tempfile.mkdtemp()
+    splits_log_update(splits_log_path(spl_dir3), "NBA", spl_d1["games"], "2026-11-19T19:30:00Z", "2:29 PM ET", "2026-11-19")
+    splits_log_update(splits_log_path(spl_dir3), "NBA", spl_moved, "2026-11-19T21:00:00Z", "4:00 PM ET", "2026-11-19")
+    spl_rows3 = [{"sport": "NBA", "gdate": "2026-11-19", "away": "Trail Blazers", "home": "Bucks", "inputs": {}}, {"sport": "NBA", "gdate": "2026-11-19", "away": "76ers", "home": "Clippers", "inputs": {}}]
+    spl_n3 = splits_onto_rows(spl_rows3, splits_log_path(spl_dir3))
+    spl_b3, spl_b4 = json.loads(spl_rows3[0]["inputs"]["nbasplits"]), json.loads(spl_rows3[1]["inputs"]["nbasplits"])
+    check("splits: after two runs the row carries the second run's count and says two were kept; a game with the total alone carries the total alone; a count taken before the tip does not say otherwise",
+          spl_n3 == 2 and spl_b3["n"] == 2 and spl_b3["upd"] == "4:00 PM ET" and spl_b3["tot"] == {"o": [229.5, -110.0, 2, 24], "u": [229.5, -110.0, 98, 76]} and "pre" not in spl_b3
+          and sorted(spl_b4) == ["at", "n", "tot", "upd"] and spl_b4["n"] == 1 and spl_b4["upd"] == "2:29 PM ET")
     check("splits: the self-test never reads the site, and the three leagues are DraftKings' own numbers",
           SPLITS["on"] is False and make_splits("2026-11-19", spl_dir2, spl_log2.append, ("NBA",)) is None and SPLITS_LEAGUE == {"NBA": 42648, "NHL": 42133, "MLB": 84240} and "splits" in TODAY_MODES)
 

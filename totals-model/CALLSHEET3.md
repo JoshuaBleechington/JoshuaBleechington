@@ -5893,3 +5893,37 @@ each got a check. `slate.py` selftest 320 (three on the rows). The odds
 run driven with stand-ins five ways (lab `odds_hook_test.py`): the read
 failing, the count read and on the row, a page with nothing, no game on
 the feed, and the order of the run's last lines.
+
+### 6. The evening it shipped: "I dont see the money section"
+
+The user loaded a slate of three days before (16 Nov) and wrote: "I dont
+see the money section or sharp better". Two things were true. A slate
+from before the count has none, and DraftKings counts the day's games
+only, so no past game can get one; and a game that is graded is left
+exactly as logged by any file. But the card gave no sign of either: where
+there was no count it showed nothing, so there was nothing to tell a game
+with no count from a page that had not changed.
+
+- **The card says so** (page v173). On a game with no count and no final
+  the same line of the why reads "No count on this game yet", says where
+  it comes from (the odds run of the slate.py of 19 Nov or later) and how
+  to get one at any time for nothing, and that a game already played
+  cannot get one. A graded game with no count shows nothing, as before; a
+  graded game that has a count keeps its line. No chip.
+- **A free way onto the sheet.** `python slate.py splits` now also writes
+  `splits-DATE.json` (`splits_sheet`): the day's basketball games, the
+  count the only box of each. Load slate takes it: a carded game takes
+  the count as it takes a newer starting five, a game still in the slate
+  list keeps every box it had, and no line or price is touched. It
+  refreshes the count through the day without an odds pull. Tried on the
+  page three ways with the night's real count (lab `money_states.js`):
+  the night's games carded with their lines (four rows filled, the lines
+  as they were, the line and the chip drawn), the slate loaded and not
+  carded (the same from Fill form), and nothing of the night on the sheet
+  (no decision to hang it on, so nothing: the night's slate and odds go
+  on first).
+
+The night's count at 4:59 pm against 3:08 pm showed how thin the early
+one is: the under in Trail Blazers at Bucks went from 99% of the money on
+77% of the bets to 76% on 67%, and only Knicks at Timberwolves still had
+a side twenty apart (the under 216.5, 91% on 52%).

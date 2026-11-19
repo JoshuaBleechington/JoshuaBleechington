@@ -410,7 +410,12 @@ today only, so every odds run now keeps what it showed for the sports
 that had a game, in `splits-log.json` beside `odds-log.json` and keyed
 the same way, and prints each game with the side of a market that has
 twenty points more of the money than of the bets. `python slate.py
-splits` does the same alone (`--sports NBA,NHL`), as often as wanted. A
+splits` does the same alone (`--sports NBA,NHL`), as often as wanted, and
+also writes the day's basketball counts as `splits-DATE.json`, a file
+the sheet's Load slate takes: a game a row with the count its only box,
+so loading it puts the newest count on tonight's games and changes no
+line or price (the count moves through the day, and this refreshes it
+without an odds pull). A
 snapshot is added only when a share or a number has moved, and says
 whether it was taken before the tip. If the page is down, empty or
 changed the odds run prints one line and is otherwise untouched; a log

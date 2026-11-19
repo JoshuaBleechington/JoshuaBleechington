@@ -8245,6 +8245,35 @@ def splits_onto_rows(rows, path):
     return n
 
 
+def splits_sheet_path(out_dir, date_iso):
+    return os.path.join(out_dir, "splits-%s.json" % date_iso)
+
+
+def splits_sheet(log_path, date_iso, now):
+    """The day's basketball counts as a document the sheet's Load slate takes: a game a row, the count its only box
+    (nbasplits). Loaded, it puts the newest count on the day's games and touches no line, price or other box: a row
+    already carded takes it as it takes a newer starting five, and a game still in the slate list keeps every box it
+    had. None where the log has no basketball game of the day."""
+    try:
+        with open(log_path, encoding="utf-8") as f:
+            games = json.load(f).get("games") or {}
+    except (OSError, ValueError, AttributeError):
+        return None
+    rows = []
+    for k in games:
+        sport, date, clubs = (k.split("|") + ["", ""])[:3]
+        if sport != "NBA" or date != date_iso or " @ " not in clubs:
+            continue
+        away, home = clubs.split(" @ ", 1)
+        rows.append({"sport": "NBA", "gdate": date, "away": away, "home": home, "notes": [], "inputs": {}})
+    splits_onto_rows(rows, log_path)
+    rows = [r for r in rows if r["inputs"].get("nbasplits")]
+    if not rows:
+        return None
+    return {"format": FORMAT, "version": VERSION, "date": date_iso, "generated": now,
+            "source": "slate.py splits: DraftKings Sportsbook betting splits (the share of the bets and of the money; no line, no price)", "games": rows}
+
+
 def splits_line(e, away, home):
     """One game's last snapshot in words: the side of each market with more of the money than of the bets, where the two are SPLITS_GAP apart."""
     s = (e.get("snaps") or [{}])[-1]
@@ -8262,9 +8291,11 @@ def splits_line(e, away, home):
     return bits
 
 
-def make_splits(date_iso, out_dir, log, sports=("NBA",), page_of=None):
+def make_splits(date_iso, out_dir, log, sports=("NBA",), page_of=None, sheet=False):
     """Read DraftKings' betting-splits page for each sport and add what it shows to splits-log.json. Free: an open
-    page, no key, no credit. page_of(sport, page) -> the page's text, for the self-test."""
+    page, no key, no credit. page_of(sport, page) -> the page's text, for the self-test. sheet: also write the day's
+    basketball counts as splits-DATE.json for the sheet's Load slate (the splits command alone; the odds run's own
+    file carries them)."""
     if not SPLITS["on"] and page_of is None:
         return None
     def read(sport, n):
@@ -8295,6 +8326,16 @@ def make_splits(date_iso, out_dir, log, sports=("NBA",), page_of=None):
             log("  %s @ %s  ·  %s%s" % (away, home, "  ·  ".join(bits) if bits else "nothing %d apart" % SPLITS_GAP, "" if added else "  (unchanged since the last run)"))
     if total:
         log("Kept in %s to be measured against the close and the finals. Logged, not scored: nothing on the sheet moves on these." % path)
+    if sheet:
+        doc = splits_sheet(path, date_iso, now)
+        if doc:
+            sp = splits_sheet_path(out_dir, date_iso)
+            with open(sp, "w", encoding="utf-8") as f:
+                json.dump(doc, f, indent=1)
+            log("Wrote %s with the count on %d basketball game%s. In The Super Model: Saving, Load slate, pick it. It puts the newest count on tonight's games (the gold chip in tonight's signals, \"Where the money is\" in the decision) and changes no line or price; run it again any time, it costs nothing." % (
+                sp, len(doc["games"]), "" if len(doc["games"]) == 1 else "s"))
+            return sp
+        log("No basketball game of %s has a count yet, so no file for the sheet was written." % date_iso)
     return path
 
 
@@ -11076,6 +11117,24 @@ def selftest():
     check("splits: after two runs the row carries the second run's count and says two were kept; a game with the total alone carries the total alone; a count taken before the tip does not say otherwise",
           spl_n3 == 2 and spl_b3["n"] == 2 and spl_b3["upd"] == "4:00 PM ET" and spl_b3["tot"] == {"o": [229.5, -110.0, 2, 24], "u": [229.5, -110.0, 98, 76]} and "pre" not in spl_b3
           and sorted(spl_b4) == ["at", "n", "tot", "upd"] and spl_b4["n"] == 1 and spl_b4["upd"] == "2:29 PM ET")
+    spl_dir4, spl_log4 = tempfile.mkdtemp(), []
+    spl_nba = lambda sport, n: spl_p1 if sport == "NBA" else spl_p2 if sport == "NHL" else "<html></html>"
+    spl_out4 = make_splits("2026-11-19", spl_dir4, spl_log4.append, ("NBA", "NHL"), page_of=spl_nba, sheet=True)
+    with open(spl_out4, encoding="utf-8") as f:
+        spl_sheet4 = json.load(f)
+    check("splits: the command alone also writes the day's basketball counts as a file for the sheet's Load slate: a game a row, the count its only box, no hockey, and says how to load it",
+          spl_out4 == os.path.join(spl_dir4, "splits-2026-11-19.json") and spl_sheet4["format"] == FORMAT and spl_sheet4["version"] == VERSION and spl_sheet4["date"] == "2026-11-19"
+          and [(g["sport"], g["gdate"], g["away"], g["home"], sorted(g["inputs"])) for g in spl_sheet4["games"]] == [("NBA", "2026-11-19", "Trail Blazers", "Bucks", ["nbasplits"]), ("NBA", "2026-11-19", "76ers", "Clippers", ["nbasplits"])]
+          and json.loads(spl_sheet4["games"][0]["inputs"]["nbasplits"])["sp"] == {"a": [-11.5, -108.0, 87, 66], "h": [11.5, -112.0, 13, 34]} and json.loads(spl_sheet4["games"][0]["inputs"]["nbasplits"])["upd"] == "2:29 PM ET"
+          and spl_log4[-1].startswith("Wrote %s with the count on 2 basketball games. In The Super Model: Saving, Load slate, pick it." % spl_out4) and spl_log4[-1].endswith("it costs nothing."))
+    spl_dir5, spl_log5 = tempfile.mkdtemp(), []
+    spl_out5 = make_splits("2026-11-19", spl_dir5, spl_log5.append, ("NHL",), page_of=spl_nba, sheet=True)
+    spl_out6 = make_splits("2026-11-19", spl_dir5, spl_log5.append, ("NBA",), page_of=spl_nba)
+    spl_out7 = make_splits("2026-11-20", spl_dir5, spl_log5.append, ("NBA",), page_of=spl_nba, sheet=True)
+    check("splits: no basketball count of the day, no file for the sheet (hockey alone, another day's date), and the odds run's own call writes none",
+          spl_out5 == splits_log_path(spl_dir5) and spl_out6 == splits_log_path(spl_dir5) and spl_out7 == splits_log_path(spl_dir5) and not any(n.startswith("splits-2026") for n in os.listdir(spl_dir5))
+          and spl_log5.count("No basketball game of 2026-11-19 has a count yet, so no file for the sheet was written.") == 1 and spl_log5[-1] == "No basketball game of 2026-11-20 has a count yet, so no file for the sheet was written."
+          and splits_sheet(os.path.join(spl_dir5, "nope.json"), "2026-11-19", "x") is None)
     check("splits: the self-test never reads the site, and the three leagues are DraftKings' own numbers",
           SPLITS["on"] is False and make_splits("2026-11-19", spl_dir2, spl_log2.append, ("NBA",)) is None and SPLITS_LEAGUE == {"NBA": 42648, "NHL": 42133, "MLB": 84240} and "splits" in TODAY_MODES)
 
@@ -11515,7 +11574,7 @@ def main(argv=None):
                          "nba-gap-retest: the team-total gap rule held against three numbers, from the ledger, the period lines and the lines history in the folder (no credit spent). "
                          "odds: today's lines, prices, openers, the sharp line, the alternates and every book's price from The Odds API (needs odds_key.txt). "
                          "odds-history: a past season's lines at two moments a day, for the backtest's openers (paid plans; asks before it spends). "
-                         "splits: the share of the bets and of the money on today's games from DraftKings' open page, into splits-log.json (free; the odds run does it too).")
+                         "splits: the share of the bets and of the money on today's games from DraftKings' open page, into splits-log.json, and the day's basketball counts as splits-DATE.json for the sheet's Load slate (free; the odds run reads the page too and its own file carries the counts).")
     ap.add_argument("--books", help="odds only: the books to read, first one carded, pinnacle never carded, e.g. fanatics,betmgm,draftkings,pinnacle (default: %s)" % ",".join(ODDS_BOOKS))
     ap.add_argument("--sports", help="odds only: which sports, e.g. NHL,MLB (default: MLB,NHL; odds-history: NHL)")
     ap.add_argument("--sport", help="odds-periods: NBA (default) or NHL; hockey pulls the first-period total and the team totals at the close.")
@@ -11587,7 +11646,7 @@ def main(argv=None):
             path = make_odds(date_iso, a.out, log, a.books, sports)
         elif a.mode == "splits":
             sports = tuple(s.strip().upper() for s in a.sports.split(",") if s.strip()) if a.sports else ("NBA", "NHL")
-            path = make_splits(date_iso, a.out, log, sports)
+            path = make_splits(date_iso, a.out, log, sports, sheet=True)
         elif a.mode == "odds-history":
             sports = tuple(s.strip().upper() for s in a.sports.split(",") if s.strip()) if a.sports else ("NHL",)
             path = make_odds_history(a.out, log, a.books, sports, a.season, a.start, a.end, a.times, a.markets, a.yes, a.keep)

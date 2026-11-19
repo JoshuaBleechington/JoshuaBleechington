@@ -1968,6 +1968,9 @@
      scored: one book's customers, thin early in the day, and kept from this day to be measured (NBA.md, "Three in-play ideas
      and where the money goes") ---- */
   var NBA_SPLITS_GAP = 20;   // points of share, the money less the bets, at which a side is named
+  /* a game not yet played with no count says so, and how to get one (19 Nov 2026, the user, the evening the line shipped, having loaded
+     a slate of three days before: "I dont see the money section or sharp better") */
+  var NBA_SPLITS_NONE = "No count on this game yet. It comes with the odds run (the slate.py of 19 Nov 2026 or later), or at any time for nothing: run <b>python slate.py splits</b>, then Load slate and pick the <b>splits-DATE.json</b> it writes; that changes no line or price. DraftKings counts the day's games only, so a game already played cannot get one. Shown, not scored.";
   function nbaSplitsOf(raw) {
     var s = null; try { s = raw ? JSON.parse(raw) : null; } catch (e) { s = null; }
     if (!s || typeof s !== "object") return null;
@@ -2076,6 +2079,7 @@
     /* where the money is: DraftKings' count of the bets and the money, from the odds run (19 Nov 2026) */
     var spl = nbaSplitsOf(inp.nbasplits);
     if (spl) li.push(["Where the money is", nbaSplitsWords(spl, row.away, row.home, c)]);
+    else if (!hasFinals(row.finals)) li.push(["Where the money is", NBA_SPLITS_NONE]);   // a graded game keeps its card as it was
     /* what else speaks on the game */
     var ks = nbaCallKinds(row); nbaCallLive(ks, all);   // marks a read that repeats a cold call's pick
     var also = ks.filter(function (x) { return x.kind !== c.kind; }).map(function (x) {

@@ -5826,13 +5826,14 @@ line stays.
   money, of the bets, and the gap between them.
 - `nbaSplitsTop`: the sides with twenty points or more of the money than
   of the bets (`NBA_SPLITS_GAP`), the widest first.
-- `nbaSplitsWords` is the line in the decision's why, **Where the money
-  is**, after the crew and ahead of what else speaks on the game:
-  - for the spread, the total and the moneyline, one side each: the side
-    with ten points or more of the money than of the bets, else the side
-    with most of the money ("the spread, Knicks -1.5 63% of the money on
-    51% of the bets");
-  - the sides twenty or more apart, in bold, or that none is;
+- `nbaMoneyPanel` is the money's own box on the card, **Where the money
+  is**, between the decision's why and its list (first shipped as a line
+  in that list; section 7 says why it moved):
+  - a row a market (spread, total, moneyline) with one side each: the
+    side with ten points or more of the money than of the bets, else the
+    side with most of the money; its share of the bets, of the money, and
+    the gap ("level" where they are the same);
+  - the rows twenty or more apart in bold;
   - the decision's own side in the count, where the count has its market:
     "the larger bets are with it" at twenty or more over, "the larger
     bets are on the other side" at twenty or more under, "no gap of 20
@@ -5841,9 +5842,10 @@ line stays.
     early in the day, kept from 19 Nov to be measured), and what backing
     a line's move has been worth (752-698 on spreads, 933-930 on totals,
     at the closing number).
-- `signalList`: a gold chip, **the money**, right after the decision's:
-  the widest gap, "and" the next, "N more" beyond that, "DraftKings, not
-  scored". No chip where no side is twenty apart. Never green.
+- `signalList`: a chip, **the money**, right after the decision's, that
+  goes to the box. Gold with the widest gap ("and" the next, "N more"
+  beyond that); plain where the count has no side twenty apart; plain
+  where a game not yet played has no count. Never green.
 
 The phone's game card is the computer's own markup, so the chip and the
 line go with it.
@@ -5905,11 +5907,11 @@ there was no count it showed nothing, so there was nothing to tell a game
 with no count from a page that had not changed.
 
 - **The card says so** (page v173). On a game with no count and no final
-  the same line of the why reads "No count on this game yet", says where
-  it comes from (the odds run of the slate.py of 19 Nov or later) and how
-  to get one at any time for nothing, and that a game already played
-  cannot get one. A graded game with no count shows nothing, as before; a
-  graded game that has a count keeps its line. No chip.
+  the same place reads "no count on this game yet", says where it comes
+  from (the odds run of the slate.py of 19 Nov or later) and how to get
+  one at any time for nothing, and that a game already played cannot get
+  one. A graded game with no count shows nothing, as before; a graded
+  game that has a count keeps it.
 - **A free way onto the sheet.** `python slate.py splits` now also writes
   `splits-DATE.json` (`splits_sheet`): the day's basketball games, the
   count the only box of each. Load slate takes it: a carded game takes
@@ -5927,3 +5929,42 @@ The night's count at 4:59 pm against 3:08 pm showed how thin the early
 one is: the under in Trail Blazers at Bucks went from 99% of the money on
 77% of the bets to 76% on 67%, and only Knicks at Timberwolves still had
 a side twenty apart (the under 216.5, 91% on 52%).
+
+### 7. A box of its own: "I dont see it on the knicks game"
+
+With v173 live and the night's count file sent, the user opened the
+Knicks game and still wrote: "I dont see it on the knicks game". His
+sheet could not be seen from here (the page's saved copy for the phone
+was five days old), so the page was made to answer for itself in every
+state it could be in (page v174):
+
+- **A box, not a sentence.** The line in the why's list was one item
+  among eight long ones. The money now has a boxed section of its own
+  right under the decision's why paragraph (`nbaMoneyPanel`, `.dmoney`,
+  id `secMoney`): the title on a gold tag, the count's time, a table of
+  market, side, bets, money and gap with the wide rows in bold, the
+  sentence on the decision's side, and the caution in small print. The
+  why's own list is as it was before the day.
+- **The same box when there is nothing in it.** A game not yet played
+  with no count has the box, dashed and plain, saying there is no count
+  yet and how to get one. So a card with no box at all on a game not yet
+  played is a page that has not been refreshed, and that can be told at
+  a glance.
+- **A chip on every game.** Tonight's signals carry "the money" on every
+  game not yet played: gold with the widest gap, standing by the
+  decision's chip; plain and last in the row with "no side 20 points
+  apart" or "no count on this game yet". The chip goes to the box. (The
+  plain chip first sat by the decision too, and three older checks that
+  read the row's first chips said so.)
+- **Before the lines.** A game in the form with a count and no lines
+  yet (the count file loaded before the night's odds) had no decision to
+  hang the money on and showed nothing. It now shows the count's box
+  alone under the empty card (`nbaMoneyLoose`).
+
+Checked again: the six harness checks rewritten for the box (the three
+states of a decision in the count, the edges at 9, 10, 19 and 20 points
+and at level, eight boxes that are not a count, the row and the files,
+a graded game with and without a count, and a game with a count and no
+lines), against 52 copies broken on purpose and an untouched control;
+the two older checks that had taken the line into their lists went back
+to what they were; 1,371 in all, passing.

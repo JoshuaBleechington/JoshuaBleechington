@@ -342,8 +342,8 @@
     if (ss) out.push(signalChip("watch", "markets", "Pinnacle", "shades the <b>" + esc(ss.side) + "</b> by " + ss.pts.toFixed(1) + " points"));
     if (!nba) return out;
     var inputs = snapshot(), f = readNba(), row = nbaSimTakeRow(f), away = f.away || "Away", home = f.home || "Home";
-    var spl = nbaSplitsOf(inputs.nbasplits), stop = spl ? nbaSplitsTop(spl, away, home) : [];   // the bets against the money (19 Nov 2026): gold, shown and not scored
-    if (stop.length) out.push(signalChip("watch", "markets", "the money", "<b>" + esc(stop[0].label) + "</b> · " + stop[0].money + "% of the money on " + stop[0].bets + "% of the bets" +
+    var spl = nbaSplitsOf(inputs.nbasplits), stop = spl ? nbaSplitsTop(spl, away, home) : [];   // the bets against the money (19 Nov 2026): gold, shown and not scored; the chip goes to the money's own block
+    if (stop.length) out.push(signalChip("watch", "secMoney", "the money", "<b>" + esc(stop[0].label) + "</b> · " + stop[0].money + "% of the money on " + stop[0].bets + "% of the bets" +
       (stop.length > 1 ? " · and " + esc(stop[1].label) + (stop.length > 2 ? ", " + (stop.length - 2) + " more" : "") : "") + " · DraftKings, not scored"));
     var V = null; try { V = nbaVoices({ sport: "NBA", inputs: inputs, markets: (m && m.markets) || [] }); } catch (e) { V = null; }
     var vrec = null; try { vrec = nbaCallsRecord().rule; } catch (e) { vrec = null; }
@@ -411,6 +411,12 @@
       var d = nbaOutList(), outs = function (s) { return (d[s] || []).filter(function (p) { return /^out/i.test(String(p.st || "")); }).length; }, oa = outs("away"), oh = outs("home");
       if (oa || oh) out.push(signalChip("info", "secOut", "out", [oa ? esc(away) + " <b>" + oa + "</b> (" + nbaOutMinutes("away").toFixed(0) + " min of regulars)" : "", oh ? esc(home) + " <b>" + oh + "</b> (" + nbaOutMinutes("home").toFixed(0) + " min of regulars)" : ""].filter(Boolean).join(" · ")));
     } catch (e) {}
+    /* every game not yet played says where its count stands, so a row with no money chip at all is a page that is old: plain, and last
+       in the row, where the count has no side twenty apart or there is no count yet (the gold chip, a watch, stands by the decision) */
+    if (!stop.length) {
+      if (spl) out.push(signalChip("info", "secMoney", "the money", "no side " + NBA_SPLITS_GAP + " points apart · DraftKings" + (spl.upd ? " at " + esc(spl.upd) : "") + ", not scored"));
+      else if (!(typeof openedFinals === "function" && openedFinals())) out.push(signalChip("info", "secMoney", "the money", "no count on this game yet · it comes with the odds run, or <b>python slate.py splits</b>"));
+    }
     return out;
   }
   function signalStrip(m, pk, upsetView, likely, leg) {
@@ -1970,7 +1976,7 @@
   var NBA_SPLITS_GAP = 20;   // points of share, the money less the bets, at which a side is named
   /* a game not yet played with no count says so, and how to get one (19 Nov 2026, the user, the evening the line shipped, having loaded
      a slate of three days before: "I dont see the money section or sharp better") */
-  var NBA_SPLITS_NONE = "No count on this game yet. It comes with the odds run (the slate.py of 19 Nov 2026 or later), or at any time for nothing: run <b>python slate.py splits</b>, then Load slate and pick the <b>splits-DATE.json</b> it writes; that changes no line or price. DraftKings counts the day's games only, so a game already played cannot get one. Shown, not scored.";
+  var NBA_SPLITS_NONE = "It comes with the odds run (the slate.py of 19 Nov 2026 or later), or at any time for nothing: run <b>python slate.py splits</b>, then Load slate and pick the <b>splits-DATE.json</b> it writes; that changes no line or price. DraftKings counts the day's games only, so a game already played cannot get one. Shown, not scored.";
   function nbaSplitsOf(raw) {
     var s = null; try { s = raw ? JSON.parse(raw) : null; } catch (e) { s = null; }
     if (!s || typeof s !== "object") return null;
@@ -1992,22 +1998,32 @@
   function nbaSplitsTop(s, away, home) {   // the sides with NBA_SPLITS_GAP more of the money than of the bets, the widest first
     return nbaSplitsSides(s, away, home).filter(function (x) { return x.gap >= NBA_SPLITS_GAP; }).sort(function (a, b) { return b.gap - a.gap; });
   }
-  function nbaSplitsWords(s, away, home, c) {
-    var sides = nbaSplitsSides(s, away, home), top = nbaSplitsTop(s, away, home), bits = [];
-    [["spread", "the spread"], ["total", "the total"], ["ml", "the moneyline"]].forEach(function (k) {
+  /* the money's own block on the card (the same evening, the user with the Knicks game open: "I dont see it on the knicks game"; a
+     line in the why's list was one sentence among eight). A boxed section under the decision's why: a row a market, the side with
+     clearly more of the money than of the bets (ten points or more; where neither has, the side with most of the money), its share
+     of the bets, of the money and the gap, the sides twenty apart in bold; how the decision's own side stands; what it is worth so
+     far. A game not yet played with no count says so in the same box; a graded game with no count has none */
+  function nbaMoneyCap(s) { s = String(s).replace(/^the /, ""); return s.charAt(0).toUpperCase() + s.slice(1); }
+  function nbaMoneyPanel(inp, away, home, c, graded) {
+    var s = nbaSplitsOf((inp || {}).nbasplits);
+    if (!s) return graded ? "" : '<div class="dmoney none" id="secMoney"><div class="dmh"><b>Where the money is</b><span>no count on this game yet</span></div><div class="dmn">' + NBA_SPLITS_NONE + '</div></div>';
+    var sides = nbaSplitsSides(s, away, home), rows = "";
+    [["spread", "Spread"], ["total", "Total"], ["ml", "Moneyline"]].forEach(function (k) {
       var two = sides.filter(function (x) { return x.key === k[0]; }); if (two.length !== 2) return;
       var up = two[0].gap >= two[1].gap ? two[0] : two[1], big = two[0].money >= two[1].money ? two[0] : two[1];
-      var lead = up.gap >= NBA_SPLITS_GAP / 2 ? up : big;   // the side with clearly more of the money than of the bets; where neither has, the side with most of the money
-      bits.push(k[1] + ", " + esc(lead.label) + " " + lead.money + "% of the money on " + lead.bets + "% of the bets");
+      var lead = up.gap >= NBA_SPLITS_GAP / 2 ? up : big, hot = lead.gap >= NBA_SPLITS_GAP;
+      rows += '<tr' + (hot ? ' class="hot"' : '') + '><td>' + k[1] + '</td><td class="s">' + esc(nbaMoneyCap(lead.label)) + '</td><td>' + lead.bets + '%</td><td>' + lead.money + '%</td><td>' + (lead.gap === 0 ? 'level' : sgn(lead.gap, 0)) + '</td></tr>';
     });
-    var t = "DraftKings' own count" + (s.upd ? " at " + esc(s.upd) : "") + (s.pre ? "" : ", taken after the tip") + ": " + bits.join("; ") + ". ";
-    t += top.length ? "More of the money than of the bets by " + NBA_SPLITS_GAP + " points or more: " + top.map(function (x) { return "<b>" + esc(x.label) + "</b> (" + sgn(x.gap, 0) + ")"; }).join(", ") + ". "
-                    : "No side has " + NBA_SPLITS_GAP + " points more of the money than of the bets. ";
     var mine = c ? sides.filter(function (x) { return x.key === c.key && x.side === c.side; })[0] : null;
-    if (mine) t += "The decision's side (" + esc(mine.label) + " at DraftKings) has " + mine.money + "% of the money on " + mine.bets + "% of the bets: " +
-      (mine.gap >= NBA_SPLITS_GAP ? "the larger bets are with it" : mine.gap <= -NBA_SPLITS_GAP ? "the larger bets are on the other side" : "no gap of " + NBA_SPLITS_GAP + " points either way") + ". ";
-    t += "Shown, not scored: one book's customers, thin early in the day, and kept from 19 Nov to be measured. Backing the side a line had already moved to went 752-698 on spreads and 933-930 on totals at the closing number.";
-    return t;
+    return '<div class="dmoney" id="secMoney"><div class="dmh"><b>Where the money is</b><span>DraftKings\' own count' + (s.upd ? ' at ' + esc(s.upd) : '') + (s.pre ? '' : ', taken after the tip') + ' · shown, not scored</span></div>' +
+      '<table><thead><tr><th>Market</th><th>Side</th><th>Bets</th><th>Money</th><th>Gap</th></tr></thead><tbody>' + rows + '</tbody></table>' +
+      (mine ? '<div class="dms">The decision\'s side (' + esc(mine.label) + ' at DraftKings) has ' + mine.money + '% of the money on ' + mine.bets + '% of the bets: <b>' +
+        (mine.gap >= NBA_SPLITS_GAP ? 'the larger bets are with it' : mine.gap <= -NBA_SPLITS_GAP ? 'the larger bets are on the other side' : 'no gap of ' + NBA_SPLITS_GAP + ' points either way') + '</b>.</div>' : '') +
+      '<div class="dmn">A side in bold has ' + NBA_SPLITS_GAP + ' points or more of the money than of the bets: the larger bets are on it. One book\'s customers, thin early in the day, and kept from 19 Nov to be measured. Backing the side a line had already moved to went 752-698 on spreads and 933-930 on totals at the closing number.</div></div>';
+  }
+  function nbaMoneyLoose() {   // a game in the form with a count and no lines yet: the count's own block, so it shows before the odds are loaded
+    var inp = snapshot(); if (!nbaSplitsOf(inp.nbasplits)) return "";
+    return nbaMoneyPanel(inp, (($("away") || {}).value || "").trim() || "Away", (($("home") || {}).value || "").trim() || "Home", null, false);
   }
   function nbaDecWhy(c, row, m) {
     var inp = row.inputs || {}, pc = function (p) { return (100 * p).toFixed(1) + "%"; }, li = [], V = null, all = nbaCallsRecord();
@@ -2076,10 +2092,6 @@
     /* the crew */
     var names = nbaCrewNames(inp.ncrew), cl = null; try { cl = nbaCrewLean(row); } catch (e) { cl = null; }
     if (names.length) li.push(["The crew", esc(names.join(", ")) + (cl ? ": " + (cl.lean === "even" ? "no lean (z " + sgn(cl.z, 1) + ")" : "leans " + cl.lean + " (z " + sgn(cl.z, 1) + ")") + ". A crew predicts the night's free throws, not the total: its lean alone went 56-59 on this season's games to 17 Nov, so it is a voice and not a call." : ": not in the table.")]);
-    /* where the money is: DraftKings' count of the bets and the money, from the odds run (19 Nov 2026) */
-    var spl = nbaSplitsOf(inp.nbasplits);
-    if (spl) li.push(["Where the money is", nbaSplitsWords(spl, row.away, row.home, c)]);
-    else if (!hasFinals(row.finals)) li.push(["Where the money is", NBA_SPLITS_NONE]);   // a graded game keeps its card as it was
     /* what else speaks on the game */
     var ks = nbaCallKinds(row); nbaCallLive(ks, all);   // marks a read that repeats a cold call's pick
     var also = ks.filter(function (x) { return x.kind !== c.kind; }).map(function (x) {
@@ -2098,7 +2110,7 @@
   function nbaDecisionBlock(pk, m, fin) {
     var row = nbaDecRow(m, fin), c = null;
     try { c = nbaCallOf(row); } catch (e) { c = null; }
-    if (!c) return pickBlock(pk, m, "NBA");
+    if (!c) return pickBlock(pk, m, "NBA") + nbaMoneyPanel(row.inputs, row.away, row.home, null, hasFinals(row.finals));
     var kd = NBA_CALL_KINDS.filter(function (q) { return q[0] === nbaCallBucket(c); })[0], rec = nbaCallsRecord()[kd[0]], given = nbaCallsRecord().given;
     var res = fin ? nbaCallRes(c, row) : null, V = null; try { V = nbaVoices(row); } catch (e) { V = null; }
     var o = nbaOddsBlock(row.inputs), where = c.app ? esc(bookName(c.app)) : (o && o.book && (c.kind === "read" || c.kind === "sheet" || c.kind === "rule") ? esc(bookName(o.book)) + ", the card's book" : "");
@@ -2111,6 +2123,7 @@
       '<div class="dplace">' + (big === sgn(c.price, 0) ? (where ? 'at ' + where + ' · ' : '') : sgn(c.price, 0) + (where ? ' at ' + where : '') + ' · ') + 'needs ' + (implied(c.price) * 100).toFixed(1) + '%</div>' +
       '<div class="dkind"><b>' + esc(kd[1].replace(/^[A-Z]+ · /, "")) + '</b> · ' + esc(nbaCallRecWords(rec)) + ' · ' + esc(NBA_DEC_STRENGTH[c.kind] || "") + '</div>' +
       '<div class="why"><b>Why</b>: ' + nbaDecCallWords(c, row, m, V) + '</div>' +
+      nbaMoneyPanel(row.inputs, row.away, row.home, c, hasFinals(row.finals)) +   // where the money is, in a box of its own (19 Nov 2026)
       (why.length ? '<ul class="dwhy">' + why.map(function (x) { return '<li><b>' + esc(x[0]) + '.</b> ' + x[1] + '</li>'; }).join("") + '</ul>' : '') +
       '<div class="also">The decision as given, one a game: ' + esc(nbaCallRecWords(given)) + '. Each kind keeps its own line in the NBA record. A measured kind that has lost here over ' + NBA_CALL_COLD + ' or more calls steps out of the order; the sheet\'s own read steps out only under four wins in ten over as many; the likelier winner always stands.</div></div>';
     var lb = likely && likely.key === c.key && likely.side === c.side ? "" : likelyBlock(likely, pk).replace("Likeliest at any price · not the pick", "Likeliest at any price · not the decision");

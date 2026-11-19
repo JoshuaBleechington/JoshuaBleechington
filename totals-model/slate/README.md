@@ -424,10 +424,11 @@ measured against the close and the finals (NBA.md, "Three in-play ideas
 and where the money goes"). The read comes before the odds file is
 written, so each basketball row of the file carries its game's newest
 count (the hidden box `nbasplits`: `{at, upd, n, ml, sp, tot}`), and the
-page shows it on the game's card: a gold chip in tonight's signals for
-the widest gap and a "Where the money is" line in the decision's why
-(CALLSHEET3.md, "Where the money is, on the game card"). Shown, never
-scored. The run still ends on its credits line and its "Wrote" line.
+page shows it on the game's card: a boxed section of its own, "Where
+the money is", under the decision's why (a row a market: the side, its
+share of the bets and of the money, the gap), and a chip in tonight's
+signals on every game not yet played (CALLSHEET3.md, "Where the money
+is, on the game card"). Shown, never scored. The run still ends on its credits line and its "Wrote" line.
 
 **The history mode**, for the backtest. `python slate.py odds-history
 --season 20252026`, or **Run odds history.bat**, pulls a past season's

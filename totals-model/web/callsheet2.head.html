@@ -182,6 +182,23 @@
   .pickcard.decision ul.dwhy { margin: 8px 0 0; padding-left: 17px; font-size: 12.5px; color: var(--ink-2); line-height: 1.5; }
   .pickcard.decision ul.dwhy li { margin: 5px 0; }
   .pickcard.decision ul.dwhy li b { color: var(--ink); }
+  /* where the money is (19 Nov 2026): a box of its own on the basketball card, gold as a watch is; dashed and plain where there is no count yet */
+  .dmoney { margin: 10px 0 4px; padding: 9px 11px 8px; border: 1.5px solid var(--edge); border-radius: 10px; background: var(--edge-wash); }
+  .dmoney.none { border-style: dashed; border-color: var(--rule-firm); background: var(--surface); }
+  .dmoney .dmh { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 9px; margin-bottom: 5px; }
+  .dmoney .dmh b { font: 800 10px/1 var(--sans); letter-spacing: .08em; text-transform: uppercase; color: #fff; background: var(--edge); padding: 4px 7px; border-radius: 999px; white-space: nowrap; }
+  .dmoney.none .dmh b { background: var(--surface-2); color: var(--ink-2); }
+  .dmoney .dmh span { font-size: 11.5px; color: var(--muted); }
+  .dmoney table { width: 100%; border-collapse: collapse; font-size: 12.5px; margin: 2px 0 6px; }
+  .dmoney th { font: 700 9.5px/1.2 var(--sans); letter-spacing: .06em; text-transform: uppercase; color: var(--muted); text-align: right; padding: 2px 6px 4px; }
+  .dmoney th:nth-child(-n+2) { text-align: left; }
+  .dmoney td { padding: 4px 6px; border-top: 1px solid var(--rule); text-align: right; font-variant-numeric: tabular-nums; color: var(--ink-2); }
+  .dmoney td:first-child { text-align: left; color: var(--muted); font-size: 10.5px; text-transform: uppercase; letter-spacing: .05em; white-space: nowrap; }
+  .dmoney td.s { text-align: left; color: var(--ink); }
+  .dmoney tr.hot td { color: var(--ink); font-weight: 700; }
+  .dmoney .dms { font-size: 12.5px; color: var(--ink); line-height: 1.45; margin: 2px 0 5px; }
+  .dmoney .dmn { font-size: 11.5px; color: var(--muted); line-height: 1.45; }
+  .dmoney .dmn b { color: var(--ink-2); }
   .likelycard { border: 2px dashed var(--ink-2); border-radius: 10px; padding: 10px 14px; margin-bottom: 10px; }
   .likelycard.altcard { border-color: var(--go); border-style: solid; }
   .likelycard .lab { font-size: 11px; color: var(--ink-2); font-weight: 800; letter-spacing: .08em; text-transform: uppercase; }

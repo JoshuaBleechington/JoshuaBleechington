@@ -1466,3 +1466,86 @@ record to test again and build before the trade deadline. Until then the
 decision card names it as a watch on a game that qualifies (from the props
 run's own count of the games each man has missed) and scores nothing.
 
+## When the lines go up, and the opener against the close, 19 Nov 2026
+
+The user: "What times are the odds released for the gamelines each day
+with the betting apps I use? That way I can set my alarm to get up
+earlier to see if there's value I can find when the lines first come
+out?"
+
+**When.** No book publishes a time and a search found none. Watched for
+one night, free, on ESPN's scoreboard, whose book is DraftKings (lab
+`lines_watch.py`, a look every five minutes, Eastern time), for the four
+games of Thursday 19 Nov:
+
+| Game | The line first showed | The clubs the night before |
+| --- | --- | --- |
+| Clippers @ Spurs | Wed 9:35 to 9:40 pm | neither played |
+| Knicks @ Timberwolves | Wed 11:26 to 11:31 pm | neither played |
+| Warriors @ Grizzlies | Wed 11:41 to 11:46 pm | both played (7 and 8 pm tips) |
+| Trail Blazers @ Bucks | Wed 11:51 to 11:56 pm | the Bucks played (7 pm tip) |
+
+The spread, the total and the moneyline of a game showed in the same
+look, and the number ESPN's game page keeps as the "open" is the number
+first seen. At the same hour all twelve NHL games of the next day were
+already up and none of the day after. In the user's own saved sheets of
+six game days, FanDuel, BetMGM, Fanatics and DraftKings each had a total
+and a moneyline on every game by the time the sheet was saved (10:21 am
+to 12:03 pm). So the NBA opener is a thing of the late evening before,
+about twenty to twenty-two hours ahead of the tip, and not of the early
+morning. One night and one book: the other three apps have no free feed
+to watch.
+
+**The opener against the close** (lab `open_close.py`,
+`open_run_close.py`; DraftKings' opening and closing total, spread and
+moneylines off ESPN's game pages, 978 games of 2025-26 from 24 Nov and
+the 205 of 2026-27 to 16 Nov; the user's morning slate run from the
+"opened X and sits Y" line each row was logged with):
+
+| | 2025-26 | 2026-27 |
+| --- | --- | --- |
+| The total, open to close: mean move | 2.70 points | 2.29 |
+| ... a point or more | 88% of games | 83% |
+| The spread, open to close: mean move | 1.49 | 1.67 |
+| The final total: the opener's miss, the close's | 14.94, 14.67 | 14.58, 14.10 |
+| The total moved a point or more: WITH the move at the opener's number (hindsight) | 502-362, 58.1% | 98-73, 57.3% |
+| ... with it at the close | 440-424 | 86-85 |
+| The spread moved a point or more: with the move at the opener's number (hindsight) | 434-304, 58.8% | 91-67, 57.6% |
+| ... with it at the close | 398-340 | 75-83 |
+| Every game, the over at the opener | 487-491 | |
+| Every game, the home side at the opener | 488-490 | |
+| The opening favourite at its opening price, and the same side at the close | -4.6%, -5.1% a bet | +2.8%, +3.2% |
+| The rested club against one on the second night, at the opener's spread | 117-115 | 25-23 |
+| ... the spread then moved toward the rested club by | 0.73 | 0.96 |
+| The over behind a tired favourite: at the close, at the opener | 28-15, 29-14 | 5-2, 5-2 |
+| ... the total moved after the open by | +1.16 (up 23, down 17) | -0.29 |
+
+By the morning run (2026-27, 205 games): the total had already moved
+1.90 points on average and a point or more on 80% of games; where it
+ended a point or more from its opener, a median 75% of that move was
+made. With the day's full move in hindsight the opener's number won
+57.3%, the run's number 53.8% and the close 50.3%. With no hindsight,
+following the overnight move at the run's number went 83-82, and after
+the run the line went on the same way 56 times and back 55.
+
+What it says:
+
+- The opening number is soft. It moves a point or more on five games in
+  six, most of it overnight, and the side the line then moves to wins 57
+  to 58% at the opener's number and a coin at the close.
+- Nothing tested says which way a line will move: not the side, not the
+  over, not rest, not the favourite's price, not the move already made.
+  A first reading that the favourite was cheaper at the open (-1.6%
+  against -4.4% a bet) was the closing favourite read back, which is
+  hindsight; the opening favourite at its opening price is the same
+  cost as at the close.
+- The one measured call it touches is the over behind a tired favourite,
+  which did as well at the opener as at the close (29-14 and 28-15) with
+  the total a point higher by the close last season; on 43 games that is
+  a note and not a rule. Its opener goes up around midnight, after the
+  favourite's game ends.
+- So an early alarm buys nothing measured here. The numbers that have
+  paid on this page are late ones: an app's total a point off the middle
+  of the books went 78-70 at the day's first snapshot (about noon) and
+  105-84 at the last one before the tip.
+

@@ -162,6 +162,13 @@ Three double-click files, in this order on a game day:
    its prices, the first-half total, the spread and the moneylines fill
    from the carded book. Run it early for the opener and again before tip
    for the close.
+3b. **Run money.bat**, or `python slate.py splits --sports NBA` (19 Nov
+   2026), any time and as often as wanted: DraftKings' own count of the
+   bets and the money on the day's games, free. The odds run reads it too
+   and its file carries the count onto each game; this refreshes it
+   between odds runs. It writes `splits-DATE.json`: **Saving → Load
+   slate**, pick it, and the "Where the money is" box on tonight's games
+   updates with no line or price touched.
 4b. **Close NBA props.bat**, or `python slate.py nba-props --close` (6 Nov
    2026), a few minutes before the first tip: the same props as the books
    post them then, written as `nba-props-close-DATE.json`. Load it on the

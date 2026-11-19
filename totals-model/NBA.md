@@ -1819,3 +1819,65 @@ close.
   cheap. The user's own note of the live line at the moment (the score,
   the quarter, the price offered) is the practical source.
 - **The splits**, which the run now keeps for nothing.
+
+### 9. The professionals' own method: the sharp book's fair price against the four apps
+
+The user, later the same day: "I'm thinking sharp money information from
+pros might help us." The professionals' money shows first in the book
+they bet into, and that book has been beside the four apps in every pull:
+Pinnacle. What had been measured on it already, on NBA games: its total
+against the apps' middle as a guide to the side, 227-234 last season and
+46-41 here; its price shade, 29-27 at the last snapshot, 15-26 at the
+opener and 8-22 here (off the NBA card since 12 Nov); the crowd on Kalshi
+against it, 2-5; and on props, its price no nearer the outcome than the
+carded book's (Brier 0.2468 each, every book's consensus 0.2467).
+
+Not yet measured was the way a professional uses it: take the sharp
+book's two prices, remove its margin, call that the fair chance, and bet
+any app that pays more. Run on the moneyline, the spread and the total
+(lab `topdown.py`, `topdown2.py`; a number that differs from the sharp
+book's is priced from its own number with a game as wide as the season
+was around it, 13.7 points of margin and 17.8 of total), on five samples:
+2024-25 at the first snapshot, about noon on the day and the last before
+the tip, and this season's 222 graded rows at the first odds run and the
+newest.
+
+**Whose number is best**, the same games for every book:
+
+| | Pinnacle | Fanatics | DraftKings | FanDuel | BetMGM | The middle of the four |
+| --- | --- | --- | --- | --- | --- | --- |
+| The winner, log loss, 2024-25 last snapshot (794) | 0.5761 | 0.5759 | 0.5765 | 0.5770 | 0.5759 | 0.5762 |
+| ... about noon (785) | 0.5740 | 0.5739 | 0.5743 | 0.5738 | 0.5739 | 0.5738 |
+| ... this season, the newest run (142) | 0.5555 | 0.5550 | 0.5559 | 0.5564 | 0.5554 | 0.5558 |
+| The total, mean miss, 2024-25 last snapshot (796) | 13.925 | 13.905 | 13.925 | 13.913 | 13.920 | 13.911 |
+| ... this season, the first run (222) | 14.128 | 14.171 | 14.140 | 14.171 | 14.144 | 14.154 |
+| The spread, mean miss, 2024-25 last snapshot (786) | 10.817 | 10.798 | 10.787 | 10.811 | 10.771 | 10.794 |
+| ... this season, the first run (222) | 11.277 | 11.304 | 11.288 | 11.279 | 11.338 | 11.314 |
+
+Nothing separates them. On NBA game lines the sharp book knows nothing
+the four apps do not already show, at noon or near the tip.
+
+**The bets the method gives**, one a game a sample (a game can count in
+more than one sample):
+
+| | Every sample | 2024-25 | This season |
+| --- | --- | --- | --- |
+| Moneyline, an edge of 2% and more | 38-160, -33.0u | 37-140, -13.5u | 1-20, -19.4u |
+| Spread, 1% and more | 23-38-1, -16.9u | 19-29-1 | 4-9 |
+| Total, 1% and more | 63-46-1 (57.8%), +11.5u | 54-39 | 9-7-1 |
+| Total, 2% and more | 26-15, +8.8u | 23-14 | 3-1 |
+
+The moneyline bets are nearly all long dogs, an artefact of removing the
+margin evenly when a book keeps more of it on the dog: with the margin
+removed by the power method 18 bets are left at 2% and they went 6-12.
+The spread bets lose. The total bets win, and every one of them is an
+app whose number is better than the sharp book's by enough to matter:
+the best number on the board, which the page has called since 12 Nov
+against the middle of every book (105-84 last season, 48-42-1 here),
+seen from the other side. It is the same small edge, on fewer games.
+
+So the professionals' information, read through their book, is in the
+apps' numbers before the page sees them. The channel not yet measured is
+the one section 7 began to log: the share of the money against the share
+of the bets. A second full season for this test is on the user's machine
+if `odds-history-NBA-2025-26.json` was pulled (already paid for).

@@ -5968,3 +5968,41 @@ a graded game with and without a count, and a game with a count and no
 lines), against 52 copies broken on purpose and an untouched control;
 the two older checks that had taken the line into their lists went back
 to what they were; 1,371 in all, passing.
+
+### 8. The first night, 19 Nov
+
+From the user's backup of 20 Nov (lab `money_night.py`). The count
+reached his sheet: the four games of the 19th carry it from his last odds
+run (5:53 pm Eastern, four counts kept in his log), and the nine games of
+the 20th carried the morning's by 10:38 am.
+
+The count on the row against the finals, at DraftKings' own number:
+
+| Game (final) | Spread | Total | Moneyline |
+| --- | --- | --- | --- |
+| Warriors 98, Grizzlies 126 | Grizzlies -5.5, 65% on 63%: won | under 225.5, 78% on 61%: won | Grizzlies, 90% on 79%: won |
+| Clippers 112, Spurs 124 | Spurs -15.5, 73% on 60%: lost | over 224.5, 56% on 49%: won | Spurs, 89% on 88%: won |
+| Trail Blazers 124, Bucks 114 | **Trail Blazers -11.5, 87% on 65%: lost** | under 230.5, 73% on 61%: lost | Trail Blazers, 92% on 95%: won |
+| Knicks 102, Timberwolves 99 | **Knicks -1.5, 89% on 58%: won** | **under 216.5, 79% on 50%: won** | Knicks, 85% on 70%: won |
+
+The sides twenty or more apart went 2-1 (+0.9u); every market's named
+side 9-3. Earlier counts of the same night held here: at 3:08 pm the
+sides twenty apart went 3-2 (the under in Trail Blazers at Bucks, 99% of
+the money then, lost by seven and a half) and at 4:59 pm 2-0. One night:
+a note, not a reading.
+
+One game had the decision against the money. Knicks at Timberwolves: the
+decision was the over 215.5 at FanDuel (the best number on the board) and
+the box said the under had 79% of the money on 50% of the bets; it ended
+201. On Warriors at Grizzlies the decision, the under 225.5 at DraftKings,
+had no gap of twenty either way and won by a point and a half.
+
+The night otherwise: the decision as given 3-1 (140-85-1, +3.4u on the
+season); no prop BET and the leans 11-8 (+0.2u); the user's 16 marked
+bets 9-6 with one pair void (+1.0u): four game bets 4-0, two calls on the
+game 1-1, two props 1-1, the same-game pairs 3-4.
+
+The morning count of the 20th showed a side twenty apart on all nine
+games (Nets +5.5 with 79% of the money on 22% of the bets), which is what
+a count of a few early bets looks like; the count worth reading is the
+last one before the tip.

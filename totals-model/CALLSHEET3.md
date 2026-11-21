@@ -6166,3 +6166,348 @@ men as the losses: a hint only.
   replay. The past seasons hold no prop lines, so this one rests on the
   season in hand.
 - The money read at about 150 games, as before.
+
+## The expected five as a role, 21 Nov 2026
+
+The user, told the morning's two pointers: "Yes start with the first one
+bro", and while it ran: "You're awesome bro. find anything and everything
+and let me know if you need anything from me to help". The first was a
+starter's minutes when teammates are newly out.
+
+### 1. The first one, measured: nothing there
+
+Every game a rotation man played in four seasons with five behind him,
+through `props_project` as the file stood, who sat read off who played
+(lab `e2e7.py`, `e2e7_read.py`; 58,755 games). A man who started all of
+his last five and starts tonight, by the regulars newly out against the
+games his minutes are read from:
+
+| Newly out | Games | Played against the read |
+| --- | --- | --- |
+| none | 11,746 | +0.08 |
+| up to 15 mpg | 5,758 | +0.41 |
+| 15 to 30 | 5,765 | +0.33 |
+| 30 to 45 | 3,168 | +0.41 |
+| 45 to 60 | 1,304 | +0.26 |
+| 60 and more | 632 | -1.06 |
+| 25 and more | 7,122 | +0.23 (t 3.4) |
+
+By season at 25 and more: +0.49, +0.27, -0.11, +0.54. Guards +0.51,
+forwards +0.21, centres 0.46 under the read. The lever on who is out
+(13 Nov) already carries it; a third of a minute is left, and nothing to
+build. The three nights of the morning's note (1.53 over on 79 men) were
+the tail.
+
+A correction to that note. It said the book's line had Poeltl near 30
+minutes. That was BetMGM's 8.5 rebounds, the carded line; the middle of
+the seven books was 7.5, about 27 minutes at his rate, and the consensus
+lever had already taken 3.7 points off that under.
+
+### 2. What the same games showed: the role
+
+Poeltl had started three of his last five and RotoWire's expected five
+had him starting. The run reads a man's games in tonight's role only when
+the five is CONFIRMED; under an expected five it reads his games of any
+kind. That was measured on 15 Nov with 139 men and left, the mix reading
+the chance worse on the nights then in hand. With 25 nights:
+
+The expected five's record (2,489 men-nights under an expected five, 26
+Oct to 20 Nov, against who started; lab `exp_role.py`):
+
+| It said | His starts in his last five | Men | Right |
+| --- | --- | --- | --- |
+| starts | all five | 1,217 | 98.4% |
+| starts | three or four | 103 | 80.6% |
+| starts | one or two | 69 | 76.8% |
+| starts | none | 21 | 71.4% |
+| bench | none | 329 | 94.2% |
+| bench | one or two | 142 | 81.7% |
+| bench | three or four | 39 | 61.5% |
+| bench | all five | 10 | 10.0% |
+
+A new role named: 441, right on 340 (77.1%); to start 231 (79.7%), to
+the bench 210 (74.3%).
+
+The minutes of a man told he starts in a role he has not had in all his
+last five, mixed at w between the read as it stood and the path the run
+takes when the five is confirmed (his games as a starter, the role's own
+lever on who is out, the script and the top). Four seasons, each game
+counted by how often the expected five names such a man a starter (of
+those who then started 44, 67 and 85% by none, one or two and three or
+four starts; of those who did not 2, 12 and 45%); and the 24 graded
+nights through the run itself. He played less the read / the mean miss:
+
+| | w = 0 | 0.3 | 0.5 | 0.7 | 1.0 |
+| --- | --- | --- | --- | --- | --- |
+| Four seasons, started none | +3.32 / 6.14 | +1.68 / 5.64 | +0.60 / 5.55 | -0.49 / 5.66 | -2.13 / 6.16 |
+| started one or two | +2.09 / 5.53 | +0.89 / 5.31 | +0.09 / 5.31 | -0.72 / 5.42 | -1.92 / 5.77 |
+| three or four, his last game a start | +0.90 / 5.02 | +0.36 / 4.92 | -0.01 / 4.89 | -0.37 / 4.90 | -0.92 / 4.97 |
+| three or four, his last game off the bench | -0.74 / 5.05 | -1.65 / 5.26 | -2.26 / 5.50 | -2.86 / 5.80 | -3.77 / 6.34 |
+| Graded nights, started none (21 men) | +3.50 / 5.06 | +1.98 / 4.66 | +0.96 / 4.81 | -0.05 / 5.07 | -1.57 / 5.78 |
+| started one or two (69) | +4.67 / 5.92 | +3.49 / 5.10 | +2.69 / 4.71 | +1.90 / 4.41 | +0.71 / 4.32 |
+| three or four, last game a start (89) | +1.24 / 4.80 | +0.63 / 4.72 | +0.22 / 4.70 | -0.19 / 4.72 | -0.81 / 4.78 |
+| three or four, last game off the bench (14) | +2.02 / 4.71 | +1.59 / 4.63 | +1.30 / 4.65 | +1.01 / 4.73 | +0.57 / 4.84 |
+
+The four seasons take the expected five's misses as falling at random
+among such men, which is hard on the mix (a man it names wrongly is
+nearer a starter than the average bench man: on the nights the role read
+ran 4.0 over what such a man played, not the six or seven of the
+seasons). The nights are 193 men. Both are better at a half than as it
+stood, in the bias and in the miss; past a half the seasons turn.
+
+To the bench the same mix measured nothing: a man who started none of
+his last five and is not in the expected five played 0.02 under the read
+(329 men; the seasons 0.44 under, which half the confirmed five's 0.96
+would level and leave the miss at 4.62). One who started one or two and
+came off the bench in his last game played 0.85 under (104 men; on the
+seasons every man told the bench after one or two starts, 0.77): small,
+the miss unmoved, on record.
+
+### 3. The rule
+
+`PROPS_EXPECTED_START = 0.5`, `PROPS_EXPECTED_FEW = 2` (slate.py,
+`props_project`, after the top of the minutes). RotoWire's EXPECTED five
+has him starting; five games or more behind him this season; he has not
+started all of his last five; and either he started two or fewer of
+them, or three or four with his last game a start. Then his minutes are
+read half way from the read above (his games of any kind through every
+lever) to the minutes of the same call with the five taken as confirmed.
+The row keeps `mix` {w, any, role, dmin, games, how}, a part `mix` ("The
+expected five: his games as a starter") and a why line; the levers' mark
+is 5. A confirmed five, a man told he is on the bench, a starter all
+along, under five games, and a run with no five named read as before.
+
+### 4. Before and after, row for row
+
+Four seasons through the file before and after (lab `e2e8_read.py`;
+64,108 games, five reads of each): only the read "told he starts by an
+expected five" moves, and only for the two kinds (24,809 of 25,008 games
+of the first, 3,002 of 3,090 of the second; the rest by under a twentieth
+of a minute). Counted as the expected five names them:
+
+| | Before | After | By season, the miss |
+| --- | --- | --- | --- |
+| Started two or fewer | +2.45 / 5.72 | +0.23 / 5.39 | 5.97 5.76 5.52 5.19 to 5.67 5.38 5.21 5.04 |
+| Three or four, last game a start | +0.89 / 5.03 | -0.03 / 4.90 | 5.12 4.99 5.01 4.91 to 5.03 4.86 4.85 4.84 |
+| Every man told he starts | +0.38 / 4.38 | +0.10 / 4.34 | |
+
+The 24 graded nights, every row re-projected by the file before and
+after with the row's own line, prices, books, spread, role and report
+(lab `replay_role22.py`, `replay22_read.py`; 16,052 rows): 586 of 587
+rows of the first kind and 602 of 610 of the second change, two rows of a
+man with both an expected and a confirmed run, and nothing else (0 of
+2,877 told the bench, 0 of 9,291 starters all along, 0 of 2,347 under
+five games, 0 of 87 with the last game off the bench).
+
+| | Before | After |
+| --- | --- | --- |
+| Minutes, started two or fewer (90 men) | +4.40 / 5.72 | +2.28 / 4.73 |
+| first 12 nights (36) | +2.49 / 4.33 | +0.54 / 4.47 |
+| last 12 nights (54) | +5.67 / 6.64 | +3.44 / 4.90 |
+| Minutes, three or four, last game a start (89) | +1.24 / 4.80 | +0.22 / 4.70 |
+| Minutes, every man with a prop (2,308) | +0.32 / 4.213 | +0.20 / 4.171 |
+| What they did against the projection, the first kind | 19.4% over it | 10.3% over |
+| the second kind | 2.9% over | 0.7% under |
+| The over's chance by the model, the first kind (it landed 49.2%) | 39.0% | 44.7% |
+| Brier, the blend, the first kind (the book 0.24388) | 0.24415 | 0.24284 |
+| Brier, the blend, the second kind (the book 0.24928) | 0.24883 | 0.24906 |
+| Brier, the blend, every row (the book 0.24797) | 0.24785 | 0.24781 |
+| The model's earned share, every row | 0.142 | 0.156 |
+| from 5 Nov | 0.148 | 0.181 |
+| The BET and LEAN picks, every night | 783-674, -53.3u | 730-623, -46.8u |
+| one a man a night | 373-310, -34.0u | 363-295, -26.9u |
+| from 5 Nov | 465-381, -13.3u | 434-336, +5.9u |
+
+### 5. What it does not do
+
+It does not win back 20 Nov: that night replays two units worse with the
+mix (30-41 to 25-39). Night by night the picks are better on nine nights
+and worse on nine; six and a half units over 24 nights is no measure.
+What is measured is the minutes and the projection on a tenth of the
+men, who carry a fifth of the picks: the read was low on them every
+season and on both halves of the nights, and their unders came from it
+(on the first kind the model said the over 39% of the time where it
+landed 49%). On the first twelve nights the miss on the first kind is a
+tenth of a minute worse with the mix and the bias two minutes better.
+
+### 6. Checked
+
+- slate.py's self-test: 323 checks, one new ("the expected five as a
+  role": the half way, the part and the mark, the why line, the two
+  kinds, and the six cases read as before), three marks moved to 5, the
+  role check's expected-five clause moved to the new check.
+- 16 broken copies of slate.py (the weight, the two-or-fewer line, five
+  games, the bench, any source, the sign, the part, the mark, the last
+  game either way, the base read for the role path, the rounded minutes,
+  the levers' mark, the threshold, the part's rate, the minutes not
+  added): each fails the self-test, the control passes (lab
+  `mk_mix_mutants.py`). One change is no change and is off the list: the
+  role read's own guard, since a confirmed path with no role read is the
+  same path.
+- The row-for-row replays above: nothing outside the rule moves.
+- The page (v175): `mix` kept off the file and through the trim; a line
+  of its own on the card and the panel ("Minutes: RotoWire's expected
+  five has him starting ... the read sits half way between: +4.6
+  minutes"); the mix a lever in the tally and among those that take the
+  start to the projection, not inside the start; a record tile, "The
+  expected five as a role (scored from 21 Nov 2026)", drawn from the
+  first such man graded: the BET and LEAN picks on such men by side, and
+  what the men played against the read and against the read without the
+  mix. Harness 1,374 checks (80 cases), three new; 22 broken copies of
+  the page each fail the new block, the control passes (lab
+  `mk_mixpage_mutants.py`).
+
+### 7. On record
+
+- Told he is on the bench having started one or two, his last game off
+  the bench: 0.85 under the read on 104 men, 0.77 on the seasons; small.
+- A starter all along with any regular newly out: a third of a minute
+  over the read (t 4 to 6 in each bucket); 60 mpg and more newly out, a
+  minute under. Too small to score.
+- The weight: the nights lean past a half (0.7: 1.45 over and 4.57 on
+  the first kind), the seasons turn there. To read again at fifty nights.
+
+## The sweep: "find anything and everything", 21 Nov 2026
+
+With the lever built, the rest of the props were swept for what else
+leaks: the book's own price against what happened, what the model's lean
+earns, and where the picks pay. Errors here are by resampling whole
+nights (2,000 to 3,000 draws): a man's eight markets and a night's games
+move together, and read row by row the same figures looked three times
+as sure (lab `sweep1.py` to `sweep4.py`, `shade_wf.py`, `homefav_min.py`,
+`home_gap.py`). Nothing in this section is built.
+
+### 1. The book's own price, no model in it
+
+Every graded prop on the backup, 31 nights (20 Oct to 20 Nov; 18,742
+with pushes and voids out), the carded book's two prices with the hold
+(7.0% on average) taken out:
+
+| | Props | Over landed | The price says | Gap | Every under | Every over |
+| --- | --- | --- | --- | --- | --- | --- |
+| Every prop | 18,742 | 47.4% | 49.6% | -2.2 (±0.6) | -2.4% a bet (±1.1) | -10.8% |
+| At home | 9,303 | 46.0% | 49.7% | -3.7 (±0.8) | +0.3% (±1.5) | -13.5% |
+| On the road | 9,439 | 48.7% | 49.5% | -0.8 (±1.0) | -5.0% (±1.9) | -8.2% |
+| At home, favoured by 3.5 or more | 4,395 | 44.8% | 49.7% | -4.8 (±0.8) | +2.5% (±1.6) | -15.7% |
+| At home, a dog of 3.5 or more | 2,789 | 47.5% | 49.7% | -2.2 (±1.9) | -2.3% (±3.5) | -10.6% |
+| On the road, favoured by 3.5 or more | 3,191 | 47.8% | 49.4% | -1.6 (±1.8) | -3.6% (±3.3) | -9.6% |
+| On the road, a dog of 3.5 or more | 4,107 | 50.2% | 49.6% | +0.6 (±1.8) | -7.8% (±3.3) | -5.6% |
+
+By thirds of the nights the gap at home is -3.5, -4.8 and -2.5 and on
+the road -1.6, -2.2 and +0.9: home under road each time. By the spread
+alone: a favourite of 7.5 or more -4.0 (±1.2), a dog of 3.5 to 7.5 +0.1.
+By market: points + rebounds -4.0 (±0.9), the three together -3.4,
+points + assists -2.9, points -2.4, rebounds -1.8, assists -1.1 (±1.0),
+threes -0.7 (±0.8). By the under's own price the gap is level, -1.3 to
+-2.7 from -200 to plus money. A man read under 22 minutes -4.4 (±1.7),
+off the bench -5.2; read 22 to 26, +0.3.
+
+So the over is the public's side and the books lean every line to it by
+two points, as measured on 5 Nov; what is new is where. On a home
+favourite's man the under has paid with no model at all, and on a road
+dog's man the price is fair and the under gives the whole hold back.
+
+### 2. Why home and road
+
+Each man his own control (three games or more each way, ten minutes or
+more), what he does a minute at home against on the road:
+
+| Season | Points | Rebounds | Assists | Threes |
+| --- | --- | --- | --- | --- |
+| 2023-24 | +1.8% | +2.0% | +3.8% | +2.3% |
+| 2024-25 | +1.6% | +0.7% | +3.1% | +4.0% |
+| 2025-26 | +1.2% | +0.1% | +1.7% | +2.9% |
+| 2026-27, 235 games | 0.0% (±1.4) | -1.6% (±2.3) | +2.3% (±2.9) | -1.8% (±4.1) |
+
+The home side has won 50.2% of this season's games by 1.1 points. The
+home edge has been falling for three seasons and has not shown this one;
+the books' lines and the run's own home and road lever (+0.7% points,
++1.1% assists, +1.6% threes at home, measured on the three seasons
+before) both still carry it. On the 24 graded nights as the file stands,
+at home men did what was projected to the tenth of a percent and on the
+road 2.9% more; a road dog's starters 4.7% more, the model saying the
+over 45.9% of the time where it landed 51.4% (±2.1).
+
+One more piece from the four seasons, the role known (lab
+`homefav_min.py`): the game script cuts a starter's minutes by the
+expected margin whichever side he is on, and a big dog's starters played
+over the read, 0.93 minutes at home and 0.54 on the road for a dog of 8
+or more (t 6.1 and 5.6), 0.33 and 0.24 for a dog of 3.5 to 7.5; a
+favourite of 7.5 or more 0.15 under at home and 0.26 over on the road.
+
+### 3. A shade by class, walk-forward: not built
+
+The gap of each class (home or road, favoured by 3.5 or more or not)
+measured on the nights before each night, shrunk to the pooled figure,
+read onto the book's chance; the blend, the side and the band drawn as
+the run draws them; 19 nights from 1 Nov:
+
+| | BET band | LEAN band |
+| --- | --- | --- |
+| As it stands | 35-24, +2.5u | 500-399, -6.7u |
+| One shade for every prop | 257-209, -14.0u | 2,131-1,818, -31.8u |
+| A shade for each class | 297-250, -21.0u | 2,113-1,793, -21.4u |
+| Home favourites' men only, their gap over the rest's | 59-41, +2.9u | 663-511, +22.7u |
+
+The blanket shade is what came off on 5 Nov, and for the same reason:
+the under's price eats it. Read on home favourites' men alone it took
+their picks from 125-105 (-6.0u) to 312-234 (+23.7u; the leans +4.2% a
+pick, ±3.1). Not built: nineteen nights, a class drawn after the look,
+and a season whose home edge may come back. It is the first thing to
+read again at fifty nights.
+
+### 4. What the model's lean earns
+
+The share of the model's gap from the book's chance that the results
+bear out (the blend gives it a fifth), the 24 nights as the file stands:
+every row +0.156 (±0.079). Where the model leans under +0.215 (±0.092),
+where it leans over -0.031 (±0.132), and by 0 to 5 points over -0.97
+(±0.39), which is the books' own lean and not the model's. Rebounds
++0.401 (±0.088), threes +0.018 (±0.164), the rest +0.09 to +0.16. Under
+five games behind him -0.109 (±0.195), nearly all of it the season's
+first fortnight. By
+thirds of the nights +0.12, +0.41 and +0.02. A fifth stands; nothing
+here is three errors from it.
+
+### 5. The picks by class
+
+The BET and LEAN picks of the 24 nights as the file stands, a unit a
+pick: 730-623, -46.8u, -3.5% a pick (±3.7).
+
+| | Record | A pick |
+| --- | --- | --- |
+| The BET band | 57-35, +7.4u | +8.0% (±12.7) |
+| The LEAN band | 673-588, -54.1u | -4.3% (±4.0) |
+| A man with under five games behind him | 153-184, -59.9u | -17.8% (±7.2) |
+| Five or more | 577-439, +13.1u | +1.3% (±4.1) |
+| Unders, rebounds | 65-39, +7.2u | +6.9% (±6.5) |
+| Unders, points and the points combinations | 387-337, -5.5u | -0.8% (±4.9) |
+| Unders, assists | 59-50, -9.3u | -8.5% (±6.6) |
+| Unders, threes | 45-36, -11.8u | -14.5% (±8.6) |
+| Unders priced -140 or shorter | 144-101, -14.7u | -6.0% (±4.4) |
+| Unders priced -139 to -111 | 354-269, +24.1u | +3.9% (±4.2) |
+| Unders priced -110 or longer | 116-145, -35.2u | -13.5% (±8.1) |
+| The sheet says 62% or more | 126-85, -15.5u | -7.4% (±4.7) |
+
+The whole replayed loss is the season's first fortnight, on men it had
+barely shown. The leans are not bets: the band is everything with an edge above
+nought and it has paid the hold back and no more. The picks the sheet is
+surest of are the heaviest prices, on threes and assists, and they have
+landed 59.7% where it said 66.1%: that is why the tickets by best chance
+stand 8-27 at two legs and 2-19 at three, and they should not be played.
+
+### 6. On record, in the order worth doing
+
+1. The tell on a prop by home and road beside the favourite's (shown,
+   not scored): a home favourite's man, a road dog's man.
+2. The game script by side: a dog's starter is cut as a favourite's is,
+   and on four seasons he played over the read. To be measured with the
+   real spreads and replayed.
+3. The home and road lever against this season: half the 2.9% the road
+   men ran over the projection is that lever if the season stays level.
+4. No pick on a man with under five games this season behind him: the
+   first fortnight's picks on such men lost 18% a pick. Late in a season it is the
+   man back from a long absence and the call-up.
+5. Threes and assists unders at the heaviest prices, and the under
+   priced -110 or longer: both on the watch tiles already.
+6. The shade for home favourites' men, at fifty nights.

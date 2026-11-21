@@ -6511,3 +6511,100 @@ stand 8-27 at two legs and 2-19 at three, and they should not be played.
 5. Threes and assists unders at the heaviest prices, and the under
    priced -110 or longer: both on the watch tiles already.
 6. The shade for home favourites' men, at fifty nights.
+
+## The home and road chip, 21 Nov 2026
+
+The user, told where the book's price had been off (the sweep, section 2):
+"Go bro, start with the chip". Page v176. Nothing in the model changed.
+
+### 1. What it is
+
+Each prop's card and panel now carries a chip that says where the man
+stands tonight and what the sheet's side has done there with no model in
+it:
+
+> On the road, a dog by 6.5 · with no model the under on a road dog's man
+> has landed 49.8% against a fair price of 50.4% (-0.7, the error 1.8,
+> 4255 props on 31 nights): -7.9% a bet, the over -5.4%
+
+Six classes: at home or on the road, and his club favoured by 3.5 or
+more, a dog by as much, or in a game inside 3.5 (a club favoured by 3.5 to
+the dot is a favourite and its opponent a dog). The pool is every graded
+prop on the page with both prices, a spread and a result off the line. The
+fair chance is the two prices with the hold taken out. The error is by
+night: a night's props move together, so each night's sum of (landed less
+fair) is one draw and the spread of those sums across nights gives the
+error.
+
+The colour:
+
+- **green** where the price has leaned against the other side by two
+  errors or more AND this side has paid at its prices;
+- **red** where it has leaned against this side by two errors or more;
+- no colour between, which is also where a side has the lean and has not
+  paid (the under on a home dog's man at -130 a side in the test).
+
+Nothing is drawn under 300 graded props of the class or under five
+nights, or where the game has no spread. Shown, not scored: it moves no
+chance and no band. It reads in the tells filter as a tell (the green and
+the red views), and it keeps no leg out of a ticket: the red-tell rule of
+the tickets excepts it, because it is the book's price by class and not a
+verdict on the leg.
+
+### 2. What it reads on the backup of 21 Nov
+
+| His club | Props | The over against its fair price | Every under | Every over |
+| --- | --- | --- | --- | --- |
+| At home, favoured by 3.5+ | 4,531 | 45.0% v 49.7%: -4.7 (the error 0.9) | +2.1% a bet | -15.4% |
+| At home, inside 3.5 | 2,172 | -3.0 (1.5) | -1.1% | -12.2% |
+| At home, a dog by 3.5+ | 2,867 | -1.9 (1.9) | -2.9% | -9.9% |
+| On the road, favoured by 3.5+ | 3,256 | -1.7 (1.8) | -3.4% | -9.7% |
+| On the road, inside 3.5 | 2,156 | -2.3 (2.0) | -2.3% | -10.8% |
+| On the road, a dog by 3.5+ | 4,255 | +0.7 (1.8) | -7.9% | -5.4% |
+
+So the chip is green on the under of a home favourite's man and red on
+his over (2,491-2,040 and +97.4u on every under there); red on the over of
+a home man in a game inside 3.5 (two errors under, and it lost 12%); and
+plain everywhere else. On a road dog's man the price is fair and the
+under has lost its hold and more (2,117-2,138, -337.9u).
+
+The twelve best cards of 20 Nov under it: nine unders with no colour,
+one green (Okongwu under 3.5 assists, at home favoured by 7.5: won) and
+two red overs (Buzelis over 1.5 assists, lost; Mara over 1.5 assists,
+won). Both BETs that lost that night were Poeltl's unders, "on the road, a
+dog by 6.5": the class where every under has lost 7.9% a bet. The chip
+would not have coloured them; it would have said in words that nothing
+was on that side.
+
+### 3. Where it shows
+
+- The best cards and the panel, with the other tells.
+- The tells filter on the table: a green chip and no red, or a red chip.
+- The record: "A home favourite's man (3.5+), every under with no model
+  (shown, not scored)" with every class at the minimum in its note, and
+  "A road dog's man (3.5+), every under with no model". They read off the
+  same pool as the chip and move as nights are graded.
+
+### 4. What it is not
+
+It is the season to date, read live. The season has shown no home edge
+(a man has done no more a minute at home than on the road; the home side
+has won half the games) while the books' lines still carry one, and that
+is the whole of the home favourite's under. If the edge comes back, or the
+books take it out, the gap closes and the chip loses its colour by
+itself. The class was drawn after the look, and a home favourite's under
+at +2.1% a bet is thin against its own error. It is a reason to prefer one
+side of a prop the sheet already likes, not a bet by itself.
+
+### 5. Tests
+
+Three checks in the harness (1,377 in all, every one passing): the chip's
+words and colour by class off a built record of six nights (green, red,
+plain on a fair price, plain on a side that has the lean and has not
+paid; nothing under 300 props, under five nights or with no spread; 3.5
+to the dot); the tells filter and the ticket that keeps a red-chipped leg;
+the record's two tiles and their note, and the same reading after the
+early nights are trimmed. 38 broken copies of the page (one change each:
+the minimum, the nights, the line, home for road, the sign of the gap, the
+units, the error's two halves, the ticket's exception and so on) each fail
+a check; the untouched copy passes all three.

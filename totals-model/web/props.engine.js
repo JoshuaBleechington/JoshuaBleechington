@@ -238,6 +238,35 @@
   var PROPS_TELL_MIN = 50;
   function propFav(r) { return r && r.spread !== null && r.spread !== undefined && isFinite(+r.spread) ? (r.athome ? -(+r.spread) : +r.spread) : null; }   // his club's margin on the spread, positive when favoured
   function propSpike(r) { var p = ((r && r.parts) || []).filter(function (p) { return p.k === "minutes"; })[0]; return p && isFinite(+p.eff) ? +p.eff : null; }   // the minutes lever: his last five against his season, in the stat's units
+  /* THE HOME AND ROAD CHIP (21 Nov 2026, the user, told where the book's price had been off: "Go bro, start with the chip"). With no model
+     in it, on every graded prop of 31 nights (18,742), the over landed 2.2 points under the fair chance of its two prices; at home 3.7
+     under and on the road 0.8; on a home favourite's man (his club favoured by 3.5 or more) 4.8 under (the error 0.8 by night), where
+     every under paid 2.5% a bet, and on a road dog's man 0.6 over, where every under lost 7.8%. The season has shown no home edge (a man
+     has done no more a minute at home; the home side has won half the games) and the lines still carry one. So each prop says where its
+     man stands: home or road, his club favoured by PROPS_VENUE_LINE or more, a dog by as much, or inside it; and, read live off the
+     page's own graded props, what the sheet's side has done there with no model: its rate against the price's fair chance, the gap and
+     its error by night, and a unit on every such bet. GREEN where the price has leaned against the other side by two errors or more
+     and this side has paid; RED where it has leaned against this side by two errors or more; no colour between. Nothing is drawn
+     until the class holds PROPS_VENUE_MIN graded props on PROPS_VENUE_NIGHTS nights. Shown, not scored: the chance does not move and
+     the chip keeps no leg out of a ticket. A shade on the book's chance for home favourites' men read well walk-forward on nineteen
+     nights and is on record to read again at fifty */
+  var PROPS_VENUE_MIN = 300, PROPS_VENUE_NIGHTS = 5, PROPS_VENUE_LINE = 3.5;
+  var PROPS_VENUE_WHO = { HF: "a home favourite's man", HD: "a home dog's man", HI: "a home man in a game inside " + PROPS_VENUE_LINE, RF: "a road favourite's man", RD: "a road dog's man", RI: "a road man in a game inside " + PROPS_VENUE_LINE };
+  function propVenueClass(r) {
+    var fv = propFav(r); if (fv === null) return null;
+    return (r.athome ? "H" : "R") + (fv >= PROPS_VENUE_LINE ? "F" : fv <= -PROPS_VENUE_LINE ? "D" : "I");
+  }
+  function propVenueLabel(r) {
+    var fv = propFav(r), c = propVenueClass(r); if (!c) return "";
+    return (r.athome ? "At home" : "On the road") + ", " + (c.charAt(1) === "F" ? "favoured by " + fv : c.charAt(1) === "D" ? "a dog by " + (-fv) : "a game inside " + PROPS_VENUE_LINE);
+  }
+  function propVenueRead(r, pools) {   // the class's pool as the pick's side reads it, or null under the minimum: {n, d, landed, fair, gap, se, ret, other, state}
+    var c = propVenueClass(r), v = c ? ((pools || propsTellPools()).venue || {})[c] : null;
+    if (!v || v.n < PROPS_VENUE_MIN || v.d < PROPS_VENUE_NIGHTS || v.se === null || (r.side !== "OVER" && r.side !== "UNDER")) return null;
+    var over = r.side === "OVER", gap = over ? v.g : -v.g, ret = over ? v.ro : v.ru;
+    return { c: c, n: v.n, d: v.d, landed: over ? v.y / v.n : 1 - v.y / v.n, fair: over ? v.f / v.n : 1 - v.f / v.n, gap: gap, se: v.se, ret: ret, other: over ? v.ru : v.ro,
+             state: (gap >= 2 * v.se && ret > 0) ? "green" : (gap <= -2 * v.se ? "red" : "plain") };
+  }
   var tellPools = null;   // cleared whenever the props change; the record and the chips read the same pools
   function propsTellPools() {
     if (tellPools) return tellPools;
@@ -259,6 +288,25 @@
       if ((r.band === "BET" || r.band === "LEAN") && isFinite(+r.price) && +r.price >= PROPS_PLUS && (r.gdate || "") >= PROPS_BLEND_FROM) { sinks.push(pools.plus); if (pools.plusSide[r.side]) sinks.push(pools.plusSide[r.side]); }   // the pick at even money or better, as carded under the blend as it stands (12 Nov 2026)
       sinks.forEach(function (s) { s.n++; s.says += +r.chance; if (r.result === "win") s.w++; else s.l++; });
     });
+    /* the home and road pools (21 Nov 2026): every graded prop with both prices and a spread, the sheet's side or none, no model in it:
+       the over's rate against the fair chance of the two prices, a unit on every under and on every over, the gap's error by night */
+    var venue = {};
+    props.forEach(function (r) {
+      var c = propVenueClass(r);
+      if (!c || !r.result || r.result === "void" || r.result === "push") return;
+      if (r.actual === null || r.actual === undefined || r.actual === "" || !isFinite(+r.actual) || !isFinite(+r.line) || +r.actual === +r.line) return;
+      if (r.op === null || r.op === undefined || r.up === null || r.up === undefined || !isFinite(+r.op) || !isFinite(+r.up) || !+r.op || !+r.up) return;
+      var po = implied(+r.op), pu = implied(+r.up), fair = po / (po + pu), y = +r.actual > +r.line ? 1 : 0, d = r.gdate || "?";
+      var v = venue[c] || (venue[c] = { n: 0, y: 0, f: 0, uu: 0, uo: 0, nights: {} });
+      v.n++; v.y += y; v.f += fair; v.uu += y ? -1 : decimalOf(+r.up) - 1; v.uo += y ? decimalOf(+r.op) - 1 : -1;
+      var nd = v.nights[d] || (v.nights[d] = [0, 0]); nd[0] += y - fair; nd[1]++;
+    });
+    Object.keys(venue).forEach(function (c) {
+      var v = venue[c], ds = Object.keys(v.nights), g = (v.y - v.f) / v.n, ss = 0;
+      ds.forEach(function (d) { var e = v.nights[d][0] - g * v.nights[d][1]; ss += e * e; });
+      v.d = ds.length; v.g = g; v.se = ds.length > 1 ? Math.sqrt(ss * ds.length / (ds.length - 1)) / v.n : null; v.ru = v.uu / v.n; v.ro = v.uo / v.n;
+    });
+    pools.venue = venue;
     tellPools = pools; return pools;
   }
   function propTells(r) {
@@ -274,6 +322,9 @@
       } else out.push({ k: "spike", state: state(pools.spikeRest[r.side]), label: "Minutes spike " + sgn(sp, 1), words: words(pools.spikeRest[r.side], "a spike man not on a favourite", " BET and LEAN") });
     }
     if (fv !== null && fv >= 5) out.push({ k: "fav", state: state(pools.fav[r.side]), label: "His club favoured by " + fv, words: words(pools.fav[r.side], "a favourite's man") });
+    var vr = propVenueRead(r, pools);   // home and road (21 Nov 2026): no model in it, the side's rate against the price's fair chance where his club stands
+    if (vr) out.push({ k: "venue", state: vr.state, label: propVenueLabel(r), words: "with no model the " + r.side.toLowerCase() + " on " + PROPS_VENUE_WHO[vr.c] + " has landed " + (100 * vr.landed).toFixed(1) + "% against a fair price of " + (100 * vr.fair).toFixed(1) +
+      "% (" + sgn(100 * vr.gap, 1) + ", the error " + (100 * vr.se).toFixed(1) + ", " + vr.n + " props on " + vr.d + " nights): " + sgn(100 * vr.ret, 1) + "% a bet, the " + (r.side === "OVER" ? "under " : "over ") + sgn(100 * vr.other, 1) + "%" });
     if (propIsPlus(r)) {   // the pick at even money or better (12 Nov 2026): one pool for both sides, read from the day the blend changed
       var pl = pools.plus, pu = pools.plusSide.UNDER, po = pools.plusSide.OVER;
       out.push({ k: "plus", state: state(pl), label: "Pays even money or better", words: "the sheet's side at +100 or longer" + (pl.n ? " does " + (100 * pl.w / pl.n).toFixed(1) + "%, claimed " + (100 * pl.says / pl.n).toFixed(1) + "%, on " + pl.n + " BET and LEAN pick" + (pl.n === 1 ? "" : "s") + " since " + propsBlendDay() + " (unders " + pu.w + "-" + pu.l + ", overs " + po.w + "-" + po.l + ")" + (pl.n < PROPS_TELL_MIN ? ", too few to read" : "") : " has no graded pick since " + propsBlendDay() + " yet") + "; replayed on fourteen nights it went 83-58" });
@@ -910,7 +961,7 @@
     if (hr.n5 < 5 || hr.h5 < PROPS_T3.l5 || hr.n10 < PROPS_T3.n10 || hr.h10 / hr.n10 < PROPS_T3.l10) return null;
     var t = propsLeverTally(r); if (!(t.toward > t.against)) return null;
     var tells = propTells(r), fv = propFav(r);
-    if (tells.some(function (x) { return x.state === "red" && x.k !== "plus"; })) return null;   // the even-money chip is a test of its own and keeps no leg out
+    if (tells.some(function (x) { return x.state === "red" && x.k !== "plus" && x.k !== "venue"; })) return null;   // the even-money chip is a test of its own and keeps no leg out; the home and road chip is shown, not scored (21 Nov 2026)
     if (propRampUnder(r)) return null;   // an under on a man whose minutes are on the way back makes no leg (13 Nov 2026)
     /* the over on a favourite's man is the measured leak (5.4 points under the book's chance on 3,223 props, both halves): out
        unless its own record reads green, so a page with little graded yet does not list it for want of a colour */
@@ -1711,6 +1762,19 @@
     if (byForm.toward.n || byForm.toward.p) h2 += tile("His last three with the pick (shown, not scored)", byForm.toward, []);
     if (byForm.against.n || byForm.against.p) h2 += tile("His last three against the pick (shown, not scored)", byForm.against, []);
     if (byFav.UNDER.n || byFav.OVER.n) h2 += tile("A favourite's man (5+), the under (shown, not scored)", byFav.UNDER, []) + tile("A favourite's man (5+), the over", byFav.OVER, []);
+    h2 += (function (tp) {   // home and road with no model (21 Nov 2026): the chip's own pools, every under of a class as a tile, the six classes under the first
+      var V = tp.venue || {}, ok = function (c) { return V[c] && V[c].n >= PROPS_VENUE_MIN && V[c].d >= PROPS_VENUE_NIGHTS && V[c].se !== null; };
+      var order = ["HF", "HD", "HI", "RF", "RD", "RI"].filter(ok); if (!order.length) return "";
+      var pool = function (c) { var v = V[c]; return { n: v.n, w: v.n - v.y, l: v.y, p: 0, v: 0, says: v.n - v.f, units: v.uu }; };
+      var one = function (c) { var v = V[c]; return PROPS_VENUE_WHO[c] + ": the over " + (100 * v.y / v.n).toFixed(1) + "% where the price says " + (100 * v.f / v.n).toFixed(1) + "% (" + sgn(100 * v.g, 1) + ", the error " + (100 * v.se).toFixed(1) + ", " + v.n + " props), every under " + sgn(100 * v.ru, 1) + "% a bet and every over " + sgn(100 * v.ro, 1) + "%"; };
+      var note = "every graded prop with both prices and a spread, the fair chance the two prices with the hold taken out, the error by night; no model in it · " + order.map(one).join(" · ") +
+        " · on 31 nights to 20 Nov 2026 a home favourite's man 4.8 under the price (the error 0.8) and a road dog's man 0.6 over it; the season has shown no home edge and the lines still carry one";
+      var out = "";
+      if (ok("HF")) out += tile("A home favourite's man (" + PROPS_VENUE_LINE + "+), every under with no model (shown, not scored)", pool("HF"), [note]);
+      if (ok("RD")) out += tile("A road dog's man (" + PROPS_VENUE_LINE + "+), every under with no model (shown, not scored)", pool("RD"), ok("HF") ? [] : [note]);
+      if (!ok("HF") && !ok("RD")) out += tile(PROPS_VENUE_WHO[order[0]].replace(/^a /, "A ") + ", every under with no model (shown, not scored)", pool(order[0]), [note]);
+      return out;
+    })(propsTellPools());
     if (bySpike.UNDER.n || bySpike.OVER.n) h2 += (function (tp) {   // the chip's own pools under each tile (10 Nov 2026), so the tile and the chip read the same numbers
       var sub = function (sd) { var a = tp.spikeRest[sd], b = tp.spikeFav[sd]; return ["the chip reads the BET and LEAN picks: not on a favourite " + a.w + "-" + a.l + (a.n ? " (" + (100 * a.w / a.n).toFixed(1) + "%)" : "") + " · on a favourite " + b.w + "-" + b.l + (b.n ? " (" + (100 * b.w / b.n).toFixed(1) + "%)" : "") + ", no colour"]; };
       return tile("A minutes spike, the under (shown, not scored)", bySpike.UNDER, sub("UNDER")) + tile("A minutes spike, the over", bySpike.OVER, sub("OVER"));
@@ -1904,7 +1968,7 @@
       if (propRoleLine(r)) h += '<p class="note pd-mrole">' + esc(propRoleLine(r)) + '</p>';
       if (propMixLine(r)) h += '<p class="note pd-mmix">' + esc(propMixLine(r)) + '</p>';
       if (propBackLine(r)) h += '<p class="note pd-mret">' + esc(propBackLine(r)) + '</p>';
-      if (propTellsLine(r)) h += '<p class="note pd-tells">' + propTellsLine(r) + ' <span class="dim">· the tells (7 Nov 2026), shown, not scored: the favourite\'s chip reads every graded pick on this side, the spike\'s chip the BET and LEAN picks on a spike man not on a favourite (10 Nov 2026: on a favourite\'s man the spike swings by the night and carries no colour), the even-money chip the BET and LEAN picks at +100 or longer since the blend changed on ' + propsBlendDay() + ' (12 Nov 2026: a test); green where the line has done at least what it claimed on ' + PROPS_TELL_MIN + ' picks or more, red where less</span></p>';
+      if (propTellsLine(r)) h += '<p class="note pd-tells">' + propTellsLine(r) + ' <span class="dim">· the tells (7 Nov 2026), shown, not scored: the favourite\'s chip reads every graded pick on this side, the spike\'s chip the BET and LEAN picks on a spike man not on a favourite (10 Nov 2026: on a favourite\'s man the spike swings by the night and carries no colour), the even-money chip the BET and LEAN picks at +100 or longer since the blend changed on ' + propsBlendDay() + ' (12 Nov 2026: a test); green where the line has done at least what it claimed on ' + PROPS_TELL_MIN + ' picks or more, red where less. The home and road chip (21 Nov 2026) has no model in it: every graded prop where his club stands as tonight (at home or on the road, favoured by ' + PROPS_VENUE_LINE + ' or more, a dog by as much, or inside it), this side\'s rate against the fair chance of the two prices; green where the price has leaned against the other side by two errors or more and this side has paid, red where it has leaned against this side by as much, drawn from ' + PROPS_VENUE_MIN + ' graded props</span></p>';
       if (propBestAppLine(r)) h += '<p class="note pd-bestapp">' + propBestAppLine(r) + ' <span class="dim">· where to place it; the call and the grade stay at the carded book</span></p>';
       var clvP = propClv(r); if (clvP) h += '<p class="note pd-clv' + (clvP.clv > 0.0005 ? ' pos' : clvP.clv < -0.0005 ? ' neg' : '') + '">' + propClvLine(r) + ' <span class="dim">· the chance re-read at the closing line by the sheet\'s own blend, the need from the closing price</span></p>';
       /* the floors (26 Oct 2026): the number he clears 95, 90 and 80% of nights by the model, and his other markets' 95% floors tonight */

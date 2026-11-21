@@ -6006,3 +6006,163 @@ The morning count of the 20th showed a side twenty apart on all nine
 games (Nets +5.5 with 79% of the money on 22% of the bets), which is what
 a count of a few early bets looks like; the count worth reading is the
 last one before the tip.
+
+### 9. The second night, 20 Nov
+
+From the user's backup of 21 Nov (lab `money_night.py`). All nine games
+carried the count of 5:44 pm Eastern, the second kept that day.
+
+| Game (final) | Spread | Total | Moneyline |
+| --- | --- | --- | --- |
+| Hornets 97, Hawks 111 | Hawks -7.5, 70% on 66%: won | **under 219.5, 89% on 16%: won** | Hawks, 88% on 91%: won |
+| Magic 113, Nets 111 | **Nets +6.5, 52% on 24%: won** | **under 224.5, 82% on 34%: won** | Magic, 91% on 93%: won |
+| Pacers 119, Cavaliers 128 | Cavaliers -5.5, 74% on 71%: won | **over 234.5, 96% on 46%: won** | Pacers, 19% on 9%: lost |
+| Raptors 105, Pistons 102 | Pistons -6.5, 94% on 78%: lost | **under 216.5, 91% on 38%: won** | Pistons, 92% on 91%: lost |
+| Wizards 98, Bulls 94 | Bulls -2.5, 62% on 46%: lost | **over 238.5, 77% on 48%: lost** | **Wizards, 75% on 49%: won** |
+| Pelicans 120, Thunder 126 | **Thunder -11.5, 96% on 65%: lost** | over 227.5, 92% on 74%: won | **Pelicans, 24% on 4%: lost** |
+| Suns 111, Jazz 101 | Suns -4.5, 50% on 57%: won | **under 225.5, 63% on 23%: won** | Suns, 82% on 78%: won |
+| Rockets 124, Nuggets 133 | **Rockets +1.5, 76% on 48%: lost** | **under 226.5, 74% on 24%: lost** | Rockets, 53% on 56%: lost |
+| Kings 104, Lakers 106 | **Kings +14.5, 80% on 54%: won** | **over 229.5, 98% on 66%: lost** | **Kings, 68% on 8%: lost** |
+
+The sides twenty or more apart went 8-7 (+0.4u): spreads 2-2, totals 5-3
+(the unders 4-1, the overs 1-2), moneylines 1-2. Every market's named
+side 15-12 (+0.2u). Two of the three moneyline sides in bold were long
+dogs (Pelicans, Kings): a dog's share of the money runs past its share of
+the bets whenever a few larger bets land on a long price, so a gap there
+says less than the same gap on a spread or a total.
+
+Two nights together: the sides twenty apart 10-8 (+1.3u), every named
+side 24-15. Thirteen games; still a note.
+
+The decision against the count, by the card's own sentence. The larger
+bets with it, 2-1: the under 224.5 in Magic at Nets (won by half a point)
+and the under 216 in Raptors at Pistons won, the under 227.5 in Rockets at
+Nuggets lost by 29½. The larger bets on the other side, 1-2: the over
+218.5 in Hornets at Hawks (89% of the money on the under; 208) and the
+Bulls to win (75% of the money on the Wizards) lost, the Thunder to win
+at -598 (76% of the money on 96% of the bets) won. No gap of twenty: the
+Cavaliers and the Suns to win, both won. The first-half under in Kings at
+Lakers won where the game's count had 98% of the money on the over 229.5;
+the game ended 210. Over the two nights a full-game decision with the
+larger bets on the other side is 1-3 and with them 2-1.
+
+## The night of 20 Nov: four stat lines, and where the picks leak
+
+The user's backup of 21 Nov, graded (lab `grade_night.py`,
+`night_page5.js` on the published page, `leans_night.py`,
+`leans_season.py`, `leans_men.py`, `mins_gap.py`, `gap_picks.py`,
+`mins_out.py`). Nothing in the model was changed.
+
+### 1. The night
+
+The decision as given went 6-3 (146-88-1, +4.2u on the season): the best
+number 1-2 (the under 224.5 in Magic at Nets won at 224; the over 218.5
+in Hornets at Hawks and the under 227.5 in Rockets at Nuggets lost), the
+sheet's read 2-0, the likelier winner 3-1 (the Bulls lost at home).
+
+The props had their worst night under the blend as it stands (from
+5 Nov): the BET band 0-2, the leans 19-32, together 19-34, -20.4u; the
+overs 4-14 (-11.5u), the unders 15-20 (-8.9u). The sixteen nights from
+5 Nov now read 532-425 (+4.8u): the BET band 38-26 (+4.6u), the leans
+494-399 (+0.3u). The picks under the levers as corrected on 13 Nov went
+from 151-118 (-0.3u) to 170-152 (-20.7u).
+
+The user's ten marked bets went 3-7 (-4.6u): the first-half under in
+Kings at Lakers won; the calls on the game 1-3 (the under in Magic at
+Nets won; the over in Hornets at Hawks, the Bulls to win and the under in
+Rockets at Nuggets lost); the simulation's Pistons -7 lost; the props 1-2
+(Michael Porter Jr. under 7.5 rebounds won with 4; Jakob Poeltl under 8.5
+rebounds lost with 9 and Matas Buzelis over 1.5 assists lost with 1); a
+three-leg ticket lost.
+
+### 2. Four men
+
+53 picks sat on 30 men. Four of them took 17 of the 34 losses:
+
+| Man | Picks | What happened |
+| --- | --- | --- |
+| Alperen Sengun | unders 0-5 | 28 points, 11 rebounds, 10 assists in 36 minutes; the read 31.7, with a 14-minute game set aside (27.8 with it) |
+| Sam Merrill | overs 0-5 | 25 minutes as read (23.6); 6 points |
+| Alex Sarr | overs 0-3 | 20 minutes against a read of 27.9; three shots |
+| Jakob Poeltl | unders 2-4, both BETs | 32 minutes against a read of 24.3 with Barrett, Leonard and Murray-Boyles out; 9 rebounds on 8.5, 12 rebounds and assists on 10.5 |
+
+The other 26 men went 17-17. One pick a man (the one the page was surest
+of) went 14-16 on the night, but that is no rule: from 5 Nov one a man by
+that measure is 248-202 for -22.1u against +4.8u for every pick, because
+the surest pick is the one at the shortest price.
+
+Four of the fourteen losing overs were priced -110 to -101 and so were
+already off the lists and out of the tickets by the rule of 15 Nov; that
+watch reads 0-6. A man's picks are one stat line. The page's own chances
+put par at 30.4 wins of the 53; nineteen is eleven under, close to two
+standard deviations even if every man's picks landed or missed together
+(the kindest reading), so a night due no more than once in thirty: worth
+the look that follows.
+
+### 3. Where the picks leak: the minutes
+
+On the night the unders that lost were on men who played 5.0 minutes over
+the read on average (20 picks); the unders that won, 0.7 over (15). Thirteen
+picks sat on a man who played six or more minutes off the read: 3-10.
+
+The same cut on every BET and LEAN from 5 Nov (957 picks), in hindsight:
+
+| The man played | Unders | Overs | Together |
+| --- | --- | --- | --- |
+| within 4 minutes of the read | 177-111 (+27.1u) | 117-80 (+16.8u) | 294-191, 60.6% (+43.9u) |
+| 4 or more against the pick | 62-114 (-64.2u) | 58-99 (-49.6u) | 120-213 (-113.8u) |
+| 4 or more with the pick | 82-14 (+52.6u) | 36-7 (+22.0u) | 118-21 (+74.6u) |
+
+When the minutes read holds, both sides win. And the miss is not even:
+the man behind an over played 2.88 minutes under his read on average (397
+picks; four or more under on 40% of them, four or more over on 11%), the
+man behind an under 1.14 over his (560 picks; 31% against 17%), where
+every man with a prop this season ran 0.64 under (2,882 man-nights, mean
+absolute miss 4.37, as measured before). The page picks the over where
+its minutes read is too high and the under where it is too low, more often
+than chance: part of every disagreement with the book is the book knowing
+the minutes better.
+
+### 4. A pointer before the tip (first pass, not built)
+
+Is the miss visible before the game? Two first looks on the backup.
+
+The projection against the book's points line, a man once a night (2,873
+man-nights): r -0.225 (t -12.4) between how far the projection sits over
+the line and how far the man played over the read.
+
+| Points projection against the line | Men | Played against the read | 4+ under · 4+ over |
+| --- | --- | --- | --- |
+| 20% or more under | 140 | +1.88 | 16% · 36% |
+| 10 to 20% under | 259 | +0.70 | 19% · 26% |
+| 0 to 10% under | 646 | +0.39 | 19% · 24% |
+| 0 to 10% over | 706 | -0.44 | 23% · 20% |
+| 10 to 20% over | 507 | -1.52 | 30% · 13% |
+| 20 to 35% over | 404 | -2.33 | 33% · 10% |
+| 35% or more over | 211 | -2.56 | 39% · 14% |
+
+It is not a filter on the picks: from 5 Nov the unders whose projection
+sat 15% or more under their own line still went 234-153, and the overs
+ran 52 to 54% whatever the gap (lab `gap_picks.py`). What it could be is
+a pull on the minutes read itself, toward the minutes the book's line
+implies at his own rate.
+
+Teammates newly out, on the three nights the row has kept the count
+(18 to 20 Nov, 254 men): a starter with 25 or more minutes of teammates
+newly out played 1.53 over his read (se 0.63, 79 men); with none newly
+out, 0.10 under (44). Poeltl (38 minutes newly out, played 7.7 over),
+Keegan Murray (30; 40 minutes against 27.6) and Daniss Jenkins (45; 39
+against 33.8) were three of them on the night. Three nights and the same
+men as the losses: a hint only.
+
+### 5. On record, not built
+
+- A starter's minutes when 25 or more minutes of teammates are newly out:
+  to be measured on the four seasons of box scores (the minutes read as
+  the rule gives it against the minutes played), then replayed on the
+  graded nights, before anything is scored.
+- The book's implied minutes as a pull on the read: the weight fitted
+  walk-forward on this season's man-nights with a points line, then the
+  replay. The past seasons hold no prop lines, so this one rests on the
+  season in hand.
+- The money read at about 150 games, as before.

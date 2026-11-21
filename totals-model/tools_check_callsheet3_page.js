@@ -3559,6 +3559,101 @@ const CHECKS = ["dome","playoff"];
       && JSON.stringify(cyr.tilesAfter) === JSON.stringify(cyr.tiles) && (cyr.lv || []).length === 1 && /^Picks under the levers as corrected \(from 13 Nov 2026\) 8-1 /i.test(cyr.lv[0]),
       'what the men out carried, the record: the five BET and LEAN picks whose projection the lever moved 2% or more (two lifted 5.3% and 4.2%, two cut 2.9% and 5.7%, one lifted 2.0% to the dot) sit on a tile of their own, four won and one lost, split by lifted and cut and by whether the pick is on the lever\'s side (an over on a lift, an under on a cut) or against it; a pick moved 1.5% is not counted, nor a pick the lever did not touch, nor the man with no pick though it moved him 11%; the rate is read against his rate without the lever; the tile reads the same after the night is trimmed; and the picks stay on the levers\' own tile, which counts every pick of the new run',
       JSON.stringify({ tiles: cyr.tiles, results: cyr.results, after: cyr.tilesAfter, lv: cyr.lv }));
+  // ---- 21 Nov 2026: the expected five as a role (the user, after the BET band lost twice on a centre read at 24 minutes who played 32: "Yes start with the first one
+  //      bro"; "find anything and everything"). A man RotoWire's EXPECTED five has starting who has not started all of his last five was read from his games of any
+  //      kind and played more (four seasons of box scores and the 24 graded nights), so slate.py reads his minutes half way to the confirmed five's path and writes
+  //      what it read on the row (`mix`). The page keeps it off the file and through the trim, says it on the card and the panel, counts it as a lever of its own
+  //      and keeps a tile that measures it: the BET and LEAN picks on such a man, and what such men played against the read and against the read without the mix ----
+  const mxKeep = await pg.evaluate(async () => { await smStore.ready; const k = {}; for (const x of ['callsheet3.card.v1', 'callsheet3.props.v1', 'callsheet3.draft.v1']) k[x] = await smStore.getItem(x); k.below = localStorage.getItem('callsheet3.props.below.v1'); k.legs = localStorage.getItem('callsheet3.props.legs.v1'); await smStore.removeItem('callsheet3.card.v1'); await smStore.removeItem('callsheet3.props.v1'); return k; });
+  await reloaded();
+  const mxr = await pg.evaluate(async () => {
+    const wait = (ms) => new Promise(r => setTimeout(r, ms || 120)), txt = e => (e ? e.innerText : '').replace(/\s+/g, ' ').trim();
+    await smStore.ready;
+    const load = async (doc, name) => { const dt = new DataTransfer(); dt.items.add(new File([JSON.stringify(doc)], name, { type: 'application/json' })); const inp = document.getElementById('slateFile'); inp.files = dt.files; inp.dispatchEvent(new Event('change', { bubbles: true })); await wait(); await wait(); };
+    const G = [['Hawks', 'Magic', 'ATL', 'ORL', -2.5], ['Bulls', 'Bucks', 'CHI', 'MIL', 3.5], ['Heat', 'Jazz', 'MIA', 'UTA', -1.5]];
+    const need = (price) => price < 0 ? -price / (-price + 100) : 100 / (price + 100);
+    const steady = [31, 33, 32, 30, 34, 32, 31, 33, 32, 30];
+    const cold = L => [L + 2, L - 2, L + 3, L - 1, L + 1, L - 2, L + 2, L - 3, L + 1, L - 1];
+    const man = (pid, name, gi, home, mk, side, line, chance, price, band, extra) => Object.assign({ gi, pid: String(pid), name, team: G[gi][home ? 3 : 2], opp: G[gi][home ? 2 : 3], home: !!home, pos: 'F', mk, line,
+      op: side === 'OVER' ? price : 100, up: side === 'UNDER' ? price : 100, book: 'fanduel', books: { fanduel: [line, side === 'OVER' ? price : 100, side === 'UNDER' ? price : 100] },
+      proj: line + (side === 'OVER' ? 2 : -2), sd: 6, pm: side === 'OVER' ? 0.7 : 0.3, pb: 0.5, p: side === 'OVER' ? chance : Math.round((1 - chance) * 10000) / 10000, push: 0, side, chance, price, need: Math.round(need(price) * 10000) / 10000,
+      edge: Math.round((chance - need(price)) * 10000) / 10000, band, mins: 24, rate36: 20, base: 18, med: line + (side === 'OVER' ? 1.5 : -1.5), usg: 22, sdf: 1, starter: true, start_src: "RotoWire's expected five", why: ['x'], lv: 5,
+      log: cold(line).map((v, i) => ['2026-11-' + String(10 + i), 'OPP', i % 2, steady[i], v, ['won by 3']]), parts: [{ k: 'out', t: 'Who is out', eff: side === 'OVER' ? 0.4 : -0.4, i: 0 }] }, extra || {});
+    const D = '2026-12-27', D0 = '2026-12-26';
+    const mx = (any, role, dmin, games, how, w) => ({ mix: { w: w === undefined ? 0.5 : w, any, role, dmin, games, how } });
+    const part = (eff) => ({ k: 'mix', t: 'The expected five: his games as a starter', eff, i: 0 });
+    const out = (eff) => ({ k: 'out', t: 'Who is out', eff, i: 0 });
+    const men = [man(41, 'Mix Under', 0, 0, 'reb', 'UNDER', 8.5, 0.60, -125, 'LEAN', Object.assign({ mins: 23.4, parts: [out(-0.4), part(1.3)] }, mx(18.8, 28.0, 4.61, 0, 'flat'))),        // the under, the mix against it: a bench man with no start this season
+      man(42, 'Mix Over', 1, 0, 'pts', 'OVER', 12.5, 0.58, -120, 'BET', Object.assign({ mins: 16.3, parts: [part(0.15)] }, mx(16.0, 16.6, 0.3, 6, 'role'))),                           // three starts in five, his last game one of them
+      man(43, 'Mix No Edge', 2, 0, 'ast', 'UNDER', 4.5, 0.52, -125, 'no edge', Object.assign({ mins: 21.0, parts: [part(0.3)] }, mx(19.0, 23.0, 2.0, 1, 'few'))),                    // no pick: off the picks' count, in the minutes
+      man(43, 'Mix No Edge', 2, 0, 'pts', 'UNDER', 12.5, 0.52, -125, 'no edge', Object.assign({ mins: 21.0, parts: [part(0.9)] }, mx(19.0, 23.0, 2.0, 1, 'few'))),                    // his second market: one man, counted once in the minutes
+      man(44, 'No Mix', 0, 1, 'pts', 'UNDER', 18.5, 0.58, -120, 'LEAN', {}),                                                                                                            // the run read no mix
+      man(45, 'Mix Nought', 1, 1, 'reb', 'UNDER', 6.5, 0.59, -125, 'LEAN', mx(20.0, 20.0, 0, 3, 'few')),                                                                               // the two reads level: the row keeps nothing
+      man(46, 'Mix Bad', 2, 1, 'pts', 'OVER', 10.5, 0.57, -115, 'LEAN', { mix: { w: 0.5, any: 'x', role: 24, dmin: 1.2, games: 2, how: 'few' } }),                                      // a read that is no number: the row keeps nothing
+      man(47, 'Mix Seven', 0, 0, 'ast', 'OVER', 3.5, 0.57, -115, 'LEAN', Object.assign({ mins: 26.0, parts: [part(0.4)] }, mx(22.0, 27.7, 4.0, 4, 'few', 0.7)))];                      // a file made at another share: the line says the share
+    const file = (date, list) => ({ format: 'callsheet3.props', version: 1, date, levers: 5, games: G.map((g, gi) => ({ gid: 'mx' + gi, away: g[0], home: g[1], aab: g[2], hab: g[3], spread: g[4], total: 225.5, props: list.filter(m => m.gi === gi) })) });
+    const grade = (date, list, box) => ({ format: 'callsheet2.slate', version: 1, date, games: G.map((g, gi) => ({ sport: 'NBA', gdate: date, away: g[0], home: g[1], finals: { fa: '110', fh: '104', f5a: '55', f5h: '50' }, notes: [],
+      box: Object.fromEntries(list.filter(m => m.gi === gi).map(m => [m.pid, [m.name, box[m.name][0], box[m.name][1], box[m.name][2], box[m.name][3], 1]])) })) });
+    const tiles = () => [...document.querySelectorAll('#propsCalib .calib > div')].map(txt).filter(t => /expected five as a role/i.test(t));
+    const day = async (d) => { const pd = document.getElementById('propsDate'); pd.value = d; pd.dispatchEvent(new Event('change', { bubbles: true })); await wait(); };
+    const show = async () => { if (document.getElementById('propsView').hidden) { document.getElementById('m-props').click(); await wait(); } };
+    const o = {};
+    // the night before: a plain pick, graded: the record is drawn and the tile is not on it
+    const plain = [man(40, 'Plain Day', 0, 0, 'pts', 'UNDER', 16.5, 0.58, -120, 'LEAN', {})];
+    await load(file(D0, plain), 'nba-props-2026-12-26.json');
+    await load(grade(D0, plain, { 'Plain Day': [30, 12, 4, 2] }), 'nba-grade-2026-12-26.json'); await wait(250);
+    await show(); await day(D0);
+    o.none = tiles(); o.drawn = [...document.querySelectorAll('#propsCalib .calib > div')].map(txt).filter(t => /levers as corrected/i.test(t)).length;
+    // a man the mix moved and the sheet did not pick, the same night: the minutes are the measure, so the tile is drawn with no pick on it
+    const early = [man(48, 'Early Mix', 1, 0, 'pts', 'UNDER', 14.5, 0.52, -125, 'no edge', Object.assign({ mins: 23.0, parts: [part(0.5)] }, mx(20.0, 26.0, 3.0, 2, 'few')))];
+    await load(file(D0, plain.concat(early)), 'nba-props-2026-12-26.json');
+    await load(grade(D0, plain.concat(early), { 'Plain Day': [30, 12, 4, 2], 'Early Mix': [25, 12, 4, 2] }), 'nba-grade-2026-12-26.json'); await wait(250);
+    await show(); await day(D0);
+    o.nopick = tiles();
+    await load(file(D, men), 'nba-props-2026-12-27.json');
+    await show(); document.getElementById('propsReset').click(); await wait();
+    const pick = async (id, v) => { const el = document.getElementById(id); el.value = v; el.dispatchEvent(new Event('change', { bubbles: true })); await wait(); };
+    await day(D); await pick('propsBelow', 'leans');
+    const stored = () => JSON.parse(smStore.getItem('callsheet3.props.v1')).filter(x => x.gdate === D).map(x => x.name + ':' + JSON.stringify(x.mix) + (x.trim ? ':trim' : '')).sort().join(' | ');
+    o.rows = stored();
+    o.cards = [...document.getElementById('propsBest').querySelectorAll('.pk[data-prop]')].map(c => txt(c.querySelector('.n2')) + ' :: ' + txt(c.querySelector('.n5.mmix')) + ' :: ' + txt(c.querySelector('.n1')).replace(/^.*levers /, 'levers ')).sort();
+    const panel = async (name) => { const tr = [...document.querySelectorAll('#propsTable tr[data-prop]')].find(r => r.textContent.indexOf(name) >= 0); tr.click(); await wait(); const b = document.querySelector('#propDetailBody');
+      const base = txt(b.querySelector('.pd-base'));
+      const t = document.getElementById('propDetail').hidden ? 'closed' : txt(b.querySelector('.pd-mmix')) + ' :: ' + (base.match(/minutes; (.*?) (?:take it to|moves it from)/) || ['', '?'])[1] + ' :: ' + (/Inside the start[^.]*expected five/i.test(base) ? 'INSIDE' : 'not inside') + ' :: ' + [...b.querySelectorAll('h4')].map(txt).filter(x => /^what moves it/i.test(x)).join('').toLowerCase();
+      document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })); await wait(); return t; };
+    o.panel = [await panel('Mix Under'), await panel('Mix Seven'), await panel('No Mix'), await panel('Mix Nought')];
+    // the night: Mix Under 6 rebounds in 27 minutes (win), Mix Over 10 points in 15 (loss), Mix No Edge 3 assists in 22, No Mix 12 points (win), Mix Nought 5 rebounds (win), Mix Bad 14 points (win),
+    // Mix Seven 5 assists in 24 (win)
+    await load(grade(D, men, { 'Mix Under': [27, 9, 6, 2], 'Mix Over': [15, 10, 4, 2], 'Mix No Edge': [22, 9, 4, 3], 'No Mix': [30, 12, 4, 2], 'Mix Nought': [30, 9, 5, 2], 'Mix Bad': [30, 14, 4, 2], 'Mix Seven': [24, 9, 4, 5] }), 'nba-grade-2026-12-27.json'); await wait(250);
+    await show(); await day(D);
+    o.tiles = tiles(); o.results = JSON.parse(smStore.getItem('callsheet3.props.v1')).filter(x => x.gdate === D).map(x => x.name + ':' + x.result + ':' + x.amin).sort().join(' | ');
+    for (let i = 1; i <= 7; i++) { const d = i <= 4 ? '2026-12-' + String(27 + i) : '2027-01-0' + String(i - 4); await load(file(d, [man(980 + i, 'Later ' + i, 0, 0, 'pts', 'UNDER', 10.5, 0.5, -110, 'no edge', {})]), 'nba-props-' + d + '.json'); }
+    await show(); await day(D);
+    o.kept = stored(); o.tilesAfter = tiles();
+    return o;
+  });
+  await pg.evaluate(async (k) => { for (const x of Object.keys(k)) { if (x === 'below' || x === 'legs') { const key = x === 'below' ? 'callsheet3.props.below.v1' : 'callsheet3.props.legs.v1'; if (k[x] === null) localStorage.removeItem(key); else localStorage.setItem(key, k[x]); continue; } if (k[x] === null || k[x] === undefined) await smStore.removeItem(x); else await smStore.setItem(x, k[x]); } }, mxKeep);
+  await reloaded();
+  const mxLine = (any, role, as, share, d) => "Minutes: RotoWire's expected five has him starting, a role he has not had in all his last five. His games of any kind say " + any + ' and as a starter (' + as + ') the run reads ' + role + '; the five is expected, not confirmed, so the read sits ' + share + ' between: ' + d +
+    ' minutes. Scored from 21 Nov 2026: such a man played more than his games of any kind said on four seasons of box scores and on the 24 graded nights (the reasons below carry the numbers).';
+  const mxUnder = mxLine('18.8', '28.0', 'no game as a starter this season, so the 27.5 a rotation man with none plays', 'half way', '+4.6'), mxSeven = mxLine('22.0', '27.7', 'his last 4 games as a starter', '70% of the way', '+4.0'), mxOver = mxLine('16.0', '16.6', 'his last 6 games as a starter', 'half way', '+0.3');
+  const mxRows = 'Mix Bad:null | Mix No Edge:{"w":0.5,"any":19,"role":23,"dmin":2,"games":1,"how":"few"} | Mix No Edge:{"w":0.5,"any":19,"role":23,"dmin":2,"games":1,"how":"few"} | Mix Nought:null | Mix Over:{"w":0.5,"any":16,"role":16.6,"dmin":0.3,"games":6,"how":"role"} | Mix Seven:{"w":0.7,"any":22,"role":27.7,"dmin":4,"games":4,"how":"few"} | Mix Under:{"w":0.5,"any":18.8,"role":28,"dmin":4.61,"games":0,"how":"flat"} | No Mix:null';
+  chk(mxr.rows === mxRows && mxr.kept === mxRows.split(' | ').map(x => x + ':trim').join(' | ') && JSON.stringify(mxr.none) === '[]' && mxr.drawn === 1,
+      'the expected five as a role (21 Nov 2026), the rows: each keeps what the run read (his games of any kind, the confirmed path, the share between them, the minutes it moved, the starts behind the role read) as the file gave it, a file made at another share its own share; a row the run read no mix on, one where the two reads were level and one whose read is no number keep nothing; the mark stays through the trim; with the record drawn and no such man graded the tile is not on it',
+      JSON.stringify({ rows: mxr.rows, kept: mxr.kept, none: mxr.none, drawn: mxr.drawn }));
+  chk(JSON.stringify(mxr.cards) === JSON.stringify(['Mix Bad OVER 10.5 points ::  :: levers 1▲ 0▼', 'Mix Nought UNDER 6.5 rebounds ::  :: levers 1▲ 0▼', 'Mix Over OVER 12.5 points :: ' + mxOver + ' :: levers 1▲ 0▼', 'Mix Seven OVER 3.5 assists :: ' + mxSeven + ' :: levers 1▲ 0▼',
+        'Mix Under UNDER 8.5 rebounds :: ' + mxUnder + ' :: levers 1▲ 1▼', 'No Mix UNDER 18.5 points ::  :: levers 1▲ 0▼'])
+      && JSON.stringify(mxr.panel) === JSON.stringify([mxUnder + ' :: the regulars out and the expected five :: not inside :: what moves it · 1 of 2 levers toward the under, 1 against', mxSeven + ' :: the expected five :: not inside :: what moves it · 1 of 1 lever toward the over',
+        ' :: the regulars out :: not inside :: what moves it · 1 of 1 lever toward the under', ' :: the regulars out :: not inside :: what moves it · 1 of 1 lever toward the under']),
+      'the expected five as a role, on the card and the panel: a pick on a man whose minutes the mix moved says so in a line of its own (his games of any kind, the read as a starter and the games behind it, half way or the file\'s own share, the minutes it moved); the mix is a lever of its own, named among those that take the start to the projection and counted in the tally toward or against the pick (an under it lifted: one lever against), not inside the start; a row with no mix, or with the two reads level, says nothing',
+      JSON.stringify({ cards: mxr.cards, panel: mxr.panel }));
+  const mxMeasured = 'measured on four seasons of box scores (2.4 over the old read, 0.2 with the mix) and replayed on the 24 graded nights (4.4 and 2.3 over 90 men, the miss 5.72 and 4.73)';
+  const mxSays = "the BET and LEAN picks on a man RotoWire's expected five had starting in a role he had not had in all his last five, his minutes read half way to his games as a starter: ";
+  chk((mxr.nopick || []).length === 1 && mxr.nopick[0].toLowerCase() === ('The expected five as a role (scored from 21 Nov 2026) no pick yet ' + mxSays + 'unders 0-0 · overs 0-0 · the minutes: 1 such man played +2.0 against the read, +5.0 against the read without the mix · ' + mxMeasured).toLowerCase()
+      && (mxr.tiles || []).length === 1 && mxr.tiles[0].toLowerCase() === ('The expected five as a role (scored from 21 Nov 2026) 2-1 says 58.3% · does 66.7% (±28.9) · +0.67u ' + mxSays + 'unders 1-0 +0.8u · overs 1-1 -0.1u · the minutes: 5 such men played +0.7 against the read, +3.4 against the read without the mix · ' + mxMeasured).toLowerCase()
+      && mxr.results === 'Mix Bad:win:30 | Mix No Edge:win:22 | Mix No Edge:win:22 | Mix Nought:win:30 | Mix Over:loss:15 | Mix Seven:win:24 | Mix Under:win:27 | No Mix:win:30' && JSON.stringify(mxr.tilesAfter) === JSON.stringify(mxr.tiles),
+      'the expected five as a role, the record: a tile of its own that measures the lever. The minutes are the measure, so it is drawn from the first such man graded, pick or no pick (one man, no pick: what he played against the read and against the read without the mix); then the three BET and LEAN picks on such men, two won, by side, and the five men\'s minutes (0.7 over the read, 3.4 over the read as it was); a man the sheet did not pick counts in the minutes and not in the picks, once whatever the markets he has; a row that kept no mix counts in neither; the tile reads the same after the night is trimmed',
+      JSON.stringify({ nopick: mxr.nopick, tiles: mxr.tiles, results: mxr.results, after: mxr.tilesAfter }));
   // ---- 13 Nov 2026: the second pass on the levers (the user: "Make sure those levers are as perfect as they can be"). A row marked `lv` 3 had its minutes
   //      read from his last ten games, the recent counting most: a short game kept in part counts three tenths (a starter's short LAST game among them),
   //      his games in tonight's role are read the same way with the flat number standing as the game before his first, and after his own games missed

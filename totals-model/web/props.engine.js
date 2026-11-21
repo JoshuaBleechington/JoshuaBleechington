@@ -113,6 +113,19 @@
     return "Minutes: the five is confirmed and he " + (m.starter ? "starts" : "comes off the bench") + " tonight, a role he has not had in all his last five. The read is " + what + ": " + (+m.read).toFixed(1) +
            " a game where the mean of his last five says " + (+m.mean).toFixed(1) + ". Scored from 13 Nov 2026: with the real starters such a night misses by 5.0 minutes this way and 6.3 from his last five (three seasons of box scores).";
   }
+  /* THE EXPECTED FIVE AS A ROLE (21 Nov 2026, the user, after the BET band lost twice on a centre read at 24 minutes who played 32: "Yes start
+     with the first one bro"; "find anything and everything"). A man RotoWire's EXPECTED five has starting who has not started all of his
+     last five was read from his games of any kind, and he played more: 2.4 minutes over that read on four seasons where he had started two
+     or fewer of five (4.4 on the 24 graded nights), 0.9 (1.2) where three or four with his last game a start. slate.py now reads his
+     minutes half way to the path it takes when the five is confirmed and writes what it read on the row (`mix`: the two reads, the share
+     between them, the minutes it moved). It is a lever of its own on the panel, and the record keeps its picks and its minutes on a tile */
+  function propMixLine(r) {
+    var m = r && r.mix; if (!m || !isFinite(+m.dmin) || !+m.dmin || !isFinite(+m.any) || !isFinite(+m.role) || r.p === null || r.p === undefined) return "";
+    var as = m.how === "flat" ? "no game as a starter this season, so the 27.5 a rotation man with none plays" : "his last " + m.games + " game" + (m.games === 1 ? "" : "s") + " as a starter";
+    var share = Math.abs(+m.w - 0.5) < 1e-9 ? "half way" : (100 * +m.w).toFixed(0) + "% of the way";
+    return "Minutes: RotoWire's expected five has him starting, a role he has not had in all his last five. His games of any kind say " + (+m.any).toFixed(1) + " and as a starter (" + as + ") the run reads " + (+m.role).toFixed(1) +
+           "; the five is expected, not confirmed, so the read sits " + share + " between: " + sgn(+m.dmin, 1) + " minutes. Scored from 21 Nov 2026: such a man played more than his games of any kind said on four seasons of box scores and on the 24 graded nights (the reasons below carry the numbers).";
+  }
   function propsTrim() {
     var seen = {}; props.forEach(function (r) { if (r.gdate) seen[r.gdate] = true; });
     var whole = {}; Object.keys(seen).sort().slice(-PROPS_WHOLE_NIGHTS).forEach(function (d) { whole[d] = true; });
@@ -1313,6 +1326,8 @@
                     lv: isFinite(+x.lv) && +x.lv > 0 ? +x.lv : null,
                     ret: x.ret && +x.ret.missed > 0 && isFinite(+x.ret.f) ? { missed: +x.ret.missed, f: +x.ret.f, dmin: isFinite(+x.ret.dmin) ? +x.ret.dmin : null } : null,   // his first game back (the second pass)
                     mrole: x.mrole && x.mrole.how ? { how: String(x.mrole.how), games: +x.mrole.games || 0, starter: !!x.mrole.starter, mean: +x.mrole.mean, read: +x.mrole.read } : null,
+                    /* the expected five as a role (21 Nov 2026): his games of any kind, the confirmed path's read, the share between them and the minutes it moved */
+                    mix: x.mix && isFinite(+x.mix.dmin) && +x.mix.dmin !== 0 && isFinite(+x.mix.any) && isFinite(+x.mix.role) ? { w: isFinite(+x.mix.w) ? +x.mix.w : 0.5, any: +x.mix.any, role: +x.mix.role, dmin: +x.mix.dmin, games: +x.mix.games || 0, how: String(x.mix.how || "") } : null,
                     chg: x.chg ? { nw: x.chg["new"] === null || x.chg["new"] === undefined ? null : +x.chg["new"], back: x.chg.back === null || x.chg.back === undefined ? null : +x.chg.back, dmin: +x.chg.dmin || 0,
                                    lvl: x.chg.lvl === null || x.chg.lvl === undefined ? null : +x.chg.lvl, lg: x.chg.lg === null || x.chg.lg === undefined ? null : +x.chg.lg } : null,
                     /* what the men out carried (18 Nov 2026): what the lever added to his rate per 36, and the minutes newly out and back it read */
@@ -1512,6 +1527,7 @@
     var byPlus = mk(), byPlusSide = { UNDER: mk(), OVER: mk() };   // the pick at even money or better, as carded from the day the blend changed (12 Nov 2026): the chip's own pool
     var byRamp = mk();   // the sheet's under, BET or LEAN, on a man whose minutes are on the way back (13 Nov 2026): shown, not scored
     var byShort = { UNDER: mk(), OVER: mk() }, byShortAll = mk();   // the BET and LEAN picks on a man whose short game the run set aside in his minutes (13 Nov 2026): scored, so it measures itself
+    var byMix = { UNDER: mk(), OVER: mk() }, byMixAll = mk(), mixMen = {};   // the BET and LEAN picks on a man whose minutes the expected five's mix moved (21 Nov 2026), and what each such man played against the read: scored, so it measures itself
     var byCarry = { up: mk(), down: mk(), "with": mk(), against: mk() }, byCarryAll = mk();   // the BET and LEAN picks whose projection the lever on what the men out carried moved 2% or more (18 Nov 2026): scored, so it measures itself
     /* the pick priced -110 to -101 from the day its over was left off the lists (15 Nov 2026): the overs left off, counted as the slate carded
        them so the rule measures itself, and the unders, which stay on the lists and are watched */
@@ -1556,6 +1572,10 @@
       if ((r.band === "BET" || r.band === "LEAN") && propRampUnder(r)) sinks.push(byRamp);
       if ((r.band === "BET" || r.band === "LEAN") && r.mshort && r.mshort.how) { sinks.push(byShortAll); if (byShort[r.side]) sinks.push(byShort[r.side]); }
       if ((r.band === "BET" || r.band === "LEAN") && r.lv >= 2) { sinks.push(byLvAll); sinks.push(byLv[r.band]); if (byLvSide[r.side]) sinks.push(byLvSide[r.side]); }
+      if (r.mix && isFinite(+r.mix.dmin) && +r.mix.dmin) {
+        if (r.band === "BET" || r.band === "LEAN") { sinks.push(byMixAll); if (byMix[r.side]) sinks.push(byMix[r.side]); }
+        if (r.result && r.result !== "void" && isFinite(+r.amin) && r.amin !== null && isFinite(+r.mins)) mixMen[r.gdate + "|" + r.pid] = [+r.amin - +r.mins, +r.mix.dmin];   // a man once a night
+      }
       var cmv = propCarryMove(r);
       if ((r.band === "BET" || r.band === "LEAN") && cmv !== null && Math.abs(cmv) >= PROPS_CARRY_SHOW - 1e-9) { sinks.push(byCarryAll); sinks.push(cmv > 0 ? byCarry.up : byCarry.down); sinks.push((cmv > 0) === (r.side === "OVER") ? byCarry["with"] : byCarry.against); }
       if ((r.band === "BET" || r.band === "LEAN") && byCoin[r.side] && d >= PROPS_COIN.from && propCoinPrice(r.price)) { sinks.push(byCoin[r.side]); sinks.push(byCoinBand[r.side][r.band]); }
@@ -1671,6 +1691,12 @@
       " · unders " + rec(byLvSide.UNDER) + (byLvSide.UNDER.n ? " " + sgn(byLvSide.UNDER.units, 1) + "u" : "") + " · overs " + rec(byLvSide.OVER) + (byLvSide.OVER.n ? " " + sgn(byLvSide.OVER.units, 1) + "u" : "") +
       " · the sixteen nights before it, replayed with the ledgers in place: every pick with an edge 518-445 as the levers stand against 464-384 as they stood, the BET band 38-33 against 32-13 (71 and 45 picks: too few to tell apart, so this tile keeps the count)"]);
     var cu = function (x) { return rec(x) + (x.n ? " " + sgn(x.units, 1) + "u" : ""); };
+    var mixKeys = Object.keys(mixMen), mixGap = mixKeys.length ? mixKeys.reduce(function (a, k) { return a + mixMen[k][0]; }, 0) / mixKeys.length : 0, mixOld = mixKeys.length ? mixKeys.reduce(function (a, k) { return a + mixMen[k][0] + mixMen[k][1]; }, 0) / mixKeys.length : 0;
+    var mixNote = ["the BET and LEAN picks on a man RotoWire's expected five had starting in a role he had not had in all his last five, his minutes read half way to his games as a starter: unders " + cu(byMix.UNDER) + " · overs " + cu(byMix.OVER) +
+      " · the minutes: " + (mixKeys.length ? mixKeys.length + " such m" + (mixKeys.length === 1 ? "an" : "en") + " played " + sgn(mixGap, 1) + " against the read, " + sgn(mixOld, 1) + " against the read without the mix" : "none graded yet") +
+      " · measured on four seasons of box scores (2.4 over the old read, 0.2 with the mix) and replayed on the 24 graded nights (4.4 and 2.3 over 90 men, the miss 5.72 and 4.73)"];
+    if (byMixAll.n || byMixAll.p) h2 += tile("The expected five as a role (scored from 21 Nov 2026)", byMixAll, mixNote);
+    else if (mixKeys.length) h2 += '<div><p class="k">' + esc("The expected five as a role (scored from 21 Nov 2026)") + '</p><p class="v">no pick yet</p><p class="s sides">' + esc(mixNote.join(" · ")) + '</p></div>';   // the minutes are the measure: shown from the first such man graded, pick or no pick
     if (byCarryAll.n || byCarryAll.p) h2 += tile("What the men out carried, 2% or more on the read (scored from 18 Nov 2026)", byCarryAll, ["the BET and LEAN picks whose projection the lever moved 2% or more: lifted " + cu(byCarry.up) + " · cut " + cu(byCarry.down) +
       " · the pick on the lever's side " + cu(byCarry["with"]) + " · against it " + cu(byCarry.against) +
       " · measured on 36,502 man-games of two seasons (assists t 10, points t 8 and 11, rebounds t 5); replayed on 21 graded nights the 54 picks it dropped went 23-31 and the 83 it added 43-40"]);
@@ -1795,8 +1821,8 @@
      market's number (the regulars out, their centre out, the game script, pace, the defence by position, the books'
      consensus). Last season's prior and the minutes trend say what sits inside the start, and the matchup from the profiles
      measured null, so they stay off the list, the tally and the card, and read as a line of their own on the panel */
-  var PROPS_LEVER_KEYS = { pull: 1, out: 1, ret: 1, stay: 1, oppc: 1, script: 1, top: 1, pace: 1, home: 1, dvp: 1, cons: 1 };   // 13 Nov 2026, the second pass: his season's minutes, his first games back, the top of the minutes and the league's home and road
-  var PROPS_LEVER_WORDS = { pull: "his season's minutes", out: "the regulars out", ret: "his first games back", stay: "the bench confirmed", oppc: "their centre out", script: "the game script", top: "the top of the minutes", pace: "pace", home: "home and road", dvp: "the defence" };
+  var PROPS_LEVER_KEYS = { pull: 1, out: 1, ret: 1, stay: 1, oppc: 1, script: 1, top: 1, mix: 1, pace: 1, home: 1, dvp: 1, cons: 1 };   // 13 Nov 2026, the second pass: his season's minutes, his first games back, the top of the minutes and the league's home and road
+  var PROPS_LEVER_WORDS = { pull: "his season's minutes", out: "the regulars out", ret: "his first games back", stay: "the bench confirmed", oppc: "their centre out", script: "the game script", top: "the top of the minutes", mix: "the expected five", pace: "pace", home: "home and road", dvp: "the defence" };
   function propsLevers(r) {
     return (r.parts || []).filter(function (p) { return p && isFinite(+p.eff) && PROPS_LEVER_KEYS[p.k]; }).slice().sort(function (a, b) { return Math.abs(b.eff) - Math.abs(a.eff); });
   }
@@ -1876,6 +1902,7 @@
       if (propRampLine(r)) h += '<p class="note pd-ramp">' + esc(propRampLine(r)) + '</p>';
       if (propShortLine(r)) h += '<p class="note pd-msh">' + esc(propShortLine(r)) + '</p>';
       if (propRoleLine(r)) h += '<p class="note pd-mrole">' + esc(propRoleLine(r)) + '</p>';
+      if (propMixLine(r)) h += '<p class="note pd-mmix">' + esc(propMixLine(r)) + '</p>';
       if (propBackLine(r)) h += '<p class="note pd-mret">' + esc(propBackLine(r)) + '</p>';
       if (propTellsLine(r)) h += '<p class="note pd-tells">' + propTellsLine(r) + ' <span class="dim">· the tells (7 Nov 2026), shown, not scored: the favourite\'s chip reads every graded pick on this side, the spike\'s chip the BET and LEAN picks on a spike man not on a favourite (10 Nov 2026: on a favourite\'s man the spike swings by the night and carries no colour), the even-money chip the BET and LEAN picks at +100 or longer since the blend changed on ' + propsBlendDay() + ' (12 Nov 2026: a test); green where the line has done at least what it claimed on ' + PROPS_TELL_MIN + ' picks or more, red where less</span></p>';
       if (propBestAppLine(r)) h += '<p class="note pd-bestapp">' + propBestAppLine(r) + ' <span class="dim">· where to place it; the call and the grade stay at the carded book</span></p>';
@@ -1905,7 +1932,7 @@
     if (levers.length && r.base !== undefined && r.base !== null) {
       var maxE = Math.max.apply(null, levers.map(function (p) { return Math.abs(+p.eff); }).concat([0.01])), gap = r.proj - r.line;
       var tally = propsLeverTally(r), inside = propsInside(r), hasCons = levers.some(function (p) { return p.k === "cons"; });
-      var onProj = ["pull", "out", "ret", "stay", "oppc", "script", "top", "pace", "home", "dvp"].filter(function (k) { return levers.some(function (p) { return p.k === k; }); }).map(function (k) { return PROPS_LEVER_WORDS[k]; });
+      var onProj = ["pull", "out", "ret", "stay", "oppc", "script", "top", "mix", "pace", "home", "dvp"].filter(function (k) { return levers.some(function (p) { return p.k === k; }); }).map(function (k) { return PROPS_LEVER_WORDS[k]; });
       var onProjTxt = onProj.length ? onProj.slice(0, -1).join(', ') + (onProj.length > 1 ? ' and ' : '') + onProj[onProj.length - 1] + ' take it to' : 'nothing measured moves it from';
       h += '<h4>What moves it' + (tally.n ? ' <span class="dim">· ' + esc(tally.words) + '</span>' : '') + '</h4><p class="pd-base">Starts from <b>' + esc(String(r.base)) + '</b>, his ' + esc(String(r.rate36)) + ' per 36 at his minutes; ' + onProjTxt + ' <b>' + esc(String(r.proj)) +
            '</b>, ' + sgn(gap, 1) + ' against the line' + (hasCons ? '; the books\' consensus moves the market\'s number, not the projection' : '') + '. Green pushes toward the ' + esc(r.side || "pick") + ', red away from it: the measured levers only (5 Nov 2026).' +
@@ -2045,6 +2072,7 @@
         (propRampLine(r) ? '<div class="n5 ramp">' + esc(propRampLine(r)) + '</div>' : '') +
         (propShortLine(r) ? '<div class="n5 msh">' + esc(propShortLine(r)) + '</div>' : '') +
         (propRoleLine(r) ? '<div class="n5 mrole">' + esc(propRoleLine(r)) + '</div>' : '') +
+        (propMixLine(r) ? '<div class="n5 mmix">' + esc(propMixLine(r)) + '</div>' : '') +
         (propBackLine(r) ? '<div class="n5 mret">' + esc(propBackLine(r)) + '</div>' : '') +
         (propsLeversLine(r) ? '<div class="n5">Moves it: ' + propsLeversLine(r) + '</div>' : '') +
         (propTellsLine(r) ? '<div class="n5 tells">' + propTellsLine(r) + '</div>' : '') +

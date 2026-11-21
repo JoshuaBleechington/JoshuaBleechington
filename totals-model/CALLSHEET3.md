@@ -6608,3 +6608,260 @@ early nights are trimmed. 38 broken copies of the page (one change each:
 the minimum, the nights, the line, home for road, the sign of the gap, the
 units, the error's two halves, the ticket's exception and so on) each fail
 a check; the untouched copy passes all three.
+
+## The game script by side, and the scripts already in his read: measured, built, replayed, left (21 Nov 2026)
+
+The sweep's second item: "a dog's starter is cut as a favourite's is,
+and on four seasons he played over the read". It was measured, a second
+and larger effect was found beside it, both were built into slate.py and
+tested, and the replay of the graded nights said the picks get worse. It
+is **not in the file**: slate.py stands as it stood after the expected
+five. This section is the record, so the work need not be done twice.
+
+Lab: `script_side.py`, `script_side2.py`, `script_side3.py`,
+`script_real.py`, `script_win.py`, `script_win2.py`, `script_win3.py`,
+`script_final.py`, `e2e9.py`, `e2e9_read.py`, `e2e9_med.py`, `e2e10.py`,
+`e2e10_read.py`, `replay_role23.py`, `replay23_read.py`,
+`replay23_var.py`, `replay23_follow.py`, `replay23_dropped.py`,
+`sweep_read.py`.
+
+### 1. What was measured: the minutes
+
+Every game started by a man who had started all of his last five, the
+minutes he played against the run's read with its script taken out, the
+errors by club-night.
+
+**Tonight's script by side.** 17,461 starter-games against the closing
+spread (2024-25 to 2026-27). The run reads one slope for every starter:
+0.187 minutes off a point of the spread's expected margin over the
+season's 11.8. Fitted as one level at a pick'em and a slope a side:
+
+| | Fitted | The error |
+| --- | --- | --- |
+| At a pick'em | +0.58 minutes (the run: +0.34) | 0.07 |
+| A favourite's starter, a point of expected margin over a pick'em's | -0.313 | 0.03 |
+| A dog's starter | -0.143 | 0.03 |
+| The gap between the two | 0.170 | 95% of 300 draws 0.095 to 0.244 |
+
+The same way in each of the three seasons, and on the ratings' own
+spread in each of four. As the run reads it:
+
+| His club | Starter-games | Played against the read |
+| --- | --- | --- |
+| Favoured by 12.5 or more | 1,460 | -0.67 (±0.20) |
+| Favoured by 8.5 to 12 | 2,017 | -0.01 (±0.16) |
+| Favoured by 4 to 8 | 3,276 | +0.20 (±0.12) |
+| Inside 3.5 | 4,292 | +0.20 (±0.11) |
+| A dog of 3.5 to 7.5 | 3,569 | +0.40 (±0.12) |
+| A dog of 8 to 11.5 | 1,685 | +0.30 (±0.17) |
+| A dog of 12 or more | 1,168 | +0.50 (±0.21) |
+
+By how the game ends the sitting is even (won by 25 or more -4.2 minutes,
+lost by 25 or more -3.9), so the gap is not a coach's habit; it stays
+when the club's own recent margins are put beside it. On the 24 graded
+nights a dog's starter (3.5+) played 0.58 over the read (±0.24) and a
+favourite's 0.17 (±0.25): the gap 0.41, over nought in 96% of 3,000
+draws of the nights.
+
+**The scripts already in his read.** His minutes are read from his last
+ten games, the recent ones counting most, so the scripts of those games
+sit in the read. Over the games of the read, with the read's own weights,
+the size of his club's final margin averages 12.75 (sd 3.9). A point over
+that is **+0.153 minutes tonight** (the error 0.010; 28,378 starter-games
+of four seasons; by season +0.186, +0.164, +0.120, +0.166; on the graded
+nights +0.156, the error 0.055 by night).
+
+| The size of the final margin in his read | Starter-games | Played against the read with no script |
+| --- | --- | --- |
+| Under 8 | 2,691 | -0.81 (±0.14) |
+| 8 to 10 | 4,590 | -0.37 (±0.10) |
+| 10 to 12 | 5,975 | -0.05 (±0.09) |
+| 12 to 14 | 5,505 | +0.28 (±0.09) |
+| 14 to 16 | 4,052 | +0.50 (±0.10) |
+| 16 to 19 | 3,602 | +0.73 (±0.12) |
+| 19 and up | 1,963 | +1.61 (±0.14) |
+
+A man coming off close games has minutes in his read he will not see
+again; a man coming off routs has given minutes up. It is the games he
+started that carry it (0.154 a point on them, nothing on his games off
+the bench; 0.117 ±0.028 on the starts of a man who started one to four
+of five). The bench runs 0.04 a point the other way (0.11 for a man read
+under 18 minutes, nothing for one read 24 or more).
+
+Each form fitted on the other seasons and read on the one left out
+(17,461 games): the run's script 4.034 minutes of mean miss, a slope a
+side 4.019, a slope a side with the read's games 3.998. The season with
+no closing spreads, held out whole: 4.231 to 4.167.
+
+### 2. What was built
+
+In slate.py, and taken out again:
+
+    minutes = +0.6 - k x (expected margin - 10.0) + 0.15 x R
+    k = 0.33 for a favourite's starter, 0.18 for a dog's
+    R = the sum over the STARTS in his read of
+        weight x (size of the final margin - 12.75), over the read's whole weight;
+        nothing with under five games carrying a margin
+
+The expected margin at a pick'em is 10.0; the read's weights are the
+minutes read's own (a game set aside counts nothing; a role read brings
+its own games and the flat number's weight). The spread helper carried
+the number itself so the lever could read the side. Selftest 324 checks.
+The change is kept as `slate/unbuilt/props-script-second-pass.patch`
+(it applies to slate.py as committed on 21 Nov: `git apply
+slate/unbuilt/props-script-second-pass.patch` from `totals-model`), so
+the replay at fifty nights starts from it.
+
+### 3. Through the file: the minutes got better
+
+Four seasons, row for row, the closing spread where held (lab `e2e9`):
+38,192 man-games of men who start, the read changed on 35,382; the
+bench's 24,688 rows not at all.
+
+| | Before (bias / mean miss / rms) | After | The mean miss |
+| --- | --- | --- | --- |
+| Every starter | +0.53 / 4.306 / 5.645 | +0.40 / 4.258 / 5.601 | -0.048 (±0.004) |
+| 2023-24 | 4.436 | 4.387 | -0.049 |
+| 2024-25 | 4.274 | 4.221 | -0.053 |
+| 2025-26 | 4.220 | 4.179 | -0.041 |
+| 2026-27 | 4.232 | 4.187 | -0.045 |
+| Favoured by 12.5 or more | -0.37 / 4.220 | +0.16 / 4.201 | -0.019 |
+| A dog of 12 or more | +1.21 / 4.755 | +0.71 / 4.671 | -0.084 |
+| His read made of lopsided games | +1.22 / 4.372 | +0.29 / 4.166 | -0.205 |
+| His read made of close games | -0.41 / 4.079 | +0.12 / 4.116 | +0.037 |
+
+The root mean square is better in every class. The last row's mean miss
+is worse because the misses are lopsided (a man leaves hurt, a rout);
+what the chance needs of the read is the same middle miss in every class,
+since one shift serves every man, and the classes' middle misses stood
+0.50 minutes apart before and 0.18 after. The read moves a minute or
+more on 11% of starters.
+
+The graded nights' starters: +0.29 / 4.085 to +0.07 / 4.040; better on
+17 nights of 24.
+
+### 4. The stat: it follows one piece and not the other
+
+Four seasons, points, rebounds and assists projected for every starter
+before and after (lab `e2e10`; that replay has no defence or pace lever
+in it). What he did less the old projection, on how far the projection
+moved: one says the stat follows the change in full, nought not at all.
+
+| | Points | Rebounds | Assists |
+| --- | --- | --- | --- |
+| The whole change | +0.85 (±0.12) | +0.63 (±0.14) | +0.43 (±0.17) |
+| The games of his read | +1.46 (±0.13) | +1.22 (±0.16) | +1.07 (±0.19) |
+| Tonight's side | -1.49 (±0.23) | -1.52 (±0.29) | -2.22 (±0.35) |
+
+The read's games carry into the stat in full and more, every season.
+The side goes the other way: the starter of a club favoured by 8 or more
+plays fewer minutes and scores 4.8% MORE than projected, because his club
+is scoring on a weak opponent; with no defence lever in that replay the
+side stands in for the opponent. The minutes are right and the stat does
+not follow them.
+
+### 5. The graded nights: the picks got worse
+
+24 nights, 16,052 graded props, every row projected again by the file
+before and after (lab `replay_role23.py`).
+
+| | Before | After |
+| --- | --- | --- |
+| Starters' minutes (bias / mean miss) | +0.29 / 4.085 | +0.07 / 4.040 |
+| Actual over projection | +1.43% | +0.83% |
+| The blend's Brier (the book 0.24797) | 0.24781 | 0.24786 |
+| The model's lean earns | 0.156 | 0.141 |
+| BET and LEAN picks | 730-623, -46.8u | 670-612, -87.7u |
+| From 5 Nov | 434-336, +5.9u | 395-340, -31.4u |
+| The BET band | 57-35, +7.4u | 49-35, +1.6u |
+
+A pick's return 3.4 points worse (nights resampled 3,000 times: 95% -7.7
+to +0.3; better in 3% of draws). Better on 11 nights, worse on 12.
+
+Taken apart (the first row a check that the old numbers come back):
+
+| | Minutes | Brier | Earned | Picks |
+| --- | --- | --- | --- | --- |
+| The old script through the new code | 4.085 | 0.24781 | 0.156 | 730-623, -46.8u |
+| A slope a side, +0.6 at a pick'em | 4.071 | 0.24780 | 0.161 | 699-611, -62.3u |
+| A slope a side, the old +0.34 | 4.101 | 0.24777 | 0.167 | 769-654, -44.9u |
+| The read's games alone | 4.051 | 0.24787 | 0.137 | 687-617, -77.6u |
+| Both, the old +0.34 | 4.069 | 0.24783 | 0.150 | 734-640, -61.2u |
+| Both, +0.6 (as built) | 4.040 | 0.24786 | 0.141 | 670-612, -87.7u |
+
+No form helps the picks and the minutes together. The one that holds the
+picks (the side's slopes at the old level) makes the minutes worse: it is
+a lean toward the under, not a better read.
+
+What the change gives up and takes on:
+
+| | Rows | Record | The men played |
+| --- | --- | --- | --- |
+| Unders given up | 161, on 117 men | 105-56, +33.0u | 1.09 over the old read, 0.19 over the new |
+| Overs taken on | 53 | 20-33, -17.3u | 1.10 UNDER the old read |
+| Unders taken on | 46 | 28-18, +5.8u | 0.22 under the old read |
+| Overs given up | 9 | 3-6 | |
+
+The unders given up are men coming off lopsided games (81-38 of them).
+The fix was right about their minutes: they played a minute more than
+the old read. They went under all the same. Five nights carry it (53-4
+on 30 Oct, 31 Oct, 11 Nov, 18 Nov and 19 Nov; 52-52 on the other
+eighteen), so on 24 nights this is a strong hint and not a proof.
+
+### 6. Why: the book's price leans the same way the old read errs
+
+With no model, every graded prop on a starter with both prices (lab
+`sweep_read.py`; 21 nights that have five games behind the man; the
+errors by night):
+
+| A starter whose read's games ran | Props | The over against its fair price | Every under | Every over |
+| --- | --- | --- | --- | --- |
+| Over the league's size (lopsided) | 5,527 | 46.2% v 49.7%: -3.5 (±0.9) | +0.0% a bet | -13.2% |
+| Under it (close) | 5,210 | 50.1% v 49.7%: +0.4 (±1.5) | -7.2% (±2.8) | -5.8% |
+| Lopsided, his club not favoured by 3.5 | 3,378 | -4.4 (±1.3) | +1.7% | -14.9% |
+| Close, his club not favoured by 3.5 | 2,809 | 53.2% v 49.8%: +3.4 (±1.9) | -12.8% (±3.5) | +0.1% |
+| Lopsided, favoured by 3.5 or more | 2,149 | -2.1 (±1.3) | -2.6% | -10.5% |
+| Close, favoured by 3.5 or more | 2,401 | -3.2 (±1.7) | -0.6% | -12.7% |
+
+The book's line on a starter coming off routs has been too high: his
+over lands 3.5 points under its fair price. The run's read of his
+minutes is too LOW (he plays a minute more than it says), so the run sat
+under the book's number and called the under, and the under was right
+for a reason the run did not know. Mend the read and the run agrees with
+the book, the under is not called, and what is called in its place is an
+over at a price that loses 13% a bet. On a starter of a club that is not
+favoured the two classes stand 7.8 points of chance apart (the error
+2.3): coming off close games his over has landed 53.2% and every under
+has lost 12.8% a bet.
+
+So the run's unders have been earning partly from a read that is wrong
+in the book's direction. That is worth knowing by itself: an accurate
+projection does not earn at these prices, because the over is priced two
+points over its chance on every prop (5 Nov, and the sweep), and what
+earns is disagreeing with the book where the book leans.
+
+### 7. The decision, and what is on record
+
+Not built. The rule of this sheet is that a lever goes in when the
+replay of the graded nights does not get worse, and here it gets worse
+on the picks (3.4 points a pick, 97% of draws) while the Brier does not
+move. The minutes finding is sound and it stays measured; the file
+stands as it did.
+
+On record:
+
+1. The game script's second pass (section 2, the constants as fitted),
+   to be replayed again at fifty graded nights. It can go in when the
+   over's standing shortfall is in the chance the picks are read
+   against, so that a truer read is not turned into overs that lose.
+2. A tell beside the home and road chip (shown, not scored): what a
+   starter's recent games were, with the over's rate against its fair
+   price in his class read live. The under on a starter of a club not
+   favoured who comes off close games has lost 12.8% a bet with no
+   model; four cells drawn after the look, 21 nights.
+3. The side's slope against the stat with the defence and pace levers
+   in the replay: on four seasons the starter of a club favoured by 8 or
+   more scores 4.8% more than projected, which may be a lever the
+   defence table does not carry in full.
+4. The level: a man told he starts plays 0.29 minutes over the read on
+   the graded nights (±0.21) and 0.25 on four seasons.

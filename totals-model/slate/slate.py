@@ -5213,6 +5213,32 @@ PROPS_THIN_SD = ((360.0, 1.04),)
 # CONFIRMED and him not in it he played 0.96 of the projection (14,290 games over four seasons: -0.8 minutes, -0.83, -0.73, -0.78
 # and -0.98 by season, 0.96 at every level of the read from 14 minutes up). An expected five is not read this way.
 PROPS_BENCH_STAYS = 0.96
+# THE EXPECTED FIVE AS A ROLE (21 Nov 2026, the user, after the BET band's 0-2 on a centre read at 24 minutes who played 32: "Yes
+# start with the first one bro", the first being a starter's minutes when teammates are newly out). That one measured nothing: a man
+# who started all of his last five and starts tonight, with 25 mpg or more of regulars newly out, played 0.23 over the read (7,122
+# games over four seasons; centres 0.46 UNDER it), the lever on who is out already carrying it. What the same games showed is the
+# ROLE: a man RotoWire's expected five has STARTING who has not started all of his last five is read from his games of any kind,
+# and he plays more. On four seasons through props_project (lab e2e7, e2e8), each game counted by how often the expected five
+# names such a man a starter (its record on 25 graded nights: 44 to 85% of those who then started, 2 to 45% of those who did not):
+#   started two or fewer of his last five        2.45 minutes over the read, the miss 5.72; with the mix 0.23 over and 5.39,
+#                                                every season (5.97 5.76 5.52 5.19 to 5.67 5.38 5.21 5.04)
+#   three or four, his last game a start         0.89 over and 5.03; with the mix 0.03 under and 4.90 (5.12 4.99 5.01 4.91 to
+#                                                5.03 4.86 4.85 4.84)
+#   three or four, his last game off the bench   0.75 UNDER the read as it stands: left (the expected five right 6 times in 14)
+# The mix: half way from the read to the path the run takes when the five is CONFIRMED (his games as a starter, the role's own
+# lever on who is out, the script and the top). Half, not the 0.8 the expected five is right: when it is wrong the role read
+# runs four minutes over what he plays (47 men on the graded nights; his games of any kind half a minute over), and at 0.7 the
+# four seasons read 0.65 under and 5.50. On the 24 graded
+# nights, the same rows through the file before and after (lab replay_role22, replay22_read): the 90 men of the first kind played
+# 4.40 over the read and 2.28 with the mix, the miss 5.72 and 4.73; the 89 of the second 1.24 and 0.22, 4.80 and 4.70; every man
+# with a prop 4.213 to 4.171. On their rows the projection ran 19.4% and 2.9% under what they did, 10.3% under and 0.7% over
+# with the mix. Every row of the nights: the blend's Brier 0.24785 to 0.24781 (the book's 0.24797), the model's earned share
+# 0.142 to 0.156; from 5 Nov 0.24807 to 0.24798 and 0.148 to 0.181. The picks, for the record and too few to weigh: 783-674
+# (-53.3u) before and 730-623 (-46.8u) after, nine nights better and nine worse, the night of 20 Nov two units worse. Left on
+# 15 Nov 2026 with 139 men, when the mix read the chance worse. To the BENCH the same mix measured nothing (a bench man in an
+# expected five played 0.1 under the read on 520 men) and is not read.
+PROPS_EXPECTED_START = 0.5   # the share of the way from his games of any kind to the confirmed five's path
+PROPS_EXPECTED_FEW = 2       # started this many of his last five or fewer: read whatever his last game; three or four: only when he started his last game
 
 
 def props_usage_bucket(usage):
@@ -5355,7 +5381,7 @@ PROPS_DRIFT_CLAMP = (0.85, 1.15)
 PROPS_DRIFT_LAST_MIN = 300.0                                                  # a man's minutes last season before he counts toward the drift
 PROPS_ROLE_FLAT = {True: 27.5, False: 20.5}                                   # what a rotation man with no game in the role plays: a starter, a bench man (four seasons)
 PROPS_CLUB_RECENT = 15   # a regular counts with his club while his last game for it is inside its last fifteen (the audit's measure)
-PROPS_LEVERS = 4                                                              # 2: the levers as corrected on 13 Nov 2026; 3: the second pass the same day (the weighted read, the first games back, home and road); 4: what the men out carried (18 Nov 2026)
+PROPS_LEVERS = 5                                                              # 2: the levers as corrected on 13 Nov 2026; 3: the second pass the same day (the weighted read, the first games back, home and road); 4: what the men out carried (18 Nov 2026); 5: the expected five as a role (21 Nov 2026)
 # WHAT THE MEN OUT CARRIED (18 Nov 2026). The day's first BET was the under on a second-year guard's assists with his club's lead
 # guard out; in his five games without that man he had gone over the number five times, and every book but the carded one leaned over.
 # The lever on who is out read the absent men by their MINUTES alone. Measured on every game a rotation man played in 2024-25 and
@@ -6956,6 +6982,31 @@ def props_project(prop, logs_this, logs_last, ctx):
         mins += d_top
         why.append("the top of the minutes: a man projected past %.0f played 1.4 minutes less than the projection and did 2.4%% fewer points than projected (2,722 games over four seasons; a long night is cut short by a blowout, fouls or a knock far more often than it runs longer), so every minute over %.0f is read at half: %+.1f minutes, scored" % (
             PROPS_TOP_AT, PROPS_TOP_AT, d_top))
+    # THE EXPECTED FIVE AS A ROLE (21 Nov 2026): RotoWire's EXPECTED five has him starting and he has not started all of his last
+    # five: his minutes are read PROPS_EXPECTED_START of the way from the read above to the path the run takes when the five is
+    # confirmed (his games as a starter, the role's own lever on who is out, the script and the top), both ends through this function
+    i_mix, d_mix, mixn = len(why), 0.0, None
+    played_ = [g for g in (logs_this or []) if g["min"] > 0]
+    if (not ctx.get("_minutes_only") and ctx.get("starter") is True and str(ctx.get("start_src") or "") == "RotoWire's expected five" and not mrole and not m["last_season"]
+            and m.get("n5") == PROPS_LAST_N and m["starts"] < m["n5"] and (m["starts"] <= PROPS_EXPECTED_FEW or bool(played_[-1]["st"]))):
+        alt, _walt = props_project(prop, logs_this, logs_last, dict(ctx, start_src="RotoWire's confirmed five", _minutes_only=True))
+        if alt and alt.get("mrole"):
+            d_mix = PROPS_EXPECTED_START * (alt["mins"] - mins)
+            if abs(d_mix) >= 0.005:
+                ar = alt["mrole"]
+                mixn = {"w": PROPS_EXPECTED_START, "any": mins, "role": alt["mins"], "games": ar["games"], "how": ar["how"]}
+                mins += d_mix
+                few_ = m["starts"] <= PROPS_EXPECTED_FEW
+                why.append("RotoWire's expected five has him starting and he started %s of his last five%s: the read above is his games of any kind, %.1f minutes; as a starter (%s, with the role's own lever on who is out) the run reads %.1f; the five is expected, not confirmed, so his minutes are read %s of the way between: %+.1f minutes (%s), scored" % (
+                    ("none" if m["starts"] == 0 else "%d" % m["starts"]), "" if few_ else ", his last game among them", mixn["any"],
+                    ("no game as a starter this season, so %.1f, what a rotation man with none plays" % PROPS_ROLE_FLAT[True]) if ar["how"] == "flat" else ("his last %d game%s as a starter" % (ar["games"], "" if ar["games"] == 1 else "s")),
+                    mixn["role"], ("half" if abs(PROPS_EXPECTED_START - 0.5) < 1e-9 else "%.2f" % PROPS_EXPECTED_START), d_mix,
+                    "such a man played 2.4 minutes more than his games of any kind said on four seasons, the miss 5.72 so read and 5.39 half way, every season; on the 24 graded nights 4.4 more, 5.72 and 4.73" if few_ else
+                    "such a man played 0.9 minutes more than his games of any kind said on four seasons, the miss 5.03 so read and 4.90 half way, every season; on the 24 graded nights 1.2 more, 4.80 and 4.70"))
+            else:
+                d_mix = 0.0
+    if ctx.get("_minutes_only"):   # the minutes alone, for the mix above: the role path asked for by the expected one
+        return {"mins": mins, "mrole": mrole}, why
     # the OPPONENT'S absences (28 Oct 2026, the user: "when players are out that helps the next man go over, yet it seems to
     # think the same for the defence even when their main players are out"): named on every prop; scored where it measured and
     # held from one half of 2025-26 to the other, a missing centre on a forward's or centre's rebounds (tools_nba_opp_out.py)
@@ -7136,6 +7187,8 @@ def props_project(prop, logs_this, logs_last, ctx):
         parts.append({"k": "script", "t": "The game script, from %s" % ((sc or {}).get("src") or "the simulation"), "eff": round(rate_out * dmin_script, 2), "i": i_script})
     if abs(d_top) > 1e-9:
         parts.append({"k": "top", "t": "The top of the minutes", "eff": round(rate_out * d_top, 2), "i": i_top})
+    if abs(d_mix) > 1e-9:
+        parts.append({"k": "mix", "t": "The expected five: his games as a starter", "eff": round(rate_out * d_mix, 2), "i": i_mix})
     if drate_c > 0:
         parts.append({"k": "oppc", "t": "Their centre out", "eff": round(drate_c * mins, 2), "i": i_oppc})
     if abs(f_pace - 1.0) > 1e-9:
@@ -7175,6 +7228,8 @@ def props_project(prop, logs_this, logs_last, ctx):
         res["pull"] = round(d_pull, 2)
     if abs(d_stay) > 1e-9:
         res["stay"] = round(d_stay, 2)
+    if mixn:   # the expected five as a role (21 Nov 2026): the two reads, the share between them and what it moved
+        res["mix"] = {"w": mixn["w"], "any": round(mixn["any"], 1), "role": round(mixn["role"], 1), "dmin": round(d_mix, 2), "games": mixn["games"], "how": mixn["how"]}
     if abs(lean) > 1e-9:
         res["lean"] = round(lean, 2)
     return res, why
@@ -9633,7 +9688,7 @@ def selftest():
     check("props: the projection is rate x minutes, who is out, pace and the defence, against the line; the chance read around the median (the mean less 0.08 sigmas on points, 0.04 of it back for a man who started all of his last five)",
           abs(mu_x - 32.57) < 0.01 and abs(proj_["proj"] - mu_x) < 0.006 and abs(proj_["sd"] - sd_x) < 0.006 and proj_["side"] == "OVER" and abs(proj_["p"] - props_blend(0.5, pm_x)) < 0.0002 and proj_["band"] == "no edge"   # the market the spine, the model a fifth (5 Nov 2026)
           and abs(proj_["edge"] - (props_blend(0.5, pm_x) - props_implied(-110))) < 0.0002 and proj_["price"] == -110 and proj_["mins"] == 36.1 and proj_["top"] == -0.05 and proj_["pull"] == -0.11 and abs(proj_["pm"] - pm_x) < 0.0002
-          and proj_["lv"] == PROPS_LEVERS == 4 and proj_["chg"] == {"new": 30.0, "back": 0.0, "dmin": 0.0, "lvl": 30.0, "lg": 20.0, "drate36": round(pr_["rate"] * 36 * 0.035 / 3.0, 3)} and "mrole" not in proj_ and "drift" not in proj_ and "ret" not in proj_
+          and proj_["lv"] == PROPS_LEVERS == 5 and proj_["chg"] == {"new": 30.0, "back": 0.0, "dmin": 0.0, "lvl": 30.0, "lg": 20.0, "drate36": round(pr_["rate"] * 36 * 0.035 / 3.0, 3)} and "mrole" not in proj_ and "drift" not in proj_ and "ret" not in proj_
           and props_shade("pts", 0.5) == 0.0 and props_shade("reb", 0.5) == 0.0 and props_shade("pra", 0.4892) == 0.0 and props_shade("tpm", 0.4038) == 0.0 and all(v == 0.0 for v in PROPS_SIDE_SHADE.values()) and set(PROPS_SIDE_SHADE) == set(PROPS_SD_K)   # the over's shade off (5 Nov 2026): it had called the under on four props in five
           and any("the over's shade is off" in w and "the model 20% of the say" in w for w in why_)
           and abs(props_over(proj_["proj"] - 0.04 * proj_["sd"], proj_["sd"], 30.5)[0] - proj_["pm"]) < 0.001   # the sigma carries the thin-history factor (27 Oct 2026; x 1.04 from 13 Nov) on 125 minutes of evidence
@@ -9920,7 +9975,7 @@ def selftest():
           and abs(pa_["proj"] - (9.0 + 0.11 * over_c) / 36.0 * mins_c * 0.989) < 0.006 and abs(pr2_["proj"] - 8.0 / 36.0 * mins_c) < 0.006
           and abs(pc_["proj"] - (47.0 + 30.0 * 0.035 * over_c + 0.11 * over_c) / 36.0 * mins_c * (1 - hr_c)) < 0.006
           and abs(pb_["proj"] - 0.5 * (1 + 0.035 * over_c) * mins_b * 0.993) < 0.006 and abs(mins_b - 18.8073) < 1e-4 and pb_["mins"] == 18.8
-          and pj_["chg"] == {"new": 25.7, "back": 4.7, "dmin": round(mins_c - 36.0, 2), "lvl": 41.7, "lg": 20.0, "drate36": round(30.0 * 0.035 * over_c, 3)} and pj_["lv"] == 4
+          and pj_["chg"] == {"new": 25.7, "back": 4.7, "dmin": round(mins_c - 36.0, 2), "lvl": 41.7, "lg": 20.0, "drate36": round(30.0 * 0.035 * over_c, 3)} and pj_["lv"] == 5
           and dict((p_["k"], p_) for p_ in pj_["parts"])["out"]["eff"] == round(30.0 / 36.0 * (1 + 0.035 * over_c) * mins_c - 30.0, 2)
           and any(w == "who is out against his last 6: newly out: Kyrie Irving (30 mpg, with him in 4 of his last 6), PJ Washington (26 mpg, with him in 6 of his last 6, listed Questionable and counted 45% out); back: Klay Thompson (28 mpg, missed 2 of his last 6): -0.2 minutes (0.00 a 30 mpg newly out and 1.42 off a 30 mpg back for a man who started all of his last five on 36.0 minutes; a man out through all of them is already in his minutes; 57,908 games over four seasons, the miss 4.80 with no lever and 4.58 with this), scored" for w in wj_)
           and any(w.startswith("who is out against his last 6: newly out: Kyrie Irving (30 mpg, with him in 4 of his last 6), PJ Washington") and ": +2.8 minutes (3.74 a 30 mpg newly out and 2.55 off a 30 mpg back for a man who started none of his last five on 16.0 minutes" in w for w in wb_)
@@ -10020,7 +10075,7 @@ def selftest():
           # nobody out and nobody back who missed a game of his: the sums are nought and no name is carried
           and props_out_carry("11", lc, None, dict(nc, out=[], maybe=[], regs={"11": ("Luka Doncic", 36.0), "24": ("PJ Washington", 26.0)}, plays={})) == {"mnew": 0.0, "mback": 0.0, "new": {"pts": 0.0, "reb": 0.0, "ast": 0.0}, "back": {"pts": 0.0, "reb": 0.0, "ast": 0.0}, "new_names": [], "back_names": [], "n": 6}
           # the projection: his points rate x (1 + the lever on the level + the share), the minutes as they were
-          and abs(pk_["proj"] - 30.0 / 36.0 * (1 + 0.035 * over_c + sh_p) * mins_c * 0.993) < 0.006 and pk_["mins"] == pj_["mins"] and pk_["lv"] == 4
+          and abs(pk_["proj"] - 30.0 / 36.0 * (1 + 0.035 * over_c + sh_p) * mins_c * 0.993) < 0.006 and pk_["mins"] == pj_["mins"] and pk_["lv"] == 5
           and abs((pka_["proj"] - pa_["proj"]) - 9.0 / 36.0 * sh_a * mins_c * 0.989) < 0.012 and abs((pkr_["proj"] - pr2_["proj"]) - 8.0 / 36.0 * sh_r * mins_c) < 0.012
           and pk_["carry"] == {"mnew": round(cm_new, 1), "mback": round(cm_back, 1), "new": {"pts": round(cn_["pts"], 2)}, "back": {"pts": round(cb_["pts"], 2)}, "share": {"pts": round(sh_p, 4)}, "drate36": round(30.0 * sh_p, 3), "n": 6}
           and pk_["chg"] == pj_["chg"]                                                    # the lever on the level and the minutes read as they did
@@ -10112,12 +10167,44 @@ def selftest():
     # a man with five starts behind two bench games, starting tonight on a confirmed five: his starts weighted, 27.5 standing as the game before them
     lg7 = [dict(g_, st=1) for g_ in lc["25"]["g"][:5]] + [dict(lc["25"]["g"][5], st=0, d="2026-11-07"), dict(lc["25"]["g"][5], st=0, d="2026-11-08")]
     pr7_, wr7_ = props_project(dict(prop_, name="Bench Man", line=7.5), lg7, None, {"home": False, "pos": "G", "opp_nick": "Lakers", "self_out": "", "starter": True, "start_src": "RotoWire's confirmed five"})
-    check("props: his games in tonight's role when RotoWire's five is CONFIRMED and the role is new (13 Nov 2026; his last ten in the role weighted, the flat number as the game before his first, the second pass): a bench man with no start this season reads the flat 27.5, the lever on who is out by the role; an expected five and a role he has had all along read his games of any kind",
+    # THE EXPECTED FIVE AS A ROLE (21 Nov 2026): told he starts by an EXPECTED five, not having started all of his last five
+    mins_e5 = mins_b + 0.5 * (mins_r - mins_b)
+    pex2_, wex_ = props_project(dict(prop_, name="Bench Man", line=7.5), lc["25"]["g"], None, dict(ctx_r, start_src="RotoWire's expected five"))
+    parts_x = dict((p_["k"], p_) for p_ in pex_["parts"])
+    ctx_x0 = {"home": False, "pos": "G", "opp_nick": "Lakers", "self_out": "", "starter": True, "start_src": "RotoWire's expected five"}
+    g25_ = lc["25"]["g"]
+    lg8 = [dict(g25_[0], st=s_, d="2026-11-%02d" % (1 + i_)) for i_, s_ in enumerate((1, 1, 1, 0, 0, 1, 1, 1))]   # three starts in his last five, his last game one of them
+    px8_, wx8_ = props_project(dict(prop_, name="Bench Man", line=7.5), lg8, None, ctx_x0)
+    px7_, _wx7 = props_project(dict(prop_, name="Bench Man", line=7.5), lg7, None, ctx_x0)                          # three starts in his last five, his last two off the bench
+    px8l_, _wx8l = props_project(dict(prop_, name="Bench Man", line=7.5), lg8, None, dict(ctx_x0, start_src="his last game this season"))   # the same man with no five named
+    px8b_, _wx8b = props_project(dict(prop_, name="Bench Man", line=7.5), lg8, None, dict(ctx_x0, starter=False))                            # the same man told he is on the BENCH by the expected five
+    px4_, _wx4 = props_project(dict(prop_, name="Bench Man", line=7.5), g25_[:4], None, dict(ctx_r, start_src="RotoWire's expected five"))   # four games behind him
+    pxa_, _wxa = props_project(dict(prop_, line=30.5), lc["11"]["g"], None, dict(ctx_c2, starter=True, start_src="RotoWire's expected five"))   # a starter all along
+    mo_, _wmo = props_project(dict(prop_, name="Bench Man", line=7.5), lc["25"]["g"], None, dict(ctx_r, _minutes_only=True))
+    role8 = (16.0 * sum(0.75 ** k_ for k_ in range(6)) + 0.75 ** 6 * 27.5) / (sum(0.75 ** k_ for k_ in range(6)) + 0.75 ** 6)   # six starts at 16, the flat 27.5 as the game before them: 16.59
+    check("props: the expected five as a role (21 Nov 2026): RotoWire's EXPECTED five has him starting and he has not started all of his last five, so his minutes are read half way from his games of any kind to the path of a confirmed five (his games as a starter, the role's own lever on who is out); a part of its own and the mark on the row; whatever his last game where he started two or fewer of five, only with his last game a start where he started three or four; under five games, a starter all along, a man told he is on the bench, a confirmed five and a run with no five named are read as before",
+          pex_ == pex2_ and pex_["mins"] == round(mins_e5, 1) == 23.4 and abs(pex_["proj"] - 0.5 * (1 + 0.035 * over_c) * mins_e5 * 0.993) < 0.006
+          and pex_["mix"] == {"w": 0.5, "any": round(mins_b, 1), "role": round(mins_r, 1), "dmin": round(0.5 * (mins_r - mins_b), 2), "games": 0, "how": "flat"} and pex_["mix"]["any"] == 18.8 and pex_["mix"]["role"] == 28.0 and pex_["mix"]["dmin"] == 4.61
+          and parts_x["mix"]["t"] == "The expected five: his games as a starter" and parts_x["mix"]["eff"] == round(0.5 * (1 + 0.035 * over_c) * 0.5 * (mins_r - mins_b), 2)
+          and abs(pex_["base"] + sum(parts_x[k_]["eff"] for k_ in ("out", "mix", "home")) - pex_["proj"]) < 0.03 and "mrole" not in pex_ and "stay" not in pex_ and pex_["lv"] == 5
+          and wex_[parts_x["mix"]["i"]].startswith("RotoWire's expected five has him starting and he started none of his last five: the read above is his games of any kind, 18.8 minutes; as a starter (no game as a starter this season, so 27.5, what a rotation man with none plays, with the role's own lever on who is out) the run reads 28.0; the five is expected, not confirmed, so his minutes are read half of the way between: +4.6 minutes (such a man played 2.4 minutes more than his games of any kind said")
+          and wex_[parts_x["mix"]["i"]].endswith("the miss 5.72 so read and 5.39 half way, every season; on the 24 graded nights 4.4 more, 5.72 and 4.73), scored")
+          # three or four starts in five: read only when his last game was a start
+          and abs(role8 - 16.5905) < 1e-3 and px8_["mins"] == round(16.0 + 0.5 * (role8 - 16.0), 1) == 16.3 and px8_["mix"] == {"w": 0.5, "any": 16.0, "role": 16.6, "dmin": 0.3, "games": 6, "how": "role"}
+          and any(w.startswith("RotoWire's expected five has him starting and he started 3 of his last five, his last game among them: the read above is his games of any kind, 16.0 minutes; as a starter (his last 6 games as a starter, with the role's own lever on who is out) the run reads 16.6;") and w.endswith("the miss 5.03 so read and 4.90 half way, every season; on the 24 graded nights 1.2 more, 4.80 and 4.70), scored") for w in wx8_)
+          and "mix" not in px7_ and px7_["mins"] == 16.0 and "mix" not in dict((p_["k"], p_) for p_ in px7_["parts"]) and not any(w.startswith("RotoWire's expected five has him starting") for w in _wx7)
+          and "mix" not in px8l_ and px8l_["mins"] == 16.0 and "mix" not in px8b_ and px8b_["mins"] == 16.0 and not any("The expected five" in p_["t"] for p_ in px8b_["parts"]) and dict((p_["k"], p_) for p_ in px8_["parts"])["mix"]["eff"] == round(0.5 * 0.5 * (role8 - 16.0), 2) == 0.15
+          # under five games behind him, a starter all along, the bench, a confirmed five, no five named
+          and "mix" not in px4_ and "mix" not in pxa_ and pxa_["proj"] == psm_["proj"] and "mix" not in pse_ and pse_["proj"] == pb_["proj"] and "mix" not in prl_ and "mix" not in pb_ and "mix" not in pst_
+          # the minutes alone, for the mix: the role path's own, and nothing of it on a row
+          and sorted(mo_) == ["mins", "mrole"] and abs(mo_["mins"] - mins_r) < 1e-9 and mo_["mrole"]["how"] == "flat" and not any(str(k_).startswith("_") for k_ in pex_)
+          and PROPS_EXPECTED_START == 0.5 and PROPS_EXPECTED_FEW == 2)
+    check("props: his games in tonight's role when RotoWire's five is CONFIRMED and the role is new (13 Nov 2026; his last ten in the role weighted, the flat number as the game before his first, the second pass): a bench man with no start this season reads the flat 27.5, the lever on who is out by the role; a role he has had all along reads his games of any kind (an expected five: the check before this one)",
           abs(prl_["proj"] - 0.5 * (1 + 0.035 * over_c) * mins_r * 0.993) < 0.006 and prl_["mins"] == round(mins_r, 1) == 28.0 and prl_["mrole"] == {"how": "flat", "games": 0, "starter": True, "mean": 16.0, "read": 27.5}
           and any(w.startswith("27.5 minutes projected: no game as a starter this season, so 27.5, what a rotation man with none plays, held to his own games (season 16.0); his last 6 of any kind say 16.0, 0 of his last 5 starts; the five is confirmed and the role is not that of all his last five: with the real starters his games in the role miss by 4.8 minutes on such a night where his games of any kind miss by 5.3 (15,671 games over four seasons), scored") for w in wrl_)
           and any("for a starter tonight on 27.5 minutes" in w and "(0.80 a 30 mpg newly out and 1.02 off a 30 mpg back" in w for w in wrl_)
           and dict((p_["k"], p_) for p_ in prl_["parts"])["minutes"]["t"] == "Minutes, his games in tonight's role against the season"
-          and pex_["proj"] == pb_["proj"] and "mrole" not in pex_ and psm_["proj"] == pj_["proj"] and "mrole" not in psm_
+          and "mrole" not in pex_ and psm_["proj"] == pj_["proj"] and "mrole" not in psm_
           # two games in the role: 16 and 17 at 0.75 and 1, the flat 20.5 as the game before them at 0.5625
           and abs(role_few["proj"] - (0.75 * 16 + 17 + 0.5625 * 20.5) / 2.3125) < 1e-9 and abs((0.75 * 16 + 17 + 0.5625 * 20.5) / 2.3125 - 17.527) < 1e-3
           and role_few["role"] == {"how": "few", "games": 2, "starter": False, "mean": round(sum(a * b for a, b in zip(w7_, [30, 31, 29, 30, 32, 16, 17])) / sum(w7_), 1), "flat": 20.5} and role_few["role"]["mean"] == 23.5

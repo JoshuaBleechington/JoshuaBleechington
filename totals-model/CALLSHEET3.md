@@ -6046,6 +6046,37 @@ Lakers won where the game's count had 98% of the money on the over 229.5;
 the game ended 210. Over the two nights a full-game decision with the
 larger bets on the other side is 1-3 and with them 2-1.
 
+### 10. The third night, 21 Nov
+
+From the user's backup of 22 Nov (lab `money_night.py`). Six games; the
+early one (Bucks at 76ers) carried the count of 11:50 am Eastern, the
+other five that of 3:20 pm.
+
+| Game (final) | Spread | Total | Moneyline |
+| --- | --- | --- | --- |
+| Bucks 129, 76ers 132 | 76ers -10.5, 86% on 76%: lost | **over 228.5, 87% on 29%: won** | **Bucks, 76% on 9%: lost** |
+| Trail Blazers 96, Knicks 97 | Knicks -3.5, 66% on 66%: lost | over 215.5, 79% on 72%: lost | Knicks, 95% on 79%: won |
+| Clippers 100, Mavericks 110 | Mavericks -4.5, 93% on 81%: won | under 230.5, 52% on 36%: won | Mavericks, 99% on 89%: won |
+| Grizzlies 95, Timberwolves 104 | Grizzlies +6.5, 65% on 58%: lost | **over 228.5, 97% on 69%: lost** | Timberwolves, 78% on 82%: won |
+| Pelicans 91, Spurs 114 | Pelicans +18.5, 51% on 48%: lost | under 228.5, 50% on 33%: won | **Pelicans, 70% on 18%: lost** |
+| Celtics 96, Kings 97 | Celtics -13.5, 90% on 83%: lost | over 217.5, 99% on 82%: lost | **Kings, 48% on 10%: won** |
+
+The sides twenty or more apart went 2-3 (+3.4u, the Kings' price carrying
+it): totals 1-1, moneylines 1-2 (three long dogs: the Kings won as a dog
+of 13.5). Every market's named side 8-10 (+0.7u).
+
+Three nights together: the sides twenty apart 12-11 (+4.7u), every named
+side 32-25. Nineteen games; still a note.
+
+The decision against the count. The larger bets with it, 0-1: the over
+228.5 in Grizzlies at Timberwolves (97% of the money on 69% of the bets;
+199), which the user took. The larger bets on the other side, 0-1: the
+under 229.5 in Bucks at 76ers (87% of the money on the over on 29% of the
+bets; 261). No gap of twenty, 4-0: the unders in Pelicans at Spurs and
+Celtics at Kings, the Mavericks and the Knicks to win. Over the three
+nights a full-game decision with the larger bets on the other side is 1-4
+and with them 2-2.
+
 ## The night of 20 Nov: four stat lines, and where the picks leak
 
 The user's backup of 21 Nov, graded (lab `grade_night.py`,
@@ -6865,3 +6896,67 @@ On record:
    defence table does not carry in full.
 4. The level: a man told he starts plays 0.29 minutes over the read on
    the graded nights (±0.21) and 0.25 on four seasons.
+
+## The night of 21 Nov: the chip's first night
+
+The user's backup of 22 Nov, graded (lab `grade_night.py`,
+`night_page5.js` on the published page, `money_night.py`,
+`chip_night.py`, `picks_men.py`, `why_men.py`; the six finals checked
+against ESPN's scoreboard, two of them 96-97 by coincidence). Nothing in
+the model was changed.
+
+### 1. The night
+
+The decision as given went 4-2 (150-90-1, +5.2u on the season): the best
+number 0-2 (the under 229.5 in Bucks at 76ers lost at 261, the over 228.5
+in Grizzlies at Timberwolves at 199: both by thirty points, where the
+number was a point better than the middle of the books), the sheet's read
+2-0 (the unders in Pelicans at Spurs, 205, and Celtics at Kings, 193),
+the likelier winner 2-0 (the Mavericks and the Knicks). The likeliest
+side on each game went 5-1; the Celtics lost at -800.
+
+The user marked one bet, the over 228.5 in Grizzlies at Timberwolves at
+-115: lost. The calls on the game taken stand 8-6 (+1.2u).
+
+The props: no BET. The leans 16-17, -2.8u; from 5 Nov the BET band 38-26
+(+4.6u) and the leans 510-416 (-2.6u). The four overs priced -110 to -101
+that are left off the lists went 2-2. The pairs listed went 1-7 and the
+two-leg ticket lost; none was taken.
+
+The rows carry the mark 4: the night's props were run with the slate.py
+from before the expected five's change (sent at 12:36 pm Eastern on the
+day), so no row has the mix.
+
+### 2. The picks, man by man
+
+33 picks on 12 men.
+
+| | Record | Who |
+| --- | --- | --- |
+| Unders on a favourite's man | 10-1 | Paul George 4-1 (Celtics by 13.5), Cooper Flagg 3-0 and Naji Marshall 3-0 (Mavericks by 5.5) |
+| Unders on a dog's starter | 3-10 | Tyler Herro 0-3, Jeremiah Fears 0-2, Rui Hachimura 0-2, Keegan Murray 1-2, Deni Avdija 1-1, Darius Garland 1-0 |
+| Overs | 3-6 | Cam Spencer 3-4, Jaylen Wells 0-1, Zach Edey 0-1 |
+
+The dogs' starters played well over their reads: Herro 40 minutes
+against 28.7 (50 points; the Bucks, dogs of 10.5, lost by three), Murray
+40 against 29.0 (the Kings won as dogs of 13.5), Fears 34 against 29.6 in
+a 23-point loss, Avdija 36 against 31.6. George played 37 against 29.1
+and his unders won all the same.
+
+### 3. The home and road chip, as it stood before the games
+
+| The chip on the pick | Picks | Who |
+| --- | --- | --- |
+| Green (the under on a home favourite's man) | 6-0, +5.3u | Flagg and Marshall |
+| No colour | 10-17, -8.2u | a road dog's man 5-14, a home dog's (Murray) 1-2, a road favourite's (George) 4-1 |
+| Red | none | |
+
+On every prop with a side on the night the sheet's side went 65-52 where
+the chip was green, 102-127 where it had no colour and 44-42 where it was
+red. With no model, on a home favourite's man the over landed 47.3% where
+the prices said 50.0% (203 props); on a road dog's man 45.5% against
+49.3% (202 props), so the under there had the better of the night as a
+whole and the sheet's own unders on six starters did not.
+
+One night, and the green picks are two men's stat lines. It is the first
+count, kept because the chip was built the day before.

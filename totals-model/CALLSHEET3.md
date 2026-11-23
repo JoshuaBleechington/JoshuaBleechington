@@ -7252,3 +7252,342 @@ first-half total. Selftest 325.
   slate.py will show which apps post it and how.
 - The fills. They are on the list because the list was asked to carry
   three; on the games looked at they lost.
+
+## The night of 22 Nov: the first-half list's first night out of sample
+
+The user's backup of 23 Nov, graded (lab `grade_night.py`, the night's
+page scripts on the published page, `money_night.py`, `chip_night.py`,
+`h1_page_ref.py`; the seven finals checked against ESPN's scoreboard:
+Pistons 97 at Hawks 107, Thunder 113 at Heat 123, Nuggets 151 at Bulls
+145 in overtime, Magic 96 at Wizards 116, Mavericks 116 at Jazz 114,
+Pacers 106 at Knicks 113, Celtics 87 at Warriors 88). Nothing in the
+model was changed by the grading.
+
+### 1. The night
+
+The decision as given went 3-4 (153-94-1, +3.6u on the season): the over
+behind a tired favourite 1-1 (the over 213 in Pacers at Knicks won at
+219; the over 210.5 in Celtics at Warriors lost at 175; the kind 7-3,
++3.3u), the best number 1-2 (the under 220.5 in Magic at Wizards won;
+the under 225.5 in Mavericks at Jazz lost at 230; the under 236.5 in
+Nuggets at Bulls lost at 296 after overtime; the kind 51-49-1), the
+likelier winner 1-1 (the Heat won, the Pistons lost). The sheet's own
+call on the Hawks at +105 won; that kind is cold here (18-28) and was
+left out of the order. The likeliest side on each game went 5-2, and the
+parlay four lost on the Celtics and the Magic. The user marked no bet.
+
+### 2. The props
+
+No BET. The leans 15-11 (-0.1u), one a man 9-5; from 5 Nov the BET band
+38-26 (+4.6u) and the leans 525-427 (-2.7u). By man: Scheierman 5-0,
+Tatum 2-2, Flagg 2-0, Dort 0-3 (read at 23.7 minutes, he played 31),
+Zubac 0-2, Hart 0-1. The pairs listed went 2-6; the best-chance two-leg
+ticket won at the top of its list (+1.35u) and lost second, the
+best-chance three-leg ticket won (+2.82u), the last-five two-leg ticket
+lost. None was taken.
+
+### 3. The expected five as a role: its first night
+
+The rows carry the mark 5. Nine men carried the mix (Mara did not play).
+The eight who played went 0.6 minutes under the read with the mix in it
+and 0.0 against the read without it (Hayes 12 against 25.1, Suggs 22
+against 29.8). One pick among them: Bassey over 13.5 points and rebounds
+at -128, won at 22.
+
+### 4. The home and road chip
+
+Green 0-1 (the under on Hart's rebounds), no colour 15-10 (+0.9u); over
+two nights the green picks are 6-1. With no model, a home favourite's
+man's over landed 54.8% on the night where the prices said 49.7%.
+
+### 5. The money
+
+The sides twenty apart went 3-6 (-3.09u) and every named side 10-11; on
+four nights 15-17 (+1.6u) and 42-36, 26 games. The decision with the
+larger bets on the other side went 3-1 on the night (the over in Pacers
+at Knicks, the under in Magic at Wizards, the Heat; the Pistons lost),
+4-5 on four nights, and 2-2 with the larger bets on it. The page keeps
+this count itself from the 23rd (below).
+
+### 6. The first half's list
+
+The rule was drawn on the games to 21 Nov, so this is its first night
+out of sample: 1-3, -$205 at $100 a bet. The over 104.5 in Pacers at
+Knicks (the tired favourite) won at 106; the over 107.5 in Celtics at
+Warriors (the same kind) lost at 86; the cheaper side lost twice, the
+under 114.5 in Nuggets at Bulls at 142 and the over 115.5 in Pistons at
+Hawks at 103. Off the list, the cheaper side's under 112.5 in Thunder at
+Heat and the split's under 115.5 in Mavericks at Jazz lost too: every
+candidate 1-5, the cheaper side 0-3. The cheaper side stands 62-41 on
+this season's games before the 23rd and 13-22 since 13 Nov; the list
+67-45 on 33 nights. The sheet's own first-half side won on Mavericks at
+Jazz and Pistons at Hawks, opposite the cheaper side both times.
+
+## The simulation realigned: engine 3, 23 Nov 2026
+
+The user: "And i'd like to remove the Kalshi from the NBA model as well
+and see if the simulation needs to be realligned"; "Make it perfect bro.
+We have your brillance and can play the game outcomes thousands of times
+to find the likely outcome."; and, of a professional bettor, "its not to
+ask who will win, but can they cover the spread".
+
+### 1. The audit
+
+The 207 graded rows of this season that carry the simulation's block
+(lab `sim_audit.py`, the backup of 23 Nov):
+
+| | Read |
+| --- | --- |
+| The spread of the runs | right: the final falls evenly across the runs, and the anchored view's spread against the games' is 1.01 |
+| The own view's total | 2.94 points under the row's line (the error 0.30); the finals 1.85 over the own view and 1.09 under the line |
+| The own view's chance on a total or a spread | worth nothing: the shrink that fits is -0.23 and -0.22 |
+| The own view's win chance | says 64.3%, does 68.1%; log loss 0.6203 where the book's price reads 0.5641, and the best mix gives the runs no weight |
+| The moneyline calls as banded | STRONG 38-15 for -6.0u, BET 21-8 for +0.2u, LEAN 28-9 for +2.7u |
+| The agreement rule | 8-12 |
+
+### 2. Where the three points went
+
+The league's level under the ratings matched the line (0.42 under). Two
+things took points off the total that the close does not take off.
+
+The men out. Each listed-Out regular's points a game times 0.075 came
+off his club's own scoring per 100 possessions, in full. That charge
+averaged 2.52 points a game on the rows (3.69 in the latest week), and
+with it taken back out the own view sat 0.04 under the line. The level
+the ratings ride was earned with men out, so the mean charge was being
+taken twice.
+
+Rest. A club on the second night of a back-to-back lost 1.7 per 100 of
+its own scoring, which took 1.7 off the game's total. The close takes
+0.3: a tired club scores a point less and gives up most of a point more.
+
+### 3. Measured on three seasons, with who played
+
+The ledger's did-not-play lists could not carry the test: they are the
+injury page as it stood when a game was fetched, and 2,344 of 13,301
+entries of 2024-25 are men who played that night. So a man is out when he
+is the club's man and is not in that night's box (his last game before
+was for the club and his next is too; lab `sim_avail2.py`). 2,444 games
+with a closing total and spread: 1,231 of 2024-25, 978 of 2025-26 from 24
+Nov, 235 of this season.
+
+What the close does with it (lab `sim_avail2_read.py`,
+`sim_avail2_loso.py`):
+
+| | The closing spread moves | The closing total moves |
+| --- | --- | --- |
+| A club's charge for its men out | 0.89 of it (the error 0.03) | 0.64 of it (0.03) |
+| A club on no rest | 1.58 points (0.17) | 0.32 (0.17) |
+| A third game in four nights | 0.29 (0.14) | 0.05 (0.15) |
+
+The mean club carries 1.71 per 100 of charge on any night (1.54, 2.00 and
+1.43 by season).
+
+Five ways of pricing the men out were fitted on two seasons and read on
+the third: nothing, the charge sized freely, each man by his share of the
+club's rating with the men back credited, by share alone, and the charge
+with the men back. The last four came out within 0.02 points of each
+other on the held-out season, so the simplest stands. A first attempt,
+built on the did-not-play lists before they were found out, was thrown
+away unsent.
+
+### 4. Engine 3
+
+| | Engine 2 | Engine 3 |
+| --- | --- | --- |
+| The men out | the whole charge off the club's own scoring | the mean charge of the clubs on the slate comes off first; of what is left 0.77 comes off its own scoring and 0.13 goes on the other side's |
+| A club on no rest | 1.7 per 100 off its own scoring | 0.95 off its own, 0.63 on the other side's |
+| A third game in four nights | 0.35 off its own | 0.17 off its own, 0.12 on the other side's |
+
+The sum of the two shares is the margin's 0.90 and their difference the
+total's 0.64. A club with fewer out than the slate's mean scores a little
+more and gives up a little less. `nbasim.py` is version 3 (the rest
+split in `_target`); `slate.py` prices the men out
+(`nba_sim_out_charge`, `nba_sim_out_mean`, `nba_sim_out_adj`) and the
+slate run takes the mean over the clubs on tonight's slate from the same
+injury report. The row's block carries the mean, each club's charge and
+what it does to both sides, and whether a club is on its third game in
+four nights.
+
+The mean of the day against the season's mean to date or a blend of the
+two: the same to the third decimal at every size of slate (lab
+`sim_avail2_mean.py`), so the day's own mean stands. On a one-game night
+that leaves the total where the ratings put it.
+
+### 5. What it does, the same 2,444 games
+
+The centre the runs are built on (lab `sim_avail2_final.py`):
+
+| | Engine 2 | Engine 3 | The close itself |
+| --- | --- | --- | --- |
+| The total less the closing total | -4.08 (-3.85, -4.42, -3.87 by season) | +0.05 (-0.09, +0.31, -0.32) | |
+| Its mean miss to the close | 5.02 | 3.43 | |
+| Its mean miss to the final | 15.33 | 14.86 | 14.40 |
+| The margin's mean miss to the book | 2.79 | 2.79 | |
+| The margin's mean miss to the final | 11.21 | 11.21 | 10.83 |
+| The winner's log loss | 0.5962 | 0.5970 | 0.5805 |
+
+The total is 0.47 points a game nearer the final (days resampled: 0.30
+to 0.65, above nought every time; nearer in 12 months of 15). The margin
+does not move.
+
+The production code against the lab (lab `sim_engine3_prod.py`): every
+centre rebuilt with `slate.py`'s and `nbasim.py`'s own functions, the
+largest gap to the lab's on any of the 2,444 games 0.0000, both engines'
+rows of the table above reproduced to the last digit.
+
+### 6. The play-out, and what the simulation can and cannot say
+
+Every one of the 2,444 games set up with the production code and played
+2,000 times (lab `sim_engine3_mc.py`, `sim_engine3_mc_read.py`):
+
+| | The runs | What happened |
+| --- | --- | --- |
+| The total less the close | -0.06 (-0.31, +0.31, -0.29) | mean miss to the final 14.88, the close 14.40 |
+| The spread of the total | 18.2 | 18.7 about the runs' centre, 18.1 about the close |
+| The spread of the margin | 13.3 | 14.4 about the runs' centre, 13.9 about the book |
+| Its favourite to win | 65.7% | 68.5%; log loss 0.5984, the book's spread as a chance 0.5805; the best mix gives the runs no weight |
+| Its side at the closing spread, at 55% and up | | 701-691 (by season 349-321, 287-298, 65-72) |
+| Its side at the closing total, at 55% and up | | 737-751 (388-396, 290-290, 59-65) |
+| Its side at the closing first-half total, 789 games | 0.79 over the line | 275-291 at 55% and up |
+
+Of the runs' margin less the book's the games kept -0.07 (the error
+0.08), of the total less the close -0.08 (0.08), of the win chance less
+the book's +0.02 (0.11). So: the realigned simulation puts the game where
+the market puts it, and at the closing number its own side is a coin. It
+is a fair picture of the game and of the markets that hang off it (the
+halves, the quarters, each club's points, a window on the total), not a
+reason to bet a side of the main number. The page says so on the card.
+
+### 7. The margin is a little flat: measured, and left
+
+The runs' margin is flatter than the book's: the closing margin on the
+runs' mean margin has a slope of 1.087 (the error 0.010; 1.055, 1.166
+and 0.963 by season) and the final margin 1.122 (0.043), which is why the
+favourite at 65.7% wins 68.5%. Two things pull against each other: the
+ratings' centre is too steep (the book's margin is 0.87 of it, 0.76 this
+season with the season young) and the play-out's score effects flatten
+it by a fifth (0.796, the same in every season). A stretch fitted on two
+seasons helped the third twice (log loss 0.5983 to 0.5966, 0.5991 to
+0.5977) and hurt it this season (0.5938 to 0.5947), and the best of it
+leaves the runs 0.016 of log loss behind the book. Not built: a number
+that changes sign by season is not a lever (lab `sim_engine3_stretch.py`).
+
+### 8. The agreement rule, re-measured
+
+The one scored rule that reads the simulation's own total: the own view
+at 55% and the crew's lean on one side, the sheet not against it. It was
+measured on 28 Oct with a simulation that charged nothing for the men
+out (157-108). The slate's runs did charge them and sat low, so the rule
+had been firing on unders four times in five. Re-measured with engine
+3's own play-out, the tool's own definitions and the crew's record built
+in date order (lab `sim_agree3.py`, the same 2,444 games):
+
+| | The rule | 2 of 3, the sheet silent | 3 of 3 | The sheet a BET the other way |
+| --- | --- | --- | --- | --- |
+| Engine 3 | 149-113 (56.9%), +22.5u; by season 80-62, 56-37, 13-14 | 130-104 | 19-9 | 11-21 |
+| Engine 2's centre | 124-97 (56.1%), +15.7u; 61-43, 51-40, 12-14 | 115-96 | 9-1 | 13-23 |
+| Nothing charged, as first measured | 150-119 (55.8%), +17.4u | 131-108 | 19-11 | 12-17 |
+
+Both engines fire on 131 games (77-54), engine 3 alone on 131 (72-59),
+engine 2 alone on 90 (47-43). The rule is not hurt and fires on overs
+and unders alike (99-71 and 50-42). The page quotes the re-measured
+record, and the rate that gates the price is 56.9% (it was 59.2%). This
+season the rule is cold here under either engine and stays out of the
+decision's order until its record turns.
+
+### 9. The moneyline against the price
+
+The professional's rule in the sheet's own numbers (lab
+`sim_ml_price.py`, the 206 rows of this season with both prices): the
+simulation's moneyline call was banded by its chance alone and went
+87-32 for -3.1u. The 88 of those calls whose price asked more than the
+chance went 66-22, right about the winner three times in four, and lost
+5.5 units; the 31 the price allowed went 21-10 for +2.3u. Either side
+wherever the runs beat the price: the favourites 33-16 (+3.5u), the dogs
+27-94 (-45.5u), the flat margin flattering every dog.
+
+So with a price on the row the simulation's moneyline is a call only
+where its worth beats what the price needs. The card prints the price
+and what it needs beside the chance, the record keeps the calls the
+price did not allow on a line of their own, and the card says how to
+read the table: can they cover; who wins is not the bet.
+
+### 10. On the page
+
+- The Simulation card names the engine and what changed, and the
+  profiles carry each club's charge against the slate's mean and what it
+  does to its own scoring and to the other side's, with a third game in
+  four nights beside a back-to-back. A row of engine 2 reads as it did.
+- The moneyline row: the chance, its worth, the price and what it
+  needs; no call where the price asks more; the same gate on tonight's
+  signals, the phone's list and the record.
+- The record: the calls the price did not allow, and the agreement
+  rule's three-season line.
+- The props are not moved: the matchup lever that reads the simulation's
+  target carries no weight on any market.
+
+### 11. Tests
+
+`slate.py --selftest` 329 checks, four new: the charge, the slate's mean
+and the split; the split and the rest through `nbasim`'s target (0.90 of
+the charge on the margin and 0.64 on the total, 1.58 and 0.32 for a club
+on no rest); the block playing both views with both numbers, the
+simulation watched as `nba_sim_block` calls it; the slate run taking the
+mean of its six clubs and saying so in its log. The page harness, four
+new checks (engine 3 on the card, the moneyline against the price, the
+record's line for the calls the price did not allow, the money's record)
+and two for Kalshi's removal.
+
+### 12. On record, not built
+
+- The margin's stretch (7 above): look again at 600 games of this
+  season, when its sign by season can be read.
+- Each man priced by his share of the club's rating, and the men back
+  credited: no better than the plain charge on a held-out season.
+- The first half from the own view: 275-291 at the closing line, so it
+  stays shown and unscored; the first half's list reads the books.
+
+## Kalshi off the NBA model, 23 Nov 2026
+
+The user: "And i'd like to remove the Kalshi from the NBA model as well".
+It had been off the props since 5 Nov.
+
+`slate.py`: the fetch, the parser and the row's `nbakalshi` block are
+gone from the slate run and the odds run, with their self-tests; one
+check says no name in the file carries the exchange. The page: the
+card's section and its hidden box, the jump bar's link, the chips among
+tonight's signals (the sharp side, the crowd's numbers, each club's team
+total), the chip on the board's moneyline cards, the line under the
+simulation's team-total rows, the number in the decision's why, the
+watch on the moneyline tile, the fold on the phone's sheet and the
+purple of the signals. The page's lists of a row's boxes no longer name
+the block, so a slate written before the 23rd that still carries one
+fills a row's other boxes and leaves it off. A row logged between 4 and
+22 Nov keeps its block in the user's backup; nothing reads it.
+
+Nothing scored is touched: the exchange was shown and never scored (the
+audit of 12 Nov had it the books' number to within a point).
+
+## The money's own record, 23 Nov 2026
+
+The user: "Is there a way to tell me how the Sharp better info we added
+is doing too". The count had been graded by hand each night since the
+19th; the NBA record now keeps it (`nbaMoneyRecord`, under the first
+half's best bets): every graded game whose row kept a count taken before
+the tip, graded at DraftKings' own number and price in that count.
+
+| Line | What it counts |
+| --- | --- |
+| The side with the larger bets | a side with 20 points or more of the money than of the bets, by market |
+| Every market's named side | the side the card's box prints for each market: ten points or more, else the side with most of the money |
+| The decision, by where the larger bets stood | the game's decision as it was given, at its own price: the larger bets with it, on the other side, or no gap of 20 either way |
+
+On the backup of 23 Nov the page reads what the hand count read (lab
+`money_ref.py`): 26 games on four nights; the larger bets' side 15-17
+for +1.6u (the spread 4-6, the total 8-6, the moneyline 3-5); every
+named side 42-36 for +2.4u (the spread 10-16, the total and the
+moneyline 16-10 each); the decision 2-2 with the larger bets on it, 4-5
+with them on the other side, 9-3 with no gap. Shown, not scored: one
+book's customers and 26 games, where a side that wins 55% needs about
+400 to show it.

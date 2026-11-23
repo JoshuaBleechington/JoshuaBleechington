@@ -220,111 +220,17 @@
     });
     return { side: "game", k: "crew", s: "shown", t: "Crew: " + bits.join("; ") + (refs && refs.lg ? "; the league " + (+refs.lg[1]).toFixed(1) + " and " + (+refs.lg[2]).toFixed(1) + "." : "."), tag: NBA_CREW_TAG };
   }
-  /* the crowd on Kalshi (4 Nov 2026, the user: "if I wanted to use some metrics from Kalshi such as public percentages on who
-     may win the game... what could we add?"): the slate keeps each side's bid, ask, last, volume and open interest from the
-     exchange's game-winner market on the row (nbakalshi). A contract's price is the crowd's probability with no vig; the fee
-     is taken on the win (7% of the expected profit), so a 57-cent yes needs 58.7%. The card shows the crowd beside the book's
-     devigged moneyline and Pinnacle's, says which price is better after the fee, and names the sharp side when the crowd sits
-     three points or more from Pinnacle: a watch with its own line on the moneyline tile's record. Shown, not scored */
-  var KALSHI_GAP = 0.03;
-  function kalshiMid(s) {
-    if (!s) return null;
-    var b = +s.bid, a = +s.ask;
-    if (isFinite(b) && isFinite(a) && a > 0) return (b + a) / 2;
-    return isFinite(+s.last) && +s.last > 0 ? +s.last : null;
-  }
-  function kalshiNeed(s, fee) { var a = +(s || {}).ask; if (!isFinite(a) || a <= 0 || a >= 1) return null; return a + fee * a * (1 - a); }   // what a yes at the ask needs, the fee on the win counted
-  function kalshiNeedAt(ask, fee) { return !isFinite(ask) || ask <= 0 || ask >= 1 ? null : ask + fee * ask * (1 - ask); }
-  /* the ladders (4 Nov 2026, the user's spread and total listings): a club's spread markets ("Memphis wins by over 6.5 points")
-     and the game's total markets ("Over 228.5 points") each read as the crowd's chance of more than the floor, so together they
-     are the crowd's distribution of the margin and the total: the number at even money is the crowd's spread or total, and the
-     chance at the book's line is read straight between two rungs */
-  function kalshiRungs(list) {
-    return (list || []).map(function (r) { var bid = +r[1], ask = +r[2]; return isFinite(bid) && isFinite(ask) && ask > 0 && isFinite(+r[0]) ? { x: +r[0], p: (bid + ask) / 2, bid: bid, ask: ask, vol: +r[4] || 0 } : null; })
-      .filter(function (r) { return r; }).sort(function (a, b) { return a.x - b.x; });
-  }
-  function kalshiCurveAt(pts, x) {   // P(more than x) off the rungs, straight between two, null outside them
-    if (!pts || !pts.length || x < pts[0].x || x > pts[pts.length - 1].x) return null;
-    for (var i = 0; i < pts.length; i++) {
-      if (x === pts[i].x) return pts[i].p;
-      if (i && x < pts[i].x) { var a = pts[i - 1], b = pts[i]; return a.p + (b.p - a.p) * (x - a.x) / (b.x - a.x); }
-    }
-    return null;
-  }
-  function kalshiMedian(pts) {   // the number the crowd puts at even money
-    for (var i = 1; i < (pts || []).length; i++) { var a = pts[i - 1], b = pts[i]; if (a.p >= 0.5 && b.p < 0.5) return a.p === b.p ? a.x : a.x + (a.p - 0.5) / (a.p - b.p) * (b.x - a.x); }
-    return null;
-  }
-  function kalshiRungAt(pts, x) { for (var i = 0; i < (pts || []).length; i++) if (pts[i].x === x) return pts[i]; return null; }
-  function kalshiOf(raw) {
-    var k = null; try { k = raw ? JSON.parse(raw) : null; } catch (e) { k = null; }
-    if (!k || typeof k !== "object") return null;
-    k.fee = isFinite(+k.fee) ? +k.fee : 0.07;
-    var ma = kalshiMid(k.a), mh = kalshiMid(k.h);
-    k.ml = !!(k.a && k.h && ma !== null && mh !== null && ma + mh > 0);
-    if (k.ml) { k.pa = ma / (ma + mh); k.ph = mh / (ma + mh); k.needA = kalshiNeed(k.a, k.fee); k.needH = kalshiNeed(k.h, k.fee); }   // the crowd's chances: the two sides' mids made to sum to one
-    else { k.pa = k.ph = k.needA = k.needH = null; }
-    k.spH = kalshiRungs(k.sp && k.sp.h); k.spA = kalshiRungs(k.sp && k.sp.a);
-    /* the home margin's curve: P(the home side wins by more than x) from its own ladder, and from the away ladder as P(the away side
-       wins by more than y) = P(the home margin is under -y), the margins never landing on a half */
-    k.margin = k.spH.map(function (r) { return { x: r.x, p: r.p }; }).concat(k.spA.map(function (r) { return { x: -r.x, p: 1 - r.p }; })).sort(function (a, b) { return a.x - b.x; });
-    k.total = kalshiRungs(k.tot);
-    k.spMed = k.margin.length >= 2 ? kalshiMedian(k.margin) : null;   // the crowd's spread, as the home margin at even money
-    k.totMed = k.total.length >= 2 ? kalshiMedian(k.total) : null;    // the crowd's total at even money
-    /* the team totals (4 Nov 2026, the user's address off the Game Props tab): a ladder a club, P(the club scores more than x) */
-    k.ttA = kalshiRungs(k.tt && k.tt.a); k.ttH = kalshiRungs(k.tt && k.tt.h);
-    k.ttAMed = k.ttA.length >= 2 ? kalshiMedian(k.ttA) : null; k.ttHMed = k.ttH.length >= 2 ? kalshiMedian(k.ttH) : null;
-    if (!k.ml && !k.margin.length && !k.total.length && !k.ttA.length && !k.ttH.length) return null;
-    return k;
-  }
-  /* the crowd on one side of one market at one line: its chance, and when the line is a rung of the ladder, the price it trades at
-     (the yes ask for the side the ladder names, the no ask -- one less the yes bid -- for the other) and what that needs after the fee */
-  function kalshiSideQuote(k, key, side, line) {
-    if (!k) return null;
-    var q = { p: null, ask: null, need: null, rung: false }, r;
-    if (key === "ml") { if (!k.ml) return null; q.p = side === "HOME" ? k.ph : k.pa; q.ask = +(side === "HOME" ? k.h : k.a).ask; q.need = side === "HOME" ? k.needH : k.needA; q.rung = true; }
-    else if (key === "total") {
-      if (!k.total.length || !isFinite(+line)) return null;
-      var po = kalshiCurveAt(k.total, +line); if (po === null) return null;
-      q.p = side === "OVER" ? po : 1 - po;
-      r = kalshiRungAt(k.total, +line);
-      if (r) { q.rung = true; q.ask = side === "OVER" ? r.ask : 1 - r.bid; q.need = kalshiNeedAt(q.ask, k.fee); }
-    } else if (key === "spread") {
-      if (!k.margin.length || !isFinite(+line)) return null;
-      var ph = kalshiCurveAt(k.margin, -(+line)); if (ph === null) return null;   // the home side covers when its margin beats the number it gives
-      q.p = side === "HOME" ? ph : 1 - ph;
-      if (+line < 0) { r = kalshiRungAt(k.spH, -(+line)); if (r) { q.rung = true; q.ask = side === "HOME" ? r.ask : 1 - r.bid; } }
-      else if (+line > 0) { r = kalshiRungAt(k.spA, +line); if (r) { q.rung = true; q.ask = side === "AWAY" ? r.ask : 1 - r.bid; } }
-      if (q.rung) q.need = kalshiNeedAt(q.ask, k.fee);
-    } else if (key === "away_total" || key === "home_total") {
-      var lad = key === "away_total" ? k.ttA : k.ttH;
-      if (!lad.length || !isFinite(+line)) return null;
-      var pt = kalshiCurveAt(lad, +line); if (pt === null) return null;
-      q.p = side === "OVER" ? pt : 1 - pt;
-      r = kalshiRungAt(lad, +line);
-      if (r) { q.rung = true; q.ask = side === "OVER" ? r.ask : 1 - r.bid; q.need = kalshiNeedAt(q.ask, k.fee); }
-    } else return null;
-    return q.p === null ? null : q;
-  }
-  /* the team totals on the simulation's table (4 Nov 2026): one line under the row's team-total line, the crowd's chance of the
-     over at the book's number and, on a rung, each side's price after the fee against the book's */
-  function kalshiTTLine(k, key, line, op, up) {
-    var qo = kalshiSideQuote(k, key, "OVER", line), qu = kalshiSideQuote(k, key, "UNDER", line);
-    if (!qo) return "";
-    var px = function (nm, q, bp) {
-      if (!q || q.need === null) return '';
-      var bn = isFinite(+bp) && +bp ? implied(+bp) : null, better = bn !== null && q.need < bn - 0.001;
-      return ' · ' + nm + ' ' + kalshiCents(q.ask) + ' needs ' + (100 * q.need).toFixed(1) + '% after the fee' + (bn !== null ? (better ? ', <b>better than</b> ' : ', not better than ') + sgn(+bp, 0) + ' needing ' + (100 * bn).toFixed(1) + '%' : '');
-    };
-    return '<b class="kname">Kalshi</b>: the crowd <b>' + (100 * qo.p).toFixed(1) + '%</b> over at ' + esc(String(line)) + (qo.rung ? px('over', qo, op) + px('under', qu, up) : ' · no rung at the line, so no price');
-  }
+  /* the crowd on Kalshi rode here from 4 Nov to 22 Nov 2026: the exchange's price on each side beside the book's and Pinnacle's,
+     its spread, total and team-total ladders, a chip on the board and a watch on the moneyline tile. Shown, never scored. Off on
+     23 Nov 2026 (the user: "i'd like to remove the Kalshi from the NBA model as well"): slate.py no longer reads the exchange, and
+     a row logged in between keeps its nbakalshi block in the backup, where nothing reads it */
   /* ---- tonight's signals (4 Nov 2026, the user: "it never gives a green bet signal anymore... make the other sections, like
      the simulation, refs, lineups, Kalshi, the board, the middles, the context be a little more of the forefront"). The
      sheet's own pick stays grey on most NBA rows because the close already carries what its inputs know; the calls that do
      fire live in the engines down the card. This strip gathers every one of them at the top of the matchup rail: the pick
      and #1's verdict, the upset signal, Pinnacle's shade, the agreement rule, the simulation's bands, the gap watch, the
-     middles, the crew's lean, the crowd on Kalshi and who is out. Green when a scored rule fires, gold for a watch, the
-     exchange in its own colour, each chip a link to its section; the jump bar's dots and the sections' live lines read
+     middles, the crew's lean and who is out (and the crowd on Kalshi until 23 Nov 2026). Green when a scored rule fires, gold
+     for a watch, each chip a link to its section; the jump bar's dots and the sections' live lines read
      off the same list. Shown: it adds no number and takes nothing ---- */
   function signalChip(cls, go, badge, html) { return { cls: cls, go: go, badge: badge, html: html, text: badge + ": " + html.replace(/<[^>]+>/g, "") }; }
   function signalList(m, pk, upsetView, leg) {
@@ -379,34 +285,6 @@
     } catch (e) {}
     var cl = null; try { cl = nbaCrewLean({ inputs: inputs }); } catch (e) { cl = null; }
     if (cl && cl.lean && cl.lean !== "even") out.push(signalChip("watch", "secCrew", "crew", "leans <b>" + esc(String(cl.lean).toUpperCase()) + "</b> · z " + sgn(cl.z, 1)));
-    var k = kalshiOf(($("nbakalshi") || {}).value || "");
-    if (k) {
-      var ks = kalshiSharpOf({ inputs: inputs });
-      if (ks) out.push(signalChip("crowd", "secKalshi", "Kalshi", "the sharp side <b>" + esc(ks.side === "HOME" ? home : away) + "</b> · the crowd " + ks.pts.toFixed(1) + " points over Pinnacle on the " + esc(ks.side === "HOME" ? away : home)));
-      var bits = [];
-      if (k.ml) bits.push("<b>" + esc(k.ph >= 0.5 ? home : away) + "</b> to win " + pc(Math.max(k.ph, k.pa)));
-      if (k.spMed !== null) bits.push("spread <b>" + (Math.abs(k.spMed) < 0.05 ? "a pick" : esc(k.spMed > 0 ? home : away) + " " + sgn(-Math.abs(k.spMed), 1)) + "</b>");
-      if (k.totMed !== null) bits.push("total <b>" + k.totMed.toFixed(1) + "</b>");
-      if (bits.length) out.push(signalChip("crowd", "secKalshi", "the crowd", bits.join(" · ")));
-      /* the team totals as chips of their own (4 Nov 2026, the user: "can i have the team totals predictions from kalshi be on the
-         matchup section with a color like you have the other signals"): each club's number at even money against the book's
-         team-total line, the side the crowd leans to when it sits a point or more off it, and the crowd's chance of the over at
-         the book's number; without a book line, against the number the book's total and spread imply */
-      var oddsRaw = ($("odds") || {}).value || "", tl = parseFloat(inputs.line), spv = parseFloat(inputs.sp);
-      [["AWAY", away, k.ttAMed, "away_total"], ["HOME", home, k.ttHMed, "home_total"]].forEach(function (t) {
-        if (t[2] === null || t[2] === undefined) return;
-        var bl = typeof nbaTeamTotalLine === "function" ? nbaTeamTotalLine(oddsRaw, t[0]) : null, s = "<b>" + esc(t[1]) + " " + t[2].toFixed(1) + "</b>";
-        var lean = function (d) { return d <= -1 ? "<b>leans UNDER</b>" : d >= 1 ? "<b>leans OVER</b>" : "sits with the book"; };
-        if (bl) {
-          var q = kalshiSideQuote(k, t[3], "OVER", bl.line);
-          s += " · the book " + bl.line + " · " + lean(t[2] - bl.line) + (q ? ", the over " + pc(q.p) + " at the book's number" : "");
-        } else if (isFinite(tl) && isFinite(spv)) {
-          var imp = t[0] === "HOME" ? (tl - spv) / 2 : (tl + spv) / 2;
-          s += " · the book's total and spread imply " + imp.toFixed(1) + " · " + lean(t[2] - imp).replace("sits with the book", "sits with that number");
-        }
-        out.push(signalChip("crowd", "secKalshi", "Kalshi team total", s));
-      });
-    }
     try {
       var d = nbaOutList(), outs = function (s) { return (d[s] || []).filter(function (p) { return /^out/i.test(String(p.st || "")); }).length; }, oa = outs("away"), oh = outs("home");
       if (oa || oh) out.push(signalChip("info", "secOut", "out", [oa ? esc(away) + " <b>" + oa + "</b> (" + nbaOutMinutes("away").toFixed(0) + " min of regulars)" : "", oh ? esc(home) + " <b>" + oh + "</b> (" + nbaOutMinutes("home").toFixed(0) + " min of regulars)" : ""].filter(Boolean).join(" · ")));
@@ -421,13 +299,13 @@
   }
   function signalStrip(m, pk, upsetView, likely, leg) {
     var el = $("signals"); if (!el) return;
-    var nav = $("nbaNav"), live = { secOut: [], secSim: [], secMid: [], secCrew: [], secKalshi: [] };
+    var nav = $("nbaNav"), live = { secOut: [], secSim: [], secMid: [], secCrew: [] };
     var list = [];
     if (m) { try { list = signalList(m, pk, upsetView, leg); } catch (e) { list = []; } }
     if (!m) { el.hidden = true; el.innerHTML = ""; }
     else {
       el.hidden = false;
-      el.innerHTML = '<div class="sighead">Tonight\'s signals <span class="tag">every engine\'s call on this row · green fires, gold watches, purple the crowd</span></div>' +
+      el.innerHTML = '<div class="sighead">Tonight\'s signals <span class="tag">every engine\'s call on this row · green fires, gold watches</span></div>' +
         (list.length ? list.map(function (s) { return '<a class="sig ' + s.cls + '" href="#' + s.go + '"><span class="sb">' + esc(s.badge) + '</span><span class="st">' + s.html + '</span></a>'; }).join("")   // two flex items: the badge, then the words as one span, so the gap never splits a sentence
                      : '<span class="quiet">Nothing fires on this row tonight: the sheet\'s pick, the simulation, the agreement rule, the middles and the watches all sit inside their lines.</span>');
     }
@@ -439,132 +317,6 @@
         if (dot) { var top = live[id].filter(function (s) { return s.cls === "go"; })[0] || live[id].filter(function (s) { return s.cls === "watch"; })[0] || live[id][0]; dot.className = "dot" + (top ? " " + top.cls : ""); }
       }
     });
-  }
-  function kalshiSharpRaw(raw) { var s = null; try { s = raw ? JSON.parse(raw) : null; } catch (e) { s = null; } return s && isFinite(+s.hml) && isFinite(+s.aml) && +s.hml && +s.aml ? s : null; }
-  function kalshiSharpOf(row) {
-    var i = (row && row.inputs) || {}, k = kalshiOf(i.nbakalshi), sh = kalshiSharpRaw(i.sharp);
-    if (!k || !k.ml || !sh) return null;
-    var ih = implied(+sh.hml), ia = implied(+sh.aml), ph = ih / (ih + ia), gap = k.ph - ph;   // the crowd above the sharp book on the home side
-    if (Math.abs(gap) < KALSHI_GAP) return null;
-    return { side: gap > 0 ? "AWAY" : "HOME", pts: Math.abs(gap) * 100, crowdHome: k.ph, sharpHome: ph };
-  }
-  function kalshiCents(v) { return v === null || v === undefined || !isFinite(+v) ? "–" : (Math.round(+v * 1000) / 10).toFixed(1).replace(/\.0$/, "") + "¢"; }
-  function kalshiVol(v) { return v === null || v === undefined || !isFinite(+v) ? "?" : (+v >= 1000 ? Math.round(+v / 1000) + "k" : String(Math.round(+v))) + " contracts"; }
-  /* the chip on a moneyline pick card (the board): the exchange's price for the pick's side against the book's, after the fee */
-  function kalshiChip(row, mk) {
-    if (!row || !mk || row.sport !== "NBA" || (mk.key !== "ml" && mk.key !== "total" && mk.key !== "spread")) return "";
-    var k = kalshiOf((row.inputs || {}).nbakalshi); if (!k) return "";
-    var line = mk.key === "ml" ? null : (typeof lineOf === "function" ? lineOf(mk) : mk.point), q = kalshiSideQuote(k, mk.key, mk.side, line);
-    if (!q) return "";
-    var crowd = 'the crowd ' + (q.p * 100).toFixed(1) + '%' + (mk.key === "ml" ? '' : ' at this line');
-    if (q.need === null || mk.price === null || mk.price === undefined) return ' <span class="tagm kal">Kalshi: ' + crowd + '</span>';
-    var book = implied(+mk.price), better = q.need < book - 0.001;
-    return ' <span class="tagm kal' + (better ? ' warn' : '') + '" title="' + (better ? 'The exchange\'s price for this side needs less than the book\'s after Kalshi\'s fee on the win' : 'The book\'s price needs less than the exchange\'s after Kalshi\'s fee on the win') + '">' +
-           (better ? 'better on Kalshi: ' : 'Kalshi ') + kalshiCents(q.ask) + ' needs ' + (q.need * 100).toFixed(1) + '% after the fee v ' + sgn(+mk.price, 0) + ' needing ' + (book * 100).toFixed(1) + '%' + (better ? '' : ': the book') + ' · ' + crowd + '</span>';
-  }
-  /* mks: the sheet's markets for the game on the form, from the forecast that is drawing it. The card read them off the page's
-     last result until 11 Nov 2026, and the card is drawn before the forecast it sits in has finished, so a game opened from the
-     board carried the "by the sheet" chances of the game drawn before it until something redrew the form (Bucks @ Knicks on
-     10 Nov read 50.0% at the spread and the total where its own were 48.9%). The forecast now draws the card first without the
-     sheet's figures and again with its own markets once it has them */
-  function nbaKalshiPanel(mks) {
-    var el = $("nbaKalshiPanel"); if (!el) return;
-    var k = kalshiOf(($("nbakalshi") || {}).value || "");
-    if (!k) { el.innerHTML = "No Kalshi price on the row — load the slate or the odds file and Fill form, and the exchange's game-winner market comes with it."; return; }
-    var away = ($("away") || {}).value || "the away side", home = ($("home") || {}).value || "the home side";
-    var hml = +(($("hml") || {}).value), aml = +(($("aml") || {}).value), book = null;
-    if (isFinite(hml) && isFinite(aml) && hml && aml) { var ih = implied(hml), ia = implied(aml); book = { h: ih / (ih + ia), a: ia / (ih + ia), hml: hml, aml: aml }; }
-    var sh = kalshiSharpRaw(($("sharp") || {}).value || ""), pin = null;
-    if (sh) { var sh_h = implied(+sh.hml), sh_a = implied(+sh.aml); pin = { h: sh_h / (sh_h + sh_a), a: sh_a / (sh_h + sh_a), hml: +sh.hml, aml: +sh.aml }; }
-    var when = k.at ? new Date(k.at) : null, whenTxt = when && !isNaN(when.getTime()) ? when.toLocaleString([], { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" }) : "";
-    var pc = function (v) { return (v * 100).toFixed(1) + "%"; };
-    var line = function (nick, s, p, pb, pr, ml, need) {
-      var bits = ['the crowd <b>' + pc(p) + '</b>'];
-      if (pb !== null) bits.push('the book ' + pc(pb) + ' (' + sgn(ml, 0) + ')');
-      if (pr !== null) bits.push('Pinnacle ' + pc(pr));
-      var price = '';
-      if (need !== null && pb !== null) {
-        var bn = implied(ml), better = need < bn - 0.001;
-        price = ' · ' + (better ? '<b>better on Kalshi</b>: ' : 'the book\'s price: ') + kalshiCents(s.ask) + ' needs ' + pc(need) + ' after the fee against ' + sgn(ml, 0) + ' needing ' + pc(bn);
-      } else if (need !== null) price = ' · ' + kalshiCents(s.ask) + ' needs ' + pc(need) + ' after the fee';
-      return '<li><b>' + esc(nick) + '</b> ' + kalshiCents(kalshiMid(s)) + ' <span class="dim">(bid ' + kalshiCents(s.bid) + ' / ask ' + kalshiCents(s.ask) + ' · ' + kalshiVol(s.vol) + ')</span>: ' + bits.join(' · ') + price + '</li>';
-    };
-    var h = '<div class="kalshi"><p><b>The crowd on <span class="kname">Kalshi</span></b>' + (whenTxt ? ' <span class="dim">· as the run read it, ' + esc(whenTxt) + '</span>' : '') + '</p>';
-    var gapTxt = "";
-    if (k.ml) {
-      h += '<ul class="ctx">' + line(away, k.a, k.pa, book ? book.a : null, pin ? pin.a : null, book ? book.aml : null, k.needA) +
-           line(home, k.h, k.ph, book ? book.h : null, pin ? pin.h : null, book ? book.hml : null, k.needH) + '</ul>';
-      if (pin) {
-        var gap = k.ph - pin.h, over = gap > 0 ? home : away, sharp = gap > 0 ? away : home;
-        gapTxt = Math.abs(gap) >= KALSHI_GAP
-          ? '<p><b>The crowd sits ' + (Math.abs(gap) * 100).toFixed(1) + ' points above Pinnacle on the ' + esc(over) + ': the sharp side is the ' + esc(sharp) + '.</b> <span class="dim">A watch, on the moneyline tile\'s record; the Pinnacle shade on totals hit 56% at three points over two seasons, and this is its moneyline cousin, unmeasured.</span></p>'
-          : '<p class="dim">The crowd and Pinnacle sit within three points of each other (' + (Math.abs(gap) * 100).toFixed(1) + ' on the home side): no watch.</p>';
-      } else gapTxt = '<p class="dim">No Pinnacle moneyline on the row to set the crowd against (the odds run brings it).</p>';
-    } else h += '<p class="dim">No game-winner market on the row.</p>';
-    /* the ladders (4 Nov 2026): the crowd's spread and total at even money against the book's numbers, the sheet's chance at the
-       book's line and the simulation's, and the price of each side at the book's line when it is a rung of the ladder */
-    var sheet = mks || [], sheetOf = function (key) { return sheet.filter(function (m) { return m.key === key; })[0] || null; };
-    var sim = typeof nbaSim === "function" ? nbaSim() : null;
-    var sideTxt = function (nick, q, bookPrice) {
-      if (!q) return '';
-      var s = ' · <b>' + esc(nick) + '</b> ' + pc(q.p) + ' by the crowd';
-      if (q.need !== null && bookPrice !== null && isFinite(bookPrice)) {
-        var bn = implied(bookPrice), better = q.need < bn - 0.001;
-        s += (better ? ', <b>better on Kalshi</b>: ' : ', the book\'s price: ') + kalshiCents(q.ask) + ' needs ' + pc(q.need) + ' after the fee against ' + sgn(bookPrice, 0) + ' needing ' + pc(bn);
-      } else if (q.need !== null) s += ', ' + kalshiCents(q.ask) + ' on the exchange (needs ' + pc(q.need) + ' after the fee)';
-      return s;
-    };
-    var spIn = ($("sp") || {}).value, sp = spIn === "" || spIn === undefined || isNaN(+spIn) ? null : +spIn, sph = +(($("sph") || {}).value), spa = +(($("spa") || {}).value);
-    if (k.margin.length >= 2) {
-      var m = k.spMed, mTxt = m === null ? 'no even-money number inside the ladder' : (Math.abs(m) < 0.05 ? 'a pick' : esc(m > 0 ? home : away) + ' ' + sgn(-Math.abs(m), 1));
-      var s2 = '<p><b>The spread</b>: the crowd ' + mTxt;
-      if (sp !== null) {
-        s2 += ' · the book ' + esc(sp <= 0 ? home : away) + ' ' + sgn(-Math.abs(sp), 1);
-        var sm = sheetOf("spread"), simSp = sim && sim.own && sim.own.margin ? nbaSimOver(sim.own.margin, -sp) : null;
-        var qh = kalshiSideQuote(k, "spread", "HOME", sp), qa = kalshiSideQuote(k, "spread", "AWAY", sp);
-        s2 += '. At the book\'s number' + (qh ? ': ' + esc(home) + ' covers ' + pc(qh.p) + ' by the crowd' + (sm && isFinite(+sm.p) ? ', ' + pc(sm.side === "HOME" ? +sm.p : 1 - +sm.p) + ' by the sheet' : '') + (simSp ? ', ' + pc(simSp.over) + ' by the simulation\'s own view' : '') : ': the crowd\'s ladder does not reach it');
-        if (qh && qh.rung) s2 += sideTxt(home + ' ' + sgn(sp, 1), qh, isFinite(sph) && sph ? sph : null) + sideTxt(away + ' ' + sgn(-sp, 1), qa, isFinite(spa) && spa ? spa : null);
-        else if (qh) s2 += ' · <span class="dim">no rung at the book\'s number on the exchange (its ladder runs on halves), so no price to compare</span>';
-      }
-      h += s2 + '.</p>';
-    }
-    var tl = ($("line") || {}).value, line0 = tl === "" || tl === undefined || isNaN(+tl) ? null : +tl, op = +(($("op") || {}).value), up = +(($("up") || {}).value);
-    if (k.total.length >= 2) {
-      var t = k.totMed, s3 = '<p><b>The total</b>: the crowd ' + (t === null ? 'no even-money number inside the ladder' : t.toFixed(1));
-      if (line0 !== null) s3 += ' · the book ' + line0;
-      if (sh && isFinite(+sh.line)) s3 += ' · Pinnacle ' + (+sh.line);
-      if (sim && sim.own && sim.own.total) { var q50 = nbaSimQ(sim.own.total, 0.5); if (q50 !== null) s3 += ' · the simulation\'s own view ' + q50 + (sim.mkt && sim.mkt.total ? ' (anchored to the market ' + nbaSimQ(sim.mkt.total, 0.5) + ')' : ''); }
-      if (line0 !== null) {
-        var tm = sheetOf("total"), simT = sim && sim.own && sim.own.total ? nbaSimOver(sim.own.total, line0) : null;
-        var qo = kalshiSideQuote(k, "total", "OVER", line0), qu = kalshiSideQuote(k, "total", "UNDER", line0);
-        s3 += '. At the book\'s ' + line0 + (qo ? ': the over ' + pc(qo.p) + ' by the crowd' + (tm && isFinite(+tm.p) ? ', ' + pc(tm.side === "OVER" ? +tm.p : 1 - +tm.p) + ' by the sheet' : '') + (simT ? ', ' + pc(simT.over) + ' by the simulation\'s own view' : '') : ': the crowd\'s ladder does not reach it');
-        if (qo && qo.rung) s3 += sideTxt('over ' + line0, qo, isFinite(op) && op ? op : null) + sideTxt('under ' + line0, qu, isFinite(up) && up ? up : null);
-        else if (qo) s3 += ' · <span class="dim">no rung at the book\'s number on the exchange (its ladder runs two points apart), so no price to compare</span>';
-      }
-      h += s3 + '.</p>';
-    }
-    /* the team totals (4 Nov 2026, the user: "Can we also have team totals too?"): a paragraph a club, the crowd's team total at
-       even money against the book's team-total line (the odds run's), the number the book's own total and spread imply and the
-       simulation's mean; at the book's line the crowd's chance of the over, the simulation's, and on a rung each side's price */
-    var oddsRaw = ($("odds") || {}).value || "";
-    [["AWAY", away, k.ttA, k.ttAMed, "away"], ["HOME", home, k.ttH, k.ttHMed, "home"]].forEach(function (t) {
-      var side = t[0], nick = t[1], lad = t[2], med = t[3], hk = t[4];
-      if (lad.length < 2) return;
-      var bl = typeof nbaTeamTotalLine === "function" ? nbaTeamTotalLine(oddsRaw, side) : null, imp = line0 !== null && sp !== null ? (side === "HOME" ? (line0 - sp) / 2 : (line0 + sp) / 2) : null;
-      var hist = sim && sim.own ? sim.own[hk] : null, simMean = hist ? nbaSimMean(hist) : null;
-      var s4 = '<p><b>The ' + esc(nick) + ' team total</b>: the crowd ' + (med === null ? 'no even-money number inside the ladder' : med.toFixed(1));
-      if (bl) s4 += ' · the book ' + bl.line + ' (' + esc(String(bl.book)) + ' ' + sgn(bl.op, 0) + '/' + sgn(bl.up, 0) + ')';
-      if (imp !== null) s4 += ' · implied by the book\'s total and spread ' + imp.toFixed(1);
-      if (simMean !== null) s4 += ' · the simulation\'s own view ' + simMean.toFixed(1);
-      if (bl) {
-        var qo = kalshiSideQuote(k, hk + "_total", "OVER", bl.line), qu = kalshiSideQuote(k, hk + "_total", "UNDER", bl.line), simO = hist ? nbaSimOver(hist, bl.line) : null;
-        s4 += '. At the book\'s ' + bl.line + (qo ? ': the over ' + pc(qo.p) + ' by the crowd' + (simO ? ', ' + pc(simO.over) + ' by the simulation\'s own view' : '') : ': the crowd\'s ladder does not reach it');
-        if (qo && qo.rung) s4 += sideTxt('over ' + bl.line, qo, bl.op) + sideTxt('under ' + bl.line, qu, bl.up);
-        else if (qo) s4 += ' · <span class="dim">no rung at the book\'s number on the exchange, so no price to compare</span>';
-      } else s4 += ' · <span class="dim">no book team total on the row (the odds run brings it)</span>';
-      h += s4 + '.</p>';
-    });
-    el.innerHTML = h + gapTxt + '<p class="dim">Shown, not scored: a prediction market\'s price is a market price, which is already the sheet\'s spine. The fee is Kalshi\'s on the win, ' + (k.fee * 100).toFixed(0) + '% of the expected profit a contract.</p></div>';
   }
   function nbaCtxPanel() {
     var el = $("nbaCtxPanel"); if (!el) return;
@@ -615,7 +367,7 @@
                    '<span class="crewchips">' + chips + '</span>' + call + (crew.tag ? ' <span class="ctag">' + esc(crew.tag) + '</span>' : '') + '</div>';
   }
   function forecastMatchupNba() {
-    if (!SRC) { nbaOutPanel(); nbaLineupPanel(); nbaFormPanel(); nbaSimPanel(); nbaMidPanel(); nbaCrewPanel(); nbaKalshiPanel(); nbaCtxPanel(); }   // the form's panels: not while a card row is being re-scored
+    if (!SRC) { nbaOutPanel(); nbaLineupPanel(); nbaFormPanel(); nbaSimPanel(); nbaMidPanel(); nbaCrewPanel(); nbaCtxPanel(); }   // the form's panels: not while a card row is being re-scored
     var f = readNba();
     var away = f.away, home = f.home, line = f.line;
     var op = num("op"), up = num("up"), hml = num("hml"), aml = num("aml");
@@ -696,7 +448,7 @@
           ["The spread with both prices in is the anchor and nothing moves it off: the sides are priced. Shown and graded, never the pick."]));
       }
     }
-    if (!SRC) { nbaVoicesFill({ markets: markets }); nbaKalshiPanel(markets); }   // the three voices on the total (28 Oct 2026) and the crowd's card, with this render's sheet
+    if (!SRC) nbaVoicesFill({ markets: markets });   // the three voices on the total (28 Oct 2026), with this render's sheet
     return { sport: "NBA", away: away, home: home, matchup: away + " @ " + home, markets: markets, lamHome: lamH, lamAway: lamA, total: f, notes: notes, period: projH1 };
   }
   /* ---- the who-is-out panel: each side's list, the regulars' minutes summed, a tick for the doubtful ---- */
@@ -946,7 +698,20 @@
     add("total", "total", "Total", lines.total, nbaSimOver(H.total, lines.total), "OVER", "UNDER");
     add("h1", "h1", "First half", lines.h1, nbaSimOver(H.h1, lines.h1), "OVER", "UNDER");
     if (lines.sp !== null && lines.sp !== undefined && lines.sp !== "" && !isNaN(+lines.sp)) add("spread", "spread", "Spread", +lines.sp, nbaSimOver(H.margin, -(+lines.sp)), "HOME", "AWAY");
-    if (view === "own") add("ml", "ml", "Moneyline", null, nbaSimOver(H.margin, 0), "HOME", "AWAY");
+    if (view === "own") {
+      add("ml", "ml", "Moneyline", null, nbaSimOver(H.margin, 0), "HOME", "AWAY");
+      /* the price decides (23 Nov 2026, the user, quoting a professional: "its not to ask who will win, but can they cover the
+         spread"). The moneyline was banded by its chance alone, so a favourite the runs made 78% read STRONG at a price that
+         asked 80%. On the 206 games graded to 22 Nov those calls went 87-32 and lost 3.1 units; the 88 of them whose price
+         asked more than the chance went 66-22, right about the winner three times in four, and lost 5.5; the 31 the price
+         allowed went 21-10 for +2.3 (lab sim_ml_price.py). So with a price on the row the call stands only where the worth
+         beats what the price needs; `was` keeps the band it would have had, for the record's line on the rest */
+      var ml = out[out.length - 1], px = ml && ml.key === "ml" ? (ml.side === "HOME" ? lines.hml : lines.aml) : null;
+      if (px !== null && px !== undefined && px !== "" && isFinite(+px) && +px) {
+        ml.price = +px; ml.need = implied(+px); ml.was = ml.band;
+        if (ml.worth <= ml.need) ml.band = "no call";
+      }
+    }
     if (lines.away_tt) add("away_total", nbaSimTeamKind(view, "away_total"), "Away team total", lines.away_tt.line, nbaSimOver(H.away, lines.away_tt.line), "OVER", "UNDER");
     if (lines.home_tt) add("home_total", nbaSimTeamKind(view, "home_total"), "Home team total", lines.home_tt.line, nbaSimOver(H.home, lines.home_tt.line), "OVER", "UNDER");
     return out;
@@ -986,7 +751,7 @@
      long dogs among them, 3-32 for -24.8) and 29 were calls (11-18, -6.7); the spread's 73-86-1 and the first half's 80-80
      were a coin less the price on a side nobody had called. A call is a side priced below the sheet's chance (an edge above
      zero) or one a verdict sits on; the rest is listed under the tile as no call and left out of its count. The watches that
-     read both sides of a market (Pinnacle's shade, the short dog, the crowd on Kalshi, the 54%+ line) keep every game. No
+     read both sides of a market (Pinnacle's shade, the short dog, the 54%+ line) keep every game. No
      chance and no pick moves: this is the record's arithmetic alone */
   function nbaIsCall(mk) { return !!mk && ((mk.edge !== null && mk.edge !== undefined && mk.edge > 1e-9) || !!bandOf(mk)); }
   /* the gap rule (26 Oct 2026): the book's team total against the number the game's own total and spread imply, (total -/+
@@ -1023,12 +788,13 @@
   function nbaSimLinesFrom(inputs) {
     var oddsRaw = inputs.odds || "";
     var total = blank(inputs.line) ? null : +inputs.line, sp = blank(inputs.sp) ? null : +inputs.sp;
-    var out = { total: total, h1: blank(inputs.h1line) ? null : +inputs.h1line, sp: sp, away_tt: nbaTeamTotalLine(oddsRaw, "AWAY"), home_tt: nbaTeamTotalLine(oddsRaw, "HOME") };
+    var out = { total: total, h1: blank(inputs.h1line) ? null : +inputs.h1line, sp: sp, away_tt: nbaTeamTotalLine(oddsRaw, "AWAY"), home_tt: nbaTeamTotalLine(oddsRaw, "HOME"),
+                hml: blank(inputs.hml) ? null : +inputs.hml, aml: blank(inputs.aml) ? null : +inputs.aml };   // each side's moneyline price: the sim's call there is read against it (23 Nov 2026)
     if (out.away_tt) out.away_tt.rule = nbaTeamTotalGap(out.away_tt, total, sp, "AWAY");
     if (out.home_tt) out.home_tt.rule = nbaTeamTotalGap(out.home_tt, total, sp, "HOME");
     return out;
   }
-  function nbaSimLinesFromForm() { return nbaSimLinesFrom({ line: $("line").value, h1line: $("h1line").value, sp: $("sp").value, odds: ($("odds") || {}).value || "" }); }
+  function nbaSimLinesFromForm() { return nbaSimLinesFrom({ line: $("line").value, h1line: $("h1line").value, sp: $("sp").value, odds: ($("odds") || {}).value || "", hml: ($("hml") || {}).value, aml: ($("aml") || {}).value }); }
   function nbaSimChip(c) {
     if (!c) return '<span class="dim">—</span>';
     var cls = c.band === "no call" ? "simno" : c.band === "LEAN" ? "simlean" : c.band === "BET" ? "simbet" : "simstrong";
@@ -1054,19 +820,21 @@
     var h = '<div class="simtiles">' +
             tile("Total", nbaSimQ(own.total, 0.5), 'middle half ' + nbaSimQ(own.total, 0.25) + '–' + nbaSimQ(own.total, 0.75)) +
             tile("Margin", esc(mg >= 0 ? home : away) + ' by ' + Math.abs(mg).toFixed(1), esc(away) + ' ' + fmt1(mA) + ' · ' + esc(home) + ' ' + fmt1(mH)) +
-            tile(esc(home) + " wins", (100 * (nbaSimOver(own.margin, 0) || {}).over).toFixed(0) + '%', 'the one chance the replay found true') +
+            tile(esc(home) + " wins", (100 * (nbaSimOver(own.margin, 0) || {}).over).toFixed(0) + '%', 'of the runs · the price decides the bet') +
             tile("Overtime", (100 * (own.ot || 0)).toFixed(1) + '%', '') + '</div>';
     h += '<div class="simmeta"><b>' + String(sim.runs).replace(/\B(?=(\d{3})+(?!\d))/g, ",") + ' games</b>, the sim\'s own view. ' +
          (sim.anchor ? 'Anchored to ' + esc(sim.anchor.book) + '\'s ' + esc(String(sim.anchor.total)) + (sim.anchor.sp !== null && sim.anchor.sp !== undefined ? ' / ' + (sim.anchor.sp > 0 ? '+' : '') + esc(String(sim.anchor.sp)) : '') + ' for the market view.' : 'No book on the scoreboard at the run: no market view.') +
          (sim.level && sim.level.ortg ? ' The ratings ride the league\'s level of the last fortnight, ' + esc(String(sim.level.ortg)) + ' per 100 at ' + esc(String(sim.level.pace)) + ' possessions (30 Oct 2026).' : '') +
-         (sim.v >= 2 ? ' Engine 2: score effects, the market\'s shape (30 Oct 2026).' : '') + '</div>';
+         (sim.v >= 3 ? ' Engine 3 (23 Nov 2026): the men out are priced against tonight\'s slate and a tired club the way the close prices it, part off a club\'s own scoring and part on the other side\'s, so the total sits on the books\' line where engine 2 sat 4 points under it.'
+          : sim.v >= 2 ? ' Engine 2: score effects, the market\'s shape (30 Oct 2026).' : '') + '</div>';
     h += '<div id="nbaVoices"></div>';   // the three voices on the total (28 Oct 2026), filled once the sheet has scored this render
     var takeRow = nbaSimTakeRow(f);   // the card row this game is on, if any: a sim call is taken on the row (26 Oct 2026)
     var cell = function (c) {
       if (!c) return '<span class="dim">—</span>';
       var cls = c.band === "no call" ? "simno" : c.band === "LEAN" ? "simlean" : c.band === "BET" ? "simbet" : "simstrong";
       return '<span class="simchip ' + cls + '"><b>' + esc(c.side) + '</b> ' + (100 * c.p).toFixed(0) + '%</span>' +
-             '<div class="simsub">' + (c.band !== "no call" ? esc(c.band) + ' · ' : '') + 'worth ' + (100 * c.worth).toFixed(0) + '%</div>' +
+             '<div class="simsub">' + (c.band !== "no call" ? esc(c.band) + ' · ' : '') + 'worth ' + (100 * c.worth).toFixed(0) + '%' +
+             (c.key === "ml" && c.need !== undefined ? ' · ' + sgn(c.price, 0) + ' needs ' + (100 * c.need).toFixed(1) + '%' + (c.worth > c.need ? '' : ': the price asks more, no call') : '') + '</div>' +
              '<div class="simtake">' + nbaSimTakeBtn(takeRow, c.view, c.key, c.side) + '</div>';
     };
     h += '<table class="form simtab"><thead><tr><th>Market</th><th>The sim\'s own view</th><th>Anchored to the market</th></tr></thead><tbody>';
@@ -1084,8 +852,6 @@
             first += '<div class="ttgap">implied <b>' + tt.rule.implied + '</b>, gap <b>' + (tt.rule.gap > 0 ? '+' : '') + tt.rule.gap + '</b> · ' +
                      (tt.rule.call ? '<span class="simchip simwatch gaprule"><b>' + tt.rule.call + '</b> by the gap</span> <span class="dim">a watch, not scored</span> ' + nbaSimTakeBtn(takeRow, "gap", m[0], tt.rule.call) : '<span class="dim">inside a point</span>') + '</div>';
           }
-          var kk = typeof kalshiOf === "function" ? kalshiOf(($("nbakalshi") || {}).value || "") : null, kl = kk ? kalshiTTLine(kk, m[0], +m[2], tt.op, tt.up) : "";   // the crowd on Kalshi beside the gap rule (4 Nov 2026)
-          if (kl) first += '<div class="ttgap kal">' + kl + '</div>';
         } else {
           first += '</div>';
         }
@@ -1093,6 +859,10 @@
       h += '<tr><td>' + first + '</td><td>' + cell(calls.own[m[0]]) + '</td><td>' + (m[0] === "ml" ? '<span class="dim">the own view\'s</span>' : cell(calls.mkt[m[0]])) + '</td></tr>';
     });
     h += '</tbody></table>';
+    /* how to read the table (23 Nov 2026): the professional's rule the user brought, and what the play-out of three seasons says of each row */
+    h += '<div class="simmeta simread"><b>Can they cover.</b> Every row asks one thing of a side: does it beat its number at its price. Who wins is not the bet. ' +
+         'Played out on 2,444 games of three seasons, the runs\' own side covered the closing spread 701-691 and beat the closing total 737-751 at 55% and up, a coin, so the own view makes no call there (worth 50%). ' +
+         'Its win chance runs a little low (its favourite at 65.7% won 68.5%) and is a call only where it beats what the price needs: this season the favourites it liked at a price that asked more went 66-22 and lost 5.5 units.</div>';
     var V = mkt || own, tag = mkt ? "anchored to the market" : "the own view";
     var tot = nbaSimQ(V.total, 0.5);
     h += '<table class="form simq"><thead><tr><th>Medians, ' + tag + '</th><th>Q1</th><th>Q2</th><th>Q3</th><th>Q4</th><th>1H</th><th>2H</th><th>' + esc(away) + '</th><th>' + esc(home) + '</th></tr></thead><tbody><tr><td class="dim">' +
@@ -1102,8 +872,17 @@
     h += nbaWindowHtml(sim, takeRow);   // the window on the total as one ticket (29 Oct 2026)
     var pa = sim.prof && sim.prof.away, ph = sim.prof && sim.prof.home;
     if (pa && ph) {
-      h += '<div class="simprof dim">Profiles: ' + esc(away) + ' ' + pa.ortg + ' / ' + pa.drtg + ' per 100, pace ' + pa.pace + (pa.b2b ? ', back to back' : '') + (pa.out ? ', out ' + pa.out + ' per 100' : '') +
-           ' · ' + esc(home) + ' ' + ph.ortg + ' / ' + ph.drtg + ', pace ' + ph.pace + (ph.b2b ? ', back to back' : '') + (ph.out ? ', out ' + ph.out + ' per 100' : '') +
+      /* the men out (engine 3, 23 Nov 2026): the club's charge against the mean charge of the clubs on the slate, and what that does to its
+         own scoring and to the other side's; a row of engine 2 carries the one number, the whole charge off its own scoring */
+      var e3 = sim.out_mean !== undefined && sim.out_mean !== null;
+      var outW = function (p) {
+        if (!e3 || p.charge === undefined) return p.out ? ', out ' + p.out + ' per 100' : '';
+        if (!p.charge && !sim.out_mean) return '';
+        return ', men out ' + p.charge + ' per 100 against the slate\'s ' + sim.out_mean + ' (' + sgn(+p.out, 2) + ' its own scoring, ' + sgn(+p.outo || 0, 2) + ' the other side\'s)';
+      };
+      var restW = function (p) { return (p.b2b ? ', back to back' : '') + (p.r3in4 ? ', third game in four nights' : ''); };
+      h += '<div class="simprof dim">Profiles: ' + esc(away) + ' ' + pa.ortg + ' / ' + pa.drtg + ' per 100, pace ' + pa.pace + restW(pa) + outW(pa) +
+           ' · ' + esc(home) + ' ' + ph.ortg + ' / ' + ph.drtg + ', pace ' + ph.pace + restW(ph) + outW(ph) +
            (sim.ft_factor && Math.abs(sim.ft_factor - 1) >= 0.02 ? ' · the crew\'s whistle x' + sim.ft_factor : '') + '</div>';
     }
     el.innerHTML = h;
@@ -1280,6 +1059,7 @@
     var B = { n: 0, w: 0, says: 0, units: 0 };   // the withdrawn boost (11 Nov 2026): what the anchored home team total would have called at 1.5 and no longer does
     var M = { n: 0, both: 0, half: 0, split: 0, units: 0, first: 0, says: 0 };   // the middles (28 Oct 2026): the pair graded together, and the first leg alone
     var Wd = { n: 0, w: 0, p: 0, says: 0, units: 0 };   // the windows (29 Oct 2026): one ticket, inside or out
+    var Pr = { n: 0, w: 0, says: 0, units: 0 };   // the moneyline calls the price did not allow (23 Nov 2026): the runs' favourite at LEAN or better, its price asking more than its chance
     rows.forEach(function (r) {
       var fin = r.finals || {}, fa = +fin.fa, fh = +fin.fh, half = (fin.f5a !== undefined && fin.f5a !== "" && fin.f5h !== undefined && fin.f5h !== "") ? (+fin.f5a + +fin.f5h) : null;
       (r.simTakes || []).forEach(function (t) {
@@ -1318,6 +1098,10 @@
             var wonB = (fh > c.line) === (c.side === "OVER");
             B.n++; B.w += wonB ? 1 : 0; B.says += c.p; B.units += nbaSimUnits(c.side === "OVER" ? lines.home_tt.op : lines.home_tt.up, wonB);
           }
+          if (view === "own" && c.key === "ml" && c.was && c.was !== "no call" && c.band === "no call" && fa !== fh) {
+            var wonP = (fh > fa) === (c.side === "HOME");
+            Pr.n++; Pr.w += wonP ? 1 : 0; Pr.says += c.p; Pr.units += nbaSimUnits(c.price, wonP);
+          }
           if (c.band === "no call") return;
           var won = null, price = -110;
           if (c.key === "total") { if (fa + fh === c.line) return; won = (fa + fh > c.line) === (c.side === "OVER"); price = c.side === "OVER" ? r.inputs.op : r.inputs.up; }
@@ -1336,7 +1120,7 @@
         });
       });
     });
-    if (!n && !gn && !an && !B.n && !M.n && !Wd.n && !Wd.p) return '';
+    if (!n && !gn && !an && !B.n && !M.n && !Wd.n && !Wd.p && !Pr.n) return '';
     var order = { total: 0, h1: 1, spread: 2, ml: 3, away_total: 4, home_total: 5 }, bandOrder = { STRONG: 0, BET: 1, LEAN: 2 },
         label = { total: "Total", h1: "First half", spread: "Spread", ml: "Moneyline", away_total: "Away team total", home_total: "Home team total" };
     var h = '<div class="simrec"><div class="calibhead">SIMULATION · says against does, every call at LEAN or better</div>';
@@ -1350,6 +1134,11 @@
       });
       h += '</tbody></table>';
     });
+    if (Pr.n) {
+      var pcls = Pr.units > 0 ? "good" : Pr.units < 0 ? "bad" : "";
+      h += '<div class="simrecview">The moneyline calls the price did not allow <span class="tag">the runs\' favourite at LEAN or better whose price asked more than its chance · no call from 23 Nov 2026: who wins is not the bet, the price is</span></div><table class="form simrectab pricetab"><thead><tr><th>Games</th><th>Record</th><th>Says</th><th>Does</th><th>Units at the price</th></tr></thead><tbody>' +
+           '<tr><td>' + Pr.n + '</td><td>' + Pr.w + '-' + (Pr.n - Pr.w) + '</td><td>' + (100 * Pr.says / Pr.n).toFixed(1) + '%</td><td>' + (100 * Pr.w / Pr.n).toFixed(1) + '%</td><td class="' + pcls + '">' + (Pr.units >= 0 ? '+' : '') + Pr.units.toFixed(1) + 'u</td></tr></tbody></table>';
+    }
     if (gn) {
       h += '<div class="simrecview">The team-total gap, a watch <span class="tag">the book\'s line a point or more off the number the game\'s total and spread imply · shown, not scored, from 11 Nov 2026 · the two seasons behind the rule read one book\'s line, and the season pull had kept that book\'s alternate points with another point\'s prices: 61% on those, a coin less the price on the books\' own lines</span></div><table class="form simrectab gaptab"><thead><tr><th>Side</th><th>Record</th><th>Does</th><th>Units</th><th>The re-test said, two seasons</th></tr></thead><tbody>';
       [["HOME", "212-210 (50.2%), −22.3u at the apps against the book\'s own number; 176-190, −34.8u against the other books\'"], ["AWAY", "222-210 (51.4%), −13.6u; 194-179, −7.8u"]].forEach(function (x) {
@@ -1366,8 +1155,8 @@
            '<tr><td>' + B.n + '</td><td>' + B.w + '-' + (B.n - B.w) + '</td><td>' + (100 * B.says / B.n).toFixed(1) + '%</td><td class="' + bcls + '">' + (100 * B.w / B.n).toFixed(1) + '%</td><td class="' + bcls + '">' + (B.units >= 0 ? '+' : '') + B.units.toFixed(1) + 'u</td></tr></tbody></table>';
     }
     if (an) {
-      h += '<div class="simrecview">The agreement rule on the total <span class="tag">' + esc(NBA_AGREE_TAG) + ' · scored, BET</span></div><table class="form simrectab agreetab"><thead><tr><th>Voices</th><th>Record</th><th>Does</th><th>Units</th><th>Two seasons said</th></tr></thead><tbody>';
-      [[2, "2 of 3: the sim and the crew, the sheet silent", "134-98 (57.8%), +23.8u"], [3, "3 of 3: the sheet on it too", "23-10 (69.7%), +10.9u"]].forEach(function (x) {
+      h += '<div class="simrecview">The agreement rule on the total <span class="tag">' + esc(NBA_AGREE_TAG) + ' · scored, BET</span></div><table class="form simrectab agreetab"><thead><tr><th>Voices</th><th>Record</th><th>Does</th><th>Units</th><th>Three seasons said</th></tr></thead><tbody>';
+      [[2, "2 of 3: the sim and the crew, the sheet silent", "130-104 (55.6%), +14.2u"], [3, "3 of 3: the sheet on it too", "19-9 (67.9%), +8.3u"]].forEach(function (x) {
         var d = A[x[0]];
         if (!d.n) return;
         var cls = d.units > 0 ? "good" : d.units < 0 ? "bad" : "";
@@ -1385,7 +1174,7 @@
       h += '<div class="simrecview">Windows on the total <span class="tag">one ticket, over the low number and under the high; the chance is the anchored sim\'s mass inside the window</span></div><table class="form simrectab"><thead><tr><th>Tickets</th><th>Record</th><th>Says</th><th>Does</th><th>Units</th></tr></thead><tbody>' +
            '<tr><td>' + (Wd.n + Wd.p) + (Wd.p ? ' (' + Wd.p + ' on a number)' : '') + '</td><td>' + Wd.w + '-' + (Wd.n - Wd.w) + '</td><td>' + (Wd.n ? (100 * Wd.says / Wd.n).toFixed(1) + '%' : '—') + '</td><td class="' + wcls + '">' + (Wd.n ? (100 * Wd.w / Wd.n).toFixed(1) + '%' : '—') + '</td><td class="' + wcls + '">' + (Wd.units >= 0 ? '+' : '') + Wd.units.toFixed(2) + 'u</td></tr></tbody></table>';
     }
-    h += '<div class="note dim">A call is the sim\'s side on the line the row carried whose WORTH (the chance shrunk by what the replay found) reads LEAN (60%) or better; "says" is the sim\'s own chance, "does" the share that landed. The replays: the own view\'s total and spread calls land at 50% whatever they say (the close already carries the ratings), its win chances within 3 points of true; the first half is a coin from either view over two seasons. The team totals were scored until 11 Nov 2026 on a replay whose lines were not the book\'s: the season pull had kept, for the one book it read, an alternate point with another point\'s prices. On the books\' own lines the gap between a team total and the number the game\'s total and spread imply reads a coin less the price, so the gap and the anchored home team total are watches now, counted above and scored nowhere.</div></div>';
+    h += '<div class="note dim">A call is the sim\'s side on the line the row carried whose WORTH (the chance shrunk by what the replay found) reads LEAN (60%) or better; "says" is the sim\'s own chance, "does" the share that landed. The replays: the own view\'s total and spread calls land at 50% whatever they say (the close already carries the ratings), its win chances within 3 points of true; the first half is a coin from either view over two seasons. Engine 3 (23 Nov 2026) played out on 2,444 games of three seasons: the total\'s centre 0.1 under the close where engine 2 sat 4.1 under, the cover 701-691 and the total 737-751 at 55% and up, the favourite at 65.7% winning 68.5%. A moneyline call stands only where its worth beats what the row\'s price needs. The team totals were scored until 11 Nov 2026 on a replay whose lines were not the book\'s: the season pull had kept, for the one book it read, an alternate point with another point\'s prices. On the books\' own lines the gap between a team total and the number the game\'s total and spread imply reads a coin less the price, so the gap and the anchored home team total are watches now, counted above and scored nowhere.</div></div>';
     return h;
   }
 
@@ -1429,9 +1218,16 @@
      view at 55%+ and the crew's lean on the same side, the sheet not against it, landed 157-108 (59.2%, +34.7 units at
      -110): 134-98 with the sheet silent, 23-10 with the sheet on it too, and 15-20 when the sheet was BET the other way,
      which is why a sheet against it blocks the rule. The sheet's own BET band lands 56.3% on the same games, so the rule
-     reads BET, green: on the Simulation card, on the board's Agreement section, takeable, with its own record line ---- */
-  var NBA_AGREE = { sim: 0.55, model: 0.53, rate: 0.592, alt: 1.5 };   // the rule's measured rate gates the price; a row line 1.5+ off the market's number is an alternate, outside the measurement
-  var NBA_AGREE_TAG = "the sim's own view at 55%+ and the crew's lean on the same side, the sheet not against it: 157-108 (59.2%) over two seasons of closes, +34.7u at -110; 23-10 with the sheet on it too, 15-20 when the sheet was against it. On watch (30 Oct 2026): an official's over/under lean did not carry from 2024-25 to 2025-26 (r -0.09 over 60 officials), so the crew's voice may be noise and the replay's 59% a lucky cut; the live record decides";
+     reads BET, green: on the Simulation card, on the board's Agreement section, takeable, with its own record line.
+     Re-measured 23 Nov 2026 with engine 3's own play-out (lab sim_agree3.py; 2,444 games with a close on three seasons, who
+     played each night for the men out, the crew's record built in date order as the tool builds it): 149-113 (56.9%, +22.5
+     units), by season 80-62, 56-37 and 13-14; 130-104 with the sheet silent, 19-9 with the sheet on it too, 11-21 with the
+     sheet a BET the other way. The first measurement charged nothing for the men out; the slate's runs did (engine 2) and
+     sat 4 points low, so the rule had been firing on unders four times in five: on the same games engine 2's centre gives
+     124-97, with 131 games fired by both engines (77-54), 131 by engine 3 alone (72-59) and 90 by engine 2 alone (47-43).
+     The rate that gates the price is the re-measured one ---- */
+  var NBA_AGREE = { sim: 0.55, model: 0.53, rate: 0.569, alt: 1.5 };   // the rule's measured rate gates the price; a row line 1.5+ off the market's number is an alternate, outside the measurement
+  var NBA_AGREE_TAG = "the sim's own view at 55%+ and the crew's lean on the same side, the sheet not against it: 149-113 (56.9%) on three seasons of closes with the realigned simulation, +22.5u at -110 (157-108 as first measured, 28 Oct); 19-9 with the sheet on it too, 11-21 when the sheet was against it. On watch (30 Oct 2026): an official's over/under lean did not carry from 2024-25 to 2025-26 (r -0.09 over 60 officials), so the crew's voice may be noise and the replay's 59% a lucky cut; the live record decides";
   /* the market's main number from the row's odds block: the carded book's total, else the commonest point across the books */
   function nbaMainTotal(inp) {
     var o = null; try { o = inp && inp.odds ? JSON.parse(inp.odds) : null; } catch (e) { o = null; }
@@ -1466,7 +1262,7 @@
     ["OVER", "UNDER"].forEach(function (s) { var c = v.filter(function (x) { return x === s; }).length; if (c >= 2) { side = s; count = c; against = v.length > c; } });
     var agree = !!side && !against && !!simV && !!crew && simV.votes === side && crew.votes === side;
     /* the two gates (28 Oct 2026, the user's Spurs row): the rule was measured on the market's main number at -110, so an
-       alternate line is outside it, and a price that asks more than the rule's 59.2% is the book's price, not a bet */
+       alternate line is outside it, and a price that asks more than the rule's rate (56.9% from 23 Nov 2026) is the book's price, not a bet */
     var main = nbaMainTotal(inp), alt = main !== null && isFinite(line) && Math.abs(line - main) >= NBA_AGREE.alt;
     var price = agree ? parseFloat(side === "OVER" ? inp.op : inp.up) : NaN, need = isFinite(price) ? implied(price) : implied(-110);
     var priceOk = need <= NBA_AGREE.rate;
@@ -1555,7 +1351,7 @@
          is the books' number to within a point (Brier 0.1609, the middle of the books 0.1619; 0.85 points apart on average), a
          little higher on the heavy favourite, and after the fee it beat the best of the four apps' prices on 20 favourites, lost
          on 36 and tied on 7. A first reading against the price the row was logged with (cheaper on 41, the better score) set a
-         later quote beside an earlier price and is withdrawn.
+         later quote beside an earlier price and is withdrawn. Off the page on 23 Nov 2026 at the user's word.
      So every game is given one call, by this order: the agreement rule when it fires (BET); a side the sheet prices below its
      chance, or one a verdict sits on (BET); the over behind a tired favourite (REST, 17 Nov 2026, below); a total a point or
      more off the market's middle at one of the four apps (VALUE); else the likelier winner at the best of the four prices
@@ -1680,7 +1476,7 @@
   }
   function nbaCallBucket(c) { return c.kind !== "winner" ? c.kind : c.p >= 0.8 ? "w80" : c.p >= 0.7 ? "w70" : c.p >= 0.6 ? "w60" : "w50"; }
   var NBA_CALL_KINDS = [
-    ["rule", "BET · the agreement rule", "the simulation and the crew on the same side of the total, the sheet not against it: 157-108 (59.2%) over two seasons of closes"],
+    ["rule", "BET · the agreement rule", "the simulation and the crew on the same side of the total, the sheet not against it: 149-113 (56.9%) on three seasons of closes"],
     ["sheet", "BET · the sheet's own call", "a side the sheet prices below its chance, or one a verdict sits on"],
     ["rest", "REST · the over behind a tired favourite", "a favourite of 70% or more on the second night of a back to back, the other club rested: the game went over the closing total 66-33 (66.7%) on three seasons, 32-16, 28-15 and 6-2; the same favourites rested 360-367"],
     ["number", "VALUE · the best number on the board", "a total at one of your four apps a point or more off the middle of every book's number: 105-84 (55.6%) on last season's closes, 78-70 at the opener"],
@@ -1710,11 +1506,12 @@
       var ks = nbaCallKinds(r).map(function (c) { return { c: c, res: nbaCallRes(c, r) }; }).filter(function (x) { return x.res; });
       if (!ks.length) return;
       ks.forEach(function (x) { add(rec[nbaCallBucket(x.c)], x.c, x.res); });   // every kind on its own line, on every game it speaks to
-      graded.push(ks);
+      graded.push({ r: r, ks: ks });
     });
     NBA_CALL_KINDS.forEach(function (k) { var s = rec[k[0]]; s.cold = s.n >= NBA_CALL_COLD && s.units < 0 && (k[0] === "rule" || k[0] === "sheet" || k[0] === "rest"); });   // the rest call is new and rests on 99 games: it steps out of the order too when it has lost here
     rec.read.cold = rec.read.n >= NBA_CALL_COLD && rec.read.w / rec.read.n < NBA_READ_COLD;   // the sheet's read stands through a losing run and steps out only when it is clearly losing here
-    graded.forEach(function (ks) { var cs = ks.map(function (y) { return y.c; }), c = nbaCallLive(cs, rec)[0] || cs[cs.length - 1], x = ks.filter(function (y) { return y.c === c; })[0]; add(rec.given, x.c, x.res); });   // the call as given: the first kind in the order that is live
+    rec.list = [];   // the call as given on each graded game, for the records that read it against something else (the money's, 23 Nov 2026)
+    graded.forEach(function (g) { var ks = g.ks, cs = ks.map(function (y) { return y.c; }), c = nbaCallLive(cs, rec)[0] || cs[cs.length - 1], x = ks.filter(function (y) { return y.c === c; })[0]; add(rec.given, x.c, x.res); rec.list.push({ r: g.r, c: x.c, res: x.res }); });   // the call as given: the first kind in the order that is live
     nbaCallsMemo = { stamp: stamp, rec: rec };
     return rec;
   }
@@ -1744,7 +1541,7 @@
   function nbaCallCard(x) {
     var c = x.c, r = x.row, res = nbaCallRes(c, r), all = nbaCallsRecord(), kind = NBA_CALL_KINDS.filter(function (k) { return k[0] === nbaCallBucket(c); })[0], rec = all[kind[0]];
     var at = c.app ? " at " + esc(bookName(c.app)) : "", line3, btn = "";
-    if (c.kind === "rule") { line3 = c.count + " of 3 voices · " + sgn(c.price, 0) + " needs " + (implied(c.price) * 100).toFixed(1) + "% · the rule's rate 59.2%"; btn = typeof nbaSimTakeBtn === "function" ? nbaSimTakeBtn(r, "agree", "total", c.side) : ""; }
+    if (c.kind === "rule") { line3 = c.count + " of 3 voices · " + sgn(c.price, 0) + " needs " + (implied(c.price) * 100).toFixed(1) + "% · the rule's rate " + (100 * NBA_AGREE.rate).toFixed(1) + "%"; btn = typeof nbaSimTakeBtn === "function" ? nbaSimTakeBtn(r, "agree", "total", c.side) : ""; }
     else if (c.kind === "sheet") { line3 = (c.p * 100).toFixed(1) + "% by the sheet · " + sgn(c.price, 0) + " needs " + (implied(c.price) * 100).toFixed(1) + "%"; btn = typeof takeBtn === "function" ? takeBtn(r, c.mk) : ""; }
     else if (c.kind === "rest") { line3 = sgn(c.price, 0) + at + " · " + esc(c.fav) + " are " + (c.pfav * 100).toFixed(1) + "% by the books on the second night of a back to back, " + esc(c.dog) + " rested " + (c.dogRest === 1 ? "a day" : c.dogRest + " days") + (c.app ? ": the lowest total at your four apps" : ": the carded total"); btn = nbaSimTakeBtn(r, "call", "total", c.side); }
     else if (c.kind === "read") { line3 = (c.p * 100).toFixed(1) + "% by the sheet" + (c.pMkt !== null ? " where the book's own prices say " + (c.pMkt * 100).toFixed(1) + "%" : "") + " · " + sgn(c.price, 0) + " needs " + (implied(c.price) * 100).toFixed(1) + "%" + " · " + esc(nbaDecType(c)); btn = typeof takeBtn === "function" ? takeBtn(r, c.mk) : ""; }
@@ -1753,7 +1550,6 @@
       var cost = c.p * (decimalOf(c.price) - 1) - (1 - c.p);
       line3 = (c.p * 100).toFixed(1) + "% by the middle of " + (c.books > 1 ? c.books + " books" : "the carded book") + " · " + sgn(c.price, 0) + at + " needs " + (c.need * 100).toFixed(1) + "% · " + (cost >= 0 ? "pays " + sgn(cost * 100, 1) + "% a bet at that" : "costs " + (-cost * 100).toFixed(1) + "% a bet");
       btn = nbaSimTakeBtn(r, "call", "ml", c.side);   // the mark keeps this app and this price, not the price the row was logged with
-      if (typeof kalshiChip === "function") line3 += kalshiChip(r, { key: "ml", side: c.side, price: c.price });   // the crowd against the price on this card
     }
     var also = (c.also || []).map(function (a) { var ak = NBA_CALL_KINDS.filter(function (k) { return k[0] === nbaCallBucket(a); })[0]; return esc(ak[1].replace(/^[A-Z]+ · /, "")) + " says " + esc(a.pick) + " (" + esc(nbaCallRecWords(all[ak[0]])) + ": cold, and left out of the order until its record turns)"; });
     return '<div class="pk call ' + c.tier.toLowerCase() + (res ? ' ' + res : '') + '" data-open="' + r.id + '" title="Load ' + esc(r.matchup) + ' into the form">' +
@@ -2192,7 +1988,7 @@
       }
       return s;
     }
-    if (c.kind === "rule" && V) { var vw = nbaVoicesWords(V); return "Three voices on the total: " + vw.bits.join("; ") + ". " + vw.verdict + ". The simulation and the crew on one side with the sheet not against it went 157-108 (59.2%) over two seasons of closes."; }
+    if (c.kind === "rule" && V) { var vw = nbaVoicesWords(V); return "Three voices on the total: " + vw.bits.join("; ") + ". " + vw.verdict + ". The simulation and the crew on one side with the sheet not against it went 149-113 (56.9%) on three seasons of closes."; }
     if (c.kind === "sheet" || c.kind === "read") {
       var w0 = ""; try { w0 = pickWhy({ mk: c.mk, type: c.type || "" }, m, "NBA"); } catch (e) { w0 = ""; }
       if (c.kind === "read") w0 = w0.replace("the price asks more than that chance, so this is the likeliest side, not a value bet.", "the price asks a little more than that chance: this is the sheet's read of the game and not an edge at the price, so the bet is a small one.");
@@ -2226,7 +2022,7 @@
     return out.sp || out.tot || out.ml ? out : null;
   }
   function nbaSplitsSides(s, away, home) {   // every side the count names: {key, side, label, money, bets, gap}
-    var out = [], add = function (key, side, label, v) { var n = v.length; out.push({ key: key, side: side, label: label, money: +v[n - 2], bets: +v[n - 1], gap: +v[n - 2] - +v[n - 1] }); };
+    var out = [], add = function (key, side, label, v) { var n = v.length; out.push({ key: key, side: side, label: label, money: +v[n - 2], bets: +v[n - 1], gap: +v[n - 2] - +v[n - 1], num: n === 4 ? +v[0] : null, odds: n === 4 ? +v[1] : +v[0] }); };   // num and odds: DraftKings' own number and price in the count, for the record
     if (s.sp) { add("spread", "AWAY", away + " " + sgn(+s.sp.a[0], 1), s.sp.a); add("spread", "HOME", home + " " + sgn(+s.sp.h[0], 1), s.sp.h); }
     if (s.tot) { add("total", "OVER", "the over " + (+s.tot.o[0]), s.tot.o); add("total", "UNDER", "the under " + (+s.tot.u[0]), s.tot.u); }
     if (s.ml) { add("ml", "AWAY", away + " to win", s.ml.a); add("ml", "HOME", home + " to win", s.ml.h); }
@@ -2262,6 +2058,61 @@
     var inp = snapshot(); if (!nbaSplitsOf(inp.nbasplits)) return "";
     return nbaMoneyPanel(inp, (($("away") || {}).value || "").trim() || "Away", (($("home") || {}).value || "").trim() || "Home", null, false);
   }
+  /* ---- the money's own record (23 Nov 2026, the user: "Is there a way to tell me how the Sharp better info we added is doing too").
+     Every graded game whose row kept a count taken before the tip, graded at DraftKings' own number and price in that count: the
+     side with the larger bets (NBA_SPLITS_GAP points more of the money than of the bets), by market; every market's named side
+     (the one the card's box prints: ten points or more, else most of the money); and the decision as it was given when the larger
+     bets were with it, on the other side, or neither. Shown, never scored. When it was built: 26 games on four nights, the larger
+     bets' side 15-17 for +1.6 units (the total 8-6, the spread 4-6, the moneyline 3-5), every named side 42-36 ---- */
+  function nbaMoneyRes(x, fa, fh) {
+    var m = fh - fa, t = fa + fh, v;
+    if (x.key === "ml") return m === 0 ? null : ((m > 0) === (x.side === "HOME") ? "win" : "loss");
+    if (!nbaDecNum(x.num)) return null;
+    v = x.key === "spread" ? (x.side === "HOME" ? m + +x.num : -m + +x.num) : (x.side === "OVER" ? t - +x.num : +x.num - t);
+    return v === 0 ? "push" : v > 0 ? "win" : "loss";
+  }
+  function nbaMoneyRecord() {
+    var mk = function () { return { w: 0, l: 0, p: 0, units: 0, n: 0 }; };
+    var add = function (s, res, price) { if (!res) return; if (res === "push") { s.p++; return; } s.n++; if (res === "win") { s.w++; s.units += decimalOf(nbaDecNum(price) && +price ? +price : -110) - 1; } else { s.l++; s.units -= 1; } };
+    var R = { hot: { all: mk(), spread: mk(), total: mk(), ml: mk() }, lead: { all: mk(), spread: mk(), total: mk(), ml: mk() }, dec: { "with": mk(), against: mk(), none: mk() }, games: 0, nights: 0, first: "", last: "" };
+    var given = {}, nights = {};
+    (nbaCallsRecord().list || []).forEach(function (x) { given[x.r.id] = x; });
+    card.forEach(function (r) {
+      if (r.sport !== "NBA" || isVoid(r) || !rowGraded(r)) return;
+      var s = nbaSplitsOf((r.inputs || {}).nbasplits); if (!s || !s.pre) return;   // a count taken after the tip is no read of the game
+      var fa = +(r.finals || {}).fa, fh = +(r.finals || {}).fh; if (!isFinite(fa) || !isFinite(fh)) return;
+      var sides = nbaSplitsSides(s, r.away, r.home);
+      R.games++; nights[r.gdate] = 1; if (!R.first || r.gdate < R.first) R.first = r.gdate; if (r.gdate > R.last) R.last = r.gdate;
+      ["spread", "total", "ml"].forEach(function (key) {
+        var two = sides.filter(function (x) { return x.key === key; }); if (two.length !== 2) return;
+        var up = two[0].gap >= two[1].gap ? two[0] : two[1], big = two[0].money >= two[1].money ? two[0] : two[1], lead = up.gap >= NBA_SPLITS_GAP / 2 ? up : big, res = nbaMoneyRes(lead, fa, fh);
+        add(R.lead[key], res, lead.odds); add(R.lead.all, res, lead.odds);
+        if (lead.gap >= NBA_SPLITS_GAP) { add(R.hot[key], res, lead.odds); add(R.hot.all, res, lead.odds); }
+      });
+      var g = given[r.id], mine = g ? sides.filter(function (x) { return x.key === g.c.key && x.side === g.c.side; })[0] : null;
+      if (mine) add(R.dec[mine.gap >= NBA_SPLITS_GAP ? "with" : mine.gap <= -NBA_SPLITS_GAP ? "against" : "none"], g.res, g.c.price);
+    });
+    R.nights = Object.keys(nights).length;
+    return R;
+  }
+  function nbaMoneyRecordHtml() {   // on the NBA record, under the first half's best bets
+    var R = nbaMoneyRecord(); if (!R.games) return '';
+    var cls = function (s) { return s.units > 0 ? "good" : s.units < 0 ? "bad" : ""; };
+    var row = function (label, s, note) {
+      return '<tr><td>' + label + '</td><td>' + (s.n || s.p ? s.w + '-' + s.l + (s.p ? '-' + s.p : '') : 'none yet') + '</td><td class="' + cls(s) + '">' + (s.n ? (100 * s.w / s.n).toFixed(1) + '%' : '') + '</td><td class="' + cls(s) + '">' + (s.n ? sgn(s.units, 1) + 'u' : '') + '</td><td class="dim">' + note + '</td></tr>';
+    };
+    return '<div class="simrecview">Where the money is: the sharp-money read against the finals <span class="tag">DraftKings\' own count as each row kept it before the tip · ' + R.games + ' game' + (R.games === 1 ? '' : 's') + ' on ' + R.nights + ' night' + (R.nights === 1 ? '' : 's') +
+           ', ' + esc(R.first) + ' to ' + esc(R.last) + ' · graded at DraftKings\' own number and price in the count · shown, not scored</span></div>' +
+      '<table class="form simrectab moneytab"><thead><tr><th>The read</th><th>Record</th><th>Does</th><th>Units</th><th></th></tr></thead><tbody>' +
+      row('<b>The side with the larger bets</b>', R.hot.all, NBA_SPLITS_GAP + ' points or more of the money than of the bets: the bold rows of the card\'s box') +
+      row('&nbsp;&nbsp;on the spread', R.hot.spread, '') + row('&nbsp;&nbsp;on the total', R.hot.total, '') + row('&nbsp;&nbsp;on the moneyline', R.hot.ml, '') +
+      row('<b>Every market\'s named side</b>', R.lead.all, 'the side the box prints for each market: ten points or more of the money than of the bets, else the side with most of the money') +
+      row('&nbsp;&nbsp;on the spread', R.lead.spread, '') + row('&nbsp;&nbsp;on the total', R.lead.total, '') + row('&nbsp;&nbsp;on the moneyline', R.lead.ml, '') +
+      row('<b>The decision, the larger bets with it</b>', R.dec["with"], 'the game\'s decision as it was given, at its own price') +
+      row('<b>The decision, the larger bets on the other side</b>', R.dec.against, '') +
+      row('The decision, no gap of ' + NBA_SPLITS_GAP + ' either way', R.dec.none, '') +
+      '</tbody></table><div class="note dim">One book\'s customers, counted from 19 Nov 2026. A side that truly wins 55% needs about 400 games to show it, so this is a count and not yet a verdict; nothing here moves a pick. The test it comes from: backing the side a line had already moved to went 752-698 on spreads and 933-930 on totals at the closing number.</div>';
+  }
   function nbaDecWhy(c, row, m) {
     var inp = row.inputs || {}, pc = function (p) { return (100 * p).toFixed(1) + "%"; }, li = [], V = null, all = nbaCallsRecord();
     try { V = nbaVoices(row); } catch (e) { V = null; }
@@ -2279,8 +2130,6 @@
       nums.push("<b>" + esc(w.team) + "</b> win " + pc(w.p) + " of the time by the middle of " + (w.books > 1 ? w.books + " books" : "the carded book") + (mine !== null ? ", " + pc(mine) + " by the sheet" : "") + ".");
     }
     if (V && V.sim) nums.push("The simulation's own view has the " + V.sim.side.toLowerCase() + " at " + (100 * Math.max(V.sim.p, 1 - V.sim.p)).toFixed(0) + "%.");
-    var k = kalshiOf(inp.nbakalshi || "");
-    if (k && (k.ml || k.totMed !== null)) nums.push("The crowd on Kalshi: " + [k.ml ? esc(k.ph >= 0.5 ? row.home : row.away) + " " + pc(Math.max(k.ph, k.pa)) : "", k.totMed !== null ? "a total of " + k.totMed.toFixed(1) : ""].filter(Boolean).join(", ") + ".");
     if (nums.length) li.push(["The numbers", nums.join(" ")]);
     /* form */
     var form = nbaJson(inp.nbaform) || {}, fa = nbaDecFormOf(form.away, row.away, row.gdate), fh = nbaDecFormOf(form.home, row.home, row.gdate), ctx = nbaJson(inp.nbactx), ctxList = ctx && ctx.length ? ctx : [];

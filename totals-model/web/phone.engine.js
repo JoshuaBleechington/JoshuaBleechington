@@ -44,7 +44,7 @@
      THE GAMES (the same day, the user: "can you have it so the game lines open as well like the props? I really
      like this to view on the go or show someone on the fly"). On the computer a game line opens its game in the
      form: tonight's signals, the pick and its why, every market with its chance, price and edge, the simulation,
-     who is out, the form, the middles, the referees, the crowd on Kalshi, the context. Those are drawn off the
+     who is out, the form, the middles, the referees, the context. Those are drawn off the
      form, so at the save each game on the sheet is put in the form, drawn by the page's own render, read off,
      and the form put back exactly as it stood, all in one step with nothing saved in between (phoneGamesDraw).
      The card is tidied for a phone (a signal is a chip, not a link; the calculators and the buttons go; the long
@@ -211,7 +211,6 @@
       if (full("nbaFormPanel")) h += sec("Recent form", "", '<div class="note pg-form">' + html("nbaFormPanel") + '</div>', false);
       if (full("nbaMidPanel")) h += sec("Middles", live("secMid"), '<div class="note pg-mid">' + html("nbaMidPanel") + '</div>', false);
       if (full("nbaCrewPanel")) h += sec("Referee stats", live("secCrew"), '<div class="note pg-crew">' + html("nbaCrewPanel") + '</div>', false);
-      if (full("nbaKalshiPanel")) h += sec("Kalshi", live("secKalshi"), '<div class="note pg-kal">' + html("nbaKalshiPanel") + '</div>', false);
       if (full("nbaCtxPanel")) h += sec("Context", "", '<div class="note pg-ctx">' + html("nbaCtxPanel") + '</div>', false);
     }
     var why = html("why"); if (why) h += sec("Why", "", '<ul class="why">' + why + '</ul>', false);
@@ -247,9 +246,9 @@
   function phoneGamesDraw(games) {
     var rows = ((games && games.rows) || []).slice().sort(function (a, b) { return (a.rank - b.rank) || (a.n - b.n); }), map = {}, order = [];
     if (!rows.length) return { map: map, order: order };
-    var folds = ["markets", "nbaSimPanel", "nbaOutPanel", "nbaLineupPanel", "nbaFormPanel", "nbaMidPanel", "nbaCrewPanel", "nbaKalshiPanel", "nbaCtxPanel"];
+    var folds = ["markets", "nbaSimPanel", "nbaOutPanel", "nbaLineupPanel", "nbaFormPanel", "nbaMidPanel", "nbaCrewPanel", "nbaCtxPanel"];
     var stood = { sport: sport, inputs: snapshot(), opened: opened, win: winCalc, open: folds.map(function (id) { var el = $(id), l = el ? el.querySelectorAll("details") : [], o = []; for (var i = 0; i < l.length; i++) o.push(!!l[i].open); return o; }) };
-    var hid = folds.slice(1).concat(["secOutLive", "secSimLive", "secMidLive", "secCrewLive", "secKalshiLive"]), dots = function () { var n = $("nbaNav"); return n ? n.querySelectorAll(".dot") : []; };
+    var hid = folds.slice(1).concat(["secOutLive", "secSimLive", "secMidLive", "secCrewLive"]), dots = function () { var n = $("nbaNav"); return n ? n.querySelectorAll(".dot") : []; };
     if (sport !== "NBA") { stood.nba = hid.map(function (id) { var el = $(id); return el ? el.innerHTML : null; }); stood.dots = []; for (var d0 = dots(), q = 0; q < d0.length; q++) stood.dots.push(d0[q].className); }
     try {
       rows.forEach(function (x) {

@@ -320,7 +320,6 @@ def tail() -> str:
              '                  "arest","hrest","al5","hl5","hml","aml","sp","sph","spa"];\n'
              '  var NBA_IDS = ["away","home","line","op","up","opened","gdate","hml","aml","sp","sph","spa","h1line","h1op","h1up",\n'
              '                 "naort","nhort","nadrt","nhdrt","napace","nhpace","nagp","nhgp","nlrtg","nlpace","narest","nhrest","nbaout","nbaq","nbactx","ncrew","nbarefs","nbalineup","nbaform","nbasim","odds","sharp",\n'
-             '                 "nbakalshi",   // the crowd on Kalshi (4 Nov 2026)\n'
              '                 "nbasplits"];   // the bets against the money, DraftKings\' own count from the odds run (19 Nov 2026)\n'
              '  var ALL = MLB_IDS.concat(WNBA_IDS).concat(NBA_IDS).filter(function (v, i, a) { return a.indexOf(v) === i; });\n'
              '  var CHECKS = ["dome","playoff"];\n'
@@ -368,7 +367,7 @@ def tail() -> str:
              '  })();\n'
              '  function save() {', "relabel")
     t = once(t, "the units column is the referee.') + '</div>';\n    });",
-             "the units column is the referee.') + '</div>';\n      if (sp === \"NBA\") h += nbaRefsWatchHtml();   // the referees as a watch (22 Oct 2026)\n      if (sp === \"NBA\") h += nbaSimRecordHtml();   // the simulation's calls, says against does (25 Oct 2026)\n      if (sp === \"NBA\") h += nbaCallsRecordHtml();   // a call on every game, each kind's record (12 Nov 2026)\n      if (sp === \"NBA\") h += nbaH1RecordHtml();   // the first half's best bets, each kind and the list as given (23 Nov 2026)\n    });", "refs watch")
+             "the units column is the referee.') + '</div>';\n      if (sp === \"NBA\") h += nbaRefsWatchHtml();   // the referees as a watch (22 Oct 2026)\n      if (sp === \"NBA\") h += nbaSimRecordHtml();   // the simulation's calls, says against does (25 Oct 2026)\n      if (sp === \"NBA\") h += nbaCallsRecordHtml();   // a call on every game, each kind's record (12 Nov 2026)\n      if (sp === \"NBA\") h += nbaH1RecordHtml();   // the first half's best bets, each kind and the list as given (23 Nov 2026)\n      if (sp === \"NBA\") h += nbaMoneyRecordHtml();   // the sharp-money read against the finals (23 Nov 2026)\n    });", "refs watch")
     t = every(t, 'sp === "WNBA" ? forecastMatchupWnba() : forecastMatchupMlb()',
               'sp === "NBA" ? forecastMatchupNba() : sp === "WNBA" ? forecastMatchupWnba() : forecastMatchupMlb()', "dispatch (stored)", 1)
     t = every(t, 'sport === "WNBA" ? forecastMatchupWnba() : forecastMatchupMlb()',
@@ -395,7 +394,7 @@ def tail() -> str:
     t = every(t, '["MLB", "WNBA"]', '["MLB", "NBA", "WNBA"]', "sport loops", 4)
     # the NBA record counts the sheet's calls (11 Nov 2026, the user: "fix the NBA record so tiles count only real calls"): a market where
     # neither side is priced below its chance is the book's own number; it is listed under the tile as no call and left out of its count.
-    # The watches that read both sides (Pinnacle's shade, the short dog, the crowd on Kalshi, the 54%+ line) keep every game.
+    # The watches that read both sides (Pinnacle's shade, the short dog, the 54%+ line) keep every game.
     t = once(t, 'NBA: [["total","Full-game total"],["h1","First half"],["ml","Moneyline"],["spread","Spread"]],',
              'NBA: [["total","Full-game total · calls"],["h1","First half · calls"],["ml","Moneyline · calls"],["spread","Spread · calls"]],', "nba calls: labels")
     t = once(t, '    var tally = function (t, mk, res, row, clvRow) {\n      var cl = clvOf(mk, clvRow || row);\n      if (cl !== null) {',
@@ -507,7 +506,6 @@ def tail() -> str:
     t = once(t, '                      "line","op","up","opened","hml","aml","rl","rlh","rla","f5line","f5op","f5up","odds","sharp"];',
              '                      "line","op","up","opened","hml","aml","rl","rlh","rla","f5line","f5op","f5up","odds","sharp",\n'
              '                      "sp","sph","spa","h1line","h1op","h1up","naort","nhort","nadrt","nhdrt","napace","nhpace","nagp","nhgp","nlrtg","nlpace","narest","nhrest","nbaout","nbactx","ncrew","nbarefs","nbalineup","nbaform","nbasim",\n'
-             '                      "nbakalshi",   // the crowd on Kalshi (4 Nov 2026): the exchange\'s game-winner prices, from the slate and the odds run\n'
              '                      "nbasplits"];   // the bets against the money (19 Nov 2026): DraftKings\' own count, from the odds run', "slate fields")
     # the slate's backup-in-net flags are booleans, carried like the roof: into a
     # row's inputs when the card already has the game, into the form otherwise.
@@ -518,7 +516,7 @@ def tail() -> str:
     # other box keeps the loader's rule, blanks fill and typed values stay, so the record is of the row as logged
     t = once(t, '          if (g.inputs.dome === true && !row.inputs.dome) { row.inputs.dome = true; changed = true; }',
              '          if (g.inputs.dome === true && !row.inputs.dome) { row.inputs.dome = true; changed = true; }\n'
-             '          ["nbalineup", "nbaout", "nbasim", "nbakalshi", "nbasplits"].forEach(function (k) { if (!blank(g.inputs[k]) && String(g.inputs[k]) !== String(row.inputs[k] || "")) { row.inputs[k] = String(g.inputs[k]); changed = true; } });   // the starting five follows the newest slate (23 Oct 2026); so do the injury report and the simulation run from it (26 Oct 2026) and the crowd\'s price on Kalshi (4 Nov 2026), shown and recorded, never scored by the engine', "lineup refresh")
+             '          ["nbalineup", "nbaout", "nbasim", "nbasplits"].forEach(function (k) { if (!blank(g.inputs[k]) && String(g.inputs[k]) !== String(row.inputs[k] || "")) { row.inputs[k] = String(g.inputs[k]); changed = true; } });   // the starting five follows the newest slate (23 Oct 2026); so do the injury report and the simulation run from it (26 Oct 2026), shown and recorded, never scored by the engine', "lineup refresh")
     # the Props tab (19 Oct 2026): the backup carries the props and a restore brings them back; the slate
     # loader takes a props file too and grades the props from a grade file's box lines; the record block
     # ends with the props tile; a sport button leaves the tab

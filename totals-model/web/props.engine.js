@@ -1420,7 +1420,7 @@
   }
   /* Kalshi is off the props (5 Nov 2026, the user: "remove the kalshi completely from the props"): the crowd's lines on the
      matchup and the player ladders rode on the cards, the panel and the strip from 4 Nov and came off; a row's kal field, where a
-     file from the 4th still carries one, is ignored. The crowd stays on the NBA card's matchup, where the sheet reads it */
+     file from the 4th still carries one, is ignored. The crowd stayed on the NBA card's matchup until 23 Nov 2026, when it came off there too */
   function propsFivesHtml(r) {
     var f = r.fives; if (!f || (!f.away && !f.home)) return '';
     var me = propsNameKey(r.name);

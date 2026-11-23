@@ -71,6 +71,27 @@ the goalies.
 
 ## Basketball (The Super Model, 15 Oct 2026)
 
+**The engine's third version (23 Nov 2026, `slate/nbasim.py` VERSION 3; the
+user: "see if the simulation needs to be realligned").** Engine 2's own total
+sat 4.1 points under the closing total on 2,444 games of three seasons (2.9
+under on this season's rows) with the margin right. Two things took points
+off the total that the close does not: a club on the second night of a
+back-to-back had 1.7 per 100 taken off its own scoring (the close docks it
+1.6 of margin and 0.3 of total), and a listed-out regular's whole charge
+came off his club's own scoring with nothing taken off for the men every
+club has out (the ratings' level was earned with men out). Now a tired club
+loses 0.95 per 100 of its own scoring and gives the other side 0.63 (a third
+game in four nights 0.17 and 0.12); the mean charge of the clubs on tonight's
+slate comes off each club's first, and of what is left 0.77 comes off its own
+scoring and 0.13 goes on the other side's. Measured with who played each
+night (the ledger's did-not-play lists are the injury page at fetch time).
+The total's centre sits 0.05 over the close, its mean miss to the close 3.43
+against 5.02 and to the final 14.86 against 15.33; the margin and the
+winner do not move. Played out 2,000 times a game, the runs' own side at the
+closing spread and total is a coin (701-691 and 737-751 at 55% and up): the
+simulation is a fair picture of the game, and the page says so. Both files
+changed: **replace `slate.py` and `nbasim.py` together.**
+
 **The engine's second version (30 Oct 2026, `slate/nbasim.py` VERSION 2):**
 the game's two sides now play with score effects (the side in front eases,
 the side behind presses, 0.0025 points per possession per point of margin,
@@ -95,17 +116,12 @@ carded line (5 Nov
 2026: the simulation came off the props, measured null on 4,800 graded
 props; where the other books sit half a point or more off the carded
 line the truth sat about half way toward them, scored at half that on
-the book's chance). The slate run and the odds run also read Kalshi's open NBA
-markets (4 Nov 2026, no key needed): the game winner a side, and the
-spread, total and team-total ladders (a contract a rung, the crowd's chance
-of more than each number), and put them on the row. The sheet's card shows
-the crowd's no-vig price beside the book's and Pinnacle's, the crowd's
-spread, total and team totals at even money beside the book's numbers (the
-team totals beside the simulation's too), the chance of each side
-at the book's number by the crowd, the sheet and the simulation, which
-price is better after the exchange's 7% fee on the win, and the sharp side
-when the crowd sits three points from Pinnacle on the moneyline, a watch on
-the moneyline tile. Nothing to run differently.
+the book's chance). The slate run and the odds run read Kalshi's open NBA
+markets from 4 Nov to 22 Nov 2026 and put them on the row, shown and never
+scored. That came off on 23 Nov 2026 at the user's word ("remove the Kalshi
+from the NBA model as well"): neither run reads the exchange, no row carries
+its block, and the page has no Kalshi section, chip or record line. Nothing
+to run differently.
 
 **The folder (12 Nov 2026).** A run reads and writes in the folder its
 bat sits in, and nowhere else: the ledgers, `odds_key.txt`, the odds log
@@ -266,7 +282,7 @@ projection, built from the ledgers' box lines and measured on 2025-26
 | The closing line (6 Nov 2026) | `python slate.py nba-props --close` (Close NBA props.bat), a few minutes before the first tip: the same run written as `nba-props-close-DATE.json` in the close format. Loaded on the Props tab after the morning's file it attaches each prop's closing line and prices to the row (`close`: line, op, up, book, at) and adds none; the card, the panel and the record read every pick against the close: the edge it was bought at less the edge at the close, the chance re-read at the closing line by the sheet's own blend and the need from the closing price, so a pick beats the close when the market moved its way in line or in price | The market's last word, the standard test of a props model: a sheet that keeps beating the close has an edge the market agrees with, read in weeks where results at 55 to 60% take months. Its record line keeps how many picks beat the close and the points a pick, by band |
 | The best app for a pick (6 Nov 2026) | The pick's side read at each of the four apps' line and price off the books on the prop, the chance re-read at the app's line by the sheet's own blend, the app named on the card and the panel when it beats the carded book | On 185 BET picks of ten nights the best app had a better line or price on 64, worth 0.3 points of edge a pick and +1.3 units over the same results. The call and the grade stay at the carded book |
 | Recent form (5 Nov 2026) | His last three games with the stat against the line (`props_form`, on the prop as `form`: the numbers, how many over, on it, their mean), on the best card and the panel in green with the pick and red against it, with its own line on the record tile | **Shown, not scored.** On the 5,647 graded props with a log (28 Oct to 4 Nov) the over landed 6.7 points under the book's chance where his last three had averaged half a sigma or more under the line and on the book's number where they had averaged over it; on 4 Nov it had pointed over on 14 of the 35 losing unders against 4 of the 29 that won. Read as a lever walk-forward (fitted on the nights before, scored on the next) it did not help the BET band, as a push on the projection (160-120 against 133-97 without it) or as a correction on the book's chance (166-125 against 132-97). The favourite's script (a club favoured by 5 to 10 lands over 43% against the book's 49%, starters on favourites of 7 or more 1.5 minutes under their projection) and a shrink of the last five games' minutes toward the season (a spike reverses: he plays 1.7 minutes under a projection that took it at face value) were measured the same two ways and did not help the bet either (128-95 and 136-101 as pushes, 139-106 and 136-111 on the book's chance; all three together 164-123 and 201-165): on record, not on the sheet (CALLSHEET3.md, 5 Nov 2026) |
-| The crowd on Kalshi (4 Nov 2026; off the props 5 Nov 2026) | The exchange's player ladders (points, rebounds, assists, threes, PRA) rode on the props for one night and came off at the user's word ("remove the kalshi completely from the props"): the props run reads no player series and keeps no ladder on a prop, and the Props tab shows no crowd line or tile. The crowd stays on the NBA card's matchup: the game winner, the spread, the total and the team totals, against the book, Pinnacle and the simulation | Off the props. The crowd's game markets stay on the row, shown and recorded there |
+| The crowd on Kalshi (4 Nov 2026; off the props 5 Nov, off the game's row 23 Nov 2026) | The exchange's player ladders (points, rebounds, assists, threes, PRA) rode on the props for one night and came off at the user's word ("remove the kalshi completely from the props"): the props run reads no player series and keeps no ladder on a prop, and the Props tab shows no crowd line or tile. The crowd stayed on the NBA card's matchup (the game winner, the spread, the total and the team totals, against the book, Pinnacle and the simulation) until 23 Nov 2026, when the user took it off there too | Off the props, and off the game's row from 23 Nov 2026: neither run reads the exchange |
 | The opponent's absences, and their centre out (28 Oct 2026) | Every prop names the opponent's regulars out (Out or Doubtful at 24+ mpg) and what the sheet does with them. Scored on one thing: the opponent's listed-out **centres'** minutes a game (`props_out_centres`, the position by the ledgers, else ESPN's roster) lift a **forward's or centre's rebounds** +0.30 per 36 per 30 mpg (`PROPS_OPP_C_REB_PER30`) on rebounds, PRA, points + rebounds and rebounds + assists, a lever of its own ("Their centre out"); a guard's rebounds and every other market read the absences as shown, not scored. The scored matchup lever still reads the opponent's full-strength rating (`club_match` zeroes both clubs' absence adjustments so his own club's lever is not counted twice) | 2025-26 (`tools_nba_opp_out.py`): the opponent's absences lift points +0.17 per 36 per 30 mpg (t 2.7) against his own club's +0.42, −0.02 in the first half and +0.30 in the second, so not scored; forwards' and centres' rebounds with an opposing centre out +0.56 / +0.78 by half (t 2.8 / 4.6), the over landing 48.9% against 45.1% on other nights (bias +0.067 sigmas, t 2.4); 0.30 closes that gap (bias +0.001), 0.69 overshoots it (−0.081, t −3.0) |
 | Who steps up (18 Nov 2026) | For each of his club's two highest scorers listed Out (ten points a game or more), his own games for the club this season split by whether that man played: his points, minutes and usage a game either way (`props_step_up`, on his points row as `step`: `[{n, ppg, gw, gwo, pw, pwo, mw, mwo, uw, uwo}]`). The page's decision card on the game reads it: who has scored more without the man, who is newly out, who has hardly played with them | Shown, never scored: picks against a man's games without an absent teammate went 28-12 and with them 34-25 the same day, a club's absences are in the game's line by the tip, and the levers on who is out already read his minutes and rates |
 | (measured, not an input) The blowout | Whether the market's expected margin, read off the closing moneyline, predicts the shortfall in a regular's minutes against his last five and so the projection's miss | Regulars do lose minutes with the expected margin, 0.08 a point over two seasons (t −9; 1.4 minutes at twelve or more, the favourite's regulars most) and the bench gains 0.09, but the stat projection's miss is flat across the expected margin in both seasons (the over rate 46-47% in every bucket) and shading the minutes by the margin made the projection worse out of sample. The blowouts that cost the night of 21 Oct 2026 (seven of eleven games by fifteen or more, the overs 105-162 in them) were not in the spreads: two of the seven were favoured by nine or more. `tools_backtest_nba_blowout.py` |

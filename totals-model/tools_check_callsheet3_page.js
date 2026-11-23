@@ -1109,11 +1109,6 @@ const CHECKS = ["dome","playoff"];
     document.getElementById('m-nba').click(); await wait();
     const set = (id, v) => { const el = document.getElementById(id); el.value = v; el.dispatchEvent(new Event('input', { bubbles: true })); };
     set('gdate', today); document.getElementById('example').click(); await wait(); set('gdate', today); await wait();
-    // the crowd on the row (4 Nov 2026): the Knicks by 5.25 at even money on the ladders (57% by 3.5, 49% by 5.5), the total 229.25, the Knicks to win 69.5%
-    const rung = (x, mid, vol) => [x, +(mid - 0.01).toFixed(2), +(mid + 0.01).toFixed(2), +mid.toFixed(2), vol];
-    set('nbakalshi', JSON.stringify({ at: '2026-11-14T20:00:00Z', ev: 'KXNBAGAME-26NOV14PHINYK', fee: 0.07, a: { bid: 0.30, ask: 0.31, last: 0.31, vol: 5000, oi: 4000 }, h: { bid: 0.69, ask: 0.70, last: 0.70, vol: 9000, oi: 8000 },
-      sp: { h: [rung(1.5, 0.66, 100), rung(3.5, 0.57, 100), rung(5.5, 0.49, 100), rung(7.5, 0.41, 100)], a: [rung(1.5, 0.26, 10), rung(3.5, 0.2, 10)] }, tot: [rung(227.5, 0.57, 100), rung(229.5, 0.49, 100), rung(231.5, 0.42, 100)],
-      tt: { a: [rung(106.5, 0.58, 50), rung(108.5, 0.49, 50), rung(110.5, 0.40, 50)], h: [rung(116.5, 0.60, 50), rung(118.5, 0.52, 50), rung(120.5, 0.43, 50)] } })); await wait();   // the team totals: the 76ers 108.3 and the Knicks 118.9 at even money
     document.getElementById('add').click(); await wait();
     document.getElementById('clear').click(); await wait();
     const awayBefore = document.getElementById('away').value;
@@ -1129,7 +1124,7 @@ const CHECKS = ["dome","playoff"];
     return { cardOff0, cardTitle0, fives, me, heads, panelOff, panelText, takeStill, stillOpen, said, awayBefore, cardLive, propsHidden, dlgHidden, away, home, nbaPressed, lineupPanel, kalLine, kalStrip, panelKal, stripKal };
   });
   chk(goT.kalLine === '' && goT.kalStrip.length === 0 && goT.panelKal === false && goT.stripKal === false,
-      'props: Kalshi is off the props (5 Nov 2026): with the crowd\'s block on the NBA card\'s row for the game, the prop\'s panel and the game\'s strip carry no crowd line (the crowd stays on the NBA card)', JSON.stringify({ line: goT.kalLine, strip: goT.kalStrip, panel: goT.panelKal, stripKal: goT.stripKal }));
+      'props: Kalshi is off the props (5 Nov 2026) and off the NBA card (23 Nov 2026): the prop\'s panel and the game\'s strip carry no crowd line', JSON.stringify({ line: goT.kalLine, strip: goT.kalStrip, panel: goT.panelKal, stripKal: goT.stripKal }));
   chk(goT.cardOff0 === true && /^The NBA card has no row for 76ers @ Knicks on /.test(goT.cardTitle0) && goT.fives.length === 2 && /^76ers EXPECTED PG Tyrese Maxey SG VJ Edgecombe SF Paul George THIS PROP PF Kelly Oubre Jr\. C Adem Bona May not play: C Andre Drummond \(Questionable\)\.$/i.test(goT.fives[0])
       && /^Knicks CONFIRMED PG Jalen Brunson SG Mikal Bridges SF OG Anunoby PF Josh Hart C Karl-Anthony Towns$/i.test(goT.fives[1]) && /^SF Paul George THIS PROP$/i.test(goT.me) && goT.heads.join(',') === 'lbadge exp|expected,lbadge conf|confirmed'
       && goT.panelOff === true && /^open the matchup on the nba card$/i.test(goT.panelText) && goT.takeStill && goT.stillOpen && /^The NBA card has no row for 76ers @ Knicks on .+: load the NBA slate for the date \(Load slate\) and Add the game, and the button opens it\.$/.test(goT.said),
@@ -1335,7 +1330,7 @@ const CHECKS = ["dome","playoff"];
   const gapCard = gapCardT.rows;
   await pg.evaluate(async () => { await smStore.removeItem('callsheet3.card.v1'); }); await reloaded(); await pg.evaluate(() => smStore.ready);
   chk(simT.tiles.length === 4 && /^Total=\d+$/.test(simT.tiles[0]) && /^Margin=Knicks by \d+\.\d$/.test(simT.tiles[1]) && /^Knicks wins=\d+%$/.test(simT.tiles[2]) && /^Overtime=\d\.\d%$/.test(simT.tiles[3])
-      && /^3,000 games, the sim's own view\. Anchored to DraftKings's 231\.5 \/ -5\.5 for the market view\.( The ratings ride the league's level of the last fortnight, [\d.]+ per 100 at [\d.]+ possessions \(30 Oct 2026\)\.)?( Engine 2: score effects, the market's shape \(30 Oct 2026\)\.)?$/.test(simT.meta)
+      && /^3,000 games, the sim's own view\. Anchored to DraftKings's 231\.5 \/ -5\.5 for the market view\.( The ratings ride the league's level of the last fortnight, [\d.]+ per 100 at [\d.]+ possessions \(30 Oct 2026\)\.)?( Engine 2: score effects, the market's shape \(30 Oct 2026\)\.| Engine 3 \(23 Nov 2026\): the men out are priced against tonight's slate and a tired club the way the close prices it, part off a club's own scoring and part on the other side's, so the total sits on the books' line where engine 2 sat 4 points under it\.)?$/.test(simT.meta)
       && /^Medians, anchored to the market Q1 Q2 Q3 Q4 1H 2H 76ers Knicks the fourth \d+\.\d% of the game( \d+){8}$/i.test(simT.medians)
       && simT.rows.length === 6 && /^Total 231\.5 (OVER|UNDER) \d+%/.test(simT.rows[0]) && /^First half 115\.5 (OVER|UNDER) \d+%/.test(simT.rows[1]) && /^Spread \(home\) -5\.5 (HOME|AWAY) \d+%/.test(simT.rows[2]) && /^Moneyline (HOME|AWAY) \d+%.*the own view's$/.test(simT.rows[3])
       && /^76ers team total no line on the row \(the odds run brings it\) — —$/.test(simT.rows[4]) && /^Knicks team total no line on the row/.test(simT.rows[5])
@@ -1515,14 +1510,14 @@ const CHECKS = ["dome","playoff"];
     await smStore.removeItem('callsheet3.card.v1');
     return { headHidden, cards, block, take, taking, boardTake, rec, recHead, graded, priced, alt, split };
   });
-  chk(agreeT.priced.cls === 'voices' && /^[23] OF 3 · NO BET$/i.test(agreeT.priced.badge) && /[23] of 3 on the OVER, but at -208 it needs 67\.5%, more than the rule's 59\.2%: the book's price, not a bet\.$/i.test(agreeT.priced.line) && !agreeT.priced.take
+  chk(agreeT.priced.cls === 'voices' && /^[23] OF 3 · NO BET$/i.test(agreeT.priced.badge) && /[23] of 3 on the OVER, but at -208 it needs 67\.5%, more than the rule's 56\.9%: the book's price, not a bet\.$/i.test(agreeT.priced.line) && !agreeT.priced.take
       && /^2 OF 3 · NO BET$/i.test(agreeT.alt.badge) && /2 of 3 on the OVER, but the row's line 222\.5 is an alternate \(the market's number is 229\.5\): the rule was measured on the main line, no bet\.$/i.test(agreeT.alt.line) && !agreeT.alt.take,
-      'agreement gates: the same voices at -208 read the book\'s price, not a bet (the over needs 67.5%, the rule measured 59.2%), and a row line seven off the market\'s number reads an alternate outside the measurement; neither carries a Take', JSON.stringify({ priced: agreeT.priced, alt: agreeT.alt }));
+      'agreement gates: the same voices at -208 read the book\'s price, not a bet (the over needs 67.5%, the rule measured 56.9%), and a row line seven off the market\'s number reads an alternate outside the measurement; neither carries a Take', JSON.stringify({ priced: agreeT.priced, alt: agreeT.alt }));
   chk(agreeT.headHidden === false && agreeT.cards.length === 1 && /^AGREEMENT · 2 OF 3 · BET BY THE RULE$/i.test(agreeT.cards[0].n1) && /^TOTAL OVER 222\.5$/i.test(agreeT.cards[0].n2)
       && /^the sheet silent \((OVER|UNDER) 50%, no bet\) · the sim OVER 6\d% · the crew leans OVER \(z \+4\.4\) · -110$/i.test(agreeT.cards[0].n3) && /^Kings @ Spurs · the sim's own view/.test(agreeT.cards[0].n4) && agreeT.cards[0].take
       && agreeT.block.cls === 'voices fires' && /^BET · 2 OF 3$/i.test(agreeT.block.badge) && /2 of 3 on the OVER, none against: BET by the agreement rule\.$/i.test(agreeT.block.line) && agreeT.block.take && agreeT.block.color !== 'rgba(0, 0, 0, 0)' && agreeT.block.simchips === 2
       && agreeT.take.length === 1 && /^agree\|total\|OVER\|222\.5\|-110\|agreement\|Total OVER 222\.5\|0\.6\d\|null$/.test(agreeT.take[0]) && /Total OVER 222\.5 6\d% by the sim · agreement · -110 needs 52\.4% Kings @ Spurs · the agreement rule, the sim and the crew/i.test(agreeT.taking) && !/worth/i.test(agreeT.taking) && /TAKING/i.test(agreeT.boardTake)
-      && /^Voices Record Does Units Two seasons said 2 of 3: the sim and the crew, the sheet silent 1-0 100\.0% \+0\.9u 134-98 \(57\.8%\), \+23\.8u$/i.test(agreeT.rec) && /scored, BET/i.test(agreeT.recHead) && /WIN$/i.test(agreeT.graded)
+      && /^Voices Record Does Units Three seasons said 2 of 3: the sim and the crew, the sheet silent 1-0 100\.0% \+0\.9u 130-104 \(55\.6%\), \+14\.2u$/i.test(agreeT.rec) && /scored, BET/i.test(agreeT.recHead) && /WIN$/i.test(agreeT.graded)
       && agreeT.split.cls === 'voices' && /^NO RULE$/i.test(agreeT.split.badge) && /the sim UNDER [6-9]\d% · the crew leans OVER \(z \+4\.4\) — (split, 2 on the (OVER|UNDER) with one against: no rule|no two voices on a side: no rule)\.$/i.test(agreeT.split.line),
       'agreement: a basketball total with the sim\'s own view and the crew on the same side and the sheet silent reads BET on the board\'s Agreement section and on the Simulation card\'s three-voices block in green, takes from either (the mark on the row at the row\'s price, listed under Taking tonight without a worth), grades on the rule\'s own record line, and a split (the example: the sim under, the crew over) reads no rule', JSON.stringify(agreeT).slice(0, 1800));
 
@@ -2353,7 +2348,7 @@ const CHECKS = ["dome","playoff"];
     const foldOf = () => document.querySelector('#markets details.mknotes') || document.querySelector('#markets details'); if (foldOf()) foldOf().open = true;
     const state = () => {
       const vals = {}; document.querySelectorAll('input, select, textarea').forEach((e, i) => { vals[e.id || ('#' + i)] = e.type === 'checkbox' ? e.checked : e.value; });
-      const html = {}; ['signals', 'forecastLine', 'markets', 'why', 'nbaOutPanel', 'nbaLineupPanel', 'nbaFormPanel', 'nbaSimPanel', 'nbaMidPanel', 'nbaCrewPanel', 'nbaKalshiPanel', 'nbaCtxPanel', 'rankTag', 'secSimLive', 'secOutLive', 'secKalshiLive', 'secCrewLive', 'secMidLive', 'nbaNav', 'eyebrow', 'picks', 'bestBets', 'likeliest', 'board', 'cardTable', 'taking', 'saveState', 'lockNote']
+      const html = {}; ['signals', 'forecastLine', 'markets', 'why', 'nbaOutPanel', 'nbaLineupPanel', 'nbaFormPanel', 'nbaSimPanel', 'nbaMidPanel', 'nbaCrewPanel', 'nbaCtxPanel', 'rankTag', 'secSimLive', 'secOutLive', 'secCrewLive', 'secMidLive', 'nbaNav', 'eyebrow', 'picks', 'bestBets', 'likeliest', 'board', 'cardTable', 'taking', 'saveState', 'lockNote']
         .forEach(k => { const e = document.getElementById(k); html[k] = e ? e.innerHTML + '|' + e.hidden : null; });
       return JSON.stringify({ vals, html, open: [...document.querySelectorAll('details')].map(d => d.open ? 1 : 0).join(''), dis: [...document.querySelectorAll('input, select, textarea, button')].map(e => e.disabled ? 1 : 0).join(''),
         pressed: ['m-mlb', 'm-nba', 'm-wnba'].map(id => document.getElementById(id).getAttribute('aria-pressed')).join(), store: ['callsheet3.card.v1', 'callsheet3.draft.v1', 'callsheet3.props.v1', 'callsheet3.slate.v1'].map(k => smStore.getItem(k)) });
@@ -2507,44 +2502,9 @@ const CHECKS = ["dome","playoff"];
       'phone, the file to send with the games in it: each game line of the saved file folds its game\'s card under it, a still copy with no script, button, link, field, id, handler or outside address; opened with scripts off on a phone-width screen a tap on a line opens that game\'s card, a tap on a heading inside it opens that section, nothing is fetched and nothing runs off the side',
       JSON.stringify({ name: phG.filed.name, bytes: gfd.length, folds: gFolds, gameFolds: gGameFolds, tip: gTip, open: gOpen, head: gHead, under: gUnder.slice(0, 60), secs0: gSecs0, secs1: gSecs1, wide: gWide, reqs: gReqs.slice(0, 3) }));
 
-  // ---- 11 Nov 2026: the Kalshi card reads the sheet's chances of the game on the form. It read them off the page's last result, and the card is drawn before the
-  //      forecast it sits in has finished, so a game opened from the board carried the "by the sheet" chances of the game drawn before it until something redrew
-  //      the form (found while the games' cards were being drawn for the phone, each of which is one draw). Two games here, priced apart, opened one after the other ----
-  const kalLagKeep = await pg.evaluate(async () => { await smStore.ready; const k = {}; for (const x of ['callsheet3.card.v1', 'callsheet3.draft.v1']) k[x] = await smStore.getItem(x); await smStore.removeItem('callsheet3.card.v1'); return k; });
+  // ---- 11 Nov 2026: a block stood here for the crowd's card on Kalshi (it read the sheet's chances of the game on the form, on the first draw). The card came
+  //      off on 23 Nov 2026 with the rest of Kalshi; the page is loaded afresh here as that block left it ----
   await reloaded();
-  const kalLag = await pg.evaluate(async () => {
-    const wait = () => new Promise(r => setTimeout(r, 120));
-    const set = (id, v) => { const el = document.getElementById(id); el.value = v; el.dispatchEvent(new Event('input', { bubbles: true })); };
-    await smStore.ready;
-    const rung = (x, mid, vol) => [x, +(mid - 0.01).toFixed(2), +(mid + 0.01).toFixed(2), +mid.toFixed(2), vol];
-    const kal = { at: '2026-11-14T20:00:00Z', ev: 'KXNBAGAME-26NOV14', fee: 0.07, a: { bid: 0.57, ask: 0.58, last: 0.58, vol: 149511, oi: 136925 }, h: { bid: 0.42, ask: 0.43, last: 0.43, vol: 140051, oi: 115254 },
-      sp: { a: [rung(1.5, 0.56, 900), rung(2.5, 0.51, 1200), rung(3.5, 0.47, 800), rung(4.5, 0.41, 500)], h: [rung(1.5, 0.33, 40), rung(3.5, 0.25, 0)] }, tot: [rung(230.5, 0.57, 1500), rung(232.5, 0.49, 8000), rung(234.5, 0.41, 300)] };
-    const game = async (away, home, op, up, sph, spa) => {
-      document.getElementById('clear').click(); document.getElementById('m-nba').click(); await wait();
-      set('gdate', '2026-11-14'); set('away', away); set('home', home); set('line', '232.5'); set('op', op); set('up', up); set('hml', '140'); set('aml', '-165'); set('sp', '2.5'); set('sph', sph); set('spa', spa); set('nbakalshi', JSON.stringify(kal)); await wait();
-      document.getElementById('add').click(); await wait();
-    };
-    await game('Hawks', 'Wizards', '-110', '-110', '-110', '-110');
-    await game('Kings', 'Spurs', '-135', '115', '-130', '110');
-    document.getElementById('clear').click(); await wait();
-    const ids = JSON.parse(smStore.getItem('callsheet3.card.v1')).filter(r => r.gdate === '2026-11-14').map(r => [r.matchup, r.id]);
-    const card = () => { const t = document.getElementById('nbaKalshiPanel').innerText.replace(/\s+/g, ' '), sp = /covers [\d.]+% by the crowd, ([\d.]+)% by the sheet/.exec(t), to = /the over [\d.]+% by the crowd, ([\d.]+)% by the sheet/.exec(t); return [sp ? sp[1] : '', to ? to[1] : ''].join('/'); };
-    const own = (home) => { const one = (k, mine) => { const m = document.querySelector('#markets .mk[data-key="' + k + '"]'); if (!m) return ''; const p = parseFloat(m.querySelector('.nums .p').textContent), name = m.querySelector('.pick').childNodes[0].textContent; return (mine(name) ? p : 100 - p).toFixed(1); };
-      return [one('spread', n => n.indexOf(home) === 0), one('total', n => /^OVER/.test(n))].join('/'); };
-    const seen = [];
-    for (const [m, id, home] of [[ids[0][0], ids[0][1], 'Wizards'], [ids[1][0], ids[1][1], 'Spurs'], [ids[0][0], ids[0][1], 'Wizards'], [ids[1][0], ids[1][1], 'Spurs']]) {
-      document.querySelector('#cardTable [data-open="' + id + '"]').click(); await wait();   // one draw of the form: what a click on a card gives
-      seen.push({ game: m, card: card(), own: own(home) });
-    }
-    document.getElementById('clear').click(); await wait();
-    return { seen };
-  });
-  await pg.evaluate(async (k) => { for (const x of Object.keys(k)) { if (k[x] === null || k[x] === undefined) await smStore.removeItem(x); else await smStore.setItem(x, k[x]); } }, kalLagKeep);
-  await reloaded();
-  chk(kalLag.seen.length === 4 && kalLag.seen.every(x => /^\d+\.\d\/\d+\.\d$/.test(x.card) && x.card === x.own) && kalLag.seen[0].card === '50.0/50.0' && kalLag.seen[1].card !== kalLag.seen[0].card && kalLag.seen[2].card === kalLag.seen[0].card && kalLag.seen[3].card === kalLag.seen[1].card
-      && /Hawks @ Wizards/.test(kalLag.seen[0].game) && /Kings @ Spurs/.test(kalLag.seen[1].game),
-      'kalshi, the sheet\'s own game: a game opened from the card shows, on the crowd\'s card, the sheet\'s chance at the book\'s spread and total for that game on the first draw, the same figures its own market rows carry, and not the figures of the game that was drawn before it; two games priced apart, opened in turn and again, each read their own',
-      JSON.stringify(kalLag.seen));
 
   // ---- 12 Nov 2026: a mark keeps what was marked. A prop's mark was a flag and a pair's the other leg's key, so a props file loaded after the mark re-read the
   //      bet at the newer run's line, side and price: on 11 Nov the user's Caleb Wilson UNDER 6.5 rebounds (five rebounds, a win) was recorded as OVER 5.5, a loss,
@@ -3898,7 +3858,7 @@ const CHECKS = ["dome","playoff"];
     // the crew both under the total
     await game(D, 'Hornets', 'Bucks', { hml: '-120', aml: '100' });
     await game(D, 'Celtics', 'Lakers', { hml: '-600', aml: '440', odds: JSON.stringify({ book: 'fanatics', total: tot({ fanatics: 225.5, draftkings: 225.5, fanduel: 227, betmgm: 225.5, pinnacle: 225.5 }) }) });
-    await game(D, 'Heat', 'Jazz', { hml: '-650', aml: '460', nbakalshi: JSON.stringify({ h: { bid: 0.84, ask: 0.85 }, a: { bid: 0.15, ask: 0.16 }, fee: 0.07 }), odds: JSON.stringify({ book: 'fanatics', total: tot({ fanatics: 229.5, draftkings: 229.5, fanduel: 230, betmgm: 229.5, pinnacle: 231.5 }),   // the sharp book two points off the middle is not one of the four apps: no number here
+    await game(D, 'Heat', 'Jazz', { hml: '-650', aml: '460', odds: JSON.stringify({ book: 'fanatics', total: tot({ fanatics: 229.5, draftkings: 229.5, fanduel: 230, betmgm: 229.5, pinnacle: 231.5 }),   // the sharp book two points off the middle is not one of the four apps: no number here
       ml: ml({ fanatics: -650, draftkings: -600, fanduel: -620, betmgm: -640, pinnacle: -610 }, { fanatics: 460, draftkings: 440, fanduel: 450, betmgm: 455, pinnacle: 470 }) }) });
     await game(D, 'Suns', 'Kings', { hml: '-190', aml: '160' });
     await game(D, 'Bulls', 'Pistons', { line: '232', hml: '-190', aml: '160', ncrew: 'Ref One, Ref Two, Ref Three', nbarefs: JSON.stringify({ lg: [2462, 44.0, 228.8], r: { 'Ref One': [70, 44, 228, 10, 30, 0, 0], 'Ref Two': [70, 44, 228, 12, 30, 0, 0], 'Ref Three': [70, 44, 228, 11, 30, 0, 0] } }),
@@ -3940,16 +3900,16 @@ const CHECKS = ["dome","playoff"];
   await reloaded();
   const clc = (cards) => cards.map(c => c.cls.replace('pk call ', '') + ' | ' + c.n1.toUpperCase() + ' | ' + c.n2);
   chk(cl.before.hidden === false && cl.noNba === true && clc(cl.before.cards).join(' ## ') === "bet | BET · THE AGREEMENT RULE | Total UNDER 232 ## bet | BET · THE SHEET'S OWN CALL | Hornets ML ## value | VALUE · THE BEST NUMBER ON THE BOARD | Total UNDER 227 ## lean | LEAN · THE LIKELIER WINNER, 80% OR MORE | Jazz to win ## lean | LEAN · THE LIKELIER WINNER, 60 TO 70% | Kings to win"
-      && /^2 of 3 voices · -110 needs 52\.4% · the rule's rate 59\.2%$/.test(cl.before.cards[0].n3) && /^Bulls @ Pistons · the simulation and the crew on the same side of the total, the sheet not against it: 157-108 \(59\.2%\) over two seasons of closes · none graded here yet$/.test(cl.before.cards[0].n4)
+      && /^2 of 3 voices · -110 needs 52\.4% · the rule's rate 56\.9%$/.test(cl.before.cards[0].n3) && /^Bulls @ Pistons · the simulation and the crew on the same side of the total, the sheet not against it: 149-113 \(56\.9%\) on three seasons of closes · none graded here yet$/.test(cl.before.cards[0].n4)
       && /^51\.8% by the sheet · \+100 needs 50\.0%$/.test(cl.before.cards[1].n3) && /^Hornets @ Bucks · a side the sheet prices below its chance, or one a verdict sits on · none graded here yet$/.test(cl.before.cards[1].n4)
       && cl.before.cards[2].n3 === '-110 at FanDuel · the middle of 5 books is 225.5: 1.5 points over it, on your side' && /^Celtics @ Lakers · a total at one of your four apps a point or more off the middle of every book's number: 105-84 \(55\.6%\) on last season's closes, 78-70 at the opener · none graded here yet$/.test(cl.before.cards[2].n4)
-      && /^82\.8% by the middle of 5 books · -600 at DraftKings needs 85\.7% · costs 3\.4% a bet Kalshi 85¢ needs 85\.9% after the fee v -600 needing 85\.7%: the book · the crowd 84\.5%$/i.test(cl.before.cards[3].n3) && /^Heat @ Jazz · the book's price: such favourites at the best of the four prices went 231-31 last season, -0\.3% a bet · none graded here yet$/.test(cl.before.cards[3].n4)
+      && /^82\.8% by the middle of 5 books · -600 at DraftKings needs 85\.7% · costs 3\.4% a bet$/i.test(cl.before.cards[3].n3) && /^Heat @ Jazz · the book's price: such favourites at the best of the four prices went 231-31 last season, -0\.3% a bet · none graded here yet$/.test(cl.before.cards[3].n4)
       && /^63\.0% by the middle of the carded book · -190 needs 65\.5% · costs 3\.8% a bet$/.test(cl.before.cards[4].n3) && /^Suns @ Kings · the book's price: 230-134 last season at the best of the four prices, -6\.0% a bet · none graded here yet$/.test(cl.before.cards[4].n4)
       && cl.before.cards.map(c => c.take ? 'T' : '-').join('') === 'TTTTT' && cl.before.cards.every(c => c.also === ''),
-      'a call on every game (12 Nov 2026): the board gives every basketball game one call and the section is away on a date with none; the agreement rule where the simulation and the crew sit on one side of the total, a side the sheet prices below its chance, a total at one of the four apps a point or more off the middle of every book\'s number with the app and how far, else the likelier winner at the best of the four apps\' prices (the carded book alone where the shop is thin) with what the price costs; the BETs first, then the value, then the leans, the likelier first; each card says what its kind was measured to be and how it has done here, and carries Take; the crowd\'s chip on a winner reads against the price on the card (85.9% after the fee is dearer than -600 at DraftKings, though cheaper than the -650 the row was logged with)',
+      'a call on every game (12 Nov 2026): the board gives every basketball game one call and the section is away on a date with none; the agreement rule where the simulation and the crew sit on one side of the total, a side the sheet prices below its chance, a total at one of the four apps a point or more off the middle of every book\'s number with the app and how far, else the likelier winner at the best of the four apps\' prices (the carded book alone where the shop is thin) with what the price costs; the BETs first, then the value, then the leans, the likelier first; each card says what its kind was measured to be and how it has done here, and carries Take',
       JSON.stringify({ hidden: cl.before.hidden, noNba: cl.noNba, cards: cl.before.cards }));
   chk(clc(cl.after.cards).join(' ## ') === "bet loss | BET · THE AGREEMENT RULE | Total UNDER 232 LOSS ## bet win | BET · THE SHEET'S OWN CALL | Hornets ML WIN ## value loss | VALUE · THE BEST NUMBER ON THE BOARD | Total UNDER 227 LOSS ## lean win | LEAN · THE LIKELIER WINNER, 80% OR MORE | Jazz to win WIN ## lean loss | LEAN · THE LIKELIER WINNER, 60 TO 70% | Kings to win LOSS"
-      && cl.table && cl.table.join(' ## ') === "BET · the agreement rule | 0-1 | 59.2% | 0.0% | -1.0u ## BET · the sheet's own call | 1-0 | " + ((cl.table[1] || '').split(' | ')[2] || '') + " | 100.0% | +1.0u ## REST · the over behind a tired favourite | none yet |  |  |  ## VALUE · the best number on the board | 0-1 |  | 0.0% | -1.0u ## READ · the sheet's own read of the game | 1-0 | " + ((cl.table[1] || '').split(' | ')[2] || '') + " | 100.0% | +1.0u ## LEAN · the likelier winner, 80% or more | 2-0 | " + ((cl.table[5] || '').split(' | ')[2] || '') + " | 100.0% | +0.3u ## LEAN · the likelier winner, 70 to 80% | none yet |  |  |  ## LEAN · the likelier winner, 60 to 70% | 1-1 | " + ((cl.table[7] || '').split(' | ')[2] || '') + " | 50.0% | -0.5u ## LEAN · the likelier winner, near a coin | 0-1 | " + ((cl.table[8] || '').split(' | ')[2] || '') + " | 0.0% | -1.0u ## The call as given, one a game | 2-3 |  | 40.0% | -1.8u"
+      && cl.table && cl.table.join(' ## ') === "BET · the agreement rule | 0-1 | 56.9% | 0.0% | -1.0u ## BET · the sheet's own call | 1-0 | " + ((cl.table[1] || '').split(' | ')[2] || '') + " | 100.0% | +1.0u ## REST · the over behind a tired favourite | none yet |  |  |  ## VALUE · the best number on the board | 0-1 |  | 0.0% | -1.0u ## READ · the sheet's own read of the game | 1-0 | " + ((cl.table[1] || '').split(' | ')[2] || '') + " | 100.0% | +1.0u ## LEAN · the likelier winner, 80% or more | 2-0 | " + ((cl.table[5] || '').split(' | ')[2] || '') + " | 100.0% | +0.3u ## LEAN · the likelier winner, 70 to 80% | none yet |  |  |  ## LEAN · the likelier winner, 60 to 70% | 1-1 | " + ((cl.table[7] || '').split(' | ')[2] || '') + " | 50.0% | -0.5u ## LEAN · the likelier winner, near a coin | 0-1 | " + ((cl.table[8] || '').split(' | ')[2] || '') + " | 0.0% | -1.0u ## The call as given, one a game | 2-3 |  | 40.0% | -1.8u"
       && /0-1 here, -1\.0u$/.test(cl.after.cards[0].n4) && /2-0 here, \+0\.3u$/.test(cl.after.cards[3].n4) && /1-1 here, -0\.5u$/.test(cl.after.cards[4].n4),
       'a call on every game, graded: each call is graded on its own line and side (the total at the app\'s number, where 228 loses the under at 227 though it sits under the row\'s 229.5; the winner on the final) and the cards carry the results; the NBA record keeps every kind on every game it speaks to (the likelier winner on all five, by how likely the market made him; the sheet\'s read on the one game it has one, the short dog its own call names), and the call as the board gave it, one a game',
       JSON.stringify({ cards: clc(cl.after.cards), n4: cl.after.cards.map(c => c.n4.slice(-28)), table: cl.table }));
@@ -3974,7 +3934,7 @@ const CHECKS = ["dome","playoff"];
       && clOne(cl.tookList, /Jazz ML at DraftKings · Heat @ Jazzgame call82\.8%[-−]600WIN\+0\.17u$/).length === 1 && clOne(cl.tookList, /Total UNDER 227 at FanDuel · Celtics @ Lakersgame call50\.0%[-−]110LOSS[-−]1\.00u$/).length === 1
       && clOne(cl.takingGraded, /Total UNDER 227 at FanDuel .*-110 needs 52\.4% · loss Celtics @ Lakers/i).length === 1 && clOne(cl.takingGraded, /Jazz ML at DraftKings .*-600 needs 85\.7% · win Heat @ Jazz/i).length === 1
       && clOne(cl.takingGraded, /^TONIGHT 2 bets marked graded 1-1 · [-−]0\.83u at one unit each/i).length === 1
-      && (clBack.jazz || []).length === 1 && /^82\.9% by the middle of 5 books · -590 at FanDuel needs 85\.5% · costs \d\.\d% a bet Kalshi 85¢ needs 85\.9% after the fee v -590 needing 85\.5%: the book · the crowd 84\.5% \[TAKEN\]$/i.test(clBack.jazz[0])
+      && (clBack.jazz || []).length === 1 && /^82\.9% by the middle of 5 books · -590 at FanDuel needs 85\.5% · costs \d\.\d% a bet \[TAKEN\]$/i.test(clBack.jazz[0])
       && clOne(clBack.taking, /Jazz ML at DraftKings lean · 82\.8% by the books' middle · -600 needs 85\.7% · win Heat @ Jazz · a call on the game/i).length === 1,
       'a call on every game, the mark keeps the bet: the number is kept at the app\'s line and price (UNDER 227 at FanDuel, not the row\'s 229.5) and the winner at the app and price on the card (-600 at DraftKings, not the -650 the row was logged with), with the chance by the books\' middle; they list under Taking as calls on the game and are counted apart from the simulation\'s; graded, each on its own line (228 loses the under at 227), they sit on their own tile of What you took and in the list of every pick as game calls; and after a later odds run moves the best price to another app the card follows it and the mark does not',
       JSON.stringify({ b: clT.b, c: clT.c, list: clT.list, took: cl.took, tookList: (cl.tookList || []).slice(0, 4), graded: cl.takingGraded, jazz: clBack.jazz, backTaking: clBack.taking }));
@@ -4582,7 +4542,7 @@ const CHECKS = ["dome","playoff"];
       && dc.rest.secs['Rest and the schedule'] === "Knicks on the second night of a back to back, Bulls on 3 days' rest. The books price rest on the side: a club on the second night won 408 of 875 where the moneylines priced 411; the total is the part they miss, and it is this game's call."
       && dc.rest.likely && dc.rest.likely.pick === 'Knicks ML'
       && dcc(dc.rule) === "pickcard decision rule | total | UNDER | The decision · an UNDER game | Total UNDER 232 | BET* | -110 | needs 52.4% | the agreement rule · none graded here yet · measured on two seasons of closes"
-      && dc.rule.why === "Why: Three voices on the total: the sheet silent (OVER 50%, no bet); the sim UNDER 93%; the crew leans UNDER (z -8.9). 2 of 3 on the UNDER, none against: BET by the agreement rule. The simulation and the crew on one side with the sheet not against it went 157-108 (59.2%) over two seasons of closes."
+      && dc.rule.why === "Why: Three voices on the total: the sheet silent (OVER 50%, no bet); the sim UNDER 93%; the crew leans UNDER (z -8.9). 2 of 3 on the UNDER, none against: BET by the agreement rule. The simulation and the crew on one side with the sheet not against it went 149-113 (56.9%) on three seasons of closes."
       && dc.rule.sigs.slice(0, 2).join(' ## ') === 'the decision · BET :: Total UNDER 232 · -110 ## three voices · BET :: UNDER 232 · 2 of 3 on it, none against',
       'the decision, the other kinds: with nothing else speaking the decision is the likelier winner at the best price, said as that, and no second card repeats it; a 71.8% favourite on the second night against a rested club is the over behind a tired favourite with what three seasons of lines showed, and the rest line says the total is the part the books miss; the simulation and the crew on one side of the total is the agreement rule with the three voices spelled out; each wears the green BET and says what kind of read it is',
       JSON.stringify({ winner: dcc(dc.winner), wwhy: dc.winner.why, rest: dcc(dc.rest), rwhy: dc.rest.why, rrest: dc.rest.secs['Rest and the schedule'], rule: dcc(dc.rule), rulewhy: dc.rule.why, rsigs: dc.rule.sigs }));
@@ -4598,7 +4558,7 @@ const CHECKS = ["dome","playoff"];
       && dc.form.kind === 'winner' && dc.winner.secs['Form'] === undefined && dc.winner.secs['Rest and the schedule'] === undefined && !/Rest days, time zones/.test(dc.read.secs['Rest and the schedule']),
       'the decision, form and the schedule: each club\'s last five off the row give its record, its points for and against, its totals against their closes (a total that landed on the number counts neither way, a game with no close is left out), its games against the spread from its own side of the home spread, its streak, a third game in four nights and a run on the road or a return home; a tired dog is not the rest call, and the card says the books price the schedule where the schedule shows something; a row with no form and no rest has neither part',
       JSON.stringify({ form: dc.form.secs['Form'], rest: dc.form.secs['Rest and the schedule'], kind: dc.form.kind, bare: Object.keys(dc.winner.secs) }));
-  chk((dc.table || []).join(' ## ') === "BET · the agreement rule · cold here | 0-10 | 59.2% | 0.0% | -10.0u ## BET · the sheet's own call · cold here | 0-10 | 51.8% | 0.0% | -10.0u ## REST · the over behind a tired favourite | none yet |  |  |  ## VALUE · the best number on the board | none yet |  |  |  ## READ · the sheet's own read of the game | 9-10 | 51.4% | 47.4% | -1.5u ## LEAN · the likelier winner, 80% or more | none yet |  |  |  ## LEAN · the likelier winner, 70 to 80% | none yet |  |  |  ## LEAN · the likelier winner, 60 to 70% | 10-1 | 63.4% | 90.9% | +4.3u ## LEAN · the likelier winner, near a coin | 10-8 | 51.7% | 55.6% | +0.3u ## The call as given, one a game | 29-0 | 55.5% | 100.0% | +22.1u"
+  chk((dc.table || []).join(' ## ') === "BET · the agreement rule · cold here | 0-10 | 56.9% | 0.0% | -10.0u ## BET · the sheet's own call · cold here | 0-10 | 51.8% | 0.0% | -10.0u ## REST · the over behind a tired favourite | none yet |  |  |  ## VALUE · the best number on the board | none yet |  |  |  ## READ · the sheet's own read of the game | 9-10 | 51.4% | 47.4% | -1.5u ## LEAN · the likelier winner, 80% or more | none yet |  |  |  ## LEAN · the likelier winner, 70 to 80% | none yet |  |  |  ## LEAN · the likelier winner, 60 to 70% | 10-1 | 63.4% | 90.9% | +4.3u ## LEAN · the likelier winner, near a coin | 10-8 | 51.7% | 55.6% | +0.3u ## The call as given, one a game | 29-0 | 55.5% | 100.0% | +22.1u"
       && dcc(dc.dup) === "pickcard decision winner | ml | HOME | The decision · a MONEYLINE game | Bucks to win | BET* | 52.2% | -120 · needs 54.5% | the likelier winner, near a coin · 10-8 here, +0.3u · the book's favourite at the book's price: a small bet or a parlay leg"
       && dc.dup.secs['Also on this game'] === "The sheet's own call says Hornets ML (0-10 here, -10.0u: cold, left out of the order); the sheet's own read of the game says Hornets ML (9-10 here, -1.5u: the same pick as a call that is cold here, left out with it)."
       && dc.dup.sigs.slice(0, 2).join(' ## ') === "the decision · BET :: Bucks to win · 52.2% · -120 ## the sheet's read :: Hornets ML · 51.8% · edge +1.8"
@@ -4658,91 +4618,153 @@ const CHECKS = ["dome","playoff"];
       'nba record, calls only: a market the sheet has not called says no call in place of a record (the first half and the spread, the book\'s own number on every game) with the closer side\'s record beside it for scale; the verdict says what a call is; the other sports\' blocks are untouched',
       JSON.stringify({ h1: callsTile(/First half/i), spread: callsTile(/Spread/i), verdict: callsT.verdict.slice(0, 80) + ' … ' + callsT.verdict.slice(-330), others: callsT.others }));
 
-  // ---- 4 Nov 2026: the crowd on Kalshi -- the exchange's game-winner prices on the row, the card beside the book and Pinnacle, the better price after the fee on the board, the sharp side against the crowd on the moneyline tile ----
+  // ---- 23 Nov 2026: Kalshi off the NBA model (the user: "i'd like to remove the Kalshi from the NBA model as well"). The crowd on Kalshi rode on the NBA card
+  //      from 4 Nov: its own section and hidden box, a link on the jump bar, chips among tonight's signals, a chip on the board's cards, a line under the
+  //      simulation's team totals, a number in the decision's why and a watch on the moneyline tile. All of it is gone; a slate that still carries the exchange's
+  //      block (one written before the 23rd) puts nothing on a row; and what stood beside it stands as it did: the gap's two sides, the dots, the folds ----
   const kalT = await pg.evaluate(async () => {
     const wait = () => new Promise(r => setTimeout(r, 120));
     const txt = e => (e ? e.innerText : '').replace(/\s+/g, ' ').trim();
     const set = (id, v) => { const el = document.getElementById(id); el.value = v; el.dispatchEvent(new Event('input', { bubbles: true })); };
     const load = async (doc, fname) => { const dt = new DataTransfer(); dt.items.add(new File([JSON.stringify(doc)], fname, { type: 'application/json' })); const inp = document.getElementById('slateFile'); inp.files = dt.files; inp.dispatchEvent(new Event('change', { bubbles: true })); await wait(); };
     await smStore.removeItem('callsheet3.card.v1'); document.getElementById('clear').click(); document.getElementById('m-nba').click(); await wait();
-    const empty = txt(document.getElementById('nbaKalshiPanel'));
-    // the game winner a side, and the ladders (the Hawks by 2.75 at even money: 51% to win by 2.5 and 47% by 3.5; the total 232.25)
+    const gone = { sec: !document.getElementById('secKalshi'), box: !document.getElementById('nbakalshi'), panel: !document.getElementById('nbaKalshiPanel'), live: !document.getElementById('secKalshiLive'),
+                   nav: [...document.querySelectorAll('#nbaNav a')].map(txt), money: !!document.getElementById('nbasplits') };
+    // the block a slate of 4 to 22 Nov carried: the game winner a side and the ladders
     const rung = (x, mid, vol) => [x, +(mid - 0.01).toFixed(2), +(mid + 0.01).toFixed(2), +mid.toFixed(2), vol];
     const kal = { at: '2026-11-14T20:00:00Z', ev: 'KXNBAGAME-26NOV14ATLWAS', fee: 0.07, a: { bid: 0.57, ask: 0.58, last: 0.58, vol: 149511, oi: 136925 }, h: { bid: 0.42, ask: 0.43, last: 0.43, vol: 140051, oi: 115254 },
-      sp: { a: [rung(1.5, 0.56, 900), rung(2.5, 0.51, 1200), rung(3.5, 0.47, 800), rung(4.5, 0.41, 500), rung(6.5, 0.33, 60)], h: [rung(1.5, 0.33, 40), rung(3.5, 0.25, 0)] },
-      tot: [rung(230.5, 0.57, 1500), rung(232.5, 0.49, 8000), rung(234.5, 0.41, 300)],
-      // the team totals (the Hawks 117.5 and the Wizards 114.1 at even money); the book's Hawks line 118.5 is a rung, its Wizards line 113.5 sits between two
+      sp: { a: [rung(1.5, 0.56, 900), rung(2.5, 0.51, 1200), rung(3.5, 0.47, 800)], h: [rung(1.5, 0.33, 40), rung(3.5, 0.25, 0)] }, tot: [rung(230.5, 0.57, 1500), rung(232.5, 0.49, 8000), rung(234.5, 0.41, 300)],
       tt: { a: [rung(116.5, 0.55, 400), rung(118.5, 0.45, 600)], h: [rung(112.5, 0.58, 300), rung(114.5, 0.48, 700)] } };
     const pin = JSON.stringify({ book: 'pinnacle', line: 232.5, op: -108, up: -108, hml: 150, aml: -170 });
     set('gdate', '2026-11-14'); set('away', 'Hawks'); set('home', 'Wizards'); set('line', '232.5'); set('op', '-110'); set('up', '-110'); set('hml', '140'); set('aml', '-165'); set('sp', '2.5'); set('sph', '-110'); set('spa', '-110');
     set('odds', JSON.stringify({ book: 'fanatics', team: { AWAY: { OVER: [['fanatics', -110, 118.5]], UNDER: [['fanatics', -110, 118.5]] }, HOME: { OVER: [['fanatics', -115, 113.5]], UNDER: [['fanatics', -105, 113.5]] } } }));
-    set('sharp', pin); set('nbakalshi', JSON.stringify(kal)); await wait();
-    const panel = txt(document.getElementById('nbaKalshiPanel'));
-    set('line', '231.5'); await wait(); const between = txt(document.getElementById('nbaKalshiPanel')); set('line', '232.5'); await wait();
-    set('sharp', ''); await wait(); const noPin = txt(document.getElementById('nbaKalshiPanel'));
     set('sharp', pin); await wait();
-    // with the simulation on the row (the Hawks' mean 117, the Wizards' 115): the card adds its mean and its chance at the book's line, the sim's table carries the crowd under its team-total rows
+    // with the simulation on the row (the Hawks' mean 117, the Wizards' 115): the gap's two sides on the simulation's table and among tonight's signals
     const hist = (lo, mean, sd) => { const c = []; for (let v = lo; v <= lo + 100; v++) c.push(Math.round(10000 * Math.exp(-((v - mean) ** 2) / (2 * sd * sd)))); return { lo, c }; };
     set('nbasim', JSON.stringify({ v: 1, runs: 1000, own: { total: hist(170, 232, 15), h1: hist(80, 116, 10), h2: hist(80, 116, 10), q: [hist(30, 58, 7), hist(30, 58, 7), hist(30, 58, 7), hist(30, 58, 7)], margin: hist(-50, -3, 12), away: hist(80, 117, 11), home: hist(80, 115, 11), ot: 0.04 }, mkt: null, anchor: null, ft_factor: 1.0,
                                    shrink: { total: 0.05, h1: 0.1, spread: 0.0, ml: 0.97, team: 1.5, team_away: 0.3, team_own: 0.3, quarter: 0.1 }, bands: [[0.7, 'STRONG'], [0.65, 'BET'], [0.6, 'LEAN']] })); await wait();
-    const withSim = txt(document.getElementById('nbaKalshiPanel'));
     const simTT = [...document.querySelectorAll('#nbaSimPanel .simtab td')].map(td => txt(td)).filter(s => /team total/i.test(s));
-    // tonight's signals on the rail (4 Nov 2026): the gap's two sides (a watch from 11 Nov 2026), the crowd's sharp side and numbers; the jump bar's dots and the live lines read off the same list
-    const signals = txt(document.getElementById('signals')), simLive = txt(document.getElementById('secSimLive')), kalLive = txt(document.getElementById('secKalshiLive'));
+    const signals = txt(document.getElementById('signals')), simLive = txt(document.getElementById('secSimLive'));
     const dots = [...document.querySelectorAll('#nbaNav a[data-go]')].map(a => a.dataset.go + ':' + ((a.querySelector('.dot') || {}).className || ''));
     const folded = { about: [...document.querySelectorAll('#nbaFields details.about')].length, aboutOpen: [...document.querySelectorAll('#nbaFields details.about[open]')].length, rail: !!document.querySelector('#markets + details.about, .rail details.about'), notes: [...document.querySelectorAll('#markets details.mknotes')].length };
+    const formKal = /kalshi/i.test(txt(document.body));   // the whole page with the game on the form
     set('nbasim', ''); await wait();
     document.getElementById('add').click(); await wait();
     document.getElementById('boardDate').value = '2026-11-14'; document.getElementById('boardDate').dispatchEvent(new Event('change')); await wait();
-    const chips = [...document.querySelectorAll('.pk:not(.call)')].filter(e => /Hawks ML|Wizards ML/.test(e.textContent)).map(e => txt(e.querySelector('.n4')));   // the board's own moneyline cards; the calls section (12 Nov 2026) has its own check
-    const row = JSON.parse(smStore.getItem('callsheet3.card.v1')).find(r => /Hawks @ Wizards/.test(r.matchup)), stored = !!((row.inputs || {}).nbakalshi);
-    // graded: the sharp side (the Hawks, Pinnacle's 61.2% against the crowd's 57.5%) wins, and the moneyline tile keeps the line
+    const chips = [...document.querySelectorAll('.pk:not(.call)')].filter(e => /Hawks ML|Wizards ML/.test(e.textContent)).map(e => txt(e.querySelector('.n4')));
+    // a slate written before the 23rd still carries the block: the row does not take it
+    await load({ format: 'callsheet2.slate', version: 1, date: '2026-11-14', games: [{ sport: 'NBA', gdate: '2026-11-14', away: 'Hawks', home: 'Wizards', notes: [], inputs: { nbakalshi: JSON.stringify(kal), narest: '2' } }] }, 'nba-slate-2026-11-14.json');
+    const row = JSON.parse(smStore.getItem('callsheet3.card.v1')).find(r => /Hawks @ Wizards/.test(r.matchup)) || { inputs: {} };
+    const stored = Object.keys(row.inputs || {}).filter(k => /kalshi/i.test(k)), took = (row.inputs || {}).narest;
+    // graded: the moneyline tile carries no line on the exchange
     await load({ format: 'callsheet2.slate', version: 1, date: '2026-11-14', games: [{ sport: 'NBA', gdate: '2026-11-14', away: 'Hawks', home: 'Wizards', finals: { fa: '118', fh: '110', f5a: '60', f5h: '55' }, close: { ctot: '232.5' }, notes: [] }] }, 'nba-grade-2026-11-14.json');
     const mlTile = txt([...document.querySelectorAll('#calibBox .calib[data-sport="NBA"] > div')].find(d => /^MONEYLINE/i.test(txt(d))));
-    // the loader: a bare row takes the block from a slate, and a newer slate's block replaces it
-    document.getElementById('clear').click(); await wait();
-    set('gdate', '2026-11-15'); set('away', 'Kings'); set('home', 'Spurs'); set('line', '222.5'); set('op', '-110'); set('up', '-110'); await wait(); document.getElementById('add').click(); await wait();
-    await load({ format: 'callsheet2.slate', version: 1, date: '2026-11-15', games: [{ sport: 'NBA', gdate: '2026-11-15', away: 'Kings', home: 'Spurs', notes: [], inputs: { nbakalshi: JSON.stringify(Object.assign({}, kal, { ev: 'KXNBAGAME-26NOV15SACSAS' })) } }] }, 'nba-slate-2026-11-15.json');
-    const first = ((JSON.parse(smStore.getItem('callsheet3.card.v1')).find(r => /Kings @ Spurs/.test(r.matchup)) || { inputs: {} }).inputs.nbakalshi || '');
-    await load({ format: 'callsheet2.slate', version: 1, date: '2026-11-15', games: [{ sport: 'NBA', gdate: '2026-11-15', away: 'Kings', home: 'Spurs', notes: [], inputs: { nbakalshi: JSON.stringify(Object.assign({}, kal, { ev: 'KXNBAGAME-26NOV15SACSAS', a: { bid: 0.60, ask: 0.61, last: 0.61, vol: 5000, oi: 4000 } })) } }] }, 'nba-slate-2026-11-15b.json');
-    const second = ((JSON.parse(smStore.getItem('callsheet3.card.v1')).find(r => /Kings @ Spurs/.test(r.matchup)) || { inputs: {} }).inputs.nbakalshi || '');
+    const pageKal = /kalshi/i.test(txt(document.body));
     document.getElementById('clear').click(); await wait(); await smStore.removeItem('callsheet3.card.v1');
-    return { empty, panel, noPin, chips, stored, mlTile, first: first.slice(0, 60), second: second.indexOf('"bid":0.6') >= 0, between, withSim, simTT, signals, simLive, kalLive, dots, folded };
+    return { gone, simTT, signals, simLive, dots, folded, formKal, chips, stored, took, mlTile, pageKal };
   });
   chk(/gap watch:? ?Hawks team total UNDER 118\.5 · gap \+1 · not scored/i.test(kalT.signals) && /gap watch:? ?Wizards team total OVER 113\.5 · gap -1\.5 · not scored/i.test(kalT.signals) && !/gap rule/i.test(kalT.signals)
-      && /Kalshi:? ?the sharp side Hawks · the crowd 3\.7 points over Pinnacle on the Wizards/i.test(kalT.signals)
-      && /the crowd:? ?Hawks to win 57\.5% · spread Hawks [-−]2\.8 · total 232\.3\b/i.test(kalT.signals)
-      && /Kalshi team total:? ?Hawks 117\.5 · the book 118\.5 · leans UNDER, the over 45\.0% at the book's number/i.test(kalT.signals)
-      && /Kalshi team total:? ?Wizards 114\.1 · the book 113\.5 · sits with the book, the over 53\.0% at the book's number/i.test(kalT.signals)
-      && /gap watch: Hawks team total UNDER 118\.5 · gap \+1 · not scored · gap watch: Wizards team total OVER 113\.5 · gap -1\.5 · not scored/.test(kalT.simLive) && /^Kalshi: the sharp side Hawks/.test(kalT.kalLive)
-      && kalT.dots.indexOf('secSim:dot watch') >= 0 && kalT.dots.indexOf('secSim:dot go') < 0 && kalT.dots.indexOf('secKalshi:dot crowd') >= 0 && kalT.dots.indexOf('secMid:dot') >= 0 && kalT.dots.indexOf('boardDate:') >= 0
-      && kalT.folded.about === 7 && kalT.folded.aboutOpen === 0 && kalT.folded.rail && kalT.folded.notes >= 3,
-      'signals: the matchup rail opens with tonight\'s signals, every engine\'s call on the row as a chip that links to its section (the gap\'s two sides gold, a watch from 11 Nov 2026 and green before it, the crowd\'s sharp side and its numbers in the exchange\'s colour, each club\'s team total as a chip of its own against the book\'s line with the side the crowd leans to); the jump bar\'s dots and the sections\' live lines read off the same list, and the explanations fold under a line on the rail, on every NBA section and under each market row',
-      JSON.stringify({ signals: kalT.signals.slice(0, 900), simLive: kalT.simLive, kalLive: kalT.kalLive, dots: kalT.dots, folded: kalT.folded }));
-  chk(/The spread: the crowd Hawks [-−]2\.8 · the book Hawks [-−]2\.5\. At the book's number: Wizards covers 49\.0% by the crowd, \d+\.\d% by the sheet · Wizards \+2\.5 49\.0% by the crowd, better on Kalshi: 50¢ needs 51\.[78]% after the fee against [-−]110 needing 52\.4% · Hawks [-−]2\.5 51\.0% by the crowd, the book's price: 52¢ needs 53\.7% after the fee against [-−]110 needing 52\.4%\./.test(kalT.panel)
-      && /The total: the crowd 232\.3 · the book 232\.5 · Pinnacle 232\.5\. At the book's 232\.5: the over 49\.0% by the crowd, \d+\.\d% by the sheet · over 232\.5 49\.0% by the crowd, better on Kalshi: 50¢ needs 51\.[78]% after the fee against [-−]110 needing 52\.4% · under 232\.5 51\.0% by the crowd, the book's price: 52¢ needs 53\.7% after the fee against [-−]110 needing 52\.4%\./.test(kalT.panel)
-      && /At the book's 231\.5: the over 53\.0% by the crowd, \d+\.\d% by the sheet · no rung at the book's number on the exchange \(its ladder runs two points apart\), so no price to compare\./.test(kalT.between),
-      'kalshi ladders: the card reads the crowd\'s spread and total at even money off the ladders (the Hawks by 2.8, the total 232.3), the chance of each side at the book\'s number read straight between rungs with the sheet\'s beside it, and when the number is a rung the price of each side after the fee against the book\'s (the no side one less the yes bid); a number between rungs gets the chance and no price',
-      JSON.stringify({ panel: kalT.panel.slice(500, 1500), between: kalT.between.slice(900, 1300) }));
-  chk(/The Hawks team total: the crowd 117\.5 · the book 118\.5 \(fanatics [-−]110\/[-−]110\) · implied by the book's total and spread 117\.5\. At the book's 118\.5: the over 45\.0% by the crowd · over 118\.5 45\.0% by the crowd, better on Kalshi: 46¢ needs 47\.7% after the fee against [-−]110 needing 52\.4% · under 118\.5 55\.0% by the crowd, the book's price: 56¢ needs 57\.7% after the fee against [-−]110 needing 52\.4%\./.test(kalT.panel)
-      && /The Wizards team total: the crowd 114\.1 · the book 113\.5 \(fanatics [-−]115\/[-−]105\) · implied by the book's total and spread 115\.0\. At the book's 113\.5: the over 53\.0% by the crowd · no rung at the book's number on the exchange, so no price to compare\./.test(kalT.panel),
-      'kalshi team totals: the card reads each club\'s team total at even money off its ladder (the Hawks 117.5, the Wizards 114.1) beside the book\'s line and the number the book\'s total and spread imply, the crowd\'s chance of the over at the book\'s line, and on a rung each side\'s price after the fee against the book\'s (the Hawks over 118.5 at 46¢ better than -110); a line between rungs gets the chance and no price',
-      JSON.stringify({ panel: kalT.panel.slice(1400, 2400) }));
-  chk(/the simulation's own view 117\.0\. At the book's 118\.5: the over 45\.0% by the crowd, 4\d\.\d% by the simulation's own view/.test(kalT.withSim)
-      && kalT.simTT.length === 2 && /Kalshi: the crowd 45\.0% over at 118\.5 · over 46¢ needs 47\.7% after the fee, better than [-−]110 needing 52\.4% · under 56¢ needs 57\.7% after the fee, not better than [-−]110 needing 52\.4%/.test(kalT.simTT[0])
-      && /Kalshi: the crowd 53\.0% over at 113\.5 · no rung at the line, so no price/.test(kalT.simTT[1]),
-      'kalshi team totals: with the simulation on the row the card adds its mean and its chance at the book\'s line, and the simulation\'s table carries the crowd\'s read under each team-total row beside the gap',
-      JSON.stringify({ withSim: kalT.withSim.slice(1400, 2400), simTT: kalT.simTT }));
-  chk(/^No Kalshi price on the row/.test(kalT.empty)
-      && /^The crowd on Kalshi · as the run read it, Nov 14, \d{1,2}:\d\d [AP]M Hawks 57\.5¢ \(bid 57¢ \/ ask 58¢ · 150k contracts\): the crowd 57\.5% · the book 59\.9% \([-−]165\) · Pinnacle 61\.2% · better on Kalshi: 58¢ needs 59\.7% after the fee against [-−]165 needing 62\.3% Wizards 42\.5¢ \(bid 42¢ \/ ask 43¢ · 140k contracts\): the crowd 42\.5% · the book 40\.1% \(\+140\) · Pinnacle 38\.8% · the book's price: 43¢ needs 44\.7% after the fee against \+140 needing 41\.7% The spread:/.test(kalT.panel)
-      && /The crowd sits 3\.7 points above Pinnacle on the Wizards: the sharp side is the Hawks\./.test(kalT.panel)
-      && /No Pinnacle moneyline on the row to set the crowd against/.test(kalT.noPin) && !/sharp side/.test(kalT.noPin),
-      'kalshi: the form\'s card reads each side three ways (the crowd\'s no-vig price, the book\'s devigged moneyline, Pinnacle\'s) with the bid, the ask and the contracts, says which price is better after the 7% fee on the win (the Hawks at 58¢ needing 59.7% against -165 needing 62.3%), and names the sharp side when the crowd sits three points from Pinnacle; without Pinnacle it says so',
-      JSON.stringify({ empty: kalT.empty, panel: kalT.panel.slice(0, 520), noPin: kalT.noPin.slice(0, 200) }));
-  chk(kalT.stored && kalT.chips.length >= 2 && /better on Kalshi: 58¢ needs 59\.7% after the fee v [-−]165 needing 62\.3% · the crowd 57\.5%/i.test(kalT.chips[0]) && /Kalshi 43¢ needs 44\.7% after the fee v \+140 needing 41\.7%: the book · the crowd 42\.5%/i.test(kalT.chips[1])
-      && /the sharp side against Kalshi's crowd, 3\+ points 1-0/.test(kalT.mlTile) && /^\{"at":"2026-11-14T20:00:00Z","ev":"KXNBAGAME-26NOV15SACSAS",/.test(kalT.first) && kalT.second,
-      'kalshi: Add carries the block on the row, the board\'s moneyline cards carry the exchange\'s price for their side against the book\'s after the fee, the moneyline tile keeps the sharp side against the crowd once the game grades (the Hawks, 1-0), and a slate fills a bare row\'s block and a newer slate replaces it',
-      JSON.stringify({ stored: kalT.stored, chips: kalT.chips, tile: kalT.mlTile, first: kalT.first, second: kalT.second }));
+      && !/the crowd|purple/i.test(kalT.signals)
+      && /gap watch: Hawks team total UNDER 118\.5 · gap \+1 · not scored · gap watch: Wizards team total OVER 113\.5 · gap -1\.5 · not scored/.test(kalT.simLive)
+      && kalT.dots.indexOf('secSim:dot watch') >= 0 && kalT.dots.indexOf('secSim:dot go') < 0 && !kalT.dots.some(d => /Kalshi/i.test(d)) && kalT.dots.indexOf('secMid:dot') >= 0 && kalT.dots.indexOf('boardDate:') >= 0
+      && kalT.folded.about === 6 && kalT.folded.aboutOpen === 0 && kalT.folded.rail && kalT.folded.notes >= 3,
+      'signals: the matchup rail opens with tonight\'s signals, every engine\'s call on the row as a chip that links to its section (the gap\'s two sides gold, a watch from 11 Nov 2026); the jump bar\'s dots and the sections\' live lines read off the same list, and the explanations fold under a line on the rail, on every NBA section and under each market row',
+      JSON.stringify({ signals: kalT.signals.slice(0, 900), simLive: kalT.simLive, dots: kalT.dots, folded: kalT.folded }));
+  const pageCode = fs.readFileSync(path.join(__dirname, 'web/callsheet3.html'), 'utf8').replace(/\/\*[\s\S]*?\*\//g, '');
+  chk(kalT.gone.sec && kalT.gone.box && kalT.gone.panel && kalT.gone.live && kalT.gone.money && kalT.gone.nav.length >= 6 && !kalT.gone.nav.some(s => /kalshi/i.test(s))
+      && kalT.formKal === false && kalT.pageKal === false && kalT.simTT.length === 2 && kalT.simTT.every(s => !/kalshi|the crowd/i.test(s)) && kalT.chips.length >= 2 && kalT.chips.every(s => !/kalshi|the crowd/i.test(s))
+      && kalT.stored.length === 0 && kalT.took === '2' && /^MONEYLINE/i.test(kalT.mlTile) && !/kalshi|the crowd/i.test(kalT.mlTile) && !/kalshi/i.test(pageCode),
+      'kalshi off the NBA model (23 Nov 2026): the card has no Kalshi section, hidden box or jump-bar link (the money\'s box stays), nothing on the page names the exchange with a game on the form, on the board or graded, the simulation\'s team-total rows and the board\'s moneyline cards carry no crowd line, a slate that still carries the exchange\'s block fills the row\'s other boxes and leaves the block off it, the moneyline tile keeps no watch on it, and the page\'s code names it only in comments',
+      JSON.stringify({ gone: kalT.gone, formKal: kalT.formKal, pageKal: kalT.pageKal, simTT: kalT.simTT, chips: kalT.chips, stored: kalT.stored, took: kalT.took, tile: kalT.mlTile.slice(0, 300), code: (pageCode.match(/.{0,60}kalshi.{0,60}/i) || [''])[0] }));
+
+  // ---- 23 Nov 2026: engine 3 on the Simulation card, the moneyline against the price, and the money's own record. The user: "see if the simulation needs to be
+  //      realligned", "Make it perfect bro", and, quoting a professional, "its not to ask who will win, but can they cover the spread"; then "Is there a way to tell
+  //      me how the Sharp better info we added is doing too". The card names the engine and what the men out and rest do to each side; the simulation's moneyline is
+  //      a call only where its worth beats what the row's price needs, and the record keeps the calls the price did not allow on a line of their own; the NBA record
+  //      carries the sharp-money read against the finals ----
+  const e3T = await pg.evaluate(async () => {
+    const wait = () => new Promise(r => setTimeout(r, 120));
+    const txt = e => (e ? e.innerText : '').replace(/\s+/g, ' ').trim();
+    const set = (id, v) => { const el = document.getElementById(id); el.value = v; el.dispatchEvent(new Event('input', { bubbles: true })); };
+    const load = async (doc, fname) => { const dt = new DataTransfer(); dt.items.add(new File([JSON.stringify(doc)], fname, { type: 'application/json' })); const inp = document.getElementById('slateFile'); inp.files = dt.files; inp.dispatchEvent(new Event('change', { bubbles: true })); await wait(); };
+    const keep = {}; for (const k of ['callsheet3.card.v1', 'callsheet3.slate.v1']) keep[k] = smStore.getItem(k);
+    await smStore.removeItem('callsheet3.card.v1'); await smStore.removeItem('callsheet3.slate.v1'); document.getElementById('clear').click(); document.getElementById('m-nba').click(); await wait();
+    const hist = (lo, mean, sd) => { const c = []; for (let v = lo; v <= lo + 100; v++) c.push(Math.round(10000 * Math.exp(-((v - mean) ** 2) / (2 * sd * sd)))); return { lo, c }; };
+    // the home club by 9 on a spread of 12: it wins 78% of the runs, worth 77.2% at the row's 0.97
+    const own = { total: hist(170, 228, 15), h1: hist(80, 114, 10), h2: hist(80, 114, 10), q: [hist(30, 57, 7), hist(30, 57, 7), hist(30, 57, 7), hist(30, 57, 7)], margin: hist(-41, 9, 12), away: hist(60, 109.5, 11), home: hist(60, 118.5, 11), ot: 0.04 };
+    const shrink = { total: 0.0, h1: 0.1, spread: 0.0, ml: 0.97, team: 0.3, team_away: 0.3, team_own: 0.3, quarter: 0.1 }, bands = [[0.7, 'STRONG'], [0.65, 'BET'], [0.6, 'LEAN']];
+    const sim3 = { v: 3, runs: 1000, own, mkt: null, anchor: null, ft_factor: 1.0, shrink, bands, out_mean: 0.66, level: null,
+      prof: { away: { ortg: 114.1, drtg: 112.3, pace: 99.5, n: 14, b2b: true, r3in4: false, out: -0.94, outo: 0.16, charge: 1.88, a3: 0.4 }, home: { ortg: 116.2, drtg: 110.8, pace: 100.4, n: 14, b2b: false, r3in4: true, out: 0.51, outo: -0.09, charge: 0, a3: 0.41 } } };
+    const sim2 = { v: 2, runs: 1000, own, mkt: null, anchor: null, ft_factor: 1.0, shrink, bands, level: null, prof: { away: { ortg: 114.1, drtg: 112.3, pace: 99.5, n: 14, b2b: true, out: -1.88, a3: 0.4 }, home: { ortg: 116.2, drtg: 110.8, pace: 100.4, n: 14, b2b: false, out: 0, a3: 0.41 } } };
+    const cellOf = () => { const tr = [...document.querySelectorAll('#nbaSimPanel .simtab tbody tr')].find(r => /^Moneyline/.test(txt(r.children[0]))); return tr ? txt(tr.children[1]) : ''; };
+    const o = {};
+    set('gdate', '2026-11-23'); set('away', 'Hawks'); set('home', 'Wizards'); set('line', '228.5'); set('op', '-110'); set('up', '-110'); set('sp', '-9.5'); set('sph', '-110'); set('spa', '-110');
+    set('hml', '-600'); set('aml', '450'); set('nbasim', JSON.stringify(sim3)); await wait();
+    const panel = document.getElementById('nbaSimPanel');
+    o.meta = txt(panel.querySelector('.simmeta')); o.read = txt(panel.querySelector('.simread')); o.prof = txt(panel.querySelector('.simprof'));
+    o.tile = [...panel.querySelectorAll('.simtile')].map(txt).find(s => /wins/i.test(s)) || '';
+    o.dear = cellOf(); o.dearSig = txt(document.getElementById('signals'));
+    set('hml', '-250'); set('aml', '205'); await wait();
+    o.fair = cellOf(); o.fairSig = txt(document.getElementById('signals'));
+    set('hml', ''); set('aml', ''); await wait();
+    o.bare = cellOf();
+    set('nbasim', JSON.stringify(sim2)); await wait();
+    o.meta2 = txt(panel.querySelector('.simmeta')); o.prof2 = txt(panel.querySelector('.simprof'));
+    // the record: two games graded, the home club winning both; at -600 the price did not allow the call, at -250 it did
+    const game = async (away, home, hml, aml, extra) => {
+      document.getElementById('clear').click(); await wait();
+      set('gdate', '2026-11-22'); set('away', away); set('home', home); set('line', '228.5'); set('op', '-110'); set('up', '-110'); set('sp', '-9.5'); set('sph', '-110'); set('spa', '-110'); set('hml', hml); set('aml', aml);
+      set('nbasim', JSON.stringify(sim3)); Object.keys(extra || {}).forEach(k => set(k, extra[k])); await wait(); document.getElementById('add').click(); await wait();
+    };
+    const J = JSON.stringify;
+    // the money's count on each: the Hawks +9.5 with the larger bets (65% of the money on 30% of the bets), the over named with most of the money, the Hawks to win 25 points apart
+    await game('Hawks', 'Wizards', '-600', '450', { nbasplits: J({ at: '2026-11-22T20:00:00Z', upd: '3:00 PM ET', n: 2, sp: { a: [9.5, -110, 65, 30], h: [-9.5, -110, 35, 70] }, tot: { o: [228.5, -110, 55, 50], u: [228.5, -110, 45, 50] }, ml: { a: [450, 55, 30], h: [-600, 45, 70] } }) });
+    // the Kings game: no side twenty apart, and the Kings to win named on fifteen points though the Spurs hold most of the money; a count taken after the tip on the third game, which the record leaves out
+    await game('Kings', 'Spurs', '-250', '205', { nbasplits: J({ at: '2026-11-22T20:00:00Z', upd: '3:00 PM ET', n: 1, sp: { a: [9.5, -110, 45, 40], h: [-9.5, -110, 55, 60] }, tot: { o: [228.5, -110, 30, 45], u: [228.5, -110, 70, 55] }, ml: { a: [205, 45, 30], h: [-250, 55, 70] } }) });
+    await game('Bulls', 'Pistons', '-250', '205', { nbasplits: J({ at: '2026-11-23T01:00:00Z', upd: '8:00 PM ET', pre: false, n: 1, ml: { a: [205, 90, 10], h: [-250, 10, 90] } }) });
+    await load({ format: 'callsheet2.slate', version: 1, date: '2026-11-22', games: [
+      { sport: 'NBA', gdate: '2026-11-22', away: 'Hawks', home: 'Wizards', finals: { fa: '104', fh: '112', f5a: '50', f5h: '58' }, notes: [] },     // the Wizards by 8: the Hawks +9.5 cover, the total 216 under, the Wizards win
+      { sport: 'NBA', gdate: '2026-11-22', away: 'Kings', home: 'Spurs', finals: { fa: '110', fh: '125', f5a: '55', f5h: '60' }, notes: [] },        // the Spurs by 15: cover, the total 235 over, the Spurs win
+      { sport: 'NBA', gdate: '2026-11-22', away: 'Bulls', home: 'Pistons', finals: { fa: '100', fh: '111', f5a: '50', f5h: '55' }, notes: [] }] }, 'nba-grade-2026-11-22.json');
+    await wait();
+    const tabs = {};
+    [...document.querySelectorAll('#calibBox table.simrectab')].forEach(t => {
+      let p = t.previousElementSibling; while (p && !p.classList.contains('simrecview') && !p.classList.contains('calibhead')) p = p.previousElementSibling;
+      const key = t.classList.contains('moneytab') ? 'money' : t.classList.contains('pricetab') ? 'price' : /^The sim's own view/.test(txt(p)) ? 'own' : null;
+      if (key) tabs[key] = { head: txt(p), rows: [...t.querySelectorAll('tbody tr')].map(tr => [...tr.children].slice(0, 4).map(txt).join(' | ')) };
+    });
+    o.tabs = tabs;
+    o.dec = [...document.querySelectorAll('#calibBox .callstab tbody tr, #calibBox table.simrectab.callrec tbody tr')].map(txt).slice(0, 3);
+    o.simNote = txt([...document.querySelectorAll('#calibBox .simrec .note')].pop());
+    document.getElementById('clear').click(); await wait();
+    for (const k of Object.keys(keep)) { if (keep[k] === null || keep[k] === undefined) await smStore.removeItem(k); else await smStore.setItem(k, keep[k]); }
+    return o;
+  });
+  chk(/Engine 3 \(23 Nov 2026\): the men out are priced against tonight's slate and a tired club the way the close prices it, part off a club's own scoring and part on the other side's, so the total sits on the books' line where engine 2 sat 4 points under it\.$/.test(e3T.meta)
+      && /^Profiles: Hawks 114\.1 \/ 112\.3 per 100, pace 99\.5, back to back, men out 1\.88 per 100 against the slate's 0\.66 \([-−]0\.94 its own scoring, \+0\.16 the other side's\) · Wizards 116\.2 \/ 110\.8, pace 100\.4, third game in four nights, men out 0 per 100 against the slate's 0\.66 \(\+0\.51 its own scoring, [-−]0\.09 the other side's\)$/.test(e3T.prof)
+      && /Engine 2: score effects, the market's shape \(30 Oct 2026\)\.$/.test(e3T.meta2) && !/Engine 3/.test(e3T.meta2)
+      && /^Profiles: Hawks 114\.1 \/ 112\.3 per 100, pace 99\.5, back to back, out [-−]1\.88 per 100 · Wizards 116\.2 \/ 110\.8, pace 100\.4$/.test(e3T.prof2),
+      'engine 3 on the Simulation card: a row of engine 3 says so, with what changed, and its profiles carry each club\'s charge for its men out against the slate\'s mean and what that does to its own scoring and to the other side\'s, a third game in four nights beside a back-to-back; a row of engine 2 reads as it did',
+      JSON.stringify({ meta: e3T.meta.slice(-260), prof: e3T.prof, meta2: e3T.meta2.slice(-80), prof2: e3T.prof2 }));
+  chk(/^Wizards wins 78% of the runs · the price decides the bet$/i.test(e3T.tile) && /^Can they cover\. Every row asks one thing of a side: does it beat its number at its price\. Who wins is not the bet\./.test(e3T.read) && /701-691/.test(e3T.read) && /737-751/.test(e3T.read) && /66-22 and lost 5\.5 units\.$/.test(e3T.read)
+      && /^HOME 78% worth 77% · [-−]600 needs 85\.7%: the price asks more, no call/.test(e3T.dear) && !/STRONG|BET|LEAN/.test(e3T.dear.replace(/Take.*$/i, '')) && !/sim · \w+:? ?Wizards ML/i.test(e3T.dearSig)
+      && /^HOME 78% STRONG · worth 77% · [-−]250 needs 71\.4%(?! *: the price)/.test(e3T.fair) && /sim · STRONG:? ?Wizards ML · worth 77%/i.test(e3T.fairSig)
+      && /^HOME 78% STRONG · worth 77%(?! · )/.test(e3T.bare) && !/needs/.test(e3T.bare),
+      'the moneyline against the price: the Simulation card says how to read it (can they cover; who wins is not the bet), the home club at 78% of the runs is no call at -600, which needs 85.7%, and is off tonight\'s signals; at -250, which needs 71.4%, the same chance is a STRONG call and a signal; with no price on the row the call is banded by its worth as it was',
+      JSON.stringify({ tile: e3T.tile, read: e3T.read.slice(0, 200), dear: e3T.dear, fair: e3T.fair, bare: e3T.bare, dearSig: e3T.dearSig.slice(0, 300), fairSig: e3T.fairSig.slice(0, 300) }));
+  const e3own = ((e3T.tabs.own || {}).rows || []).filter(r => /^Moneyline/.test(r)), e3price = (e3T.tabs.price || {}).rows || [];
+  chk(e3own.length === 1 && /^Moneyline \| STRONG \| 2-0 \| 78\.\d%$/.test(e3own[0]) && e3price.length === 1 && /^1 \| 1-0 \| 78\.\d% \| 100\.0%$/.test(e3price[0])
+      && /^The moneyline calls the price did not allow/.test((e3T.tabs.price || {}).head || '') && /A moneyline call stands only where its worth beats what the row's price needs\./.test(e3T.simNote) && /Engine 3 \(23 Nov 2026\) played out on 2,444 games/.test(e3T.simNote),
+      'the simulation\'s record keeps the price\'s rule: of three graded games with the home club at 78% of the runs, the two priced -250 are STRONG calls on the moneyline\'s line (2-0) and the one priced -600 is on a line of its own, the calls the price did not allow (1-0), and the note under the tables says so',
+      JSON.stringify({ own: (e3T.tabs.own || {}).rows, price: e3T.tabs.price, note: e3T.simNote.slice(-420) }));
+  const e3m = (e3T.tabs.money || {}).rows || [], e3dec = e3m.filter(r => /^The decision/.test(r)), e3decN = e3dec.map(r => { const m = /\| (\d+)-(\d+)/.exec(r); return m ? +m[1] + +m[2] : 0; }).reduce((a, b) => a + b, 0);
+  chk(/^Where the money is: the sharp-money read against the finals DraftKings' own count as each row kept it before the tip · 2 games on 1 night, 2026-11-22 to 2026-11-22 · graded at DraftKings' own number and price in the count · shown, not scored$/.test((e3T.tabs.money || {}).head || '')
+      && e3m.length === 11 && /^The side with the larger bets \| 1-1 \| 50\.0% \| [-−]0\.1u$/.test(e3m[0]) && /^on the spread \| 1-0 \| 100\.0% \| \+0\.9u$/.test(e3m[1]) && /^on the total \| none yet \|/.test(e3m[2]) && /^on the moneyline \| 0-1 \| 0\.0% \| [-−]1\.0u$/.test(e3m[3])
+      && /^Every market's named side \| 2-4 \| 33\.3% \| [-−]2\.2u$/.test(e3m[4]) && /^on the spread \| 2-0 \| 100\.0% \| \+1\.8u$/.test(e3m[5]) && /^on the total \| 0-2 \| 0\.0% \| [-−]2\.0u$/.test(e3m[6]) && /^on the moneyline \| 0-2 \| 0\.0% \| [-−]2\.0u$/.test(e3m[7])
+      && e3dec.length === 3 && e3decN === 2 && /^The decision, the larger bets with it \| 0-1 \| 0\.0% \| [-−]1\.0u$/.test(e3m[8]) && /^The decision, the larger bets on the other side \| none yet \|/.test(e3m[9])
+      && /^The decision, no gap of 20 either way \| 1-0 \| 100\.0% \| \+0\.4u$/.test(e3m[10]),
+      'the money\'s own record on the NBA record: every graded game with a count taken before the tip (two here; the third game\'s count came after the tip and is left out), the side with the larger bets by market at DraftKings\' own number and price (the Hawks +9.5 a win, the Hawks to win a loss), every market\'s named side (ten points or more, else most of the money), and the decision as it was given by where the larger bets stood (the Hawks at +450, the larger bets with them, a loss; the Spurs with no gap of 20 either way, a win)',
+      JSON.stringify({ head: (e3T.tabs.money || {}).head, rows: e3m }));
 
   const git = (cmd) => execSync(cmd, { cwd: __dirname, encoding: 'utf8' }).trim();
   let want, why;

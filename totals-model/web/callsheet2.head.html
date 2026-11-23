@@ -32,7 +32,7 @@
     --bad:        #a2372c;
     --bad-wash:   rgba(162, 55, 44, 0.10);
     --warn:       #8a6a12;
-    --crowd:      #6b3fa0;   /* the crowd on Kalshi (4 Nov 2026): one colour for the exchange wherever it shows */
+    --crowd:      #6b3fa0;   /* purple: the exchange's colour from 4 to 22 Nov 2026; the tries note in a prop's log keeps it */
     --crowd-wash: rgba(107, 63, 160, 0.10);
     --shadow:     0 1px 2px rgba(20,24,26,.05), 0 10px 30px -18px rgba(20,24,26,.35);
     --sans: "Archivo", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
@@ -404,7 +404,6 @@
   .sig .sb { font: 800 9px/1 var(--sans); letter-spacing: .08em; text-transform: uppercase; padding: 4px 6px; border-radius: 999px; background: var(--surface-2); color: var(--ink-2); white-space: nowrap; }
   .sig.go { border-color: var(--go); background: var(--go-wash); } .sig.go .sb { background: var(--go); color: #fff; }
   .sig.watch { border-color: var(--edge); background: var(--edge-wash); } .sig.watch .sb { background: var(--edge); color: #fff; }
-  .sig.crowd { border-color: var(--crowd); background: var(--crowd-wash); } .sig.crowd .sb { background: var(--crowd); color: #fff; }
   .sig.info { color: var(--ink-2); }
   .sig:hover { border-color: var(--ink); }
   .signals .quiet { font-size: 12px; line-height: 1.5; color: var(--muted); }
@@ -413,16 +412,9 @@
   .jumpbar a { display: inline-flex; align-items: center; gap: 6px; font: 700 10.5px/1 var(--sans); letter-spacing: .05em; text-transform: uppercase; color: var(--ink-2); text-decoration: none; padding: 7px 8px; border-radius: 6px; white-space: nowrap; }
   .jumpbar a:hover { background: var(--surface-2); color: var(--ink); }
   .jumpbar .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--rule-firm); flex: none; }
-  .jumpbar .dot.go { background: var(--go); } .jumpbar .dot.watch { background: var(--edge); } .jumpbar .dot.crowd { background: var(--crowd); } .jumpbar .dot.info { background: var(--ink-2); }
+  .jumpbar .dot.go { background: var(--go); } .jumpbar .dot.watch { background: var(--edge); } .jumpbar .dot.info { background: var(--ink-2); }
   .jumpbar .sep { flex: 1; min-width: 6px; }
   section.card[id], #boardDate, #cardCount, #calibBox { scroll-margin-top: 54px; }
-  /* the crowd on Kalshi, in its own colour (4 Nov 2026, the user: "add a little color... so it stands out on the props and game matchups"); off the props from 5 Nov 2026, so the colour lives on the NBA card, the board and the simulation's table */
-  .kname { color: var(--crowd); font-weight: 800; }
-  .simpanel .ttgap.kal { border-left: 3px solid var(--crowd); background: var(--crowd-wash); padding: 5px 9px; border-radius: 0 6px 6px 0; color: var(--ink); }
-  .simpanel .ttgap.kal b, .kalshi b { color: var(--crowd); }
-  .pk .tagm.kal { color: var(--crowd); border-color: var(--crowd); } .pk .tagm.kal.warn { background: var(--crowd); color: #fff; }
-  .kalshi { border-left: 3px solid var(--crowd); padding: 2px 0 2px 12px; } .kalshi ul.ctx li { border-bottom-color: var(--crowd-wash); }
-  #secKalshi > h2 { color: var(--crowd); } #secKalshi > h2 .tag { color: var(--crowd); opacity: .8; }
   /* the books' consensus in the simulation's place on the props (5 Nov 2026): the best cards' last line, green toward the pick */
   .pk .n5.shopline.pos { color: var(--go); } .pk .n5.shopline.neg { color: var(--bad); } .pk.simg.mkt .n1 { color: var(--ink-2); }
   /* the BET band in front (6 Nov 2026): a BET card carries a badge, its edge tier and a why line in green inside a thicker green frame; the LEANs sit quieter under a divider; the best app and the close are lines of their own */

@@ -7537,7 +7537,17 @@ simulation watched as `nba_sim_block` calls it; the slate run taking the
 mean of its six clubs and saying so in its log. The page harness, four
 new checks (engine 3 on the card, the moneyline against the price, the
 record's line for the calls the price did not allow, the money's record)
-and two for Kalshi's removal.
+and two for Kalshi's removal: 1,384 checks, passed on the page as
+published (v178).
+
+Broken copies, one change each. Of `slate.py` and `nbasim.py`, 20 (the
+sizes, the signs, the mean and which clubs it is taken over, the block's
+wiring of both numbers into both views, the rest split, the version):
+all caught by the self-test. Of the page, 21 (the price's gate and which
+side's price it reads, the card's words, the money's sides, signs,
+prices and buckets): 20 caught at first, and the last (a market's named
+side taken by its money alone) once the fixture gave it a market where
+the larger gap and the larger share of the money sit on different sides.
 
 ### 12. On record, not built
 

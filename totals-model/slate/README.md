@@ -161,7 +161,13 @@ Three double-click files, in this order on a game day:
 3. **Run odds.bat**: the NBA is in the default sports now, so the total,
    its prices, the first-half total, the spread and the moneylines fill
    from the carded book. Run it early for the opener and again before tip
-   for the close.
+   for the close. On basketball it also brings each side's own first-half
+   total where a book posts one (23 Nov 2026; one more credit a game a
+   run; where the feed will not serve it for a game the run asks again
+   without it and says so, and the game keeps its first-half total): the
+   day board's **first half's best bets** read it, and they read
+   the spread and the first-half numbers of the newest run, so the run
+   before the tip is the one that counts.
 3b. **Run money.bat**, or `python slate.py splits --sports NBA` (19 Nov
    2026), any time and as often as wanted: DraftKings' own count of the
    bets and the money on the day's games, free. The odds run reads it too
@@ -392,9 +398,10 @@ FanDuel and BetMGM, which list one point. NBA.md has the tables.
 from <https://the-odds-api.com> in `odds_key.txt` beside `slate.py` (one
 line, nothing else), or in the `ODDS_API_KEY` environment variable. One call
 a sport for the main markets (three credits) and one call a game for the
-period total, the alternate totals and the team totals (a credit a market
-the books price), so a night of twelve hockey games and two baseball games
-is about fifty credits a run. The last line printed is the credits the run
+period total, the alternate totals and the team totals, and on basketball
+each side's own first-half total (a credit a market the books price), so a
+night of twelve hockey games and two baseball games is about fifty credits
+a run and a night of ten basketball games about forty-three. The last line printed is the credits the run
 used and what is left this month.
 
 | On the sheet | Where it comes from |
@@ -405,6 +412,7 @@ used and what is left this month.
 | **The sharp line**, on the rail and in the why list | Pinnacle's total and prices, beside the carded line (the hidden `sharp` box). Pinnacle is read, never carded. When its number differs from the card the chip says so in green. Shown, not scored: the odds log keeps the gap nightly and it is measured before it can move a number |
 | **The alternates**, on the rail and in the why list | Every number the books post on the total, priced by the sheet's own projection: the two nearest numbers on the listed side show with the best price, the sheet's chance there and the edge. Shown, not picked: the row still ranks the main number, and the Line box stays on it |
 | **The book's split**, on the rail | Each side's own total at the carded book (team totals), shown, not scored, beside the sheet's own split bar |
+| **The first half's best bets**, on the day board (basketball, 23 Nov 2026) | Every app's first-half total with both prices (`period` on the row's odds) and each side's own first-half total (`period_team`: the market `team_totals_h1`, asked for on basketball only), with the books' spreads and the row's days of rest. Up to four a night at the user's four apps: the over behind a favourite of 4 or more on no rest (the half, then the rested club's own), then the cheaper side where every app that posts the half is on one number; a club's own half and a split half only to make three. Shown, not scored; CALLSHEET3.md, "The first half's best bets" |
 | **Close** | The morning grade run attaches the last number the odds run saw before the game to each final, and the sheet's CLOSE box fills if it is blank, so "beat the close" grades itself |
 
 The sheet's own number never moves: the line boxes are the book's main

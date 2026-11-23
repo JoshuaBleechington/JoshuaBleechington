@@ -706,7 +706,7 @@
   <header class="top">
     <div>
       <div class="eyebrow"><span id="eyebrow">MLB · every market on the game</span>
-        <span class="build">· build <span id="build">2026-11-21</span></span></div>
+        <span class="build">· build <span id="build">2026-11-23</span></span></div>
       <h1>The <em>Super</em> Model</h1>
       <p>One matchup, every market the book posts on it — in baseball the full-game total, the first five,
          the moneyline and the run line;
@@ -1345,6 +1345,8 @@
     <div class="body">
       <div class="subhead" id="takingHead" hidden>Taking tonight <span class="tag" id="takingCount"></span> <span class="tag">the bets you marked with Take, on the card and on the props, with the result once the game grades · one unit each</span> <button type="button" class="btn" id="takingText" style="margin-left:8px;padding:4px 10px;font-size:11px">Copy as text</button></div>
       <div id="taking" class="picks" hidden></div>
+      <div class="subhead" id="h1Head" hidden>The first half's best bets <span class="tag" id="h1Tag"></span></div>
+      <div id="h1best" class="picks" hidden></div>
       <div class="subhead" id="callsHead" hidden>A call on every game <span class="tag">basketball, one a game: the agreement rule when it fires and a side the sheet prices below its chance read BET; a total at one of your four apps a point or more off the middle of every book's number reads VALUE; else the likelier winner at the best of the four prices, a LEAN that says what the price costs — shown, not scored; each kind keeps its own record under Is it working</span></div>
       <div id="calls" class="picks" hidden></div>
       <div class="subhead">The parlay four <span class="tag">the likeliest side on each game at any price, alternate totals included — one a game, likeliest first; each card says whether its price agrees and names the value side it passed over</span></div>
@@ -3642,19 +3644,24 @@ smStore.ready.then(function () {
       var G = nbaCallOf(row), K = Ks.filter(function (x) { return G && x.kind === G.kind; })[0] || Ks[0];   // the kind whose card is shown: the rest call where it and the best number both say the over, the best number where the rest call is cold
       if (K) c = { line: K.kind === "winner" ? null : K.line, p: K.p, worth: null, band: K.kind === "number" ? "value" : K.kind === "rest" ? "rest" : "lean", price: K.price, book: K.app, call: K.kind };
     }
+    else if (view === "h1") {   // a first-half best bet (23 Nov 2026): the kind's own number, app and price as its card shows them
+      var Hk = nbaH1Kinds(row).filter(function (x) { return x.key === key && x.side === side; })[0];
+      if (Hk) c = { line: Hk.line, p: null, worth: null, band: "first half", price: Hk.price, book: Hk.app, call: Hk.kind, text: Hk.pick };
+    }
     else if (sim) c = nbaSimCalls(sim, lines, view).filter(function (x) { return x.key === key && x.side === side; })[0] || null;
     if (!c) { say("That call is not on the card as shown now; put the line back and take it again."); return; }
     var inp = view === "agree" ? { op: (row.inputs || {}).op, up: (row.inputs || {}).up }
             : { op: $("op").value, up: $("up").value, h1op: $("h1op").value, h1up: $("h1up").value, sph: $("sph").value, spa: $("spa").value, hml: $("hml").value, aml: $("aml").value };
-    var take = { id: id, view: view, key: key, side: side, line: c.line, price: (view === "middle" || view === "window" || view === "call") ? c.price : nbaSimPriceOf(key, side, lines, inp),
+    var take = { id: id, view: view, key: key, side: side, line: c.line, price: (view === "middle" || view === "window" || view === "call" || view === "h1") ? c.price : nbaSimPriceOf(key, side, lines, inp),
                  p: c.p === null ? null : +(+c.p).toFixed(4), worth: c.worth === null ? null : +(+c.worth).toFixed(4), band: c.band,
                  pick: view === "middle" ? "Total " + side + " " + c.line + " at " + bookName(c.book) + " (the middle with " + c.with.side + " " + c.with.line + ")"
                      : view === "window" ? "Total window " + c.lo + "-" + c.hi + " (over the low, under the high), one ticket"
                      : view === "call" ? (c.call !== "winner" ? "Total " + side + " " + c.line : (side === "HOME" ? row.home : row.away) + " ML") + (c.book ? " at " + bookName(c.book) : "")
+                     : view === "h1" ? c.text + (c.book ? " at " + bookName(c.book) : "")
                      : nbaSimPickText(key, side, c.line, f.away || row.away, f.home || row.home), at: new Date().toISOString() };
     if (view === "middle") { take.book = c.book; take.with = c.with; take.pair = c.pair; }
     if (view === "window") { take.lo = c.lo; take.hi = c.hi; take.winView = c.winView; }
-    if (view === "call") { take.book = c.book; take.call = c.call; }
+    if (view === "call" || view === "h1") { take.book = c.book; take.call = c.call; }
     row.simTakes = (row.simTakes || []).concat([take]);
     done();
   }
@@ -3670,12 +3677,13 @@ smStore.ready.then(function () {
     if (t.key === "h1") { var f5a = parseFloat(fin.f5a), f5h = parseFloat(fin.f5h); if (!isFinite(f5a) || !isFinite(f5h)) return null; return cmp(f5a + f5h, +t.line, t.side === "OVER"); }
     if (t.key === "spread") { var m = fh - fa + +t.line; if (m === 0) return "push"; return ((m > 0) === (t.side === "HOME")) ? "win" : "loss"; }
     if (t.key === "ml") { if (fa === fh) return "push"; return ((fh > fa) === (t.side === "HOME")) ? "win" : "loss"; }
+    if (t.key === "h1_away" || t.key === "h1_home") { var h5a = parseFloat(fin.f5a), h5h = parseFloat(fin.f5h); if (!isFinite(h5a) || !isFinite(h5h)) return null; return cmp(t.key === "h1_away" ? h5a : h5h, +t.line, t.side === "OVER"); }   // a club's own first half (23 Nov 2026)
     if (t.key === "away_total") return cmp(fa, +t.line, t.side === "OVER");
     if (t.key === "home_total") return cmp(fh, +t.line, t.side === "OVER");
     return null;
   }
-  function nbaSimTakeViewLabel(view) { return view === "own" ? "the sim's own view" : view === "mkt" ? "anchored to the market" : view === "agree" ? "the agreement rule, the sim and the crew" : view === "middle" ? "the middle's second leg" : view === "window" ? "the window, one ticket (anchored to the market)" : view === "call" ? "a call on the game" : "the gap, a watch"; }
-  function nbaSimTakeFrom(t) { return (t && t.view === "call" ? "" : "the simulation, ") + nbaSimTakeViewLabel(t && t.view); }   // whose call it was, in words: a call on the game is the board's, not the simulation's (12 Nov 2026)
+  function nbaSimTakeViewLabel(view) { return view === "own" ? "the sim's own view" : view === "mkt" ? "anchored to the market" : view === "agree" ? "the agreement rule, the sim and the crew" : view === "middle" ? "the middle's second leg" : view === "window" ? "the window, one ticket (anchored to the market)" : view === "call" ? "a call on the game" : view === "h1" ? "a first-half best bet" : "the gap, a watch"; }
+  function nbaSimTakeFrom(t) { return (t && (t.view === "call" || t.view === "h1") ? "" : "the simulation, ") + nbaSimTakeViewLabel(t && t.view); }   // whose call it was, in words: a call on the game is the board's, not the simulation's (12 Nov 2026)
   /* the record: every graded NBA row's sim calls at LEAN or better, says against does by view, market and band */
   function nbaSimUnits(price, win) { var p = +price; if (!p || isNaN(p)) p = -110; return win ? (p > 0 ? p / 100 : 100 / -p) : -1; }
   function nbaSimRecordHtml() {
@@ -4179,6 +4187,237 @@ smStore.ready.then(function () {
     var h = '<div class="simrecview">A call on every game <span class="tag">each kind on every game it speaks to, replayed from the rows as their last odds run before tip stood; then the call as the board gives it, one a game · a kind that has lost here over ' + NBA_CALL_COLD + ' or more calls is cold and left out of the order until its record turns · shown, not scored</span></div><table class="form simrectab callstab"><thead><tr><th>Kind</th><th>Record</th><th>Says</th><th>Does</th><th>Units</th><th>Measured before</th></tr></thead><tbody>';
     NBA_CALL_KINDS.forEach(function (k) { h += row(esc(k[1]) + (rec[k[0]].cold ? ' <b>· cold here</b>' : ''), rec[k[0]], esc(k[2])); });
     h += row('<b>The call as given, one a game</b>', rec.given, 'the first kind in the order that is not cold');
+    return any ? h + '</tbody></table>' : "";
+  }
+
+  /* ============================ THE FIRST HALF'S BEST BETS (23 Nov 2026) ============================
+     The user: "since I'm seeing some positive trend with the first half totals, I'd like the model to focus a little more on that and
+     for first half team totals. Help me get a lot of money by winning first half totals ... I want to be able to put a $100 on a 3-4
+     best bet for either the first half totals for both teams combined or the best team total."
+     The trend on the card (the sheet's first-half side 131-110) was taken apart first (lab h1_*.py): that side is mostly the CHEAPER
+     of the carded book's two prices, since the page's lean on the half is a fifth of a point. Measured on the 789 games that carry
+     the books' own first-half lines (2024-25 to 9 Jan at a quarter of an hour before the tip, and this season's card), the half
+     graded off the quarter scores, every price the book's own:
+       - nothing a plain signal reads beats the line: the clubs' own first halves, the size of the spread, the first-quarter line,
+         the total's move, the tip, the book's number against the others' all read level, and the best side on the board by the
+         middle of the books went 403-379 at prices asking 52.4% (-1.3% a bet);
+       - THE CHEAPER SIDE. Where every app that posts the first-half total is on one number (three apps or more) and the two sides
+         are priced apart, the cheaper side at the best of the four apps won 125-82 (60.4%, +17.3% a bet, the error 6.9) as this
+         page reads it, a tired favourite's games left to the rule below: 63-44 in 2024-25 and 62-38 this season, the under
+         70-45 and the over 55-37, 116-76 of it with four apps on the number. Where the apps split on the number, or only two
+         post it, the same side was level (210-205). The first-quarter total, a market the rule was not drawn on, reads the same
+         way with four apps on the number (103-69) and not with three (77-88). A side a book leans its own prices to has lost:
+         1,474-1,481 where its prices said 52.5% and asked 55.6%;
+       - THE OVER BEHIND A TIRED FAVOURITE, in the half. A favourite of 4 or more on the second night of a back to back, the other
+         club rested: the first half went over 112-66 (62.9%) on three seasons of closes (the books' line where held, else the
+         line the books' own fit of the half on the total gives), 32-19 at the lowest number among the four apps where the
+         books' lines were held, and it is the RESTED club's half that does it: +1.9 points on its share of the line, over
+         114-64, where the favourite's own half was level. No book's first-half TEAM lines were held, so that one starts its
+         record here. The spread is read as it stands in the newest odds on the row, the middle of the books' numbers: the rule
+         was measured on closes and a logged spread goes stale (Lakers at Clippers on 28 Oct was logged with the Lakers by 4
+         on no rest and tipped with the Clippers by 1.5).
+     So the board gives up to four first-half bets a night, the measured kinds first: the over behind a tired favourite (the half,
+     then the rested club's own total), then the cheaper side where every app is on the number; and where those leave fewer than
+     three, the cheaper side of a club's own first half, then of a half the apps split on, each marked as there to make three
+     with what its record is. One unit is the $100 he stakes. Shown, not scored: no chance, band or pick on a card moves. The
+     order was drawn on these same games, so each kind keeps two records here: the nights before 23 Nov 2026 and the nights from it. */
+  var NBA_H1 = { market: ["draftkings", "fanduel", "betmgm", "espnbet", "fanatics", "caesars"], minApps: 3, fav: 4, max: 4, fill: 3, since: "2026-11-23", stake: 100 };
+  var NBA_H1_RANK = { rest: 0, ttrest: 1, cheap: 2, ttcheap: 3, split: 4 };
+  var NBA_H1_KINDS = [
+    ["rest", "FIRST HALF · THE OVER BEHIND A TIRED FAVOURITE", "a favourite of 4 or more on the second night of a back to back, the other club rested: the first half went over 112-66 (62.9%) on three seasons of closes, 32-19 at the lowest number among these apps where the books' own first-half lines were held"],
+    ["ttrest", "FIRST HALF · THE RESTED CLUB'S OWN TOTAL", "the rested club's own first half in those games ran 1.9 points over its share of the line, over 114-64 against a stand-in line; no book's first-half team line was held to test it at a price, so its record starts here"],
+    ["cheap", "FIRST HALF · THE CHEAPER SIDE", "every app that posts the first-half total is on one number and prices the two sides apart: the cheaper side won 125-82 (60.4%) at these apps' prices on two seasons, 63-44 and 62-38; the first-quarter total the same way, 103-69"],
+    ["ttcheap", "FIRST HALF · A CLUB'S OWN TOTAL, TO MAKE THREE", "the cheaper side where every app is on one number, on a club's own first half: no first-half team lines were held to test it, and on full-game team totals it was level (94-85)"],
+    ["split", "FIRST HALF · TO MAKE THREE", "the apps split on the number, or only two post it: the cheaper side at the number most of them post was level (210-205) on two seasons; no edge measured"]];
+  function nbaH1Measured(kind) { return kind === "rest" || kind === "ttrest" || kind === "cheap"; }   // the kinds with a measured record behind them; the other two are there to make three
+  function nbaH1Num(v) { return v !== null && v !== undefined && String(v).trim() !== "" && isFinite(+v); }
+  /* {OVER: [[book, price, number]...], UNDER: [...]} -> {book: {line, o, u}}: the number a book posts both sides of, the most evenly priced one (the lower on a tie) */
+  function nbaH1Mains(block) {
+    var by = {}, out = {};
+    ["OVER", "UNDER"].forEach(function (side) {
+      ((block || {})[side] || []).forEach(function (x) {
+        if (!x || x.length < 3 || !nbaH1Num(x[1]) || !nbaH1Num(x[2])) return;
+        var k = x[0] + "|" + (+x[2]), e = by[k] || (by[k] = { book: String(x[0]), line: +x[2] }), f = side === "OVER" ? "o" : "u";
+        if (e[f] === undefined) e[f] = +x[1];
+      });
+    });
+    Object.keys(by).map(function (k) { return by[k]; }).sort(function (a, b) { return a.book < b.book ? -1 : a.book > b.book ? 1 : a.line - b.line; }).forEach(function (e) {
+      if (e.o === undefined || e.u === undefined) return;
+      var ev = Math.abs(implied(e.o) - implied(e.u));
+      if (!out[e.book] || ev < out[e.book].ev - 1e-12) out[e.book] = { line: e.line, o: e.o, u: e.u, ev: ev };
+    });
+    return out;
+  }
+  function nbaH1Posted(block) { var m = nbaH1Mains(block), out = {}; NBA_H1.market.forEach(function (b) { if (m[b]) out[b] = m[b]; }); return out; }
+  /* the home spread as it stands: the middle of the books' home handicaps in the newest odds on the row (of the middle two, the
+     one nearer nought), else the spread the row was logged with */
+  function nbaH1SpreadNow(inp) {
+    var o = nbaOddsBlock(inp) || {}, pts = (((o.spread || {}).HOME) || []).filter(function (x) { return x && x.length >= 3 && nbaH1Num(x[2]); }).map(function (x) { return +x[2]; }).sort(function (a, b) { return a - b; });
+    if (pts.length) { var n = pts.length; if (n % 2) return pts[(n - 1) / 2]; var a = pts[n / 2 - 1], b = pts[n / 2]; return Math.abs(a) <= Math.abs(b) ? a : b; }
+    return nbaH1Num(inp.sp) ? +inp.sp : null;
+  }
+  function nbaH1Tired(inp) {   // a favourite of NBA_H1.fav or more that played yesterday, the other club with a day or more
+    var sp = nbaH1SpreadNow(inp);
+    if (sp === null || !nbaH1Num(inp.narest) || !nbaH1Num(inp.nhrest)) return null;
+    var ra = +inp.narest, rh = +inp.nhrest;
+    if (sp <= -NBA_H1.fav && rh <= 0 && ra >= 1) return { fav: "HOME", by: -sp, dogRest: ra };
+    if (sp >= NBA_H1.fav && ra <= 0 && rh >= 1) return { fav: "AWAY", by: sp, dogRest: rh };
+    return null;
+  }
+  function nbaH1LowestOver(posted, apps) {   // the lowest number among the apps, the better over price on a tie, the earlier app after that
+    var best = null;
+    apps.forEach(function (b) {
+      var x = posted[b]; if (!x) return;
+      if (!best || x.line < best.line - 1e-9 || (Math.abs(x.line - best.line) <= 1e-9 && implied(x.o) < implied(best.price) - 1e-12)) best = { line: x.line, price: x.o, app: b };
+    });
+    return best ? { side: "OVER", line: best.line, price: best.price, app: best.app } : null;
+  }
+  function nbaH1Cheaper(posted, within, betApps) {   // the cheaper side among the books on the number; the bet at the best of betApps among them
+    var bo = -1, bu = -1;
+    within.forEach(function (b) { bo = Math.max(bo, decimalOf(posted[b].o)); bu = Math.max(bu, decimalOf(posted[b].u)); });
+    if (!within.length || Math.abs(bo - bu) < 1e-12) return null;
+    var side = bo > bu ? "OVER" : "UNDER", f = side === "OVER" ? "o" : "u", g = side === "OVER" ? "u" : "o", mine = betApps.filter(function (b) { return within.indexOf(b) >= 0; }), best = null, other = null;
+    if (!mine.length) return null;
+    mine.forEach(function (b) { if (best === null || implied(posted[b][f]) < implied(posted[best][f]) - 1e-12) best = b; });
+    within.forEach(function (b) { if (other === null || decimalOf(posted[b][g]) > decimalOf(other)) other = posted[b][g]; });
+    return { side: side, line: posted[best].line, price: posted[best][f], app: best, other: other, n: within.length };
+  }
+  function nbaH1PickText(c, row) { return (c.key === "h1" ? "First half " : (c.key === "h1_away" ? row.away : row.home) + " first half ") + c.side + " " + c.line; }
+  function nbaH1Kinds(row) {   // every first-half bet the game carries: the half's total, then each club's own
+    if (!row || row.sport !== "NBA" || isVoid(row)) return [];
+    var inp = row.inputs || {}, o = nbaOddsBlock(inp) || {}, out = [], t = nbaH1Tired(inp), his = NBA_CALL.apps, mkt = NBA_H1.market;
+    var on = function (list, P) { return list.filter(function (b) { return !!P[b]; }); };
+    var oneNumber = function (P, names) { var seen = {}; names.forEach(function (b) { seen[P[b].line] = (seen[P[b].line] || 0) + 1; }); return seen; };
+    var posted = nbaH1Posted(o.period), names = on(mkt, posted), c = null;
+    if (names.length) {
+      if (t) { var a1 = on(his, posted); c = nbaH1LowestOver(posted, a1.length ? a1 : names); if (c) { c.kind = "rest"; c.key = "h1"; c.tired = t; c.own = a1.length > 0; } }
+      else {
+        var cnt = oneNumber(posted, names), nums = Object.keys(cnt);
+        if (names.length >= NBA_H1.minApps && nums.length === 1) { c = nbaH1Cheaper(posted, names, his) || nbaH1Cheaper(posted, names, mkt); if (c) { c.kind = "cheap"; c.key = "h1"; } }
+        else if (names.length >= 2) {
+          var top = 0; nums.forEach(function (l) { top = Math.max(top, cnt[l]); });
+          if (top >= 2) {
+            var cands = nums.filter(function (l) { return cnt[l] === top; }).map(Number).sort(function (a, b) { return a - b; }), line = cands[Math.floor(cands.length / 2)];
+            c = nbaH1Cheaper(posted, names.filter(function (b) { return Math.abs(posted[b].line - line) < 1e-9; }), his);
+            if (c) { c.kind = "split"; c.key = "h1"; c.apps = names.length; }
+          }
+        }
+      }
+      if (c) out.push(c);
+    }
+    var pt = o.period_team || {};
+    [["AWAY", "h1_away"], ["HOME", "h1_home"]].forEach(function (S) {
+      var P = nbaH1Posted(pt[S[0]]), nm = on(mkt, P), d = null; if (!nm.length) return;
+      if (t && t.fav !== S[0]) { var a2 = on(his, P); d = nbaH1LowestOver(P, a2.length ? a2 : nm); if (d) { d.kind = "ttrest"; d.key = S[1]; d.tired = t; d.own = a2.length > 0; } }
+      else if (!t && nm.length >= NBA_H1.minApps && Object.keys(oneNumber(P, nm)).length === 1) { d = nbaH1Cheaper(P, nm, his) || nbaH1Cheaper(P, nm, mkt); if (d) { d.kind = "ttcheap"; d.key = S[1]; } }
+      if (d) out.push(d);
+    });
+    out.forEach(function (x) { x.pick = nbaH1PickText(x, row); });
+    return out;
+  }
+  function nbaH1Res(c, row) {   // against the half-time score: the half's total, or one club's own
+    var fin = row && row.finals; if (!c || !fin || isVoid(row)) return null;
+    var a = parseFloat(fin.f5a), h = parseFloat(fin.f5h); if (!isFinite(a) || !isFinite(h)) return null;
+    var v = c.key === "h1" ? a + h : c.key === "h1_away" ? a : h;
+    return Math.abs(v - c.line) < 1e-9 ? "push" : ((v > c.line) === (c.side === "OVER") ? "win" : "loss");
+  }
+  /* a night's list: every bet its games carry in the order, then up to NBA_H1.max of the measured kinds, and where those leave
+     fewer than NBA_H1.fill, a club's own total and then a split half from games not on the list yet */
+  function nbaH1Night(rows) {
+    var C = [], picks = [], used = {};
+    rows.forEach(function (r) { nbaH1Kinds(r).forEach(function (c) { C.push({ row: r, c: c }); }); });
+    C.sort(function (a, b) {
+      return (NBA_H1_RANK[a.c.kind] - NBA_H1_RANK[b.c.kind]) || (implied(a.c.price) - implied(b.c.price)) ||
+             (String(a.row.matchup) < String(b.row.matchup) ? -1 : String(a.row.matchup) > String(b.row.matchup) ? 1 : 0) || (a.c.key < b.c.key ? -1 : a.c.key > b.c.key ? 1 : 0);
+    });
+    C.forEach(function (x) { if (nbaH1Measured(x.c.kind) && picks.length < NBA_H1.max) { picks.push(x); used[x.row.id] = 1; } });
+    ["ttcheap", "split"].forEach(function (kind) {
+      C.forEach(function (x) { if (picks.length < NBA_H1.fill && x.c.kind === kind && !used[x.row.id]) { picks.push(x); used[x.row.id] = 1; } });
+    });
+    return { all: C, picks: picks };
+  }
+  function nbaH1On(dateISO) { return nbaH1Night(card.filter(function (r) { return r.sport === "NBA" && (r.gdate || "") === dateISO && !isVoid(r); })); }
+  var nbaH1Memo = null;   // the record, replayed from the rows: built again when a half-time score, a row's odds, its spread or its rest, or the card changes
+  function nbaH1Stamp() {
+    var n = 0, s = 0, u = 0;
+    card.forEach(function (r) {
+      if (r.sport !== "NBA") return;
+      var inp = r.inputs || {};
+      u += String(inp.oddsNow || inp.odds || "").length + (parseFloat(inp.sp) || 0) * 3 + (parseFloat(inp.narest) || 0) * 5 + (parseFloat(inp.nhrest) || 0) * 11;   // a night's list is drawn from every row of the night, graded or not
+      if (r.finals && r.finals.f5a !== undefined && r.finals.f5a !== "") { n++; s += (+r.finals.f5a || 0) * 3 + (+r.finals.f5h || 0) * 7 + (r.finals.void ? 1 : 0); }
+    });
+    return n + "|" + s + "|" + u + "|" + card.length;
+  }
+  function nbaH1Record() {
+    var stamp = nbaH1Stamp();
+    if (nbaH1Memo && nbaH1Memo.stamp === stamp) return nbaH1Memo.rec;
+    var mk = function () { return { w: 0, l: 0, p: 0, units: 0, n: 0 }; }, two = function () { return { before: mk(), since: mk() }; }, rec = { given: two(), givenM: two(), givenF: two(), nights: { before: 0, since: 0 } }, byDate = {};
+    NBA_H1_KINDS.forEach(function (k) { rec[k[0]] = two(); });
+    var add = function (s, c, res) { if (res === "push") { s.p++; return; } s.n++; if (res === "win") { s.w++; s.units += decimalOf(c.price) - 1; } else { s.l++; s.units -= 1; } };
+    card.forEach(function (r) { if (r.sport !== "NBA" || isVoid(r)) return; var d = r.gdate || ""; (byDate[d] = byDate[d] || []).push(r); });
+    Object.keys(byDate).forEach(function (d) {
+      var N = nbaH1Night(byDate[d]), era = d >= NBA_H1.since ? "since" : "before", any = false;
+      N.all.forEach(function (x) { var res = nbaH1Res(x.c, x.row); if (res) add(rec[x.c.kind][era], x.c, res); });   // every kind on every game it speaks to
+      N.picks.forEach(function (x) {   // the list as it was given, and the two parts of it: the measured kinds and the fills
+        var res = nbaH1Res(x.c, x.row); if (!res) return;
+        add(rec.given[era], x.c, res); add((nbaH1Measured(x.c.kind) ? rec.givenM : rec.givenF)[era], x.c, res); any = true;
+      });
+      if (any) rec.nights[era]++;
+    });
+    nbaH1Memo = { stamp: stamp, rec: rec };
+    return rec;
+  }
+  function nbaH1Dollars(units) { var d = Math.round(units * NBA_H1.stake); return (d < 0 ? "-$" : "+$") + Math.abs(d).toLocaleString("en-US"); }
+  function nbaH1Wins(price) { return "$" + (NBA_H1.stake * (decimalOf(price) - 1)).toFixed(2); }
+  function nbaH1TakeWords(t) {   // on the Taking card: which kind the bet was when it was marked
+    var k = t && t.call;
+    return k === "rest" ? "the over behind a tired favourite, in the half" : k === "ttrest" ? "the rested club's own first half behind a tired favourite" : k === "cheap" ? "the cheaper side, every app on one number"
+         : k === "ttcheap" ? "the cheaper side on a club's own first half, there to make three" : k === "split" ? "the apps split on the number, there to make three" : "a first-half best bet";
+  }
+  function nbaH1RecWords(s) { return s && (s.n || s.p) ? s.w + "-" + s.l + (s.p ? "-" + s.p : "") + ", " + sgn(s.units, 1) + "u" : "none graded yet"; }
+  function nbaH1Why(c, row) {
+    var away = row.away, home = row.home, days = function (n) { return n === 1 ? "a day" : n + " days"; }, poss = function (n) { return /s$/.test(n) ? n + "'" : n + "'s"; };
+    if (c.kind === "rest" || c.kind === "ttrest") {   // which number: the lowest among the four apps; where none of them posts the market, the lowest among the apps that do, said so
+      var fav = c.tired.fav === "HOME" ? home : away, dog = c.tired.fav === "HOME" ? away : home, what = c.kind === "rest" ? "the first-half total" : esc(poss(dog)) + " own first half";
+      return esc(fav) + " are favoured by " + c.tired.by + " and played last night, " + esc(dog) + " rested " + days(c.tired.dogRest) +
+             (c.own ? ": the lowest number your apps post on " + what : ": none of your four apps posts " + what + ", so the lowest number at the apps that do");
+    }
+    if (c.kind === "split") return (c.n === c.apps ? "only " + c.apps + " apps post it, both on " + c.line : c.n + " of the " + c.apps + " apps that post it are on " + c.line + ", the others off it") + ": the cheaper side there (" + sgn(c.price, 0) + " against " + sgn(c.other, 0) + ")";
+    return (c.n === 2 ? "both apps" : "all " + c.n + " apps") + " that post it are on " + c.line + " and price the two sides apart (" + sgn(c.price, 0) + " against " + sgn(c.other, 0) + "): the cheaper side";
+  }
+  function nbaH1Card(x, i) {
+    var c = x.c, r = x.row, res = nbaH1Res(c, r), rec = nbaH1Record(), kind = NBA_H1_KINDS.filter(function (k) { return k[0] === c.kind; })[0], s = rec[c.kind];
+    var cls = nbaH1Measured(c.kind) ? "value" : "lean", btn = nbaSimTakeBtn(r, "h1", c.key, c.side);
+    return '<div class="pk call h1 ' + cls + ' h1-' + c.kind + (res ? ' ' + res : '') + '" data-open="' + r.id + '" title="Load ' + esc(r.matchup) + ' into the form">' +
+      '<div class="n1">#' + (i + 1) + ' · ' + esc(kind[1]) + '</div>' +
+      '<div class="n2">' + esc(c.pick) + (res ? ' <span class="chip ' + res + '">' + esc(resText(res).toUpperCase()) + '</span>' : '') + '</div>' +
+      '<div class="n3">' + sgn(c.price, 0) + (c.app ? ' at ' + esc(bookName(c.app)) : '') + ' · $' + NBA_H1.stake + ' wins ' + nbaH1Wins(c.price) + ' · needs ' + (implied(c.price) * 100).toFixed(1) + '% · ' + nbaH1Why(c, r) + '</div>' +
+      '<div class="n4">' + esc(r.matchup) + ' · ' + esc(kind[2]) + ' · here from 23 Nov: ' + esc(nbaH1RecWords(s.since)) + (s.before.n || s.before.p ? ' (the nights before it: ' + esc(nbaH1RecWords(s.before)) + ')' : '') + '</div>' +
+      (btn ? '<div class="n6">' + btn + '</div>' : '') + '</div>';
+  }
+  function nbaH1Head(N) {   // the line beside the list's heading: what is on it tonight and what the list has done
+    var m = N.picks.filter(function (x) { return nbaH1Measured(x.c.kind); }).length, f = N.picks.length - m, rec = nbaH1Record(), g = rec.given;
+    return "the first half's total and each club's own, at your four apps · up to " + NBA_H1.max + " a night, the measured kinds first: the over behind a tired favourite, then the cheaper side where every app is on one number · " +
+           m + " tonight carr" + (m === 1 ? "ies" : "y") + " a measured record" + (f ? ", " + f + " " + (f === 1 ? "is" : "are") + " here to make three" : "") + " · $" + NBA_H1.stake + " a bet is one unit · the list from 23 Nov: " +
+           (g.since.n || g.since.p ? g.since.w + "-" + g.since.l + (g.since.p ? "-" + g.since.p : "") + ", " + nbaH1Dollars(g.since.units) : "no night graded yet") +
+           (g.before.n ? " · on the " + rec.nights.before + " night" + (rec.nights.before === 1 ? "" : "s") + " before it, which the order was drawn on: " + g.before.w + "-" + g.before.l + (g.before.p ? "-" + g.before.p : "") + ", " + nbaH1Dollars(g.before.units) : "") + " · shown, not scored";
+  }
+  function nbaH1RecordHtml() {   // on the NBA record: each kind on every game it speaks to, and the list as it was given
+    var rec = nbaH1Record(), any = false, cls = function (s) { return s.units > 0 ? "good" : s.units < 0 ? "bad" : ""; };
+    var cell = function (s) { return s.n || s.p ? s.w + "-" + s.l + (s.p ? "-" + s.p : "") : "none yet"; };
+    var row = function (label, t, note) {
+      var s = t.since, b = t.before; if (s.n || s.p || b.n || b.p) any = true;
+      return '<tr><td>' + label + '</td><td>' + cell(s) + '</td><td class="' + cls(s) + '">' + (s.n ? (100 * s.w / s.n).toFixed(1) + "%" : "") + '</td><td class="' + cls(s) + '">' + (s.n ? sgn(s.units, 1) + "u" : "") + '</td><td class="' + cls(s) + '">' + (s.n ? nbaH1Dollars(s.units) : "") +
+             '</td><td>' + cell(b) + (b.n ? ' · ' + (100 * b.w / b.n).toFixed(1) + '% · ' + sgn(b.units, 1) + 'u' : '') + '</td><td class="dim">' + note + '</td></tr>';
+    };
+    var h = '<div class="simrecview">The first half\'s best bets <span class="tag">each kind on every game it speaks to, replayed from the rows as their last odds run before the tip stood, then the list as the board gives it, up to ' + NBA_H1.max + ' a night · graded off the half-time score at the app\'s own number and price · one unit is $' + NBA_H1.stake +
+            ' · the order was drawn on the nights before 23 Nov 2026, so those stand apart · shown, not scored</span></div><table class="form simrectab h1tab"><thead><tr><th>Kind</th><th>From 23 Nov</th><th>Does</th><th>Units</th><th>At $' + NBA_H1.stake + ' a bet</th><th>The nights before</th><th>Measured before</th></tr></thead><tbody>';
+    NBA_H1_KINDS.forEach(function (k) { h += row(esc(k[1].replace(/^FIRST HALF · /, "").toLowerCase().replace(/^./, function (ch) { return ch.toUpperCase(); })), rec[k[0]], esc(k[2])); });
+    h += row('<b>The list as given, up to ' + NBA_H1.max + ' a night</b>', rec.given, 'the measured kinds first; a club\'s own total and a split half only to make three · ' + rec.nights.since + ' night' + (rec.nights.since === 1 ? '' : 's') + ' from 23 Nov, ' + rec.nights.before + ' before');
+    /* the list's two parts (23 Nov 2026): on the lists of the two seasons the order was drawn on, the measured kinds went 145-89 (62.0%, +20.0% a bet) and the
+       fills 44-53 (45.4%, -11.3% a bet). The user asked for three or four a night, so the fills stay on the list; the record says each night what each part has done */
+    h += row('&nbsp;&nbsp;of the list, the measured kinds', rec.givenM, 'the over behind a tired favourite, the rested club\'s own total and the cheaper side: on the lists of the two seasons the order was drawn on these went 145-89 (62.0%)');
+    h += row('&nbsp;&nbsp;of the list, the fills to make three', rec.givenF, 'a club\'s own total and a split half, there when the measured kinds give fewer than three: on those same lists they went 44-53 (45.4%)');
     return any ? h + '</tbody></table>' : "";
   }
 
@@ -7074,13 +7313,13 @@ smStore.ready.then(function () {
   function simTakeResOf(t, row) { return nbaSimTakeRes(t, row); }
   function simTakeBtnOf(row, view, key, side) { return nbaSimTakeBtn(row, view, key, side); }
   function simTakeCard(x) {
-    var t = x.t, res = simTakeResOf(t, x.row), price = t.price === null || t.price === undefined ? -110 : t.price, isCall = t.view === "call";   // a call on the game is the board's: its own words (12 Nov 2026)
+    var t = x.t, res = simTakeResOf(t, x.row), price = t.price === null || t.price === undefined ? -110 : t.price, isCall = t.view === "call", isH1 = t.view === "h1";   // a call on the game is the board's: its own words (12 Nov 2026); a first-half best bet the same (23 Nov 2026)
     return '<div class="pk taking sim" data-open="' + x.row.id + '" title="Load ' + esc(x.row.matchup) + ' into the form">' +
-      '<div class="n1">TAKING · ' + esc(x.row.sport) + (isCall ? ' · A CALL ON THE GAME' : ' · SIMULATION') + (t.at ? ' · marked ' + esc(takeWhen(t.at)) : '') + '</div>' +
+      '<div class="n1">TAKING · ' + esc(x.row.sport) + (isH1 ? ' · A FIRST-HALF BEST BET' : isCall ? ' · A CALL ON THE GAME' : ' · SIMULATION') + (t.at ? ' · marked ' + esc(takeWhen(t.at)) : '') + '</div>' +
       '<div class="n2">' + esc(t.pick) + '</div>' +
-      '<div class="n3">' + (isCall ? (t.call === "rest" ? 'rest · the over behind a tired favourite' : t.p === null || t.p === undefined ? 'value · the best number on the board' : 'lean · ' + (100 * t.p).toFixed(1) + '% by the books\' middle')
+      '<div class="n3">' + (isH1 ? esc(nbaH1TakeWords(t)) : isCall ? (t.call === "rest" ? 'rest · the over behind a tired favourite' : t.p === null || t.p === undefined ? 'value · the best number on the board' : 'lean · ' + (100 * t.p).toFixed(1) + '% by the books\' middle')
         : t.p === null || t.p === undefined ? esc(t.band) : (100 * t.p).toFixed(0) + '% by the sim' + (t.worth === null || t.worth === undefined ? '' : ' · worth ' + (100 * t.worth).toFixed(0) + '%') + (t.band === "no call" ? ' (no call by its worth)' : ' · ' + esc(t.band))) +
-        ' · ' + (t.price === null || t.price === undefined ? 'no price on the row (−110 assumed)' : sgn(t.price, 0) + ' needs ' + (implied(price) * 100).toFixed(1) + '%') + (res ? ' · <span class="chip ' + res + '">' + esc(res) + '</span>' : '') + '</div>' +
+        ' · ' + (t.price === null || t.price === undefined ? 'no price on the row (−110 assumed)' : sgn(t.price, 0) + ' needs ' + (implied(price) * 100).toFixed(1) + '%') + (isH1 ? ' · $' + NBA_H1.stake + ' wins ' + nbaH1Wins(price) : '') + (res ? ' · <span class="chip ' + res + '">' + esc(res) + '</span>' : '') + '</div>' +
       '<div class="n4">' + esc(x.row.matchup) + ' · ' + esc(nbaSimTakeViewLabel(t.view)) + '</div>' +
       '<div class="n6">' + simTakeBtnOf(x.row, t.view, t.key, t.side) + '</div></div>';
   }
@@ -7122,7 +7361,8 @@ smStore.ready.then(function () {
     var bets = takesOn(dateISO), sims = simTakesOn(dateISO), ps = propsTakenOn(dateISO), prs = pairTakesList(dateISO), t3s = t3TakesList(dateISO), n = bets.length + sims.length + ps.length + prs.length + t3s.length;
     $("takingHead").hidden = !n; box.hidden = !n;
     if (!n) { box.innerHTML = ""; $("takingCount").textContent = ""; return; }
-    var s = { n: 0, w: 0, l: 0, p: 0, units: 0 }, h = "", callN = sims.filter(function (x) { return x.t.view === "call"; }).length;   // a call on the game is the board's, counted apart from the simulation's (12 Nov 2026)
+    var s = { n: 0, w: 0, l: 0, p: 0, units: 0 }, h = "", callN = sims.filter(function (x) { return x.t.view === "call"; }).length,   // a call on the game is the board's, counted apart from the simulation's (12 Nov 2026)
+        h1N = sims.filter(function (x) { return x.t.view === "h1"; }).length;   // and a first-half best bet apart from both (23 Nov 2026)
     bets.forEach(function (x) { takeTally(s, gradeMarket(x.mk, x.row.finals), x.mk.price); h += takeCard(x); });
     sims.forEach(function (x) { takeTally(s, simTakeResOf(x.t, x.row), x.t.price === null || x.t.price === undefined ? -110 : x.t.price); h += simTakeCard(x); });
     ps.forEach(function (r) { takeTally(s, propTakeRes(r), r.price); h += propTakeCard(r); });
@@ -7130,7 +7370,7 @@ smStore.ready.then(function () {
     t3s.forEach(function (t, i) { t3TakeTally(s, t); h += propsT3Card(t, i, true); });
     h += '<div class="pk taking sum"><div class="n1">TONIGHT</div><div class="n2">' + n + ' bet' + (n === 1 ? '' : 's') + ' marked</div>' +
          '<div class="n3">' + (s.n || s.p ? 'graded ' + s.w + '-' + s.l + (s.p ? '-' + s.p : '') + ' · ' + sgn(s.units, 2) + 'u at one unit each' : 'none graded yet · one unit each') + '</div>' +
-         '<div class="n4">' + bets.length + ' on the card, ' + (sims.length - callN) + ' from the simulation, ' + (callN ? callN + ' call' + (callN === 1 ? '' : 's') + ' on the game, ' : '') + ps.length + ' prop' + (ps.length === 1 ? '' : 's') + (prs.length ? ', ' + prs.length + ' same-game pair' + (prs.length === 1 ? '' : 's') : '') +
+         '<div class="n4">' + bets.length + ' on the card, ' + (sims.length - callN - h1N) + ' from the simulation, ' + (callN ? callN + ' call' + (callN === 1 ? '' : 's') + ' on the game, ' : '') + (h1N ? h1N + ' first-half best bet' + (h1N === 1 ? '' : 's') + ', ' : '') + ps.length + ' prop' + (ps.length === 1 ? '' : 's') + (prs.length ? ', ' + prs.length + ' same-game pair' + (prs.length === 1 ? '' : 's') : '') +
          [2, 3].map(function (k) { var c = t3s.filter(function (t) { return t.legs.length === k; }).length; return c ? ', ' + c + ' ' + t3Word(k) + '-leg ticket' + (c === 1 ? '' : 's') : ''; }).join("") + '</div></div>';
     box.innerHTML = h;
     $("takingCount").textContent = n + " marked";
@@ -7165,7 +7405,7 @@ smStore.ready.then(function () {
   }
   /* the record: every marked bet that has graded, at the price shown when it was marked */
   function takenRecordHtml() {
-    var mk = function () { return { n: 0, w: 0, l: 0, p: 0, says: 0, units: 0 }; }, bets = mk(), sims = mk(), pr = mk(), calls = mk();
+    var mk = function () { return { n: 0, w: 0, l: 0, p: 0, says: 0, units: 0 }; }, bets = mk(), sims = mk(), pr = mk(), calls = mk(), h1s = mk();
     card.forEach(function (r) {
       if (isVoid(r)) return;
       (r.markets || []).forEach(function (m) {
@@ -7176,8 +7416,9 @@ smStore.ready.then(function () {
       });
       if (r.sport === "NBA") (r.simTakes || []).forEach(function (t) {
         var res = simTakeResOf(t, r); if (!res) return;
-        var into = t.view === "call" ? calls : sims;   // a call on the game on its own tile (12 Nov 2026)
-        takeTally(into, res, t.price === null || t.price === undefined ? -110 : t.price); if (res !== "push") into.says += (t.p === null || t.p === undefined ? 0.5 : t.p);
+        var into = t.view === "call" ? calls : t.view === "h1" ? h1s : sims;   // a call on the game on its own tile (12 Nov 2026); a first-half best bet on its own too (23 Nov 2026)
+        var tp = t.price === null || t.price === undefined ? -110 : t.price;
+        takeTally(into, res, tp); if (res !== "push") into.says += (t.view === "h1" ? implied(tp) : t.p === null || t.p === undefined ? 0.5 : t.p);   // the sheet gives a first-half best bet no chance: its tile reads what the price asks
       });
     });
     (typeof props === "undefined" ? [] : props).forEach(function (r0) {
@@ -7188,15 +7429,15 @@ smStore.ready.then(function () {
     var prs = mk(), t3r = { 2: mk(), 3: mk() };
     if (typeof pairTakesAll === "function") pairTakesAll().forEach(function (t) { pairTakeTally(prs, t); });
     if (typeof propsT3TakesAll === "function") propsT3TakesAll().forEach(function (t) { t3TakeTally(t3r[t.legs.length], t); });
-    if (!bets.n && !bets.p && !sims.n && !sims.p && !calls.n && !calls.p && !pr.n && !pr.p && !prs.n && !prs.p && !t3r[2].n && !t3r[2].p && !t3r[3].n && !t3r[3].p) return "";
-    var tile = function (label, s) {
+    if (!bets.n && !bets.p && !sims.n && !sims.p && !calls.n && !calls.p && !h1s.n && !h1s.p && !pr.n && !pr.p && !prs.n && !prs.p && !t3r[2].n && !t3r[2].p && !t3r[3].n && !t3r[3].p) return "";
+    var tile = function (label, s, needs) {   // needs: a tile with no chance of the sheet's behind it, read against what its prices ask
       if (!s.n && !s.p) return "";
       var says = s.n ? s.says / s.n * 100 : 0, does = s.n ? s.w / s.n * 100 : 0;
       return '<div class="' + (s.n ? (s.units > 0 ? 'good' : s.units < 0 ? 'bad' : '') : '') + '"><p class="k">' + esc(label) + '</p><p class="v">' + s.w + '-' + s.l + (s.p ? '-' + s.p : '') + '</p>' +
-             '<p class="s">' + (s.n ? 'says ' + says.toFixed(1) + '% · does ' + does.toFixed(1) + '% (±' + (100 / Math.sqrt(s.n) / 2).toFixed(1) + ') · ' + sgn(s.units, 2) + 'u' : 'pushes only') + '</p></div>';
+             '<p class="s">' + (s.n ? (needs ? 'needs ' : 'says ') + says.toFixed(1) + '% · does ' + does.toFixed(1) + '% (±' + (100 / Math.sqrt(s.n) / 2).toFixed(1) + ') · ' + sgn(s.units, 2) + 'u' + (needs ? ' · ' + nbaH1Dollars(s.units) + ' at $' + NBA_H1.stake + ' a bet' : '') : 'pushes only') + '</p></div>';
     };
-    var h = '<div class="subhead" data-sport="TAKEN">What you took <span class="tag">every bet marked Taking before its game, graded at the price shown when it was marked · one unit each · says is the sheet\'s chance</span></div>' +
-            '<div class="calib" data-sport="TAKEN">' + tile("Game bets taken", bets) + tile("Calls on the game taken", calls) + tile("Simulation calls taken", sims) + tile("Props taken", pr) + tile("Same-game pairs taken", prs) + tile("Two-leg tickets taken", t3r[2]) + tile("Three-leg tickets taken", t3r[3]) + '</div>';
+    var h = '<div class="subhead" data-sport="TAKEN">What you took <span class="tag">every bet marked Taking before its game, graded at the price shown when it was marked · one unit each · says is the sheet\'s chance; a first-half best bet has none, so its tile reads what its prices need</span></div>' +
+            '<div class="calib" data-sport="TAKEN">' + tile("Game bets taken", bets) + tile("Calls on the game taken", calls) + tile("First-half best bets taken", h1s, true) + tile("Simulation calls taken", sims) + tile("Props taken", pr) + tile("Same-game pairs taken", prs) + tile("Two-leg tickets taken", t3r[2]) + tile("Three-leg tickets taken", t3r[3]) + '</div>';
     /* your picks (3 Nov 2026, the user: "is there a way to have the props that I select taken be graded or tracked so I can
        see how I'm picking the bets?"): every marked bet that has graded, night by night with the sheet's own BET and LEAN
        props that night beside it, the props you took by side, band, market and price, and the list of every pick, newest
@@ -7214,7 +7455,7 @@ smStore.ready.then(function () {
       if (r.sport === "NBA") (r.simTakes || []).forEach(function (t) {
         var res = simTakeResOf(t, r); if (!res) return;
         var price = t.price === null || t.price === undefined ? -110 : t.price;
-        picks.push({ d: r.gdate || "", kind: t.view === "call" ? "game call" : "simulation call", text: t.pick + " · " + r.matchup, p: t.p === null || t.p === undefined ? 0.5 : t.p, price: price, res: res, units: payOf(price, res) });
+        picks.push({ d: r.gdate || "", kind: t.view === "call" ? "game call" : t.view === "h1" ? "first-half bet" : "simulation call", text: t.pick + " · " + r.matchup, p: t.view === "h1" ? implied(price) : t.p === null || t.p === undefined ? 0.5 : t.p, price: price, res: res, units: payOf(price, res) });
       });
     });
     (typeof props === "undefined" ? [] : props).forEach(function (r0) {
@@ -9679,23 +9920,25 @@ var qrcode = function() {
     return x;
   }
   function phoneGameKeep(P, have) {   // a line keeps its game's mark only where that game's card was drawn and rides with the save
-    ["take", "four", "bets", "likely", "sim"].forEach(function (k) { (P[k] || []).forEach(function (x) { if (x.gid !== undefined && !(have && typeof have[x.gid] === "string" && have[x.gid])) delete x.gid; }); });
+    ["take", "h1", "four", "bets", "likely", "sim"].forEach(function (k) { (P[k] || []).forEach(function (x) { if (x.gid !== undefined && !(have && typeof have[x.gid] === "string" && have[x.gid])) delete x.gid; }); });
   }
   function phoneChance(p) { return p === null || p === undefined ? undefined : Math.round(p * 1000) / 10; }
   function phonePayload(dateISO, keep) {
     keep = keep || {};
-    var P = { v: 1, d: dateISO, at: new Date().toISOString(), take: [], four: [], bets: [], likely: [], props: [], sim: [], pairs: [], t3: [] };
+    var P = { v: 1, d: dateISO, at: new Date().toISOString(), take: [], h1: [], four: [], bets: [], likely: [], props: [], sim: [], pairs: [], t3: [] };
     if (typeof propsPairs === "function") propsPairs(dateISO).slice(0, 6).forEach(function (t) {
       var res = propsPairRes(t);
       P.pairs.push(phoneRefs(keep, { g: t.game, p: t.legs.map(function (r) { return r.name + " " + r.side + " " + r.line + " " + (PROPS_LABEL[r.mk] || r.mk); }).join(" + "), c: phoneChance(t.chance), pr: t.price, ok: t.chance >= t.need ? 1 : undefined, r: res || undefined }, t.legs, 3));
     });
     var res = function (mk, row) { var r = gradeMarket(mk, row.finals); return r && r !== "invalid" ? r : undefined; };
     takesOn(dateISO).forEach(function (x) { P.take.push(phoneGameRef(keep, { k: "card", s: x.row.sport, g: x.row.matchup, p: x.mk.pick, m: x.mk.label || x.mk.key, c: phoneChance(x.mk.p), pr: x.mk.price, r: res(x.mk, x.row) }, x.row, 0)); });
-    simTakesOn(dateISO).forEach(function (x) { P.take.push(phoneGameRef(keep, { k: x.t.view === "call" ? "call" : "sim", s: "NBA", g: x.row.matchup, p: x.t.pick, m: nbaSimTakeFrom(x.t), c: phoneChance(x.t.p), w: phoneChance(x.t.worth), b: x.t.band === "no call" ? undefined : x.t.band, pr: x.t.price === null ? undefined : x.t.price, r: nbaSimTakeRes(x.t, x.row) || undefined }, x.row, 0)); });
+    simTakesOn(dateISO).forEach(function (x) { P.take.push(phoneGameRef(keep, { k: x.t.view === "call" ? "call" : x.t.view === "h1" ? "h1" : "sim", s: "NBA", g: x.row.matchup, p: x.t.pick, m: x.t.view === "h1" ? nbaH1TakeWords(x.t) : nbaSimTakeFrom(x.t), c: phoneChance(x.t.p), w: phoneChance(x.t.worth), b: x.t.band === "no call" || x.t.view === "h1" ? undefined : x.t.band, pr: x.t.price === null ? undefined : x.t.price, r: nbaSimTakeRes(x.t, x.row) || undefined }, x.row, 0)); });
     propsTakenOn(dateISO).forEach(function (r) { P.take.push(phoneRefs(keep, { k: "prop", s: "NBA", g: r.game, p: r.name + " " + r.side + " " + r.line + " " + (PROPS_LABEL[r.mk] || r.mk), m: "prop", c: phoneChance(r.chance), pr: r.price, b: r.band, r: propTakeRes(r) || undefined }, [r._row || r], 0)); });   // the bet as it was marked; its panel is the prop as the card stands
     if (typeof pairTakesOn === "function") pairTakesOn(dateISO).forEach(function (t) { P.take.push(phoneRefs(keep, { k: "pair", s: "NBA", g: t.game, p: t.legs.map(function (r) { return r.name + " " + r.side + " " + r.line + " " + (PROPS_LABEL[r.mk] || r.mk); }).join(" + "), m: "same-game pair at the parlay price", c: phoneChance(t.chance), pr: t.price, r: propsPairRes(t) || undefined }, t.legs.map(function (l) { return l._row || l; }), 0)); });
     if (typeof propsT3TakesOn === "function") propsT3TakesOn(dateISO).forEach(function (t) { var x = phoneTicket(t); x.k = "ticket"; P.take.push(phoneRefs(keep, x, t.legs.map(function (l) { return l.r; }), 0)); });   // 11 Nov 2026: a ticket you are taking is a bet you are taking
     if (keep.t3 !== false && typeof propsTrebles === "function" && propsBelow !== "leans") propsTrebles(dateISO, null, propsT3Mode(), propsLegs).slice(0, 6).forEach(function (t) { P.t3.push(phoneRefs(keep, phoneTicket(t), t.legs.map(function (l) { return l.r; }), 2)); });
+    // the first half's best bets (23 Nov 2026): the night's list as the board gives it, each with its app, its price and its kind
+    if (typeof nbaH1On === "function") nbaH1On(dateISO).picks.forEach(function (x) { P.h1.push(phoneGameRef(keep, { g: x.row.matchup, s: "NBA", p: x.c.pick + (x.c.app ? " at " + bookName(x.c.app) : ""), m: nbaH1TakeWords({ call: x.c.kind }), pr: x.c.price, r: nbaH1Res(x.c, x.row) || undefined }, x.row, 1)); });
     parlayFour(dateISO).forEach(function (x) { P.four.push(phoneGameRef(keep, { g: x.row.matchup, s: x.row.sport, p: x.mk.pick, m: x.mk.label, c: phoneChance(x.mk.p), pr: x.mk.price === null ? undefined : x.mk.price, b: bandOf(x.mk) || undefined, r: res(x.mk, x.row) }, x.row, 1)); });
     bestBets(dateISO).forEach(function (x) { P.bets.push(phoneGameRef(keep, { g: x.row.matchup, s: x.row.sport, p: x.mk.pick, m: x.mk.label, c: phoneChance(x.mk.p), pr: x.mk.price, e: x.mk.edge === null || x.mk.edge === undefined ? undefined : Math.round(x.mk.edge * 1000) / 10, b: bandOf(x.mk) || undefined, r: res(x.mk, x.row) }, x.row, 1)); });
     if (keep.likely !== false) likeliestLegs(dateISO).forEach(function (x) { P.likely.push(phoneGameRef(keep, { g: x.row.matchup, s: x.row.sport, p: x.mk.pick, c: phoneChance(x.mk.p), pr: x.mk.price, ok: x.mk.p >= x.need ? 1 : undefined, r: res(x.mk, x.row) }, x.row, 2)); });
@@ -9861,7 +10104,7 @@ var qrcode = function() {
     }
     return { map: map, order: order };
   }
-  function phoneLines(P) { return P.take.length + P.four.length + P.bets.length + P.likely.length + P.props.length + P.sim.length + (P.t3 || []).length; }
+  function phoneLines(P) { return P.take.length + (P.h1 || []).length + P.four.length + P.bets.length + P.likely.length + P.props.length + P.sim.length + (P.t3 || []).length; }
   /* the code's size: the least important sections go first when a night runs long, and the sheet says what was left out */
   function phoneFit(dateISO) {
     var steps = [[{}, ""], [{ likely: false }, "the likeliest-at-any-price list"], [{ likely: false, t3: false }, "the likeliest list and the tickets"], [{ likely: false, t3: false, sim: false }, "the likeliest list, the tickets and the simulation's calls"],
@@ -9969,7 +10212,7 @@ var qrcode = function() {
     var one = g && typeof g[gid] === "string" ? phoneClean(g[gid]) : "";
     return one ? '<div class="pp-leg">' + one + '</div>' : (missing || "");
   }
-  function phoneTakeLabel(x) { return "TAKING · " + (x.k === "prop" ? "NBA PROP" : x.k === "sim" ? "NBA · SIMULATION" : x.k === "call" ? "NBA · A CALL ON THE GAME" : x.k === "pair" ? "NBA · SAME-GAME PAIR" : x.k === "ticket" ? "NBA · " + (x.n || 2) + "-LEG TICKET" : x.s); }
+  function phoneTakeLabel(x) { return "TAKING · " + (x.k === "prop" ? "NBA PROP" : x.k === "sim" ? "NBA · SIMULATION" : x.k === "call" ? "NBA · A CALL ON THE GAME" : x.k === "h1" ? "NBA · A FIRST-HALF BEST BET" : x.k === "pair" ? "NBA · SAME-GAME PAIR" : x.k === "ticket" ? "NBA · " + (x.n || 2) + "-LEG TICKET" : x.s); }
   function phoneDate(iso) { try { return new Date(iso + "T12:00:00").toLocaleDateString([], { weekday: "short", month: "short", day: "numeric" }); } catch (e) { return String(iso); } }   // the weekday with it, as m.html writes it
   function phoneSheetHtml(P, tap) {
     var sec = function (title, items, fn) { if (!items || !items.length) return ''; return '<h2>' + esc(title) + ' <span class="pshc">' + items.length + '</span></h2>' + items.map(fn).join(''); };
@@ -9977,6 +10220,7 @@ var qrcode = function() {
     var made = ""; try { made = new Date(P.at).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" }); } catch (e) { made = ""; }
     var h = '';
     h += sec("Taking tonight", P.take, function (x) { return phoneCard(x, "take", phoneTakeLabel(x), tap); });
+    h += sec("The first half's best bets, $" + NBA_H1.stake + " each", P.h1, function (x, i) { return phoneCard(x, "", "#" + (i + 1) + " · NBA · FIRST HALF", tap); });
     h += sec("The parlay four", P.four, function (x, i) { return phoneCard(x, "", "#" + (i + 1) + " · " + x.s, tap); });
     h += sec("Best straight bets", P.bets, function (x, i) { return phoneCard(x, "", "#" + (i + 1) + " · " + x.s, tap); });
     h += sec("Likeliest at any price", P.likely, function (x, i) { return phoneCard(x, "", "#" + (i + 1) + " · " + x.s, tap); });
@@ -9999,6 +10243,7 @@ var qrcode = function() {
       items.forEach(function (x, i) { var l3 = phoneLine3(x); out.push(fn(x, i) + " " + x.p + (x.b ? " [" + x.b + "]" : "") + (x.r ? " · " + String(x.r).toUpperCase() : "") + (l3 ? " · " + l3 : "") + " · " + x.g + (x.m ? " · " + x.m : "") + (x.v ? " · " + x.v : "")); });
     };
     sec("Taking tonight", P.take, function (x, i) { return (i + 1) + "."; });
+    sec("The first half's best bets, $" + NBA_H1.stake + " each", P.h1, function (x, i) { return "#" + (i + 1); });
     sec("The parlay four", P.four, function (x, i) { return "#" + (i + 1); });
     sec("Best straight bets", P.bets, function (x, i) { return "#" + (i + 1); });
     sec("Likeliest at any price", P.likely, function (x, i) { return "#" + (i + 1); });
@@ -10244,7 +10489,7 @@ var qrcode = function() {
       } else {
         var qr = qrcode(0, "L"); qr.addData(url, "Byte"); qr.make();
         h += '<div class="qrbox">' + qr.createSvgTag({ cellSize: 4, margin: 6, scalable: true }) + '</div>';
-        h += '<p class="note"><b>Point your phone\'s camera at the code</b> and open the link. It shows ' + x.n + ' line' + (x.n === 1 ? '' : 's') + ': the bets you are taking, the parlay four, the best straight bets' +
+        h += '<p class="note"><b>Point your phone\'s camera at the code</b> and open the link. It shows ' + x.n + ' line' + (x.n === 1 ? '' : 's') + ': the bets you are taking, the first half\'s best bets, the parlay four, the best straight bets' +
              (x.cut ? '' : ', the likeliest sides, the best props, the night\'s tickets and the simulation\'s calls') + ', view only.' + (x.cut ? ' The night ran long for one code, so ' + esc(x.cut) + ' stayed off it.' : '') +
              ' The picks are inside the code itself, nothing is uploaded; press the button again after a new run for a fresh code. The page is private, so the phone has to be signed in to claude.ai to open it.</p>';
         h += '<p class="note dim"><a href="' + esc(url) + '" target="_blank" rel="noopener">Open the phone sheet in a tab</a> · ' + x.enc.length + ' characters in the code · ' + qr.getModuleCount() + ' modules a side</p>';
@@ -11865,6 +12110,14 @@ var qrcode = function() {
     $("boardCount").textContent = rows.length ? rows.length + " priced markets on " + gameDate(dateISO) : "nothing logged for " + gameDate(dateISO);
     renderTaking(dateISO);   // the bets marked as taken on the date (26 Oct 2026)
 
+    // --- the first half's best bets (23 Nov 2026): basketball, up to four a night, each a $100 bet with its app and price ---
+    if ($("h1best") && typeof nbaH1On === "function") {
+      var hN = nbaH1On(dateISO), hh = "";
+      hN.picks.forEach(function (x, i) { hh += nbaH1Card(x, i); });
+      $("h1Head").hidden = !hN.picks.length; $("h1best").hidden = !hN.picks.length;
+      $("h1best").innerHTML = hh; $("h1Tag").textContent = hN.picks.length ? nbaH1Head(hN) : "";
+    }
+
     // --- a call on every game (12 Nov 2026): basketball, so the section shows when the date has an NBA game ---
     if ($("calls") && typeof nbaCallsOn === "function") {
       var cl = nbaCallsOn(dateISO), ch = "";
@@ -12393,6 +12646,7 @@ var qrcode = function() {
       if (sp === "NBA") h += nbaRefsWatchHtml();   // the referees as a watch (22 Oct 2026)
       if (sp === "NBA") h += nbaSimRecordHtml();   // the simulation's calls, says against does (25 Oct 2026)
       if (sp === "NBA") h += nbaCallsRecordHtml();   // a call on every game, each kind's record (12 Nov 2026)
+      if (sp === "NBA") h += nbaH1RecordHtml();   // the first half's best bets, each kind and the list as given (23 Nov 2026)
     });
     h += takenRecordHtml();   // what you took (26 Oct 2026): the marked bets, graded at the price shown when marked
     /* the board's likeliest side and the two-leg parlays, across every date (15 Oct 2026,
@@ -12617,6 +12871,7 @@ var qrcode = function() {
   if ($("upsets")) $("upsets").addEventListener("click", function (e) { var t = e.target.closest("[data-open]"); if (t) openRow(t.dataset.open); });
   if ($("agree")) $("agree").addEventListener("click", function (e) { if (e.target.closest("[data-stake]")) return; var t = e.target.closest("[data-open]"); if (t) openRow(t.dataset.open); });
   if ($("calls")) $("calls").addEventListener("click", function (e) { if (e.target.closest("[data-stake],[data-take],a")) return; var t = e.target.closest("[data-open]"); if (t) openRow(t.dataset.open); });
+  if ($("h1best")) $("h1best").addEventListener("click", function (e) { if (e.target.closest("[data-stake],[data-take],a")) return; var t = e.target.closest("[data-open]"); if (t) openRow(t.dataset.open); });
   if ($("mid")) $("mid").addEventListener("click", function (e) { if (e.target.closest("[data-stake]")) return; var t = e.target.closest("[data-open]"); if (t) openRow(t.dataset.open); });
   /* the window's boxes on the Simulation card (29 Oct 2026): typed, kept across renders, priced as you type; the Take button
      follows the numbers in the boxes, so the card is redrawn when a number changes and the price alone updates the line */

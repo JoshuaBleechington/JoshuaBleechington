@@ -1552,6 +1552,14 @@
     $("boardCount").textContent = rows.length ? rows.length + " priced markets on " + gameDate(dateISO) : "nothing logged for " + gameDate(dateISO);
     renderTaking(dateISO);   // the bets marked as taken on the date (26 Oct 2026)
 
+    // --- the first half's best bets (23 Nov 2026): basketball, up to four a night, each a $100 bet with its app and price ---
+    if ($("h1best") && typeof nbaH1On === "function") {
+      var hN = nbaH1On(dateISO), hh = "";
+      hN.picks.forEach(function (x, i) { hh += nbaH1Card(x, i); });
+      $("h1Head").hidden = !hN.picks.length; $("h1best").hidden = !hN.picks.length;
+      $("h1best").innerHTML = hh; $("h1Tag").textContent = hN.picks.length ? nbaH1Head(hN) : "";
+    }
+
     // --- a call on every game (12 Nov 2026): basketball, so the section shows when the date has an NBA game ---
     if ($("calls") && typeof nbaCallsOn === "function") {
       var cl = nbaCallsOn(dateISO), ch = "";
@@ -2275,6 +2283,7 @@
   if ($("upsets")) $("upsets").addEventListener("click", function (e) { var t = e.target.closest("[data-open]"); if (t) openRow(t.dataset.open); });
   if ($("agree")) $("agree").addEventListener("click", function (e) { if (e.target.closest("[data-stake]")) return; var t = e.target.closest("[data-open]"); if (t) openRow(t.dataset.open); });
   if ($("calls")) $("calls").addEventListener("click", function (e) { if (e.target.closest("[data-stake],[data-take],a")) return; var t = e.target.closest("[data-open]"); if (t) openRow(t.dataset.open); });
+  if ($("h1best")) $("h1best").addEventListener("click", function (e) { if (e.target.closest("[data-stake],[data-take],a")) return; var t = e.target.closest("[data-open]"); if (t) openRow(t.dataset.open); });
   if ($("mid")) $("mid").addEventListener("click", function (e) { if (e.target.closest("[data-stake]")) return; var t = e.target.closest("[data-open]"); if (t) openRow(t.dataset.open); });
   /* the window's boxes on the Simulation card (29 Oct 2026): typed, kept across renders, priced as you type; the Take button
      follows the numbers in the boxes, so the card is redrawn when a number changes and the price alone updates the line */

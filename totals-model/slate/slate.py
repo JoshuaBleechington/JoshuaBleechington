@@ -7694,6 +7694,18 @@ ODDS_PERIOD = {"MLB": "totals_1st_5_innings", "NHL": "totals_p1", "NBA": "totals
 ODDS_PERIOD_KEYS = {"MLB": ("f5line", "f5op", "f5up"), "NHL": ("p1line", "p1op", "p1up"), "NBA": ("h1line", "h1op", "h1up")}
 ODDS_SPREAD_KEYS = {"MLB": ("rl", "rlh", "rla"), "NHL": ("pl", "plh", "pla"), "NBA": ("sp", "sph", "spa")}
 ODDS_EXTRA = ["alternate_totals", "team_totals"]     # per-game markets fetched beside the period total
+# THE FIRST HALF'S TEAM TOTALS (23 Nov 2026, the user: "I'd like the model to focus a little more on that and for first half team totals ...
+# I want to be able to put a $100 on a 3-4 best bet for either the first half totals for both teams combined or the best team total").
+# Basketball's per-game pull asks for each side's own first-half total too: one more market, so one more credit a game a run where a book
+# prices it. It rides in the shop as `period_team`, each side's Over and Under at every book, beside the first-half total (`period`); the
+# page's first-half list reads both. Nothing on the sheet's own numbers moves.
+ODDS_EXTRA_SPORT = {"NBA": ["team_totals_h1"]}
+ODDS_PERIOD_TEAM = {"NBA": "team_totals_h1"}
+
+
+def odds_event_markets(sport):
+    """The markets one game's extra pull asks for: the period total, the alternates, the team totals, and what the sport adds."""
+    return ",".join([ODDS_PERIOD[sport]] + ODDS_EXTRA + ODDS_EXTRA_SPORT.get(sport, []))
 ODDS_BOOKS = ["fanatics", "betmgm", "draftkings", "fanduel", "caesars", "espnbet", "betrivers", "bovada", "pinnacle"]
 ODDS_SHARP = "pinnacle"                               # read beside the carded line, never carded
 ODDS_LOG = "odds-log.json"
@@ -7777,11 +7789,30 @@ def fetch_odds(sport, key, books):
 
 def fetch_odds_event(sport, event_id, key, books, markets=None):
     """One game's extra markets: the period total, the alternate totals and the
-    team totals (a credit a market the books actually price)."""
-    mk = ",".join([ODDS_PERIOD[sport]] + ODDS_EXTRA) if markets is None else markets
+    team totals, and on basketball each side's first-half total (a credit a
+    market the books actually price)."""
+    mk = odds_event_markets(sport) if markets is None else markets
     q = urllib.parse.urlencode({"apiKey": key, "markets": mk, "oddsFormat": "american",
                                 "dateFormat": "iso", "bookmakers": ",".join(books)})
     return fetch_json("%s/sports/%s/events/%s/odds?%s" % (ODDS_API, ODDS_SPORTS[sport], event_id, q))
+
+
+def odds_event_pull(sport, fetch):
+    """One game's extra markets, asked for in full and, where that call fails, once more without the sport's own extra market
+    (23 Nov 2026). The feed fails a whole call over one market it will not serve, and the period total, the alternates and the
+    team totals ride in the same call: basketball's first-half team totals must never cost a game its first-half total.
+    fetch(markets) gives the feed's answer or raises. -> (the answer or None, the calls made, the first failure's text or "")"""
+    full = odds_event_markets(sport); base = ",".join([ODDS_PERIOD[sport]] + ODDS_EXTRA)
+    try:
+        return fetch(full), 1, ""
+    except Exception as e:  # noqa: BLE001
+        first = str(e)
+    if full == base:
+        return None, 1, first
+    try:
+        return fetch(base), 2, first
+    except Exception as e:  # noqa: BLE001
+        return None, 2, "%s; and without each side's first half: %s" % (first, e)
 
 
 def fetch_odds_history(sport, key, books, at_iso, markets="totals"):
@@ -7950,6 +7981,10 @@ def odds_game(ev, sport, books, extra=None):
         side = "HOME" if desc == full_home else "AWAY" if desc == full_away else None
         if side and name in ("Over", "Under") and point is not None:
             shop.setdefault("team", {}).setdefault(side, {}).setdefault(name.upper(), []).append([b, price, point])
+    for b, name, desc, price, point in odds_rows(extra, ODDS_PERIOD_TEAM.get(sport) or ""):   # each side's own first half (23 Nov 2026)
+        side = "HOME" if desc == full_home else "AWAY" if desc == full_away else None
+        if side and name in ("Over", "Under") and point is not None:
+            shop.setdefault("period_team", {}).setdefault(side, {}).setdefault(name.upper(), []).append([b, price, point])
     if shop:
         shop["book"] = book     # the carded book, so the sheet's split reads the same book
         i["odds"] = json.dumps(shop, separators=(",", ":"))
@@ -8062,13 +8097,15 @@ def make_odds(date_iso, out_dir, log, books=None, sports=("MLB", "NHL", "NBA")):
                 log("  %s @ %s: started %s UTC, skipped; its lines are in play now, so the log keeps the last run before tip as the close" % (
                     odds_nick(ev.get("away_team")), odds_nick(ev.get("home_team")), str(ev.get("commence_time") or "")[11:16]))
                 continue
-            extra = None
-            try:
-                extra = fetch_odds_event(sport, ev.get("id"), key, books)
+            extra, calls, why = odds_event_pull(sport, lambda mk, ev=ev: fetch_odds_event(sport, ev.get("id"), key, books, markets=mk))
+            if extra is not None:
                 used, left = odds_credits()
                 spent += used or 0
-            except Exception as e:  # noqa: BLE001
-                log("  %s @ %s: no period, alternate or team totals on the feed (%s)" % (odds_nick(ev.get("away_team")), odds_nick(ev.get("home_team")), e))
+                if calls > 1:   # the call with each side's first-half total in it failed and the one without it did not
+                    log("  %s @ %s: the feed would not serve the call with each side's first-half total in it (%s); asked again without it, so this game has its first-half total and no club's own half" % (
+                        odds_nick(ev.get("away_team")), odds_nick(ev.get("home_team")), why))
+            else:
+                log("  %s @ %s: no period, alternate or team totals on the feed (%s)" % (odds_nick(ev.get("away_team")), odds_nick(ev.get("home_team")), why))
             g = odds_game(ev, sport, books, extra)
             if sport == "NBA" and kalshi:
                 kb = kalshi_game(kalshi, date_iso, NBA_TRICODE.get(g["away"], g["away"]), NBA_TRICODE.get(g["home"], g["home"]))
@@ -10320,6 +10357,40 @@ def selftest():
     check("odds: the alternate totals ride in the shop with their prices", [x[2] for x in shop3["alt"]["UNDER"]] == [6.5, 7.5] and shop3["alt"]["OVER"][1][1] == 130)
     check("odds: the team totals ride as each side's own number", shop3["team"]["HOME"]["OVER"][0] == ["fanatics", -115, 3.5] and shop3["team"]["AWAY"]["OVER"][0][2] == 4.5 and "UNDER" not in shop3["team"]["AWAY"])
     check("odds: the period total still fills beside them", og3["inputs"]["f5line"] == "3.5")
+    # the first half's team totals (23 Nov 2026): basketball's per-game pull asks for them, and they ride in the shop as period_team
+    ev_h1 = {"id": "h1", "commence_time": "2026-11-24T00:10:00Z", "home_team": "Boston Celtics", "away_team": "New York Knicks", "bookmakers": [
+        {"key": "draftkings", "markets": [{"key": "totals", "outcomes": [{"name": "Over", "price": -110, "point": 224.5}, {"name": "Under", "price": -110, "point": 224.5}]}]}]}
+    extra_h1 = {"id": "h1", "bookmakers": [
+        {"key": "draftkings", "markets": [{"key": "totals_h1", "outcomes": [{"name": "Over", "price": -105, "point": 112.5}, {"name": "Under", "price": -115, "point": 112.5}]},
+                                          {"key": "team_totals_h1", "outcomes": [{"name": "Over", "description": "Boston Celtics", "price": -110, "point": 58.5}, {"name": "Under", "description": "Boston Celtics", "price": -110, "point": 58.5},
+                                                                                 {"name": "Over", "description": "New York Knicks", "price": -102, "point": 54.5}, {"name": "Under", "description": "New York Knicks", "price": -118, "point": 54.5}]}]},
+        {"key": "fanduel", "markets": [{"key": "team_totals_h1", "outcomes": [{"name": "Over", "description": "New York Knicks", "price": -112, "point": 53.5}, {"name": "Under", "description": "New York Knicks", "price": -108, "point": 53.5},
+                                                                              {"name": "Over", "description": "Somebody Else", "price": -110, "point": 50.5}]}]}]}
+    og_h1 = odds_game(ev_h1, "NBA", ["draftkings", "fanduel"], extra_h1)
+    shop_h1 = json.loads(og_h1["inputs"]["odds"])
+    check("odds: basketball's per-game pull asks for each side's first-half total beside the first-half total (one more market a game), and the shop carries them as period_team: each side's Over and Under at every book, a line for neither club dropped; the other sports ask for what they did",
+          odds_event_markets("NBA") == "totals_h1,alternate_totals,team_totals,team_totals_h1" and odds_event_markets("NHL") == "totals_p1,alternate_totals,team_totals" and odds_event_markets("MLB") == "totals_1st_5_innings,alternate_totals,team_totals"
+          and shop_h1["period_team"] == {"HOME": {"OVER": [["draftkings", -110, 58.5]], "UNDER": [["draftkings", -110, 58.5]]},
+                                         "AWAY": {"OVER": [["draftkings", -102, 54.5], ["fanduel", -112, 53.5]], "UNDER": [["draftkings", -118, 54.5], ["fanduel", -108, 53.5]]}}
+          and shop_h1["period"] == {"OVER": [["draftkings", -105, 112.5]], "UNDER": [["draftkings", -115, 112.5]]} and og_h1["inputs"]["h1line"] == "112.5"
+          and "period_team" not in shop3 and "team" not in shop_h1)
+    # the per-game call falls back (23 Nov 2026): the feed fails a whole call over one market it will not serve, and the first-half total rides in that call
+    pulls = []
+    def pull_ok(mk): pulls.append(("ok", mk)); return {"markets": mk}
+    def pull_new_refused(mk):
+        pulls.append(("refuse", mk))
+        if "team_totals_h1" in mk: raise RuntimeError("HTTP Error 422: Unprocessable Entity")
+        return {"markets": mk}
+    def pull_down(mk): pulls.append(("down", mk)); raise RuntimeError("timed out")
+    pull_a = odds_event_pull("NBA", pull_ok); pull_b = odds_event_pull("NBA", pull_new_refused); pull_c = odds_event_pull("NBA", pull_down); pull_d = odds_event_pull("NHL", pull_down)
+    check("odds: one game's extra markets are asked for in full, and where that call fails once more without basketball's first-half team totals, so the new market can never cost a game its first-half total; a sport with no market of its own is asked once",
+          pull_a == ({"markets": "totals_h1,alternate_totals,team_totals,team_totals_h1"}, 1, "")
+          and pull_b == ({"markets": "totals_h1,alternate_totals,team_totals"}, 2, "HTTP Error 422: Unprocessable Entity")
+          and pull_c == (None, 2, "timed out; and without each side's first half: timed out") and pull_d == (None, 1, "timed out")
+          and pulls == [("ok", "totals_h1,alternate_totals,team_totals,team_totals_h1"),
+                        ("refuse", "totals_h1,alternate_totals,team_totals,team_totals_h1"), ("refuse", "totals_h1,alternate_totals,team_totals"),
+                        ("down", "totals_h1,alternate_totals,team_totals,team_totals_h1"), ("down", "totals_h1,alternate_totals,team_totals"),
+                        ("down", "totals_p1,alternate_totals,team_totals")])
     check("odds: the main period line is the number most books post, not one book's alternate, at the first book in the list that posts it",
           odds_main_line([("betmgm", "Over", "", 240, 2.5), ("betmgm", "Under", "", -325, 2.5), ("draftkings", "Over", "", -130, 1.5), ("draftkings", "Under", "", 100, 1.5),
                           ("pinnacle", "Over", "", -122, 1.5), ("pinnacle", "Under", "", 104, 1.5)], ["fanatics", "betmgm", "draftkings"]) == (1.5, -130, 100, "draftkings")

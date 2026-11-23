@@ -1260,7 +1260,7 @@ const CHECKS = ["dome","playoff"];
   };
   const decoded = qrRead(phoneT.n, phoneT.mods);
   chk(phoneT.hidden0 && phoneT.open && /\/m\.html#z[A-Za-z0-9_-]+$/.test(phoneT.link) && phoneT.n >= 57 && phoneT.n % 4 === 1 && decoded === phoneT.link
-      && /^Point your phone's camera at the code and open the link\. It shows \d+ lines: the bets you are taking, the parlay four, the best straight bets, the likeliest sides, the best props, the night's tickets and the simulation's calls, view only\./.test(phoneT.note)
+      && /^Point your phone's camera at the code and open the link\. It shows \d+ lines: the bets you are taking, the first half's best bets, the parlay four, the best straight bets, the likeliest sides, the best props, the night's tickets and the simulation's calls, view only\./.test(phoneT.note)
       && /nothing is uploaded/.test(phoneT.note) && /signed in to claude\.ai/.test(phoneT.note) && new RegExp(phoneT.n + ' modules a side').test(phoneT.dim) && phoneT.closed,
       'phone: the Phone QR button draws a code whose link carries the night\'s picks deflated into the hash of m.html, an independent decoder reads the very link back off the drawn modules, the note says what is in it and how it works, and Escape closes it',
       JSON.stringify({ hidden0: phoneT.hidden0, open: phoneT.open, link: phoneT.link.slice(0, 90), n: phoneT.n, decoded: decoded === phoneT.link ? 'matches' : String(decoded).slice(0, 80), note: phoneT.note.slice(0, 160), dim: phoneT.dim, closed: phoneT.closed }));
@@ -4078,6 +4078,207 @@ const CHECKS = ["dome","playoff"];
       && !(rs.dayCold || []).some(x => /^REST/.test(x)),
       'the over behind a tired favourite, gone cold: ten such games on the days before stay under and the kind, 2-11, is cold: the next such game is given the likelier winner with the rest call named and its record, one where the best number says the over too is given the best number and Take on its card marks the best number (not the rest call, though both say the over at the same app), the record marks the kind cold, and the earlier day reads by what the board would give now (the best number on the two games that have one, the likelier winner on the third)',
       JSON.stringify({ cold: rs.cold, coldTake: rs.coldTake, coldTaking: rs.coldTaking, tableCold: rs.tableCold, dayCold: rs.dayCold }));
+
+  // ---- 23 Nov 2026: the first half's best bets (the user: "since I'm seeing some positive trend with the first half totals, I'd like the model to focus a little
+  //      more on that and for first half team totals ... I want to be able to put a $100 on a 3-4 best bet for either the first half totals for both teams combined
+  //      or the best team total"). Measured on the games that carry the books' own first-half lines: where every app that posts the first-half total is on one number
+  //      and the two sides are priced apart, the cheaper side won 125-82; behind a favourite of 4 or more on the second night of a back to back, the other club
+  //      rested, the first half went over 112-66 on three seasons, and it is the rested club's own half that does it. So the board gives up to four a night, the
+  //      measured kinds first, and where those leave fewer than three it fills from a club's own total and then a half the apps split on, each marked as a fill.
+  //      Each card names the app, the price and what $100 wins, takes a mark, and the record keeps each kind and the list as given, the nights before 23 Nov apart ----
+  // the block loads grade files and an odds file, so the slate the page holds is kept and put back with the card: the next block reads its own
+  const h1Keep = await pg.evaluate(async () => { await smStore.ready; const k = {}; for (const x of ['callsheet3.card.v1', 'callsheet3.props.v1', 'callsheet3.draft.v1', 'callsheet3.slate.v1']) k[x] = await smStore.getItem(x); await smStore.removeItem('callsheet3.card.v1'); await smStore.removeItem('callsheet3.props.v1'); await smStore.removeItem('callsheet3.slate.v1'); return k; });
+  await reloaded();
+  const h1T = await pg.evaluate(async () => {
+    const wait = (ms) => new Promise(r => setTimeout(r, ms || 90)), txt = e => (e ? e.innerText : '').replace(/\s+/g, ' ').trim(), tc = e => (e ? e.textContent : '').replace(/\s+/g, ' ').trim();
+    const set = (id, v) => { const el = document.getElementById(id); el.value = v; el.dispatchEvent(new Event('input', { bubbles: true })); };
+    await smStore.ready;
+    const game = async (date, away, home, f) => { document.getElementById('clear').click(); document.getElementById('m-nba').click(); await wait(); set('gdate', date); set('away', away); set('home', home); set('line', '229.5'); set('op', '-110'); set('up', '-110');
+      Object.keys(f).forEach(k => set(k, f[k])); await wait(); document.getElementById('add').click(); await wait(); };
+    const rows = () => JSON.parse(smStore.getItem('callsheet3.card.v1')), rowOf = (date, away) => rows().find(x => x.gdate === date && x.away === away);
+    const load = async (doc, fname) => { const dt = new DataTransfer(); dt.items.add(new File([JSON.stringify(doc)], fname, { type: 'application/json' })); const inp = document.getElementById('slateFile'); inp.files = dt.files; inp.dispatchEvent(new Event('change', { bubbles: true })); await wait(260); };
+    const grade = (date, list) => load({ format: 'callsheet2.slate', version: 1, date, games: list.map(g => ({ sport: 'NBA', gdate: date, away: g[0], home: g[1], finals: { fa: String(g[2]), fh: String(g[3]), f5a: String(g[4]), f5h: String(g[5]) }, notes: [] })) }, 'nba-grade-' + date + '.json');
+    const cardEls = () => [...document.querySelectorAll('#h1best .pk')];
+    const board = async (d) => { const bd = document.getElementById('boardDate'); bd.value = d; bd.dispatchEvent(new Event('change')); await wait(140);
+      return { hidden: document.getElementById('h1Head').hidden && document.getElementById('h1best').hidden, tag: tc(document.getElementById('h1Tag')),
+               cards: cardEls().map(c => ({ cls: c.className.replace('pk call h1 ', ''), n1: tc(c.querySelector('.n1')), n2: tc(c.querySelector('.n2')), n3: tc(c.querySelector('.n3')), n4: tc(c.querySelector('.n4')), btn: tc(c.querySelector('.n6')) })) }; };
+    const taking = () => [...document.querySelectorAll('#taking .pk.taking')].map(e => txt(e));
+    const table = () => { const t = document.querySelector('#calibBox .h1tab'); return t ? [...t.querySelectorAll('tbody tr')].map(tr => [...tr.children].slice(0, 6).map(td => tc(td)).join(' | ')) : null; };
+    const tableLast = () => { const t = document.querySelector('#calibBox .h1tab'); const tr = t ? [...t.querySelectorAll('tbody tr')].find(x => /^The list as given/.test(tc(x.children[0]))) : null; return tr ? tc(tr.children[6]) : ''; };
+    const tableNotes = () => { const t = document.querySelector('#calibBox .h1tab'); return t ? [...t.querySelectorAll('tbody tr')].slice(-2).map(tr => tc(tr.children[6])) : []; };
+    const per = (lines) => { const o = { OVER: [], UNDER: [] }; Object.keys(lines).forEach(b => { o.OVER.push([b, lines[b][1], lines[b][0]]); o.UNDER.push([b, lines[b][2], lines[b][0]]); }); return o; };   // app: [the number, the over's price, the under's]
+    const spr = (pts) => ({ HOME: Object.keys(pts).map(b => [b, -110, pts[b]]), AWAY: Object.keys(pts).map(b => [b, -110, -pts[b]]) });
+    const bare = (ts) => (ts || []).map(t => { const c = Object.assign({}, t); delete c.at; return c; });
+    const D = '2026-12-12', o = {};
+    // A: the Celtics at home on the second night, logged at -3 and standing at -6.5 by the middle of five books, the Magic rested two days. The lowest first-half
+    //    total among the four apps is 107.5 at two of them, FanDuel's over the better price (another app's 106.5 is lower and is not one of the four); the Magic's
+    //    own first half is lowest among the four at DraftKings (another app is lower there too); the Celtics' own half, three apps on one number, gets nothing in this game
+    const A = { sp: '-3', narest: '2', nhrest: '0', odds: JSON.stringify({ book: 'fanatics', spread: spr({ fanatics: -6.5, draftkings: -6.5, fanduel: -7, betmgm: -6, pinnacle: -6.5 }),
+      period: per({ fanatics: [108.5, -110, -110], draftkings: [107.5, -112, -108], fanduel: [107.5, -105, -115], betmgm: [108.5, -110, -110], espnbet: [106.5, -110, -110] }),
+      period_team: { AWAY: per({ fanatics: [51.5, -110, -110], draftkings: [50.5, -115, -105], betmgm: [51.5, -108, -112], espnbet: [49.5, -110, -110] }), HOME: per({ fanatics: [57.5, -110, -110], draftkings: [57.5, -115, -105], betmgm: [57.5, -108, -112] }) } }) };
+    // B: four apps on 112.5, priced apart: the over is the cheaper side (FanDuel's -102 against the best under, -110). DraftKings posts an alternate at 110.5 too,
+    //    priced far from even, FanDuel one side of another number, and two books that are not apps post other numbers: none of it moves the read
+    const pB = per({ fanatics: [112.5, -110, -110], draftkings: [112.5, -105, -115], fanduel: [112.5, -102, -118], betmgm: [112.5, -108, -112], pinnacle: [113.5, -105, -105], betrivers: [111.5, -110, -110] });
+    pB.OVER.push(['draftkings', -150, 110.5]); pB.UNDER.push(['draftkings', 120, 110.5]); pB.OVER.push(['fanduel', -125, 111.5]);
+    const B = { sp: '-5', narest: '1', nhrest: '1', odds: JSON.stringify({ book: 'fanatics', period: pB }) };   // a favourite of 5 with a day of rest: not the spot
+    // C: three apps on 110.5; the under's best price is at an app that is not one of the four (+100), so the bet is the under at the best of his own, FanDuel's -108
+    const C = { odds: JSON.stringify({ book: 'draftkings', period: per({ draftkings: [110.5, -110, -110], fanduel: [110.5, -112, -108], espnbet: [110.5, -120, 100] }) }) };
+    // Dg: the apps split (two of four on 115.5): a fill; the Hawks' own first half has three apps on 58.5 priced apart: a fill; the Jazz's has three apps on two
+    //     numbers: nothing (a club's own half is read only where every app is on one number)
+    const Dg = { odds: JSON.stringify({ book: 'fanatics', period: per({ fanatics: [115.5, -110, -110], draftkings: [115.5, -105, -115], fanduel: [116.5, -110, -110], betmgm: [114.5, -110, -110] }),
+      period_team: { HOME: per({ fanatics: [58.5, -110, -110], draftkings: [58.5, -115, -105], betmgm: [58.5, -112, -108] }), AWAY: per({ fanatics: [56.5, -110, -110], draftkings: [56.5, -105, -115], betmgm: [57.5, -110, -110] }) } }) };
+    // E: only two apps post it, both on 109.5: a fill. F: four apps on one number, the two sides priced the same: nothing. G: a favourite of 3.5 on the second night
+    //    is not the spot (under 4), so its three apps on one number give the cheaper side, the under at BetMGM
+    const E = { odds: JSON.stringify({ book: 'draftkings', period: per({ draftkings: [109.5, -108, -112], fanduel: [109.5, -110, -110] }) }) };
+    const F = { odds: JSON.stringify({ book: 'fanatics', period: per({ fanatics: [111.5, -110, -110], draftkings: [111.5, -110, -110], fanduel: [111.5, -110, -110], betmgm: [111.5, -110, -110] }) }) };
+    const G = { sp: '-3.5', narest: '1', nhrest: '0', odds: JSON.stringify({ book: 'fanatics', period: per({ fanatics: [114.5, -110, -110], draftkings: [114.5, -110, -110], betmgm: [114.5, -115, -105] }) }) };
+    // H: a favourite of 6 on no rest whose opponent played last night too is not the spot, and its half is priced the same on both sides: nothing
+    const H = { sp: '-6', narest: '0', nhrest: '0', odds: JSON.stringify({ book: 'fanatics', period: per({ fanatics: [113.5, -110, -110], draftkings: [113.5, -110, -110], fanduel: [113.5, -110, -110] }) }) };
+    await game(D, 'Magic', 'Celtics', A); await game(D, 'Suns', 'Thunder', B); await game(D, 'Knicks', 'Bulls', C); await game(D, 'Jazz', 'Hawks', Dg); await game(D, 'Wizards', 'Pistons', E); await game(D, 'Nets', '76ers', F); await game(D, 'Kings', 'Lakers', G); await game(D, 'Heat', 'Nuggets', H);
+    o.before = await board(D);
+    // a press on a card loads its game into the form; Take on the third card (the cheaper side) and on the second (the Magic's own half) marks each as its card shows it
+    cardEls()[0].querySelector('.n2').click(); await wait(140); o.opened = document.getElementById('away').value + ' @ ' + document.getElementById('home').value;
+    cardEls()[1].querySelector('[data-stake]').click(); await wait(160); cardEls()[2].querySelector('[data-stake]').click(); await wait(160);
+    o.afterTake = document.getElementById('away').value + ' @ ' + document.getElementById('home').value;   // a press on Take marks the bet and does not load its game
+    o.taken = { btns: (await board(D)).cards.map(c => c.btn), list: taking(), b: bare((rowOf(D, 'Suns') || {}).simTakes), a: bare((rowOf(D, 'Magic') || {}).simTakes), g: bare((rowOf(D, 'Kings') || {}).simTakes) };
+    // the phone's code for the night
+    document.getElementById('phone').click(); await wait(900);
+    o.phoneLink = (document.querySelector('#phoneBody a') || {}).href || ''; o.phoneNote = txt(document.querySelector('#phoneBody .note'));
+    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })); await wait();
+    // the half-time scores: 58-50 (108 over 107.5; the Magic's 58 over 50.5 where the Celtics' 50 would not be), 50-60 (110 under 112.5), 52-55 (107 under 110.5),
+    // 58-60 (118 over 115.5; the Hawks' 60 over 58.5 where the Jazz's 58 would not be), 54-55 (109 under 109.5), 57-57 (114 under 114.5)
+    await grade(D, [['Magic', 'Celtics', 105, 110, 58, 50], ['Suns', 'Thunder', 100, 118, 50, 60], ['Knicks', 'Bulls', 101, 104, 52, 55], ['Jazz', 'Hawks', 120, 125, 58, 60], ['Wizards', 'Pistons', 108, 111, 54, 55], ['Nets', '76ers', 100, 110, 50, 55], ['Kings', 'Lakers', 110, 115, 57, 57], ['Heat', 'Nuggets', 100, 110, 50, 55]]);
+    o.after = await board(D); o.table = table(); o.tableLast = tableLast();
+    o.took = [...document.querySelectorAll('#calibBox .calib[data-sport="TAKEN"] > div')].map(d => txt(d)); o.takingGraded = taking();
+    // the next night: one measured bet, so the list is filled to three from games not on it: the Hawks' own half, then the half two apps post (the split half of the
+    // Hawks' game is passed over: that game is on the list already), and a fourth game's half that two apps post, at a steeper price, stays off: three is the fill
+    await game('2026-12-13', 'Suns', 'Thunder', B); await game('2026-12-13', 'Jazz', 'Hawks', Dg); await game('2026-12-13', 'Wizards', 'Pistons', E);
+    await game('2026-12-13', 'Nets', '76ers', { odds: JSON.stringify({ book: 'draftkings', period: per({ draftkings: [111.5, -109, -111], fanduel: [111.5, -110, -110] }) }) });
+    o.fill = await board('2026-12-13');
+    // a night with nothing to give: no section. Then a half the apps split on, alone; then a road favourite of 4 on no rest whose first half only two apps post,
+    // neither one of the four, and whose rested opponent's own half one of those posts
+    await game('2026-12-14', 'Nets', '76ers', F); await game('2026-12-14', 'Heat', 'Nuggets', { odds: JSON.stringify({ book: 'fanatics', period: per({ fanatics: [113.5, -110, -110], draftkings: [114.5, -105, -115], fanduel: [115.5, -110, -110] }) }) });   // three apps, three numbers: no number two of them post
+    o.none = await board('2026-12-14');
+    // two apps on 115.5 and two on 116.5: the higher of the two numbers is read, the cheaper side among the apps on it
+    await game('2026-12-14', 'Jazz', 'Hawks', { odds: JSON.stringify({ book: 'fanatics', period: per({ fanatics: [115.5, -110, -110], draftkings: [115.5, -105, -115], fanduel: [116.5, -104, -116], betmgm: [116.5, -110, -110] }) }) });
+    o.split = await board('2026-12-14');
+    await game('2026-12-14', 'Knicks', 'Bulls', { sp: '4', narest: '0', nhrest: '3', odds: JSON.stringify({ book: 'espnbet', period: per({ espnbet: [109.5, -110, -110], caesars: [108.5, -115, -105] }), period_team: { HOME: per({ espnbet: [52.5, -110, -110] }), AWAY: per({ espnbet: [57.5, -110, -110] }) } }) });
+    o.road = await board('2026-12-14');
+    // a night before 23 Nov: its bets are counted apart, on the cards, in the heading and in the record
+    await game('2026-11-10', 'Suns', 'Thunder', B); await game('2026-11-10', 'Kings', 'Lakers', { odds: JSON.stringify({ book: 'fanatics', period: per({ fanatics: [114, -110, -110], draftkings: [114, -110, -110], betmgm: [114, -115, -105] }) }) });
+    await grade('2026-11-10', [['Suns', 'Thunder', 120, 118, 60, 58], ['Kings', 'Lakers', 110, 115, 57, 57]]);   // 118 over 112.5; 114 on a whole number is a push
+    o.early = await board('2026-11-10'); o.fillLater = await board('2026-12-13'); o.tableBefore = table(); o.tableLastBefore = tableLast();
+    // a later odds run: the Celtics were logged at -6.5 on no rest, the over behind them; the run has two books at -3.5 and two at -4.5, read as the one nearer
+    // nought, so the spot is gone and the half reads by its prices; and the run brings a club's own first half for a game logged with no odds at all
+    const D4 = '2026-12-15';
+    await game(D4, 'Magic', 'Celtics', { sp: '-6.5', narest: '2', nhrest: '0', odds: JSON.stringify({ book: 'fanatics', period: per({ fanatics: [108.5, -110, -110], draftkings: [108.5, -112, -108], fanduel: [108.5, -105, -115] }) }) });
+    await game(D4, 'Suns', 'Thunder', {});
+    o.odds0 = await board(D4);
+    await load({ format: 'callsheet2.slate', version: 1, date: D4, generated: '2026-12-15T22:00:00Z', games: [
+      { sport: 'NBA', gdate: D4, away: 'Magic', home: 'Celtics', inputs: { odds: JSON.stringify({ book: 'fanatics', spread: spr({ fanatics: -3.5, draftkings: -3.5, fanduel: -4.5, betmgm: -4.5 }), period: per({ fanatics: [109.5, -110, -110], draftkings: [109.5, -112, -108], fanduel: [109.5, -115, -105] }) }) }, notes: [] },
+      { sport: 'NBA', gdate: D4, away: 'Suns', home: 'Thunder', inputs: { odds: JSON.stringify({ book: 'fanatics', period_team: { HOME: per({ fanatics: [60.5, -110, -110], draftkings: [60.5, -118, -102], betmgm: [60.5, -112, -108] }) } }) }, notes: [] }] }, 'odds-2026-12-15.json');
+    o.odds1 = await board(D4);
+    // the night of the fills, graded: 60-58 (118 over 112.5), 58-57 (the Hawks' 57 under 58.5; 115 under the split half's 115.5, which was not on the list),
+    // 54-55 (109 under 109.5), 56-56 (112 over the fourth game's 111.5, not on the list either): the list went 2-1, its measured bet 1-0 and its two fills 1-1
+    await grade('2026-12-13', [['Suns', 'Thunder', 100, 118, 60, 58], ['Jazz', 'Hawks', 120, 125, 58, 57], ['Wizards', 'Pistons', 108, 111, 54, 55], ['Nets', '76ers', 110, 112, 56, 56]]);
+    o.tableEnd = table(); o.tableLastEnd = tableLast(); o.tableNotes = tableNotes(); o.fillGraded = await board('2026-12-13');
+    return o;
+  });
+  // the phone's page off the code, as a phone draws it
+  const h1SheetErrs = [];
+  const h1Ctx = await pg.context().browser().newContext({ viewport: { width: 390, height: 844 } }), h1Sheet = await h1Ctx.newPage();
+  h1Sheet.on('pageerror', e => h1SheetErrs.push(e.message));
+  let h1SheetText = '';
+  if (/\/m\.html#/.test(h1T.phoneLink || '')) { await h1Sheet.goto(h1T.phoneLink); await h1Sheet.waitForTimeout(600); h1SheetText = await h1Sheet.evaluate(() => document.body.innerText.replace(/\s+/g, ' ').trim()); }
+  await h1Ctx.close();
+  await pg.evaluate(async (k) => { for (const x of Object.keys(k)) { if (k[x] === null || k[x] === undefined) await smStore.removeItem(x); else await smStore.setItem(x, k[x]); } }, h1Keep);
+  await reloaded();
+  const h1c = (b) => ((b || {}).cards || []).map(c => c.cls + ' | ' + c.n1 + ' | ' + c.n2);
+  const h1RestNote = "a favourite of 4 or more on the second night of a back to back, the other club rested: the first half went over 112-66 (62.9%) on three seasons of closes, 32-19 at the lowest number among these apps where the books' own first-half lines were held";
+  const h1TtrestNote = "the rested club's own first half in those games ran 1.9 points over its share of the line, over 114-64 against a stand-in line; no book's first-half team line was held to test it at a price, so its record starts here";
+  const h1CheapNote = "every app that posts the first-half total is on one number and prices the two sides apart: the cheaper side won 125-82 (60.4%) at these apps' prices on two seasons, 63-44 and 62-38; the first-quarter total the same way, 103-69";
+  const h1TtcheapNote = "the cheaper side where every app is on one number, on a club's own first half: no first-half team lines were held to test it, and on full-game team totals it was level (94-85)";
+  const h1SplitNote = "the apps split on the number, or only two post it: the cheaper side at the number most of them post was level (210-205) on two seasons; no edge measured";
+  const h1Head = (mid, rec) => "the first half's total and each club's own, at your four apps · up to 4 a night, the measured kinds first: the over behind a tired favourite, then the cheaper side where every app is on one number · " + mid + " · $100 a bet is one unit · the list from 23 Nov: " + rec + " · shown, not scored";
+  const h1B = (h1T.before || {}).cards || [];
+  chk(!(h1T.before || {}).hidden && h1c(h1T.before).join(' ## ') === "value h1-rest | #1 · FIRST HALF · THE OVER BEHIND A TIRED FAVOURITE | First half OVER 107.5 ## value h1-ttrest | #2 · FIRST HALF · THE RESTED CLUB'S OWN TOTAL | Magic first half OVER 50.5 ## value h1-cheap | #3 · FIRST HALF · THE CHEAPER SIDE | First half OVER 112.5 ## value h1-cheap | #4 · FIRST HALF · THE CHEAPER SIDE | First half UNDER 114.5"
+      && h1B[0].n3 === "-105 at FanDuel · $100 wins $95.24 · needs 51.2% · Celtics are favoured by 6.5 and played last night, Magic rested 2 days: the lowest number your apps post on the first-half total"
+      && h1B[1].n3 === "-115 at DraftKings · $100 wins $86.96 · needs 53.5% · Celtics are favoured by 6.5 and played last night, Magic rested 2 days: the lowest number your apps post on Magic's own first half"
+      && h1B[2].n3 === "-102 at FanDuel · $100 wins $98.04 · needs 50.5% · all 4 apps that post it are on 112.5 and price the two sides apart (-102 against -110): the cheaper side"
+      && h1B[3].n3 === "-105 at BetMGM · $100 wins $95.24 · needs 51.2% · all 3 apps that post it are on 114.5 and price the two sides apart (-105 against -110): the cheaper side"
+      && h1B[0].n4 === 'Magic @ Celtics · ' + h1RestNote + ' · here from 23 Nov: none graded yet' && h1B[1].n4 === 'Magic @ Celtics · ' + h1TtrestNote + ' · here from 23 Nov: none graded yet'
+      && h1B[2].n4 === 'Suns @ Thunder · ' + h1CheapNote + ' · here from 23 Nov: none graded yet' && h1B[3].n4 === 'Kings @ Lakers · ' + h1CheapNote + ' · here from 23 Nov: none graded yet'
+      && h1B.every(c => c.btn === 'Take') && h1T.before.tag === h1Head('4 tonight carry a measured record', 'no night graded yet') && h1T.opened === 'Magic @ Celtics' && h1T.afterTake === 'Magic @ Celtics',
+      'the first half\'s best bets (23 Nov 2026, the user: "I want to be able to put a $100 on a 3-4 best bet for either the first half totals for both teams combined or the best team total"): the board gives up to four a night in the measured order. Behind a favourite of 4 or more on no rest (the spread as it stands in the newest odds, -6.5 by the middle of five books where the row was logged at -3) the first half\'s over at the lowest number among the four apps (107.5 at two of them, FanDuel\'s the better price; another app\'s 106.5 is not one of the four), then the rested club\'s own first-half over at the lowest of the four (the tired favourite\'s own half is left alone), then the cheaper side where every app that posts the half is on one number and prices the sides apart, the best of the four apps\' prices first (an alternate number, a one-sided number and two books that are not apps change nothing); a fifth measured bet, the fills, a half priced the same on both sides and a favourite of 3.5 on no rest (read by its prices) stay off the list. Each card names the app, the price, what $100 wins, what the price needs, why, and what was measured; a press loads the game',
+      JSON.stringify({ hidden: (h1T.before || {}).hidden, cards: h1c(h1T.before), n3: h1B.map(c => c.n3), n4: h1B.map(c => c.n4.slice(0, 60) + ' … ' + c.n4.slice(-40)), btn: h1B.map(c => c.btn), tag: (h1T.before || {}).tag, opened: h1T.opened, afterTake: h1T.afterTake }));
+  const h1K = h1T.taken || {};
+  chk(JSON.stringify(h1K.btns) === JSON.stringify(['Take', '✓ Taking', '✓ Taking', 'Take'])
+      && JSON.stringify(h1K.b) === JSON.stringify([{ id: 'h1|h1|OVER', view: 'h1', key: 'h1', side: 'OVER', line: 112.5, price: -102, p: null, worth: null, band: 'first half', pick: 'First half OVER 112.5 at FanDuel', book: 'fanduel', call: 'cheap' }])
+      && JSON.stringify(h1K.a) === JSON.stringify([{ id: 'h1|h1_away|OVER', view: 'h1', key: 'h1_away', side: 'OVER', line: 50.5, price: -115, p: null, worth: null, band: 'first half', pick: 'Magic first half OVER 50.5 at DraftKings', book: 'draftkings', call: 'ttrest' }])
+      && JSON.stringify(h1K.g) === '[]' && (h1K.list || []).length === 3
+      && (h1K.list || []).some(x => /^TAKING · NBA · A FIRST-HALF BEST BET · marked .+ First half OVER 112\.5 at FanDuel the cheaper side, every app on one number · -102 needs 50\.5% · \$100 wins \$98\.04 Suns @ Thunder · a first-half best bet ✓ Taking$/i.test(x))
+      && (h1K.list || []).some(x => /^TAKING · NBA · A FIRST-HALF BEST BET · marked .+ Magic first half OVER 50\.5 at DraftKings the rested club's own first half behind a tired favourite · -115 needs 53\.5% · \$100 wins \$86\.96 Magic @ Celtics · a first-half best bet ✓ Taking$/i.test(x))
+      && /^TONIGHT 2 bets marked none graded yet · one unit each 0 on the card, 0 from the simulation, 2 first-half best bets, 0 props$/i.test((h1K.list || [])[2] || ''),
+      'the first half\'s best bets, taken: Take on a card marks the bet at the number, the app and the price the card shows (the half\'s over 112.5 at FanDuel at -102, the Magic\'s own first half over 50.5 at DraftKings at -115), the mark keeps which kind it was, the buttons on those two cards read Taking and the others do not, and Taking tonight lists each as a first-half best bet with what $100 wins, counted apart from the simulation\'s calls and the calls on the game',
+      JSON.stringify(h1K));
+  const h1A = (h1T.after || {}).cards || [];
+  chk(h1c(h1T.after).join(' ## ') === "value h1-rest win | #1 · FIRST HALF · THE OVER BEHIND A TIRED FAVOURITE | First half OVER 107.5 WIN ## value h1-ttrest win | #2 · FIRST HALF · THE RESTED CLUB'S OWN TOTAL | Magic first half OVER 50.5 WIN ## value h1-cheap loss | #3 · FIRST HALF · THE CHEAPER SIDE | First half OVER 112.5 LOSS ## value h1-cheap win | #4 · FIRST HALF · THE CHEAPER SIDE | First half UNDER 114.5 WIN"
+      && /here from 23 Nov: 1-0, \+1\.0u$/.test(h1A[0].n4) && /here from 23 Nov: 1-0, \+0\.9u$/.test(h1A[1].n4) && /here from 23 Nov: 2-1, \+0\.9u$/.test(h1A[2].n4)
+      && JSON.stringify(h1A.map(c => c.btn)) === JSON.stringify(['', 'TAKEN', 'TAKEN', '']) && h1T.after.tag === h1Head('4 tonight carry a measured record', '3-1, +$177')
+      && (h1T.table || []).join(' ## ') === "The over behind a tired favourite | 1-0 | 100.0% | +1.0u | +$95 | none yet ## The rested club's own total | 1-0 | 100.0% | +0.9u | +$87 | none yet ## The cheaper side | 2-1 | 66.7% | +0.9u | +$88 | none yet ## A club's own total, to make three | 0-1 | 0.0% | -1.0u | -$100 | none yet ## To make three | 1-1 | 50.0% | -0.0u | -$5 | none yet ## The list as given, up to 4 a night | 3-1 | 75.0% | +1.8u | +$177 | none yet ## of the list, the measured kinds | 3-1 | 75.0% | +1.8u | +$177 | none yet ## of the list, the fills to make three | none yet |  |  |  | none yet"
+      && h1T.tableLast === "the measured kinds first; a club's own total and a split half only to make three · 1 night from 23 Nov, 0 before"
+      && (h1T.took || []).length === 1 && /^First-half best bets taken 1-1 needs 52\.0% · does 50\.0% \(±35\.4\) · [-−]0\.13u · [-−]\$13 at \$100 a bet$/i.test(h1T.took[0])
+      && (h1T.takingGraded || []).some(x => /First half OVER 112\.5 at FanDuel the cheaper side, every app on one number · -102 needs 50\.5% · \$100 wins \$98\.04 · loss Suns @ Thunder · a first-half best bet TAKEN$/i.test(x))
+      && (h1T.takingGraded || []).some(x => /Magic first half OVER 50\.5 at DraftKings .+ · -115 needs 53\.5% · \$100 wins \$86\.96 · win Magic @ Celtics · a first-half best bet TAKEN$/i.test(x)),
+      'the first half\'s best bets, graded off the half-time score: 55-56 puts the half over 107.5 and the Magic over 50.5, 50-60 leaves 112.5 short, 57-57 stays under 114.5, and each card carries its result at its own number; the record keeps each kind on every game it speaks to (the cheaper side 2-1 with the fifth bet that was left off the list, the two fills counted on their own lines) and the list as given 3-1, +$177 at $100 a bet; the two bets taken grade on a tile of their own under What you took, read against what their prices need',
+      JSON.stringify({ cards: h1c(h1T.after), n4: h1A.map(c => c.n4.slice(-34)), btn: h1A.map(c => c.btn), tag: (h1T.after || {}).tag, table: h1T.table, last: h1T.tableLast, took: h1T.took, graded: h1T.takingGraded }));
+  const h1F = (h1T.fill || {}).cards || [], h1R = (h1T.road || {}).cards || [], h1S = (h1T.split || {}).cards || [];
+  chk(h1c(h1T.fill).join(' ## ') === "value h1-cheap | #1 · FIRST HALF · THE CHEAPER SIDE | First half OVER 112.5 ## lean h1-ttcheap | #2 · FIRST HALF · A CLUB'S OWN TOTAL, TO MAKE THREE | Hawks first half UNDER 58.5 ## lean h1-split | #3 · FIRST HALF · TO MAKE THREE | First half OVER 109.5"
+      && h1F[1].n3 === "-105 at DraftKings · $100 wins $95.24 · needs 51.2% · all 3 apps that post it are on 58.5 and price the two sides apart (-105 against -110): the cheaper side"
+      && h1F[2].n3 === "-108 at DraftKings · $100 wins $92.59 · needs 51.9% · only 2 apps post it, both on 109.5: the cheaper side there (-108 against -110)"
+      && h1F[1].n4 === 'Jazz @ Hawks · ' + h1TtcheapNote + ' · here from 23 Nov: 0-1, -1.0u' && h1F[2].n4 === 'Wizards @ Pistons · ' + h1SplitNote + ' · here from 23 Nov: 1-1, -0.0u'
+      && h1T.fill.tag === h1Head('1 tonight carries a measured record, 2 are here to make three', '3-1, +$177')
+      && (h1T.none || {}).hidden === true && ((h1T.none || {}).cards || []).length === 0 && (h1T.none || {}).tag === ''
+      && h1c(h1T.split).join(' ## ') === "lean h1-split | #1 · FIRST HALF · TO MAKE THREE | First half OVER 116.5"
+      && h1S[0].n3 === "-104 at FanDuel · $100 wins $96.15 · needs 51.0% · 2 of the 4 apps that post it are on 116.5, the others off it: the cheaper side there (-104 against -110)"
+      && h1T.split.tag === h1Head('0 tonight carry a measured record, 1 is here to make three', '3-1, +$177')
+      && h1c(h1T.road).join(' ## ') === "value h1-rest | #1 · FIRST HALF · THE OVER BEHIND A TIRED FAVOURITE | First half OVER 108.5 ## value h1-ttrest | #2 · FIRST HALF · THE RESTED CLUB'S OWN TOTAL | Bulls first half OVER 52.5 ## lean h1-split | #3 · FIRST HALF · TO MAKE THREE | First half OVER 116.5"
+      && h1R[0].n3 === "-115 at Caesars · $100 wins $86.96 · needs 53.5% · Knicks are favoured by 4 and played last night, Bulls rested 3 days: none of your four apps posts the first-half total, so the lowest number at the apps that do"
+      && h1R[1].n3 === "-110 at ESPN BET · $100 wins $90.91 · needs 52.4% · Knicks are favoured by 4 and played last night, Bulls rested 3 days: none of your four apps posts Bulls' own first half, so the lowest number at the apps that do"
+      && h1T.road.tag === h1Head('2 tonight carry a measured record, 1 is here to make three', '3-1, +$177'),
+      'the first half\'s best bets, the fills and the edges: a night with one measured bet is filled to three from games not on the list yet, a club\'s own first half (three apps on one number, priced apart) before a half the apps split on or only two post, each card marked as there to make three with what its kind has done (a split half in a game already on the list is passed over); a night with nothing to give shows no section; a half the apps split on says how many of them are on the number; and a road favourite of exactly 4 on no rest is the spot off the logged spread where the row has no shop of spreads, the card saying so where none of the four apps posts the market and the number is another app\'s',
+      JSON.stringify({ fill: h1c(h1T.fill), fn3: h1F.map(c => c.n3), fn4: h1F.map(c => c.n4.slice(-40)), ftag: (h1T.fill || {}).tag, none: h1T.none, split: h1c(h1T.split), sn3: h1S.map(c => c.n3), stag: (h1T.split || {}).tag, road: h1c(h1T.road), rn3: h1R.map(c => c.n3), rtag: (h1T.road || {}).tag }));
+  const h1E = (h1T.early || {}).cards || [], h1L = (h1T.fillLater || {}).cards || [];
+  chk(h1c(h1T.early).join(' ## ') === "value h1-cheap win | #1 · FIRST HALF · THE CHEAPER SIDE | First half OVER 112.5 WIN ## value h1-cheap push | #2 · FIRST HALF · THE CHEAPER SIDE | First half UNDER 114 PUSH"
+      && h1E[0].n4 === 'Suns @ Thunder · ' + h1CheapNote + ' · here from 23 Nov: 2-1, +0.9u (the nights before it: 1-0-1, +1.0u)'
+      && h1T.early.tag === h1Head('2 tonight carry a measured record', '3-1, +$177 · on the 1 night before it, which the order was drawn on: 1-0-1, +$98')
+      && h1L.length === 3 && h1L[0].n4 === 'Suns @ Thunder · ' + h1CheapNote + ' · here from 23 Nov: 2-1, +0.9u (the nights before it: 1-0-1, +1.0u)' && /here from 23 Nov: 0-1, -1\.0u$/.test(h1L[1].n4)
+      && (h1T.tableBefore || []).join(' ## ') === "The over behind a tired favourite | 1-0 | 100.0% | +1.0u | +$95 | none yet ## The rested club's own total | 1-0 | 100.0% | +0.9u | +$87 | none yet ## The cheaper side | 2-1 | 66.7% | +0.9u | +$88 | 1-0-1 · 100.0% · +1.0u ## A club's own total, to make three | 0-1 | 0.0% | -1.0u | -$100 | none yet ## To make three | 1-1 | 50.0% | -0.0u | -$5 | none yet ## The list as given, up to 4 a night | 3-1 | 75.0% | +1.8u | +$177 | 1-0-1 · 100.0% · +1.0u ## of the list, the measured kinds | 3-1 | 75.0% | +1.8u | +$177 | 1-0-1 · 100.0% · +1.0u ## of the list, the fills to make three | none yet |  |  |  | none yet"
+      && h1T.tableLastBefore === "the measured kinds first; a club's own total and a split half only to make three · 1 night from 23 Nov, 1 before",
+      'the first half\'s best bets, the nights before 23 Nov apart: the order was drawn on those nights, so a bet graded on 10 Nov counts in a column of its own in the record, in brackets on the cards and in its own words in the heading, and never in the count from 23 Nov; a half that lands on a whole number is a push, shown on its card and kept out of the wins and the losses',
+      JSON.stringify({ early: h1c(h1T.early), n4: h1E.map(c => c.n4.slice(-70)), tag: (h1T.early || {}).tag, later: h1L.map(c => c.n4.slice(-70)), table: h1T.tableBefore, last: h1T.tableLastBefore }));
+  const h1O0 = (h1T.odds0 || {}).cards || [], h1O1 = (h1T.odds1 || {}).cards || [];
+  chk(h1c(h1T.odds0).join(' ## ') === "value h1-rest | #1 · FIRST HALF · THE OVER BEHIND A TIRED FAVOURITE | First half OVER 108.5"
+      && h1O0[0].n3 === "-105 at FanDuel · $100 wins $95.24 · needs 51.2% · Celtics are favoured by 6.5 and played last night, Magic rested 2 days: the lowest number your apps post on the first-half total"
+      && h1c(h1T.odds1).join(' ## ') === "value h1-cheap | #1 · FIRST HALF · THE CHEAPER SIDE | First half UNDER 109.5 ## lean h1-ttcheap | #2 · FIRST HALF · A CLUB'S OWN TOTAL, TO MAKE THREE | Thunder first half UNDER 60.5"
+      && h1O1[0].n3 === "-105 at FanDuel · $100 wins $95.24 · needs 51.2% · all 3 apps that post it are on 109.5 and price the two sides apart (-105 against -110): the cheaper side"
+      && h1O1[1].n3 === "-102 at DraftKings · $100 wins $98.04 · needs 50.5% · all 3 apps that post it are on 60.5 and price the two sides apart (-102 against -110): the cheaper side",
+      'the first half\'s best bets follow the newest odds on the row: a favourite logged at -6.5 on no rest is the spot until a later odds run has him at -3.5 by the middle of the books (two at -3.5, two at -4.5: the one nearer nought), and then the half reads by its prices at the run\'s numbers (the under at 109.5, not the over at the logged 108.5); and a club\'s own first half that a later run brings for a game logged with no odds is read off that run',
+      JSON.stringify({ odds0: h1c(h1T.odds0), n30: h1O0.map(c => c.n3), odds1: h1c(h1T.odds1), n31: h1O1.map(c => c.n3) }));
+  chk((h1T.tableEnd || []).join(' ## ') === "The over behind a tired favourite | 1-0 | 100.0% | +1.0u | +$95 | none yet ## The rested club's own total | 1-0 | 100.0% | +0.9u | +$87 | none yet ## The cheaper side | 3-1 | 75.0% | +1.9u | +$186 | 1-0-1 · 100.0% · +1.0u ## A club's own total, to make three | 1-1 | 50.0% | -0.0u | -$5 | none yet ## To make three | 2-3 | 40.0% | -1.1u | -$113 | none yet ## The list as given, up to 4 a night | 5-2 | 71.4% | +2.7u | +$271 | 1-0-1 · 100.0% · +1.0u ## of the list, the measured kinds | 4-1 | 80.0% | +2.8u | +$275 | 1-0-1 · 100.0% · +1.0u ## of the list, the fills to make three | 1-1 | 50.0% | -0.0u | -$5 | none yet"
+      && h1T.tableLastEnd === "the measured kinds first; a club's own total and a split half only to make three · 2 nights from 23 Nov, 1 before"
+      && JSON.stringify(h1T.tableNotes) === JSON.stringify(["the over behind a tired favourite, the rested club's own total and the cheaper side: on the lists of the two seasons the order was drawn on these went 145-89 (62.0%)", "a club's own total and a split half, there when the measured kinds give fewer than three: on those same lists they went 44-53 (45.4%)"])
+      && h1c(h1T.fillGraded).join(' ## ') === "value h1-cheap win | #1 · FIRST HALF · THE CHEAPER SIDE | First half OVER 112.5 WIN ## lean h1-ttcheap win | #2 · FIRST HALF · A CLUB'S OWN TOTAL, TO MAKE THREE | Hawks first half UNDER 58.5 WIN ## lean h1-split loss | #3 · FIRST HALF · TO MAKE THREE | First half OVER 109.5 LOSS"
+      && h1T.fillGraded.tag === h1Head('1 tonight carries a measured record, 2 are here to make three', '5-2, +$271 · on the 1 night before it, which the order was drawn on: 1-0-1, +$98'),
+      'the first half\'s best bets, the list in its two parts: the record keeps the measured kinds on the list and the fills on the list on lines of their own under the list as given (a night of one measured bet and two fills went 1-0 and 1-1, so the list 5-2 is 4-1 and 1-1), each with what it did on the two seasons the order was drawn on, and the fills that were passed over are counted on their kinds\' lines only',
+      JSON.stringify({ table: h1T.tableEnd, last: h1T.tableLastEnd, notes: h1T.tableNotes, cards: h1c(h1T.fillGraded), tag: (h1T.fillGraded || {}).tag }));
+  chk(h1SheetErrs.length === 0 && /It shows \d+ lines: the bets you are taking, the first half's best bets, the parlay four, the best straight bets/.test(h1T.phoneNote || '')
+      && /TAKING TONIGHT 2 TAKING · NBA · A FIRST-HALF BEST BET /.test(h1SheetText)
+      && /TAKING · NBA · A FIRST-HALF BEST BET First half OVER 112\.5 at FanDuel [-−]102 needs 50\.5% Suns @ Thunder · the cheaper side, every app on one number THE FIRST HALF'S BEST BETS/.test(h1SheetText)
+      && /TAKING · NBA · A FIRST-HALF BEST BET Magic first half OVER 50\.5 at DraftKings [-−]115 needs 53\.5% Magic @ Celtics · the rested club's own first half behind a tired favourite TAKING/.test(h1SheetText)
+      && /THE FIRST HALF'S BEST BETS, \$100 EACH 4 #1 · NBA · FIRST HALF First half OVER 107\.5 at FanDuel [-−]105 needs 51\.2% Magic @ Celtics · the over behind a tired favourite, in the half #2 · NBA · FIRST HALF Magic first half OVER 50\.5 at DraftKings [-−]115 needs 53\.5% Magic @ Celtics · the rested club's own first half behind a tired favourite #3 · NBA · FIRST HALF First half OVER 112\.5 at FanDuel [-−]102 needs 50\.5% Suns @ Thunder · the cheaper side, every app on one number #4 · NBA · FIRST HALF First half UNDER 114\.5 at BetMGM [-−]105 needs 51\.2% Kings @ Lakers · the cheaper side, every app on one number/.test(h1SheetText),
+      'the first half\'s best bets on the phone: the code carries the night\'s list under the bets you are taking, each with its app, what its price needs and its kind, the two taken marked as first-half best bets, and the note under the code names the list',
+      JSON.stringify({ errs: h1SheetErrs, note: (h1T.phoneNote || '').slice(0, 200), link: (h1T.phoneLink || '').slice(0, 60), text: h1SheetText.slice(0, 1500) }));
 
   // ---- 19 Nov 2026: the bets against the money on the game's card (the user, with a screenshot of "sharp money vs public money", a club with 15% of the bets
   //      and 65% of the money: "Sharp betting from pros and where the money is going type stuff", then "Is there an example I may be able to see ... regarding

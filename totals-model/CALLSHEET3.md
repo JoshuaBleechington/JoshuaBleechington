@@ -6960,3 +6960,295 @@ whole and the sheet's own unders on six starters did not.
 
 One night, and the green picks are two men's stat lines. It is the first
 count, kept because the chip was built the day before.
+
+## The first half's best bets, 23 Nov 2026
+
+The user: "since I'm seeing some positive trend with the first half
+totals, I'd like the model to focus a little more on that and for first
+half team totals. Help me get a lot of money by winning first half
+totals bro. Ideally and no push back bro please, I want to be able to put
+a $100 on a 3-4 best bet for either the first half totals for both teams
+combined or the best team total."
+
+Built as asked: the day board gives up to four first-half bets a night,
+each with its app, its price and what $100 wins, a Take button, a record
+of its own and a place on the phone. What follows is what was measured
+first, the rule, what the rule did on the games it was drawn on, and the
+part of the list that has no measured edge.
+
+Lab: `h1_data.py` (the file of games), `h1_lib.py`, `h1_study1.py` to
+`h1_rule4.py` (the measurements), `h1_page_ref.py` (the rule in Python,
+the reference the page is checked against), `h1_split_check.py`,
+`h1_cheap_cut.py`, `h1_list_check.py`, `h1_diff.py`, `h1_cross.js`.
+
+### 1. The data
+
+Four seasons of quarter scores (ESPN). The books' own first-half total,
+with both prices at each book, on 789 games: 554 of 2024-25 (the period
+lines pulled a quarter of an hour before each tip: DraftKings, FanDuel,
+BetMGM, BetRivers, ESPN BET) and 235 of this season (the card's rows as
+their last odds run before the tip stood, Fanatics among them; the
+page's own replay reads all 241 rows that carry the market). Closing
+totals and spreads for three seasons. No book's first-half TEAM totals
+were held anywhere, for any season.
+
+The half itself: 50.3% of regulation scoring, a standard deviation of
+11.4 points about the books' line, the over 49.7% of the time. The
+books' own line is close to 6.44 + 0.4716 × the total + 0.036 × the size
+of the spread, which is the stand-in used where a game has no real
+first-half line.
+
+### 2. The trend on the card
+
+The sheet's first-half side had gone 131-110 this season (+4.8% a bet,
+the error 6.4). Taken apart, that side is mostly the cheaper of the
+carded book's two first-half prices: the page's own lean on the half
+averages 0.23 points, so the price decides the side nearly every time.
+So the question became whether the cheaper side is a real edge, and
+where.
+
+### 3. What reads level
+
+Against the books' line, at the books' prices, none of these picked a
+side: the two clubs' own first halves so far; the size of the spread;
+the gap between the book's first-half line and its own fit on the total;
+the first-quarter line against the half's; the tip time; rest by itself;
+the total's move from open to close (1.5 errors on the real lines,
+nothing on the stand-in). Shopping the number against the middle of the
+books, the best side on the board went 403-379 at prices asking 52.4%:
+-1.3% a bet.
+
+A side a book leans its OWN two prices to has lost: 1,474-1,481 where
+the prices said 52.5% and asked 55.6%, -10.4% a bet (the error 1.8).
+
+### 4. What does not read level
+
+**The cheaper side, where every app is on one number.** Take the apps
+that post the first-half total (DraftKings, FanDuel, BetMGM, ESPN BET,
+Fanatics, Caesars). Where three or more post it, all on the same number,
+and the best over price and the best under price among them differ, the
+cheaper side at the best price among the user's four apps:
+
+| | Record | A bet returns |
+| --- | --- | --- |
+| Both seasons, as the page reads it | 125-82 (60.4%) | +17.3% (the error 6.9) |
+| 2024-25 | 63-44 (58.9%) | +14.0% (9.2) |
+| This season, to 21 Nov | 62-38 (62.0%) | +20.8% (10.5) |
+| The cheaper side the under | 70-45 | +18.2% |
+| The cheaper side the over | 55-37 | +16.2% |
+| Four apps on the number | 116-76 | +17.3% |
+| Three apps on the number | 9-6 | |
+| The two best prices under 1.2 points of chance apart | 103-67 | +17.4% |
+| 1.2 to 3 points apart | 22-15 | +16.7% |
+
+With a tired favourite's games left in, as first measured, it was
+133-85 (68-47 and 65-38), and on 211 of those 218 bets the best price
+among his four apps was the best among all the apps; on the other seven
+a better price stood at an app that is not one of his. Where the apps
+split on the number, or only two post it, the same
+side at the number most of them post was level: 210-205, -1.6% a bet
+(the error 4.9). On full-game team totals the same rule was level
+(94-85 with four apps on the number). On the first-quarter total, a
+market the rule was not drawn on, it read the same way with four apps on
+the number (103-69) and not with three (77-88).
+
+Why it might be real: when every app agrees on the number, the number is
+settled and the only thing a book can lean is its price; the side the
+books make dearer is the side the public takes, and the half has landed
+on the other. Why it might not be: two seasons, about two hundred bets,
+and a rule found by looking.
+
+**The over behind a tired favourite, in the half.** The full game's
+over in that spot was measured on 17 Nov. In the first half, a favourite
+on the second night of a back to back with the other club rested:
+
+| The favourite | Games | The half over | The rested club's own half over |
+| --- | --- | --- | --- |
+| Any | 255 | 155-100 (60.8%), +1.7 points | 156-99, +1.7 points |
+| By 4 or more | 178 | 112-66 (62.9%), +2.1 | 114-64 (64.0%), +1.9 |
+| By under 4 | 77 | 43-34, +0.7 | 42-35, +1.2 |
+
+Three seasons of closes; the half against the books' own line where held
+and the stand-in elsewhere. At the lowest number among the user's four
+apps, on the games with real lines, as the page reads it: 32-19 (23-13
+in 2024-25, 9-6 this season). The points are the rested club's: the
+favourite's own half was level. The rested club's own first-half total
+is therefore the second bet in such a game, and it has never been tested
+at a price, because no first-half team line was held: its record starts
+on the page.
+
+The spread is read as it stands in the newest odds on the row, the
+middle of the books' home handicaps (of the middle two, the one nearer
+nought), and the logged spread only where the row has none. The rule was
+measured on closes and a logged spread goes stale: Lakers at Clippers on
+28 Oct was logged with the Lakers by 4 on no rest and tipped with the
+Clippers by 1.5.
+
+### 5. The rule on the page
+
+`NBA_H1` in `web/nba.engine.js`; one unit is the $100 he stakes.
+
+1. In a game with a favourite of 4 or more that played yesterday and an
+   opponent that did not: the first half OVER at the lowest number among
+   his four apps (the better price on a tie), then the rested club's own
+   first-half OVER at the lowest number among his four. Where none of
+   his four posts the market, the lowest number among the apps that do,
+   and the card says so. The favourite's own half gets nothing.
+2. In any other game: where three or more apps post the first-half
+   total, all on one number, priced apart, the cheaper side at the best
+   price among his four apps.
+3. A night's list is every bet of kinds 1 and 2, the tired favourite's
+   first, then by price, up to four.
+4. Where that leaves fewer than three, the list is filled to three from
+   games not on it yet: first the cheaper side of a club's own first
+   half where three or more apps are on one number (untested: no lines
+   were held), then the cheaper side of a half the apps split on or only
+   two post (level, 210-205). A fill's card is dashed, headed "to make
+   three", and says no edge was measured.
+
+Shown, not scored: no chance, band, pick or ticket anywhere else on the
+page moves.
+
+### 6. What the list did on the games it was drawn on
+
+The page's own list, night by night (`h1_list_check.py`: 2024-25 off the
+period lines, this season off the card's rows as the page replays them):
+
+| | Record | A bet returns | At $100 a bet | Nights |
+| --- | --- | --- | --- | --- |
+| The list as given | 189-142 (57.1%) | +10.8% (the error 5.7) | +$3,589 | 108: 53 up, 55 down |
+| 2024-25 | 123-100 (55.2%) | +6.9% (7.0) | +$1,530 | 76 |
+| This season to 21 Nov | 66-42 (61.1%) | +19.1% (10.1) | +$2,059 | 32 |
+| Of the list, the measured kinds | 145-89 (62.0%) | +20.0% (6.8) | +$4,683 | |
+| Of the list, the fills to make three | 44-53 (45.4%) | -11.3% (9.9) | -$1,094 | |
+
+A night's list had four bets on 28 nights, three on 65, two on 9, one
+on 6. The measured kinds gave four on 28 nights, three on 20, two on 21,
+one on 20 and none on 19: on most nights there are fewer than three
+measured bets, and the fills make up the count. The fills lost. Whole
+nights resampled, a bet on the list returned between -0.1% and +22.1%
+(95%), above nought in 97.3% of draws; the measured kinds alone +6.7% to
++33.3%, above nought in 99.8%. The longest run of losing bets was 5, of
+losing nights 8; the deepest fall from a high was 8.1 units ($811); the
+worst night -3.0 units and the best +3.8.
+
+**Where in the season the cheaper side won** (`h1_when.py`, every game
+the kind speaks to):
+
+| Stretch | The cheaper side |
+| --- | --- |
+| 2024-25: 22 Oct to 4 Nov | 14-11 |
+| 5 to 18 Nov | 15-6 |
+| 19 Nov to 2 Dec | 7-11 |
+| 3 to 16 Dec | 9-6 |
+| 17 to 31 Dec | 11-7 |
+| 1 to 9 Jan | 7-3 |
+| This season: 20 Oct to 2 Nov | 35-9 |
+| 3 to 12 Nov | 14-10 |
+| 13 to 21 Nov | 13-19 |
+
+This season's 62-38 is 35-9 in the first fortnight and 27-29 since. The
+list as given went 34-14 (+$1,826) to 2 Nov and 32-28 (+$233) from 4
+Nov; over the last ten nights, 12 to 21 Nov, it went 16-18 (-$277).
+Last season the kind won in five stretches of six and lost the second
+half of November as well. The trend the user saw is that first
+fortnight. A hot fortnight is what a rule found by looking is usually
+built on, and that is the reason for the two records.
+
+All of it is in-sample: the kinds, the cut at 4 points and the order
+were chosen on these games. An edge found this way is larger on the
+games it was found on than afterwards. So the page keeps two records for
+every line, the nights before 23 Nov 2026 and the nights from it, and
+only the second is a test.
+
+### 7. On the page
+
+- **Day board**, under Taking tonight: "The first half's best bets", up
+  to four cards. A card: the pick ("First half UNDER 112.5", "Clippers
+  first half OVER 54.5"), the price and the app, what $100 wins, what
+  the price needs, why (who is tired and by how much, or how many apps
+  are on the number and the two prices), what was measured, and the
+  kind's record here from 23 Nov with the nights before it in brackets.
+  A measured kind is a solid green card; a fill is dashed. A press loads
+  the game; Take marks the bet at the card's number, app and price.
+- **Taking tonight** lists a marked bet as a first-half best bet with
+  what $100 wins, counted apart from the simulation's calls and the
+  calls on the game; it grades off the half-time score once the game is
+  final (a club's own half off that club's half-time points).
+- **The NBA record**: a table of eight lines. Each of the five kinds on
+  every game it speaks to (whether or not it made the list), then the
+  list as given, then the list's two parts: the measured kinds on it
+  and the fills on it. Columns: from 23 Nov (record, rate, units,
+  dollars at $100 a bet), the nights before, and what was measured.
+- **What you took**: a tile for the first-half best bets taken, read
+  against what their prices need (the sheet gives these no chance of its
+  own).
+- **The phone**: the night's list rides in the code under the bets being
+  taken.
+
+### 8. slate.py
+
+The odds run's per-game pull asks for one more market on basketball,
+`team_totals_h1` (each side's own first-half total), and carries it on
+the row as `period_team`: `{"HOME": {"OVER": [[book, price, number], ...],
+"UNDER": [...]}, "AWAY": ...}`. One more credit a game a run where a book
+prices it. Hockey and baseball ask for what they asked for before. Until
+he runs the new slate.py the list is first-half totals only; the two
+kinds on a club's own half appear once an odds file carries the market.
+
+The feed fails a whole call over one market it will not serve, and the
+first-half total, the alternates and the team totals ride in the same
+call. The key is listed in the feed's own documentation (Team Totals 1st
+Half) and could not be tried here: the feed answers only with his key,
+and a call spends his credits. So the per-game pull is made in two steps
+(`odds_event_pull`): the full list, and where that call fails, once more
+without basketball's own market, with a line in the log saying which
+game went without. The new market can therefore never cost a game its
+first-half total. Selftest 325.
+
+### 9. Tests
+
+- The page against the Python reference on the backup of 22 Nov: 108
+  picks on 32 nights, none different (pick, app, price, kind, result),
+  and the record table the same (the cheaper side 62-38, the tired
+  favourite 9-6, the split half 44-51, the list 66-42).
+- The harness block of 23 Nov, eight checks on fixture nights: the
+  order and the cut at four, the four apps against the others, a
+  book's alternate and one-sided numbers, the spread from the newest
+  odds over the logged one, a favourite of 3.5, both clubs on no rest,
+  a road favourite, a market none of the four posts, the fills and
+  their order, a tie between two numbers, a night with nothing, a push,
+  the two eras, Take and its grade for the half and for a club's own
+  half, a later odds file, the record's eight lines, the phone.
+- Mutation, two runs, each beside an untouched control that passes
+  every check. The first: 94 broken copies of the page and of the
+  phone's page, one line of the rule, the grade, the record, the card,
+  the mark or the phone changed in each. 92 failed a check. One is the
+  same page in effect (the list's own guard against a press on Take
+  repeats what the page's button handler already does first). One got
+  through and showed a hole in the fixtures: a club's own first half
+  with the apps on two numbers was never drawn, so a rule that read it
+  anyway passed. The fixture was added. The second run: that copy again
+  and twelve more on the lines written after the first run (the
+  measured kinds as one function, the list's two parts in the record,
+  the record's memo). All thirteen failed a check.
+- slate.py: nine broken copies (the market's key, the sport it is asked
+  for, the name it rides under, which side is which, and five of the
+  two-step pull), each failing the selftest beside a control that passes
+  all 325.
+- The full harness: 1,385 checks pass, eight more than before. Its
+  first run failed one check of the block that follows this one: the new
+  block loads grade files and had left its slate in the page's store,
+  and the next block read it. The block now keeps the slate and puts it
+  back; nothing in the page changed between the two runs.
+
+### 10. What is not known
+
+- Whether the cheaper side holds out of sample. The record from 23 Nov
+  is the test; at 60% it takes about 100 bets to stand two errors clear
+  of what the prices need.
+- Whether a club's own first-half total can be bet at a fair number at
+  all: no line has been seen yet. The first odds run with the new
+  slate.py will show which apps post it and how.
+- The fills. They are on the list because the list was asked to carry
+  three; on the games looked at they lost.

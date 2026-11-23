@@ -91,23 +91,25 @@
     return x;
   }
   function phoneGameKeep(P, have) {   // a line keeps its game's mark only where that game's card was drawn and rides with the save
-    ["take", "four", "bets", "likely", "sim"].forEach(function (k) { (P[k] || []).forEach(function (x) { if (x.gid !== undefined && !(have && typeof have[x.gid] === "string" && have[x.gid])) delete x.gid; }); });
+    ["take", "h1", "four", "bets", "likely", "sim"].forEach(function (k) { (P[k] || []).forEach(function (x) { if (x.gid !== undefined && !(have && typeof have[x.gid] === "string" && have[x.gid])) delete x.gid; }); });
   }
   function phoneChance(p) { return p === null || p === undefined ? undefined : Math.round(p * 1000) / 10; }
   function phonePayload(dateISO, keep) {
     keep = keep || {};
-    var P = { v: 1, d: dateISO, at: new Date().toISOString(), take: [], four: [], bets: [], likely: [], props: [], sim: [], pairs: [], t3: [] };
+    var P = { v: 1, d: dateISO, at: new Date().toISOString(), take: [], h1: [], four: [], bets: [], likely: [], props: [], sim: [], pairs: [], t3: [] };
     if (typeof propsPairs === "function") propsPairs(dateISO).slice(0, 6).forEach(function (t) {
       var res = propsPairRes(t);
       P.pairs.push(phoneRefs(keep, { g: t.game, p: t.legs.map(function (r) { return r.name + " " + r.side + " " + r.line + " " + (PROPS_LABEL[r.mk] || r.mk); }).join(" + "), c: phoneChance(t.chance), pr: t.price, ok: t.chance >= t.need ? 1 : undefined, r: res || undefined }, t.legs, 3));
     });
     var res = function (mk, row) { var r = gradeMarket(mk, row.finals); return r && r !== "invalid" ? r : undefined; };
     takesOn(dateISO).forEach(function (x) { P.take.push(phoneGameRef(keep, { k: "card", s: x.row.sport, g: x.row.matchup, p: x.mk.pick, m: x.mk.label || x.mk.key, c: phoneChance(x.mk.p), pr: x.mk.price, r: res(x.mk, x.row) }, x.row, 0)); });
-    simTakesOn(dateISO).forEach(function (x) { P.take.push(phoneGameRef(keep, { k: x.t.view === "call" ? "call" : "sim", s: "NBA", g: x.row.matchup, p: x.t.pick, m: nbaSimTakeFrom(x.t), c: phoneChance(x.t.p), w: phoneChance(x.t.worth), b: x.t.band === "no call" ? undefined : x.t.band, pr: x.t.price === null ? undefined : x.t.price, r: nbaSimTakeRes(x.t, x.row) || undefined }, x.row, 0)); });
+    simTakesOn(dateISO).forEach(function (x) { P.take.push(phoneGameRef(keep, { k: x.t.view === "call" ? "call" : x.t.view === "h1" ? "h1" : "sim", s: "NBA", g: x.row.matchup, p: x.t.pick, m: x.t.view === "h1" ? nbaH1TakeWords(x.t) : nbaSimTakeFrom(x.t), c: phoneChance(x.t.p), w: phoneChance(x.t.worth), b: x.t.band === "no call" || x.t.view === "h1" ? undefined : x.t.band, pr: x.t.price === null ? undefined : x.t.price, r: nbaSimTakeRes(x.t, x.row) || undefined }, x.row, 0)); });
     propsTakenOn(dateISO).forEach(function (r) { P.take.push(phoneRefs(keep, { k: "prop", s: "NBA", g: r.game, p: r.name + " " + r.side + " " + r.line + " " + (PROPS_LABEL[r.mk] || r.mk), m: "prop", c: phoneChance(r.chance), pr: r.price, b: r.band, r: propTakeRes(r) || undefined }, [r._row || r], 0)); });   // the bet as it was marked; its panel is the prop as the card stands
     if (typeof pairTakesOn === "function") pairTakesOn(dateISO).forEach(function (t) { P.take.push(phoneRefs(keep, { k: "pair", s: "NBA", g: t.game, p: t.legs.map(function (r) { return r.name + " " + r.side + " " + r.line + " " + (PROPS_LABEL[r.mk] || r.mk); }).join(" + "), m: "same-game pair at the parlay price", c: phoneChance(t.chance), pr: t.price, r: propsPairRes(t) || undefined }, t.legs.map(function (l) { return l._row || l; }), 0)); });
     if (typeof propsT3TakesOn === "function") propsT3TakesOn(dateISO).forEach(function (t) { var x = phoneTicket(t); x.k = "ticket"; P.take.push(phoneRefs(keep, x, t.legs.map(function (l) { return l.r; }), 0)); });   // 11 Nov 2026: a ticket you are taking is a bet you are taking
     if (keep.t3 !== false && typeof propsTrebles === "function" && propsBelow !== "leans") propsTrebles(dateISO, null, propsT3Mode(), propsLegs).slice(0, 6).forEach(function (t) { P.t3.push(phoneRefs(keep, phoneTicket(t), t.legs.map(function (l) { return l.r; }), 2)); });
+    // the first half's best bets (23 Nov 2026): the night's list as the board gives it, each with its app, its price and its kind
+    if (typeof nbaH1On === "function") nbaH1On(dateISO).picks.forEach(function (x) { P.h1.push(phoneGameRef(keep, { g: x.row.matchup, s: "NBA", p: x.c.pick + (x.c.app ? " at " + bookName(x.c.app) : ""), m: nbaH1TakeWords({ call: x.c.kind }), pr: x.c.price, r: nbaH1Res(x.c, x.row) || undefined }, x.row, 1)); });
     parlayFour(dateISO).forEach(function (x) { P.four.push(phoneGameRef(keep, { g: x.row.matchup, s: x.row.sport, p: x.mk.pick, m: x.mk.label, c: phoneChance(x.mk.p), pr: x.mk.price === null ? undefined : x.mk.price, b: bandOf(x.mk) || undefined, r: res(x.mk, x.row) }, x.row, 1)); });
     bestBets(dateISO).forEach(function (x) { P.bets.push(phoneGameRef(keep, { g: x.row.matchup, s: x.row.sport, p: x.mk.pick, m: x.mk.label, c: phoneChance(x.mk.p), pr: x.mk.price, e: x.mk.edge === null || x.mk.edge === undefined ? undefined : Math.round(x.mk.edge * 1000) / 10, b: bandOf(x.mk) || undefined, r: res(x.mk, x.row) }, x.row, 1)); });
     if (keep.likely !== false) likeliestLegs(dateISO).forEach(function (x) { P.likely.push(phoneGameRef(keep, { g: x.row.matchup, s: x.row.sport, p: x.mk.pick, c: phoneChance(x.mk.p), pr: x.mk.price, ok: x.mk.p >= x.need ? 1 : undefined, r: res(x.mk, x.row) }, x.row, 2)); });
@@ -273,7 +275,7 @@
     }
     return { map: map, order: order };
   }
-  function phoneLines(P) { return P.take.length + P.four.length + P.bets.length + P.likely.length + P.props.length + P.sim.length + (P.t3 || []).length; }
+  function phoneLines(P) { return P.take.length + (P.h1 || []).length + P.four.length + P.bets.length + P.likely.length + P.props.length + P.sim.length + (P.t3 || []).length; }
   /* the code's size: the least important sections go first when a night runs long, and the sheet says what was left out */
   function phoneFit(dateISO) {
     var steps = [[{}, ""], [{ likely: false }, "the likeliest-at-any-price list"], [{ likely: false, t3: false }, "the likeliest list and the tickets"], [{ likely: false, t3: false, sim: false }, "the likeliest list, the tickets and the simulation's calls"],
@@ -381,7 +383,7 @@
     var one = g && typeof g[gid] === "string" ? phoneClean(g[gid]) : "";
     return one ? '<div class="pp-leg">' + one + '</div>' : (missing || "");
   }
-  function phoneTakeLabel(x) { return "TAKING · " + (x.k === "prop" ? "NBA PROP" : x.k === "sim" ? "NBA · SIMULATION" : x.k === "call" ? "NBA · A CALL ON THE GAME" : x.k === "pair" ? "NBA · SAME-GAME PAIR" : x.k === "ticket" ? "NBA · " + (x.n || 2) + "-LEG TICKET" : x.s); }
+  function phoneTakeLabel(x) { return "TAKING · " + (x.k === "prop" ? "NBA PROP" : x.k === "sim" ? "NBA · SIMULATION" : x.k === "call" ? "NBA · A CALL ON THE GAME" : x.k === "h1" ? "NBA · A FIRST-HALF BEST BET" : x.k === "pair" ? "NBA · SAME-GAME PAIR" : x.k === "ticket" ? "NBA · " + (x.n || 2) + "-LEG TICKET" : x.s); }
   function phoneDate(iso) { try { return new Date(iso + "T12:00:00").toLocaleDateString([], { weekday: "short", month: "short", day: "numeric" }); } catch (e) { return String(iso); } }   // the weekday with it, as m.html writes it
   function phoneSheetHtml(P, tap) {
     var sec = function (title, items, fn) { if (!items || !items.length) return ''; return '<h2>' + esc(title) + ' <span class="pshc">' + items.length + '</span></h2>' + items.map(fn).join(''); };
@@ -389,6 +391,7 @@
     var made = ""; try { made = new Date(P.at).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" }); } catch (e) { made = ""; }
     var h = '';
     h += sec("Taking tonight", P.take, function (x) { return phoneCard(x, "take", phoneTakeLabel(x), tap); });
+    h += sec("The first half's best bets, $" + NBA_H1.stake + " each", P.h1, function (x, i) { return phoneCard(x, "", "#" + (i + 1) + " · NBA · FIRST HALF", tap); });
     h += sec("The parlay four", P.four, function (x, i) { return phoneCard(x, "", "#" + (i + 1) + " · " + x.s, tap); });
     h += sec("Best straight bets", P.bets, function (x, i) { return phoneCard(x, "", "#" + (i + 1) + " · " + x.s, tap); });
     h += sec("Likeliest at any price", P.likely, function (x, i) { return phoneCard(x, "", "#" + (i + 1) + " · " + x.s, tap); });
@@ -411,6 +414,7 @@
       items.forEach(function (x, i) { var l3 = phoneLine3(x); out.push(fn(x, i) + " " + x.p + (x.b ? " [" + x.b + "]" : "") + (x.r ? " · " + String(x.r).toUpperCase() : "") + (l3 ? " · " + l3 : "") + " · " + x.g + (x.m ? " · " + x.m : "") + (x.v ? " · " + x.v : "")); });
     };
     sec("Taking tonight", P.take, function (x, i) { return (i + 1) + "."; });
+    sec("The first half's best bets, $" + NBA_H1.stake + " each", P.h1, function (x, i) { return "#" + (i + 1); });
     sec("The parlay four", P.four, function (x, i) { return "#" + (i + 1); });
     sec("Best straight bets", P.bets, function (x, i) { return "#" + (i + 1); });
     sec("Likeliest at any price", P.likely, function (x, i) { return "#" + (i + 1); });
@@ -656,7 +660,7 @@
       } else {
         var qr = qrcode(0, "L"); qr.addData(url, "Byte"); qr.make();
         h += '<div class="qrbox">' + qr.createSvgTag({ cellSize: 4, margin: 6, scalable: true }) + '</div>';
-        h += '<p class="note"><b>Point your phone\'s camera at the code</b> and open the link. It shows ' + x.n + ' line' + (x.n === 1 ? '' : 's') + ': the bets you are taking, the parlay four, the best straight bets' +
+        h += '<p class="note"><b>Point your phone\'s camera at the code</b> and open the link. It shows ' + x.n + ' line' + (x.n === 1 ? '' : 's') + ': the bets you are taking, the first half\'s best bets, the parlay four, the best straight bets' +
              (x.cut ? '' : ', the likeliest sides, the best props, the night\'s tickets and the simulation\'s calls') + ', view only.' + (x.cut ? ' The night ran long for one code, so ' + esc(x.cut) + ' stayed off it.' : '') +
              ' The picks are inside the code itself, nothing is uploaded; press the button again after a new run for a fresh code. The page is private, so the phone has to be signed in to claude.ai to open it.</p>';
         h += '<p class="note dim"><a href="' + esc(url) + '" target="_blank" rel="noopener">Open the phone sheet in a tab</a> · ' + x.enc.length + ' characters in the code · ' + qr.getModuleCount() + ' modules a side</p>';

@@ -72,13 +72,13 @@
   function simTakeResOf(t, row) { return nbaSimTakeRes(t, row); }
   function simTakeBtnOf(row, view, key, side) { return nbaSimTakeBtn(row, view, key, side); }
   function simTakeCard(x) {
-    var t = x.t, res = simTakeResOf(t, x.row), price = t.price === null || t.price === undefined ? -110 : t.price, isCall = t.view === "call";   // a call on the game is the board's: its own words (12 Nov 2026)
+    var t = x.t, res = simTakeResOf(t, x.row), price = t.price === null || t.price === undefined ? -110 : t.price, isCall = t.view === "call", isH1 = t.view === "h1";   // a call on the game is the board's: its own words (12 Nov 2026); a first-half best bet the same (23 Nov 2026)
     return '<div class="pk taking sim" data-open="' + x.row.id + '" title="Load ' + esc(x.row.matchup) + ' into the form">' +
-      '<div class="n1">TAKING · ' + esc(x.row.sport) + (isCall ? ' · A CALL ON THE GAME' : ' · SIMULATION') + (t.at ? ' · marked ' + esc(takeWhen(t.at)) : '') + '</div>' +
+      '<div class="n1">TAKING · ' + esc(x.row.sport) + (isH1 ? ' · A FIRST-HALF BEST BET' : isCall ? ' · A CALL ON THE GAME' : ' · SIMULATION') + (t.at ? ' · marked ' + esc(takeWhen(t.at)) : '') + '</div>' +
       '<div class="n2">' + esc(t.pick) + '</div>' +
-      '<div class="n3">' + (isCall ? (t.call === "rest" ? 'rest · the over behind a tired favourite' : t.p === null || t.p === undefined ? 'value · the best number on the board' : 'lean · ' + (100 * t.p).toFixed(1) + '% by the books\' middle')
+      '<div class="n3">' + (isH1 ? esc(nbaH1TakeWords(t)) : isCall ? (t.call === "rest" ? 'rest · the over behind a tired favourite' : t.p === null || t.p === undefined ? 'value · the best number on the board' : 'lean · ' + (100 * t.p).toFixed(1) + '% by the books\' middle')
         : t.p === null || t.p === undefined ? esc(t.band) : (100 * t.p).toFixed(0) + '% by the sim' + (t.worth === null || t.worth === undefined ? '' : ' · worth ' + (100 * t.worth).toFixed(0) + '%') + (t.band === "no call" ? ' (no call by its worth)' : ' · ' + esc(t.band))) +
-        ' · ' + (t.price === null || t.price === undefined ? 'no price on the row (−110 assumed)' : sgn(t.price, 0) + ' needs ' + (implied(price) * 100).toFixed(1) + '%') + (res ? ' · <span class="chip ' + res + '">' + esc(res) + '</span>' : '') + '</div>' +
+        ' · ' + (t.price === null || t.price === undefined ? 'no price on the row (−110 assumed)' : sgn(t.price, 0) + ' needs ' + (implied(price) * 100).toFixed(1) + '%') + (isH1 ? ' · $' + NBA_H1.stake + ' wins ' + nbaH1Wins(price) : '') + (res ? ' · <span class="chip ' + res + '">' + esc(res) + '</span>' : '') + '</div>' +
       '<div class="n4">' + esc(x.row.matchup) + ' · ' + esc(nbaSimTakeViewLabel(t.view)) + '</div>' +
       '<div class="n6">' + simTakeBtnOf(x.row, t.view, t.key, t.side) + '</div></div>';
   }
@@ -120,7 +120,8 @@
     var bets = takesOn(dateISO), sims = simTakesOn(dateISO), ps = propsTakenOn(dateISO), prs = pairTakesList(dateISO), t3s = t3TakesList(dateISO), n = bets.length + sims.length + ps.length + prs.length + t3s.length;
     $("takingHead").hidden = !n; box.hidden = !n;
     if (!n) { box.innerHTML = ""; $("takingCount").textContent = ""; return; }
-    var s = { n: 0, w: 0, l: 0, p: 0, units: 0 }, h = "", callN = sims.filter(function (x) { return x.t.view === "call"; }).length;   // a call on the game is the board's, counted apart from the simulation's (12 Nov 2026)
+    var s = { n: 0, w: 0, l: 0, p: 0, units: 0 }, h = "", callN = sims.filter(function (x) { return x.t.view === "call"; }).length,   // a call on the game is the board's, counted apart from the simulation's (12 Nov 2026)
+        h1N = sims.filter(function (x) { return x.t.view === "h1"; }).length;   // and a first-half best bet apart from both (23 Nov 2026)
     bets.forEach(function (x) { takeTally(s, gradeMarket(x.mk, x.row.finals), x.mk.price); h += takeCard(x); });
     sims.forEach(function (x) { takeTally(s, simTakeResOf(x.t, x.row), x.t.price === null || x.t.price === undefined ? -110 : x.t.price); h += simTakeCard(x); });
     ps.forEach(function (r) { takeTally(s, propTakeRes(r), r.price); h += propTakeCard(r); });
@@ -128,7 +129,7 @@
     t3s.forEach(function (t, i) { t3TakeTally(s, t); h += propsT3Card(t, i, true); });
     h += '<div class="pk taking sum"><div class="n1">TONIGHT</div><div class="n2">' + n + ' bet' + (n === 1 ? '' : 's') + ' marked</div>' +
          '<div class="n3">' + (s.n || s.p ? 'graded ' + s.w + '-' + s.l + (s.p ? '-' + s.p : '') + ' · ' + sgn(s.units, 2) + 'u at one unit each' : 'none graded yet · one unit each') + '</div>' +
-         '<div class="n4">' + bets.length + ' on the card, ' + (sims.length - callN) + ' from the simulation, ' + (callN ? callN + ' call' + (callN === 1 ? '' : 's') + ' on the game, ' : '') + ps.length + ' prop' + (ps.length === 1 ? '' : 's') + (prs.length ? ', ' + prs.length + ' same-game pair' + (prs.length === 1 ? '' : 's') : '') +
+         '<div class="n4">' + bets.length + ' on the card, ' + (sims.length - callN - h1N) + ' from the simulation, ' + (callN ? callN + ' call' + (callN === 1 ? '' : 's') + ' on the game, ' : '') + (h1N ? h1N + ' first-half best bet' + (h1N === 1 ? '' : 's') + ', ' : '') + ps.length + ' prop' + (ps.length === 1 ? '' : 's') + (prs.length ? ', ' + prs.length + ' same-game pair' + (prs.length === 1 ? '' : 's') : '') +
          [2, 3].map(function (k) { var c = t3s.filter(function (t) { return t.legs.length === k; }).length; return c ? ', ' + c + ' ' + t3Word(k) + '-leg ticket' + (c === 1 ? '' : 's') : ''; }).join("") + '</div></div>';
     box.innerHTML = h;
     $("takingCount").textContent = n + " marked";
@@ -163,7 +164,7 @@
   }
   /* the record: every marked bet that has graded, at the price shown when it was marked */
   function takenRecordHtml() {
-    var mk = function () { return { n: 0, w: 0, l: 0, p: 0, says: 0, units: 0 }; }, bets = mk(), sims = mk(), pr = mk(), calls = mk();
+    var mk = function () { return { n: 0, w: 0, l: 0, p: 0, says: 0, units: 0 }; }, bets = mk(), sims = mk(), pr = mk(), calls = mk(), h1s = mk();
     card.forEach(function (r) {
       if (isVoid(r)) return;
       (r.markets || []).forEach(function (m) {
@@ -174,8 +175,9 @@
       });
       if (r.sport === "NBA") (r.simTakes || []).forEach(function (t) {
         var res = simTakeResOf(t, r); if (!res) return;
-        var into = t.view === "call" ? calls : sims;   // a call on the game on its own tile (12 Nov 2026)
-        takeTally(into, res, t.price === null || t.price === undefined ? -110 : t.price); if (res !== "push") into.says += (t.p === null || t.p === undefined ? 0.5 : t.p);
+        var into = t.view === "call" ? calls : t.view === "h1" ? h1s : sims;   // a call on the game on its own tile (12 Nov 2026); a first-half best bet on its own too (23 Nov 2026)
+        var tp = t.price === null || t.price === undefined ? -110 : t.price;
+        takeTally(into, res, tp); if (res !== "push") into.says += (t.view === "h1" ? implied(tp) : t.p === null || t.p === undefined ? 0.5 : t.p);   // the sheet gives a first-half best bet no chance: its tile reads what the price asks
       });
     });
     (typeof props === "undefined" ? [] : props).forEach(function (r0) {
@@ -186,15 +188,15 @@
     var prs = mk(), t3r = { 2: mk(), 3: mk() };
     if (typeof pairTakesAll === "function") pairTakesAll().forEach(function (t) { pairTakeTally(prs, t); });
     if (typeof propsT3TakesAll === "function") propsT3TakesAll().forEach(function (t) { t3TakeTally(t3r[t.legs.length], t); });
-    if (!bets.n && !bets.p && !sims.n && !sims.p && !calls.n && !calls.p && !pr.n && !pr.p && !prs.n && !prs.p && !t3r[2].n && !t3r[2].p && !t3r[3].n && !t3r[3].p) return "";
-    var tile = function (label, s) {
+    if (!bets.n && !bets.p && !sims.n && !sims.p && !calls.n && !calls.p && !h1s.n && !h1s.p && !pr.n && !pr.p && !prs.n && !prs.p && !t3r[2].n && !t3r[2].p && !t3r[3].n && !t3r[3].p) return "";
+    var tile = function (label, s, needs) {   // needs: a tile with no chance of the sheet's behind it, read against what its prices ask
       if (!s.n && !s.p) return "";
       var says = s.n ? s.says / s.n * 100 : 0, does = s.n ? s.w / s.n * 100 : 0;
       return '<div class="' + (s.n ? (s.units > 0 ? 'good' : s.units < 0 ? 'bad' : '') : '') + '"><p class="k">' + esc(label) + '</p><p class="v">' + s.w + '-' + s.l + (s.p ? '-' + s.p : '') + '</p>' +
-             '<p class="s">' + (s.n ? 'says ' + says.toFixed(1) + '% · does ' + does.toFixed(1) + '% (±' + (100 / Math.sqrt(s.n) / 2).toFixed(1) + ') · ' + sgn(s.units, 2) + 'u' : 'pushes only') + '</p></div>';
+             '<p class="s">' + (s.n ? (needs ? 'needs ' : 'says ') + says.toFixed(1) + '% · does ' + does.toFixed(1) + '% (±' + (100 / Math.sqrt(s.n) / 2).toFixed(1) + ') · ' + sgn(s.units, 2) + 'u' + (needs ? ' · ' + nbaH1Dollars(s.units) + ' at $' + NBA_H1.stake + ' a bet' : '') : 'pushes only') + '</p></div>';
     };
-    var h = '<div class="subhead" data-sport="TAKEN">What you took <span class="tag">every bet marked Taking before its game, graded at the price shown when it was marked · one unit each · says is the sheet\'s chance</span></div>' +
-            '<div class="calib" data-sport="TAKEN">' + tile("Game bets taken", bets) + tile("Calls on the game taken", calls) + tile("Simulation calls taken", sims) + tile("Props taken", pr) + tile("Same-game pairs taken", prs) + tile("Two-leg tickets taken", t3r[2]) + tile("Three-leg tickets taken", t3r[3]) + '</div>';
+    var h = '<div class="subhead" data-sport="TAKEN">What you took <span class="tag">every bet marked Taking before its game, graded at the price shown when it was marked · one unit each · says is the sheet\'s chance; a first-half best bet has none, so its tile reads what its prices need</span></div>' +
+            '<div class="calib" data-sport="TAKEN">' + tile("Game bets taken", bets) + tile("Calls on the game taken", calls) + tile("First-half best bets taken", h1s, true) + tile("Simulation calls taken", sims) + tile("Props taken", pr) + tile("Same-game pairs taken", prs) + tile("Two-leg tickets taken", t3r[2]) + tile("Three-leg tickets taken", t3r[3]) + '</div>';
     /* your picks (3 Nov 2026, the user: "is there a way to have the props that I select taken be graded or tracked so I can
        see how I'm picking the bets?"): every marked bet that has graded, night by night with the sheet's own BET and LEAN
        props that night beside it, the props you took by side, band, market and price, and the list of every pick, newest
@@ -212,7 +214,7 @@
       if (r.sport === "NBA") (r.simTakes || []).forEach(function (t) {
         var res = simTakeResOf(t, r); if (!res) return;
         var price = t.price === null || t.price === undefined ? -110 : t.price;
-        picks.push({ d: r.gdate || "", kind: t.view === "call" ? "game call" : "simulation call", text: t.pick + " · " + r.matchup, p: t.p === null || t.p === undefined ? 0.5 : t.p, price: price, res: res, units: payOf(price, res) });
+        picks.push({ d: r.gdate || "", kind: t.view === "call" ? "game call" : t.view === "h1" ? "first-half bet" : "simulation call", text: t.pick + " · " + r.matchup, p: t.view === "h1" ? implied(price) : t.p === null || t.p === undefined ? 0.5 : t.p, price: price, res: res, units: payOf(price, res) });
       });
     });
     (typeof props === "undefined" ? [] : props).forEach(function (r0) {

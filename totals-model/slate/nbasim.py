@@ -46,6 +46,27 @@ games of play-by-play):
   * Absences (slate.py): a newly absent man costs his club's offence 0.075 per
     100 a point of his scoring and the other side nothing, the market's price.
 
+Engine 3 (23 Nov 2026, the user: "see if the simulation needs to be
+realligned"; "Make it perfect bro"; three seasons of box scores in date
+order against 2,444 closing totals and spreads). Engine 2's own total sat
+2.9 points under the book's line on this season's 207 games; with nothing
+charged for the men out it sat on it. Two things were taking points off the
+total that the close does not take off:
+  * Rest: a club on the second night of a back-to-back loses 0.95 per 100 of
+    its own scoring and gives the other side 0.63 (1.6 of margin, 0.3 of
+    total; engine 2 took all 1.7 off its scoring, so off the total). A third
+    game in four nights, 0.17 and 0.12.
+  * The men out (slate.py, nba_sim_out_adj): the charge is still each
+    regular's points a game times 0.075, but the league's mean charge of the
+    day comes off it first (the level the ratings ride was earned with men
+    out), 0.77 of what is left comes off his club's scoring and 0.13 goes on
+    the other side's (0.9 of margin, 0.64 of total: the sizes the close
+    moves by). Engine 2 took all of it off his club's scoring.
+The margin and the win chance do not move. The total's centre, same games:
+4.08 under the close before and 0.05 over after, its mean miss to the close
+5.02 points against 3.43 and to the final 15.33 against 14.86 (the close
+itself 14.40).
+
 Everything that moves a number here is a named constant with a measured or
 a-priori source, and the backtest (tools_backtest_nba_sim.py) sets the shrink
 each market's raw probability gets before it is shown. Pure standard library,
@@ -54,7 +75,7 @@ so it runs on the user's machine beside slate.py.
 import math
 import random
 
-VERSION = 2
+VERSION = 3
 
 # ---- the league's a-priori figures (2025-26 as the ledger measured them; the slate replaces what it can) ----
 LEAGUE = {
@@ -79,8 +100,16 @@ LEAGUE = {
     "foul_reach": 9,      # the margin inside which it fouls
     "quick_a3": 0.80,     # the trailing side's three share in the window
     "quick_secs": 6.5,    # seconds a quick possession takes; a free-throw trip takes 3
-    "rest_b2b": -1.7,     # points per 100 for a club on the second night of a back-to-back (30 Oct 2026: the close docks a back-to-back 0.7 more than the old -1.0 did, t 2.6, two seasons)
-    "rest_3in4": -0.35,   # points per 100 for a club's third game in four nights (30 Oct 2026: the close, t 2.0)
+    # rest (23 Nov 2026, engine 3; three seasons of box scores in date order against 2,444 closing totals and spreads, lab
+    # sim_avail2_loso.py): the close docks a club on the second night of a back-to-back 1.58 points of margin (the error 0.17) and
+    # 0.32 of total (0.17). The -1.7 per 100 engine 2 took off that club's own scoring got the margin right and took 1.7 off the
+    # total where the book takes 0.3: a tired club scores a point less and gives up most of a point more. So 0.95 comes off its
+    # scoring and 0.63 goes on the other side's. The full-game over behind a tired favourite (17 Nov) is the same thing seen in
+    # the finals. A third game in four nights: 0.29 of margin (0.14) and 0.05 of total (0.15), so 0.17 and 0.12 the same way
+    "rest_b2b": -0.95,     # points per 100 off the scoring of a club on the second night of a back-to-back (-1.7 until 23 Nov 2026)
+    "rest_b2b_opp": 0.63,  # points per 100 on the scoring of the club that faces it
+    "rest_3in4": -0.17,    # points per 100 off the scoring of a club on its third game in four nights (-0.35 until 23 Nov 2026)
+    "rest_3in4_opp": 0.12, # points per 100 on the scoring of the club that faces it
     # score effects (30 Oct 2026): the side in front eases and the side behind presses, each by score_k points per possession
     # per point of margin. Two seasons of closes: a side's first-half surplus comes back 10% in the second half, the margin's
     # 21%, and the margin's spread around the spread is 13.7 where independent possessions give 16.7. The possession-level
@@ -243,6 +272,10 @@ def _target(off, dfn, lg, home_side):
         ppp += lg["rest_b2b"] / 100.0
     if off.get("r3in4"):
         ppp += lg.get("rest_3in4", 0.0) / 100.0
+    if dfn.get("b2b"):
+        ppp += lg.get("rest_b2b_opp", 0.0) / 100.0    # a tired club defends worse (23 Nov 2026, engine 3)
+    if dfn.get("r3in4"):
+        ppp += lg.get("rest_3in4_opp", 0.0) / 100.0
     ppp += (off.get("out_adj") or 0.0) / 100.0
     ppp -= (dfn.get("out_dadj") or 0.0) / 100.0
     return ppp

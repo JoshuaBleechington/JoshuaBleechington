@@ -4240,6 +4240,23 @@ NBA_REF_LEAN_Z = 1.5       # an official, and a crew (the sum of its three), lea
 NBA_AGREE_SIM_P = 0.55     # the agreement rule (28 Oct 2026, tools_nba_total_agree.py): the sim's own view at this chance and the crew's lean on the same side
 NBA_SIM_OUT_PPG = 0.075     # an OUT regular's cost, points per 100 possessions off his club's offence: his points a game times this (30 Oct 2026, measured within the club over two seasons of closes, 188 cases: a newly absent scorer costs 0.62 points of margin and 0.77 of total per 10 ppg at the close, nothing on the other side's scoring; the old 0.15 plus 0.03 a minute, split three fifths offence and two fifths defence, cost a 25-point man 4.7 points of margin, three times the market's)
 NBA_SIM_OUT_MPG = 0.0       # his minutes a game add nothing beyond his points (the same measurement)
+# Engine 3 (23 Nov 2026, the user: "see if the simulation needs to be realligned"; "Make it perfect bro"). Who PLAYED each night of
+# three seasons, in date order, against 2,444 closing totals and spreads (lab sim_avail2*.py; the ledger's did-not-play lists are the
+# injury page as it stood when a game was fetched and could not be used: 2,344 of 13,301 entries of 2024-25 played that night).
+# A club's charge for its men out moves the closing spread by 0.89 of itself (the error 0.03) and the closing total by 0.64 (0.03),
+# and the mean club carries 1.7 per 100 of charge on any night, which the level the ratings ride was earned with. Engine 2 took the
+# whole charge off the club's own scoring and nothing for the mean: the margin right, the total 4.1 points under the close on those
+# games and 2.9 under on this season's 207 logged rows. So the mean charge of the clubs on tonight's slate comes off each club's
+# first; of what is left NBA_SIM_OUT_OWN comes off its own scoring and NBA_SIM_OUT_OPP goes on the other side's (their sum the
+# margin's 0.90, their difference the total's 0.64). Held out a season at a time this carried as well as pricing each man by his
+# share of the club's rating or crediting the men back (models B to E within 0.02 points of each other), so the simplest stands.
+# The same games, engine 2 against engine 3: the total's centre 4.08 under the close against 0.05 over (by season -0.09, +0.31,
+# -0.32); its mean miss to the close 5.02 against 3.43 and to the final 15.33 against 14.86 (the close itself 14.40; the gain 0.47
+# a game, days resampled 0.30 to 0.65, nearer the final in 12 months of 15); the margin's miss and the winner's log loss unmoved
+# (2.79 to the book, 11.21 to the final, 0.5962 against 0.5970). The day's mean against the season's to date or a shrunk blend:
+# the same to the third decimal at every size of slate (sim_avail2_mean.py), so the day's own mean stands
+NBA_SIM_OUT_OWN = 0.77      # of a club's charge against the slate's mean: off its own scoring, points per 100
+NBA_SIM_OUT_OPP = 0.13      # of the same: on the other side's scoring
 NBA_TEND_FILE = "nba-tend.json"
 
 
@@ -4255,14 +4272,35 @@ def nba_load_tend(out_dir):
         return None
 
 
-def nba_sim_out_adj(out_list):
-    """(offence, defence) adjustments per 100 possessions from a club's who-is-out list: the cost comes off the club's
-    own scoring; the other side's scoring does not move (the market's pricing of a newly absent man, 30 Oct 2026)."""
+def nba_sim_out_charge(out_list):
+    """A club's charge for its men out, points per 100 possessions: each listed-Out regular's points a game times
+    NBA_SIM_OUT_PPG (30 Oct 2026). A doubtful or questionable man and a man under NBA_REGULAR_MPG minutes cost nothing."""
     cost = 0.0
     for e in out_list or []:
         if str(e.get("st", "")).lower().startswith("out") and (e.get("mpg") or 0) >= NBA_REGULAR_MPG:
             cost += NBA_SIM_OUT_PPG * (e.get("ppg") or 0) + NBA_SIM_OUT_MPG * (e.get("mpg") or 0)
-    return -cost, 0.0
+    return cost
+
+
+def nba_sim_out_mean(out_lists):
+    """The mean charge of the clubs on tonight's slate (engine 3, 23 Nov 2026): what the level the ratings ride already
+    carries for men out. None with no club."""
+    costs = [nba_sim_out_charge(o) for o in out_lists or []]
+    return (sum(costs) / len(costs)) if costs else None
+
+
+def nba_sim_out_adj(out_list, mean=None):
+    """(own scoring, defence) adjustments per 100 possessions from a club's who-is-out list. With the slate's mean charge
+    (engine 3, 23 Nov 2026): the club's charge less the mean, NBA_SIM_OUT_OWN of it off its own scoring and NBA_SIM_OUT_OPP
+    of it on the other side's (nbasim takes the second number off what the other side scores, so it is negative when the
+    club has more out than the mean). A club with fewer out than the mean scores a little more and gives up a little less.
+    With no mean (a caller with no slate around the game) the whole charge comes off the club's own scoring and the other
+    side's does not move: engine 2's rule (30 Oct 2026), right for the margin and low for the total."""
+    cost = nba_sim_out_charge(out_list)
+    if mean is None:
+        return -cost, 0.0
+    c = cost - mean
+    return -NBA_SIM_OUT_OWN * c, -NBA_SIM_OUT_OPP * c
 
 
 def nba_sim_ft_factor(crew, refs):
@@ -4327,27 +4365,33 @@ def nba_prop_sim_read(gs, home_side, proj):
             "read": read, "blowout": gs["blowout"], "ot": gs["ot"], "poss": gs["poss"], "home_win": gs["home_win"], "out": (gs.get("out") or {}).get("home" if home_side else "away", 0.0)}
 
 
-def nba_sim_block(g, sides, prof, refs, crew, runs, log):
-    """The row's nbasim block: both views' histograms, the anchor, the profiles."""
+def nba_sim_block(g, sides, prof, refs, crew, runs, log, out_mean=None):
+    """The row's nbasim block: both views' histograms, the anchor, the profiles. `out_mean` is the slate's mean charge
+    for men out (nba_sim_out_mean), which engine 3 takes off each club's before it prices it."""
     if not nbasim or not prof:
         return None
-    adj_a, adj_h = nba_sim_out_adj(sides[0]["out"]), nba_sim_out_adj(sides[1]["out"])
+    adj_a, adj_h = nba_sim_out_adj(sides[0]["out"], out_mean), nba_sim_out_adj(sides[1]["out"], out_mean)
     out_adj = {"away": adj_a[0], "home": adj_h[0]}
+    out_dadj = {"away": adj_a[1], "home": adj_h[1]}
+    charge = {"away": nba_sim_out_charge(sides[0]["out"]), "home": nba_sim_out_charge(sides[1]["out"])}
     ftf = nba_sim_ft_factor(crew, refs)
     setup = nbasim.setup_from_profiles(prof, g["away"], g["home"], g.get("date") or "", ft_factor=ftf, out_adj=out_adj)
     if not setup:
         return None
-    setup["away"]["out_dadj"], setup["home"]["out_dadj"] = adj_a[1], adj_h[1]
+    setup["away"]["out_dadj"], setup["home"]["out_dadj"] = out_dadj["away"], out_dadj["home"]
     seed = int(str(g.get("id") or "0")[-6:] or 0)
     own = nbasim.simulate(setup, n=runs, seed=seed)
     block = {"v": nbasim.VERSION, "runs": runs, "own": nbasim.histograms(own), "mkt": None, "anchor": None, "ft_factor": round(ftf, 3),
              "shrink": nbasim.SHRINK, "bands": nbasim.BANDS, "level": setup["league"].get("level"),   # the league's level the ratings ride (30 Oct 2026)
              "prof": {s: {"ortg": round(setup[s]["ortg"], 1), "drtg": round(setup[s]["drtg"], 1), "pace": round(setup[s]["pace"], 1), "n": setup[s].get("n", 0),
-                          "b2b": bool(setup[s].get("b2b")), "out": round(out_adj[s], 2), "a3": round(setup[s]["a3"], 3)} for s in ("away", "home")}}
+                          "b2b": bool(setup[s].get("b2b")), "r3in4": bool(setup[s].get("r3in4")), "out": round(out_adj[s], 2), "outo": round(-out_dadj[s], 2),
+                          "charge": round(charge[s], 2), "a3": round(setup[s]["a3"], 3)} for s in ("away", "home")}}
+    if out_mean is not None:
+        block["out_mean"] = round(out_mean, 2)   # the slate's mean charge, off each club's before it is priced (engine 3)
     o = g.get("odds") or {}
     if o.get("total") is not None:
         setup2 = nbasim.setup_from_profiles(prof, g["away"], g["home"], g.get("date") or "", ft_factor=ftf, out_adj=out_adj)
-        setup2["away"]["out_dadj"], setup2["home"]["out_dadj"] = adj_a[1], adj_h[1]
+        setup2["away"]["out_dadj"], setup2["home"]["out_dadj"] = out_dadj["away"], out_dadj["home"]
         mkt = nbasim.simulate_anchored(setup2, o["total"], o.get("sp"), n=runs, seed=seed + 1)
         block["mkt"] = nbasim.histograms(mkt)
         block["anchor"] = {"total": o["total"], "sp": o.get("sp"), "book": o.get("book") or "the book"}
@@ -4600,208 +4644,15 @@ def nba_odds_note(o, away, home):
     return "%s on ESPN's scoreboard at the slate run: %s. Shown for the opener and as a check on the carded book; the lines come from the odds run." % (o.get("book") or "The book", "; ".join(bits))
 
 
-# ---- the crowd on Kalshi (4 Nov 2026) -------------------------------------------------------------------------
-# The user: "if I wanted to use some metrics from Kalshi such as public percentages on who may win the game... what
-# could we add to help the model or give me more info at a glance?" Kalshi's market endpoint needs no key. A game-winner
-# market is one binary contract a side, priced in cents: the price is the crowd's probability with no vig, the bid-ask
-# spread the only juice, and the fee is taken on the win (7% of the expected profit a contract, so a yes at 57 cents
-# costs 57 + 0.07 x 57 x 43 = 58.7). The slate keeps each side's bid, ask, last, volume and open interest on the row
-# (nbakalshi) from the slate run and the odds run; the page shows the crowd beside the book and Pinnacle, says which
-# price is better after the fee, and keeps the sharp side against the crowd (three points or more from Pinnacle) on a
-# record line. Shown, not scored: a prediction market's price is a market price, not a lean, and the market price is
-# already the sheet's spine. The event ticker reads KXNBAGAME-26NOV04ATLWAS, the date then the two clubs' codes
-KALSHI_API = "https://api.elections.kalshi.com/trade-api/v2"
-# the three series (4 Nov 2026, the user's listings): the game winner, one contract a side; the spread, a ladder a club
-# ("Memphis wins by over 6.5 points", the floor in floor_strike, a point apart near the number and two apart further out);
-# the total, one ladder ("Full Game: Over 228.5 points scored", two points apart). The ladders are the crowd's whole
-# distribution of the margin and the total, read against the simulation's on the page. The team totals too (later that
-# evening, the user's address off the Game Props tab, KXNBATEAMTOTAL-26NOV04PHIDET-PHI109): a ladder a club, the club's
-# code then the number in the ticker's tail, the floor in floor_strike like the rest
-KALSHI_SERIES = {"NBA": {"ml": "KXNBAGAME", "sp": "KXNBASPREAD", "tot": "KXNBATOTAL", "tt": "KXNBATEAMTOTAL"}}
-KALSHI_FEE = 0.07
-KALSHI_MONTHS = {"JAN": 1, "FEB": 2, "MAR": 3, "APR": 4, "MAY": 5, "JUN": 6, "JUL": 7, "AUG": 8, "SEP": 9, "OCT": 10, "NOV": 11, "DEC": 12}
-KALSHI_CODES = {"WSH": "WAS", "GS": "GSW", "NY": "NYK", "NO": "NOP", "SA": "SAS", "UTAH": "UTA", "PHO": "PHX"}   # a club's code as other feeds write it
+# ---- the crowd on Kalshi: off (23 Nov 2026) --------------------------------------------------------------------
+# Kalshi's game-winner, spread, total and team-total markets rode on the NBA row from 4 Nov 2026 (shown, never scored) and
+# its player ladders on the props for a night (off on 5 Nov, the user: "remove the kalshi completely from the props").
+# On 23 Nov the user took the rest off: "i'd like to remove the Kalshi from the NBA model as well". The fetch, the parser
+# and the row's nbakalshi block went from the slate run and the odds run, and the page's panel, chips and record line with
+# them. A row logged before then keeps its block in the user's backup; nothing reads it
 
 
-def kalshi_event_key(event_ticker):
-    """'KXNBAGAME-26NOV04ATLWAS' -> ('2026-11-04', 'ATL', 'WAS'): the date and the two clubs' codes, or None."""
-    m = re.search(r"-(\d{2})([A-Z]{3})(\d{2})([A-Z]{3})([A-Z]{3})$", str(event_ticker or ""))
-    if not m or m.group(2) not in KALSHI_MONTHS:
-        return None
-    return ("20%s-%02d-%s" % (m.group(1), KALSHI_MONTHS[m.group(2)], m.group(3)), m.group(4), m.group(5))
-
-
-def kalshi_num(v):
-    try:
-        return float(v)
-    except (TypeError, ValueError):
-        return None
-
-
-def kalshi_kind(event_ticker):
-    """Which of the sport's series an event belongs to: 'ml', 'sp', 'tot', 'tt' (the team totals) or None."""
-    head = str(event_ticker or "").split("-")[0]
-    for kinds in KALSHI_SERIES.values():
-        for kind, series in kinds.items():
-            if head == series:
-                return kind
-    return None
-
-
-def kalshi_parse(doc):
-    """The exchange's markets -> {"ml": {(date, codeA, codeB): {"ev", "sides": {code: {bid, ask, last, vol, oi, name}}}},
-    "sp": {key: {"ev", "sides": {code: [[floor, bid, ask, last, vol], ...]}}}, "tot": {key: {"ev", "rungs": [[floor, bid, ask, last, vol], ...]}},
-    "tt": {key: {"ev", "sides": {code: [rungs]}}} (each club's team total, a ladder a club like the spread)},
-    the prices in dollars, the volume and the open interest in contracts, the ladders by their floor."""
-    out = {"ml": {}, "sp": {}, "tot": {}, "tt": {}}
-    for m in (doc or {}).get("markets") or []:
-        key, kind = kalshi_event_key(m.get("event_ticker")), kalshi_kind(m.get("event_ticker"))
-        if not key or not kind:
-            continue
-        suffix = str(m.get("ticker") or "").rsplit("-", 1)[-1]
-        bid, ask, last, vol = kalshi_num(m.get("yes_bid_dollars")), kalshi_num(m.get("yes_ask_dollars")), kalshi_num(m.get("last_price_dollars")), kalshi_num(m.get("volume_fp"))
-        if kind == "ml":
-            out["ml"].setdefault(key, {"ev": m.get("event_ticker"), "sides": {}})["sides"][suffix] = {
-                "bid": bid, "ask": ask, "last": last, "vol": vol, "oi": kalshi_num(m.get("open_interest_fp")), "name": m.get("yes_sub_title") or ""}
-            continue
-        floor = kalshi_num(m.get("floor_strike"))
-        if floor is None:
-            continue
-        rung = [floor, bid, ask, last, int(round(vol)) if vol is not None else None]
-        if kind in ("sp", "tt"):
-            code = "".join(c for c in suffix if c.isalpha())
-            out[kind].setdefault(key, {"ev": m.get("event_ticker"), "sides": {}})["sides"].setdefault(code, []).append(rung)
-        else:
-            out["tot"].setdefault(key, {"ev": m.get("event_ticker"), "rungs": []})["rungs"].append(rung)
-    for kind in ("sp", "tt"):
-        for ev in out[kind].values():
-            for rungs in ev["sides"].values():
-                rungs.sort(key=lambda r: r[0])
-    for ev in out["tot"].values():
-        ev["rungs"].sort(key=lambda r: r[0])
-    return out
-
-
-def kalshi_fetch(sport, log):
-    """Every open market of the sport's three series on the exchange, paged; None when it cannot be read."""
-    kinds = KALSHI_SERIES.get(sport)
-    if not kinds:
-        return None
-    markets, counts = [], {}
-    for kind, series in kinds.items():
-        cursor, n = "", 0
-        try:
-            for _ in range(20):
-                doc = fetch_json("%s/markets?series_ticker=%s&status=open&limit=200%s" % (KALSHI_API, series, ("&cursor=" + cursor) if cursor else ""), cache=False)
-                page = doc.get("markets") or []
-                markets.extend(page)
-                n += len(page)
-                cursor = doc.get("cursor") or ""
-                if not cursor or not page:
-                    break
-        except Exception as e:  # noqa: BLE001
-            log("Kalshi: the %s series (%s) could not be read (%s)." % ({"ml": "game-winner", "sp": "spread", "tot": "total", "tt": "team-total"}[kind], series, e))
-        counts[kind] = n
-    if not markets:
-        log("Kalshi: the exchange could not be read; the rows carry no crowd price.")
-        return None
-    parsed = kalshi_parse({"markets": markets})
-    log("Kalshi: %d %s game%s open on the exchange (%d game-winner, %d spread, %d total and %d team-total markets)." % (
-        len(parsed["ml"]), sport, "" if len(parsed["ml"]) == 1 else "s", counts.get("ml", 0), counts.get("sp", 0), counts.get("tot", 0), counts.get("tt", 0)))
-    return parsed
-
-
-def kalshi_find(table, date_iso, a_code, h_code):
-    for key, ev in (table or {}).items():
-        if key[0] == date_iso and {key[1], key[2]} == {a_code, h_code}:
-            return ev
-    return None
-
-
-def kalshi_game(parsed, date_iso, away_code, home_code):
-    """The crowd's block for one game, the clubs matched by code in either order: the game winner a side (a, h), the spread
-    ladders (sp.a, sp.h: the club wins by over the floor), the total ladder (tot: over the floor) and the team-total ladders
-    (tt.a, tt.h: the club scores over the floor); None when the exchange has nothing on the game."""
-    if not parsed:
-        return None
-    a_code, h_code = KALSHI_CODES.get(away_code, away_code), KALSHI_CODES.get(home_code, home_code)
-    block, ev = {"at": now_utc(), "fee": KALSHI_FEE}, None
-    ml = kalshi_find(parsed.get("ml"), date_iso, a_code, h_code)
-    if ml and ml["sides"].get(a_code) and ml["sides"].get(h_code):
-        pick = lambda s: {k: s.get(k) for k in ("bid", "ask", "last", "vol", "oi")}  # noqa: E731
-        block["a"], block["h"], ev = pick(ml["sides"][a_code]), pick(ml["sides"][h_code]), ml.get("ev")
-    sp = kalshi_find(parsed.get("sp"), date_iso, a_code, h_code)
-    if sp and (sp["sides"].get(a_code) or sp["sides"].get(h_code)):
-        block["sp"] = {"a": sp["sides"].get(a_code) or [], "h": sp["sides"].get(h_code) or []}
-        ev = ev or sp.get("ev")
-    tot = kalshi_find(parsed.get("tot"), date_iso, a_code, h_code)
-    if tot and tot.get("rungs"):
-        block["tot"] = tot["rungs"]
-        ev = ev or tot.get("ev")
-    tt = kalshi_find(parsed.get("tt"), date_iso, a_code, h_code)
-    if tt and (tt["sides"].get(a_code) or tt["sides"].get(h_code)):
-        block["tt"] = {"a": tt["sides"].get(a_code) or [], "h": tt["sides"].get(h_code) or []}
-        ev = ev or tt.get("ev")
-    if not ev:
-        return None
-    block["ev"] = ev
-    return block
-
-
-def kalshi_median(points):
-    """The number the crowd puts at even money: points (x, P(over x)) by x, the crossing of 50% read straight between two rungs."""
-    pts = sorted(p for p in points if p[1] is not None)
-    for i in range(1, len(pts)):
-        (x0, p0), (x1, p1) = pts[i - 1], pts[i]
-        if p0 >= 0.5 > p1:
-            return x0 if p0 == p1 else x0 + (p0 - 0.5) / (p0 - p1) * (x1 - x0)
-    return None
-
-
-def kalshi_mid(r):
-    return (r[1] + r[2]) / 2.0 if r[1] is not None and r[2] is not None and r[2] > 0 else None
-
-
-def kalshi_crowd_lines(block):
-    """(the crowd's home margin at even money, the crowd's total at even money), either None without the ladder."""
-    sp, tot = block.get("sp") or {}, block.get("tot") or []
-    pts = [(r[0], kalshi_mid(r)) for r in sp.get("h") or []] + [(-r[0], 1.0 - kalshi_mid(r)) for r in sp.get("a") or [] if kalshi_mid(r) is not None]
-    return kalshi_median(pts), kalshi_median([(r[0], kalshi_mid(r)) for r in tot])
-
-
-def kalshi_team_totals(block):
-    """(the away side's team total at even money, the home side's), either None without its ladder."""
-    tt = block.get("tt") or {}
-    return tuple(kalshi_median([(r[0], kalshi_mid(r)) for r in tt.get(k) or []]) for k in ("a", "h"))
-
-
-def kalshi_summary(block, away, home):
-    """One line for the log: each side's mid price in cents, the bid and ask, the contracts traded; the crowd's spread and total."""
-    def side(s, nick):
-        bid, ask, vol = s.get("bid"), s.get("ask"), s.get("vol")
-        mid = (bid + ask) / 2.0 if bid is not None and ask is not None else s.get("last")
-        if mid is None:
-            return "%s no price" % nick
-        return "%s %.1f cents (%s/%s, %s contracts)" % (nick, mid * 100, int(round(bid * 100)) if bid is not None else "-", int(round(ask * 100)) if ask is not None else "-",
-                                                      ("%dk" % round(vol / 1000.0)) if vol and vol >= 1000 else (str(int(vol)) if vol is not None else "?"))
-    bits = [side(block["a"], away) + " · " + side(block["h"], home)] if block.get("a") and block.get("h") else []
-    margin, total = kalshi_crowd_lines(block)
-    if margin is not None:
-        bits.append("the crowd's spread %s %.1f" % ((home, -margin) if margin >= 0 else (away, margin)))
-    if total is not None:
-        bits.append("the crowd's total %.1f" % total)
-    tta, tth = kalshi_team_totals(block)
-    if tta is not None or tth is not None:
-        bits.append("the crowd's team totals " + " · ".join("%s %.1f" % (nick, v) for nick, v in ((away, tta), (home, tth)) if v is not None))
-    return " · ".join(bits) if bits else "no price"
-
-
-# The player ladders (KXNBAPTS, KXNBAREB, KXNBAAST, KXNBA3PT, KXNBAPRA) rode on the props from 4 Nov 2026 and came off on
-# 5 Nov 2026 (the user: "remove the kalshi completely from the props"): the crowd stays on the game's row, where the sheet
-# reads it against the book, Pinnacle and the simulation; the props carry the books alone
-
-
-def build_nba_game(g, date_iso, tables, league, players, prior_players, injuries, log, have_ledger=True, officials=None, refs=None, lineups=None, form=None, sim=None, kalshi=None):
+def build_nba_game(g, date_iso, tables, league, players, prior_players, injuries, log, have_ledger=True, officials=None, refs=None, lineups=None, form=None, sim=None):
     away, home = g.get("an") or NBA_NICK.get(g["away"], g["away"]), g.get("hn") or NBA_NICK.get(g["home"], g["home"])
     inputs = {k: "" for k in NBA_INPUT_IDS}
     notes = []
@@ -4900,19 +4751,12 @@ def build_nba_game(g, date_iso, tables, league, players, prior_players, injuries
         log("  crew: " + nba_crew_summary(crew, refs))
     elif officials is not None:
         notes.append("No crew on the league's feed for this game yet (posted about 9 am Eastern): type the names in the Crew box when they are up.")
-    # the crowd on Kalshi (4 Nov 2026): each side's price on the exchange, shown beside the book's, never scored
-    kal = kalshi_game(kalshi, date_iso, g["away"], g["home"]) if kalshi else None
-    if kal:
-        inputs["nbakalshi"] = json.dumps(kal, separators=(",", ":"))
-        log("  Kalshi: " + kalshi_summary(kal, away, home))
-    elif kalshi:
-        notes.append("Kalshi has no open market on this game yet: the crowd's price stays off the row until a later run finds one.")
     # the simulation (25 Oct 2026): both views on the row as histograms
     if sim and sim.get("prof"):
         try:
             g2 = dict(g)
             g2["date"] = date_iso
-            block = nba_sim_block(g2, sides, sim["prof"], refs, crew, sim.get("runs") or NBA_SIM_RUNS, log)
+            block = nba_sim_block(g2, sides, sim["prof"], refs, crew, sim.get("runs") or NBA_SIM_RUNS, log, out_mean=sim.get("out_mean"))
             if block:
                 inputs["nbasim"] = json.dumps(block, separators=(",", ":"))
             else:
@@ -5015,7 +4859,10 @@ def make_nba_slate(date_iso, out_dir, log, topup=False, sim_runs=NBA_SIM_RUNS):
     lineups = nba_lineups(date_iso, log) if games else {}
     if (lineups or {}).get("rw"):   # the two reports together (26 Oct 2026): RotoWire's outs and confirmed starters into ESPN's list
         injuries, _rw_notes = nba_injuries_rotowire(injuries, lineups, [players, prior_players], log)
-    kalshi = kalshi_fetch("NBA", log) if games else None   # the crowd's prices on the exchange (4 Nov 2026), shown beside the book's
+    if sim and games:   # engine 3 (23 Nov 2026): the mean charge for men out across the clubs on tonight's slate, off each club's before it is priced
+        sim["out_mean"] = nba_sim_out_mean([nba_out_list(ab, injuries, players, prior_players) for g in games for ab in (g["away"], g["home"])])
+        log("Simulation, the men out: the clubs on tonight's slate carry %.2f points per 100 of charge on average (%d clubs); each club is priced against that, %.0f%% off its own scoring and %.0f%% on the other side's." % (
+            sim["out_mean"], 2 * len(games), 100 * NBA_SIM_OUT_OWN, 100 * NBA_SIM_OUT_OPP))
     try:
         with open(odds_log_path(out_dir), encoding="utf-8") as f:
             logd = json.load(f)
@@ -5025,7 +4872,7 @@ def make_nba_slate(date_iso, out_dir, log, topup=False, sim_runs=NBA_SIM_RUNS):
     for g in games:
         try:
             form = {"away": nba_recent_form(led["games"], g["away"], date_iso, logd), "home": nba_recent_form(led["games"], g["home"], date_iso, logd)} if led else None
-            rows.append(build_nba_game(g, date_iso, tables, league, players, prior_players, injuries, log, have_ledger=bool(led and led.get("games")), officials=officials, refs=refs, lineups=lineups, form=form, sim=sim, kalshi=kalshi))
+            rows.append(build_nba_game(g, date_iso, tables, league, players, prior_players, injuries, log, have_ledger=bool(led and led.get("games")), officials=officials, refs=refs, lineups=lineups, form=form, sim=sim))
         except Exception as e:  # noqa: BLE001
             log("%s @ %s: FAILED (%s); left out of the slate" % (g.get("an"), g.get("hn"), e))
         log("")
@@ -7392,7 +7239,7 @@ def make_nba_props(date_iso, out_dir, log, topup=False, sim_runs=NBA_SIM_RUNS, c
         log("Nothing to project for %s. The run is for today unless told otherwise: python slate.py nba-props --date 2026-10-21 (or add --date to the bat file's click)." % date_iso)
     markets = ",".join(api for _mk, api, _lab in PROPS_MARKETS)
     games, credits_used, roster_cache = [], 0, {}
-    # Kalshi is off the props from 5 Nov 2026 (the user: "remove the kalshi completely from the props"); the crowd stays on the game's row
+    # Kalshi is off the props from 5 Nov 2026 (the user: "remove the kalshi completely from the props") and off the game's row from 23 Nov 2026
     for ev in events:
         aab, hab = nba_nick_tricode(ev.get("away_team")), nba_nick_tricode(ev.get("home_team"))
         away, home = NBA_NICK.get(aab, ev.get("away_team")), NBA_NICK.get(hab, ev.get("home_team"))
@@ -8081,7 +7928,6 @@ def make_odds(date_iso, out_dir, log, books=None, sports=("MLB", "NHL", "NBA")):
     key = odds_key(out_dir)
     books = odds_books_list(books)
     rows, now, spent, left = [], now_utc(), 0, None
-    kalshi = kalshi_fetch("NBA", log) if "NBA" in sports else None   # the crowd's prices on the exchange (4 Nov 2026), on the NBA rows beside the book's
     for sport in sports:
         try:
             evs = fetch_odds(sport, key, books)
@@ -8107,11 +7953,6 @@ def make_odds(date_iso, out_dir, log, books=None, sports=("MLB", "NHL", "NBA")):
             else:
                 log("  %s @ %s: no period, alternate or team totals on the feed (%s)" % (odds_nick(ev.get("away_team")), odds_nick(ev.get("home_team")), why))
             g = odds_game(ev, sport, books, extra)
-            if sport == "NBA" and kalshi:
-                kb = kalshi_game(kalshi, date_iso, NBA_TRICODE.get(g["away"], g["away"]), NBA_TRICODE.get(g["home"], g["home"]))
-                if kb:
-                    g["inputs"]["nbakalshi"] = json.dumps(kb, separators=(",", ":"))
-                    log("    Kalshi: " + kalshi_summary(kb, g["away"], g["home"]))
             e = odds_log_update(odds_log_path(out_dir), g, now)
             opener = (e.get("first") or {}).get("line")
             if opener and not g["inputs"].get("opened"):
@@ -9757,50 +9598,11 @@ def selftest():
           and "pull" not in proj_s and "pull" not in proj_h and proj_l["pull"] == -0.8
           and any(w.startswith("27.0 minutes projected: his last 5 games, his 7-minute last game counted as three tenths of a game, the recent counting most (season 25.4), 5 of his last 5 starts; the same games untouched say 22.4; he started all five and only his last was short: on four seasons such a man played 2.5 minutes more than the read with it in full, 0.4 less at three tenths (302 games), scored")
                   for w in why_l))
-    # the crowd on Kalshi (4 Nov 2026): the exchange's markets parsed, matched to a game by code in either order, summarised
-    kal_doc = {"markets": [
-        {"ticker": "KXNBAGAME-26NOV04ATLWAS-WAS", "event_ticker": "KXNBAGAME-26NOV04ATLWAS", "yes_sub_title": "Washington", "yes_bid_dollars": "0.4200", "yes_ask_dollars": "0.4300", "last_price_dollars": "0.4300", "volume_fp": "140050.68", "open_interest_fp": "115253.70"},
-        {"ticker": "KXNBAGAME-26NOV04ATLWAS-ATL", "event_ticker": "KXNBAGAME-26NOV04ATLWAS", "yes_sub_title": "Atlanta", "yes_bid_dollars": "0.5700", "yes_ask_dollars": "0.5800", "last_price_dollars": "0.5800", "volume_fp": "149511.06", "open_interest_fp": "136925.31"},
-        {"ticker": "KXNBAGAME-26NOV07SASPOR-SAS", "event_ticker": "KXNBAGAME-26NOV07SASPOR", "yes_sub_title": "San Antonio", "yes_bid_dollars": "0.5400", "yes_ask_dollars": "0.6700", "last_price_dollars": "0.7000", "volume_fp": "12.15", "open_interest_fp": "12.15"},
-        {"ticker": "KXNBAGAME-26NOV07SASPOR-POR", "event_ticker": "KXNBAGAME-26NOV07SASPOR", "yes_sub_title": "Portland", "yes_bid_dollars": "0.3500", "yes_ask_dollars": "0.4600", "last_price_dollars": "0.4500", "volume_fp": "24.64", "open_interest_fp": "24.64"},
-        # the spread ladders (the Hawks the favourite by about 3) and the total ladder, as the exchange lists them, out of order
-        {"ticker": "KXNBASPREAD-26NOV04ATLWAS-ATL5", "event_ticker": "KXNBASPREAD-26NOV04ATLWAS", "floor_strike": 4.5, "yes_bid_dollars": "0.4000", "yes_ask_dollars": "0.4200", "last_price_dollars": "0.4100", "volume_fp": "500.5"},
-        {"ticker": "KXNBASPREAD-26NOV04ATLWAS-ATL2", "event_ticker": "KXNBASPREAD-26NOV04ATLWAS", "floor_strike": 1.5, "yes_bid_dollars": "0.5500", "yes_ask_dollars": "0.5700", "last_price_dollars": "0.5600", "volume_fp": "900"},
-        {"ticker": "KXNBASPREAD-26NOV04ATLWAS-ATL3", "event_ticker": "KXNBASPREAD-26NOV04ATLWAS", "floor_strike": 2.5, "yes_bid_dollars": "0.5000", "yes_ask_dollars": "0.5200", "last_price_dollars": "0.5100", "volume_fp": "1200"},
-        {"ticker": "KXNBASPREAD-26NOV04ATLWAS-ATL4", "event_ticker": "KXNBASPREAD-26NOV04ATLWAS", "floor_strike": 3.5, "yes_bid_dollars": "0.4600", "yes_ask_dollars": "0.4800", "last_price_dollars": "0.4700", "volume_fp": "800"},
-        {"ticker": "KXNBASPREAD-26NOV04ATLWAS-WAS4", "event_ticker": "KXNBASPREAD-26NOV04ATLWAS", "floor_strike": 3.5, "yes_bid_dollars": "0.2400", "yes_ask_dollars": "0.2600", "last_price_dollars": "0.0000", "volume_fp": "0"},
-        {"ticker": "KXNBASPREAD-26NOV04ATLWAS-WAS2", "event_ticker": "KXNBASPREAD-26NOV04ATLWAS", "floor_strike": 1.5, "yes_bid_dollars": "0.3100", "yes_ask_dollars": "0.3300", "last_price_dollars": "0.3200", "volume_fp": "40"},
-        {"ticker": "KXNBATOTAL-26NOV04ATLWAS-235", "event_ticker": "KXNBATOTAL-26NOV04ATLWAS", "floor_strike": 234.5, "yes_bid_dollars": "0.4000", "yes_ask_dollars": "0.4200", "last_price_dollars": "0.4100", "volume_fp": "300"},
-        {"ticker": "KXNBATOTAL-26NOV04ATLWAS-231", "event_ticker": "KXNBATOTAL-26NOV04ATLWAS", "floor_strike": 230.5, "yes_bid_dollars": "0.5600", "yes_ask_dollars": "0.5800", "last_price_dollars": "0.5700", "volume_fp": "1500"},
-        {"ticker": "KXNBATOTAL-26NOV04ATLWAS-233", "event_ticker": "KXNBATOTAL-26NOV04ATLWAS", "floor_strike": 232.5, "yes_bid_dollars": "0.4800", "yes_ask_dollars": "0.5000", "last_price_dollars": "0.4900", "volume_fp": "8000"},
-        # the team totals (the user's address off the Game Props tab): a ladder a club, the Hawks 117.5 and the Wizards 114.1 at even money
-        {"ticker": "KXNBATEAMTOTAL-26NOV04ATLWAS-ATL119", "event_ticker": "KXNBATEAMTOTAL-26NOV04ATLWAS", "floor_strike": 118.5, "yes_bid_dollars": "0.4400", "yes_ask_dollars": "0.4600", "last_price_dollars": "0.4500", "volume_fp": "600"},
-        {"ticker": "KXNBATEAMTOTAL-26NOV04ATLWAS-ATL117", "event_ticker": "KXNBATEAMTOTAL-26NOV04ATLWAS", "floor_strike": 116.5, "yes_bid_dollars": "0.5400", "yes_ask_dollars": "0.5600", "last_price_dollars": "0.5500", "volume_fp": "400"},
-        {"ticker": "KXNBATEAMTOTAL-26NOV04ATLWAS-WAS113", "event_ticker": "KXNBATEAMTOTAL-26NOV04ATLWAS", "floor_strike": 112.5, "yes_bid_dollars": "0.5700", "yes_ask_dollars": "0.5900", "last_price_dollars": "0.5800", "volume_fp": "300"},
-        {"ticker": "KXNBATEAMTOTAL-26NOV04ATLWAS-WAS115", "event_ticker": "KXNBATEAMTOTAL-26NOV04ATLWAS", "floor_strike": 114.5, "yes_bid_dollars": "0.4700", "yes_ask_dollars": "0.4900", "last_price_dollars": "0.4800", "volume_fp": "700"},
-        {"ticker": "SOMETHING-ELSE", "event_ticker": "KXNBASERIES-26-BOS"}]}
-    kal_p = kalshi_parse(kal_doc)
-    kal_g = kalshi_game(kal_p, "2026-11-04", "WSH", "ATL")   # the sheet's codes as ESPN writes them, the clubs the other way round
-    check("kalshi: the event ticker reads as the date and the two clubs' codes, the four series parse by game (a side each on the winner, a ladder a club on the spread and on the team totals, one ladder on the total, by the floor), and a game matches by code in either order",
-          kalshi_event_key("KXNBAGAME-26NOV04ATLWAS") == ("2026-11-04", "ATL", "WAS") and kalshi_event_key("KXNBASERIES-26-BOS") is None and kalshi_event_key(None) is None
-          and kalshi_kind("KXNBASPREAD-26NOV04ATLWAS") == "sp" and kalshi_kind("KXNBATOTAL-26NOV04ATLWAS") == "tot" and kalshi_kind("KXNBAGAME-26NOV04ATLWAS") == "ml" and kalshi_kind("KXNBASERIES-26-BOS") is None
-          and kalshi_kind("KXNBATEAMTOTAL-26NOV04ATLWAS") == "tt" and [r[0] for r in kal_g["tt"]["h"]] == [116.5, 118.5] and kal_g["tt"]["h"][1] == [118.5, 0.44, 0.46, 0.45, 600] and [r[0] for r in kal_g["tt"]["a"]] == [112.5, 114.5]
-          and "tt" not in kalshi_game(kal_p, "2026-11-07", "SAS", "POR")
-          and set(kal_p["ml"]) == {("2026-11-04", "ATL", "WAS"), ("2026-11-07", "SAS", "POR")} and kal_p["ml"][("2026-11-04", "ATL", "WAS")]["sides"]["ATL"]["ask"] == 0.58 and kal_p["ml"][("2026-11-04", "ATL", "WAS")]["sides"]["WAS"]["name"] == "Washington"
-          and kal_g is not None and kal_g["ev"] == "KXNBAGAME-26NOV04ATLWAS" and kal_g["fee"] == KALSHI_FEE and kal_g["a"] == {"bid": 0.42, "ask": 0.43, "last": 0.43, "vol": 140050.68, "oi": 115253.7} and kal_g["h"]["bid"] == 0.57
-          and [r[0] for r in kal_g["sp"]["h"]] == [1.5, 2.5, 3.5, 4.5] and kal_g["sp"]["h"][1] == [2.5, 0.5, 0.52, 0.51, 1200] and [r[0] for r in kal_g["sp"]["a"]] == [1.5, 3.5] and [r[0] for r in kal_g["tot"]] == [230.5, 232.5, 234.5] and kal_g["tot"][1][4] == 8000
-          and kalshi_game(kal_p, "2026-11-05", "ATL", "WAS") is None and kalshi_game(kal_p, "2026-11-04", "BOS", "ATL") is None and kalshi_game(None, "2026-11-04", "ATL", "WAS") is None
-          and "sp" not in kalshi_game(kal_p, "2026-11-07", "SAS", "POR") and "tot" not in kalshi_game(kal_p, "2026-11-07", "SAS", "POR"))
-    kal_m, kal_t = kalshi_crowd_lines(kal_g)
-    kal_tta, kal_tth = kalshi_team_totals(kal_g)
-    check("kalshi: the crowd's spread, total and team totals are the ladders' even-money crossings read straight between rungs (the Hawks by 2.75: 51% at 2.5 and 47% at 3.5; the total 232.25: 57% at 230.5 and 49% at 232.5; the Wizards 114.1 and the Hawks 117.5), and the log line says so",
-          abs(kal_m - 2.75) < 1e-9 and abs(kal_t - 232.25) < 1e-9 and kalshi_median([(1.5, 0.3), (3.5, 0.2)]) is None and kalshi_median([]) is None
-          and abs(kal_tta - 114.1) < 1e-9 and abs(kal_tth - 117.5) < 1e-9 and kalshi_team_totals({}) == (None, None) and kalshi_team_totals({"tt": {"a": kal_g["tt"]["a"]}}) == (114.1, None)
-          and kalshi_summary(kal_g, "Wizards", "Hawks") == "Wizards 42.5 cents (42/43, 140k contracts) · Hawks 57.5 cents (57/58, 150k contracts) · the crowd's spread Hawks -2.8 · the crowd's total 232.2 · the crowd's team totals Wizards 114.1 · Hawks 117.5"
-          and kalshi_summary(kalshi_game(kal_p, "2026-11-07", "SAS", "POR"), "Spurs", "Trail Blazers") == "Spurs 60.5 cents (54/67, 12 contracts) · Trail Blazers 40.5 cents (35/46, 24 contracts)")
     # the player ladders came off the props on 5 Nov 2026 (the user: "remove the kalshi completely from the props"); the props run carries no Kalshi
     check("props: Kalshi is off the props (5 Nov 2026): no player series, no ladder on a prop, and the slate says so in its method block",
           "kalshi_prop" not in globals() and "kalshi_fetch_players" not in globals() and "KALSHI_PLAYER_SERIES" not in globals() and "kal" not in proj_)
+    check("nba: Kalshi is off the game's row too (23 Nov 2026, the user: \"remove the Kalshi from the NBA model as well\"): no fetch, no parser, nothing of the exchange among the file's names",
+          not [k for k in globals() if "kalshi" in k.lower()])
     parts_ = dict((p["k"], p) for p in proj_["parts"])
     check("props: what moves it: the base is his rate at his minutes, the regulars out, pace and the defence sum from it to the projection, the prior and the minutes trend say what sits inside it, each pointing at its why line",
           set(parts_) == {"prior", "minutes", "pull", "out", "top", "pace", "home", "dvp"} and abs(proj_["base"] + parts_["pull"]["eff"] + parts_["out"]["eff"] + parts_["top"]["eff"] + parts_["pace"]["eff"] + parts_["home"]["eff"] + parts_["dvp"]["eff"] - proj_["proj"]) < 0.03
@@ -10951,12 +10753,63 @@ def selftest():
     check("nba sim: every slate row carries a sim block with the own view's histograms, the runs and the profiles",
           nbasim is not None and len(sim_rows) == len(sl7["games"]) and sb.get("runs") == 300 and sb.get("own", {}).get("total", {}).get("c") and sum(sb["own"]["total"]["c"]) == 300
           and set(sb["own"].keys()) >= {"total", "h1", "h2", "q", "margin", "away", "home", "ot"} and len(sb["own"]["q"]) == 4 and sb["prof"]["home"]["ortg"] > 90)
+    check("nba slate: no row carries the exchange's block and the run's log does not name it (23 Nov 2026)",
+          len(sl7["games"]) == 3 and all("nbakalshi" not in g["inputs"] for g in sl7["games"]) and not any("kalshi" in l.lower() for l in lines7))
     check("nba sim: the slate log names the runs and the sim's own total",
           any(l.startswith("  sim, 300 runs: total ") and "home win" in l for l in lines7) and any(l.startswith("Simulation: ") and "runs a game" in l for l in lines7))
     check("nba sim: an OUT regular costs his club's offence 0.075 per 100 a point of his scoring and the other side nothing (30 Oct 2026), a listed doubtful man nothing, and the crew's whistle scales inside its bounds",
           nba_sim_out_adj([{"st": "Out", "mpg": 34.0, "ppg": 25.0}, {"st": "Questionable", "mpg": 30.0, "ppg": 20.0}, {"st": "Out", "mpg": 12.0, "ppg": 4.0}]) == (-(0.075 * 25.0), 0.0)
           and nba_sim_ft_factor(["A", "B"], {"r": {"A": [50, 48.0, 230.0], "B": [40, 44.0, 228.0]}, "lg": [1000, 44.0, 228.8]}) == (46.0 / 44.0) and nba_sim_ft_factor(["A"], {"r": {"A": [50, 80.0, 230.0]}, "lg": [1000, 44.0, 228.8]}) == 1.15
           and nba_sim_ft_factor(None, {"r": {}, "lg": [1000, 44.0, 228.8]}) == 1.0)
+    # engine 3 (23 Nov 2026): the charge against the slate's mean, split between the club's own scoring and the other side's; rest split the same way
+    o3a = [{"st": "Out", "mpg": 34.0, "ppg": 25.0}, {"st": "Questionable", "mpg": 30.0, "ppg": 20.0}, {"st": "Out", "mpg": 12.0, "ppg": 4.0}]
+    o3b = [{"st": "Out", "mpg": 30.0, "ppg": 10.0}]
+    m3 = nba_sim_out_mean([o3a, o3b, [], []])
+    check("nba sim, engine 3: a club's charge is its Out regulars' points a game times 0.075, the slate's mean is the mean over its clubs (none with no club), and against the mean 0.77 of the difference comes off the club's own scoring and 0.13 goes on the other side's; a club with fewer out than the mean gains the same way; with no mean the whole charge comes off its own scoring",
+          nba_sim_out_charge(o3a) == 1.875 and nba_sim_out_charge(o3b) == 0.75 and nba_sim_out_charge([]) == 0.0 and nba_sim_out_charge(None) == 0.0 and m3 == (1.875 + 0.75) / 4.0 and nba_sim_out_mean([]) is None
+          and nba_sim_out_adj(o3a, m3) == (-0.77 * (1.875 - m3), -0.13 * (1.875 - m3)) and nba_sim_out_adj([], m3) == (0.77 * m3, 0.13 * m3) and nba_sim_out_adj(o3a, 0.0) == (-0.77 * 1.875, -0.13 * 1.875)
+          and nba_sim_out_adj(o3a) == (-1.875, 0.0) and (NBA_SIM_OUT_OWN, NBA_SIM_OUT_OPP) == (0.77, 0.13))
+    if nbasim:
+        d3 = nbasim.demo_setup()
+        lg3 = d3["league"]
+        a3_ = dict(d3["away"], b2b=False, r3in4=False, out_adj=0.0, out_dadj=0.0)
+        h3_ = dict(d3["home"], b2b=False, r3in4=False, out_adj=0.0, out_dadj=0.0)
+        t3 = lambda a, h: (nbasim._target(a, h, lg3, False) * 100.0, nbasim._target(h, a, lg3, True) * 100.0)   # (the away club's, the home club's) points per 100
+        base3 = t3(a3_, h3_)
+        adj3 = nba_sim_out_adj(o3a, 0.0)
+        out3 = t3(a3_, dict(h3_, out_adj=adj3[0], out_dadj=adj3[1]))
+        b2b3, r34_3 = t3(a3_, dict(h3_, b2b=True)), t3(a3_, dict(h3_, r3in4=True))
+        check("nba sim, engine 3: through nbasim's target a home club with 1.875 of charge against a mean of nought scores 0.77 of it less per 100 and gives up 0.13 of it more (0.90 of the charge on the margin, 0.64 on the total); a home club on no rest scores 0.95 less and gives up 0.63 more (1.58 of margin, 0.32 of total), on a third game in four nights 0.17 and 0.12; the engine is version 3",
+              abs(out3[1] - base3[1] + 0.77 * 1.875) < 1e-9 and abs(out3[0] - base3[0] - 0.13 * 1.875) < 1e-9
+              and abs(b2b3[1] - base3[1] + 0.95) < 1e-9 and abs(b2b3[0] - base3[0] - 0.63) < 1e-9 and abs(r34_3[1] - base3[1] + 0.17) < 1e-9 and abs(r34_3[0] - base3[0] - 0.12) < 1e-9
+              and nbasim.VERSION == 3 and (nbasim.LEAGUE["rest_b2b"], nbasim.LEAGUE["rest_b2b_opp"], nbasim.LEAGUE["rest_3in4"], nbasim.LEAGUE["rest_3in4_opp"]) == (-0.95, 0.63, -0.17, 0.12))
+        # the block hands both numbers to the runs: the simulation is watched as nba_sim_block calls it
+        seen3 = []
+        _sim3, _anc3 = nbasim.simulate, nbasim.simulate_anchored
+
+        def _spy_own(setup, *a, **k):
+            seen3.append(("own", setup["away"].get("out_adj"), setup["away"].get("out_dadj"), setup["home"].get("out_adj"), setup["home"].get("out_dadj")))
+            return _sim3(setup, *a, **k)
+
+        def _spy_mkt(setup, *a, **k):
+            seen3.append(("mkt", setup["away"].get("out_adj"), setup["away"].get("out_dadj"), setup["home"].get("out_adj"), setup["home"].get("out_dadj")))
+            return _anc3(setup, *a, **k)
+        prof3 = {"league": dict(nbasim.LEAGUE), "last": {}, "teams": {"BOS": dict(d3["away"], n=10), "NYK": dict(d3["home"], n=10)}}
+        g3 = {"away": "BOS", "home": "NYK", "id": "4019000101", "date": "2026-10-26", "odds": {"total": 221.5, "sp": -1.5, "book": "Draft Kings"}}
+        sides3 = [{"out": o3a, "nick": "Celtics"}, {"out": [], "nick": "Knicks"}]
+        nbasim.simulate, nbasim.simulate_anchored = _spy_own, _spy_mkt
+        try:
+            blk3 = nba_sim_block(g3, sides3, prof3, None, None, 120, (lambda s_: None), out_mean=m3)
+            blk3n = nba_sim_block(g3, sides3, prof3, None, None, 120, (lambda s_: None))
+        finally:
+            nbasim.simulate, nbasim.simulate_anchored = _sim3, _anc3
+        want3 = (-0.77 * (1.875 - m3), -0.13 * (1.875 - m3), 0.77 * m3, 0.13 * m3)
+        check("nba sim, engine 3: the row's block plays both views with the club's own number and the other side's, and carries the slate's mean, each club's charge and both effects; a block built with no mean plays engine 2's rule and says nothing of a mean",
+              blk3 is not None and blk3n is not None and [x[0] for x in seen3] == ["own", "mkt", "own", "mkt"] and seen3[0][1:] == want3 and seen3[1][1:] == want3
+              and seen3[2][1:] == (-1.875, 0.0, 0.0, 0.0) and seen3[3][1:] == (-1.875, 0.0, 0.0, 0.0)
+              and blk3["v"] == 3 and blk3["out_mean"] == round(m3, 2) and blk3["prof"]["away"]["charge"] == 1.88 and blk3["prof"]["away"]["out"] == round(want3[0], 2) and blk3["prof"]["away"]["outo"] == round(-want3[1], 2)
+              and blk3["prof"]["home"]["charge"] == 0.0 and blk3["prof"]["home"]["out"] == round(want3[2], 2) and blk3["prof"]["home"]["outo"] == round(-want3[3], 2) and blk3["prof"]["home"]["r3in4"] is False
+              and "out_mean" not in blk3n and blk3n["prof"]["away"]["out"] == -1.88 and blk3n["prof"]["away"]["outo"] == 0.0 and blk3n["prof"]["away"]["charge"] == 1.88)
     check("nba play-by-play: the play codes", [nba_pbp_code(t, s, p) for t, s, p in (("Substitution", False, 0), ("Shooting Foul", False, 0), ("Offensive Charge", False, 0), ("Full Timeout", False, 0), ("Official Timeout", False, 0),
                                                                                        ("Free Throw - 1 of 2", True, 1), ("Jump Shot", True, 3), ("Jump Shot", False, 0), ("Defensive Rebound", False, 0), ("Bad Pass\nTurnover", False, 0),
                                                                                        ("End Period", False, 0), ("Ref-Initiated Review (Overturned)", False, 0), ("Traveling", False, 0))]
@@ -10994,6 +10847,13 @@ def selftest():
           len(out7["away"]) == 3 and len(moved) == 1 and moved[0]["st"] == "Out" and moved[0]["mpg"] == 30.0 and moved[0]["src"] == "last season" and moved[0]["note"] == "Hamstring; with Lakers last season"
           and star[0]["st"] == "Questionable" and star[0]["mpg"] == 34.0 and star[0]["src"] == "this season" and star[0]["g"] == 6 and "mpg" not in rookie[0]
           and out7["away"][0]["id"] == "9000" and len(out7["home"]) == 2 and out7["home"][0]["n"] == "Knicks Star" and out7["home"][0]["st"] == "Day-To-Day")
+    sbk = json.loads(bn["inputs"]["nbasim"]) if bn["inputs"].get("nbasim") else {}
+    ch7 = NBA_SIM_OUT_PPG * moved[0]["ppg"] if moved else 0.0
+    check("nba sim, engine 3: the slate takes the mean charge of its six clubs off each club's, the row's block carries the mean, each club's charge and what it does to its own scoring and the other side's, and the log says so",
+          ch7 > 0 and sbk.get("v") == 3 and sbk.get("out_mean") == round(ch7 / 6.0, 2) and sbk["prof"]["away"]["charge"] == round(ch7, 2) and sbk["prof"]["home"]["charge"] == 0.0
+          and sbk["prof"]["away"]["out"] == round(-0.77 * (ch7 - ch7 / 6.0), 2) and sbk["prof"]["away"]["outo"] == round(0.13 * (ch7 - ch7 / 6.0), 2)
+          and sbk["prof"]["home"]["out"] == round(0.77 * (ch7 / 6.0), 2) and sbk["prof"]["home"]["outo"] == round(-0.13 * (ch7 / 6.0), 2) and sbk["prof"]["away"]["b2b"] is True and sbk["prof"]["away"]["r3in4"] in (True, False)
+          and any(l.startswith("Simulation, the men out: the clubs on tonight's slate carry %.2f points per 100 of charge on average (6 clubs); each club is priced against that, 77%% off its own scoring and 13%% on the other side's." % (ch7 / 6.0)) for l in lines7))
     check("nba slate: the id is read off the player-card link or the headshot when the page gives none, the name stands in when there is neither, and the page's comment and return date ride along",
           moved[0]["c"] == "Man (hamstring) is out for Wednesday's game against the Knicks." and moved[0]["ret"] == "2026-10-28" and "past" not in moved[0] and "c" not in star[0]
           and rookie[0]["ret"] == "2026-10-19" and rookie[0]["past"] is True

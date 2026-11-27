@@ -367,7 +367,7 @@ def tail() -> str:
              '  })();\n'
              '  function save() {', "relabel")
     t = once(t, "the units column is the referee.') + '</div>';\n    });",
-             "the units column is the referee.') + '</div>';\n      if (sp === \"NBA\") h += nbaRefsWatchHtml();   // the referees as a watch (22 Oct 2026)\n      if (sp === \"NBA\") h += nbaSimRecordHtml();   // the simulation's calls, says against does (25 Oct 2026)\n      if (sp === \"NBA\") h += nbaCallsRecordHtml();   // a call on every game, each kind's record (12 Nov 2026)\n      if (sp === \"NBA\") h += nbaH1RecordHtml();   // the first half's best bets, each kind and the list as given (23 Nov 2026)\n      if (sp === \"NBA\") h += nbaMoneyRecordHtml();   // the sharp-money read against the finals (23 Nov 2026)\n    });", "refs watch")
+             "the units column is the referee.') + '</div>';\n      if (sp === \"NBA\") h += nbaRefsWatchHtml();   // the referees as a watch (22 Oct 2026)\n      if (sp === \"NBA\") h += nbaSimRecordHtml();   // the simulation's calls, says against does (25 Oct 2026)\n      if (sp === \"NBA\") h += nbaCallsRecordHtml();   // a call on every game, each kind's record (12 Nov 2026)\n      if (sp === \"NBA\") h += nbaEarlyRecordHtml();   // the early total, every call at its own number (27 Nov 2026)\n      if (sp === \"NBA\") h += nbaH1RecordHtml();   // the first half's best bets, each kind and the list as given (23 Nov 2026)\n      if (sp === \"NBA\") h += nbaMoneyRecordHtml();   // the sharp-money read against the finals (23 Nov 2026)\n    });", "refs watch")
     t = every(t, 'sp === "WNBA" ? forecastMatchupWnba() : forecastMatchupMlb()',
               'sp === "NBA" ? forecastMatchupNba() : sp === "WNBA" ? forecastMatchupWnba() : forecastMatchupMlb()', "dispatch (stored)", 1)
     t = every(t, 'sport === "WNBA" ? forecastMatchupWnba() : forecastMatchupMlb()',
@@ -525,9 +525,13 @@ def tail() -> str:
              '      /* the props a row a line (2 Nov 2026): pretty-printed, a prop\'s last games ran a number a line and the file of 1 Nov came to\n'
              '         44.6 MB for 29 compact; with the old nights trimmed (props.engine.js) the file holds the last seven nights whole */\n'
              '      .replace(/\\n}$/, \',\\n  "props": [\\n\' + props.map(function (r) { return "    " + JSON.stringify(r); }).join(",\\n") + \'\\n  ]\\n}\');', "backup props")
+    t = once(t, "join(\",\\n\") + '\\n  ]\\n}');",
+             "join(\",\\n\") + '\\n  ]\\n}')\n"
+             "      .replace(/\\n}$/, ',\\n  \"early\": ' + JSON.stringify(typeof nbaEarlyStore === \"function\" ? nbaEarlyStore() : {}) + '\\n}');   // the early total's calls (27 Nov 2026)", "backup early")
     t = once(t, '        } else card = d.card;\n        save(); renderCard(); renderBoard(); renderCalib();',
              '        } else card = d.card;\n'
              '        if (!moved && Array.isArray(d.props)) { props = d.props; saveProps(); renderProps(); }\n'
+             '        if (!moved && d.early && typeof nbaEarlyRestore === "function") nbaEarlyRestore(d.early);   // the early total\'s calls (27 Nov 2026)\n'
              '        save(); renderCard(); renderBoard(); renderCalib();', "restore props")
     t = once(t, '    if (!d || d.format !== "callsheet2.slate" || !Array.isArray(d.games)) throw new Error("not a Call Sheet 2.0 slate");',
              '    if (!d || d.format !== "callsheet2.slate" || !Array.isArray(d.games)) throw new Error("not a Call Sheet 2.0 slate");\n'
@@ -546,7 +550,7 @@ def tail() -> str:
              ' + (propsMinsFilled ? " Minutes filled in on <b>" + propsMinsFilled + "</b> graded prop" + (propsMinsFilled === 1 ? "" : "s") + " from the box lines." : "")'
              ' + (hockey ? " <b>" + hockey + "</b> hockey game" + (hockey === 1 ? "" : "s") + " skipped: hockey is retired from the sheet." : ""));', "grade props message")
     t = once(t, '      try { applySlate(JSON.parse(rd.result), f.name); }',
-             '      try { var sd = JSON.parse(rd.result); if (sd && sd.format === "callsheet3.props") applyProps(sd, f.name); else if (sd && sd.format === "callsheet3.props.close") applyPropsClose(sd, f.name); else if (sd && sd.format === "callsheet3.marks") applyMarks(sd, f.name); else applySlate(sd, f.name); }', "props file")
+             '      try { var sd = JSON.parse(rd.result); if (sd && sd.format === "callsheet3.props") applyProps(sd, f.name); else if (sd && sd.format === "callsheet3.props.close") applyPropsClose(sd, f.name); else if (sd && sd.format === "callsheet3.marks") applyMarks(sd, f.name); else if (sd && sd.format === "callsheet2.early") nbaEarlyApply(sd, f.name); else applySlate(sd, f.name); }', "props file")
     t = once(t, '    box.innerHTML = h;\n  }\n\n\n  /* ---- the WNBA paste', '    h += propsRecordHtml();\n    box.innerHTML = h;\n  }\n\n\n  /* ---- the WNBA paste', "props record")
     t = once(t, '    $("opened").placeholder = s === "WNBA" ? "165.5" : s === "NBA" ? "228.5" : "8.5";',
              '    $("opened").placeholder = s === "WNBA" ? "165.5" : s === "NBA" ? "228.5" : "8.5";\n'

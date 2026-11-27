@@ -270,9 +270,10 @@
   }
   /* the buttons: caught before the card or the row underneath opens anything */
   document.addEventListener("click", function (e) {
-    var t = e.target && e.target.closest ? e.target.closest("[data-take],[data-ptake],[data-stake],[data-ttake],[data-t3take],[data-t3copy]") : null; if (!t) return;
+    var t = e.target && e.target.closest ? e.target.closest("[data-take],[data-ptake],[data-stake],[data-ttake],[data-t3take],[data-t3copy],[data-etake]") : null; if (!t) return;
     e.stopPropagation(); e.preventDefault();
     if (t.hasAttribute("data-take")) toggleTake(t.getAttribute("data-take"));
+    else if (t.hasAttribute("data-etake")) { if (typeof nbaEarlyToggle === "function") nbaEarlyToggle(t.getAttribute("data-etake")); }   // a call on the early total (27 Nov 2026)
     else if (t.hasAttribute("data-stake")) toggleSimTake(t.getAttribute("data-stake"));
     else if (t.hasAttribute("data-ttake")) togglePairTake(t.getAttribute("data-ttake"));
     else if (t.hasAttribute("data-t3take")) { if (typeof toggleT3Take === "function") toggleT3Take(t.getAttribute("data-t3take")); }   // a three-leg ticket (11 Nov 2026)

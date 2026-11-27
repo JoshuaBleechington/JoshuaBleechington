@@ -1552,6 +1552,14 @@
     $("boardCount").textContent = rows.length ? rows.length + " priced markets on " + gameDate(dateISO) : "nothing logged for " + gameDate(dateISO);
     renderTaking(dateISO);   // the bets marked as taken on the date (26 Oct 2026)
 
+    // --- the early total (27 Nov 2026): tomorrow's totals read the evening before, the calls with the number each is good to ---
+    if ($("early") && typeof nbaEarlyOn === "function") {
+      var eN = nbaEarlyOn(dateISO), eh = "";
+      eN.calls.forEach(function (x, i) { eh += nbaEarlyCard(x, i); });
+      $("earlyHead").hidden = !eN.all.length; $("early").hidden = !eN.calls.length;
+      $("early").innerHTML = eh; $("earlyTag").textContent = eN.all.length ? nbaEarlyHead(eN) : "";
+    }
+
     // --- the first half (23 Nov 2026): basketball, up to four a night; $100 best bets to 26 Nov, a watch list from 27 Nov 2026 ---
     if ($("h1best") && typeof nbaH1On === "function") {
       var hN = nbaH1On(dateISO), hh = "";
@@ -2278,6 +2286,7 @@
   if ($("upsets")) $("upsets").addEventListener("click", function (e) { var t = e.target.closest("[data-open]"); if (t) openRow(t.dataset.open); });
   if ($("agree")) $("agree").addEventListener("click", function (e) { if (e.target.closest("[data-stake]")) return; var t = e.target.closest("[data-open]"); if (t) openRow(t.dataset.open); });
   if ($("calls")) $("calls").addEventListener("click", function (e) { if (e.target.closest("[data-stake],[data-take],a")) return; var t = e.target.closest("[data-open]"); if (t) openRow(t.dataset.open); });
+  if ($("early")) $("early").addEventListener("click", function (e) { if (e.target.closest("[data-etake],a")) return; var t = e.target.closest("[data-open]"); if (t) openRow(t.dataset.open); });
   if ($("h1best")) $("h1best").addEventListener("click", function (e) { if (e.target.closest("[data-stake],[data-take],a")) return; var t = e.target.closest("[data-open]"); if (t) openRow(t.dataset.open); });
   if ($("mid")) $("mid").addEventListener("click", function (e) { if (e.target.closest("[data-stake]")) return; var t = e.target.closest("[data-open]"); if (t) openRow(t.dataset.open); });
   /* the window's boxes on the Simulation card (29 Oct 2026): typed, kept across renders, priced as you type; the Take button

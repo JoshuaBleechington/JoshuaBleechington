@@ -1835,6 +1835,149 @@
     return any ? h + '</tbody></table>' : "";
   }
 
+  /* ============================ THE EARLY TOTAL (27 Nov 2026) ============================
+     The user: "we could really be finding gaps or patterns to have this super model a lot more pinpoint. If something needs to go
+     then lets remove it or lets enhance or optimize."
+     Three seasons were swept for anything that beats the LATE number (lab sweep_*.py: 274 looks at 2,479 games) and nothing held.
+     The two spots that looked best were then run on seasons they were not found on (sixteen from sportsbookreviewsonline.com's
+     archive, two more from covers.com) and went level: the under after an overtime game 1,037-990, the over behind a tired
+     favourite 419-436. What did hold is WHEN the bet is made. The simulation's plain total (the two clubs' ratings into each
+     other at the game's pace, rest in it, nobody out) against the number a day ahead of the tip, 1,880 games on three seasons:
+       - the line then moved the plain total's way by 0.21 of the gap between them (the error 0.015; 0.19, 0.18, 0.31 by season);
+       - where they stood 8 or more apart it moved that way 68 times to 18, by 2.8 points on average, and the plain total's side
+         at the early number won 54-38 (22-17, 24-16, 8-5), which is what 2.8 points of a total are worth; at 7 or more 86-68,
+         at 6 or more 134-120, so the call is at 8;
+       - by the morning nothing is left: of 2024-25's gap at eleven in the morning the late number kept +0.007, and of this
+         season's gap at the user's own slate run +0.019 (the same side at his morning line went 24-41);
+       - on the sixteen archived seasons a cruder centre shows it arriving: the opener kept nothing of the gap to 2014-15 and more
+         every season since (0.03, 0.04, 0.05, 0.06, 0.08, 0.08, 0.10, 0.21 in 2022-23).
+     So slate.py has an evening run for TOMORROW's games (python slate.py nba-early, Run NBA early.bat: free), which writes
+     nba-early-DATE.json: each game's plain total, the number the scoreboard's book shows that evening, the gap, and the call where
+     they stand 8 apart. The page keeps what it loads in a store of its own (nbaEarly, by date and clubs): a CALL STANDS AT THE
+     NUMBER IT WAS MADE AT, so a later run's file only notes where the number went; a game that was not a call takes the newer
+     read. The board lists the date's calls with the number each is good to and a Take; the game's decision says what the early
+     call was; the NBA record grades every call at its own number once the game is on the card and graded (-110 a side, since
+     no price is held), the ones marked on a line of their own, and counts what the number did afterwards (the row's close where
+     it has one, else the line the row carries). Shown, never scored: no chance, band or pick on a card moves. */
+  var NBA_EARLY_KEY = "callsheet3.early.v1";
+  var NBA_EARLY = { gap: 8, price: -110 };
+  var NBA_EARLY_NOTE = "the simulation's plain total against the number a day ahead: where they stood 8 or more apart the line then moved the simulation's way 68 times to 18, by 2.8 points, and its side won 54-38 at the early number on three seasons; by the morning the number has caught up";
+  var nbaEarly = (function () { var d = null; try { d = JSON.parse(smStore.getItem(NBA_EARLY_KEY) || "{}"); } catch (e) { d = null; } return d && typeof d === "object" && !Array.isArray(d) ? d : {}; })();
+  function nbaEarlySave() { try { smStore.setItem(NBA_EARLY_KEY, JSON.stringify(nbaEarly)); } catch (e) {} }
+  function nbaEarlyStore() { return nbaEarly; }   // for the backup
+  function nbaEarlyRestore(d) { nbaEarly = d && typeof d === "object" && !Array.isArray(d) ? d : {}; nbaEarlySave(); }
+  function nbaEarlyNum(v) { return v !== null && v !== undefined && v !== "" && isFinite(+v) ? +v : null; }
+  function nbaEarlyId(g) { return (g.gdate || "") + "|" + g.away + "|" + g.home; }
+  function nbaEarlyWhen(iso) {   // "Fri 9:14 PM", on the reader's own clock
+    var d = new Date(iso); if (!iso || isNaN(d.getTime())) return "";
+    try { return d.toLocaleDateString([], { weekday: "short" }) + " " + d.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" }); } catch (e) { return ""; }
+  }
+  function nbaEarlyPts(x) { var a = Math.abs(x); return (Math.abs(a - Math.round(a)) < 1e-9 ? String(Math.round(a)) : a.toFixed(1)) + (Math.abs(a - 1) < 1e-9 ? " point" : " points"); }
+  /* an early-total file from slate.py: every game read; a call already held stands at its number and only notes the newer one */
+  function nbaEarlyApply(d, fname) {
+    if (!d || d.format !== "callsheet2.early" || !Array.isArray(d.games)) throw new Error("not an early-total file");
+    var calls = [], read = 0, kept = 0, waiting = 0;
+    d.games.forEach(function (g) {
+      if (!g || g.sport !== "NBA" || !g.away || !g.home || !g.gdate) return;
+      var line = nbaEarlyNum(g.line), centre = nbaEarlyNum(g.centre), side = g.side === "OVER" || g.side === "UNDER" ? g.side : "";
+      var e = { gdate: String(g.gdate), away: String(g.away), home: String(g.home), at: String(g.at || d.generated || ""), book: String(g.book || ""), line: line, opened: nbaEarlyNum(g.opened), centre: centre,
+                gap: centre !== null && line !== null ? Math.round((centre - line) * 10) / 10 : null, side: side, call: !!g.call && !!side && line !== null && centre !== null, to: nbaEarlyNum(g.to),
+                b2b: Array.isArray(g.b2b) ? [!!g.b2b[0], !!g.b2b[1]] : [false, false] };
+      var id = nbaEarlyId(e), old = nbaEarly[id];
+      read++;
+      if (old && old.call) { if (line !== null) old.last = { at: e.at, line: line }; kept++; return; }
+      nbaEarly[id] = e;
+      if (e.call) calls.push(e); else if (line === null) waiting++;
+    });
+    nbaEarlySave();
+    if (d.date && $("boardDate")) $("boardDate").value = d.date;
+    renderBoard(); renderCalib();
+    say("Early totals for <b>" + esc(d.date || "") + "</b> from " + esc(fname) + ": " + read + " game" + (read === 1 ? "" : "s") + " read, <b>" + calls.length + "</b> new call" + (calls.length === 1 ? "" : "s") +
+        (calls.length ? " (" + calls.map(function (e) { return esc(e.away) + " @ " + esc(e.home) + " " + e.side + " " + e.line; }).join("; ") + ")" : "") +
+        (kept ? "; " + kept + " call" + (kept === 1 ? "" : "s") + " already held " + (kept === 1 ? "stands" : "stand") + " at " + (kept === 1 ? "its" : "their") + " own number" : "") +
+        (waiting ? "; " + waiting + " with no number yet: run it again later tonight" : "") + ". A call is a bet for tonight, at its number or better. The board shows the list.");
+  }
+  function nbaEarlyRow(e) { return card.filter(function (r) { return r.sport === "NBA" && (r.gdate || "") === e.gdate && r.away === e.away && r.home === e.home && !isVoid(r); })[0] || null; }
+  function nbaEarlyRes(e, row) {   // the call against the final, at the number it was made at
+    row = row === undefined ? nbaEarlyRow(e) : row;
+    var fin = row && row.finals; if (!fin || !rowGraded(row)) return null;
+    var fa = parseFloat(fin.fa), fh = parseFloat(fin.fh); if (!isFinite(fa) || !isFinite(fh)) return null;
+    var t = fa + fh; return Math.abs(t - e.line) < 1e-9 ? "push" : ((t > e.line) === (e.side === "OVER") ? "win" : "loss");
+  }
+  /* where the number went: the row's close where it has one, else the line the row carries, else a later early run's number.
+     {line, from, pts}: pts is how far it moved the call's way (an over's number up, an under's down) */
+  function nbaEarlyLater(e, row) {
+    row = row === undefined ? nbaEarlyRow(e) : row;
+    var c = row && row.close ? nbaEarlyNum(row.close.ctot) : null, l = row && row.inputs ? nbaEarlyNum(row.inputs.line) : null, x = e.last ? nbaEarlyNum(e.last.line) : null;
+    var line = c !== null ? c : l !== null ? l : x, from = c !== null ? "the close" : l !== null ? "the card's line" : "a later run";
+    if (line === null || e.line === null) return null;
+    return { line: line, from: from, pts: (line - e.line) * (e.side === "OVER" ? 1 : -1) };
+  }
+  function nbaEarlyOn(dateISO) {
+    var all = Object.keys(nbaEarly).map(function (k) { return nbaEarly[k]; }).filter(function (e) { return e && e.gdate === dateISO; });
+    var byGap = function (a, b) { return (Math.abs(b.gap || 0) - Math.abs(a.gap || 0)) || (a.away < b.away ? -1 : a.away > b.away ? 1 : 0); };
+    return { all: all, calls: all.filter(function (e) { return e.call; }).sort(byGap), near: all.filter(function (e) { return !e.call && e.gap !== null; }).sort(byGap), waiting: all.filter(function (e) { return e.line === null; }) };
+  }
+  function nbaEarlyTakeBtn(e, res) {
+    if (res) return e.taken ? '<span class="chip taken">TAKEN</span>' : '';
+    return '<button type="button" class="takebtn' + (e.taken ? ' on' : '') + '" data-etake="' + esc(nbaEarlyId(e)) + '" title="' + (e.taken ? 'Marked as a bet you placed: click to unmark it' : 'Mark this call as a bet you placed') + '">' + (e.taken ? '&#10003; Taking' : 'Take') + '</button>';
+  }
+  function nbaEarlyToggle(id) {
+    var e = nbaEarly[id]; if (!e || !e.call || nbaEarlyRes(e)) return;
+    if (e.taken) delete e.taken; else e.taken = { at: new Date().toISOString() };
+    nbaEarlySave(); renderBoard(); renderCalib();
+  }
+  function nbaEarlyRecWords(s) { return s && (s.n || s.p) ? s.w + "-" + s.l + (s.p ? "-" + s.p : "") + ", " + sgn(s.units, 1) + "u" : "none graded yet"; }
+  function nbaEarlyCard(e, i) {
+    var row = nbaEarlyRow(e), res = nbaEarlyRes(e, row), later = nbaEarlyLater(e, row), rec = nbaEarlyRecord(), when = nbaEarlyWhen(e.at);
+    var moved = later ? (Math.abs(later.pts) < 1e-9 ? "where it was" : nbaEarlyPts(later.pts) + (later.pts > 0 ? " its way" : " against it")) : "";
+    return '<div class="pk call early value' + (res ? ' ' + res : '') + '"' + (row ? ' data-open="' + row.id + '" title="Load ' + esc(e.away + " @ " + e.home) + ' into the form"' : '') + '>' +
+      '<div class="n1">#' + (i + 1) + ' · EARLY · THE TOTAL A DAY AHEAD</div>' +
+      '<div class="n2">Total ' + e.side + ' ' + e.line + (res ? ' <span class="chip ' + res + '">' + esc(resText(res).toUpperCase()) + '</span>' : '') + '</div>' +
+      '<div class="n3">' + esc(e.book || "the scoreboard's book") + (when ? ' at ' + esc(when) : '') + ' · the simulation\'s plain total is ' + e.centre.toFixed(1) + ', ' + nbaEarlyPts(e.gap) + ' ' + (e.gap > 0 ? 'over' : 'under') + ' that number' +
+        (e.to !== null ? ' · good ' + (e.side === 'OVER' ? 'up to ' : 'down to ') + e.to : '') + (e.b2b[0] || e.b2b[1] ? ' · ' + esc(e.b2b[0] && e.b2b[1] ? 'both clubs' : e.b2b[0] ? e.away : e.home) + ' on the second night' : '') +
+        (later ? ' · the number since: ' + later.line + ' by ' + later.from + ', ' + moved : ' · a bet for the evening it is read: by the morning the number has caught up') + '</div>' +
+      '<div class="n4">' + esc(e.away + " @ " + e.home) + ' · ' + esc(NBA_EARLY_NOTE) + ' · here: ' + esc(nbaEarlyRecWords(rec.all)) + '</div>' +
+      '<div class="n6">' + nbaEarlyTakeBtn(e, res) + '</div></div>';
+  }
+  function nbaEarlyHead(N) {
+    var rec = nbaEarlyRecord(), at = N.all.map(function (e) { return e.at || ""; }).sort().pop() || "", when = nbaEarlyWhen(at), w = N.near[0];
+    return "tomorrow's totals, read the evening before (Run NBA early.bat, free) · " + N.all.length + " game" + (N.all.length === 1 ? "" : "s") + " read" + (when ? ", the last at " + when : "") + " · " +
+           (N.calls.length ? N.calls.length + " call" + (N.calls.length === 1 ? "" : "s") + ": the simulation's plain total " + NBA_EARLY.gap + " or more from the number" : "no call: no game stands " + NBA_EARLY.gap + " or more from its number") +
+           (w ? " · the widest of the rest " + w.away + " @ " + w.home + " at " + Math.abs(w.gap).toFixed(1) : "") + (N.waiting.length ? " · " + N.waiting.length + " with no number yet: run it again later tonight" : "") +
+           " · bet a call the evening it is read, at its number or better · here: " + nbaEarlyRecWords(rec.all) + " · shown, not scored";
+  }
+  /* the record: every call at the number it was made at, once its game is on the card and graded; the ones marked; and what the
+     number did afterwards on every call whose row has a later number */
+  function nbaEarlyRecord() {
+    var mk = function () { return { w: 0, l: 0, p: 0, units: 0, n: 0 }; }, R = { all: mk(), over: mk(), under: mk(), taken: mk(), clv: { n: 0, up: 0, down: 0, sum: 0 }, calls: 0, open: 0 };
+    var add = function (s, res) { if (res === "push") { s.p++; return; } s.n++; if (res === "win") { s.w++; s.units += decimalOf(NBA_EARLY.price) - 1; } else { s.l++; s.units -= 1; } };
+    Object.keys(nbaEarly).forEach(function (k) {
+      var e = nbaEarly[k]; if (!e || !e.call) return;
+      var row = nbaEarlyRow(e), res = nbaEarlyRes(e, row), later = nbaEarlyLater(e, row);
+      R.calls++;
+      if (later && later.from !== "a later run") { R.clv.n++; R.clv.sum += later.pts; if (later.pts > 1e-9) R.clv.up++; else if (later.pts < -1e-9) R.clv.down++; }
+      if (!res) { R.open++; return; }
+      add(R.all, res); add(e.side === "OVER" ? R.over : R.under, res); if (e.taken) add(R.taken, res);
+    });
+    return R;
+  }
+  function nbaEarlyRecordHtml() {   // on the NBA record, ahead of the first half
+    var R = nbaEarlyRecord(); if (!R.calls) return "";
+    var cls = function (s) { return s.units > 0 ? "good" : s.units < 0 ? "bad" : ""; };
+    var row = function (label, s, note) {
+      return '<tr><td>' + label + '</td><td>' + (s.n || s.p ? s.w + '-' + s.l + (s.p ? '-' + s.p : '') : 'none yet') + '</td><td class="' + cls(s) + '">' + (s.n ? (100 * s.w / s.n).toFixed(1) + '%' : '') + '</td><td class="' + cls(s) + '">' + (s.n ? sgn(s.units, 1) + 'u' : '') + '</td><td class="dim">' + note + '</td></tr>';
+    };
+    var c = R.clv, mean = c.n ? c.sum / c.n : 0;
+    return '<div class="simrecview">The early total <span class="tag">the simulation\'s plain total against tomorrow\'s number, read the evening before (Run NBA early.bat) · ' + R.calls + ' call' + (R.calls === 1 ? '' : 's') + ', ' + R.open + ' not graded yet · each graded at the number it was made at, once its game is on the card and graded, at ' + sgn(NBA_EARLY.price, 0) + ' a side (no price is held) · shown, not scored</span></div>' +
+      '<table class="form simrectab earlytab"><thead><tr><th>The call</th><th>Record</th><th>Does</th><th>Units</th><th>Measured before</th></tr></thead><tbody>' +
+      row('<b>Every call</b>', R.all, '8 or more apart: the line then moved its way 68 times to 18, by 2.8 points, and its side won 54-38 on three seasons') + row('&nbsp;&nbsp;the overs', R.over, 'the plain total above the number: 33-28') + row('&nbsp;&nbsp;the unders', R.under, 'the plain total below it: 21-10') +
+      row('<b>The ones you marked</b>', R.taken, 'the calls you pressed Take on') +
+      '<tr><td><b>What the number did afterwards</b></td><td colspan="3">' + (c.n ? 'moved the call\'s way on ' + c.up + ' of ' + c.n + ', against it on ' + c.down + ': <b>' + sgn(mean, 2) + '</b> points a call' : 'no call has a later number yet') +
+      '</td><td class="dim">the row\'s close, else its line: 68 of 86 moved the call\'s way on three seasons, +2.83 a call. It says whether the bets are placed in time</td></tr>' +
+      '</tbody></table>';
+  }
+
   /* ============================ THE DECISION ON EVERY GAME (18 Nov 2026) ============================
      The user: "the 'this matchup' setup for the NBA games, it would be nice if it actually made a decision and not a no bet ... If
      the model is going to make a decision, and it needs to for every game, then it needs to say bet ... it doesn't need to be all
@@ -2198,6 +2341,14 @@
       return t;
     });
     if (also.length) { var at = also.join("; ") + "."; li.push(["Also on this game", at.charAt(0).toUpperCase() + at.slice(1)]); }
+    /* the early total (27 Nov 2026): what was called on this game the evening before, at what number, and where the number is now */
+    var ee = nbaEarly[nbaEarlyId({ gdate: row.gdate || "", away: row.away, home: row.home })];
+    if (ee && ee.call) {
+      var el = nbaEarlyLater(ee, nbaEarlyRow(ee) || { inputs: inp }), ew = nbaEarlyWhen(ee.at);
+      li.push(["The early total", "Read " + (ew ? esc(ew) : "the evening before") + ": <b>Total " + ee.side + " " + ee.line + "</b> at " + esc(ee.book || "the scoreboard's book") + ", the simulation's plain total " + ee.centre.toFixed(1) + " standing " + nbaEarlyPts(ee.gap) + " " + (ee.gap > 0 ? "over" : "under") + " it." +
+        (el ? " The number is " + el.line + " by " + el.from + ", " + (Math.abs(el.pts) < 1e-9 ? "where it was" : nbaEarlyPts(el.pts) + (el.pts > 0 ? " the call's way" : " against it")) + "." : "") +
+        " It was a bet for the evening it was read: at today's number nothing of it is measured."]);
+    }
     return li;
   }
   function nbaDecisionBlock(pk, m, fin) {

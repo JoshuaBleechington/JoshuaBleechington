@@ -8,7 +8,10 @@ rem the side, the number, and the number it is good to. Free: no key and no
 rem odds credit. It brings this season's ledger up to date first.
 rem Why the evening: on three seasons the line then moved the simulation's
 rem way 68 times to 18, by 2.8 points, and by the morning of the game the
-rem number had caught up. (27 Nov 2026)
+rem number had caught up. The measurement read the numbers at about 5:30
+rem in the evening, Eastern, the day before: run it then, or as soon after
+rem as tomorrow's numbers are up. Run after midnight (before 5 am) it reads
+rem the games of the day that has just begun. (27 Nov 2026)
 cd /d "%~dp0"
 python slate.py nba-early %*
 echo.

@@ -7845,3 +7845,91 @@ block with `out_mean` under an engine number below 3 gets a line in red
 on the Simulation card and a chip in tonight's signals
 (`nbaSimMixed`): "Old nbasim.py ... Copy the nbasim.py that came with
 slate.py into the folder and run the slate again".
+
+### 10. The early total on the page
+
+The file loads through Saving, Load slate like any other (the loader
+reads `format: "callsheet2.early"`), and the page keeps it in a store of
+its own (`callsheet3.early.v1`, `nbaEarly`, by date and clubs):
+
+- **a call stands at the number it was made at.** A later run's file
+  the same evening only notes where the number went (`last`); a game
+  that was not a call takes the newer read, and one that had no number
+  becomes a call at the number the later run found. The file's own flag
+  makes a call, and only with a side, a number and a centre.
+- **the board** moves to the file's date and lists the calls, the widest
+  first (`nbaEarlyOn`, `nbaEarlyCard`, under "The early total"): the
+  book and the hour it was read, the plain total, how far the number
+  stands from it, the number the call is good to, a club on the second
+  night, the number since and how far it moved the call's way, and a
+  Take (`data-etake`, the mark kept on the call). The heading counts the
+  games read, the calls, the widest game that is not one and the games
+  with no number yet.
+- **the decision** on a game carded the next day carries a line in its
+  why, "The early total": what was called, at what number, where the
+  number is now, and that it was a bet for the evening it was read.
+- **the NBA record** (`nbaEarlyRecordHtml`, ahead of the first half)
+  grades every call at its own number once its game is on the card and
+  graded, at -110 a side since no price is held: every call, the overs,
+  the unders, the ones marked, and "What the number did afterwards" (the
+  row's close where it has one, else the line the row carries). That
+  last line is the one that says whether the bets are being placed in
+  time: the measurement had 68 of 86 move the call's way, +2.83 points.
+- **the backup** carries the store (`"early"`) and a restore brings it
+  back.
+
+Shown, never scored: no chance, band or pick on a card moves.
+
+When to run it: the measurement read the numbers at about 5:30 in the
+evening, Eastern, the day before. Run after midnight and before five in
+the morning the mode reads the games of the day that has just begun. A live run at two in the morning of 27
+Nov for that night's eleven games found no game 8 apart (the widest 7.5)
+and several numbers already five to ten points off their openers.
+
+### 11. Tests
+
+slate.py's selftest, 338 checks (329 before): the engine's note by
+engine number and a whole slate run with an engine 2 beside it; the
+plain centre, tonight's clubs counted once and left out when the ledger
+is already past that night, the number a call is good to, the early
+file's every field, the run's window, a night with no call, a folder
+with no ledger, the mode's default date (tomorrow; run after midnight
+and before five in the morning, the games of the day that has just
+begun: `nba_early_date`), and the command line itself handing the run
+its date, folder and top-up.
+
+The harness: the first half's block now runs on the nights of 23 to 26
+Nov and has three checks of a watch night; the money's block checks the
+box and its chips are gone and the count is still kept; a check of the
+calls record's split; a check of the old-nbasim line and chip; five
+checks of the early total (the file loaded, a call held through a later
+run, the next day's card and decision, the grades and the record, the
+backup and a reload).
+
+The harness stands at 1,390 checks on 80 cases.
+
+Broken on purpose, one string each, against the blocks that cover the
+change (lab `mk_27a_page_mutants.py`, `mk_27b_mutants.py`): 26 copies of
+the page for the corrections, 37 for the early total, and 31 copies of
+slate.py for the early run, its date and the engine's guard. Four got
+through at first and each named a hole: a watch night's record taking
+fills (a night of fills alone is now graded in the block), the early
+heading on a night with no call and a board showing another night's
+calls (another night's file is now loaded), and the command line's date
+(the selftest now runs `main`). A fifth was a second asking of a call's
+own flag, and that line was taken out. All the rest were caught.
+
+### 12. On record, not built
+
+- The under after a club's overtime game: level on sixteen seasons.
+- The over at Denver and Utah, the home side against a visitor from the
+  west, the first game back from a trip: level or thin on sixteen.
+- The early SPREAD: of the plain margin's gap to the early spread the
+  line kept +0.077 and the game nothing. Totals only.
+- The early total at 6 or 7 apart (134-120, 86-68): the line moves its
+  way and the bet is about level. If the record's own line shows him
+  beating the close by more than the measurement did, the cut can come
+  down.
+- A read of the hour: the store keeps when each call was read, so in a
+  month the record can say how the number's move falls off with the
+  hour the run is made.

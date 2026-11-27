@@ -44,7 +44,7 @@ over 1,243-1,195; the spread's residual −0.15 (sd 13.7), the home side 1,237-
 | Missing regulars' minutes, away minus home (the side) | 2,449 | +0.29 (t 1.2) | +0.14 / +0.42 | weak, same sign both seasons; not scored. Big gaps (60+ minutes) ran +1.2 to the home side on 280 games |
 | Pace × efficiency margin projection, minus the spread | 2,142 | −0.01 | +0.06 / −0.09 | **the spread is priced**: nothing from the box score moves a side |
 | Rest days, home minus away; time zones; the trip's length | 2,418 | +0.18 / −0.18 / null | signs flip | null on the side and the total |
-| Back to back (either, away, home, both); three in four; the second night on the road | 455-1,087 | residuals −1.9 to +0.8, every t under 1.3 | signs flip | **labels only** on the side; the market prices rest. On the total it does not behind a tired favourite: see the back to back against three seasons of lines, 17 Nov 2026 |
+| Back to back (either, away, home, both); three in four; the second night on the road | 455-1,087 | residuals −1.9 to +0.8, every t under 1.3 | signs flip | **labels only** on the side; the market prices rest. On the total it does not behind a tired favourite: see the back to back against three seasons of lines, 17 Nov 2026 (27 Nov 2026: that is three seasons; on the seventeen before them the same spot went 419-436, so it is a small bet, CALLSHEET3.md) |
 | The crew's free throws to date (the total) | 2,066 | −1.3 per 10 FTA (t −1.0) | | crews DO predict the night's free throws (slope 0.60, t 7.3) and a little pace (t 2.5); the total does not follow. Not an input |
 | The crew's own over/under residual to date | 2,062 | +0.17 (t 1.0) | | null |
 | A club's own over/under residual to date (last 10 / 20 / season) | 2,137 | −0.07 / +0.05 / −0.05 | | null within a season. Across the two seasons the clubs' residuals correlate at r +0.40 (20 of 30 the same sign): Nuggets +5.1 / +4.3 and Jazz +3.0 / +5.7 over, Celtics −2.9 / −3.2 and Hornets −2.9 / −3.6 under. **Watched, a label on the card**, not scored |
@@ -1535,6 +1535,13 @@ What it says:
   to 58% at the opener's number and a coin at the close.
 - Nothing tested says which way a line will move: not the side, not the
   over, not rest, not the favourite's price, not the move already made.
+  (27 Nov 2026: one thing does, for the TOTAL. The simulation's plain
+  total, ratings and rest with nobody out, against the number a day
+  ahead: the line then moves its way by a fifth of the gap, 68 times to
+  18 where they stand 8 or more apart, and its side wins 54-38 at the
+  early number; nothing of it is left by the morning. It is the evening
+  run, `python slate.py nba-early`; CALLSHEET3.md, "The sweep, and what
+  came off".)
   A first reading that the favourite was cheaper at the open (-1.6%
   against -4.4% a bet) was the closing favourite read back, which is
   hindsight; the opening favourite at its opening price is the same

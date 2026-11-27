@@ -4681,6 +4681,132 @@ const CHECKS = ["dome","playoff"];
       'kalshi off the NBA model (23 Nov 2026): the card has no Kalshi section, hidden box or jump-bar link (the money\'s box stays), nothing on the page names the exchange with a game on the form, on the board or graded, the simulation\'s team-total rows and the board\'s moneyline cards carry no crowd line, a slate that still carries the exchange\'s block fills the row\'s other boxes and leaves the block off it, the moneyline tile keeps no watch on it, and the page\'s code names it only in comments',
       JSON.stringify({ gone: kalT.gone, formKal: kalT.formKal, pageKal: kalT.pageKal, simTT: kalT.simTT, chips: kalT.chips, stored: kalT.stored, took: kalT.took, tile: kalT.mlTile.slice(0, 300), code: (pageCode.match(/.{0,60}kalshi.{0,60}/i) || [''])[0] }));
 
+  // ---- 27 Nov 2026: the early total (the user: "we could really be finding gaps or patterns to have this super model a lot more pinpoint"). Three seasons swept and
+  //      sixteen more checked: nothing beats the late number, and the one thing that held is the simulation's plain total against the number a day ahead (where they
+  //      stood 8 or more apart the line then moved the simulation's way 68 times to 18 and its side won 54-38; nothing of it is left by the morning). slate.py's
+  //      evening run writes nba-early-DATE.json; the page keeps it in a store of its own, a call standing at the number it was made at, lists the date's calls on
+  //      the board with a Take, says on the game's decision what the early call was, grades every call on the NBA record, and carries the store in the backup ----
+  const erKeep = await pg.evaluate(async () => { await smStore.ready; const k = {}; for (const x of ['callsheet3.card.v1', 'callsheet3.props.v1', 'callsheet3.draft.v1', 'callsheet3.slate.v1', 'callsheet3.early.v1']) k[x] = await smStore.getItem(x); for (const x of ['callsheet3.card.v1', 'callsheet3.props.v1', 'callsheet3.slate.v1', 'callsheet3.early.v1']) await smStore.removeItem(x); return k; });
+  await reloaded();
+  const er = await pg.evaluate(async () => {
+    const wait = (ms) => new Promise(r => setTimeout(r, ms || 90)), txt = e => (e ? e.innerText : '').replace(/\s+/g, ' ').trim(), tc = e => (e ? e.textContent : '').replace(/\s+/g, ' ').trim();
+    const set = (id, v) => { const el = document.getElementById(id); el.value = v; el.dispatchEvent(new Event('input', { bubbles: true })); };
+    await smStore.ready;
+    const load = async (doc, fname) => { const dt = new DataTransfer(); dt.items.add(new File([JSON.stringify(doc)], fname, { type: 'application/json' })); const inp = document.getElementById('slateFile'); inp.files = dt.files; inp.dispatchEvent(new Event('change', { bubbles: true })); await wait(260); };
+    const game = async (date, away, home, line) => { document.getElementById('clear').click(); document.getElementById('m-nba').click(); await wait(); set('gdate', date); set('away', away); set('home', home); set('line', line); set('op', '-110'); set('up', '-110'); set('hml', '-190'); set('aml', '160'); await wait(140);
+      const li = [...document.querySelectorAll('#markets .pickcard ul.dwhy li')].find(x => /^The early total/.test(tc(x))); const why = li ? tc(li) : ''; document.getElementById('add').click(); await wait(); return why; };
+    const grade = (date, list) => load({ format: 'callsheet2.slate', version: 1, date, games: list.map(g => ({ sport: 'NBA', gdate: date, away: g[0], home: g[1], finals: { fa: String(g[2]), fh: String(g[3]) }, notes: [] })) }, 'nba-grade-' + date + '.json');
+    const store = () => JSON.parse(smStore.getItem('callsheet3.early.v1') || '{}');
+    const board = async (d) => { const bd = document.getElementById('boardDate'); if (d) { bd.value = d; bd.dispatchEvent(new Event('change')); await wait(160); }
+      return { date: bd.value, headHidden: document.getElementById('earlyHead').hidden, listHidden: document.getElementById('early').hidden, tag: tc(document.getElementById('earlyTag')),
+               cards: [...document.querySelectorAll('#early .pk')].map(c => ({ cls: c.className.replace('pk call early ', ''), open: c.dataset.open || '', n1: tc(c.querySelector('.n1')), n2: tc(c.querySelector('.n2')), n3: tc(c.querySelector('.n3')), n4: tc(c.querySelector('.n4')), btn: tc(c.querySelector('.n6')) })) }; };
+    const table = () => { const t = document.querySelector('#calibBox .earlytab'); return t ? { head: tc(t.previousElementSibling), rows: [...t.querySelectorAll('tbody tr')].map(tr => [...tr.children].slice(0, -1).map(td => tc(td)).join(' | ')), notes: [...t.querySelectorAll('tbody tr')].map(tr => tc(tr.lastElementChild)) } : null; };
+    const when = (iso) => { const d = new Date(iso); return d.toLocaleDateString([], { weekday: 'short' }) + ' ' + d.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }); };
+    const D = '2026-12-05', AT1 = '2026-12-05T02:14:00Z', AT2 = '2026-12-05T04:40:00Z', o = { w1: when(AT1), w2: when(AT2) };
+    const file = (at, games) => ({ format: 'callsheet2.early', version: 1, date: D, generated: at, gap: 8, engine: 3, source: 'the harness', games });
+    const G = (away, home, line, centre, extra) => Object.assign({ sport: 'NBA', gdate: D, away, home, gameId: '1', tip: '2026-12-06T00:00Z', book: 'Draft Kings', line, opened: line === null ? null : line + 2, centre,
+      gap: line === null || centre === null ? null : Math.round((centre - line) * 10) / 10, side: line === null || centre === null ? '' : centre > line ? 'OVER' : 'UNDER', call: line !== null && centre !== null && Math.abs(centre - line) >= 8, to: null, b2b: [false, false], n: [15, 15] }, extra || {});
+    await game('2026-12-01', 'Magic', 'Pacers', '220'); await grade('2026-12-01', [['Magic', 'Pacers', 100, 110]]);   // a graded game of another night, so the NBA record is drawn throughout
+    o.before = await board(D); o.recBefore = table();
+    // 1. the evening's first run: an over 9.1 apart with the home club on the second night, an under 8.5 apart, a game 3.1 apart, one with no number yet, one with no profile, and a line that is not basketball
+    await board('2026-11-30');
+    await load(file(AT1, [G('Celtics', 'Knicks', 211.5, 220.6, { to: 212.5, b2b: [false, true] }), G('Trail Blazers', 'Lakers', 231, 222.5, { to: 230.5 }), G('Heat', 'Bulls', 224.5, 221.4), G('Nuggets', 'Jazz', null, 216.7, { why: 'no number on the scoreboard yet' }),
+                     G('Suns', 'Kings', 230, null, { why: 'a club has no profile in the ledgers yet', call: true, side: 'OVER' }), Object.assign(G('Bruins', 'Rangers', 5.5, 15), { sport: 'NHL' })]), 'nba-early-2026-12-05.json');
+    o.msg1 = tc(document.getElementById('saveMsg')); o.b1 = await board(); o.keys1 = Object.keys(store()).sort();
+    // another night's file, one game 3 apart: that night has the heading, says there is no call, and draws no card; the first night's list is as it was
+    await load({ format: 'callsheet2.early', version: 1, date: '2026-12-06', generated: AT1, gap: 8, games: [Object.assign(G('Bucks', 'Pacers', 226, 223), { gdate: '2026-12-06' })] }, 'nba-early-2026-12-06.json');
+    o.other = await board(); o.b1again = await board(D);
+    // 2. Take on the wider call; a press on the card itself does nothing while the game is not on the card
+    document.querySelector('#early .pk [data-etake]').click(); await wait(160);
+    o.b1t = await board(); o.taken1 = !!(store()[D + '|Celtics|Knicks'] || {}).taken;
+    // 3. a later run the same evening: the over's number has gone to 214.5 (6.1 apart: it would not be a call now), the under's to 229.5, the game that had no number has one 8.8 over its
+    //    centre, and the third game is still 3.6 apart. The two calls stand at their own numbers and note the newer one; the new game is a call at its number; the mark stays
+    await load(file(AT2, [G('Celtics', 'Knicks', 214.5, 220.6), G('Trail Blazers', 'Lakers', 229.5, 222.5, { to: 230.5 }), G('Heat', 'Bulls', 225, 221.4), G('Nuggets', 'Jazz', 225.5, 216.7, { to: 225 })]), 'nba-early-2026-12-05.json');
+    o.msg2 = tc(document.getElementById('saveMsg')); o.b2 = await board(); o.rec3 = table(); const s2 = store();
+    o.held = { line: s2[D + '|Celtics|Knicks'].line, call: s2[D + '|Celtics|Knicks'].call, last: s2[D + '|Celtics|Knicks'].last, taken: !!s2[D + '|Celtics|Knicks'].taken, heat: s2[D + '|Heat|Bulls'].line, heatAt: s2[D + '|Heat|Bulls'].at, jazz: s2[D + '|Nuggets|Jazz'].call };
+    // 4. the next day the games are carded: the card's line is the number since, the card opens its game, and the decision's why says what the early call was; a game with no early call says nothing
+    o.why1 = await game(D, 'Celtics', 'Knicks', '216.5'); o.why0 = await game(D, 'Heat', 'Bulls', '225'); await game(D, 'Trail Blazers', 'Lakers', '233'); await game(D, 'Nuggets', 'Jazz', '225.5');
+    o.b4 = await board(D); o.rec4 = table();
+    document.querySelector('#early .pk .n2').click(); await wait(160); o.opened = document.getElementById('away').value + ' @ ' + document.getElementById('home').value;
+    // 5. graded: 218 (over 211.5), 231 (the under's own number: a push), 230 (over 225.5: the under lost)
+    await grade(D, [['Celtics', 'Knicks', 110, 108], ['Trail Blazers', 'Lakers', 116, 115], ['Nuggets', 'Jazz', 120, 110], ['Heat', 'Bulls', 100, 110]]);
+    o.b5 = await board(D); o.rec5 = table();
+    document.querySelector('#early .pk [data-etake]') ? (o.takeAfter = 'a button on a graded card') : (o.takeAfter = 'none');
+    // 6. the backup carries the store, and a restore brings it back
+    let blob = null; const mkURL = URL.createObjectURL, click = HTMLAnchorElement.prototype.click;
+    URL.createObjectURL = b => { blob = b; return 'blob:x'; }; HTMLAnchorElement.prototype.click = function () {};
+    document.getElementById('backup').click(); await wait(); await wait();
+    URL.createObjectURL = mkURL; HTMLAnchorElement.prototype.click = click;
+    const text = blob ? await blob.text() : '', parsed = text ? JSON.parse(text) : null;
+    o.backup = parsed ? { format: parsed.format, early: Object.keys(parsed.early || {}).sort(), call: ((parsed.early || {})[D + '|Celtics|Knicks'] || {}).line, props: Array.isArray(parsed.props), card: parsed.card.length } : null;
+    await smStore.removeItem('callsheet3.early.v1');
+    const dt2 = new DataTransfer(); dt2.items.add(new File([text], 'the-super-model-2026-12-06.json', { type: 'application/json' }));
+    const inp2 = document.getElementById('restoreFile'); inp2.files = dt2.files; inp2.dispatchEvent(new Event('change', { bubbles: true })); await wait(400);
+    o.restored = Object.keys(store()).sort(); o.b6 = await board(D);
+    // a file that is not an early file's shape is refused and nothing moves
+    await load({ format: 'callsheet2.early', version: 1, date: D, games: 'none' }, 'nba-early-bad.json'); o.badMsg = tc(document.getElementById('saveMsg')); o.afterBad = Object.keys(store()).length;
+    // the Lakers' row is given a close of 229: after the reload the close is the number since, ahead of the card's line
+    const rs = JSON.parse(smStore.getItem('callsheet3.card.v1')); rs.find(x => x.gdate === D && x.away === 'Trail Blazers').close = { ctot: '229' }; await smStore.setItem('callsheet3.card.v1', JSON.stringify(rs));
+    return o;
+  });
+  await reloaded();
+  const erAfter = await pg.evaluate(async () => { await smStore.ready; document.getElementById('m-nba').click(); const bd = document.getElementById('boardDate'); bd.value = '2026-12-05'; bd.dispatchEvent(new Event('change')); await new Promise(r => setTimeout(r, 300)); const tc = e => (e ? e.textContent : '').replace(/\s+/g, ' ').trim(), t = document.querySelector('#calibBox .earlytab');
+    return { cards: [...document.querySelectorAll('#early .pk .n2')].map(tc), n3: [...document.querySelectorAll('#early .pk .n3')].map(tc), clv: t ? tc([...t.querySelectorAll('tbody tr')].pop().children[1]) : '', keys: Object.keys(JSON.parse(smStore.getItem('callsheet3.early.v1') || '{}')).length }; });
+  await pg.evaluate(async (k) => { for (const x of Object.keys(k)) { if (k[x] === null || k[x] === undefined) await smStore.removeItem(x); else await smStore.setItem(x, k[x]); } }, erKeep);
+  await reloaded();
+  const erNote = "the simulation's plain total against the number a day ahead: where they stood 8 or more apart the line then moved the simulation's way 68 times to 18, by 2.8 points, and its side won 54-38 at the early number on three seasons; by the morning the number has caught up";
+  const erc = (b) => ((b || {}).cards || []).map(c => c.cls + ' | ' + c.n1 + ' | ' + c.n2);
+  const erHead = (n, when, mid, rec) => "tomorrow's totals, read the evening before (Run NBA early.bat, free) · " + n + " read, the last at " + when + " · " + mid + " · bet a call the evening it is read, at its number or better · here: " + rec + " · shown, not scored";
+  const er1 = (er.b1 || {}).cards || [];
+  chk(er.before && er.before.headHidden && er.before.listHidden && er.before.cards.length === 0 && er.recBefore === null
+      && er.b1 && er.b1.date === '2026-12-05' && !er.b1.headHidden && !er.b1.listHidden
+      && erc(er.b1).join(' ## ') === "value | #1 · EARLY · THE TOTAL A DAY AHEAD | Total OVER 211.5 ## value | #2 · EARLY · THE TOTAL A DAY AHEAD | Total UNDER 231"
+      && er1[0].n3 === "Draft Kings at " + er.w1 + " · the simulation's plain total is 220.6, 9.1 points over that number · good up to 212.5 · Knicks on the second night · a bet for the evening it is read: by the morning the number has caught up"
+      && er1[1].n3 === "Draft Kings at " + er.w1 + " · the simulation's plain total is 222.5, 8.5 points under that number · good down to 230.5 · a bet for the evening it is read: by the morning the number has caught up"
+      && er1[0].n4 === 'Celtics @ Knicks · ' + erNote + ' · here: none graded yet' && er1.every(c => c.btn === 'Take' && c.open === '')
+      && er.b1.tag === erHead('5 games', er.w1, "2 calls: the simulation's plain total 8 or more from the number · the widest of the rest Heat @ Bulls at 3.1 · 1 with no number yet: run it again later tonight", 'none graded yet')
+      && er.other && er.other.date === '2026-12-06' && !er.other.headHidden && er.other.listHidden && er.other.cards.length === 0
+      && er.other.tag === erHead('1 game', er.w1, "no call: no game stands 8 or more from its number · the widest of the rest Bucks @ Pacers at 3.0", 'none graded yet') && erc(er.b1again).join(' ## ') === erc(er.b1).join(' ## ') && er.b1again.tag === er.b1.tag
+      && JSON.stringify(er.keys1) === JSON.stringify(['2026-12-05|Celtics|Knicks', '2026-12-05|Heat|Bulls', '2026-12-05|Nuggets|Jazz', '2026-12-05|Suns|Kings', '2026-12-05|Trail Blazers|Lakers'])
+      && /^Early totals for 2026-12-05 from nba-early-2026-12-05\.json: 5 games read, 2 new calls \(Celtics @ Knicks OVER 211\.5; Trail Blazers @ Lakers UNDER 231\); 1 with no number yet: run it again later tonight\. A call is a bet for tonight, at its number or better\. The board shows the list\.$/.test(er.msg1),
+      'the early total (27 Nov 2026, the user: "we could really be finding gaps or patterns"): the evening run\'s file loads through Load slate, the board moves to the file\'s date and lists the calls, the widest first, each with the book and the hour it was read, the simulation\'s plain total, how far the number stands from it, the last number the call is good to, a club on the second night, and what was measured; the heading counts the games read, the calls, the widest game that is not a call and the games with no number yet; a game with no profile and a line that is not basketball make no card; nothing shows before a file is loaded',
+      JSON.stringify({ before: er.before, rec: er.recBefore, b1: er.b1, keys: er.keys1, msg: er.msg1, w1: er.w1 }));
+  const er2 = (er.b2 || {}).cards || [];
+  chk(JSON.stringify(((er.b1t || {}).cards || []).map(c => c.btn)) === JSON.stringify(['✓ Taking', 'Take']) && er.taken1 === true
+      && erc(er.b2).join(' ## ') === "value | #1 · EARLY · THE TOTAL A DAY AHEAD | Total OVER 211.5 ## value | #2 · EARLY · THE TOTAL A DAY AHEAD | Total UNDER 225.5 ## value | #3 · EARLY · THE TOTAL A DAY AHEAD | Total UNDER 231"
+      && /^Draft Kings at .+ · the simulation's plain total is 220\.6, 9\.1 points over that number · good up to 212\.5 · Knicks on the second night · the number since: 214\.5 by a later run, 3 points its way$/.test(er2[0].n3) && er2[0].n3.indexOf('at ' + er.w1 + ' ·') > 0
+      && /· good down to 225 · a bet for the evening it is read: by the morning the number has caught up$/.test(er2[1].n3) && er2[1].n3.indexOf('at ' + er.w2 + ' ·') > 0
+      && /· good down to 230\.5 · the number since: 229\.5 by a later run, 1\.5 points its way$/.test(er2[2].n3)
+      && JSON.stringify(er2.map(c => c.btn)) === JSON.stringify(['✓ Taking', 'Take', 'Take'])
+      && JSON.stringify(er.held) === JSON.stringify({ line: 211.5, call: true, last: { at: '2026-12-05T04:40:00Z', line: 214.5 }, taken: true, heat: 225, heatAt: '2026-12-05T04:40:00Z', jazz: true })
+      && er.b2.tag === erHead('5 games', er.w2, "3 calls: the simulation's plain total 8 or more from the number · the widest of the rest Heat @ Bulls at 3.6", 'none graded yet')
+      && /: 4 games read, 1 new call \(Nuggets @ Jazz UNDER 225\.5\); 2 calls already held stand at their own number\. A call is a bet for tonight/.test(er.msg2)
+      && er.rec3 && /· 3 calls, 3 not graded yet ·/.test(er.rec3.head) && /^What the number did afterwards \| no call has a later number yet$/.test(er.rec3.rows[4]),
+      'the early total, a call stands at the number it was made at: Take marks the call; a later run the same evening, with the over\'s number gone from 211.5 to 214.5 (no call now), leaves the call at 211.5 with its mark and notes where the number went and how far that is its way (an under\'s number coming down is its way too); a game that was not a call takes the newer read, and one that had no number becomes a call at the number the later run found',
+      JSON.stringify({ taken: (er.b1t || {}).cards, b2: er.b2, held: er.held, msg: er.msg2, w2: er.w2 }));
+  const er4 = (er.b4 || {}).cards || [], er5 = (er.b5 || {}).cards || [];
+  chk(/^The early total\. Read .+: Total OVER 211\.5 at Draft Kings, the simulation's plain total 220\.6 standing 9\.1 points over it\. The number is 216\.5 by the card's line, 5 points the call's way\. It was a bet for the evening it was read: at today's number nothing of it is measured\.$/.test(er.why1) && er.why1.indexOf('Read ' + er.w1 + ':') > 0 && er.why0 === ''
+      && /· the number since: 216\.5 by the card's line, 5 points its way$/.test(er4[0].n3) && /· the number since: 225\.5 by the card's line, where it was$/.test(er4[1].n3) && /· the number since: 233 by the card's line, 2 points against it$/.test(er4[2].n3)
+      && er4.every(c => /^\d+$/.test(c.open)) && er.opened === 'Celtics @ Knicks'
+      && er.rec4 && /^The early total the simulation's plain total against tomorrow's number, read the evening before \(Run NBA early\.bat\) · 3 calls, 3 not graded yet · each graded at the number it was made at, once its game is on the card and graded, at -110 a side \(no price is held\) · shown, not scored$/.test(er.rec4.head)
+      && er.rec4.rows.join(' ## ') === "Every call | none yet |  |  ## the overs | none yet |  |  ## the unders | none yet |  |  ## The ones you marked | none yet |  |  ## What the number did afterwards | moved the call's way on 1 of 3, against it on 1: +1.00 points a call",
+      'the early total, the next day: once a game is on the card the card\'s line is the number since (5 points the over\'s way, where it was, 2 points against the under), the board\'s card opens its game, and the game\'s decision says what the early call was, at what number and where the number is now, and that it was a bet for the evening; a game with no early call says nothing; the NBA record counts what the number did afterwards before any game is graded',
+      JSON.stringify({ why1: er.why1, why0: er.why0, n3: er4.map(c => c.n3.slice(-70)), open: er4.map(c => c.open), opened: er.opened, rec: er.rec4 }));
+  chk(erc(er.b5).join(' ## ') === "value win | #1 · EARLY · THE TOTAL A DAY AHEAD | Total OVER 211.5 WIN ## value loss | #2 · EARLY · THE TOTAL A DAY AHEAD | Total UNDER 225.5 LOSS ## value push | #3 · EARLY · THE TOTAL A DAY AHEAD | Total UNDER 231 PUSH"
+      && JSON.stringify(er5.map(c => c.btn)) === JSON.stringify(['TAKEN', '', '']) && er.takeAfter === 'none' && /· here: 1-1-1, -0\.1u$/.test(er5[0].n4)
+      && er.rec5 && /· 3 calls, 0 not graded yet ·/.test(er.rec5.head)
+      && er.rec5.rows.join(' ## ') === "Every call | 1-1-1 | 50.0% | -0.1u ## the overs | 1-0 | 100.0% | +0.9u ## the unders | 0-1-1 | 0.0% | -1.0u ## The ones you marked | 1-0 | 100.0% | +0.9u ## What the number did afterwards | moved the call's way on 1 of 3, against it on 1: +1.00 points a call"
+      && er.rec5.notes[0] === '8 or more apart: the line then moved its way 68 times to 18, by 2.8 points, and its side won 54-38 on three seasons' && /^the row's close, else its line: 68 of 86 moved the call's way on three seasons/.test(er.rec5.notes[4]) && /^tomorrow's totals, read the evening before .+ · here: 1-1-1, -0\.1u · shown, not scored$/.test(er.b5.tag),
+      'the early total, graded: each call is graded at the number it was made at once its game is graded (218 over 211.5 a win though the number had gone to 214.5; 231 on the under\'s own number a push; 230 over 225.5 a loss), the cards carry the results and the marked one reads TAKEN with no button, and the NBA record keeps every call, the overs and the unders, the ones marked, and what the number did afterwards, at -110 a side',
+      JSON.stringify({ cards: erc(er.b5), btn: er5.map(c => c.btn), takeAfter: er.takeAfter, n4: er5.map(c => c.n4.slice(-30)), rec: er.rec5, tag: (er.b5 || {}).tag }));
+  chk(er.backup && er.backup.format === 'callsheet3.backup' && er.backup.props === true && er.backup.card === 5 && er.backup.call === 211.5
+      && JSON.stringify(er.backup.early) === JSON.stringify(['2026-12-05|Celtics|Knicks', '2026-12-05|Heat|Bulls', '2026-12-05|Nuggets|Jazz', '2026-12-05|Suns|Kings', '2026-12-05|Trail Blazers|Lakers', '2026-12-06|Bucks|Pacers'])
+      && JSON.stringify(er.restored) === JSON.stringify(er.backup.early) && erc(er.b6).join(' ## ') === erc(er.b5).join(' ## ')
+      && /not an early-total file/.test(er.badMsg) && er.afterBad === 6 && erAfter.keys === 6 && erAfter.cards.length === 3 && /^Total OVER 211\.5/.test(erAfter.cards[0])
+      && /· the number since: 229 by the close, 2 points its way$/.test(erAfter.n3[2] || '') && erAfter.clv === "moved the call's way on 2 of 3, against it on 0: +2.33 points a call",
+      'the early total is kept: the backup file carries the store beside the card and the props, a restore brings every call back at its own number, the store outlives a reload of the page, and a file that says it is an early file and is not shaped like one is refused with nothing changed',
+      JSON.stringify({ backup: er.backup, restored: er.restored, b6: erc(er.b6), bad: er.badMsg, afterBad: er.afterBad, after: erAfter }));
+
   // ---- 23 Nov 2026: engine 3 on the Simulation card, the moneyline against the price, and the money's own record. The user: "see if the simulation needs to be
   //      realligned", "Make it perfect bro", and, quoting a professional, "its not to ask who will win, but can they cover the spread"; then "Is there a way to tell
   //      me how the Sharp better info we added is doing too". The card names the engine and what the men out and rest do to each side; the simulation's moneyline is

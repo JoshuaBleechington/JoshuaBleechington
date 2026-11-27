@@ -9270,7 +9270,7 @@ def selftest():
     check("lineup diff", missing_from_lineup({1, 2}, [1, 2, 3], {3: "Third Man"}) == ["Third Man"])
 
     print("one game through canned payloads")
-    global fetch_json, make_nba_ledger
+    global fetch_json, make_nba_ledger, make_nba_early
     real = fetch_json
     canned = _canned()
 
@@ -11032,6 +11032,20 @@ def selftest():
               [g["call"] for g in n27e["games"]] == [False, False] and any(l.startswith("  THE EARLY TOTAL for 2026-10-22: no call. No game stands 8 or more from its number; the widest is Heat @ Bulls at ") for l in lines27n)
               and (lambda L: (make_nba_early("2026-10-22", tempfile.mkdtemp(), L.append, day_games=lambda d: day27.get(d, [])), any(l.startswith("No ledger in ") for l in L), any("THE EARLY TOTAL for 2026-10-22: no call. No game has a number to read yet." in l for l in L))[1:])([]) == (True, True)
               and default_date("nba-early", dt.date(2026, 11, 27)) == "2026-11-28" and default_date("nba", dt.date(2026, 11, 27)) == "2026-11-27" and default_date("nba-grade", dt.date(2026, 11, 27)) == "2026-11-26")
+        import io as _io27
+        real27e, seen27e, out27e = make_nba_early, [], sys.stdout
+        make_nba_early = lambda d, o, lg, topup=False, day_games=None: seen27e.append((d, o, topup)) or "stub"
+        sys.stdout = _io27.StringIO()
+        try:
+            want27e = (nba_early_date(dt.datetime.now()), nba_early_date(dt.datetime.now() + dt.timedelta(seconds=30)))   # either, should the clock pass five or midnight in between
+            rc27e = (main(["nba-early", "--out", tmp27e, "--quiet"]), main(["nba-early", "--date", "2026-12-01", "--no-ledger", "--out", tmp27e, "--quiet"]))
+        finally:
+            make_nba_early, sys.stdout = real27e, out27e
+        check("nba early, the command line: python slate.py nba-early hands the run the early mode's own date (tomorrow, or today's games after midnight), the folder, and the ledger's top-up; --date and --no-ledger are passed on as given",
+              rc27e == (0, 0) and len(seen27e) == 2 and seen27e[0][0] in want27e and seen27e[0][1:] == (tmp27e, True) and seen27e[1] == ("2026-12-01", tmp27e, False))
+        check("nba early: run in the evening it reads tomorrow's games; run after midnight and before five in the morning it is that evening's run made late and reads the games of the day that has just begun",
+              nba_early_date(dt.datetime(2026, 11, 27, 17, 30)) == "2026-11-28" and nba_early_date(dt.datetime(2026, 11, 27, 23, 59)) == "2026-11-28" and nba_early_date(dt.datetime(2026, 11, 28, 0, 5)) == "2026-11-28"
+              and nba_early_date(dt.datetime(2026, 11, 28, 4, 59)) == "2026-11-28" and nba_early_date(dt.datetime(2026, 11, 28, 5, 0)) == "2026-11-29" and nba_early_date(dt.datetime(2026, 12, 31, 22, 0)) == "2027-01-01")
     class _Eng27(object):
         def __init__(self, v):
             if v is not None:
@@ -11867,6 +11881,12 @@ def default_date(mode, today):
     return (today if mode in TODAY_MODES else today - dt.timedelta(days=1)).isoformat()
 
 
+def nba_early_date(now):
+    """The games an early run reads when no date is given: tomorrow's. Run after midnight and before five in the morning it is
+    the same evening's run made late, so it reads the games of the day that has just begun."""
+    return default_date("nba-early", now.date() - dt.timedelta(days=1) if now.hour < 5 else now.date())
+
+
 def main(argv=None):
     ap = argparse.ArgumentParser(description="Write the day's slate (or yesterday's finals) for Call Sheet 2.0.")
     ap.add_argument("mode", nargs="?", choices=["slate", "grade", "nhl", "nhl-grade", "nhl-ledger", "nhl-pbp", "nhl-shots", "nba", "nba-early", "nba-grade", "nba-ledger", "nba-pbp", "nba-props", "nba-gap-retest", "odds", "odds-history", "odds-periods", "splits"], default="slate",
@@ -11913,7 +11933,7 @@ def main(argv=None):
             print("--date must look like 2026-09-28")
             return 2
     else:
-        date_iso = default_date(a.mode, today)
+        date_iso = nba_early_date(dt.datetime.now()) if a.mode == "nba-early" else default_date(a.mode, today)
     lines = []
 
     def log(s):

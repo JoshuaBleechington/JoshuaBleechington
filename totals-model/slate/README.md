@@ -181,7 +181,8 @@ Three double-click files, in this order on a game day:
    total where a book posts one (23 Nov 2026; one more credit a game a
    run; where the feed will not serve it for a game the run asks again
    without it and says so, and the game keeps its first-half total): the
-   day board's **first half's best bets** read it, and they read
+   day board's first-half list reads it (best bets from 23 to 26 Nov, a
+   watch list from 27 Nov 2026, when the bets came off), and it reads
    the spread and the first-half numbers of the newest run, so the run
    before the tip is the one that counts.
 3b. **Run money.bat**, or `python slate.py splits --sports NBA` (19 Nov
@@ -189,8 +190,10 @@ Three double-click files, in this order on a game day:
    bets and the money on the day's games, free. The odds run reads it too
    and its file carries the count onto each game; this refreshes it
    between odds runs. It writes `splits-DATE.json`: **Saving → Load
-   slate**, pick it, and the "Where the money is" box on tonight's games
-   updates with no line or price touched.
+   slate**, pick it, and each game keeps the count with no line or price
+   touched. From 27 Nov 2026 the count is off the game's card (the side
+   with the larger bets had gone 30-35) and only counted on the NBA
+   record, so this run is optional.
 4b. **Close NBA props.bat**, or `python slate.py nba-props --close` (6 Nov
    2026), a few minutes before the first tip: the same props as the books
    post them then, written as `nba-props-close-DATE.json`. Load it on the
@@ -235,6 +238,22 @@ Three double-click files, in this order on a game day:
    nba-grade`: `nba-grade-DATE.json` with each final, the half-time score,
    the close the odds run last saw, and every player's box line. Load it
    the same way: it grades the card and the Props tab together.
+7. **In the evening, Run NBA early.bat**, or `python slate.py nba-early`
+   (27 Nov 2026), free: TOMORROW's totals. For each of tomorrow's games it
+   works out the simulation's plain total (the two clubs' ratings at the
+   game's pace, rest in it, nobody out; a club that plays tonight is on
+   the second night tomorrow) and sets it against the number DraftKings
+   shows that evening on ESPN's scoreboard. Where they stand 8 points or
+   more apart the window names the side, the number and the number the
+   call is good to, and `nba-early-DATE.json` carries every game:
+   **Saving → Load slate**, pick it, and the board lists the calls. A
+   call is a bet for that evening: on three seasons the line then moved
+   the plain total's way 68 times to 18, by 2.8 points, and its side won
+   54-38 at the early number, and by the morning of the game the number
+   had caught up. The measurement read the numbers at about 5:30 in the
+   evening, Eastern. A game with no number yet is named: run it again
+   later. Run after midnight and before five in the morning it reads the
+   games of the day that has just begun; `--date` reads any other day's.
 
 | On the sheet | Where it comes from |
 | --- | --- |

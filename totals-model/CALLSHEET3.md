@@ -7933,3 +7933,30 @@ own flag, and that line was taken out. All the rest were caught.
 - A read of the hour: the store keeps when each call was read, so in a
   month the record can say how the number's move falls off with the
   hour the run is made.
+
+### 13. Head to head, asked the same day
+
+The user: "Does the model take into account head to head data for the
+teams?" The basketball sheet and the simulation do not (the baseball
+sheet carries the season series' mean total as an input; basketball
+never had one). Measured before answering (lab `h2h_all.py`): every
+season with a closing total and spread, 22,821 games on twenty seasons,
+14,356 of them with an earlier meeting of the two clubs that season.
+
+| Head to head | Against the closing line |
+| --- | --- |
+| the last meeting's points less its own total, on tonight's total | slope -0.011 (t -1.3) |
+| the last meeting went over by 10 or more: the over again | 1,981-2,049 |
+| the last meeting went under by 10 or more: the under again | 1,979-2,096 |
+| the season's meetings average 8 or more over tonight's total: the over | 1,805-1,804 |
+| ... 8 or more under it: the under | 2,355-2,443 |
+| the last meeting's margin for tonight's home club, on tonight's spread | slope -0.018 (t -2.5): a club beaten by 20 gets a third of a point |
+| the home club lost the last meeting: the home side | 3,863-3,861 |
+| the road club lost the last meeting: the road side | 3,263-3,137 (51.0%) |
+| a club beaten by 15 or more last time: that club | 2,076-1,955 (51.5%); by 20 or more 1,114-1,142 |
+| a club that covered by 10 or more last time: that club again | 2,840-2,954 |
+
+It is in the number. The one thing with a sign is the side leaning a
+shade to the club that lost the last meeting, and at its best cut it
+wins 51.5% where -110 needs 52.4%. Nothing was built. Not looked at:
+head to head against the EARLY number.

@@ -1,0 +1,323 @@
+[
+  {
+    "name": "empty card on a key number",
+    "inputs": {
+      "line": -3
+    },
+    "expect": {
+      "side": "HOME",
+      "band": "NO BET",
+      "p_resolved": 0.5,
+      "p_push": 0.05236184,
+      "projected": 2.38333589,
+      "expected_margin": 2.43920473,
+      "fair": 100.0,
+      "half_point_cents": 11.051,
+      "estimates": 1
+    }
+  },
+  {
+    "name": "empty card on a half point",
+    "inputs": {
+      "line": -3.5
+    },
+    "expect": {
+      "side": "HOME",
+      "band": "NO BET",
+      "p_resolved": 0.5,
+      "p_push": 0.0,
+      "projected": 3.25612148,
+      "expected_margin": 3.33137279,
+      "fair": 100.0,
+      "half_point_cents": 11.7045,
+      "estimates": 1
+    }
+  },
+  {
+    "name": "empty card, home dog",
+    "inputs": {
+      "line": 6.5
+    },
+    "expect": {
+      "side": "HOME",
+      "band": "NO BET",
+      "p_resolved": 0.5,
+      "p_push": 0.0,
+      "projected": -5.89765977,
+      "expected_margin": -6.02480111,
+      "fair": 100.0,
+      "half_point_cents": 8.5038,
+      "estimates": 1
+    }
+  },
+  {
+    "name": "even market on the three",
+    "inputs": {
+      "line": -3,
+      "op": -110,
+      "up": -110
+    },
+    "expect": {
+      "side": "HOME",
+      "band": "NO BET",
+      "p_resolved": 0.5,
+      "p_push": 0.05236184,
+      "projected": 2.38333589,
+      "expected_margin": 2.43920473,
+      "fair": 100.0,
+      "half_point_cents": 11.051,
+      "estimates": 1
+    }
+  },
+  {
+    "name": "juiced home price",
+    "inputs": {
+      "line": -3,
+      "op": -130,
+      "up": 110
+    },
+    "expect": {
+      "side": "HOME",
+      "band": "BET",
+      "p_resolved": 0.54274354,
+      "p_push": 0.05231146,
+      "projected": 3.73459791,
+      "expected_margin": 3.82007856,
+      "fair": -118.6957,
+      "half_point_cents": 12.0718,
+      "estimates": 1
+    }
+  },
+  {
+    "name": "alternate-looking wide market",
+    "inputs": {
+      "line": -3,
+      "op": -160,
+      "up": 120
+    },
+    "expect": {
+      "side": "HOME",
+      "band": "BET",
+      "p_resolved": 0.55374183,
+      "p_push": 0.05221128,
+      "projected": 4.08442725,
+      "expected_margin": 4.17718113,
+      "fair": -124.0855,
+      "half_point_cents": 12.3443,
+      "estimates": 1
+    }
+  },
+  {
+    "name": "two league-average teams",
+    "inputs": {
+      "line": -3,
+      "anet": 0,
+      "hnet": 0,
+      "gp": 12
+    },
+    "expect": {
+      "side": "HOME",
+      "band": "NO BET",
+      "p_resolved": 0.5,
+      "p_push": 0.05236184,
+      "projected": 2.38333589,
+      "expected_margin": 2.43920473,
+      "fair": 100.0,
+      "half_point_cents": 11.051,
+      "estimates": 2
+    }
+  },
+  {
+    "name": "strong home side, full season",
+    "inputs": {
+      "line": -6.5,
+      "op": -115,
+      "up": -105,
+      "anet": -3.1,
+      "hnet": 4.2,
+      "gp": 10
+    },
+    "expect": {
+      "side": "HOME",
+      "band": "BET",
+      "p_resolved": 0.54579414,
+      "p_push": 0.0,
+      "projected": 7.4410108,
+      "expected_margin": 7.5922506,
+      "fair": -120.1645,
+      "half_point_cents": 7.3355,
+      "estimates": 2
+    }
+  },
+  {
+    "name": "same teams in week one",
+    "inputs": {
+      "line": -6.5,
+      "op": -115,
+      "up": -105,
+      "anet": -3.1,
+      "hnet": 4.2,
+      "gp": 1
+    },
+    "expect": {
+      "side": "HOME",
+      "band": "NO BET",
+      "p_resolved": 0.51632555,
+      "p_push": 0.0,
+      "projected": 6.44647883,
+      "expected_margin": 6.58277991,
+      "fair": -106.7506,
+      "half_point_cents": 6.1353,
+      "estimates": 2
+    }
+  },
+  {
+    "name": "rating with no games played",
+    "inputs": {
+      "line": -3,
+      "anet": -8,
+      "hnet": 8
+    },
+    "expect": {
+      "side": "HOME",
+      "band": "NO BET",
+      "p_resolved": 0.5,
+      "p_push": 0.05236184,
+      "projected": 2.38333589,
+      "expected_margin": 2.43920473,
+      "fair": 100.0,
+      "half_point_cents": 11.051,
+      "estimates": 1
+    }
+  },
+  {
+    "name": "away side much better",
+    "inputs": {
+      "line": -3,
+      "anet": 8,
+      "hnet": 0,
+      "gp": 12
+    },
+    "expect": {
+      "side": "AWAY",
+      "band": "BET",
+      "p_resolved": 0.54090574,
+      "p_push": 0.05191014,
+      "projected": 1.09102819,
+      "expected_margin": 1.11693755,
+      "fair": -117.8202,
+      "half_point_cents": 12.5542,
+      "estimates": 2
+    }
+  },
+  {
+    "name": "home dog with a priced market",
+    "inputs": {
+      "line": 7,
+      "op": -120,
+      "up": 100,
+      "anet": 2,
+      "hnet": -5,
+      "gp": 4
+    },
+    "expect": {
+      "side": "HOME",
+      "band": "NO BET",
+      "p_resolved": 0.50200241,
+      "p_push": 0.0392728,
+      "projected": -6.49315458,
+      "expected_margin": -6.63020539,
+      "fair": -100.8042,
+      "half_point_cents": 8.2085,
+      "estimates": 2
+    }
+  },
+  {
+    "name": "the seven",
+    "inputs": {
+      "line": -7,
+      "op": -110,
+      "up": -110,
+      "anet": -2,
+      "hnet": 3,
+      "gp": 9
+    },
+    "expect": {
+      "side": "HOME",
+      "band": "NO BET",
+      "p_resolved": 0.52491874,
+      "p_push": 0.03925905,
+      "projected": 7.36567785,
+      "expected_margin": 7.51586373,
+      "fair": -110.4903,
+      "half_point_cents": 8.6013,
+      "estimates": 2
+    }
+  },
+  {
+    "name": "big favourite off a key number",
+    "inputs": {
+      "line": -9.5,
+      "op": -110,
+      "up": -110,
+      "anet": -6,
+      "hnet": 6,
+      "gp": 12
+    },
+    "expect": {
+      "side": "HOME",
+      "band": "BET",
+      "p_resolved": 0.5570294,
+      "p_push": 0.0,
+      "projected": 11.19852732,
+      "expected_margin": 11.3852477,
+      "fair": -125.7486,
+      "half_point_cents": 9.0387,
+      "estimates": 2
+    }
+  },
+  {
+    "name": "quarterback out, deliberately unscored",
+    "inputs": {
+      "line": -3,
+      "anet": 0,
+      "hnet": 2,
+      "gp": 12,
+      "hqb": true
+    },
+    "expect": {
+      "side": "HOME",
+      "band": "NO BET",
+      "p_resolved": 0.51024133,
+      "p_push": 0.05239857,
+      "projected": 2.70641281,
+      "expected_margin": 2.76955445,
+      "fair": -104.1822,
+      "half_point_cents": 11.2905,
+      "estimates": 2
+    }
+  },
+  {
+    "name": "line moved through three",
+    "inputs": {
+      "line": -3.5,
+      "op": -110,
+      "up": -110,
+      "nopened": -2.5,
+      "anet": -1,
+      "hnet": 1,
+      "gp": 10
+    },
+    "expect": {
+      "side": "HOME",
+      "band": "NO BET",
+      "p_resolved": 0.50969246,
+      "p_push": 0.0,
+      "projected": 3.5791984,
+      "expected_margin": 3.66139104,
+      "fair": -103.9536,
+      "half_point_cents": 12.4243,
+      "estimates": 2
+    }
+  }
+]

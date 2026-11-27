@@ -1,0 +1,323 @@
+diff --git a/totals-model/slate/slate.py b/totals-model/slate/slate.py
+index 07f0a86..b97d661 100644
+--- a/totals-model/slate/slate.py
++++ b/totals-model/slate/slate.py
+@@ -5381,7 +5381,7 @@ PROPS_DRIFT_CLAMP = (0.85, 1.15)
+ PROPS_DRIFT_LAST_MIN = 300.0                                                  # a man's minutes last season before he counts toward the drift
+ PROPS_ROLE_FLAT = {True: 27.5, False: 20.5}                                   # what a rotation man with no game in the role plays: a starter, a bench man (four seasons)
+ PROPS_CLUB_RECENT = 15   # a regular counts with his club while his last game for it is inside its last fifteen (the audit's measure)
+-PROPS_LEVERS = 5                                                              # 2: the levers as corrected on 13 Nov 2026; 3: the second pass the same day (the weighted read, the first games back, home and road); 4: what the men out carried (18 Nov 2026); 5: the expected five as a role (21 Nov 2026)
++PROPS_LEVERS = 6                                                              # 2: the levers as corrected on 13 Nov 2026; 3: the second pass the same day (the weighted read, the first games back, home and road); 4: what the men out carried (18 Nov 2026); 5: the expected five as a role (21 Nov 2026); 6: the game script's second pass (the same day: a slope a side, the scripts in his read)
+ # WHAT THE MEN OUT CARRIED (18 Nov 2026). The day's first BET was the under on a second-year guard's assists with his club's lead
+ # guard out; in his five games without that man he had gone over the number five times, and every book but the carded one leaned over.
+ # The lever on who is out read the absent men by their MINUTES alone. Measured on every game a rotation man played in 2024-25 and
+@@ -5518,11 +5518,34 @@ PROPS_SHADE_TENT = (0.40, 0.46, 0.55, 0.63)
+ # the lever: the expected size of the final margin for a normal at PROPS_MARGIN_SD around the book's number. The simulation's
+ # own expected margin had run 10.9 to 12.1 on every game against a base of 12.6, so it only ever added minutes; on 3,801
+ # starter props of 27 Oct to 2 Nov the spread's expected margin carried the minutes (r -0.12, t -7.2, -0.32 minutes a point)
+-PROPS_SCRIPT_PER_POINT = 0.187
+ PROPS_MARGIN_SD = 12.5
+-# the base is the spread's expected margin averaged over the season's games (11.8 over the 107 graded games of 20 Oct to
+-# 2 Nov 2026), so the lever averages to nothing across a season
+-PROPS_SCRIPT_BASE = 11.8
++# THE SECOND PASS (21 Nov 2026; the user, on the sweep's "the game script by side": "Go bro"). To that day one slope read every
++# starter: 0.187 minutes a point of the spread's expected margin over the season's 11.8 (PROPS_SCRIPT_PER_POINT and
++# PROPS_SCRIPT_BASE, both gone). Measured on every game started by a man who had started all of his last five, against the
++# read with the script taken out, the errors by club-night (lab script_side*.py, script_win*.py, script_final.py):
++#   TONIGHT'S SCRIPT BY SIDE, 17,461 starter-games against the closing spread (2024-25 to 2026-27): one level at a pick'em and a
++#   slope a side, a point of expected margin over a pick'em's. At a pick'em +0.58 minutes (the error 0.07); a FAVOURITE'S
++#   starter -0.313 a point (0.03), a DOG'S -0.143 (0.03); the gap 0.170 (95% of 300 draws 0.095 to 0.244), the same way in
++#   each of the three seasons and, on the ratings' own spread, in each of four. As the run read it the starter of a club
++#   favoured by 12.5 or more played 0.67 minutes UNDER the read and a dog's of 3.5 or more 0.39 OVER it; on the 24 graded
++#   nights a dog's starter 0.58 over (the error 0.24) and a favourite's 0.17.
++#   THE SCRIPTS ALREADY IN HIS READ, 28,378 starter-games of four seasons. His minutes are read from his last ten games and
++#   the scripts of those games sit in them: a point the size of his club's final margin ran over the league's 12.75 in those
++#   games, by the read's own weights, is +0.153 minutes tonight (the error 0.010; by season +0.186 +0.164 +0.120 +0.166; on
++#   the graded nights +0.156, the error 0.055). A starter whose read is made of close games (under 8 a game) played 0.81
++#   under it, one whose read is made of lopsided games (19 and up) 1.61 over. The games he STARTED carry it (0.154 on them,
++#   nothing on his games off the bench), so the sum runs over his starts as a share of the whole read.
++# Together, each fitted on the other seasons and read on the one left out, the mean miss 4.034 -> 3.998; the season with no
++# closing spreads, held out whole, 4.231 -> 4.167; the rule as built over every man who starts tonight, four seasons, 4.133 ->
++# 4.082 with the root mean square better in every class of spread and of read; over the 24 graded nights' starters 4.085 ->
++# 4.036, better on 17 nights. The bench is left alone: 0.04 a point the other way (0.11 for a man read under 18 minutes,
++# nothing for one read 24 or more).
++PROPS_SCRIPT_EVEN = 10.0                          # the spread's expected margin at a pick'em: props_spread_script(0)
++PROPS_SCRIPT_LEVEL = 0.6                          # a starter's minutes at a pick'em, the games of his read at the league's size
++PROPS_SCRIPT_SIDE = {"fav": 0.33, "dog": 0.18}    # minutes given up a point of expected margin over a pick'em's: his club the favourite, the dog
++PROPS_SCRIPT_READ = 0.15                          # minutes a point the final margins of the starts in his read ran over the league's size
++PROPS_SCRIPT_READ_BASE = 12.75                    # the league's: the weighted size of the final margin in a starter's read (four seasons)
++PROPS_SCRIPT_READ_MIN = 5                         # games of the read with a final margin before his read's games count
+ PROPS_DVP_WEIGHT = {"pts": 0.75, "reb": 0.75, "ast": 0.75, "tpm": 0.4, "pra": 0.75, "pr": 0.75, "pa": 0.75, "ra": 0.75}   # how much of a defence's lean to carry (measured, first half to second)
+ # the matchup lever (25 Oct 2026, the user: "see if the simulation enhances the props"): the club's expected points per
+ # possession in the simulation's own view (its offence into the opponent's defence, league-relative, home court, a back to
+@@ -5585,7 +5608,8 @@ def props_shade(mk, p_over_book):
+ 
+ def props_spread_script(spread):
+     """The game script off the book's spread (5 Nov 2026): the expected size of the final margin and the chance of a blowout
+-    of 15 or more, for a normal at PROPS_MARGIN_SD around the number; None without a spread."""
++    of 15 or more, for a normal at PROPS_MARGIN_SD around the number, with the number itself (the HOME club's: under
++    nought the home club is the favourite); None without a spread."""
+     try:
+         mu = abs(float(spread))
+     except (TypeError, ValueError):
+@@ -5593,7 +5617,7 @@ def props_spread_script(spread):
+     sd = PROPS_MARGIN_SD
+     em = sd * math.sqrt(2.0 / math.pi) * math.exp(-mu * mu / (2.0 * sd * sd)) + mu * (1.0 - 2.0 * _phi(-mu / sd))
+     blow = (1.0 - _phi((15.0 - mu) / sd)) + _phi((-15.0 - mu) / sd)
+-    return {"emargin": round(em, 1), "blowout": round(blow, 3), "src": "the spread"}
++    return {"emargin": round(em, 1), "blowout": round(blow, 3), "src": "the spread", "sp": float(spread)}   # `sp`: the number itself, the home club's (the second pass, 21 Nov 2026: the lever reads the side)
+ 
+ 
+ def props_consensus(books, line):
+@@ -6054,6 +6078,23 @@ def props_short_weights(recent):
+     return [w if i in shorts else 1.0 for i in range(n)], {"how": how, "min": [mins[i] for i in shorts], "mean": round(mean5, 1), "rise": round((mins[-1] + mins[-2]) / 2.0 - mean5, 1)}
+ 
+ 
++def props_read_margin(win, w, extra=0.0):
++    """The scripts already in a minutes read (the game script's second pass, 21 Nov 2026). `win` is the games the read is
++    made of and `w` what each counts for (a game set aside counts nothing); `extra` is weight in the read that is no game
++    (the flat number of a role read). Over the games he STARTED: how far the size of his club's final margin ran over the
++    league's (PROPS_SCRIPT_READ_BASE), as a share of the whole read (`over`: a game off the bench carries nothing), the
++    weighted size itself (`size`), how many starts (`n`) and their share of the read. None with under PROPS_SCRIPT_READ_MIN
++    games carrying a weight and a final margin."""
++    held = [(a, g) for a, g in zip(w, win) if a > 0 and g.get("mg") is not None]
++    tot = sum(w) + extra
++    if len(held) < PROPS_SCRIPT_READ_MIN or tot <= 0:
++        return None
++    st = [(a, g) for a, g in held if g.get("st")]
++    sw = sum(a for a, _g in st)
++    return {"over": sum(a * (abs(g["mg"]) - PROPS_SCRIPT_READ_BASE) for a, g in st) / tot, "size": (sum(a * abs(g["mg"]) for a, g in st) / sw) if sw > 0 else None,
++            "n": len(st), "share": sw / tot}
++
++
+ def props_short_game(recent):
+     """His last five with a short game set aside, as a plain mean: (minutes, None | {how, min, mean, rise}); props_short_weights says how."""
+     mins = [float(g["min"]) for g in recent]
+@@ -6097,7 +6138,8 @@ def props_minutes(logs_this, logs_last):
+         win = this[-len(w):]
+         five = this[-PROPS_LAST_N:]
+         return {"proj": sum(a * g["min"] for a, g in zip(w, win)) / sum(w), "n": len(win), "season": sum(g["min"] for g in this) / len(this),
+-                "starts": sum(1 for g in five if g["st"]), "n5": len(five), "last_season": False, "short": short, "w": w}
++                "starts": sum(1 for g in five if g["st"]), "n5": len(five), "last_season": False, "short": short, "w": w,
++                "sg": props_read_margin(win, w)}   # the scripts in the read (21 Nov 2026)
+     last = [g for g in (logs_last or []) if g["min"] > 0]
+     if not last:
+         return None
+@@ -6745,6 +6787,7 @@ def props_minutes_role(logs_this, starter):
+     std = props_minutes(this, None)
+     same = [g for g in this if bool(g["st"]) == starter][-PROPS_READ_N:]
+     short = None
++    sg = None   # the scripts in the read (21 Nov 2026): a starter's, from his games in the role
+     if not same:
+         proj, how = (max(flat, std["proj"]) if starter else min(flat, std["proj"])), "flat"
+     else:
+@@ -6761,7 +6804,9 @@ def props_minutes_role(logs_this, starter):
+                 short = dict(short, mean=round(plain, 1))   # what the same games say untouched
+         proj = (sum(a * g["min"] for a, g in zip(w, same)) + wf * flat) / (sum(w) + wf)
+         how = "role" if n >= PROPS_LAST_N else "few"
+-    return {"proj": proj, "n": std["n"], "season": std["season"], "starts": std["starts"], "n5": std["n5"], "last_season": False, "short": short, "w": std["w"],
++        if starter:
++            sg = props_read_margin(same, w, wf)
++    return {"proj": proj, "n": std["n"], "season": std["season"], "starts": std["starts"], "n5": std["n5"], "last_season": False, "short": short, "w": std["w"], "sg": sg,
+             "role": {"how": how, "games": len(same), "starter": starter, "mean": round(std["proj"], 1), "flat": flat}}
+ 
+ 
+@@ -6964,15 +7009,34 @@ def props_project(prop, logs_this, logs_last, ctx):
+             why.append("%s is %s: counted as playing" % (nm_, st_))
+         else:
+             why.append("%s is %s: counted %.0f%% out (a regular so listed played 46 nights in 76 on the graded nights)" % (nm_, st_, 100 * (1.0 - plays_)))
+-    # the game script (30 Oct 2026): a starter's minutes follow how lopsided the game is expected to run
++    # the game script (30 Oct 2026): a starter's minutes follow how lopsided the game is expected to run. The second pass
++    # (21 Nov 2026): a slope for each side from one level at a pick'em, and the scripts already in the games of his read
+     i_script = len(why)
+     dmin_script = 0.0
++    scn = None
+     sc = ctx.get("script")
+     if sc and sc.get("emargin") is not None and ctx.get("starter") is True:
+-        dmin_script = -PROPS_SCRIPT_PER_POINT * (float(sc["emargin"]) - PROPS_SCRIPT_BASE)
++        em_ = float(sc["emargin"])
++        own = None if sc.get("sp") is None else (float(sc["sp"]) if ctx.get("home") else -float(sc["sp"]))   # his own club's number: under nought the favourite
++        side = None if own is None else ("fav" if own < 0 else "dog" if own > 0 else "even")
++        k_side = PROPS_SCRIPT_SIDE[side] if side in PROPS_SCRIPT_SIDE else sum(PROPS_SCRIPT_SIDE.values()) / len(PROPS_SCRIPT_SIDE)   # a pick'em sits on the level whatever the slope; a script with no number is read at the middle of the two
++        d_side = PROPS_SCRIPT_LEVEL - k_side * (em_ - PROPS_SCRIPT_EVEN)
++        sg = m.get("sg")
++        d_read = PROPS_SCRIPT_READ * sg["over"] if sg else 0.0
++        dmin_script = d_side + d_read
+         mins += dmin_script
+-        why.append("the game script: %s's expected margin %.1f against the season's %.1f (a blowout of 15 or more %.0f%% of the time), so a starter's minutes read %+.1f, measured on 20,729 starter-games over two seasons, scored" % (
+-            sc.get("src") or "the simulation", float(sc["emargin"]), PROPS_SCRIPT_BASE, 100 * float(sc.get("blowout") or 0), dmin_script))
++        scn = {"side": side, "em": em_, "d": round(d_side, 2), "dread": round(d_read, 2), "over": (round(sg["over"], 2) if sg else None), "size": (round(sg["size"], 1) if sg and sg["size"] is not None else None), "n": (sg["n"] if sg else None)}
++        who = {"fav": "his club the favourite by %g" % (-own if own else 0), "dog": "his club the dog by %g" % (own or 0), "even": "a pick'em", None: "the side not told"}[side]
++        if sg and sg["n"]:
++            way = "close games sit in his read as minutes he will not see" if d_read < 0 else "lopsided games sit in his read as minutes given up"
++            read_said = "the %d start%s his minutes are read from were decided by %.1f on average against the league's %.1f, and %s: %+.1f (%.2f a point, by their weight in the read)" % (
++                sg["n"], "" if sg["n"] == 1 else "s", sg["size"], PROPS_SCRIPT_READ_BASE, way, d_read, PROPS_SCRIPT_READ)
++        elif sg:
++            read_said = "no start among the games his minutes are read from, so they add nothing"
++        else:
++            read_said = "the games his minutes are read from are not counted (under %d with a final margin)" % PROPS_SCRIPT_READ_MIN
++        why.append("the game script: %s's expected margin %.1f against a pick'em's %.1f (a blowout of 15 or more %.0f%% of the time), %s: from %+.1f at a pick'em a favourite's starter gives up %.2f minutes a point and a dog's %.2f, so %+.1f; %s; a starter's minutes read %+.1f, measured on 17,461 starter-games against the closing spread and 28,378 over four seasons, scored" % (
++            sc.get("src") or "the simulation", em_, PROPS_SCRIPT_EVEN, 100 * float(sc.get("blowout") or 0), who, PROPS_SCRIPT_LEVEL, PROPS_SCRIPT_SIDE["fav"], PROPS_SCRIPT_SIDE["dog"], d_side, read_said, dmin_script))
+     elif sc and sc.get("emargin") is not None and ctx.get("starter") is False:
+         why.append("the game script: %s's expected margin %.1f; a bench man's minutes did not move with it over two seasons (+0.006 a point), nothing scored" % (sc.get("src") or "the simulation", float(sc["emargin"])))
+     # THE TOP OF THE MINUTES (the second pass, 13 Nov 2026): every minute over PROPS_TOP_AT is read at PROPS_TOP_SHARE
+@@ -7210,6 +7274,8 @@ def props_project(prop, logs_this, logs_last, ctx):
+         res["mshort"] = {"how": msh["how"], "min": msh["min"], "mean": msh["mean"], "read": round(mins0, 1)}
+     # the levers as corrected on 13 Nov 2026: the mark, and what each read, so a later audit has the numbers and not the words
+     res["lv"] = PROPS_LEVERS
++    if scn:   # the game script's pieces (the second pass, 21 Nov 2026): the side, tonight's part, what the games of his read add
++        res["scr"] = scn
+     if mrole:
+         res["mrole"] = {"how": mrole["how"], "games": mrole["games"], "starter": mrole["starter"], "mean": mrole["mean"], "read": round(mins0, 1)}
+     if chg or lvl is not None:
+@@ -7508,7 +7574,7 @@ def make_nba_props(date_iso, out_dir, log, topup=False, sim_runs=NBA_SIM_RUNS, c
+     doc = {"format": PROPS_CLOSE_FORMAT if close else PROPS_FORMAT, "version": 1, "date": date_iso, "generated": now_utc(), "source": "slate.py nba-props%s: The Odds API, the ledgers, ESPN, HashtagBasketball" % (" --close" if close else ""),
+            "credits": credits_used, "games": games, "ledgers": ledgers,   # what the run read (23 Oct 2026): the page says so when nothing projects
+            "levers": PROPS_LEVERS, "drift": dict((k, round(v, 4)) for k, v in drift.items()), "league_out": (round(league_out, 1) if league_out is not None else None),   # the levers as corrected on 13 Nov 2026
+-           "method": {"anchor": PROPS_ANCHOR, "model": PROPS_MODEL_W, "side_shade": PROPS_SIDE_SHADE, "shade_tent": PROPS_SHADE_TENT, "script_per_point": PROPS_SCRIPT_PER_POINT, "script_base": PROPS_SCRIPT_BASE, "sd_k": PROPS_SD_K, "out_min_per30": PROPS_OUT_MIN_PER30, "out_rate_per30": PROPS_OUT_RATE_PER30, "dvp_weight": PROPS_DVP_WEIGHT, "dvp_shrink": PROPS_DVP_SHRINK,
++           "method": {"anchor": PROPS_ANCHOR, "model": PROPS_MODEL_W, "side_shade": PROPS_SIDE_SHADE, "shade_tent": PROPS_SHADE_TENT, "script_level": PROPS_SCRIPT_LEVEL, "script_side": PROPS_SCRIPT_SIDE, "script_even": PROPS_SCRIPT_EVEN, "script_read": PROPS_SCRIPT_READ, "script_read_base": PROPS_SCRIPT_READ_BASE, "sd_k": PROPS_SD_K, "out_min_per30": PROPS_OUT_MIN_PER30, "out_rate_per30": PROPS_OUT_RATE_PER30, "dvp_weight": PROPS_DVP_WEIGHT, "dvp_shrink": PROPS_DVP_SHRINK,
+                       "match_alpha": PROPS_MATCH_ALPHA, "pace": "the game's possessions against the club's own", "usage_sd": PROPS_USAGE_SD, "role_sd": PROPS_ROLE_SD, "usage_cuts": PROPS_USAGE_CUTS, "thin_sd": PROPS_THIN_SD,
+                       "script_src": "the spread", "margin_sd": PROPS_MARGIN_SD, "cons_k": PROPS_CONS_K, "cons_cap": PROPS_CONS_CAP, "cons_min_books": PROPS_CONS_MIN_BOOKS, "sim": "off the props from 5 Nov 2026 (measured null)",
+                       "shade": "off from 5 Nov 2026 (it had called the under on four props in five)", "kalshi": "off the props from 5 Nov 2026",
+@@ -9688,7 +9754,7 @@ def selftest():
+     check("props: the projection is rate x minutes, who is out, pace and the defence, against the line; the chance read around the median (the mean less 0.08 sigmas on points, 0.04 of it back for a man who started all of his last five)",
+           abs(mu_x - 32.57) < 0.01 and abs(proj_["proj"] - mu_x) < 0.006 and abs(proj_["sd"] - sd_x) < 0.006 and proj_["side"] == "OVER" and abs(proj_["p"] - props_blend(0.5, pm_x)) < 0.0002 and proj_["band"] == "no edge"   # the market the spine, the model a fifth (5 Nov 2026)
+           and abs(proj_["edge"] - (props_blend(0.5, pm_x) - props_implied(-110))) < 0.0002 and proj_["price"] == -110 and proj_["mins"] == 36.1 and proj_["top"] == -0.05 and proj_["pull"] == -0.11 and abs(proj_["pm"] - pm_x) < 0.0002
+-          and proj_["lv"] == PROPS_LEVERS == 5 and proj_["chg"] == {"new": 30.0, "back": 0.0, "dmin": 0.0, "lvl": 30.0, "lg": 20.0, "drate36": round(pr_["rate"] * 36 * 0.035 / 3.0, 3)} and "mrole" not in proj_ and "drift" not in proj_ and "ret" not in proj_
++          and proj_["lv"] == PROPS_LEVERS == 6 and proj_["chg"] == {"new": 30.0, "back": 0.0, "dmin": 0.0, "lvl": 30.0, "lg": 20.0, "drate36": round(pr_["rate"] * 36 * 0.035 / 3.0, 3)} and "mrole" not in proj_ and "drift" not in proj_ and "ret" not in proj_
+           and props_shade("pts", 0.5) == 0.0 and props_shade("reb", 0.5) == 0.0 and props_shade("pra", 0.4892) == 0.0 and props_shade("tpm", 0.4038) == 0.0 and all(v == 0.0 for v in PROPS_SIDE_SHADE.values()) and set(PROPS_SIDE_SHADE) == set(PROPS_SD_K)   # the over's shade off (5 Nov 2026): it had called the under on four props in five
+           and any("the over's shade is off" in w and "the model 20% of the say" in w for w in why_)
+           and abs(props_over(proj_["proj"] - 0.04 * proj_["sd"], proj_["sd"], 30.5)[0] - proj_["pm"]) < 0.001   # the sigma carries the thin-history factor (27 Oct 2026; x 1.04 from 13 Nov) on 125 minutes of evidence
+@@ -9796,14 +9862,19 @@ def selftest():
+           and all(PROPS_MATCH_ALPHA[m] == 0.0 for m in PROPS_MATCH_ALPHA))
+     # the simulation off the props (5 Nov 2026): the game script off the spread, the books' consensus the scored lever in its place, the market block on the prop
+     sc_s = props_spread_script(-12.5)
+-    check("props: the game script reads the spread: a 12.5-point number expects a 14.6 margin and a blowout 43% of the time, a pick 10.0 and 23%, and a starter's minutes read against the season's base",
++    check("props: the game script reads the spread: a 12.5-point number expects a 14.6 margin and a blowout 43% of the time, a pick 10.0 and 23%; the number itself rides along (the home club's), and a pick'em's expected margin is the level the lever reads from",
+           abs(sc_s["emargin"] - 14.6) < 0.06 and abs(sc_s["blowout"] - 0.435) < 0.003 and sc_s["src"] == "the spread" and abs(props_spread_script(0)["emargin"] - 10.0) < 0.06 and abs(props_spread_script("0")["blowout"] - 0.230) < 0.003
+-          and props_spread_script(None) is None and props_spread_script("x") is None and abs(PROPS_SCRIPT_BASE - 11.8) < 1e-9)
++          and props_spread_script(None) is None and props_spread_script("x") is None and sc_s["sp"] == -12.5 and props_spread_script("3.5")["sp"] == 3.5 and props_spread_script(0)["emargin"] == PROPS_SCRIPT_EVEN == 10.0
++          and PROPS_SCRIPT_LEVEL == 0.6 and PROPS_SCRIPT_SIDE == {"fav": 0.33, "dog": 0.18} and PROPS_SCRIPT_READ == 0.15 and PROPS_SCRIPT_READ_BASE == 12.75 and PROPS_SCRIPT_READ_MIN == 5)
+     ctx_s = dict(ctx_m); ctx_s.update({"starter": True, "script": sc_s})
+     proj_s, why_s = props_project(prop_, lt["11"]["g"], ll["11"]["g"], ctx_s)
+-    check("props: a starter's minutes follow the spread's expected margin at the measured 0.187 a point (14.6 against 11.8: -0.5 minutes), the why line naming the spread, the part on the projection",
+-          abs(proj_s["mins"] - (mins_p_x - 0.187 * (14.6 - 11.8))) < 0.06 and any(w.startswith("the game script: the spread's expected margin 14.6 against the season's 11.8 (a blowout of 15 or more 44% of the time), so a starter's minutes read -0.5") for w in why_s)
+-          and "script" in dict((p["k"], p) for p in proj_s["parts"]) and dict((p["k"], p) for p in proj_s["parts"])["script"]["eff"] < 0
++    proj_sh, why_sh = props_project(prop_, lt["11"]["g"], ll["11"]["g"], dict(ctx_s, home=True))
++    check("props: a starter's minutes follow the spread's expected margin from +0.6 at a pick'em, his side's slope a point over a pick'em's 10.0 (the second pass, 21 Nov 2026): on the road against a club favoured by 12.5 he is the dog, 0.18 a point (14.6: -0.2 minutes); the same man at home is the favourite, 0.33 a point (-0.9); the why line names the spread and the side, the part is on the projection, and three games with no final margin add nothing",
++          abs(proj_s["mins"] - (mins_p_x + 0.6 - 0.18 * (14.6 - 10.0))) < 0.06 and abs(proj_sh["mins"] - (mins_p_x + 0.6 - 0.33 * (14.6 - 10.0))) < 0.06
++          and any(w.startswith("the game script: the spread's expected margin 14.6 against a pick'em's 10.0 (a blowout of 15 or more 44% of the time), his club the dog by 12.5: from +0.6 at a pick'em a favourite's starter gives up 0.33 minutes a point and a dog's 0.18, so -0.2; the games his minutes are read from are not counted (under 5 with a final margin); a starter's minutes read -0.2, measured on 17,461 starter-games against the closing spread and 28,378 over four seasons, scored") for w in why_s)
++          and any("his club the favourite by 12.5: from +0.6 at a pick'em a favourite's starter gives up 0.33 minutes a point and a dog's 0.18, so -0.9; " in w and "a starter's minutes read -0.9, measured on" in w for w in why_sh)
++          and proj_s["scr"] == {"side": "dog", "em": 14.6, "d": -0.23, "dread": 0.0, "over": None, "size": None, "n": None} and proj_sh["scr"] == {"side": "fav", "em": 14.6, "d": -0.92, "dread": 0.0, "over": None, "size": None, "n": None}
++          and "script" in dict((p["k"], p) for p in proj_s["parts"]) and dict((p["k"], p) for p in proj_s["parts"])["script"]["eff"] < 0 and dict((p["k"], p) for p in proj_sh["parts"])["script"]["eff"] < dict((p["k"], p) for p in proj_s["parts"])["script"]["eff"]
+           and "top" not in dict((p["k"], p) for p in proj_s["parts"]) and "top" not in proj_s)   # the script takes his 36.1 under 36: the top of the minutes reads nothing
+     cons_ = props_consensus({"fanduel": [26.5, -112, -118], "betmgm": [27.5, 105, -140], "draftkings": [26.5, -108, -118], "pinnacle": [26.5, -115, -115], "bovada": [None, None, None]}, 27.5)
+     check("props: the books' consensus is the median line across the books posting one, with Pinnacle's own and the carded line's gap; fewer than three books give nothing",
+@@ -9975,7 +10046,7 @@ def selftest():
+           and abs(pa_["proj"] - (9.0 + 0.11 * over_c) / 36.0 * mins_c * 0.989) < 0.006 and abs(pr2_["proj"] - 8.0 / 36.0 * mins_c) < 0.006
+           and abs(pc_["proj"] - (47.0 + 30.0 * 0.035 * over_c + 0.11 * over_c) / 36.0 * mins_c * (1 - hr_c)) < 0.006
+           and abs(pb_["proj"] - 0.5 * (1 + 0.035 * over_c) * mins_b * 0.993) < 0.006 and abs(mins_b - 18.8073) < 1e-4 and pb_["mins"] == 18.8
+-          and pj_["chg"] == {"new": 25.7, "back": 4.7, "dmin": round(mins_c - 36.0, 2), "lvl": 41.7, "lg": 20.0, "drate36": round(30.0 * 0.035 * over_c, 3)} and pj_["lv"] == 5
++          and pj_["chg"] == {"new": 25.7, "back": 4.7, "dmin": round(mins_c - 36.0, 2), "lvl": 41.7, "lg": 20.0, "drate36": round(30.0 * 0.035 * over_c, 3)} and pj_["lv"] == 6
+           and dict((p_["k"], p_) for p_ in pj_["parts"])["out"]["eff"] == round(30.0 / 36.0 * (1 + 0.035 * over_c) * mins_c - 30.0, 2)
+           and any(w == "who is out against his last 6: newly out: Kyrie Irving (30 mpg, with him in 4 of his last 6), PJ Washington (26 mpg, with him in 6 of his last 6, listed Questionable and counted 45% out); back: Klay Thompson (28 mpg, missed 2 of his last 6): -0.2 minutes (0.00 a 30 mpg newly out and 1.42 off a 30 mpg back for a man who started all of his last five on 36.0 minutes; a man out through all of them is already in his minutes; 57,908 games over four seasons, the miss 4.80 with no lever and 4.58 with this), scored" for w in wj_)
+           and any(w.startswith("who is out against his last 6: newly out: Kyrie Irving (30 mpg, with him in 4 of his last 6), PJ Washington") and ": +2.8 minutes (3.74 a 30 mpg newly out and 2.55 off a 30 mpg back for a man who started none of his last five on 16.0 minutes" in w for w in wb_)
+@@ -10015,7 +10086,7 @@ def selftest():
+           and abs(pbm_["proj"] - 0.5 * (1 + 0.035 * over_c) * mins_b * 0.94 * 0.993) < 0.006 and pbm_["ret"] == {"missed": 1, "f": 0.94, "dmin": round(-0.06 * mins_b, 2)}
+           and any(w.startswith("his club has played 1 game since his last: in his first game back from that many a man who did not start all of his last five plays 0.94 of the read") and w.endswith("so -1.1 minutes, scored") for w in wbm_)
+           # the game script reads after it: a starter's minutes move with the spread on top of the share
+-          and abs(psc_["mins"] - (mins_c * 0.93 - 0.187 * (props_spread_script(-12.5)["emargin"] - 11.8))) < 0.06 and psc_["ret"]["f"] == 0.93
++          and abs(psc_["mins"] - (mins_c * 0.93 + 0.6 - 0.18 * (props_spread_script(-12.5)["emargin"] - 10.0))) < 0.06 and psc_["ret"]["f"] == 0.93   # on the road against a favourite of 12.5: the dog's slope
+           and abs(psc_["base"] + sum(parts_sc[k_]["eff"] for k_ in ("out", "ret", "script", "home")) - psc_["proj"]) < 0.03)
+     # WHAT THE MEN OUT CARRIED (18 Nov 2026): Kyrie (30 mpg; 20 points, 4 rebounds, 5 assists a game) is Out and shared four of
+     # Luka's six games; PJ Washington (26; 12, 7, 2) is Questionable, counted 45% out, and shared all six; Klay (28; 15, 3, 2) plays
+@@ -10075,7 +10146,7 @@ def selftest():
+           # nobody out and nobody back who missed a game of his: the sums are nought and no name is carried
+           and props_out_carry("11", lc, None, dict(nc, out=[], maybe=[], regs={"11": ("Luka Doncic", 36.0), "24": ("PJ Washington", 26.0)}, plays={})) == {"mnew": 0.0, "mback": 0.0, "new": {"pts": 0.0, "reb": 0.0, "ast": 0.0}, "back": {"pts": 0.0, "reb": 0.0, "ast": 0.0}, "new_names": [], "back_names": [], "n": 6}
+           # the projection: his points rate x (1 + the lever on the level + the share), the minutes as they were
+-          and abs(pk_["proj"] - 30.0 / 36.0 * (1 + 0.035 * over_c + sh_p) * mins_c * 0.993) < 0.006 and pk_["mins"] == pj_["mins"] and pk_["lv"] == 5
++          and abs(pk_["proj"] - 30.0 / 36.0 * (1 + 0.035 * over_c + sh_p) * mins_c * 0.993) < 0.006 and pk_["mins"] == pj_["mins"] and pk_["lv"] == 6
+           and abs((pka_["proj"] - pa_["proj"]) - 9.0 / 36.0 * sh_a * mins_c * 0.989) < 0.012 and abs((pkr_["proj"] - pr2_["proj"]) - 8.0 / 36.0 * sh_r * mins_c) < 0.012
+           and pk_["carry"] == {"mnew": round(cm_new, 1), "mback": round(cm_back, 1), "new": {"pts": round(cn_["pts"], 2)}, "back": {"pts": round(cb_["pts"], 2)}, "share": {"pts": round(sh_p, 4)}, "drate36": round(30.0 * sh_p, 3), "n": 6}
+           and pk_["chg"] == pj_["chg"]                                                    # the lever on the level and the minutes read as they did
+@@ -10126,6 +10197,62 @@ def selftest():
+           and abs(psb_["proj"] - 0.75 * ((36.0 * w6_ + 16.0 * w4_) / (w6_ + w4_) + 0.21 * 6.0)) < 0.006 and psb_["pull"] == 1.26      # 7.8 under his season: held to 6
+           and "pull" not in pn_ and "pull" not in pj_ and "pull" not in dict((p_["k"], p_) for p_ in pj_["parts"]) and not any("his season's mean is" in w for w in wj_)   # his six games at 36: the season and the read agree
+           and PROPS_SEASON_PULL == {"all": 0.50, "some": 0.11, "none": 0.21} and PROPS_SEASON_HOLD == (-2.0, 6.0))
++    # THE GAME SCRIPT'S SECOND PASS (21 Nov 2026): a slope for each side from one level at a pick'em, and the scripts already in the
++    # games of his read. Six 30-minute starts; each game back counts three quarters of the one after it
++    W6 = [0.75 ** k_ for k_ in range(5, -1, -1)]
++    close6, lop6 = (3, -5, 2, -4, 6, -1), (20, -25, 18, -30, 22, -15)
++    g_close = [dict(g_, min=30.0, mg=mg_) for g_, mg_ in zip(lc["11"]["g"], close6)]
++    g_lop = [dict(g_, min=30.0, mg=mg_) for g_, mg_ in zip(lc["11"]["g"], lop6)]
++    sz_close = sum(a_ * abs(b_) for a_, b_ in zip(W6, close6)) / sum(W6)            # 3.31: decided by three points a game
++    sz_lop = sum(a_ * abs(b_) for a_, b_ in zip(W6, lop6)) / sum(W6)                # 20.87
++    ctx_g = dict(ctx_h0, starter=True)
++    sp_g = lambda g_, **kw_: props_project(dict(prop_, line=22.5), g_, None, dict(ctx_g, **kw_))
++    p_hf, w_hf = sp_g(g_close, home=True, script=props_spread_script(-12.5))       # at home, favoured by 12.5
++    p_rd, _w = sp_g(g_close, home=False, script=props_spread_script(-12.5))        # on the road against that favourite: the dog
++    p_hd, _w = sp_g(g_close, home=True, script=props_spread_script(12.5))          # at home, a dog by 12.5
++    p_rf, _w = sp_g(g_close, home=False, script=props_spread_script(12.5))         # on the road, favoured by 12.5
++    p_ev, w_ev = sp_g(g_close, home=True, script=props_spread_script(0))
++    p_lop, w_lop = sp_g(g_lop, home=True, script=props_spread_script(-12.5))
++    g_lop_b = [dict(g_, st=(0 if i_ == 0 else 1)) for i_, g_ in enumerate(g_lop)]   # his oldest game off the bench: it carries nothing, and it still counts in the read's weight
++    p_lopb, _w = sp_g(g_lop_b, home=True, script=props_spread_script(-12.5))
++    over_lopb = sum(a_ * (abs(b_) - 12.75) for a_, b_ in list(zip(W6, lop6))[1:]) / sum(W6)   # 7.60 against 8.12 with every game counted
++    g_four = [dict(g_, mg=(None if i_ < 2 else g_["mg"])) for i_, g_ in enumerate(g_close)]   # four games with a final margin: not enough
++    p_four, w_four = sp_g(g_four, home=True, script=props_spread_script(-12.5))
++    g_short = [dict(g_, min=(10.0 if i_ == 2 else 30.0), mg=(40 if i_ == 2 else g_["mg"])) for i_, g_ in enumerate(g_close)]   # a ten-minute game in a 40-point rout, three games back: the read sets it aside, and so does this
++    p_short, _w = sp_g(g_short, home=True, script=props_spread_script(-12.5))
++    w_short = [a_ for i_, a_ in enumerate(W6) if i_ != 2]
++    over_short = sum(a_ * (abs(b_) - 12.75) for a_, b_ in zip(w_short, [m_ for i_, m_ in enumerate(close6) if i_ != 2])) / sum(w_short)   # -9.25; -4.56 had the rout been counted
++    p_bench, w_bench = sp_g(g_close, home=True, starter=False, script=props_spread_script(-12.5))
++    p_nosp, w_nosp = sp_g(g_close, home=True, script={"emargin": 14.6, "blowout": 0.435, "src": "the spread"})
++    # the role read's own games (a confirmed five, a man who came off the bench once in his last five): eight starts, and the flat number's weight carries nothing
++    st9, mg9 = (1, 1, 1, 1, 1, 0, 1, 1, 1), (20, -25, 18, -30, 22, 2, -15, 28, -16)
++    g_role = [dict(lc["11"]["g"][0], d="2026-11-%02d" % (1 + i_), min=30.0, st=st_, mg=mg_) for i_, (st_, mg_) in enumerate(zip(st9, mg9))]
++    p_role, _w = props_project(dict(prop_, line=22.5), g_role, None, dict(ctx_g, home=True, start_src="RotoWire's confirmed five", script=props_spread_script(-12.5)))
++    w8 = [0.75 ** k_ for k_ in range(7, -1, -1)]
++    over_role = sum(a_ * (abs(b_) - 12.75) for a_, b_ in zip(w8, [m_ for m_, s_ in zip(mg9, st9) if s_])) / (sum(w8) + 0.75 ** 8)
++    parts_hf = dict((p_["k"], p_) for p_ in p_hf["parts"])
++    check("props: the game script's second pass (21 Nov 2026): a favourite's starter gives up 0.33 minutes a point of expected margin over a pick'em's and a dog's 0.18, from +0.6 at a pick'em, the side read off the number and where he plays (the home favourite and the road favourite one way, the home dog and the road dog the other); and the games of his read: the starts in it decided by 3.3 a game against the league's 12.75 take 1.4 minutes off (close games sit in his read as minutes he will not see), lopsided ones add 1.2, by their weight in the read; a game off the bench carries nothing and still counts in the weight, a game the read sets aside is not counted, under five games with a final margin nothing is read; the role read brings its own games and the flat number's weight; a bench man reads nothing; a script with no number reads the middle of the two slopes; a part and a why line, the pieces on the row",
++          abs(sz_close - 3.31) < 0.006 and abs(sz_lop - 20.87) < 0.006
++          and p_hf["scr"] == {"side": "fav", "em": 14.6, "d": -0.92, "dread": -1.42, "over": -9.44, "size": 3.3, "n": 6} and p_hf["mins"] == round(30.0 + 0.6 - 0.33 * 4.6 + 0.15 * (sz_close - 12.75), 1) == 27.7
++          and p_rf["scr"] == p_hf["scr"] and p_rf["mins"] == p_hf["mins"]
++          and p_rd["scr"] == {"side": "dog", "em": 14.6, "d": -0.23, "dread": -1.42, "over": -9.44, "size": 3.3, "n": 6} and p_rd["mins"] == round(30.0 + 0.6 - 0.18 * 4.6 + 0.15 * (sz_close - 12.75), 1) == 28.4
++          and p_hd["scr"] == p_rd["scr"] and p_hd["mins"] == p_rd["mins"]
++          and p_ev["scr"] == {"side": "even", "em": 10.0, "d": 0.6, "dread": -1.42, "over": -9.44, "size": 3.3, "n": 6} and p_ev["mins"] == 29.2 and any("a pick'em: from +0.6 at a pick'em" in w and "so +0.6; " in w for w in w_ev)
++          and p_lop["scr"] == {"side": "fav", "em": 14.6, "d": -0.92, "dread": 1.22, "over": 8.12, "size": 20.9, "n": 6} and p_lop["mins"] == round(30.0 + 0.6 - 0.33 * 4.6 + 0.15 * (sz_lop - 12.75), 1) == 30.3
++          and abs(over_lopb - 7.60) < 0.006 and p_lopb["scr"]["over"] == round(over_lopb, 2) and p_lopb["scr"]["dread"] == 1.14 and p_lopb["scr"]["n"] == 5 and p_lopb["scr"]["size"] == 20.9
++          and p_four["scr"] == {"side": "fav", "em": 14.6, "d": -0.92, "dread": 0.0, "over": None, "size": None, "n": None} and any("the games his minutes are read from are not counted (under 5 with a final margin)" in w for w in w_four)
++          and abs(over_short - -9.25) < 0.006 and p_short["scr"]["over"] == round(over_short, 2) and p_short["scr"]["dread"] == -1.39 and p_short["scr"]["n"] == 5 and p_short["mshort"]["how"] == "out"
++          and "scr" not in p_bench and "script" not in dict((p_["k"], p_) for p_ in p_bench["parts"]) and p_bench["mins"] == 30.0 and any(w.startswith("the game script: the spread's expected margin 14.6; a bench man's minutes did not move with it") for w in w_bench)
++          and p_nosp["scr"]["side"] is None and p_nosp["scr"]["d"] == round(0.6 - 0.255 * 4.6, 2) == -0.57 and any("the side not told: from +0.6" in w for w in w_nosp)
++          and p_role["mrole"]["how"] == "role" and p_role["mrole"]["games"] == 8 and p_role["scr"]["n"] == 8 and p_role["scr"]["over"] == round(over_role, 2) and abs(over_role - 8.03) < 0.006 and p_role["scr"]["dread"] == round(0.15 * over_role, 2)
++          and any(w.startswith("the game script: the spread's expected margin 14.6 against a pick'em's 10.0 (a blowout of 15 or more 44% of the time), his club the favourite by 12.5: from +0.6 at a pick'em a favourite's starter gives up 0.33 minutes a point and a dog's 0.18, so -0.9; the 6 starts his minutes are read from were decided by 3.3 on average against the league's 12.8, and close games sit in his read as minutes he will not see: -1.4 (0.15 a point, by their weight in the read); a starter's minutes read -2.3, measured on 17,461 starter-games against the closing spread and 28,378 over four seasons, scored") for w in w_hf)
++          and any("the 6 starts his minutes are read from were decided by 20.9 on average against the league's 12.8, and lopsided games sit in his read as minutes given up: +1.2 (0.15 a point, by their weight in the read); a starter's minutes read +0.3," in w for w in w_lop)
++          and w_hf[parts_hf["script"]["i"]].startswith("the game script: ") and parts_hf["script"]["t"] == "The game script, from the spread" and abs(p_hf["base"] + sum(p_["eff"] for p_ in p_hf["parts"]) - p_hf["proj"]) < 0.03
++          and props_read_margin([{"mg": 5, "st": 1}] * 4, [1.0] * 4) is None and props_read_margin([{"mg": -5, "st": 1}] * 5, [1.0] * 5) == {"over": -7.75, "size": 5.0, "n": 5, "share": 1.0}
++          and props_read_margin([{"mg": -5, "st": 1}] * 5, [1.0] * 5, 5.0) == {"over": -3.875, "size": 5.0, "n": 5, "share": 0.5}
++          and props_read_margin([{"mg": 5, "st": 1}] * 6, [0.0] + [1.0] * 5)["n"] == 5 and props_read_margin([{"mg": 5, "st": 1}] * 6, [0.0, 0.0] + [1.0] * 4) is None
++          and props_read_margin([{"mg": 5, "st": 0}] * 5, [1.0] * 5) == {"over": 0.0, "size": None, "n": 0, "share": 0.0}
++          and props_minutes(g_close, None)["sg"]["n"] == 6 and "sg" not in props_minutes(None, g_close))
+     # THE TOP OF THE MINUTES (the second pass, 13 Nov 2026): every minute over 36 read at half
+     l40 = [dict(g_, min=40.0) for g_ in lc["11"]["g"]]
+     pt40, wt40 = props_project(dict(prop_, line=27.5), l40, None, ctx_h0)
+@@ -10134,7 +10261,7 @@ def selftest():
+     check("props: the top of the minutes (the second pass, 13 Nov 2026): a man projected past 36 played 1.4 minutes less than the projection, so every minute over 36 is read at half; a part of its own, the mark on the row, after the first games back and the game script; at 36 and under nothing is read",
+           pt40["mins"] == 38.0 and abs(pt40["proj"] - 0.75 * 38.0) < 0.006 and pt40["top"] == -2.0 and dict((p_["k"], p_) for p_ in pt40["parts"])["top"]["eff"] == -1.5 and pt40["base"] == 30.0
+           and any(w.endswith("so every minute over 36 is read at half: -2.0 minutes, scored") for w in wt40)
+-          and abs(pt40s["mins"] - (36.0 + 0.5 * (40.0 - 0.187 * (props_spread_script(-12.5)["emargin"] - 11.8) - 36.0))) < 0.06     # the script first (39.5), then the top (37.7)
++          and abs(pt40s["mins"] - (36.0 + 0.5 * (40.0 + 0.6 - 0.18 * (props_spread_script(-12.5)["emargin"] - 10.0) - 36.0))) < 0.06     # the script first (the dog's: 39.8), then the top (37.9)
+           and abs(pt40s["base"] + sum(p_["eff"] for p_ in pt40s["parts"] if p_["k"] in ("script", "top")) - pt40s["proj"]) < 0.03
+           and pt40m["mins"] == round(36.0 + 0.5 * (40.0 * 0.93 - 36.0), 1) == 36.6 and pt40m["top"] == round(-0.5 * (37.2 - 36.0), 2) and pt40m["ret"]["f"] == 0.93   # three games missed: 37.2, then the top
+           and "top" not in pn_ and not any("the top of the minutes" in w for w in wn_) and "top" not in dict((p_["k"], p_) for p_ in pn_["parts"])                  # his 36.0: nothing read
+@@ -10186,7 +10313,7 @@ def selftest():
+           pex_ == pex2_ and pex_["mins"] == round(mins_e5, 1) == 23.4 and abs(pex_["proj"] - 0.5 * (1 + 0.035 * over_c) * mins_e5 * 0.993) < 0.006
+           and pex_["mix"] == {"w": 0.5, "any": round(mins_b, 1), "role": round(mins_r, 1), "dmin": round(0.5 * (mins_r - mins_b), 2), "games": 0, "how": "flat"} and pex_["mix"]["any"] == 18.8 and pex_["mix"]["role"] == 28.0 and pex_["mix"]["dmin"] == 4.61
+           and parts_x["mix"]["t"] == "The expected five: his games as a starter" and parts_x["mix"]["eff"] == round(0.5 * (1 + 0.035 * over_c) * 0.5 * (mins_r - mins_b), 2)
+-          and abs(pex_["base"] + sum(parts_x[k_]["eff"] for k_ in ("out", "mix", "home")) - pex_["proj"]) < 0.03 and "mrole" not in pex_ and "stay" not in pex_ and pex_["lv"] == 5
++          and abs(pex_["base"] + sum(parts_x[k_]["eff"] for k_ in ("out", "mix", "home")) - pex_["proj"]) < 0.03 and "mrole" not in pex_ and "stay" not in pex_ and pex_["lv"] == 6
+           and wex_[parts_x["mix"]["i"]].startswith("RotoWire's expected five has him starting and he started none of his last five: the read above is his games of any kind, 18.8 minutes; as a starter (no game as a starter this season, so 27.5, what a rotation man with none plays, with the role's own lever on who is out) the run reads 28.0; the five is expected, not confirmed, so his minutes are read half of the way between: +4.6 minutes (such a man played 2.4 minutes more than his games of any kind said")
+           and wex_[parts_x["mix"]["i"]].endswith("the miss 5.72 so read and 5.39 half way, every season; on the 24 graded nights 4.4 more, 5.72 and 4.73), scored")
+           # three or four starts in five: read only when his last game was a start

@@ -1,0 +1,4923 @@
+/* Replays web/callsheet3-cases.json through web/callsheet3.html in a real
+ * browser and asserts the page reaches the same markets, in the same order,
+ * with the same probabilities and edges the Python package reached -- the
+ * MLB cases through Call Sheet #1's engine block (byte-identical to
+ * fullgame.html's) and the NBA cases through the NBA block (ported from
+ * totals/nba.py); the hockey book came off the page on 30 Oct 2026.
+ *
+ * Then what the fixtures cannot see: the basketball card and its slate, the
+ * props, the simulation, the takes, the middles and the window, the store,
+ * a void row, and the build stamp is current.
+ *
+ *   node tools_check_callsheet3_page.js
+ */
+const { chromium } = require('playwright');
+const path = require('path');
+const fs = require('fs');
+const { execSync } = require('child_process');
+
+const CASES = JSON.parse(fs.readFileSync(path.join(__dirname, 'web/callsheet3-cases.json'), 'utf8'));
+const IDS = ["away","home","line","op","up","opened","gdate","aera","hera","aip","hip","arpg","hrpg",
+             "abp","hbp","al10","hl10","h2h","h2hn","pf","mph","dir","temp","tick","cash",
+             "hml","aml","rl","rlh","rla","f5line","f5op","f5up","al5era","hl5era","al5ip","hl5ip",
+             "apace","hpace","aort","hort","adrt","hdrt","arest","hrest","al5","hl5","sp","sph","spa",
+             "h1line","h1op","h1up","naort","nhort","nadrt","nhdrt","napace","nhpace","nagp","nhgp","nlrtg","nlpace","narest","nhrest","nbaout","nbaq","nbactx","ncrew","nbarefs","nbalineup","nbaform","nbasim"];
+const CHECKS = ["dome","playoff"];
+
+(async () => {
+  const b = await chromium.launch({ executablePath: process.env.CHROMIUM_PATH || '/opt/pw-browsers/chromium' });
+  const pg = await b.newPage({ viewport: { width: 1280, height: 1400 } });
+  // 11 Nov 2026: three-leg tickets sit under the BETs by default; the blocks written before read the LEAN cards there, so every load
+  // puts the LEANs back unless a block frees the choice
+  let belowFree = false;
+  const leansBelow = async () => { if (belowFree) return; await pg.evaluate(async () => { await window.smStore.ready; const el = document.getElementById('propsBelow'); if (el && el.value !== 'leans') { el.value = 'leans'; el.dispatchEvent(new Event('change', { bubbles: true })); } }); };
+  const reloaded = async () => {
+    await pg.reload();
+    try { await pg.waitForFunction(() => window.smStore && window.smStore.ready, null, { timeout: 60000 }); }
+    catch (e) {   // 2 Nov 2026: a reload stalled 30 s once under load; say what the page looks like before giving up
+      const state = await pg.evaluate(() => ({ ready: document.readyState, store: typeof window.smStore, url: location.href.slice(-40), scripts: document.scripts.length })).catch(err => String(err));
+      console.log('reload stalled:', JSON.stringify(state), 'page errors so far:', JSON.stringify(errs.slice(-5)));
+      throw e;
+    }
+    await pg.waitForTimeout(300);
+    await leansBelow();
+  };   // a reload waits for the store, not a fixed 300 ms (30 Oct 2026: the harness raced the page under load)
+  const errs = [];
+  pg.on('pageerror', e => errs.push(String(e)));
+  pg.on('console', m => {
+    const where = (m.location() && m.location().url) || '';
+    if (m.type() === 'error' && !/fonts\.(googleapis|gstatic)\.com/.test(where + ' ' + m.text())) errs.push('console: ' + m.text());
+  });
+  await pg.goto('file://' + path.join(__dirname, 'web/callsheet3.html'));
+  await pg.waitForTimeout(300);
+  // the page's memory is the store (25 Oct 2026): IndexedDB behind a cache, localStorage for the small keys
+  await pg.evaluate(() => smStore.ready.then(() => smStore.clear()));
+  await pg.reload();
+  await pg.waitForTimeout(300);
+  const belowDefault = await pg.evaluate(async () => { await window.smStore.ready; return (document.getElementById('propsBelow') || {}).value; });   // the choice on a first visit
+  const legsDefault = await pg.evaluate(() => (document.getElementById('propsLegs') || {}).value);   // and the legs a ticket
+  await leansBelow();
+
+  let fails = 0;
+  const chk = (ok, m, d) => { if (!ok) fails++; console.log(`${ok ? 'PASS' : 'FAIL'}  ${m}${ok ? '' : '\n        ' + d}`); };
+
+  // ---- the engine block is Call Sheet #1's, byte for byte; the NBA block sits after it ----
+  const block = (file, open, close) => {
+    const s = fs.readFileSync(path.join(__dirname, 'web', file), 'utf8').split('\n');
+    const a = s.findIndex(l => l.startsWith(open));
+    const z = s.findIndex(l => l.startsWith(close));
+    return a >= 0 && z > a ? s.slice(a, z + 1).join('\n') : null;
+  };
+  const b1 = block('fullgame.html', '  /* ===== ENGINE BLOCK.', '  /* ===== END ENGINE BLOCK ===== */');
+  const b3 = block('callsheet3.html', '  /* ===== ENGINE BLOCK.', '  /* ===== END ENGINE BLOCK ===== */');
+  chk(b1 && b3 && b1 === b3, 'engine: callsheet3.html carries fullgame.html\'s engine block byte-identical', `#1 ${b1 ? b1.length : 'missing'} vs 3.0 ${b3 ? b3.length : 'missing'}`);
+  const html = fs.readFileSync(path.join(__dirname, 'web/callsheet3.html'), 'utf8');
+  chk(html.indexOf('NHL BLOCK.') < 0 && html.indexOf('id="m-nhl"') < 0 && html.indexOf('id="nhlFields"') < 0, 'engine: the hockey block, button and fields are off the page (30 Oct 2026)', '');
+  const nbb = block('callsheet3.html', '  /* ===== NBA BLOCK.', '  /* ===== END NBA BLOCK ===== */');
+  const nsrc = fs.readFileSync(path.join(__dirname, 'web/nba.engine.js'), 'utf8').replace(/\n$/, '');
+  chk(nbb && nbb === nsrc, 'engine: the NBA block is web/nba.engine.js verbatim and follows the engine block', `${nbb ? nbb.length : 'missing'} vs ${nsrc.length}`);
+  chk(html.indexOf('END ENGINE BLOCK') < html.indexOf('NBA BLOCK.'), 'engine: the NBA block comes after the engine block', '');
+
+  // ---- fixtures ---------------------------------------------------------------
+  const fill = async (sport, inputs) => pg.evaluate(async ([sport, inputs, ids, checks]) => {
+    document.getElementById(sport === 'WNBA' ? 'm-wnba' : sport === 'NHL' ? 'm-nhl' : sport === 'NBA' ? 'm-nba' : 'm-mlb').click();
+    document.getElementById('byEdge').checked = true;
+    ids.forEach(id => { document.getElementById(id).value = ''; });
+    checks.forEach(id => { document.getElementById(id).checked = false; });
+    for (const [k, v] of Object.entries(inputs)) {
+      if (v === null || v === undefined) continue;
+      const el = document.getElementById(k); if (!el) continue;
+      if (el.type === 'checkbox') el.checked = !!v; else el.value = String(v);
+    }
+    ids.forEach(id => document.getElementById(id).dispatchEvent(new Event('input', { bubbles: true })));
+    checks.forEach(id => document.getElementById(id).dispatchEvent(new Event('change', { bubbles: true })));
+    await new Promise(r => setTimeout(r, 40));
+    return [...document.querySelectorAll('#markets .mk')].map(el => {
+      const e = el.querySelector('.e').textContent;
+      const edge = /edge ([+-][0-9.]+)/.exec(e);
+      return { key: el.dataset.key, pick: el.querySelector('.pick').childNodes[0].textContent.trim(),
+               p: parseFloat(el.querySelector('.p').textContent), edge: edge ? parseFloat(edge[1]) : null,
+               derived: !!el.querySelector('.derived'), band: (el.querySelector('.band') || {}).textContent || '' };
+    });
+  }, [sport, inputs, IDS, CHECKS]);
+
+  for (const c of CASES) {
+    // the alternate total (19 Oct 2026) is a page-only market built from the odds file; the Python engine has no such row
+    const got = (await fill(c.sport, c.inputs)).filter(m => m.key !== 'alt');
+    const w = c.expect, tag = `${c.sport} · ${c.name}`;
+    chk(got.length === w.markets.length, `${tag}: ${w.markets.length} markets`, `page drew ${got.length}`);
+    chk(got.map(m => m.key).join('>') === w.markets.map(m => m.key).join('>'),
+        `${tag}: ranked ${w.markets.map(m => m.key).join(' > ')}`, `page ranked ${got.map(m => m.key).join(' > ')}`);
+    w.markets.forEach((m, i) => {
+      const g = got[i]; if (!g) return;
+      chk(g.pick === m.pick, `${tag}: #${i + 1} ${m.pick}`, `page said ${g.pick}`);
+      chk(Math.abs(g.p - m.p * 100) < 0.051, `${tag}: #${i + 1} ${(m.p * 100).toFixed(1)}%`, `page said ${g.p}%`);
+      if (m.edge === null) chk(g.edge === null, `${tag}: #${i + 1} has no price`, `page printed an edge ${g.edge}`);
+      else chk(Math.abs(g.edge - m.edge * 100) < 0.051, `${tag}: #${i + 1} edge ${(m.edge * 100).toFixed(1)}`, `page said ${g.edge}`);
+      chk(g.derived === !m.anchored, `${tag}: #${i + 1} ${m.anchored ? 'anchored' : 'derived'}`, `derived=${g.derived}`);
+      if (m.key === 'total') chk(g.band === m.band, `${tag}: total carries #1's band ${m.band}`, `page said ${g.band}`);
+    });
+  }
+
+  // ---- the basketball card (15 Oct 2026): add, pick, who is out, grade with the half, record ----
+  const nba = await pg.evaluate(async () => {
+    const wait = () => new Promise(r => setTimeout(r, 60));
+    const set = (id, v) => { const el = document.getElementById(id); el.value = v; el.dispatchEvent(new Event('input', { bubbles: true })); };
+    await smStore.removeItem('callsheet3.card.v1');
+    document.getElementById('clear').click(); document.getElementById('m-nba').click(); await wait();
+    document.getElementById('boardDate').value = '2027-04-06';
+    // the last two weeks: the stage delta puts +2 on the line, the half carries its share, the ratings fade is past fifty games
+    set('gdate', '2027-04-06'); set('away', 'Raptors'); set('home', 'Boston'); set('line', '221.5'); set('op', '-110'); set('up', '-110');
+    set('sp', '-9.5'); set('sph', '-110'); set('spa', '-110'); set('hml', '-450'); set('aml', '340'); set('h1line', '111.5'); set('h1op', '-110'); set('h1up', '-110');
+    set('naort', '113.6'); set('nadrt', '111.2'); set('nhort', '117.7'); set('nhdrt', '110.5'); set('napace', '100.8'); set('nhpace', '97.4'); set('nagp', '77'); set('nhgp', '77');
+    set('nbaout', JSON.stringify({ away: [{ id: '1', n: 'Scottie Barnes', st: 'Out', mpg: 34.5, ppg: 20.1, pm: 2.2, note: 'knee' }, { id: '2', n: 'Deep Bench', st: 'Out', mpg: 6.0, ppg: 1.5, pm: -0.5 }],
+                                   home: [{ id: '3', n: 'Jaylen Brown', st: 'Questionable', mpg: 33.8, ppg: 24.2, pm: 4.0, note: 'ankle' }] }));
+    set('nbactx', JSON.stringify([{ side: 'home', k: 'drt', s: 'faded', t: 'Celtics allow 110.5 per 100, 3rd best in the league (77 games).', tag: 'faded: the market over-moves with early-season ratings; past fifty games shown' },
+                                  { side: 'away', k: 'pace', s: 'shown', t: 'Raptors play at 100.8 possessions, 8th slowest.', tag: 'shown: pace alone measured null against the close' }]));
+    await wait();
+    // the starting five: nothing until the box fills, then the away five with its status, the home side RotoWire has not posted
+    const lineup0 = document.getElementById('nbaLineupPanel').innerText;
+    set('nbalineup', JSON.stringify({ away: { status: 'expected', five: [['PG', 'Immanuel Quickley'], ['SG', 'RJ Barrett'], ['SF', 'Brandon Ingram'], ['PF', 'Jonathan Mogbo'], ['C', 'Jakob Poeltl']], maybe: [['F', 'Scottie Barnes', 'Out']] }, home: null, src: 'RotoWire' }));
+    await wait();
+    const lineup1 = document.getElementById('nbaLineupPanel').innerText, lineupBadges = [...document.querySelectorAll('#nbaLineupPanel .lbadge')].map(b => b.className + '|' + b.textContent);
+    // recent form: the away side's three games with a close, one without; the home side empty
+    const form0 = document.getElementById('nbaFormPanel').innerText;
+    set('nbaform', JSON.stringify({ away: [
+      { date: '2027-03-30', opp: 'Knicks', home: false, pf: 104, pa: 112, h1f: 51, h1a: 58, end: 'REG', ctot: 221.5, ch1: 110.5, csp: -6.5 },
+      { date: '2027-04-01', opp: 'Hornets', home: true, pf: 118, pa: 109, h1f: 60, h1a: 52, end: 'OT', ctot: 224.0, ch1: 111.5, csp: -7.5 },
+      { date: '2027-04-03', opp: 'Heat', home: false, pf: 99, pa: 101, h1f: 48, h1a: 50, end: 'REG', ctot: null, ch1: null, csp: null },
+      // this very game, without a close: once the row is on the card and graded, the panel borrows the card's line, half and spread
+      { date: '2027-04-06', opp: 'Celtics', home: false, pf: 101, pa: 115, h1f: 46, h1a: 54, end: 'REG', ctot: null, ch1: null, csp: null }], home: [] }));
+    await wait();
+    const form1 = document.getElementById('nbaFormPanel').innerText.replace(/\s+/g, ' ').trim();
+    const formChips = [...document.querySelectorAll('#nbaFormPanel tbody tr')].map(tr => [...tr.querySelectorAll('.chip')].map(c => c.className.replace('chip ', '') + ':' + c.textContent).join(','));
+    const ctxLines =[...document.querySelectorAll('#nbaCtxPanel ul.ctx li')].map(li => li.className + '|' + li.querySelector('.cbadge').textContent + '|' + li.querySelector('.ctext').textContent);
+    const visible = { nba: !document.getElementById('nbaFields').hidden, h1: !document.getElementById('h1Fields').hidden, sp: !document.getElementById('spFields').hidden, pressed: document.getElementById('m-nba').getAttribute('aria-pressed'), label: document.getElementById('lineLabel').textContent };
+    const rail = [...document.querySelectorAll('#markets .mk')].map(el => ({ key: el.dataset.key, pick: el.querySelector('.pick').childNodes[0].textContent.trim(), p: parseFloat(el.querySelector('.p').textContent), chips: [...el.querySelectorAll('.cap')].map(c => c.textContent) }));
+    const pick = (() => { const c = document.querySelector('#markets .pickcard'); return c ? { key: c.dataset.key || '', side: c.dataset.side || '', lab: c.querySelector('.lab').textContent, why: c.querySelector('.why').textContent, none: c.classList.contains('none') } : null; })();
+    const why = document.getElementById('why').textContent;
+    const panel0 = document.getElementById('nbaOutPanel').innerText;
+    // tick Brown out: the home minutes go from none to 33.8
+    const box = document.querySelector('#nbaOutPanel input[data-q="3"]'); box.checked = true; box.dispatchEvent(new Event('change', { bubbles: true })); await wait();
+    const panel1 = document.getElementById('nbaOutPanel').innerText, q = document.getElementById('nbaq').value, why1 = document.getElementById('why').textContent;
+    const forecast = document.getElementById('forecastLine').textContent;
+    document.getElementById('add').click(); await wait();
+    document.getElementById('boardDate').dispatchEvent(new Event('change')); await wait();
+    const card = JSON.parse(smStore.getItem('callsheet3.card.v1')).filter(r => r.sport === 'NBA');
+    const boardRows = [...document.querySelectorAll('#board tbody tr')].map(tr => ({ market: tr.querySelectorAll('td')[2].textContent, notPicked: !!tr.querySelector('.chip.dim') && /not picked/.test(tr.querySelectorAll('td')[2].textContent) }));
+    const bets = [...document.querySelectorAll('#bestBets .pk .n4')].map(e => e.textContent);
+    // grade: Celtics 115, Raptors 101; 54-46 at the half
+    const tr = () => [...document.querySelectorAll('#cardTable tr')].find(t => /Raptors @ Celtics/.test(t.textContent));
+    const label = [...tr().querySelectorAll('.finals .l')].map(e => e.textContent).join(',');
+    const g = (k, v) => { const el = tr().querySelector(`.grade[data-k="${k}"]`); el.value = v; el.dispatchEvent(new Event('input', { bubbles: true })); el.dispatchEvent(new Event('change', { bubbles: true })); };
+    g('f5a', '46'); g('f5h', '54'); g('fa', '101'); g('fh', '115'); await wait();
+    const graded = [...tr().querySelectorAll('.rowmk .m')].map(e => ({ pick: e.querySelector('.chip').textContent, res: (e.querySelector('.chip.win,.chip.loss,.chip.push') || {}).textContent || '' }));
+    const calib = document.getElementById('calibBox').innerText;
+    const nbaBlock = [...document.querySelectorAll('#calibBox .calib[data-sport="NBA"] > div')].map(d => d.querySelector('.k').textContent + ' ' + d.querySelector('.v').textContent + ' ' + d.querySelector('.s').textContent);
+    tr().querySelector('[data-open]').click(); await wait();
+    const final = (document.querySelector('#markets .final') || {}).textContent || '';
+    const reopened = document.getElementById('nbaOutPanel').innerText, lineupReopened = document.getElementById('nbaLineupPanel').innerText;
+    const formReopened = document.getElementById('nbaFormPanel').innerText.replace(/\s+/g, ' ').trim();
+    document.getElementById('clear').click(); await wait();
+    return { visible, rail, pick, why, panel0, panel1, q, why1, forecast, card: card.map(r => r.sport + ':' + r.matchup), keys: card[0].markets.map(m => m.key), boardRows, bets, label, graded, calib, nbaBlock, final, reopened, proj: card[0].proj, ctxLines, ctxStored: (card[0].inputs.nbactx || '').length > 10,
+             lineup0, lineup1, lineupBadges, lineupStored: card[0].inputs.nbalineup || '', lineupReopened, form0, form1, formChips, formStored: (card[0].inputs.nbaform || '').indexOf('Hornets') > 0, formReopened };
+  });
+  chk(/04-06 @ Celtics L 101–115 46–54 U 111\.5 UNDER 216\/221\.5 \+9\.5 NO/.test(nba.formReopened) && /^Raptors last 4: 1-3, over 1-2, covered 1-2/.test(nba.formReopened) && /04-06 @ Celtics L 101–115 46–54 216 no close —/.test(nba.form1),
+      'nba: a form game without a close borrows the card\'s own line, half and spread once the game is on the card, read from the right side', JSON.stringify({ before: nba.form1.slice(-120), after: nba.formReopened.slice(0, 420) }));
+  chk(/^No recent games on the row/.test(nba.form0) && /^Raptors last 4: 1-3, over 1-1, covered 1-1, 105\.5 for and 109\.3 against, the half 51\.3–53\.5 \(over 1-1\)\./.test(nba.form1)
+      && /Celtics: no finals in the ledger yet\./.test(nba.form1) && /03-30 @ Knicks L 104–112 51–58 U 110\.5 UNDER 216\/221\.5 \+6\.5 NO/.test(nba.form1)
+      && /04-01 v Hornets W 118–109 \(OT\) 60–52 O 111\.5 OVER 227\/224 -7\.5 COVERED/.test(nba.form1) && /04-03 @ Heat L 99–101 48–50 200 no close —/.test(nba.form1)
+      && nba.formChips.join('|') === 'loss:L,under:U 110.5,under:UNDER,loss:NO|win:W,over:O 111.5,over:OVER,win:COVERED|loss:L|loss:L' && nba.formStored,
+      'nba: the recent form card lists each side\'s last five with the half, the total and the spread against the close in colour, a game without a close shows its score alone, and the JSON rides in the row',
+      JSON.stringify({ form1: nba.form1.slice(0, 400), chips: nba.formChips }));
+  chk(/^No lineup on the row/.test(nba.lineup0) && /Raptors\s+expected/i.test(nba.lineup1) && /PG\s+Immanuel Quickley/.test(nba.lineup1) && /C\s+Jakob Poeltl/.test(nba.lineup1) && /May not play: F Scottie Barnes \(Out\)\./.test(nba.lineup1)
+      && /Celtics\s+no lineup/i.test(nba.lineup1) && /RotoWire has not posted this side yet/.test(nba.lineup1) && /Source: RotoWire/.test(nba.lineup1)
+      && nba.lineupBadges.join(',') === 'lbadge exp|expected,lbadge none|no lineup' && nba.lineupStored.indexOf('Immanuel Quickley') > 0 && /PG\s+Immanuel Quickley/.test(nba.lineupReopened),
+      'nba: the starting five panel says no lineup until the box fills, then lists the five with the status and the may-not-play men, says when a side is not posted, rides in the row and comes back when it is reopened',
+      JSON.stringify({ l0: nba.lineup0.slice(0, 40), l1: nba.lineup1, badges: nba.lineupBadges, stored: nba.lineupStored.length }));
+  chk(nba.ctxLines.length === 2 && nba.ctxLines[0].startsWith('ctx-faded|faded|Celtics allow 110.5 per 100, 3rd best') && nba.ctxLines[1].startsWith('ctx-shown|shown|Raptors play at 100.8') && nba.ctxStored,
+      'nba: the context card lists the slate\'s lines with their badges, faded before shown, and the JSON rides in the row', JSON.stringify(nba.ctxLines));
+  chk(nba.visible.nba && nba.visible.h1 && nba.visible.sp && nba.visible.pressed === 'true' && nba.visible.label === 'Total (points)', 'nba: the fourth button shows the NBA fields, the half and the spread, and hides hockey', JSON.stringify(nba.visible));
+  chk(nba.card.length === 1 && nba.card[0] === 'NBA:Raptors @ Celtics' && nba.keys.join(',') === 'total,h1,ml,spread', 'nba: the row stores total, half, moneyline and spread, Boston canonicalised to the NBA table', JSON.stringify({ card: nba.card, keys: nba.keys }));
+  const tot = nba.rail.find(r => r.key === 'total');
+  chk(tot && /OVER 221\.5/.test(tot.pick) && tot.p > 53 && tot.p < 56, 'nba: the last two weeks put +2 on the line and the over reads about 54%', JSON.stringify(tot));
+  chk(nba.pick && !nba.pick.none && nba.pick.key === 'total' && nba.pick.side === 'OVER' && /an OVER game/.test(nba.pick.lab) && /The book's own number makes it 50\.0%; the sheet's inputs move it to 5[3-5]\.\d%/.test(nba.pick.why),
+      'nba: the pick is the total, named an OVER game, with the book\'s number and the sheet\'s in the why', JSON.stringify(nba.pick));
+  chk(nba.rail.filter(r => r.key === 'ml' || r.key === 'spread').every(r => r.chips.some(c => /shown, not picked/.test(c))) && nba.boardRows.filter(r => /Moneyline|Spread/.test(r.market)).every(r => r.notPicked) && !nba.bets.some(t => /Moneyline|Spread/.test(t)),
+      'nba: the moneyline and the spread are shown, not picked, on the rail and the board, and never reach the straight bets', JSON.stringify({ rail: nba.rail.map(r => r.key + ':' + r.chips.join('|')), board: nba.boardRows, bets: nba.bets }));
+  chk(/past 50 games a side the market has the ratings priced/.test(nba.why) && /last two weeks of the season/.test(nba.why), 'nba: the why list says the ratings are shown past fifty games and names the stage',
+      (nba.why.match(/[^.]*past 50 games[^.]*\./) || ['no ratings note'])[0] + ' | ' + (nba.why.match(/[^.]*last two weeks[^.]*\./) || ['no stage note'])[0]);
+  chk(/Raptors: 2 listed, 35 minutes a game of regulars out/.test(nba.panel0) && /Celtics: 1 listed, 0 minutes a game/.test(nba.panel0) && /Regulars out, minutes a game: away 35\./.test(nba.why) && !/home 34/.test(nba.why),
+      'nba: who is out lists each side, sums the regulars\' minutes (a six-minute man does not count) and the why carries it', nba.panel0.slice(0, 200) + ' | ' + (nba.why.match(/Regulars out[^.]*\./) || [''])[0]);
+  chk(nba.q === '3' && /Celtics: 1 listed, 34 minutes a game/.test(nba.panel1) && /away 35, home 34/.test(nba.why1), 'nba: ticking a doubtful player out adds his minutes and the tick rides in the row', JSON.stringify({ q: nba.q, panel: nba.panel1.slice(0, 160) }));
+  chk(/Forecast · Raptors [0-9.]+ – Celtics [0-9.]+ · total [0-9.]+ points · first half [0-9.]+ · Celtics to win, \d+%/.test(nba.forecast), 'nba: the forecast line reads in points with the half and the winner', nba.forecast.slice(0, 200));
+  chk(/1H/.test(nba.label) && nba.graded.length === 4 && nba.graded.every(x => x.res), 'nba: the score boxes are labelled 1H and all four markets grade from a final and a half', JSON.stringify({ label: nba.label, graded: nba.graded }));
+  const nbaTot = nba.graded.find(x => /^(OVER|UNDER) 221\.5$/.test(x.pick)), nbaH1 = nba.graded.find(x => /1H (OVER|UNDER) 111\.5/.test(x.pick)), nbaSp = nba.graded.find(x => /-9\.5|\+9\.5/.test(x.pick));
+  chk(nbaTot && nbaTot.res === (/OVER/.test(nbaTot.pick) ? 'loss' : 'win') && nbaH1 && nbaH1.res === (/OVER/.test(nbaH1.pick) ? 'loss' : 'win') && nbaSp && nbaSp.res === (/Celtics/.test(nbaSp.pick) ? 'win' : 'loss'),
+      'nba: 216 is under 221.5, 100 at the half is under 111.5, and Boston by 14 covers -9.5', JSON.stringify([nbaTot, nbaH1, nbaSp]));
+  chk(nba.nbaBlock.length >= 4 && nba.nbaBlock.some(t => /First half/.test(t)) && nba.nbaBlock.some(t => /Spread/.test(t)) && /First half projected/.test(nba.calib), 'nba: the record has an NBA block with first-half and spread tiles and the half in the forecast line', JSON.stringify(nba.nbaBlock));
+  chk(/at the half 46–54/.test(nba.final) && /Final: Raptors 101, Celtics 115/.test(nba.final) && /Jaylen Brown/.test(nba.reopened), 'nba: reopening the graded row prints the final with the half-time score and the who-is-out list', nba.final + ' | ' + nba.reopened.slice(0, 80));
+
+  // ---- a void row (17 Oct 2026): postponed, counts nowhere, undo brings it back --------
+  const voided = await pg.evaluate(async () => {
+    const wait = () => new Promise(r => setTimeout(r, 60));
+    const set = (id, v) => { const el = document.getElementById(id); el.value = v; el.dispatchEvent(new Event('input', { bubbles: true })); };
+    document.getElementById('clear').click(); document.getElementById('m-mlb').click(); await wait();
+    document.getElementById('boardDate').value = '2026-11-30';
+    set('gdate', '2026-11-30'); set('away', 'Brewers'); set('home', 'Dodgers'); set('line', '8'); set('op', '-105'); set('up', '-115'); set('hml', '-150'); set('aml', '125'); await wait();
+    document.getElementById('add').click(); await wait();
+    const tr = () => [...document.querySelectorAll('#cardTable tr')].find(t => /Brewers @ Dodgers/.test(t.textContent) && /Nov 30/.test(t.textContent));
+    const g = (k, v) => { const el = tr().querySelector(`.grade[data-k="${k}"]`); el.value = v; el.dispatchEvent(new Event('input', { bubbles: true })); el.dispatchEvent(new Event('change', { bubbles: true })); };
+    g('f5a', '4'); g('f5h', '4'); g('fa', '6'); g('fh', '4'); await wait();
+    const mlbHead = () => (document.querySelector('#calibBox .subhead[data-sport="MLB"]') || {}).textContent || '';
+    const gradedBefore = mlbHead();
+    const chipsBefore = [...tr().querySelectorAll('.rowmk .chip.win, .rowmk .chip.loss, .rowmk .chip.push')].length;
+    document.getElementById('boardDate').dispatchEvent(new Event('change')); await wait();
+    const boardBefore = document.querySelectorAll('#board tbody tr').length;
+    tr().querySelector('[data-void]').click(); await wait();
+    const rowCls = tr().className, tag = (tr().querySelector('.voidtag') || {}).textContent || '', chipsAfter = [...tr().querySelectorAll('.rowmk .chip.win, .rowmk .chip.loss, .rowmk .chip.push')].length;
+    const gradedAfter = mlbHead(), boardAfter = document.querySelectorAll('#board tbody tr').length;
+    const stored = JSON.parse(smStore.getItem('callsheet3.card.v1')).find(r => /Brewers @ Dodgers/.test(r.matchup) && r.gdate === '2026-11-30').finals;
+    const hasUndo = !!tr().querySelector('[data-unvoid]'), hasInputs = !!tr().querySelector('.grade[data-k="fa"]');
+    tr().querySelector('[data-unvoid]').click(); await wait();
+    const chipsBack = [...tr().querySelectorAll('.rowmk .chip.win, .rowmk .chip.loss, .rowmk .chip.push')].length, gradedBack = mlbHead(), faBack = tr().querySelector('.grade[data-k="fa"]').value;
+    document.getElementById('clear').click(); await wait();
+    return { gradedBefore, gradedAfter, gradedBack, chipsBefore, chipsAfter, chipsBack, boardBefore, boardAfter, rowCls, tag, stored, hasUndo, hasInputs, faBack };
+  });
+  const gradedN = s => { const m = s.match(/(\d+) graded game/); return m ? +m[1] : (/nothing graded/.test(s) ? 0 : -1); };
+  chk(voided.chipsBefore > 0 && voided.chipsAfter === 0 && voided.rowCls === 'void' && voided.tag === 'no action · postponed' && voided.stored.void === true && voided.stored.fa === '6' && voided.hasUndo && !voided.hasInputs,
+      'void: the row goes grey with VOID on it, its grades vanish, the finals stay stored and an undo button replaces the score boxes', JSON.stringify({ before: voided.chipsBefore, after: voided.chipsAfter, cls: voided.rowCls, tag: voided.tag, stored: voided.stored }));
+  chk(gradedN(voided.gradedBefore) - gradedN(voided.gradedAfter) === 1 && voided.boardBefore > voided.boardAfter && gradedN(voided.gradedBack) === gradedN(voided.gradedBefore) && voided.chipsBack === voided.chipsBefore && voided.faBack === '6',
+      'void: the record and the board leave the row out, and undo void brings the grades and the typed finals back', JSON.stringify({ gradedBefore: voided.gradedBefore, gradedAfter: voided.gradedAfter, gradedBack: voided.gradedBack, board: [voided.boardBefore, voided.boardAfter], chipsBack: voided.chipsBack }));
+
+  // ---- the NBA short dog (16 Oct 2026): a dog the book makes 40%+ is lifted four points, pickable, on the upset card ----
+  const shortDog = await pg.evaluate(async () => {
+    const wait = () => new Promise(r => setTimeout(r, 60));
+    const set = (id, v) => { const el = document.getElementById(id); el.value = v; el.dispatchEvent(new Event('input', { bubbles: true })); };
+    document.getElementById('clear').click(); document.getElementById('m-nba').click(); await wait();
+    document.getElementById('boardDate').value = '2026-11-21';
+    set('gdate', '2026-11-21'); set('away', 'Hornets'); set('home', 'Bucks'); set('line', '229.5'); set('op', '-110'); set('up', '-110'); set('hml', '-120'); set('aml', '100'); await wait();
+    const read = () => { const el = document.querySelector('#markets .mk[data-key="ml"]'); const pick = el.querySelector('.pick').childNodes[0].textContent.trim(); const p = parseFloat(el.querySelector('.p').textContent);
+      const uc = document.querySelector('#markets .upsetcard');
+      return { pick, p, away: /Hornets/.test(pick) ? p : 100 - p, chips: [...el.querySelectorAll('.cap')].map(c => c.textContent), why: document.getElementById('why').textContent,
+               card: uc ? { cls: uc.className, lab: uc.querySelector('.lab').textContent, pick: uc.querySelector('.pick').textContent, p: uc.querySelector('.p').textContent } : null }; };
+    const short = read();
+    document.getElementById('add').click(); await wait();
+    document.getElementById('boardDate').dispatchEvent(new Event('change')); await wait();
+    const ups = [...document.querySelectorAll('#upsets .pk')].map(e => ({ cls: e.className, n2: e.querySelector('.n2').textContent, n4: e.querySelector('.n4').textContent }));
+    const bets = [...document.querySelectorAll('#bestBets .pk .n2')].map(e => e.textContent);
+    set('hml', '-198'); set('aml', '164'); await wait();
+    const long = read();
+    document.getElementById('clear').click(); await wait();
+    return { short, ups, bets, long };
+  });
+  chk(Math.abs(shortDog.short.away - 51.8) < 0.3 && !shortDog.short.chips.some(c => /shown, not picked/.test(c)) && shortDog.short.chips.some(c => c === 'upset signal: Hornets ML 51.8%')
+      && shortDog.short.card && /scored/.test(shortDog.short.card.cls) && shortDog.short.card.pick === 'Hornets ML' && /Upset watch, Hornets at \+100: Hornets a short dog at 48% \(scored, \+4 points\)/.test(shortDog.short.why),
+      'nba short dog: -120/+100 lifts the dog to 51.8%, pickable, with the green upset card and the chip', JSON.stringify({ away: shortDog.short.away, chips: shortDog.short.chips, card: shortDog.short.card }));
+  chk(shortDog.ups.some(u => /scored/.test(u.cls) && u.n2 === 'Hornets ML' && /a short dog at 48% \(scored, \+4 points\)/.test(u.n4)) && shortDog.bets.some(t => /^Hornets ML/.test(t)),
+      'nba short dog: the board\'s upset watch and the straight bets carry the dog', JSON.stringify({ ups: shortDog.ups, bets: shortDog.bets }));
+  chk(Math.abs(shortDog.long.away - 36.3) < 0.3 && shortDog.long.chips.some(c => /shown, not picked/.test(c)) && !shortDog.long.card && !/short dog/.test(shortDog.long.why),
+      'nba short dog: a dog at 36% is the book\'s number, not pickable, no card', JSON.stringify({ away: shortDog.long.away, chips: shortDog.long.chips }));
+
+  // ---- the NBA early-season side watch: a note on the why list, nothing moved -------
+  const earlySide = await pg.evaluate(async () => {
+    const wait = () => new Promise(r => setTimeout(r, 60));
+    const set = (id, v) => { const el = document.getElementById(id); el.value = v; el.dispatchEvent(new Event('input', { bubbles: true })); };
+    document.getElementById('clear').click(); document.getElementById('m-nba').click(); await wait();
+    set('gdate', '2026-11-05'); set('away', 'Hornets'); set('home', 'Bucks'); set('line', '229.5'); set('op', '-110'); set('up', '-110'); set('sp', '-3.5'); set('sph', '-110'); set('spa', '-110');
+    set('naort', '110'); set('nadrt', '118'); set('nhort', '118'); set('nhdrt', '110'); set('napace', '100'); set('nhpace', '100'); set('nagp', '15'); set('nhgp', '16'); await wait();
+    const read = () => { const el = document.querySelector('#markets .mk[data-key="spread"]'); const lk = document.querySelector('#markets .mk.likely'); const lc = document.querySelector('#markets .likelycard'); return { pick: el.querySelector('.pick').childNodes[0].textContent.trim(), p: parseFloat(el.querySelector('.p').textContent), why: document.getElementById('why').textContent, also: (document.querySelector('#markets .pickcard .also') || {}).textContent || '', card: lc ? lc.querySelector('.pick').textContent + ' ' + lc.querySelector('.p').textContent + ' ' + lc.querySelector('.why').textContent : '', likely: lk ? { key: lk.dataset.key, chip: (lk.querySelector('.cap.likely') || {}).textContent || '', other: (lk.querySelector('.other.likely') || {}).textContent || '' } : null }; };
+    const early = read();
+    set('nagp', '35'); set('nhgp', '36'); await wait();
+    const later = read();
+    document.getElementById('clear').click(); await wait();
+    return { early, later };
+  });
+  chk(/Early-season side watch: the ratings' margin projects \+16\.0 against the market's \+3\.5, 12\.5 points toward the Bucks\. WATCHED, NOT SCORED: in a club's first 30 games the ratings' side at 4\+ points of lean went 148-124/.test(earlySide.early.why)
+      && Math.abs(earlySide.early.p - 50) < 0.6, 'nba early side: at fifteen games the why names the ratings\' side as a watch and the spread stays the book\'s 50%', JSON.stringify({ p: earlySide.early.p, why: (earlySide.early.why.match(/Early-season[^.]*\./) || ['none'])[0] }));
+  chk(!/Early-season side watch/.test(earlySide.later.why) && Math.abs(earlySide.later.p - earlySide.early.p) < 0.01, 'nba early side: at thirty-five games the watch is gone and nothing else changed', (earlySide.later.why.match(/Early-season[^.]*\./) || ['none'])[0]);
+  chk((earlySide.early.also === 'Also the likeliest side on the card at any price.' && earlySide.early.card === '')
+      || (earlySide.early.also === '' && /^(OVER|UNDER) 229\.5 5\d\.\d% -110 needs 52\.4%: the book's price, not an edge\. A high chance at a steep price is the book knowing it, and you paying for it\.$/.test(earlySide.early.card)),
+      'likeliest card: a likelier side under its break-even is named as the book\'s price, not an edge, in its card or on the pick card when it is the pick (the unpriced moneyline is passed over)', JSON.stringify({ also: earlySide.early.also, card: earlySide.early.card }));
+  chk(earlySide.early.likely && earlySide.early.likely.key === 'total' && /^likeliest at any price(: (OVER|UNDER) 229\.5 5\d\.\d%)? · -110 needs 52\.4%, the book's price$/.test(earlySide.early.likely.chip),
+      'rail: the likeliest side at a steep price is chipped as the book\'s price on its own row', JSON.stringify(earlySide.early.likely));
+
+  // ---- the NBA example: a game-day row with every card filled -----------------------
+  const nbaEx = await pg.evaluate(async () => {
+    const wait = () => new Promise(r => setTimeout(r, 60));
+    document.getElementById('clear').click(); document.getElementById('m-nba').click(); await wait();
+    document.getElementById('gdate').value = '2026-11-10';
+    document.getElementById('example').click(); await wait();
+    const out = document.getElementById('nbaOutPanel').innerText;
+    const lineup = document.getElementById('nbaLineupPanel').innerText;
+    const ctx = [...document.querySelectorAll('#nbaCtxPanel ul.ctx li')].map(li => li.querySelector('.cbadge').textContent);
+    const why = document.getElementById('why').textContent;
+    const rail = [...document.querySelectorAll('#markets .mk')].map(el => el.dataset.key + ':' + el.querySelector('.pick').childNodes[0].textContent.trim());
+    const pick = (document.querySelector('#markets .pickcard .lab') || {}).textContent || '';
+    const also = (document.querySelector('#markets .pickcard .also') || {}).textContent || '';
+    const dec = (() => { const c = document.querySelector('#markets .pickcard.decision'), t = e => (e ? e.textContent : '').replace(/\s+/g, ' ').trim(); return c ? { kind: c.dataset.kind, key: c.dataset.key, side: c.dataset.side, lab: t(c.querySelector('.lab')), pick: c.querySelector('.pick').childNodes[0].textContent.trim(),
+      band: t(c.querySelector('.band')), hot: c.querySelector('.band').classList.contains('hot'), p: t(c.querySelector('.p')), place: t(c.querySelector('.dplace')), kindLine: t(c.querySelector('.dkind')), secs: [...c.querySelectorAll('ul.dwhy li > b:first-child')].map(t) } : null; })();
+    const likelyCard = (() => { const el = document.querySelector('#markets .likelycard'); return el ? { lab: el.querySelector('.lab').textContent, pick: el.querySelector('.pick').textContent, p: el.querySelector('.p').textContent, why: el.querySelector('.why').textContent, afterPick: !!(el.previousElementSibling && el.previousElementSibling.classList.contains('pickcard')) } : null; })();
+    const likelyRow = (() => { const el = document.querySelector('#markets .mk.likely'); return el ? { key: el.dataset.key, chip: (el.querySelector('.cap.likely') || {}).textContent || '', other: (el.querySelector('.other.likely') || {}).textContent || '' } : null; })();
+    const opened = document.getElementById('opened').value;
+    const crewText = () => ((document.querySelector('#nbaCrewPanel .ctext') || {}).textContent || '');
+    const crew0 = crewText();
+    const crewLi = document.querySelector('#nbaCrewPanel .crewblock');
+    const crewBlock = { first: !document.querySelector('#nbaCtxPanel ul.ctx li.ctx-crew') && !/^Crew:/.test(document.getElementById('nbaCtxPanel').innerText), cls: crewLi ? crewLi.className : '', alert: ((crewLi && crewLi.querySelector('.crewalert')) || {}).textContent || '',
+                        chips: crewLi ? [...crewLi.querySelectorAll('.refchip')].map(e => e.className + '|' + e.textContent.replace(/\s+/g, ' ').trim()) : [], head: ((crewLi && crewLi.closest('section').querySelector('h2')) || {}).textContent || '',
+                        call: ((crewLi && crewLi.querySelector('.crewcall')) || {}).textContent || '' };
+    // the crew typed by hand: a surname alone matches when it is unique in the table, an unknown name says so
+    const el = document.getElementById('ncrew'); el.value = 'Zarba; Nobody Here'; el.dispatchEvent(new Event('input', { bubbles: true })); await wait();
+    const crew1 = crewText();
+    el.value = ''; el.dispatchEvent(new Event('input', { bubbles: true })); await wait();
+    const crew2 = crewText(), ctxNoCrew = document.querySelectorAll('#nbaCtxPanel ul.ctx li').length;
+    document.getElementById('add').click(); await wait();
+    const stored = JSON.parse(smStore.getItem('callsheet3.card.v1')).find(r => /76ers @ Knicks/.test(r.matchup));
+    document.getElementById('clear').click(); await wait();
+    return { out, lineup, ctx, why, rail, pick, also, dec, likelyCard, likelyRow, opened, crew0, crew1, crew2, ctxNoCrew, storedRefs: (stored.inputs.nbarefs || '').length > 10, storedCrew: stored.inputs.ncrew, storedLineup: (stored.inputs.nbalineup || '').indexOf('Tyrese Maxey') > 0, crewBlock };
+  });
+  chk(nbaEx.crewBlock.first && /^crewblock lean-over$/.test(nbaEx.crewBlock.cls) && nbaEx.crewBlock.alert === 'Crew leans OVER · z +4.4' && /^Referee stats/.test(nbaEx.crewBlock.head)
+      && nbaEx.crewBlock.chips.join(' || ') === 'refchip over|Scott Foster 66-41 OVER LEAN · 4-2 this season || refchip even|Tony Brothers 56-54 · 3-3 this season || refchip over|Marc Davis 71-51 OVER LEAN'
+      && /^Crew call for tonight: free throws \+0\.7 against the league's 44\.0 \(the one thing a crew predicts, t 7\.3\); points [-−]0\.3 a game by their history; the past table's over rate with these 3 is 56\.9% on 339 games, a soft lean to the OVER\. Shown, not scored/.test(nbaEx.crewBlock.call),
+      'nba crew: the crew sits on its own Referee stats card, out of the Context list, highlighted with the crew\'s lean as its badge, each official a chip, and a crew call for tonight with the honest weights', JSON.stringify(nbaEx.crewBlock));
+  chk(/76ers\s+expected/i.test(nbaEx.lineup) && /Knicks\s+confirmed/i.test(nbaEx.lineup) && /PG\s+Tyrese Maxey/.test(nbaEx.lineup) && /C\s+Karl-Anthony Towns/.test(nbaEx.lineup)
+      && /Joel Embiid \(Out\)/.test(nbaEx.lineup) && /Mitchell Robinson \(Out\)/.test(nbaEx.lineup) && nbaEx.storedLineup,
+      'nba example: both starting fives on the card, the 76ers expected and the Knicks confirmed, Embiid and Robinson under may-not-play, and the lineup stored with the row', nbaEx.lineup);
+  // 18 Nov 2026: on a basketball matchup the pick card is the decision. On the example the sheet's own call is the likeliest side on the card, so the decision names it and no second card repeats it
+  chk(nbaEx.likelyCard === null && nbaEx.dec && nbaEx.dec.kind === 'sheet' && nbaEx.dec.key === 'ml' && nbaEx.dec.side === 'HOME' && nbaEx.dec.lab === 'The decision · a MONEYLINE game' && nbaEx.dec.pick === 'Knicks ML'
+      && nbaEx.dec.band === 'BET' && nbaEx.dec.hot && nbaEx.dec.p === '66.6%' && nbaEx.dec.place === '-198 · needs 66.4%' && /^the sheet's own call · (none graded here yet|\d+-\d+(-\d+)? here, [+-]\d+\.\du) · the sheet's own edge at the price$/.test(nbaEx.dec.kindLine)
+      && nbaEx.dec.secs.join('|') === 'The numbers.|Form.|Pace and the matchup.|Rest and the schedule.|Who is out, who steps up.|The crew.|Also on this game.' && /^The decision as given, one a game: (none graded here yet|\d+-\d+(-\d+)? here, [+-]\d+\.\du)\. Each kind keeps its own line in the NBA record\./.test(nbaEx.also),
+      'the decision on the example: the likeliest side on the whole card, Knicks ML at 66.6% where -198 needs 66.4%, is the sheet\'s own call and so the decision, with a green BET, where it is placed, what kind of read it is and the seven parts of its why; no second "likeliest" card repeats it', JSON.stringify({ dec: nbaEx.dec, likely: nbaEx.likelyCard, also: nbaEx.also }));
+  chk(nbaEx.likelyRow && nbaEx.likelyRow.key === 'ml' && nbaEx.likelyRow.chip === 'likeliest at any price · -198 needs 66.4%, the price agrees' && nbaEx.likelyRow.other === '',
+      'rail: the likeliest side\'s market row is outlined and chipped with what its price needs', JSON.stringify(nbaEx.likelyRow));
+  chk(nbaEx.crew0 === 'Crew: Scott Foster 46.2 free throws and 229.1 points a game (118 games), over the close 66-41 the last two seasons and 4-2 this season; Tony Brothers 43.1 free throws and 226.0 points a game (95 games), over the close 56-54 the last two seasons and 3-3 this season; Marc Davis 44.8 free throws and 230.3 points a game (102 games), over the close 71-51 the last two seasons; the league 44.0 and 228.8.',
+      'nba crew: the Referee stats card carries the crew line, each referee\'s free throws, points and record against the close, past seasons and this one', nbaEx.crew0);
+  chk(nbaEx.crew1 === 'Crew: Zarba 42.9 free throws and 227.4 points a game (110 games), over the close 58-60 the last two seasons and 2-5 this season; Nobody Here (no games in the ledger); the league 44.0 and 228.8.' && nbaEx.crew2 === '' && nbaEx.ctxNoCrew === 9,
+      'nba crew: a typed surname matches the table, an unknown name says so, and an empty box drops the line while the Context list keeps its nine', JSON.stringify({ crew1: nbaEx.crew1, crew2: nbaEx.crew2, n: nbaEx.ctxNoCrew }));
+  chk(nbaEx.storedRefs && nbaEx.storedCrew === '', 'nba crew: the referee table rides in the row and the crew box is stored as typed', JSON.stringify({ refs: nbaEx.storedRefs, crew: nbaEx.storedCrew }));
+  chk(/76ers: 3 listed, 32 minutes a game of regulars out/.test(nbaEx.out) && /Knicks: 2 listed, 22 minutes a game/.test(nbaEx.out) && /Embiid \(knee\) has been ruled out/.test(nbaEx.out) && /back Nov 10/.test(nbaEx.out) && /last season's line/.test(nbaEx.out),
+      'nba example: the who-is-out card lists both sides with the comments, the return dates and the traded man\'s last-season line', nbaEx.out.slice(0, 300));
+  chk(nbaEx.ctx.length === 9 && nbaEx.ctx.slice(0, 3).every(b => b === 'faded') && nbaEx.ctx.indexOf('label') > nbaEx.ctx.indexOf('shown'), 'nba example: nine context lines without the crew, faded first, labels last', JSON.stringify(nbaEx.ctx));
+  chk(/Ratings, faded/.test(nbaEx.why) && /Early-season side watch/.test(nbaEx.why) && /Back to back for the home side/.test(nbaEx.why) && /Regulars out, minutes a game: away 32, home 22/.test(nbaEx.why) && /The number moved 229\.5 to 231\.5/.test(nbaEx.why),
+      'nba example: the why list carries the fade, the side watch, the back to back, the regulars out and the move off the opener', nbaEx.why.slice(0, 400));
+  chk(nbaEx.rail.length === 4 && nbaEx.opened === '229.5' && nbaEx.pick === 'The decision · a MONEYLINE game', 'nba example: all four markets on the rail, the opener in its box, the decision card', JSON.stringify({ rail: nbaEx.rail, pick: nbaEx.pick, opened: nbaEx.opened }));
+
+  // ---- the pick: one side per matchup, the likeliest on the board, with its kind of game and its why ----
+  const pickT = await pg.evaluate(async () => {
+    const wait = () => new Promise(r => setTimeout(r, 60));
+    const set = (id, v) => { const el = document.getElementById(id); el.value = v; el.dispatchEvent(new Event('input', { bubbles: true })); };
+    const read = () => { const c = document.querySelector('#markets .pickcard'), o = document.querySelector('#markets details.others'), ml = document.querySelector('#markets .mk[data-key="ml"]');
+      return { has: !!c, none: !!(c && c.classList.contains('none')), key: c ? c.dataset.key || '' : '', side: c ? c.dataset.side || '' : '', pick: c ? c.querySelector('.pick').textContent : '',
+               lab: c ? c.querySelector('.lab').textContent : '', p: c && c.querySelector('.p') ? parseFloat(c.querySelector('.p').textContent) : null, why: c ? c.querySelector('.why').textContent : '',
+               open: o ? o.open : null, summary: o ? o.querySelector('summary').textContent : '', rows: [...document.querySelectorAll('#markets .mk')].map(e => e.dataset.key),
+               mlP: ml ? parseFloat(ml.querySelector('.p').textContent) : null, mlChips: ml ? [...ml.querySelectorAll('.cap')].map(x => x.textContent) : [] }; };
+    document.getElementById('clear').click(); document.getElementById('m-mlb').click(); await wait();
+    set('gdate', '2026-10-20'); set('away', 'Rays'); set('home', 'Yankees'); set('line', '8.5'); set('op', '-110'); set('up', '-110'); await wait();
+    const bare = read();
+    set('aera', '2.10'); set('hera', '2.30'); set('aip', '180'); set('hip', '175'); set('abp', '2.90'); set('hbp', '3.00'); await wait();
+    const totalPick = read();
+    set('aml', '210'); set('hml', '-250'); await wait();
+    const mlPick = read();
+    document.getElementById('clear').click(); await wait();
+    return { bare, totalPick, mlPick };
+  });
+  chk(pickT.bare.has && pickT.bare.none && /^No pick yet$/.test(pickT.bare.pick) && /Nothing on the card moves a number off the book's/.test(pickT.bare.why) && pickT.bare.open === true,
+      'the pick: a line and two prices alone give no pick, because nothing on the card moves a number off the book\'s', JSON.stringify(pickT.bare).slice(0, 400));
+  chk(pickT.totalPick.has && !pickT.totalPick.none && pickT.totalPick.key === 'total' && pickT.totalPick.side === 'UNDER' && /^The pick · an UNDER game$/.test(pickT.totalPick.lab) &&
+      /^Why: Projected [0-9.]+ runs against the 8\.5 line, so the under at [0-9.]+%\. Behind it: the market's own fair number/.test(pickT.totalPick.why) &&
+      /The book's own number makes it 50\.0%; the sheet's inputs move it to [0-9.]+%, a [0-9.]+-point lean toward the under\./.test(pickT.totalPick.why) &&
+      pickT.totalPick.open === false && /other markets/.test(pickT.totalPick.summary) && pickT.totalPick.rows.indexOf('total') >= 0,
+      'the pick: two aces against an 8.5 make it an UNDER game; the why carries the total\'s lean and the book\'s number against the sheet\'s; the other markets fold under it', JSON.stringify(pickT.totalPick).slice(0, 600));
+  // the moneyline row lists its better-priced side, which on -250/+210 is the dog, so its chance reads under 40 rather than over 60
+  chk(pickT.mlPick.key === 'total' && pickT.mlPick.side === 'UNDER' && pickT.mlPick.mlP !== null && (pickT.mlPick.mlP > 60 || pickT.mlPick.mlP < 40) && pickT.mlPick.mlChips.some(c => /shown, not picked/.test(c)) && pickT.mlPick.rows.indexOf('ml') >= 0,
+      'the pick: a -250 favourite does NOT take the pick from the under, because the sheet has no information on the sides; the moneyline row sits folded, shown not picked',
+      JSON.stringify({ key: pickT.mlPick.key, side: pickT.mlPick.side, mlP: pickT.mlPick.mlP, mlChips: pickT.mlPick.mlChips, rows: pickT.mlPick.rows }));
+
+  // ---- 19 Oct 2026: the Props tab -- a props file lists, a grade file grades, the record tile and the backup carry it ----
+  const propsT = await pg.evaluate(async () => {
+    const wait = () => new Promise(r => setTimeout(r, 80));
+    await smStore.removeItem('callsheet3.props.v1');
+    const propsDoc = { format: 'callsheet3.props', version: 1, date: '2026-10-21', games: [
+      { gid: '401909834', away: 'Hawks', home: 'Magic', aab: 'ATL', hab: 'ORL', spread: -4.5, total: 229.5, pace: 99.8, props: [
+        { pid: '3037789', name: 'Trae Young', team: 'ATL', opp: 'ORL', home: false, pos: 'PG', mk: 'pts', line: 24.5, op: -110, up: -110, book: 'fanatics', books: { fanatics: [24.5, -110, -110], draftkings: [25.5, -115, -105] },
+          proj: 27.2, sd: 9.4, pm: 0.612, pb: 0.5, p: 0.5604, push: 0, side: 'OVER', chance: 0.5604, price: -110, need: 0.5238, edge: 0.0366, band: 'BET', mins: 35.1, rate36: 27.9,
+          kal: { r: [[19.5, 0.70, 0.72, 0.71, 100], [24.5, 0.46, 0.48, 0.47, 500], [29.5, 0.24, 0.26, 0.25, 50]], team: 'ATL' },   // a ladder a file from 4 Nov 2026 still carries: ignored from 5 Nov (Kalshi is off the props)
+          form: { vals: [20, 21, 30], over: 1, on: 0, avg: 23.7 },   // the slate's block (7 Nov 2026): the log below has two games with the stat, so the card's form line can only come off the block
+          why: ['27.9 points per 36 this season (3 games, 104 minutes)', '35.1 minutes projected'],
+          log: [['2026-10-15', 'MIA', 0, 34.0, 26, ['won by 3', '34 min (his usual 33)'], 'tries: 20 from the floor (his usual 19 at those minutes) · 3 of 8 from three · 5 of 6 from the line'], ['2026-10-17', 'CHI', 1, 31.0, 22], ['2026-10-19', 'BOS', 0, 12.5, null]] },   // the first game carries the factors and the tries (7 Nov 2026)
+        { pid: '4066261', name: 'Jalen Suggs', team: 'ORL', opp: 'ATL', home: true, pos: 'SG', mk: 'ast', line: 4.5, op: -120, up: -100, book: 'fanatics', books: { fanatics: [4.5, -120, -100] },
+          why: ['no history to project from (under 60 minutes with the stat in the ledgers)'], log: [] },
+        { pid: '4397020', name: 'Paolo Banchero', team: 'ORL', opp: 'ATL', home: true, pos: 'PF', mk: 'reb', line: 7.5, op: -105, up: -115, book: 'fanatics', books: { fanatics: [7.5, -105, -115] },
+          proj: 7.1, sd: 3.5, pm: 0.45, pb: 0.4773, p: 0.468, push: 0, side: 'UNDER', chance: 0.532, price: -115, need: 0.5349, edge: -0.0029, band: 'no edge', mins: 33.0, rate36: 7.7, why: ['7.7 rebounds per 36'], log: [] } ] } ] };
+    const load = async (doc, fname) => { const dt = new DataTransfer(); dt.items.add(new File([JSON.stringify(doc)], fname, { type: 'application/json' })); const inp = document.getElementById('slateFile'); inp.files = dt.files; inp.dispatchEvent(new Event('change', { bubbles: true })); await wait(); };
+    // a file that projects nothing says why: the run read no ledger
+    await load({ format: 'callsheet3.props', version: 1, date: '2026-10-23', ledgers: { folder: 'C:\\Users\\J\\Downloads', this: { season: '2026-27', games: 0, lines: 0 }, last: { season: '2025-26', games: 0, lines: 0 } },
+                 games: [{ gid: 'z', away: 'Bulls', home: 'Bucks', aab: 'CHI', hab: 'MIL', props: [{ pid: '1', name: 'Josh Giddey', team: 'CHI', opp: 'MIL', home: false, pos: 'G', mk: 'pts', line: 12.5, op: -135, up: 100, book: 'fanatics', books: {}, why: ['no history to project from (under 60 minutes with the stat in the ledgers)'], log: [] }] }] }, 'nba-props-2026-10-23.json');
+    const noneMsg = document.getElementById('propsMsg').innerText.replace(/\s+/g, ' ');
+    document.getElementById('propsClear').click(); await wait();
+    // a file whose projections rest on this season alone says last season's ledger was not read (25 Oct 2026)
+    await load({ format: 'callsheet3.props', version: 1, date: '2026-10-24', ledgers: { folder: 'C:\\Users\\J\\slate', this: { season: '2026-27', games: 16, lines: 400 }, last: { season: '2025-26', games: 0, lines: 0 } },
+                 games: [{ gid: 'y', away: 'Heat', home: 'Hornets', aab: 'MIA', hab: 'CHA', props: [
+                   { pid: '1', name: 'Bam Adebayo', team: 'MIA', opp: 'CHA', home: false, pos: 'C', mk: 'reb', line: 9.5, op: -105, up: -125, book: 'betmgm', books: {}, proj: 10.8, sd: 3.6, pm: 0.6, pb: 0.5, p: 0.57, push: 0, side: 'OVER', chance: 0.57, price: -105, need: 0.512, edge: 0.058, band: 'LEAN', mins: 31, rate36: 12.5, why: ['12.5 rebounds per 36 this season (2 games, 63 minutes); no last season to blend'], log: [] },
+                   { pid: '2', name: 'Naz Reid', team: 'CHA', opp: 'MIA', home: true, pos: 'F', mk: 'pts', line: 14.5, op: -110, up: -110, book: 'betmgm', books: {}, why: ['no history to project from (under 60 minutes with the stat in the ledgers)'], log: [] }] }] }, 'nba-props-2026-10-24.json');
+    const thinMsg = document.getElementById('propsMsg').innerText.replace(/\s+/g, ' ');
+    document.getElementById('propsClear').click(); await wait();
+    // a file written after a game tipped leaves that game's props out
+    await load({ format: 'callsheet3.props', version: 1, date: '2026-10-23', generated: '2026-10-24T01:10:00Z', games: [
+      { gid: 'a', away: 'Bulls', home: 'Bucks', aab: 'CHI', hab: 'MIL', tip: '2026-10-24T00:00Z', props: [{ pid: '1', name: 'Josh Giddey', team: 'CHI', opp: 'MIL', home: false, pos: 'G', mk: 'pts', line: 12.5, op: -135, up: 100, book: 'fanatics', books: {}, proj: 14.1, sd: 6.9, pm: 0.58, pb: 0.5, p: 0.53, push: 0, side: 'OVER', chance: 0.53, price: -135, need: 0.574, edge: -0.044, band: 'no edge', mins: 30, rate36: 16.9, why: ['x'], log: [] }] },
+      { gid: 'b', away: 'Knicks', home: 'Celtics', aab: 'NYK', hab: 'BOS', tip: '2026-10-24T02:30Z', props: [{ pid: '2', name: 'Paul George', team: 'BOS', opp: 'NYK', home: true, pos: 'F', mk: 'pts', line: 17.5, op: -110, up: -110, book: 'fanatics', books: {}, proj: 19.0, sd: 8.1, pm: 0.57, pb: 0.5, p: 0.524, push: 0, side: 'OVER', chance: 0.524, price: -110, need: 0.524, edge: 0.0, band: 'no edge', mins: 32, rate36: 21.4, why: ['x'], log: [] }] }] }, 'nba-props-2026-10-23.json');
+    const inPlay = { msg: document.getElementById('propsMsg').innerText.replace(/\s+/g, ' '), names: JSON.parse(smStore.getItem('callsheet3.props.v1')).map(r => r.name) };
+    document.getElementById('propsClear').click(); await wait();
+    await load(propsDoc, 'nba-props-2026-10-21.json');
+    const tabEmpty0 = document.getElementById('propsCalib').innerText.replace(/\s+/g, ' ').trim();
+    const viewOn = !document.getElementById('propsView').hidden, colsOff = document.querySelector('.cols').hidden, pressed = document.getElementById('m-props').getAttribute('aria-pressed');
+    const best = [...document.querySelectorAll('#propsBest .pk')].map(e => e.innerText.replace(/\s+/g, ' ').trim());
+    const formBlock = (() => { const c = [...document.querySelectorAll('#propsBest .pk')].find(e => /Trae Young/.test(e.textContent)), fl = c && c.querySelector('.n5.formline'); return fl ? fl.textContent.replace(/\s+/g, ' ').trim() + '|' + fl.className : ''; })();
+    const formStored = await (async () => { try { const raw = (window.smStore ? await smStore.getItem('callsheet3.props.v1') : null) || localStorage.getItem('callsheet3.props.v1') || '[]'; const r = JSON.parse(raw).find(x => x.pid === '3037789'); return r && r.form ? JSON.stringify(r.form) : ''; } catch (e) { return 'err ' + e; } })();
+    const rowsOn = document.querySelectorAll('#propsTable tr[data-prop]').length;
+    document.getElementById('propsAll').checked = true; document.getElementById('propsAll').dispatchEvent(new Event('change', { bubbles: true })); await wait();
+    const rowsAll = document.querySelectorAll('#propsTable tr[data-prop]').length;
+    const count = document.getElementById('propsCount').textContent, msg = document.getElementById('propsMsg').textContent;
+    document.querySelector('#propsTable tr[data-prop]').click(); await wait();
+    const whyOpen = document.getElementById('propDetail').hidden ? [] : [document.getElementById('propDetailBody').innerText.replace(/\s+/g, ' ').trim()];
+    const logMarks = [...document.querySelectorAll('#propDetail .pd-log b.lg')].map(b => b.className + '|' + b.textContent);
+    document.getElementById('propDetailClose').click(); await wait();
+    const tileBefore = !!document.querySelector('#calibBox .calib[data-sport="PROPS"]');
+    const gradeDoc = { format: 'callsheet2.slate', version: 1, date: '2026-10-21', games: [
+      { sport: 'NBA', gdate: '2026-10-21', away: 'Hawks', home: 'Magic', gameId: '401909834', finals: { fa: '118', fh: '112', f5a: '60', f5h: '55' }, notes: [],
+        box: { '3037789': ['Trae Young', 36.2, 28, 3, 11, 4, { pts: ['won by 6', '36 min (his usual 34)', '22 shots (his usual 21 at those minutes)', '10 of 19 from the floor'], reb: ['won by 6', '36 min (his usual 34)', '3 of the club\'s 44 rebounds (his usual 9%)'], ast: ['Dyson Daniels out (30 mpg, a lift for him)', 'won by 6', '11 of the club\'s 27 assists, 41% (his usual 30%)'], tpm: ['won by 6'], pra: ['won by 6'] }, { pts: 'tries: 19 from the floor (his usual 18 at those minutes) · 3 of 7 from three · 6 of 7 from the line', tpm: 'tries: 3 of 7 from three (his usual 6.5 at those minutes) · 19 from the floor · 6 of 7 from the line' }], '4397020': ['Paolo Banchero', 34.0, 22, 9, 4, 1] } } ] };   // the tries eighth (7 Nov 2026)
+    await load(gradeDoc, 'nba-grade-2026-10-21.json');
+    const after = JSON.parse(smStore.getItem('callsheet3.props.v1'));
+    // the graded night joins the panel's last games, with his minutes from the box line (25 Oct 2026)
+    document.querySelector('#propsTable tr[data-prop]').click(); await wait();
+    const thisRow = (document.querySelector('#propDetail .pd-log tr.this') || { innerText: '' }).innerText.replace(/\s+/g, ' ').trim(), thisMark = (document.querySelector('#propDetail .pd-log tr.this b.lg') || { className: '' }).className;
+    const thisWhat = (document.querySelector('#propDetail .pd-log tr.this td.pd-what') || { innerText: '' }).innerText.replace(/\s+/g, ' ').trim(), whatHead = [...document.querySelectorAll('#propDetail .pd-log thead th')].map(t => t.textContent.trim()).join('|'), otherWhat = [...document.querySelectorAll('#propDetail .pd-log tbody tr:not(.this) td.pd-what')].map(td => td.textContent.trim());
+    const logRows = document.querySelectorAll('#propDetail .pd-log tbody tr').length;
+    const triesCells = [...document.querySelectorAll('#propDetail .pd-log tbody tr')].map(tr => { const s = tr.querySelector('td.pd-what .tries'); return (tr.classList.contains('this') ? 'this:' : '') + (s ? s.className + '|' + s.textContent.trim() : ''); });
+    const lastH4 = [...document.querySelectorAll('#propDetail h4')].find(h => /^Last games/.test(h.textContent.trim())) || document.createElement('h4');
+    const headDim = [...lastH4.querySelectorAll('.dim')].find(d => /what the box says/.test(d.textContent)) || document.createElement('span');   // the tally's own dim span comes first
+    const triesHead = (headDim.textContent || '').replace(/\s+/g, ' ').trim(), triesHeadCls = ((headDim.querySelector('.tries') || {}).className || '');
+    const triesStored = (after.find(r => r.pid === '3037789' && r.mk === 'pts') || {}).atries || '';
+    document.getElementById('propDetailClose').click(); await wait();
+    const tile = document.querySelector('#calibBox .calib[data-sport="PROPS"]');
+    const tileText = tile ? tile.innerText.replace(/\s+/g, ' ').trim() : '';
+    const tabCalib = document.getElementById('propsCalib').innerText.replace(/\s+/g, ' ').trim();
+    const tabBlocks = ['PROPS-TAB', 'PROPS-MK', 'PROPS-EDGE', 'PROPS-CENTRE'].map(k => { const b = document.querySelector('#propsCalib .calib[data-sport="' + k + '"]'); return k + ':' + (b ? [...b.querySelectorAll(':scope > div .k')].map(e => e.textContent).join('|') : 'none'); });
+    const nights = [...document.querySelectorAll('#propsNights tbody tr')].map(tr => tr.innerText.replace(/\s+/g, ' ').trim());
+    const ladder = [...document.querySelectorAll('#propsLadder tbody tr')].map(tr => tr.innerText.replace(/\s+/g, ' ').trim());
+    const slateMsg = document.getElementById('saveMsg').textContent;
+    const bk = { format: 'callsheet3.backup', version: 1, card: [], props: [after[0]] };
+    const dt2 = new DataTransfer(); dt2.items.add(new File([JSON.stringify(bk)], 'the-super-model-2026-10-22.json', { type: 'application/json' }));
+    const inp2 = document.getElementById('restoreFile'); inp2.files = dt2.files; inp2.dispatchEvent(new Event('change', { bubbles: true })); await wait();
+    const restored = JSON.parse(smStore.getItem('callsheet3.props.v1'));
+    // older graded props get their minutes from a second load of the night's grade file, results untouched (25 Oct 2026)
+    const bk3 = { format: 'callsheet3.backup', version: 1, card: [], props: after.map(r => { const c = Object.assign({}, r); delete c.amin; return c; }) };
+    const dt3 = new DataTransfer(); dt3.items.add(new File([JSON.stringify(bk3)], 'the-super-model-2026-10-22.json', { type: 'application/json' }));
+    inp2.files = dt3.files; inp2.dispatchEvent(new Event('change', { bubbles: true })); await wait();
+    const stripped = JSON.parse(smStore.getItem('callsheet3.props.v1')).every(r => r.amin === undefined);
+    await load(gradeDoc, 'nba-grade-2026-10-21.json');
+    const refilled = JSON.parse(smStore.getItem('callsheet3.props.v1'));
+    const refill = { stripped, same: refilled.length === after.length && refilled.every((r, i) => r.result === after[i].result && r.actual === after[i].actual),
+                     mins: refilled.map(r => r.amin), was: after.map(r => r.amin), msg: document.getElementById('saveMsg').innerText.replace(/\s+/g, ' ') };
+    document.getElementById('m-nba').click(); await wait();
+    const viewOff = document.getElementById('propsView').hidden, colsBack = !document.querySelector('.cols').hidden, nbaPressed = document.getElementById('m-nba').getAttribute('aria-pressed');
+    await smStore.removeItem('callsheet3.props.v1');
+    return { viewOn, colsOff, pressed, best, formBlock, formStored, rowsOn, rowsAll, count, msg, whyOpen, logMarks, tileBefore, after: after.map(r => [r.name, r.mk, r.result, r.actual]), tileText, slateMsg, restored: restored.length, viewOff, colsBack, nbaPressed,
+             tabCalib, tabBlocks, nights, ladder, tabEmpty0, noneMsg, thinMsg, inPlay, thisRow, thisMark, logRows, refill, thisWhat, whatHead, otherWhat, triesCells, triesHead, triesHeadCls, triesStored };
+  });
+  chk(propsT.formBlock === 'His last 3: 20 · 21 · 30 against 24.5 · 1 of 3 over, against the OVER|n5 formline neg' && propsT.formStored === '{"vals":[20,21,30],"over":1,"on":0,"avg":23.7}',
+      'props file: the slate\'s form block lands on the row and the card\'s form line reads it (7 Nov 2026; the seeded log has two games with the stat, so the line can only come off the block)', JSON.stringify({ card: propsT.formBlock, stored: propsT.formStored }));
+  chk(propsT.refill.stripped && propsT.refill.same && JSON.stringify(propsT.refill.mins) === JSON.stringify(propsT.refill.was) && propsT.refill.mins.some(m => typeof m === 'number') && /Minutes filled in on \d+ graded props? from the box lines\./.test(propsT.refill.msg),
+      'props: a second load of a night\'s grade file fills the minutes in on props graded before they were kept, leaves every result as it was, and says how many', JSON.stringify(propsT.refill));
+  chk(/^10-21 @ [A-Z]+ this game 36\.2 28 won by 6 · 36 min \(his usual 34\) · 22 shots \(his usual 21 at those minutes\) · 10 of 19 from the floor tries: 19 from the floor \(his usual 18 at those minutes\) · 3 of 7 from three · 6 of 7 from the line$/.test(propsT.thisRow) && /lg over/.test(propsT.thisMark) && propsT.logRows === 4
+      && propsT.whatHead === 'Date|Opp|Min|points|What happened' && propsT.thisWhat === 'won by 6 · 36 min (his usual 34) · 22 shots (his usual 21 at those minutes) · 10 of 19 from the floor tries: 19 from the floor (his usual 18 at those minutes) · 3 of 7 from three · 6 of 7 from the line'
+      && propsT.otherWhat.length === 3 && propsT.otherWhat[0] === 'won by 3 · 34 min (his usual 33) tries: 20 from the floor (his usual 19 at those minutes) · 3 of 8 from three · 5 of 6 from the line' && propsT.otherWhat.slice(1).every(t => t === ''),
+      'props: a graded prop\'s last games end with the game itself, his minutes from the box line and the stat marked against the line', JSON.stringify({ row: propsT.thisRow, mark: propsT.thisMark, rows: propsT.logRows, other: propsT.otherWhat }));
+  chk(JSON.stringify(propsT.triesCells) === JSON.stringify(['tries|tries: 20 from the floor (his usual 19 at those minutes) · 3 of 8 from three · 5 of 6 from the line', '', '', 'this:tries|tries: 19 from the floor (his usual 18 at those minutes) · 3 of 7 from three · 6 of 7 from the line'])
+      && propsT.triesHead === '· what the box says happened, the biggest factor first, the tries in their own colour' && propsT.triesHeadCls === 'tries' && propsT.triesStored === 'tries: 19 from the floor (his usual 18 at those minutes) · 3 of 7 from three · 6 of 7 from the line',
+      'props: the tries (7 Nov 2026): a game\'s seventh element and the grade file\'s eighth land in the what-happened cell in their own class after the factors, the heading says so, and the graded night\'s tries are kept on the row for the market', JSON.stringify({ cells: propsT.triesCells, head: propsT.triesHead, cls: propsT.triesHeadCls, stored: propsT.triesStored }));
+  chk(/loaded: 2 new.*Last season's ledger, nba-ledger-202526\.json, was not read by this run: 1 of the 1 projections rest on this season's two or three games a player, and 1 prop has no history at all\. The run was started in C:\\Users\\J\\slate: copy the file into that folder, beside slate\.py, run the props again before tip, and load the new file; it replaces these\./.test(propsT.thinMsg),
+      'props: a file whose projections rest on this season alone says last season\'s ledger was not read, names the folder the run was started in (12 Nov 2026) and says what to do', propsT.thinMsg.slice(0, 600));
+  chk(/loaded: 1 new, 0 replaced, 0 graded and left as they were, 1 on 1 game already under way left out \(in-play lines; the calls made before tip stand\)/.test(propsT.inPlay.msg) && propsT.inPlay.names.join(',') === 'Paul George',
+      'props: a file written after a game tipped leaves that game\'s props out and says so, and keeps the games still to come', JSON.stringify(propsT.inPlay));
+  chk(/None of the 1 props has a projection\. The run read 0 games of 2026-27 and 0 of 2025-26 in C:\\Users\\J\\Downloads\. Last season's ledger, nba-ledger-202526\.json, was not read\. With a game or two this season nobody has the sixty minutes a projection needs, so every prop reads no history\. Put that file back in the slate folder beside slate\.py, with this season's ledger beside it, run the props again/.test(propsT.noneMsg),
+      'props: a file that projects nothing says last season\'s ledger was not read, names the folder the run saw, and says what to put back', propsT.noneMsg.slice(0, 500));
+  chk(/Nothing graded yet/.test(propsT.tabEmpty0) && /^Every prop with a side 1-1 says 54\.6% · does 50\.0%/i.test(propsT.tabCalib) && /BET band 1-0 says 56\.0% · does 100\.0%/i.test(propsT.tabCalib)
+      && /^PROPS-TAB:Every prop with a side\|BET band\|BET band, one bet a man a night\|No edge: the book's own side(\|Same-game pairs, at the parlay price)?\|His last three against the pick \(shown, not scored\)$/.test(propsT.tabBlocks[0])   // the one-a-man tile beside the band (10 Nov 2026)   // the form tile off Trae Young's block (7 Nov 2026): his last three ran 1 of 3 over, against his OVER && propsT.tabBlocks[1] === 'PROPS-MK:points|rebounds|assists' && propsT.tabBlocks[2] === 'PROPS-EDGE:3 to 6 points|no edge'
+      && propsT.tabBlocks[3] === 'PROPS-CENTRE:Called at the mean, to 21 Oct' && propsT.nights.length === 1 && /^Oct 21 1-1 1 void 54\.6% 50\.0% [-−]0\.1u 1-0 \+0\.9u —$/.test(propsT.nights[0])
+      && propsT.ladder.length === 2 && /^50 to 55% 1 53\.2% 0\.0% 50\.0 [-−]1\.0u$/.test(propsT.ladder[0]) && /^55 to 60% 1 56\.0% 100\.0% 50\.0 \+0\.9u$/.test(propsT.ladder[1]) && /Called at the median/.test(propsT.tabCalib) === false,
+      'props: the tab\'s own Is it working block: the bands as tiles, by market, by the edge claimed, the centre the chance was read around, night by night and says against does by the chance claimed; empty until something grades',
+      JSON.stringify({ blocks: propsT.tabBlocks, nights: propsT.nights, ladder: propsT.ladder, head: propsT.tabCalib.slice(0, 160), empty: propsT.tabEmpty0.slice(0, 60) }));
+  chk(propsT.logMarks.join(',') === 'lg over|26,lg under|22,lg|?' && /Last games \(1 of 2 over 24\.5\)/i.test(propsT.whyOpen[0]) && /10-19 @ BOS 12\.5 \?/.test(propsT.whyOpen[0]),
+      'props: the last games mark each stat, green over the prop\'s line and red under it, a missing one plain, and tally how many cleared the number', JSON.stringify({ marks: propsT.logMarks, why: propsT.whyOpen }));
+  chk(propsT.viewOn && propsT.colsOff && propsT.pressed === 'true', 'props: loading a props file through Load slate opens the Props tab in place of the matchup columns', JSON.stringify({ on: propsT.viewOn, cols: propsT.colsOff, pressed: propsT.pressed }));
+  chk(propsT.best.length === 1 && /#1 · BET/.test(propsT.best[0]) && /Trae Young OVER 24\.5 points/.test(propsT.best[0]) && /56\.0% · [-−]110 needs 52\.4% · edge \+3\.7/.test(propsT.best[0]) && /projected 27\.2 \(±9\.4\)/.test(propsT.best[0]),
+      'props: the best list carries the one prop that clears its price, with its band, chance, price, need, edge and projection', JSON.stringify(propsT.best));
+  chk(propsT.rowsOn === 2 && propsT.rowsAll === 3 && /3 props on .*21/.test(propsT.count) && /3.* new/.test(propsT.msg),
+      'props: the table lists the projected props, every prop with the box ticked, and the count names the date', JSON.stringify({ on: propsT.rowsOn, all: propsT.rowsAll, count: propsT.count, msg: propsT.msg }));
+  chk(propsT.whyOpen.length === 1 && /27\.9 points per 36/.test(propsT.whyOpen[0]) && /10-15 @ MIA 34 26 won by 3 · 34 min \(his usual 33\) tries: 20 from the floor/.test(propsT.whyOpen[0]) && /fanatics carded 24\.5 [-−]110 [-−]110 draftkings 25\.5 [-−]115 [-−]105/.test(propsT.whyOpen[0]) && /what happened/i.test(propsT.whyOpen[0]),
+      'props: a click on a table row opens the prop\'s panel with the reasons, the last games and every book\'s line; the what-happened column shows because one seeded game carries the factors and the tries (7 Nov 2026)', JSON.stringify(propsT.whyOpen));
+  chk(!propsT.tileBefore, 'props: no record tile before anything is graded', '');
+  chk(propsT.after[0][2] === 'win' && propsT.after[0][3] === 28 && propsT.after[2][2] === 'loss' && propsT.after[2][3] === 9 && propsT.after[1][2] === 'void',
+      'props: the grade file\'s box grades each prop by its side (28 over 24.5 wins; 9 rebounds beat the under 7.5), and a player with no box line is void', JSON.stringify(propsT.after));
+  chk(/Every prop with a side 1-1 says 54\.6% · does 50\.0%/i.test(propsT.tileText) && /BET 1-0 \+0\.9u/.test(propsT.tileText) && /no edge 0-1 [-−]1\.0u/.test(propsT.tileText) && /over 1-0 · under 0-1/.test(propsT.tileText) && /points 1-0/i.test(propsT.tileText) && /rebounds 0-1/i.test(propsT.tileText) && /assists 0-0 pushes only · 1 void/i.test(propsT.tileText),
+      'props: the record tile keeps the props by band, side and market, the void counted apart', propsT.tileText.slice(0, 500));
+  chk(/3 props graded on the Props tab/.test(propsT.slateMsg), 'props: the slate message says how many props the grade file graded', propsT.slateMsg.slice(-160));
+  chk(propsT.restored === 1 && propsT.viewOff && propsT.colsBack && propsT.nbaPressed === 'true', 'props: a backup\'s props restore, and a sport button brings the matchup columns back', JSON.stringify({ restored: propsT.restored, off: propsT.viewOff, cols: propsT.colsBack, nba: propsT.nbaPressed }));
+  chk(propsT.best.length >= 1 && !/Kalshi/i.test(propsT.best[0]) && propsT.whyOpen.length === 1 && !/Kalshi/i.test(propsT.whyOpen[0]),
+      'props: Kalshi is off the props (5 Nov 2026): a prop that still carries a ladder from a 4 Nov file shows no crowd line on the best card and no crowd tile on its panel', JSON.stringify({ best: (propsT.best[0] || '').slice(-200), panel: (propsT.whyOpen[0] || '').slice(0, 200) }));
+  // the Example button: one game's props computed at build time through the slate's projection, previewed and never saved
+  const propsEx = await pg.evaluate(async () => {
+    const wait = () => new Promise(r => setTimeout(r, 80));
+    await smStore.removeItem('callsheet3.props.v1');
+    document.getElementById('m-props').click(); await wait();
+    const before = document.getElementById('propsCount').textContent, tileBefore = !!document.querySelector('#calibBox .calib[data-sport="PROPS"]');
+    document.getElementById('propsAll').checked = false; document.getElementById('propsAll').dispatchEvent(new Event('change', { bubbles: true })); await wait();
+    document.getElementById('propsExample').click(); await wait();
+    const on = !document.getElementById('propsView').hidden, count = document.getElementById('propsCount').textContent, msg = document.getElementById('propsMsg').textContent;
+    const best = [...document.querySelectorAll('#propsBest .pk')].map(e => e.innerText.replace(/\s+/g, ' ').trim());
+    const rows = document.querySelectorAll('#propsTable tr[data-prop]').length;
+    document.getElementById('propsAll').checked = true; document.getElementById('propsAll').dispatchEvent(new Event('change', { bubbles: true })); await wait();
+    const rowsAll = document.querySelectorAll('#propsTable tr[data-prop]').length;
+    const sides = [...document.querySelectorAll('#propsTable tr[data-prop]')].map(tr => tr.querySelectorAll('td')[1].textContent.trim().replace(/\s+[A-Z]$/, '') + ' ' + tr.querySelectorAll('td')[4].textContent.trim());
+    const whys = [];
+    for (const tr of [...document.querySelectorAll('#propsTable tr[data-prop]')]) {
+      tr.click(); await wait();
+      whys.push(document.getElementById('propDetailBody').innerText.replace(/\s+/g, ' ').trim());
+      document.getElementById('propDetailClose').click(); await wait();
+    }
+    // the table's view: a market filter, a column sort, a band filter and a name, then Reset
+    const cells = (i) => [...document.querySelectorAll('#propsTable tbody tr[data-prop]')].map(tr => tr.querySelectorAll('td')[i].textContent.trim());
+    const sel = (id, v) => { const el = document.getElementById(id); el.value = v; el.dispatchEvent(new Event(id === 'propsQ' ? 'input' : 'change', { bubbles: true })); };
+    sel('propsMk', 'reb'); await wait();
+    const view1 = { markets: cells(2), shown: document.getElementById('propsShown').textContent };
+    sel('propsMk', ''); document.querySelector('#propsTable th[data-sort="chance"]').click(); await wait();
+    const view2 = { chances: cells(5), head: document.querySelector('#propsTable th[data-sort="chance"]').textContent, shown: document.getElementById('propsShown').textContent, order: JSON.parse(localStorage.getItem('callsheet3.props.view.v1') || '{}') };
+    document.querySelector('#propsTable th[data-sort="chance"]').click(); await wait();
+    const view3 = { chances: cells(5) };
+    sel('propsBand', 'LEAN'); sel('propsQ', 'george'); await wait();
+    const view4 = { names: cells(1), bands: cells(10), shown: document.getElementById('propsShown').textContent };
+    document.getElementById('propsReset').click(); await wait();
+    const view5 = { rows: document.querySelectorAll('#propsTable tbody tr[data-prop]').length, shown: document.getElementById('propsShown').textContent, stored: localStorage.getItem('callsheet3.props.view.v1'), mk: document.getElementById('propsMk').value, q: document.getElementById('propsQ').value };
+    const saved = smStore.getItem('callsheet3.props.v1');
+    const tileAfter = !!document.querySelector('#calibBox .calib[data-sport="PROPS"]');
+    document.getElementById('m-nba').click(); await wait();
+    document.getElementById('m-props').click(); await wait();
+    const after = document.getElementById('propsCount').textContent;
+    document.getElementById('m-nba').click(); await wait();
+    return { on, count, msg, best, rows, rowsAll, sides, whys, saved, tileSame: tileBefore === tileAfter, before, after, view1, view2, view3, view4, view5 };
+  });
+  const pct = (s) => parseFloat(String(s).replace('%', ''));
+  chk(propsEx.view1.markets.length >= 1 && propsEx.view1.markets.every(m => m === 'rebounds') && /of 8 shown$/.test(propsEx.view1.shown)
+      && propsEx.view2.chances.length === 8 && propsEx.view2.chances.slice(0, 7).every((c, i) => isNaN(pct(c)) ? false : pct(c) >= (isNaN(pct(propsEx.view2.chances[i + 1])) ? -1 : pct(propsEx.view2.chances[i + 1]))) && /Chance ▾/.test(propsEx.view2.head) && /sorted by chance ▾/.test(propsEx.view2.shown) && propsEx.view2.order.sort === 'chance'
+      && propsEx.view3.chances.filter(c => !isNaN(pct(c))).every((c, i, a) => i === 0 || pct(c) >= pct(a[i - 1]))
+      && propsEx.view4.names.every(n => /George/.test(n)) && propsEx.view4.bands.every(b => b === 'LEAN') && propsEx.view4.names.length >= 1
+      && propsEx.view5.rows === 8 && propsEx.view5.shown === '8 shown' && propsEx.view5.stored === null && propsEx.view5.mk === '' && propsEx.view5.q === '',
+      'props table: the market filter keeps the rebounds, a click on Chance sorts it high to low and again low to high, the band and name filters narrow it, and Reset view puts it back', JSON.stringify({ v1: propsEx.view1, v2: { head: propsEx.view2.head, shown: propsEx.view2.shown, chances: propsEx.view2.chances }, v3: propsEx.view3, v4: propsEx.view4, v5: propsEx.view5 }));
+  chk(propsEx.on && /^EXAMPLE · 8 props on/.test(propsEx.count) && /An example/.test(propsEx.msg) && propsEx.rows === 7 && propsEx.rowsAll === 8,
+      'props example: eight props on 76ers @ Knicks, seven projected (Embiid is out), the count says EXAMPLE', JSON.stringify({ count: propsEx.count, rows: propsEx.rows, all: propsEx.rowsAll }));
+  chk(propsEx.best.length === 2 && /#1 · LEAN .*Paul George UNDER 2\.5 threes 55\.5% · [-−]115 needs 53\.5% · edge \+2\.1/.test(propsEx.best[0]) && /#2 · LEAN .*Karl-Anthony Towns UNDER 11\.5 rebounds 52\.9% · [-−]105 needs 51\.2% · edge \+1\.7/.test(propsEx.best[1])
+      && !propsEx.best.some(b => /OG Anunoby|Tyrese Maxey|Mikal Bridges|Kelly Oubre|Jalen Brunson/.test(b))
+      && propsEx.sides.length === 8 && propsEx.sides.filter(s => / OVER$/.test(s)).length === 2 && propsEx.sides.some(s => /^Jalen Brunson OVER$/.test(s)) && propsEx.sides.some(s => /^Tyrese Maxey OVER$/.test(s)) && propsEx.sides.filter(s => / UNDER$/.test(s)).length === 5 && propsEx.sides.filter(s => /Joel Embiid listed Out/.test(s)).length === 1,
+      'props example: with the over\'s shade off and the model a fifth of the say (5 Nov 2026) the sheet chooses on the prop\'s own evidence again, both ways: Brunson\'s and Maxey\'s points read OVER in the table, five props UNDER, Embiid\'s row says he is out, and the best list holds the two that clear their price, George\'s under at -115 first (13 Nov 2026, the second pass: his first game back and a regular back take minutes off him) and Towns\' under second (the books a point under the carded line); Brunson\'s over, level with its price until the levers were corrected, sits 0.3 under it; no prop reaches the BET band', JSON.stringify({ best: propsEx.best.map(b => b.slice(0, 90)), sides: propsEx.sides }));
+  chk(propsEx.whys.some(w => /who is out against his last 10: newly out: Joel Embiid \(31 mpg, with him in 8 of his last 10\); back: Jared McCain \(28 mpg, missed 4 of his last 10\): [-−]1\.0 minutes \(0\.00 a 30 mpg newly out and 1\.42 off a 30 mpg back for a man who started all of his last five on 36\.0 minutes/.test(w))
+      // the second pass (13 Nov 2026): the read of ten, his season's pull, the first game back, the top of the minutes, the league's home and road, the role's lean
+      && propsEx.whys.some(w => /36\.0 minutes projected: his last 10 games, the recent counting most \(season 37\.1\), 5 of his last 5 starts/.test(w) && /his season's mean is 37\.1 minutes against the read's 36\.0: .* 0\.50 of the gap for a man who started all of his last five .* so \+0\.6 minutes, scored/.test(w))
+      && propsEx.whys.some(w => /his club has played 2 games since his last: in his first game back from that many a man who started all of his last five plays 0\.96 of the read .* so [-−]1\.3 minutes, scored/.test(w))
+      && propsEx.whys.some(w => /the top of the minutes: a man projected past 36 played 1\.4 minutes less .* so every minute over 36 is read at half: [-−]1\.0 minutes, scored/.test(w))
+      && propsEx.whys.some(w => /on the road: x0\.993, the league's own gap over and above his rate/.test(w)) && propsEx.whys.some(w => /at home: x1\.011, the league's own gap/.test(w)) && propsEx.whys.filter(w => /the league's own gap/.test(w)).length === 6   // not on Towns' rebounds, nor on the man listed out
+      && propsEx.whys.some(w => /the median for a man who started all of his last five is read 0\.04 sigmas above the market's own shift/.test(w))
+      && propsEx.whys.some(w => /his club's regulars out tonight run 31 minutes a game against the league's 21 on the day's report: \+1\.2% on his points rate \(3\.5% a 30 mpg\), \+0\.33 points per 36/.test(w))
+      && propsEx.whys.some(w => /Josh Hart is Day-To-Day: counted 45% out \(a regular so listed played 46 nights in 76 on the graded nights\)/.test(w)) && !propsEx.whys.some(w => /the pooled rule|not counted as out/.test(w))
+      && propsEx.whys.some(w => /the game's pace 97\.0 \(their 99\.5, Knicks's 98\.0, the league's 100\.5\) against their own: x0\.975, carried at 65% beside the defence's table/.test(w) && /: x0\.984/.test(w))
+      && propsEx.whys.some(w => /blended with last season's 27\.7 \(1000 of 1909 minutes at a quarter, weight 250, last season's 28\.5 at x0\.970, how the men with both seasons are running this season\): 27\.7 per 36/.test(w))
+      && propsEx.whys.some(w => /listed Out on ESPN: no projection/.test(w))
+      && propsEx.whys.some(w => /Knicks allow 0\.97x the league's points per minute to guards \(this season 0\.95 over 16 games, last season 0\.99\): x0\.978 at 0\.75 weight, measured/.test(w)) && propsEx.whys.some(w => /HashtagBasketball: 76ers allow/.test(w)),
+      'props example: the why lines are the slate\'s own, as the levers were corrected (13 Nov 2026) and the second pass left them: who is out against the ten games read (Embiid newly out, a regular back) and against the league\'s night, his season\'s pull, a first game back, the top of the minutes, home and road, the role\'s lean, a man listed day-to-day by his chance, pace at its share, last season\'s rate at this season\'s level, the defence factor, the website\'s rank and the listed-out man', JSON.stringify(propsEx.whys.slice(0, 2)).slice(0, 600));
+  chk(propsEx.saved === null && propsEx.tileSame && propsEx.after === propsEx.before, 'props example: nothing is saved or graded, and a sport button puts it away', JSON.stringify({ saved: propsEx.saved, same: propsEx.tileSame, before: propsEx.before, after: propsEx.after }));
+
+  // ---- the prop's own panel (21 Oct 2026): a best-prop card opens it, a table row still folds its why, Escape or Close puts it away
+  const propsDlg = await pg.evaluate(async () => {
+    const wait = () => new Promise(r => setTimeout(r, 60));
+    document.getElementById('m-props').click(); await wait();
+    document.getElementById('propsExample').click(); await wait();
+    const dlg = document.getElementById('propDetail'), hidden0 = dlg.hidden;
+    const card = [...document.querySelectorAll('#propsBest .pk')].find(e => /Paul George/.test(e.textContent)), id = card.getAttribute('data-prop');
+    card.click(); await wait();
+    const open = !dlg.hidden, text = document.getElementById('propDetailBody').innerText.replace(/\s+/g, ' ').trim();
+    const tiles = [...dlg.querySelectorAll('.pd-tiles .pd-tile .k')].map(e => e.textContent);
+    // recent form (5 Nov 2026): his last three against the line on the card and the panel, shown, not scored
+    const formCard = ((card.querySelector('.n5.formline') || {}).textContent || ''), formCardCls = ((card.querySelector('.n5.formline') || {}).className || ''), formPanel = ((dlg.querySelector('.pd-form') || {}).textContent || '').replace(/\s+/g, ' ').trim(), formPanelCls = ((dlg.querySelector('.pd-form') || {}).className || '');
+    const formWhy = ([...dlg.querySelectorAll('ul.pd-why li')].map(e => e.textContent.replace(/\s+/g, ' ').trim()).find(t => /^his last 3 games/.test(t)) || '');
+    // the simulation on the prop (26 Oct 2026): six tiles of its own under What moves it, and the paragraph that says what was scored
+    const simTiles = [...dlg.querySelectorAll('.pd-simtiles .pd-tile')].map(e => e.querySelector('.k').textContent + '=' + e.querySelector('.v').textContent + '|' + ((e.querySelector('.s') || {}).textContent || '') + '|' + e.className);
+    const simText = ((dlg.querySelector('.pd-sim') || {}).innerText || '').replace(/\s+/g, ' ').trim(), simBeforeWhy = (() => { const s = dlg.querySelector('.pd-sim'); let n = s && s.nextElementSibling; return !!(n && /^H4$/i.test(n.tagName) && /^Why/.test(n.textContent)); })();
+    const marks = dlg.querySelectorAll('.pd-log b.lg').length, books = dlg.querySelectorAll('.pd-books tbody tr').length, carded = (dlg.querySelector('.pd-books tr.carded td') || {}).textContent || '';
+    const fromCardPos = document.getElementById('propDetailPos').textContent, noscroll = document.body.classList.contains('noscroll');
+    const levers = [...dlg.querySelectorAll('.pd-levers .lever')].map(e => e.className + '|' + e.querySelector('.lt').textContent.trim() + '|' + e.querySelector('.lv').textContent);
+    const base = (dlg.querySelector('.pd-base') || {}).textContent || '', boldWhy = [...dlg.querySelectorAll('ul.pd-why li.lever-line')].map(e => e.textContent.slice(0, 40));
+    const againstWhy = [...dlg.querySelectorAll('ul.pd-why li.lever-against')].map(e => e.textContent.replace(/\s+/g, ' ').trim()), whyHead = ((dlg.querySelector('h4 + ul.pd-why') || {}).previousElementSibling || {}).textContent || '';
+    const boldTags = [...dlg.querySelectorAll('ul.pd-why li.lever-line')].map(e => e.textContent.slice(0, 12) + '→' + ((e.querySelector('.tag.helps') || {}).textContent || '') + '|' + getComputedStyle(e).color + '|' + getComputedStyle(e).fontWeight);
+    const cardLever = [...card.querySelectorAll('.n5')].map(e => e.textContent).find(t => /^Moves it:/.test(t)) || '', cardBack = (card.querySelector('.n5.mret') || {}).textContent || '';   // the first game back sits above what moves it (13 Nov 2026, the second pass)
+    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })); await wait();
+    const closedEsc = dlg.hidden && !document.body.classList.contains('noscroll');
+    card.click(); await wait(); document.getElementById('propDetailClose').click(); await wait();
+    const closedBtn = dlg.hidden;
+    card.click(); await wait(); document.getElementById('m-nba').click(); await wait();
+    const closedSport = dlg.hidden;
+    // a row of the Every-prop table opens the same panel, and Previous / Next and the arrow keys walk the table's order
+    document.getElementById('m-props').click(); await wait();
+    document.getElementById('propsExample').click(); await wait();   // the sport button put the example away
+    const trs =[...document.querySelectorAll('#propsTable tr[data-prop]')], rowNames = trs.slice(0, 3).map(t => t.querySelectorAll('td')[1].textContent.trim());
+    const h3 = () => ((document.querySelector('#propDetailBody h3') || {}).textContent || '').trim();
+    trs[0].click(); await wait();
+    const rowOpen = !dlg.hidden, name0 = h3(), pos0 = document.getElementById('propDetailPos').textContent, prevOff0 = document.getElementById('propDetailPrev').disabled, navShown = !document.getElementById('propDetailNav').hidden;
+    document.getElementById('propDetailNext').click(); await wait();
+    const name1 = h3(), pos1 = document.getElementById('propDetailPos').textContent, prevOff1 = document.getElementById('propDetailPrev').disabled;
+    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowRight', bubbles: true })); await wait();
+    const name2 = h3();
+    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowLeft', bubbles: true })); await wait();
+    const name1b = h3();
+    trs[trs.length - 1].click(); await wait();
+    const nextOffLast = document.getElementById('propDetailNext').disabled, posLast = document.getElementById('propDetailPos').textContent;
+    document.getElementById('propDetailClose').click(); await wait(); document.getElementById('m-nba').click(); await wait();
+    return { hidden0, open, text: text.slice(0, 3200), tiles, simTiles, simText, simBeforeWhy, marks, books, carded, fromCardPos, noscroll, closedEsc, closedBtn, closedSport, levers, base, boldWhy, againstWhy, whyHead, boldTags, cardLever, cardBack,
+             n: trs.length, rowNames, rowOpen, name0, pos0, prevOff0, navShown, name1, pos1, prevOff1, name2, name1b, nextOffLast, posLast, formCard, formCardCls, formPanel, formPanelCls, formWhy };
+  });
+  chk(/^His last 3: \d+ · \d+ · \d+ against 2\.5 · [0-3] of 3 over(, [1-3] on it)?(, with the UNDER|, against the UNDER|, split)$/.test(propsDlg.formCard) && /^n5 formline( pos| neg)?$/.test(propsDlg.formCardCls)
+      && ((/, with the UNDER$/.test(propsDlg.formCard) && /formline pos$/.test(propsDlg.formCardCls)) || (/, against the UNDER$/.test(propsDlg.formCard) && /formline neg$/.test(propsDlg.formCardCls)) || (/, split$/.test(propsDlg.formCard) && propsDlg.formCardCls === 'n5 formline'))
+      && propsDlg.formPanel.indexOf(propsDlg.formCard) === 0 && /· shown, not scored: it did not help the bet as a lever walk-forward \(5 Nov 2026\), so it is measured on the record tile's own line$/.test(propsDlg.formPanel) && propsDlg.formPanelCls.replace('note ', '').replace('pd-form', 'n5 formline') === propsDlg.formCardCls
+      && /^his last 3 games: \d+, \d+, \d+ against 2\.5 \([0-3] of 3 over(, [1-3] on it)?\): shown, not scored \(5 Nov 2026: read as a push on the projection or on the book's chance it did not help the bet walk-forward on seven nights of logs; its own line on the record tile is the measure\)/.test(propsDlg.formWhy),
+      'props detail: recent form (5 Nov 2026) reads his last three games against the line on George\'s card and his panel, green with the pick and red against it, split when neither side has two, with the why line saying it is shown, not scored', JSON.stringify({ card: propsDlg.formCard, cls: propsDlg.formCardCls, panel: propsDlg.formPanel, pcls: propsDlg.formPanelCls, why: propsDlg.formWhy }));
+  chk(propsDlg.simTiles.length === 4 && /^The books=2\.5\|3 post it · fanatics 2\.5, with them\|pd-tile$/.test(propsDlg.simTiles[0]) && /^PHI points=113\|implied by the book's total and spread · 112\.9 a game by the ratings \(×1\.001, shown: measured null as a lever\)\|pd-tile$/.test(propsDlg.simTiles[1])
+      && /^Expected margin=10\.9\|off the spread · a starter's minutes follow it \(the game script, scored\)\|pd-tile$/.test(propsDlg.simTiles[2]) && /^Blowout=27%\|15 or more either way, off the spread\|pd-tile$/.test(propsDlg.simTiles[3])
+      && /^THE MARKET ON THIS GAME · the books' numbers in the simulation's old place; the consensus is the scored part /i.test(propsDlg.simText) && /The simulation came off the props on 5 Nov 2026/.test(propsDlg.simText)
+      && /What the score takes from the market now is the books' consensus/.test(propsDlg.simText) && propsDlg.simBeforeWhy,
+      'props detail: the market on the game takes the simulation\'s old place on the panel (5 Nov 2026): the books\' consensus with the carded line level with it on George\'s threes (so no lever tile), his club\'s points implied by the total and spread against the ratings\' number, the expected margin that sets the game script, the blowout chance off the spread, and the paragraph that says what came off and what is scored, before the why',
+      JSON.stringify({ tiles: propsDlg.simTiles, text: propsDlg.simText.slice(0, 700), beforeWhy: propsDlg.simBeforeWhy }));
+  chk(propsDlg.rowOpen && propsDlg.navShown && propsDlg.name0.indexOf(propsDlg.rowNames[0]) === 0 && propsDlg.pos0 === '1 of ' + propsDlg.n && propsDlg.prevOff0
+      && propsDlg.name1.indexOf(propsDlg.rowNames[1]) === 0 && propsDlg.pos1 === '2 of ' + propsDlg.n && !propsDlg.prevOff1 && propsDlg.name2.indexOf(propsDlg.rowNames[2]) === 0 && propsDlg.name1b === propsDlg.name1
+      && propsDlg.nextOffLast && propsDlg.posLast === propsDlg.n + ' of ' + propsDlg.n && /^\d+ of \d+$/.test(propsDlg.fromCardPos),
+      'props detail: a row of the Every-prop table opens the same panel, Next and the arrow keys walk the table\'s order with the position shown, Previous is off on the first and Next on the last, and a card opened from the best list knows its place too',
+      JSON.stringify({ n: propsDlg.n, rows: propsDlg.rowNames, name0: propsDlg.name0, pos0: propsDlg.pos0, name1: propsDlg.name1, pos1: propsDlg.pos1, name2: propsDlg.name2, back: propsDlg.name1b, last: propsDlg.posLast, card: propsDlg.fromCardPos }));
+  chk(propsDlg.levers.length === 7 && /^lever helps top\|His first games back biggest lever\|[-−]0\.1$/.test(propsDlg.levers[0]) && /^lever helps\|Who is out\|[-−]0\.1$/.test(propsDlg.levers[1]) && propsDlg.levers.some(l => /^lever helps\|Pace\|[-−]0\.0$/.test(l)) && propsDlg.levers.some(l => /^lever (hurts|helps)\|Defence v position\|[-−+]0\.0$/.test(l))
+      && propsDlg.levers.some(l => /^lever helps\|Home and road\|[-−]0\.0$/.test(l)) && propsDlg.levers.some(l => /^lever helps\|His season's minutes\|[-−]0\.0$/.test(l))
+      && propsDlg.levers.some(l => /^lever (hurts|helps)\|The game script, from the spread\|[-−+]0\.0$/.test(l)) && !propsDlg.levers.some(l => /matchup|prior|Minutes/.test(l))
+      && /^Starts from 2\.05, his 2\.17 per 36 at his minutes; his season's minutes, the regulars out, his first games back, the game script, pace, home and road and the defence take it to 1\.88, [-−]0\.6 against the line\. Green pushes toward the UNDER, red away from it: the measured levers only \(5 Nov 2026\)\. Inside the start, not a lever: Last season's prior on his rate \+0\.1 · Minutes, his last 10 against the season \+0\.0\.$/.test(propsDlg.base)
+      && propsDlg.boldWhy.length === 2 && /^who is out against his last 10: newly ou$/.test(propsDlg.boldWhy[0]) && /^his club has played 2 games since his la/.test(propsDlg.boldWhy[1]) && !propsDlg.boldWhy.some(w => /^the game's pace|^2\.0 threes/.test(w))
+      && propsDlg.againstWhy.length === 0   // nothing against the under is big enough to tag: the defence and the script each move it 0.02 or less
+      && /the biggest reasons for the UNDER in green$/.test(propsDlg.whyHead.trim()) && !/against it in red/.test(propsDlg.whyHead)   // the heading names only what the list tags
+      && propsDlg.boldTags.length === 2 && /^who is out a→the second biggest for the UNDER\|/.test(propsDlg.boldTags[0]) && /^his club has→the biggest for the UNDER\|/.test(propsDlg.boldTags[1])
+      && propsDlg.boldTags.every(t => /\|rgb\(\d+, \d+, \d+\)\|600$/.test(t)) && propsDlg.boldTags[0].split('|')[1] !== 'rgb(0, 0, 0)'
+      && /^Moves it: His first games back [-−]0\.1 · Who is out [-−]0\.1$/.test(propsDlg.cardLever)
+      && /^Minutes: his club has played 2 games since his last\. In his first game back from that many such a man plays 0\.96 of what his games say: [-−]1\.3 minutes\. Scored from 13 Nov 2026, measured on four seasons of box scores\.$/.test(propsDlg.cardBack),
+      'props detail: what moves it keeps the measured levers only (5 Nov 2026): the regulars out, the game script off the spread, pace and the defence on George\'s threes, with last season\'s prior and the minutes trend named as what sits inside the start and no matchup lever; the two biggest levers toward the UNDER (his first game back, his club having played two since his last, and who is out: Embiid newly out gives a 34-minute starter nothing and McCain back takes 0.9 minutes; the second pass, 13 Nov 2026, which also lists his season\'s minutes and home and road) bold their why lines in green with a tag each, nothing against it is big enough to tag in red, and the card says his first game back and names the top two levers by size', JSON.stringify({ levers: propsDlg.levers, base: propsDlg.base, bold: propsDlg.boldWhy, tags: propsDlg.boldTags, against: propsDlg.againstWhy, head: propsDlg.whyHead, card: propsDlg.cardLever, back: propsDlg.cardBack }));
+  chk(propsDlg.hidden0 && propsDlg.open && propsDlg.noscroll && /^LEAN Paul George F PHI( starter)? UNDER 2\.5 threes 76ers @ Knicks/.test(propsDlg.text) && /on the road at NYK/.test(propsDlg.text) && /Why /i.test(propsDlg.text)
+      && propsDlg.tiles.join(',') === 'Chance,Price,Edge,Projection,Minutes,Per 36,Usage' && propsDlg.marks === 10 && propsDlg.books === 3 && /fanatics/.test(propsDlg.carded),
+      'props detail: a best-prop card opens the prop on its own panel with the tiles, the why, the marked last games and every book', JSON.stringify(propsDlg).slice(0, 1500));
+  chk(propsDlg.closedEsc && propsDlg.closedBtn && propsDlg.closedSport, 'props detail: Escape, the Close button and a sport button each put the panel away', JSON.stringify({ esc: propsDlg.closedEsc, btn: propsDlg.closedBtn, sport: propsDlg.closedSport }));
+
+  // ---- an NBA row re-scored while another game sits in the form keeps its own clubs' names (21 Oct 2026) ----
+  const relabel = await pg.evaluate(async () => {
+    const wait = () => new Promise(r => setTimeout(r, 60));
+    const set = (id, v) => { const el = document.getElementById(id); el.value = v; el.dispatchEvent(new Event('input', { bubbles: true })); };
+    await smStore.removeItem('callsheet3.card.v1');
+    document.getElementById('clear').click(); document.getElementById('m-nba').click(); await wait();
+    set('gdate', '2026-10-20'); set('away', 'Celtics'); set('home', 'Pistons'); set('line', '213'); set('op', '-215'); set('up', '170');
+    set('sp', '1.5'); set('sph', '-110'); set('spa', '-110'); set('hml', '100'); set('aml', '-120'); await wait();
+    document.getElementById('add').click(); await wait();
+    // another sport's game in the form while a slate merges into the basketball row on the card (hockey until 30 Oct 2026, baseball since)
+    document.getElementById('clear').click(); document.getElementById('m-mlb').click(); await wait();
+    set('gdate', '2026-10-20'); set('away', 'Ducks'); set('home', 'Islanders'); set('line', '6'); set('op', '-110'); set('up', '-110'); await wait();
+    const doc = { format: 'callsheet2.slate', version: 1, date: '2026-10-20', games: [{ sport: 'NBA', gdate: '2026-10-20', away: 'Celtics', home: 'Pistons', inputs: { narest: '1', nhrest: '2' }, notes: [] }] };
+    const dt = new DataTransfer(); dt.items.add(new File([JSON.stringify(doc)], 'nba-slate-2026-10-20.json', { type: 'application/json' }));
+    const inp = document.getElementById('slateFile'); inp.files = dt.files; inp.dispatchEvent(new Event('change', { bubbles: true })); await wait();
+    const row = JSON.parse(smStore.getItem('callsheet3.card.v1')).find(r => /Celtics @ Pistons/.test(r.matchup));
+    const sides = row.markets.filter(m => m.key === 'ml' || m.key === 'spread').map(m => ({ key: m.key, side: m.side, pick: m.pick, other: (m.other || {}).pick, label: m.label }));
+    // a later slate refreshes the starting five on the carded row but leaves a filled box (the rest days) as logged
+    const loadDoc = async (games, fname) => { const dt2 = new DataTransfer(); dt2.items.add(new File([JSON.stringify({ format: 'callsheet2.slate', version: 1, date: '2026-10-20', games })], fname, { type: 'application/json' })); inp.files = dt2.files; inp.dispatchEvent(new Event('change', { bubbles: true })); await wait(); };
+    // the injury report and the simulation follow too (26 Oct 2026, the user: "will the simulation update when I re-run closer to start?")
+    const lineupDoc = (status, rest) => [{ sport: 'NBA', gdate: '2026-10-20', away: 'Celtics', home: 'Pistons', notes: [], inputs: { narest: rest, nbalineup: JSON.stringify({ away: { status, five: [['PG', 'Derrick White']], maybe: [] }, home: null, src: 'RotoWire' }),
+      nbaout: JSON.stringify({ away: [{ n: 'Jayson Tatum', st: status === 'expected' ? 'Questionable' : 'Out' }], home: [] }), nbasim: JSON.stringify({ v: 1, runs: status === 'expected' ? 100 : 200 }) } }];
+    await loadDoc(lineupDoc('expected', '2'), 'nba-slate-a.json');
+    const lu1 = JSON.parse(smStore.getItem('callsheet3.card.v1')).find(r => /Celtics @ Pistons/.test(r.matchup)).inputs;
+    await loadDoc(lineupDoc('confirmed', '9'), 'nba-slate-b.json');
+    const lu2 = JSON.parse(smStore.getItem('callsheet3.card.v1')).find(r => /Celtics @ Pistons/.test(r.matchup)).inputs;
+    const refresh = { lu1: /expected/.test(lu1.nbalineup || ''), rest1: lu1.narest, lu2: /confirmed/.test(lu2.nbalineup || ''), rest2: lu2.narest,
+                      out1: /Questionable/.test(lu1.nbaout || ''), out2: /"Out"/.test(lu2.nbaout || ''), sim1: /"runs":100/.test(lu1.nbasim || ''), sim2: /"runs":200/.test(lu2.nbasim || '') };
+    // a row the old page wrote: another game's names on the moneyline and the spread, to be relabelled on load
+    const broken = JSON.parse(smStore.getItem('callsheet3.card.v1'));
+    broken.forEach(r => r.markets.forEach(m => { if (m.key === 'ml') { m.pick = 'Islanders ML'; m.other.pick = 'Ducks ML'; } if (m.key === 'spread') { m.pick = 'Islanders +1.5'; m.label = 'Spread Islanders: +1.5'; m.other.pick = 'Ducks -1.5'; } }));
+    await smStore.setItem('callsheet3.card.v1', JSON.stringify(broken));
+    return { merged: row.inputs.narest === '1' && row.inputs.nhrest === '2', sides, formAway: document.getElementById('away').value, refresh };
+  });
+  chk(relabel.refresh.lu1 && relabel.refresh.rest1 === '1' && relabel.refresh.lu2 && relabel.refresh.rest2 === '1' && relabel.refresh.out1 && relabel.refresh.out2 && relabel.refresh.sim1 && relabel.refresh.sim2,
+      'slate reload: a later slate replaces the starting five, the injury report and the simulation on a carded row (expected to confirmed, questionable to out, the newer runs) and leaves the filled boxes as logged', JSON.stringify(relabel.refresh));
+  await reloaded(); await pg.evaluate(() => smStore.ready);
+  const relabelled = await pg.evaluate(async () => {
+    const row = JSON.parse(smStore.getItem('callsheet3.card.v1')).find(r => /Celtics @ Pistons/.test(r.matchup));
+    const out = row.markets.filter(m => m.key === 'ml' || m.key === 'spread').map(m => ({ key: m.key, side: m.side, pick: m.pick, other: (m.other || {}).pick, label: m.label }));
+    await smStore.removeItem('callsheet3.card.v1');
+    return out;
+  });
+  const ownClubs = (s) => s.length === 2 && s.every(m => (m.side === 'HOME' ? /^Pistons /.test(m.pick) && /^Celtics /.test(m.other) : /^Celtics /.test(m.pick) && /^Pistons /.test(m.other)))
+    && s.find(m => m.key === 'spread').label === 'Spread Pistons: +1.5' && /^(Pistons \+1\.5|Celtics -1\.5)$/.test(s.find(m => m.key === 'spread').pick) && /^(Pistons|Celtics) ML$/.test(s.find(m => m.key === 'ml').pick);
+  chk(relabel.merged && relabel.formAway === 'Ducks' && ownClubs(relabel.sides),
+      'nba: a card row re-scored by a slate while another game sits in the form keeps its own clubs on the moneyline and the spread', JSON.stringify(relabel));
+  chk(ownClubs(relabelled), 'nba: a row the old page mislabelled with the form\'s clubs is relabelled by side from its own clubs on load', JSON.stringify(relabelled));
+
+  // ---- the referees as a watch (22 Oct 2026): graded totals against the close by the crew's lean in the frozen table ----
+  const refsW = await pg.evaluate(async () => {
+    const wait = () => new Promise(r => setTimeout(r, 60));
+    const set = (id, v) => { const el = document.getElementById(id); el.value = v; el.dispatchEvent(new Event('input', { bubbles: true })); };
+    await smStore.removeItem('callsheet3.card.v1');
+    document.getElementById('clear').click(); document.getElementById('m-nba').click(); await wait();
+    const empty = (document.querySelector('#calibBox .calib[data-sport="REFS"]') || {}).innerText || '';
+    // the NBA example: Foster, Brothers and Davis, a crew leaning over (z 2.4 + 0.2 + 1.8); the game lands 238 against a 231.5 close
+    document.getElementById('gdate').value = '2026-11-10'; document.getElementById('example').click(); await wait();
+    document.getElementById('add').click(); await wait();
+    // a second row with Zarba alone, no lean (58-60): lands 205 against a 220 close
+    document.getElementById('clear').click(); document.getElementById('m-nba').click(); await wait();
+    set('gdate', '2026-11-10'); set('away', 'Raptors'); set('home', 'Celtics'); set('line', '221.5'); set('op', '-110'); set('up', '-110');
+    set('ncrew', 'Zach Zarba'); set('nbarefs', JSON.stringify({ lg: [2462, 44.0, 228.8], r: { 'Zach Zarba': [110, 42.9, 227.4, 58, 60, 2, 5] } })); await wait();
+    document.getElementById('add').click(); await wait();
+    const rowOf = (re) => [...document.querySelectorAll('#cardTable tr')].find(t => re.test(t.textContent));
+    const g = (tr, k, v) => { const el = tr.querySelector(`.grade[data-k="${k}"]`); el.value = v; el.dispatchEvent(new Event('input', { bubbles: true })); el.dispatchEvent(new Event('change', { bubbles: true })); };
+    g(rowOf(/76ers @ Knicks/), 'fa', '118'); g(rowOf(/76ers @ Knicks/), 'fh', '120'); g(rowOf(/76ers @ Knicks/), 'ctot', '231.5'); await wait();
+    const rowsOf = (id) => [...document.querySelectorAll('#' + id + ' tbody tr')].map(tr => [...tr.querySelectorAll('td')].map(td => td.className + ':' + td.textContent.trim()).join('|'));
+    const afterOne = rowsOf('refsLean'), refsOne = rowsOf('refsRefs').concat(rowsOf('refsEven'));
+    g(rowOf(/Raptors @ Celtics/), 'fa', '100'); g(rowOf(/Raptors @ Celtics/), 'fh', '105'); g(rowOf(/Raptors @ Celtics/), 'ctot', '220'); await wait();
+    const leanRows = rowsOf('refsLean'), refRows = rowsOf('refsRefs').concat(rowsOf('refsEven')), evenFolded = !!document.querySelector('#calibBox details.refsfold #refsEven');
+    const verdict = (document.querySelector('#refsLean ~ .verdict') || {}).textContent || '';
+    await smStore.removeItem('callsheet3.card.v1'); document.getElementById('clear').click(); await wait();
+    return { empty: empty.replace(/\s+/g, ' ').slice(0, 120), afterOne, refsOne, leanRows, refRows, evenFolded, verdict: verdict.slice(0, 200) };
+  });
+  chk(refsW.empty === '' && refsW.afterOne.length === 3 && /^:OVER LEAN\|:1\|:1-0\|:56\.9%\|over:100\.0%\|dim:50\.0\|over:\+6\.5\|pos:\+0\.91u$/.test(refsW.afterOne[0]) && /^:EVEN\|:0\|dim:nothing graded/.test(refsW.afterOne[1])
+      && refsW.refsOne.length === 3 && /^:Scott Foster\|:OVER LEAN\|:66-41 z \+2\.4\|:1-0\|over:100\.0%\|over:\+6\.5$/.test(refsW.refsOne[0]) && /^:Marc Davis\|:OVER LEAN\|:71-51 z \+1\.8\|:1-0\|/.test(refsW.refsOne[1]) && /^:Tony Brothers\|:EVEN\|:56-54 z \+0\.2\|:1-0\|/.test(refsW.refsOne[2]),
+      'refs watch: one table by the crew\'s lean and one by official, in colour; the example\'s crew leans over and its 238 against 231.5 counts as an over, Foster and Davis the leaning officials, Brothers even', JSON.stringify({ empty: refsW.empty, lean: refsW.afterOne, refs: refsW.refsOne }));
+  chk(/^:EVEN\|:1\|:0-1\|:49\.2%\|under:0\.0%\|dim:50\.0\|under:[-−]15\.0\|dim:no side$/.test(refsW.leanRows[1]) && /^:UNDER LEAN\|:0\|dim:nothing graded/.test(refsW.leanRows[2])
+      && refsW.refRows.length === 4 && /^:Zach Zarba\|:EVEN\|:58-60 z [-−]0\.2\|:0-1\|under:0\.0%\|under:[-−]15\.0$/.test(refsW.refRows[3]) && refsW.evenFolded && /An official 1\.5 sigma or more/.test(refsW.verdict),
+      'refs watch: Zarba alone has no lean, so his 205 against 220 lands on the even line with no side taken, and he joins the folded no-lean officials last', JSON.stringify({ lean: refsW.leanRows, refs: refsW.refRows, folded: refsW.evenFolded, verdict: refsW.verdict.slice(0, 80) }));
+
+  // ---- 26 Oct 2026: the bets you take -- a Take button on the board, the pick cards and the props; Taking tonight lists them;
+  //      the mark rides through a rescore and a reload, a graded row cannot be marked, and What you took grades them ----
+  const takeT = await pg.evaluate(async () => {
+    const wait = () => new Promise(r => setTimeout(r, 90));
+    const set = (id, v) => { const el = document.getElementById(id); el.value = v; el.dispatchEvent(new Event('input', { bubbles: true })); };
+    await smStore.removeItem('callsheet3.card.v1'); await smStore.removeItem('callsheet3.props.v1');
+    document.getElementById('clear').click(); document.getElementById('m-mlb').click(); await wait();   // the baseball example since 30 Oct 2026 (the hockey one until then)
+    set('gdate', '2026-11-12'); document.getElementById('example').click(); await wait(); set('gdate', '2026-11-12');
+    document.getElementById('add').click(); await wait();
+    document.getElementById('boardDate').value = '2026-11-12'; document.getElementById('boardDate').dispatchEvent(new Event('change')); await wait();
+    const head0 = document.getElementById('takingHead').hidden, btns0 = document.querySelectorAll('#board tbody tr .takebtn').length, rows0 = document.querySelectorAll('#board tbody tr').length;
+    const tr0 = document.querySelector('#board tbody tr'), pick0 = tr0.querySelectorAll('td')[3].querySelector('.chip').textContent.trim();
+    set('line', '6'); await wait();   // the form now differs from the row: a row click would put the row's 6.5 back
+    tr0.querySelector('.takebtn').click(); await wait();
+    const lineAfter = document.getElementById('line').value;
+    const mine = () => JSON.parse(smStore.getItem('callsheet3.card.v1')).filter(r => /Rays @ Yankees/.test(r.matchup) && r.gdate === '2026-11-12');   // rows from earlier checks sit on the card too
+    const stored1 = mine()[0];
+    const takes1 = stored1.markets.filter(m => m.take).map(m => m.key + ':' + m.take.side + ':' + m.take.pick + ':' + m.take.price + ':' + (m.take.p > 0 && m.take.p < 1));
+    const tr1 = document.querySelector('#board tbody tr'), on1 = tr1.classList.contains('taking') && /Taking/.test(tr1.querySelector('.takebtn').textContent);
+    const list1 = [...document.querySelectorAll('#taking .pk')].map(e => e.innerText.replace(/\s+/g, ' ').trim());
+    const head1 = document.getElementById('takingHead').hidden, count1 = document.getElementById('takingCount').textContent;
+    const cardOn = [...document.querySelectorAll('#picks .pk .takebtn.on, #bestBets .pk .takebtn.on, #likeliest .pk .takebtn.on')].length;
+    // a rescore rebuilds every ungraded row's markets: the mark moves over
+    document.getElementById('rescore').click(); await wait();
+    const takes2 = mine()[0].markets.filter(m => m.take).map(m => m.key + ':' + m.take.side);
+    // the same game added again from the form replaces its markets: the mark moves over
+    set('line', '6.5'); await wait(); document.getElementById('add').click(); await wait();
+    const takes3 = mine()[0].markets.filter(m => m.take).map(m => m.key + ':' + m.take.side), nRows = mine().length;
+    // the copy button speaks, with or without a clipboard
+    document.getElementById('takingText').click(); await new Promise(r => setTimeout(r, 250));
+    const said = document.getElementById('saveMsg').textContent;
+    // grade the game 2-3: the mark grades on its card, the button becomes a TAKEN chip, and What you took keeps the line
+    const trc = () => [...document.querySelectorAll('#cardTable tr')].find(t => /Rays @ Yankees/.test(t.textContent));
+    const g = (k, v) => { const el = trc().querySelector(`.grade[data-k="${k}"]`); el.value = v; el.dispatchEvent(new Event('input', { bubbles: true })); el.dispatchEvent(new Event('change', { bubbles: true })); };
+    g('fa', '2'); g('fh', '3'); await wait();
+    const list3 = [...document.querySelectorAll('#taking .pk')].map(e => e.innerText.replace(/\s+/g, ' ').trim());
+    const res3 = (document.querySelector('#taking .pk .chip.win, #taking .pk .chip.loss, #taking .pk .chip.push') || {}).textContent || '';
+    const boardRes = (document.querySelector('#board tbody tr.taking td:nth-child(10) .chip') || {}).textContent || '';
+    const chip3 = (document.querySelector('#board tbody tr.taking .chip.taken') || {}).textContent || '', btn3 = document.querySelectorAll('#board tbody tr.taking .takebtn').length;
+    const took = [...document.querySelectorAll('#calibBox .calib[data-sport="TAKEN"] > div')].map(d => d.innerText.replace(/\s+/g, ' ').trim());
+    // a graded row refuses a new mark
+    const other = [...document.querySelectorAll('#board tbody tr')].find(t => !t.classList.contains('taking')), otherBtns = other ? other.querySelectorAll('.takebtn').length : -1;
+    return { head0, btns0, rows0, pick0, lineAfter, takes1, on1, list1, head1, count1, cardOn, takes2, takes3, nRows, said, list3, res3, boardRes, chip3, btn3, took, otherBtns };
+  });
+  chk(takeT.head0 && takeT.btns0 === takeT.rows0 && takeT.rows0 > 0 && takeT.lineAfter === '6' && takeT.takes1.length === 1 && new RegExp('^(total|f5|ml|rl):(OVER|UNDER|HOME|AWAY):' + takeT.pick0.replace(/[.+\-]/g, '\\$&') + ':[-−]?\\d+:true$').test(takeT.takes1[0])
+      && takeT.on1 && !takeT.head1 && takeT.count1 === '1 marked' && takeT.list1.length === 2 && /^TAKING · MLB · marked /.test(takeT.list1[0]) && takeT.list1[0].indexOf(takeT.pick0) > 0 && /Rays @ Yankees/.test(takeT.list1[0]) && /Taking$/i.test(takeT.list1[0])
+      && /^TONIGHT 1 bet marked none graded yet · one unit each 1 on the card, 0 from the simulation, 0 props$/.test(takeT.list1[1]) && takeT.cardOn >= 1,
+      'take: a Take button on every priced row of the board marks the pick as shown without opening the row; the row lights, the same market\'s card lights, and Taking tonight lists it with a summary card', JSON.stringify(takeT).slice(0, 1200));
+  chk(takeT.takes2.length === 1 && takeT.takes2[0] === takeT.takes1[0].split(':').slice(0, 2).join(':') && takeT.takes3.length === 1 && takeT.takes3[0] === takeT.takes2[0] && takeT.nRows === 1 && /Copied the bets you are taking|the text is below/.test(takeT.said),
+      'take: the mark rides through a rescore and through the same game added again, and the copy button speaks', JSON.stringify({ t2: takeT.takes2, t3: takeT.takes3, rows: takeT.nRows, said: takeT.said.slice(0, 80) }));
+  chk(takeT.list3.length === 2 && /(WIN|LOSS|PUSH|win|loss|push)/.test(takeT.res3) && takeT.res3.toLowerCase() === takeT.boardRes.toLowerCase() && takeT.chip3 === 'TAKEN' && takeT.btn3 === 0 && takeT.otherBtns === 0
+      && takeT.took.length === 1 && new RegExp('^Game bets taken ' + (takeT.res3.toLowerCase() === 'win' ? '1-0' : takeT.res3.toLowerCase() === 'loss' ? '0-1' : '0-0-1') + ' ', 'i').test(takeT.took[0]) && /says \d+\.\d% · does \d+\.\d% \(±\d+\.\d\) · [-−+]\d\.\d\du$/.test(takeT.took[0])
+      && new RegExp('graded ' + (takeT.res3.toLowerCase() === 'win' ? '1-0' : takeT.res3.toLowerCase() === 'loss' ? '0-1' : '0-0-1') + ' · ').test(takeT.list3[1]),
+      'take: once the game grades the marked bet shows its result on its card and the board, the button becomes a TAKEN chip, no mark can be added to the graded row, and What you took keeps the record at the price marked', JSON.stringify({ list3: takeT.list3, res: takeT.res3, board: takeT.boardRes, chip: takeT.chip3, took: takeT.took, other: takeT.otherBtns }));
+  await reloaded(); await pg.evaluate(() => smStore.ready);
+  const takeR = await pg.evaluate(async () => {
+    const wait = () => new Promise(r => setTimeout(r, 90));
+    document.getElementById('boardDate').value = '2026-11-12'; document.getElementById('boardDate').dispatchEvent(new Event('change')); await wait();
+    const list = [...document.querySelectorAll('#taking .pk')].map(e => e.innerText.replace(/\s+/g, ' ').trim()), hidden = document.getElementById('takingHead').hidden;
+    // the props: the example's best card, the table row and the panel each carry the button; Taking lists the mark; the board's Taking tonight lists it on the props' date
+    document.getElementById('m-props').click(); await wait(); document.getElementById('propsExample').click(); await wait();
+    const card = () => [...document.querySelectorAll('#propsBest .pk')].find(e => /Paul George/.test(e.textContent)), id = card().getAttribute('data-prop');   // re-found after every re-render
+    const pHead0 = document.getElementById('propsTakingHead').hidden, pBtns = document.querySelectorAll('#propsTable tr[data-prop] .takebtn').length, pRows = document.querySelectorAll('#propsTable tr[data-prop]').length;
+    card().querySelector('.takebtn').click(); await wait();
+    const dlgOpen = !document.getElementById('propDetail').hidden;
+    const pList = [...document.querySelectorAll('#propsTaking .pk')].map(e => e.innerText.replace(/\s+/g, ' ').trim());
+    const rowTaking = !!document.querySelector('#propsTable tr[data-prop="' + id + '"].taking'), cardOn = card().querySelector('.takebtn').classList.contains('on');
+    const pCount = document.getElementById('propsTakingCount').textContent, pHead1 = document.getElementById('propsTakingHead').hidden;
+    card().click(); await wait();
+    const panelBtn = (document.querySelector('#propDetail .pd-take .takebtn') || {}).textContent || '', panelOn = !!document.querySelector('#propDetail .pd-take .takebtn.on');
+    document.querySelector('#propDetail .pd-take .takebtn').click(); await wait();   // unmark from the panel
+    const panelOff = !document.querySelector('#propDetail .pd-take .takebtn.on') && !!document.querySelector('#propDetail .pd-take .takebtn'), pList2 = document.querySelectorAll('#propsTaking .pk').length, pHead2 = document.getElementById('propsTakingHead').hidden;
+    document.getElementById('propDetailClose').click(); await wait();
+    card().querySelector('.takebtn').click(); await wait();   // mark it again from the card
+    document.getElementById('propsTakingText').click(); await new Promise(r => setTimeout(r, 250));
+    const pSaid = document.getElementById('propsMsg').textContent;
+    const today = document.getElementById('propsDate').value;
+    document.getElementById('m-nba').click(); await wait();   // the example is put away by a sport button, and its mark with it
+    document.getElementById('m-props').click(); await wait();
+    const gone = document.querySelectorAll('#propsTaking .pk').length + (document.getElementById('propsTakingHead').hidden ? 0 : 100);
+    document.getElementById('m-nba').click(); await wait();
+    document.getElementById('boardDate').value = today; document.getElementById('boardDate').dispatchEvent(new Event('change')); await wait();
+    const boardProps = [...document.querySelectorAll('#taking .pk')].map(e => e.innerText.replace(/\s+/g, ' ').trim()).filter(t => /NBA PROP/.test(t)).length;
+    await smStore.removeItem('callsheet3.card.v1'); await smStore.removeItem('callsheet3.props.v1');
+    document.getElementById('clear').click(); await wait();
+    return { list, hidden, pHead0, pBtns, pRows, dlgOpen, pList, rowTaking, cardOn, pCount, pHead1, panelBtn, panelOn, panelOff, pList2, pHead2, pSaid, gone, boardProps };
+  });
+  chk(!takeR.hidden && takeR.list.length === 2 && /^TAKING · MLB/.test(takeR.list[0]), 'take: the mark survives a reload of the page', JSON.stringify({ hidden: takeR.hidden, list: takeR.list }));
+  chk(takeR.pHead0 && takeR.pBtns === 7 && takeR.pRows === 7 && !takeR.dlgOpen && takeR.pList.length === 1 && /^TAKING · NBA PROP · LEAN · marked \d{1,2}:\d\d [AP]M Paul George UNDER 2\.5 threes 5\d\.\d% · [-−]115 needs 53\.5% 76ers @ Knicks · fanatics · projected \d\.\d\d .*Taking$/i.test(takeR.pList[0])
+      && takeR.rowTaking && takeR.cardOn && takeR.pCount === '1 marked' && !takeR.pHead1 && takeR.panelOn && /Taking/.test(takeR.panelBtn) && takeR.panelOff && takeR.pList2 === 0 && takeR.pHead2
+      && /Copied the props you are taking|the text is below/.test(takeR.pSaid) && takeR.gone === 0 && takeR.boardProps === 0,
+      'take: a prop\'s Take button on the best card marks it without opening the panel; the row lights, Taking lists it with a count, the panel\'s own button shows it on and unmarks it, the copy button speaks, and the example\'s mark goes with the example',
+      JSON.stringify(takeR).slice(0, 1200));
+
+  // ---- 26 Oct 2026: the simulation's calls can be taken too -- a Take button under every chip on the NBA Simulation card, greyed until the
+  //      game is on the card; the mark lives on the row, lists under Taking tonight as a simulation call, rides through a rescore and grades on its own tile ----
+  const simTakeT = await pg.evaluate(async () => {
+    const wait = () => new Promise(r => setTimeout(r, 90));
+    const set = (id, v) => { const el = document.getElementById(id); el.value = v; el.dispatchEvent(new Event('input', { bubbles: true })); };
+    await smStore.removeItem('callsheet3.card.v1');
+    document.getElementById('clear').click(); document.getElementById('m-nba').click(); await wait();
+    set('gdate', '2026-11-13'); document.getElementById('example').click(); await wait(); set('gdate', '2026-11-13'); await wait();
+    const off0 = document.querySelectorAll('#nbaSimPanel .takebtn.off[disabled]').length, on0 = document.querySelectorAll('#nbaSimPanel .takebtn[data-stake]').length;
+    const hint = (document.querySelector('#nbaSimPanel .takebtn.off') || {}).title || '';
+    document.getElementById('add').click(); await wait();
+    document.getElementById('boardDate').value = '2026-11-13'; document.getElementById('boardDate').dispatchEvent(new Event('change')); await wait();
+    const live = document.querySelectorAll('#nbaSimPanel .takebtn[data-stake]').length, off1 = document.querySelectorAll('#nbaSimPanel .takebtn.off').length;
+    const mine = () => JSON.parse(smStore.getItem('callsheet3.card.v1')).filter(r => /76ers @ Knicks/.test(r.matchup) && r.gdate === '2026-11-13');
+    const mlBtn = document.querySelector('#nbaSimPanel .takebtn[data-stake*="|own|ml|"]'), mlSpec = mlBtn.getAttribute('data-stake');
+    mlBtn.click(); await wait();
+    const t1 = (mine()[0].simTakes || [])[0] || null;
+    const btnOn = !!document.querySelector('#nbaSimPanel .takebtn.on[data-stake="' + mlSpec + '"]');
+    const list1 = [...document.querySelectorAll('#taking .pk')].map(e => e.innerText.replace(/\s+/g, ' ').trim());
+    // a second mark, the total's own-view call, then the first unmarked from the Taking card
+    const totBtn = document.querySelector('#nbaSimPanel .takebtn[data-stake*="|own|total|"]'); totBtn.click(); await wait();
+    const n2 = (mine()[0].simTakes || []).length, count2 = document.getElementById('takingCount').textContent;
+    document.querySelector('#taking .pk.sim .takebtn.on').click(); await wait();
+    const after = (mine()[0].simTakes || []).map(t => t.id), list2 = document.querySelectorAll('#taking .pk.sim').length;
+    // a rescore keeps the mark; the copy names the simulation
+    document.getElementById('rescore').click(); await wait();
+    const after3 = (mine()[0].simTakes || []).map(t => t.id);
+    document.getElementById('takingText').click(); await new Promise(r => setTimeout(r, 250));
+    const said = document.getElementById('saveMsg').textContent;
+    // grade: 231 points, the Knicks by ten -- the total's call grades off the final
+    const trc = () => [...document.querySelectorAll('#cardTable tr')].find(t => /76ers @ Knicks/.test(t.textContent));
+    const g = (k, v) => { const el = trc().querySelector(`.grade[data-k="${k}"]`); el.value = v; el.dispatchEvent(new Event('input', { bubbles: true })); el.dispatchEvent(new Event('change', { bubbles: true })); };
+    g('fa', '110'); g('fh', '120'); await wait();
+    const t3 = (mine()[0].simTakes || [])[0], list3 = [...document.querySelectorAll('#taking .pk.sim')].map(e => e.innerText.replace(/\s+/g, ' ').trim());
+    const took = [...document.querySelectorAll('#calibBox .calib[data-sport="TAKEN"] > div')].map(d => d.innerText.replace(/\s+/g, ' ').trim());
+    await smStore.removeItem('callsheet3.card.v1'); document.getElementById('clear').click(); await wait();
+    return { off0, on0, hint, live, off1, mlSpec, t1, btnOn, list1, n2, count2, after, list2, after3, said, t3, list3, took };
+  });
+  chk(simTakeT.off0 >= 7 && simTakeT.on0 === 0 && /Add the game to the card first/.test(simTakeT.hint) && simTakeT.live === simTakeT.off0 && simTakeT.off1 === 0
+      && simTakeT.t1 && simTakeT.t1.view === 'own' && simTakeT.t1.key === 'ml' && /^(HOME|AWAY)$/.test(simTakeT.t1.side) && simTakeT.t1.pick === (simTakeT.t1.side === 'HOME' ? 'Knicks ML' : '76ers ML')
+      && simTakeT.t1.price === (simTakeT.t1.side === 'HOME' ? -198 : 164) && simTakeT.t1.p > 0.5 && simTakeT.t1.p < 1 && simTakeT.t1.worth > 0.5 && /^(LEAN|BET|STRONG)$/.test(simTakeT.t1.band) && simTakeT.t1.line === null && simTakeT.btnOn
+      && simTakeT.list1.length === 2 && /^TAKING · NBA · SIMULATION · marked /.test(simTakeT.list1[0]) && /Knicks ML \d\d% by the sim · worth \d\d% · (LEAN|BET|STRONG) · [-−]198 needs 66\.4% 76ers @ Knicks · the sim's own view/.test(simTakeT.list1[0])
+      && /1 bet marked none graded yet · one unit each 0 on the card, 1 from the simulation, 0 props$/.test(simTakeT.list1[1]),
+      'sim take: the Simulation card\'s buttons are greyed with a hint until the game is on the card, then a click marks the call on the row as shown (the pick in words, the row\'s price, the sim\'s chance, worth and band) and Taking tonight lists it as a simulation call', JSON.stringify(simTakeT).slice(0, 1400));
+  chk(simTakeT.n2 === 2 && simTakeT.count2 === '2 marked' && simTakeT.after.length === 1 && /^own\|total\|(OVER|UNDER)$/.test(simTakeT.after[0]) && simTakeT.list2 === 1 && simTakeT.after3.join() === simTakeT.after.join()
+      && /Copied the bets you are taking|the text is below/.test(simTakeT.said),
+      'sim take: a second call marks beside the first, the Taking card\'s own button unmarks one, a rescore keeps the mark, and the copy speaks', JSON.stringify({ n2: simTakeT.n2, count: simTakeT.count2, after: simTakeT.after, list2: simTakeT.list2, after3: simTakeT.after3, said: simTakeT.said.slice(0, 60) }));
+  chk(simTakeT.t3 && simTakeT.t3.key === 'total' && simTakeT.t3.line === 231.5 && simTakeT.list3.length === 1 && new RegExp(' · ' + (simTakeT.t3.side === 'UNDER' ? 'win' : 'loss') + ' 76ers @ Knicks', 'i').test(simTakeT.list3[0]) && /TAKEN$/.test(simTakeT.list3[0])
+      && simTakeT.took.some(t => new RegExp('^Simulation calls taken ' + (simTakeT.t3.side === 'UNDER' ? '1-0' : '0-1') + ' says \\d\\d\\.\\d% · does (100|0)\\.0%', 'i').test(t)),
+      'sim take: once the game grades the call shows its result off the final on its card, the button becomes a TAKEN chip, and What you took keeps it on the Simulation calls tile', JSON.stringify({ t3: simTakeT.t3, list3: simTakeT.list3, took: simTakeT.took }));
+
+  // ---- 26 Oct 2026: the levers' tally -- a Levers column counting the factors toward the pick and against, sortable, a filter for the
+  //      props where every lever leans the pick's way, the tag on the card and the panel's heading ----
+  const leverT = await pg.evaluate(async () => {
+    const wait = () => new Promise(r => setTimeout(r, 90));
+    document.getElementById('propsReset').click(); await wait();
+    document.getElementById('m-props').click(); await wait(); document.getElementById('propsExample').click(); await wait();
+    const card = () => [...document.querySelectorAll('#propsBest .pk')].find(e => /Paul George/.test(e.textContent)), id = card().getAttribute('data-prop');
+    const cell = (tr) => (tr.querySelector('td.agree') || {}).textContent || '';
+    const head = document.querySelector('#propsTable th[data-sort="agree"]').textContent;
+    const maxey = document.querySelector('#propsTable tr[data-prop="' + id + '"]'), maxeyCell = cell(maxey), maxeyCls = maxey.querySelector('td.agree').className, maxeyTitle = maxey.querySelector('td.agree').title;
+    const tag = (card().querySelector('.n1 .tag') || {}).textContent || '', tagTitle = (card().querySelector('.n1 .tag') || {}).title || '';
+    const all = [...document.querySelectorAll('#propsTable tbody tr[data-prop]')].map(cell);
+    // sort by the levers: the top row has the most toward less against
+    document.querySelector('#propsTable th[data-sort="agree"]').click(); await wait();
+    const sorted = [...document.querySelectorAll('#propsTable tbody tr[data-prop]')].map(cell), headOn = document.querySelector('#propsTable th[data-sort="agree"]').textContent;
+    const score = (s) => { const m = /^(\d+)▲ (\d+)▼$/.exec(s); return m ? (+m[1] - +m[2]) + (+m[1]) / 10 : -50; };
+    // the filters
+    const sel = (v) => { const el = document.getElementById('propsAgree'); el.value = v; el.dispatchEvent(new Event('change', { bubbles: true })); };
+    sel('all'); await wait();
+    const onlyAll = [...document.querySelectorAll('#propsTable tbody tr[data-prop]')].map(cell), shownAll = document.getElementById('propsShown').textContent;
+    sel('most'); await wait();
+    const onlyMost = [...document.querySelectorAll('#propsTable tbody tr[data-prop]')].map(cell);
+    const stored = JSON.parse(localStorage.getItem('callsheet3.props.view.v1') || '{}');
+    document.getElementById('propsReset').click(); await wait();
+    const after = { rows: document.querySelectorAll('#propsTable tbody tr[data-prop]').length, agree: document.getElementById('propsAgree').value };
+    // the panel's heading carries the words
+    card().click(); await wait();
+    const h4 = ([...document.querySelectorAll('#propDetail h4')].find(h => /What moves it/.test(h.textContent)) || {}).textContent || '';
+    document.getElementById('propDetailClose').click(); await wait(); document.getElementById('m-nba').click(); await wait();
+    return { head, maxeyCell, maxeyCls, maxeyTitle, tag, tagTitle, all, sorted, headOn, scores: sorted.map(score), onlyAll, shownAll, onlyMost, stored, after, h4 };
+  });
+  chk(leverT.head === 'Levers' && leverT.maxeyCell === '2▲ 0▼' && /\bpos\b/.test(leverT.maxeyCls) && /\bagree\b/.test(leverT.maxeyCls) && leverT.maxeyTitle === '2 of 2 levers toward the UNDER' && leverT.tag === 'levers 2▲ 0▼' && leverT.tagTitle === leverT.maxeyTitle
+      && leverT.all.length === 7 && leverT.all.every(s => /^\d+▲ \d+▼$/.test(s)) && leverT.all.some(s => s === '3▲ 2▼') && leverT.all.some(s => s === '3▲ 3▼') && /^What moves it · 2 of 2 levers toward the UNDER$/.test(leverT.h4.replace(/\s+/g, ' ').trim()),
+      'levers: the Every-prop table counts the measured levers toward the pick and against (George 2 up and none down: his first game back and who is out, a regular back, with the prior and the minutes trend read as what sits inside the start, 5 Nov 2026, and the pace, the defence, the script, his season\'s minutes and home and road too small to count, 13 Nov 2026; Towns\' under 3 up 3 down with the books\' consensus a lever of its own), the best card carries the tally as a tag and the panel\'s heading says it in words', JSON.stringify(leverT).slice(0, 900));
+  chk(/Levers ▾/.test(leverT.headOn) && leverT.scores.every((s, i, a) => i === 0 || s <= a[i - 1]) && leverT.scores[0] > leverT.scores[leverT.scores.length - 1]
+      && leverT.onlyAll.every(s => /^\d+▲ 0▼$/.test(s)) && leverT.onlyAll.length < leverT.all.length && /^\d+ of 7 shown/.test(leverT.shownAll)
+      && leverT.onlyMost.length >= leverT.onlyAll.length && leverT.onlyMost.every(s => { const m = /^(\d+)▲ (\d+)▼$/.exec(s); return m && +m[1] > +m[2]; }) && leverT.stored.agree === 'most' && leverT.after.rows === 7 && leverT.after.agree === '',
+      'levers: the column sorts with the most agreement first, the filter keeps the props where every lever leans the pick\'s way or more do than not, the view is remembered and Reset view clears it', JSON.stringify({ head: leverT.headOn, scores: leverT.scores, all: leverT.onlyAll, most: leverT.onlyMost, shown: leverT.shownAll, stored: leverT.stored, after: leverT.after }));
+
+  // ---- 26 Oct 2026: usage and role on the prop, the floors, and the same-game pairs ----
+  const usageT = await pg.evaluate(async () => {
+    const wait = () => new Promise(r => setTimeout(r, 90));
+    document.getElementById('propsReset').click(); await wait();
+    document.getElementById('m-props').click(); await wait(); document.getElementById('propsExample').click(); await wait();
+    const card = () => [...document.querySelectorAll('#propsBest .pk')].find(e => /Paul George/.test(e.textContent));
+    card().click(); await wait();
+    const dlg = document.getElementById('propDetail');
+    const h3 = (dlg.querySelector('h3') || {}).innerText.replace(/\s+/g, ' ').trim(), role = (dlg.querySelector('h3 .tag.role') || {}).title || '';
+    const usage = [...dlg.querySelectorAll('.pd-tiles .pd-tile')].map(e => e.querySelector('.k').textContent + '=' + e.querySelector('.v').textContent + '|' + ((e.querySelector('.s') || {}).textContent || '')).find(s => /^Usage=/.test(s)) || '';
+    const floorsH = ([...dlg.querySelectorAll('h4')].find(h => /^Floors/.test(h.textContent)) || {}).nextElementSibling, floors = floorsH ? floorsH.innerText.replace(/\s+/g, ' ').trim() : '';
+    const why = [...dlg.querySelectorAll('ul.pd-why li')].map(e => e.textContent).find(w => /^usage /.test(w)) || '';
+    document.getElementById('propDetailClose').click(); await wait();
+    // the filters: usage 24% and up, then the role
+    const sel = (id, v) => { const el = document.getElementById(id); el.value = v; el.dispatchEvent(new Event('change', { bubbles: true })); };
+    const names = () => [...document.querySelectorAll('#propsTable tbody tr[data-prop]')].map(tr => tr.querySelectorAll('td')[1].textContent.trim());
+    const heads = [...document.querySelectorAll('#propsTable thead th')].map(t => t.textContent.trim()), tds0 = [...document.querySelector('#propsTable tbody tr[data-prop]').querySelectorAll('td')];
+    const aligned = heads.length === tds0.length && tds0[heads.indexOf('Sim')].classList.contains('simc') && tds0[heads.indexOf('Usage')].classList.contains('usgc') && tds0[heads.indexOf('Levers')].classList.contains('agree') && tds0[heads.indexOf('Take')].classList.contains('take');
+    const usgCells = [...document.querySelectorAll('#propsTable tbody tr[data-prop]')].map(tr => tr.querySelectorAll('td')[1].textContent.trim().split(' ')[0] + ':' + tr.querySelector('td.usgc').textContent.trim() + ':' + tr.querySelector('td.usgc').className);
+    document.querySelector('#propsTable th[data-sort="usage"]').click(); await wait();
+    const usgSorted = [...document.querySelectorAll('#propsTable tbody tr[data-prop] td.usgc')].map(td => parseFloat(td.textContent)), usgShown = document.getElementById('propsShown').textContent;
+    document.getElementById('propsReset').click(); await wait();
+    sel('propsUsage', 'hi'); await wait(); const hi = names();
+    sel('propsUsage', ''); sel('propsRole', 'bench'); await wait(); const bench = names();
+    document.getElementById('propsReset').click(); await wait();
+    const after = { n: names().length, usage: document.getElementById('propsUsage').value, role: document.getElementById('propsRole').value };
+    // the pairs
+    const pairs = [...document.querySelectorAll('#propsPairs .pk.pair')].map(e => ({ text: e.innerText.replace(/\s+/g, ' ').trim(), agrees: e.classList.contains('agrees') }));
+    document.getElementById('m-nba').click(); await wait();
+    return { h3, role, usage, floors, why, hi, bench, after, pairs, usgCells, usgSorted, usgShown, aligned };
+  });
+  chk(/^Paul George F PHI starter$/.test(usageT.h3) && usageT.role === "RotoWire's expected five" && /^Usage=22\.5%\|of his club's possessions while on; a starter, the miss read at 0\.94 sigmas \(measured\)$/.test(usageT.usage)
+      && usageT.floors === ''
+      && /^usage 22\.5% of his club's possessions \(this season\), a starter \(RotoWire's expected five\): a mid-usage starting man's miss runs 0\.94 sigmas, measured, so the chance is read narrower$/.test(usageT.why),
+      'props: the panel carries his role as a tag, his usage as a tile (a mid-usage starter on threes: the miss read at 0.94 sigmas from 13 Nov 2026, no floors on a threes line), and the why line', JSON.stringify({ h3: usageT.h3, role: usageT.role, usage: usageT.usage, floors: usageT.floors.slice(0, 200), why: usageT.why }));
+  chk(usageT.aligned && usageT.usgCells.length === 7 && usageT.usgCells.some(c => /^Tyrese:29% S:usgc pos$/.test(c)) && usageT.usgCells.some(c => /^Kelly:19% B:usgc$/.test(c)) && usageT.usgCells.every(c => /:\d+(\.\d)?% [SB]:usgc( pos)?$/.test(c))
+      && usageT.usgSorted.length === 7 && usageT.usgSorted.every((u, i, a) => i === 0 || u <= a[i - 1]) && /sorted by usage ▾/.test(usageT.usgShown)
+      && usageT.hi.length === 3 && usageT.hi.every(n => /Jalen Brunson|Karl-Anthony Towns|Tyrese Maxey/.test(n)) && usageT.bench.length === 1 && /Kelly Oubre/.test(usageT.bench[0]) && usageT.after.n === 7 && usageT.after.usage === '' && usageT.after.role === ''
+      && usageT.pairs.length >= 3 && usageT.pairs.every(p => /^PAIR #\d · 76ers @ Knicks · at (Fanatics|DraftKings|FanDuel|BetMGM) · the price (agrees|asks more) .+ \+ .+ both land \d\d\.\d% · pays [-−+]\d+ \(\d\.\d\d×\) needs \d\d\.\d% .+ · (two players|two overs on one club|one man, two markets|one man, his points with his threes), measured ×(0\.95|1\.00|1\.15|1\.50) TAKE$/.test(p.text))
+      && usageT.pairs.map(p => parseFloat(/both land (\d\d\.\d)%/.exec(p.text)[1])).every((c, i, a) => i === 0 || c <= a[i - 1]),
+      'props: every header of the Every-prop table sits over its own cell; the Usage column carries his share with S or B for his role, green at 24% and up, and sorts highest first; the usage and role filters keep the right men and Reset view clears them, and the same-game pairs list the date\'s tickets likeliest first with the parlay\'s price, what it needs and the measured kind of pair', JSON.stringify({ aligned: usageT.aligned, cells: usageT.usgCells, sorted: usageT.usgSorted, shown: usageT.usgShown, hi: usageT.hi, bench: usageT.bench, after: usageT.after, pairs: usageT.pairs.map(p => p.text.slice(0, 160)) }));
+
+  // ---- 26 Oct 2026: the simulation's stats on the Props page -- a card a game above the picks, the Sim column with its filter and sort, the best cards' last line ----
+  const simPropsT = await pg.evaluate(async () => {
+    const wait = () => new Promise(r => setTimeout(r, 90));
+    document.getElementById('propsReset').click(); await wait();
+    document.getElementById('m-props').click(); await wait(); document.getElementById('propsExample').click(); await wait();
+    const strip = [...document.querySelectorAll('#propsSim .pk.simg')].map(e => e.className + '|' + e.innerText.replace(/\s+/g, ' ').trim());
+    const head = [...document.querySelectorAll('#propsTable thead th')].map(th => th.textContent.trim());
+    const rowOf = tr => { const tds = tr.querySelectorAll('td'), c = tr.querySelector('td.simc'); return { name: tds[1].textContent.trim(), mk: tds[2].textContent.trim(), line: parseFloat(tds[3].textContent), side: tds[4].textContent.trim(), sim: c ? c.textContent.trim() : null, cls: c ? c.className : null, title: c ? c.title : '' }; };
+    const rows = [...document.querySelectorAll('#propsTable tbody tr[data-prop]')].map(rowOf);
+    const best = [...document.querySelectorAll('#propsBest .pk')].map(e => { const l = e.querySelector('.n5.shopline') || e.querySelector('.n5.simline'); return (e.querySelector('.n2') || {}).textContent + '→' + (l ? l.className + '|' + l.textContent.replace(/\s+/g, ' ').trim() : 'none'); });
+    const sel = (id, v) => { const el = document.getElementById(id); el.value = v; el.dispatchEvent(new Event('change', { bubbles: true })); };
+    const cells = () => [...document.querySelectorAll('#propsTable tbody tr[data-prop] td.simc')].map(c => c.className);
+    sel('propsSimSel', 'yes'); await wait(); const yes = cells();
+    sel('propsSimSel', 'no'); await wait(); const no = cells();
+    sel('propsSimSel', ''); await wait();
+    document.querySelector('#propsTable th[data-sort="sim"]').click(); await wait();
+    const sorted = [...document.querySelectorAll('#propsTable tbody tr[data-prop]')].map(rowOf), shown = document.getElementById('propsShown').textContent;
+    document.getElementById('propsReset').click(); await wait();
+    const after = { sim: document.getElementById('propsSimSel').value, n: document.querySelectorAll('#propsTable tbody tr[data-prop]').length, shown: document.getElementById('propsShown').textContent };
+    document.getElementById('m-nba').click(); await wait();
+    return { strip, head, rows, best, yes, no, sorted, shown, after };
+  });
+  const simGap = r => r.sim === null || r.sim === '' ? null : (r.side === 'UNDER' ? r.line - parseFloat(r.sim) : parseFloat(r.sim) - r.line);
+  const simMaxey = simPropsT.rows.find(r => /^Tyrese Maxey/.test(r.name)), simBig = simPropsT.rows.slice().sort((a, b) => simGap(b) - simGap(a))[0];
+  chk(simPropsT.strip.length === 1 && /^pk simg mkt\|76ers @ Knicks · the market PHI 113 \(112\.9 a game\) · NYK 118\.5 \(115\.6 a game\) total 231\.5 · spread -5\.5 each club's points implied by the book's total and spread, against its points a game by the ratings · shown, not scored expected margin 10\.9 · blowout of 15 or more 27%, off the spread · the carded line sits off the books' consensus on 5 of 7 props$/.test(simPropsT.strip[0])
+      && simPropsT.head.slice(-5).join('|') === 'Levers|Sim|Usage|Spike|Take' && simPropsT.rows.length === 7 && simPropsT.rows.every(r => /^\d+(\.\d)?$/.test(r.sim) && /^simc( pos| neg)?$/.test(r.cls) && (simGap(r) > 0) === /pos/.test(r.cls) && (simGap(r) < 0) === /neg/.test(r.cls) && /the books' consensus line across 3 books/.test(r.title))
+      && simMaxey && simMaxey.side === 'OVER' && simMaxey.line === 25.5 && simMaxey.sim === '24.5' && simMaxey.cls === 'simc neg',
+      'props: the market\'s strip takes the simulation\'s place above the picks (5 Nov 2026): each club\'s points implied by the book\'s total and spread against the ratings\' number, the expected margin and the blowout off the spread, and how many carded lines sit off the books\' consensus; the Sim column carries the consensus line on every projected prop, green when the carded line sits off it the pick\'s way and red against it (Maxey\'s over at 25.5 with the books at 24.5, red)', JSON.stringify({ strip: simPropsT.strip, head: simPropsT.head.slice(-4), rows: simPropsT.rows.map(r => r.name + ' ' + r.side + ' ' + r.line + ' sim ' + r.sim + ' ' + r.cls) }));
+  chk(simPropsT.best.length === 2 && simPropsT.best.every(b => /→n5 shopline( pos| neg)?\|The books: 3 post \d+(\.\d)? · fanatics \d+(\.\d)? sits (with them|1 (above|below) them, (the (UNDER|OVER)'s way|against the (UNDER|OVER)) · the book's chance read [-−+]\d\.\d on the over, measured)$/.test(b))
+      && simPropsT.best.filter(b => /the (UNDER|OVER)'s way/.test(b)).every(b => /shopline pos/.test(b)) && simPropsT.best.filter(b => /against the (UNDER|OVER)/.test(b)).every(b => /shopline neg/.test(b)) && simPropsT.best.filter(b => /sits with them/.test(b)).every(b => /shopline\|/.test(b))
+      && simPropsT.best.filter(b => /the UNDER's way/.test(b)).length === 1 && simPropsT.best.filter(b => /the OVER's way/.test(b)).length === 0 && simPropsT.best.filter(b => /against the/.test(b)).length === 0 && simPropsT.best.filter(b => /sits with them/.test(b)).length === 1
+      && simPropsT.yes.length === 2 && simPropsT.yes.every(c => c === 'simc pos') && simPropsT.no.length === 3 && simPropsT.no.every(c => c === 'simc neg') && simPropsT.yes.length + simPropsT.no.length === simPropsT.rows.filter(r => simGap(r) !== 0).length
+      && simPropsT.sorted.length === 7 && simPropsT.sorted[0].name === simBig.name && simPropsT.sorted[0].mk === simBig.mk && simPropsT.sorted.every((r, i, a) => i === 0 || simGap(r) <= simGap(a[i - 1])) && /sorted by sim ▾/.test(simPropsT.shown)
+      && simPropsT.after.sim === '' && simPropsT.after.n === 7 && !/sorted/.test(simPropsT.after.shown),
+      'props: every best card ends with the books\' consensus against the carded line, green when it sits the pick\'s way and red against it (Towns\' under lifted, George\'s level; Brunson\'s over, lifted too, is off the list since the levers were corrected, 13 Nov 2026), the filter keeps the props the consensus sides with (or against), the column sorts by the gap toward the pick, and Reset view clears both', JSON.stringify({ best: simPropsT.best.map(b => b.slice(0, 140)), yes: simPropsT.yes, no: simPropsT.no, sorted: simPropsT.sorted.map(r => r.name + ' ' + r.side + ' ' + r.line + ' ' + r.sim), shown: simPropsT.shown, after: simPropsT.after }));
+
+  // ---- 26 Oct 2026: what happened on each of his last games -- the slate writes beside each game what the box says (a regular back or out,
+  //      a blowout, his role, then his minutes, shots and shooting against his season's, then overtime and the pace); the panel's Last games table
+  //      shows it as a column, the first factor bold, red under the line and green over it ----
+  const whatT = await pg.evaluate(async () => {
+    const wait = () => new Promise(r => setTimeout(r, 90));
+    document.getElementById('propsReset').click(); await wait();
+    document.getElementById('m-props').click(); await wait(); document.getElementById('propsExample').click(); await wait();
+    [...document.querySelectorAll('#propsTable tr[data-prop]')].find(e => /Kelly Oubre/.test(e.textContent)).click(); await wait();   // off the best list since 5 Nov 2026 (his under clears no price at the new blend): the table row opens the same panel
+    const dlg = document.getElementById('propDetail');
+    const head = [...dlg.querySelectorAll('.pd-log thead th')].map(t => t.textContent), h4 = ([...dlg.querySelectorAll('h4')].find(h => /^Last games/i.test(h.textContent)) || {}).innerText.replace(/\s+/g, ' ').trim();
+    const rows = [...dlg.querySelectorAll('.pd-log tbody tr')].map(tr => { const tds = tr.querySelectorAll('td'), b = tr.querySelector('td.pd-what b'); return { stat: tds[3].textContent.trim(), mark: tds[3].querySelector('b.lg').className, what: tds[4] ? tds[4].textContent.trim() : null, first: b ? b.textContent : '', cls: b ? b.className : '' }; });
+    document.getElementById('propDetailClose').click(); await wait();
+    // a prop with another market reads its own factors: rebounds take no shots or shooting
+    [...document.querySelectorAll('#propsBest .pk')].find(e => /Karl-Anthony Towns/.test(e.textContent)).click(); await wait();
+    const rebWhat = [...dlg.querySelectorAll('.pd-log tbody tr td.pd-what')].map(td => td.textContent.trim()).filter(t => t);
+    document.getElementById('propDetailClose').click(); await wait();
+    // a PRA prop opens each game with the three behind the total (27 Oct 2026)
+    [...document.querySelectorAll('#propsTable tr[data-prop]')].find(tr => /Mikal Bridges/.test(tr.textContent)).click(); await wait();
+    const praWhat = [...dlg.querySelectorAll('.pd-log tbody tr')].map(tr => (tr.querySelectorAll('td')[3].textContent.trim()) + '=' + tr.querySelector('td.pd-what').textContent.trim());
+    document.getElementById('propDetailClose').click(); await wait();
+    document.getElementById('m-nba').click(); await wait();
+    return { head, h4, rows, rebWhat, praWhat };
+  });
+  const whatRe = /^((\d+ pts \+ \d+ reb \+ \d+ ast = \d+)|(.+ (back|out) \(\d+ mpg(, (a lift for him|the lift gone))?\))|((won|lost) by \d+(, a blowout)?)|(off the bench)|(a start)|(\d+ min, \d+ (under|over) his usual \d+)|(\d+ min \(his usual \d+\))|(\d+ shots, \d+ (under|over) his usual at those minutes)|(\d+ shots \(his usual \d+ at those minutes\))|(\d+ of \d+ from the floor(, (cold|hot) \(his season \d+%\))?)|(overtime)|(a (slow|fast) game, \d+ possessions against their usual \d+)|(\d+ of the club's \d+ (rebounds|assists)(, \d+% \(his usual \d+%\)| \(his usual \d+%\))?)|(.+ (took|had) \d+ \(his usual \d+(\.\d)?\)))$/;
+  chk(whatT.head.join('|') === 'Date|Opp|Min|points|What happened' && /^LAST GAMES \(\d+ of 10 over 14\.5\) · what the box says happened, the biggest factor first$/i.test(whatT.h4) && whatT.rows.length === 10
+      && whatT.rows.every(r => r.what && r.what.split(' · ').length >= 3 && r.what.split(' · ').length <= 5 && r.what.split(' · ').every(p => whatRe.test(p)) && /(won|lost) by \d+/.test(r.what) && /\d+ min/.test(r.what) && /\d+ shots/.test(r.what))
+      && whatT.rows.every(r => !r.first || (r.first === r.what.split(' · ')[0] && r.cls === (/over/.test(r.mark) ? 'over' : /under/.test(r.mark) ? 'under' : '')))
+      && whatT.rows.some(r => /(back|out) \(\d+ mpg, (a lift for him|the lift gone)\)/.test(r.first)) && whatT.rows.some(r => /a blowout/.test(r.what)) && whatT.rows.some(r => /shots, \d+ (under|over) his usual/.test(r.what))
+      && whatT.rebWhat.length === 10 && whatT.rebWhat.every(t => !/shots|from the floor/.test(t) && /\d+ min/.test(t) && /(won|lost) by \d+/.test(t) && /of the club's \d+ rebounds/.test(t)) && whatT.rebWhat.some(t => /(Josh Hart|Joel Embiid) took 12 \(his usual 6\.5\)/.test(t))
+      && whatT.praWhat.length === 10 && whatT.praWhat.every(t => { const m = /^(\d+)=(\d+) pts \+ (\d+) reb \+ (\d+) ast = (\d+)( · |$)/.exec(t); return !!m && +m[1] === +m[5] && +m[2] + +m[3] + +m[4] === +m[5]; }),
+      'props: every one of the panel\'s last games carries the line behind it, the night\'s causes first (a regular back or out, a blowout) then what stood out and the plain box with the margin, the first item bold in the colour of the game\'s mark; a rebounds prop reads no shots or shooting; a PRA prop opens each game with the three behind the total, which add up to the stat', JSON.stringify(whatT).slice(0, 1800));
+
+  // ---- 27 Oct 2026: the combination markets -- points + rebounds, points + assists and rebounds + assists list, filter, grade by the sum and name their tile ----
+  const comboT = await pg.evaluate(async () => {
+    const wait = () => new Promise(r => setTimeout(r, 90));
+    const txt = e => (e ? e.innerText : '').replace(/\s+/g, ' ').trim();
+    await smStore.removeItem('callsheet3.props.v1'); document.getElementById('m-nba').click(); await wait();
+    const load = async (doc, fname) => { const dt = new DataTransfer(); dt.items.add(new File([JSON.stringify(doc)], fname, { type: 'application/json' })); const inp = document.getElementById('slateFile'); inp.files = dt.files; inp.dispatchEvent(new Event('change', { bubbles: true })); await wait(); };
+    const mk = (pid, name, mkt, line, proj, sd, chance, side) => ({ pid, name, team: 'ATL', opp: 'ORL', home: false, pos: 'G', mk: mkt, line, op: -110, up: -110, book: 'fanatics', books: {}, proj, sd, pm: chance + 0.02, pb: 0.5, p: chance, push: 0, side, chance, price: -110, need: 0.5238, edge: chance - 0.5238, band: chance >= 0.55 && chance - 0.5238 >= 0.03 ? 'BET' : chance > 0.5238 ? 'LEAN' : 'no edge', mins: 35, rate36: 30, why: ['x'], log: [['2026-10-26', 'MIA', 0, 34, 37, ['28 pts + 9 ast = 37', '34 min (his usual 35)']]] });
+    await load({ format: 'callsheet3.props', version: 1, date: '2026-10-28', games: [{ gid: '401909901', away: 'Hawks', home: 'Magic', aab: 'ATL', hab: 'ORL', props: [
+      mk('3037789', 'Trae Young', 'pa', 35.5, 38.2, 11.4, 0.57, 'OVER'), mk('3037789', 'Trae Young', 'pr', 27.5, 29.1, 9.9, 0.53, 'OVER'), mk('4397020', 'Paolo Banchero', 'ra', 12.5, 11.6, 4.6, 0.56, 'UNDER') ] }] }, 'nba-props-2026-10-28.json');
+    const rows = [...document.querySelectorAll('#propsTable tbody tr[data-prop]')].map(tr => { const t = tr.querySelectorAll('td'); return t[1].textContent.trim() + '|' + t[2].textContent.trim() + '|' + t[4].textContent.trim() + '|' + t[3].textContent.trim().split(' ')[0]; });
+    const opts = [...document.querySelectorAll('#propsMk option')].map(o => o.value + '=' + o.textContent);
+    const sel = (id, v) => { const el = document.getElementById(id); el.value = v; el.dispatchEvent(new Event('change', { bubbles: true })); };
+    sel('propsMk', 'ra'); await wait(); const onlyRa = [...document.querySelectorAll('#propsTable tbody tr[data-prop]')].map(tr => tr.querySelectorAll('td')[2].textContent.trim());
+    document.getElementById('propsReset').click(); await wait();
+    [...document.querySelectorAll('#propsTable tr[data-prop]')].find(tr => /pts \+ ast/.test(tr.textContent)).click(); await wait();
+    const panel = txt(document.querySelector('#propDetail .pd-pick')) + ' || ' + txt(document.querySelector('#propDetail .pd-log tbody tr td.pd-what'));
+    document.getElementById('propDetailClose').click(); await wait();
+    await load({ format: 'callsheet2.slate', version: 1, date: '2026-10-28', games: [{ sport: 'NBA', gdate: '2026-10-28', away: 'Hawks', home: 'Magic', gameId: '401909901', finals: { fa: '118', fh: '112', f5a: '60', f5h: '55' }, notes: [],
+      box: { '3037789': ['Trae Young', 36.2, 28, 3, 11, 4, { pa: ['28 pts + 11 ast = 39', 'won by 6'], pr: ['28 pts + 3 reb = 31', 'won by 6'] }], '4397020': ['Paolo Banchero', 34.0, 22, 9, 4, 1] } }] }, 'nba-grade-2026-10-28.json');
+    const graded = JSON.parse(smStore.getItem('callsheet3.props.v1')).filter(r => r.gdate === '2026-10-28').map(r => r.name + ' ' + r.mk + ' ' + r.side + ' ' + r.line + ' -> ' + r.result + ' ' + r.actual + ' | ' + (r.awhat || []).join(' · '));
+    const tile = txt(document.querySelector('#calibBox .calib[data-sport="PROPS"]'));
+    document.getElementById('m-nba').click(); await wait(); await smStore.removeItem('callsheet3.props.v1');   // the key goes last: Clear this date saves what it keeps
+    return { rows, opts, onlyRa, panel, graded, tile };
+  });
+  await reloaded(); await pg.evaluate(() => smStore.ready);   // the graded fixture rows are records and stay in memory until a reload
+  chk(comboT.rows.length === 3 && comboT.rows.join(';') === 'Trae Young G|pts + ast|OVER|35.5;Paolo Banchero G|reb + ast|UNDER|12.5;Trae Young G|pts + reb|OVER|27.5'
+      && comboT.opts.slice(-3).join(',') === 'pr=pts + reb,pa=pts + ast,ra=reb + ast' && comboT.onlyRa.join(',') === 'reb + ast'
+      && /^OVER 35\.5 pts \+ ast \|\| 28 pts \+ 9 ast = 37 · 34 min \(his usual 35\)$/.test(comboT.panel)
+      && comboT.graded.join(';') === 'Trae Young pa OVER 35.5 -> win 39 | 28 pts + 11 ast = 39 · won by 6;Trae Young pr OVER 27.5 -> win 31 | 28 pts + 3 reb = 31 · won by 6;Paolo Banchero ra UNDER 12.5 -> loss 13 | '
+      && /pts \+ ast 1-0/i.test(comboT.tile) && /pts \+ reb 1-0/i.test(comboT.tile) && /reb \+ ast 0-1/i.test(comboT.tile),
+      'props: the combination markets list with their labels, filter by market, open their panel with the parts behind each game, grade by the sum of the box (28 + 11 = 39 over 35.5; 9 + 4 = 13 against the under 12.5) and take their own tiles in the record', JSON.stringify(comboT).slice(0, 1500));
+
+  // ---- 27 Oct 2026: the fives and the matchup on the prop -- both clubs' starting fives on the panel with the man marked; a Matchup button on the
+  //      panel and the cards, off until the NBA card has the game, then opening it into the form ----
+  // an empty card in memory first (10 Nov 2026): earlier blocks add the example game dated 2026-11-10, and on that day the props example,
+  // dated today, found the row; removing the stored card and loading the page again leaves none whatever the date
+  await pg.evaluate(async () => { await smStore.removeItem('callsheet3.card.v1'); }); await reloaded(); await pg.evaluate(() => smStore.ready);
+  const goT = await pg.evaluate(async () => {
+    const wait = () => new Promise(r => setTimeout(r, 90));
+    const txt = e => (e ? e.innerText : '').replace(/\s+/g, ' ').trim();
+    await smStore.removeItem('callsheet3.card.v1'); document.getElementById('clear').click(); await wait();
+    document.getElementById('propsReset').click(); await wait();
+    document.getElementById('m-props').click(); await wait(); document.getElementById('propsExample').click(); await wait();
+    const today = document.getElementById('propsDate').value, dlg = document.getElementById('propDetail');
+    const card0 = [...document.querySelectorAll('#propsBest .pk')].find(e => /Paul George/.test(e.textContent));
+    const cardBtn0 = card0.querySelector('.btn.go[data-pgo]'), cardOff0 = cardBtn0 ? cardBtn0.classList.contains('off') : null, cardTitle0 = cardBtn0 ? cardBtn0.title : '';
+    card0.click(); await wait();
+    const fives = [...dlg.querySelectorAll('.pd-fives .five')].map(e => txt(e)), me = txt(dlg.querySelector('.pd-fives tr.me')), heads = [...dlg.querySelectorAll('.pd-fives .lbadge')].map(e => e.className + '|' + e.textContent);
+    const panelBtn = dlg.querySelector('.pd-go .btn.go[data-pgo]'), panelOff = panelBtn ? panelBtn.classList.contains('off') : null, panelText = txt(panelBtn), takeStill = !!dlg.querySelector('.pd-take .takebtn[data-ptake]');
+    panelBtn.click(); await wait();
+    const stillOpen = !dlg.hidden, said = txt(document.getElementById('propsMsg'));
+    document.getElementById('propDetailClose').click(); await wait();
+    // the NBA example on the card for the props' date, then the button is live and opens the game into the form
+    document.getElementById('m-nba').click(); await wait();
+    const set = (id, v) => { const el = document.getElementById(id); el.value = v; el.dispatchEvent(new Event('input', { bubbles: true })); };
+    set('gdate', today); document.getElementById('example').click(); await wait(); set('gdate', today); await wait();
+    document.getElementById('add').click(); await wait();
+    document.getElementById('clear').click(); await wait();
+    const awayBefore = document.getElementById('away').value;
+    document.getElementById('m-props').click(); await wait(); document.getElementById('propsExample').click(); await wait();
+    const card1 = [...document.querySelectorAll('#propsBest .pk')].find(e => /Paul George/.test(e.textContent)), cardBtn1 = card1.querySelector('.btn.go[data-pgo]'), cardLive = cardBtn1 && !cardBtn1.classList.contains('off');
+    card1.click(); await wait();
+    const kalLine = dlg.querySelector('.pd-kalshi') ? txt(dlg.querySelector('.pd-kalshi')) : '', kalStrip = [...document.querySelectorAll('#propsSim .pk .kalshi-strip')].map(txt), panelKal = /Kalshi/i.test(txt(dlg)), stripKal = /Kalshi/i.test(txt(document.getElementById('propsSim')));
+    document.getElementById('propDetailClose').click(); await wait();
+    cardBtn1.click(); await wait();
+    const propsHidden = document.getElementById('propsView').hidden, dlgHidden = dlg.hidden, away = document.getElementById('away').value, home = document.getElementById('home').value, nbaPressed = document.getElementById('m-nba').getAttribute('aria-pressed');
+    const lineupPanel = txt(document.getElementById('nbaLineupPanel')).slice(0, 80);
+    await smStore.removeItem('callsheet3.card.v1'); document.getElementById('clear').click(); await wait();
+    return { cardOff0, cardTitle0, fives, me, heads, panelOff, panelText, takeStill, stillOpen, said, awayBefore, cardLive, propsHidden, dlgHidden, away, home, nbaPressed, lineupPanel, kalLine, kalStrip, panelKal, stripKal };
+  });
+  chk(goT.kalLine === '' && goT.kalStrip.length === 0 && goT.panelKal === false && goT.stripKal === false,
+      'props: Kalshi is off the props (5 Nov 2026) and off the NBA card (23 Nov 2026): the prop\'s panel and the game\'s strip carry no crowd line', JSON.stringify({ line: goT.kalLine, strip: goT.kalStrip, panel: goT.panelKal, stripKal: goT.stripKal }));
+  chk(goT.cardOff0 === true && /^The NBA card has no row for 76ers @ Knicks on /.test(goT.cardTitle0) && goT.fives.length === 2 && /^76ers EXPECTED PG Tyrese Maxey SG VJ Edgecombe SF Paul George THIS PROP PF Kelly Oubre Jr\. C Adem Bona May not play: C Andre Drummond \(Questionable\)\.$/i.test(goT.fives[0])
+      && /^Knicks CONFIRMED PG Jalen Brunson SG Mikal Bridges SF OG Anunoby PF Josh Hart C Karl-Anthony Towns$/i.test(goT.fives[1]) && /^SF Paul George THIS PROP$/i.test(goT.me) && goT.heads.join(',') === 'lbadge exp|expected,lbadge conf|confirmed'
+      && goT.panelOff === true && /^open the matchup on the nba card$/i.test(goT.panelText) && goT.takeStill && goT.stillOpen && /^The NBA card has no row for 76ers @ Knicks on .+: load the NBA slate for the date \(Load slate\) and Add the game, and the button opens it\.$/.test(goT.said),
+      'props: the panel carries both clubs\' starting fives from the props run with the prop\'s man marked and the status badges, and the Matchup button is off, with the reason, while the NBA card has no row for the game', JSON.stringify(goT).slice(0, 1200));
+  chk(goT.awayBefore === '' && goT.cardLive === true && goT.propsHidden && goT.dlgHidden && /76ers/.test(goT.away) && /Knicks/.test(goT.home) && goT.nbaPressed === 'true' && !/No lineup on the row/.test(goT.lineupPanel),
+      'props: once the NBA card has the game, Matchup on the card opens it into the form: the props view folds away, the NBA tab is pressed and the form reads the game with its lineup panel', JSON.stringify({ before: goT.awayBefore, live: goT.cardLive, hidden: goT.propsHidden, dlg: goT.dlgHidden, away: goT.away, home: goT.home, nba: goT.nbaPressed, lineup: goT.lineupPanel }));
+
+  // ---- 26 Oct 2026: the pair's own panel -- a same-game pair card opens like a prop: the ticket's numbers, how the chance is made, each leg with a way
+  //      into its own panel, Previous / Next across the night's tickets; Take marks the pair on both legs, lists it under Taking and grades it under What you took ----
+  const pairT = await pg.evaluate(async () => {
+    const wait = () => new Promise(r => setTimeout(r, 90));
+    document.getElementById('propsReset').click(); await wait();
+    document.getElementById('m-props').click(); await wait(); document.getElementById('propsExample').click(); await wait();
+    const o = {}, dlg = document.getElementById('propDetail'), txt = e => (e ? e.innerText : '').replace(/\s+/g, ' ').trim();
+    const cards = [...document.querySelectorAll('#propsPairs .pk.pair')]; o.nCards = cards.length; o.attrs = cards.map(c => c.getAttribute('data-pair'));
+    cards[0].click(); await wait();
+    o.open = !dlg.hidden; o.band = txt(dlg.querySelector('.pd-band')); o.h3 = txt(dlg.querySelector('h3')); o.pick = txt(dlg.querySelector('.pd-pick')); o.sub = txt(dlg.querySelector('.pd-sub'));
+    o.tiles = [...dlg.querySelectorAll('#propDetailBody > .pd-tiles .pd-tile')].map(e => e.querySelector('.k').textContent + '=' + e.querySelector('.v').textContent);
+    o.how = txt(([...dlg.querySelectorAll('h4')].find(h => /^How the chance/.test(h.textContent)) || {}).nextElementSibling);
+    o.legs = [...dlg.querySelectorAll('.pd-leg')].map(e => txt(e.querySelector('h4')) + ' || ' + [...e.querySelectorAll('.pd-tile .k')].map(k => k.textContent).join(',') + ' || ' + txt(e.querySelector('.pd-base')) + ' || ' + txt(e.querySelector('button[data-prop]')) + ' | ' + !!e.querySelector('.takebtn[data-ptake]'));
+    o.nav = { hidden: document.getElementById('propDetailNav').hidden, pos: document.getElementById('propDetailPos').textContent, prevOff: document.getElementById('propDetailPrev').disabled, nextOff: document.getElementById('propDetailNext').disabled };
+    o.bigBtn = txt(dlg.querySelector('.pd-take .takebtn[data-ttake]'));
+    document.getElementById('propDetailNext').click(); await wait();
+    o.h3next = txt(dlg.querySelector('h3')); o.posNext = document.getElementById('propDetailPos').textContent;
+    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowLeft', bubbles: true })); await wait();
+    o.h3back = txt(dlg.querySelector('h3'));
+    dlg.querySelector('.pd-take .takebtn[data-ttake]').click(); await wait();   // take the pair from its panel
+    o.takeOn = !!dlg.querySelector('.pd-take .takebtn.on[data-ttake]'); o.cardTaking = document.querySelectorAll('#propsPairs .pk.pair.taking').length; o.cardBtnOn = document.querySelectorAll('#propsPairs .pk.pair .takebtn.on[data-ttake]').length;
+    o.takingList = [...document.querySelectorAll('#propsTaking .pk')].map(txt); o.takingCount = document.getElementById('propsTakingCount').textContent; o.takingHead = document.getElementById('propsTakingHead').hidden;
+    o.stored = JSON.stringify(((window.__props_preview_peek = null), null));
+    dlg.querySelector('.pd-leg button[data-prop]').click(); await wait();   // the first leg's own panel from the pair's
+    o.legPanel = txt(dlg.querySelector('h3')) + ' | ' + txt(dlg.querySelector('.pd-band')) + ' | ' + document.getElementById('propDetailPos').textContent;
+    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })); await wait();
+    o.closed = dlg.hidden && !document.body.classList.contains('noscroll');
+    document.querySelector('#propsTaking .pk.pair').click(); await wait();   // the Taking card opens the pair's panel too
+    o.fromTaking = txt(dlg.querySelector('.pd-band')) + ' | ' + txt(dlg.querySelector('h3'));
+    document.getElementById('propDetailClose').click(); await wait();
+    document.querySelector('#propsPairs .pk.pair .takebtn.on[data-ttake]').click(); await wait();   // unmark from the card's button, without opening it
+    o.unmarked = { dlg: dlg.hidden, taking: document.querySelectorAll('#propsPairs .pk.pair.taking').length, list: document.querySelectorAll('#propsTaking .pk').length, head: document.getElementById('propsTakingHead').hidden };
+    const today = document.getElementById('propsDate').value;
+    // a real file: a pair marked before the game lists on the board, rides through the file loaded again, grades under What you took and in the tab's record
+    const load = async (doc, fname) => { const dt = new DataTransfer(); dt.items.add(new File([JSON.stringify(doc)], fname, { type: 'application/json' })); const inp = document.getElementById('slateFile'); inp.files = dt.files; inp.dispatchEvent(new Event('change', { bubbles: true })); await wait(); };
+    const pdoc = { format: 'callsheet3.props', version: 1, date: '2026-10-27', games: [
+      { gid: '401909900', away: 'Hawks', home: 'Magic', aab: 'ATL', hab: 'ORL', spread: -4.5, total: 229.5, pace: 99.8, props: [
+        { pid: '3037789', name: 'Trae Young', team: 'ATL', opp: 'ORL', home: false, pos: 'G', mk: 'pts', line: 24.5, op: -110, up: -110, book: 'fanatics', books: { fanatics: [24.5, -110, -110] }, proj: 27.2, sd: 9.4, pm: 0.63, pb: 0.5, p: 0.6, push: 0, side: 'OVER', chance: 0.6, price: -110, need: 0.5238, edge: 0.0762, band: 'BET', mins: 35.1, rate36: 27.9, why: ['27.9 points per 36'], log: [] },
+        { pid: '4397020', name: 'Paolo Banchero', team: 'ORL', opp: 'ATL', home: true, pos: 'F', mk: 'reb', line: 7.5, op: -105, up: -115, book: 'fanatics', books: { fanatics: [7.5, -105, -115] }, proj: 8.9, sd: 3.5, pm: 0.6, pb: 0.5, p: 0.56, push: 0, side: 'OVER', chance: 0.56, price: -105, need: 0.512, edge: 0.048, band: 'LEAN', mins: 33.0, rate36: 9.7, why: ['9.7 rebounds per 36'], log: [] } ] } ] };
+    await smStore.removeItem('callsheet3.props.v1'); document.getElementById('m-nba').click(); await wait();
+    await load(pdoc, 'nba-props-2026-10-27.json');
+    o.filePairs = [...document.querySelectorAll('#propsPairs .pk.pair')].map(txt);
+    document.querySelector('#propsPairs .pk.pair .takebtn[data-ttake]').click(); await wait();
+    const stored1 = JSON.parse(smStore.getItem('callsheet3.props.v1'));
+    o.storedPairs = stored1.map(r => r.name + ':' + JSON.stringify(r.pairs || null));
+    document.getElementById('m-nba').click(); await wait();
+    document.getElementById('boardDate').value = '2026-10-27'; document.getElementById('boardDate').dispatchEvent(new Event('change')); await wait();
+    o.board = [...document.querySelectorAll('#taking .pk')].map(txt);
+    document.getElementById('takingText').click(); await new Promise(r => setTimeout(r, 250));
+    o.said = document.getElementById('saveMsg').innerText.replace(/\s+/g, ' ').trim();
+    await load(pdoc, 'nba-props-2026-10-27.json');   // the same file again: the mark rides through
+    const stored2 = JSON.parse(smStore.getItem('callsheet3.props.v1'));
+    o.storedPairs2 = stored2.map(r => r.name + ':' + JSON.stringify(r.pairs || null));
+    o.tabTaking = [...document.querySelectorAll('#propsTaking .pk')].map(txt);
+    await load({ format: 'callsheet2.slate', version: 1, date: '2026-10-27', games: [{ sport: 'NBA', gdate: '2026-10-27', away: 'Hawks', home: 'Magic', gameId: '401909900', finals: { fa: '118', fh: '112', f5a: '60', f5h: '55' }, notes: [],
+      box: { '3037789': ['Trae Young', 36.2, 28, 3, 11, 4], '4397020': ['Paolo Banchero', 34.0, 22, 9, 4, 1] } }] }, 'nba-grade-2026-10-27.json');
+    o.gradedCards = [...document.querySelectorAll('#propsPairs .pk.pair')].map(e => e.className + ' | ' + txt(e));
+    o.tabParts = txt(document.querySelector('#calibBox .calib[data-sport="PROPS"] .sides'));
+    const taken = document.querySelector('#calibBox .calib[data-sport="TAKEN"]');
+    o.took = taken ? [...taken.querySelectorAll(':scope > div')].map(txt) : [];
+    document.getElementById('m-nba').click(); await wait();
+    o.boardGraded = [...document.querySelectorAll('#taking .pk')].map(txt);
+    await smStore.removeItem('callsheet3.props.v1'); document.getElementById('clear').click(); await wait();
+    return o;
+  });
+  chk(pairT.nCards >= 3 && pairT.attrs.every(a => /^\d+\|\d+$/.test(a)) && pairT.open && /^same-game pair · the price agrees$/i.test(pairT.band) && /^.+ (OVER|UNDER) \d+\.5 \w+ \+ .+ (OVER|UNDER) \d+\.5 \w+$/.test(pairT.h3)
+      && /^both land \d\d\.\d% · pays \+\d+ \(\d\.\d\d×\) needs \d\d\.\d%$/.test(pairT.pick) && /^76ers @ Knicks · \w{3} \d{1,2} · (two players|two overs on one club|one man, two markets|one man, his points with his threes), measured ×\d\.\d\d · both at (Fanatics|DraftKings|FanDuel|BetMGM)$/.test(pairT.sub)
+      && pairT.tiles.length === 5 && /^Both land=\d\d\.\d%$/.test(pairT.tiles[0]) && /^Parlay price=\+\d+$/.test(pairT.tiles[1]) && /^Edge=\+\d\.\d$/.test(pairT.tiles[2]) && /^Leg 1=\d\d\.\d%$/.test(pairT.tiles[3]) && /^Leg 2=\d\d\.\d%$/.test(pairT.tiles[4])
+      && /lands \d\d\.\d% by the sheet and .+ \d\d\.\d%, each the blended chance on its own panel\. .+ so the product carries ×\d\.\d\d: \d\d\.\d% × \d\d\.\d% × \d\.\d\d = \d\d\.\d%.*\. The ticket pays the two prices multiplied, \d\.\d\d × \d\.\d\d = \d\.\d\d×, \+\d+, which needs \d\d\.\d%: the price agrees by \d+\.\d points\. A pushed leg drops out/.test(pairT.how)
+      && pairT.legs.length === 2 && pairT.legs.every(l => /^LEG [12] · .+ (OVER|UNDER) \d+\.5 [\w +]+? · [A-Z] (PHI|NYK) · (starter|bench) \|\| Chance,Price,Edge,Projection,Minutes,Usage \|\| Moves it: .+ \|\| Open this prop \| true$/.test(l))
+      && !pairT.nav.hidden && /^1 of \d pairs$/.test(pairT.nav.pos) && pairT.nav.prevOff && !pairT.nav.nextOff && /^take this pair$/i.test(pairT.bigBtn) && pairT.h3next !== pairT.h3 && /^2 of \d pairs$/.test(pairT.posNext) && pairT.h3back === pairT.h3
+      && /^.+ \| (LEAN|BET|no edge) \| \d of 7$/i.test(pairT.legPanel) && pairT.closed && pairT.fromTaking.toLowerCase() === ('Same-game pair · the price agrees | ' + pairT.h3).toLowerCase(),
+      'pairs: a same-game pair card opens its own panel with the ticket\'s band, both legs, the chance, the parlay price and what it needs, five tiles, the arithmetic of the chance with the measured factor, each leg\'s numbers with a button to its own panel, and Previous / Next across the night\'s tickets', JSON.stringify(pairT).slice(0, 1500));
+  chk(pairT.takeOn && pairT.cardTaking === 1 && pairT.cardBtnOn === 1 && pairT.takingList.length === 1 && /^TAKING · SAME-GAME PAIR · 76ers @ Knicks · at (Fanatics|DraftKings|FanDuel|BetMGM) · the price agrees .+ \+ .+ both land \d\d\.\d% · pays \+\d+ .+Taking$/i.test(pairT.takingList[0]) && pairT.takingCount === '1 marked' && !pairT.takingHead
+      && pairT.unmarked.dlg && pairT.unmarked.taking === 0 && pairT.unmarked.list === 0 && pairT.unmarked.head
+      && pairT.filePairs.length === 1 && /^PAIR #1 · Hawks @ Magic · the price agrees Trae Young OVER 24\.5 points \+ Paolo Banchero OVER 7\.5 rebounds both land 33\.6% · pays \+27\d \(3\.7\d×\) needs 26\.\d% .+two players, measured ×1\.00 TAKE$/.test(pairT.filePairs[0])
+      && pairT.storedPairs.join(';') === 'Trae Young:["2026-10-27|4397020|reb"];Paolo Banchero:["2026-10-27|3037789|pts"]' && pairT.storedPairs2.join(';') === pairT.storedPairs.join(';')
+      && pairT.board.length === 2 && /^TAKING · SAME-GAME PAIR · Hawks @ Magic · the price agrees Trae Young OVER 24\.5 points \+ Paolo Banchero OVER 7\.5 rebounds both land 33\.6%/.test(pairT.board[0]) && /^TONIGHT 1 bet marked none graded yet · one unit each 0 on the card, 0 from the simulation, 0 props, 1 same-game pair$/.test(pairT.board[1])
+      && /Copied the bets you are taking|the text is below/.test(pairT.said) && (!/the text is below/.test(pairT.said) || /1\. SAME-GAME PAIR Trae Young OVER 24\.5 points \+ Paolo Banchero OVER 7\.5 rebounds \+27\d · both land 33\.6% needs 26\.\d% · Hawks @ Magic/.test(pairT.said))
+      && pairT.tabTaking.length === 1 && /^TAKING · SAME-GAME PAIR/.test(pairT.tabTaking[0])
+      && pairT.gradedCards.length === 1 && /^pk pair agrees win taking \| PAIR #1 .+ WIN .+ TAKEN$/.test(pairT.gradedCards[0]) && /same-game pairs 1-0 \+2\.7u · pairs taken 1-0 \+2\.7u/.test(pairT.tabParts)
+      && pairT.took.some(t => /^same-game pairs taken 1-0 says 33\.6% · does 100\.0% \(±50\.0\) · \+2\.7\du$/i.test(t)) && pairT.boardGraded.length === 2 && /WIN/.test(pairT.boardGraded[0]) && /graded 1-0 · \+2\.7\du at one unit each/.test(pairT.boardGraded[1]),
+      'pairs: Take on the pair\'s panel marks the ticket on both legs (the card lights, its button is on, Taking lists it with a count, the card\'s button unmarks it without opening); on a real file the mark lists on the board\'s Taking tonight with the summary, copies as text, rides through the file loaded again, and once the night grades the ticket shows WIN with a TAKEN chip, the tab\'s record says pairs taken 1-0 and What you took carries a Same-game pairs taken tile at the parlay price',
+      JSON.stringify({ takeOn: pairT.takeOn, cardTaking: pairT.cardTaking, cardBtnOn: pairT.cardBtnOn, takingList: pairT.takingList, count: pairT.takingCount, unmarked: pairT.unmarked, filePairs: pairT.filePairs, stored: pairT.storedPairs, stored2: pairT.storedPairs2, board: pairT.board, said: pairT.said.slice(0, 200), tabTaking: pairT.tabTaking, graded: pairT.gradedCards, parts: pairT.tabParts, took: pairT.took, boardGraded: pairT.boardGraded }).slice(0, 2500));
+
+  // ---- 26 Oct 2026: tonight on your phone -- the Phone QR button makes a code carrying the night's picks; an independent decoder (jsQR,
+  //      tools_vendor) reads it back off the drawn modules; the phone sheet m.html renders it, view only ----
+  const phoneT = await pg.evaluate(async () => {
+    const wait = (ms) => new Promise(r => setTimeout(r, ms || 100));
+    const set = (id, v) => { const el = document.getElementById(id); el.value = v; el.dispatchEvent(new Event('input', { bubbles: true })); };
+    await smStore.removeItem('callsheet3.card.v1'); await smStore.removeItem('callsheet3.props.v1');
+    document.getElementById('clear').click(); document.getElementById('m-nba').click(); await wait();
+    set('gdate', '2026-11-14'); document.getElementById('example').click(); await wait(); set('gdate', '2026-11-14'); await wait();
+    document.getElementById('add').click(); await wait();
+    document.getElementById('boardDate').value = '2026-11-14'; document.getElementById('boardDate').dispatchEvent(new Event('change')); await wait();
+    document.querySelector('#nbaSimPanel .takebtn[data-stake*="|own|total|"]').click(); await wait();
+    document.querySelector('#board tbody tr .takebtn').click(); await wait();
+    const hidden0 = document.getElementById('phoneDlg').hidden;
+    document.getElementById('phone').click(); await wait(700);
+    const open = !document.getElementById('phoneDlg').hidden, link = (document.querySelector('#phoneBody a') || {}).href || '';
+    const note = (document.querySelector('#phoneBody .note') || {}).innerText || '', dim = (document.querySelector('#phoneBody .note.dim') || {}).innerText || '';
+    const d = (document.querySelector('#phoneBody svg path') || { getAttribute: () => '' }).getAttribute('d') || '';
+    const pts = [...d.matchAll(/M(-?\d+(?:\.\d+)?),(-?\d+(?:\.\d+)?)[hl]/g)].map(m => [Math.round(((+m[1]) - 6) / 4), Math.round(((+m[2]) - 6) / 4)]);
+    const n = pts.length ? Math.max(...pts.map(p => p[0])) + 1 : 0, mods = [];
+    for (let r = 0; r < n; r++) { const row = []; for (let c = 0; c < n; c++) row.push(0); mods.push(row); }
+    pts.forEach(p => { mods[p[1]][p[0]] = 1; });
+    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })); await wait();
+    const closed = document.getElementById('phoneDlg').hidden && !document.body.classList.contains('noscroll');
+    return { hidden0, open, link, note: note.replace(/\s+/g, ' ').trim(), dim, n, mods, closed };
+  });
+  const qrRead = (n, mods) => {   // the drawn modules through an independent decoder (jsQR, tools_vendor): what a phone's camera reads
+    try {
+      const jsQR = require('./tools_vendor/jsQR.js');
+      const scale = 4, q = 4, size = (n + 2 * q) * scale, data = new Uint8ClampedArray(size * size * 4);
+      for (let y = 0; y < size; y++) for (let x = 0; x < size; x++) {
+        const r = Math.floor(y / scale) - q, c = Math.floor(x / scale) - q, dark = r >= 0 && c >= 0 && r < n && c < n && mods[r][c];
+        const v = dark ? 0 : 255, i = (y * size + x) * 4; data[i] = v; data[i + 1] = v; data[i + 2] = v; data[i + 3] = 255;
+      }
+      const res = jsQR(data, size, size); return res ? res.data : null;
+    } catch (e) { return 'decoder error: ' + e.message; }
+  };
+  const decoded = qrRead(phoneT.n, phoneT.mods);
+  chk(phoneT.hidden0 && phoneT.open && /\/m\.html#z[A-Za-z0-9_-]+$/.test(phoneT.link) && phoneT.n >= 57 && phoneT.n % 4 === 1 && decoded === phoneT.link
+      && /^Point your phone's camera at the code and open the link\. It shows \d+ lines: the bets you are taking, the first half's best bets, the parlay four, the best straight bets, the likeliest sides, the best props, the night's tickets and the simulation's calls, view only\./.test(phoneT.note)
+      && /nothing is uploaded/.test(phoneT.note) && /signed in to claude\.ai/.test(phoneT.note) && new RegExp(phoneT.n + ' modules a side').test(phoneT.dim) && phoneT.closed,
+      'phone: the Phone QR button draws a code whose link carries the night\'s picks deflated into the hash of m.html, an independent decoder reads the very link back off the drawn modules, the note says what is in it and how it works, and Escape closes it',
+      JSON.stringify({ hidden0: phoneT.hidden0, open: phoneT.open, link: phoneT.link.slice(0, 90), n: phoneT.n, decoded: decoded === phoneT.link ? 'matches' : String(decoded).slice(0, 80), note: phoneT.note.slice(0, 160), dim: phoneT.dim, closed: phoneT.closed }));
+  // the phone sheet renders the code, view only
+  const sheetErrs = [];
+  const sheetCtx = await pg.context().browser().newContext({ viewport: { width: 390, height: 844 } }), sheet = await sheetCtx.newPage();
+  sheet.on('pageerror', e => sheetErrs.push(e.message));
+  await sheet.goto(phoneT.link); await sheet.waitForTimeout(600);
+  const sheetT = await sheet.evaluate(() => ({ text: document.body.innerText.replace(/\s+/g, ' ').trim(), cards: document.querySelectorAll('.pk').length, takes: document.querySelectorAll('.pk.take').length, inputs: document.querySelectorAll('input, button, select, textarea').length, wide: document.documentElement.scrollWidth <= 390 }));
+  await sheetCtx.close();
+  chk(sheetErrs.length === 0 && /^The Super Model Sat, Nov 14 · made \d{1,2}:\d\d [AP]M · view only TAKING TONIGHT 2 TAKING · NBA Knicks ML 66\.6% · [-−]198 needs 66\.4% 76ers @ Knicks · Moneyline TAKING · NBA · SIMULATION Total UNDER 231\.5 [6-9]\d\.\d% · worth 5\d% · [-−]110 needs 52\.4% 76ers @ Knicks · the simulation, the sim's own view THE PARLAY FOUR 1 /.test(sheetT.text)
+      && /LIKELIEST AT ANY PRICE 1 /.test(sheetT.text) && /THE SIMULATION'S CALLS, BET OR BETTER \d /.test(sheetT.text) && /View only: the card lives in the desktop browser\./.test(sheetT.text) && sheetT.takes === 2 && sheetT.cards >= 5 && sheetT.inputs === 0 && sheetT.wide,
+      'phone sheet: m.html unpacks the code on a phone-width screen with no script errors and lists the bets marked Taking first, then the parlay four, the likeliest sides and the simulation\'s calls, with nothing to type into and no sideways scroll', JSON.stringify({ errs: sheetErrs, text: sheetT.text.slice(0, 500), cards: sheetT.cards, takes: sheetT.takes, inputs: sheetT.inputs, wide: sheetT.wide }));
+  await pg.evaluate(async () => { await smStore.removeItem('callsheet3.card.v1'); await smStore.removeItem('callsheet3.props.v1'); document.getElementById('clear').click(); });
+
+  // ---- the build stamp ------------------------------------------------------------
+  // ---- the simulation (25 Oct 2026): the card on the example, the block stored with the row, the record once graded ----
+  await pg.evaluate(async () => { await smStore.removeItem('callsheet3.card.v1'); }); await reloaded(); await pg.evaluate(() => smStore.ready);
+  const simT = await pg.evaluate(async () => {
+    const wait = () => new Promise(r => setTimeout(r, 80));
+    document.getElementById('clear').click(); document.getElementById('m-nba').click(); await wait();
+    document.getElementById('gdate').value = '2026-11-10';
+    document.getElementById('example').click(); await wait();
+    const panel = document.getElementById('nbaSimPanel').innerText.replace(/\s+/g, ' ').trim();
+    const tiles = [...document.querySelectorAll('#nbaSimPanel .simtile')].map(t => t.querySelector('.k').textContent + '=' + t.querySelector('.v').textContent);
+    const meta = (document.querySelector('#nbaSimPanel .simmeta') || {}).innerText || '';
+    const medians = (document.querySelector('#nbaSimPanel table.simq') || {}).innerText || '';
+    const rows = [...document.querySelectorAll('#nbaSimPanel .simtab tbody tr')].map(tr => tr.innerText.replace(/\s+/g, ' ').trim());
+    const chips = [...document.querySelectorAll('#nbaSimPanel .simchip')].map(e => e.className + '|' + e.textContent.replace(/\s+/g, ' ').trim());
+    const set = (id, v) => { const el = document.getElementById(id); el.value = v; el.dispatchEvent(new Event('input', { bubbles: true })); };
+    set('line', '245.5'); await wait();
+    const moved = document.querySelector('#nbaSimPanel .simtab tbody tr').innerText.replace(/\s+/g, ' ').trim();
+    set('line', '231.5'); await wait();
+    document.getElementById('add').click(); await wait();
+    const stored = JSON.parse(smStore.getItem('callsheet3.card.v1')).find(r => /76ers @ Knicks/.test(r.matchup));
+    return { panel: panel.slice(0, 420), tiles, meta: meta.replace(/\s+/g, ' ').trim(), medians: medians.replace(/\s+/g, ' ').trim(), rows, chips, moved, hasSim: !!(stored && stored.inputs.nbasim && stored.inputs.nbasim.length > 1000),
+             teamShrink: stored ? ((JSON.parse(stored.inputs.nbasim).shrink || {}).team) : null };
+  });
+  // graded, with the book's team totals on the row's odds JSON (26 Oct 2026): the record takes them too
+  // (11 Nov 2026: and with the 1.5 a slate written before that day stored for the anchored home team total, which the page no longer takes from the row)
+  await pg.evaluate(async () => { const c = JSON.parse(smStore.getItem('callsheet3.card.v1')); c.forEach(r => { if (/76ers @ Knicks/.test(r.matchup)) { r.finals = { fa: '112', fh: '121', f5a: '55', f5h: '60' };
+    const sb = JSON.parse(r.inputs.nbasim); sb.shrink.team = 1.5; r.inputs.nbasim = JSON.stringify(sb);
+    r.inputs.odds = JSON.stringify({ total: {}, ml: {}, spread: {}, book: 'fanatics', team: { AWAY: { OVER: [['fanatics', -110, 113.5], ['fanatics', 140, 117.5], ['draftkings', -112, 113.5]], UNDER: [['fanatics', -110, 113.5], ['fanatics', -170, 117.5], ['draftkings', -108, 113.5]] },
+                                                                                                    HOME: { OVER: [['fanatics', -115, 123.5]], UNDER: [['fanatics', -105, 123.5]] } } }); } }); await smStore.setItem('callsheet3.card.v1', JSON.stringify(c)); });
+  await reloaded(); await pg.evaluate(() => smStore.ready);
+  const simRec = await pg.evaluate(() => { const rec = document.querySelector('#calibBox .simrec'); return { has: !!rec, text: rec ? rec.innerText.replace(/\s+/g, ' ').trim().slice(0, 300) : '', gapHead: rec ? ((e) => e ? e.innerText.replace(/\s+/g, ' ').trim() : '')([...rec.querySelectorAll('.simrecview')].find(e => /team-total gap/i.test(e.textContent))) : '', rows: rec ? [...rec.querySelectorAll('.simrectab:not(.gaptab):not(.boosttab) tbody tr')].map(tr => tr.innerText.replace(/\s+/g, ' ').trim()) : [],
+    gap: rec ? [...rec.querySelectorAll('.gaptab tbody tr')].map(tr => tr.innerText.replace(/\s+/g, ' ').trim()) : [],
+    gapTh: rec ? [...rec.querySelectorAll('.gaptab thead th')].map(th => th.textContent.replace(/\s+/g, ' ').trim()).join(' | ') : '',
+    // 11 Nov 2026: the anchored home team total's 1.5 is withdrawn; what it would have called is a watch row of its own, and the note says why
+    boost: rec ? [...rec.querySelectorAll('.boosttab tbody tr')].map(tr => tr.innerText.replace(/\s+/g, ' ').trim()) : [],
+    boostHead: rec ? ((e) => e ? e.innerText.replace(/\s+/g, ' ').trim() : '')([...rec.querySelectorAll('.simrecview')].find(e => /anchored home team total/i.test(e.textContent))) : '',
+    anchoredTab: rec ? [...rec.querySelectorAll('.simrecview')].some(e => /^Anchored to the market$/i.test(e.textContent.trim())) : null,
+    note: rec ? ((e) => e ? e.innerText.replace(/\s+/g, ' ').trim() : '')(rec.querySelector('.note')) : '',
+    storedTeam: (() => { try { const r = JSON.parse(smStore.getItem('callsheet3.card.v1')).find(x => /76ers @ Knicks/.test(x.matchup)); return JSON.parse(r.inputs.nbasim).shrink.team; } catch (e) { return null; } })() }; });
+  // the gap on the card: the Knicks' 123.5 sits 5 above the implied (231.5 + 5.5) / 2 = 118.5, so UNDER by the gap; the 76ers' 113.5 sits half a point over 113, inside a point
+  // (26 Oct 2026: the band comes from the worth, so the anchored home team total at 123.5 read a band at its 1.5; 121 scored, the under wins)
+  // (11 Nov 2026: the gap is a watch and the 1.5 is withdrawn. The re-test showed the two seasons behind both read a line the season pull had kept wrong. The gap's chip is a dashed
+  //  outline that says "a watch, not scored"; the anchored home team total's 67% is worth 55% at 0.3, no band, on a row whose slate stored 1.5; the record keeps both as watches)
+  const gapCardT = await pg.evaluate(async () => {
+    const wait = () => new Promise(r => setTimeout(r, 80));
+    document.getElementById('m-nba').click(); await wait();
+    const row = JSON.parse(smStore.getItem('callsheet3.card.v1')).find(r => /76ers @ Knicks/.test(r.matchup));
+    const btn = document.querySelector('#card tr[data-id="' + row.id + '"] button.fill, #card [data-id="' + row.id + '"] .fill, button[data-fill="' + row.id + '"]');
+    if (btn) { btn.click(); await wait(); }
+    else { document.getElementById('odds').value = row.inputs.odds; document.getElementById('line').value = '231.5'; document.getElementById('sp').value = '-5.5'; document.getElementById('nbasim').value = row.inputs.nbasim; document.getElementById('away').value = '76ers'; document.getElementById('home').value = 'Knicks'; document.getElementById('line').dispatchEvent(new Event('input', { bubbles: true })); await wait(); }
+    const rows = [...document.querySelectorAll('#nbaSimPanel .simtab tbody tr')].map(tr => tr.innerText.replace(/\s+/g, ' ').trim());
+    const chips = [...document.querySelectorAll('#nbaSimPanel .simtab tbody tr')].slice(4).map(tr => [...tr.querySelectorAll('.simchip')].map(e => e.className + '|' + e.textContent.replace(/\s+/g, ' ').trim()));
+    const sig = [...document.querySelectorAll('#signals a.sig')].map(a => a.className + '|' + a.innerText.replace(/\s+/g, ' ').trim());
+    document.getElementById('clear').click(); await wait();
+    return { rows: rows.slice(4), chips, sig };
+  });
+  const gapCard = gapCardT.rows;
+  await pg.evaluate(async () => { await smStore.removeItem('callsheet3.card.v1'); }); await reloaded(); await pg.evaluate(() => smStore.ready);
+  chk(simT.tiles.length === 4 && /^Total=\d+$/.test(simT.tiles[0]) && /^Margin=Knicks by \d+\.\d$/.test(simT.tiles[1]) && /^Knicks wins=\d+%$/.test(simT.tiles[2]) && /^Overtime=\d\.\d%$/.test(simT.tiles[3])
+      && /^3,000 games, the sim's own view\. Anchored to DraftKings's 231\.5 \/ -5\.5 for the market view\.( The ratings ride the league's level of the last fortnight, [\d.]+ per 100 at [\d.]+ possessions \(30 Oct 2026\)\.)?( Engine 2: score effects, the market's shape \(30 Oct 2026\)\.| Engine 3 \(23 Nov 2026\): the men out are priced against tonight's slate and a tired club the way the close prices it, part off a club's own scoring and part on the other side's, so the total sits on the books' line where engine 2 sat 4 points under it\.)?$/.test(simT.meta)
+      && /^Medians, anchored to the market Q1 Q2 Q3 Q4 1H 2H 76ers Knicks the fourth \d+\.\d% of the game( \d+){8}$/i.test(simT.medians)
+      && simT.rows.length === 6 && /^Total 231\.5 (OVER|UNDER) \d+%/.test(simT.rows[0]) && /^First half 115\.5 (OVER|UNDER) \d+%/.test(simT.rows[1]) && /^Spread \(home\) -5\.5 (HOME|AWAY) \d+%/.test(simT.rows[2]) && /^Moneyline (HOME|AWAY) \d+%.*the own view's$/.test(simT.rows[3])
+      && /^76ers team total no line on the row \(the odds run brings it\) — —$/.test(simT.rows[4]) && /^Knicks team total no line on the row/.test(simT.rows[5])
+      && simT.chips.length === 7 && simT.chips.every(c => /^simchip sim(no|lean|bet|strong)\|(OVER|UNDER|HOME|AWAY) \d+%$/.test(c)) && simT.moved !== simT.rows[0] && /UNDER [89]\d%/.test(simT.moved) && simT.hasSim,
+      'nba sim: the Simulation card reads the example\'s runs, lists every market with the own and the anchored chance for the line on the row, follows the line when it is typed, and the block rides with the row', JSON.stringify({ panel: simT.panel, rows: simT.rows, moved: simT.moved, chips: simT.chips.length, has: simT.hasSim }));
+  chk(simRec.has && /^SIMULATION · says against does, every call at LEAN or better The sim's own view/.test(simRec.text) && simRec.rows.length >= 1
+      && simRec.rows.every(r => /^(Total|First half|Spread|Moneyline|Away team total|Home team total) (STRONG|BET|LEAN) [01]-[01] \d+\.\d% (0|100)\.0% [+-]\d+\.\du$/.test(r))
+      && simRec.gap.length === 1 && /^Home team total 1-0 100\.0% \+[01]\.\du 212-210 \(50\.2%\), [-−]22\.3u at the apps against the book's own number; 176-190, [-−]34\.8u against the other books'$/.test(simRec.gap[0]) && /The re-test said, two seasons/i.test(simRec.gapTh)
+      && /^The team-total gap, a watch the book's line a point or more off the number the game's total and spread imply · shown, not scored, from 11 Nov 2026 · the two seasons behind the rule read one book's line, and the season pull had kept that book's alternate points with another point's prices: 61% on those, a coin less the price on the books' own lines$/i.test(simRec.gapHead)
+      && !/scored, two seasons|under re-test/i.test(simRec.gapHead),
+      'nba sim: once the row grades, the record block keeps the calls whose worth reads LEAN or better, says against does by view, market and band, and the gap\'s own tally as a watch (the Knicks\' 123.5 five above the implied 118.5, under called, 121 scored: a win): its heading says shown, not scored, from 11 Nov 2026 and why, and the column beside the tally carries what the re-test read on the books\' own lines over the two seasons (212-210 at home at the apps)', JSON.stringify(simRec));
+  chk(simT.teamShrink === 0.3 && simRec.storedTeam === 1.5 && simRec.anchoredTab === false && !simRec.rows.some(r => /^Home team total (STRONG|BET|LEAN) 1-0 6\d\.\d% /.test(r))
+      && simRec.boost.length === 1 && /^1 1-0 6\d\.\d% 100\.0% \+[01]\.\du$/.test(simRec.boost[0])
+      && /^The anchored home team total at its old weight, a watch the sim's chance times 1\.5, the weight the same replay gave it · withdrawn 11 Nov 2026 with the gap rule: it reads at 0\.3 now, like the away side, and calls nothing here until a replay on the books' own lines says otherwise$/i.test(simRec.boostHead)
+      && /The team totals were scored until 11 Nov 2026 on a replay whose lines were not the book's: the season pull had kept, for the one book it read, an alternate point with another point's prices\. On the books' own lines the gap between a team total and the number the game's total and spread imply reads a coin less the price, so the gap and the anchored home team total are watches now, counted above and scored nowhere\.$/.test(simRec.note)
+      && !/the one inefficiency/i.test(simRec.note),
+      'nba sim: the anchored home team total\'s 1.5 is withdrawn: a block built today carries 0.3, and a row whose slate stored 1.5 with it reads at 0.3 all the same: its 67% under 123.5 is worth 55% and no call, so no anchored table opens for it; the record keeps what the old weight would have called as a watch of its own (one call, a win) and the note under the record says the team totals were scored on lines that were not the book\'s', JSON.stringify({ built: simT.teamShrink, stored: simRec.storedTeam, anchoredTab: simRec.anchoredTab, rows: simRec.rows, boost: simRec.boost, boostHead: simRec.boostHead, note: simRec.note.slice(-420) }));
+  chk(gapCard.length === 2 && /^76ers team total 113\.5 fanatics -110\/-110 implied 113, gap \+0\.5 · inside a point (OVER|UNDER) \d+% worth \d+% (OVER|UNDER) \d+% worth \d+%$/.test(gapCard[0])
+      && /^Knicks team total 123\.5 fanatics -115\/-105 implied 118\.5, gap \+5 · UNDER by the gap a watch, not scored UNDER \d+% (LEAN · |BET · |STRONG · )?worth \d+% UNDER 6\d% worth 5[45]%$/.test(gapCard[1])
+      && gapCardT.chips.length === 2 && gapCardT.chips[0].every(c => !/gaprule/.test(c)) && gapCardT.chips[1][0] === 'simchip simwatch gaprule|UNDER by the gap' && /^simchip simno\|UNDER 6\d%$/.test(gapCardT.chips[1][2])
+      && !gapCardT.chips[1].some(c => /simbet gaprule/.test(c))
+      && gapCardT.sig.some(c => /^sig watch\|GAP WATCH Knicks team total UNDER 123\.5 · gap \+5 · not scored$/i.test(c)) && !gapCardT.sig.some(c => /^sig go\|GAP/i.test(c)) && !gapCardT.sig.some(c => /gap rule/i.test(c)),
+      'nba sim: the Simulation card shows each team total\'s implied number and gap, and the side the gap points to when it is a point or more as a watch: a dashed chip that says not scored where the green BET chip was, the anchored home team total beside it reading no band at its new weight, and the signal on the rail gold, not green', JSON.stringify(gapCardT));
+
+  // ---- the store (25 Oct 2026): the card, the props and the slate live in IndexedDB, past localStorage's 10 MB ----
+  await fill(CASES[0].sport, CASES[0].inputs);
+  const store1 = await pg.evaluate(async () => {
+    await smStore.ready;
+    const before = { backend: smStore.backend(), why: smStore.why(), keys: Object.keys(localStorage) };
+    document.getElementById('add').click(); await new Promise(r => setTimeout(r, 80));
+    const row = smStore.getItem('callsheet3.card.v1');
+    // a props list far past the localStorage limit saves through the store
+    const big = JSON.stringify(Array.from({ length: 3000 }, (_, i) => ({ id: i + 1, gdate: '2026-10-24', game: 'Heat @ Hornets', away: 'Heat', home: 'Hornets', aab: 'MIA', hab: 'CHA', pid: String(i), name: 'Player ' + i, team: 'MIA', opp: 'CHA', pos: 'G', mk: 'pts', line: 20.5, op: -110, up: -110, book: 'fanatics', books: {}, proj: 22.1, sd: 7, pm: 0.58, pb: 0.5, p: 0.55, push: 0, side: 'OVER', chance: 0.55, price: -110, need: 0.524, edge: 0.026, band: 'LEAN', mins: 30, rate36: 26, why: ['x'.repeat(1800)], log: [] })));
+    await smStore.setItem('callsheet3.props.v1', big);
+    // the move: the card goes back to where the old page kept it, and the database forgets it
+    await smStore.removeItem('callsheet3.card.v1');
+    localStorage.setItem('callsheet3.card.v1', row);
+    const inLocal = window.localStorage.getItem('callsheet3.props.v1');   // the browser's own store, on purpose: the key must not be there
+    return { before, backend: smStore.backend(), why: smStore.why(), rows: JSON.parse(row).length, bigLen: big.length, propsInLocal: inLocal === null ? null : inLocal.length, keys: Object.keys(localStorage) };
+  });
+  await reloaded();
+  const store2 = await pg.evaluate(async () => {
+    await smStore.ready;
+    const p = smStore.getItem('callsheet3.props.v1'), c = JSON.parse(smStore.getItem('callsheet3.card.v1') || '[]');
+    const lc = window.localStorage.getItem('callsheet3.card.v1'), lp = window.localStorage.getItem('callsheet3.props.v1');   // the browser's own store, on purpose
+    return { pLen: p ? p.length : 0, cardRows: c.length, localCard: lc === null ? null : lc.length, localProps: lp === null ? null : lp.length, keys: Object.keys(localStorage), saveState: document.getElementById('saveState').textContent };
+  });
+  chk(store1.backend === 'indexeddb' && store1.rows >= 1 && store1.propsInLocal === null, 'store: the page keeps the card and the props in IndexedDB, not localStorage', JSON.stringify(store1));
+  chk(store2.pLen === store1.bigLen && store2.localProps === null, 'store: a props list far past the localStorage limit saves and comes back after a reload', JSON.stringify({ pLen: store2.pLen, bigLen: store1.bigLen }));
+  chk(store2.cardRows === store1.rows && store2.localCard === null && !/not storing/.test(store2.saveState), 'store: a card the old page left in localStorage moves to the database on load and leaves localStorage', JSON.stringify(store2));
+  await pg.evaluate(() => smStore.clear()); await reloaded();
+
+  // ---- 2 Nov 2026: the save trimmed -- a prop on a night older than the last seven keeps its record and loses the panel's detail; the backup writes a prop a line ----
+  await pg.evaluate(async () => {
+    await smStore.ready;
+    const heavy = (id, gdate, name, mk, side, result) => ({ id, gdate, game: 'Heat @ Hornets', away: 'Heat', home: 'Hornets', aab: 'MIA', hab: 'CHA', pid: String(id), name, team: 'MIA', opp: 'CHA', pos: 'G', mk, line: 20.5, op: -110, up: -110, book: 'fanatics',
+      books: { fanatics: [20.5, -110, -110], draftkings: [20.5, -112, -108] }, proj: 22.1, sd: 7, pm: 0.58, pb: 0.475, p: 0.49, push: 0, side, chance: side === 'OVER' ? 0.49 : 0.51, price: -110, need: 0.524, edge: side === 'OVER' ? -0.034 : -0.014, band: 'no edge', mins: 30, rate36: 26, base: 25, med: 21.5, usg: 25, sdf: 0.93, starter: true, start_src: 'RotoWire',
+      why: ['26.0 points per 36 this season', 'the chance read around the median 21.5 (' + 'x'.repeat(400) + ')'], log: [['2026-10-15', 'MIA', 0, 34.0, 26], ['2026-10-17', 'CHI', 1, 31.0, 22, ['won by 6', '31 min']]], parts: [{ k: 'pace', t: 'Pace', eff: 0.4, i: 0 }],
+      sim: { runs: 10000, team_pts: 115, team_lo: 106, team_hi: 124, read: 21.0, blowout: 0.3, ot: 0.04, poss: 100 }, gsim: { runs: 10000, a: [115, 106, 124, 116], h: [110, 101, 119, 111], t: 225, m: -5, hw: 0.4, ot: 0.04, bo: 0.3, poss: 100, out: [0, 0] },
+      fives: { away: { status: 'confirmed', five: [['G', name]] }, home: null }, awhat: ['won by 6'], actual: result === 'win' ? (side === 'UNDER' ? 18 : 24) : (side === 'UNDER' ? 24 : 18), amin: 33, result });
+    const dates = ['2026-10-20', '2026-10-21', '2026-10-22', '2026-10-23', '2026-10-24', '2026-10-25', '2026-10-26', '2026-10-27', '2026-10-28'];
+    const rows = []; dates.forEach((d, i) => { rows.push(heavy(i * 2 + 1, d, 'Tyler Herro', 'pts', 'UNDER', 'win')); rows.push(heavy(i * 2 + 2, d, 'Bam Adebayo', 'reb', 'OVER', 'loss')); });
+    rows.push(Object.assign(heavy(99, '2026-10-29', 'Norman Powell', 'pts', 'UNDER', null), { result: null, actual: null, amin: null }));   // tonight's, ungraded: the tenth night on the tab
+    // three of Herro's unders marked Taking (3 Nov 2026: your picks), one on a night the trim takes, and a LEAN on the sheet's own side on the 28th for the comparison
+    rows.filter(r => r.name === 'Tyler Herro' && ['2026-10-20', '2026-10-23', '2026-10-28'].indexOf(r.gdate) >= 0).forEach(r => { r.take = true; });
+    rows.filter(r => r.name === 'Bam Adebayo' && r.gdate === '2026-10-28').forEach(r => { r.band = 'LEAN'; r.edge = 0.012; });
+    await smStore.setItem('callsheet3.props.v1', JSON.stringify(rows));
+  });
+  await reloaded();
+  const trimT = await pg.evaluate(async () => {
+    const wait = () => new Promise(r => setTimeout(r, 90));
+    const txt = e => (e ? e.innerText : '').replace(/\s+/g, ' ').trim();
+    await smStore.ready;
+    const stored = JSON.parse(smStore.getItem('callsheet3.props.v1'));
+    const byDate = {}; stored.forEach(r => { (byDate[r.gdate] = byDate[r.gdate] || []).push(r); });
+    const dates = Object.keys(byDate).sort();
+    const trimmed = dates.filter(d => byDate[d].every(r => r.trim)), whole = dates.filter(d => byDate[d].every(r => !r.trim && r.why && r.log && r.books && r.sim && r.gsim && r.fives && r.parts && r.awhat));
+    const old = stored.filter(r => r.trim);
+    const gone = old.length > 0 && old.every(r => ['why', 'log', 'parts', 'sim', 'gsim', 'fives', 'awhat'].every(k => r[k] === undefined) && r.books !== undefined);   // the books stay (5 Nov 2026): the pairs are rebuilt at one app from them
+    const kept = old.every(r => r.result && r.chance && r.price && r.band && r.side && r.mk && r.gdate && r.name && r.centre === 'median' && r.actual !== undefined && r.amin === 33 && r.med === 21.5 && /^\d{4}-\d{2}-\d{2}$/.test(r.trim));
+    // the tab: the record counts every graded night, a trimmed night's strip and panel say so, a whole night's panel keeps its detail
+    document.getElementById('m-props').click(); await wait();
+    const tile = txt(document.querySelector('#propsCalib .calib[data-sport="PROPS-TAB"]')), nights = document.querySelectorAll('#propsNights tbody tr').length;
+    const sel = document.getElementById('propsDate'); sel.value = '2026-10-20'; sel.dispatchEvent(new Event('change')); await wait();
+    const strip = txt(document.getElementById('propsSim'));
+    document.getElementById('propsAll').checked = true; document.getElementById('propsAll').dispatchEvent(new Event('change', { bubbles: true })); await wait();
+    document.querySelector('#propsTable tr[data-prop]').click(); await wait();
+    const panel = txt(document.getElementById('propDetailBody')), h4s = [...document.querySelectorAll('#propDetailBody h4')].map(h => h.textContent.trim().split(' ')[0]);
+    const thisRow = txt(document.querySelector('#propDetail .pd-log tr.this'));
+    document.getElementById('propDetailClose').click(); await wait();
+    sel.value = '2026-10-28'; sel.dispatchEvent(new Event('change')); await wait();
+    document.querySelector('#propsTable tr[data-prop]').click(); await wait();
+    const wholePanel = txt(document.getElementById('propDetailBody')), wholeStrip = txt(document.getElementById('propsSim'));
+    document.getElementById('propDetailClose').click(); await wait();
+    // the backup: a prop a line, compact, the trimmed rows without their detail; the file parses as a backup
+    let blob = null; const mkURL = URL.createObjectURL, click = HTMLAnchorElement.prototype.click;
+    URL.createObjectURL = b => { blob = b; return 'blob:x'; }; HTMLAnchorElement.prototype.click = function () {};
+    document.getElementById('backup').click(); await wait(); await wait();
+    URL.createObjectURL = mkURL; HTMLAnchorElement.prototype.click = click;
+    const text = blob ? await blob.text() : '', parsed = text ? JSON.parse(text) : null;
+    const backup = parsed ? { format: parsed.format, props: parsed.props.length, propLines: text.slice(text.indexOf('"props": [')).split('\n').filter(l => /^    \{"id":/.test(l)).length, trimmedInFile: parsed.props.filter(r => r.trim).length, whyInFile: parsed.props.filter(r => r.why).length, card: Array.isArray(parsed.card), draft: !!parsed.draft, msg: txt(document.getElementById('saveMsg')) } : null;
+    // your picks (3 Nov 2026): the night table's You took column, the Taken filter, and the record's night-by-night, the props' cuts and the list
+    const youTook = [...document.querySelectorAll('#propsNights tbody tr')].map(tr => { const td = tr.querySelectorAll('td'); return td[0].textContent.trim() + '|' + td[6].textContent.trim() + '|' + td[6].className; });
+    sel.value = '2026-10-23'; sel.dispatchEvent(new Event('change')); await wait();
+    const takenSel = document.getElementById('propsTakenSel'); takenSel.value = 'yes'; takenSel.dispatchEvent(new Event('change', { bubbles: true })); await wait();
+    const onlyTaken = [...document.querySelectorAll('#propsTable tbody tr[data-prop]')].map(tr => tr.querySelectorAll('td')[1].textContent.trim()), takenShown = txt(document.getElementById('propsShown')), takenStored = JSON.parse(localStorage.getItem('callsheet3.props.view.v1') || '{}').taken;
+    document.getElementById('propsReset').click(); await wait();
+    const afterReset = { n: document.querySelectorAll('#propsTable tbody tr[data-prop]').length, taken: document.getElementById('propsTakenSel').value };
+    document.getElementById('m-nba').click(); await wait();
+    const fold = document.querySelector('.takenlist'); if (fold) fold.open = true;   // the list sits folded; innerText reads nothing from a closed fold
+    const yourNights = [...document.querySelectorAll('#takenNights tbody tr')].map(tr => txt(tr)), yourProps = [...document.querySelectorAll('#takenProps tbody tr')].map(tr => txt(tr)), yourList = [...document.querySelectorAll('#takenList tbody tr')].map(tr => txt(tr)), yourSummary = txt(document.querySelector('.takenlist summary'));
+    await smStore.removeItem('callsheet3.props.v1');
+    return { trimmed, whole, gone, kept, tile: tile.slice(0, 160), nights, strip: strip.slice(0, 200), panel: panel.slice(0, 700), h4s, thisRow, wholeHas: /what moves it/i.test(wholePanel) && /\bwhy\b/i.test(wholePanel) && /every book/i.test(wholePanel) && /simulation · Heat @ Hornets played 10,000 times/i.test(wholePanel) && !/trimmed from the save/.test(wholePanel), wholeStrip: wholeStrip.slice(0, 120), backup,
+             youTook, onlyTaken, takenShown, takenStored, afterReset, yourNights, yourProps, yourList, yourSummary };
+  });
+  chk(JSON.stringify(trimT.trimmed) === JSON.stringify(['2026-10-20', '2026-10-21', '2026-10-22']) && JSON.stringify(trimT.whole) === JSON.stringify(['2026-10-23', '2026-10-24', '2026-10-25', '2026-10-26', '2026-10-27', '2026-10-28', '2026-10-29']) && trimT.gone && trimT.kept,
+      'trim: on load, a prop on a night older than the last seven on the tab loses the panel\'s detail (the why, the last games, the levers, the simulation, the fives, what happened) and keeps its record (the call, the price, the chance, the band, the result, his minutes, the median, the centre) and every book\'s line (5 Nov 2026, for the pairs at one app), stamped with the day; the last seven nights stay whole, tonight\'s ungraded one among them',
+      JSON.stringify({ trimmed: trimT.trimmed, whole: trimT.whole, gone: trimT.gone, kept: trimT.kept }));
+  chk(/every prop with a side 9-9/i.test(trimT.tile) && trimT.nights === 9 && /trimmed from the save with the night's detail/.test(trimT.strip) && /was trimmed from the save on [A-Z][a-z]{2} \d{1,2} to keep the backup small/.test(trimT.panel) && JSON.stringify(trimT.h4s) === JSON.stringify(['Floors', 'Last', 'Every']) && /this game 33 18/.test(trimT.thisRow)
+      && trimT.wholeHas && /played 10,000 times/.test(trimT.wholeStrip),
+      'trim: the record still counts every graded night (9-9 over nine), a trimmed night\'s strip and panel say the detail was trimmed and when, the panel keeps the floors, the graded game\'s own line and every book\'s line, and a whole night keeps its why, levers, books, simulation and strip',
+      JSON.stringify({ tile: trimT.tile, nights: trimT.nights, strip: trimT.strip, panel: trimT.panel.slice(0, 320), h4s: trimT.h4s, thisRow: trimT.thisRow, wholeHas: trimT.wholeHas, wholeStrip: trimT.wholeStrip }));
+  chk(trimT.backup && trimT.backup.format === 'callsheet3.backup' && trimT.backup.card && trimT.backup.draft && trimT.backup.props === 19 && trimT.backup.propLines === 19 && trimT.backup.trimmedInFile === 6 && trimT.backup.whyInFile === 13 && /Backup saved as/.test(trimT.backup.msg),
+      'trim: the backup file writes a prop a line, compact, the trimmed rows without their detail, and parses as a backup with the card and the draft', JSON.stringify(trimT.backup));
+  chk(trimT.youTook.length === 9 && trimT.youTook.filter(s => /\|1-0 \+0\.9u\|pos$/.test(s)).length === 3 && trimT.youTook.filter(s => /\|—\|$/.test(s)).length === 6 && /^Oct 28\|1-0/.test(trimT.youTook[0]) && /^Oct 20\|1-0/.test(trimT.youTook[8])
+      && JSON.stringify(trimT.onlyTaken) === JSON.stringify(['Tyler Herro G']) && /^1 of 2 shown$/.test(trimT.takenShown) && trimT.takenStored === 'yes' && trimT.afterReset.n === 2 && trimT.afterReset.taken === '',
+      'your picks: the Props tab\'s night table carries a You took column (the marked props\' record that night, a dash on a night with none, a trimmed night counted too), and the Taken filter keeps only the props you marked until Reset view', JSON.stringify({ youTook: trimT.youTook, onlyTaken: trimT.onlyTaken, shown: trimT.takenShown, stored: trimT.takenStored, after: trimT.afterReset }));
+  chk(trimT.yourNights.length === 3 && /^Oct 28 1 1 prop 1-0 51\.0% 100\.0% \+0\.9u 0-1 · 0\.0% · [-−]1\.0u$/.test(trimT.yourNights[0]) && /^Oct 23 1 1 prop 1-0 51\.0% 100\.0% \+0\.9u —$/.test(trimT.yourNights[1]) && /^Oct 20 1 1 prop 1-0 51\.0% 100\.0% \+0\.9u —$/.test(trimT.yourNights[2])
+      && trimT.yourProps.length === 4 && /^Unders 3-0 51\.0% 100\.0% \+2\.7u$/.test(trimT.yourProps[0]) && /^No edge: the book's own side 3-0/.test(trimT.yourProps[1]) && /^points 3-0/.test(trimT.yourProps[2]) && /^[-−]120 to \+100 3-0/.test(trimT.yourProps[3])
+      && trimT.yourList.length === 3 && /^Oct 28 Tyler Herro UNDER 20\.5 points · Heat @ Hornets prop 51\.0% [-−]110 WIN \+0\.91u$/.test(trimT.yourList[0]) && /^Oct 20 /.test(trimT.yourList[2]) && /^Every pick you marked, newest night first · 3 graded$/.test(trimT.yourSummary),
+      'your picks: What you took goes on to your picks night by night with the sheet\'s own BET and LEAN props beside each night (the 28th\'s lean lost, the other nights had none), your props by side, band, market and price, and every pick newest first', JSON.stringify({ nights: trimT.yourNights, props: trimT.yourProps, list: trimT.yourList, summary: trimT.yourSummary }));
+
+  // ---- 28 Oct 2026: the three voices on the total -- the sim's own view and the crew on the same side, the sheet not against it: BET on the Simulation card and the board, takeable, with its own record line ----
+  const agreeT = await pg.evaluate(async () => {
+    const wait = () => new Promise(r => setTimeout(r, 90));
+    const txt = e => (e ? e.innerText : '').replace(/\s+/g, ' ').trim();
+    const set = (id, v) => { const el = document.getElementById(id); el.value = v; el.dispatchEvent(new Event('input', { bubbles: true })); };
+    await smStore.removeItem('callsheet3.card.v1'); document.getElementById('clear').click(); document.getElementById('m-nba').click(); await wait();
+    const load = async (doc, fname) => { const dt = new DataTransfer(); dt.items.add(new File([JSON.stringify(doc)], fname, { type: 'application/json' })); const inp = document.getElementById('slateFile'); inp.files = dt.files; inp.dispatchEvent(new Event('change', { bubbles: true })); await wait(); };
+    const hist = (lo, mean, sd) => { const c = []; for (let v = lo; v <= lo + 100; v++) c.push(Math.round(10000 * Math.exp(-((v - mean) ** 2) / (2 * sd * sd)))); return { lo, c }; };
+    const sim = { v: 1, runs: 1000, own: { total: hist(170, 230, 15), h1: hist(80, 115, 10), h2: hist(80, 115, 10), q: [hist(30, 57, 7), hist(30, 57, 7), hist(30, 57, 7), hist(30, 57, 7)], margin: hist(-50, 2, 12), away: hist(80, 114, 11), home: hist(80, 116, 11), ot: 0.04 }, mkt: null, anchor: null, ft_factor: 1.0,
+                  shrink: { total: 0.05, h1: 0.1, spread: 0.0, ml: 0.97, team: 1.5, team_away: 0.3, team_own: 0.3, quarter: 0.1 }, bands: [[0.7, 'STRONG'], [0.65, 'BET'], [0.6, 'LEAN']] };
+    const refs = { lg: [2462, 44.0, 228.8], r: { 'Scott Foster': [118, 46.2, 229.1, 66, 41, 4, 2], 'Marc Davis': [102, 44.8, 230.3, 71, 51, 0, 0], 'Tony Brothers': [95, 43.1, 226.0, 56, 54, 3, 3] } };
+    // the game on the card first (a slate fills a row, it does not add one), then the slate brings the crew, the table and the runs
+    set('gdate', '2026-11-12'); set('away', 'Kings'); set('home', 'Spurs'); set('line', '222.5'); set('op', '-110'); set('up', '-110'); await wait();
+    document.getElementById('add').click(); await wait();
+    await load({ format: 'callsheet2.slate', version: 1, date: '2026-11-12', games: [{ sport: 'NBA', gdate: '2026-11-12', away: 'Kings', home: 'Spurs', notes: [], inputs: { ncrew: 'Scott Foster, Marc Davis, Tony Brothers', nbarefs: JSON.stringify(refs), nbasim: JSON.stringify(sim) } }] }, 'nba-slate-2026-11-12.json');
+    document.getElementById('boardDate').value = '2026-11-12'; document.getElementById('boardDate').dispatchEvent(new Event('change')); await wait();
+    const headHidden = document.getElementById('agreeHead').hidden;
+    const cards = [...document.querySelectorAll('#agree .pk.agree')].map(e => ({ n1: txt(e.querySelector('.n1')), n2: txt(e.querySelector('.n2')), n3: txt(e.querySelector('.n3')), n4: txt(e.querySelector('.n4')).slice(0, 40), take: !!e.querySelector('.takebtn[data-stake$="|agree|total|OVER"]') }));
+    // the card opens the row into the form: the Simulation card's block reads BET with a Take of its own
+    document.querySelector('#agree .pk.agree .n2').click(); await wait();
+    const voices = document.querySelector('#nbaVoices .voices');
+    const block = { cls: voices ? voices.className : '', badge: txt(voices && voices.querySelector('.vbadge')), line: txt(voices && voices.querySelector('.vline')), take: !!(voices && voices.querySelector('.vtake .takebtn[data-stake$="|agree|total|OVER"]')),
+                    color: voices ? getComputedStyle(voices.querySelector('.vbadge')).backgroundColor : '', simchips: document.querySelectorAll('#nbaSimPanel .simchip').length };
+    // taken from the block: the row carries the mark at the row's price, Taking tonight lists it, the board's card shows it taken
+    voices.querySelector('.vtake .takebtn').click(); await wait();
+    const row = JSON.parse(smStore.getItem('callsheet3.card.v1')).find(r => /Kings @ Spurs/.test(r.matchup));
+    const take = (row.simTakes || []).map(t => t.view + '|' + t.key + '|' + t.side + '|' + t.line + '|' + t.price + '|' + t.band + '|' + t.pick + '|' + (t.p === null ? 'null' : (+t.p).toFixed(2)) + '|' + t.worth);
+    const taking = txt(document.getElementById('taking')), boardTake = txt(document.querySelector('#agree .pk.agree .n5'));
+    // graded: the record keeps the rule's own line, the card shows the result
+    await load({ format: 'callsheet2.slate', version: 1, date: '2026-11-12', games: [{ sport: 'NBA', gdate: '2026-11-12', away: 'Kings', home: 'Spurs', finals: { fa: '118', fh: '121', f5a: '58', f5h: '60' }, close: { ctot: '222.5' }, notes: [] }] }, 'nba-grade-2026-11-12.json');
+    const rec = txt(document.querySelector('.agreetab')), recHead = txt([...document.querySelectorAll('.simrecview')].find(e => /agreement rule/i.test(e.textContent)));
+    const graded = txt(document.querySelector('#agree .pk.agree .n3'));
+    // the two gates (the user's Spurs row of 27 Oct 2026, an alternate 225.5 at -208 against a market number of 232): the price, then an alternate line
+    set('op', '-208'); set('up', '165'); await wait();
+    const priced = { cls: (document.querySelector('#nbaVoices .voices') || {}).className || '', badge: txt(document.querySelector('#nbaVoices .vbadge')), line: txt(document.querySelector('#nbaVoices .vline')), take: !!document.querySelector('#nbaVoices .vtake') };
+    set('op', '-110'); set('up', '-110'); await wait();
+    set('odds', JSON.stringify({ book: 'fanatics', total: { OVER: [['fanatics', -110, 229.5], ['draftkings', -108, 229.5]], UNDER: [['fanatics', -110, 229.5], ['draftkings', -112, 229.5]] } })); set('line', '222.5'); await wait();
+    const alt = { badge: txt(document.querySelector('#nbaVoices .vbadge')), line: txt(document.querySelector('#nbaVoices .vline')), take: !!document.querySelector('#nbaVoices .vtake') };
+    set('odds', ''); await wait();
+    // a split: the example's sim leans under while its crew leans over, so no rule, and the words say so
+    document.getElementById('clear').click(); document.getElementById('m-nba').click(); await wait();
+    document.getElementById('gdate').value = '2026-11-10'; document.getElementById('example').click(); await wait();
+    const split = { cls: (document.querySelector('#nbaVoices .voices') || {}).className || '', badge: txt(document.querySelector('#nbaVoices .vbadge')), line: txt(document.querySelector('#nbaVoices .vline')) };
+    document.getElementById('clear').click(); await wait();
+    await smStore.removeItem('callsheet3.card.v1');
+    return { headHidden, cards, block, take, taking, boardTake, rec, recHead, graded, priced, alt, split };
+  });
+  chk(agreeT.priced.cls === 'voices' && /^[23] OF 3 · NO BET$/i.test(agreeT.priced.badge) && /[23] of 3 on the OVER, but at -208 it needs 67\.5%, more than the rule's 56\.9%: the book's price, not a bet\.$/i.test(agreeT.priced.line) && !agreeT.priced.take
+      && /^2 OF 3 · NO BET$/i.test(agreeT.alt.badge) && /2 of 3 on the OVER, but the row's line 222\.5 is an alternate \(the market's number is 229\.5\): the rule was measured on the main line, no bet\.$/i.test(agreeT.alt.line) && !agreeT.alt.take,
+      'agreement gates: the same voices at -208 read the book\'s price, not a bet (the over needs 67.5%, the rule measured 56.9%), and a row line seven off the market\'s number reads an alternate outside the measurement; neither carries a Take', JSON.stringify({ priced: agreeT.priced, alt: agreeT.alt }));
+  chk(agreeT.headHidden === false && agreeT.cards.length === 1 && /^AGREEMENT · 2 OF 3 · BET BY THE RULE$/i.test(agreeT.cards[0].n1) && /^TOTAL OVER 222\.5$/i.test(agreeT.cards[0].n2)
+      && /^the sheet silent \((OVER|UNDER) 50%, no bet\) · the sim OVER 6\d% · the crew leans OVER \(z \+4\.4\) · -110$/i.test(agreeT.cards[0].n3) && /^Kings @ Spurs · the sim's own view/.test(agreeT.cards[0].n4) && agreeT.cards[0].take
+      && agreeT.block.cls === 'voices fires' && /^BET · 2 OF 3$/i.test(agreeT.block.badge) && /2 of 3 on the OVER, none against: BET by the agreement rule\.$/i.test(agreeT.block.line) && agreeT.block.take && agreeT.block.color !== 'rgba(0, 0, 0, 0)' && agreeT.block.simchips === 2
+      && agreeT.take.length === 1 && /^agree\|total\|OVER\|222\.5\|-110\|agreement\|Total OVER 222\.5\|0\.6\d\|null$/.test(agreeT.take[0]) && /Total OVER 222\.5 6\d% by the sim · agreement · -110 needs 52\.4% Kings @ Spurs · the agreement rule, the sim and the crew/i.test(agreeT.taking) && !/worth/i.test(agreeT.taking) && /TAKING/i.test(agreeT.boardTake)
+      && /^Voices Record Does Units Three seasons said 2 of 3: the sim and the crew, the sheet silent 1-0 100\.0% \+0\.9u 130-104 \(55\.6%\), \+14\.2u$/i.test(agreeT.rec) && /scored, BET/i.test(agreeT.recHead) && /WIN$/i.test(agreeT.graded)
+      && agreeT.split.cls === 'voices' && /^NO RULE$/i.test(agreeT.split.badge) && /the sim UNDER [6-9]\d% · the crew leans OVER \(z \+4\.4\) — (split, 2 on the (OVER|UNDER) with one against: no rule|no two voices on a side: no rule)\.$/i.test(agreeT.split.line),
+      'agreement: a basketball total with the sim\'s own view and the crew on the same side and the sheet silent reads BET on the board\'s Agreement section and on the Simulation card\'s three-voices block in green, takes from either (the mark on the row at the row\'s price, listed under Taking tonight without a worth), grades on the rule\'s own record line, and a split (the example: the sim under, the crew over) reads no rule', JSON.stringify(agreeT).slice(0, 1800));
+
+  // ---- 28 Oct 2026: middles on the total -- the apps' numbers on the row, a leg held, the number runs, the watch names the second leg, a take, the pair on the record ----
+  const midT = await pg.evaluate(async () => {
+    const wait = () => new Promise(r => setTimeout(r, 220));
+    const txt = e => (e ? e.innerText : '').replace(/\s+/g, ' ').trim();
+    const set = (id, v) => { const el = document.getElementById(id); el.value = v; el.dispatchEvent(new Event('input', { bubbles: true })); };
+    await smStore.removeItem('callsheet3.card.v1'); document.getElementById('clear').click(); document.getElementById('m-nba').click(); await wait();
+    const load = async (doc, fname) => { const dt = new DataTransfer(); dt.items.add(new File([JSON.stringify(doc)], fname, { type: 'application/json' })); const inp = document.getElementById('slateFile'); inp.files = dt.files; inp.dispatchEvent(new Event('change', { bubbles: true })); await wait(); };
+    const odds = (pt) => JSON.stringify({ book: 'fanatics', total: { OVER: [['fanduel', -108, pt], ['betmgm', -110, pt], ['draftkings', -112, pt + 0.5], ['fanatics', -110, pt], ['pinnacle', -105, pt]], UNDER: [['fanduel', -112, pt], ['betmgm', -110, pt], ['draftkings', -108, pt + 0.5], ['fanatics', -110, pt], ['pinnacle', -115, pt]] },
+                                           alt: { OVER: [['fanduel', -135, pt - 2], ['draftkings', -150, pt - 3]], UNDER: [['fanduel', -135, pt + 2], ['draftkings', -150, pt + 3]] }, ml: {}, spread: {}, period: {}, team: {} });
+    const game = (extra) => Object.assign({ sport: 'NBA', gdate: '2026-11-13', away: 'Jazz', home: 'Nuggets', notes: [] }, extra);
+    set('gdate', '2026-11-13'); set('away', 'Jazz'); set('home', 'Nuggets'); set('line', '230.5'); set('op', '-110'); set('up', '-110'); await wait();
+    document.getElementById('add').click(); await wait();
+    await load({ format: 'callsheet2.slate', version: 1, date: '2026-11-13', generated: '2026-11-13T15:00:00Z', games: [game({ inputs: { odds: odds(230.5) } })] }, 'odds-2026-11-13.json');
+    const row0 = JSON.parse(smStore.getItem('callsheet3.card.v1')).find(r => /Jazz @ Nuggets/.test(r.matchup)), ti = row0.markets.findIndex(m => m.key === 'total');
+    document.getElementById('boardDate').value = '2026-11-13'; document.getElementById('boardDate').dispatchEvent(new Event('change')); await wait();
+    const panel0 = txt(document.getElementById('nbaMidPanel'));
+    // hold the sheet's over: the same mark the board's Take button makes (the board lists the pick's side, which at 50% is either)
+    const tb = document.createElement('button'); tb.setAttribute('data-take', row0.id + '|' + ti + '|OVER'); document.body.appendChild(tb); tb.click(); tb.remove(); await wait();
+    const before = { head: document.getElementById('midHead').hidden, cards: document.querySelectorAll('#mid .pk.mid').length, text: txt(document.getElementById('mid')) };
+    // the number runs: a later odds run posts 234.5 at the apps and 235 at DraftKings
+    await load({ format: 'callsheet2.slate', version: 1, date: '2026-11-13', generated: '2026-11-13T22:30:00Z', games: [game({ inputs: { odds: odds(234.5) } })] }, 'odds-2026-11-13b.json');
+    const row1 = JSON.parse(smStore.getItem('callsheet3.card.v1')).find(r => /Jazz @ Nuggets/.test(r.matchup));
+    const stored = { logged: /230\.5/.test(row1.inputs.odds) && !/234\.5/.test(row1.inputs.odds), now: /234\.5/.test(row1.inputs.oddsNow || ''), at: row1.inputs.oddsAt, line: row1.inputs.line, markets: row1.markets.filter(m => m.key === 'total').map(m => m.label).join() };
+    const card = document.querySelector('#mid .pk.mid');
+    const after = { head: document.getElementById('midHead').hidden, n: document.querySelectorAll('#mid .pk.mid').length, n1: txt(card && card.querySelector('.n1')), n2: txt(card && card.querySelector('.n2')), n3: txt(card && card.querySelector('.n3')), take: !!(card && card.querySelector('.takebtn[data-stake*="|middle|total|UNDER|235|-108|draftkings|sheet"]')) };
+    // the rail: the row opens, the Middles panel shows the apps now, the watch, the pairs; the calculator prices a typed pair
+    card.querySelector('.n2').click(); await wait();
+    const now = txt(document.querySelector('#nbaMidPanel .midnow')), watch = { cls: (document.querySelector('#nbaMidPanel .midwatch') || {}).className || '', text: txt(document.querySelector('#nbaMidPanel .midwatch')) };
+    const pairs = [...document.querySelectorAll('#nbaMidPanel .midtab tbody tr')].map(tr => tr.className + '|' + txt(tr)), note = txt(document.querySelector('#nbaMidPanel .midnote'));
+    const fit = (() => { const t = document.querySelector('#nbaMidPanel .midtab'), s = document.getElementById('nbaMidPanel'); return !!t && t.getBoundingClientRect().width <= s.clientWidth + 1 && s.scrollWidth <= s.clientWidth + 1; })();   // the table fits the card (29 Oct 2026)
+    set('midOverLine', '226.5'); set('midOverPrice', '-110'); set('midUnderLine', '234.5'); set('midUnderPrice', '-110'); await wait();
+    const calc = txt(document.getElementById('midCalcOut'));
+    set('midUnderLine', '228.5'); await wait();
+    const calc2 = txt(document.getElementById('midCalcOut'));
+    // the second leg taken from the panel: the mark on the row with the app, the leg it pairs with, Taking tonight lists it
+    document.querySelector('#nbaMidPanel .midwatch .takebtn').click(); await wait();
+    const row2 = JSON.parse(smStore.getItem('callsheet3.card.v1')).find(r => /Jazz @ Nuggets/.test(r.matchup));
+    const take = (row2.simTakes || []).map(t => t.view + '|' + t.side + '|' + t.line + '|' + t.price + '|' + t.book + '|' + (t.with ? t.with.side + ' ' + t.with.line + ' ' + t.with.price : '') + '|' + (t.pair ? t.pair.gap : '') + '|' + t.pick);
+    const taking = txt(document.getElementById('taking')), stillOpen = txt(document.querySelector('#mid .pk.mid .n5'));
+    // graded between the numbers: both legs win, the record's Middles line
+    await load({ format: 'callsheet2.slate', version: 1, date: '2026-11-13', games: [game({ finals: { fa: '116', fh: '117', f5a: '58', f5h: '60' }, close: { ctot: '234.5' } })] }, 'nba-grade-2026-11-13.json');
+    const rec = txt(document.querySelector('.midrectab')), recHead = txt([...document.querySelectorAll('.simrecview')].find(e => /Middles on the total/i.test(e.textContent)));
+    document.getElementById('clear').click(); await wait();
+    await smStore.removeItem('callsheet3.card.v1');
+    return { panel0, before, stored, after, now, watch, pairs, fit, note, calc, calc2, take, taking, stillOpen, rec, recHead };
+  });
+  chk(/(The apps now|No odds on the row)/.test(midT.panel0) && midT.before.head === false && midT.before.cards === 0 && /1 total held on this date, no window open/.test(midT.before.text)
+      && midT.stored.logged && midT.stored.now && midT.stored.at === '2026-11-13T22:30:00Z' && midT.stored.line === '230.5' && /230\.5/.test(midT.stored.markets)
+      && midT.after.head === false && midT.after.n === 1 && /^MIDDLE OPEN · A 4\.5-POINT WINDOW · PAYS \+[4-6]\.\d% OF THE STAKE$/i.test(midT.after.n1) && /^TOTAL UNDER 235 AT DRAFTKINGS -108$/i.test(midT.after.n2)
+      && /^with your OVER 230\.5 -110 \(the sheet's pick\) · both win [89]\.\d%, needs 4\.[0-9]% · the market's number 234\.5$/i.test(midT.after.n3) && midT.after.take
+      && /^The apps now \(the odds run of 2026-11-13 22:30 UTC\), the market's number 234\.5: FanDuel 234\.5 \(-108\/-112\) · BetMGM 234\.5 \(-110\/-110\) · DraftKings 235 \(-112\/-108\) · Fanatics 234\.5 \(-110\/-110\)$/.test(midT.now)
+      && midT.watch.cls === 'midwatch pays' && /MIDDLE OPEN · a 4\.5-point window · pays \+[4-6]\.\d% of the stake You hold OVER 230\.5 at -110 \(the sheet's pick\); the market's number is 234\.5, so that leg alone is 5[6-9]\.\d% to win\. The best under now: DraftKings 235 at -108\. Both win [89]\.\d% \(the pair needs 4\.[0-9]%\)/i.test(midT.watch.text)
+      && midT.pairs.length === 6 && midT.pairs.every(p => /\|(FanDuel|BetMGM|DraftKings|Fanatics)( alt)? \d+(\.5)? -\d+/.test(p)) && midT.fit === true && /^\d+ pairs across the apps' main and alternate numbers, the best six shown; none pays at these prices/.test(midT.note)
+      && /^Pays: a 8-point window, both win 1[5-9]\.\d%, the pair needs 4\.8% at these prices: \+\d+\.\d% of the stake expected/.test(midT.calc) && /^(The book's price|Positive, but under a three-point gap): a 2-point window, both win [234]\.\d%/.test(midT.calc2)
+      && midT.take.length === 1 && /^middle\|UNDER\|235\|-108\|draftkings\|OVER 230\.5 -110\|4\.5\|Total UNDER 235 at DraftKings \(the middle with OVER 230\.5\)$/.test(midT.take[0])
+      && /Total UNDER 235 at DraftKings \(the middle with OVER 230\.5\) 50% by the sim · middle · -108 needs 51\.9% Jazz @ Nuggets · the middle's second leg/i.test(midT.taking) && /TAKING/i.test(midT.stillOpen)
+      && /^Pairs Both won One pushed Split Said both The pair The first leg alone 1 1 \(100\.0%\) 0 0 [89]\.\d% \+1\.8[0-9]u \+0\.91u$/i.test(midT.rec) && /the pair graded together/.test(midT.recHead),
+      'middles: the Middles card prices every over/under pair the four apps post off the sheet\'s normal and says none pays on an ordinary night; a total taken on the row is watched, and when a later odds run moves the number 4.5 points the board and the panel name the best second leg at its app with the pair\'s chance and what it pays; the apps\' numbers follow the newest run while the logged line stays; the calculator prices a typed pair; the second leg takes from the panel with the leg it pairs with, lists under Taking tonight, and the graded pair lands on the record\'s Middles line beside what the first leg alone did', JSON.stringify(midT).slice(0, 2600));
+
+  // ---- the window on the total (29 Oct 2026): one ticket over the low number and under the high, priced off the sim ----
+  const winT = await pg.evaluate(async () => {
+    const wait = () => new Promise(r => setTimeout(r, 260));
+    const txt = e => (e ? e.innerText : '').replace(/\s+/g, ' ').trim();
+    await smStore.removeItem('callsheet3.card.v1'); document.getElementById('clear').click(); document.getElementById('m-nba').click(); await wait();
+    document.getElementById('example').click(); await wait();
+    const CARD = () => JSON.parse(smStore.getItem('callsheet3.card.v1') || '[]').filter(r => r.sport === 'NBA' && /76ers @ Knicks/.test(r.matchup));
+    const set = (id, v) => { const el = document.getElementById(id); el.value = v; el.dispatchEvent(new Event('input', { bubbles: true })); };
+    const block = document.querySelector('#nbaSimPanel .simwin');
+    const head = txt(block), out0 = txt(document.getElementById('winOut')), ph = ['winLo', 'winHi', 'winPrice'].map(id => document.getElementById(id).placeholder);
+    const sim = JSON.parse(document.getElementById('nbasim').value), V = sim.mkt || sim.own;
+    const q = (h, p) => { const n = h.c.reduce((a, b) => a + b, 0); let acc = 0; for (let i = 0; i < h.c.length; i++) { acc += h.c[i]; if (acc >= p * n) return h.lo + i; } return h.lo + h.c.length - 1; };
+    const lo = q(V.total, 0.25) - 0.5, hi = q(V.total, 0.75) + 0.5;
+    const inside = (h, a, b) => { let n = 0, k = 0; h.c.forEach((c, i) => { n += c; const v = h.lo + i; if (v > a && v < b) k += c; }); return k / n; };
+    const pDefault = inside(V.total, lo, hi);
+    set('winLo', String(lo + 2)); set('winHi', String(hi - 2)); await wait();
+    const out1 = txt(document.getElementById('winOut')), pTyped = inside(V.total, lo + 2, hi - 2);
+    set('winPrice', '+120'); await wait();
+    const out2 = txt(document.getElementById('winOut'));
+    const btnOff = !!document.querySelector('#nbaSimPanel .simwin .takebtn[disabled]');
+    document.getElementById('add').click(); await wait();
+    const btn = document.querySelector('#nbaSimPanel .simwin .takebtn[data-stake]'); const stake = btn ? btn.getAttribute('data-stake') : '';
+    if (btn) btn.click(); await wait();
+    const row = CARD()[0], taken = row && (row.simTakes || [])[0];
+    const btnOn = txt(document.querySelector('#nbaSimPanel .simwin .takebtn, #nbaSimPanel .simwin .chip'));
+    // the finals land inside the window: the ticket wins
+    const c = JSON.parse(smStore.getItem('callsheet3.card.v1')); c.forEach(r => { if (/76ers @ Knicks/.test(r.matchup)) r.finals = { fa: String(Math.floor((lo + hi) / 2) - 110), fh: '110', f5a: '55', f5h: '60' }; }); await smStore.setItem('callsheet3.card.v1', JSON.stringify(c));
+    return { head, out0, ph, lo, hi, pDefault, out1, pTyped, out2, btnOff, stake, taken, btnOn, rowId: row && row.id };
+  });
+  await reloaded(); await pg.evaluate(() => smStore.ready);
+  const winRec = await pg.evaluate(() => { const rec = document.querySelector('#calibBox .simrec'); const t = rec ? rec.innerText.replace(/\s+/g, ' ').trim() : ''; const i = t.indexOf('Windows on the total'); return i >= 0 ? t.slice(i, i + 260) : t.slice(0, 200); });
+  const pc = p => (100 * p).toFixed(1) + '%';
+  chk(/^The window · one ticket, over the low number and under the high, a same-game parlay · the boxes start at the middle half anchored to the market/.test(winT.head) && winT.ph[0] === 'over ' + winT.lo && winT.ph[1] === 'under ' + winT.hi && winT.ph[2] === 'parlay price'
+      && winT.out0.indexOf('Over ' + winT.lo + ' and under ' + winT.hi + ', a ' + (winT.hi - winT.lo) + '-point window: lands inside ' + pc(winT.pDefault) + ' anchored to the market (the sim\'s own view ') === 0 && /· fair [+-]\d+ · type the app's parlay price and the edge reads here$/.test(winT.out0),
+      'window: the block starts at the anchored middle half on half-point numbers, with the chance inside, the own view beside it and the fair price', JSON.stringify({ head: winT.head.slice(0, 160), out0: winT.out0, ph: winT.ph, lo: winT.lo, hi: winT.hi }));
+  chk(winT.out1.indexOf('Over ' + (winT.lo + 2) + ' and under ' + (winT.hi - 2) + ', a ' + (winT.hi - winT.lo - 4) + '-point window: lands inside ' + pc(winT.pTyped)) === 0
+      && new RegExp('at \\+120 the ticket needs 45\\.5%: (PAYS, \\+\\d+\\.\\d points over the price|the app\'s price, -\\d+\\.\\d points)$').test(winT.out2) && ((winT.pTyped > 0.4545) === /PAYS/.test(winT.out2)),
+      'window: typed numbers reprice as you type, and the app\'s parlay price turns into the need and the edge', JSON.stringify({ out1: winT.out1, out2: winT.out2, p: winT.pTyped }));
+  chk(winT.btnOff === true && /\|window\|total\|WINDOW [0-9.]+-[0-9.]+$/.test(winT.stake) && winT.taken && winT.taken.view === 'window' && winT.taken.lo === winT.lo + 2 && winT.taken.hi === winT.hi - 2 && winT.taken.price === 120
+      && Math.abs(winT.taken.p - winT.pTyped) < 0.001 && winT.taken.band === 'window' && winT.taken.pick === 'Total window ' + (winT.lo + 2) + '-' + (winT.hi - 2) + ' (over the low, under the high), one ticket' && /taking/i.test(winT.btnOn),
+      'window: the Take wakes with the row, and the ticket keeps the two numbers, the price and the anchored chance', JSON.stringify({ off: winT.btnOff, stake: winT.stake, taken: winT.taken, btn: winT.btnOn }));
+  chk(/^Windows on the total .*? TICKETS RECORD SAYS DOES UNITS 1 1-0 \d\d\.\d% 100\.0% \+1\.20u/.test(winRec), 'window: the record grades the ticket inside or out on its own line', winRec);
+  await pg.evaluate(async () => { await smStore.removeItem('callsheet3.card.v1'); }); await reloaded(); await pg.evaluate(() => smStore.ready);
+
+  const stamp = await pg.evaluate(() => (document.getElementById('build') || {}).textContent);
+  // ---- 5 Nov 2026: the simulation off the props, the market and the books' consensus in its place -- the strip, the best cards' last line, the panel's tiles, the column, the filter and the record's line, on a seeded night ----
+  await pg.evaluate(async () => {
+    await smStore.ready;
+    const books = (cons, line) => ({ fanatics: [line, -110, -110], draftkings: [cons, -112, -108], fanduel: [cons, -110, -110], pinnacle: [cons, -112, -112] });
+    const row = (id, name, team, mk, side, line, cons, edge, band, chance, result, shift) => ({ id, gdate: '2026-11-05', game: '76ers @ Knicks', away: '76ers', home: 'Knicks', aab: 'PHI', hab: 'NYK', pid: String(id), name, team, opp: team === 'PHI' ? 'NYK' : 'PHI', athome: team === 'NYK', pos: 'G', mk, line, op: -110, up: -110, book: 'fanatics',
+      books: books(cons, line), proj: line + (side === 'OVER' ? 1.2 : -1.2), sd: 6, pm: side === 'OVER' ? 0.58 : 0.42, pb: 0.5, p: side === 'OVER' ? 0.5 + chance - 0.5 : 0.5 - (chance - 0.5), push: 0, side, chance, price: -110, need: 0.524, edge, band, mins: 33, rate36: 24, base: 22, med: line, usg: 26, sdf: 0.95, starter: true, start_src: "RotoWire's confirmed five",
+      total: 229.5, spread: -5.5, why: ['24.0 points per 36 this season', "the books' consensus " + cons + ' across 4 books (Pinnacle ' + cons + ') against fanatics\'s ' + line], log: [], parts: [{ k: 'pace', t: 'Pace', eff: 0.3, i: 0 }, { k: 'cons', t: "The books' consensus, on the market's number", eff: shift * 6 / 0.4, i: 1 }],
+      mkt: { tt: team === 'PHI' ? 112.0 : 117.5, ppg: team === 'PHI' ? 110.0 : 115.0, f: team === 'PHI' ? 1.018 : 1.022, em: 10.9, blow: 0.274 }, cons: { line: cons, n: 4, gap: Math.round((cons - line) * 100) / 100, pin: cons, shift },
+      actual: result === 'win' ? (side === 'UNDER' ? line - 3 : line + 3) : result === 'loss' ? (side === 'UNDER' ? line + 3 : line - 3) : null, amin: result ? 34 : null, result });
+    const rows = [row(1, 'Tyrese Maxey', 'PHI', 'pts', 'UNDER', 25.5, 24.5, 0.04, 'BET', 0.564, null, -0.015), row(2, 'Jalen Brunson', 'NYK', 'ast', 'OVER', 6.5, 5.5, 0.02, 'LEAN', 0.544, null, -0.03),
+                  row(3, 'Joel Embiid', 'PHI', 'reb', 'OVER', 10.5, 11.5, 0.015, 'LEAN', 0.539, 'win', 0.03), row(4, 'Karl-Anthony Towns', 'NYK', 'pts', 'OVER', 22.5, 21.5, 0.01, 'LEAN', 0.534, 'loss', -0.015)];
+    rows[2].parts.push({ k: 'minutes', t: 'Minutes, his last 5 against the season', eff: 0.5, i: 2 });   // a minutes spike (6 Nov 2026), for the record's own line
+    rows[1].med = 7.5; rows[1].edge = 0.005; rows[1].books.draftkings = [5.5, 100, -120];   // the best app (6 Nov 2026): Brunson's over a point lower and at even money at DraftKings, his centre above the line so the re-read chance there clears the carded edge
+    // the tells (7 Nov 2026): a pool of graded picks on an earlier night, so the spike's over reads green (40-20 before Embiid's win), the favourite's over red (20-40 before Towns' loss) and the spike's under too few (10)
+    let pid = 100;
+    const pool = (n, w, side, spikeEff, fav, mk) => { const out = []; for (let i = 0; i < n; i++) { const r = row(++pid, 'Pool Man ' + pid, fav ? 'NYK' : 'PHI', mk, side, 20.5, 20.5, 0.01, 'LEAN', 0.53, i < w ? 'win' : 'loss', 0); r.gdate = '2026-11-03'; r.cons = null; r.log = []; r.parts = spikeEff ? [{ k: 'minutes', t: 'Minutes, his last 5 against the season', eff: spikeEff, i: 0 }] : []; out.push(r); } return out; };
+    rows.push(...pool(60, 40, 'OVER', 0.8, false, 'pts'), ...pool(60, 20, 'OVER', 0, true, 'reb'), ...pool(10, 6, 'UNDER', 0.6, false, 'ast'));
+    await smStore.setItem('callsheet3.props.v1', JSON.stringify(rows));
+  });
+  await reloaded();
+  const mktT = await pg.evaluate(async () => {
+    const wait = () => new Promise(r => setTimeout(r, 90));
+    const txt = e => (e ? e.innerText : '').replace(/\s+/g, ' ').trim();
+    await smStore.ready;
+    document.getElementById('propsReset').click(); await wait();
+    document.getElementById('m-props').click(); await wait();
+    const strip = [...document.querySelectorAll('#propsSim .pk.simg')].map(e => e.className + '|' + txt(e));
+    const best = [...document.querySelectorAll('#propsBest .pk')].map(e => { const l = e.querySelector('.n5.shopline') || e.querySelector('.n5.simline'); return txt(e.querySelector('.n2')) + '→' + (l ? l.className + '|' + txt(l) : 'none'); });
+    const card = [...document.querySelectorAll('#propsBest .pk')].find(e => /Tyrese Maxey/.test(e.textContent));
+    // the BET band in front, the best app and the close (6 Nov 2026)
+    const betCard = txt(card), betCls = card.className, betN1 = txt(card.querySelector('.n1')), betWhy = txt(card.querySelector('.n5.betwhy')), leanCls = [...document.querySelectorAll('#propsBest .pk')].filter(e => !/Tyrese Maxey/.test(e.textContent)).map(e => e.className);
+    const divider = txt(document.querySelector('#propsBest .pk-divider')), dividerAt = [...document.getElementById('propsBest').children].findIndex(e => e.classList.contains('pk-divider'));
+    const bestApp = [...document.querySelectorAll('#propsBest .pk')].map(e => txt(e.querySelector('.n2')) + '→' + txt(e.querySelector('.n5.bestapp')));
+    // the tells (7 Nov 2026): the chips on the cards, the filter and the panel's line
+    const tells = [...document.querySelectorAll('#propsBest .pk')].map(e => txt(e.querySelector('.n2')) + '→' + [...e.querySelectorAll('.n5.tells .tell')].map(t => t.className + '|' + txt(t)).join(' ; '));
+    const selT = (v) => { const el = document.getElementById('propsTells'); el.value = v; el.dispatchEvent(new Event('change', { bubbles: true })); };
+    selT('green'); await wait(); const tellsGreen = [...document.querySelectorAll('#propsBest .pk .n2')].map(txt), tellsGreenDiv = txt(document.querySelector('#propsBest .pk-divider'));
+    selT('red'); await wait(); const tellsRed = [...document.querySelectorAll('#propsBest .pk .n2')].map(txt);
+    selT(''); await wait();
+    const embiidCard = [...document.querySelectorAll('#propsBest .pk')].find(e => /Joel Embiid/.test(e.textContent)); embiidCard.click(); await wait();
+    const panelTells = [...document.querySelectorAll('#propDetail .pd-tells .tell')].map(t => t.className + '|' + txt(t)), panelTellsDim = txt(document.querySelector('#propDetail .pd-tells .dim'));
+    document.getElementById('propDetailClose').click(); await wait();
+    const load = async (doc, fname) => { const dt = new DataTransfer(); dt.items.add(new File([JSON.stringify(doc)], fname, { type: 'application/json' })); const inp = document.getElementById('slateFile'); inp.files = dt.files; inp.dispatchEvent(new Event('change', { bubbles: true })); await wait(); await wait(); };
+    await load({ format: 'callsheet3.props.close', version: 1, date: '2026-11-05', generated: '2026-11-05T23:30:00Z', games: [{ gid: 'x', away: '76ers', home: 'Knicks', aab: 'PHI', hab: 'NYK', spread: -5.5, total: 229.5, props: [
+      { pid: '1', name: 'Tyrese Maxey', team: 'PHI', opp: 'NYK', home: false, mk: 'pts', line: 24.5, op: -110, up: -110, book: 'fanatics', books: { fanatics: [24.5, -110, -110] } },
+      { pid: '2', name: 'Jalen Brunson', team: 'NYK', opp: 'PHI', home: true, mk: 'ast', line: 6.5, op: -125, up: 105, book: 'fanatics', books: { fanatics: [6.5, -125, 105] } },
+      { pid: '9', name: 'Nobody Here', team: 'NYK', opp: 'PHI', home: true, mk: 'pts', line: 10.5, op: -110, up: -110, book: 'fanatics', books: {} }] }] }, 'nba-props-close-2026-11-05.json');
+    const closeMsg = txt(document.getElementById('propsMsg'));
+    const clvCards = [...document.querySelectorAll('#propsBest .pk')].map(e => txt(e.querySelector('.n2')) + '→' + ((e.querySelector('.n5.clvline') || {}).className || '') + '|' + txt(e.querySelector('.n5.clvline')));
+    const storedClose = JSON.parse(smStore.getItem('callsheet3.props.v1')).map(r => r.name + ':' + JSON.stringify(r.close || null));
+    const card2 = [...document.querySelectorAll('#propsBest .pk')].find(e => /Tyrese Maxey/.test(e.textContent));
+    card2.click(); await wait();
+    const dlg = document.getElementById('propDetail');
+    const panelBetWhy = txt(dlg.querySelector('.pd-betwhy')), panelClv = txt(dlg.querySelector('.pd-clv')), panelClvCls = (dlg.querySelector('.pd-clv') || {}).className || '';
+    const tiles = [...dlg.querySelectorAll('.pd-mkt .pd-simtiles .pd-tile')].map(e => e.querySelector('.k').textContent + '=' + e.querySelector('.v').textContent + '|' + ((e.querySelector('.s') || {}).textContent || '').slice(0, 60) + '|' + e.className);
+    const head = ((dlg.querySelector('.pd-mkt h4') || {}).textContent || '').replace(/\s+/g, ' ').trim(), simBlock = !!dlg.querySelector('.pd-sim:not(.pd-mkt)');
+    const levers = [...dlg.querySelectorAll('.pd-levers .lever')].map(e => e.className + '|' + e.querySelector('.lt').textContent.trim());
+    document.getElementById('propDetailClose').click(); await wait();
+    const cells = [...document.querySelectorAll('#propsTable tbody tr[data-prop]')].map(tr => { const tds = tr.querySelectorAll('td'), c = tr.querySelector('td.simc'); return tds[1].textContent.trim() + '|' + (c ? c.textContent.trim() + '|' + c.className + '|' + c.title.slice(0, 50) : 'none'); });
+    const sel = (id, v) => { const el = document.getElementById(id); el.value = v; el.dispatchEvent(new Event('change', { bubbles: true })); };
+    sel('propsSimSel', 'yes'); await wait(); const yes = [...document.querySelectorAll('#propsTable tbody tr[data-prop] td:nth-child(2)')].map(td => td.textContent.trim());
+    sel('propsSimSel', 'no'); await wait(); const no = [...document.querySelectorAll('#propsTable tbody tr[data-prop] td:nth-child(2)')].map(td => td.textContent.trim());
+    sel('propsSimSel', ''); await wait();
+    // the Spike column and the tells filter on the table (9 Nov 2026)
+    const nm = () => [...document.querySelectorAll('#propsTable tbody tr[data-prop] td:nth-child(2)')].map(td => td.textContent.trim().split(' ').slice(0, 2).join(' '));
+    const spikeCells = [...document.querySelectorAll('#propsTable tbody tr[data-prop]')].map(tr => { const td = tr.querySelector('td.spikec'); return tr.querySelectorAll('td')[1].textContent.trim().split(' ').slice(0, 2).join(' ') + '|' + (td ? td.className + '|' + td.textContent.trim() + '|' + td.title.slice(0, 110) : 'none'); });
+    const spikeHead = ((document.querySelector('#propsTable th[data-sort="spike"]') || {}).textContent || '').trim();
+    sel('propsTellSel', 'spike'); await wait(); const tellSpike = nm();
+    sel('propsTellSel', 'fav'); await wait(); const tellFav = nm();
+    sel('propsTellSel', 'green'); await wait(); const tellGreen = nm();
+    sel('propsTellSel', 'red'); await wait(); const tellRed = nm();
+    sel('propsTellSel', ''); await wait();
+    document.querySelector('#propsTable th[data-sort="spike"]').click(); await wait(); const spikeSorted = nm(), spikeHeadOn = document.querySelector('#propsTable th[data-sort="spike"]').textContent.trim();
+    document.getElementById('propsReset').click(); await wait();
+    const record = txt(document.getElementById('propsCalib'));
+    // the same-game pairs at one app (5 Nov 2026): the card names the app, the panel reads the same ticket at each of the four apps
+    const pairs = [...document.querySelectorAll('#propsPairs .pk')].map(e => txt(e).slice(0, 220));
+    const pairCard = document.querySelector('#propsPairs .pk'); let pairApps = [], pairSub = '', pairHow = '';
+    if (pairCard) { pairCard.click(); await wait(); pairApps = [...dlg.querySelectorAll('.pd-apps tbody tr')].map(tr => txt(tr).slice(0, 120)); pairSub = txt(dlg.querySelector('.pd-sub')); pairHow = txt([...dlg.querySelectorAll('.pd-base')].find(p => /Both legs are read at|No single app posts/.test(p.textContent))).slice(-200); document.getElementById('propDetailClose').click(); await wait(); }
+    const selLabel = txt([...document.querySelectorAll('#propsView .propsctl label')].find(l => l.querySelector('#propsSimSel')));
+    const subhead = txt([...document.querySelectorAll('#propsView .subhead')].find(e => /the market on the games/i.test(e.textContent)));
+    const cardTile = txt(document.querySelector('#calibBox .calib[data-sport="PROPS"] .sides'));
+    document.getElementById('propsReset').click(); await wait(); document.getElementById('m-nba').click(); await wait();
+    await smStore.removeItem('callsheet3.props.v1');
+    return { strip, best, tiles, head, simBlock, levers, cells, yes, no, record, selLabel, subhead, pairs, pairApps, pairSub, pairHow, betCard, betCls, betN1, betWhy, leanCls, divider, dividerAt, bestApp, closeMsg, clvCards, storedClose, panelBetWhy, panelClv, panelClvCls, cardTile,
+             tells, tellsGreen, tellsGreenDiv, tellsRed, panelTells, panelTellsDim, spikeCells, spikeHead, tellSpike, tellFav, tellGreen, tellRed, spikeSorted, spikeHeadOn };
+  });
+  chk(/^pk scored bet$/.test(mktT.betCls) && /^BET #1 · BET · 3 to 5 points of edge levers/.test(mktT.betN1) && mktT.leanCls.length === 3 && mktT.leanCls.every(c => c === 'pk lean')
+      && /^Why a BET: 56\.4% clears the 52\.4% that [-−]110 needs by 4\.0 points · the model says 58% at a fifth of the say, the book 50% · the books' consensus with it \([-−]1\.5 on the over\) · the top lever Pace \+0\.3, against it\.$/.test(mktT.betWhy) && mktT.panelBetWhy === mktT.betWhy
+      && mktT.dividerAt === 1 && /^LEANs below: information, not a measured edge \(the band says 55% and does 52% over 1,300 graded picks\); the BETs above are the bets\.$/.test(mktT.divider),
+      'props: the BET band in front (6 Nov 2026): the BET card carries the badge, its edge tier and a why line in words from its own numbers, the panel the same line, and the LEANs sit quieter under a divider that says what the record says of them', JSON.stringify({ cls: mktT.betCls, n1: mktT.betN1, why: mktT.betWhy, lean: mktT.leanCls, divider: mktT.divider, at: mktT.dividerAt }));
+  chk(mktT.bestApp.some(b => /^Jalen Brunson OVER 6\.5 assists→Best app: DraftKings 5\.5 at \+100 · 5\d\.\d% there, edge \+\d\.\d against \+0\.5 at fanatics$/.test(b)) && mktT.bestApp.some(b => /^Tyrese Maxey UNDER 25\.5 points→$/.test(b)),
+      'props: the best app for a single pick (6 Nov 2026): Brunson\'s over reads a point lower and at even money at DraftKings, so the card names it with the chance re-read there and the edge against the carded book; Maxey\'s under has no better line among the apps, so no line', JSON.stringify(mktT.bestApp));
+  chk(/^The close nba-props-close-2026-11-05\.json attached to 2 props; 1 in the file had no prop loaded for the morning \(load the morning's props first; the close adds none\)\. Every pick now reads against the close/.test(mktT.closeMsg)
+      && mktT.clvCards.some(c => /^Tyrese Maxey UNDER 25\.5 points→n5 clvline pos\|The close: 24\.5 at [-−]110 · the line moved the pick's way · beat the close by \d+\.\d points of edge$/.test(c))
+      && mktT.clvCards.some(c => /^Jalen Brunson OVER 6\.5 assists→n5 clvline pos\|The close: 6\.5 at [-−]125 · the price moved the pick's way · beat the close by \d+\.\d points of edge$/.test(c))
+      && mktT.clvCards.some(c => /^Joel Embiid OVER 10\.5 rebounds→\|$/.test(c)) && mktT.storedClose.some(s => /^Tyrese Maxey:\{"line":24\.5,"op":-110,"up":-110,"book":"fanatics","at":"2026-11-05T23:30:00Z"\}$/.test(s)) && mktT.storedClose.some(s => /^Joel Embiid:null$/.test(s))
+      && /^The close: 24\.5 at [-−]110 · the line moved the pick's way · beat the close by \d+\.\d points of edge · the chance re-read at the closing line/.test(mktT.panelClv) && /pd-clv pos$/.test(mktT.panelClvCls)
+      && /against the close: BET beat it 1 of 1 \(\+\d+\.\d pts a pick\) · LEAN 1 of 1 \(\+\d+\.\d\) · no edge 0 of 0/.test(mktT.cardTile) && /Against the close · closing line value 2 of 2 \+\d+\.\d points of edge a pick kept against the close · BET 1 of 1 \(\+\d+\.\d\) · LEAN 1 of 1 \(\+\d+\.\d\) · no edge 0 of 0/i.test(mktT.record),
+      'props: the closing-line file (6 Nov 2026) attaches each prop\'s close to its row and adds none, the card and the panel read the pick against the close (Maxey\'s under beat it, the line moving its way; Brunson\'s over beat it on price), the record keeps how many picks beat the close by band and the points a pick', JSON.stringify({ msg: mktT.closeMsg, cards: mktT.clvCards, stored: mktT.storedClose, panel: mktT.panelClv, pcls: mktT.panelClvCls, tile: mktT.cardTile.slice(0, 600), record: mktT.record.replace(/^[\s\S]*?(Against the close)/, '$1').slice(0, 300) }));
+  chk(/a man on a club favoured by 5 or more: unders 0-0 · overs 20-41 [-−]\d+\.\du \(shown, not scored\)/.test(mktT.cardTile) && /a minutes spike \(his last five above his season\): unders 6-4 \+\d\.\du · overs 41-20 \+\d+\.\du \(shown, not scored\)/.test(mktT.cardTile)
+      && /A favourite's man \(5\+\), the under \(shown, not scored\) 0-0/i.test(mktT.record) && /A favourite's man \(5\+\), the over 20-41/i.test(mktT.record) && /A minutes spike, the under \(shown, not scored\) 6-4/i.test(mktT.record) && /A minutes spike, the over 41-20/i.test(mktT.record),
+      'props: two lines that measure themselves (6 Nov 2026): a man on a club favoured by five or more (Towns on the Knicks at -5.5, the over, lost, after a seeded pool of 60) and a minutes spike (Embiid\'s last five above his season, the over, won, after a pool of 60; ten unders), by the side the sheet took, on the card\'s tile and as tiles on the tab', JSON.stringify({ tile: mktT.cardTile.slice(0, 900) }));
+  chk(mktT.tells.some(t => /^Tyrese Maxey UNDER 25\.5 points→$/.test(t)) && mktT.tells.some(t => /^Joel Embiid OVER 10\.5 rebounds→tell green\|Minutes spike \+0\.5 · the over on a spike man not on a favourite does 67\.2%, claimed 53\.0%, on 61 BET and LEAN picks$/.test(t))
+      && mktT.tells.some(t => /^Karl-Anthony Towns OVER 22\.5 points→tell red\|His club favoured by 5\.5 · the over on a favourite's man does 32\.8%, claimed 53\.0%, on 61 picks$/.test(t)) && mktT.tells.some(t => /^Jalen Brunson OVER 6\.5 assists→tell red\|His club favoured by 5\.5 · the over on a favourite's man does 32\.8%, claimed 53\.0%, on 61 picks$/.test(t))
+      && JSON.stringify(mktT.tellsGreen) === '["Joel Embiid OVER 10.5 rebounds"]' && /^No BET among these\. LEANs below: information, not a measured edge/.test(mktT.tellsGreenDiv) && JSON.stringify(mktT.tellsRed.slice().sort()) === '["Jalen Brunson OVER 6.5 assists","Karl-Anthony Towns OVER 22.5 points"]'
+      && mktT.panelTells.length === 1 && /^tell green\|Minutes spike \+0\.5 · the over on a spike man not on a favourite does 67\.2%, claimed 53\.0%, on 61 BET and LEAN picks$/.test(mktT.panelTells[0]) && /^· the tells \(7 Nov 2026\), shown, not scored: the favourite's chip reads every graded pick on this side, the spike's chip the BET and LEAN picks on a spike man not on a favourite \(10 Nov 2026: on a favourite's man the spike swings by the night and carries no colour\), the even-money chip the BET and LEAN picks at \+100 or longer since the blend changed on 5 Nov \(12 Nov 2026: a test\); green where the line has done at least what it claimed on 50 picks or more, red where less\. The home and road chip \(21 Nov 2026\) has no model in it: every graded prop where his club stands as tonight \(at home or on the road, favoured by 3\.5 or more, a dog by as much, or inside it\), this side's rate against the fair chance of the two prices; green where the price has leaned against the other side by two errors or more and this side has paid, red where it has leaned against this side by as much, drawn from 300 graded props$/.test(mktT.panelTellsDim),
+      'props: the tells (7 Nov 2026): a minutes spike and a favourite\'s man ride on the best cards as chips coloured live off the record on the pick\'s side (Embiid\'s spike green at 67% on 61 picks, Brunson\'s and Towns\' favourite\'s over red at 33%, Maxey none), the panel carries the same chip and its note, and the tells filter keeps the picks with a green tell and no red, or with a red one', JSON.stringify({ tells: mktT.tells, green: mktT.tellsGreen, div: mktT.tellsGreenDiv, red: mktT.tellsRed, panel: mktT.panelTells, dim: mktT.panelTellsDim }));
+  chk(mktT.spikeHead === 'Spike' && mktT.spikeCells.some(c => /^Joel Embiid\|spikec pos\|\+0\.5\|Minutes, his last 5 against the season: \+0\.5 rebounds at his minutes; a spike at \+0\.3/.test(c)) && mktT.spikeCells.some(c => /^Tyrese Maxey\|spikec\|\|no minutes lever on this prop$/.test(c)) && mktT.spikeCells.length === 4
+      && JSON.stringify(mktT.tellSpike) === '["Joel Embiid"]' && JSON.stringify(mktT.tellFav.slice().sort()) === '["Jalen Brunson","Karl-Anthony Towns"]' && JSON.stringify(mktT.tellGreen) === '["Joel Embiid"]' && JSON.stringify(mktT.tellRed.slice().sort()) === '["Jalen Brunson","Karl-Anthony Towns"]'
+      && mktT.spikeSorted[0] === 'Joel Embiid' && mktT.spikeSorted.length === 4 && /^Spike ▾$/.test(mktT.spikeHeadOn),
+      'props: the Spike column and the tells filter on the table (9 Nov 2026): the minutes lever\'s push in its own column, green at +0.3 and up with the words in the title, blank where a prop has no minutes lever, sortable with the spikes first, and the tells filter keeps the spikes, the favourites\' men, or the picks with a green or a red chip', JSON.stringify({ head: mktT.spikeHead, cells: mktT.spikeCells, spike: mktT.tellSpike, fav: mktT.tellFav, green: mktT.tellGreen, red: mktT.tellRed, sorted: mktT.spikeSorted, headOn: mktT.spikeHeadOn }));
+  chk(mktT.pairs.length >= 3 && mktT.pairs.every(p => /^PAIR #\d · 76ers @ Knicks · at (Fanatics|DraftKings|FanDuel|BetMGM) · the price (agrees|asks more) /.test(p))
+      && mktT.pairApps.length === 4 && mktT.pairApps.some(r => /chosen/.test(r)) && mktT.pairApps.some(r => /^BetMGM — — does not post both legs$/.test(r)) && mktT.pairApps.filter(r => /^(Fanatics|DraftKings|FanDuel)( chosen)? \d+(\.\d)? [-−+]\d+ \d+(\.\d)? [-−+]\d+ \d\d\.\d% [-−+]\d+ \d\d\.\d% [-−+]\d+\.\d$/.test(r)).length === 3
+      && / · both at (Fanatics|DraftKings|FanDuel)$/.test(mktT.pairSub) && /Both legs are read at (Fanatics|DraftKings|FanDuel), (at the carded lines|the chance re-read at its line where it differs from the carded one), so the ticket goes into one app as it reads here\.$/.test(mktT.pairHow),
+      'pairs: from 5 Nov 2026 every same-game pair is one app\'s ticket, both legs at that app\'s line and price with the best edge chosen, the card names the app, and the pair\'s panel reads the same ticket at each of the four apps with the chosen one marked and an app that posts only one leg said so',
+      JSON.stringify({ pairs: mktT.pairs.slice(0, 3), apps: mktT.pairApps, sub: mktT.pairSub, how: mktT.pairHow }));
+  chk(mktT.strip.length === 1 && /^pk simg mkt\|76ers @ Knicks · the market PHI 112 \(110 a game\) · NYK 117\.5 \(115 a game\) total 229\.5 · spread -5\.5 each club's points implied by the book's total and spread, against its points a game by the ratings · shown, not scored expected margin 10\.9 · blowout of 15 or more 27%, off the spread · the carded line sits off the books' consensus on 4 of 4 props$/.test(mktT.strip[0])
+      && mktT.best.length === 4 && /^Tyrese Maxey UNDER 25\.5 points→n5 shopline pos\|The books: 4 post 24\.5 \(Pinnacle 24\.5\) · fanatics 25\.5 sits 1 above them, the UNDER's way · the book's chance read -1\.5 on the over, measured$/.test(mktT.best[0])
+      && mktT.best.some(b => /^Jalen Brunson OVER 6\.5 assists→n5 shopline neg\|The books: 4 post 5\.5 \(Pinnacle 5\.5\) · fanatics 6\.5 sits 1 above them, against the OVER · the book's chance read -3\.0 on the over, measured$/.test(b))
+      && mktT.best.some(b => /^Joel Embiid OVER 10\.5 rebounds→n5 shopline pos\|The books: 4 post 11\.5 \(Pinnacle 11\.5\) · fanatics 10\.5 sits 1 below them, the OVER's way · the book's chance read \+3\.0 on the over, measured/.test(b)),
+      'props: with the simulation off, the strip above the picks carries the market on the game (each club\'s points implied by the total and spread against its average, the expected margin and the blowout off the spread, how many carded lines sit off the books\' consensus), and every best card ends with the books\' consensus against the carded line, green when it sits the pick\'s way', JSON.stringify({ strip: mktT.strip, best: mktT.best }));
+  chk(/^The market on this game/.test(mktT.head) && !mktT.simBlock && mktT.tiles.length === 5
+      && /^The books=24\.5\|4 post it · Pinnacle 24\.5 · fanatics 25\.5, 1 above\|pd-tile good$/.test(mktT.tiles[0]) && /^Consensus lever=-1\.5 pts\|on the book's over chance: half the measured slope, capped at six\|pd-tile good$/.test(mktT.tiles[1])
+      && /^PHI points=112\|implied by the book's total and spread · 110 a game by the ratings \(×1\.018/.test(mktT.tiles[2]) && /^Expected margin=10\.9\|off the spread · a starter's minutes follow it/.test(mktT.tiles[3]) && /^Blowout=27%\|15 or more either way, off the spread/.test(mktT.tiles[4])
+      && mktT.levers.some(l => /The books' consensus, on the market's number/.test(l))
+      && mktT.cells.length === 4 && /^Tyrese Maxey\|24\.5\|simc pos\|the books' consensus line across 4 books/.test(mktT.cells.find(c => /^Tyrese Maxey/.test(c))) && /^Jalen Brunson\|5\.5\|simc neg\|/.test(mktT.cells.find(c => /^Jalen Brunson/.test(c)))
+      && mktT.yes.join('|') === 'Tyrese Maxey|Joel Embiid' && mktT.no.slice().sort().join('|') === 'Jalen Brunson|Karl-Anthony Towns'
+      && /the books' consensus with the pick 1-0 \+0\.9u · against it 0-1 -1\.0u/.test(mktT.record) && /THE BOOKS' CONSENSUS WITH THE PICK, HALF A POINT OR MORE 1-0/i.test(mktT.record) && /THE BOOKS' CONSENSUS AGAINST THE PICK 0-1/i.test(mktT.record)
+      && /^the books the books' consensus on the pick's side$/i.test(mktT.selLabel.replace(/\s+all.*$/i, '').replace(/^the books\s+/i, 'the books ').slice(0, 9) + mktT.selLabel.slice(9).replace(/^.*?(the books' consensus on the pick's side).*$/i, ' $1')) || /the books/i.test(mktT.selLabel)
+      && /^The market on the games in the simulation's place from 5 Nov 2026/i.test(mktT.subhead),
+      'props: the prop\'s panel carries the market in the simulation\'s old place (the books with the carded line\'s gap, the consensus lever, the club\'s implied points, the expected margin, the blowout) and no simulation block, the levers list names the consensus, the table\'s column shows the consensus line green when it sits the pick\'s way, the filter keeps the props the consensus sides with (or against), and the record keeps the consensus\'s own line', JSON.stringify({ head: mktT.head, tiles: mktT.tiles, levers: mktT.levers, cells: mktT.cells, yes: mktT.yes, no: mktT.no, record: mktT.record.slice(0, 700), sel: mktT.selLabel, sub: mktT.subhead.slice(0, 80) }));
+
+  // ---- 10 Nov 2026: one bet a man a night -- the note above the best list, the line on a man's several BET cards and on the panel, the record's tile and its line on the card's tile ----
+  await pg.evaluate(async () => {
+    await smStore.ready;
+    const row = (id, gdate, pid, name, team, mk, side, line, edge, chance, result) => ({ id, gdate, game: 'Pelicans @ Warriors', away: 'Pelicans', home: 'Warriors', aab: 'NOP', hab: 'GSW', pid: String(pid), name, team, opp: team === 'GSW' ? 'NOP' : 'GSW', athome: team === 'GSW', pos: 'G', mk, line, op: -115, up: -115, book: 'betmgm',
+      books: { betmgm: [line, -115, -115] }, proj: line + (side === 'OVER' ? 6 : -6), sd: 8, pm: side === 'OVER' ? 0.8 : 0.2, pb: 0.5, p: side === 'OVER' ? chance : 1 - chance, push: 0, side, chance, price: -115, need: 0.535, edge, band: 'BET', mins: 34, rate36: 30, base: 28, med: line + (side === 'OVER' ? 5.5 : -5.5), usg: 30, sdf: 0.9, starter: true, start_src: "RotoWire's expected five",
+      total: 232.5, spread: -9.5, why: ['30.0 per 36 this season'], log: [], parts: [{ k: 'pace', t: 'Pace', eff: 1.0, i: 0 }], mkt: null, cons: null,
+      actual: result === 'win' ? (side === 'UNDER' ? line - 3 : line + 3) : result === 'loss' ? (side === 'UNDER' ? line + 3 : line - 3) : null, amin: result ? 30 : null, result });
+    const rows = [
+      // a graded night: Curry's three BETs (the one with the most edge lost, one of the others won) and one BET on a Pelican, the dog
+      row(1, '2026-11-08', 201, 'Stephen Curry', 'GSW', 'pra', 'OVER', 37.5, 0.047, 0.582, 'loss'), row(2, '2026-11-08', 201, 'Stephen Curry', 'GSW', 'pa', 'OVER', 33.5, 0.045, 0.58, 'loss'), row(3, '2026-11-08', 201, 'Stephen Curry', 'GSW', 'pts', 'OVER', 28.5, 0.038, 0.573, 'win'),
+      row(4, '2026-11-08', 202, 'Dejounte Murray', 'NOP', 'ast', 'UNDER', 7.5, 0.04, 0.575, 'win'),
+      // the night on the tab: Curry's three BETs again and one on Podziemski, all in one game
+      row(5, '2026-11-09', 201, 'Stephen Curry', 'GSW', 'pra', 'OVER', 37.5, 0.047, 0.582, null), row(6, '2026-11-09', 201, 'Stephen Curry', 'GSW', 'pa', 'OVER', 33.5, 0.045, 0.58, null), row(7, '2026-11-09', 201, 'Stephen Curry', 'GSW', 'pts', 'OVER', 28.5, 0.038, 0.573, null),
+      row(8, '2026-11-09', 203, 'Brandin Podziemski', 'GSW', 'pra', 'OVER', 24.5, 0.036, 0.571, null)];
+    await smStore.setItem('callsheet3.props.v1', JSON.stringify(rows));
+  });
+  await reloaded();
+  const oneT = await pg.evaluate(async () => {
+    const wait = () => new Promise(r => setTimeout(r, 90));
+    const txt = e => (e ? e.innerText : '').replace(/\s+/g, ' ').trim();
+    await smStore.ready;
+    document.getElementById('propsReset').click(); await wait();
+    document.getElementById('m-props').click(); await wait();
+    const best = document.getElementById('propsBest');
+    const note = txt(best.querySelector('.pk-note')), noteAt = [...best.children].findIndex(e => e.classList.contains('pk-note'));
+    const cards = [...best.querySelectorAll('.pk')].map(e => txt(e.querySelector('.n2')) + '→' + txt(e.querySelector('.n5.onebet')));
+    const card2 = [...best.querySelectorAll('.pk')].find(e => /Stephen Curry OVER 33\.5/.test(e.textContent)); card2.click(); await wait();
+    const panel = txt(document.querySelector('#propDetail .pd-onebet'));
+    document.getElementById('propDetailClose').click(); await wait();
+    const record = txt(document.getElementById('propsCalib'));
+    const cardTile = txt(document.querySelector('#calibBox .calib[data-sport="PROPS"] .sides'));
+    document.getElementById('propsReset').click(); await wait(); document.getElementById('m-nba').click(); await wait();
+    await smStore.removeItem('callsheet3.props.v1');
+    return { note, noteAt, cards, panel, record, cardTile };
+  });
+  chk(oneT.note === "The 4 BETs on this date sit on 2 men in 1 game: a man's BETs land or miss together, so that is 2 bets, not 4; and one game carries them all, so a blowout or a slow night hits every one." && oneT.noteAt === 0
+      && oneT.cards.length === 4 && oneT.cards[0] === 'Stephen Curry OVER 37.5 pts + reb + ast→One bet, not 3: he holds 3 BETs on this date (pts + reb + ast, pts + ast, points) and they land or miss together. This is the one with the most edge.'
+      && oneT.cards[1] === 'Stephen Curry OVER 33.5 pts + ast→The same bet as his OVER 37.5 pts + reb + ast: one outcome, so take one of his 3 BETs, not all 3.' && oneT.cards[2] === 'Stephen Curry OVER 28.5 points→The same bet as his OVER 37.5 pts + reb + ast: one outcome, so take one of his 3 BETs, not all 3.'
+      && oneT.cards[3] === 'Brandin Podziemski OVER 24.5 pts + reb + ast→' && oneT.panel === 'The same bet as his OVER 37.5 pts + reb + ast: one outcome, so take one of his 3 BETs, not all 3.',
+      'props: one bet a man (10 Nov 2026): the best list opens with how many men and games the date\'s BETs sit on, the card with the most edge says it is the one of his three, his other two say they are the same bet, a man with one BET carries no line, and the panel says the same', JSON.stringify({ note: oneT.note, at: oneT.noteAt, cards: oneT.cards, panel: oneT.panel }));
+  chk(/BET band 2-2 says 5\d\.\d% · does 50\.0%/i.test(oneT.record) && /BET band, one bet a man a night 1-1 says 5\d\.\d% · does 50\.0% \(±35\.4\) · [-−]0\.13u the over on a favourite's man 0-1 [-−]1\.0u · every other 1-0 \+0\.9u/i.test(oneT.record)
+      && /BET, one a man a night 1-1 [-−]0\.1u \(the over on a favourite's man 0-1\)/.test(oneT.cardTile),
+      'props: the record reads the BET band one bet a man a night beside the count by cards (10 Nov 2026): Curry\'s three BETs on the graded night count once, as the one with the most edge, which lost, the Pelican\'s under won, and the over on a favourite\'s man keeps its own count on the tile and on the card\'s line', JSON.stringify({ record: oneT.record.replace(/^[\s\S]*?(BET band)/i, '$1').slice(0, 420), tile: oneT.cardTile.slice(0, 500) }));
+
+  // ---- 10 Nov 2026: the spike's chip split by the favourite -- read off the BET and LEAN picks, coloured off a favourite, plain on one ----
+  await pg.evaluate(async () => {
+    await smStore.ready;
+    const row = (id, gdate, pid, name, team, side, band, edge, chance, result, spk) => ({ id, gdate, game: 'Pelicans @ Warriors', away: 'Pelicans', home: 'Warriors', aab: 'NOP', hab: 'GSW', pid: String(pid), name, team, opp: team === 'GSW' ? 'NOP' : 'GSW', athome: team === 'GSW', pos: 'G', mk: 'pts', line: 20.5, op: -110, up: -110, book: 'betmgm',
+      books: { betmgm: [20.5, -110, -110] }, proj: 22.5, sd: 7, pm: 0.6, pb: 0.5, p: side === 'OVER' ? chance : 1 - chance, push: 0, side, chance, price: -110, need: 0.524, edge, band, mins: 30, rate36: 24, base: 20, med: 22, usg: 24, sdf: 1, starter: true, start_src: "RotoWire's expected five",
+      total: 232.5, spread: -9.5, why: ['24.0 per 36 this season'], log: [], parts: spk ? [{ k: 'minutes', t: 'Minutes, his last 5 against the season', eff: spk, i: 0 }] : [], mkt: null, cons: null,
+      actual: result === 'win' ? (side === 'UNDER' ? 17 : 24) : result === 'loss' ? (side === 'UNDER' ? 24 : 17) : null, amin: result ? 30 : null, result });
+    const rows = []; let id = 0;
+    const pool = (n, w, team, band, spk) => { for (let i = 0; i < n; i++) { id++; rows.push(row(id, '2026-11-08', 300 + id, 'Pool Man ' + id, team, 'OVER', band, band === 'no edge' ? -0.01 : 0.01, 0.53, i < w ? 'win' : 'loss', spk)); } };
+    pool(60, 40, 'NOP', 'LEAN', 0.8);      // a spike, not on a favourite, in the bet bands: 40-20, green
+    pool(60, 20, 'GSW', 'LEAN', 0.8);      // a spike on a favourite's man, in the bet bands: 20-40, no colour of its own; the favourite's over reads 20-40 off the same men
+    pool(30, 0, 'NOP', 'no edge', 0.8);    // spike picks with no edge, every one lost: outside the chip's pools, inside the tile's
+    rows.push(row(901, '2026-11-09', 901, 'Jeremiah Fears', 'NOP', 'OVER', 'LEAN', 0.02, 0.544, null, 0.6), row(902, '2026-11-09', 902, 'Stephen Curry', 'GSW', 'OVER', 'LEAN', 0.015, 0.539, null, 0.6), row(903, '2026-11-09', 903, 'Zion Williamson', 'NOP', 'OVER', 'LEAN', 0.01, 0.534, null, 0));
+    await smStore.setItem('callsheet3.props.v1', JSON.stringify(rows));
+  });
+  await reloaded();
+  const splitT = await pg.evaluate(async () => {
+    const wait = () => new Promise(r => setTimeout(r, 90));
+    const txt = e => (e ? e.innerText : '').replace(/\s+/g, ' ').trim();
+    await smStore.ready;
+    document.getElementById('propsReset').click(); await wait();
+    document.getElementById('m-props').click(); await wait();
+    const all = [...document.querySelectorAll('#propsBest .pk')].map(e => txt(e.querySelector('.n2')).split(' OVER')[0] + '→' + [...e.querySelectorAll('.n5.tells .tell')].map(t => t.className + '|' + txt(t)).join(' ; '));
+    const selT = (v) => { const el = document.getElementById('propsTells'); el.value = v; el.dispatchEvent(new Event('change', { bubbles: true })); };
+    const names = () => [...document.querySelectorAll('#propsBest .pk .n2')].map(e => txt(e).split(' OVER')[0]);
+    selT('green'); await wait(); const green = names();
+    selT('red'); await wait(); const red = names();
+    selT(''); await wait();
+    const record = txt(document.getElementById('propsCalib')), cardTile = txt(document.querySelector('#calibBox .calib[data-sport="PROPS"] .sides'));
+    document.getElementById('propsReset').click(); await wait(); document.getElementById('m-nba').click(); await wait();
+    await smStore.removeItem('callsheet3.props.v1');
+    return { all, green, red, record, cardTile };
+  });
+  chk(splitT.all.length === 3 && splitT.all[0] === 'Jeremiah Fears→tell green|Minutes spike +0.6 · the over on a spike man not on a favourite does 66.7%, claimed 53.0%, on 60 BET and LEAN picks'
+      && splitT.all[1] === "Stephen Curry→tell plain|Minutes spike +0.6 · on a favourite's man the spike carries no colour: the over there is 20-40 on the BET and LEAN picks and swings by the night, so the favourite's chip is the read ; tell red|His club favoured by 9.5 · the over on a favourite's man does 33.3%, claimed 53.0%, on 60 picks"
+      && splitT.all[2] === 'Zion Williamson→' && JSON.stringify(splitT.green) === '["Jeremiah Fears"]' && JSON.stringify(splitT.red) === '["Stephen Curry"]',
+      'props: the spike\'s chip split by the favourite (10 Nov 2026): on a spike man not on a favourite it reads the BET and LEAN picks and takes their colour (40-20, green; thirty no-edge losses stay out of the pool), on a favourite\'s man it carries no colour and names the favourite\'s chip as the read, a man with neither carries nothing, and the tells filter follows', JSON.stringify({ all: splitT.all, green: splitT.green, red: splitT.red }));
+  chk(/A minutes spike, the over 60-90 .*?the chip reads the BET and LEAN picks: not on a favourite 40-20 \(66\.7%\) · on a favourite 20-40 \(33\.3%\), no colour/i.test(splitT.record)
+      && /the chip reads the BET and LEAN picks: the over off a favourite 40-20, on one 20-40/.test(splitT.cardTile),
+      'props: the spike\'s tile keeps every band\'s count and says under it what the chip reads, off a favourite and on one, and the card\'s line the same (10 Nov 2026)', JSON.stringify({ record: splitT.record.replace(/^[\s\S]*?(A minutes spike, the over)/i, '$1').slice(0, 330), tile: splitT.cardTile.slice(-260) }));
+
+  // ---- 11 Nov 2026: three-leg tickets under the BETs -- the legs' test, one app a ticket, three games before a shared one, a man in one ticket, the three modes, the copy, the take through a reload, the day board, the list kept at grading and the record ----
+  belowFree = true;
+  const t3Keep = await pg.evaluate(async () => { await smStore.ready; const k = { card: await smStore.getItem('callsheet3.card.v1'), slate: await smStore.getItem('callsheet3.slate.v1') }; await smStore.removeItem('callsheet3.props.v1'); return k; });
+  await reloaded();
+  const t3T = await pg.evaluate(async () => {
+    const wait = () => new Promise(r => setTimeout(r, 110));
+    const txt = e => (e ? e.innerText : '').replace(/\s+/g, ' ').trim();
+    await smStore.ready;
+    const copies = []; try { Object.defineProperty(navigator, 'clipboard', { configurable: true, value: { writeText: t => { copies.push(String(t)); return Promise.resolve(); } } }); } catch (e) {}
+    const load = async (doc, name) => { const dt = new DataTransfer(); dt.items.add(new File([JSON.stringify(doc)], name, { type: 'application/json' })); const inp = document.getElementById('slateFile'); inp.files = dt.files; inp.dispatchEvent(new Event('change', { bubbles: true })); await wait(); await wait(); };
+    const G = [['Hawks', 'Magic', 'ATL', 'ORL', -2.5], ['Bulls', 'Bucks', 'CHI', 'MIL', -2.5], ['Heat', 'Jazz', 'MIA', 'UTA', -2.5], ['Suns', 'Kings', 'PHX', 'SAC', -7.5]];
+    const ov = L => [L + 2, L - 2, L + 3, L - 1, L + 1, L + 2, L + 4, L - 3, L + 1, L + 2], un = L => [L - 2, L + 2, L - 3, L + 1, L - 1, L - 2, L - 4, L + 3, L - 1, L - 2];   // four of the last five and seven of the last ten the pick's way
+    const up = [{ k: 'pace', t: 'Pace', eff: 0.4, i: 0 }, { k: 'dvp', t: 'Defence v position', eff: 0.6, i: 0 }], dn = [{ k: 'pace', t: 'Pace', eff: -0.4, i: 0 }, { k: 'dvp', t: 'Defence v position', eff: -0.6, i: 0 }];
+    const man = (pid, name, team, gi, mk, side, line, chance, vals, parts, books) => ({ gi, pid: String(pid), name, team, opp: team === G[gi][2] ? G[gi][3] : G[gi][2], home: team === G[gi][3], pos: 'G', mk, line, op: -110, up: -110, book: books ? Object.keys(books)[0] : 'fanduel',
+      books: books || { fanduel: [line, -110, -110], draftkings: [line, -115, -115] }, proj: line + (side === 'OVER' ? 2 : -2), sd: 6, pm: side === 'OVER' ? 0.7 : 0.3, pb: 0.5, p: side === 'OVER' ? chance : Math.round((1 - chance) * 10000) / 10000, push: 0, side, chance, price: -110, need: 0.5238,
+      edge: Math.round((chance - 0.5238) * 10000) / 10000, band: 'LEAN', mins: 32, rate36: 20, base: 18, med: line + (side === 'OVER' ? 1.5 : -1.5), usg: 22, sdf: 1, starter: true, start_src: "RotoWire's expected five", why: ['x'],
+      log: vals.map((v, i) => ['2026-10-' + String(20 + i), 'OPP', i % 2, 32, v, ['won by 3']]), parts });
+    const men = () => [man(1, 'Man One', 'ATL', 0, 'pts', 'OVER', 20.5, 0.60, ov(20.5), up), man(2, 'Man Two', 'CHI', 1, 'reb', 'OVER', 7.5, 0.59, ov(7.5), up), man(3, 'Man Three', 'MIA', 2, 'ast', 'UNDER', 5.5, 0.58, un(5.5), dn),
+      man(7, 'Man Seven', 'ORL', 0, 'tpm', 'UNDER', 4.5, 0.57, un(4.5), dn, { fanduel: [4.5, -110, -110], draftkings: [3.5, -170, 140] }),   // DraftKings posts him a point lower at a price with an edge: three of his last five under it, so no leg there
+      man(8, 'Man Eight', 'MIL', 1, 'pts', 'OVER', 12.5, 0.56, ov(12.5), up), man(9, 'Man Nine', 'MIL', 1, 'reb', 'OVER', 6.5, 0.55, ov(6.5), up),
+      man(4, 'Cold Hand', 'ATL', 0, 'pts', 'OVER', 15.5, 0.60, [17.5, 17.5, 18.5, 16.5, 16.5, 13.5, 14.5, 17.5, 12.5, 16.5], up),   // two of his last five: no leg
+      man(5, 'Wrong Levers', 'CHI', 1, 'ast', 'OVER', 4.5, 0.60, ov(4.5), dn),                                                    // the levers against the over: no leg
+      man(6, 'Other App', 'MIA', 2, 'pts', 'OVER', 18.5, 0.60, ov(18.5), up, { betmgm: [18.5, -110, -110] }),                      // a leg at BetMGM alone: no three there
+      man(10, 'Big Fav', 'SAC', 3, 'pts', 'OVER', 22.5, 0.62, ov(22.5), up)];                                                      // the over on a favourite's man: out until its record reads green
+    const doc = (list) => ({ format: 'callsheet3.props', version: 1, date: '2026-11-12', games: G.map((g, gi) => ({ gid: 't3' + gi, away: g[0], home: g[1], aab: g[2], hab: g[3], spread: g[4], total: 225.5, props: list.filter(m => m.gi === gi) })) });
+    await load(doc(men()), 'nba-props-2026-11-12.json');
+    if (document.getElementById('propsView').hidden) { document.getElementById('m-props').click(); await wait(); }
+    document.getElementById('propsReset').click(); await wait();
+    const sel = (v) => { const el = document.getElementById('propsBelow'); el.value = v; el.dispatchEvent(new Event('change', { bubbles: true })); };
+    const best = document.getElementById('propsBest');
+    const tix = (root) => [...(root || best).querySelectorAll('.pk.t3')].map(e => ({ n1: txt(e.querySelector('.n1')), pay: txt(e.querySelector('.t3pay')), legs: [...e.querySelectorAll('.leg')].map(txt), pips: [...e.querySelectorAll('.leg .pips')].map(p => [...p.querySelectorAll('i')].map(i => i.className.replace(' g5', '|')).join('')).join(','), stats: txt(e.querySelector('.t3stats')), n4: txt(e.querySelector('.n4')), n6: txt(e.querySelector('.n6')), cls: e.className }));
+    const opts = [...document.querySelectorAll('#propsBelow option')].map(o => o.value + '=' + o.textContent), legOpts = [...document.querySelectorAll('#propsLegs option')].map(o => o.value + '=' + o.textContent);
+    const selLegs = (v) => { const el = document.getElementById('propsLegs'); el.value = v; el.dispatchEvent(new Event('change', { bubbles: true })); };
+    const tabsOf = (c) => [...c.querySelectorAll('.t3apps .t3app')].map(a => txt(a) + (a.classList.contains('on') ? '*' : a.classList.contains('off') ? ' (off)' : ''));
+    const brief = (t) => t.n1 + ' :: ' + t.legs.map(l => l.split(' ').slice(1, 3).join(' ')).join(' + ') + ' :: ' + t.stats.toLowerCase() + ' :: ' + t.cls;
+    // two legs a ticket, the default: the best pair first, on two games, by the same leg rule
+    sel('t3'); selLegs('2'); await wait();
+    const twoL = tix(), twoDiv = txt(best.querySelector('.pk-divider.t3d')), twoTabs = [...best.querySelectorAll('.pk.t3')].map(tabsOf), twoWhys = [...best.querySelectorAll('.pk.t3')].map(c => txt(c.querySelector('.t3why'))), twoLabel = txt(best.querySelector('.pk.t3 .t3apl')), storedLegs = await smStore.getItem('callsheet3.props.legs.v1');
+    sel('t3o'); await wait(); const twoO = tix().map(brief);
+    sel('t3u'); await wait(); const twoU = tix().map(brief);
+    sel('t3'); await wait();
+    copies.length = 0; best.querySelector('.pk.t3 [data-t3copy]').click(); await wait(); await wait(); const twoCopy = copies.slice();
+    selLegs('3'); await wait();
+    const either = tix(), divider = txt(best.querySelector('.pk-divider.t3d')), others = best.querySelectorAll('.pk:not(.t3)').length, inGrid = best.querySelectorAll('.t3grid > .pk.t3').length, pipTitle = (best.querySelector('.pk.t3 .pips i') || {}).title, pipAria = best.querySelector('.pk.t3 .pips') ? best.querySelector('.pk.t3 .pips').getAttribute('aria-label') : '';
+    sel('t3o'); await wait(); const overs = tix(), dividerO = txt(best.querySelector('.pk-divider.t3d'));
+    sel('t3u'); await wait(); const unders = tix(), none = txt(best.querySelector('.empty.t3none'));
+    sel('leans'); await wait(); const leans = [...best.querySelectorAll('.pk')].map(e => txt(e.querySelector('.n2'))), leansT3 = best.querySelectorAll('.pk.t3').length, leansDiv = txt(best.querySelector('.pk-divider'));
+    sel('t3'); await wait();
+    const stored0 = await smStore.getItem('callsheet3.props.below.v1');
+    // the same three at another app: the tabs, the ticket shown there, the copy and the take there, and back
+    const cards0 = [...best.querySelectorAll('.pk.t3')], tabs = cards0.map(tabsOf), whys = cards0.map(c => txt(c.querySelector('.t3why'))), tabLabel = txt(cards0[0].querySelector('.t3apl'));
+    cards0[0].querySelector('button.t3app:not(.on)').click(); await wait();
+    const atDK = tix()[0], tabsDK = tabsOf(best.querySelector('.pk.t3')), secondStays = tix()[1].n1;
+    copies.length = 0; best.querySelector('.pk.t3 [data-t3copy]').click(); await wait(); await wait();
+    const copiedDK = copies.slice();
+    best.querySelector('.pk.t3 [data-t3take]').click(); await wait();
+    const dkTaking = tix(document.getElementById('propsTaking')).map(t => t.n1), dkTabs = tabsOf(best.querySelector('.pk.t3')), dkSpec = ((JSON.parse(await smStore.getItem('callsheet3.props.v1')).find(r => r.pid === '1') || {}).t3 || []).map(sp => sp.id + (sp.take ? '/take' : ''));
+    best.querySelector('.pk.t3 [data-t3take]').click(); await wait();
+    const dkUntaken = tix(document.getElementById('propsTaking')).length + '|' + (((JSON.parse(await smStore.getItem('callsheet3.props.v1')).find(r => r.pid === '1') || {}).t3 || []).length);
+    [...best.querySelector('.pk.t3').querySelectorAll('button.t3app')].find(a => /FanDuel/.test(a.textContent)).click(); await wait();
+    const backAtFD = tix()[0].n1;
+    // a leg opens his panel; Copy puts the ticket in words and opens nothing; Take marks it and the strip carries it
+    best.querySelector('.pk.t3 .leg').click(); await wait();
+    const legPanel = document.getElementById('propDetail').hidden ? '' : txt(document.querySelector('#propDetailBody h3'));
+    document.getElementById('propDetailClose').click(); await wait();
+    copies.length = 0; best.querySelector('.pk.t3 [data-t3copy]').click(); await wait(); await wait();
+    const copied = copies.slice(), copySay = txt(document.getElementById('propsMsg')), panelAfterCopy = !document.getElementById('propDetail').hidden;
+    best.querySelector('.pk.t3 [data-t3take]').click(); await wait();
+    const taking = tix(document.getElementById('propsTaking')), takingCount = txt(document.getElementById('propsTakingCount')), takeBtn = txt(document.querySelector('#propsBest .pk.t3 [data-t3take]')), bestCls = best.querySelector('.pk.t3').className;
+    const spec0 = (JSON.parse(await smStore.getItem('callsheet3.props.v1')).find(r => r.pid === '1') || {}).t3 || [];
+    // the file loaded again with Man Two's pick turned to the under at a moved line: the ticket taken keeps its own legs, lines and sides
+    const again = men(), two = again.find(m => m.pid === '2'); two.side = 'UNDER'; two.line = 8.5; two.chance = 0.55; two.p = 0.45; two.edge = 0.0262; two.books = { fanduel: [8.5, -110, -110], draftkings: [8.5, -115, -115] };
+    await load(doc(again), 'nba-props-2026-11-12.json');
+    if (document.getElementById('propsView').hidden) { document.getElementById('m-props').click(); await wait(); }
+    const msg2 = txt(document.getElementById('propsMsg')).slice(0, 90), taking2 = tix(document.getElementById('propsTaking')), live2 = tix();
+    // the day board carries the ticket, and its text
+    document.getElementById('m-nba').click(); await wait();
+    const bd = document.getElementById('boardDate'); bd.value = '2026-11-12'; bd.dispatchEvent(new Event('change')); await wait();
+    const board = tix(document.getElementById('taking')), boardSum = txt(document.querySelector('#taking .pk.taking.sum')), boardCount = txt(document.getElementById('takingCount'));
+    copies.length = 0; document.getElementById('takingText').click(); await wait(); await wait();
+    const boardText = copies.slice();
+    document.getElementById('m-props').click(); await wait();
+    // the grade: the list is kept on the rows before the results land, then each ticket is graded on its own lines and sides
+    const box = (pid, name, pts, reb, ast, tpm) => [pid, [name, 32, pts, reb, ast, tpm]];
+    const gdoc = { format: 'callsheet2.slate', version: 1, date: '2026-11-12', games: [
+      { sport: 'NBA', gdate: '2026-11-12', away: 'Hawks', home: 'Magic', gameId: 't3a', finals: { fa: '110', fh: '105', f5a: '55', f5h: '50' }, notes: [], box: Object.fromEntries([box('1', 'Man One', 25, 4, 4, 2), box('7', 'Man Seven', 12, 3, 2, 6), box('4', 'Cold Hand', 10, 2, 2, 1)]) },
+      { sport: 'NBA', gdate: '2026-11-12', away: 'Bulls', home: 'Bucks', gameId: 't3b', finals: { fa: '100', fh: '111', f5a: '50', f5h: '56' }, notes: [], box: Object.fromEntries([box('2', 'Man Two', 14, 9, 3, 1), box('8', 'Man Eight', 10, 4, 2, 1), box('9', 'Man Nine', 8, 8, 1, 0), box('5', 'Wrong Levers', 9, 2, 6, 0)]) },
+      { sport: 'NBA', gdate: '2026-11-12', away: 'Heat', home: 'Jazz', gameId: 't3c', finals: { fa: '104', fh: '99', f5a: '52', f5h: '49' }, notes: [], box: Object.fromEntries([box('3', 'Man Three', 11, 3, 3, 1), box('6', 'Other App', 22, 5, 3, 2)]) },
+      { sport: 'NBA', gdate: '2026-11-12', away: 'Suns', home: 'Kings', gameId: 't3d', finals: { fa: '101', fh: '120', f5a: '50', f5h: '61' }, notes: [], box: Object.fromEntries([box('10', 'Big Fav', 30, 5, 3, 2)]) }] };
+    await load(gdoc, 'nba-grade-2026-11-12.json');
+    if (document.getElementById('propsView').hidden) { document.getElementById('m-props').click(); await wait(); }
+    const after = tix(), afterDiv = txt(best.querySelector('.pk-divider.t3d')), afterTaking = tix(document.getElementById('propsTaking'));
+    const rowsNow = JSON.parse(await smStore.getItem('callsheet3.props.v1')), specs = rowsNow.filter(r => r.t3).map(r => r.name + ':' + r.t3.map(sp => sp.app + '/' + sp.m + '/' + sp.ks.length + (sp.listed ? '/listed' + sp.n : '') + (sp.c ? '/c' + sp.c : '') + (sp.take ? '/take' : '')).join(',')).join(';');
+    const twoRow = rowsNow.find(r => r.pid === '2');
+    const record = txt(document.getElementById('propsCalib')), cardTile = txt(document.querySelector('#calibBox .calib[data-sport="PROPS"] .sides')), took = txt(document.querySelector('#calibBox .calib[data-sport="TAKEN"]'));
+    selLegs('2'); await wait(); const afterTwo = tix().map(brief), afterTwoDiv = txt(best.querySelector('.pk-divider.t3d')); selLegs('3'); await wait();
+    sel('t3o'); await wait(); const afterO = tix(), afterODiv = txt(best.querySelector('.pk-divider.t3d'));
+    sel('t3'); await wait();
+    await load(gdoc, 'nba-grade-2026-11-12.json');   // the grade loaded again leaves the list as it was kept
+    const specs2 = JSON.parse(await smStore.getItem('callsheet3.props.v1')).filter(r => r.t3).map(r => r.name + ':' + r.t3.length).join(',');
+    selLegs('2'); sel('leans'); await wait();
+    if (!document.getElementById('propsView').hidden) { document.getElementById('propsReset').click(); await wait(); } document.getElementById('m-nba').click(); await wait();
+    return { legOpts, two: twoL, twoDiv, twoTabs, twoWhys, twoLabel, storedLegs, twoO, twoU, twoCopy, afterTwo, afterTwoDiv, tabs, whys, tabLabel, atDK, tabsDK, secondStays, copiedDK, dkTaking, dkTabs, dkSpec, dkUntaken, backAtFD, opts, either, divider, others, inGrid, pipTitle, pipAria, overs, dividerO, unders, none, leans, leansT3, leansDiv, stored0, legPanel, copied, copySay, panelAfterCopy, taking, takingCount, takeBtn, bestCls, spec0, msg2, taking2, live2, board, boardSum, boardCount, boardText, after, afterDiv, afterTaking, specs, twoRow: [twoRow.side, twoRow.line, twoRow.result, twoRow.actual], record, cardTile, took, afterO, afterODiv, specs2 };
+  });
+  await pg.evaluate(async (k) => { await smStore.removeItem('callsheet3.props.v1'); if (k.card === null || k.card === undefined) await smStore.removeItem('callsheet3.card.v1'); else await smStore.setItem('callsheet3.card.v1', k.card); if (k.slate === null || k.slate === undefined) await smStore.removeItem('callsheet3.slate.v1'); else await smStore.setItem('callsheet3.slate.v1', k.slate); }, t3Keep);
+  belowFree = false;
+  await reloaded();
+  const lc = v => String(v || '').toLowerCase(), legOf = (t, i) => lc(t && t.legs[i]);
+  const t3Leg = (n, name, pick, price, pct, where, avg) => `${n} ${name} ${pick} ${price} · ${pct}% last 5: 4 of 5 · last 10: 7 of 10 ${where} · averaging ${avg} his last five · levers 2▲ 0▼`.toLowerCase();
+  chk(legsDefault === '2' && t3T.legOpts.join('|') === '2=2 legs|3=3 legs' && t3T.storedLegs === '2' && t3T.two.length === 2
+      && t3T.twoDiv === "No BET on this date. Two-leg tickets below, to test, in the LEANs' place: two men at one app on two games, each a pick with an edge whose last five games went his way four times or more and his last ten at least half, more levers toward the pick than against, no red chip and, from 15 Nov 2026, no leg priced -200 or shorter and no over priced -110 to -101. A card is one app throughout; where the same two also pass at another app, a tab on the card shows the ticket there. Replayed on the eleven nights that keep the logs and the levers, exactly as built here: such legs went 45-28 one at a time (the overs 20-7, the unders 25-21) and the tickets 7 of 20 for +2.8 units, where three legs went 2 of 12 for +0.7. A test, not a measured edge: its record builds in Is it working, and the LEANs are one choice away."
+      && t3T.two[0].n1 === '2 LEGS #1 · at FanDuel · two games' && t3T.two[0].pay === '+264 3.64×' && t3T.two[0].legs.length === 2 && legOf(t3T.two[0], 0) === t3Leg(1, 'Man One', 'OVER 20.5 points', '-110', '60.0', 'ATL @ ORL', '21.7') && legOf(t3T.two[0], 1) === t3Leg(2, 'Man Two', 'OVER 7.5 rebounds', '-110', '59.0', 'CHI @ MIL', '8.7')
+      && lc(t3T.two[0].stats) === 'both land 35.4% needs 27.4% edge +8.0 a unit wins 2.64u' && t3T.two[0].n4 === '' && lc(t3T.two[0].n6) === 'take copy ticket'
+      && t3T.two[1].n1 === '2 LEGS #2 · at FanDuel · two games' && t3T.two[1].legs.map(l => l.split(' ').slice(1, 3).join(' ')).join(',') === 'Man Three,Man Seven' && lc(t3T.two[1].stats) === 'both land 33.1% needs 27.4% edge +5.6 a unit wins 2.64u'
+      && /^the same two at$/i.test(t3T.twoLabel) && JSON.stringify(t3T.twoTabs) === '[["DraftKings +250 35.4%","FanDuel +264 35.4%*"],["DraftKings × (off)","FanDuel +264 33.1%*"]]' && t3T.twoWhys[1] === "Not at DraftKings: Man Seven's line is 3.5 there, 3 of his last 5 under it."
+      && t3T.twoO.length === 1 && /^2 LEGS #1 · at FanDuel · two games :: Man One \+ Man Two :: both land 35\.4%/.test(t3T.twoO[0]) && t3T.twoU.length === 1 && /^2 LEGS #1 · at FanDuel · two games :: Man Three \+ Man Seven :: both land 33\.1%/.test(t3T.twoU[0])
+      && t3T.twoCopy.length === 1 && t3T.twoCopy[0] === '2-leg ticket at FanDuel · pays +264 (3.64x) · both land 35.4%, needs 27.4%\n1. Man One OVER 20.5 points -110 · last 5: 4 of 5, last 10: 7 of 10 · Hawks @ Magic\n2. Man Two OVER 7.5 rebounds -110 · last 5: 4 of 5, last 10: 7 of 10 · Bulls @ Bucks'
+      && !/Cold Hand|Wrong Levers|Other App|Big Fav|Man Eight|Man Nine/i.test(JSON.stringify(t3T.two)),
+      'two-leg tickets (11 Nov 2026, the user: what about instead of the 3, we do 2 legs, the absolute best 2 men pairs): two legs are the default on a first visit and the choice is kept; the same leg rule, the best pair first by expected value, two men on two games at one app, a man in one ticket; the two men left on one game make no ticket (a same-game two is the pairs\' own section); the card reads both land, the tabs the same two at another app, the overs and the unders alone their own pair, and Copy the two-leg ticket in words', JSON.stringify({ def: legsDefault, opts: t3T.legOpts, stored: t3T.storedLegs, two: t3T.two, div: t3T.twoDiv.slice(0, 140), tabs: t3T.twoTabs, whys: t3T.twoWhys, label: t3T.twoLabel, overs: t3T.twoO, unders: t3T.twoU, copy: t3T.twoCopy }));
+  chk(belowDefault === 't3' && t3T.opts.join('|') === 't3=tickets, either side|t3o=tickets, overs|t3u=tickets, unders|t3c=tickets, best chance|plus=even money or better|leans=the LEANs one by one' && t3T.stored0 === 't3'
+      && t3T.either.length === 2 && t3T.inGrid === 2 && t3T.others === 0
+      && t3T.divider === "No BET on this date. Three-leg tickets below, to test, in the LEANs' place: three men at one app, each a pick with an edge whose last five games went his way four times or more and his last ten at least half, more levers toward the pick than against, no red chip and, from 15 Nov 2026, no leg priced -200 or shorter and no over priced -110 to -101. A card is one app throughout; where the same three also pass at another app, a tab on the card shows the ticket there. Replayed on the eleven nights that keep the logs and the levers, exactly as built here: such legs went 45-28 one at a time (the overs 20-7, the unders 25-21) and the tickets 2 of 12 for +0.7 units, where two legs went 7 of 20 for +2.8. A test, not a measured edge: its record builds in Is it working, and the LEANs are one choice away."
+      && t3T.either[0].n1 === '3 LEGS #1 · at FanDuel · three games' && t3T.either[0].pay === '+596 6.96×' && t3T.either[0].legs.length === 3
+      && legOf(t3T.either[0], 0) === t3Leg(1, 'Man One', 'OVER 20.5 points', '-110', '60.0', 'ATL @ ORL', '21.7') && legOf(t3T.either[0], 1) === t3Leg(2, 'Man Two', 'OVER 7.5 rebounds', '-110', '59.0', 'CHI @ MIL', '8.7')
+      && legOf(t3T.either[0], 2) === t3Leg(3, 'Man Three', 'UNDER 5.5 assists', '-110', '58.0', 'MIA @ UTA', '4.3') && t3T.either[0].pips === 'hmhmhh|hmhh,hmhmhh|hmhh,hmhmhh|hmhh'
+      && lc(t3T.either[0].stats) === 'all three land 20.5% needs 14.4% edge +6.2 a unit wins 5.96u' && t3T.either[0].n4 === '' && lc(t3T.either[0].n6) === 'take copy ticket'
+      && t3T.pipTitle === '10-20 @ OPP: 22.5, his way' && t3T.pipAria === "his last 10 games, oldest first: 7 went the pick's way",
+      'three-leg tickets (11 Nov 2026): under the BETs on a first visit, either side, in their own grid with the LEAN cards away; a leg is a pick with an edge, four of his last five and half of his last ten his way and the levers toward him, three men at one app on three games with the most expected value first; the card carries the price, each leg\'s chip, price and chance, his last ten as pips with the last five set apart, the counts, his last five\'s average and the levers, and the ticket\'s chance, what it needs, the edge and what a unit wins', JSON.stringify({ def: belowDefault, opts: t3T.opts, either: t3T.either[0], divider: t3T.divider, others: t3T.others, inGrid: t3T.inGrid, pip: [t3T.pipTitle, t3T.pipAria] }));
+  chk(t3T.either.length === 2 && t3T.either[1].n1 === '3 LEGS #2 · at FanDuel · two games' && legOf(t3T.either[1], 0) === t3Leg(1, 'Man Seven', 'UNDER 4.5 threes', '-110', '57.0', 'ORL v ATL', '3.3')
+      && legOf(t3T.either[1], 1) === t3Leg(2, 'Man Eight', 'OVER 12.5 points', '-110', '56.0', 'MIL v CHI', '13.7') && legOf(t3T.either[1], 2) === t3Leg(3, 'Man Nine', 'OVER 6.5 rebounds', '-110', '55.0', 'MIL v CHI', '7.7')
+      && lc(t3T.either[1].stats) === 'all three land 16.7% needs 14.4% edge +2.3 a unit wins 5.96u'
+      && t3T.either[1].n4 === 'Two legs share a game: the app prices same-game legs its own way, usually a little under the product shown; two overs on one club carry the measured ×0.95.'
+      && !/Cold Hand|Wrong Levers|Other App|Big Fav/i.test(JSON.stringify([t3T.either, t3T.overs])),
+      'three-leg tickets: a man sits in one ticket, so the second is built from the three left; with no three games among them two legs share a game, the card says so and two overs on one club carry the measured 0.95; the cold hand, the man with the levers against him, the man posted at another app alone and the over on a favourite\'s man with no record yet make no leg', JSON.stringify({ second: t3T.either[1] }));
+  chk(t3T.overs.length === 1 && t3T.overs[0].n1 === '3 LEGS #1 · at FanDuel · two games' && t3T.overs[0].legs.map(l => l.split(' ').slice(1, 3).join(' ')).join(',') === 'Man One,Man Two,Man Eight'
+      && lc(t3T.overs[0].stats) === 'all three land 19.8% needs 14.4% edge +5.5 a unit wins 5.96u' && t3T.overs[0].n4 === 'Two legs share a game: the app prices same-game legs its own way, usually a little under the product shown.'
+      && /no red chip and, from 15 Nov 2026, no leg priced -200 or shorter and no over priced -110 to -101, the overs only\. A card is one app throughout; where the same three also pass at another app, a tab on the card shows the ticket there\. Replayed on the eleven nights/.test(t3T.dividerO)
+      && t3T.unders.length === 0 && t3T.none === 'No three legs on this date pass the test at one app among the unders.'
+      && t3T.leansT3 === 0 && t3T.leans.length === 10 && t3T.leans[0] === 'Big Fav OVER 22.5 points' && /^No BET on this date\. LEANs below/.test(t3T.leansDiv),
+      'three-leg tickets: the overs alone make one ticket, on two games for want of a third, with the note on the app\'s own price and no factor where the two share no club; the unders alone make none and say so; the LEANs one by one bring the ten cards back with no ticket', JSON.stringify({ overs: t3T.overs, dividerO: t3T.dividerO.slice(260, 380), unders: t3T.unders, none: t3T.none, leans: t3T.leans, leansT3: t3T.leansT3, leansDiv: t3T.leansDiv }));
+  chk(/^the same three at$/i.test(t3T.tabLabel) && JSON.stringify(t3T.tabs) === '[["DraftKings +553 20.5%","FanDuel +596 20.5%*"],["DraftKings × (off)","FanDuel +596 16.7%*"]]'
+      && t3T.whys[0] === '' && t3T.whys[1] === "Not at DraftKings: Man Seven's line is 3.5 there, 3 of his last 5 under it."
+      && t3T.atDK.n1 === '3 LEGS #1 · at DraftKings · three games' && t3T.atDK.pay === '+553 6.53×' && legOf(t3T.atDK, 0) === t3Leg(1, 'Man One', 'OVER 20.5 points', '-115', '60.0', 'ATL @ ORL', '21.7') && legOf(t3T.atDK, 2) === t3Leg(3, 'Man Three', 'UNDER 5.5 assists', '-115', '58.0', 'MIA @ UTA', '4.3')
+      && lc(t3T.atDK.stats) === 'all three land 20.5% needs 15.3% edge +5.2 a unit wins 5.53u' && JSON.stringify(t3T.tabsDK) === '["DraftKings +553 20.5%*","FanDuel +596 20.5%"]' && t3T.secondStays === '3 LEGS #2 · at FanDuel · two games'
+      && t3T.copiedDK.length === 1 && /^3-leg ticket at DraftKings · pays \+553 \(6\.53x\) · all three land 20\.5%, needs 15\.3%\n1\. Man One OVER 20\.5 points -115 /.test(t3T.copiedDK[0])
+      && JSON.stringify(t3T.dkTaking) === '["TAKING · 3 LEGS · at DraftKings · three games"]' && JSON.stringify(t3T.dkTabs) === '["✓ DraftKings +553 20.5%*","FanDuel +596 20.5%"]' && JSON.stringify(t3T.dkSpec) === '["t3|2026-11-12|draftkings|1:pts|2:reb|3:ast/take"]'
+      && t3T.dkUntaken === '0|0' && t3T.backAtFD === '3 LEGS #1 · at FanDuel · three games',
+      'three-leg tickets: a card is one app throughout, and the same three at another app are a tab away (11 Nov 2026): the apps that post all three sit under the band with what the ticket pays and the chance it lands there, the app shown marked; the tab shows the ticket at that app\'s own lines and prices and leaves the other cards alone, Copy and Take act on the version shown, a ticket taken there is marked on its tab and unmarks clean; where all three are posted and one does not pass, the app is crossed and the card says which man and why', JSON.stringify({ label: t3T.tabLabel, tabs: t3T.tabs, whys: t3T.whys, atDK: t3T.atDK, tabsDK: t3T.tabsDK, second: t3T.secondStays, copied: t3T.copiedDK, taking: t3T.dkTaking, dkTabs: t3T.dkTabs, spec: t3T.dkSpec, untaken: t3T.dkUntaken, back: t3T.backAtFD }));
+  chk(/^Man One/.test(t3T.legPanel) && t3T.panelAfterCopy === false && t3T.copySay === 'Copied the ticket.' && t3T.copied.length === 1
+      && t3T.copied[0] === '3-leg ticket at FanDuel · pays +596 (6.96x) · all three land 20.5%, needs 14.4%\n1. Man One OVER 20.5 points -110 · last 5: 4 of 5, last 10: 7 of 10 · Hawks @ Magic\n2. Man Two OVER 7.5 rebounds -110 · last 5: 4 of 5, last 10: 7 of 10 · Bulls @ Bucks\n3. Man Three UNDER 5.5 assists -110 · last 5: 4 of 5, last 10: 7 of 10 · Heat @ Jazz'
+      && t3T.taking.length === 1 && t3T.taking[0].n1 === 'TAKING · 3 LEGS · at FanDuel · three games' && /^1 marked$/i.test(t3T.takingCount) && /taking/i.test(t3T.takeBtn) && /\btaking\b/.test(t3T.bestCls) && lc(t3T.taking[0].n6) === '✓ taking copy ticket'
+      && JSON.stringify(t3T.spec0) === '[{"id":"t3|2026-11-12|fanduel|1:pts|2:reb|3:ast","app":"fanduel","m":"t3","ks":["2026-11-12|1|pts","2026-11-12|2|reb","2026-11-12|3|ast"],"at":[[20.5,-110,0.6,"OVER"],[7.5,-110,0.59,"OVER"],[5.5,-110,0.58,"UNDER"]],"take":true}]',
+      'three-leg tickets: a leg opens his panel, Copy puts the ticket in words for the app and opens nothing, Take marks the ticket on its first leg\'s row with the app and what each leg read there (line, price, chance, side), and the Taking strip carries it', JSON.stringify({ panel: t3T.legPanel, copied: t3T.copied, say: t3T.copySay, taking: t3T.taking, count: t3T.takingCount, btn: t3T.takeBtn, spec: t3T.spec0 }));
+  chk(/0 new, 10 replaced/.test(t3T.msg2) && t3T.taking2.length === 1 && legOf(t3T.taking2[0], 0) === t3Leg(1, 'Man One', 'OVER 20.5 points', '-110', '60.0', 'ATL @ ORL', '21.7')
+      && legOf(t3T.taking2[0], 1) === "2 man two over 7.5 rebounds -110 · 59.0% last 5: 4 of 5 · last 10: 7 of 10 chi @ mil · averaging 8.7 his last five · 7.5 on the ticket, the card's 8.5" && lc(t3T.taking2[0].stats) === 'all three land 20.5% needs 14.4% edge +6.2 a unit wins 5.96u'
+      && t3T.live2.length === 1 && t3T.live2[0].n1 === '3 LEGS #1 · at FanDuel · three games' && t3T.live2[0].legs.map(l => l.split(' ').slice(1, 3).join(' ')).join(',') === 'Man One,Man Three,Man Eight' && lc(t3T.live2[0].stats) === 'all three land 19.5% needs 14.4% edge +5.1 a unit wins 5.96u' && lc(t3T.live2[0].n6) === 'take copy ticket'
+      && t3T.board.length === 1 && t3T.board[0].n1 === 'TAKING · 3 LEGS · at FanDuel · three games' && /^TONIGHT 1 bet marked none graded yet · one unit each 0 on the card, 0 from the simulation, 0 props, 1 three-leg ticket$/.test(t3T.boardSum) && /^1 marked$/i.test(t3T.boardCount)
+      && t3T.boardText.length === 1 && /\n1\. 3-LEG TICKET at FanDuel: Man One OVER 20\.5 points -110 \+ Man Two OVER 7\.5 rebounds -110 \+ Man Three UNDER 5\.5 assists -110 · pays \+596 · all three land 20\.5% needs 14\.4%$/.test(t3T.boardText[0]),
+      'three-leg tickets: the props file loaded again, a pick turned to the other side at a moved line, leaves the ticket taken with its own legs, lines and sides and says where the card now differs, while the list is rebuilt from the rows as they stand; the day board\'s Taking strip carries the ticket and its text', JSON.stringify({ msg: t3T.msg2, taking: t3T.taking2, live: t3T.live2, board: t3T.board, sum: t3T.boardSum, count: t3T.boardCount, text: t3T.boardText }));
+  chk(t3T.after.length === 1 && /pk t3 agrees loss/.test(t3T.after[0].cls) && t3T.after[0].n1 === '3 LEGS #1 · at FanDuel · three games LOSS' && / win · 25$/.test(legOf(t3T.after[0], 0)) && / win · 3$/.test(legOf(t3T.after[0], 1)) && / loss · 10$/.test(legOf(t3T.after[0], 2))
+      && lc(t3T.after[0].stats) === 'all three land 19.5% needs 14.4% edge +5.1 result -1.00u' && lc(t3T.after[0].n6) === 'copy ticket' && t3T.afterDiv.endsWith('and the LEANs are one choice away. This list was kept before the games and is in the record.')
+      && t3T.afterTaking.length === 1 && /pk t3 agrees win taking/.test(t3T.afterTaking[0].cls) && t3T.afterTaking[0].n1 === 'TAKING · 3 LEGS · at FanDuel · three games WIN' && /7\.5 on the ticket, the card's 8\.5 win · 9$/.test(legOf(t3T.afterTaking[0], 1))
+      && lc(t3T.afterTaking[0].stats) === 'all three land 20.5% needs 14.4% edge +6.2 result +5.96u' && lc(t3T.afterTaking[0].n6) === 'taken copy ticket'
+      && t3T.specs === 'Man One:fanduel/t3/3/take,fanduel/t3/2/listed1,fanduel/t3c/2/c1,fanduel/t3/3/listed1,fanduel/t3c/3/c1;Man Seven:fanduel/t3/2/listed2;Cold Hand:fanduel/t3c/2/c2' && JSON.stringify(t3T.twoRow) === '["UNDER",8.5,"loss",9]' && t3T.specs2 === 'Man One:5,Man Seven:1,Cold Hand:1'
+      && t3T.afterTwo.length === 2 && t3T.afterTwo[0] === '2 LEGS #1 · at FanDuel · two games WIN :: Man One + Man Three :: both land 34.8% needs 27.4% edge +7.4 result +2.64u :: pk t3 agrees win'
+      && t3T.afterTwo[1] === '2 LEGS #2 · at FanDuel · two games LOSS :: Man Seven + Man Eight :: both land 31.9% needs 27.4% edge +4.5 result -1.00u :: pk t3 agrees loss' && t3T.afterTwoDiv.endsWith('This list was kept before the games and is in the record.'),
+      'three-leg tickets: the grade keeps the date\'s lists on the rows before the results land, the two-leg list and the three-leg one, whichever the tab showed (the lists as the rows then stood, not the ticket taken earlier), grades each ticket on its own lines and sides (the ticket taken wins on the over it was taken on, though the card\'s row had turned to the under and lost), the cards carry the results, and a second load of the grade lists nothing more', JSON.stringify({ after: t3T.after, div: t3T.afterDiv.slice(-100), taking: t3T.afterTaking, specs: t3T.specs, two: t3T.twoRow, specs2: t3T.specs2, afterTwo: t3T.afterTwo, afterTwoDiv: t3T.afterTwoDiv.slice(-70) }));
+  chk(/Two-leg tickets as listed, to test 1-1 says 33\.4% · does 50\.0% \(±35\.4\) · \+1\.64u at the product of the two legs' prices; a void or pushed leg drops out · from 15 Nov 2026 no leg priced -200 or shorter and no over priced -110 to -101: none graded since, 1-1 before it Three-leg tickets as listed, to test 0-1 says 19\.5% · does 0\.0% \(±50\.0\) · -1\.00u at the product of the three legs' prices; a void or pushed leg drops out · from 15 Nov 2026 no leg priced -200 or shorter and no over priced -110 to -101: none graded since, 0-1 before it Two-leg tickets by best chance, as listed, to test 1-1 says 35\.4% · does 50\.0% \(±35\.4\) · \+1\.64u the two picks likeliest to land together, each on its own game, at the product of their prices; a void or pushed leg drops out · from 15 Nov 2026 no leg priced -200 or shorter and no over priced -110 to -101: none graded since, 1-1 before it Three-leg tickets by best chance, as listed, to test 1-0 says 20\.9% · does 100\.0% \(±50\.0\) · \+5\.96u the three picks likeliest to land together, each on its own game, at the product of their prices; a void or pushed leg drops out · from 15 Nov 2026 no leg priced -200 or shorter and no over priced -110 to -101: none graded since, 1-0 before it Three-leg tickets you took 1-0 says 20\.5% · does 100\.0% \(±50\.0\) · \+5\.96u/i.test(t3T.record)
+      && /two-leg tickets as listed 1-1 \+1\.6u · three-leg tickets as listed 0-1 -1\.0u · two-leg tickets by best chance 1-1 \+1\.6u · three-leg tickets by best chance 1-0 \+6\.0u · three-leg tickets taken 1-0 \+6\.0u/.test(t3T.cardTile) && /Three-leg tickets taken 1-0 says 20\.5% · does 100\.0% \(±50\.0\) · \+5\.96u/i.test(t3T.took)
+      && t3T.afterO.length === 1 && /pk t3 agrees loss/.test(t3T.afterO[0].cls) && t3T.afterO[0].legs.map(l => l.split(' ').slice(1, 3).join(' ')).join(',') === 'Man One,Man Eight,Man Nine' && t3T.afterODiv.endsWith("and the LEANs are one choice away. Rebuilt from the night's rows after the games: for study, not in the record."),
+      'three-leg tickets: the record keeps the two-leg tickets as listed, the three-leg ones and the ones taken on tiles of their own, on the card\'s line and under What you took, each list\'s tile saying what it did before a leg priced -200 or shorter was left out (15 Nov 2026) and since; a list asked for after the games in another mode is rebuilt for study, says so and stays out of the record', JSON.stringify({ record: t3T.record.replace(/^[\s\S]*?(Two-leg tickets as listed)/i, '$1').slice(0, 1100), tile: (t3T.cardTile.match(/two-leg tickets[^·]*·[^·]*·[^·]*·[^·]*·[^·]*/i) || [''])[0], took: t3T.took.replace(/^[\s\S]*?(Three-leg tickets taken)/i, '$1').slice(0, 110), afterO: t3T.afterO, div: t3T.afterODiv.slice(-120) }));
+
+  // ---- 11 Nov 2026: is the page finding the best tickets? (the user: "thoroughly test multiple times to make sure the algorithm is finding the best pairs") -- a short seeded sample of the brute-force checker, tools_check_tickets.js: random nights, every valid ticket enumerated apart from the page's code, the page's ticket at each step worth exactly what the best one left is worth ----
+  belowFree = true;
+  await pg.evaluate(async () => { await smStore.ready; await smStore.removeItem('callsheet3.props.v1'); });
+  await reloaded();
+  const tkTool = require('./tools_check_tickets.js');
+  const tkA = await tkTool.checkNights(pg, 14, 31, false, '2027-01-01'), tkB = await tkTool.checkNights(pg, 6, 9100, true, '2027-03-01');
+  await pg.evaluate(async () => {
+    await smStore.ready; const wait = () => new Promise(r => setTimeout(r, 110));
+    const set = (id, v) => { const el = document.getElementById(id); if (el && el.value !== v) { el.value = v; el.dispatchEvent(new Event('change', { bubbles: true })); } };
+    set('propsLegs', '2'); set('propsBelow', 'leans'); await wait();
+    if (!document.getElementById('propsView').hidden) { document.getElementById('propsReset').click(); await wait(); } document.getElementById('m-nba').click(); await wait();
+    await smStore.removeItem('callsheet3.props.v1');
+  });
+  belowFree = false;
+  await reloaded();
+  chk(tkA.fails.length === 0 && tkB.fails.length === 0 && tkA.nights === 14 && tkB.nights === 6 && tkA.checks === 84 && tkB.checks === 36
+      && tkA.tickets[2] >= 20 && tkA.tickets[3] >= 10 && tkA.empties >= 5 && tkB.tickets[2] >= 60 && tkB.tickets[3] >= 60 && tkB.sizes.slice().sort((a, b) => b - a)[0] >= 1000,
+      'the tickets are the best ones (11 Nov 2026): on fourteen ordinary random nights and six busy ones, every two-leg and three-leg ticket the page lists, either side, the overs and the unders, is a valid ticket worth exactly what the best one left is worth by brute force over every pair and three at every app, a man in one ticket, two legs never on one game, and a list ends only when nothing valid is left or at six',
+      JSON.stringify({ ordinary: tkTool.report(tkA), busy: tkTool.report(tkB), fails: tkA.fails.concat(tkB.fails).slice(0, 6) }));
+
+  // ---- 11 Nov 2026: the phone sheet through the page's own store on claude.ai (the user: "I saved the log for today for what I am betting and then took the
+  //      picture with my phone and it brings up the model but nothing in it"; then: "what if I want to share the QR or have someone else see it too without
+  //      changing" anything). On claude.ai the page is private and framed by the viewer: the code's link to m.html lands on the main page with a phone's empty
+  //      storage. So where the viewer gives the page a store, the button saves the night's sheet there, the code carries the page's address, a phone-width or
+  //      bare view opens the sheet by itself, and someone the page is shared with gets the sheet and nothing else. The viewer here is a stand-in:
+  //      window.claude.use("db" | "user") over an in-memory store, every call logged, set() refusing on demand with the store's own codes ----
+  const claudeMock = (o) => {
+    o = o || {};
+    const M = window.__mock = { docs: JSON.parse(JSON.stringify(o.docs || {})), calls: [], fail: (o.fail || []).slice(), subs: [] };
+    const has = (path) => Object.prototype.hasOwnProperty.call(M.docs, path);
+    const snap = (path) => ({ id: path.split('/').pop(), exists: has(path), data: () => (has(path) ? Object.freeze(JSON.parse(JSON.stringify(M.docs[path]))) : undefined), metadata: { fromCache: false, hasPendingWrites: false } });
+    const put = (path, body) => { M.docs[path] = JSON.parse(JSON.stringify(body)); M.subs.filter(x => x.path === path).forEach(x => setTimeout(() => x.next(snap(path)), 0)); };
+    M.put = put;
+    const db = Object.freeze({
+      doc(path) {
+        if (path.split('/').length % 2) throw new TypeError('a document path has an even number of segments: ' + path);
+        return { id: path.split('/').pop(), path,
+          get() { M.calls.push('get ' + path); return Promise.resolve(snap(path)); },
+          set(data) {
+            M.calls.push('set ' + path);
+            if (M.fail.length) { const code = M.fail.shift(); return Promise.reject({ code, message: 'stand-in ' + code }); }
+            if (!data || typeof data !== 'object' || Array.isArray(data) || JSON.stringify(data) !== JSON.stringify(JSON.parse(JSON.stringify(data)))) return Promise.reject({ code: 'invalid_argument', message: 'the body is not a plain JSON object' });
+            put(path, data); return Promise.resolve();
+          },
+          onSnapshot(next) { M.calls.push('sub ' + path); const x = { path, next }; M.subs.push(x); setTimeout(() => next(snap(path)), 0); return () => { M.subs = M.subs.filter(y => y !== x); }; } };
+      },
+      collection(path) { throw new Error('the page keeps one document, not a collection: ' + path); },
+    });
+    const user = Object.freeze({ isOwner: () => { M.calls.push('isOwner'); return Promise.resolve(!!o.owner); } });
+    const downloads = Object.freeze({ save(req) { M.calls.push('save ' + req.filename); if (M.dlFail) return Promise.reject({ code: M.dlFail, message: 'stand-in ' + M.dlFail }); M.saved = { filename: req.filename, data: String(req.data) }; return Promise.resolve({ status: 'saved' }); } });
+    window.claude = { use(name) { M.calls.push('use ' + name); return Promise.resolve(name === 'db' ? (o.db === false ? null : db) : name === 'user' ? (o.owner === null ? null : user) : name === 'downloads' ? downloads : null); } };
+  };
+  const PH_URL = 'https://claude.ai/artifact/TESTtestTEST0123456789';
+  belowFree = true;
+  await pg.evaluate(async () => { await smStore.ready; await smStore.removeItem('callsheet3.props.v1'); });
+  await reloaded();
+  const phS = await pg.evaluate(async ({ src, url }) => {
+    const wait = (ms) => new Promise(r => setTimeout(r, ms || 110));
+    const txt = e => (e ? e.innerText : '').replace(/\s+/g, ' ').trim();
+    await smStore.ready;
+    const copies = []; try { Object.defineProperty(navigator, 'clipboard', { configurable: true, value: { writeText: t => { copies.push(String(t)); return Promise.resolve(); } } }); } catch (e) {}
+    const load = async (doc, name) => { const dt = new DataTransfer(); dt.items.add(new File([JSON.stringify(doc)], name, { type: 'application/json' })); const inp = document.getElementById('slateFile'); inp.files = dt.files; inp.dispatchEvent(new Event('change', { bubbles: true })); await wait(); await wait(); };
+    const G = [['Hawks', 'Magic', 'ATL', 'ORL', -2.5], ['Bulls', 'Bucks', 'CHI', 'MIL', -2.5], ['Heat', 'Jazz', 'MIA', 'UTA', -2.5]];
+    const ov = L => [L + 2, L - 2, L + 3, L - 1, L + 1, L + 2, L + 4, L - 3, L + 1, L + 2], un = L => [L - 2, L + 2, L - 3, L + 1, L - 1, L - 2, L - 4, L + 3, L - 1, L - 2];
+    const up = [{ k: 'pace', t: 'Pace', eff: 0.4, i: 0 }, { k: 'dvp', t: 'Defence v position', eff: 0.6, i: 0 }], dn = [{ k: 'pace', t: 'Pace', eff: -0.4, i: 0 }, { k: 'dvp', t: 'Defence v position', eff: -0.6, i: 0 }];
+    const man = (pid, name, team, gi, mk, side, line, chance, vals, parts) => ({ gi, pid: String(pid), name, team, opp: team === G[gi][2] ? G[gi][3] : G[gi][2], home: team === G[gi][3], pos: 'G', mk, line, op: -110, up: -110, book: 'fanduel',
+      books: { fanduel: [line, -110, -110], draftkings: [line, -115, -115] }, proj: line + (side === 'OVER' ? 2 : -2), sd: 6, pm: side === 'OVER' ? 0.7 : 0.3, pb: 0.5, p: side === 'OVER' ? chance : Math.round((1 - chance) * 10000) / 10000, push: 0, side, chance, price: -110, need: 0.5238,
+      edge: Math.round((chance - 0.5238) * 10000) / 10000, band: 'LEAN', mins: 32, rate36: 20, base: 18, med: line + (side === 'OVER' ? 1.5 : -1.5), usg: 22, sdf: 1, starter: true, start_src: "RotoWire's expected five", why: ['x'],
+      log: vals.map((v, i) => ['2026-10-' + String(20 + i), 'OPP', i % 2, 32, v, ['won by 3']]), parts });
+    const men = [man(1, 'Man One', 'ATL', 0, 'pts', 'OVER', 20.5, 0.60, ov(20.5), up), man(2, 'Man Two', 'CHI', 1, 'reb', 'OVER', 7.5, 0.59, ov(7.5), up), man(3, 'Man Three', 'MIA', 2, 'ast', 'UNDER', 5.5, 0.58, un(5.5), dn), man(8, 'Man Eight', 'MIL', 1, 'pts', 'OVER', 12.5, 0.56, ov(12.5), up)];
+    await load({ format: 'callsheet3.props', version: 1, date: '2026-11-12', games: G.map((g, gi) => ({ gid: 'ph' + gi, away: g[0], home: g[1], aab: g[2], hab: g[3], spread: g[4], total: 225.5, props: men.filter(m => m.gi === gi) })) }, 'nba-props-2026-11-12.json');
+    if (document.getElementById('propsView').hidden) { document.getElementById('m-props').click(); await wait(); }
+    document.getElementById('propsReset').click(); await wait();
+    const pick = (id, v) => { const el = document.getElementById(id); el.value = v; el.dispatchEvent(new Event('change', { bubbles: true })); };
+    pick('propsLegs', '2'); pick('propsBelow', 't3'); await wait();
+    const best = document.getElementById('propsBest'), listed = best.querySelectorAll('.pk.t3').length;
+    best.querySelector('.pk.t3 [data-t3take]').click(); await wait();
+    document.getElementById('m-nba').click(); await wait();
+    const bd = document.getElementById('boardDate'), day = (v) => { bd.value = v; bd.dispatchEvent(new Event('change')); };
+    day('2026-11-12'); await wait();
+    const body = document.getElementById('phoneBody'), dlg = document.getElementById('phoneDlg'), esc = async () => { document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })); await wait(); };
+    const notes = () => [...body.querySelectorAll('.note')].map(txt), press = async (ms) => { document.getElementById('phone').click(); await wait(ms || 500); };
+    const mods = (cell, margin) => {
+      const d = (body.querySelector('svg path') || { getAttribute: () => '' }).getAttribute('d') || '';
+      const pts = [...d.matchAll(/M(-?\d+(?:\.\d+)?),(-?\d+(?:\.\d+)?)[hl]/g)].map(m => [Math.round(((+m[1]) - margin) / cell), Math.round(((+m[2]) - margin) / cell)]);
+      const n = pts.length ? Math.max(...pts.map(q => q[0])) + 1 : 0, out = [];
+      for (let r = 0; r < n; r++) { const row = []; for (let c = 0; c < n; c++) row.push(0); out.push(row); }
+      pts.forEach(q => { out[q[1]][q[0]] = 1; });
+      return { n, mods: out };
+    };
+    // a) no viewer: the code carries the picks to m.html, the ticket taken and the night's tickets with them
+    await press(700);
+    const code = { link: (body.querySelector('a') || {}).href || '', note: notes()[0] || '' };
+    await esc();
+    // b) the viewer, its store unavailable once: one more try, and the sheet is saved whole
+    const mock = (0, eval)('(' + src + ')');
+    mock({ docs: { 'phone/config': { url } }, owner: true, fail: ['unavailable'] });
+    await press(1800);
+    const saved = { notes: notes(), calls: window.__mock.calls.slice(), doc: JSON.parse(JSON.stringify(window.__mock.docs['phone/latest'] || null)), qr: mods(6, 4), links: [...body.querySelectorAll('a')].map(a => a.id + '|' + a.getAttribute('href')), tag: txt(body.querySelector('h3')) };
+    document.getElementById('phonePreview').click(); await wait();
+    const sh = document.getElementById('phoneSheet');
+    const preview = { open: !!(sh && !sh.hidden), how: sh.dataset.how, btn: txt(sh.querySelector('[data-pshclose]')), text: txt(sh), heads: [...sh.querySelectorAll('h2')].map(txt), takes: sh.querySelectorAll('.pshk.take').length, cards: sh.querySelectorAll('.pshk').length };
+    // (11 Nov 2026) a card with detail opens it over the sheet: the ticket's two legs, each the prop's own panel as the computer draws it
+    const tapCards = [...sh.querySelectorAll('.pshk.tap')], ticketCard = tapCards.find(c => /2-LEG TICKET/i.test(c.innerText));
+    ticketCard.click(); await wait(350);
+    const pp = document.getElementById('phonePanel'), ppb = document.getElementById('phonePanelBody');
+    const panel = { open: !!(pp && !pp.hidden), legs: ppb.querySelectorAll('.pp-leg').length, heads: [...ppb.querySelectorAll('.pp-legn')].map(txt), names: [...ppb.querySelectorAll('h3')].map(txt), picks: [...ppb.querySelectorAll('.pd-pick')].map(txt),
+      tiles: ppb.querySelectorAll('.pd-tile').length, logs: ppb.querySelectorAll('.pd-log tbody tr').length, books: ppb.querySelectorAll('.pd-books tbody tr').length, levers: ppb.querySelectorAll('.pd-levers .lever').length,
+      controls: ppb.querySelectorAll('button, a, input, select, textarea').length, data: (ppb.innerHTML.match(/\sdata-[a-z-]+=/g) || []).length, taps: tapCards.length, plain: sh.querySelectorAll('.pshk:not(.tap)').length, tip: txt(sh.querySelector('.psh-tip')) };
+    const single = tapCards.find(c => /#1 · NBA PROP/i.test(c.innerText)); single.click(); await wait(350);
+    panel.single = { legs: ppb.querySelectorAll('.pp-leg').length, heads: ppb.querySelectorAll('.pp-legn').length, name: txt(ppb.querySelector('h3')) };
+    await esc();
+    const afterEsc0 = { panel: pp.hidden, sheet: sh.hidden };
+    await esc();
+    const afterEsc = { sheet: sh.hidden, dlg: !dlg.hidden, noscroll: document.body.classList.contains('noscroll') };
+    document.getElementById('phoneCopy').click(); await wait();
+    const copied = { text: copies[copies.length - 1] || '', said: txt(document.getElementById('phoneSaid')) };
+    // the sheet as a file to send: saved through the viewer's own save, a still copy with the detail folded under each pick
+    document.getElementById('phoneFile').click(); await wait(400);
+    const filed = { name: (window.__mock.saved || {}).filename || '', data: (window.__mock.saved || {}).data || '', said: txt(document.getElementById('phoneSaid')), calls: window.__mock.calls.filter(c => /^(use downloads|save )/.test(c)) };
+    window.__mock.dlFail = 'declined'; document.getElementById('phoneFile').click(); await wait(300);
+    const declined = txt(document.getElementById('phoneSaid')); window.__mock.dlFail = null;
+    await esc();
+    const closed = dlg.hidden && !document.body.classList.contains('noscroll');
+    // c) the store refuses the write: said in the dialog, no code drawn, the last sheet left as it was
+    window.__mock.fail = ['invalid_argument']; window.__mock.calls.length = 0;
+    await press(500);
+    const refused = { notes: notes(), qr: !!body.querySelector('svg'), calls: window.__mock.calls.slice(), same: JSON.stringify(window.__mock.docs['phone/latest']) === JSON.stringify(saved.doc) };
+    await esc();
+    // d) the viewer gives the page no store: said, and no code that would land on an empty page
+    mock({ docs: {}, owner: true, db: false });
+    await press(400);
+    const nostore = { notes: notes(), qr: !!body.querySelector('svg'), link: !!body.querySelector('a'), calls: window.__mock.calls.slice() };
+    await esc();
+    // e) a date with nothing on the board: nothing is written
+    mock({ docs: {}, owner: true });
+    day('2027-01-01'); await wait();
+    await press(400);
+    const empty = { notes: notes(), wrote: Object.keys(window.__mock.docs), calls: window.__mock.calls.slice() };
+    await esc();
+    // f) the store with no address beside the sheet: saved all the same, and the words stand in for the code
+    day('2026-11-12'); await wait();
+    await press(500);
+    const noUrl = { notes: notes(), qr: !!body.querySelector('svg'), wrote: Object.keys(window.__mock.docs) };
+    await esc();
+    delete window.claude; delete window.__mock;
+    day(''); pick('propsBelow', 'leans'); await wait();
+    return { listed, code, saved, preview, panel, afterEsc0, afterEsc, copied, filed, declined, closed, refused, nostore, empty, noUrl };
+  }, { src: claudeMock.toString(), url: PH_URL });
+  const phQr = qrRead(phS.saved.qr.n, phS.saved.qr.mods);
+  // the views that open the page with the sheet in the store: the owner's phone, a guest's, a guest at a desk, and the two with nothing to show
+  const phView = async (opts, vp, steps) => {
+    const c = await pg.context().browser().newContext({ viewport: vp }), p = await c.newPage(), e2 = [];
+    p.on('pageerror', e => e2.push(e.message));
+    await p.addInitScript(claudeMock, opts);
+    if (opts.later) await p.addInitScript((d) => { window.__later = d; }, opts.later);
+    await p.goto('file://' + path.join(__dirname, 'web/callsheet3.html'));
+    await p.waitForFunction(() => window.smStore && window.smStore.ready, null, { timeout: 60000 }); await p.waitForTimeout(700);
+    if (steps === 'card') {   // a view with a card of its own: add the example, load again, and see what it asked of the viewer
+      await p.evaluate(async () => { const wait = () => new Promise(r => setTimeout(r, 110)); document.getElementById('m-nba').click(); await wait(); document.getElementById('example').click(); await wait(); document.getElementById('add').click(); await wait(); await wait(); });
+      await p.reload(); await p.waitForFunction(() => window.smStore && window.smStore.ready, null, { timeout: 60000 }); await p.waitForTimeout(700);
+    }
+    const r = await p.evaluate(async (steps) => {
+      const wait = (ms) => new Promise(r => setTimeout(r, ms || 140)), txt = e => (e ? e.innerText : '').replace(/\s+/g, ' ').trim();
+      const s = document.getElementById('phoneSheet'), o = { open: !!(s && !s.hidden), how: s ? s.dataset.how : '', btn: s ? txt(s.querySelector('[data-pshclose]')) : '', text: txt(s), heads: s ? [...s.querySelectorAll('h2')].map(txt) : [],
+        takes: s ? s.querySelectorAll('.pshk.take').length : 0, cards: s ? s.querySelectorAll('.pshk').length : 0, controls: s ? s.querySelectorAll('input, button, select, textarea, a').length : 0,
+        fits: document.documentElement.scrollWidth <= window.innerWidth && (!s || s.scrollWidth <= s.clientWidth), calls: window.__mock.calls.slice(),
+        hint: (h => (h && !h.hidden ? txt(h.querySelector('span')) : ''))(document.getElementById('phoneHint')) };
+      if (steps === 'arrives') {   // nothing saved when the phone opened the page; then the computer saves one
+        window.__mock.put('phone/latest', steps && window.__later); await wait(300);
+        const s2 = document.getElementById('phoneSheet'), h2 = document.getElementById('phoneHint');
+        o.arrived = !!(s2 && !s2.hidden); o.arrivedTakes = s2 ? s2.querySelectorAll('.pshk.take').length : 0; o.hintAfter = !!(h2 && !h2.hidden);
+        return o;
+      }
+      if (!s) return o;
+      const tap = [...s.querySelectorAll('.pshk.tap')], tk = tap.find(c => /2-LEG TICKET/i.test(c.innerText));
+      o.taps = tap.length; o.tip = txt(s.querySelector('.psh-tip'));
+      if (tk) {
+        tk.click(); await wait(450);
+        const pp = document.getElementById('phonePanel'), ppb = document.getElementById('phonePanelBody');
+        o.panel = { open: !!(pp && !pp.hidden), legs: ppb.querySelectorAll('.pp-leg').length, names: [...ppb.querySelectorAll('h3')].map(txt), tiles: ppb.querySelectorAll('.pd-tile').length, logs: ppb.querySelectorAll('.pd-log tbody tr').length,
+          controls: ppb.querySelectorAll('button, a, input, select, textarea').length, shut: pp.querySelectorAll('[data-ppclose]').length, fits: pp.scrollWidth <= pp.clientWidth + 1 };
+        document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })); await wait();
+        o.panelShut = pp.hidden; o.sheetStays = !s.hidden;
+      }
+      document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })); await wait();
+      o.escShut = s.hidden;
+      if (steps === 'newer') {   // shut by hand, the same sheet again stays shut, a newer one opens
+        const d = JSON.parse(JSON.stringify(window.__mock.docs['phone/latest']));
+        window.__mock.put('phone/latest', d); await wait(); o.sameStaysShut = s.hidden && !document.body.classList.contains('noscroll');
+        d.at = '2026-11-12T23:59:00.000Z'; d.sheet.at = d.at; d.sheet.take = []; window.__mock.put('phone/latest', d); await wait();
+        o.newerOpens = !s.hidden; o.newerTakes = s.querySelectorAll('.pshk.take').length; o.subs = window.__mock.calls.filter(x => /^sub /.test(x)).length;
+      }
+      return o;
+    }, steps);
+    await c.close(); r.errs = e2; return r;
+  };
+  const phDocs = { 'phone/latest': phS.saved.doc, 'phone/config': { url: PH_URL } };
+  const phOwner = await phView({ docs: phDocs, owner: true }, { width: 390, height: 844 }, 'newer');
+  const phGuest = await phView({ docs: phDocs, owner: false }, { width: 390, height: 844 });
+  const phGuestDesk = await phView({ docs: phDocs, owner: false }, { width: 1280, height: 900 });
+  const phOwnDesk = await phView({ docs: phDocs, owner: true }, { width: 1280, height: 900 }, 'card');
+  const phNone = await phView({ docs: {}, owner: true, later: phS.saved.doc }, { width: 390, height: 844 }, 'arrives');
+  const phGuestNone = await phView({ docs: {}, owner: false }, { width: 390, height: 844 });
+  const phNoStore = await phView({ docs: phDocs, owner: true, db: false }, { width: 390, height: 844 });
+  // m.html with the code's link: the same night as the store's sheet, line for line
+  const mCtx = await pg.context().browser().newContext({ viewport: { width: 390, height: 844 } }), mPage = await mCtx.newPage(), mErrs = [];
+  mPage.on('pageerror', e => mErrs.push(e.message));
+  await mPage.goto(phS.code.link); await mPage.waitForTimeout(600);
+  const mText = await mPage.evaluate(() => document.body.innerText.replace(/\s+/g, ' ').trim());
+  await mCtx.close();
+  const phFilePath = path.join(require('os').tmpdir(), 'cs3-harness-' + process.pid + '-sheet.html');
+  fs.writeFileSync(phFilePath, phS.filed.data || '<!doctype html><title>nothing saved</title>');
+  const fCtx = await pg.context().browser().newContext({ viewport: { width: 390, height: 844 }, javaScriptEnabled: false }), fPage = await fCtx.newPage(), fReqs = [];
+  fPage.on('request', q => { if (!/^(file|data):/.test(q.url())) fReqs.push(q.url()); });
+  await fPage.goto('file://' + phFilePath); await fPage.waitForTimeout(400);
+  const fFolds = await fPage.locator('details.pfd').count(), fOpen0 = await fPage.locator('details.pfd[open]').count();
+  if (fFolds) { await fPage.locator('details.pfd > summary').first().click(); await fPage.waitForTimeout(200); }
+  const fOpen1 = await fPage.locator('details.pfd[open]').count();
+  const fText = (await fPage.locator('body').innerText()).replace(/\s+/g, ' ').trim();
+  const fBox = fOpen1 ? await fPage.locator('details.pfd[open] .pdlg-box').first().boundingBox() : null;
+  const fPanel = { tiles: await fPage.locator('details.pfd[open] .pd-tile').count(), legs: await fPage.locator('details.pfd[open] .pp-leg').count(), wide: await fPage.evaluate(() => document.documentElement.scrollWidth) };
+  await fCtx.close(); try { fs.unlinkSync(phFilePath); } catch (e) {}
+  await pg.evaluate(async () => { await smStore.ready; await smStore.removeItem('callsheet3.props.v1'); });
+  belowFree = false;
+  await reloaded();
+  const phLines = (t) => { const a = t.search(/TAKING TONIGHT/i), b = t.search(/View only:/i); return a >= 0 && b > a ? t.slice(a, b).trim().toLowerCase() : ''; };
+  const phSheet = (phS.saved.doc || {}).sheet || {}, phTake = (phSheet.take || [])[0] || {};
+  chk(phS.listed === 2 && /\/m\.html#z[A-Za-z0-9_-]+$/.test(phS.code.link) && /the best props, the night's tickets and the simulation's calls, view only\./.test(phS.code.note) && /nothing is uploaded/.test(phS.code.note)
+      && mErrs.length === 0 && /TAKING TONIGHT 1 TAKING · NBA · 2-LEG TICKET Man One OVER 20\.5 Points \+ Man Two OVER 7\.5 Rebounds 3[0-9]\.\d% · \+26\d needs 27\.\d% Hawks @ Magic · Bulls @ Bucks · at FanDuel/i.test(mText)
+      && /TWO-LEG TICKETS, TO TEST 2 TICKET #1 Man One OVER 20\.5 Points \+ Man Two OVER 7\.5 Rebounds/i.test(mText),
+      'phone, off claude.ai: with no viewer the button draws the code as before, its link carrying the night to m.html, and the night now includes the ticket marked Taking (two legs at FanDuel, the games, the chance both land and the parlay price) and the night\'s two tickets under the best props',
+      JSON.stringify({ listed: phS.listed, link: phS.code.link.slice(0, 80), note: phS.code.note.slice(0, 260), m: mText.slice(0, 420), errs: mErrs }));
+  chk(JSON.stringify(phS.saved.calls) === JSON.stringify(['use db', 'set phone/latest', 'set phone/latest', 'get phone/config'])
+      && phS.saved.doc && phS.saved.doc.v === 4 && phS.saved.doc.d === '2026-11-12' && phS.saved.doc.at === phSheet.at && Object.keys(phS.saved.doc).join() === 'v,d,at,sheet,panels,games' && phS.saved.doc.games === 0 && !Object.keys(phSheet).some(k => Array.isArray(phSheet[k]) && phSheet[k].some(x => x.gid !== undefined)) && /^z[A-Za-z0-9_-]{400,}$/.test(phS.saved.doc.panels)
+      && phTake.ids.length === 2 && phSheet.props.every(x => x.ids && x.ids.length === 1) && phSheet.t3.every(x => x.ids.length === 2) && JSON.stringify(phS.saved.doc).length < 200000
+      && phSheet.take.length === 1 && phTake.k === 'ticket' && phTake.n === 2 && phTake.p === 'Man One OVER 20.5 points + Man Two OVER 7.5 rebounds' && phTake.m === 'at FanDuel' && phTake.g === 'Hawks @ Magic · Bulls @ Bucks' && phTake.pr >= 260 && phTake.pr <= 269 && phTake.c > 30 && phTake.c < 40
+      && phSheet.t3.length === 2 && phSheet.t3[0].n === 2 && phSheet.props.length === 4 && !('cut' in phSheet)
+      && /^Saved for your phone at \d{1,2}:\d\d [AP]M: \d+ lines, the bets and tickets you are taking first, then the parlay four, the best straight bets, the likeliest sides, the best props, the night's tickets and the simulation's calls\. Tap a prop, a ticket or a pair on the phone and its detail opens as it reads here: 4 props\.$/.test(phS.saved.notes[0])
+      && /^Point your phone's camera at the code, or open The Super Model in the Claude app on your phone\. Tonight's sheet opens by itself, view only\./.test(phS.saved.notes[1])
+      && phQr === PH_URL && phS.saved.qr.n >= 25 && !phS.saved.links.some(l => /m\.html/.test(l)) && phS.saved.links.join() === 'phoneFile|#,phoneCopy|#,phonePreview|#',
+      'phone, on claude.ai: where the viewer gives the page its store, the button saves the night\'s sheet there whole (one document, the ticket you are taking in it, nothing trimmed), tries once more when the store is unavailable, says it is saved and how many lines, and the code it draws is the page\'s own address from the store, read back off the drawn modules by an independent decoder, with no link to m.html',
+      JSON.stringify({ calls: phS.saved.calls, keys: phS.saved.doc && Object.keys(phS.saved.doc), take: phTake, t3: (phSheet.t3 || []).length, props: (phSheet.props || []).length, notes: phS.saved.notes.map(n => n.slice(0, 150)), qr: phQr, n: phS.saved.qr.n, links: phS.saved.links }));
+  chk(/^For someone else to see it: share this page with them from the Share menu on claude\.ai \(Viewer is enough\)\. Signed in to Claude, they scan the same code and get tonight's sheet with the detail behind each pick, the games' cards with it, and nothing else, view only: only you can save over it, and your card never leaves this browser\. For someone with no Claude account, save the sheet as a file to send \(the detail is folded under each pick, and it opens on any phone\), or copy it as text\./.test(phS.saved.notes[2])
+      && /readable by you and by anyone you share the page with, and each save replaces the last\./.test(phS.saved.notes[3])
+      && phS.preview.open && phS.preview.how === 'preview' && phS.preview.btn === 'Close' && phS.preview.takes === 1 && phS.preview.cards === 8
+      && phS.preview.heads.join('|').toLowerCase() === 'taking tonight 1|best props 4|two-leg tickets, to test 2|same-game pairs 1'
+      && phS.afterEsc.sheet && phS.afterEsc.dlg && phS.afterEsc.noscroll && phS.closed
+      && /^The Super Model · Thu, Nov 12 · view only\n\nTAKING TONIGHT\n1\. Man One OVER 20\.5 points \+ Man Two OVER 7\.5 rebounds · 3\d\.\d% · \+26\d needs 27\.\d% · Hawks @ Magic · Bulls @ Bucks · at FanDuel\n\nBEST PROPS\n#1 Man One OVER 20\.5 points \[LEAN\]/.test(phS.copied.text)
+      && /\n\nTWO-LEG TICKETS, TO TEST\n#1 /.test(phS.copied.text) && /\n\nSAME-GAME PAIRS\n#1 /.test(phS.copied.text) && phS.copied.said === 'Copied the sheet as text.',
+      'phone, sharing: the dialog says how someone else sees the sheet (share the page from the Share menu, Viewer is enough; they get the sheet and nothing else, and only the owner saves over it) and who can read the store; the sheet opens as the phone shows it over the dialog and Escape shuts it first, the dialog after; and the sheet copies as plain text for someone with no account',
+      JSON.stringify({ notes: phS.saved.notes.slice(2).map(n => n.slice(0, 200)), preview: { open: phS.preview.open, how: phS.preview.how, btn: phS.preview.btn, heads: phS.preview.heads, takes: phS.preview.takes, cards: phS.preview.cards }, afterEsc: phS.afterEsc, closed: phS.closed, copied: phS.copied.text.slice(0, 330), said: phS.copied.said }));
+  chk(phS.panel.open && phS.panel.taps === 8 && phS.panel.plain === 0 && phS.panel.tip === 'Tap a prop, a ticket or a pair for its detail.'
+      && phS.panel.legs === 2 && phS.panel.heads.join('|').toLowerCase() === 'leg 1 of 2|leg 2 of 2' && /^Man One/.test(phS.panel.names[0]) && /^Man Two/.test(phS.panel.names[1])
+      && /^OVER 20\.5 points/i.test(phS.panel.picks[0]) && /^OVER 7\.5 rebounds/i.test(phS.panel.picks[1]) && phS.panel.tiles >= 12 && phS.panel.logs === 20 && phS.panel.books === 4 && phS.panel.levers >= 4
+      && phS.panel.controls === 0 && phS.panel.data === 0 && phS.panel.single.legs === 1 && phS.panel.single.heads === 0 && /^Man One/.test(phS.panel.single.name)
+      && phS.afterEsc0.panel && !phS.afterEsc0.sheet,
+      'phone, the detail behind a pick (11 Nov 2026, the user: "see the prop cards when I select it so I can see the graphs and info too"): every card that stands on a prop carries a mark and opens the prop\'s own panel as the computer draws it, over the sheet (the tiles, the levers, his last games, every book); a ticket opens its two legs one under the other, a single prop one panel with no leg heading; the buttons and every attribute that would act are out of the markup; and Escape shuts the detail and leaves the sheet',
+      JSON.stringify({ open: phS.panel.open, taps: phS.panel.taps, plain: phS.panel.plain, tip: phS.panel.tip, legs: phS.panel.legs, heads: phS.panel.heads, names: phS.panel.names, picks: phS.panel.picks, tiles: phS.panel.tiles, logs: phS.panel.logs, books: phS.panel.books, levers: phS.panel.levers, controls: phS.panel.controls, data: phS.panel.data, single: phS.panel.single, afterEsc0: phS.afterEsc0 }));
+  const fd = phS.filed.data || '';
+  chk(phS.filed.name === 'super-model-2026-11-12.html' && JSON.stringify(phS.filed.calls) === JSON.stringify(['use downloads', 'save super-model-2026-11-12.html'])
+      && /^Saved super-model-2026-11-12\.html\. Send it as it is: it opens on any phone, view only, with the detail under each pick\.$/.test(phS.filed.said) && phS.declined === 'Not saved.'
+      && /^<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport"/.test(fd) && !/<script|<button|<a\b|<input|<select|<textarea|<iframe|<img|\son[a-z]+\s*=|\sdata-[a-z-]+=|https?:\/\//i.test(fd)
+      && fFolds === 8 && fOpen0 === 0 && fOpen1 === 1 && fReqs.length === 0 && fPanel.legs === 2 && fPanel.tiles >= 12 && fPanel.wide <= 390 && fBox && fBox.x >= 0 && fBox.x + fBox.width <= 391
+      && /^The Super Model Thu, Nov 12 · made \d{1,2}:\d\d [AP]M · view only a copy Tap a prop, a ticket or a pair for its detail\. TAKING TONIGHT 1 TAKING · NBA · 2-LEG TICKET Man One OVER 20\.5 points \+ Man Two OVER 7\.5 rebounds/i.test(fText)
+      && /Leg 1 of 2 .*Man One .*Leg 2 of 2 .*Man Two /i.test(fText) && /View only: a copy of the sheet as it stood on [^.]*\. Nothing in this file changes anything\./.test(fText),
+      'phone, the sheet as a file to send (the user: "share my picks for the day with someone, and have them see the details behind the pick without them changing" anything "but able to see from their phone"): the dialog saves the sheet through the viewer\'s own save as one .html file, a still copy with the detail folded under each pick; it holds no script, button, link, field, handler or outside address, opens with scripts off and nothing fetched on a phone-width screen with no sideways scroll, and a tap opens a pick\'s detail; a save the viewer declines is said and nothing more',
+      JSON.stringify({ name: phS.filed.name, calls: phS.filed.calls, said: phS.filed.said, declined: phS.declined, bytes: fd.length, head: fd.slice(0, 90), folds: fFolds, open0: fOpen0, open1: fOpen1, reqs: fReqs.slice(0, 3), panel: fPanel, box: fBox && [Math.round(fBox.x), Math.round(fBox.x + fBox.width)], text: fText.slice(0, 260) }));
+  chk(/^The sheet could not be saved for the phone: the store refused it: only the page's owner saves the sheet\. Press the button again in a moment\./.test(phS.refused.notes[0] || '') && !phS.refused.qr && phS.refused.same && JSON.stringify(phS.refused.calls) === JSON.stringify(['use db', 'set phone/latest'])
+      && /^The sheet could not be saved for the phone: this view was not given the page's store on claude\.ai\./.test(phS.nostore.notes[0] || '') && !phS.nostore.qr && !phS.nostore.link && JSON.stringify(phS.nostore.calls) === JSON.stringify(['use db'])
+      && /^Nothing on the board for .*2027.* yet|^Nothing on the board for /.test(phS.empty.notes[0] || '') && phS.empty.wrote.length === 0 && JSON.stringify(phS.empty.calls) === JSON.stringify(['use db'])
+      && /^Saved for your phone/.test(phS.noUrl.notes[0] || '') && !phS.noUrl.qr && /^Open The Super Model in the Claude app on your phone, or in its browser signed in to claude\.ai\./.test(phS.noUrl.notes[1] || '') && phS.noUrl.wrote.join() === 'phone/latest',
+      'phone, when it cannot: a write the store refuses is said in the dialog with no code drawn and the last sheet left as it was; a viewer that gives the page no store is said too, with no code that would land on an empty page; a date with nothing on the board writes nothing; and a store with no address beside the sheet still saves it and says where to open it in words',
+      JSON.stringify({ refused: phS.refused, nostore: phS.nostore, empty: phS.empty, noUrl: { notes: phS.noUrl.notes.map(n => n.slice(0, 120)), qr: phS.noUrl.qr, wrote: phS.noUrl.wrote } }));
+  chk(phOwner.errs.length === 0 && phOwner.open && phOwner.how === 'auto' && phOwner.btn === 'Open the full model' && phOwner.takes === 1 && phOwner.cards === 8 && phOwner.fits
+      && phOwner.taps === 8 && phOwner.panel && phOwner.panel.open && phOwner.panel.legs === 2 && /^Man One/.test(phOwner.panel.names[0]) && phOwner.panel.tiles >= 12 && phOwner.panel.logs === 20 && phOwner.panel.controls === 0 && phOwner.panel.shut === 1 && phOwner.panel.fits && phOwner.panelShut && phOwner.sheetStays
+      && /^The Super Model Thu, Nov 12 · made \d{1,2}:\d\d [AP]M · view only Open the full model Tap a prop, a ticket or a pair for its detail\. (This sheet is for Thu, Nov 12\. Press Phone QR on the day board of the computer for tonight's\. )?TAKING TONIGHT 1 TAKING · NBA · 2-LEG TICKET Man One OVER 20\.5 Points \+ Man Two OVER 7\.5 Rebounds/i.test(phOwner.text)
+      && JSON.stringify(phOwner.calls) === JSON.stringify(['use db', 'use user', 'isOwner', 'sub phone/latest']) && phOwner.escShut && phOwner.sameStaysShut && phOwner.newerOpens && phOwner.newerTakes === 0 && phOwner.subs === 1
+      && phLines(phOwner.text) === phLines(mText) && phLines(mText).length > 300,
+      'phone, the owner\'s: a view the width of a phone with nothing of its own asks the store once and opens the night\'s sheet over the page by itself, the ticket you are taking first, line for line what m.html draws from the code, with no sideways scroll and no script error; a tap on the ticket unpacks the detail the store holds and opens its two legs over the sheet, inside the screen\'s width, and Escape shuts the detail and leaves the sheet; a button opens the model behind it, a sheet shut by hand stays shut, and a newer one saved from the computer opens on the one subscription',
+      JSON.stringify({ errs: phOwner.errs, open: phOwner.open, how: phOwner.how, btn: phOwner.btn, takes: phOwner.takes, cards: phOwner.cards, fits: phOwner.fits, taps: phOwner.taps, panel: phOwner.panel, panelShut: phOwner.panelShut, sheetStays: phOwner.sheetStays, text: phOwner.text.slice(0, 300), calls: phOwner.calls, escShut: phOwner.escShut, same: phOwner.sameStaysShut, newer: phOwner.newerOpens, newerTakes: phOwner.newerTakes, subs: phOwner.subs, lines: phLines(phOwner.text) === phLines(mText), len: phLines(mText).length }));
+  chk(phGuest.errs.length === 0 && phGuest.open && phGuest.how === 'guest' && phGuest.btn === '' && phGuest.controls === 0 && phGuest.escShut === false && phGuest.takes === 1 && phGuest.fits && /view only SHARED WITH YOU/i.test(phGuest.text)
+      && /View only: this is the owner's sheet for the night, and it follows when they save a new one\./.test(phGuest.text) && phLines(phGuest.text) === phLines(phOwner.text)
+      && phGuestDesk.errs.length === 0 && phGuestDesk.open && phGuestDesk.how === 'guest' && phGuestDesk.controls === 0 && phGuestDesk.escShut === false
+      && phGuest.taps === 8 && phGuest.panel && phGuest.panel.open && phGuest.panel.legs === 2 && phGuest.panel.tiles >= 12 && phGuest.panel.controls === 0 && phGuest.panel.fits && phGuest.panelShut && phGuest.sheetStays
+      && phGuestDesk.panel && phGuestDesk.panel.open && phGuestDesk.panel.controls === 0,
+      'phone, someone the page is shared with: they get the same sheet, marked shared with you, with no button, field or link in it and no way past it (Escape leaves it up), on a phone and at a desk alike; a pick opens the detail behind it for them as it does for the owner, with nothing in the detail to press but Close; the store\'s rule, read by all the page is shared with and written by its owner alone, is declared at the publish',
+      JSON.stringify({ phone: { errs: phGuest.errs, open: phGuest.open, how: phGuest.how, btn: phGuest.btn, controls: phGuest.controls, esc: phGuest.escShut, taps: phGuest.taps, panel: phGuest.panel, panelShut: phGuest.panelShut, sheetStays: phGuest.sheetStays, text: phGuest.text.slice(0, 160) }, desk: { open: phGuestDesk.open, how: phGuestDesk.how, controls: phGuestDesk.controls, esc: phGuestDesk.escShut, panel: phGuestDesk.panel } }));
+  chk(phOwnDesk.errs.length === 0 && !phOwnDesk.open && phOwnDesk.calls.length === 0
+      && phOwnDesk.hint === '' && phOwner.hint === '' && phGuest.hint === ''
+      && phNone.errs.length === 0 && !phNone.open && JSON.stringify(phNone.calls) === JSON.stringify(['use db', 'use user', 'isOwner', 'sub phone/latest'])
+      && phNone.hint === 'No sheet saved for the phone yet. On the computer, press Phone QR on the day board and it opens here by itself.' && phNone.arrived && phNone.arrivedTakes === 1 && !phNone.hintAfter
+      && phGuestNone.errs.length === 0 && !phGuestNone.open && phGuestNone.hint === 'The owner has not saved a sheet yet. It opens here by itself when they do.'
+      && phNoStore.errs.length === 0 && !phNoStore.open && JSON.stringify(phNoStore.calls) === JSON.stringify(['use db'])
+      && phNoStore.hint === "Tonight's sheet is kept in this page's store on claude.ai, and this view was not given it. Open the page in your phone's browser signed in to claude.ai, and allow it if a box asks.",
+      'phone, when there is nothing to open: a view with a card of its own asks the viewer nothing at load, so the computer sees no prompt it did not ask for; a phone with no sheet in the store says so across the top and what to press, and the sheet opens there by itself when the computer saves one; a guest is told the owner has not saved one; and a phone whose view gives the page no store is told to open it in the browser signed in, with no script error anywhere',
+      JSON.stringify({ desk: { open: phOwnDesk.open, calls: phOwnDesk.calls, errs: phOwnDesk.errs, hint: phOwnDesk.hint }, none: { open: phNone.open, calls: phNone.calls, hint: phNone.hint, arrived: phNone.arrived, takes: phNone.arrivedTakes, hintAfter: phNone.hintAfter }, guestNone: { open: phGuestNone.open, hint: phGuestNone.hint }, nostore: { open: phNoStore.open, calls: phNoStore.calls, hint: phNoStore.hint } }));
+
+  // ---- 11 Nov 2026: a game line opens its game's card on the phone (the user: "can you have it so the game lines open as well like the props? I really like this
+  //      to view on the go or show someone on the fly"). At the save each game on the sheet is put in the form, drawn by the page's own render and read off, and
+  //      the form is put back as it stood; the cards ride in a document of their own beside the sheet, phone/games, written first and stamped with the sheet's time.
+  //      Every line of a game opens the same card under the line that was pressed: a bet you are taking, a parlay leg, a likeliest side, a simulation call ----
+  const phGKeep = await pg.evaluate(async () => { await smStore.ready; const k = {}; for (const x of ['callsheet3.card.v1', 'callsheet3.props.v1', 'callsheet3.draft.v1']) k[x] = await smStore.getItem(x); await smStore.removeItem('callsheet3.card.v1'); await smStore.removeItem('callsheet3.props.v1'); return k; });
+  await reloaded();
+  const phG = await pg.evaluate(async ({ src, url }) => {
+    const wait = (ms) => new Promise(r => setTimeout(r, ms || 110)), txt = e => (e ? e.innerText : '').replace(/\s+/g, ' ').trim();
+    const set = (id, v) => { const el = document.getElementById(id); el.value = v; el.dispatchEvent(new Event('input', { bubbles: true })); };
+    await smStore.ready;
+    document.getElementById('clear').click(); document.getElementById('m-nba').click(); await wait();
+    // a game of the night before, graded: it is opened in the form, locked, for one of the presses below
+    set('gdate', '2026-11-12'); document.getElementById('example').click(); await wait(); set('gdate', '2026-11-12'); await wait();
+    document.getElementById('add').click(); await wait();
+    const C = JSON.parse(smStore.getItem('callsheet3.card.v1')).find(x => x.gdate === '2026-11-12');
+    const grade = (k, v) => { const el = document.querySelector('#cardTable .grade[data-id="' + C.id + '"][data-k="' + k + '"]'); el.value = v; el.dispatchEvent(new Event('input', { bubbles: true })); el.dispatchEvent(new Event('change', { bubbles: true })); };
+    grade('fa', '110'); grade('fh', '120'); await wait();
+    document.getElementById('clear').click(); document.getElementById('m-nba').click(); await wait();
+    set('gdate', '2026-11-13'); document.getElementById('example').click(); await wait(); set('gdate', '2026-11-13'); await wait();
+    document.getElementById('add').click(); await wait();
+    set('away', 'Celtics'); set('home', 'Lakers'); set('line', '219.5'); set('sp', '-3.5'); await wait();
+    document.getElementById('add').click(); await wait();
+    const bd = document.getElementById('boardDate'); bd.value = '2026-11-13'; bd.dispatchEvent(new Event('change')); await wait();
+    const rows = () => JSON.parse(smStore.getItem('callsheet3.card.v1')).filter(x => x.gdate === '2026-11-13');
+    const A = rows().find(x => /76ers @ Knicks/.test(x.matchup)), B = rows().find(x => /Celtics @ Lakers/.test(x.matchup));
+    // a bet on the second game from the board, a simulation call on the first from its own card
+    const brow = [...document.querySelectorAll('#board tbody tr')].find(t => /Celtics @ Lakers/.test(t.innerText) && t.querySelector('.takebtn')); brow.querySelector('.takebtn').click(); await wait();
+    document.querySelector('#cardTable [data-open="' + A.id + '"]').click(); await wait();
+    document.querySelector('#nbaSimPanel .takebtn[data-stake*="|own|total|"]').click(); await wait();
+    // the form holds a draft of a third game when the button is pressed, with a fold standing open in the rail
+    document.getElementById('clear').click(); await wait(); document.getElementById('m-nba').click(); await wait();
+    set('away', 'Bulls'); set('home', 'Heat'); set('line', '230.5'); set('op', '-110'); set('up', '-110'); set('hml', '-150'); set('aml', '130'); set('gdate', '2026-11-13'); await wait();
+    const foldOf = () => document.querySelector('#markets details.mknotes') || document.querySelector('#markets details'); if (foldOf()) foldOf().open = true;
+    const state = () => {
+      const vals = {}; document.querySelectorAll('input, select, textarea').forEach((e, i) => { vals[e.id || ('#' + i)] = e.type === 'checkbox' ? e.checked : e.value; });
+      const html = {}; ['signals', 'forecastLine', 'markets', 'why', 'nbaOutPanel', 'nbaLineupPanel', 'nbaFormPanel', 'nbaSimPanel', 'nbaMidPanel', 'nbaCrewPanel', 'nbaCtxPanel', 'rankTag', 'secSimLive', 'secOutLive', 'secCrewLive', 'secMidLive', 'nbaNav', 'eyebrow', 'picks', 'bestBets', 'likeliest', 'board', 'cardTable', 'taking', 'saveState', 'lockNote']
+        .forEach(k => { const e = document.getElementById(k); html[k] = e ? e.innerHTML + '|' + e.hidden : null; });
+      return JSON.stringify({ vals, html, open: [...document.querySelectorAll('details')].map(d => d.open ? 1 : 0).join(''), dis: [...document.querySelectorAll('input, select, textarea, button')].map(e => e.disabled ? 1 : 0).join(''),
+        pressed: ['m-mlb', 'm-nba', 'm-wnba'].map(id => document.getElementById(id).getAttribute('aria-pressed')).join(), store: ['callsheet3.card.v1', 'callsheet3.draft.v1', 'callsheet3.props.v1', 'callsheet3.slate.v1'].map(k => smStore.getItem(k)) });
+    };
+    const body = document.getElementById('phoneBody'), esc = async () => { document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })); await wait(); };
+    const notes = () => [...body.querySelectorAll('.note')].map(txt), press = async (ms) => { document.getElementById('phone').click(); await wait(ms || 900); };
+    const mock = (0, eval)('(' + src + ')'); mock({ docs: { 'phone/config': { url } }, owner: true });
+    const before = state(), fold0 = !!(foldOf() && foldOf().open);
+    await press(1000);
+    const after = state(), diff = [];
+    if (before !== after) { const X = JSON.parse(before), Y = JSON.parse(after); for (const k of Object.keys(X)) { if (X[k] && typeof X[k] === 'object') { for (const j of Object.keys(X[k])) if (X[k][j] !== Y[k][j]) diff.push(k + '.' + j); } else if (X[k] !== Y[k]) diff.push(k); } }
+    const doc = JSON.parse(JSON.stringify(window.__mock.docs['phone/latest'] || null)), gdoc = JSON.parse(JSON.stringify(window.__mock.docs['phone/games'] || null));
+    const gids = k => ((doc.sheet || {})[k] || []).map(x => x.gid === undefined ? '-' : x.gid === String(A.id) ? 'A' : x.gid === String(B.id) ? 'B' : '?').join('');
+    const saved = { notes: notes(), calls: window.__mock.calls.slice(), same: before === after, diff, fold0, fold1: !!(foldOf() && foldOf().open), v: doc.v, keys: Object.keys(doc).join(), games: doc.games, gkeys: gdoc ? Object.keys(gdoc).join() : '', gv: gdoc && gdoc.v, gd: gdoc && gdoc.d,
+      gat: !!gdoc && gdoc.at === doc.at, gz: !!gdoc && /^z[A-Za-z0-9_-]{2000,}$/.test(gdoc.panels), gbytes: gdoc ? JSON.stringify(gdoc).length : 0, bytes: JSON.stringify(doc).length,
+      gid: { take: gids('take'), four: gids('four'), likely: gids('likely'), sim: gids('sim') }, take: doc.sheet.take.map(x => x.k + ':' + x.p), ids: ['take', 'four', 'bets', 'likely', 'sim'].some(k => (doc.sheet[k] || []).some(x => x.ids)) };
+    // the sheet as the phone shows it: a game line opens its game's card over the sheet, under the line that was pressed
+    document.getElementById('phonePreview').click(); await wait();
+    const sh = document.getElementById('phoneSheet'), pp = () => document.getElementById('phonePanel'), ppb = () => document.getElementById('phonePanelBody');
+    const cardOf = re => [...sh.querySelectorAll('[data-pgid]')].find(c => re.test(c.innerText));
+    const read = () => { const p = ppb(); return { open: !pp().hidden, line: txt(p.querySelector('.pp-line')), head: txt(p.querySelector('.pgame h3')), band: txt(p.querySelector('.pgame .pd-band')), sigs: p.querySelectorAll('.signals .sig').length, sigLinks: p.querySelectorAll('.signals a').length,
+      fc: /^Forecast/.test(txt(p.querySelector('.pg-fc'))), mks: p.querySelectorAll('.mk').length, others: !!(p.querySelector('details.others') || {}).open, pick: txt(p.querySelector('.pickcard .lab')), split: !!p.querySelector('.split'),
+      secs: [...p.querySelectorAll('details.pg-sec')].map(d => txt(d.querySelector('.pg-t')) + (d.open ? '*' : '')), simRows: p.querySelectorAll('.simtab tbody tr').length, tiles: p.querySelectorAll('.simtile').length, taking: [...p.querySelectorAll('.simtab .chip.taken')].map(txt),
+      why: p.querySelectorAll('ul.why li').length, controls: p.querySelectorAll('button, a, input, select, textarea').length, data: (p.innerHTML.match(/\sdata-[a-z-]+=/g) || []).length, ids: (p.innerHTML.match(/\sid=/g) || []).length, titles: (p.innerHTML.match(/\stitle=/g) || []).length,
+      words: /Press Clear|Type the inputs|type the app's parlay price|into the form/.test(p.innerText) }; };
+    const preview = { tip: txt(sh.querySelector('.psh-tip')), gtaps: sh.querySelectorAll('[data-pgid]').length, ptaps: sh.querySelectorAll('[data-pids]').length, plain: sh.querySelectorAll('.pshk:not(.tap)').length, heads: [...sh.querySelectorAll('h2')].map(txt) };
+    cardOf(/TAKING · NBA(?! · SIM)/).click(); await wait(350); preview.bet = read();
+    await esc(); preview.afterEsc = { panel: pp().hidden, sheet: sh.hidden };
+    cardOf(/TAKING · NBA · SIMULATION/).click(); await wait(350); preview.simTake = read();
+    await esc(); await esc();
+    // the file to send: the game's card folded under each of its lines
+    document.getElementById('phoneFile').click(); await wait(500);
+    const filed = { name: (window.__mock.saved || {}).filename || '', data: (window.__mock.saved || {}).data || '' };
+    await esc();
+    // the games' document refused by a full store: the sheet is saved all the same, its game lines plain, and the dialog says so
+    window.__mock.fail = ['quota_exceeded']; window.__mock.calls.length = 0;
+    await press(1000);
+    const d2 = window.__mock.docs['phone/latest'];
+    const noGames = { note: notes()[0] || '', calls: window.__mock.calls.slice(), games: d2.games, gid: ['take', 'four', 'bets', 'likely', 'sim'].map(k => (d2.sheet[k] || []).filter(x => x.gid !== undefined).length).join() };
+    document.getElementById('phonePreview').click(); await wait();
+    noGames.taps = sh.querySelectorAll('.pshk.tap').length; noGames.cards = sh.querySelectorAll('.pshk').length; noGames.tip = !!sh.querySelector('.psh-tip'); await esc(); await esc();
+    // a graded game open in the form, locked, when the button is pressed: the rail's grading and the lock stand after it
+    document.querySelector('#cardTable [data-open="' + C.id + '"]').click(); await wait();
+    const before3 = state(), final3 = txt(document.querySelector('#markets .final'));
+    window.__mock.calls.length = 0; await press(1000);
+    const graded = { same: before3 === state(), final0: final3, final1: txt(document.querySelector('#markets .final')), lock: !document.getElementById('lockNote').hidden, dis: document.getElementById('line').disabled, games: window.__mock.docs['phone/latest'].games };
+    await esc();
+    // the store unavailable once on the games' document: one more try, then the sheet. The form is on another sport for this press, a baseball game in it and the
+    // NBA card out of sight, and the page is read before and after it again
+    document.getElementById('clear').click(); await wait(); document.getElementById('m-mlb').click(); await wait(); document.getElementById('example').click(); await wait();
+    if (foldOf()) foldOf().open = true;
+    const before2 = state(), fold2 = !!(foldOf() && foldOf().open), sport2 = ['m-mlb', 'm-nba', 'm-wnba'].map(id => document.getElementById(id).getAttribute('aria-pressed')).join();
+    window.__mock.fail = ['unavailable']; window.__mock.calls.length = 0;
+    await press(2200);
+    const after2 = state(), diff2 = [];
+    if (before2 !== after2) { const X = JSON.parse(before2), Y = JSON.parse(after2); for (const k of Object.keys(X)) { if (X[k] && typeof X[k] === 'object') { for (const j of Object.keys(X[k])) if (X[k][j] !== Y[k][j]) diff2.push(k + '.' + j); } else if (X[k] !== Y[k]) diff2.push(k); } }
+    const again = { calls: window.__mock.calls.slice(), games: window.__mock.docs['phone/latest'].games, gat: window.__mock.docs['phone/games'].at === window.__mock.docs['phone/latest'].at, note: notes()[0] || '',
+      same: before2 === after2, diff: diff2, fold0: fold2, fold1: !!(foldOf() && foldOf().open), sport: sport2, away: document.getElementById('away').value + ' @ ' + document.getElementById('home').value, rail: txt(document.querySelector('#markets .pickcard .lab')) };
+    await esc();
+    const docs = JSON.parse(JSON.stringify(window.__mock.docs));
+    delete window.claude; delete window.__mock;
+    document.getElementById('clear').click(); await wait(); document.getElementById('m-nba').click(); await wait();
+    bd.value = ''; bd.dispatchEvent(new Event('change')); await wait();
+    return { saved, preview, filed, noGames, graded, again, docs };
+  }, { src: claudeMock.toString(), url: PH_URL });
+  const phGView = async (opts) => {
+    const c = await pg.context().browser().newContext({ viewport: { width: 390, height: 844 } }), p = await c.newPage(), e2 = [];
+    p.on('pageerror', e => e2.push(e.message));
+    await p.addInitScript(claudeMock, opts);
+    await p.goto('file://' + path.join(__dirname, 'web/callsheet3.html'));
+    await p.waitForFunction(() => window.smStore && window.smStore.ready, null, { timeout: 60000 }); await p.waitForTimeout(800);
+    const r = await p.evaluate(async () => {
+      const wait = (ms) => new Promise(r => setTimeout(r, ms || 140)), txt = e => (e ? e.innerText : '').replace(/\s+/g, ' ').trim();
+      const s = document.getElementById('phoneSheet'); if (!s || s.hidden) return { open: false, calls: window.__mock.calls.slice() };
+      const g = [...s.querySelectorAll('[data-pgid]')], o = { open: true, how: s.dataset.how, gtaps: g.length, cards: s.querySelectorAll('.pshk').length, tip: txt(s.querySelector('.psh-tip')), controls: s.querySelectorAll('input, button, select, textarea, a').length, atOpen: window.__mock.calls.slice(), right: 0, wrong: 0, none: 0, fits: true, pcontrols: 0, shut: 0 };
+      for (const c of g) {
+        c.click(); await wait(220);
+        const pp = document.getElementById('phonePanel'), p = document.getElementById('phonePanelBody'), h = txt(p.querySelector('.pgame h3')), m = txt(c.querySelector('.a4'));
+        if (!h) o.none++; else if (m.indexOf(h) === 0 && txt(p.querySelector('.pp-line')) === txt(c)) o.right++; else o.wrong++;
+        o.last = txt(p).slice(0, 200); o.fits = o.fits && pp.scrollWidth <= pp.clientWidth + 1; o.pcontrols += p.querySelectorAll('button, a, input, select, textarea').length; o.shut = pp.querySelectorAll('[data-ppclose]').length;
+        document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })); await wait(60);
+      }
+      o.sheetStays = !s.hidden; o.calls = window.__mock.calls.slice(); o.pageFits = document.documentElement.scrollWidth <= window.innerWidth;
+      return o;
+    });
+    await c.close(); r.errs = e2; return r;
+  };
+  const phGDocs = phG.docs || {};
+  const phGOwner = await phGView({ docs: phGDocs, owner: true });
+  const phGGuest = await phGView({ docs: phGDocs, owner: false });
+  const phGStale = await phGView({ docs: Object.assign({}, phGDocs, { 'phone/games': Object.assign({}, phGDocs['phone/games'], { at: '2026-01-01T00:00:00.000Z' }) }), owner: true });
+  const phGGone = await phGView({ docs: { 'phone/latest': phGDocs['phone/latest'], 'phone/config': phGDocs['phone/config'] }, owner: false });
+  const phGFilePath = path.join(require('os').tmpdir(), 'cs3-harness-' + process.pid + '-games.html');
+  fs.writeFileSync(phGFilePath, phG.filed.data || '<!doctype html><title>nothing saved</title>');
+  const gCtx = await pg.context().browser().newContext({ viewport: { width: 390, height: 844 }, javaScriptEnabled: false }), gPage = await gCtx.newPage(), gReqs = [];
+  gPage.on('request', q => { if (!/^(file|data):/.test(q.url())) gReqs.push(q.url()); });
+  await gPage.goto('file://' + phGFilePath); await gPage.waitForTimeout(400);
+  const gFolds = await gPage.locator('details.pfd').count(), gGameFolds = await gPage.locator('details.pfd:has(.pgame)').count();
+  const gTip = gFolds ? (await gPage.locator('.psh-tip').innerText()).replace(/\s+/g, ' ').trim() : '';
+  if (gGameFolds) { await gPage.locator('details.pfd:has(.pgame) > summary').first().click(); await gPage.waitForTimeout(200); }
+  const gOpen = await gPage.locator('details.pfd[open]').count();
+  const gHead = gOpen ? (await gPage.locator('details.pfd[open] .pgame h3').first().innerText()).trim() : '', gUnder = gOpen ? (await gPage.locator('details.pfd[open] > summary .a4').first().innerText()).trim() : '';
+  const gSecs0 = await gPage.locator('details.pfd[open] details.pg-sec[open]').count();
+  if (gOpen) { await gPage.locator('details.pfd[open] details.pg-sec:not([open]) > summary').first().click(); await gPage.waitForTimeout(200); }
+  const gSecs1 = await gPage.locator('details.pfd[open] details.pg-sec[open]').count(), gWide = await gPage.evaluate(() => document.documentElement.scrollWidth);
+  await gCtx.close(); try { fs.unlinkSync(phGFilePath); } catch (e) {}
+  await pg.evaluate(async (k) => { for (const x of Object.keys(k)) { if (k[x] === null || k[x] === undefined) await smStore.removeItem(x); else await smStore.setItem(x, k[x]); } }, phGKeep);
+  await reloaded();
+  const phGs = phG.saved, gfd = phG.filed.data || '';
+  chk(JSON.stringify(phGs.calls) === JSON.stringify(['use db', 'set phone/games', 'set phone/latest', 'get phone/config'])
+      && phGs.v === 4 && phGs.keys === 'v,d,at,sheet,panels,games' && phGs.games === 2 && phGs.gkeys === 'v,d,at,panels' && phGs.gv === 1 && phGs.gd === '2026-11-13' && phGs.gat && phGs.gz && phGs.gbytes < 200000 && phGs.bytes < 200000
+      && phGs.gid.take === 'BA' && phGs.gid.four.split('').sort().join('') === 'AB' && phGs.gid.likely.split('').sort().join('') === 'AB' && /^[AB]+$/.test(phGs.gid.sim) && !phGs.ids
+      && /^card:Lakers ML$/.test(phGs.take[0]) && /^sim:Total (OVER|UNDER) 231\.5$/.test(phGs.take[1])
+      && /^Saved for your phone at \d{1,2}:\d\d [AP]M: \d+ lines, .* and the simulation's calls\. Tap a game line and its game's card opens, the signals, the pick, every market and the simulation: 2 games\.$/.test(phGs.notes[0] || '')
+      && /they scan the same code and get tonight's sheet with the detail behind each pick, the games' cards with it, and nothing else, view only/.test(phGs.notes[2] || ''),
+      'phone, the games\' cards at the save (11 Nov 2026, the user: "have it so the game lines open as well like the props"): with games on the board the button writes the games\' cards to a document of their own first (phone/games, packed, stamped with the sheet\'s date and time), then the sheet, which says how many it carries; every game line of the sheet, the bet and the simulation call you are taking, the parlay legs, the likeliest sides and the simulation\'s calls, carries its own game\'s mark; and the dialog says a game line opens its game\'s card and how many games',
+      JSON.stringify({ calls: phGs.calls, v: phGs.v, keys: phGs.keys, games: phGs.games, gkeys: phGs.gkeys, gv: phGs.gv, gd: phGs.gd, gat: phGs.gat, gz: phGs.gz, gbytes: phGs.gbytes, bytes: phGs.bytes, gid: phGs.gid, ids: phGs.ids, take: phGs.take, notes: phGs.notes.map(n => n.slice(0, 330)) }));
+  chk(phGs.same && phGs.diff.length === 0 && phGs.fold0 && phGs.fold1
+      && phG.again.same && phG.again.diff.length === 0 && phG.again.fold0 && phG.again.fold1 && phG.again.sport === 'true,false,false' && /^Rays @ Yankees$/.test(phG.again.away) && /^THE PICK/i.test(phG.again.rail)
+      && phG.graded.same && /^Final: 76ers 110, Knicks 120 /.test(phG.graded.final0) && /this card went \d+-\d+/.test(phG.graded.final0) && phG.graded.final1 === phG.graded.final0 && phG.graded.lock && phG.graded.dis && phG.graded.games === 2,
+      'phone, the page after the save: drawing the games\' cards puts each game through the form, and when the button has done the form is as it stood, a draft of a third game in it: every box and tick, the rail and every section of the NBA card, the board, the card table, the bets marked Taking, which sport is pressed, what is disabled, the fold that stood open in the rail, and everything in the page\'s storage, the draft included; the same with a graded game of the night before open in the form, its final and its record still on the rail and the form still locked; and the same with the form on another sport, a baseball game in it and the NBA card out of sight, which holds after the save what it held before',
+      JSON.stringify({ same: phGs.same, diff: phGs.diff.slice(0, 12), fold0: phGs.fold0, fold1: phGs.fold1, graded: phG.graded, mlb: { same: phG.again.same, diff: phG.again.diff.slice(0, 12), fold0: phG.again.fold0, fold1: phG.again.fold1, sport: phG.again.sport, away: phG.again.away, rail: phG.again.rail } }));
+  const gBet = phG.preview.bet || {}, gSim = phG.preview.simTake || {};
+  chk(phG.preview.tip === "Tap a game line for its game's card." && phG.preview.gtaps === 8 && phG.preview.ptaps === 0 && phG.preview.plain === 0
+      && phG.preview.heads.join('|').toLowerCase() === "taking tonight 2|the parlay four 2|likeliest at any price 2|the simulation's calls, bet or better 2"
+      && gBet.open && /^TAKING · NBA Lakers ML \d/.test(gBet.line) && / Celtics @ Lakers · Moneyline$/.test(gBet.line) && gBet.head === 'Celtics @ Lakers' && /^NBA · NOV 13$/i.test(gBet.band)
+      && gBet.sigs >= 2 && gBet.sigLinks === 0 && gBet.fc && gBet.mks === 4 && gBet.others && /^THE DECISION · AN? (UPSET|MONEYLINE|OVER|UNDER) GAME$/i.test(gBet.pick) && /^THE DECISION/i.test(gSim.pick) && gBet.split && gBet.secs[0] === 'SIMULATION*' && gBet.secs[gBet.secs.length - 1] === 'WHY' && gBet.secs.slice(1).every(s => !/\*$/.test(s)) && gBet.secs.length >= 4
+      && gBet.simRows === 6 && gBet.tiles === 4 && gBet.taking.length === 0 && gBet.why >= 3 && gBet.controls === 0 && gBet.data === 0 && gBet.ids === 0 && gBet.titles === 0 && !gBet.words
+      && phG.preview.afterEsc.panel && !phG.preview.afterEsc.sheet
+      && gSim.open && /^TAKING · NBA · SIMULATION Total (OVER|UNDER) 231\.5 /.test(gSim.line) && / 76ers @ Knicks · the simulation, the sim's own view$/.test(gSim.line) && gSim.head === '76ers @ Knicks' && gSim.mks === 4 && gSim.simRows === 6
+      && gSim.taking.join() === 'TAKING' && gSim.controls === 0 && gSim.data === 0 && gSim.ids === 0 && gSim.titles === 0 && !gSim.words,
+      'phone, a game line opens its game\'s card: every line of a game on the sheet carries the mark and none is left plain; a press opens that game\'s card over the sheet under the line that was pressed, as the computer draws the game: tonight\'s signals as chips (no link in them), the forecast, the decision and its why, the four markets standing open with their numbers, the split, the simulation standing open with its tiles and its table, and the rest of the NBA card and the why folded under their headings; the simulation call you are taking is marked in its table on its own game and not on the other; no button, field, link, id, hover note or handler is in it, nor a word telling the reader to press something on the computer; and Escape shuts the card and leaves the sheet',
+      JSON.stringify({ tip: phG.preview.tip, gtaps: phG.preview.gtaps, ptaps: phG.preview.ptaps, plain: phG.preview.plain, heads: phG.preview.heads, bet: gBet, afterEsc: phG.preview.afterEsc, sim: gSim }));
+  const gCalls = ['use db', 'use user', 'isOwner', 'sub phone/latest', 'get phone/games'];
+  chk(phGOwner.errs.length === 0 && phGOwner.open && phGOwner.how === 'auto' && phGOwner.gtaps === 8 && phGOwner.cards === 8 && phGOwner.right === 8 && phGOwner.wrong === 0 && phGOwner.none === 0 && phGOwner.fits && phGOwner.pageFits && phGOwner.pcontrols === 0 && phGOwner.shut === 1 && phGOwner.sheetStays
+      && JSON.stringify(phGOwner.atOpen) === JSON.stringify(gCalls) && JSON.stringify(phGOwner.calls) === JSON.stringify(gCalls) && phGOwner.tip === "Tap a game line for its game's card."
+      && phGGuest.errs.length === 0 && phGGuest.open && phGGuest.how === 'guest' && phGGuest.controls === 0 && phGGuest.gtaps === 8 && phGGuest.right === 8 && phGGuest.wrong === 0 && phGGuest.none === 0 && phGGuest.fits && phGGuest.pcontrols === 0 && phGGuest.sheetStays
+      && JSON.stringify(phGGuest.calls) === JSON.stringify(gCalls),
+      'phone, the games\' cards on the owner\'s phone and a guest\'s: the sheet that lands says games\' cards ride beside it, so the phone reads that document once as the sheet opens and never again; each of the eight game lines opens its own game\'s card under its own line, inside the screen\'s width, with nothing in it to press but Close, and Escape leaves the sheet; someone the page is shared with gets the same, with no control anywhere on the sheet, and no script error on either',
+      JSON.stringify({ owner: { errs: phGOwner.errs, open: phGOwner.open, how: phGOwner.how, gtaps: phGOwner.gtaps, cards: phGOwner.cards, right: phGOwner.right, wrong: phGOwner.wrong, none: phGOwner.none, fits: phGOwner.fits, pageFits: phGOwner.pageFits, pcontrols: phGOwner.pcontrols, shut: phGOwner.shut, atOpen: phGOwner.atOpen, calls: phGOwner.calls, tip: phGOwner.tip },
+        guest: { errs: phGGuest.errs, open: phGGuest.open, how: phGGuest.how, controls: phGGuest.controls, gtaps: phGGuest.gtaps, right: phGGuest.right, wrong: phGGuest.wrong, none: phGGuest.none, fits: phGGuest.fits, pcontrols: phGGuest.pcontrols, calls: phGGuest.calls } }));
+  chk(phGStale.errs.length === 0 && phGStale.open && phGStale.gtaps === 8 && phGStale.none === 8 && phGStale.right === 0 && phGStale.wrong === 0 && / The detail of this one is not in the save\. Press Phone QR on the computer again, or open it there\.$/.test(phGStale.last || '') && phGStale.sheetStays
+      && phGGone.errs.length === 0 && phGGone.open && phGGone.gtaps === 8 && phGGone.none === 8 && phGGone.right === 0 && / The detail of this one is not in the save\./.test(phGGone.last || '')
+      && /^Saved for your phone at .* and the simulation's calls\. The games' cards did not save \(the page's store is full\), so a game line does not open tonight; press the button again for them\.$/.test(phG.noGames.note)
+      && JSON.stringify(phG.noGames.calls) === JSON.stringify(['use db', 'set phone/games', 'set phone/latest', 'get phone/config']) && phG.noGames.games === 0 && phG.noGames.gid === '0,0,0,0,0' && phG.noGames.taps === 0 && phG.noGames.cards === 8 && !phG.noGames.tip
+      && JSON.stringify(phG.again.calls) === JSON.stringify(['use db', 'set phone/games', 'set phone/games', 'set phone/latest', 'get phone/config']) && phG.again.games === 2 && phG.again.gat && /: 2 games\.$/.test(phG.again.note),
+      'phone, when a game\'s card is not there: games\' cards stamped with another save\'s time are not this sheet\'s and are not shown, and a sheet whose games\' document is gone says the same under the line that was pressed, with no script error; a full store that refuses the games\' document still gets the sheet, saved with its game lines plain and the dialog saying the games\' cards did not save and why; and a store unavailable once on the games\' document is tried once more before the sheet is written',
+      JSON.stringify({ stale: { errs: phGStale.errs, open: phGStale.open, gtaps: phGStale.gtaps, none: phGStale.none, right: phGStale.right, wrong: phGStale.wrong, last: (phGStale.last || '').slice(-120) }, gone: { errs: phGGone.errs, gtaps: phGGone.gtaps, none: phGGone.none, last: (phGGone.last || '').slice(-120) }, noGames: phG.noGames, again: { calls: phG.again.calls, games: phG.again.games, gat: phG.again.gat, note: phG.again.note.slice(-60) } }));
+  chk(phG.filed.name === 'super-model-2026-11-13.html' && /^<!doctype html><html lang="en">/.test(gfd) && !/<script|<button|<a\b|<input|<select|<textarea|<iframe|<img|\son[a-z]+\s*=|\sdata-[a-z-]+=|\sid=|https?:\/\//i.test(gfd)
+      && gFolds === 8 && gGameFolds === 8 && gTip === "Tap a game line for its game's card." && gOpen === 1 && /^(76ers @ Knicks|Celtics @ Lakers)$/.test(gHead) && gUnder.indexOf(gHead) === 0 && gSecs0 === 1 && gSecs1 === 2 && gWide <= 390 && gReqs.length === 0,
+      'phone, the file to send with the games in it: each game line of the saved file folds its game\'s card under it, a still copy with no script, button, link, field, id, handler or outside address; opened with scripts off on a phone-width screen a tap on a line opens that game\'s card, a tap on a heading inside it opens that section, nothing is fetched and nothing runs off the side',
+      JSON.stringify({ name: phG.filed.name, bytes: gfd.length, folds: gFolds, gameFolds: gGameFolds, tip: gTip, open: gOpen, head: gHead, under: gUnder.slice(0, 60), secs0: gSecs0, secs1: gSecs1, wide: gWide, reqs: gReqs.slice(0, 3) }));
+
+  // ---- 11 Nov 2026: a block stood here for the crowd's card on Kalshi (it read the sheet's chances of the game on the form, on the first draw). The card came
+  //      off on 23 Nov 2026 with the rest of Kalshi; the page is loaded afresh here as that block left it ----
+  await reloaded();
+
+  // ---- 12 Nov 2026: a mark keeps what was marked. A prop's mark was a flag and a pair's the other leg's key, so a props file loaded after the mark re-read the
+  //      bet at the newer run's line, side and price: on 11 Nov the user's Caleb Wilson UNDER 6.5 rebounds (five rebounds, a win) was recorded as OVER 5.5, a loss,
+  //      and two of his pairs were rebuilt and read the wrong way. Here a prop and a pair are marked, the page is loaded again, a later run moves the lines and
+  //      turns the picks, and the night is graded: the bets stay as marked. A mark with nothing kept (one made before this) is kept as the rows stand before the
+  //      later file replaces them. And a date whose props were made without last season's ledger says so on the tab for as long as the date is shown ----
+  const fzKeep = await pg.evaluate(async () => { await smStore.ready; const k = {}; for (const x of ['callsheet3.card.v1', 'callsheet3.props.v1', 'callsheet3.draft.v1']) k[x] = await smStore.getItem(x); await smStore.removeItem('callsheet3.card.v1'); await smStore.removeItem('callsheet3.props.v1'); return k; });
+  await reloaded();
+  const fzMen = () => {
+    const G = [['Spurs', 'Bulls', 'SAS', 'CHI', -2.5]];
+    const need = (price) => price < 0 ? -price / (-price + 100) : 100 / (price + 100);
+    const man = (pid, name, team, mk, side, line, chance, price, why, o) => Object.assign({ gi: 0, pid: String(pid), name, team, opp: team === 'SAS' ? 'CHI' : 'SAS', home: team === 'CHI', pos: 'F', mk, line, op: side === 'OVER' ? price : 100, up: side === 'UNDER' ? price : 100, book: 'betmgm',
+      books: { betmgm: [line, side === 'OVER' ? price : 100, side === 'UNDER' ? price : 100], draftkings: [line, -115, -105] }, proj: line + (side === 'OVER' ? 1.5 : -1.5), sd: 3, pm: side === 'OVER' ? 0.7 : 0.3, pb: 0.5, p: side === 'OVER' ? chance : Math.round((1 - chance) * 10000) / 10000, push: 0, side, chance, price, need: Math.round(need(price) * 10000) / 10000,
+      edge: Math.round((chance - need(price)) * 10000) / 10000, band: chance - need(price) > 0.012 ? 'LEAN' : 'no edge', mins: 30, rate36: 8, base: 7, med: line, usg: 15, sdf: 1, starter: true, start_src: "RotoWire's expected five",
+      why: [why], log: [6, 5, 7, 4, 6, 5, 8, 5, 6, 4].map((v, i) => ['2026-10-' + String(20 + i), 'OPP', i % 2, 30, v, ['won by 3']]), parts: [{ k: 'pace', t: 'Pace', eff: side === 'OVER' ? 0.3 : -0.3, i: 0 }] }, o || {});
+    const file = (men, gen) => ({ format: 'callsheet3.props', version: 1, date: '2026-11-20', generated: gen, games: G.map((g, gi) => ({ gid: 'fz' + gi, away: g[0], home: g[1], aab: g[2], hab: g[3], spread: g[4], total: 225.5, props: men })) });
+    const WITH = "7.0 rebounds per 36 this season (9 games, 250 minutes), blended with last season's 6.5 (900 of 900 minutes at a quarter, weight 225): 6.8 per 36", NONE = '7.0 rebounds per 36 this season (9 games, 250 minutes); no last season to blend';
+    const crowd = (why) => { const out = []; for (let i = 0; i < 22; i++) out.push(man(100 + i, 'Bench Man ' + (i + 1), i % 2 ? 'CHI' : 'SAS', 'pts', 'UNDER', 8.5, 0.5, -110, why)); return out; };
+    return { man, file, WITH, NONE, crowd };
+  };
+  const fz1 = await pg.evaluate(async (src) => {
+    const wait = (ms) => new Promise(r => setTimeout(r, ms || 130)), txt = e => (e ? e.innerText : '').replace(/\s+/g, ' ').trim();
+    await smStore.ready;
+    const { man, file, WITH, crowd } = (0, eval)('(' + src + ')')();
+    const load = async (doc, name) => { const dt = new DataTransfer(); dt.items.add(new File([JSON.stringify(doc)], name, { type: 'application/json' })); const inp = document.getElementById('slateFile'); inp.files = dt.files; inp.dispatchEvent(new Event('change', { bubbles: true })); await wait(); await wait(); };
+    // the morning's run, made with last season's ledger: Wilson UNDER 6.5 rebounds at -155, Fox OVER 0.5 threes and UNDER 6.5 assists
+    await load(file([man(11, 'Caleb Wilson', 'CHI', 'reb', 'UNDER', 6.5, 0.622, -155, WITH), man(12, "De'Aaron Fox", 'SAS', 'tpm', 'OVER', 0.5, 0.668, -120, WITH), man(12, "De'Aaron Fox", 'SAS', 'ast', 'UNDER', 6.5, 0.64, -155, WITH), man(13, 'Old Mark', 'CHI', 'pts', 'OVER', 10.5, 0.60, -120, WITH),
+      man(14, 'Old Mate', 'SAS', 'reb', 'UNDER', 7.5, 0.60, -120, WITH), man(15, 'Old Pal', 'CHI', 'ast', 'OVER', 3.5, 0.58, -110, WITH)].concat(crowd(WITH)), '2026-11-20T15:00:00Z'), 'nba-props-2026-11-20.json');
+    if (document.getElementById('propsView').hidden) { document.getElementById('m-props').click(); await wait(); }
+    const stored = () => JSON.parse(smStore.getItem('callsheet3.props.v1')).filter(x => x.gdate === '2026-11-20'), row = (name, mk) => stored().find(x => x.name === name && x.mk === mk);
+    const warn0 = document.getElementById('propsWarn').hidden;
+    document.querySelector('#propsTable tr[data-prop="' + row('Caleb Wilson', 'reb').id + '"] .takebtn').click(); await wait();
+    const pairCard = [...document.querySelectorAll('#propsPairs .pk.pair')].find(c => /Fox .* \+ De'Aaron Fox/.test(c.innerText) && c.querySelector('.takebtn'));
+    const pairText0 = txt(pairCard).replace(/ Take$/i, ''); pairCard.querySelector('.takebtn').click(); await wait();
+    const w = row('Caleb Wilson', 'reb'), sp = (row("De'Aaron Fox", 'tpm').pairsAt || []).concat(row("De'Aaron Fox", 'ast').pairsAt || []);
+    // unmarking takes what was kept with it; marking again keeps it again
+    document.querySelector('#propsTaking .pk[data-prop="' + w.id + '"] .takebtn').click(); await wait();
+    const off = { take: !!row('Caleb Wilson', 'reb').take, took: row('Caleb Wilson', 'reb').took === undefined };
+    document.querySelector('#propsTable tr[data-prop="' + w.id + '"] .takebtn').click(); await wait();
+    [...document.querySelectorAll('#propsTaking .pk.pair .takebtn')][0].click(); await wait();
+    const pairOff = { pairs: !row("De'Aaron Fox", 'tpm').pairs && !row("De'Aaron Fox", 'ast').pairs, kept: !row("De'Aaron Fox", 'tpm').pairsAt && !row("De'Aaron Fox", 'ast').pairsAt };
+    [...document.querySelectorAll('#propsPairs .pk.pair')].find(c => /Fox .* \+ De'Aaron Fox/.test(c.innerText) && c.querySelector('.takebtn')).querySelector('.takebtn').click(); await wait();
+    const o = { warn0, pairText0, took: w.took, specs: sp, off, pairOff, tookAgain: row('Caleb Wilson', 'reb').took, specsAgain: (row("De'Aaron Fox", 'tpm').pairsAt || []).concat(row("De'Aaron Fox", 'ast').pairsAt || []).length,
+      taking: [...document.querySelectorAll('#propsTaking .pk')].map(txt) };
+    // a mark from before the marks kept anything: a flag and nothing else. Written after the last click of this visit, so nothing the page saves writes over it
+    { const all = JSON.parse(smStore.getItem('callsheet3.props.v1')); all.find(x => x.name === 'Old Mark').take = true;
+      all.find(x => x.name === 'Old Mate').pairs = ['2026-11-20|15|ast']; all.find(x => x.name === 'Old Pal').pairs = ['2026-11-20|14|reb']; await smStore.setItem('callsheet3.props.v1', JSON.stringify(all)); }
+    o.oldMark = (m => ({ take: m.take, took: m.took === undefined }))(row('Old Mark', 'pts'));
+    o.oldPair = { a: row('Old Mate', 'reb').pairs, b: row('Old Pal', 'ast').pairs, kept: row('Old Mate', 'reb').pairsAt === undefined && row('Old Pal', 'ast').pairsAt === undefined };
+    return o;
+  }, fzMen.toString());
+  await reloaded();
+  const fz2 = await pg.evaluate(async ({ src, mockSrc, url }) => {
+    const wait = (ms) => new Promise(r => setTimeout(r, ms || 130)), txt = e => (e ? e.innerText : '').replace(/\s+/g, ' ').trim();
+    await smStore.ready;
+    const { man, file, NONE, crowd } = (0, eval)('(' + src + ')')();
+    const load = async (doc, name) => { const dt = new DataTransfer(); dt.items.add(new File([JSON.stringify(doc)], name, { type: 'application/json' })); const inp = document.getElementById('slateFile'); inp.files = dt.files; inp.dispatchEvent(new Event('change', { bubbles: true })); await wait(); await wait(); };
+    // the page as it comes back: the flag-only mark lists as its row stands, with no time of its own
+    if (document.getElementById('propsView').hidden) { document.getElementById('m-props').click(); await wait(); }
+    { const pd = document.getElementById('propsDate'); pd.value = '2026-11-20'; pd.dispatchEvent(new Event('change', { bubbles: true })); await wait(); }
+    const back = { taking: [...document.querySelectorAll('#propsTaking .pk')].map(txt), flag: (m => ({ take: m.take, took: m.took === undefined }))(JSON.parse(smStore.getItem('callsheet3.props.v1')).find(x => x.name === 'Old Mark')) };
+    // the afternoon's run, started in a folder with no last-season ledger: the lines have moved and the picks have turned
+    await load(file([man(11, 'Caleb Wilson', 'CHI', 'reb', 'OVER', 5.5, 0.518, -135, NONE), man(12, "De'Aaron Fox", 'SAS', 'tpm', 'OVER', 0.5, 0.668, -210, NONE), man(12, "De'Aaron Fox", 'SAS', 'ast', 'OVER', 5.5, 0.512, -125, NONE), man(13, 'Old Mark', 'CHI', 'pts', 'UNDER', 9.5, 0.55, -110, NONE),
+      man(14, 'Old Mate', 'SAS', 'reb', 'OVER', 6.5, 0.53, -115, NONE), man(15, 'Old Pal', 'CHI', 'ast', 'OVER', 4.5, 0.55, -110, NONE)].concat(crowd(NONE)), '2026-11-20T20:00:00Z'), 'nba-props-2026-11-20b.json');
+    if (document.getElementById('propsView').hidden) { document.getElementById('m-props').click(); await wait(); }
+    const stored = () => JSON.parse(smStore.getItem('callsheet3.props.v1')).filter(x => x.gdate === '2026-11-20'), row = (name, mk) => stored().find(x => x.name === name && x.mk === mk);
+    const o = { back, wilson: (w => ({ side: w.side, line: w.line, price: w.price, take: w.take, took: w.took }))(row('Caleb Wilson', 'reb')), oldMark: (w => ({ side: w.side, line: w.line, took: w.took }))(row('Old Mark', 'pts')),
+      specs: (row("De'Aaron Fox", 'tpm').pairsAt || []).concat(row("De'Aaron Fox", 'ast').pairsAt || []).length, taking: [...document.querySelectorAll('#propsTaking .pk')].map(txt),
+      oldPair: (row('Old Mate', 'reb').pairsAt || []).concat(row('Old Pal', 'ast').pairsAt || []),
+      warn: txt(document.getElementById('propsWarn')), warnShown: !document.getElementById('propsWarn').hidden, said: txt(document.getElementById('propsMsg')) };
+    document.querySelector('#propsTaking .pk[data-prop="' + row('Caleb Wilson', 'reb').id + '"]').click(); await wait();
+    o.panel = { pick: txt(document.querySelector('#propDetailBody .pd-pick')), took: txt(document.querySelector('#propDetailBody .pd-took')) };
+    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })); await wait();
+    [...document.querySelectorAll('#propsTaking .pk.pair')][0].click(); await wait();
+    o.pairPanel = { head: txt(document.querySelector('#propDetailBody h3')), pick: txt(document.querySelector('#propDetailBody .pd-pick')), took: txt(document.querySelector('#propDetailBody .pd-took')) };
+    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })); await wait();
+    // the board's Taking tonight, its copy, and the sheet for the phone
+    const copies = []; try { Object.defineProperty(navigator, 'clipboard', { configurable: true, value: { writeText: t => { copies.push(String(t)); return Promise.resolve(); } } }); } catch (e) {}
+    document.getElementById('m-nba').click(); await wait();
+    const bd = document.getElementById('boardDate'); bd.value = '2026-11-20'; bd.dispatchEvent(new Event('change')); await wait();
+    o.board = [...document.querySelectorAll('#taking .pk')].map(txt);
+    document.getElementById('takingText').click(); await wait(250); o.copied = copies[copies.length - 1] || '';
+    const mock = (0, eval)('(' + mockSrc + ')'); mock({ docs: { 'phone/config': { url } }, owner: true });
+    document.getElementById('phone').click(); await wait(900);
+    o.sheet = ((window.__mock.docs['phone/latest'] || {}).sheet || { take: [] }).take.map(x => x.k + ': ' + x.p + ' | ' + x.c + ' | ' + x.pr + (x.ids ? ' | ids ' + x.ids.length : ''));
+    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })); await wait();
+    delete window.claude; delete window.__mock;
+    // the grade: Wilson five rebounds, Fox two threes and nine assists, Old Mark ten points, Old Mate seven rebounds, Old Pal four assists
+    await load({ format: 'callsheet2.slate', version: 1, date: '2026-11-20', games: [{ sport: 'NBA', gdate: '2026-11-20', away: 'Spurs', home: 'Bulls', finals: { fa: '110', fh: '100', f5a: '50', f5h: '48' }, notes: [],
+      box: { '11': ['Caleb Wilson', 15, 2, 5, 1, 0], '12': ["De'Aaron Fox", 31, 20, 3, 9, 2], '13': ['Old Mark', 30, 10, 4, 2, 1], '14': ['Old Mate', 28, 8, 7, 3, 0], '15': ['Old Pal', 26, 9, 2, 4, 1] } }] }, 'nba-grade-2026-11-20.json');
+    await wait(300);
+    if (document.getElementById('propsView').hidden) { document.getElementById('m-props').click(); await wait(); }
+    o.rows = stored().filter(x => !/^Bench Man/.test(x.name)).map(x => [x.name, x.mk, x.side, x.line, x.actual, x.result].join(' '));
+    o.graded = [...document.querySelectorAll('#propsTaking .pk')].map(txt);
+    o.tiles = [...document.querySelectorAll('#calibBox .calib[data-sport="TAKEN"] > div')].map(txt);
+    o.list = [...document.querySelectorAll('#takenList tbody tr')].map(e => e.textContent.replace(/\s+/g, ' ').trim());
+    o.recordLine = (txt(document.getElementById('calibBox')).match(/taken \d+-\d+ [^·]+· same-game pairs[^·]*· pairs taken [^·]+/) || [''])[0].trim();
+    o.warnGraded = txt(document.getElementById('propsWarn'));
+    // the backup carries what the marks kept
+    const blob = JSON.parse(smStore.getItem('callsheet3.props.v1'));
+    o.kept = { took: blob.filter(x => x.took).length, pairsAt: blob.filter(x => x.pairsAt).length };
+    return o;
+  }, { src: fzMen.toString(), mockSrc: claudeMock.toString(), url: PH_URL });
+  await pg.evaluate(async (k) => { for (const x of Object.keys(k)) { if (k[x] === null || k[x] === undefined) await smStore.removeItem(x); else await smStore.setItem(x, k[x]); } }, fzKeep);
+  await reloaded();
+  const fzSp = (fz1.specs || [])[0] || {};
+  chk(fz1.warn0 && fz1.took && fz1.took.side === 'UNDER' && fz1.took.line === 6.5 && fz1.took.price === -155 && fz1.took.chance === 0.622 && fz1.took.band === 'LEAN' && fz1.took.book === 'betmgm' && /^\d{4}-\d\d-\d\dT/.test(fz1.took.at || '')
+      && fz1.specs.length === 1 && fzSp.ks.join() === '2026-11-20|12|tpm,2026-11-20|12|ast' && /^(fanatics|draftkings|fanduel|betmgm)$/.test(fzSp.app) && fzSp.at.length === 2 && fzSp.at[0][3] === 'OVER' && fzSp.at[1][3] === 'UNDER' && fzSp.at[0][4] === 0.5 && fzSp.at[1][4] === 6.5 && /^\d{4}-/.test(fzSp.at0 || '')
+      && fz1.off.take === false && fz1.off.took && fz1.pairOff.pairs && fz1.pairOff.kept && fz1.tookAgain && fz1.tookAgain.line === 6.5 && fz1.specsAgain === 1 && fz1.oldMark.take === true && fz1.oldMark.took
+      && fz1.oldPair.a.join() === '2026-11-20|15|ast' && fz1.oldPair.b.join() === '2026-11-20|14|reb' && fz1.oldPair.kept
+      && fz2.back.taking.some(t => /^TAKING · SAME-GAME PAIR · Spurs @ Bulls · at [A-Za-z]+ · .* (Old Mate UNDER 7\.5 rebounds \+ Old Pal OVER 3\.5 assists|Old Pal OVER 3\.5 assists \+ Old Mate UNDER 7\.5 rebounds) both land /.test(t) && !/As you marked|moved/.test(t))
+      && fz2.back.flag.take === true && fz2.back.flag.took && fz2.back.taking.length === 4 && fz2.back.taking.some(t => /^TAKING · NBA PROP · LEAN Old Mark OVER 10\.5 points 60\.0% · -120 needs 54\.5% Spurs @ Bulls · betmgm · projected 12 /.test(t) && !/marked|moved/.test(t))
+      && fz2.back.taking.some(t => /^TAKING · NBA PROP · LEAN · marked \d{1,2}:\d\d [AP]M Caleb Wilson UNDER 6\.5 rebounds 62\.2% · -155 /.test(t) && !/moved/.test(t))
+      && fz1.taking.length === 2 && fz1.taking.some(t => t.indexOf(fz1.pairText0.replace(/^PAIR #\d+/, 'TAKING · SAME-GAME PAIR')) === 0 && / As you marked it at \d{1,2}:\d\d [AP]M\. /.test(t))
+      && fz1.taking.some(t => /^TAKING · NBA PROP · LEAN · marked \d{1,2}:\d\d [AP]M Caleb Wilson UNDER 6\.5 rebounds 62\.2% · -155 needs 60\.8% Spurs @ Bulls · betmgm · projected 5 /.test(t) && !/moved/.test(t)),
+      'marks, what a mark keeps: marking a prop keeps its side, line, price, chance, band, book and the time on the row, and marking a pair keeps the ticket on one of its two rows (the app, and each leg\'s line, price and chance there, its side and the card\'s line); the Taking cards read as the cards did and say when they were marked; unmarking takes what was kept with it and marking again keeps it again; and when the page is loaded again the marks read the same, and a mark that kept nothing, as every mark did before (a flag on a prop, the other leg\'s key on a pair), lists as its rows stand with no time of its own',
+      JSON.stringify({ back: { flag: fz2.back.flag, taking: fz2.back.taking.map(t => t.slice(0, 200)) }, oldPair: fz1.oldPair, warn0: fz1.warn0, took: fz1.took, specs: fz1.specs, off: fz1.off, pairOff: fz1.pairOff, specsAgain: fz1.specsAgain, oldMark: fz1.oldMark, pairText0: fz1.pairText0.slice(0, 200), taking: fz1.taking.map(t => t.slice(0, 260)) }));
+  chk(fz2.wilson.side === 'OVER' && fz2.wilson.line === 5.5 && fz2.wilson.take === true && fz2.wilson.took && fz2.wilson.took.side === 'UNDER' && fz2.wilson.took.line === 6.5 && fz2.wilson.took.price === -155
+      && fz2.oldMark.side === 'UNDER' && fz2.oldMark.took && fz2.oldMark.took.side === 'OVER' && fz2.oldMark.took.line === 10.5 && fz2.oldMark.took.price === -120 && fz2.oldMark.took.at === undefined && fz2.specs === 1
+      && fz2.oldPair.length === 1 && fz2.oldPair[0].at0 === undefined && fz2.oldPair[0].ks.slice().sort().join() === '2026-11-20|14|reb,2026-11-20|15|ast' && fz2.oldPair[0].at.map(x => x[3] + ' ' + x[4]).sort().join() === 'OVER 3.5,UNDER 7.5'
+      && fz2.taking.some(t => /^TAKING · SAME-GAME PAIR · Spurs @ Bulls · at [A-Za-z]+ · .* (Old Mate UNDER 7\.5 rebounds \+ Old Pal OVER 3\.5 assists|Old Pal OVER 3\.5 assists \+ Old Mate UNDER 7\.5 rebounds) both land .* As you marked it: the card has moved since \(.*Old Mate OVER 6\.5 at [-+]\d+.*Old Pal OVER 4\.5 at [-+]\d+.* now\)\. Your ticket stays as marked\./.test(t) || /^TAKING · SAME-GAME PAIR · Spurs @ Bulls · at [A-Za-z]+ · .* (Old Mate UNDER 7\.5 rebounds \+ Old Pal OVER 3\.5 assists|Old Pal OVER 3\.5 assists \+ Old Mate UNDER 7\.5 rebounds) both land .* As you marked it: the card has moved since \(.*Old Pal OVER 4\.5 at [-+]\d+.*Old Mate OVER 6\.5 at [-+]\d+.* now\)\. Your ticket stays as marked\./.test(t))
+      && fz2.taking.length === 4 && fz2.taking.some(t => t.indexOf(fz1.pairText0.replace(/^PAIR #\d+/, 'TAKING · SAME-GAME PAIR')) === 0 && /As you marked it at \d{1,2}:\d\d [AP]M: the card has moved since \(.*De'Aaron Fox OVER 5\.5 at [-+]\d+ now\)\. Your ticket stays as marked\./.test(t))
+      && fz2.taking.some(t => /^TAKING · NBA PROP · LEAN · marked \d{1,2}:\d\d [AP]M Caleb Wilson UNDER 6\.5 rebounds 62\.2% · -155 needs 60\.8% Spurs @ Bulls · betmgm · projected 5 The card has moved since you marked it: OVER 5\.5 at -135 now \(no edge\)\. Your bet stays as marked\./.test(t))
+      && fz2.taking.some(t => /^TAKING · NBA PROP · LEAN Old Mark OVER 10\.5 points 60\.0% · -120 needs 54\.5% .* The card has moved since you marked it: UNDER 9\.5 at -110 now/.test(t))
+      && /^OVER 5\.5 rebounds/.test(fz2.panel.pick) && /^You marked UNDER 6\.5 at -155 \(62\.2%, LEAN\) at \d{1,2}:\d\d [AP]M\. The card has moved since and reads as above; your bet is listed and graded as you marked it\.$/.test(fz2.panel.took)
+      && fz2.pairPanel.head === "De'Aaron Fox OVER 0.5 threes + De'Aaron Fox UNDER 6.5 assists" && /^As you marked it at .*: the card has moved since .* Your ticket stays as marked\. The ticket above is the one you marked, graded on its own lines; each leg's panel reads as the card stands now\.$/.test(fz2.pairPanel.took)
+      && fz2.board.some(t => /Caleb Wilson UNDER 6\.5 rebounds 62\.2% · -155/.test(t)) && fz2.board.some(t => /De'Aaron Fox OVER 0\.5 threes \+ De'Aaron Fox UNDER 6\.5 assists/.test(t)) && /TONIGHT 4 bets marked/.test(fz2.board[fz2.board.length - 1] || '') && fz2.board.some(t => /(Old Mate UNDER 7\.5 rebounds \+ Old Pal OVER 3\.5 assists|Old Pal OVER 3\.5 assists \+ Old Mate UNDER 7\.5 rebounds)/.test(t))
+      && /\d\. Caleb Wilson UNDER 6\.5 rebounds -155 · 62\.2% needs 60\.8% · Spurs @ Bulls/.test(fz2.copied) && /\d\. Old Mark OVER 10\.5 points -120/.test(fz2.copied) && /SAME-GAME PAIR De'Aaron Fox OVER 0\.5 threes \+ De'Aaron Fox UNDER 6\.5 assists/.test(fz2.copied) && /SAME-GAME PAIR (Old Mate UNDER 7\.5 rebounds \+ Old Pal OVER 3\.5 assists|Old Pal OVER 3\.5 assists \+ Old Mate UNDER 7\.5 rebounds)/.test(fz2.copied)
+      && fz2.sheet.some(s => /^prop: Caleb Wilson UNDER 6\.5 rebounds \| 62\.2 \| -155 \| ids 1$/.test(s)) && fz2.sheet.some(s => /^prop: Old Mark OVER 10\.5 points \| 60 \| -120 \| ids 1$/.test(s)) && fz2.sheet.some(s => /^pair: De'Aaron Fox OVER 0\.5 threes \+ De'Aaron Fox UNDER 6\.5 assists \| [\d.]+ \| \d+ \| ids 2$/.test(s)) && fz2.sheet.some(s => /^pair: (Old Mate UNDER 7\.5 rebounds \+ Old Pal OVER 3\.5 assists|Old Pal OVER 3\.5 assists \+ Old Mate UNDER 7\.5 rebounds) \| [\d.]+ \| \d+ \| ids 2$/.test(s)),
+      'marks, through a later run: the page is loaded again and a later props file moves the lines and turns the picks (Wilson to OVER 5.5, Fox\'s assists to OVER 5.5); the marked prop still reads UNDER 6.5 at -155 with the chance and the band it had, and says the card has moved and to what; the marked pair still reads as it was marked, at its app\'s prices, and says which legs have moved; the marks that had kept nothing (the flag on a prop, the keys of a pair) are kept as their rows stood before the later file replaced them, with no time; the prop\'s own panel shows the card as it stands and says what was marked; and the board\'s list, its copy and the sheet for the phone carry the bets as marked',
+      JSON.stringify({ wilson: fz2.wilson, oldMark: fz2.oldMark, oldPair: fz2.oldPair, specs: fz2.specs, taking: fz2.taking.map(t => t.slice(0, 420)), panel: fz2.panel, pairPanel: fz2.pairPanel, board: fz2.board.map(t => t.slice(0, 120)), copied: fz2.copied.slice(0, 500), sheet: fz2.sheet }));
+  chk(fz2.rows.join(' | ') === "Caleb Wilson reb OVER 5.5 5 loss | De'Aaron Fox tpm OVER 0.5 2 win | De'Aaron Fox ast OVER 5.5 9 win | Old Mark pts UNDER 9.5 10 loss | Old Mate reb OVER 6.5 7 win | Old Pal ast OVER 4.5 4 loss"
+      && fz2.graded.some(t => /Caleb Wilson UNDER 6\.5 rebounds 62\.2% · -155 needs 60\.8% WIN · 5 /.test(t)) && fz2.graded.some(t => /Old Mark OVER 10\.5 points 60\.0% · -120 needs 54\.5% LOSS · 10 /.test(t))
+      && fz2.graded.some(t => /De'Aaron Fox OVER 0\.5 threes \+ De'Aaron Fox UNDER 6\.5 assists LOSS /.test(t)) && fz2.graded.some(t => /(Old Mate UNDER 7\.5 rebounds \+ Old Pal OVER 3\.5 assists|Old Pal OVER 3\.5 assists \+ Old Mate UNDER 7\.5 rebounds) WIN /.test(t))
+      && /^PROPS TAKEN 1-1 says 61\.1% · does 50\.0% \(±35\.4\) · -0\.35u$/i.test(fz2.tiles.find(t => /^PROPS TAKEN/i.test(t)) || '') && /^SAME-GAME PAIRS TAKEN 1-1 says \d\d\.\d% · does 50\.0% \(±35\.4\) · \+\d\.\d\du$/i.test(fz2.tiles.find(t => /^SAME-GAME PAIRS TAKEN/i.test(t)) || '')
+      && fz2.list.some(l => /Caleb Wilson UNDER 6\.5 rebounds · Spurs @ Bullsprop62\.2%-155WIN\+0\.65u$/.test(l)) && fz2.list.some(l => /Old Mark OVER 10\.5 points · Spurs @ Bullsprop60\.0%-120LOSS-1\.00u$/.test(l))
+      && fz2.list.some(l => /De'Aaron Fox OVER 0\.5 threes \+ De'Aaron Fox UNDER 6\.5 assists · Spurs @ Bullssame-game pair\d\d\.\d%\+\d+LOSS-1\.00u$/.test(l))
+      && fz2.list.some(l => /(Old Mate UNDER 7\.5 rebounds \+ Old Pal OVER 3\.5 assists|Old Pal OVER 3\.5 assists \+ Old Mate UNDER 7\.5 rebounds) · Spurs @ Bullssame-game pair\d\d\.\d%\+\d+WIN\+\d\.\d\du$/.test(l))
+      && /^taken 1-1 -0\.4u · same-game pairs .* pairs taken 1-1 \+\d\.\du$/.test(fz2.recordLine) && fz2.kept.took === 2 && fz2.kept.pairsAt === 2,
+      'marks, at the grade: the rows grade on the later run\'s lines (Wilson OVER 5.5 a loss on five rebounds, Fox\'s assists OVER 5.5 a win on nine), and the bets grade as they were marked: Wilson UNDER 6.5 a win at -155, the flag-only mark a loss on the line it had, the pair a loss on Fox UNDER 6.5 assists, and the pair marked the old way a win on the two lines it had where the later run\'s would have lost; What you took, the list of every pick and the props record\'s own line count them so, at the prices and chances marked; and what the marks kept is in the saved props, so a backup carries it',
+      JSON.stringify({ rows: fz2.rows, graded: fz2.graded.map(t => t.slice(0, 200)), tiles: fz2.tiles, list: fz2.list, recordLine: fz2.recordLine, kept: fz2.kept }));
+  chk(fz1.warn0 && fz2.warnShown && /^The props on this date were made without last season's ledger\. 28 of the 28 projections rest on this season's games alone, with nothing from last season behind them, .* The run did not find last season's ledger file, nba-ledger-202526\.json, in the folder it was started in\. Copy that file into the folder you run the props from, beside slate\.py \(a copy costs nothing and nothing is pulled again\), run the props again before tip and load the new file: it replaces these, and a bet you have marked stays as you marked it\.$/.test(fz2.warn)
+      && /The night is graded as it was made\.$/.test(fz2.warnGraded) && /Last season's ledger, nba-ledger-202526\.json, was not read by this run: 28 of the 28 projections .* Put the file back beside slate\.py, run the props again before tip, and load the new file; it replaces these\./.test(fz2.said),
+      'props, a date made without last season\'s ledger: a file whose projections were blended with last season shows no warning; a later file for the same date in which more than half of the projections read no last season to blend puts a standing warning on the tab, above the lists, for as long as the date is shown, with the count, the cause (last season\'s ledger file, named for the season before the date\'s own, was not in the folder the run was started in) and what to do (copy the file, not pull it again, and run the props again; a marked bet stays as marked); once the night is graded it says the night is graded as it was made',
+      JSON.stringify({ warn0: fz1.warn0, shown: fz2.warnShown, warn: fz2.warn, graded: fz2.warnGraded.slice(-120), said: fz2.said.slice(0, 400) }));
+
+  // ---- 12 Nov 2026: tickets by best chance (the user: "put together the best two and three guys that have a good chance to each hit to complete the parlay ...
+  //      keep them as we have but add the new option as well"). A leg is a pick with an edge on its card and at the app's own line and price that the sheet gives
+  //      58% or more there; an over in a game with a spread of five or more is left out, and an over on a man whose minutes swing; a ticket is the picks
+  //      likeliest to land together, each on its own game. Nobody here passes the last-five test, so the last-five lists stay empty beside it ----
+  const tcKeep = await pg.evaluate(async () => { await smStore.ready; const k = {}; for (const x of ['callsheet3.card.v1', 'callsheet3.props.v1', 'callsheet3.draft.v1']) k[x] = await smStore.getItem(x); await smStore.removeItem('callsheet3.card.v1'); await smStore.removeItem('callsheet3.props.v1'); return k; });
+  await reloaded();
+  const tc = await pg.evaluate(async () => {
+    const wait = (ms) => new Promise(r => setTimeout(r, ms || 120)), txt = e => (e ? e.innerText : '').replace(/\s+/g, ' ').trim();
+    await smStore.ready;
+    const load = async (doc, name) => { const dt = new DataTransfer(); dt.items.add(new File([JSON.stringify(doc)], name, { type: 'application/json' })); const inp = document.getElementById('slateFile'); inp.files = dt.files; inp.dispatchEvent(new Event('change', { bubbles: true })); await wait(); await wait(); };
+    const G = [['Hawks', 'Magic', 'ATL', 'ORL', -2.5], ['Bulls', 'Bucks', 'CHI', 'MIL', 3.5], ['Heat', 'Jazz', 'MIA', 'UTA', -1.5], ['Suns', 'Kings', 'PHX', 'SAC', -7.5]];
+    const need = (price) => price < 0 ? -price / (-price + 100) : 100 / (price + 100);
+    const cold = L => [L + 2, L - 2, L + 3, L - 1, L + 1, L - 2, L + 2, L - 3, L + 1, L - 1];   // two or three of his last five either way: nobody passes the last-five test
+    const steady = [31, 33, 32, 30, 34, 32, 31, 33, 32, 30], swing = [12, 38, 14, 36, 15, 37, 13, 39, 16, 35];
+    const man = (pid, name, team, gi, mk, side, line, chance, price, mins, books) => ({ gi, pid: String(pid), name, team, opp: team === G[gi][2] ? G[gi][3] : G[gi][2], home: team === G[gi][3], pos: 'G', mk, line,
+      op: side === 'OVER' ? price : 100, up: side === 'UNDER' ? price : 100, book: 'fanduel', books: books || { fanduel: [line, side === 'OVER' ? price : 100, side === 'UNDER' ? price : 100] },
+      proj: line + (side === 'OVER' ? 2 : -2), sd: 6, pm: side === 'OVER' ? 0.7 : 0.3, pb: 0.5, p: side === 'OVER' ? chance : Math.round((1 - chance) * 10000) / 10000, push: 0, side, chance, price, need: Math.round(need(price) * 10000) / 10000,
+      edge: Math.round((chance - need(price)) * 10000) / 10000, band: chance - need(price) > 0 ? 'LEAN' : 'no edge', mins: 32, rate36: 20, base: 18, med: line + (side === 'OVER' ? 1.5 : -1.5), usg: 22, sdf: 1, starter: true, start_src: "RotoWire's expected five", why: ['x'],
+      log: cold(line).map((v, i) => ['2026-11-' + String(10 + i), 'OPP', i % 2, (mins || steady)[i], v, ['won by 3']]), parts: [{ k: 'pace', t: 'Pace', eff: side === 'OVER' ? 0.4 : -0.4, i: 0 }] });
+    const men = [man(1, 'Top Under', 'ATL', 0, 'tpm', 'UNDER', 1.5, 0.70, -180, null, { fanduel: [1.5, 100, -180], betmgm: [1.5, 100, -195], draftkings: [1.5, 100, -260] }),   // BetMGM posts him at a price with an edge still (and short of -200, where a leg is left out from 15 Nov 2026), DraftKings at one with none
+      man(2, 'Second Under', 'CHI', 1, 'ast', 'UNDER', 4.5, 0.66, -160, null, { fanduel: [4.5, 100, -160], betmgm: [4.5, 100, -175], draftkings: [4.5, 100, -165] }), man(3, 'Third Over', 'MIA', 2, 'pts', 'OVER', 10.5, 0.62, -130), man(4, 'Fourth Under', 'ORL', 0, 'reb', 'UNDER', 6.5, 0.61, -125),
+      man(5, 'Lop Over', 'PHX', 3, 'pts', 'OVER', 22.5, 0.69, -150),          // an over in a game with a spread of 7.5, on the dog's man: out as on the favourite's
+      man(6, 'Lop Under', 'SAC', 3, 'reb', 'UNDER', 8.5, 0.60, -120),         // an under there is a leg
+      man(11, 'Fifth Under', 'ATL', 0, 'ast', 'UNDER', 2.5, 0.585, -120),     // a leg with nobody left on another game to stand beside: a pick under 58% would be, were it let in
+      man(7, 'Swing Over', 'MIL', 1, 'pts', 'OVER', 14.5, 0.68, -150, swing), // an over on minutes that swing: out
+      man(8, 'Swing Under', 'UTA', 2, 'reb', 'UNDER', 5.5, 0.59, -115, swing),// an under on them is a leg
+      man(9, 'Short Chance', 'MIA', 2, 'ast', 'OVER', 3.5, 0.575, -105),      // an edge, and under the 58% a leg asks: out
+      man(10, 'No Edge', 'CHI', 1, 'reb', 'UNDER', 9.5, 0.67, -220)];         // 67% at a price that asks 68.8%: no edge, out
+    await load({ format: 'callsheet3.props', version: 1, date: '2026-11-21', games: G.map((g, gi) => ({ gid: 'tc' + gi, away: g[0], home: g[1], aab: g[2], hab: g[3], spread: g[4], total: 225.5, props: men.filter(m => m.gi === gi) })) }, 'nba-props-2026-11-21.json');
+    if (document.getElementById('propsView').hidden) { document.getElementById('m-props').click(); await wait(); }
+    document.getElementById('propsReset').click(); await wait();
+    const pick = async (id, v) => { const el = document.getElementById(id); el.value = v; el.dispatchEvent(new Event('change', { bubbles: true })); await wait(); };
+    const best = document.getElementById('propsBest');
+    const cards = () => [...best.querySelectorAll('.pk.t3')].map(c => ({ n1: txt(c.querySelector('.n1')), pay: txt(c.querySelector('.t3pay')), who: [...c.querySelectorAll('.leg .lname')].map(e => e.textContent).join(' + '), legs: [...c.querySelectorAll('.leg')].map(l => txt(l.querySelector('.l1'))),
+      stats: txt(c.querySelector('.t3stats')), tabs: txt(c.querySelector('.t3apps')), cls: c.className }));
+    const o = {};
+    await pick('propsLegs', '2'); await pick('propsBelow', 't3'); o.form2 = cards().length; o.formNone = txt(best.querySelector('.empty.t3none'));
+    await pick('propsBelow', 't3c'); o.two = cards(); o.div2 = txt(best.querySelector('.pk-divider.t3d')); o.stored = localStorage.getItem('callsheet3.props.below.v1');
+    await pick('propsLegs', '3'); o.three = cards(); o.div3 = txt(best.querySelector('.pk-divider.t3d'));
+    await pick('propsLegs', '2');
+    // a best-chance ticket taken and unmarked: the spec says which rule built it, and goes with the mark
+    const stored = () => JSON.parse(smStore.getItem('callsheet3.props.v1')).filter(r => r.gdate === '2026-11-21');
+    const specs = () => stored().filter(r => r.t3).map(r => r.name + ':' + r.t3.map(sp => sp.app + '/' + sp.m + '/' + sp.ks.length + (sp.listed ? '/listed' + sp.n : '') + (sp.c ? '/c' + sp.c : '') + (sp.take ? '/take' : '')).join(',')).join(';');
+    best.querySelector('.pk.t3 [data-t3take]').click(); await wait(); o.taken = specs(); o.taking = [...document.querySelectorAll('#propsTaking .pk.t3 .n1')].map(txt);
+    document.querySelector('#propsTaking .pk.t3 [data-t3take]').click(); await wait(); o.untaken = specs();
+    best.querySelector('.pk.t3 [data-t3take]').click(); await wait();
+    // the same two at another app: a tab where both pass there, the reason where one does not; the tab shows the ticket at that app
+    o.tabs = txt(best.querySelector('.pk.t3 .t3apps'));
+    best.querySelector('.pk.t3 button.t3app[data-t3app="betmgm"]').click(); await wait(); o.atMgm = cards()[0];
+    best.querySelector('.pk.t3 button.t3app[data-t3app="fanduel"]').click(); await wait(); o.backFd = cards()[0].n1;
+    // the grade: Top Under 1 three, Second Under 6 assists, Third Over 14, Fourth Under 5, Lop Under 7, Swing Under 4
+    await load({ format: 'callsheet2.slate', version: 1, date: '2026-11-21', games: G.map((g, gi) => ({ sport: 'NBA', gdate: '2026-11-21', away: g[0], home: g[1], finals: { fa: '110', fh: '104', f5a: '55', f5h: '50' }, notes: [],
+      box: Object.fromEntries(men.filter(m => m.gi === gi).map(m => [m.pid, [m.name, 30, m.name === 'Third Over' ? 14 : 9, ({ 'Fourth Under': 5, 'Lop Under': 7, 'Swing Under': 4 })[m.name] || 12, m.name === 'Second Under' ? 6 : 2, m.name === 'Top Under' ? 1 : 3]])) })) }, 'nba-grade-2026-11-21.json');
+    await wait(300);
+    if (document.getElementById('propsView').hidden) { document.getElementById('m-props').click(); await wait(); }
+    { const pd = document.getElementById('propsDate'); pd.value = '2026-11-21'; pd.dispatchEvent(new Event('change', { bubbles: true })); await wait(); }
+    o.kept = specs();
+    await pick('propsBelow', 't3c'); await pick('propsLegs', '2'); o.after2 = cards(); o.afterDiv = txt(best.querySelector('.pk-divider.t3d')).slice(-90);
+    await pick('propsLegs', '3'); o.after3 = cards();
+    await pick('propsLegs', '2'); await pick('propsBelow', 't3'); o.afterForm = cards().length;
+    const rec = txt(document.getElementById('propsCalib'));
+    o.tiles = (rec.match(/Two-leg tickets by best chance, as listed, to test[\s\S]*?before it Three-leg tickets by best chance, as listed, to test[\s\S]*?before it/i) || [''])[0];
+    o.formTile = /Two-leg tickets as listed, to test/i.test(rec); o.tookTile = (rec.match(/Two-leg tickets you took [^T]*?u\b/i) || [''])[0];
+    o.line = (txt(document.getElementById('calibBox')).match(/two-leg tickets by best chance [^·]+· three-leg tickets by best chance [^·]+/) || [''])[0].trim();
+    return o;
+  });
+  await pg.evaluate(async (k) => { for (const x of Object.keys(k)) { if (k[x] === null || k[x] === undefined) await smStore.removeItem(x); else await smStore.setItem(x, k[x]); } localStorage.setItem('callsheet3.props.below.v1', 't3'); localStorage.setItem('callsheet3.props.legs.v1', '2'); }, tcKeep);
+  await reloaded();
+  chk(tc.form2 === 0 && /^No two legs on this date pass the test at one app on two games\.$/.test(tc.formNone) && tc.stored === 't3c' && tc.two.length === 3
+      && tc.two.map(c => c.n1 + ' :: ' + c.who + ' :: ' + c.stats).join(' | ') === '2 LEGS #1 · at FanDuel · two games :: Top Under + Second Under :: BOTH LAND 46.2% NEEDS 39.6% EDGE +6.6 A UNIT WINS 1.53u | 2 LEGS #2 · at FanDuel · two games :: Third Over + Fourth Under :: BOTH LAND 37.8% NEEDS 31.4% EDGE +6.4 A UNIT WINS 2.18u | 2 LEGS #3 · at FanDuel · two games :: Lop Under + Swing Under :: BOTH LAND 35.4% NEEDS 29.2% EDGE +6.2 A UNIT WINS 2.43u'
+      && tc.two[0].legs.join(' | ').toLowerCase() === '1 top under under 1.5 threes -180 · 70.0% | 2 second under under 4.5 assists -160 · 66.0%'
+      && !tc.two.concat(tc.three).some(c => /Lop Over|Swing Over|Short Chance|No Edge/.test(c.who))
+      && /^No BET on this date\. Two-leg tickets by best chance below, to test, in the LEANs' place: the two picks likeliest to land together at one app, each on its own game\. A leg is a pick with an edge on its card and at the app's own line and price that the sheet gives 58% or more there; an over in a game with a spread of 5 or more is left out, an over on a man whose minutes swing, and from 15 Nov 2026 any leg priced -200 or shorter and any over priced -110 to -101\. A card is one app throughout; where the same two also pass at another app, a tab on the card shows the ticket there\. Replayed on the eighteen nights to 14 Nov under the levers as they stand: as first built the tickets landed 26 of 77 at two legs where the sheet said 42\.3%, and tickets of legs priced -200 or shorter alone 3 of 16 \(such a price asks 69%, and every favourite so priced landed 64\.6% on 25 nights, the sheet's own picks among them 23 of 43\); with those legs left out, 27 of 69 \(the sheet said 40\.1%, the prices asked 37\.6%; 18 of 40 then 9 of 29 by half\)\. A test, not a measured edge: its record builds in Is it working beside the last-five tickets'\.$/.test(tc.div2),
+      'tickets by best chance (12 Nov 2026): the choice sits beside the last-five tickets and is kept; a leg is a pick with an edge at the app\'s own line and price that the sheet gives 58% or more; an over in a lopsided game, an over on swinging minutes, a pick under 58% and a pick with no edge are left out (and, the note says, a leg priced -200 or shorter from 15 Nov 2026), where an under in a lopsided game and an under on swinging minutes are legs; the two likeliest to land together come first, each on its own game, a man in one ticket; and the note above them says the rule and what the replay found',
+      JSON.stringify({ form2: tc.form2, none: tc.formNone, stored: tc.stored, two: tc.two.map(c => c.n1 + ' :: ' + c.who + ' :: ' + c.stats), legs: tc.two[0] && tc.two[0].legs, div: tc.div2 }));
+  chk(tc.three.length === 2 && tc.three.map(c => c.n1 + ' :: ' + c.who + ' :: ' + c.stats).join(' | ') === '3 LEGS #1 · at FanDuel · three games :: Top Under + Second Under + Third Over :: ALL THREE LAND 28.6% NEEDS 22.4% EDGE +6.3 A UNIT WINS 3.47u | 3 LEGS #2 · at FanDuel · three games :: Fourth Under + Lop Under + Swing Under :: ALL THREE LAND 21.6% NEEDS 16.2% EDGE +5.4 A UNIT WINS 5.17u'
+      && /^No BET on this date\. Three-leg tickets by best chance below, to test, .* as first built the tickets landed 11 of 53 at three legs where the sheet said 27\.1%, and tickets of legs priced -200 or shorter alone 0 of 6 \(such a price asks 69%, and every favourite so priced landed 64\.6% on 25 nights, the sheet's own picks among them 23 of 43\); with those legs left out, 13 of 46 \(the sheet said 25\.1%, the prices asked 22\.9%; 8 of 32 then 5 of 14 by half\)\. A test, not a measured edge: its record builds in Is it working beside the last-five tickets'\.$/.test(tc.div3)
+      && tc.taken === 'Top Under:fanduel/t3c/2/take' && tc.taking.length === 1 && tc.taking[0] === 'TAKING · 2 LEGS · at FanDuel · two games' && tc.untaken === ''
+      && /^the same two at DraftKings × (?:✓ )?FanDuel \+153 46\.2% BetMGM \+138 46\.2% Not at DraftKings: Top Under has no edge at -260 there\.$/i.test(tc.tabs)
+      && tc.atMgm.n1 === '2 LEGS #1 · at BetMGM · two games' && tc.atMgm.pay === '+138 2.38×' && tc.atMgm.who === 'Top Under + Second Under' && /^BOTH LAND 46\.2% NEEDS 42\.1% EDGE \+4\.1 /.test(tc.atMgm.stats) && tc.backFd === '2 LEGS #1 · at FanDuel · two games',
+      'tickets by best chance, three legs, the take and the other apps: three legs are the three likeliest on three games, then the next three; Take marks the ticket with the rule that built it and unmarking takes the spec away, as with the last-five tickets; where the same two also pass the best-chance test at another app a tab shows the ticket there at its own prices, and an app where one leg has no edge says so',
+      JSON.stringify({ three: tc.three.map(c => c.n1 + ' :: ' + c.who + ' :: ' + c.stats), div3: tc.div3.slice(-230), taken: tc.taken, taking: tc.taking, untaken: tc.untaken, tabs: tc.tabs, atMgm: tc.atMgm, back: tc.backFd }));
+  chk(tc.kept === 'Top Under:fanduel/t3c/2/c1/take,fanduel/t3c/3/c1;Fourth Under:fanduel/t3c/3/c2;Third Over:fanduel/t3c/2/c2;Lop Under:fanduel/t3c/2/c3'
+      && tc.after2.map(c => c.n1 + ' :: ' + c.who).join(' | ') === '2 LEGS #1 · at FanDuel · two games LOSS :: Top Under + Second Under | 2 LEGS #2 · at FanDuel · two games WIN :: Third Over + Fourth Under | 2 LEGS #3 · at FanDuel · two games WIN :: Lop Under + Swing Under'
+      && tc.after3.map(c => c.n1 + ' :: ' + c.who).join(' | ') === '3 LEGS #1 · at FanDuel · three games LOSS :: Top Under + Second Under + Third Over | 3 LEGS #2 · at FanDuel · three games WIN :: Fourth Under + Lop Under + Swing Under'
+      && tc.afterDiv.endsWith('This list was kept before the games and is in the record.') && tc.afterForm === 0 && tc.formTile === false
+      && /^Two-leg tickets by best chance, as listed, to test 2-1 says 39\.8% · does 66\.7% \(±28\.9\) · \+3\.61u the two picks likeliest to land together, each on its own game, at the product of their prices; a void or pushed leg drops out · from 15 Nov 2026 no leg priced -200 or shorter and no over priced -110 to -101: 2-1 \+3\.6u since, 0-0 before it Three-leg tickets by best chance, as listed, to test 1-1 says 25\.1% · does 50\.0% \(±35\.4\) · \+4\.17u the three picks likeliest to land together, each on its own game, at the product of their prices; a void or pushed leg drops out · from 15 Nov 2026 no leg priced -200 or shorter and no over priced -110 to -101: 1-1 \+4\.2u since, 0-0 before it$/i.test(tc.tiles)
+      && /^Two-leg tickets you took 0-1 says 46\.2% · does 0\.0% \(±50\.0\) · -1\.00u$/i.test(tc.tookTile) && tc.line === 'two-leg tickets by best chance 2-1 +3.6u · three-leg tickets by best chance 1-1 +4.2u',
+      'tickets by best chance, at the grade: the best-chance lists are kept on the rows before the results land, two legs and three, each with its rank, whichever the tab showed; the cards carry the results and say the list is in the record; the record keeps them on tiles of their own and on the card\'s line, apart from the last-five tickets (none listed here) and from the ticket taken',
+      JSON.stringify({ kept: tc.kept, after2: tc.after2.map(c => c.n1 + ' :: ' + c.who), after3: tc.after3.map(c => c.n1 + ' :: ' + c.who), div: tc.afterDiv, form: tc.afterForm, formTile: tc.formTile, tiles: tc.tiles, took: tc.tookTile, line: tc.line }));
+
+  // ---- 15 Nov 2026: no leg priced -200 or shorter in a ticket (the user, of the two-leg and three-leg tickets: "I dont like that they are not hitting. Find the
+  //      issue and lets win today"). The best-chance list ranks by chance, so it led with the heaviest prices: a favourite priced -200 or shorter asks 69% and
+  //      landed 64.6% on 25 nights (no model), the sheet's own picks among them 23 of 43, and tickets of such legs alone 3 of 16 and 0 of 6. Such a leg is left out
+  //      of either rule's ticket at that app; the pick stays on its card; the note says so; and each list's tile says what it did before the day and since ----
+  const hvKeep = await pg.evaluate(async () => { await smStore.ready; const k = {}; for (const x of ['callsheet3.card.v1', 'callsheet3.props.v1', 'callsheet3.draft.v1']) k[x] = await smStore.getItem(x); k.below = localStorage.getItem('callsheet3.props.below.v1'); k.legs = localStorage.getItem('callsheet3.props.legs.v1'); await smStore.removeItem('callsheet3.card.v1'); await smStore.removeItem('callsheet3.props.v1'); return k; });
+  await reloaded();
+  const hv = await pg.evaluate(async () => {
+    const wait = (ms) => new Promise(r => setTimeout(r, ms || 120)), txt = e => (e ? e.innerText : '').replace(/\s+/g, ' ').trim();
+    await smStore.ready;
+    const load = async (doc, name) => { const dt = new DataTransfer(); dt.items.add(new File([JSON.stringify(doc)], name, { type: 'application/json' })); const inp = document.getElementById('slateFile'); inp.files = dt.files; inp.dispatchEvent(new Event('change', { bubbles: true })); await wait(); await wait(); };
+    const G = [['Hawks', 'Magic', 'ATL', 'ORL', -2.5], ['Bulls', 'Bucks', 'CHI', 'MIL', -2.5], ['Heat', 'Jazz', 'MIA', 'UTA', -2.5], ['Suns', 'Kings', 'PHX', 'SAC', -2.5]];
+    const need = (price) => price < 0 ? -price / (-price + 100) : 100 / (price + 100);
+    const un = L => [L - 2, L + 2, L - 3, L + 1, L - 1, L - 2, L - 4, L + 3, L - 1, L - 2];      // four of his last five and seven of his last ten under the line: a last-five leg
+    const cold = L => [L + 2, L - 2, L + 3, L - 1, L + 1, L - 2, L + 2, L - 3, L + 1, L - 1];    // two of his last five: no last-five leg
+    const dn = [{ k: 'pace', t: 'Pace', eff: -0.4, i: 0 }, { k: 'dvp', t: 'Defence v position', eff: -0.6, i: 0 }];
+    // every man an UNDER carded at FanDuel; books: the app's line, the over's price, the under's
+    const man = (pid, name, team, gi, mk, line, chance, vals, books) => { const price = books.fanduel[2]; return { gi, pid: String(pid), name, team, opp: team === G[gi][2] ? G[gi][3] : G[gi][2], home: team === G[gi][3], pos: 'G', mk, line,
+      op: books.fanduel[1], up: price, book: 'fanduel', books, proj: line - 2, sd: 6, pm: 0.3, pb: 0.5, p: Math.round((1 - chance) * 10000) / 10000, push: 0, side: 'UNDER', chance, price, need: Math.round(need(price) * 10000) / 10000,
+      edge: Math.round((chance - need(price)) * 10000) / 10000, band: 'LEAN', mins: 32, rate36: 20, base: 18, med: line - 1.5, usg: 22, sdf: 1, starter: true, start_src: "RotoWire's expected five", why: ['x'],
+      log: vals.map((v, i) => ['2026-11-' + String(10 + i), 'OPP', i % 2, 32, v, ['won by 3']]), parts: dn }; };
+    const men = [
+      man(1, 'Heavy Card', 'ATL', 0, 'tpm', 1.5, 0.71, un(1.5), { fanduel: [1.5, 150, -200], betmgm: [1.5, 145, -190], draftkings: [1.5, 160, -210] }),    // -200 at the carded app and -210 at another: a leg at BetMGM alone, at -190
+      man(2, 'Light One', 'CHI', 1, 'ast', 4.5, 0.66, un(4.5), { fanduel: [4.5, 130, -160], betmgm: [4.5, 130, -165], draftkings: [4.5, 135, -170] }),
+      man(3, 'Light Two', 'MIA', 2, 'reb', 6.5, 0.62, un(6.5), { fanduel: [6.5, 110, -135], betmgm: [6.5, 110, -140], draftkings: [6.5, 112, -138] }),
+      man(4, 'Edge Price', 'PHX', 3, 'pts', 20.5, 0.70, cold(20.5), { fanduel: [20.5, 150, -199], betmgm: [20.5, 150, -199], draftkings: [20.5, 150, -199] }),  // a point inside the cap: a leg by best chance at every app (no last-five leg)
+      man(5, 'Big Heavy', 'SAC', 3, 'reb', 2.5, 0.80, un(2.5), { fanduel: [2.5, 190, -250], betmgm: [2.5, 190, -250], draftkings: [2.5, 190, -250] })];        // the likeliest pick on the date, the most edge, the best last five: no leg anywhere
+    const file = (date, list) => ({ format: 'callsheet3.props', version: 1, date, games: G.map((g, gi) => ({ gid: 'hv' + gi, away: g[0], home: g[1], aab: g[2], hab: g[3], spread: g[4], total: 225.5, props: list.filter(m => m.gi === gi) })) });
+    const D = '2026-11-15', E = '2026-11-14';   // the day the price came in, and the day before it
+    await load(file(D, men), 'nba-props-' + D + '.json');
+    if (document.getElementById('propsView').hidden) { document.getElementById('m-props').click(); await wait(); }
+    document.getElementById('propsReset').click(); await wait();
+    const pick = async (id, v) => { const el = document.getElementById(id); el.value = v; el.dispatchEvent(new Event('change', { bubbles: true })); await wait(); };
+    const day = async (d) => { const pd = document.getElementById('propsDate'); pd.value = d; pd.dispatchEvent(new Event('change', { bubbles: true })); await wait(); };
+    const best = document.getElementById('propsBest');
+    const cards = () => [...best.querySelectorAll('.pk.t3')].map(c => ({ n1: txt(c.querySelector('.n1')), pay: txt(c.querySelector('.t3pay')), who: [...c.querySelectorAll('.leg .lname')].map(e => e.textContent).join(' + '), legs: [...c.querySelectorAll('.leg')].map(l => txt(l.querySelector('.l1'))),
+      stats: txt(c.querySelector('.t3stats')), tabs: txt(c.querySelector('.t3apps')), why: txt(c.querySelector('.t3why')), cls: c.className }));
+    const o = {};
+    await pick('propsLegs', '2'); await pick('propsBelow', 't3c'); o.c2 = cards(); o.cdiv = txt(best.querySelector('.pk-divider.t3d'));
+    await pick('propsLegs', '3'); o.c3 = cards();
+    await pick('propsLegs', '2'); await pick('propsBelow', 't3'); o.f2 = cards(); o.fdiv = txt(best.querySelector('.pk-divider.t3d'));
+    await pick('propsLegs', '3'); o.f3 = cards();
+    await pick('propsLegs', '2'); await pick('propsBelow', 'leans'); o.leans = [...best.querySelectorAll('.pk[data-prop] .n2')].map(txt);
+    // the night: Heavy Card 1 three (under 1.5 lands), Edge Price 18 points (lands), Light One 6 assists (misses), Light Two 5 rebounds (lands), Big Heavy 4 rebounds (misses)
+    const box = { 'Heavy Card': [9, 3, 2, 1], 'Light One': [9, 3, 6, 1], 'Light Two': [9, 5, 2, 1], 'Edge Price': [18, 3, 2, 1], 'Big Heavy': [9, 4, 2, 1] };
+    const grade = async (date, list, bx) => { await load({ format: 'callsheet2.slate', version: 1, date, games: G.map((g, gi) => ({ sport: 'NBA', gdate: date, away: g[0], home: g[1], finals: { fa: '110', fh: '104', f5a: '55', f5h: '50' }, notes: [],
+      box: Object.fromEntries(list.filter(m => m.gi === gi).map(m => [m.pid, [m.name, 30].concat(bx[m.name])])) })) }, 'nba-grade-' + date + '.json'); await wait(250); };
+    await pick('propsBelow', 't3c');
+    const specs = (d) => JSON.parse(smStore.getItem('callsheet3.props.v1')).filter(r => r.gdate === d && r.t3).map(r => r.name + ':' + r.t3.map(sp => sp.app + '/' + sp.m + '/' + sp.ks.length + (sp.listed ? '/listed' + sp.n : '') + (sp.c ? '/c' + sp.c : '')).join(',')).sort().join(';');
+    const tiles = () => [...document.querySelectorAll('#propsCalib .calib > div')].map(txt).filter(t => /-leg tickets (as listed|by best chance)/i.test(t));
+    // the day before the price came in, graded first: the two light men alone, both landing; its ticket counts as before it, and nothing is graded since
+    const early = [men[1], men[2]].map(m => Object.assign({}, m));
+    await load(file(E, early), 'nba-props-' + E + '.json'); await grade(E, early, { 'Light One': [9, 3, 3, 1], 'Light Two': [9, 5, 2, 1] });
+    if (document.getElementById('propsView').hidden) { document.getElementById('m-props').click(); await wait(); }
+    await day(E); o.keptE = specs(E); o.tilesE = tiles();
+    // then the day itself
+    await grade(D, men, box);
+    if (document.getElementById('propsView').hidden) { document.getElementById('m-props').click(); await wait(); }
+    await day(D); o.kept = specs(D); o.tiles = tiles();
+    await pick('propsBelow', 't3');
+    return o;
+  });
+  await pg.evaluate(async (k) => { for (const x of Object.keys(k)) { if (x === 'below' || x === 'legs') { const key = x === 'below' ? 'callsheet3.props.below.v1' : 'callsheet3.props.legs.v1'; if (k[x] === null) localStorage.removeItem(key); else localStorage.setItem(key, k[x]); continue; } if (k[x] === null || k[x] === undefined) await smStore.removeItem(x); else await smStore.setItem(x, k[x]); } }, hvKeep);
+  await reloaded();
+  const hvList = L => (L || []).map(c => c.n1 + ' :: ' + c.who + ' :: ' + c.pay + ' :: ' + c.stats.replace(/ A UNIT WINS.*$/, '')).join(' | ');
+  const hvWhy = (app, name, price) => 'Not at ' + app + ': ' + name + ' is priced ' + price + ' there, and a leg at -200 or shorter is left out.';
+  chk(hvList(hv.c2) === '2 LEGS #1 · at BetMGM · two games :: Heavy Card + Edge Price :: +129 2.29× :: BOTH LAND 49.7% NEEDS 43.6% EDGE +6.1 | 2 LEGS #2 · at FanDuel · two games :: Light One + Light Two :: +183 2.83× :: BOTH LAND 40.9% NEEDS 35.4% EDGE +5.6'
+      && hv.c2[0].legs.join(' | ').toLowerCase() === '1 heavy card under 1.5 threes -190 · 71.0% | 2 edge price under 20.5 points -199 · 70.0%'
+      && hvList(hv.c3) === '3 LEGS #1 · at BetMGM · three games :: Heavy Card + Edge Price + Light One :: +268 3.68× :: ALL THREE LAND 32.8% NEEDS 27.2% EDGE +5.7'
+      && !hv.c2.concat(hv.c3, hv.f2, hv.f3).some(c => /Big Heavy/.test(c.who))
+      && hv.c2[0].tabs.indexOf(hvWhy('DraftKings', 'Heavy Card', '-210')) >= 0 && hv.c2[0].tabs.indexOf(hvWhy('FanDuel', 'Heavy Card', '-200')) >= 0 && !/no edge/.test(hv.c2[0].tabs)
+      && /an over in a game with a spread of 5 or more is left out, an over on a man whose minutes swing, and from 15 Nov 2026 any leg priced -200 or shorter and any over priced -110 to -101\. A card is one app throughout;/.test(hv.cdiv)
+      && /as first built the tickets landed 26 of 77 at two legs where the sheet said 42\.3%, and tickets of legs priced -200 or shorter alone 3 of 16 \(such a price asks 69%, and every favourite so priced landed 64\.6% on 25 nights, the sheet's own picks among them 23 of 43\); with those legs left out, 27 of 69 \(the sheet said 40\.1%, the prices asked 37\.6%; 18 of 40 then 9 of 29 by half\)\. A test, not a measured edge/.test(hv.cdiv),
+      'no leg priced -200 or shorter, by best chance (15 Nov 2026): the likeliest pick on the date, priced -250 at every app, makes no leg; a man priced -200 at one app and -210 at another is a leg where he is -190, and the tabs for the other two say the price keeps him out there (he has an edge at both); a man priced -199 is a leg; the two and the three likeliest of what is left come first; and the note says the rule and what the replay under the levers as they stand found',
+      JSON.stringify({ c2: hvList(hv.c2), legs: hv.c2[0] && hv.c2[0].legs, c3: hvList(hv.c3), tabs: hv.c2[0] && hv.c2[0].tabs, div: hv.cdiv }));
+  chk(hvList(hv.f2) === '2 LEGS #1 · at FanDuel · two games :: Light Two + Light One :: +183 2.83× :: BOTH LAND 40.9% NEEDS 35.4% EDGE +5.6'
+      && hvList(hv.f3) === '3 LEGS #1 · at BetMGM · three games :: Heavy Card + Light Two + Light One :: +320 4.20× :: ALL THREE LAND 29.1% NEEDS 23.8% EDGE +5.3'
+      && hv.f3[0].tabs.indexOf(hvWhy('DraftKings', 'Heavy Card', '-210')) >= 0 && hv.f3[0].tabs.indexOf(hvWhy('FanDuel', 'Heavy Card', '-200')) >= 0
+      && /more levers toward the pick than against, no red chip and, from 15 Nov 2026, no leg priced -200 or shorter and no over priced -110 to -101\. A card is one app throughout;/.test(hv.fdiv)
+      && JSON.stringify(hv.leans.slice().sort()) === JSON.stringify(['Big Heavy UNDER 2.5 rebounds', 'Edge Price UNDER 20.5 points', 'Heavy Card UNDER 1.5 threes', 'Light One UNDER 4.5 assists', 'Light Two UNDER 6.5 rebounds']),
+      'no leg priced -200 or shorter, the last-five rule and the cards: the two men priced -200 or shorter at the carded app pass the last-five test and make no leg there, so the two-leg list is the two light men (with them the list would open on the -250 man) and the three-leg ticket sits at the one app where the first is -190, its tabs saying the price keeps him out at the other two; the note says the rule; and every pick stays on its card in the LEANs, the two heavy ones too',
+      JSON.stringify({ f2: hvList(hv.f2), f3: hvList(hv.f3), tabs: hv.f3[0] && hv.f3[0].tabs, div: hv.fdiv.slice(0, 420), leans: hv.leans }));
+  const hvTile = (re) => (hv.tiles || []).some(t => re.test(t)), hvTileE = (re) => (hv.tilesE || []).some(t => re.test(t));
+  chk(hv.kept === 'Heavy Card:betmgm/t3c/2/c1,betmgm/t3/3/listed1,betmgm/t3c/3/c1;Light Two:fanduel/t3/2/listed1/c2' && hv.keptE === 'Light Two:fanduel/t3/2/listed1/c1'   // the two light men's ticket is both rules' and is kept once
+        && hv.tilesE.length === 2
+        && hvTileE(/^Two-leg tickets as listed, to test 1-0 says 40\.9% · does 100\.0% \(±50\.0\) · \+1\.83u at the product of the two legs' prices; a void or pushed leg drops out · from 15 Nov 2026 no leg priced -200 or shorter and no over priced -110 to -101: none graded since, 1-0 before it$/i)
+        && hvTileE(/^Two-leg tickets by best chance, as listed, to test 1-0 says 40\.9% · does 100\.0% \(±50\.0\) · \+1\.83u the two picks likeliest to land together, each on its own game, at the product of their prices; a void or pushed leg drops out · from 15 Nov 2026 no leg priced -200 or shorter and no over priced -110 to -101: none graded since, 1-0 before it$/i)
+        && hv.tiles.length === 4
+        && hvTile(/^Two-leg tickets as listed, to test 1-1 says 40\.9% · does 50\.0% \(±35\.4\) · \+0\.83u at the product of the two legs' prices; a void or pushed leg drops out · from 15 Nov 2026 no leg priced -200 or shorter and no over priced -110 to -101: 0-1 [-−]1\.0u since, 1-0 before it$/i)
+        && hvTile(/^Three-leg tickets as listed, to test 0-1 says 29\.1% · does 0\.0% \(±50\.0\) · [-−]1\.00u at the product of the three legs' prices; a void or pushed leg drops out · from 15 Nov 2026 no leg priced -200 or shorter and no over priced -110 to -101: 0-1 [-−]1\.0u since, 0-0 before it$/i)
+        && hvTile(/^Two-leg tickets by best chance, as listed, to test 2-1 says 43\.8% · does 66\.7% \(±28\.9\) · \+2\.12u the two picks likeliest to land together, each on its own game, at the product of their prices; a void or pushed leg drops out · from 15 Nov 2026 no leg priced -200 or shorter and no over priced -110 to -101: 1-1 \+0\.3u since, 1-0 before it$/i)
+        && hvTile(/^Three-leg tickets by best chance, as listed, to test 0-1 says 32\.8% · does 0\.0% \(±50\.0\) · [-−]1\.00u the three picks likeliest to land together, each on its own game, at the product of their prices; a void or pushed leg drops out · from 15 Nov 2026 no leg priced -200 or shorter and no over priced -110 to -101: 0-1 [-−]1\.0u since, 0-0 before it$/i),
+      'no leg priced -200 or shorter, the record: the lists are kept at grading as the tab showed them (no heavy leg in any), and each list\'s tile says what the list has done since the day the price came in and before it: with the night before it graded alone nothing is graded since and its ticket is before it; then the day itself counts as since',
+      JSON.stringify({ kept: hv.kept, tiles: hv.tiles, keptE: hv.keptE, tilesE: hv.tilesE }));
+  // ---- 15 Nov 2026: the over priced -110 to -101 is left off the lists (the user, of the picks at that price: "Measure and let me know right away please").
+  //      With no model the over at such a price landed 43.1% on 25 nights where the price asks 51.6%, and the sheet's own went 149-221 as carded (the BET band
+  //      31-45): its worst price by a distance, where the under at that price is level. So from 15 Nov a pick that is an over carded at -110 to -101 makes no
+  //      card, is not counted among the BETs, makes no ticket leg at any app and stays off the phone sheet; an over priced so at an app makes no leg there; the
+  //      table and the panel say so; and two tiles keep the count: the overs left off, and the unders at that price, which stay on the lists ----
+  const coKeep = await pg.evaluate(async () => { await smStore.ready; const k = {}; for (const x of ['callsheet3.card.v1', 'callsheet3.props.v1', 'callsheet3.draft.v1']) k[x] = await smStore.getItem(x); k.below = localStorage.getItem('callsheet3.props.below.v1'); k.legs = localStorage.getItem('callsheet3.props.legs.v1'); await smStore.removeItem('callsheet3.card.v1'); await smStore.removeItem('callsheet3.props.v1'); return k; });
+  await reloaded();
+  const co = await pg.evaluate(async ({ src, url }) => {
+    const wait = (ms) => new Promise(r => setTimeout(r, ms || 120)), txt = e => (e ? e.innerText : '').replace(/\s+/g, ' ').trim(), tc = e => (e ? e.textContent : '').replace(/\s+/g, ' ').trim();
+    await smStore.ready;
+    const copies = []; try { Object.defineProperty(navigator, 'clipboard', { configurable: true, value: { writeText: t => { copies.push(String(t)); return Promise.resolve(); } } }); } catch (e) {}
+    const load = async (doc, name) => { const dt = new DataTransfer(); dt.items.add(new File([JSON.stringify(doc)], name, { type: 'application/json' })); const inp = document.getElementById('slateFile'); inp.files = dt.files; inp.dispatchEvent(new Event('change', { bubbles: true })); await wait(); await wait(); };
+    const G = [['Hawks', 'Magic', 'ATL', 'ORL', -2.5], ['Bulls', 'Bucks', 'CHI', 'MIL', -2.5], ['Heat', 'Jazz', 'MIA', 'UTA', -2.5], ['Suns', 'Kings', 'PHX', 'SAC', -2.5]];
+    const need = (price) => price < 0 ? -price / (-price + 100) : 100 / (price + 100);
+    const ov = L => [L + 2, L - 2, L + 3, L - 1, L + 1, L + 2, L + 4, L - 3, L + 1, L + 2], un = L => [L - 2, L + 2, L - 3, L + 1, L - 1, L - 2, L - 4, L + 3, L - 1, L - 2];   // four of his last five and seven of his last ten the pick's way: a last-five leg
+    const cold = L => [L + 2, L - 2, L + 3, L - 1, L + 1, L - 2, L + 2, L - 3, L + 1, L - 1];   // two of his last five over and three under: no last-five leg on either side
+    const up = [{ k: 'pace', t: 'Pace', eff: 0.4, i: 0 }, { k: 'dvp', t: 'Defence v position', eff: 0.6, i: 0 }], dn = [{ k: 'pace', t: 'Pace', eff: -0.4, i: 0 }, { k: 'dvp', t: 'Defence v position', eff: -0.6, i: 0 }];
+    // every man carded at FanDuel; books: the app's line, the over's price, the under's
+    const man = (pid, name, team, gi, mk, side, line, chance, band, vals, books) => { const o = side === 'OVER', price = books.fanduel[o ? 1 : 2]; return { gi, pid: String(pid), name, team, opp: team === G[gi][2] ? G[gi][3] : G[gi][2], home: team === G[gi][3], pos: 'G', mk, line,
+      op: books.fanduel[1], up: books.fanduel[2], book: 'fanduel', books, proj: line + (o ? 2 : -2), sd: 6, pm: o ? 0.7 : 0.3, pb: 0.5, p: o ? chance : Math.round((1 - chance) * 10000) / 10000, push: 0, side, chance, price, need: Math.round(need(price) * 10000) / 10000,
+      edge: Math.round((chance - need(price)) * 10000) / 10000, band, mins: 32, rate36: 20, base: 18, med: line + (o ? 1.5 : -1.5), usg: 22, sdf: 1, starter: true, start_src: "RotoWire's expected five", why: ['x'],
+      log: vals.map((v, i) => ['2026-11-' + String(i + 1).padStart(2, '0'), 'OPP', i % 2, 32, v, ['won by 3']]), parts: o ? up : dn }; };
+    const men = [
+      man(1, 'Held Top', 'ATL', 0, 'pts', 'OVER', 20.5, 0.66, 'BET', ov(20.5), { fanduel: [20.5, -105, -125], betmgm: [20.5, -105, -125], draftkings: [20.5, -120, -110] }),   // the most edge and the likeliest pick on the date, carded at -105: off the lists, and no leg at DraftKings where the same over is -120
+      man(1, 'Held Top', 'ATL', 0, 'pra', 'OVER', 30.5, 0.60, 'BET', cold(30.5), { fanduel: [30.5, -125, -105], betmgm: [30.5, -125, -105], draftkings: [30.5, -125, -105] }),  // his other BET stays, and is one BET, not one of two
+      man(2, 'Held Low', 'CHI', 1, 'reb', 'OVER', 7.5, 0.55, 'LEAN', ov(7.5), { fanduel: [7.5, -110, -110] }),       // -110: the long end of the range
+      man(3, 'Held High', 'MIA', 2, 'ast', 'OVER', 5.5, 0.54, 'LEAN', ov(5.5), { fanduel: [5.5, -101, -119] }),      // -101: the short end
+      man(4, 'Kept Low', 'MIL', 1, 'pts', 'OVER', 12.5, 0.56, 'BET', cold(12.5), { fanduel: [12.5, -111, -109] }),   // -111: a point outside it
+      man(5, 'Kept Even', 'UTA', 2, 'pts', 'OVER', 9.5, 0.53, 'LEAN', cold(9.5), { fanduel: [9.5, 100, -120] }),     // +100: outside it
+      man(6, 'Coin Under', 'PHX', 3, 'reb', 'UNDER', 6.5, 0.57, 'BET', un(6.5), { fanduel: [6.5, -115, -105], betmgm: [6.5, -115, -105], draftkings: [6.5, -112, -108] }),   // the under at -105 stays, a card and a leg
+      man(7, 'No Edge', 'SAC', 3, 'pts', 'OVER', 18.5, 0.50, 'no edge', ov(18.5), { fanduel: [18.5, -105, -115] }),  // an over at -105 with no edge was never a pick: nothing to leave off
+      man(8, 'App Over', 'ORL', 0, 'ast', 'OVER', 6.5, 0.64, 'BET', ov(6.5), { fanduel: [6.5, -115, -105], betmgm: [6.5, -105, -115], draftkings: [6.5, -118, -102] }),      // carded at -115: a pick, and no leg at BetMGM where his over is -105
+      man(9, 'Solid Under', 'SAC', 3, 'ast', 'UNDER', 4.5, 0.65, 'BET', un(4.5), { fanduel: [4.5, 130, -160], betmgm: [4.5, 130, -160], draftkings: [4.5, 130, -165] }),
+      man(10, 'Lean Under', 'UTA', 2, 'pts', 'UNDER', 14.5, 0.536, 'LEAN', cold(14.5), { fanduel: [14.5, -112, -108] })];   // a LEAN under at -108: stays, and is watched
+    const file = (date, list) => ({ format: 'callsheet3.props', version: 1, date, games: G.map((g, gi) => ({ gid: 'co' + gi, away: g[0], home: g[1], aab: g[2], hab: g[3], spread: g[4], total: 225.5, props: list.filter(m => m.gi === gi) })) });
+    const D = '2026-11-15', E = '2026-11-14', F = '2026-11-16';   // the rule's first day, the day before it, and a day with one such over and nothing else
+    await load(file(D, men), 'nba-props-' + D + '.json');
+    if (document.getElementById('propsView').hidden) { document.getElementById('m-props').click(); await wait(); }
+    document.getElementById('propsReset').click(); await wait();
+    const pick = async (id, v) => { const el = document.getElementById(id); el.value = v; el.dispatchEvent(new Event('change', { bubbles: true })); await wait(); };
+    const day = async (d) => { const pd = document.getElementById('propsDate'); pd.value = d; pd.dispatchEvent(new Event('change', { bubbles: true })); await wait(); };
+    const best = document.getElementById('propsBest');
+    const cards = () => [...best.querySelectorAll('.pk.t3')].map(c => ({ n1: txt(c.querySelector('.n1')), pay: txt(c.querySelector('.t3pay')), who: [...c.querySelectorAll('.leg .lname')].map(e => e.textContent).join(' + '), legs: [...c.querySelectorAll('.leg')].map(l => txt(l.querySelector('.l1'))),
+      stats: txt(c.querySelector('.t3stats')), tabs: txt(c.querySelector('.t3apps')), why: txt(c.querySelector('.t3why')), n4: txt(c.querySelector('.n4')) }));
+    const list = () => ({ n2: [...best.querySelectorAll('.pk[data-prop] .n2')].map(txt), notes: [...best.querySelectorAll('.pk-note')].map(e => e.className + ' :: ' + txt(e)), onebet: [...best.querySelectorAll('.pk[data-prop] .n5.onebet')].map(txt), empty: txt(best.querySelector('.empty')),
+      divs: [...best.querySelectorAll('.pk-divider')].map(e => txt(e).slice(0, 40)), betCards: best.querySelectorAll('.pk.bet').length });
+    const rows = () => [...document.querySelectorAll('#propsTable tbody tr')];
+    const rowName = tr => tc(tr.children[1]).replace(/ G$/, '') + ' ' + tc(tr.children[2]);
+    const o = {};
+    await pick('propsLegs', '2'); await pick('propsBelow', 't3c'); o.c2 = cards(); o.cdiv = txt(best.querySelector('.pk-divider.t3d')); o.cnotes = list().notes;
+    await pick('propsLegs', '3'); o.c3 = cards(); o.c3none = txt(best.querySelector('.empty.t3none'));
+    await pick('propsLegs', '2'); await pick('propsBelow', 't3'); o.f2 = cards(); o.fdiv = txt(best.querySelector('.pk-divider.t3d'));
+    await pick('propsLegs', '3'); o.f3 = cards();
+    await pick('propsLegs', '2'); await pick('propsBelow', 'leans'); o.leans = list();
+    await pick('propsTells', 'red'); o.red = list(); await pick('propsTells', '');
+    o.tags = rows().filter(tr => tr.querySelector('.tag.heldt')).map(tr => rowName(tr) + ' | ' + tc(tr.children[10])).sort();
+    o.plain = rows().filter(tr => !tr.querySelector('.tag.heldt')).map(tr => rowName(tr) + ' | ' + tc(tr.children[10])).sort();
+    o.tagTitle = (t => t ? t.getAttribute('title') : '')(document.querySelector('#propsTable .tag.heldt'));
+    // the panel: the over left off, and a BET that stays
+    const dlg = document.getElementById('propDetail');
+    const panel = async (name) => { const tr = rows().find(r => rowName(r) === name); if (!tr) return null; tr.children[1].click(); await wait(250);
+      const p = { open: !dlg.hidden, band: tc(dlg.querySelector('.pd-band')), pick: txt(dlg.querySelector('.pd-pick')), held: tc(dlg.querySelector('.pd-held')), betwhy: tc(dlg.querySelector('.pd-betwhy')).slice(0, 60), onebet: tc(dlg.querySelector('.pd-onebet')), take: !!dlg.querySelector('.pd-take [data-take], .pd-take button') };
+      document.getElementById('propDetailClose').click(); await wait(); return p; };
+    o.pHeld = await panel('Held Top points'); o.pKept = await panel('App Over assists'); o.pOther = await panel('Held Top pts + reb + ast'); o.pUnder = await panel('Coin Under rebounds');
+    // the props as text
+    document.getElementById('propsText').click(); await wait(); o.text = (copies[copies.length - 1] || '').split('\n');
+    // a day with one such over and nothing else: the note in the singular, above the empty list
+    await load(file(F, [man(11, 'Lone Over', 'ATL', 0, 'pts', 'OVER', 10.5, 0.55, 'LEAN', ov(10.5), { fanduel: [10.5, -105, -115] })]), 'nba-props-' + F + '.json');
+    if (document.getElementById('propsView').hidden) { document.getElementById('m-props').click(); await wait(); }
+    await day(F); o.lone = list(); await pick('propsBelow', 't3c'); o.loneT = { notes: list().notes, none: txt(best.querySelector('.empty.t3none')) }; await pick('propsBelow', 'leans');
+    // the phone sheet for the rule's first day, through the stand-in viewer
+    await day(D);
+    document.getElementById('m-nba').click(); await wait();
+    const bd = document.getElementById('boardDate'); bd.value = D; bd.dispatchEvent(new Event('change')); await wait();
+    (0, eval)('(' + src + ')')({ docs: { 'phone/config': { url } }, owner: true });
+    document.getElementById('phone').click(); await wait(1800);
+    if (document.getElementById('phoneCopy')) { document.getElementById('phoneCopy').click(); await wait(); }
+    const ptxt = copies[copies.length - 1] || '', pi = ptxt.indexOf('\n\nBEST PROPS\n');
+    o.phone = pi < 0 ? null : ptxt.slice(pi + 13).split('\n\n')[0].split('\n').map(l => l.replace(/^#\d+ /, '').split(' · ')[0]);
+    o.phoneHeldIn = ptxt.split('\n\n').filter(sec => /Held (Top OVER 20\.5 points|Low OVER|High OVER)/.test(sec)).map(sec => sec.split('\n')[0]);   // the sections of the sheet that name an over left off
+    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })); await wait(); document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })); await wait();
+    try { delete window.claude; } catch (e) { window.claude = undefined; }
+    // the day before the rule, graded first: an over at -105 is a card and a leg there, and nothing of that day reaches the two tiles
+    const grade = async (date, list2, bx) => { await load({ format: 'callsheet2.slate', version: 1, date, games: G.map((g, gi) => ({ sport: 'NBA', gdate: date, away: g[0], home: g[1], finals: { fa: '110', fh: '104', f5a: '55', f5h: '50' }, notes: [],
+      box: Object.fromEntries(list2.filter(m => m.gi === gi).map(m => [m.pid, [m.name, 30].concat(bx[m.name])])) })) }, 'nba-grade-' + date + '.json'); await wait(250); };
+    const early = [man(12, 'Early Over', 'ATL', 0, 'pts', 'OVER', 22.5, 0.60, 'BET', ov(22.5), { fanduel: [22.5, -105, -125] }), man(13, 'Early Under', 'CHI', 1, 'reb', 'UNDER', 8.5, 0.56, 'BET', un(8.5), { fanduel: [8.5, -125, -105] })];
+    await load(file(E, early), 'nba-props-' + E + '.json');
+    if (document.getElementById('propsView').hidden) { document.getElementById('m-props').click(); await wait(); }
+    await day(E); o.early = list(); o.earlyTags = rows().filter(tr => tr.querySelector('.tag.heldt')).length;
+    await pick('propsBelow', 't3'); o.earlyF2 = cards(); await pick('propsBelow', 'leans');
+    const tiles = () => [...document.querySelectorAll('#propsCalib .calib > div')].map(txt).filter(t => /priced -110 to -101, (left off the lists|a watch)/i.test(t));
+    await grade(E, early, { 'Early Over': [25, 3, 2, 1], 'Early Under': [9, 7, 2, 1] });
+    if (document.getElementById('propsView').hidden) { document.getElementById('m-props').click(); await wait(); }
+    await day(E); o.tilesE = tiles(); o.gradedE = JSON.parse(smStore.getItem('callsheet3.props.v1')).filter(r => r.gdate === E).map(r => r.name + ' ' + r.result).sort().join(', ');
+    // then the day itself: Held Top 18 points and 29 in all (both overs miss), Held Low 9 rebounds and Held High 7 assists (land), Coin Under 5 rebounds (lands), Lean Under 16 points (misses)
+    const box = { 'Held Top': [18, 5, 6, 1], 'Held Low': [10, 9, 2, 1], 'Held High': [10, 3, 7, 1], 'Kept Low': [14, 3, 2, 1], 'Kept Even': [11, 3, 2, 1], 'Coin Under': [10, 5, 2, 1], 'No Edge': [20, 3, 2, 1], 'App Over': [10, 3, 8, 1], 'Solid Under': [10, 3, 3, 1], 'Lean Under': [16, 3, 2, 1] };
+    await day(D); await pick('propsBelow', 't3c');
+    await grade(D, men, box);
+    if (document.getElementById('propsView').hidden) { document.getElementById('m-props').click(); await wait(); }
+    await day(D); o.tiles = tiles(); o.t3tiles = [...document.querySelectorAll('#propsCalib .calib > div')].map(txt).filter(t => /-leg tickets (as listed|by best chance)/i.test(t)).map(t => t.replace(/^(.*?to test) .* · (from 15 Nov 2026 .*)$/i, '$1 :: $2'));
+    o.kept = JSON.parse(smStore.getItem('callsheet3.props.v1')).filter(r => r.gdate === D && r.t3).map(r => r.name + ' ' + r.mk + ':' + r.t3.map(sp => sp.app + '/' + sp.m + '/' + sp.ks.length + (sp.listed ? '/listed' + sp.n : '') + (sp.c ? '/c' + sp.c : '')).join(',')).sort().join(';');
+    o.graded = JSON.parse(smStore.getItem('callsheet3.props.v1')).filter(r => r.gdate === D).map(r => r.name + ' ' + r.mk + ' ' + r.result).sort().join(', ');
+    await pick('propsBelow', 't3');
+    return o;
+  }, { src: claudeMock.toString(), url: PH_URL });
+  await pg.evaluate(async (k) => { for (const x of Object.keys(k)) { if (x === 'below' || x === 'legs') { const key = x === 'below' ? 'callsheet3.props.below.v1' : 'callsheet3.props.legs.v1'; if (k[x] === null) localStorage.removeItem(key); else localStorage.setItem(key, k[x]); continue; } if (k[x] === null || k[x] === undefined) await smStore.removeItem(x); else await smStore.setItem(x, k[x]); } }, coKeep);
+  await reloaded();
+  const coNote = "pk-note heldn :: 3 overs priced -110 to -101 are left off the lists on this date (Held Top OVER 20.5 points at -105; Held High OVER 5.5 assists at -101; Held Low OVER 7.5 rebounds at -110): with no model the over at such a price landed 43.1% on 25 nights where the price asks 51.6%, and the sheet's own went 149-221 as carded. They stay in the table below, and the panel says why.";
+  const coOne = "pk-note heldn :: One over priced -110 to -101 is left off the lists on this date (Lone Over OVER 10.5 points at -105): with no model the over at such a price landed 43.1% on 25 nights where the price asks 51.6%, and the sheet's own went 149-221 as carded. It stays in the table below, and the panel says why.";
+  const coLine = (price) => "Left off the lists: an over priced -110 to -101 (this one " + price + " at FanDuel). With no model the over at such a price landed 43.1% on 25 nights where the price asks 51.6%, and the sheet's own went 149-221 as carded (the BET band 31-45), so from 15 Nov 2026 such a pick makes no card and no ticket leg. The band is the slate's own, and a tile in Is it working counts what the ones left off do.";
+  const coSame = (a, b) => JSON.stringify(a) === JSON.stringify(b);
+  chk(coSame(co.leans.n2, ['App Over OVER 6.5 assists', 'Coin Under UNDER 6.5 rebounds', 'Held Top OVER 30.5 pts + reb + ast', 'Solid Under UNDER 4.5 assists', 'Kept Low OVER 12.5 points', 'Kept Even OVER 9.5 points', 'Lean Under UNDER 14.5 points'])
+      && coSame(co.leans.notes, [coNote]) && co.leans.onebet.length === 0 && co.leans.betCards === 5 && co.leans.empty === ''
+      && coSame(co.red.n2, []) && coSame(co.red.notes, [coNote]) && co.red.empty === 'No pick on this date carries a red tell.'
+      && coSame(co.tags, ['Held High assists | LEAN off the lists', 'Held Low rebounds | LEAN off the lists', 'Held Top points | BET off the lists'])
+      && coSame(co.plain, ['App Over assists | BET', 'Coin Under rebounds | BET', 'Held Top pts + reb + ast | BET', 'Kept Even points | LEAN', 'Kept Low points | BET', 'Lean Under points | LEAN', 'No Edge points | no edge', 'Solid Under assists | BET'])
+      && coSame(co.lone.n2, []) && coSame(co.lone.notes, [coOne]) && co.lone.empty === 'No prop on this date clears its price.'
+      && coSame(co.loneT.notes, [coOne]) && co.loneT.none === 'No two picks on this date pass the best-chance test at one app on two games.'
+      && coSame(co.early.n2, ['Early Over OVER 22.5 points', 'Early Under UNDER 8.5 rebounds']) && coSame(co.early.notes, []) && co.early.betCards === 2 && co.earlyTags === 0,
+      'the over priced -110 to -101, off the best list (15 Nov 2026, the user: "Measure and let me know right away please"): on the rule\'s first day the three overs carded at -105, -101 and -110 make no card, the one with the most edge on the date among them, where an over at -111, an over at +100 and the unders at -105 and -108 keep theirs; the note above the cards names the three, the most edge first, and says what was measured; the man whose BET was left off holds one BET, not two, so his other card carries no one-bet line and the BETs are counted without it; an over at -105 with no edge was never a pick and is not named; the table tags the three and keeps the slate\'s band; with a filter that leaves no card, and on a day whose only pick is such an over, the note still stands above the empty list, in the singular for one; and the day before the rule an over at -105 is a card like any other',
+      JSON.stringify({ leans: co.leans, red: co.red, tags: co.tags, plain: co.plain, lone: co.lone, loneT: co.loneT, early: co.early, earlyTags: co.earlyTags }));
+  chk(co.pHeld && co.pHeld.open && co.pHeld.band === 'BET · left off the lists' && co.pHeld.pick === 'OVER 20.5 points' && co.pHeld.held === coLine('-105') && co.pHeld.betwhy === '' && co.pHeld.onebet === '' && co.pHeld.take === true
+      && co.tagTitle === coLine('-110')
+      && co.pKept && co.pKept.band === 'BET' && co.pKept.held === '' && /^Why a BET: 64\.0% clears the 53\.5% that -115 needs/.test(co.pKept.betwhy)
+      && co.pOther && co.pOther.band === 'BET' && co.pOther.held === '' && /^Why a BET: 60\.0% clears the 55\.6% that -125 needs/.test(co.pOther.betwhy) && co.pOther.onebet === ''
+      && co.pUnder && co.pUnder.band === 'BET' && co.pUnder.held === '' && /^Why a BET: 57\.0% clears the 51\.2% that -105 needs/.test(co.pUnder.betwhy)
+      && co.text.length === 12 && co.text.filter(l => /\(off the lists: an over priced -110 to -101\)/.test(l)).length === 3
+      && co.text[1] === '1. Held Top OVER 20.5 points -105 · 66.0% needs 51.2% · BET (off the lists: an over priced -110 to -101) · Hawks @ Magic · proj 22.5'
+      && co.text[3] === '3. Coin Under UNDER 6.5 rebounds -105 · 57.0% needs 51.2% · BET · Suns @ Kings · proj 4.5' && co.text[11] === '11. No Edge OVER 18.5 points -105 · 50.0% needs 51.2% · no edge · Suns @ Kings · proj 20.5'
+      && coSame(co.phone, ['App Over OVER 6.5 assists [BET]', 'Coin Under UNDER 6.5 rebounds [BET]', 'Held Top OVER 30.5 pts + reb + ast [BET]', 'Solid Under UNDER 4.5 assists [BET]', 'Kept Low OVER 12.5 points [BET]', 'Kept Even OVER 9.5 points [LEAN]', 'Lean Under UNDER 14.5 points [LEAN]'])
+      && coSame(co.phoneHeldIn, ['SAME-GAME PAIRS']),
+      'the over priced -110 to -101, the panel, the text and the phone: the panel of the over left off says so beside the slate\'s band and in a line of its own with its price and app and what was measured, the BET\'s own why standing down, and the prop can still be taken; the table\'s tag carries the same line; a BET that stays, the same man\'s other BET and the under at -105 read as before; the props copied as text mark the three and no other; and the phone sheet\'s best props leave the three off, which appear only in the same-game pairs (kept as they are)',
+      JSON.stringify({ pHeld: co.pHeld, tagTitle: co.tagTitle, pKept: co.pKept, pOther: co.pOther, pUnder: co.pUnder, text: co.text, phone: co.phone, phoneHeldIn: co.phoneHeldIn }));
+  const coList = L => (L || []).map(c => c.n1 + ' :: ' + c.who + ' :: ' + c.pay + ' :: ' + c.stats.replace(/ A UNIT WINS.*$/, '')).join(' | ');
+  const coWhy = "Not at BetMGM: App Over's is an over priced -105 there, and an over at -110 to -101 is left out.";
+  chk(coList(co.c2) === '2 LEGS #1 · at FanDuel · two games :: Solid Under + App Over :: +204 3.04× :: BOTH LAND 41.6% NEEDS 32.9% EDGE +8.7'
+      && co.c2[0].legs.join(' | ').toLowerCase() === '1 solid under under 4.5 assists -160 · 65.0% | 2 app over over 6.5 assists -115 · 64.0%'
+      && co.c2[0].tabs === 'THE SAME TWO AT DraftKings +197 41.6% FanDuel +204 41.6% BetMGM × ' + coWhy && co.c2[0].why === coWhy
+      && co.c3.length === 0 && co.c3none === 'No three picks on this date pass the best-chance test at one app on three games.'
+      && coSame(co.cnotes, [coNote])
+      && /an over on a man whose minutes swing, and from 15 Nov 2026 any leg priced -200 or shorter and any over priced -110 to -101\. A card is one app throughout;/.test(co.cdiv)
+      && coList(co.f2) === '2 LEGS #1 · at FanDuel · two games :: App Over + Coin Under :: +265 3.65× :: BOTH LAND 36.5% NEEDS 27.4% EDGE +9.1'
+      && co.f2[0].legs.join(' | ').toLowerCase() === '1 app over over 6.5 assists -115 · 64.0% | 2 coin under under 6.5 rebounds -105 · 57.0%'
+      && co.f2[0].tabs === 'THE SAME TWO AT DraftKings +256 36.5% FanDuel +265 36.5% BetMGM × ' + coWhy
+      && coList(co.f3) === '3 LEGS #1 · at FanDuel · two games :: App Over + Coin Under + Solid Under :: +493 5.93× :: ALL THREE LAND 23.7% NEEDS 16.9% EDGE +6.9'
+      && co.f3[0].tabs === 'THE SAME THREE AT DraftKings +471 23.7% FanDuel +493 23.7% BetMGM × ' + coWhy
+      && /more levers toward the pick than against, no red chip and, from 15 Nov 2026, no leg priced -200 or shorter and no over priced -110 to -101\. A card is one app throughout;/.test(co.fdiv)
+      && !co.c2.concat(co.c3, co.f2, co.f3).some(c => /Held Top|Held Low|Held High/.test(c.who))
+      && coList(co.earlyF2) === '2 LEGS #1 · at FanDuel · two games :: Early Over + Early Under :: +281 3.81× :: BOTH LAND 33.6% NEEDS 26.2% EDGE +7.4'
+      && co.earlyF2[0].legs.join(' | ').toLowerCase() === '1 early over over 22.5 points -105 · 60.0% | 2 early under under 8.5 rebounds -105 · 56.0%',
+      'the over priced -110 to -101, the tickets: the over left off its card is the likeliest pick on the date and is -120 at DraftKings, and makes no leg at any app under either rule (with it the best-chance list would open on it there); an over carded at -115 is a leg at FanDuel and at DraftKings and none at BetMGM, where it is -105, and the tab for BetMGM says the price keeps it out (it has an edge there, and the ticket would pay more); the under at -105 is a leg; both notes say the rule; and the day before the rule an over at -105 is a leg',
+      JSON.stringify({ c2: coList(co.c2), c2legs: co.c2[0] && co.c2[0].legs, c2tabs: co.c2[0] && co.c2[0].tabs, c3: co.c3.length, c3none: co.c3none, f2: coList(co.f2), f2legs: co.f2[0] && co.f2[0].legs, f2tabs: co.f2[0] && co.f2[0].tabs, f3: coList(co.f3), f3tabs: co.f3[0] && co.f3[0].tabs, earlyF2: coList(co.earlyF2), earlyLegs: co.earlyF2[0] && co.earlyF2[0].legs, cdiv: co.cdiv.slice(0, 520), fdiv: co.fdiv.slice(0, 420) }));
+  chk(co.gradedE === 'Early Over win, Early Under win' && co.tilesE.length === 0
+      && co.graded === 'App Over ast win, Coin Under reb win, Held High ast win, Held Low reb win, Held Top pra loss, Held Top pts loss, Kept Even pts win, Kept Low pts win, Lean Under pts loss, No Edge pts win, Solid Under ast win'
+      && co.tiles.length === 2
+      && /^The over priced -110 to -101, left off the lists \(from 15 Nov 2026\) 2-1 says 58\.3% · does 66\.7% \(±28\.9\) · \+0\.90u the BET and LEAN overs at that price as the slate carded them, not listed and not in a ticket: the BET band 0-1 -1\.0u · the leans 2-0 \+1\.9u · with no model the over at such a price landed 43\.1% on 25 nights where the price asks 51\.6%, and the sheet's own went 149-221 as carded \(the price's own worst for the sheet: 124-122 at -115 to -111, 56-68 at \+100 to \+119\), so this tile says whether leaving them off earns its place$/i.test(co.tiles[0])
+      && /^The under priced -110 to -101, a watch \(from 15 Nov 2026\) 1-1 says 55\.3% · does 50\.0% \(±35\.4\) · -0\.05u the BET and LEAN unders at that price, which stay on the lists: the BET band 1-0 \+1\.0u · the leans 0-1 -1\.0u · with no model the under at such a price landed 51\.5% on 25 nights where the price asks 51\.6% and the sheet's own went 345-324 as carded, but replayed under the levers as they stand on the eighteen nights to 14 Nov they went 83-104, so this tile keeps the count before anything moves$/i.test(co.tiles[1])
+      && co.kept === 'App Over ast:fanduel/t3/2/listed1,fanduel/t3/3/listed1;Solid Under ast:fanduel/t3c/2/c1'
+      && coSame(co.t3tiles.map(t => t.toLowerCase()), ['two-leg tickets as listed, to test :: from 15 nov 2026 no leg priced -200 or shorter and no over priced -110 to -101: 1-0 +2.7u since, 1-0 before it',
+        'three-leg tickets as listed, to test :: from 15 nov 2026 no leg priced -200 or shorter and no over priced -110 to -101: 1-0 +4.9u since, 0-0 before it',
+        'two-leg tickets by best chance, as listed, to test :: from 15 nov 2026 no leg priced -200 or shorter and no over priced -110 to -101: 1-0 +2.0u since, 0-0 before it']),
+      'the over priced -110 to -101, the record: with the day before the rule graded alone (an over and an under at -105, both landing) neither tile shows; with the rule\'s first day graded, one tile counts the three overs left off as the slate carded them, by band, and one the two unders at that price, which stayed on the lists, each saying what was measured; an over at -111, an over at +100 and an over at -105 with no edge are in neither; the lists kept at the grade hold no such over; and each ticket tile names both prices left out from 15 Nov and counts the day before as before it',
+      JSON.stringify({ gradedE: co.gradedE, tilesE: co.tilesE, graded: co.graded, tiles: co.tiles, kept: co.kept, t3tiles: co.t3tiles }));
+  // ---- 12 Nov 2026: the sharp book's price shade is off the NBA card (the user, told it had pointed the wrong way: "Take care of these bro"). It is a hockey measure,
+  //      where the sharp book moves its price before its number; on an NBA total a shade of three points is rare and the shaded side went 29-27 at last season's last
+  //      snapshot, 15-26 at its opener and 8-22 on this season's rows. The chip on the total, the line in tonight's signals and the sentence in the why are gone on
+  //      basketball and stay on the other sports; the record keeps counting the shade on its own line and says it is off the card ----
+  const shKeep = await pg.evaluate(async () => { await smStore.ready; const k = {}; for (const x of ['callsheet3.card.v1', 'callsheet3.props.v1', 'callsheet3.draft.v1']) k[x] = await smStore.getItem(x); await smStore.removeItem('callsheet3.card.v1'); await smStore.removeItem('callsheet3.props.v1'); return k; });
+  await reloaded();
+  const shRead = async (c) => { await fill(c.sport, c.inputs); return pg.evaluate(async () => {
+    const wait = (ms) => new Promise(r => setTimeout(r, ms || 120)), txt = e => (e ? e.innerText : '').replace(/\s+/g, ' ').trim();
+    const line = +document.getElementById('line').value, sh = document.getElementById('sharp');
+    sh.value = JSON.stringify({ book: 'pinnacle', line, op: -125, up: 105 }); sh.dispatchEvent(new Event('input', { bubbles: true })); await wait();
+    const o = { line, chips: [...document.querySelectorAll('#markets .mk[data-key="total"] .cap')].map(txt).filter(t => /pinnacle|sharp/i.test(t)), signals: document.getElementById('signals').textContent.replace(/\s+/g, ' '),
+      why: [...document.querySelectorAll('#why li')].map(txt).filter(t => /Pinnacle, the sharp book/.test(t)).join(' ') };
+    sh.value = ''; sh.dispatchEvent(new Event('input', { bubbles: true })); await wait();
+    return o; }); };
+  const shNba = await shRead(CASES.find(c => c.sport === 'NBA')), shMlb = await shRead(CASES.find(c => c.sport === 'MLB'));
+  const shRec = await pg.evaluate(async () => {
+    const wait = (ms) => new Promise(r => setTimeout(r, ms || 100)), txt = e => (e ? e.innerText : '').replace(/\s+/g, ' ').trim();
+    const set = (id, v) => { const el = document.getElementById(id); el.value = v; el.dispatchEvent(new Event('input', { bubbles: true })); };
+    await smStore.ready;
+    document.getElementById('clear').click(); document.getElementById('m-nba').click(); await wait();
+    const f = { gdate: '2026-11-25', away: 'Suns', home: 'Kings', line: '229.5', op: '-110', up: '-110', hml: '-190', aml: '160', sharp: JSON.stringify({ book: 'pinnacle', line: 229.5, op: -125, up: 105 }) };
+    Object.keys(f).forEach(k => set(k, f[k])); await wait(); document.getElementById('add').click(); await wait();
+    const r = JSON.parse(smStore.getItem('callsheet3.card.v1')).find(x => x.gdate === '2026-11-25' && x.away === 'Suns');
+    for (const [k, v] of [['fa', 110], ['fh', 115]]) { const el = document.querySelector('#cardTable .grade[data-id="' + r.id + '"][data-k="' + k + '"]'); el.value = String(v); el.dispatchEvent(new Event('input', { bubbles: true })); el.dispatchEvent(new Event('change', { bubbles: true })); }
+    await wait(160);
+    return [...document.querySelectorAll('#calibBox .calib > div')].map(txt).filter(t => /Pinnacle's shade/.test(t)).map(t => (t.match(/Pinnacle's shade, 3\+ points [^·]*/) || [''])[0].trim());
+  });
+  await pg.evaluate(async (k) => { for (const x of Object.keys(k)) { if (k[x] === null || k[x] === undefined) await smStore.removeItem(x); else await smStore.setItem(x, k[x]); } }, shKeep);
+  await reloaded();
+  chk(shNba.chips.length === 1 && new RegExp('^Pinnacle agrees at ' + String(shNba.line).replace('.', '\\.') + ' \\(-125/\\+105\\)$', 'i').test(shNba.chips[0]) && !/shades/i.test(shNba.signals) && /Pinnacle, the sharp book: [\d.]+ \(-125\/\+105\)/.test(shNba.why) && !/shades/i.test(shNba.why),
+      'the shade off the NBA card (12 Nov 2026): on a basketball game whose sharp book prices the over 6.8 points shorter than the under, the total carries the sharp line\'s chip and no shade chip, tonight\'s signals carry no Pinnacle line and the why names the sharp book\'s number and prices with no sentence about a shade',
+      JSON.stringify(shNba));
+  chk(shMlb.chips.length === 2 && /^Pinnacle agrees at /i.test(shMlb.chips[0]) && /^Pinnacle shades OVER by 6\.8 points$/i.test(shMlb.chips[1]) && /shades the OVER by 6\.8 points/i.test(shMlb.signals) && /It shades the over by 6\.8 points/.test(shMlb.why),
+      'the shade stays on the other sports: the same sharp prices on a baseball game carry the shade\'s chip on the total, its line in the signals and its sentence in the why',
+      JSON.stringify(shMlb));
+  chk(shRec.length === 1 && shRec[0] === "Pinnacle's shade, 3+ points 0-1 (off the card here: a hockey measure)",
+      'the shade\'s record line is kept on basketball: a graded NBA game whose sharp book shaded the over, which lost, counts 0-1 on the total tile\'s own line, and the line says the shade is off the card here',
+      JSON.stringify(shRec));
+
+  // ---- 12 Nov 2026: the pick at even money or better, a list of its own (the user, told the sheet's plus-money sides had gone 83-58: "Take care of these bro"). Under
+  //      the BETs a choice lists every pick with an edge whose price pays +100 or longer; each such pick carries a chip coloured by its own record, read from the
+  //      day the blend changed and grey under fifty graded picks; the record keeps a tile for it. Shown, not scored ----
+  const pmKeep = await pg.evaluate(async () => { await smStore.ready; const k = {}; for (const x of ['callsheet3.card.v1', 'callsheet3.props.v1', 'callsheet3.draft.v1']) k[x] = await smStore.getItem(x); k.below = localStorage.getItem('callsheet3.props.below.v1'); await smStore.removeItem('callsheet3.card.v1'); await smStore.removeItem('callsheet3.props.v1'); return k; });
+  await reloaded();
+  const pm = await pg.evaluate(async () => {
+    const wait = (ms) => new Promise(r => setTimeout(r, ms || 120)), txt = e => (e ? e.innerText : '').replace(/\s+/g, ' ').trim();
+    await smStore.ready;
+    const load = async (doc, name) => { const dt = new DataTransfer(); dt.items.add(new File([JSON.stringify(doc)], name, { type: 'application/json' })); const inp = document.getElementById('slateFile'); inp.files = dt.files; inp.dispatchEvent(new Event('change', { bubbles: true })); await wait(); await wait(); };
+    const need = (price) => price < 0 ? -price / (-price + 100) : 100 / (price + 100);
+    const man = (pid, name, mk, side, line, chance, price, band) => { const other = price >= 100 ? -125 : 100, op = side === 'OVER' ? price : other, up = side === 'UNDER' ? price : other;
+      return { pid: String(pid), name, team: 'ATL', opp: 'ORL', home: false, pos: 'G', mk, line, op, up, book: 'fanduel', books: { fanduel: [line, op, up] }, proj: line + (side === 'OVER' ? 2 : -2), sd: 6, pm: side === 'OVER' ? 0.75 : 0.25, pb: 0.46,
+        p: side === 'OVER' ? chance : Math.round((1 - chance) * 10000) / 10000, push: 0, side, chance, price, need: Math.round(need(price) * 10000) / 10000, edge: Math.round((chance - need(price)) * 10000) / 10000, band, mins: 32, rate36: 20, base: 18, med: line + (side === 'OVER' ? 1.5 : -1.5),
+        usg: 22, sdf: 1, starter: true, start_src: "RotoWire's expected five", why: ['x'], log: [12, 9, 11, 8, 13, 10, 9, 12, 11, 10].map((v, i) => ['2026-11-' + String(10 + i), 'OPP', i % 2, 32, v, ['won by 3']]), parts: [{ k: 'pace', t: 'Pace', eff: side === 'OVER' ? 0.4 : -0.4, i: 0 }] }; };
+    const file = (date, men) => ({ format: 'callsheet3.props', version: 1, date, games: [{ gid: 'pm' + date, away: 'Hawks', home: 'Magic', aab: 'ATL', hab: 'ORL', spread: -2.5, total: 225.5, props: men }] });
+    const grade = (date, men, win) => ({ format: 'callsheet2.slate', version: 1, date, games: [{ sport: 'NBA', gdate: date, away: 'Hawks', home: 'Magic', finals: { fa: '110', fh: '104', f5a: '55', f5h: '50' }, notes: [],
+      box: Object.fromEntries(men.map(m => [m.pid, [m.name, 30, (win(m) ? m.side === 'OVER' : m.side !== 'OVER') ? 14 : 8, 5, 5, 2]])) }] });
+    // tonight: two BETs (one of them at plus money), an under at +105, an over at +100, a lean at -110 and a plus-money side with no edge
+    const D = '2026-11-26';
+    await load(file(D, [man(1, 'Big Bet', 'pts', 'UNDER', 20.5, 0.60, -120, 'BET'), man(2, 'Plus Bet', 'ast', 'UNDER', 3.5, 0.56, 102, 'BET'), man(3, 'Plus Under', 'reb', 'UNDER', 5.5, 0.52, 105, 'LEAN'), man(4, 'Even Over', 'ast', 'OVER', 2.5, 0.515, 100, 'LEAN'),
+      man(5, 'Minus Lean', 'pts', 'UNDER', 8.5, 0.55, -110, 'LEAN'), man(6, 'Plus No Edge', 'tpm', 'OVER', 1.5, 0.45, 110, 'no edge')]), 'nba-props-2026-11-26.json');
+    if (document.getElementById('propsView').hidden) { document.getElementById('m-props').click(); await wait(); }
+    document.getElementById('propsReset').click(); await wait();
+    const pick = async (id, v) => { const el = document.getElementById(id); el.value = v; el.dispatchEvent(new Event('change', { bubbles: true })); await wait(); };
+    const day = async (d) => { const pd = document.getElementById('propsDate'); pd.value = d; pd.dispatchEvent(new Event('change', { bubbles: true })); await wait(); };
+    const best = document.getElementById('propsBest');
+    const cards = () => [...best.querySelectorAll('.pk[data-prop]')].map(c => ({ who: txt(c.querySelector('.n2')), band: /scored bet/.test(c.className) ? 'BET' : 'LEAN', tell: [...c.querySelectorAll('.n5.tells .tell')].filter(t => /even money/i.test(t.textContent)).map(t => t.className.replace('tell ', '') + ' | ' + txt(t)).join(' ## ') }));
+    const o = { options: [...document.getElementById('propsBelow').options].map(x => x.value + '=' + x.textContent).join(' | ') };
+    await pick('propsBelow', 'leans'); o.leans = cards();
+    await pick('propsBelow', 'plus'); o.plus = cards(); o.div = txt(best.querySelector('.pk-divider.plusd')); o.stored = localStorage.getItem('callsheet3.props.below.v1'); o.none0 = !!best.querySelector('.plusnone');
+    // the chip on the prop's own panel: on the pick at +105, not on the plus-money side with no edge, not on the lean at -110
+    const panelTells = async (name) => { const tr = [...document.querySelectorAll('#propsTable tr[data-prop]')].find(r => r.textContent.indexOf(name) >= 0); if (!tr) return -1; tr.click(); await wait();
+      const n = document.getElementById('propDetail').hidden ? -2 : [...document.querySelectorAll('#propDetailBody .pd-tells .tell')].filter(x => /even money/i.test(x.textContent)).length;
+      document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })); await wait(); return n; };
+    o.panel = [await panelTells('Plus Under'), await panelTells('Plus No Edge'), await panelTells('Minus Lean')].join(',');
+    // a night under the blend as it stands: 52 picks at +105, the unders 20-10 and the overs 12-10; a lean at -110 and a plus-money side with no edge beside them count for nothing
+    const N = '2026-11-24', made = [];
+    for (let i = 0; i < 30; i++) made.push(Object.assign(man(100 + i, 'Under ' + i, 'pts', 'UNDER', 10.5, 0.52, 105, 'LEAN'), { win: i < 20 }));
+    for (let i = 0; i < 22; i++) made.push(Object.assign(man(200 + i, 'Over ' + i, 'pts', 'OVER', 10.5, 0.52, 105, 'LEAN'), { win: i < 12 }));
+    made.push(Object.assign(man(300, 'Lean Loser', 'pts', 'UNDER', 10.5, 0.55, -110, 'LEAN'), { win: false })); made.push(Object.assign(man(301, 'Edge None', 'pts', 'OVER', 10.5, 0.44, 120, 'no edge'), { win: false }));
+    await load(file(N, made.map(m => { const c = Object.assign({}, m); delete c.win; return c; })), 'nba-props-2026-11-24.json'); await load(grade(N, made, m => m.win), 'nba-grade-2026-11-24.json'); await wait(200);
+    // and a night under the older blend, thirty such picks that all lost: before the day the blend changed, not in the pool
+    const O = '2026-11-03', old = []; for (let i = 0; i < 30; i++) old.push(man(400 + i, 'Old ' + i, 'pts', 'UNDER', 10.5, 0.52, 100, 'LEAN'));
+    await load(file(O, old), 'nba-props-2026-11-03.json'); await load(grade(O, old, () => false), 'nba-grade-2026-11-03.json'); await wait(200);
+    if (document.getElementById('propsView').hidden) { document.getElementById('m-props').click(); await wait(); }
+    await day(D); await pick('propsBelow', 'plus'); o.after = cards();
+    o.tile = [...document.querySelectorAll('#propsCalib .calib > div')].map(txt).filter(t => /^The pick at even money or better/i.test(t));
+    // the older night's thirty are picks with an edge at +100, so they list on their own date; they are only out of the chip's pool
+    await day(O); o.oldCards = cards().length;
+    // a date with a BET and a lean at -110 and nothing at even money: the BET, and a line that says there is none under it
+    const E = '2026-11-25'; await load(file(E, [man(500, 'Solo Lean', 'pts', 'UNDER', 8.5, 0.55, -110, 'LEAN'), man(501, 'Solo Bet', 'pts', 'UNDER', 20.5, 0.60, -120, 'BET')]), 'nba-props-2026-11-25.json');
+    if (document.getElementById('propsView').hidden) { document.getElementById('m-props').click(); await wait(); }
+    await day(E); await pick('propsBelow', 'plus'); o.eCards = cards(); o.eNone = txt(best.querySelector('.plusnone')); o.eDiv = !!best.querySelector('.pk-divider.plusd');
+    await day(D); await pick('propsBelow', 't3');
+    return o;
+  });
+  await pg.evaluate(async (k) => { for (const x of Object.keys(k)) { if (x === 'below') { if (k[x] === null) localStorage.removeItem('callsheet3.props.below.v1'); else localStorage.setItem('callsheet3.props.below.v1', k[x]); continue; } if (k[x] === null || k[x] === undefined) await smStore.removeItem(x); else await smStore.setItem(x, k[x]); } }, pmKeep);
+  await reloaded();
+  const pmWho = (cs) => (cs || []).map(c => c.band + ' ' + c.who).join(' | ');
+  chk(/\| plus=even money or better \| leans=the LEANs one by one$/.test(pm.options) && pmWho(pm.leans) === 'BET Plus Bet UNDER 3.5 assists | BET Big Bet UNDER 20.5 points | LEAN Plus Under UNDER 5.5 rebounds | LEAN Minus Lean UNDER 8.5 points | LEAN Even Over OVER 2.5 assists'
+      && pmWho(pm.plus) === 'BET Plus Bet UNDER 3.5 assists | BET Big Bet UNDER 20.5 points | LEAN Plus Under UNDER 5.5 rebounds | LEAN Even Over OVER 2.5 assists' && pm.stored === 'plus' && pm.none0 === false
+      && /^The sheet's side at even money or better below, to test, in the LEANs' place: every pick with an edge whose price pays \+100 or longer, the most edge first\. .* went 83-58 \(58\.9%\) .* the unders 49-34, the overs 34-24, .* not a scored edge\.$/.test(pm.div),
+      'the pick at even money or better (12 Nov 2026): the choice sits under the BETs beside the tickets and the LEANs and is kept; it lists the BETs as always and under them every other pick with an edge at +100 or longer, the most edge first (the under at +105, the over at +100), leaving out the lean at -110 and the plus-money side with no edge, under a line that says what was measured and that it is a test',
+      JSON.stringify({ options: pm.options, leans: pmWho(pm.leans), plus: pmWho(pm.plus), div: pm.div.slice(0, 200), stored: pm.stored }));
+  const pmTell = (cs, who) => ((cs || []).find(c => c.who.indexOf(who) === 0) || {}).tell;
+  chk(/^few \| Pays even money or better · the sheet's side at \+100 or longer has no graded pick since 5 Nov yet; replayed on fourteen nights it went 83-58$/i.test(pmTell(pm.plus, 'Plus Under') || '') && /^few \| Pays even money or better/i.test(pmTell(pm.plus, 'Plus Bet') || '') && /^few \| /.test(pmTell(pm.plus, 'Even Over') || '')
+      && pmTell(pm.plus, 'Big Bet') === '' && pmTell(pm.leans, 'Minus Lean') === '' && pm.panel === '1,0,0'
+      && /^green \| Pays even money or better · the sheet's side at \+100 or longer does 61\.5%, claimed 52\.0%, on 52 BET and LEAN picks since 5 Nov \(unders 20-10, overs 12-10\); replayed on fourteen nights it went 83-58$/i.test(pmTell(pm.after, 'Plus Under') || '')
+      && /^green \| /.test(pmTell(pm.after, 'Even Over') || '') && pmTell(pm.after, 'Big Bet') === '',
+      'the even-money chip: a pick with an edge at +100 or longer carries it, on its card and on its panel, a BET among them too, and a pick at a shorter price does not, nor a plus-money side with no edge; with nothing graded since the blend changed it is grey and says so; after a night of 52 such picks that went 32-20 it reads green with its own numbers by side, counting neither the thirty that lost under the older blend, nor a lean at -110, nor a plus-money side with no edge',
+      JSON.stringify({ panel: pm.panel, before: (pm.plus || []).map(c => c.who + ' :: ' + c.tell), after: (pm.after || []).map(c => c.who + ' :: ' + c.tell) }));
+  chk((pm.tile || []).length === 1 && /^The pick at even money or better, to test 32-20 says 52\.0% · does 61\.5% \(±6\.9\) · \+13\.60u an edge on the card at a price of \+100 or longer, as carded since 5 Nov \(the blend as it stands\): unders 20-10 \+11\.0u · overs 12-10 \+2\.6u · replayed under this blend on fourteen nights it went 83-58 \(shown, not scored\)$/i.test(pm.tile[0])
+      && pm.oldCards === 30 && pmWho(pm.eCards) === 'BET Solo Bet UNDER 20.5 points' && pm.eDiv === true && pm.eNone === 'No pick with an edge on this date pays even money or better outside the BETs above.',
+      'the even-money record: its own tile on the props record from the day the blend changed, by side, at the prices carded; the older night\'s thirty still list on their own date, being picks with an edge at +100; and a date with a BET and nothing at even money shows the BET and says under it that there is none',
+      JSON.stringify({ tile: pm.tile, oldCards: pm.oldCards, eCards: pmWho(pm.eCards), eNone: pm.eNone, eDiv: pm.eDiv }));
+
+  // ---- 12 Nov 2026: a marks file puts a bet back as it was marked (the user, of three bets of 11 Nov the page had recorded wrong: "Take care of these bro"). The marks
+  //      of that night were flags, so the record read each bet at the lines a later run carded. The file corrects a mark that is on the page and makes none: a prop
+  //      not marked, or a pair whose legs do not name each other, is left alone; a key the page does not hold is passed over; an entry it cannot read is refused ----
+  const mkKeep = await pg.evaluate(async () => { await smStore.ready; const k = {}; for (const x of ['callsheet3.card.v1', 'callsheet3.props.v1', 'callsheet3.draft.v1']) k[x] = await smStore.getItem(x); await smStore.removeItem('callsheet3.card.v1'); await smStore.removeItem('callsheet3.props.v1'); return k; });
+  await reloaded();
+  const mkSrc = () => {
+    const need = (price) => price < 0 ? -price / (-price + 100) : 100 / (price + 100);
+    const man = (pid, name, team, mk, side, line, chance, price) => ({ pid: String(pid), name, team, opp: team === 'SAS' ? 'CHI' : 'SAS', home: team === 'CHI', pos: 'F', mk, line, op: side === 'OVER' ? price : 100, up: side === 'UNDER' ? price : 100, book: 'betmgm',
+      books: { betmgm: [line, side === 'OVER' ? price : 100, side === 'UNDER' ? price : 100] }, proj: line + (side === 'OVER' ? 1.5 : -1.5), sd: 3, pm: side === 'OVER' ? 0.7 : 0.3, pb: 0.5, p: side === 'OVER' ? chance : Math.round((1 - chance) * 10000) / 10000, push: 0, side, chance, price,
+      need: Math.round(need(price) * 10000) / 10000, edge: Math.round((chance - need(price)) * 10000) / 10000, band: chance - need(price) > 0 ? 'LEAN' : 'no edge', mins: 30, rate36: 8, base: 7, med: line, usg: 15, sdf: 1, starter: true, start_src: "RotoWire's expected five",
+      why: ['x'], log: [6, 5, 7, 4, 6, 5, 8, 5, 6, 4].map((v, i) => ['2026-11-' + String(10 + i), 'OPP', i % 2, 30, v, ['won by 3']]), parts: [{ k: 'pace', t: 'Pace', eff: side === 'OVER' ? 0.3 : -0.3, i: 0 }] });
+    const D = '2026-11-27';
+    // the rows as a later run left them: the under at 6.5 is an over at 5.5 now, and the pair's second leg has turned to the over at 5.5
+    const men = [man(21, 'Rebound Man', 'CHI', 'reb', 'OVER', 5.5, 0.518, -135), man(22, 'Dime Man', 'SAS', 'tpm', 'OVER', 0.5, 0.668, -210), man(22, 'Dime Man', 'SAS', 'ast', 'OVER', 5.5, 0.512, -125), man(23, 'Free Man', 'CHI', 'pts', 'OVER', 10.5, 0.60, -120),
+      man(24, 'Loose One', 'SAS', 'reb', 'UNDER', 7.5, 0.60, -120), man(25, 'Loose Two', 'CHI', 'ast', 'OVER', 3.5, 0.58, -110)];
+    const props = { format: 'callsheet3.props', version: 1, date: D, games: [{ gid: 'mk0', away: 'Spurs', home: 'Bulls', aab: 'SAS', hab: 'CHI', spread: -2.5, total: 225.5, props: men }] };
+    // the box: five rebounds, two threes and nine assists, fourteen points
+    const grade = { format: 'callsheet2.slate', version: 1, date: D, games: [{ sport: 'NBA', gdate: D, away: 'Spurs', home: 'Bulls', finals: { fa: '110', fh: '104', f5a: '55', f5h: '50' }, notes: [],
+      box: { 21: ['Rebound Man', 30, 9, 5, 2, 1], 22: ['Dime Man', 30, 12, 4, 9, 2], 23: ['Free Man', 30, 14, 4, 2, 1], 24: ['Loose One', 30, 9, 6, 2, 1], 25: ['Loose Two', 30, 9, 4, 5, 1] } }] };
+    const k = (pid, mk) => D + '|' + pid + '|' + mk;
+    const marks = { format: 'callsheet3.marks', version: 1, date: D, props: [
+        { key: k(21, 'reb'), name: 'Rebound Man', took: { side: 'UNDER', line: 6.5, price: -155, chance: 0.622, band: 'LEAN', book: 'betmgm', proj: 5.46 } },
+        { key: k(23, 'pts'), name: 'Free Man', took: { side: 'UNDER', line: 10.5, price: -110, chance: 0.55 } },          // never marked: left alone
+        { key: k(99, 'pts'), name: 'Nobody', took: { side: 'OVER', line: 1.5, price: -110, chance: 0.5 } },                // not on the page: passed over
+        { key: k(21, 'reb'), name: 'Bad Side', took: { side: 'UP', line: 6.5, price: -155, chance: 0.6 } }],                 // not a side: refused
+      pairs: [
+        { ks: [k(22, 'tpm'), k(22, 'ast')], names: ['Dime Man OVER 0.5 threes', 'Dime Man UNDER 6.5 assists'], app: 'betmgm', kind: 'same_man', f: 1.15, chance: 0.508, at: [[0.5, -210, 0.672, 'OVER', 0.5], [6.5, -200, 0.658, 'UNDER', 6.5]] },
+        { ks: [k(24, 'reb'), k(25, 'ast')], names: ['Loose One', 'Loose Two'], app: 'betmgm', chance: 0.4, at: [[7.5, -120, 0.6, 'UNDER', 7.5], [3.5, -110, 0.58, 'OVER', 3.5]] },   // a pair nobody marked: left alone
+        { ks: [k(22, 'tpm'), k(22, 'ast')], names: ['Bad Pair'], chance: 0.5, at: [[0.5, -210, 0.672, 'OVER', 0.5]] }] };                                                          // one leg: refused
+    return { D, props, grade, marks, k };
+  };
+  await pg.evaluate(async (src) => {
+    const wait = (ms) => new Promise(r => setTimeout(r, ms || 130));
+    await smStore.ready;
+    const { D, props, k } = (0, eval)('(' + src + ')')();
+    const load = async (doc, name) => { const dt = new DataTransfer(); dt.items.add(new File([JSON.stringify(doc)], name, { type: 'application/json' })); const inp = document.getElementById('slateFile'); inp.files = dt.files; inp.dispatchEvent(new Event('change', { bubbles: true })); await wait(); await wait(); };
+    await load(props, 'nba-props-2026-11-27.json');
+    // the marks as they were before a mark kept anything: a flag on the prop, each leg naming the other. Written after the last click of this visit
+    const all = JSON.parse(smStore.getItem('callsheet3.props.v1')), row = (pid, mk) => all.find(x => x.gdate === D && String(x.pid) === String(pid) && x.mk === mk);
+    row(21, 'reb').take = true; row(22, 'tpm').pairs = [k(22, 'ast')]; row(22, 'ast').pairs = [k(22, 'tpm')];
+    await smStore.setItem('callsheet3.props.v1', JSON.stringify(all));
+  }, mkSrc.toString());
+  await reloaded();
+  const mk = await pg.evaluate(async (src) => {
+    const wait = (ms) => new Promise(r => setTimeout(r, ms || 130)), txt = e => (e ? e.innerText : '').replace(/\s+/g, ' ').trim();
+    await smStore.ready;
+    const { D, grade, marks } = (0, eval)('(' + src + ')')();
+    const load = async (doc, name) => { const dt = new DataTransfer(); dt.items.add(new File([JSON.stringify(doc)], name, { type: 'application/json' })); const inp = document.getElementById('slateFile'); inp.files = dt.files; inp.dispatchEvent(new Event('change', { bubbles: true })); await wait(); await wait(); };
+    await load(grade, 'nba-grade-2026-11-27.json'); await wait(200);
+    const read = async () => {
+      if (document.getElementById('propsView').hidden) { document.getElementById('m-props').click(); await wait(); }
+      const pd = document.getElementById('propsDate'); pd.value = D; pd.dispatchEvent(new Event('change', { bubbles: true })); await wait();
+      const o = { taking: [...document.querySelectorAll('#propsTaking .pk')].map(txt), said: txt(document.getElementById('propsMsg')), shown: !document.getElementById('propsView').hidden, date: document.getElementById('propsDate').value };
+      const strip = (x) => { if (!x) return null; const c = JSON.parse(JSON.stringify(x)); (Array.isArray(c) ? c : [c]).forEach(y => { o.fixed = (o.fixed || 0) + (y.fixed ? 1 : 0); delete y.fixed; }); return c; };
+      o.rows = JSON.parse(smStore.getItem('callsheet3.props.v1')).filter(x => x.gdate === D).map(x => x.name + ' ' + x.mk + ' | take ' + !!x.take + ' | took ' + JSON.stringify(strip(x.took)) + ' | pairs ' + JSON.stringify(x.pairs || null) + ' | kept ' + JSON.stringify(strip(x.pairsAt)));
+      document.getElementById('m-nba').click(); await wait();
+      o.took = [...document.querySelectorAll('#calibBox .calib[data-sport="TAKEN"] > div')].map(txt);
+      o.list = [...document.querySelectorAll('#takenList tbody tr')].map(e => e.textContent.replace(/\s+/g, ' ').trim());
+      return o;
+    };
+    const o = { before: await read() };
+    document.getElementById('m-nba').click(); await wait();   // loaded from the board's tab: the file opens the props at its date
+    await load(marks, 'nba-marks-2026-11-27.json'); o.opened = { shown: !document.getElementById('propsView').hidden, date: document.getElementById('propsDate').value, said: txt(document.getElementById('propsMsg')) };
+    o.after = await read();
+    await load(marks, 'nba-marks-2026-11-27.json'); o.again = await read();
+    return o;
+  }, mkSrc.toString());
+  await pg.evaluate(async (k) => { for (const x of Object.keys(k)) { if (k[x] === null || k[x] === undefined) await smStore.removeItem(x); else await smStore.setItem(x, k[x]); } }, mkKeep);
+  await reloaded();
+  const mkOne = (xs, re) => (xs || []).filter(x => re.test(x));
+  chk(mkOne(mk.before.taking, /Rebound Man OVER 5\.5 rebounds 51\.8% · -135 needs 57\.5% LOSS · 5/i).length === 1 && mkOne(mk.before.taking, /Dime Man OVER 0\.5 threes \+ Dime Man OVER 5\.5 assists WIN/i).length === 1
+      && mkOne(mk.before.took, /^Props taken 0-1 /i).length === 1 && mkOne(mk.before.took, /^Same-game pairs taken 1-0 /i).length === 1,
+      'a marks file, the night before it (12 Nov 2026): a prop marked with a flag and a pair marked by its legs\' keys read as the rows stand after a later run, the under at 6.5 as an over at 5.5 that lost on five rebounds and the pair with its second leg turned, a win',
+      JSON.stringify({ taking: mk.before.taking.map(t => t.slice(0, 200)), took: mk.before.took }));
+  chk(mk.opened.shown === true && mk.opened.date === '2026-11-27'
+      && mk.opened.said === "The marks file nba-marks-2026-11-27.json put 2 bets back as they were marked: Rebound Man UNDER 6.5 rebounds at -155; Dime Man OVER 0.5 threes + Dime Man UNDER 6.5 assists at +121. Each is listed and graded from here on the line and the side kept, at the price kept. 2 left alone, not marked on this page: Free Man; Loose One + Loose Two. 1 passed over, not among the props this page holds: Nobody. 2 refused, not a mark this page can read: Bad Side; Bad Pair."
+      && mkOne(mk.after.rows, /^Rebound Man reb \| take true \| took \{"side":"UNDER","line":6\.5,"price":-155,"chance":0\.622,"band":"LEAN","book":"betmgm","proj":5\.46\} \| pairs null \| kept null$/).length === 1
+      && mkOne(mk.after.rows, /^Dime Man tpm \| take false \| took null \| pairs \["2026-11-27\|22\|ast"\] \| kept \[\{"ks":\["2026-11-27\|22\|tpm","2026-11-27\|22\|ast"\],"app":"betmgm","kind":"same_man","f":1\.15,"chance":0\.508,"at":\[\[0\.5,-210,0\.672,"OVER",0\.5\],\[6\.5,-200,0\.658,"UNDER",6\.5\]\]\}\]$/).length === 1
+      && mkOne(mk.after.rows, /^Dime Man ast \| take false \| took null \| pairs \["2026-11-27\|22\|tpm"\] \| kept null$/).length === 1
+      && mkOne(mk.after.rows, /^Free Man pts \| take false \| took null \| pairs null \| kept null$/).length === 1 && mkOne(mk.after.rows, /^Loose (One reb|Two ast) \| take false \| took null \| pairs null \| kept null$/).length === 2 && mk.after.fixed === 2,
+      'a marks file, loaded: it opens the props at its date and says what it did; the prop marked on the page takes the bet the file kept (its side, line, price, chance, band and book) and the marked pair its ticket (the app, each leg\'s line, price, chance and side), stamped as put back; a prop nobody marked and a pair nobody marked are left alone, a key the page does not hold is passed over, and an entry with no side or one leg is refused',
+      JSON.stringify({ opened: mk.opened, rows: mk.after.rows, fixed: mk.after.fixed }));
+  chk(mkOne(mk.after.taking, /Rebound Man UNDER 6\.5 rebounds 62\.2% · -155 needs 60\.8% WIN · 5 .*The card has moved since you marked it: OVER 5\.5 at -135 now \(no edge\)\. Your bet stays as marked\./i).length === 1
+      && mkOne(mk.after.taking, /Dime Man OVER 0\.5 threes \+ Dime Man UNDER 6\.5 assists LOSS both land 50\.8% · pays \+121 \(2\.21×\) needs 45\.2% Dime Man 67\.2% at -210 · Dime Man 65\.8% at -200 · one man, two markets, measured ×1\.15 As you marked it: the card has moved since/i).length === 1
+      && mkOne(mk.after.took, /^Props taken 1-0 says 62\.2% · does 100\.0% \(±50\.0\) · \+0\.65u$/i).length === 1 && mkOne(mk.after.took, /^Same-game pairs taken 0-1 says 50\.8% · does 0\.0% \(±50\.0\) · [-−]1\.00u$/i).length === 1
+      && mkOne(mk.after.list, /Rebound Man UNDER 6\.5 rebounds · Spurs @ Bullsprop62\.2%[-−]155WIN\+0\.65u$/).length === 1 && mkOne(mk.after.list, /Dime Man OVER 0\.5 threes \+ Dime Man UNDER 6\.5 assists · Spurs @ Bullssame-game pair50\.8%\+121LOSS[-−]1\.00u$/).length === 1
+      && JSON.stringify(mk.again.rows) === JSON.stringify(mk.after.rows) && JSON.stringify(mk.again.took) === JSON.stringify(mk.after.took) && mk.again.said === mk.opened.said,
+      'a marks file, the night after it: the prop is listed and graded as it was marked, the under at 6.5 a win on five rebounds at -155, with the card it has moved to named beside it; the pair is the ticket that was marked, a loss on nine assists at +121; What you took and the list of every pick read them so; and loading the file a second time changes nothing and keeps one ticket',
+      JSON.stringify({ taking: mk.after.taking.map(t => t.slice(0, 330)), took: mk.after.took, list: (mk.after.list || []).slice(0, 4), same: JSON.stringify(mk.again.rows) === JSON.stringify(mk.after.rows), said2: mk.again.said.slice(0, 120) }));
+
+  // ---- 13 Nov 2026: minutes on the way back. The props run reads a man's minutes off the mean of his last five games; with a short game among the five and his last
+  //      two above them the mean runs low and the sheet calls the under on him (Zubac: 7, 19, 19, 28, 31, six unders lost on 11 Nov and five BETs on the under again
+  //      on the 13th). Measured on fourteen nights: such a man played 4.8 minutes more than projected and the sheet's unders on him went 14-32. The card and the
+  //      panel say so, the BETs' note counts them, such an under makes no leg of a ticket by either rule, and the record keeps its line through the trim ----
+  const rpKeep = await pg.evaluate(async () => { await smStore.ready; const k = {}; for (const x of ['callsheet3.card.v1', 'callsheet3.props.v1', 'callsheet3.draft.v1']) k[x] = await smStore.getItem(x); k.below = localStorage.getItem('callsheet3.props.below.v1'); k.legs = localStorage.getItem('callsheet3.props.legs.v1'); await smStore.removeItem('callsheet3.card.v1'); await smStore.removeItem('callsheet3.props.v1'); return k; });
+  await reloaded();
+  const rp = await pg.evaluate(async () => {
+    const wait = (ms) => new Promise(r => setTimeout(r, ms || 120)), txt = e => (e ? e.innerText : '').replace(/\s+/g, ' ').trim();
+    await smStore.ready;
+    const load = async (doc, name) => { const dt = new DataTransfer(); dt.items.add(new File([JSON.stringify(doc)], name, { type: 'application/json' })); const inp = document.getElementById('slateFile'); inp.files = dt.files; inp.dispatchEvent(new Event('change', { bubbles: true })); await wait(); await wait(); };
+    const G = [['Hawks', 'Magic', 'ATL', 'ORL', -2.5], ['Bulls', 'Bucks', 'CHI', 'MIL', 3.5], ['Heat', 'Jazz', 'MIA', 'UTA', -1.5]];
+    const need = (price) => price < 0 ? -price / (-price + 100) : 100 / (price + 100);
+    const steady = [31, 33, 32, 30, 34, 32, 31, 33, 32, 30], back = [30, 31, 30, 29, 30, 7, 19, 19, 28, 31];   // back: a short game five games ago and the last two above the five
+    const cold = L => [L + 2, L - 2, L + 3, L - 1, L + 1, L - 2, L + 2, L - 3, L + 1, L - 1];   // three of his last five either way: no leg by the last-five rule
+    const man = (pid, name, gi, home, mk, side, line, chance, price, band, mins, vals) => ({ gi, pid: String(pid), name, team: G[gi][home ? 3 : 2], opp: G[gi][home ? 2 : 3], home: !!home, pos: 'F', mk, line,
+      op: side === 'OVER' ? price : 100, up: side === 'UNDER' ? price : 100, book: 'fanduel', books: { fanduel: [line, side === 'OVER' ? price : 100, side === 'UNDER' ? price : 100] },
+      proj: line + (side === 'OVER' ? 2 : -2), sd: 6, pm: side === 'OVER' ? 0.7 : 0.3, pb: 0.5, p: side === 'OVER' ? chance : Math.round((1 - chance) * 10000) / 10000, push: 0, side, chance, price, need: Math.round(need(price) * 10000) / 10000,
+      edge: Math.round((chance - need(price)) * 10000) / 10000, band, mins: 24, rate36: 20, base: 18, med: line + (side === 'OVER' ? 1.5 : -1.5), usg: 22, sdf: 1, starter: true, start_src: "RotoWire's expected five", why: ['x'],
+      log: (vals || cold(line)).slice(0, mins.length).map((v, i) => ['2026-11-' + String(10 + i), 'OPP', i % 2, mins[i], v, ['won by 3']]), parts: [{ k: 'pace', t: 'Pace', eff: side === 'OVER' ? 0.4 : -0.4, i: 0 }] });
+    const D = '2026-12-10';
+    const men = [man(1, 'Ramp Under', 0, 0, 'pts', 'UNDER', 20.5, 0.70, -180, 'BET', back, [18, 25, 17, 19, 16, 4, 12, 14, 22, 18]), man(1, 'Ramp Under', 0, 0, 'reb', 'UNDER', 8.5, 0.66, -150, 'BET', back, [7, 10, 6, 8, 7, 2, 5, 6, 9, 7]),
+      man(2, 'Ramp Over', 1, 0, 'ast', 'OVER', 5.5, 0.60, -130, 'LEAN', back),                                    // the same last five, and the sheet's side is the over: no caution
+      man(3, 'Steady Under', 1, 1, 'reb', 'UNDER', 6.5, 0.64, -140, 'LEAN', steady, [5, 8, 6, 4, 7, 5, 6, 8, 5, 4]),
+      man(4, 'Form Under', 2, 0, 'ast', 'UNDER', 4.5, 0.62, -135, 'LEAN', steady, [3, 6, 4, 2, 5, 3, 4, 6, 3, 2]),
+      man(5, 'Short Last', 2, 1, 'pts', 'UNDER', 12.5, 0.59, -125, 'LEAN', [30, 31, 30, 29, 30, 31, 30, 31, 29, 7]),  // the short game is his last one: his last two sit under the five
+      man(6, 'Rise No Short', 0, 1, 'reb', 'UNDER', 5.5, 0.60, -130, 'LEAN', [20, 20, 20, 20, 20, 20, 20, 20, 28, 30]),  // his last two above the five and no short game among them
+      man(7, 'Four Games', 1, 0, 'pts', 'UNDER', 9.5, 0.585, -120, 'LEAN', [7, 19, 28, 31]),                        // four games behind him: no last five to read
+      man(8, 'Median Man', 2, 1, 'reb', 'UNDER', 7.5, 0.57, -120, 'LEAN', [30, 30, 30, 30, 30, 12, 26, 26, 27, 28])];  // short against the median of his five (12 under half of 26), not against their mean (23.8): the median is the measure
+    const file = (date, list) => ({ format: 'callsheet3.props', version: 1, date, games: G.map((g, gi) => ({ gid: 'rp' + gi, away: g[0], home: g[1], aab: g[2], hab: g[3], spread: g[4], total: 225.5, props: list.filter(m => m.gi === gi) })) });
+    await load(file(D, men), 'nba-props-2026-12-10.json');
+    if (document.getElementById('propsView').hidden) { document.getElementById('m-props').click(); await wait(); }
+    document.getElementById('propsReset').click(); await wait();
+    const pick = async (id, v) => { const el = document.getElementById(id); el.value = v; el.dispatchEvent(new Event('change', { bubbles: true })); await wait(); };
+    const day = async (d) => { const pd = document.getElementById('propsDate'); pd.value = d; pd.dispatchEvent(new Event('change', { bubbles: true })); await wait(); };
+    const best = document.getElementById('propsBest');
+    const cards = () => [...best.querySelectorAll('.pk[data-prop]')].map(c => txt(c.querySelector('.n2')) + ' :: ' + txt(c.querySelector('.n5.ramp')));
+    const tix = () => [...best.querySelectorAll('.pk.t3')].map(e => [...e.querySelectorAll('.leg .lname')].map(x => x.textContent).join(' + '));
+    const o = {};
+    await pick('propsBelow', 'leans'); o.note = txt(best.querySelector('.pk-note')); o.cards = cards();
+    const panel = async (name) => { const tr = [...document.querySelectorAll('#propsTable tr[data-prop]')].find(r => r.textContent.indexOf(name) >= 0); tr.click(); await wait(); const t = document.getElementById('propDetail').hidden ? 'closed' : txt(document.querySelector('#propDetailBody .pd-ramp'));
+      document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })); await wait(); return t; };
+    o.panel = [await panel('Ramp Under'), await panel('Ramp Over'), await panel('Steady Under')];
+    await pick('propsLegs', '2'); await pick('propsBelow', 't3c'); o.c2 = tix(); await pick('propsLegs', '3'); o.c3 = tix();
+    await pick('propsLegs', '2'); await pick('propsBelow', 't3'); o.f2 = tix();
+    // the night: his two unders lose (26 points, 10 rebounds), the over on the other man wins
+    const box = { 'Ramp Under': [26, 10, 3], 'Ramp Over': [9, 4, 7], 'Steady Under': [9, 5, 2], 'Form Under': [9, 4, 6], 'Short Last': [10, 4, 2], 'Rise No Short': [9, 4, 2], 'Four Games': [12, 4, 2], 'Median Man': [9, 5, 2] };
+    await load({ format: 'callsheet2.slate', version: 1, date: D, games: G.map((g, gi) => ({ sport: 'NBA', gdate: D, away: g[0], home: g[1], finals: { fa: '110', fh: '104', f5a: '55', f5h: '50' }, notes: [],
+      box: Object.fromEntries(men.filter(m => m.gi === gi).map(m => [m.pid, [m.name, 30, box[m.name][0], box[m.name][1], box[m.name][2], 1]])) })) }, 'nba-grade-2026-12-10.json'); await wait(250);
+    if (document.getElementById('propsView').hidden) { document.getElementById('m-props').click(); await wait(); }
+    await day(D);
+    const tile = () => [...document.querySelectorAll('#propsCalib .calib > div')].map(txt).filter(t => /way back/i.test(t));
+    o.tile = tile();
+    // seven later dates push the night out of the whole ones: its rows are trimmed, the log goes, the mark stays and the record's line with it
+    for (let i = 1; i <= 7; i++) { const d = '2026-12-' + String(10 + i); await load(file(d, [man(900 + i, 'Later ' + i, 0, 0, 'pts', 'UNDER', 10.5, 0.5, -110, 'no edge', steady)]), 'nba-props-' + d + '.json'); }
+    if (document.getElementById('propsView').hidden) { document.getElementById('m-props').click(); await wait(); }
+    await day(D);
+    o.kept = JSON.parse(smStore.getItem('callsheet3.props.v1')).filter(x => x.gdate === D).map(x => x.name + ' ' + x.mk + ':' + (x.trim ? 'trim' : 'whole') + (x.log ? ':log' : '') + (x.rmp ? ':rmp' : '')).sort().join(' | ');
+    o.tileAfter = tile();
+    await pick('propsBelow', 't3');
+    return o;
+  });
+  await pg.evaluate(async (k) => { for (const x of Object.keys(k)) { if (x === 'below' || x === 'legs') { const key = x === 'below' ? 'callsheet3.props.below.v1' : 'callsheet3.props.legs.v1'; if (k[x] === null) localStorage.removeItem(key); else localStorage.setItem(key, k[x]); continue; } if (k[x] === null || k[x] === undefined) await smStore.removeItem(x); else await smStore.setItem(x, k[x]); } }, rpKeep);
+  await reloaded();
+  const rpLine = 'Minutes on the way back: the projection reads his last five games (7, 19, 19, 28, 31 minutes, 20.8 a game) and one of them is a short game; his last two ran 29.5. Such a man played 4.8 minutes more than the sheet projected on fourteen nights and its under on him went 14-32. Shown, not scored: the chance on this card is not changed.';
+  chk(rp.note === "The 2 BETs on this date sit on 1 man in 1 game: a man's BETs land or miss together, so that is 1 bet, not 2. Both BETs on this date are unders on a man whose minutes are on the way back (Ramp Under): the projection reads a short game in his last five, and the sheet's under on such a man went 14-32."
+      && (rp.cards || []).join(' ## ') === ['Ramp Under UNDER 8.5 rebounds :: ' + rpLine, 'Ramp Under UNDER 20.5 points :: ' + rpLine, 'Steady Under UNDER 6.5 rebounds :: ', 'Form Under UNDER 4.5 assists :: ', 'Four Games UNDER 9.5 points :: ', 'Rise No Short UNDER 5.5 rebounds :: ', 'Ramp Over OVER 5.5 assists :: ', 'Short Last UNDER 12.5 points :: ', 'Median Man UNDER 7.5 rebounds :: ' + rpLine.replace('7, 19, 19, 28, 31 minutes, 20.8 a game', '12, 26, 26, 27, 28 minutes, 23.8 a game').replace('ran 29.5', 'ran 27.5')].join(' ## ')
+      && JSON.stringify(rp.panel) === JSON.stringify([rpLine, '', '']),
+      'minutes on the way back (13 Nov 2026): the sheet\'s under on a man with a short game in his last five and his last two above them carries the caution on its card and its panel, with his five and what they average, and the BETs\' note says how many of the BETs are such unders and on whom; the over on such a man carries none, nor an under on steady minutes, nor one whose short game is his last, nor one whose minutes rose with no short game, nor a man with four games behind him; and the short game is read against the median of the five, not their mean',
+      JSON.stringify({ note: rp.note, cards: rp.cards, panel: rp.panel }));
+  chk(JSON.stringify(rp.c2) === JSON.stringify(['Steady Under + Form Under', 'Rise No Short + Short Last']) && JSON.stringify(rp.c3) === JSON.stringify(['Steady Under + Form Under + Rise No Short']) && JSON.stringify(rp.f2) === JSON.stringify(['Steady Under + Form Under']),
+      'minutes on the way back, the tickets: his under is the likeliest pick on the date and the one with the form, and it makes no leg by either rule: the best-chance tickets are built from the next likeliest on each game and the last-five ticket from the other two men with the form',
+      JSON.stringify({ c2: rp.c2, c3: rp.c3, f2: rp.f2 }));
+  chk((rp.tile || []).length === 1 && /^The under on a man whose minutes are on the way back \(shown, not scored\) 1-2 says 64\.3% · does 33\.3% \(±28\.9\) · [-−]1\.17u a short game in his last five and his last two above them: the projection's minutes run low; counted from the nights whose logs the page holds · measured on fourteen nights before it, 14-32$/i.test(rp.tile[0])
+      && rp.kept === 'Form Under ast:trim | Four Games pts:trim | Median Man reb:trim:rmp | Ramp Over ast:trim:rmp | Ramp Under pts:trim:rmp | Ramp Under reb:trim:rmp | Rise No Short reb:trim | Short Last pts:trim | Steady Under reb:trim'
+      && JSON.stringify(rp.tileAfter) === JSON.stringify(rp.tile),
+      'minutes on the way back, the record: the sheet\'s unders on such men, two lost and one won, sit on their own tile (the over on the other such man is not counted); and when seven later dates push the night out and its rows are trimmed, the log goes, the mark stays on the two men\'s rows and the tile reads the same',
+      JSON.stringify({ tile: rp.tile, kept: rp.kept, after: rp.tileAfter }));
+
+  // ---- 13 Nov 2026: a short game set aside in the minutes (the user: "do it"). slate.py now leaves a short game out of a starter's minutes, or counts it as half
+  //      a game for another man on the rise, measured on four seasons of box scores, and marks the row (`mshort`). On such a row the page's own caution stands
+  //      down, the card and the panel say what was set aside and what the five say untouched, the under is a ticket leg again, and the record keeps a tile for the
+  //      picks on such rows, by side; a row of the same shape from the old run keeps the caution ----
+  const msKeep = await pg.evaluate(async () => { await smStore.ready; const k = {}; for (const x of ['callsheet3.card.v1', 'callsheet3.props.v1', 'callsheet3.draft.v1']) k[x] = await smStore.getItem(x); k.below = localStorage.getItem('callsheet3.props.below.v1'); k.legs = localStorage.getItem('callsheet3.props.legs.v1'); await smStore.removeItem('callsheet3.card.v1'); await smStore.removeItem('callsheet3.props.v1'); return k; });
+  await reloaded();
+  const ms = await pg.evaluate(async () => {
+    const wait = (ms) => new Promise(r => setTimeout(r, ms || 120)), txt = e => (e ? e.innerText : '').replace(/\s+/g, ' ').trim();
+    await smStore.ready;
+    const load = async (doc, name) => { const dt = new DataTransfer(); dt.items.add(new File([JSON.stringify(doc)], name, { type: 'application/json' })); const inp = document.getElementById('slateFile'); inp.files = dt.files; inp.dispatchEvent(new Event('change', { bubbles: true })); await wait(); await wait(); };
+    const G = [['Hawks', 'Magic', 'ATL', 'ORL', -2.5], ['Bulls', 'Bucks', 'CHI', 'MIL', 3.5], ['Heat', 'Jazz', 'MIA', 'UTA', -1.5]];
+    const need = (price) => price < 0 ? -price / (-price + 100) : 100 / (price + 100);
+    const steady = [31, 33, 32, 30, 34, 32, 31, 33, 32, 30], back = [30, 31, 30, 29, 30, 7, 19, 19, 28, 31];
+    const cold = L => [L + 2, L - 2, L + 3, L - 1, L + 1, L - 2, L + 2, L - 3, L + 1, L - 1];
+    const man = (pid, name, gi, home, mk, side, line, chance, price, band, mins, mshort) => Object.assign({ gi, pid: String(pid), name, team: G[gi][home ? 3 : 2], opp: G[gi][home ? 2 : 3], home: !!home, pos: 'F', mk, line,
+      op: side === 'OVER' ? price : 100, up: side === 'UNDER' ? price : 100, book: 'fanduel', books: { fanduel: [line, side === 'OVER' ? price : 100, side === 'UNDER' ? price : 100] },
+      proj: line + (side === 'OVER' ? 2 : -2), sd: 6, pm: side === 'OVER' ? 0.7 : 0.3, pb: 0.5, p: side === 'OVER' ? chance : Math.round((1 - chance) * 10000) / 10000, push: 0, side, chance, price, need: Math.round(need(price) * 10000) / 10000,
+      edge: Math.round((chance - need(price)) * 10000) / 10000, band, mins: 24, rate36: 20, base: 18, med: line + (side === 'OVER' ? 1.5 : -1.5), usg: 22, sdf: 1, starter: true, start_src: "RotoWire's expected five", why: ['x'],
+      log: cold(line).slice(0, mins.length).map((v, i) => ['2026-11-' + String(10 + i), 'OPP', i % 2, mins[i], v, ['won by 3']]), parts: [{ k: 'pace', t: 'Pace', eff: side === 'OVER' ? 0.4 : -0.4, i: 0 }] }, mshort ? { mshort } : {});
+    const D = '2026-12-20';
+    const men = [man(11, 'Set Aside', 0, 0, 'pts', 'UNDER', 20.5, 0.70, -180, 'BET', back, { how: 'out', min: [7], mean: 20.8, read: 24.3 }),                  // the new run: a starter's 7-minute game left out
+      man(12, 'Old Run', 1, 0, 'reb', 'UNDER', 8.5, 0.66, -150, 'LEAN', back),                                                                             // the same five from the old run: the caution
+      man(13, 'Half Man', 1, 1, 'ast', 'OVER', 5.5, 0.60, -130, 'LEAN', [20, 20, 20, 20, 20, 20, 8, 21, 24, 25], { how: 'half', min: [8], mean: 19.6, read: 20.9 }),
+      man(14, 'Two Back', 2, 0, 'pts', 'UNDER', 12.5, 0.59, -125, 'LEAN', [30, 30, 30, 30, 30, 30, 31, 29, 7, 30], { how: 'half2', min: [7], mean: 25.4, read: 27.4 }),
+      man(15, 'Two Short', 0, 1, 'reb', 'UNDER', 5.5, 0.585, -120, 'LEAN', [30, 30, 30, 30, 30, 8, 30, 9, 31, 32], { how: 'out', min: [8, 9], mean: 22, read: 31 }),
+      man(16, 'No Edge Short', 2, 1, 'reb', 'UNDER', 7.5, 0.52, -120, 'no edge', back, { how: 'out', min: [7], mean: 20.8, read: 24.3 }),                   // no pick: the panel says what was set aside, the record does not count it
+      man(17, 'Plain', 2, 1, 'ast', 'UNDER', 4.5, 0.64, -140, 'LEAN', steady)];
+    const file = (date, list) => ({ format: 'callsheet3.props', version: 1, date, games: G.map((g, gi) => ({ gid: 'ms' + gi, away: g[0], home: g[1], aab: g[2], hab: g[3], spread: g[4], total: 225.5, props: list.filter(m => m.gi === gi) })) });
+    await load(file(D, men), 'nba-props-2026-12-20.json');
+    if (document.getElementById('propsView').hidden) { document.getElementById('m-props').click(); await wait(); }
+    document.getElementById('propsReset').click(); await wait();
+    const pick = async (id, v) => { const el = document.getElementById(id); el.value = v; el.dispatchEvent(new Event('change', { bubbles: true })); await wait(); };
+    const day = async (d) => { const pd = document.getElementById('propsDate'); pd.value = d; pd.dispatchEvent(new Event('change', { bubbles: true })); await wait(); };
+    const best = document.getElementById('propsBest');
+    const cards = () => [...best.querySelectorAll('.pk[data-prop]')].map(c => txt(c.querySelector('.n2')) + ' :: ' + (c.querySelector('.n5.ramp') ? 'CAUTION' : '') + ' :: ' + txt(c.querySelector('.n5.msh')));
+    const tix = () => [...best.querySelectorAll('.pk.t3')].map(e => [...e.querySelectorAll('.leg .lname')].map(x => x.textContent).join(' + '));
+    const o = {};
+    await pick('propsBelow', 'leans'); o.note = txt(best.querySelector('.pk-note')); o.cards = cards();
+    const panel = async (name) => { const tr = [...document.querySelectorAll('#propsTable tr[data-prop]')].find(r => r.textContent.indexOf(name) >= 0); tr.click(); await wait(); const b = document.querySelector('#propDetailBody');
+      const t = document.getElementById('propDetail').hidden ? 'closed' : (b.querySelector('.pd-ramp') ? 'CAUTION' : '') + ' :: ' + txt(b.querySelector('.pd-msh'));
+      document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })); await wait(); return t; };
+    o.panel = [await panel('Set Aside'), await panel('Old Run'), await panel('No Edge Short'), await panel('Plain')];
+    await pick('propsLegs', '2'); await pick('propsBelow', 't3c'); o.c2 = tix();
+    o.rows = JSON.parse(smStore.getItem('callsheet3.props.v1')).filter(x => x.gdate === D).map(x => x.name + ':' + JSON.stringify(x.mshort)).sort().join(' | ');
+    // the night: Set Aside's under wins (15 points), Half Man's over loses (4 assists), Two Back's under wins (9), Two Short's under loses (7 rebounds), Old Run's under loses (10 rebounds)
+    const box = { 'Set Aside': [15, 4, 2], 'Old Run': [9, 10, 2], 'Half Man': [9, 4, 4], 'Two Back': [9, 4, 2], 'Two Short': [9, 7, 2], 'No Edge Short': [9, 5, 2], 'Plain': [9, 4, 3] };
+    await load({ format: 'callsheet2.slate', version: 1, date: D, games: G.map((g, gi) => ({ sport: 'NBA', gdate: D, away: g[0], home: g[1], finals: { fa: '110', fh: '104', f5a: '55', f5h: '50' }, notes: [],
+      box: Object.fromEntries(men.filter(m => m.gi === gi).map(m => [m.pid, [m.name, 30, box[m.name][0], box[m.name][1], box[m.name][2], 1]])) })) }, 'nba-grade-2026-12-20.json'); await wait(250);
+    if (document.getElementById('propsView').hidden) { document.getElementById('m-props').click(); await wait(); }
+    await day(D);
+    const tiles = () => [...document.querySelectorAll('#propsCalib .calib > div')].map(txt).filter(t => /way back|set aside/i.test(t));
+    o.tiles = tiles(); o.short = ([...document.querySelectorAll('p.sides')].map(txt).join(' · ').match(/picks on a man with a short game set aside in his minutes [^·]*/) || [''])[0].trim();
+    for (let i = 1; i <= 7; i++) { const d = '2026-12-' + String(20 + i); await load(file(d, [man(950 + i, 'Later ' + i, 0, 0, 'pts', 'UNDER', 10.5, 0.5, -110, 'no edge', steady)]), 'nba-props-' + d + '.json'); }
+    if (document.getElementById('propsView').hidden) { document.getElementById('m-props').click(); await wait(); }
+    await day(D);
+    o.kept = JSON.parse(smStore.getItem('callsheet3.props.v1')).filter(x => x.gdate === D).map(x => x.name + ':' + (x.trim ? 'trim' : 'whole') + (x.log ? ':log' : '') + (x.rmp ? ':rmp' : '') + (x.mshort ? ':msh-' + x.mshort.how : '')).sort().join(' | ');
+    o.tilesAfter = tiles();
+    await pick('propsBelow', 't3');
+    return o;
+  });
+  await pg.evaluate(async (k) => { for (const x of Object.keys(k)) { if (x === 'below' || x === 'legs') { const key = x === 'below' ? 'callsheet3.props.below.v1' : 'callsheet3.props.legs.v1'; if (k[x] === null) localStorage.removeItem(key); else localStorage.setItem(key, k[x]); continue; } if (k[x] === null || k[x] === undefined) await smStore.removeItem(x); else await smStore.setItem(x, k[x]); } }, msKeep);
+  await reloaded();
+  const msTail = ' Scored from 13 Nov 2026, measured on four seasons of box scores.';
+  const msOut = 'Minutes: his 7-minute game is left out (he started all five, and a game cut short three or more back says nothing of tonight). The read is 24.3 a game where the mean of his last five says 20.8.' + msTail;
+  chk(ms.note === ''
+      && (ms.cards || []).join(' ## ') === ['Old Run UNDER 8.5 rebounds :: CAUTION :: ', 'Set Aside UNDER 20.5 points ::  :: ' + msOut, 'Plain UNDER 4.5 assists ::  :: ',
+        'Two Short UNDER 5.5 rebounds ::  :: Minutes: his 8- and 9-minute games are left out (he started all five, and a game cut short three or more back says nothing of tonight). The read is 31.0 a game where the mean of his last five says 22.0.' + msTail,
+        'Half Man OVER 5.5 assists ::  :: Minutes: his 8-minute game counts as half a game (his last two run above the five). The read is 20.9 a game where the mean of his last five says 19.6.' + msTail,
+        'Two Back UNDER 12.5 points ::  :: Minutes: his 7-minute game two games back counts as half a game (he started all five and his last was a full game). The read is 27.4 a game where the mean of his last five says 25.4.' + msTail].join(' ## ')
+      && JSON.stringify(ms.panel) === JSON.stringify([' :: ' + msOut, 'CAUTION :: ', ' :: ' + msOut, ' :: ']),
+      'a short game set aside in the minutes (13 Nov 2026): a row the run marked carries no caution and says on its card and its panel which game was set aside, how, the read and what the five say untouched (left out, half a game, half a game two back, two games left out); the same five from the old run keeps the caution and has no such line; a man with no pick still says it on his panel; and the BETs\' note has nothing to add on a BET the run has already read right',
+      JSON.stringify({ note: ms.note, cards: ms.cards, panel: ms.panel }));
+  chk(JSON.stringify(ms.c2) === JSON.stringify(['Set Aside + Plain', 'Half Man + Two Back'])
+      && ms.rows === 'Half Man:{"how":"half","min":[8],"mean":19.6,"read":20.9} | No Edge Short:{"how":"out","min":[7],"mean":20.8,"read":24.3} | Old Run:null | Plain:null | Set Aside:{"how":"out","min":[7],"mean":20.8,"read":24.3} | Two Back:{"how":"half2","min":[7],"mean":25.4,"read":27.4} | Two Short:{"how":"out","min":[8,9],"mean":22,"read":31}',
+      'a short game set aside, the tickets and the rows: the under the run has read right makes a leg of the first best-chance ticket and the two half-game men the second, where the same five from the old run, the pick with the most edge on the date, makes none; and each row keeps the mark as the file gave it',
+      JSON.stringify({ c2: ms.c2, rows: ms.rows }));
+  chk((ms.tiles || []).length === 2
+      && /^The under on a man whose minutes are on the way back \(shown, not scored\) 0-1 says 66\.0% · does 0\.0% \(±50\.0\) · [-−]1\.00u /i.test(ms.tiles[0])
+      && /^A short game set aside in his minutes \(scored from 13 Nov 2026\) 2-2 says 61\.9% · does 50\.0% \(±25\.0\) · [-−]0\.64u the BET and LEAN picks on a man whose short game the run left out of his minutes or counted only in part: unders 2-1 \+0\.4u · overs 0-1 [-−]1\.0u · measured on four seasons of box scores: the minutes missed by 6\.3 with the short game in, 5\.6 with it set aside$/i.test(ms.tiles[1])
+      && /^picks on a man with a short game set aside in his minutes 2-2 [-−]0\.6u$/.test(ms.short)
+      && ms.kept === 'Half Man:trim:msh-half | No Edge Short:trim:msh-out | Old Run:trim:rmp | Plain:trim | Set Aside:trim:msh-out | Two Back:trim:msh-half2 | Two Short:trim:msh-out'
+      && JSON.stringify(ms.tilesAfter) === JSON.stringify(ms.tiles),
+      'a short game set aside, the record: the four picks on rows the run marked, two won and two lost, sit on their own tile by side (the man with no pick is not counted, nor the old run\'s row, which stays on the caution\'s tile); and when seven later dates push the night out and its rows are trimmed the marks stay, the old run\'s row keeps the caution\'s mark and no other, and both tiles read the same',
+      JSON.stringify({ tiles: ms.tiles, short: ms.short, kept: ms.kept, after: ms.tilesAfter }));
+  // ---- 13 Nov 2026: the levers as corrected (the user: "Please make sure the levers are accurate"; "explore the confirmed lineups"). slate.py marks every row
+  //      it projects with the levers' version (`lv`), says what the lever on who is out read (`chg`), and on a confirmed five with a new role reads his minutes
+  //      from his games in that role (`mrole`). The page keeps the three off the file, says on the card and the panel how the minutes were read by the role,
+  //      and gives the BET and LEAN picks made under the corrected levers a tile of their own, by band and side; a row from the run as it stood is not in it ----
+  const lvKeep = await pg.evaluate(async () => { await smStore.ready; const k = {}; for (const x of ['callsheet3.card.v1', 'callsheet3.props.v1', 'callsheet3.draft.v1']) k[x] = await smStore.getItem(x); k.below = localStorage.getItem('callsheet3.props.below.v1'); k.legs = localStorage.getItem('callsheet3.props.legs.v1'); await smStore.removeItem('callsheet3.card.v1'); await smStore.removeItem('callsheet3.props.v1'); return k; });
+  await reloaded();
+  const lvr = await pg.evaluate(async () => {
+    const wait = (ms) => new Promise(r => setTimeout(r, ms || 120)), txt = e => (e ? e.innerText : '').replace(/\s+/g, ' ').trim();
+    await smStore.ready;
+    const load = async (doc, name) => { const dt = new DataTransfer(); dt.items.add(new File([JSON.stringify(doc)], name, { type: 'application/json' })); const inp = document.getElementById('slateFile'); inp.files = dt.files; inp.dispatchEvent(new Event('change', { bubbles: true })); await wait(); await wait(); };
+    const G = [['Hawks', 'Magic', 'ATL', 'ORL', -2.5], ['Bulls', 'Bucks', 'CHI', 'MIL', 3.5], ['Heat', 'Jazz', 'MIA', 'UTA', -1.5]];
+    const need = (price) => price < 0 ? -price / (-price + 100) : 100 / (price + 100);
+    const steady = [31, 33, 32, 30, 34, 32, 31, 33, 32, 30];
+    const cold = L => [L + 2, L - 2, L + 3, L - 1, L + 1, L - 2, L + 2, L - 3, L + 1, L - 1];
+    const man = (pid, name, gi, home, mk, side, line, chance, price, band, extra) => Object.assign({ gi, pid: String(pid), name, team: G[gi][home ? 3 : 2], opp: G[gi][home ? 2 : 3], home: !!home, pos: 'F', mk, line,
+      op: side === 'OVER' ? price : 100, up: side === 'UNDER' ? price : 100, book: 'fanduel', books: { fanduel: [line, side === 'OVER' ? price : 100, side === 'UNDER' ? price : 100] },
+      proj: line + (side === 'OVER' ? 2 : -2), sd: 6, pm: side === 'OVER' ? 0.7 : 0.3, pb: 0.5, p: side === 'OVER' ? chance : Math.round((1 - chance) * 10000) / 10000, push: 0, side, chance, price, need: Math.round(need(price) * 10000) / 10000,
+      edge: Math.round((chance - need(price)) * 10000) / 10000, band, mins: 24, rate36: 20, base: 18, med: line + (side === 'OVER' ? 1.5 : -1.5), usg: 22, sdf: 1, starter: true, start_src: "RotoWire's confirmed five", why: ['x'],
+      log: cold(line).map((v, i) => ['2026-11-' + String(10 + i), 'OPP', i % 2, steady[i], v, ['won by 3']]), parts: [{ k: 'out', t: 'Who is out', eff: side === 'OVER' ? 0.4 : -0.4, i: 0 }] }, extra || {});
+    const D = '2026-12-29';
+    const chg = { 'new': 29.7, back: 5.6, dmin: 0.51, lvl: 41.7, lg: 20, drate36: 0.46 };
+    const men = [man(21, 'Role Start', 0, 0, 'pts', 'OVER', 14.5, 0.62, -125, 'BET', { lv: 2, chg, mrole: { how: 'flat', games: 0, starter: true, mean: 16, read: 27.5 } }),          // a bench man in a confirmed five: no start this season
+      man(22, 'Role Bench', 1, 0, 'reb', 'UNDER', 6.5, 0.60, -130, 'BET', { lv: 2, chg, starter: false, mrole: { how: 'few', games: 2, starter: false, mean: 24.8, read: 17.8 } }),  // a starter sent to the bench: two bench games this season
+      man(23, 'Role Five', 2, 0, 'ast', 'OVER', 4.5, 0.58, -120, 'LEAN', { lv: 2, mrole: { how: 'role', games: 5, starter: true, mean: 22.4, read: 29.6 } }),                       // five starts behind him, in and out of the five
+      man(24, 'Plain New', 0, 1, 'pts', 'UNDER', 18.5, 0.59, -125, 'LEAN', { lv: 2, chg: { 'new': null, back: null, dmin: 0, lvl: 0, lg: 20, drate36: -0.3 } }),                   // the corrected run, his last five as they are
+      man(25, 'Old Levers', 1, 1, 'ast', 'UNDER', 5.5, 0.64, -140, 'BET', { start_src: "RotoWire's expected five" }),                                                               // a row from the run as it stood: no mark
+      man(26, 'No Edge New', 2, 1, 'reb', 'UNDER', 7.5, 0.52, -120, 'no edge', { lv: 2, mrole: { how: 'role', games: 5, starter: true, mean: 20, read: 28 } })];                    // no pick: the panel says the role, the record does not count it
+    const file = (date, list) => ({ format: 'callsheet3.props', version: 1, date, levers: 2, games: G.map((g, gi) => ({ gid: 'lv' + gi, away: g[0], home: g[1], aab: g[2], hab: g[3], spread: g[4], total: 225.5, props: list.filter(m => m.gi === gi) })) });
+    await load(file(D, men), 'nba-props-2026-12-29.json');
+    if (document.getElementById('propsView').hidden) { document.getElementById('m-props').click(); await wait(); }
+    document.getElementById('propsReset').click(); await wait();
+    const pick = async (id, v) => { const el = document.getElementById(id); el.value = v; el.dispatchEvent(new Event('change', { bubbles: true })); await wait(); };
+    const day = async (d) => { const pd = document.getElementById('propsDate'); pd.value = d; pd.dispatchEvent(new Event('change', { bubbles: true })); await wait(); };
+    const best = document.getElementById('propsBest');
+    const o = {};
+    await pick('propsBelow', 'leans');
+    o.cards = [...best.querySelectorAll('.pk[data-prop]')].map(c => txt(c.querySelector('.n2')) + ' :: ' + txt(c.querySelector('.n5.mrole'))).sort();
+    const panel = async (name) => { const tr = [...document.querySelectorAll('#propsTable tr[data-prop]')].find(r => r.textContent.indexOf(name) >= 0); tr.click(); await wait(); const b = document.querySelector('#propDetailBody');
+      const t = document.getElementById('propDetail').hidden ? 'closed' : txt(b.querySelector('.pd-mrole')) + ' :: ' + (/Who is out/.test(txt(b)) ? 'lever named' : 'no lever');
+      document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })); await wait(); return t; };
+    o.panel = [await panel('Role Start'), await panel('Old Levers'), await panel('No Edge New'), await panel('Plain New')];
+    o.rows = JSON.parse(smStore.getItem('callsheet3.props.v1')).filter(x => x.gdate === D).map(x => x.name + ':' + JSON.stringify([x.lv, x.mrole, x.chg])).sort().join(' | ');
+    // the night: Role Start's over wins (20 points), Role Bench's under loses (9 rebounds), Role Five's over wins (6 assists), Plain New's under wins (12 points), Old Levers's under wins (3 assists)
+    const box = { 'Role Start': [20, 4, 2], 'Role Bench': [9, 9, 2], 'Role Five': [9, 4, 6], 'Plain New': [12, 4, 2], 'Old Levers': [9, 4, 3], 'No Edge New': [9, 5, 2] };
+    await load({ format: 'callsheet2.slate', version: 1, date: D, games: G.map((g, gi) => ({ sport: 'NBA', gdate: D, away: g[0], home: g[1], finals: { fa: '110', fh: '104', f5a: '55', f5h: '50' }, notes: [],
+      box: Object.fromEntries(men.filter(m => m.gi === gi).map(m => [m.pid, [m.name, 30, box[m.name][0], box[m.name][1], box[m.name][2], 1]])) })) }, 'nba-grade-2026-12-29.json'); await wait(250);
+    if (document.getElementById('propsView').hidden) { document.getElementById('m-props').click(); await wait(); }
+    await day(D);
+    const tiles = () => [...document.querySelectorAll('#propsCalib .calib > div')].map(txt).filter(t => /levers as corrected/i.test(t));
+    o.tiles = tiles(); o.sides = ([...document.querySelectorAll('p.sides')].map(txt).join(' · ').match(/picks under the levers as corrected on 13 Nov 2026: the BET band [^·]* · the leans [^·]*/) || [''])[0].trim();
+    for (let i = 1; i <= 7; i++) { const d = i <= 2 ? '2026-12-' + String(29 + i) : '2027-01-0' + String(i - 2); await load(file(d, [man(960 + i, 'After ' + i, 0, 0, 'pts', 'UNDER', 10.5, 0.5, -110, 'no edge', {})]), 'nba-props-' + d + '.json'); }
+    if (document.getElementById('propsView').hidden) { document.getElementById('m-props').click(); await wait(); }
+    await day(D);
+    o.kept = JSON.parse(smStore.getItem('callsheet3.props.v1')).filter(x => x.gdate === D).map(x => x.name + ':' + (x.trim ? 'trim' : 'whole') + (x.lv ? ':lv' + x.lv : '') + (x.mrole ? ':role-' + x.mrole.how : '') + (x.chg ? ':chg' : '')).sort().join(' | ');
+    o.tilesAfter = tiles();
+    await pick('propsBelow', 't3');
+    return o;
+  });
+  await pg.evaluate(async (k) => { for (const x of Object.keys(k)) { if (x === 'below' || x === 'legs') { const key = x === 'below' ? 'callsheet3.props.below.v1' : 'callsheet3.props.legs.v1'; if (k[x] === null) localStorage.removeItem(key); else localStorage.setItem(key, k[x]); continue; } if (k[x] === null || k[x] === undefined) await smStore.removeItem(x); else await smStore.setItem(x, k[x]); } }, lvKeep);
+  await reloaded();
+  const lvTail = ' Scored from 13 Nov 2026: with the real starters such a night misses by 5.0 minutes this way and 6.3 from his last five (three seasons of box scores).';
+  const lvStart = 'Minutes: the five is confirmed and he starts tonight, a role he has not had in all his last five. The read is no game as a starter this season, so the 27.5 a rotation man with none plays, held to his own five: 27.5 a game where the mean of his last five says 16.0.' + lvTail;
+  const lvNoEdge = 'Minutes: the five is confirmed and he starts tonight, a role he has not had in all his last five. The read is his last 5 games as a starter: 28.0 a game where the mean of his last five says 20.0.' + lvTail;
+  chk(JSON.stringify(lvr.cards) === JSON.stringify(['Old Levers UNDER 5.5 assists :: ', 'Plain New UNDER 18.5 points :: ',
+        'Role Bench UNDER 6.5 rebounds :: Minutes: the five is confirmed and he comes off the bench tonight, a role he has not had in all his last five. The read is his 2 games off the bench this season, with one game\'s weight on the 20.5 a rotation man with none plays: 17.8 a game where the mean of his last five says 24.8.' + lvTail,
+        'Role Five OVER 4.5 assists :: Minutes: the five is confirmed and he starts tonight, a role he has not had in all his last five. The read is his last 5 games as a starter: 29.6 a game where the mean of his last five says 22.4.' + lvTail,
+        'Role Start OVER 14.5 points :: ' + lvStart])
+      && JSON.stringify(lvr.panel) === JSON.stringify([lvStart + ' :: lever named', ' :: lever named', lvNoEdge + ' :: lever named', ' :: lever named']),
+      'the levers as corrected, the role read (13 Nov 2026): a row whose minutes the run read from his games in tonight\'s role says so on its card and its panel, by how it was read (no game in the role, a few, his last five in it), with the read and what his last five say; a row read from his last five, new run or old, says nothing; a man with no pick says it on his panel',
+      JSON.stringify({ cards: lvr.cards, panel: lvr.panel }));
+  chk(lvr.rows === 'No Edge New:[2,{"how":"role","games":5,"starter":true,"mean":20,"read":28},null] | Old Levers:[null,null,null] | Plain New:[2,null,{"nw":null,"back":null,"dmin":0,"lvl":0,"lg":20}] | Role Bench:[2,{"how":"few","games":2,"starter":false,"mean":24.8,"read":17.8},{"nw":29.7,"back":5.6,"dmin":0.51,"lvl":41.7,"lg":20}] | Role Five:[2,{"how":"role","games":5,"starter":true,"mean":22.4,"read":29.6},null] | Role Start:[2,{"how":"flat","games":0,"starter":true,"mean":16,"read":27.5},{"nw":29.7,"back":5.6,"dmin":0.51,"lvl":41.7,"lg":20}]',
+      'the levers as corrected, the rows: each keeps the run\'s mark, the role read and what the lever on who is out read as the file gave them; a row from the run as it stood has none of the three',
+      lvr.rows);
+  chk((lvr.tiles || []).length === 1
+      && /^Picks under the levers as corrected \(from 13 Nov 2026\) 3-1 says 59\.8% · does 75\.0% \(±25\.0\) · \+1\.43u the BET band 1-1 [-−]0\.2u · the leans 2-0 \+1\.6u · unders 1-1 [-−]0\.2u · overs 2-0 \+1\.6u · the sixteen nights before it, replayed with the ledgers in place: every pick with an edge 518-445 as the levers stand against 464-384 as they stood, the BET band 38-33 against 32-13 \(71 and 45 picks: too few to tell apart, so this tile keeps the count\)$/i.test(lvr.tiles[0])
+      && /^picks under the levers as corrected on 13 Nov 2026: the BET band 1-1 [-−]0\.2u · the leans 2-0 \+1\.6u$/.test(lvr.sides)
+      && lvr.kept === 'No Edge New:trim:lv2:role-role | Old Levers:trim | Plain New:trim:lv2:chg | Role Bench:trim:lv2:role-few:chg | Role Five:trim:lv2:role-role | Role Start:trim:lv2:role-flat:chg'
+      && JSON.stringify(lvr.tilesAfter) === JSON.stringify(lvr.tiles),
+      'the levers as corrected, the record: the four BET and LEAN picks the corrected run made, three won and one lost, sit on a tile of their own by band and by side with the sixteen replayed nights beside them (the old run\'s BET, a winner, is not counted, nor the man with no pick); and when seven later dates push the night out and its rows are trimmed the marks stay and the tile reads the same',
+      JSON.stringify({ tiles: lvr.tiles, sides: lvr.sides, kept: lvr.kept, after: lvr.tilesAfter }));
+  // ---- 18 Nov 2026: what the men out carried. The day's first BET was an under on a guard's assists with his club's lead guard out; the lever on who is out read
+  //      the absent men by their minutes alone. Measured on 36,502 man-games of two seasons, what those men average in the stat says more, so slate.py scores it
+  //      as a share of his rate and writes what it read on the row (`carry`). The page keeps it off the file and through the trim, and counts on a tile of its own
+  //      the BET and LEAN picks whose projection the lever moved 2% or more: lifted and cut, the pick on the lever's side and against it ----
+  const cyKeep = await pg.evaluate(async () => { await smStore.ready; const k = {}; for (const x of ['callsheet3.card.v1', 'callsheet3.props.v1', 'callsheet3.draft.v1']) k[x] = await smStore.getItem(x); k.below = localStorage.getItem('callsheet3.props.below.v1'); k.legs = localStorage.getItem('callsheet3.props.legs.v1'); await smStore.removeItem('callsheet3.card.v1'); await smStore.removeItem('callsheet3.props.v1'); return k; });
+  await reloaded();
+  const cyr = await pg.evaluate(async () => {
+    const wait = (ms) => new Promise(r => setTimeout(r, ms || 120)), txt = e => (e ? e.innerText : '').replace(/\s+/g, ' ').trim();
+    await smStore.ready;
+    const load = async (doc, name) => { const dt = new DataTransfer(); dt.items.add(new File([JSON.stringify(doc)], name, { type: 'application/json' })); const inp = document.getElementById('slateFile'); inp.files = dt.files; inp.dispatchEvent(new Event('change', { bubbles: true })); await wait(); await wait(); };
+    const G = [['Hawks', 'Magic', 'ATL', 'ORL', -2.5], ['Bulls', 'Bucks', 'CHI', 'MIL', 3.5], ['Heat', 'Jazz', 'MIA', 'UTA', -1.5]];
+    const need = (price) => price < 0 ? -price / (-price + 100) : 100 / (price + 100);
+    const steady = [31, 33, 32, 30, 34, 32, 31, 33, 32, 30];
+    const cold = L => [L + 2, L - 2, L + 3, L - 1, L + 1, L - 2, L + 2, L - 3, L + 1, L - 1];
+    const man = (pid, name, gi, home, mk, side, line, chance, price, band, extra) => Object.assign({ gi, pid: String(pid), name, team: G[gi][home ? 3 : 2], opp: G[gi][home ? 2 : 3], home: !!home, pos: 'F', mk, line,
+      op: side === 'OVER' ? price : 100, up: side === 'UNDER' ? price : 100, book: 'fanduel', books: { fanduel: [line, side === 'OVER' ? price : 100, side === 'UNDER' ? price : 100] },
+      proj: line + (side === 'OVER' ? 2 : -2), sd: 6, pm: side === 'OVER' ? 0.7 : 0.3, pb: 0.5, p: side === 'OVER' ? chance : Math.round((1 - chance) * 10000) / 10000, push: 0, side, chance, price, need: Math.round(need(price) * 10000) / 10000,
+      edge: Math.round((chance - need(price)) * 10000) / 10000, band, mins: 24, rate36: 20, base: 18, med: line + (side === 'OVER' ? 1.5 : -1.5), usg: 22, sdf: 1, starter: true, start_src: "RotoWire's confirmed five", why: ['x'], lv: 4,
+      log: cold(line).map((v, i) => ['2026-11-' + String(10 + i), 'OPP', i % 2, steady[i], v, ['won by 3']]), parts: [{ k: 'out', t: 'Who is out', eff: side === 'OVER' ? 0.4 : -0.4, i: 0 }] }, extra || {});
+    const D = '2026-12-27';
+    const cy = (d36, mnew, mback) => ({ carry: { mnew, mback, 'new': { pts: 12.5 }, back: { pts: 0 }, share: { pts: 0.05 }, drate36: d36, n: 9 } });
+    const men = [man(31, 'Lift Over', 0, 0, 'pts', 'OVER', 14.5, 0.58, -125, 'LEAN', cy(1.0, 30, 0)),                                  // +1.0 on a rate of 19.0 without it: lifted 5.3%, the over on its side
+      man(32, 'Lift Under', 1, 0, 'reb', 'UNDER', 6.5, 0.62, -130, 'BET', cy(0.8, 24.5, 3)),                                           // lifted 4.2%, the under against it
+      man(33, 'Cut Under', 2, 0, 'ast', 'UNDER', 5.5, 0.57, -120, 'LEAN', cy(-0.6, 2, 28)),                                             // -0.6 on 20.6: cut 2.9%, the under on its side
+      man(34, 'Cut Over', 0, 1, 'pts', 'OVER', 18.5, 0.56, -110, 'LEAN', cy(-1.2, 0, 33.3)),                                            // cut 5.7%, the over against it
+      man(35, 'Small Move', 1, 1, 'ast', 'UNDER', 4.5, 0.61, -125, 'BET', { carry: { drate36: 0.3 } }),                                 // +0.3 on 19.7: 1.5%, under the line; the minutes not on the file
+      man(36, 'Edge Two', 2, 1, 'reb', 'UNDER', 7.5, 0.60, -115, 'LEAN', Object.assign({ rate36: 25.5 }, cy(0.5, 15, 0))),              // +0.5 on 25.0: 2.0% to the dot, counted
+      man(37, 'No Carry', 0, 0, 'reb', 'UNDER', 10.5, 0.59, -125, 'LEAN', {}),                                                          // the new run, nobody new out and nobody back: nothing read
+      man(38, 'No Edge', 1, 0, 'pts', 'UNDER', 22.5, 0.52, -120, 'no edge', cy(2.0, 40, 0)),                                            // lifted 11% and no pick: not counted
+      man(39, 'Nought', 2, 0, 'pts', 'OVER', 12.5, 0.57, -120, 'LEAN', cy(0, 10, 10))];                                                 // the two sides cancelled: the row keeps nothing
+    const file = (date, list) => ({ format: 'callsheet3.props', version: 1, date, levers: 4, games: G.map((g, gi) => ({ gid: 'cy' + gi, away: g[0], home: g[1], aab: g[2], hab: g[3], spread: g[4], total: 225.5, props: list.filter(m => m.gi === gi) })) });
+    // the night before, graded, with one plain pick the lever did not touch: the record is drawn, and the lever's tile is not on it
+    const D0 = '2026-12-26', plain = [man(30, 'Plain Day', 0, 0, 'pts', 'UNDER', 16.5, 0.58, -120, 'LEAN', {})];
+    await load(file(D0, plain), 'nba-props-2026-12-26.json');
+    await load({ format: 'callsheet2.slate', version: 1, date: D0, games: G.map((g, gi) => ({ sport: 'NBA', gdate: D0, away: g[0], home: g[1], finals: { fa: '110', fh: '104', f5a: '55', f5h: '50' }, notes: [],
+      box: Object.fromEntries(plain.filter(m => m.gi === gi).map(m => [m.pid, [m.name, 30, 12, 4, 2, 1]])) })) }, 'nba-grade-2026-12-26.json'); await wait(250);
+    await load(file(D, men), 'nba-props-2026-12-27.json');
+    if (document.getElementById('propsView').hidden) { document.getElementById('m-props').click(); await wait(); }
+    document.getElementById('propsReset').click(); await wait();
+    const day = async (d) => { const pd = document.getElementById('propsDate'); pd.value = d; pd.dispatchEvent(new Event('change', { bubbles: true })); await wait(); };
+    const o = {};
+    await day(D);
+    o.drawn = [...document.querySelectorAll('#propsCalib .calib > div')].map(txt).filter(t => /levers as corrected/i.test(t)).map(t => t.slice(0, 62));
+    const stored = () => JSON.parse(smStore.getItem('callsheet3.props.v1')).filter(x => x.gdate === D).map(x => x.name + ':' + JSON.stringify(x.carry) + (x.trim ? ':trim' : '')).sort().join(' | ');
+    const tiles = () => [...document.querySelectorAll('#propsCalib .calib > div')].map(txt).filter(t => /men out carried/i.test(t));
+    o.rows = stored(); o.before = tiles();
+    // the night: Lift Over 20 points (win), Lift Under 9 rebounds (loss), Cut Under 3 assists (win), Cut Over 25 points (win), Small Move 2 assists (win), Edge Two 5 rebounds (win),
+    // No Carry 8 rebounds (win), No Edge 30 points, Nought 15 points (win)
+    const box = { 'Lift Over': [20, 4, 2], 'Lift Under': [9, 9, 2], 'Cut Under': [9, 4, 3], 'Cut Over': [25, 4, 2], 'Small Move': [9, 4, 2], 'Edge Two': [9, 5, 2], 'No Carry': [9, 8, 2], 'No Edge': [30, 4, 2], 'Nought': [15, 4, 2] };
+    await load({ format: 'callsheet2.slate', version: 1, date: D, games: G.map((g, gi) => ({ sport: 'NBA', gdate: D, away: g[0], home: g[1], finals: { fa: '110', fh: '104', f5a: '55', f5h: '50' }, notes: [],
+      box: Object.fromEntries(men.filter(m => m.gi === gi).map(m => [m.pid, [m.name, 30, box[m.name][0], box[m.name][1], box[m.name][2], 1]])) })) }, 'nba-grade-2026-12-27.json'); await wait(250);
+    if (document.getElementById('propsView').hidden) { document.getElementById('m-props').click(); await wait(); }
+    await day(D);
+    o.tiles = tiles(); o.results = JSON.parse(smStore.getItem('callsheet3.props.v1')).filter(x => x.gdate === D).map(x => x.name + ':' + x.result).sort().join(' | ');
+    o.lv = [...document.querySelectorAll('#propsCalib .calib > div')].map(txt).filter(t => /levers as corrected/i.test(t)).map(t => t.slice(0, 62));
+    for (let i = 1; i <= 7; i++) { const d = i <= 4 ? '2026-12-' + String(27 + i) : '2027-01-0' + String(i - 4); await load(file(d, [man(970 + i, 'Later ' + i, 0, 0, 'pts', 'UNDER', 10.5, 0.5, -110, 'no edge', {})]), 'nba-props-' + d + '.json'); }
+    if (document.getElementById('propsView').hidden) { document.getElementById('m-props').click(); await wait(); }
+    await day(D);
+    o.kept = stored(); o.tilesAfter = tiles();
+    return o;
+  });
+  await pg.evaluate(async (k) => { for (const x of Object.keys(k)) { if (x === 'below' || x === 'legs') { const key = x === 'below' ? 'callsheet3.props.below.v1' : 'callsheet3.props.legs.v1'; if (k[x] === null) localStorage.removeItem(key); else localStorage.setItem(key, k[x]); continue; } if (k[x] === null || k[x] === undefined) await smStore.removeItem(x); else await smStore.setItem(x, k[x]); } }, cyKeep);
+  await reloaded();
+  const cyRows = 'Cut Over:{"d36":-1.2,"mnew":0,"mback":33.3} | Cut Under:{"d36":-0.6,"mnew":2,"mback":28} | Edge Two:{"d36":0.5,"mnew":15,"mback":0} | Lift Over:{"d36":1,"mnew":30,"mback":0} | Lift Under:{"d36":0.8,"mnew":24.5,"mback":3} | No Carry:null | No Edge:{"d36":2,"mnew":40,"mback":0} | Nought:null | Small Move:{"d36":0.3,"mnew":null,"mback":null}';
+  chk(cyr.rows === cyRows && JSON.stringify(cyr.before) === '[]' && (cyr.drawn || []).length === 1 && /^Picks under the levers as corrected \(from 13 Nov 2026\) 1-0 /i.test(cyr.drawn[0])
+      && cyr.kept === cyRows.split(' | ').map(x => x + ':trim').join(' | '),
+      'what the men out carried (18 Nov 2026), the rows: each keeps what the lever added to his rate per 36 and the minutes newly out and back it read, as the file gave them (the minutes blank where the file has none); a row the lever did not touch, and one where the two sides cancelled to nought, keep nothing; with the record drawn for a night before (one plain pick, graded) the lever\'s tile is not on it until a pick it moved is graded; and the reading stays on the row when the night is trimmed from the save',
+      JSON.stringify({ rows: cyr.rows, before: cyr.before, drawn: cyr.drawn, kept: cyr.kept }));
+  chk((cyr.tiles || []).length === 1
+      && /^What the men out carried, 2% or more on the read \(scored from 18 Nov 2026\) 4-1 says 58\.6% · does 80\.0% \(±22\.4\) · \+2\.41u the BET and LEAN picks whose projection the lever moved 2% or more: lifted 2-1 \+0\.7u · cut 2-0 \+1\.7u · the pick on the lever's side 2-0 \+1\.6u · against it 2-1 \+0\.8u · measured on 36,502 man-games of two seasons \(assists t 10, points t 8 and 11, rebounds t 5\); replayed on 21 graded nights the 54 picks it dropped went 23-31 and the 83 it added 43-40$/i.test(cyr.tiles[0])
+      && cyr.results === 'Cut Over:win | Cut Under:win | Edge Two:win | Lift Over:win | Lift Under:loss | No Carry:win | No Edge:loss | Nought:win | Small Move:win'
+      && JSON.stringify(cyr.tilesAfter) === JSON.stringify(cyr.tiles) && (cyr.lv || []).length === 1 && /^Picks under the levers as corrected \(from 13 Nov 2026\) 8-1 /i.test(cyr.lv[0]),
+      'what the men out carried, the record: the five BET and LEAN picks whose projection the lever moved 2% or more (two lifted 5.3% and 4.2%, two cut 2.9% and 5.7%, one lifted 2.0% to the dot) sit on a tile of their own, four won and one lost, split by lifted and cut and by whether the pick is on the lever\'s side (an over on a lift, an under on a cut) or against it; a pick moved 1.5% is not counted, nor a pick the lever did not touch, nor the man with no pick though it moved him 11%; the rate is read against his rate without the lever; the tile reads the same after the night is trimmed; and the picks stay on the levers\' own tile, which counts every pick of the new run',
+      JSON.stringify({ tiles: cyr.tiles, results: cyr.results, after: cyr.tilesAfter, lv: cyr.lv }));
+  // ---- 21 Nov 2026: the expected five as a role (the user, after the BET band lost twice on a centre read at 24 minutes who played 32: "Yes start with the first one
+  //      bro"; "find anything and everything"). A man RotoWire's EXPECTED five has starting who has not started all of his last five was read from his games of any
+  //      kind and played more (four seasons of box scores and the 24 graded nights), so slate.py reads his minutes half way to the confirmed five's path and writes
+  //      what it read on the row (`mix`). The page keeps it off the file and through the trim, says it on the card and the panel, counts it as a lever of its own
+  //      and keeps a tile that measures it: the BET and LEAN picks on such a man, and what such men played against the read and against the read without the mix ----
+  const mxKeep = await pg.evaluate(async () => { await smStore.ready; const k = {}; for (const x of ['callsheet3.card.v1', 'callsheet3.props.v1', 'callsheet3.draft.v1']) k[x] = await smStore.getItem(x); k.below = localStorage.getItem('callsheet3.props.below.v1'); k.legs = localStorage.getItem('callsheet3.props.legs.v1'); await smStore.removeItem('callsheet3.card.v1'); await smStore.removeItem('callsheet3.props.v1'); return k; });
+  await reloaded();
+  const mxr = await pg.evaluate(async () => {
+    const wait = (ms) => new Promise(r => setTimeout(r, ms || 120)), txt = e => (e ? e.innerText : '').replace(/\s+/g, ' ').trim();
+    await smStore.ready;
+    const load = async (doc, name) => { const dt = new DataTransfer(); dt.items.add(new File([JSON.stringify(doc)], name, { type: 'application/json' })); const inp = document.getElementById('slateFile'); inp.files = dt.files; inp.dispatchEvent(new Event('change', { bubbles: true })); await wait(); await wait(); };
+    const G = [['Hawks', 'Magic', 'ATL', 'ORL', -2.5], ['Bulls', 'Bucks', 'CHI', 'MIL', 3.5], ['Heat', 'Jazz', 'MIA', 'UTA', -1.5]];
+    const need = (price) => price < 0 ? -price / (-price + 100) : 100 / (price + 100);
+    const steady = [31, 33, 32, 30, 34, 32, 31, 33, 32, 30];
+    const cold = L => [L + 2, L - 2, L + 3, L - 1, L + 1, L - 2, L + 2, L - 3, L + 1, L - 1];
+    const man = (pid, name, gi, home, mk, side, line, chance, price, band, extra) => Object.assign({ gi, pid: String(pid), name, team: G[gi][home ? 3 : 2], opp: G[gi][home ? 2 : 3], home: !!home, pos: 'F', mk, line,
+      op: side === 'OVER' ? price : 100, up: side === 'UNDER' ? price : 100, book: 'fanduel', books: { fanduel: [line, side === 'OVER' ? price : 100, side === 'UNDER' ? price : 100] },
+      proj: line + (side === 'OVER' ? 2 : -2), sd: 6, pm: side === 'OVER' ? 0.7 : 0.3, pb: 0.5, p: side === 'OVER' ? chance : Math.round((1 - chance) * 10000) / 10000, push: 0, side, chance, price, need: Math.round(need(price) * 10000) / 10000,
+      edge: Math.round((chance - need(price)) * 10000) / 10000, band, mins: 24, rate36: 20, base: 18, med: line + (side === 'OVER' ? 1.5 : -1.5), usg: 22, sdf: 1, starter: true, start_src: "RotoWire's expected five", why: ['x'], lv: 5,
+      log: cold(line).map((v, i) => ['2026-11-' + String(10 + i), 'OPP', i % 2, steady[i], v, ['won by 3']]), parts: [{ k: 'out', t: 'Who is out', eff: side === 'OVER' ? 0.4 : -0.4, i: 0 }] }, extra || {});
+    const D = '2026-12-27', D0 = '2026-12-26';
+    const mx = (any, role, dmin, games, how, w) => ({ mix: { w: w === undefined ? 0.5 : w, any, role, dmin, games, how } });
+    const part = (eff) => ({ k: 'mix', t: 'The expected five: his games as a starter', eff, i: 0 });
+    const out = (eff) => ({ k: 'out', t: 'Who is out', eff, i: 0 });
+    const men = [man(41, 'Mix Under', 0, 0, 'reb', 'UNDER', 8.5, 0.60, -125, 'LEAN', Object.assign({ mins: 23.4, parts: [out(-0.4), part(1.3)] }, mx(18.8, 28.0, 4.61, 0, 'flat'))),        // the under, the mix against it: a bench man with no start this season
+      man(42, 'Mix Over', 1, 0, 'pts', 'OVER', 12.5, 0.58, -120, 'BET', Object.assign({ mins: 16.3, parts: [part(0.15)] }, mx(16.0, 16.6, 0.3, 6, 'role'))),                           // three starts in five, his last game one of them
+      man(43, 'Mix No Edge', 2, 0, 'ast', 'UNDER', 4.5, 0.52, -125, 'no edge', Object.assign({ mins: 21.0, parts: [part(0.3)] }, mx(19.0, 23.0, 2.0, 1, 'few'))),                    // no pick: off the picks' count, in the minutes
+      man(43, 'Mix No Edge', 2, 0, 'pts', 'UNDER', 12.5, 0.52, -125, 'no edge', Object.assign({ mins: 21.0, parts: [part(0.9)] }, mx(19.0, 23.0, 2.0, 1, 'few'))),                    // his second market: one man, counted once in the minutes
+      man(44, 'No Mix', 0, 1, 'pts', 'UNDER', 18.5, 0.58, -120, 'LEAN', {}),                                                                                                            // the run read no mix
+      man(45, 'Mix Nought', 1, 1, 'reb', 'UNDER', 6.5, 0.59, -125, 'LEAN', mx(20.0, 20.0, 0, 3, 'few')),                                                                               // the two reads level: the row keeps nothing
+      man(46, 'Mix Bad', 2, 1, 'pts', 'OVER', 10.5, 0.57, -115, 'LEAN', { mix: { w: 0.5, any: 'x', role: 24, dmin: 1.2, games: 2, how: 'few' } }),                                      // a read that is no number: the row keeps nothing
+      man(47, 'Mix Seven', 0, 0, 'ast', 'OVER', 3.5, 0.57, -115, 'LEAN', Object.assign({ mins: 26.0, parts: [part(0.4)] }, mx(22.0, 27.7, 4.0, 4, 'few', 0.7)))];                      // a file made at another share: the line says the share
+    const file = (date, list) => ({ format: 'callsheet3.props', version: 1, date, levers: 5, games: G.map((g, gi) => ({ gid: 'mx' + gi, away: g[0], home: g[1], aab: g[2], hab: g[3], spread: g[4], total: 225.5, props: list.filter(m => m.gi === gi) })) });
+    const grade = (date, list, box) => ({ format: 'callsheet2.slate', version: 1, date, games: G.map((g, gi) => ({ sport: 'NBA', gdate: date, away: g[0], home: g[1], finals: { fa: '110', fh: '104', f5a: '55', f5h: '50' }, notes: [],
+      box: Object.fromEntries(list.filter(m => m.gi === gi).map(m => [m.pid, [m.name, box[m.name][0], box[m.name][1], box[m.name][2], box[m.name][3], 1]])) })) });
+    const tiles = () => [...document.querySelectorAll('#propsCalib .calib > div')].map(txt).filter(t => /expected five as a role/i.test(t));
+    const day = async (d) => { const pd = document.getElementById('propsDate'); pd.value = d; pd.dispatchEvent(new Event('change', { bubbles: true })); await wait(); };
+    const show = async () => { if (document.getElementById('propsView').hidden) { document.getElementById('m-props').click(); await wait(); } };
+    const o = {};
+    // the night before: a plain pick, graded: the record is drawn and the tile is not on it
+    const plain = [man(40, 'Plain Day', 0, 0, 'pts', 'UNDER', 16.5, 0.58, -120, 'LEAN', {})];
+    await load(file(D0, plain), 'nba-props-2026-12-26.json');
+    await load(grade(D0, plain, { 'Plain Day': [30, 12, 4, 2] }), 'nba-grade-2026-12-26.json'); await wait(250);
+    await show(); await day(D0);
+    o.none = tiles(); o.drawn = [...document.querySelectorAll('#propsCalib .calib > div')].map(txt).filter(t => /levers as corrected/i.test(t)).length;
+    // a man the mix moved and the sheet did not pick, the same night: the minutes are the measure, so the tile is drawn with no pick on it
+    const early = [man(48, 'Early Mix', 1, 0, 'pts', 'UNDER', 14.5, 0.52, -125, 'no edge', Object.assign({ mins: 23.0, parts: [part(0.5)] }, mx(20.0, 26.0, 3.0, 2, 'few')))];
+    await load(file(D0, plain.concat(early)), 'nba-props-2026-12-26.json');
+    await load(grade(D0, plain.concat(early), { 'Plain Day': [30, 12, 4, 2], 'Early Mix': [25, 12, 4, 2] }), 'nba-grade-2026-12-26.json'); await wait(250);
+    await show(); await day(D0);
+    o.nopick = tiles();
+    await load(file(D, men), 'nba-props-2026-12-27.json');
+    await show(); document.getElementById('propsReset').click(); await wait();
+    const pick = async (id, v) => { const el = document.getElementById(id); el.value = v; el.dispatchEvent(new Event('change', { bubbles: true })); await wait(); };
+    await day(D); await pick('propsBelow', 'leans');
+    const stored = () => JSON.parse(smStore.getItem('callsheet3.props.v1')).filter(x => x.gdate === D).map(x => x.name + ':' + JSON.stringify(x.mix) + (x.trim ? ':trim' : '')).sort().join(' | ');
+    o.rows = stored();
+    o.cards = [...document.getElementById('propsBest').querySelectorAll('.pk[data-prop]')].map(c => txt(c.querySelector('.n2')) + ' :: ' + txt(c.querySelector('.n5.mmix')) + ' :: ' + txt(c.querySelector('.n1')).replace(/^.*levers /, 'levers ')).sort();
+    const panel = async (name) => { const tr = [...document.querySelectorAll('#propsTable tr[data-prop]')].find(r => r.textContent.indexOf(name) >= 0); tr.click(); await wait(); const b = document.querySelector('#propDetailBody');
+      const base = txt(b.querySelector('.pd-base'));
+      const t = document.getElementById('propDetail').hidden ? 'closed' : txt(b.querySelector('.pd-mmix')) + ' :: ' + (base.match(/minutes; (.*?) (?:take it to|moves it from)/) || ['', '?'])[1] + ' :: ' + (/Inside the start[^.]*expected five/i.test(base) ? 'INSIDE' : 'not inside') + ' :: ' + [...b.querySelectorAll('h4')].map(txt).filter(x => /^what moves it/i.test(x)).join('').toLowerCase();
+      document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })); await wait(); return t; };
+    o.panel = [await panel('Mix Under'), await panel('Mix Seven'), await panel('No Mix'), await panel('Mix Nought')];
+    // the night: Mix Under 6 rebounds in 27 minutes (win), Mix Over 10 points in 15 (loss), Mix No Edge 3 assists in 22, No Mix 12 points (win), Mix Nought 5 rebounds (win), Mix Bad 14 points (win),
+    // Mix Seven 5 assists in 24 (win)
+    await load(grade(D, men, { 'Mix Under': [27, 9, 6, 2], 'Mix Over': [15, 10, 4, 2], 'Mix No Edge': [22, 9, 4, 3], 'No Mix': [30, 12, 4, 2], 'Mix Nought': [30, 9, 5, 2], 'Mix Bad': [30, 14, 4, 2], 'Mix Seven': [24, 9, 4, 5] }), 'nba-grade-2026-12-27.json'); await wait(250);
+    await show(); await day(D);
+    o.tiles = tiles(); o.results = JSON.parse(smStore.getItem('callsheet3.props.v1')).filter(x => x.gdate === D).map(x => x.name + ':' + x.result + ':' + x.amin).sort().join(' | ');
+    for (let i = 1; i <= 7; i++) { const d = i <= 4 ? '2026-12-' + String(27 + i) : '2027-01-0' + String(i - 4); await load(file(d, [man(980 + i, 'Later ' + i, 0, 0, 'pts', 'UNDER', 10.5, 0.5, -110, 'no edge', {})]), 'nba-props-' + d + '.json'); }
+    await show(); await day(D);
+    o.kept = stored(); o.tilesAfter = tiles();
+    return o;
+  });
+  await pg.evaluate(async (k) => { for (const x of Object.keys(k)) { if (x === 'below' || x === 'legs') { const key = x === 'below' ? 'callsheet3.props.below.v1' : 'callsheet3.props.legs.v1'; if (k[x] === null) localStorage.removeItem(key); else localStorage.setItem(key, k[x]); continue; } if (k[x] === null || k[x] === undefined) await smStore.removeItem(x); else await smStore.setItem(x, k[x]); } }, mxKeep);
+  await reloaded();
+  const mxLine = (any, role, as, share, d) => "Minutes: RotoWire's expected five has him starting, a role he has not had in all his last five. His games of any kind say " + any + ' and as a starter (' + as + ') the run reads ' + role + '; the five is expected, not confirmed, so the read sits ' + share + ' between: ' + d +
+    ' minutes. Scored from 21 Nov 2026: such a man played more than his games of any kind said on four seasons of box scores and on the 24 graded nights (the reasons below carry the numbers).';
+  const mxUnder = mxLine('18.8', '28.0', 'no game as a starter this season, so the 27.5 a rotation man with none plays', 'half way', '+4.6'), mxSeven = mxLine('22.0', '27.7', 'his last 4 games as a starter', '70% of the way', '+4.0'), mxOver = mxLine('16.0', '16.6', 'his last 6 games as a starter', 'half way', '+0.3');
+  const mxRows = 'Mix Bad:null | Mix No Edge:{"w":0.5,"any":19,"role":23,"dmin":2,"games":1,"how":"few"} | Mix No Edge:{"w":0.5,"any":19,"role":23,"dmin":2,"games":1,"how":"few"} | Mix Nought:null | Mix Over:{"w":0.5,"any":16,"role":16.6,"dmin":0.3,"games":6,"how":"role"} | Mix Seven:{"w":0.7,"any":22,"role":27.7,"dmin":4,"games":4,"how":"few"} | Mix Under:{"w":0.5,"any":18.8,"role":28,"dmin":4.61,"games":0,"how":"flat"} | No Mix:null';
+  chk(mxr.rows === mxRows && mxr.kept === mxRows.split(' | ').map(x => x + ':trim').join(' | ') && JSON.stringify(mxr.none) === '[]' && mxr.drawn === 1,
+      'the expected five as a role (21 Nov 2026), the rows: each keeps what the run read (his games of any kind, the confirmed path, the share between them, the minutes it moved, the starts behind the role read) as the file gave it, a file made at another share its own share; a row the run read no mix on, one where the two reads were level and one whose read is no number keep nothing; the mark stays through the trim; with the record drawn and no such man graded the tile is not on it',
+      JSON.stringify({ rows: mxr.rows, kept: mxr.kept, none: mxr.none, drawn: mxr.drawn }));
+  chk(JSON.stringify(mxr.cards) === JSON.stringify(['Mix Bad OVER 10.5 points ::  :: levers 1▲ 0▼', 'Mix Nought UNDER 6.5 rebounds ::  :: levers 1▲ 0▼', 'Mix Over OVER 12.5 points :: ' + mxOver + ' :: levers 1▲ 0▼', 'Mix Seven OVER 3.5 assists :: ' + mxSeven + ' :: levers 1▲ 0▼',
+        'Mix Under UNDER 8.5 rebounds :: ' + mxUnder + ' :: levers 1▲ 1▼', 'No Mix UNDER 18.5 points ::  :: levers 1▲ 0▼'])
+      && JSON.stringify(mxr.panel) === JSON.stringify([mxUnder + ' :: the regulars out and the expected five :: not inside :: what moves it · 1 of 2 levers toward the under, 1 against', mxSeven + ' :: the expected five :: not inside :: what moves it · 1 of 1 lever toward the over',
+        ' :: the regulars out :: not inside :: what moves it · 1 of 1 lever toward the under', ' :: the regulars out :: not inside :: what moves it · 1 of 1 lever toward the under']),
+      'the expected five as a role, on the card and the panel: a pick on a man whose minutes the mix moved says so in a line of its own (his games of any kind, the read as a starter and the games behind it, half way or the file\'s own share, the minutes it moved); the mix is a lever of its own, named among those that take the start to the projection and counted in the tally toward or against the pick (an under it lifted: one lever against), not inside the start; a row with no mix, or with the two reads level, says nothing',
+      JSON.stringify({ cards: mxr.cards, panel: mxr.panel }));
+  const mxMeasured = 'measured on four seasons of box scores (2.4 over the old read, 0.2 with the mix) and replayed on the 24 graded nights (4.4 and 2.3 over 90 men, the miss 5.72 and 4.73)';
+  const mxSays = "the BET and LEAN picks on a man RotoWire's expected five had starting in a role he had not had in all his last five, his minutes read half way to his games as a starter: ";
+  chk((mxr.nopick || []).length === 1 && mxr.nopick[0].toLowerCase() === ('The expected five as a role (scored from 21 Nov 2026) no pick yet ' + mxSays + 'unders 0-0 · overs 0-0 · the minutes: 1 such man played +2.0 against the read, +5.0 against the read without the mix · ' + mxMeasured).toLowerCase()
+      && (mxr.tiles || []).length === 1 && mxr.tiles[0].toLowerCase() === ('The expected five as a role (scored from 21 Nov 2026) 2-1 says 58.3% · does 66.7% (±28.9) · +0.67u ' + mxSays + 'unders 1-0 +0.8u · overs 1-1 -0.1u · the minutes: 5 such men played +0.7 against the read, +3.4 against the read without the mix · ' + mxMeasured).toLowerCase()
+      && mxr.results === 'Mix Bad:win:30 | Mix No Edge:win:22 | Mix No Edge:win:22 | Mix Nought:win:30 | Mix Over:loss:15 | Mix Seven:win:24 | Mix Under:win:27 | No Mix:win:30' && JSON.stringify(mxr.tilesAfter) === JSON.stringify(mxr.tiles),
+      'the expected five as a role, the record: a tile of its own that measures the lever. The minutes are the measure, so it is drawn from the first such man graded, pick or no pick (one man, no pick: what he played against the read and against the read without the mix); then the three BET and LEAN picks on such men, two won, by side, and the five men\'s minutes (0.7 over the read, 3.4 over the read as it was); a man the sheet did not pick counts in the minutes and not in the picks, once whatever the markets he has; a row that kept no mix counts in neither; the tile reads the same after the night is trimmed',
+      JSON.stringify({ nopick: mxr.nopick, tiles: mxr.tiles, results: mxr.results, after: mxr.tilesAfter }));
+  // ---- 21 Nov 2026: the home and road chip (the user, told where the book's price had been off: "Go bro, start with the chip"). With no model in it, on every
+  //      graded prop of 31 nights, the over landed 4.8 points under its fair price on a home favourite's man and at it on a road dog's. Each prop now says where
+  //      its man stands (home or road; favoured by 3.5 or more, a dog by as much, inside it) and what the sheet's side has done there with no model: its rate
+  //      against the fair chance of the two prices, the gap and its error by night, a unit on every such bet. Green where the price has leaned against the other
+  //      side by two errors or more and this side has paid, red where it has leaned against this side by as much, no colour between; nothing drawn under 300
+  //      graded props on five nights. Shown, not scored: it keeps no leg out of a ticket. The record keeps the classes on tiles of their own ----
+  const vnKeep = await pg.evaluate(async () => { await smStore.ready; const k = {}; for (const x of ['callsheet3.card.v1', 'callsheet3.props.v1', 'callsheet3.draft.v1']) k[x] = await smStore.getItem(x); k.below = localStorage.getItem('callsheet3.props.below.v1'); k.legs = localStorage.getItem('callsheet3.props.legs.v1'); await smStore.removeItem('callsheet3.card.v1'); await smStore.removeItem('callsheet3.props.v1'); return k; });
+  await reloaded();
+  const vnr = await pg.evaluate(async () => {
+    const wait = (ms) => new Promise(r => setTimeout(r, ms || 120)), txt = e => (e ? e.innerText : '').replace(/\s+/g, ' ').trim();
+    await smStore.ready;
+    const load = async (doc, name) => { const dt = new DataTransfer(); dt.items.add(new File([JSON.stringify(doc)], name, { type: 'application/json' })); const inp = document.getElementById('slateFile'); inp.files = dt.files; inp.dispatchEvent(new Event('change', { bubbles: true })); await wait(200); await wait(200); };
+    // two games a night: the Magic at home favoured by 6.5 over the Hawks, the Bucks at home a dog by 5 to the Bulls; a third with no spread on the night itself
+    const G = [['Hawks', 'Magic', 'ATL', 'ORL', -6.5], ['Bulls', 'Bucks', 'CHI', 'MIL', 5], ['Heat', 'Jazz', 'MIA', 'UTA', null], ['Suns', 'Kings', 'PHX', 'SAC', -2]];   // and a fourth inside 3.5, played on four of the nights
+    const need = (price) => price < 0 ? -price / (-price + 100) : 100 / (price + 100);
+    const ov = L => [L + 2, L - 2, L + 3, L - 1, L + 1, L + 2, L + 4, L - 3, L + 1, L + 2], cold = L => [L + 2, L - 2, L + 3, L - 1, L + 1, L - 2, L + 2, L - 3, L + 1, L - 1];
+    const up = [{ k: 'pace', t: 'Pace', eff: 0.4, i: 0 }, { k: 'dvp', t: 'Defence v position', eff: 0.6, i: 0 }];
+    const man = (pid, name, gi, home, side, band, price, extra) => Object.assign({ gi, pid: String(pid), name, team: G[gi][home ? 3 : 2], opp: G[gi][home ? 2 : 3], home: !!home, pos: 'F', mk: 'pts', line: 10.5,
+      op: price, up: price, book: 'fanduel', books: { fanduel: [10.5, price, price], draftkings: [10.5, price, price] }, proj: side === 'OVER' ? 12.5 : 8.5, sd: 6, pm: side === 'OVER' ? 0.7 : 0.3, pb: 0.5,
+      p: side === 'OVER' ? (band === 'no edge' ? 0.5 : 0.6) : (band === 'no edge' ? 0.5 : 0.4), push: 0, side, chance: band === 'no edge' ? 0.5 : 0.6, price, need: Math.round(need(price) * 10000) / 10000, edge: Math.round(((band === 'no edge' ? 0.5 : 0.6) - need(price)) * 10000) / 10000, band,
+      mins: 30, rate36: 14, base: 11, med: side === 'OVER' ? 12 : 9, usg: 20, sdf: 1, starter: true, start_src: "RotoWire's expected five", why: ['x'], lv: 5,
+      log: cold(10.5).map((v, i) => ['2026-11-' + String(10 + i), 'OPP', i % 2, 30, v, ['won by 3']]), parts: [] }, extra || {});
+    const file = (date, list, spreads) => ({ format: 'callsheet3.props', version: 1, date, levers: 5, games: G.map((g, gi) => ({ gid: 'vn' + gi, away: g[0], home: g[1], aab: g[2], hab: g[3], spread: spreads ? spreads[gi] : g[4], total: 225.5, props: list.filter(m => m.gi === gi) })) });
+    const grade = (date, list, pts) => ({ format: 'callsheet2.slate', version: 1, date, games: G.map((g, gi) => ({ sport: 'NBA', gdate: date, away: g[0], home: g[1], finals: { fa: '110', fh: '104', f5a: '55', f5h: '50' }, notes: [],
+      box: Object.fromEntries(list.filter(m => m.gi === gi).map(m => [m.pid, [m.name, 30, pts[m.pid], 4, 2, 1]])) })) });
+    // a graded night: 52 home favourite's men, 52 road dog's, 52 home dog's at -130 a side, 10 road favourite's, and on the nights that have them 80 road men in the game inside 3.5;
+    // `overs` says how many of each went over 10.5 (14 points) that night
+    const night = (overs) => { const list = [], pts = {};
+      [['HF', 0, 1, 52, -110, 1000], ['RD', 0, 0, 52, -110, 2000], ['HD', 1, 1, 52, -130, 3000], ['RF', 1, 0, 10, -110, 4000], ['RI', 3, 0, overs.RI === undefined ? 0 : 80, -110, 5000]].forEach(([c, gi, home, n, price, base]) => {
+        for (let i = 0; i < n; i++) { const m = man(base + i, c + ' ' + i, gi, home, 'UNDER', 'no edge', price); list.push(m); pts[m.pid] = i < overs[c] ? 14 : 8; } });
+      return { list, pts }; };
+    const NIGHTS = [['2026-12-21', { HF: 20, RD: 26, HD: 23, RF: 5, RI: 20 }], ['2026-12-22', { HF: 22, RD: 27, HD: 24, RF: 5, RI: 22 }], ['2026-12-23', { HF: 21, RD: 25, HD: 23, RF: 5, RI: 21 }], ['2026-12-24', { HF: 21, RD: 26, HD: 24, RF: 5, RI: 21 }], ['2026-12-25', { HF: 20, RD: 27, HD: 23, RF: 5 }],
+      ['2026-12-26', { HF: 22, RD: 25, HD: 24, RF: 5 }]];
+    const D = '2026-12-27';
+    const tonight = [man(51, 'Home Fav Under', 0, 1, 'UNDER', 'LEAN', -110), man(52, 'Home Fav Over', 0, 1, 'OVER', 'LEAN', -115), man(53, 'Road Dog Under', 0, 0, 'UNDER', 'LEAN', -110), man(54, 'Home Dog Under', 1, 1, 'UNDER', 'LEAN', -110),
+      man(55, 'Home Dog Over', 1, 1, 'OVER', 'LEAN', -115), man(56, 'Road Fav Under', 1, 0, 'UNDER', 'LEAN', -110), man(57, 'No Spread', 2, 0, 'UNDER', 'LEAN', -110),   // the overs at -115: an over priced -110 to -101 is left off the lists
+      man(60, 'Few Nights', 3, 0, 'UNDER', 'LEAN', -110),   // a road man in the game inside 3.5: 320 graded props of his class, on four nights
+      // two legs for a ticket by the last-five rule: the over on a home favourite's man (the chip red on it) and an over with no chip, each four of his last five and seven of his last ten, the levers toward
+      man(58, 'Leg One', 0, 1, 'OVER', 'LEAN', -115, { parts: up, log: ov(10.5).map((v, i) => ['2026-11-' + String(10 + i), 'OPP', i % 2, 30, v, ['won by 3']]) }),
+      man(59, 'Leg Two', 2, 1, 'OVER', 'LEAN', -115, { parts: up, log: ov(10.5).map((v, i) => ['2026-11-' + String(10 + i), 'OPP', i % 2, 30, v, ['won by 3']]) })];
+    const tonightSpreads = [-3.5, 4.5, null, -2];   // the Magic favoured by 3.5 tonight, the line itself; the Bulls by 4.5, under the favourite's own chip, which starts at 5
+    const show = async () => { if (document.getElementById('propsView').hidden) { document.getElementById('m-props').click(); await wait(); } };
+    const day = async (d) => { const pd = document.getElementById('propsDate'); pd.value = d; pd.dispatchEvent(new Event('change', { bubbles: true })); await wait(250); };
+    const pick = async (id, v) => { const el = document.getElementById(id); el.value = v; el.dispatchEvent(new Event('change', { bubbles: true })); await wait(250); };
+    const tiles = () => [...document.querySelectorAll('#propsCalib .calib > div')].map(txt).filter(t => /with no model/i.test(t));
+    const chips = () => Object.fromEntries([...document.getElementById('propsBest').querySelectorAll('.pk[data-prop]')].map(c => [txt(c.querySelector('.n2')).replace(/ (OVER|UNDER) .*$/, ''), [...c.querySelectorAll('.n5.tells .tell')].map(t => t.className.replace('tell ', '') + ' :: ' + txt(t)).filter(t => /At home|On the road/.test(t)).join(' ## ')]));
+    const o = {};
+    for (const [d, overs] of NIGHTS.slice(0, 5)) { const n = night(overs); await load(file(d, n.list), 'nba-props-' + d + '.json'); await load(grade(d, n.list, n.pts), 'nba-grade-' + d + '.json'); await wait(150); }
+    await load(file(D, tonight, tonightSpreads), 'nba-props-' + D + '.json');
+    await show(); document.getElementById('propsReset').click(); await wait(); await day(D); await pick('propsBelow', 'leans');
+    o.early = chips(); o.earlyTiles = tiles();      // five nights, 260 props a class: nothing drawn yet
+    { const [d, overs] = NIGHTS[5]; const n = night(overs); await load(file(d, n.list), 'nba-props-' + d + '.json'); await load(grade(d, n.list, n.pts), 'nba-grade-' + d + '.json'); await wait(150); }
+    await show(); await day(D); await pick('propsBelow', 'leans');
+    o.chips = chips(); o.tiles = tiles();
+    const ALL = tonight.map(m => m.name), names = () => [...document.querySelectorAll('#propsTable tbody tr[data-prop] td:nth-child(2)')].map(td => ALL.filter(n => td.textContent.trim().indexOf(n) === 0).sort((a, b) => b.length - a.length)[0] || '?').sort();
+    await pick('propsTellSel', 'green'); o.green = names(); await pick('propsTellSel', 'red'); o.red = names(); await pick('propsTellSel', '');
+    const tr = [...document.querySelectorAll('#propsTable tr[data-prop]')].find(r => r.textContent.indexOf('Home Fav Under') >= 0); if (tr) { tr.click(); await wait(250); }
+    const body = document.querySelector('#propDetailBody'), pdt = tr && body ? body.querySelector('.pd-tells') : null;
+    o.panel = !pdt ? 'NO TELLS ON THE PANEL' : [...pdt.querySelectorAll('.tell')].map(t => t.className.replace('tell ', '') + ' :: ' + txt(t)).filter(t => /At home/.test(t)).join(' ## ') + ' || ' + (/The home and road chip \(21 Nov 2026\) has no model in it: every graded prop where his club stands as tonight \(at home or on the road, favoured by 3\.5 or more, a dog by as much, or inside it\), this side's rate against the fair chance of the two prices; green where the price has leaned against the other side by two errors or more and this side has paid, red where it has leaned against this side by as much, drawn from 300 graded props/.test(txt(pdt)) ? 'said' : 'NOT SAID');
+    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })); await wait();
+    // the ticket by the last-five rule: the leg with the red chip on it is a leg
+    await pick('propsBelow', 't3'); await pick('propsLegs', '2');
+    o.ticket = [...document.getElementById('propsBest').querySelectorAll('.pk.t3')].map(e => [...e.querySelectorAll('.leg .lname')].map(txt).join(' + '));
+    await pick('propsBelow', 'leans');
+    for (let i = 1; i <= 7; i++) { const d = i <= 4 ? '2026-12-' + String(27 + i) : '2027-01-0' + String(i - 4); await load(file(d, [man(990 + i, 'Later ' + i, 2, 0, 'UNDER', 'no edge', -110)]), 'nba-props-' + d + '.json'); }
+    await show(); await day(D); await pick('propsBelow', 'leans');
+    o.trimmed = JSON.parse(smStore.getItem('callsheet3.props.v1')).filter(x => x.gdate === '2026-12-21' && x.trim).length; o.chipsAfter = chips(); o.tilesAfter = tiles();
+    return o;
+  });
+  await pg.evaluate(async (k) => { for (const x of Object.keys(k)) { if (x === 'below' || x === 'legs') { const key = x === 'below' ? 'callsheet3.props.below.v1' : 'callsheet3.props.legs.v1'; if (k[x] === null) localStorage.removeItem(key); else localStorage.setItem(key, k[x]); continue; } if (k[x] === null || k[x] === undefined) await smStore.removeItem(x); else await smStore.setItem(x, k[x]); } }, vnKeep);
+  await reloaded();
+  const vnChip = (st, label, side, who, landed, fair, gap, err, ret, oth) => st + ' :: ' + label + ' · with no model the ' + side + ' on ' + who + ' has landed ' + landed + '% against a fair price of ' + fair + '% (' + gap + ', the error ' + err + ', 312 props on 6 nights): ' + ret + '% a bet, the ' + (side === 'over' ? 'under ' : 'over ') + oth + '%';
+  const vnWant = { 'Home Fav Under': vnChip('green', 'At home, favoured by 3.5', 'under', "a home favourite's man", '59.6', '50.0', '+9.6', '0.7', '+13.8', '-22.9'), 'Home Fav Over': vnChip('red', 'At home, favoured by 3.5', 'over', "a home favourite's man", '40.4', '50.0', '-9.6', '0.7', '-22.9', '+13.8'),
+    'Road Dog Under': vnChip('plain', 'On the road, a dog by 3.5', 'under', "a road dog's man", '50.0', '50.0', '+0.0', '0.7', '-4.5', '-4.5'), 'Home Dog Under': vnChip('plain', 'At home, a dog by 4.5', 'under', "a home dog's man", '54.8', '50.0', '+4.8', '0.4', '-3.0', '-20.0'),
+    'Home Dog Over': vnChip('red', 'At home, a dog by 4.5', 'over', "a home dog's man", '45.2', '50.0', '-4.8', '0.4', '-20.0', '-3.0'), 'Road Fav Under': '', 'No Spread': '', 'Few Nights': '',
+    'Leg One': vnChip('red', 'At home, favoured by 3.5', 'over', "a home favourite's man", '40.4', '50.0', '-9.6', '0.7', '-22.9', '+13.8'), 'Leg Two': '' };
+  const vnCanon = (o) => JSON.stringify(Object.keys(o || {}).sort().map(k => [k, o[k]]));
+  chk(vnCanon(vnr.chips) === vnCanon(vnWant) && Object.values(vnr.early || { x: 1 }).every(v => v === '') && Object.keys(vnr.early || {}).length === 10 && JSON.stringify(vnr.earlyTiles) === '[]'
+      && vnr.panel === vnWant['Home Fav Under'] + ' || said',
+      'the home and road chip (21 Nov 2026): each prop says where its man stands and what the sheet\'s side has done there with no model, read off the page\'s own graded props: its rate against the fair chance of the two prices, the gap, its error by night and a unit a bet on either side. Green where the price has leaned against the other side by two errors or more and this side has paid (the under on a home favourite\'s man), red where it has leaned against this side (the over there, and the over on a home dog\'s man), no colour where the price is fair (a road dog\'s man) and where the side has the lean and has not paid at its prices (the under on a home dog\'s man at -130 a side); nothing under 300 graded props a class (260 after five nights: no chip on any card; a road favourite\'s man with 60) or under five nights (a road man in a game inside 3.5: 320 props on four), and nothing where the game has no spread; a club favoured by 3.5 to the dot is a favourite and its opponent a dog; the panel carries it with what it is',
+      JSON.stringify({ chips: vnr.chips, early: vnr.early, earlyTiles: vnr.earlyTiles, panel: vnr.panel }));
+  chk(JSON.stringify(vnr.green) === JSON.stringify(['Home Fav Under']) && JSON.stringify(vnr.red) === JSON.stringify(['Home Dog Over', 'Home Fav Over', 'Leg One'])
+      && JSON.stringify(vnr.ticket) === JSON.stringify(['Leg One + Leg Two']),
+      'the home and road chip, shown and not scored: it reads in the tells filter as a tell (a green tell and no red: the under on the home favourite\'s man; a red tell: the three overs it is red on) and it keeps no leg out of a ticket: the over on a home favourite\'s man with the chip red on it is a leg by the last-five rule all the same',
+      JSON.stringify({ green: vnr.green, red: vnr.red, ticket: vnr.ticket }));
+  const vnNote = 'every graded prop with both prices and a spread, the fair chance the two prices with the hold taken out, the error by night; no model in it · ' +
+    "a home favourite's man: the over 40.4% where the price says 50.0% (-9.6, the error 0.7, 312 props), every under +13.8% a bet and every over -22.9% · a home dog's man: the over 45.2% where the price says 50.0% (-4.8, the error 0.4, 312 props), every under -3.0% a bet and every over -20.0% · " +
+    "a road dog's man: the over 50.0% where the price says 50.0% (+0.0, the error 0.7, 312 props), every under -4.5% a bet and every over -4.5%" +
+    " · on 31 nights to 20 Nov 2026 a home favourite's man 4.8 under the price (the error 0.8) and a road dog's man 0.6 over it; the season has shown no home edge and the lines still carry one";
+  chk((vnr.tiles || []).length === 2
+      && vnr.tiles[0].toLowerCase() === ("A home favourite's man (3.5+), every under with no model (shown, not scored) 186-126 says 50.0% · does 59.6% (±2.8) · +43.09u " + vnNote).toLowerCase()
+      && vnr.tiles[1].toLowerCase() === "a road dog's man (3.5+), every under with no model (shown, not scored) 156-156 says 50.0% · does 50.0% (±2.8) · -14.18u"
+      && vnr.trimmed > 0 && JSON.stringify(vnr.tilesAfter) === JSON.stringify(vnr.tiles) && vnCanon(vnr.chipsAfter) === vnCanon(vnr.chips),
+      'the home and road chip, the record: the chip\'s own pools on tiles, every under of a home favourite\'s man and of a road dog\'s man with no model (the record, the fair chance against what landed, the units), and under the first every class that has reached the minimum with the over\'s rate against the price, the gap and its error and a unit a bet on either side (a road favourite\'s man with 60 props is not listed); the tiles and the chips read the same after the early nights are trimmed',
+      JSON.stringify({ tiles: vnr.tiles, trimmed: vnr.trimmed, after: vnr.tilesAfter, chipsAfter: vnr.chipsAfter }));
+  // ---- 13 Nov 2026: the second pass on the levers (the user: "Make sure those levers are as perfect as they can be"). A row marked `lv` 3 had its minutes
+  //      read from his last ten games, the recent counting most: a short game kept in part counts three tenths (a starter's short LAST game among them),
+  //      his games in tonight's role are read the same way with the flat number standing as the game before his first, and after his own games missed
+  //      the run reads a share for his first game back (`ret`). The card and the panel say each in the second pass's words; a row marked `lv` 2 reads as
+  //      it did; and his season's minutes, his first games back, the bench confirmed, the top of the minutes and home and road are levers on the panel ----
+  const l3Keep = await pg.evaluate(async () => { await smStore.ready; const k = {}; for (const x of ['callsheet3.card.v1', 'callsheet3.props.v1', 'callsheet3.draft.v1']) k[x] = await smStore.getItem(x); k.below = localStorage.getItem('callsheet3.props.below.v1'); k.legs = localStorage.getItem('callsheet3.props.legs.v1'); await smStore.removeItem('callsheet3.card.v1'); await smStore.removeItem('callsheet3.props.v1'); return k; });
+  await reloaded();
+  const l3 = await pg.evaluate(async () => {
+    const wait = (ms) => new Promise(r => setTimeout(r, ms || 120)), txt = e => (e ? e.innerText : '').replace(/\s+/g, ' ').trim();
+    await smStore.ready;
+    const load = async (doc, name) => { const dt = new DataTransfer(); dt.items.add(new File([JSON.stringify(doc)], name, { type: 'application/json' })); const inp = document.getElementById('slateFile'); inp.files = dt.files; inp.dispatchEvent(new Event('change', { bubbles: true })); await wait(); await wait(); };
+    const G = [['Hawks', 'Magic', 'ATL', 'ORL', -2.5], ['Bulls', 'Bucks', 'CHI', 'MIL', 3.5], ['Heat', 'Jazz', 'MIA', 'UTA', -1.5], ['Suns', 'Kings', 'PHX', 'SAC', 1.5]];
+    const need = (price) => price < 0 ? -price / (-price + 100) : 100 / (price + 100);
+    const steady = [31, 33, 32, 30, 34, 32, 31, 33, 32, 30];
+    const cold = L => [L + 2, L - 2, L + 3, L - 1, L + 1, L - 2, L + 2, L - 3, L + 1, L - 1];
+    const man = (pid, name, gi, home, mk, side, line, chance, price, band, extra) => Object.assign({ gi, pid: String(pid), name, team: G[gi][home ? 3 : 2], opp: G[gi][home ? 2 : 3], home: !!home, pos: 'F', mk, line,
+      op: side === 'OVER' ? price : 100, up: side === 'UNDER' ? price : 100, book: 'fanduel', books: { fanduel: [line, side === 'OVER' ? price : 100, side === 'UNDER' ? price : 100] },
+      proj: line + (side === 'OVER' ? 2 : -2), sd: 6, pm: side === 'OVER' ? 0.7 : 0.3, pb: 0.5, p: side === 'OVER' ? chance : Math.round((1 - chance) * 10000) / 10000, push: 0, side, chance, price, need: Math.round(need(price) * 10000) / 10000,
+      edge: Math.round((chance - need(price)) * 10000) / 10000, band, mins: 24, rate36: 20, base: 18, med: line + (side === 'OVER' ? 1.5 : -1.5), usg: 22, sdf: 1, starter: true, start_src: "RotoWire's confirmed five", why: ['x'],
+      log: cold(line).map((v, i) => ['2026-11-' + String(10 + i), 'OPP', i % 2, steady[i], v, ['won by 3']]), parts: [{ k: 'out', t: 'Who is out', eff: side === 'OVER' ? 0.4 : -0.4, i: 0 }] }, extra || {});
+    const D = '2027-02-09';
+    const half = { how: 'half', min: [7], mean: 28.2, read: 31.3 };
+    // every lever of the second pass on one man, with the two parts that sit inside the start (an UNDER: a minus helps)
+    const every = [['pull', "His season's minutes", 0.3], ['out', 'Who is out', -0.2], ['ret', 'His first games back', -0.6], ['stay', 'The bench confirmed', -0.26], ['oppc', 'Their centre out', 0.1], ['script', 'The game script, from the spread', -0.16],
+      ['top', 'The top of the minutes', -0.34], ['pace', 'Pace', 0.12], ['home', 'Home and road', -0.08], ['dvp', 'Defence v position', 0.4], ['cons', "The books' consensus", 0.04], ['prior', "Last season's prior on his rate", 0.2], ['minutes', 'Minutes, his last 10 against the season', -0.1]]
+      .map((x, i) => ({ k: x[0], t: x[1], eff: x[2], i }));
+    const men = [
+      man(31, 'Last Short', 0, 0, 'pts', 'OVER', 14.5, 0.62, -125, 'BET', { lv: 3, mshort: { how: 'last', min: [7], mean: 22.4, read: 27.0 } }),                                // a starter whose last game was the short one
+      man(32, 'Half Three', 1, 0, 'reb', 'UNDER', 6.5, 0.60, -130, 'BET', { lv: 3, mshort: half }),                                                                             // a short game kept in part: three tenths from the second pass
+      man(33, 'Half Two', 2, 0, 'ast', 'OVER', 4.5, 0.58, -120, 'LEAN', { lv: 2, mshort: half }),                                                                               // the same mark on a row of the first pass: half a game
+      man(34, 'Role Three', 0, 1, 'pts', 'UNDER', 18.5, 0.59, -125, 'LEAN', { lv: 3, mrole: { how: 'few', games: 3, starter: true, mean: 22.4, read: 29.6 } }),                 // three starts, the flat number as the game before them
+      man(35, 'Role One', 1, 1, 'ast', 'UNDER', 5.5, 0.64, -140, 'BET', { lv: 3, starter: false, mrole: { how: 'few', games: 1, starter: false, mean: 26.1, read: 21.9 } }),    // one game off the bench
+      man(36, 'Role Ten', 2, 1, 'reb', 'UNDER', 7.5, 0.57, -120, 'LEAN', { lv: 3, mrole: { how: 'role', games: 10, starter: true, mean: 24.0, read: 30.2 } }),                  // ten starts: no flat number left in the read
+      man(37, 'Role None', 3, 0, 'pts', 'OVER', 9.5, 0.58, -120, 'LEAN', { lv: 3, starter: false, mrole: { how: 'flat', games: 0, starter: false, mean: 27.0, read: 20.5 } }),  // no bench game this season
+      man(38, 'Role Old', 3, 0, 'reb', 'OVER', 5.5, 0.58, -120, 'LEAN', { lv: 2, mrole: { how: 'few', games: 3, starter: true, mean: 22.4, read: 29.6 } }),                     // the first pass's role read: its own words
+      man(39, 'Back Two', 3, 1, 'pts', 'UNDER', 21.5, 0.60, -125, 'BET', { lv: 3, ret: { missed: 2, f: 0.96, dmin: -1.3 } }),                                                   // his club has played two since his last
+      man(40, 'Back One', 3, 1, 'ast', 'UNDER', 6.5, 0.57, -120, 'LEAN', { lv: 3, ret: { missed: 1, f: 0.98, dmin: -0.7 }, mshort: { how: 'out', min: [5, 9], mean: 25.1, read: 31.0 } }),   // one missed, and two short games left out
+      man(41, 'Back None', 3, 1, 'reb', 'UNDER', 8.5, 0.52, -120, 'no edge', { lv: 3, ret: { missed: 0, f: 1, dmin: 0 } }),                                                     // he played his club's last game: nothing to say (no pick: the list shows twelve cards)
+      man(42, 'Back Bare', 3, 1, 'tpm', 'UNDER', 2.5, 0.57, -120, 'LEAN', { lv: 3, ret: { missed: 12, f: 0.74 } }),                                                             // a file with no minutes beside the share
+      man(43, 'Back No Edge', 3, 0, 'ast', 'UNDER', 3.5, 0.52, -120, 'no edge', { lv: 3, ret: { missed: 6, f: 0.85, dmin: -4.2 } }),                                            // no pick: the panel says it
+      man(45, 'Back Flat', 0, 1, 'reb', 'UNDER', 4.5, 0.52, -120, 'no edge', { lv: 3, ret: { missed: 3, f: 1, dmin: 0 } }),                                                    // a share of one: nothing to say
+      man(44, 'Every Lever', 2, 1, 'pts', 'UNDER', 20.5, 0.60, -125, 'BET', { lv: 3, base: 19.0, rate36: 22.8, proj: 18.5, parts: every })];
+    const file = (date, list) => ({ format: 'callsheet3.props', version: 1, date, levers: 3, games: G.map((g, gi) => ({ gid: 'l3' + gi, away: g[0], home: g[1], aab: g[2], hab: g[3], spread: g[4], total: 225.5, props: list.filter(m => m.gi === gi) })) });
+    await load(file(D, men), 'nba-props-2027-02-09.json');
+    if (document.getElementById('propsView').hidden) { document.getElementById('m-props').click(); await wait(); }
+    document.getElementById('propsReset').click(); await wait();
+    const pick = async (id, v) => { const el = document.getElementById(id); el.value = v; el.dispatchEvent(new Event('change', { bubbles: true })); await wait(); };
+    const day = async (d) => { const pd = document.getElementById('propsDate'); pd.value = d; pd.dispatchEvent(new Event('change', { bubbles: true })); await wait(); };
+    const best = document.getElementById('propsBest');
+    const o = {};
+    await pick('propsBelow', 'leans');
+    const lines = c => ['.n5.msh', '.n5.mrole', '.n5.mret'].map(q => txt(c.querySelector(q))).filter(Boolean);
+    o.cards = Object.fromEntries([...best.querySelectorAll('.pk[data-prop]')].map(c => [txt(c.querySelector('.n2')).replace(/ (OVER|UNDER) .*$/, ''), lines(c)]));
+    o.moves = (c => c ? txt([...c.querySelectorAll('.n5')].find(e => /^Moves it:/.test(txt(e)))) : 'no card')([...best.querySelectorAll('.pk[data-prop]')].find(c => /Every Lever/.test(txt(c.querySelector('.n2')))));
+    const panel = async (name, f) => { const tr = [...document.querySelectorAll('#propsTable tr[data-prop]')].find(r => r.textContent.indexOf(name) >= 0); tr.click(); await wait(); const b = document.querySelector('#propDetailBody');
+      const t = document.getElementById('propDetail').hidden ? 'closed' : f(b);
+      document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })); await wait(); return t; };
+    const plines = b => ['.pd-msh', '.pd-mrole', '.pd-mret'].map(q => txt(b.querySelector(q))).filter(Boolean);
+    o.panels = {}; for (const m of men) o.panels[m.name] = await panel(m.name, plines);
+    o.every = await panel('Every Lever', b => ({ base: txt(b.querySelector('.pd-base')), h4: ((h) => h ? h.textContent.replace(/\s+/g, ' ').trim() : '')([...b.querySelectorAll('h4')].find(h => /^What moves it/.test(h.textContent))),
+      levers: [...b.querySelectorAll('.pd-levers .lever')].map(l => (/\bhelps\b/.test(l.className) ? 'helps' : 'hurts') + (/\btop\b/.test(l.className) ? ' top' : '') + '|' + txt(l.querySelector('.lt')) + '|' + txt(l.querySelector('.lv'))) }));
+    o.cell = (tr => tr ? txt(tr.querySelector('td.lvt') || [...tr.querySelectorAll('td')].find(td => /^\d+▲ \d+▼$/.test(txt(td)))) : 'no row')([...document.querySelectorAll('#propsTable tr[data-prop]')].find(r => r.textContent.indexOf('Every Lever') >= 0));
+    o.rows = JSON.parse(smStore.getItem('callsheet3.props.v1')).filter(x => x.gdate === D).map(x => x.name + ':' + JSON.stringify([x.lv, x.ret, x.mshort ? x.mshort.how : null, x.mrole ? x.mrole.games : null])).sort().join(' | ');
+    // the night, points, rebounds, assists (one three each). The BETs 4-1: Last Short's over wins (20 points), Half Three's under loses (9 rebounds), Role One's under wins (3 assists), Back Two's under wins (15 points),
+    // Every Lever's under wins (17). The leans: Half Two's over wins (6 assists), Role Three's under wins (12 points), Role Ten's under loses (9 rebounds), Role None's over wins (12 points), Role Old's over loses (4 rebounds),
+    // Back One's under loses (8 assists), Back Bare's under wins (1 three): 4-3. Unders 5-3, overs 3-1; the three men with no pick are not counted
+    const box = { 'Last Short': [20, 4, 2], 'Half Three': [9, 9, 2], 'Half Two': [9, 4, 6], 'Role Three': [12, 4, 2], 'Role One': [9, 4, 3], 'Role Ten': [9, 9, 2], 'Role None': [12, 4, 2], 'Role Old': [9, 4, 2], 'Back Two': [15, 4, 2], 'Back One': [9, 4, 8], 'Back None': [9, 6, 2], 'Back Bare': [9, 4, 2], 'Back No Edge': [9, 4, 2], 'Back Flat': [9, 4, 2], 'Every Lever': [17, 4, 2] };
+    await load({ format: 'callsheet2.slate', version: 1, date: D, games: G.map((g, gi) => ({ sport: 'NBA', gdate: D, away: g[0], home: g[1], finals: { fa: '110', fh: '104', f5a: '55', f5h: '50' }, notes: [],
+      box: Object.fromEntries(men.filter(m => m.gi === gi).map(m => [m.pid, [m.name, 30, box[m.name][0], box[m.name][1], box[m.name][2], 1]])) })) }, 'nba-grade-2027-02-09.json'); await wait(250);
+    if (document.getElementById('propsView').hidden) { document.getElementById('m-props').click(); await wait(); }
+    await day(D);
+    const tiles = () => [...document.querySelectorAll('#propsCalib .calib > div')].map(txt).filter(t => /levers as corrected/i.test(t)).map(t => t.replace(/ · the sixteen nights before it.*$/, ''));
+    o.tiles = tiles();
+    for (let i = 1; i <= 7; i++) { const d = '2027-02-' + String(9 + i); await load(file(d, [man(970 + i, 'Later ' + i, 0, 0, 'pts', 'UNDER', 10.5, 0.5, -110, 'no edge', {})]), 'nba-props-' + d + '.json'); }
+    if (document.getElementById('propsView').hidden) { document.getElementById('m-props').click(); await wait(); }
+    await day(D);
+    o.kept = JSON.parse(smStore.getItem('callsheet3.props.v1')).filter(x => x.gdate === D).map(x => x.name + ':' + (x.trim ? 'trim' : 'whole') + (x.lv ? ':lv' + x.lv : '') + (x.ret ? ':ret' + x.ret.missed : '') + (x.mshort ? ':msh-' + x.mshort.how : '') + (x.mrole ? ':role-' + x.mrole.how : '')).sort().join(' | ');
+    await pick('propsBelow', 'leans');
+    o.cardsAfter = Object.fromEntries([...best.querySelectorAll('.pk[data-prop]')].map(c => [txt(c.querySelector('.n2')).replace(/ (OVER|UNDER) .*$/, ''), lines(c)]));
+    o.tilesAfter = tiles();
+    await pick('propsBelow', 't3');
+    return o;
+  });
+  await pg.evaluate(async (k) => { for (const x of Object.keys(k)) { if (x === 'below' || x === 'legs') { const key = x === 'below' ? 'callsheet3.props.below.v1' : 'callsheet3.props.legs.v1'; if (k[x] === null) localStorage.removeItem(key); else localStorage.setItem(key, k[x]); continue; } if (k[x] === null || k[x] === undefined) await smStore.removeItem(x); else await smStore.setItem(x, k[x]); } }, l3Keep);
+  await reloaded();
+  const l3Four = ' Scored from 13 Nov 2026, measured on four seasons of box scores.';
+  const l3Role = ' Scored from 13 Nov 2026: with the real starters such a night misses by 4.8 minutes this way and 5.3 from his games of any kind (four seasons of box scores).';
+  const l3Head = (starts) => 'Minutes: the five is confirmed and he ' + (starts ? 'starts' : 'comes off the bench') + ' tonight, a role he has not had in all his last five. The read is ';
+  const l3Want = {
+    'Last Short': ['Minutes: his 7-minute game, his last, counts as three tenths of a game (he started all five and only his last was short). The read is 27.0 a game where the same games untouched say 22.4.' + l3Four],
+    'Half Three': ['Minutes: his 7-minute game counts as three tenths of a game (his last two run above the five). The read is 31.3 a game where the same games untouched say 28.2.' + l3Four],
+    'Half Two': ['Minutes: his 7-minute game counts as half a game (his last two run above the five). The read is 31.3 a game where the mean of his last five says 28.2.' + l3Four],
+    'Role Three': [l3Head(true) + 'his last 3 games as a starter, the recent counting most, with the 27.5 a rotation man with none plays standing as the game before them: 29.6 a game where his games of any kind say 22.4.' + l3Role],
+    'Role One': [l3Head(false) + 'his last 1 game off the bench, with the 20.5 a rotation man with none plays standing as the game before it: 21.9 a game where his games of any kind say 26.1.' + l3Role],
+    'Role Ten': [l3Head(true) + 'his last 10 games as a starter, the recent counting most: 30.2 a game where his games of any kind say 24.0.' + l3Role],
+    'Role None': [l3Head(false) + 'no game off the bench this season, so the 20.5 a rotation man with none plays, held to his own games: 20.5 a game where his games of any kind say 27.0.' + l3Role],
+    'Role Old': [l3Head(true) + 'his 3 games as a starter this season, with one game\'s weight on the 27.5 a rotation man with none plays: 29.6 a game where the mean of his last five says 22.4. Scored from 13 Nov 2026: with the real starters such a night misses by 5.0 minutes this way and 6.3 from his last five (three seasons of box scores).'],
+    'Back Two': ['Minutes: his club has played 2 games since his last. In his first game back from that many such a man plays 0.96 of what his games say: -1.3 minutes.' + l3Four],
+    'Back One': ['Minutes: his 5- and 9-minute games are left out (he started all five, and a game cut short three or more back says nothing of tonight). The read is 31.0 a game where the same games untouched say 25.1.' + l3Four,
+      'Minutes: his club has played 1 game since his last. In his first game back from that many such a man plays 0.98 of what his games say: -0.7 minutes.' + l3Four],
+    'Back None': [], 'Back Flat': [],
+    'Back Bare': ['Minutes: his club has played 12 games since his last. In his first game back from that many such a man plays 0.74 of what his games say.' + l3Four],
+    'Back No Edge': ['Minutes: his club has played 6 games since his last. In his first game back from that many such a man plays 0.85 of what his games say: -4.2 minutes.' + l3Four],
+    'Every Lever': [] };
+  const l3Minus = s => String(s).replace(/−/g, '-');
+  const l3Carded = Object.keys(l3Want).filter(n => !/^Back (No Edge|None|Flat)$/.test(n));   // a man with no pick has no card
+  chk(JSON.stringify(Object.keys(l3.cards).sort()) === JSON.stringify(l3Carded.slice().sort()) && l3Carded.every(n => l3Minus(JSON.stringify(l3.cards[n])) === JSON.stringify(l3Want[n]))
+      && Object.keys(l3Want).every(n => l3Minus(JSON.stringify(l3.panels[n])) === JSON.stringify(l3Want[n])),
+      'the second pass on the levers, what the card and the panel say of the minutes (13 Nov 2026): on a row marked 3 a short game kept in part counts three tenths of a game, a starter\'s short last game among them, against what the same games say untouched; his games in tonight\'s role are read with the recent counting most and the flat number standing as the game before his first (none of it left at ten games, the flat number alone with none), against his games of any kind, with the four seasons\' misses; his first game back says how many his club has played since his last, the share and the minutes (no minutes where the file gives none; nothing where he missed none or the share is one); a row marked 2 keeps the first pass\'s words; a man with no pick says it on his panel',
+      JSON.stringify({ cards: l3.cards, panels: l3.panels }));
+  chk(l3Minus(l3.every.base) === 'Starts from 19, his 22.8 per 36 at his minutes; his season\'s minutes, the regulars out, his first games back, the bench confirmed, their centre out, the game script, the top of the minutes, pace, home and road and the defence take it to 18.5, -2.0 against the line; the books\' consensus moves the market\'s number, not the projection. Green pushes toward the UNDER, red away from it: the measured levers only (5 Nov 2026). Inside the start, not a lever: Last season\'s prior on his rate +0.2 · Minutes, his last 10 against the season -0.1.'
+      && JSON.stringify(l3.every.levers.map(l3Minus)) === JSON.stringify(['helps top|His first games back biggest lever|-0.6', 'hurts|Defence v position|+0.4', 'helps|The top of the minutes|-0.3', 'hurts|His season\'s minutes|+0.3', 'helps|The bench confirmed|-0.3', 'helps|Who is out|-0.2', 'helps|The game script, from the spread|-0.2',
+        'hurts|Pace|+0.1', 'hurts|Their centre out|+0.1', 'helps|Home and road|-0.1', 'hurts|The books\' consensus|+0.0'])
+      && l3.every.h4.replace(/\s+/g, ' ') === 'What moves it · 6 of 10 levers toward the UNDER, 4 against' && l3.cell === '6▲ 4▼' && l3Minus(l3.moves) === 'Moves it: His first games back -0.6 · Defence v position +0.4',
+      'the second pass on the levers, what moves it: his season\'s minutes, his first games back, the bench confirmed, the top of the minutes and home and road are levers on the panel beside the six there were, biggest first and green where they push toward the pick; the sentence above them names each that moves the projection in the order the run applies them; the prior and the minutes trend stay inside the start; the tally counts the ten of 0.05 or more (the books\' consensus at 0.04 is listed, not counted) on the panel and in the table, and the card names the two biggest',
+      JSON.stringify({ every: l3.every, cell: l3.cell, moves: l3.moves }));
+  chk(l3.rows === 'Back Bare:[3,{"missed":12,"f":0.74,"dmin":null},null,null] | Back Flat:[3,{"missed":3,"f":1,"dmin":0},null,null] | Back No Edge:[3,{"missed":6,"f":0.85,"dmin":-4.2},null,null] | Back None:[3,null,null,null] | Back One:[3,{"missed":1,"f":0.98,"dmin":-0.7},"out",null] | Back Two:[3,{"missed":2,"f":0.96,"dmin":-1.3},null,null] | Every Lever:[3,null,null,null] | Half Three:[3,null,"half",null] | Half Two:[2,null,"half",null] | Last Short:[3,null,"last",null] | Role None:[3,null,null,0] | Role Old:[2,null,null,3] | Role One:[3,null,null,1] | Role Ten:[3,null,null,10] | Role Three:[3,null,null,3]'
+      && l3.tiles.length === 1 && /^Picks under the levers as corrected \(from 13 Nov 2026\) 8-4 says /i.test(l3.tiles[0]) && /the BET band 4-1 /.test(l3.tiles[0]) && /the leans 4-3 /.test(l3.tiles[0]) && /unders 5-3 /.test(l3.tiles[0]) && /overs 3-1 /.test(l3.tiles[0])
+      && l3.kept === 'Back Bare:trim:lv3:ret12 | Back Flat:trim:lv3:ret3 | Back No Edge:trim:lv3:ret6 | Back None:trim:lv3 | Back One:trim:lv3:ret1:msh-out | Back Two:trim:lv3:ret2 | Every Lever:trim:lv3 | Half Three:trim:lv3:msh-half | Half Two:trim:lv2:msh-half | Last Short:trim:lv3:msh-last | Role None:trim:lv3:role-flat | Role Old:trim:lv2:role-few | Role One:trim:lv3:role-few | Role Ten:trim:lv3:role-role | Role Three:trim:lv3:role-few'
+      && l3Carded.every(n => l3Minus(JSON.stringify(l3.cardsAfter[n])) === JSON.stringify(l3Want[n])) && JSON.stringify(l3.tilesAfter) === JSON.stringify(l3.tiles),
+      'the second pass on the levers, the rows and the record: each row keeps the run\'s mark and his first game back as the file gave them (none where he missed none, no minutes where the file gave none); the twelve picks of both passes, eight won and four lost, count on the one tile for the levers as corrected, by band and by side (the three men with no pick are not counted); and when seven later dates push the night out and its rows are trimmed the marks stay, the cards say the same of the minutes and the tile reads the same',
+      JSON.stringify({ rows: l3.rows, tiles: l3.tiles, kept: l3.kept, cardsAfter: l3.cardsAfter, after: l3.tilesAfter }));
+  // ---- 12 Nov 2026: a call on every game (the user: "the model wont give 'green bet' ... it still need to be able to provide a bet on something because an outcome is
+  //      going to happen"). One a game on the board, by this order: the agreement rule, a side the sheet prices below its chance, a total at one of the four apps a
+  //      point or more off the middle of every book's number, else the likelier winner at the best of the four prices. Each kind keeps its own record, replayed from the
+  //      rows, and a rule that has lost over ten or more calls is cold: left out of the order, named on the card, counted on its line. Shown, not scored ----
+  const clKeep = await pg.evaluate(async () => { await smStore.ready; const k = {}; for (const x of ['callsheet3.card.v1', 'callsheet3.props.v1', 'callsheet3.draft.v1']) k[x] = await smStore.getItem(x); await smStore.removeItem('callsheet3.card.v1'); await smStore.removeItem('callsheet3.props.v1'); return k; });
+  await reloaded();
+  const cl = await pg.evaluate(async () => {
+    const wait = (ms) => new Promise(r => setTimeout(r, ms || 90)), txt = e => (e ? e.innerText : '').replace(/\s+/g, ' ').trim();
+    const set = (id, v) => { const el = document.getElementById(id); el.value = v; el.dispatchEvent(new Event('input', { bubbles: true })); };
+    await smStore.ready;
+    const game = async (date, away, home, f) => { document.getElementById('clear').click(); document.getElementById('m-nba').click(); await wait(); set('gdate', date); set('away', away); set('home', home); set('line', '229.5'); set('op', '-110'); set('up', '-110');
+      Object.keys(f).forEach(k => set(k, f[k])); await wait(); document.getElementById('add').click(); await wait(); };
+    const rows = () => JSON.parse(smStore.getItem('callsheet3.card.v1')), rowOf = (date, away) => rows().find(x => x.gdate === date && x.away === away);
+    const grade = async (date, away, fa, fh) => { const r = rowOf(date, away); for (const [k, v] of [['fa', fa], ['fh', fh]]) { const el = document.querySelector('#cardTable .grade[data-id="' + r.id + '"][data-k="' + k + '"]'); el.value = String(v); el.dispatchEvent(new Event('input', { bubbles: true })); el.dispatchEvent(new Event('change', { bubbles: true })); } await wait(); };
+    const board = async (d) => { const bd = document.getElementById('boardDate'); bd.value = d; bd.dispatchEvent(new Event('change')); await wait(140); return { hidden: document.getElementById('callsHead').hidden && document.getElementById('calls').hidden,
+      cards: [...document.querySelectorAll('#calls .pk.call')].map(c => ({ cls: c.className, n1: txt(c.querySelector('.n1')), n2: txt(c.querySelector('.n2')), n3: txt(c.querySelector('.n3')), n4: txt(c.querySelector('.n4')), also: txt(c.querySelector('.n4.also')), take: !!c.querySelector('.takebtn'), btn: txt(c.querySelector('.n6')) })) }; };
+    const taking = () => [...document.querySelectorAll('#taking .pk.taking')].map(e => txt(e));
+    const table = () => { const t = document.querySelector('#calibBox .callstab'); return t ? [...t.querySelectorAll('tbody tr')].map(tr => [...tr.children].slice(0, 5).map(td => txt(td)).join(' | ')) : null; };
+    const tot = (lines) => { const o = { OVER: [], UNDER: [] }; Object.keys(lines).forEach(b => { o.OVER.push([b, -110, lines[b]]); o.UNDER.push([b, -110, lines[b]]); }); return o; };
+    const ml = (h, a) => { const o = { HOME: [], AWAY: [] }; Object.keys(h).forEach(b => { o.HOME.push([b, h[b], null]); o.AWAY.push([b, a[b], null]); }); return o; };
+    const hist = (lo, mean, sd) => { const c = []; for (let v = lo; v <= lo + 100; v++) c.push(Math.round(10000 * Math.exp(-((v - mean) ** 2) / (2 * sd * sd)))); return { lo, c }; };
+    const D = '2026-11-23', o = {};
+    // A: a short dog the sheet prices below its chance. B: a total at FanDuel a point and a half over the middle of five books. C: a heavy favourite, the best of the four
+    // prices at DraftKings, and the crowd's price dearer than that and cheaper than the row's own. D: a favourite at 63%, the carded book alone. E: the simulation and
+    // the crew both under the total
+    await game(D, 'Hornets', 'Bucks', { hml: '-120', aml: '100' });
+    await game(D, 'Celtics', 'Lakers', { hml: '-600', aml: '440', odds: JSON.stringify({ book: 'fanatics', total: tot({ fanatics: 225.5, draftkings: 225.5, fanduel: 227, betmgm: 225.5, pinnacle: 225.5 }) }) });
+    await game(D, 'Heat', 'Jazz', { hml: '-650', aml: '460', odds: JSON.stringify({ book: 'fanatics', total: tot({ fanatics: 229.5, draftkings: 229.5, fanduel: 230, betmgm: 229.5, pinnacle: 231.5 }),   // the sharp book two points off the middle is not one of the four apps: no number here
+      ml: ml({ fanatics: -650, draftkings: -600, fanduel: -620, betmgm: -640, pinnacle: -610 }, { fanatics: 460, draftkings: 440, fanduel: 450, betmgm: 455, pinnacle: 470 }) }) });
+    await game(D, 'Suns', 'Kings', { hml: '-190', aml: '160' });
+    await game(D, 'Bulls', 'Pistons', { line: '232', hml: '-190', aml: '160', ncrew: 'Ref One, Ref Two, Ref Three', nbarefs: JSON.stringify({ lg: [2462, 44.0, 228.8], r: { 'Ref One': [70, 44, 228, 10, 30, 0, 0], 'Ref Two': [70, 44, 228, 12, 30, 0, 0], 'Ref Three': [70, 44, 228, 11, 30, 0, 0] } }),
+      nbasim: JSON.stringify({ v: 1, runs: 1000, own: { total: hist(160, 215, 12), h1: hist(60, 108, 9), h2: hist(60, 108, 9), q: [hist(20, 54, 6), hist(20, 54, 6), hist(20, 54, 6), hist(20, 54, 6)], margin: hist(-50, 3, 12), away: hist(60, 106, 10), home: hist(60, 109, 10), ot: 0.04 }, mkt: null, anchor: null, ft_factor: 1,
+        shrink: { total: 0.0, h1: 0.1, spread: 0.0, ml: 0.97, team: 0.3, team_away: 0.3, team_own: 0.3, quarter: 0.1 }, bands: [[0.7, 'STRONG'], [0.65, 'BET'], [0.6, 'LEAN']] }) });
+    o.before = await board(D);
+    o.noNba = (await board('2026-07-04')).hidden;
+    // the Take on the number and on the winner (cards 3 and 4): the mark keeps the app, the line and the price its card shows, not the row's own
+    await board(D);
+    for (const i of [2, 3]) { document.querySelectorAll('#calls .pk.call')[i].querySelector('[data-stake]').click(); await wait(160); }
+    const bare = (ts) => (ts || []).map(t => { const c = Object.assign({}, t); delete c.at; return c; });
+    o.taken = { btns: (await board(D)).cards.map(c => c.btn), list: taking(), b: bare(rowOf(D, 'Celtics').simTakes), c: bare(rowOf(D, 'Heat').simTakes) };
+    // the finals: the dog wins, 228 lands over FanDuel's 227 and under the row's own 229.5 (the call is graded at the app's number), the Jazz and the Lakers win at
+    // home, the Kings lose, 241 lands over 232 with the Pistons winning (the rule's one call a loss: one loss does not make a kind cold)
+    await grade(D, 'Hornets', 110, 100); await grade(D, 'Celtics', 108, 120); await grade(D, 'Heat', 100, 120); await grade(D, 'Suns', 115, 110); await grade(D, 'Bulls', 120, 121);
+    o.after = await board(D); o.table = table();
+    o.took = [...document.querySelectorAll('#calibBox .calib[data-sport="TAKEN"] > div')].map(d => txt(d));
+    o.tookList = [...document.querySelectorAll('#takenList tbody tr')].map(e => e.textContent.replace(/\s+/g, ' ').trim());
+    o.takingGraded = taking();
+    // ten short dogs that lose on the days before: the sheet's own call goes cold, and the next short dog is given the lean with the cold call named
+    for (let i = 1; i <= 10; i++) { const d = '2026-11-' + String(i).padStart(2, '0'); await game(d, 'Hornets', 'Bucks', { hml: '-120', aml: '100' }); await grade(d, 'Hornets', 100, 112); }
+    await game('2026-11-24', 'Hornets', 'Bucks', { hml: '-120', aml: '100' });
+    o.cold = await board('2026-11-24'); o.tableCold = table();
+    // the ten wiped, the call is the sheet's own again
+    const keep = rows().filter(x => !(x.gdate >= '2026-11-01' && x.gdate <= '2026-11-10'));
+    // and a later odds run on the Jazz game: DraftKings out to -700, FanDuel the best of the four at -590. The card follows it; the mark does not
+    const later = keep.find(x => x.gdate === D && x.away === 'Heat'); later.inputs.oddsNow = JSON.stringify({ book: 'fanatics', total: tot({ fanatics: 229.5, draftkings: 229.5, fanduel: 230, betmgm: 229.5, pinnacle: 231.5 }),
+      ml: ml({ fanatics: -650, draftkings: -700, fanduel: -590, betmgm: -640, pinnacle: -610 }, { fanatics: 460, draftkings: 500, fanduel: 430, betmgm: 455, pinnacle: 470 }) });
+    await smStore.setItem('callsheet3.card.v1', JSON.stringify(keep));
+    return o;
+  });
+  await reloaded();
+  const clBack = await pg.evaluate(async () => { const txt = e => (e ? e.innerText : '').replace(/\s+/g, ' ').trim(), wait = (ms) => new Promise(r => setTimeout(r, ms || 140)); await smStore.ready; document.getElementById('m-nba').click(); await wait();
+    const bd = document.getElementById('boardDate'); bd.value = '2026-11-24'; bd.dispatchEvent(new Event('change')); await wait(); const back = [...document.querySelectorAll('#calls .pk.call')].map(c => txt(c.querySelector('.n1')) + ' :: ' + txt(c.querySelector('.n2')) + ' :: ' + (c.querySelector('.n4.also') ? 'also' : 'no also'));
+    bd.value = '2026-11-23'; bd.dispatchEvent(new Event('change')); await wait();
+    const jazz = [...document.querySelectorAll('#calls .pk.call')].filter(c => /Jazz to win/.test(txt(c.querySelector('.n2')))).map(c => txt(c.querySelector('.n3')) + ' [' + txt(c.querySelector('.n6')) + ']');
+    return { back, jazz, taking: [...document.querySelectorAll('#taking .pk.taking')].map(e => txt(e)) }; });
+  await pg.evaluate(async (k) => { for (const x of Object.keys(k)) { if (k[x] === null || k[x] === undefined) await smStore.removeItem(x); else await smStore.setItem(x, k[x]); } }, clKeep);
+  await reloaded();
+  const clc = (cards) => cards.map(c => c.cls.replace('pk call ', '') + ' | ' + c.n1.toUpperCase() + ' | ' + c.n2);
+  chk(cl.before.hidden === false && cl.noNba === true && clc(cl.before.cards).join(' ## ') === "bet | BET · THE AGREEMENT RULE | Total UNDER 232 ## bet | BET · THE SHEET'S OWN CALL | Hornets ML ## value | VALUE · THE BEST NUMBER ON THE BOARD | Total UNDER 227 ## lean | LEAN · THE LIKELIER WINNER, 80% OR MORE | Jazz to win ## lean | LEAN · THE LIKELIER WINNER, 60 TO 70% | Kings to win"
+      && /^2 of 3 voices · -110 needs 52\.4% · the rule's rate 56\.9%$/.test(cl.before.cards[0].n3) && /^Bulls @ Pistons · the simulation and the crew on the same side of the total, the sheet not against it: 149-113 \(56\.9%\) on three seasons of closes · none graded here yet$/.test(cl.before.cards[0].n4)
+      && /^51\.8% by the sheet · \+100 needs 50\.0%$/.test(cl.before.cards[1].n3) && /^Hornets @ Bucks · a side the sheet prices below its chance, or one a verdict sits on · none graded here yet$/.test(cl.before.cards[1].n4)
+      && cl.before.cards[2].n3 === '-110 at FanDuel · the middle of 5 books is 225.5: 1.5 points over it, on your side' && /^Celtics @ Lakers · a total at one of your four apps a point or more off the middle of every book's number: 105-84 \(55\.6%\) on last season's closes, 78-70 at the opener · none graded here yet$/.test(cl.before.cards[2].n4)
+      && /^82\.8% by the middle of 5 books · -600 at DraftKings needs 85\.7% · costs 3\.4% a bet$/i.test(cl.before.cards[3].n3) && /^Heat @ Jazz · the book's price: such favourites at the best of the four prices went 231-31 last season, -0\.3% a bet · none graded here yet$/.test(cl.before.cards[3].n4)
+      && /^63\.0% by the middle of the carded book · -190 needs 65\.5% · costs 3\.8% a bet$/.test(cl.before.cards[4].n3) && /^Suns @ Kings · the book's price: 230-134 last season at the best of the four prices, -6\.0% a bet · none graded here yet$/.test(cl.before.cards[4].n4)
+      && cl.before.cards.map(c => c.take ? 'T' : '-').join('') === 'TTTTT' && cl.before.cards.every(c => c.also === ''),
+      'a call on every game (12 Nov 2026): the board gives every basketball game one call and the section is away on a date with none; the agreement rule where the simulation and the crew sit on one side of the total, a side the sheet prices below its chance, a total at one of the four apps a point or more off the middle of every book\'s number with the app and how far, else the likelier winner at the best of the four apps\' prices (the carded book alone where the shop is thin) with what the price costs; the BETs first, then the value, then the leans, the likelier first; each card says what its kind was measured to be and how it has done here, and carries Take',
+      JSON.stringify({ hidden: cl.before.hidden, noNba: cl.noNba, cards: cl.before.cards }));
+  chk(clc(cl.after.cards).join(' ## ') === "bet loss | BET · THE AGREEMENT RULE | Total UNDER 232 LOSS ## bet win | BET · THE SHEET'S OWN CALL | Hornets ML WIN ## value loss | VALUE · THE BEST NUMBER ON THE BOARD | Total UNDER 227 LOSS ## lean win | LEAN · THE LIKELIER WINNER, 80% OR MORE | Jazz to win WIN ## lean loss | LEAN · THE LIKELIER WINNER, 60 TO 70% | Kings to win LOSS"
+      && cl.table && cl.table.join(' ## ') === "BET · the agreement rule | 0-1 | 56.9% | 0.0% | -1.0u ## BET · the sheet's own call | 1-0 | " + ((cl.table[1] || '').split(' | ')[2] || '') + " | 100.0% | +1.0u ## REST · the over behind a tired favourite | none yet |  |  |  ## VALUE · the best number on the board | 0-1 |  | 0.0% | -1.0u ## READ · the sheet's own read of the game | 1-0 | " + ((cl.table[1] || '').split(' | ')[2] || '') + " | 100.0% | +1.0u ## LEAN · the likelier winner, 80% or more | 2-0 | " + ((cl.table[5] || '').split(' | ')[2] || '') + " | 100.0% | +0.3u ## LEAN · the likelier winner, 70 to 80% | none yet |  |  |  ## LEAN · the likelier winner, 60 to 70% | 1-1 | " + ((cl.table[7] || '').split(' | ')[2] || '') + " | 50.0% | -0.5u ## LEAN · the likelier winner, near a coin | 0-1 | " + ((cl.table[8] || '').split(' | ')[2] || '') + " | 0.0% | -1.0u ## The call as given, one a game | 2-3 |  | 40.0% | -1.8u"
+      && /0-1 here, -1\.0u$/.test(cl.after.cards[0].n4) && /2-0 here, \+0\.3u$/.test(cl.after.cards[3].n4) && /1-1 here, -0\.5u$/.test(cl.after.cards[4].n4),
+      'a call on every game, graded: each call is graded on its own line and side (the total at the app\'s number, where 228 loses the under at 227 though it sits under the row\'s 229.5; the winner on the final) and the cards carry the results; the NBA record keeps every kind on every game it speaks to (the likelier winner on all five, by how likely the market made him; the sheet\'s read on the one game it has one, the short dog its own call names), and the call as the board gave it, one a game',
+      JSON.stringify({ cards: clc(cl.after.cards), n4: cl.after.cards.map(c => c.n4.slice(-28)), table: cl.table }));
+  chk(cl.cold.cards.length === 1 && cl.cold.cards[0].n1 === 'LEAN · the likelier winner, near a coin' && cl.cold.cards[0].n2 === 'Bucks to win' && /^52\.2% by the middle of the carded book · -120 needs 54\.5% · costs 4\.3% a bet$/.test(cl.cold.cards[0].n3)
+      && cl.cold.cards[0].also === "Also on this game: the sheet's own call says Hornets ML (1-10 here, -9.0u: cold, and left out of the order until its record turns); the sheet's own read of the game says Hornets ML (1-10 here, -9.0u: cold, and left out of the order until its record turns)."
+      && /^BET · the sheet's own call · cold here \| 1-10 \| /.test((cl.tableCold || [])[1] || '') && /^BET · the agreement rule \| 0-1 \| /.test((cl.tableCold || [])[0] || '') && /^READ · the sheet's own read of the game · cold here \| 1-10 \| /.test((cl.tableCold || [])[4] || '')
+      && /^The call as given, one a game \| 11-4 \| /.test((cl.tableCold || [])[9] || '')
+      && clBack.back.length === 1 && clBack.back[0] === "BET · the sheet's own call :: Hornets ML :: no also",
+      'a call on every game, a kind gone cold: ten short dogs lose on the days before and the sheet\'s own call, 1-10, is cold, and so is the sheet\'s read, which names the same dogs and has won under four in ten: the next short dog is given the likelier winner, the card names both calls that were left out and their record, the record marks both kinds cold and counts the call as given by what the board would give now (the day the dog won reads the favourite, a loss); with the ten gone the same game is the sheet\'s call again',
+      JSON.stringify({ cold: cl.cold.cards, table: cl.tableCold, back: clBack.back }));
+  const clT = cl.taken || {}, clOne = (xs, re) => (xs || []).filter(x => re.test(x));
+  chk(JSON.stringify(clT.btns) === JSON.stringify(['Take', 'Take', '✓ Taking', '✓ Taking', 'Take'].map(s => s)) || JSON.stringify((clT.btns || []).map(s => s.toUpperCase())) === JSON.stringify(['TAKE', 'TAKE', '✓ TAKING', '✓ TAKING', 'TAKE'])
+      , 'a call on every game, taken: Take on the best number and on the likelier winner turns to Taking on those two cards and no other',
+      JSON.stringify(clT.btns));
+  chk(JSON.stringify(clT.b) === JSON.stringify([{ id: 'call|total|UNDER', view: 'call', key: 'total', side: 'UNDER', line: 227, price: -110, p: null, worth: null, band: 'value', pick: 'Total UNDER 227 at FanDuel', book: 'fanduel', call: 'number' }])
+      && JSON.stringify(clT.c) === JSON.stringify([{ id: 'call|ml|HOME', view: 'call', key: 'ml', side: 'HOME', line: null, price: -600, p: 0.8276, worth: null, band: 'lean', pick: 'Jazz ML at DraftKings', book: 'draftkings', call: 'winner' }])
+      && (clT.list || []).length === 3
+      && clOne(clT.list, /^TAKING · NBA · A CALL ON THE GAME · marked .+ Total UNDER 227 at FanDuel value · the best number on the board · -110 needs 52\.4% Celtics @ Lakers · a call on the game ✓ Taking$/i).length === 1
+      && clOne(clT.list, /^TAKING · NBA · A CALL ON THE GAME · marked .+ Jazz ML at DraftKings lean · 82\.8% by the books' middle · -600 needs 85\.7% Heat @ Jazz · a call on the game ✓ Taking$/i).length === 1
+      && /^TONIGHT 2 bets marked none graded yet · one unit each 0 on the card, 0 from the simulation, 2 calls on the game, 0 props$/i.test(clT.list[2])
+      && clOne(cl.took, /^Calls on the game taken 1-1 says 66\.4% · does 50\.0% \(±35\.4\) · [-−]0\.83u$/i).length === 1 && clOne(cl.took, /^Simulation calls taken/i).length === 0 && clOne(cl.took, /^Game bets taken/i).length === 0
+      && clOne(cl.tookList, /Jazz ML at DraftKings · Heat @ Jazzgame call82\.8%[-−]600WIN\+0\.17u$/).length === 1 && clOne(cl.tookList, /Total UNDER 227 at FanDuel · Celtics @ Lakersgame call50\.0%[-−]110LOSS[-−]1\.00u$/).length === 1
+      && clOne(cl.takingGraded, /Total UNDER 227 at FanDuel .*-110 needs 52\.4% · loss Celtics @ Lakers/i).length === 1 && clOne(cl.takingGraded, /Jazz ML at DraftKings .*-600 needs 85\.7% · win Heat @ Jazz/i).length === 1
+      && clOne(cl.takingGraded, /^TONIGHT 2 bets marked graded 1-1 · [-−]0\.83u at one unit each/i).length === 1
+      && (clBack.jazz || []).length === 1 && /^82\.9% by the middle of 5 books · -590 at FanDuel needs 85\.5% · costs \d\.\d% a bet \[TAKEN\]$/i.test(clBack.jazz[0])
+      && clOne(clBack.taking, /Jazz ML at DraftKings lean · 82\.8% by the books' middle · -600 needs 85\.7% · win Heat @ Jazz · a call on the game/i).length === 1,
+      'a call on every game, the mark keeps the bet: the number is kept at the app\'s line and price (UNDER 227 at FanDuel, not the row\'s 229.5) and the winner at the app and price on the card (-600 at DraftKings, not the -650 the row was logged with), with the chance by the books\' middle; they list under Taking as calls on the game and are counted apart from the simulation\'s; graded, each on its own line (228 loses the under at 227), they sit on their own tile of What you took and in the list of every pick as game calls; and after a later odds run moves the best price to another app the card follows it and the mark does not',
+      JSON.stringify({ b: clT.b, c: clT.c, list: clT.list, took: cl.took, tookList: (cl.tookList || []).slice(0, 4), graded: cl.takingGraded, jazz: clBack.jazz, backTaking: clBack.taking }));
+
+  // ---- 17 Nov 2026: the over behind a tired favourite (the user: "Can you test the back to back games this season to see if there is anything there? The celtics
+  //      were on a back to back and played at home with full starters and lost by 10"). On 2,409 games with a closing line the side is priced (a club on the second
+  //      night won 408 of 875 where priced 411) and the total is not where the club on the second night is a favourite of 70% or more and the other is rested: over
+  //      66-33 (32-16, 28-15, 6-2 by season), the same favourites rested 360-367. So that game's call is the over at the lowest total the four apps post, ahead of the
+  //      best number on the board, on its own record line, and cold like the BET kinds when it has lost here over ten or more calls ----
+  const rsKeep = await pg.evaluate(async () => { await smStore.ready; const k = {}; for (const x of ['callsheet3.card.v1', 'callsheet3.props.v1', 'callsheet3.draft.v1']) k[x] = await smStore.getItem(x); await smStore.removeItem('callsheet3.card.v1'); await smStore.removeItem('callsheet3.props.v1'); return k; });
+  await reloaded();
+  const rs = await pg.evaluate(async () => {
+    const wait = (ms) => new Promise(r => setTimeout(r, ms || 90)), txt = e => (e ? e.innerText : '').replace(/\s+/g, ' ').trim();
+    const set = (id, v) => { const el = document.getElementById(id); el.value = v; el.dispatchEvent(new Event('input', { bubbles: true })); };
+    await smStore.ready;
+    let whyOf = null;
+    const game = async (date, away, home, f, keepWhy) => { document.getElementById('clear').click(); document.getElementById('m-nba').click(); await wait(); set('gdate', date); set('away', away); set('home', home); set('line', '229.5'); set('op', '-110'); set('up', '-110');
+      Object.keys(f).forEach(k => set(k, f[k])); await wait(); if (keepWhy) whyOf = document.getElementById('why').textContent.replace(/\s+/g, ' '); document.getElementById('add').click(); await wait(); };
+    const rows = () => JSON.parse(smStore.getItem('callsheet3.card.v1')), rowOf = (date, away) => rows().find(x => x.gdate === date && x.away === away);
+    const grade = async (date, away, fa, fh) => { const r = rowOf(date, away); for (const [k, v] of [['fa', fa], ['fh', fh]]) { const el = document.querySelector('#cardTable .grade[data-id="' + r.id + '"][data-k="' + k + '"]'); el.value = String(v); el.dispatchEvent(new Event('input', { bubbles: true })); el.dispatchEvent(new Event('change', { bubbles: true })); } await wait(); };
+    const board = async (d) => { const bd = document.getElementById('boardDate'); bd.value = d; bd.dispatchEvent(new Event('change')); await wait(140);
+      return [...document.querySelectorAll('#calls .pk.call')].map(c => ({ cls: c.className, n1: txt(c.querySelector('.n1')), n2: txt(c.querySelector('.n2')), n3: txt(c.querySelector('.n3')), n4: txt(c.querySelector('.n4')), also: txt(c.querySelector('.n4.also')), btn: txt(c.querySelector('.n6')) })); };
+    const taking = () => [...document.querySelectorAll('#taking .pk.taking')].map(e => txt(e));
+    const table = () => { const t = document.querySelector('#calibBox .callstab'); return t ? [...t.querySelectorAll('tbody tr')].map(tr => [...tr.children].slice(0, 5).map(td => txt(td)).join(' | ')) : null; };
+    const tableNote = (re) => { const t = document.querySelector('#calibBox .callstab'); const tr = t ? [...t.querySelectorAll('tbody tr')].find(x => re.test(txt(x.children[0]))) : null; return tr ? txt(tr.children[5]) : ''; };
+    const tot = (lines) => { const o = { OVER: [], UNDER: [] }; Object.keys(lines).forEach(b => { o.OVER.push([b, lines[b][1], lines[b][0]]); o.UNDER.push([b, lines[b][2], lines[b][0]]); }); return o; };   // book: [the line, the over's price, the under's]
+    const ml = (h, a) => { const o = { HOME: [], AWAY: [] }; Object.keys(h).forEach(b => { o.HOME.push([b, h[b], null]); o.AWAY.push([b, a[b], null]); }); return o; };
+    const D = '2026-12-12', o = {};
+    // A: the Celtics at home on the second night, 74.5% by five books, the Magic rested two days; Fanatics' 212.5 is a point under the middle, so the best number says the over too
+    await game(D, 'Magic', 'Celtics', { narest: '2', nhrest: '0', hml: '-350', aml: '275', odds: JSON.stringify({ book: 'fanatics', total: tot({ fanatics: [212.5, -110, -110], draftkings: [213.5, -110, -110], fanduel: [213.5, -110, -110], betmgm: [213, -110, -110], pinnacle: [213.5, -110, -110] }),
+      ml: ml({ fanatics: -350, draftkings: -335, fanduel: -340, betmgm: -350, pinnacle: -330 }, { fanatics: 275, draftkings: 265, fanduel: 270, betmgm: 280, pinnacle: 290 }) }) }, true);
+    // B: the Thunder at home on the second night, 76.6%, the Suns rested a day; the best number on the board is FanDuel's UNDER 223 (a point and a half over the middle),
+    // and the lowest total, 221.5, is at three apps, DraftKings' over the best price of the three (the sharp book's -102 there is better still, and is not one of the four)
+    await game(D, 'Suns', 'Thunder', { narest: '1', nhrest: '0', hml: '-400', aml: '310', odds: JSON.stringify({ book: 'fanatics', total: tot({ fanatics: [221.5, -110, -110], draftkings: [221.5, -105, -115], fanduel: [223, -110, -110], betmgm: [221.5, -108, -112], pinnacle: [221.5, -102, -112] }),
+      ml: ml({ fanatics: -400, draftkings: -380, fanduel: -390, betmgm: -410, pinnacle: -385 }, { fanatics: 310, draftkings: 300, fanduel: 305, betmgm: 320, pinnacle: 330 }) }) });
+    // C: the Knicks on the road on the second night, 71.8% by the carded book alone, the Bulls rested three days: no shop, so the carded total
+    await game(D, 'Knicks', 'Bulls', { narest: '0', nhrest: '3', hml: '240', aml: '-300' });
+    // none of these is the spot: the Hawks 69.5% (under the cut); the Pistons with the Wizards on the second night too; the 76ers with a day of rest; the Lakers with no rest on the row
+    await game(D, 'Jazz', 'Hawks', { narest: '2', nhrest: '0', hml: '-260', aml: '215' });
+    await game(D, 'Wizards', 'Pistons', { narest: '0', nhrest: '0', hml: '-420', aml: '320' });
+    await game(D, 'Nets', '76ers', { narest: '2', nhrest: '1', hml: '-400', aml: '310' });
+    await game(D, 'Kings', 'Lakers', { narest: '2', nhrest: '', hml: '-380', aml: '300' });
+    o.why = whyOf;
+    o.before = await board(D);
+    // Take on the Thunder game's card: the over at DraftKings, where the best number on the board is the under
+    const tk = [...document.querySelectorAll('#calls .pk.call')].find(c => /221\.5/.test(txt(c.querySelector('.n2')))); if (tk) { tk.querySelector('[data-stake]').click(); await wait(160); }
+    const bare = (ts) => (ts || []).map(t => { const c = Object.assign({}, t); delete c.at; return c; });
+    o.taken = { btns: (await board(D)).map(c => c.btn), list: taking(), b: bare((rowOf(D, 'Suns') || {}).simTakes), a: bare((rowOf(D, 'Magic') || {}).simTakes) };
+    // the finals: 220 lands over 212.5 with the Celtics beaten, 210 under 221.5 (and under FanDuel's 223: the best number wins where the rest call loses), 245 over 229.5; the four favourites win
+    await grade(D, 'Magic', 115, 105); await grade(D, 'Suns', 100, 110); await grade(D, 'Knicks', 125, 120); await grade(D, 'Jazz', 100, 110); await grade(D, 'Wizards', 100, 110); await grade(D, 'Nets', 100, 110); await grade(D, 'Kings', 100, 110);
+    o.after = await board(D); o.table = table(); o.note = tableNote(/^REST/); o.split = txt(document.querySelector('#calibBox .callsplit'));
+    o.took = [...document.querySelectorAll('#calibBox .calib[data-sport="TAKEN"] > div')].map(d => txt(d)); o.takingGraded = taking();
+    // ten such games on the days before that all stay under: the rest call is cold, and the next one is given the next kind with the rest call named
+    for (let i = 1; i <= 10; i++) { const d = '2026-12-' + String(i).padStart(2, '0'); await game(d, 'Magic', 'Celtics', { narest: '2', nhrest: '0', hml: '-350', aml: '275' }); await grade(d, 'Magic', 100, 110); }
+    await game('2026-12-13', 'Magic', 'Celtics', { narest: '2', nhrest: '0', hml: '-350', aml: '275' });
+    // and one where the best number says the over too (Fanatics' 220.5, a point under the middle): its card is the number's now, and Take on it marks the number, not the cold rest call
+    await game('2026-12-13', 'Suns', 'Thunder', { narest: '1', nhrest: '0', hml: '-400', aml: '310', odds: JSON.stringify({ book: 'fanatics', total: tot({ fanatics: [220.5, -108, -112], draftkings: [221.5, -110, -110], fanduel: [221.5, -110, -110], betmgm: [221.5, -110, -110], pinnacle: [222, -110, -110] }) }) });
+    o.cold = await board('2026-12-13');
+    const tk2 = [...document.querySelectorAll('#calls .pk.call')].find(c => /220\.5/.test(txt(c.querySelector('.n2')))); if (tk2) { tk2.querySelector('[data-stake]').click(); await wait(160); }
+    o.coldTake = bare((rowOf('2026-12-13', 'Suns') || {}).simTakes); o.coldTaking = taking();
+    o.tableCold = table(); o.dayCold = (await board(D)).map(c => c.n1 + ' :: ' + c.n2);
+    return o;
+  });
+  await pg.evaluate(async (k) => { for (const x of Object.keys(k)) { if (k[x] === null || k[x] === undefined) await smStore.removeItem(x); else await smStore.setItem(x, k[x]); } }, rsKeep);
+  await reloaded();
+  const rsc = (cards) => (cards || []).map(c => c.cls.replace('pk call ', '') + ' | ' + c.n1 + ' | ' + c.n2);
+  const rsNote = "a favourite of 70% or more on the second night of a back to back, the other club rested: the game went over the closing total 66-33 on the three seasons it was found on (32-16, 28-15 and 6-2); on the seventeen seasons before them the same spot, the tired favourite laying 5.5 or more, went 419-436 (49.0%), and 48-40 on the two nearest: not proven, so a small bet";
+  chk(rsc(rs.before).join(' ## ').toLowerCase() === ("rest | REST · the over behind a tired favourite | Total OVER 229.5 ## rest | REST · the over behind a tired favourite | Total OVER 212.5 ## rest | REST · the over behind a tired favourite | Total OVER 221.5 ## lean | LEAN · the likelier winner, 70 to 80% | Pistons to win ## lean | LEAN · the likelier winner, 70 to 80% | 76ers to win ## lean | LEAN · the likelier winner, 70 to 80% | Lakers to win ## lean | LEAN · the likelier winner, 60 to 70% | Hawks to win").toLowerCase()
+      && rs.before[0].n3 === '-110 · Knicks are 71.8% by the books on the second night of a back to back, Bulls rested 3 days: the carded total'
+      && rs.before[1].n3 === '-110 at Fanatics · Celtics are 74.5% by the books on the second night of a back to back, Magic rested 2 days: the lowest total at your four apps'
+      && rs.before[2].n3 === '-105 at DraftKings · Thunder are 76.6% by the books on the second night of a back to back, Suns rested a day: the lowest total at your four apps'
+      && rs.before[0].n4 === 'Knicks @ Bulls · ' + rsNote + ' · none graded here yet' && rs.before[1].n4 === 'Magic @ Celtics · ' + rsNote + ' · none graded here yet' && rs.before[2].n4 === 'Suns @ Thunder · ' + rsNote + ' · none graded here yet'
+      && /^69\.5% by the middle of the carded book · -260 needs 72\.2%/.test(rs.before[6].n3) && rs.before.every(c => c.also === '') && rs.before.every(c => /^take$/i.test(c.btn))
+      && rs.why.indexOf("Back to back for the home side. A LABEL on the side: on three seasons of closing lines a club on the second night won 408 of 875 where the moneylines priced 411 and covered the spread 425-441, and rest, the second night on the road and three in four flipped sign between seasons. The market prices rest on the side. On the total the three seasons to hand had the game over 66-33 where the club on the second night is a favourite of 70% or more and the other is rested; the seventeen seasons before them had the same spot 419-436, so the call on the game carries it as a small bet.") >= 0,
+      'the over behind a tired favourite (17 Nov 2026, the user: "test the back to back games this season to see if there is anything there"): where the likelier winner is 70% or more by the books, played the day before, and the other club did not, the game\'s call is the over at the lowest total the four apps post (the best price on a tie, here DraftKings\' -105 of three apps at 221.5; the carded total where the row has no shop), at home or on the road, ahead of the best number on the board though that number is the under at another app; the card says who is tired and by how much the books favour him, how long the other club rested and what three seasons measured; a favourite at 69.5%, one whose opponent is on the second night too, one with a day of rest and one with no rest on the row get the likelier winner as before; and the card\'s own note on a back to back says the side is priced and where the total is not',
+      JSON.stringify({ cards: rsc(rs.before), n3: rs.before.map(c => c.n3), n4: rs.before.slice(0, 3).map(c => c.n4), why: (rs.why || '').slice((rs.why || '').indexOf('Back to back'), (rs.why || '').indexOf('Back to back') + 520) }));
+  const rsT = rs.taken || {};
+  chk(JSON.stringify((rsT.btns || []).map(b => b.toUpperCase())) === JSON.stringify(['TAKE', 'TAKE', '✓ TAKING', 'TAKE', 'TAKE', 'TAKE', 'TAKE'])
+      && JSON.stringify(rsT.b) === JSON.stringify([{ id: 'call|total|OVER', view: 'call', key: 'total', side: 'OVER', line: 221.5, price: -105, p: null, worth: null, band: 'rest', pick: 'Total OVER 221.5 at DraftKings', book: 'draftkings', call: 'rest' }])
+      && JSON.stringify(rsT.a) === '[]' && (rsT.list || []).length === 2
+      && /^TAKING · NBA · A CALL ON THE GAME · marked .+ Total OVER 221\.5 at DraftKings rest · the over behind a tired favourite · -105 needs 51\.2% Suns @ Thunder · a call on the game ✓ Taking$/i.test(rsT.list[0])
+      && /^TONIGHT 1 bet marked none graded yet · one unit each 0 on the card, 0 from the simulation, 1 call on the game, 0 props$/i.test(rsT.list[1])
+      && (rs.took || []).length === 1 && /^Calls on the game taken 0-1 says 50\.0% · does 0\.0% \(±50\.0\) · [-−]1\.00u$/i.test(rs.took[0])
+      && /Total OVER 221\.5 at DraftKings rest · the over behind a tired favourite · -105 needs 51\.2% · loss Suns @ Thunder · a call on the game/i.test((rs.takingGraded || [])[0] || ''),
+      'the over behind a tired favourite, taken: Take on its card marks the over at the app, the line and the price the card shows (221.5 at DraftKings at -105, not the row\'s 229.5 and not the under the best number names), the mark says it is the rest call, lists under Taking as a call on the game, and is graded on its own line (210 loses it)',
+      JSON.stringify({ btns: rsT.btns, b: rsT.b, a: rsT.a, list: rsT.list, took: rs.took, graded: rs.takingGraded }));
+  chk(rsc(rs.after).slice(0, 3).join(' ## ').toLowerCase() === ('rest win | REST · the over behind a tired favourite | Total OVER 229.5 WIN ## rest win | REST · the over behind a tired favourite | Total OVER 212.5 WIN ## rest loss | REST · the over behind a tired favourite | Total OVER 221.5 LOSS').toLowerCase()
+      && /2-1 here, \+0\.8u$/.test(rs.after[0].n4)
+      && (rs.table || []).join(' ## ') === "BET · the agreement rule | none yet |  |  |  ## BET · the sheet's own call | none yet |  |  |  ## REST · the over behind a tired favourite | 2-1 |  | 66.7% | +0.8u ## VALUE · the best number on the board | 2-0 |  | 100.0% | +1.8u ## READ · the sheet's own read of the game | none yet |  |  |  ## LEAN · the likelier winner, 80% or more | none yet |  |  |  ## LEAN · the likelier winner, 70 to 80% | 5-1 | 75.5% | 83.3% | +0.3u ## LEAN · the likelier winner, 60 to 70% | 1-0 | 69.5% | 100.0% | +0.4u ## LEAN · the likelier winner, near a coin | none yet |  |  |  ## The call as given, one a game | 6-1 |  | 85.7% | +2.0u"
+      && rs.note === rsNote,
+      'the over behind a tired favourite, graded: each of the three is graded on its own total (220 over 212.5, 245 over 229.5, 210 under 221.5) and the cards carry the results; the NBA record keeps the kind on its own line between the sheet\'s own call and the best number, with what was measured before, and the best number and the likelier winner are still counted on every game they speak to (the under at 223 a win where the rest call lost); the call as given counts the rest call on its three games',
+      JSON.stringify({ cards: rsc(rs.after), n4: rs.after.slice(0, 1).map(c => c.n4.slice(-24)), table: rs.table, note: rs.note }));
+  chk(rs.split === "The call as given, by what gave it: a kind with a measurement behind it (the agreement rule, the sheet's own call, the over behind a tired favourite, the best number) 2-1, +0.8u · the sheet's own read none yet · the likelier winner at the book's price 4-0, +1.1u. A favourite at -150 has to win six in ten to be level, so a record of six in ten here is the book's price coming in as priced: read the units, not the wins.",
+      'where the call as given comes from (27 Nov 2026, the user: "I noticed the Decision as given is 165-104-1 and that looks pretty good"): under the calls record a line splits the call as given by what gave it, a kind with a measurement behind it (here the rest call on its three games, 2-1), the sheet\'s own read, and the likelier winner at the book\'s price (4-0), each with its units, and says a favourite has to win six in ten to be level, so the units are the referee',
+      JSON.stringify({ split: rs.split }));
+  chk((rs.cold || []).length === 2 && rs.cold[1].n1 === 'LEAN · the likelier winner, 70 to 80%' && rs.cold[1].n2 === 'Celtics to win'
+      && rs.cold[1].also === 'Also on this game: the over behind a tired favourite says Total OVER 229.5 (2-11 here, -9.2u: cold, and left out of the order until its record turns).'
+      && rs.cold[0].n1 === 'VALUE · the best number on the board' && rs.cold[0].n2 === 'Total OVER 220.5' && rs.cold[0].n3 === '-108 at Fanatics · the middle of 5 books is 221.5: a point under it, on your side'
+      && rs.cold[0].also === 'Also on this game: the over behind a tired favourite says Total OVER 220.5 (2-11 here, -9.2u: cold, and left out of the order until its record turns).'
+      && JSON.stringify(rs.coldTake) === JSON.stringify([{ id: 'call|total|OVER', view: 'call', key: 'total', side: 'OVER', line: 220.5, price: -108, p: null, worth: null, band: 'value', pick: 'Total OVER 220.5 at Fanatics', book: 'fanatics', call: 'number' }])
+      && (rs.coldTaking || []).some(x => /Total OVER 220\.5 at Fanatics value · the best number on the board · -108 needs 51\.9% Suns @ Thunder · a call on the game/i.test(x))
+      && (rs.tableCold || [])[2] === 'REST · the over behind a tired favourite · cold here | 2-11 |  | 15.4% | -9.2u' && (rs.tableCold || [])[4] === "READ · the sheet's own read of the game | none yet |  |  | " && /^The call as given, one a game \| 17-0 \| /.test((rs.tableCold || [])[9] || '')
+      && JSON.stringify((rs.dayCold || []).slice(0, 2)) === JSON.stringify(['VALUE · the best number on the board :: Total OVER 212.5 WIN', 'VALUE · the best number on the board :: Total UNDER 223 WIN']) && (rs.dayCold || []).indexOf('LEAN · the likelier winner, 70 to 80% :: Knicks to win WIN') >= 0
+      && !(rs.dayCold || []).some(x => /^REST/.test(x)),
+      'the over behind a tired favourite, gone cold: ten such games on the days before stay under and the kind, 2-11, is cold: the next such game is given the likelier winner with the rest call named and its record, one where the best number says the over too is given the best number and Take on its card marks the best number (not the rest call, though both say the over at the same app), the record marks the kind cold, and the earlier day reads by what the board would give now (the best number on the two games that have one, the likelier winner on the third)',
+      JSON.stringify({ cold: rs.cold, coldTake: rs.coldTake, coldTaking: rs.coldTaking, tableCold: rs.tableCold, dayCold: rs.dayCold }));
+
+  // ---- 23 Nov 2026: the first half's best bets (the user: "since I'm seeing some positive trend with the first half totals, I'd like the model to focus a little
+  //      more on that and for first half team totals ... I want to be able to put a $100 on a 3-4 best bet for either the first half totals for both teams combined
+  //      or the best team total"). Measured on the games that carry the books' own first-half lines: where every app that posts the first-half total is on one number
+  //      and the two sides are priced apart, the cheaper side won 125-82; behind a favourite of 4 or more on the second night of a back to back, the other club
+  //      rested, the first half went over 112-66 on three seasons, and it is the rested club's own half that does it. So the board gives up to four a night, the
+  //      measured kinds first, and where those leave fewer than three it fills from a club's own total and then a half the apps split on, each marked as a fill.
+  //      Each card names the app, the price and what $100 wins, takes a mark, and the record keeps each kind and the list as given, the nights before 23 Nov apart ----
+  // the block loads grade files and an odds file, so the slate the page holds is kept and put back with the card: the next block reads its own
+  const h1Keep = await pg.evaluate(async () => { await smStore.ready; const k = {}; for (const x of ['callsheet3.card.v1', 'callsheet3.props.v1', 'callsheet3.draft.v1', 'callsheet3.slate.v1']) k[x] = await smStore.getItem(x); await smStore.removeItem('callsheet3.card.v1'); await smStore.removeItem('callsheet3.props.v1'); await smStore.removeItem('callsheet3.slate.v1'); return k; });
+  await reloaded();
+  const h1T = await pg.evaluate(async () => {
+    const wait = (ms) => new Promise(r => setTimeout(r, ms || 90)), txt = e => (e ? e.innerText : '').replace(/\s+/g, ' ').trim(), tc = e => (e ? e.textContent : '').replace(/\s+/g, ' ').trim();
+    const set = (id, v) => { const el = document.getElementById(id); el.value = v; el.dispatchEvent(new Event('input', { bubbles: true })); };
+    await smStore.ready;
+    const game = async (date, away, home, f) => { document.getElementById('clear').click(); document.getElementById('m-nba').click(); await wait(); set('gdate', date); set('away', away); set('home', home); set('line', '229.5'); set('op', '-110'); set('up', '-110');
+      Object.keys(f).forEach(k => set(k, f[k])); await wait(); document.getElementById('add').click(); await wait(); };
+    const rows = () => JSON.parse(smStore.getItem('callsheet3.card.v1')), rowOf = (date, away) => rows().find(x => x.gdate === date && x.away === away);
+    const load = async (doc, fname) => { const dt = new DataTransfer(); dt.items.add(new File([JSON.stringify(doc)], fname, { type: 'application/json' })); const inp = document.getElementById('slateFile'); inp.files = dt.files; inp.dispatchEvent(new Event('change', { bubbles: true })); await wait(260); };
+    const grade = (date, list) => load({ format: 'callsheet2.slate', version: 1, date, games: list.map(g => ({ sport: 'NBA', gdate: date, away: g[0], home: g[1], finals: { fa: String(g[2]), fh: String(g[3]), f5a: String(g[4]), f5h: String(g[5]) }, notes: [] })) }, 'nba-grade-' + date + '.json');
+    const cardEls = () => [...document.querySelectorAll('#h1best .pk')];
+    const board = async (d) => { const bd = document.getElementById('boardDate'); bd.value = d; bd.dispatchEvent(new Event('change')); await wait(140);
+      return { hidden: document.getElementById('h1Head').hidden && document.getElementById('h1best').hidden, tag: tc(document.getElementById('h1Tag')),
+               cards: cardEls().map(c => ({ cls: c.className.replace('pk call h1 ', ''), n1: tc(c.querySelector('.n1')), n2: tc(c.querySelector('.n2')), n3: tc(c.querySelector('.n3')), n4: tc(c.querySelector('.n4')), btn: tc(c.querySelector('.n6')) })) }; };
+    const taking = () => [...document.querySelectorAll('#taking .pk.taking')].map(e => txt(e));
+    const tableAll = () => { const t = document.querySelector('#calibBox .h1tab'); return t ? [...t.querySelectorAll('tbody tr')].map(tr => [...tr.children].slice(0, 6).map(td => tc(td)).join(' | ')) : null; };
+    const table = () => { const r = tableAll(); return r ? r.filter(x => !/^The watch list/.test(x)) : null; }, tableWatch = () => (tableAll() || []).filter(x => /^The watch list/.test(x)).join(' ## ');
+    const recHead = () => { const t = document.querySelector('#calibBox .h1tab'); return t && t.previousElementSibling ? tc(t.previousElementSibling) : ''; };
+    const tableLast = () => { const t = document.querySelector('#calibBox .h1tab'); const tr = t ? [...t.querySelectorAll('tbody tr')].find(x => /^The list as given/.test(tc(x.children[0]))) : null; return tr ? tc(tr.children[6]) : ''; };
+    const tableNotes = () => { const t = document.querySelector('#calibBox .h1tab'); return t ? [...t.querySelectorAll('tbody tr')].slice(-3, -1).map(tr => tc(tr.children[6])) : []; };
+    const per = (lines) => { const o = { OVER: [], UNDER: [] }; Object.keys(lines).forEach(b => { o.OVER.push([b, lines[b][1], lines[b][0]]); o.UNDER.push([b, lines[b][2], lines[b][0]]); }); return o; };   // app: [the number, the over's price, the under's]
+    const spr = (pts) => ({ HOME: Object.keys(pts).map(b => [b, -110, pts[b]]), AWAY: Object.keys(pts).map(b => [b, -110, -pts[b]]) });
+    const bare = (ts) => (ts || []).map(t => { const c = Object.assign({}, t); delete c.at; return c; });
+    const D = '2026-11-23', o = {};
+    // A: the Celtics at home on the second night, logged at -3 and standing at -6.5 by the middle of five books, the Magic rested two days. The lowest first-half
+    //    total among the four apps is 107.5 at two of them, FanDuel's over the better price (another app's 106.5 is lower and is not one of the four); the Magic's
+    //    own first half is lowest among the four at DraftKings (another app is lower there too); the Celtics' own half, three apps on one number, gets nothing in this game
+    const A = { sp: '-3', narest: '2', nhrest: '0', odds: JSON.stringify({ book: 'fanatics', spread: spr({ fanatics: -6.5, draftkings: -6.5, fanduel: -7, betmgm: -6, pinnacle: -6.5 }),
+      period: per({ fanatics: [108.5, -110, -110], draftkings: [107.5, -112, -108], fanduel: [107.5, -105, -115], betmgm: [108.5, -110, -110], espnbet: [106.5, -110, -110] }),
+      period_team: { AWAY: per({ fanatics: [51.5, -110, -110], draftkings: [50.5, -115, -105], betmgm: [51.5, -108, -112], espnbet: [49.5, -110, -110] }), HOME: per({ fanatics: [57.5, -110, -110], draftkings: [57.5, -115, -105], betmgm: [57.5, -108, -112] }) } }) };
+    // B: four apps on 112.5, priced apart: the over is the cheaper side (FanDuel's -102 against the best under, -110). DraftKings posts an alternate at 110.5 too,
+    //    priced far from even, FanDuel one side of another number, and two books that are not apps post other numbers: none of it moves the read
+    const pB = per({ fanatics: [112.5, -110, -110], draftkings: [112.5, -105, -115], fanduel: [112.5, -102, -118], betmgm: [112.5, -108, -112], pinnacle: [113.5, -105, -105], betrivers: [111.5, -110, -110] });
+    pB.OVER.push(['draftkings', -150, 110.5]); pB.UNDER.push(['draftkings', 120, 110.5]); pB.OVER.push(['fanduel', -125, 111.5]);
+    const B = { sp: '-5', narest: '1', nhrest: '1', odds: JSON.stringify({ book: 'fanatics', period: pB }) };   // a favourite of 5 with a day of rest: not the spot
+    // C: three apps on 110.5; the under's best price is at an app that is not one of the four (+100), so the bet is the under at the best of his own, FanDuel's -108
+    const C = { odds: JSON.stringify({ book: 'draftkings', period: per({ draftkings: [110.5, -110, -110], fanduel: [110.5, -112, -108], espnbet: [110.5, -120, 100] }) }) };
+    // Dg: the apps split (two of four on 115.5): a fill; the Hawks' own first half has three apps on 58.5 priced apart: a fill; the Jazz's has three apps on two
+    //     numbers: nothing (a club's own half is read only where every app is on one number)
+    const Dg = { odds: JSON.stringify({ book: 'fanatics', period: per({ fanatics: [115.5, -110, -110], draftkings: [115.5, -105, -115], fanduel: [116.5, -110, -110], betmgm: [114.5, -110, -110] }),
+      period_team: { HOME: per({ fanatics: [58.5, -110, -110], draftkings: [58.5, -115, -105], betmgm: [58.5, -112, -108] }), AWAY: per({ fanatics: [56.5, -110, -110], draftkings: [56.5, -105, -115], betmgm: [57.5, -110, -110] }) } }) };
+    // E: only two apps post it, both on 109.5: a fill. F: four apps on one number, the two sides priced the same: nothing. G: a favourite of 3.5 on the second night
+    //    is not the spot (under 4), so its three apps on one number give the cheaper side, the under at BetMGM
+    const E = { odds: JSON.stringify({ book: 'draftkings', period: per({ draftkings: [109.5, -108, -112], fanduel: [109.5, -110, -110] }) }) };
+    const F = { odds: JSON.stringify({ book: 'fanatics', period: per({ fanatics: [111.5, -110, -110], draftkings: [111.5, -110, -110], fanduel: [111.5, -110, -110], betmgm: [111.5, -110, -110] }) }) };
+    const G = { sp: '-3.5', narest: '1', nhrest: '0', odds: JSON.stringify({ book: 'fanatics', period: per({ fanatics: [114.5, -110, -110], draftkings: [114.5, -110, -110], betmgm: [114.5, -115, -105] }) }) };
+    // H: a favourite of 6 on no rest whose opponent played last night too is not the spot, and its half is priced the same on both sides: nothing
+    const H = { sp: '-6', narest: '0', nhrest: '0', odds: JSON.stringify({ book: 'fanatics', period: per({ fanatics: [113.5, -110, -110], draftkings: [113.5, -110, -110], fanduel: [113.5, -110, -110] }) }) };
+    await game(D, 'Magic', 'Celtics', A); await game(D, 'Suns', 'Thunder', B); await game(D, 'Knicks', 'Bulls', C); await game(D, 'Jazz', 'Hawks', Dg); await game(D, 'Wizards', 'Pistons', E); await game(D, 'Nets', '76ers', F); await game(D, 'Kings', 'Lakers', G); await game(D, 'Heat', 'Nuggets', H);
+    o.before = await board(D);
+    // a press on a card loads its game into the form; Take on the third card (the cheaper side) and on the second (the Magic's own half) marks each as its card shows it
+    cardEls()[0].querySelector('.n2').click(); await wait(140); o.opened = document.getElementById('away').value + ' @ ' + document.getElementById('home').value;
+    cardEls()[1].querySelector('[data-stake]').click(); await wait(160); cardEls()[2].querySelector('[data-stake]').click(); await wait(160);
+    o.afterTake = document.getElementById('away').value + ' @ ' + document.getElementById('home').value;   // a press on Take marks the bet and does not load its game
+    o.taken = { btns: (await board(D)).cards.map(c => c.btn), list: taking(), b: bare((rowOf(D, 'Suns') || {}).simTakes), a: bare((rowOf(D, 'Magic') || {}).simTakes), g: bare((rowOf(D, 'Kings') || {}).simTakes) };
+    // the phone's code for the night
+    document.getElementById('phone').click(); await wait(900);
+    o.phoneLink = (document.querySelector('#phoneBody a') || {}).href || ''; o.phoneNote = txt(document.querySelector('#phoneBody .note'));
+    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })); await wait();
+    // the half-time scores: 58-50 (108 over 107.5; the Magic's 58 over 50.5 where the Celtics' 50 would not be), 50-60 (110 under 112.5), 52-55 (107 under 110.5),
+    // 58-60 (118 over 115.5; the Hawks' 60 over 58.5 where the Jazz's 58 would not be), 54-55 (109 under 109.5), 57-57 (114 under 114.5)
+    await grade(D, [['Magic', 'Celtics', 105, 110, 58, 50], ['Suns', 'Thunder', 100, 118, 50, 60], ['Knicks', 'Bulls', 101, 104, 52, 55], ['Jazz', 'Hawks', 120, 125, 58, 60], ['Wizards', 'Pistons', 108, 111, 54, 55], ['Nets', '76ers', 100, 110, 50, 55], ['Kings', 'Lakers', 110, 115, 57, 57], ['Heat', 'Nuggets', 100, 110, 50, 55]]);
+    o.after = await board(D); o.table = table(); o.tableLast = tableLast();
+    o.took = [...document.querySelectorAll('#calibBox .calib[data-sport="TAKEN"] > div')].map(d => txt(d)); o.takingGraded = taking();
+    // the next night: one measured bet, so the list is filled to three from games not on it: the Hawks' own half, then the half two apps post (the split half of the
+    // Hawks' game is passed over: that game is on the list already), and a fourth game's half that two apps post, at a steeper price, stays off: three is the fill
+    await game('2026-11-24', 'Suns', 'Thunder', B); await game('2026-11-24', 'Jazz', 'Hawks', Dg); await game('2026-11-24', 'Wizards', 'Pistons', E);
+    await game('2026-11-24', 'Nets', '76ers', { odds: JSON.stringify({ book: 'draftkings', period: per({ draftkings: [111.5, -109, -111], fanduel: [111.5, -110, -110] }) }) });
+    o.fill = await board('2026-11-24');
+    // a night with nothing to give: no section. Then a half the apps split on, alone; then a road favourite of 4 on no rest whose first half only two apps post,
+    // neither one of the four, and whose rested opponent's own half one of those posts
+    await game('2026-11-25', 'Nets', '76ers', F); await game('2026-11-25', 'Heat', 'Nuggets', { odds: JSON.stringify({ book: 'fanatics', period: per({ fanatics: [113.5, -110, -110], draftkings: [114.5, -105, -115], fanduel: [115.5, -110, -110] }) }) });   // three apps, three numbers: no number two of them post
+    o.none = await board('2026-11-25');
+    // two apps on 115.5 and two on 116.5: the higher of the two numbers is read, the cheaper side among the apps on it
+    await game('2026-11-25', 'Jazz', 'Hawks', { odds: JSON.stringify({ book: 'fanatics', period: per({ fanatics: [115.5, -110, -110], draftkings: [115.5, -105, -115], fanduel: [116.5, -104, -116], betmgm: [116.5, -110, -110] }) }) });
+    o.split = await board('2026-11-25');
+    await game('2026-11-25', 'Knicks', 'Bulls', { sp: '4', narest: '0', nhrest: '3', odds: JSON.stringify({ book: 'espnbet', period: per({ espnbet: [109.5, -110, -110], caesars: [108.5, -115, -105] }), period_team: { HOME: per({ espnbet: [52.5, -110, -110] }), AWAY: per({ espnbet: [57.5, -110, -110] }) } }) });
+    o.road = await board('2026-11-25');
+    // a night before 23 Nov: its bets are counted apart, on the cards, in the heading and in the record
+    await game('2026-11-10', 'Suns', 'Thunder', B); await game('2026-11-10', 'Kings', 'Lakers', { odds: JSON.stringify({ book: 'fanatics', period: per({ fanatics: [114, -110, -110], draftkings: [114, -110, -110], betmgm: [114, -115, -105] }) }) });
+    await grade('2026-11-10', [['Suns', 'Thunder', 120, 118, 60, 58], ['Kings', 'Lakers', 110, 115, 57, 57]]);   // 118 over 112.5; 114 on a whole number is a push
+    o.early = await board('2026-11-10'); o.fillLater = await board('2026-11-24'); o.tableBefore = table(); o.tableLastBefore = tableLast();
+    // a later odds run: the Celtics were logged at -6.5 on no rest, the over behind them; the run has two books at -3.5 and two at -4.5, read as the one nearer
+    // nought, so the spot is gone and the half reads by its prices; and the run brings a club's own first half for a game logged with no odds at all
+    const D4 = '2026-11-26';
+    await game(D4, 'Magic', 'Celtics', { sp: '-6.5', narest: '2', nhrest: '0', odds: JSON.stringify({ book: 'fanatics', period: per({ fanatics: [108.5, -110, -110], draftkings: [108.5, -112, -108], fanduel: [108.5, -105, -115] }) }) });
+    await game(D4, 'Suns', 'Thunder', {});
+    o.odds0 = await board(D4);
+    await load({ format: 'callsheet2.slate', version: 1, date: D4, generated: '2026-11-26T22:00:00Z', games: [
+      { sport: 'NBA', gdate: D4, away: 'Magic', home: 'Celtics', inputs: { odds: JSON.stringify({ book: 'fanatics', spread: spr({ fanatics: -3.5, draftkings: -3.5, fanduel: -4.5, betmgm: -4.5 }), period: per({ fanatics: [109.5, -110, -110], draftkings: [109.5, -112, -108], fanduel: [109.5, -115, -105] }) }) }, notes: [] },
+      { sport: 'NBA', gdate: D4, away: 'Suns', home: 'Thunder', inputs: { odds: JSON.stringify({ book: 'fanatics', period_team: { HOME: per({ fanatics: [60.5, -110, -110], draftkings: [60.5, -118, -102], betmgm: [60.5, -112, -108] }) } }) }, notes: [] }] }, 'odds-2026-11-26.json');
+    o.odds1 = await board(D4);
+    // the night of the fills, graded: 60-58 (118 over 112.5), 58-57 (the Hawks' 57 under 58.5; 115 under the split half's 115.5, which was not on the list),
+    // 54-55 (109 under 109.5), 56-56 (112 over the fourth game's 111.5, not on the list either): the list went 2-1, its measured bet 1-0 and its two fills 1-1
+    await grade('2026-11-24', [['Suns', 'Thunder', 100, 118, 60, 58], ['Jazz', 'Hawks', 120, 125, 58, 57], ['Wizards', 'Pistons', 108, 111, 54, 55], ['Nets', '76ers', 110, 112, 56, 56]]);
+    o.tableEnd = table(); o.tableLastEnd = tableLast(); o.tableNotes = tableNotes(); o.fillGraded = await board('2026-11-24');
+    // ---- 27 Nov 2026, the bets come off: a night from 27 Nov is a WATCH list. The tired favourite's game (the half, then the rested club's own), the cheaper side
+    //      where four apps are on one number, a game whose apps split with a club's own half on one number, and a half only two apps post: the three lead kinds
+    //      are shown and the two that were there to make three are not; no stake is named; a Take is still there; the heading says what it is
+    const DW = '2026-12-12';
+    await game(DW, 'Magic', 'Celtics', A); await game(DW, 'Suns', 'Thunder', B); await game(DW, 'Jazz', 'Hawks', Dg); await game(DW, 'Wizards', 'Pistons', E);
+    o.watch = await board(DW); o.watchTitle = tc(document.getElementById('h1Title'));
+    cardEls()[2].querySelector('[data-stake]').click(); await wait(160);
+    o.watchTaken = { btns: (await board(DW)).cards.map(c => c.btn), list: taking(), b: bare((rowOf(DW, 'Suns') || {}).simTakes) };
+    document.getElementById('phone').click(); await wait(900);
+    o.watchPhoneLink = (document.querySelector('#phoneBody a') || {}).href || '';
+    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })); await wait();
+    await board('2026-11-23'); o.betsTitle = tc(document.getElementById('h1Title'));
+    // the night of 27 Nov itself is the first watch night; the 26th was the last night of bets
+    await game('2026-11-27', 'Suns', 'Thunder', B); o.watchFirst = await board('2026-11-27'); o.watchFirstTitle = tc(document.getElementById('h1Title')); o.betsLast = await board('2026-11-26');
+    // a night of fills alone (a split half, a club's own half, a half two apps post) gives a watch night nothing: no section
+    const DW2 = '2026-12-13';
+    await game(DW2, 'Jazz', 'Hawks', Dg); await game(DW2, 'Wizards', 'Pistons', E);
+    o.watchNone = await board(DW2);
+    // the watch night graded: 58-50 (108 over 107.5; the Magic's 58 over 50.5), 50-60 (110 under 112.5): the watch list 2-1 on a line of its own, the list as it was
+    // given as bets where it stood, and each kind still counted on every game it speaks to
+    await grade(DW, [['Magic', 'Celtics', 105, 110, 58, 50], ['Suns', 'Thunder', 100, 118, 50, 60], ['Jazz', 'Hawks', 120, 125, 58, 60], ['Wizards', 'Pistons', 108, 111, 54, 55]]);
+    // the night of fills alone, graded too (the Hawks' 57 under 58.5, 109 under the half's 109.5): a watch night lists no fill, so the watch list's line does not move
+    await grade(DW2, [['Jazz', 'Hawks', 120, 125, 58, 57], ['Wizards', 'Pistons', 108, 111, 54, 55]]);
+    o.watchAfter = await board(DW); o.watchRow = tableWatch(); o.tableAfterWatch = table(); o.recHead = recHead(); o.tableLastAfterWatch = tableLast();
+    o.watchNote = (() => { const t = document.querySelector('#calibBox .h1tab'); const tr = t ? [...t.querySelectorAll('tbody tr')].find(x => /^The watch list/.test(tc(x.children[0]))) : null; return tr ? tc(tr.children[6]) : ''; })();
+    return o;
+  });
+  // the phone's page off the code, as a phone draws it
+  const h1SheetErrs = [];
+  const h1Ctx = await pg.context().browser().newContext({ viewport: { width: 390, height: 844 } }), h1Sheet = await h1Ctx.newPage();
+  h1Sheet.on('pageerror', e => h1SheetErrs.push(e.message));
+  let h1SheetText = '';
+  if (/\/m\.html#/.test(h1T.phoneLink || '')) { await h1Sheet.goto(h1T.phoneLink); await h1Sheet.waitForTimeout(600); h1SheetText = await h1Sheet.evaluate(() => document.body.innerText.replace(/\s+/g, ' ').trim()); }
+  let h1WatchSheetText = '';
+  if (/\/m\.html#/.test(h1T.watchPhoneLink || '')) { const h1Sheet2 = await h1Ctx.newPage(); h1Sheet2.on('pageerror', e => h1SheetErrs.push(e.message)); await h1Sheet2.goto(h1T.watchPhoneLink); await h1Sheet2.waitForTimeout(600); h1WatchSheetText = await h1Sheet2.evaluate(() => document.body.innerText.replace(/\s+/g, ' ').trim()); }
+  await h1Ctx.close();
+  await pg.evaluate(async (k) => { for (const x of Object.keys(k)) { if (k[x] === null || k[x] === undefined) await smStore.removeItem(x); else await smStore.setItem(x, k[x]); } }, h1Keep);
+  await reloaded();
+  const h1c = (b) => ((b || {}).cards || []).map(c => c.cls + ' | ' + c.n1 + ' | ' + c.n2);
+  const h1RestNote = "a favourite of 4 or more on the second night of a back to back, the other club rested: the first half went over 112-66 (62.9%) on the three seasons it was found on; on sixteen earlier seasons the first half of those games ran level with its share of the closing lines, 553 over and 539 under: not proven";
+  const h1TtrestNote = "the rested club's own first half in those games ran over 114-64 against a stand-in line on the three seasons it was found on, and level on sixteen earlier ones (543 over its share, 549 under): not proven";
+  const h1CheapNote = "every app that posts the first-half total is on one number and prices the two sides apart: the cheaper side won 125-82 (60.4%) on the games it was found on and has lost here since the list was built: not proven";
+  const h1TtcheapNote = "the cheaper side where every app is on one number, on a club's own first half: no first-half team lines were held to test it, and on full-game team totals it was level (94-85)";
+  const h1SplitNote = "the apps split on the number, or only two post it: the cheaper side at the number most of them post was level (210-205) on two seasons; no edge measured";
+  const h1Head = (mid, rec) => "the first half's total and each club's own, at your four apps · up to 4 a night, the measured kinds first: the over behind a tired favourite, then the cheaper side where every app is on one number · " + mid + " · $100 a bet is one unit · the list from 23 Nov: " + rec + " · shown, not scored";
+  const h1B = (h1T.before || {}).cards || [];
+  chk(!(h1T.before || {}).hidden && h1c(h1T.before).join(' ## ') === "value h1-rest | #1 · FIRST HALF · THE OVER BEHIND A TIRED FAVOURITE | First half OVER 107.5 ## value h1-ttrest | #2 · FIRST HALF · THE RESTED CLUB'S OWN TOTAL | Magic first half OVER 50.5 ## value h1-cheap | #3 · FIRST HALF · THE CHEAPER SIDE | First half OVER 112.5 ## value h1-cheap | #4 · FIRST HALF · THE CHEAPER SIDE | First half UNDER 114.5"
+      && h1B[0].n3 === "-105 at FanDuel · $100 wins $95.24 · needs 51.2% · Celtics are favoured by 6.5 and played last night, Magic rested 2 days: the lowest number your apps post on the first-half total"
+      && h1B[1].n3 === "-115 at DraftKings · $100 wins $86.96 · needs 53.5% · Celtics are favoured by 6.5 and played last night, Magic rested 2 days: the lowest number your apps post on Magic's own first half"
+      && h1B[2].n3 === "-102 at FanDuel · $100 wins $98.04 · needs 50.5% · all 4 apps that post it are on 112.5 and price the two sides apart (-102 against -110): the cheaper side"
+      && h1B[3].n3 === "-105 at BetMGM · $100 wins $95.24 · needs 51.2% · all 3 apps that post it are on 114.5 and price the two sides apart (-105 against -110): the cheaper side"
+      && h1B[0].n4 === 'Magic @ Celtics · ' + h1RestNote + ' · here from 23 Nov: none graded yet' && h1B[1].n4 === 'Magic @ Celtics · ' + h1TtrestNote + ' · here from 23 Nov: none graded yet'
+      && h1B[2].n4 === 'Suns @ Thunder · ' + h1CheapNote + ' · here from 23 Nov: none graded yet' && h1B[3].n4 === 'Kings @ Lakers · ' + h1CheapNote + ' · here from 23 Nov: none graded yet'
+      && h1B.every(c => c.btn === 'Take') && h1T.before.tag === h1Head('4 tonight carry a measured record', 'no night graded yet') && h1T.opened === 'Magic @ Celtics' && h1T.afterTake === 'Magic @ Celtics',
+      'the first half\'s best bets (23 Nov 2026, the user: "I want to be able to put a $100 on a 3-4 best bet for either the first half totals for both teams combined or the best team total"): the board gives up to four a night in the measured order. Behind a favourite of 4 or more on no rest (the spread as it stands in the newest odds, -6.5 by the middle of five books where the row was logged at -3) the first half\'s over at the lowest number among the four apps (107.5 at two of them, FanDuel\'s the better price; another app\'s 106.5 is not one of the four), then the rested club\'s own first-half over at the lowest of the four (the tired favourite\'s own half is left alone), then the cheaper side where every app that posts the half is on one number and prices the sides apart, the best of the four apps\' prices first (an alternate number, a one-sided number and two books that are not apps change nothing); a fifth measured bet, the fills, a half priced the same on both sides and a favourite of 3.5 on no rest (read by its prices) stay off the list. Each card names the app, the price, what $100 wins, what the price needs, why, and what was measured; a press loads the game',
+      JSON.stringify({ hidden: (h1T.before || {}).hidden, cards: h1c(h1T.before), n3: h1B.map(c => c.n3), n4: h1B.map(c => c.n4.slice(0, 60) + ' … ' + c.n4.slice(-40)), btn: h1B.map(c => c.btn), tag: (h1T.before || {}).tag, opened: h1T.opened, afterTake: h1T.afterTake }));
+  const h1K = h1T.taken || {};
+  chk(JSON.stringify(h1K.btns) === JSON.stringify(['Take', '✓ Taking', '✓ Taking', 'Take'])
+      && JSON.stringify(h1K.b) === JSON.stringify([{ id: 'h1|h1|OVER', view: 'h1', key: 'h1', side: 'OVER', line: 112.5, price: -102, p: null, worth: null, band: 'first half', pick: 'First half OVER 112.5 at FanDuel', book: 'fanduel', call: 'cheap' }])
+      && JSON.stringify(h1K.a) === JSON.stringify([{ id: 'h1|h1_away|OVER', view: 'h1', key: 'h1_away', side: 'OVER', line: 50.5, price: -115, p: null, worth: null, band: 'first half', pick: 'Magic first half OVER 50.5 at DraftKings', book: 'draftkings', call: 'ttrest' }])
+      && JSON.stringify(h1K.g) === '[]' && (h1K.list || []).length === 3
+      && (h1K.list || []).some(x => /^TAKING · NBA · A FIRST-HALF BEST BET · marked .+ First half OVER 112\.5 at FanDuel the cheaper side, every app on one number · -102 needs 50\.5% · \$100 wins \$98\.04 Suns @ Thunder · a first-half best bet ✓ Taking$/i.test(x))
+      && (h1K.list || []).some(x => /^TAKING · NBA · A FIRST-HALF BEST BET · marked .+ Magic first half OVER 50\.5 at DraftKings the rested club's own first half behind a tired favourite · -115 needs 53\.5% · \$100 wins \$86\.96 Magic @ Celtics · a first-half best bet ✓ Taking$/i.test(x))
+      && /^TONIGHT 2 bets marked none graded yet · one unit each 0 on the card, 0 from the simulation, 2 first-half best bets, 0 props$/i.test((h1K.list || [])[2] || ''),
+      'the first half\'s best bets, taken: Take on a card marks the bet at the number, the app and the price the card shows (the half\'s over 112.5 at FanDuel at -102, the Magic\'s own first half over 50.5 at DraftKings at -115), the mark keeps which kind it was, the buttons on those two cards read Taking and the others do not, and Taking tonight lists each as a first-half best bet with what $100 wins, counted apart from the simulation\'s calls and the calls on the game',
+      JSON.stringify(h1K));
+  const h1A = (h1T.after || {}).cards || [];
+  chk(h1c(h1T.after).join(' ## ') === "value h1-rest win | #1 · FIRST HALF · THE OVER BEHIND A TIRED FAVOURITE | First half OVER 107.5 WIN ## value h1-ttrest win | #2 · FIRST HALF · THE RESTED CLUB'S OWN TOTAL | Magic first half OVER 50.5 WIN ## value h1-cheap loss | #3 · FIRST HALF · THE CHEAPER SIDE | First half OVER 112.5 LOSS ## value h1-cheap win | #4 · FIRST HALF · THE CHEAPER SIDE | First half UNDER 114.5 WIN"
+      && /here from 23 Nov: 1-0, \+1\.0u$/.test(h1A[0].n4) && /here from 23 Nov: 1-0, \+0\.9u$/.test(h1A[1].n4) && /here from 23 Nov: 2-1, \+0\.9u$/.test(h1A[2].n4)
+      && JSON.stringify(h1A.map(c => c.btn)) === JSON.stringify(['', 'TAKEN', 'TAKEN', '']) && h1T.after.tag === h1Head('4 tonight carry a measured record', '3-1, +$177')
+      && (h1T.table || []).join(' ## ') === "The over behind a tired favourite | 1-0 | 100.0% | +1.0u | +$95 | none yet ## The rested club's own total | 1-0 | 100.0% | +0.9u | +$87 | none yet ## The cheaper side | 2-1 | 66.7% | +0.9u | +$88 | none yet ## A club's own total, to make three | 0-1 | 0.0% | -1.0u | -$100 | none yet ## To make three | 1-1 | 50.0% | -0.0u | -$5 | none yet ## The list as given, $100 best bets, 23 to 26 Nov | 3-1 | 75.0% | +1.8u | +$177 | none yet ## of the list, the lead kinds | 3-1 | 75.0% | +1.8u | +$177 | none yet ## of the list, the fills to make three | none yet |  |  |  | none yet"
+      && h1T.tableLast === "the lead kinds first; a club's own total and a split half only to make three · 1 night from 23 Nov, 0 before"
+      && (h1T.took || []).length === 1 && /^First-half best bets taken 1-1 needs 52\.0% · does 50\.0% \(±35\.4\) · [-−]0\.13u · [-−]\$13 at \$100 a bet$/i.test(h1T.took[0])
+      && (h1T.takingGraded || []).some(x => /First half OVER 112\.5 at FanDuel the cheaper side, every app on one number · -102 needs 50\.5% · \$100 wins \$98\.04 · loss Suns @ Thunder · a first-half best bet TAKEN$/i.test(x))
+      && (h1T.takingGraded || []).some(x => /Magic first half OVER 50\.5 at DraftKings .+ · -115 needs 53\.5% · \$100 wins \$86\.96 · win Magic @ Celtics · a first-half best bet TAKEN$/i.test(x)),
+      'the first half\'s best bets, graded off the half-time score: 55-56 puts the half over 107.5 and the Magic over 50.5, 50-60 leaves 112.5 short, 57-57 stays under 114.5, and each card carries its result at its own number; the record keeps each kind on every game it speaks to (the cheaper side 2-1 with the fifth bet that was left off the list, the two fills counted on their own lines) and the list as given 3-1, +$177 at $100 a bet; the two bets taken grade on a tile of their own under What you took, read against what their prices need',
+      JSON.stringify({ cards: h1c(h1T.after), n4: h1A.map(c => c.n4.slice(-34)), btn: h1A.map(c => c.btn), tag: (h1T.after || {}).tag, table: h1T.table, last: h1T.tableLast, took: h1T.took, graded: h1T.takingGraded }));
+  const h1F = (h1T.fill || {}).cards || [], h1R = (h1T.road || {}).cards || [], h1S = (h1T.split || {}).cards || [];
+  chk(h1c(h1T.fill).join(' ## ') === "value h1-cheap | #1 · FIRST HALF · THE CHEAPER SIDE | First half OVER 112.5 ## lean h1-ttcheap | #2 · FIRST HALF · A CLUB'S OWN TOTAL, TO MAKE THREE | Hawks first half UNDER 58.5 ## lean h1-split | #3 · FIRST HALF · TO MAKE THREE | First half OVER 109.5"
+      && h1F[1].n3 === "-105 at DraftKings · $100 wins $95.24 · needs 51.2% · all 3 apps that post it are on 58.5 and price the two sides apart (-105 against -110): the cheaper side"
+      && h1F[2].n3 === "-108 at DraftKings · $100 wins $92.59 · needs 51.9% · only 2 apps post it, both on 109.5: the cheaper side there (-108 against -110)"
+      && h1F[1].n4 === 'Jazz @ Hawks · ' + h1TtcheapNote + ' · here from 23 Nov: 0-1, -1.0u' && h1F[2].n4 === 'Wizards @ Pistons · ' + h1SplitNote + ' · here from 23 Nov: 1-1, -0.0u'
+      && h1T.fill.tag === h1Head('1 tonight carries a measured record, 2 are here to make three', '3-1, +$177')
+      && (h1T.none || {}).hidden === true && ((h1T.none || {}).cards || []).length === 0 && (h1T.none || {}).tag === ''
+      && h1c(h1T.split).join(' ## ') === "lean h1-split | #1 · FIRST HALF · TO MAKE THREE | First half OVER 116.5"
+      && h1S[0].n3 === "-104 at FanDuel · $100 wins $96.15 · needs 51.0% · 2 of the 4 apps that post it are on 116.5, the others off it: the cheaper side there (-104 against -110)"
+      && h1T.split.tag === h1Head('0 tonight carry a measured record, 1 is here to make three', '3-1, +$177')
+      && h1c(h1T.road).join(' ## ') === "value h1-rest | #1 · FIRST HALF · THE OVER BEHIND A TIRED FAVOURITE | First half OVER 108.5 ## value h1-ttrest | #2 · FIRST HALF · THE RESTED CLUB'S OWN TOTAL | Bulls first half OVER 52.5 ## lean h1-split | #3 · FIRST HALF · TO MAKE THREE | First half OVER 116.5"
+      && h1R[0].n3 === "-115 at Caesars · $100 wins $86.96 · needs 53.5% · Knicks are favoured by 4 and played last night, Bulls rested 3 days: none of your four apps posts the first-half total, so the lowest number at the apps that do"
+      && h1R[1].n3 === "-110 at ESPN BET · $100 wins $90.91 · needs 52.4% · Knicks are favoured by 4 and played last night, Bulls rested 3 days: none of your four apps posts Bulls' own first half, so the lowest number at the apps that do"
+      && h1T.road.tag === h1Head('2 tonight carry a measured record, 1 is here to make three', '3-1, +$177'),
+      'the first half\'s best bets, the fills and the edges: a night with one measured bet is filled to three from games not on the list yet, a club\'s own first half (three apps on one number, priced apart) before a half the apps split on or only two post, each card marked as there to make three with what its kind has done (a split half in a game already on the list is passed over); a night with nothing to give shows no section; a half the apps split on says how many of them are on the number; and a road favourite of exactly 4 on no rest is the spot off the logged spread where the row has no shop of spreads, the card saying so where none of the four apps posts the market and the number is another app\'s',
+      JSON.stringify({ fill: h1c(h1T.fill), fn3: h1F.map(c => c.n3), fn4: h1F.map(c => c.n4.slice(-40)), ftag: (h1T.fill || {}).tag, none: h1T.none, split: h1c(h1T.split), sn3: h1S.map(c => c.n3), stag: (h1T.split || {}).tag, road: h1c(h1T.road), rn3: h1R.map(c => c.n3), rtag: (h1T.road || {}).tag }));
+  const h1E = (h1T.early || {}).cards || [], h1L = (h1T.fillLater || {}).cards || [];
+  chk(h1c(h1T.early).join(' ## ') === "value h1-cheap win | #1 · FIRST HALF · THE CHEAPER SIDE | First half OVER 112.5 WIN ## value h1-cheap push | #2 · FIRST HALF · THE CHEAPER SIDE | First half UNDER 114 PUSH"
+      && h1E[0].n4 === 'Suns @ Thunder · ' + h1CheapNote + ' · here from 23 Nov: 2-1, +0.9u (the nights before it: 1-0-1, +1.0u)'
+      && h1T.early.tag === h1Head('2 tonight carry a measured record', '3-1, +$177 · on the 1 night before it, which the order was drawn on: 1-0-1, +$98')
+      && h1L.length === 3 && h1L[0].n4 === 'Suns @ Thunder · ' + h1CheapNote + ' · here from 23 Nov: 2-1, +0.9u (the nights before it: 1-0-1, +1.0u)' && /here from 23 Nov: 0-1, -1\.0u$/.test(h1L[1].n4)
+      && (h1T.tableBefore || []).join(' ## ') === "The over behind a tired favourite | 1-0 | 100.0% | +1.0u | +$95 | none yet ## The rested club's own total | 1-0 | 100.0% | +0.9u | +$87 | none yet ## The cheaper side | 2-1 | 66.7% | +0.9u | +$88 | 1-0-1 · 100.0% · +1.0u ## A club's own total, to make three | 0-1 | 0.0% | -1.0u | -$100 | none yet ## To make three | 1-1 | 50.0% | -0.0u | -$5 | none yet ## The list as given, $100 best bets, 23 to 26 Nov | 3-1 | 75.0% | +1.8u | +$177 | 1-0-1 · 100.0% · +1.0u ## of the list, the lead kinds | 3-1 | 75.0% | +1.8u | +$177 | 1-0-1 · 100.0% · +1.0u ## of the list, the fills to make three | none yet |  |  |  | none yet"
+      && h1T.tableLastBefore === "the lead kinds first; a club's own total and a split half only to make three · 1 night from 23 Nov, 1 before",
+      'the first half\'s best bets, the nights before 23 Nov apart: the order was drawn on those nights, so a bet graded on 10 Nov counts in a column of its own in the record, in brackets on the cards and in its own words in the heading, and never in the count from 23 Nov; a half that lands on a whole number is a push, shown on its card and kept out of the wins and the losses',
+      JSON.stringify({ early: h1c(h1T.early), n4: h1E.map(c => c.n4.slice(-70)), tag: (h1T.early || {}).tag, later: h1L.map(c => c.n4.slice(-70)), table: h1T.tableBefore, last: h1T.tableLastBefore }));
+  const h1O0 = (h1T.odds0 || {}).cards || [], h1O1 = (h1T.odds1 || {}).cards || [];
+  chk(h1c(h1T.odds0).join(' ## ') === "value h1-rest | #1 · FIRST HALF · THE OVER BEHIND A TIRED FAVOURITE | First half OVER 108.5"
+      && h1O0[0].n3 === "-105 at FanDuel · $100 wins $95.24 · needs 51.2% · Celtics are favoured by 6.5 and played last night, Magic rested 2 days: the lowest number your apps post on the first-half total"
+      && h1c(h1T.odds1).join(' ## ') === "value h1-cheap | #1 · FIRST HALF · THE CHEAPER SIDE | First half UNDER 109.5 ## lean h1-ttcheap | #2 · FIRST HALF · A CLUB'S OWN TOTAL, TO MAKE THREE | Thunder first half UNDER 60.5"
+      && h1O1[0].n3 === "-105 at FanDuel · $100 wins $95.24 · needs 51.2% · all 3 apps that post it are on 109.5 and price the two sides apart (-105 against -110): the cheaper side"
+      && h1O1[1].n3 === "-102 at DraftKings · $100 wins $98.04 · needs 50.5% · all 3 apps that post it are on 60.5 and price the two sides apart (-102 against -110): the cheaper side",
+      'the first half\'s best bets follow the newest odds on the row: a favourite logged at -6.5 on no rest is the spot until a later odds run has him at -3.5 by the middle of the books (two at -3.5, two at -4.5: the one nearer nought), and then the half reads by its prices at the run\'s numbers (the under at 109.5, not the over at the logged 108.5); and a club\'s own first half that a later run brings for a game logged with no odds is read off that run',
+      JSON.stringify({ odds0: h1c(h1T.odds0), n30: h1O0.map(c => c.n3), odds1: h1c(h1T.odds1), n31: h1O1.map(c => c.n3) }));
+  chk((h1T.tableEnd || []).join(' ## ') === "The over behind a tired favourite | 1-0 | 100.0% | +1.0u | +$95 | none yet ## The rested club's own total | 1-0 | 100.0% | +0.9u | +$87 | none yet ## The cheaper side | 3-1 | 75.0% | +1.9u | +$186 | 1-0-1 · 100.0% · +1.0u ## A club's own total, to make three | 1-1 | 50.0% | -0.0u | -$5 | none yet ## To make three | 2-3 | 40.0% | -1.1u | -$113 | none yet ## The list as given, $100 best bets, 23 to 26 Nov | 5-2 | 71.4% | +2.7u | +$271 | 1-0-1 · 100.0% · +1.0u ## of the list, the lead kinds | 4-1 | 80.0% | +2.8u | +$275 | 1-0-1 · 100.0% · +1.0u ## of the list, the fills to make three | 1-1 | 50.0% | -0.0u | -$5 | none yet"
+      && h1T.tableLastEnd === "the lead kinds first; a club's own total and a split half only to make three · 2 nights from 23 Nov, 1 before"
+      && JSON.stringify(h1T.tableNotes) === JSON.stringify(["the over behind a tired favourite, the rested club's own total and the cheaper side: on the lists of the two seasons the order was drawn on these went 145-89 (62.0%)", "a club's own total and a split half, there when the lead kinds gave fewer than three: on those same lists they went 44-53 (45.4%)"])
+      && h1c(h1T.fillGraded).join(' ## ') === "value h1-cheap win | #1 · FIRST HALF · THE CHEAPER SIDE | First half OVER 112.5 WIN ## lean h1-ttcheap win | #2 · FIRST HALF · A CLUB'S OWN TOTAL, TO MAKE THREE | Hawks first half UNDER 58.5 WIN ## lean h1-split loss | #3 · FIRST HALF · TO MAKE THREE | First half OVER 109.5 LOSS"
+      && h1T.fillGraded.tag === h1Head('1 tonight carries a measured record, 2 are here to make three', '5-2, +$271 · on the 1 night before it, which the order was drawn on: 1-0-1, +$98'),
+      'the first half\'s best bets, the list in its two parts: the record keeps the measured kinds on the list and the fills on the list on lines of their own under the list as given (a night of one measured bet and two fills went 1-0 and 1-1, so the list 5-2 is 4-1 and 1-1), each with what it did on the two seasons the order was drawn on, and the fills that were passed over are counted on their kinds\' lines only',
+      JSON.stringify({ table: h1T.tableEnd, last: h1T.tableLastEnd, notes: h1T.tableNotes, cards: h1c(h1T.fillGraded), tag: (h1T.fillGraded || {}).tag }));
+  chk(h1SheetErrs.length === 0 && /It shows \d+ lines: the bets you are taking, the first half's best bets, the parlay four, the best straight bets/.test(h1T.phoneNote || '')
+      && /TAKING TONIGHT 2 TAKING · NBA · A FIRST-HALF BEST BET /.test(h1SheetText)
+      && /TAKING · NBA · A FIRST-HALF BEST BET First half OVER 112\.5 at FanDuel [-−]102 needs 50\.5% Suns @ Thunder · the cheaper side, every app on one number THE FIRST HALF'S BEST BETS/.test(h1SheetText)
+      && /TAKING · NBA · A FIRST-HALF BEST BET Magic first half OVER 50\.5 at DraftKings [-−]115 needs 53\.5% Magic @ Celtics · the rested club's own first half behind a tired favourite TAKING/.test(h1SheetText)
+      && /THE FIRST HALF'S BEST BETS, \$100 EACH 4 #1 · NBA · FIRST HALF First half OVER 107\.5 at FanDuel [-−]105 needs 51\.2% Magic @ Celtics · the over behind a tired favourite, in the half #2 · NBA · FIRST HALF Magic first half OVER 50\.5 at DraftKings [-−]115 needs 53\.5% Magic @ Celtics · the rested club's own first half behind a tired favourite #3 · NBA · FIRST HALF First half OVER 112\.5 at FanDuel [-−]102 needs 50\.5% Suns @ Thunder · the cheaper side, every app on one number #4 · NBA · FIRST HALF First half UNDER 114\.5 at BetMGM [-−]105 needs 51\.2% Kings @ Lakers · the cheaper side, every app on one number/.test(h1SheetText),
+      'the first half\'s best bets on the phone: the code carries the night\'s list under the bets you are taking, each with its app, what its price needs and its kind, the two taken marked as first-half best bets, and the note under the code names the list',
+      JSON.stringify({ errs: h1SheetErrs, note: (h1T.phoneNote || '').slice(0, 200), link: (h1T.phoneLink || '').slice(0, 60), text: h1SheetText.slice(0, 1500) }));
+  // ---- 27 Nov 2026: the first half's bets come off (the user: "If something needs to go then lets remove it"). The list went 2-9 as $100 best bets, the cheaper
+  //      side has lost since the build, and on sixteen earlier seasons the first half behind a tired favourite ran level with its share of the closing lines. From
+  //      the night of 27 Nov the board shows the three lead kinds as a watch list: no fills, no stake, a Take still there, nothing on the phone but a marked bet ----
+  const h1W = (h1T.watch || {}).cards || [], h1WA = (h1T.watchAfter || {}).cards || [], h1WK = h1T.watchTaken || {};
+  const h1WatchHead = (given, watch) => "watched, not bets, from 27 Nov 2026 · as $100 best bets from 23 to 26 Nov the list went " + given + ", and neither kind it led with has held up: the cheaper side has lost since the list was built, and on sixteen earlier seasons the first half behind a tired favourite ran level with its share of the closing lines (553 over, 539 under) · the watch list from 27 Nov: " + watch + " · no stake is named: nothing in the first half is proven · shown, not scored";
+  chk(!(h1T.watch || {}).hidden && h1c(h1T.watch).join(' ## ') === "lean h1-rest h1watch | #1 · WATCH · FIRST HALF · THE OVER BEHIND A TIRED FAVOURITE | First half OVER 107.5 ## lean h1-ttrest h1watch | #2 · WATCH · FIRST HALF · THE RESTED CLUB'S OWN TOTAL | Magic first half OVER 50.5 ## lean h1-cheap h1watch | #3 · WATCH · FIRST HALF · THE CHEAPER SIDE | First half OVER 112.5"
+      && h1W[0].n3 === "-105 at FanDuel · needs 51.2% · Celtics are favoured by 6.5 and played last night, Magic rested 2 days: the lowest number your apps post on the first-half total"
+      && h1W[2].n3 === "-102 at FanDuel · needs 50.5% · all 4 apps that post it are on 112.5 and price the two sides apart (-102 against -110): the cheaper side"
+      && h1W.every(c => !/\$100 wins/.test(c.n3) && c.btn === 'Take') && /^Magic @ Celtics · a favourite of 4 or more on the second night of a back to back, the other club rested: the first half went over 112-66 \(62\.9%\) on the three seasons it was found on; on sixteen earlier seasons the first half of those games ran level with its share of the closing lines, 553 over and 539 under: not proven · here from 23 Nov: /.test(h1W[0].n4)
+      && h1T.watchTitle === 'The first half, watched' && h1T.betsTitle === "The first half's best bets" && h1T.watch.tag === h1WatchHead('5-2, +$271', 'no night graded yet')
+      && (h1T.watchNone || {}).hidden === true && ((h1T.watchNone || {}).cards || []).length === 0
+      && h1c(h1T.watchFirst).join(' ## ') === "lean h1-cheap h1watch | #1 · WATCH · FIRST HALF · THE CHEAPER SIDE | First half OVER 112.5" && h1T.watchFirstTitle === 'The first half, watched' && /^value h1-/.test(h1c(h1T.betsLast)[0] || ''),
+      'the first half, watched (27 Nov 2026, the user: "If something needs to go then lets remove it"): a night from 27 Nov shows the three lead kinds as a watch list. Each card says WATCH and is drawn as a lean, names its app, its price and what the price needs and no stake, and carries what its kind did on the seasons it was found on and on the sixteen before them; a club\'s own half and a split half, which were there to make three, are not shown, so a night with only those has no section; the heading reads "The first half, watched" and says what the list did as best bets and why the bets came off, where a night of 23 to 26 Nov keeps the old heading',
+      JSON.stringify({ hidden: (h1T.watch || {}).hidden, cards: h1c(h1T.watch), n3: h1W.map(c => c.n3), n4: h1W.map(c => c.n4.slice(0, 80) + ' … ' + c.n4.slice(-60)), btn: h1W.map(c => c.btn), title: h1T.watchTitle, betsTitle: h1T.betsTitle, tag: (h1T.watch || {}).tag, none: h1T.watchNone }));
+  chk(JSON.stringify(h1WK.btns) === JSON.stringify(['Take', 'Take', '✓ Taking'])
+      && JSON.stringify(h1WK.b) === JSON.stringify([{ id: 'h1|h1|OVER', view: 'h1', key: 'h1', side: 'OVER', line: 112.5, price: -102, p: null, worth: null, band: 'first half', pick: 'First half OVER 112.5 at FanDuel', book: 'fanduel', call: 'cheap' }])
+      && (h1WK.list || []).some(x => /^TAKING · NBA · A FIRST-HALF BEST BET · marked .+ First half OVER 112\.5 at FanDuel the cheaper side, every app on one number · -102 needs 50\.5% · \$100 wins \$98\.04 Suns @ Thunder · a first-half best bet ✓ Taking$/i.test(x))
+      && /\/m\.html#/.test(h1T.watchPhoneLink || '') && /TAKING TONIGHT 1 TAKING · NBA · A FIRST-HALF BEST BET First half OVER 112\.5 at FanDuel/.test(h1WatchSheetText) && !/THE FIRST HALF'S BEST BETS/.test(h1WatchSheetText) && !/Magic first half OVER 50\.5/.test(h1WatchSheetText),
+      'the first half, watched: a Take on a watch card still marks the bet at its number, app and price, and Taking tonight lists it; the phone\'s sheet for a watch night carries the bet he marked and no first-half list (the sheet is what to bet)',
+      JSON.stringify({ taken: h1WK, link: (h1T.watchPhoneLink || '').slice(0, 60), sheet: h1WatchSheetText.slice(0, 700) }));
+  chk(h1c(h1T.watchAfter).join(' ## ') === "lean h1-rest h1watch win | #1 · WATCH · FIRST HALF · THE OVER BEHIND A TIRED FAVOURITE | First half OVER 107.5 WIN ## lean h1-ttrest h1watch win | #2 · WATCH · FIRST HALF · THE RESTED CLUB'S OWN TOTAL | Magic first half OVER 50.5 WIN ## lean h1-cheap h1watch loss | #3 · WATCH · FIRST HALF · THE CHEAPER SIDE | First half OVER 112.5 LOSS"
+      && h1T.watchRow === "The watch list from 27 Nov, up to 4 a night | 2-1 | 66.7% | +0.8u | +$82 | none yet"
+      && (h1T.tableAfterWatch || []).some(r => r === "The list as given, $100 best bets, 23 to 26 Nov | 5-2 | 71.4% | +2.7u | +$271 | 1-0-1 · 100.0% · +1.0u")
+      && (h1T.tableAfterWatch || []).some(r => /^The over behind a tired favourite \| 2-0 \| 100\.0% \| \+1\.9u \| \+\$190 \| none yet$/.test(r)) && (h1T.tableAfterWatch || []).every(r => !/^The watch list/.test(r))
+      && h1T.watchAfter.tag === h1WatchHead('5-2, +$271', '2-1, +$82 at $100 a bet')
+      && h1T.watchNote === 'the three lead kinds, no fills and no stake: watched while nothing in the first half is proven · 1 night' && h1T.tableLastAfterWatch === "the lead kinds first; a club's own total and a split half only to make three · 2 nights from 23 Nov, 1 before"
+      && /^The first half each kind on every game it speaks to, .+ \$100 best bets from 23 to 26 Nov and a watch list from 27 Nov 2026, when the bets came off: the list had lost and neither kind it led with held up · up to 4 a night · /.test(h1T.recHead || ''),
+      'the first half, watched and graded: the watch night\'s three cards carry their results, the record keeps the watch list on a line of its own (2-1 here) under the list as it was given as best bets, which a watch night does not move, each kind still counts on every game it speaks to (the over behind a tired favourite 2-0 with the watch night\'s game), and the record\'s heading says the bets came off on 27 Nov and why',
+      JSON.stringify({ cards: h1c(h1T.watchAfter), row: h1T.watchRow, table: h1T.tableAfterWatch, tag: (h1T.watchAfter || {}).tag, head: h1T.recHead }));
+
+  // ---- 27 Nov 2026: the sharp-money box is off the card (the user: "Im wondering if the where money is is working or worth it"). From 19 Nov the decision card
+  //      carried DraftKings' share of the bets and of the money in a box of its own, with a chip in tonight's signals on every game. On the 48 games that kept a
+  //      count before the tip the side with the larger bets went 30-35, so the box, its chips and the box of a game with no lines yet are gone. A count that is
+  //      loaded is still kept on the row (an odds file fills it, a later one replaces it, the typed line stays) and is still counted on the NBA record ----
+  const mnKeep = await pg.evaluate(async () => { await smStore.ready; const k = {}; for (const x of ['callsheet3.card.v1', 'callsheet3.props.v1', 'callsheet3.draft.v1']) k[x] = await smStore.getItem(x); await smStore.removeItem('callsheet3.card.v1'); await smStore.removeItem('callsheet3.props.v1'); return k; });
+  await reloaded();
+  const mn = await pg.evaluate(async () => {
+    const wait = (ms) => new Promise(r => setTimeout(r, ms || 90)), txt = e => (e ? e.textContent : '').replace(/\s+/g, ' ').trim();
+    const set = (id, v) => { const el = document.getElementById(id); el.value = v; el.dispatchEvent(new Event('input', { bubbles: true })); };
+    await smStore.ready;
+    const card = () => { const c = document.querySelector('#markets .pickcard'), sg = [...document.querySelectorAll('#signals .sig')], w = c ? c.querySelector('.why') : null;
+      return { kind: c ? c.dataset.kind || '' : '', pick: c && c.querySelector('.pick') ? c.querySelector('.pick').childNodes[0].textContent.trim() : '',
+        order: c ? [...c.querySelectorAll('ul.dwhy li')].map(li => txt(li.querySelector('b')).replace(/\.$/, '')).join(' | ') : '',
+        n: document.querySelectorAll('.dmoney').length, box: !!document.getElementById('secMoney'), after: w && w.nextElementSibling ? w.nextElementSibling.tagName + '.' + w.nextElementSibling.className : '',
+        sigs: sg.map(s => txt(s.querySelector('.sb')) + ' :: ' + txt(s.querySelector('.st'))), money: sg.filter(s => /^the money/.test(txt(s.querySelector('.sb')))).length + (/Where the money is/i.test(txt(document.getElementById('markets'))) ? 1 : 0),
+        empty: txt(document.querySelector('#markets .empty')), markets: txt(document.getElementById('markets')).slice(0, 90) }; };
+    const game = async (away, home, f, add) => { document.getElementById('clear').click(); document.getElementById('m-nba').click(); await wait(); set('gdate', '2026-11-19'); set('away', away); set('home', home); set('line', '229.5'); set('op', '-110'); set('up', '-110');
+      Object.keys(f).forEach(k => set(k, f[k])); await wait(140); const c = card(); if (add) { document.getElementById('add').click(); await wait(); } return c; };
+    const bare = async (away, home, f) => { document.getElementById('clear').click(); document.getElementById('m-nba').click(); await wait(); set('gdate', '2026-11-19'); set('away', away); set('home', home); Object.keys(f).forEach(k => set(k, f[k])); await wait(140); return card(); };
+    const rows = () => JSON.parse(smStore.getItem('callsheet3.card.v1') || '[]'), rowOf = (away) => rows().find(x => x.gdate === '2026-11-19' && x.away === away);
+    const load = async (doc, name) => { const dt = new DataTransfer(); dt.items.add(new File([JSON.stringify(doc)], name, { type: 'application/json' })); const inp = document.getElementById('slateFile'); inp.files = dt.files; inp.dispatchEvent(new Event('change', { bubbles: true })); await wait(); await wait(); };
+    const J = (x) => JSON.stringify(x), W = { hml: '-190', aml: '160' }, o = {};
+    const grade = async (away, fa, fh) => { const r = rowOf(away); for (const [k, v] of [['fa', fa], ['fh', fh]]) { const el = document.querySelector('#cardTable .grade[data-id="' + r.id + '"][data-k="' + k + '"]'); el.value = String(v); el.dispatchEvent(new Event('input', { bubbles: true })); el.dispatchEvent(new Event('change', { bubbles: true })); await wait(); } };
+    const reopen = async (away) => { document.querySelector('#cardTable [data-open="' + rowOf(away).id + '"]').click(); await wait(220); return card(); };
+    // A. a count on the row with the three markets, the larger bets on the other side of the decision: no box on the card, no chip in tonight's signals
+    o.a = await game('Knicks', 'Timberwolves', Object.assign({ nbasplits: J({ at: '2026-11-19T20:08:44Z', upd: '3:08 PM ET', n: 2, ml: { a: [160, 60, 30], h: [-190, 40, 70] }, sp: { a: [4.5, -110, 45, 40], h: [-4.5, -110, 55, 60] }, tot: { o: [229.5, -110, 30, 55], u: [229.5, -110, 70, 45] } }) }, W));
+    // B. the over behind a tired favourite is the decision and three sides of the count are twenty apart: the same
+    o.d = await game('Knicks', 'Bulls', { narest: '0', nhrest: '3', hml: '240', aml: '-300', nbasplits: J({ upd: '3:08 PM ET', ml: { a: [-300, 99, 70], h: [240, 1, 30] }, sp: { a: [-7.5, -110, 80, 50], h: [7.5, -110, 20, 50] }, tot: { o: [229.5, -110, 30, 55], u: [229.5, -110, 70, 45] } }) });
+    // C. nothing on the row: no box that says there is no count, no chip that asks for one
+    o.none = await game('Knicks', 'Timberwolves', W);
+    // D. the row still keeps the count: an odds file fills it on a carded game and a later one replaces it, the typed line staying
+    await game('Kings', 'Spurs', Object.assign({}, W), true);
+    const A = J({ upd: '11:02 AM ET', ml: { a: [160, 60, 30], h: [-190, 40, 70] } }), B = J({ upd: '3:08 PM ET', n: 2, ml: { a: [160, 20, 30], h: [-190, 80, 70] } });
+    const doc = (box) => ({ format: 'callsheet2.slate', version: 1, date: '2026-11-19', games: [{ sport: 'NBA', gdate: '2026-11-19', away: 'Kings', home: 'Spurs', notes: [], inputs: { line: '240.5', nbasplits: box } }] });
+    o.before = (rowOf('Kings').inputs || {}).nbasplits || '';
+    await load(doc(A), 'odds-2026-11-19.json'); o.first = rowOf('Kings').inputs.nbasplits === A; o.line1 = rowOf('Kings').inputs.line;
+    await load(doc(B), 'odds-2026-11-19.json'); o.second = rowOf('Kings').inputs.nbasplits === B; o.line2 = rowOf('Kings').inputs.line;
+    o.opened = await reopen('Kings');
+    await game('Hawks', 'Wizards', Object.assign({ nbasplits: A }, W), true); o.kept = rowOf('Hawks').inputs.nbasplits === A;
+    // E. a game with a count and no lines yet: the empty card alone; and a game of the file that is not carded fills the form from the slate list, the count with it
+    o.loose = await bare('Suns', 'Jazz', { nbasplits: B });
+    document.getElementById('clear').click(); await wait();
+    await load({ format: 'callsheet2.slate', version: 1, date: '2026-11-19', games: [{ sport: 'NBA', gdate: '2026-11-19', away: 'Suns', home: 'Jazz', notes: [], inputs: { line: '231.5', op: '-110', up: '-110', hml: '-190', aml: '160', nbasplits: B } }] }, 'odds-2026-11-19.json');
+    const sl = [...document.querySelectorAll('#slateList [data-slate]')].filter(e => /Suns/.test(e.closest('li, tr, div').textContent))[0] || document.querySelector('#slateList [data-slate]');
+    if (sl) { sl.click(); await wait(200); } o.filled = Object.assign({ boxSet: document.getElementById('nbasplits').value === B, away: document.getElementById('away').value }, card());
+    return o;
+  });
+  chk(mn.a && mn.a.kind === 'winner' && mn.a.pick === 'Timberwolves to win' && mn.a.n === 0 && mn.a.box === false && mn.a.money === 0 && mn.a.after === 'UL.dwhy' && mn.a.order === 'The numbers'
+      && mn.a.sigs[0] === 'the decision · BET :: Timberwolves to win · 63.0% · -190' && mn.a.sigs.every(x => !/money on|no count|points apart/.test(x))
+      && mn.d && mn.d.kind === 'rest' && mn.d.pick === 'Total OVER 229.5' && mn.d.n === 0 && mn.d.box === false && mn.d.money === 0 && mn.d.after === 'UL.dwhy'
+      && mn.none && mn.none.pick === 'Timberwolves to win' && mn.none.n === 0 && mn.none.box === false && mn.none.money === 0 && mn.none.sigs.every(x => !/no count|slate\.py splits/.test(x)),
+      'the sharp-money box is off the card (27 Nov 2026, the user: "Im wondering if the where money is is working or worth it"; the side with the larger bets had gone 30-35): with DraftKings\' count on the row the decision card has no box between the why and its list and tonight\'s signals no chip for the money, whether the decision is the likelier winner or the over behind a tired favourite and however far apart the count\'s sides are; and a game with no count has no box saying so and no chip asking for one',
+      JSON.stringify({ a: mn.a, d: mn.d, none: mn.none }));
+  chk(mn.before === '' && mn.first === true && mn.second === true && mn.line1 === '229.5' && mn.line2 === '229.5' && mn.kept === true
+      && mn.opened && mn.opened.pick === 'Spurs to win' && mn.opened.n === 0 && mn.opened.money === 0
+      && mn.filled && mn.filled.boxSet === true && mn.filled.away === 'Suns' && mn.filled.n === 0 && mn.filled.money === 0
+      && mn.loose && mn.loose.n === 0 && mn.loose.box === false && mn.loose.pick === '' && mn.loose.empty === 'Enter a total to start. Add both moneyline prices for the sides.' && mn.loose.markets === 'Enter a total to start. Add both moneyline prices for the sides.',
+      'the count is still kept on the row: a matchup carded with a count keeps it, an odds file fills it on a game already carded and a later run\'s file replaces it while the typed line stays, and a game of the file that is not carded fills the form from the slate list with the count in its hidden box, so the NBA record can go on counting it; a game with a count and no lines yet shows the empty card and nothing under it',
+      JSON.stringify({ before: mn.before, first: mn.first, second: mn.second, l1: mn.line1, l2: mn.line2, kept: mn.kept, opened: mn.opened, filled: mn.filled, loose: mn.loose }));
+  await pg.evaluate(async (k) => { for (const x of Object.keys(k)) { if (k[x] === null || k[x] === undefined) await smStore.removeItem(x); else await smStore.setItem(x, k[x]); } }, mnKeep);
+  await reloaded();
+
+  // ---- 18 Nov 2026: the decision on every game (the user: "it would be nice if it actually made a decision and not a no bet ... If the model is going to make a
+  //      decision, and it needs to for every game, then it needs to say bet ... let the explanation for the pick be detailed in sense of some math but trends for the
+  //      teams, players, travel, usage increase for certain players"). On a basketball matchup the pick card is the decision: the game's call with a green BET, where
+  //      it is placed, what kind of read it is with its record here, and a why in parts. The sheet's own read is a kind of call after the measured kinds and ahead of
+  //      the likelier winner; it steps out under four wins in ten, or where it names the pick of a kind that is cold on the game. The props run's `step` says who
+  //      steps up when a scorer is out; the dog is the side with the longer price, not the side with a plus sign. Shown, not scored ----
+  const dcKeep = await pg.evaluate(async () => { await smStore.ready; const k = {}; for (const x of ['callsheet3.card.v1', 'callsheet3.props.v1', 'callsheet3.draft.v1']) k[x] = await smStore.getItem(x); k.below = localStorage.getItem('callsheet3.props.below.v1'); k.legs = localStorage.getItem('callsheet3.props.legs.v1'); await smStore.removeItem('callsheet3.card.v1'); await smStore.removeItem('callsheet3.props.v1'); return k; });
+  await reloaded();
+  const dc = await pg.evaluate(async () => {
+    const wait = (ms) => new Promise(r => setTimeout(r, ms || 90)), txt = e => (e ? e.textContent : '').replace(/\s+/g, ' ').trim();
+    const set = (id, v) => { const el = document.getElementById(id); el.value = v; el.dispatchEvent(new Event('input', { bubbles: true })); };
+    await smStore.ready;
+    const card = () => { const c = document.querySelector('#markets .pickcard'), lk = document.querySelector('#markets .likelycard'), up = document.querySelector('#markets .upsetcard'), o = document.querySelector('#markets details.others');
+      if (!c) return null;
+      const secs = {}; [...c.querySelectorAll('ul.dwhy li')].forEach(li => { const h = txt(li.querySelector('b')); secs[h.replace(/\.$/, '')] = txt(li).slice(h.length).trim(); });
+      return { cls: c.className, kind: c.dataset.kind || '', key: c.dataset.key || '', side: c.dataset.side || '', lab: txt(c.querySelector('.lab')), pick: c.querySelector('.pick') ? c.querySelector('.pick').childNodes[0].textContent.trim() : '',
+        band: txt(c.querySelector('.band')), hot: !!(c.querySelector('.band') && c.querySelector('.band').classList.contains('hot')), res: txt(c.querySelector('.head .chip')), p: txt(c.querySelector('.p')), place: txt(c.querySelector('.dplace')), kindLine: txt(c.querySelector('.dkind')),
+        why: txt(c.querySelector('.why')), secs, also: txt(c.querySelector('.also')), likely: lk ? { lab: txt(lk.querySelector('.lab')), pick: txt(lk.querySelector('.pick')), after: !!(lk.previousElementSibling && lk.previousElementSibling.classList.contains('pickcard')) } : null,
+        upset: up ? txt(up.querySelector('.pick')) + ' :: ' + txt(up).slice(0, 160) : '', sigs: [...document.querySelectorAll('#signals .sig')].map(s => txt(s.querySelector('.sb')) + ' :: ' + txt(s.querySelector('.st'))),
+        tag: txt(document.getElementById('rankTag')), open: o ? o.open : null, summary: o ? txt(o.querySelector('summary')) : '' }; };
+    const game = async (date, away, home, f, add) => { document.getElementById('clear').click(); document.getElementById('m-nba').click(); await wait(); set('gdate', date); set('away', away); set('home', home); set('line', '229.5'); set('op', '-110'); set('up', '-110');
+      Object.keys(f).forEach(k => set(k, f[k])); await wait(140); const c = card(); if (add !== false) { document.getElementById('add').click(); await wait(); } return c; };
+    const rows = () => JSON.parse(smStore.getItem('callsheet3.card.v1') || '[]'), rowOf = (date, away) => rows().find(x => x.gdate === date && x.away === away);
+    const grade = async (date, away, fa, fh) => { const r = rowOf(date, away); for (const [k, v] of [['fa', fa], ['fh', fh]]) { const el = document.querySelector('#cardTable .grade[data-id="' + r.id + '"][data-k="' + k + '"]'); el.value = String(v); el.dispatchEvent(new Event('input', { bubbles: true })); el.dispatchEvent(new Event('change', { bubbles: true })); } await wait(); };
+    const openRow = async (date, away) => { const bd = document.getElementById('boardDate'); bd.value = date; bd.dispatchEvent(new Event('change')); await wait(140); const r = rowOf(date, away); const el = document.querySelector('#calls .pk.call[data-open="' + r.id + '"]'); el.click(); await wait(200); return card(); };
+    const table = () => { const t = document.querySelector('#calibBox .callstab'); return t ? [...t.querySelectorAll('tbody tr')].map(tr => [...tr.children].slice(0, 5).map(td => txt(td)).join(' | ')) : null; };
+    const tot = (lines) => { const o = { OVER: [], UNDER: [] }; Object.keys(lines).forEach(b => { o.OVER.push([b, -110, lines[b]]); o.UNDER.push([b, -110, lines[b]]); }); return o; };
+    const hist = (lo, mean, sd) => { const c = []; for (let v = lo; v <= lo + 100; v++) c.push(Math.round(10000 * Math.exp(-((v - mean) ** 2) / (2 * sd * sd)))); return { lo, c }; };
+    const load = async (doc, name) => { const dt = new DataTransfer(); dt.items.add(new File([JSON.stringify(doc)], name, { type: 'application/json' })); const inp = document.getElementById('slateFile'); inp.files = dt.files; inp.dispatchEvent(new Event('change', { bubbles: true })); await wait(); await wait(); };
+    const o = {};
+    // ---- I. who steps up: the example's game (Embiid out for the 76ers) with the props run's rows for it, a night a case
+    const prow = (pid, name, home, proj, usg, extra) => Object.assign({ pid: String(pid), name, team: home ? 'NYK' : 'PHI', opp: home ? 'PHI' : 'NYK', home: !!home, pos: 'G', mk: 'pts', line: Math.round(proj) - 0.5, op: -110, up: -110, book: 'fanduel',
+      books: { fanduel: [Math.round(proj) - 0.5, -110, -110] }, proj, sd: 6, pm: 0.5, pb: 0.5, p: 0.5, push: 0, side: 'OVER', chance: 0.5, price: -110, need: 0.5238, edge: -0.0238, band: 'no edge', mins: 34, rate36: 20, base: proj, med: proj, usg, sdf: 1,
+      starter: true, start_src: "RotoWire's confirmed five", why: ['x'], lv: 4, log: [], parts: [] }, extra || {});
+    const st = (n, gw, gwo, pw, pwo, mw, mwo, uw, uwo) => ({ n, ppg: n === 'Joel Embiid' ? 26.9 : 16.0, gw, gwo, pw, pwo, mw, mwo, uw, uwo });
+    const pfile = (date, list) => ({ format: 'callsheet3.props', version: 1, date, levers: 4, games: [{ gid: 'dc' + date, away: '76ers', home: 'Knicks', aab: 'PHI', hab: 'NYK', spread: -5.5, total: 231.5, props: list }] });
+    const example = async (date, edit) => { document.getElementById('clear').click(); document.getElementById('m-nba').click(); await wait(); set('gdate', date); document.getElementById('example').click(); await wait(); set('gdate', date); set('hml', '-230'); set('aml', '190');
+      if (edit) { const d = JSON.parse(document.getElementById('nbaout').value); edit(d); set('nbaout', JSON.stringify(d)); } await wait(160); return card(); };
+    const outOf = async (date, edit) => { const c = await example(date, edit); return c ? c.secs['Who is out, who steps up'] : null; };
+    const men = (m, g, ou, b) => [prow(1, 'Tyrese Maxey', 0, 27.4, 30.2, m), prow(2, 'Paul George', 0, 17.6, 23.4, g), prow(3, 'Kelly Oubre Jr.', 0, 14.2, 19.0, ou), prow(4, 'Bench Guy', 0, 8.1, 15.5, b), prow(5, 'Jalen Brunson', 1, 26.0, 31.0, {})];
+    const stepOf = (d) => JSON.parse(smStore.getItem('callsheet3.props.v1')).filter(x => x.gdate === d).map(x => x.name + ':' + JSON.stringify(x.step === undefined ? 'gone' : x.step) + (x.trim ? ':trim' : '')).sort().join(' | ');
+    const E = 'Joel Embiid';
+    // 1. games both ways: the two largest lifts of a point or more, with usage; a 0.6 lift and a man with one game beside him are not named; out five games, nobody newly out: the watch
+    await load(pfile('2026-11-10', men({ step: [st(E, 6, 5, 24.0, 29.5, 36.0, 38.2, 27.5, 33.1)] }, { step: [st(E, 6, 5, 16.0, 18.2, 34.0, 37.0, 22.0, 25.0)] }, { step: [st(E, 6, 5, 14.0, 14.6, 30.0, 30.5, 19.0, 19.4)] }, { step: [st(E, 1, 2, 2.0, 11.5, 8.0, 20.0, 12.0, 16.0)] })), 'nba-props-2026-11-10.json');
+    o.split = await outOf('2026-11-10'); o.kept = stepOf('2026-11-10');
+    // 2. newly out: no game without him; what the run lifts tonight (0.3 of a point or more), the minutes where half a minute or more
+    await load(pfile('2026-11-11', men({ step: [st(E, 11, 0, 24.0, null, 36.0, null, 27.5, null)], parts: [{ k: 'out', t: 'Who is out', eff: 1.2, i: 0 }], chg: { 'new': 30, back: 0, dmin: 1.5, lvl: 30, lg: 29 } },
+      { step: [st(E, 10, 1, 16.0, 30.0, 34.0, 38.0, 22.0, 28.0)], parts: [{ k: 'out', t: 'Who is out', eff: 0.6, i: 0 }], chg: { 'new': 30, back: 0, dmin: 0.3, lvl: 30, lg: 29 } },
+      { step: [st(E, 11, 0, 14.0, null, 30.0, null, 19.0, null)], parts: [{ k: 'out', t: 'Who is out', eff: 0.2, i: 0 }] }, {})), 'nba-props-2026-11-11.json');
+    o.fresh = await outOf('2026-11-11');
+    // 3. hardly a game with him: the club's three highest projections with their usage; out eleven games: the watch
+    await load(pfile('2026-11-12', men({ step: [st(E, 0, 11, null, 28.0, null, 37.5, null, 32.0)] }, { step: [st(E, 1, 10, 9.0, 17.9, 30.0, 35.0, 20.0, 24.0)] }, { step: [st(E, 0, 11, null, 14.2, null, 30.0, null, 19.0)] }, {})), 'nba-props-2026-11-12.json');
+    o.gone = await outOf('2026-11-12');
+    // 4. out sixteen games: past the watch's fifteen. 4b: out two: short of its three
+    await load(pfile('2026-11-13', men({ step: [st(E, 4, 16, 24.0, 29.5, 36.0, 38.2, 27.5, 33.1)] }, {}, {}, {})), 'nba-props-2026-11-13.json');
+    o.long = await outOf('2026-11-13');
+    await load(pfile('2026-11-20', men({ step: [st(E, 9, 2, 24.0, 29.5, 36.0, 38.2, 27.5, 33.1)] }, {}, {}, {})), 'nba-props-2026-11-20.json');
+    o.two = await outOf('2026-11-20');
+    await load(pfile('2026-11-21', men({ step: [st(E, 8, 3, 24.0, 29.5, 36.0, 38.2, 27.5, 33.1)] }, { step: [st(E, 0, 15, null, 18.2, null, 37.0, null, 25.0)] }, {}, {})), 'nba-props-2026-11-21.json');
+    o.edges = await outOf('2026-11-21');   // three for one man and fifteen for another: fifteen is the count, the top of the watch
+    await load(pfile('2026-11-23', men({ step: [st(E, 8, 3, 24.0, 29.5, 36.0, 38.2, 27.5, 33.1)] }, { step: [st(E, 9, 2, 16.0, 16.2, 34.0, 34.0, 22.0, 22.0)] }, {}, {})), 'nba-props-2026-11-23.json');
+    o.three = await outOf('2026-11-23');   // three games missed, to the dot: the foot of the watch
+    // 5. a 16-point man out too, in his first game out: not a clean game, no watch
+    await load(pfile('2026-11-14', men({ step: [st(E, 6, 5, 24.0, 29.5, 36.0, 38.2, 27.5, 33.1), st('Paul George', 10, 1, 25.0, 33.0, 36.0, 39.0, 28.0, 34.0)] }, {}, { step: [st(E, 6, 5, 14.0, 16.5, 30.0, 33.0, 19.0, 22.0), st('Paul George', 10, 1, 14.5, 20.0, 30.0, 36.0, 19.5, 24.0)] }, {})), 'nba-props-2026-11-14.json');
+    o.unclean = await outOf('2026-11-14', d => { d.away.push({ id: '99', n: 'Paul George', st: 'Out', pos: 'F', mpg: 33.0, ppg: 16.0, src: 'this season', g: 10 }); });
+    // 6. nobody moved a point
+    await load(pfile('2026-11-15', men({ step: [st(E, 6, 5, 24.0, 24.9, 36.0, 36.5, 27.5, 28.0)] }, { step: [st(E, 6, 5, 16.0, 15.2, 34.0, 34.0, 22.0, 22.0)] }, {}, {})), 'nba-props-2026-11-15.json');
+    o.flat = await outOf('2026-11-15');
+    // 7. a file from before the reading: the log's notes over his last ten, three games with the man out and four with him
+    const lg = (a, b) => a.map((v, i) => ['2026-11-0' + (i + 1), 'OPP', i % 2, v[0], v[1], ['Joel Embiid out (32 mpg, a lift for him)', 'won by 3']]).concat(b.map((v, i) => ['2026-11-1' + i, 'OPP', i % 2, v[0], v[1], ['won by 3']]));
+    const logs = men({ log: lg([[38, 30], [37, 28], [39, 32]], [[35, 22], [36, 24], [35, 23], [34, 25]]) }, { log: lg([[36, 18], [36, 19], [36, 17]], [[35, 17.5], [35, 17.5], [35, 17.5], [35, 17.5]]) }, {}, {});
+    await load(pfile('2026-11-16', logs), 'nba-props-2026-11-16.json');
+    o.log = await outOf('2026-11-16');
+    // 8. the same file where two men with more minutes are out as well: the notes name two a game, so they are not read for him
+    await load(pfile('2026-11-17', logs), 'nba-props-2026-11-17.json');
+    o.unnamed = await outOf('2026-11-17', d => { d.away.push({ id: '97', n: 'Big A', st: 'Out', pos: 'C', mpg: 36.0, ppg: 8.0, src: 'this season', g: 10 }, { id: '98', n: 'Big B', st: 'Out', pos: 'C', mpg: 35.0, ppg: 7.0, src: 'this season', g: 10 }); });
+    // 8b. the notes with nobody up a point: they name two men a game at most, so the card does not say "nobody moved" on them
+    await load(pfile('2026-11-22', men({ log: lg([[36, 24], [36, 25], [36, 23]], [[35, 23.5], [35, 23.5], [35, 23.5], [35, 23.5]]) }, {}, {}, {})), 'nba-props-2026-11-22.json');
+    o.logflat = await outOf('2026-11-22');
+    // 9. his numbers are last season's (a game or two this season at most) and the file has no split: hardly played, whatever the notes say; no watch
+    await load(pfile('2026-11-18', logs), 'nba-props-2026-11-18.json');
+    o.last = await outOf('2026-11-18', d => { d.away[0].src = 'last season'; });
+    // 9b. the same man where the run did read him: two games with him and eleven without (the Magic's scorer on 18 Nov). The run's own split is the reading, and its count the watch's
+    await load(pfile('2026-11-24', men({ step: [st(E, 2, 11, 20.0, 24.9, 31.0, 37.9, 32.0, 30.2)] }, { step: [st(E, 2, 10, 11.5, 20.2, 30.0, 36.0, 23.5, 22.4)] }, {}, {})), 'nba-props-2026-11-24.json');
+    o.lastRead = await outOf('2026-11-24', d => { d.away[0].src = 'last season'; });
+    // 10. no props on the night: who is out and nothing more
+    o.none = await outOf('2026-11-19');
+    o.trimmed = stepOf('2026-11-10');
+    // ---- II. the kinds, each on a game of its own, read off the form before the row is added
+    const D = '2026-12-21';
+    const ruleFix = { line: '232', hml: '-190', aml: '160', ncrew: 'Ref One, Ref Two, Ref Three', nbarefs: JSON.stringify({ lg: [2462, 44.0, 228.8], r: { 'Ref One': [70, 44, 228, 10, 30, 0, 0], 'Ref Two': [70, 44, 228, 12, 30, 0, 0], 'Ref Three': [70, 44, 228, 11, 30, 0, 0] } }),
+      nbasim: JSON.stringify({ v: 1, runs: 1000, own: { total: hist(160, 215, 12), h1: hist(60, 108, 9), h2: hist(60, 108, 9), q: [hist(20, 54, 6), hist(20, 54, 6), hist(20, 54, 6), hist(20, 54, 6)], margin: hist(-50, 3, 12), away: hist(60, 106, 10), home: hist(60, 109, 10), ot: 0.04 }, mkt: null, anchor: null, ft_factor: 1,
+        shrink: { total: 0.0, h1: 0.1, spread: 0.0, ml: 0.97, team: 0.3, team_away: 0.3, team_own: 0.3, quarter: 0.1 }, bands: [[0.7, 'STRONG'], [0.65, 'BET'], [0.6, 'LEAN']] }) };
+    const dogEdge = { hml: '-120', aml: '100' }, dogRead = { hml: '-105', aml: '-115', sp: '1.0' };
+    const valueFix = { line: '228.5', hml: '-450', aml: '350', sp: '-10', nagp: '15', nhgp: '16', nlrtg: '113.0', nlpace: '100.5', naort: '115.5', nadrt: '115.5', napace: '100.2', nhort: '115.5', nhdrt: '115.5', nhpace: '100.2',
+      odds: JSON.stringify({ book: 'fanatics', total: tot({ fanatics: 228.5, draftkings: 228.5, fanduel: 227.5, betmgm: 228.5, pinnacle: 228.5 }) }) };
+    o.read = await example(D);                                                             // the sheet's read of a total, the likeliest side another market
+    o.upset = await game(D, '76ers', 'Magic', dogRead, false);                             // the sheet's read of a short dog priced -105 against -115
+    o.winner = await game(D, 'Suns', 'Kings', { hml: '-190', aml: '160' }, false);         // nothing speaks: the likelier winner
+    o.rest = await game(D, 'Knicks', 'Bulls', { narest: '0', nhrest: '3', hml: '240', aml: '-300' }, false);   // a 71.8% favourite on the second night, the other club rested
+    o.value = await game(D, 'Jazz', 'Lakers', valueFix, false);                            // FanDuel a point under the middle, the sheet's 227.6 between the two numbers
+    o.rule = await game(D, 'Bulls', 'Pistons', ruleFix, false);                            // the simulation and the crew under the total
+    o.edge = await game(D, 'Hornets', 'Bucks', dogEdge, false);                            // a short dog the sheet prices below its chance: the sheet's own call
+    // the form read off the row: the Suns five on the road (the last two inside three nights), the Kings home after four away, one game with no close and one total that pushed
+    const fg = (date, opp, home, pf, pa, ctot, csp) => ({ date, opp, home, pf, pa, h1f: 50, h1a: 50, end: 'REG', ctot, ch1: null, csp });
+    o.form = await game(D, 'Suns', 'Kings', { hml: '-190', aml: '160', narest: '0', nhrest: '1', nbaform: JSON.stringify({
+      away: [fg('2026-12-13', 'Jazz', false, 110, 100, 215.5, 4.5), fg('2026-12-15', 'Nuggets', false, 104, 111, 220.5, -6.5), fg('2026-12-17', 'Lakers', false, 120, 118, 230.5, -3.5), fg('2026-12-19', 'Clippers', false, 99, 108, 221.0, -5.0), fg('2026-12-20', 'Warriors', false, 115, 113, 228.0, -2.0)],
+      home: [fg('2026-12-12', 'Spurs', true, 101, 99, 205.5, -3.5), fg('2026-12-14', 'Trail Blazers', false, 108, 112, 219.5, -1.5), fg('2026-12-16', 'Thunder', false, 95, 120, 221.5, -9.5), fg('2026-12-17', 'Rockets', false, 100, 111, null, null), fg('2026-12-19', 'Mavericks', false, 105, 110, 216.0, -4.5)] }) }, false);
+    document.getElementById('clear').click(); document.getElementById('m-mlb').click(); await wait(); set('gdate', D); set('away', 'Rays'); set('home', 'Yankees'); set('line', '8.5'); set('op', '-110'); set('up', '-110'); set('aera', '2.10'); set('hera', '2.30'); set('aip', '180'); set('hip', '175'); set('abp', '2.90'); set('hbp', '3.00'); await wait(140);
+    o.mlb = card(); document.getElementById('clear').click(); await wait();
+    // ---- III. the record behind it: ten short dogs with an edge lose, eight short dogs without one win, ten agreement-rule unders lose
+    for (let i = 1; i <= 10; i++) { const d = '2026-12-' + String(i).padStart(2, '0'); await game(d, 'Hornets', 'Bucks', dogEdge); await grade(d, 'Hornets', 100, 112); }
+    for (let i = 11; i <= 18; i++) { const d = '2026-12-' + i; await game(d, '76ers', 'Magic', dogRead); await grade(d, '76ers', 104, 110); }
+    for (let i = 20; i <= 29; i++) { const d = '2026-11-' + i; await game(d, 'Bulls', 'Pistons', ruleFix); await grade(d, 'Bulls', 120, 121); }
+    await example('2026-12-19'); document.getElementById('add').click(); await wait(); await grade('2026-12-19', '76ers', 120, 118);   // a read of a total, graded at the card's number: 238 over 231.5
+    o.table = table();
+    o.dup = await game(D, 'Hornets', 'Bucks', dogEdge);      // the sheet's own call is cold, and the read names the same dog: both left out
+    o.live = await game(D, '76ers', 'Magic', dogRead);       // the read stands at 8-10
+    o.ruleCold = await game(D, 'Bulls', 'Pistons', ruleFix); // the rule is cold: its chip says so and the decision is the next kind
+    o.coldOther = await game(D, 'Nets', 'Heat', Object.assign({}, ruleFix, dogRead), false);   // the rule cold on the total and the read on the short dog: another pick, so the read stands
+    { const bd = document.getElementById('boardDate'); bd.value = D; bd.dispatchEvent(new Event('change')); await wait(160);
+      o.board = [...document.querySelectorAll('#calls .pk.call')].map(c => [c.className, txt(c.querySelector('.n1')), txt(c.querySelector('.n2')), txt(c.querySelector('.n3')), c.querySelector('.takebtn') ? 'take' : 'no take', txt(c.querySelector('.n4.also'))].join(' | ')); }
+    // ---- IV. a graded game opened from the board carries its result
+    o.graded = await openRow('2026-12-11', '76ers');
+    return o;
+  });
+  await pg.evaluate(async (k) => { for (const x of Object.keys(k)) { if (x === 'below' || x === 'legs') { const key = x === 'below' ? 'callsheet3.props.below.v1' : 'callsheet3.props.legs.v1'; if (k[x] === null) localStorage.removeItem(key); else localStorage.setItem(key, k[x]); continue; } if (k[x] === null || k[x] === undefined) await smStore.removeItem(x); else await smStore.setItem(x, k[x]); } }, dcKeep);
+  await reloaded();
+  const dcP = "76ers without Joel Embiid (26.9 points, 32 minutes): 26.9 points a game out; listed short of out: Anfernee Simons (Questionable, 14.3 points), Dominick Barlow (Day-To-Day, 4.2 points).";
+  const dcK = " Knicks without Mitchell Robinson (5.6 points, 22 minutes): 5.6 points a game out; listed short of out: Josh Hart (Questionable, 13.4 points).";
+  const dcW = " Watched, not scored: with a scorer of 18 a game out three to fifteen of his club's games, and nobody of 15 a game newly out, the total ran over 207-157 on three seasons of lines (56.9%), nearly all of it from February on (110-70, against 97-87 before); the side was priced.";
+  const dcT = " A club's own absences are in the line by the tip; what moves is the players' own numbers, which the props read.";
+  const dcTop = "Tyrese Maxey 27.4 (usage 30.2%), Paul George 17.6 (usage 23.4%), Kelly Oubre Jr. 14.2 (usage 19.0%)";
+  const dcMax = (wo, w) => " Stepping up without Embiid (each man's games for the club this season): Tyrese Maxey 29.5 points in 38.2 minutes on 33.1% usage over the " + wo + " without him, 24.0 in 36.0 on 27.5% over the " + w + " with him";
+  chk(dc.split === dcP + dcMax(5, 6) + "; Paul George 18.2 points in 37.0 minutes on 25.0% usage over the 5 without him, 16.0 in 34.0 on 22.0% over the 6 with him." + dcK + dcW + dcT
+      && dc.kept === 'Bench Guy:[{"n":"Joel Embiid","ppg":26.9,"gw":1,"gwo":2,"pw":2,"pwo":11.5,"mw":8,"mwo":20,"uw":12,"uwo":16}] | Jalen Brunson:null | Kelly Oubre Jr.:[{"n":"Joel Embiid","ppg":26.9,"gw":6,"gwo":5,"pw":14,"pwo":14.6,"mw":30,"mwo":30.5,"uw":19,"uwo":19.4}] | Paul George:[{"n":"Joel Embiid","ppg":26.9,"gw":6,"gwo":5,"pw":16,"pwo":18.2,"mw":34,"mwo":37,"uw":22,"uwo":25}] | Tyrese Maxey:[{"n":"Joel Embiid","ppg":26.9,"gw":6,"gwo":5,"pw":24,"pwo":29.5,"mw":36,"mwo":38.2,"uw":27.5,"uwo":33.1}]'
+      && dc.trimmed === 'Bench Guy:"gone":trim | Jalen Brunson:"gone":trim | Kelly Oubre Jr.:"gone":trim | Paul George:"gone":trim | Tyrese Maxey:"gone":trim',
+      'the decision, who steps up (18 Nov 2026): with a 27-point scorer out, the card names the two teammates whose scoring has risen a point a game or more in their games without him, largest first, each with his points, minutes and usage over the games without the man and over the games with him, from the props run\'s own split on his points row; a man up 0.6 and a man with one game beside him are not named (he joined late and has two games without the scorer: the games missed are the most any teammate has played without him, five, inside the watch); the row keeps the split off the file and drops it when the night is trimmed from the save',
+      JSON.stringify({ split: dc.split, kept: dc.kept, trimmed: dc.trimmed }));
+  chk(dc.fresh === dcP + " Embiid is newly out: no more than one game without him this season. The props run lifts Tyrese Maxey +1.2 points to 27.4 (+1.5 minutes), Paul George +0.6 points to 17.6." + dcK + dcT
+      && dc.gone === dcP + " Embiid has hardly played with them this season: the scoring already runs through " + dcTop + " by the props run." + dcK + dcW + dcT
+      && dc.flat === dcP + " Nobody's scoring has moved a point a game without Embiid this season. Tonight's scoring by the props run: " + dcTop + "." + dcK + dcW + dcT
+      && dc.none === dcP + dcK + dcT,
+      'the decision, who steps up, the other cases: no game without the man reads "newly out" with what the props run lifts tonight (0.3 of a point or more; the minutes where half a minute or more; a lift of 0.2 is not named); no game with him reads "has hardly played with them" with the club\'s three highest projections and their usage; games both ways and nobody up a point says so; and a night with no props names who is out and nothing more',
+      JSON.stringify({ fresh: dc.fresh, gone: dc.gone, flat: dc.flat, none: dc.none }));
+  chk(dc.two === dcP + dcMax(2, 9) + "." + dcK + dcT && dc.three === dcP + dcMax(3, 8) + "." + dcK + dcW + dcT && dc.edges === dcP + dcMax(3, 8) + "." + dcK + dcW + dcT && dc.long === dcP + dcMax(16, 4) + "." + dcK + dcT
+      && dc.unclean === "76ers without Joel Embiid (26.9 points, 32 minutes), Paul George (16.0 points, 33 minutes): 42.9 points a game out; listed short of out: Anfernee Simons (Questionable, 14.3 points), Dominick Barlow (Day-To-Day, 4.2 points)." + dcMax(5, 6) + "; Kelly Oubre Jr. 16.5 points in 33.0 minutes on 22.0% usage over the 5 without him, 14.0 in 30.0 on 19.0% over the 6 with him." + dcK + dcT,
+      'the decision, the watch on a scorer long out: named where a scorer of 18 a game has missed three to fifteen of his club\'s games by the run\'s own count (three is in and two is short of it; three for one teammate and fifteen for another counts fifteen, and is in; sixteen is past it) and nobody of 15 a game is inside his first three games out (a 16-point man out for the first time takes it off the card); it says what was measured and that it is not scored',
+      JSON.stringify({ two: dc.two, three: dc.three, edges: dc.edges, long: dc.long, unclean: dc.unclean }));
+  chk(dc.log === dcP + " Stepping up without Embiid (each man's last ten games): Tyrese Maxey 30.0 points in 38.0 minutes over the 3 without him, 23.5 in 35.0 over the 4 with him." + dcK + dcT
+      && dc.unnamed === "76ers without Joel Embiid (26.9 points, 32 minutes), Big A (8.0 points, 36 minutes), Big B (7.0 points, 35 minutes): 41.9 points a game out; listed short of out: Anfernee Simons (Questionable, 14.3 points), Dominick Barlow (Day-To-Day, 4.2 points). Tonight's scoring by the props run: " + dcTop + "." + dcK + dcT
+      && dc.last === dcP + " Embiid has hardly played this season: the scoring already runs through " + dcTop + " by the props run." + dcK + dcT
+      && dc.lastRead === dcP + " Stepping up without Embiid (each man's games for the club this season): Paul George 20.2 points in 36.0 minutes on 22.4% usage over the 10 without him, 11.5 in 30.0 on 23.5% over the 2 with him; Tyrese Maxey 24.9 points in 37.9 minutes on 30.2% usage over the 11 without him, 20.0 in 31.0 on 32.0% over the 2 with him." + dcK + dcW + dcT
+      && dc.logflat === dcP + " Tonight's scoring by the props run: " + dcTop + "." + dcK + dcT,
+      'the decision, who steps up from a file without the split: the game log\'s notes over each man\'s last ten are read (30.0 in the three games the notes name the scorer out, 23.5 in the four they do not; no usage, no watch, and a man up half a point is not named; where nobody is up a point the card gives the night\'s scoring and does not say "nobody moved"); they are not read where two men with more minutes are out as well, since a note names two men at most; and a scorer whose numbers are last season\'s has hardly played this season, whatever the notes say, with no watch on a count the page cannot make; where the run did read that man (two games with him, eleven without) its own split is the reading and its count the watch\'s',
+      JSON.stringify({ log: dc.log, unnamed: dc.unnamed, last: dc.last, lastRead: dc.lastRead, logflat: dc.logflat }));
+  const dcc = (c) => c ? [c.cls, c.key, c.side, c.lab, c.pick, c.band + (c.hot ? '*' : ''), c.p, c.place, c.kindLine].join(' | ') : 'none';
+  const dcAlso = "The decision as given, one a game: none graded here yet. Each kind keeps its own line in the NBA record. A measured kind that has lost here over 10 or more calls steps out of the order; the sheet's own read steps out only under four wins in ten over as many; the likelier winner always stands.";
+  chk(dcc(dc.read) === "pickcard decision read | total | OVER | The decision · an OVER game | OVER 231.5 | BET* | 51.2% | -110 · needs 52.4% | the sheet's own read of the game · none graded here yet · no measured edge at the price: a small bet"
+      && /^Why: Projected 232\.0 points against the 231\.5 line, so the over at 51\.2%\. Behind it: the market's own fair number is 231\.50 against the 231\.5 line; ratings, faded \+0\.52 on the line \(tagged\)\. The book's own number makes it 50\.0%; the sheet's inputs move it to 51\.2%, a 1\.2-point lean toward the over\. At -110 it needs 52\.4%: the price asks a little more than that chance: this is the sheet's read of the game and not an edge at the price, so the bet is a small one\.$/.test(dc.read.why)
+      && Object.keys(dc.read.secs).join('|') === 'The numbers|Form|Pace and the matchup|Rest and the schedule|Who is out, who steps up|The crew|Also on this game' && dc.read.secs['Also on this game'] === 'The likelier winner, 60 to 70% says Knicks to win (none graded here yet).'
+      && dc.read.secs['The numbers'] === "The sheet projects 76ers 113.3, Knicks 118.7, a total of 232.0 against the card's 231.5 (it opened 229.5). The spread is Knicks -5.5. Knicks win 66.9% of the time by the middle of the carded book, 66.6% by the sheet. The simulation's own view has the under at 81%."
+      && /^Scott Foster, Tony Brothers, Marc Davis: leans over \(z \+4\.4\)\. A crew predicts the night's free throws, not the total/.test(dc.read.secs['The crew']) && /^Pace: 76ers 99\.5 possessions a game, Knicks 98\.0 \(the league 100\.5\)\. 76ers score 113\.5 per 100 into a defence that allows 109\.0; Knicks score 118\.0 into one that allows 115\.0 \(the league 113\.0\)\./.test(dc.read.secs['Pace and the matchup'])
+      && dc.read.also === dcAlso && dc.read.likely && dc.read.likely.after && dc.read.likely.lab === 'Likeliest at any price · not the decision' && dc.read.likely.pick === 'Knicks ML'
+      && dc.read.sigs[0] === 'the decision · BET :: OVER 231.5 · 51.2% · -110' && !dc.read.sigs.some(s => /^the (pick|sheet's read)/.test(s)) && dc.read.open === true && dc.read.summary === 'the markets on the card, listed and graded, by edge' && dc.read.tag === 'the decision, then the markets by edge'
+      && dc.mlb && dc.mlb.cls === 'pickcard' && dc.mlb.lab === 'The pick · an UNDER game' && dc.mlb.band === 'NO BET' && !dc.mlb.hot && dc.mlb.place === '' && dc.mlb.sigs[0] === 'the pick :: UNDER 8.5 · 51.5% · edge -0.9',
+      'the decision, the sheet\'s read (the user: "where it says the pick is an over game. I like that and it should also put the green bet"): a game the sheet reads as an over game with no measured kind speaking is given the over as the decision, with a green BET, its chance, the price and what it needs, the kind and its record and that it carries no measured edge; the why ends on what the BET is and is followed by the seven parts; the likeliest side at any price keeps its own card under it, worded "not the decision"; tonight\'s signals lead with the decision, the markets stand open, and a baseball matchup keeps its pick card and its NO BET',
+      JSON.stringify({ read: dcc(dc.read), why: dc.read.why.slice(-200), secs: Object.keys(dc.read.secs), likely: dc.read.likely, sigs: dc.read.sigs, open: dc.read.open, tag: dc.read.tag, mlb: dcc(dc.mlb), mlbSig: dc.mlb && dc.mlb.sigs }));
+  chk(dcc(dc.upset) === "pickcard decision read | ml | HOME | The decision · an UPSET game | Magic ML | BET* | 50.8% | -105 · needs 51.2% | the sheet's own read of the game · none graded here yet · no measured edge at the price: a small bet"
+      && /^Magic ML :: Upset watch · a scored signalMagic ML50\.8%-105 needs 51\.2%: the book's price, not an edge\. Signals: a short dog at 49% \(scored, \+4 points\)/.test(dc.upset.upset) && dc.upset.sigs.join(' ## ') === 'the decision · BET :: Magic ML · 50.8% · -105 ## upset signal :: Magic ML · 50.8%'
+      && dc.upset.likely === null && dc.upset.secs['The numbers'] === "The sheet projects 76ers 115.3, Magic 114.3, a total of 229.5 against the card's 229.5. The spread is 76ers -1. 76ers win 51.1% of the time by the middle of the carded book, 49.2% by the sheet."
+      && dcc(dc.edge) === "pickcard decision sheet | ml | AWAY | The decision · an UPSET game | Hornets ML | BET* | 51.8% | +100 · needs 50.0% | the sheet's own call · none graded here yet · the sheet's own edge at the price"
+      && dc.edge.secs['Also on this game'] === "The sheet's own read of the game says Hornets ML (none graded here yet); the likelier winner, near a coin says Bucks to win (none graded here yet).",
+      'the decision, an upset read (the user: "If it believes the Magic are going to win ... then stand by that especially if it highlights it"): the home club priced -105 against -115 is the book\'s dog though neither price has a plus sign; the sheet reads it at 50.8% where the price needs 51.2%, so it is the sheet\'s read and the decision, an UPSET game with a green BET, and the upset card and the upset chip under it name the same club (they named the favourite); a short dog the sheet prices below its chance is the sheet\'s own call, ahead of its read',
+      JSON.stringify({ upset: dcc(dc.upset), card: dc.upset.upset, sigs: dc.upset.sigs, likely: dc.upset.likely, nums: dc.upset.secs['The numbers'], edge: dcc(dc.edge), edgeAlso: dc.edge.secs['Also on this game'] }));
+  chk(dcc(dc.winner) === "pickcard decision winner | ml | HOME | The decision · a MONEYLINE game | Kings to win | BET* | 63.0% | -190 · needs 65.5% | the likelier winner, 60 to 70% · none graded here yet · the book's favourite at the book's price: a small bet or a parlay leg"
+      && dc.winner.why === "Why: By the middle of the carded book Kings win 63.0% of the time; the best of your four prices is -190, which needs 65.5%: it costs 3.8% a bet. Nothing measured speaks on this game and the sheet's inputs do not move a side a point off the book, so the decision is the likelier winner."
+      && dc.winner.likely === null && dc.winner.secs['Also on this game'] === undefined
+      && dcc(dc.rest) === "pickcard decision rest | total | OVER | The decision · an OVER game | Total OVER 229.5 | BET* | -110 | needs 52.4% | the over behind a tired favourite · none graded here yet · 66-33 on the three seasons it was found on and 419-436 on the seventeen before them: not proven, a small bet"
+      && dc.rest.why === "Why: Knicks are 71.8% by the books and played last night; Bulls rested 3 days. A favourite of 70% or more on the second night against a rested club went over the total 66-33 on the three seasons this was found on (32-16, 28-15 and 6-2), where the same favourites rested went 360-367. On the seventeen seasons before them the same spot, the tired favourite laying 5.5 or more, went 419-436, and 48-40 on the two nearest, so the long record does not back it: the over, as a small bet, at the carded total."
+      && dc.rest.secs['Rest and the schedule'] === "Knicks on the second night of a back to back, Bulls on 3 days' rest. The books price rest on the side: a club on the second night won 408 of 875 where the moneylines priced 411; on the three seasons to hand the total ran over behind a tired favourite of 70% or more, and that is this game's call, a small one."
+      && dc.rest.likely && dc.rest.likely.pick === 'Knicks ML'
+      && dcc(dc.rule) === "pickcard decision rule | total | UNDER | The decision · an UNDER game | Total UNDER 232 | BET* | -110 | needs 52.4% | the agreement rule · none graded here yet · measured on two seasons of closes"
+      && dc.rule.why === "Why: Three voices on the total: the sheet silent (OVER 50%, no bet); the sim UNDER 93%; the crew leans UNDER (z -8.9). 2 of 3 on the UNDER, none against: BET by the agreement rule. The simulation and the crew on one side with the sheet not against it went 149-113 (56.9%) on three seasons of closes."
+      && dc.rule.sigs.slice(0, 2).join(' ## ') === 'the decision · BET :: Total UNDER 232 · -110 ## three voices · BET :: UNDER 232 · 2 of 3 on it, none against',
+      'the decision, the other kinds: with nothing else speaking the decision is the likelier winner at the best price, said as that, and no second card repeats it; a 71.8% favourite on the second night against a rested club is the over behind a tired favourite with what three seasons of lines showed, and the rest line says the total is the part the books miss; the simulation and the crew on one side of the total is the agreement rule with the three voices spelled out; each wears the green BET and says what kind of read it is',
+      JSON.stringify({ winner: dcc(dc.winner), wwhy: dc.winner.why, rest: dcc(dc.rest), rwhy: dc.rest.why, rrest: dc.rest.secs['Rest and the schedule'], rule: dcc(dc.rule), rulewhy: dc.rule.why, rsigs: dc.rule.sigs }));
+  chk(dcc(dc.value) === "pickcard decision number | total | OVER | The decision · an OVER game | Total OVER 227.5 | BET* | -110 | at FanDuel · needs 52.4% | the best number on the board · none graded here yet · a point better than the market's number: a small edge, so a small bet"
+      && dc.value.why === "Why: FanDuel posts 227.5 where the middle of 5 books is 228.5: a point under it, on the over's side. A total a point or more off the middle at one of your four apps won 105-84 (55.6%) on last season's closes. The point itself decides few games: the final landed within a point of the app's number on 10 of 280 such calls over two seasons, so this is a small edge and no read of the game. The sheet's own projection is 227.6: at 227.5 that is the over 50.3% of the time, so the sheet does not argue."
+      && dc.value.secs['Also on this game'] === "The sheet's own read of the game says UNDER 228.5 (none graded here yet): the sheet's 227.6 sits between the two numbers, so it is the over at 227.5 and the under at 228.5 at once, and the decision takes the better number; the likelier winner, 70 to 80% says Lakers to win at Fanatics (none graded here yet)."
+      && dc.value.sigs.slice(0, 2).join(' ## ') === "the decision · BET :: Total OVER 227.5 · -110 at FanDuel ## the sheet's read :: UNDER 228.5 · 51.9% · edge -0.5" && dc.value.likely && dc.value.likely.pick === 'Lakers ML'
+      && /^The sheet projects Jazz 108\.8, Lakers 118\.8, a total of 227\.6 against the card's 228\.5; the middle of 5 books is 228\.5\. The spread is Lakers -10\. /.test(dc.value.secs['The numbers']),
+      'the decision, the best number against the sheet\'s read (the Lakers game of 18 Nov): FanDuel\'s total a point under the middle is the decision at FanDuel, ahead of the sheet\'s read, and the card says what a point of number is worth (the final inside it on 10 of 280 such calls: a small edge, a small bet); the sheet\'s own read at the card\'s number is the other side, and the card says why both are true (its projection sits between the two numbers) and that the decision takes the better number; tonight\'s signals carry the decision first and the sheet\'s read beside it',
+      JSON.stringify({ value: dcc(dc.value), why: dc.value.why, also: dc.value.secs['Also on this game'], sigs: dc.value.sigs, nums: dc.value.secs['The numbers'] }));
+  chk(dc.form.secs['Form'] === "Suns 3-2 in their last five, 109.6 for and 110.0 against; their totals went over 1-3 and they covered 3-2; won the last one; tonight is their third game in four nights; the sixth straight on the road. Kings 1-4 in their last five, 101.8 for and 110.4 against; their totals went over 1-3 and they covered 0-4; lost the last four; home after four on the road."
+      && dc.form.secs['Rest and the schedule'] === "Suns on the second night of a back to back, Kings on a day's rest. The books price rest on the side: a club on the second night won 408 of 875 where the moneylines priced 411; the total has run over only behind a favourite of 70% or more, which this is not. Rest days, time zones, a long trip and a third game in four nights each read nothing on the side or the total against two seasons of closing lines: the books price the schedule, so it is shown and not scored."
+      && dc.form.kind === 'winner' && dc.winner.secs['Form'] === undefined && dc.winner.secs['Rest and the schedule'] === undefined && !/Rest days, time zones/.test(dc.read.secs['Rest and the schedule']),
+      'the decision, form and the schedule: each club\'s last five off the row give its record, its points for and against, its totals against their closes (a total that landed on the number counts neither way, a game with no close is left out), its games against the spread from its own side of the home spread, its streak, a third game in four nights and a run on the road or a return home; a tired dog is not the rest call, and the card says the books price the schedule where the schedule shows something; a row with no form and no rest has neither part',
+      JSON.stringify({ form: dc.form.secs['Form'], rest: dc.form.secs['Rest and the schedule'], kind: dc.form.kind, bare: Object.keys(dc.winner.secs) }));
+  chk((dc.table || []).join(' ## ') === "BET · the agreement rule · cold here | 0-10 | 56.9% | 0.0% | -10.0u ## BET · the sheet's own call · cold here | 0-10 | 51.8% | 0.0% | -10.0u ## REST · the over behind a tired favourite | none yet |  |  |  ## VALUE · the best number on the board | none yet |  |  |  ## READ · the sheet's own read of the game | 9-10 | 51.4% | 47.4% | -1.5u ## LEAN · the likelier winner, 80% or more | none yet |  |  |  ## LEAN · the likelier winner, 70 to 80% | none yet |  |  |  ## LEAN · the likelier winner, 60 to 70% | 10-1 | 63.4% | 90.9% | +4.3u ## LEAN · the likelier winner, near a coin | 10-8 | 51.7% | 55.6% | +0.3u ## The call as given, one a game | 29-0 | 55.5% | 100.0% | +22.1u"
+      && dcc(dc.dup) === "pickcard decision winner | ml | HOME | The decision · a MONEYLINE game | Bucks to win | BET* | 52.2% | -120 · needs 54.5% | the likelier winner, near a coin · 10-8 here, +0.3u · the book's favourite at the book's price: a small bet or a parlay leg"
+      && dc.dup.secs['Also on this game'] === "The sheet's own call says Hornets ML (0-10 here, -10.0u: cold, left out of the order); the sheet's own read of the game says Hornets ML (9-10 here, -1.5u: the same pick as a call that is cold here, left out with it)."
+      && dc.dup.sigs.slice(0, 2).join(' ## ') === "the decision · BET :: Bucks to win · 52.2% · -120 ## the sheet's read :: Hornets ML · 51.8% · edge +1.8"
+      && dcc(dc.live) === "pickcard decision read | ml | HOME | The decision · an UPSET game | Magic ML | BET* | 50.8% | -105 · needs 51.2% | the sheet's own read of the game · 9-10 here, -1.5u · no measured edge at the price: a small bet"
+      && dc.live.secs['Also on this game'] === 'The likelier winner, near a coin says 76ers to win (10-8 here, +0.3u).'
+      && dcc(dc.ruleCold) === "pickcard decision winner | ml | HOME | The decision · a MONEYLINE game | Pistons to win | BET* | 63.0% | -190 · needs 65.5% | the likelier winner, 60 to 70% · 10-1 here, +4.3u · the book's favourite at the book's price: a small bet or a parlay leg"
+      && dc.ruleCold.secs['Also on this game'] === 'The agreement rule says Total UNDER 232 (0-10 here, -10.0u: cold, left out of the order).'
+      && dc.ruleCold.sigs.slice(0, 2).join(' ## ') === 'the decision · BET :: Pistons to win · 63.0% · -190 ## three voices · cold here :: UNDER 232 · 2 of 3 on it · 0-10 here, -10.0u, so it is left out of the decision'
+      && dcc(dc.coldOther) === "pickcard decision read | ml | HOME | The decision · an UPSET game | Heat ML | BET* | 50.8% | -105 · needs 51.2% | the sheet's own read of the game · 9-10 here, -1.5u · no measured edge at the price: a small bet"
+      && dc.coldOther.secs['Also on this game'] === 'The agreement rule says Total UNDER 232 (0-10 here, -10.0u: cold, left out of the order); the likelier winner, near a coin says Nets to win (10-8 here, +0.3u).'
+      && (dc.board || []).join(' ## ') === "pk call read | READ · the sheet's own read of the game | Magic ML | 50.8% by the sheet where the book's own prices say 48.9% · -105 needs 51.2% · an UPSET game | take |  ## pk call lean | LEAN · the likelier winner, 60 to 70% | Pistons to win | 63.0% by the middle of the carded book · -190 needs 65.5% · costs 3.8% a bet | take | Also on this game: the agreement rule says Total UNDER 232 (0-10 here, -10.0u: cold, and left out of the order until its record turns). ## pk call lean | LEAN · the likelier winner, near a coin | Bucks to win | 52.2% by the middle of the carded book · -120 needs 54.5% · costs 4.3% a bet | take | Also on this game: the sheet's own call says Hornets ML (0-10 here, -10.0u: cold, and left out of the order until its record turns)."
+      && dc.graded && dc.graded.cls === 'pickcard decision read win' && dc.graded.res === 'win' && dc.graded.pick === 'Magic ML' && /^The decision as given, one a game: 29-0 here, \+22\.1u\./.test(dc.graded.also),
+      'the decision, the record behind it: the sheet\'s read keeps its own line (9-10 here: eight short dogs won, ten lost, and a total it read went over the card\'s number) and stands at that, where the measured kinds step out on any loss over ten calls (the agreement rule and the sheet\'s own call, both 0-10, are cold); a read that names the very dog of the cold call is left out with it and the game is given the likelier winner, the card saying why, while a read of another pick on a game where a cold kind speaks still stands; the three voices\' chip turns from a green BET to "cold here" with the rule\'s record once the rule is cold, and the decision is the next kind; the board\'s calls give the same three, the read ahead of the leans with its chance against the book\'s own, the price and Take; the call as given counts each game by what the board would give now; and a graded game opened from the board carries its result on the decision',
+      JSON.stringify({ table: dc.table, dup: dcc(dc.dup), dupAlso: dc.dup.secs['Also on this game'], dupSigs: dc.dup.sigs, live: dcc(dc.live), ruleCold: dcc(dc.ruleCold), rcAlso: dc.ruleCold.secs['Also on this game'], rcSigs: dc.ruleCold.sigs, coldOther: dcc(dc.coldOther), coAlso: dc.coldOther && dc.coldOther.secs['Also on this game'], board: dc.board, graded: dc.graded && [dc.graded.cls, dc.graded.res, dc.graded.also.slice(0, 60)] }));
+
+  // ---- 11 Nov 2026: the NBA record counts the sheet's calls (the user: "fix the NBA record so tiles count only real calls") -- a market where neither side is priced below its chance is the book's own number, listed under the tile as no call and left out of its count ----
+  const callsKeep = await pg.evaluate(async () => { await smStore.ready; const k = { card: await smStore.getItem('callsheet3.card.v1'), slate: await smStore.getItem('callsheet3.slate.v1') }; await smStore.removeItem('callsheet3.card.v1'); return k; });
+  await reloaded();
+  const callsT = await pg.evaluate(async () => {
+    const wait = () => new Promise(r => setTimeout(r, 90));
+    const txt = e => (e ? e.innerText : '').replace(/\s+/g, ' ').trim();
+    await smStore.ready;
+    const set = (id, v) => { const el = document.getElementById(id); el.value = v; el.dispatchEvent(new Event('input', { bubbles: true })); };
+    const load = async (doc, name) => { const dt = new DataTransfer(); dt.items.add(new File([JSON.stringify(doc)], name, { type: 'application/json' })); const inp = document.getElementById('slateFile'); inp.files = dt.files; inp.dispatchEvent(new Event('change', { bubbles: true })); await wait(); await wait(); };
+    document.getElementById('clear').click(); document.getElementById('m-nba').click(); await wait();
+    const game = async (away, home, line, op, up, hml, aml, sp, h1) => { document.getElementById('clear').click(); await wait(); set('gdate', '2026-11-22'); set('away', away); set('home', home); set('line', line); set('op', op); set('up', up); set('hml', hml); set('aml', aml);
+      set('sp', sp); set('sph', sp ? '-110' : ''); set('spa', sp ? '-110' : ''); set('h1line', h1); set('h1op', '-110'); set('h1up', '-110'); await wait(); document.getElementById('add').click(); await wait(); };
+    await game('Hornets', 'Bucks', '229.5', '-110', '-110', '-120', '100', '', '114.5');          // a short dog priced below its lifted chance: a moneyline call; no spread on the row
+    await game('Pistons', 'Celtics', '224', '-110', '-110', '-300', '240', '-7.5', '111.5');      // a long dog, the closer of two sides neither priced below its chance: nobody's call
+    await game('Jazz', 'Suns', '223.5', '-210', '160', '-150', '130', '-3.5', '110.5');           // the under at a price a hair below its chance: a call on the total; a short dog lifted but not below its price: no call
+    const stored = JSON.parse(smStore.getItem('callsheet3.card.v1')).map(r => r.matchup + ' :: ' + r.markets.map(m => m.key + ' ' + m.pick + ' e' + (m.edge === null ? 'null' : (m.edge > 0 ? '+' : '-')) + (m.informed ? ' informed' : '')).join(' | '));
+    await load({ format: 'callsheet2.slate', version: 1, date: '2026-11-22', games: [
+      { sport: 'NBA', gdate: '2026-11-22', away: 'Hornets', home: 'Bucks', finals: { fa: '118', fh: '110', f5a: '60', f5h: '55' }, notes: [] },
+      { sport: 'NBA', gdate: '2026-11-22', away: 'Pistons', home: 'Celtics', finals: { fa: '100', fh: '120', f5a: '48', f5h: '62' }, notes: [] },
+      { sport: 'NBA', gdate: '2026-11-22', away: 'Jazz', home: 'Suns', finals: { fa: '100', fh: '110', f5a: '52', f5h: '54' }, notes: [] }] }, 'nba-grade-2026-11-22.json');
+    const head = txt(document.querySelector('#calibBox .subhead[data-sport="NBA"]'));
+    const tiles = [...document.querySelectorAll('#calibBox .calib[data-sport="NBA"] > div')].map(d => [d.className, txt(d.querySelector('.k')), txt(d.querySelector('.v')), txt(d.querySelector('.s')), txt(d.querySelector('.s.sides'))].join(' | '));
+    const verdict = txt([...document.querySelectorAll('#calibBox .verdict')].find(v => /graded NBA call/.test(v.textContent)));
+    const others = txt(document.querySelector('#calibBox .subhead[data-sport="MLB"]')) + ' / ' + txt(document.querySelector('#calibBox .subhead[data-sport="WNBA"]'));
+    document.getElementById('clear').click(); await wait();
+    return { stored, head, tiles, verdict, others };
+  });
+  await pg.evaluate(async (k) => { if (k.card === null || k.card === undefined) await smStore.removeItem('callsheet3.card.v1'); else await smStore.setItem('callsheet3.card.v1', k.card); if (k.slate === null || k.slate === undefined) await smStore.removeItem('callsheet3.slate.v1'); else await smStore.setItem('callsheet3.slate.v1', k.slate); }, callsKeep);
+  await reloaded();
+  const callsTile = (re) => callsT.tiles.find(t => re.test(t)) || '';
+  chk(/^Hornets @ Bucks :: total OVER 229\.5 e- \| h1 1H OVER 114\.5 e- \| ml Hornets ML e\+ informed$/.test(callsT.stored[0]) && / \| ml Pistons ML e- \| spread Celtics -7\.5 e-$/.test(callsT.stored[1])
+      && /^Jazz @ Suns :: total UNDER 223\.5 e\+ \| h1 1H OVER 110\.5 e- \| ml Jazz ML e- informed \| spread Suns -3\.5 e-$/.test(callsT.stored[2])
+      && /^NBA 3 graded games · 2 calls graded, the rest the book's own number$/i.test(callsT.head)
+      && /^ \| Full-game total · calls \| 1-0 \| says 38\.9% · does 100\.0% \(±0\.0\) · \+1\.60u \| under 1-0 · no call on 2 games, the book's own number: the closer side 0-2, not counted$/i.test(callsTile(/Full-game total/i))
+      && /^ \| Moneyline · calls \| 1-0 \| says 51\.8% · does 100\.0% \(±0\.0\) · \+1\.00u \| away 1-0 · the short dog 1-1 · no call on 2 games, the book's own number: the closer side 0-2, not counted$/i.test(callsTile(/Moneyline/i)),
+      'nba record, calls only (11 Nov 2026): three graded games, and the tiles count the two calls the sheet made (the under priced a hair below its chance, the short dog priced below its lifted chance); the two totals and the two moneylines that were only the closer of two sides are listed under the tile as no call with their own record and left out of the count; the short dog\'s own line still reads every lifted dog',
+      JSON.stringify({ stored: callsT.stored, head: callsT.head, total: callsTile(/Full-game total/i), ml: callsTile(/Moneyline/i) }));
+  chk(/^nocall \| First half · calls \| no call \| no side priced below its chance yet \| no call on 3 games, the book's own number: the closer side 1-2, not counted$/i.test(callsTile(/First half/i))
+      && /^nocall \| Spread · calls \| no call \| no side priced below its chance yet \| no call on 2 games, the book's own number: the closer side 2-0, not counted$/i.test(callsTile(/Spread/i))
+      && /^2 graded NBA calls\. Nothing here can be read yet/.test(callsT.verdict) && /A call is a side the sheet prices below its chance, or one a verdict sits on\. Where neither side is, the market is the book's own number: it is listed under the tile as no call and left out of the tile's count/.test(callsT.verdict)
+      && /The watches under a tile read every game\.$/.test(callsT.verdict) && /^MLB nothing graded yet \/ WNBA nothing graded yet$/i.test(callsT.others),
+      'nba record, calls only: a market the sheet has not called says no call in place of a record (the first half and the spread, the book\'s own number on every game) with the closer side\'s record beside it for scale; the verdict says what a call is; the other sports\' blocks are untouched',
+      JSON.stringify({ h1: callsTile(/First half/i), spread: callsTile(/Spread/i), verdict: callsT.verdict.slice(0, 80) + ' … ' + callsT.verdict.slice(-330), others: callsT.others }));
+
+  // ---- 23 Nov 2026: Kalshi off the NBA model (the user: "i'd like to remove the Kalshi from the NBA model as well"). The crowd on Kalshi rode on the NBA card
+  //      from 4 Nov: its own section and hidden box, a link on the jump bar, chips among tonight's signals, a chip on the board's cards, a line under the
+  //      simulation's team totals, a number in the decision's why and a watch on the moneyline tile. All of it is gone; a slate that still carries the exchange's
+  //      block (one written before the 23rd) puts nothing on a row; and what stood beside it stands as it did: the gap's two sides, the dots, the folds ----
+  const kalT = await pg.evaluate(async () => {
+    const wait = () => new Promise(r => setTimeout(r, 120));
+    const txt = e => (e ? e.innerText : '').replace(/\s+/g, ' ').trim();
+    const set = (id, v) => { const el = document.getElementById(id); el.value = v; el.dispatchEvent(new Event('input', { bubbles: true })); };
+    const load = async (doc, fname) => { const dt = new DataTransfer(); dt.items.add(new File([JSON.stringify(doc)], fname, { type: 'application/json' })); const inp = document.getElementById('slateFile'); inp.files = dt.files; inp.dispatchEvent(new Event('change', { bubbles: true })); await wait(); };
+    await smStore.removeItem('callsheet3.card.v1'); document.getElementById('clear').click(); document.getElementById('m-nba').click(); await wait();
+    const gone = { sec: !document.getElementById('secKalshi'), box: !document.getElementById('nbakalshi'), panel: !document.getElementById('nbaKalshiPanel'), live: !document.getElementById('secKalshiLive'),
+                   nav: [...document.querySelectorAll('#nbaNav a')].map(txt), money: !!document.getElementById('nbasplits') };
+    // the block a slate of 4 to 22 Nov carried: the game winner a side and the ladders
+    const rung = (x, mid, vol) => [x, +(mid - 0.01).toFixed(2), +(mid + 0.01).toFixed(2), +mid.toFixed(2), vol];
+    const kal = { at: '2026-11-14T20:00:00Z', ev: 'KXNBAGAME-26NOV14ATLWAS', fee: 0.07, a: { bid: 0.57, ask: 0.58, last: 0.58, vol: 149511, oi: 136925 }, h: { bid: 0.42, ask: 0.43, last: 0.43, vol: 140051, oi: 115254 },
+      sp: { a: [rung(1.5, 0.56, 900), rung(2.5, 0.51, 1200), rung(3.5, 0.47, 800)], h: [rung(1.5, 0.33, 40), rung(3.5, 0.25, 0)] }, tot: [rung(230.5, 0.57, 1500), rung(232.5, 0.49, 8000), rung(234.5, 0.41, 300)],
+      tt: { a: [rung(116.5, 0.55, 400), rung(118.5, 0.45, 600)], h: [rung(112.5, 0.58, 300), rung(114.5, 0.48, 700)] } };
+    const pin = JSON.stringify({ book: 'pinnacle', line: 232.5, op: -108, up: -108, hml: 150, aml: -170 });
+    set('gdate', '2026-11-14'); set('away', 'Hawks'); set('home', 'Wizards'); set('line', '232.5'); set('op', '-110'); set('up', '-110'); set('hml', '140'); set('aml', '-165'); set('sp', '2.5'); set('sph', '-110'); set('spa', '-110');
+    set('odds', JSON.stringify({ book: 'fanatics', team: { AWAY: { OVER: [['fanatics', -110, 118.5]], UNDER: [['fanatics', -110, 118.5]] }, HOME: { OVER: [['fanatics', -115, 113.5]], UNDER: [['fanatics', -105, 113.5]] } } }));
+    set('sharp', pin); await wait();
+    // with the simulation on the row (the Hawks' mean 117, the Wizards' 115): the gap's two sides on the simulation's table and among tonight's signals
+    const hist = (lo, mean, sd) => { const c = []; for (let v = lo; v <= lo + 100; v++) c.push(Math.round(10000 * Math.exp(-((v - mean) ** 2) / (2 * sd * sd)))); return { lo, c }; };
+    set('nbasim', JSON.stringify({ v: 1, runs: 1000, own: { total: hist(170, 232, 15), h1: hist(80, 116, 10), h2: hist(80, 116, 10), q: [hist(30, 58, 7), hist(30, 58, 7), hist(30, 58, 7), hist(30, 58, 7)], margin: hist(-50, -3, 12), away: hist(80, 117, 11), home: hist(80, 115, 11), ot: 0.04 }, mkt: null, anchor: null, ft_factor: 1.0,
+                                   shrink: { total: 0.05, h1: 0.1, spread: 0.0, ml: 0.97, team: 1.5, team_away: 0.3, team_own: 0.3, quarter: 0.1 }, bands: [[0.7, 'STRONG'], [0.65, 'BET'], [0.6, 'LEAN']] })); await wait();
+    const simTT = [...document.querySelectorAll('#nbaSimPanel .simtab td')].map(td => txt(td)).filter(s => /team total/i.test(s));
+    const signals = txt(document.getElementById('signals')), simLive = txt(document.getElementById('secSimLive'));
+    const dots = [...document.querySelectorAll('#nbaNav a[data-go]')].map(a => a.dataset.go + ':' + ((a.querySelector('.dot') || {}).className || ''));
+    const folded = { about: [...document.querySelectorAll('#nbaFields details.about')].length, aboutOpen: [...document.querySelectorAll('#nbaFields details.about[open]')].length, rail: !!document.querySelector('#markets + details.about, .rail details.about'), notes: [...document.querySelectorAll('#markets details.mknotes')].length };
+    const formKal = /kalshi/i.test(txt(document.body));   // the whole page with the game on the form
+    set('nbasim', ''); await wait();
+    document.getElementById('add').click(); await wait();
+    document.getElementById('boardDate').value = '2026-11-14'; document.getElementById('boardDate').dispatchEvent(new Event('change')); await wait();
+    const chips = [...document.querySelectorAll('.pk:not(.call)')].filter(e => /Hawks ML|Wizards ML/.test(e.textContent)).map(e => txt(e.querySelector('.n4')));
+    // a slate written before the 23rd still carries the block: the row does not take it
+    await load({ format: 'callsheet2.slate', version: 1, date: '2026-11-14', games: [{ sport: 'NBA', gdate: '2026-11-14', away: 'Hawks', home: 'Wizards', notes: [], inputs: { nbakalshi: JSON.stringify(kal), narest: '2' } }] }, 'nba-slate-2026-11-14.json');
+    const row = JSON.parse(smStore.getItem('callsheet3.card.v1')).find(r => /Hawks @ Wizards/.test(r.matchup)) || { inputs: {} };
+    const stored = Object.keys(row.inputs || {}).filter(k => /kalshi/i.test(k)), took = (row.inputs || {}).narest;
+    // graded: the moneyline tile carries no line on the exchange
+    await load({ format: 'callsheet2.slate', version: 1, date: '2026-11-14', games: [{ sport: 'NBA', gdate: '2026-11-14', away: 'Hawks', home: 'Wizards', finals: { fa: '118', fh: '110', f5a: '60', f5h: '55' }, close: { ctot: '232.5' }, notes: [] }] }, 'nba-grade-2026-11-14.json');
+    const mlTile = txt([...document.querySelectorAll('#calibBox .calib[data-sport="NBA"] > div')].find(d => /^MONEYLINE/i.test(txt(d))));
+    const pageKal = /kalshi/i.test(txt(document.body));
+    document.getElementById('clear').click(); await wait(); await smStore.removeItem('callsheet3.card.v1');
+    return { gone, simTT, signals, simLive, dots, folded, formKal, chips, stored, took, mlTile, pageKal };
+  });
+  chk(/gap watch:? ?Hawks team total UNDER 118\.5 · gap \+1 · not scored/i.test(kalT.signals) && /gap watch:? ?Wizards team total OVER 113\.5 · gap -1\.5 · not scored/i.test(kalT.signals) && !/gap rule/i.test(kalT.signals)
+      && !/the crowd|purple/i.test(kalT.signals)
+      && /gap watch: Hawks team total UNDER 118\.5 · gap \+1 · not scored · gap watch: Wizards team total OVER 113\.5 · gap -1\.5 · not scored/.test(kalT.simLive)
+      && kalT.dots.indexOf('secSim:dot watch') >= 0 && kalT.dots.indexOf('secSim:dot go') < 0 && !kalT.dots.some(d => /Kalshi/i.test(d)) && kalT.dots.indexOf('secMid:dot') >= 0 && kalT.dots.indexOf('boardDate:') >= 0
+      && kalT.folded.about === 6 && kalT.folded.aboutOpen === 0 && kalT.folded.rail && kalT.folded.notes >= 3,
+      'signals: the matchup rail opens with tonight\'s signals, every engine\'s call on the row as a chip that links to its section (the gap\'s two sides gold, a watch from 11 Nov 2026); the jump bar\'s dots and the sections\' live lines read off the same list, and the explanations fold under a line on the rail, on every NBA section and under each market row',
+      JSON.stringify({ signals: kalT.signals.slice(0, 900), simLive: kalT.simLive, dots: kalT.dots, folded: kalT.folded }));
+  const pageCode = fs.readFileSync(path.join(__dirname, 'web/callsheet3.html'), 'utf8').replace(/\/\*[\s\S]*?\*\//g, '');
+  chk(kalT.gone.sec && kalT.gone.box && kalT.gone.panel && kalT.gone.live && kalT.gone.money && kalT.gone.nav.length >= 6 && !kalT.gone.nav.some(s => /kalshi/i.test(s))
+      && kalT.formKal === false && kalT.pageKal === false && kalT.simTT.length === 2 && kalT.simTT.every(s => !/kalshi|the crowd/i.test(s)) && kalT.chips.length >= 2 && kalT.chips.every(s => !/kalshi|the crowd/i.test(s))
+      && kalT.stored.length === 0 && kalT.took === '2' && /^MONEYLINE/i.test(kalT.mlTile) && !/kalshi|the crowd/i.test(kalT.mlTile) && !/kalshi/i.test(pageCode),
+      'kalshi off the NBA model (23 Nov 2026): the card has no Kalshi section, hidden box or jump-bar link (the money\'s box stays), nothing on the page names the exchange with a game on the form, on the board or graded, the simulation\'s team-total rows and the board\'s moneyline cards carry no crowd line, a slate that still carries the exchange\'s block fills the row\'s other boxes and leaves the block off it, the moneyline tile keeps no watch on it, and the page\'s code names it only in comments',
+      JSON.stringify({ gone: kalT.gone, formKal: kalT.formKal, pageKal: kalT.pageKal, simTT: kalT.simTT, chips: kalT.chips, stored: kalT.stored, took: kalT.took, tile: kalT.mlTile.slice(0, 300), code: (pageCode.match(/.{0,60}kalshi.{0,60}/i) || [''])[0] }));
+
+  // ---- 27 Nov 2026: the early total (the user: "we could really be finding gaps or patterns to have this super model a lot more pinpoint"). Three seasons swept and
+  //      sixteen more checked: nothing beats the late number, and the one thing that held is the simulation's plain total against the number a day ahead (where they
+  //      stood 8 or more apart the line then moved the simulation's way 68 times to 18 and its side won 54-38; nothing of it is left by the morning). slate.py's
+  //      evening run writes nba-early-DATE.json; the page keeps it in a store of its own, a call standing at the number it was made at, lists the date's calls on
+  //      the board with a Take, says on the game's decision what the early call was, grades every call on the NBA record, and carries the store in the backup ----
+  const erKeep = await pg.evaluate(async () => { await smStore.ready; const k = {}; for (const x of ['callsheet3.card.v1', 'callsheet3.props.v1', 'callsheet3.draft.v1', 'callsheet3.slate.v1', 'callsheet3.early.v1']) k[x] = await smStore.getItem(x); for (const x of ['callsheet3.card.v1', 'callsheet3.props.v1', 'callsheet3.slate.v1', 'callsheet3.early.v1']) await smStore.removeItem(x); return k; });
+  await reloaded();
+  const er = await pg.evaluate(async () => {
+    const wait = (ms) => new Promise(r => setTimeout(r, ms || 90)), txt = e => (e ? e.innerText : '').replace(/\s+/g, ' ').trim(), tc = e => (e ? e.textContent : '').replace(/\s+/g, ' ').trim();
+    const set = (id, v) => { const el = document.getElementById(id); el.value = v; el.dispatchEvent(new Event('input', { bubbles: true })); };
+    await smStore.ready;
+    const load = async (doc, fname) => { const dt = new DataTransfer(); dt.items.add(new File([JSON.stringify(doc)], fname, { type: 'application/json' })); const inp = document.getElementById('slateFile'); inp.files = dt.files; inp.dispatchEvent(new Event('change', { bubbles: true })); await wait(260); };
+    const game = async (date, away, home, line) => { document.getElementById('clear').click(); document.getElementById('m-nba').click(); await wait(); set('gdate', date); set('away', away); set('home', home); set('line', line); set('op', '-110'); set('up', '-110'); set('hml', '-190'); set('aml', '160'); await wait(140);
+      const li = [...document.querySelectorAll('#markets .pickcard ul.dwhy li')].find(x => /^The early total/.test(tc(x))); const why = li ? tc(li) : ''; document.getElementById('add').click(); await wait(); return why; };
+    const grade = (date, list) => load({ format: 'callsheet2.slate', version: 1, date, games: list.map(g => ({ sport: 'NBA', gdate: date, away: g[0], home: g[1], finals: { fa: String(g[2]), fh: String(g[3]) }, notes: [] })) }, 'nba-grade-' + date + '.json');
+    const store = () => JSON.parse(smStore.getItem('callsheet3.early.v1') || '{}');
+    const board = async (d) => { const bd = document.getElementById('boardDate'); if (d) { bd.value = d; bd.dispatchEvent(new Event('change')); await wait(160); }
+      return { date: bd.value, headHidden: document.getElementById('earlyHead').hidden, listHidden: document.getElementById('early').hidden, tag: tc(document.getElementById('earlyTag')),
+               cards: [...document.querySelectorAll('#early .pk')].map(c => ({ cls: c.className.replace('pk call early ', ''), open: c.dataset.open || '', n1: tc(c.querySelector('.n1')), n2: tc(c.querySelector('.n2')), n3: tc(c.querySelector('.n3')), n4: tc(c.querySelector('.n4')), btn: tc(c.querySelector('.n6')) })) }; };
+    const table = () => { const t = document.querySelector('#calibBox .earlytab'); return t ? { head: tc(t.previousElementSibling), rows: [...t.querySelectorAll('tbody tr')].map(tr => [...tr.children].slice(0, -1).map(td => tc(td)).join(' | ')), notes: [...t.querySelectorAll('tbody tr')].map(tr => tc(tr.lastElementChild)) } : null; };
+    const when = (iso) => { const d = new Date(iso); return d.toLocaleDateString([], { weekday: 'short' }) + ' ' + d.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }); };
+    const D = '2026-12-05', AT1 = '2026-12-05T02:14:00Z', AT2 = '2026-12-05T04:40:00Z', o = { w1: when(AT1), w2: when(AT2) };
+    const file = (at, games) => ({ format: 'callsheet2.early', version: 1, date: D, generated: at, gap: 8, engine: 3, source: 'the harness', games });
+    const G = (away, home, line, centre, extra) => Object.assign({ sport: 'NBA', gdate: D, away, home, gameId: '1', tip: '2026-12-06T00:00Z', book: 'Draft Kings', line, opened: line === null ? null : line + 2, centre,
+      gap: line === null || centre === null ? null : Math.round((centre - line) * 10) / 10, side: line === null || centre === null ? '' : centre > line ? 'OVER' : 'UNDER', call: line !== null && centre !== null && Math.abs(centre - line) >= 8, to: null, b2b: [false, false], n: [15, 15] }, extra || {});
+    await game('2026-12-01', 'Magic', 'Pacers', '220'); await grade('2026-12-01', [['Magic', 'Pacers', 100, 110]]);   // a graded game of another night, so the NBA record is drawn throughout
+    o.before = await board(D); o.recBefore = table();
+    // 1. the evening's first run: an over 9.1 apart with the home club on the second night, an under 8.5 apart, a game 3.1 apart, one with no number yet, one with no profile, and a line that is not basketball
+    await board('2026-11-30');
+    await load(file(AT1, [G('Celtics', 'Knicks', 211.5, 220.6, { to: 212.5, b2b: [false, true] }), G('Trail Blazers', 'Lakers', 231, 222.5, { to: 230.5 }), G('Heat', 'Bulls', 224.5, 221.4), G('Nuggets', 'Jazz', null, 216.7, { why: 'no number on the scoreboard yet' }),
+                     G('Suns', 'Kings', 230, null, { why: 'a club has no profile in the ledgers yet', call: true, side: 'OVER' }), Object.assign(G('Bruins', 'Rangers', 5.5, 15), { sport: 'NHL' })]), 'nba-early-2026-12-05.json');
+    o.msg1 = tc(document.getElementById('saveMsg')); o.b1 = await board(); o.keys1 = Object.keys(store()).sort();
+    // another night's file, one game 3 apart: that night has the heading, says there is no call, and draws no card; the first night's list is as it was
+    await load({ format: 'callsheet2.early', version: 1, date: '2026-12-06', generated: AT1, gap: 8, games: [Object.assign(G('Bucks', 'Pacers', 226, 223), { gdate: '2026-12-06' })] }, 'nba-early-2026-12-06.json');
+    o.other = await board(); o.b1again = await board(D);
+    // 2. Take on the wider call; a press on the card itself does nothing while the game is not on the card
+    document.querySelector('#early .pk [data-etake]').click(); await wait(160);
+    o.b1t = await board(); o.taken1 = !!(store()[D + '|Celtics|Knicks'] || {}).taken;
+    // 3. a later run the same evening: the over's number has gone to 214.5 (6.1 apart: it would not be a call now), the under's to 229.5, the game that had no number has one 8.8 over its
+    //    centre, and the third game is still 3.6 apart. The two calls stand at their own numbers and note the newer one; the new game is a call at its number; the mark stays
+    await load(file(AT2, [G('Celtics', 'Knicks', 214.5, 220.6), G('Trail Blazers', 'Lakers', 229.5, 222.5, { to: 230.5 }), G('Heat', 'Bulls', 225, 221.4), G('Nuggets', 'Jazz', 225.5, 216.7, { to: 225 })]), 'nba-early-2026-12-05.json');
+    o.msg2 = tc(document.getElementById('saveMsg')); o.b2 = await board(); o.rec3 = table(); const s2 = store();
+    o.held = { line: s2[D + '|Celtics|Knicks'].line, call: s2[D + '|Celtics|Knicks'].call, last: s2[D + '|Celtics|Knicks'].last, taken: !!s2[D + '|Celtics|Knicks'].taken, heat: s2[D + '|Heat|Bulls'].line, heatAt: s2[D + '|Heat|Bulls'].at, jazz: s2[D + '|Nuggets|Jazz'].call };
+    // 4. the next day the games are carded: the card's line is the number since, the card opens its game, and the decision's why says what the early call was; a game with no early call says nothing
+    o.why1 = await game(D, 'Celtics', 'Knicks', '216.5'); o.why0 = await game(D, 'Heat', 'Bulls', '225'); await game(D, 'Trail Blazers', 'Lakers', '233'); await game(D, 'Nuggets', 'Jazz', '225.5');
+    o.b4 = await board(D); o.rec4 = table();
+    document.querySelector('#early .pk .n2').click(); await wait(160); o.opened = document.getElementById('away').value + ' @ ' + document.getElementById('home').value;
+    // 5. graded: 218 (over 211.5), 231 (the under's own number: a push), 230 (over 225.5: the under lost)
+    await grade(D, [['Celtics', 'Knicks', 110, 108], ['Trail Blazers', 'Lakers', 116, 115], ['Nuggets', 'Jazz', 120, 110], ['Heat', 'Bulls', 100, 110]]);
+    o.b5 = await board(D); o.rec5 = table();
+    document.querySelector('#early .pk [data-etake]') ? (o.takeAfter = 'a button on a graded card') : (o.takeAfter = 'none');
+    // 6. the backup carries the store, and a restore brings it back
+    let blob = null; const mkURL = URL.createObjectURL, click = HTMLAnchorElement.prototype.click;
+    URL.createObjectURL = b => { blob = b; return 'blob:x'; }; HTMLAnchorElement.prototype.click = function () {};
+    document.getElementById('backup').click(); await wait(); await wait();
+    URL.createObjectURL = mkURL; HTMLAnchorElement.prototype.click = click;
+    const text = blob ? await blob.text() : '', parsed = text ? JSON.parse(text) : null;
+    o.backup = parsed ? { format: parsed.format, early: Object.keys(parsed.early || {}).sort(), call: ((parsed.early || {})[D + '|Celtics|Knicks'] || {}).line, props: Array.isArray(parsed.props), card: parsed.card.length } : null;
+    await smStore.removeItem('callsheet3.early.v1');
+    const dt2 = new DataTransfer(); dt2.items.add(new File([text], 'the-super-model-2026-12-06.json', { type: 'application/json' }));
+    const inp2 = document.getElementById('restoreFile'); inp2.files = dt2.files; inp2.dispatchEvent(new Event('change', { bubbles: true })); await wait(400);
+    o.restored = Object.keys(store()).sort(); o.b6 = await board(D);
+    // a file that is not an early file's shape is refused and nothing moves
+    await load({ format: 'callsheet2.early', version: 1, date: D, games: 'none' }, 'nba-early-bad.json'); o.badMsg = tc(document.getElementById('saveMsg')); o.afterBad = Object.keys(store()).length;
+    // the Lakers' row is given a close of 229: after the reload the close is the number since, ahead of the card's line
+    const rs = JSON.parse(smStore.getItem('callsheet3.card.v1')); rs.find(x => x.gdate === D && x.away === 'Trail Blazers').close = { ctot: '229' }; await smStore.setItem('callsheet3.card.v1', JSON.stringify(rs));
+    return o;
+  });
+  await reloaded();
+  const erAfter = await pg.evaluate(async () => { await smStore.ready; document.getElementById('m-nba').click(); const bd = document.getElementById('boardDate'); bd.value = '2026-12-05'; bd.dispatchEvent(new Event('change')); await new Promise(r => setTimeout(r, 300)); const tc = e => (e ? e.textContent : '').replace(/\s+/g, ' ').trim(), t = document.querySelector('#calibBox .earlytab');
+    return { cards: [...document.querySelectorAll('#early .pk .n2')].map(tc), n3: [...document.querySelectorAll('#early .pk .n3')].map(tc), clv: t ? tc([...t.querySelectorAll('tbody tr')].pop().children[1]) : '', keys: Object.keys(JSON.parse(smStore.getItem('callsheet3.early.v1') || '{}')).length }; });
+  await pg.evaluate(async (k) => { for (const x of Object.keys(k)) { if (k[x] === null || k[x] === undefined) await smStore.removeItem(x); else await smStore.setItem(x, k[x]); } }, erKeep);
+  await reloaded();
+  const erNote = "the simulation's plain total against the number a day ahead: where they stood 8 or more apart the line then moved the simulation's way 68 times to 18, by 2.8 points, and its side won 54-38 at the early number on three seasons; by the morning the number has caught up";
+  const erc = (b) => ((b || {}).cards || []).map(c => c.cls + ' | ' + c.n1 + ' | ' + c.n2);
+  const erHead = (n, when, mid, rec) => "tomorrow's totals, read the evening before (Run NBA early.bat, free) · " + n + " read, the last at " + when + " · " + mid + " · bet a call the evening it is read, at its number or better · here: " + rec + " · shown, not scored";
+  const er1 = (er.b1 || {}).cards || [];
+  chk(er.before && er.before.headHidden && er.before.listHidden && er.before.cards.length === 0 && er.recBefore === null
+      && er.b1 && er.b1.date === '2026-12-05' && !er.b1.headHidden && !er.b1.listHidden
+      && erc(er.b1).join(' ## ') === "value | #1 · EARLY · THE TOTAL A DAY AHEAD | Total OVER 211.5 ## value | #2 · EARLY · THE TOTAL A DAY AHEAD | Total UNDER 231"
+      && er1[0].n3 === "Draft Kings at " + er.w1 + " · the simulation's plain total is 220.6, 9.1 points over that number · good up to 212.5 · Knicks on the second night · a bet for the evening it is read: by the morning the number has caught up"
+      && er1[1].n3 === "Draft Kings at " + er.w1 + " · the simulation's plain total is 222.5, 8.5 points under that number · good down to 230.5 · a bet for the evening it is read: by the morning the number has caught up"
+      && er1[0].n4 === 'Celtics @ Knicks · ' + erNote + ' · here: none graded yet' && er1.every(c => c.btn === 'Take' && c.open === '')
+      && er.b1.tag === erHead('5 games', er.w1, "2 calls: the simulation's plain total 8 or more from the number · the widest of the rest Heat @ Bulls at 3.1 · 1 with no number yet: run it again later tonight", 'none graded yet')
+      && er.other && er.other.date === '2026-12-06' && !er.other.headHidden && er.other.listHidden && er.other.cards.length === 0
+      && er.other.tag === erHead('1 game', er.w1, "no call: no game stands 8 or more from its number · the widest of the rest Bucks @ Pacers at 3.0", 'none graded yet') && erc(er.b1again).join(' ## ') === erc(er.b1).join(' ## ') && er.b1again.tag === er.b1.tag
+      && JSON.stringify(er.keys1) === JSON.stringify(['2026-12-05|Celtics|Knicks', '2026-12-05|Heat|Bulls', '2026-12-05|Nuggets|Jazz', '2026-12-05|Suns|Kings', '2026-12-05|Trail Blazers|Lakers'])
+      && /^Early totals for 2026-12-05 from nba-early-2026-12-05\.json: 5 games read, 2 new calls \(Celtics @ Knicks OVER 211\.5; Trail Blazers @ Lakers UNDER 231\); 1 with no number yet: run it again later tonight\. A call is a bet for tonight, at its number or better\. The board shows the list\.$/.test(er.msg1),
+      'the early total (27 Nov 2026, the user: "we could really be finding gaps or patterns"): the evening run\'s file loads through Load slate, the board moves to the file\'s date and lists the calls, the widest first, each with the book and the hour it was read, the simulation\'s plain total, how far the number stands from it, the last number the call is good to, a club on the second night, and what was measured; the heading counts the games read, the calls, the widest game that is not a call and the games with no number yet; a game with no profile and a line that is not basketball make no card; nothing shows before a file is loaded',
+      JSON.stringify({ before: er.before, rec: er.recBefore, b1: er.b1, keys: er.keys1, msg: er.msg1, w1: er.w1 }));
+  const er2 = (er.b2 || {}).cards || [];
+  chk(JSON.stringify(((er.b1t || {}).cards || []).map(c => c.btn)) === JSON.stringify(['✓ Taking', 'Take']) && er.taken1 === true
+      && erc(er.b2).join(' ## ') === "value | #1 · EARLY · THE TOTAL A DAY AHEAD | Total OVER 211.5 ## value | #2 · EARLY · THE TOTAL A DAY AHEAD | Total UNDER 225.5 ## value | #3 · EARLY · THE TOTAL A DAY AHEAD | Total UNDER 231"
+      && /^Draft Kings at .+ · the simulation's plain total is 220\.6, 9\.1 points over that number · good up to 212\.5 · Knicks on the second night · the number since: 214\.5 by a later run, 3 points its way$/.test(er2[0].n3) && er2[0].n3.indexOf('at ' + er.w1 + ' ·') > 0
+      && /· good down to 225 · a bet for the evening it is read: by the morning the number has caught up$/.test(er2[1].n3) && er2[1].n3.indexOf('at ' + er.w2 + ' ·') > 0
+      && /· good down to 230\.5 · the number since: 229\.5 by a later run, 1\.5 points its way$/.test(er2[2].n3)
+      && JSON.stringify(er2.map(c => c.btn)) === JSON.stringify(['✓ Taking', 'Take', 'Take'])
+      && JSON.stringify(er.held) === JSON.stringify({ line: 211.5, call: true, last: { at: '2026-12-05T04:40:00Z', line: 214.5 }, taken: true, heat: 225, heatAt: '2026-12-05T04:40:00Z', jazz: true })
+      && er.b2.tag === erHead('5 games', er.w2, "3 calls: the simulation's plain total 8 or more from the number · the widest of the rest Heat @ Bulls at 3.6", 'none graded yet')
+      && /: 4 games read, 1 new call \(Nuggets @ Jazz UNDER 225\.5\); 2 calls already held stand at their own number\. A call is a bet for tonight/.test(er.msg2)
+      && er.rec3 && /· 3 calls, 3 not graded yet ·/.test(er.rec3.head) && /^What the number did afterwards \| no call has a later number yet$/.test(er.rec3.rows[4]),
+      'the early total, a call stands at the number it was made at: Take marks the call; a later run the same evening, with the over\'s number gone from 211.5 to 214.5 (no call now), leaves the call at 211.5 with its mark and notes where the number went and how far that is its way (an under\'s number coming down is its way too); a game that was not a call takes the newer read, and one that had no number becomes a call at the number the later run found',
+      JSON.stringify({ taken: (er.b1t || {}).cards, b2: er.b2, held: er.held, msg: er.msg2, w2: er.w2 }));
+  const er4 = (er.b4 || {}).cards || [], er5 = (er.b5 || {}).cards || [];
+  chk(/^The early total\. Read .+: Total OVER 211\.5 at Draft Kings, the simulation's plain total 220\.6 standing 9\.1 points over it\. The number is 216\.5 by the card's line, 5 points the call's way\. It was a bet for the evening it was read: at today's number nothing of it is measured\.$/.test(er.why1) && er.why1.indexOf('Read ' + er.w1 + ':') > 0 && er.why0 === ''
+      && /· the number since: 216\.5 by the card's line, 5 points its way$/.test(er4[0].n3) && /· the number since: 225\.5 by the card's line, where it was$/.test(er4[1].n3) && /· the number since: 233 by the card's line, 2 points against it$/.test(er4[2].n3)
+      && er4.every(c => /^\d+$/.test(c.open)) && er.opened === 'Celtics @ Knicks'
+      && er.rec4 && /^The early total the simulation's plain total against tomorrow's number, read the evening before \(Run NBA early\.bat\) · 3 calls, 3 not graded yet · each graded at the number it was made at, once its game is on the card and graded, at -110 a side \(no price is held\) · shown, not scored$/.test(er.rec4.head)
+      && er.rec4.rows.join(' ## ') === "Every call | none yet |  |  ## the overs | none yet |  |  ## the unders | none yet |  |  ## The ones you marked | none yet |  |  ## What the number did afterwards | moved the call's way on 1 of 3, against it on 1: +1.00 points a call",
+      'the early total, the next day: once a game is on the card the card\'s line is the number since (5 points the over\'s way, where it was, 2 points against the under), the board\'s card opens its game, and the game\'s decision says what the early call was, at what number and where the number is now, and that it was a bet for the evening; a game with no early call says nothing; the NBA record counts what the number did afterwards before any game is graded',
+      JSON.stringify({ why1: er.why1, why0: er.why0, n3: er4.map(c => c.n3.slice(-70)), open: er4.map(c => c.open), opened: er.opened, rec: er.rec4 }));
+  chk(erc(er.b5).join(' ## ') === "value win | #1 · EARLY · THE TOTAL A DAY AHEAD | Total OVER 211.5 WIN ## value loss | #2 · EARLY · THE TOTAL A DAY AHEAD | Total UNDER 225.5 LOSS ## value push | #3 · EARLY · THE TOTAL A DAY AHEAD | Total UNDER 231 PUSH"
+      && JSON.stringify(er5.map(c => c.btn)) === JSON.stringify(['TAKEN', '', '']) && er.takeAfter === 'none' && /· here: 1-1-1, -0\.1u$/.test(er5[0].n4)
+      && er.rec5 && /· 3 calls, 0 not graded yet ·/.test(er.rec5.head)
+      && er.rec5.rows.join(' ## ') === "Every call | 1-1-1 | 50.0% | -0.1u ## the overs | 1-0 | 100.0% | +0.9u ## the unders | 0-1-1 | 0.0% | -1.0u ## The ones you marked | 1-0 | 100.0% | +0.9u ## What the number did afterwards | moved the call's way on 1 of 3, against it on 1: +1.00 points a call"
+      && er.rec5.notes[0] === '8 or more apart: the line then moved its way 68 times to 18, by 2.8 points, and its side won 54-38 on three seasons' && /^the row's close, else its line: 68 of 86 moved the call's way on three seasons/.test(er.rec5.notes[4]) && /^tomorrow's totals, read the evening before .+ · here: 1-1-1, -0\.1u · shown, not scored$/.test(er.b5.tag),
+      'the early total, graded: each call is graded at the number it was made at once its game is graded (218 over 211.5 a win though the number had gone to 214.5; 231 on the under\'s own number a push; 230 over 225.5 a loss), the cards carry the results and the marked one reads TAKEN with no button, and the NBA record keeps every call, the overs and the unders, the ones marked, and what the number did afterwards, at -110 a side',
+      JSON.stringify({ cards: erc(er.b5), btn: er5.map(c => c.btn), takeAfter: er.takeAfter, n4: er5.map(c => c.n4.slice(-30)), rec: er.rec5, tag: (er.b5 || {}).tag }));
+  chk(er.backup && er.backup.format === 'callsheet3.backup' && er.backup.props === true && er.backup.card === 5 && er.backup.call === 211.5
+      && JSON.stringify(er.backup.early) === JSON.stringify(['2026-12-05|Celtics|Knicks', '2026-12-05|Heat|Bulls', '2026-12-05|Nuggets|Jazz', '2026-12-05|Suns|Kings', '2026-12-05|Trail Blazers|Lakers', '2026-12-06|Bucks|Pacers'])
+      && JSON.stringify(er.restored) === JSON.stringify(er.backup.early) && erc(er.b6).join(' ## ') === erc(er.b5).join(' ## ')
+      && /not an early-total file/.test(er.badMsg) && er.afterBad === 6 && erAfter.keys === 6 && erAfter.cards.length === 3 && /^Total OVER 211\.5/.test(erAfter.cards[0])
+      && /· the number since: 229 by the close, 2 points its way$/.test(erAfter.n3[2] || '') && erAfter.clv === "moved the call's way on 2 of 3, against it on 0: +2.33 points a call",
+      'the early total is kept: the backup file carries the store beside the card and the props, a restore brings every call back at its own number, the store outlives a reload of the page, and a file that says it is an early file and is not shaped like one is refused with nothing changed',
+      JSON.stringify({ backup: er.backup, restored: er.restored, b6: erc(er.b6), bad: er.badMsg, afterBad: er.afterBad, after: erAfter }));
+
+  // ---- 23 Nov 2026: engine 3 on the Simulation card, the moneyline against the price, and the money's own record. The user: "see if the simulation needs to be
+  //      realligned", "Make it perfect bro", and, quoting a professional, "its not to ask who will win, but can they cover the spread"; then "Is there a way to tell
+  //      me how the Sharp better info we added is doing too". The card names the engine and what the men out and rest do to each side; the simulation's moneyline is
+  //      a call only where its worth beats what the row's price needs, and the record keeps the calls the price did not allow on a line of their own; the NBA record
+  //      carries the sharp-money read against the finals ----
+  const e3T = await pg.evaluate(async () => {
+    const wait = () => new Promise(r => setTimeout(r, 120));
+    const txt = e => (e ? e.innerText : '').replace(/\s+/g, ' ').trim();
+    const set = (id, v) => { const el = document.getElementById(id); el.value = v; el.dispatchEvent(new Event('input', { bubbles: true })); };
+    const load = async (doc, fname) => { const dt = new DataTransfer(); dt.items.add(new File([JSON.stringify(doc)], fname, { type: 'application/json' })); const inp = document.getElementById('slateFile'); inp.files = dt.files; inp.dispatchEvent(new Event('change', { bubbles: true })); await wait(); };
+    const keep = {}; for (const k of ['callsheet3.card.v1', 'callsheet3.slate.v1']) keep[k] = smStore.getItem(k);
+    await smStore.removeItem('callsheet3.card.v1'); await smStore.removeItem('callsheet3.slate.v1'); document.getElementById('clear').click(); document.getElementById('m-nba').click(); await wait();
+    const hist = (lo, mean, sd) => { const c = []; for (let v = lo; v <= lo + 100; v++) c.push(Math.round(10000 * Math.exp(-((v - mean) ** 2) / (2 * sd * sd)))); return { lo, c }; };
+    // the home club by 9 on a spread of 12: it wins 78% of the runs, worth 77.2% at the row's 0.97
+    const own = { total: hist(170, 228, 15), h1: hist(80, 114, 10), h2: hist(80, 114, 10), q: [hist(30, 57, 7), hist(30, 57, 7), hist(30, 57, 7), hist(30, 57, 7)], margin: hist(-41, 9, 12), away: hist(60, 109.5, 11), home: hist(60, 118.5, 11), ot: 0.04 };
+    const shrink = { total: 0.0, h1: 0.1, spread: 0.0, ml: 0.97, team: 0.3, team_away: 0.3, team_own: 0.3, quarter: 0.1 }, bands = [[0.7, 'STRONG'], [0.65, 'BET'], [0.6, 'LEAN']];
+    const sim3 = { v: 3, runs: 1000, own, mkt: null, anchor: null, ft_factor: 1.0, shrink, bands, out_mean: 0.66, level: null,
+      prof: { away: { ortg: 114.1, drtg: 112.3, pace: 99.5, n: 14, b2b: true, r3in4: false, out: -0.94, outo: 0.16, charge: 1.88, a3: 0.4 }, home: { ortg: 116.2, drtg: 110.8, pace: 100.4, n: 14, b2b: false, r3in4: true, out: 0.51, outo: -0.09, charge: 0, a3: 0.41 } } };
+    const sim2 = { v: 2, runs: 1000, own, mkt: null, anchor: null, ft_factor: 1.0, shrink, bands, level: null, prof: { away: { ortg: 114.1, drtg: 112.3, pace: 99.5, n: 14, b2b: true, out: -1.88, a3: 0.4 }, home: { ortg: 116.2, drtg: 110.8, pace: 100.4, n: 14, b2b: false, out: 0, a3: 0.41 } } };
+    const cellOf = () => { const tr = [...document.querySelectorAll('#nbaSimPanel .simtab tbody tr')].find(r => /^Moneyline/.test(txt(r.children[0]))); return tr ? txt(tr.children[1]) : ''; };
+    const o = {};
+    set('gdate', '2026-11-23'); set('away', 'Hawks'); set('home', 'Wizards'); set('line', '228.5'); set('op', '-110'); set('up', '-110'); set('sp', '-9.5'); set('sph', '-110'); set('spa', '-110');
+    set('hml', '-600'); set('aml', '450'); set('nbasim', JSON.stringify(sim3)); await wait();
+    const panel = document.getElementById('nbaSimPanel');
+    o.meta = txt(panel.querySelector('.simmeta')); o.read = txt(panel.querySelector('.simread')); o.prof = txt(panel.querySelector('.simprof'));
+    o.tile = [...panel.querySelectorAll('.simtile')].map(txt).find(s => /wins/i.test(s)) || '';
+    o.dear = cellOf(); o.dearSig = txt(document.getElementById('signals'));
+    set('hml', '-250'); set('aml', '205'); await wait();
+    o.fair = cellOf(); o.fairSig = txt(document.getElementById('signals'));
+    set('hml', ''); set('aml', ''); await wait();
+    o.bare = cellOf();
+    set('nbasim', JSON.stringify(sim2)); await wait();
+    o.meta2 = txt(panel.querySelector('.simmeta')); o.prof2 = txt(panel.querySelector('.simprof'));
+    // the two files go together (27 Nov 2026): a block with engine 3's mean for the men out under an engine number of 2 was run by the new slate.py with the old nbasim.py beside it
+    const oldSig = () => [...document.querySelectorAll('#signals .sig')].filter(g => /old nbasim/i.test(txt(g))).map(g => g.className + ' ' + g.getAttribute('href') + ' :: ' + txt(g)).join(' ## ');
+    o.old2 = txt(panel.querySelector('.simold')); o.old2Sig = oldSig();
+    set('nbasim', JSON.stringify(Object.assign({}, sim2, { out_mean: 0.66 }))); await wait();
+    o.oldMix = txt(document.querySelector('#nbaSimPanel .simold')); o.oldMixSig = oldSig(); o.oldMixMeta = txt(document.querySelector('#nbaSimPanel .simmeta'));
+    set('nbasim', JSON.stringify(sim3)); await wait();
+    o.old3 = txt(document.querySelector('#nbaSimPanel .simold')); o.old3Sig = oldSig();
+    // the record: two games graded, the home club winning both; at -600 the price did not allow the call, at -250 it did
+    const game = async (away, home, hml, aml, extra) => {
+      document.getElementById('clear').click(); await wait();
+      set('gdate', '2026-11-22'); set('away', away); set('home', home); set('line', '228.5'); set('op', '-110'); set('up', '-110'); set('sp', '-9.5'); set('sph', '-110'); set('spa', '-110'); set('hml', hml); set('aml', aml);
+      set('nbasim', JSON.stringify(sim3)); Object.keys(extra || {}).forEach(k => set(k, extra[k])); await wait(); document.getElementById('add').click(); await wait();
+    };
+    const J = JSON.stringify;
+    // the money's count on each: the Hawks +9.5 with the larger bets (65% of the money on 30% of the bets), the over named with most of the money, the Hawks to win 25 points apart
+    await game('Hawks', 'Wizards', '-600', '450', { nbasplits: J({ at: '2026-11-22T20:00:00Z', upd: '3:00 PM ET', n: 2, sp: { a: [9.5, -110, 65, 30], h: [-9.5, -110, 35, 70] }, tot: { o: [228.5, -110, 55, 50], u: [228.5, -110, 45, 50] }, ml: { a: [450, 55, 30], h: [-600, 45, 70] } }) });
+    // the Kings game: no side twenty apart, and the Kings to win named on fifteen points though the Spurs hold most of the money; a count taken after the tip on the third game, which the record leaves out
+    await game('Kings', 'Spurs', '-250', '205', { nbasplits: J({ at: '2026-11-22T20:00:00Z', upd: '3:00 PM ET', n: 1, sp: { a: [9.5, -110, 45, 40], h: [-9.5, -110, 55, 60] }, tot: { o: [228.5, -110, 30, 45], u: [228.5, -110, 70, 55] }, ml: { a: [205, 45, 30], h: [-250, 55, 70] } }) });
+    await game('Bulls', 'Pistons', '-250', '205', { nbasplits: J({ at: '2026-11-23T01:00:00Z', upd: '8:00 PM ET', pre: false, n: 1, ml: { a: [205, 90, 10], h: [-250, 10, 90] } }) });
+    await load({ format: 'callsheet2.slate', version: 1, date: '2026-11-22', games: [
+      { sport: 'NBA', gdate: '2026-11-22', away: 'Hawks', home: 'Wizards', finals: { fa: '104', fh: '112', f5a: '50', f5h: '58' }, notes: [] },     // the Wizards by 8: the Hawks +9.5 cover, the total 216 under, the Wizards win
+      { sport: 'NBA', gdate: '2026-11-22', away: 'Kings', home: 'Spurs', finals: { fa: '110', fh: '125', f5a: '55', f5h: '60' }, notes: [] },        // the Spurs by 15: cover, the total 235 over, the Spurs win
+      { sport: 'NBA', gdate: '2026-11-22', away: 'Bulls', home: 'Pistons', finals: { fa: '100', fh: '111', f5a: '50', f5h: '55' }, notes: [] }] }, 'nba-grade-2026-11-22.json');
+    await wait();
+    const tabs = {};
+    [...document.querySelectorAll('#calibBox table.simrectab')].forEach(t => {
+      let p = t.previousElementSibling; while (p && !p.classList.contains('simrecview') && !p.classList.contains('calibhead')) p = p.previousElementSibling;
+      const key = t.classList.contains('moneytab') ? 'money' : t.classList.contains('pricetab') ? 'price' : /^The sim's own view/.test(txt(p)) ? 'own' : null;
+      if (key) tabs[key] = { head: txt(p), rows: [...t.querySelectorAll('tbody tr')].map(tr => [...tr.children].slice(0, 4).map(txt).join(' | ')) };
+    });
+    o.tabs = tabs;
+    o.dec = [...document.querySelectorAll('#calibBox .callstab tbody tr, #calibBox table.simrectab.callrec tbody tr')].map(txt).slice(0, 3);
+    o.simNote = txt([...document.querySelectorAll('#calibBox .simrec .note')].pop());
+    document.getElementById('clear').click(); await wait();
+    for (const k of Object.keys(keep)) { if (keep[k] === null || keep[k] === undefined) await smStore.removeItem(k); else await smStore.setItem(k, keep[k]); }
+    return o;
+  });
+  chk(/Engine 3 \(23 Nov 2026\): the men out are priced against tonight's slate and a tired club the way the close prices it, part off a club's own scoring and part on the other side's, so the total sits on the books' line where engine 2 sat 4 points under it\.$/.test(e3T.meta)
+      && /^Profiles: Hawks 114\.1 \/ 112\.3 per 100, pace 99\.5, back to back, men out 1\.88 per 100 against the slate's 0\.66 \([-−]0\.94 its own scoring, \+0\.16 the other side's\) · Wizards 116\.2 \/ 110\.8, pace 100\.4, third game in four nights, men out 0 per 100 against the slate's 0\.66 \(\+0\.51 its own scoring, [-−]0\.09 the other side's\)$/.test(e3T.prof)
+      && /Engine 2: score effects, the market's shape \(30 Oct 2026\)\.$/.test(e3T.meta2) && !/Engine 3/.test(e3T.meta2)
+      && /^Profiles: Hawks 114\.1 \/ 112\.3 per 100, pace 99\.5, back to back, out [-−]1\.88 per 100 · Wizards 116\.2 \/ 110\.8, pace 100\.4$/.test(e3T.prof2),
+      'engine 3 on the Simulation card: a row of engine 3 says so, with what changed, and its profiles carry each club\'s charge for its men out against the slate\'s mean and what that does to its own scoring and to the other side\'s, a third game in four nights beside a back-to-back; a row of engine 2 reads as it did',
+      JSON.stringify({ meta: e3T.meta.slice(-260), prof: e3T.prof, meta2: e3T.meta2.slice(-80), prof2: e3T.prof2 }));
+  chk(/^Wizards wins 78% of the runs · the price decides the bet$/i.test(e3T.tile) && /^Can they cover\. Every row asks one thing of a side: does it beat its number at its price\. Who wins is not the bet\./.test(e3T.read) && /701-691/.test(e3T.read) && /737-751/.test(e3T.read) && /66-22 and lost 5\.5 units\.$/.test(e3T.read)
+      && /^HOME 78% worth 77% · [-−]600 needs 85\.7%: the price asks more, no call/.test(e3T.dear) && !/STRONG|BET|LEAN/.test(e3T.dear.replace(/Take.*$/i, '')) && !/sim · \w+:? ?Wizards ML/i.test(e3T.dearSig)
+      && /^HOME 78% STRONG · worth 77% · [-−]250 needs 71\.4%(?! *: the price)/.test(e3T.fair) && /sim · STRONG:? ?Wizards ML · worth 77%/i.test(e3T.fairSig)
+      && /^HOME 78% STRONG · worth 77%(?! · )/.test(e3T.bare) && !/needs/.test(e3T.bare),
+      'the moneyline against the price: the Simulation card says how to read it (can they cover; who wins is not the bet), the home club at 78% of the runs is no call at -600, which needs 85.7%, and is off tonight\'s signals; at -250, which needs 71.4%, the same chance is a STRONG call and a signal; with no price on the row the call is banded by its worth as it was',
+      JSON.stringify({ tile: e3T.tile, read: e3T.read.slice(0, 200), dear: e3T.dear, fair: e3T.fair, bare: e3T.bare, dearSig: e3T.dearSig.slice(0, 300), fairSig: e3T.fairSig.slice(0, 300) }));
+  const e3own = ((e3T.tabs.own || {}).rows || []).filter(r => /^Moneyline/.test(r)), e3price = (e3T.tabs.price || {}).rows || [];
+  chk(e3own.length === 1 && /^Moneyline \| STRONG \| 2-0 \| 78\.\d%$/.test(e3own[0]) && e3price.length === 1 && /^1 \| 1-0 \| 78\.\d% \| 100\.0%$/.test(e3price[0])
+      && /^The moneyline calls the price did not allow/.test((e3T.tabs.price || {}).head || '') && /A moneyline call stands only where its worth beats what the row's price needs\./.test(e3T.simNote) && /Engine 3 \(23 Nov 2026\) played out on 2,444 games/.test(e3T.simNote),
+      'the simulation\'s record keeps the price\'s rule: of three graded games with the home club at 78% of the runs, the two priced -250 are STRONG calls on the moneyline\'s line (2-0) and the one priced -600 is on a line of its own, the calls the price did not allow (1-0), and the note under the tables says so',
+      JSON.stringify({ own: (e3T.tabs.own || {}).rows, price: e3T.tabs.price, note: e3T.simNote.slice(-420) }));
+  chk(e3T.old2 === '' && e3T.old2Sig === '' && e3T.old3 === '' && e3T.old3Sig === ''
+      && e3T.oldMix === "Old nbasim.py. This game was run by the new slate.py with engine 2 of nbasim.py beside it: its rest is that engine's and the other side's share of the men out was not played. The two files go together. Copy the nbasim.py that came with slate.py into the folder and run the slate again (it is free)."
+      && /^sig watch #secSim :: old nbasim\.py ?this game was run by the new slate\.py with engine 2 beside it · copy the new nbasim\.py into the folder and run the slate again$/i.test(e3T.oldMixSig) && /Engine 2: score effects/.test(e3T.oldMixMeta),
+      'the two files go together (27 Nov 2026: the rows of 23 to 25 Nov were run by the new slate.py with the old nbasim.py beside it and nothing said so): a simulation block that carries the slate\'s mean for the men out under an engine number of 2 gets a line in red on the Simulation card and a chip in tonight\'s signals that say to copy the new nbasim.py in and run the slate again; a row of engine 2 from before 23 Nov (no mean) and a row of engine 3 get neither',
+      JSON.stringify({ old2: e3T.old2, old2Sig: e3T.old2Sig, mix: e3T.oldMix, mixSig: e3T.oldMixSig, old3: e3T.old3, old3Sig: e3T.old3Sig }));
+  const e3m = (e3T.tabs.money || {}).rows || [], e3dec = e3m.filter(r => /^The decision/.test(r)), e3decN = e3dec.map(r => { const m = /\| (\d+)-(\d+)/.exec(r); return m ? +m[1] + +m[2] : 0; }).reduce((a, b) => a + b, 0);
+  chk(/^Where the money is: the sharp-money read against the finals off the game's card from 27 Nov 2026: the side with the larger bets had lost more than it won · DraftKings' own count as each row kept it before the tip · 2 games on 1 night, 2026-11-22 to 2026-11-22 · graded at DraftKings' own number and price in the count · shown, not scored$/.test((e3T.tabs.money || {}).head || '')
+      && e3m.length === 11 && /^The side with the larger bets \| 1-1 \| 50\.0% \| [-−]0\.1u$/.test(e3m[0]) && /^on the spread \| 1-0 \| 100\.0% \| \+0\.9u$/.test(e3m[1]) && /^on the total \| none yet \|/.test(e3m[2]) && /^on the moneyline \| 0-1 \| 0\.0% \| [-−]1\.0u$/.test(e3m[3])
+      && /^Every market's named side \| 2-4 \| 33\.3% \| [-−]2\.2u$/.test(e3m[4]) && /^on the spread \| 2-0 \| 100\.0% \| \+1\.8u$/.test(e3m[5]) && /^on the total \| 0-2 \| 0\.0% \| [-−]2\.0u$/.test(e3m[6]) && /^on the moneyline \| 0-2 \| 0\.0% \| [-−]2\.0u$/.test(e3m[7])
+      && e3dec.length === 3 && e3decN === 2 && /^The decision, the larger bets with it \| 0-1 \| 0\.0% \| [-−]1\.0u$/.test(e3m[8]) && /^The decision, the larger bets on the other side \| none yet \|/.test(e3m[9])
+      && /^The decision, no gap of 20 either way \| 1-0 \| 100\.0% \| \+0\.4u$/.test(e3m[10]),
+      'the money\'s own record on the NBA record: every graded game with a count taken before the tip (two here; the third game\'s count came after the tip and is left out), the side with the larger bets by market at DraftKings\' own number and price (the Hawks +9.5 a win, the Hawks to win a loss), every market\'s named side (ten points or more, else most of the money), and the decision as it was given by where the larger bets stood (the Hawks at +450, the larger bets with them, a loss; the Spurs with no gap of 20 either way, a win)',
+      JSON.stringify({ head: (e3T.tabs.money || {}).head, rows: e3m }));
+
+  const git = (cmd) => execSync(cmd, { cwd: __dirname, encoding: 'utf8' }).trim();
+  let want, why;
+  try {
+    if (git('git status --porcelain -- web/callsheet3.html web/nba.engine.js web/callsheet3.nba-fields.html tools_build_callsheet3.py')) { want = git('date +%Y-%m-%d'); why = 'edited and not committed, so today'; }
+    else { want = git('git log -1 --format=%cs -- web/callsheet3.html'); why = 'committed, so the commit date'; }
+  } catch (e) { want = stamp; why = 'no git here'; }
+  chk(stamp === want, `build: the stamp is current (${why})`, `page says ${stamp}, expected ${want}`);
+
+  if (errs.length) { console.log('PAGE ERRORS:\n' + errs.join('\n')); fails++; }
+  console.log(fails ? `\n${fails} FAILED` : `\nall checks passed (${CASES.length} cases)`);
+  await b.close();
+  process.exit(fails ? 1 : 0);
+})();

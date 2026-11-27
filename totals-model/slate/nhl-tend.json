@@ -1,0 +1,461 @@
+{
+ "K": {
+  "drawn": 36.5,
+  "fin": 101.2,
+  "pen": 31.4,
+  "pkq": 400.0,
+  "pkr": 63.4,
+  "ppq": 185.2,
+  "ppr": 41.5,
+  "qa": 35.6,
+  "qf": 38.8,
+  "ra": 25.9,
+  "rf": 11.6
+ },
+ "clubs": {
+  "ANA": {
+   "drawn": 3.451,
+   "games": 164,
+   "taken": 3.579
+  },
+  "BOS": {
+   "drawn": 3.396,
+   "games": 164,
+   "taken": 3.622
+  },
+  "BUF": {
+   "drawn": 3.506,
+   "games": 164,
+   "taken": 3.494
+  },
+  "CAR": {
+   "drawn": 3.311,
+   "games": 164,
+   "taken": 3.305
+  },
+  "CBJ": {
+   "drawn": 2.652,
+   "games": 164,
+   "taken": 3.03
+  },
+  "CGY": {
+   "drawn": 3.317,
+   "games": 164,
+   "taken": 3.366
+  },
+  "CHI": {
+   "drawn": 2.939,
+   "games": 164,
+   "taken": 3.159
+  },
+  "COL": {
+   "drawn": 3.293,
+   "games": 164,
+   "taken": 2.976
+  },
+  "DAL": {
+   "drawn": 3.28,
+   "games": 164,
+   "taken": 3.195
+  },
+  "DET": {
+   "drawn": 3.366,
+   "games": 164,
+   "taken": 2.78
+  },
+  "EDM": {
+   "drawn": 3.0,
+   "games": 164,
+   "taken": 2.945
+  },
+  "FLA": {
+   "drawn": 3.823,
+   "games": 164,
+   "taken": 3.884
+  },
+  "LAK": {
+   "drawn": 2.921,
+   "games": 164,
+   "taken": 3.171
+  },
+  "MIN": {
+   "drawn": 3.14,
+   "games": 164,
+   "taken": 2.854
+  },
+  "MTL": {
+   "drawn": 3.555,
+   "games": 164,
+   "taken": 3.72
+  },
+  "NJD": {
+   "drawn": 2.915,
+   "games": 164,
+   "taken": 2.957
+  },
+  "NSH": {
+   "drawn": 3.274,
+   "games": 164,
+   "taken": 3.402
+  },
+  "NYI": {
+   "drawn": 2.957,
+   "games": 164,
+   "taken": 2.677
+  },
+  "NYR": {
+   "drawn": 2.921,
+   "games": 164,
+   "taken": 3.287
+  },
+  "OTT": {
+   "drawn": 3.829,
+   "games": 164,
+   "taken": 3.445
+  },
+  "PHI": {
+   "drawn": 3.22,
+   "games": 164,
+   "taken": 3.25
+  },
+  "PIT": {
+   "drawn": 3.098,
+   "games": 164,
+   "taken": 3.067
+  },
+  "SEA": {
+   "drawn": 3.079,
+   "games": 164,
+   "taken": 2.829
+  },
+  "SJS": {
+   "drawn": 3.268,
+   "games": 164,
+   "taken": 3.402
+  },
+  "STL": {
+   "drawn": 2.866,
+   "games": 164,
+   "taken": 2.872
+  },
+  "TBL": {
+   "drawn": 3.738,
+   "games": 164,
+   "taken": 3.652
+  },
+  "TOR": {
+   "drawn": 2.945,
+   "games": 164,
+   "taken": 3.262
+  },
+  "UTA": {
+   "drawn": 3.238,
+   "games": 164,
+   "taken": 3.402
+  },
+  "VAN": {
+   "drawn": 3.317,
+   "games": 164,
+   "taken": 3.299
+  },
+  "VGK": {
+   "drawn": 2.768,
+   "games": 164,
+   "taken": 2.494
+  },
+  "WPG": {
+   "drawn": 2.994,
+   "games": 164,
+   "taken": 2.823
+  },
+  "WSH": {
+   "drawn": 3.268,
+   "games": 164,
+   "taken": 3.445
+  }
+ },
+ "format": "callsheet3.nhl-tend",
+ "games": 2624,
+ "league": {
+  "double_share": 0.013,
+  "en60": 28.9,
+  "extra60": 76.1,
+  "home_q": 1.009,
+  "home_rate": 1.015,
+  "pen60": 3.208,
+  "pen_game": 3.208,
+  "pen_period": [
+   0.943,
+   1.149,
+   0.908
+  ],
+  "period_fin": [
+   0.967,
+   1.022,
+   1.01
+  ],
+  "period_q": [
+   0.994,
+   1.019,
+   0.985
+  ],
+  "period_rate": [
+   1.008,
+   1.083,
+   0.913
+  ],
+  "pk60": 12.49,
+  "pp60": 76.15,
+  "pull": {
+   "1": {
+    "p": 0.92,
+    "q": [
+     35,
+     65,
+     93,
+     122,
+     154
+    ]
+   },
+   "2": {
+    "p": 1.0,
+    "q": [
+     82,
+     126,
+     166,
+     206,
+     247
+    ]
+   },
+   "3": {
+    "p": 0.6,
+    "q": [
+     137,
+     196,
+     246,
+     315,
+     435
+    ]
+   }
+  },
+  "q33": 0.1365,
+  "q44": 0.0733,
+  "q5": 0.0605,
+  "q_en": 0.521,
+  "q_extra": 0.0722,
+  "qpk": 0.0728,
+  "qpp": 0.0978,
+  "s33": 24.8,
+  "s44": 36.04,
+  "score_q": {
+   "-3": 0.974,
+   "-2": 0.996,
+   "-1": 0.994,
+   "0": 1.0,
+   "1": 1.015,
+   "2": 1.029,
+   "3": 1.04
+  },
+  "score_rate": {
+   "-3": 1.046,
+   "-2": 1.016,
+   "-1": 1.028,
+   "0": 1.0,
+   "1": 0.917,
+   "2": 0.865,
+   "3": 0.859
+  },
+  "sf60": 40.27,
+  "so_home": 0.495,
+  "t55": 3009.1,
+  "tpp": 530.3,
+  "two_man": 1.787,
+  "two_man_q": 1.746,
+  "xg5": 0.061,
+  "xgpp": 0.0987
+ },
+ "league_minors": 6.415,
+ "refs": {
+  "Alex Lepkowski": {
+   "games": 24,
+   "minors": 6.042
+  },
+  "Beau Halkidis": {
+   "games": 75,
+   "minors": 6.36
+  },
+  "Brandon Blandina": {
+   "games": 148,
+   "minors": 6.554
+  },
+  "Brandon Schrader": {
+   "games": 147,
+   "minors": 6.456
+  },
+  "Brian Pochmara": {
+   "games": 117,
+   "minors": 6.077
+  },
+  "Carter Sandlak": {
+   "games": 144,
+   "minors": 5.806
+  },
+  "Chris Lee": {
+   "games": 144,
+   "minors": 5.917
+  },
+  "Chris Rooney": {
+   "games": 108,
+   "minors": 6.343
+  },
+  "Chris Schlenker": {
+   "games": 121,
+   "minors": 6.488
+  },
+  "Cody Beach": {
+   "games": 148,
+   "minors": 6.966
+  },
+  "Corey Syvret": {
+   "games": 149,
+   "minors": 6.121
+  },
+  "Dan O'Rourke": {
+   "games": 95,
+   "minors": 5.663
+  },
+  "Eric Furlatt": {
+   "games": 142,
+   "minors": 6.62
+  },
+  "Francis Charron": {
+   "games": 149,
+   "minors": 6.376
+  },
+  "Francois St. Laurent": {
+   "games": 118,
+   "minors": 6.737
+  },
+  "Frederick L'Ecuyer": {
+   "games": 149,
+   "minors": 6.168
+  },
+  "Furman South": {
+   "games": 150,
+   "minors": 5.807
+  },
+  "Garrett Rank": {
+   "games": 150,
+   "minors": 6.84
+  },
+  "Ghislain Hebert": {
+   "games": 74,
+   "minors": 6.257
+  },
+  "Gord Dwyer": {
+   "games": 143,
+   "minors": 6.364
+  },
+  "Graedy Hamilton": {
+   "games": 54,
+   "minors": 6.333
+  },
+  "Graham Skilliter": {
+   "games": 150,
+   "minors": 6.107
+  },
+  "Jake Brenk": {
+   "games": 149,
+   "minors": 6.852
+  },
+  "Jean Hebert": {
+   "games": 137,
+   "minors": 7.058
+  },
+  "Jon McIsaac": {
+   "games": 139,
+   "minors": 5.827
+  },
+  "Jordan Samuels-Thomas": {
+   "games": 106,
+   "minors": 7.189
+  },
+  "Justin Kea": {
+   "games": 149,
+   "minors": 6.342
+  },
+  "Kelly Sutherland": {
+   "games": 150,
+   "minors": 6.727
+  },
+  "Kendrick Nicholson": {
+   "games": 150,
+   "minors": 6.407
+  },
+  "Kyle Rehman": {
+   "games": 150,
+   "minors": 6.76
+  },
+  "Liam Maaskant": {
+   "games": 29,
+   "minors": 6.069
+  },
+  "Michael Markovic": {
+   "games": 148,
+   "minors": 6.75
+  },
+  "Mike Sullivan": {
+   "games": 58,
+   "minors": 6.448
+  },
+  "Mitch Dunning": {
+   "games": 128,
+   "minors": 6.188
+  },
+  "Morgan MacPhee": {
+   "games": 60,
+   "minors": 6.05
+  },
+  "Peter MacDougall": {
+   "games": 139,
+   "minors": 6.561
+  },
+  "Pierre Lambert": {
+   "games": 148,
+   "minors": 6.284
+  },
+  "Riley Brace": {
+   "games": 34,
+   "minors": 7.647
+  },
+  "Stephen Hiff": {
+   "games": 66,
+   "minors": 6.424
+  },
+  "Steve Kozari": {
+   "games": 20,
+   "minors": 7.6
+  },
+  "TJ Luxmore": {
+   "games": 150,
+   "minors": 6.227
+  },
+  "Tom Chmielewski": {
+   "games": 136,
+   "minors": 6.382
+  },
+  "Trevor Hanson": {
+   "games": 150,
+   "minors": 6.62
+  },
+  "Wes McCauley": {
+   "games": 151,
+   "minors": 6.338
+  }
+ },
+ "seasons": [
+  "2024",
+  "2025"
+ ],
+ "version": 1
+}

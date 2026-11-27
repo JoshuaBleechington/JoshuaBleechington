@@ -9,7 +9,8 @@ python slate.py splits --sports NBA %*
 echo.
 echo ---------------------------------------------------------------
 echo Done. In The Super Model: Saving, Load slate, pick the splits file
-echo with today's date. The WHERE THE MONEY IS box on tonight's games
-echo updates. No line or price changes. Run it again any time.
+echo with today's date. The count is kept on each game and counted on the
+echo NBA record. The box came off the game's card on 27 Nov 2026 (the side
+echo with the larger bets had lost more than it won), so this run is optional.
 echo ---------------------------------------------------------------
 pause

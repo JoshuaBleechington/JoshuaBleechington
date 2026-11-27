@@ -7601,3 +7601,247 @@ moneyline 16-10 each); the decision 2-2 with the larger bets on it, 4-5
 with them on the other side, 9-3 with no gap. Shown, not scored: one
 book's customers and 26 games, where a side that wins 55% needs about
 400 to show it.
+
+## The sweep, and what came off: 27 Nov 2026
+
+The user, with the backup of 26 Nov: "I noticed the 'Decision as given'
+is 165-104-1 and that looks pretty good. Im wondering if the where money
+is is working or worth it and instead would some other metric we could
+consider to replace it with to help with the accuracy? ... I honestly
+think you're not using your full potential and we could really be
+finding gaps or patterns to have this super model a lot more pinpoint.
+If something needs to go then lets remove it or lets enhance or
+optimize."
+
+The short of it: nothing that reads a game at its late number beats that
+number, on three seasons or on nineteen; two things on the page that
+looked measured were three seasons deep and are level on the long
+record; and the one edge that held is not a pattern in a game but the
+hour the bet is made.
+
+### 1. The nights of 23 to 25 Nov
+
+| Night | Games | The decision as given | Props, BET | Props, LEAN | First-half list |
+| --- | --- | --- | --- | --- | --- |
+| 23 Nov | 10 | 4-6 | 1-1 (-0.4u) | 14-20 (-10.7u) | 1-3 |
+| 24 Nov | 3 | 2-1 | none | 4-3 (-0.4u) | 0-3 |
+| 25 Nov | 9 | 6-3 | none | 26-20 (+0.8u) | 1-3 |
+
+The decisions by kind on the three nights: the best number 4-4, the
+sheet's own read 4-2, the likelier winner 4-4. The user marked four bets
+on the 23rd and none after: the first half under 118.5 at the 76ers
+(lost, the half 138), the first half under 108.5 at Toronto (won, 102),
+the first half over 115.5 at Sacramento (lost, 111), and the total under
+241.5 at Chicago at -108 (won, 230). No prop was marked.
+
+The rows of all three nights carry `out_mean` and each club's `charge`
+under `"v": 2`: the slate.py of 23 Nov was copied into the folder and
+the old nbasim.py left beside it, so their rest is engine 2's and the
+other side's 0.13 of the men out was never played (section 9).
+
+### 2. "The decision as given is 165-104-1"
+
+It is 61.3% and it is +2.8 units, because most of the calls are the
+likelier winner at the book's price, where six wins in ten at -150 is
+level money. The record now says which part of the order gave the calls
+(`rec.by` in `nbaCallsRecord`, the line `.callsplit` under the table):
+
+| What gave the call | Record | Units |
+| --- | --- | --- |
+| a kind with a measurement behind it (the agreement rule, the sheet's own call, the rest over, the best number) | 61-55-1 | -0.7 |
+| the sheet's own read | 15-6 | +7.6 |
+| the likelier winner at the book's price | 89-43 | -4.1 |
+
+Each kind on every game it speaks to, the same 270 games: the agreement
+rule 11-14 (-4.0u, cold), the sheet's own call 22-33 (-9.6u, cold), the
+rest over 7-3 (+3.3u), the best number 55-53-1 (-4.2u), the sheet's read
+26-19 (+4.8u), the likelier winner 38-2, 55-19, 47-28 and 42-39 by band
+(+3.3, -3.0, -4.3 and -7.7u).
+
+### 3. The sharp-money read: 30-35, and off the card
+
+48 games on seven nights (19 to 25 Nov) kept DraftKings' count before
+the tip. The side with the larger bets (20 points more of the money than
+of the bets) went 30-35 for -2.7u: the spread 9-13, the moneyline 4-9,
+the total 17-13. Every market's named side went 80-64 (+7.4u), nearly
+all of it favourites on the moneyline and unders. Taken apart (lab
+`money_deep.py`): the spread side with most of the MONEY where most of
+the BETS were on the other side, which is the "sharp against public"
+read itself, went 3-10 (-7.3u); the spread side with most of the bets
+29-19; the total side with most of the bets 18-30. By night the larger
+bets' side went 2-1, 8-7, 2-3, 3-6, 9-6, 3-1 and 3-11. The decision went
+4-3 with the larger bets on it, 7-8 against them, 16-9 with no gap.
+
+It is not working and there is no history of the count to test it on (a
+side that wins 55% needs about 400 games to show it). The box, its chips
+in tonight's signals and the box of a game with no lines yet are off the
+page (`nbaMoneyPanel`, `nbaMoneyLoose`, `nbaSplitsTop`, `NBA_SPLITS_NONE`
+and the `.dmoney` styles are gone). A count that is loaded is still kept
+on the row (`nbasplits`) and still counted on the NBA record
+(`nbaMoneyRecordHtml`), so `python slate.py splits` is optional now.
+What replaces it is section 8.
+
+### 4. The sweep: three seasons against the late number
+
+2,479 games with a line (lab `sweep_data.py` builds `sweep/rows.json`):
+2024-25, 1,231 games at the middle of eight books from the user's odds
+history; 2025-26, 978 from late November at DraftKings' open and close
+as ESPN's game page keeps them; 2026-27, the card's 270. For every game:
+rest, back to backs, three in four, four in six, five in seven, the run
+of road or home games, the first game back from a trip, miles and time
+zones since the last game, whether the last game went to overtime and
+by how much it was won, ratings, pace, the three-point rate, luck from
+three (a club's and its opponents'), the last five against the spread
+and the total, streaks, the last meeting.
+
+274 pairs of a feature and a result (lab `sweep_scan.py`): against the
+LATE number nothing reaches t 3. The best: the men-out differential in
+hindsight +2.8, the favourite on no rest with the dog rested and the
+over +2.7, a club off an overtime game and the under -2.6, the month
++2.5, the three-point rate -2.4. Line MOVES are predictable (the rest
+differential t 5.9, recent overs 7.2, the last ten's margin 3.6) and
+betting them at the late number wins nothing.
+
+As bets at the late number (lab `sweep_spots.py`): the over behind a
+tired favourite laying 5.5 or more 88-52; the under after a club's
+overtime game 124-90 (61-50, 44-33, 19-7); the over at Denver and Utah
+96-69; the home side against a visitor two time zones west of its last
+game 49-32; against the home club's first game back from four on the
+road 109-90. Two of those looked worth building, so they were put to
+seasons they were not found on first.
+
+### 5. Sixteen seasons nobody here had looked at
+
+`sportsbookreviewsonline.com` keeps an NBA archive, a page a season,
+2007-08 to January 2023: quarter scores, an opener and a close for the
+total and the spread, the moneylines (lab `sbr_parse.py`: 19,821 games,
+18,546 of them regular season, overtime read off the quarters, rest off
+the schedule itself). `covers.com` keeps each club's results with the
+closing spread and total, which gave all of 2022-23 and 2023-24 (lab
+`covers_fetch2.sh`, `covers_parse.py`: 2,458 games; the two sources
+agree on the games they share). All free, a request at a time.
+
+| Spot | Found on (three seasons) | Not found on |
+| --- | --- | --- |
+| the under after a club's overtime game | 124-90 | 1,037-990 (51.2%) on sixteen, ten of them the right side of even |
+| the over behind a tired favourite laying 5.5 or more | 88-52 | 419-436 (49.0%) on seventeen; 48-40 on the two nearest |
+| ... the page's own rule, 70% or more on the moneylines | 66-33 | 270-298 (47.5%) on sixteen |
+| the first half of those games (a favourite of 4 or more) | 112-66 | 553 over its share of the closing lines, 539 under, on sixteen |
+| ... the rested club's own first half | 114-64 | 543 over its share, 549 under |
+| the over at Denver and Utah | 96-69 | 598-611 |
+| against the home club's first game back from four on the road | 109-90 | 666-612 (52.1%) |
+
+The tired favourite by season, laying 5.5 or more (lab `rest_all.py`):
+27-36, 16-29, 29-23, 30-27, 27-25, 24-31, 15-28, 30-33, 32-26, 20-23,
+27-29, 17-21, 22-18, 23-28 from 2007-08 to 2020-21 (339-377); 32-19 in
+2021-22; 17-14 and 31-26 on the two seasons nobody had looked at; then
+45-25, 34-24 and 9-3 on the three it was found on. Fourteen seasons at
+47%, six at 60% (168-111), and the two clean ones 54.5%. It may be the
+game changing or it may be a run; the long record does not back it.
+
+The under after an overtime game was not built. The check on box scores
+that seemed to support it (lab `sweep_ot.py`: a club off overtime scores
+1.66 fewer in regulation than its scoring to date expects, t -2.4) was
+drawn on the same three seasons; the one season outside them, 2023-24,
+read -0.22.
+
+### 6. The over behind a tired favourite, re-worded
+
+It stays a call (every game is given one, and the kinds under it are the
+book's own price) but it says what the long record says, and it is a
+small bet: the kind's note, the decision's strength line
+(`NBA_DEC_STRENGTH.rest`: "66-33 on the three seasons it was found on
+and 419-436 on the seventeen before them: not proven, a small bet"), the
+decision's why, the rest line of the why's list, and the back-to-back
+label in the matchup's notes. The cold rule still takes it out of the
+order when it loses here over ten calls.
+
+### 7. The first half's best bets come off
+
+As $100 best bets from 23 to 25 Nov the list went 2-9 (-$710). The
+cheaper side, which it led with on every one of those nights, went 2-8
+from the build and 13-22 in the ten days before it, after 62-41 on the
+weeks the rule was drawn on. The other lead, the over behind a tired
+favourite in the half, is section 5's level record. Nothing in the first
+half is proven, so from the night of 27 Nov (`NBA_H1.off`,
+`nbaH1Watch`) the board shows the three lead kinds as a WATCH list
+("The first half, watched"): each card says WATCH, is drawn as a lean
+and names no stake; no fill is added to make three; a Take is still
+there for a bet he chooses to make; the list is off the phone's sheet.
+The nights of 23 to 26 Nov replay as they were given, the record keeps
+"The list as given, $100 best bets, 23 to 26 Nov" and a new line "The
+watch list from 27 Nov", and each kind goes on counting on every game it
+speaks to, so a kind that turns will show.
+
+This reverses an ask of 23 Nov ("I want to be able to put a $100 on a
+3-4 best bet"). It follows the ask of 27 Nov. Turning the bets back on
+is `NBA_H1.off`.
+
+### 8. The early total: the one thing that held
+
+The simulation's plain total (the two clubs' ratings into each other at
+the game's pace, rest in it, nobody out: `rat0_t` of lab
+`sim_avail2.py`, plus rest and a point for overtime) against the number
+a DAY AHEAD of the tip (lab `sweep_open.py`, `sweep_early.py`,
+`sweep_decay.py`). The day-ahead number: for 2024-25 the middle of the
+books at 22:30 UTC the day before; for 2025-26 and 2026-27 DraftKings'
+opener as ESPN keeps it. 1,880 games:
+
+| The plain total against the early number | Games | The line then moved its way | Its side at the early number | The same side at the close |
+| --- | --- | --- | --- | --- |
+| 4 or more apart | 565 | 321 times to 188, +1.20 points | 280-283 | 273-292 |
+| 6 or more | 256 | 148 to 81, +1.59 | 134-120 | 123-133 |
+| 7 or more | 156 | 97 to 42, +2.07 | 86-68 | 78-78 |
+| 8 or more | 93 | 68 to 18, +2.83 | 54-38 (22-17, 24-16, 8-5) | 48-45 |
+| 10 or more | 38 | 30 to 6, +3.68 | 26-12 | 25-13 |
+
+Of the gap, the line's own move kept +0.207 (the error 0.015; 0.19,
+0.18, 0.31 by season), and +0.198 where neither club had played the
+night before, so it is not one day's news. 58.7% is what 2.8 points of
+a total are worth; the win and the move say the same thing. At 8 or
+more the unders went 21-10 and the overs 33-28.
+
+It does not last. 2024-25, the day before to eleven in the morning: the
+line kept +0.146 of the gap; from eleven in the morning to the late
+number, +0.007. This season, DraftKings' opener to the user's own slate
+run +0.334; his run to the close +0.019, and the same side at his
+morning line went 24-41. Nothing is left by the time the slate is run.
+
+It is new. On the sixteen archived seasons a cruder centre (each club's
+regulation points for and against to date, the season's mean gap taken
+off; lab `sbr_early.py`, 14,802 games) the opener kept nothing of the
+gap to 2014-15 and more every season since: 0.03, 0.04, 0.05, 0.06,
+0.08, 0.08, 0.10, and 0.21 in 2022-23. From 2017-18 that crude centre's
+side at the opener went 505-405 (55.5%) at 6 or more apart and 78-49 at
+10 or more. The books post tomorrow's totals earlier and softer than
+they did, and they are right by the morning.
+
+So slate.py has an evening run, `python slate.py nba-early` (Run NBA
+early.bat), for TOMORROW's games by default, free. It brings the ledger
+up to date, reads tomorrow's scoreboard for the number its book shows
+that evening and its opener, reads TONIGHT's scoreboard for the clubs
+that play (their game is not in the ledger yet and they are on the
+second night tomorrow: `nba_early_rest`), works out the plain total
+(`nba_early_centre`) and writes `nba-early-DATE.json`
+(`callsheet2.early`): each game's centre, number, gap, side, whether it
+is a call (`NBA_EARLY_GAP`, 8) and the last number the call stands at
+(`nba_early_to`). The window ends on a starred block with the calls,
+the widest first, and the games that have no number yet.
+
+What it is worth, said plainly: about one game in twenty is a call,
+sixty or so a season; at 58% and -110 that is about six units a season
+at a unit a bet, and the page will say within a few weeks whether his
+own bets are getting the number (the line "What the number did
+afterwards").
+
+### 9. The two files go together
+
+`NBA_SIM_NEEDS = 3` in slate.py. Where the nbasim.py beside it is an
+older engine, the slate run and the early run say so in a starred block
+where the profiles are built and again as their last word
+(`nba_sim_engine_note`, `nba_sim_engine_shout`), and every game's notes
+carry the line onto the page's slate list. On the page a simulation
+block with `out_mean` under an engine number below 3 gets a line in red
+on the Simulation card and a chip in tonight's signals
+(`nbaSimMixed`): "Old nbasim.py ... Copy the nbasim.py that came with
+slate.py into the folder and run the slate again".

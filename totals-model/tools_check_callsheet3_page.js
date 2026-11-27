@@ -3985,7 +3985,7 @@ const CHECKS = ["dome","playoff"];
     o.taken = { btns: (await board(D)).map(c => c.btn), list: taking(), b: bare((rowOf(D, 'Suns') || {}).simTakes), a: bare((rowOf(D, 'Magic') || {}).simTakes) };
     // the finals: 220 lands over 212.5 with the Celtics beaten, 210 under 221.5 (and under FanDuel's 223: the best number wins where the rest call loses), 245 over 229.5; the four favourites win
     await grade(D, 'Magic', 115, 105); await grade(D, 'Suns', 100, 110); await grade(D, 'Knicks', 125, 120); await grade(D, 'Jazz', 100, 110); await grade(D, 'Wizards', 100, 110); await grade(D, 'Nets', 100, 110); await grade(D, 'Kings', 100, 110);
-    o.after = await board(D); o.table = table(); o.note = tableNote(/^REST/);
+    o.after = await board(D); o.table = table(); o.note = tableNote(/^REST/); o.split = txt(document.querySelector('#calibBox .callsplit'));
     o.took = [...document.querySelectorAll('#calibBox .calib[data-sport="TAKEN"] > div')].map(d => txt(d)); o.takingGraded = taking();
     // ten such games on the days before that all stay under: the rest call is cold, and the next one is given the next kind with the rest call named
     for (let i = 1; i <= 10; i++) { const d = '2026-12-' + String(i).padStart(2, '0'); await game(d, 'Magic', 'Celtics', { narest: '2', nhrest: '0', hml: '-350', aml: '275' }); await grade(d, 'Magic', 100, 110); }
@@ -4001,14 +4001,14 @@ const CHECKS = ["dome","playoff"];
   await pg.evaluate(async (k) => { for (const x of Object.keys(k)) { if (k[x] === null || k[x] === undefined) await smStore.removeItem(x); else await smStore.setItem(x, k[x]); } }, rsKeep);
   await reloaded();
   const rsc = (cards) => (cards || []).map(c => c.cls.replace('pk call ', '') + ' | ' + c.n1 + ' | ' + c.n2);
-  const rsNote = "a favourite of 70% or more on the second night of a back to back, the other club rested: the game went over the closing total 66-33 (66.7%) on three seasons, 32-16, 28-15 and 6-2; the same favourites rested 360-367";
+  const rsNote = "a favourite of 70% or more on the second night of a back to back, the other club rested: the game went over the closing total 66-33 on the three seasons it was found on (32-16, 28-15 and 6-2); on the seventeen seasons before them the same spot, the tired favourite laying 5.5 or more, went 419-436 (49.0%), and 48-40 on the two nearest: not proven, so a small bet";
   chk(rsc(rs.before).join(' ## ').toLowerCase() === ("rest | REST · the over behind a tired favourite | Total OVER 229.5 ## rest | REST · the over behind a tired favourite | Total OVER 212.5 ## rest | REST · the over behind a tired favourite | Total OVER 221.5 ## lean | LEAN · the likelier winner, 70 to 80% | Pistons to win ## lean | LEAN · the likelier winner, 70 to 80% | 76ers to win ## lean | LEAN · the likelier winner, 70 to 80% | Lakers to win ## lean | LEAN · the likelier winner, 60 to 70% | Hawks to win").toLowerCase()
       && rs.before[0].n3 === '-110 · Knicks are 71.8% by the books on the second night of a back to back, Bulls rested 3 days: the carded total'
       && rs.before[1].n3 === '-110 at Fanatics · Celtics are 74.5% by the books on the second night of a back to back, Magic rested 2 days: the lowest total at your four apps'
       && rs.before[2].n3 === '-105 at DraftKings · Thunder are 76.6% by the books on the second night of a back to back, Suns rested a day: the lowest total at your four apps'
       && rs.before[0].n4 === 'Knicks @ Bulls · ' + rsNote + ' · none graded here yet' && rs.before[1].n4 === 'Magic @ Celtics · ' + rsNote + ' · none graded here yet' && rs.before[2].n4 === 'Suns @ Thunder · ' + rsNote + ' · none graded here yet'
       && /^69\.5% by the middle of the carded book · -260 needs 72\.2%/.test(rs.before[6].n3) && rs.before.every(c => c.also === '') && rs.before.every(c => /^take$/i.test(c.btn))
-      && rs.why.indexOf("Back to back for the home side. A LABEL on the side: on three seasons of closing lines a club on the second night won 408 of 875 where the moneylines priced 411 and covered the spread 425-441, and rest, the second night on the road and three in four flipped sign between seasons. The market prices rest on the side. On the total it does not where the club on the second night is a favourite of 70% or more and the other is rested: the game went over 66-33, and the call on the game carries it.") >= 0,
+      && rs.why.indexOf("Back to back for the home side. A LABEL on the side: on three seasons of closing lines a club on the second night won 408 of 875 where the moneylines priced 411 and covered the spread 425-441, and rest, the second night on the road and three in four flipped sign between seasons. The market prices rest on the side. On the total the three seasons to hand had the game over 66-33 where the club on the second night is a favourite of 70% or more and the other is rested; the seventeen seasons before them had the same spot 419-436, so the call on the game carries it as a small bet.") >= 0,
       'the over behind a tired favourite (17 Nov 2026, the user: "test the back to back games this season to see if there is anything there"): where the likelier winner is 70% or more by the books, played the day before, and the other club did not, the game\'s call is the over at the lowest total the four apps post (the best price on a tie, here DraftKings\' -105 of three apps at 221.5; the carded total where the row has no shop), at home or on the road, ahead of the best number on the board though that number is the under at another app; the card says who is tired and by how much the books favour him, how long the other club rested and what three seasons measured; a favourite at 69.5%, one whose opponent is on the second night too, one with a day of rest and one with no rest on the row get the likelier winner as before; and the card\'s own note on a back to back says the side is priced and where the total is not',
       JSON.stringify({ cards: rsc(rs.before), n3: rs.before.map(c => c.n3), n4: rs.before.slice(0, 3).map(c => c.n4), why: (rs.why || '').slice((rs.why || '').indexOf('Back to back'), (rs.why || '').indexOf('Back to back') + 520) }));
   const rsT = rs.taken || {};
@@ -4027,6 +4027,9 @@ const CHECKS = ["dome","playoff"];
       && rs.note === rsNote,
       'the over behind a tired favourite, graded: each of the three is graded on its own total (220 over 212.5, 245 over 229.5, 210 under 221.5) and the cards carry the results; the NBA record keeps the kind on its own line between the sheet\'s own call and the best number, with what was measured before, and the best number and the likelier winner are still counted on every game they speak to (the under at 223 a win where the rest call lost); the call as given counts the rest call on its three games',
       JSON.stringify({ cards: rsc(rs.after), n4: rs.after.slice(0, 1).map(c => c.n4.slice(-24)), table: rs.table, note: rs.note }));
+  chk(rs.split === "The call as given, by what gave it: a kind with a measurement behind it (the agreement rule, the sheet's own call, the over behind a tired favourite, the best number) 2-1, +0.8u · the sheet's own read none yet · the likelier winner at the book's price 4-0, +1.1u. A favourite at -150 has to win six in ten to be level, so a record of six in ten here is the book's price coming in as priced: read the units, not the wins.",
+      'where the call as given comes from (27 Nov 2026, the user: "I noticed the Decision as given is 165-104-1 and that looks pretty good"): under the calls record a line splits the call as given by what gave it, a kind with a measurement behind it (here the rest call on its three games, 2-1), the sheet\'s own read, and the likelier winner at the book\'s price (4-0), each with its units, and says a favourite has to win six in ten to be level, so the units are the referee',
+      JSON.stringify({ split: rs.split }));
   chk((rs.cold || []).length === 2 && rs.cold[1].n1 === 'LEAN · the likelier winner, 70 to 80%' && rs.cold[1].n2 === 'Celtics to win'
       && rs.cold[1].also === 'Also on this game: the over behind a tired favourite says Total OVER 229.5 (2-11 here, -9.2u: cold, and left out of the order until its record turns).'
       && rs.cold[0].n1 === 'VALUE · the best number on the board' && rs.cold[0].n2 === 'Total OVER 220.5' && rs.cold[0].n3 === '-108 at Fanatics · the middle of 5 books is 221.5: a point under it, on your side'
@@ -4063,13 +4066,15 @@ const CHECKS = ["dome","playoff"];
       return { hidden: document.getElementById('h1Head').hidden && document.getElementById('h1best').hidden, tag: tc(document.getElementById('h1Tag')),
                cards: cardEls().map(c => ({ cls: c.className.replace('pk call h1 ', ''), n1: tc(c.querySelector('.n1')), n2: tc(c.querySelector('.n2')), n3: tc(c.querySelector('.n3')), n4: tc(c.querySelector('.n4')), btn: tc(c.querySelector('.n6')) })) }; };
     const taking = () => [...document.querySelectorAll('#taking .pk.taking')].map(e => txt(e));
-    const table = () => { const t = document.querySelector('#calibBox .h1tab'); return t ? [...t.querySelectorAll('tbody tr')].map(tr => [...tr.children].slice(0, 6).map(td => tc(td)).join(' | ')) : null; };
+    const tableAll = () => { const t = document.querySelector('#calibBox .h1tab'); return t ? [...t.querySelectorAll('tbody tr')].map(tr => [...tr.children].slice(0, 6).map(td => tc(td)).join(' | ')) : null; };
+    const table = () => { const r = tableAll(); return r ? r.filter(x => !/^The watch list/.test(x)) : null; }, tableWatch = () => (tableAll() || []).filter(x => /^The watch list/.test(x)).join(' ## ');
+    const recHead = () => { const t = document.querySelector('#calibBox .h1tab'); return t && t.previousElementSibling ? tc(t.previousElementSibling) : ''; };
     const tableLast = () => { const t = document.querySelector('#calibBox .h1tab'); const tr = t ? [...t.querySelectorAll('tbody tr')].find(x => /^The list as given/.test(tc(x.children[0]))) : null; return tr ? tc(tr.children[6]) : ''; };
-    const tableNotes = () => { const t = document.querySelector('#calibBox .h1tab'); return t ? [...t.querySelectorAll('tbody tr')].slice(-2).map(tr => tc(tr.children[6])) : []; };
+    const tableNotes = () => { const t = document.querySelector('#calibBox .h1tab'); return t ? [...t.querySelectorAll('tbody tr')].slice(-3, -1).map(tr => tc(tr.children[6])) : []; };
     const per = (lines) => { const o = { OVER: [], UNDER: [] }; Object.keys(lines).forEach(b => { o.OVER.push([b, lines[b][1], lines[b][0]]); o.UNDER.push([b, lines[b][2], lines[b][0]]); }); return o; };   // app: [the number, the over's price, the under's]
     const spr = (pts) => ({ HOME: Object.keys(pts).map(b => [b, -110, pts[b]]), AWAY: Object.keys(pts).map(b => [b, -110, -pts[b]]) });
     const bare = (ts) => (ts || []).map(t => { const c = Object.assign({}, t); delete c.at; return c; });
-    const D = '2026-12-12', o = {};
+    const D = '2026-11-23', o = {};
     // A: the Celtics at home on the second night, logged at -3 and standing at -6.5 by the middle of five books, the Magic rested two days. The lowest first-half
     //    total among the four apps is 107.5 at two of them, FanDuel's over the better price (another app's 106.5 is lower and is not one of the four); the Magic's
     //    own first half is lowest among the four at DraftKings (another app is lower there too); the Celtics' own half, three apps on one number, gets nothing in this game
@@ -4112,36 +4117,61 @@ const CHECKS = ["dome","playoff"];
     o.took = [...document.querySelectorAll('#calibBox .calib[data-sport="TAKEN"] > div')].map(d => txt(d)); o.takingGraded = taking();
     // the next night: one measured bet, so the list is filled to three from games not on it: the Hawks' own half, then the half two apps post (the split half of the
     // Hawks' game is passed over: that game is on the list already), and a fourth game's half that two apps post, at a steeper price, stays off: three is the fill
-    await game('2026-12-13', 'Suns', 'Thunder', B); await game('2026-12-13', 'Jazz', 'Hawks', Dg); await game('2026-12-13', 'Wizards', 'Pistons', E);
-    await game('2026-12-13', 'Nets', '76ers', { odds: JSON.stringify({ book: 'draftkings', period: per({ draftkings: [111.5, -109, -111], fanduel: [111.5, -110, -110] }) }) });
-    o.fill = await board('2026-12-13');
+    await game('2026-11-24', 'Suns', 'Thunder', B); await game('2026-11-24', 'Jazz', 'Hawks', Dg); await game('2026-11-24', 'Wizards', 'Pistons', E);
+    await game('2026-11-24', 'Nets', '76ers', { odds: JSON.stringify({ book: 'draftkings', period: per({ draftkings: [111.5, -109, -111], fanduel: [111.5, -110, -110] }) }) });
+    o.fill = await board('2026-11-24');
     // a night with nothing to give: no section. Then a half the apps split on, alone; then a road favourite of 4 on no rest whose first half only two apps post,
     // neither one of the four, and whose rested opponent's own half one of those posts
-    await game('2026-12-14', 'Nets', '76ers', F); await game('2026-12-14', 'Heat', 'Nuggets', { odds: JSON.stringify({ book: 'fanatics', period: per({ fanatics: [113.5, -110, -110], draftkings: [114.5, -105, -115], fanduel: [115.5, -110, -110] }) }) });   // three apps, three numbers: no number two of them post
-    o.none = await board('2026-12-14');
+    await game('2026-11-25', 'Nets', '76ers', F); await game('2026-11-25', 'Heat', 'Nuggets', { odds: JSON.stringify({ book: 'fanatics', period: per({ fanatics: [113.5, -110, -110], draftkings: [114.5, -105, -115], fanduel: [115.5, -110, -110] }) }) });   // three apps, three numbers: no number two of them post
+    o.none = await board('2026-11-25');
     // two apps on 115.5 and two on 116.5: the higher of the two numbers is read, the cheaper side among the apps on it
-    await game('2026-12-14', 'Jazz', 'Hawks', { odds: JSON.stringify({ book: 'fanatics', period: per({ fanatics: [115.5, -110, -110], draftkings: [115.5, -105, -115], fanduel: [116.5, -104, -116], betmgm: [116.5, -110, -110] }) }) });
-    o.split = await board('2026-12-14');
-    await game('2026-12-14', 'Knicks', 'Bulls', { sp: '4', narest: '0', nhrest: '3', odds: JSON.stringify({ book: 'espnbet', period: per({ espnbet: [109.5, -110, -110], caesars: [108.5, -115, -105] }), period_team: { HOME: per({ espnbet: [52.5, -110, -110] }), AWAY: per({ espnbet: [57.5, -110, -110] }) } }) });
-    o.road = await board('2026-12-14');
+    await game('2026-11-25', 'Jazz', 'Hawks', { odds: JSON.stringify({ book: 'fanatics', period: per({ fanatics: [115.5, -110, -110], draftkings: [115.5, -105, -115], fanduel: [116.5, -104, -116], betmgm: [116.5, -110, -110] }) }) });
+    o.split = await board('2026-11-25');
+    await game('2026-11-25', 'Knicks', 'Bulls', { sp: '4', narest: '0', nhrest: '3', odds: JSON.stringify({ book: 'espnbet', period: per({ espnbet: [109.5, -110, -110], caesars: [108.5, -115, -105] }), period_team: { HOME: per({ espnbet: [52.5, -110, -110] }), AWAY: per({ espnbet: [57.5, -110, -110] }) } }) });
+    o.road = await board('2026-11-25');
     // a night before 23 Nov: its bets are counted apart, on the cards, in the heading and in the record
     await game('2026-11-10', 'Suns', 'Thunder', B); await game('2026-11-10', 'Kings', 'Lakers', { odds: JSON.stringify({ book: 'fanatics', period: per({ fanatics: [114, -110, -110], draftkings: [114, -110, -110], betmgm: [114, -115, -105] }) }) });
     await grade('2026-11-10', [['Suns', 'Thunder', 120, 118, 60, 58], ['Kings', 'Lakers', 110, 115, 57, 57]]);   // 118 over 112.5; 114 on a whole number is a push
-    o.early = await board('2026-11-10'); o.fillLater = await board('2026-12-13'); o.tableBefore = table(); o.tableLastBefore = tableLast();
+    o.early = await board('2026-11-10'); o.fillLater = await board('2026-11-24'); o.tableBefore = table(); o.tableLastBefore = tableLast();
     // a later odds run: the Celtics were logged at -6.5 on no rest, the over behind them; the run has two books at -3.5 and two at -4.5, read as the one nearer
     // nought, so the spot is gone and the half reads by its prices; and the run brings a club's own first half for a game logged with no odds at all
-    const D4 = '2026-12-15';
+    const D4 = '2026-11-26';
     await game(D4, 'Magic', 'Celtics', { sp: '-6.5', narest: '2', nhrest: '0', odds: JSON.stringify({ book: 'fanatics', period: per({ fanatics: [108.5, -110, -110], draftkings: [108.5, -112, -108], fanduel: [108.5, -105, -115] }) }) });
     await game(D4, 'Suns', 'Thunder', {});
     o.odds0 = await board(D4);
-    await load({ format: 'callsheet2.slate', version: 1, date: D4, generated: '2026-12-15T22:00:00Z', games: [
+    await load({ format: 'callsheet2.slate', version: 1, date: D4, generated: '2026-11-26T22:00:00Z', games: [
       { sport: 'NBA', gdate: D4, away: 'Magic', home: 'Celtics', inputs: { odds: JSON.stringify({ book: 'fanatics', spread: spr({ fanatics: -3.5, draftkings: -3.5, fanduel: -4.5, betmgm: -4.5 }), period: per({ fanatics: [109.5, -110, -110], draftkings: [109.5, -112, -108], fanduel: [109.5, -115, -105] }) }) }, notes: [] },
-      { sport: 'NBA', gdate: D4, away: 'Suns', home: 'Thunder', inputs: { odds: JSON.stringify({ book: 'fanatics', period_team: { HOME: per({ fanatics: [60.5, -110, -110], draftkings: [60.5, -118, -102], betmgm: [60.5, -112, -108] }) } }) }, notes: [] }] }, 'odds-2026-12-15.json');
+      { sport: 'NBA', gdate: D4, away: 'Suns', home: 'Thunder', inputs: { odds: JSON.stringify({ book: 'fanatics', period_team: { HOME: per({ fanatics: [60.5, -110, -110], draftkings: [60.5, -118, -102], betmgm: [60.5, -112, -108] }) } }) }, notes: [] }] }, 'odds-2026-11-26.json');
     o.odds1 = await board(D4);
     // the night of the fills, graded: 60-58 (118 over 112.5), 58-57 (the Hawks' 57 under 58.5; 115 under the split half's 115.5, which was not on the list),
     // 54-55 (109 under 109.5), 56-56 (112 over the fourth game's 111.5, not on the list either): the list went 2-1, its measured bet 1-0 and its two fills 1-1
-    await grade('2026-12-13', [['Suns', 'Thunder', 100, 118, 60, 58], ['Jazz', 'Hawks', 120, 125, 58, 57], ['Wizards', 'Pistons', 108, 111, 54, 55], ['Nets', '76ers', 110, 112, 56, 56]]);
-    o.tableEnd = table(); o.tableLastEnd = tableLast(); o.tableNotes = tableNotes(); o.fillGraded = await board('2026-12-13');
+    await grade('2026-11-24', [['Suns', 'Thunder', 100, 118, 60, 58], ['Jazz', 'Hawks', 120, 125, 58, 57], ['Wizards', 'Pistons', 108, 111, 54, 55], ['Nets', '76ers', 110, 112, 56, 56]]);
+    o.tableEnd = table(); o.tableLastEnd = tableLast(); o.tableNotes = tableNotes(); o.fillGraded = await board('2026-11-24');
+    // ---- 27 Nov 2026, the bets come off: a night from 27 Nov is a WATCH list. The tired favourite's game (the half, then the rested club's own), the cheaper side
+    //      where four apps are on one number, a game whose apps split with a club's own half on one number, and a half only two apps post: the three lead kinds
+    //      are shown and the two that were there to make three are not; no stake is named; a Take is still there; the heading says what it is
+    const DW = '2026-12-12';
+    await game(DW, 'Magic', 'Celtics', A); await game(DW, 'Suns', 'Thunder', B); await game(DW, 'Jazz', 'Hawks', Dg); await game(DW, 'Wizards', 'Pistons', E);
+    o.watch = await board(DW); o.watchTitle = tc(document.getElementById('h1Title'));
+    cardEls()[2].querySelector('[data-stake]').click(); await wait(160);
+    o.watchTaken = { btns: (await board(DW)).cards.map(c => c.btn), list: taking(), b: bare((rowOf(DW, 'Suns') || {}).simTakes) };
+    document.getElementById('phone').click(); await wait(900);
+    o.watchPhoneLink = (document.querySelector('#phoneBody a') || {}).href || '';
+    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })); await wait();
+    await board('2026-11-23'); o.betsTitle = tc(document.getElementById('h1Title'));
+    // the night of 27 Nov itself is the first watch night; the 26th was the last night of bets
+    await game('2026-11-27', 'Suns', 'Thunder', B); o.watchFirst = await board('2026-11-27'); o.watchFirstTitle = tc(document.getElementById('h1Title')); o.betsLast = await board('2026-11-26');
+    // a night of fills alone (a split half, a club's own half, a half two apps post) gives a watch night nothing: no section
+    const DW2 = '2026-12-13';
+    await game(DW2, 'Jazz', 'Hawks', Dg); await game(DW2, 'Wizards', 'Pistons', E);
+    o.watchNone = await board(DW2);
+    // the watch night graded: 58-50 (108 over 107.5; the Magic's 58 over 50.5), 50-60 (110 under 112.5): the watch list 2-1 on a line of its own, the list as it was
+    // given as bets where it stood, and each kind still counted on every game it speaks to
+    await grade(DW, [['Magic', 'Celtics', 105, 110, 58, 50], ['Suns', 'Thunder', 100, 118, 50, 60], ['Jazz', 'Hawks', 120, 125, 58, 60], ['Wizards', 'Pistons', 108, 111, 54, 55]]);
+    // the night of fills alone, graded too (the Hawks' 57 under 58.5, 109 under the half's 109.5): a watch night lists no fill, so the watch list's line does not move
+    await grade(DW2, [['Jazz', 'Hawks', 120, 125, 58, 57], ['Wizards', 'Pistons', 108, 111, 54, 55]]);
+    o.watchAfter = await board(DW); o.watchRow = tableWatch(); o.tableAfterWatch = table(); o.recHead = recHead(); o.tableLastAfterWatch = tableLast();
+    o.watchNote = (() => { const t = document.querySelector('#calibBox .h1tab'); const tr = t ? [...t.querySelectorAll('tbody tr')].find(x => /^The watch list/.test(tc(x.children[0]))) : null; return tr ? tc(tr.children[6]) : ''; })();
     return o;
   });
   // the phone's page off the code, as a phone draws it
@@ -4150,13 +4180,15 @@ const CHECKS = ["dome","playoff"];
   h1Sheet.on('pageerror', e => h1SheetErrs.push(e.message));
   let h1SheetText = '';
   if (/\/m\.html#/.test(h1T.phoneLink || '')) { await h1Sheet.goto(h1T.phoneLink); await h1Sheet.waitForTimeout(600); h1SheetText = await h1Sheet.evaluate(() => document.body.innerText.replace(/\s+/g, ' ').trim()); }
+  let h1WatchSheetText = '';
+  if (/\/m\.html#/.test(h1T.watchPhoneLink || '')) { const h1Sheet2 = await h1Ctx.newPage(); h1Sheet2.on('pageerror', e => h1SheetErrs.push(e.message)); await h1Sheet2.goto(h1T.watchPhoneLink); await h1Sheet2.waitForTimeout(600); h1WatchSheetText = await h1Sheet2.evaluate(() => document.body.innerText.replace(/\s+/g, ' ').trim()); }
   await h1Ctx.close();
   await pg.evaluate(async (k) => { for (const x of Object.keys(k)) { if (k[x] === null || k[x] === undefined) await smStore.removeItem(x); else await smStore.setItem(x, k[x]); } }, h1Keep);
   await reloaded();
   const h1c = (b) => ((b || {}).cards || []).map(c => c.cls + ' | ' + c.n1 + ' | ' + c.n2);
-  const h1RestNote = "a favourite of 4 or more on the second night of a back to back, the other club rested: the first half went over 112-66 (62.9%) on three seasons of closes, 32-19 at the lowest number among these apps where the books' own first-half lines were held";
-  const h1TtrestNote = "the rested club's own first half in those games ran 1.9 points over its share of the line, over 114-64 against a stand-in line; no book's first-half team line was held to test it at a price, so its record starts here";
-  const h1CheapNote = "every app that posts the first-half total is on one number and prices the two sides apart: the cheaper side won 125-82 (60.4%) at these apps' prices on two seasons, 63-44 and 62-38; the first-quarter total the same way, 103-69";
+  const h1RestNote = "a favourite of 4 or more on the second night of a back to back, the other club rested: the first half went over 112-66 (62.9%) on the three seasons it was found on; on sixteen earlier seasons the first half of those games ran level with its share of the closing lines, 553 over and 539 under: not proven";
+  const h1TtrestNote = "the rested club's own first half in those games ran over 114-64 against a stand-in line on the three seasons it was found on, and level on sixteen earlier ones (543 over its share, 549 under): not proven";
+  const h1CheapNote = "every app that posts the first-half total is on one number and prices the two sides apart: the cheaper side won 125-82 (60.4%) on the games it was found on and has lost here since the list was built: not proven";
   const h1TtcheapNote = "the cheaper side where every app is on one number, on a club's own first half: no first-half team lines were held to test it, and on full-game team totals it was level (94-85)";
   const h1SplitNote = "the apps split on the number, or only two post it: the cheaper side at the number most of them post was level (210-205) on two seasons; no edge measured";
   const h1Head = (mid, rec) => "the first half's total and each club's own, at your four apps · up to 4 a night, the measured kinds first: the over behind a tired favourite, then the cheaper side where every app is on one number · " + mid + " · $100 a bet is one unit · the list from 23 Nov: " + rec + " · shown, not scored";
@@ -4185,8 +4217,8 @@ const CHECKS = ["dome","playoff"];
   chk(h1c(h1T.after).join(' ## ') === "value h1-rest win | #1 · FIRST HALF · THE OVER BEHIND A TIRED FAVOURITE | First half OVER 107.5 WIN ## value h1-ttrest win | #2 · FIRST HALF · THE RESTED CLUB'S OWN TOTAL | Magic first half OVER 50.5 WIN ## value h1-cheap loss | #3 · FIRST HALF · THE CHEAPER SIDE | First half OVER 112.5 LOSS ## value h1-cheap win | #4 · FIRST HALF · THE CHEAPER SIDE | First half UNDER 114.5 WIN"
       && /here from 23 Nov: 1-0, \+1\.0u$/.test(h1A[0].n4) && /here from 23 Nov: 1-0, \+0\.9u$/.test(h1A[1].n4) && /here from 23 Nov: 2-1, \+0\.9u$/.test(h1A[2].n4)
       && JSON.stringify(h1A.map(c => c.btn)) === JSON.stringify(['', 'TAKEN', 'TAKEN', '']) && h1T.after.tag === h1Head('4 tonight carry a measured record', '3-1, +$177')
-      && (h1T.table || []).join(' ## ') === "The over behind a tired favourite | 1-0 | 100.0% | +1.0u | +$95 | none yet ## The rested club's own total | 1-0 | 100.0% | +0.9u | +$87 | none yet ## The cheaper side | 2-1 | 66.7% | +0.9u | +$88 | none yet ## A club's own total, to make three | 0-1 | 0.0% | -1.0u | -$100 | none yet ## To make three | 1-1 | 50.0% | -0.0u | -$5 | none yet ## The list as given, up to 4 a night | 3-1 | 75.0% | +1.8u | +$177 | none yet ## of the list, the measured kinds | 3-1 | 75.0% | +1.8u | +$177 | none yet ## of the list, the fills to make three | none yet |  |  |  | none yet"
-      && h1T.tableLast === "the measured kinds first; a club's own total and a split half only to make three · 1 night from 23 Nov, 0 before"
+      && (h1T.table || []).join(' ## ') === "The over behind a tired favourite | 1-0 | 100.0% | +1.0u | +$95 | none yet ## The rested club's own total | 1-0 | 100.0% | +0.9u | +$87 | none yet ## The cheaper side | 2-1 | 66.7% | +0.9u | +$88 | none yet ## A club's own total, to make three | 0-1 | 0.0% | -1.0u | -$100 | none yet ## To make three | 1-1 | 50.0% | -0.0u | -$5 | none yet ## The list as given, $100 best bets, 23 to 26 Nov | 3-1 | 75.0% | +1.8u | +$177 | none yet ## of the list, the lead kinds | 3-1 | 75.0% | +1.8u | +$177 | none yet ## of the list, the fills to make three | none yet |  |  |  | none yet"
+      && h1T.tableLast === "the lead kinds first; a club's own total and a split half only to make three · 1 night from 23 Nov, 0 before"
       && (h1T.took || []).length === 1 && /^First-half best bets taken 1-1 needs 52\.0% · does 50\.0% \(±35\.4\) · [-−]0\.13u · [-−]\$13 at \$100 a bet$/i.test(h1T.took[0])
       && (h1T.takingGraded || []).some(x => /First half OVER 112\.5 at FanDuel the cheaper side, every app on one number · -102 needs 50\.5% · \$100 wins \$98\.04 · loss Suns @ Thunder · a first-half best bet TAKEN$/i.test(x))
       && (h1T.takingGraded || []).some(x => /Magic first half OVER 50\.5 at DraftKings .+ · -115 needs 53\.5% · \$100 wins \$86\.96 · win Magic @ Celtics · a first-half best bet TAKEN$/i.test(x)),
@@ -4213,8 +4245,8 @@ const CHECKS = ["dome","playoff"];
       && h1E[0].n4 === 'Suns @ Thunder · ' + h1CheapNote + ' · here from 23 Nov: 2-1, +0.9u (the nights before it: 1-0-1, +1.0u)'
       && h1T.early.tag === h1Head('2 tonight carry a measured record', '3-1, +$177 · on the 1 night before it, which the order was drawn on: 1-0-1, +$98')
       && h1L.length === 3 && h1L[0].n4 === 'Suns @ Thunder · ' + h1CheapNote + ' · here from 23 Nov: 2-1, +0.9u (the nights before it: 1-0-1, +1.0u)' && /here from 23 Nov: 0-1, -1\.0u$/.test(h1L[1].n4)
-      && (h1T.tableBefore || []).join(' ## ') === "The over behind a tired favourite | 1-0 | 100.0% | +1.0u | +$95 | none yet ## The rested club's own total | 1-0 | 100.0% | +0.9u | +$87 | none yet ## The cheaper side | 2-1 | 66.7% | +0.9u | +$88 | 1-0-1 · 100.0% · +1.0u ## A club's own total, to make three | 0-1 | 0.0% | -1.0u | -$100 | none yet ## To make three | 1-1 | 50.0% | -0.0u | -$5 | none yet ## The list as given, up to 4 a night | 3-1 | 75.0% | +1.8u | +$177 | 1-0-1 · 100.0% · +1.0u ## of the list, the measured kinds | 3-1 | 75.0% | +1.8u | +$177 | 1-0-1 · 100.0% · +1.0u ## of the list, the fills to make three | none yet |  |  |  | none yet"
-      && h1T.tableLastBefore === "the measured kinds first; a club's own total and a split half only to make three · 1 night from 23 Nov, 1 before",
+      && (h1T.tableBefore || []).join(' ## ') === "The over behind a tired favourite | 1-0 | 100.0% | +1.0u | +$95 | none yet ## The rested club's own total | 1-0 | 100.0% | +0.9u | +$87 | none yet ## The cheaper side | 2-1 | 66.7% | +0.9u | +$88 | 1-0-1 · 100.0% · +1.0u ## A club's own total, to make three | 0-1 | 0.0% | -1.0u | -$100 | none yet ## To make three | 1-1 | 50.0% | -0.0u | -$5 | none yet ## The list as given, $100 best bets, 23 to 26 Nov | 3-1 | 75.0% | +1.8u | +$177 | 1-0-1 · 100.0% · +1.0u ## of the list, the lead kinds | 3-1 | 75.0% | +1.8u | +$177 | 1-0-1 · 100.0% · +1.0u ## of the list, the fills to make three | none yet |  |  |  | none yet"
+      && h1T.tableLastBefore === "the lead kinds first; a club's own total and a split half only to make three · 1 night from 23 Nov, 1 before",
       'the first half\'s best bets, the nights before 23 Nov apart: the order was drawn on those nights, so a bet graded on 10 Nov counts in a column of its own in the record, in brackets on the cards and in its own words in the heading, and never in the count from 23 Nov; a half that lands on a whole number is a push, shown on its card and kept out of the wins and the losses',
       JSON.stringify({ early: h1c(h1T.early), n4: h1E.map(c => c.n4.slice(-70)), tag: (h1T.early || {}).tag, later: h1L.map(c => c.n4.slice(-70)), table: h1T.tableBefore, last: h1T.tableLastBefore }));
   const h1O0 = (h1T.odds0 || {}).cards || [], h1O1 = (h1T.odds1 || {}).cards || [];
@@ -4225,9 +4257,9 @@ const CHECKS = ["dome","playoff"];
       && h1O1[1].n3 === "-102 at DraftKings · $100 wins $98.04 · needs 50.5% · all 3 apps that post it are on 60.5 and price the two sides apart (-102 against -110): the cheaper side",
       'the first half\'s best bets follow the newest odds on the row: a favourite logged at -6.5 on no rest is the spot until a later odds run has him at -3.5 by the middle of the books (two at -3.5, two at -4.5: the one nearer nought), and then the half reads by its prices at the run\'s numbers (the under at 109.5, not the over at the logged 108.5); and a club\'s own first half that a later run brings for a game logged with no odds is read off that run',
       JSON.stringify({ odds0: h1c(h1T.odds0), n30: h1O0.map(c => c.n3), odds1: h1c(h1T.odds1), n31: h1O1.map(c => c.n3) }));
-  chk((h1T.tableEnd || []).join(' ## ') === "The over behind a tired favourite | 1-0 | 100.0% | +1.0u | +$95 | none yet ## The rested club's own total | 1-0 | 100.0% | +0.9u | +$87 | none yet ## The cheaper side | 3-1 | 75.0% | +1.9u | +$186 | 1-0-1 · 100.0% · +1.0u ## A club's own total, to make three | 1-1 | 50.0% | -0.0u | -$5 | none yet ## To make three | 2-3 | 40.0% | -1.1u | -$113 | none yet ## The list as given, up to 4 a night | 5-2 | 71.4% | +2.7u | +$271 | 1-0-1 · 100.0% · +1.0u ## of the list, the measured kinds | 4-1 | 80.0% | +2.8u | +$275 | 1-0-1 · 100.0% · +1.0u ## of the list, the fills to make three | 1-1 | 50.0% | -0.0u | -$5 | none yet"
-      && h1T.tableLastEnd === "the measured kinds first; a club's own total and a split half only to make three · 2 nights from 23 Nov, 1 before"
-      && JSON.stringify(h1T.tableNotes) === JSON.stringify(["the over behind a tired favourite, the rested club's own total and the cheaper side: on the lists of the two seasons the order was drawn on these went 145-89 (62.0%)", "a club's own total and a split half, there when the measured kinds give fewer than three: on those same lists they went 44-53 (45.4%)"])
+  chk((h1T.tableEnd || []).join(' ## ') === "The over behind a tired favourite | 1-0 | 100.0% | +1.0u | +$95 | none yet ## The rested club's own total | 1-0 | 100.0% | +0.9u | +$87 | none yet ## The cheaper side | 3-1 | 75.0% | +1.9u | +$186 | 1-0-1 · 100.0% · +1.0u ## A club's own total, to make three | 1-1 | 50.0% | -0.0u | -$5 | none yet ## To make three | 2-3 | 40.0% | -1.1u | -$113 | none yet ## The list as given, $100 best bets, 23 to 26 Nov | 5-2 | 71.4% | +2.7u | +$271 | 1-0-1 · 100.0% · +1.0u ## of the list, the lead kinds | 4-1 | 80.0% | +2.8u | +$275 | 1-0-1 · 100.0% · +1.0u ## of the list, the fills to make three | 1-1 | 50.0% | -0.0u | -$5 | none yet"
+      && h1T.tableLastEnd === "the lead kinds first; a club's own total and a split half only to make three · 2 nights from 23 Nov, 1 before"
+      && JSON.stringify(h1T.tableNotes) === JSON.stringify(["the over behind a tired favourite, the rested club's own total and the cheaper side: on the lists of the two seasons the order was drawn on these went 145-89 (62.0%)", "a club's own total and a split half, there when the lead kinds gave fewer than three: on those same lists they went 44-53 (45.4%)"])
       && h1c(h1T.fillGraded).join(' ## ') === "value h1-cheap win | #1 · FIRST HALF · THE CHEAPER SIDE | First half OVER 112.5 WIN ## lean h1-ttcheap win | #2 · FIRST HALF · A CLUB'S OWN TOTAL, TO MAKE THREE | Hawks first half UNDER 58.5 WIN ## lean h1-split loss | #3 · FIRST HALF · TO MAKE THREE | First half OVER 109.5 LOSS"
       && h1T.fillGraded.tag === h1Head('1 tonight carries a measured record, 2 are here to make three', '5-2, +$271 · on the 1 night before it, which the order was drawn on: 1-0-1, +$98'),
       'the first half\'s best bets, the list in its two parts: the record keeps the measured kinds on the list and the fills on the list on lines of their own under the list as given (a night of one measured bet and two fills went 1-0 and 1-1, so the list 5-2 is 4-1 and 1-1), each with what it did on the two seasons the order was drawn on, and the fills that were passed over are counted on their kinds\' lines only',
@@ -4239,28 +4271,52 @@ const CHECKS = ["dome","playoff"];
       && /THE FIRST HALF'S BEST BETS, \$100 EACH 4 #1 · NBA · FIRST HALF First half OVER 107\.5 at FanDuel [-−]105 needs 51\.2% Magic @ Celtics · the over behind a tired favourite, in the half #2 · NBA · FIRST HALF Magic first half OVER 50\.5 at DraftKings [-−]115 needs 53\.5% Magic @ Celtics · the rested club's own first half behind a tired favourite #3 · NBA · FIRST HALF First half OVER 112\.5 at FanDuel [-−]102 needs 50\.5% Suns @ Thunder · the cheaper side, every app on one number #4 · NBA · FIRST HALF First half UNDER 114\.5 at BetMGM [-−]105 needs 51\.2% Kings @ Lakers · the cheaper side, every app on one number/.test(h1SheetText),
       'the first half\'s best bets on the phone: the code carries the night\'s list under the bets you are taking, each with its app, what its price needs and its kind, the two taken marked as first-half best bets, and the note under the code names the list',
       JSON.stringify({ errs: h1SheetErrs, note: (h1T.phoneNote || '').slice(0, 200), link: (h1T.phoneLink || '').slice(0, 60), text: h1SheetText.slice(0, 1500) }));
+  // ---- 27 Nov 2026: the first half's bets come off (the user: "If something needs to go then lets remove it"). The list went 2-9 as $100 best bets, the cheaper
+  //      side has lost since the build, and on sixteen earlier seasons the first half behind a tired favourite ran level with its share of the closing lines. From
+  //      the night of 27 Nov the board shows the three lead kinds as a watch list: no fills, no stake, a Take still there, nothing on the phone but a marked bet ----
+  const h1W = (h1T.watch || {}).cards || [], h1WA = (h1T.watchAfter || {}).cards || [], h1WK = h1T.watchTaken || {};
+  const h1WatchHead = (given, watch) => "watched, not bets, from 27 Nov 2026 · as $100 best bets from 23 to 26 Nov the list went " + given + ", and neither kind it led with has held up: the cheaper side has lost since the list was built, and on sixteen earlier seasons the first half behind a tired favourite ran level with its share of the closing lines (553 over, 539 under) · the watch list from 27 Nov: " + watch + " · no stake is named: nothing in the first half is proven · shown, not scored";
+  chk(!(h1T.watch || {}).hidden && h1c(h1T.watch).join(' ## ') === "lean h1-rest h1watch | #1 · WATCH · FIRST HALF · THE OVER BEHIND A TIRED FAVOURITE | First half OVER 107.5 ## lean h1-ttrest h1watch | #2 · WATCH · FIRST HALF · THE RESTED CLUB'S OWN TOTAL | Magic first half OVER 50.5 ## lean h1-cheap h1watch | #3 · WATCH · FIRST HALF · THE CHEAPER SIDE | First half OVER 112.5"
+      && h1W[0].n3 === "-105 at FanDuel · needs 51.2% · Celtics are favoured by 6.5 and played last night, Magic rested 2 days: the lowest number your apps post on the first-half total"
+      && h1W[2].n3 === "-102 at FanDuel · needs 50.5% · all 4 apps that post it are on 112.5 and price the two sides apart (-102 against -110): the cheaper side"
+      && h1W.every(c => !/\$100 wins/.test(c.n3) && c.btn === 'Take') && /^Magic @ Celtics · a favourite of 4 or more on the second night of a back to back, the other club rested: the first half went over 112-66 \(62\.9%\) on the three seasons it was found on; on sixteen earlier seasons the first half of those games ran level with its share of the closing lines, 553 over and 539 under: not proven · here from 23 Nov: /.test(h1W[0].n4)
+      && h1T.watchTitle === 'The first half, watched' && h1T.betsTitle === "The first half's best bets" && h1T.watch.tag === h1WatchHead('5-2, +$271', 'no night graded yet')
+      && (h1T.watchNone || {}).hidden === true && ((h1T.watchNone || {}).cards || []).length === 0
+      && h1c(h1T.watchFirst).join(' ## ') === "lean h1-cheap h1watch | #1 · WATCH · FIRST HALF · THE CHEAPER SIDE | First half OVER 112.5" && h1T.watchFirstTitle === 'The first half, watched' && /^value h1-/.test(h1c(h1T.betsLast)[0] || ''),
+      'the first half, watched (27 Nov 2026, the user: "If something needs to go then lets remove it"): a night from 27 Nov shows the three lead kinds as a watch list. Each card says WATCH and is drawn as a lean, names its app, its price and what the price needs and no stake, and carries what its kind did on the seasons it was found on and on the sixteen before them; a club\'s own half and a split half, which were there to make three, are not shown, so a night with only those has no section; the heading reads "The first half, watched" and says what the list did as best bets and why the bets came off, where a night of 23 to 26 Nov keeps the old heading',
+      JSON.stringify({ hidden: (h1T.watch || {}).hidden, cards: h1c(h1T.watch), n3: h1W.map(c => c.n3), n4: h1W.map(c => c.n4.slice(0, 80) + ' … ' + c.n4.slice(-60)), btn: h1W.map(c => c.btn), title: h1T.watchTitle, betsTitle: h1T.betsTitle, tag: (h1T.watch || {}).tag, none: h1T.watchNone }));
+  chk(JSON.stringify(h1WK.btns) === JSON.stringify(['Take', 'Take', '✓ Taking'])
+      && JSON.stringify(h1WK.b) === JSON.stringify([{ id: 'h1|h1|OVER', view: 'h1', key: 'h1', side: 'OVER', line: 112.5, price: -102, p: null, worth: null, band: 'first half', pick: 'First half OVER 112.5 at FanDuel', book: 'fanduel', call: 'cheap' }])
+      && (h1WK.list || []).some(x => /^TAKING · NBA · A FIRST-HALF BEST BET · marked .+ First half OVER 112\.5 at FanDuel the cheaper side, every app on one number · -102 needs 50\.5% · \$100 wins \$98\.04 Suns @ Thunder · a first-half best bet ✓ Taking$/i.test(x))
+      && /\/m\.html#/.test(h1T.watchPhoneLink || '') && /TAKING TONIGHT 1 TAKING · NBA · A FIRST-HALF BEST BET First half OVER 112\.5 at FanDuel/.test(h1WatchSheetText) && !/THE FIRST HALF'S BEST BETS/.test(h1WatchSheetText) && !/Magic first half OVER 50\.5/.test(h1WatchSheetText),
+      'the first half, watched: a Take on a watch card still marks the bet at its number, app and price, and Taking tonight lists it; the phone\'s sheet for a watch night carries the bet he marked and no first-half list (the sheet is what to bet)',
+      JSON.stringify({ taken: h1WK, link: (h1T.watchPhoneLink || '').slice(0, 60), sheet: h1WatchSheetText.slice(0, 700) }));
+  chk(h1c(h1T.watchAfter).join(' ## ') === "lean h1-rest h1watch win | #1 · WATCH · FIRST HALF · THE OVER BEHIND A TIRED FAVOURITE | First half OVER 107.5 WIN ## lean h1-ttrest h1watch win | #2 · WATCH · FIRST HALF · THE RESTED CLUB'S OWN TOTAL | Magic first half OVER 50.5 WIN ## lean h1-cheap h1watch loss | #3 · WATCH · FIRST HALF · THE CHEAPER SIDE | First half OVER 112.5 LOSS"
+      && h1T.watchRow === "The watch list from 27 Nov, up to 4 a night | 2-1 | 66.7% | +0.8u | +$82 | none yet"
+      && (h1T.tableAfterWatch || []).some(r => r === "The list as given, $100 best bets, 23 to 26 Nov | 5-2 | 71.4% | +2.7u | +$271 | 1-0-1 · 100.0% · +1.0u")
+      && (h1T.tableAfterWatch || []).some(r => /^The over behind a tired favourite \| 2-0 \| 100\.0% \| \+1\.9u \| \+\$190 \| none yet$/.test(r)) && (h1T.tableAfterWatch || []).every(r => !/^The watch list/.test(r))
+      && h1T.watchAfter.tag === h1WatchHead('5-2, +$271', '2-1, +$82 at $100 a bet')
+      && h1T.watchNote === 'the three lead kinds, no fills and no stake: watched while nothing in the first half is proven · 1 night' && h1T.tableLastAfterWatch === "the lead kinds first; a club's own total and a split half only to make three · 2 nights from 23 Nov, 1 before"
+      && /^The first half each kind on every game it speaks to, .+ \$100 best bets from 23 to 26 Nov and a watch list from 27 Nov 2026, when the bets came off: the list had lost and neither kind it led with held up · up to 4 a night · /.test(h1T.recHead || ''),
+      'the first half, watched and graded: the watch night\'s three cards carry their results, the record keeps the watch list on a line of its own (2-1 here) under the list as it was given as best bets, which a watch night does not move, each kind still counts on every game it speaks to (the over behind a tired favourite 2-0 with the watch night\'s game), and the record\'s heading says the bets came off on 27 Nov and why',
+      JSON.stringify({ cards: h1c(h1T.watchAfter), row: h1T.watchRow, table: h1T.tableAfterWatch, tag: (h1T.watchAfter || {}).tag, head: h1T.recHead }));
 
-  // ---- 19 Nov 2026: the bets against the money on the game's card (the user, with a screenshot of "sharp money vs public money", a club with 15% of the bets
-  //      and 65% of the money: "Sharp betting from pros and where the money is going type stuff", then "Is there an example I may be able to see ... regarding
-  //      the model", and the same evening, with a line in the why's list shipped: "I dont see the money section", "I dont see it on the knicks game"). DraftKings
-  //      prints the share of the bets and of the money on a game's spread, total and moneyline; the odds run puts the newest count on the basketball row
-  //      (nbasplits). The card carries it in a box of its own under the decision's why: a row a market, how the decision's own side stands, what it has been worth.
-  //      Tonight's signals carry a chip on every game not yet played: gold for the widest gap, plain where no side is twenty apart or there is no count yet.
-  //      A game with a count and no lines yet shows the box alone. Shown, never scored ----
+  // ---- 27 Nov 2026: the sharp-money box is off the card (the user: "Im wondering if the where money is is working or worth it"). From 19 Nov the decision card
+  //      carried DraftKings' share of the bets and of the money in a box of its own, with a chip in tonight's signals on every game. On the 48 games that kept a
+  //      count before the tip the side with the larger bets went 30-35, so the box, its chips and the box of a game with no lines yet are gone. A count that is
+  //      loaded is still kept on the row (an odds file fills it, a later one replaces it, the typed line stays) and is still counted on the NBA record ----
   const mnKeep = await pg.evaluate(async () => { await smStore.ready; const k = {}; for (const x of ['callsheet3.card.v1', 'callsheet3.props.v1', 'callsheet3.draft.v1']) k[x] = await smStore.getItem(x); await smStore.removeItem('callsheet3.card.v1'); await smStore.removeItem('callsheet3.props.v1'); return k; });
   await reloaded();
   const mn = await pg.evaluate(async () => {
     const wait = (ms) => new Promise(r => setTimeout(r, ms || 90)), txt = e => (e ? e.textContent : '').replace(/\s+/g, ' ').trim();
     const set = (id, v) => { const el = document.getElementById(id); el.value = v; el.dispatchEvent(new Event('input', { bubbles: true })); };
     await smStore.ready;
-    const card = () => { const c = document.querySelector('#markets .pickcard'), p = document.getElementById('secMoney'), sg = [...document.querySelectorAll('#signals .sig')];
-      return { kind: c ? c.dataset.kind || '' : '', side: c ? c.dataset.side || '' : '', pick: c && c.querySelector('.pick') ? c.querySelector('.pick').childNodes[0].textContent.trim() : '',
+    const card = () => { const c = document.querySelector('#markets .pickcard'), sg = [...document.querySelectorAll('#signals .sig')], w = c ? c.querySelector('.why') : null;
+      return { kind: c ? c.dataset.kind || '' : '', pick: c && c.querySelector('.pick') ? c.querySelector('.pick').childNodes[0].textContent.trim() : '',
         order: c ? [...c.querySelectorAll('ul.dwhy li')].map(li => txt(li.querySelector('b')).replace(/\.$/, '')).join(' | ') : '',
-        box: p ? p.className : null, n: document.querySelectorAll('.dmoney').length, inCard: !!(p && c && c.contains(p)), after: p && p.previousElementSibling ? p.previousElementSibling.className : '', before: p && p.nextElementSibling ? p.nextElementSibling.tagName + '.' + p.nextElementSibling.className : '',
-        head: p ? txt(p.querySelector('.dmh b')) + ' :: ' + txt(p.querySelector('.dmh span')) : '', cols: p ? [...p.querySelectorAll('thead th')].map(txt).join(' | ') : '',
-        rows: p ? [...p.querySelectorAll('tbody tr')].map(tr => [...tr.children].map(txt).join(' | ') + (tr.classList.contains('hot') ? ' *' : '')) : [], mine: p ? txt(p.querySelector('.dms')) : '', mineB: p ? txt(p.querySelector('.dms b')) : '', note: p ? txt(p.querySelector('.dmn')) : '',
-        sigs: sg.map(s => txt(s.querySelector('.sb')) + ' :: ' + txt(s.querySelector('.st'))), chip: sg.filter(s => /^the money/.test(txt(s.querySelector('.sb')))).map(s => s.className + ' ' + s.getAttribute('href') + ' :: ' + txt(s.querySelector('.st'))).join(' ## '),
-        shown: !document.getElementById('signals').hidden, empty: txt(document.querySelector('#markets .empty')) }; };
+        n: document.querySelectorAll('.dmoney').length, box: !!document.getElementById('secMoney'), after: w && w.nextElementSibling ? w.nextElementSibling.tagName + '.' + w.nextElementSibling.className : '',
+        sigs: sg.map(s => txt(s.querySelector('.sb')) + ' :: ' + txt(s.querySelector('.st'))), money: sg.filter(s => /^the money/.test(txt(s.querySelector('.sb')))).length + (/Where the money is/i.test(txt(document.getElementById('markets'))) ? 1 : 0),
+        empty: txt(document.querySelector('#markets .empty')), markets: txt(document.getElementById('markets')).slice(0, 90) }; };
     const game = async (away, home, f, add) => { document.getElementById('clear').click(); document.getElementById('m-nba').click(); await wait(); set('gdate', '2026-11-19'); set('away', away); set('home', home); set('line', '229.5'); set('op', '-110'); set('up', '-110');
       Object.keys(f).forEach(k => set(k, f[k])); await wait(140); const c = card(); if (add) { document.getElementById('add').click(); await wait(); } return c; };
     const bare = async (away, home, f) => { document.getElementById('clear').click(); document.getElementById('m-nba').click(); await wait(); set('gdate', '2026-11-19'); set('away', away); set('home', home); Object.keys(f).forEach(k => set(k, f[k])); await wait(140); return card(); };
@@ -4269,28 +4325,13 @@ const CHECKS = ["dome","playoff"];
     const J = (x) => JSON.stringify(x), W = { hml: '-190', aml: '160' }, o = {};
     const grade = async (away, fa, fh) => { const r = rowOf(away); for (const [k, v] of [['fa', fa], ['fh', fh]]) { const el = document.querySelector('#cardTable .grade[data-id="' + r.id + '"][data-k="' + k + '"]'); el.value = String(v); el.dispatchEvent(new Event('input', { bubbles: true })); el.dispatchEvent(new Event('change', { bubbles: true })); await wait(); } };
     const reopen = async (away) => { document.querySelector('#cardTable [data-open="' + rowOf(away).id + '"]').click(); await wait(220); return card(); };
-    // A. the likelier winner is the decision; the count has the three markets and the larger bets are on the other side
+    // A. a count on the row with the three markets, the larger bets on the other side of the decision: no box on the card, no chip in tonight's signals
     o.a = await game('Knicks', 'Timberwolves', Object.assign({ nbasplits: J({ at: '2026-11-19T20:08:44Z', upd: '3:08 PM ET', n: 2, ml: { a: [160, 60, 30], h: [-190, 40, 70] }, sp: { a: [4.5, -110, 45, 40], h: [-4.5, -110, 55, 60] }, tot: { o: [229.5, -110, 30, 55], u: [229.5, -110, 70, 45] } }) }, W));
-    // B. the moneyline alone, the larger bets with the decision, no time on the count
-    o.b = await game('Knicks', 'Timberwolves', Object.assign({ nbasplits: J({ ml: { a: [160, 5, 30], h: [-190, 95, 70] } }) }, W));
-    // C. no gap of twenty either way, and a count taken after the tip
-    o.c = await game('Knicks', 'Timberwolves', Object.assign({ nbasplits: J({ upd: '8:14 PM ET', pre: false, ml: { a: [160, 25, 30], h: [-190, 75, 70] } }) }, W));
-    // D. the over behind a tired favourite is the decision (a total): three sides twenty apart, the chip names two and counts the third
+    // B. the over behind a tired favourite is the decision and three sides of the count are twenty apart: the same
     o.d = await game('Knicks', 'Bulls', { narest: '0', nhrest: '3', hml: '240', aml: '-300', nbasplits: J({ upd: '3:08 PM ET', ml: { a: [-300, 99, 70], h: [240, 1, 30] }, sp: { a: [-7.5, -110, 80, 50], h: [7.5, -110, 20, 50] }, tot: { o: [229.5, -110, 30, 55], u: [229.5, -110, 70, 45] } }) });
-    // E. the edges: twenty apart is bold and nineteen is not; ten apart leads its market and under ten the side with most of the money does; level says level
-    o.e = await game('Knicks', 'Timberwolves', Object.assign({ nbasplits: J({ upd: '3:08 PM ET', ml: { a: [160, 49, 30], h: [-190, 51, 70] }, sp: { a: [4.5, -110, 40, 30], h: [-4.5, -110, 60, 70] }, tot: { o: [229.5, -110, 60, 40], u: [229.5, -110, 40, 60] } }) }, W));
-    o.e9 = await game('Knicks', 'Timberwolves', Object.assign({ nbasplits: J({ sp: { a: [4.5, -110, 39, 30], h: [-4.5, -110, 61, 70] } }) }, W));
-    o.lvl = await game('Knicks', 'Timberwolves', Object.assign({ nbasplits: J({ sp: { a: [4.5, -110, 40, 40], h: [-4.5, -110, 60, 60] } }) }, W));
-    o.e20 = await game('Knicks', 'Timberwolves', Object.assign({ nbasplits: J({ ml: { a: [160, 50, 30], h: [-190, 50, 70] } }) }, W));      // the decision's side exactly twenty under
-    o.e20b = await game('Knicks', 'Timberwolves', Object.assign({ nbasplits: J({ ml: { a: [160, 10, 30], h: [-190, 90, 70] } }) }, W));    // and exactly twenty over
-    // F. nothing on the row, and a box that does not read: the same box says there is no count yet, and the chip with it
+    // C. nothing on the row: no box that says there is no count, no chip that asks for one
     o.none = await game('Knicks', 'Timberwolves', W);
-    o.bad = [];
-    for (const raw of ['not json', J({ at: 'x' }), J({ ml: { a: [160, 60], h: [-190, 40, 70] } }), J({ ml: { a: [160, 140, 30], h: [-190, 40, 70] } }), J({ tot: { o: ['', -110, 30, 55], u: [229.5, -110, 70, 45] } }), J([1, 2]), J({ sp: { a: [4.5, -110, 45, 40] } }), J({ ml: { a: [160, 60, 30, 99], h: [-190, 40, 70, 1] } })]) {
-      const c = await game('Knicks', 'Timberwolves', Object.assign({ nbasplits: raw }, W)); o.bad.push(!!c && c.box === 'dmoney none' && c.rows.length === 0 && /^sig info #secMoney :: no count on this game yet/.test(c.chip) && c.pick === 'Timberwolves to win'); }
-    // one market that does not read leaves the others standing
-    o.part = await game('Knicks', 'Timberwolves', Object.assign({ nbasplits: J({ ml: { a: [160, 60], h: [-190, 40, 70] }, tot: { o: [229.5, -110, 30, 55], u: [229.5, -110, 70, 45] } }) }, W));
-    // G. the row keeps the box; an odds file fills it on a carded game and a later one replaces it, the typed line staying
+    // D. the row still keeps the count: an odds file fills it on a carded game and a later one replaces it, the typed line staying
     await game('Kings', 'Spurs', Object.assign({}, W), true);
     const A = J({ upd: '11:02 AM ET', ml: { a: [160, 60, 30], h: [-190, 40, 70] } }), B = J({ upd: '3:08 PM ET', n: 2, ml: { a: [160, 20, 30], h: [-190, 80, 70] } });
     const doc = (box) => ({ format: 'callsheet2.slate', version: 1, date: '2026-11-19', games: [{ sport: 'NBA', gdate: '2026-11-19', away: 'Kings', home: 'Spurs', notes: [], inputs: { line: '240.5', nbasplits: box } }] });
@@ -4299,63 +4340,26 @@ const CHECKS = ["dome","playoff"];
     await load(doc(B), 'odds-2026-11-19.json'); o.second = rowOf('Kings').inputs.nbasplits === B; o.line2 = rowOf('Kings').inputs.line;
     o.opened = await reopen('Kings');
     await game('Hawks', 'Wizards', Object.assign({ nbasplits: A }, W), true); o.kept = rowOf('Hawks').inputs.nbasplits === A;
-    // H. a game with no count: not yet played it says so; graded it says nothing, and a graded game with a count keeps its box
-    await game('Pacers', 'Pistons', Object.assign({}, W), true); o.h1 = await reopen('Pacers'); await grade('Pacers', 100, 110); o.h2 = await reopen('Pacers');
-    await grade('Hawks', 100, 110); o.h3 = await reopen('Hawks');
-    // I. a game with a count and no lines yet (the count file loaded before the odds): the box alone, under the empty card; with no count, nothing
-    o.loose = await bare('Suns', 'Jazz', { nbasplits: B }); o.looseNone = await bare('Suns', 'Jazz', {});
-    // a game of the file that is not carded: its line in the slate list fills the form, the count with it
+    // E. a game with a count and no lines yet: the empty card alone; and a game of the file that is not carded fills the form from the slate list, the count with it
+    o.loose = await bare('Suns', 'Jazz', { nbasplits: B });
     document.getElementById('clear').click(); await wait();
     await load({ format: 'callsheet2.slate', version: 1, date: '2026-11-19', games: [{ sport: 'NBA', gdate: '2026-11-19', away: 'Suns', home: 'Jazz', notes: [], inputs: { line: '231.5', op: '-110', up: '-110', hml: '-190', aml: '160', nbasplits: B } }] }, 'odds-2026-11-19.json');
     const sl = [...document.querySelectorAll('#slateList [data-slate]')].filter(e => /Suns/.test(e.closest('li, tr, div').textContent))[0] || document.querySelector('#slateList [data-slate]');
     if (sl) { sl.click(); await wait(200); } o.filled = Object.assign({ boxSet: document.getElementById('nbasplits').value === B, away: document.getElementById('away').value }, card());
     return o;
   });
-  const mnNote = "A side in bold has 20 points or more of the money than of the bets: the larger bets are on it. One book's customers, thin early in the day, and kept from 19 Nov to be measured. Backing the side a line had already moved to went 752-698 on spreads and 933-930 on totals at the closing number.";
-  const mnNone = "It comes with the odds run (the slate.py of 19 Nov 2026 or later), or at any time for nothing: run python slate.py splits, then Load slate and pick the splits-DATE.json it writes; that changes no line or price. DraftKings counts the day's games only, so a game already played cannot get one. Shown, not scored.";
-  const mnNoChip = 'sig info #secMoney :: no count on this game yet · it comes with the odds run, or python slate.py splits';
-  const mnR = (c) => (c ? c.rows : ['no card']).join(' ## ');
-  chk(mn.a && mn.a.kind === 'winner' && mn.a.pick === 'Timberwolves to win' && mn.a.side === 'HOME' && mn.a.box === 'dmoney' && mn.a.n === 1 && mn.a.inCard && mn.a.after === 'why' && mn.a.before === 'UL.dwhy'
-      && mn.a.head === "Where the money is :: DraftKings' own count at 3:08 PM ET · shown, not scored" && mn.a.cols === 'Market | Side | Bets | Money | Gap'
-      && mnR(mn.a) === 'Spread | Timberwolves -4.5 | 60% | 55% | -5 ## Total | Under 229.5 | 45% | 70% | +25 * ## Moneyline | Knicks to win | 30% | 60% | +30 *'
-      && mn.a.mine === "The decision's side (Timberwolves to win at DraftKings) has 40% of the money on 70% of the bets: the larger bets are on the other side." && mn.a.mineB === 'the larger bets are on the other side' && mn.a.note === mnNote
-      && mn.a.chip === 'sig watch #secMoney :: Knicks to win · 60% of the money on 30% of the bets · and the under 229.5 · DraftKings, not scored'
-      && mn.a.sigs[0] === 'the decision · BET :: Timberwolves to win · 63.0% · -190' && /^the money ::/.test(mn.a.sigs[1]) && mn.a.order === 'The numbers',
-      'the money, on the card (the user: "where the money is going type stuff ... an example I may be able to see regarding the model", and with a line in the why\'s list shipped, "I dont see it on the knicks game"): with DraftKings\' count on the row the decision card carries a box of its own between the why and its list, "Where the money is": a row a market with the side that has clearly more of the money than of the bets (the spread\'s two are five apart, so its row is the side with most of the money), its share of the bets, of the money and the gap, the rows twenty or more apart in bold; how the decision\'s own side stands (40% of the money on 70% of the bets: the larger bets are on the other side); and that it is shown and not scored with what following a move has been worth. Tonight\'s signals carry the widest gap in gold right after the decision, never green, and the chip goes to the box',
-      JSON.stringify({ a: mn.a }));
-  chk(mn.b && mn.b.head === "Where the money is :: DraftKings' own count · shown, not scored" && mnR(mn.b) === 'Moneyline | Timberwolves to win | 70% | 95% | +25 *'
-      && mn.b.mine === "The decision's side (Timberwolves to win at DraftKings) has 95% of the money on 70% of the bets: the larger bets are with it." && mn.b.chip === 'sig watch #secMoney :: Timberwolves to win · 95% of the money on 70% of the bets · DraftKings, not scored'
-      && mn.c && mn.c.head === "Where the money is :: DraftKings' own count at 8:14 PM ET, taken after the tip · shown, not scored" && mnR(mn.c) === 'Moneyline | Timberwolves to win | 70% | 75% | +5'
-      && mn.c.mine === "The decision's side (Timberwolves to win at DraftKings) has 75% of the money on 70% of the bets: no gap of 20 points either way." && mn.c.chip === 'sig info #secMoney :: no side 20 points apart · DraftKings at 8:14 PM ET, not scored' && /^the money ::/.test(mn.c.sigs[mn.c.sigs.length - 1]),
-      'the money, the three ways a decision can stand in it: the larger bets with it (95% of the money on 70% of the bets), on the other side, or no gap of twenty either way, where no row is in bold and the chip is plain, last in the row, and says no side is twenty apart (the gold chip stands by the decision, ahead of the other signals); a count with one market has one row, one with no time says none, and one taken after the tip says so',
-      JSON.stringify({ b: mn.b, c: mn.c }));
-  chk(mn.d && mn.d.kind === 'rest' && mn.d.pick === 'Total OVER 229.5'
-      && mnR(mn.d) === 'Spread | Knicks -7.5 | 50% | 80% | +30 * ## Total | Under 229.5 | 45% | 70% | +25 * ## Moneyline | Knicks to win | 70% | 99% | +29 *'
-      && mn.d.mine === "The decision's side (the over 229.5 at DraftKings) has 30% of the money on 55% of the bets: the larger bets are on the other side."
-      && mn.d.chip === 'sig watch #secMoney :: Knicks -7.5 · 80% of the money on 50% of the bets · and Knicks to win, 1 more · DraftKings, not scored' && mn.d.after === 'why' && !/Where the money is/.test(mn.d.order),
-      'the money, a decision on the total: the over behind a tired favourite is read against the total\'s count (the over has 30% of the money on 55% of the bets), three rows are in bold, the chip names the widest two and counts the third, and the why\'s own list is as it was',
-      JSON.stringify({ d: mn.d }));
-  chk(mn.e && mnR(mn.e) === 'Spread | Knicks +4.5 | 30% | 40% | +10 ## Total | Over 229.5 | 40% | 60% | +20 * ## Moneyline | Knicks to win | 30% | 49% | +19'
-      && mn.e.mine === "The decision's side (Timberwolves to win at DraftKings) has 51% of the money on 70% of the bets: no gap of 20 points either way." && mn.e.chip === 'sig watch #secMoney :: the over 229.5 · 60% of the money on 40% of the bets · DraftKings, not scored'
-      && mn.e9 && mnR(mn.e9) === 'Spread | Timberwolves -4.5 | 70% | 61% | -9' && mn.e9.mine === '' && mn.e9.chip === 'sig info #secMoney :: no side 20 points apart · DraftKings, not scored'
-      && mn.lvl && mnR(mn.lvl) === 'Spread | Timberwolves -4.5 | 60% | 60% | level'
-      && mn.e20 && mnR(mn.e20) === 'Moneyline | Knicks to win | 30% | 50% | +20 *' && mn.e20.mineB === 'the larger bets are on the other side'
-      && mn.e20b && mnR(mn.e20b) === 'Moneyline | Timberwolves to win | 70% | 90% | +20 *' && mn.e20b.mineB === 'the larger bets are with it',
-      'the money, the edges: twenty points apart is bold and nineteen is not (the over at 60 on 40, the Knicks\' moneyline at 49 on 30); a side ten apart has its market\'s row though it has less than half the money, and under ten the side with most of the money has it; shares that are the same read "level"; a decision whose market the count does not have is not read against it; a decision\'s side exactly twenty under has the larger bets on the other side and exactly twenty over has them with it',
-      JSON.stringify({ e: mn.e, e9: mn.e9, lvl: mn.lvl && mn.lvl.rows, e20: mn.e20, e20b: mn.e20b }));
-  chk(mn.none && mn.none.box === 'dmoney none' && mn.none.head === 'Where the money is :: no count on this game yet' && mn.none.rows.length === 0 && mn.none.note === mnNone && mn.none.mine === '' && mn.none.chip === mnNoChip && /^the money ::/.test(mn.none.sigs[mn.none.sigs.length - 1]) && mn.none.order === 'The numbers' && mn.none.inCard
-      && mn.bad.length === 8 && mn.bad.every(Boolean) && mn.part && mnR(mn.part) === 'Total | Under 229.5 | 45% | 70% | +25 *' && mn.part.mine === ''
-      && mn.h1 && mn.h1.box === 'dmoney none' && mn.h1.chip === mnNoChip && mn.h2 && mn.h2.box === null && mn.h2.chip === '' && mn.h2.n === 0
-      && mn.h3 && mn.h3.head === "Where the money is :: DraftKings' own count at 11:02 AM ET · shown, not scored" && mnR(mn.h3) === 'Moneyline | Hawks to win | 30% | 60% | +30 *',
-      'the money, nothing to read (the user, the evening it shipped, with a slate of three days before loaded: "I dont see the money section"): a game not yet played with no count has the same box, dashed, saying there is no count yet and how to get one for nothing, and a plain chip saying so; a game already graded with no count has no box and no chip, as before, and a graded game that has a count keeps its box; a box on the row that is not a count (not JSON, no market, a side short of a number, a share over a hundred, a total with no number, a list, half a market, a moneyline in the shape of a spread) is no count and the decision stands; a count with one market that does not read keeps the ones that do',
-      JSON.stringify({ none: mn.none, bad: mn.bad, part: mn.part, h1: mn.h1, h2: mn.h2, h3: mn.h3 }));
+  chk(mn.a && mn.a.kind === 'winner' && mn.a.pick === 'Timberwolves to win' && mn.a.n === 0 && mn.a.box === false && mn.a.money === 0 && mn.a.after === 'UL.dwhy' && mn.a.order === 'The numbers'
+      && mn.a.sigs[0] === 'the decision · BET :: Timberwolves to win · 63.0% · -190' && mn.a.sigs.every(x => !/money on|no count|points apart/.test(x))
+      && mn.d && mn.d.kind === 'rest' && mn.d.pick === 'Total OVER 229.5' && mn.d.n === 0 && mn.d.box === false && mn.d.money === 0 && mn.d.after === 'UL.dwhy'
+      && mn.none && mn.none.pick === 'Timberwolves to win' && mn.none.n === 0 && mn.none.box === false && mn.none.money === 0 && mn.none.sigs.every(x => !/no count|slate\.py splits/.test(x)),
+      'the sharp-money box is off the card (27 Nov 2026, the user: "Im wondering if the where money is is working or worth it"; the side with the larger bets had gone 30-35): with DraftKings\' count on the row the decision card has no box between the why and its list and tonight\'s signals no chip for the money, whether the decision is the likelier winner or the over behind a tired favourite and however far apart the count\'s sides are; and a game with no count has no box saying so and no chip asking for one',
+      JSON.stringify({ a: mn.a, d: mn.d, none: mn.none }));
   chk(mn.before === '' && mn.first === true && mn.second === true && mn.line1 === '229.5' && mn.line2 === '229.5' && mn.kept === true
-      && mn.opened && mn.opened.head === "Where the money is :: DraftKings' own count at 3:08 PM ET · shown, not scored" && mnR(mn.opened) === 'Moneyline | Spurs to win | 70% | 80% | +10'
-      && mn.filled && mn.filled.boxSet === true && mn.filled.away === 'Suns' && mnR(mn.filled) === 'Moneyline | Jazz to win | 70% | 80% | +10' && mn.filled.inCard
-      && mn.loose && mn.loose.box === 'dmoney' && mn.loose.n === 1 && !mn.loose.inCard && mn.loose.pick === '' && mn.loose.empty === 'Enter a total to start. Add both moneyline prices for the sides.' && mnR(mn.loose) === 'Moneyline | Jazz to win | 70% | 80% | +10' && mn.loose.mine === '' && mn.loose.shown === false
-      && mn.looseNone && mn.looseNone.box === null && mn.looseNone.empty === 'Enter a total to start. Add both moneyline prices for the sides.',
-      'the money, on the row: a matchup carded with a count keeps it; an odds file fills the box on a game already carded and a later run\'s file replaces it (the count moves through the day) while the typed line stays; the row opened again reads the newer count; a game of the file that is not carded fills the form from the slate list, the count with it; and a game in the form with a count and no lines yet (the count file loaded before the odds) shows the count\'s box alone under the empty card, where a game with neither shows nothing new',
-      JSON.stringify({ before: mn.before, first: mn.first, second: mn.second, l1: mn.line1, l2: mn.line2, kept: mn.kept, opened: mn.opened, filled: mn.filled, loose: mn.loose, looseNone: mn.looseNone }));
+      && mn.opened && mn.opened.pick === 'Spurs to win' && mn.opened.n === 0 && mn.opened.money === 0
+      && mn.filled && mn.filled.boxSet === true && mn.filled.away === 'Suns' && mn.filled.n === 0 && mn.filled.money === 0
+      && mn.loose && mn.loose.n === 0 && mn.loose.box === false && mn.loose.pick === '' && mn.loose.empty === 'Enter a total to start. Add both moneyline prices for the sides.' && mn.loose.markets === 'Enter a total to start. Add both moneyline prices for the sides.',
+      'the count is still kept on the row: a matchup carded with a count keeps it, an odds file fills it on a game already carded and a later run\'s file replaces it while the typed line stays, and a game of the file that is not carded fills the form from the slate list with the count in its hidden box, so the NBA record can go on counting it; a game with a count and no lines yet shows the empty card and nothing under it',
+      JSON.stringify({ before: mn.before, first: mn.first, second: mn.second, l1: mn.line1, l2: mn.line2, kept: mn.kept, opened: mn.opened, filled: mn.filled, loose: mn.loose }));
   await pg.evaluate(async (k) => { for (const x of Object.keys(k)) { if (k[x] === null || k[x] === undefined) await smStore.removeItem(x); else await smStore.setItem(x, k[x]); } }, mnKeep);
   await reloaded();
 
@@ -4528,7 +4532,7 @@ const CHECKS = ["dome","playoff"];
       'the decision, the sheet\'s read (the user: "where it says the pick is an over game. I like that and it should also put the green bet"): a game the sheet reads as an over game with no measured kind speaking is given the over as the decision, with a green BET, its chance, the price and what it needs, the kind and its record and that it carries no measured edge; the why ends on what the BET is and is followed by the seven parts; the likeliest side at any price keeps its own card under it, worded "not the decision"; tonight\'s signals lead with the decision, the markets stand open, and a baseball matchup keeps its pick card and its NO BET',
       JSON.stringify({ read: dcc(dc.read), why: dc.read.why.slice(-200), secs: Object.keys(dc.read.secs), likely: dc.read.likely, sigs: dc.read.sigs, open: dc.read.open, tag: dc.read.tag, mlb: dcc(dc.mlb), mlbSig: dc.mlb && dc.mlb.sigs }));
   chk(dcc(dc.upset) === "pickcard decision read | ml | HOME | The decision · an UPSET game | Magic ML | BET* | 50.8% | -105 · needs 51.2% | the sheet's own read of the game · none graded here yet · no measured edge at the price: a small bet"
-      && /^Magic ML :: Upset watch · a scored signalMagic ML50\.8%-105 needs 51\.2%: the book's price, not an edge\. Signals: a short dog at 49% \(scored, \+4 points\)/.test(dc.upset.upset) && dc.upset.sigs.join(' ## ') === 'the decision · BET :: Magic ML · 50.8% · -105 ## upset signal :: Magic ML · 50.8% ## the money :: no count on this game yet · it comes with the odds run, or python slate.py splits'
+      && /^Magic ML :: Upset watch · a scored signalMagic ML50\.8%-105 needs 51\.2%: the book's price, not an edge\. Signals: a short dog at 49% \(scored, \+4 points\)/.test(dc.upset.upset) && dc.upset.sigs.join(' ## ') === 'the decision · BET :: Magic ML · 50.8% · -105 ## upset signal :: Magic ML · 50.8%'
       && dc.upset.likely === null && dc.upset.secs['The numbers'] === "The sheet projects 76ers 115.3, Magic 114.3, a total of 229.5 against the card's 229.5. The spread is 76ers -1. 76ers win 51.1% of the time by the middle of the carded book, 49.2% by the sheet."
       && dcc(dc.edge) === "pickcard decision sheet | ml | AWAY | The decision · an UPSET game | Hornets ML | BET* | 51.8% | +100 · needs 50.0% | the sheet's own call · none graded here yet · the sheet's own edge at the price"
       && dc.edge.secs['Also on this game'] === "The sheet's own read of the game says Hornets ML (none graded here yet); the likelier winner, near a coin says Bucks to win (none graded here yet).",
@@ -4537,9 +4541,9 @@ const CHECKS = ["dome","playoff"];
   chk(dcc(dc.winner) === "pickcard decision winner | ml | HOME | The decision · a MONEYLINE game | Kings to win | BET* | 63.0% | -190 · needs 65.5% | the likelier winner, 60 to 70% · none graded here yet · the book's favourite at the book's price: a small bet or a parlay leg"
       && dc.winner.why === "Why: By the middle of the carded book Kings win 63.0% of the time; the best of your four prices is -190, which needs 65.5%: it costs 3.8% a bet. Nothing measured speaks on this game and the sheet's inputs do not move a side a point off the book, so the decision is the likelier winner."
       && dc.winner.likely === null && dc.winner.secs['Also on this game'] === undefined
-      && dcc(dc.rest) === "pickcard decision rest | total | OVER | The decision · an OVER game | Total OVER 229.5 | BET* | -110 | needs 52.4% | the over behind a tired favourite · none graded here yet · measured on three seasons of lines: the strongest read on the board"
-      && dc.rest.why === "Why: Knicks are 71.8% by the books and played last night; Bulls rested 3 days. A favourite of 70% or more on the second night against a rested club went over the total 66-33 on three seasons of lines (32-16, 28-15 and 6-2), at home and on the road, where the same favourites rested went 360-367: the tired club still wins as priced, and the other scores more than the lines allow. So the over, at the carded total."
-      && dc.rest.secs['Rest and the schedule'] === "Knicks on the second night of a back to back, Bulls on 3 days' rest. The books price rest on the side: a club on the second night won 408 of 875 where the moneylines priced 411; the total is the part they miss, and it is this game's call."
+      && dcc(dc.rest) === "pickcard decision rest | total | OVER | The decision · an OVER game | Total OVER 229.5 | BET* | -110 | needs 52.4% | the over behind a tired favourite · none graded here yet · 66-33 on the three seasons it was found on and 419-436 on the seventeen before them: not proven, a small bet"
+      && dc.rest.why === "Why: Knicks are 71.8% by the books and played last night; Bulls rested 3 days. A favourite of 70% or more on the second night against a rested club went over the total 66-33 on the three seasons this was found on (32-16, 28-15 and 6-2), where the same favourites rested went 360-367. On the seventeen seasons before them the same spot, the tired favourite laying 5.5 or more, went 419-436, and 48-40 on the two nearest, so the long record does not back it: the over, as a small bet, at the carded total."
+      && dc.rest.secs['Rest and the schedule'] === "Knicks on the second night of a back to back, Bulls on 3 days' rest. The books price rest on the side: a club on the second night won 408 of 875 where the moneylines priced 411; on the three seasons to hand the total ran over behind a tired favourite of 70% or more, and that is this game's call, a small one."
       && dc.rest.likely && dc.rest.likely.pick === 'Knicks ML'
       && dcc(dc.rule) === "pickcard decision rule | total | UNDER | The decision · an UNDER game | Total UNDER 232 | BET* | -110 | needs 52.4% | the agreement rule · none graded here yet · measured on two seasons of closes"
       && dc.rule.why === "Why: Three voices on the total: the sheet silent (OVER 50%, no bet); the sim UNDER 93%; the crew leans UNDER (z -8.9). 2 of 3 on the UNDER, none against: BET by the agreement rule. The simulation and the crew on one side with the sheet not against it went 149-113 (56.9%) on three seasons of closes."
@@ -4554,7 +4558,7 @@ const CHECKS = ["dome","playoff"];
       'the decision, the best number against the sheet\'s read (the Lakers game of 18 Nov): FanDuel\'s total a point under the middle is the decision at FanDuel, ahead of the sheet\'s read, and the card says what a point of number is worth (the final inside it on 10 of 280 such calls: a small edge, a small bet); the sheet\'s own read at the card\'s number is the other side, and the card says why both are true (its projection sits between the two numbers) and that the decision takes the better number; tonight\'s signals carry the decision first and the sheet\'s read beside it',
       JSON.stringify({ value: dcc(dc.value), why: dc.value.why, also: dc.value.secs['Also on this game'], sigs: dc.value.sigs, nums: dc.value.secs['The numbers'] }));
   chk(dc.form.secs['Form'] === "Suns 3-2 in their last five, 109.6 for and 110.0 against; their totals went over 1-3 and they covered 3-2; won the last one; tonight is their third game in four nights; the sixth straight on the road. Kings 1-4 in their last five, 101.8 for and 110.4 against; their totals went over 1-3 and they covered 0-4; lost the last four; home after four on the road."
-      && dc.form.secs['Rest and the schedule'] === "Suns on the second night of a back to back, Kings on a day's rest. The books price rest on the side: a club on the second night won 408 of 875 where the moneylines priced 411; the total moves only behind a favourite of 70% or more, which this is not. Rest days, time zones, a long trip and a third game in four nights each read nothing on the side or the total against two seasons of closing lines: the books price the schedule, so it is shown and not scored."
+      && dc.form.secs['Rest and the schedule'] === "Suns on the second night of a back to back, Kings on a day's rest. The books price rest on the side: a club on the second night won 408 of 875 where the moneylines priced 411; the total has run over only behind a favourite of 70% or more, which this is not. Rest days, time zones, a long trip and a third game in four nights each read nothing on the side or the total against two seasons of closing lines: the books price the schedule, so it is shown and not scored."
       && dc.form.kind === 'winner' && dc.winner.secs['Form'] === undefined && dc.winner.secs['Rest and the schedule'] === undefined && !/Rest days, time zones/.test(dc.read.secs['Rest and the schedule']),
       'the decision, form and the schedule: each club\'s last five off the row give its record, its points for and against, its totals against their closes (a total that landed on the number counts neither way, a game with no close is left out), its games against the spread from its own side of the home spread, its streak, a third game in four nights and a run on the road or a return home; a tired dog is not the rest call, and the card says the books price the schedule where the schedule shows something; a row with no form and no rest has neither part',
       JSON.stringify({ form: dc.form.secs['Form'], rest: dc.form.secs['Rest and the schedule'], kind: dc.form.kind, bare: Object.keys(dc.winner.secs) }));
@@ -4710,6 +4714,13 @@ const CHECKS = ["dome","playoff"];
     o.bare = cellOf();
     set('nbasim', JSON.stringify(sim2)); await wait();
     o.meta2 = txt(panel.querySelector('.simmeta')); o.prof2 = txt(panel.querySelector('.simprof'));
+    // the two files go together (27 Nov 2026): a block with engine 3's mean for the men out under an engine number of 2 was run by the new slate.py with the old nbasim.py beside it
+    const oldSig = () => [...document.querySelectorAll('#signals .sig')].filter(g => /old nbasim/i.test(txt(g))).map(g => g.className + ' ' + g.getAttribute('href') + ' :: ' + txt(g)).join(' ## ');
+    o.old2 = txt(panel.querySelector('.simold')); o.old2Sig = oldSig();
+    set('nbasim', JSON.stringify(Object.assign({}, sim2, { out_mean: 0.66 }))); await wait();
+    o.oldMix = txt(document.querySelector('#nbaSimPanel .simold')); o.oldMixSig = oldSig(); o.oldMixMeta = txt(document.querySelector('#nbaSimPanel .simmeta'));
+    set('nbasim', JSON.stringify(sim3)); await wait();
+    o.old3 = txt(document.querySelector('#nbaSimPanel .simold')); o.old3Sig = oldSig();
     // the record: two games graded, the home club winning both; at -600 the price did not allow the call, at -250 it did
     const game = async (away, home, hml, aml, extra) => {
       document.getElementById('clear').click(); await wait();
@@ -4757,8 +4768,13 @@ const CHECKS = ["dome","playoff"];
       && /^The moneyline calls the price did not allow/.test((e3T.tabs.price || {}).head || '') && /A moneyline call stands only where its worth beats what the row's price needs\./.test(e3T.simNote) && /Engine 3 \(23 Nov 2026\) played out on 2,444 games/.test(e3T.simNote),
       'the simulation\'s record keeps the price\'s rule: of three graded games with the home club at 78% of the runs, the two priced -250 are STRONG calls on the moneyline\'s line (2-0) and the one priced -600 is on a line of its own, the calls the price did not allow (1-0), and the note under the tables says so',
       JSON.stringify({ own: (e3T.tabs.own || {}).rows, price: e3T.tabs.price, note: e3T.simNote.slice(-420) }));
+  chk(e3T.old2 === '' && e3T.old2Sig === '' && e3T.old3 === '' && e3T.old3Sig === ''
+      && e3T.oldMix === "Old nbasim.py. This game was run by the new slate.py with engine 2 of nbasim.py beside it: its rest is that engine's and the other side's share of the men out was not played. The two files go together. Copy the nbasim.py that came with slate.py into the folder and run the slate again (it is free)."
+      && /^sig watch #secSim :: old nbasim\.py ?this game was run by the new slate\.py with engine 2 beside it · copy the new nbasim\.py into the folder and run the slate again$/i.test(e3T.oldMixSig) && /Engine 2: score effects/.test(e3T.oldMixMeta),
+      'the two files go together (27 Nov 2026: the rows of 23 to 25 Nov were run by the new slate.py with the old nbasim.py beside it and nothing said so): a simulation block that carries the slate\'s mean for the men out under an engine number of 2 gets a line in red on the Simulation card and a chip in tonight\'s signals that say to copy the new nbasim.py in and run the slate again; a row of engine 2 from before 23 Nov (no mean) and a row of engine 3 get neither',
+      JSON.stringify({ old2: e3T.old2, old2Sig: e3T.old2Sig, mix: e3T.oldMix, mixSig: e3T.oldMixSig, old3: e3T.old3, old3Sig: e3T.old3Sig }));
   const e3m = (e3T.tabs.money || {}).rows || [], e3dec = e3m.filter(r => /^The decision/.test(r)), e3decN = e3dec.map(r => { const m = /\| (\d+)-(\d+)/.exec(r); return m ? +m[1] + +m[2] : 0; }).reduce((a, b) => a + b, 0);
-  chk(/^Where the money is: the sharp-money read against the finals DraftKings' own count as each row kept it before the tip · 2 games on 1 night, 2026-11-22 to 2026-11-22 · graded at DraftKings' own number and price in the count · shown, not scored$/.test((e3T.tabs.money || {}).head || '')
+  chk(/^Where the money is: the sharp-money read against the finals off the game's card from 27 Nov 2026: the side with the larger bets had lost more than it won · DraftKings' own count as each row kept it before the tip · 2 games on 1 night, 2026-11-22 to 2026-11-22 · graded at DraftKings' own number and price in the count · shown, not scored$/.test((e3T.tabs.money || {}).head || '')
       && e3m.length === 11 && /^The side with the larger bets \| 1-1 \| 50\.0% \| [-−]0\.1u$/.test(e3m[0]) && /^on the spread \| 1-0 \| 100\.0% \| \+0\.9u$/.test(e3m[1]) && /^on the total \| none yet \|/.test(e3m[2]) && /^on the moneyline \| 0-1 \| 0\.0% \| [-−]1\.0u$/.test(e3m[3])
       && /^Every market's named side \| 2-4 \| 33\.3% \| [-−]2\.2u$/.test(e3m[4]) && /^on the spread \| 2-0 \| 100\.0% \| \+1\.8u$/.test(e3m[5]) && /^on the total \| 0-2 \| 0\.0% \| [-−]2\.0u$/.test(e3m[6]) && /^on the moneyline \| 0-2 \| 0\.0% \| [-−]2\.0u$/.test(e3m[7])
       && e3dec.length === 3 && e3decN === 2 && /^The decision, the larger bets with it \| 0-1 \| 0\.0% \| [-−]1\.0u$/.test(e3m[8]) && /^The decision, the larger bets on the other side \| none yet \|/.test(e3m[9])

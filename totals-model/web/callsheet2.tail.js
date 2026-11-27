@@ -589,7 +589,7 @@
     catch (e) { m = null; }
     last = m;
     var box = $("markets"), why = $("why");
-    if (!m) { box.innerHTML = '<div class="empty">Enter a total to start. Add both moneyline prices for the sides.</div>' + (sport === "NBA" && typeof nbaMoneyLoose === "function" ? nbaMoneyLoose() : ""); why.innerHTML = ""; if (typeof signalStrip === "function") signalStrip(null); return; }
+    if (!m) { box.innerHTML = '<div class="empty">Enter a total to start. Add both moneyline prices for the sides.</div>'; why.innerHTML = ""; if (typeof signalStrip === "function") signalStrip(null); return; }
     /* The rail ranks by EDGE, always: the toggle on the day board orders the
        table, not this list. Probability stays the big number on every row. */
     var byProb = false;
@@ -1552,10 +1552,11 @@
     $("boardCount").textContent = rows.length ? rows.length + " priced markets on " + gameDate(dateISO) : "nothing logged for " + gameDate(dateISO);
     renderTaking(dateISO);   // the bets marked as taken on the date (26 Oct 2026)
 
-    // --- the first half's best bets (23 Nov 2026): basketball, up to four a night, each a $100 bet with its app and price ---
+    // --- the first half (23 Nov 2026): basketball, up to four a night; $100 best bets to 26 Nov, a watch list from 27 Nov 2026 ---
     if ($("h1best") && typeof nbaH1On === "function") {
       var hN = nbaH1On(dateISO), hh = "";
-      hN.picks.forEach(function (x, i) { hh += nbaH1Card(x, i); });
+      hN.picks.forEach(function (x, i) { hh += nbaH1Card(x, i, hN.watch); });
+      if ($("h1Title")) $("h1Title").textContent = hN.watch ? "The first half, watched" : "The first half's best bets";
       $("h1Head").hidden = !hN.picks.length; $("h1best").hidden = !hN.picks.length;
       $("h1best").innerHTML = hh; $("h1Tag").textContent = hN.picks.length ? nbaH1Head(hN) : "";
     }

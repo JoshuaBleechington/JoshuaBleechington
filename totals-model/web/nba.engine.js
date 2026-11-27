@@ -170,7 +170,7 @@
     /* 17 Nov 2026 (the user: "test the back to back games this season to see if there is anything there"): on three seasons of closing lines
        a club on the second night won 408 of 875 where the moneylines priced 411 and covered 425-441, so the side stays a label. The total is
        another matter where the tired club is a heavy favourite and the other is rested: that is the rest call on the game (nbaCallRest) */
-    if (b2b.length) notes.push("Back to back for the " + b2b.join(" and ") + " side. <b>A LABEL</b> on the side: on three seasons of closing lines a club on the second night won 408 of 875 where the moneylines priced 411 and covered the spread 425-441, and rest, the second night on the road and three in four flipped sign between seasons. The market prices rest on the side. On the total it does not where the club on the second night is a favourite of 70% or more and the other is rested: the game went over 66-33, and the call on the game carries it.");
+    if (b2b.length) notes.push("Back to back for the " + b2b.join(" and ") + " side. <b>A LABEL</b> on the side: on three seasons of closing lines a club on the second night won 408 of 875 where the moneylines priced 411 and covered the spread 425-441, and rest, the second night on the road and three in four flipped sign between seasons. The market prices rest on the side. On the total the three seasons to hand had the game over 66-33 where the club on the second night is a favourite of 70% or more and the other is rested; the seventeen seasons before them had the same spot 419-436, so the call on the game carries it as a small bet.");
     var outA = nbaOutMinutes("away"), outH = nbaOutMinutes("home"), outBits = [];
     if (outA > 0) outBits.push("away " + outA.toFixed(0));
     if (outH > 0) outBits.push("home " + outH.toFixed(0));
@@ -248,9 +248,9 @@
     if (ss) out.push(signalChip("watch", "markets", "Pinnacle", "shades the <b>" + esc(ss.side) + "</b> by " + ss.pts.toFixed(1) + " points"));
     if (!nba) return out;
     var inputs = snapshot(), f = readNba(), row = nbaSimTakeRow(f), away = f.away || "Away", home = f.home || "Home";
-    var spl = nbaSplitsOf(inputs.nbasplits), stop = spl ? nbaSplitsTop(spl, away, home) : [];   // the bets against the money (19 Nov 2026): gold, shown and not scored; the chip goes to the money's own block
-    if (stop.length) out.push(signalChip("watch", "secMoney", "the money", "<b>" + esc(stop[0].label) + "</b> · " + stop[0].money + "% of the money on " + stop[0].bets + "% of the bets" +
-      (stop.length > 1 ? " · and " + esc(stop[1].label) + (stop.length > 2 ? ", " + (stop.length - 2) + " more" : "") : "") + " · DraftKings, not scored"));
+    /* the money's chip stood here from 19 Nov 2026; it came off on 27 Nov with the box (the side with the larger bets 30-35 on 48 games) */
+    var simOld = ""; try { simOld = nbaSimMixed(nbaJson(inputs.nbasim)); } catch (e) { simOld = ""; }   // the new slate.py run with the old nbasim.py beside it (27 Nov 2026)
+    if (simOld) out.push(signalChip("watch", "secSim", "old nbasim.py", "this game was run by the new slate.py with <b>" + esc(simOld) + "</b> beside it · copy the new nbasim.py into the folder and run the slate again"));
     var V = null; try { V = nbaVoices({ sport: "NBA", inputs: inputs, markets: (m && m.markets) || [] }); } catch (e) { V = null; }
     var vrec = null; try { vrec = nbaCallsRecord().rule; } catch (e) { vrec = null; }
     if (V && V.fires && vrec && vrec.cold) out.push(signalChip("watch", "secSim", "three voices · cold here", "<b>" + esc(V.side) + " " + esc(String(V.line)) + "</b> · " + V.count + " of 3 on it · " + esc(nbaCallRecWords(vrec)) + ", so it is left out of the decision"));
@@ -289,12 +289,6 @@
       var d = nbaOutList(), outs = function (s) { return (d[s] || []).filter(function (p) { return /^out/i.test(String(p.st || "")); }).length; }, oa = outs("away"), oh = outs("home");
       if (oa || oh) out.push(signalChip("info", "secOut", "out", [oa ? esc(away) + " <b>" + oa + "</b> (" + nbaOutMinutes("away").toFixed(0) + " min of regulars)" : "", oh ? esc(home) + " <b>" + oh + "</b> (" + nbaOutMinutes("home").toFixed(0) + " min of regulars)" : ""].filter(Boolean).join(" · ")));
     } catch (e) {}
-    /* every game not yet played says where its count stands, so a row with no money chip at all is a page that is old: plain, and last
-       in the row, where the count has no side twenty apart or there is no count yet (the gold chip, a watch, stands by the decision) */
-    if (!stop.length) {
-      if (spl) out.push(signalChip("info", "secMoney", "the money", "no side " + NBA_SPLITS_GAP + " points apart · DraftKings" + (spl.upd ? " at " + esc(spl.upd) : "") + ", not scored"));
-      else if (!(typeof openedFinals === "function" && openedFinals())) out.push(signalChip("info", "secMoney", "the money", "no count on this game yet · it comes with the odds run, or <b>python slate.py splits</b>"));
-    }
     return out;
   }
   function signalStrip(m, pk, upsetView, likely, leg) {
@@ -802,6 +796,10 @@
            (c.band !== "no call" ? ' <span class="tag">' + esc(c.band) + '</span>' : '') +
            ' <span class="dim">worth ' + (100 * c.worth).toFixed(0) + '%</span>';
   }
+  /* the two files go together (27 Nov 2026). The user copied the slate.py of 23 Nov into his folder and left the old nbasim.py beside
+     it, so the rows of 23, 24 and 25 Nov carry engine 3's mean for the men out under an engine number of 2: the rest in them is
+     engine 2's and the other side's share of the men out was never played. A block like that is named: "engine 2", else "" */
+  function nbaSimMixed(sim) { return sim && sim.out_mean !== undefined && sim.out_mean !== null && !(+sim.v >= 3) ? "engine " + (+sim.v || 0) : ""; }
   function nbaSimPanel() {
     var el = $("nbaSimPanel"); if (!el) return;
     var sim = nbaSim();
@@ -827,6 +825,8 @@
          (sim.level && sim.level.ortg ? ' The ratings ride the league\'s level of the last fortnight, ' + esc(String(sim.level.ortg)) + ' per 100 at ' + esc(String(sim.level.pace)) + ' possessions (30 Oct 2026).' : '') +
          (sim.v >= 3 ? ' Engine 3 (23 Nov 2026): the men out are priced against tonight\'s slate and a tired club the way the close prices it, part off a club\'s own scoring and part on the other side\'s, so the total sits on the books\' line where engine 2 sat 4 points under it.'
           : sim.v >= 2 ? ' Engine 2: score effects, the market\'s shape (30 Oct 2026).' : '') + '</div>';
+    var mixed = nbaSimMixed(sim);
+    if (mixed) h += '<div class="simmeta simold"><b>Old nbasim.py.</b> This game was run by the new slate.py with ' + esc(mixed) + ' of nbasim.py beside it: its rest is that engine\'s and the other side\'s share of the men out was not played. The two files go together. Copy the nbasim.py that came with slate.py into the folder and run the slate again (it is free).</div>';
     h += '<div id="nbaVoices"></div>';   // the three voices on the total (28 Oct 2026), filled once the sheet has scored this render
     var takeRow = nbaSimTakeRow(f);   // the card row this game is on, if any: a sim call is taken on the row (26 Oct 2026)
     var cell = function (c) {
@@ -1375,6 +1375,15 @@
        - the base: the same favourites with a day of rest and a rested dog 360-367 (+0.1); both clubs on the second night 36-31;
          the favourite rested and the dog on the second night 91-82. Ninety-nine games drawn at random from the 829 with a
          favourite of 70% or more and a rested dog ran this far over once in ten thousand draws.
+     27 Nov 2026, THE SAME SPOT ON SEVENTEEN SEASONS IT WAS NOT FOUND ON (the user: "we could really be finding gaps or patterns ...
+     If something needs to go then lets remove it"; lab sbr_parse.py, sbr_test.py, covers_parse.py, rest_all.py). Closing totals
+     for 2007-08 to 2021-22 from sportsbookreviewsonline.com's archive and for 2022-23 and 2023-24 from each club's results at
+     covers.com, 20,347 regular-season games, the rest days from the schedule itself. The tired favourite laying 5.5 or more with
+     the other club rested (88-52 on the three seasons above by that cut): 339-377 (47.3%) on the fourteen seasons to 2020-21,
+     32-19 in 2021-22, then 17-14 and 31-26 on the two seasons nobody here had looked at; 419-436 (49.0%) on all seventeen.
+     By the page's own rule (70% or more on the moneylines) the archive's sixteen seasons went 270-298. So the 66-33 is three
+     seasons and the long record is level: the call stays, since every game is given one and the kinds under it are the book's
+     own price, but as a small bet that says so, and the cold rule still takes it out of the order when it loses here.
      Found by taking the back to back apart, so it is a strong lean on 99 games and not a proof: a call of its own, on the over
      at the lowest total the four apps post, ahead of the best number on the board (55.6%), with its own record line, and cold
      like the two BET kinds when it has lost here over ten or more calls. */
@@ -1478,7 +1487,7 @@
   var NBA_CALL_KINDS = [
     ["rule", "BET · the agreement rule", "the simulation and the crew on the same side of the total, the sheet not against it: 149-113 (56.9%) on three seasons of closes"],
     ["sheet", "BET · the sheet's own call", "a side the sheet prices below its chance, or one a verdict sits on"],
-    ["rest", "REST · the over behind a tired favourite", "a favourite of 70% or more on the second night of a back to back, the other club rested: the game went over the closing total 66-33 (66.7%) on three seasons, 32-16, 28-15 and 6-2; the same favourites rested 360-367"],
+    ["rest", "REST · the over behind a tired favourite", "a favourite of 70% or more on the second night of a back to back, the other club rested: the game went over the closing total 66-33 on the three seasons it was found on (32-16, 28-15 and 6-2); on the seventeen seasons before them the same spot, the tired favourite laying 5.5 or more, went 419-436 (49.0%), and 48-40 on the two nearest: not proven, so a small bet"],
     ["number", "VALUE · the best number on the board", "a total at one of your four apps a point or more off the middle of every book's number: 105-84 (55.6%) on last season's closes, 78-70 at the opener"],
     ["read", "READ · the sheet's own read of the game", "the likeliest side where the sheet's inputs move its chance a point or more off the book's own number; no measured edge at the price, so it is given where nothing measured speaks, and it stands unless it wins under four in ten here"],
     ["w80", "LEAN · the likelier winner, 80% or more", "the book's price: such favourites at the best of the four prices went 231-31 last season, -0.3% a bet"],
@@ -1494,7 +1503,7 @@
   function nbaCallsRecord() {
     var stamp = nbaCallsStamp();
     if (nbaCallsMemo && nbaCallsMemo.stamp === stamp) return nbaCallsMemo.rec;
-    var mk = function () { return { w: 0, l: 0, p: 0, units: 0, says: 0, sn: 0, n: 0 }; }, rec = { given: mk() }, graded = [];
+    var mk = function () { return { w: 0, l: 0, p: 0, units: 0, says: 0, sn: 0, n: 0 }; }, rec = { given: mk(), by: { measured: mk(), read: mk(), winner: mk() } }, graded = [];
     NBA_CALL_KINDS.forEach(function (k) { rec[k[0]] = mk(); });
     var add = function (s, c, res) {
       if (res === "push") { s.p++; return; }
@@ -1511,7 +1520,7 @@
     NBA_CALL_KINDS.forEach(function (k) { var s = rec[k[0]]; s.cold = s.n >= NBA_CALL_COLD && s.units < 0 && (k[0] === "rule" || k[0] === "sheet" || k[0] === "rest"); });   // the rest call is new and rests on 99 games: it steps out of the order too when it has lost here
     rec.read.cold = rec.read.n >= NBA_CALL_COLD && rec.read.w / rec.read.n < NBA_READ_COLD;   // the sheet's read stands through a losing run and steps out only when it is clearly losing here
     rec.list = [];   // the call as given on each graded game, for the records that read it against something else (the money's, 23 Nov 2026)
-    graded.forEach(function (g) { var ks = g.ks, cs = ks.map(function (y) { return y.c; }), c = nbaCallLive(cs, rec)[0] || cs[cs.length - 1], x = ks.filter(function (y) { return y.c === c; })[0]; add(rec.given, x.c, x.res); rec.list.push({ r: g.r, c: x.c, res: x.res }); });   // the call as given: the first kind in the order that is live
+    graded.forEach(function (g) { var ks = g.ks, cs = ks.map(function (y) { return y.c; }), c = nbaCallLive(cs, rec)[0] || cs[cs.length - 1], x = ks.filter(function (y) { return y.c === c; })[0]; add(rec.given, x.c, x.res); add(rec.by[x.c.kind === "winner" ? "winner" : x.c.kind === "read" ? "read" : "measured"], x.c, x.res); rec.list.push({ r: g.r, c: x.c, res: x.res }); });   // the call as given: the first kind in the order that is live; and which part of the order gave it (27 Nov 2026)
     nbaCallsMemo = { stamp: stamp, rec: rec };
     return rec;
   }
@@ -1569,7 +1578,13 @@
     var h = '<div class="simrecview">A call on every game <span class="tag">each kind on every game it speaks to, replayed from the rows as their last odds run before tip stood; then the call as the board gives it, one a game · a kind that has lost here over ' + NBA_CALL_COLD + ' or more calls is cold and left out of the order until its record turns · shown, not scored</span></div><table class="form simrectab callstab"><thead><tr><th>Kind</th><th>Record</th><th>Says</th><th>Does</th><th>Units</th><th>Measured before</th></tr></thead><tbody>';
     NBA_CALL_KINDS.forEach(function (k) { h += row(esc(k[1]) + (rec[k[0]].cold ? ' <b>· cold here</b>' : ''), rec[k[0]], esc(k[2])); });
     h += row('<b>The call as given, one a game</b>', rec.given, 'the first kind in the order that is not cold');
-    return any ? h + '</tbody></table>' : "";
+    /* where it comes from (27 Nov 2026, the user: 'I noticed the "Decision as given" is 165-104-1 and that looks pretty good'): most of
+       the calls are the likelier winner at the book's price, where six wins in ten is level money, so the line says which part of the
+       order gave the calls and what each part is worth; the units are the referee */
+    var part = function (s) { return s.n || s.p ? s.w + "-" + s.l + (s.p ? "-" + s.p : "") + ", " + sgn(s.units, 1) + "u" : "none yet"; };
+    return any ? h + '</tbody></table><div class="note dim callsplit">The call as given, by what gave it: a kind with a measurement behind it (the agreement rule, the sheet\'s own call, the over behind a tired favourite, the best number) <b>' + part(rec.by.measured) +
+      '</b> · the sheet\'s own read <b>' + part(rec.by.read) + '</b> · the likelier winner at the book\'s price <b>' + part(rec.by.winner) +
+      '</b>. A favourite at -150 has to win six in ten to be level, so a record of six in ten here is the book\'s price coming in as priced: read the units, not the wins.</div>' : "";
   }
 
   /* ============================ THE FIRST HALF'S BEST BETS (23 Nov 2026) ============================
@@ -1602,16 +1617,25 @@
      then the rested club's own total), then the cheaper side where every app is on the number; and where those leave fewer than
      three, the cheaper side of a club's own first half, then of a half the apps split on, each marked as there to make three
      with what its record is. One unit is the $100 he stakes. Shown, not scored: no chance, band or pick on a card moves. The
-     order was drawn on these same games, so each kind keeps two records here: the nights before 23 Nov 2026 and the nights from it. */
-  var NBA_H1 = { market: ["draftkings", "fanduel", "betmgm", "espnbet", "fanatics", "caesars"], minApps: 3, fav: 4, max: 4, fill: 3, since: "2026-11-23", stake: 100 };
+     order was drawn on these same games, so each kind keeps two records here: the nights before 23 Nov 2026 and the nights from it.
+     27 Nov 2026, THE BETS COME OFF (the user: "If something needs to go then lets remove it"). From 23 to 25 Nov the list as given
+     went 2-9 (-$710); the cheaper side it led with went 2-8 from the build and 13-22 in the ten days before it, after 62-41 on the
+     weeks the rule was drawn on; and the over behind a tired favourite, the other lead, does not carry to seasons it was not found
+     on: on sixteen earlier seasons of quarter scores and closing lines (lab sbr_h1.py) the first half of those games ran level
+     with its share of the closing lines, 553 over and 539 under, the rested club's own half 543 and 549. Nothing in the first half
+     is proven, so from the night of 27 Nov the board shows the three lead kinds as a WATCH list: no fills to make three, no stake
+     named, a Take still there for a bet he chooses to make, and off the phone's sheet. The nights of 23 to 26 Nov replay as they
+     were given, and each kind keeps counting on every game it speaks to. */
+  var NBA_H1 = { market: ["draftkings", "fanduel", "betmgm", "espnbet", "fanatics", "caesars"], minApps: 3, fav: 4, max: 4, fill: 3, since: "2026-11-23", off: "2026-11-27", stake: 100 };   // off: from this night the list is watched, not bet
   var NBA_H1_RANK = { rest: 0, ttrest: 1, cheap: 2, ttcheap: 3, split: 4 };
   var NBA_H1_KINDS = [
-    ["rest", "FIRST HALF · THE OVER BEHIND A TIRED FAVOURITE", "a favourite of 4 or more on the second night of a back to back, the other club rested: the first half went over 112-66 (62.9%) on three seasons of closes, 32-19 at the lowest number among these apps where the books' own first-half lines were held"],
-    ["ttrest", "FIRST HALF · THE RESTED CLUB'S OWN TOTAL", "the rested club's own first half in those games ran 1.9 points over its share of the line, over 114-64 against a stand-in line; no book's first-half team line was held to test it at a price, so its record starts here"],
-    ["cheap", "FIRST HALF · THE CHEAPER SIDE", "every app that posts the first-half total is on one number and prices the two sides apart: the cheaper side won 125-82 (60.4%) at these apps' prices on two seasons, 63-44 and 62-38; the first-quarter total the same way, 103-69"],
+    ["rest", "FIRST HALF · THE OVER BEHIND A TIRED FAVOURITE", "a favourite of 4 or more on the second night of a back to back, the other club rested: the first half went over 112-66 (62.9%) on the three seasons it was found on; on sixteen earlier seasons the first half of those games ran level with its share of the closing lines, 553 over and 539 under: not proven"],
+    ["ttrest", "FIRST HALF · THE RESTED CLUB'S OWN TOTAL", "the rested club's own first half in those games ran over 114-64 against a stand-in line on the three seasons it was found on, and level on sixteen earlier ones (543 over its share, 549 under): not proven"],
+    ["cheap", "FIRST HALF · THE CHEAPER SIDE", "every app that posts the first-half total is on one number and prices the two sides apart: the cheaper side won 125-82 (60.4%) on the games it was found on and has lost here since the list was built: not proven"],
     ["ttcheap", "FIRST HALF · A CLUB'S OWN TOTAL, TO MAKE THREE", "the cheaper side where every app is on one number, on a club's own first half: no first-half team lines were held to test it, and on full-game team totals it was level (94-85)"],
     ["split", "FIRST HALF · TO MAKE THREE", "the apps split on the number, or only two post it: the cheaper side at the number most of them post was level (210-205) on two seasons; no edge measured"]];
-  function nbaH1Measured(kind) { return kind === "rest" || kind === "ttrest" || kind === "cheap"; }   // the kinds with a measured record behind them; the other two are there to make three
+  function nbaH1Measured(kind) { return kind === "rest" || kind === "ttrest" || kind === "cheap"; }   // the three kinds the list leads with (none of them proven: 27 Nov 2026); the other two were there to make three
+  function nbaH1Watch(dateISO) { return String(dateISO || "") >= NBA_H1.off; }   // from the night of NBA_H1.off the list is watched, not bet
   function nbaH1Num(v) { return v !== null && v !== undefined && String(v).trim() !== "" && isFinite(+v); }
   /* {OVER: [[book, price, number]...], UNDER: [...]} -> {book: {line, o, u}}: the number a book posts both sides of, the most evenly priced one (the lower on a tie) */
   function nbaH1Mains(block) {
@@ -1703,9 +1727,10 @@
     var v = c.key === "h1" ? a + h : c.key === "h1_away" ? a : h;
     return Math.abs(v - c.line) < 1e-9 ? "push" : ((v > c.line) === (c.side === "OVER") ? "win" : "loss");
   }
-  /* a night's list: every bet its games carry in the order, then up to NBA_H1.max of the measured kinds, and where those leave
-     fewer than NBA_H1.fill, a club's own total and then a split half from games not on the list yet */
-  function nbaH1Night(rows) {
+  /* a night's list: every bet its games carry in the order, then up to NBA_H1.max of the lead kinds, and (on the nights it was
+     given as best bets) where those leave fewer than NBA_H1.fill, a club's own total and then a split half from games not on the
+     list yet. A watch night takes no fills */
+  function nbaH1Night(rows, watch) {
     var C = [], picks = [], used = {};
     rows.forEach(function (r) { nbaH1Kinds(r).forEach(function (c) { C.push({ row: r, c: c }); }); });
     C.sort(function (a, b) {
@@ -1713,12 +1738,12 @@
              (String(a.row.matchup) < String(b.row.matchup) ? -1 : String(a.row.matchup) > String(b.row.matchup) ? 1 : 0) || (a.c.key < b.c.key ? -1 : a.c.key > b.c.key ? 1 : 0);
     });
     C.forEach(function (x) { if (nbaH1Measured(x.c.kind) && picks.length < NBA_H1.max) { picks.push(x); used[x.row.id] = 1; } });
-    ["ttcheap", "split"].forEach(function (kind) {
+    if (!watch) ["ttcheap", "split"].forEach(function (kind) {
       C.forEach(function (x) { if (picks.length < NBA_H1.fill && x.c.kind === kind && !used[x.row.id]) { picks.push(x); used[x.row.id] = 1; } });
     });
-    return { all: C, picks: picks };
+    return { all: C, picks: picks, watch: !!watch };
   }
-  function nbaH1On(dateISO) { return nbaH1Night(card.filter(function (r) { return r.sport === "NBA" && (r.gdate || "") === dateISO && !isVoid(r); })); }
+  function nbaH1On(dateISO) { return nbaH1Night(card.filter(function (r) { return r.sport === "NBA" && (r.gdate || "") === dateISO && !isVoid(r); }), nbaH1Watch(dateISO)); }
   var nbaH1Memo = null;   // the record, replayed from the rows: built again when a half-time score, a row's odds, its spread or its rest, or the card changes
   function nbaH1Stamp() {
     var n = 0, s = 0, u = 0;
@@ -1733,18 +1758,20 @@
   function nbaH1Record() {
     var stamp = nbaH1Stamp();
     if (nbaH1Memo && nbaH1Memo.stamp === stamp) return nbaH1Memo.rec;
-    var mk = function () { return { w: 0, l: 0, p: 0, units: 0, n: 0 }; }, two = function () { return { before: mk(), since: mk() }; }, rec = { given: two(), givenM: two(), givenF: two(), nights: { before: 0, since: 0 } }, byDate = {};
+    var mk = function () { return { w: 0, l: 0, p: 0, units: 0, n: 0 }; }, two = function () { return { before: mk(), since: mk() }; }, rec = { given: two(), givenM: two(), givenF: two(), watch: mk(), nights: { before: 0, since: 0, watch: 0 } }, byDate = {};
     NBA_H1_KINDS.forEach(function (k) { rec[k[0]] = two(); });
     var add = function (s, c, res) { if (res === "push") { s.p++; return; } s.n++; if (res === "win") { s.w++; s.units += decimalOf(c.price) - 1; } else { s.l++; s.units -= 1; } };
     card.forEach(function (r) { if (r.sport !== "NBA" || isVoid(r)) return; var d = r.gdate || ""; (byDate[d] = byDate[d] || []).push(r); });
     Object.keys(byDate).forEach(function (d) {
-      var N = nbaH1Night(byDate[d]), era = d >= NBA_H1.since ? "since" : "before", any = false;
+      var watch = nbaH1Watch(d), N = nbaH1Night(byDate[d], watch), era = d >= NBA_H1.since ? "since" : "before", any = false;
       N.all.forEach(function (x) { var res = nbaH1Res(x.c, x.row); if (res) add(rec[x.c.kind][era], x.c, res); });   // every kind on every game it speaks to
-      N.picks.forEach(function (x) {   // the list as it was given, and the two parts of it: the measured kinds and the fills
+      N.picks.forEach(function (x) {   // the list as it was given, and the two parts of it: the lead kinds and the fills; a watch night on a line of its own
         var res = nbaH1Res(x.c, x.row); if (!res) return;
-        add(rec.given[era], x.c, res); add((nbaH1Measured(x.c.kind) ? rec.givenM : rec.givenF)[era], x.c, res); any = true;
+        any = true;
+        if (watch) { add(rec.watch, x.c, res); return; }
+        add(rec.given[era], x.c, res); add((nbaH1Measured(x.c.kind) ? rec.givenM : rec.givenF)[era], x.c, res);
       });
-      if (any) rec.nights[era]++;
+      if (any) rec.nights[watch ? "watch" : era]++;
     });
     nbaH1Memo = { stamp: stamp, rec: rec };
     return rec;
@@ -1767,18 +1794,22 @@
     if (c.kind === "split") return (c.n === c.apps ? "only " + c.apps + " apps post it, both on " + c.line : c.n + " of the " + c.apps + " apps that post it are on " + c.line + ", the others off it") + ": the cheaper side there (" + sgn(c.price, 0) + " against " + sgn(c.other, 0) + ")";
     return (c.n === 2 ? "both apps" : "all " + c.n + " apps") + " that post it are on " + c.line + " and price the two sides apart (" + sgn(c.price, 0) + " against " + sgn(c.other, 0) + "): the cheaper side";
   }
-  function nbaH1Card(x, i) {
+  function nbaH1Card(x, i, watch) {   // watch: a night from 27 Nov 2026, the card of a watch and not of a bet
     var c = x.c, r = x.row, res = nbaH1Res(c, r), rec = nbaH1Record(), kind = NBA_H1_KINDS.filter(function (k) { return k[0] === c.kind; })[0], s = rec[c.kind];
-    var cls = nbaH1Measured(c.kind) ? "value" : "lean", btn = nbaSimTakeBtn(r, "h1", c.key, c.side);
-    return '<div class="pk call h1 ' + cls + ' h1-' + c.kind + (res ? ' ' + res : '') + '" data-open="' + r.id + '" title="Load ' + esc(r.matchup) + ' into the form">' +
-      '<div class="n1">#' + (i + 1) + ' · ' + esc(kind[1]) + '</div>' +
+    var cls = !watch && nbaH1Measured(c.kind) ? "value" : "lean", btn = nbaSimTakeBtn(r, "h1", c.key, c.side);
+    return '<div class="pk call h1 ' + cls + ' h1-' + c.kind + (watch ? ' h1watch' : '') + (res ? ' ' + res : '') + '" data-open="' + r.id + '" title="Load ' + esc(r.matchup) + ' into the form">' +
+      '<div class="n1">#' + (i + 1) + ' · ' + (watch ? 'WATCH · ' : '') + esc(kind[1]) + '</div>' +
       '<div class="n2">' + esc(c.pick) + (res ? ' <span class="chip ' + res + '">' + esc(resText(res).toUpperCase()) + '</span>' : '') + '</div>' +
-      '<div class="n3">' + sgn(c.price, 0) + (c.app ? ' at ' + esc(bookName(c.app)) : '') + ' · $' + NBA_H1.stake + ' wins ' + nbaH1Wins(c.price) + ' · needs ' + (implied(c.price) * 100).toFixed(1) + '% · ' + nbaH1Why(c, r) + '</div>' +
+      '<div class="n3">' + sgn(c.price, 0) + (c.app ? ' at ' + esc(bookName(c.app)) : '') + (watch ? '' : ' · $' + NBA_H1.stake + ' wins ' + nbaH1Wins(c.price)) + ' · needs ' + (implied(c.price) * 100).toFixed(1) + '% · ' + nbaH1Why(c, r) + '</div>' +
       '<div class="n4">' + esc(r.matchup) + ' · ' + esc(kind[2]) + ' · here from 23 Nov: ' + esc(nbaH1RecWords(s.since)) + (s.before.n || s.before.p ? ' (the nights before it: ' + esc(nbaH1RecWords(s.before)) + ')' : '') + '</div>' +
       (btn ? '<div class="n6">' + btn + '</div>' : '') + '</div>';
   }
   function nbaH1Head(N) {   // the line beside the list's heading: what is on it tonight and what the list has done
     var m = N.picks.filter(function (x) { return nbaH1Measured(x.c.kind); }).length, f = N.picks.length - m, rec = nbaH1Record(), g = rec.given;
+    var wl = function (s) { return s.w + "-" + s.l + (s.p ? "-" + s.p : "") + ", " + nbaH1Dollars(s.units); };
+    if (N.watch) return "watched, not bets, from 27 Nov 2026 · as $" + NBA_H1.stake + " best bets from 23 to 26 Nov the list went " + (g.since.n || g.since.p ? wl(g.since) : "ungraded") +
+           ", and neither kind it led with has held up: the cheaper side has lost since the list was built, and on sixteen earlier seasons the first half behind a tired favourite ran level with its share of the closing lines (553 over, 539 under) · the watch list from 27 Nov: " +
+           (rec.watch.n || rec.watch.p ? wl(rec.watch) + " at $" + NBA_H1.stake + " a bet" : "no night graded yet") + " · no stake is named: nothing in the first half is proven · shown, not scored";
     return "the first half's total and each club's own, at your four apps · up to " + NBA_H1.max + " a night, the measured kinds first: the over behind a tired favourite, then the cheaper side where every app is on one number · " +
            m + " tonight carr" + (m === 1 ? "ies" : "y") + " a measured record" + (f ? ", " + f + " " + (f === 1 ? "is" : "are") + " here to make three" : "") + " · $" + NBA_H1.stake + " a bet is one unit · the list from 23 Nov: " +
            (g.since.n || g.since.p ? g.since.w + "-" + g.since.l + (g.since.p ? "-" + g.since.p : "") + ", " + nbaH1Dollars(g.since.units) : "no night graded yet") +
@@ -1792,14 +1823,15 @@
       return '<tr><td>' + label + '</td><td>' + cell(s) + '</td><td class="' + cls(s) + '">' + (s.n ? (100 * s.w / s.n).toFixed(1) + "%" : "") + '</td><td class="' + cls(s) + '">' + (s.n ? sgn(s.units, 1) + "u" : "") + '</td><td class="' + cls(s) + '">' + (s.n ? nbaH1Dollars(s.units) : "") +
              '</td><td>' + cell(b) + (b.n ? ' · ' + (100 * b.w / b.n).toFixed(1) + '% · ' + sgn(b.units, 1) + 'u' : '') + '</td><td class="dim">' + note + '</td></tr>';
     };
-    var h = '<div class="simrecview">The first half\'s best bets <span class="tag">each kind on every game it speaks to, replayed from the rows as their last odds run before the tip stood, then the list as the board gives it, up to ' + NBA_H1.max + ' a night · graded off the half-time score at the app\'s own number and price · one unit is $' + NBA_H1.stake +
+    var h = '<div class="simrecview">The first half <span class="tag">each kind on every game it speaks to, replayed from the rows as their last odds run before the tip stood; then the list as the board gave it, $' + NBA_H1.stake + ' best bets from 23 to 26 Nov and a watch list from 27 Nov 2026, when the bets came off: the list had lost and neither kind it led with held up · up to ' + NBA_H1.max + ' a night · graded off the half-time score at the app\'s own number and price · one unit is $' + NBA_H1.stake +
             ' · the order was drawn on the nights before 23 Nov 2026, so those stand apart · shown, not scored</span></div><table class="form simrectab h1tab"><thead><tr><th>Kind</th><th>From 23 Nov</th><th>Does</th><th>Units</th><th>At $' + NBA_H1.stake + ' a bet</th><th>The nights before</th><th>Measured before</th></tr></thead><tbody>';
     NBA_H1_KINDS.forEach(function (k) { h += row(esc(k[1].replace(/^FIRST HALF · /, "").toLowerCase().replace(/^./, function (ch) { return ch.toUpperCase(); })), rec[k[0]], esc(k[2])); });
-    h += row('<b>The list as given, up to ' + NBA_H1.max + ' a night</b>', rec.given, 'the measured kinds first; a club\'s own total and a split half only to make three · ' + rec.nights.since + ' night' + (rec.nights.since === 1 ? '' : 's') + ' from 23 Nov, ' + rec.nights.before + ' before');
-    /* the list's two parts (23 Nov 2026): on the lists of the two seasons the order was drawn on, the measured kinds went 145-89 (62.0%, +20.0% a bet) and the
-       fills 44-53 (45.4%, -11.3% a bet). The user asked for three or four a night, so the fills stay on the list; the record says each night what each part has done */
-    h += row('&nbsp;&nbsp;of the list, the measured kinds', rec.givenM, 'the over behind a tired favourite, the rested club\'s own total and the cheaper side: on the lists of the two seasons the order was drawn on these went 145-89 (62.0%)');
-    h += row('&nbsp;&nbsp;of the list, the fills to make three', rec.givenF, 'a club\'s own total and a split half, there when the measured kinds give fewer than three: on those same lists they went 44-53 (45.4%)');
+    h += row('<b>The list as given, $' + NBA_H1.stake + ' best bets, 23 to 26 Nov</b>', rec.given, 'the lead kinds first; a club\'s own total and a split half only to make three · ' + rec.nights.since + ' night' + (rec.nights.since === 1 ? '' : 's') + ' from 23 Nov, ' + rec.nights.before + ' before');
+    /* the list's two parts (23 Nov 2026): on the lists of the two seasons the order was drawn on, the lead kinds went 145-89 (62.0%, +20.0% a bet) and the
+       fills 44-53 (45.4%, -11.3% a bet). The user asked for three or four a night, so the fills stayed on the list while it was given as bets */
+    h += row('&nbsp;&nbsp;of the list, the lead kinds', rec.givenM, 'the over behind a tired favourite, the rested club\'s own total and the cheaper side: on the lists of the two seasons the order was drawn on these went 145-89 (62.0%)');
+    h += row('&nbsp;&nbsp;of the list, the fills to make three', rec.givenF, 'a club\'s own total and a split half, there when the lead kinds gave fewer than three: on those same lists they went 44-53 (45.4%)');
+    h += row('<b>The watch list from 27 Nov, up to ' + NBA_H1.max + ' a night</b>', { since: rec.watch, before: { w: 0, l: 0, p: 0, units: 0, n: 0 } }, 'the three lead kinds, no fills and no stake: watched while nothing in the first half is proven · ' + rec.nights.watch + ' night' + (rec.nights.watch === 1 ? '' : 's'));
     return any ? h + '</tbody></table>' : "";
   }
 
@@ -1830,7 +1862,7 @@
   /* 19 Nov 2026, after the best number went 1-6 on the card's first night and the user wrote "the Bucks vs the Heat went over by 30 points" (the under
      237.5 at one app against a middle of 236.5; the game ended 267): the better number is worth the games that land inside it, 10 of 280 over two
      seasons (lab board_side.py), about two wins in a hundred, so the card calls it a small edge and a small bet and not a measured read */
-  var NBA_DEC_STRENGTH = { rule: "measured on two seasons of closes", sheet: "the sheet's own edge at the price", rest: "measured on three seasons of lines: the strongest read on the board",
+  var NBA_DEC_STRENGTH = { rule: "measured on two seasons of closes", sheet: "the sheet's own edge at the price", rest: "66-33 on the three seasons it was found on and 419-436 on the seventeen before them: not proven, a small bet",
     number: "a point better than the market's number: a small edge, so a small bet", read: "no measured edge at the price: a small bet", winner: "the book's favourite at the book's price: a small bet or a parlay leg" };
   function nbaJson(v) { var d = null; try { d = v ? (typeof v === "string" ? JSON.parse(v) : v) : null; } catch (e) { d = null; } return d && typeof d === "object" ? d : null; }
   function nbaDecNum(v) { return v !== null && v !== undefined && v !== "" && isFinite(+v); }
@@ -1977,7 +2009,7 @@
   function nbaDecCallWords(c, row, m, V) {   // the first paragraph: the call itself, by its kind
     var pc = function (p) { return (100 * p).toFixed(1) + "%"; };
     if (c.kind === "rest") return "<b>" + esc(c.fav) + "</b> are " + pc(c.pfav) + " by the books and played last night; <b>" + esc(c.dog) + "</b> rested " + (c.dogRest === 1 ? "a day" : c.dogRest + " days") +
-      ". A favourite of 70% or more on the second night against a rested club went over the total 66-33 on three seasons of lines (32-16, 28-15 and 6-2), at home and on the road, where the same favourites rested went 360-367: the tired club still wins as priced, and the other scores more than the lines allow. So the over, at " + (c.app ? "the lowest total your four apps post" : "the carded total") + ".";
+      ". A favourite of 70% or more on the second night against a rested club went over the total 66-33 on the three seasons this was found on (32-16, 28-15 and 6-2), where the same favourites rested went 360-367. On the seventeen seasons before them the same spot, the tired favourite laying 5.5 or more, went 419-436, and 48-40 on the two nearest, so the long record does not back it: the over, as a small bet, at " + (c.app ? "the lowest total your four apps post" : "the carded total") + ".";
     if (c.kind === "number") {
       var s = (c.app ? esc(bookName(c.app)) + " posts " : "The app posts ") + c.line + " where the middle of " + c.books + " books is " + c.mid + ": " + (Math.abs(c.gap - 1) < 1e-9 ? "a point" : c.gap + " points") + " " + (c.side === "OVER" ? "under" : "over") +
         " it, on the " + c.side.toLowerCase() + "'s side. A total a point or more off the middle at one of your four apps won 105-84 (55.6%) on last season's closes. The point itself decides few games: the final landed within a point of the app's number on 10 of 280 such calls over two seasons, so this is a small edge and no read of the game.";
@@ -2006,10 +2038,15 @@
      odds, money, bets]}}). The decision's why says where the money sits and tonight's signals carry the widest gap. Shown, never
      scored: one book's customers, thin early in the day, and kept from this day to be measured (NBA.md, "Three in-play ideas
      and where the money goes") ---- */
+  /* 27 Nov 2026, OFF THE CARD (the user: "Im wondering if the where money is is working or worth it"). On the 48 games of 19 to 25
+     Nov that kept a count before the tip, the side with the larger bets went 30-35 (the spread 9-13, the moneyline 4-9, the total
+     17-13) and every named side 80-64 at DraftKings' own prices, nearly all of that favourites on the moneyline at minus prices.
+     Taken apart (lab money_deep.py): the spread side with most of the money where most of the BETS were on the other side, the
+     "sharp against public" read itself, went 3-10; the spread side with most of the bets 29-19. It is not working, there is no
+     history of the count to test it on, and the chip and the box were in the way of the decision. So the box, its chips and the
+     box of a game with no lines yet are gone; a count that is loaded is still kept on the row and still counted on the NBA
+     record, where it can turn if it is ever going to. */
   var NBA_SPLITS_GAP = 20;   // points of share, the money less the bets, at which a side is named
-  /* a game not yet played with no count says so, and how to get one (19 Nov 2026, the user, the evening the line shipped, having loaded
-     a slate of three days before: "I dont see the money section or sharp better") */
-  var NBA_SPLITS_NONE = "It comes with the odds run (the slate.py of 19 Nov 2026 or later), or at any time for nothing: run <b>python slate.py splits</b>, then Load slate and pick the <b>splits-DATE.json</b> it writes; that changes no line or price. DraftKings counts the day's games only, so a game already played cannot get one. Shown, not scored.";
   function nbaSplitsOf(raw) {
     var s = null; try { s = raw ? JSON.parse(raw) : null; } catch (e) { s = null; }
     if (!s || typeof s !== "object") return null;
@@ -2027,36 +2064,6 @@
     if (s.tot) { add("total", "OVER", "the over " + (+s.tot.o[0]), s.tot.o); add("total", "UNDER", "the under " + (+s.tot.u[0]), s.tot.u); }
     if (s.ml) { add("ml", "AWAY", away + " to win", s.ml.a); add("ml", "HOME", home + " to win", s.ml.h); }
     return out;
-  }
-  function nbaSplitsTop(s, away, home) {   // the sides with NBA_SPLITS_GAP more of the money than of the bets, the widest first
-    return nbaSplitsSides(s, away, home).filter(function (x) { return x.gap >= NBA_SPLITS_GAP; }).sort(function (a, b) { return b.gap - a.gap; });
-  }
-  /* the money's own block on the card (the same evening, the user with the Knicks game open: "I dont see it on the knicks game"; a
-     line in the why's list was one sentence among eight). A boxed section under the decision's why: a row a market, the side with
-     clearly more of the money than of the bets (ten points or more; where neither has, the side with most of the money), its share
-     of the bets, of the money and the gap, the sides twenty apart in bold; how the decision's own side stands; what it is worth so
-     far. A game not yet played with no count says so in the same box; a graded game with no count has none */
-  function nbaMoneyCap(s) { s = String(s).replace(/^the /, ""); return s.charAt(0).toUpperCase() + s.slice(1); }
-  function nbaMoneyPanel(inp, away, home, c, graded) {
-    var s = nbaSplitsOf((inp || {}).nbasplits);
-    if (!s) return graded ? "" : '<div class="dmoney none" id="secMoney"><div class="dmh"><b>Where the money is</b><span>no count on this game yet</span></div><div class="dmn">' + NBA_SPLITS_NONE + '</div></div>';
-    var sides = nbaSplitsSides(s, away, home), rows = "";
-    [["spread", "Spread"], ["total", "Total"], ["ml", "Moneyline"]].forEach(function (k) {
-      var two = sides.filter(function (x) { return x.key === k[0]; }); if (two.length !== 2) return;
-      var up = two[0].gap >= two[1].gap ? two[0] : two[1], big = two[0].money >= two[1].money ? two[0] : two[1];
-      var lead = up.gap >= NBA_SPLITS_GAP / 2 ? up : big, hot = lead.gap >= NBA_SPLITS_GAP;
-      rows += '<tr' + (hot ? ' class="hot"' : '') + '><td>' + k[1] + '</td><td class="s">' + esc(nbaMoneyCap(lead.label)) + '</td><td>' + lead.bets + '%</td><td>' + lead.money + '%</td><td>' + (lead.gap === 0 ? 'level' : sgn(lead.gap, 0)) + '</td></tr>';
-    });
-    var mine = c ? sides.filter(function (x) { return x.key === c.key && x.side === c.side; })[0] : null;
-    return '<div class="dmoney" id="secMoney"><div class="dmh"><b>Where the money is</b><span>DraftKings\' own count' + (s.upd ? ' at ' + esc(s.upd) : '') + (s.pre ? '' : ', taken after the tip') + ' · shown, not scored</span></div>' +
-      '<table><thead><tr><th>Market</th><th>Side</th><th>Bets</th><th>Money</th><th>Gap</th></tr></thead><tbody>' + rows + '</tbody></table>' +
-      (mine ? '<div class="dms">The decision\'s side (' + esc(mine.label) + ' at DraftKings) has ' + mine.money + '% of the money on ' + mine.bets + '% of the bets: <b>' +
-        (mine.gap >= NBA_SPLITS_GAP ? 'the larger bets are with it' : mine.gap <= -NBA_SPLITS_GAP ? 'the larger bets are on the other side' : 'no gap of ' + NBA_SPLITS_GAP + ' points either way') + '</b>.</div>' : '') +
-      '<div class="dmn">A side in bold has ' + NBA_SPLITS_GAP + ' points or more of the money than of the bets: the larger bets are on it. One book\'s customers, thin early in the day, and kept from 19 Nov to be measured. Backing the side a line had already moved to went 752-698 on spreads and 933-930 on totals at the closing number.</div></div>';
-  }
-  function nbaMoneyLoose() {   // a game in the form with a count and no lines yet: the count's own block, so it shows before the odds are loaded
-    var inp = snapshot(); if (!nbaSplitsOf(inp.nbasplits)) return "";
-    return nbaMoneyPanel(inp, (($("away") || {}).value || "").trim() || "Away", (($("home") || {}).value || "").trim() || "Home", null, false);
   }
   /* ---- the money's own record (23 Nov 2026, the user: "Is there a way to tell me how the Sharp better info we added is doing too").
      Every graded game whose row kept a count taken before the tip, graded at DraftKings' own number and price in that count: the
@@ -2101,17 +2108,17 @@
     var row = function (label, s, note) {
       return '<tr><td>' + label + '</td><td>' + (s.n || s.p ? s.w + '-' + s.l + (s.p ? '-' + s.p : '') : 'none yet') + '</td><td class="' + cls(s) + '">' + (s.n ? (100 * s.w / s.n).toFixed(1) + '%' : '') + '</td><td class="' + cls(s) + '">' + (s.n ? sgn(s.units, 1) + 'u' : '') + '</td><td class="dim">' + note + '</td></tr>';
     };
-    return '<div class="simrecview">Where the money is: the sharp-money read against the finals <span class="tag">DraftKings\' own count as each row kept it before the tip · ' + R.games + ' game' + (R.games === 1 ? '' : 's') + ' on ' + R.nights + ' night' + (R.nights === 1 ? '' : 's') +
+    return '<div class="simrecview">Where the money is: the sharp-money read against the finals <span class="tag">off the game\'s card from 27 Nov 2026: the side with the larger bets had lost more than it won · DraftKings\' own count as each row kept it before the tip · ' + R.games + ' game' + (R.games === 1 ? '' : 's') + ' on ' + R.nights + ' night' + (R.nights === 1 ? '' : 's') +
            ', ' + esc(R.first) + ' to ' + esc(R.last) + ' · graded at DraftKings\' own number and price in the count · shown, not scored</span></div>' +
       '<table class="form simrectab moneytab"><thead><tr><th>The read</th><th>Record</th><th>Does</th><th>Units</th><th></th></tr></thead><tbody>' +
-      row('<b>The side with the larger bets</b>', R.hot.all, NBA_SPLITS_GAP + ' points or more of the money than of the bets: the bold rows of the card\'s box') +
+      row('<b>The side with the larger bets</b>', R.hot.all, NBA_SPLITS_GAP + ' points or more of the money than of the bets') +
       row('&nbsp;&nbsp;on the spread', R.hot.spread, '') + row('&nbsp;&nbsp;on the total', R.hot.total, '') + row('&nbsp;&nbsp;on the moneyline', R.hot.ml, '') +
-      row('<b>Every market\'s named side</b>', R.lead.all, 'the side the box prints for each market: ten points or more of the money than of the bets, else the side with most of the money') +
+      row('<b>Every market\'s named side</b>', R.lead.all, 'for each market, the side with ten points or more of the money than of the bets, else the side with most of the money') +
       row('&nbsp;&nbsp;on the spread', R.lead.spread, '') + row('&nbsp;&nbsp;on the total', R.lead.total, '') + row('&nbsp;&nbsp;on the moneyline', R.lead.ml, '') +
       row('<b>The decision, the larger bets with it</b>', R.dec["with"], 'the game\'s decision as it was given, at its own price') +
       row('<b>The decision, the larger bets on the other side</b>', R.dec.against, '') +
       row('The decision, no gap of ' + NBA_SPLITS_GAP + ' either way', R.dec.none, '') +
-      '</tbody></table><div class="note dim">One book\'s customers, counted from 19 Nov 2026. A side that truly wins 55% needs about 400 games to show it, so this is a count and not yet a verdict; nothing here moves a pick. The test it comes from: backing the side a line had already moved to went 752-698 on spreads and 933-930 on totals at the closing number.</div>';
+      '</tbody></table><div class="note dim">One book\'s customers, counted from 19 Nov 2026 and kept counting on any game whose count is loaded (python slate.py splits, free). A side that truly wins 55% needs about 400 games to show it, so this is a count and not a verdict; nothing here moves a pick, and from 27 Nov nothing of it is on the card. The test it comes from: backing the side a line had already moved to went 752-698 on spreads and 933-930 on totals at the closing number.</div>';
   }
   function nbaDecWhy(c, row, m) {
     var inp = row.inputs || {}, pc = function (p) { return (100 * p).toFixed(1) + "%"; }, li = [], V = null, all = nbaCallsRecord();
@@ -2151,7 +2158,7 @@
       var ra = +inp.narest, rh = +inp.nhrest;
       rbits.push(ra === rh ? "Both clubs " + nbaDecRestWords(ra) + "." : esc(row.away) + " " + nbaDecRestWords(ra) + ", " + esc(row.home) + " " + nbaDecRestWords(rh) + ".");
       if (ra <= 0 && rh <= 0) rbits.push("Both on the second night reads level on three seasons of lines (the over 70-73).");
-      else if (ra <= 0 || rh <= 0) rbits.push("The books price rest on the side: a club on the second night won 408 of 875 where the moneylines priced 411" + (c.kind === "rest" ? "; the total is the part they miss, and it is this game's call." : "; the total moves only behind a favourite of 70% or more, which this is not."));
+      else if (ra <= 0 || rh <= 0) rbits.push("The books price rest on the side: a club on the second night won 408 of 875 where the moneylines priced 411" + (c.kind === "rest" ? "; on the three seasons to hand the total ran over behind a tired favourite of 70% or more, and that is this game's call, a small one." : "; the total has run over only behind a favourite of 70% or more, which this is not."));
     }
     if ((fa && (fa.road >= 2 || fa.three4)) || (fh && (fh.road >= 3 || fh.three4))) rbits.push("Rest days, time zones, a long trip and a third game in four nights each read nothing on the side or the total against two seasons of closing lines: the books price the schedule, so it is shown and not scored.");
     var mv = ctxOf("game", ["move"]); if (mv.length) rbits.push(mv.join(" "));
@@ -2196,7 +2203,7 @@
   function nbaDecisionBlock(pk, m, fin) {
     var row = nbaDecRow(m, fin), c = null;
     try { c = nbaCallOf(row); } catch (e) { c = null; }
-    if (!c) return pickBlock(pk, m, "NBA") + nbaMoneyPanel(row.inputs, row.away, row.home, null, hasFinals(row.finals));
+    if (!c) return pickBlock(pk, m, "NBA");
     var kd = NBA_CALL_KINDS.filter(function (q) { return q[0] === nbaCallBucket(c); })[0], rec = nbaCallsRecord()[kd[0]], given = nbaCallsRecord().given;
     var res = fin ? nbaCallRes(c, row) : null, V = null; try { V = nbaVoices(row); } catch (e) { V = null; }
     var o = nbaOddsBlock(row.inputs), where = c.app ? esc(bookName(c.app)) : (o && o.book && (c.kind === "read" || c.kind === "sheet" || c.kind === "rule") ? esc(bookName(o.book)) + ", the card's book" : "");
@@ -2209,7 +2216,6 @@
       '<div class="dplace">' + (big === sgn(c.price, 0) ? (where ? 'at ' + where + ' · ' : '') : sgn(c.price, 0) + (where ? ' at ' + where : '') + ' · ') + 'needs ' + (implied(c.price) * 100).toFixed(1) + '%</div>' +
       '<div class="dkind"><b>' + esc(kd[1].replace(/^[A-Z]+ · /, "")) + '</b> · ' + esc(nbaCallRecWords(rec)) + ' · ' + esc(NBA_DEC_STRENGTH[c.kind] || "") + '</div>' +
       '<div class="why"><b>Why</b>: ' + nbaDecCallWords(c, row, m, V) + '</div>' +
-      nbaMoneyPanel(row.inputs, row.away, row.home, c, hasFinals(row.finals)) +   // where the money is, in a box of its own (19 Nov 2026)
       (why.length ? '<ul class="dwhy">' + why.map(function (x) { return '<li><b>' + esc(x[0]) + '.</b> ' + x[1] + '</li>'; }).join("") + '</ul>' : '') +
       '<div class="also">The decision as given, one a game: ' + esc(nbaCallRecWords(given)) + '. Each kind keeps its own line in the NBA record. A measured kind that has lost here over ' + NBA_CALL_COLD + ' or more calls steps out of the order; the sheet\'s own read steps out only under four wins in ten over as many; the likelier winner always stands.</div></div>';
     var lb = likely && likely.key === c.key && likely.side === c.side ? "" : likelyBlock(likely, pk).replace("Likeliest at any price · not the pick", "Likeliest at any price · not the decision");

@@ -4257,6 +4257,34 @@ NBA_SIM_OUT_MPG = 0.0       # his minutes a game add nothing beyond his points (
 # the same to the third decimal at every size of slate (sim_avail2_mean.py), so the day's own mean stands
 NBA_SIM_OUT_OWN = 0.77      # of a club's charge against the slate's mean: off its own scoring, points per 100
 NBA_SIM_OUT_OPP = 0.13      # of the same: on the other side's scoring
+# The two files go together (27 Nov 2026). On 23 Nov the user copied the new slate.py into the folder and left the old nbasim.py
+# beside it: the rows of 23, 24 and 25 Nov carry engine 3's mean and charge with "v": 2, so the rest in them is engine 2's (1.7 off
+# the tired club, nothing on the other side) and the other side's 0.13 of the men out was never played. Nothing in the run said so.
+# Now the run says so where the profiles are built and again as its last word, and every game's notes carry the line onto the page
+NBA_SIM_NEEDS = 3           # the nbasim.py engine this slate.py is written for
+
+
+def nba_sim_engine_note(mod=None):
+    """None where the nbasim.py beside this file is the engine this slate.py is written for (or a later one); else the line the
+    run shouts and every game's notes carry. `mod` stands in for the module in the selftest."""
+    mod = nbasim if mod is None else mod
+    if mod is None:
+        return None
+    try:
+        v = int(getattr(mod, "VERSION", 0) or 0)
+    except (TypeError, ValueError):
+        v = 0
+    if v >= NBA_SIM_NEEDS:
+        return None
+    return ("OLD nbasim.py: the nbasim.py in this folder is engine %d and this slate.py is written for engine %d. The two files go together: "
+            "copy the nbasim.py that came with this slate.py over the old one and run the slate again (it is free). "
+            "Until then the simulation's rest is engine %d's and the other side's share of the men out is not played." % (v, NBA_SIM_NEEDS, v))
+
+
+def nba_sim_engine_shout(log, note):
+    """The engine's mismatch as a block in the run's window."""
+    for line in ("", "  " + "*" * 78, "  " + note, "  " + "*" * 78, ""):
+        log(line)
 NBA_TEND_FILE = "nba-tend.json"
 
 
@@ -4753,6 +4781,8 @@ def build_nba_game(g, date_iso, tables, league, players, prior_players, injuries
         notes.append("No crew on the league's feed for this game yet (posted about 9 am Eastern): type the names in the Crew box when they are up.")
     # the simulation (25 Oct 2026): both views on the row as histograms
     if sim and sim.get("prof"):
+        if sim.get("warn"):
+            notes.append(sim["warn"])
         try:
             g2 = dict(g)
             g2["date"] = date_iso
@@ -4846,6 +4876,10 @@ def make_nba_slate(date_iso, out_dir, log, topup=False, sim_runs=NBA_SIM_RUNS):
             sim = {"prof": prof, "runs": sim_runs}
             log("Simulation: %d clubs profiled (%s), %s runs a game, %s." % (len(prof["teams"]), "this season blended with last" if prior else "this season only",
                                                                            "{:,}".format(sim_runs), ("the play-by-play's shot mix and rotations from %s" % NBA_TEND_FILE) if tend else "the league's shot mix (no %s in the folder)" % NBA_TEND_FILE))
+            warn = nba_sim_engine_note()
+            if warn:   # an older nbasim.py beside this slate.py (27 Nov 2026)
+                sim["warn"] = warn
+                nba_sim_engine_shout(log, warn)
         except Exception as e:  # noqa: BLE001
             log("Simulation: could not build the profiles (%s); the rows carry no sim." % e)
     elif sim_runs and not nbasim:
@@ -4882,7 +4916,153 @@ def make_nba_slate(date_iso, out_dir, log, topup=False, sim_runs=NBA_SIM_RUNS):
         json.dump(doc, f, indent=1)
     if not prior and LEDGER_FIND["on"]:
         ledger_shout(log, out_dir, nba_prev_season(season), "The who-is-out list and the simulation's club profiles in this slate rest on this season alone.")
+    if sim and sim.get("warn"):
+        nba_sim_engine_shout(log, sim["warn"])
     log("Wrote %s with %d game%s. Open The Super Model -> Saving -> Load slate; then run the odds for the lines." % (path, len(rows), "" if len(rows) == 1 else "s"))
+    return path
+
+
+# ---- the early total (27 Nov 2026) ------------------------------------------------
+# The user: "we could really be finding gaps or patterns to have this super model a lot more pinpoint. If something needs to go
+# then lets remove it or lets enhance or optimize." Three seasons were swept for anything that beats the LATE number (lab
+# sweep_*.py, 274 looks at 2,479 games) and nothing held; the two spots that looked best were then run on seasons they were not
+# found on (16 from sportsbookreviewsonline.com's archive, two more from covers.com) and went level: the under after an overtime
+# game 1,037-990, the over behind a tired favourite 419-436. What did hold is WHEN the bet is made. The engine's plain total
+# (the two clubs' ratings into each other at the game's pace, rest in it, nobody out) against the number a day ahead of the tip,
+# 1,880 games on three seasons: the line then moved the centre's way by 0.21 of the gap between them (the error 0.015); where
+# they stood 8 or more apart it moved the centre's way 68 times to 18, by 2.8 points on average, and the centre's side at the
+# early number won 54-38 (22-17, 24-16, 8-5 by season), which is what 2.8 points of a total are worth. By the morning of the game
+# nothing is left: of 2024-25's gap at eleven in the morning the late number kept +0.007, and of this season's gap at the user's
+# own slate run +0.019. On the sixteen archived seasons a cruder centre shows the same thing arriving: the opener kept nothing of
+# the gap to 2014-15 and more every season since (0.03, 0.04, 0.05, 0.06, 0.08, 0.08, 0.10, 0.21 in 2022-23). The books post
+# tomorrow's numbers earlier and softer than they used to, and they are right by the morning.
+# So an evening run for TOMORROW's games. It reads the day's scoreboard for the number its book shows then, knows which clubs
+# play TONIGHT (their game is not in the ledger yet, and they are on the second night tomorrow), and writes the plain centre,
+# the number, the gap and the call (NBA_EARLY_GAP apart) for the page, which keeps the call at the number it was made at and
+# measures it against the later numbers and the final.
+NBA_EARLY_GAP = 8.0         # points between the plain centre and the evening's number at which the centre's side is a call
+NBA_EARLY_OT = 1.0          # overtime's mean share of a game's points on top of the regulation centre, as the sweep measured it
+NBA_EARLY_FORMAT = "callsheet2.early"
+
+
+def nba_early_centre(setup):
+    """The engine's plain total for a game's setup: nobody out, the league's whistle, rest as engine 3 prices it, and overtime's
+    mean on top. The same number the sweep measured (lab sim_avail2.py's rat0_t with rest, and sweep_early.py's centre)."""
+    lg = setup["league"]
+    a, h = dict(setup["away"], out_adj=0.0, out_dadj=0.0), dict(setup["home"], out_adj=0.0, out_dadj=0.0)
+    return nbasim._pace_game(a, h, lg) * (nbasim._target(a, h, lg, False) + nbasim._target(h, a, lg, True)) + NBA_EARLY_OT
+
+
+def nba_early_rest(prof, tonight, on_iso):
+    """The profiles with tonight's games counted: a club that plays on `on_iso`, the day before the early run's games, has not got
+    that game in the ledger yet and would read as rested. Returns a copy of `prof` and the clubs it added a game for."""
+    last, recent, added = dict(prof.get("last") or {}), dict((k, list(v)) for k, v in (prof.get("recent") or {}).items()), []
+    for g in tonight or []:
+        for ab in (g.get("away"), g.get("home")):
+            if not ab or ab in added or (last.get(ab) or "") >= on_iso:
+                continue
+            last[ab] = on_iso
+            recent.setdefault(ab, []).append(on_iso)
+            added.append(ab)
+    out = dict(prof)
+    out["last"], out["recent"] = last, recent
+    return out, added
+
+
+def nba_early_to(centre, side):
+    """The last half-point number at which the call still stands: an over up to it, an under down to it."""
+    return math.floor((centre - NBA_EARLY_GAP) * 2.0 + 1e-9) / 2.0 if side == "OVER" else math.ceil((centre + NBA_EARLY_GAP) * 2.0 - 1e-9) / 2.0
+
+
+def nba_early_entry(g, setup, date_iso, at):
+    """One game of the early file: the plain centre, the number the scoreboard's book shows, the gap, and the call."""
+    o = g.get("odds") or {}
+    e = {"sport": "NBA", "gdate": date_iso, "away": g.get("an") or NBA_NICK.get(g["away"], g["away"]), "home": g.get("hn") or NBA_NICK.get(g["home"], g["home"]), "gameId": g.get("id"),
+         "tip": g.get("t") or "", "at": at, "book": o.get("book") or "", "line": o.get("total"), "opened": o.get("o_total"), "centre": None, "gap": None, "side": "", "call": False, "to": None,
+         "b2b": [False, False], "n": [0, 0]}
+    if not setup:
+        e["why"] = "a club has no profile in the ledgers yet"
+        return e
+    c = nba_early_centre(setup)
+    e["centre"], e["b2b"], e["n"] = round(c, 1), [bool(setup["away"].get("b2b")), bool(setup["home"].get("b2b"))], [int(setup["away"].get("n") or 0), int(setup["home"].get("n") or 0)]
+    if e["line"] is None:
+        e["why"] = "no number on the scoreboard yet"
+        return e
+    gap = c - float(e["line"])
+    e["gap"], e["side"] = round(gap, 1), ("OVER" if gap > 0 else "UNDER")
+    e["call"] = abs(gap) >= NBA_EARLY_GAP - 1e-9
+    e["to"] = nba_early_to(c, e["side"])
+    return e
+
+
+def make_nba_early(date_iso, out_dir, log, topup=False, day_games=None):
+    """The evening run for the games of `date_iso` (tomorrow, by default): nba-early-DATE.json. `day_games` stands in for the
+    scoreboard in the selftest."""
+    day_games = day_games or nba_day_games
+    prev_iso = (dt.date.fromisoformat(date_iso) - dt.timedelta(days=1)).isoformat()
+    path = os.path.join(out_dir, "nba-early-%s.json" % date_iso)
+    doc = {"format": NBA_EARLY_FORMAT, "version": 1, "date": date_iso, "generated": now_utc(), "gap": NBA_EARLY_GAP, "engine": getattr(nbasim, "VERSION", None),
+           "source": "slate.py nba-early: the engine's plain total against the number the scoreboard's book shows the evening before", "games": []}
+    if topup:
+        nba_ledger_topup(prev_iso, out_dir, log)
+    games = [g for g in day_games(date_iso) if not g.get("final") and g.get("type") != 1]
+    log("The early total for %s: %d game%s on the feed." % (date_iso, len(games), "" if len(games) == 1 else "s"))
+    season = nba_season_id(date_iso)
+    led = nba_ledger_for(out_dir, season, log)
+    prior = nba_ledger_for(out_dir, nba_prev_season(season), log)
+    prof = None
+    if not nbasim:
+        log("nbasim.py is not beside slate.py: the early total is the simulation's own centre, so there is nothing to write.")
+    elif not (led or prior):
+        log("No ledger in %s: run 'python slate.py nba-ledger' (Run NBA ledger.bat) first." % out_dir)
+    else:
+        try:
+            prof = nbasim.profiles_from_ledger(led["games"] if led else [], date_iso, prior_games=prior["games"] if prior else None, tend=nba_load_tend(out_dir))
+        except Exception as e:  # noqa: BLE001
+            log("Could not build the clubs' profiles (%s)." % e)
+    warn = nba_sim_engine_note()
+    if warn:
+        nba_sim_engine_shout(log, warn)
+    if prof and games:
+        tonight = []
+        try:
+            tonight = [g for g in day_games(prev_iso) if g.get("type") != 1]
+        except Exception as e:  # noqa: BLE001
+            log("Could not read tonight's scoreboard (%s): a club that plays tonight will read as rested." % e)
+        prof, added = nba_early_rest(prof, tonight, prev_iso)
+        if added:
+            log("Playing tonight (%s), so on the second night tomorrow: %s." % (prev_iso, ", ".join(sorted(NBA_NICK.get(ab, ab) for ab in added))))
+        for g in games:
+            doc["games"].append(nba_early_entry(g, nbasim.setup_from_profiles(prof, g["away"], g["home"], date_iso), date_iso, doc["generated"]))
+    rows = doc["games"]
+    for e in rows:
+        if e["centre"] is None:
+            log("  %s @ %s: %s." % (e["away"], e["home"], e.get("why") or "no centre"))
+        elif e["line"] is None:
+            log("  %s @ %s: the plain centre %s; %s." % (e["away"], e["home"], fmt(e["centre"], 1), e.get("why")))
+        else:
+            log("  %s @ %s: the plain centre %s against %s %s%s, %s %s%s" % (
+                e["away"], e["home"], fmt(e["centre"], 1), (e["book"] + ("'" if e["book"].endswith("s") else "'s")) if e["book"] else "the book's", fmt(e["line"], 1), (" (opened %s)" % fmt(e["opened"], 1)) if e.get("opened") is not None and e["opened"] != e["line"] else "",
+                fmt(abs(e["gap"]), 1), "over it" if e["gap"] > 0 else "under it", "  <== THE %s" % e["side"] if e["call"] else ""))
+    calls, waiting = [e for e in rows if e["call"]], [e for e in rows if e["centre"] is not None and e["line"] is None]
+    out = ["", "  " + "*" * 78]
+    if calls:
+        out.append("  THE EARLY TOTAL for %s: %d call%s. Bet tonight, at the number or better; by the morning it is gone." % (date_iso, len(calls), "" if len(calls) == 1 else "s"))
+        for e in sorted(calls, key=lambda x: -abs(x["gap"])):
+            out.append("    %s @ %s: Total %s %s (%s). Good %s %s." % (e["away"], e["home"], e["side"], fmt(e["line"], 1), e["book"] or "the book", "up to" if e["side"] == "OVER" else "down to", fmt(e["to"], 1)))
+    else:
+        near = sorted([e for e in rows if e["gap"] is not None], key=lambda x: -abs(x["gap"]))
+        out.append("  THE EARLY TOTAL for %s: no call. %s" % (date_iso, ("No game stands %g or more from its number; the widest is %s @ %s at %s." % (NBA_EARLY_GAP, near[0]["away"], near[0]["home"], fmt(abs(near[0]["gap"]), 1))) if near else "No game has a number to read yet."))
+    if waiting:
+        out.append("  %d game%s no number on the scoreboard yet (%s): run this again later tonight." % (len(waiting), " has" if len(waiting) == 1 else "s have", ", ".join("%s @ %s" % (e["away"], e["home"]) for e in waiting)))
+    out += ["  " + "*" * 78, ""]
+    for line in out:
+        log(line)
+    with open(path, "w", encoding="utf-8") as f:
+        json.dump(doc, f, indent=1)
+    if warn:
+        nba_sim_engine_shout(log, warn)
+    log("Wrote %s with %d game%s. Open The Super Model -> Saving -> Load slate and pick it: the page keeps each call at tonight's number." % (path, len(rows), "" if len(rows) == 1 else "s"))
     return path
 
 
@@ -10537,6 +10717,20 @@ def selftest():
             gr8 = json.load(f)
         lines9 = []
         bare = build_nba_game(day[1], "2026-10-21", {}, None, {}, {}, {}, lines9.append, have_ledger=False)
+        # an old nbasim.py beside a new slate.py (27 Nov 2026): the same run with the engine's number wound back, in a folder of its own
+        old27 = tempfile.mkdtemp()
+        for name27 in os.listdir(tmp7):
+            if name27.endswith(".json") and not name27.startswith("nba-slate-"):
+                shutil.copyfile(os.path.join(tmp7, name27), os.path.join(old27, name27))
+        lines27, sl27 = [], None
+        if nbasim:
+            v27 = nbasim.VERSION
+            nbasim.VERSION = 2
+            try:
+                with open(make_nba_slate("2026-10-21", old27, lines27.append, sim_runs=300), "r", encoding="utf-8") as f:
+                    sl27 = json.load(f)
+            finally:
+                nbasim.VERSION = v27
         # a ledger left in another folder (12 Nov 2026): the same slate run from a new folder beside the old one, which holds both ledgers
         base12 = tempfile.mkdtemp()
         old12, new12, bare12 = os.path.join(base12, "The Super Model v139"), os.path.join(base12, "The Super Model v158"), os.path.join(tempfile.mkdtemp(), "nothing near")
@@ -10769,7 +10963,96 @@ def selftest():
           nba_sim_out_charge(o3a) == 1.875 and nba_sim_out_charge(o3b) == 0.75 and nba_sim_out_charge([]) == 0.0 and nba_sim_out_charge(None) == 0.0 and m3 == (1.875 + 0.75) / 4.0 and nba_sim_out_mean([]) is None
           and nba_sim_out_adj(o3a, m3) == (-0.77 * (1.875 - m3), -0.13 * (1.875 - m3)) and nba_sim_out_adj([], m3) == (0.77 * m3, 0.13 * m3) and nba_sim_out_adj(o3a, 0.0) == (-0.77 * 1.875, -0.13 * 1.875)
           and nba_sim_out_adj(o3a) == (-1.875, 0.0) and (NBA_SIM_OUT_OWN, NBA_SIM_OUT_OPP) == (0.77, 0.13))
+    # the early total (27 Nov 2026): tomorrow's games off a scoreboard the test hands in, the clubs that play tonight on the second night
     if nbasim:
+        def _g27(gid, away, home, odds=None, final=False, typ=2):
+            return {"id": gid, "date": "2026-10-22", "t": "2026-10-23T00:00Z", "type": typ, "final": final, "state": "Scheduled", "away": away, "home": home, "an": NBA_NICK.get(away, away), "hn": NBA_NICK.get(home, home), "odds": odds}
+        prof27 = nbasim.profiles_from_ledger(led_now, "2026-10-22", prior_games=led_prior, tend=None)
+        s27 = nbasim.setup_from_profiles(prof27, "BOS", "NYK", "2026-10-22")
+        c27 = nba_early_centre(s27)
+        lg27, pace27 = s27["league"], nbasim._pace_game(s27["away"], s27["home"], s27["league"])
+        ra27 = nba_early_rest(prof27, [{"away": "BOS", "home": "MIA"}, {"away": "BOS", "home": "MIA"}, {"away": None, "home": "ZZZ"}], "2026-10-21")
+        sb27 = nbasim.setup_from_profiles(ra27[0], "BOS", "NYK", "2026-10-22")
+        cb27 = nba_early_centre(sb27)
+        check("nba early: the plain centre is the two clubs' ratings into each other at the game's pace with nobody out and the league's whistle, overtime's point on top, whatever the men out and the crew are; "
+              "a club that plays tonight is counted as playing (once), is on the second night tomorrow, and the centre moves by engine 3's rest for it; the profiles handed in are left as they were",
+              abs(c27 - (pace27 * (nbasim._target(dict(s27["away"], out_adj=0.0, out_dadj=0.0), dict(s27["home"], out_adj=0.0, out_dadj=0.0), lg27, False)
+                                   + nbasim._target(dict(s27["home"], out_adj=0.0, out_dadj=0.0), dict(s27["away"], out_adj=0.0, out_dadj=0.0), lg27, True)) + 1.0)) < 1e-9
+              and abs(nba_early_centre(dict(s27, away=dict(s27["away"], out_adj=-3.0, out_dadj=1.0), ft_factor=1.15)) - c27) < 1e-9 and 150.0 < c27 < 290.0 and NBA_EARLY_OT == 1.0 and NBA_EARLY_GAP == 8.0
+              and sorted(ra27[1]) == ["BOS", "MIA", "ZZZ"] and ra27[0]["last"]["BOS"] == "2026-10-21" and ra27[0]["recent"]["BOS"].count("2026-10-21") == 1 and prof27["last"].get("BOS") != "2026-10-21"
+              and "2026-10-21" not in (prof27.get("recent") or {}).get("BOS", []) and sb27["away"]["b2b"] is True and sb27["home"]["b2b"] is False and s27["away"]["b2b"] is False
+              and sb27["away"]["r3in4"] is True and s27["away"]["r3in4"] is False   # Boston's games of the 20th and of tonight are two in the three days before
+              and abs((cb27 - c27) - pace27 * (lg27["rest_b2b"] + lg27["rest_b2b_opp"] + lg27["rest_3in4"] + lg27["rest_3in4_opp"]) / 100.0) < 1e-9
+              and nba_early_rest(prof27, [{"away": "BOS", "home": "MIA"}], "2026-10-18")[1] == ["MIA"])   # a club whose last game in the ledger is later than that night is left alone
+        check("nba early: the last number a call stands at is the half point eight from the centre, an over up to it and an under down to it",
+              nba_early_to(228.4, "OVER") == 220.0 and nba_early_to(228.5, "OVER") == 220.5 and nba_early_to(228.0, "OVER") == 220.0 and nba_early_to(219.8, "UNDER") == 228.0 and nba_early_to(219.5, "UNDER") == 227.5
+              and nba_early_to(220.0, "UNDER") == 228.0)
+        dk27 = lambda tot, op=None: {"book": "Draft Kings", "total": tot, "o_total": op}
+        line9 = math.floor((cb27 - 9.0) * 2.0) / 2.0          # a number nine or so under the centre of a game with Boston on the second night: the over
+        lal27 = nba_early_centre(nbasim.setup_from_profiles(ra27[0], "POR", "LAL", "2026-10-22"))
+        lineU = math.ceil((lal27 + 8.0) * 2.0) / 2.0          # the first half point eight or more over the other game's centre: the under, just
+        lineM = math.floor((nba_early_centre(nbasim.setup_from_profiles(ra27[0], "MIA", "CHI", "2026-10-22")) + 3.0) * 2.0) / 2.0   # about three over a third game's centre: no call
+        day27 = {"2026-10-22": [_g27("1", "BOS", "NYK", dk27(line9, line9 + 2.0)), _g27("2", "POR", "LAL", dk27(lineU)), _g27("3", "MIA", "CHI", dk27(lineM)), _g27("4", "DEN", "UTA", None),
+                                _g27("5", "SAS", "GSW", dk27(230.0), final=True), _g27("6", "DAL", "PHX", dk27(230.0), typ=1), _g27("7", "ZZZ", "BOS", dk27(230.0))],
+                 "2026-10-21": [_g27("8", "BOS", "MIA"), _g27("9", "ORL", "ATL", typ=1)]}
+        tmp27e, lines27e = tempfile.mkdtemp(), []
+        for season, games in (("2026-27", led_now), ("2025-26", led_prior)):
+            with open(nba_ledger_path(tmp27e, season), "w", encoding="utf-8") as f:
+                json.dump({"format": NBA_LEDGER_FORMAT, "season": season, "through": games[-1]["date"], "games": games}, f)
+        p27e = make_nba_early("2026-10-22", tmp27e, lines27e.append, day_games=lambda d: day27.get(d, []))
+        with open(p27e, "r", encoding="utf-8") as f:
+            e27 = json.load(f)
+        by27 = dict(((g["away"], g["home"]), g) for g in e27["games"])
+        b27, l27, m27, d27, z27 = by27.get(("Celtics", "Knicks")) or {}, by27.get(("Trail Blazers", "Lakers")) or {}, by27.get(("Heat", "Bulls")) or {}, by27.get(("Nuggets", "Jazz")) or {}, by27.get(("ZZZ", "Celtics")) or {}
+        check("nba early: the evening run writes nba-early-DATE.json for the page: tomorrow's games that are not final and not preseason, each with the plain centre, the scoreboard book's number and opener, the gap, "
+              "the side and whether it is a call (eight or more apart), and the last number the call stands at; Boston and Miami play tonight and are on the second night; a game with no number yet says so, a club with no profile says so",
+              os.path.basename(p27e) == "nba-early-2026-10-22.json" and e27["format"] == "callsheet2.early" and e27["version"] == 1 and e27["date"] == "2026-10-22" and e27["gap"] == 8.0 and e27["engine"] == 3
+              and len(e27["games"]) == 5 and b27.get("centre") == round(cb27, 1) and b27.get("line") == line9 and b27.get("opened") == line9 + 2.0 and b27.get("book") == "Draft Kings" and b27.get("side") == "OVER" and b27.get("call") is True
+              and b27.get("gap") == round(cb27 - line9, 1) and b27.get("to") == nba_early_to(cb27, "OVER") and b27.get("b2b") == [True, False] and b27.get("gameId") == "1" and b27.get("gdate") == "2026-10-22" and b27.get("at") == e27["generated"]
+              and l27.get("side") == "UNDER" and l27.get("call") is True and l27.get("line") == lineU and l27.get("to") == lineU and l27.get("b2b") == [False, False]
+              and m27.get("side") == "UNDER" and m27.get("call") is False and m27.get("b2b") == [True, False] and -3.05 <= m27.get("gap") <= -2.45 and m27.get("line") == lineM
+              and d27.get("line") is None and d27.get("call") is False and d27.get("side") == "" and d27.get("why") == "no number on the scoreboard yet" and d27.get("centre") is not None
+              and z27.get("centre") is None and z27.get("call") is False and z27.get("why") == "a club has no profile in the ledgers yet")
+        stars27e = "  " + "*" * 78
+        k27 = [i for i, l in enumerate(lines27e) if l == stars27e]
+        check("nba early: the run's window names each game's centre and number, says who plays tonight, and ends on a starred block with the calls, the widest first, each with the number it is good to, and the games still to be posted",
+              len(k27) == 2 and lines27e[k27[0] + 1] == "  THE EARLY TOTAL for 2026-10-22: 2 calls. Bet tonight, at the number or better; by the morning it is gone."
+              and lines27e[k27[0] + 2] == "    Celtics @ Knicks: Total OVER %s (Draft Kings). Good up to %s." % (fmt(line9, 1), fmt(nba_early_to(cb27, "OVER"), 1))
+              and lines27e[k27[0] + 3] == "    Trail Blazers @ Lakers: Total UNDER %s (Draft Kings). Good down to %s." % (fmt(lineU, 1), fmt(lineU, 1))
+              and lines27e[k27[0] + 4] == "  1 game has no number on the scoreboard yet (Nuggets @ Jazz): run this again later tonight." and k27[1] == k27[0] + 5
+              and "Playing tonight (2026-10-21), so on the second night tomorrow: Celtics, Heat." in lines27e
+              and any(l.startswith("  Celtics @ Knicks: the plain centre %s against Draft Kings' %s (opened %s), " % (fmt(cb27, 1), fmt(line9, 1), fmt(line9 + 2.0, 1))) and l.endswith("over it  <== THE OVER") for l in lines27e)
+              and any(l == "  ZZZ @ Celtics: a club has no profile in the ledgers yet." for l in lines27e) and lines27e[-1].startswith("Wrote ") and "nba-early-2026-10-22.json with 5 games" in lines27e[-1]
+              and not any("OLD nbasim.py" in l for l in lines27e))
+        lines27n = []
+        p27n = make_nba_early("2026-10-22", tmp27e, lines27n.append, day_games=lambda d: {"2026-10-22": [_g27("3", "MIA", "CHI", dk27(lineM)), _g27("4", "DEN", "UTA", None)]}.get(d, []))
+        with open(p27n, "r", encoding="utf-8") as f:
+            n27e = json.load(f)
+        check("nba early: a night with no game eight apart says no call and names the widest; a folder with no ledger writes an empty file and says to run the ledger; the default date of the mode is tomorrow",
+              [g["call"] for g in n27e["games"]] == [False, False] and any(l.startswith("  THE EARLY TOTAL for 2026-10-22: no call. No game stands 8 or more from its number; the widest is Heat @ Bulls at ") for l in lines27n)
+              and (lambda L: (make_nba_early("2026-10-22", tempfile.mkdtemp(), L.append, day_games=lambda d: day27.get(d, [])), any(l.startswith("No ledger in ") for l in L), any("THE EARLY TOTAL for 2026-10-22: no call. No game has a number to read yet." in l for l in L))[1:])([]) == (True, True)
+              and default_date("nba-early", dt.date(2026, 11, 27)) == "2026-11-28" and default_date("nba", dt.date(2026, 11, 27)) == "2026-11-27" and default_date("nba-grade", dt.date(2026, 11, 27)) == "2026-11-26")
+    class _Eng27(object):
+        def __init__(self, v):
+            if v is not None:
+                self.VERSION = v
+    n27 = nba_sim_engine_note(_Eng27(2))
+    check("nba sim, the two files go together (27 Nov 2026): this slate.py is written for engine 3; an nbasim.py of engine 2 beside it gets a line that names both engines and says to copy the new file over and run again, "
+          "one with no version reads as engine 0, engine 3 and a later one get none, and no module at all gets none (the run says the file is missing in its own words)",
+          NBA_SIM_NEEDS == 3 and n27 is not None and n27.startswith("OLD nbasim.py: the nbasim.py in this folder is engine 2 and this slate.py is written for engine 3.") and "copy the nbasim.py that came with this slate.py over the old one" in n27
+          and "run the slate again (it is free)" in n27 and "engine 2's" in n27 and (nba_sim_engine_note(_Eng27(None)) or "").startswith("OLD nbasim.py: the nbasim.py in this folder is engine 0")
+          and (nba_sim_engine_note(_Eng27("x")) or "").startswith("OLD nbasim.py: the nbasim.py in this folder is engine 0") and nba_sim_engine_note(_Eng27(3)) is None and nba_sim_engine_note(_Eng27(4)) is None
+          and (nba_sim_engine_note() is None) == (nbasim is None or nbasim.VERSION >= NBA_SIM_NEEDS))
+    if nbasim:
+        stars27 = "  " + "*" * 78
+        at27 = [i for i, l in enumerate(lines27) if l == "  " + n27]
+        sim27 = [g for g in (sl27 or {}).get("games", []) if (g.get("inputs") or {}).get("nbasim")]
+        check("nba sim, the two files go together: a slate run with an engine 2 nbasim.py beside it shouts the line in a starred block where the profiles are built and again as the last word before the file is named, "
+              "every game with a simulation carries the line in its notes and its block says engine 2, and the run with the right engine says nothing of it",
+              len(at27) == 2 and all(lines27[i - 1] == stars27 and lines27[i + 1] == stars27 for i in at27) and lines27[-1].startswith("Wrote ") and at27[1] == len(lines27) - 4
+              and at27[0] < min(i for i, l in enumerate(lines27) if " @ " in l) and len(sim27) >= 1 and all(n27 in g["notes"] for g in sim27) and all(json.loads(g["inputs"]["nbasim"])["v"] == 2 for g in sim27)
+              and all(n27 not in g["notes"] for g in sl27["games"] if not (g.get("inputs") or {}).get("nbasim"))
+              and not any("OLD nbasim.py" in l for l in lines7) and not any("OLD nbasim.py" in n for g in sl7["games"] for n in g["notes"]) and nbasim.VERSION == 3)
         d3 = nbasim.demo_setup()
         lg3 = d3["league"]
         a3_ = dict(d3["away"], b2b=False, r3in4=False, out_adj=0.0, out_dadj=0.0)
@@ -11579,15 +11862,18 @@ TODAY_MODES = ("slate", "nhl", "nhl-ledger", "nba", "nba-ledger", "nba-props", "
 
 
 def default_date(mode, today):
+    if mode == "nba-early":     # the evening run reads tomorrow's games (27 Nov 2026)
+        return (today + dt.timedelta(days=1)).isoformat()
     return (today if mode in TODAY_MODES else today - dt.timedelta(days=1)).isoformat()
 
 
 def main(argv=None):
     ap = argparse.ArgumentParser(description="Write the day's slate (or yesterday's finals) for Call Sheet 2.0.")
-    ap.add_argument("mode", nargs="?", choices=["slate", "grade", "nhl", "nhl-grade", "nhl-ledger", "nhl-pbp", "nhl-shots", "nba", "nba-grade", "nba-ledger", "nba-pbp", "nba-props", "nba-gap-retest", "odds", "odds-history", "odds-periods", "splits"], default="slate",
+    ap.add_argument("mode", nargs="?", choices=["slate", "grade", "nhl", "nhl-grade", "nhl-ledger", "nhl-pbp", "nhl-shots", "nba", "nba-early", "nba-grade", "nba-ledger", "nba-pbp", "nba-props", "nba-gap-retest", "odds", "odds-history", "odds-periods", "splits"], default="slate",
                     help="slate (default): today's MLB inputs. grade: MLB finals. nhl: today's NHL inputs. nhl-grade: NHL finals. "
                          "nhl-ledger: every NHL final this season, measured against the sheet's assumptions. "
                          "nba: today's NBA inputs (ratings, pace, rest, who is out, the context lines). nba-grade: NBA finals with the half-time score. "
+                         "nba-early: TOMORROW's totals, run in the evening: the simulation's plain total against the number the scoreboard's book shows tonight (free). "
                          "nba-ledger: every NBA final of a season with quarters, pace and every player's minutes (--season 2024-25 for a past season). "
                          "nba-gap-retest: the team-total gap rule held against three numbers, from the ledger, the period lines and the lines history in the folder (no credit spent). "
                          "odds: today's lines, prices, openers, the sharp line, the alternates and every book's price from The Odds API (needs odds_key.txt). "
@@ -11653,6 +11939,8 @@ def main(argv=None):
             path = make_nhl_shots(date_iso, a.out, log, a.season, force=True)
         elif a.mode == "nba":
             path = make_nba_slate(date_iso, a.out, log, topup=not a.no_ledger, sim_runs=max(0, a.runs))
+        elif a.mode == "nba-early":
+            path = make_nba_early(date_iso, a.out, log, topup=not a.no_ledger)
         elif a.mode == "nba-grade":
             path = make_nba_grade(date_iso, a.out, log)
         elif a.mode == "nba-props":
